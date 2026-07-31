@@ -279,7 +279,7 @@ EOF
 
   [ "${status}" -eq 0 ]
   grep -q 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${WGET_LOG}"
-  run ! grep -q 'patch application shopping-cart-order' "${KUBECTL_LOG}"
+  run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-order' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE: shopping-cart-order|' "${NOTIFY_LOG}"
 }
 
@@ -309,8 +309,8 @@ EOF
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"PROMOTION shopping-cart-basket: from ghcr.io/wilddog64/shopping-cart-basket:sha-old to ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeef"* ]]
-  grep -q 'patch application shopping-cart-basket' "${KUBECTL_LOG}"
-  grep -q 'annotate application shopping-cart-basket argocd.argoproj.io/refresh=hard --overwrite' "${KUBECTL_LOG}"
+  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+  grep -q 'annotate application ubuntu-hostinger-shopping-cart-basket argocd.argoproj.io/refresh=hard --overwrite' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE Promotion: shopping-cart-basket|' "${NOTIFY_LOG}"
 }
 
@@ -340,7 +340,7 @@ EOF
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"PROMOTION shopping-cart-basket: from ghcr.io/wilddog64/shopping-cart-basket:sha-old to ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeef"* ]]
-  grep -q 'patch application shopping-cart-basket' "${KUBECTL_LOG}"
+  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
 }
 
 @test "digest resolution reads busybox-style indented lowercase headers" {
@@ -431,7 +431,7 @@ EOF
   [[ "${output}" == *"failed to resolve immutable sha-* candidate for ghcr.io/wilddog64/shopping-cart-payment — promotion skipped"* ]]
   grep -q 'warning|App CVE Candidate Missing: shopping-cart-payment|' "${NOTIFY_LOG}"
   run ! grep -q 'actions/workflows' "${WGET_LOG}"
-  run ! grep -q 'patch application shopping-cart-payment' "${KUBECTL_LOG}"
+  run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-payment' "${KUBECTL_LOG}"
 }
 
 @test "rebuild path without GH token returns non-zero" {
@@ -459,7 +459,7 @@ EOF
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 1 ]
-  run ! grep -q 'patch application shopping-cart-order' "${KUBECTL_LOG}"
+  run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-order' "${KUBECTL_LOG}"
 }
 
 @test "missing immutable sha candidate notifies without retrying the batch" {
@@ -540,5 +540,5 @@ EOF
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"failed to resolve immutable sha-* candidate"* ]]
   grep -q 'warning|App CVE Candidate Missing: shopping-cart-product-catalog|' "${NOTIFY_LOG}"
-  run ! grep -q 'patch application shopping-cart-product-catalog' "${KUBECTL_LOG}"
+  run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-product-catalog' "${KUBECTL_LOG}"
 }
