@@ -138,6 +138,17 @@ outside the cluster-secret/ApplicationSet self-management path.
 Deploy with `make platform-ops`, then manually create one scan Job only if the operator
 authorizes a runtime test that can patch remote chart-version labels.
 
+## Deployment verification (2026-07-30)
+
+The operator ran `make platform-ops`. The live `argocd-cve-scan-script` ConfigMap now
+contains `_hub_chart_version`, queries `get deployment argocd-server`, and sets
+`CURRENT_CHART=$(_hub_chart_version "${HUB_KUBECTL}")`. The deployed scanner Role includes
+`apiGroups: ["apps"]`, `resources: ["deployments"]`, `verbs: ["get"]`; an authorization check
+for `system:serviceaccount:platform-ops:argocd-cve-scanner` returned `yes`.
+
+No scan Job was started because a scan that finds a newer chart can patch remote
+chart-version labels. Runtime confirmation remains the next authorized/manual scan.
+
 ---
 
 ## Separate finding — the hub's Helm release is `failed`
