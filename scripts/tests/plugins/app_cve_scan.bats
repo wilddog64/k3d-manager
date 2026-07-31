@@ -121,6 +121,10 @@ case "${_url}" in
     ;;
   https://ghcr.io/v2/*/manifests/latest|https://ghcr.io/v2/*/manifests/sha-*)
     [ "${_spider}" = "true" ] || exit 1
+    case "${_accept_header}" in
+      *application/vnd.oci.image.index.v1+json*) ;;
+      *) exit 1 ;;
+    esac
     case "${_url}" in
       *"/manifests/latest")
         _digest="${TEST_LATEST_DIGEST:-sha256:testdigest}"
