@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Payment Dockerfile Go 1.25 build-stage mismatch — DONE `a243bda` on `origin/fix/dockerfile-go125-build-stage` (2026-07-31).** Changed only `shopping-cart-payment/go/Dockerfile`, replacing `FROM golang:1.21 AS build` with `FROM golang:1.25 AS build`; old-image grep count is 0 and the distroless runtime stage remains unchanged. Pushed `go-ci` run `30665950406` passed both `go`, including `docker build -f Dockerfile .`, and `integration`; no PR created.
+
 - [x] **Payment Go CI toolchain mismatch — DONE `69342eb` on `origin/fix/golangci-go125-toolchain` (2026-07-31).** Changed only `shopping-cart-payment/.github/workflows/go-ci.yml`, pinning golangci-lint `v2.5.0` → `v2.7.2`; old-pin grep count is 0 and YAML parses. Pushed `go-ci` run `30662579954` passed both `go` (including golangci-lint) and `integration`.
 - [x] **Payment PR #43 MERGED `6e457b0d` (2026-07-31)** — golangci `v2.5.0`→`v2.7.2` on main. Copilot CHANGELOG nit addressed (`315bd1a`), thread resolved. **enforce_admins RE-ENABLED on payment main (verified `true`).**
 - [x] **Payment #37 (pgx 5.9.2) + #38 (x/net 0.55.0) MERGED (2026-07-31)** via `@dependabot rebase` → automerge (`7689422`, `2f69c8e`). golangci now passes. BUT both merged with a **failing `go` check** (`go` is NOT a required status check).

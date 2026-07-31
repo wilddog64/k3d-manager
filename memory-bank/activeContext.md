@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Payment Dockerfile Go 1.25 build-stage mismatch fixed (2026-07-31).** `shopping-cart-payment` commit `a243bda` on `origin/fix/dockerfile-go125-build-stage` changes only `go/Dockerfile`: `golang:1.21` → `golang:1.25` in the build stage; the runtime stage is unchanged. The pushed `go-ci` run `30665950406` passed the full `go` job, including `docker build -f Dockerfile .`, and `integration`; no PR was created.
+
 - **Payment Go CI toolchain mismatch fixed (2026-07-31).** `shopping-cart-payment` commit `69342eb` on `origin/fix/golangci-go125-toolchain` changes only `.github/workflows/go-ci.yml`: golangci-lint `v2.5.0` → `v2.7.2` for Go 1.25 compatibility. The pushed `go-ci` workflow run `30662579954` passed both `go` (including lint) and `integration`; no PR was created.
 v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag + GitHub release published (Latest) · **v1.18.0 RELEASED 2026-07-28** — first-mile CVE gap closure (event-driven CVE auto-patch + Dependabot on 5 shopping-cart repos) · PR #108 merged `85742ef7` to main · tag v1.18.0 + GitHub release (Latest) · enforce_admins restored on main (verified `true`) · k3d-manager-v1.19.0 branch cut · retrospective written. Current focus: v1.19.0 preparation.
 
