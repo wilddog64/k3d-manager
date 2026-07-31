@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Payment Temurin 25 rollback — DONE `aecc353` on `origin/fix/revert-temurin25-jdk-lombok-break` (2026-07-31).** Changed only `shopping-cart-payment/Dockerfile` (both Java stages `25` → `21`) and `CHANGELOG.md` (one Fixed bullet). `grep -c 'eclipse-temurin:25' Dockerfile` → 0; both required Temurin 21 stages occur once. No PR created; Claude owns PR creation and the post-merge image-build verification.
+
 - [x] **Payment Dockerfile Go 1.25 build-stage mismatch — MERGED `fe20c36` (PR #44, 2026-07-31).** `go/Dockerfile` `golang:1.21`→`golang:1.25` + CHANGELOG `9d9ec71`. Main's Go image build fixed. enforce_admins RE-ENABLED (`true`).
 - [ ] **Payment #28 (temurin 21→25) accidentally merged `4074d19`, BROKE main image build — REVERT specced.** JDK 25 + Lombok 1.18.30 (SB 3.2.0-managed) → `mvn package` `cannot find symbol`. Slipped through: required checks compile JDK 21; image build (`Build, Scan & Push`) non-required + skipped on PRs. Spec `docs/bugs/2026-07-31-shopping-cart-payment-revert-temurin25-lombok-break.md`, branch `fix/revert-temurin25-jdk-lombok-break`. Codex handoff pending → then Claude /create-pr.
 - [ ] **Payment 4 GHA majors (#31/#30/#29/#26) OPEN, BEHIND after #28 — re-rebase + merge after revert lands.** User go-ahead given for the 4. #39 (x/crypto 0.51→0.52) MERGED `abb496a` (benign). Do NOT auto-merge.
