@@ -1,7 +1,9 @@
 # BLOCKED: registering the Hub as `environment=infra` would self-destruct ArgoCD
 
 **Branch:** `k3d-manager-v1.16.0`
-**Status:** **DO NOT EXECUTE.** Decision required from the repo owner.
+**Status:** **DO NOT EXECUTE the cluster-Secret registration route.** Owner approved
+Option A (read the live Deployment label) on 2026-07-30; source fix `699da11b` is
+awaiting deployment through `make platform-ops`.
 **Supersedes:** the "Phase 2 — Claude-only" section of
 `docs/bugs/2026-07-18-argocd-cve-scan-silent-exit-missing-infra-secret.md`
 
@@ -123,6 +125,18 @@ Helm release first. Not a bugfix — this is a project.*
 **Option D — leave `argocd-cve-scan` red.** `5fcc3f89` already makes it fail loudly. Do
 nothing further until the promotion pipeline's infra stage is actually needed.
 *Assessment: valid. The job is now honest about being broken, which was the real defect.*
+
+## Decision (2026-07-30)
+
+The owner selected **Option A**. Commit `699da11b` reads the live
+`cicd/argocd-server` Deployment's `helm.sh/chart` label (verified as
+`argo-cd-10.1.4`) and strips the `argo-cd-` prefix for the scanner. The scanner is granted
+only `get` access to Deployments, and the `infra` self-patch stage reports `external`
+instead of looking up or patching a cluster Secret. This keeps the Hub's Argo CD release
+outside the cluster-secret/ApplicationSet self-management path.
+
+Deploy with `make platform-ops`, then manually create one scan Job only if the operator
+authorizes a runtime test that can patch remote chart-version labels.
 
 ---
 
