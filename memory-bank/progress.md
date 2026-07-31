@@ -1,6 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
+
+- [x] **Payment Go CI toolchain mismatch — DONE `69342eb` on `origin/fix/golangci-go125-toolchain` (2026-07-31).** Changed only `shopping-cart-payment/.github/workflows/go-ci.yml`, pinning golangci-lint `v2.5.0` → `v2.7.2`; old-pin grep count is 0 and YAML parses. Pushed `go-ci` run `30662579954` passed both `go` (including golangci-lint) and `integration`; no PR created.
 v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag `v1.17.0` + GitHub release published (Latest) · **v1.18.0 RELEASED 2026-07-28** — first-mile CVE gap closure · PR #108 merged `85742ef7` · tag + GitHub release published (Latest) · enforce_admins restored on main (verified `true`) · k3d-manager-v1.19.0 branch cut.
 
 - [x] **CVE CronJob pod-accumulation fixed `bda65d5c` (2026-07-30) — reviewed & verified clean.** `app-cve-scan-cronjob.yaml` and `cve-scan-cronjob.yaml` now set `backoffLimit: 2` and `ttlSecondsAfterFinished: 3600` under `jobTemplate.spec`. Webhook `cve-auto-*` Jobs created from the CronJob inherit both bounds, so a failing run produces at most three pods and all finished Jobs/pods self-GC after one hour. Both YAML files parse clean; `git show --stat bda65d5c` is exactly two files; correct indent; history limits untouched; exact commit message; on origin; memory follow-up `5e2ed4d9`. Source is not live until the CVE app's stale `k3d-manager-v1.18.0` targetRevision is updated and synced. The separate infra-secret registration remains Claude-only.
