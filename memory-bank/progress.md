@@ -2,8 +2,8 @@
 
 ## Status
 
-- [x] **Payment Dockerfile Go 1.25 build-stage mismatch — DONE `a243bda`, PR #44 OPEN (2026-07-31).** Changed only `shopping-cart-payment/go/Dockerfile` (`golang:1.21`→`golang:1.25` build stage) + CHANGELOG `9d9ec71`; distroless runtime unchanged. PR #44 all CI green (incl. `go` docker build), Copilot approved no comments, `mergeStateStatus: CLEAN`; enforce_admins DISABLED for merge. Unbreaks main after #37/#38.
-- [ ] **Payment open Dependabot backlog (5 PRs) — pending disposition after #44 merges.** #31/#30/#29/#26 GHA majors + #28 eclipse-temurin 21→25 JRE. All green + MERGEABLE, only BEHIND. Rebase → merge the 4 GHA majors; #28 flagged as Java-runtime major.
+- [x] **Payment Dockerfile Go 1.25 build-stage mismatch — MERGED `fe20c36` (PR #44, 2026-07-31).** `go/Dockerfile` `golang:1.21`→`golang:1.25` + CHANGELOG `9d9ec71`. Main's Go image build fixed. enforce_admins RE-ENABLED (`true`).
+- [ ] **Payment open Dependabot backlog (5 PRs) — rebase triggered, awaiting merge go-ahead.** `@dependabot rebase` sent to #31/#30/#29/#26 (GHA majors) + #28 (eclipse-temurin 21→25 JRE). After rebases settle green: merge the 4 GHA majors; #28 flagged as Java-runtime major for a conscious call. Do NOT auto-merge.
 
 - [x] **Payment Go CI toolchain mismatch — DONE `69342eb` on `origin/fix/golangci-go125-toolchain` (2026-07-31).** Changed only `shopping-cart-payment/.github/workflows/go-ci.yml`, pinning golangci-lint `v2.5.0` → `v2.7.2`; old-pin grep count is 0 and YAML parses. Pushed `go-ci` run `30662579954` passed both `go` (including golangci-lint) and `integration`.
 - [x] **Payment PR #43 MERGED `6e457b0d` (2026-07-31)** — golangci `v2.5.0`→`v2.7.2` on main. Copilot CHANGELOG nit addressed (`315bd1a`), thread resolved. **enforce_admins RE-ENABLED on payment main (verified `true`).**
