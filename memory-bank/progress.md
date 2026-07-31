@@ -2,11 +2,11 @@
 
 ## Status
 
-- [x] **Payment Temurin 25 rollback — PR #45 OPEN + GREEN `aecc353` (2026-07-31).** Changed only `shopping-cart-payment/Dockerfile` (both Java stages `25`→`21`) + `CHANGELOG.md`. `grep -c 'eclipse-temurin:25'` → 0. [PR #45](https://github.com/wilddog64/shopping-cart-payment/pull/45): required checks green, `Build, Scan & Push` skipped on PR (expected), Copilot 0 findings, `clean`. **enforce_admins DISABLED — awaiting user merge**, then re-enable + re-rebase the 4 GHA majors + fresh main image build.
+- [x] **Payment Temurin 25 rollback — MERGED `8a48fb1` (PR #45, 2026-07-31); image build RESTORED.** Java `Dockerfile` both stages `25`→`21`. enforce_admins RE-ENABLED (`true`); main synced. `main` `Build, Scan & Push` for `8a48fb1` = SUCCESS, republished `latest` + `sha-8a48fb1f...`. **app-cve-scan Spec 1 deploy blocker CLEARED.**
 
 - [x] **Payment Dockerfile Go 1.25 build-stage mismatch — MERGED `fe20c36` (PR #44, 2026-07-31).** `go/Dockerfile` `golang:1.21`→`golang:1.25` + CHANGELOG `9d9ec71`. Main's Go image build fixed. enforce_admins RE-ENABLED (`true`).
 - [ ] **Payment #28 (temurin 21→25) accidentally merged `4074d19`, BROKE main image build — revert in PR #45 (green, awaiting merge).** JDK 25 + Lombok 1.18.30 (SB 3.2.0-managed) → `mvn package` `cannot find symbol`. Slipped through: required checks compile JDK 21; image build (`Build, Scan & Push`) non-required + skipped on PRs. Spec `docs/bugs/2026-07-31-shopping-cart-payment-revert-temurin25-lombok-break.md`.
-- [ ] **Payment 4 GHA majors (#31/#30/#29/#26) OPEN, BEHIND after #28 — re-rebase + merge after revert lands.** User go-ahead given for the 4. #39 (x/crypto 0.51→0.52) MERGED `abb496a` (benign). Do NOT auto-merge.
+- [ ] **Payment 4 GHA majors (#31 `a5026e9`/#30 `59ea05d`/#29 `cd1c004`/#26 `edfca29`) REBASED onto revert-main — all CLEAN + green, ready for user merge.** 0 fail/pending each. Owner runs `gh pr merge` (classifier-blocked for Claude). #39 (x/crypto) MERGED `abb496a` (benign). Do NOT auto-merge.
 - [ ] **Payment CI gap:** image build skipped on PRs + non-required → JDK/base bumps unvalidated pre-merge; main `strict: true`. Follow-up: run image build on PRs / make required.
 
 - [x] **Payment Go CI toolchain mismatch — DONE `69342eb` on `origin/fix/golangci-go125-toolchain` (2026-07-31).** Changed only `shopping-cart-payment/.github/workflows/go-ci.yml`, pinning golangci-lint `v2.5.0` → `v2.7.2`; old-pin grep count is 0 and YAML parses. Pushed `go-ci` run `30662579954` passed both `go` (including golangci-lint) and `integration`.
