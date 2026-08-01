@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-alertmanager-auth-proxy uninstall-alertmanager-auth-proxy clean-tmp
+.PHONY: up down refresh status preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-alertmanager-auth-proxy uninstall-alertmanager-auth-proxy clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -23,6 +23,7 @@ up:
 	  *)       GHCR_PAT="$(GHCR_PAT)" K3DM_RESUME="$(K3DM_RESUME)" bin/cluster-up "$(URL)" ;; \
 	esac
 	@$(MAKE) --no-print-directory observability
+	@$(MAKE) --no-print-directory platform-ops
 
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
 ## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
@@ -411,6 +412,10 @@ alertmanager-secret:
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:
 	./scripts/k3d-manager deploy_observability --confirm
+
+## Reconcile Hub platform-ops resources (CVE scanner, retry limits, and dashboards)
+platform-ops:
+	./scripts/k3d-manager deploy_argocd_platform_ops --confirm
 
 ## Deploy observability stack (Prometheus+Trivy) to ACG ubuntu-k3s
 observability-acg:

@@ -949,8 +949,10 @@ else
     -l app.kubernetes.io/name=ldap \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
   if [[ -z "${_ldap_pod}" ]]; then
-    _warn "[acg-up] LDAP pod not found in identity namespace — skipping user password seed"
+    _err "[acg-up] LDAP pod not found in identity namespace — cannot seed user passwords"
+    exit 1
   else
+    _ldap_seed_failed=0
     for _ldap_user in admin developer operator; do
       _ldap_user_vault_path="keycloak/users/${_ldap_user}"
       if _vault_kv_exists "${_ldap_user_vault_path}"; then
@@ -959,20 +961,41 @@ else
         _ldap_user_pass=$(openssl rand -base64 18 | tr -d '=+/')
         _vault_kv_put "{\"username\":\"${_ldap_user}\",\"password\":\"${_ldap_user_pass}\"}" "${_ldap_user_vault_path}"
       fi
-      if kubectl exec -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
-          ldappasswd -x -H ldap://localhost:389 \
-          -D "cn=admin,dc=shopping-cart,dc=local" \
-          -w "${_ldap_admin_pass}" \
-          -s "${_ldap_user_pass}" \
-          "uid=${_ldap_user},ou=users,dc=shopping-cart,dc=local" >/dev/null 2>&1; then
-        _info "[acg-up] LDAP password set for user '${_ldap_user}'"
+      if printf '%s\n%s\n' "${_ldap_user_pass}" "${_ldap_user_pass}" | \
+          kubectl exec -i -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
+            sh -ceu '
+              ldappasswd -x -H ldap://localhost:389 \
+                -D "cn=admin,dc=shopping-cart,dc=local" \
+                -w "$LDAP_ADMIN_PASSWORD" \
+                -S "uid=$1,ou=users,dc=shopping-cart,dc=local"
+            ' sh "${_ldap_user}" >/dev/null 2>&1; then
+        if printf '%s\n' "${_ldap_user_pass}" | \
+            kubectl exec -i -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
+              sh -ceu '
+                _ldap_password_file=$(mktemp)
+                trap "rm -f \"${_ldap_password_file}\"" EXIT
+                cat > "${_ldap_password_file}"
+                ldapwhoami -x -H ldap://localhost:389 \
+                  -D "uid=$1,ou=users,dc=shopping-cart,dc=local" \
+                  -y "${_ldap_password_file}"
+              ' sh "${_ldap_user}" >/dev/null 2>&1; then
+          _info "[acg-up] LDAP password set and verified for user '${_ldap_user}'"
+        else
+          _warn "[acg-up] LDAP password verification failed for user '${_ldap_user}'"
+          _ldap_seed_failed=$((_ldap_seed_failed + 1))
+        fi
       else
-        _warn "[acg-up] Failed to set LDAP password for user '${_ldap_user}' — login may fail"
+        _warn "[acg-up] Failed to set LDAP password for user '${_ldap_user}'"
+        _ldap_seed_failed=$((_ldap_seed_failed + 1))
       fi
     done
+    if [[ ${_ldap_seed_failed} -ne 0 ]]; then
+      _err "[acg-up] LDAP password seed failed verification; checkpoint not written"
+      exit 1
+    fi
     _info "[acg-up] Retrieve passwords: bin/vault-exec --namespace secrets -- vault kv get -field=password secret/keycloak/users/<user>"
+    _cp_write "step-10d5-ldap-passwords"
   fi
-  _cp_write "step-10d5-ldap-passwords"
 fi
 
 _info "[acg-up] Step 10d.6/14 — Reconciling Keycloak LDAP federation bind credential..."
