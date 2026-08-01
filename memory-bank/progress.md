@@ -2,6 +2,8 @@
 
 ## Status
 
+- [ ] **app-cve-scan non-zero-exit + missing pod labels — SPEC WRITTEN, Codex handoff pending (2026-08-01).** `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`. Job completes scan then `exit 1` from per-service `_rc=1` (@~347 digest, @~362 rebuild-dispatch) → recurring triage message. Fix: downgrade both to `_notify warning` (keep only zero-matched `_rc=1` @~370); add `app` labels to both cronjob pod templates. Stale Failed cve jobs/pods DELETED 2026-08-01 (immediate relief); next run 2026-08-15. `argocd-cve-scan` infra-secret already fixed live. Post-merge: `make platform-ops`.
+
 - [x] **Payment PR image-build check — MERGED `3aeaaee` (PR #46, 2026-08-01).** PR-only `image-build-check` job in `ci.yaml` ran GREEN on the PR (2m24s), then `@v7` on `422bc9c` (3m9s). Copilot: `@v6→@v7` fixed, gate-on-secret declined by design, BuildKit cache deferred — all 3 threads resolved. enforce_admins RE-ENABLED (`true`); main synced. **BOTH owner follow-ups DONE:** (1) `PACKAGES_TOKEN` added to payment Dependabot secrets (verified API, `2026-08-01T10:57:59Z`) — also unblocks rabbitmq-401; (2) `Image Build Check` now a **required** check on payment main. CI-gap fully closed (pending first-Dependabot-PR confirmation).
 
 - [x] **Payment Temurin 25 rollback — MERGED `8a48fb1` (PR #45, 2026-07-31); image build RESTORED.** Java `Dockerfile` both stages `25`→`21`. enforce_admins RE-ENABLED (`true`); main synced. `main` `Build, Scan & Push` for `8a48fb1` = SUCCESS, republished `latest` + `sha-8a48fb1f...`. **app-cve-scan Spec 1 deploy blocker CLEARED.**
