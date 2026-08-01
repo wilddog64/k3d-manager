@@ -390,10 +390,13 @@ show-service-passwords:
 	echo ""
 	@_kc=$$(kubectl get secret keycloak-secrets -n identity \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 -d); \
+	_realm_admin=$$(./bin/get-keycloak-password admin -q 2>/dev/null || true); \
+	_dev=$$(./bin/get-keycloak-password developer -q 2>/dev/null || true); \
+	_op=$$(./bin/get-keycloak-password operator -q 2>/dev/null || true); \
 	echo "  Frontend    https://frontend.3ai-talk.org  (login via Keycloak SSO)";\
 	echo "  Keycloak    https://keycloak.3ai-talk.org";\
 	echo "    admin user:     admin / $${_kc:-N/A}";\
-	echo "    dev users:      admin / Shopping1!  |  developer / Dev1234!  |  operator / Ops5678!";\
+	echo "    dev users:      admin / $${_realm_admin:-N/A}  |  developer / $${_dev:-N/A}  |  operator / $${_op:-N/A}";\
 	echo ""
 
 ## Store Alertmanager credentials in Vault (run once; requires Hub Vault + port-forward)
