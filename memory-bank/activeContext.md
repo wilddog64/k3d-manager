@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Payment PR image-build check pushed (2026-07-31).** `shopping-cart-payment` commit `ac8ed9f` on `origin/fix/ci-pr-image-build-check` changes only `.github/workflows/ci.yaml` and `CHANGELOG.md`: new PR-only `Image Build Check` runs the full Docker build with `push: false`, Buildx, and `GH_TOKEN=${{ secrets.PACKAGES_TOKEN }}`; `publish` is unchanged. YAML parses and no action uses `@main`/`@latest`. Claude owns PR creation and confirming the job green; the owner must add `PACKAGES_TOKEN` to Dependabot secrets and then require this check.
+
 - **Payment Temurin 25 rollback — MERGED `8a48fb1` (PR #45, 2026-07-31). Image build RESTORED.** Reverted Java `Dockerfile` both stages `eclipse-temurin:25`→`21`. **enforce_admins RE-ENABLED (`true`); main synced.** The `main` image build (`Build, Scan & Push`) for `8a48fb1` = **SUCCESS**, republished tags `latest` + `sha-8a48fb1f...`.
 - **app-cve-scan Spec 1 (17f5f0e0 Accept-header) — DEPLOYED + VERIFIED (2026-07-31).** Ran `make platform-ops` on Hub `k3d-k3d-cluster`; `configmap/argocd-cve-scan-script configured`. Verified live ConfigMap `app-cve-scan.sh` now carries the widened `_accept` header (`application/vnd.oci.image.index.v1+json` + `manifest.list.v2+json`) so multi-arch digests resolve. Next scheduled app-cve-scan (1st/15th) will use it. Spec 1 blocker fully cleared.
 

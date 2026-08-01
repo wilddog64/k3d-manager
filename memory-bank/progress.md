@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Payment PR image-build check — DONE `ac8ed9f` on `origin/fix/ci-pr-image-build-check` (2026-07-31).** Added the exact PR-only `image-build-check` job before unchanged `publish` in `ci.yaml` plus one CHANGELOG Added bullet; it uses Buildx, `docker/build-push-action@v6`, `push: false`, and `GH_TOKEN=${{ secrets.PACKAGES_TOKEN }}`. YAML parses, `@main`/`@latest` action count is 0, and only the two allowed files changed. Claude owns PR creation/job verification; owner must set the Dependabot token and require `Image Build Check` after it is green.
+
 - [x] **Payment Temurin 25 rollback — MERGED `8a48fb1` (PR #45, 2026-07-31); image build RESTORED.** Java `Dockerfile` both stages `25`→`21`. enforce_admins RE-ENABLED (`true`); main synced. `main` `Build, Scan & Push` for `8a48fb1` = SUCCESS, republished `latest` + `sha-8a48fb1f...`. **app-cve-scan Spec 1 deploy blocker CLEARED.**
 
 - [x] **Payment Dockerfile Go 1.25 build-stage mismatch — MERGED `fe20c36` (PR #44, 2026-07-31).** `go/Dockerfile` `golang:1.21`→`golang:1.25` + CHANGELOG `9d9ec71`. Main's Go image build fixed. enforce_admins RE-ENABLED (`true`).
