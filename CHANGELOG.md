@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-08-01
+
+**Theme: make the CVE auto-patch loop actually run.** v1.18.0 wired up the Trivy→webhook→`app-cve-scan` detect→patch loop; this release fixes the many ways it broke in practice. `app-cve-scan` now targets ArgoCD Applications by their cluster-prefixed name (26 remediation jobs had been failing on the bare service name and never patched anything), resolves multi-arch image digests through OCI image-index media types, authenticates registry reads with the scan pod's BusyBox `wget`, and exits 0 when a scan completes — a still-pending per-service remediation no longer marks the whole CronJob Failed, which had a triage bot looping on a misleading "Trivy exits 1 on CRITICAL" diagnosis. Failed scan pods no longer accumulate, the Hub chart is read from live deployment metadata instead of a guessed path, and `make up` reconciles platform-ops so the CVE stack is present after a cold bring-up. (v1.19.0 was a shopping-cart-only Dependabot milestone with no k3d-manager changes — no tag.)
+
+### Changed
+- `make up` reconciles the platform-ops stack after the cluster comes up, so the CVE scan and dashboards are present on a cold bring-up instead of needing a manual `make platform-ops` (`0a316fb6`) (`Makefile`)
+
+### Fixed
+- `app-cve-scan` patches ArgoCD Applications by their cluster-prefixed name instead of the bare service name — root cause of 26 remediation-job failures that ran but patched nothing (`9f7cdfe0`) (`scripts/etc/argocd/platform-ops/app-cve-scan.sh`)
+- `app-cve-scan` accepts OCI image-index media types in the manifest `Accept` header, so multi-arch `latest`/`sha-*` digests resolve instead of silently failing candidate resolution (`17f5f0e0`) (`scripts/etc/argocd/platform-ops/app-cve-scan.sh`)
+- `app-cve-scan` authenticates registry reads with the scan pod's BusyBox `wget --header` instead of the GNU-only `--config`, which BusyBox `wget` does not support (`47c2e2d7`) (`scripts/etc/argocd/platform-ops/app-cve-scan.sh`)
+- `app-cve-scan` exits 0 when the scan completes — a per-service unresolved-digest or failed-rebuild-dispatch state now emits a warning notification instead of poisoning the Job exit code; only a run that matched zero VulnerabilityReports fails the Job. Both scan CronJob pod templates carry `app` / `app.kubernetes.io/name` labels so alerts render the workload name instead of `app ''` (`03fe5684`) (`scripts/etc/argocd/platform-ops/`)
+- CVE scan no longer retries a service whose immutable candidate image cannot be resolved this run — it notifies and moves on instead of spinning the batch (`0136571f`) (`scripts/etc/argocd/platform-ops/app-cve-scan.sh`)
+- CVE scan CronJobs bound `backoffLimit` and `ttlSecondsAfterFinished`, so failed scan pods no longer accumulate in `platform-ops` (`bda65d5c`) (`scripts/etc/argocd/platform-ops/`)
+- Hub CVE scan reads the target chart from live deployment metadata instead of a hard-coded path, so it keeps working when the Hub chart layout changes (`699da11b`) (`scripts/etc/argocd/platform-ops/cve-scan.sh`)
+- LDAP password seeds are verified during cluster bring-up, so identity login self-heals instead of silently seeding an unusable credential (`bb5b5653`) (`bin/cluster-up`)
+
 ## [1.18.0] - 2026-07-28
 
 **Theme: close the first-mile CVE gap.** A Trivy vulnerability report on a running app now drives an automatic patch end-to-end: the Trivy alert fires a webhook that re-runs `app-cve-scan`, and — for the app dependencies Trivy can't rebuild — Dependabot is enabled on all five shopping-cart repos so dependency CVEs self-heal into PRs. The platform-ops stack (CVE scan + dashboards + webhook-token sync) now deploys from bootstrap so it survives a rebuild, a hub Grafana dashboard makes the auto-patch loop observable, and the webhook token has a Keychain→Secret disaster-recovery path. Ships lib-foundation **v0.4.8** via subtree (brace-expansion CVE fix).
