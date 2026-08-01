@@ -82,6 +82,22 @@ if echo "$CMD" | grep -qE '\b(rm|rmdir|dd|mkfs|shred|truncate|mv|chmod|chown|kil
   _deny "$CMD"
 fi
 
+# General-purpose interpreters — bypass every denylist above, so block outright.
+if echo "$CMD" | grep -qE '\b(python[0-9.]*|perl|ruby|node|deno|bun|osascript|php|lua|tclsh|Rscript|gdb|lldb)\b'; then
+  _deny "$CMD"
+fi
+
+# Nested shell invocation and command-prefix maskers that hide the real command.
+if echo "$CMD" | grep -qE '\b(bash|sh|zsh|ksh|dash)\b\s+-c\b|\b(env|xargs|nice|nohup|timeout|sudo|command|builtin|exec|eval|watch|setsid)\b'; then
+  _deny "$CMD"
+fi
+
+# Output redirection / process substitution — can write or overwrite arbitrary paths
+# that the per-arg scope loop never sees (the target lives inside the -c string).
+if echo "$CMD" | grep -qE '(>>?|<\()'; then
+  _deny "$CMD"
+fi
+
 # curl/wget write operations
 if echo "$CMD" | grep -qE '\b(curl|wget)\b.*(-X\s*(POST|PUT|DELETE|PATCH)|--request\s*(POST|PUT|DELETE|PATCH)|--data|--upload-file)'; then
   _deny "$CMD"
