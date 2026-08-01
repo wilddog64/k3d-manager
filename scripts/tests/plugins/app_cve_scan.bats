@@ -438,7 +438,7 @@ EOF
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-payment' "${KUBECTL_LOG}"
 }
 
-@test "rebuild path without GH token returns non-zero" {
+@test "rebuild dispatch failure notifies without failing the batch" {
   export APP_SERVICES="shopping-cart-order"
   export TEST_SHA_TAG="sha-order-new"
   export TEST_LATEST_DIGEST="sha256:deadbeef"
@@ -462,7 +462,8 @@ EOF
     TEST_LATEST_CVES_shopping_cart_order="${TEST_LATEST_CVES_shopping_cart_order}" \
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
-  [ "${status}" -eq 1 ]
+  [ "${status}" -eq 0 ]
+  grep -q 'warning|App CVE Rebuild Dispatch Failed: shopping-cart-order|' "${NOTIFY_LOG}"
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-order' "${KUBECTL_LOG}"
 }
 
