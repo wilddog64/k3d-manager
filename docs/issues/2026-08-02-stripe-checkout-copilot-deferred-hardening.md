@@ -41,3 +41,15 @@ Copilot threads on purpose so they stay visible.
 Write an exact-old/new-block spec (Codex handoff) covering #1–#7 once A–F are merged and
 enablement is scheduled. #2 (aud/azp) and #4 (IDOR) are the priority — real access-control
 gaps — and should land before the enablement flip that makes the Stripe/auth path live.
+
+## Status (2026-08-02, A–F merged)
+
+- **#2 (aud/azp) + #4 (IDOR) — SPECCED** in
+  `docs/bugs/2026-08-02-stripe-checkout-order-access-control-hardening.md` (order repo, branch
+  `fix/order-access-control-hardening`). Both are the pre-enablement gate. aud/azp enforcement is
+  configurable via a new `OAUTH2_EXPECTED_AUDIENCE` (default `""` = off, so it lands without
+  breaking the current flow) and is switched on with a **verified** value at the enablement flip
+  (Keycloak audience-mapper decision documented in that spec). Codex handoff pending.
+- **#1, #3, #5, #6, #7 — still open**, lower severity, deferred to a follow-up hardening pass
+  (order fail-fast empty-issuer; unused `OAuth2JWKSetURI`; go.mod doc claim; payment amount>2dp
+  truncation; payment `TransactionID=pi.ID` dup). Not enablement gates.
