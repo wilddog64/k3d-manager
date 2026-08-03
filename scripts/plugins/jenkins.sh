@@ -1553,7 +1553,7 @@ function _jenkins_select_template() {
          _info "[jenkins] sourcing AD test configuration: $ad_test_vars_file"
          source "$ad_test_vars_file"
       fi
-      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.identity.svc:1389}"
+      export LDAP_URL="${LDAP_URL:-ldap://openldap.identity.svc:1389}"
       export LDAP_BASE_DN="${LDAP_BASE_DN:-DC=corp,DC=example,DC=com}"
       export LDAP_BIND_DN="${LDAP_BIND_DN:-cn=admin,DC=corp,DC=example,DC=com}"
       export LDAP_USER_SEARCH_BASE="${LDAP_USER_SEARCH_BASE:-OU=Users,DC=corp,DC=example,DC=com}"
@@ -1567,7 +1567,7 @@ function _jenkins_select_template() {
          _info "[jenkins] sourcing LDAP configuration: $ldap_vars_file"
          source "$ldap_vars_file"
       fi
-      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.identity.svc:1389}"
+      export LDAP_URL="${LDAP_URL:-ldap://openldap.identity.svc:1389}"
       _JENKINS_TEMPLATE_FILE="$JENKINS_CONFIG_DIR/values-ldap.yaml.tmpl"
       _JENKINS_AUTH_MODE="standard-ldap"
       _info "[jenkins] using standard LDAP template: values-ldap.yaml.tmpl"

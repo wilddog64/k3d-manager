@@ -195,43 +195,9 @@ function _ldap_apply_eso_resources() {
    _info "[ldap] using ESO API version ${api_version}"
    export LDAP_ESO_API_VERSION="$api_version"
 
-   if [[ "${LDAP_LDIF_ENABLED:-false}" == "true" && -n "${LDAP_LDIF_VAULT_PATH:-}" ]]; then
-      local ldif_name="${LDAP_LDIF_SECRET_NAME}"
-      local ldif_refresh="${LDAP_LDIF_REFRESH_INTERVAL}"
-      local ldif_secret_key="${LDAP_LDIF_SECRET_KEY}"
-      local ldif_vault_path="${LDAP_LDIF_VAULT_PATH}"
-      local ldif_content_key="${LDAP_LDIF_CONTENT_KEY}"
-      local ldif_remote_property="${LDAP_LDIF_REMOTE_PROPERTY:-content}"
-      local ldif_namespace="${LDAP_NAMESPACE}"
-      local ldif_store="${LDAP_ESO_SECRETSTORE}"
-
-      ldif_block=$(cat <<EOF
----
-apiVersion: ${api_version}
-kind: ExternalSecret
-metadata:
-  name: ${ldif_name}
-  namespace: ${ldif_namespace}
-spec:
-  refreshInterval: ${ldif_refresh}
-  secretStoreRef:
-    name: ${ldif_store}
-    kind: SecretStore
-  target:
-    name: ${ldif_name}
-    creationPolicy: Owner
-    template:
-      type: Opaque
-  data:
-    - secretKey: ${ldif_secret_key}
-      remoteRef:
-        key: ${ldif_vault_path}
-        property: ${ldif_remote_property}
-EOF
-)
-   else
-      ldif_block=""
-   fi
+   # LDIF bootstrap is non-secret and delivered via a ConfigMap (stack-ha customLdifCm),
+   # created in _ldap_apply_ldif_configmap. No ExternalSecret needed for it.
+   ldif_block=""
    export LDAP_LDIF_EXTERNALSECRET_YAML="$ldif_block"
 
    rendered=$(_ldap_render_template "$tmpl" "ldap-eso") || return 1
@@ -600,16 +566,34 @@ function _ldap_wait_for_secret() {
    _err "[ldap] timed out waiting for secret ${ns}/${secret}"
 }
 
+# Build the customLdifCm ConfigMap from the local bootstrap LDIF (non-secret).
+# The openldap-stack-ha chart mounts every *.ldif key from this ConfigMap at /cm-ldifs/
+# and applies it on first boot.
+function _ldap_apply_ldif_configmap() {
+   local ns="${1:-$LDAP_NAMESPACE}"
+   [[ "${LDAP_LDIF_ENABLED:-false}" == "true" ]] || return 0
+   local cm_name="${LDAP_LDIF_SECRET_NAME:-openldap-ldif-import}"
+   local ldif_file="${LDAP_LDIF_FILE}"
+   if [[ ! -f "$ldif_file" ]]; then
+      _warn "[ldap] bootstrap LDIF ${ldif_file} not found; skipping customLdifCm"
+      return 0
+   fi
+   _kubectl --no-exit -n "$ns" create configmap "$cm_name" \
+      --from-file="bootstrap.ldif=${ldif_file}" \
+      --dry-run=client -o yaml | _kubectl apply -f - >/dev/null 2>&1 \
+      || _warn "[ldap] unable to apply LDIF ConfigMap ${ns}/${cm_name}"
+}
+
 function _ldap_deploy_chart() {
    local ns="${1:-$LDAP_NAMESPACE}"
    local release="${2:-$LDAP_RELEASE}"
    local version="${3:-${LDAP_HELM_CHART_VERSION:-}}"
 
-   local helm_repo_name_default="johanneskastl-openldap-bitnami"
+   local helm_repo_name_default="jp-gouin"
    local helm_repo_name="${LDAP_HELM_REPO_NAME:-$helm_repo_name_default}"
-   local helm_repo_url_default="https://johanneskastl.github.io/openldap-bitnami-helm-chart/"
+   local helm_repo_url_default="https://jp-gouin.github.io/helm-openldap/"
    local helm_repo_url="${LDAP_HELM_REPO_URL:-$helm_repo_url_default}"
-   local helm_chart_ref_default="${helm_repo_name_default}/openldap-bitnami"
+   local helm_chart_ref_default="${helm_repo_name_default}/openldap-stack-ha"
 
    local chart_archive_candidate="${LDAP_HELM_CHART_ARCHIVE:-}"
    if [[ -z "$chart_archive_candidate" ]]; then
@@ -637,6 +621,8 @@ function _ldap_deploy_chart() {
    values_rendered=$(_ldap_render_template "$values_template" "ldap-values") || return 1
 
    _ldap_ensure_helm_chart_available "$helm_chart_ref" "$version" "$helm_repo_name" "$skip_repo_ops" "$is_oci_ref" || return 1
+
+   _ldap_apply_ldif_configmap "$ns"
 
    local -a args=(upgrade --install "$release" "$helm_chart_ref" -n "$ns" -f "$values_rendered" --create-namespace)
    if [[ -n "$version" ]]; then
@@ -694,7 +680,7 @@ function _ldap_fetch_import_prereqs() {
    fi
 
    local pod=""
-   pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=openldap-bitnami,app.kubernetes.io/instance=${release}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+   pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=openldap-stack-ha,app.kubernetes.io/instance=${release}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
    if [[ -z "$pod" ]]; then
       _warn "[ldap] no OpenLDAP pod found for release ${ns}/${release}; skipping LDIF import"
       return 1
@@ -707,20 +693,20 @@ function _ldap_fetch_import_prereqs() {
 function _ldap_import_ldif() {
    local ns="${1:-$LDAP_NAMESPACE}"
    local release="${2:-$LDAP_RELEASE}"
-   local ldif_secret="${LDAP_LDIF_SECRET_NAME:-openldap-bitnami-ldif-import}"
+   local ldif_secret="${LDAP_LDIF_SECRET_NAME:-openldap-ldif-import}"
    local ldif_mount_path="${LDAP_LDIF_MOUNT_PATH:-/ldif_import/bootstrap.ldif}"
    local admin_secret="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
    local admin_key="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
    local admin_user="${LDAP_ADMIN_USERNAME:-ldap-admin}"
    local base_dn="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY:-home},dc=${LDAP_DC_SECONDARY:-org}}"
    local admin_dn="cn=${admin_user},${base_dn}"
-   local deploy_name="${release}-openldap-bitnami"
+   local deploy_name="openldap"
    local ldap_port="1389"
 
    [[ "${LDAP_LDIF_ENABLED:-false}" == "true" ]] || return 0
    [[ -n "${LDAP_LDIF_VAULT_PATH:-}" ]] || { _warn "[ldap] LDIF sync enabled but LDAP_LDIF_VAULT_PATH is empty; skipping LDIF import"; return 0; }
 
-   if ! _kubectl --no-exit -n "$ns" get secret "$ldif_secret" >/dev/null 2>&1; then
+   if ! _kubectl --no-exit -n "$ns" get configmap "$ldif_secret" >/dev/null 2>&1; then
       _info "[ldap] LDIF secret ${ns}/${ldif_secret} not found; skipping LDIF import"
       return 0
    fi
@@ -853,7 +839,7 @@ function _ldap_sync_admin_password() {
    local config_pass="$_LDAP_SYNC_CONFIG_PASS"
 
    local pod=""
-   pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/instance=${release},app.kubernetes.io/name=openldap-bitnami" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+   pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/instance=${release},app.kubernetes.io/name=openldap-stack-ha" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
    if [[ -z "$pod" ]]; then
       _warn "[ldap] unable to locate pod for release ${release} in namespace ${ns}; skipping admin password sync"
       return 1
@@ -1077,8 +1063,8 @@ function _ldap_ensure_vault_ready() {
 function _ldap_run_post_deploy() {
    local namespace="$1" release="$2" deploy_name="$3" smoke_port="$4"
 
-   if ! _kubectl --no-exit -n "$namespace" rollout status "deployment/${deploy_name}" --timeout=180s; then
-      _warn "[ldap] deployment ${namespace}/${deploy_name} not ready; skipping smoke test"
+   if ! _kubectl --no-exit -n "$namespace" rollout status "statefulset/${deploy_name}" --timeout=180s; then
+      _warn "[ldap] statefulset ${namespace}/${deploy_name} not ready; skipping smoke test"
       return 0
    fi
 
@@ -1097,7 +1083,7 @@ function _ldap_run_post_deploy() {
    fi
 
    local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
-   local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
+   local service_name="${LDAP_SERVICE_NAME:-openldap}"
    if [[ -x "$smoke_script" ]]; then
       "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || _warn "[ldap] smoke test failed; inspect output above"
    elif [[ -r "$smoke_script" ]]; then
@@ -1143,15 +1129,13 @@ function deploy_ldap() {
    _ldap_apply_eso_resources "$namespace" || return 1
    _eso_apply_vault_cluster_store || return 1
    _ldap_wait_for_secret "$namespace" "${LDAP_ADMIN_SECRET_NAME}" || { _err "[ldap] Vault-sourced secret ${LDAP_ADMIN_SECRET_NAME} not available"; return 1; }
-   if [[ "${LDAP_LDIF_ENABLED:-false}" == "true" && -n "${LDAP_LDIF_VAULT_PATH:-}" ]]; then
-      _ldap_wait_for_secret "$namespace" "${LDAP_LDIF_SECRET_NAME}" ||          { _err "[ldap] Vault-sourced LDIF secret ${LDAP_LDIF_SECRET_NAME} not available"; return 1; }
-   fi
+   # LDIF is delivered as a ConfigMap (customLdifCm), created at deploy time — no Secret to wait for.
 
    local deploy_rc=0
    _ldap_deploy_chart "$namespace" "$release" "$chart_version" || deploy_rc=$?
 
    if (( deploy_rc == 0 )); then
-      local deploy_name="${release}-openldap-bitnami"
+      local deploy_name="openldap"
       local smoke_port="${LDAP_SMOKE_PORT:-3389}"
       _ldap_run_post_deploy "$namespace" "$release" "$deploy_name" "$smoke_port"
    fi
@@ -1168,7 +1152,7 @@ function deploy_ldap() {
 # _ldap_run_ad_smoke_test
 function _ldap_run_ad_smoke_test() {
    local namespace="$1" release="$2" smoke_port="$3"
-   local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
+   local service_name="${LDAP_SERVICE_NAME:-openldap}"
    local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
    if [[ -x "$smoke_script" ]]; then
       "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || _warn "[ad] smoke test failed; inspect output above"
