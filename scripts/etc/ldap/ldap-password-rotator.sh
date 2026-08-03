@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Configuration from environment variables
 LDAP_NAMESPACE="${LDAP_NAMESPACE:-identity}"
-LDAP_POD_LABEL="${LDAP_POD_LABEL:-app.kubernetes.io/name=openldap}"
+LDAP_POD_LABEL="${LDAP_POD_LABEL:-app.kubernetes.io/name=openldap-stack-ha}"
 LDAP_PORT="${LDAP_PORT:-389}"
 LDAP_BASE_DN="${LDAP_BASE_DN:-dc=home,dc=org}"
 LDAP_ADMIN_DN="${LDAP_ADMIN_DN:-cn=ldap-admin,dc=home,dc=org}"
