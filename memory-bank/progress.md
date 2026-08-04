@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Grafana provisioning cache refresh** — `3f099ca6` bumps the CVE dashboard JSON version to 2 so the existing Grafana UID reloads the new Patch status transformation. Dashboard BATS 5/5 passed; `make platform-ops` configured the updated ConfigMap.
+
 - [x] **CVE dashboard direct deployment** — `844fd0db` adds the CVE dashboard to the `platform-ops` reconciliation path after live Grafana showed stale columns. BATS 3/3, shellcheck, and `_agent_audit` passed; `make platform-ops` configured the dashboard ConfigMap successfully.
 
 - [x] **Grafana dashboard owner rollout** — `make observability` reapplied the owning `grafana-dashboards-hub` ApplicationSet after the live screenshot showed stale columns. The command succeeded; direct Argo/live verification is blocked by the unreachable kube API endpoint (`127.0.0.1:57780`).
