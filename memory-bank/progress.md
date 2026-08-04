@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Remediation failure metric semantics** — `090f0437` excludes retried Jobs that eventually succeeded from the Grafana failed panel. Live investigation found no remediation failure; the lone failed attempt was transient kubelet mount loss and the retry completed successfully. Dashboard BATS 6/6 passed; deployed with `make platform-ops`.
+
 - [x] **Live Grafana patch-status verification** — Hub recovered after OrbStack upgrade. Verified live dashboard ConfigMap contains `Patch status` and version 2; exporter emits `patch_status="patched"`; restarted Grafana and new pod reached 3/3 Ready. Reopen/ hard-refresh dashboard UID `cve-autopatch`.
 
 - [x] **Exporter ConfigMap reload** — `45aff929` restarts the inventory exporter during platform-ops reconciliation so new `patch_status` labels are emitted. BATS 4/4, shellcheck, and `_agent_audit` passed; `make platform-ops` restarted the deployment successfully.
