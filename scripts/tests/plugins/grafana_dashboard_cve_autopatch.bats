@@ -8,7 +8,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
-  run grep -F '"version": 2' "${DASH}"
+  run grep -F '"version": 3' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
@@ -30,5 +30,12 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
   run grep -F 'Critical CVE Alerts Firing' "${DASH}"
   [ "$status" -eq 0 ]
   run grep -F 'Remediation Jobs (cve-auto-*) Outcomes' "${DASH}"
+  [ "$status" -eq 0 ]
+}
+
+@test "CVE dashboard: failed remediation count excludes jobs that eventually succeeded" {
+  run grep -F 'kube_job_status_succeeded' "${DASH}"
+  [ "$status" -eq 0 ]
+  run grep -F '== 0)) or vector(0)' "${DASH}"
   [ "$status" -eq 0 ]
 }
