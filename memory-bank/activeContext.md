@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Prometheus exporter scrape issue RESOLVED 2026-08-03** — the ServiceMonitor and Endpoints were valid; Prometheus target discovery lagged after deployment, then appeared after operator reconciliation. `trivy_vulnerability_inventory` now returns series with `fixed_version` and package labels. Evidence: `docs/issues/2026-08-03-prometheus-service-monitor-discovery-delay.md`.
+
 - **CVE detail exporter DEPLOYED 2026-08-03** — `vulnerability-inventory-exporter` is Running in `platform-ops`, has read-only VulnerabilityReport RBAC, Service, and ServiceMonitor, and emits `trivy_vulnerability_inventory` with CVE, fixed-version, package, title, description, and advisory labels. Prometheus target discovery is still pending; do not claim Grafana patch/description columns until the target appears.
 
 - **CVE detail exporter required** — live Prometheus inspection shows `trivy_image_vulnerabilities` lacks CVE ID, fixed version, package, and description labels. Spec commit `69cc6fea` records the required read-only VulnerabilityReport exporter, RBAC, ServiceMonitor, normalization, and dashboard follow-up. Exporter implementation is pending; dashboard is not claiming unavailable fields.
