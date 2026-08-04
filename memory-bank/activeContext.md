@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Exporter reload fix 2026-08-03** — the patch-status label was absent because the exporter Deployment kept running code from before the ConfigMap update. Commit `45aff929` makes platform-ops restart `vulnerability-inventory-exporter` after applying its ConfigMap. BATS 4/4, shellcheck, and `_agent_audit` passed; pushed and deployed successfully (`deployment.apps/vulnerability-inventory-exporter restarted`).
+
 - **Grafana dashboard provisioning refresh forced 2026-08-03** — screenshot still showed the old table after ConfigMap reconciliation. Commit `3f099ca6` bumps the `cve-autopatch` dashboard JSON version to 2, forcing Grafana's sidecar/provisioner to reload the UID. Dashboard BATS 5/5 passed; pushed and reapplied with `make platform-ops` (`grafana-dashboard-cve-autopatch configured`).
 
 - **CVE dashboard direct reconciliation added 2026-08-03** — live Grafana remained stale after ApplicationSet refresh, so commit `844fd0db` makes `deploy_argocd_platform_ops` apply `grafana-dashboard-cve-autopatch.yaml` directly as well. Regression BATS 3/3, shellcheck, and `_agent_audit` passed; pushed and deployed with `make platform-ops`, which configured `grafana-dashboard-cve-autopatch`.

@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Exporter ConfigMap reload** — `45aff929` restarts the inventory exporter during platform-ops reconciliation so new `patch_status` labels are emitted. BATS 4/4, shellcheck, and `_agent_audit` passed; `make platform-ops` restarted the deployment successfully.
+
 - [x] **Grafana provisioning cache refresh** — `3f099ca6` bumps the CVE dashboard JSON version to 2 so the existing Grafana UID reloads the new Patch status transformation. Dashboard BATS 5/5 passed; `make platform-ops` configured the updated ConfigMap.
 
 - [x] **CVE dashboard direct deployment** — `844fd0db` adds the CVE dashboard to the `platform-ops` reconciliation path after live Grafana showed stale columns. BATS 3/3, shellcheck, and `_agent_audit` passed; `make platform-ops` configured the dashboard ConfigMap successfully.
