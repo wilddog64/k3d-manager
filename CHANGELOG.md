@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-08-03
+
+**Theme: harden the k3dm webhook auth surface.** A security review of the internet-facing webhook (Cloudflare Worker → tunnel → `127.0.0.1:7443`) found the bearer token was the only real boundary — and it grants full admin. This release adds defense-in-depth so a leaked token, a Slack user without an explicit role, or a crafted `/ask` payload can no longer reach admin operations. The Slack command path now enforces the same RBAC as the HTTP path, roles fail **closed** instead of open, the `/ask` bash sandbox blocks interpreter and shell escapes, and the server gains a rate limiter, guarded JSON parsing, a bounded event-id cache, and a token-file permission check. Verified live on a restarted `:7443` instance (health 200; no-token → 401; invalid role → 403 fail-closed to reader; malformed JSON → 400; sustained GETs trip the 429 rate limiter) and by `bin/smoke-test-webhook` (13/13 health checks) with 49/49 BATS green. **Owner deploy note:** populate `K3DM_SLACK_ROLE_MAP` (env or Keychain `k3dm-slack-role-map`) before deploy, or every Slack user is treated as reader-only.
+
+### Security
+- Slack command path enforces RBAC — a `user`→role allowlist (`K3DM_SLACK_ROLE_MAP` env / Keychain `k3dm-slack-role-map`, unknown user → reader) plus a minimum-role check in `_handle_thread_command`, so Slack no longer bypasses the role gate the HTTP path enforces (`490756e1`) (`bin/k3dm-webhook`, `scripts/lib/webhook/auth.py`)
+- Roles fail **closed** — a present-but-invalid role header now resolves to reader instead of admin (an absent header is still the direct-token admin path, unchanged) (`490756e1`) (`scripts/lib/webhook/auth.py`)
+- `/ask` bash sandbox blocks interpreters, nested shells, and redirection in `k3dm-ask-bash`, closing the denylist-bypass paths in the read-only sandbox (`490756e1`) (`bin/k3dm-ask-bash`)
+- Fixed-window rate limiter returns `429` on sustained request bursts; guarded POST `json.loads` returns `400` on malformed bodies instead of tracing back; the Slack `_seen_event_ids` dedup cache is bounded (OrderedDict cap 2048); a `TOKEN_FILE` with over-permissive mode is rejected; the `GEMINI_CLI_TRUST_WORKSPACE` workspace-trust escape hatch is dropped (`490756e1`) (`bin/k3dm-webhook`)
+
+### Fixed
+- `make show-service-passwords` shows the current Keycloak user passwords (`21cf3a38`) (`Makefile`)
+
 ## [1.20.0] - 2026-08-01
 
 **Theme: make the CVE auto-patch loop actually run.** v1.18.0 wired up the Trivy→webhook→`app-cve-scan` detect→patch loop; this release fixes the many ways it broke in practice. `app-cve-scan` now targets ArgoCD Applications by their cluster-prefixed name (26 remediation jobs had been failing on the bare service name and never patched anything), resolves multi-arch image digests through OCI image-index media types, authenticates registry reads with the scan pod's BusyBox `wget`, and exits 0 when a scan completes — a still-pending per-service remediation no longer marks the whole CronJob Failed, which had a triage bot looping on a misleading "Trivy exits 1 on CRITICAL" diagnosis. Failed scan pods no longer accumulate, the Hub chart is read from live deployment metadata instead of a guessed path, and `make up` reconciles platform-ops so the CVE stack is present after a cold bring-up. (v1.19.0 was a shopping-cart-only Dependabot milestone with no k3d-manager changes — no tag.)
