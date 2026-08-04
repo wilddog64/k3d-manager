@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Grafana CVE inventory no-data fix** — `799ad1bf` changed the exporter query to uppercase Trivy severities; live Prometheus verification returns 1,207 Critical/High rows and the dashboard ConfigMap is refreshed.
+
 - [x] **Prometheus scrape verification** — exporter target discovered after reconciliation; Prometheus query returns `trivy_vulnerability_inventory` series with patch metadata. Issue recorded in `docs/issues/2026-08-03-prometheus-service-monitor-discovery-delay.md`.
 
 - [~] **Vulnerability detail exporter deployed** — commits `27d74be4` (exporter/dashboard/wiring), `7176d6fa` (ServiceMonitor selector), and `442dc05f` (cross-namespace selector) pushed and `make platform-ops` applied them. Exporter pod/metrics are healthy; Prometheus query currently returns no series, so scrape discovery remains unresolved.
