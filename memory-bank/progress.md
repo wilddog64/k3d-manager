@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Shopping-cart vulnerability table data fix** — `7f0db9d9` filters by the exporter’s actual `image_repository` labels (`wilddog64/shopping-cart-*`) instead of nonexistent namespace names. BATS 7/7 passed; Argo synced dashboard version 6 and Grafana rollout completed.
+
 - [x] **Fixed-version visibility** — `1ed4aea6` adds the `Fixed version` dashboard column alongside `Version` and `Patch status`. BATS 6/6 passed; Argo synced revision `1ed4aea6`, live ConfigMap is version 4, and Grafana rollout completed.
 
 - [x] **ArgoCD stale dashboard cache** — hard refresh moved `hub-grafana-dashboards` from cached `83302658` to `8b5ec5fe`; live CVE dashboard ConfigMap now reports version 3. Grafana restart initiated after sync.
