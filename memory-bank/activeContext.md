@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Shopping-cart cross-cluster CVE inventory live 2026-08-04** — exporter now parses the app-cluster Secret's JSON `{bearerToken,tlsClientConfig}` plus `server` key. Commit `267dffd9` deployed; exporter emits `cluster="ubuntu-hostinger"` shopping-cart findings and Prometheus reports 1,201 app-cluster inventory series. The dedicated Grafana table filter is now backed by live data.
+
 - **Shopping-cart CVE table filter corrected 2026-08-04** — live exporter labels use `image_repository=wilddog64/shopping-cart-*` and `namespace=platform-ops`; the namespace filter returned no data. Commit `7f0db9d9` changes the dedicated table to filter shopping-cart image repositories, dashboard version 6. Dashboard BATS 7/7 passed; Argo synced version 6 and Grafana rollout completed.
 
 - **Grafana fixed-version column live 2026-08-04** — commit `1ed4aea6` exposes exporter `fixed_version` as `Fixed version` next to installed `Version`, retaining `Patch status`; dashboard version 4. Dashboard BATS 6/6 passed. Argo hard-refresh synced revision `1ed4aea6`; live ConfigMap version 4; Grafana rollout completed successfully.
