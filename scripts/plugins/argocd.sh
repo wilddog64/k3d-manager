@@ -1470,6 +1470,9 @@ EOF
    _info "[argocd] Deploying PrometheusRule..."
    _kubectl apply -f "${_dir}/prometheusrule.yaml"
 
+   _info "[argocd] Deploying vulnerability inventory exporter..."
+   _kubectl apply -f "${_dir}/vulnerability-inventory-exporter.yaml"
+
    _info "[argocd] Deploying Grafana dashboard (ArgoCD apps + image-updater sync)..."
    _kubectl apply -f "${_dir}/grafana-dashboard-argocd.yaml"
 
