@@ -2,6 +2,8 @@
 
 ## Status
 
+- **CVE dashboard LIVE-DEPLOYED 2026-08-03** — `hub-grafana-dashboards` was pinned at `k3d-manager-v1.20.0`, so `make platform-ops` initially left the old alert table in place. The owning `grafana-dashboards-hub` ApplicationSet was switched to `k3d-manager-v1.22.0`; ArgoCD is Synced/Healthy and the live ConfigMap now contains the actionable `Current Image Vulnerabilities` table with the `trivy_image_vulnerabilities` inventory query. No manual ConfigMap apply was used.
+
 - **CVE dashboard actionable inventory implemented** — `2e6baa9b` on `k3d-manager-v1.22.0` replaces the alert-only table with an instant Trivy vulnerability inventory (workload/image/severity/CVE labels), adds focused BATS coverage, and records the Phase 0 label/staleness data contract. YAML/JSON parsing, BATS, and `_agent_audit` passed; live Prometheus label confirmation remains required before rollout.
 
 - **v1.21.0 SHIPPED — PR #110 MERGED `f68bdee1`, tag+release published, enforce_admins RESTORED, retro written (2026-08-03).** Webhook auth-surface hardening is done and closed out. Post-merge housekeeping complete (main synced, tag `v1.21.0`, GitHub release, enforce_admins back to `true`, `docs/retro/2026-08-03-v1.21.0-retrospective.md`, standing docs audited — unchanged). **Current focus → v1.22.0:** rebase `k3d-manager-v1.22.0` onto new main, then open the openldap migration PR (prepare-and-stop for user go), then Claude-owned live cutover.
