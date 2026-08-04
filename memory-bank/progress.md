@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Platform table naming** — `af7056cb` clarifies that the general CVE inventory covers platform services, while shopping-cart findings are shown in the dedicated app table. BATS 8/8 passed; dashboard version 7 synced live.
+
 - [x] **Cross-cluster shopping-cart CVE inventory** — `267dffd9` completed app-cluster config parsing; live exporter emits shopping-cart metrics and Prometheus counts 1,201 `cluster="ubuntu-hostinger"` series. Dashboard table is now populated after Grafana refresh.
 
 - [x] **Shopping-cart vulnerability table data fix** — `7f0db9d9` filters by the exporter’s actual `image_repository` labels (`wilddog64/shopping-cart-*`) instead of nonexistent namespace names. BATS 7/7 passed; Argo synced dashboard version 6 and Grafana rollout completed.

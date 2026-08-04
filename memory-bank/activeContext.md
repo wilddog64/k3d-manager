@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Platform vulnerability table clarified 2026-08-04** — commit `af7056cb` renames the general inventory panel to `Platform Image Vulnerabilities (platform services; verify stale reports)` so it is distinct from the shopping-cart table. Dashboard BATS 8/8 passed; Argo synced dashboard version 7 live.
+
 - **Shopping-cart cross-cluster CVE inventory live 2026-08-04** — exporter now parses the app-cluster Secret's JSON `{bearerToken,tlsClientConfig}` plus `server` key. Commit `267dffd9` deployed; exporter emits `cluster="ubuntu-hostinger"` shopping-cart findings and Prometheus reports 1,201 app-cluster inventory series. The dedicated Grafana table filter is now backed by live data.
 
 - **Shopping-cart CVE table filter corrected 2026-08-04** — live exporter labels use `image_repository=wilddog64/shopping-cart-*` and `namespace=platform-ops`; the namespace filter returned no data. Commit `7f0db9d9` changes the dedicated table to filter shopping-cart image repositories, dashboard version 6. Dashboard BATS 7/7 passed; Argo synced version 6 and Grafana rollout completed.
