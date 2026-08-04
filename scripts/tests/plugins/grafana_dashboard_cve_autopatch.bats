@@ -8,7 +8,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
-  run grep -F '"version": 7' "${DASH}"
+  run grep -F '"version": 8' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
@@ -42,6 +42,13 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 
 @test "CVE dashboard: labels the general inventory as platform coverage" {
   run grep -F 'Platform Image Vulnerabilities (platform services; verify stale reports)' "${DASH}"
+  [ "$status" -eq 0 ]
+}
+
+@test "CVE dashboard: namespace panels include hub and shopping-cart clusters" {
+  run grep -F 'sum by (cluster, namespace) (trivy_vulnerability_inventory' "${DASH}"
+  [ "$status" -eq 0 ]
+  run grep -F 'cluster}} / {{namespace}}' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
