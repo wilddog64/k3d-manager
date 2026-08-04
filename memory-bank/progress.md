@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Fixed-version visibility** — `1ed4aea6` adds the `Fixed version` dashboard column alongside `Version` and `Patch status`. BATS 6/6 passed; Argo synced revision `1ed4aea6`, live ConfigMap is version 4, and Grafana rollout completed.
+
 - [x] **ArgoCD stale dashboard cache** — hard refresh moved `hub-grafana-dashboards` from cached `83302658` to `8b5ec5fe`; live CVE dashboard ConfigMap now reports version 3. Grafana restart initiated after sync.
 
 - [x] **Remediation failure metric semantics** — `090f0437` excludes retried Jobs that eventually succeeded from the Grafana failed panel. Live investigation found no remediation failure; the lone failed attempt was transient kubelet mount loss and the retry completed successfully. Dashboard BATS 6/6 passed; deployed with `make platform-ops`.

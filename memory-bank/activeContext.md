@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Grafana fixed-version column live 2026-08-04** — commit `1ed4aea6` exposes exporter `fixed_version` as `Fixed version` next to installed `Version`, retaining `Patch status`; dashboard version 4. Dashboard BATS 6/6 passed. Argo hard-refresh synced revision `1ed4aea6`; live ConfigMap version 4; Grafana rollout completed successfully.
+
 - **ArgoCD dashboard cache corrected 2026-08-04** — live ConfigMap had reverted to version 2 because `hub-grafana-dashboards` was serving cached Git revision `83302658`. Forced `argocd.argoproj.io/refresh=hard`; Application now synced revision `8b5ec5fe`, live ConfigMap is version 3, and Grafana rollout restart was initiated.
 
 - **Remediation failure panel corrected 2026-08-04** — live `cve-auto-1785813371` had one transient failed retry (`ExitCode 255`, kubelet `FailedMount` object-not-registered) and one successful completion; scan/promotions succeeded. Commit `090f0437` changes the Grafana failed count to exclude Jobs with `succeeded>0`, bumps dashboard version to 3, and deploys successfully via `make platform-ops`.
