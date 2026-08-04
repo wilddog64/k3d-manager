@@ -8,7 +8,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: inventory table uses instant Trivy vulnerability metric" {
-  run grep -F 'count by (namespace, resource_kind, resource_name, image_repository, image_tag, image_digest, severity, vulnerability_id)' "${DASH}"
+  run grep -F 'trivy_vulnerability_inventory' "${DASH}"
   [ "$status" -eq 0 ]
   run grep -F '"instant": true' "${DASH}"
   [ "$status" -eq 0 ]
