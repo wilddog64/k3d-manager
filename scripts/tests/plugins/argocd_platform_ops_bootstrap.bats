@@ -15,3 +15,8 @@
   run grep -F -- 'grafana-dashboard-cve-autopatch.yaml' scripts/plugins/argocd.sh
   [ "$status" -eq 0 ]
 }
+
+@test "platform-ops reconciliation restarts exporter after ConfigMap updates" {
+  run grep -F -- 'rollout restart deployment/vulnerability-inventory-exporter' scripts/plugins/argocd.sh
+  [ "$status" -eq 0 ]
+}

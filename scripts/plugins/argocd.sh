@@ -1472,6 +1472,8 @@ EOF
 
    _info "[argocd] Deploying vulnerability inventory exporter..."
    _kubectl apply -f "${_dir}/vulnerability-inventory-exporter.yaml"
+   _info "[argocd] Restarting vulnerability inventory exporter to load ConfigMap updates..."
+   _kubectl rollout restart deployment/vulnerability-inventory-exporter -n platform-ops
 
    _info "[argocd] Deploying Grafana dashboard (ArgoCD apps + image-updater sync)..."
    _kubectl apply -f "${_dir}/grafana-dashboard-argocd.yaml"
