@@ -328,6 +328,15 @@ setup() {
     [[ "$output" == *'"status":"queued"'* ]]
 }
 
+@test "hostinger status keeps report header and final health sections when long" {
+    run grep -F -- "middle of report truncated" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- "report[:1600]" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- "report[-1800:]" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+}
+
 @test "POST /diagnostics with reader role returns 202" {
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
