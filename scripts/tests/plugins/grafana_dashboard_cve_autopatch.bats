@@ -15,7 +15,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: inventory exposes workload, image, severity, and CVE columns" {
-  for field in resource_kind resource_name image_repository image_tag image_digest severity vulnerability_id; do
+  for field in resource_name image_repository image_tag image_digest severity vulnerability_id patch_status; do
     run grep -F "${field}" "${DASH}"
     [ "$status" -eq 0 ]
   done
