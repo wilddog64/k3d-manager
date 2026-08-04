@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **ArgoCD stale dashboard cache** — hard refresh moved `hub-grafana-dashboards` from cached `83302658` to `8b5ec5fe`; live CVE dashboard ConfigMap now reports version 3. Grafana restart initiated after sync.
+
 - [x] **Remediation failure metric semantics** — `090f0437` excludes retried Jobs that eventually succeeded from the Grafana failed panel. Live investigation found no remediation failure; the lone failed attempt was transient kubelet mount loss and the retry completed successfully. Dashboard BATS 6/6 passed; deployed with `make platform-ops`.
 
 - [x] **Live Grafana patch-status verification** — Hub recovered after OrbStack upgrade. Verified live dashboard ConfigMap contains `Patch status` and version 2; exporter emits `patch_status="patched"`; restarted Grafana and new pod reached 3/3 Ready. Reopen/ hard-refresh dashboard UID `cve-autopatch`.
