@@ -14,6 +14,7 @@
 
 ### Fixed
 - `make show-service-passwords` shows the current Keycloak user passwords (`21cf3a38`) (`Makefile`)
+- `stale_test_refs.bats` guards its three fixture tests with a commit-reachability `skip` so a fresh CI clone stays green — the hard-coded historical SHAs (`f03df202`/`4c89dabb`/`e3a75f1f`) were orphaned by the v1.20.0 branch cleanup and are unreachable in CI even under `fetch-depth: 0` (`scripts/tests/lib/stale_test_refs.bats`)
 
 ## [1.20.0] - 2026-08-01
 
