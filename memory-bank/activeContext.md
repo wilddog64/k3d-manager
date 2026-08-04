@@ -1,6 +1,7 @@
 # Active Context — k3d-manager
 
 ## Status
+- **Namespace CVE charts now include app cluster 2026-08-04** — commit `4e04b91f` adds a stable `cluster` label (`hub`/`ubuntu-hostinger`) and changes critical namespace panels to the inventory metric with legends `cluster / namespace`. Dashboard version 8 synced; Grafana restarted successfully; BATS 9/9 passed.
 
 - **Platform vulnerability table clarified 2026-08-04** — commit `af7056cb` renames the general inventory panel to `Platform Image Vulnerabilities (platform services; verify stale reports)` so it is distinct from the shopping-cart table. Dashboard BATS 8/8 passed; Argo synced dashboard version 7 live.
 

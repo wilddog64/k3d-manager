@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- [x] **Cluster-aware CVE charts** — `4e04b91f` includes Hub and shopping-cart app-cluster findings in namespace charts and legends. Dashboard version 8 synced and Grafana restarted; BATS 9/9 passed.
 
 - [x] **Platform table naming** — `af7056cb` clarifies that the general CVE inventory covers platform services, while shopping-cart findings are shown in the dedicated app table. BATS 8/8 passed; dashboard version 7 synced live.
 
