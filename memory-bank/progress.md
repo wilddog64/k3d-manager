@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Grafana dashboard owner rollout** — `make observability` reapplied the owning `grafana-dashboards-hub` ApplicationSet after the live screenshot showed stale columns. The command succeeded; direct Argo/live verification is blocked by the unreachable kube API endpoint (`127.0.0.1:57780`).
+
 - [x] **CVE patch availability column** — `9cfab2a6` adds `patch_status` to the vulnerability inventory exporter and renders `Patch status` in the Grafana table (`patched`/`unavailable`). Dashboard BATS 4/4, YAML parsing, diff check, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Deployment via `make platform-ops` remains.
 
 - [x] **Slack `/cluster-status` report completeness** — `0adf5c3f` preserves both beginning reachability details and ending service/login health details under Slack truncation, with an explicit middle marker. Webhook BATS 50/50 (6 live-only skips), Python compile, diff check, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`.

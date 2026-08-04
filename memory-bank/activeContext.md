@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Grafana patch-status dashboard rollout corrected 2026-08-03** — the screenshot showed the live dashboard was still on an older ApplicationSet revision; `make platform-ops` does not own that dashboard. Ran `make observability`, which reapplied `grafana-dashboards-hub` with the current branch. Argo sync/live verification is pending because the kube API endpoint is currently unreachable from this shell.
+
 - **Grafana CVE table patch status column 2026-08-03** — commit `9cfab2a6` adds exporter label `patch_status` (`patched` when Trivy provides a fixed version, otherwise `unavailable`) and displays it as `Patch status` after Version. Dashboard BATS 4/4, YAML parsing, diff check, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Run `make platform-ops` to sync the exporter/dashboard.
 
 - **Slack `/cluster-status` truncation fixed 2026-08-03** — commit `0adf5c3f` keeps both the report header and final service/login health sections when Slack's ~4k message limit requires truncation, instead of sending only the tail. Webhook BATS 50/50 (6 live-only skips), Python compile, diff check, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`.
