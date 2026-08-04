@@ -673,3 +673,61 @@ setup() {
     [[ "$output" == *'"status":"queued"'* ]]
     [[ "$output" == *'"job_id"'* ]]
 }
+
+# ── Webhook hardening regressions ──────────────────────────────────────────────
+
+@test "k3dm-ask-bash denies general-purpose interpreters" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run "${repo_root}/bin/k3dm-ask-bash" -c "python3 -c 'import os'"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Blocked"* ]]
+}
+
+@test "k3dm-ask-bash denies output redirection" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run "${repo_root}/bin/k3dm-ask-bash" -c "echo hi > /etc/x"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Blocked"* ]]
+
+    run "${repo_root}/bin/k3dm-ask-bash" -c "cat a >> b"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Blocked"* ]]
+}
+
+@test "k3dm-ask-bash denies nested shells and command maskers" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run "${repo_root}/bin/k3dm-ask-bash" -c "bash -c 'kubectl get pods'"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Blocked"* ]]
+
+    run "${repo_root}/bin/k3dm-ask-bash" -c "xargs rm"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Blocked"* ]]
+}
+
+@test "k3dm-ask-bash allows a plain kubectl read" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run "${repo_root}/bin/k3dm-ask-bash" -c "kubectl get pods -n cicd"
+    [ "$status" -eq 0 ]
+}
+
+@test "webhook role helpers preserve token admin and fail closed" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run env PYTHONPATH="${repo_root}/scripts/lib" K3DM_WEBHOOK_TOKEN="" K3DM_WEBHOOK_PATH="${repo_root}/bin/k3dm-webhook" python3 -c '
+import importlib.machinery
+import os
+from webhook.auth import _slack_user_role
+webhook = importlib.machinery.SourceFileLoader("k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]).load_module()
+assert webhook._request_role({}) == "admin"
+assert webhook._request_role({"X-K3DM-Role": "bogus"}) == "reader"
+assert webhook._thread_command_min_role("cluster-up hostinger") == "admin"
+assert webhook._thread_command_min_role("status") == "reader"
+assert _slack_user_role("Uunknown") == "reader"
+'
+    [ "$status" -eq 0 ]
+}

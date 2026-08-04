@@ -44,6 +44,11 @@ def _get_token():
     except Exception:
         pass
     if TOKEN_FILE.exists():
+        import stat
+        mode = TOKEN_FILE.stat().st_mode
+        if mode & (stat.S_IRWXG | stat.S_IRWXO):
+            print(f"[k3dm-webhook] ignoring {TOKEN_FILE}: group/other-accessible (chmod 600)", flush=True)
+            return None
         return TOKEN_FILE.read_text().strip()
     return None
 
@@ -62,3 +67,27 @@ def _verify_slack_signature(raw_body, timestamp, signature):
         digestmod="sha256",
     ).hexdigest()
     return hmac.compare_digest(expected, signature)
+
+
+def _load_slack_role_map():
+    """Parse 'U012:admin,U045:operator' from env or Keychain into {user_id: role}."""
+    raw = os.environ.get("K3DM_SLACK_ROLE_MAP") or _keychain_secret("k3dm-slack-role-map")
+    mapping = {}
+    for pair in (raw or "").split(","):
+        pair = pair.strip()
+        if not pair or ":" not in pair:
+            continue
+        uid, _, role = pair.partition(":")
+        uid = uid.strip()
+        role = role.strip().lower()
+        if uid and role in ("reader", "operator", "admin"):
+            mapping[uid] = role
+    return mapping
+
+
+SLACK_ROLE_MAP = _load_slack_role_map()
+
+
+def _slack_user_role(user_id):
+    """Resolve a Slack user ID to reader|operator|admin. Unknown → reader (fail closed)."""
+    return SLACK_ROLE_MAP.get((user_id or "").strip(), "reader")
