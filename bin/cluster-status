@@ -139,6 +139,19 @@ if [[ -z "${_prom_available}" || "${_prom_available}" == "/" ]]; then
   echo "Prometheus: not installed (no ${_prom_cr} resource in monitoring)"
 else
   echo "Prometheus: ${_prom_available} available"
+  _prom_ready_path='/api/v1/namespaces/monitoring/services/http:prometheus-operated:9090/proxy/-/ready'
+  if kubectl --context "${APP_CONTEXT}" get --raw="${_prom_ready_path}" >/dev/null 2>&1; then
+    echo "Prometheus API: UP (service proxy reachable)"
+    _trivy_app_query='ALERTS%7Balertname%3D%22TrivyCriticalVulnerabilityDetected%22%2Capp%21%3D%22%22%7D'
+    _trivy_app_result="$(kubectl --context "${APP_CONTEXT}" get --raw="/api/v1/namespaces/monitoring/services/http:prometheus-operated:9090/proxy/api/v1/query?query=${_trivy_app_query}" 2>/dev/null || true)"
+    if printf '%s' "${_trivy_app_result}" | grep -Eq '"result":\[[^]]+\]'; then
+      echo "Trivy alert app labels: PRESENT (non-empty app labels observed)"
+    else
+      echo "WARN Trivy alert app labels: NONE (rule may not be reconciled yet)"
+    fi
+  else
+    echo "Prometheus API: DOWN (service proxy unreachable; check kube context/tunnel)"
+  fi
   _prom_pod="$(kubectl --context "${APP_CONTEXT}" -n monitoring \
     get pods -l "operator.prometheus.io/name=${_prom_cr}" \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"

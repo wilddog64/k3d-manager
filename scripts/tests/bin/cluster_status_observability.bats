@@ -15,6 +15,12 @@
 
   run grep -nF 'Grafana panels may be blank until Prometheus stays ready' bin/cluster-status
   [ "$status" -eq 0 ]
+
+  run grep -nF 'Prometheus API: DOWN (service proxy unreachable; check kube context/tunnel)' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'Trivy alert app labels: PRESENT' bin/cluster-status
+  [ "$status" -eq 0 ]
 }
 
 @test "cluster-status surfaces Alertmanager Cloudflare health" {
