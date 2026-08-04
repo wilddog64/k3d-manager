@@ -115,3 +115,8 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   run grep -F -- 'https://webhook.3ai-talk.org/api/v1/analyze' "${ROUTE}"
   [ "${status}" -eq 0 ]
 }
+
+@test "trivy observability: critical alerts populate legacy app notification label" {
+  run grep -F -- 'app: "{{ $labels.image_repository }}"' "${RULE}"
+  [ "${status}" -eq 0 ]
+}
