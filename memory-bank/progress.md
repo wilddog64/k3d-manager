@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Status command Prometheus verification** — `dc005bda` makes `make status` report Prometheus API reachability through the Kubernetes service proxy and whether `TrivyCriticalVulnerabilityDetected` has non-empty `app` labels. BATS, syntax, shellcheck, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`.
+
 - [x] **Trivy `app ''` notification fix — source deployed to branch** — `78981791` adds the legacy `app` alert label from `image_repository` and a regression assertion in `trivy_operator_observability.bats`. BATS 8/8, YAML parsing, shellcheck, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Live sync remains: run `make platform-ops`, then query firing alerts for non-empty `app`.
 
 - [x] **Trivy empty-app diagnosis corrected** — verified live `ALERTS{alertname="TrivyCriticalVulnerabilityDetected"}` labels and rule grouping; completed-pod deletion is not the alert fix. Notification should render `image_repository` instead of assuming `app`.
