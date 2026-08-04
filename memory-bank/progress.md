@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- [x] **App-cluster remediation alert wiring** — `9b7c54a3` makes critical alerts evaluate the cross-cluster inventory metric, so ubuntu-hostinger shopping-cart findings can trigger the existing cve-remediate route. BATS 9/9 passed; deployed via `make platform-ops`.
 - [x] **Cluster-aware CVE charts** — `4e04b91f` includes Hub and shopping-cart app-cluster findings in namespace charts and legends. Dashboard version 8 synced and Grafana restarted; BATS 9/9 passed.
 
 - [x] **Platform table naming** — `af7056cb` clarifies that the general CVE inventory covers platform services, while shopping-cart findings are shown in the dedicated app table. BATS 8/8 passed; dashboard version 7 synced live.

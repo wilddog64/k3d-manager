@@ -1,6 +1,7 @@
 # Active Context — k3d-manager
 
 ## Status
+- **Hostinger CVEs now enter remediation alerts 2026-08-04** — live investigation showed exporter had 1,201 app-cluster findings but `TrivyCriticalVulnerabilityDetected` still queried Hub-only `trivy_image_vulnerabilities`. Commit `9b7c54a3` changes the rule to `trivy_vulnerability_inventory` grouped by cluster/namespace/image, preserving the existing remediation route; BATS 9/9 passed and `make platform-ops` applied it.
 - **Namespace CVE charts now include app cluster 2026-08-04** — commit `4e04b91f` adds a stable `cluster` label (`hub`/`ubuntu-hostinger`) and changes critical namespace panels to the inventory metric with legends `cluster / namespace`. Dashboard version 8 synced; Grafana restarted successfully; BATS 9/9 passed.
 
 - **Platform vulnerability table clarified 2026-08-04** — commit `af7056cb` renames the general inventory panel to `Platform Image Vulnerabilities (platform services; verify stale reports)` so it is distinct from the shopping-cart table. Dashboard BATS 8/8 passed; Argo synced dashboard version 7 live.
