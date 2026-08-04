@@ -2,6 +2,8 @@
 
 ## Status
 
+- **CVE dashboard direct reconciliation added 2026-08-03** — live Grafana remained stale after ApplicationSet refresh, so commit `844fd0db` makes `deploy_argocd_platform_ops` apply `grafana-dashboard-cve-autopatch.yaml` directly as well. Regression BATS 3/3, shellcheck, and `_agent_audit` passed; pushed and deployed with `make platform-ops`, which configured `grafana-dashboard-cve-autopatch`.
+
 - **Grafana patch-status dashboard rollout corrected 2026-08-03** — the screenshot showed the live dashboard was still on an older ApplicationSet revision; `make platform-ops` does not own that dashboard. Ran `make observability`, which reapplied `grafana-dashboards-hub` with the current branch. Argo sync/live verification is pending because the kube API endpoint is currently unreachable from this shell.
 
 - **Grafana CVE table patch status column 2026-08-03** — commit `9cfab2a6` adds exporter label `patch_status` (`patched` when Trivy provides a fixed version, otherwise `unavailable`) and displays it as `Patch status` after Version. Dashboard BATS 4/4, YAML parsing, diff check, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Run `make platform-ops` to sync the exporter/dashboard.

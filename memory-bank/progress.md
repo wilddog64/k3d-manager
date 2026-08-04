@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **CVE dashboard direct deployment** — `844fd0db` adds the CVE dashboard to the `platform-ops` reconciliation path after live Grafana showed stale columns. BATS 3/3, shellcheck, and `_agent_audit` passed; `make platform-ops` configured the dashboard ConfigMap successfully.
+
 - [x] **Grafana dashboard owner rollout** — `make observability` reapplied the owning `grafana-dashboards-hub` ApplicationSet after the live screenshot showed stale columns. The command succeeded; direct Argo/live verification is blocked by the unreachable kube API endpoint (`127.0.0.1:57780`).
 
 - [x] **CVE patch availability column** — `9cfab2a6` adds `patch_status` to the vulnerability inventory exporter and renders `Patch status` in the Grafana table (`patched`/`unavailable`). Dashboard BATS 4/4, YAML parsing, diff check, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Deployment via `make platform-ops` remains.
