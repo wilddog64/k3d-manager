@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **CVE patch availability column** — `9cfab2a6` adds `patch_status` to the vulnerability inventory exporter and renders `Patch status` in the Grafana table (`patched`/`unavailable`). Dashboard BATS 4/4, YAML parsing, diff check, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Deployment via `make platform-ops` remains.
+
 - [x] **Slack `/cluster-status` report completeness** — `0adf5c3f` preserves both beginning reachability details and ending service/login health details under Slack truncation, with an explicit middle marker. Webhook BATS 50/50 (6 live-only skips), Python compile, diff check, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`.
 
 - [x] **Status command Prometheus verification** — `dc005bda` makes `make status` report Prometheus API reachability through the Kubernetes service proxy and whether `TrivyCriticalVulnerabilityDetected` has non-empty `app` labels. BATS, syntax, shellcheck, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`.
