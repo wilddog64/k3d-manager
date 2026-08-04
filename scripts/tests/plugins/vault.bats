@@ -746,6 +746,13 @@ JSON
   done
 }
 
+@test "deploy_vault installs the unseal watchdog after bootstrap" {
+  run grep -F -- '_vault_bootstrap_ha "$ns" "$release"' scripts/plugins/vault.sh
+  [ "$status" -eq 0 ]
+  run grep -F -- 'vault_install_unseal_watchdog "$ns"' scripts/plugins/vault.sh
+  [ "$status" -eq 0 ]
+}
+
 @test "_vault_bootstrap_ha errors when vault health check fails" {
   setup_vault_bootstrap_stubs
 

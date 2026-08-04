@@ -1041,6 +1041,7 @@ EOF
    _vault_repo_setup
    _deploy_vault_ha "$ns" "$release" "$version"
    _vault_bootstrap_ha "$ns" "$release"
+   vault_install_unseal_watchdog "$ns"
    _enable_kv2_k8s_auth "$ns" "$release"
    _vault_seed_ldap_service_accounts "$ns" "$release"
    _vault_setup_pki "$ns" "$release"
