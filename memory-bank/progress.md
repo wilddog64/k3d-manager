@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Live Grafana patch-status verification** — Hub recovered after OrbStack upgrade. Verified live dashboard ConfigMap contains `Patch status` and version 2; exporter emits `patch_status="patched"`; restarted Grafana and new pod reached 3/3 Ready. Reopen/ hard-refresh dashboard UID `cve-autopatch`.
+
 - [x] **Exporter ConfigMap reload** — `45aff929` restarts the inventory exporter during platform-ops reconciliation so new `patch_status` labels are emitted. BATS 4/4, shellcheck, and `_agent_audit` passed; `make platform-ops` restarted the deployment successfully.
 
 - [x] **Grafana provisioning cache refresh** — `3f099ca6` bumps the CVE dashboard JSON version to 2 so the existing Grafana UID reloads the new Patch status transformation. Dashboard BATS 5/5 passed; `make platform-ops` configured the updated ConfigMap.

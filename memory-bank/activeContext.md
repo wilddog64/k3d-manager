@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Live CVE patch-status verification completed 2026-08-03** — after OrbStack upgrade, Hub k3d recovered (`k3d` 1 server/3 agents, all Ready). Live ConfigMap contains `Patch status`, dashboard JSON version is 2, exporter emits `patch_status="patched"`, and Grafana was restarted; new Grafana pod reached 3/3 Ready. The UI should now show the column after a hard refresh/reopen of UID `cve-autopatch`.
+
 - **Exporter reload fix 2026-08-03** — the patch-status label was absent because the exporter Deployment kept running code from before the ConfigMap update. Commit `45aff929` makes platform-ops restart `vulnerability-inventory-exporter` after applying its ConfigMap. BATS 4/4, shellcheck, and `_agent_audit` passed; pushed and deployed successfully (`deployment.apps/vulnerability-inventory-exporter restarted`).
 
 - **Grafana dashboard provisioning refresh forced 2026-08-03** — screenshot still showed the old table after ConfigMap reconciliation. Commit `3f099ca6` bumps the `cve-autopatch` dashboard JSON version to 2, forcing Grafana's sidecar/provisioner to reload the UID. Dashboard BATS 5/5 passed; pushed and reapplied with `make platform-ops` (`grafana-dashboard-cve-autopatch configured`).
