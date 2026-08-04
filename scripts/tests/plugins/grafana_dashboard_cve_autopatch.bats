@@ -7,6 +7,11 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
   [ "$status" -eq 0 ]
 }
 
+@test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
+  run grep -F '"version": 2' "${DASH}"
+  [ "$status" -eq 0 ]
+}
+
 @test "CVE dashboard: inventory table uses instant Trivy vulnerability metric" {
   run grep -F 'trivy_vulnerability_inventory' "${DASH}"
   [ "$status" -eq 0 ]
