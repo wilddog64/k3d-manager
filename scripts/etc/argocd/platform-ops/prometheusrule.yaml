@@ -63,8 +63,8 @@ spec:
             description: "At least one Trivy Operator scan job in namespace trivy-system has failed within the last 10 minutes"
         - alert: TrivyCriticalVulnerabilityDetected
           expr: |
-            sum by (namespace, image_repository) (
-              trivy_image_vulnerabilities{severity="Critical"}
+            sum by (cluster, namespace, image_repository) (
+              trivy_vulnerability_inventory{severity="CRITICAL"}
             ) > 0
           for: 15m
           labels:

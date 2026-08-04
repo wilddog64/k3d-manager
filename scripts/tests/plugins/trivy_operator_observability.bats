@@ -116,6 +116,13 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   [ "${status}" -eq 0 ]
 }
 
+@test "trivy observability: critical alert includes app-cluster inventory findings" {
+  run grep -F -- 'sum by (cluster, namespace, image_repository)' "${RULE}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- 'trivy_vulnerability_inventory{severity="CRITICAL"}' "${RULE}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "trivy observability: critical alerts populate legacy app notification label" {
   run grep -F -- 'app: "{{ $labels.image_repository }}"' "${RULE}"
   [ "${status}" -eq 0 ]
