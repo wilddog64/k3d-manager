@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Trivy `app ''` notification investigated 2026-08-03** — live alert series have `namespace`/`image_repository` but no `app`; firing alerts include ordinary workload images. The empty app is a notification-template mismatch, not evidence that completed scan pods cause the alert. Issue: `docs/issues/2026-08-03-trivy-alert-empty-app-misdiagnosed.md`.
+
 - **Grafana CVE table no-data fixed 2026-08-03** — Trivy severity labels are uppercase (`CRITICAL`, `HIGH`, `UNKNOWN`); the dashboard filter used title case. Commit `799ad1bf` corrected the filter, ArgoCD refreshed the dashboard, and the live query returns 1,207 rows. Evidence: `docs/issues/2026-08-03-grafana-cve-table-no-data.md`.
 
 - **Prometheus exporter scrape issue RESOLVED 2026-08-03** — the ServiceMonitor and Endpoints were valid; Prometheus target discovery lagged after deployment, then appeared after operator reconciliation. `trivy_vulnerability_inventory` now returns series with `fixed_version` and package labels. Evidence: `docs/issues/2026-08-03-prometheus-service-monitor-discovery-delay.md`.

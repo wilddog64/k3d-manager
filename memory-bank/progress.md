@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Trivy empty-app diagnosis corrected** — verified live `ALERTS{alertname="TrivyCriticalVulnerabilityDetected"}` labels and rule grouping; completed-pod deletion is not the alert fix. Notification should render `image_repository` instead of assuming `app`.
+
 - [x] **Grafana CVE inventory no-data fix** — `799ad1bf` changed the exporter query to uppercase Trivy severities; live Prometheus verification returns 1,207 Critical/High rows and the dashboard ConfigMap is refreshed.
 
 - [x] **Prometheus scrape verification** — exporter target discovered after reconciliation; Prometheus query returns `trivy_vulnerability_inventory` series with patch metadata. Issue recorded in `docs/issues/2026-08-03-prometheus-service-monitor-discovery-delay.md`.
