@@ -1,6 +1,7 @@
 # Active Context — k3d-manager
 
 ## Status
+- **Keycloak credentials display fixed 2026-08-04** — `make show-service-passwords` was querying the wrong (app-cluster) Vault; Keycloak users are stored in Hub Vault. Commit `874dbfe5` defaults `bin/get-keycloak-password` back to `k3d-k3d-cluster`. Verified target now prints admin/developer/operator passwords and the frontend SSO endpoint.
 - **Vault auto-unseal fixed 2026-08-04** — Vault was sealed after OrbStack reboot because the existing watchdog CronJob had never been installed. Installed `vault-unseal-watchdog` in `secrets` (runs every minute); it successfully unsealed Vault (`sealed=false`) using `vault-unseal` shard-1. Commit `1564febd` wires watchdog installation into `deploy_vault`; watchdog+Vault BATS 31/31 and shellcheck passed.
 - **Hostinger CVEs now enter remediation alerts 2026-08-04** — live investigation showed exporter had 1,201 app-cluster findings but `TrivyCriticalVulnerabilityDetected` still queried Hub-only `trivy_image_vulnerabilities`. Commit `9b7c54a3` changes the rule to `trivy_vulnerability_inventory` grouped by cluster/namespace/image, preserving the existing remediation route; BATS 9/9 passed and `make platform-ops` applied it.
 - **Namespace CVE charts now include app cluster 2026-08-04** — commit `4e04b91f` adds a stable `cluster` label (`hub`/`ubuntu-hostinger`) and changes critical namespace panels to the inventory metric with legends `cluster / namespace`. Dashboard version 8 synced; Grafana restarted successfully; BATS 9/9 passed.

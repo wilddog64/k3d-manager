@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- [x] **Credential target Keycloak lookup** — `874dbfe5` restores Hub Vault context; `make show-service-passwords` now returns live Keycloak admin/developer/operator credentials instead of N/A.
 - [x] **Vault post-reboot auto-unseal** — installed and verified `vault-unseal-watchdog` CronJob; it unsealed the live Vault after reboot. `1564febd` makes future `deploy_vault` runs install it automatically. Vault/watchdog BATS 31/31 and shellcheck passed.
 - [x] **App-cluster remediation alert wiring** — `9b7c54a3` makes critical alerts evaluate the cross-cluster inventory metric, so ubuntu-hostinger shopping-cart findings can trigger the existing cve-remediate route. BATS 9/9 passed; deployed via `make platform-ops`.
 - [x] **Cluster-aware CVE charts** — `4e04b91f` includes Hub and shopping-cart app-cluster findings in namespace charts and legends. Dashboard version 8 synced and Grafana restarted; BATS 9/9 passed.
