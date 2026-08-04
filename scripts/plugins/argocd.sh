@@ -1475,6 +1475,8 @@ EOF
 
    _info "[argocd] Deploying Grafana dashboard (ArgoCD apps + image-updater sync)..."
    _kubectl apply -f "${_dir}/grafana-dashboard-argocd.yaml"
+   _info "[argocd] Deploying CVE inventory dashboard..."
+   _kubectl apply -f "${_dir}/grafana-dashboard-cve-autopatch.yaml"
 
    _info "[argocd] Deploying AlertmanagerConfig..."
    _kubectl apply -f "${_dir}/alertmanager-config.yaml"

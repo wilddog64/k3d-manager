@@ -10,3 +10,8 @@
   run bash -c "awk '/^function deploy_argocd_bootstrap\\(\\)/,/^}\$/' scripts/plugins/argocd.sh | grep -F 'deploy_argocd_platform_ops || _warn'"
   [ "$status" -eq 0 ]
 }
+
+@test "platform-ops reconciliation applies the CVE inventory dashboard" {
+  run grep -F -- 'grafana-dashboard-cve-autopatch.yaml' scripts/plugins/argocd.sh
+  [ "$status" -eq 0 ]
+}
