@@ -2,6 +2,8 @@
 
 ## Status
 
+- [ ] **Vulnerability detail exporter** — live label preflight completed; metric lacks CVE/fix/description fields. Spec updated and pushed as `69cc6fea`; exporter implementation remains the next required change before adding patch/description columns.
+
 - [x] **Live CVE dashboard rollout verified 2026-08-03** — updated the `grafana-dashboards-hub` ApplicationSet target revision from `k3d-manager-v1.20.0` to `k3d-manager-v1.22.0`; ArgoCD reports Synced/Healthy and the live dashboard ConfigMap contains the new inventory query/title. The earlier direct Application patch was correctly superseded by the owning ApplicationSet patch.
 
 - [x] **CVE dashboard actionable inventory** — `2e6baa9b` adds the dashboard implementation, focused `grafana_dashboard_cve_autopatch.bats`, and the inventory/six-phase specs. Four BATS tests, YAML/embedded JSON parsing, diff checks, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`.

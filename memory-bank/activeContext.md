@@ -2,6 +2,8 @@
 
 ## Status
 
+- **CVE detail exporter required** — live Prometheus inspection shows `trivy_image_vulnerabilities` lacks CVE ID, fixed version, package, and description labels. Spec commit `69cc6fea` records the required read-only VulnerabilityReport exporter, RBAC, ServiceMonitor, normalization, and dashboard follow-up. Exporter implementation is pending; dashboard is not claiming unavailable fields.
+
 - **CVE dashboard LIVE-DEPLOYED 2026-08-03** — `hub-grafana-dashboards` was pinned at `k3d-manager-v1.20.0`, so `make platform-ops` initially left the old alert table in place. The owning `grafana-dashboards-hub` ApplicationSet was switched to `k3d-manager-v1.22.0`; ArgoCD is Synced/Healthy and the live ConfigMap now contains the actionable `Current Image Vulnerabilities` table with the `trivy_image_vulnerabilities` inventory query. No manual ConfigMap apply was used.
 
 - **CVE dashboard actionable inventory implemented** — `2e6baa9b` on `k3d-manager-v1.22.0` replaces the alert-only table with an instant Trivy vulnerability inventory (workload/image/severity/CVE labels), adds focused BATS coverage, and records the Phase 0 label/staleness data contract. YAML/JSON parsing, BATS, and `_agent_audit` passed; live Prometheus label confirmation remains required before rollout.
