@@ -1471,8 +1471,8 @@ EOF
    _kubectl apply -f "${_dir}/prometheusrule.yaml"
 
    _info "[argocd] Deploying vulnerability inventory exporter..."
-   _kubectl get secret cluster-ubuntu-hostinger -n cicd -o json 2>/dev/null \
-      | sed 's/"namespace":"cicd"/"namespace":"platform-ops"/; s/"name":"cluster-ubuntu-hostinger"/"name":"app-cluster-kubeconfig"/' \
+   _kubectl get secret cluster-ubuntu-hostinger -n cicd -o yaml 2>/dev/null \
+      | sed -e 's/^  name: cluster-ubuntu-hostinger/  name: app-cluster-kubeconfig/' -e 's/^  namespace: cicd/  namespace: platform-ops/' \
       | _kubectl apply -f - >/dev/null 2>&1 || _warn "[argocd] app-cluster kubeconfig unavailable; exporter will report Hub findings only"
    _kubectl apply -f "${_dir}/vulnerability-inventory-exporter.yaml"
    _info "[argocd] Restarting vulnerability inventory exporter to load ConfigMap updates..."
