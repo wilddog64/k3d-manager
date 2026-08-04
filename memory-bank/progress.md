@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **Trivy `app ''` notification fix — source deployed to branch** — `78981791` adds the legacy `app` alert label from `image_repository` and a regression assertion in `trivy_operator_observability.bats`. BATS 8/8, YAML parsing, shellcheck, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Live sync remains: run `make platform-ops`, then query firing alerts for non-empty `app`.
+
 - [x] **Trivy empty-app diagnosis corrected** — verified live `ALERTS{alertname="TrivyCriticalVulnerabilityDetected"}` labels and rule grouping; completed-pod deletion is not the alert fix. Notification should render `image_repository` instead of assuming `app`.
 
 - [x] **Grafana CVE inventory no-data fix** — `799ad1bf` changed the exporter query to uppercase Trivy severities; live Prometheus verification returns 1,207 Critical/High rows and the dashboard ConfigMap is refreshed.

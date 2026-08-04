@@ -2,6 +2,8 @@
 
 ## Status
 
+- **Trivy empty-app notification bridge deployed 2026-08-03** — commit `78981791` adds `app: "{{ $labels.image_repository }}"` to `TrivyCriticalVulnerabilityDetected`, preserving the legacy webhook/template field while retaining canonical namespace/image grouping. Focused observability BATS (8/8), YAML parse, shellcheck, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Run `make platform-ops` to sync the PrometheusRule, then verify live alert labels include `app`.
+
 - **Trivy `app ''` notification investigated 2026-08-03** — live alert series have `namespace`/`image_repository` but no `app`; firing alerts include ordinary workload images. The empty app is a notification-template mismatch, not evidence that completed scan pods cause the alert. Issue: `docs/issues/2026-08-03-trivy-alert-empty-app-misdiagnosed.md`.
 
 - **Grafana CVE table no-data fixed 2026-08-03** — Trivy severity labels are uppercase (`CRITICAL`, `HIGH`, `UNKNOWN`); the dashboard filter used title case. Commit `799ad1bf` corrected the filter, ArgoCD refreshed the dashboard, and the live query returns 1,207 rows. Evidence: `docs/issues/2026-08-03-grafana-cve-table-no-data.md`.
