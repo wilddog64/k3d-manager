@@ -2,6 +2,8 @@
 
 ## Status
 
+- [x] **CVE dashboard actionable inventory** — `2e6baa9b` adds the dashboard implementation, focused `grafana_dashboard_cve_autopatch.bats`, and the inventory/six-phase specs. Four BATS tests, YAML/embedded JSON parsing, diff checks, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`.
+
 - [x] **v1.21.0 webhook hardening — PR #110 MERGED to main `f68bdee1` + /post-merge DONE (2026-08-03).** Squash-merged 2026-08-04T01:22Z. **Tag `v1.21.0` created + GitHub release published** (`https://github.com/wilddog64/k3d-manager/releases/tag/v1.21.0`). **`enforce_admins` RESTORED to `true` on main.** Retro `docs/retro/2026-08-03-v1.21.0-retrospective.md`. Standing docs audited — no new plugins/providers/public-functions (only `bin/k3dm-webhook`/`k3dm-ask-bash`/`webhook/auth.py` hardened), so projectbrief/copilot-instructions/functions.md unchanged. **NEXT (sequential stack, user-go per phase):** rebase `k3d-manager-v1.22.0` onto new main (`f68bdee1` is NOT yet its ancestor) → open v1.22.0 openldap PR → Claude-owned live openldap cutover (respect preserveResourcesOnDeletion trap — no appset rename/delete). Then v1.23.0.
 - [x] **v1.22.0 OpenLDAP Symas migration** — feature commit `b30f7898` pushed to `origin/k3d-manager-v1.22.0`; exactly 12 source files changed. ShellCheck, Bash syntax, template YAML parsing, `_agent_audit`, and diff gates passed. Phase 0 pins confirmed from the rewritten spec (`openldap-stack-ha` 4.3.3 / `jpgouin/openldap:2.6.9-fix`); live Helm/Kubernetes deployment not performed.
 
