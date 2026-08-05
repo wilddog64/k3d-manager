@@ -48,7 +48,19 @@ The Hostinger node identifies itself as `v1.36.2+k3s1`. Application history show
 
 ## Fix and follow-up
 
-Source fix `fb3df7d4` adds exact ArgoCD ignore rules for the two controller-owned webhooks and renders the k3s CNI paths from the Hostinger provider. Deploy by reapplying the Hostinger GitOps ApplicationSets, then verify:
+Source fix `fb3df7d4` adds exact ArgoCD ignore rules for the two controller-owned webhooks and renders the k3s CNI paths from the Hostinger provider. A second source fix, `0510e1f8`, enables ArgoCD Server-Side Diff for this ApplicationSet. This is required because `ServerSideApply=true` otherwise selects structured-merge comparison, which retains false drift on Kubernetes defaulted fields. Kubernetes server-side dry-run reported no changes with the `argocd-controller` field manager.
+
+The ApplicationSet was deployed with `deploy_istio_ambient --confirm`. Final live verification:
+
+```text
+istio-base-ubuntu-hostinger sync=Synced health=Healthy
+istio-cni-ubuntu-hostinger sync=Synced health=Healthy
+istiod-ubuntu-hostinger sync=Synced health=Healthy
+
+istio-cni-node   1   1   1   1   1
+```
+
+Repeat verification with:
 
 ```text
 kubectl --context ubuntu-hostinger -n istio-system get daemonset istio-cni-node
