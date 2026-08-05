@@ -8,6 +8,11 @@ function deploy_observability() {
   : "${ARGOCD_NAMESPACE:=cicd}"
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
   export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
+  local _grafana_secret_manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-admin-externalsecret.yaml"
+  if [[ -f "${_grafana_secret_manifest}" ]]; then
+    _kubectl apply -f "${_grafana_secret_manifest}" >/dev/null \
+      && _info "[observability] Grafana admin credential ExternalSecret applied"
+  fi
   # shellcheck disable=SC2016
   if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] Hub ApplicationSet applied — ArgoCD will sync monitoring/trivy-system"
