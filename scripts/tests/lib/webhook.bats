@@ -16,6 +16,8 @@ setup_file() {
     export K3DM_WEBHOOK_TOKEN
     K3DM_WEBHOOK_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     export K3DM_WEBHOOK_PORT="${_WEBHOOK_PORT}"
+    export SLACK_SIGNING_SECRET="bats-slack-signing-secret"
+    export K3DM_SLACK_ROLE_MAP="U-reader:reader"
 
     # Stub the analysis binary so queued /analyze and /diagnostics jobs cannot
     # spawn the real agy CLI (which launches Chrome via ACG browser automation).
@@ -112,6 +114,31 @@ _wait_cluster_idle() {
         (( i++ )) || true
     done
     return 0
+}
+
+_raw_post_status() {
+    local path="$1" content_length="$2"
+    python3 -c '
+import os, socket, sys
+request = ("POST %s HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\nAuthorization: Bearer %s\\r\\nContent-Length: %s\\r\\nConnection: close\\r\\n\\r\\n" % (sys.argv[2], os.environ["K3DM_WEBHOOK_TOKEN"], sys.argv[3])).encode()
+with socket.create_connection(("127.0.0.1", int(sys.argv[1]))) as sock:
+    sock.settimeout(2)
+    sock.sendall(request)
+    sock.shutdown(socket.SHUT_WR)
+    print(sock.recv(1024).split(b"\\r\\n", 1)[0].decode())
+' "${_WEBHOOK_PORT}" "${path}" "${content_length}"
+}
+
+_slack_event() {
+    local body="$1" timestamp signature
+    timestamp="$(date +%s)"
+    signature="$(K3DM_TEST_SLACK_BODY="${body}" K3DM_TEST_SLACK_TIMESTAMP="${timestamp}" python3 -c 'import hashlib,hmac,os; body=os.environ["K3DM_TEST_SLACK_BODY"]; ts=os.environ["K3DM_TEST_SLACK_TIMESTAMP"]; secret=os.environ["SLACK_SIGNING_SECRET"]; print("v0=" + hmac.new(secret.encode(), f"v0:{ts}:{body}".encode(), hashlib.sha256).hexdigest())')"
+    curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "X-Slack-Request-Timestamp: ${timestamp}" \
+        -H "X-Slack-Signature: ${signature}" \
+        --data-raw "${body}" \
+        "${_WEBHOOK_URL}/slack/events"
 }
 
 setup() {
@@ -684,6 +711,72 @@ setup() {
 }
 
 # ── Webhook hardening regressions ──────────────────────────────────────────────
+
+@test "webhook rejects malformed Content-Length without killing either POST route" {
+    local path length response
+    for path in "/api/v1/argocd-upgrade" "/slack/events"; do
+        for length in nope -1; do
+            response="$(_raw_post_status "${path}" "${length}")"
+            [[ "${response}" == *"400"* ]]
+        done
+    done
+
+    run curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        "${_WEBHOOK_URL}/api/v1/health"
+    [ "${status}" -eq 0 ]
+    [ "${output}" = "200" ]
+}
+
+@test "Slack signature verification rejects malformed timestamps and bodies" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run env PYTHONPATH="${repo_root}/scripts/lib" SLACK_SIGNING_SECRET="test-secret" python3 -c '
+from webhook.auth import _verify_slack_signature
+assert not _verify_slack_signature(b"{}", "not-a-number", "v0=x")
+assert not _verify_slack_signature(b"\xff", "0", "v0=x")
+'
+    [ "${status}" -eq 0 ]
+}
+
+@test "unauthenticated API noise cannot consume the authenticated rate-limit bucket" {
+    local port=17444 pid i code
+    env K3DM_WEBHOOK_PORT="${port}" K3DM_RATE_MAX_PER_MIN=1 python3 "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook" &
+    pid=$!
+    for i in $(seq 1 20); do
+        curl -s -o /dev/null "http://127.0.0.1:${port}/" && break
+        sleep 0.1
+    done
+
+    for i in 1 2 3; do
+        code="$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{}' "http://127.0.0.1:${port}/api/v1/cluster-status")"
+        [ "${code}" = "401" ]
+    done
+    code="$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" -H "Content-Type: application/json" -d '{}' "http://127.0.0.1:${port}/api/v1/cluster-status")"
+    kill "${pid}" 2>/dev/null || true
+    [ "${code}" = "202" ]
+}
+
+@test "Slack ignores signed unknown and user-less commands without creating anchors" {
+    local before after response
+    before="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    response="$(_slack_event '{"event":{"type":"message","user":"U-unknown","text":"/cluster-status","ts":"1"}}')"
+    [[ "${response}" == *'"ok":true'* ]]
+    response="$(_slack_event '{"event":{"type":"message","text":"/cluster-status","ts":"2"}}')"
+    [[ "${response}" == *'"ok":true'* ]]
+    after="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    [ "${after}" = "${before}" ]
+}
+
+@test "Slack allowlisted reader can dispatch cluster-status" {
+    local before after response
+    before="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    response="$(_slack_event '{"event":{"type":"message","user":"U-reader","text":"/cluster-status","ts":"3"}}')"
+    [[ "${response}" == *'"ok":true'* ]]
+    sleep 0.2
+    after="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    [ "${after}" -eq $((before + 2)) ]
+}
 
 @test "k3dm-ask-bash denies general-purpose interpreters" {
     local repo_root
