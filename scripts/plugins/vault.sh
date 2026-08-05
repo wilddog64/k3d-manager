@@ -2118,7 +2118,7 @@ path "${mount_path}/data/${secret_path}" { capabilities = ["create", "read", "up
 HCL
   local token_audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
   local role_cmd
-  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"' \
+  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h audience="%s"' \
     "$role" "$service_account" "$service_namespace" "$policy" "$token_audience"
   _vault_exec "$ns" "$role_cmd" "$release"
 }
