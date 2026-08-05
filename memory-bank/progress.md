@@ -1,5 +1,25 @@
 # Progress — k3d-manager
 
+## Current prioritized backlog — 2026-08-04
+
+This is the authoritative todo list. Older entries below are chronological
+evidence and may describe issues that have since been completed or superseded.
+
+| Priority | Item | Status | Completion evidence / next gate |
+| --- | --- | --- | --- |
+| P0 | OpenLDAP Symas migration live cutover | **Not complete** | Source migration `b30f7898` is verified; deploy, LDAP/Keycloak/Jenkins consumer checks, and a real login re-test remain owner/Claude-gated. |
+| P0 | Webhook parsing and auth-order hardening | **Not complete** | Exact v1.23 spec is `docs/bugs/2026-08-04-webhook-request-parsing-and-rate-limit-auth-order.md`; it covers malformed `Content-Length`, authenticated rate-limit keys/order, and Slack unknown/user-less regressions. |
+| P1 | Stripe checkout live acceptance | **Not complete** | A–F implementation and payment secret wiring are complete, but no successful production-like browser checkout plus OAuth2/Stripe-gated Playwright run is recorded. The frontend image-promotion pipeline must be healthy first. |
+| P1 | Frontend image-promotion pipeline | **Not complete** | The durable GH006 PR-based promotion design exists; confirm it is merged, that a `sha-*` image is promoted, and that the deployed frontend contains the Stripe publishable build argument before acceptance testing. |
+| P1 | CVE-ID-level table aggregation | **Not complete** | Live ConfigMap groups by CVE *and* title, namespace, severity, workload, service, package, image tag, installed/fixed version, and patch status. It removes only exact duplicate findings; the same CVE ID still appears once per affected component. A dedicated aggregation/detail design is needed. |
+| P2 | E2E test repository baseline | **Not complete** | Repo-wide `tsc --noEmit` strict-null failures and the missing ESLint configuration remain separate pre-existing debt; the Stripe spec file itself is clean. |
+| P2 | Hostinger Trivy scan capacity | **Not complete** | Decide whether to increase node capacity or reduce scan-job requests; the recorded constraint is insufficient requested CPU for concurrent scans. |
+| P3 | `loki` → `acg-loki` Application rename | **Not complete** | Safe source change and focused BATS remain; the finalizer/reapply is a separate live operation. |
+| P3 | Stale ACG sandbox URL and app-cluster Vault portability | **Not complete** | Both are low-urgency, unassigned maintenance issues; do not combine them with the P0/P1 release work. |
+| Closed | Empty `app` Trivy notifications | **Complete** | Live Prometheus: 39 firing alerts, `empty_app_alerts=0`; completed scan jobs already use a 3600-second TTL. |
+| Closed | Missing platform-ops / CVE dashboard data | **Complete / superseded** | Platform-ops and the inventory exporter are live; later dashboard revisions supersede the historical absent-namespace notes. |
+| Closed | Grafana scan temp-file error, v1.16 Trivy-panel backport, curl-vs-wget test note, unsafe hub infra registration | **Complete / superseded** | Scanner error resolved after the Trivy upgrade; dashboards are now on newer revisions; wget coverage exists; safe `argocd-cve-scan` redesign eliminates the unsafe infra-registration dependency. |
+
 ## Status
 - [ ] **Webhook request parsing and rate-limit auth-order hardening — QUEUED for v1.23.0 (2026-08-04).** Spec: `docs/bugs/2026-08-04-webhook-request-parsing-and-rate-limit-auth-order.md`. Confirmed unguarded/negative `Content-Length`, pre-auth shared limiter DoS, and unknown/user-less Slack command-attribution gaps. Scope is exactly `bin/k3dm-webhook`, `scripts/lib/webhook/auth.py`, and `scripts/tests/lib/webhook.bats`; required regressions include raw malformed headers, malformed Slack timestamps, unauthenticated rate-limit isolation, and signed unknown/user-less Slack events. No implementation or deployment has been performed.
 - [x] **CVE dashboard table identity normalized — DONE 2026-08-04.** `af81c468` aggregates identical displayed vulnerability findings in both Grafana inventory tables and aligns their ordered schemas: CVE ID, Title, Namespace, Severity, Workload, Service, Package, Image tag, Version, Fixed version, Patch status, Count. Both use `exported_namespace`, the vulnerability report namespace, rather than the exporter target namespace. Dashboard version 9; YAML/embedded JSON parse, `bats scripts/tests/plugins/grafana_dashboard_cve_autopatch.bats` → `1..10` all `ok`, diff check, and `_agent_audit` passed. Deploy through `make platform-ops` to provision the updated dashboard.
