@@ -211,6 +211,13 @@ case "$*" in
   -n\ cicd\ annotate\ application\ *\ argocd.argoproj.io/refresh=hard\ --overwrite)
     exit 0
     ;;
+  -n\ platform-ops\ create\ configmap\ cve-remediation-*\ *)
+    printf '%s\n' 'apiVersion: v1'
+    exit 0
+    ;;
+  apply\ -f\ -)
+    exit 0
+    ;;
 esac
 
 exit 1
