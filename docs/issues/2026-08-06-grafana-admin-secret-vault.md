@@ -19,3 +19,11 @@ the service-password display path and was not sourced from Vault.
 
 The credential value is not recorded in this issue or in Git.
 
+## Rotation follow-up
+
+The initial Vault seed intentionally preserved the existing password. After
+the old value was reported, Vault was rotated to a new generated value, ESO
+was force-synced, and the Grafana Deployment was restarted. SHA-256 fingerprints
+of Vault and the ESO Secret match, and the new credential authenticated against
+the local Grafana service with HTTP 200. An external Grafana probe returned 502
+through the tunnel during verification; the in-cluster service check passed.

@@ -3,7 +3,7 @@
 ## Current prioritized backlog — 2026-08-04
 
 Latest verification (2026-08-06): frontend login timeout is an expired Keycloak authorization code, not a credential failure; see `docs/issues/2026-08-06-frontend-login-expired-code.md`.
-Grafana admin credential migration is complete: Vault seed, live ExternalSecret, Argo sync, Grafana rollout, and Vault-backed `make show-service-passwords` are verified (`141cfa34`).
+Grafana admin credential migration is complete: Vault seed, password rotation, live ExternalSecret, Argo sync, Grafana rollout, local authenticated API check, and Vault-backed `make show-service-passwords` are verified (`141cfa34`, `40c8b08e`).
 
 This is the authoritative todo list. Older entries below are chronological
 evidence and may describe issues that have since been completed or superseded.
