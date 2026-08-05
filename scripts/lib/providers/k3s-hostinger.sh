@@ -782,6 +782,11 @@ function _hostinger_reapply_gitops_applicationsets() {
   export K3D_MANAGER_BRANCH
   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_HOSTINGER_KUBE_CONTEXT}}"
   export APP_CLUSTER_NAME
+  # Hostinger runs k3s/flannel.  The Istio CNI DaemonSet must mount the k3s
+  # CNI directories rather than the generic Cilium defaults.
+  AMBIENT_CNI_CONF_DIR="/var/lib/rancher/k3s/agent/etc/cni/net.d"
+  AMBIENT_CNI_BIN_DIR="/var/lib/rancher/k3s/data/cni"
+  export AMBIENT_CNI_CONF_DIR AMBIENT_CNI_BIN_DIR
 
   local -a hub_kubectl=()
   read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"

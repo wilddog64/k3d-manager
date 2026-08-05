@@ -53,6 +53,21 @@ spec:
         app-type: mesh
     spec:
       project: platform
+      # Istiod changes these bootstrap values once its validation endpoints are
+      # ready.  They are controller-owned runtime state, not Git drift.
+      ignoreDifferences:
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+          name: istiod-default-validator
+          jsonPointers:
+            - /webhooks/0/clientConfig/caBundle
+            - /webhooks/0/failurePolicy
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+          name: istio-validator-istio-system
+          jsonPointers:
+            - /webhooks/0/clientConfig/caBundle
+            - /webhooks/0/failurePolicy
       destination:
         name: ${APP_CLUSTER_NAME}
         namespace: istio-system
