@@ -8,7 +8,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
-  run grep -F '"version": 10' "${DASH}"
+  run grep -F '"version": 11' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
@@ -19,8 +19,8 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
   [ "$status" -eq 0 ]
 }
 
-@test "CVE dashboard: unique-CVE tables expose identity, severity, and affected-finding count" {
-  for field in vulnerability_id title severity 'Affected findings'; do
+@test "CVE dashboard: unique-CVE tables retain remediation and image detail" {
+  for field in vulnerability_id title exported_namespace severity resource_name service package image_tag installed_version fixed_version patch_status 'Affected findings'; do
     run grep -F "${field}" "${DASH}"
     [ "$status" -eq 0 ]
   done
@@ -40,20 +40,28 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
   [ "$status" -eq 0 ]
 }
 
-@test "CVE dashboard: both tables deduplicate findings by CVE ID with matching columns" {
+@test "CVE dashboard: both tables deduplicate by CVE ID while preserving distinct finding details" {
   run python3 -c '
 import json, sys, yaml
 dashboard = json.loads(yaml.safe_load(open(sys.argv[1]))["data"]["cve-autopatch.json"])
 panels = {panel["title"]: panel for panel in dashboard["panels"]}
 names = ["Platform Unique CVEs (by CVE ID)", "Shopping-cart Unique CVEs (by CVE ID)"]
-expected = {"vulnerability_id": 0, "title": 1, "severity": 2, "Value": 3}
+expected_grouped = ["vulnerability_id", "title", "severity"]
+expected_aggregated = ["exported_namespace", "resource_name", "service", "package", "image_tag", "installed_version", "fixed_version", "patch_status"]
 for name in names:
     panel = panels[name]
-    assert panel["targets"][0]["expr"].startswith("sum by (vulnerability_id, title, severity)")
-    options = panel["transformations"][0]["options"]
-    assert options["indexByName"] == expected
-    assert options["renameByName"]["Value"] == "Affected findings"
-    assert options["excludeByName"]["namespace"] is True
+    assert panel["targets"][0]["expr"].startswith("trivy_vulnerability_inventory{")
+    group = panel["transformations"][0]
+    assert group["id"] == "groupBy"
+    fields = group["options"]["fields"]
+    assert all(fields[field]["operation"] == "groupby" for field in expected_grouped)
+    assert all(fields[field]["aggregations"] == ["uniqueValues"] for field in expected_aggregated)
+    assert fields["Value"]["aggregations"] == ["sum"]
+    organize = panel["transformations"][1]["options"]
+    assert organize["renameByName"]["image_tag (uniqueValues)"] == "Image tag"
+    assert organize["renameByName"]["installed_version (uniqueValues)"] == "Version"
+    assert organize["renameByName"]["fixed_version (uniqueValues)"] == "Fixed version"
+    assert organize["renameByName"]["Value (sum)"] == "Affected findings"
 ' "${DASH}"
   [ "$status" -eq 0 ]
 }
