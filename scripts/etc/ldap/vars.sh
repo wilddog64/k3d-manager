@@ -100,4 +100,4 @@ export LDAP_ROTATOR_IMAGE="${LDAP_ROTATOR_IMAGE:-docker.io/bitnami/kubectl:lates
 export LDAP_ROTATION_SCHEDULE="${LDAP_ROTATION_SCHEDULE:-0 0 1 * *}"  # Monthly: 1st day of month at midnight
 export LDAP_ROTATION_PORT="${LDAP_ROTATION_PORT:-1389}"  # Internal LDAP port
 export LDAP_USERS_TO_ROTATE="${LDAP_USERS_TO_ROTATE:-chengkai.liang,jenkins-admin,test-user}"
-export LDAP_POD_LABEL="${LDAP_POD_LABEL:-app.kubernetes.io/name=openldap-stack-ha}"
+export LDAP_POD_LABEL="${LDAP_POD_LABEL:-app.kubernetes.io/component=openldap}"

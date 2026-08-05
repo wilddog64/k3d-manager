@@ -225,7 +225,7 @@ function _keycloak_setup_vault_policies() {
 
    _vault_login "$ns" "$release"
 
-   cat <<POLICY | _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+   cat <<POLICY | _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- \
      vault policy write "${KEYCLOAK_ESO_ROLE}" -
      path "secret/data/keycloak/*"      { capabilities = ["read"] }
      path "secret/metadata/keycloak"    { capabilities = ["list"] }
