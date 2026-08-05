@@ -53,9 +53,11 @@ parent immediately recreated it from `shopping-cart-infra/argocd/applications/mo
 argocd.argoproj.io/tracking-id: shopping-cart-apps:argoproj.io/Application:cicd/shopping-cart-rules
 ```
 
-`shopping-cart-infra` commit `c558834` deletes only that obsolete manifest. Once merged,
-the parent Application will prune the stale card; no PrometheusRule is removed because
-the direct `deploy_observability` path remains the rule owner.
+`shopping-cart-infra` commit `c558834` deletes only that obsolete manifest. It merged as
+PR #88 (`fbc382e`); after a hard refresh, the parent Application pruned the stale card
+and `kubectl get application shopping-cart-rules -n cicd` returned `NotFound`. No
+PrometheusRule was removed because the direct `deploy_observability` path remains the
+rule owner.
 
 `shopping-cart-identity` was already `Synced Healthy`; its red UI marker was an old
 2026-07-20 failed operation. A normal sync completed successfully after the project
