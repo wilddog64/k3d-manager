@@ -8,7 +8,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
-  run grep -F '"version": 8' "${DASH}"
+  run grep -F '"version": 9' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
@@ -37,6 +37,24 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
   run grep -F 'Shopping-cart App Vulnerabilities' "${DASH}"
   [ "$status" -eq 0 ]
   run grep -F 'wilddog64/shopping-cart-.*' "${DASH}"
+  [ "$status" -eq 0 ]
+}
+
+@test "CVE dashboard: both inventory tables deduplicate identical findings with matching columns" {
+  run python3 -c '
+import json, sys, yaml
+dashboard = json.loads(yaml.safe_load(open(sys.argv[1]))["data"]["cve-autopatch.json"])
+panels = {panel["title"]: panel for panel in dashboard["panels"]}
+names = ["Platform Image Vulnerabilities (platform services; verify stale reports)", "Shopping-cart App Vulnerabilities"]
+expected = {"vulnerability_id": 0, "title": 1, "exported_namespace": 2, "severity": 3, "resource_name": 4, "service": 5, "package": 6, "image_tag": 7, "installed_version": 8, "fixed_version": 9, "patch_status": 10, "Value": 11}
+for name in names:
+    panel = panels[name]
+    assert panel["targets"][0]["expr"].startswith("sum by (vulnerability_id, title, exported_namespace")
+    options = panel["transformations"][0]["options"]
+    assert options["indexByName"] == expected
+    assert options["renameByName"]["exported_namespace"] == "Namespace"
+    assert options["excludeByName"]["namespace"] is True
+' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
