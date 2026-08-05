@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- [x] **Hostinger Istio ambient drift source fix — DONE 2026-08-04.** `fb3df7d4` adds precise `ignoreDifferences` entries for Istiod-owned validating-webhook `caBundle`/`failurePolicy`, and forces Hostinger's ApplicationSet render to use its k3s CNI directories. Validation: rendered ApplicationSet YAML parses; `bash -n` and `shellcheck -S warning scripts/lib/providers/k3s-hostinger.sh` clean; `bats scripts/tests/lib/provider_contract.bats` → `1..52`, all `ok`; `_agent_audit` passed. Pushed to `origin/k3d-manager-v1.22.0`; live reconciliation remains pending user authorization.
 - [x] **Credential target Keycloak lookup** — `874dbfe5` restores Hub Vault context; `make show-service-passwords` now returns live Keycloak admin/developer/operator credentials instead of N/A.
 - [x] **Vault post-reboot auto-unseal** — installed and verified `vault-unseal-watchdog` CronJob; it unsealed the live Vault after reboot. `1564febd` makes future `deploy_vault` runs install it automatically. Vault/watchdog BATS 31/31 and shellcheck passed.
 - [x] **App-cluster remediation alert wiring** — `9b7c54a3` makes critical alerts evaluate the cross-cluster inventory metric, so ubuntu-hostinger shopping-cart findings can trigger the existing cve-remediate route. BATS 9/9 passed; deployed via `make platform-ops`.
