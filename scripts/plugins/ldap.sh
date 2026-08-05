@@ -280,6 +280,14 @@ function _ldap_ensure_helm_chart_available() {
 # Reads existing admin/config passwords from Vault or generates new ones.
 # Sets globals: _LDAP_ADMIN_CRED_USERNAME _LDAP_ADMIN_CRED_ADMIN_PASS _LDAP_ADMIN_CRED_CONFIG_PASS
 # Args: $1=vault_ns $2=vault_release $3=full_path $4=username_key $5=password_key $6=config_key $7=username
+function _ldap_generate_chart_safe_password() {
+   _no_trace bash -c 'openssl rand -hex 24'
+}
+
+function _ldap_password_is_chart_safe() {
+   [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
 function _ldap_generate_or_load_admin_creds() {
    local vault_ns="$1" vault_release="$2" full_path="$3"
    local username_key="$4" password_key="$5" config_key="$6" username="$7"
@@ -300,14 +308,16 @@ function _ldap_generate_or_load_admin_creds() {
 
    _LDAP_ADMIN_CRED_USERNAME="${existing_username:-$username}"
 
-   if [[ -z "$admin_password" ]]; then
-      admin_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+   if ! _ldap_password_is_chart_safe "$admin_password"; then
+      _warn "[ldap] rotating an incompatible admin password for the chart init script"
+      admin_password=$(_ldap_generate_chart_safe_password)
       if [[ -z "$admin_password" ]]; then
          _err "[ldap] failed to generate admin password"
       fi
    fi
-   if [[ -z "$config_password" ]]; then
-      config_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+   if ! _ldap_password_is_chart_safe "$config_password"; then
+      _warn "[ldap] rotating an incompatible config password for the chart init script"
+      config_password=$(_ldap_generate_chart_safe_password)
       if [[ -z "$config_password" ]]; then
          _err "[ldap] failed to generate config password"
       fi
