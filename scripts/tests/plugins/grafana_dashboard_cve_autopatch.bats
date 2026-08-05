@@ -8,8 +8,14 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
-  run grep -F '"version": 12' "${DASH}"
+  run grep -F '"version": 13' "${DASH}"
   [ "$status" -eq 0 ]
+}
+
+@test "CVE dashboard: labels vendor fixes as available rather than installed patches" {
+  run grep -F '"patch_status": "available" if finding.get("fixedVersion") else "unavailable"' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '"patch_status": "available" if finding.get("fixedVersion") else "unavailable"' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml")" -eq 2 ]
 }
 
 @test "CVE dashboard: inventory table uses instant Trivy vulnerability metric" {
@@ -65,6 +71,7 @@ for name in names:
     assert organize["renameByName"]["image_tag (uniqueValues)"] == "Image tag"
     assert organize["renameByName"]["installed_version (uniqueValues)"] == "Version"
     assert organize["renameByName"]["fixed_version (uniqueValues)"] == "Fixed version"
+    assert panel["fieldConfig"]["overrides"] == [{"matcher": {"id": "byName", "options": "Patch status"}, "properties": [{"id": "displayName", "value": "Fix available"}]}]
     assert organize["renameByName"]["Value (sum)"] == "Affected findings"
 ' "${DASH}"
   [ "$status" -eq 0 ]
