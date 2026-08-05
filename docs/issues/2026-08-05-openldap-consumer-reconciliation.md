@@ -17,6 +17,13 @@ The Keycloak helper piped a policy heredoc into `_vault_exec_stream` without
 its `--stdin` flag. After adding that flag, the policy upload succeeded and the
 LDAP ExternalSecret became `SecretSynced=True`.
 
+The first post-migration realm user list contained only `chengkai.liang`,
+`jenkins-admin`, `k3dm-smoke`, and `test-user`; `admin`, `developer`, and
+`operator` were absent. Those three accounts are seeded from Vault by
+`bin/cluster-up`, but its old LDAP label, port, and shopping-cart DNs no longer
+matched the Symas chart. The users were restored from their Vault passwords and
+the seeding path was updated for the new StatefulSet contract.
+
 The existing Keycloak realm still pointed at the retired service and base:
 
 ```text
@@ -41,6 +48,8 @@ Full sync returned:
 The documented bootstrap user login through the `k3dm-smoke` client returned
 HTTP 200 and `login-ok`. ArgoCD is OIDC-based (Keycloak issuer), and Jenkins is
 not deployed in this cluster, so neither required an LDAP consumer change.
+The restored `developer` account also returned HTTP 200 through the same smoke
+client.
 
 ## Root cause
 
@@ -52,5 +61,5 @@ defaulted to the old chart label, so it could not locate `openldap-0`.
 
 The Keycloak Vault policy stream now requests stdin explicitly. The rotator
 defaults now select `app.kubernetes.io/component=openldap`, matching the
-Symas chart's StatefulSet label.
-
+Symas chart's StatefulSet label. `bin/cluster-up` and the bootstrap LDIF now
+use the Symas label/port/DNs and include the three Vault-seeded platform users.
