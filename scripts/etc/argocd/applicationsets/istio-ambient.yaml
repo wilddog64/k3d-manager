@@ -48,6 +48,10 @@ spec:
       namespace: ${ARGOCD_NAMESPACE}
       annotations:
         argocd.argoproj.io/sync-wave: '{{ .wave }}'
+        # ServerSideApply otherwise selects ArgoCD's structured-merge diff,
+        # which retains Kubernetes default-value false drift for Istio's
+        # DaemonSet and Deployment manifests.
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
       labels:
         managed-by: k3d-manager
         app-type: mesh

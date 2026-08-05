@@ -506,6 +506,7 @@ teardown_file() {
   [[ "$output" == *"cniBinDir: /var/lib/rancher/k3s/data/cni"* ]]
   [[ "$output" == *"name: istiod-default-validator"* ]]
   [[ "$output" == *"/webhooks/0/failurePolicy"* ]]
+  [[ "$output" == *"argocd.argoproj.io/compare-options: ServerSideDiff=true"* ]]
 }
 
 @test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership and refreshes apps" {
