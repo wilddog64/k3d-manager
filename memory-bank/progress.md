@@ -38,9 +38,9 @@
 
 - [x] **Status command Prometheus verification** — `dc005bda` makes `make status` report Prometheus API reachability through the Kubernetes service proxy and whether `TrivyCriticalVulnerabilityDetected` has non-empty `app` labels. BATS, syntax, shellcheck, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`.
 
-- [x] **Trivy `app ''` notification fix — source deployed to branch** — `78981791` adds the legacy `app` alert label from `image_repository` and a regression assertion in `trivy_operator_observability.bats`. BATS 8/8, YAML parsing, shellcheck, and `_agent_audit` passed; pushed to `origin/k3d-manager-v1.22.0`. Live sync remains: run `make platform-ops`, then query firing alerts for non-empty `app`.
+- [x] **Trivy `app ''` notification fix — live verified 2026-08-04** — `78981791` adds the legacy `app` alert label from `image_repository` and a regression assertion in `trivy_operator_observability.bats`. The deployed `cicd/argocd-degraded` rule has that label and Prometheus reports 39 firing alerts with `empty_app_alerts=0`.
 
-- [x] **Trivy empty-app diagnosis corrected** — verified live `ALERTS{alertname="TrivyCriticalVulnerabilityDetected"}` labels and rule grouping; completed-pod deletion is not the alert fix. Notification should render `image_repository` instead of assuming `app`.
+- [x] **Trivy empty-app diagnosis corrected and re-verified 2026-08-04** — live `ALERTS{alertname="TrivyCriticalVulnerabilityDetected"}` labels all provide `app=image_repository`; completed scan Jobs use a 3600-second TTL and were observed under ten minutes old. Deleting them is not the alert fix; no duplicate cleanup bug opened.
 
 - [x] **Grafana CVE inventory no-data fix** — `799ad1bf` changed the exporter query to uppercase Trivy severities; live Prometheus verification returns 1,207 Critical/High rows and the dashboard ConfigMap is refreshed.
 
