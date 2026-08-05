@@ -11,6 +11,13 @@ spec:
   sourceRepos:
     - '*'
   destinations:
+    # Hub-owned app-of-apps, identity, and Istio routing resources.
+    - namespace: cicd
+      server: https://kubernetes.default.svc
+    - namespace: identity
+      server: https://kubernetes.default.svc
+    - namespace: istio-system
+      server: https://kubernetes.default.svc
     - namespace: shopping-cart-apps
       name: ubuntu-k3s
     - namespace: shopping-cart-apps

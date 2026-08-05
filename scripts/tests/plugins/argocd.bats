@@ -187,3 +187,17 @@ JSON
 @test "ARGOCD_NAMESPACE defaults to cicd" {
   [ "$ARGOCD_NAMESPACE" = "cicd" ]
 }
+
+@test "shopping-cart AppProject permits hub app-of-apps, identity, and networking destinations" {
+  local project="${BATS_TEST_DIRNAME}/../../etc/argocd/projects/shopping-cart.yaml.tmpl"
+  run ruby -ryaml -e '
+    project = YAML.load_file(ARGV.fetch(0))
+    destinations = project.fetch("spec").fetch("destinations")
+    %w[cicd identity istio-system].each do |namespace|
+      unless destinations.include?({"namespace" => namespace, "server" => "https://kubernetes.default.svc"})
+        abort "missing hub destination: #{namespace}"
+      end
+    end
+  ' "$project"
+  [ "$status" -eq 0 ]
+}
