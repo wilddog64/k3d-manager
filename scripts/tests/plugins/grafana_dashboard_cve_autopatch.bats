@@ -8,7 +8,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
-  run grep -F '"version": 13' "${DASH}"
+  run grep -F '"version": 14' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
@@ -16,6 +16,17 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
   run grep -F '"patch_status": "available" if finding.get("fixedVersion") else "unavailable"' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml"
   [ "$status" -eq 0 ]
   [ "$(grep -c '"patch_status": "available" if finding.get("fixedVersion") else "unavailable"' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml")" -eq 2 ]
+}
+
+@test "CVE dashboard: excludes obsolete patched metric series during the label transition" {
+  run python3 -c '
+import json, sys, yaml
+dashboard = json.loads(yaml.safe_load(open(sys.argv[1]))["data"]["cve-autopatch.json"])
+for panel in dashboard["panels"]:
+    if panel["title"] in ["Platform Unique CVEs (by CVE ID)", "Shopping-cart Unique CVEs (by CVE ID)"]:
+        assert "patch_status=~\"available|unavailable\"" in panel["targets"][0]["expr"]
+' "${DASH}"
+  [ "$status" -eq 0 ]
 }
 
 @test "CVE dashboard: inventory table uses instant Trivy vulnerability metric" {
