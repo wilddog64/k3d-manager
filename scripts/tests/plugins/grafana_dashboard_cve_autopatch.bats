@@ -8,7 +8,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
-  run grep -F '"version": 14' "${DASH}"
+  run grep -F '"version": 15' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
@@ -104,5 +104,28 @@ for name in names:
   run grep -F 'kube_job_status_succeeded' "${DASH}"
   [ "$status" -eq 0 ]
   run grep -F '== 0)) or vector(0)' "${DASH}"
+  [ "$status" -eq 0 ]
+}
+
+@test "CVE dashboard: includes durable remediation history table" {
+  run python3 -c '
+import json, sys, yaml
+dashboard = json.loads(yaml.safe_load(open(sys.argv[1]))["data"]["cve-autopatch.json"])
+panel = next(panel for panel in dashboard["panels"] if panel["title"] == "Recent CVE Remediations")
+assert panel["targets"][0]["expr"] == "cve_remediation_event_info"
+assert panel["targets"][0]["instant"] is True
+renames = panel["transformations"][0]["options"]["renameByName"]
+assert renames == {"cve_ids": "CVE IDs", "service": "Service", "to_image": "Replacement image", "requested_at": "Requested at", "applied_at": "Applied at", "state": "State", "reason": "Reason"}
+' "${DASH}"
+  [ "$status" -eq 0 ]
+}
+
+@test "CVE exporter: exposes bounded remediation lifecycle metrics and event details" {
+  EXPORTER="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml"
+  for metric in cve_remediation_requested_timestamp_seconds cve_remediation_applied_timestamp_seconds cve_remediation_state cve_remediation_event_info; do
+    run grep -F "$metric" "$EXPORTER"
+    [ "$status" -eq 0 ]
+  done
+  run grep -F 'resources: ["configmaps"]' "$EXPORTER"
   [ "$status" -eq 0 ]
 }

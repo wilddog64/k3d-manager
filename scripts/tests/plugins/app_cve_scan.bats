@@ -557,3 +557,10 @@ EOF
   grep -q 'warning|App CVE Candidate Missing: shopping-cart-product-catalog|' "${NOTIFY_LOG}"
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-product-catalog' "${KUBECTL_LOG}"
 }
+
+@test "clean candidate supports explicit dry-run mode without promotion" {
+  run grep -F 'DRY_RUN="${DRY_RUN:-false}"' "${TEST_SCAN_SCRIPT}"
+  [ "$status" -eq 0 ]
+  run grep -F 'no event or ArgoCD patch' "${TEST_SCAN_SCRIPT}"
+  [ "$status" -eq 0 ]
+}
