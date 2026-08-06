@@ -1,5 +1,8 @@
 # Progress — k3d-manager
 
+- [ ] **P2 Hostinger capacity expansion** — single-node CPU requests block zero-downtime surge rollouts for order/payment/product-catalog; resize VPS or add worker before retrying Argo rollouts. Evidence: `docs/issues/2026-08-06-hostinger-rollout-capacity-degraded.md`.
+- [x] **Grafana CVE Count visibility** — dashboard v18 places Count second in both CVE tables; deployment pending commit/apply.
+
 ## Current prioritized backlog — 2026-08-04
 
 Latest verification (2026-08-06): frontend login timeout is an expired Keycloak authorization code, not a credential failure; see `docs/issues/2026-08-06-frontend-login-expired-code.md`.
