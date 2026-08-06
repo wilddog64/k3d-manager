@@ -38,3 +38,12 @@ error validating "STDIN": error validating data: failed to download openapi:
 Get "https://127.0.0.1:57780/openapi/v2?timeout=32s": dial tcp
 127.0.0.1:57780: connect: operation not permitted
 ```
+
+## Recovery
+
+After refreshing the Hostinger access layer, the three Applications were
+verified `Synced Healthy` with no Pending pods. The payment rollout also
+exposed a missing `payment-db-credentials` Secret; it was recreated from the
+already-synchronized Postgres payment-admin and RabbitMQ credentials, and the
+unnecessary restart was rolled back. The capacity limitation remains for
+future surge rollouts.

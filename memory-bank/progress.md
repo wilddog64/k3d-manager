@@ -1,6 +1,6 @@
 # Progress — k3d-manager
 
-- [ ] **P2 Hostinger capacity expansion** — single-node CPU requests block zero-downtime surge rollouts for order/payment/product-catalog; resize VPS or add worker before retrying Argo rollouts. Evidence: `docs/issues/2026-08-06-hostinger-rollout-capacity-degraded.md`.
+- [ ] **P2 Hostinger capacity expansion** — current order/payment/product-catalog Applications recovered to `Synced Healthy`, but single-node CPU requests still block future zero-downtime surge rollouts; resize VPS or add worker. Evidence: `docs/issues/2026-08-06-hostinger-rollout-capacity-degraded.md`.
 - [x] **Grafana CVE Count visibility** — dashboard v18 places Count second in both CVE tables; source commit `eae0d607` pushed, live apply blocked by unavailable Hub API tunnel.
 
 ## Current prioritized backlog — 2026-08-04
