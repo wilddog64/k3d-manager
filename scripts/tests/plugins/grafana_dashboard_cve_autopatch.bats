@@ -8,7 +8,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-a
 }
 
 @test "CVE dashboard: version is bumped for Grafana provisioning refresh" {
-  run grep -F '"version": 15' "${DASH}"
+  run grep -F '"version": 16' "${DASH}"
   [ "$status" -eq 0 ]
 }
 
@@ -82,7 +82,7 @@ for name in names:
     assert organize["renameByName"]["image_tag (uniqueValues)"] == "Image tag"
     assert organize["renameByName"]["installed_version (uniqueValues)"] == "Version"
     assert organize["renameByName"]["fixed_version (uniqueValues)"] == "Fixed version"
-    assert panel["fieldConfig"]["overrides"] == [{"matcher": {"id": "byName", "options": "Patch status"}, "properties": [{"id": "displayName", "value": "Fix available"}]}]
+    assert panel["fieldConfig"]["overrides"] == [{"matcher": {"id": "byName", "options": "Fix available"}, "properties": [{"id": "displayName", "value": "Fix available"}]}]
     assert organize["renameByName"]["Value (sum)"] == "Affected findings"
 ' "${DASH}"
   [ "$status" -eq 0 ]
