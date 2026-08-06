@@ -218,6 +218,9 @@ case "$*" in
   apply\ -f\ -)
     exit 0
     ;;
+  -n\ platform-ops\ label\ configmap\ cve-remediation-*\ k3dm.k3d.io/cve-remediation-event=true\ --overwrite)
+    exit 0
+    ;;
 esac
 
 exit 1
