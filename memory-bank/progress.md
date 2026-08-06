@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 - [ ] **P2 Hostinger capacity expansion** — current order/payment/product-catalog Applications recovered to `Synced Healthy`, but single-node CPU requests still block future zero-downtime surge rollouts; resize VPS or add worker. Evidence: `docs/issues/2026-08-06-hostinger-rollout-capacity-degraded.md`.
-- [x] **Payment Secret GitOps durability** — added the Vault-backed `payment-db-credentials` ExternalSecret to the payment kustomization; deploy/reconcile after ArgoCD access is available.
+- [x] **Payment Secret GitOps durability** — verified `postgres-payment-app` is the existing Vault-backed owner of `payment-db-credentials` and `SecretSynced=True`; duplicate ownership was avoided.
 - [x] **Grafana CVE Count visibility** — dashboard v18 places Count second in both CVE tables; source commit `eae0d607` pushed, live apply blocked by unavailable Hub API tunnel.
 
 ## Current prioritized backlog — 2026-08-04

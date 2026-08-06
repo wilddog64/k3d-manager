@@ -47,3 +47,7 @@ exposed a missing `payment-db-credentials` Secret; it was recreated from the
 already-synchronized Postgres payment-admin and RabbitMQ credentials, and the
 unnecessary restart was rolled back. The capacity limitation remains for
 future surge rollouts.
+
+The payment Secret is owned by the existing data-layer `postgres-payment-app`
+ExternalSecret (`SecretSynced=True`). A temporary duplicate service-level
+ExternalSecret was rejected by ESO and removed; it was not kept in GitOps.
