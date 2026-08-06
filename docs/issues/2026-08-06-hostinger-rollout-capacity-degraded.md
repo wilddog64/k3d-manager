@@ -28,3 +28,13 @@ permit downtime without an explicit owner decision. The repository's
 `k3s-hostinger` provider currently provisions a permanent single-node VPS and
 has no supported worker/resize target; infrastructure-panel work is required.
 
+## Dashboard deployment note
+
+The source dashboard change is pushed in `eae0d607`, but `make platform-ops`
+could not apply it because the local Hub API tunnel is unavailable:
+
+```text
+error validating "STDIN": error validating data: failed to download openapi:
+Get "https://127.0.0.1:57780/openapi/v2?timeout=32s": dial tcp
+127.0.0.1:57780: connect: operation not permitted
+```
