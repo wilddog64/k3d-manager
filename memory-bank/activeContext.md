@@ -5,38 +5,30 @@
 > `docs/plans/release-split-intent-map.md`, and git history (pre-compression versions of
 > this file are recoverable via `git log --follow memory-bank/activeContext.md`).
 
-## Current focus — v1.22.0 OpenLDAP release (PR #111)
+## Current focus — v1.23.0 CVE observability + remediation lifecycle (workstreams B+C)
 
-- **PR #111 OPEN → main — ALL GATES GREEN, READY TO MERGE, prepare-and-stop for user go.**
-  https://github.com/wilddog64/k3d-manager/pull/111 · head `627a6d4d` · base main `f68bdee1`.
-  Theme: migrate OpenLDAP off the retired `bitnamilegacy` image (66 criticals) to the Symas
-  `jp-gouin/openldap-stack-ha` chart 4.3.3; service/ports pinned (`openldap.identity.svc:389`)
-  so the cutover is transparent. Delimiter-safe (hex) chart passwords; durable Vault-seeded
-  platform users; Keycloak/Jenkins/ArgoCD/rotator reconciled. Live-verified (Symas running,
-  `developer` login through Keycloak, Jenkins LDAP auth). `ldap_chart_passwords` BATS 2/2,
-  shellcheck clean. **CI green** (CI/CodeQL/Analyze×4/GitGuardian/lint). **Copilot: 3 findings
-  addressed** (`627a6d4d`) — base64 `-d`→`--decode` FIXED; LDIF mount path
-  `/ldif_import`→`/ldifs/bootstrap.ldif` FIXED (verified live, post-deploy import had silently
-  no-op'd); notifier ClusterRole DECLINED with ordering justification (`platform-ops` not owned
-  by `deploy_ldap`) — all 3 threads resolved. Doc: `docs/issues/2026-08-07-copilot-pr111-review-findings.md`.
-  **enforce_admins NOT yet disabled — do that only at merge time to minimize the unprotected
-  window; then `/post-merge` (tag `v1.22.0`, re-enable enforce_admins, retro).**
-- **Branch is the clean OpenLDAP-only re-cut.** The old 142-commit integration branch is
-  archived intact at `origin/archive/k3d-manager-v1.22.0-integration` (`03ed9ad6`) — verified
-  byte-identical before the `--force-with-lease` that replaced `origin/k3d-manager-v1.22.0`
-  with the 5-commit re-cut. Nothing lost. Split rationale + file map: `docs/plans/release-split-intent-map.md`.
-- **⚠️ Note for v1.23.0:** `origin/k3d-manager-v1.23.0` already exists and carries a *duplicate*
-  OpenLDAP commit (`b30f7898`). It collapses away once v1.22.0 merges to main and v1.23.0 is
-  rebased. Not a v1.22.0 concern; flag when cutting task #7.
-- **After merge:** `/post-merge` (tag `v1.22.0`, re-enable enforce_admins, retro), then cut v1.23.0.
+- **Branch cut fresh off main (`1bbb74b0`).** `origin/k3d-manager-v1.23.0` was 50 commits
+  diverged (merge-base at v1.20.0), predating the v1.21.0 + v1.22.0 squash-merges and carrying
+  a duplicate OpenLDAP commit (`b30f7898`) plus superseded verbose memory-bank state. Re-cut
+  clean (same playbook as v1.22.0): old branch archived intact at
+  `origin/archive/k3d-manager-v1.23.0-integration` (`48148c0d`); only the two genuinely-new
+  artifacts carried forward — the CVE dashboard spec and the v1.22.0 retro (commit `f7105dc5`).
+  ⚠️ The re-cut still needs a **`--force-with-lease`** to replace the diverged remote branch
+  (hard-blocked in this env → user runs it). Nothing lost — verified via tree diff before archive.
+- **Spec:** `docs/plans/v1.23.0-cve-autopatch-dashboard-observability.md` — make the CVE
+  Auto-Patch Grafana dashboard show *what* and *where* (namespace/image/CVE/remediation target),
+  not just aggregate counts. Three parts: (a) dashboard query change (no cluster reconfig);
+  (b) enable `trivy_vulnerability_id` export + CVE-ID table panel; (c) label `cve-auto-*` Jobs
+  with their target + allowlist in kube-state-metrics + remediation-by-target panel. Parts (b)/(c)
+  have runtime-label names confirmable only *after* config applies.
+- **Carried blockers (from the integration split):**
+  - Apply CVE dashboard v18 live (Hub tunnel `127.0.0.1:57780`).
+  - Close out payment `manual_review` digest-mismatch event (verify or document as expected).
+  - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
+  - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
 
 ## Pending releases (from the integration split — see intent map for files + full detail)
 
-- **v1.23.0 = CVE observability + remediation lifecycle (workstreams B+C).** Carried blockers:
-  apply CVE dashboard v18 live (Hub tunnel `127.0.0.1:57780`); close out payment `manual_review`
-  digest-mismatch event (verify or document as expected). `observability.sh` needs per-hunk split
-  from workstream E. Also carries the `app-cve-scan` nonzero-exit/pod-label spec
-  (`docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`).
 - **v1.24.0 = platform hardening (D webhook + E credential rotation + F istio/hostinger + unseal watchdog).**
   Carried blocker: recurring rotation automation exists ONLY for LDAP+Grafana — ArgoCD/Prometheus/
   Alertmanager were rotated once by hand; per-service automation NOT built.
@@ -47,6 +39,8 @@
 
 ## Recently shipped (pointers only)
 
+- **v1.22.0** RELEASED — OpenLDAP bitnami→Symas migration. PR #111 merged `1bbb74b0`, tagged v1.22.0
+  (2026-08-07). enforce_admins restored on main. Retro: `docs/retro/2026-08-07-v1.22.0-retrospective.md`. (CHANGELOG)
 - **v1.21.0** RELEASED — k3dm-webhook security hardening. PR #110 merged `f68bdee1`, tagged. (CHANGELOG)
 - **v1.20.0** RELEASED — CVE auto-patch-loop hardening. PR #109 merged `9da73458`, tagged. (CHANGELOG + retro)
 - **Stripe checkout A–F** all MERGED to main across the 5 shopping-cart repos (2026-08-02); enablement

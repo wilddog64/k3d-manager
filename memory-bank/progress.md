@@ -9,7 +9,7 @@
 
 | Version | Theme | State |
 |---|---|---|
-| v1.22.0 | OpenLDAP bitnami→Symas migration | **PR #111 OPEN → main, CI green, awaiting user go on merge** |
+| v1.22.0 | OpenLDAP bitnami→Symas migration | RELEASED — PR #111 merged `1bbb74b0`, tagged v1.22.0 |
 | v1.21.0 | k3dm-webhook security hardening | RELEASED — PR #110 `f68bdee1`, tagged |
 | v1.20.0 | CVE auto-patch-loop hardening | RELEASED — PR #109 `9da73458`, tagged |
 | v1.18.0 | first-mile CVE gap closure | RELEASED — PR #108 `85742ef7`, tagged |
@@ -20,15 +20,16 @@
 
 ## In flight
 
-- [ ] **v1.22.0 — PR #111 open, prepare-and-stop for user go on merge.** After merge: `/post-merge`
-      (tag `v1.22.0`, re-enable enforce_admins, retro), then cut v1.23.0. See `activeContext.md`.
+- [ ] **v1.23.0 — CVE observability + remediation lifecycle (B+C).** Branch re-cut fresh off main
+      (`1bbb74b0`); old 50-commit diverged branch archived `archive/k3d-manager-v1.23.0-integration`
+      (`48148c0d`); still needs `--force-with-lease` (user-run) to replace the remote branch.
+      Spec: `docs/plans/v1.23.0-cve-autopatch-dashboard-observability.md`. Blockers: dashboard v18
+      live-apply (Hub tunnel `127.0.0.1:57780`); payment `manual_review` digest-mismatch closeout;
+      carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`;
+      `observability.sh` per-hunk split from E. See `activeContext.md`.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
-- [ ] **v1.23.0** — CVE observability + remediation lifecycle (B+C). Blockers: dashboard v18 live-apply
-      (Hub tunnel `127.0.0.1:57780`); payment `manual_review` digest-mismatch closeout; carries
-      `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`; `observability.sh`
-      per-hunk split from E.
 - [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
       Blocker: recurring rotation automation for ArgoCD/Prometheus/Alertmanager (only LDAP+Grafana done).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Blockers:
@@ -48,3 +49,4 @@
       `docs/issues/2026-08-02-*` + git.
 - [x] Branch-protection approval count restored `0→1` on shopping-cart-infra #89 + order #63.
 - [x] Integration branch archived `archive/k3d-manager-v1.22.0-integration` (`03ed9ad6`) + intent map.
+- [x] v1.22.0 shipped — PR #111 merged `1bbb74b0`, tagged, enforce_admins restored, retro written (2026-08-07).
