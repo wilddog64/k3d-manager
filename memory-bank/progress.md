@@ -44,6 +44,12 @@
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
+- [ ] **QUEUED bug — Grafana rotation never reaches the DB + status false-green (task #11).** Spec
+      `docs/bugs/v1.23.0-bugfix-grafana-rotation-db-not-applied.md`. Rotator updates Vault/ESO/secret
+      but not Grafana's sqlite DB → stored password 401s after each monthly rotation; `bin/k3dm-webhook`
+      hub Grafana smoke reads app-cluster `acg-kube-prometheus-stack-grafana` (absent on hub) →
+      false-green. Live stopgap `reset-admin-password` applied 2026-08-07 (not in git; re-breaks next
+      rotation). Needs design (exec+RBAC vs admin API) + LIVE-VERIFY. Not handed off.
 - [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
       Blocker: recurring rotation automation for ArgoCD/Prometheus/Alertmanager (only LDAP+Grafana done).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Blockers:
