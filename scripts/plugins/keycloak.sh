@@ -46,7 +46,7 @@ fi
 : "${KEYCLOAK_LDAP_VAULT_PATH:=ldap/openldap-admin}"
 : "${KEYCLOAK_LDAP_BINDDN_KEY:=LDAP_BIND_DN}"
 : "${KEYCLOAK_LDAP_PASSWORD_KEY:=LDAP_ADMIN_PASSWORD}"
-: "${KEYCLOAK_LDAP_HOST:=openldap-openldap-bitnami.identity.svc.cluster.local}"
+: "${KEYCLOAK_LDAP_HOST:=openldap.identity.svc.cluster.local}"
 : "${KEYCLOAK_LDAP_PORT:=389}"
 : "${KEYCLOAK_LDAP_BASE_DN:=dc=home,dc=org}"
 : "${KEYCLOAK_LDAP_USERS_DN:=ou=users,dc=home,dc=org}"
@@ -225,7 +225,7 @@ function _keycloak_setup_vault_policies() {
 
    _vault_login "$ns" "$release"
 
-   cat <<POLICY | _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+   cat <<POLICY | _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- \
      vault policy write "${KEYCLOAK_ESO_ROLE}" -
      path "secret/data/keycloak/*"      { capabilities = ["read"] }
      path "secret/metadata/keycloak"    { capabilities = ["list"] }

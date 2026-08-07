@@ -1,4 +1,4 @@
-# How-To: Trivy Operator Observability
+# Trivy Operator Observability
 
 This repo now exposes Trivy Operator in three places:
 

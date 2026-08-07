@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-08-07
+
+**Theme: migrate OpenLDAP off the retired Bitnami image to the Symas chart.** Bitnami's `bitnamilegacy` OpenLDAP images are no longer maintained; this release moves the directory service to the community `jp-gouin/openldap-stack-ha` chart (4.3.3) and reconciles every consumer so the cutover is transparent. Admin/config passwords are now generated delimiter-safe so the chart's `sed`-based templating can't corrupt them, the platform `admin`/`developer`/`operator` users survive the chart swap (Vault-seeded bootstrap made durable), and Keycloak's LDAP federation plus the password-rotator labels are reconciled to the new `openldap.identity.svc.cluster.local` service. Verified live: the Symas chart is running, `developer` login succeeds through Keycloak, and Jenkins LDAP auth is reconciled. Pure-logic BATS `ldap_chart_passwords` 2/2 green; shellcheck clean on all changed shell.
+
+### Changed
+- OpenLDAP migrated from the retired `bitnamilegacy` image to the Symas `jp-gouin/openldap-stack-ha` chart (4.3.3); Keycloak LDAP federation and Jenkins LDAP auth reconciled to `openldap.identity.svc.cluster.local` (`0b23884b`) (`scripts/plugins/ldap.sh`, `scripts/etc/ldap/values.yaml.tmpl`, `scripts/etc/ldap/vars.sh`, `scripts/etc/keycloak/vars.sh`, `scripts/plugins/keycloak.sh`, `scripts/plugins/jenkins.sh`, `scripts/etc/jenkins/values-ldap.yaml.tmpl`)
+
+### Fixed
+- LDAP chart admin/config passwords are generated delimiter-safe (hex), so the Symas chart's `sed`-based value templating can no longer corrupt them (`7fb1ad28`) (`scripts/plugins/ldap.sh`, `scripts/tests/plugins/ldap_chart_passwords.bats`) — see `docs/issues/2026-08-05-openldap-chart-password-sed-delimiter.md`
+- Platform `admin`/`developer`/`operator` users are preserved across the Symas migration — the Vault-seeded bootstrap is now durable instead of one-shot (`c6195bb2`) (`scripts/plugins/ldap.sh`, `scripts/etc/ldap/bootstrap-basic-schema.ldif`)
+- Keycloak policy and password-rotator labels reconciled to the new OpenLDAP service so consumer wiring survives the cutover (`e9fa00cc`) (`scripts/plugins/keycloak.sh`, `scripts/etc/ldap/ldap-password-rotator.sh`, `scripts/etc/ldap/ldap-password-rotator.yaml.tmpl`) — see `docs/issues/2026-08-05-openldap-consumer-reconciliation.md`
+
 ## [1.21.0] - 2026-08-03
 
 **Theme: harden the k3dm webhook auth surface.** A security review of the internet-facing webhook (Cloudflare Worker → tunnel → `127.0.0.1:7443`) found the bearer token was the only real boundary — and it grants full admin. This release adds defense-in-depth so a leaked token, a Slack user without an explicit role, or a crafted `/ask` payload can no longer reach admin operations. The Slack command path now enforces the same RBAC as the HTTP path, roles fail **closed** instead of open, the `/ask` bash sandbox blocks interpreter and shell escapes, and the server gains a rate limiter, guarded JSON parsing, a bounded event-id cache, and a token-file permission check. Verified live on a restarted `:7443` instance (health 200; no-token → 401; invalid role → 403 fail-closed to reader; malformed JSON → 400; sustained GETs trip the 429 rate limiter) and by `bin/smoke-test-webhook` (13/13 health checks) with 49/49 BATS green. **Owner deploy note:** populate `K3DM_SLACK_ROLE_MAP` (env or Keychain `k3dm-slack-role-map`) before deploy, or every Slack user is treated as reader-only.
