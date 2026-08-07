@@ -8,6 +8,12 @@ function deploy_observability() {
   : "${ARGOCD_NAMESPACE:=cicd}"
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
   export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
+  local _grafana_secret_manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-admin-externalsecret.yaml"
+  if [[ -f "${_grafana_secret_manifest}" ]]; then
+    _kubectl apply -f "${_grafana_secret_manifest}" >/dev/null \
+      && _info "[observability] Grafana admin credential ExternalSecret applied"
+  fi
+  _observability_apply_grafana_rotator
   # shellcheck disable=SC2016
   if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] Hub ApplicationSet applied — ArgoCD will sync monitoring/trivy-system"
@@ -91,6 +97,19 @@ function deploy_observability() {
   _observability_install_alertmanager_auth_proxy
   _observability_apply_argocd_dashboard "${_hub_context}"
   _deploy_promtail_acg "${_hub_context}"
+}
+
+function _observability_apply_grafana_rotator() {
+  local manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-credential-rotator.yaml"
+  [[ -f "${manifest}" ]] || return 0
+  _kubectl apply -f "${manifest}" >/dev/null \
+    && _info "[observability] Grafana monthly credential rotator applied"
+  if declare -f _vault_configure_secret_writer_role >/dev/null 2>&1; then
+    _vault_configure_secret_writer_role "secrets" "vault" \
+      "grafana-credential-rotator" "monitoring" "secret" "observability/grafana" \
+      "grafana-rotation" "grafana-rotation" \
+      || _err "[observability] failed to configure Grafana rotation Vault role"
+  fi
 }
 
 function _observability_install_alertmanager_port_forward() {

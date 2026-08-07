@@ -2102,6 +2102,26 @@ SH
   _vault_exec "$ns" "$role_cmd" "$release"
 }
 
+function _vault_configure_secret_writer_role() {
+  local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local service_account="${3:-grafana-credential-rotator}" service_namespace="${4:-monitoring}"
+  local mount="${5:-secret}" secret_path="${6:-observability/grafana}"
+  local role="${7:-grafana-rotation}" pod="${release}-0"
+  local policy="${8:-${role}}"
+  _vault_login "$ns" "$release"
+  local mount_path="${mount%/}"
+  _vault_exec "$ns" "vault secrets list -format=json" "$release" | jq -e --arg path "${mount_path}/" 'has($path)' >/dev/null 2>&1 ||
+    _vault_exec "$ns" "vault secrets enable -path=${mount_path} kv-v2" "$release"
+  cat <<HCL | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -
+path "${mount_path}/data/${secret_path}" { capabilities = ["create", "read", "update"] }
+HCL
+  local token_audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
+  local role_cmd
+  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h audience="%s"' \
+    "$role" "$service_account" "$service_namespace" "$policy" "$token_audience"
+  _vault_exec "$ns" "$role_cmd" "$release"
+}
+
 # _vault_build_parent_metadata_policy
 # Appends parent-path metadata policy blocks to an existing policy HCL string.
 # Sets global: _VAULT_PARENT_POLICY_HCL (appended)
