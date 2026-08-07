@@ -7,14 +7,20 @@
 
 ## Current focus — v1.22.0 OpenLDAP release (PR #111)
 
-- **PR #111 OPEN → main — CI GREEN, prepare-and-stop for user go on merge.**
-  https://github.com/wilddog64/k3d-manager/pull/111 · head `204b82f8` · base main `f68bdee1`.
+- **PR #111 OPEN → main — ALL GATES GREEN, READY TO MERGE, prepare-and-stop for user go.**
+  https://github.com/wilddog64/k3d-manager/pull/111 · head `627a6d4d` · base main `f68bdee1`.
   Theme: migrate OpenLDAP off the retired `bitnamilegacy` image (66 criticals) to the Symas
   `jp-gouin/openldap-stack-ha` chart 4.3.3; service/ports pinned (`openldap.identity.svc:389`)
   so the cutover is transparent. Delimiter-safe (hex) chart passwords; durable Vault-seeded
   platform users; Keycloak/Jenkins/ArgoCD/rotator reconciled. Live-verified (Symas running,
   `developer` login through Keycloak, Jenkins LDAP auth). `ldap_chart_passwords` BATS 2/2,
-  shellcheck clean. Copilot tagged — review outcome pending at time of writing.
+  shellcheck clean. **CI green** (CI/CodeQL/Analyze×4/GitGuardian/lint). **Copilot: 3 findings
+  addressed** (`627a6d4d`) — base64 `-d`→`--decode` FIXED; LDIF mount path
+  `/ldif_import`→`/ldifs/bootstrap.ldif` FIXED (verified live, post-deploy import had silently
+  no-op'd); notifier ClusterRole DECLINED with ordering justification (`platform-ops` not owned
+  by `deploy_ldap`) — all 3 threads resolved. Doc: `docs/issues/2026-08-07-copilot-pr111-review-findings.md`.
+  **enforce_admins NOT yet disabled — do that only at merge time to minimize the unprotected
+  window; then `/post-merge` (tag `v1.22.0`, re-enable enforce_admins, retro).**
 - **Branch is the clean OpenLDAP-only re-cut.** The old 142-commit integration branch is
   archived intact at `origin/archive/k3d-manager-v1.22.0-integration` (`03ed9ad6`) — verified
   byte-identical before the `--force-with-lease` that replaced `origin/k3d-manager-v1.22.0`
