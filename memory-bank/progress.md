@@ -58,6 +58,18 @@
       reads `secret/data/observability/grafana` from Vault. Intent map updated: v1.24.0 E carve-out
       skips this hunk. Nothing was lost/overridden — full E work stays parked on
       `archive/k3d-manager-v1.22.0-integration` for v1.24.0.
+- [~] **Grafana→Vault wiring RESTORED onto v1.23.0 (2026-08-07, `5b418dd7`) — leaked password.**
+      Restored workstream-E Grafana slice from archive (`141cfa34`/`9d5e25c5`/`5f16d736`/`79019fc9`):
+      `grafana-admin-externalsecret.yaml` + `grafana-credential-rotator.yaml` (whole), plus Grafana
+      hunks of `kube-prometheus-stack-values.yaml` (existingSecret `grafana-admin-credentials`),
+      `observability.sh` (apply + Vault role), `vault.sh` (`_vault_configure_secret_writer_role`).
+      shellcheck clean, YAML parses, secret name/path consistent across files. **NOT deployed** —
+      cluster was DOWN (Docker daemon not running; API `127.0.0.1:57780` + Vault PF `18200` dead).
+      **Live cutover pending cluster bring-up:** start Docker/cluster → `make install-vault-port-forward`
+      → apply the two platform-ops manifests + configure Vault role (`deploy_observability` does both)
+      → restart Grafana to pick up `existingSecret` → trigger a rotation. Only then does
+      `make show-service-passwords` show the live Grafana password. Intent map: v1.24.0 E skips the
+      Grafana slice.
 
 ## Backlog (not release-gated)
 
