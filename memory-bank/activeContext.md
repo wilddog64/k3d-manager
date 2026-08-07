@@ -26,6 +26,10 @@
   - Close out payment `manual_review` digest-mismatch event (verify or document as expected).
   - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
   - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
+  - **NEW blocker (found 2026-08-07 post-OrbStack-restart):** `cve-remediation-verify` (and any
+    `app-cve-scan` jobs) pin `docker.io/bitnami/kubectl:1.30.2`, which Bitnami REMOVED from Docker
+    Hub (Aug 2025 catalog change) → `ImagePullBackOff` on every scheduled run. Needs image re-pin
+    (e.g. `rancher/kubectl` or `bitnamilegacy/kubectl`). `/bugfix` spec pending.
 - **Part (a) handed to Codex (2026-08-07).** Focused spec
   `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md` — panel id 5 regroup by
   `namespace, image_repository, resource_name` (source-only, no cluster reconfig, no LIVE-VERIFY).
