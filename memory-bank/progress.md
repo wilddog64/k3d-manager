@@ -27,6 +27,8 @@
       live-apply (Hub tunnel `127.0.0.1:57780`); payment `manual_review` digest-mismatch closeout;
       carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`;
       `observability.sh` per-hunk split from E. See `activeContext.md`.
+      Part (a) spec handed to Codex: `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md`
+      (panel id 5 image/resource regroup; source-only). Parts (b)/(c) = later handoff.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 

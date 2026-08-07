@@ -26,6 +26,11 @@
   - Close out payment `manual_review` digest-mismatch event (verify or document as expected).
   - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
   - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
+- **Part (a) handed to Codex (2026-08-07).** Focused spec
+  `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md` — panel id 5 regroup by
+  `namespace, image_repository, resource_name` (source-only, no cluster reconfig, no LIVE-VERIFY).
+  Parts (b) CVE-id export + (c) job-target labeling are a separate later handoff (need live
+  reconfig + ApplicationSet reapply). Live dashboard reapply is Claude-owned post-merge.
 
 ## Pending releases (from the integration split — see intent map for files + full detail)
 
