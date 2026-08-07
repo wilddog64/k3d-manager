@@ -2,6 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - https://github.com/wilddog64/shopping-cart-order//k8s/base?ref=main
+patches:
   - patch: |-
       - op: add
         path: /data/BASKET_URL
@@ -15,7 +16,6 @@ resources:
     target:
       kind: ConfigMap
       name: order-service-config
-patches:
   - patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/readinessProbe
