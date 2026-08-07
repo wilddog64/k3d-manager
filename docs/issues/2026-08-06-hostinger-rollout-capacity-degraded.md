@@ -51,3 +51,20 @@ future surge rollouts.
 The payment Secret is owned by the existing data-layer `postgres-payment-app`
 ExternalSecret (`SecretSynced=True`). A temporary duplicate service-level
 ExternalSecret was rejected by ESO and removed; it was not kept in GitOps.
+
+## Request-right-sizing investigation (2026-08-07)
+
+Request reduction is technically applicable, but requires service-level
+changes and load validation. The node reports only 411m actual CPU usage (20%)
+while pod requests reserve 1,910m of its 2 CPU allocatable capacity. The
+pending order, product-catalog, and payment surge pods request 100m, 100m, and
+200m respectively. Their replacement pods are blocked by scheduling requests,
+not observed CPU consumption.
+
+The safe candidate is a staged reduction of over-reserved non-critical service
+requests (starting with one service, preserving limits), followed by a
+zero-downtime rollout and peak-load check. Do not reduce all requests based on
+the single low-usage sample: Java startup and traffic spikes need headroom, and
+reducing requests weakens scheduling guarantees. Capacity expansion remains the
+permanent fix; right-sizing is a short-term mitigation that needs a separate
+spec across the affected service repositories.
