@@ -32,6 +32,12 @@
   Parts (b) CVE-id export + (c) job-target labeling are a separate later handoff (need live
   reconfig + ApplicationSet reapply). Live dashboard reapply is Claude-owned post-merge.
 
+## Part (a) source fix complete — 2026-08-07
+
+Commit `db81f534` changes only panel id 5's Prometheus grouping, legend, and title to attribute
+critical vulnerabilities by image and resource. Both YAML and embedded-dashboard JSON parse checks
+passed; the commit is pushed to `origin/k3d-manager-v1.23.0`. Live reapply remains Claude-owned.
+
 ## Pending releases (from the integration split — see intent map for files + full detail)
 
 - **v1.24.0 = platform hardening (D webhook + E credential rotation + F istio/hostinger + unseal watchdog).**

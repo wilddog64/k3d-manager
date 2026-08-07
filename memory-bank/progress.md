@@ -29,6 +29,10 @@
       `observability.sh` per-hunk split from E. See `activeContext.md`.
       Part (a) spec handed to Codex: `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md`
       (panel id 5 image/resource regroup; source-only). Parts (b)/(c) = later handoff.
+- [x] **v1.23.0 Part (a) dashboard image attribution — COMPLETE 2026-08-07.** `db81f534` changes
+      only panel id 5 to group by `namespace, image_repository, resource_name`, with the specified
+      legend and title. Both YAML and embedded JSON parse checks passed; pushed to
+      `origin/k3d-manager-v1.23.0`. Live dashboard reapply remains Claude-owned.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
