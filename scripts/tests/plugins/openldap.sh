@@ -3,7 +3,7 @@ set -euo pipefail
 
 namespace="${1:-directory}"
 release="${2:-openldap}"
-service="${3:-${release}-openldap-bitnami}"
+service="${3:-openldap}"
 local_port="${4:-3389}"
 
 if ! command -v kubectl >/dev/null 2>&1; then
@@ -65,9 +65,9 @@ discover_base_dn() {
 
   pod_name=$(kubectl -n "$namespace" get pods -l app.kubernetes.io/instance="$release" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
   if [[ -n "$pod_name" ]]; then
-    detected=$(kubectl -n "$namespace" exec "$pod_name" -c openldap-bitnami -- printenv LDAP_ROOT 2>/dev/null | tr -d '\r\n' || true)
+    detected=$(kubectl -n "$namespace" exec "$pod_name" -c openldap-stack-ha -- printenv LDAP_ROOT 2>/dev/null | tr -d '\r\n' || true)
     if [[ -z "$detected" ]]; then
-      detected=$(kubectl -n "$namespace" exec "$pod_name" -c openldap-bitnami -- printenv LDAP_BASE_DN 2>/dev/null | tr -d '\r\n' || true)
+      detected=$(kubectl -n "$namespace" exec "$pod_name" -c openldap-stack-ha -- printenv LDAP_BASE_DN 2>/dev/null | tr -d '\r\n' || true)
     fi
   fi
   if [[ -n "$detected" ]]; then

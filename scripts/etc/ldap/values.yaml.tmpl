@@ -1,99 +1,49 @@
-# --- OpenLDAP chart defaults (johanneskastl-openldap-bitnami) ---
-
+# --- OpenLDAP chart (jp-gouin/openldap-stack-ha, Symas jpgouin/openldap) ---
+fullnameOverride: "openldap"
 replicaCount: 1
 
 image:
   repository: "${LDAP_IMAGE_REPOSITORY}"
-  pullPolicy: "${LDAP_IMAGE_PULL_POLICY}"
   tag: "${LDAP_IMAGE_TAG}"
+  pullPolicy: "${LDAP_IMAGE_PULL_POLICY}"
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
+global:
+  ldapDomain: "${LDAP_DOMAIN}"
+  adminUser: "${LDAP_ADMIN_USERNAME}"
+  configUser: "admin"
+  existingSecret: "${LDAP_ADMIN_SECRET_NAME}"
+  ldapPort: ${LDAP_PORT}
+  sslLdapPort: ${LDAP_TLS}
 
-# Populated by ESO -> Secret (Vault-sourced credentials)
-envFrom:
-  - secretRef:
-      name: "${LDAP_ADMIN_SECRET_NAME}"
-extraEnv:
-  - name: LDAP_ROOT
-    value: "${LDAP_ROOT}"
-  - name: LDAP_DOMAIN
-    value: "${LDAP_DOMAIN}"
-  - name: LDAP_BASE_DN
-    value: "${LDAP_BASE_DN}"
-  - name: LDAP_ORG_NAME
-    value: "${LDAP_ORG_NAME}"
-  - name: LDAP_ADMIN_USERNAME
-    value: "${LDAP_ADMIN_USERNAME}"
+customLdifCm: "${LDAP_LDIF_SECRET_NAME}"
 
-# Skip Bitnami's sample tree only when a custom LDIF secret is mounted
-skip_default_tree_generation: ${LDAP_SKIP_DEFAULT_TREE}
+env:
+  BITNAMI_DEBUG: "false"
+  LDAP_LOGLEVEL: "256"
 
-mount_ldif_secret:
-  enabled: ${LDAP_LDIF_ENABLED}
-  secretName: "${LDAP_LDIF_SECRET_NAME}"
-
-tls_enabled: true
-
-tls_certificates_from_secret:
-  enabled: false
-
-serviceAccount:
-  create: true
-  annotations: {}
-  name: ""
+initTLSSecret:
+  tls_enabled: false
 
 service:
   type: "ClusterIP"
-  ports:
-    ldap-tcp:
-      enabled: true
-      port: ${LDAP_PORT}
-      protocol: TCP
-      targetPort: 1389
-    ldap-udp:
-      enabled: false
-      port: ${LDAP_PORT}
-      protocol: UDP
-      targetPort: 1389
-    ldaps-tcp:
-      enabled: true
-      port: ${LDAP_TLS}
-      protocol: TCP
-      targetPort: 1636
-    ldaps-udp:
-      enabled: false
-      port: ${LDAP_TLS}
-      protocol: UDP
-      targetPort: 1636
+  enableLdapPort: true
+  enableSslLdapPort: true
 
-ingress:
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 8Gi
+
+replication:
   enabled: false
-  className: ""
-  annotations: {}
-  hosts:
-    - host: "chart-example.local"
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
-  tls: []
+ltb-passwd:
+  enabled: false
+phpldapadmin:
+  enabled: false
 
 podAnnotations:
   sidecar.istio.io/inject: "false"
-
-podSecurityContext:
-  fsGroup: 1001
-
-securityContext:
-  capabilities:
-    drop:
-      - ALL
-    add:
-      - NET_BIND_SERVICE
-  readOnlyRootFilesystem: false
-  runAsNonRoot: true
-  runAsUser: 1001
 
 resources:
   requests:
@@ -103,7 +53,5 @@ resources:
     memory: "${LDAP_LIMIT_MEM}"
 
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}
