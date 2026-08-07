@@ -26,10 +26,16 @@
   - Close out payment `manual_review` digest-mismatch event (verify or document as expected).
   - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
   - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
-  - **NEW blocker (found 2026-08-07 post-OrbStack-restart):** `cve-remediation-verify` (and any
-    `app-cve-scan` jobs) pin `docker.io/bitnami/kubectl:1.30.2`, which Bitnami REMOVED from Docker
-    Hub (Aug 2025 catalog change) → `ImagePullBackOff` on every scheduled run. Needs image re-pin
-    (e.g. `rancher/kubectl` or `bitnamilegacy/kubectl`). `/bugfix` spec pending.
+  - **Bitnami image removed (found 2026-08-07 post-OrbStack-restart).** `docker.io/bitnami/kubectl`
+    is GONE from Docker Hub (Aug 2025 catalog migration) → `ImagePullBackOff`. Two consumers, both
+    re-pin to `docker.io/alpine/k8s:1.31.4` (already used pinned by `grafana-credential-rotator`;
+    drop-in — both invoke `command: ["sh", <script>]`, no entrypoint dep):
+    - **On-branch (bugfix spec written):** `scripts/etc/ldap/vars.sh:99` `LDAP_ROTATOR_IMAGE`.
+      Spec `docs/bugs/v1.23.0-bugfix-bitnami-kubectl-image-removed.md`. Handed to Codex.
+    - **Off-branch carry-forward gap:** live `cve-remediation-verify` CronJob + its script + RBAC +
+      `argocd.sh` wiring exist ONLY on `archive/k3d-manager-v1.22.0-integration` (workstream-C gap in
+      the v1.23.0 re-cut). Re-pin to alpine/k8s when the verify job is carried forward. Interim:
+      delete the orphaned live cronjob (v1.23.0 won't recreate it).
 - **Part (a) handed to Codex (2026-08-07).** Focused spec
   `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md` — panel id 5 regroup by
   `namespace, image_repository, resource_name` (source-only, no cluster reconfig, no LIVE-VERIFY).
