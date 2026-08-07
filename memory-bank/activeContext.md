@@ -38,6 +38,22 @@ Commit `db81f534` changes only panel id 5's Prometheus grouping, legend, and tit
 critical vulnerabilities by image and resource. Both YAML and embedded-dashboard JSON parse checks
 passed; the commit is pushed to `origin/k3d-manager-v1.23.0`. Live reapply remains Claude-owned.
 
+## Parts (b)+(c) handed to Codex — 2026-08-07
+
+Focused spec `docs/plans/v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md` (spec
+commit `5aa7f771`). Six source files: dashboard panels id 8 (CVE-ID table) + id 9
+(remediation-by-target), `trivy-operator-values.yaml` + acg `metricsVulnIdEnabled: true`,
+`kube-prometheus-stack-values.yaml` + acg KSM `metricLabelsAllowlist` for
+`jobs=[target-namespace,target-image]`, `bin/k3dm-webhook` `_create_cve_scan_job` job-labeling +
+`_cve_label_value` sanitizer, and the `webhook.bats` label assertion. All old-blocks were verified
+against live source before handoff (`import re` present L9; caller vars in scope L3201; dashboard
+tail L96–99; trivy L29–31 both files; both kube-prometheus files lack a top-level
+`kube-state-metrics` key). Corrected the master spec's Change 7: **7b-only** — the bats mock logs
+argv at L45 and falls through to `exit 0`, so a `label job` arm would double-log. Panels 8/9 are
+**LIVE-VERIFY** (`vuln_id` / `label_target_*` names confirmed after apply). Live cutover
+(reapply trivy + kube-prometheus values hub+acg, ApplicationSet reapply, `make restart-webhook` +
+smoke gate, finalize panel 8/9 queries) is **Claude-owned, post-merge**.
+
 ## Pending releases (from the integration split — see intent map for files + full detail)
 
 - **v1.24.0 = platform hardening (D webhook + E credential rotation + F istio/hostinger + unseal watchdog).**

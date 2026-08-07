@@ -33,6 +33,14 @@
       only panel id 5 to group by `namespace, image_repository, resource_name`, with the specified
       legend and title. Both YAML and embedded JSON parse checks passed; pushed to
       `origin/k3d-manager-v1.23.0`. Live dashboard reapply remains Claude-owned.
+- [ ] **v1.23.0 Parts (b)+(c) — spec handed to Codex 2026-08-07.**
+      `docs/plans/v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md` (spec commit
+      `5aa7f771`): (b) trivy `metricsVulnIdEnabled: true` (hub+acg) + CVE-ID panel id 8; (c) KSM
+      `metricLabelsAllowlist` jobs=[target-namespace,target-image] (hub+acg) + `bin/k3dm-webhook`
+      `_create_cve_scan_job` labels the job + bats assertion + remediation-by-target panel id 9.
+      6 files, source-only. Panels 8/9 are LIVE-VERIFY (label names confirmed post-apply). Change 7
+      is 7b-only (mock already logs argv + falls through exit 0 — no `label job` arm). Live cutover
+      (reapply trivy/kube-prometheus values hub+acg, `make restart-webhook`, LIVE-VERIFY) Claude-owned.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
