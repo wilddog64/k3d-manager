@@ -68,3 +68,14 @@ the single low-usage sample: Java startup and traffic spikes need headroom, and
 reducing requests weakens scheduling guarantees. Capacity expansion remains the
 permanent fix; right-sizing is a short-term mitigation that needs a separate
 spec across the affected service repositories.
+
+## Bounded peak-load validation (2026-08-07)
+
+An ephemeral `curlimages/curl:8.10.1` pod issued 300 liveness requests to the
+internal order service (10 concurrent loops, 10m CPU request). All responses
+were HTTP 200. Node usage rose from 411m to 618m (20% to 30%), the order
+Deployment remained `1/1` ready, and order, payment, and product-catalog
+Applications remained `Synced Healthy`. The probe pod was deleted afterward.
+
+This validates the right-sized requests under a bounded liveness burst; it is
+not a sustained production traffic or application-checkout benchmark.

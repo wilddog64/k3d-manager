@@ -1,6 +1,6 @@
 # Progress — k3d-manager
 
-- [ ] **P2 Hostinger capacity expansion** — short-term right-sizing is deployed (`daacf657`): order/product-catalog requests 50m and payment 100m, with limits unchanged; all three Applications are now `Synced Healthy`. Resize/add-worker remains the permanent fix and peak-load validation is still required. Evidence: `docs/issues/2026-08-06-hostinger-rollout-capacity-degraded.md`.
+- [ ] **P2 Hostinger capacity expansion** — short-term right-sizing is deployed (`daacf657`) and bounded peak-load validation passed: 300/300 liveness responses were HTTP 200, node CPU peaked at 30%, and all three Applications stayed `Synced Healthy`. Resize/add-worker remains the permanent fix; sustained checkout benchmarking is still separate. Evidence: `docs/issues/2026-08-06-hostinger-rollout-capacity-degraded.md`.
 - [x] **Payment Secret GitOps durability** — verified `postgres-payment-app` is the existing Vault-backed owner of `payment-db-credentials` and `SecretSynced=True`; duplicate ownership was avoided.
 - [x] **Grafana CVE Count visibility** — dashboard v18 places Count second in both CVE tables; source commit `eae0d607` pushed, live apply blocked by unavailable Hub API tunnel.
 
