@@ -704,7 +704,7 @@ function _ldap_import_ldif() {
    local ns="${1:-$LDAP_NAMESPACE}"
    local release="${2:-$LDAP_RELEASE}"
    local ldif_secret="${LDAP_LDIF_SECRET_NAME:-openldap-ldif-import}"
-   local ldif_mount_path="${LDAP_LDIF_MOUNT_PATH:-/ldif_import/bootstrap.ldif}"
+   local ldif_mount_path="${LDAP_LDIF_MOUNT_PATH:-/ldifs/bootstrap.ldif}"
    local admin_secret="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
    local admin_key="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
    local admin_user="${LDAP_ADMIN_USERNAME:-ldap-admin}"
@@ -717,7 +717,7 @@ function _ldap_import_ldif() {
    [[ -n "${LDAP_LDIF_VAULT_PATH:-}" ]] || { _warn "[ldap] LDIF sync enabled but LDAP_LDIF_VAULT_PATH is empty; skipping LDIF import"; return 0; }
 
    if ! _kubectl --no-exit -n "$ns" get configmap "$ldif_secret" >/dev/null 2>&1; then
-      _info "[ldap] LDIF secret ${ns}/${ldif_secret} not found; skipping LDIF import"
+      _info "[ldap] LDIF ConfigMap ${ns}/${ldif_secret} not found; skipping LDIF import"
       return 0
    fi
 
