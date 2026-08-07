@@ -4,6 +4,22 @@ resources:
   - https://github.com/wilddog64/shopping-cart-order//k8s/base?ref=main
 patches:
   - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: order-service
+      spec:
+        template:
+          spec:
+            containers:
+              - name: order-service
+                resources:
+                  requests:
+                    cpu: 50m
+    target:
+      kind: Deployment
+      name: order-service
+  - patch: |-
       - op: add
         path: /data/BASKET_URL
         value: http://basket-service.shopping-cart-apps.svc.cluster.local:8083

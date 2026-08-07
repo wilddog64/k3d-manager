@@ -4,6 +4,22 @@ resources:
   - https://github.com/wilddog64/shopping-cart-payment//k8s/base?ref=main
 patches:
   - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: payment-service
+      spec:
+        template:
+          spec:
+            containers:
+              - name: payment-service
+                resources:
+                  requests:
+                    cpu: 100m
+    target:
+      kind: Deployment
+      name: payment-service
+  - patch: |-
       apiVersion: v1
       kind: ServiceAccount
       metadata:

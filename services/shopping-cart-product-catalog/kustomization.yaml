@@ -7,6 +7,22 @@ images:
     newTag: latest
 patches:
   - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: product-catalog
+      spec:
+        template:
+          spec:
+            containers:
+              - name: product-catalog
+                resources:
+                  requests:
+                    cpu: 50m
+    target:
+      kind: Deployment
+      name: product-catalog
+  - patch: |-
       apiVersion: v1
       kind: ServiceAccount
       metadata:
