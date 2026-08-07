@@ -32,10 +32,18 @@
     drop-in — both invoke `command: ["sh", <script>]`, no entrypoint dep):
     - **On-branch (bugfix spec written):** `scripts/etc/ldap/vars.sh:99` `LDAP_ROTATOR_IMAGE`.
       Spec `docs/bugs/v1.23.0-bugfix-bitnami-kubectl-image-removed.md`. Handed to Codex.
-    - **Off-branch carry-forward gap:** live `cve-remediation-verify` CronJob + its script + RBAC +
+- **Off-branch carry-forward gap:** live `cve-remediation-verify` CronJob + its script + RBAC +
       `argocd.sh` wiring exist ONLY on `archive/k3d-manager-v1.22.0-integration` (workstream-C gap in
       the v1.23.0 re-cut). Re-pin to alpine/k8s when the verify job is carried forward. Interim:
       delete the orphaned live cronjob (v1.23.0 won't recreate it).
+
+## LDAP rotator image re-pin complete — 2026-08-07
+
+Fix commit `ddc68c90` re-pins `LDAP_ROTATOR_IMAGE` in `scripts/etc/ldap/vars.sh` from the
+removed floating `docker.io/bitnami/kubectl:latest` image to the maintained pinned
+`docker.io/alpine/k8s:1.31.4`. The file-scoped grep and shellcheck gates passed and the fix is
+pushed to `origin/k3d-manager-v1.23.0`. The live `cve-remediation-verify` carry-forward gap
+remains explicitly out of scope and Claude-owned.
 - **Part (a) handed to Codex (2026-08-07).** Focused spec
   `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md` — panel id 5 regroup by
   `namespace, image_repository, resource_name` (source-only, no cluster reconfig, no LIVE-VERIFY).

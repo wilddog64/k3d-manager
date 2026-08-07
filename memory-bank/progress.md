@@ -42,6 +42,12 @@
       is 7b-only (mock already logs argv + falls through exit 0 — no `label job` arm). Live cutover
       (reapply trivy/kube-prometheus values hub+acg, `make restart-webhook`, LIVE-VERIFY) Claude-owned.
 
+- [x] **LDAP rotator image re-pin — COMPLETE 2026-08-07.** Fix commit `ddc68c90` changes only
+      `scripts/etc/ldap/vars.sh`, replacing removed `docker.io/bitnami/kubectl:latest` with
+      `docker.io/alpine/k8s:1.31.4`. Grep counts are 0/1, shellcheck is clean, and the fix is
+      pushed to `origin/k3d-manager-v1.23.0`. The live `cve-remediation-verify` carry-forward
+      gap remains out of scope.
+
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
 - [ ] **QUEUED bug — Grafana rotation never reaches the DB + status false-green (task #11).** Spec
