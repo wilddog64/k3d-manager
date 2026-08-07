@@ -50,6 +50,15 @@
       merge order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now);
       hostinger capacity expansion.
 
+## Done — recent (pointers) — cont.
+
+- [x] **Grafana `show-service-passwords` unblock (2026-08-07).** `make show-service-passwords`
+      was reading Grafana from the stale k8s secret after the live credential rotation. Pulled the
+      Makefile Grafana hunk forward from workstream E (`40c8b08e`) onto v1.23.0 (`31db9732`); now
+      reads `secret/data/observability/grafana` from Vault. Intent map updated: v1.24.0 E carve-out
+      skips this hunk. Nothing was lost/overridden — full E work stays parked on
+      `archive/k3d-manager-v1.22.0-integration` for v1.24.0.
+
 ## Backlog (not release-gated)
 
 - [ ] Shopping-cart Dependabot backlog (Go builder-image bumps, majors held for migration work) —
