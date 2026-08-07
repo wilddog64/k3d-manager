@@ -358,8 +358,11 @@ show-service-passwords:
 	echo "    user:     admin";\
 	echo "    password: $${_argocd:-N/A}";\
 	echo ""
-	@_grafana=$$(kubectl get secret kube-prometheus-stack-grafana -n monitoring \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d); \
+	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	_grafana=$$(curl -sf -H "X-Vault-Token: $$_vault_tok" \
+	  "http://127.0.0.1:18200/v1/secret/data/observability/grafana" 2>/dev/null | \
+	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
 	echo "  Grafana     https://grafana.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_grafana:-N/A}";\
