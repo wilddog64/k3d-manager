@@ -237,6 +237,9 @@ docs/
 - **[Two-Cluster Architecture](docs/plans/two-cluster-infra.md)** — Infra + app cluster design
 - **[Cloudflare Tunnel + Slack Relay](docs/architecture/cloudflare-slack-relay.md)** — Ingress routing and Slack slash command dispatch with Mermaid diagrams
 - **[Webhook Server](docs/architecture/webhook-server.md)** — `bin/k3dm-webhook` + `scripts/lib/webhook/` module layout after the v1.13.0 modularization, request flow, and remaining phases
+- **[OpenLDAP Directory Service](docs/architecture/openldap-directory-service.md)** — Symas `jp-gouin/openldap-stack-ha` topology, credential model, and consumer wiring after the v1.22.0 `bitnamilegacy` migration
+- **[CVE Detection and Remediation Pipeline](docs/architecture/cve-remediation-pipeline.md)** — Trivy alert → webhook → immutable-image promotion/rebuild, plus Dependabot escalation
+- **[Trivy Operator Observability](docs/architecture/trivy-operator-observability.md)** — Trivy Operator reconcile-error logs, scan-job failure alerts, and metrics scraping
 
 ### How-To
 
@@ -248,8 +251,6 @@ docs/
 **GitOps & CI/CD**
 - **[ArgoCD](docs/howto/argocd.md)** — Deploy, register app cluster, configure deploy keys
 - **[ArgoCD Alerts](docs/howto/argocd-alerts.md)** — ArgoCD Degraded/OutOfSync alert wiring, visibility, and test steps
-- **[Trivy Operator Observability](docs/howto/trivy-operator-observability.md)** — Trivy Operator reconcile-error logs, scan-job failure alerts, and metrics scraping
-- **[CVE Detection and Remediation Pipeline](docs/howto/cve-remediation-pipeline.md)** — Trivy alert to webhook to immutable-image promotion/rebuild, plus Dependabot escalation
 - **[cert-manager](docs/howto/cert-manager.md)** — Deploy, Vault + ACME issuers, certificate lifecycle
 
 **Cloud Sandbox**
