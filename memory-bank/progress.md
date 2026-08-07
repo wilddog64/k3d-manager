@@ -52,6 +52,21 @@
 
 ## Done — recent (pointers) — cont.
 
+- [~] **Grafana admin password rotation trap — DB never updated (found + stopgap-fixed 2026-08-07).**
+      Symptom: `make show-service-passwords` Grafana value gave HTTP 401 at `grafana.3ai-talk.org`,
+      but `make status` reported "Grafana login: HTTP 200". Root cause: kube-prometheus-stack Grafana
+      applies `admin_password` from `existingSecret` ONLY at first DB provisioning — the monthly
+      rotator (`grafana-credential-rotator`) rotates Vault → ESO → k8s secret `grafana-admin-credentials`
+      but NEVER changes Grafana's sqlite DB password, so Vault/secret (same hash) drift from the DB.
+      **Stopgap applied live:** `grafana cli admin reset-admin-password --password-from-stdin` inside
+      the pod, reset DB to the stored secret value → login now HTTP 200. **Will recur on next monthly
+      rotation.** Two durable fixes needed (spec pending): (1) rotator + initial deploy must apply the
+      new password to Grafana's DB (reset-admin-password or admin API) after writing the secret;
+      (2) `bin/k3dm-webhook` hub Grafana smoke reads `acg-kube-prometheus-stack-grafana` (app-cluster,
+      ABSENT on hub) → false-green; must read hub `grafana-admin-credentials`
+      (monitoring/admin-password) so `make status` actually catches this drift. Audited the others —
+      ArgoCD (`argocd-initial-admin-secret`), Prometheus + Alertmanager basic-auth all authenticate
+      HTTP 200 with their displayed passwords; only Grafana was broken. See [[project_status_login_verification]].
 - [x] **Grafana `show-service-passwords` unblock (2026-08-07).** `make show-service-passwords`
       was reading Grafana from the stale k8s secret after the live credential rotation. Pulled the
       Makefile Grafana hunk forward from workstream E (`40c8b08e`) onto v1.23.0 (`31db9732`); now
