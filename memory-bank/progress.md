@@ -137,6 +137,23 @@
       Part 2 (separate, shopping-cart repo): set `minReadySeconds` on order/payment/product-catalog
       Deployments to auto-close the `manual_review` gate. Answers the user's "how to address the state
       automatically" — the verifier auto-stamps `applied` once the promoted digest is confirmed running.
+- [ ] **CVE verifier payment-namespace mismatch — bug filed + QUEUED (doc `d444bf44`).** Spec
+      `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-payment-namespace.md`. Dashboard-state triage
+      2026-08-08: the remediation table is a LEDGER of immutable per-attempt ConfigMaps (verifier only
+      acts on `state=promotion_requested`, writes terminal state once). `manual_review
+      /min_ready_seconds_not_configured` rows are OLD (pre-`minReadySeconds`) history — order now has
+      `minReadySeconds=10`, product-catalog recent events `applied`. Root causes of the recurring
+      `failed`: (a) **order `ready_pod_digest_mismatch`** — running `sha256:77fbb912` (tag
+      `sha-56033880`) ≠ remediation target `sha256:a8813e75`; image tug-of-war (CI/Image-Updater vs
+      remediation promotion); (b) **payment `argocd_not_synced_or_healthy`** — app `Synced|Degraded`
+      because a surge pod is stuck `Pending 31h` (`FailedScheduling: Insufficient cpu`; hostinger node
+      at 90% CPU requests). Payment's remediation digest `sha256:87c1b58c` IS already the running image,
+      so payment flips to `applied` once Healthy. **Verifier bug:** `cve-remediation-verify.sh`
+      hardcodes `-n shopping-cart-apps`, but `payment-service` runs in `shopping-cart-payment` → after
+      the Degraded fix it would still mis-verify. Fix = `_namespace_for` map. Commit
+      `fix(cve): verify payment remediation in its shopping-cart-payment namespace`. Two follow-ons
+      (shopping-cart repos, not yet specced): payment `strategy.rollingUpdate.maxSurge: 0` (unblock
+      the CPU-bound rollout) + order image source-of-truth reconciliation.
 - [x] **CVE dashboard namespace=platform-ops collision — FIXED live + committed `43ece528` (task #13).**
       Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md` (Option A). Root cause:
       `vulnerability-inventory-exporter` runs in platform-ops; Prometheus `honorLabels:false`
