@@ -143,10 +143,27 @@ dropped. Claude owns the live Grafana rotation and Trivy reapply verification.
   `restore` trap fires. Only the Grafana rotator uses openssl (`grep -rn openssl scripts/etc/argocd/`
   = 1 hit); LDAP rotator unaffected. Portable replacement live-verified in-image:
   `head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'` → 48 lowercase-hex chars (== `openssl rand
-  -hex 24`). **Bug filed + committed `7e857fbb`:**
-  `docs/bugs/v1.23.0-bugfix-grafana-rotator-openssl-not-found.md` (commit
-  `fix(observability): generate Grafana rotator password without openssl`). QUEUED — awaiting go to
-  apply; full rotation + login-200 LIVE-VERIFY still pending on this fix.
+  -hex 24`). **Bug filed `7e857fbb`; fix committed `4557cdeb`** (`fix(observability): generate
+  Grafana rotator password without openssl`).
+- **4th latent blocker — `rollout status` RBAC.** With openssl fixed, the pod reached line 122
+  `kubectl rollout status deployment/kube-prometheus-stack-grafana` and looped on
+  `cannot list resource "deployments"` until timeout. `rollout status` uses a ListWatch informer →
+  needs `deployments` **list+watch** at collection scope; the Role only had name-scoped `get`/`patch`.
+  **RBAC subtlety:** `resourceNames` is ignored for `list`/`watch` (collection verbs), so the fix is a
+  **separate verbs-only rule** (`list`,`watch`) alongside the name-scoped get/patch — least privilege
+  preserved, namespace-scoped Role. `rollout restart` had worked because it uses get+patch.
+  **Bug filed `52493b04`; fix committed `a0bb46c2`** (`fix(observability): grant Grafana rotator
+  deployments list/watch for rollout status`).
+- **✅ ROTATOR NOW RUNS END-TO-END (first time ever) — LIVE-VERIFIED 2026-08-08.** Manual
+  `rotate-verify` Job → **`Complete`** (1/1, 21s), clean logs, stored password fingerprint changed
+  (real rotation: Vault write → ESO force-sync → k8s secret → Grafana DB reset). Login with the
+  newly-rotated secret: in-pod `POST /login` → 200 `{"message":"Logged in"}`; external
+  `grafana.3ai-talk.org` → 200 (one transient 502 during the Grafana restart, recovered on retry);
+  `make status` → `✅ Grafana login: HTTP 200`. Empirically confirms the Vault write path (policy
+  `grafana-rotation` = create/read/update, vault.sh:2116) + the DB-apply exec. **All four latent
+  rotator blockers (runAsNonRoot → openssl → rollout-status RBAC, plus Codex's DB-apply) resolved;
+  Grafana Fix 1 is no longer inert — the monthly rotation will self-heal.** Live rotator manifest
+  applied on the hub (matches git `a0bb46c2`).
 
 ### Webhook request-hardening bugfix specced — 2026-08-08 (Codex handoff)
 Spec `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md` (from a security

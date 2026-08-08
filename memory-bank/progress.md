@@ -89,13 +89,19 @@
       `runAsUser: 65534` + `runAsGroup: 65534` (kept `runAsNonRoot: true`). Claude applied directly,
       pushed+verified on origin. Live-applied the rotator; manual `rotate-verify` job now **starts as
       uid 65534** — `CreateContainerConfigError` gone. This blocker is resolved.
-- [ ] **Grafana rotator `openssl: not found` — 3rd latent blocker, bug filed + QUEUED.** Spec
-      `docs/bugs/v1.23.0-bugfix-grafana-rotator-openssl-not-found.md` (doc committed `7e857fbb`).
-      Uncovered by the runAsNonRoot live-verify: `alpine/k8s:1.31.4` has no `openssl`, so line 109
-      `new="$(openssl rand -hex 24)"` aborts the job before any rotation. Fix = `/dev/urandom`+`od`
-      equivalent (48 hex chars, live-verified in-image). Only the Grafana rotator uses openssl.
-      Commit `fix(observability): generate Grafana rotator password without openssl`. Awaiting go to
-      apply; full rotation + login-200 LIVE-VERIFY pending on this fix.
+- [x] **Grafana rotator `openssl: not found` — 3rd blocker, FIXED + committed `4557cdeb`.** Spec
+      `7e857fbb`. `alpine/k8s:1.31.4` has no `openssl`; line 109 now uses `/dev/urandom`+`od` (48 hex,
+      live-verified). Only the Grafana rotator used openssl.
+- [x] **Grafana rotator `rollout status` RBAC — 4th blocker, FIXED + committed `a0bb46c2`.** Spec
+      `52493b04` (`docs/bugs/v1.23.0-bugfix-grafana-rotator-rollout-status-rbac.md`). `rollout status`
+      needs `deployments` list+watch (ListWatch informer); `resourceNames` is ignored for collection
+      verbs, so added a separate verbs-only `list`/`watch` rule (name-scoped get/patch retained).
+- [x] **✅ Grafana rotator END-TO-END LIVE-VERIFIED — runs for the first time ever (2026-08-08).**
+      Manual `rotate-verify` Job `Complete` (21s, clean logs); password rotated (fingerprint changed);
+      login with the new secret → 200 in-pod + external + `make status ✅ Grafana login: HTTP 200`.
+      All four latent blockers (runAsNonRoot `a66463e1` → openssl `4557cdeb` → rollout-status RBAC
+      `a0bb46c2`, plus Codex DB-apply `816835fd`) resolved. Grafana Fix 1 no longer inert; monthly
+      rotation self-heals. Live rotator on hub matches git `a0bb46c2`.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
