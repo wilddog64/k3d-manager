@@ -56,6 +56,22 @@
       hub Grafana smoke reads app-cluster `acg-kube-prometheus-stack-grafana` (absent on hub) →
       false-green. Live stopgap `reset-admin-password` applied 2026-08-07 (not in git; re-breaks next
       rotation). Needs design (exec+RBAC vs admin API) + LIVE-VERIFY. Not handed off.
+- [ ] **CVE remediation verifier dead (ImagePullBackOff) + carry-forward gap — HOTFIXED live, durable spec QUEUED for Codex.**
+      Spec `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-carry-forward.md`. Root cause: the
+      `cve-remediation-verify` CronJob (the every-5-min loop driving ALL remediation state
+      transitions) was in `ImagePullBackOff` for 2+ days — image `docker.io/bitnami/kubectl:latest`
+      removed by Bitnami (same as task #12). Compounded by carry-forward gap: verifier is
+      archive-only (branch `app-cve-scan-cronjob.yaml` lost its 96-line verify CronJob doc,
+      `cve-remediation-verify.sh` absent, `argocd.sh` unwired). **LIVE HOTFIX 2026-08-07 (Claude):**
+      patched running CronJob image → `docker.io/alpine/k8s:1.31.4`, deleted the wedged 2d job, kicked
+      a manual run → 41 `promotion_requested` drained: **19 auto-advanced to `applied`** (2→21), 24 →
+      `failed` (running hostinger pod digest ≠ target — real gap, correctly reported, NOT auto-forced),
+      7 → `manual_review` (`min_ready_seconds_not_configured`). Hotfix is NOT durable — next
+      `deploy_argocd_platform_ops` wipes it; durable spec (re-pin + carry `app-cve-scan-cronjob.yaml`
+      verify doc + `cve-remediation-verify.sh` + wire `argocd.sh` ConfigMap) queued for Codex.
+      Part 2 (separate, shopping-cart repo): set `minReadySeconds` on order/payment/product-catalog
+      Deployments to auto-close the `manual_review` gate. Answers the user's "how to address the state
+      automatically" — the verifier auto-stamps `applied` once the promoted digest is confirmed running.
 - [x] **CVE dashboard namespace=platform-ops collision — FIXED live + committed `43ece528` (task #13).**
       Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md` (Option A). Root cause:
       `vulnerability-inventory-exporter` runs in platform-ops; Prometheus `honorLabels:false`
