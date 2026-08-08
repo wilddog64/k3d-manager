@@ -171,7 +171,11 @@
       hardcodes `-n shopping-cart-apps`, but `payment-service` runs in `shopping-cart-payment` → after
       the Degraded fix it would still mis-verify. Fix = `_namespace_for` map. Commit
       `fix(cve): verify payment remediation in its shopping-cart-payment namespace` (DONE `8a8566e8`).
-      Follow-ons: **payment `maxSurge:0` DONE — PR #59** (above, CI green / no Copilot / awaiting merge).
+      Follow-ons: **payment `maxSurge:0` DONE — PR #59 MERGED `32c06f7b` 2026-08-08.** Post-merge:
+      forced ArgoCD **hard refresh** (remote kustomize base `…?ref=main` is cached — a plain sync
+      won't re-pull it) → strategy live `0/1` → rollout replaced in-place → the 33h-stuck Pending pod
+      scheduled into freed CPU → payment app **Synced|Healthy**. Verifier can now reach `applied` for
+      payment (Healthy + namespace fix + minReadySeconds=10 + digest already matches).
 - [ ] **Order remediation `ready_pod_digest_mismatch` — deep root cause, Part 3 PENDING (needs decision).**
       Promoter (`app-cve-scan.sh:289`) deploys the patched image by patching the **live ArgoCD
       Application** `spec.source.kustomize.images` (NOT git) → inherently ephemeral (any ApplicationSet
