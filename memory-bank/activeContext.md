@@ -44,6 +44,15 @@ removed floating `docker.io/bitnami/kubectl:latest` image to the maintained pinn
 `docker.io/alpine/k8s:1.31.4`. The file-scoped grep and shellcheck gates passed and the fix is
 pushed to `origin/k3d-manager-v1.23.0`. The live `cve-remediation-verify` carry-forward gap
 remains explicitly out of scope and Claude-owned.
+
+## CVE remediation verifier carry-forward complete — 2026-08-08
+
+Fix commit `33b151ba` restores the archive's `cve-remediation-verify` CronJob document and
+verifier script onto `k3d-manager-v1.23.0`, re-pins its image to
+`docker.io/alpine/k8s:1.31.4`, and wires the verifier ConfigMap into `deploy_argocd_platform_ops`.
+The YAML, shellcheck, grep, BATS, and `_agent_audit` gates passed; the fix is pushed to
+`origin/k3d-manager-v1.23.0`. The separate shopping-cart `minReadySeconds` work remains out of
+scope, as do live deployment actions.
 - **Part (a) handed to Codex (2026-08-07).** Focused spec
   `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md` — panel id 5 regroup by
   `namespace, image_repository, resource_name` (source-only, no cluster reconfig, no LIVE-VERIFY).

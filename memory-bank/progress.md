@@ -47,6 +47,11 @@
       `docker.io/alpine/k8s:1.31.4`. Grep counts are 0/1, shellcheck is clean, and the fix is
       pushed to `origin/k3d-manager-v1.23.0`. The live `cve-remediation-verify` carry-forward
       gap remains out of scope.
+- [x] **CVE remediation verifier carry-forward — COMPLETE 2026-08-08.** Fix commit `33b151ba`
+      restores the verifier CronJob and script, re-pins the verifier image to
+      `docker.io/alpine/k8s:1.31.4`, and wires its ConfigMap in `argocd.sh`. YAML, shellcheck,
+      grep, BATS, and `_agent_audit` gates passed; pushed to `origin/k3d-manager-v1.23.0`.
+      Shopping-cart `minReadySeconds` remains a separate follow-up; no live deployment was run.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
