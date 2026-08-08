@@ -137,9 +137,28 @@
       Part 2 (separate, shopping-cart repo): set `minReadySeconds` on order/payment/product-catalog
       Deployments to auto-close the `manual_review` gate. Answers the user's "how to address the state
       automatically" — the verifier auto-stamps `applied` once the promoted digest is confirmed running.
-- [ ] **CVE verifier payment-namespace mismatch — bug filed + QUEUED (doc `d444bf44`).** Spec
-      `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-payment-namespace.md`. Dashboard-state triage
-      2026-08-08: the remediation table is a LEDGER of immutable per-attempt ConfigMaps (verifier only
+- [x] **CVE verifier payment-namespace mismatch — FIXED + committed `8a8566e8` (2026-08-08).** Added
+      `_namespace_for` (payment→`shopping-cart-payment`, others→`shopping-cart-apps`); replaced the four
+      hardcoded `-n shopping-cart-apps` lookups with `-n "$app_ns"`. shellcheck+`sh -n` clean. **Live
+      ConfigMap `cve-remediation-verify-script` updated** from the fixed script (same form as
+      `argocd.sh:1454`); the every-5-min CronJob reads it fresh. Full payment→`applied` verification is
+      gated on payment going Healthy (see maxSurge PR below).
+- [x] **Payment single-node rollout wedge — Option A fix, PR #59 OPEN (shopping-cart-payment).** Branch
+      `fix/payment-rollout-maxsurge-single-node` commit `d4b8f038`; PR
+      https://github.com/wilddog64/shopping-cart-payment/pull/59 (Copilot tagged, CI running). Root:
+      payment app sources **k3d-manager repo** `services/shopping-cart-payment` (kustomize) whose base is
+      pulled from `shopping-cart-payment//k8s/base?ref=main` — so the fix lands in that repo's
+      `k8s/base/deployment.yaml` on main. History flip-flop: #24 set `maxSurge:0/maxUnavailable:1`, #49
+      reverted to `1/0` (zero-downtime). On the 2-CPU node (1810m/2000m reserved, ~190m free; actual
+      usage only 341m/17%) the `1/0` surge pod needs 200m → peak 2010m>2000m → wedges Pending 31h →
+      Degraded. **User chose Option A** (`0/1`): replace-in-place, peak stays 1810m, ~seconds downtime
+      per rollout. NOT merged — awaiting user go (payment app selfHeal pulls ref=main, so merge = live).
+      After merge: payment Healthy → verifier (namespace fix live) reaches `applied` (digest
+      `sha256:87c1b58c` already running). Note: values ref freeze — payment app targetRevision still
+      `k3d-manager-v1.22.0`, but the payment base pin is `ref=main` so it's unaffected by that freeze.
+- [i] **Dashboard-state triage record (2026-08-08)** — spec
+      `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-payment-namespace.md`.
+      The remediation table is a LEDGER of immutable per-attempt ConfigMaps (verifier only
       acts on `state=promotion_requested`, writes terminal state once). `manual_review
       /min_ready_seconds_not_configured` rows are OLD (pre-`minReadySeconds`) history — order now has
       `minReadySeconds=10`, product-catalog recent events `applied`. Root causes of the recurring
@@ -151,9 +170,10 @@
       so payment flips to `applied` once Healthy. **Verifier bug:** `cve-remediation-verify.sh`
       hardcodes `-n shopping-cart-apps`, but `payment-service` runs in `shopping-cart-payment` → after
       the Degraded fix it would still mis-verify. Fix = `_namespace_for` map. Commit
-      `fix(cve): verify payment remediation in its shopping-cart-payment namespace`. Two follow-ons
-      (shopping-cart repos, not yet specced): payment `strategy.rollingUpdate.maxSurge: 0` (unblock
-      the CPU-bound rollout) + order image source-of-truth reconciliation.
+      `fix(cve): verify payment remediation in its shopping-cart-payment namespace` (DONE `8a8566e8`).
+      Follow-ons: **payment `maxSurge:0` DONE — PR #59** (above); **order image source-of-truth
+      reconciliation — Part 3, STILL PENDING** (CI/Image-Updater vs remediation-promotion tug-of-war;
+      running `sha256:77fbb912`/tag `sha-56033880` ≠ target `sha256:a8813e75`).
 - [x] **CVE dashboard namespace=platform-ops collision — FIXED live + committed `43ece528` (task #13).**
       Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md` (Option A). Root cause:
       `vulnerability-inventory-exporter` runs in platform-ops; Prometheus `honorLabels:false`
