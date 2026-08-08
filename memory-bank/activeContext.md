@@ -80,6 +80,16 @@ the tunnel so source IP is always localhost and `X-K3DM-Actor` is spoofable). (2
 guard → 400. Adds `scripts/tests/bin/webhook_request_hardening.py`. Gates: py_compile + the new
 test + `bin/smoke-test-webhook` + `make restart-webhook`. Commit:
 `fix(webhook): rate-limit after auth + guard malformed Content-Length`. Handed to Codex; SHA pending.
+
+### Webhook request-hardening bugfix complete — 2026-08-08
+
+Fix commit `ee32837d` moves API/Slack rate limiting after authentication/signature checks and
+guards both POST `Content-Length` parses with `_content_length`, returning HTTP 400 for malformed
+values. It adds `scripts/tests/bin/webhook_request_hardening.py`; the extensionless webhook module
+needed an explicit `SourceFileLoader` in that test so Python can import it. `py_compile`, the six
+regression tests, smoke test, and `_agent_audit` passed. `make restart-webhook` was run and the
+live smoke check returned HTTP 200; Grafana login emitted the pre-existing HTTP 401 warning while
+the smoke command still passed. The fix is pushed to `origin/k3d-manager-v1.23.0`.
 - **Part (a) handed to Codex (2026-08-07).** Focused spec
   `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md` — panel id 5 regroup by
   `namespace, image_repository, resource_name` (source-only, no cluster reconfig, no LIVE-VERIFY).

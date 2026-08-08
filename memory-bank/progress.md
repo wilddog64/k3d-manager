@@ -64,6 +64,12 @@
       guard (400 on malformed) at the two POST sites; new test
       `scripts/tests/bin/webhook_request_hardening.py`. Commit `fix(webhook): rate-limit after auth
       + guard malformed Content-Length`. SHA pending.
+- [x] **Webhook rate-limit ordering + Content-Length guard — COMPLETE 2026-08-08.** Fix commit
+      `ee32837d` moves rate limiting after auth/signature checks, adds guarded Content-Length
+      parsing, and adds the six-test regression script. `py_compile`, regression tests, smoke,
+      and `_agent_audit` passed; `make restart-webhook` ran and the live health endpoint returned
+      HTTP 200. The smoke output retained the pre-existing Grafana HTTP 401 warning. Pushed to
+      `origin/k3d-manager-v1.23.0`.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
