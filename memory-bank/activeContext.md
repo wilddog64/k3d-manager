@@ -113,6 +113,27 @@ Python compilation, and `_agent_audit` passed; both commits are pushed to
 in these legacy YAML files; no unrelated formatting was changed. `observability.sh` remains
 dropped. Claude owns the live Grafana rotation and Trivy reapply verification.
 
+**Live cutover + verification (Claude, 2026-08-08):** both commits independently verified on
+`origin` (SHAs, exact messages, exact-scope diffs, separate memory commit `5c48f087`).
+- **Trivy — DONE + verified.** Reapplied `cicd/argocd-degraded` PrometheusRule (Prometheus reloaded
+  it: `image_repository!=""` present) + exporter ConfigMap; restarted the exporter. Live: **46**
+  active TrivyCritical alerts, **0 empty-app**; exporter emits **4870** series, **0** with empty
+  `image_repository`. Two-layer guard live.
+- **Grafana Fix 2 (hub-scope smoke) — DONE + verified GREEN.** `make status` → `✅ Grafana login:
+  HTTP 200`; direct hub login with `grafana-admin-credentials` → 200. False-red gone. Webhook restarted.
+- **Grafana Fix 1 (DB-apply on rotation) — code correct but INERT (blocked).** Discovered the
+  rotator pod has **never been able to start**: pod `securityContext` sets `runAsNonRoot: true` with
+  no `runAsUser`, and `alpine/k8s` runs as root → `CreateContainerConfigError` (pre-existing since
+  the rotator's creation `5b418dd7`; NOT a Codex defect). Live-verified the fix: a clone with
+  `runAsUser: 65534`+`runAsGroup: 65534` starts, execs into Grafana, runs
+  `reset-admin-password --password-from-stdin` → rc 0, login stays 200. Codex's Fix 1 command form
+  is correct; it just can't run until the securityContext is fixed. Reframes the original "401 after
+  rotation": no scheduled rotation ever ran — the 401 was DB drift from the `5b418dd7` Vault-sourcing
+  cutover (stopgap already repaired live DB). **Follow-up bug filed + QUEUED:**
+  `docs/bugs/v1.23.0-bugfix-grafana-rotator-runasnonroot-cannot-start.md` (add `runAsUser: 65534` +
+  `runAsGroup: 65534`; commit `fix(observability): let Grafana rotator pod start as non-root
+  (runAsUser)`). Post-fix, Claude runs the manual-rotation LIVE-VERIFY.
+
 ### Webhook request-hardening bugfix specced — 2026-08-08 (Codex handoff)
 Spec `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md` (from a security
 report on `bin/k3dm-webhook`). Two findings: (1) `_rate_limited` runs BEFORE auth in do_POST/do_GET
