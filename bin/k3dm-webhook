@@ -320,6 +320,16 @@ def _request_source_command(headers):
     return source_command or "direct-api"
 
 
+def _content_length(headers):
+    """Parse Content-Length as a non-negative int; return None if malformed."""
+    raw = headers.get("Content-Length", "0")
+    try:
+        length = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return length if length >= 0 else None
+
+
 def _role_allows(actual_role, required_role):
     return _ROLE_LEVELS[_normalize_role(actual_role)] >= _ROLE_LEVELS[_normalize_role(required_role)]
 
@@ -3015,16 +3025,19 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if _rate_limited("slack" if self.path == "/slack/events" else "api"):
-            self._json(429, {"error": "rate limited"})
-            return
         if self.path == "/slack/events":
-            length = int(self.headers.get("Content-Length", 0))
+            length = _content_length(self.headers)
+            if length is None:
+                self._json(400, {"error": "invalid content-length"})
+                return
             raw_body = self.rfile.read(min(length, MAX_BODY))
             timestamp = self.headers.get("X-Slack-Request-Timestamp", "0")
             signature = self.headers.get("X-Slack-Signature", "")
             if not _verify_slack_signature(raw_body, timestamp, signature):
                 self._json(401, {"error": "invalid signature"})
+                return
+            if _rate_limited("slack"):
+                self._json(429, {"error": "rate limited"})
                 return
             try:
                 event = json.loads(raw_body)
@@ -3110,8 +3123,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if self.path.startswith("/api/") and not self.path.startswith("/api/v1/"):
             self._json(400, {"error": "invalid api path"})
             return
+        if _rate_limited("api"):
+            self._json(429, {"error": "rate limited"})
+            return
 
-        length = int(self.headers.get("Content-Length", 0))
+        length = _content_length(self.headers)
+        if length is None:
+            self._json(400, {"error": "invalid content-length"})
+            return
         if length > MAX_BODY:
             self._json(413, {"error": "request too large"})
             return
@@ -3383,11 +3402,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_GET(self):
-        if _rate_limited("api"):
-            self._json(429, {"error": "rate limited"})
-            return
         if not self._auth():
             self._json(401, {"error": "unauthorized"})
+            return
+        if _rate_limited("api"):
+            self._json(429, {"error": "rate limited"})
             return
         if self.path.startswith("/api/") and not self.path.startswith("/api/v1/"):
             self._json(400, {"error": "invalid api path"})
