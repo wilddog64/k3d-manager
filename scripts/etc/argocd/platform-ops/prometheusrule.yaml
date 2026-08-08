@@ -64,7 +64,7 @@ spec:
         - alert: TrivyCriticalVulnerabilityDetected
           expr: |
             sum by (cluster, namespace, image_repository) (
-              trivy_vulnerability_inventory{severity="CRITICAL"}
+              trivy_vulnerability_inventory{severity="CRITICAL", image_repository!=""}
             ) > 0
           for: 15m
           labels:
