@@ -171,9 +171,25 @@
       hardcodes `-n shopping-cart-apps`, but `payment-service` runs in `shopping-cart-payment` → after
       the Degraded fix it would still mis-verify. Fix = `_namespace_for` map. Commit
       `fix(cve): verify payment remediation in its shopping-cart-payment namespace` (DONE `8a8566e8`).
-      Follow-ons: **payment `maxSurge:0` DONE — PR #59** (above); **order image source-of-truth
-      reconciliation — Part 3, STILL PENDING** (CI/Image-Updater vs remediation-promotion tug-of-war;
-      running `sha256:77fbb912`/tag `sha-56033880` ≠ target `sha256:a8813e75`).
+      Follow-ons: **payment `maxSurge:0` DONE — PR #59** (above, CI green / no Copilot / awaiting merge).
+- [ ] **Order remediation `ready_pod_digest_mismatch` — deep root cause, Part 3 PENDING (needs decision).**
+      Promoter (`app-cve-scan.sh:289`) deploys the patched image by patching the **live ArgoCD
+      Application** `spec.source.kustomize.images` (NOT git) → inherently ephemeral (any ApplicationSet
+      reconcile/reapply wipes it). product-catalog currently HAS the override
+      (`…@sha256:340371a9`, running matches → `applied`); **order's override is EMPTY** → runs base image
+      `sha256:77fbb912` (tag `sha-56033880`) ≠ event `to_digest sha256:a8813e75`. Order's promotion event
+      has `candidate`/`to_tag`/`from_digest` all EMPTY → promoter never resolved a clean immutable `sha-*`
+      candidate for order (`app-cve-scan.sh:333`/`:362` "promotion skipped"/"rebuild dispatched — waits
+      for clean candidate"). So order isn't a config toggle: the promoter can't produce/resolve a
+      CVE-clean candidate image for order. Two durable fixes to weigh: (a) persist promotions to git
+      instead of live-patching the Application (survives reconcile); (b) close order's rebuild→clean-image
+      loop. NOT started — flagged to user.
+- [ ] **CVE remediation dashboard never clears (queued user notification 2026-08-08).** The remediation
+      table/alert is an immutable LEDGER: 70 event ConfigMaps (30 applied / 33 failed / 7 manual_review),
+      **no ownerReferences, no TTL, no sweeper** → accumulate unbounded; old terminal `manual_review`
+      (pre-`minReadySeconds`) + `failed` rows persist forever regardless of service fixes. To quiet it:
+      add an event GC/TTL sweep (verify CronJob already iterates events — delete terminal events older
+      than N days / keep last N per service) and/or a dashboard time-window filter. NOT started.
 - [x] **CVE dashboard namespace=platform-ops collision — FIXED live + committed `43ece528` (task #13).**
       Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md` (Option A). Root cause:
       `vulnerability-inventory-exporter` runs in platform-ops; Prometheus `honorLabels:false`
