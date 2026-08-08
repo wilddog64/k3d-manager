@@ -84,11 +84,18 @@
       reloaded `image_repository!=""`) + exporter ConfigMap + exporter restart → 46 active TrivyCritical
       alerts / **0 empty-app**; exporter emits 4870 series / **0 empty-repo**. `observability.sh`
       unchanged. (task #14 code+cutover complete)
-- [ ] **Grafana rotator can't start (runAsNonRoot) — bug filed + QUEUED for Codex.** Spec
-      `docs/bugs/v1.23.0-bugfix-grafana-rotator-runasnonroot-cannot-start.md`. Add `runAsUser: 65534`
-      + `runAsGroup: 65534` to the pod securityContext (keep `runAsNonRoot: true`). Blocks `816835fd`
-      Fix 1 from ever running. Mechanism live-verified. Commit `fix(observability): let Grafana rotator
-      pod start as non-root (runAsUser)`. Post-fix: Claude runs manual-rotation LIVE-VERIFY.
+- [x] **Grafana rotator can't start (runAsNonRoot) — FIXED + committed `a66463e1` (2026-08-08).**
+      Spec `docs/bugs/v1.23.0-bugfix-grafana-rotator-runasnonroot-cannot-start.md`. Added
+      `runAsUser: 65534` + `runAsGroup: 65534` (kept `runAsNonRoot: true`). Claude applied directly,
+      pushed+verified on origin. Live-applied the rotator; manual `rotate-verify` job now **starts as
+      uid 65534** — `CreateContainerConfigError` gone. This blocker is resolved.
+- [ ] **Grafana rotator `openssl: not found` — 3rd latent blocker, bug filed + QUEUED.** Spec
+      `docs/bugs/v1.23.0-bugfix-grafana-rotator-openssl-not-found.md` (doc committed `7e857fbb`).
+      Uncovered by the runAsNonRoot live-verify: `alpine/k8s:1.31.4` has no `openssl`, so line 109
+      `new="$(openssl rand -hex 24)"` aborts the job before any rotation. Fix = `/dev/urandom`+`od`
+      equivalent (48 hex chars, live-verified in-image). Only the Grafana rotator uses openssl.
+      Commit `fix(observability): generate Grafana rotator password without openssl`. Awaiting go to
+      apply; full rotation + login-200 LIVE-VERIFY pending on this fix.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 

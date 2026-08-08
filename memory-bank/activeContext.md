@@ -133,6 +133,20 @@ dropped. Claude owns the live Grafana rotation and Trivy reapply verification.
   `docs/bugs/v1.23.0-bugfix-grafana-rotator-runasnonroot-cannot-start.md` (add `runAsUser: 65534` +
   `runAsGroup: 65534`; commit `fix(observability): let Grafana rotator pod start as non-root
   (runAsUser)`). Post-fix, Claude runs the manual-rotation LIVE-VERIFY.
+- **runAsNonRoot fix APPLIED + committed `a66463e1`** (2026-08-08) — Claude applied directly,
+  pushed+verified on origin. Live-applied the rotator; CronJob now carries
+  `runAsUser/runAsGroup: 65534`. Manual `rotate-verify` job **started as uid 65534** —
+  `CreateContainerConfigError` GONE, so this blocker is fixed and confirmed.
+- **3rd latent blocker uncovered — `openssl: not found`.** With the pod now starting, the rotator
+  aborts at line 109 `new="$(openssl rand -hex 24)"`: `alpine/k8s:1.31.4` ships **no openssl**
+  (`command -v openssl` → MISSING; verified live, uid 65534). `set -eu` aborts before any rotation;
+  `restore` trap fires. Only the Grafana rotator uses openssl (`grep -rn openssl scripts/etc/argocd/`
+  = 1 hit); LDAP rotator unaffected. Portable replacement live-verified in-image:
+  `head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'` → 48 lowercase-hex chars (== `openssl rand
+  -hex 24`). **Bug filed + committed `7e857fbb`:**
+  `docs/bugs/v1.23.0-bugfix-grafana-rotator-openssl-not-found.md` (commit
+  `fix(observability): generate Grafana rotator password without openssl`). QUEUED — awaiting go to
+  apply; full rotation + login-200 LIVE-VERIFY still pending on this fix.
 
 ### Webhook request-hardening bugfix specced — 2026-08-08 (Codex handoff)
 Spec `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md` (from a security
