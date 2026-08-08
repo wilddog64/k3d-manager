@@ -82,6 +82,18 @@
       db81f534 is superseded. The dashboard now matches v1.22.0 exactly; namespace-collision fix
       (honorLabels) unaffected. NOTE: parts (b)/(c) spec `5aa7f771` still references panel-5 "by image"
       as untouched — re-check that assumption before executing b/c.
+      **FULL REVERT TO CODEX 1:1 2026-08-07 (`06a0416e`, doc `0516f98d`)** — user reported the live
+      dashboard had only ONE table + wrong columns vs what they used to see, asked for exact 1:1
+      with Codex. Root cause: live dashboard was the v1.23.0 branch's simpler single-table version,
+      not Codex's full 4-table archive dashboard (`archive/…v1.22.0-integration` `eae0d607`). Restored
+      `grafana-dashboard-cve-autopatch.yaml` + `vulnerability-inventory-exporter.yaml` byte-for-byte
+      from archive; **reverted honorLabels:true** so `exported_namespace` returns (Codex detail tables
+      read it). Verified live: ArgoCD `hub-grafana-dashboards` synced `06a0416e`; ConfigMap + Grafana
+      provisioned file show all 4 tables (Platform/Shopping-cart Unique CVEs, Recent CVE Remediations,
+      Firing Critical CVE Alerts); Prometheus re-scraped honorLabels-off. TRADE-OFF (user chose): summary
+      panels group by `namespace` → read `platform-ops` again, as Codex built it. honorLabels/exported_
+      namespace fix (43ece528) is superseded — any future namespace fix must modify Codex's dashboard,
+      not replace it.
 - [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
       Blocker: recurring rotation automation for ArgoCD/Prometheus/Alertmanager (only LDAP+Grafana done).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Blockers:
