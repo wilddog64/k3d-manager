@@ -51,8 +51,35 @@ Fix commit `33b151ba` restores the archive's `cve-remediation-verify` CronJob do
 verifier script onto `k3d-manager-v1.23.0`, re-pins its image to
 `docker.io/alpine/k8s:1.31.4`, and wires the verifier ConfigMap into `deploy_argocd_platform_ops`.
 The YAML, shellcheck, grep, BATS, and `_agent_audit` gates passed; the fix is pushed to
-`origin/k3d-manager-v1.23.0`. The separate shopping-cart `minReadySeconds` work remains out of
-scope, as do live deployment actions.
+`origin/k3d-manager-v1.23.0`.
+
+### Live follow-ons executed — 2026-08-08
+- **Observability values-branch drift FIXED + verified.** All 6 apps (acg-kube-prometheus-stack,
+  acg-trivy-operator, hub-loki, kube-prometheus-stack, loki, trivy-operator) were pinned to
+  `k3d-manager-v1.22.0`. Reapplied `observability.yaml` + `observability-acg.yaml` in ns `cicd`
+  with `K3D_MANAGER_BRANCH=k3d-manager-v1.23.0` / `APP_CLUSTER_NAME=ubuntu-hostinger`; all 6 now
+  reference v1.23.0. Confirmed by `argocd_check_values_branch` ("All Applications reference values
+  branch k3d-manager-v1.23.0"). NOTE: hub ArgoCD namespace is **`cicd`**, not `argocd`.
+- **7 `manual_review` root cause was NOT missing source.** `minReadySeconds: 10` is already in all
+  3 shopping-cart repos' `main` (since 2026-08-05). Live lagged because the k3d-manager service
+  Apps are frozen at v1.22.0 and ArgoCD cached the remote base (`?ref=main`). Fix = hard-refresh
+  (`argocd.argoproj.io/refresh=hard`) the 3 `ubuntu-hostinger-shopping-cart-{order,payment,
+  product-catalog}` Apps. All 3 live Deployments now report `minReadySeconds: 10` (order-service &
+  product-catalog in `shopping-cart-apps`, payment-service in `shopping-cart-payment`). Corrected
+  diagnosis recorded in `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-carry-forward.md` Part 2.
+- **STILL real (do NOT auto-force):** payment app `Degraded`; order `ready_pod_digest_mismatch`
+  (patched image requested but old pod running).
+
+### Webhook request-hardening bugfix specced — 2026-08-08 (Codex handoff)
+Spec `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md` (from a security
+report on `bin/k3dm-webhook`). Two findings: (1) `_rate_limited` runs BEFORE auth in do_POST/do_GET
+— a single global bucket per channel means an unauthenticated flood 429s the one legit caller; fix
+= move limiter after signature/token check (NOT re-key by IP/actor — server binds 127.0.0.1 behind
+the tunnel so source IP is always localhost and `X-K3DM-Actor` is spoofable). (2) bare
+`int(Content-Length)` at two POST sites throws on non-numeric header → fix = `_content_length`
+guard → 400. Adds `scripts/tests/bin/webhook_request_hardening.py`. Gates: py_compile + the new
+test + `bin/smoke-test-webhook` + `make restart-webhook`. Commit:
+`fix(webhook): rate-limit after auth + guard malformed Content-Length`. Handed to Codex; SHA pending.
 - **Part (a) handed to Codex (2026-08-07).** Focused spec
   `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md` — panel id 5 regroup by
   `namespace, image_repository, resource_name` (source-only, no cluster reconfig, no LIVE-VERIFY).

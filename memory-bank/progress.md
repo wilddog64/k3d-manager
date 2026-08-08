@@ -51,7 +51,19 @@
       restores the verifier CronJob and script, re-pins the verifier image to
       `docker.io/alpine/k8s:1.31.4`, and wires its ConfigMap in `argocd.sh`. YAML, shellcheck,
       grep, BATS, and `_agent_audit` gates passed; pushed to `origin/k3d-manager-v1.23.0`.
-      Shopping-cart `minReadySeconds` remains a separate follow-up; no live deployment was run.
+- [x] **Observability values-branch drift + 7 `manual_review` — RESOLVED LIVE 2026-08-08.**
+      Reapplied `observability.yaml`+`observability-acg.yaml` in ns `cicd` at v1.23.0 (all 6 apps
+      confirmed via `argocd_check_values_branch`). Hard-refreshed the 3
+      `ubuntu-hostinger-shopping-cart-{order,payment,product-catalog}` Apps; all 3 live Deployments
+      now have `minReadySeconds: 10` (it was already in the shopping-cart repos since 2026-08-05 —
+      ArgoCD was serving a cached remote base under the v1.22.0 freeze). Corrected diagnosis in
+      `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-carry-forward.md` Part 2.
+- [ ] **Webhook rate-limit ordering + Content-Length guard — SPECCED, Codex handoff 2026-08-08.**
+      `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md`. From a security
+      report: move `_rate_limited` after auth (do_POST both paths + do_GET); add `_content_length`
+      guard (400 on malformed) at the two POST sites; new test
+      `scripts/tests/bin/webhook_request_hardening.py`. Commit `fix(webhook): rate-limit after auth
+      + guard malformed Content-Length`. SHA pending.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
