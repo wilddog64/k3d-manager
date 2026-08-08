@@ -68,7 +68,14 @@
       dashboard live — was committed `db81f534`, never deployed). Kept the alert `app` label (webhook
       renders `.Labels.app`). Correction: the LIVE dashboard was the BRANCH dashboard (not archive) —
       the `exported_namespace` flips were unneeded. Alerts finish → firing after the 15m `for:`.
-      Not yet pushed.
+      **DEPLOYED + PUSHED 2026-08-07** (fix `43ece528` on origin). The cve-autopatch dashboard is
+      ArgoCD-managed by ApplicationSet `grafana-dashboards-hub`, frozen at `k3d-manager-v1.22.0`
+      (selfHeal reverted my direct applies). Reapplied BOTH `grafana-dashboards-hub` and
+      `grafana-dashboards-acg` ApplicationSets to track `k3d-manager-v1.23.0` (K3D_MANAGER_BRANCH);
+      hub Synced w/ part(a) panel, ubuntu-hostinger Synced, ubuntu-k3s Unknown (dead sandbox, normal).
+      honorLabels ServiceMonitor + inventory rule are NOT ArgoCD-managed (argocd.sh bootstrap) → persist.
+      ⚠️ Dashboard ApplicationSets now track the in-flight v1.23.0 branch: future v1.23.0 dashboard
+      commits (parts b/c panels 8/9) will auto-deploy on push.
 - [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
       Blocker: recurring rotation automation for ArgoCD/Prometheus/Alertmanager (only LDAP+Grafana done).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Blockers:
