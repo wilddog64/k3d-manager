@@ -56,17 +56,19 @@
       hub Grafana smoke reads app-cluster `acg-kube-prometheus-stack-grafana` (absent on hub) →
       false-green. Live stopgap `reset-admin-password` applied 2026-08-07 (not in git; re-breaks next
       rotation). Needs design (exec+RBAC vs admin API) + LIVE-VERIFY. Not handed off.
-- [ ] **QUEUED bug — CVE dashboard namespace=platform-ops collision + dashboard carry-forward gap
-      (task #13).** Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md`.
-      `trivy_vulnerability_inventory` exporter runs in platform-ops; Prometheus `honorLabels:false`
-      overwrites the metric's `namespace` with the target's → real ns lands in `exported_namespace`.
-      Live `TrivyCriticalVulnerabilityDetected` alert groups by collided `namespace` + sets
-      `app={{image_repository}}` (redundant) → "Firing Critical CVE Alerts" table shows platform-ops
-      for everything. Detail CVE-ID tables already use `exported_namespace` (inconsistent).
-      ⚠️ CARRY-FORWARD GAP: the live richer dashboard + exporter + inventory-based rule are
-      archive-only, NOT on v1.23.0 (branch dashboard has 0 `trivy_vulnerability_inventory` refs) —
-      part (a)/(b)/(c) were authored against the STALE dashboard. Fix A (honorLabels:true, recommended)
-      vs B (exported_namespace everywhere). Needs design + reconcile + LIVE-VERIFY. Not handed off.
+- [x] **CVE dashboard namespace=platform-ops collision — FIXED live + committed `43ece528` (task #13).**
+      Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md` (Option A). Root cause:
+      `vulnerability-inventory-exporter` runs in platform-ops; Prometheus `honorLabels:false`
+      overwrote the metric's `namespace` with the target's. Fix: `honorLabels:true` on the exporter
+      ServiceMonitor → `trivy_vulnerability_inventory.namespace` now real (11 namespaces verified);
+      `TrivyCriticalVulnerabilityDetected` alert re-fires with correct ns → panel 7 "Firing Critical
+      CVE Alerts" attributes correctly. Carried the exporter + inventory-based rule forward (were
+      archive-only) and wired `deploy_argocd_platform_ops` to apply the exporter + cve-autopatch
+      dashboard (branch bootstrap applied neither). Re-ported part (a)'s panel 5 (deployed the branch
+      dashboard live — was committed `db81f534`, never deployed). Kept the alert `app` label (webhook
+      renders `.Labels.app`). Correction: the LIVE dashboard was the BRANCH dashboard (not archive) —
+      the `exported_namespace` flips were unneeded. Alerts finish → firing after the 15m `for:`.
+      Not yet pushed.
 - [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
       Blocker: recurring rotation automation for ArgoCD/Prometheus/Alertmanager (only LDAP+Grafana done).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Blockers:
