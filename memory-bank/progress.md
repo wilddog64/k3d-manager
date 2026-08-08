@@ -184,12 +184,19 @@
       CVE-clean candidate image for order. Two durable fixes to weigh: (a) persist promotions to git
       instead of live-patching the Application (survives reconcile); (b) close order's rebuild→clean-image
       loop. NOT started — flagged to user.
-- [ ] **CVE remediation dashboard never clears (queued user notification 2026-08-08).** The remediation
-      table/alert is an immutable LEDGER: 70 event ConfigMaps (30 applied / 33 failed / 7 manual_review),
-      **no ownerReferences, no TTL, no sweeper** → accumulate unbounded; old terminal `manual_review`
-      (pre-`minReadySeconds`) + `failed` rows persist forever regardless of service fixes. To quiet it:
-      add an event GC/TTL sweep (verify CronJob already iterates events — delete terminal events older
-      than N days / keep last N per service) and/or a dashboard time-window filter. NOT started.
+- [x] **CVE remediation dashboard never clears — FIXED + LIVE-VERIFIED 2026-08-08 (queued user item).**
+      Spec `docs/bugs/v1.23.0-bugfix-cve-remediation-event-gc.md` (doc `c4cfb388`), fix `9168edd7`
+      (`feat(cve): garbage-collect old remediation events (keep newest N per service)`). Root: 70 event
+      ConfigMaps, no ownerRefs/TTL/sweeper → immutable ledger; exporter emits one
+      `cve_remediation_event_info` series per event → dashboard shows all-time, stale `manual_review`
+      (pre-`minReadySeconds`) never clear. Fix: `_gc_events` in `cve-remediation-verify.sh` keeps newest
+      `REMEDIATION_EVENT_KEEP_PER_SERVICE` (default 5) **terminal** events per service, never touches
+      `promotion_requested`; name-embedded `YYYYMMDDHHMMSS` gives sortable order (no date parsing). SA
+      `app-cve-scanner` already had `configmaps delete` (no RBAC change). shellcheck+`sh -n` clean.
+      **Live:** updated `cve-remediation-verify-script` ConfigMap; count dropped **70→15** (5/svc), all 7
+      stale `manual_review` GONE; exporter now 15 series / 0 manual_review (`{failed:10, applied:5}`).
+      Remaining `failed`: 5 payment (clear after PR #59 merge) + 5 order (task #18). Durable via
+      `argocd.sh:1454` (script→ConfigMap wiring).
 - [x] **CVE dashboard namespace=platform-ops collision — FIXED live + committed `43ece528` (task #13).**
       Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md` (Option A). Root cause:
       `vulnerability-inventory-exporter` runs in platform-ops; Prometheus `honorLabels:false`
