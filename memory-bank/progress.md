@@ -73,12 +73,15 @@
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
-- [ ] **QUEUED bug — Grafana rotation never reaches the DB + status false-green (task #11).** Spec
-      `docs/bugs/v1.23.0-bugfix-grafana-rotation-db-not-applied.md`. Rotator updates Vault/ESO/secret
-      but not Grafana's sqlite DB → stored password 401s after each monthly rotation; `bin/k3dm-webhook`
-      hub Grafana smoke reads app-cluster `acg-kube-prometheus-stack-grafana` (absent on hub) →
-      false-green. Live stopgap `reset-admin-password` applied 2026-08-07 (not in git; re-breaks next
-      rotation). Needs design (exec+RBAC vs admin API) + LIVE-VERIFY. Not handed off.
+- [ ] **Grafana rotation DB-apply + hub-scope smoke (task #11) — bundled spec READY, handed to Codex.**
+      Spec `docs/bugs/v1.23.0-bugfix-grafana-rotation-db-not-applied.md` rewritten with live-verified
+      exact blocks (user chose both fixes bundled). Fix 1: `pods`/`pods/exec` Role rules + `grafana cli
+      admin reset-admin-password --password-from-stdin` after ESO sync in `grafana-credential-rotator.yaml`
+      (Grafana 11.4.0, deployment-form exec exit 0 + login 200 verified live). Fix 2: `bin/k3dm-webhook`
+      smoke reads `grafana-admin-credentials` on hub context (was reading hostinger `acg-…` → false-red 401).
+      Dropped `observability.sh` (grafana async via ArgoCD, no sync hook; fresh deploy provisions from
+      secret). Commit `fix(observability): apply rotated Grafana admin password to DB + hub-scope status
+      smoke`. Gates yamllint+py_compile+`make restart-webhook`; manual-rotation LIVE-VERIFY is Claude-owned. SHA pending.
 - [ ] **CVE remediation verifier dead (ImagePullBackOff) + carry-forward gap — HOTFIXED live, durable spec QUEUED for Codex.**
       Spec `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-carry-forward.md`. Root cause: the
       `cve-remediation-verify` CronJob (the every-5-min loop driving ALL remediation state

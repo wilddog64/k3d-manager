@@ -70,6 +70,23 @@ The YAML, shellcheck, grep, BATS, and `_agent_audit` gates passed; the fix is pu
 - **STILL real (do NOT auto-force):** payment app `Degraded`; order `ready_pod_digest_mismatch`
   (patched image requested but old pod running).
 
+### Grafana rotation DB-apply + hub-scope smoke — bundled spec READY (Codex handoff) — 2026-08-08
+Task #11. Live-diagnosed the `make status` "Grafana login: HTTP 401": it is a **false-red** — hub
+login at `grafana.3ai-talk.org` with `grafana-admin-credentials` returns **200**; the smoke
+(`bin/k3dm-webhook:1769-1774`) reads the password from `acg-kube-prometheus-stack-grafana` on the
+**hostinger** context (wrong cluster) → 401. Root defect #1: the monthly rotator only
+`rollout restart`s Grafana, which never rewrites its sqlite DB, so the rotated password 401s until
+manually reset. User chose **both fixes bundled** on v1.23.0. Spec
+`docs/bugs/v1.23.0-bugfix-grafana-rotation-db-not-applied.md` rewritten with live-verified exact
+blocks: Fix 1 = add `pods`/`pods/exec` Role rules + `grafana cli admin reset-admin-password
+--password-from-stdin` (Grafana 11.4.0, homepath `/usr/share/grafana`; deployment-form exec exit 0,
+login 200 — verified live) after ESO sync in `grafana-credential-rotator.yaml`; Fix 2 = smoke reads
+`grafana-admin-credentials` on hub context. **Dropped** the original `observability.sh` convergence
+file (grafana deploys async via ArgoCD, no synchronous hook; fresh deploy provisions DB from secret,
+no drift). Gates: yamllint + py_compile + `make restart-webhook`; LIVE-VERIFY (manual rotation →
+login 200 → status GREEN) is Claude-owned post-commit. Commit: `fix(observability): apply rotated
+Grafana admin password to DB + hub-scope status smoke`. Handed to Codex; SHA pending.
+
 ### Webhook request-hardening bugfix specced — 2026-08-08 (Codex handoff)
 Spec `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md` (from a security
 report on `bin/k3dm-webhook`). Two findings: (1) `_rate_limited` runs BEFORE auth in do_POST/do_GET
