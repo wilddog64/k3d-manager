@@ -76,6 +76,12 @@
       honorLabels ServiceMonitor + inventory rule are NOT ArgoCD-managed (argocd.sh bootstrap) → persist.
       ⚠️ Dashboard ApplicationSets now track the in-flight v1.23.0 branch: future v1.23.0 dashboard
       commits (parts b/c panels 8/9) will auto-deploy on push.
+      **Part (a) REVERTED 2026-08-07 (`1d9251b4`)** — after seeing "Critical Vulnerabilities by Image"
+      live, the user preferred the original "Critical Vulnerabilities by Namespace" panel format;
+      restored panel 5 to the v1.22.0 version (`sum by (namespace) (trivy_image_vulnerabilities)`).
+      db81f534 is superseded. The dashboard now matches v1.22.0 exactly; namespace-collision fix
+      (honorLabels) unaffected. NOTE: parts (b)/(c) spec `5aa7f771` still references panel-5 "by image"
+      as untouched — re-check that assumption before executing b/c.
 - [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
       Blocker: recurring rotation automation for ArgoCD/Prometheus/Alertmanager (only LDAP+Grafana done).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Blockers:
