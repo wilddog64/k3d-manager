@@ -73,6 +73,13 @@
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 
+- [ ] **TrivyCritical empty-app alert (task #14) — bug filed + QUEUED for Codex.** Spec
+      `docs/bugs/v1.23.0-bugfix-trivy-critical-empty-image-repository-alert.md`. Empty `app` == empty
+      `image_repository` (rule sets `app: {{ $labels.image_repository }}`); exporter emits it from
+      `report.artifact.repository`, empty for transient ephemeral-job VulnerabilityReports. Fix: alert
+      selector `image_repository!=""` + exporter skips empty-repo reports (hub+app loops). Commit
+      `fix(observability): stop TrivyCritical alert firing on empty image_repository`. SEPARATE from
+      Grafana. Live reapply Claude-owned post-commit. SHA pending.
 - [ ] **Grafana rotation DB-apply + hub-scope smoke (task #11) — bundled spec READY, handed to Codex.**
       Spec `docs/bugs/v1.23.0-bugfix-grafana-rotation-db-not-applied.md` rewritten with live-verified
       exact blocks (user chose both fixes bundled). Fix 1: `pods`/`pods/exec` Role rules + `grafana cli

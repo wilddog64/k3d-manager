@@ -70,6 +70,21 @@ The YAML, shellcheck, grep, BATS, and `_agent_audit` gates passed; the fix is pu
 - **STILL real (do NOT auto-force):** payment app `Degraded`; order `ready_pod_digest_mismatch`
   (patched image requested but old pod running).
 
+### TrivyCritical empty-app alert — bug filed + QUEUED (Codex) — 2026-08-08
+Recurring Slack page `TrivyCriticalVulnerabilityDetected — ''` (empty app). Live-diagnosed: the rule
+sets `app: {{ $labels.image_repository }}`, so empty app == empty `image_repository`, emitted by the
+custom `vulnerability-inventory-exporter` from `report.artifact.repository`. Transient VulnerabilityReports
+for ephemeral job pods (cve-auto/cve-remediation-verify/acg-expiry-check/scan-vulnerabilityreport) can
+have an empty `artifact.repository`; with a CRITICAL finding + `for:15m` it pages with an unactionable
+empty name. The notification's own auto-diagnosis was WRONG (claimed missing pod app-label; actual =
+image_repository) and its TTL fix is only hygiene, not a root fix. Spec
+`docs/bugs/v1.23.0-bugfix-trivy-critical-empty-image-repository-alert.md`: (1) alert selector gains
+`image_repository!=""`; (2) exporter skips empty-`repository` reports (hub + app loops). Commit
+`fix(observability): stop TrivyCritical alert firing on empty image_repository`. SEPARATE commit from
+Grafana. Live reapply (PrometheusRule + exporter ConfigMap + pod restart) is Claude-owned post-commit.
+Aside noted (out of scope): every alert groups `namespace=platform-ops` (Prometheus overwrites the
+exporter's namespace with the scrape target's; real ns is `exported_namespace`).
+
 ### Grafana rotation DB-apply + hub-scope smoke — bundled spec READY (Codex handoff) — 2026-08-08
 Task #11. Live-diagnosed the `make status` "Grafana login: HTTP 401": it is a **false-red** — hub
 login at `grafana.3ai-talk.org` with `grafana-admin-credentials` returns **200**; the smoke
