@@ -1768,10 +1768,10 @@ def _smoke_test_logins(provider, app_context):
 
     graf_user = (os.environ.get("K3DM_SMOKE_GRAFANA_USER")
                  or _smoke_secret("monitoring", "admin-user",
-                                  "acg-kube-prometheus-stack-grafana", context=app_context)
+                                  "grafana-admin-credentials")
                  or "admin")
     graf_pass = os.environ.get("K3DM_SMOKE_GRAFANA_PASS") or _smoke_secret(
-        "monitoring", "admin-password", "acg-kube-prometheus-stack-grafana", context=app_context)
+        "monitoring", "admin-password", "grafana-admin-credentials")
     if not graf_pass:
         results.append(("Grafana login", None, "no credentials (acg-kube-prometheus-stack-grafana absent; set K3DM_SMOKE_GRAFANA_PASS)"))
     else:
