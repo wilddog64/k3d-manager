@@ -63,14 +63,18 @@ spec:
             description: "At least one Trivy Operator scan job in namespace trivy-system has failed within the last 10 minutes"
         - alert: TrivyCriticalVulnerabilityDetected
           expr: |
-            sum by (namespace, image_repository) (
-              trivy_image_vulnerabilities{severity="Critical"}
+            sum by (cluster, namespace, image_repository) (
+              trivy_vulnerability_inventory{severity="CRITICAL"}
             ) > 0
           for: 15m
           labels:
             severity: critical
             group: trivy-operator
             remediation: cve-auto-patch
+            # The notification webhook historically renders .Labels.app. Keep
+            # that field populated from the canonical image label so alerts do
+            # not arrive as "app ''" when no workload app label exists.
+            app: "{{ $labels.image_repository }}"
           annotations:
             summary: "Critical CVE(s) detected in a running image"
             description: "{{ $value }} critical vulnerabilities in {{ $labels.image_repository }} (ns {{ $labels.namespace }}); event-driven app-cve-scan will attempt promotion/rebuild."

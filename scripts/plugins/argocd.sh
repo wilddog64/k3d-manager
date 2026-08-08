@@ -1476,6 +1476,13 @@ EOF
    _info "[argocd] Deploying AlertmanagerConfig..."
    _kubectl apply -f "${_dir}/alertmanager-config.yaml"
 
+   _info "[argocd] Deploying vulnerability inventory exporter..."
+   _kubectl apply -f "${_dir}/vulnerability-inventory-exporter.yaml"
+   _kubectl rollout restart deployment/vulnerability-inventory-exporter -n platform-ops >/dev/null 2>&1 || true
+
+   _info "[argocd] Deploying CVE auto-patch Grafana dashboard..."
+   _kubectl apply -f "${_dir}/grafana-dashboard-cve-autopatch.yaml"
+
    _info "[argocd] Syncing secrets from Keychain (DR — see argocd_sync_webhook_token_secret / argocd_sync_app_rebuild_secret)..."
    argocd_sync_webhook_token_secret cicd
    argocd_sync_app_rebuild_secret platform-ops
