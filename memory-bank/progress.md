@@ -56,6 +56,17 @@
       hub Grafana smoke reads app-cluster `acg-kube-prometheus-stack-grafana` (absent on hub) →
       false-green. Live stopgap `reset-admin-password` applied 2026-08-07 (not in git; re-breaks next
       rotation). Needs design (exec+RBAC vs admin API) + LIVE-VERIFY. Not handed off.
+- [ ] **QUEUED bug — CVE dashboard namespace=platform-ops collision + dashboard carry-forward gap
+      (task #13).** Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md`.
+      `trivy_vulnerability_inventory` exporter runs in platform-ops; Prometheus `honorLabels:false`
+      overwrites the metric's `namespace` with the target's → real ns lands in `exported_namespace`.
+      Live `TrivyCriticalVulnerabilityDetected` alert groups by collided `namespace` + sets
+      `app={{image_repository}}` (redundant) → "Firing Critical CVE Alerts" table shows platform-ops
+      for everything. Detail CVE-ID tables already use `exported_namespace` (inconsistent).
+      ⚠️ CARRY-FORWARD GAP: the live richer dashboard + exporter + inventory-based rule are
+      archive-only, NOT on v1.23.0 (branch dashboard has 0 `trivy_vulnerability_inventory` refs) —
+      part (a)/(b)/(c) were authored against the STALE dashboard. Fix A (honorLabels:true, recommended)
+      vs B (exported_namespace everywhere). Needs design + reconcile + LIVE-VERIFY. Not handed off.
 - [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
       Blocker: recurring rotation automation for ArgoCD/Prometheus/Alertmanager (only LDAP+Grafana done).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Blockers:
