@@ -70,6 +70,15 @@
       and `_agent_audit` passed; `make restart-webhook` ran and the live health endpoint returned
       HTTP 200. The smoke output retained the pre-existing Grafana HTTP 401 warning. Pushed to
       `origin/k3d-manager-v1.23.0`.
+- [x] **Grafana rotation DB apply + hub-scope smoke — COMPLETE 2026-08-08.** Task A commit
+      `816835fd` adds namespace-scoped pod/exec RBAC, applies the rotated password through
+      `grafana cli ... --password-from-stdin`, and reads the hub Grafana credential in the webhook
+      smoke. YAML, Python compile, relaxed lint, and restart gates passed; pushed to origin.
+- [x] **Trivy empty `image_repository` alert — COMPLETE 2026-08-08.** Task B commit `5302ea54`
+      filters empty repositories in the PrometheusRule and both exporter loops. YAML parsing,
+      embedded exporter compilation, relaxed lint, and `_agent_audit` passed; pushed to origin.
+      Default yamllint reports pre-existing legacy line-length violations; `observability.sh` was
+      not changed. Live reapply remains Claude-owned.
 
 ## Pending (integration-split releases — full file map + blockers in the intent map)
 

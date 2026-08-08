@@ -102,6 +102,17 @@ no drift). Gates: yamllint + py_compile + `make restart-webhook`; LIVE-VERIFY (m
 login 200 → status GREEN) is Claude-owned post-commit. Commit: `fix(observability): apply rotated
 Grafana admin password to DB + hub-scope status smoke`. Handed to Codex; SHA pending.
 
+### Grafana rotation + Trivy empty-repository fixes complete — 2026-08-08
+
+Task A commit `816835fd` adds namespace-scoped Grafana pod/exec RBAC, applies the rotated
+password to Grafana's DB via stdin, and changes the webhook smoke to the hub credential secret.
+Task B commit `5302ea54` excludes empty `image_repository` from the critical alert and skips
+empty-repository reports in both exporter loops. YAML parsing, embedded exporter compilation,
+Python compilation, and `_agent_audit` passed; both commits are pushed to
+`origin/k3d-manager-v1.23.0`. Default yamllint still reports pre-existing line-length violations
+in these legacy YAML files; no unrelated formatting was changed. `observability.sh` remains
+dropped. Claude owns the live Grafana rotation and Trivy reapply verification.
+
 ### Webhook request-hardening bugfix specced — 2026-08-08 (Codex handoff)
 Spec `docs/bugs/v1.23.0-bugfix-webhook-ratelimit-order-and-content-length.md` (from a security
 report on `bin/k3dm-webhook`). Two findings: (1) `_rate_limited` runs BEFORE auth in do_POST/do_GET
