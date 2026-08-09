@@ -201,6 +201,25 @@
       stale `manual_review` GONE; exporter now 15 series / 0 manual_review (`{failed:10, applied:5}`).
       Remaining `failed`: 5 payment (clear after PR #59 merge) + 5 order (task #18). Durable via
       `argocd.sh:1454` (script→ConfigMap wiring).
+- [x] **Webhook agy model drift — FIXED + restarted + verified 2026-08-08 (queued user notification).**
+      Spec `docs/bugs/v1.23.0-bugfix-webhook-agy-model-drift.md` (doc `6e837906`, code `8e7a5c79`).
+      `TrivyCriticalVulnerabilityDetected` Slack alert showed `invalid model selection (--model
+      "gemini-2.5-flash")` — Alertmanager `k3dm-analyze` → `/api/v1/analyze` → `agy --model
+      GEMINI_MODEL` where `bin/k3dm-webhook:211` defaulted to the retired `gemini-2.5-flash`. Fixed
+      default → `gemini-3.5-flash-medium` (valid per `agy models`). py_compile clean; `make
+      restart-webhook` done; webhook up (health→auth), plist has no `K3DM_ANALYSIS_MODEL` override,
+      model ID valid → next alert analysis won't error. NOTE: `gemini.sh` `_GEMINI_MODELS`
+      (2.5/2.0/1.5-flash) + `antigravity.bats` still carry the drift on the browser-automation path —
+      separate follow-up (bats coupled).
+- [x] **PACKAGES_TOKEN rotation chore ELIMINATED for PR path — PR #60 (shopping-cart-payment), CI GREEN.**
+      Root of the recurring Image Build Check 401 (see [[reference_packages_token_expiry_image_build]]):
+      lint/build/image-build-check auth'd the GitHub Packages pull of the **public** `rabbitmq-client`
+      with the manually-rotated `PACKAGES_TOKEN` PAT. Switched those 3 jobs to the built-in
+      `GITHUB_TOKEN` (branch `fix/ci-github-token-for-packages`, commit `d307ddc`, PR #60). **Image
+      Build Check SUCCESS with GITHUB_TOKEN; #60 CLEAN/MERGEABLE** → empirically proven, no PAT rotation
+      needed. Awaiting user merge (never auto-merge). After #60 merges → `@dependabot rebase` #56/#53
+      → they pick up the fix → Image Build Check passes → auto-merge. `publish` job left on
+      PACKAGES_TOKEN (reusable workflow may need cross-repo PAT) + same swap pending for order/basket.
 - [x] **CVE dashboard namespace=platform-ops collision — FIXED live + committed `43ece528` (task #13).**
       Spec `docs/bugs/v1.23.0-bugfix-cve-dashboard-namespace-collision.md` (Option A). Root cause:
       `vulnerability-inventory-exporter` runs in platform-ops; Prometheus `honorLabels:false`
