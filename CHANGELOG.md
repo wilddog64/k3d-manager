@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
-- CVE Slack noise tamed: a new `CVERemediationInFlight` alert (fires while `cve_remediation_state{state="promotion_requested"}`) inhibits `TrivyCriticalVulnerabilityDetected` for the same `image_repository` during an active auto-patch, and the `k3dm-analyze` route now caps re-notification at `repeatInterval: 12h` instead of the Alertmanager global default (`ed52cf0c`) (`scripts/etc/argocd/platform-ops/prometheusrule.yaml`, `scripts/etc/argocd/platform-ops/alertmanager-config.yaml`) — see `docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`
+- CVE Slack noise tamed: a new `CVERemediationInFlight` alert (fires while `cve_remediation_state{state="promotion_requested"}`) inhibits `TrivyCriticalVulnerabilityDetected` for the same image during an active auto-patch, and the `k3dm-analyze` route now caps re-notification at `repeatInterval: 12h` instead of the Alertmanager global default (`ed52cf0c`, `72be9383`) (`scripts/etc/argocd/platform-ops/prometheusrule.yaml`, `scripts/etc/argocd/platform-ops/alertmanager-config.yaml`) — see `docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`. The source alert normalizes `image_repository` with `label_replace` (strips the `ghcr.io/` registry host) because `cve_remediation_state` is host-qualified while `trivy_vulnerability_inventory` is not — without it the inhibit rule matches nothing (caught by a live hub check)
 
 ## [1.22.0] - 2026-08-07
 
