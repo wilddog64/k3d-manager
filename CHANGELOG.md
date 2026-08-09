@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- CVE Slack noise tamed: a new `CVERemediationInFlight` alert (fires while `cve_remediation_state{state="promotion_requested"}`) inhibits `TrivyCriticalVulnerabilityDetected` for the same `image_repository` during an active auto-patch, and the `k3dm-analyze` route now caps re-notification at `repeatInterval: 12h` instead of the Alertmanager global default (`ed52cf0c`) (`scripts/etc/argocd/platform-ops/prometheusrule.yaml`, `scripts/etc/argocd/platform-ops/alertmanager-config.yaml`) — see `docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`
+
 ## [1.22.0] - 2026-08-07
 
 **Theme: migrate OpenLDAP off the retired Bitnami image to the Symas chart.** Bitnami's `bitnamilegacy` OpenLDAP images are no longer maintained; this release moves the directory service to the community `jp-gouin/openldap-stack-ha` chart (4.3.3) and reconciles every consumer so the cutover is transparent. Admin/config passwords are now generated delimiter-safe so the chart's `sed`-based templating can't corrupt them, the platform `admin`/`developer`/`operator` users survive the chart swap (Vault-seeded bootstrap made durable), and Keycloak's LDAP federation plus the password-rotator labels are reconciled to the new `openldap.identity.svc.cluster.local` service. Verified live: the Symas chart is running, `developer` login succeeds through Keycloak, and Jenkins LDAP auth is reconciled. Pure-logic BATS `ldap_chart_passwords` 2/2 green; shellcheck clean on all changed shell.
