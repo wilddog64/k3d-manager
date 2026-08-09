@@ -78,3 +78,15 @@ spec:
           annotations:
             summary: "Critical CVE(s) detected in a running image"
             description: "{{ $value }} critical vulnerabilities in {{ $labels.image_repository }} (ns {{ $labels.namespace }}); event-driven app-cve-scan will attempt promotion/rebuild."
+        - alert: CVERemediationInFlight
+          expr: |
+            max by (image_repository) (
+              cve_remediation_state{state="promotion_requested", image_repository!=""}
+            ) == 1
+          for: 0m
+          labels:
+            group: cve-remediation
+            severity: none
+          annotations:
+            summary: "CVE auto-patch in flight for {{ $labels.image_repository }}"
+            description: "An auto-patch promotion is in flight for {{ $labels.image_repository }}; TrivyCriticalVulnerabilityDetected for this image is inhibited until the promotion completes."

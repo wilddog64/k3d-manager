@@ -29,6 +29,19 @@ spec:
             value: cve-auto-patch
             matchType: "="
         groupBy: ["namespace", "image_repository"]
+        groupWait: 30s
+        groupInterval: 5m
+        repeatInterval: 12h
+  inhibitRules:
+    - sourceMatch:
+        - name: alertname
+          value: CVERemediationInFlight
+          matchType: "="
+      targetMatch:
+        - name: alertname
+          value: TrivyCriticalVulnerabilityDetected
+          matchType: "="
+      equal: ["image_repository"]
   receivers:
     - name: k3dm-analyze
       webhookConfigs:
