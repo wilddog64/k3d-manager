@@ -35,6 +35,15 @@
     imageID. Spec: `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-multiarch-index-digest.md`. Order
     is separately bare-tag/`IfNotPresent` (no digest to verify) + its failed rows are stale Aug-06
     events → GC ages them out.
+
+### CVE verifier multi-arch digest fix complete — 2026-08-09
+
+Commit `33b45a41` replaces the unreliable ready-pod runtime `imageID` comparison with the
+Deployment-pinned container spec digest check, preserving the readiness gate and applied reason.
+`shellcheck`, `sh -n`, `git diff --check`, and `_agent_audit` passed; the fix is pushed to
+`origin/k3d-manager-v1.23.0`. No Grafana dashboard source enumerates the removed pod-image reason
+strings, so no additional dashboard edit was needed. Claude owns the post-merge verifier reapply
+and live payment/product-catalog confirmation.
   - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
   - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
   - **Bitnami image removed (found 2026-08-07 post-OrbStack-restart).** `docker.io/bitnami/kubectl`

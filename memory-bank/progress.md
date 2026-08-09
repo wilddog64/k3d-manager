@@ -310,6 +310,11 @@
       the patched image IS running (proven: both indexes → child `4e3b7f8c`/config `34599a8c`). Fix =
       verify Deployment-pinned spec digest + readiness gate, drop the runtime-imageID compare. Spec:
       `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-multiarch-index-digest.md`. Not yet handed off.
+- [x] **CVE verifier multi-arch index-digest aliasing — COMPLETE 2026-08-09.** Commit `33b45a41`
+      verifies the Deployment-pinned digest instead of the unreliable pod runtime `imageID`, while
+      preserving readiness and the applied reason. `shellcheck`, `sh -n`, and `_agent_audit` passed;
+      pushed to `origin/k3d-manager-v1.23.0`. No dashboard reason-string references were found;
+      Claude owns the post-merge verifier reapply and live confirmation.
 
 ## Backlog (not release-gated)
 
