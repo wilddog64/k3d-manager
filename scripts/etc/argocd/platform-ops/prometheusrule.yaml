@@ -81,7 +81,10 @@ spec:
         - alert: CVERemediationInFlight
           expr: |
             max by (image_repository) (
-              cve_remediation_state{state="promotion_requested", image_repository!=""}
+              label_replace(
+                cve_remediation_state{state="promotion_requested", image_repository!=""},
+                "image_repository", "$1", "image_repository", "(?:[^/]+/)?([^/]+/[^/]+)"
+              )
             ) == 1
           for: 0m
           labels:
