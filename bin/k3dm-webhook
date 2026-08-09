@@ -208,7 +208,7 @@ def _acg_stack_probe(provider):
 from collections import OrderedDict  # noqa: E402
 _seen_event_ids: "OrderedDict[str, float]" = OrderedDict()
 _SEEN_EVENT_MAX = 2048
-GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-3.5-flash-medium")
 # k8s API context for ESO checks — initialized at startup before NEF loads (see _init_k8s_ctx)
 _k3d_ssl_ctx = None
 _k3d_server = None
