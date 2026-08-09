@@ -302,6 +302,15 @@
       consuming it via `existingSecret`; monthly rotator CronJob (`0 0 1 * *`) installed. Intent map:
       v1.24.0 E skips the Grafana slice.
 
+## v1.23.0 verifier — queued spec
+
+- [ ] **CVE verifier false-negative on multi-arch index-digest aliasing (spec queued 2026-08-09).**
+      Verifier compares pod runtime `imageID` (index digest) vs remediation `to_digest` (different
+      index over the same amd64 child) → payment/order mislabeled `ready_pod_digest_mismatch` though
+      the patched image IS running (proven: both indexes → child `4e3b7f8c`/config `34599a8c`). Fix =
+      verify Deployment-pinned spec digest + readiness gate, drop the runtime-imageID compare. Spec:
+      `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-multiarch-index-digest.md`. Not yet handed off.
+
 ## Backlog (not release-gated)
 
 - [ ] Shopping-cart Dependabot backlog (Go builder-image bumps, majors held for migration work) —

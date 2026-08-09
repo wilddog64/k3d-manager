@@ -23,7 +23,18 @@
   have runtime-label names confirmable only *after* config applies.
 - **Carried blockers (from the integration split):**
   - Apply CVE dashboard v18 live (Hub tunnel `127.0.0.1:57780`).
-  - Close out payment `manual_review` digest-mismatch event (verify or document as expected).
+  - **Payment/order verifier false-negative DIAGNOSED (2026-08-09) → spec queued.** After the
+    namespace fix landed, payment now fails `ready_pod_digest_mismatch`. Live-proven root cause: the
+    verifier string-compares the pod's runtime `imageID` (an OCI *index* digest) against the
+    remediation `to_digest` (a *different* index digest). Both indexes wrap the **byte-identical amd64
+    child** (`4e3b7f8c`/config `34599a8c`) — payment IS running the patched image; containerd just
+    reports the index it first cached the child under (`022e737a`, from a prior `:latest` pull), not
+    the pinned `4abd5935`. product-catalog passes by luck (node reported the matching index). A
+    `rollout restart` did NOT change the reported imageID (persistent aliasing, not a stale pod). Fix
+    = verify the **Deployment-pinned spec digest** (+ existing readiness gate), not the runtime
+    imageID. Spec: `docs/bugs/v1.23.0-bugfix-cve-remediation-verify-multiarch-index-digest.md`. Order
+    is separately bare-tag/`IfNotPresent` (no digest to verify) + its failed rows are stale Aug-06
+    events → GC ages them out.
   - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
   - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
   - **Bitnami image removed (found 2026-08-07 post-OrbStack-restart).** `docker.io/bitnami/kubectl`
