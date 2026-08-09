@@ -71,6 +71,22 @@ differ:** #1+#2 (prometheusrule + alertmanager-config) sync via ArgoCD app `hub-
 (tracks `k3d-manager-v1.23.0`, path `scripts/etc/argocd/platform-ops`); the verifier script CM is
 built by `argocd.sh`, NOT ArgoCD — needs `argocd.sh` re-run / manual CM update. End-to-end "TrivyCritical
 inhibited" only observable during a real `promotion_requested` window.
+
+**LIVE-VERIFIED END-TO-END 2026-08-09 (applied on hub via the three `argocd.sh` steps):**
+verify-script CM now carries the fixed script (`spec_image`/`deployment_digest_mismatch`, no
+`ready_pod_digest_mismatch`); `CVERemediationInFlight` + `inhibitRules` live; analyze route
+`repeatInterval=12h`. Controlled test (suspend CronJob → flip newest payment event to
+`promotion_requested`): `CVERemediationInFlight{image_repository="wilddog64/shopping-cart-payment"}`
+fired (label_replace normalization works live) and Alertmanager marked payment's
+`TrivyCriticalVulnerabilityDetected` **`state=suppressed` / inhibitedBy** the in-flight alert. Manual
+verifier Job then flipped both matching-digest (`4abd5935`) payment events
+`promotion_requested → applied / verified_synced_healthy_digest` (proves `33b45a41`; old script would
+have said `ready_pod_digest_mismatch`). Unsuspended CronJob; inhibition lifted ~16s after
+completion (payment TrivyCritical back to `active`). The 3 stale `386775a3` payment events correctly
+stay `failed` (deploy moved past that digest → GC ages them out). NOTE: applied directly for
+verification; the durable path is `argocd.sh deploy_argocd_platform_ops` at release (the branch is
+inert for these files until then). Cleanup overreach: a `delete job -l job-name` also removed
+completed acg-expiry/verify job *history* (benign — CronJobs respawn).
   - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
   - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
   - **Bitnami image removed (found 2026-08-07 post-OrbStack-restart).** `docker.io/bitnami/kubectl`

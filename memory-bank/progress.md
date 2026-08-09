@@ -31,9 +31,13 @@
 - [ ] **CVE Slack-noise inhibit + repeat-interval (folded into v1.23.0).** Code `ed52cf0c`,
       docs+CHANGELOG `388eaeb6`. `CVERemediationInFlight` alert + `inhibitRules` suppress
       TrivyCritical by `image_repository` during active auto-patch; analyze route capped at
-      `repeatInterval: 12h`. Both YAML dry-run clean. Spec
-      `docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`. PR pending; Claude owns
-      post-merge live inhibition check (image_repository label-value match).
+      `repeatInterval: 12h`. Corrected `72be9383`: `label_replace` strips `ghcr.io/` so
+      `image_repository` matches Trivy (live check found intersection was empty). Spec
+      `docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`. **LIVE-VERIFIED
+      2026-08-09** on hub: CVERemediationInFlight fired for `wilddog64/shopping-cart-payment`,
+      Alertmanager suppressed the payment TrivyCritical (inhibitedBy), lifted on completion. Also
+      re-verified `33b45a41` live — both matching-digest payment events flipped `failed → applied`.
+      Rides the v1.23.0 release PR (no separate PR).
       (panel id 5 image/resource regroup; source-only). Parts (b)/(c) = later handoff.
 - [x] **v1.23.0 Part (a) dashboard image attribution — COMPLETE 2026-08-07.** `db81f534` changes
       only panel id 5 to group by `namespace, image_repository, resource_name`, with the specified
