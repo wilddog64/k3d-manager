@@ -208,9 +208,10 @@
       GEMINI_MODEL` where `bin/k3dm-webhook:211` defaulted to the retired `gemini-2.5-flash`. Fixed
       default → `gemini-3.5-flash-medium` (valid per `agy models`). py_compile clean; `make
       restart-webhook` done; webhook up (health→auth), plist has no `K3DM_ANALYSIS_MODEL` override,
-      model ID valid → next alert analysis won't error. NOTE: `gemini.sh` `_GEMINI_MODELS`
-      (2.5/2.0/1.5-flash) + `antigravity.bats` still carry the drift on the browser-automation path —
-      separate follow-up (bats coupled).
+      model ID valid → next alert analysis won't error. Companion fix `612ca86d` (spec `4acf1b6c`):
+      `gemini.sh` `_GEMINI_MODELS` (was 2.5/2.0/1.5-flash) → `gemini-3.5-flash-medium` /
+      `3.6-flash-medium` / `3.1-pro-low`; `antigravity.bats` assertions updated in lockstep — all 7 bats
+      pass, shellcheck clean. No `gemini-2.5/2.0/1.5-flash` refs remain in either file.
 - [x] **PACKAGES_TOKEN rotation chore ELIMINATED for PR path — PR #60 (shopping-cart-payment), CI GREEN.**
       Root of the recurring Image Build Check 401 (see [[reference_packages_token_expiry_image_build]]):
       lint/build/image-build-check auth'd the GitHub Packages pull of the **public** `rabbitmq-client`
