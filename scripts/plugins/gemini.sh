@@ -23,9 +23,9 @@ if [[ -z "${SCRIPT_DIR:-}" ]]; then
 fi
 
 _GEMINI_MODELS=(
-  "gemini-2.5-flash"
-  "gemini-2.0-flash"
-  "gemini-1.5-flash"
+  "gemini-3.5-flash-medium"
+  "gemini-3.6-flash-medium"
+  "gemini-3.1-pro-low"
 )
 
 # shellcheck source=/dev/null

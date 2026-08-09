@@ -37,7 +37,7 @@ setup() {
   _info() { :; }
   sleep() { :; }
   agy() {
-    [[ "$2" == "gemini-2.5-flash" ]] && echo "ok" && return 0
+    [[ "$2" == "gemini-3.5-flash-medium" ]] && echo "ok" && return 0
     return 1
   }
   export -f _info agy
@@ -53,11 +53,11 @@ setup() {
   _info() { :; }
   sleep() { :; }
   agy() {
-    if [[ "$2" == "gemini-2.5-flash" ]]; then
+    if [[ "$2" == "gemini-3.5-flash-medium" ]]; then
       echo "429 RESOURCE_EXHAUSTED rateLimitExceeded"
       return 1
     fi
-    if [[ "$2" == "gemini-2.0-flash" ]]; then
+    if [[ "$2" == "gemini-3.6-flash-medium" ]]; then
       echo "ok"
       return 0
     fi
