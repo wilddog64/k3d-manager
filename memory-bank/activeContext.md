@@ -57,9 +57,20 @@ commit `ed52cf0c`, docs+CHANGELOG `388eaeb6` (memory this commit). Two changes: 
 `alertmanagerConfigMatcherStrategy.type: None` (no namespace no-op); `CVERemediationInFlight`
 unrouted → `null` (no Slack); inhibit only on `promotion_requested`, NOT `applied` (would mask
 genuine post-patch failures). Both files pass `kubectl --dry-run=client`. Spec
-`docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`. **Claude owns post-merge
-live check:** confirm `image_repository` value is byte-identical on both metrics (else inhibit is
-inert) and that Alertmanager shows the paired TrivyCritical inhibited.
+`docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`.
+
+**Live check done 2026-08-09 → found + fixed a real mismatch (`72be9383`, docs `e4aa28a8`).**
+`cve_remediation_state` carries a **host-qualified** `image_repository`
+(`ghcr.io/wilddog64/shopping-cart-payment`) but `trivy_vulnerability_inventory` carries the bare
+`org/repo` (`wilddog64/shopping-cart-payment`) — intersection **empty**, so the inhibit rule was
+inert as first written. Fixed by wrapping the source alert in
+`label_replace(..., "(?:[^/]+/)?([^/]+/[^/]+)")` to strip the registry host; verified against live
+Prometheus that normalized values match Trivy for all three sc services, and the full expr parses.
+Payment currently has 7 CRITICALs firing TrivyCritical → the live inhibit target. **Deploy paths
+differ:** #1+#2 (prometheusrule + alertmanager-config) sync via ArgoCD app `hub-grafana-dashboards`
+(tracks `k3d-manager-v1.23.0`, path `scripts/etc/argocd/platform-ops`); the verifier script CM is
+built by `argocd.sh`, NOT ArgoCD — needs `argocd.sh` re-run / manual CM update. End-to-end "TrivyCritical
+inhibited" only observable during a real `promotion_requested` window.
   - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
   - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
   - **Bitnami image removed (found 2026-08-07 post-OrbStack-restart).** `docker.io/bitnami/kubectl`
