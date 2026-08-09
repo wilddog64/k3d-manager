@@ -44,6 +44,22 @@ Deployment-pinned container spec digest check, preserving the readiness gate and
 `origin/k3d-manager-v1.23.0`. No Grafana dashboard source enumerates the removed pod-image reason
 strings, so no additional dashboard edit was needed. Claude owns the post-merge verifier reapply
 and live payment/product-catalog confirmation.
+
+### CVE Slack-noise inhibit + repeat-interval — 2026-08-09 (code done, PR pending)
+
+Folded into v1.23.0 (remediation-lifecycle theme; user-approved routing 2026-08-09). Code
+commit `ed52cf0c`, docs+CHANGELOG `388eaeb6` (memory this commit). Two changes: (1) new
+`CVERemediationInFlight` alert (`prometheusrule.yaml`, fires on
+`cve_remediation_state{state="promotion_requested"}`) + `inhibitRules` in
+`alertmanager-config.yaml` suppressing `TrivyCriticalVulnerabilityDetected` by
+`equal: ["image_repository"]` during an active auto-patch; (2) `repeatInterval: 12h` on the
+`k3dm-analyze` route (was inheriting the Alertmanager global default). Design verified:
+`alertmanagerConfigMatcherStrategy.type: None` (no namespace no-op); `CVERemediationInFlight`
+unrouted → `null` (no Slack); inhibit only on `promotion_requested`, NOT `applied` (would mask
+genuine post-patch failures). Both files pass `kubectl --dry-run=client`. Spec
+`docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`. **Claude owns post-merge
+live check:** confirm `image_repository` value is byte-identical on both metrics (else inhibit is
+inert) and that Alertmanager shows the paired TrivyCritical inhibited.
   - `observability.sh` needs a per-hunk split from workstream E (E lands in v1.24.0).
   - Carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
   - **Bitnami image removed (found 2026-08-07 post-OrbStack-restart).** `docker.io/bitnami/kubectl`

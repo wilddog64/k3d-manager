@@ -28,6 +28,12 @@
       carries `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`;
       `observability.sh` per-hunk split from E. See `activeContext.md`.
       Part (a) spec handed to Codex: `docs/plans/v1.23.0-cve-dashboard-part-a-image-attribution.md`
+- [ ] **CVE Slack-noise inhibit + repeat-interval (folded into v1.23.0).** Code `ed52cf0c`,
+      docs+CHANGELOG `388eaeb6`. `CVERemediationInFlight` alert + `inhibitRules` suppress
+      TrivyCritical by `image_repository` during active auto-patch; analyze route capped at
+      `repeatInterval: 12h`. Both YAML dry-run clean. Spec
+      `docs/bugs/v1.23.0-bugfix-cve-alert-inhibit-and-repeat-interval.md`. PR pending; Claude owns
+      post-merge live inhibition check (image_repository label-value match).
       (panel id 5 image/resource regroup; source-only). Parts (b)/(c) = later handoff.
 - [x] **v1.23.0 Part (a) dashboard image attribution — COMPLETE 2026-08-07.** `db81f534` changes
       only panel id 5 to group by `namespace, image_repository, resource_name`, with the specified
