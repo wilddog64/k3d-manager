@@ -50,8 +50,15 @@
   `k3d-manager-v1.22.0` → promoter must commit to the branch `targetRevision` tracks, not main
   (`${K3D_MANAGER_BRANCH}` inert trap). (4) Promoter runs in `aquasec/trivy:0.63.0` `/bin/sh` — **no
   `git`** → write via GitHub REST Contents API over `wget` (like `_dispatch_rebuild`), scoped
-  `contents:write` PAT on `wilddog64/k3d-manager` only, injected as `GIT_WRITE_TOKEN`. Net-new impl
-  (not a mechanical reconcile) — Codex would author from the resolved design; no exact code blocks yet.
+  `contents:write` PAT on `wilddog64/k3d-manager` only, injected as `GIT_WRITE_TOKEN`. **Q4 corrected +
+  full impl AUTHORED `70952d53`:** trivy image actually HAS `git` 2.47.2 (busybox wget is POST-only, can't
+  PUT → Contents API infeasible) → write path is `git clone --depth 1 --branch <targetRevision>` over
+  HTTPS-with-token, awk-edit the kustomization `images:` to pin `digest:` only, commit+push. **awk editor
+  tested live in `aquasec/trivy:0.63.0`** against real payment/order (append) + product-catalog (in-place
+  `newTag`→`digest`, idempotent). Spec now has 5 exact change blocks (app-cve-scan.sh helpers +
+  `_promote_image` hook, cronjob env, argocd.sh `argocd_sync_git_writer_secret`) + user prereq (seed
+  `platform-ops-git-writer` PAT in Keychain, contents:write scope only). **#18 now fully handoff-ready
+  (transcribe-not-design).**
 - **Dashboard parts (b)+(c) superseded.** Spec
   `docs/plans/v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md` (CVE-ID panel + KSM
   `metricLabelsAllowlist` job-target labeling) was written before the full revert to Codex 1:1
