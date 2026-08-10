@@ -204,6 +204,16 @@
 - **v1.25.0 = Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo).** Merge
   order-repo `0e3feb9` schema fix (`order_items.total_price NOT NULL`) + promote image → rerun Stripe
   live E2E (2/4 now); hostinger 2-CPU capacity expansion (right-sizing is a stopgap).
+  **+ E2E verification harness (SCOPED 2026-08-10, plan doc #1):** `docs/plans/v1.25.0-e2e-verification-harness.md`.
+  The e2e suite is disabled because both its triggers need reachable services (localhost basket:8083/
+  catalog:8000/order:8080); it is **substrate-agnostic** — only needs the 3 URLs + `OAUTH2_ENABLED`.
+  Two tiers: **Tier 1 vCluster** = blocking per-candidate gate (fast, `OAUTH2_ENABLED=false`, deploys the
+  candidate digest, `trap` teardown, exit-code+JSON contract) reusing `vcluster_create/use/destroy`;
+  **Tier 2 ACG sandbox** = periodic full-stack (real Istio ingress + Keycloak OIDC, `OAUTH2_ENABLED=true`)
+  running the **Stripe live E2E** to move G past 2/4 — NOT a blocking gate (4h+4h lifetime, fragile ACG
+  creds). New `scripts/plugins/e2e.sh`; `workflow_call` added to `shopping-cart-e2e-tests`. Prior art:
+  archived `docs/plans/archive/v0.9.2-vcluster-e2e-workflow.md`. Promoter dispatch-and-wait + e2e cosign
+  attestation are the FORWARD seam to v1.26.0 ([[project_image_signing_cve_loop]]), NOT built here.
 - **v1.26.0 = image signing + attestation — close the CVE loop (SCOPED 2026-08-10, not started).**
   Spec `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. Adds the missing latch to scan→remediate→
   pin→deploy: **cosign sign + Trivy vuln/SBOM attest at build; verify at promotion AND admission.**
