@@ -8,6 +8,15 @@
 
 ### v1.24.0 handoff batch completed (2026-08-10)
 
+### E rotation automation completed (2026-08-10)
+
+- Prometheus weak basic-auth default removed in `e1256d0a`; both weak-hash fallback references are
+  gone, stdin-fed `htpasswd -i` generation is enforced, shellcheck and 13 observability BATS pass.
+- Monthly rotators committed in `3db193cb`: least-privilege in-cluster ArgoCD rotator plus host-side
+  Prometheus launchd rotation; ArgoCD/observability BATS, shellcheck, YAML, plist, and `_agent_audit`
+  pass. Alertmanager and in-cluster Prometheus rotation remain out of scope.
+- Static implementation only; deployment/live rotation verification remains a release operation.
+
 - Webhook auth reconciliation committed and pushed as `3fddcf3e`; hostinger status head/tail
   truncation split and pushed as `8eb8cc34`.
 - Istio/Hostinger drift reconciliation committed and pushed as `357edf52`.

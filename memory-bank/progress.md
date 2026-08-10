@@ -10,6 +10,13 @@
 
 | Work item | Commit | Status |
 |---|---|---|
+| Prometheus weak basic-auth default removal | `e1256d0a` | pushed; weak-hash grep empty, shellcheck clean, 13 observability BATS pass |
+| Monthly ArgoCD + host-side Prometheus rotators | `3db193cb` | pushed; 16 ArgoCD BATS, 14 observability BATS, shellcheck, YAML/plist parsing, and `_agent_audit` pass |
+
+Live deployment and rotation verification are intentionally deferred to release operations.
+
+| Work item | Commit | Status |
+|---|---|---|
 | Webhook auth fail-closed + Slack allowlist enforcement | `3fddcf3e` | pushed to `origin/k3d-manager-v1.24.0`; py_compile and 52 BATS tests pass |
 | Hostinger status report head/tail truncation | `8eb8cc34` | pushed to `origin/k3d-manager-v1.24.0`; py_compile and 53 BATS tests pass |
 | Istio ambient/Hostinger drift reconciliation | `357edf52` | pushed; shellcheck and YAML parsing pass |
