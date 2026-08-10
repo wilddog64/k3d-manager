@@ -6,6 +6,17 @@
 
 ## Releases
 
+### v1.24.0 completed commits (2026-08-10)
+
+| Work item | Commit | Status |
+|---|---|---|
+| Webhook auth fail-closed + Slack allowlist enforcement | `3fddcf3e` | pushed to `origin/k3d-manager-v1.24.0`; py_compile and 52 BATS tests pass |
+| Hostinger status report head/tail truncation | `8eb8cc34` | pushed to `origin/k3d-manager-v1.24.0`; py_compile and 53 BATS tests pass |
+| Istio ambient/Hostinger drift reconciliation | `357edf52` | pushed; shellcheck and YAML parsing pass |
+| Git-persisted CVE remediation promoter | `3df62fbf` | pushed; shellcheck, POSIX shebang, YAML parsing, and `_agent_audit` pass |
+
+Live promoter dry-run/auto-sync verification and PAT seeding remain Claude-owned release follow-up.
+
 | Version | Theme | State |
 |---|---|---|
 | v1.23.0 | CVE observability + remediation lifecycle (B+C) | RELEASED — PR #112 `7253ece4`, tagged v1.23.0; platform-ops deployed live (alert-noise split active), webhook restarted, `enforce_admins` restored |

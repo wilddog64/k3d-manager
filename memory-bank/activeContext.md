@@ -6,6 +6,17 @@
 
 ## Current focus — v1.23.0 RELEASED; now on `k3d-manager-v1.24.0`
 
+### v1.24.0 handoff batch completed (2026-08-10)
+
+- Webhook auth reconciliation committed and pushed as `3fddcf3e`; hostinger status head/tail
+  truncation split and pushed as `8eb8cc34`.
+- Istio/Hostinger drift reconciliation committed and pushed as `357edf52`.
+- Order remediation promoter git-persistence slice committed and pushed as `3df62fbf`.
+- Static gates passed: webhook `py_compile` + BATS (52 and 53 tests respectively), Istio shellcheck/YAML
+  parsing, promoter shellcheck/POSIX/YAML parsing, and `_agent_audit` under Bash.
+- Promoter live dry-run/auto-sync remains Claude-owned post-merge verification; the dedicated
+  `platform-ops-git-writer` least-privilege PAT must be seeded before durable git writes activate.
+
 - **PR [#112](https://github.com/wilddog64/k3d-manager/pull/112) MERGED** (`7253ece4`), tagged
   **v1.23.0** + GitHub release. Post-merge close-out complete 2026-08-09: `deploy_argocd_platform_ops`
   applied the platform-ops files live and the **TrivyCritical ownership split + `k3dm-quiet` blackhole
