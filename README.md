@@ -1,6 +1,8 @@
 # k3d-manager
 
-Modular Bash utility for creating and managing local Kubernetes development clusters. Supports a **two-cluster architecture** — an infra cluster (Vault, ESO, Istio, Jenkins, ArgoCD, OpenLDAP, Keycloak) and an app cluster (Ubuntu k3s) managed via ArgoCD GitOps.
+Modular Bash utility for creating and managing local Kubernetes development clusters. Supports a **two-cluster architecture** — an infra cluster (Vault, ESO, Istio, ArgoCD, OpenLDAP, Keycloak) and an app cluster (Ubuntu k3s) managed via ArgoCD GitOps.
+
+> **Jenkins is an optional, legacy demonstration feature** — disabled by default (`ENABLE_JENKINS=0`) and **not deployed** in the current environment. CI/CD is GitHub Actions; app delivery is ArgoCD GitOps. Removal of the Jenkins code is planned for a future release. It is retained below for reference only.
 
 The entry point is `./scripts/k3d-manager`, which dispatches to core libraries and lazily loads plugins on demand. On macOS with OrbStack running, the `orbstack` provider is auto-selected; otherwise `k3d` is the default. Linux hosts use `CLUSTER_PROVIDER=k3s`.
 
@@ -20,7 +22,7 @@ The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_l
 ./scripts/k3d-manager deploy_eso --confirm              # External Secrets Operator
 ./scripts/k3d-manager deploy_ldap --confirm             # OpenLDAP directory
 ./scripts/k3d-manager deploy_argocd --confirm           # ArgoCD GitOps engine
-ENABLE_JENKINS=1 ./scripts/k3d-manager deploy_jenkins --enable-vault            # Jenkins + Vault auth
+ENABLE_JENKINS=1 ./scripts/k3d-manager deploy_jenkins --enable-vault            # OPTIONAL legacy demo — not part of the default stack
 ./scripts/k3d-manager deploy_keycloak --confirm         # Keycloak identity provider
 ACME_EMAIL=you@example.com \
   ./scripts/k3d-manager deploy_cert_manager --confirm   # cert-manager + ACME ClusterIssuer
@@ -131,7 +133,7 @@ graph TD
     VAULT["Vault (PKI + Auth)"]
     ESO[ESO]
     ARGOCD[ArgoCD]
-    JENKINS[Jenkins]
+    JENKINS["Jenkins (optional/legacy — not deployed)"]
     ISTIO[Istio]
     LDAP[LDAP / AD]
     TRIVY[Trivy Operator]
@@ -206,7 +208,7 @@ docs/
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
 | **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
 | **ESO** | `deploy_eso` | External Secrets Operator — syncs Vault/AKV secrets into Kubernetes |
-| **Jenkins** | `deploy_jenkins` | Jenkins StatefulSet + Vault sidecar + ESO cert rotation CronJob |
+| **Jenkins** _(optional/legacy — not deployed by default)_ | `deploy_jenkins` | Jenkins StatefulSet + Vault sidecar + ESO cert rotation CronJob. Requires `ENABLE_JENKINS=1`; retirement planned for a future release |
 | **LDAP** | `deploy_ldap`, `deploy_ad`, `ldap_get_user_password` | OpenLDAP or Active Directory directory service |
 | **Keycloak** | `deploy_keycloak`, `test_keycloak`, `keycloak_seed_smoke_user` | Keycloak identity provider + smoke test; seeds the `k3dm-smoke` login-verification client/user |
 | **cert-manager** | `deploy_cert_manager` | cert-manager + ACME ClusterIssuer (Let's Encrypt) |

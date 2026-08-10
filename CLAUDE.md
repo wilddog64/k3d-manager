@@ -1,7 +1,8 @@
 # CLAUDE.md
 
-Modular Bash utility for managing local Kubernetes dev clusters (Istio, Vault, Jenkins, OpenLDAP, ESO).
+Modular Bash utility for managing local Kubernetes dev clusters (Istio, Vault, OpenLDAP, ESO).
 Uses a dispatcher pattern with lazy plugin loading.
+(Jenkins is an optional, legacy demo feature — disabled by default, not deployed; retirement planned.)
 
 **Entry point:** `./scripts/k3d-manager <function> [args]`
 **Current state:** `memory-bank/activeContext.md` and `memory-bank/progress.md`
