@@ -56,6 +56,24 @@
   Transcribe-not-design; ready for Codex handoff. Live-verify = a real `wilddog64/*` TrivyCritical
   analyze posts real text; `make restart-webhook` is the release step (host launchd, inert until restart).
 
+### Live-ops finding 2026-08-10 — hostinger rollout deadlock (maxSurge on 2-CPU node) — STOPGAPPED
+
+- Investigating the CVE dashboard's `ready_pod_digest_mismatch` "failed" rows found **two things.**
+  (1) Those failures are **stale false-positives** — the multi-arch containerd index-digest aliasing
+  bug ([[reference_containerd_index_digest_aliasing_verifier]]), fixed by `33b45a41` (v1.23.0, live
+  2026-08-09 ~15:58); `payment` flips `failed`→`applied` across the fix window, every event after is
+  `applied`. The Grafana table is an event LOG — old failed rows persist by design, not current state.
+  **No action.**
+  (2) **Real** live problem: `order-service` (11h) + `basket-service` (26h) were **wedged mid-rollout**
+  — `replicas=1, maxSurge=1, maxUnavailable=0` needs 2× CPU transiently, but the 2-CPU node was at
+  **1910m/2000m (95%)** → surge pods `FailedScheduling: Insufficient cpu` forever, while the OLD
+  replicaset kept serving (`1/1` masks it). Capacity silently blocks CVE convergence for any
+  surge-strategy rollout. **Stopgap applied:** live-patched both to `maxSurge=0/maxUnavailable=1`
+  (delete-old-then-create-new) → both converged (order→`sha-564ccfd24c`, basket→`sha-cc6d4e1f5f`,
+  ready; zero Pending). **Durable fix = v1.25.0-G:** commit `maxSurge=0` into the app git manifests
+  (ArgoCD may selfHeal the live patch away) OR bump node CPU. Full detail:
+  `docs/issues/2026-08-10-hostinger-rollout-deadlock-maxsurge-on-2cpu-node.md`.
+
 ### Jenkins DEPRECATED in docs — DONE 2026-08-10 (code KEPT; earlier code-retirement plan cancelled)
 
 - **Verified 2026-08-10:** Jenkins is a built-in but **unused** feature — no live namespace/pods,

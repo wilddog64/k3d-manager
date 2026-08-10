@@ -102,7 +102,11 @@ still errors ("no output produced — command permission auto-denied") for the s
       rotate/restore, promoter dry-run) + `platform-ops-git-writer` PAT seed, then the release path.
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger
-      capacity expansion. **+ E2E verification harness (SCOPED 2026-08-10, plan doc #1):**
+      capacity expansion. **Live deadlock found + stopgapped 2026-08-10:** order/basket wedged
+      mid-rollout (maxSurge=1 needs 2× CPU on a 95%-full 2-CPU node → FailedScheduling 11h/26h);
+      live-patched both to `maxSurge=0/maxUnavailable=1`, converged. Durable fix (this workstream):
+      commit `maxSurge=0` into app git manifests (ArgoCD may revert the live patch) OR bump node CPU.
+      Issue: `docs/issues/2026-08-10-hostinger-rollout-deadlock-maxsurge-on-2cpu-node.md`. **+ E2E verification harness (SCOPED 2026-08-10, plan doc #1):**
       `docs/plans/v1.25.0-e2e-verification-harness.md`. Enable the disabled e2e suite on ephemeral
       substrates — **Tier 1 vCluster** (per-candidate, blocking, `OAUTH2_ENABLED=false`, deploys candidate
       digest, always teardown) + **Tier 2 ACG sandbox** (periodic full-stack, real ingress/OIDC,
