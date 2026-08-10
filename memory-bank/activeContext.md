@@ -74,10 +74,19 @@
   archive-vs-main diff found **genuine live-relevant drift** (fixes applied to the live cluster but
   committed only to `archive/k3d-manager-v1.22.0-integration`), so the user chose the broad reconcile.
   **Confirmed carry-ins (verified real gaps, not superseded forks):**
-  - **D — webhook auth.py hardening.** `bin/k3dm-webhook:52` imports `_verify_slack_signature` from
-    `scripts/lib/webhook/auth.py` (so the lib IS live). Archive adds malformed-timestamp/body
-    try/except fail-closed to the Slack sig verify + a `_slack_user_is_allowlisted` helper; +102-line
-    `scripts/tests/lib/webhook.bats`. Neither on main.
+  - **D — webhook auth.py hardening (spec REVISED 2026-08-10).** `bin/k3dm-webhook:52` imports
+    `_verify_slack_signature` from `scripts/lib/webhook/auth.py` (so the lib IS live). Archive adds
+    malformed-timestamp/body try/except fail-closed to the Slack sig verify + a
+    `_slack_user_is_allowlisted` helper. **Codex hit a real spec defect:** 2 of the 4 archive
+    `webhook.bats` tests exercise `bin/k3dm-webhook` code (allowlist ENFORCEMENT + hostinger report
+    truncation) that is archive-only, while the spec forbade touching `bin/k3dm-webhook`. **User chose
+    (2026-08-10): wire the allowlist enforcement INTO D** (the helper is dead code otherwise — Change 2b
+    hand-applies the import + 6-line reject block, ⚠️ NOT a file checkout: archive `bin/k3dm-webhook` is
+    older and would revert v1.23.0's `gemini-3.5-flash-medium` + Content-Length hardening; keep main's
+    `_rate_limited("slack")`). D now = 3 tests. **Hostinger report truncation SPLIT OUT** to
+    `docs/bugs/v1.24.0-bugfix-hostinger-status-report-truncation.md` (its own commit,
+    `fix(webhook): keep hostinger status report header + health sections when long`). Codex's auth.py
+    Change 1+2 already applied+verified in the working tree (compiles, malformed-sig test passes).
   - **F — Istio/hostinger GitOps drift.** `istio-ambient.yaml`: `ServerSideDiff=true` compare-option +
     `ignoreDifferences` for istiod `ValidatingWebhookConfiguration` caBundle/failurePolicy
     (controller-owned runtime state). `k3s-hostinger.sh`: `AMBIENT_CNI_CONF_DIR`/`_BIN_DIR` pointing

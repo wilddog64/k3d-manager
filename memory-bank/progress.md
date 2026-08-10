@@ -58,7 +58,9 @@ still errors ("no output produced — command permission auto-denied") for the s
 
 - [ ] **v1.24.0** — platform hardening (D+E+F), scope CONFIRMED 2026-08-09 (broad reconcile). Detail +
       confirmed carry-ins in `activeContext.md`. Doc set (≤5 plan-doc cap): 4 plan docs —
-      `v1.24.0-webhook-auth-reconcile` (D auth.py malformed-input fail-closed + allowlist helper + bats),
+      `v1.24.0-webhook-auth-reconcile` (D — REVISED 2026-08-10: auth.py fail-closed + allowlist helper
+      + wire enforcement into bin/k3dm-webhook (hand-applied, no archive revert) + 3 bats; hostinger
+      truncation split to `docs/bugs/v1.24.0-bugfix-hostinger-status-report-truncation.md`),
       `v1.24.0-istio-hostinger-drift-reconcile` (F istio ServerSideDiff/ignoreDifferences + hostinger
       AMBIENT_CNI paths), `v1.24.0-credential-rotation-automation` (E: ArgoCD/Prometheus/Alertmanager
       recurring rotation + observability.sh carry), `v1.24.0-order-remediation-promoter` (task #18); + 2
