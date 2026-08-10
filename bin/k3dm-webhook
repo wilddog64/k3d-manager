@@ -2582,14 +2582,21 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             return
 
         for alert in firing:
-            app_name = alert.get("labels", {}).get("name", "")
-            alert_name = alert.get("labels", {}).get("alertname", "unknown")
-            _log(f"=== {alert_name}: {app_name} ===\n")
+            labels = alert.get("labels", {})
+            argocd_app = labels.get("name", "")
+            display_name = (
+                argocd_app
+                or labels.get("app")
+                or labels.get("image_repository", "")
+                or "unknown"
+            )
+            alert_name = labels.get("alertname", "unknown")
+            _log(f"=== {alert_name}: {display_name} ===\n")
 
             diag_parts = []
-            if app_name:
+            if argocd_app:
                 desc_out, desc_timeout = _posix_spawn_capture(
-                    ["kubectl", "describe", "application", app_name, "-n", "cicd"],
+                    ["kubectl", "describe", "application", argocd_app, "-n", "cicd"],
                     timeout=15,
                 )
                 if not desc_timeout and desc_out.strip():
@@ -2612,7 +2619,7 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             prompt = (
                 f"You are a Kubernetes operations expert. Analyze this alert and give a "
                 f"concise diagnosis (2-3 sentences) and the single most likely fix.\n\n"
-                f"Alert: {alert_name} on app '{app_name}'\n\n"
+                f"Alert: {alert_name} on app '{display_name}'\n\n"
                 f"Diagnostics:\n{diagnostics}"
             )
             analysis = _call_gemini(prompt)
@@ -2621,7 +2628,7 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             notify_url = response_url or SLACK_WEBHOOK_URL
             if notify_url:
                 _slack_post(notify_url,
-                    f"🔍 *{alert_name}* — `{app_name}`\n{analysis}")
+                    f"🔍 *{alert_name}* — `{display_name}`\n{analysis}")
 
         _finish("success")
     except Exception as exc:

@@ -61,10 +61,18 @@ spec:
           annotations:
             summary: "Trivy Operator scan jobs are failing"
             description: "At least one Trivy Operator scan job in namespace trivy-system has failed within the last 10 minutes"
+        # Only images we build (wilddog64/*) can be auto-remediated by the
+        # event-driven app-cve-scan loop, so only those carry the
+        # remediation=cve-auto-patch label that routes to the remediate/analyze
+        # webhooks. Upstream/third-party images are split into a separate rule
+        # below that routes quietly (dashboard-only) — otherwise every upstream
+        # CVE floods Slack with a non-actionable "will attempt promotion/rebuild"
+        # notification. namespace is NOT a usable discriminator here: the
+        # exporter attributes every image to platform-ops.
         - alert: TrivyCriticalVulnerabilityDetected
           expr: |
             sum by (cluster, namespace, image_repository) (
-              trivy_vulnerability_inventory{severity="CRITICAL", image_repository!=""}
+              trivy_vulnerability_inventory{severity="CRITICAL", image_repository=~"wilddog64/.*"}
             ) > 0
           for: 15m
           labels:
@@ -78,6 +86,21 @@ spec:
           annotations:
             summary: "Critical CVE(s) detected in a running image"
             description: "{{ $value }} critical vulnerabilities in {{ $labels.image_repository }} (ns {{ $labels.namespace }}); event-driven app-cve-scan will attempt promotion/rebuild."
+        - alert: TrivyCriticalVulnerabilityDetected
+          expr: |
+            sum by (cluster, namespace, image_repository) (
+              trivy_vulnerability_inventory{severity="CRITICAL", image_repository!="", image_repository!~"wilddog64/.*"}
+            ) > 0
+          for: 15m
+          labels:
+            severity: warning
+            group: trivy-operator
+            remediation: none
+            tier: upstream
+            app: "{{ $labels.image_repository }}"
+          annotations:
+            summary: "Critical CVE(s) in an upstream image (not auto-remediable)"
+            description: "{{ $value }} critical vulnerabilities in third-party image {{ $labels.image_repository }} (ns {{ $labels.namespace }}); visible in the CVE inventory dashboard. No auto-patch — track upstream."
         - alert: CVERemediationInFlight
           expr: |
             max by (image_repository) (

@@ -32,6 +32,22 @@ spec:
         groupWait: 30s
         groupInterval: 5m
         repeatInterval: 12h
+      # Upstream/third-party critical CVEs are not auto-remediable (we do not
+      # build those images) — keep them visible on the CVE inventory dashboard
+      # but route them to a blackhole receiver so they do not flood Slack via
+      # the parent analyze receiver.
+      - receiver: k3dm-quiet
+        matchers:
+          - name: alertname
+            value: TrivyCriticalVulnerabilityDetected
+            matchType: "="
+          - name: tier
+            value: upstream
+            matchType: "="
+        groupBy: ["namespace", "image_repository"]
+        groupWait: 5m
+        groupInterval: 1h
+        repeatInterval: 168h
   inhibitRules:
     - sourceMatch:
         - name: alertname
@@ -62,3 +78,5 @@ spec:
               credentials:
                 name: k3dm-webhook-token
                 key: token
+    # Blackhole receiver (no configs) — swallows non-actionable upstream CVE alerts.
+    - name: k3dm-quiet
