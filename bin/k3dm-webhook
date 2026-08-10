@@ -50,6 +50,7 @@ from webhook.proc import _spawn_capture_text  # noqa: E402
 from webhook.auth import (  # noqa: E402
     _get_token,
     _verify_slack_signature,
+    _slack_user_is_allowlisted,
     _slack_user_role,
 )
 
@@ -3070,6 +3071,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ev_subtype = ev.get("subtype", "")
             ev_text = ev.get("text", "").strip()
             ev_user = ev.get("user", "")
+            if not _slack_user_is_allowlisted(ev_user):
+                print(
+                    f"[slack/events] ignored type={ev_type!r} user={ev_user!r} reason=unallowlisted",
+                    flush=True,
+                )
+                self._json(200, {"ok": True})
+                return
             slack_role = _slack_user_role(ev_user)
             print(
                 f"[slack/events] type={ev_type!r} thread_ts={ev_thread_ts!r} "
