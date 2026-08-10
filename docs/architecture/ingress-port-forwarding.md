@@ -2,8 +2,8 @@
 
 This document explains how k3d-manager enables multiple services (ArgoCD, Grafana, Keycloak, etc.) to share a single external HTTPS port (443) through port forwarding and SNI-based routing.
 
-> **Note:** Jenkins is used throughout this document as the illustrative example, but it is an
-> **optional, legacy feature — disabled by default and not deployed** in the current environment.
+> **Note:** Jenkins is used throughout this document as the illustrative example, but it is a
+> **deprecated feature — disabled by default and not deployed** (code retained but unsupported).
 > The routing pattern applies identically to the live hub services; substitute any of them for
 > `jenkins.dev.local.me` in the examples below.
 

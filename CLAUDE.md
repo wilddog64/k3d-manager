@@ -2,7 +2,7 @@
 
 Modular Bash utility for managing local Kubernetes dev clusters (Istio, Vault, OpenLDAP, ESO).
 Uses a dispatcher pattern with lazy plugin loading.
-(Jenkins is an optional, legacy demo feature — disabled by default, not deployed; retirement planned.)
+(Jenkins is a deprecated demo feature — disabled by default, not deployed; code retained but unsupported.)
 
 **Entry point:** `./scripts/k3d-manager <function> [args]`
 **Current state:** `memory-bank/activeContext.md` and `memory-bank/progress.md`
