@@ -4,10 +4,26 @@
 > `CHANGELOG.md` (v1.23.0 section), `docs/retro/`, `docs/issues/`, `docs/bugs/`,
 > `docs/plans/release-split-intent-map.md`, and git history (`git log --follow memory-bank/`).
 
-## Current focus — cut v1.23.0 (CVE observability + remediation lifecycle, B+C)
+## Current focus — v1.23.0 PR #112 OPEN, gates passed, awaiting user merge
 
-- **Release PR being created** off `k3d-manager-v1.23.0` (tip `d4e11abf`; 84 commits ahead of main,
-  all pushed). Scope = workstreams **B** (CVE inventory dashboard + `vulnerability-inventory-exporter`)
+- **PR [#112](https://github.com/wilddog64/k3d-manager/pull/112) is OPEN and merge-ready**
+  (head `9c55e81a`). All gates passed: CI green, Copilot's 3 findings fixed + threads resolved
+  (0 unresolved), Copilot re-review of the folded-in alert-noise commit clean. **`enforce_admins`
+  is DISABLED** — user can merge. Do NOT auto-merge. Copilot findings (all fixed `9f319630`):
+  Vault token off `curl` argv → mktemp header file; exporter `/tmp` emptyDir for ro-rootfs; vault.sh
+  `mount_path` `printf %q`. Findings doc `docs/issues/2026-08-09-copilot-pr112-review-findings.md`.
+- **Folded into PR #112 (`9c55e81a`): TrivyCritical upstream-CVE noise fix.** Live hub: 39 firing
+  `TrivyCriticalVulnerabilityDetected`, only 1 (`wilddog64/shopping-cart-payment`) auto-remediable;
+  38 third-party images the app-cve-scan loop can't rebuild flooded Slack. Split the alert by image
+  ownership — only `wilddog64/*` keeps `remediation: cve-auto-patch`; upstream gets a `tier: upstream`
+  rule routed to a new `k3dm-quiet` blackhole receiver (still on the dashboard, no Slack). Also fixed
+  the analyze Slack title (`labels["name"]` → empty; now `app`/`image_repository` fallback). Spec
+  `docs/bugs/v1.23.0-bugfix-trivy-critical-upstream-image-alert-noise.md`. ⚠️ namespace is NOT a usable
+  discriminator — exporter attributes every image to `platform-ops`. **Follow-up (v1.24.0):** headless
+  `_call_gemini` analyze still posts "no output produced — command permission auto-denied" for the
+  surviving ours-alert; needs an agy no-tools/permission decision.
+
+- **Original scope** off `k3d-manager-v1.23.0`. Scope = workstreams **B** (CVE inventory dashboard + `vulnerability-inventory-exporter`)
   + **C** (remediation-lifecycle verifier), plus the **pulled-forward Grafana admin credential
   rotation slice** (E — see intent map §E; v1.24.0 must SKIP the Grafana slice) and adjacent
   live-ops bugfixes (agy model drift, webhook rate-limit-after-auth + Content-Length, LDAP rotator

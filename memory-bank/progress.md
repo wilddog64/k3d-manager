@@ -8,7 +8,7 @@
 
 | Version | Theme | State |
 |---|---|---|
-| v1.23.0 | CVE observability + remediation lifecycle (B+C) | **PR pending** — branch `k3d-manager-v1.23.0` tip `d4e11abf`, 84 commits, live-verified |
+| v1.23.0 | CVE observability + remediation lifecycle (B+C) | **PR #112 OPEN, merge-ready** — head `9c55e81a`; CI green, Copilot 3 findings fixed+resolved, `enforce_admins` DISABLED, awaiting user merge |
 | v1.22.0 | OpenLDAP bitnami→Symas migration | RELEASED — PR #111 `1bbb74b0`, tagged |
 | v1.21.0 | k3dm-webhook security hardening | RELEASED — PR #110 `f68bdee1`, tagged |
 | v1.20.0 | CVE auto-patch-loop hardening | RELEASED — PR #109 `9da73458`, tagged |
