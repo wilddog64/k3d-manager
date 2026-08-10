@@ -45,10 +45,10 @@ still errors ("no output produced — command permission auto-denied") for the s
 
 ## Deferred — NOT v1.23.0-gating
 
-- [ ] **Order remediation promoter — needs decision (task #18).** Promoter live-patches the ArgoCD
-      Application (ephemeral, not git); order's override is empty and the promoter never resolved a
-      clean immutable `sha-*` candidate (bare-tag/`IfNotPresent`). Fix options: (a) persist to git;
-      (b) close order's rebuild→clean-image loop. See `activeContext.md`.
+- [x] **Order remediation promoter — DECIDED (task #18): Option B, 2026-08-10.** Promoter
+      live-patches the ArgoCD Application (ephemeral, not git). Ratified: promoter persists the override
+      to git in v1.24.0 (durable for all services); order's own CI `sha-<gitsha>` tagging (root cause A)
+      deferred to v1.25.0 as a cross-repo carry-in. Impl in v1.24.0 = Option B slice.
 - [ ] Dashboard parts (b)+(c) — spec `v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md`
       superseded by the Codex 1:1 revert; re-scope before executing.
 - [ ] `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` +

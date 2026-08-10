@@ -35,13 +35,17 @@
 
 ## Deferred — carry forward into v1.24.0
 
-- **Order remediation `ready_pod_digest_mismatch` — needs a design decision (task #18).** The
+- **Order remediation `ready_pod_digest_mismatch` — DECIDED 2026-08-10 (task #18): Option B.** The
   promoter (`app-cve-scan.sh:289`) deploys the patched image by patching the **live ArgoCD
   Application** `spec.source.kustomize.images`, not git → ephemeral (any appset reconcile wipes it).
   order's override is EMPTY and its promotion event has `candidate`/`to_tag`/`from_digest` all empty →
   the promoter never resolved a clean immutable `sha-*` candidate for order (order is bare-tag /
-  `IfNotPresent`). Two durable fixes to weigh: (a) persist promotions to git; (b) close order's
-  rebuild→clean-image loop. product-catalog + payment work; order is the outstanding case.
+  `IfNotPresent`). **Ratified: do B (promoter persists the override to git → durable for ALL services,
+  this-repo only) in v1.24.0; A (order CI `sha-<gitsha>` tagging, cross-repo) deferred to v1.25.0.** Not
+  C. Spec `docs/plans/v1.24.0-order-remediation-promoter.md` (B ratified) — 3 open impl questions still
+  to pin (which infra repo/path holds each `kustomize.images`; reuse `platform-ops-app-rebuild` token
+  slot vs mint a dedicated least-priv infra-write token; does ArgoCD auto-sync infra or must the
+  promoter trigger sync).
 - **Dashboard parts (b)+(c) superseded.** Spec
   `docs/plans/v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md` (CVE-ID panel + KSM
   `metricLabelsAllowlist` job-target labeling) was written before the full revert to Codex 1:1
