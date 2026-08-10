@@ -25,18 +25,19 @@
   are code-complete and pushed.** Remaining v1.24.0 work: **E rotation automation** (now the active task),
   agy headless bug doc (`agy --help` discovery), the two Claude-owned live verifications, PAT seed.
 
-### Jenkins doc reconciliation — #1 DONE 2026-08-10; #2 (code retirement) queued for next release
+### Jenkins DEPRECATED in docs — DONE 2026-08-10 (code KEPT; earlier code-retirement plan cancelled)
 
-- **Verified 2026-08-10:** Jenkins is a built-in but **unused/legacy** feature — no live namespace/pods,
+- **Verified 2026-08-10:** Jenkins is a built-in but **unused** feature — no live namespace/pods,
   `deploy_jenkins` never auto-invoked (opt-in `ENABLE_JENKINS=1` only), absent from `docs/roadmap.md`;
   real CI/CD is GitHub Actions + ArgoCD; `dirservice_generate_jcasc`'s only caller is `jenkins.sh`.
-- **#1 (this branch, DONE):** marked Jenkins "optional/legacy — not deployed" in the current-state docs —
-  `README.md`, `CLAUDE.md`, `docs/architecture/{configuration-driven-design,ingress-port-forwarding}.md`,
-  and memory-bank `projectbrief.md`/`systemPatterns.md`/`techContext.md`. Historical docs
-  (`docs/issues|retro|archive`, `docs/tests`, feature docs `docs/guides|howto/jenkins-*`,
-  `docs/plans/jenkins-*`) intentionally left untouched.
-- **#2 (NEXT RELEASE, queued):** remove the Jenkins code — see progress.md backlog + auto-memory
-  [[project_jenkins_retirement]]. Own spec + full bats run required (touches directory-service abstraction).
+- **Decision (revised by user 2026-08-10): KEEP the code, mark the service DEPRECATED in docs.** Marked
+  Jenkins "deprecated — disabled by default, not deployed, code retained but unsupported" in the
+  current-state docs — `README.md`, `CLAUDE.md`,
+  `docs/architecture/{configuration-driven-design,ingress-port-forwarding}.md`, and memory-bank
+  `projectbrief.md`/`systemPatterns.md`/`techContext.md`. Historical docs (`docs/issues|retro|archive`,
+  `docs/tests`, feature docs `docs/guides|howto/jenkins-*`, `docs/plans/jenkins-*`) left untouched.
+- **No code-retirement task** — the earlier "#2 remove the code" plan is **cancelled**. See auto-memory
+  [[project_jenkins_deprecation]].
 
 ### QUEUED (do NOT start until Codex finishes his v1.24.0 assignment) — secure Vault remote access
 
