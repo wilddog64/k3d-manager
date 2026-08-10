@@ -351,6 +351,15 @@ assert not _verify_slack_signature(b"\xff", "0", "v0=x")
     [ "${after}" -eq $((before + 2)) ]
 }
 
+@test "hostinger status keeps report header and final health sections when long" {
+    run grep -F -- "middle of report truncated" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- "report[:1600]" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- "report[-1800:]" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+}
+
 @test "POST /cluster-status with wrong token returns 401" {
     run curl -s -o /dev/null -w "%{http_code}" -X POST \
         -H "Authorization: Bearer wrongtoken" \
