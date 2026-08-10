@@ -2110,8 +2110,10 @@ function _vault_configure_secret_writer_role() {
   local policy="${8:-${role}}"
   _vault_login "$ns" "$release"
   local mount_path="${mount%/}"
+  local enable_cmd
+  printf -v enable_cmd 'vault secrets enable -path=%q kv-v2' "$mount_path"
   _vault_exec "$ns" "vault secrets list -format=json" "$release" | jq -e --arg path "${mount_path}/" 'has($path)' >/dev/null 2>&1 ||
-    _vault_exec "$ns" "vault secrets enable -path=${mount_path} kv-v2" "$release"
+    _vault_exec "$ns" "$enable_cmd" "$release"
   cat <<HCL | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -
 path "${mount_path}/data/${secret_path}" { capabilities = ["create", "read", "update"] }
 HCL

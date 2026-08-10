@@ -360,19 +360,23 @@ show-service-passwords:
 	echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	_grafana=$$(curl -sf -H "X-Vault-Token: $$_vault_tok" \
+	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
+	_grafana=$$(curl -sf -H "@$$_vault_hdr" \
 	  "http://127.0.0.1:18200/v1/secret/data/observability/grafana" 2>/dev/null | \
 	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
+	rm -f "$$_vault_hdr"; \
 	echo "  Grafana     https://grafana.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_grafana:-N/A}";\
 	echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
 	_prom_creds=$$(curl -sf \
-	  -H "X-Vault-Token: $$_vault_tok" \
+	  -H "@$$_vault_hdr" \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
 	  | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]["data"]; print(d.get("user","admin")+"|"+d.get("password","N/A"))' 2>/dev/null || true); \
+	rm -f "$$_vault_hdr"; \
 	_prom_user=$${_prom_creds%%|*}; \
 	_prom_pass=$${_prom_creds##*|}; \
 	echo "  Prometheus  https://prometheus.3ai-talk.org";\
