@@ -43,6 +43,19 @@
   are code-complete and pushed.** Remaining v1.24.0 work: **E rotation automation** (now the active task),
   agy headless bug doc (`agy --help` discovery), the two Claude-owned live verifications, PAT seed.
 
+### agy headless analyze bugfix — spec FINALIZED (handoff-ready) 2026-08-10
+
+- Flag discovery DONE (`agy --help`): **no** tool-disable / allowlist / `--approval-mode` flag exists;
+  only `--dangerously-skip-permissions` (blanket auto-approve — forbidden without sign-off) and
+  `--mode plan` (still permits read-only tool calls). The "tool-free flag" preferred path is therefore
+  **unavailable** → the **prompt-guard fallback is authoritative**. Spec
+  `docs/bugs/v1.24.0-bugfix-webhook-gemini-headless-permission.md` now has 2 exact old/new blocks in
+  `_call_gemini` (`bin/k3dm-webhook`): Change 1 prepends a headless tool-suppression guard to every
+  prompt (single choke point covers all callers); Change 2 detects `"headless mode"…"auto-denied"` and
+  returns `"agy analysis skipped — headless tool use disabled"` instead of the raw jetski string.
+  Transcribe-not-design; ready for Codex handoff. Live-verify = a real `wilddog64/*` TrivyCritical
+  analyze posts real text; `make restart-webhook` is the release step (host launchd, inert until restart).
+
 ### Jenkins DEPRECATED in docs — DONE 2026-08-10 (code KEPT; earlier code-retirement plan cancelled)
 
 - **Verified 2026-08-10:** Jenkins is a built-in but **unused** feature — no live namespace/pods,

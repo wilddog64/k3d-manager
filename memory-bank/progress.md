@@ -95,6 +95,11 @@ still errors ("no output produced — command permission auto-denied") for the s
       bugfix filed `docs/bugs/v1.24.0-bugfix-prometheus-weak-basic-auth-default.md` (weak admin/password
       confirmed live) — do the bugfix FIRST, then the rotators. Then agy headless bug doc + two live
       verifications + PAT seed.
+      **agy headless bugfix spec FINALIZED 2026-08-10 (handoff-ready):** `agy --help` confirms no
+      tool-disable flag → prompt-guard fallback authoritative; `docs/bugs/v1.24.0-bugfix-webhook-gemini-headless-permission.md`
+      now has 2 exact `_call_gemini` old/new blocks (suppression guard + legible auto-deny message).
+      Remaining v1.24.0: hand off/implement the agy fix, then Claude-owned live verifications (E deploy +
+      rotate/restore, promoter dry-run) + `platform-ops-git-writer` PAT seed, then the release path.
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger
       capacity expansion. **+ E2E verification harness (SCOPED 2026-08-10, plan doc #1):**
