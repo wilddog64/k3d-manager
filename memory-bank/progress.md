@@ -94,6 +94,14 @@ still errors ("no output produced — command permission auto-denied") for the s
 
 ## Backlog (not release-gated)
 
+- [ ] **Retire Jenkins code (NEXT RELEASE — #2 of the Jenkins reconcile)** — Jenkins verified unused
+      2026-08-10 (no live namespace/pods; `deploy_jenkins` never auto-invoked; not in `docs/roadmap.md`;
+      real CI/CD = GitHub Actions + ArgoCD; `dirservice_generate_jcasc`'s only caller is `jenkins.sh`).
+      Doc reconciliation (#1) DONE this branch. #2 = remove the code: `scripts/plugins/jenkins.sh`,
+      `scripts/etc/jenkins/`, `bin/*jenkins*`, `ENABLE_JENKINS` wiring in `vault.sh`, the JCasC generators
+      in `directory_service.sh`/`dirservices/*`, and `jenkins_optional.bats`. Needs its own spec + full
+      bats run (touches the directory-service abstraction). Keep historical `docs/issues|retro|archive`
+      untouched. Auto-memory `project_jenkins_retirement`.
 - [ ] **Secure Vault remote access (QUEUED — after Codex's v1.24.0 assignment)** — expose Vault UI via
       laptop cloudflared `vault.3ai-talk.org` behind Cloudflare Access + MFA (Google IdP / Authenticator
       TOTP); Access-app-before-ingress ordering; Vault audit device on; root token laptop-only. Filing:
