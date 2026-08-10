@@ -35,17 +35,23 @@
 
 ## Deferred — carry forward into v1.24.0
 
-- **Order remediation `ready_pod_digest_mismatch` — DECIDED 2026-08-10 (task #18): Option B.** The
-  promoter (`app-cve-scan.sh:289`) deploys the patched image by patching the **live ArgoCD
-  Application** `spec.source.kustomize.images`, not git → ephemeral (any appset reconcile wipes it).
-  order's override is EMPTY and its promotion event has `candidate`/`to_tag`/`from_digest` all empty →
-  the promoter never resolved a clean immutable `sha-*` candidate for order (order is bare-tag /
-  `IfNotPresent`). **Ratified: do B (promoter persists the override to git → durable for ALL services,
-  this-repo only) in v1.24.0; A (order CI `sha-<gitsha>` tagging, cross-repo) deferred to v1.25.0.** Not
-  C. Spec `docs/plans/v1.24.0-order-remediation-promoter.md` (B ratified) — 3 open impl questions still
-  to pin (which infra repo/path holds each `kustomize.images`; reuse `platform-ops-app-rebuild` token
-  slot vs mint a dedicated least-priv infra-write token; does ArgoCD auto-sync infra or must the
-  promoter trigger sync).
+- **Order remediation `ready_pod_digest_mismatch` — DECIDED 2026-08-10 (task #18): Option B; open
+  questions RESOLVED (`da12ab8c`).** The promoter (`app-cve-scan.sh:289`) patches the **live ArgoCD
+  Application** `spec.source.kustomize.images`, not git. order's override is EMPTY and its promotion
+  event has `candidate`/`to_tag`/`from_digest` all empty → no clean immutable `sha-*` candidate resolved
+  (order is bare-tag / `IfNotPresent`). **Ratified: B (promoter persists override to git → durable for
+  ALL services) in v1.24.0; A (order CI `sha-<gitsha>` tagging, cross-repo) → v1.25.0.** Not C.
+  Live-verified design (spec now handoff-ready): (1) source is **THIS repo** — `services-git` appset
+  generates apps from `repoURL: k3d-manager`, `path: services/shopping-cart-<svc>/kustomization.yaml`,
+  `targetRevision: ${K3D_MANAGER_BRANCH}` (NOT shopping-cart-infra); edit is kustomize `images:`
+  (name/newTag/digest). (2) Appset has `ignoreApplicationDifferences: .spec.source.kustomize.images` →
+  live-patch already survives routine reconcile; the real gap is git≠live source-of-truth (lost on
+  rebuild/recreate). (3) Apps run `automated {prune,selfHeal}` (auto-sync) but frozen at
+  `k3d-manager-v1.22.0` → promoter must commit to the branch `targetRevision` tracks, not main
+  (`${K3D_MANAGER_BRANCH}` inert trap). (4) Promoter runs in `aquasec/trivy:0.63.0` `/bin/sh` — **no
+  `git`** → write via GitHub REST Contents API over `wget` (like `_dispatch_rebuild`), scoped
+  `contents:write` PAT on `wilddog64/k3d-manager` only, injected as `GIT_WRITE_TOKEN`. Net-new impl
+  (not a mechanical reconcile) — Codex would author from the resolved design; no exact code blocks yet.
 - **Dashboard parts (b)+(c) superseded.** Spec
   `docs/plans/v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md` (CVE-ID panel + KSM
   `metricLabelsAllowlist` job-target labeling) was written before the full revert to Codex 1:1
