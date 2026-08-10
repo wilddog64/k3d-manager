@@ -98,6 +98,13 @@ still errors ("no output produced — command permission auto-denied") for the s
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger
       capacity expansion.
+- [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED 2026-08-10, not started).
+      Spec `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + Trivy vuln/SBOM attest
+      at build; `cosign verify` at promotion (promoter gate) AND admission (Kyverno, staged Audit→Enforce,
+      app namespaces only). Key-based, private key in Vault + Keychain backup, pub via ESO (LOCKED, not
+      keyless). Multi-repo: k3d-manager `signing.sh`/Kyverno/ClusterPolicy/promoter gate + shopping-cart
+      `{order,payment,basket,frontend,product-catalog}` CI. Slots after v1.25.0. Auto-memory
+      `project_image_signing_cve_loop`.
 
 ## Backlog (not release-gated)
 

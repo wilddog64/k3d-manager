@@ -16,6 +16,15 @@
   Prometheus launchd rotation; ArgoCD/observability BATS, shellcheck, YAML, plist, and `_agent_audit`
   pass. Alertmanager and in-cluster Prometheus rotation remain out of scope.
 - Static implementation only; deployment/live rotation verification remains a release operation.
+- **Claude independently VERIFIED all 3 SHAs on `origin/k3d-manager-v1.24.0` (2026-08-10):** A `e1256d0a`
+  touches only the 2 spec files, `_default_bcrypt_hash` greps to **0**, no weak literals, generator +
+  stdin `htpasswd` present; B `3db193cb` = exactly 6 files, **no** Grafana/Alertmanager touch, ArgoCD
+  rotator `kind: Role` in `cicd` with pinned `resourceNames` + no wildcard/cluster-admin, bcrypt via
+  stdin; memory-bank `22d07d37` = 2 mb files only (no code leak), records both SHAs. Claude re-ran
+  `shellcheck -S warning` (exit 0) + BATS observability/argocd (green, incl. weak-default, rotation
+  value-free, ArgoCD least-privilege gates). **E static half code-complete + verified.** Live half
+  (deploy ArgoCD rotator, create `argocd-rotation` Vault role, one-shot rotate+restore verify, install
+  host Prometheus launchd timer) remains Claude-owned release ops.
 
 - Webhook auth reconciliation committed and pushed as `3fddcf3e`; hostinger status head/tail
   truncation split and pushed as `8eb8cc34`.
@@ -195,6 +204,17 @@
 - **v1.25.0 = Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo).** Merge
   order-repo `0e3feb9` schema fix (`order_items.total_price NOT NULL`) + promote image → rerun Stripe
   live E2E (2/4 now); hostinger 2-CPU capacity expansion (right-sizing is a stopgap).
+- **v1.26.0 = image signing + attestation — close the CVE loop (SCOPED 2026-08-10, not started).**
+  Spec `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. Adds the missing latch to scan→remediate→
+  pin→deploy: **cosign sign + Trivy vuln/SBOM attest at build; verify at promotion AND admission.**
+  Decisions LOCKED: **key-based, private key in Vault** `secret/cosign/signing` + Keychain backup, pub
+  via ESO (not keyless — self-managed/offline ethos); **staged Audit→Enforce**, app namespaces only,
+  upstream/`tier:upstream` images excluded (reuse ours-vs-upstream split). Decision to CONFIRM at impl:
+  admission engine **Kyverno** (recommended, reusable for A05 policy) vs sigstore `policy-controller`.
+  Multi-repo (k3d-manager plugin `signing.sh` + Kyverno/ClusterPolicy + promoter `cosign verify` gate;
+  shopping-cart `{order,payment,basket,frontend,product-catalog}` CI sign+attest; infra ns labels). CI
+  key delivered as GH secrets seeded from Vault (runners can't reach Vault — no `hashivault://`). Slots
+  **after** v1.25.0. Split seam if needed = the Audit→Enforce boundary. See [[project_image_signing_cve_loop]].
 
 ## Recently shipped (pointers only — detail in CHANGELOG + retro)
 
