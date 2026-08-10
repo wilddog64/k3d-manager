@@ -16,6 +16,14 @@
   parsing, promoter shellcheck/POSIX/YAML parsing, and `_agent_audit` under Bash.
 - Promoter live dry-run/auto-sync remains Claude-owned post-merge verification; the dedicated
   `platform-ops-git-writer` least-privilege PAT must be seeded before durable git writes activate.
+- **Claude independently VERIFIED all 5 SHAs on `origin/k3d-manager-v1.24.0` (2026-08-10):** archive-revert
+  guard intact (`GEMINI_MODEL=gemini-3.5-flash-medium` line 212, `_rate_limited("slack")` line 3054, zero
+  `gemini-2.5-flash`, Content-Length hardening present) — the D `bin/k3dm-webhook` edit was hand-applied,
+  not a file checkout; `bats webhook.bats` re-run by Claude = `1..53`, **0 failures**; `py_compile` clean;
+  promoter touched **exactly 3 files, zero service-kustomization edits**; memory-bank commit (`fcab6f16`)
+  is code-free; chain linear off `670ff7c6`, all commit messages match specs verbatim. **D + F + #18 slice
+  are code-complete and pushed.** Remaining v1.24.0 work: **E rotation automation** (now the active task),
+  agy headless bug doc (`agy --help` discovery), the two Claude-owned live verifications, PAT seed.
 
 - **PR [#112](https://github.com/wilddog64/k3d-manager/pull/112) MERGED** (`7253ece4`), tagged
   **v1.23.0** + GitHub release. Post-merge close-out complete 2026-08-09: `deploy_argocd_platform_ops`
@@ -46,8 +54,12 @@
 
 ## Deferred — carry forward into v1.24.0
 
-- **Order remediation `ready_pod_digest_mismatch` — DECIDED 2026-08-10 (task #18): Option B; open
-  questions RESOLVED (`da12ab8c`).** The promoter (`app-cve-scan.sh:289`) patches the **live ArgoCD
+- **Order remediation `ready_pod_digest_mismatch` — task #18 SHIPPED 2026-08-10 (`3df62fbf`), Claude-verified.**
+  Git-persistence slice (Option B) committed + pushed; `_git_persist_promotion` clones the frozen
+  `_app_target_branch`, awk-pins `digest:` in `services/shopping-cart-<svc>/kustomization.yaml`, commit+push;
+  falls back to live-patch-only when `GIT_WRITE_TOKEN` unset. Still Claude-owned: live dry-run + PAT seed.
+  Decision record below (Option B; open
+  questions RESOLVED (`da12ab8c`)). The promoter (`app-cve-scan.sh:289`) patches the **live ArgoCD
   Application** `spec.source.kustomize.images`, not git. order's override is EMPTY and its promotion
   event has `candidate`/`to_tag`/`from_digest` all empty → no clean immutable `sha-*` candidate resolved
   (order is bare-tag / `IfNotPresent`). **Ratified: B (promoter persists override to git → durable for

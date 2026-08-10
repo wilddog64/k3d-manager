@@ -56,10 +56,11 @@ still errors ("no output produced — command permission auto-denied") for the s
 
 ## Deferred — NOT v1.23.0-gating
 
-- [x] **Order remediation promoter — DECIDED (task #18): Option B, 2026-08-10.** Promoter
-      live-patches the ArgoCD Application (ephemeral, not git). Ratified: promoter persists the override
-      to git in v1.24.0 (durable for all services); order's own CI `sha-<gitsha>` tagging (root cause A)
-      deferred to v1.25.0 as a cross-repo carry-in. Impl in v1.24.0 = Option B slice.
+- [x] **Order remediation promoter — SHIPPED (task #18): Option B, `3df62fbf` 2026-08-10, Claude-verified.**
+      Git-persistence slice committed + pushed on `k3d-manager-v1.24.0` (3 files, zero kustomization edits;
+      awk-pins `digest:` on the frozen `_app_target_branch`; live-patch fallback when `GIT_WRITE_TOKEN` unset).
+      order's own CI `sha-<gitsha>` tagging (root cause A) deferred to v1.25.0 as a cross-repo carry-in.
+      Claude-owned follow-up: live dry-run/auto-sync verify + seed `platform-ops-git-writer` PAT.
 - [ ] Dashboard parts (b)+(c) — spec `v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md`
       superseded by the Codex 1:1 revert; re-scope before executing.
 - [ ] `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` +
@@ -79,6 +80,10 @@ still errors ("no output produced — command permission auto-denied") for the s
       ⚠️ SKIP the v1.23.0 Grafana slice. Verified: D/F archive deltas are real live-drift gaps, not forks
       (`bin/k3dm-webhook:52` imports the live `auth.py`; istio/hostinger fixes applied live, committed
       only to archive).
+      **STATUS 2026-08-10:** D `3fddcf3e` + hostinger-truncation `8eb8cc34` + F `357edf52` + #18 `3df62fbf`
+      all pushed + Claude-verified (archive-revert guard intact, `bats`=`1..53` 0 fail). **E rotation
+      automation is the only remaining code slice — NOW ACTIVE** (`v1.24.0-credential-rotation-automation`;
+      has open design decisions — see activeContext). Then agy headless bug doc + two live verifications + PAT seed.
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger
       capacity expansion.
