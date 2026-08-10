@@ -214,6 +214,10 @@
   creds). New `scripts/plugins/e2e.sh`; `workflow_call` added to `shopping-cart-e2e-tests`. Prior art:
   archived `docs/plans/archive/v0.9.2-vcluster-e2e-workflow.md`. Promoter dispatch-and-wait + e2e cosign
   attestation are the FORWARD seam to v1.26.0 ([[project_image_signing_cve_loop]]), NOT built here.
+  **Observability (D5, added 2026-08-10):** surface e2e in Grafana via the CVE-loop seam — harness writes
+  a `k3dm.k3d.io/e2e-result=true` ConfigMap (same JSON summary), extend `vulnerability-inventory-exporter`
+  to emit `e2e_*` metrics, add a dashboard row (deploy via `argocd.sh`). Stack = Prometheus+Pushgateway+
+  Loki; **no Tempo → span tracing is a separate forward milestone, out of scope.**
 - **v1.26.0 = image signing + attestation — close the CVE loop (SCOPED 2026-08-10, not started).**
   Spec `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. Adds the missing latch to scan→remediate→
   pin→deploy: **cosign sign + Trivy vuln/SBOM attest at build; verify at promotion AND admission.**
