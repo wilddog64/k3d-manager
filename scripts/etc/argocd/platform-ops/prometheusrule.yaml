@@ -61,16 +61,58 @@ spec:
           annotations:
             summary: "Trivy Operator scan jobs are failing"
             description: "At least one Trivy Operator scan job in namespace trivy-system has failed within the last 10 minutes"
+        # Only images we build (wilddog64/*) can be auto-remediated by the
+        # event-driven app-cve-scan loop, so only those carry the
+        # remediation=cve-auto-patch label that routes to the remediate/analyze
+        # webhooks. Upstream/third-party images are split into a separate rule
+        # below that routes quietly (dashboard-only) — otherwise every upstream
+        # CVE floods Slack with a non-actionable "will attempt promotion/rebuild"
+        # notification. namespace is NOT a usable discriminator here: the
+        # exporter attributes every image to platform-ops.
         - alert: TrivyCriticalVulnerabilityDetected
           expr: |
-            sum by (namespace, image_repository) (
-              trivy_image_vulnerabilities{severity="Critical"}
+            sum by (cluster, namespace, image_repository) (
+              trivy_vulnerability_inventory{severity="CRITICAL", image_repository=~"wilddog64/.*"}
             ) > 0
           for: 15m
           labels:
             severity: critical
             group: trivy-operator
             remediation: cve-auto-patch
+            # The notification webhook historically renders .Labels.app. Keep
+            # that field populated from the canonical image label so alerts do
+            # not arrive as "app ''" when no workload app label exists.
+            app: "{{ $labels.image_repository }}"
           annotations:
             summary: "Critical CVE(s) detected in a running image"
             description: "{{ $value }} critical vulnerabilities in {{ $labels.image_repository }} (ns {{ $labels.namespace }}); event-driven app-cve-scan will attempt promotion/rebuild."
+        - alert: TrivyCriticalVulnerabilityDetected
+          expr: |
+            sum by (cluster, namespace, image_repository) (
+              trivy_vulnerability_inventory{severity="CRITICAL", image_repository!="", image_repository!~"wilddog64/.*"}
+            ) > 0
+          for: 15m
+          labels:
+            severity: warning
+            group: trivy-operator
+            remediation: none
+            tier: upstream
+            app: "{{ $labels.image_repository }}"
+          annotations:
+            summary: "Critical CVE(s) in an upstream image (not auto-remediable)"
+            description: "{{ $value }} critical vulnerabilities in third-party image {{ $labels.image_repository }} (ns {{ $labels.namespace }}); visible in the CVE inventory dashboard. No auto-patch — track upstream."
+        - alert: CVERemediationInFlight
+          expr: |
+            max by (image_repository) (
+              label_replace(
+                cve_remediation_state{state="promotion_requested", image_repository!=""},
+                "image_repository", "$1", "image_repository", "(?:[^/]+/)?([^/]+/[^/]+)"
+              )
+            ) == 1
+          for: 0m
+          labels:
+            group: cve-remediation
+            severity: none
+          annotations:
+            summary: "CVE auto-patch in flight for {{ $labels.image_repository }}"
+            description: "An auto-patch promotion is in flight for {{ $labels.image_repository }}; TrivyCriticalVulnerabilityDetected for this image is inhibited until the promotion completes."

@@ -208,7 +208,7 @@ def _acg_stack_probe(provider):
 from collections import OrderedDict  # noqa: E402
 _seen_event_ids: "OrderedDict[str, float]" = OrderedDict()
 _SEEN_EVENT_MAX = 2048
-GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-3.5-flash-medium")
 # k8s API context for ESO checks — initialized at startup before NEF loads (see _init_k8s_ctx)
 _k3d_ssl_ctx = None
 _k3d_server = None
@@ -318,6 +318,16 @@ def _request_actor(headers):
 def _request_source_command(headers):
     source_command = (headers.get("X-K3DM-Source-Command", "") or "").strip()
     return source_command or "direct-api"
+
+
+def _content_length(headers):
+    """Parse Content-Length as a non-negative int; return None if malformed."""
+    raw = headers.get("Content-Length", "0")
+    try:
+        length = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return length if length >= 0 else None
 
 
 def _role_allows(actual_role, required_role):
@@ -1758,10 +1768,10 @@ def _smoke_test_logins(provider, app_context):
 
     graf_user = (os.environ.get("K3DM_SMOKE_GRAFANA_USER")
                  or _smoke_secret("monitoring", "admin-user",
-                                  "acg-kube-prometheus-stack-grafana", context=app_context)
+                                  "grafana-admin-credentials")
                  or "admin")
     graf_pass = os.environ.get("K3DM_SMOKE_GRAFANA_PASS") or _smoke_secret(
-        "monitoring", "admin-password", "acg-kube-prometheus-stack-grafana", context=app_context)
+        "monitoring", "admin-password", "grafana-admin-credentials")
     if not graf_pass:
         results.append(("Grafana login", None, "no credentials (acg-kube-prometheus-stack-grafana absent; set K3DM_SMOKE_GRAFANA_PASS)"))
     else:
@@ -2572,14 +2582,21 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             return
 
         for alert in firing:
-            app_name = alert.get("labels", {}).get("name", "")
-            alert_name = alert.get("labels", {}).get("alertname", "unknown")
-            _log(f"=== {alert_name}: {app_name} ===\n")
+            labels = alert.get("labels", {})
+            argocd_app = labels.get("name", "")
+            display_name = (
+                argocd_app
+                or labels.get("app")
+                or labels.get("image_repository", "")
+                or "unknown"
+            )
+            alert_name = labels.get("alertname", "unknown")
+            _log(f"=== {alert_name}: {display_name} ===\n")
 
             diag_parts = []
-            if app_name:
+            if argocd_app:
                 desc_out, desc_timeout = _posix_spawn_capture(
-                    ["kubectl", "describe", "application", app_name, "-n", "cicd"],
+                    ["kubectl", "describe", "application", argocd_app, "-n", "cicd"],
                     timeout=15,
                 )
                 if not desc_timeout and desc_out.strip():
@@ -2602,7 +2619,7 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             prompt = (
                 f"You are a Kubernetes operations expert. Analyze this alert and give a "
                 f"concise diagnosis (2-3 sentences) and the single most likely fix.\n\n"
-                f"Alert: {alert_name} on app '{app_name}'\n\n"
+                f"Alert: {alert_name} on app '{display_name}'\n\n"
                 f"Diagnostics:\n{diagnostics}"
             )
             analysis = _call_gemini(prompt)
@@ -2611,7 +2628,7 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             notify_url = response_url or SLACK_WEBHOOK_URL
             if notify_url:
                 _slack_post(notify_url,
-                    f"🔍 *{alert_name}* — `{app_name}`\n{analysis}")
+                    f"🔍 *{alert_name}* — `{display_name}`\n{analysis}")
 
         _finish("success")
     except Exception as exc:
@@ -3015,16 +3032,19 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if _rate_limited("slack" if self.path == "/slack/events" else "api"):
-            self._json(429, {"error": "rate limited"})
-            return
         if self.path == "/slack/events":
-            length = int(self.headers.get("Content-Length", 0))
+            length = _content_length(self.headers)
+            if length is None:
+                self._json(400, {"error": "invalid content-length"})
+                return
             raw_body = self.rfile.read(min(length, MAX_BODY))
             timestamp = self.headers.get("X-Slack-Request-Timestamp", "0")
             signature = self.headers.get("X-Slack-Signature", "")
             if not _verify_slack_signature(raw_body, timestamp, signature):
                 self._json(401, {"error": "invalid signature"})
+                return
+            if _rate_limited("slack"):
+                self._json(429, {"error": "rate limited"})
                 return
             try:
                 event = json.loads(raw_body)
@@ -3110,8 +3130,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if self.path.startswith("/api/") and not self.path.startswith("/api/v1/"):
             self._json(400, {"error": "invalid api path"})
             return
+        if _rate_limited("api"):
+            self._json(429, {"error": "rate limited"})
+            return
 
-        length = int(self.headers.get("Content-Length", 0))
+        length = _content_length(self.headers)
+        if length is None:
+            self._json(400, {"error": "invalid content-length"})
+            return
         if length > MAX_BODY:
             self._json(413, {"error": "request too large"})
             return
@@ -3383,11 +3409,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_GET(self):
-        if _rate_limited("api"):
-            self._json(429, {"error": "rate limited"})
-            return
         if not self._auth():
             self._json(401, {"error": "unauthorized"})
+            return
+        if _rate_limited("api"):
+            self._json(429, {"error": "rate limited"})
             return
         if self.path.startswith("/api/") and not self.path.startswith("/api/v1/"):
             self._json(400, {"error": "invalid api path"})

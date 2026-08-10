@@ -1,55 +1,79 @@
 # Active Context — k3d-manager
 
-> **Compressed 2026-08-07.** This file holds only the *live* focus + carried-forward
-> blockers. Completed-work detail lives in `CHANGELOG.md`, `docs/retro/`, `docs/issues/`,
-> `docs/plans/release-split-intent-map.md`, and git history (pre-compression versions of
-> this file are recoverable via `git log --follow memory-bank/activeContext.md`).
+> **Compressed 2026-08-09.** Live focus + carried-forward blockers only. Shipped detail lives in
+> `CHANGELOG.md` (v1.23.0 section), `docs/retro/`, `docs/issues/`, `docs/bugs/`,
+> `docs/plans/release-split-intent-map.md`, and git history (`git log --follow memory-bank/`).
 
-## Current focus — v1.22.0 OpenLDAP release (PR #111)
+## Current focus — v1.23.0 PR #112 OPEN, gates passed, awaiting user merge
 
-- **PR #111 OPEN → main — ALL GATES GREEN, READY TO MERGE, prepare-and-stop for user go.**
-  https://github.com/wilddog64/k3d-manager/pull/111 · head `627a6d4d` · base main `f68bdee1`.
-  Theme: migrate OpenLDAP off the retired `bitnamilegacy` image (66 criticals) to the Symas
-  `jp-gouin/openldap-stack-ha` chart 4.3.3; service/ports pinned (`openldap.identity.svc:389`)
-  so the cutover is transparent. Delimiter-safe (hex) chart passwords; durable Vault-seeded
-  platform users; Keycloak/Jenkins/ArgoCD/rotator reconciled. Live-verified (Symas running,
-  `developer` login through Keycloak, Jenkins LDAP auth). `ldap_chart_passwords` BATS 2/2,
-  shellcheck clean. **CI green** (CI/CodeQL/Analyze×4/GitGuardian/lint). **Copilot: 3 findings
-  addressed** (`627a6d4d`) — base64 `-d`→`--decode` FIXED; LDIF mount path
-  `/ldif_import`→`/ldifs/bootstrap.ldif` FIXED (verified live, post-deploy import had silently
-  no-op'd); notifier ClusterRole DECLINED with ordering justification (`platform-ops` not owned
-  by `deploy_ldap`) — all 3 threads resolved. Doc: `docs/issues/2026-08-07-copilot-pr111-review-findings.md`.
-  **enforce_admins NOT yet disabled — do that only at merge time to minimize the unprotected
-  window; then `/post-merge` (tag `v1.22.0`, re-enable enforce_admins, retro).**
-- **Branch is the clean OpenLDAP-only re-cut.** The old 142-commit integration branch is
-  archived intact at `origin/archive/k3d-manager-v1.22.0-integration` (`03ed9ad6`) — verified
-  byte-identical before the `--force-with-lease` that replaced `origin/k3d-manager-v1.22.0`
-  with the 5-commit re-cut. Nothing lost. Split rationale + file map: `docs/plans/release-split-intent-map.md`.
-- **⚠️ Note for v1.23.0:** `origin/k3d-manager-v1.23.0` already exists and carries a *duplicate*
-  OpenLDAP commit (`b30f7898`). It collapses away once v1.22.0 merges to main and v1.23.0 is
-  rebased. Not a v1.22.0 concern; flag when cutting task #7.
-- **After merge:** `/post-merge` (tag `v1.22.0`, re-enable enforce_admins, retro), then cut v1.23.0.
+- **PR [#112](https://github.com/wilddog64/k3d-manager/pull/112) is OPEN and merge-ready**
+  (head `9c55e81a`). All gates passed: CI green, Copilot's 3 findings fixed + threads resolved
+  (0 unresolved), Copilot re-review of the folded-in alert-noise commit clean. **`enforce_admins`
+  is DISABLED** — user can merge. Do NOT auto-merge. Copilot findings (all fixed `9f319630`):
+  Vault token off `curl` argv → mktemp header file; exporter `/tmp` emptyDir for ro-rootfs; vault.sh
+  `mount_path` `printf %q`. Findings doc `docs/issues/2026-08-09-copilot-pr112-review-findings.md`.
+- **Folded into PR #112 (`9c55e81a`): TrivyCritical upstream-CVE noise fix.** Live hub: 39 firing
+  `TrivyCriticalVulnerabilityDetected`, only 1 (`wilddog64/shopping-cart-payment`) auto-remediable;
+  38 third-party images the app-cve-scan loop can't rebuild flooded Slack. Split the alert by image
+  ownership — only `wilddog64/*` keeps `remediation: cve-auto-patch`; upstream gets a `tier: upstream`
+  rule routed to a new `k3dm-quiet` blackhole receiver (still on the dashboard, no Slack). Also fixed
+  the analyze Slack title (`labels["name"]` → empty; now `app`/`image_repository` fallback). Spec
+  `docs/bugs/v1.23.0-bugfix-trivy-critical-upstream-image-alert-noise.md`. ⚠️ namespace is NOT a usable
+  discriminator — exporter attributes every image to `platform-ops`. **Follow-up (v1.24.0):** headless
+  `_call_gemini` analyze still posts "no output produced — command permission auto-denied" for the
+  surviving ours-alert; needs an agy no-tools/permission decision.
 
-## Pending releases (from the integration split — see intent map for files + full detail)
+- **Original scope** off `k3d-manager-v1.23.0`. Scope = workstreams **B** (CVE inventory dashboard + `vulnerability-inventory-exporter`)
+  + **C** (remediation-lifecycle verifier), plus the **pulled-forward Grafana admin credential
+  rotation slice** (E — see intent map §E; v1.24.0 must SKIP the Grafana slice) and adjacent
+  live-ops bugfixes (agy model drift, webhook rate-limit-after-auth + Content-Length, LDAP rotator
+  image re-pin). Full change list = `CHANGELOG.md` [1.23.0]. Both intent-map carried-forward v1.23.0
+  items are **resolved**: dashboard is live at **Codex 1:1** (`06a0416e`, user preferred the 4-table
+  view over the "by image" regroup); payment digest-mismatch closed by the multi-arch verifier fix
+  (`33b45a41`).
+- **All B+C work is LIVE-VERIFIED end-to-end on the hub** (2026-08-09): verifier flips
+  matching-digest payment events `promotion_requested → applied`; `CVERemediationInFlight` fires and
+  Alertmanager marks the paired payment TrivyCritical `suppressed`/`inhibitedBy`, lifting ~16s after
+  completion. `label_replace` normalization (strip `ghcr.io/`) confirmed live for all 3 sc services.
 
-- **v1.23.0 = CVE observability + remediation lifecycle (workstreams B+C).** Carried blockers:
-  apply CVE dashboard v18 live (Hub tunnel `127.0.0.1:57780`); close out payment `manual_review`
-  digest-mismatch event (verify or document as expected). `observability.sh` needs per-hunk split
-  from workstream E. Also carries the `app-cve-scan` nonzero-exit/pod-label spec
-  (`docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`).
-- **v1.24.0 = platform hardening (D webhook + E credential rotation + F istio/hostinger + unseal watchdog).**
-  Carried blocker: recurring rotation automation exists ONLY for LDAP+Grafana — ArgoCD/Prometheus/
-  Alertmanager were rotated once by hand; per-service automation NOT built.
-- **v1.25.0 = Stripe/Go live acceptance + hostinger capacity (workstream G, BLOCKED, cross-repo).**
-  Carried blockers: merge order-repo `0e3feb9` schema fix (`order_items.total_price NOT NULL`) +
-  promote image → rerun Stripe live E2E acceptance (currently 2/4, Stripe cases fail on schema);
-  hostinger 2-CPU capacity expansion (right-sizing is a stopgap).
+### Post-merge checklist (Claude-owned)
+- Reapply platform-ops durably: `argocd.sh deploy_argocd_platform_ops` (the prometheusrule /
+  alertmanager-config / verify-script CM were applied **directly** for verification only — inert on
+  the branch until deployed). Dashboard ApplicationSets (`grafana-dashboards-hub`/`-acg`) already
+  track `k3d-manager-v1.23.0`; confirm with `argocd_check_values_branch`. Hub ArgoCD ns = **`cicd`**.
+- Tag `v1.23.0`, restore `enforce_admins`, write retro, cut `k3d-manager-v1.24.0`.
 
-## Recently shipped (pointers only)
+## Deferred — NOT v1.23.0-gating (carry forward)
 
-- **v1.21.0** RELEASED — k3dm-webhook security hardening. PR #110 merged `f68bdee1`, tagged. (CHANGELOG)
-- **v1.20.0** RELEASED — CVE auto-patch-loop hardening. PR #109 merged `9da73458`, tagged. (CHANGELOG + retro)
-- **Stripe checkout A–F** all MERGED to main across the 5 shopping-cart repos (2026-08-02); enablement
-  PRs (#47/#66) merged; payment side live on hostinger. Remaining *live acceptance* work is workstream
-  G above (v1.25.0). Deep saga detail is in git history + `docs/issues/2026-08-02-*`.
-- Branch-protection approval count restored (`0→1`) on shopping-cart-infra #89 + order #63 (task #4, done).
+- **Order remediation `ready_pod_digest_mismatch` — needs a design decision (task #18).** The
+  promoter (`app-cve-scan.sh:289`) deploys the patched image by patching the **live ArgoCD
+  Application** `spec.source.kustomize.images`, not git → ephemeral (any appset reconcile wipes it).
+  order's override is EMPTY and its promotion event has `candidate`/`to_tag`/`from_digest` all empty →
+  the promoter never resolved a clean immutable `sha-*` candidate for order (order is bare-tag /
+  `IfNotPresent`). Two durable fixes to weigh: (a) persist promotions to git; (b) close order's
+  rebuild→clean-image loop. product-catalog + payment work; order is the outstanding case.
+- **Dashboard parts (b)+(c) superseded.** Spec
+  `docs/plans/v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md` (CVE-ID panel + KSM
+  `metricLabelsAllowlist` job-target labeling) was written before the full revert to Codex 1:1
+  (`06a0416e`). Re-scope against the Codex dashboard before ever executing; not part of this release.
+- **Leftover carry:** `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`;
+  `observability.sh` per-hunk split from workstream E — both → v1.24.0.
+
+## Pending releases (from the integration split — files + detail in the intent map)
+
+- **v1.24.0 = platform hardening (D webhook + E credential rotation + F istio/hostinger + unseal
+  watchdog).** ⚠️ SKIP the Grafana rotation slice (shipped early in v1.23.0). Remaining E = recurring
+  rotation automation for **ArgoCD / Prometheus / Alertmanager** (only LDAP + Grafana automated;
+  the rest were hand-rotated once).
+- **v1.25.0 = Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo).** Merge
+  order-repo `0e3feb9` schema fix (`order_items.total_price NOT NULL`) + promote image → rerun Stripe
+  live E2E (2/4 now); hostinger 2-CPU capacity expansion (right-sizing is a stopgap).
+
+## Recently shipped (pointers only — detail in CHANGELOG + retro)
+
+- **v1.22.0** RELEASED — OpenLDAP bitnami→Symas migration. PR #111 `1bbb74b0`, tagged. Retro
+  `docs/retro/2026-08-07-v1.22.0-retrospective.md`.
+- **v1.21.0** RELEASED — webhook security hardening. PR #110 `f68bdee1`, tagged.
+- **v1.20.0** RELEASED — CVE auto-patch-loop hardening. PR #109 `9da73458`, tagged.
+- Stripe checkout A–F all MERGED to main across the 5 shopping-cart repos (2026-08-02); payment side
+  live on hostinger. Remaining live-acceptance work = v1.25.0 (workstream G).

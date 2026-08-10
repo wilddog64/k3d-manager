@@ -1450,6 +1450,12 @@ EOF
       --namespace platform-ops \
       --dry-run=client -o yaml | _kubectl apply -f -
 
+   _info "[argocd] Deploying CVE remediation verify script ConfigMap..."
+   _kubectl create configmap cve-remediation-verify-script \
+      --from-file=cve-remediation-verify.sh="${_dir}/cve-remediation-verify.sh" \
+      --namespace platform-ops \
+      --dry-run=client -o yaml | _kubectl apply -f -
+
    _info "[argocd] Deploying notification Secret scaffold..."
    NOTIFICATION_FROM="${NOTIFICATION_FROM:-argocd-cve@k3d-manager}" \
    SENDGRID_API_KEY="${SENDGRID_API_KEY:-}" \
@@ -1475,6 +1481,13 @@ EOF
 
    _info "[argocd] Deploying AlertmanagerConfig..."
    _kubectl apply -f "${_dir}/alertmanager-config.yaml"
+
+   _info "[argocd] Deploying vulnerability inventory exporter..."
+   _kubectl apply -f "${_dir}/vulnerability-inventory-exporter.yaml"
+   _kubectl rollout restart deployment/vulnerability-inventory-exporter -n platform-ops >/dev/null 2>&1 || true
+
+   _info "[argocd] Deploying CVE auto-patch Grafana dashboard..."
+   _kubectl apply -f "${_dir}/grafana-dashboard-cve-autopatch.yaml"
 
    _info "[argocd] Syncing secrets from Keychain (DR — see argocd_sync_webhook_token_secret / argocd_sync_app_rebuild_secret)..."
    argocd_sync_webhook_token_secret cicd
