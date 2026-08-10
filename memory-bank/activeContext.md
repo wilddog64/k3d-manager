@@ -114,9 +114,20 @@
     `ignoreDifferences` for istiod `ValidatingWebhookConfiguration` caBundle/failurePolicy
     (controller-owned runtime state). `k3s-hostinger.sh`: `AMBIENT_CNI_CONF_DIR`/`_BIN_DIR` pointing
     the Istio CNI DaemonSet at k3s/flannel paths (not Cilium defaults). `shopping-cart.yaml.tmpl` +7.
-  - **E — the only genuinely UN-built work:** recurring rotation automation for **ArgoCD / Prometheus /
-    Alertmanager** (LDAP + Grafana are the only automated ones; these three were hand-rotated once —
-    needs per-service consumer design). Includes the `observability.sh` per-hunk E carry.
+  - **E — REWRITTEN 2026-08-10 after live discovery (was ArgoCD/Prometheus/Alertmanager, now
+    ArgoCD + Prometheus).** User chose "ArgoCD-only (Rec)" then added Prometheus after finding its
+    basic-auth is the weak `admin/password`. Live facts: **ArgoCD** = the only genuine persistent
+    in-cluster hub credential (`argocd-secret`.admin.password bcrypt) → clean in-cluster CronJob rotator;
+    `argocd account bcrypt` reads stdin (no argv leak), reuse it. **Alertmanager** = host-side launchd
+    proxy cred (plaintext Vault → local env → python proxy :9093), no in-cluster consumer → **DROPPED
+    from E.** **Prometheus** = NOT enforced on hub (empty web-config, localhost port-forward); weak
+    `admin/password` applied only to ACG sandboxes via host deploy; `alpine/k8s` image has no
+    htpasswd/openssl/bcrypt → recurring rotation is **host-side launchd timer**, not a CronJob. The
+    `observability.sh` per-hunk E carry is **VACUOUS** (empty main..archive diff) — dropped. **New bugfix
+    filed:** `docs/bugs/v1.24.0-bugfix-prometheus-weak-basic-auth-default.md` (kill the bcrypt('password')
+    literal + `:-password` default; htpasswd -i strong gen; self-heal the live weak value; do the bugfix
+    FIRST). E spec fully rewritten in `docs/plans/v1.24.0-credential-rotation-automation.md`.
+    Live weak value CONFIRMED: hub Vault `secret/k3d-manager/prometheus-basic-auth` = admin/password.
   - **Fold-ins (all four, per user):** agy `_call_gemini` headless command-permission fix (v1.23.0
     follow-up); `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` (already
     filed); order remediation promoter decision (task #18); observability.sh E carry (above).

@@ -82,8 +82,12 @@ still errors ("no output produced — command permission auto-denied") for the s
       only to archive).
       **STATUS 2026-08-10:** D `3fddcf3e` + hostinger-truncation `8eb8cc34` + F `357edf52` + #18 `3df62fbf`
       all pushed + Claude-verified (archive-revert guard intact, `bats`=`1..53` 0 fail). **E rotation
-      automation is the only remaining code slice — NOW ACTIVE** (`v1.24.0-credential-rotation-automation`;
-      has open design decisions — see activeContext). Then agy headless bug doc + two live verifications + PAT seed.
+      automation is the only remaining code slice — NOW ACTIVE** (`v1.24.0-credential-rotation-automation`).
+      **E REWRITTEN 2026-08-10 after live discovery: ArgoCD in-cluster rotator + Prometheus host-side rotation;
+      Alertmanager DROPPED (host-side proxy cred); observability.sh carry VACUOUS (dropped).** New cap-exempt
+      bugfix filed `docs/bugs/v1.24.0-bugfix-prometheus-weak-basic-auth-default.md` (weak admin/password
+      confirmed live) — do the bugfix FIRST, then the rotators. Then agy headless bug doc + two live
+      verifications + PAT seed.
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger
       capacity expansion.
