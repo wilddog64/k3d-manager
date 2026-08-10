@@ -8,7 +8,7 @@
 
 | Version | Theme | State |
 |---|---|---|
-| v1.23.0 | CVE observability + remediation lifecycle (B+C) | **PR #112 OPEN, merge-ready** — head `9c55e81a`; CI green, Copilot 3 findings fixed+resolved, `enforce_admins` DISABLED, awaiting user merge |
+| v1.23.0 | CVE observability + remediation lifecycle (B+C) | RELEASED — PR #112 `7253ece4`, tagged v1.23.0; platform-ops deployed live (alert-noise split active), webhook restarted, `enforce_admins` restored |
 | v1.22.0 | OpenLDAP bitnami→Symas migration | RELEASED — PR #111 `1bbb74b0`, tagged |
 | v1.21.0 | k3dm-webhook security hardening | RELEASED — PR #110 `f68bdee1`, tagged |
 | v1.20.0 | CVE auto-patch-loop hardening | RELEASED — PR #109 `9da73458`, tagged |
@@ -17,10 +17,14 @@
 
 (v1.19.0 was a shopping-cart-only Dependabot milestone — no k3d-manager tag.)
 
-## In flight — v1.23.0 (PR pending)
+## Shipped — v1.23.0 (RELEASED 2026-08-09)
 
-All B+C code + the pulled-forward Grafana slice is committed, pushed, and LIVE-VERIFIED end-to-end on
-the hub. Full change list = `CHANGELOG.md` [1.23.0]. Shipped work (SHA pointers):
+PR #112 merged (`7253ece4`), tagged v1.23.0. Post-merge close-out done: `deploy_argocd_platform_ops`
+applied live (TrivyCritical ownership split + `k3dm-quiet` blackhole route confirmed live on the hub),
+`make restart-webhook` loaded the Slack-title fix, `argocd_check_values_branch` = all 6 apps on
+`k3d-manager-v1.23.0`, `enforce_admins` restored, retro at
+`docs/retro/2026-08-09-v1.23.0-retrospective.md`. Full change list = `CHANGELOG.md` [1.23.0].
+Shipped work (SHA pointers):
 
 - Verifier: multi-arch spec-digest fix `33b45a41`; payment-namespace `_namespace_for` `8a8566e8`;
   event GC `9168edd7`; carry-forward + alpine/k8s re-pin + argocd.sh wiring `33b151ba`.
@@ -34,9 +38,10 @@ the hub. Full change list = `CHANGELOG.md` [1.23.0]. Shipped work (SHA pointers)
 - Adjacent: LDAP rotator alpine/k8s re-pin `ddc68c90`; webhook rate-limit-after-auth + Content-Length
   `ee32837d`; agy model-id retirement `8e7a5c79` (webhook) + `612ca86d` (gemini.sh/antigravity.bats).
 
-**Post-merge (Claude):** `argocd.sh deploy_argocd_platform_ops` (durable platform-ops apply — files are
-inert on the branch until then); confirm dashboard appsets track v1.23.0 (`argocd_check_values_branch`);
-tag `v1.23.0`; restore `enforce_admins`; retro; cut `k3d-manager-v1.24.0`.
+**Post-merge (Claude) — DONE 2026-08-09:** platform-ops deployed live; dashboard appsets confirmed on
+v1.23.0; tagged `v1.23.0` + GitHub release; `enforce_admins` restored; retro written; webhook restarted;
+`k3d-manager-v1.24.0` cut from `7253ece4`. Remaining v1.24.0 follow-up: headless `_call_gemini` analyze
+still errors ("no output produced — command permission auto-denied") for the surviving ours-alert.
 
 ## Deferred — NOT v1.23.0-gating
 
