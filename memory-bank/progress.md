@@ -105,6 +105,14 @@ still errors ("no output produced — command permission auto-denied") for the s
       basket/catalog/order URLs + oauth flag). `workflow_call` added to `shopping-cart-e2e-tests`; new
       `scripts/plugins/e2e.sh` (`e2e_verify_vcluster`/`e2e_verify_sandbox`) reusing `vcluster_*` prims.
       Exit-code + JSON-summary contract seeds the v1.26.0 promotion gate ([[project_image_signing_cve_loop]]).
+      **+ plan doc #2 `v1.25.0-e2e-observability-path-a.md` (implementation-grade):** surface e2e in
+      Grafana by reusing the CVE exporter seam — harness writes `k3dm.k3d.io/e2e-result=true` ConfigMap
+      (the JSON summary); extend `vulnerability-inventory-exporter.py` (exact blocks) to emit
+      `e2e_run_info`/`e2e_last_run_pass`/`e2e_last_run_timestamp_seconds`/`e2e_last_run_duration_seconds`/
+      `e2e_last_success_timestamp_seconds` (gauges, aggregated in Python); new `grafana-dashboard-e2e.yaml`;
+      `E2EVerificationFailing`/`Stale` rules; deploy via `argocd.sh` + rollout-restart; NO RBAC widening
+      (existing Role already get/list configmaps in platform-ops); writer prunes N=20/service+tier. No new
+      component; no Tempo (span tracing = separate forward theme).
 - [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED 2026-08-10, not started).
       Spec `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + Trivy vuln/SBOM attest
       at build; `cosign verify` at promotion (promoter gate) AND admission (Kyverno, staged Audit→Enforce,
