@@ -94,6 +94,11 @@ still errors ("no output produced — command permission auto-denied") for the s
 
 ## Backlog (not release-gated)
 
+- [ ] **Secure Vault remote access (QUEUED — after Codex's v1.24.0 assignment)** — expose Vault UI via
+      laptop cloudflared `vault.3ai-talk.org` behind Cloudflare Access + MFA (Google IdP / Authenticator
+      TOTP); Access-app-before-ingress ordering; Vault audit device on; root token laptop-only. Filing:
+      `docs/howto/secure-vault-remote-access-cloudflare-access.md` (decision pending). Auto-memory
+      `project_secure_vault_remote_access`. No changes made yet.
 - [ ] Shopping-cart Dependabot backlog (Go builder-image bumps, majors held) — auto-memory
       `project_backlog.md`.
 - [ ] rabbitmq-client-java NPE fix `36ed860` — JAR publish + pom update pending.

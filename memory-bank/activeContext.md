@@ -25,6 +25,26 @@
   are code-complete and pushed.** Remaining v1.24.0 work: **E rotation automation** (now the active task),
   agy headless bug doc (`agy --help` discovery), the two Claude-owned live verifications, PAT seed.
 
+### QUEUED (do NOT start until Codex finishes his v1.24.0 assignment) — secure Vault remote access
+
+- **Trigger 2026-08-10:** user cannot reach Vault from office (SSH blocked, browser/HTTPS-only machine).
+  Investigation found Vault is fully healthy (pod `1/1`, unsealed, local `:18200` → 200) but has **no
+  public path**: not in the laptop cloudflared ingress, no VirtualService, and the only remote path is a
+  reverse SSH tunnel (`com.k3d-manager.ssh-tunnel`, autossh `-R 8200:127.0.0.1:18200 ubuntu@srv1754834.hstgr.cloud`)
+  landing on hostinger **loopback** `127.0.0.1:8200` — usable only from on the hostinger box. hostinger
+  cloudflared is `inactive` and has no vault ingress either.
+- **Chosen design (Option B — user-approved direction):** expose the **Vault UI** via the existing laptop
+  cloudflared as `vault.3ai-talk.org → http://localhost:18200`, gated by **Cloudflare Access** with **MFA
+  = Google IdP** (user's Google Authenticator/TOTP is the second factor). Two independent gates: Cloudflare
+  Access (identity+MFA) then Vault's own login (userpass/OIDC — NOT root token).
+- **Non-negotiable build order:** create the Access application + default-deny allow-only-me policy FIRST,
+  THEN add the cloudflared ingress + proxied DNS; verify an anonymous request redirects to Access (never
+  Vault) before trusting. Enable a Vault audit device. Root token stays laptop-only (break-glass).
+- **Filing (decision pending):** proposed `docs/howto/secure-vault-remote-access-cloudflare-access.md`
+  (mostly Cloudflare Zero-Trust dashboard config + one-line tunnel ingress — runbook, not repo code).
+  NOT folded into v1.24.0 (already at 5-plan-doc cap; off-theme). No tunnel/Cloudflare changes made yet.
+  See auto-memory [[project_secure_vault_remote_access]].
+
 - **PR [#112](https://github.com/wilddog64/k3d-manager/pull/112) MERGED** (`7253ece4`), tagged
   **v1.23.0** + GitHub release. Post-merge close-out complete 2026-08-09: `deploy_argocd_platform_ops`
   applied the platform-ops files live and the **TrivyCritical ownership split + `k3dm-quiet` blackhole
@@ -131,7 +151,10 @@
     `secret/k3d-manager/prometheus-basic-auth` overwritten with a 32-char strong password + `$2y$12$`
     bcrypt (token+payload via stdin, no argv leak). Value is now non-weak/non-empty so current unfixed
     code reads it as-is (won't re-seed weak); the bugfix keeps it strong + self-heals. Bugfix code +
-    E rotators still to implement (bugfix FIRST).
+    E rotators still to implement (bugfix FIRST). **Grafana Vault `user`-key gap (noted 2026-08-10):**
+    `secret/observability/grafana` holds only `password` (matches live secret by SHA); `user` key empty.
+    Non-blocking hygiene follow-up recorded in the E spec's "Follow-up note" — NOT in the ArgoCD/Prometheus
+    batch; address when the Grafana rotator YAML is next edited (add `"user":"admin"` to its Vault PUT).
   - **Fold-ins (all four, per user):** agy `_call_gemini` headless command-permission fix (v1.23.0
     follow-up); `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` (already
     filed); order remediation promoter decision (task #18); observability.sh E carry (above).
