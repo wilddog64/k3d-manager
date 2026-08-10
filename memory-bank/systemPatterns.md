@@ -67,10 +67,10 @@ Vault policies must allow each service's service account to read its secrets pat
 
 ## 5) Jenkins Certificate Rotation Pattern
 
-> **Jenkins (sections 5–7) is an optional, legacy demonstration feature** — disabled by default
+> **Jenkins (sections 5–7) is a deprecated demonstration feature** — disabled by default
 > (`ENABLE_JENKINS=0`) and **not deployed** in the current environment. Real CI/CD is GitHub Actions;
-> app delivery is ArgoCD GitOps. These patterns are retained for reference; code retirement is planned
-> for a future release.
+> app delivery is ArgoCD GitOps. These patterns are retained for reference; the Jenkins code is kept
+> but unsupported.
 
 ```
 deploy_jenkins
