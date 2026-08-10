@@ -14,6 +14,7 @@ function deploy_observability() {
       && _info "[observability] Grafana admin credential ExternalSecret applied"
   fi
   _observability_apply_grafana_rotator
+  _observability_install_prometheus_rotator
   # shellcheck disable=SC2016
   if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] Hub ApplicationSet applied — ArgoCD will sync monitoring/trivy-system"
@@ -110,6 +111,27 @@ function _observability_apply_grafana_rotator() {
       "grafana-rotation" "grafana-rotation" \
       || _err "[observability] failed to configure Grafana rotation Vault role"
   fi
+}
+
+function _observability_install_prometheus_rotator() {
+  if ! _is_mac; then
+    return 0
+  fi
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
+    _warn "[observability] launchctl or kubectl not available — skipping Prometheus rotator"
+    return 0
+  fi
+  local _plist_template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.prometheus-credential-rotator.plist.tmpl"
+  local _plist="${HOME}/Library/LaunchAgents/com.k3d-manager.prometheus-credential-rotator.plist"
+  [[ -f "${_plist_template}" ]] || return 0
+  mkdir -p "$(dirname "${_plist}")"
+  sed \
+    -e "s|{{K3D_MANAGER_PATH}}|${SCRIPT_DIR}/../bin/k3d-manager|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_plist_template}" > "${_plist}"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-credential-rotator" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _info "[observability] Prometheus credential rotator installed"
 }
 
 function _observability_install_alertmanager_port_forward() {
@@ -525,6 +547,28 @@ function _observability_generate_prometheus_basic_auth() {
   fi
   _PROM_BASIC_AUTH_BCRYPT="$(printf '%s' "${_PROM_BASIC_AUTH_PASSWORD}" | htpasswd -niBC 12 admin | cut -d: -f2-)"
   [[ -n "${_PROM_BASIC_AUTH_BCRYPT}" ]] || { _err "[observability] failed to generate Prometheus bcrypt"; return 1; }
+}
+
+function observability_rotate_prometheus_basic_auth() {
+  local _vault_addr="http://127.0.0.1:18200"
+  local _vault_token _vault_hdr _prom_payload
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+  _observability_generate_prometheus_basic_auth || { rm -f "${_vault_hdr}"; return 1; }
+  _prom_payload=$(_observability_prometheus_vault_payload "${_PROM_BASIC_AUTH_PASSWORD}" "${_PROM_BASIC_AUTH_BCRYPT}")
+  curl -sf --header "@${_vault_hdr}" --header 'Content-Type: application/json' \
+    --request POST --data "${_prom_payload}" \
+    "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null
+  rm -f "${_vault_hdr}"
+  _prometheus_acg_web_config_secret "${1:-}" || return 1
+  if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
+    curl -sf --max-time 10 -X POST "${SLACK_WEBHOOK_URL}" \
+      -H 'Content-Type: application/json' \
+      -d '{"text":"🔐 Monthly service password rotation completed: Prometheus. Password values are not included."}' >/dev/null || true
+  fi
+  _info "[observability] Prometheus basic-auth rotated and ACG web config reapplied"
 }
 
 function _prometheus_acg_web_config_secret() {

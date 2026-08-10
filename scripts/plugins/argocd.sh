@@ -1415,6 +1415,19 @@ function argocd_sync_git_writer_secret() {
    _no_trace _argocd_apply_secret_from_stdin "${_token}" "${_ns}" "${_name}" git-token
 }
 
+function _argocd_apply_credential_rotator() {
+   local _manifest="${ARGOCD_CONFIG_DIR}/platform-ops/argocd-credential-rotator.yaml"
+   [[ -f "${_manifest}" ]] || return 0
+   _kubectl apply -f "${_manifest}" >/dev/null \
+      && _info "[argocd] ArgoCD monthly credential rotator applied"
+   if declare -f _vault_configure_secret_writer_role >/dev/null 2>&1; then
+      _vault_configure_secret_writer_role "secrets" "vault" \
+         "argocd-credential-rotator" "cicd" "secret" "argocd/admin" \
+         "argocd-rotation" "argocd-rotation" \
+         || _err "[argocd] failed to configure ArgoCD rotation Vault role"
+   fi
+}
+
 function deploy_argocd_platform_ops() {
    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
       cat <<'HELP'
@@ -1511,6 +1524,7 @@ EOF
    argocd_sync_webhook_token_secret cicd
    argocd_sync_app_rebuild_secret platform-ops
    argocd_sync_git_writer_secret platform-ops
+   _argocd_apply_credential_rotator
 
    _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
    _info "[argocd] Secrets still to create manually (no durable local source):"

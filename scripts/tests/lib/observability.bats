@@ -552,3 +552,12 @@ EOF
     run grep -F -- "htpasswd -niBC 12 admin" "${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
     [ "${status}" -eq 0 ]
 }
+
+@test "Prometheus rotation entrypoint and launchd template are value-free" {
+  run grep -F -- 'function observability_rotate_prometheus_basic_auth()' "${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'observability_rotate_prometheus_basic_auth' "${BATS_TEST_DIRNAME}/../../etc/launchd/com.k3d-manager.prometheus-credential-rotator.plist.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'password' "${BATS_TEST_DIRNAME}/../../etc/launchd/com.k3d-manager.prometheus-credential-rotator.plist.tmpl"
+  [ "$status" -ne 0 ]
+}

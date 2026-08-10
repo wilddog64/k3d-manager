@@ -12,6 +12,26 @@ setup() {
   [[ "$output" == *"Usage: deploy_argocd"* ]]
 }
 
+@test "ArgoCD credential rotator is namespaced and least privilege" {
+  local manifest="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/argocd-credential-rotator.yaml"
+  run python3 -c 'import sys,yaml; docs=list(yaml.safe_load_all(open(sys.argv[1]))); assert any(d.get("kind")=="CronJob" for d in docs)' "${manifest}"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'namespace: cicd' "${manifest}"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'resourceNames: ["argocd-secret"]' "${manifest}"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'resourceNames: ["argocd-admin-secret"]' "${manifest}"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'image: docker.io/alpine/k8s:1.31.4' "${manifest}"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'schedule: "0 0 1 * *"' "${manifest}"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'argocd account bcrypt' "${manifest}"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'cluster-admin' "${manifest}"
+  [ "$status" -ne 0 ]
+}
+
 @test "deploy_argocd skips when CLUSTER_ROLE=app" {
   CLUSTER_ROLE=app run deploy_argocd
   [ "$status" -eq 0 ]
