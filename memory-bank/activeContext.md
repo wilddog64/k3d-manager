@@ -71,10 +71,14 @@
   - **Fold-ins (all four, per user):** agy `_call_gemini` headless command-permission fix (v1.23.0
     follow-up); `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` (already
     filed); order remediation promoter decision (task #18); observability.sh E carry (above).
-  - **Planned doc set (≤5 plan-doc cap):** 4 plan docs — `v1.24.0-webhook-auth-reconcile` (D),
-    `v1.24.0-istio-hostinger-drift-reconcile` (F), `v1.24.0-credential-rotation-automation` (E +
-    observability.sh carry), `v1.24.0-order-remediation-promoter` (task #18); + 2 `docs/bugs/`
-    (cap-exempt): new agy-headless-permission bugfix, and the existing app-cve-scan bug.
+  - **Specs WRITTEN `8ceb533d` (≤5 plan-doc cap):** 4 plan docs — `v1.24.0-webhook-auth-reconcile` (D,
+    exact old/new blocks), `v1.24.0-istio-hostinger-drift-reconcile` (F, exact blocks),
+    `v1.24.0-credential-rotation-automation` (E design + observability.sh carry — has open design
+    decisions on bcrypt/htpasswd application + Prom/AM shared-credential), `v1.24.0-order-remediation-promoter`
+    (task #18 DECISION doc: recommends Option B persist-to-git in v1.24.0, defer Option A order-CI
+    sha-tagging to v1.25.0); + `docs/bugs/v1.24.0-bugfix-webhook-gemini-headless-permission.md` (cap-exempt,
+    needs `agy --help` flag discovery) and existing `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
+    Ready for handoff; E + #18 have open decisions the user/impl must resolve first.
   - **Split-execution:** bring archive-only hunks in per-file via
     `git checkout archive/k3d-manager-v1.22.0-integration -- <file>` (per-hunk for shared files);
     `observability.sh` splits across releases so needs per-hunk selection.
