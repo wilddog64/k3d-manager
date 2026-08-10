@@ -56,9 +56,16 @@ still errors ("no output produced — command permission auto-denied") for the s
 
 ## Pending releases (integration-split — full file map + blockers in the intent map)
 
-- [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
-      ⚠️ SKIP the Grafana slice (shipped in v1.23.0). Remaining E = recurring rotation automation for
-      ArgoCD / Prometheus / Alertmanager (only LDAP + Grafana automated).
+- [ ] **v1.24.0** — platform hardening (D+E+F), scope CONFIRMED 2026-08-09 (broad reconcile). Detail +
+      confirmed carry-ins in `activeContext.md`. Doc set (≤5 plan-doc cap): 4 plan docs —
+      `v1.24.0-webhook-auth-reconcile` (D auth.py malformed-input fail-closed + allowlist helper + bats),
+      `v1.24.0-istio-hostinger-drift-reconcile` (F istio ServerSideDiff/ignoreDifferences + hostinger
+      AMBIENT_CNI paths), `v1.24.0-credential-rotation-automation` (E: ArgoCD/Prometheus/Alertmanager
+      recurring rotation + observability.sh carry), `v1.24.0-order-remediation-promoter` (task #18); + 2
+      `docs/bugs/` (cap-exempt): agy `_call_gemini` headless permission fix, existing app-cve-scan bug.
+      ⚠️ SKIP the v1.23.0 Grafana slice. Verified: D/F archive deltas are real live-drift gaps, not forks
+      (`bin/k3dm-webhook:52` imports the live `auth.py`; istio/hostinger fixes applied live, committed
+      only to archive).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger
       capacity expansion.

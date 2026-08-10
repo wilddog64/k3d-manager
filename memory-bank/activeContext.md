@@ -51,10 +51,33 @@
 
 ## Pending releases (from the integration split — files + detail in the intent map)
 
-- **v1.24.0 = platform hardening (D webhook + E credential rotation + F istio/hostinger + unseal
-  watchdog).** ⚠️ SKIP the Grafana rotation slice (shipped early in v1.23.0). Remaining E = recurring
-  rotation automation for **ArgoCD / Prometheus / Alertmanager** (only LDAP + Grafana automated;
-  the rest were hand-rotated once).
+- **v1.24.0 = platform hardening (D+E+F) — scope CONFIRMED 2026-08-09 (broad reconcile).** The intent
+  map's "D+E+F" label was stale: D's webhook hardening mostly shipped in v1.21.0 + v1.23.0 (`ee32837d`),
+  F is on main and live-verified, and E's Grafana slice shipped in v1.23.0 (⚠️ SKIP it). But an
+  archive-vs-main diff found **genuine live-relevant drift** (fixes applied to the live cluster but
+  committed only to `archive/k3d-manager-v1.22.0-integration`), so the user chose the broad reconcile.
+  **Confirmed carry-ins (verified real gaps, not superseded forks):**
+  - **D — webhook auth.py hardening.** `bin/k3dm-webhook:52` imports `_verify_slack_signature` from
+    `scripts/lib/webhook/auth.py` (so the lib IS live). Archive adds malformed-timestamp/body
+    try/except fail-closed to the Slack sig verify + a `_slack_user_is_allowlisted` helper; +102-line
+    `scripts/tests/lib/webhook.bats`. Neither on main.
+  - **F — Istio/hostinger GitOps drift.** `istio-ambient.yaml`: `ServerSideDiff=true` compare-option +
+    `ignoreDifferences` for istiod `ValidatingWebhookConfiguration` caBundle/failurePolicy
+    (controller-owned runtime state). `k3s-hostinger.sh`: `AMBIENT_CNI_CONF_DIR`/`_BIN_DIR` pointing
+    the Istio CNI DaemonSet at k3s/flannel paths (not Cilium defaults). `shopping-cart.yaml.tmpl` +7.
+  - **E — the only genuinely UN-built work:** recurring rotation automation for **ArgoCD / Prometheus /
+    Alertmanager** (LDAP + Grafana are the only automated ones; these three were hand-rotated once —
+    needs per-service consumer design). Includes the `observability.sh` per-hunk E carry.
+  - **Fold-ins (all four, per user):** agy `_call_gemini` headless command-permission fix (v1.23.0
+    follow-up); `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` (already
+    filed); order remediation promoter decision (task #18); observability.sh E carry (above).
+  - **Planned doc set (≤5 plan-doc cap):** 4 plan docs — `v1.24.0-webhook-auth-reconcile` (D),
+    `v1.24.0-istio-hostinger-drift-reconcile` (F), `v1.24.0-credential-rotation-automation` (E +
+    observability.sh carry), `v1.24.0-order-remediation-promoter` (task #18); + 2 `docs/bugs/`
+    (cap-exempt): new agy-headless-permission bugfix, and the existing app-cve-scan bug.
+  - **Split-execution:** bring archive-only hunks in per-file via
+    `git checkout archive/k3d-manager-v1.22.0-integration -- <file>` (per-hunk for shared files);
+    `observability.sh` splits across releases so needs per-hunk selection.
 - **v1.25.0 = Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo).** Merge
   order-repo `0e3feb9` schema fix (`order_items.total_price NOT NULL`) + promote image → rerun Stripe
   live E2E (2/4 now); hostinger 2-CPU capacity expansion (right-sizing is a stopgap).
