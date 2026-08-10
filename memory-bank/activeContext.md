@@ -127,7 +127,11 @@
     filed:** `docs/bugs/v1.24.0-bugfix-prometheus-weak-basic-auth-default.md` (kill the bcrypt('password')
     literal + `:-password` default; htpasswd -i strong gen; self-heal the live weak value; do the bugfix
     FIRST). E spec fully rewritten in `docs/plans/v1.24.0-credential-rotation-automation.md`.
-    Live weak value CONFIRMED: hub Vault `secret/k3d-manager/prometheus-basic-auth` = admin/password.
+    Live weak value CONFIRMED then **CLOSED 2026-08-10 (Claude ops):** hub Vault
+    `secret/k3d-manager/prometheus-basic-auth` overwritten with a 32-char strong password + `$2y$12$`
+    bcrypt (token+payload via stdin, no argv leak). Value is now non-weak/non-empty so current unfixed
+    code reads it as-is (won't re-seed weak); the bugfix keeps it strong + self-heals. Bugfix code +
+    E rotators still to implement (bugfix FIRST).
   - **Fold-ins (all four, per user):** agy `_call_gemini` headless command-permission fix (v1.23.0
     follow-up); `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` (already
     filed); order remediation promoter decision (task #18); observability.sh E carry (above).
