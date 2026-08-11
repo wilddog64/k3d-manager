@@ -1160,7 +1160,13 @@ def _call_gemini(prompt):
             (os.POSIX_SPAWN_OPEN, 1, tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
             (os.POSIX_SPAWN_DUP2, 1, 2),
         ]
-        cmd = [resolved, "--model", GEMINI_MODEL, "--prompt", prompt]
+        guarded = (
+            "You are analyzing pre-collected data in a HEADLESS session with no "
+            "interactive approver. Do NOT run any commands or call any tools — a tool "
+            "call is auto-denied and yields no answer. Answer ONLY from the text below; "
+            "if it is insufficient, say so briefly.\n\n" + prompt
+        )
+        cmd = [resolved, "--model", GEMINI_MODEL, "--prompt", guarded]
         child_pid = os.posix_spawn(
             resolved, cmd, dict(env),
             file_actions=file_actions, setsid=True,
@@ -1183,6 +1189,8 @@ def _call_gemini(prompt):
             time.sleep(0.5)
         raw = Path(tmp_path).read_text(errors="replace").strip()
         Path(tmp_path).unlink(missing_ok=True)
+        if "headless mode" in raw and "auto-denied" in raw:
+            return "agy analysis skipped — headless tool use disabled"
         raw = raw or "agy returned no output"
         # Strip CLI startup banners (Warning: lines)
         raw = re.sub(r'(?m)^Warning:.*\n?', '', raw).strip()
