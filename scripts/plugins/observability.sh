@@ -126,7 +126,7 @@ function _observability_install_prometheus_rotator() {
   [[ -f "${_plist_template}" ]] || return 0
   mkdir -p "$(dirname "${_plist}")"
   sed \
-    -e "s|{{K3D_MANAGER_PATH}}|${SCRIPT_DIR}/../bin/k3d-manager|g" \
+    -e "s|{{K3D_MANAGER_PATH}}|${SCRIPT_DIR}/k3d-manager|g" \
     -e "s|{{HOME}}|${HOME}|g" \
     "${_plist_template}" > "${_plist}"
   launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-credential-rotator" 2>/dev/null || true

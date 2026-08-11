@@ -32,6 +32,22 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "ArgoCD rotator bcrypt is runtime-correct and pod excludes istio sidecar" {
+  local manifest="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/argocd-credential-rotator.yaml"
+  # newline-fed stdin (no trailing newline → argocd account bcrypt fatal EOF)
+  run grep -F -- "printf '%s\\n' \"\$new\"" "${manifest}"
+  [ "$status" -eq 0 ]
+  # strip the 'Password: ' prompt argocd prints to stdout (else the hash is malformed)
+  run grep -F -- "sed 's/^Password: //'" "${manifest}"
+  [ "$status" -eq 0 ]
+  # never pass the password via argv (OWASP A02)
+  run grep -F -- 'account bcrypt --password' "${manifest}"
+  [ "$status" -ne 0 ]
+  # CronJob in cicd (istio-injection=enabled) must opt the pod out of the sidecar mesh
+  run grep -F -- 'sidecar.istio.io/inject: "false"' "${manifest}"
+  [ "$status" -eq 0 ]
+}
+
 @test "deploy_argocd skips when CLUSTER_ROLE=app" {
   CLUSTER_ROLE=app run deploy_argocd
   [ "$status" -eq 0 ]
