@@ -63,6 +63,25 @@
   are code-complete and pushed.** Remaining v1.24.0 work: **E rotation automation** (now the active task),
   agy headless bug doc (`agy --help` discovery), the two Claude-owned live verifications, PAT seed.
 
+### agy headless analyze bugfix — IMPLEMENTED + verified live 2026-08-11 (`69e21e15`)
+
+- Applied both `_call_gemini` blocks (`bin/k3dm-webhook`): prompt-guard prepend + legible auto-deny
+  message. `py_compile` OK, webhook.bats 53/53. **Live smoke:** guarded prompt to
+  `agy --model gemini-3.5-flash-medium` returned real analysis text (OOM-kill diagnosis), NOT the
+  jetski auto-deny string — model answered from context with no tool call. `make restart-webhook` ran
+  (new PID on :7443, health endpoint 401 = up + auth-enforcing). **This was the last open v1.24.0 code
+  slice → v1.24.0 is now code-complete.** Follow-up: update `reference_trivy_critical_upstream_image_noise`
+  "still errors" note once a real `wilddog64/*` TrivyCritical analyze is observed posting real text.
+
+### show-service-passwords — ArgoCD block now reads Vault 2026-08-11 (`33e42905`)
+
+- The ArgoCD rotator exposed a gap: `make show-service-passwords` read `argocd-initial-admin-secret`
+  (install-time, static) → showed a password that no longer logs in after rotation. Fixed the Makefile
+  ArgoCD block to read Vault `secret/data/argocd/admin.password` (mirrors the Grafana `31db9732` +
+  Prometheus blocks). **Verified:** the shown ArgoCD password authenticates to `/api/v1/session`.
+  Prometheus block already reflects rotation (rotate writes plaintext `password` to the same Vault path);
+  Grafana unchanged (not rotated this batch).
+
 ### agy headless analyze bugfix — spec FINALIZED (handoff-ready) 2026-08-10
 
 - Flag discovery DONE (`agy --help`): **no** tool-disable / allowlist / `--approval-mode` flag exists;

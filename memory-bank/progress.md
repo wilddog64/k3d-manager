@@ -108,6 +108,12 @@ still errors ("no output produced — command permission auto-denied") for the s
       now has 2 exact `_call_gemini` old/new blocks (suppression guard + legible auto-deny message).
       Remaining v1.24.0: hand off/implement the agy fix, then Claude-owned live verifications (E deploy +
       rotate/restore, promoter dry-run) + `platform-ops-git-writer` PAT seed, then the release path.
+      **agy fix IMPLEMENTED + verified live 2026-08-11 (`69e21e15`)** — prompt-guard + legible auto-deny;
+      py_compile OK, webhook.bats 53/53, live smoke returns real analysis (no tool call), webhook restarted.
+      **v1.24.0 is now CODE-COMPLETE.** Also `33e42905`: `make show-service-passwords` ArgoCD block now reads
+      Vault `secret/argocd/admin` (was stale `argocd-initial-admin-secret`) — shown password verified to log in.
+      **Remaining before release path: #18 promoter live dry-run/auto-sync verify + seed `platform-ops-git-writer` PAT**
+      (its code is already live from the E full deploy, GIT_WRITE_TOKEN optional/safe). Then CHANGELOG/README/PR gate.
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger
       capacity expansion. **Live deadlock found + stopgapped 2026-08-10:** order/basket wedged
