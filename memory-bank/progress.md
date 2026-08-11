@@ -15,6 +15,14 @@
 
 Live deployment and rotation verification are intentionally deferred to release operations.
 
+**E LIVE HALF DONE 2026-08-11 (`84232cc0`):** rotator deployed + Vault `argocd-rotation` role created via
+`deploy_argocd_platform_ops`; one-shot Job verified live (mtime advanced, clean bcrypt, new password →
+ArgoCD LOGIN SUCCESS); Prometheus host-side launchd agent installed + rotate regenerates a strong cred.
+Live verify caught **4 rotator bugs** in Codex's static commit (`docs/bugs/v1.24.0-bugfix-argocd-rotator-bcrypt-and-istio-sidecar.md`):
+bcrypt no-newline `fatal EOF`; `Password:` stdout prompt in captured hash; istio sidecar deadlock in `cicd`;
+Prometheus launchd `bin/k3d-manager` (nonexistent) → `scripts/k3d-manager`. argocd.bats 17/17, observability.bats 14/14, shellcheck clean.
+⚠️ Full deploy also brought #18 promoter code live (GIT_WRITE_TOKEN `optional:true` → safe fallback); #18 dry-run + PAT seed still pending.
+
 | Work item | Commit | Status |
 |---|---|---|
 | Webhook auth fail-closed + Slack allowlist enforcement | `3fddcf3e` | pushed to `origin/k3d-manager-v1.24.0`; py_compile and 52 BATS tests pass |

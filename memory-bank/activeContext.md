@@ -25,6 +25,26 @@
   value-free, ArgoCD least-privilege gates). **E static half code-complete + verified.** Live half
   (deploy ArgoCD rotator, create `argocd-rotation` Vault role, one-shot rotate+restore verify, install
   host Prometheus launchd timer) remains Claude-owned release ops.
+- **E LIVE HALF DONE 2026-08-11 — and live verify caught 4 real rotator bugs Codex's static commit missed**
+  (bugfix `84232cc0`, spec `docs/bugs/v1.24.0-bugfix-argocd-rotator-bcrypt-and-istio-sidecar.md`):
+  (1) `argocd account bcrypt` fed via `printf '%s'` (no newline) → `fatal EOF` exit 20; fix `printf '%s\n'`.
+  (2) `argocd account bcrypt` prints its `Password: ` prompt to **stdout** → captured hash was malformed
+  (would corrupt `argocd-secret` + break login); fix `| sed 's/^Password: //'`. (3) CronJob in `cicd`
+  (istio-injection=enabled) gets an istio-proxy sidecar → Job deadlocks/BackoffLimitExceeded; fix pod
+  annotation `sidecar.istio.io/inject: "false"`. (4) Prometheus rotator launchd templated
+  `{{K3D_MANAGER_PATH}}`→`bin/k3d-manager` which **doesn't exist** (entry is `scripts/k3d-manager`); fixed.
+  **Deployed live:** rotator manifest applied + Vault `argocd-rotation` policy/role created via
+  `deploy_argocd_platform_ops` (note: that also brought #18 promoter code live — GIT_WRITE_TOKEN is
+  `optional:true`, safe live-patch fallback; #18 dry-run + PAT seed still pending). **Verified live:**
+  one-shot Job rotates → `argocd-secret` mtime advanced 2026-08-05→2026-08-11, stored bcrypt clean/valid,
+  new Vault password → ArgoCD `/api/v1/session` **LOGIN SUCCESS** (wrong pw rejected as control).
+  Prometheus host-side launchd agent installed (path fixed) + `observability_rotate_prometheus_basic_auth`
+  run once → regenerated a strong bcrypt (changed) + re-applied `prometheus-web-config` on `ubuntu-hostinger`.
+  argocd.bats 17/17 (new runtime-correctness test), observability.bats 14/14, shellcheck clean.
+  **Restore-on-failure path is code-present (trap) but not fault-injected live** (avoided deliberately
+  breaking the live credential). **NOTE:** all rotator fixes are live in the CLUSTER + committed; the
+  ArgoCD admin password is now the rotated value (old bcrypt `$2y$10$AgfGS5Vm…390Uqy.` retained as manual
+  restore net; new plaintext in Vault `secret/argocd/admin`).
 
 - Webhook auth reconciliation committed and pushed as `3fddcf3e`; hostinger status head/tail
   truncation split and pushed as `8eb8cc34`.
