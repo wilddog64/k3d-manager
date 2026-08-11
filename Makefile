@@ -352,8 +352,13 @@ show-service-passwords:
 	@echo ""
 	@echo "  === Service Credentials ==="
 	@echo ""
-	@_argocd=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 -d); \
+	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
+	_argocd=$$(curl -sf -H "@$$_vault_hdr" \
+	  "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
+	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
+	rm -f "$$_vault_hdr"; \
 	echo "  ArgoCD      https://argocd.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_argocd:-N/A}";\
