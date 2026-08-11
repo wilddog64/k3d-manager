@@ -198,7 +198,7 @@ function _observability_ensure_alertmanager_login() {
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
 
   local _vault_hdr
   _vault_hdr=$(mktemp)
@@ -398,7 +398,7 @@ function deploy_observability_acg() {
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
 
   local _am_creds _vault_hdr
   _vault_hdr=$(mktemp)
@@ -577,7 +577,7 @@ function _prometheus_acg_web_config_secret() {
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
 
   local _vault_hdr
   _vault_hdr=$(mktemp)
