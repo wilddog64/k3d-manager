@@ -14,6 +14,7 @@ function deploy_observability() {
       && _info "[observability] Grafana admin credential ExternalSecret applied"
   fi
   _observability_apply_grafana_rotator
+  _observability_install_prometheus_rotator
   # shellcheck disable=SC2016
   if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] Hub ApplicationSet applied — ArgoCD will sync monitoring/trivy-system"
@@ -35,7 +36,7 @@ function deploy_observability() {
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
 
   local _am_creds _vault_hdr
   _vault_hdr=$(mktemp)
@@ -112,6 +113,27 @@ function _observability_apply_grafana_rotator() {
   fi
 }
 
+function _observability_install_prometheus_rotator() {
+  if ! _is_mac; then
+    return 0
+  fi
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
+    _warn "[observability] launchctl or kubectl not available — skipping Prometheus rotator"
+    return 0
+  fi
+  local _plist_template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.prometheus-credential-rotator.plist.tmpl"
+  local _plist="${HOME}/Library/LaunchAgents/com.k3d-manager.prometheus-credential-rotator.plist"
+  [[ -f "${_plist_template}" ]] || return 0
+  mkdir -p "$(dirname "${_plist}")"
+  sed \
+    -e "s|{{K3D_MANAGER_PATH}}|${SCRIPT_DIR}/k3d-manager|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_plist_template}" > "${_plist}"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-credential-rotator" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _info "[observability] Prometheus credential rotator installed"
+}
+
 function _observability_install_alertmanager_port_forward() {
   if ! _is_mac; then
     return 0
@@ -176,7 +198,7 @@ function _observability_ensure_alertmanager_login() {
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
 
   local _vault_hdr
   _vault_hdr=$(mktemp)
@@ -376,7 +398,7 @@ function deploy_observability_acg() {
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
 
   local _am_creds _vault_hdr
   _vault_hdr=$(mktemp)
@@ -508,13 +530,54 @@ function _observability_prometheus_vault_payload() {
     }}))'
 }
 
+# Known-weak legacy value: bcrypt('password'). Detected + replaced on sight.
+_PROM_WEAK_BCRYPT='$2a$12$NqL.y.Z1.h.1.E.1.p.9.Q.2.a.7.I.3.Z.7.d.3.Q.2.v.0.K.2.x.6'
+
+function _observability_generate_prometheus_basic_auth() {
+  # Sets _PROM_BASIC_AUTH_PASSWORD + _PROM_BASIC_AUTH_BCRYPT to a fresh strong credential.
+  # bcrypt via htpasswd stdin (-i) so the plaintext never lands in argv or logs.
+  if ! command -v htpasswd >/dev/null 2>&1; then
+    _err "[observability] htpasswd required to generate Prometheus basic-auth (install httpd-tools/apache2-utils)"
+    return 1
+  fi
+  _PROM_BASIC_AUTH_PASSWORD="${PROM_ADMIN_PASSWORD:-$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)}"
+  if [[ "${_PROM_BASIC_AUTH_PASSWORD}" == "password" ]]; then
+    _err "[observability] refusing to seed Prometheus basic-auth with the weak literal 'password'"
+    return 1
+  fi
+  _PROM_BASIC_AUTH_BCRYPT="$(printf '%s' "${_PROM_BASIC_AUTH_PASSWORD}" | htpasswd -niBC 12 admin | cut -d: -f2-)"
+  [[ -n "${_PROM_BASIC_AUTH_BCRYPT}" ]] || { _err "[observability] failed to generate Prometheus bcrypt"; return 1; }
+}
+
+function observability_rotate_prometheus_basic_auth() {
+  local _vault_addr="http://127.0.0.1:18200"
+  local _vault_token _vault_hdr _prom_payload
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+  _observability_generate_prometheus_basic_auth || { rm -f "${_vault_hdr}"; return 1; }
+  _prom_payload=$(_observability_prometheus_vault_payload "${_PROM_BASIC_AUTH_PASSWORD}" "${_PROM_BASIC_AUTH_BCRYPT}")
+  curl -sf --header "@${_vault_hdr}" --header 'Content-Type: application/json' \
+    --request POST --data "${_prom_payload}" \
+    "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null
+  rm -f "${_vault_hdr}"
+  _prometheus_acg_web_config_secret "${1:-}" || return 1
+  if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
+    curl -sf --max-time 10 -X POST "${SLACK_WEBHOOK_URL}" \
+      -H 'Content-Type: application/json' \
+      -d '{"text":"🔐 Monthly service password rotation completed: Prometheus. Password values are not included."}' >/dev/null || true
+  fi
+  _info "[observability] Prometheus basic-auth rotated and ACG web config reapplied"
+}
+
 function _prometheus_acg_web_config_secret() {
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
 
   local _vault_hdr
   _vault_hdr=$(mktemp)
@@ -528,12 +591,15 @@ function _prometheus_acg_web_config_secret() {
         print(d['user']+'|'+d['password_bcrypt'])" 2>/dev/null); then
     _prom_creds=""
   fi
+  if [[ "${_prom_creds#*|}" == "${_PROM_WEAK_BCRYPT}" ]]; then
+    _warn "[observability] Prometheus basic-auth is the weak 'password' default — regenerating"
+    _prom_creds=""
+  fi
   if [[ -z "${_prom_creds}" ]]; then
-    local _default_bcrypt_hash="\$2a\$12\$NqL.y.Z1.h.1.E.1.p.9.Q.2.a.7.I.3.Z.7.d.3.Q.2.v.0.K.2.x.6" # bcrypt hash for 'password'
-    local _prom_password="${PROM_ADMIN_PASSWORD:-password}"
+    _observability_generate_prometheus_basic_auth || return 1
     local _prom_payload
     _info "[observability] Ensuring Prometheus basic auth secret exists in Vault."
-    _prom_payload=$(_observability_prometheus_vault_payload "${_prom_password}" "${_default_bcrypt_hash}") || _prom_payload=""
+    _prom_payload=$(_observability_prometheus_vault_payload "${_PROM_BASIC_AUTH_PASSWORD}" "${_PROM_BASIC_AUTH_BCRYPT}") || _prom_payload=""
     if [[ -n "${_prom_payload}" ]] && curl -sf \
         --header "@${_vault_hdr}" \
         --header 'Content-Type: application/json' \
@@ -552,12 +618,12 @@ function _prometheus_acg_web_config_secret() {
       done
     else
       _warn "[observability] Failed to create Prometheus basic auth secret in Vault — using generated web config for this run"
-      _prom_creds="admin|${_default_bcrypt_hash}"
+      _prom_creds="admin|${_PROM_BASIC_AUTH_BCRYPT}"
     fi
 
     if [[ -z "${_prom_creds}" ]]; then
       _warn "[observability] Failed to retrieve Prometheus basic auth secret after creation attempt — using generated web config for this run"
-      _prom_creds="admin|${_default_bcrypt_hash}"
+      _prom_creds="admin|${_PROM_BASIC_AUTH_BCRYPT}"
     fi
   fi
   rm -f "${_vault_hdr}"

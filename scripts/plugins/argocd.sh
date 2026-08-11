@@ -1397,6 +1397,37 @@ function argocd_sync_app_rebuild_secret() {
    _no_trace _argocd_apply_secret_from_stdin "${_token}" "${_ns}" "${_name}" gh-token
 }
 
+function argocd_sync_git_writer_secret() {
+   local _ns="${1:-platform-ops}"
+   local _service="platform-ops-git-writer"
+   local _account="k3dm"
+   local _name="platform-ops-git-writer"
+   local _token=""
+
+   _token=$(_argocd_keychain_value "${_service}" "${_account}")
+
+   if [[ -z "${_token}" ]]; then
+      _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — optional CVE git-writer PAT; skipping (store a dedicated fine-grained PAT scoped to wilddog64/k3d-manager contents:write ONLY — do NOT reuse a broad gh CLI token)"
+      return 0
+   fi
+
+   _info "[argocd] Syncing ${_name} Secret (git-token) into namespace ${_ns} from Keychain..."
+   _no_trace _argocd_apply_secret_from_stdin "${_token}" "${_ns}" "${_name}" git-token
+}
+
+function _argocd_apply_credential_rotator() {
+   local _manifest="${ARGOCD_CONFIG_DIR}/platform-ops/argocd-credential-rotator.yaml"
+   [[ -f "${_manifest}" ]] || return 0
+   _kubectl apply -f "${_manifest}" >/dev/null \
+      && _info "[argocd] ArgoCD monthly credential rotator applied"
+   if declare -f _vault_configure_secret_writer_role >/dev/null 2>&1; then
+      _vault_configure_secret_writer_role "secrets" "vault" \
+         "argocd-credential-rotator" "cicd" "secret" "argocd/admin" \
+         "argocd-rotation" "argocd-rotation" \
+         || _err "[argocd] failed to configure ArgoCD rotation Vault role"
+   fi
+}
+
 function deploy_argocd_platform_ops() {
    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
       cat <<'HELP'
@@ -1492,6 +1523,8 @@ EOF
    _info "[argocd] Syncing secrets from Keychain (DR — see argocd_sync_webhook_token_secret / argocd_sync_app_rebuild_secret)..."
    argocd_sync_webhook_token_secret cicd
    argocd_sync_app_rebuild_secret platform-ops
+   argocd_sync_git_writer_secret platform-ops
+   _argocd_apply_credential_rotator
 
    _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
    _info "[argocd] Secrets still to create manually (no durable local source):"

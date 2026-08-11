@@ -1,65 +1,69 @@
 # Progress — k3d-manager
 
-> **Compressed 2026-08-09.** Shipped-release detail lives in `CHANGELOG.md` + `docs/retro/`; the
-> integration-split carry-forward in `docs/plans/release-split-intent-map.md`; per-incident detail in
-> `docs/issues/` / `docs/bugs/`. Pre-compression history is in git (`git log --follow memory-bank/`).
+> **Compressed 2026-08-11.** Shipped-release detail lives in `CHANGELOG.md` + `docs/retro/`; per-incident
+> detail in `docs/issues/` / `docs/bugs/`. Pre-compression history is in git (`git log --follow memory-bank/`).
 
 ## Releases
 
 | Version | Theme | State |
 |---|---|---|
-| v1.23.0 | CVE observability + remediation lifecycle (B+C) | **PR #112 OPEN, merge-ready** — head `9c55e81a`; CI green, Copilot 3 findings fixed+resolved, `enforce_admins` DISABLED, awaiting user merge |
+| v1.24.0 | platform hardening (D+E+F+#18) | **CODE-COMPLETE + LIVE-VERIFIED; release path in progress** — all SHAs pushed + Claude-verified on `origin/k3d-manager-v1.24.0`; CHANGELOG/README/releases.md written; PR gate → merge → tag → reapply ApplicationSets next |
+| v1.23.0 | CVE observability + remediation lifecycle (B+C) | RELEASED — PR #112 `7253ece4`, tagged; platform-ops deployed live, `enforce_admins` restored |
 | v1.22.0 | OpenLDAP bitnami→Symas migration | RELEASED — PR #111 `1bbb74b0`, tagged |
 | v1.21.0 | k3dm-webhook security hardening | RELEASED — PR #110 `f68bdee1`, tagged |
 | v1.20.0 | CVE auto-patch-loop hardening | RELEASED — PR #109 `9da73458`, tagged |
 | v1.18.0 | first-mile CVE gap closure | RELEASED — PR #108 `85742ef7`, tagged |
-| v1.17.0 | real login verification in health smoke | RELEASED — PR #107 `b5d401b6`, tagged |
 
 (v1.19.0 was a shopping-cart-only Dependabot milestone — no k3d-manager tag.)
 
-## In flight — v1.23.0 (PR pending)
+## v1.24.0 shipped commits (2026-08-11)
 
-All B+C code + the pulled-forward Grafana slice is committed, pushed, and LIVE-VERIFIED end-to-end on
-the hub. Full change list = `CHANGELOG.md` [1.23.0]. Shipped work (SHA pointers):
+| Work item | Commit | Verify |
+|---|---|---|
+| Webhook auth fail-closed + Slack allowlist enforcement (D) | `3fddcf3e` | py_compile + webhook.bats; live 401/403 |
+| Hostinger status report head/tail truncation (D) | `8eb8cc34` | webhook.bats 53/53 |
+| Istio ambient / hostinger CNI drift reconcile (F) | `357edf52` | shellcheck + YAML |
+| Prometheus weak basic-auth default removal (E) | `e1256d0a` | weak-hash grep empty, 13 observability BATS |
+| Monthly ArgoCD + host-side Prometheus rotators (E) | `3db193cb` | argocd/observability BATS, shellcheck, plist |
+| ArgoCD rotator bcrypt/sidecar + Prometheus launchd path (E bugfix, 4 live-verify defects) | `84232cc0` | argocd.bats 17/17, observability.bats 14/14 |
+| Git-persisted CVE remediation promoter (#18) | `3df62fbf` | shellcheck/POSIX/YAML; dry-run verified live |
+| agy headless analyze fix | `69e21e15` | webhook.bats 53/53; live real-analysis smoke |
+| show-service-passwords ArgoCD reads Vault | `33e42905` | shown password logs in |
 
-- Verifier: multi-arch spec-digest fix `33b45a41`; payment-namespace `_namespace_for` `8a8566e8`;
-  event GC `9168edd7`; carry-forward + alpine/k8s re-pin + argocd.sh wiring `33b151ba`.
-- Alerting: `CVERemediationInFlight` inhibit + analyze `repeatInterval:12h` `ed52cf0c`;
-  `image_repository` `label_replace` normalization `72be9383`; empty-repo TrivyCritical guard `5302ea54`.
-- Dashboard/exporter: shipped as **Codex 1:1** 4-table view `06a0416e` (churn `db81f534`→`1d9251b4`→
-  `43ece528`→`06a0416e`); exporter + dashboard wired into `deploy_argocd_platform_ops`.
-- Grafana rotation (E slice pulled forward): Vault source + monthly rotator `5b418dd7`;
-  show-service-passwords `31db9732`; four latent blockers fixed — runAsUser `a66463e1`, openssl-free
-  `4557cdeb`, rollout-status RBAC `a0bb46c2`, DB-apply + hub-scope smoke `816835fd`. Runs end-to-end.
-- Adjacent: LDAP rotator alpine/k8s re-pin `ddc68c90`; webhook rate-limit-after-auth + Content-Length
-  `ee32837d`; agy model-id retirement `8e7a5c79` (webhook) + `612ca86d` (gemini.sh/antigravity.bats).
+**LIVE-VERIFIED 2026-08-11:** E ArgoCD rotator deployed via `deploy_argocd_platform_ops` (Vault
+`argocd-rotation` role created); one-shot Job → `argocd-secret` mtime advanced, clean bcrypt, new password
+→ ArgoCD LOGIN SUCCESS; Prometheus host launchd installed + rotate regenerates strong cred. #18 promoter
+git-persist dry-run end-to-end (clone → awk-pin → `push --dry-run` authenticates), remote untouched.
+⚠️ Interim git-writer token (`gh auth token`, `repo` scope) must be replaced with a fine-grained
+`contents:write`-only PAT before the promoter runs in-cluster — see `activeContext.md`.
 
-**Post-merge (Claude):** `argocd.sh deploy_argocd_platform_ops` (durable platform-ops apply — files are
-inert on the branch until then); confirm dashboard appsets track v1.23.0 (`argocd_check_values_branch`);
-tag `v1.23.0`; restore `enforce_admins`; retro; cut `k3d-manager-v1.24.0`.
+**PR #113 review follow-up 2026-08-11:** Copilot's six actionable threads were fixed and resolved in
+`be29b5a0`; local BATS/shellcheck/static parse gates passed and GitHub CI is green. PR is mergeable but
+still requires an approving review.
 
-## Deferred — NOT v1.23.0-gating
+## Pending releases (forward scope — detail in activeContext.md)
 
-- [ ] **Order remediation promoter — needs decision (task #18).** Promoter live-patches the ArgoCD
-      Application (ephemeral, not git); order's override is empty and the promoter never resolved a
-      clean immutable `sha-*` candidate (bare-tag/`IfNotPresent`). Fix options: (a) persist to git;
-      (b) close order's rebuild→clean-image loop. See `activeContext.md`.
-- [ ] Dashboard parts (b)+(c) — spec `v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md`
-      superseded by the Codex 1:1 revert; re-scope before executing.
-- [ ] `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` +
-      `observability.sh` per-hunk split from E → v1.24.0.
-
-## Pending releases (integration-split — full file map + blockers in the intent map)
-
-- [ ] **v1.24.0** — webhook + credential rotation + istio/hostinger ops + unseal watchdog (D+E+F).
-      ⚠️ SKIP the Grafana slice (shipped in v1.23.0). Remaining E = recurring rotation automation for
-      ArgoCD / Prometheus / Alertmanager (only LDAP + Grafana automated).
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
-      order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger
-      capacity expansion.
+      order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger capacity
+      (durable `maxSurge=0` in git OR bump node CPU — issue `2026-08-10-hostinger-rollout-deadlock-*`).
+      **+ E2E verification harness** (plan doc #1) + **e2e observability** (plan doc #2) — enable disabled
+      e2e on ephemeral substrates (Tier 1 vCluster blocking + Tier 2 ACG sandbox periodic); exit-code +
+      JSON-summary contract seeds the v1.26.0 gate.
+- [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED, not started). Spec
+      `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + attest at build; `cosign verify`
+      at promotion + admission (Kyverno, staged Audit→Enforce). Key-in-Vault, pub via ESO. Multi-repo.
+      Slots after v1.25.0. `project_image_signing_cve_loop`.
 
 ## Backlog (not release-gated)
 
-- [ ] Shopping-cart Dependabot backlog (Go builder-image bumps, majors held) — auto-memory
-      `project_backlog.md`.
+- [x] **Jenkins DEPRECATED in docs (DONE 2026-08-10) — code KEPT.** Verified unused; earlier removal item
+      cancelled. `project_jenkins_deprecation`.
+- [ ] **Secure Vault remote access (QUEUED — after v1.24.0 release)** — expose Vault UI via laptop
+      cloudflared `vault.3ai-talk.org` behind Cloudflare Access + MFA (Google IdP / TOTP);
+      Access-app-before-ingress ordering; Vault audit device on; root token laptop-only. Filing
+      `docs/howto/secure-vault-remote-access-cloudflare-access.md` (decision pending). No changes made yet.
+      `project_secure_vault_remote_access`.
+- [ ] Dashboard parts (b)+(c) — superseded by the Codex 1:1 dashboard; re-scope before executing.
+- [ ] `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` carry.
+- [ ] Shopping-cart Dependabot backlog (Go builder-image bumps, majors held) — `project_backlog.md`.
 - [ ] rabbitmq-client-java NPE fix `36ed860` — JAR publish + pom update pending.

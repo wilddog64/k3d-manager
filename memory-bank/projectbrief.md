@@ -15,8 +15,9 @@ providers at zero managed-service cost: no EKS, no GKE, no AKS — k3s everywher
 
 Provide a single-command experience for:
 - Provisioning and destroying k3s clusters on any supported cloud or local runtime.
-- Deploying Vault, ESO, Istio, Jenkins, ArgoCD, and OpenLDAP with correct wiring on first
-  run, identical regardless of provider.
+- Deploying Vault, ESO, Istio, ArgoCD, and OpenLDAP with correct wiring on first
+  run, identical regardless of provider. (Jenkins is a **deprecated** demo feature —
+  disabled by default via `ENABLE_JENKINS=0`, not deployed; code retained but unsupported.)
 - Validating certificate rotation, directory-service integration, and secret management
   end-to-end before committing anything to production infrastructure.
 - Running a GitOps app cluster (ubuntu-k3s on EC2) managed by ArgoCD on the infra cluster.
@@ -73,7 +74,8 @@ directory integration plugin, mirroring the same pattern as cluster providers.
 - Local k3d (Docker-based) and k3s (systemd-based) clusters (`CLUSTER_PROVIDER=k3d`, `orbstack`).
 - Remote 3-node k3s on AWS EC2 ACG sandbox via CloudFormation + k3sup (`CLUSTER_PROVIDER=k3s-aws`).
 - HashiCorp Vault with PKI, K8s auth, and ESO integration.
-- Jenkins with Vault-issued TLS, cert rotation CronJob, and optional LDAP/AD auth.
+- Jenkins with Vault-issued TLS, cert rotation CronJob, and optional LDAP/AD auth
+  **(deprecated — disabled by default, not deployed; code retained but unsupported)**.
 - OpenLDAP (standard schema and AD-schema variant for testing AD code paths).
 - External Secrets Operator (Vault backend; Azure backend partial).
 - Active Directory integration (external-only; AD is never deployed by this tool).

@@ -16,6 +16,8 @@ setup_file() {
     export K3DM_WEBHOOK_TOKEN
     K3DM_WEBHOOK_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     export K3DM_WEBHOOK_PORT="${_WEBHOOK_PORT}"
+    export SLACK_SIGNING_SECRET="bats-slack-signing-secret"
+    export K3DM_SLACK_ROLE_MAP="U-reader:reader"
 
     # Stub the analysis binary so queued /analyze and /diagnostics jobs cannot
     # spawn the real agy CLI (which launches Chrome via ACG browser automation).
@@ -112,6 +114,18 @@ _wait_cluster_idle() {
         (( i++ )) || true
     done
     return 0
+}
+
+_slack_event() {
+    local body="$1" timestamp signature
+    timestamp="$(date +%s)"
+    signature="$(K3DM_TEST_SLACK_BODY="${body}" K3DM_TEST_SLACK_TIMESTAMP="${timestamp}" python3 -c 'import hashlib,hmac,os; body=os.environ["K3DM_TEST_SLACK_BODY"]; ts=os.environ["K3DM_TEST_SLACK_TIMESTAMP"]; secret=os.environ["SLACK_SIGNING_SECRET"]; print("v0=" + hmac.new(secret.encode(), f"v0:{ts}:{body}".encode(), hashlib.sha256).hexdigest())')"
+    curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "X-Slack-Request-Timestamp: ${timestamp}" \
+        -H "X-Slack-Signature: ${signature}" \
+        --data-raw "${body}" \
+        "${_WEBHOOK_URL}/slack/events"
 }
 
 setup() {
@@ -303,6 +317,47 @@ setup() {
 
     run grep -F -- 'kwargs={"thread_ts": thread_ts, "provider": provider}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
+}
+
+@test "Slack signature verification rejects malformed timestamps and bodies" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run env PYTHONPATH="${repo_root}/scripts/lib" SLACK_SIGNING_SECRET="test-secret" python3 -c '
+from webhook.auth import _verify_slack_signature
+assert not _verify_slack_signature(b"{}", "not-a-number", "v0=x")
+assert not _verify_slack_signature(b"\xff", "0", "v0=x")
+'
+    [ "${status}" -eq 0 ]
+}
+
+@test "Slack ignores signed unknown and user-less commands without creating anchors" {
+    local before after response
+    before="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    response="$(_slack_event '{"event":{"type":"message","user":"U-unknown","text":"/cluster-status","ts":"1"}}')"
+    [[ "${response}" == *'"ok":true'* ]]
+    response="$(_slack_event '{"event":{"type":"message","text":"/cluster-status","ts":"2"}}')"
+    [[ "${response}" == *'"ok":true'* ]]
+    after="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    [ "${after}" = "${before}" ]
+}
+
+@test "Slack allowlisted reader can dispatch cluster-status" {
+    local before after response
+    before="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    response="$(_slack_event '{"event":{"type":"message","user":"U-reader","text":"/cluster-status","ts":"3"}}')"
+    [[ "${response}" == *'"ok":true'* ]]
+    sleep 0.2
+    after="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    [ "${after}" -eq $((before + 2)) ]
+}
+
+@test "hostinger status keeps report header and final health sections when long" {
+    run grep -F -- "middle of report truncated" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- "report[:1600]" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- "report[-1800:]" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
 }
 
 @test "POST /cluster-status with wrong token returns 401" {

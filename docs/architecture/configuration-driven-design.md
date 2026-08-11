@@ -10,6 +10,11 @@
 
 k3d-manager uses a **configuration-driven design** where system behavior is determined by configuration data rather than code changes. This enables the same codebase to support multiple providers (OpenLDAP, Active Directory, Azure AD, Vault, Azure Key Vault, etc.) without modifying consumer code.
 
+> **Note:** Jenkins appears below as the example *consumer* of the directory-service abstraction, but it
+> is a **deprecated feature — disabled by default and not deployed** in the current environment.
+> The provider-agnostic pattern it illustrates still applies to any consumer. The Jenkins code is
+> retained but unsupported.
+
 ## Core Principle
 
 > **Configuration determines behavior. Code provides interface.**

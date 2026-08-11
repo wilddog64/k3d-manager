@@ -50,6 +50,7 @@ from webhook.proc import _spawn_capture_text  # noqa: E402
 from webhook.auth import (  # noqa: E402
     _get_token,
     _verify_slack_signature,
+    _slack_user_is_allowlisted,
     _slack_user_role,
 )
 
@@ -1159,7 +1160,13 @@ def _call_gemini(prompt):
             (os.POSIX_SPAWN_OPEN, 1, tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
             (os.POSIX_SPAWN_DUP2, 1, 2),
         ]
-        cmd = [resolved, "--model", GEMINI_MODEL, "--prompt", prompt]
+        guarded = (
+            "You are analyzing pre-collected data in a HEADLESS session with no "
+            "interactive approver. Do NOT run any commands or call any tools — a tool "
+            "call is auto-denied and yields no answer. Answer ONLY from the text below; "
+            "if it is insufficient, say so briefly.\n\n" + prompt
+        )
+        cmd = [resolved, "--model", GEMINI_MODEL, "--prompt", guarded]
         child_pid = os.posix_spawn(
             resolved, cmd, dict(env),
             file_actions=file_actions, setsid=True,
@@ -1182,6 +1189,8 @@ def _call_gemini(prompt):
             time.sleep(0.5)
         raw = Path(tmp_path).read_text(errors="replace").strip()
         Path(tmp_path).unlink(missing_ok=True)
+        if "headless mode" in raw and "auto-denied" in raw:
+            return "agy analysis skipped — headless tool use disabled"
         raw = raw or "agy returned no output"
         # Strip CLI startup banners (Warning: lines)
         raw = re.sub(r'(?m)^Warning:.*\n?', '', raw).strip()
@@ -2412,7 +2421,14 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
         report = status_out.replace("__WEBHOOK_SUCCESS__", "").rstrip()
         _log("🖥️ *Hostinger app cluster status*")
         if report:
-            _log("```\n{}\n```".format(report[-3500:]))
+            # Slack limits a message to roughly 4k characters. Keep both the
+            # opening reachability sections and the final service/login health
+            # sections instead of showing only the tail of the report.
+            if len(report) > 3500:
+                report = (report[:1600]
+                          + "\n… (middle of report truncated) …\n"
+                          + report[-1800:])
+            _log("```\n{}\n```".format(report))
         if "__WEBHOOK_SUCCESS__" not in status_out:
             _log("⚠️ hostinger-status exited non-zero")
         _finish("success")
@@ -3070,6 +3086,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ev_subtype = ev.get("subtype", "")
             ev_text = ev.get("text", "").strip()
             ev_user = ev.get("user", "")
+            if not _slack_user_is_allowlisted(ev_user):
+                print(
+                    f"[slack/events] ignored type={ev_type!r} user={ev_user!r} reason=unallowlisted",
+                    flush=True,
+                )
+                self._json(200, {"ok": True})
+                return
             slack_role = _slack_user_role(ev_user)
             print(
                 f"[slack/events] type={ev_type!r} thread_ts={ev_thread_ts!r} "

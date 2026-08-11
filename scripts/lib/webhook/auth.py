@@ -58,9 +58,14 @@ def _verify_slack_signature(raw_body, timestamp, signature):
     if not SLACK_SIGNING_SECRET:
         return False
     import time
-    if abs(time.time() - int(timestamp)) > 300:
+    try:
+        timestamp_value = int(timestamp)
+        body_text = raw_body.decode()
+    except (AttributeError, TypeError, UnicodeDecodeError, ValueError):
         return False
-    base = f"v0:{timestamp}:{raw_body.decode()}"
+    if abs(time.time() - timestamp_value) > 300:
+        return False
+    base = f"v0:{timestamp}:{body_text}"
     expected = "v0=" + hmac.new(
         SLACK_SIGNING_SECRET.encode(),
         base.encode(),
@@ -91,3 +96,8 @@ SLACK_ROLE_MAP = _load_slack_role_map()
 def _slack_user_role(user_id):
     """Resolve a Slack user ID to reader|operator|admin. Unknown → reader (fail closed)."""
     return SLACK_ROLE_MAP.get((user_id or "").strip(), "reader")
+
+
+def _slack_user_is_allowlisted(user_id):
+    """Return True only when a non-empty Slack user ID is explicitly mapped."""
+    return bool((user_id or "").strip() in SLACK_ROLE_MAP)
