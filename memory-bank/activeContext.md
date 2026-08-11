@@ -1,319 +1,104 @@
 # Active Context — k3d-manager
 
-> **Compressed 2026-08-09.** Live focus + carried-forward blockers only. Shipped detail lives in
-> `CHANGELOG.md` (v1.23.0 section), `docs/retro/`, `docs/issues/`, `docs/bugs/`,
-> `docs/plans/release-split-intent-map.md`, and git history (`git log --follow memory-bank/`).
+> **Compressed 2026-08-11.** Live focus + carried-forward blockers only. Shipped detail lives in
+> `CHANGELOG.md` (v1.24.0 section), `docs/plans/v1.24.0-*`, `docs/bugs/v1.24.0-*`, `docs/retro/`,
+> `docs/issues/`, and git history (`git log --follow memory-bank/`).
 
-## Current focus — v1.23.0 RELEASED; now on `k3d-manager-v1.24.0`
+## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release path in progress
 
-### v1.24.0 handoff batch completed (2026-08-10)
+**v1.24.0 = platform hardening (D+E+F+#18).** All code committed + pushed to
+`origin/k3d-manager-v1.24.0`, Claude-verified on origin. CHANGELOG + README + `docs/releases.md`
+written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + ACG) → confirm
+`argocd_check_values_branch`.**
 
-### E rotation automation completed (2026-08-10)
+| Slice | Commit(s) | State |
+|---|---|---|
+| D — webhook auth fail-closed + Slack allowlist enforcement | `3fddcf3e`; hostinger truncation `8eb8cc34` | live; py_compile + webhook.bats 53/53 |
+| F — Istio ambient / hostinger CNI drift reconcile onto release branch | `357edf52` | shellcheck + YAML pass |
+| E — Prometheus weak-default removal + ArgoCD/Prometheus rotators + 4 live-verify bugfixes | `e1256d0a`, `3db193cb`, `84232cc0` | LIVE-VERIFIED (see below) |
+| #18 — CVE promoter persists to git | `3df62fbf` | dry-run verified live (see below) |
+| agy headless analyze fix | `69e21e15` | live-smoked (real analysis text) |
+| show-service-passwords ArgoCD reads Vault | `33e42905` | shown password logs in |
 
-- Prometheus weak basic-auth default removed in `e1256d0a`; both weak-hash fallback references are
-  gone, stdin-fed `htpasswd -i` generation is enforced, shellcheck and 13 observability BATS pass.
-- Monthly rotators committed in `3db193cb`: least-privilege in-cluster ArgoCD rotator plus host-side
-  Prometheus launchd rotation; ArgoCD/observability BATS, shellcheck, YAML, plist, and `_agent_audit`
-  pass. Alertmanager and in-cluster Prometheus rotation remain out of scope.
-- Static implementation only; deployment/live rotation verification remains a release operation.
-- **Claude independently VERIFIED all 3 SHAs on `origin/k3d-manager-v1.24.0` (2026-08-10):** A `e1256d0a`
-  touches only the 2 spec files, `_default_bcrypt_hash` greps to **0**, no weak literals, generator +
-  stdin `htpasswd` present; B `3db193cb` = exactly 6 files, **no** Grafana/Alertmanager touch, ArgoCD
-  rotator `kind: Role` in `cicd` with pinned `resourceNames` + no wildcard/cluster-admin, bcrypt via
-  stdin; memory-bank `22d07d37` = 2 mb files only (no code leak), records both SHAs. Claude re-ran
-  `shellcheck -S warning` (exit 0) + BATS observability/argocd (green, incl. weak-default, rotation
-  value-free, ArgoCD least-privilege gates). **E static half code-complete + verified.** Live half
-  (deploy ArgoCD rotator, create `argocd-rotation` Vault role, one-shot rotate+restore verify, install
-  host Prometheus launchd timer) remains Claude-owned release ops.
-- **E LIVE HALF DONE 2026-08-11 — and live verify caught 4 real rotator bugs Codex's static commit missed**
-  (bugfix `84232cc0`, spec `docs/bugs/v1.24.0-bugfix-argocd-rotator-bcrypt-and-istio-sidecar.md`):
-  (1) `argocd account bcrypt` fed via `printf '%s'` (no newline) → `fatal EOF` exit 20; fix `printf '%s\n'`.
-  (2) `argocd account bcrypt` prints its `Password: ` prompt to **stdout** → captured hash was malformed
-  (would corrupt `argocd-secret` + break login); fix `| sed 's/^Password: //'`. (3) CronJob in `cicd`
-  (istio-injection=enabled) gets an istio-proxy sidecar → Job deadlocks/BackoffLimitExceeded; fix pod
-  annotation `sidecar.istio.io/inject: "false"`. (4) Prometheus rotator launchd templated
-  `{{K3D_MANAGER_PATH}}`→`bin/k3d-manager` which **doesn't exist** (entry is `scripts/k3d-manager`); fixed.
-  **Deployed live:** rotator manifest applied + Vault `argocd-rotation` policy/role created via
-  `deploy_argocd_platform_ops` (note: that also brought #18 promoter code live — GIT_WRITE_TOKEN is
-  `optional:true`, safe live-patch fallback; **#18 dry-run + PAT seed DONE 2026-08-11 — see below**). **Verified live:**
-  one-shot Job rotates → `argocd-secret` mtime advanced 2026-08-05→2026-08-11, stored bcrypt clean/valid,
-  new Vault password → ArgoCD `/api/v1/session` **LOGIN SUCCESS** (wrong pw rejected as control).
-  Prometheus host-side launchd agent installed (path fixed) + `observability_rotate_prometheus_basic_auth`
-  run once → regenerated a strong bcrypt (changed) + re-applied `prometheus-web-config` on `ubuntu-hostinger`.
-  argocd.bats 17/17 (new runtime-correctness test), observability.bats 14/14, shellcheck clean.
-  **Restore-on-failure path is code-present (trap) but not fault-injected live** (avoided deliberately
-  breaking the live credential). **NOTE:** all rotator fixes are live in the CLUSTER + committed; the
-  ArgoCD admin password is now the rotated value (old bcrypt `$2y$10$AgfGS5Vm…390Uqy.` retained as manual
-  restore net; new plaintext in Vault `secret/argocd/admin`).
+### Live-verify state (release-ops, done 2026-08-11)
 
-- Webhook auth reconciliation committed and pushed as `3fddcf3e`; hostinger status head/tail
-  truncation split and pushed as `8eb8cc34`.
-- Istio/Hostinger drift reconciliation committed and pushed as `357edf52`.
-- Order remediation promoter git-persistence slice committed and pushed as `3df62fbf`.
-- Static gates passed: webhook `py_compile` + BATS (52 and 53 tests respectively), Istio shellcheck/YAML
-  parsing, promoter shellcheck/POSIX/YAML parsing, and `_agent_audit` under Bash.
-- **#18 promoter git-persist DRY-RUN VERIFIED live 2026-08-11 (Claude).** Keychain slot
-  `platform-ops-git-writer`/`k3dm` seeded — **interim** with `gh auth token` (`repo` scope; decision:
-  reuse the broad token for the *local* dry-run only, since it runs as the user not the in-cluster robot;
-  a dedicated fine-grained `contents:write`-only PAT must replace it BEFORE the promoter runs in-cluster,
-  where the token lives in a cluster Secret). Synced into `platform-ops` via
-  `argocd_sync_git_writer_secret` → Secret `platform-ops-git-writer` key `git-token` (cronjob env
-  `GIT_WRITE_TOKEN`, `optional:true`). Exercised the promoter's exact git-persist path end-to-end,
-  non-destructively: clone release branch via `x-access-token:` URL (exit 0), ran the real
-  `set_image_digest.awk` on `services/shopping-cart-order/kustomization.yaml` (no pre-existing `images:`
-  block → `END` branch appended one correctly), local commit with promoter author/message,
-  `git push --dry-run origin HEAD:k3d-manager-v1.24.0` → `503b5dd..7e4474e`, exit 0 (**token authenticates
-  WRITE**). Remote untouched, scratch scrubbed. Last open #18 item closed.
-- **Claude independently VERIFIED all 5 SHAs on `origin/k3d-manager-v1.24.0` (2026-08-10):** archive-revert
-  guard intact (`GEMINI_MODEL=gemini-3.5-flash-medium` line 212, `_rate_limited("slack")` line 3054, zero
-  `gemini-2.5-flash`, Content-Length hardening present) — the D `bin/k3dm-webhook` edit was hand-applied,
-  not a file checkout; `bats webhook.bats` re-run by Claude = `1..53`, **0 failures**; `py_compile` clean;
-  promoter touched **exactly 3 files, zero service-kustomization edits**; memory-bank commit (`fcab6f16`)
-  is code-free; chain linear off `670ff7c6`, all commit messages match specs verbatim. **D + F + #18 slice
-  are code-complete and pushed.** Remaining v1.24.0 work: **E rotation automation** (now the active task),
-  agy headless bug doc (`agy --help` discovery), the two Claude-owned live verifications, PAT seed.
+- **E ArgoCD rotator DEPLOYED + verified live:** rotator manifest applied + Vault `argocd-rotation`
+  policy/role created via `deploy_argocd_platform_ops`; one-shot Job rotated → `argocd-secret` mtime
+  advanced, stored bcrypt clean/valid, new Vault password → ArgoCD `/api/v1/session` **LOGIN SUCCESS**
+  (wrong pw rejected as control). Prometheus host-side launchd agent installed + rotate regenerated a
+  strong bcrypt on `ubuntu-hostinger`. **The live ArgoCD admin password is now the ROTATED value**
+  (old bcrypt `$2y$10$AgfGS5Vm…390Uqy.` retained as manual restore net; new plaintext in Vault
+  `secret/argocd/admin`). ⚠️ **Restore-on-failure path is code-present (trap) but not fault-injected**
+  (avoided breaking the live credential).
+- **#18 promoter git-persist DRY-RUN verified live:** exercised `_git_persist_promotion`'s exact path
+  non-destructively — clone release branch via `x-access-token:` URL (exit 0), real `set_image_digest.awk`
+  on `services/shopping-cart-order/kustomization.yaml` (appended `images:` block correctly),
+  promoter-author local commit, `git push --dry-run origin HEAD:k3d-manager-v1.24.0` → exit 0
+  (**token authenticates WRITE**). Remote untouched.
+  - ⚠️ **INTERIM TOKEN — MUST REPLACE before in-cluster promoter use.** Keychain
+    `platform-ops-git-writer`/`k3dm` currently holds `gh auth token` (`repo` scope) — acceptable ONLY
+    for the local dry-run (runs as the user). Before the promoter runs **in-cluster** (token lives in
+    a cluster Secret), replace with a dedicated **fine-grained `contents:write`-only PAT** on
+    `wilddog64/k3d-manager`, then re-run `argocd_sync_git_writer_secret platform-ops`. The full E deploy
+    already brought the promoter code live with `GIT_WRITE_TOKEN` `optional:true` (safe live-patch fallback).
 
-### agy headless analyze bugfix — IMPLEMENTED + verified live 2026-08-11 (`69e21e15`)
+### Follow-up (non-blocking)
 
-- Applied both `_call_gemini` blocks (`bin/k3dm-webhook`): prompt-guard prepend + legible auto-deny
-  message. `py_compile` OK, webhook.bats 53/53. **Live smoke:** guarded prompt to
-  `agy --model gemini-3.5-flash-medium` returned real analysis text (OOM-kill diagnosis), NOT the
-  jetski auto-deny string — model answered from context with no tool call. `make restart-webhook` ran
-  (new PID on :7443, health endpoint 401 = up + auth-enforcing). **This was the last open v1.24.0 code
-  slice → v1.24.0 is now code-complete.** Follow-up: update `reference_trivy_critical_upstream_image_noise`
-  "still errors" note once a real `wilddog64/*` TrivyCritical analyze is observed posting real text.
+- Update auto-memory `reference_trivy_critical_upstream_image_noise` "still errors" note once a real
+  `wilddog64/*` TrivyCritical analyze is observed posting real text via the `69e21e15` fix.
 
-### show-service-passwords — ArgoCD block now reads Vault 2026-08-11 (`33e42905`)
+## Pending releases (forward scope)
 
-- The ArgoCD rotator exposed a gap: `make show-service-passwords` read `argocd-initial-admin-secret`
-  (install-time, static) → showed a password that no longer logs in after rotation. Fixed the Makefile
-  ArgoCD block to read Vault `secret/data/argocd/admin.password` (mirrors the Grafana `31db9732` +
-  Prometheus blocks). **Verified:** the shown ArgoCD password authenticates to `/api/v1/session`.
-  Prometheus block already reflects rotation (rotate writes plaintext `password` to the same Vault path);
-  Grafana unchanged (not rotated this batch).
-
-### agy headless analyze bugfix — spec FINALIZED (handoff-ready) 2026-08-10
-
-- Flag discovery DONE (`agy --help`): **no** tool-disable / allowlist / `--approval-mode` flag exists;
-  only `--dangerously-skip-permissions` (blanket auto-approve — forbidden without sign-off) and
-  `--mode plan` (still permits read-only tool calls). The "tool-free flag" preferred path is therefore
-  **unavailable** → the **prompt-guard fallback is authoritative**. Spec
-  `docs/bugs/v1.24.0-bugfix-webhook-gemini-headless-permission.md` now has 2 exact old/new blocks in
-  `_call_gemini` (`bin/k3dm-webhook`): Change 1 prepends a headless tool-suppression guard to every
-  prompt (single choke point covers all callers); Change 2 detects `"headless mode"…"auto-denied"` and
-  returns `"agy analysis skipped — headless tool use disabled"` instead of the raw jetski string.
-  Transcribe-not-design; ready for Codex handoff. Live-verify = a real `wilddog64/*` TrivyCritical
-  analyze posts real text; `make restart-webhook` is the release step (host launchd, inert until restart).
-
-### Live-ops finding 2026-08-10 — hostinger rollout deadlock (maxSurge on 2-CPU node) — STOPGAPPED
-
-- Investigating the CVE dashboard's `ready_pod_digest_mismatch` "failed" rows found **two things.**
-  (1) Those failures are **stale false-positives** — the multi-arch containerd index-digest aliasing
-  bug ([[reference_containerd_index_digest_aliasing_verifier]]), fixed by `33b45a41` (v1.23.0, live
-  2026-08-09 ~15:58); `payment` flips `failed`→`applied` across the fix window, every event after is
-  `applied`. The Grafana table is an event LOG — old failed rows persist by design, not current state.
-  **No action.**
-  (2) **Real** live problem: `order-service` (11h) + `basket-service` (26h) were **wedged mid-rollout**
-  — `replicas=1, maxSurge=1, maxUnavailable=0` needs 2× CPU transiently, but the 2-CPU node was at
-  **1910m/2000m (95%)** → surge pods `FailedScheduling: Insufficient cpu` forever, while the OLD
-  replicaset kept serving (`1/1` masks it). Capacity silently blocks CVE convergence for any
-  surge-strategy rollout. **Stopgap applied:** live-patched both to `maxSurge=0/maxUnavailable=1`
-  (delete-old-then-create-new) → both converged (order→`sha-564ccfd24c`, basket→`sha-cc6d4e1f5f`,
-  ready; zero Pending). **Durable fix = v1.25.0-G:** commit `maxSurge=0` into the app git manifests
-  (ArgoCD may selfHeal the live patch away) OR bump node CPU. Full detail:
-  `docs/issues/2026-08-10-hostinger-rollout-deadlock-maxsurge-on-2cpu-node.md`.
-
-### Jenkins DEPRECATED in docs — DONE 2026-08-10 (code KEPT; earlier code-retirement plan cancelled)
-
-- **Verified 2026-08-10:** Jenkins is a built-in but **unused** feature — no live namespace/pods,
-  `deploy_jenkins` never auto-invoked (opt-in `ENABLE_JENKINS=1` only), absent from `docs/roadmap.md`;
-  real CI/CD is GitHub Actions + ArgoCD; `dirservice_generate_jcasc`'s only caller is `jenkins.sh`.
-- **Decision (revised by user 2026-08-10): KEEP the code, mark the service DEPRECATED in docs.** Marked
-  Jenkins "deprecated — disabled by default, not deployed, code retained but unsupported" in the
-  current-state docs — `README.md`, `CLAUDE.md`,
-  `docs/architecture/{configuration-driven-design,ingress-port-forwarding}.md`, and memory-bank
-  `projectbrief.md`/`systemPatterns.md`/`techContext.md`. Historical docs (`docs/issues|retro|archive`,
-  `docs/tests`, feature docs `docs/guides|howto/jenkins-*`, `docs/plans/jenkins-*`) left untouched.
-- **No code-retirement task** — the earlier "#2 remove the code" plan is **cancelled**. See auto-memory
-  [[project_jenkins_deprecation]].
-
-### QUEUED (do NOT start until Codex finishes his v1.24.0 assignment) — secure Vault remote access
-
-- **Trigger 2026-08-10:** user cannot reach Vault from office (SSH blocked, browser/HTTPS-only machine).
-  Investigation found Vault is fully healthy (pod `1/1`, unsealed, local `:18200` → 200) but has **no
-  public path**: not in the laptop cloudflared ingress, no VirtualService, and the only remote path is a
-  reverse SSH tunnel (`com.k3d-manager.ssh-tunnel`, autossh `-R 8200:127.0.0.1:18200 ubuntu@srv1754834.hstgr.cloud`)
-  landing on hostinger **loopback** `127.0.0.1:8200` — usable only from on the hostinger box. hostinger
-  cloudflared is `inactive` and has no vault ingress either.
-- **Chosen design (Option B — user-approved direction):** expose the **Vault UI** via the existing laptop
-  cloudflared as `vault.3ai-talk.org → http://localhost:18200`, gated by **Cloudflare Access** with **MFA
-  = Google IdP** (user's Google Authenticator/TOTP is the second factor). Two independent gates: Cloudflare
-  Access (identity+MFA) then Vault's own login (userpass/OIDC — NOT root token).
-- **Non-negotiable build order:** create the Access application + default-deny allow-only-me policy FIRST,
-  THEN add the cloudflared ingress + proxied DNS; verify an anonymous request redirects to Access (never
-  Vault) before trusting. Enable a Vault audit device. Root token stays laptop-only (break-glass).
-- **Filing (decision pending):** proposed `docs/howto/secure-vault-remote-access-cloudflare-access.md`
-  (mostly Cloudflare Zero-Trust dashboard config + one-line tunnel ingress — runbook, not repo code).
-  NOT folded into v1.24.0 (already at 5-plan-doc cap; off-theme). No tunnel/Cloudflare changes made yet.
-  See auto-memory [[project_secure_vault_remote_access]].
-
-- **PR [#112](https://github.com/wilddog64/k3d-manager/pull/112) MERGED** (`7253ece4`), tagged
-  **v1.23.0** + GitHub release. Post-merge close-out complete 2026-08-09: `deploy_argocd_platform_ops`
-  applied the platform-ops files live and the **TrivyCritical ownership split + `k3dm-quiet` blackhole
-  route are confirmed live on the hub** (ours = `image_repository=~"wilddog64/.*"` → cve-auto-patch;
-  upstream → `tier: upstream` → blackhole); `make restart-webhook` loaded the Slack-title fix;
-  `argocd_check_values_branch` = all 6 apps on `k3d-manager-v1.23.0`; `enforce_admins` restored; retro
-  `docs/retro/2026-08-09-v1.23.0-retrospective.md`; next branch `k3d-manager-v1.24.0` cut from `7253ece4`.
-- **Open follow-up carried to v1.24.0:** headless `_call_gemini` analyze still posts "no output produced
-  — command permission auto-denied" for the surviving ours-alert; needs an agy no-tools/permission
-  decision. See auto-memory `reference_trivy_critical_upstream_image_noise` and the alert-noise spec
-  `docs/bugs/v1.23.0-bugfix-trivy-critical-upstream-image-alert-noise.md`.
-
-### v1.23.0 shipped scope (reference)
-
-- **Scope** was off `k3d-manager-v1.23.0`. Scope = workstreams **B** (CVE inventory dashboard + `vulnerability-inventory-exporter`)
-  + **C** (remediation-lifecycle verifier), plus the **pulled-forward Grafana admin credential
-  rotation slice** (E — see intent map §E; v1.24.0 must SKIP the Grafana slice) and adjacent
-  live-ops bugfixes (agy model drift, webhook rate-limit-after-auth + Content-Length, LDAP rotator
-  image re-pin). Full change list = `CHANGELOG.md` [1.23.0]. Both intent-map carried-forward v1.23.0
-  items are **resolved**: dashboard is live at **Codex 1:1** (`06a0416e`, user preferred the 4-table
-  view over the "by image" regroup); payment digest-mismatch closed by the multi-arch verifier fix
-  (`33b45a41`).
-- **All B+C work is LIVE-VERIFIED end-to-end on the hub** (2026-08-09): verifier flips
-  matching-digest payment events `promotion_requested → applied`; `CVERemediationInFlight` fires and
-  Alertmanager marks the paired payment TrivyCritical `suppressed`/`inhibitedBy`, lifting ~16s after
-  completion. `label_replace` normalization (strip `ghcr.io/`) confirmed live for all 3 sc services.
-
-## Deferred — carry forward into v1.24.0
-
-- **Order remediation `ready_pod_digest_mismatch` — task #18 SHIPPED 2026-08-10 (`3df62fbf`), Claude-verified.**
-  Git-persistence slice (Option B) committed + pushed; `_git_persist_promotion` clones the frozen
-  `_app_target_branch`, awk-pins `digest:` in `services/shopping-cart-<svc>/kustomization.yaml`, commit+push;
-  falls back to live-patch-only when `GIT_WRITE_TOKEN` unset. Still Claude-owned: live dry-run + PAT seed.
-  Decision record below (Option B; open
-  questions RESOLVED (`da12ab8c`)). The promoter (`app-cve-scan.sh:289`) patches the **live ArgoCD
-  Application** `spec.source.kustomize.images`, not git. order's override is EMPTY and its promotion
-  event has `candidate`/`to_tag`/`from_digest` all empty → no clean immutable `sha-*` candidate resolved
-  (order is bare-tag / `IfNotPresent`). **Ratified: B (promoter persists override to git → durable for
-  ALL services) in v1.24.0; A (order CI `sha-<gitsha>` tagging, cross-repo) → v1.25.0.** Not C.
-  Live-verified design (spec now handoff-ready): (1) source is **THIS repo** — `services-git` appset
-  generates apps from `repoURL: k3d-manager`, `path: services/shopping-cart-<svc>/kustomization.yaml`,
-  `targetRevision: ${K3D_MANAGER_BRANCH}` (NOT shopping-cart-infra); edit is kustomize `images:`
-  (name/newTag/digest). (2) Appset has `ignoreApplicationDifferences: .spec.source.kustomize.images` →
-  live-patch already survives routine reconcile; the real gap is git≠live source-of-truth (lost on
-  rebuild/recreate). (3) Apps run `automated {prune,selfHeal}` (auto-sync) but frozen at
-  `k3d-manager-v1.22.0` → promoter must commit to the branch `targetRevision` tracks, not main
-  (`${K3D_MANAGER_BRANCH}` inert trap). (4) Promoter runs in `aquasec/trivy:0.63.0` `/bin/sh` — **no
-  `git`** → write via GitHub REST Contents API over `wget` (like `_dispatch_rebuild`), scoped
-  `contents:write` PAT on `wilddog64/k3d-manager` only, injected as `GIT_WRITE_TOKEN`. **Q4 corrected +
-  full impl AUTHORED `70952d53`:** trivy image actually HAS `git` 2.47.2 (busybox wget is POST-only, can't
-  PUT → Contents API infeasible) → write path is `git clone --depth 1 --branch <targetRevision>` over
-  HTTPS-with-token, awk-edit the kustomization `images:` to pin `digest:` only, commit+push. **awk editor
-  tested live in `aquasec/trivy:0.63.0`** against real payment/order (append) + product-catalog (in-place
-  `newTag`→`digest`, idempotent). Spec now has 5 exact change blocks (app-cve-scan.sh helpers +
-  `_promote_image` hook, cronjob env, argocd.sh `argocd_sync_git_writer_secret`) + user prereq (seed
-  `platform-ops-git-writer` PAT in Keychain, contents:write scope only). **#18 now fully handoff-ready
-  (transcribe-not-design).**
-- **Dashboard parts (b)+(c) superseded.** Spec
-  `docs/plans/v1.23.0-cve-dashboard-parts-bc-cveid-and-remediation-target.md` (CVE-ID panel + KSM
-  `metricLabelsAllowlist` job-target labeling) was written before the full revert to Codex 1:1
-  (`06a0416e`). Re-scope against the Codex dashboard before ever executing; not part of this release.
-- **Leftover carry:** `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`;
-  `observability.sh` per-hunk split from workstream E — both → v1.24.0.
-
-## Pending releases (from the integration split — files + detail in the intent map)
-
-- **v1.24.0 = platform hardening (D+E+F) — scope CONFIRMED 2026-08-09 (broad reconcile).** The intent
-  map's "D+E+F" label was stale: D's webhook hardening mostly shipped in v1.21.0 + v1.23.0 (`ee32837d`),
-  F is on main and live-verified, and E's Grafana slice shipped in v1.23.0 (⚠️ SKIP it). But an
-  archive-vs-main diff found **genuine live-relevant drift** (fixes applied to the live cluster but
-  committed only to `archive/k3d-manager-v1.22.0-integration`), so the user chose the broad reconcile.
-  **Confirmed carry-ins (verified real gaps, not superseded forks):**
-  - **D — webhook auth.py hardening (spec REVISED 2026-08-10).** `bin/k3dm-webhook:52` imports
-    `_verify_slack_signature` from `scripts/lib/webhook/auth.py` (so the lib IS live). Archive adds
-    malformed-timestamp/body try/except fail-closed to the Slack sig verify + a
-    `_slack_user_is_allowlisted` helper. **Codex hit a real spec defect:** 2 of the 4 archive
-    `webhook.bats` tests exercise `bin/k3dm-webhook` code (allowlist ENFORCEMENT + hostinger report
-    truncation) that is archive-only, while the spec forbade touching `bin/k3dm-webhook`. **User chose
-    (2026-08-10): wire the allowlist enforcement INTO D** (the helper is dead code otherwise — Change 2b
-    hand-applies the import + 6-line reject block, ⚠️ NOT a file checkout: archive `bin/k3dm-webhook` is
-    older and would revert v1.23.0's `gemini-3.5-flash-medium` + Content-Length hardening; keep main's
-    `_rate_limited("slack")`). D now = 3 tests. **Hostinger report truncation SPLIT OUT** to
-    `docs/bugs/v1.24.0-bugfix-hostinger-status-report-truncation.md` (its own commit,
-    `fix(webhook): keep hostinger status report header + health sections when long`). Codex's auth.py
-    Change 1+2 already applied+verified in the working tree (compiles, malformed-sig test passes).
-  - **F — Istio/hostinger GitOps drift.** `istio-ambient.yaml`: `ServerSideDiff=true` compare-option +
-    `ignoreDifferences` for istiod `ValidatingWebhookConfiguration` caBundle/failurePolicy
-    (controller-owned runtime state). `k3s-hostinger.sh`: `AMBIENT_CNI_CONF_DIR`/`_BIN_DIR` pointing
-    the Istio CNI DaemonSet at k3s/flannel paths (not Cilium defaults). `shopping-cart.yaml.tmpl` +7.
-  - **E — REWRITTEN 2026-08-10 after live discovery (was ArgoCD/Prometheus/Alertmanager, now
-    ArgoCD + Prometheus).** User chose "ArgoCD-only (Rec)" then added Prometheus after finding its
-    basic-auth is the weak `admin/password`. Live facts: **ArgoCD** = the only genuine persistent
-    in-cluster hub credential (`argocd-secret`.admin.password bcrypt) → clean in-cluster CronJob rotator;
-    `argocd account bcrypt` reads stdin (no argv leak), reuse it. **Alertmanager** = host-side launchd
-    proxy cred (plaintext Vault → local env → python proxy :9093), no in-cluster consumer → **DROPPED
-    from E.** **Prometheus** = NOT enforced on hub (empty web-config, localhost port-forward); weak
-    `admin/password` applied only to ACG sandboxes via host deploy; `alpine/k8s` image has no
-    htpasswd/openssl/bcrypt → recurring rotation is **host-side launchd timer**, not a CronJob. The
-    `observability.sh` per-hunk E carry is **VACUOUS** (empty main..archive diff) — dropped. **New bugfix
-    filed:** `docs/bugs/v1.24.0-bugfix-prometheus-weak-basic-auth-default.md` (kill the bcrypt('password')
-    literal + `:-password` default; htpasswd -i strong gen; self-heal the live weak value; do the bugfix
-    FIRST). E spec fully rewritten in `docs/plans/v1.24.0-credential-rotation-automation.md`.
-    Live weak value CONFIRMED then **CLOSED 2026-08-10 (Claude ops):** hub Vault
-    `secret/k3d-manager/prometheus-basic-auth` overwritten with a 32-char strong password + `$2y$12$`
-    bcrypt (token+payload via stdin, no argv leak). Value is now non-weak/non-empty so current unfixed
-    code reads it as-is (won't re-seed weak); the bugfix keeps it strong + self-heals. Bugfix code +
-    E rotators still to implement (bugfix FIRST). **Grafana Vault `user`-key gap (noted 2026-08-10):**
-    `secret/observability/grafana` holds only `password` (matches live secret by SHA); `user` key empty.
-    Non-blocking hygiene follow-up recorded in the E spec's "Follow-up note" — NOT in the ArgoCD/Prometheus
-    batch; address when the Grafana rotator YAML is next edited (add `"user":"admin"` to its Vault PUT).
-  - **Fold-ins (all four, per user):** agy `_call_gemini` headless command-permission fix (v1.23.0
-    follow-up); `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` (already
-    filed); order remediation promoter decision (task #18); observability.sh E carry (above).
-  - **Specs WRITTEN `8ceb533d` (≤5 plan-doc cap):** 4 plan docs — `v1.24.0-webhook-auth-reconcile` (D,
-    exact old/new blocks), `v1.24.0-istio-hostinger-drift-reconcile` (F, exact blocks),
-    `v1.24.0-credential-rotation-automation` (E design + observability.sh carry — has open design
-    decisions on bcrypt/htpasswd application + Prom/AM shared-credential), `v1.24.0-order-remediation-promoter`
-    (task #18 DECISION doc: recommends Option B persist-to-git in v1.24.0, defer Option A order-CI
-    sha-tagging to v1.25.0); + `docs/bugs/v1.24.0-bugfix-webhook-gemini-headless-permission.md` (cap-exempt,
-    needs `agy --help` flag discovery) and existing `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`.
-    Ready for handoff; E + #18 have open decisions the user/impl must resolve first.
-  - **Split-execution:** bring archive-only hunks in per-file via
-    `git checkout archive/k3d-manager-v1.22.0-integration -- <file>` (per-hunk for shared files);
-    `observability.sh` splits across releases so needs per-hunk selection.
 - **v1.25.0 = Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo).** Merge
   order-repo `0e3feb9` schema fix (`order_items.total_price NOT NULL`) + promote image → rerun Stripe
-  live E2E (2/4 now); hostinger 2-CPU capacity expansion (right-sizing is a stopgap).
-  **+ E2E verification harness (SCOPED 2026-08-10, plan doc #1):** `docs/plans/v1.25.0-e2e-verification-harness.md`.
-  The e2e suite is disabled because both its triggers need reachable services (localhost basket:8083/
-  catalog:8000/order:8080); it is **substrate-agnostic** — only needs the 3 URLs + `OAUTH2_ENABLED`.
-  Two tiers: **Tier 1 vCluster** = blocking per-candidate gate (fast, `OAUTH2_ENABLED=false`, deploys the
-  candidate digest, `trap` teardown, exit-code+JSON contract) reusing `vcluster_create/use/destroy`;
-  **Tier 2 ACG sandbox** = periodic full-stack (real Istio ingress + Keycloak OIDC, `OAUTH2_ENABLED=true`)
-  running the **Stripe live E2E** to move G past 2/4 — NOT a blocking gate (4h+4h lifetime, fragile ACG
-  creds). New `scripts/plugins/e2e.sh`; `workflow_call` added to `shopping-cart-e2e-tests`. Prior art:
-  archived `docs/plans/archive/v0.9.2-vcluster-e2e-workflow.md`. Promoter dispatch-and-wait + e2e cosign
-  attestation are the FORWARD seam to v1.26.0 ([[project_image_signing_cve_loop]]), NOT built here.
-  **Observability (D5, added 2026-08-10):** surface e2e in Grafana via the CVE-loop seam — harness writes
-  a `k3dm.k3d.io/e2e-result=true` ConfigMap (same JSON summary), extend `vulnerability-inventory-exporter`
-  to emit `e2e_*` metrics, add a dashboard row (deploy via `argocd.sh`). Stack = Prometheus+Pushgateway+
-  Loki; **no Tempo → span tracing is a separate forward milestone, out of scope.**
-- **v1.26.0 = image signing + attestation — close the CVE loop (SCOPED 2026-08-10, not started).**
-  Spec `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. Adds the missing latch to scan→remediate→
-  pin→deploy: **cosign sign + Trivy vuln/SBOM attest at build; verify at promotion AND admission.**
-  Decisions LOCKED: **key-based, private key in Vault** `secret/cosign/signing` + Keychain backup, pub
-  via ESO (not keyless — self-managed/offline ethos); **staged Audit→Enforce**, app namespaces only,
-  upstream/`tier:upstream` images excluded (reuse ours-vs-upstream split). Decision to CONFIRM at impl:
-  admission engine **Kyverno** (recommended, reusable for A05 policy) vs sigstore `policy-controller`.
-  Multi-repo (k3d-manager plugin `signing.sh` + Kyverno/ClusterPolicy + promoter `cosign verify` gate;
-  shopping-cart `{order,payment,basket,frontend,product-catalog}` CI sign+attest; infra ns labels). CI
-  key delivered as GH secrets seeded from Vault (runners can't reach Vault — no `hashivault://`). Slots
-  **after** v1.25.0. Split seam if needed = the Audit→Enforce boundary. See [[project_image_signing_cve_loop]].
+  live E2E (2/4 now). **Live deadlock stopgapped 2026-08-10** (`docs/issues/2026-08-10-hostinger-rollout-deadlock-maxsurge-on-2cpu-node.md`):
+  order/basket wedged mid-rollout — `maxSurge=1` needs 2× CPU on a 95%-full 2-CPU node → `FailedScheduling`;
+  live-patched both to `maxSurge=0/maxUnavailable=1`, converged. **Durable fix = this workstream:** commit
+  `maxSurge=0` into app git manifests (ArgoCD may selfHeal the live patch away) OR bump node CPU.
+  **+ E2E verification harness (plan doc #1 `v1.25.0-e2e-verification-harness.md`):** enable the disabled
+  e2e suite on ephemeral substrates — Tier 1 vCluster (per-candidate blocking, `OAUTH2_ENABLED=false`) +
+  Tier 2 ACG sandbox (periodic full-stack, real ingress/OIDC, runs Stripe live E2E). Substrate-agnostic
+  (needs basket/catalog/order URLs + oauth flag); new `scripts/plugins/e2e.sh`; `workflow_call` on
+  `shopping-cart-e2e-tests`. Exit-code + JSON-summary contract seeds the v1.26.0 gate.
+  **+ e2e observability (plan doc #2 `v1.25.0-e2e-observability-path-a.md`):** reuse the CVE exporter seam
+  — harness writes a `k3dm.k3d.io/e2e-result=true` ConfigMap; extend `vulnerability-inventory-exporter.py`
+  to emit `e2e_*` gauges; new `grafana-dashboard-e2e.yaml` + `E2EVerificationFailing/Stale` rules; deploy
+  via `argocd.sh`. No new component, no Tempo (span tracing = separate forward theme).
+- **v1.26.0 = image signing + attestation — close the CVE loop (SCOPED, not started).** Spec
+  `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + Trivy vuln/SBOM attest at build;
+  `cosign verify` at promotion (promoter gate) AND admission (Kyverno, staged Audit→Enforce, app
+  namespaces only, upstream/`tier:upstream` excluded). Key-based, private key in Vault + Keychain backup,
+  pub via ESO (LOCKED, not keyless). Multi-repo: k3d-manager `signing.sh`/Kyverno/ClusterPolicy/promoter
+  gate + shopping-cart `{order,payment,basket,frontend,product-catalog}` CI. CI key delivered as GH
+  secrets seeded from Vault (runners can't reach Vault). Slots after v1.25.0. See
+  [[project_image_signing_cve_loop]].
+
+## Backlog / queued (not release-gated)
+
+- **Secure Vault remote access (QUEUED — start after v1.24.0 release).** Expose the **Vault UI** via the
+  existing laptop cloudflared as `vault.3ai-talk.org → http://localhost:18200`, gated by **Cloudflare
+  Access** with **MFA = Google IdP** (TOTP). Two gates: Access (identity+MFA) then Vault login
+  (userpass/OIDC — NOT root token). **Non-negotiable build order:** create the Access application +
+  default-deny allow-only-me policy FIRST, THEN add cloudflared ingress + proxied DNS; verify an
+  anonymous request redirects to Access before trusting. Enable a Vault audit device; root token
+  laptop-only (break-glass). Vault today has NO public path (reverse-tunnel loopback only). Filing
+  (decision pending): `docs/howto/secure-vault-remote-access-cloudflare-access.md`. No changes made yet.
+  See [[project_secure_vault_remote_access]].
+- **Jenkins DEPRECATED in docs — DONE 2026-08-10, code KEPT.** Built-in but unused (no live pods, opt-in
+  `ENABLE_JENKINS=1` only, not in roadmap; real CI/CD = GHA+ArgoCD). Marked deprecated in current-state
+  docs; historical docs untouched. Earlier code-retirement plan **cancelled**. See
+  [[project_jenkins_deprecation]].
+- Dashboard parts (b)+(c) — spec `v1.23.0-cve-dashboard-parts-bc-*` superseded by the Codex 1:1 dashboard;
+  re-scope before executing. `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md`
+  carry; the observability.sh E per-hunk carry was **VACUOUS** (empty diff) → dropped.
+- Shopping-cart Dependabot backlog (Go builder-image bumps, majors held) — `project_backlog.md`.
+- rabbitmq-client-java NPE fix `36ed860` — JAR publish + pom update pending.
 
 ## Recently shipped (pointers only — detail in CHANGELOG + retro)
 
-- **v1.22.0** RELEASED — OpenLDAP bitnami→Symas migration. PR #111 `1bbb74b0`, tagged. Retro
-  `docs/retro/2026-08-07-v1.22.0-retrospective.md`.
+- **v1.23.0** RELEASED — CVE observability + remediation lifecycle (B+C). PR #112 `7253ece4`, tagged;
+  platform-ops deployed live (alert-noise split active), retro `docs/retro/2026-08-09-v1.23.0-retrospective.md`.
+- **v1.22.0** RELEASED — OpenLDAP bitnami→Symas migration. PR #111 `1bbb74b0`, tagged.
 - **v1.21.0** RELEASED — webhook security hardening. PR #110 `f68bdee1`, tagged.
 - **v1.20.0** RELEASED — CVE auto-patch-loop hardening. PR #109 `9da73458`, tagged.
 - Stripe checkout A–F all MERGED to main across the 5 shopping-cart repos (2026-08-02); payment side
