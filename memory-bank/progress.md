@@ -21,7 +21,7 @@ ArgoCD LOGIN SUCCESS); Prometheus host-side launchd agent installed + rotate reg
 Live verify caught **4 rotator bugs** in Codex's static commit (`docs/bugs/v1.24.0-bugfix-argocd-rotator-bcrypt-and-istio-sidecar.md`):
 bcrypt no-newline `fatal EOF`; `Password:` stdout prompt in captured hash; istio sidecar deadlock in `cicd`;
 Prometheus launchd `bin/k3d-manager` (nonexistent) → `scripts/k3d-manager`. argocd.bats 17/17, observability.bats 14/14, shellcheck clean.
-⚠️ Full deploy also brought #18 promoter code live (GIT_WRITE_TOKEN `optional:true` → safe fallback); #18 dry-run + PAT seed still pending.
+⚠️ Full deploy also brought #18 promoter code live (GIT_WRITE_TOKEN `optional:true` → safe fallback); **#18 dry-run + PAT seed DONE 2026-08-11 (Claude)** — see below.
 
 | Work item | Commit | Status |
 |---|---|---|
@@ -30,7 +30,13 @@ Prometheus launchd `bin/k3d-manager` (nonexistent) → `scripts/k3d-manager`. ar
 | Istio ambient/Hostinger drift reconciliation | `357edf52` | pushed; shellcheck and YAML parsing pass |
 | Git-persisted CVE remediation promoter | `3df62fbf` | pushed; shellcheck, POSIX shebang, YAML parsing, and `_agent_audit` pass |
 
-Live promoter dry-run/auto-sync verification and PAT seeding remain Claude-owned release follow-up.
+**#18 promoter git-persist DRY-RUN VERIFIED 2026-08-11 (Claude):** Keychain `platform-ops-git-writer`/`k3dm`
+seeded (interim `gh auth token`, `repo` scope — local dry-run only; replace with fine-grained
+`contents:write`-only PAT before in-cluster use), synced to `platform-ops` Secret key `git-token`.
+Exercised the exact git-persist path non-destructively — clone via `x-access-token:` URL (exit 0), real
+`set_image_digest.awk` on `services/shopping-cart-order/kustomization.yaml`, promoter-author local commit,
+`git push --dry-run origin HEAD:k3d-manager-v1.24.0` → `503b5dd..7e4474e` exit 0 (WRITE authenticates).
+Remote untouched. Last open #18 item closed → **v1.24.0 fully code-complete + live-verified.**
 
 | Version | Theme | State |
 |---|---|---|

@@ -35,7 +35,7 @@
   `{{K3D_MANAGER_PATH}}`→`bin/k3d-manager` which **doesn't exist** (entry is `scripts/k3d-manager`); fixed.
   **Deployed live:** rotator manifest applied + Vault `argocd-rotation` policy/role created via
   `deploy_argocd_platform_ops` (note: that also brought #18 promoter code live — GIT_WRITE_TOKEN is
-  `optional:true`, safe live-patch fallback; #18 dry-run + PAT seed still pending). **Verified live:**
+  `optional:true`, safe live-patch fallback; **#18 dry-run + PAT seed DONE 2026-08-11 — see below**). **Verified live:**
   one-shot Job rotates → `argocd-secret` mtime advanced 2026-08-05→2026-08-11, stored bcrypt clean/valid,
   new Vault password → ArgoCD `/api/v1/session` **LOGIN SUCCESS** (wrong pw rejected as control).
   Prometheus host-side launchd agent installed (path fixed) + `observability_rotate_prometheus_basic_auth`
@@ -52,8 +52,18 @@
 - Order remediation promoter git-persistence slice committed and pushed as `3df62fbf`.
 - Static gates passed: webhook `py_compile` + BATS (52 and 53 tests respectively), Istio shellcheck/YAML
   parsing, promoter shellcheck/POSIX/YAML parsing, and `_agent_audit` under Bash.
-- Promoter live dry-run/auto-sync remains Claude-owned post-merge verification; the dedicated
-  `platform-ops-git-writer` least-privilege PAT must be seeded before durable git writes activate.
+- **#18 promoter git-persist DRY-RUN VERIFIED live 2026-08-11 (Claude).** Keychain slot
+  `platform-ops-git-writer`/`k3dm` seeded — **interim** with `gh auth token` (`repo` scope; decision:
+  reuse the broad token for the *local* dry-run only, since it runs as the user not the in-cluster robot;
+  a dedicated fine-grained `contents:write`-only PAT must replace it BEFORE the promoter runs in-cluster,
+  where the token lives in a cluster Secret). Synced into `platform-ops` via
+  `argocd_sync_git_writer_secret` → Secret `platform-ops-git-writer` key `git-token` (cronjob env
+  `GIT_WRITE_TOKEN`, `optional:true`). Exercised the promoter's exact git-persist path end-to-end,
+  non-destructively: clone release branch via `x-access-token:` URL (exit 0), ran the real
+  `set_image_digest.awk` on `services/shopping-cart-order/kustomization.yaml` (no pre-existing `images:`
+  block → `END` branch appended one correctly), local commit with promoter author/message,
+  `git push --dry-run origin HEAD:k3d-manager-v1.24.0` → `503b5dd..7e4474e`, exit 0 (**token authenticates
+  WRITE**). Remote untouched, scratch scrubbed. Last open #18 item closed.
 - **Claude independently VERIFIED all 5 SHAs on `origin/k3d-manager-v1.24.0` (2026-08-10):** archive-revert
   guard intact (`GEMINI_MODEL=gemini-3.5-flash-medium` line 212, `_rate_limited("slack")` line 3054, zero
   `gemini-2.5-flash`, Content-Length hardening present) — the D `bin/k3dm-webhook` edit was hand-applied,
