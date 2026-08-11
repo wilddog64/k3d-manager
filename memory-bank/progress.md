@@ -37,6 +37,10 @@ git-persist dry-run end-to-end (clone → awk-pin → `push --dry-run` authentic
 ⚠️ Interim git-writer token (`gh auth token`, `repo` scope) must be replaced with a fine-grained
 `contents:write`-only PAT before the promoter runs in-cluster — see `activeContext.md`.
 
+**PR #113 review follow-up 2026-08-11:** Copilot's six actionable threads were fixed and resolved in
+`be29b5a0`; local BATS/shellcheck/static parse gates passed and GitHub CI is green. PR is mergeable but
+still requires an approving review.
+
 ## Pending releases (forward scope — detail in activeContext.md)
 
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge

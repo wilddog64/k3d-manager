@@ -96,6 +96,10 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
 
 ## Recently shipped (pointers only — detail in CHANGELOG + retro)
 
+- **PR #113 Copilot follow-up (2026-08-11):** six actionable review threads addressed and resolved in
+  `be29b5a0` (credential exposure, portability, launchd PATH, and test dependency). CI is green; PR
+  remains review-gated pending an approving reviewer.
+
 - **v1.23.0** RELEASED — CVE observability + remediation lifecycle (B+C). PR #112 `7253ece4`, tagged;
   platform-ops deployed live (alert-noise split active), retro `docs/retro/2026-08-09-v1.23.0-retrospective.md`.
 - **v1.22.0** RELEASED — OpenLDAP bitnami→Symas migration. PR #111 `1bbb74b0`, tagged.
