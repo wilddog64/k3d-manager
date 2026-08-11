@@ -36,7 +36,7 @@ function deploy_observability() {
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
 
   local _am_creds _vault_hdr
   _vault_hdr=$(mktemp)
@@ -553,7 +553,7 @@ function observability_rotate_prometheus_basic_auth() {
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token _vault_hdr _prom_payload
   _vault_token=$(_kubectl get secret vault-root -n secrets \
-    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
   _vault_hdr=$(mktemp)
   printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
   _observability_generate_prometheus_basic_auth || { rm -f "${_vault_hdr}"; return 1; }

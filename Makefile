@@ -353,7 +353,7 @@ show-service-passwords:
 	@echo "  === Service Credentials ==="
 	@echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
 	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
 	_argocd=$$(curl -sf -H "@$$_vault_hdr" \
 	  "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \

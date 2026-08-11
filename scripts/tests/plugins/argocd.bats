@@ -14,7 +14,7 @@ setup() {
 
 @test "ArgoCD credential rotator is namespaced and least privilege" {
   local manifest="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/argocd-credential-rotator.yaml"
-  run python3 -c 'import sys,yaml; docs=list(yaml.safe_load_all(open(sys.argv[1]))); assert any(d.get("kind")=="CronJob" for d in docs)' "${manifest}"
+  run grep -F -- 'kind: CronJob' "${manifest}"
   [ "$status" -eq 0 ]
   run grep -F -- 'namespace: cicd' "${manifest}"
   [ "$status" -eq 0 ]
