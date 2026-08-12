@@ -71,6 +71,9 @@ still requires an approving review.
       `Overall: HEALTHY`; issue `docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md`.
 - [x] Status JSON provider repair (2026-08-13): `make status-json` now follows the active-provider
       file instead of defaulting to `k3s-aws`; 5/5 summary BATS pass and live JSON is healthy.
+- [x] Istio Unknown cleanup (2026-08-13): removed finalizers from four deletion-marked stale
+      `ubuntu-k3s` Istio Applications targeting retired `host.k3d.internal`; ArgoCD removed them and
+      Hostinger Istio remains Synced/Healthy. Issue: `docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md`.
 - [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED, not started). Spec
       `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + attest at build; `cosign verify`
       at promotion + admission (Kyverno, staged Audit→Enforce). Key-in-Vault, pub via ESO. Multi-repo.

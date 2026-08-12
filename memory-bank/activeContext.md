@@ -27,6 +27,9 @@ values from Vault; the LaunchAgent renderer now substitutes the real HOME in KUB
 `docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md`.
 `make status-json` now follows the active provider as well as `make status`; the live JSON result is
 `overall=healthy`, provider `k3s-hostinger`. See `docs/issues/2026-08-13-status-json-default-provider.md`.
+Stale Istio `ubuntu-k3s` Applications were diagnosed as deletion-tombstoned objects targeting retired
+`host.k3d.internal`; their finalizers were removed and ArgoCD deleted them. Hostinger Istio remains
+Synced/Healthy. See `docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md`.
 The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete
