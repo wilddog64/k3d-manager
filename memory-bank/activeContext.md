@@ -57,6 +57,10 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
 
 - Update auto-memory `reference_trivy_critical_upstream_image_noise` "still errors" note once a real
   `wilddog64/*` TrivyCritical analyze is observed posting real text via the `69e21e15` fix.
+- **CVE remediation dashboard history (investigated 2026-08-12):** the displayed `ready_pod_digest_mismatch`
+  rows are retained Aug 6/Aug 9 historical events. Payment has later `applied` events; current order/payment
+  workloads are healthy. The flat panel does not collapse superseded failures. Follow-up issue:
+  `docs/issues/2026-08-12-cve-remediation-failed-history-investigation.md`.
 
 ## Pending releases (forward scope)
 

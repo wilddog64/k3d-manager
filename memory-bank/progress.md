@@ -78,3 +78,7 @@ still requires an approving review.
 - [ ] `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` carry.
 - [ ] Shopping-cart Dependabot backlog (Go builder-image bumps, majors held) — `project_backlog.md`.
 - [ ] rabbitmq-client-java NPE fix `36ed860` — JAR publish + pom update pending.
+- [x] CVE remediation failure investigation (2026-08-12) — dashboard rows are historical
+      `ready_pod_digest_mismatch` events; later payment events applied and current workloads are healthy.
+      Dashboard supersession/current-state query remains queued; see
+      `docs/issues/2026-08-12-cve-remediation-failed-history-investigation.md`.
