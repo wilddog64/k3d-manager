@@ -12,7 +12,7 @@ implementation-grade plans: `docs/plans/v1.25.0-e2e-verification-harness.md`,
 `docs/plans/v1.25.0-dependabot-automerge-observability.md` (event-driven Dependabot auto-merge
 monitoring with Grafana/Alertmanager visibility), plus
 `docs/plans/v1.25.0-status-output-contract.md` (concise color-coded `make status` with failed-service
-health/HTTP codes, full and JSON modes). Implementation is not started.
+health/HTTP codes, `SERVICE=<name>` focused diagnostics, full and JSON modes). Implementation is not started.
 The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete
