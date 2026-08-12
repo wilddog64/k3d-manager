@@ -1757,10 +1757,13 @@ def _smoke_test_logins(provider, app_context):
             results.append(("Frontend login", False, str(exc)[:200]))
 
     argo_user = os.environ.get("K3DM_SMOKE_ARGOCD_USER", "admin")
+    # The bootstrap Secret is immutable after installation.  Monthly rotation
+    # publishes the authoritative password through Vault/ESO instead.
     argo_pass = os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _smoke_secret(
-        "cicd", "password", "argocd-initial-admin-secret")
+        "cicd", "password", "argocd-admin-secret") or _smoke_secret(
+            "cicd", "password", "argocd-initial-admin-secret")
     if not argo_pass:
-        results.append(("ArgoCD login", None, "no credentials (argocd-initial-admin-secret absent; set K3DM_SMOKE_ARGOCD_PASS)"))
+        results.append(("ArgoCD login", None, "no credentials (argocd-admin-secret absent; set K3DM_SMOKE_ARGOCD_PASS)"))
     else:
         try:
             code, raw = _post(

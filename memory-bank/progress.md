@@ -43,6 +43,7 @@ still requires an approving review.
 
 **Diagnosis 2026-08-11:** filed `docs/issues/2026-08-11-argocd-login-smoke-stale-initial-secret.md`;
 ArgoCD health is 200, but login smoke uses the stale bootstrap Secret after `argocd-secret` rotation.
+Live ESO/Vault reconciliation completed 2026-08-12; smoke code now prefers the rotated admin Secret.
 
 ## Pending releases (forward scope — detail in activeContext.md)
 

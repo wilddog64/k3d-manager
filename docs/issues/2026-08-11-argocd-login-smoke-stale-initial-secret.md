@@ -48,3 +48,8 @@ Make the smoke test read the same authoritative rotated credential used by `make
 regression test proving the initial bootstrap Secret is not used after rotation. Reconcile or explicitly
 remove the missing `argocd-admin-secret` ExternalSecret path as part of that fix. Do not patch
 `argocd-initial-admin-secret` as a workaround; it is bootstrap state, not the active credential source.
+
+## Fix status
+
+The live SecretStore, Vault role, and ESO ExternalSecret were reconciled on 2026-08-12. The smoke
+test now prefers `argocd-admin-secret` and retains the initial Secret only as a pre-rotation fallback.
