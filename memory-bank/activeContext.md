@@ -30,6 +30,9 @@ values from Vault; the LaunchAgent renderer now substitutes the real HOME in KUB
 Stale Istio `ubuntu-k3s` Applications were diagnosed as deletion-tombstoned objects targeting retired
 `host.k3d.internal`; their finalizers were removed and ArgoCD deleted them. Hostinger Istio remains
 Synced/Healthy. See `docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md`.
+The CVE remediation dashboard cleanup is implemented: exporter events now expose `current=true` and
+mark superseded failed events; Grafana separates Current Remediation Status from Remediation History.
+Historical ConfigMaps remain intact. See the updated `docs/issues/2026-08-12-cve-remediation-failed-history-investigation.md`.
 The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete

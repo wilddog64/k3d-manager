@@ -74,6 +74,9 @@ still requires an approving review.
 - [x] Istio Unknown cleanup (2026-08-13): removed finalizers from four deletion-marked stale
       `ubuntu-k3s` Istio Applications targeting retired `host.k3d.internal`; ArgoCD removed them and
       Hostinger Istio remains Synced/Healthy. Issue: `docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md`.
+- [x] CVE remediation dashboard cleanup (2026-08-13): exporter marks current events and superseded
+      failures; dashboard adds Current Status and labels audit history. Static YAML/JSON and embedded
+      exporter compilation pass; live reapply remains to be run after push.
 - [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED, not started). Spec
       `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + attest at build; `cosign verify`
       at promotion + admission (Kyverno, staged Audit→Enforce). Key-in-Vault, pub via ESO. Multi-repo.
