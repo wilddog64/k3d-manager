@@ -43,6 +43,9 @@ still requires an approving review.
 
 ## Pending releases (forward scope — detail in activeContext.md)
 
+- [x] **v1.25.0 branch prepared** from merged `main` with the two queued E2E specs; no unrelated
+      ArgoCD diagnosis branch content carried forward.
+
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger capacity
       (durable `maxSurge=0` in git OR bump node CPU — issue `2026-08-10-hostinger-rollout-deadlock-*`).

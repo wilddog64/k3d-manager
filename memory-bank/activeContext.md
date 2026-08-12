@@ -4,7 +4,13 @@
 > `CHANGELOG.md` (v1.24.0 section), `docs/plans/v1.24.0-*`, `docs/bugs/v1.24.0-*`, `docs/retro/`,
 > `docs/issues/`, and git history (`git log --follow memory-bank/`).
 
-## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release path in progress
+## Current focus — v1.25.0 scope queued on clean release branch
+
+The clean `v1.25.0` branch is based on merged `main` (`fd281c85`). Its queued scope is limited to
+`docs/plans/v1.25.0-e2e-verification-harness.md` and `docs/plans/v1.25.0-e2e-observability-path-a.md`.
+The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
+
+## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete
 
 **v1.24.0 = platform hardening (D+E+F+#18).** All code committed + pushed to
 `origin/k3d-manager-v1.24.0`, Claude-verified on origin. CHANGELOG + README + `docs/releases.md`
