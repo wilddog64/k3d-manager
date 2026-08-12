@@ -41,6 +41,9 @@ git-persist dry-run end-to-end (clone → awk-pin → `push --dry-run` authentic
 `be29b5a0`; local BATS/shellcheck/static parse gates passed and GitHub CI is green. PR is mergeable but
 still requires an approving review.
 
+**Diagnosis 2026-08-11:** filed `docs/issues/2026-08-11-argocd-login-smoke-stale-initial-secret.md`;
+ArgoCD health is 200, but login smoke uses the stale bootstrap Secret after `argocd-secret` rotation.
+
 ## Pending releases (forward scope — detail in activeContext.md)
 
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
