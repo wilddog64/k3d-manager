@@ -25,6 +25,8 @@ refusal as a warning; remaining login 401s are genuine service credential issues
 The login checks are now green after reading hub-scoped Keycloak credentials and current ArgoCD/Grafana
 values from Vault; the LaunchAgent renderer now substitutes the real HOME in KUBECONFIG. See
 `docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md`.
+`make status-json` now follows the active provider as well as `make status`; the live JSON result is
+`overall=healthy`, provider `k3s-hostinger`. See `docs/issues/2026-08-13-status-json-default-provider.md`.
 The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete

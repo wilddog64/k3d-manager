@@ -69,6 +69,8 @@ still requires an approving review.
 - [x] Status login smoke repair (2026-08-12): webhook now uses hub-scoped Keycloak and Vault-managed
       ArgoCD/Grafana credentials; LaunchAgent KUBECONFIG renders correctly. Live `make status` is
       `Overall: HEALTHY`; issue `docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md`.
+- [x] Status JSON provider repair (2026-08-13): `make status-json` now follows the active-provider
+      file instead of defaulting to `k3s-aws`; 5/5 summary BATS pass and live JSON is healthy.
 - [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED, not started). Spec
       `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + attest at build; `cosign verify`
       at promotion + admission (Kyverno, staged Audit→Enforce). Key-in-Vault, pub via ESO. Multi-repo.

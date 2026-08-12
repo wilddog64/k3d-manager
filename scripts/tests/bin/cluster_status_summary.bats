@@ -44,3 +44,11 @@ teardown() { rm -rf "${TMP_DIR}"; }
   [ "${status}" -eq 3 ]
   [[ "${output}" == *"unknown service"* ]]
 }
+
+@test "json mode follows the active provider when no provider is explicit" {
+  mkdir -p "${TMP_DIR}/.local/share/k3d-manager"
+  printf '%s\n' k3s-hostinger >"${TMP_DIR}/.local/share/k3d-manager/active-provider"
+  HOME="${TMP_DIR}" run "${STATUS_SCRIPT}" --mode json
+  [ "${status}" -eq 1 ]
+  python3 -c 'import json,sys; assert json.loads(sys.argv[1])["provider"] == "k3s-hostinger"' "${output}"
+}
