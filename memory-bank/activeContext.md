@@ -18,6 +18,9 @@ The status refactor is now implemented on this branch; live deployment is not pe
 Keychain token, refreshed the GitHub secret, and reinstalled the LaunchAgent; health endpoint HTTP 200.
 Concise status now works. It reports separate Keycloak, ArgoCD, and Grafana login 401 failures plus
 expected ESO/data-layer warnings; see `docs/issues/2026-08-12-webhook-token-restored-status-verification.md`.
+Follow-up fixed provider selection from the active-provider file and classified optional Pushgateway
+refusal as a warning; remaining login 401s are genuine service credential issues. See
+`docs/issues/2026-08-12-status-provider-and-optional-pushgateway.md`.
 The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete

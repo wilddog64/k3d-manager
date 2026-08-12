@@ -6,7 +6,7 @@ setup() {
   cat >"${TMP_DIR}/curl" <<'EOF'
 #!/bin/sh
 cat <<'JSON'
-{"services":[{"name":"shopping-cart-order","ok":false,"detail":"HTTP 503; readiness 0/1"},{"name":"Grafana","ok":true,"detail":"HTTP 200"}]}
+{"services":[{"name":"shopping-cart-order","ok":false,"detail":"HTTP 503; readiness 0/1"},{"name":"Pushgateway","ok":false,"detail":"connection refused"},{"name":"Grafana","ok":true,"detail":"HTTP 200"}]}
 JSON
 EOF
   chmod +x "${TMP_DIR}/curl"
@@ -21,6 +21,7 @@ teardown() { rm -rf "${TMP_DIR}"; }
   [[ "${output}" == *"shopping-cart-order: HTTP 503; readiness 0/1"* ]]
   [[ "${output}" == *"Grafana: HTTP 200"* ]]
   [[ "${output}" == *"Overall: FAIL"* ]]
+  [[ "${output}" == *"Pushgateway: connection refused"* ]]
 }
 
 @test "focused service mode excludes unrelated services" {
