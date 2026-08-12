@@ -524,6 +524,11 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
 
 ### Follow-up (non-blocking)
 
+- **ArgoCD login smoke bug filed 2026-08-11:** `make status` gets HTTP 401 because `bin/k3dm-webhook`
+  reads stale `argocd-initial-admin-secret` after the rotator updates `argocd-secret`; the intended
+  `argocd-admin-secret` ESO path is absent live. Evidence and fix direction:
+  `docs/issues/2026-08-11-argocd-login-smoke-stale-initial-secret.md`.
+
 - Update auto-memory `reference_trivy_critical_upstream_image_noise` "still errors" note once a real
   `wilddog64/*` TrivyCritical analyze is observed posting real text via the `69e21e15` fix.
 - **CVE remediation dashboard history (investigated 2026-08-12):** the displayed `ready_pod_digest_mismatch`
