@@ -13,7 +13,8 @@ implementation-grade plans: `docs/plans/v1.25.0-e2e-verification-harness.md`,
 monitoring with Grafana/Alertmanager visibility), plus
 `docs/plans/v1.25.0-status-output-contract.md` (concise color-coded `make status` with failed-service
 health/HTTP codes, `SERVICE=<name>` focused diagnostics, full and JSON modes). Implementation is not started.
-The status refactor is now implemented on this branch; live deployment is not performed.
+The status refactor is now implemented on this branch and live-verified healthy after the
+webhook login credential/KUBECONFIG fix (`fix(status): use current Vault credentials for login smoke`).
 **Status source verified 2026-08-12:** `bin/k3dm-webhook-setup` restored the existing 64-byte
 Keychain token, refreshed the GitHub secret, and reinstalled the LaunchAgent; health endpoint HTTP 200.
 Concise status now works. It reports separate Keycloak, ArgoCD, and Grafana login 401 failures plus
@@ -21,6 +22,9 @@ expected ESO/data-layer warnings; see `docs/issues/2026-08-12-webhook-token-rest
 Follow-up fixed provider selection from the active-provider file and classified optional Pushgateway
 refusal as a warning; remaining login 401s are genuine service credential issues. See
 `docs/issues/2026-08-12-status-provider-and-optional-pushgateway.md`.
+The login checks are now green after reading hub-scoped Keycloak credentials and current ArgoCD/Grafana
+values from Vault; the LaunchAgent renderer now substitutes the real HOME in KUBECONFIG. See
+`docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md`.
 The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete

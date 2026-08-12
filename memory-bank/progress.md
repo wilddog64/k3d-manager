@@ -66,6 +66,9 @@ still requires an approving review.
       HTTP 200. Remaining login 401s (Keycloak/ArgoCD/Grafana) are separate follow-up issues.
 - [x] Status follow-up (2026-08-12): default `make status` now follows the active provider file and
       optional Pushgateway refusal is warning-level; focused status tests remain green.
+- [x] Status login smoke repair (2026-08-12): webhook now uses hub-scoped Keycloak and Vault-managed
+      ArgoCD/Grafana credentials; LaunchAgent KUBECONFIG renders correctly. Live `make status` is
+      `Overall: HEALTHY`; issue `docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md`.
 - [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED, not started). Spec
       `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + attest at build; `cosign verify`
       at promotion + admission (Kyverno, staged Audit→Enforce). Key-in-Vault, pub via ESO. Multi-repo.
