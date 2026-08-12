@@ -5,7 +5,7 @@ while [[ $# -gt 0 ]]; do case "$1" in --mode) [[ $# -ge 2 ]] || exit 3; _mode="$
 case "${_mode}" in summary|json) ;; *) exit 3;; esac
 _provider="${CLUSTER_PROVIDER:-k3s-aws}"; _context="${APP_CONTEXT:-}"
 _color() { local code="$1" text="$2"; if [[ "${_mode}" == json || "${NO_COLOR:-}" == 1 || "${STATUS_COLOR:-}" == never || ( ! -t 1 && "${STATUS_COLOR:-}" != always ) ]]; then printf '%s' "${text}"; else printf '\033[%sm%s\033[0m' "${code}" "${text}"; fi; }
-_token="${K3DM_WEBHOOK_TOKEN:-$(security find-generic-password -s k3dm-webhook-token -w 2>/dev/null || true)}"; _port="${K3DM_WEBHOOK_PORT:-7443}"; _tmp="$(mktemp -t k3dm-status.XXXXXX)"; trap 'rm -f "${_tmp}"' EXIT
+_token="${K3DM_WEBHOOK_TOKEN:-$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null || true)}"; _port="${K3DM_WEBHOOK_PORT:-7443}"; _tmp="$(mktemp -t k3dm-status.XXXXXX)"; trap 'rm -f "${_tmp}"' EXIT
 if [[ -z "${_token}" ]] || ! curl -sf --max-time 15 -H "Authorization: Bearer ${_token}" "http://localhost:${_port}/api/v1/health?provider=${_provider}" >"${_tmp}" 2>/dev/null; then
   if [[ "${_mode}" == json ]]; then printf '{"overall":"unknown","provider":"%s","context":"%s","errors":[],"warnings":[{"id":"status_source","status":"unknown","reason":"webhook unavailable"}],"checks":[],"counts":{}}\n' "${_provider}" "${_context}"; else printf '%s\n' "$(_color 33 'Overall: UNKNOWN')" '  ! status source: webhook unavailable' '  hint: make restart-webhook'; fi; exit 2
 fi
