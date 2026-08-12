@@ -50,6 +50,10 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
   `docs/issues/2026-08-11-argocd-login-smoke-stale-initial-secret.md`.
   Live Vault ESO role/SecretStore/ExternalSecret were reconciled 2026-08-12; the smoke fix now prefers
   the rotated `argocd-admin-secret` and keeps the bootstrap Secret only as fallback.
+- **Product-catalog rollout CPU deadlock 2026-08-12:** Hostinger's single node cannot schedule the
+  default `maxSurge: 1` replacement. The product-catalog overlay now uses `maxSurge: 0` and
+  `maxUnavailable: 1`; evidence and verification are in
+  `docs/issues/2026-08-12-product-catalog-rollout-cpu-deadlock.md`.
 
 - Update auto-memory `reference_trivy_critical_upstream_image_noise` "still errors" note once a real
   `wilddog64/*` TrivyCritical analyze is observed posting real text via the `69e21e15` fix.

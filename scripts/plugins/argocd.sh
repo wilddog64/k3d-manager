@@ -1524,6 +1524,12 @@ EOF
    argocd_sync_webhook_token_secret cicd
    argocd_sync_app_rebuild_secret platform-ops
    argocd_sync_git_writer_secret platform-ops
+   _info "[argocd] Reconciling admin credentials ExternalSecret for rotated password smoke checks..."
+   envsubst < "${ARGOCD_CONFIG_DIR}/externalsecret-admin.yaml.tmpl" | _kubectl apply -f - >/dev/null
+   if ! _kubectl -n "${ARGOCD_NAMESPACE}" wait --for=condition=Ready --timeout=60s \
+      externalsecret/"${ARGOCD_ADMIN_SECRET_NAME}" 2>/dev/null; then
+      _warn "[argocd] Timeout waiting for admin ExternalSecret; ArgoCD login smoke may remain stale"
+   fi
    _argocd_apply_credential_rotator
 
    _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"

@@ -7,6 +7,20 @@ images:
     newTag: latest
 patches:
   - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: product-catalog
+      spec:
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
+    target:
+      kind: Deployment
+      name: product-catalog
+  - patch: |-
       apiVersion: v1
       kind: ServiceAccount
       metadata:

@@ -32,6 +32,15 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "platform-ops deploy reconciles the rotated ArgoCD admin ExternalSecret" {
+  run grep -F -- 'externalsecret-admin.yaml.tmpl' \
+    "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'externalsecret/"${ARGOCD_ADMIN_SECRET_NAME}"' \
+    "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+}
+
 @test "ArgoCD rotator bcrypt is runtime-correct and pod excludes istio sidecar" {
   local manifest="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/argocd-credential-rotator.yaml"
   # newline-fed stdin (no trailing newline → argocd account bcrypt fatal EOF)

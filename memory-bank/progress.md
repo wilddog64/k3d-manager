@@ -45,6 +45,10 @@ still requires an approving review.
 ArgoCD health is 200, but login smoke uses the stale bootstrap Secret after `argocd-secret` rotation.
 Live ESO/Vault reconciliation completed 2026-08-12; smoke code now prefers the rotated admin Secret.
 
+**Product-catalog rollout 2026-08-12:** fixed the Hostinger CPU deadlock in the overlay with
+`maxSurge: 0/maxUnavailable: 1`; documented in
+`docs/issues/2026-08-12-product-catalog-rollout-cpu-deadlock.md`.
+
 ## Pending releases (forward scope — detail in activeContext.md)
 
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
