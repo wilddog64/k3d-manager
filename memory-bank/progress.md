@@ -43,8 +43,9 @@ still requires an approving review.
 
 ## Pending releases (forward scope — detail in activeContext.md)
 
-- [x] **v1.25.0 branch prepared** from merged `main` with three queued plans: E2E verification,
-      E2E observability, and event-driven Dependabot auto-merge monitoring/Grafana visibility; no
+- [x] **v1.25.0 branch prepared** from merged `main` with four queued plans: E2E verification,
+      E2E observability, event-driven Dependabot auto-merge monitoring/Grafana visibility, and the
+      concise color-coded status output contract; no
       unrelated ArgoCD diagnosis branch content carried forward.
 
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
@@ -56,6 +57,8 @@ still requires an approving review.
       **+ Dependabot auto-merge observability** (plan doc #3) — signed GitHub event intake, bounded
       Prometheus state, Grafana panels, Alertmanager Slack alerts, and read-only reconciliation fallback.
       Plan committed on `v1.25.0`; implementation not started.
+      **+ Status output contract** (plan doc #4) — concise error-first output with red/yellow/green
+      terminal semantics, `status-full`, `status-json`, and stable exit codes. Implementation not started.
 - [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED, not started). Spec
       `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + attest at build; `cosign verify`
       at promotion + admission (Kyverno, staged Audit→Enforce). Key-in-Vault, pub via ESO. Multi-repo.
