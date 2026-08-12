@@ -6,8 +6,11 @@
 
 ## Current focus — v1.25.0 scope queued on clean release branch
 
-The clean `v1.25.0` branch is based on merged `main` (`fd281c85`). Its queued scope is limited to
-`docs/plans/v1.25.0-e2e-verification-harness.md` and `docs/plans/v1.25.0-e2e-observability-path-a.md`.
+The clean `v1.25.0` branch is based on merged `main` (`fd281c85`). Its queued scope now contains three
+implementation-grade plans: `docs/plans/v1.25.0-e2e-verification-harness.md`,
+`docs/plans/v1.25.0-e2e-observability-path-a.md`, and
+`docs/plans/v1.25.0-dependabot-automerge-observability.md` (event-driven Dependabot auto-merge
+monitoring with Grafana/Alertmanager visibility). Implementation is not started.
 The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete
@@ -68,8 +71,12 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
   `shopping-cart-e2e-tests`. Exit-code + JSON-summary contract seeds the v1.26.0 gate.
   **+ e2e observability (plan doc #2 `v1.25.0-e2e-observability-path-a.md`):** reuse the CVE exporter seam
   — harness writes a `k3dm.k3d.io/e2e-result=true` ConfigMap; extend `vulnerability-inventory-exporter.py`
-  to emit `e2e_*` gauges; new `grafana-dashboard-e2e.yaml` + `E2EVerificationFailing/Stale` rules; deploy
-  via `argocd.sh`. No new component, no Tempo (span tracing = separate forward theme).
+      to emit `e2e_*` gauges; new `grafana-dashboard-e2e.yaml` + `E2EVerificationFailing/Stale` rules; deploy
+      via `argocd.sh`. No new component, no Tempo (span tracing = separate forward theme).
+      **+ Dependabot auto-merge observability (plan doc #3 `v1.25.0-dependabot-automerge-observability.md`):**
+      signed GitHub PR/check/workflow events plus 15-minute read-only reconciliation feed bounded
+      Prometheus metrics, Grafana panels, and owned Alertmanager Slack alerts. Monitor never merges or
+      changes branch protection; implementation not started.
 - **v1.26.0 = image signing + attestation — close the CVE loop (SCOPED, not started).** Spec
   `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + Trivy vuln/SBOM attest at build;
   `cosign verify` at promotion (promoter gate) AND admission (Kyverno, staged Audit→Enforce, app
