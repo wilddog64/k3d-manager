@@ -59,7 +59,8 @@ still requires an approving review.
       Plan committed on `v1.25.0`; implementation not started.
       **+ Status output contract** (plan doc #4) — concise error-first output with red/yellow/green
       terminal semantics, failed-service health/HTTP codes, `SERVICE=<name>` focused diagnostics,
-      `status-full`, `status-json`, and stable exit codes. Implementation not started.
+      `status-full`, `status-json`, and stable exit codes. Implementation is committed on the branch;
+      live verification/deployment is pending.
 - [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED, not started). Spec
       `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + attest at build; `cosign verify`
       at promotion + admission (Kyverno, staged Audit→Enforce). Key-in-Vault, pub via ESO. Multi-repo.

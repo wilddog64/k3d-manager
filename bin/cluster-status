@@ -15,6 +15,26 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+_status_mode=full
+_status_service=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --summary) _status_mode=summary ;;
+    --full) _status_mode=full ;;
+    --json) _status_mode=json ;;
+    --service) [[ $# -ge 2 ]] || { echo "--service requires a name" >&2; exit 3; }; _status_service="$2"; shift ;;
+    --help|-h) echo "Usage: bin/cluster-status [--summary|--full|--json] [--service NAME]"; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 3 ;;
+  esac
+  shift
+done
+if [[ "${_status_mode}" != full ]]; then
+  if [[ -n "${_status_service}" ]]; then
+    exec "${SCRIPT_DIR}/cluster-status-summary" --mode "${_status_mode}" --service "${_status_service}"
+  fi
+  exec "${SCRIPT_DIR}/cluster-status-summary" --mode "${_status_mode}"
+fi
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/observability.sh"
