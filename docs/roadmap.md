@@ -108,6 +108,23 @@ Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth
 
 ---
 
+## Queued milestones (scoped)
+
+These have scope docs and committed version numbers; they ship in order after v1.25.0
+(Stripe/Go live acceptance, workstream G).
+
+- **v1.26.0 — sandbox registration lifecycle hygiene** — managed registration metadata, explicit
+  provider teardown, a TTL/grace-period watchdog for stale ArgoCD cluster registrations,
+  resource-preserving Application cleanup, and Grafana/Slack visibility. Prevents destroyed ephemeral
+  sandboxes from leaving misleading `Unknown` Applications while protecting live clusters from
+  false-positive cleanup. Scope: `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`.
+- **v1.27.0 — image signing + attestation** — cosign sign + Trivy vuln/SBOM attest at build;
+  `cosign verify` at promotion and admission (Kyverno, staged Audit→Enforce), closing the CVE loop.
+  Scope: `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`.
+- **v1.28.0 — platform zero-downtime rollouts** — scale the stateless hub tier, add probes/PDBs and
+  rolling-update guarantees, validate capacity, and separately design failover for each stateful
+  service before claiming no downtime. Scope: `docs/plans/v1.28.0-platform-zero-downtime-rollouts.md`.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
