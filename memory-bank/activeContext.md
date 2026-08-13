@@ -87,3 +87,5 @@ historical failed promotion with no applied event, not the current image. See
 `docs/issues/2026-08-13-order-remediation-current-row.md`.
 The exporter refinement is now live: order is classified `deployment_advanced` and payment remains
 `applied` in the current-status metrics; no audit events were deleted.
+Dashboard remediation tables now hide repeated Prometheus scrape metadata and use concise headers:
+`CVEs`, `Affected service`, `Image`, `Requested`, `Applied`, `State`, and `Reason`.
