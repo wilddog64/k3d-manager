@@ -47,14 +47,14 @@ status:
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
 	             || echo "OCI cluster unreachable" ;; \
-	  *)       $(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )CLUSTER_PROVIDER="$$_provider" bin/cluster-status --summary $(if $(SERVICE),--service $(SERVICE),) ;; \
+	  *)       $(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )CLUSTER_PROVIDER="$$_provider" bin/cluster-status --summary $(if $(SERVICE),--service "$(SERVICE)",) ;; \
 	esac
 
 status-full:
 	@$(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status --full
 
 status-json:
-	@$(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status --json $(if $(SERVICE),--service $(SERVICE),)
+	@$(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status --json $(if $(SERVICE),--service "$(SERVICE)",)
 
 ## Spin up a vCluster and deploy the full stack via ArgoCD (NAME=<name>; MODE=--auto|--keep, default --auto)
 preflight:

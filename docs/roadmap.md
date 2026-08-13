@@ -115,10 +115,10 @@ These have scope docs and committed version numbers; they ship in this order.
 - **v1.24.1 — cluster status output contract + observability polish (point release)** — concise
   color-coded / JSON `make status` modes with `SERVICE=<name>` focus, Slack `/cluster-status` rendered
   as a concise emoji summary, CVE-dashboard header cleanup, and Dependabot auto-merge observability.
-  Already implemented on the `k3d-manager-v1.25.0` branch (to be re-homed to `k3d-manager-v1.24.1` when
-  cut). Scope: `docs/plans/v1.25.0-status-output-contract.md`,
-  `docs/plans/v1.25.0-dependabot-automerge-observability.md`,
-  `docs/bugs/v1.25.0-bugfix-slack-cluster-status-summary-wiring.md`.
+  Implemented on the `k3d-manager-v1.24.1` branch (PR #115). Scope:
+  `docs/plans/v1.24.1-status-output-contract.md`,
+  `docs/plans/v1.24.1-dependabot-automerge-observability.md`,
+  `docs/bugs/v1.24.1-bugfix-slack-cluster-status-summary-wiring.md`.
 - **v1.25.0 — Stripe/Go live acceptance + E2E verification harness (workstream G)** — BLOCKED
   (cross-repo): merge the order-repo schema fix + promote the image → rerun the Stripe live E2E (2/4
   now); hostinger capacity. Plus the substrate-agnostic E2E harness (Tier 1 vCluster blocking + Tier 2
