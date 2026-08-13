@@ -82,6 +82,8 @@ tag `v1.23.0`; restore `enforce_admins`; retro; cut `k3d-manager-v1.24.0`.
 - [x] 2026-08-13: Cleaned stale ubuntu-k3s registration after confirming no AWS sandbox exists.
       Enabled preserve-on-deletion on five dependent ApplicationSets, removed the cluster Secret,
       and confirmed all generated k3s apps disappeared without affecting hostinger apps.
+- [ ] v1.26.0 queued: implement managed sandbox registration lifecycle cleanup and stale ArgoCD
+      watchdog per `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`.
 
 ## Pending releases (integration-split — full file map + blockers in the intent map)
 

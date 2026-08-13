@@ -110,6 +110,15 @@ Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth
 
 ## Forward themes (unversioned until scoped)
 
+### v1.26.0 — sandbox registration lifecycle hygiene
+
+Queued as the sandbox lifecycle milestone before availability work. The concrete scope is
+`docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`: managed registration metadata,
+explicit provider teardown, a TTL/grace-period watchdog for stale ArgoCD cluster registrations,
+resource-preserving Application cleanup, and Grafana/Slack visibility. It prevents destroyed
+ephemeral sandboxes from leaving misleading `Unknown` Applications while protecting live clusters
+from false-positive cleanup.
+
 ### v1.27.0 — platform zero-downtime rollouts
 
 Queued as the availability milestone after v1.26.0 image signing. The concrete

@@ -96,6 +96,11 @@ Platform and shopping-cart CVE inventory tables also hide repeated scrape metada
 changes needed for no-downtime platform patching: two-replica stateless tier, probes, PDBs, rollout and
 capacity gates, plus separate stateful failover decisions. No live workload changes made.
 
+**v1.26.0 queued:** `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md` scopes managed
+sandbox registration metadata, explicit teardown, stale-registration watchdogs, resource-preserving
+Application cleanup, and Grafana/Slack visibility. This is the follow-up to the stale ubuntu-k3s
+cleanup performed on 2026-08-13.
+
 **Payment Trivy alert investigation (2026-08-12):** Live reports for
 `wilddog64/shopping-cart-payment` scan retired ReplicaSet digest `sha256:4abd5935…`, while the
 ready pod runs digest `sha256:022e737a…`; the alert is therefore stale until the current digest is
