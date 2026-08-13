@@ -17,7 +17,10 @@ The branch holds ONLY status-output + observability work (zero workstream-G impl
 - **DEFERRED to cut-time (not done now, same rationale as the appset repoint):** rename branch
   `k3d-manager-v1.25.0` → `k3d-manager-v1.24.1`; rename the status/dependabot/bugfix plan docs
   `v1.25.0-*` → `v1.24.1-*` (keep `v1.25.0-e2e-*` as G); start a fresh `k3d-manager-v1.25.0` off
-  `v1.24.0` for G. **Renaming the branch now would break the dashboards appset ref just repointed to
+  **`main` after v1.24.1 merges** (NOT off v1.24.0) for G — this makes v1.25.0 inherit v1.24.1 with no
+  back-merge, and avoids a divergent `vulnerability-inventory-exporter.yaml` (v1.24.1 touched it via
+  `a119fdde`; e2e-observability plan #2 edits it again). So **v1.24.1 must merge to main before the
+  v1.25.0 branch is created.** **Renaming the branch now would break the dashboards appset ref just repointed to
   `k3d-manager-v1.25.0` — so re-repoint dashboards to the new name as part of that cut.** Roadmap
   `docs/roadmap.md` "Queued milestones" already records this order (v1.24.1 → v1.25.0-G → v1.26 → v1.27 → v1.28).
 
