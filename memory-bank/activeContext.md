@@ -105,4 +105,5 @@ away those labels and `bin/k3dm-webhook` only gathers non-running pods. Issue:
 `docs/issues/2026-08-12-payment-trivy-alert-stale-report-details.md`. A forced report deletion
 recreated the same old digest (46 findings); the ReplicaSet template is sha-tagged while the pod
 runtime reports `latest`, confirming an image mutation/reconciliation gap that must be fixed before
-using a scan refresh as proof.
+using a scan refresh as proof. The hub Application is still pinned to `k3d-manager-v1.22.0`, so the
+v1.23 observability/verifier fixes are not live on this app.

@@ -48,19 +48,25 @@ an ArgoCD app label exists) and a cluster-wide non-running pod list; it does not
 reports or inventory metric. Gemini therefore receives no vulnerability-specific evidence and
 correctly reports that the notification is insufficient to diagnose.
 
+The hub ArgoCD Application currently targets `k3d-manager-v1.22.0` (path
+`services/shopping-cart-payment`), not this branch's `k3d-manager-v1.23.0`. The v1.23
+report/exporter and verifier changes are therefore not live on that Application.
+
 ## Recommended follow-up
 
 1. Do not delete reports as the remediation itself. I deleted the report owned by the current
    ReplicaSet to force a refresh; Trivy recreated it within the observation window with the same
    old digest `sha256:4abd5935…` and 46 findings. The controller follows the ReplicaSet pod
    template, not the runtime image ID.
-2. Resolve the image mutation/reconciliation gap: the ReplicaSet template is
+2. Advance the hub Application to the intended release branch after its PR/release gates pass;
+   do not live-patch the Application because reconciliation will overwrite it.
+3. Resolve the image mutation/reconciliation gap: the ReplicaSet template is
    `:sha-76fbd486…`, while the pod spec/status reports `:latest` and runtime digest
    `sha256:022e737a…`. Until that drift is corrected, a report refresh cannot prove which image is
    deployed.
-3. Add a diagnostics path that looks up the matching inventory/report by repository and digest,
+4. Add a diagnostics path that looks up the matching inventory/report by repository and digest,
    and include a bounded CVE/package/version summary in the alert annotation or webhook prompt.
-4. Upgrade the payment service dependencies/base image to remediate the seven findings if they are
+5. Upgrade the payment service dependencies/base image to remediate the seven findings if they are
    confirmed on the current digest; do not rebuild solely from this stale report.
 
 ## Evidence
@@ -82,4 +88,11 @@ The pod's declared and runtime images were also different:
 ```text
 spec_images: ghcr.io/wilddog64/shopping-cart-payment:sha-76fbd486cf83ae4e8bc5f5275d6b4953998f7921
 status_images: ghcr.io/wilddog64/shopping-cart-payment:latest @sha256:022e737a20189dd857d7605562d58f2d4baf52d32b63c3f195ff73d3643229f8
+```
+
+The hub Application query returned:
+
+```text
+targetRevision: k3d-manager-v1.22.0
+path: services/shopping-cart-payment
 ```

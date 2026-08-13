@@ -69,7 +69,8 @@ tag `v1.23.0`; restore `enforce_admins`; retro; cut `k3d-manager-v1.24.0`.
 - [ ] Payment Trivy alert follow-up: current pod digest differs from the retired ReplicaSet reports;
       seven critical findings are documented. Forced refresh recreated the old report because the
       pod template and runtime image differ; image reconciliation plus Slack report/metric lookup
-      are required.
+      are required. Hub ArgoCD is still tracking `k3d-manager-v1.22.0`, so v1.23 fixes await the
+      release/app branch advance.
       See `docs/issues/2026-08-12-payment-trivy-alert-stale-report-details.md`.
 
 ## Pending releases (integration-split — full file map + blockers in the intent map)
