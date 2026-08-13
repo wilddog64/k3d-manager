@@ -17,6 +17,12 @@
 
 (v1.19.0 was a shopping-cart-only Dependabot milestone — no k3d-manager tag.)
 
+### Dashboard cleanup promotion (2026-08-13)
+
+Commit `02128101` promoted the current-versus-history exporter/dashboard fix to the tracked
+`k3d-manager-v1.23.0` branch. ArgoCD hard refresh reached revision `02128101`, Synced/Healthy, and
+the live dashboard now contains both remediation panels.
+
 ## In flight — v1.23.0 (PR pending)
 
 All B+C code + the pulled-forward Grafana slice is committed, pushed, and LIVE-VERIFIED end-to-end on

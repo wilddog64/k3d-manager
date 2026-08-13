@@ -77,3 +77,7 @@
 - **v1.20.0** RELEASED — CVE auto-patch-loop hardening. PR #109 `9da73458`, tagged.
 - Stripe checkout A–F all MERGED to main across the 5 shopping-cart repos (2026-08-02); payment side
   live on hostinger. Remaining live-acceptance work = v1.25.0 (workstream G).
+
+**Dashboard cleanup promoted 2026-08-13:** `02128101` is now on the ArgoCD-tracked
+`k3d-manager-v1.23.0` branch. A hard refresh advanced `hub-grafana-dashboards` to that revision;
+the live ConfigMap contains Current CVE Remediation Status and Remediation History (audit) panels.
