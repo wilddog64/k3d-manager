@@ -67,7 +67,9 @@ tag `v1.23.0`; restore `enforce_admins`; retro; cut `k3d-manager-v1.24.0`.
 - [ ] `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` +
       `observability.sh` per-hunk split from E → v1.24.0.
 - [ ] Payment Trivy alert follow-up: current pod digest differs from the retired ReplicaSet reports;
-      seven critical findings are documented, and Slack alert diagnostics need report/metric lookup.
+      seven critical findings are documented. Forced refresh recreated the old report because the
+      pod template and runtime image differ; image reconciliation plus Slack report/metric lookup
+      are required.
       See `docs/issues/2026-08-12-payment-trivy-alert-stale-report-details.md`.
 
 ## Pending releases (integration-split — full file map + blockers in the intent map)

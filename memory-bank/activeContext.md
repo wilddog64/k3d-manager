@@ -102,4 +102,7 @@ ready pod runs digest `sha256:022e737a…`; the alert is therefore stale until t
 rescanned. The stale report contains seven critical findings (Tomcat 10.1.16, PostgreSQL 42.6.0,
 Spring Security 6.2.0). Slack diagnostics omit CVE/package data because the Prometheus rule groups
 away those labels and `bin/k3dm-webhook` only gathers non-running pods. Issue:
-`docs/issues/2026-08-12-payment-trivy-alert-stale-report-details.md`.
+`docs/issues/2026-08-12-payment-trivy-alert-stale-report-details.md`. A forced report deletion
+recreated the same old digest (46 findings); the ReplicaSet template is sha-tagged while the pod
+runtime reports `latest`, confirming an image mutation/reconciliation gap that must be fixed before
+using a scan refresh as proof.

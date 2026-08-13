@@ -50,11 +50,17 @@ correctly reports that the notification is insufficient to diagnose.
 
 ## Recommended follow-up
 
-1. Delete or expire vulnerability reports for retired ReplicaSets, and ensure Trivy scans the
-   currently running image digest (`022e737a…`) before treating the finding as current.
-2. Add a diagnostics path that looks up the matching inventory/report by repository and digest,
+1. Do not delete reports as the remediation itself. I deleted the report owned by the current
+   ReplicaSet to force a refresh; Trivy recreated it within the observation window with the same
+   old digest `sha256:4abd5935…` and 46 findings. The controller follows the ReplicaSet pod
+   template, not the runtime image ID.
+2. Resolve the image mutation/reconciliation gap: the ReplicaSet template is
+   `:sha-76fbd486…`, while the pod spec/status reports `:latest` and runtime digest
+   `sha256:022e737a…`. Until that drift is corrected, a report refresh cannot prove which image is
+   deployed.
+3. Add a diagnostics path that looks up the matching inventory/report by repository and digest,
    and include a bounded CVE/package/version summary in the alert annotation or webhook prompt.
-3. Upgrade the payment service dependencies/base image to remediate the seven findings if they are
+4. Upgrade the payment service dependencies/base image to remediate the seven findings if they are
    confirmed on the current digest; do not rebuild solely from this stale report.
 
 ## Evidence
@@ -63,3 +69,17 @@ The live report query returned repository `wilddog64/shopping-cart-payment`, tag
 `sha-76fbd486cf83ae4e8bc5f5275d6b4953998f7921`, and digest
 `sha256:4abd59357b6aaec354b3ef066723cc675ae8202e6cd923d50a3d4f0bdb5f6dc5`; the ready pod image ID
 was `sha256:022e737a20189dd857d7605562d58f2d4baf52d32b63c3f195ff73d3643229f8`.
+
+The forced-refresh command and observation output were:
+
+```text
+vulnerabilityreport.aquasecurity.github.io "replicaset-payment-service-67b4d694d6-payment-service" deleted from shopping-cart-payment namespace
+replicaset-payment-service-67b4d694d6-payment-service sha256:4abd59357b6aaec354b3ef066723cc675ae8202e6cd923d50a3d4f0bdb5f6dc5 46
+```
+
+The pod's declared and runtime images were also different:
+
+```text
+spec_images: ghcr.io/wilddog64/shopping-cart-payment:sha-76fbd486cf83ae4e8bc5f5275d6b4953998f7921
+status_images: ghcr.io/wilddog64/shopping-cart-payment:latest @sha256:022e737a20189dd857d7605562d58f2d4baf52d32b63c3f195ff73d3643229f8
+```
