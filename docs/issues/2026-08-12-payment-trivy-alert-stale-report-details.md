@@ -96,3 +96,11 @@ The hub Application query returned:
 targetRevision: k3d-manager-v1.22.0
 path: services/shopping-cart-payment
 ```
+
+## Live follow-up
+
+The owning `services-git` ApplicationSet was updated to `k3d-manager-v1.23.0` for both its Git
+generator revision and generated Application `targetRevision`. After reconciliation,
+`ubuntu-hostinger-shopping-cart-payment` and the other hostinger shopping-cart Applications
+reported `k3d-manager-v1.23.0`, `Synced`, and `Healthy`. This replaces the earlier non-durable direct
+Application patch, which the v1.22 ApplicationSet reverted.

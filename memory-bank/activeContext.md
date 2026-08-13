@@ -107,3 +107,8 @@ recreated the same old digest (46 findings); the ReplicaSet template is sha-tagg
 runtime reports `latest`, confirming an image mutation/reconciliation gap that must be fixed before
 using a scan refresh as proof. The hub Application is still pinned to `k3d-manager-v1.22.0`, so the
 v1.23 observability/verifier fixes are not live on this app.
+
+**Live follow-up (2026-08-12):** Updated the hub `services-git` ApplicationSet generator and
+template to `k3d-manager-v1.23.0`; hostinger shopping-cart Applications, including payment, now
+report v1.23.0/Synced/Healthy. k3s generated apps show v1.23.0 with Unknown sync but Healthy
+resources, a separate status-source issue.

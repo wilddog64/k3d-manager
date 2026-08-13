@@ -71,6 +71,9 @@ tag `v1.23.0`; restore `enforce_admins`; retro; cut `k3d-manager-v1.24.0`.
       pod template and runtime image differ; image reconciliation plus Slack report/metric lookup
       are required. Hub ArgoCD is still tracking `k3d-manager-v1.22.0`, so v1.23 fixes await the
       release/app branch advance.
+- [x] 2026-08-12: Advanced live `services-git` ApplicationSet to `k3d-manager-v1.23.0`; hostinger
+      shopping-cart Applications are Synced/Healthy on v1.23.0. k3s sync Unknown status remains
+      a separate follow-up.
       See `docs/issues/2026-08-12-payment-trivy-alert-stale-report-details.md`.
 
 ## Pending releases (integration-split — full file map + blockers in the intent map)
