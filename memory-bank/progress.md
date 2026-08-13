@@ -7,7 +7,8 @@
 
 | Version | Theme | State |
 |---|---|---|
-| v1.24.0 | platform hardening (D+E+F+#18) | **CODE-COMPLETE + LIVE-VERIFIED; release path in progress** — all SHAs pushed + Claude-verified on `origin/k3d-manager-v1.24.0`; CHANGELOG/README/releases.md written; PR gate → merge → tag → reapply ApplicationSets next |
+| v1.24.1 | status output contract + observability polish (point release) | **CUT IN PROGRESS** — branch renamed `k3d-manager-v1.25.0`→`k3d-manager-v1.24.1`; dashboards appset repointed to v1.24.1 (Synced/Healthy); docs renumbered; CHANGELOG `[1.24.1]` + README/releases.md done; PR gate next. Content: status modes (`7ed82b89`), Slack `/cluster-status` summary (`5b9442cf`), CVE-dashboard cleanup (`a119fdde`,`d471d075`) |
+| v1.24.0 | platform hardening (D+E+F+#18) | RELEASED — PR #113 `fd281c85`, tagged v1.24.0 + GitHub release |
 | v1.23.0 | CVE observability + remediation lifecycle (B+C) | RELEASED — PR #112 `7253ece4`, tagged; platform-ops deployed live, `enforce_admins` restored |
 | v1.22.0 | OpenLDAP bitnami→Symas migration | RELEASED — PR #111 `1bbb74b0`, tagged |
 | v1.21.0 | k3dm-webhook security hardening | RELEASED — PR #110 `f68bdee1`, tagged |
