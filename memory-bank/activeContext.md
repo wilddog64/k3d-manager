@@ -73,8 +73,11 @@ so no Keychain read; `NO_COLOR=1`), parses the last JSON line, and renders a con
 **Verified static:** py_compile clean; formatter unit-exercised (fail/healthy/unknown → correct emoji, no
 ANSI); webhook.bats 53/53. **Scoped OUT:** `_run_cluster_status` (ACG path) — bespoke reachability report,
 already emoji-based, not backed by `cluster-status --json` (documented non-goal in the spec).
-**Remaining live step:** `make restart-webhook` on the hub (host launchd, inert until restart) + one live
-Slack `/cluster-status` smoke on hostinger.
+**Live-verified 2026-08-13:** `make restart-webhook` done (health 401 = up+auth). End-to-end smoke with
+real cluster data — `CLUSTER_PROVIDER=k3s-hostinger bin/cluster-status --json` → exit 0, 13 services
+healthy; fed through the live `_format_status_summary_slack` →
+`:white_check_mark: *Cluster status: HEALTHY* — \`k3s-hostinger\`  (13 ok / 0 warn / 0 fail)` (no ANSI).
+Only an actual Slack `/cluster-status` trigger (user action) remains as final confirmation.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete
 
