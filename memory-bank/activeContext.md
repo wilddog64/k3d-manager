@@ -95,3 +95,11 @@ Platform and shopping-cart CVE inventory tables also hide repeated scrape metada
 **v1.27.0 queued:** `docs/plans/v1.27.0-platform-zero-downtime-rollouts.md` scopes the hub topology
 changes needed for no-downtime platform patching: two-replica stateless tier, probes, PDBs, rollout and
 capacity gates, plus separate stateful failover decisions. No live workload changes made.
+
+**Payment Trivy alert investigation (2026-08-12):** Live reports for
+`wilddog64/shopping-cart-payment` scan retired ReplicaSet digest `sha256:4abd5935…`, while the
+ready pod runs digest `sha256:022e737a…`; the alert is therefore stale until the current digest is
+rescanned. The stale report contains seven critical findings (Tomcat 10.1.16, PostgreSQL 42.6.0,
+Spring Security 6.2.0). Slack diagnostics omit CVE/package data because the Prometheus rule groups
+away those labels and `bin/k3dm-webhook` only gathers non-running pods. Issue:
+`docs/issues/2026-08-12-payment-trivy-alert-stale-report-details.md`.
