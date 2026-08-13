@@ -4,7 +4,22 @@
 > `CHANGELOG.md` (v1.24.0 section), `docs/plans/v1.24.0-*`, `docs/bugs/v1.24.0-*`, `docs/retro/`,
 > `docs/issues/`, and git history (`git log --follow memory-bank/`).
 
-## Current focus — v1.25.0 scope queued on clean release branch
+## Current focus — release scope split (user decision 2026-08-13)
+
+**⚠️ SCOPE DECISION 2026-08-13 — the `k3d-manager-v1.25.0` branch is MISNAMED for its content.**
+The branch holds ONLY status-output + observability work (zero workstream-G implementation). Per user:
+- **v1.24.1 (point release) = what's on this branch now:** status-output contract (concise/JSON `make
+  status` + `SERVICE=` focus, live-verified), Slack `/cluster-status` concise-summary wiring
+  (`5b9442cf`), CVE-dashboard header cleanup (`a119fdde`), Dependabot auto-merge observability (spec).
+- **v1.25.0 = Stripe/Go live acceptance + E2E verification harness (workstream G)** — BLOCKED,
+  cross-repo (order schema merge + image promote → rerun Stripe live E2E; hostinger capacity). The
+  `v1.25.0-e2e-*` plan docs belong here.
+- **DEFERRED to cut-time (not done now, same rationale as the appset repoint):** rename branch
+  `k3d-manager-v1.25.0` → `k3d-manager-v1.24.1`; rename the status/dependabot/bugfix plan docs
+  `v1.25.0-*` → `v1.24.1-*` (keep `v1.25.0-e2e-*` as G); start a fresh `k3d-manager-v1.25.0` off
+  `v1.24.0` for G. **Renaming the branch now would break the dashboards appset ref just repointed to
+  `k3d-manager-v1.25.0` — so re-repoint dashboards to the new name as part of that cut.** Roadmap
+  `docs/roadmap.md` "Queued milestones" already records this order (v1.24.1 → v1.25.0-G → v1.26 → v1.27 → v1.28).
 
 The clean `v1.25.0` branch is based on merged `main` (`fd281c85`). Its queued scope now contains three
 implementation-grade plans: `docs/plans/v1.25.0-e2e-verification-harness.md`,
