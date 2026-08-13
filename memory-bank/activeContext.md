@@ -35,6 +35,34 @@ mark superseded failed events; Grafana separates Current Remediation Status from
 Historical ConfigMaps remain intact. See the updated `docs/issues/2026-08-12-cve-remediation-failed-history-investigation.md`.
 The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
 
+### Branch-hygiene reconciliation — 2026-08-13 (Claude)
+
+Post-v1.23.0-release work had been committed onto the **released, dead-end `k3d-manager-v1.23.0`
+branch** and was stranded (v1.23.0 was squash-merged as `7253ece4`, so those commits never reach a
+forward branch). Reconciled onto `v1.25.0`:
+
+- **Orphaned future plans rescued + renumbered** (`4cdd7abf`): resolved a v1.26.0 collision (image-signing
+  vs new sandbox-cleanup). **User decision: sandbox-registration=v1.26.0, image-signing=v1.27.0,
+  zero-downtime=v1.28.0.** `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md` moved as-is;
+  `v1.26.0-image-signing-cve-loop-closure.md` → `v1.27.0-…`; `v1.27.0-platform-zero-downtime-rollouts.md`
+  → `v1.28.0-…`; internal refs + `docs/roadmap.md` "Queued milestones" reconciled.
+- **Live CVE dashboard + exporter forward-ported** (`a119fdde`): the concise-header dashboard cleanup and
+  exporter `deployment_advanced`/`display_reason` logic existed only on v1.23.0 (which the hub
+  `hub-grafana-dashboards` ApplicationSet **currently tracks**). Both files were a strict superset of the
+  v1.25.0 versions; carried onto v1.25.0. YAML-parse + embedded-python checks clean.
+
+**⚠️ REQUIRED live follow-up:** repoint hub `hub-grafana-dashboards` (and any ACG variant) off
+`k3d-manager-v1.23.0` so the forward-ported dashboard/exporter survive the next reapply — otherwise the
+set re-syncs from the stale branch and the live cleanup reverts. Confirm with `argocd_check_values_branch`.
+**Process:** forward work goes on `v1.25.0`, never a released branch.
+
+### OPEN — Slack `/cluster-status` not wired to the new status contract (user-flagged 2026-08-13)
+
+`docs/plans/v1.25.0-status-output-contract.md` §"Slack integration" (concise summary / `status-json`,
+emoji severity, no ANSI) is **unimplemented**. `_run_cluster_status` (generic/ACG) is untouched (separate
+hand-rolled report); `_run_hostinger_status` runs bare `bin/cluster-status` → defaults to `--full`
+(verbose, ANSI-prone) into Slack. **Next after hygiene: spec-first bugfix, then wire both paths.**
+
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete
 
 **v1.24.0 = platform hardening (D+E+F+#18).** All code committed + pushed to
