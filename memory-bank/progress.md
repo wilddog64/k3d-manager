@@ -25,6 +25,8 @@ the live dashboard now contains both remediation panels.
 - [x] Order remediation row investigation (2026-08-13): failed event targets retired `sha-05ce65...`,
       while live order runs `sha-564ccfd...`; current findings are UNKNOWN severity. Recorded as a
       historical deployment-advanced case; future exporter refinement queued in the issue doc.
+- [x] Deployment-advanced classification (2026-08-13): exporter compares failed remediation targets
+      with current inventory images; live metrics show order `deployment_advanced` and payment `applied`.
 
 ## In flight — v1.23.0 (PR pending)
 

@@ -85,3 +85,5 @@ Follow-up investigation: the remaining order failure targets old `sha-05ce65...@
 while live order runs `sha-564ccfd...`; its current inventory has only UNKNOWN findings. This is a
 historical failed promotion with no applied event, not the current image. See
 `docs/issues/2026-08-13-order-remediation-current-row.md`.
+The exporter refinement is now live: order is classified `deployment_advanced` and payment remains
+`applied` in the current-status metrics; no audit events were deleted.

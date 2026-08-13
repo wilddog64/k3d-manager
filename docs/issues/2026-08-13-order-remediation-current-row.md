@@ -25,8 +25,15 @@ order pod is running the failed target image, but the event ledger has no later
 `applied` event for that service/image lineage, so the dashboard correctly
 keeps it visible as the latest recorded event.
 
-## Follow-up
+## Implemented follow-up
 
-The exporter should compare failed event `to_image` against the current
-inventory/deployment image and expose a distinct `superseded` or `deployment_advanced`
-state when the workload has moved on. Do not delete the audit ConfigMaps.
+The exporter now compares failed event `to_image` against the current inventory
+image and exposes `state="deployment_advanced"` when the workload has moved on.
+The live current-status metrics now show:
+
+```text
+shopping-cart-order  state="deployment_advanced"  current="true"
+shopping-cart-payment state="applied"             current="true"
+```
+
+Audit ConfigMaps remain retained.
