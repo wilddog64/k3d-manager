@@ -99,7 +99,8 @@ capacity gates, plus separate stateful failover decisions. No live workload chan
 **v1.26.0 queued:** `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md` scopes managed
 sandbox registration metadata, explicit teardown, stale-registration watchdogs, resource-preserving
 Application cleanup, and Grafana/Slack visibility. This is the follow-up to the stale ubuntu-k3s
-cleanup performed on 2026-08-13.
+cleanup performed on 2026-08-13. The spec now also requires registration release metadata and
+ApplicationSet generator/template revision consistency to prevent stale-version Slack alerts.
 
 **Payment Trivy alert investigation (2026-08-12):** Live reports for
 `wilddog64/shopping-cart-payment` scan retired ReplicaSet digest `sha256:4abd5935…`, while the
