@@ -30,6 +30,8 @@ the live dashboard now contains both remediation panels.
 - [x] Remediation table labels (2026-08-13): hidden repeated scrape metadata and renamed the visible
       fields to concise user-facing headers (`CVEs`, `Affected service`, `Image`, `Requested`, `Applied`,
       `State`, `Reason`).
+- [x] CVE inventory table cleanup (2026-08-13): removed repeated exporter scrape columns from platform
+      and shopping-cart tables; source commit `91b13fe3`.
 
 ## In flight — v1.23.0 (PR pending)
 

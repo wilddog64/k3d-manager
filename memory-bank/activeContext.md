@@ -89,3 +89,5 @@ The exporter refinement is now live: order is classified `deployment_advanced` a
 `applied` in the current-status metrics; no audit events were deleted.
 Dashboard remediation tables now hide repeated Prometheus scrape metadata and use concise headers:
 `CVEs`, `Affected service`, `Image`, `Requested`, `Applied`, `State`, and `Reason`.
+Platform and shopping-cart CVE inventory tables also hide repeated scrape metadata (`Service`,
+`container`, `endpoint`, and exported labels) so only actionable vulnerability fields remain.
