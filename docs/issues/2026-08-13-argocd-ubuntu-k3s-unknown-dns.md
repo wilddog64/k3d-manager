@@ -60,3 +60,14 @@ Get "https://34.222.252.197:6443/api?timeout=8s": context deadline exceeded (Cli
 Thus the registration hostname issue is corrected, but the ubuntu-k3s API endpoint itself is
 currently unavailable or blocked by network/firewall state. The ten Applications remain Unknown
 until the API path is restored.
+
+Follow-up network checks confirmed the failure is below ArgoCD:
+
+```text
+34.222.252.197:6443 (sun-sr-https): Operation timed out
+PING 34.222.252.197: 100% packet loss
+kubectl ubuntu-k3s: context deadline exceeded while awaiting headers
+```
+
+The registration Secret remains on `https://34.222.252.197:6443`; restore/restart the k3s control
+plane or its AWS security-group/network route before refreshing ArgoCD again.

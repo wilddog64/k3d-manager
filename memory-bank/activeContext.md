@@ -119,4 +119,4 @@ ComparisonError because the `cluster-ubuntu-k3s` registration points to
 uses `https://34.222.252.197:6443`. This is a cluster-registration endpoint bug, not ten app
 failures; see `docs/issues/2026-08-13-argocd-ubuntu-k3s-unknown-dns.md`. The Secret was updated
 to the kubeconfig endpoint and the controller restarted, but both hub and host now time out during
-the TLS/API handshake; the k3s API/network path is unavailable.
+the TLS/API handshake; TCP/ICMP checks also time out, so the k3s API/network path is unavailable.
