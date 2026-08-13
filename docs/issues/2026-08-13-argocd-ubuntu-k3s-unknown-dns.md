@@ -35,3 +35,28 @@ Update the durable cluster registration path to use an address resolvable from t
 then refresh the `ubuntu-k3s` cluster and all ten Applications. Do not hand-edit individual
 Application statuses. Validate DNS/API connectivity from inside an ArgoCD pod and require every
 affected Application to return `Synced` or a documented resource-level failure.
+
+## Live endpoint update attempt
+
+The hub Secret `cluster-ubuntu-k3s` was updated to:
+
+```text
+https://34.222.252.197:6443
+```
+
+The ArgoCD application-controller was restarted to reload the Secret. The error changed from DNS
+failure to:
+
+```text
+Get "https://34.222.252.197:6443/version?timeout=32s": net/http: TLS handshake timeout
+```
+
+The host-side kubeconfig also cannot reach the endpoint:
+
+```text
+Get "https://34.222.252.197:6443/api?timeout=8s": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+```
+
+Thus the registration hostname issue is corrected, but the ubuntu-k3s API endpoint itself is
+currently unavailable or blocked by network/firewall state. The ten Applications remain Unknown
+until the API path is restored.
