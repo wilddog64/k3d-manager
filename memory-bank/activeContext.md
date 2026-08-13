@@ -112,3 +112,9 @@ v1.23 observability/verifier fixes are not live on this app.
 template to `k3d-manager-v1.23.0`; hostinger shopping-cart Applications, including payment, now
 report v1.23.0/Synced/Healthy. k3s generated apps show v1.23.0 with Unknown sync but Healthy
 resources, a separate status-source issue.
+
+**ArgoCD ubuntu-k3s Unknown investigation (2026-08-13):** All ten Unknown Applications share a
+ComparisonError because the `cluster-ubuntu-k3s` registration points to
+`https://host.k3d.internal:6443`, which does not resolve from the hub DNS. The local kubeconfig
+uses `https://34.222.252.197:6443`. This is a cluster-registration endpoint bug, not ten app
+failures; see `docs/issues/2026-08-13-argocd-ubuntu-k3s-unknown-dns.md`.
