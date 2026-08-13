@@ -51,17 +51,30 @@ forward branch). Reconciled onto `v1.25.0`:
   `hub-grafana-dashboards` ApplicationSet **currently tracks**). Both files were a strict superset of the
   v1.25.0 versions; carried onto v1.25.0. YAML-parse + embedded-python checks clean.
 
-**⚠️ REQUIRED live follow-up:** repoint hub `hub-grafana-dashboards` (and any ACG variant) off
-`k3d-manager-v1.23.0` so the forward-ported dashboard/exporter survive the next reapply — otherwise the
-set re-syncs from the stale branch and the live cleanup reverts. Confirm with `argocd_check_values_branch`.
-**Process:** forward work goes on `v1.25.0`, never a released branch.
+**Dashboards repointed live 2026-08-13 (Claude):** `grafana-dashboards-hub` + `grafana-dashboards-acg`
+appsets reapplied with `K3D_MANAGER_BRANCH=k3d-manager-v1.25.0`; live `hub-grafana-dashboards`
+Application now `targetRevision=k3d-manager-v1.25.0`, **Synced/Healthy** (forward-port is byte-identical
+to live → no drift). Repointed to v1.25.0 (not v1.24.0) because v1.24.0's dashboard is the older verbose
+version — pointing there would revert the live cleanup.
+**⚠️ STILL on `k3d-manager-v1.23.0`:** `observability`, `observability-acg`, `services-git` (the exporter
+is synced by `observability`, not the dashboards appset). They keep serving the correct (identical)
+content, so nothing reverts — but **do NOT delete the v1.23.0 branch until these are repointed too.**
+That is a release-grade full-hub repoint (services-git pulls service-manifest deltas), best done when
+v1.25.0 is cut; confirm with `argocd_check_values_branch`. **Process:** forward work goes on `v1.25.0`,
+never a released branch.
 
-### OPEN — Slack `/cluster-status` not wired to the new status contract (user-flagged 2026-08-13)
+### Slack `/cluster-status` concise-summary wiring — IMPLEMENTED 2026-08-13 (Claude)
 
-`docs/plans/v1.25.0-status-output-contract.md` §"Slack integration" (concise summary / `status-json`,
-emoji severity, no ANSI) is **unimplemented**. `_run_cluster_status` (generic/ACG) is untouched (separate
-hand-rolled report); `_run_hostinger_status` runs bare `bin/cluster-status` → defaults to `--full`
-(verbose, ANSI-prone) into Slack. **Next after hygiene: spec-first bugfix, then wire both paths.**
+Spec `docs/bugs/v1.25.0-bugfix-slack-cluster-status-summary-wiring.md` (`2094398e`); fix `5b9442cf`
+(`bin/k3dm-webhook`). `_run_hostinger_status` now runs `bin/cluster-status --json` (token passed via env
+so no Keychain read; `NO_COLOR=1`), parses the last JSON line, and renders a concise Slack summary via new
+`_format_status_summary_slack` — emoji severity (`:x:`/`:warning:`/`:white_check_mark:`/`:grey_question:`)
++ `N ok / N warn / N fail` counts + error/warning lines, **no ANSI**, raw-report fallback retained.
+**Verified static:** py_compile clean; formatter unit-exercised (fail/healthy/unknown → correct emoji, no
+ANSI); webhook.bats 53/53. **Scoped OUT:** `_run_cluster_status` (ACG path) — bespoke reachability report,
+already emoji-based, not backed by `cluster-status --json` (documented non-goal in the spec).
+**Remaining live step:** `make restart-webhook` on the hub (host launchd, inert until restart) + one live
+Slack `/cluster-status` smoke on hostinger.
 
 ## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete
 
