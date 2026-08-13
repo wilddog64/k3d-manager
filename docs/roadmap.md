@@ -110,6 +110,13 @@ Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth
 
 ## Forward themes (unversioned until scoped)
 
+### v1.27.0 — platform zero-downtime rollouts
+
+Queued as the availability milestone after v1.26.0 image signing. The concrete
+scope is `docs/plans/v1.27.0-platform-zero-downtime-rollouts.md`: scale the
+stateless hub tier, add probes/PDBs/rolling-update guarantees, validate capacity,
+and separately design failover for stateful services before claiming no downtime.
+
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
 milestone only when it gets a scope doc.
 

@@ -32,6 +32,8 @@ the live dashboard now contains both remediation panels.
       `State`, `Reason`).
 - [x] CVE inventory table cleanup (2026-08-13): removed repeated exporter scrape columns from platform
       and shopping-cart tables; source commit `91b13fe3`.
+- [ ] **v1.27.0 platform availability queued:** plan `docs/plans/v1.27.0-platform-zero-downtime-rollouts.md`
+      covers stateless replicas/probes/PDBs/rolling updates, capacity gates, and stateful failover design.
 
 ## In flight — v1.23.0 (PR pending)
 
