@@ -120,3 +120,6 @@ uses `https://34.222.252.197:6443`. This is a cluster-registration endpoint bug,
 failures; see `docs/issues/2026-08-13-argocd-ubuntu-k3s-unknown-dns.md`. The Secret was updated
 to the kubeconfig endpoint and the controller restarted, but both hub and host now time out during
 the TLS/API handshake; TCP/ICMP checks also time out, so the k3s API/network path is unavailable.
+With no AWS sandbox provisioned, the stale `cluster-ubuntu-k3s` registration was then removed after
+enabling resource-preserving deletion on all five dependent ApplicationSets; generated k3s apps are
+gone and hostinger shopping-cart apps remain Synced/Healthy.

@@ -71,3 +71,11 @@ kubectl ubuntu-k3s: context deadline exceeded while awaiting headers
 
 The registration Secret remains on `https://34.222.252.197:6443`; restore/restart the k3s control
 plane or its AWS security-group/network route before refreshing ArgoCD again.
+
+## Cleanup
+
+Because no AWS sandbox is currently provisioned, the stale registration was removed instead of
+being repaired. Before deleting `cluster-ubuntu-k3s`, `preserveResourcesOnDeletion: true` was set
+on all five dependent ApplicationSets (`data-git`, `eso`, `grafana-dashboards-acg`, `platform-helm`,
+and `services-git`). The ten generated `ubuntu-k3s-*` Applications then disappeared without pruning
+resources. All hostinger shopping-cart Applications remained `Synced` and `Healthy`.

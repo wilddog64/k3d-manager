@@ -79,6 +79,9 @@ tag `v1.23.0`; restore `enforce_admins`; retro; cut `k3d-manager-v1.24.0`.
       `host.k3d.internal`; Secret updated to `34.222.252.197`, but the API now times out from both
       hub and host (TCP timeout/100% packet loss), so k3s control-plane/network restoration is
       pending.
+- [x] 2026-08-13: Cleaned stale ubuntu-k3s registration after confirming no AWS sandbox exists.
+      Enabled preserve-on-deletion on five dependent ApplicationSets, removed the cluster Secret,
+      and confirmed all generated k3s apps disappeared without affecting hostinger apps.
 
 ## Pending releases (integration-split — full file map + blockers in the intent map)
 
