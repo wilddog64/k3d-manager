@@ -22,6 +22,9 @@
 Commit `02128101` promoted the current-versus-history exporter/dashboard fix to the tracked
 `k3d-manager-v1.23.0` branch. ArgoCD hard refresh reached revision `02128101`, Synced/Healthy, and
 the live dashboard now contains both remediation panels.
+- [x] Order remediation row investigation (2026-08-13): failed event targets retired `sha-05ce65...`,
+      while live order runs `sha-564ccfd...`; current findings are UNKNOWN severity. Recorded as a
+      historical deployment-advanced case; future exporter refinement queued in the issue doc.
 
 ## In flight — v1.23.0 (PR pending)
 

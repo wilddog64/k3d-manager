@@ -81,3 +81,7 @@
 **Dashboard cleanup promoted 2026-08-13:** `02128101` is now on the ArgoCD-tracked
 `k3d-manager-v1.23.0` branch. A hard refresh advanced `hub-grafana-dashboards` to that revision;
 the live ConfigMap contains Current CVE Remediation Status and Remediation History (audit) panels.
+Follow-up investigation: the remaining order failure targets old `sha-05ce65...@sha256:a8813e...`,
+while live order runs `sha-564ccfd...`; its current inventory has only UNKNOWN findings. This is a
+historical failed promotion with no applied event, not the current image. See
+`docs/issues/2026-08-13-order-remediation-current-row.md`.
