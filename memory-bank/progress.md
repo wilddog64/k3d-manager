@@ -174,6 +174,14 @@ still requires an approving review.
       child (make passes env→`bin/cluster-*` recipe; NO edits to cluster-up/down/Makefile), skip
       `_record_acg_state`/`_run_post_provision_check`/`_push_metrics` in dry-run, 🧪-tag Slack msgs. Admin-only
       unchanged. Commit msg `feat(webhook): support DRY_RUN preview for Slack cluster-up/cluster-down`.
+      **Phase 3b test-hardening FOLDED IN (2026-08-14):** the Phase 4 spec now has a **Part B (test-only)** —
+      Change 7 replaces the vacuous `*)` bridge test in `scripts/tests/bin/cluster_down.bats` with a
+      sentinel-survival guard: `CLUSTER_PROVIDER=orbstack DRY_RUN=1` + `KEYCLOAK_BROWSER_LISTENER_PLIST=<sentinel>`,
+      assert the sentinel survives (the `_run_command --prefer-sudo -- rm -f` at cluster-down:198 is non-tty-gated,
+      so the base `_run_command` really rm's it without the `*)` source). **Mutation-verified by Claude before
+      writing the spec:** passes on current tree, fails `[ -e "${_sentinel}" ]` when Phase 3's `*)` source line is
+      removed (bin/cluster-down restored clean). Part B is test-only, must NOT edit bin/cluster-down; DoD adds a
+      pass→fail→pass mutation check. Both parts land in the one webhook commit.
       **Blocked on Phase 2 merge** (dry-run is a footgun until guards exist); not handed off.
       **Post-Phase-2 follow-up:** `docs/howto/makefile.md` is stale — documents renamed `bin/acg-*` binaries
       (now `bin/cluster-*`, v1.7.1), `make sudoers` (actual: `install-sudoers`), omits many targets, and has 0
