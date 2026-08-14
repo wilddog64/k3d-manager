@@ -59,7 +59,9 @@ still requires an approving review.
 - [ ] **BUG spec (2026-08-14) — k3s-aws provisioning cannot install k3s.** `env: 'deploy_app_cluster':
       No such file or directory` at `k3s-aws.sh:178` (`env VAR=val` can't call a shell function). Fix =
       drop `env`. Blocks every fresh k3s-aws bring-up. Spec:
-      `docs/bugs/v1.25.0-bugfix-k3s-aws-env-cannot-call-deploy-app-cluster.md`. Not yet handed off.
+      `docs/bugs/v1.25.0-bugfix-k3s-aws-env-cannot-call-deploy-app-cluster.md`. **DONE** — `7a24d768`
+      pushed; export-then-call matches `_dry_guard` direct argument handling; shellcheck and provider
+      BATS 8/8 passed.
 - [ ] **BUG spec (2026-08-14) — observability DRY_RUN `base64: invalid input`.** 5× `_kubectl get secret
       vault-root … | base64 --decode` in `observability.sh` pipe the `[dry-run]` preview banner into
       base64; fix = plain `kubectl` for the read. Spec:
