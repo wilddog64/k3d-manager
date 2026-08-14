@@ -87,10 +87,14 @@ still requires an approving review.
       fns (D1 per-op, D2 all-providers, D3 foundation-first). Phased: **Phase 0 lib-foundation** (helper+BATS+release)
       → Phase 1 subtree-pull+sync → Phase 2 guards → **Phase 3** also fixes `make down` k3s-aws NOT calling
       `_k3s_aws_deregister_cluster` (bin/cluster-down bypasses the dispatcher).
-      **Phase 0 DONE + PR open:** lib-foundation `feat/v0.4.9` — helpers `287fa0e`, Copilot fixes `bc06608`
-      (location-independent bats `$SYSTEM_LIB` + non-racy `mktemp`), findings doc `f51b95d`. PR
-      wilddog64/lib-foundation#40 — CI green, 3 Copilot threads resolved, main unprotected → ready to merge.
-      Next: merge #40 → tag v0.4.9 → subtree-pull into k3d-manager → then Phases 1–3.
+      **Phase 0 + Phase 1 DONE:** lib-foundation PR #40 **MERGED** (`1327c86`), released **v0.4.9**
+      (tag `5826946`, CHANGE.md stamped + retro `docs/retro/2026-08-14-v0.4.9-retrospective.md`, GH release
+      live, main unprotected so no protection restore). **Subtree-pulled into k3d-manager** on
+      `k3d-manager-v1.25.0`: merge `56ff8df1` (squash `9a31ac7a`, `14c79082..58269466`) — `_dry_run_active`
+      /`_dry_guard` now live at `scripts/lib/foundation/scripts/lib/system.sh:1850`. Copilot findings folded in
+      (location-independent bats `$SYSTEM_LIB` + non-racy `mktemp`, doc `f51b95d`).
+      **Next: Phase 2** per-op `_dry_guard` guards across `bin/cluster-up`, `bin/cluster-down`, and all 5 provider
+      deploy+destroy fns; **Phase 3** also fixes `make down` k3s-aws NOT calling `_k3s_aws_deregister_cluster`.
       Tier-2 e2e proceeds in parallel.
 - [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
       #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
