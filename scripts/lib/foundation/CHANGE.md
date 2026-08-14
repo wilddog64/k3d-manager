@@ -1,5 +1,21 @@
 # Changes - lib-foundation
 
+## [Unreleased]
+
+## [v0.4.9] — 2026-08-14
+
+DRY_RUN guard primitives — Phase 0 of the foundation-first DRY_RUN project. Ships the
+predicate + wrapper into the shared library so downstream consumers (k3d-manager `make
+up`/`make down`) can guard mutating operations without each re-implementing the check
+(PR #40, merged `1327c86`).
+
+### Added
+- `scripts/lib/system.sh`: `_dry_run_active` — predicate that is true only when
+  `DRY_RUN=1` (any other value, including unset, is false). `_dry_guard "<desc>" cmd…` —
+  wrapper that, in DRY_RUN, logs `INFO: DRY_RUN: would <desc>` and returns 0 without
+  executing; otherwise runs the command unchanged. Guards mutating operations only —
+  read-only probes stay unguarded so status/inspection paths keep working under DRY_RUN.
+
 ## [v0.4.8] — 2026-07-25
 
 Bump `brace-expansion` to 1.1.16 to clear the high-severity DoS advisory GHSA-3jxr-9vmj-r5cp (resolves Dependabot alert #3 on the k3d-manager consumer).

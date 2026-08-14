@@ -9,6 +9,35 @@ setup() {
 
 bats_require_minimum_version 1.5.0
 
+@test "_dry_run_active true only when DRY_RUN=1" {
+  run bash -c "source \"$SYSTEM_LIB\"; DRY_RUN=1 _dry_run_active"
+  [ "$status" -eq 0 ]
+  run bash -c "source \"$SYSTEM_LIB\"; DRY_RUN=0 _dry_run_active"
+  [ "$status" -ne 0 ]
+  run bash -c "source \"$SYSTEM_LIB\"; unset DRY_RUN; _dry_run_active"
+  [ "$status" -ne 0 ]
+}
+
+@test "_dry_guard in DRY_RUN logs intent and does NOT execute" {
+  sentinel="$(mktemp)"
+  rm -f "${sentinel}"
+  run bash -c "source \"$SYSTEM_LIB\"; DRY_RUN=1 _dry_guard 'create marker' touch '${sentinel}'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"DRY_RUN: would create marker"* ]]
+  [ ! -e "${sentinel}" ]
+}
+
+@test "_dry_guard outside DRY_RUN executes and preserves exit status" {
+  sentinel="$(mktemp)"
+  rm -f "${sentinel}"
+  run bash -c "source \"$SYSTEM_LIB\"; DRY_RUN=0 _dry_guard 'create marker' touch '${sentinel}'"
+  [ "$status" -eq 0 ]
+  [ -e "${sentinel}" ]
+  rm -f "${sentinel}"
+  run bash -c "source \"$SYSTEM_LIB\"; DRY_RUN=0 _dry_guard \"fail\" false"
+  [ "$status" -eq 1 ]
+}
+
 @test "_run_command_resolve_sudo: no sudo flags → plain runner" {
   _RCRS_RUNNER=()
   _run_command_resolve_sudo "echo" 0 0 0
