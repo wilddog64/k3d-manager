@@ -55,6 +55,7 @@ WEBHOOK_LOG="${HOME}/Library/Logs/k3dm-webhook.log"
 sed \
   -e "s|{{WEBHOOK_BIN}}|${WEBHOOK_BIN}|g" \
   -e "s|{{K3DM_REPO_ROOT}}|${REPO_ROOT}|g" \
+  -e "s|{{HOME}}|${HOME}|g" \
   -e "s|{{WEBHOOK_LOG}}|${WEBHOOK_LOG}|g" \
   "${REPO_ROOT}/scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl" \
   > "${PLIST_DST}"

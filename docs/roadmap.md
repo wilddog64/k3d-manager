@@ -108,6 +108,34 @@ Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth
 
 ---
 
+## Queued milestones (scoped)
+
+These have scope docs and committed version numbers; they ship in this order.
+
+- **v1.24.1 — cluster status output contract + observability polish (point release)** — concise
+  color-coded / JSON `make status` modes with `SERVICE=<name>` focus, Slack `/cluster-status` rendered
+  as a concise emoji summary, CVE-dashboard header cleanup, and Dependabot auto-merge observability.
+  Implemented on the `k3d-manager-v1.24.1` branch (PR #115). Scope:
+  `docs/plans/v1.24.1-status-output-contract.md`,
+  `docs/plans/v1.24.1-dependabot-automerge-observability.md`,
+  `docs/bugs/v1.24.1-bugfix-slack-cluster-status-summary-wiring.md`.
+- **v1.25.0 — Stripe/Go live acceptance + E2E verification harness (workstream G)** — BLOCKED
+  (cross-repo): merge the order-repo schema fix + promote the image → rerun the Stripe live E2E (2/4
+  now); hostinger capacity. Plus the substrate-agnostic E2E harness (Tier 1 vCluster blocking + Tier 2
+  ACG sandbox periodic) and its Grafana observability. Scope:
+  `docs/plans/v1.25.0-e2e-verification-harness.md`, `docs/plans/v1.25.0-e2e-observability-path-a.md`.
+- **v1.26.0 — sandbox registration lifecycle hygiene** — managed registration metadata, explicit
+  provider teardown, a TTL/grace-period watchdog for stale ArgoCD cluster registrations,
+  resource-preserving Application cleanup, and Grafana/Slack visibility. Prevents destroyed ephemeral
+  sandboxes from leaving misleading `Unknown` Applications while protecting live clusters from
+  false-positive cleanup. Scope: `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`.
+- **v1.27.0 — image signing + attestation** — cosign sign + Trivy vuln/SBOM attest at build;
+  `cosign verify` at promotion and admission (Kyverno, staged Audit→Enforce), closing the CVE loop.
+  Scope: `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`.
+- **v1.28.0 — platform zero-downtime rollouts** — scale the stateless hub tier, add probes/PDBs and
+  rolling-update guarantees, validate capacity, and separately design failover for each stateful
+  service before claiming no downtime. Scope: `docs/plans/v1.28.0-platform-zero-downtime-rollouts.md`.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a

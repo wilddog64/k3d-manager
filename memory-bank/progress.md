@@ -7,7 +7,8 @@
 
 | Version | Theme | State |
 |---|---|---|
-| v1.24.0 | platform hardening (D+E+F+#18) | **CODE-COMPLETE + LIVE-VERIFIED; release path in progress** — all SHAs pushed + Claude-verified on `origin/k3d-manager-v1.24.0`; CHANGELOG/README/releases.md written; PR gate → merge → tag → reapply ApplicationSets next |
+| v1.24.1 | status output contract + observability polish (point release) | **CUT IN PROGRESS** — branch renamed `k3d-manager-v1.25.0`→`k3d-manager-v1.24.1`; dashboards appset repointed to v1.24.1 (Synced/Healthy); docs renumbered; CHANGELOG `[1.24.1]` + README/releases.md done; PR gate next. Content: status modes (`7ed82b89`), Slack `/cluster-status` summary (`5b9442cf`), CVE-dashboard cleanup (`a119fdde`,`d471d075`) |
+| v1.24.0 | platform hardening (D+E+F+#18) | RELEASED — PR #113 `fd281c85`, tagged v1.24.0 + GitHub release |
 | v1.23.0 | CVE observability + remediation lifecycle (B+C) | RELEASED — PR #112 `7253ece4`, tagged; platform-ops deployed live, `enforce_admins` restored |
 | v1.22.0 | OpenLDAP bitnami→Symas migration | RELEASED — PR #111 `1bbb74b0`, tagged |
 | v1.21.0 | k3dm-webhook security hardening | RELEASED — PR #110 `f68bdee1`, tagged |
@@ -43,12 +44,40 @@ still requires an approving review.
 
 ## Pending releases (forward scope — detail in activeContext.md)
 
+- [x] **v1.25.0 branch prepared** from merged `main` with four queued plans: E2E verification,
+      E2E observability, event-driven Dependabot auto-merge monitoring/Grafana visibility, and the
+      concise color-coded status output contract; no
+      unrelated ArgoCD diagnosis branch content carried forward.
+
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger capacity
       (durable `maxSurge=0` in git OR bump node CPU — issue `2026-08-10-hostinger-rollout-deadlock-*`).
       **+ E2E verification harness** (plan doc #1) + **e2e observability** (plan doc #2) — enable disabled
       e2e on ephemeral substrates (Tier 1 vCluster blocking + Tier 2 ACG sandbox periodic); exit-code +
       JSON-summary contract seeds the v1.26.0 gate.
+      **+ Dependabot auto-merge observability** (plan doc #3) — signed GitHub event intake, bounded
+      Prometheus state, Grafana panels, Alertmanager Slack alerts, and read-only reconciliation fallback.
+      Plan committed on `v1.25.0`; implementation not started.
+      **+ Status output contract** (plan doc #4) — concise error-first output with red/yellow/green
+      terminal semantics, failed-service health/HTTP codes, `SERVICE=<name>` focused diagnostics,
+      `status-full`, `status-json`, and stable exit codes. Implementation is committed on the branch;
+      live verification/deployment is pending.
+- [x] Webhook status source repaired (2026-08-12): restored Keychain token with
+      `bin/k3dm-webhook-setup`, refreshed GitHub secret, reinstalled LaunchAgent, and verified health
+      HTTP 200. Remaining login 401s (Keycloak/ArgoCD/Grafana) are separate follow-up issues.
+- [x] Status follow-up (2026-08-12): default `make status` now follows the active provider file and
+      optional Pushgateway refusal is warning-level; focused status tests remain green.
+- [x] Status login smoke repair (2026-08-12): webhook now uses hub-scoped Keycloak and Vault-managed
+      ArgoCD/Grafana credentials; LaunchAgent KUBECONFIG renders correctly. Live `make status` is
+      `Overall: HEALTHY`; issue `docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md`.
+- [x] Status JSON provider repair (2026-08-13): `make status-json` now follows the active-provider
+      file instead of defaulting to `k3s-aws`; 5/5 summary BATS pass and live JSON is healthy.
+- [x] Istio Unknown cleanup (2026-08-13): removed finalizers from four deletion-marked stale
+      `ubuntu-k3s` Istio Applications targeting retired `host.k3d.internal`; ArgoCD removed them and
+      Hostinger Istio remains Synced/Healthy. Issue: `docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md`.
+- [x] CVE remediation dashboard cleanup (2026-08-13): exporter marks current events and superseded
+      failures; dashboard adds Current Status and labels audit history. Static YAML/JSON and embedded
+      exporter compilation pass; live reapply remains to be run after push.
 - [ ] **v1.26.0** — image signing + attestation, closing the CVE loop (SCOPED, not started). Spec
       `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + attest at build; `cosign verify`
       at promotion + admission (Kyverno, staged Audit→Enforce). Key-in-Vault, pub via ESO. Multi-repo.
@@ -67,3 +96,7 @@ still requires an approving review.
 - [ ] `docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` carry.
 - [ ] Shopping-cart Dependabot backlog (Go builder-image bumps, majors held) — `project_backlog.md`.
 - [ ] rabbitmq-client-java NPE fix `36ed860` — JAR publish + pom update pending.
+- [x] CVE remediation failure investigation (2026-08-12) — dashboard rows are historical
+      `ready_pod_digest_mismatch` events; later payment events applied and current workloads are healthy.
+      Dashboard supersession/current-state query remains queued; see
+      `docs/issues/2026-08-12-cve-remediation-failed-history-investigation.md`.

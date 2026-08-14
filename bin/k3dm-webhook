@@ -1684,6 +1684,21 @@ def _smoke_test_logins(provider, app_context):
     ctx.verify_mode = ssl.CERT_NONE
     results = []
 
+    def _vault_secret(path, key):
+        """Read a current KV value from the hub Vault port-forward."""
+        token = _smoke_secret("secrets", "root_token", "vault-root", context="k3d-k3d-cluster")
+        if not token:
+            return None
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:18200/v1/secret/data/{path}",
+                headers={"X-Vault-Token": token},
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                return json.loads(resp.read()).get("data", {}).get("data", {}).get(key)
+        except Exception:
+            return None
+
     if provider == "k3s-hostinger":
         keycloak_base = "https://keycloak.3ai-talk.org"
         frontend_base = "https://frontend.3ai-talk.org"
@@ -1708,8 +1723,8 @@ def _smoke_test_logins(provider, app_context):
     kc_client = os.environ.get("K3DM_SMOKE_KC_CLIENT", "frontend")
     kc_via_smoke_client = False
     if not (kc_user and kc_pass):
-        seeded_user = _smoke_secret("identity", "username", "k3dm-smoke-user")
-        seeded_pass = _smoke_secret("identity", "password", "k3dm-smoke-user")
+        seeded_user = _smoke_secret("identity", "username", "k3dm-smoke-user", context="k3d-k3d-cluster")
+        seeded_pass = _smoke_secret("identity", "password", "k3dm-smoke-user", context="k3d-k3d-cluster")
         if seeded_user and seeded_pass:
             kc_user, kc_pass = seeded_user, seeded_pass
             if "K3DM_SMOKE_KC_CLIENT" not in os.environ:
@@ -1757,8 +1772,8 @@ def _smoke_test_logins(provider, app_context):
             results.append(("Frontend login", False, str(exc)[:200]))
 
     argo_user = os.environ.get("K3DM_SMOKE_ARGOCD_USER", "admin")
-    argo_pass = os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _smoke_secret(
-        "cicd", "password", "argocd-initial-admin-secret")
+    argo_pass = os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _vault_secret("argocd/admin", "password") or _smoke_secret(
+        "cicd", "password", "argocd-initial-admin-secret", context="k3d-k3d-cluster")
     if not argo_pass:
         results.append(("ArgoCD login", None, "no credentials (argocd-initial-admin-secret absent; set K3DM_SMOKE_ARGOCD_PASS)"))
     else:
@@ -1776,11 +1791,12 @@ def _smoke_test_logins(provider, app_context):
             results.append(("ArgoCD login", False, str(exc)[:200]))
 
     graf_user = (os.environ.get("K3DM_SMOKE_GRAFANA_USER")
+                 or _vault_secret("observability/grafana", "username")
                  or _smoke_secret("monitoring", "admin-user",
-                                  "grafana-admin-credentials")
+                                  "grafana-admin-credentials", context="k3d-k3d-cluster")
                  or "admin")
-    graf_pass = os.environ.get("K3DM_SMOKE_GRAFANA_PASS") or _smoke_secret(
-        "monitoring", "admin-password", "grafana-admin-credentials")
+    graf_pass = os.environ.get("K3DM_SMOKE_GRAFANA_PASS") or _vault_secret("observability/grafana", "password") or _smoke_secret(
+        "monitoring", "admin-password", "grafana-admin-credentials", context="k3d-k3d-cluster")
     if not graf_pass:
         results.append(("Grafana login", None, "no credentials (acg-kube-prometheus-stack-grafana absent; set K3DM_SMOKE_GRAFANA_PASS)"))
     else:
@@ -2385,6 +2401,30 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
         _finish("failed")
 
 
+def _format_status_summary_slack(payload, provider):
+    """Render bin/cluster-status --json as a concise, ANSI-free Slack message (contract §Slack)."""
+    overall = str(payload.get("overall", "unknown"))
+    emoji = {"healthy": ":white_check_mark:", "warn": ":warning:",
+             "fail": ":x:", "unknown": ":grey_question:"}.get(overall, ":grey_question:")
+    counts = payload.get("counts", {}) or {}
+    header = f"{emoji} *Cluster status: {overall.upper()}* — `{provider}`"
+    if counts:
+        header += ("  ({} ok / {} warn / {} fail)".format(
+            counts.get("services_healthy", 0),
+            counts.get("services_warning", 0),
+            counts.get("services_failed", 0)))
+    out = [header]
+    for item in payload.get("errors", []):
+        out.append(":x: {}: {}".format(
+            item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
+    for item in payload.get("warnings", []):
+        out.append(":warning: {}: {}".format(
+            item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
+    if overall == "unknown":
+        out.append("_status source unavailable — run `make restart-webhook` on the hub_")
+    return "\n".join(out)
+
+
 def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
     """Run bin/cluster-status for k3s-hostinger (read-only); post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
@@ -2406,31 +2446,39 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
 
     try:
         (job_dir / "status").write_text("running")
-        import shlex as _shlex_hs
         repo_root = Path(__file__).resolve().parent.parent
         status_bin = repo_root / "bin" / "cluster-status"
+        # --json emits no ANSI; pass our own bearer token so the summary tool can
+        # reach /api/v1/health without a Keychain read (launchd children can't).
+        _status_env = dict(os.environ)
+        _status_env.update({"CLUSTER_PROVIDER": "k3s-hostinger", "NO_COLOR": "1",
+                            "K3DM_WEBHOOK_TOKEN": _get_token() or ""})
         status_out, status_timeout = _posix_spawn_capture(
-            ["/bin/bash", "-c",
-             f"CLUSTER_PROVIDER=k3s-hostinger {_shlex_hs.quote(str(status_bin))} && echo __WEBHOOK_SUCCESS__"],
-            timeout=180,
+            [str(status_bin), "--json"], timeout=180, env=_status_env,
         )
         if status_timeout:
             _log("\n❌ *Hostinger status timed out* after 180s — run `make status CLUSTER_PROVIDER=k3s-hostinger` manually")
             _finish("failed")
             return
-        report = status_out.replace("__WEBHOOK_SUCCESS__", "").rstrip()
-        _log("🖥️ *Hostinger app cluster status*")
-        if report:
-            # Slack limits a message to roughly 4k characters. Keep both the
-            # opening reachability sections and the final service/login health
-            # sections instead of showing only the tail of the report.
-            if len(report) > 3500:
-                report = (report[:1600]
-                          + "\n… (middle of report truncated) …\n"
-                          + report[-1800:])
-            _log("```\n{}\n```".format(report))
-        if "__WEBHOOK_SUCCESS__" not in status_out:
-            _log("⚠️ hostinger-status exited non-zero")
+        payload = None
+        for _line in reversed(status_out.strip().splitlines()):
+            _line = _line.strip()
+            if _line.startswith("{") and _line.endswith("}"):
+                try:
+                    payload = json.loads(_line)
+                    break
+                except ValueError:
+                    continue
+        if payload is not None:
+            _log(_format_status_summary_slack(payload, "k3s-hostinger"))
+        else:
+            # Fall back to the raw report if --json could not be parsed.
+            report = status_out.rstrip()
+            _log("🖥️ *Hostinger app cluster status*")
+            if report:
+                if len(report) > 3500:
+                    report = report[:1600] + "\n… (middle of report truncated) …\n" + report[-1800:]
+                _log("```\n{}\n```".format(report))
         _finish("success")
     except Exception as exc:
         _log(f"ERROR: {exc}")

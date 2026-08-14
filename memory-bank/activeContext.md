@@ -4,7 +4,107 @@
 > `CHANGELOG.md` (v1.24.0 section), `docs/plans/v1.24.0-*`, `docs/bugs/v1.24.0-*`, `docs/retro/`,
 > `docs/issues/`, and git history (`git log --follow memory-bank/`).
 
-## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release path in progress
+## Current focus — v1.24.1 cut IN PROGRESS; v1.25.0 = workstream G (queued)
+
+**Scope split executed 2026-08-13 (user decision).** The branch formerly named `k3d-manager-v1.25.0`
+held only status/observability work (zero G implementation), so it was **renamed to
+`k3d-manager-v1.24.1`** and is being cut as a point release; `v1.25.0` is reserved for **workstream G**.
+
+### v1.24.1 (point release) — CUT IN PROGRESS
+Content (implemented + live-verified): status-output contract (concise/JSON `make status` + `SERVICE=`
+focus, `7ed82b89` + status fixes), Slack `/cluster-status` concise-summary wiring (`5b9442cf`),
+CVE-dashboard/exporter cleanup (`a119fdde`, `d471d075`). Dependabot auto-merge observability = scoped
+spec only (not implemented; doc renumbered to v1.24.1).
+- **Done 2026-08-13:** branch renamed `v1.25.0`→`v1.24.1` (old remote deleted); dashboards appset
+  (`grafana-dashboards-hub`/`-acg`) repointed to `k3d-manager-v1.24.1`, `hub-grafana-dashboards`
+  Synced/Healthy; plan/bug docs renumbered `v1.25.0-*`→`v1.24.1-*` (kept `v1.25.0-e2e-*` as G);
+  CHANGELOG `[1.24.1]`, README releases table (3-most-recent, de-duplicated) + Issue Logs (5 newest) +
+  `docs/releases.md`.
+- **Next:** PR gate (CI green + Copilot + scope check) → merge → tag v1.24.1 → then **full-hub repoint**
+  (observability + services-git off `k3d-manager-v1.23.0`) + retire the v1.23.0 branch.
+
+### v1.25.0 = workstream G (queued, BLOCKED cross-repo)
+Stripe/Go live acceptance (stuck 2/4) + E2E verification harness (Tier 1 vCluster blocking + Tier 2 ACG
+sandbox periodic) + e2e observability. Plan docs `v1.25.0-e2e-*`. **Create the fresh
+`k3d-manager-v1.25.0` off `main` AFTER v1.24.1 merges** (inherits v1.24.1, no back-merge; avoids a
+divergent `vulnerability-inventory-exporter.yaml` — v1.24.1 touched it via `a119fdde`, e2e-observability
+plan #2 edits it again). Critical path: build the harness (buildable now, not blocked) → run the Stripe
+E2E on Tier 2 to move G past 2/4. Roadmap order: v1.24.1 → v1.25.0-G → v1.26 → v1.27 → v1.28.
+
+This branch (now `k3d-manager-v1.24.1`) is based on merged `main` (`fd281c85`). Its queued scope now contains three
+implementation-grade plans: `docs/plans/v1.25.0-e2e-verification-harness.md`,
+`docs/plans/v1.25.0-e2e-observability-path-a.md`, and
+`docs/plans/v1.25.0-dependabot-automerge-observability.md` (event-driven Dependabot auto-merge
+monitoring with Grafana/Alertmanager visibility), plus
+`docs/plans/v1.25.0-status-output-contract.md` (concise color-coded `make status` with failed-service
+health/HTTP codes, `SERVICE=<name>` focused diagnostics, full and JSON modes). Implementation is not started.
+The status refactor is now implemented on this branch and live-verified healthy after the
+webhook login credential/KUBECONFIG fix (`fix(status): use current Vault credentials for login smoke`).
+**Status source verified 2026-08-12:** `bin/k3dm-webhook-setup` restored the existing 64-byte
+Keychain token, refreshed the GitHub secret, and reinstalled the LaunchAgent; health endpoint HTTP 200.
+Concise status now works. It reports separate Keycloak, ArgoCD, and Grafana login 401 failures plus
+expected ESO/data-layer warnings; see `docs/issues/2026-08-12-webhook-token-restored-status-verification.md`.
+Follow-up fixed provider selection from the active-provider file and classified optional Pushgateway
+refusal as a warning; remaining login 401s are genuine service credential issues. See
+`docs/issues/2026-08-12-status-provider-and-optional-pushgateway.md`.
+The login checks are now green after reading hub-scoped Keycloak credentials and current ArgoCD/Grafana
+values from Vault; the LaunchAgent renderer now substitutes the real HOME in KUBECONFIG. See
+`docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md`.
+`make status-json` now follows the active provider as well as `make status`; the live JSON result is
+`overall=healthy`, provider `k3s-hostinger`. See `docs/issues/2026-08-13-status-json-default-provider.md`.
+Stale Istio `ubuntu-k3s` Applications were diagnosed as deletion-tombstoned objects targeting retired
+`host.k3d.internal`; their finalizers were removed and ArgoCD deleted them. Hostinger Istio remains
+Synced/Healthy. See `docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md`.
+The CVE remediation dashboard cleanup is implemented: exporter events now expose `current=true` and
+mark superseded failed events; Grafana separates Current Remediation Status from Remediation History.
+Historical ConfigMaps remain intact. See the updated `docs/issues/2026-08-12-cve-remediation-failed-history-investigation.md`.
+The mistaken `docs/argocd-login-smoke-diagnosis` branch was closed/deleted and is not part of v1.25.0.
+
+### Branch-hygiene reconciliation — 2026-08-13 (Claude)
+
+Post-v1.23.0-release work had been committed onto the **released, dead-end `k3d-manager-v1.23.0`
+branch** and was stranded (v1.23.0 was squash-merged as `7253ece4`, so those commits never reach a
+forward branch). Reconciled onto `v1.25.0`:
+
+- **Orphaned future plans rescued + renumbered** (`4cdd7abf`): resolved a v1.26.0 collision (image-signing
+  vs new sandbox-cleanup). **User decision: sandbox-registration=v1.26.0, image-signing=v1.27.0,
+  zero-downtime=v1.28.0.** `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md` moved as-is;
+  `v1.26.0-image-signing-cve-loop-closure.md` → `v1.27.0-…`; `v1.27.0-platform-zero-downtime-rollouts.md`
+  → `v1.28.0-…`; internal refs + `docs/roadmap.md` "Queued milestones" reconciled.
+- **Live CVE dashboard + exporter forward-ported** (`a119fdde`): the concise-header dashboard cleanup and
+  exporter `deployment_advanced`/`display_reason` logic existed only on v1.23.0 (which the hub
+  `hub-grafana-dashboards` ApplicationSet **currently tracks**). Both files were a strict superset of the
+  v1.25.0 versions; carried onto v1.25.0. YAML-parse + embedded-python checks clean.
+
+**Dashboards repointed live 2026-08-13 (Claude):** `grafana-dashboards-hub` + `grafana-dashboards-acg`
+appsets reapplied with `K3D_MANAGER_BRANCH=k3d-manager-v1.25.0`; live `hub-grafana-dashboards`
+Application now `targetRevision=k3d-manager-v1.25.0`, **Synced/Healthy** (forward-port is byte-identical
+to live → no drift). Repointed to v1.25.0 (not v1.24.0) because v1.24.0's dashboard is the older verbose
+version — pointing there would revert the live cleanup.
+**⚠️ STILL on `k3d-manager-v1.23.0`:** `observability`, `observability-acg`, `services-git` (the exporter
+is synced by `observability`, not the dashboards appset). They keep serving the correct (identical)
+content, so nothing reverts — but **do NOT delete the v1.23.0 branch until these are repointed too.**
+That is a release-grade full-hub repoint (services-git pulls service-manifest deltas), best done when
+v1.25.0 is cut; confirm with `argocd_check_values_branch`. **Process:** forward work goes on `v1.25.0`,
+never a released branch.
+
+### Slack `/cluster-status` concise-summary wiring — IMPLEMENTED 2026-08-13 (Claude)
+
+Spec `docs/bugs/v1.25.0-bugfix-slack-cluster-status-summary-wiring.md` (`2094398e`); fix `5b9442cf`
+(`bin/k3dm-webhook`). `_run_hostinger_status` now runs `bin/cluster-status --json` (token passed via env
+so no Keychain read; `NO_COLOR=1`), parses the last JSON line, and renders a concise Slack summary via new
+`_format_status_summary_slack` — emoji severity (`:x:`/`:warning:`/`:white_check_mark:`/`:grey_question:`)
++ `N ok / N warn / N fail` counts + error/warning lines, **no ANSI**, raw-report fallback retained.
+**Verified static:** py_compile clean; formatter unit-exercised (fail/healthy/unknown → correct emoji, no
+ANSI); webhook.bats 53/53. **Scoped OUT:** `_run_cluster_status` (ACG path) — bespoke reachability report,
+already emoji-based, not backed by `cluster-status --json` (documented non-goal in the spec).
+**Live-verified 2026-08-13:** `make restart-webhook` done (health 401 = up+auth). End-to-end smoke with
+real cluster data — `CLUSTER_PROVIDER=k3s-hostinger bin/cluster-status --json` → exit 0, 13 services
+healthy; fed through the live `_format_status_summary_slack` →
+`:white_check_mark: *Cluster status: HEALTHY* — \`k3s-hostinger\`  (13 ok / 0 warn / 0 fail)` (no ANSI).
+Only an actual Slack `/cluster-status` trigger (user action) remains as final confirmation.
+
+## Current focus — v1.24.0 CODE-COMPLETE + LIVE-VERIFIED; release complete
 
 **v1.24.0 = platform hardening (D+E+F+#18).** All code committed + pushed to
 `origin/k3d-manager-v1.24.0`, Claude-verified on origin. CHANGELOG + README + `docs/releases.md`
@@ -46,6 +146,10 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
 
 - Update auto-memory `reference_trivy_critical_upstream_image_noise` "still errors" note once a real
   `wilddog64/*` TrivyCritical analyze is observed posting real text via the `69e21e15` fix.
+- **CVE remediation dashboard history (investigated 2026-08-12):** the displayed `ready_pod_digest_mismatch`
+  rows are retained Aug 6/Aug 9 historical events. Payment has later `applied` events; current order/payment
+  workloads are healthy. The flat panel does not collapse superseded failures. Follow-up issue:
+  `docs/issues/2026-08-12-cve-remediation-failed-history-investigation.md`.
 
 ## Pending releases (forward scope)
 
@@ -62,8 +166,12 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
   `shopping-cart-e2e-tests`. Exit-code + JSON-summary contract seeds the v1.26.0 gate.
   **+ e2e observability (plan doc #2 `v1.25.0-e2e-observability-path-a.md`):** reuse the CVE exporter seam
   — harness writes a `k3dm.k3d.io/e2e-result=true` ConfigMap; extend `vulnerability-inventory-exporter.py`
-  to emit `e2e_*` gauges; new `grafana-dashboard-e2e.yaml` + `E2EVerificationFailing/Stale` rules; deploy
-  via `argocd.sh`. No new component, no Tempo (span tracing = separate forward theme).
+      to emit `e2e_*` gauges; new `grafana-dashboard-e2e.yaml` + `E2EVerificationFailing/Stale` rules; deploy
+      via `argocd.sh`. No new component, no Tempo (span tracing = separate forward theme).
+      **+ Dependabot auto-merge observability (plan doc #3 `v1.25.0-dependabot-automerge-observability.md`):**
+      signed GitHub PR/check/workflow events plus 15-minute read-only reconciliation feed bounded
+      Prometheus metrics, Grafana panels, and owned Alertmanager Slack alerts. Monitor never merges or
+      changes branch protection; implementation not started.
 - **v1.26.0 = image signing + attestation — close the CVE loop (SCOPED, not started).** Spec
   `docs/plans/v1.26.0-image-signing-cve-loop-closure.md`. cosign sign + Trivy vuln/SBOM attest at build;
   `cosign verify` at promotion (promoter gate) AND admission (Kyverno, staged Audit→Enforce, app
