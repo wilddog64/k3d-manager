@@ -260,6 +260,14 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
 
 ## Recently shipped (pointers only — detail in CHANGELOG + retro)
 
+- **DRY_RUN Phase 4 COMPLETE (2026-08-14):** `7a34856c` pushed to `origin/k3d-manager-v1.25.0`.
+  Slack `cluster-up`/`cluster-down` now parse provider and dry-run tokens in any order, inject
+  `DRY_RUN=1` into the spawned make job, skip post-provision/metrics side effects for previews,
+  and document the command syntax. Behavioral webhook BATS (54/54), cluster-down BATS (12/12),
+  py_compile, agent lint/audit, and isolated smoke test passed. Mutation check was pass → fail
+  after removing the `*)` bridge source → pass after restoration; `bin/cluster-down` remained
+  unchanged. `make restart-webhook` intentionally deferred for Claude's live process.
+
 - **PR #113 Copilot follow-up (2026-08-11):** six actionable review threads addressed and resolved in
   `be29b5a0` (credential exposure, portability, launchd PATH, and test dependency). CI is green; PR
   remains review-gated pending an approving reviewer.

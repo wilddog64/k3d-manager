@@ -56,6 +56,11 @@ still requires an approving review.
 
 ## Pending releases (forward scope — detail in activeContext.md)
 
+- [x] **DRY_RUN Slack Phase 4 (2026-08-14):** `7a34856c` pushed to `origin/k3d-manager-v1.25.0`.
+      Provider/dry-run token parsing, env injection, preview side-effect suppression, and help/docs
+      are implemented. Webhook BATS 54/54, cluster-down BATS 12/12, py_compile, smoke, and mutation
+      pass→fail→pass gates passed; `make restart-webhook` deferred to Claude for live pickup.
+
 - [x] **v1.25.0 branch created** from merged main (e7a32bb9) with four queued plans: E2E verification,
       E2E observability, event-driven Dependabot auto-merge monitoring/Grafana visibility; no
       unrelated ArgoCD diagnosis branch content carried forward. Ready for development (workstream G).
