@@ -56,6 +56,19 @@ still requires an approving review.
 
 ## Pending releases (forward scope — detail in activeContext.md)
 
+- [ ] **BUG spec (2026-08-14) — k3s-aws provisioning cannot install k3s.** `env: 'deploy_app_cluster':
+      No such file or directory` at `k3s-aws.sh:178` (`env VAR=val` can't call a shell function). Fix =
+      drop `env`. Blocks every fresh k3s-aws bring-up. Spec:
+      `docs/bugs/v1.25.0-bugfix-k3s-aws-env-cannot-call-deploy-app-cluster.md`. Not yet handed off.
+- [ ] **BUG spec (2026-08-14) — observability DRY_RUN `base64: invalid input`.** 5× `_kubectl get secret
+      vault-root … | base64 --decode` in `observability.sh` pipe the `[dry-run]` preview banner into
+      base64; fix = plain `kubectl` for the read. Spec:
+      `docs/bugs/v1.25.0-bugfix-observability-dryrun-base64-invalid-input.md`. Not yet handed off.
+- [ ] **Tier 2 live dry-run (2026-08-14) — 2A/2B decision pending.** Sandbox up; found identity is
+      hub-hosted w/ Cloudflare issuer → D1 "same appsets" doesn't cover identity/OIDC. 2A (fully
+      self-contained, weeks-scale cross-repo) vs 2B (shared hub identity, ~80/20, unblocks G, still no
+      hub registration). Detail scratchpad `tier2-dryrun-findings.md`. Awaiting user pick.
+
 - [x] **DRY_RUN Slack Phase 4 (2026-08-14):** `7a34856c` pushed to `origin/k3d-manager-v1.25.0`.
       Provider/dry-run token parsing, env injection, preview side-effect suppression, and help/docs
       are implemented. Webhook BATS 54/54, cluster-down BATS 12/12, py_compile, smoke, and mutation
@@ -192,9 +205,16 @@ still requires an approving review.
       (now `bin/cluster-*`, v1.7.1), `make sudoers` (actual: `install-sudoers`), omits many targets, and has 0
       DRY_RUN coverage. Update it (DRY_RUN CLI row + `[dry-run]` Slack arg + `acg-*`→`cluster-*` rename) when
       Phase 2 lands.
-- [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
-      #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
-      `register_app_cluster` (self-contained → no hub orphans). Shortest path to G past 2/4. Order schema
+- [ ] **v1.25.0 E2E harness Tier 2 — ARCHITECTURE LOCKED, blocked on Claude live dry-run** (2026-08-14,
+      user chose "design fully first"; `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan #4).
+      **D1 RESOLVED → disposable in-sandbox ArgoCD** (stack is appset-driven keyed on
+      `k3d-manager/role: app-cluster`; install ArgoCD in-sandbox, label `in-cluster`, apply same appsets vs
+      `kubernetes.default.svc`). INVARIANT never calls `register_app_cluster` (self-contained → no hub orphans).
+      **NOT handoff-ready:** exact deploy code blocked on THREE undesigned paths needing a live dry-run —
+      GAP1 in-sandbox ArgoCD install unsupported (`deploy_argocd_bootstrap` skips `CLUSTER_ROLE=app`,
+      argocd.sh:969); GAP2 Keycloak/identity deploy not a reusable fn (`services-git` excludes
+      `shopping-cart-identity`); GAP3 no app-cluster ingress-exposure helper. Next = Claude live dry-run
+      pins GAP1–3 AND moves G past 2/4 (live Stripe run is Claude's), then Codex handoff. Order schema
       blocker already resolved on main (`cb58e8b` #67 + image `df35ea8`); remaining = rerun Stripe E2E.
       **+ Status output contract** (plan doc #4) — concise error-first output with red/yellow/green
       terminal semantics, failed-service health/HTTP codes, `SERVICE=<name>` focused diagnostics,
