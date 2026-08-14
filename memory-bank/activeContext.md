@@ -4,13 +4,13 @@
 > `CHANGELOG.md` (v1.24.0 section), `docs/plans/v1.24.0-*`, `docs/bugs/v1.24.0-*`, `docs/retro/`,
 > `docs/issues/`, and git history (`git log --follow memory-bank/`).
 
-## Current focus — v1.24.1 cut IN PROGRESS; v1.25.0 = workstream G (queued)
+## Current focus — v1.24.1 RELEASED; v1.25.0 = workstream G (open for development)
 
 **Scope split executed 2026-08-13 (user decision).** The branch formerly named `k3d-manager-v1.25.0`
 held only status/observability work (zero G implementation), so it was **renamed to
-`k3d-manager-v1.24.1`** and is being cut as a point release; `v1.25.0` is reserved for **workstream G**.
+`k3d-manager-v1.24.1`** and was cut as a point release; `v1.25.0` is reserved for **workstream G**.
 
-### v1.24.1 (point release) — CUT IN PROGRESS
+### v1.24.1 (point release) — RELEASED
 Content (implemented + live-verified): status-output contract (concise/JSON `make status` + `SERVICE=`
 focus, `7ed82b89` + status fixes), Slack `/cluster-status` concise-summary wiring (`5b9442cf`),
 CVE-dashboard/exporter cleanup (`a119fdde`, `d471d075`). Dependabot auto-merge observability = scoped
@@ -20,16 +20,21 @@ spec only (not implemented; doc renumbered to v1.24.1).
   Synced/Healthy; plan/bug docs renumbered `v1.25.0-*`→`v1.24.1-*` (kept `v1.25.0-e2e-*` as G);
   CHANGELOG `[1.24.1]`, README releases table (3-most-recent, de-duplicated) + Issue Logs (5 newest) +
   `docs/releases.md`.
-- **Next:** PR gate (CI green + Copilot + scope check) → merge → tag v1.24.1 → then **full-hub repoint**
-  (observability + services-git off `k3d-manager-v1.23.0`) + retire the v1.23.0 branch.
+- **Released 2026-08-13:** PR #115 merged to main (e7a32bb9), tag v1.24.1 created and pushed, GitHub
+  release published. `enforce_admins` branch protection restored. Retrospective filed
+  (`docs/retro/2026-08-13-v1.24.1-retrospective.md`). Three Copilot findings addressed (Makefile
+  shell-injection quoting + roadmap/plan-header doc sweep). **Partial hub repoint complete**
+  (dashboards appset repointed to v1.24.1, Synced/Healthy). **Full repoint deferred** to v1.25.0
+  release-ops (`observability` + `observability-acg` + `services-git` still track v1.23.0; safe to defer
+  until v1.25.0 ships, do NOT delete v1.23.0 branch yet).
 
-### v1.25.0 = workstream G (queued, BLOCKED cross-repo)
+### v1.25.0 = workstream G (branch created, ready for development, BLOCKED cross-repo)
 Stripe/Go live acceptance (stuck 2/4) + E2E verification harness (Tier 1 vCluster blocking + Tier 2 ACG
-sandbox periodic) + e2e observability. Plan docs `v1.25.0-e2e-*`. **Create the fresh
-`k3d-manager-v1.25.0` off `main` AFTER v1.24.1 merges** (inherits v1.24.1, no back-merge; avoids a
-divergent `vulnerability-inventory-exporter.yaml` — v1.24.1 touched it via `a119fdde`, e2e-observability
-plan #2 edits it again). Critical path: build the harness (buildable now, not blocked) → run the Stripe
-E2E on Tier 2 to move G past 2/4. Roadmap order: v1.24.1 → v1.25.0-G → v1.26 → v1.27 → v1.28.
+sandbox periodic) + e2e observability. Plan docs `v1.25.0-e2e-*`. **Branch created 2026-08-13** from
+merged main (`e7a32bb9`, inherits v1.24.1, no back-merge; avoids divergent `vulnerability-inventory-exporter.yaml`
+— v1.24.1 touched it via `a119fdde`, e2e-observability plan #2 edits it again). Critical path: build the
+harness (buildable now, not blocked) → run the Stripe E2E on Tier 2 to move G past 2/4. Roadmap order:
+v1.24.1 → v1.25.0-G → v1.26 → v1.27 → v1.28.
 
 This branch (now `k3d-manager-v1.24.1`) is based on merged `main` (`fd281c85`). Its queued scope now contains three
 implementation-grade plans: `docs/plans/v1.25.0-e2e-verification-harness.md`,

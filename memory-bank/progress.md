@@ -7,7 +7,7 @@
 
 | Version | Theme | State |
 |---|---|---|
-| v1.24.1 | status output contract + observability polish (point release) | **CUT IN PROGRESS** — branch renamed `k3d-manager-v1.25.0`→`k3d-manager-v1.24.1`; dashboards appset repointed to v1.24.1 (Synced/Healthy); docs renumbered; CHANGELOG `[1.24.1]` + README/releases.md done; PR gate next. Content: status modes (`7ed82b89`), Slack `/cluster-status` summary (`5b9442cf`), CVE-dashboard cleanup (`a119fdde`,`d471d075`) |
+| v1.24.1 | status output contract + observability polish (point release) | RELEASED — PR #115 merged (e7a32bb9), tag v1.24.1 created + pushed, GitHub release published. Retrospective filed. Copilot findings fixed (Makefile quoting + roadmap sweep). Partial hub repoint (dashboards appset Synced/Healthy). Content: status modes (`7ed82b89`), Slack `/cluster-status` summary (`5b9442cf`), CVE-dashboard cleanup (`a119fdde`,`d471d075`) |
 | v1.24.0 | platform hardening (D+E+F+#18) | RELEASED — PR #113 `fd281c85`, tagged v1.24.0 + GitHub release |
 | v1.23.0 | CVE observability + remediation lifecycle (B+C) | RELEASED — PR #112 `7253ece4`, tagged; platform-ops deployed live, `enforce_admins` restored |
 | v1.22.0 | OpenLDAP bitnami→Symas migration | RELEASED — PR #111 `1bbb74b0`, tagged |
@@ -16,6 +16,18 @@
 | v1.18.0 | first-mile CVE gap closure | RELEASED — PR #108 `85742ef7`, tagged |
 
 (v1.19.0 was a shopping-cart-only Dependabot milestone — no k3d-manager tag.)
+
+## v1.24.1 shipped commits (2026-08-13)
+
+| Work item | Commit(s) | Verify |
+|---|---|---|
+| Status output contract (concise/full/JSON modes + provider-aware + SERVICE focus) | `7ed82b89` | shellcheck, BATS (summary), live `make status-json overall=healthy` |
+| Slack `/cluster-status` concise-summary wiring | `5b9442cf` | py_compile, webhook.bats 53/53, live emoji/count output verified |
+| CVE remediation dashboard cleanup (current vs history split) | `a119fdde`, `d471d075` | YAML/JSON parse, exporter `current/superseded` flags, live reapply done |
+| Copilot follow-up fixes (Makefile quoting + roadmap/plan-header sweep) | `68fe1b88` | Make dry-run, static doc refs verified |
+
+**RELEASED 2026-08-13:** PR #115 (e7a32bb9) merged to main; v1.24.1 tag created + pushed; GitHub
+release published; `enforce_admins` restored; retrospective filed (`docs/retro/2026-08-13-v1.24.1-retrospective.md`).
 
 ## v1.24.0 shipped commits (2026-08-11)
 
@@ -44,10 +56,9 @@ still requires an approving review.
 
 ## Pending releases (forward scope — detail in activeContext.md)
 
-- [x] **v1.25.0 branch prepared** from merged `main` with four queued plans: E2E verification,
-      E2E observability, event-driven Dependabot auto-merge monitoring/Grafana visibility, and the
-      concise color-coded status output contract; no
-      unrelated ArgoCD diagnosis branch content carried forward.
+- [x] **v1.25.0 branch created** from merged main (e7a32bb9) with four queued plans: E2E verification,
+      E2E observability, event-driven Dependabot auto-merge monitoring/Grafana visibility; no
+      unrelated ArgoCD diagnosis branch content carried forward. Ready for development (workstream G).
 
 - [ ] **v1.25.0** — Stripe/Go live acceptance + hostinger capacity (G, BLOCKED, cross-repo). Merge
       order-repo `0e3feb9` schema fix + promote image → rerun Stripe live E2E (2/4 now); hostinger capacity
