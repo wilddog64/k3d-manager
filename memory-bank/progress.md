@@ -80,10 +80,35 @@ still requires an approving review.
       safety net only (TTL-expiry watchdog = v1.26.0). **DONE** — `d6217640`, pushed to
       `origin/k3d-manager-v1.25.0`; DRY_RUN, targeted cleanup, finalizer removal, and idempotent BATS
       coverage passed with shellcheck and the 60-test provider suite.
-- [x] **v1.25.0 DRY_RUN cluster-lifecycle Phase 2 — COMPLETE** (`c8b6a1aa`, pushed to `origin/k3d-manager-v1.25.0`).
-      Per-operation guards cover `bin/cluster-up`, `bin/cluster-down`, and all five provider deploy/destroy
-      paths; shellcheck is clean, relevant lifecycle/provider BATS passes 47/47, and dry `make up/down`
-      emits `DRY_RUN: would …` without follow-on deployment. Phase 3 remains separate.
+- [ ] **v1.25.0 DRY_RUN cluster-lifecycle Phase 2 — REJECTED at verify (`c8b6a1aa`, on origin).** Partial impl.
+      PASS: scope=7 files, commit msg verbatim, shellcheck clean ×7, k3s-aws deregister NOT double-guarded,
+      OCI interactive `read` kept outside guard, hostinger `_uninstall_rc` preserved, `bin/cluster-down` fully
+      covered. **FAIL (blocker): `bin/cluster-up` guards STOP at line 364** (last `_dry_guard`); the entire macOS
+      access layer after it is UNGUARDED — argocd-browser (~509–591), keycloak-browser (~1200–1238), loopback
+      alias (~1364–1410), frontend-browser (~1461–1478), named tunnel (~1717–1719): 17 `_run_command
+      --interactive-sudo/--prefer-sudo` mutations. **Split-brain root cause:** the new guards read `DRY_RUN`
+      (`_dry_run_active`, system.sh:1717) but `_run_command`'s pre-existing dry-run reads a DIFFERENT var
+      `K3DM_DEPLOY_DRY_RUN` (system_overrides.sh:30; also vault.sh ×3, jenkins.sh, dispatcher k3d-manager:530).
+      The two are unbridged → under `DRY_RUN=1 make up` those sudo ops (system-keychain `security add-trusted-cert`,
+      `launchctl bootstrap system`, `ifconfig lo0 alias`) EXECUTE. DoD "touches nothing" gate is violated; Codex's
+      "47/47 / no follow-on deployment" claim is the pre-existing suite — **NO new BATS added** (commit touched 0
+      test files). Also `bin/cluster-down` coarse-wraps 22 mac ops in ONE `_info "would unload local launchd
+      agents…"` (safe but plan is inaccurate vs spec 2a per-op). **Remediation = Phase 2b:** (1) bridge the two
+      vars — `_dry_run_active` also true when `K3DM_DEPLOY_DRY_RUN=1`, and/or `_run_command` also honors `DRY_RUN`;
+      (2) guard cluster-up lines >364; (3) split the coarse cluster-down block; (4) add the BATS. Phase 3/4 stay
+      blocked. Do NOT proceed to release with Phase 2 as-is.
+- [ ] **v1.25.0 DRY_RUN Phase 2b — SPEC WRITTEN, ready for Codex** (`docs/bugs/v1.25.0-bugfix-dry-run-phase2b-standardize-and-complete.md`,
+      2026-08-14). Owner decided: standardize on **`DRY_RUN`** canonical; `K3DM_DEPLOY_DRY_RUN` = bridged deprecated
+      alias. make-up strategy = **guard-core + plan-and-exit** (owner-selected; a true dry-run has no cluster to
+      configure). **Part A (keystone):** override `_dry_run_active` in `system_overrides.sh` to honor both vars +
+      route `_run_command` through it; **source `system_overrides.sh` in BOTH bins** (they don't today — same
+      divergence class as the Phase-1 active-sync bug, so `_run_command` had zero dry-awareness on the make path);
+      migrate vault.sh×3 / jenkins.sh×1 / dispatcher `--dry-run` to `_dry_run_active`/`DRY_RUN`. **Part B:** cluster-up
+      plan-and-exit right before the Step 4 Vault-pf seam (line 338). **Part C:** split cluster-down's coarse 22-op
+      guard — `_run_command` ops auto-covered by Part A, direct launchctl/rm (pgw/am/am-auth/kc-pf/cf) get per-op
+      guards. **Part D:** BATS. Commit msg `fix(lifecycle): standardize dry-run on DRY_RUN and complete make up/down
+      guards`. NOT yet handed off. Phase 3 (deregister) + Phase 4 (Slack) sequence AFTER 2b — Phase 4's `DRY_RUN=1`
+      injection only works once Part A bridges `_run_command`.
 - [ ] **v1.25.0 DRY_RUN cluster-lifecycle bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-dry-run-cluster-lifecycle.md`,
       2026-08-14). `DRY_RUN=1` today is honored ONLY in `_k3s_aws_deregister_cluster` → `DRY_RUN=1 make up/down`
       really provisions/destroys (footgun). Fix = foundation-first guard primitives (`_dry_run_active`,
