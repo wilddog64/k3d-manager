@@ -70,7 +70,7 @@ Not yet handed off to Codex.
   (a) `docs/bugs/v1.25.0-bugfix-k3s-aws-hub-deregister.md` — add `_k3s_aws_deregister_cluster` (delete
       `cluster-ubuntu-k3s` + generated `destination.name==ubuntu-k3s` Apps, finalizers stripped) and call it in
       `destroy_cluster` before `acg_teardown`. Graceful-teardown safety net only; TTL-expiry watchdog stays
-      v1.26.0. Ready for Codex.
+      v1.26.0. Implemented and pushed as `d6217640`; shellcheck and provider BATS gates passed.
   (b) `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md` (plan #4) — `e2e_verify_sandbox` runs the full stack +
       Stripe live E2E in-sandbox with `OAUTH2_ENABLED=true`, **INVARIANT: never calls `register_app_cluster`**
       (self-contained island → nothing to orphan on TTL expiry). This is the shortest path to G past 2/4.

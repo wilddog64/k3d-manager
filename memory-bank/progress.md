@@ -77,7 +77,9 @@ still requires an approving review.
 - [ ] **v1.25.0 ACG cleanup bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-k3s-aws-hub-deregister.md`,
       2026-08-14). k3s-aws `destroy_cluster` lacks a hub-deregister (only provider missing it) → expired
       sandbox leaves `cluster-ubuntu-k3s` + `Unknown` Apps. Add `_k3s_aws_deregister_cluster`; graceful-teardown
-      safety net only (TTL-expiry watchdog = v1.26.0). Ready for Codex; not handed off.
+      safety net only (TTL-expiry watchdog = v1.26.0). **DONE** — `d6217640`, pushed to
+      `origin/k3d-manager-v1.25.0`; DRY_RUN, targeted cleanup, finalizer removal, and idempotent BATS
+      coverage passed with shellcheck and the 60-test provider suite.
 - [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
       #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
       `register_app_cluster` (self-contained → no hub orphans). Shortest path to G past 2/4. Order schema
