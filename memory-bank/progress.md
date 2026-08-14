@@ -108,9 +108,18 @@ still requires an approving review.
       block after the `acg_teardown` if/else, before `;;`. Commit msg
       `fix(lifecycle): deregister k3s-aws sandbox from hub on make down`. **Sequence AFTER Phase 2 merges**
       (both touch `bin/cluster-down`); not yet handed off. Tier-2 e2e proceeds in parallel.
+      **Phase 4 spec written + QUEUED** (`docs/bugs/v1.25.0-bugfix-dry-run-phase4-slack-cluster-commands.md`,
+      2026-08-14): wire DRY_RUN into Slack `cluster-up`/`cluster-down`. `bin/k3dm-webhook:_run_cluster` always
+      spawns real `make up/down`; fix = parse a `dry`/`dry-run` token (position-independent, alongside optional
+      provider), thread `dry_run` into `_run_cluster`, inject `DRY_RUN=1` into the `_posix_spawn_job(env=…)`
+      child (make passes env→`bin/cluster-*` recipe; NO edits to cluster-up/down/Makefile), skip
+      `_record_acg_state`/`_run_post_provision_check`/`_push_metrics` in dry-run, 🧪-tag Slack msgs. Admin-only
+      unchanged. Commit msg `feat(webhook): support DRY_RUN preview for Slack cluster-up/cluster-down`.
+      **Blocked on Phase 2 merge** (dry-run is a footgun until guards exist); not handed off.
       **Post-Phase-2 follow-up:** `docs/howto/makefile.md` is stale — documents renamed `bin/acg-*` binaries
       (now `bin/cluster-*`, v1.7.1), `make sudoers` (actual: `install-sudoers`), omits many targets, and has 0
-      DRY_RUN coverage. Update it (DRY_RUN row + `acg-*`→`cluster-*` rename) when Phase 2 lands.
+      DRY_RUN coverage. Update it (DRY_RUN CLI row + `[dry-run]` Slack arg + `acg-*`→`cluster-*` rename) when
+      Phase 2 lands.
 - [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
       #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
       `register_app_cluster` (self-contained → no hub orphans). Shortest path to G past 2/4. Order schema
