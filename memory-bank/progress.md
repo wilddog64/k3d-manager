@@ -86,8 +86,12 @@ still requires an approving review.
       `_dry_guard`) + per-op guards across `bin/cluster-up`, `bin/cluster-down`, and all 5 provider deploy+destroy
       fns (D1 per-op, D2 all-providers, D3 foundation-first). Phased: **Phase 0 lib-foundation** (helper+BATS+release)
       → Phase 1 subtree-pull+sync → Phase 2 guards → **Phase 3** also fixes `make down` k3s-aws NOT calling
-      `_k3s_aws_deregister_cluster` (bin/cluster-down bypasses the dispatcher). Phase 0 to be handed to Codex now;
-      Phases 1–3 land after the foundation release. Tier-2 e2e proceeds in parallel. NOT handed off yet.
+      `_k3s_aws_deregister_cluster` (bin/cluster-down bypasses the dispatcher).
+      **Phase 0 DONE + PR open:** lib-foundation `feat/v0.4.9` — helpers `287fa0e`, Copilot fixes `bc06608`
+      (location-independent bats `$SYSTEM_LIB` + non-racy `mktemp`), findings doc `f51b95d`. PR
+      wilddog64/lib-foundation#40 — CI green, 3 Copilot threads resolved, main unprotected → ready to merge.
+      Next: merge #40 → tag v0.4.9 → subtree-pull into k3d-manager → then Phases 1–3.
+      Tier-2 e2e proceeds in parallel.
 - [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
       #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
       `register_app_cluster` (self-contained → no hub orphans). Shortest path to G past 2/4. Order schema
