@@ -244,6 +244,46 @@ HELP
   _info "[k3s-aws] Verify: kubectl --context ubuntu-k3s get nodes"
 }
 
+function _k3s_aws_deregister_cluster() {
+  local ctx="${K3S_AWS_KUBE_CONTEXT:-ubuntu-k3s}"
+  local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+  local secret_name="cluster-${ctx}"
+
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    printf 'DRY_RUN: delete hub ArgoCD secret %s in %s + generated Applications targeting %s\n' \
+      "${secret_name}" "${argocd_ns}" "${ctx}"
+    return 0
+  fi
+
+  if ! declare -f _argocd_hub_kubectl_cmd >/dev/null 2>&1; then
+    # shellcheck source=/dev/null
+    source "${SCRIPT_DIR}/plugins/argocd.sh" || {
+      _warn "[k3s-aws] argocd plugin unavailable — skipping hub deregister"
+      return 0
+    }
+  fi
+
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+
+  "${hub_kubectl[@]}" -n "${argocd_ns}" delete secret "${secret_name}" \
+    --ignore-not-found >/dev/null 2>&1 || true
+
+  local app
+  while IFS= read -r app; do
+    [[ -z "${app}" ]] && continue
+    "${hub_kubectl[@]}" -n "${argocd_ns}" patch "${app}" --type=merge \
+      -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
+    "${hub_kubectl[@]}" -n "${argocd_ns}" delete "${app}" --ignore-not-found >/dev/null 2>&1 || true
+  done < <(
+    "${hub_kubectl[@]}" -n "${argocd_ns}" get applications -o \
+      jsonpath='{range .items[?(@.spec.destination.name=="'"${ctx}"'")]}application/{.metadata.name}{"\n"}{end}' \
+      2>/dev/null
+  )
+
+  _info "[k3s-aws] Deregistered ${secret_name} + generated Applications from hub ArgoCD (${argocd_ns})"
+}
+
 function _provider_k3s_aws_destroy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -288,6 +328,10 @@ HELP
     _info "[k3s-aws] Stopping tunnel..."
     tunnel_stop || true
   fi
+
+  _info "[k3s-aws] Deregistering sandbox from hub ArgoCD..."
+  _k3s_aws_deregister_cluster \
+    || _warn "[k3s-aws] hub deregister reported an issue — check hub for stale cluster-ubuntu-k3s"
 
   _info "[k3s-aws] Tearing down server EC2..."
   acg_teardown --confirm || return 1
