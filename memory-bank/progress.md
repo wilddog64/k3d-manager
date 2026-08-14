@@ -80,6 +80,10 @@ still requires an approving review.
       safety net only (TTL-expiry watchdog = v1.26.0). **DONE** — `d6217640`, pushed to
       `origin/k3d-manager-v1.25.0`; DRY_RUN, targeted cleanup, finalizer removal, and idempotent BATS
       coverage passed with shellcheck and the 60-test provider suite.
+- [x] **v1.25.0 DRY_RUN cluster-lifecycle Phase 2 — COMPLETE** (`c8b6a1aa`, pushed to `origin/k3d-manager-v1.25.0`).
+      Per-operation guards cover `bin/cluster-up`, `bin/cluster-down`, and all five provider deploy/destroy
+      paths; shellcheck is clean, relevant lifecycle/provider BATS passes 47/47, and dry `make up/down`
+      emits `DRY_RUN: would …` without follow-on deployment. Phase 3 remains separate.
 - [ ] **v1.25.0 DRY_RUN cluster-lifecycle bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-dry-run-cluster-lifecycle.md`,
       2026-08-14). `DRY_RUN=1` today is honored ONLY in `_k3s_aws_deregister_cluster` → `DRY_RUN=1 make up/down`
       really provisions/destroys (footgun). Fix = foundation-first guard primitives (`_dry_run_active`,
