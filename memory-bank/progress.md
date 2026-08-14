@@ -93,9 +93,15 @@ still requires an approving review.
       `k3d-manager-v1.25.0`: merge `56ff8df1` (squash `9a31ac7a`, `14c79082..58269466`) — `_dry_run_active`
       /`_dry_guard` now live at `scripts/lib/foundation/scripts/lib/system.sh:1850`. Copilot findings folded in
       (location-independent bats `$SYSTEM_LIB` + non-racy `mktemp`, doc `f51b95d`).
-      **Next: Phase 2** per-op `_dry_guard` guards across `bin/cluster-up`, `bin/cluster-down`, and all 5 provider
-      deploy+destroy fns; **Phase 3** also fixes `make down` k3s-aws NOT calling `_k3s_aws_deregister_cluster`.
-      Tier-2 e2e proceeds in parallel.
+      **Phase 1 ACTIVE-SYNC completed** (`f5057e73`): the subtree copy was present but `bin/cluster-up`/`cluster-down`
+      source the top-level active `scripts/lib/system.sh` directly (diverges from subtree) — the two helpers were
+      NOT runtime-callable on the make up/down path until synced into the active file (verified `CALLABLE` +
+      dry/real behavior + shellcheck clean).
+      **Phase 2 spec written + HANDED TO CODEX** (`docs/bugs/v1.25.0-bugfix-dry-run-phase2-per-op-guards.md`,
+      2026-08-14): self-contained, verified line-anchors for 2a `bin/cluster-down` / 2b `bin/cluster-up` / 2c all 5
+      providers; DoD has DRY_RUN-touches-nothing smoke + real-mode-still-mutates coverage gate + BATS. Commit msg
+      `fix(lifecycle): honor DRY_RUN per-op across make up/down for all providers`. **Phase 3** (separate) still
+      fixes `make down` k3s-aws NOT calling `_k3s_aws_deregister_cluster`. Tier-2 e2e proceeds in parallel.
 - [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
       #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
       `register_app_cluster` (self-contained → no hub orphans). Shortest path to G past 2/4. Order schema
