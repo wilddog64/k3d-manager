@@ -100,8 +100,17 @@ still requires an approving review.
       **Phase 2 spec written + HANDED TO CODEX** (`docs/bugs/v1.25.0-bugfix-dry-run-phase2-per-op-guards.md`,
       2026-08-14): self-contained, verified line-anchors for 2a `bin/cluster-down` / 2b `bin/cluster-up` / 2c all 5
       providers; DoD has DRY_RUN-touches-nothing smoke + real-mode-still-mutates coverage gate + BATS. Commit msg
-      `fix(lifecycle): honor DRY_RUN per-op across make up/down for all providers`. **Phase 3** (separate) still
-      fixes `make down` k3s-aws NOT calling `_k3s_aws_deregister_cluster`. Tier-2 e2e proceeds in parallel.
+      `fix(lifecycle): honor DRY_RUN per-op across make up/down for all providers`.
+      **Phase 3 spec written + QUEUED** (`docs/bugs/v1.25.0-bugfix-dry-run-phase3-make-down-deregister.md`,
+      2026-08-14): `bin/cluster-down` `k3s-aws)` branch (lines 48–64) tears down CloudFormation but never calls
+      `_k3s_aws_deregister_cluster` (k3s-aws.sh:247, self-guards DRY_RUN, on dispatcher path at :333, merged
+      `d6217640`) → `make down` leaves the sandbox registered in hub ArgoCD. Fix = add a dry-aware deregister
+      block after the `acg_teardown` if/else, before `;;`. Commit msg
+      `fix(lifecycle): deregister k3s-aws sandbox from hub on make down`. **Sequence AFTER Phase 2 merges**
+      (both touch `bin/cluster-down`); not yet handed off. Tier-2 e2e proceeds in parallel.
+      **Post-Phase-2 follow-up:** `docs/howto/makefile.md` is stale — documents renamed `bin/acg-*` binaries
+      (now `bin/cluster-*`, v1.7.1), `make sudoers` (actual: `install-sudoers`), omits many targets, and has 0
+      DRY_RUN coverage. Update it (DRY_RUN row + `acg-*`→`cluster-*` rename) when Phase 2 lands.
 - [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
       #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
       `register_app_cluster` (self-contained → no hub orphans). Shortest path to G past 2/4. Order schema
