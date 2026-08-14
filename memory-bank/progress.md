@@ -124,7 +124,20 @@ still requires an approving review.
 - [x] **v1.25.0 DRY_RUN cluster-lifecycle bugfix — Phase 3 COMPLETE** (`469a3427`, pushed to
       `origin/k3d-manager-v1.25.0`, 2026-08-14). `make down` now deregisters k3s-aws from hub ArgoCD and
       bridges local-provider launchd teardown under DRY_RUN; cluster-down BATS 12/12 and shellcheck pass.
-      The broader foundation/Phase 2 history remains below for reference. **Spec:**
+      **VERIFIED by Claude 2026-08-14:** both changes verbatim per spec (deregister block between `fi`/`;;` in
+      k3s-aws branch; one-line `source system_overrides.sh` in `*)`, no unset); SHA on origin; code scope 2 files
+      + CHANGELOG/memory-bank in follow-up `718a8f7b`; CHANGELOG refs fix SHA; shellcheck clean; 12/12 BATS.
+      **Mutation-tested:** reverting Change 1 fails 3 deregister tests (primary Defect-1 fix properly guarded).
+      ⚠️ **FINDING (test quality, not correctness — fix is real & correct):** the `*)` bridge test
+      (`acg-down dry-run local provider bridges launchd bootouts`) is a **vacuous** regression guard — the full
+      suite passes identically with Change 2 reverted, because the headless BATS context skips the sudo/tty-gated
+      bootouts (cluster-down:212/254) and the `launchctl-mutation-called` sentinel doesn't track the
+      unconditional `_run_command --prefer-sudo -- rm -f <plist>` leaks (198/223/224/262). A real guard must
+      exercise a non-tty-gated `_run_command --prefer-sudo` op on `*)` under DRY_RUN=1 (e.g. assert an
+      `rm -f <sentinel>` previews `[dry-run]` and leaves a real sentinel intact). **Recommended follow-up**, not
+      a blocker; Defect 2 leak itself confirmed real via standalone spy (real `sudo launchctl bootout`/`rm` on
+      interactive `DRY_RUN=1 make down` without the bridge). The broader foundation/Phase 2 history remains below
+      for reference. **Spec:**
       `docs/bugs/v1.25.0-bugfix-dry-run-cluster-lifecycle.md`,
       2026-08-14). `DRY_RUN=1` today is honored ONLY in `_k3s_aws_deregister_cluster` → `DRY_RUN=1 make up/down`
       really provisions/destroys (footgun). Fix = foundation-first guard primitives (`_dry_run_active`,
