@@ -175,7 +175,11 @@ HELP
       _info "[k3s-aws] SSM tunnel mode active — ambient mesh (Cilium) unsupported this release; provisioning with flannel"
       _ambient_mesh="false"
     }
-    _dry_guard "deploy application cluster" env UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" K3S_AMBIENT_MESH="${_ambient_mesh}" deploy_app_cluster --confirm || return 1
+    local _prev_hosts="${UBUNTU_K3S_AGENT_HOSTS:-}" _prev_mesh="${K3S_AMBIENT_MESH:-}"
+    export UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" K3S_AMBIENT_MESH="${_ambient_mesh}"
+    _dry_guard "deploy application cluster" deploy_app_cluster --confirm || return 1
+    if [[ -n "${_prev_hosts}" ]]; then export UBUNTU_K3S_AGENT_HOSTS="${_prev_hosts}"; else unset UBUNTU_K3S_AGENT_HOSTS; fi
+    if [[ -n "${_prev_mesh}" ]]; then export K3S_AMBIENT_MESH="${_prev_mesh}"; else unset K3S_AMBIENT_MESH; fi
   fi
 
   if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
