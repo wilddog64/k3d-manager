@@ -228,6 +228,7 @@ docs/
 - **[Jenkins Job DSL Setup](docs/jenkins-job-dsl-setup.md)** — Seed job + GitHub repo wiring
 - **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
 - **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
+- **[Security & Vulnerability Management](docs/guides/security/)** — Deep-dive set on the security stack: Trivy CVE loop, Vault PKI, ESO, image signing/attestation, grounded in the actual implementation
 
 ### Providers
 - **[OrbStack](docs/providers/orbstack.md)** — macOS auto-detection and manual override
