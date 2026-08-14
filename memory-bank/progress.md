@@ -80,6 +80,14 @@ still requires an approving review.
       safety net only (TTL-expiry watchdog = v1.26.0). **DONE** — `d6217640`, pushed to
       `origin/k3d-manager-v1.25.0`; DRY_RUN, targeted cleanup, finalizer removal, and idempotent BATS
       coverage passed with shellcheck and the 60-test provider suite.
+- [ ] **v1.25.0 DRY_RUN cluster-lifecycle bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-dry-run-cluster-lifecycle.md`,
+      2026-08-14). `DRY_RUN=1` today is honored ONLY in `_k3s_aws_deregister_cluster` → `DRY_RUN=1 make up/down`
+      really provisions/destroys (footgun). Fix = foundation-first guard primitives (`_dry_run_active`,
+      `_dry_guard`) + per-op guards across `bin/cluster-up`, `bin/cluster-down`, and all 5 provider deploy+destroy
+      fns (D1 per-op, D2 all-providers, D3 foundation-first). Phased: **Phase 0 lib-foundation** (helper+BATS+release)
+      → Phase 1 subtree-pull+sync → Phase 2 guards → **Phase 3** also fixes `make down` k3s-aws NOT calling
+      `_k3s_aws_deregister_cluster` (bin/cluster-down bypasses the dispatcher). Phase 0 to be handed to Codex now;
+      Phases 1–3 land after the foundation release. Tier-2 e2e proceeds in parallel. NOT handed off yet.
 - [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
       #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
       `register_app_cluster` (self-contained → no hub orphans). Shortest path to G past 2/4. Order schema
