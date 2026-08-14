@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Fixed
+- Slack `cluster-up` and `cluster-down` now accept provider and dry-run tokens in any order, previewing lifecycle work without mutating the sandbox — see `docs/bugs/v1.25.0-bugfix-dry-run-phase4-slack-cluster-commands.md`
+
+### Fixed
 - `make down CLUSTER_PROVIDER=k3s-aws` now deregisters the sandbox cluster and generated hub Applications, while local-provider dry-runs load the command bridge before launchd teardown (`469a3427`) — see `docs/bugs/v1.25.0-bugfix-dry-run-phase3-make-down-deregister.md`
 
 ### Fixed

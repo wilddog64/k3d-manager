@@ -31,11 +31,22 @@ bats_require_minimum_version 1.5.0
   [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
 }
 
-@test "acg-down dry-run local provider bridges launchd bootouts" {
-  run env DRY_RUN=1 CLUSTER_PROVIDER=orbstack bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
-  [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
+@test "acg-down dry-run *) path previews _run_command rm -f without executing it" {
+    cat > "${BATS_TEST_TMPDIR}/bin/uname" <<'STUB'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-s" ]]; then printf 'Darwin\n'; else /usr/bin/uname "$@"; fi
+STUB
+    chmod +x "${BATS_TEST_TMPDIR}/bin/uname"
+
+    _sentinel="${BATS_TEST_TMPDIR}/keycloak-browser.plist"
+    : > "${_sentinel}"
+
+    run env DRY_RUN=1 CLUSTER_PROVIDER=orbstack \
+      KEYCLOAK_BROWSER_LISTENER_PLIST="${_sentinel}" \
+      bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+
+    [ "$status" -eq 0 ]
+    [ -e "${_sentinel}" ]
 }
 
 setup() {

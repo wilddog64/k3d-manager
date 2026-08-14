@@ -607,7 +607,23 @@ def _read_job_tail(output_path, n=3):
         return []
 
 
-def _run_cluster(job_id, action, provider="aws"):
+_DRY_RUN_TOKENS = {"dry", "dry-run", "--dry-run", "dryrun"}
+_PROVIDER_TOKENS = {"aws", "gcp", "az", "hostinger"}
+
+
+def _parse_cluster_args(command):
+    """Return (provider, dry_run) from a cluster-up/down Slack command.
+
+    Provider and dry-run tokens may appear in any order after the command word.
+    Provider defaults to 'hostinger' (matches the existing dispatch default).
+    """
+    parts = command.strip().split()[1:]
+    dry_run = any(p.lower() in _DRY_RUN_TOKENS for p in parts)
+    provider = next((p.lower() for p in parts if p.lower() in _PROVIDER_TOKENS), "hostinger")
+    return provider, dry_run
+
+
+def _run_cluster(job_id, action, provider="aws", dry_run=False):
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
     _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az", "hostinger": "k3s-hostinger"}
@@ -666,9 +682,11 @@ def _run_cluster(job_id, action, provider="aws"):
         emoji = "✅" if status == "success" else "❌"
         elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
         elapsed = elapsed_secs // 60
-        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m"
+        _dry_tag = " — DRY_RUN preview" if dry_run else ""
+        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m{_dry_tag}"
         _notify_job(job_id, summary)
-        _push_metrics(action, provider, status, elapsed_secs, job_id)
+        if not dry_run:
+            _push_metrics(action, provider, status, elapsed_secs, job_id)
 
     try:
         if action == "up":
@@ -677,11 +695,14 @@ def _run_cluster(job_id, action, provider="aws"):
             cmd = ["make", "down", f"CLUSTER_PROVIDER={_cluster_provider}"]
         else:
             cmd = ["make", "down", "KEEP_LOCAL=1"]
-        _log(f"Running {' '.join(cmd)}...")
+        _log(f"DRY_RUN: would {' '.join(cmd)}" if dry_run else f"Running {' '.join(cmd)}...")
+        _spawn_env = dict(os.environ)
+        if dry_run:
+            _spawn_env["DRY_RUN"] = "1"
         _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
-        pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT)
+        pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT, env=_spawn_env)
         with _running_procs_lock:
             _running_procs[job_id] = pid
         _, _status = os.waitpid(pid, 0)
@@ -693,7 +714,7 @@ def _run_cluster(job_id, action, provider="aws"):
         if _rc != 0:
             raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
         _log(f"{action} complete")
-        if action == "up":
+        if action == "up" and not dry_run:
             _record_acg_state(provider)
             threading.Thread(
                 target=_run_post_provision_check,
@@ -1006,8 +1027,7 @@ def _handle_thread_command(job_id, command, role="admin"):
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
-        _down_parts = command.strip().split()
-        _down_provider = _down_parts[1].lower() if len(_down_parts) >= 2 and _down_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
+        _down_provider, _down_dry = _parse_cluster_args(command)
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -1019,17 +1039,18 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "down", _down_provider),
+            kwargs={"dry_run": _down_dry},
             daemon=True,
         ).start()
-        _notify_job(job_id, f"⬇️ *cluster-down* ({_down_provider}) — lab sandbox only — queued — job `{new_job_id}`")
+        _down_tag = " — DRY_RUN preview" if _down_dry else ""
+        _notify_job(job_id, f"⬇️ *cluster-down* ({_down_provider}){_down_tag} — lab sandbox only — queued — job `{new_job_id}`")
 
     elif cmd in ("cluster-up", "up"):
         running = _running_cluster_job()
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
-        _up_parts = command.strip().split()
-        _up_provider = _up_parts[1].lower() if len(_up_parts) >= 2 and _up_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
+        _up_provider, _up_dry = _parse_cluster_args(command)
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -1041,9 +1062,11 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "up", _up_provider),
+            kwargs={"dry_run": _up_dry},
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🚀 *cluster-up* ({_up_provider}) — lab sandbox only — queued — job `{new_job_id}`")
+        _up_tag = " — DRY_RUN preview" if _up_dry else ""
+        _notify_job(job_id, f"🚀 *cluster-up* ({_up_provider}){_up_tag} — lab sandbox only — queued — job `{new_job_id}`")
 
     elif cmd == "ask":
         _VALID_AGENTS = {"claude", "gemini", "codex"}
@@ -1103,7 +1126,7 @@ def _handle_thread_command(job_id, command, role="admin"):
     else:
         _notify_job(
             job_id,
-            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `/claude`, `/gemini`, `/codex`, `cluster-up`, `cluster-down`, `cluster-status`, `cluster-refresh`, `cluster-resume`",
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`",
         )
 
 

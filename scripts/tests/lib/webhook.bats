@@ -351,6 +351,67 @@ assert not _verify_slack_signature(b"\xff", "0", "v0=x")
     [ "${after}" -eq $((before + 2)) ]
 }
 
+@test "Slack cluster parser accepts tokens in any order and dry-run isolates execution" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run env K3DM_WEBHOOK_PATH="${repo_root}/bin/k3dm-webhook" python3 - <<'PY'
+import importlib.machinery
+import os
+import tempfile
+from pathlib import Path
+
+webhook = importlib.machinery.SourceFileLoader("k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]).load_module()
+assert webhook._parse_cluster_args("cluster-up --dry-run aws") == ("aws", True)
+assert webhook._parse_cluster_args("cluster-down hostinger dry") == ("hostinger", True)
+assert webhook._parse_cluster_args("cluster-up gcp") == ("gcp", False)
+assert webhook._parse_cluster_args("cluster-down dryrun") == ("hostinger", True)
+
+class Timer:
+    daemon = False
+    def __init__(self, *_args, **_kwargs):
+        pass
+    def start(self):
+        pass
+    def cancel(self):
+        pass
+
+class Thread:
+    daemon = False
+    def __init__(self, target=None, args=(), **_kwargs):
+        self.target, self.args = target, args
+    def start(self):
+        if self.target:
+            self.target(*self.args)
+
+def exercise(dry_run):
+    root = Path(tempfile.mkdtemp())
+    job = "deadbeef"
+    (root / job).mkdir()
+    webhook.JOB_DIR = root
+    webhook._notify_job = lambda *_args: None
+    webhook._push_metrics = lambda *args: metrics.append(args)
+    webhook._record_acg_state = lambda *args: records.append(args)
+    webhook._run_post_provision_check = lambda *args: posts.append(args)
+    webhook.threading.Timer = Timer
+    webhook.threading.Thread = Thread
+    webhook._posix_spawn_job = lambda _cmd, _out, **kwargs: (envs.append(kwargs["env"]) or 123)
+    webhook.os.waitpid = lambda *_args: (123, 0)
+    webhook.os.killpg = lambda *_args: None
+    webhook.REPO_ROOT = root
+    webhook._run_cluster(job, "up", "aws", dry_run=dry_run)
+    assert (root / job / "status").read_text() == "success"
+
+metrics, records, posts, envs = [], [], [], []
+exercise(True)
+assert envs[-1]["DRY_RUN"] == "1"
+assert not records and not posts and not metrics
+exercise(False)
+assert "DRY_RUN" not in envs[-1]
+assert records and posts and metrics
+PY
+    [ "$status" -eq 0 ]
+}
+
 @test "hostinger status keeps report header and final health sections when long" {
     run grep -F -- "middle of report truncated" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "${status}" -eq 0 ]
