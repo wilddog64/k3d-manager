@@ -74,6 +74,14 @@ still requires an approving review.
       spec→Codex handoff + guide-per-tech (`docs/guides/vcluster-e2e-harness.md`). Core = self-contained
       `scripts/etc/e2e/` substrate bundle (no ESO/Vault/ArgoCD). NOT yet handed off. Strategic open Q: Tier 2
       may be shorter path to G's Stripe acceptance — Tier 1 mainly serves v1.26.0 gate.
+- [ ] **v1.25.0 ACG cleanup bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-k3s-aws-hub-deregister.md`,
+      2026-08-14). k3s-aws `destroy_cluster` lacks a hub-deregister (only provider missing it) → expired
+      sandbox leaves `cluster-ubuntu-k3s` + `Unknown` Apps. Add `_k3s_aws_deregister_cluster`; graceful-teardown
+      safety net only (TTL-expiry watchdog = v1.26.0). Ready for Codex; not handed off.
+- [ ] **v1.25.0 E2E harness Tier 2 — design written** (`docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan
+      #4). `e2e_verify_sandbox` runs full stack + Stripe live E2E in-sandbox, INVARIANT never calls
+      `register_app_cluster` (self-contained → no hub orphans). Shortest path to G past 2/4. Order schema
+      blocker already resolved on main (`cb58e8b` #67 + image `df35ea8`); remaining = rerun Stripe E2E.
       **+ Status output contract** (plan doc #4) — concise error-first output with red/yellow/green
       terminal semantics, failed-service health/HTTP codes, `SERVICE=<name>` focused diagnostics,
       `status-full`, `status-json`, and stable exit codes. Implementation is committed on the branch;

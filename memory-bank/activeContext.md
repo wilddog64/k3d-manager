@@ -56,6 +56,31 @@ the normal stack, whereas Tier 1 requires inventing the minimal bundle. Tier 1 m
 per-candidate gate. Not yet decided whether to build Tier 1 first (current plan) or jump to Tier 2 for G.
 Not yet handed off to Codex.
 
+### ACG cleanup + Tier 2 self-contained — specs written 2026-08-14 (Claude); user chose "start with ACG"
+- **G unblock finding:** the order schema blocker (`order_items.total_price NOT NULL`) is ALREADY resolved on
+  `origin/main` (`cb58e8b`, PR #67 — squash-merge, so `0e3feb9` reads as not-ancestor: false-negative per
+  `reference_squash_merge_branch_cleanup_safety`) and the order image promoted (`df35ea8`). G's remaining work
+  = **rerun** the Stripe live E2E on a real substrate (Tier 2), not a code fix.
+- **Root cause of ArgoCD "unknown resources" after sandbox death:** `_provider_k3s_aws_destroy_cluster`
+  (k3s-aws.sh) is the ONLY app-cluster provider with no hub-deregister step (OCI + hostinger both have
+  `_<p>_deregister_cluster`). It tears down CFN + tunnel but never deletes the hub `cluster-ubuntu-k3s` Secret
+  / generated Apps → they go `Sync: Unknown`. **Registration is opt-in** (`deploy_app_cluster` does NOT
+  auto-register; prints "Then run: register_app_cluster").
+- **Two specs written (user greenlit both):**
+  (a) `docs/bugs/v1.25.0-bugfix-k3s-aws-hub-deregister.md` — add `_k3s_aws_deregister_cluster` (delete
+      `cluster-ubuntu-k3s` + generated `destination.name==ubuntu-k3s` Apps, finalizers stripped) and call it in
+      `destroy_cluster` before `acg_teardown`. Graceful-teardown safety net only; TTL-expiry watchdog stays
+      v1.26.0. Ready for Codex.
+  (b) `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md` (plan #4) — `e2e_verify_sandbox` runs the full stack +
+      Stripe live E2E in-sandbox with `OAUTH2_ENABLED=true`, **INVARIANT: never calls `register_app_cluster`**
+      (self-contained island → nothing to orphan on TTL expiry). This is the shortest path to G past 2/4.
+- **v1.25.0 plan-doc count = 4** (observability-path-a, verification-harness, tier1-impl, tier2-sandbox); within
+  ≤5 cap. Neither harness spec handed off yet.
+- **Dependabot check (payment PR #53):** benign auto-close (superseded); bcprov 1.85→1.85.2 now in open group
+  PR #62 (main still 1.85). #62 is MERGEABLE but BLOCKED by a **Checkstyle & SpotBugs failure** (NOT the
+  PACKAGES_TOKEN/401 issue). Payment has ~10 stacked dependabot PRs; #60 (built-in GITHUB_TOKEN) unblocks the
+  PAT-rotation ones. Not yet actioned.
+
 This branch (now `k3d-manager-v1.24.1`) is based on merged `main` (`fd281c85`). Its queued scope now contains three
 implementation-grade plans: `docs/plans/v1.25.0-e2e-verification-harness.md`,
 `docs/plans/v1.25.0-e2e-observability-path-a.md`, and
