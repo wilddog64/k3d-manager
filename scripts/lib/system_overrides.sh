@@ -4,6 +4,13 @@
 # Override selected lib-foundation helpers without modifying the subtree.
 # Currently extends _run_command with deploy dry-run awareness.
 
+# Canonical dry-run flag is DRY_RUN. K3DM_DEPLOY_DRY_RUN is a deprecated alias, still honored.
+# This override wins over the lib-foundation _dry_run_active (DRY_RUN-only) because it is
+# sourced after system.sh. Keep both in sync — never let a dry-run path read only one var.
+_dry_run_active() {
+  [[ "${DRY_RUN:-0}" == "1" || "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]
+}
+
 if declare -f _run_command >/dev/null 2>&1 && ! declare -f __k3dm_base_run_command >/dev/null 2>&1; then
   eval "$(declare -f _run_command | sed '1s/_run_command/__k3dm_base_run_command/')"
 
@@ -27,33 +34,31 @@ if declare -f _run_command >/dev/null 2>&1 && ! declare -f __k3dm_base_run_comma
     local prog="${1:-}"
     shift || true
 
-    case "${K3DM_DEPLOY_DRY_RUN:-0}" in
-      ''|0)
-        __k3dm_base_run_command "${original_args[@]}"
-        return $?
-        ;;
-      *)
-        if [[ -z "$prog" ]]; then
-          return 0
-        fi
-        local -a preview=()
-        if (( require_sudo || prefer_sudo )); then
-          preview+=("sudo" "$prog")
-        else
-          preview+=("$prog")
-        fi
-        if (( $# )); then
-          preview+=("$@")
-        fi
-        printf '[dry-run]'
-        local arg
-        for arg in "${preview[@]}"; do
-          printf ' %q' "$arg"
-        done
-        printf '\n'
+    if ! _dry_run_active; then
+      __k3dm_base_run_command "${original_args[@]}"
+      return $?
+    fi
+    {
+      if [[ -z "$prog" ]]; then
         return 0
-        ;;
-    esac
+      fi
+      local -a preview=()
+      if (( require_sudo || prefer_sudo )); then
+        preview+=("sudo" "$prog")
+      else
+        preview+=("$prog")
+      fi
+      if (( $# )); then
+        preview+=("$@")
+      fi
+      printf '[dry-run]'
+      local arg
+      for arg in "${preview[@]}"; do
+        printf ' %q' "$arg"
+      done
+      printf '\n'
+      return 0
+    }
   }
 fi
 

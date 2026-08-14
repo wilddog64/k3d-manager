@@ -1015,7 +1015,7 @@ EOF
    local plan_mode="$_VAULT_DEPLOY_PLAN_MODE"
    local mode="$_VAULT_DEPLOY_MODE"
 
-   if (( plan_mode )) && [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+   if (( plan_mode )) && _dry_run_active; then
       _err "[vault] --plan cannot be combined with --dry-run"
    fi
 
@@ -1386,7 +1386,7 @@ function _vault_reinit_from_reset() {
 
 function _vault_bootstrap_ha() {
   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
-  if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+  if _dry_run_active; then
      _info "[vault] dry-run requested; skipping bootstrap phase for ${ns}/${release}"
      return 0
   fi
@@ -1632,7 +1632,7 @@ function _vault_login() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local token_b64 token=""
 
-   if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+   if _dry_run_active; then
       _info "[vault] dry-run requested; skipping login for ${ns}/${release}"
       return 0
    fi

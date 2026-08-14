@@ -2,6 +2,19 @@
 
 bats_require_minimum_version 1.5.0
 
+@test "cluster-down sources dry-run overrides and has itemized launchd plans" {
+  run grep -nF 'source "${REPO_ROOT}/scripts/lib/system_overrides.sh"' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'DRY_RUN: would unload Pushgateway port-forward LaunchAgent' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'DRY_RUN: would unload Alertmanager port-forward LaunchAgent' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'DRY_RUN: would unload Keycloak port-forward LaunchAgent' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'would unload local launchd agents and remove their state' bin/cluster-down
+  [ "$status" -ne 0 ]
+}
+
 setup() {
   export HOME="${BATS_TEST_TMPDIR}/home"
   export PATH="${BATS_TEST_TMPDIR}/bin:$PATH"
@@ -65,10 +78,15 @@ exit 0
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/k3d"
 
-  cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/launchctl"
+cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/launchctl"
 #!/usr/bin/env bash
 set -euo pipefail
 echo "launchctl $*" >> "${BATS_TEST_TMPDIR}/launchctl.log"
+case "$*" in
+  *" unload "*|*" bootout "*|*" bootstrap "*")
+    touch "${BATS_TEST_TMPDIR}/launchctl-mutation-called"
+    ;;
+esac
 if [[ "${STUB_LAUNCHCTL_BOOTOUT_FAIL:-0}" == "1" && "$*" == *"bootout system"* ]]; then
   echo "Boot-out failed: 5: Input/output error" >&2
   exit 5
@@ -134,6 +152,28 @@ echo "docker $*" >> "${BATS_TEST_TMPDIR}/docker.log"
 exit 0
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/docker"
+}
+
+@test "acg-down dry-run itemizes teardown and invokes no destructive stubs" {
+  cat > "${BATS_TEST_TMPDIR}/bin/uname" <<'STUB'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-s" ]]; then
+  printf 'Darwin\n'
+else
+  /usr/bin/uname "$@"
+fi
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/uname"
+
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"DRY_RUN: would run acg_teardown --confirm"* ]]
+  [[ "$output" == *"DRY_RUN: would unload Pushgateway port-forward LaunchAgent"* ]]
+  [[ "$output" == *"DRY_RUN: would unload Alertmanager port-forward LaunchAgent"* ]]
+  [[ "$output" == *"DRY_RUN: would unload Keycloak port-forward LaunchAgent"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
 }
 
 @test "acg-down keeps the local hub when --keep-hub is set" {

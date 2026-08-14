@@ -20,6 +20,10 @@ set -euo pipefail
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
+if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+  export DRY_RUN=1
+fi
 _ACG_DIR="${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg"
 if ! _dry_run_active && ! NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('playwright')" >/dev/null 2>&1; then
   printf 'INFO: [acg-up] Bootstrapping ACG Playwright dependencies in %s...\n' "${_ACG_DIR}" >&2
@@ -50,6 +54,10 @@ source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 source "${REPO_ROOT}/scripts/plugins/keycloak.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
+# Some plugin entrypoints load the foundation ACG library (and its system helpers),
+# so re-apply the deploy dry-run bridge after all plugin sources are complete.
+unset -f __k3dm_base_run_command 2>/dev/null || true
+source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
 
 : "${_kc_admin_pass:=}"
 : "${_kc_db_pass:=}"
@@ -76,17 +84,6 @@ case "${_cluster_provider}" in
     _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp, k3s-az)"
     ;;
 esac
-
-if _dry_run_active; then
-  _info "DRY_RUN: would provision ${_cluster_provider} cluster (deploy_cluster --confirm)"
-  _info "DRY_RUN: would start autossh tunnel"
-  _info "DRY_RUN: would verify or create local Hub cluster"
-  _info "DRY_RUN: would bootstrap Vault, LDAP, and ArgoCD"
-  _info "DRY_RUN: would install port-forward and browser launchd agents"
-  _info "DRY_RUN: would start observability and named tunnel agents"
-  # Make's `up` target chains follow-on deploy targets; stop before they run.
-  exit 1
-fi
 
 function _argocd_open_browser_url() {
   local url="$1"
@@ -167,7 +164,9 @@ fi
 
 _info "[acg-up] Step 0/12 — Pruning stale public IPs from ~/.ssh/known_hosts..."
 _kh="${HOME}/.ssh/known_hosts"
-if [[ -f "${_kh}" ]]; then
+if _dry_run_active; then
+  _info "[acg-up] DRY_RUN: would prune stale public IPs from known_hosts"
+elif [[ -f "${_kh}" ]]; then
   cp -p "${_kh}" "${_kh}.bak"
   if command -v python3 >/dev/null 2>&1; then
     python3 - "${_kh}" <<'PY'
@@ -263,7 +262,9 @@ if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-az" 
   _dry_guard "start autossh tunnel" tunnel_start
 fi
 
-if ! docker info >/dev/null 2>&1; then
+if _dry_run_active; then
+  _info "[acg-up] DRY_RUN: would verify Docker/OrbStack availability"
+elif ! docker info >/dev/null 2>&1; then
   _info "[acg-up] Docker daemon not responding — checking OrbStack VM state..."
   if command -v orbctl >/dev/null 2>&1; then
     _orb_status=$(orbctl status 2>/dev/null || true)
@@ -335,6 +336,17 @@ elif ! _argocd_bootstrap_is_ready; then
 fi
 
 _vault_local_port="${TUNNEL_VAULT_LOCAL_PORT:-18200}"
+if _dry_run_active; then
+  _info "[acg-up] DRY_RUN: provisioning plan complete — the cluster was not created, so the"
+  _info "[acg-up] DRY_RUN: remaining configuration is skipped (would run against a live cluster):"
+  _info "[acg-up]   • Vault port-forward + LaunchAgent"
+  _info "[acg-up]   • Cloudflare tunnel credential sync + istio gateways + CoreDNS"
+  _info "[acg-up]   • Keycloak realm import + browser HTTPS/HTTP listeners"
+  _info "[acg-up]   • ArgoCD / Keycloak / frontend / Grafana / Pushgateway port-forwards"
+  _info "[acg-up]   • loopback alias + named Cloudflare tunnel"
+  _info "[acg-up] DRY_RUN: no changes were made."
+  exit 0
+fi
 _info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:${_vault_local_port})..."
 _vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
 mkdir -p "$(dirname "${_vault_pf_pid_file}")"
