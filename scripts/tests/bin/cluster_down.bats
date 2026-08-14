@@ -15,6 +15,29 @@ bats_require_minimum_version 1.5.0
   [ "$status" -ne 0 ]
 }
 
+@test "cluster-down k3s-aws deregister block has real and dry-run paths" {
+  run grep -nF '_k3s_aws_deregister_cluster || _warn' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh"' bin/cluster-down
+  [ "$status" -eq 0 ]
+}
+
+@test "acg-down dry-run k3s-aws previews hub deregistration" {
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
+}
+
+@test "acg-down dry-run local provider bridges launchd bootouts" {
+  run env DRY_RUN=1 CLUSTER_PROVIDER=orbstack bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
+}
+
 setup() {
   export HOME="${BATS_TEST_TMPDIR}/home"
   export PATH="${BATS_TEST_TMPDIR}/bin:$PATH"
@@ -152,6 +175,24 @@ echo "docker $*" >> "${BATS_TEST_TMPDIR}/docker.log"
 exit 0
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/docker"
+
+  _k3s_aws_deregister_cluster() {
+    printf 'deregister\n' >> "${BATS_TEST_TMPDIR}/deregister.log"
+  }
+  export -f _k3s_aws_deregister_cluster
+}
+
+@test "acg-down real k3s-aws path invokes hub deregistration once" {
+  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "${BATS_TEST_TMPDIR}/deregister.log")" -eq 1 ]
+}
+
+@test "acg-down dry-run k3s-aws does not invoke hub deregistration" {
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
 }
 
 @test "acg-down dry-run itemizes teardown and invokes no destructive stubs" {

@@ -76,6 +76,16 @@ _info "[acg-down] Stopping tunnel..."
     else
       _info "[acg-down] AWS credentials invalid or expired — sandbox already removed. Skipping CloudFormation teardown."
     fi
+    _info "[acg-down] Deregistering sandbox from hub ArgoCD..."
+    if _dry_run_active; then
+      _info "[acg-down] DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"
+    elif declare -f _k3s_aws_deregister_cluster >/dev/null 2>&1; then
+      _k3s_aws_deregister_cluster || _warn "[acg-down] hub deregister reported an issue"
+    else
+      # shellcheck source=/dev/null
+      source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh" 2>/dev/null \
+        && _k3s_aws_deregister_cluster || _warn "[acg-down] hub deregister unavailable"
+    fi
     ;;
   k3s-gcp)
     source "${REPO_ROOT}/scripts/lib/providers/k3s-gcp.sh"
@@ -98,6 +108,7 @@ _info "[acg-down] Stopping tunnel..."
     _provider_k3s_az_destroy_cluster --confirm
     ;;
   *)
+    source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
     _info "[acg-down] Unknown CLUSTER_PROVIDER '${_cluster_provider}' — skipping remote teardown"
     ;;
 esac
