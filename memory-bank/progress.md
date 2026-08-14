@@ -69,6 +69,11 @@ still requires an approving review.
       **+ Dependabot auto-merge observability** (plan doc #3) — signed GitHub event intake, bounded
       Prometheus state, Grafana panels, Alertmanager Slack alerts, and read-only reconciliation fallback.
       Plan committed on `v1.25.0`; implementation not started.
+- [ ] **v1.25.0 E2E harness Tier 1 — IMPL spec written** (`docs/plans/v1.25.0-e2e-harness-tier1-impl.md`,
+      2026-08-14). Decisions locked: in-cluster Playwright Job + build/publish dedicated e2e image +
+      spec→Codex handoff + guide-per-tech (`docs/guides/vcluster-e2e-harness.md`). Core = self-contained
+      `scripts/etc/e2e/` substrate bundle (no ESO/Vault/ArgoCD). NOT yet handed off. Strategic open Q: Tier 2
+      may be shorter path to G's Stripe acceptance — Tier 1 mainly serves v1.26.0 gate.
       **+ Status output contract** (plan doc #4) — concise error-first output with red/yellow/green
       terminal semantics, failed-service health/HTTP codes, `SERVICE=<name>` focused diagnostics,
       `status-full`, `status-json`, and stable exit codes. Implementation is committed on the branch;

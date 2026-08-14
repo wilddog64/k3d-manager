@@ -36,6 +36,26 @@ merged main (`e7a32bb9`, inherits v1.24.1, no back-merge; avoids divergent `vuln
 harness (buildable now, not blocked) → run the Stripe E2E on Tier 2 to move G past 2/4. Roadmap order:
 v1.24.1 → v1.25.0-G → v1.26 → v1.27 → v1.28.
 
+### E2E harness Tier 1 — IMPL spec written 2026-08-14 (Claude), ready for Codex handoff
+Impl-grade spec: `docs/plans/v1.25.0-e2e-harness-tier1-impl.md` (plan #3 for v1.25.0; within ≤5 cap).
+**Locked decisions (user, 2026-08-14):** (1) execution = spec→Codex handoff; (2) runner placement =
+in-cluster Playwright **Job** (ClusterIP DNS, not host port-forward); (3) test delivery = build+publish a
+dedicated e2e image to GHCR (`ghcr.io/wilddog64/shopping-cart-e2e-tests`), Job pulls pinned digest;
+(4) standing rule — every major tech gets a learning guide → this release ships
+`docs/guides/vcluster-e2e-harness.md` (memory `feedback_guide_per_major_tech`).
+**Key discovery:** existing `shopping_cart_reconcile_*` are hardcoded to the live app cluster
+(`--context ubuntu-k3s`, ESO/Vault/Postgres) — NOT reusable for a throwaway vCluster. The real Tier 1 core
+is a **self-contained substrate bundle** `scripts/etc/e2e/` (3 services + minimal postgres/redis + seed, no
+ESO/Vault/ArgoCD, `OAUTH2_ENABLED=false`), derived from the e2e repo's `docker-compose.yml` (the
+service+datastore contract) + each service's `k8s/base`. Actual Playwright project is `flows` (not `flow`);
+JSON report → `test-results/results.json`. Scope = Tier 1 only (Part 1 e2e-image+workflow_call + Part 2
+`e2e_verify_vcluster`); Tier 2 `e2e_verify_sandbox` + exporter/dashboard deferred (plan #2 / v1.26.0).
+**Strategic note (unresolved, for user):** for unblocking **G's Stripe acceptance** specifically, Tier 2
+(ACG sandbox full-stack via existing bring-up) may be the SHORTER path — it runs the Stripe E2E and reuses
+the normal stack, whereas Tier 1 requires inventing the minimal bundle. Tier 1 mainly serves the v1.26.0
+per-candidate gate. Not yet decided whether to build Tier 1 first (current plan) or jump to Tier 2 for G.
+Not yet handed off to Codex.
+
 This branch (now `k3d-manager-v1.24.1`) is based on merged `main` (`fd281c85`). Its queued scope now contains three
 implementation-grade plans: `docs/plans/v1.25.0-e2e-verification-harness.md`,
 `docs/plans/v1.25.0-e2e-observability-path-a.md`, and
