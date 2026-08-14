@@ -8,6 +8,8 @@
 
 **DRY_RUN Phase 2 COMPLETE (2026-08-14):** commit `c8b6a1aa` (`fix(lifecycle): honor DRY_RUN per-op across make up/down for all providers`) is pushed to `origin/k3d-manager-v1.25.0`. Per-operation guards now cover `bin/cluster-up`, `bin/cluster-down`, and all five provider deploy/destroy paths; shellcheck is clean, the relevant lifecycle/provider BATS suite passes 47/47, and dry `make up/down` emits intent without follow-on deployment. Phase 3 remains separate (k3s-aws `make down` deregistration wiring).
 
+**DRY_RUN Phase 2b COMPLETE (2026-08-14):** commit `d2263cc2` is pushed to `origin/k3d-manager-v1.25.0`. The canonical `DRY_RUN` flag and bridged `K3DM_DEPLOY_DRY_RUN` alias now drive `_run_command`, both lifecycle bins, Vault/Jenkins, and dispatcher dry-run gates; cluster-up stops successfully at the Step 4 seam with a plan summary, and cluster-down emits per-operation teardown intent. Stubbed lifecycle BATS (21/21), provider BATS (38/38), and shellcheck passed. Phase 3/4 remain queued.
+
 **Scope split executed 2026-08-13 (user decision).** The branch formerly named `k3d-manager-v1.25.0`
 held only status/observability work (zero G implementation), so it was **renamed to
 `k3d-manager-v1.24.1`** and was cut as a point release; `v1.25.0` is reserved for **workstream G**.

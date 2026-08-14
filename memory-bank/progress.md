@@ -97,8 +97,9 @@ still requires an approving review.
       vars — `_dry_run_active` also true when `K3DM_DEPLOY_DRY_RUN=1`, and/or `_run_command` also honors `DRY_RUN`;
       (2) guard cluster-up lines >364; (3) split the coarse cluster-down block; (4) add the BATS. Phase 3/4 stay
       blocked. Do NOT proceed to release with Phase 2 as-is.
-- [ ] **v1.25.0 DRY_RUN Phase 2b — SPEC WRITTEN, ready for Codex** (`docs/bugs/v1.25.0-bugfix-dry-run-phase2b-standardize-and-complete.md`,
-      2026-08-14). Owner decided: standardize on **`DRY_RUN`** canonical; `K3DM_DEPLOY_DRY_RUN` = bridged deprecated
+- [x] **v1.25.0 DRY_RUN Phase 2b — COMPLETE** (`d2263cc2`, pushed to `origin/k3d-manager-v1.25.0`, 2026-08-14),
+      spec `docs/bugs/v1.25.0-bugfix-dry-run-phase2b-standardize-and-complete.md`. Owner decision honored:
+      standardize on **`DRY_RUN`** canonical; `K3DM_DEPLOY_DRY_RUN` = bridged deprecated
       alias. make-up strategy = **guard-core + plan-and-exit** (owner-selected; a true dry-run has no cluster to
       configure). **Part A (keystone):** override `_dry_run_active` in `system_overrides.sh` to honor both vars +
       route `_run_command` through it; **source `system_overrides.sh` in BOTH bins** (they don't today — same
@@ -107,8 +108,8 @@ still requires an approving review.
       plan-and-exit right before the Step 4 Vault-pf seam (line 338). **Part C:** split cluster-down's coarse 22-op
       guard — `_run_command` ops auto-covered by Part A, direct launchctl/rm (pgw/am/am-auth/kc-pf/cf) get per-op
       guards. **Part D:** BATS. Commit msg `fix(lifecycle): standardize dry-run on DRY_RUN and complete make up/down
-      guards`. NOT yet handed off. Phase 3 (deregister) + Phase 4 (Slack) sequence AFTER 2b — Phase 4's `DRY_RUN=1`
-      injection only works once Part A bridges `_run_command`.
+      guards`. Stubbed cluster-up/down BATS verify exit-0 preview/no mutations and itemized teardown; shellcheck
+      and provider/lifecycle suites pass. Phase 3 (deregister) + Phase 4 (Slack) remain sequenced after 2b.
 - [ ] **v1.25.0 DRY_RUN cluster-lifecycle bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-dry-run-cluster-lifecycle.md`,
       2026-08-14). `DRY_RUN=1` today is honored ONLY in `_k3s_aws_deregister_cluster` → `DRY_RUN=1 make up/down`
       really provisions/destroys (footgun). Fix = foundation-first guard primitives (`_dry_run_active`,

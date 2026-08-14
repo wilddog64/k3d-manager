@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Standardized lifecycle dry-run handling on `DRY_RUN` (while retaining the legacy alias), completed per-operation teardown guards, and added stubbed cluster-up/down coverage (`d2263cc2`) — see `docs/bugs/v1.25.0-bugfix-dry-run-phase2b-standardize-and-complete.md`
+
 ## [1.24.1] - 2026-08-13
 
 **Theme: make cluster status legible — one concise service-health view for the terminal, Slack, and automation.** A point release on top of v1.24.0. `make status` used to dump a long multi-section report that was hard to consume; it now defaults to a **concise, color-coded service-health summary** (with `make status-full` for the old detailed report and `make status-json` for a stable machine-readable summary), follows the **active cluster provider**, and takes `SERVICE=<name>` for focused per-service diagnostics. The same summary now reaches **Slack**: `/cluster-status` renders an emoji-severity one-liner (`:x:` / `:warning:` / `:white_check_mark:` + `N ok / N warn / N fail`) instead of a wall of ANSI-derived text. The CVE remediation dashboard is split into a live **Current CVE Remediation Status** table and a **Remediation History (audit)** table, with the exporter marking superseded / deployment-advanced events, and both dashboard and inventory tables hide repeated Prometheus scrape metadata behind concise column headers. Verified live on the hub: `make status-json` returns `overall=healthy` for `k3s-hostinger`, and the Slack path renders `:white_check_mark: *Cluster status: HEALTHY* — \`k3s-hostinger\` (13 ok / 0 warn / 0 fail)` from real cluster data.
