@@ -1714,6 +1714,20 @@ function _detect_cluster_name() {
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------
 function _info() { printf 'INFO: %s\n' "$*" >&2; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
+function _dry_run_active() {
+  [[ "${DRY_RUN:-0}" == "1" ]]
+}
+
+function _dry_guard() {
+  local _desc="${1:-}"
+  shift || true
+  if _dry_run_active; then
+    _info "DRY_RUN: would ${_desc}"
+    return 0
+  fi
+  "$@"
+}
+
 function _err() {
    printf 'ERROR: %s\n' "$*" >&2
    exit 1
