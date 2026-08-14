@@ -10,6 +10,8 @@
 
 **DRY_RUN Phase 2b COMPLETE (2026-08-14):** commit `d2263cc2` is pushed to `origin/k3d-manager-v1.25.0`. The canonical `DRY_RUN` flag and bridged `K3DM_DEPLOY_DRY_RUN` alias now drive `_run_command`, both lifecycle bins, Vault/Jenkins, and dispatcher dry-run gates; cluster-up stops successfully at the Step 4 seam with a plan summary, and cluster-down emits per-operation teardown intent. Stubbed lifecycle BATS (21/21), provider BATS (38/38), and shellcheck passed. Phase 3/4 remain queued.
 
+**DRY_RUN Phase 3 COMPLETE (2026-08-14):** commit `469a3427` is pushed to `origin/k3d-manager-v1.25.0`. `make down` now deregisters the k3s-aws sandbox from hub ArgoCD before teardown, and the local-provider path sources the dry-run bridge before common launchd cleanup. Stubbed cluster-down BATS (12/12) and shellcheck passed; Phase 4 remains queued.
+
 **Scope split executed 2026-08-13 (user decision).** The branch formerly named `k3d-manager-v1.25.0`
 held only status/observability work (zero G implementation), so it was **renamed to
 `k3d-manager-v1.24.1`** and was cut as a point release; `v1.25.0` is reserved for **workstream G**.

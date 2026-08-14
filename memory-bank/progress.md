@@ -121,7 +121,11 @@ still requires an approving review.
       (spy-confirmed: `REAL launchctl CALLED` vs `[dry-run] sudo …` when override sourced). k3s-aws/gcp/az branches
       are correctly bridged. **Fix = one line** (`source system_overrides.sh` in the `*)` branch; no unset needed —
       it sources no plugins) → **fold into Phase 3** (already edits cluster-down).
-- [ ] **v1.25.0 DRY_RUN cluster-lifecycle bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-dry-run-cluster-lifecycle.md`,
+- [x] **v1.25.0 DRY_RUN cluster-lifecycle bugfix — Phase 3 COMPLETE** (`469a3427`, pushed to
+      `origin/k3d-manager-v1.25.0`, 2026-08-14). `make down` now deregisters k3s-aws from hub ArgoCD and
+      bridges local-provider launchd teardown under DRY_RUN; cluster-down BATS 12/12 and shellcheck pass.
+      The broader foundation/Phase 2 history remains below for reference. **Spec:**
+      `docs/bugs/v1.25.0-bugfix-dry-run-cluster-lifecycle.md`,
       2026-08-14). `DRY_RUN=1` today is honored ONLY in `_k3s_aws_deregister_cluster` → `DRY_RUN=1 make up/down`
       really provisions/destroys (footgun). Fix = foundation-first guard primitives (`_dry_run_active`,
       `_dry_guard`) + per-op guards across `bin/cluster-up`, `bin/cluster-down`, and all 5 provider deploy+destroy
@@ -142,16 +146,14 @@ still requires an approving review.
       2026-08-14): self-contained, verified line-anchors for 2a `bin/cluster-down` / 2b `bin/cluster-up` / 2c all 5
       providers; DoD has DRY_RUN-touches-nothing smoke + real-mode-still-mutates coverage gate + BATS. Commit msg
       `fix(lifecycle): honor DRY_RUN per-op across make up/down for all providers`.
-      **Phase 3 spec written + QUEUED** (`docs/bugs/v1.25.0-bugfix-dry-run-phase3-make-down-deregister.md`,
+      **Phase 3 COMPLETE** (`469a3427`, pushed to `origin/k3d-manager-v1.25.0`; spec
+      `docs/bugs/v1.25.0-bugfix-dry-run-phase3-make-down-deregister.md`,
       2026-08-14): `bin/cluster-down` `k3s-aws)` branch (lines 48–64) tears down CloudFormation but never calls
       `_k3s_aws_deregister_cluster` (k3s-aws.sh:247, self-guards DRY_RUN, on dispatcher path at :333, merged
       `d6217640`) → `make down` leaves the sandbox registered in hub ArgoCD. Fix = add a dry-aware deregister
       block after the `acg_teardown` if/else, before `;;`. Commit msg
-      `fix(lifecycle): deregister k3s-aws sandbox from hub on make down`. **Sequence AFTER Phase 2 merges**
-      (both touch `bin/cluster-down`); not yet handed off. Tier-2 e2e proceeds in parallel.
-      **ALSO fold into Phase 3 (found at 2b verify):** add `source system_overrides.sh` to cluster-down's `*)`
-      branch (line 100) so `DRY_RUN=1 make down` on local providers doesn't fire real sudo `launchctl bootout`.
-      Re-anchor Phase 3 line numbers post-2b before handing off.
+      `fix(lifecycle): deregister k3s-aws sandbox from hub on make down`. Stubbed real/dry k3s-aws and local
+      provider BATS pass; shellcheck is clean. The `*)` bridge fix is included; Tier-2 e2e proceeds in parallel.
       **Phase 4 spec written + QUEUED** (`docs/bugs/v1.25.0-bugfix-dry-run-phase4-slack-cluster-commands.md`,
       2026-08-14): wire DRY_RUN into Slack `cluster-up`/`cluster-down`. `bin/k3dm-webhook:_run_cluster` always
       spawns real `make up/down`; fix = parse a `dry`/`dry-run` token (position-independent, alongside optional
