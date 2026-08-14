@@ -836,7 +836,7 @@ function _hostinger_reconcile_vault_cluster_store() {
       if declare -f tunnel_stop >/dev/null 2>&1; then
         tunnel_stop >/dev/null 2>&1 || true
       fi
-      tunnel_start || return 1
+      _dry_guard "start Hostinger reverse Vault tunnel" tunnel_start || return 1
       TUNNEL_SSH_HOST="${_prev_tunnel_host}"
     fi
 
@@ -895,8 +895,8 @@ HELP
   fi
 
   _hostinger_wait_for_ssh "${host}" "${ssh_user}" "${ssh_key}" || return 1
-  _hostinger_k3sup_install "${host}" "${ssh_user}" "${ssh_key}" || return 1
-  _hostinger_merge_kubeconfig || return 1
+  _dry_guard "install k3s on Hostinger" _hostinger_k3sup_install "${host}" "${ssh_user}" "${ssh_key}" || return 1
+  _dry_guard "merge Hostinger kubeconfig" _hostinger_merge_kubeconfig || return 1
 
   _info "[k3s-hostinger] Waiting for node to be Ready..."
   local attempts=0
@@ -918,8 +918,8 @@ HELP
       k3d-manager/node-type=server --overwrite >/dev/null 2>&1 || true
 
   _info "[k3s-hostinger] Registering cluster with hub ArgoCD..."
-  _hostinger_register_cluster || return 1
-  _acg_record_provider "k3s-hostinger"
+  _dry_guard "register Hostinger cluster with hub" _hostinger_register_cluster || return 1
+  _dry_guard "record Hostinger active provider" _acg_record_provider "k3s-hostinger"
 
   _info "[k3s-hostinger] Cluster ready."
   _info "[k3s-hostinger] Verify: kubectl --context ${_HOSTINGER_KUBE_CONTEXT} get nodes"
@@ -950,7 +950,11 @@ HELP
 
   _info "[k3s-hostinger] Uninstalling k3s on ${ssh_user}@${host}..."
   local _uninstall_rc=0
-  _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" 'sudo sh -c "test -x /usr/local/bin/k3s-uninstall.sh && /usr/local/bin/k3s-uninstall.sh"' || _uninstall_rc=$?
+  if _dry_run_active; then
+    _info "DRY_RUN: would uninstall k3s on ${ssh_user}@${host}"
+  else
+    _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" 'sudo sh -c "test -x /usr/local/bin/k3s-uninstall.sh && /usr/local/bin/k3s-uninstall.sh"' || _uninstall_rc=$?
+  fi
   if [[ "${_uninstall_rc}" -eq 255 ]]; then
     printf 'ERROR: %s\n' "[k3s-hostinger] SSH to ${ssh_user}@${host} failed — cannot uninstall k3s" >&2
     return 1
@@ -958,15 +962,19 @@ HELP
     _info "[k3s-hostinger] k3s-uninstall.sh not present or returned ${_uninstall_rc} — skipping"
   fi
 
-  _hostinger_deregister_cluster || true
+  _dry_guard "deregister Hostinger cluster from hub" _hostinger_deregister_cluster || true
 
   if kubectl config get-contexts "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1; then
-    kubectl config delete-context "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+    if _dry_run_active; then
+      _info "DRY_RUN: would remove kubeconfig context ${_HOSTINGER_KUBE_CONTEXT}"
+    else
+      kubectl config delete-context "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+    fi
     _info "[k3s-hostinger] Removed kubeconfig context ${_HOSTINGER_KUBE_CONTEXT}"
   fi
 
-  rm -f "${_HOSTINGER_KUBECONFIG}"
-  rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
+  _dry_guard "remove Hostinger kubeconfig" rm -f "${_HOSTINGER_KUBECONFIG}"
+  _dry_guard "remove Hostinger active-provider marker" rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
   _info "[k3s-hostinger] k3s uninstalled; VPS preserved."
 }
 

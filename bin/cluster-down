@@ -19,7 +19,7 @@ SCRIPT_DIR="${REPO_ROOT}/scripts"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 _ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
-mkdir -p "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
+_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
 
 : "${SCRIPT_DIR}"
 
@@ -50,12 +50,22 @@ case "${_cluster_provider}" in
     source "${REPO_ROOT}/scripts/plugins/acg.sh"
     source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
     _info "[acg-down] Clearing local port-forwarding processes (8080, 18080, 18200)..."
-lsof -ti :8080,18080,18200 | xargs kill -9 2>/dev/null || true
+if _dry_run_active; then
+  _info "DRY_RUN: would kill local port-forward processes"
+else
+  lsof -ti :8080,18080,18200 | xargs kill -9 2>/dev/null || true
+fi
 
 _info "[acg-down] Stopping tunnel..."
-    tunnel_stop 2>/dev/null || true
+    if _dry_run_active; then
+      _info "DRY_RUN: would stop autossh tunnel"
+    else
+      tunnel_stop 2>/dev/null || true
+    fi
     _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
-    if aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text >/dev/null 2>&1; then
+    if _dry_run_active; then
+      _info "[acg-down] DRY_RUN: would run acg_teardown --confirm (delete CloudFormation stack)"
+    elif aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text >/dev/null 2>&1; then
       acg_teardown --confirm || \
         _info "[acg-down] CloudFormation teardown failed — sandbox may have been recreated with new credentials. Stack cleanup skipped; continuing Hub teardown."
     else
@@ -85,38 +95,54 @@ _info "[acg-down] Stopping tunnel..."
     ;;
 esac
 
-rm -f "${HOME}/.local/share/k3d-manager/active-provider"
+_dry_guard "remove active-provider marker" rm -f "${HOME}/.local/share/k3d-manager/active-provider"
 
 _info "[acg-down] Stopping Vault port-forward..."
 _vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
 if [[ -f "${_vault_pf_pid_file}" ]]; then
-  kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
-  rm -f "${_vault_pf_pid_file}"
-  _info "[acg-down] Vault port-forward stopped"
+  if _dry_run_active; then
+    _info "DRY_RUN: would stop Vault port-forward"
+  else
+    kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
+    rm -f "${_vault_pf_pid_file}"
+    _info "[acg-down] Vault port-forward stopped"
+  fi
 fi
 if _is_mac; then
   _vault_pf_label="com.k3d-manager.vault-port-forward"
   _vault_pf_plist="${HOME}/Library/LaunchAgents/${_vault_pf_label}.plist"
   if launchctl list "${_vault_pf_label}" >/dev/null 2>&1; then
-    launchctl unload "${_vault_pf_plist}" 2>/dev/null || true
-    _info "[acg-down] Vault port-forward LaunchAgent unloaded"
+    if _dry_run_active; then
+      _info "DRY_RUN: would unload Vault port-forward LaunchAgent"
+    else
+      launchctl unload "${_vault_pf_plist}" 2>/dev/null || true
+      _info "[acg-down] Vault port-forward LaunchAgent unloaded"
+    fi
   fi
-  rm -f "${_vault_pf_plist}"
+  _dry_guard "remove Vault port-forward plist" rm -f "${_vault_pf_plist}"
 fi
 
 _info "[acg-down] Stopping frontend port-forward..."
 _frontend_pf_pid_file="${_ACG_STATE_DIR}/run/frontend-pf.pid"
 if [[ -f "${_frontend_pf_pid_file}" ]]; then
-  kill "$(cat "${_frontend_pf_pid_file}")" 2>/dev/null || true
-  rm -f "${_frontend_pf_pid_file}"
+  if _dry_run_active; then
+    _info "DRY_RUN: would stop frontend port-forward"
+  else
+    kill "$(cat "${_frontend_pf_pid_file}")" 2>/dev/null || true
+    rm -f "${_frontend_pf_pid_file}"
+  fi
   _info "[acg-down] Frontend port-forward stopped"
 fi
 
 _info "[acg-down] Stopping ACG Prometheus port-forward..."
 _acg_prom_pf_pid_file="${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
 if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
-  kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
-  rm -f "${_acg_prom_pf_pid_file}"
+  if _dry_run_active; then
+    _info "DRY_RUN: would stop ACG Prometheus port-forward"
+  else
+    kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
+    rm -f "${_acg_prom_pf_pid_file}"
+  fi
   _info "[acg-down] ACG Prometheus port-forward stopped"
 fi
 
@@ -124,11 +150,18 @@ _info "[acg-down] Stopping ArgoCD port-forward launchd agent..."
 _argocd_pf_label="com.k3d-manager.argocd-port-forward"
 _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
 if launchctl list "${_argocd_pf_label}" >/dev/null 2>&1; then
-  launchctl unload "${_argocd_pf_plist}" 2>/dev/null || true
-  _info "[acg-down] ArgoCD port-forward launchd agent unloaded"
+  if _dry_run_active; then
+    _info "DRY_RUN: would unload ArgoCD port-forward launchd agent"
+  else
+    launchctl unload "${_argocd_pf_plist}" 2>/dev/null || true
+    _info "[acg-down] ArgoCD port-forward launchd agent unloaded"
+  fi
 fi
-rm -f "${_argocd_pf_plist}"
+_dry_guard "remove ArgoCD port-forward plist" rm -f "${_argocd_pf_plist}"
 
+if _dry_run_active; then
+  _info "DRY_RUN: would unload local launchd agents and remove their state"
+else
 if _is_mac; then
   _info "[acg-down] Stopping Keycloak browser HTTP listener launchd daemon..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
@@ -242,12 +275,17 @@ if _is_mac; then
   fi
   rm -f "${_kc_pf_plist}" "${_kc_pf_wrapper}"
 fi
+fi
 
 if [[ "${_keep_hub}" -eq 0 ]]; then
   _info "[acg-down] Tearing down local Hub cluster (${_HUB_CLUSTER})..."
   if k3d cluster list 2>/dev/null | grep -q "^${_HUB_CLUSTER}[[:space:]]"; then
-    k3d cluster delete "${_HUB_CLUSTER}"
-    _info "[acg-down] Local Hub cluster deleted"
+    if _dry_run_active; then
+      _info "DRY_RUN: would delete local Hub cluster ${_HUB_CLUSTER}"
+    else
+      k3d cluster delete "${_HUB_CLUSTER}"
+      _info "[acg-down] Local Hub cluster deleted"
+    fi
   else
     _info "[acg-down] Local Hub cluster not found — skipping"
   fi
@@ -257,19 +295,23 @@ fi
 
 _info "[acg-down] Pruning Docker build cache and unused images..."
 if command -v docker >/dev/null 2>&1; then
-  docker system prune --force >/dev/null
+  _dry_guard "prune Docker build cache and unused images" docker system prune --force >/dev/null
   _info "[acg-down] Docker prune complete"
 fi
 
 _info "[acg-down] Cleaning up stale /tmp files..."
-rm -f /tmp/argocd-*.sock
-rm -f /tmp/k3d-config-tmp-*.yaml
-rm -f /tmp/k3d-hostsfile-*
-rm -f /tmp/k3d-manager-tunnel.out
-rm -f /tmp/k3d-manager-tunnel.err
-rm -f /tmp/k3d-manager-acg-watch.out
-rm -f /tmp/k3d-manager-acg-watch.err
-rm -f /tmp/k3dm-acg-screenshot-*.png
+if _dry_run_active; then
+  _info "DRY_RUN: would clean stale /tmp files"
+else
+  rm -f /tmp/argocd-*.sock
+  rm -f /tmp/k3d-config-tmp-*.yaml
+  rm -f /tmp/k3d-hostsfile-*
+  rm -f /tmp/k3d-manager-tunnel.out
+  rm -f /tmp/k3d-manager-tunnel.err
+  rm -f /tmp/k3d-manager-acg-watch.out
+  rm -f /tmp/k3d-manager-acg-watch.err
+  rm -f /tmp/k3dm-acg-screenshot-*.png
+fi
 _info "[acg-down] /tmp cleanup complete"
 
 if [[ "${_keep_hub}" -eq 1 ]]; then
