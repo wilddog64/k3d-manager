@@ -1,6 +1,6 @@
 # 02 — Automated Remediation: The Auto-Patch Promoter
 
-**Résumé phrase:** *automated remediation (auto-patch promoter)*
+**Topic:** *automated remediation (auto-patch promoter)*
 **Status:** Shipping. Source: `bin/k3dm-webhook`,
 `scripts/etc/argocd/platform-ops/app-cve-scan.sh`,
 `docs/architecture/cve-remediation-pipeline.md`.
@@ -16,7 +16,7 @@
 
 ## What "remediation" means here
 
-There are **two remediation paths**, and naming both shows you understand the limits:
+There are **two remediation paths**, and the distinction matters:
 
 1. **Image remediation (the promoter).** Promote a *clean, already-built* immutable
    image to replace the vulnerable one — or trigger a rebuild if there's no clean
@@ -49,7 +49,7 @@ Trivy finding persists 15 min
                           → new image published → loop re-evaluates
 ```
 
-## The safeguards (this is what an interviewer digs into)
+## The safeguards
 
 An auto-remediation system that can deploy is dangerous if it's naïve. The guards
 are the interesting engineering:
@@ -72,7 +72,7 @@ are the interesting engineering:
   result, never a fake success. A remediation loop that false-greens is worse than
   no loop.
 
-## Why it matters (design judgment)
+## Why it matters
 
 - **Event-driven, not polling.** The alert *is* the trigger — the system reacts to
   state changes rather than sweeping on a timer. Cheaper and faster.
@@ -84,7 +84,7 @@ are the interesting engineering:
 - **It degrades honestly.** No clean candidate → rebuild → wait. No infinite retry,
   no pretending.
 
-## Likely interview questions
+## Common questions
 
 **Q: Isn't auto-deploying a security risk in itself?**
 > Only if it's naïve. It can *only* promote an immutable digest that resolves to the
@@ -107,7 +107,7 @@ are the interesting engineering:
 > `@sha256:...` deploys exactly what I scanned. It's the difference between "which
 > tag" and "which bytes."
 
-## War story (credibility)
+## Operational story
 
 > "A remediation looked stuck — 'failed CVE remediation' on the Hostinger node — and
 > I almost blamed the verifier. Real cause: the rollout used `maxSurge=1`, which needs

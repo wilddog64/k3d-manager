@@ -1,6 +1,6 @@
 # 04 — HashiCorp Vault (PKI)
 
-**Résumé phrase:** *HashiCorp Vault (PKI)*
+**Topic:** *HashiCorp Vault (PKI)*
 **Status:** Shipping. Source: `scripts/plugins/vault.sh`
 (`_vault_setup_pki`, `_vault_enable_pki`, `_vault_ensure_pki_root_ca`,
 `_vault_upsert_pki_role`, `_vault_issue_pki_tls_secret`).
@@ -34,7 +34,7 @@ The pitch vs. alternatives:
 
 ## How it works in k3d-manager
 
-`_vault_setup_pki` orchestrates the standard sequence — you can narrate it:
+`_vault_setup_pki` orchestrates the standard sequence:
 
 1. **Enable the engine** (`_vault_enable_pki`) at mount path `pki`, tuned with a
    max lease TTL (`VAULT_PKI_MAX_TTL`, default `87600h` ≈ 10y for the *mount ceiling*,
@@ -59,7 +59,7 @@ The pitch vs. alternatives:
    existing secret and extracts the current serial, so it can revoke/rotate cleanly
    instead of orphaning old certs.
 
-## Why it matters (design judgment + security rules)
+## Why it matters (and the security rules)
 
 - **Short leaf TTLs are the security control.** The repo rule is **leaf TTL ≤ 720h**
   and you don't raise `VAULT_PKI_ROLE_TTL` without justification. Short-lived certs
@@ -67,7 +67,7 @@ The pitch vs. alternatives:
   constantly so it never rots into a break-glass ritual.
 - **Root TTL ≠ leaf TTL.** The mount ceiling is 10 years (you don't want to rebuild
   your CA constantly); the *leaves* are 30 days. Confusing these is a common
-  interview trip-up — name the distinction unprompted.
+  trip-up — the distinction is worth stating explicitly.
 - **Idempotent root generation.** Reissuing a root CA silently breaks every cert that
   chained to the old one. The "already exists → skip" guard is a correctness control,
   not just an optimization.
@@ -75,7 +75,7 @@ The pitch vs. alternatives:
   them with zero Vault-awareness — the same clean separation as ESO does for
   credentials (guide 05).
 
-## Likely interview questions
+## Common questions
 
 **Q: Why Vault PKI instead of cert-manager for everything?**
 > cert-manager + ACME is great for public names with real DNS. For internal

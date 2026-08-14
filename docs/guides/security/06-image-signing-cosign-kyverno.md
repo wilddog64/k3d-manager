@@ -1,23 +1,23 @@
 # 06 — Image Signing / Attestation (cosign) + Kyverno Admission
 
-**Résumé phrase:** *image signing/attestation (cosign) + Kyverno admission — in progress*
+**Topic:** *image signing/attestation (cosign) + Kyverno admission — in progress*
 **Status:** ⚠️ **DESIGNED, NOT SHIPPED.** Full design locked in
 `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`. Talk about it as *scoped and
 staged*, never as running in production.
 
 ---
 
-## Honesty first (read before the interview)
+## Honesty first
 
-This is the one item on the row marked **"in progress."** In an interview that's an
-asset, not a gap — *if* you frame it right:
+This is the one item marked **"in progress."** That's an asset, not a gap — *if* it's
+framed right:
 
 > "It's designed and scoped, staged Audit-before-Enforce, but I haven't shipped it
 > yet. I don't flip cryptographic admission enforcement on a live fleet without a
 > gap-closing Audit phase first."
 
-That answer demonstrates *more* security maturity than claiming it's done, because
-rushing enforcement is exactly how you wedge a cluster. Own the status.
+That framing reflects *more* security maturity than claiming it's done — rushing
+enforcement is exactly how you wedge a cluster.
 
 ## The one-liner
 
@@ -28,7 +28,7 @@ rushing enforcement is exactly how you wedge a cluster. Own the status.
 > signed by my key and carrying a passing scan attestation. Signed-and-scanned
 > becomes a hard precondition to run."
 
-## The gap it closes (the "why" — this is the strongest part)
+## The gap it closes (the "why")
 
 Today's loop is **scan → remediate → pin digest → deploy**. Pinning `@sha256:...`
 proves the exact bytes. But there's **no cryptographic link** between:
@@ -66,7 +66,7 @@ that isn't the one it scanned.
    candidate. *This is the latch that closes this project's specific loop* (admission
    is the cluster-wide backstop).
 
-## Key decisions (and the reasoning — interviewers love the "why not")
+## Key decisions (and the "why not")
 
 **D1 — Key-based, private key in Vault (not keyless).**
 cosign keypair generated once; private key + password in Vault
@@ -92,7 +92,7 @@ could wedge cluster startup, so enforcement is namespace-scoped, never hub/syste
 - *Alternative — sigstore `policy-controller`:* sigstore-native `ClusterImagePolicy`,
   cleaner if I *only* ever do signature/attestation policy. Loses the reuse upside.
 
-## Critical safety details (name at least two)
+## Critical safety details
 
 - **Scope only to app namespaces**, and **exclude all third-party/upstream images**
   (postgres, rabbitmq, redis, argocd, `alpine/k8s`). I don't sign those — an unscoped
@@ -121,7 +121,7 @@ could wedge cluster startup, so enforcement is namespace-scoped, never hub/syste
 | 3 | Flip to **Enforce** on app namespaces; promoter gate live | Unsigned test image *rejected*; signed one admits |
 | 4 | Rotation runbook exercised (`signing_rotate_key`) | Re-seed Vault + GH secrets + ESO pub; dual-key overlap documented |
 
-## Likely interview questions
+## Common questions
 
 **Q: Isn't pinning by digest already secure?**
 > It proves *which bytes* run, not *where they came from*. Nothing cryptographically
@@ -153,7 +153,7 @@ could wedge cluster startup, so enforcement is namespace-scoped, never hub/syste
 > verifier reads it from a Kubernetes Secret and never touches Vault directly — same
 > distribution pattern I use for all Vault material.
 
-## The closing line (ties the whole row together)
+## Summary
 
 > "Signing is the last latch on a loop that already scans, prioritizes, and
 > remediates. Detection tells me what's wrong; remediation fixes it; signing makes

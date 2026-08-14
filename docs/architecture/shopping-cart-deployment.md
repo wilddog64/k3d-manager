@@ -253,4 +253,4 @@ That doc (2026-03) remains useful for **data-layer**, **RabbitMQ exchange design
 - Data-layer manifests: `shopping-cart-infra/data-layer/`
 - CVE pipeline: `docs/architecture/cve-remediation-pipeline.md`
 - Ingress/port-forward: `docs/architecture/ingress-port-forwarding.md`
-- Interview-prep guides: `docs/guides/interview-prep/`
+- Security & vuln-mgmt guides: `docs/guides/security/`

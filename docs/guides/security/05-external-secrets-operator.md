@@ -1,6 +1,6 @@
 # 05 — External Secrets Operator (ESO)
 
-**Résumé phrase:** *External Secrets Operator*
+**Topic:** *External Secrets Operator*
 **Status:** Shipping. Source: `scripts/plugins/eso.sh`
 (`deploy_eso`, `_eso_apply_vault_cluster_store`, `_eso_configure_remote_vault`).
 
@@ -14,7 +14,7 @@
 > workload's own service account. So the git repo declares 'this app needs the LDAP
 > bind password' without the password ever appearing anywhere in git or a manifest."
 
-## The problem it solves (say this first)
+## The problem it solves
 
 GitOps has one hole: **you can't commit secrets to git.** But GitOps says everything
 that defines the cluster *should* be in git. ESO resolves the contradiction:
@@ -62,7 +62,7 @@ The auth model is the point: **no static Vault token is stored anywhere.** ESO p
 its identity with a Kubernetes service-account token that Vault independently
 validates. Kill the pod, the token's gone.
 
-## Why it matters (design judgment)
+## Why it matters
 
 - **Closes the GitOps secret gap** without SealedSecrets-style ciphertext-in-git or
   hand-managed Secrets. The material stays in Vault, the wiring stays in git.
@@ -77,7 +77,7 @@ validates. Kill the pod, the token's gone.
   per-cluster auth mounts, which is exactly the portability seam that made this
   non-trivial.
 
-## Likely interview questions
+## Common questions
 
 **Q: ESO vs. Sealed Secrets vs. SOPS?**
 > Sealed Secrets and SOPS put *encrypted* secrets in git — you still commit
