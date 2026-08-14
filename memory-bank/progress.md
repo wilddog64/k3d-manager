@@ -110,6 +110,17 @@ still requires an approving review.
       guards. **Part D:** BATS. Commit msg `fix(lifecycle): standardize dry-run on DRY_RUN and complete make up/down
       guards`. Stubbed cluster-up/down BATS verify exit-0 preview/no mutations and itemized teardown; shellcheck
       and provider/lifecycle suites pass. Phase 3 (deregister) + Phase 4 (Slack) remain sequenced after 2b.
+      **VERIFIED by Claude 2026-08-14:** SHA on origin; 9-file scope clean; A1/A2/A3/A4/B/C/D all present;
+      shellcheck clean on all 6 shell files; **21/21 BATS pass** (8 dry_run + 6 cluster_up + 7 cluster_down);
+      base `system.sh` untouched; no `K3DM_DEPLOY_DRY_RUN` stragglers. Smart catch: cluster-up does
+      `unset -f __k3dm_base_run_command` + re-source after plugin loads (plugins re-load foundation system.sh and
+      clobber the wrapper). **ONE confirmed follow-up defect (out of 2b DoD scope):** `bin/cluster-down` `*)` branch
+      (line 100, the local/dev provider path — orbstack/k3d/k3s all route here via `make down`) never sources
+      `system_overrides.sh`, so the common launchd block's `_run_command --prefer-sudo -- launchctl bootout`
+      browser-listener ops (lines 179/204/230/246, guarded ONLY by the bridge) fire **real sudo under `DRY_RUN=1`**
+      (spy-confirmed: `REAL launchctl CALLED` vs `[dry-run] sudo …` when override sourced). k3s-aws/gcp/az branches
+      are correctly bridged. **Fix = one line** (`source system_overrides.sh` in the `*)` branch; no unset needed —
+      it sources no plugins) → **fold into Phase 3** (already edits cluster-down).
 - [ ] **v1.25.0 DRY_RUN cluster-lifecycle bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-dry-run-cluster-lifecycle.md`,
       2026-08-14). `DRY_RUN=1` today is honored ONLY in `_k3s_aws_deregister_cluster` → `DRY_RUN=1 make up/down`
       really provisions/destroys (footgun). Fix = foundation-first guard primitives (`_dry_run_active`,
@@ -138,6 +149,9 @@ still requires an approving review.
       block after the `acg_teardown` if/else, before `;;`. Commit msg
       `fix(lifecycle): deregister k3s-aws sandbox from hub on make down`. **Sequence AFTER Phase 2 merges**
       (both touch `bin/cluster-down`); not yet handed off. Tier-2 e2e proceeds in parallel.
+      **ALSO fold into Phase 3 (found at 2b verify):** add `source system_overrides.sh` to cluster-down's `*)`
+      branch (line 100) so `DRY_RUN=1 make down` on local providers doesn't fire real sudo `launchctl bootout`.
+      Re-anchor Phase 3 line numbers post-2b before handing off.
       **Phase 4 spec written + QUEUED** (`docs/bugs/v1.25.0-bugfix-dry-run-phase4-slack-cluster-commands.md`,
       2026-08-14): wire DRY_RUN into Slack `cluster-up`/`cluster-down`. `bin/k3dm-webhook:_run_cluster` always
       spawns real `make up/down`; fix = parse a `dry`/`dry-run` token (position-independent, alongside optional
