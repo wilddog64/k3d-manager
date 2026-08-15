@@ -282,3 +282,9 @@ still requires an approving review.
       ExternalSecret, attached `ghcr-pull-secret` to the payment ServiceAccount, and listed the
       ExternalSecret in the base Kustomization. `kubectl kustomize k8s/base` passed; only the
       pre-existing `commonLabels` deprecation warning was emitted.
+
+- [x] **KEYCLOAK ROLE AUTHORITY MAPPING (2026-08-15):** shopping-cart-payment commit `aeb89e8`
+      pushed to `origin/fix/keycloak-role-authority-mapping`. Added realm/client role conversion to
+      Spring `ROLE_*` authorities, wired the JWT converter, and added three unit tests. Full Maven
+      suite passed under Java 21: 133 tests, 0 failures/errors. After merge, verify the realm role
+      assignment for the test principal.
