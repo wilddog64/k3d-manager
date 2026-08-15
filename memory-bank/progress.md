@@ -276,3 +276,9 @@ still requires an approving review.
       EC2 credentials and missing account instance-management role configuration. This blocks the
       provider's 150-second SSM wait; flannel fallback is unrelated. Evidence and recommended
       preflight/host checks: `docs/bugs/2026-08-14-k3s-aws-ssm-agent-cannot-register.md`.
+
+- [x] **PAYMENT GHCR PULL SECRET FIX (2026-08-15):** shopping-cart-payment commit `7cae043`
+      pushed to `origin/fix/payment-ghcr-eso-pull-secret`. Added the Vault/ESO-owned GHCR
+      ExternalSecret, attached `ghcr-pull-secret` to the payment ServiceAccount, and listed the
+      ExternalSecret in the base Kustomization. `kubectl kustomize k8s/base` passed; only the
+      pre-existing `commonLabels` deprecation warning was emitted.
