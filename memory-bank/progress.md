@@ -269,3 +269,10 @@ still requires an approving review.
       `ready_pod_digest_mismatch` events; later payment events applied and current workloads are healthy.
       Dashboard supersession/current-state query remains queued; see
       `docs/issues/2026-08-12-cve-remediation-failed-history-investigation.md`.
+
+- [ ] **BUG (2026-08-14) — fresh k3s-aws SSM agent cannot register.** EC2 instance
+      `i-015dbcd49b4f8eec6` was running/healthy with its SSM profile associated, but
+      `describe-instance-information` returned no record. Console output reports failure to acquire
+      EC2 credentials and missing account instance-management role configuration. This blocks the
+      provider's 150-second SSM wait; flannel fallback is unrelated. Evidence and recommended
+      preflight/host checks: `docs/bugs/2026-08-14-k3s-aws-ssm-agent-cannot-register.md`.

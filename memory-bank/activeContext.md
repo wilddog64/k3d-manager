@@ -301,3 +301,11 @@ written. **Next: PR gate → merge → tag → reapply ApplicationSets (hub + AC
 - **v1.20.0** RELEASED — CVE auto-patch-loop hardening. PR #109 `9da73458`, tagged.
 - Stripe checkout A–F all MERGED to main across the 5 shopping-cart repos (2026-08-02); payment side
   live on hostinger. Remaining live-acceptance work = v1.25.0 (workstream G).
+
+**Open bug (2026-08-14): k3s-aws SSM agent never registers.** Fresh instance
+`i-015dbcd49b4f8eec6` was running/healthy with its instance profile associated, but
+`describe-instance-information` returned no managed-instance record. Console output reports that
+the SSM agent cannot acquire EC2 credentials and that the account's Systems Manager instance
+management role is not configured. This blocks the provider's 150-second SSM wait; the flannel
+fallback message is informational. Evidence and follow-up are recorded in
+`docs/bugs/2026-08-14-k3s-aws-ssm-agent-cannot-register.md`; no live mutation was performed.
