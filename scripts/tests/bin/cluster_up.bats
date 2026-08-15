@@ -9,6 +9,14 @@
   [ "$status" -eq 0 ]
 }
 
+@test "acg-up does not capture the dry-run wrapper as its own base" {
+  run grep -nF 'unset -f __k3dm_base_run_command' bin/cluster-up
+  [ "$status" -ne 0 ]
+  run grep -cF 'source "${REPO_ROOT}/scripts/lib/system_overrides.sh"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+}
+
 @test "acg-up dry-run previews core and never crosses the Step 4 seam" {
   local stub_bin="${BATS_TEST_TMPDIR}/bin"
   local stub_log="${BATS_TEST_TMPDIR}/stub.log"

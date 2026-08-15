@@ -54,11 +54,6 @@ source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 source "${REPO_ROOT}/scripts/plugins/keycloak.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
-# Some plugin entrypoints load the foundation ACG library (and its system helpers),
-# so re-apply the deploy dry-run bridge after all plugin sources are complete.
-unset -f __k3dm_base_run_command 2>/dev/null || true
-source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
-
 : "${_kc_admin_pass:=}"
 : "${_kc_db_pass:=}"
 : "${_argocd_client_secret:=}"
