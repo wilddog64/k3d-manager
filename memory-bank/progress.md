@@ -76,6 +76,10 @@ still requires an approving review.
       are implemented. Webhook BATS 54/54, cluster-down BATS 12/12, py_compile, smoke, and mutation
       pass→fail→pass gates passed; `make restart-webhook` deferred to Claude for live pickup.
 
+- [x] **Standalone cluster-down ArgoCD plugin path (2026-08-14):** `d02c8e92` pushed. Exported
+      `PLUGINS_DIR` fixes lazy `argocd.sh` loading under `set -u`; bug report and regression test
+      added. Cluster-down BATS 13/13 and shellcheck passed.
+
 - [x] **v1.25.0 branch created** from merged main (e7a32bb9) with four queued plans: E2E verification,
       E2E observability, event-driven Dependabot auto-merge monitoring/Grafana visibility; no
       unrelated ArgoCD diagnosis branch content carried forward. Ready for development (workstream G).
