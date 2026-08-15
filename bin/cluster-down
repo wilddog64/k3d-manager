@@ -17,6 +17,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="${REPO_ROOT}/scripts"
+export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then

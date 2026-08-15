@@ -15,6 +15,11 @@ bats_require_minimum_version 1.5.0
   [ "$status" -ne 0 ]
 }
 
+@test "cluster-down defines plugin directory for lazy ArgoCD deregistration" {
+  run grep -nF 'PLUGINS_DIR="${SCRIPT_DIR}/plugins"' bin/cluster-down
+  [ "$status" -eq 0 ]
+}
+
 @test "cluster-down k3s-aws deregister block has real and dry-run paths" {
   run grep -nF '_k3s_aws_deregister_cluster || _warn' bin/cluster-down
   [ "$status" -eq 0 ]
