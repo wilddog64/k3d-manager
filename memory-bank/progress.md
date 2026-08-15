@@ -80,6 +80,11 @@ still requires an approving review.
       `PLUGINS_DIR` fixes lazy `argocd.sh` loading under `set -u`; bug report and regression test
       added. Cluster-down BATS 13/13 and shellcheck passed.
 
+- [x] **Cluster-up Step 1 recursion (2026-08-14):** `d793a1d5` pushed. Removed the redundant
+      post-plugin `_run_command` re-wrap that caused a near-100% CPU infinite recursion during
+      AWS credential validation; bug report and regression test added. Cluster-up BATS 7/7 and
+      shellcheck passed.
+
 - [x] **v1.25.0 branch created** from merged main (e7a32bb9) with four queued plans: E2E verification,
       E2E observability, event-driven Dependabot auto-merge monitoring/Grafana visibility; no
       unrelated ArgoCD diagnosis branch content carried forward. Ready for development (workstream G).

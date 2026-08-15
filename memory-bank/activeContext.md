@@ -20,6 +20,12 @@ ArgoCD plugin load; the exact `set -u` failure is recorded in
 `docs/bugs/2026-08-14-cluster-down-argocd-plugin-plugindir.md`. Cluster-down BATS 13/13,
 shellcheck, and agent lint/audit passed.
 
+**`make up` credential-check recursion FIXED (2026-08-14):** `d793a1d5` pushed to
+`origin/k3d-manager-v1.25.0`. Removed the redundant post-plugin dry-run wrapper re-capture
+that made `__k3dm_base_run_command` call the wrapper recursively at Step 1. The bug report is
+`docs/bugs/2026-08-14-cluster-up-dryrun-wrapper-recursion.md`; cluster-up BATS 7/7, shellcheck,
+bounded wrapper smoke, and agent lint/audit passed.
+
 **Tier 2 sandbox harness — ARCHITECTURE LOCKED, NOT handoff-ready (2026-08-14, user chose "design fully first").** D1 RESOLVED → **disposable in-sandbox ArgoCD** (the app-cluster stack — istio-ambient/eso/data-git/services-git — is ApplicationSet-driven keyed on `k3d-manager/role: app-cluster`; install ArgoCD inside the sandbox, label its `in-cluster` secret, apply the same appsets against `kubernetes.default.svc`; kubectl-kustomize alt rejected). Grounding recorded in `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md` ("Deploy architecture (resolved)"). **Blocked on a Claude live dry-run** to pin THREE undesigned deploy paths before Codex can get copy-paste code: GAP 1 = in-sandbox ArgoCD install is unsupported (`deploy_argocd_bootstrap` short-circuits on `CLUSTER_ROLE=app`, argocd.sh:969); GAP 2 = Keycloak/identity deploy is not a reusable fn (`services-git` excludes `services/shopping-cart-identity`); GAP 3 = no app-cluster ingress-exposure helper for the Playwright Job. **Next action = Claude live dry-run on a sandbox → pins GAP 1–3 AND moves G past 2/4 (the live Stripe run is Claude's per rules), then write exact `e2e_verify_sandbox`+BATS → Codex handoff.** Tier 2 also creates the shared `scripts/plugins/e2e.sh` scaffolding (`E2E_REPORT_DIR`/`_e2e_write_summary`) carved so Tier 1 layers `e2e_verify_vcluster` in later.
 
 **Tier 2 live dry-run STARTED 2026-08-14 (user: "do 1 first then 2").** Fresh ACG AWS sandbox up via `acg_restart` (creds valid, `arn:…:user/cloud_user`, TTL ~232m). Two blockers + one major design finding surfaced, all BEFORE reaching the Stripe E2E:
