@@ -8,6 +8,24 @@
 
 **★ ROADMAP (sequenced 2026-08-15):** v1.25.0 (current) = Stripe/Go live acceptance + hostinger capacity + E2E harness (G) — platform PROVEN live, remaining = codify `e2e_verify_sandbox`+BATS, file the live-discovered config-gap bugfix specs for Codex, hostinger `maxSurge=0` durable commit, hand task #28 k3s-aws specs to Codex, then cut. → **v1.26.0** = fleet-node-lifecycle-Lambda (résumé-critical, [[project_fleet_node_lifecycle_lambda]]) + `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`. → **v1.27.0** = image signing (cosign sign+attest close CVE loop, [[project_image_signing_cve_loop]]; slid from v1.26.0 when fleet took the slot; spec not yet written). → **v1.28.0** = parallel multi-cloud provisioning (concurrent `make up` per provider; spec WRITTEN 2026-08-15 `docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md` — provider-scope local state/ports/launchd + hub-bootstrap lock; sequential bring-up is the only safe path today).
 
+**★ v1.25.0 E2E TIER 1 — PART 1 PR OPEN (2026-08-16, Claude).** Codex `3e798e88` (repo
+`shopping-cart-e2e-tests`, branch `feat/e2e-image-and-workflow-call`) independently VERIFIED GOOD
+(branched from origin/main, exactly 4 files: Dockerfile `playwright:v1.57.0-jammy` + .dockerignore +
+publish-image.yml + e2e-tests.yml `workflow_call`; all actions pinned; minimal perms; all-tests gate
+untouched). **PR #6** opened (`gh pr view 6 --repo wilddog64/shopping-cart-e2e-tests`), base `main`,
+NOT merged. CI = GitGuardian pass only (repo has NO pull_request build/lint CI → nothing validates the
+image builds on the PR). **Copilot review ADDRESSED (2026-08-16, Claude):** 2 inline comments fixed in
+`ac304032` (pushed to PR branch) + both threads resolved — (a) Dockerfile `ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`
+before `npm ci` (base image already ships browsers); (b) `.dockerignore` now excludes `.env`/`.env.*`/`.envrc`
+(keeps `.env.example`) so a local `.env` can't be baked into the image via `COPY . .`. **Branch protection on
+`main` currently DISABLED** (backup at `scratchpad/e2e-main-protection-backup.json`: 1 review + enforce_admins
+true) so user can self-review+merge; MUST restore after merge. **Remaining pre-merge gaps:** (1) build smoke — the GHCR image
+`ghcr.io/wilddog64/shopping-cart-e2e-tests` does NOT exist yet (publish-image.yml fires only on push to
+main / manual dispatch), so `e2e_verify_vcluster` cannot run end-to-end until it's published. Part 2
+(k3d-manager `e2e.sh` + `scripts/etc/e2e` substrate, `567e923e`) already merged. No `make e2e` target
+exists — run via `./scripts/k3d-manager e2e_verify_vcluster [digest]` (ergonomic gap; candidate for a
+`make e2e` wrapper).
+
 **★ v1.25.0 HARNESS CODIFIED + CONFIG-GAP BUGFIX FILED (2026-08-15, Claude).** Two deliverables, both
 ready for Codex:
 1. **Harness codification** — folded the copy-paste-exact `e2e_verify_sandbox` sequence + BATS contract into
