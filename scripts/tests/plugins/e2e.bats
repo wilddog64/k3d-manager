@@ -154,6 +154,68 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "result event ConfigMap carries the e2e-result labels and a boolean passed field" {
+  if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
+  mkdir -p "$E2E_REPORT_DIR"
+  cat > "$E2E_REPORT_DIR/testrun.json" <<'JSON'
+{"run_id":"testrun","tier":"vcluster","service":"product-catalog","project":"api+flows","candidate_digest":null,"passed":6,"total":6,"failed":0,"duration_seconds":12.3,"timestamp":"2026-08-16T00:00:00+00:00","commit":"abc123","exit_code":0,"result":"pass"}
+JSON
+  local capture="$BATS_TEST_TMPDIR/event-manifest.json"
+  _kubectl() {
+    if [[ "$1" == "create" && "$2" == "-f" ]]; then cp "$3" "$capture"; return 0; fi
+    return 0
+  }
+  run _e2e_write_result_event "testrun"
+  [ "$status" -eq 0 ]
+  [ -f "$capture" ]
+  run python3 - "$capture" <<'PY'
+import sys, json
+m = json.load(open(sys.argv[1]))
+assert m["kind"] == "ConfigMap"
+assert m["metadata"]["generateName"] == "e2e-result-"
+assert m["metadata"]["namespace"] == "platform-ops"
+labels = m["metadata"]["labels"]
+assert labels["k3dm.k3d.io/e2e-result"] == "true"
+assert labels["k3dm.k3d.io/e2e-service"] == "product-catalog"
+assert labels["k3dm.k3d.io/e2e-tier"] == "vcluster"
+event = json.loads(m["data"]["event.json"])
+assert event["passed"] == "true", event["passed"]
+assert event["service"] == "product-catalog"
+assert event["tier"] == "vcluster"
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+}
+
+@test "failed run publishes passed=false in the result event" {
+  if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
+  mkdir -p "$E2E_REPORT_DIR"
+  cat > "$E2E_REPORT_DIR/failrun.json" <<'JSON'
+{"run_id":"failrun","tier":"vcluster","service":"product-catalog","project":"api+flows","candidate_digest":null,"passed":4,"total":6,"failed":2,"duration_seconds":9.0,"timestamp":"2026-08-16T00:00:00+00:00","commit":"def456","exit_code":1,"result":"fail"}
+JSON
+  local capture="$BATS_TEST_TMPDIR/fail-manifest.json"
+  _kubectl() {
+    if [[ "$1" == "create" && "$2" == "-f" ]]; then cp "$3" "$capture"; return 0; fi
+    return 0
+  }
+  run _e2e_write_result_event "failrun"
+  [ "$status" -eq 0 ]
+  run python3 - "$capture" <<'PY'
+import sys, json
+m = json.load(open(sys.argv[1]))
+assert json.loads(m["data"]["event.json"])["passed"] == "false"
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+}
+
+@test "missing summary -> writer is a no-op that does not fail the run" {
+  run _e2e_write_result_event "does-not-exist"
+  [ "$status" -eq 0 ]
+}
+
 @test "e2e.sh passes shellcheck at warning severity" {
   if ! command -v shellcheck >/dev/null 2>&1; then
     skip "shellcheck not installed"

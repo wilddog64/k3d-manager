@@ -9,8 +9,11 @@ E2E_REPORT_DIR="${E2E_REPORT_DIR:-${HOME}/.k3dm/e2e}"
 E2E_SERVICE_UNDER_TEST="${E2E_SERVICE_UNDER_TEST:-product-catalog}"
 E2E_ROLLOUT_TIMEOUT="${E2E_ROLLOUT_TIMEOUT:-300}"
 E2E_VCLUSTER_READY_TIMEOUT="${E2E_VCLUSTER_READY_TIMEOUT:-600}"
+E2E_RESULT_EVENT_NAMESPACE="${E2E_RESULT_EVENT_NAMESPACE:-platform-ops}"
+E2E_RESULT_EVENT_KEEP="${E2E_RESULT_EVENT_KEEP:-20}"
 export E2E_IMAGE E2E_IMAGE_TAG E2E_NAMESPACE E2E_JOB_TIMEOUT E2E_REPORT_DIR
 export E2E_SERVICE_UNDER_TEST E2E_ROLLOUT_TIMEOUT E2E_VCLUSTER_READY_TIMEOUT
+export E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP
 
 function _e2e_load_deps() {
   local plugin
@@ -56,6 +59,7 @@ function e2e_verify_vcluster() {
   rc="${_E2E_EXIT:-1}"
 
   _e2e_write_summary "$run_id" "$candidate_digest" "$rc"
+  _e2e_write_result_event "$run_id"
   return "$rc"
 }
 
@@ -297,4 +301,102 @@ with open(summary_path, "w", encoding="utf-8") as fh:
 PY
 
   _info "[e2e] Summary written to ${summary_file} (exit_code=${rc})"
+}
+
+# Publish the run's result to the hub cluster's platform-ops namespace as a durable
+# event ConfigMap. The long-lived vulnerability-inventory-exporter reads these
+# (labelSelector k3dm.k3d.io/e2e-result=true) and emits e2e_* gauges for Grafana.
+# Best-effort: a run must not fail because the hub is unreachable. Uses _kubectl
+# (hub/ambient context), NOT _e2e_kc (the ephemeral vCluster is already gone by now).
+function _e2e_write_result_event() {
+  local run_id="${1:-}"
+  local summary_file="${E2E_REPORT_DIR}/${run_id}.json"
+  [[ -r "$summary_file" ]] || { _warn "[e2e] no summary to publish for ${run_id}"; return 0; }
+
+  local manifest_file
+  manifest_file="$(mktemp -t e2e-event.XXXXXX)"
+
+  if ! E2E_SUMMARY_FILE="$summary_file" \
+       E2E_EVENT_NS="$E2E_RESULT_EVENT_NAMESPACE" \
+       python3 - "$manifest_file" <<'PY'
+import datetime, json, os, sys
+
+manifest_path = sys.argv[1]
+ns = os.environ["E2E_EVENT_NS"]
+with open(os.environ["E2E_SUMMARY_FILE"], encoding="utf-8") as fh:
+    s = json.load(fh)
+
+created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+service = s.get("service") or "unknown"
+tier = s.get("tier") or "unknown"
+event = {
+    "run_id": str(s.get("run_id", "")),
+    "tier": tier,
+    "service": service,
+    "project": s.get("project") or "",
+    "candidate_digest": s.get("candidate_digest") or "",
+    "passed": "true" if s.get("result") == "pass" else "false",
+    "total": str(s.get("total") if s.get("total") is not None else ""),
+    "failed": str(s.get("failed") if s.get("failed") is not None else ""),
+    "duration_seconds": str(s.get("duration_seconds") if s.get("duration_seconds") is not None else ""),
+    "timestamp": s.get("timestamp") or created_at,
+    "commit": s.get("commit") or "",
+}
+
+manifest = {
+    "apiVersion": "v1",
+    "kind": "ConfigMap",
+    "metadata": {
+        "generateName": "e2e-result-",
+        "namespace": ns,
+        "labels": {
+            "k3dm.k3d.io/e2e-result": "true",
+            "k3dm.k3d.io/e2e-service": service,
+            "k3dm.k3d.io/e2e-tier": tier,
+        },
+    },
+    "data": {
+        "created_at": created_at,
+        "event.json": json.dumps(event),
+    },
+}
+with open(manifest_path, "w", encoding="utf-8") as fh:
+    json.dump(manifest, fh)
+PY
+  then
+    _warn "[e2e] could not build result event for ${run_id}"
+    _run_command -- rm -f "$manifest_file"
+    return 0
+  fi
+
+  if _kubectl create -f "$manifest_file" >/dev/null 2>&1; then
+    _info "[e2e] Published result event to ${E2E_RESULT_EVENT_NAMESPACE} for run ${run_id}"
+    _e2e_prune_result_events
+  else
+    _warn "[e2e] could not publish result event (hub ${E2E_RESULT_EVENT_NAMESPACE} unreachable?) — dashboards unaffected"
+  fi
+  _run_command -- rm -f "$manifest_file"
+}
+
+# Writer-side bound: keep only the most recent E2E_RESULT_EVENT_KEEP event
+# ConfigMaps per (service,tier) so etcd does not accumulate. The exporter read is
+# separately capped, so this is defence in depth. Best-effort.
+function _e2e_prune_result_events() {
+  local svc="$E2E_SERVICE_UNDER_TEST"
+  local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=vcluster"
+  local names
+  names="$(_kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
+    -l "$selector" --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
+  [[ -z "$names" ]] && return 0
+
+  local total keep_from stale name
+  total="$(printf '%s\n' "$names" | grep -c . || true)"
+  (( total <= E2E_RESULT_EVENT_KEEP )) && return 0
+  keep_from=$(( total - E2E_RESULT_EVENT_KEEP ))
+  stale="$(printf '%s\n' "$names" | head -n "$keep_from")"
+  while IFS= read -r name; do
+    [[ -z "$name" ]] && continue
+    _kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" delete configmap "$name" >/dev/null 2>&1 || true
+  done <<< "$stale"
 }

@@ -1520,6 +1520,9 @@ EOF
    _info "[argocd] Deploying CVE auto-patch Grafana dashboard..."
    _kubectl apply -f "${_dir}/grafana-dashboard-cve-autopatch.yaml"
 
+   _info "[argocd] Deploying E2E verification Grafana dashboard..."
+   _kubectl apply -f "${_dir}/grafana-dashboard-e2e.yaml"
+
    _info "[argocd] Syncing secrets from Keychain (DR — see argocd_sync_webhook_token_secret / argocd_sync_app_rebuild_secret)..."
    argocd_sync_webhook_token_secret cicd
    argocd_sync_app_rebuild_secret platform-ops
