@@ -1,0 +1,140 @@
+#!/usr/bin/env bats
+
+setup() {
+  source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  init_test_env
+  source "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh"
+
+  RUN_LOG="$BATS_TEST_TMPDIR/run.log"
+  VC_LOG="$BATS_TEST_TMPDIR/vcluster.log"
+  : > "$RUN_LOG"
+  : > "$VC_LOG"
+  RUN_EXIT_CODES=()
+
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  mkdir -p "$E2E_REPORT_DIR"
+  export E2E_JOB_TIMEOUT=5
+  export E2E_ROLLOUT_TIMEOUT=5
+
+  _run_command() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--soft|--quiet|--prefer-sudo|--require-sudo|--interactive-sudo) shift ;;
+        --probe) shift 2 ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$RUN_LOG"
+    local rc=0
+    if ((${#RUN_EXIT_CODES[@]})); then
+      rc=${RUN_EXIT_CODES[0]}
+      RUN_EXIT_CODES=("${RUN_EXIT_CODES[@]:1}")
+    fi
+    return "$rc"
+  }
+
+  # Stub sibling-plugin dependencies so _e2e_load_deps does not source the real files.
+  vcluster_create() { echo "vcluster_create $*" >> "$VC_LOG"; }
+  vcluster_destroy() { echo "vcluster_destroy $*" >> "$VC_LOG"; }
+  _vcluster_kubeconfig_path() { echo "$BATS_TEST_TMPDIR/${1}.kubeconfig"; }
+  shopping_cart_resolve_ghcr_pat() { _github_user="test-user"; _ghcr_pat="test-pat"; }
+}
+
+@test "e2e_verify_vcluster is a public function (no leading underscore)" {
+  run declare -f e2e_verify_vcluster
+  [ "$status" -eq 0 ]
+  [[ "$BATS_TEST_DESCRIPTION" != _* ]]
+}
+
+@test "e2e.sh sources cleanly under set -euo pipefail" {
+  run bash -c '
+    set -euo pipefail
+    SCRIPT_DIR=scripts
+    _err(){ return 1; }; _info(){ :; }; _warn(){ :; }; _run_command(){ :; }
+    source scripts/plugins/e2e.sh
+    declare -f e2e_verify_vcluster >/dev/null
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "job manifest sets exactly the three ClusterIP service URLs and OAUTH2 disabled" {
+  run _e2e_job_manifest "e2e-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PRODUCT_CATALOG_URL"* ]]
+  [[ "$output" == *"http://product-catalog.shopping-cart-apps.svc:8000"* ]]
+  [[ "$output" == *"http://basket.shopping-cart-apps.svc:8083"* ]]
+  [[ "$output" == *"http://order.shopping-cart-apps.svc:8080"* ]]
+  [[ "$output" == *"OAUTH2_ENABLED"* ]]
+  [[ "$output" == *'value: "false"'* ]]
+  [[ "$output" == *"restartPolicy: Never"* ]]
+  [[ "$output" == *"backoffLimit: 0"* ]]
+  [[ "$output" == *"name: ghcr-pull-secret"* ]]
+}
+
+@test "substrate bundle is applied via kustomize (-k scripts/etc/e2e)" {
+  _e2e_wait_job() { return 0; }
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  run grep -F -- "apply -k" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F -- "etc/e2e" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "successful job -> exit 0 and vcluster torn down" {
+  _e2e_wait_job() { return 0; }
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  run grep -F -- "vcluster_destroy e2e-" "$VC_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "failed job -> non-zero exit but vcluster still torn down (teardown on failure)" {
+  _e2e_wait_job() { return 1; }
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  run grep -F -- "vcluster_destroy e2e-" "$VC_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "a JSON summary with the gate-consumable keys is written" {
+  _e2e_wait_job() { return 0; }
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  run bash -c 'ls "$E2E_REPORT_DIR"/*.json'
+  [ "$status" -eq 0 ]
+  local summary
+  summary="$(ls "$E2E_REPORT_DIR"/*.json | head -1)"
+  run grep -F -- '"tier": "vcluster"' "$summary"
+  [ "$status" -eq 0 ]
+  run grep -F -- '"result": "pass"' "$summary"
+  [ "$status" -eq 0 ]
+  run grep -F -- '"exit_code": 0' "$summary"
+  [ "$status" -eq 0 ]
+  run grep -F -- '"run_id"' "$summary"
+  [ "$status" -eq 0 ]
+}
+
+@test "failed job summary is exit-code-faithful (result fail, non-zero exit_code)" {
+  _e2e_wait_job() { return 1; }
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  local summary
+  summary="$(ls "$E2E_REPORT_DIR"/*.json | head -1)"
+  run grep -F -- '"result": "fail"' "$summary"
+  [ "$status" -eq 0 ]
+}
+
+@test "e2e.sh passes shellcheck at warning severity" {
+  if ! command -v shellcheck >/dev/null 2>&1; then
+    skip "shellcheck not installed"
+  fi
+  run shellcheck -S warning -x "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh"
+  [ "$status" -eq 0 ]
+}

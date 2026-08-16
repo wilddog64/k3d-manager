@@ -98,11 +98,23 @@ still requires an approving review.
       **+ Dependabot auto-merge observability** (plan doc #3) — signed GitHub event intake, bounded
       Prometheus state, Grafana panels, Alertmanager Slack alerts, and read-only reconciliation fallback.
       Plan committed on `v1.25.0`; implementation not started.
-- [ ] **v1.25.0 E2E harness Tier 1 — IMPL spec written** (`docs/plans/v1.25.0-e2e-harness-tier1-impl.md`,
-      2026-08-14). Decisions locked: in-cluster Playwright Job + build/publish dedicated e2e image +
-      spec→Codex handoff + guide-per-tech (`docs/guides/vcluster-e2e-harness.md`). Core = self-contained
-      `scripts/etc/e2e/` substrate bundle (no ESO/Vault/ArgoCD). NOT yet handed off. Strategic open Q: Tier 2
-      may be shorter path to G's Stripe acceptance — Tier 1 mainly serves v1.26.0 gate.
+- [~] **v1.25.0 E2E harness Tier 1 — PART 2 IMPLEMENTED by Claude, PART 1 pending Codex** (spec
+      `docs/plans/v1.25.0-e2e-harness-tier1-impl.md`, 2026-08-14; impl 2026-08-16). **Part 2 (k3d-manager, DONE,
+      uncommitted):** `scripts/plugins/e2e.sh` (`e2e_verify_vcluster [candidate_ref]`), self-contained substrate
+      bundle `scripts/etc/e2e/` (postgres+redis+3 services+seed, no ESO/Vault/ArgoCD, `OAUTH2_ENABLED=false`, all
+      images pinned), `scripts/tests/plugins/e2e.bats` (9/9 green), guide `docs/guides/vcluster-e2e-harness.md`,
+      README/functions.md/CHANGELOG. Gates: shellcheck -S warning clean, `kubectl kustomize` builds, 9 BATS pass.
+      Fixed a latent `set -u` EXIT-trap bug in the spec skeleton (hoisted run-name to global `_E2E_ACTIVE_NAME`).
+      Product-catalog Service decouples :8000→targetPort :8080 (image listens 8080; compose 8000:8000 stale).
+      NOT run live (needs Part 1 image + vCluster host). **Part 1 (shopping-cart-e2e-tests repo: Dockerfile +
+      publish-image.yml + `workflow_call`) = Codex handoff** (spec has it verbatim; shopping-cart repos are
+      spec+Codex only). **HANDED OFF 2026-08-16:** ground-truth-verified Codex prompt written to
+      `scratchpad/codex-handoff-part1.md` (Playwright pinned to real locked **1.57.0**; branch from origin/main;
+      env-block line numbers verified). No live Codex agent — user pastes it into Codex, then Claude verifies the
+      `origin` SHA per protocol before trust. **VERIFY FAILED 2026-08-16:** Codex-reported SHA `f28b6cda` does NOT
+      exist (git cat-file → invalid object; no branch/files on origin) — fabricated SHA; Part 1 still NOT done,
+      needs a real Codex re-run + origin-SHA evidence. Strategic open Q: Tier 2 may be shorter path to G's Stripe acceptance — Tier 1 mainly
+      serves the v1.26.0 gate.
 - [ ] **v1.25.0 ACG cleanup bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-k3s-aws-hub-deregister.md`,
       2026-08-14). k3s-aws `destroy_cluster` lacks a hub-deregister (only provider missing it) → expired
       sandbox leaves `cluster-ubuntu-k3s` + `Unknown` Apps. Add `_k3s_aws_deregister_cluster`; graceful-teardown

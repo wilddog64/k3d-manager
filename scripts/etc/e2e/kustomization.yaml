@@ -1,0 +1,33 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: shopping-cart-e2e-substrate
+
+namespace: shopping-cart-apps
+
+labels:
+- pairs:
+    k3dm.k3d.io/e2e-substrate: "true"
+  includeSelectors: false
+
+resources:
+- postgres.yaml
+- redis.yaml
+- product-catalog.yaml
+- basket.yaml
+- order.yaml
+- seed-configmap.yaml
+- seed-job.yaml
+
+images:
+- name: shopping-cart-product-catalog
+  newName: ghcr.io/wilddog64/shopping-cart-product-catalog
+  newTag: sha-6ca5e88d587d845217a51cb0b79b906d26f7b7ee
+- name: shopping-cart-basket
+  newName: ghcr.io/wilddog64/shopping-cart-basket
+  newTag: sha-f70d5801a4078434128d0a17b55cf2e93a028304
+- name: shopping-cart-order
+  newName: ghcr.io/wilddog64/shopping-cart-order
+  newTag: sha-56033880a16e77ad5df0752eac8ad1c00c4a258a

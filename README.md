@@ -219,6 +219,7 @@ docs/
 
 ### Guides
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
+- **[vCluster E2E Harness (Tier 1)](docs/guides/vcluster-e2e-harness.md)** — How `e2e_verify_vcluster` stands up the shopping-cart stack in a throwaway vCluster, runs Playwright as an in-cluster Job, and emits an exit-code-faithful pass/fail for the v1.26.0 promotion gate
 - **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
 - **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
 - **[Security & Vulnerability Management](docs/guides/security/)** — Deep-dive set on the security stack: Trivy CVE loop, Vault PKI, ESO, image signing/attestation, grounded in the actual implementation
@@ -272,6 +273,7 @@ docs/
 
 **Virtual Clusters**
 - **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
+- **[vCluster E2E Harness (Tier 1)](docs/guides/vcluster-e2e-harness.md)** — `e2e_verify_vcluster`: throwaway-vCluster substrate + in-cluster Playwright Job + JSON pass/fail contract
 
 **Networking**
 - **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access

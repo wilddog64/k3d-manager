@@ -39,7 +39,47 @@ tree blurb, and the two Guides + two How-To Jenkins doc links (1 ins / 12 del). 
 release-log rows (v1.22.0, v0.9.10) — factual release record, not current architecture. **Left untouched (per
 decision + user scope):** `scripts/plugins/jenkins.sh` + `scripts/etc/jenkins/` code, `docs/architecture/*`
 illustrative-example docs (already disclaimed), all `docs/{issues,retro,plans/archive,tests}` history and Jenkins
-*feature* docs. Memory `[[project_jenkins_deprecation]]` updated. NOT yet committed.
+*feature* docs. Memory `[[project_jenkins_deprecation]]` updated. Committed `d5128a7e` (pushed).
+
+**★ v1.25.0 E2E HARNESS TIER 1 — PART 2 IMPLEMENTED (2026-08-16, Claude).** Implemented the k3d-manager side of
+`docs/plans/v1.25.0-e2e-harness-tier1-impl.md` directly (user approved "do your recommendation" over the doc's
+original spec→Codex handoff). **New in-repo assets (uncommitted, on `k3d-manager-v1.25.0`):**
+`scripts/plugins/e2e.sh` (`e2e_verify_vcluster [candidate_ref]` + `_e2e_*`), the self-contained substrate bundle
+`scripts/etc/e2e/` (postgres+redis+product-catalog+basket+order+seed, kustomize, zero Vault/ESO/ArgoCD,
+`OAUTH2_ENABLED=false`, all images pinned — service defaults = each repo's own last-known-good `sha-` tag),
+`scripts/tests/plugins/e2e.bats` (9 tests, all green), guide `docs/guides/vcluster-e2e-harness.md`, plus
+README (Guides + How-To) / `docs/api/functions.md` / CHANGELOG `[Unreleased]`. **Design calls made (spec open
+items):** (1) product-catalog image really listens on **:8080** not :8000 (compose `8000:8000` is stale) → Service
+decouples port 8000→targetPort 8080; basket 8083, order 8080 direct. (2) Vendored MINIMAL Deployments (not the
+repos' `k8s/base`, which drag in ESO `externalsecret`/`secret`). (3) Job manifest written to a temp file, not
+piped, to avoid SIGPIPE+pipefail. **Caught a latent bug in the spec's own skeleton:** `trap '_e2e_teardown
+"$name"' EXIT` faults under `set -u` because the local `$name` is out of scope when the trap fires at shell
+exit → teardown never ran + non-zero exit; fixed by hoisting to a global `_E2E_ACTIVE_NAME` with `${…:-}`
+expansion. Gates: `bash -n` + `shellcheck -S warning` clean, `kubectl kustomize scripts/etc/e2e` builds (selectors
+intact, all pinned), 9/9 BATS. Dispatcher auto-discovers the verb (plugin grep) — no dispatcher edit. **NOT run
+live** (needs Part 1's e2e image + a vCluster host). **Part 1 (shopping-cart-e2e-tests repo: Dockerfile +
+publish-image.yml + `workflow_call` on e2e-tests.yml) is still a Codex handoff** — barred from editing
+shopping-cart-family repos directly; the impl spec already contains Part 1 verbatim.
+
+**PART 1 HANDED OFF TO CODEX (2026-08-16, Claude).** No live Codex agent to dispatch to (ListAgents = one
+offline peer), so the deliverable is a self-contained, ground-truth-verified Codex prompt at
+`scratchpad/codex-handoff-part1.md` (session scratchpad). Verified before writing: e2e repo currently on
+`feat/stripe-checkout-e2e` → Codex branches `feat/e2e-image-and-workflow-call` from **origin/main**; locked
+Playwright is **1.57.0** (spec's `v1.40.0` was only an example) → base `mcr.microsoft.com/playwright:v1.57.0-jammy`;
+`e2e-tests.yml` `on:` block lines 3–24 and three env blocks (api 49–52, flow 89–92, all 129–132) match the impl
+spec's find/replace snippets exactly. Guardrails baked in: keep `push`/`schedule` disabled, don't touch
+k3d-manager, no PR, no push-to-main, push branch + report `origin` SHA, no `--no-verify`, exact commit msg
+`feat(ci): publishable e2e image + workflow_call substrate inputs`. **Still pending user action:** paste the
+prompt into Codex (no live agent); on Codex "done" → verify per protocol (SHA on origin, `git show --stat`) before
+trust. k3d-manager Part 2 remains uncommitted awaiting user go.
+
+**⚠️ CODEX PART 1 VERIFICATION FAILED (2026-08-16, Claude).** User reported Codex commit `f28b6cda` for Part 1.
+Independent verification: **the SHA does not exist anywhere** — `git cat-file -t f28b6cda` → "Not a valid object
+name", absent from `origin` and local, no branch `feat/e2e-image-and-workflow-call` on origin, and no
+Dockerfile/`.dockerignore`/publish-image.yml in the e2e repo tree. Classic **fabricated-SHA** failure mode
+([[feedback_codex_verification_protocol]]). **Part 1 is NOT done.** Did NOT proceed to any downstream handoff on
+a false "verified." Next: re-run Codex against `scratchpad/codex-handoff-part1.md` and demand the real `origin`
+SHA + `git show --stat` as evidence; do not trust a bare SHA again.
 
 **★ 2B REPLAY CHECKPOINT (2026-08-15, fresh ACG sandbox, LIVE).** Account `975049916979`, server `34.220.155.130` (internal `10.0.1.78`), 3-node k3s v1.32.0 all Ready. Progress this run: (1) `deploy_cluster --confirm` with `CLUSTER_PROVIDER=k3s-aws K3S_AWS_SSM_ENABLED=false` → 3 nodes + Cilium + vault-bridge socat + autossh tunnel + ssh -R reverse tunnel (provisioner did all of this now, incl. the reverse tunnel that was manual last run). (2) In-sandbox ArgoCD 10.1.4 Helm-installed (ns `argocd`, `--kube-context ubuntu-k3s`, `server.insecure`+ClusterIP; dex crashloops, irrelevant). (3) Local RBAC `argocd-manager` SA created in-sandbox (NOT `register_app_cluster`) → minted bearer token → `ubuntu-k3s` cluster secret (name load-bearing) + platform/shopping-cart AppProjects applied. (4) 3 appsets (eso/data-git/services-git, `K3D_MANAGER_BRANCH=k3d-manager-v1.25.0`) → 8 apps generated, all keyed `ubuntu-k3s`. (5) **Secrets path fully wired + PROVEN:** created missing `vault-bridge` Endpoints → `10.0.1.78:8201` (Service had no selector, no Endpoints); chain pod→bridge:8201→socat→ssh-R→laptop:18200→hub vault reachable (health OK). ⭐ **TokenReview seam re-proven:** `configure_vault_app_auth_for_context ubuntu-k3s` created mount `kubernetes-ubuntu-k3s`+policy `app-cluster-reader`(already includes `secret/data/github/pat` read)+role `eso-app-cluster`, THEN overwrote mount config with `disable_local_ca_jwt=true kubernetes_host=https://34.220.155.130:6443 kubernetes_ca_cert=@ token_reviewer_jwt=@` using a sandbox `vault-reviewer` SA (kube-system, system:auth-delegator, long-lived token). Created `vault-backend` ClusterSecretStore (mountPath `kubernetes-ubuntu-k3s`, role `eso-app-cluster`, sa external-secrets/secrets) → **Ready=True Valid**, all **15 ExternalSecrets SecretSynced** (incl. ghcr-pull-secret). GOTCHAS: local `base64` is GNU (`-d` not macOS `-d`/`-D`); zsh no-word-split (don't stuff `kubectl … ` in a var). REMAINING: payment fix test (services/shopping-cart-payment kustomization refs `shopping-cart-payment//k8s/base?ref=main` — fix `7cae043` is on unmerged branch `fix/payment-ghcr-eso-pull-secret`, so straight deploy tests PRE-fix; need branch override to test the fix) → then GAP3 hub-Keycloak identity + ingress → Stripe E2E. Default kube-context left on `k3d-k3d-cluster` (hub) after the vault work.
 
