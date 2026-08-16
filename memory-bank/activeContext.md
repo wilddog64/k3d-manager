@@ -41,6 +41,15 @@ decision + user scope):** `scripts/plugins/jenkins.sh` + `scripts/etc/jenkins/` 
 illustrative-example docs (already disclaimed), all `docs/{issues,retro,plans/archive,tests}` history and Jenkins
 *feature* docs. Memory `[[project_jenkins_deprecation]]` updated. Committed `d5128a7e` (pushed).
 
+**HOSTINGER EDGE-DOWN SELF-DIAGNOSIS SPEC'D → CODEX (2026-08-16, Claude).** "Part 2" follow-up to the verified
+`f28b6cda` refresh-edge entrypoint. Spec `docs/bugs/2026-08-16-hostinger-status-self-diagnose-edge-down.md`:
+`bin/cluster-status-summary` (summary mode) counts error services with `HTTP 530` and, for `k3s-hostinger` with
+`_edge530>=2`, prints `hint: … run: make refresh-edge …` — 530 = Cloudflare tunnel-down (distinct from a single
+502 = zombie port-forward, which must NOT trip it). +3 BATS via the existing curl-stub pattern. KeepAlive item is
+a NO-OP — tunnel plist already `KeepAlive=<true/>` (`k3s-hostinger.sh:269`); spec forbids touching plists. Codex
+prompt: `scratchpad/codex-handoff-status-selfdiag.md`. Commit local: `567e923e` (e2e Part 2) + `9a264274` (memory
+fix) UNPUSHED on `k3d-manager-v1.25.0` — must push before/with Codex to avoid same-branch divergence.
+
 **★ v1.25.0 E2E HARNESS TIER 1 — PART 2 IMPLEMENTED (2026-08-16, Claude).** Implemented the k3d-manager side of
 `docs/plans/v1.25.0-e2e-harness-tier1-impl.md` directly (user approved "do your recommendation" over the doc's
 original spec→Codex handoff). **New in-repo assets (uncommitted, on `k3d-manager-v1.25.0`):**
