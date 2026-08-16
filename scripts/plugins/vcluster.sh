@@ -6,11 +6,13 @@ VCLUSTER_VERSION="${VCLUSTER_VERSION:-0.32.1}"
 VCLUSTER_KUBECONFIG_DIR="${VCLUSTER_KUBECONFIG_DIR:-${HOME}/.kube/vclusters}"
 VCLUSTER_INSTALL_DIR="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
 VCLUSTER_VALUES_FILE="${VCLUSTER_VALUES_FILE:-}"
+VCLUSTER_LOCAL_PORT="${VCLUSTER_LOCAL_PORT:-11443}"
 export VCLUSTER_NAMESPACE
 export VCLUSTER_VERSION
 export VCLUSTER_KUBECONFIG_DIR
 export VCLUSTER_INSTALL_DIR
 export VCLUSTER_VALUES_FILE
+export VCLUSTER_LOCAL_PORT
 
 function _vcluster_load_argocd_plugin() {
   if declare -f _argocd_hub_kubectl_cmd >/dev/null 2>&1; then
@@ -243,7 +245,8 @@ function _vcluster_export_kubeconfig() {
   local kubeconfig
   kubeconfig="$(_vcluster_kubeconfig_path "$name")"
   local config
-  config="$(_run_command -- vcluster connect "$name" -n "$VCLUSTER_NAMESPACE" --print)"
+  config="$(_run_command -- vcluster connect "$name" -n "$VCLUSTER_NAMESPACE" \
+    --local-port "$VCLUSTER_LOCAL_PORT" --print)"
   _write_sensitive_file "$kubeconfig" "$config"
   _info "Kubeconfig written to $kubeconfig"
 }
