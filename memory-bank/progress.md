@@ -111,9 +111,8 @@ still requires an approving review.
       spec+Codex only). **HANDED OFF 2026-08-16:** ground-truth-verified Codex prompt written to
       `scratchpad/codex-handoff-part1.md` (Playwright pinned to real locked **1.57.0**; branch from origin/main;
       env-block line numbers verified). No live Codex agent — user pastes it into Codex, then Claude verifies the
-      `origin` SHA per protocol before trust. **VERIFY FAILED 2026-08-16:** Codex-reported SHA `f28b6cda` does NOT
-      exist (git cat-file → invalid object; no branch/files on origin) — fabricated SHA; Part 1 still NOT done,
-      needs a real Codex re-run + origin-SHA evidence. Strategic open Q: Tier 2 may be shorter path to G's Stripe acceptance — Tier 1 mainly
+      `origin` SHA per protocol before trust. **Still genuinely pending — never handed to Codex yet** (the
+      `f28b6cda` "verify" below was the hostinger commit, NOT this). Strategic open Q: Tier 2 may be shorter path to G's Stripe acceptance — Tier 1 mainly
       serves the v1.26.0 gate.
 - [ ] **v1.25.0 ACG cleanup bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-k3s-aws-hub-deregister.md`,
       2026-08-14). k3s-aws `destroy_cluster` lacks a hub-deregister (only provider missing it) → expired

@@ -73,13 +73,17 @@ k3d-manager, no PR, no push-to-main, push branch + report `origin` SHA, no `--no
 prompt into Codex (no live agent); on Codex "done" → verify per protocol (SHA on origin, `git show --stat`) before
 trust. k3d-manager Part 2 remains uncommitted awaiting user go.
 
-**⚠️ CODEX PART 1 VERIFICATION FAILED (2026-08-16, Claude).** User reported Codex commit `f28b6cda` for Part 1.
-Independent verification: **the SHA does not exist anywhere** — `git cat-file -t f28b6cda` → "Not a valid object
-name", absent from `origin` and local, no branch `feat/e2e-image-and-workflow-call` on origin, and no
-Dockerfile/`.dockerignore`/publish-image.yml in the e2e repo tree. Classic **fabricated-SHA** failure mode
-([[feedback_codex_verification_protocol]]). **Part 1 is NOT done.** Did NOT proceed to any downstream handoff on
-a false "verified." Next: re-run Codex against `scratchpad/codex-handoff-part1.md` and demand the real `origin`
-SHA + `git show --stat` as evidence; do not trust a bare SHA again.
+**CODEX `f28b6cda` VERIFIED GOOD — but it's NOT the e2e Part 1 (2026-08-16, Claude).** SHA `f28b6cda` =
+`feat(hostinger): add narrow refresh-edge entrypoint` on `origin/k3d-manager-v1.25.0` (the hostinger
+edge-recovery bugfix, spec `docs/bugs/2026-08-16-hostinger-edge-recovery-no-narrow-entrypoint.md`), NOT the
+shopping-cart-e2e Part 1. (Self-correction: I first searched the e2e repo and wrongly called it a fabricated
+SHA — [[feedback_codex_verification_protocol]] lesson = confirm WHICH repo before declaring absent.) Verification
+PASSED: diff matches spec verbatim (core.sh `refresh_access_layer` verb + `_provider_k3s_hostinger_refresh_access_layer`
+wrapper + Makefile `refresh-edge`), `bash -n` clean, helpers exist, `make -n refresh-edge` dispatches the narrow
+verb, k3d refuses+exits 1, ZERO new shellcheck findings, full-refresh fn untouched. Only unrun = live edge-down +
+`argocd_check_values_branch` before/after (needs a down edge). **The e2e Part 1 (Dockerfile/publish-image.yml/
+`workflow_call`) is STILL genuinely pending** — prompt at `scratchpad/codex-handoff-part1.md`, never given to
+Codex yet; the "fabricated" scare was my repo mix-up, not a real Codex miss.
 
 **★ 2B REPLAY CHECKPOINT (2026-08-15, fresh ACG sandbox, LIVE).** Account `975049916979`, server `34.220.155.130` (internal `10.0.1.78`), 3-node k3s v1.32.0 all Ready. Progress this run: (1) `deploy_cluster --confirm` with `CLUSTER_PROVIDER=k3s-aws K3S_AWS_SSM_ENABLED=false` → 3 nodes + Cilium + vault-bridge socat + autossh tunnel + ssh -R reverse tunnel (provisioner did all of this now, incl. the reverse tunnel that was manual last run). (2) In-sandbox ArgoCD 10.1.4 Helm-installed (ns `argocd`, `--kube-context ubuntu-k3s`, `server.insecure`+ClusterIP; dex crashloops, irrelevant). (3) Local RBAC `argocd-manager` SA created in-sandbox (NOT `register_app_cluster`) → minted bearer token → `ubuntu-k3s` cluster secret (name load-bearing) + platform/shopping-cart AppProjects applied. (4) 3 appsets (eso/data-git/services-git, `K3D_MANAGER_BRANCH=k3d-manager-v1.25.0`) → 8 apps generated, all keyed `ubuntu-k3s`. (5) **Secrets path fully wired + PROVEN:** created missing `vault-bridge` Endpoints → `10.0.1.78:8201` (Service had no selector, no Endpoints); chain pod→bridge:8201→socat→ssh-R→laptop:18200→hub vault reachable (health OK). ⭐ **TokenReview seam re-proven:** `configure_vault_app_auth_for_context ubuntu-k3s` created mount `kubernetes-ubuntu-k3s`+policy `app-cluster-reader`(already includes `secret/data/github/pat` read)+role `eso-app-cluster`, THEN overwrote mount config with `disable_local_ca_jwt=true kubernetes_host=https://34.220.155.130:6443 kubernetes_ca_cert=@ token_reviewer_jwt=@` using a sandbox `vault-reviewer` SA (kube-system, system:auth-delegator, long-lived token). Created `vault-backend` ClusterSecretStore (mountPath `kubernetes-ubuntu-k3s`, role `eso-app-cluster`, sa external-secrets/secrets) → **Ready=True Valid**, all **15 ExternalSecrets SecretSynced** (incl. ghcr-pull-secret). GOTCHAS: local `base64` is GNU (`-d` not macOS `-d`/`-D`); zsh no-word-split (don't stuff `kubectl … ` in a var). REMAINING: payment fix test (services/shopping-cart-payment kustomization refs `shopping-cart-payment//k8s/base?ref=main` — fix `7cae043` is on unmerged branch `fix/payment-ghcr-eso-pull-secret`, so straight deploy tests PRE-fix; need branch override to test the fix) → then GAP3 hub-Keycloak identity + ingress → Stripe E2E. Default kube-context left on `k3d-k3d-cluster` (hub) after the vault work.
 
