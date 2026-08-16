@@ -223,8 +223,9 @@ still requires an approving review.
       4). Three substrate overrides (order URLs / payment gateway=stripe / JWK public issuer) stay in the harness
       (production-correct app defaults). **Config-gap bugfix filed** (real, substrate-independent):
       `docs/bugs/2026-08-15-namespace-labels-missing-for-payment-netpol.md` — two k3d-manager-only fixes so
-      payment NetworkPolicies match (namespace app labels + `data-git` `managedNamespaceMetadata`). Neither
-      handed off yet; batch with task #28. Remaining for G = app-level only (payment role-authority `aeb89e8`
+      payment NetworkPolicies match (namespace app labels + `data-git` `managedNamespaceMetadata`). **DONE**
+      in k3d-manager commit `8ea02b51`, pushed to `origin/k3d-manager-v1.25.0`; Kustomize and YAML parse
+      gates passed. Remaining for G = app-level only (payment role-authority `aeb89e8`
       merge + e2e X-User-ID keying).
 - [ ] **[superseded] v1.25.0 E2E harness Tier 2 — ARCHITECTURE LOCKED, blocked on Claude live dry-run** (2026-08-14,
       user chose "design fully first"; `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan #4).
