@@ -5,6 +5,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
   name: shopping-cart-apps
   labels:
+    app.kubernetes.io/name: shopping-cart
     app.kubernetes.io/part-of: shopping-cart
+    app.kubernetes.io/component: application
     app.kubernetes.io/managed-by: argocd
     istio.io/dataplane-mode: ambient
