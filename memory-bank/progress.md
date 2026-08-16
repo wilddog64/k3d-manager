@@ -216,7 +216,17 @@ still requires an approving review.
       (now `bin/cluster-*`, v1.7.1), `make sudoers` (actual: `install-sudoers`), omits many targets, and has 0
       DRY_RUN coverage. Update it (DRY_RUN CLI row + `[dry-run]` Slack arg + `acg-*`→`cluster-*` rename) when
       Phase 2 lands.
-- [ ] **v1.25.0 E2E harness Tier 2 — ARCHITECTURE LOCKED, blocked on Claude live dry-run** (2026-08-14,
+- [x] **v1.25.0 E2E harness Tier 2 — CODIFIED, ready for Codex handoff** (2026-08-15). Live run drove the full
+      path end-to-end (auth order $39.98 → live Stripe API); GAP 1/2/3 all CLOSED (identity = public Cloudflare
+      issuer + internet egress, no DNAT; e2e Job via ClusterIP DNS). Copy-paste-exact `e2e_verify_sandbox`
+      sequence + BATS contract folded into `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md` (kept plan count at
+      4). Three substrate overrides (order URLs / payment gateway=stripe / JWK public issuer) stay in the harness
+      (production-correct app defaults). **Config-gap bugfix filed** (real, substrate-independent):
+      `docs/bugs/2026-08-15-namespace-labels-missing-for-payment-netpol.md` — two k3d-manager-only fixes so
+      payment NetworkPolicies match (namespace app labels + `data-git` `managedNamespaceMetadata`). Neither
+      handed off yet; batch with task #28. Remaining for G = app-level only (payment role-authority `aeb89e8`
+      merge + e2e X-User-ID keying).
+- [ ] **[superseded] v1.25.0 E2E harness Tier 2 — ARCHITECTURE LOCKED, blocked on Claude live dry-run** (2026-08-14,
       user chose "design fully first"; `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan #4).
       **D1 RESOLVED → disposable in-sandbox ArgoCD** (stack is appset-driven keyed on
       `k3d-manager/role: app-cluster`; install ArgoCD in-sandbox, label `in-cluster`, apply same appsets vs

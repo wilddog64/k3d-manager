@@ -54,6 +54,23 @@ AccessDeniedException: Systems Manager's instance management role is not configu
 </error>
 ```
 
+## Corroboration (2026-08-15, second sandbox)
+
+A full `make up` smoke test on a **different** ACG sandbox (account
+`843089371063`, distinct from the `525259624675` above) reproduced the identical
+symptom. The CloudFormation stack created 3 EC2 nodes with the correct
+`k3d-manager-cluster-ssm-role` instance profile (`AmazonSSMManagedInstanceCore`
+attached), yet `ssm describe-instance-information` stayed empty 20 minutes after
+launch and the provider timed out (`Instance i-05fa364ab7567d7f7 did not become
+Online after 300s` → `make: *** [up] Error 1`). Two independent sandbox accounts
+exhibiting the same empty SSM registration confirms this is not a one-off
+account misconfiguration — it is the SSM instance-management-role / Default Host
+Management gap identified below, reproducible across fresh sandboxes.
+
+The failed run also left the 3-node stack orphaned and billable, filed
+separately as
+[`2026-08-15-cluster-up-failure-orphans-cloudformation-stack.md`](2026-08-15-cluster-up-failure-orphans-cloudformation-stack.md).
+
 ## Root cause
 
 The SSM agent starts, but cannot obtain usable instance credentials and therefore
