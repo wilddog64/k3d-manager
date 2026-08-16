@@ -42,9 +42,12 @@ print(json.dumps({"overall":"fail" if e else ("warn" if w else "healthy"),"provi
 PY
   grep -q $'\terror\t' <<<"${_parsed}" && exit 1 || exit 0
 fi
-_errors=0; _warnings=0
+_errors=0; _warnings=0; _edge530=0
 while IFS=$'\t' read -r _id _name _status _message; do
- case "${_status}" in error) _errors=$((_errors+1)); printf '  %s %s: %s\n' "$(_color 31 '✗')" "${_name}" "${_message}";; warning) _warnings=$((_warnings+1)); printf '  %s %s: %s\n' "$(_color 33 '!')" "${_name}" "${_message}";; healthy) printf '  %s %s: %s\n' "$(_color 32 '✓')" "${_name}" "${_message}";; esac
+ case "${_status}" in error) _errors=$((_errors+1)); [[ "${_message}" == *"HTTP 530"* ]] && _edge530=$((_edge530+1)); printf '  %s %s: %s\n' "$(_color 31 '✗')" "${_name}" "${_message}";; warning) _warnings=$((_warnings+1)); printf '  %s %s: %s\n' "$(_color 33 '!')" "${_name}" "${_message}";; healthy) printf '  %s %s: %s\n' "$(_color 32 '✓')" "${_name}" "${_message}";; esac
 done <<<"${_parsed}"
 if (( _errors > 0 )); then printf '%s\n' "$(_color 31 "Overall: FAIL (${_errors} errors, ${_warnings} warnings)")"; elif (( _warnings > 0 )); then printf '%s\n' "$(_color 33 "Overall: WARN (${_warnings} warnings)")"; else printf '%s\n' "$(_color 32 'Overall: HEALTHY')"; fi
+if [[ "${_provider}" == k3s-hostinger ]] && (( _edge530 >= 2 )); then
+  printf '%s\n' "  hint: edge down (Cloudflare 530 x${_edge530}) — cluster likely healthy; run: make refresh-edge CLUSTER_PROVIDER=k3s-hostinger"
+fi
 printf '%s\n' 'Details: make status-full'; (( _errors == 0 )) || exit 1
