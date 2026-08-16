@@ -227,6 +227,16 @@ still requires an approving review.
       in k3d-manager commit `8ea02b51`, pushed to `origin/k3d-manager-v1.25.0`; Kustomize and YAML parse
       gates passed. Remaining for G = app-level only (payment role-authority `aeb89e8`
       merge + e2e X-User-ID keying).
+- [x] **Codex netpol bugfix VERIFIED** (2026-08-16). `8ea02b51` on `origin/k3d-manager-v1.25.0`, exact commit
+      msg `fix(netpol): stamp component/name labels so payment NetworkPolicies match`, only the 2 spec'd files
+      (7 ins/0 del), diff verbatim to spec; memory-bank separate commit `a068995f`. Codex task DONE.
+- [ ] **hostinger edge recovery — narrow entrypoint spec filed, queued for Codex** (2026-08-16). Edge went
+      all-red (530s + argocd-refused) after a provider switch stopped cloudflared + port-forward launchd agents;
+      recovered edge-only via `_hostinger_refresh_access_layer` (scratchpad, user-run) → HEALTHY. Gap: that fn
+      has no first-class entrypoint and `make refresh` (the only wired path) also reapplies appsets/repoints the
+      `$values` ref. Spec `docs/bugs/2026-08-16-hostinger-edge-recovery-no-narrow-entrypoint.md`: add
+      `refresh_access_layer` verb + hostinger provider wrapper + `make refresh-edge` (edge-only). Not yet
+      implemented.
 - [ ] **[superseded] v1.25.0 E2E harness Tier 2 — ARCHITECTURE LOCKED, blocked on Claude live dry-run** (2026-08-14,
       user chose "design fully first"; `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan #4).
       **D1 RESOLVED → disposable in-sandbox ArgoCD** (stack is appset-driven keyed on
