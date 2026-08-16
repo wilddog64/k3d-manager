@@ -108,12 +108,10 @@ still requires an approving review.
       Product-catalog Service decouples :8000→targetPort :8080 (image listens 8080; compose 8000:8000 stale).
       NOT run live (needs Part 1 image + vCluster host). **Part 1 (shopping-cart-e2e-tests repo: Dockerfile +
       publish-image.yml + `workflow_call`) = Codex handoff** (spec has it verbatim; shopping-cart repos are
-      spec+Codex only). **HANDED OFF 2026-08-16:** ground-truth-verified Codex prompt written to
-      `scratchpad/codex-handoff-part1.md` (Playwright pinned to real locked **1.57.0**; branch from origin/main;
-      env-block line numbers verified). No live Codex agent — user pastes it into Codex, then Claude verifies the
-      `origin` SHA per protocol before trust. **Still genuinely pending — never handed to Codex yet** (the
-      `f28b6cda` "verify" below was the hostinger commit, NOT this). Strategic open Q: Tier 2 may be shorter path to G's Stripe acceptance — Tier 1 mainly
-      serves the v1.26.0 gate.
+      spec+Codex only). **MERGED 2026-08-16:** PR #6 `feat(ci): publishable e2e image + workflow_call substrate inputs`
+      merged to `origin/main` at `edc50427e9de560adaad687d4e6017744c0b4089`; branch protection (1 review + enforce_admins)
+      restored. E2E image is now published via GitHub Actions `publish-image.yml`; ready for Tier 1 vCluster integration.
+      Strategic open Q: Tier 2 may be shorter path to G's Stripe acceptance — Tier 1 mainly serves the v1.26.0 gate.
 - [ ] **v1.25.0 ACG cleanup bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-k3s-aws-hub-deregister.md`,
       2026-08-14). k3s-aws `destroy_cluster` lacks a hub-deregister (only provider missing it) → expired
       sandbox leaves `cluster-ubuntu-k3s` + `Unknown` Apps. Add `_k3s_aws_deregister_cluster`; graceful-teardown
