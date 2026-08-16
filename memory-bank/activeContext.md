@@ -39,6 +39,29 @@ result rendered from the harness JSON summary (same keys as Grafana Path-A). ALL
 (`make e2e` local / Slack async / future GHA) funnel through the one `e2e_verify_vcluster` entrypoint.
 **Slack spec is GATED on a green smoke** — do NOT wire it while the proxy-port-drift bug keeps the smoke red.
 
+**★ E2E SMOKE — CODE FIXES DONE + VERIFIED; LIVE GREEN BLOCKED BY vCLUSTER CONTROL-PLANE INSTABILITY (2026-08-16, Claude).**
+Landed & pushed on `k3d-manager-v1.25.0`: `1f1f98ce` (pin `--local-port`), `95e09b20` (`_vcluster_refresh_connection`
+recreates the wedged background-proxy; gate takes the vcluster name), `2c93e702` (decouple probe cadence 5s from
+refresh cadence 30s). 33/33 BATS green (18 vcluster + 15 e2e). Three live re-runs all exited 1 at the readiness
+gate. Root cause chain, empirically nailed:
+1. vcluster 0.36.x background-proxy = a docker container running an internal `kubectl port-forward` on a random
+   host port; froze into the create-time kubeconfig, died on syncer restart, never reconnected → EOF. Fixed by
+   pin `--local-port` + recreate-proxy-in-gate. (Proven: on a healthy pod, recreate proxy → create-time kubeconfig
+   returns `/readyz ok`.)
+2. **THE REMAINING BLOCKER — the ephemeral vcluster syncer CRASH-LOOPS from datastore I/O starvation.** Syncer logs:
+   `Slow SQL ... 1.8–2.3s` (kine) → `leaderelection lost` → `error running controller-manager: exit status 1` →
+   pod restart, repeat (RESTARTS 1→3→12 across runs; pod flaps 0/1↔1/1). NOT clock skew (~14s epoch diff). A
+   crash-looping API server defeats ALL connection logic — this is infra, not code.
+   Default vcluster datastore = embedded SQLite (kine) on the statefulSet's disk-backed volume; on k3d that's the
+   slow OrbStack overlay FS. `scripts/etc/vcluster/values.yaml` only sets CPU/mem (200m/256Mi–500m/512Mi), nothing
+   for the datastore. **Proposed fix (needs decision): back the ephemeral vcluster's data dir with a memory-backed
+   emptyDir (tmpfs) — throwaway cluster needs no persistence, RAM I/O kills the starvation** — and/or relax leader
+   election timeouts. Alt: only run the smoke on a calm host. Teardown STILL doesn't run on failure (EXIT trap) →
+   orphan crash-looping vclusters compound the pressure; manual `vcluster delete` each time.
+Full detail: `docs/bugs/2026-08-16-e2e-vcluster-kubeconfig-proxy-port-drift.md` (3 UPDATE sections).
+NEXT: decide the datastore/tmpfs fix vs calm-host acceptance; also `make e2e` (landed `1161f414`) + Slack spec
+(`docs/plans/v1.25.0-e2e-slack-command.md`) both still gated on this green smoke.
+
 **★ v1.25.0 E2E TIER 1 — PART 1 PR OPEN (2026-08-16, Claude).** Codex `3e798e88` (repo
 `shopping-cart-e2e-tests`, branch `feat/e2e-image-and-workflow-call`) independently VERIFIED GOOD
 (branched from origin/main, exactly 4 files: Dockerfile `playwright:v1.57.0-jammy` + .dockerignore +
