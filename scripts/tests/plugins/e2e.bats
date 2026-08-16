@@ -16,6 +16,7 @@ setup() {
   export E2E_JOB_TIMEOUT=5
   export E2E_ROLLOUT_TIMEOUT=5
   export E2E_VCLUSTER_READY_INTERVAL=0
+  export E2E_VCLUSTER_READY_REFRESH_INTERVAL=0
 
   _run_command() {
     while [[ $# -gt 0 ]]; do

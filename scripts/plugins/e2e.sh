@@ -9,12 +9,13 @@ E2E_REPORT_DIR="${E2E_REPORT_DIR:-${HOME}/.k3dm/e2e}"
 E2E_SERVICE_UNDER_TEST="${E2E_SERVICE_UNDER_TEST:-product-catalog}"
 E2E_ROLLOUT_TIMEOUT="${E2E_ROLLOUT_TIMEOUT:-300}"
 E2E_VCLUSTER_READY_TIMEOUT="${E2E_VCLUSTER_READY_TIMEOUT:-600}"
-E2E_VCLUSTER_READY_INTERVAL="${E2E_VCLUSTER_READY_INTERVAL:-10}"
+E2E_VCLUSTER_READY_INTERVAL="${E2E_VCLUSTER_READY_INTERVAL:-5}"
+E2E_VCLUSTER_READY_REFRESH_INTERVAL="${E2E_VCLUSTER_READY_REFRESH_INTERVAL:-30}"
 E2E_RESULT_EVENT_NAMESPACE="${E2E_RESULT_EVENT_NAMESPACE:-platform-ops}"
 E2E_RESULT_EVENT_KEEP="${E2E_RESULT_EVENT_KEEP:-20}"
 export E2E_IMAGE E2E_IMAGE_TAG E2E_NAMESPACE E2E_JOB_TIMEOUT E2E_REPORT_DIR
 export E2E_SERVICE_UNDER_TEST E2E_ROLLOUT_TIMEOUT E2E_VCLUSTER_READY_TIMEOUT
-export E2E_VCLUSTER_READY_INTERVAL
+export E2E_VCLUSTER_READY_INTERVAL E2E_VCLUSTER_READY_REFRESH_INTERVAL
 export E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP
 
 function _e2e_load_deps() {
@@ -76,19 +77,24 @@ function _e2e_wait_vcluster_ready() {
   local name="${2:-}"
   [[ -z "$kubeconfig" ]] && _err "e2e: _e2e_wait_vcluster_ready requires a kubeconfig"
 
-  local deadline
-  deadline=$(( $(date +%s) + E2E_VCLUSTER_READY_TIMEOUT ))
+  local now deadline next_refresh
+  now=$(date +%s)
+  deadline=$(( now + E2E_VCLUSTER_READY_TIMEOUT ))
+  next_refresh=$(( now + E2E_VCLUSTER_READY_REFRESH_INTERVAL ))
   _info "[e2e] Waiting for vCluster API to be ready (timeout ${E2E_VCLUSTER_READY_TIMEOUT}s)"
-  while (( $(date +%s) < deadline )); do
+  while now=$(date +%s); (( now < deadline )); do
     if _e2e_kc "$kubeconfig" get --raw='/readyz' >/dev/null 2>&1; then
       _info "[e2e] vCluster API is ready"
       return 0
     fi
     # vcluster 0.36.x's background-proxy port-forward dies on the syncer's
     # startup restart and never reconnects; recreate it so the pinned-port
-    # kubeconfig can reach the current pod on the next probe.
-    if [[ -n "$name" ]] && declare -f _vcluster_refresh_connection >/dev/null 2>&1; then
+    # kubeconfig can reach the current pod on the next probe. Refresh on its
+    # own (slower) cadence so we do not hammer a still-starting syncer.
+    if [[ -n "$name" ]] && (( now >= next_refresh )) \
+        && declare -f _vcluster_refresh_connection >/dev/null 2>&1; then
       _vcluster_refresh_connection "$name"
+      next_refresh=$(( now + E2E_VCLUSTER_READY_REFRESH_INTERVAL ))
     fi
     sleep "$E2E_VCLUSTER_READY_INTERVAL"
   done

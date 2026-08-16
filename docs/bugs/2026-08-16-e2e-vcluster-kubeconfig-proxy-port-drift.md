@@ -107,6 +107,38 @@ recreation; `_e2e_wait_vcluster_ready` gains the vCluster name and calls it betw
 (interval `E2E_VCLUSTER_READY_INTERVAL`, default 10s). This is docker-scoped, which is correct — the
 Tier 1 substrate is the k3d hub and the background-proxy IS a docker container.
 
+## UPDATE 2026-08-16 (2nd live re-run): a distinct SECOND failure mode — syncer crash-loop from datastore starvation
+
+The 2nd smoke (with port-pin + proxy-refresh) still timed out, but for a **different** reason than the
+proxy. The ephemeral vCluster syncer was **crash-looping** (RESTARTS 12, 0/1). Syncer logs showed the
+real cause — NOT clock skew (host vs OrbStack VM epoch differed by only ~14s; the `23:34` vs `16:34` is
+just UTC-vs-PDT display):
+
+```
+Slow SQL ... total time: 2.301s        (kine datastore — I/O starved)
+leaderelection lost                     (controller-manager can't renew its lease in time)
+error running controller-manager: ... exit status 1
+running interrupt handlers              (syncer process exits -> pod restarts -> repeat)
+```
+
+So under hub I/O pressure the vCluster's kine datastore is slow → controller-manager loses leader
+election → the syncer exits → pod restarts, indefinitely. A crash-looping API server defeats ANY
+connection logic. Two contributing factors, both addressed:
+
+1. **Harness self-load.** The first cut refreshed the proxy on *every* failed probe (~every 10s ⇒ ~60
+   `docker rm` + `vcluster connect` cycles across the 600s timeout), hammering a still-starting syncer.
+   Fixed: decouple probe cadence (`E2E_VCLUSTER_READY_INTERVAL`, default 5s) from refresh cadence
+   (`E2E_VCLUSTER_READY_REFRESH_INTERVAL`, default 30s) so the gate probes often but recreates the proxy
+   rarely.
+2. **Hub headroom.** Tier 1 e2e needs enough disk-I/O headroom for the ephemeral control plane's kine
+   datastore. Run 1 (RESTARTS 1) succeeded; run 2 hit contention from an orphaned crash-looping vCluster
+   (teardown had not run — the EXIT trap issue) plus accumulated churn. Post-teardown node pressure was
+   fine (CPU 12–25%, mem 5–38%, host 37% free), confirming the pressure was self-inflicted, not a
+   baseline shortage. **Operational rule:** ensure teardown actually runs (no orphaned vClusters), and
+   avoid running the smoke while the host is under heavy load. If crash-loops persist on a calm host,
+   consider giving the vCluster a non-embedded/faster datastore or bumping its resources in
+   `scripts/etc/vcluster/values.yaml`.
+
 ## Interaction with the readiness gate (keep it)
 
 The readiness gate (`_e2e_wait_vcluster_ready`, commit `38abfab5`) is still correct and necessary — it
