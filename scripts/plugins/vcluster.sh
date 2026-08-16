@@ -251,6 +251,22 @@ function _vcluster_export_kubeconfig() {
   _info "Kubeconfig written to $kubeconfig"
 }
 
+function _vcluster_refresh_connection() {
+  local name="${1:-}"
+  if [[ -z "$name" ]]; then
+    _err "vCluster name required"
+  fi
+  local proxy
+  proxy="$(_run_command --quiet -- docker ps \
+    --filter "name=vcluster_${name}_" --filter "name=background_proxy" \
+    --format '{{.Names}}' | head -1)"
+  if [[ -n "$proxy" ]]; then
+    _run_command --quiet -- docker rm -f "$proxy" >/dev/null 2>&1 || true
+  fi
+  _run_command --quiet -- vcluster connect "$name" -n "$VCLUSTER_NAMESPACE" \
+    --local-port "$VCLUSTER_LOCAL_PORT" --print >/dev/null 2>&1 || true
+}
+
 function _vcluster_values_file() {
   local file="${VCLUSTER_VALUES_FILE:-${SCRIPT_DIR}/etc/vcluster/values.yaml}"
   if [[ ! -f "$file" ]]; then

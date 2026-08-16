@@ -15,6 +15,7 @@ setup() {
   mkdir -p "$E2E_REPORT_DIR"
   export E2E_JOB_TIMEOUT=5
   export E2E_ROLLOUT_TIMEOUT=5
+  export E2E_VCLUSTER_READY_INTERVAL=0
 
   _run_command() {
     while [[ $# -gt 0 ]]; do
@@ -151,6 +152,18 @@ setup() {
   ( _e2e_wait_vcluster_ready "$BATS_TEST_TMPDIR/kc" ) >/dev/null 2>&1 || rc=$?
   [ "$rc" -ne 0 ]
   run grep -F -- "get --raw=/readyz" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "readiness gate refreshes the proxy connection between failed probes" {
+  export E2E_VCLUSTER_READY_TIMEOUT=1
+  _run_command() { echo "$*" >> "$RUN_LOG"; return 1; }
+  local refresh_log="$BATS_TEST_TMPDIR/refresh.log"
+  _vcluster_refresh_connection() { echo "refresh $*" >> "$refresh_log"; }
+  local rc=0
+  ( _e2e_wait_vcluster_ready "$BATS_TEST_TMPDIR/kc" "e2e-demo" ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  run grep -F -- "refresh e2e-demo" "$refresh_log"
   [ "$status" -eq 0 ]
 }
 

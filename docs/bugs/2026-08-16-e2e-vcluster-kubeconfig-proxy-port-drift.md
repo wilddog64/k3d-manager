@@ -79,6 +79,34 @@ parts; only pursue if Option 1's proxy proves flaky across restarts.
 **Option 3 — re-derive the kubeconfig lazily.** Re-run `vcluster connect --print` (capturing the current
 port) immediately before each phase. Fragile (racy against ongoing restarts) — not recommended.
 
+## UPDATE 2026-08-16 (live-verified): port-pin is NECESSARY but NOT SUFFICIENT
+
+Landed Option 1 (`--local-port 11443`, commit `1f1f98ce`) and re-ran the live smoke. The kubeconfig
+port now stays fixed and the proxy republishes `11443->8443` even across the syncer restart — but the
+smoke **still exited 1**, aborting in the readiness gate. Direct diagnosis on the live vCluster
+(`e2e-1786918166-24149`) established the true mechanism:
+
+- vcluster 0.36.x's background-proxy container runs an **internal `kubectl port-forward`**
+  (`docker logs …_background_proxy` → a single `Forwarding from 0.0.0.0:8443 -> 8443` line).
+- On the syncer pod's startup restart (RESTARTS 1), that port-forward's backend pod dies and
+  **`kubectl port-forward` does not reconnect**. The proxy keeps LISTENing on 11443 but every request
+  gets `EOF` / `connection reset by peer` / `TLS handshake timeout`.
+- A plain `vcluster connect --print` re-run **reuses the wedged proxy container** and still fails.
+- **Recreating the proxy fixes it:** `docker rm -f <…_background_proxy>` then `vcluster connect
+  --local-port 11443 --print` establishes a live port-forward to the *current* pod. Because the port
+  is pinned and the CA is unchanged, the **original create-time kubeconfig then returns `/readyz` →
+  `ok`** and lists namespaces. (Verified: after proxy recreation the create-time kubeconfig succeeded
+  on the first probe.)
+
+**Refined fix = Option 1 (port pin, done) + make the readiness gate refresh the proxy.** The gate
+must, on each failed `/readyz` probe, recreate the background-proxy (remove the stale container +
+reconnect on the pinned port) before retrying. With the port fixed, the create-time kubeconfig the gate
+already holds becomes valid again the moment a healthy proxy is republished — no kubeconfig rewrite
+needed. New helper `_vcluster_refresh_connection <name>` in vcluster.sh owns the docker-proxy
+recreation; `_e2e_wait_vcluster_ready` gains the vCluster name and calls it between probes
+(interval `E2E_VCLUSTER_READY_INTERVAL`, default 10s). This is docker-scoped, which is correct — the
+Tier 1 substrate is the k3d hub and the background-proxy IS a docker container.
+
 ## Interaction with the readiness gate (keep it)
 
 The readiness gate (`_e2e_wait_vcluster_ready`, commit `38abfab5`) is still correct and necessary — it
