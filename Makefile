@@ -41,6 +41,13 @@ refresh:
 	  *)       $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-refresh "$(URL)" ;; \
 	esac
 
+## Restart the k3s-hostinger laptop edge only (cloudflared + port-forwards) — no GitOps reapply
+refresh-edge:
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_access_layer ;; \
+	  *) echo "refresh-edge is k3s-hostinger-only (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER))"; exit 1 ;; \
+	esac
+
 ## Show cluster nodes, pods, endpoint + ESO health (provider-aware)
 status:
 	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ] && [ -r "$(HOME)/.local/share/k3d-manager/active-provider" ]; then _provider="$$(cat "$(HOME)/.local/share/k3d-manager/active-provider")"; fi; case "$$_provider" in \

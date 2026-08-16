@@ -978,6 +978,14 @@ HELP
   _info "[k3s-hostinger] k3s uninstalled; VPS preserved."
 }
 
+function _provider_k3s_hostinger_refresh_access_layer() {
+  _hostinger_require_host >/dev/null || return 1
+  _info "[k3s-hostinger] Refreshing edge only (cloudflared + port-forwards) — no GitOps reapply"
+  _hostinger_refresh_access_layer || return 1
+  _info "[k3s-hostinger] Edge refresh complete"
+  printf '%s\n' "__WEBHOOK_SUCCESS__"
+}
+
 function _provider_k3s_hostinger_refresh_cluster() {
   _hostinger_require_host >/dev/null || return 1
   if [[ ! -f "${_HOSTINGER_KUBECONFIG}" ]]; then
