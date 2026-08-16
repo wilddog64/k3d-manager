@@ -249,6 +249,11 @@ still requires an approving review.
       `refresh_access_layer` verb + hostinger provider wrapper + `make refresh-edge` (edge-only). Syntax,
       shellcheck, dry-run dispatch, and provider rejection gates passed; pushed to `origin/k3d-manager-v1.25.0`.
       Live Hostinger verification is Claude-owned and remains pending.
+- [x] **hostinger edge-down status self-diagnosis IMPLEMENTED** (2026-08-16, commit `f4b6985e`).
+      `bin/cluster-status-summary` now hints `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger` only when
+      at least two services report HTTP 530 under the Hostinger provider. Added the three specified BATS
+      cases; all 8 tests, syntax, shellcheck, and `_agent_audit` passed. Pushed to origin; live edge
+      verification remains Claude-owned.
 - [ ] **[superseded] v1.25.0 E2E harness Tier 2 — ARCHITECTURE LOCKED, blocked on Claude live dry-run** (2026-08-14,
       user chose "design fully first"; `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md`, plan #4).
       **D1 RESOLVED → disposable in-sandbox ArgoCD** (stack is appset-driven keyed on
