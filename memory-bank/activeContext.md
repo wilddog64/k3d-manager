@@ -30,6 +30,15 @@ goes stale → every `_e2e_kc` call gets `EOF`. NEXT FIX: pin `--local-port` in 
 Specced: `docs/bugs/2026-08-16-e2e-vcluster-kubeconfig-proxy-port-drift.md` (`6b85bb56`). vCluster + probe
 files cleaned up. Retry the smoke after the port-pin lands. Prior context ↓
 
+**★ E2E TRIGGER SURFACE (2026-08-16, Claude).** Added `make e2e` target (Makefile) → dispatches
+`./scripts/k3d-manager e2e_verify_vcluster $(DIGEST)` (verified `make -n e2e` + `DIGEST=`). Specced the
+Slack async trigger `docs/plans/v1.25.0-e2e-slack-command.md` (5th v1.25.0 plan doc = AT cap, not over):
+`/api/v1/e2e-verify` operator-gated, async worker on `_run_upgrade` shape, busy-lock via the
+`_CVE_COOLDOWN_DIR` pattern (serialize-live-sandbox — ONE run), digest `^sha256:[0-9a-f]{64}$` validate,
+result rendered from the harness JSON summary (same keys as Grafana Path-A). ALL three triggers
+(`make e2e` local / Slack async / future GHA) funnel through the one `e2e_verify_vcluster` entrypoint.
+**Slack spec is GATED on a green smoke** — do NOT wire it while the proxy-port-drift bug keeps the smoke red.
+
 **★ v1.25.0 E2E TIER 1 — PART 1 PR OPEN (2026-08-16, Claude).** Codex `3e798e88` (repo
 `shopping-cart-e2e-tests`, branch `feat/e2e-image-and-workflow-call`) independently VERIFIED GOOD
 (branched from origin/main, exactly 4 files: Dockerfile `playwright:v1.57.0-jammy` + .dockerignore +
