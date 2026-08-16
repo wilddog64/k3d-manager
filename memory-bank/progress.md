@@ -112,6 +112,15 @@ still requires an approving review.
       merged to `origin/main` at `edc50427e9de560adaad687d4e6017744c0b4089`; branch protection (1 review + enforce_admins)
       restored. E2E image is now published via GitHub Actions `publish-image.yml`; ready for Tier 1 vCluster integration.
       Strategic open Q: Tier 2 may be shorter path to G's Stripe acceptance — Tier 1 mainly serves the v1.26.0 gate.
+      **2026-08-16 (Claude): readiness gate + Grafana Path A landed; smoke still red on a new bug.** `38abfab5`
+      = `_e2e_wait_vcluster_ready` (/readyz gate, `E2E_VCLUSTER_READY_TIMEOUT=600`). `3a1f7ce5` = Grafana Path A
+      (harness `_e2e_write_result_event` → hub `platform-ops` event ConfigMap; exporter `refresh_e2e_events` + 5
+      `e2e_*` gauges; `grafana-dashboard-e2e.yaml`; `e2e.alerts` group; argocd.sh wiring; e2e_observability.bats 7/7
+      + writer BATS + py_compile). Live smoke re-run FIRED the gate but exited 1 on a **deeper** defect: vcluster
+      **0.36.1** background-proxy publishes a RANDOM host port; create-time kubeconfig hard-codes it and it drifts
+      on syncer restart → `_e2e_kc` EOF. Next fix specced `docs/bugs/2026-08-16-e2e-vcluster-kubeconfig-proxy-port-drift.md`
+      (`6b85bb56`): pin `--local-port`. All on `k3d-manager-v1.25.0`, origin tip `6b85bb56`. Grafana live-verify
+      pending a green smoke.
 - [ ] **v1.25.0 ACG cleanup bugfix — spec written** (`docs/bugs/v1.25.0-bugfix-k3s-aws-hub-deregister.md`,
       2026-08-14). k3s-aws `destroy_cluster` lacks a hub-deregister (only provider missing it) → expired
       sandbox leaves `cluster-ubuntu-k3s` + `Unknown` Apps. Add `_k3s_aws_deregister_cluster`; graceful-teardown

@@ -8,17 +8,27 @@
 
 **★ ROADMAP (sequenced 2026-08-15):** v1.25.0 (current) = Stripe/Go live acceptance + hostinger capacity + E2E harness (G) — platform PROVEN live, remaining = codify `e2e_verify_sandbox`+BATS, file the live-discovered config-gap bugfix specs for Codex, hostinger `maxSurge=0` durable commit, hand task #28 k3s-aws specs to Codex, then cut. → **v1.26.0** = fleet-node-lifecycle-Lambda (résumé-critical, [[project_fleet_node_lifecycle_lambda]]) + `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`. → **v1.27.0** = image signing (cosign sign+attest close CVE loop, [[project_image_signing_cve_loop]]; slid from v1.26.0 when fleet took the slot; spec not yet written). → **v1.28.0** = parallel multi-cloud provisioning (concurrent `make up` per provider; spec WRITTEN 2026-08-15 `docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md` — provider-scope local state/ports/launchd + hub-bootstrap lock; sequential bring-up is the only safe path today).
 
-**★ v1.25.0 E2E TIER 1 — FIRST LIVE SMOKE FAILED ON HARNESS RACE (2026-08-16, Claude).** PR #6 MERGED
-(`edc50427`); GHCR image `ghcr.io/wilddog64/shopping-cart-e2e-tests:latest` published (publish-image.yml
-success); branch protection RESTORED (1 review + enforce_admins). First live `e2e_verify_vcluster` run
-FAILED — **not the image, not the substrate**: the ephemeral vCluster control plane took ~7 min to serve
-`/readyz` (syncer restarted once, healthy-but-slow; host nodes 13–22% CPU, NOT pressure), but the harness
-raced into `_e2e_deploy_substrate` at ~6 min → every `kubectl apply` to the vCluster API (`127.0.0.1:10411`)
-TLS-timed-out, no retry, wedged before the Playwright Job (no summary JSON). Root cause: **no vCluster API
-readiness gate** between `vcluster_create` (e2e.sh:51) and `_e2e_deploy_substrate` (e2e.sh:52) — `vcluster
-create` returns on pod-scheduled, not API-ready. Fix specced: `docs/bugs/2026-08-16-e2e-vcluster-api-readiness-race.md`
-(add `_e2e_wait_vcluster_ready` polling `/readyz`, default `E2E_VCLUSTER_READY_TIMEOUT=600`). vCluster torn
-down manually (EXIT trap didn't finish under SIGTERM). Retry after the gate lands. Prior context ↓
+**★ v1.25.0 E2E TIER 1 — READINESS GATE + GRAFANA PATH A LANDED; SMOKE STILL RED ON NEW PROXY-PORT-DRIFT
+BUG (2026-08-16, Claude).** PR #6 MERGED (`edc50427`), GHCR image published, protection restored. Two
+implementations landed + pushed on `k3d-manager-v1.25.0` (origin tip `6b85bb56`):
+1. **Readiness gate** (`38abfab5`) — `_e2e_wait_vcluster_ready` polls `/readyz` (`E2E_VCLUSTER_READY_TIMEOUT=600`)
+   between `vcluster_create` and `_e2e_deploy_substrate`. BATS ordering + timeout guards green. Closes
+   `docs/bugs/2026-08-16-e2e-vcluster-api-readiness-race.md`.
+2. **Grafana observability Path A** (`3a1f7ce5`) — harness `_e2e_write_result_event` publishes each run as a
+   durable `k3dm.k3d.io/e2e-result=true` ConfigMap in hub `platform-ops` (best-effort, prune to N=20/svc+tier);
+   `vulnerability-inventory-exporter` gains `refresh_e2e_events` + 5 `e2e_*` gauges (no RBAC widening); new
+   `grafana-dashboard-e2e.yaml` + `e2e.alerts` group (E2EVerificationFailing/Stale) wired via `argocd.sh`.
+   BATS `e2e_observability.bats` (7) + writer tests green; py_compile clean. Implements
+   `docs/plans/v1.25.0-e2e-observability-path-a.md`. **Live-verify still PENDING** (needs a green smoke to
+   emit a real ConfigMap → series → dashboard).
+**Live re-run of the smoke fired the gate correctly ("Waiting for vCluster API") but STILL exited 1** — a
+**separate, deeper defect** the gate exposed: **vcluster is 0.36.1 (NOT 0.32.1 as memory said)**; 0.36.x
+connects via a **background-proxy docker container on a RANDOM host port**, and `_vcluster_export_kubeconfig`
+(vcluster.sh:246, `vcluster connect --print`) hard-codes that port into the kubeconfig at create time. On
+syncer pod restart the proxy is recreated on a NEW port (observed 12128→12707) → create-time kubeconfig
+goes stale → every `_e2e_kc` call gets `EOF`. NEXT FIX: pin `--local-port` in `_vcluster_export_kubeconfig`.
+Specced: `docs/bugs/2026-08-16-e2e-vcluster-kubeconfig-proxy-port-drift.md` (`6b85bb56`). vCluster + probe
+files cleaned up. Retry the smoke after the port-pin lands. Prior context ↓
 
 **★ v1.25.0 E2E TIER 1 — PART 1 PR OPEN (2026-08-16, Claude).** Codex `3e798e88` (repo
 `shopping-cart-e2e-tests`, branch `feat/e2e-image-and-workflow-call`) independently VERIFIED GOOD
