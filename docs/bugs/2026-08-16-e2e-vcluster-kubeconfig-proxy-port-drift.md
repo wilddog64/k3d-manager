@@ -139,6 +139,41 @@ connection logic. Two contributing factors, both addressed:
    consider giving the vCluster a non-embedded/faster datastore or bumping its resources in
    `scripts/etc/vcluster/values.yaml`.
 
+## UPDATE 2026-08-16 (datastore fix implemented): memory-backed emptyDir for the ephemeral control plane
+
+Decision (user, 2026-08-16): fix the crash-loop at its source — the slow disk-backed kine datastore.
+For a **throwaway** e2e vCluster there is no reason to persist state, so back the control-plane data
+directory with a **memory emptyDir (tmpfs)**, eliminating the overlay-FS I/O that starved kine.
+
+Verified the vcluster 0.36.1 chart schema with `helm template loft-sh/vcluster --version 0.36.1`:
+`controlPlane.statefulSet.persistence.dataVolume` is the purpose-built override ("Only works correctly
+if volumeClaim.enabled=false"). `addVolumes` was wrong — it duplicates the `data` volume and breaks the
+pod spec. With `volumeClaim.enabled=false` the control plane renders as a Deployment (no PVC), and
+`dataVolume` replaces the default disk `emptyDir: {}` at `/data` with a memory-backed one.
+
+`scripts/etc/vcluster/values.yaml` now:
+
+```yaml
+controlPlane:
+  statefulSet:
+    resources:
+      requests: { cpu: 200m, memory: 256Mi }
+      limits:   { cpu: "1",  memory: 1Gi }   # bumped: tmpfs counts against the pod mem limit;
+                                              # extra CPU also guards leader-election under load
+    persistence:
+      volumeClaim:
+        enabled: false                        # no PVC — ephemeral, Deployment not StatefulSet
+      dataVolume:
+        - name: data
+          emptyDir:
+            medium: Memory                    # tmpfs -> kine SQLite I/O is RAM-fast
+            sizeLimit: 1Gi
+```
+
+Rationale for the resource bump: a `medium: Memory` emptyDir's usage counts against the container
+memory limit, so 512Mi was too tight; 1Gi gives the syncer + the (tiny, few-MB) kine DB headroom. CPU
+limit 1 core because lost leader election is partly CPU starvation during the slow-SQL spikes.
+
 ## Interaction with the readiness gate (keep it)
 
 The readiness gate (`_e2e_wait_vcluster_ready`, commit `38abfab5`) is still correct and necessary — it
