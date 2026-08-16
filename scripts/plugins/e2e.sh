@@ -8,8 +8,9 @@ E2E_JOB_TIMEOUT="${E2E_JOB_TIMEOUT:-1200}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-${HOME}/.k3dm/e2e}"
 E2E_SERVICE_UNDER_TEST="${E2E_SERVICE_UNDER_TEST:-product-catalog}"
 E2E_ROLLOUT_TIMEOUT="${E2E_ROLLOUT_TIMEOUT:-300}"
+E2E_VCLUSTER_READY_TIMEOUT="${E2E_VCLUSTER_READY_TIMEOUT:-600}"
 export E2E_IMAGE E2E_IMAGE_TAG E2E_NAMESPACE E2E_JOB_TIMEOUT E2E_REPORT_DIR
-export E2E_SERVICE_UNDER_TEST E2E_ROLLOUT_TIMEOUT
+export E2E_SERVICE_UNDER_TEST E2E_ROLLOUT_TIMEOUT E2E_VCLUSTER_READY_TIMEOUT
 
 function _e2e_load_deps() {
   local plugin
@@ -49,6 +50,7 @@ function e2e_verify_vcluster() {
   trap '_e2e_teardown "${_E2E_ACTIVE_NAME:-}"' EXIT
 
   vcluster_create "$name"
+  _e2e_wait_vcluster_ready "$kubeconfig"
   _e2e_deploy_substrate "$kubeconfig" "$candidate_digest"
   _e2e_run_job "$kubeconfig" "$run_id" "$candidate_digest"
   rc="${_E2E_EXIT:-1}"
@@ -61,6 +63,23 @@ function _e2e_teardown() {
   local name="${1:-}"
   [[ -z "$name" ]] && return 0
   vcluster_destroy "$name" || _warn "e2e: teardown of ${name} failed (manual cleanup may be needed)"
+}
+
+function _e2e_wait_vcluster_ready() {
+  local kubeconfig="${1:-}"
+  [[ -z "$kubeconfig" ]] && _err "e2e: _e2e_wait_vcluster_ready requires a kubeconfig"
+
+  local deadline
+  deadline=$(( $(date +%s) + E2E_VCLUSTER_READY_TIMEOUT ))
+  _info "[e2e] Waiting for vCluster API to be ready (timeout ${E2E_VCLUSTER_READY_TIMEOUT}s)"
+  while (( $(date +%s) < deadline )); do
+    if _e2e_kc "$kubeconfig" get --raw='/readyz' >/dev/null 2>&1; then
+      _info "[e2e] vCluster API is ready"
+      return 0
+    fi
+    sleep 5
+  done
+  _err "e2e: vCluster API not ready within ${E2E_VCLUSTER_READY_TIMEOUT}s"
 }
 
 function _e2e_deploy_substrate() {

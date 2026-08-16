@@ -131,6 +131,29 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "vCluster readiness gate probes /readyz before applying the substrate" {
+  _e2e_wait_job() { return 0; }
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  local readyz_line apply_line
+  readyz_line="$(grep -nF -- "get --raw=/readyz" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  apply_line="$(grep -nF -- "apply -k" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  [ -n "$readyz_line" ]
+  [ -n "$apply_line" ]
+  [ "$readyz_line" -lt "$apply_line" ]
+}
+
+@test "readiness gate honours E2E_VCLUSTER_READY_TIMEOUT and fails when never ready" {
+  export E2E_VCLUSTER_READY_TIMEOUT=1
+  _run_command() { echo "$*" >> "$RUN_LOG"; return 1; }
+  local rc=0
+  ( _e2e_wait_vcluster_ready "$BATS_TEST_TMPDIR/kc" ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  run grep -F -- "get --raw=/readyz" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
 @test "e2e.sh passes shellcheck at warning severity" {
   if ! command -v shellcheck >/dev/null 2>&1; then
     skip "shellcheck not installed"
