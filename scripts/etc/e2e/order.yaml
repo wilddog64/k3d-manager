@@ -30,17 +30,21 @@ spec:
         env:
         - name: SERVER_PORT
           value: "8080"
-        - name: SPRING_DATASOURCE_URL
-          value: jdbc:postgresql://postgres:5432/orders
-        - name: SPRING_DATASOURCE_USERNAME
+        - name: DB_HOST
           value: postgres
-        - name: SPRING_DATASOURCE_PASSWORD
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: orders
+        - name: DB_USERNAME
           value: postgres
+        - name: DB_PASSWORD
+          value: postgres
+        - name: DB_SSLMODE
+          value: disable
         - name: OAUTH2_ENABLED
           value: "false"
         - name: VAULT_ENABLED
-          value: "false"
-        - name: SPRING_CLOUD_VAULT_ENABLED
           value: "false"
         readinessProbe:
           httpGet:
