@@ -105,3 +105,27 @@ _touch_old() {
   [[ "${output}" != *"k3dm-acg-screenshot-2.png"* ]]
   [[ "${output}" == *"k3dm-acg-screenshot-7.png"* ]]
 }
+
+@test "k3dm-cleanup removes old Packer artifacts and port markers only" {
+  local packer_dir="${HOME_ROOT}/.cache/packer"
+  local port_dir="${HOME_ROOT}/.cache/port"
+  mkdir -p "${packer_dir}" "${port_dir}"
+  : > "${packer_dir}/old.iso"
+  : > "${packer_dir}/old.lock"
+  : > "${packer_dir}/new.iso"
+  : > "${port_dir}/old-marker"
+  : > "${port_dir}/new-marker"
+  _touch_old "${packer_dir}/old.iso"
+  _touch_old "${packer_dir}/old.lock"
+  _touch_old "${port_dir}/old-marker"
+
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" \
+    K3DM_PACKER_RETENTION_DAYS=30 K3DM_PORT_RETENTION_DAYS=7 \
+    "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  [ ! -e "${packer_dir}/old.iso" ]
+  [ ! -e "${packer_dir}/old.lock" ]
+  [ -e "${packer_dir}/new.iso" ]
+  [ ! -e "${port_dir}/old-marker" ]
+  [ -e "${port_dir}/new-marker" ]
+}
