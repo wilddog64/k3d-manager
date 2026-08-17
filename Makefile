@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-alertmanager-auth-proxy uninstall-alertmanager-auth-proxy clean-tmp
+.PHONY: up down refresh cleanup-stale-sandbox status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -40,6 +40,10 @@ refresh:
 	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_cluster ;; \
 	  *)       $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-refresh "$(URL)" ;; \
 	esac
+
+## Remove stale state from an expired k3s-aws sandbox (dry-run unless CONFIRM=1)
+cleanup-stale-sandbox:
+	@CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM="$(CONFIRM)" bin/cleanup-stale-sandbox
 
 ## Restart the k3s-hostinger laptop edge only (cloudflared + port-forwards) — no GitOps reapply
 refresh-edge:

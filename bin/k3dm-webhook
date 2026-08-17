@@ -289,6 +289,7 @@ _THREAD_COMMAND_MIN_ROLE = {
     "down": "admin",
     "cluster-up": "admin",
     "up": "admin",
+    "cleanup-stale-sandbox": "admin",
 }
 
 
@@ -526,6 +527,18 @@ def _run_cleanup(job_id, provider):
         _notify_job(job_id, f"✅ *Cleanup complete* ({provider}) — stale connections removed")
     except Exception as exc:
         _notify_job(job_id, f"⚠️ *Cleanup error* ({provider}): {exc}")
+
+
+def _run_stale_sandbox_cleanup(job_id, confirm=False):
+    """Stop expired ACG-only forwards and remove the stale ubuntu-k3s context."""
+    cmd = [str(Path(__file__).resolve().parent / "cleanup-stale-sandbox")]
+    if confirm:
+        cmd.append("--confirm")
+    output, timed_out = _posix_spawn_capture(cmd, timeout=30)
+    if timed_out:
+        _notify_job(job_id, "⚠️ *Stale sandbox cleanup timed out*")
+    else:
+        _notify_job(job_id, f"🧹 *Stale sandbox cleanup*\n```{output.strip()}```")
 
 
 def _run_upgrade(job_id, chart_version, stage):
@@ -869,12 +882,14 @@ def _find_job_by_thread_ts(thread_ts):
 _THREAD_COMMANDS = {
     "kill", "diagnosis", "status", "logs", "ask",
     "cluster-up", "cluster-down", "cluster-refresh", "cluster-resume",
+    "cleanup-stale-sandbox",
     "cluster-status", "hostinger-status", "gemini", "claude", "codex",
 }
 _STANDALONE_CMDS = {
     "cluster-up", "cluster-down", "cluster-resume",
     "cluster-status", "hostinger-status", "cluster-refresh", "refresh",
     "ask", "claude", "gemini", "codex",
+    "cleanup-stale-sandbox",
 }
 
 def _handle_thread_command(job_id, command, role="admin"):
@@ -1044,6 +1059,14 @@ def _handle_thread_command(job_id, command, role="admin"):
         ).start()
         _down_tag = " — DRY_RUN preview" if _down_dry else ""
         _notify_job(job_id, f"⬇️ *cluster-down* ({_down_provider}){_down_tag} — lab sandbox only — queued — job `{new_job_id}`")
+
+    elif cmd == "cleanup-stale-sandbox":
+        _parts = command.strip().split()
+        _confirm = len(_parts) > 1 and _parts[1].lower() in ("confirm", "apply")
+        threading.Thread(target=_run_stale_sandbox_cleanup,
+                         args=(job_id, _confirm), daemon=True).start()
+        _tag = "apply" if _confirm else "dry-run"
+        _notify_job(job_id, f"🧹 *cleanup-stale-sandbox* ({_tag}) queued")
 
     elif cmd in ("cluster-up", "up"):
         running = _running_cluster_job()
