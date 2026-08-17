@@ -1899,7 +1899,8 @@ def _smoke_test_services(retries=None, provider=None):
     if _provider_supports_pushgateway(provider):
         smoke_endpoints.append(("Pushgateway", "http://localhost:9091/-/healthy", [200]))
 
-    for name, url, ok_codes in smoke_endpoints:
+    def _probe_endpoint(endpoint):
+        name, url, ok_codes = endpoint
         last_err = ""
         passed = False
         for attempt in range(_retries):
@@ -1916,7 +1917,14 @@ def _smoke_test_services(retries=None, provider=None):
                 last_err = str(exc)
             if attempt < _retries - 1:
                 time.sleep(_SMOKE_RETRY_SLEEP)
-        results.append((name, passed, last_err))
+        return name, passed, last_err
+
+    # These probes are independent. Running them serially made one slow API or
+    # tunnel consume the whole webhook request budget and collapse status to
+    # UNKNOWN; keep per-service failures but complete the response in parallel.
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=len(smoke_endpoints)) as _pool:
+        results.extend(_pool.map(_probe_endpoint, smoke_endpoints))
 
     if _provider_supports_pushgateway(provider):
         for _i, (_pn, _pok, _pd) in enumerate(results):
