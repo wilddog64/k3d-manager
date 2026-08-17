@@ -83,7 +83,11 @@ function _e2e_wait_vcluster_ready() {
   next_refresh=$(( now + E2E_VCLUSTER_READY_REFRESH_INTERVAL ))
   _info "[e2e] Waiting for vCluster API to be ready (timeout ${E2E_VCLUSTER_READY_TIMEOUT}s)"
   while now=$(date +%s); (( now < deadline )); do
-    if _e2e_kc "$kubeconfig" get --raw='/readyz' >/dev/null 2>&1; then
+    # Soft probe: a failed /readyz must RETURN non-zero, never exit. A bare
+    # _run_command calls _err -> exit on failure, which (bypassing this if)
+    # would kill the whole harness on the first not-ready probe.
+    if KUBECONFIG="$kubeconfig" _run_command --no-exit --quiet -- \
+        kubectl get --raw='/readyz' >/dev/null 2>&1; then
       _info "[e2e] vCluster API is ready"
       return 0
     fi

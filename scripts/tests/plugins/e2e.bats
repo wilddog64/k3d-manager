@@ -156,6 +156,23 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "readiness probe is soft (--no-exit) so a not-ready probe cannot exit the harness" {
+  export E2E_VCLUSTER_READY_TIMEOUT=1
+  local probe_log="$BATS_TEST_TMPDIR/probe.log"
+  _run_command() {
+    echo "$*" >> "$probe_log"
+    local a soft=0
+    for a in "$@"; do [[ "$a" == "--no-exit" || "$a" == "--soft" ]] && soft=1; done
+    if (( soft )); then return 1; fi
+    exit 99
+  }
+  local rc=0
+  ( _e2e_wait_vcluster_ready "$BATS_TEST_TMPDIR/kc" "e2e-demo" ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 99 ]
+  run grep -F -- "--no-exit" "$probe_log"
+  [ "$status" -eq 0 ]
+}
+
 @test "readiness gate refreshes the proxy connection between failed probes" {
   export E2E_VCLUSTER_READY_TIMEOUT=1
   _run_command() { echo "$*" >> "$RUN_LOG"; return 1; }
