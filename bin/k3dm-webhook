@@ -1149,7 +1149,7 @@ def _handle_thread_command(job_id, command, role="admin"):
     else:
         _notify_job(
             job_id,
-            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`",
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`, `cleanup-stale-sandbox [confirm]` (admin)",
         )
 
 
