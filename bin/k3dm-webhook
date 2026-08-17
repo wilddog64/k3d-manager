@@ -264,6 +264,7 @@ _ACTION_POLICY = {
     "/api/v1/hostinger-status": {"name": "hostinger-status", "min_role": "reader"},
     "/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"},
     "/api/v1/cluster-resume": {"name": "cluster-resume", "min_role": "admin"},
+    "/api/v1/cleanup-stale-sandbox": {"name": "cleanup-stale-sandbox", "min_role": "admin"},
     "/api/v1/analyze": {"name": "analyze", "min_role": "operator"},
     "/api/v1/ask": {"name": "ask", "min_role": "reader"},
 }
@@ -3484,6 +3485,22 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 target=_run_cluster_resume,
                 args=(job_id, provider),
                 daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if self.path == "/api/v1/cleanup-stale-sandbox":
+            confirm = bool(body.get("confirm", False))
+            response_url = body.get("response_url", "")
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            if response_url:
+                (JOB_DIR / job_id / "response_url").write_text(response_url)
+            threading.Thread(
+                target=_run_stale_sandbox_cleanup,
+                args=(job_id, confirm),
+                daemon=True,
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
