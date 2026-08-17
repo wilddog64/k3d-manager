@@ -58,6 +58,24 @@ PY
   [[ "${output}" == *"ok"* ]]
 }
 
+@test "exporter preserves remediation cache when refresh fails" {
+  run python3 - "${EXPORTER}" <<'PY'
+import sys, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+start = src.index('def refresh_remediation_events():')
+end = src.index('def refresh_e2e_events():', start)
+block = src[start:end]
+assert 'except Exception:\n        # Preserve the last successful cache' in block
+assert 'remediation_state = []' not in block
+print('ok')
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "e2e dashboard CM parses and its embedded JSON references e2e_* metrics" {
   run python3 - "${DASH}" <<'PY'
 import sys, yaml, json
