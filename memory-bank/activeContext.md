@@ -8,6 +8,28 @@
 
 **★ ROADMAP (sequenced 2026-08-15):** v1.25.0 (current) = Stripe/Go live acceptance + hostinger capacity + E2E harness (G) — platform PROVEN live, remaining = codify `e2e_verify_sandbox`+BATS, file the live-discovered config-gap bugfix specs for Codex, hostinger `maxSurge=0` durable commit, hand task #28 k3s-aws specs to Codex, then cut. → **v1.26.0** = fleet-node-lifecycle-Lambda (résumé-critical, [[project_fleet_node_lifecycle_lambda]]) + `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`. → **v1.27.0** = image signing (cosign sign+attest close CVE loop, [[project_image_signing_cve_loop]]; slid from v1.26.0 when fleet took the slot; spec not yet written). → **v1.28.0** = parallel multi-cloud provisioning (concurrent `make up` per provider; spec WRITTEN 2026-08-15 `docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md` — provider-scope local state/ports/launchd + hub-bootstrap lock; sequential bring-up is the only safe path today).
 
+**★ v1.25.0 E2E SMOKE — ALL 4 CONNECTION/SUBSTRATE BLOCKERS RESOLVED; SUBSTRATE PROVEN GREEN LIVE; FINAL
+FULL RE-RUN PENDING (2026-08-16, Claude).** Four-layer root cause fully cracked across 6 smoke runs:
+(1) proxy port drift → pin `--local-port` (`1f1f98ce`); (2) proxy port-forward death → recreate proxy in
+gate (`95e09b20`); (3) syncer crash-loop from kine datastore I/O starvation → **tmpfs (memory emptyDir)
+control-plane datastore** `scripts/etc/vcluster/values.yaml` (`a5485bf5`, LOCAL) + decouple probe/refresh
+cadence (`2c93e702`); (4) THE decisive bug — readiness probe used a HARD `_run_command` that **exits** on
+failure, so the first not-ready `/readyz` silently killed the harness at probe 1 (message swallowed by
+`2>&1`); fixed to soft `_run_command --no-exit --quiet` (`3adaad5b`, LOCAL) + regression BATS. Smoke #6
+became the FIRST run to pass readiness (control plane 1/1 RESTARTS 0 — tmpfs works; `[e2e] vCluster API is
+ready`), apply the substrate, and reach rollout-wait. It exited 1 there on a NEW, deeper bug:
+**substrate DB env-var mismatch** — `order` (now Go, reads `DB_HOST/DB_PORT/DB_NAME/DB_USERNAME/DB_PASSWORD/
+DB_SSLMODE`) was fed dead `SPRING_DATASOURCE_*`; `product-catalog` (pydantic, reads `DB_HOST` etc) was fed
+an ignored `DATABASE_URL`; both defaulted to `localhost` → connection-refused → CrashLoopBackOff. Fixed in
+`scripts/etc/e2e/{order,product-catalog}.yaml` (`3d4e5a4f`, LOCAL) + spec
+`docs/bugs/2026-08-16-e2e-substrate-db-env-var-mismatch.md`. **VALIDATED LIVE** by patching the still-running
+orphan vCluster's deploys: both reached 1/1 Running (order up, product-catalog `Uvicorn 0.0.0.0:8080` +
+`/health 200`); all 5 substrate services green; no RabbitMQ blocker (order publisher is lazy). LOCAL commits
+ahead of origin (`81bdca1c`): `a5485bf5`, `3adaad5b`, `3d4e5a4f`. **HOLD PUSH until a full smoke goes green
+through the Playwright verdict + JSON summary** (user rule). Next: teardown orphan, run smoke #7 (fresh
+create → readiness → substrate → Playwright Job → `~/.k3dm/e2e/*.json`); if green, push all 3 + do Grafana
+Path A live-verify. Teardown EXIT-trap still broken (orphan survived — noted in spec). Prior status ↓
+
 **★ v1.25.0 E2E TIER 1 — READINESS GATE + GRAFANA PATH A LANDED; SMOKE STILL RED ON NEW PROXY-PORT-DRIFT
 BUG (2026-08-16, Claude).** PR #6 MERGED (`edc50427`), GHCR image published, protection restored. Two
 implementations landed + pushed on `k3d-manager-v1.25.0` (origin tip `6b85bb56`):
