@@ -1753,7 +1753,8 @@ def _smoke_test_logins(provider, app_context):
         keycloak_base = "http://keycloak.shopping-cart.local"
         frontend_base = "http://frontend.shopping-cart.local"
     grafana_base = "https://grafana.3ai-talk.org"
-    argocd_base = "http://localhost:8080"
+    argocd_base = ("https://argocd.3ai-talk.org"
+                   if provider == "k3s-hostinger" else "http://localhost:8080")
 
     def _post(url, data, headers=None):
         body = urllib.parse.urlencode(data).encode() if isinstance(data, dict) else data
