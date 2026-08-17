@@ -1881,11 +1881,18 @@ def _smoke_test_services(retries=None, provider=None):
         keycloak_url = "http://keycloak.shopping-cart.local/health/live"
 
     results = []
+    if provider == "k3s-hostinger":
+        argocd_health_url = "https://argocd.3ai-talk.org/healthz"
+        prometheus_ready_url = "https://prometheus.3ai-talk.org/-/ready"
+    else:
+        argocd_health_url = "http://localhost:8080/healthz"
+        prometheus_ready_url = "http://localhost:19090/-/ready"
+
     smoke_endpoints = [
-        ("ArgoCD", "http://localhost:8080/healthz", [200]),
+        ("ArgoCD", argocd_health_url, [200]),
         ("Frontend", frontend_url, [200]),
         ("Keycloak", keycloak_url, [200]),
-        ("Prometheus", "http://localhost:19090/-/ready", [200]),
+        ("Prometheus", prometheus_ready_url, [200]),
         ("Grafana", "https://grafana.3ai-talk.org/api/health", [200]),
     ]
     if _provider_supports_pushgateway(provider):
