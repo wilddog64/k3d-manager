@@ -56,6 +56,11 @@ still requires an approving review.
 
 ## Pending releases (forward scope — detail in activeContext.md)
 
+- [x] **Local cache retention automation (2026-08-17):** `a638a9ca` pushed. Existing daily cleanup now
+  prunes only old, unreferenced Packer artifacts (>30d) and port markers (>7d); `k3dm_cleanup.bats`
+  5/5 and shellcheck passed. See `docs/issues/2026-08-17-local-cache-retention.md`. Grafana/control-plane
+  responsiveness follow-up remains pending.
+
 - [ ] **BUG spec (2026-08-14) — k3s-aws provisioning cannot install k3s.** `env: 'deploy_app_cluster':
       No such file or directory` at `k3s-aws.sh:178` (`env VAR=val` can't call a shell function). Fix =
       drop `env`. Blocks every fresh k3s-aws bring-up. Spec:

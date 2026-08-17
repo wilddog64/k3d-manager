@@ -6,6 +6,11 @@
 
 ## Current focus — v1.24.1 RELEASED; v1.25.0 = workstream G (open for development)
 
+**Maintenance update 2026-08-17:** `a638a9ca` pushed on `k3d-manager-v1.25.0`. The existing daily
+`com.k3d-manager.cleanup` LaunchAgent now safely removes unreferenced Packer ISO/lock artifacts older
+than 30 days and port-cache markers older than 7 days. BATS 5/5 and shellcheck passed; OrbStack/Codex
+caches and active logs remain out of scope. Grafana/control-plane load investigation remains open.
+
 **★ ROADMAP (sequenced 2026-08-15):** v1.25.0 (current) = Stripe/Go live acceptance + hostinger capacity + E2E harness (G) — platform PROVEN live, remaining = codify `e2e_verify_sandbox`+BATS, file the live-discovered config-gap bugfix specs for Codex, hostinger `maxSurge=0` durable commit, hand task #28 k3s-aws specs to Codex, then cut. → **v1.26.0** = fleet-node-lifecycle-Lambda (résumé-critical, [[project_fleet_node_lifecycle_lambda]]) + `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`. → **v1.27.0** = image signing (cosign sign+attest close CVE loop, [[project_image_signing_cve_loop]]; slid from v1.26.0 when fleet took the slot; spec not yet written). → **v1.28.0** = parallel multi-cloud provisioning (concurrent `make up` per provider; spec WRITTEN 2026-08-15 `docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md` — provider-scope local state/ports/launchd + hub-bootstrap lock; sequential bring-up is the only safe path today).
 
 **★ v1.25.0 E2E SMOKE — ALL 4 CONNECTION/SUBSTRATE BLOCKERS RESOLVED; SUBSTRATE PROVEN GREEN LIVE; FINAL
