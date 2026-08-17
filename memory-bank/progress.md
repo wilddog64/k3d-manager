@@ -60,6 +60,9 @@ still requires an approving review.
   prunes only old, unreferenced Packer artifacts (>30d) and port markers (>7d); `k3dm_cleanup.bats`
   5/5 and shellcheck passed. See `docs/issues/2026-08-17-local-cache-retention.md`. Grafana/control-plane
   responsiveness follow-up remains pending.
+- [x] **Grafana no-data/control-plane load recovery (2026-08-17):** `1e990cc3` pushed and deployed;
+  Prometheus/Grafana data path verified (`15` remediation events, `5181` inventory series, Grafana DB ok).
+  See `docs/issues/2026-08-17-grafana-no-data-control-plane-load.md`; stale local port-forwards remain.
 
 - [ ] **BUG spec (2026-08-14) — k3s-aws provisioning cannot install k3s.** `env: 'deploy_app_cluster':
       No such file or directory` at `k3s-aws.sh:178` (`env VAR=val` can't call a shell function). Fix =
