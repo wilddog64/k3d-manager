@@ -35,3 +35,15 @@ check. Once hub API/etcd and pod networking recover, the public endpoint should 
 
 Investigate hub control-plane/OrbStack resource pressure and embedded etcd health before restarting or
 recreating workloads. Do not weaken the forward health gate or mask the hub readiness failure.
+
+## Resolution (2026-08-18)
+
+The single hub control-plane container was saturated (approximately 610% CPU) and embedded etcd/API
+readiness was intermittent. Restarting `k3d-k3d-cluster-server-0` restored etcd/API responsiveness.
+After the cluster settled, the edge listeners were refreshed and verified:
+
+- `make status`: ArgoCD, Frontend, Keycloak, Prometheus, Grafana, product images, and login checks pass;
+  only expected optional/non-deployed warnings remain.
+- `https://grafana.3ai-talk.org/api/health`: HTTP 200, database `ok`.
+- `https://keycloak.3ai-talk.org/health/live`: HTTP 200.
+- `https://argocd.3ai-talk.org/healthz`: HTTP 200.
