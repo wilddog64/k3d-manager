@@ -7,6 +7,8 @@
 - **Tier 1 E2E verification harness** — `e2e_verify_vcluster` (`scripts/plugins/e2e.sh`) stands up the shopping-cart stack (postgres + redis + product-catalog/basket/order + seed) in a throwaway vCluster via a self-contained kustomize bundle (`scripts/etc/e2e/`, zero Vault/ESO/ArgoCD dependency, `OAUTH2_ENABLED=false`, all images pinned), runs the Playwright `api`+`flows` suite as an in-cluster Job against ClusterIP DNS, writes an exit-code-faithful JSON summary to `$E2E_REPORT_DIR/<run_id>.json`, and tears the vCluster down on success **and** failure. Optional arg overrides the service-under-test image with a candidate digest. Structural + exit-code-contract coverage in `scripts/tests/plugins/e2e.bats`; learning guide `docs/guides/vcluster-e2e-harness.md` — see `docs/plans/v1.25.0-e2e-harness-tier1-impl.md`. (Part 1, the publishable `shopping-cart-e2e-tests` image + `workflow_call` surface, is a companion change in that repo.)
 
 ### Fixed
+- Remediation events classified as `superseded` or `deployment_advanced` now remain in audit history but
+  are excluded from the Current CVE Remediation Status table, avoiding rows that have no applied timestamp.
 - **Monitoring stability under load** — raised the local Prometheus/Grafana CPU budgets and bounded the
   monolithic Loki workload so liveness probes do not restart Prometheus during expensive CVE queries;
   see `docs/issues/2026-08-17-grafana-no-data-control-plane-load.md`.

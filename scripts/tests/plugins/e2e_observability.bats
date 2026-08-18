@@ -76,6 +76,21 @@ PY
   [[ "${output}" == *"ok"* ]]
 }
 
+@test "terminal remediation outcomes are excluded from current status" {
+  run python3 - "${EXPORTER}" <<'PY'
+import sys, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+assert 'if event["display_state"] in ("superseded", "deployment_advanced"):' in src
+assert 'event["current"] = False' in src
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "e2e dashboard CM parses and its embedded JSON references e2e_* metrics" {
   run python3 - "${DASH}" <<'PY'
 import sys, yaml, json
