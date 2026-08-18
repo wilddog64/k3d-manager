@@ -347,3 +347,5 @@ still requires an approving review.
       Spring `ROLE_*` authorities, wired the JWT converter, and added three unit tests. Full Maven
       suite passed under Java 21: 133 tests, 0 failures/errors. After merge, verify the realm role
       assignment for the test principal.
+
+- [x] **Grafana stale port-forward prevention (2026-08-18):** `87382c7b` pushed to `origin/k3d-manager-v1.25.0`; generated Grafana/Pushgateway LaunchAgent wrappers health-check their local endpoints and restart stale forwards. Scoped BATS provider contract suite: 52/52 passed; shell syntax and shellcheck clean.
