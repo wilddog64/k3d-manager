@@ -20,7 +20,10 @@ Grafana was restarted during dashboard reconciliation. The service port-forward 
 pod while it was Pending, then kept a stale forwarding process after that pod was replaced. Cloudflare had
 no healthy localhost:3001 origin, so it returned 502.
 
-## Follow-up
+## Resolution
 
-Make the Grafana port-forward supervisor detect terminated/Pending pod selections and restart only after a
-Ready endpoint exists, instead of retaining a stale process.
+The Hostinger access-layer LaunchAgents now run through a health-aware supervisor wrapper. Grafana is
+checked at `/api/health` and Pushgateway at `/metrics`; after a startup grace period, a failed health
+check terminates the stale `kubectl port-forward` and starts a fresh one. This keeps the tunnel alive
+through pod replacement instead of retaining a forwarding process connected to a Pending or terminated
+pod.
