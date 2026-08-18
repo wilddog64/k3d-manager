@@ -65,6 +65,8 @@ still requires an approving review.
   See `docs/issues/2026-08-17-grafana-no-data-control-plane-load.md`; stale local port-forwards remain.
 - [x] **Remediation current-state correction (2026-08-17):** `37b06795` pushed/deployed; terminal
   `deployment_advanced`/`superseded` events are excluded from Current and retained in History. BATS 9/9.
+- [x] **Remediation table cleanup (2026-08-18):** `f60e1c07` pushed and platform-ops reconciled on the
+  hub; both remediation tables hide redundant `pod` while retaining `job`.
 
 - [ ] **BUG spec (2026-08-14) — k3s-aws provisioning cannot install k3s.** `env: 'deploy_app_cluster':
       No such file or directory` at `k3s-aws.sh:178` (`env VAR=val` can't call a shell function). Fix =
