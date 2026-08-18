@@ -556,3 +556,9 @@ start/run deadlines, and 100m CPU/128Mi memory limits; recent verifier Jobs comp
 (`Overall: HEALTHY`). The status target now defaults only its implicit provider to `k3s-hostinger`,
 while explicit/environment providers and active-provider markers remain honored. Incident details:
 `docs/issues/2026-08-18-webhook-unavailable-stale-launchagent.md`.
+
+**ArgoCD CPU tuning 2026-08-18:** `ebd3fcdf` pushed and applied. ArgoCD controller now ignores Istio
+leader-election annotation churn and runs with `--status-processors=5 --operation-processors=2`.
+Helm required `--force-conflicts` because existing argocd-cm/rbac-cm fields had competing managed
+fields; live args and ignore customization verified. After rollout settled, hub nodes were 6–20% CPU
+and no longer saturated. Evidence: `docs/issues/2026-08-18-argocd-controller-reconciliation-cpu.md`.

@@ -361,3 +361,5 @@ still requires an approving review.
 | CVE verifier live verification log | `fdf58daa` | pushed; CronJob reconciled live; status-source webhook blocker captured verbatim in issue doc |
 
 | Webhook recovery + Hostinger status default | `14ba7f17` | pushed; authenticated health all checks green; `make status` Overall HEALTHY |
+
+| ArgoCD reconciliation CPU reduction | `ebd3fcdf` + `01cbb318` | pushed/applied; live args and ignore rule verified; hub settled below saturation |
