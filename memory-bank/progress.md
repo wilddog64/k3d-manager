@@ -351,3 +351,5 @@ still requires an approving review.
 - [x] **Grafana stale port-forward prevention (2026-08-18):** `87382c7b` pushed to `origin/k3d-manager-v1.25.0`; generated Grafana/Pushgateway LaunchAgent wrappers health-check their local endpoints and restart stale forwards. Scoped BATS provider contract suite: 52/52 passed; shell syntax and shellcheck clean.
 
 - [ ] **FOLLOW-UP BUG (2026-08-18) — hub control-plane degradation blocks Grafana:** after the health-aware wrapper (`87382c7b`) was deployed, embedded etcd readiness failed and multiple workloads timed out, leaving Grafana public HTTP 502 despite a healthy pod. See `docs/issues/2026-08-18-grafana-502-hub-control-plane-degradation.md`; requires hub/OrbStack resource and etcd investigation.
+
+- [x] **STATUS WEBHOOK TIMEOUT FIX (2026-08-18):** `75ce37db` pushed; summary timeout aligned to the full health-sweep budget and issue documented in `docs/issues/2026-08-18-status-webhook-health-timeout.md`. `make status` now returns actual checks; live edge remains degraded by hub control-plane failures.
