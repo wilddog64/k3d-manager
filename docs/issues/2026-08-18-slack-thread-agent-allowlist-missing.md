@@ -44,3 +44,8 @@ real values; no token is hardcoded or recorded here.
 - Confirm the Keychain item is readable by the webhook process without printing its value.
 - Restart the LaunchAgent and verify the health endpoint and webhook import succeed.
 - A live Slack message from `U4C9LDQP2` should no longer log `reason=unallowlisted`.
+
+The import check after provisioning reported `role_map_loaded=True` and `role=admin`, and the
+LaunchAgent rebound `127.0.0.1:7443`. The full webhook BATS suite was attempted, but the local HTTP
+harness was unavailable; its affected requests exited with curl status 7. This is an environment
+failure, not a role-map assertion failure, and must be rerun when the test harness is available.
