@@ -25,6 +25,11 @@ show an unapplied terminal event as active; the History panel retains the explan
 Current CVE Remediation Status and Remediation History tables now hide the redundant `pod` column and
 retain the more useful `job` column.
 
+**Grafana 502 recovery 2026-08-18:** Grafana itself stayed healthy; Cloudflare 502 came from the local
+`com.k3d-manager.grafana-port-forward` agent retaining a stale Pending pod after the dashboard restart.
+The agent was fully reloaded after the replacement pod became Ready; local and public `/api/health` now
+return HTTP 200. See `docs/issues/2026-08-18-grafana-502-stale-port-forward.md`.
+
 **★ ROADMAP (sequenced 2026-08-15):** v1.25.0 (current) = Stripe/Go live acceptance + hostinger capacity + E2E harness (G) — platform PROVEN live, remaining = codify `e2e_verify_sandbox`+BATS, file the live-discovered config-gap bugfix specs for Codex, hostinger `maxSurge=0` durable commit, hand task #28 k3s-aws specs to Codex, then cut. → **v1.26.0** = fleet-node-lifecycle-Lambda (résumé-critical, [[project_fleet_node_lifecycle_lambda]]) + `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`. → **v1.27.0** = image signing (cosign sign+attest close CVE loop, [[project_image_signing_cve_loop]]; slid from v1.26.0 when fleet took the slot; spec not yet written). → **v1.28.0** = parallel multi-cloud provisioning (concurrent `make up` per provider; spec WRITTEN 2026-08-15 `docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md` — provider-scope local state/ports/launchd + hub-bootstrap lock; sequential bring-up is the only safe path today).
 
 **★ v1.25.0 E2E SMOKE — ALL 4 CONNECTION/SUBSTRATE BLOCKERS RESOLVED; SUBSTRATE PROVEN GREEN LIVE; FINAL

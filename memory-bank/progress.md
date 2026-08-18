@@ -67,6 +67,8 @@ still requires an approving review.
   `deployment_advanced`/`superseded` events are excluded from Current and retained in History. BATS 9/9.
 - [x] **Remediation table cleanup (2026-08-18):** `f60e1c07` pushed and platform-ops reconciled on the
   hub; both remediation tables hide redundant `pod` while retaining `job`.
+- [x] **Grafana 502 recovery (2026-08-18):** stale port-forward was fully reloaded after the replacement
+  pod became Ready; local/public health checks return HTTP 200. Issue documented.
 
 - [ ] **BUG spec (2026-08-14) — k3s-aws provisioning cannot install k3s.** `env: 'deploy_app_cluster':
       No such file or directory` at `k3s-aws.sh:178` (`env VAR=val` can't call a shell function). Fix =
