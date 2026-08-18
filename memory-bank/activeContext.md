@@ -17,6 +17,10 @@ Prometheus `/-/ready` passes, and queries return 15 remediation events / 5181 in
 health is database `ok`. `make status` now runs; remaining failures are stale local ArgoCD/Keycloak/product
 port-forwards, not the Grafana data path.
 
+**Remediation dashboard correction 2026-08-17:** `37b06795` pushed and deployed. `deployment_advanced`
+and `superseded` events are now audit-only (`current=false`), so Current CVE Remediation Status cannot
+show an unapplied terminal event as active; the History panel retains the explanation.
+
 **★ ROADMAP (sequenced 2026-08-15):** v1.25.0 (current) = Stripe/Go live acceptance + hostinger capacity + E2E harness (G) — platform PROVEN live, remaining = codify `e2e_verify_sandbox`+BATS, file the live-discovered config-gap bugfix specs for Codex, hostinger `maxSurge=0` durable commit, hand task #28 k3s-aws specs to Codex, then cut. → **v1.26.0** = fleet-node-lifecycle-Lambda (résumé-critical, [[project_fleet_node_lifecycle_lambda]]) + `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`. → **v1.27.0** = image signing (cosign sign+attest close CVE loop, [[project_image_signing_cve_loop]]; slid from v1.26.0 when fleet took the slot; spec not yet written). → **v1.28.0** = parallel multi-cloud provisioning (concurrent `make up` per provider; spec WRITTEN 2026-08-15 `docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md` — provider-scope local state/ports/launchd + hub-bootstrap lock; sequential bring-up is the only safe path today).
 
 **★ v1.25.0 E2E SMOKE — ALL 4 CONNECTION/SUBSTRATE BLOCKERS RESOLVED; SUBSTRATE PROVEN GREEN LIVE; FINAL
