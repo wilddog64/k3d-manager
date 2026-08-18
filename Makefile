@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh cleanup-stale-sandbox status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward clean-tmp
+.PHONY: up down refresh cleanup-stale-sandbox status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -296,6 +296,14 @@ update-webhook-slack:
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
 	$(MAKE) restart-webhook
 	@echo "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID injected — webhook restarted"
+
+## Store the Slack user→role allowlist in Keychain and restart the webhook
+## Example: make update-webhook-slack-roles K3DM_SLACK_ROLE_MAP=U123:admin,U456:operator
+update-webhook-slack-roles:
+	@[ -n "$(K3DM_SLACK_ROLE_MAP)" ] || (echo "ERROR: K3DM_SLACK_ROLE_MAP not set — use user_id:role[,user_id:role...]"; exit 1)
+	@security add-generic-password -U -s k3dm-slack-role-map -a k3dm -w "$(K3DM_SLACK_ROLE_MAP)"
+	$(MAKE) restart-webhook
+	@echo "K3DM_SLACK_ROLE_MAP stored in Keychain — webhook restarted"
 
 ## Inject SLACK_SIGNING_SECRET from Keychain into the webhook LaunchAgent plist and restart
 update-webhook-slack-secret:
