@@ -11,6 +11,11 @@ configs:
   cm:
     url: https://${ARGOCD_VIRTUALSERVICE_HOST}
 
+    resource.customizations.ignoreResourceUpdates.ConfigMap: |
+      jqPathExpressions:
+        # Istio leader-election renewals are volatile metadata, not desired state.
+        - '.metadata.annotations."control-plane.alpha.kubernetes.io/leader"'
+
     oidc.config: |
       name: Keycloak
       issuer: ${ARGOCD_KEYCLOAK_REALM_URL}
@@ -60,6 +65,11 @@ repoServer:
 
 controller:
   replicas: 1
+
+  # Keep the single-node hub responsive while preserving application reconciliation.
+  extraArgs:
+    - --status-processors=5
+    - --operation-processors=2
 
   metrics:
     enabled: true
