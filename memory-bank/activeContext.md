@@ -541,3 +541,8 @@ fallback message is informational. Evidence and follow-up are recorded in
 **Status timeout fix (2026-08-18):** `75ce37db` pushed to `origin/k3d-manager-v1.25.0`. `make status` now waits up to 90 seconds for the bounded webhook health sweep and reports structured service failures instead of falsely claiming the webhook is unavailable. Live Grafana/edge access remains blocked by the separately documented hub control-plane/etcd degradation.
 
 **Hub control-plane recovery (2026-08-18):** The hub server container was CPU-saturated and embedded etcd/API readiness became intermittent, causing ArgoCD/Keycloak/Grafana 502s and webhook health delays. Restarting `k3d-k3d-cluster-server-0` and refreshing the Hostinger edge restored the control plane; `make status` now passes with expected optional/non-deployed warnings, and public Grafana/Keycloak/ArgoCD health endpoints return HTTP 200. Details: `docs/issues/2026-08-18-grafana-502-hub-control-plane-degradation.md`.
+
+**CVE verifier load controls 2026-08-18:** `f9e8711a` pushed on `k3d-manager-v1.25.0`. The
+`cve-remediation-verify` CronJob now runs every 15 minutes with Forbid overlap, 120-second
+start/run deadlines, bounded 10m/100m CPU and 32Mi/128Mi memory, and the verifier only
+fetches `promotion_requested` events before verification. Incident and rationale: `docs/issues/2026-08-18-cve-remediation-verify-load.md`.

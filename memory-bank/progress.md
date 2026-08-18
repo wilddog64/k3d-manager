@@ -355,3 +355,5 @@ still requires an approving review.
 - [x] **STATUS WEBHOOK TIMEOUT FIX (2026-08-18):** `75ce37db` pushed; summary timeout aligned to the full health-sweep budget and issue documented in `docs/issues/2026-08-18-status-webhook-health-timeout.md`. `make status` now returns actual checks; live edge remains degraded by hub control-plane failures.
 
 - [x] **HUB CONTROL-PLANE RECOVERY (2026-08-18):** Restarted saturated `k3d-k3d-cluster-server-0`, restored etcd/API readiness, refreshed edge listeners, and verified `make status` overall WARN (no errors) with all core service/login checks green. Public Grafana, Keycloak, and ArgoCD health endpoints return HTTP 200. Remaining warnings are expected optional/non-deployed resources.
+
+| CVE verifier control-plane load reduction | `f9e8711a` | pushed; shellcheck/sh -n clean; YAML parse clean; app_cve_scan BATS 10/10; issue logged in `docs/issues/2026-08-18-cve-remediation-verify-load.md` |
