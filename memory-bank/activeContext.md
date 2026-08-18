@@ -546,3 +546,7 @@ fallback message is informational. Evidence and follow-up are recorded in
 `cve-remediation-verify` CronJob now runs every 15 minutes with Forbid overlap, 120-second
 start/run deadlines, bounded 10m/100m CPU and 32Mi/128Mi memory, and the verifier only
 fetches `promotion_requested` events before verification. Incident and rationale: `docs/issues/2026-08-18-cve-remediation-verify-load.md`.
+
+**CVE verifier deployment verification 2026-08-18:** `fdf58daa` logged the live reconciliation and
+exact `make status` webhook-unavailable output. The CronJob is live at `*/15` with `Forbid`, 120-second
+start/run deadlines, and 100m CPU/128Mi memory limits; recent verifier Jobs completed successfully.

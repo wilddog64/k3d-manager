@@ -357,3 +357,5 @@ still requires an approving review.
 - [x] **HUB CONTROL-PLANE RECOVERY (2026-08-18):** Restarted saturated `k3d-k3d-cluster-server-0`, restored etcd/API readiness, refreshed edge listeners, and verified `make status` overall WARN (no errors) with all core service/login checks green. Public Grafana, Keycloak, and ArgoCD health endpoints return HTTP 200. Remaining warnings are expected optional/non-deployed resources.
 
 | CVE verifier control-plane load reduction | `f9e8711a` | pushed; shellcheck/sh -n clean; YAML parse clean; app_cve_scan BATS 10/10; issue logged in `docs/issues/2026-08-18-cve-remediation-verify-load.md` |
+
+| CVE verifier live verification log | `fdf58daa` | pushed; CronJob reconciled live; status-source webhook blocker captured verbatim in issue doc |
