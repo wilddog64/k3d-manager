@@ -535,3 +535,5 @@ fallback message is informational. Evidence and follow-up are recorded in
 `docs/bugs/2026-08-14-k3s-aws-ssm-agent-cannot-register.md`; no live mutation was performed.
 
 **Grafana port-forward hardening (2026-08-18):** `87382c7b` pushed to `origin/k3d-manager-v1.25.0`. Hostinger monitoring LaunchAgents now use health-aware supervisors: Grafana checks `/api/health` and Pushgateway checks `/metrics`, restarting stale kubectl forwards after the startup grace period. Issue and verification are recorded in `docs/issues/2026-08-18-grafana-502-stale-port-forward.md`.
+
+**Grafana live verification follow-up (2026-08-18):** After `87382c7b` was applied, the health-aware wrapper correctly retried the forward, but the hub API reported embedded etcd and etcd-readiness failures and broad pod probe timeouts; public Grafana remained HTTP 502 during that control-plane incident. Follow-up is documented in `docs/issues/2026-08-18-grafana-502-hub-control-plane-degradation.md` and is separate from the stale-forward fix.
