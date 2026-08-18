@@ -359,3 +359,5 @@ still requires an approving review.
 | CVE verifier control-plane load reduction | `f9e8711a` | pushed; shellcheck/sh -n clean; YAML parse clean; app_cve_scan BATS 10/10; issue logged in `docs/issues/2026-08-18-cve-remediation-verify-load.md` |
 
 | CVE verifier live verification log | `fdf58daa` | pushed; CronJob reconciled live; status-source webhook blocker captured verbatim in issue doc |
+
+| Webhook recovery + Hostinger status default | `14ba7f17` | pushed; authenticated health all checks green; `make status` Overall HEALTHY |

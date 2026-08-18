@@ -550,3 +550,9 @@ fetches `promotion_requested` events before verification. Incident and rationale
 **CVE verifier deployment verification 2026-08-18:** `fdf58daa` logged the live reconciliation and
 exact `make status` webhook-unavailable output. The CronJob is live at `*/15` with `Forbid`, 120-second
 start/run deadlines, and 100m CPU/128Mi memory limits; recent verifier Jobs completed successfully.
+
+**Webhook/status recovery 2026-08-18:** `14ba7f17` pushed on `k3d-manager-v1.25.0`. Reloaded the stale
+`com.k3d-manager.webhook` LaunchAgent and verified authenticated health plus host-network `make status`
+(`Overall: HEALTHY`). The status target now defaults only its implicit provider to `k3s-hostinger`,
+while explicit/environment providers and active-provider markers remain honored. Incident details:
+`docs/issues/2026-08-18-webhook-unavailable-stale-launchagent.md`.
