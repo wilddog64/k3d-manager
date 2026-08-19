@@ -80,8 +80,13 @@ still requires an approving review.
   API-proxy 502/TLS failures; all nodes returned Ready and Grafana local `/api/health` returned HTTP 200.
   Prevention follow-up is documented in `docs/issues/2026-08-19-agent0-kubelet-proxy-instability.md`.
 
+- [x] **Transient status 502 checks (2026-08-19):** product-image and authenticated frontend probes
+  now retry bounded tunnel failures; webhook BATS 54/54 passed. See
+  `docs/issues/2026-08-19-status-transient-product-images-502.md`.
+
 - [ ] **E2E result-artifact gap (2026-08-19):** `make e2e` exited 1 after teardown without a local
-  log/JSON summary or hub result ConfigMap. Follow-up: persist failure artifacts before teardown;
+  log/JSON summary or hub result ConfigMap. **Fixed in the current worktree:** the EXIT trap now
+  persists phase/exit-code artifacts and publishes a best-effort failure event before teardown;
   see `docs/issues/2026-08-19-e2e-run-no-result-artifact.md`.
 
 - [ ] **BUG spec (2026-08-14) — k3s-aws provisioning cannot install k3s.** `env: 'deploy_app_cluster':
@@ -361,8 +366,3 @@ still requires an approving review.
       Spring `ROLE_*` authorities, wired the JWT converter, and added three unit tests. Full Maven
       suite passed under Java 21: 133 tests, 0 failures/errors. After merge, verify the realm role
       assignment for the test principal.
-
-**ArgoCD Keycloak OIDC render repair (2026-08-19):** `b4546bc8` is ready to push: the ArgoCD Helm
-render allowlist now substitutes the Keycloak realm URL and client ID, with BATS coverage preventing
-literal provider placeholders. Live `argocd-cm` was restored to the public issuer/URL and
-`argocd-server` rolled out; public `/healthz` returned HTTP 200.

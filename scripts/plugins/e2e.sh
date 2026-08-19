@@ -83,20 +83,47 @@ function e2e_verify_vcluster() {
   name="e2e-${run_id}"
   kubeconfig="$(_vcluster_kubeconfig_path "$name")"
 
+  # Persist enough context to diagnose failures that occur before the vCluster
+  # is ready. The old trap only tore down the vCluster, so set -e failures in
+  # setup lost the phase, exit code, and result event.
+  _E2E_RUN_ID="$run_id"
+  _E2E_CANDIDATE_DIGEST="$candidate_digest"
+  _E2E_REPORT_DIR="$E2E_REPORT_DIR"
+  _E2E_ACTIVE_PHASE="creating-vcluster"
+  _E2E_SUMMARY_WRITTEN=0
+  mkdir -p "$E2E_REPORT_DIR"
+
   # Hoist the name to a global so the EXIT trap can reference it safely even
   # after this function's locals go out of scope (set -u would otherwise fault).
   _E2E_ACTIVE_NAME="$name"
-  trap '_e2e_teardown "${_E2E_ACTIVE_NAME:-}"' EXIT
+  trap '_e2e_exit_trap' EXIT
 
   vcluster_create "$name"
+  _E2E_ACTIVE_PHASE="waiting-vcluster"
   _e2e_wait_vcluster_ready "$kubeconfig" "$name"
+  _E2E_ACTIVE_PHASE="deploying-substrate"
   _e2e_deploy_substrate "$kubeconfig" "$candidate_digest"
+  _E2E_ACTIVE_PHASE="running-playwright"
   _e2e_run_job "$kubeconfig" "$run_id" "$candidate_digest"
   rc="${_E2E_EXIT:-1}"
 
-  _e2e_write_summary "$run_id" "$candidate_digest" "$rc"
+  _E2E_ACTIVE_PHASE="recording-result"
+  _e2e_write_summary "$run_id" "$candidate_digest" "$rc" "${_E2E_ACTIVE_PHASE}"
+  _E2E_SUMMARY_WRITTEN=1
   _e2e_write_result_event "$run_id"
   return "$rc"
+}
+
+function _e2e_exit_trap() {
+  local rc=$?
+  set +e
+  if [[ -n "${_E2E_RUN_ID:-}" ]] && [[ "${_E2E_SUMMARY_WRITTEN:-0}" -eq 0 ]]; then
+    _e2e_write_summary "${_E2E_RUN_ID}" "${_E2E_CANDIDATE_DIGEST:-}" "$rc" "${_E2E_ACTIVE_PHASE:-unknown}" || true
+    _e2e_write_result_event "${_E2E_RUN_ID}" || true
+  fi
+  _e2e_teardown "${_E2E_ACTIVE_NAME:-}" || true
+  trap - EXIT
+  exit "$rc"
 }
 
 function _e2e_teardown() {
@@ -287,6 +314,7 @@ function _e2e_write_summary() {
   local run_id="${1:-}"
   local candidate_digest="${2:-}"
   local rc="${3:-1}"
+  local phase="${4:-unknown}"
   local log_file="${E2E_REPORT_DIR}/${run_id}.log"
   local summary_file="${E2E_REPORT_DIR}/${run_id}.json"
 
@@ -299,6 +327,7 @@ function _e2e_write_summary() {
   E2E_SERVICE="$E2E_SERVICE_UNDER_TEST" \
   E2E_CANDIDATE="$candidate_digest" \
   E2E_RC="$rc" \
+  E2E_PHASE="$phase" \
   E2E_COMMIT="$commit" \
   E2E_LOG="$log_file" \
   python3 - "$summary_file" <<'PY'
@@ -309,6 +338,7 @@ run_id = os.environ["E2E_RUN_ID"]
 service = os.environ["E2E_SERVICE"]
 candidate = os.environ.get("E2E_CANDIDATE") or None
 rc = int(os.environ["E2E_RC"])
+phase = os.environ.get("E2E_PHASE", "unknown")
 commit = os.environ["E2E_COMMIT"]
 log_path = os.environ["E2E_LOG"]
 
@@ -345,6 +375,7 @@ summary = {
     "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
     "commit": commit,
     "exit_code": rc,
+    "phase": phase,
     "result": "pass" if rc == 0 else "fail",
 }
 with open(summary_path, "w", encoding="utf-8") as fh:

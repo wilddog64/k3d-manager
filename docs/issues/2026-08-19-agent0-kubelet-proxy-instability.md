@@ -33,3 +33,8 @@ repair the underlying agent-0 kubelet/backend failure, so it repeatedly looped.
 
 Automatic node restart was not enabled during this incident; the restart was
 performed manually to avoid an unbounded destructive recovery loop.
+
+The bounded `bin/k3dm-node-health-watch` watchdog and its LaunchAgent template
+are now available. Installation is explicit (`make install-node-health-watch`),
+uses a three-failure threshold and five-minute cooldown, and verifies both node
+readiness and kubelet health after a restart.

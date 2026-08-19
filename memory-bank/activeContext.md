@@ -16,10 +16,16 @@ proxy 502/TLS timeout errors (`127.0.0.1:6443` to `192.168.97.3:10250`). All nod
 and Grafana returned HTTP 200/database ok through the local forward. The incident and prevention
 follow-up are documented in `docs/issues/2026-08-19-agent0-kubelet-proxy-instability.md`.
 
+**Status transient-502 fix 2026-08-19:** Product-image and authenticated frontend checks now retry
+under the same bounded policy as service health probes. This prevents a single Cloudflare/forward
+502 during node recovery from becoming a false data failure; see
+`docs/issues/2026-08-19-status-transient-product-images-502.md`.
+
 **E2E incident 2026-08-19:** `make e2e` exited 1 after vCluster teardown without a local report or
 hub result ConfigMap. The missing-artifact follow-up is documented in
 `docs/issues/2026-08-19-e2e-run-no-result-artifact.md`; the Playwright failure itself could not be
-diagnosed from retained output.
+diagnosed from retained output. The harness now records the run phase and failure summary from its
+EXIT trap before teardown, and publishes a best-effort failure event.
 
 **Observability recovery 2026-08-17:** `1e990cc3` pushed and deployed. Prometheus is `2/2 Running` with
 zero restarts after raising the local CPU budget; kube-state-metrics and node exporters are `1/1`,
@@ -599,9 +605,3 @@ the SSM agent cannot acquire EC2 credentials and that the account's Systems Mana
 management role is not configured. This blocks the provider's 150-second SSM wait; the flannel
 fallback message is informational. Evidence and follow-up are recorded in
 `docs/bugs/2026-08-14-k3s-aws-ssm-agent-cannot-register.md`; no live mutation was performed.
-
-**ArgoCD Keycloak OIDC render repair 2026-08-19:** `b4546bc8` fixes the Helm `envsubst` allowlist so
-the Keycloak issuer/client ID cannot be written literally into `argocd-cm`; the new BATS regression
-test passed. The live ConfigMap was restored to `https://argocd.3ai-talk.org` with the public Keycloak
-realm issuer and `argocd-server` was rolled out successfully. Public ArgoCD health is HTTP 200; see
-`docs/bugs/2026-08-19-argocd-keycloak-oidc-envsubst-omission.md`.

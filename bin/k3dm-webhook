@@ -1725,6 +1725,7 @@ def _smoke_test_logins(provider, app_context):
     absence of credentials never reports red. Returns list of (name, ok, detail)."""
     import ssl
     import os
+    import time
     import urllib.parse
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -1802,22 +1803,31 @@ def _smoke_test_logins(provider, app_context):
     if kc_token is None:
         results.append(("Frontend login", None, "skipped (no Keycloak token)"))
     else:
-        try:
-            req = urllib.request.Request(
-                f"{frontend_base.rstrip('/')}{fe_path}",
-                headers={"User-Agent": "k3dm-smoketest/1",
-                         "Authorization": f"Bearer {kc_token}"},
-            )
-            with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
-                ok = 200 <= resp.status < 300
-                results.append(("Frontend login", ok, f"HTTP {resp.status} on {fe_path}"))
-        except urllib.error.HTTPError as exc:
-            if kc_via_smoke_client and exc.code in (401, 403):
-                results.append(("Frontend login", None, f"skipped (smoke-client token rejected: HTTP {exc.code} on {fe_path})"))
-            else:
-                results.append(("Frontend login", False, f"HTTP {exc.code} on {fe_path}"))
-        except Exception as exc:
-            results.append(("Frontend login", False, str(exc)[:200]))
+        _frontend_detail = ""
+        _frontend_ok = False
+        _frontend_skipped = False
+        for _attempt in range(_SMOKE_RETRIES):
+            try:
+                req = urllib.request.Request(
+                    f"{frontend_base.rstrip('/')}{fe_path}",
+                    headers={"User-Agent": "k3dm-smoketest/1",
+                             "Authorization": f"Bearer {kc_token}"},
+                )
+                with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                    _frontend_ok = 200 <= resp.status < 300
+                    _frontend_detail = f"HTTP {resp.status} on {fe_path}"
+            except urllib.error.HTTPError as exc:
+                if kc_via_smoke_client and exc.code in (401, 403):
+                    _frontend_skipped = True
+                    _frontend_detail = f"skipped (smoke-client token rejected: HTTP {exc.code} on {fe_path})"
+                else:
+                    _frontend_detail = f"HTTP {exc.code} on {fe_path}"
+            except Exception as exc:
+                _frontend_detail = str(exc)[:200]
+            if _frontend_ok or _frontend_skipped or _attempt == _SMOKE_RETRIES - 1:
+                break
+            time.sleep(_SMOKE_RETRY_SLEEP)
+        results.append(("Frontend login", None if _frontend_skipped else _frontend_ok, _frontend_detail))
 
     argo_user = os.environ.get("K3DM_SMOKE_ARGOCD_USER", "admin")
     argo_pass = os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _vault_secret("argocd/admin", "password") or _smoke_secret(
@@ -1940,27 +1950,32 @@ def _smoke_test_services(retries=None, provider=None):
                                    f"not deployed (no pushgateway pod on {app_context})")
                 break
 
-    # Product catalog: verify at least one product has a non-empty imageUrl
-    try:
-        products_url = f"{frontend_url.rstrip('/')}/api/products"
-        req = urllib.request.Request(
-            products_url,
-            headers={"User-Agent": "k3dm-smoketest/1"},
-        )
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            body = json.loads(resp.read())
-            # API returns {"items": [...]} or a plain list
-            products = body.get("items", body) if isinstance(body, dict) else body
-            if isinstance(products, list) and products:
-                with_images = sum(1 for p in products if p.get("imageUrl") or p.get("image_url"))
-                if with_images > 0:
-                    results.append(("Product images", True, f"{with_images}/{len(products)} have image_url"))
+    # Product catalog: verify at least one product has a non-empty imageUrl.
+    # This request follows the same retry contract as the health endpoints;
+    # during tunnel/node recovery a transient 502 must not become a false
+    # product-data failure.
+    _products_detail = ""
+    _products_ok = False
+    for _attempt in range(_SMOKE_RETRIES):
+        try:
+            products_url = f"{frontend_url.rstrip('/')}/api/products"
+            req = urllib.request.Request(products_url, headers={"User-Agent": "k3dm-smoketest/1"})
+            with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                body = json.loads(resp.read())
+                products = body.get("items", body) if isinstance(body, dict) else body
+                if isinstance(products, list) and products:
+                    with_images = sum(1 for p in products if p.get("imageUrl") or p.get("image_url"))
+                    _products_ok = with_images > 0
+                    _products_detail = (f"{with_images}/{len(products)} have image_url"
+                                        if _products_ok else f"0/{len(products)} have image_url")
                 else:
-                    results.append(("Product images", False, f"0/{len(products)} have image_url"))
-            else:
-                results.append(("Product images", False, "empty or non-list response"))
-    except Exception as exc:
-        results.append(("Product images", False, str(exc)))
+                    _products_detail = "empty or non-list response"
+        except Exception as exc:
+            _products_detail = str(exc)[:200]
+        if _products_ok or _attempt == _SMOKE_RETRIES - 1:
+            break
+        time.sleep(_SMOKE_RETRY_SLEEP)
+    results.append(("Product images", _products_ok, _products_detail))
 
     try:
         _css_out, _css_timeout = _posix_spawn_capture(
@@ -2207,6 +2222,10 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
     def _finish(status):
         (job_dir / "status").write_text(status)
         output = "".join(lines)
+        if len(output) > 3400:
+            output = (output[:1600]
+                      + "\n… middle of report truncated …\n"
+                      + output[-1800:])
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -2429,7 +2448,12 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        report = "".join(lines)
+        if len(report) > 3400:
+            report = (report[:1600]
+                      + "\n… middle of report truncated …\n"
+                      + report[-1800:])
+        output = report
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -2511,7 +2535,12 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        report = "".join(lines)
+        if len(report) > 3400:
+            report = (report[:1600]
+                      + "\n… middle of report truncated …\n"
+                      + report[-1800:])
+        output = report
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -2520,7 +2549,10 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
 
     try:
         (job_dir / "status").write_text("running")
-        smoke = _smoke_test_services(retries=1, provider="k3s-hostinger")
+        # A node recovery invalidates several forwards at once. Use the normal
+        # bounded retry window here so `/cluster-status` does not report a
+        # false outage while launchd is rebuilding those forwards.
+        smoke = _smoke_test_services(provider="k3s-hostinger")
         checks = []
         for name, ok, detail in smoke:
             status = "healthy" if ok is True else ("warning" if ok is None else "error")
@@ -3567,7 +3599,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(400, {"error": "invalid api path"})
             return
         if self.path == "/api/v1/health":
-            services = _smoke_test_services(retries=1)
+            services = _smoke_test_services()
             result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]
             self._json(200, {"services": result,
                              "all_ok": all(r["ok"] is not False for r in result)})
@@ -3576,7 +3608,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             parsed = urllib.parse.urlsplit(self.path)
             params = urllib.parse.parse_qs(parsed.query)
             provider = params.get("provider", [None])[0]
-            services = _smoke_test_services(retries=1, provider=provider)
+            services = _smoke_test_services(provider=provider)
             result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]
             self._json(200, {"services": result,
                              "all_ok": all(r["ok"] is not False for r in result)})
