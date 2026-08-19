@@ -7,6 +7,7 @@
 
 | Version | Theme | State |
 |---|---|---|
+| v1.25.0 | lifecycle, observability, CVE remediation, Slack, and Tier 1 E2E harness | PR #116 open from `k3d-manager-v1.25.0` at `db717b21`; CI pending |
 | v1.24.1 | status output contract + observability polish (point release) | RELEASED — PR #115 merged (e7a32bb9), tag v1.24.1 created + pushed, GitHub release published. Retrospective filed. Copilot findings fixed (Makefile quoting + roadmap sweep). Partial hub repoint (dashboards appset Synced/Healthy). Content: status modes (`7ed82b89`), Slack `/cluster-status` summary (`5b9442cf`), CVE-dashboard cleanup (`a119fdde`,`d471d075`) |
 | v1.24.0 | platform hardening (D+E+F+#18) | RELEASED — PR #113 `fd281c85`, tagged v1.24.0 + GitHub release |
 | v1.23.0 | CVE observability + remediation lifecycle (B+C) | RELEASED — PR #112 `7253ece4`, tagged; platform-ops deployed live, `enforce_admins` restored |

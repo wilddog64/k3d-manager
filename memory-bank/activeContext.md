@@ -6,6 +6,10 @@
 
 ## Current focus — v1.24.1 RELEASED; v1.25.0 = workstream G (open for development)
 
+**v1.25.0 release PR 2026-08-19:** PR #116 (`feat: cut k3d-manager v1.25.0 release`) is open from
+`k3d-manager-v1.25.0` into `main` at `db717b21`. Local validation passed; GitHub checks are running.
+Copilot review could not be requested because GitHub reports the bot is not a repository collaborator.
+
 **Maintenance update 2026-08-17:** `a638a9ca` pushed on `k3d-manager-v1.25.0`. The existing daily
 `com.k3d-manager.cleanup` LaunchAgent now safely removes unreferenced Packer ISO/lock artifacts older
 than 30 days and port-cache markers older than 7 days. BATS 5/5 and shellcheck passed; OrbStack/Codex
