@@ -3,6 +3,7 @@
 ACG="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-acg.yaml"
 HUB="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-hub.yaml"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
+DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-autopatch.yaml"
 
 @test "acg dashboard appset targets app-cluster role" {
   run yq -r '.spec.generators[0].clusters.selector.matchLabels["k3d-manager/role"]' "${ACG}"
@@ -30,4 +31,15 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 @test "observability plugin applies both dashboard appsets" {
   run grep -c 'grafana-dashboards-\(acg\|hub\).yaml' "${PLUGIN}"
   [ "$output" = "2" ]
+}
+
+@test "CVE remediation success panels preserve the affected service" {
+  run grep -F -- 'sum by (exported_service) (cve_remediation_state{state=\"applied\",current=\"true\"})' "${DASHBOARD}"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- '"legendFormat": "{{exported_service}}"' "${DASHBOARD}"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- '"textMode": "valueAndName"' "${DASHBOARD}"
+  [ "$status" -eq 0 ]
 }
