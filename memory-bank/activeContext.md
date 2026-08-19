@@ -11,6 +11,16 @@
 than 30 days and port-cache markers older than 7 days. BATS 5/5 and shellcheck passed; OrbStack/Codex
 caches and active logs remain out of scope. Grafana/control-plane load investigation remains open.
 
+**Agent-0 kubelet recovery 2026-08-19:** Restarted `k3d-k3d-cluster-agent-0` after repeated kubelet
+proxy 502/TLS timeout errors (`127.0.0.1:6443` to `192.168.97.3:10250`). All nodes returned `Ready`,
+and Grafana returned HTTP 200/database ok through the local forward. The incident and prevention
+follow-up are documented in `docs/issues/2026-08-19-agent0-kubelet-proxy-instability.md`.
+
+**E2E incident 2026-08-19:** `make e2e` exited 1 after vCluster teardown without a local report or
+hub result ConfigMap. The missing-artifact follow-up is documented in
+`docs/issues/2026-08-19-e2e-run-no-result-artifact.md`; the Playwright failure itself could not be
+diagnosed from retained output.
+
 **Observability recovery 2026-08-17:** `1e990cc3` pushed and deployed. Prometheus is `2/2 Running` with
 zero restarts after raising the local CPU budget; kube-state-metrics and node exporters are `1/1`,
 Prometheus `/-/ready` passes, and queries return 15 remediation events / 5181 inventory series. Grafana

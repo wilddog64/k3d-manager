@@ -76,6 +76,14 @@ still requires an approving review.
 - [x] **Grafana 502 recovery (2026-08-18):** stale port-forward was fully reloaded after the replacement
   pod became Ready; local/public health checks return HTTP 200. Issue documented.
 
+- [x] **Agent-0 kubelet proxy recovery (2026-08-19):** restarted the affected k3d agent after repeated
+  API-proxy 502/TLS failures; all nodes returned Ready and Grafana local `/api/health` returned HTTP 200.
+  Prevention follow-up is documented in `docs/issues/2026-08-19-agent0-kubelet-proxy-instability.md`.
+
+- [ ] **E2E result-artifact gap (2026-08-19):** `make e2e` exited 1 after teardown without a local
+  log/JSON summary or hub result ConfigMap. Follow-up: persist failure artifacts before teardown;
+  see `docs/issues/2026-08-19-e2e-run-no-result-artifact.md`.
+
 - [ ] **BUG spec (2026-08-14) — k3s-aws provisioning cannot install k3s.** `env: 'deploy_app_cluster':
       No such file or directory` at `k3s-aws.sh:178` (`env VAR=val` can't call a shell function). Fix =
       drop `env`. Blocks every fresh k3s-aws bring-up. Spec:
