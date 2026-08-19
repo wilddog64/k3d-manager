@@ -37,7 +37,40 @@ function _e2e_load_deps() {
 function _e2e_kc() {
   local kubeconfig="$1"
   shift
-  KUBECONFIG="$kubeconfig" _run_command -- kubectl "$@"
+
+  local stdin_cmd=0 arg
+  for arg in "$@"; do
+    if [[ "$arg" == "-" ]]; then
+      stdin_cmd=1
+      break
+    fi
+  done
+
+  if (( stdin_cmd )); then
+    KUBECONFIG="$kubeconfig" _run_command -- kubectl "$@"
+    return
+  fi
+
+  local attempts="${E2E_KC_MAX_ATTEMPTS:-4}"
+  local interval="${E2E_KC_RETRY_INTERVAL:-5}"
+  local i=1
+  while :; do
+    if KUBECONFIG="$kubeconfig" _run_command --no-exit -- kubectl "$@"; then
+      return 0
+    fi
+    if (( i < attempts )) \
+      && ! KUBECONFIG="$kubeconfig" _run_command --no-exit --quiet -- \
+        kubectl --request-timeout=5s get --raw=/readyz >/dev/null 2>&1; then
+      _warn "[e2e] vCluster API unreachable (attempt ${i}/${attempts}); refreshing proxy and retrying"
+      if [[ -n "${_E2E_ACTIVE_NAME:-}" ]] && declare -f _vcluster_refresh_connection >/dev/null 2>&1; then
+        _vcluster_refresh_connection "${_E2E_ACTIVE_NAME}"
+      fi
+      i=$((i + 1))
+      sleep "$interval"
+      continue
+    fi
+    _err "e2e: kubectl $* failed"
+  done
 }
 
 function e2e_verify_vcluster() {

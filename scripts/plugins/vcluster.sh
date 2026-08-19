@@ -72,7 +72,11 @@ function vcluster_destroy() {
   fi
 
   _vcluster_deregister_from_hub "$name"
-  _run_command -- vcluster delete "$name" -n "$VCLUSTER_NAMESPACE" --wait
+  if ! _run_command --no-exit -- vcluster delete "$name" -n "$VCLUSTER_NAMESPACE" --wait; then
+    _warn "vcluster delete '$name' failed (child API may be unreachable); falling back to helm uninstall"
+    _run_command --no-exit -- helm -n "$VCLUSTER_NAMESPACE" uninstall "$name" --wait || true
+  fi
+  _vcluster_remove_proxy "$name"
   if [[ -f "$kubeconfig_path" ]]; then
     _run_command -- rm -f "$kubeconfig_path"
   fi
@@ -233,6 +237,17 @@ function _vcluster_wait_ready() {
     _err "vCluster name required"
   fi
   local selector="app=vcluster,release=${name}"
+  local timeout=60
+  local interval=2
+  local elapsed=0
+  until _kubectl --no-exit --quiet -- -n "$VCLUSTER_NAMESPACE" \
+    get pod -l "$selector" --no-headers 2>/dev/null | grep -q .; do
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+    if (( elapsed >= timeout )); then
+      _err "vCluster pod for '${name}' never appeared (selector: ${selector})"
+    fi
+  done
   _kubectl -n "$VCLUSTER_NAMESPACE" wait --for=condition=Ready --timeout=300s pod -l "$selector"
 }
 
@@ -251,18 +266,26 @@ function _vcluster_export_kubeconfig() {
   _info "Kubeconfig written to $kubeconfig"
 }
 
-function _vcluster_refresh_connection() {
+function _vcluster_remove_proxy() {
   local name="${1:-}"
   if [[ -z "$name" ]]; then
     _err "vCluster name required"
   fi
   local proxy
-  proxy="$(_run_command --quiet -- docker ps \
+  proxy="$(_run_command --quiet -- docker ps -a \
     --filter "name=vcluster_${name}_" --filter "name=background_proxy" \
     --format '{{.Names}}' | head -1)"
   if [[ -n "$proxy" ]]; then
     _run_command --quiet -- docker rm -f "$proxy" >/dev/null 2>&1 || true
   fi
+}
+
+function _vcluster_refresh_connection() {
+  local name="${1:-}"
+  if [[ -z "$name" ]]; then
+    _err "vCluster name required"
+  fi
+  _vcluster_remove_proxy "$name"
   _run_command --quiet -- vcluster connect "$name" -n "$VCLUSTER_NAMESPACE" \
     --local-port "$VCLUSTER_LOCAL_PORT" --print >/dev/null 2>&1 || true
 }

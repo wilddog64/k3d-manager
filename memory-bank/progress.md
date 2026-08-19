@@ -347,19 +347,3 @@ still requires an approving review.
       Spring `ROLE_*` authorities, wired the JWT converter, and added three unit tests. Full Maven
       suite passed under Java 21: 133 tests, 0 failures/errors. After merge, verify the realm role
       assignment for the test principal.
-
-- [x] **Grafana stale port-forward prevention (2026-08-18):** `87382c7b` pushed to `origin/k3d-manager-v1.25.0`; generated Grafana/Pushgateway LaunchAgent wrappers health-check their local endpoints and restart stale forwards. Scoped BATS provider contract suite: 52/52 passed; shell syntax and shellcheck clean.
-
-- [ ] **FOLLOW-UP BUG (2026-08-18) — hub control-plane degradation blocks Grafana:** after the health-aware wrapper (`87382c7b`) was deployed, embedded etcd readiness failed and multiple workloads timed out, leaving Grafana public HTTP 502 despite a healthy pod. See `docs/issues/2026-08-18-grafana-502-hub-control-plane-degradation.md`; requires hub/OrbStack resource and etcd investigation.
-
-- [x] **STATUS WEBHOOK TIMEOUT FIX (2026-08-18):** `75ce37db` pushed; summary timeout aligned to the full health-sweep budget and issue documented in `docs/issues/2026-08-18-status-webhook-health-timeout.md`. `make status` now returns actual checks; live edge remains degraded by hub control-plane failures.
-
-- [x] **HUB CONTROL-PLANE RECOVERY (2026-08-18):** Restarted saturated `k3d-k3d-cluster-server-0`, restored etcd/API readiness, refreshed edge listeners, and verified `make status` overall WARN (no errors) with all core service/login checks green. Public Grafana, Keycloak, and ArgoCD health endpoints return HTTP 200. Remaining warnings are expected optional/non-deployed resources.
-
-| CVE verifier control-plane load reduction | `f9e8711a` | pushed; shellcheck/sh -n clean; YAML parse clean; app_cve_scan BATS 10/10; issue logged in `docs/issues/2026-08-18-cve-remediation-verify-load.md` |
-
-| CVE verifier live verification log | `fdf58daa` | pushed; CronJob reconciled live; status-source webhook blocker captured verbatim in issue doc |
-
-| Webhook recovery + Hostinger status default | `14ba7f17` | pushed; authenticated health all checks green; `make status` Overall HEALTHY |
-
-| ArgoCD reconciliation CPU reduction | `ebd3fcdf` + `01cbb318` | pushed/applied; live args and ignore rule verified; hub settled below saturation |

@@ -32,6 +32,62 @@ return HTTP 200. See `docs/issues/2026-08-18-grafana-502-stale-port-forward.md`.
 
 **★ ROADMAP (sequenced 2026-08-15):** v1.25.0 (current) = Stripe/Go live acceptance + hostinger capacity + E2E harness (G) — platform PROVEN live, remaining = codify `e2e_verify_sandbox`+BATS, file the live-discovered config-gap bugfix specs for Codex, hostinger `maxSurge=0` durable commit, hand task #28 k3s-aws specs to Codex, then cut. → **v1.26.0** = fleet-node-lifecycle-Lambda (résumé-critical, [[project_fleet_node_lifecycle_lambda]]) + `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`. → **v1.27.0** = image signing (cosign sign+attest close CVE loop, [[project_image_signing_cve_loop]]; slid from v1.26.0 when fleet took the slot; spec not yet written). → **v1.28.0** = parallel multi-cloud provisioning (concurrent `make up` per provider; spec WRITTEN 2026-08-15 `docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md` — provider-scope local state/ports/launchd + hub-bootstrap lock; sequential bring-up is the only safe path today).
 
+**★ v1.25.0 E2E SMOKE — SUBSTRATE VALIDATED LIVE; 5th BLOCKER FIXED (proxy-refresh now whole-run); SMOKE12 PENDING (2026-08-16 late, Claude).**
+Smoke11 proved TWO things. (1) **Substrate fixes VALIDATED**: synced mirror pods showed `order`, `postgres`,
+`redis`, `product-catalog`, `basket` all `1/1 Running` — the initContainer + postgres-liveness fixes work;
+order reaches Ready; NO substrate defect remains. (2) Smoke11 still died, but on a **transient proxy drop
+during `rollout status deployment/redis`** (redis was 1/1; the API call hit a dropped proxy). Root cause:
+proxy-refresh was wired ONLY into the readiness gate, but the background-proxy's port-forward can drop at ANY
+point and never self-reconnects. FIX (e2e.sh `_e2e_kc`, LOCAL uncommitted): made the central kubectl wrapper
+proxy-drop-aware — on failure, probe API reachability (`kubectl --request-timeout=5s get --raw=/readyz`); if
+unreachable, `_vcluster_refresh_connection` (recreates proxy on pinned 11443) + retry up to
+`E2E_KC_MAX_ATTEMPTS`(4)×`E2E_KC_RETRY_INTERVAL`(5s); if reachable, real failure → `_err` (unchanged). Stdin
+(`-f -`) calls stay single-shot (can't re-read consumed stdin; run right after gate, low-risk). Preserves
+streaming. `bash -n`+shellcheck clean. Spec = new UPDATE section (B) in the proxy-drift bug doc. Teardown fix
+from the previous run WORKED (proxy container removed, 11443 freed) — but exposed a lower-pri context-leak (C):
+on a FAILED run, `vcluster delete`+`helm uninstall` fallback both target the dead child (127.0.0.1:11443), not
+the hub, so the release orphaned (manually force-cleaned; env now PRISTINE). (C) is NOT in the green-run path
+(a successful run's delete reaches a live child) — specced as follow-up, not fixed. Next = launch smoke12 with
+the `_e2e_kc` fix; expected to survive the proxy drop and reach the Playwright verdict + `~/.k3dm/e2e/*.json`.
+Push HOLD stands until genuine green. Prior status ↓
+
+**★ v1.25.0 E2E SMOKE — 4th LIVE BLOCKER FIXED (orphan proxy → pinned-port collision); SMOKE11 PENDING (2026-08-16 late, Claude).**
+Smoke10 WEDGED (not a substrate failure): its background-proxy could not bind `11443` (`Bind for 0.0.0.0:11443
+failed: port is already allocated`) because smoke9's proxy container survived teardown and still held the port.
+The `--local-port 11443` pin (necessary for durability) is what makes an orphaned proxy fatal — old random ports
+never collided. Root cause = `vcluster_destroy` runs `vcluster delete --wait` (which FAILS when the child API is
+unreachable, e.g. smoke9 "parent context unreachable") and **never removes the proxy docker container**. FIXED
+(vcluster.sh, LOCAL uncommitted): new `_vcluster_remove_proxy` helper (extracted from `_vcluster_refresh_connection`,
+now `docker ps -a`); `vcluster_destroy` makes `vcluster delete` non-fatal (`--no-exit`), falls back to
+`helm uninstall` on failure, then UNCONDITIONALLY removes the proxy container before rm'ing kubeconfig. Spec =
+new UPDATE section in `docs/bugs/2026-08-16-e2e-vcluster-kubeconfig-proxy-port-drift.md`. `bash -n`+shellcheck clean.
+Operational recovery done: killed wedged smoke10, `docker rm -f` orphan proxy, helm-uninstalled smoke10 vcluster —
+env now PRISTINE (vclusters ns empty, no proxy containers, 11443 free, arm64 e2e image on all 4 nodes). Next =
+launch smoke11 (validates BOTH this teardown fix AND the still-unverified smoke10 substrate fixes: initContainer +
+postgres liveness). Push HOLD stands until a genuine green Playwright verdict + `~/.k3dm/e2e/*.json`. Prior status ↓
+
+**★ v1.25.0 E2E SMOKE — 3 MORE LIVE-DISCOVERED BLOCKERS FIXED; SMOKE10 IN FLIGHT (2026-08-16 eve, Claude).**
+Smokes #8/#9 pushed the harness materially further. Fixes landed LOCAL on `k3d-manager-v1.25.0` (uncommitted
+working tree as of this run): (a) **arm64 e2e-tests image** — GHCR publish is amd64-only → `no match for
+platform` ErrImagePull on the arm64 laptop node; workaround = `docker build --platform linux/arm64` + `k3d
+image import ...:latest -c k3d-cluster` onto ALL 4 nodes (spec `docs/bugs/2026-08-16-e2e-playwright-image-amd64-only.md`;
+durable fix = multi-arch publish in the shopping-cart-e2e-tests repo, NOT done this session). (b) **vCluster
+readiness race** — `_vcluster_wait_ready` (`scripts/plugins/vcluster.sh:236`) ran `kubectl wait
+--for=condition=Ready` before the StatefulSet pod existed → `no matching resources found` exit 1 (smoke #7
+won the race, #8 lost it); fixed with a bounded poll-until-pod-exists guard (60s) before the condition wait
+(spec `docs/bugs/2026-08-16-vcluster-wait-ready-race.md`). Selector `app=vcluster,release=<name>` is correct.
+(c) **substrate startup ordering** — smoke #9 rolled out postgres/redis/product-catalog/basket GREEN, failed
+on `order` CrashLoopBackOff: order (Go, no DB-connect retry) boots parallel to postgres, hits `connection
+refused`, `log.Fatal`s; compounded by postgres self-restarting once on first boot (liveness `initialDelay:15`
+kills it mid-`initdb`). Order DID recover to Ready 35s later — but the long CrashLoop wait let the vcluster
+**proxy connection drop (TLS handshake timeout)** kill the `rollout status` first. Fixed substrate-side (no
+shopping-cart edits): `order.yaml` gains a `wait-for-postgres` initContainer (`pg_isready` loop); `postgres.yaml`
+liveness `initialDelaySeconds:15→45` (spec `docs/bugs/2026-08-16-e2e-order-postgres-startup-ordering.md`).
+Orphan vcluster from #9 helm-uninstalled clean (teardown EXIT-trap STILL broken — orphan survived again).
+**Smoke10 running now** with all 3 fixes; must go green through the Playwright verdict + `~/.k3dm/e2e/*.json`
+before ANY push. Proxy-drift on long waits is a latent flake (already specced) that the faster order startup
+should now sidestep. Prior status ↓
+
 **★ v1.25.0 E2E SMOKE — ALL 4 CONNECTION/SUBSTRATE BLOCKERS RESOLVED; SUBSTRATE PROVEN GREEN LIVE; FINAL
 FULL RE-RUN PENDING (2026-08-16, Claude).** Four-layer root cause fully cracked across 6 smoke runs:
 (1) proxy port drift → pin `--local-port` (`1f1f98ce`); (2) proxy port-forward death → recreate proxy in
@@ -533,32 +589,3 @@ the SSM agent cannot acquire EC2 credentials and that the account's Systems Mana
 management role is not configured. This blocks the provider's 150-second SSM wait; the flannel
 fallback message is informational. Evidence and follow-up are recorded in
 `docs/bugs/2026-08-14-k3s-aws-ssm-agent-cannot-register.md`; no live mutation was performed.
-
-**Grafana port-forward hardening (2026-08-18):** `87382c7b` pushed to `origin/k3d-manager-v1.25.0`. Hostinger monitoring LaunchAgents now use health-aware supervisors: Grafana checks `/api/health` and Pushgateway checks `/metrics`, restarting stale kubectl forwards after the startup grace period. Issue and verification are recorded in `docs/issues/2026-08-18-grafana-502-stale-port-forward.md`.
-
-**Grafana live verification follow-up (2026-08-18):** After `87382c7b` was applied, the health-aware wrapper correctly retried the forward, but the hub API reported embedded etcd and etcd-readiness failures and broad pod probe timeouts; public Grafana remained HTTP 502 during that control-plane incident. Follow-up is documented in `docs/issues/2026-08-18-grafana-502-hub-control-plane-degradation.md` and is separate from the stale-forward fix.
-
-**Status timeout fix (2026-08-18):** `75ce37db` pushed to `origin/k3d-manager-v1.25.0`. `make status` now waits up to 90 seconds for the bounded webhook health sweep and reports structured service failures instead of falsely claiming the webhook is unavailable. Live Grafana/edge access remains blocked by the separately documented hub control-plane/etcd degradation.
-
-**Hub control-plane recovery (2026-08-18):** The hub server container was CPU-saturated and embedded etcd/API readiness became intermittent, causing ArgoCD/Keycloak/Grafana 502s and webhook health delays. Restarting `k3d-k3d-cluster-server-0` and refreshing the Hostinger edge restored the control plane; `make status` now passes with expected optional/non-deployed warnings, and public Grafana/Keycloak/ArgoCD health endpoints return HTTP 200. Details: `docs/issues/2026-08-18-grafana-502-hub-control-plane-degradation.md`.
-
-**CVE verifier load controls 2026-08-18:** `f9e8711a` pushed on `k3d-manager-v1.25.0`. The
-`cve-remediation-verify` CronJob now runs every 15 minutes with Forbid overlap, 120-second
-start/run deadlines, bounded 10m/100m CPU and 32Mi/128Mi memory, and the verifier only
-fetches `promotion_requested` events before verification. Incident and rationale: `docs/issues/2026-08-18-cve-remediation-verify-load.md`.
-
-**CVE verifier deployment verification 2026-08-18:** `fdf58daa` logged the live reconciliation and
-exact `make status` webhook-unavailable output. The CronJob is live at `*/15` with `Forbid`, 120-second
-start/run deadlines, and 100m CPU/128Mi memory limits; recent verifier Jobs completed successfully.
-
-**Webhook/status recovery 2026-08-18:** `14ba7f17` pushed on `k3d-manager-v1.25.0`. Reloaded the stale
-`com.k3d-manager.webhook` LaunchAgent and verified authenticated health plus host-network `make status`
-(`Overall: HEALTHY`). The status target now defaults only its implicit provider to `k3s-hostinger`,
-while explicit/environment providers and active-provider markers remain honored. Incident details:
-`docs/issues/2026-08-18-webhook-unavailable-stale-launchagent.md`.
-
-**ArgoCD CPU tuning 2026-08-18:** `ebd3fcdf` pushed and applied. ArgoCD controller now ignores Istio
-leader-election annotation churn and runs with `--status-processors=5 --operation-processors=2`.
-Helm required `--force-conflicts` because existing argocd-cm/rbac-cm fields had competing managed
-fields; live args and ignore customization verified. After rollout settled, hub nodes were 6–20% CPU
-and no longer saturated. Evidence: `docs/issues/2026-08-18-argocd-controller-reconciliation-cpu.md`.
