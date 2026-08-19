@@ -361,3 +361,8 @@ still requires an approving review.
       Spring `ROLE_*` authorities, wired the JWT converter, and added three unit tests. Full Maven
       suite passed under Java 21: 133 tests, 0 failures/errors. After merge, verify the realm role
       assignment for the test principal.
+
+**ArgoCD Keycloak OIDC render repair (2026-08-19):** `b4546bc8` is ready to push: the ArgoCD Helm
+render allowlist now substitutes the Keycloak realm URL and client ID, with BATS coverage preventing
+literal provider placeholders. Live `argocd-cm` was restored to the public issuer/URL and
+`argocd-server` rolled out; public `/healthz` returned HTTP 200.
