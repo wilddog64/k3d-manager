@@ -469,7 +469,7 @@ function _argocd_helm_deploy_release() {
    if (( enable_ldap )); then
       _info "[argocd] Configuring LDAP/Dex authentication"
       values_file="/tmp/argocd-values-${RANDOM}.yaml"
-      envsubst '$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
+      envsubst '$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
          < "$ARGOCD_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
       helm_args+=(--values "$values_file")
    else
@@ -1132,15 +1132,17 @@ function _argocd_ensure_ghcr_pull_secret() {
       return 0
    fi
 
-   kubectl create secret docker-registry ghcr-pull-secret \
+   if kubectl create secret docker-registry ghcr-pull-secret \
       --docker-server=ghcr.io \
       --docker-username="$user" \
       --docker-password="$pat" \
       -n "$ARGOCD_NAMESPACE" \
       --dry-run=client -o yaml \
-      | kubectl apply -n "$ARGOCD_NAMESPACE" -f - >/dev/null 2>&1 \
-      && _info "[argocd] ghcr-pull-secret ensured in namespace $ARGOCD_NAMESPACE" \
-      || _warn "[argocd] failed to apply ghcr-pull-secret in $ARGOCD_NAMESPACE"
+      | kubectl apply -n "$ARGOCD_NAMESPACE" -f - >/dev/null 2>&1; then
+      _info "[argocd] ghcr-pull-secret ensured in namespace $ARGOCD_NAMESPACE"
+   else
+      _warn "[argocd] failed to apply ghcr-pull-secret in $ARGOCD_NAMESPACE"
+   fi
 }
 
 function _argocd_deploy_image_updater() {
