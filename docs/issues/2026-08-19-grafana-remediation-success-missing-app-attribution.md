@@ -19,6 +19,7 @@ app name in a Grafana tooltip.
 ## Fix
 
 The success series now uses the retained `cve_remediation_state{state="applied",current="true"}` event
-metric grouped by `exported_service`. The stat panel displays the service name with its value, and the
-outcomes chart preserves the same label for its legend and hover tooltip. Persistent event records remain
-the attribution source after the underlying Kubernetes Job has expired.
+metric grouped by `exported_service`. The failure series uses retained terminal audit states (`failed`,
+`superseded`, and `deployment_advanced`) grouped by both service and state. The stat panels display the
+service name with their values, and the outcomes chart preserves the same labels for its legend and hover
+tooltip. Persistent event records remain the attribution source after the underlying Kubernetes Job has expired.

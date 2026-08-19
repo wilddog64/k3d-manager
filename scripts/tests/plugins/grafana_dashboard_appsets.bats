@@ -33,7 +33,7 @@ DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-
   [ "$output" = "2" ]
 }
 
-@test "CVE remediation success panels preserve the affected service" {
+@test "CVE remediation outcome panels preserve the affected service" {
   run grep -F -- 'sum by (exported_service) (cve_remediation_state{state=\"applied\",current=\"true\"})' "${DASHBOARD}"
   [ "$status" -eq 0 ]
 
@@ -41,5 +41,11 @@ DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-
   [ "$status" -eq 0 ]
 
   run grep -F -- '"textMode": "valueAndName"' "${DASHBOARD}"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- 'sum by (exported_service, state) (cve_remediation_state{state=~\"failed|superseded|deployment_advanced\"})' "${DASHBOARD}"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- '"legendFormat": "{{exported_service}} ({{state}})"' "${DASHBOARD}"
   [ "$status" -eq 0 ]
 }
