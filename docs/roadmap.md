@@ -129,9 +129,13 @@ These have scope docs and committed version numbers; they ship in this order.
   resource-preserving Application cleanup, and Grafana/Slack visibility. Prevents destroyed ephemeral
   sandboxes from leaving misleading `Unknown` Applications while protecting live clusters from
   false-positive cleanup. Scope: `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`.
-- **v1.27.0 — image signing + attestation** — cosign sign + Trivy vuln/SBOM attest at build;
-  `cosign verify` at promotion and admission (Kyverno, staged Audit→Enforce), closing the CVE loop.
-  Scope: `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`.
+- **v1.27.0 — image signing + attestation and adaptive checkout load testing** — cosign sign +
+  Trivy vuln/SBOM attest at build; `cosign verify` at promotion and admission (Kyverno, staged
+  Audit→Enforce), closing the CVE loop. Add staged API checkout load with adaptive concurrency,
+  Stripe test mode, Prometheus metrics, and Grafana capacity reporting; browser validation remains
+  a small cohort rather than thousands of sessions. Scopes:
+  `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`,
+  `docs/plans/v1.27.0-adaptive-checkout-load-testing.md`.
 - **v1.28.0 — platform zero-downtime rollouts** — scale the stateless hub tier, add probes/PDBs and
   rolling-update guarantees, validate capacity, and separately design failover for each stateful
   service before claiming no downtime. Scope: `docs/plans/v1.28.0-platform-zero-downtime-rollouts.md`.

@@ -15,6 +15,12 @@
 | v1.20.0 | CVE auto-patch-loop hardening | RELEASED — PR #109 `9da73458`, tagged |
 | v1.18.0 | first-mile CVE gap closure | RELEASED — PR #108 `85742ef7`, tagged |
 
+**Roadmap update (2026-08-19):** v1.27.0 now includes the scoped adaptive checkout load-testing
+plan (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`) alongside image signing. It will use
+staged API concurrency, Stripe test mode, adaptive Prometheus-driven backoff, and Grafana reporting;
+the first implementation target is a measured 500-concurrency M4 baseline, not an unconditional
+5,000-session guarantee.
+
 (v1.19.0 was a shopping-cart-only Dependabot milestone — no k3d-manager tag.)
 
 ## v1.24.1 shipped commits (2026-08-13)
