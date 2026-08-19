@@ -2465,7 +2465,7 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
 
 def _format_status_summary_slack(payload, provider):
-    """Render bin/cluster-status --json as a concise, ANSI-free Slack message (contract §Slack)."""
+    """Render the same per-service status checks shown by ``make status``."""
     overall = str(payload.get("overall", "unknown"))
     emoji = {"healthy": ":white_check_mark:", "warn": ":warning:",
              "fail": ":x:", "unknown": ":grey_question:"}.get(overall, ":grey_question:")
@@ -2477,12 +2477,23 @@ def _format_status_summary_slack(payload, provider):
             counts.get("services_warning", 0),
             counts.get("services_failed", 0)))
     out = [header]
-    for item in payload.get("errors", []):
-        out.append(":x: {}: {}".format(
-            item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
-    for item in payload.get("warnings", []):
-        out.append(":warning: {}: {}".format(
-            item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
+    checks = payload.get("checks", []) or []
+    if checks:
+        icons = {"healthy": ":white_check_mark:", "warning": ":warning:", "error": ":x:"}
+        for item in checks:
+            status = item.get("status", "warning")
+            out.append("{} {}: {}".format(
+                icons.get(status, ":warning:"),
+                item.get("service") or item.get("id") or "?",
+                str(item.get("message", ""))[:250],
+            ))
+    else:
+        for item in payload.get("errors", []):
+            out.append(":x: {}: {}".format(
+                item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
+        for item in payload.get("warnings", []):
+            out.append(":warning: {}: {}".format(
+                item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
     if overall == "unknown":
         out.append("_status source unavailable — run `make restart-webhook` on the hub_")
     return "\n".join(out)
@@ -2519,6 +2530,7 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
         warnings = [item for item in checks if item["status"] == "warning"]
         payload = {
             "overall": "fail" if errors else ("warn" if warnings else "healthy"),
+            "checks": checks,
             "errors": errors,
             "warnings": warnings,
             "counts": {
