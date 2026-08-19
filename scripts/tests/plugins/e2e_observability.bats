@@ -58,6 +58,22 @@ PY
   [[ "${output}" == *"ok"* ]]
 }
 
+@test "exporter maps UNKNOWN Trivy severity from CVSS score" {
+  run python3 - "${EXPORTER}" <<'PY'
+import sys, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+assert 'def severity_for(finding):' in src
+assert 'if score >= 9.0:' in src
+assert '"severity": severity_for(finding)' in src
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "exporter preserves remediation cache when refresh fails" {
   run python3 - "${EXPORTER}" <<'PY'
 import sys, yaml
