@@ -7,8 +7,10 @@
 ## Current focus — v1.24.1 RELEASED; v1.25.0 = workstream G (open for development)
 
 **v1.25.0 release PR 2026-08-19:** PR #116 (`feat: cut k3d-manager v1.25.0 release`) is open from
-`k3d-manager-v1.25.0` into `main` at `db717b21`. Local validation passed; GitHub checks are running.
-Copilot review could not be requested because GitHub reports the bot is not a repository collaborator.
+`k3d-manager-v1.25.0` into `main` at `08b49354`. Copilot's six actionable findings were addressed
+and resolved; GitHub checks are green. Main's approval count is temporarily 0 (baseline was 1;
+all other protection settings remain unchanged) so the owner can merge, with mandatory restoration
+after merge.
 
 **Maintenance update 2026-08-17:** `a638a9ca` pushed on `k3d-manager-v1.25.0`. The existing daily
 `com.k3d-manager.cleanup` LaunchAgent now safely removes unreferenced Packer ISO/lock artifacts older
