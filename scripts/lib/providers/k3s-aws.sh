@@ -111,6 +111,34 @@ _provider_k3s_aws_autoselect_tunnel_mode() {
   fi
 }
 
+# Start the selected API tunnel. SSM can be selected optimistically when the
+# stack has a profile, but the account-level Default Host Management Role may
+# still be missing. In that case fall back to SSH; provisioning fails only if
+# both transports fail.
+_provider_k3s_aws_start_tunnel() {
+  if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
+    _info "[k3s-aws] Starting SSM port-forwarding tunnel (k3s API :6443)..."
+    local _server_id="" _ssm_ok=1
+    if ! _server_id="$(_ssm_get_instance_id "${UBUNTU_K3S_SSH_HOST:-ubuntu}")"; then
+      _warn "[k3s-aws] Could not resolve the server instance for SSM"
+      _ssm_ok=0
+    elif ! _provider_k3s_aws_wait_ssm_registered "${_server_id}"; then
+      _warn "[k3s-aws] SSM agent is not Online — falling back to SSH tunnel"
+      _ssm_ok=0
+    elif ! _dry_guard "start SSM tunnel" ssm_tunnel "${_server_id}" "6443" "6443"; then
+      _warn "[k3s-aws] SSM tunnel failed to start — falling back to SSH tunnel"
+      _ssm_ok=0
+    fi
+    if (( _ssm_ok )); then
+      return 0
+    fi
+    export K3S_AWS_SSM_ENABLED=false
+  fi
+
+  _info "[k3s-aws] Starting autossh tunnel..."
+  _dry_guard "start autossh tunnel" tunnel_start
+}
+
 function _provider_k3s_aws_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -182,16 +210,7 @@ HELP
     if [[ -n "${_prev_mesh}" ]]; then export K3S_AMBIENT_MESH="${_prev_mesh}"; else unset K3S_AMBIENT_MESH; fi
   fi
 
-  if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
-    _info "[k3s-aws] Starting SSM port-forwarding tunnel (k3s API :6443)..."
-    local _server_id
-    _server_id=$(_ssm_get_instance_id "${UBUNTU_K3S_SSH_HOST:-ubuntu}") || return 1
-    _provider_k3s_aws_wait_ssm_registered "${_server_id}" || return 1
-    _dry_guard "start SSM tunnel" ssm_tunnel "${_server_id}" "6443" "6443" || return 1
-  else
-    _info "[k3s-aws] Starting autossh tunnel..."
-    _dry_guard "start autossh tunnel" tunnel_start || return 1
-  fi
+  _provider_k3s_aws_start_tunnel || return 1
 
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local total_nodes=3

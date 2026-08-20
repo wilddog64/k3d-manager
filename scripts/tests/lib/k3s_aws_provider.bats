@@ -144,3 +144,55 @@
   '
   [ "$status" -eq 0 ]
 }
+
+@test "k3s-aws keeps SSM when registration and tunnel succeed" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ssm_get_instance_id() { echo i-test; }
+    _provider_k3s_aws_wait_ssm_registered() { return 0; }
+    ssm_tunnel() { echo "[stub] ssm_tunnel $*"; return 0; }
+    tunnel_start() { echo "[stub] tunnel_start"; return 0; }
+    K3S_AWS_SSM_ENABLED=true _provider_k3s_aws_start_tunnel
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[stub] ssm_tunnel i-test 6443 6443"* ]]
+  [[ "$output" != *"[stub] tunnel_start"* ]]
+}
+
+@test "k3s-aws falls back to SSH when SSM registration fails" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ssm_get_instance_id() { echo i-test; }
+    _provider_k3s_aws_wait_ssm_registered() { return 1; }
+    ssm_tunnel() { return 1; }
+    tunnel_start() { echo "[stub] tunnel_start"; return 0; }
+    K3S_AWS_SSM_ENABLED=true _provider_k3s_aws_start_tunnel
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"falling back to SSH tunnel"* ]]
+  [[ "$output" == *"[stub] tunnel_start"* ]]
+}
+
+@test "k3s-aws fails when both SSM and SSH tunnels fail" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ssm_get_instance_id() { echo i-test; }
+    _provider_k3s_aws_wait_ssm_registered() { return 1; }
+    tunnel_start() { return 1; }
+    K3S_AWS_SSM_ENABLED=true _provider_k3s_aws_start_tunnel
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"falling back to SSH tunnel"* ]]
+}
