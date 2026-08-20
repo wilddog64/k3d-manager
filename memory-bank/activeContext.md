@@ -30,6 +30,8 @@
   stale-cleanup targets, `make down CLEANUP_STALE=1` performs explicit post-teardown cleanup, and
   `bin/cluster-up` restores the Hub `host.k3d.internal` CoreDNS alias before ArgoCD registration. The
   regression and root-cause record are in `docs/issues/2026-08-20-make-up-data-layer-argocd-host-dns.md`.
+- The cleanup invocation is now also shown in the help Examples section (`20a13862`, pushed on
+  `k3d-manager-v1.26.0`).
 
 ## Operating decisions
 

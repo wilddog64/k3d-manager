@@ -28,6 +28,8 @@
   (`316f26d2`, pushed on `k3d-manager-v1.26.0`). Focused BATS 12/12, `bash -n`, shellcheck, and
   `_agent_audit` passed. Bug evidence is recorded in
   `docs/issues/2026-08-20-make-up-data-layer-argocd-host-dns.md`.
+- [x] Added the explicit `make down CLEANUP_STALE=1` example to `make help` (`20a13862`, pushed on
+  `k3d-manager-v1.26.0`); Makefile BATS 2/2 passed.
 
 ## Verification record
 
