@@ -78,7 +78,8 @@
   remains unverified because the managed CDP browser exits during startup on port 9222.
 - [x] Fixed ACG CDP startup recovery after IPv4 probe failure with stale IPv4/IPv6 listeners
   (`f6bb7bb`, `c7f7b37`, subtree-synced): listener reclaim BATS 5/5, shellcheck, and agent audit pass;
-  live credential extraction remains blocked by local Chrome/9222 state. See
-  `docs/bugs/2026-08-20-acg-cdp-listener-recovery.md`.
+  live `make credential-test PROVIDER=aws` now passes after recovery and sandbox restart; see
+  `docs/issues/2026-08-20-acg-credential-live-retry.md`. A later all-case BATS run exposed cases 2–4
+  failing while individual reruns pass; retained as a separate suite-isolation follow-up.
 - [x] Cloudflare tunnel/ArgoCD origin recovery: reloaded the tunnel and pinned ArgoCD ingress to
   IPv4 loopback (`929ebed7`); external Grafana returned 302 and ArgoCD returned 200.
