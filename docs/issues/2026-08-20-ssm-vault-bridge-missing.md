@@ -36,9 +36,14 @@ The source path confirms the mismatch: `_ssm_bootstrap_k3s` ends with `Vault rev
 
 SSM mode cannot use the SSH-only `_setup_vault_bridge` helper. The later app-cluster bootstrap nevertheless assumes the bridge listener exists, so ESO connects to a valid Service/Endpoint whose node port has no listener.
 
-## Recommended fix
+## Fix applied
 
-Add an SSM-native bridge setup step using `ssm_exec` (install/enable the same socat systemd unit), call it after the SSM k3s server is ready, and verify `10.0.1.61:8201` before applying/waiting on the `ClusterSecretStore`. Keep SSH behavior unchanged. Add stubbed BATS coverage for both the SSM setup and fail-fast readiness check.
+The provider now detects when the laptop Vault reverse bridge is required (the default
+`HUB_VAULT_USE_BRIDGE=1` profile) and selects SSH before provisioning. Explicit SSM is also
+overridden with a clear warning in that mode. SSM remains available when an operator selects a
+non-bridge Vault profile (`HUB_VAULT_USE_BRIDGE=0`). This avoids creating a dead endpoint and
+waiting 270 seconds for ESO. Stubbed BATS coverage covers both automatic SSH selection and the
+explicit-SSM override.
 
 ## Separate lifecycle policy note
 

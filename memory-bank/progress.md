@@ -54,6 +54,7 @@
 - Unexpected live failures get a dated `docs/issues/YYYY-MM-DD-*.md` record with verbatim evidence.
 - Historical specs/issues are archived only when superseded or unreferenced; files are never deleted.
 
-- [ ] SSM app-cluster Vault bridge gap diagnosed: `vault-backend` cannot connect because SSM mode
-  skips installation of the node `vault-bridge.service`; issue recorded in
-  `docs/issues/2026-08-20-ssm-vault-bridge-missing.md`, SSM-native bridge implementation pending.
+- [x] SSM app-cluster Vault bridge gap fixed: the provider selects SSH whenever the laptop Vault
+  reverse bridge is required and overrides explicit SSM safely; SSM remains available for
+  non-bridge profiles. Evidence and BATS coverage are in
+  `docs/issues/2026-08-20-ssm-vault-bridge-missing.md`.
