@@ -8,13 +8,16 @@
 
 - **v1.25.0 is released.** PR #116 merged as `d48e465f`; tag and GitHub release `v1.25.0` are live.
 - Main protection is restored to one required approval with administrators enforced.
-- **Next milestone: v1.26.0** — sandbox registration lifecycle cleanup and E2E promotion-gate integration.
+- **Current milestone: v1.26.0** — sandbox registration lifecycle cleanup and E2E promotion-gate integration.
+- **Lifecycle cleanup foundation landed** in `f90c8e0d` on `k3d-manager-v1.26.0`: registration metadata,
+  expiry/API-grace guarded `make cleanup-stale-clusters` (dry-run default), provider safety, and JSONL audit.
 - v1.27.0 remains planned for image signing/attestation and adaptive checkout load testing;
   v1.28.0 remains planned for parallel multi-cloud provisioning and zero-downtime rollouts.
 
 ## Open follow-ups
 
-- Validate the v1.26.0 sandbox deregistration/unknown-resource cleanup flow on a real expired sandbox.
+- Validate the v1.26.0 sandbox deregistration/unknown-resource cleanup flow on a real expired sandbox; source-only
+  implementation is pushed, and no live cleanup has been run.
 - Complete the E2E promotion-gate live acceptance and retain a result artifact for every run.
 - Replace the interim in-cluster CVE promoter git-writer token with a fine-grained contents-write-only PAT.
 - Reconcile stale local port-forward/LaunchAgent state when public Grafana or status probes fail.

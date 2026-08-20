@@ -14,7 +14,9 @@
 
 ## v1.26.0 queue
 
-- [ ] Sandbox registration lifecycle cleanup and stale Application removal.
+- [x] Lifecycle cleanup foundation — registration metadata plus dry-run/confirm `cleanup-stale-clusters`,
+  provider/grace/retain guards, generated-Application-only deletion, and JSONL audit (`f90c8e0d`, pushed on
+  `k3d-manager-v1.26.0`). Live expired-sandbox validation remains pending.
 - [ ] E2E promotion-gate integration with durable success/failure artifacts.
 - [ ] Verify unknown/out-of-sync handling without mutating unrelated live Applications.
 - [ ] Keep all new work within the five-plan milestone limit.
