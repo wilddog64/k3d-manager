@@ -79,6 +79,34 @@ bats_require_minimum_version 1.5.0
   unset -f _command_exist _run_command _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
 }
 
+@test "_browser_launch: reclaims an IPv6-only listener when the IPv4 CDP probe fails" {
+  fake_chromium="${BATS_TEST_TMPDIR}/fake-chromium"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_chromium"
+  chmod +x "$fake_chromium"
+  reclaim_log="${BATS_TEST_TMPDIR}/reclaim-ipv6.log"
+
+  _command_exist() { [[ "$1" == curl || "$1" == lsof || "$1" == node ]]; }
+  _run_command() { return 1; }
+  _cdp_port_has_listener() { return 0; }
+  _cdp_kill_port_listener() { echo "reclaimed" >>"$reclaim_log"; }
+  _cdp_stop_chrome_cdp_agent() { :; }
+  _cdp_remove_stale_singleton_lock() { :; }
+  _info() { :; }
+  uname() { echo "Darwin"; }
+  node() { printf '%s' "$fake_chromium"; }
+  _antigravity_browser_ready() { :; }
+  _cdp_ensure_acg_session() { echo "reclaimed-ipv6-session-check"; return 0; }
+  export fake_chromium reclaim_log
+  export -f _command_exist _run_command _cdp_port_has_listener _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
+
+  run _browser_launch
+  [ "$status" -eq 0 ]
+  [ "$output" = "reclaimed-ipv6-session-check" ]
+  [ -f "$reclaim_log" ]
+
+  unset -f _command_exist _run_command _cdp_port_has_listener _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
+}
+
 @test "_browser_launch: K3DM_ACG_SKIP_SESSION_CHECK=1 still bypasses the session check end-to-end" {
   _command_exist() { [[ "$1" == curl ]]; }
   _run_command() { return 0; }
