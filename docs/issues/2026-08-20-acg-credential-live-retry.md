@@ -84,7 +84,11 @@ Playwright interaction logic.
 
 ## Focused regression verification
 
-The all-case CDP BATS invocation exposed an existing suite-isolation failure:
+The initial all-case CDP BATS invocation exposed a test-environment isolation
+failure. Browser-launch cases inherited the real `HOME`, so their background
+fake Chrome launch attempted to write the operator's protected
+`~/.local/share/k3d-manager/chrome-cdp.log`. The suite also lacked an explicit
+mock for the listener probe in one launch scenario.
 
 ```text
 1..5
@@ -101,6 +105,14 @@ not ok 4 _browser_launch: reclaims an IPv6-only listener when the IPv4 CDP probe
 ok 5 _browser_launch: K3DM_ACG_SKIP_SESSION_CHECK=1 still bypasses the session check end-to-end
 ```
 
-Each failing case passes when run individually; for example, the undriveable
-browser case returned `1..1` / `ok 1`. This did not affect the live credential
-gate, but the suite-isolation behavior should be investigated separately.
+The test setup now points `HOME` at `BATS_TEST_TMPDIR`, and launch tests mock
+the listener probe. The complete suite now passes:
+
+```text
+1..5
+ok 1 _browser_launch: reuses the CDP browser and runs the session check when it is healthy
+ok 2 _browser_launch: reclaims an undriveable CDP browser then relaunches the managed Chromium
+ok 3 _browser_launch: launches the managed Chromium then runs the session check
+ok 4 _browser_launch: reclaims an IPv6-only listener when the IPv4 CDP probe fails
+ok 5 _browser_launch: K3DM_ACG_SKIP_SESSION_CHECK=1 still bypasses the session check end-to-end
+```

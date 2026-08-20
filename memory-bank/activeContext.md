@@ -90,9 +90,8 @@
   IPv4 probe now detects and reclaims IPv4/IPv6 listeners before relaunch, with explicit probe-status
   handling under `set -e`. Focused CDP BATS is 5/5 green. The live AWS credential gate now passed
   after reclaiming competing Chrome listeners and using the built-in sandbox restart fallback; evidence
-  is recorded in `docs/issues/2026-08-20-acg-credential-live-retry.md`. A full five-case BATS invocation
-  currently fails cases 2–4 while those cases pass individually; this suite-isolation issue is separate
-  follow-up work.
+  is recorded in `docs/issues/2026-08-20-acg-credential-live-retry.md`. The CDP BATS suite now isolates
+  HOME and listener probes and passes 5/5 in one invocation.
 
 ## Canonical pointers
 
