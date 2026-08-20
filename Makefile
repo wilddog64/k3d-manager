@@ -12,7 +12,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh cleanup-stale-sandbox cleanup-stale-clusters status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp
+.PHONY: up down refresh cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -37,12 +37,8 @@ down:
 	  *)       bin/cluster-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) || _down_rc=$$? ;; \
 	esac; \
 	if [ "$(CLEANUP_STALE)" = "1" ]; then \
-	  $(MAKE) --no-print-directory cleanup-stale-clusters CONFIRM=1 || _cleanup_rc=$$?; \
+	  $(MAKE) --no-print-directory cleanup-stale-resources CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM=1 || _cleanup_rc=$$?; \
 	  if [ "$${_cleanup_rc:-0}" -ne 0 ]; then _down_rc=$${_cleanup_rc}; fi; \
-	  if [ "$(CLUSTER_PROVIDER)" = "k3s-aws" ]; then \
-	    $(MAKE) --no-print-directory cleanup-stale-sandbox CLUSTER_PROVIDER=k3s-aws CONFIRM=1 || _cleanup_rc=$$?; \
-	    if [ "$${_cleanup_rc:-0}" -ne 0 ]; then _down_rc=$${_cleanup_rc}; fi; \
-	  fi; \
 	fi; \
 	exit $$_down_rc
 
@@ -60,6 +56,15 @@ cleanup-stale-sandbox:
 ## Remove expired, managed ephemeral ArgoCD cluster registrations (dry-run by default)
 cleanup-stale-clusters:
 	@ARGOCD_HUB_CONTEXT="$(INFRA_CONTEXT)" ARGOCD_NAMESPACE="$(ARGOCD_NS)" bin/cleanup-stale-clusters $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
+
+## Run both stale-resource cleanup paths (dry-run unless CONFIRM=1; sandbox path is k3s-aws-only)
+cleanup-stale-resources:
+	@$(MAKE) --no-print-directory cleanup-stale-clusters CONFIRM="$(CONFIRM)"
+	@if [ "$(CLUSTER_PROVIDER)" = "k3s-aws" ]; then \
+	  $(MAKE) --no-print-directory cleanup-stale-sandbox CLUSTER_PROVIDER=k3s-aws CONFIRM="$(if $(filter 1 true yes,$(CONFIRM)),1,0)"; \
+	else \
+	  echo "cleanup-stale-sandbox skipped (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER); k3s-aws-only)"; \
+	fi
 
 ## Restart the k3s-hostinger laptop edge only (cloudflared + port-forwards) — no GitOps reapply
 refresh-edge:
@@ -591,6 +596,7 @@ help:
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
 	@echo "    make cleanup-stale-sandbox  Preview/remove stale AWS sandbox local state (CONFIRM=1 to remove)"
 	@echo "    make cleanup-stale-clusters Preview/remove expired managed ArgoCD registrations (CONFIRM=1 to remove)"
+	@echo "    make cleanup-stale-resources Run both cleanup paths (CONFIRM=1 to remove)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make sync-branch           Point services-git at BRANCH (default: current branch) and refresh"
 	@echo "    make sync-main             Revert services-git to main and refresh"

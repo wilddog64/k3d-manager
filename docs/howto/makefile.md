@@ -19,6 +19,7 @@ make up URL=https://...      # provision with explicit sandbox URL
 | `make down CLEANUP_STALE=1` | `cleanup-stale-clusters` (+ AWS local cleanup) | Explicitly remove expired managed registrations and stale AWS sandbox state after teardown |
 | `make cleanup-stale-sandbox` | `bin/cleanup-stale-sandbox` | Preview stale AWS sandbox local state; add `CONFIRM=1` to remove it |
 | `make cleanup-stale-clusters` | `bin/cleanup-stale-clusters` | Preview expired managed ArgoCD registrations; add `CONFIRM=1` to remove them |
+| `make cleanup-stale-resources` | Both cleanup scripts | Run both guarded cleanup paths; the local sandbox path runs only for `CLUSTER_PROVIDER=k3s-aws` |
 | `make refresh` | `bin/acg-refresh` | Creds expired or tunnel dropped — re-extracts credentials and restarts tunnel |
 | `make status` | `bin/acg-status` | Read-only health check — Hub nodes, pods, tunnel, ArgoCD |
 
