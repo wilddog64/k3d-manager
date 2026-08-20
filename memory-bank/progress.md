@@ -65,5 +65,8 @@
   when they lack the managed label. Focused BATS 5/5, shellcheck, syntax, and `_agent_audit` passed;
   full-repository baseline failures (webhook, vcluster, Slack relay, and ArgoCD deploy-key suites) are
   recorded in `docs/issues/2026-08-20-stale-cleanup-unknown-applications.md`.
+- [x] Fixed ACG credential extraction after authenticated CDP navigation lands on the Pluralsight
+  `s2` 404 route: retry the legacy Cloud Sandboxes URL (`7 suites/22 tests` green; issue record:
+  `docs/issues/2026-08-20-acg-credential-s2-404.md`).
 - [x] Cloudflare tunnel/ArgoCD origin recovery: reloaded the tunnel and pinned ArgoCD ingress to
   IPv4 loopback (`929ebed7`); external Grafana returned 302 and ArgoCD returned 200.
