@@ -201,6 +201,8 @@ function _e2e_provision_pull_secret() {
   _e2e_kc "$kubeconfig" create namespace "$E2E_NAMESPACE" \
     --dry-run=client -o yaml | _e2e_kc "$kubeconfig" apply -f -
 
+  _e2e_provision_datastore_secret "$kubeconfig"
+
   _e2e_kc "$kubeconfig" create secret docker-registry ghcr-pull-secret \
     --docker-server=ghcr.io \
     --docker-username="${_github_user}" \
@@ -210,6 +212,16 @@ function _e2e_provision_pull_secret() {
 
   _e2e_kc "$kubeconfig" -n "$E2E_NAMESPACE" patch serviceaccount default \
     -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
+}
+
+function _e2e_provision_datastore_secret() {
+  local kubeconfig="${1:-}" postgres_password redis_password
+  postgres_password="${E2E_POSTGRES_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  redis_password="${E2E_REDIS_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  _e2e_kc "$kubeconfig" create secret generic e2e-datastore-credentials \
+    --from-literal=postgres-password="${postgres_password}" \
+    --from-literal=redis-password="${redis_password}" \
+    -n "$E2E_NAMESPACE" --dry-run=client -o yaml | _e2e_kc "$kubeconfig" apply -f -
 }
 
 function _e2e_job_manifest() {

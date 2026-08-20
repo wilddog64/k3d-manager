@@ -35,7 +35,10 @@ spec:
         - name: REDIS_PORT
           value: "6379"
         - name: REDIS_PASSWORD
-          value: testredis123
+          valueFrom:
+            secretKeyRef:
+              name: e2e-datastore-credentials
+              key: redis-password
         - name: OAUTH2_ENABLED
           value: "false"
         readinessProbe:

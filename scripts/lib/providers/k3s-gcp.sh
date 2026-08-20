@@ -145,7 +145,11 @@ function _gcp_merge_kubeconfig() {
     else
       kubectl config delete-context "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1 || true
     fi
-    _info "[k3s-gcp] Removed stale ${_GCP_KUBE_CONTEXT} context"
+    if _dry_run_active; then
+      _info "[k3s-gcp] Would remove stale ${_GCP_KUBE_CONTEXT} context"
+    else
+      _info "[k3s-gcp] Removed stale ${_GCP_KUBE_CONTEXT} context"
+    fi
   fi
   cp "${_GCP_KUBECONFIG}" "${tmp_kube}"
   chmod 600 "${tmp_kube}"
@@ -297,7 +301,11 @@ HELP
     else
       kubectl config delete-context "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1 || true
     fi
-    _info "[k3s-gcp] Removed kubeconfig context ${_GCP_KUBE_CONTEXT}"
+    if _dry_run_active; then
+      _info "[k3s-gcp] Would remove kubeconfig context ${_GCP_KUBE_CONTEXT}"
+    else
+      _info "[k3s-gcp] Removed kubeconfig context ${_GCP_KUBE_CONTEXT}"
+    fi
   fi
 
   _info "[k3s-gcp] GCP cluster destroyed."

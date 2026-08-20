@@ -37,7 +37,10 @@ spec:
         - name: DB_USERNAME
           value: postgres
         - name: DB_PASSWORD
-          value: postgres
+          valueFrom:
+            secretKeyRef:
+              name: e2e-datastore-credentials
+              key: postgres-password
         - name: OAUTH2_ENABLED
           value: "false"
         readinessProbe:

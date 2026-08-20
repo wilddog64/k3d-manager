@@ -23,19 +23,26 @@ spec:
       - name: redis
         image: redis:7.4-alpine
         imagePullPolicy: IfNotPresent
-        args:
-        - --requirepass
-        - testredis123
+        command:
+        - sh
+        - -c
+        - exec redis-server --requirepass "$REDIS_PASSWORD"
         ports:
         - name: redis
           containerPort: 6379
           protocol: TCP
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: e2e-datastore-credentials
+              key: redis-password
         readinessProbe:
           exec:
             command:
             - sh
             - -c
-            - redis-cli -a testredis123 ping | grep -q PONG
+            - redis-cli -a "$REDIS_PASSWORD" ping | grep -q PONG
           initialDelaySeconds: 3
           periodSeconds: 5
           timeoutSeconds: 3

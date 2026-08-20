@@ -14,7 +14,6 @@
   see `docs/issues/2026-08-17-grafana-no-data-control-plane-load.md`.
 - `make down CLUSTER_PROVIDER=k3s-aws` now deregisters the sandbox cluster and generated hub Applications, while local-provider dry-runs load the command bridge before launchd teardown (`469a3427`) — see `docs/bugs/v1.25.0-bugfix-dry-run-phase3-make-down-deregister.md`
 
-### Fixed
 - Standardized lifecycle dry-run handling on `DRY_RUN` (while retaining the legacy alias), completed per-operation teardown guards, and added stubbed cluster-up/down coverage (`d2263cc2`) — see `docs/bugs/v1.25.0-bugfix-dry-run-phase2b-standardize-and-complete.md`
 
 ## [1.24.1] - 2026-08-13

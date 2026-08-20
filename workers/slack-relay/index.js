@@ -271,10 +271,11 @@ async function handle(req, event) {
   }
 
   if (command === '/cleanup-stale-sandbox') {
-    if (text && !['confirm', 'apply'].includes(text.toLowerCase())) {
+    const cleanupText = (text || '').trim().toLowerCase()
+    if (cleanupText && !['confirm', 'apply'].includes(cleanupText)) {
       return jsonReply('Usage: /cleanup-stale-sandbox [confirm] — dry-run by default; confirm applies the cleanup', threadTs)
     }
-    const confirm = ['confirm', 'apply'].includes(text.toLowerCase())
+    const confirm = ['confirm', 'apply'].includes(cleanupText)
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cleanup-stale-sandbox', { confirm, response_url: responseUrl }, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)

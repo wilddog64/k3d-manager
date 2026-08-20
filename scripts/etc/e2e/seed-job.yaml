@@ -49,7 +49,10 @@ spec:
         - name: DB_USERNAME
           value: postgres
         - name: DB_PASSWORD
-          value: postgres
+          valueFrom:
+            secretKeyRef:
+              name: e2e-datastore-credentials
+              key: postgres-password
         volumeMounts:
         - name: scripts
           mountPath: /scripts
