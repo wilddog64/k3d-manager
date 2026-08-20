@@ -7,6 +7,7 @@ CLUSTER_PROVIDER ?= k3s-aws
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL    ?= 0
+CLEANUP_STALE ?= 0
 BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
@@ -28,11 +29,22 @@ up:
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
 ## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
 down:
-	@case "$(CLUSTER_PROVIDER)" in \
-	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster ;; \
-	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager destroy_cluster --confirm ;; \
-	  *)       bin/cluster-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) ;; \
-	esac
+	@set +e; \
+	_down_rc=0; \
+	case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster || _down_rc=$$? ;; \
+	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager destroy_cluster --confirm || _down_rc=$$? ;; \
+	  *)       bin/cluster-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) || _down_rc=$$? ;; \
+	esac; \
+	if [ "$(CLEANUP_STALE)" = "1" ]; then \
+	  $(MAKE) --no-print-directory cleanup-stale-clusters CONFIRM=1 || _cleanup_rc=$$?; \
+	  if [ "$${_cleanup_rc:-0}" -ne 0 ]; then _down_rc=$${_cleanup_rc}; fi; \
+	  if [ "$(CLUSTER_PROVIDER)" = "k3s-aws" ]; then \
+	    $(MAKE) --no-print-directory cleanup-stale-sandbox CLUSTER_PROVIDER=k3s-aws CONFIRM=1 || _cleanup_rc=$$?; \
+	    if [ "$${_cleanup_rc:-0}" -ne 0 ]; then _down_rc=$${_cleanup_rc}; fi; \
+	  fi; \
+	fi; \
+	exit $$_down_rc
 
 ## Refresh credentials and restart tunnel (provider-aware)
 refresh:
@@ -563,6 +575,7 @@ help:
 	@echo "  Targets (set CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
 	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
+	@echo "    make down ... CLEANUP_STALE=1  Also remove expired managed registrations and stale AWS local state"
 	@echo "    make status        Show concise service health (SERVICE=<name> for focused detail)"
 	@echo "    make status-full   Show full pod and diagnostic report"
 	@echo "    make status-json   Emit concise status as JSON"
@@ -576,6 +589,8 @@ help:
 	@echo "    make chrome-cdp    Install Chrome CDP launchd agent (automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
+	@echo "    make cleanup-stale-sandbox  Preview/remove stale AWS sandbox local state (CONFIRM=1 to remove)"
+	@echo "    make cleanup-stale-clusters Preview/remove expired managed ArgoCD registrations (CONFIRM=1 to remove)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make sync-branch           Point services-git at BRANCH (default: current branch) and refresh"
 	@echo "    make sync-main             Revert services-git to main and refresh"
