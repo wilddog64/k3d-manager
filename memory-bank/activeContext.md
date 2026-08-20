@@ -4,13 +4,11 @@
 > `CHANGELOG.md` (v1.24.0 section), `docs/plans/v1.24.0-*`, `docs/bugs/v1.24.0-*`, `docs/retro/`,
 > `docs/issues/`, and git history (`git log --follow memory-bank/`).
 
-## Current focus — v1.24.1 RELEASED; v1.25.0 = workstream G (open for development)
+## Current focus — v1.25.0 RELEASED; next work is v1.26.0 planning
 
-**v1.25.0 release PR 2026-08-19:** PR #116 (`feat: cut k3d-manager v1.25.0 release`) is open from
-`k3d-manager-v1.25.0` into `main` at `08b49354`. Copilot's six actionable findings were addressed
-and resolved; GitHub checks are green. Main's approval count is temporarily 0 (baseline was 1;
-all other protection settings remain unchanged) so the owner can merge, with mandatory restoration
-after merge.
+**v1.25.0 release 2026-08-20:** PR #116 merged into `main` as `d48e465f` and tag/release `v1.25.0`
+was published. Copilot's six actionable findings were addressed and resolved before merge. Main
+branch protection was restored to the recorded baseline (one approval, admins enforced).
 
 **Maintenance update 2026-08-17:** `a638a9ca` pushed on `k3d-manager-v1.25.0`. The existing daily
 `com.k3d-manager.cleanup` LaunchAgent now safely removes unreferenced Packer ISO/lock artifacts older
