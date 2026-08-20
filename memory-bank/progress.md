@@ -36,6 +36,9 @@
   (`40f1d19a`, pushed on `k3d-manager-v1.26.0`); provider BATS 13/13 and shellcheck passed.
 - [x] Added explicit SSM/SSH transition and success logs (`2424f55f`, pushed on
   `k3d-manager-v1.26.0`); provider BATS 13/13 and `_agent_audit` passed.
+- [ ] Fix local k3s-aws kubeconfig TLS SAN mismatch by retaining the loopback API endpoint for
+  tunneled kubectl traffic; incident recorded in
+  `docs/issues/2026-08-20-k3s-aws-kubeconfig-public-ip-tls-san.md`.
 
 ## Verification record
 

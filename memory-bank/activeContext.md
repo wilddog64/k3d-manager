@@ -41,6 +41,10 @@
   `docs/issues/2026-08-20-k3s-aws-ssm-fallback-provisioning.md`.
 - Fallback observability was clarified in `2424f55f`: fresh runs log SSM selection, the explicit
   `Switching transport: SSM -> SSH` transition, and SSH retry success (`k3d-manager-v1.26.0`).
+- **Open bug:** local k3s-aws kubeconfig rewrites the API endpoint to the EC2 public IP, which is
+  absent from the k3s certificate SANs and breaks OpenAPI validation through the local tunnel. Evidence
+  and the recommended loopback endpoint are recorded in
+  `docs/issues/2026-08-20-k3s-aws-kubeconfig-public-ip-tls-san.md`.
 
 ## Operating decisions
 
