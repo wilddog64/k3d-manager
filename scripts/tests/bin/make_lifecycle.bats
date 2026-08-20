@@ -14,6 +14,8 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"CLEANUP_STALE = 0"* ]]
   [[ "$output" == *'$(MAKE) --no-print-directory cleanup-stale-resources CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM=1'* ]]
+  [[ "$output" == *'_keep_hub_flag=--keep-hub'* ]]
+  [[ "$output" == *'if [ "$(KEEP_LOCAL)" = "1" ] || [ "$(CLEANUP_STALE)" = "1" ]; then'* ]]
 }
 
 @test "cleanup-stale-resources dispatches both paths for AWS" {

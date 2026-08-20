@@ -32,6 +32,9 @@
   `k3d-manager-v1.26.0`); Makefile BATS 2/2 passed.
 - [x] Added unified `cleanup-stale-resources` dispatch and wired it into confirmed `make down`
   cleanup (`f24c0c96`, pushed on `k3d-manager-v1.26.0`); Makefile BATS 3/3 passed.
+- [x] Fixed `make down CLEANUP_STALE=1` Hub/access-layer loss: the target now implies `--keep-hub`,
+  and `bin/cluster-down --keep-hub` leaves Hub-dependent ArgoCD/Grafana listeners running. The old
+  post-teardown cleanup deleted the Hub before stale cleanup could run, taking down ArgoCD/Grafana.
 - [x] SSM bootstrap readiness now falls back to SSH and fails only when both transports fail
   (`40f1d19a`, pushed on `k3d-manager-v1.26.0`); provider BATS 13/13 and shellcheck passed.
 - [x] Added explicit SSM/SSH transition and success logs (`2424f55f`, pushed on

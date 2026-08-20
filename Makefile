@@ -31,10 +31,14 @@ up:
 down:
 	@set +e; \
 	_down_rc=0; \
+	_keep_hub_flag=; \
+	if [ "$(KEEP_LOCAL)" = "1" ] || [ "$(CLEANUP_STALE)" = "1" ]; then \
+	  _keep_hub_flag=--keep-hub; \
+	fi; \
 	case "$(CLUSTER_PROVIDER)" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster || _down_rc=$$? ;; \
 	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager destroy_cluster --confirm || _down_rc=$$? ;; \
-	  *)       bin/cluster-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) || _down_rc=$$? ;; \
+	  *)       bin/cluster-down --confirm $$_keep_hub_flag || _down_rc=$$? ;; \
 	esac; \
 	if [ "$(CLEANUP_STALE)" = "1" ]; then \
 	  $(MAKE) --no-print-directory cleanup-stale-resources CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM=1 || _cleanup_rc=$$?; \

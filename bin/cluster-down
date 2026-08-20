@@ -43,7 +43,7 @@ if [[ "${_confirm}" -eq 0 ]]; then
   echo "Usage: bin/cluster-down --confirm [--keep-hub]"
   echo ""
   echo "  --confirm    Required. Tears down remote cluster and local Hub cluster."
-  echo "  --keep-hub   Optional. Skip local Hub (k3d-cluster) teardown."
+  echo "  --keep-hub   Optional. Preserve local Hub and its access layer."
   exit 1
 fi
 
@@ -55,18 +55,20 @@ case "${_cluster_provider}" in
     source "${REPO_ROOT}/scripts/plugins/acg.sh"
     source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
     source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
-    _info "[acg-down] Clearing local port-forwarding processes (8080, 18080, 18200)..."
-if _dry_run_active; then
-  _info "DRY_RUN: would kill local port-forward processes"
-else
-  lsof -ti :8080,18080,18200 | xargs kill -9 2>/dev/null || true
-fi
+    if [[ "${_keep_hub}" -eq 0 ]]; then
+      _info "[acg-down] Clearing local port-forwarding processes (8080, 18080, 18200)..."
+      if _dry_run_active; then
+        _info "DRY_RUN: would kill local port-forward processes"
+      else
+        lsof -ti :8080,18080,18200 | xargs kill -9 2>/dev/null || true
+      fi
 
-_info "[acg-down] Stopping tunnel..."
-    if _dry_run_active; then
-      _info "DRY_RUN: would stop autossh tunnel"
-    else
-      tunnel_stop 2>/dev/null || true
+      _info "[acg-down] Stopping tunnel..."
+      if _dry_run_active; then
+        _info "DRY_RUN: would stop autossh tunnel"
+      else
+        tunnel_stop 2>/dev/null || true
+      fi
     fi
     _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
     if _dry_run_active; then
@@ -165,6 +167,7 @@ if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
   _info "[acg-down] ACG Prometheus port-forward stopped"
 fi
 
+if [[ "${_keep_hub}" -eq 0 ]]; then
 _info "[acg-down] Stopping ArgoCD port-forward launchd agent..."
 _argocd_pf_label="com.k3d-manager.argocd-port-forward"
 _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
@@ -177,8 +180,9 @@ if launchctl list "${_argocd_pf_label}" >/dev/null 2>&1; then
   fi
 fi
 _dry_guard "remove ArgoCD port-forward plist" rm -f "${_argocd_pf_plist}"
+fi
 
-if _is_mac; then
+if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _info "[acg-down] Stopping Keycloak browser HTTP listener launchd daemon..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
   _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
