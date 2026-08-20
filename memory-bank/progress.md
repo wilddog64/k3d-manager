@@ -30,6 +30,8 @@
   `docs/issues/2026-08-20-make-up-data-layer-argocd-host-dns.md`.
 - [x] Added the explicit `make down CLEANUP_STALE=1` example to `make help` (`20a13862`, pushed on
   `k3d-manager-v1.26.0`); Makefile BATS 2/2 passed.
+- [x] Added unified `cleanup-stale-resources` dispatch and wired it into confirmed `make down`
+  cleanup (`f24c0c96`, pushed on `k3d-manager-v1.26.0`); Makefile BATS 3/3 passed.
 
 ## Verification record
 

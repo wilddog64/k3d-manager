@@ -32,6 +32,9 @@
   regression and root-cause record are in `docs/issues/2026-08-20-make-up-data-layer-argocd-host-dns.md`.
 - The cleanup invocation is now also shown in the help Examples section (`20a13862`, pushed on
   `k3d-manager-v1.26.0`).
+- Unified cleanup is available as `make cleanup-stale-resources` (`f24c0c96`, pushed on
+  `k3d-manager-v1.26.0`); `make down CLEANUP_STALE=1` now calls this wrapper, which runs the
+  managed-registration cleanup for every provider and the local sandbox cleanup for k3s-aws.
 
 ## Operating decisions
 
