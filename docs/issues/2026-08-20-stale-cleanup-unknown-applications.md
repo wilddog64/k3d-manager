@@ -89,6 +89,19 @@ retain checks remain unchanged.
 
 ## Follow-up
 
-The webhook failures above are unrelated to this change and indicate the local webhook test service
-was unavailable or returned unexpected connection/status results. Re-run that suite with its
-required test service before treating it as a code regression.
+The full repository run completed as `1..720` with 39 unrelated failures. In addition to the webhook
+failures above, the verbatim failing lines were:
+
+```text
+not ok 323 vcluster_create: installs CLI when binary missing
+not ok 324 vcluster_create: honors VCLUSTER_VALUES_FILE override
+not ok 472 slack relay cluster-status acks before webhook completes
+not ok 572 slack relay allowlist includes cluster-status and hostinger-status
+not ok 617 configure_vault_argocd_repos --dry-run makes no kubectl calls
+not ok 619 configure_vault_argocd_repos --dry-run --seed-vault prints actions only
+```
+
+These failures are outside the stale cleanup path. The webhook failures indicate the local webhook
+test service was unavailable or returned unexpected connection/status results; the other failures
+need their existing test fixtures/integration dependencies restored before being treated as code
+regressions.

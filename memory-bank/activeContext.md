@@ -70,7 +70,8 @@
   `k3d-manager/managed=true`, so cleanup could remove an expired AWS registration Secret while
   leaving its 19 generated Applications `Unknown`. Cleanup now matches the managed registration's
   cluster name, cluster label, or API server destination. Focused cleanup/lifecycle BATS passed;
-  the unrelated webhook suite has baseline connection/status failures recorded in
+  the full BATS run has unrelated webhook, vcluster, Slack relay, and ArgoCD deploy-key failures
+  recorded in
   `docs/issues/2026-08-20-stale-cleanup-unknown-applications.md`.
 
 ## Canonical pointers
