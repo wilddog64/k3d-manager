@@ -20,11 +20,14 @@ The k3s kubeconfig export replaces `127.0.0.1` with the EC2 public address. Loca
 TLS SAN. Kubernetes OpenAPI validation therefore fails before the GHCR secret can
 be applied.
 
-## Recommended fix
+## Fix implemented
 
 Keep the local kubeconfig server at `https://127.0.0.1:6443` whenever the local
 tunnel is used. Keep the separately registered ArgoCD cluster endpoint on the Hub
 host alias (`host.k3d.internal`) and its configured CA/insecure policy; do not disable
 TLS validation globally or use `--validate=false` as a workaround.
 
-This investigation did not modify source files or deploy the sandbox.
+Both SSH and SSM kubeconfig paths now retain the loopback API endpoint for local
+tunneled kubectl traffic. The SSH path also normalizes `https://localhost` to
+`https://127.0.0.1`. A source regression test prevents reintroducing the public-IP
+replacement. No live sandbox was deployed for this source-only fix.

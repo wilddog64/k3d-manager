@@ -19,13 +19,6 @@ set -euo pipefail
 function add_ubuntu_k3s_cluster() {
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
-  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-}"
-  if [[ -z "${external_ip}" ]] && _command_exist awk; then
-    external_ip=$(awk -v host="${ssh_host}" \
-      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
-      "${HOME}/.ssh/config" 2>/dev/null)
-  fi
-  : "${external_ip:=${ssh_host}}"
   local remote_kubeconfig="${UBUNTU_K3S_REMOTE_KUBECONFIG:-/home/${ssh_user}/.kube/k3s.yaml}"
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local ssh_target="${ssh_user}@${ssh_host}"
@@ -42,16 +35,16 @@ function add_ubuntu_k3s_cluster() {
 
 # shellcheck disable=SC2029
   if ! ssh "${ssh_target}" "cat ${remote_kubeconfig}" 2>/dev/null \
-      | sed -e "s|127.0.0.1|${external_ip}|g" -e "s|https://localhost:|https://${external_ip}:|g" > "${local_kubeconfig}"; then
+      | sed -e 's|https://localhost:|https://127.0.0.1:|g' > "${local_kubeconfig}"; then
     _err "[shopping_cart] Failed to export kubeconfig from ${ssh_target}:${remote_kubeconfig}"
     _err "[shopping_cart] Ensure ${ssh_user} can read ${remote_kubeconfig} on ${ssh_host}"
     return 1
   fi
   chmod 600 "${local_kubeconfig}"
 
-  _info "[shopping_cart] Verifying connectivity to Ubuntu k3s at ${external_ip}:6443"
+  _info "[shopping_cart] Verifying connectivity to Ubuntu k3s through local tunnel at 127.0.0.1:6443"
   if ! KUBECONFIG="${local_kubeconfig}" _run_command -- kubectl get nodes; then
-    _err "[shopping_cart] Cannot reach Ubuntu k3s API at ${external_ip}:6443"
+    _err "[shopping_cart] Cannot reach Ubuntu k3s API through local tunnel at 127.0.0.1:6443"
     return 1
   fi
 
@@ -1281,7 +1274,7 @@ function _ssm_bootstrap_k3s() {
 
   mkdir -p "$(dirname "${local_kubeconfig}")"
   printf '%s\n' "${kubeconfig_content}" \
-    | sed "s|127.0.0.1|${server_ip}|g" > "${local_kubeconfig}"
+    | sed -e 's|https://localhost:|https://127.0.0.1:|g' > "${local_kubeconfig}"
   chmod 600 "${local_kubeconfig}"
   KUBECONFIG="${local_kubeconfig}" kubectl config rename-context default \
     "${kube_context}" 2>/dev/null || true

@@ -19,6 +19,13 @@
   [[ "$output" == *"k3sup not found"* ]]
 }
 
+@test "local k3s kubeconfig keeps loopback endpoint for tunneled TLS" {
+  run grep -nF "sed -e 's|https://localhost:|https://127.0.0.1:|g'" scripts/plugins/shopping_cart.sh
+  [ "$status" -eq 0 ]
+  run grep -nF 's|127.0.0.1|${external_ip}|g' scripts/plugins/shopping_cart.sh
+  [ "$status" -ne 0 ]
+}
+
 @test "register_shopping_cart_apps fails if argocd dir missing" {
   local repo_root
   repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." >/dev/null 2>&1 && pwd)"
