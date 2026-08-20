@@ -117,10 +117,12 @@ function _browser_launch() {
   local _cdp_host="${PLAYWRIGHT_CDP_HOST:-127.0.0.1}"
   local _cdp_port="${PLAYWRIGHT_CDP_PORT:-9222}"
   local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
+  local _cdp_probe_rc=0
   if ! _command_exist curl; then
     _err "curl is required for Antigravity browser probe — install curl and retry"
   fi
-  if _run_command --soft -- curl -sf "http://${_cdp_host}:${_cdp_port}/json" >/dev/null 2>&1; then
+  _run_command --soft -- curl -sf "http://${_cdp_host}:${_cdp_port}/json" >/dev/null 2>&1 || _cdp_probe_rc=$?
+  if (( _cdp_probe_rc == 0 )); then
     if _cdp_connectable; then
       _info "[acg] Reusing existing CDP browser on :${_cdp_port}"
       _cdp_ensure_acg_session
