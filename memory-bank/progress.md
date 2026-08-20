@@ -3,7 +3,9 @@
 - [x] **ACG CDP BATS isolation (2026-08-20):** browser-launch tests now use `HOME=$BATS_TEST_TMPDIR`
   and explicit listener-probe mocks, eliminating false failures from the operator's live Chrome/CDP
   state and protected log path. Clean-env focused BATS 5/5 and ACG Jest 7 suites/22 tests pass;
-  shellcheck and agent-rigor results are recorded in the task handoff.
+  shellcheck and agent-rigor pass. Live `make credential-test PROVIDER=aws` also passes after the
+  authenticated CDP session is reused: `ACG_SESSION_OK`, four copyable inputs extracted, and
+  `sts:GetCallerIdentity OK`.
 
 ## v0.4.4 Track (branch: `feat/v0.4.4`) — js-yaml advisory fix
 
