@@ -26,6 +26,10 @@
 - **SSM fallback fixed** in `fef71219`: k3s-aws now falls back to SSH when SSM registration or tunnel setup
   fails, and fails only when both transports fail. Live account-level Default Host Management Role setup
   remains optional infrastructure follow-up.
+- **Lifecycle cleanup + data-layer DNS fix** landed in `316f26d2`: `make help` documents the guarded
+  stale-cleanup targets, `make down CLEANUP_STALE=1` performs explicit post-teardown cleanup, and
+  `bin/cluster-up` restores the Hub `host.k3d.internal` CoreDNS alias before ArgoCD registration. The
+  regression and root-cause record are in `docs/issues/2026-08-20-make-up-data-layer-argocd-host-dns.md`.
 
 ## Operating decisions
 

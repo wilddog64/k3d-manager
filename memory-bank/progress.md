@@ -23,6 +23,11 @@
 - [x] k3s-aws SSM registration fallback — recorded live account `218085830935` Default Host Management
   Role failure in `docs/issues/2026-08-20-k3s-aws-ssm-fallback.md`; provider now falls back to SSH
   (`fef71219`, pushed on `k3d-manager-v1.26.0`). BATS provider suite 11/11 and shellcheck passed.
+- [x] Lifecycle cleanup and ArgoCD data-layer DNS recovery — help documents both stale-cleanup targets,
+  `make down CLEANUP_STALE=1` runs guarded cleanup, and `make up` repairs Hub CoreDNS before registration
+  (`316f26d2`, pushed on `k3d-manager-v1.26.0`). Focused BATS 12/12, `bash -n`, shellcheck, and
+  `_agent_audit` passed. Bug evidence is recorded in
+  `docs/issues/2026-08-20-make-up-data-layer-argocd-host-dns.md`.
 
 ## Verification record
 
