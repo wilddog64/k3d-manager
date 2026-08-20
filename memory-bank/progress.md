@@ -32,8 +32,8 @@
   `k3d-manager-v1.26.0`); Makefile BATS 2/2 passed.
 - [x] Added unified `cleanup-stale-resources` dispatch and wired it into confirmed `make down`
   cleanup (`f24c0c96`, pushed on `k3d-manager-v1.26.0`); Makefile BATS 3/3 passed.
-- [ ] Fix SSM bootstrap readiness timeout bypassing the SSH fallback; issue evidence is recorded in
-  `docs/issues/2026-08-20-k3s-aws-ssm-fallback-provisioning.md`.
+- [x] SSM bootstrap readiness now falls back to SSH and fails only when both transports fail
+  (`40f1d19a`, pushed on `k3d-manager-v1.26.0`); provider BATS 13/13 and shellcheck passed.
 
 ## Verification record
 
