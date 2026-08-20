@@ -45,6 +45,20 @@ non-bridge Vault profile (`HUB_VAULT_USE_BRIDGE=0`). This avoids creating a dead
 waiting 270 seconds for ESO. Stubbed BATS coverage covers both automatic SSH selection and the
 explicit-SSM override.
 
+## Live recovery
+
+The existing sandbox had been provisioned through the old SSM path. I installed the missing
+`vault-bridge.service` over its existing SSH alias and forced an ESO reconcile:
+
+```text
+clustersecretstore.external-secrets.io/vault-backend condition met
+Ready=True reason=Valid msg=store validated
+```
+
+All 13 ExternalSecrets then reported `True SecretSynced`. A subsequent full status check still
+reported unrelated application/edge failures (Frontend remote close, Grafana HTTP 530, product
+images HTTP 502, and two data-layer pods not ready); those are not ClusterSecretStore failures.
+
 ## Separate lifecycle policy note
 
 `make down CLUSTER_PROVIDER=<provider>` already performs the selected provider teardown with the provider's internal confirmation. Stale-resource cleanup is intentionally separate because it can remove unrelated expired managed registrations. Current behavior is:

@@ -60,6 +60,9 @@
   (`HUB_VAULT_USE_BRIDGE=1`, the default), k3s-aws now selects SSH before provisioning and overrides
   explicit SSM with a warning. SSM remains available for non-bridge Vault profiles. Evidence is in
   `docs/issues/2026-08-20-ssm-vault-bridge-missing.md`.
+- Live recovery verified on the existing sandbox: installing the missing bridge and forcing ESO
+  reconcile returned `Ready=True/Valid` and 13/13 `SecretSynced`; remaining `make status` failures
+  are separate edge/application issues.
 
 ## Canonical pointers
 

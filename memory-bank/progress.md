@@ -58,3 +58,5 @@
   reverse bridge is required and overrides explicit SSM safely; SSM remains available for
   non-bridge profiles. Evidence and BATS coverage are in
   `docs/issues/2026-08-20-ssm-vault-bridge-missing.md`.
+- Live recovery verified: `vault-backend Ready=True/Valid`, all 13 ExternalSecrets `SecretSynced`;
+  unrelated Grafana/frontend/product-image/data-layer health failures remain tracked separately.
