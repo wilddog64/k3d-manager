@@ -66,6 +66,12 @@
 - Cloudflare Error 1033/ArgoCD 502 diagnosed and fixed: the tunnel had stopped, and its ArgoCD
   origin used IPv6-prone `localhost:8080`; `scripts/etc/cloudflared/config.yml` now pins
   `127.0.0.1:8080`. Edge reload verified Grafana HTTP 302 and ArgoCD HTTP 200.
+- **Stale unknown-Application cleanup fixed** in `2f4de4fd`: generated Applications did not inherit
+  `k3d-manager/managed=true`, so cleanup could remove an expired AWS registration Secret while
+  leaving its 19 generated Applications `Unknown`. Cleanup now matches the managed registration's
+  cluster name, cluster label, or API server destination. Focused cleanup/lifecycle BATS passed;
+  the unrelated webhook suite has baseline connection/status failures recorded in
+  `docs/issues/2026-08-20-stale-cleanup-unknown-applications.md`.
 
 ## Canonical pointers
 
