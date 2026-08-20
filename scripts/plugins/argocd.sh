@@ -1312,6 +1312,20 @@ HELP
   rendered="$(mktemp -t argocd-cluster-secret.XXXXXX.yaml)"
   trap '$(_cleanup_trap_command "$rendered")' RETURN
 
+  local _registered_at="${ARGOCD_APP_CLUSTER_REGISTERED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+  local _release="${ARGOCD_APP_CLUSTER_RELEASE:-${K3D_MANAGER_BRANCH:-unknown}}"
+  local _release_label
+  _release_label="$(printf '%s' "${_release}" | tr -cs 'A-Za-z0-9_.-' '-' | cut -c1-63)"
+  _release_label="${_release_label:-unknown}"
+  local _managed="${ARGOCD_APP_CLUSTER_MANAGED:-false}"
+  if [[ "${_managed}" == "true" ]] && {
+    [[ -z "${ARGOCD_APP_CLUSTER_PROVIDER:-}" || -z "${ARGOCD_APP_CLUSTER_SANDBOX_ID:-}" ||
+      -z "${ARGOCD_APP_CLUSTER_EXPIRES_AT:-}" || "${_release_label}" == "unknown" ]];
+  }; then
+    _err "[argocd] managed registrations require provider, sandbox-id, expires-at, and release metadata"
+    return 1
+  fi
+
   local _wasx=0
   case $- in *x*) _wasx=1; set +x;; esac
   cat > "$rendered" <<EOF
@@ -1326,6 +1340,13 @@ metadata:
     environment: "${app_cluster_environment}"
     argocd-chart-version: "${ARGOCD_CHART_VERSION}"
     argocd-replicas: "2"
+    k3d-manager/managed: "${_managed}"
+    k3d-manager/provider: "${ARGOCD_APP_CLUSTER_PROVIDER:-unknown}"
+    k3d-manager/release: "${_release_label}"
+  annotations:
+    k3d-manager/sandbox-id: "${ARGOCD_APP_CLUSTER_SANDBOX_ID:-}"
+    k3d-manager/registered-at: "${_registered_at}"
+    k3d-manager/expires-at: "${ARGOCD_APP_CLUSTER_EXPIRES_AT:-}"
 type: Opaque
 stringData:
   name: ${ARGOCD_APP_CLUSTER_NAME}

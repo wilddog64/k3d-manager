@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh cleanup-stale-sandbox status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp
+.PHONY: up down refresh cleanup-stale-sandbox cleanup-stale-clusters status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -44,6 +44,10 @@ refresh:
 ## Remove stale state from an expired k3s-aws sandbox (dry-run unless CONFIRM=1)
 cleanup-stale-sandbox:
 	@CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM="$(CONFIRM)" bin/cleanup-stale-sandbox
+
+## Remove expired, managed ephemeral ArgoCD cluster registrations (dry-run by default)
+cleanup-stale-clusters:
+	@ARGOCD_HUB_CONTEXT="$(INFRA_CONTEXT)" ARGOCD_NAMESPACE="$(ARGOCD_NS)" bin/cleanup-stale-clusters $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
 
 ## Restart the k3s-hostinger laptop edge only (cloudflared + port-forwards) — no GitOps reapply
 refresh-edge:
@@ -112,6 +116,11 @@ argocd-registration:
 	kubectl config use-context k3d-k3d-cluster >/dev/null || exit 1; \
 	ARGOCD_APP_CLUSTER_TOKEN="$$_token" \
 	ARGOCD_APP_CLUSTER_SERVER="$$_server" \
+	ARGOCD_APP_CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" \
+	ARGOCD_APP_CLUSTER_MANAGED="$(if $(and $(ACG_SANDBOX_ID),$(ACG_SANDBOX_EXPIRES_AT)),true,false)" \
+	ARGOCD_APP_CLUSTER_SANDBOX_ID="$(ACG_SANDBOX_ID)" \
+	ARGOCD_APP_CLUSTER_EXPIRES_AT="$(ACG_SANDBOX_EXPIRES_AT)" \
+	ARGOCD_APP_CLUSTER_RELEASE="$(BRANCH)" \
 	  scripts/k3d-manager register_app_cluster && \
 	kubectl rollout restart statefulset/argocd-application-controller \
 	  -n cicd --context k3d-k3d-cluster && \

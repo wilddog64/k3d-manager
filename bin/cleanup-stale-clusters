@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Remove only expired, explicitly managed ephemeral app-cluster registrations.
+# The default is a read-only preview; --confirm is required for deletion.
+
+confirm=0
+for arg in "$@"; do
+  case "${arg}" in
+    --confirm) confirm=1 ;;
+    --dry-run) confirm=0 ;;
+    -h|--help)
+      printf '%s\n' 'Usage: cleanup-stale-clusters [--dry-run|--confirm]'
+      printf '%s\n' '  Remove expired k3s-aws ArgoCD registrations; dry-run is the default.'
+      exit 0
+      ;;
+    *) printf 'ERROR: unknown option: %s\n' "${arg}" >&2; exit 2 ;;
+  esac
+done
+
+hub_context="${ARGOCD_HUB_CONTEXT:-k3d-k3d-cluster}"
+argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+now="${K3DM_CLEANUP_NOW:-$(date -u +%s)}"
+grace="${K3DM_CLEANUP_GRACE_SECONDS:-1800}"
+state_dir="${K3DM_CLEANUP_STATE_DIR:-${HOME}/.local/share/k3d-manager/cleanup-stale-clusters}"
+audit_file="${K3DM_CLEANUP_AUDIT_FILE:-${state_dir}/audit.jsonl}"
+kubectl_cmd=(kubectl --context "${hub_context}")
+mkdir -p "${state_dir}"
+
+iso_to_epoch() {
+  local value="$1"
+  if [[ "${value}" =~ ^[0-9]+$ ]]; then
+    printf '%s' "${value}"
+    return 0
+  fi
+  python3 - "${value}" <<'PY'
+import datetime
+import sys
+
+value = sys.argv[1].strip()
+if value.endswith("Z"):
+    value = value[:-1] + "+00:00"
+try:
+    parsed = datetime.datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+    print(int(parsed.timestamp()))
+except ValueError:
+    raise SystemExit(1)
+PY
+}
+
+secret_json="$("${kubectl_cmd[@]}" -n "${argocd_ns}" get secrets \
+  -l 'argocd.argoproj.io/secret-type=cluster,k3d-manager/managed=true' -o json)"
+mapfile -t registrations < <(printf '%s' "${secret_json}" | jq -r '.items[] |
+  [.metadata.name, .metadata.labels["argocd.argoproj.io/cluster-name"],
+   .metadata.labels["k3d-manager/provider"],
+   .metadata.annotations["k3d-manager/expires-at"],
+   .metadata.annotations["k3d-manager/sandbox-id"],
+   (.metadata.annotations["k3d-manager/retain"] // "false")] | @tsv')
+
+printf 'Stale managed cluster cleanup (context=%s namespace=%s)\n' "${hub_context}" "${argocd_ns}"
+if (( ${#registrations[@]} == 0 )); then
+  printf '%s\n' '  no managed registrations found'
+  exit 0
+fi
+
+for registration in "${registrations[@]}"; do
+  IFS=$'\t' read -r secret cluster provider expires sandbox retain <<< "${registration}"
+  [[ "${provider}" == "k3s-aws" ]] || { printf '  skip %s: provider=%s\n' "${secret}" "${provider:-missing}"; continue; }
+  [[ "${retain}" != "true" ]] || { printf '  skip %s: retain=true\n' "${secret}"; continue; }
+  if [[ -z "${expires}" ]]; then
+    printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason missing_expiry \
+      '{cluster:$cluster,provider:$provider,decision:"skip",reason:$reason,timestamp:(now|floor)}')" >> "${audit_file}"
+    printf '  skip %s: expires-at is missing\n' "${secret}"
+    continue
+  fi
+  expires_epoch="$(iso_to_epoch "${expires}")" || {
+    printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason invalid_expiry \
+      '{cluster:$cluster,provider:$provider,decision:"skip",reason:$reason,timestamp:(now|floor)}')" >> "${audit_file}"
+    printf '  skip %s: invalid expires-at=%s\n' "${secret}" "${expires}"
+    continue
+  }
+  if (( expires_epoch > now )); then
+    printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason not_expired \
+      '{cluster:$cluster,provider:$provider,decision:"keep",reason:$reason,timestamp:(now|floor)}')" >> "${audit_file}"
+    printf '  keep %s: expires-at=%s\n' "${secret}" "${expires}"
+    continue
+  fi
+
+  # Expiry alone is not enough: require a continuous API failure for the grace period.
+  if kubectl --context "${cluster}" get --raw=/readyz >/dev/null 2>&1; then
+    printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason api_healthy \
+      '{cluster:$cluster,provider:$provider,decision:"keep",reason:$reason,timestamp:(now|floor)}')" >> "${audit_file}"
+    printf '  keep %s: API is reachable\n' "${secret}"
+    continue
+  fi
+  mkdir -p "${state_dir}"
+  state_file="${state_dir}/$(printf '%s' "${secret}" | tr -c 'A-Za-z0-9_.-' '_').first-failure"
+  if [[ ! -s "${state_file}" ]]; then
+    printf '%s\n' "${now}" > "${state_file}"
+  fi
+  first_failure="$(cat "${state_file}")"
+  if (( now - first_failure < grace )); then
+    printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason grace_period \
+      '{cluster:$cluster,provider:$provider,decision:"keep",reason:$reason,timestamp:(now|floor)}')" >> "${audit_file}"
+    printf '  keep %s: API failure grace period (%ss/%ss)\n' "${secret}" "$(( now - first_failure ))" "${grace}"
+    continue
+  fi
+
+  printf '  expired %s (cluster=%s sandbox=%s expires-at=%s)\n' "${secret}" "${cluster}" "${sandbox:-unknown}" "${expires}"
+  if (( confirm == 0 )); then
+    printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason expired_api_unreachable \
+      '{cluster:$cluster,provider:$provider,decision:"propose",reason:$reason,timestamp:(now|floor)}')" >> "${audit_file}"
+    printf '    DRY_RUN: would delete managed Applications for %s and Secret %s\n' "${cluster}" "${secret}"
+    continue
+  fi
+
+  while IFS= read -r app; do
+    [[ -n "${app}" ]] || continue
+    "${kubectl_cmd[@]}" -n "${argocd_ns}" patch "application/${app}" --type=merge \
+      -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
+    "${kubectl_cmd[@]}" -n "${argocd_ns}" delete "application/${app}" --ignore-not-found >/dev/null 2>&1 || true
+  done < <("${kubectl_cmd[@]}" -n "${argocd_ns}" get applications -o json | jq -r --arg cluster "${cluster}" '
+    .items[] | select(.metadata.labels["k3d-manager/managed"] == "true") |
+    select((.spec.destination.name // "") == $cluster or (.metadata.labels["k3d-manager/cluster"] // "") == $cluster) |
+    .metadata.name')
+  "${kubectl_cmd[@]}" -n "${argocd_ns}" delete secret "${secret}" --ignore-not-found >/dev/null 2>&1 || true
+  printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason expired_api_unreachable \
+    '{cluster:$cluster,provider:$provider,decision:"delete",reason:$reason,timestamp:(now|floor)}')" >> "${audit_file}"
+  rm -f "${state_file}"
+  printf '    removed %s and its managed Applications\n' "${secret}"
+done
