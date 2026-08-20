@@ -38,6 +38,11 @@
 - **Hub preservation fix landed:** `make down CLEANUP_STALE=1` now implies `--keep-hub`, and
   `bin/cluster-down --keep-hub` preserves the Hub-dependent access layer; the prior post-teardown
   ordering deleted `k3d-k3d-cluster` before cleanup and took down ArgoCD/Grafana.
+- **Hostinger-only services recovered (2026-08-20):** rebuilt the deleted local Hub without AWS,
+  bootstrapped ArgoCD/observability, re-registered the surviving `ubuntu-hostinger` cluster, and
+  restored Cloudflare/port-forward access. Final public checks: ArgoCD HTTP 200 and Grafana HTTP 302;
+  Grafana local health HTTP 200. Current Grafana/ArgoCD credentials were regenerated; use
+  `make show-service-passwords`. Hostinger frontend rollout remains a separate degraded issue.
 - **SSM bootstrap fallback fixed** in `40f1d19a`: when `_ssm_bootstrap_k3s` fails during readiness,
   the provider disables SSM and retries `deploy_app_cluster` over SSH; it still fails if both
   transports fail. Evidence and regression coverage are recorded in

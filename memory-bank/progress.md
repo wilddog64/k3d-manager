@@ -35,6 +35,10 @@
 - [x] Fixed `make down CLEANUP_STALE=1` Hub/access-layer loss: the target now implies `--keep-hub`,
   and `bin/cluster-down --keep-hub` leaves Hub-dependent ArgoCD/Grafana listeners running. The old
   post-teardown cleanup deleted the Hub before stale cleanup could run, taking down ArgoCD/Grafana.
+- [x] Recovered Hostinger-only topology after the Hub teardown: rebuilt local k3d Hub, bootstrapped
+  ArgoCD/observability, refreshed `ubuntu-hostinger`, and verified public ArgoCD HTTP 200/Grafana
+  HTTP 302 plus local Grafana health 200. Recovery evidence and regenerated-credential note are in
+  `docs/issues/2026-08-20-stale-cleanup-deleted-hub-access-layer.md`.
 - [x] SSM bootstrap readiness now falls back to SSH and fails only when both transports fail
   (`40f1d19a`, pushed on `k3d-manager-v1.26.0`); provider BATS 13/13 and shellcheck passed.
 - [x] Added explicit SSM/SSH transition and success logs (`2424f55f`, pushed on
