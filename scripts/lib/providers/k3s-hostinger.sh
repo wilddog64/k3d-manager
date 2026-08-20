@@ -405,13 +405,48 @@ FRONTEND_WRAPPER
   chmod 700 "${wrapper_path}"
 }
 
+function _hostinger_write_monitoring_port_forward_wrapper() {
+  local wrapper_path="$1" log_file="$2" service="$3" context_name="$4" local_port="$5" remote_port="$6"
+  local kubectl_bin health_path="/metrics"
+  kubectl_bin="$(command -v kubectl 2>/dev/null || printf '%s' kubectl)"
+  [[ "${service}" == "svc/kube-prometheus-stack-grafana" ]] && health_path="/api/health"
+  cat > "${wrapper_path}" <<WRAPPER
+#!/usr/bin/env bash
+set -u
+_log="${log_file}"
+_health_url="http://127.0.0.1:${local_port}${health_path}"
+while true; do
+  printf '%s\\n' "[\$(date)] starting ${service} port-forward" >> "\${_log}"
+  "${kubectl_bin}" --context "${context_name}" port-forward "${service}" \\
+    --namespace monitoring "${local_port}:${remote_port}" >> "\${_log}" 2>&1 &
+  _pf_pid=\$!
+  _elapsed=0
+  while kill -0 "\${_pf_pid}" 2>/dev/null; do
+    sleep 5
+    ((_elapsed += 5))
+    if ((_elapsed >= 30)) && ! curl -fsS --max-time 3 "\${_health_url}" >/dev/null 2>&1; then
+      printf '%s\\n' "[\$(date)] health check failed — restarting stale port-forward" >> "\${_log}"
+      kill "\${_pf_pid}" 2>/dev/null || true
+      break
+    fi
+  done
+  wait "\${_pf_pid}" 2>/dev/null || true
+  sleep 2
+done
+WRAPPER
+  chmod 700 "${wrapper_path}"
+}
+
 function _hostinger_write_monitoring_port_forward_plist() {
   local plist="$1" log_file="$2" service="$3" context_name="$4" local_port="$5" remote_port="$6"
-  local kubectl_bin kubeconfig_value
+  local kubectl_bin kubeconfig_value wrapper_path
 
   kubectl_bin="$(command -v kubectl 2>/dev/null || printf '%s' kubectl)"
   kubeconfig_value="${HOME}/.kube/config:${_HOSTINGER_KUBECONFIG}"
+  wrapper_path="${plist%.plist}.sh"
   mkdir -p "$(dirname "${plist}")" "$(dirname "${log_file}")"
+  _hostinger_write_monitoring_port_forward_wrapper \
+    "${wrapper_path}" "${log_file}" "${service}" "${context_name}" "${local_port}" "${remote_port}"
   cat > "${plist}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -421,14 +456,8 @@ function _hostinger_write_monitoring_port_forward_plist() {
   <string>$(basename "${plist}" .plist)</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${kubectl_bin}</string>
-    <string>port-forward</string>
-    <string>${service}</string>
-    <string>--namespace</string>
-    <string>monitoring</string>
-    <string>--context</string>
-    <string>${context_name}</string>
-    <string>${local_port}:${remote_port}</string>
+    <string>/bin/bash</string>
+    <string>${wrapper_path}</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -836,7 +865,7 @@ function _hostinger_reconcile_vault_cluster_store() {
       if declare -f tunnel_stop >/dev/null 2>&1; then
         tunnel_stop >/dev/null 2>&1 || true
       fi
-      tunnel_start || return 1
+      _dry_guard "start Hostinger reverse Vault tunnel" tunnel_start || return 1
       TUNNEL_SSH_HOST="${_prev_tunnel_host}"
     fi
 
@@ -895,8 +924,8 @@ HELP
   fi
 
   _hostinger_wait_for_ssh "${host}" "${ssh_user}" "${ssh_key}" || return 1
-  _hostinger_k3sup_install "${host}" "${ssh_user}" "${ssh_key}" || return 1
-  _hostinger_merge_kubeconfig || return 1
+  _dry_guard "install k3s on Hostinger" _hostinger_k3sup_install "${host}" "${ssh_user}" "${ssh_key}" || return 1
+  _dry_guard "merge Hostinger kubeconfig" _hostinger_merge_kubeconfig || return 1
 
   _info "[k3s-hostinger] Waiting for node to be Ready..."
   local attempts=0
@@ -918,8 +947,8 @@ HELP
       k3d-manager/node-type=server --overwrite >/dev/null 2>&1 || true
 
   _info "[k3s-hostinger] Registering cluster with hub ArgoCD..."
-  _hostinger_register_cluster || return 1
-  _acg_record_provider "k3s-hostinger"
+  _dry_guard "register Hostinger cluster with hub" _hostinger_register_cluster || return 1
+  _dry_guard "record Hostinger active provider" _acg_record_provider "k3s-hostinger"
 
   _info "[k3s-hostinger] Cluster ready."
   _info "[k3s-hostinger] Verify: kubectl --context ${_HOSTINGER_KUBE_CONTEXT} get nodes"
@@ -950,7 +979,11 @@ HELP
 
   _info "[k3s-hostinger] Uninstalling k3s on ${ssh_user}@${host}..."
   local _uninstall_rc=0
-  _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" 'sudo sh -c "test -x /usr/local/bin/k3s-uninstall.sh && /usr/local/bin/k3s-uninstall.sh"' || _uninstall_rc=$?
+  if _dry_run_active; then
+    _info "DRY_RUN: would uninstall k3s on ${ssh_user}@${host}"
+  else
+    _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" 'sudo sh -c "test -x /usr/local/bin/k3s-uninstall.sh && /usr/local/bin/k3s-uninstall.sh"' || _uninstall_rc=$?
+  fi
   if [[ "${_uninstall_rc}" -eq 255 ]]; then
     printf 'ERROR: %s\n' "[k3s-hostinger] SSH to ${ssh_user}@${host} failed — cannot uninstall k3s" >&2
     return 1
@@ -958,16 +991,28 @@ HELP
     _info "[k3s-hostinger] k3s-uninstall.sh not present or returned ${_uninstall_rc} — skipping"
   fi
 
-  _hostinger_deregister_cluster || true
+  _dry_guard "deregister Hostinger cluster from hub" _hostinger_deregister_cluster || true
 
   if kubectl config get-contexts "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1; then
-    kubectl config delete-context "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+    if _dry_run_active; then
+      _info "DRY_RUN: would remove kubeconfig context ${_HOSTINGER_KUBE_CONTEXT}"
+    else
+      kubectl config delete-context "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+    fi
     _info "[k3s-hostinger] Removed kubeconfig context ${_HOSTINGER_KUBE_CONTEXT}"
   fi
 
-  rm -f "${_HOSTINGER_KUBECONFIG}"
-  rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
+  _dry_guard "remove Hostinger kubeconfig" rm -f "${_HOSTINGER_KUBECONFIG}"
+  _dry_guard "remove Hostinger active-provider marker" rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
   _info "[k3s-hostinger] k3s uninstalled; VPS preserved."
+}
+
+function _provider_k3s_hostinger_refresh_access_layer() {
+  _hostinger_require_host >/dev/null || return 1
+  _info "[k3s-hostinger] Refreshing edge only (cloudflared + port-forwards) — no GitOps reapply"
+  _hostinger_refresh_access_layer || return 1
+  _info "[k3s-hostinger] Edge refresh complete"
+  printf '%s\n' "__WEBHOOK_SUCCESS__"
 }
 
 function _provider_k3s_hostinger_refresh_cluster() {

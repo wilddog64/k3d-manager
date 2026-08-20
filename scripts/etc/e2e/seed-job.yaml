@@ -1,0 +1,66 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: product-catalog-seed
+  labels:
+    app.kubernetes.io/name: product-catalog
+    app.kubernetes.io/component: seed
+    app.kubernetes.io/part-of: shopping-cart-e2e
+spec:
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: product-catalog
+        app.kubernetes.io/component: seed
+        app.kubernetes.io/part-of: shopping-cart-e2e
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-service
+        image: alpine:3.19
+        command:
+        - sh
+        - -c
+        - |
+          until wget -qO- http://product-catalog.shopping-cart-apps.svc.cluster.local:8000/health; do
+            echo "Waiting for product-catalog service to create tables..."
+            sleep 2
+          done
+      containers:
+      - name: seed
+        image: python:3.12-alpine
+        command:
+        - sh
+        - -c
+        - |
+          pip install --quiet --target /tmp/packages psycopg2-binary
+          PYTHONPATH=/tmp/packages python3 /scripts/seed.py
+        env:
+        - name: DB_HOST
+          value: postgres
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: products
+        - name: DB_USERNAME
+          value: postgres
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: e2e-datastore-credentials
+              key: postgres-password
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: scripts
+        configMap:
+          name: product-catalog-seed-script
+      - name: tmp
+        emptyDir: {}

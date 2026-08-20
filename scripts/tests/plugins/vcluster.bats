@@ -143,6 +143,55 @@ BIN
   [ "$VCLUSTER_INSTALL_DIR" = "/usr/local/bin" ]
 }
 
+@test "VCLUSTER_LOCAL_PORT defaults to 11443" {
+  [ "$VCLUSTER_LOCAL_PORT" = "11443" ]
+}
+
+@test "_vcluster_export_kubeconfig pins --local-port so the kubeconfig port survives proxy re-creation" {
+  _write_sensitive_file() { :; }
+  run _vcluster_export_kubeconfig demo
+  [ "$status" -eq 0 ]
+  run grep -F -- "vcluster connect demo -n vclusters --local-port 11443 --print" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "_vcluster_export_kubeconfig honours VCLUSTER_LOCAL_PORT override" {
+  _write_sensitive_file() { :; }
+  VCLUSTER_LOCAL_PORT=22443 run _vcluster_export_kubeconfig demo
+  [ "$status" -eq 0 ]
+  run grep -F -- "--local-port 22443 --print" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "_vcluster_refresh_connection requires a name" {
+  run _vcluster_refresh_connection
+  [ "$status" -ne 0 ]
+}
+
+@test "_vcluster_refresh_connection removes the stale proxy and reconnects on the pinned port" {
+  _run_command() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --probe) shift 2 ;;
+        --*) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$RUN_LOG"
+    case "$*" in
+      docker\ ps*) printf '%s\n' "vcluster_demo_vclusters_k3d-k3d-cluster_background_proxy" ;;
+    esac
+    return 0
+  }
+  run _vcluster_refresh_connection demo
+  [ "$status" -eq 0 ]
+  run grep -F -- "docker rm -f vcluster_demo_vclusters_k3d-k3d-cluster_background_proxy" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F -- "vcluster connect demo -n vclusters --local-port 11443 --print" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
 @test "vcluster_install_cli is a public function" {
   run grep -n "^function vcluster_install_cli" "${BATS_TEST_DIRNAME}/../../plugins/vcluster.sh"
   [ "$status" -eq 0 ]

@@ -1,7 +1,7 @@
 # Slack Slash Commands & Webhook Server
 
 Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/cluster-diagnose`, `/cluster-refresh`,
-`/cluster-resume`, `/hostinger-status`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
+`/cluster-resume`, `/hostinger-status`, `/cleanup-stale-sandbox`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
 that control the k3d-manager cluster from any Slack channel, plus thread-based AI troubleshooting
 and job control via thread replies.
 
@@ -66,7 +66,7 @@ remote-operator role. The webhook enforces that role before it queues work.
 |------|------------------|
 | `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
 | `operator` | `/cluster-refresh` plus everything in `reader` |
-| `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade` plus everything in `operator` |
+| `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade`, `/cleanup-stale-sandbox` plus everything in `operator` |
 
 The relay forwards these metadata headers to the webhook:
 
@@ -155,6 +155,13 @@ Run once per machine. Safe to re-run.
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Check Hostinger app cluster status",
         "usage_hint": "e.g. no args",
+        "should_escape": false
+      },
+      {
+        "command": "/cleanup-stale-sandbox",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Clean expired k3s-aws sandbox state",
+        "usage_hint": "[confirm]  (dry-run by default)",
         "should_escape": false
       },
       {
@@ -301,6 +308,7 @@ bin/k3dm-webhook-setup --uninstall
 | `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | `/cluster-refresh hostinger` | Re-establishes SSH tunnel, refreshes kubeconfig |
 | `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
 | `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
+| `/cleanup-stale-sandbox [confirm]` | Clean expired k3s-aws sandbox state | `/cleanup-stale-sandbox` | Admin-only; dry-run by default, `confirm` applies |
 | `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/gemini <question>` | Multi-agent cluster troubleshooting | `/gemini why is data-layer out of sync?` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/codex <question>` | Multi-agent cluster troubleshooting | `/codex explain this ArgoCD drift` | See [agent commands](#claude--gemini--codex-commands) below |

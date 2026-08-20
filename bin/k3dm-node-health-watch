@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Bounded k3d agent recovery watchdog. It only restarts the configured agent
+# after repeated kubelet-proxy failures and a cooldown; keep it disabled when
+# running manually unless K3DM_NODE_RECOVERY_ENABLED=1 is explicitly set.
+set -u
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
+
+context="${K3DM_NODE_RECOVERY_CONTEXT:-k3d-k3d-cluster}"
+node="${K3DM_NODE_RECOVERY_NODE:-k3d-k3d-cluster-agent-0}"
+interval="${K3DM_NODE_RECOVERY_INTERVAL:-30}"
+threshold="${K3DM_NODE_RECOVERY_FAILURE_THRESHOLD:-3}"
+cooldown="${K3DM_NODE_RECOVERY_COOLDOWN:-300}"
+enabled="${K3DM_NODE_RECOVERY_ENABLED:-0}"
+log_file="${K3DM_NODE_RECOVERY_LOG:-${HOME}/.local/share/k3d-manager/logs/node-health-watch.log}"
+state_file="${K3DM_NODE_RECOVERY_STATE:-${HOME}/.local/share/k3d-manager/node-health-watch.state}"
+
+mkdir -p "$(dirname "$log_file")" "$(dirname "$state_file")"
+
+_log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >>"$log_file"; }
+
+_healthy() {
+  kubectl --context "$context" get --raw "/api/v1/nodes/${node}/proxy/healthz" \
+    --request-timeout=5s 2>/dev/null | grep -qx 'ok'
+}
+
+_ready() {
+  kubectl --context "$context" get node "$node" \
+    -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' \
+    --request-timeout=5s 2>/dev/null | grep -qx 'True'
+}
+
+_recover() {
+  local last=0 now
+  [[ "$enabled" == 1 ]] || { _log "agent unhealthy (recovery disabled)"; return 0; }
+  last="$(cat "$state_file" 2>/dev/null || echo 0)"
+  now="$(date +%s)"
+  (( now - last >= cooldown )) || { _log "agent unhealthy (recovery cooldown active)"; return 0; }
+  if ! docker inspect -f '{{.State.Status}}' "$node" 2>/dev/null | grep -qx running; then
+    _log "agent container ${node} is not running; no restart attempted"
+    return 0
+  fi
+  printf '%s\n' "$now" >"$state_file"
+  _log "restarting ${node} after ${threshold} consecutive kubelet-proxy failures"
+  docker restart "$node" >>"$log_file" 2>&1 || { _log "restart failed"; return 1; }
+  for _ in {1..20}; do
+    _ready && _healthy && { _log "${node} recovered"; return 0; }
+    sleep 5
+  done
+  _log "${node} did not recover within 100s"
+  return 1
+}
+
+failures=0
+while :; do
+  if _ready && _healthy; then
+    failures=0
+  else
+    failures=$((failures + 1))
+    _log "${node} health probe failed (${failures}/${threshold})"
+    if (( failures >= threshold )); then
+      _recover || true
+      failures=0
+    fi
+  fi
+  sleep "$interval"
+done

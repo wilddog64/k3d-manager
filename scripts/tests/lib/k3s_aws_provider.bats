@@ -78,11 +78,69 @@
     source scripts/lib/provider.sh
     source scripts/lib/providers/k3s-aws.sh
     # stubs after source — override real implementations from acg.sh
+    _k3s_aws_deregister_cluster() { echo "[stub] deregister"; return 0; }
     acg_teardown() { echo "[stub] acg_teardown"; return 0; }
     tunnel_stop() { return 0; }
     _ACG_WATCH_PID_FILE="$(mktemp)"; rm -f "$_ACG_WATCH_PID_FILE"
     _provider_k3s_aws_destroy_cluster --confirm
   '
   [ "$status" -eq 0 ]
+  [[ "$output" == *"[stub] deregister"* ]]
   [[ "$output" == *"[stub] acg_teardown"* ]]
+  [ "$(printf "%s\n" "$output" | grep -n "\[stub\] deregister" | cut -d: -f1)" -lt \
+    "$(printf "%s\n" "$output" | grep -n "\[stub\] acg_teardown" | cut -d: -f1)" ]
+}
+
+@test "_k3s_aws_deregister_cluster DRY_RUN describes the hub cleanup" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    DRY_RUN=1 _k3s_aws_deregister_cluster
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"DRY_RUN: delete hub ArgoCD secret cluster-ubuntu-k3s in cicd"* ]]
+  [[ "$output" == *"generated Applications targeting ubuntu-k3s"* ]]
+}
+
+@test "_k3s_aws_deregister_cluster deletes only ubuntu-k3s hub objects" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    LOG="$(mktemp)"
+    _argocd_hub_kubectl_cmd() { echo kubectl; }
+    kubectl() {
+      printf "%s\n" "$*" >> "$LOG"
+      case "$*" in
+        *"get applications"*) printf "%s\n" "application/ubuntu-k3s-shopping-cart-payment" ;;
+      esac
+      return 0
+    }
+    _k3s_aws_deregister_cluster
+    cat "$LOG"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"delete secret cluster-ubuntu-k3s"* ]]
+  [[ "$output" == *"patch application/ubuntu-k3s-shopping-cart-payment"* ]]
+  [[ "$output" == *"delete application/ubuntu-k3s-shopping-cart-payment"* ]]
+  [[ "$output" != *"ubuntu-hostinger"* ]]
+}
+
+@test "_k3s_aws_deregister_cluster is idempotent when hub objects are absent" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _argocd_hub_kubectl_cmd() { echo kubectl; }
+    kubectl() { return 1; }
+    _k3s_aws_deregister_cluster
+  '
+  [ "$status" -eq 0 ]
 }

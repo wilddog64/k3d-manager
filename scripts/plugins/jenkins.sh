@@ -1063,18 +1063,15 @@ function _jenkins_run_smoke_test() {
 
    local smoke_rc=0
    if (( use_port_forward )); then
-      case "${K3DM_DEPLOY_DRY_RUN:-0}" in
-         1)
-            _run_command -- kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443"
-            _jenkins_exec_smoke_cmd
-            smoke_rc=$?
-            ;;
-         *)
-            _info "[jenkins] ingress IP ${ingress_ip} is private; using kubectl port-forward to ${pf_namespace}/${pf_service} -> 127.0.0.1:${pf_port}"
-            _jenkins_run_smoke_via_port_forward "$pf_namespace" "$pf_service" "$pf_port"
-            smoke_rc="$_JENKINS_SMOKE_PF_RC"
-            ;;
-      esac
+      if _dry_run_active; then
+         _run_command -- kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443"
+         _jenkins_exec_smoke_cmd
+         smoke_rc=$?
+      else
+         _info "[jenkins] ingress IP ${ingress_ip} is private; using kubectl port-forward to ${pf_namespace}/${pf_service} -> 127.0.0.1:${pf_port}"
+         _jenkins_run_smoke_via_port_forward "$pf_namespace" "$pf_service" "$pf_port"
+         smoke_rc="$_JENKINS_SMOKE_PF_RC"
+      fi
    else
       _jenkins_exec_smoke_cmd
       smoke_rc=$?

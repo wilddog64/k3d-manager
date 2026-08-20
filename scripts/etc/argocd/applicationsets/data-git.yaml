@@ -43,6 +43,11 @@ spec:
             - .spec.volumeClaimTemplates[].apiVersion
             - .spec.volumeClaimTemplates[].kind
       syncPolicy:
+        managedNamespaceMetadata:
+          labels:
+            app.kubernetes.io/name: shopping-cart
+            app.kubernetes.io/part-of: shopping-cart
+            app.kubernetes.io/component: data
         automated:
           prune: false
           selfHeal: true

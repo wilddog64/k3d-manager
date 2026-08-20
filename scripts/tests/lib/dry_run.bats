@@ -9,7 +9,35 @@ setup() {
 }
 
 teardown() {
-  unset K3DM_DEPLOY_DRY_RUN
+  unset DRY_RUN K3DM_DEPLOY_DRY_RUN
+}
+
+@test "canonical DRY_RUN disables commands and activates predicate" {
+  export DRY_RUN=1
+  run _dry_run_active
+  [ "$status" -eq 0 ]
+  run _run_command -- touch "$BATS_TEST_TMPDIR/canonical"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[dry-run]"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/canonical" ]
+}
+
+@test "legacy K3DM_DEPLOY_DRY_RUN remains a compatible alias" {
+  export K3DM_DEPLOY_DRY_RUN=1
+  run _dry_run_active
+  [ "$status" -eq 0 ]
+  run _run_command -- touch "$BATS_TEST_TMPDIR/legacy"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[dry-run]"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/legacy" ]
+}
+
+@test "dry-run predicate is inactive when both flags are unset or zero" {
+  DRY_RUN=0 K3DM_DEPLOY_DRY_RUN=0 run _dry_run_active
+  [ "$status" -ne 0 ]
+  unset DRY_RUN K3DM_DEPLOY_DRY_RUN
+  run _dry_run_active
+  [ "$status" -ne 0 ]
 }
 
 @test "dry-run prints command instead of executing" {

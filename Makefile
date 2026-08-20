@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-alertmanager-auth-proxy uninstall-alertmanager-auth-proxy clean-tmp
+.PHONY: up down refresh cleanup-stale-sandbox status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -41,9 +41,20 @@ refresh:
 	  *)       $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-refresh "$(URL)" ;; \
 	esac
 
+## Remove stale state from an expired k3s-aws sandbox (dry-run unless CONFIRM=1)
+cleanup-stale-sandbox:
+	@CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM="$(CONFIRM)" bin/cleanup-stale-sandbox
+
+## Restart the k3s-hostinger laptop edge only (cloudflared + port-forwards) — no GitOps reapply
+refresh-edge:
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_access_layer ;; \
+	  *) echo "refresh-edge is k3s-hostinger-only (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER))"; exit 1 ;; \
+	esac
+
 ## Show cluster nodes, pods, endpoint + ESO health (provider-aware)
 status:
-	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ] && [ -r "$(HOME)/.local/share/k3d-manager/active-provider" ]; then _provider="$$(cat "$(HOME)/.local/share/k3d-manager/active-provider")"; fi; case "$$_provider" in \
+	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ]; then _provider=k3s-hostinger; if [ -r "$(HOME)/.local/share/k3d-manager/active-provider" ]; then _provider="$$(cat "$(HOME)/.local/share/k3d-manager/active-provider")"; fi; fi; case "$$_provider" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
 	             || echo "OCI cluster unreachable" ;; \
@@ -203,6 +214,20 @@ install-cleanup:
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
 	@echo "Cleanup agent installed — fires daily at 03:00"
 
+## Install the bounded k3d agent health/recovery watchdog (restarts after 3 failures)
+install-node-health-watch:
+	sed -e "s|{{REPO_ROOT}}|$$(pwd)|g" -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.node-health-watch.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.node-health-watch" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
+	@echo "Node health watchdog installed — recovery is bounded to agent-0 with a 5-minute cooldown"
+
+uninstall-node-health-watch:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.node-health-watch" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
+	@echo "Node health watchdog removed"
+
 ## Install the Vault port-forward LaunchAgent — keeps kubectl port-forward vault-0 18200:8200 alive
 install-vault-port-forward:
 	sed \
@@ -285,6 +310,14 @@ update-webhook-slack:
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
 	$(MAKE) restart-webhook
 	@echo "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID injected — webhook restarted"
+
+## Store the Slack user→role allowlist in Keychain and restart the webhook
+## Example: make update-webhook-slack-roles K3DM_SLACK_ROLE_MAP=U123:admin,U456:operator
+update-webhook-slack-roles:
+	@[ -n "$(K3DM_SLACK_ROLE_MAP)" ] || (echo "ERROR: K3DM_SLACK_ROLE_MAP not set — use user_id:role[,user_id:role...]"; exit 1)
+	@security add-generic-password -U -s k3dm-slack-role-map -a k3dm -w "$(K3DM_SLACK_ROLE_MAP)"
+	$(MAKE) restart-webhook
+	@echo "K3DM_SLACK_ROLE_MAP stored in Keychain — webhook restarted"
 
 ## Inject SLACK_SIGNING_SECRET from Keychain into the webhook LaunchAgent plist and restart
 update-webhook-slack-secret:
@@ -509,6 +542,10 @@ file-bug: ## FILE_TITLE and FILE_BODY required — write docs/bugs/<date>-<slug>
 test:
 	./scripts/k3d-manager test all
 
+## Run the Tier 1 e2e verification harness (throwaway vCluster + in-cluster Playwright Job). DIGEST=<candidate image digest> optional.
+e2e:
+	./scripts/k3d-manager e2e_verify_vcluster $(DIGEST)
+
 ## Show this help
 help:
 	@echo ""
@@ -521,6 +558,7 @@ help:
 	@echo "    make status-full   Show full pod and diagnostic report"
 	@echo "    make status-json   Emit concise status as JSON"
 	@echo "    make test          Run all BATS test suites"
+	@echo "    make e2e           Run Tier 1 e2e harness (vCluster + Playwright Job; DIGEST=<image digest> optional)"
 	@echo "    make preflight     Spin up a throwaway vCluster + deploy the full stack via ArgoCD (NAME=<name> MODE=--auto|--keep|--reuse, default --auto)"
 	@echo ""
 	@echo "  k3s-aws / k3s-gcp only:"

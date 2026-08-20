@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+- **Safe local cache retention** — the existing daily `com.k3d-manager.cleanup` LaunchAgent now removes only unreferenced Packer ISO/lock artifacts older than 30 days and stale port markers older than 7 days; active caches and unrelated OrbStack data are untouched.
+- **Tier 1 E2E verification harness** — `e2e_verify_vcluster` (`scripts/plugins/e2e.sh`) stands up the shopping-cart stack (postgres + redis + product-catalog/basket/order + seed) in a throwaway vCluster via a self-contained kustomize bundle (`scripts/etc/e2e/`, zero Vault/ESO/ArgoCD dependency, `OAUTH2_ENABLED=false`, all images pinned), runs the Playwright `api`+`flows` suite as an in-cluster Job against ClusterIP DNS, writes an exit-code-faithful JSON summary to `$E2E_REPORT_DIR/<run_id>.json`, and tears the vCluster down on success **and** failure. Optional arg overrides the service-under-test image with a candidate digest. Structural + exit-code-contract coverage in `scripts/tests/plugins/e2e.bats`; learning guide `docs/guides/vcluster-e2e-harness.md` — see `docs/plans/v1.25.0-e2e-harness-tier1-impl.md`. (Part 1, the publishable `shopping-cart-e2e-tests` image + `workflow_call` surface, is a companion change in that repo.)
+
+### Fixed
+- Remediation events classified as `superseded` or `deployment_advanced` now remain in audit history but
+  are excluded from the Current CVE Remediation Status table, avoiding rows that have no applied timestamp.
+- **Monitoring stability under load** — raised the local Prometheus/Grafana CPU budgets and bounded the
+  monolithic Loki workload so liveness probes do not restart Prometheus during expensive CVE queries;
+  see `docs/issues/2026-08-17-grafana-no-data-control-plane-load.md`.
+- `make down CLUSTER_PROVIDER=k3s-aws` now deregisters the sandbox cluster and generated hub Applications, while local-provider dry-runs load the command bridge before launchd teardown (`469a3427`) — see `docs/bugs/v1.25.0-bugfix-dry-run-phase3-make-down-deregister.md`
+
+- Standardized lifecycle dry-run handling on `DRY_RUN` (while retaining the legacy alias), completed per-operation teardown guards, and added stubbed cluster-up/down coverage (`d2263cc2`) — see `docs/bugs/v1.25.0-bugfix-dry-run-phase2b-standardize-and-complete.md`
+
 ## [1.24.1] - 2026-08-13
 
 **Theme: make cluster status legible — one concise service-health view for the terminal, Slack, and automation.** A point release on top of v1.24.0. `make status` used to dump a long multi-section report that was hard to consume; it now defaults to a **concise, color-coded service-health summary** (with `make status-full` for the old detailed report and `make status-json` for a stable machine-readable summary), follows the **active cluster provider**, and takes `SERVICE=<name>` for focused per-service diagnostics. The same summary now reaches **Slack**: `/cluster-status` renders an emoji-severity one-liner (`:x:` / `:warning:` / `:white_check_mark:` + `N ok / N warn / N fail`) instead of a wall of ANSI-derived text. The CVE remediation dashboard is split into a live **Current CVE Remediation Status** table and a **Remediation History (audit)** table, with the exporter marking superseded / deployment-advanced events, and both dashboard and inventory tables hide repeated Prometheus scrape metadata behind concise column headers. Verified live on the hub: `make status-json` returns `overall=healthy` for `k3s-hostinger`, and the Slack path renders `:white_check_mark: *Cluster status: HEALTHY* — \`k3s-hostinger\` (13 ok / 0 warn / 0 fail)` from real cluster data.

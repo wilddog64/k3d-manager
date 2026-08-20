@@ -264,6 +264,7 @@ _ACTION_POLICY = {
     "/api/v1/hostinger-status": {"name": "hostinger-status", "min_role": "reader"},
     "/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"},
     "/api/v1/cluster-resume": {"name": "cluster-resume", "min_role": "admin"},
+    "/api/v1/cleanup-stale-sandbox": {"name": "cleanup-stale-sandbox", "min_role": "admin"},
     "/api/v1/analyze": {"name": "analyze", "min_role": "operator"},
     "/api/v1/ask": {"name": "ask", "min_role": "reader"},
 }
@@ -289,6 +290,7 @@ _THREAD_COMMAND_MIN_ROLE = {
     "down": "admin",
     "cluster-up": "admin",
     "up": "admin",
+    "cleanup-stale-sandbox": "admin",
 }
 
 
@@ -528,6 +530,18 @@ def _run_cleanup(job_id, provider):
         _notify_job(job_id, f"⚠️ *Cleanup error* ({provider}): {exc}")
 
 
+def _run_stale_sandbox_cleanup(job_id, confirm=False):
+    """Stop expired ACG-only forwards and remove the stale ubuntu-k3s context."""
+    cmd = [str(Path(__file__).resolve().parent / "cleanup-stale-sandbox")]
+    if confirm:
+        cmd.append("--confirm")
+    output, timed_out = _posix_spawn_capture(cmd, timeout=30)
+    if timed_out:
+        _notify_job(job_id, "⚠️ *Stale sandbox cleanup timed out*")
+    else:
+        _notify_job(job_id, f"🧹 *Stale sandbox cleanup*\n```{output.strip()}```")
+
+
 def _run_upgrade(job_id, chart_version, stage):
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
@@ -607,7 +621,23 @@ def _read_job_tail(output_path, n=3):
         return []
 
 
-def _run_cluster(job_id, action, provider="aws"):
+_DRY_RUN_TOKENS = {"dry", "dry-run", "--dry-run", "dryrun"}
+_PROVIDER_TOKENS = {"aws", "gcp", "az", "hostinger"}
+
+
+def _parse_cluster_args(command):
+    """Return (provider, dry_run) from a cluster-up/down Slack command.
+
+    Provider and dry-run tokens may appear in any order after the command word.
+    Provider defaults to 'hostinger' (matches the existing dispatch default).
+    """
+    parts = command.strip().split()[1:]
+    dry_run = any(p.lower() in _DRY_RUN_TOKENS for p in parts)
+    provider = next((p.lower() for p in parts if p.lower() in _PROVIDER_TOKENS), "hostinger")
+    return provider, dry_run
+
+
+def _run_cluster(job_id, action, provider="aws", dry_run=False):
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
     _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az", "hostinger": "k3s-hostinger"}
@@ -666,9 +696,11 @@ def _run_cluster(job_id, action, provider="aws"):
         emoji = "✅" if status == "success" else "❌"
         elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
         elapsed = elapsed_secs // 60
-        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m"
+        _dry_tag = " — DRY_RUN preview" if dry_run else ""
+        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m{_dry_tag}"
         _notify_job(job_id, summary)
-        _push_metrics(action, provider, status, elapsed_secs, job_id)
+        if not dry_run:
+            _push_metrics(action, provider, status, elapsed_secs, job_id)
 
     try:
         if action == "up":
@@ -677,11 +709,14 @@ def _run_cluster(job_id, action, provider="aws"):
             cmd = ["make", "down", f"CLUSTER_PROVIDER={_cluster_provider}"]
         else:
             cmd = ["make", "down", "KEEP_LOCAL=1"]
-        _log(f"Running {' '.join(cmd)}...")
+        _log(f"DRY_RUN: would {' '.join(cmd)}" if dry_run else f"Running {' '.join(cmd)}...")
+        _spawn_env = dict(os.environ)
+        if dry_run:
+            _spawn_env["DRY_RUN"] = "1"
         _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
-        pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT)
+        pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT, env=_spawn_env)
         with _running_procs_lock:
             _running_procs[job_id] = pid
         _, _status = os.waitpid(pid, 0)
@@ -693,7 +728,7 @@ def _run_cluster(job_id, action, provider="aws"):
         if _rc != 0:
             raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
         _log(f"{action} complete")
-        if action == "up":
+        if action == "up" and not dry_run:
             _record_acg_state(provider)
             threading.Thread(
                 target=_run_post_provision_check,
@@ -848,12 +883,14 @@ def _find_job_by_thread_ts(thread_ts):
 _THREAD_COMMANDS = {
     "kill", "diagnosis", "status", "logs", "ask",
     "cluster-up", "cluster-down", "cluster-refresh", "cluster-resume",
+    "cleanup-stale-sandbox",
     "cluster-status", "hostinger-status", "gemini", "claude", "codex",
 }
 _STANDALONE_CMDS = {
     "cluster-up", "cluster-down", "cluster-resume",
     "cluster-status", "hostinger-status", "cluster-refresh", "refresh",
     "ask", "claude", "gemini", "codex",
+    "cleanup-stale-sandbox",
 }
 
 def _handle_thread_command(job_id, command, role="admin"):
@@ -1006,8 +1043,7 @@ def _handle_thread_command(job_id, command, role="admin"):
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
-        _down_parts = command.strip().split()
-        _down_provider = _down_parts[1].lower() if len(_down_parts) >= 2 and _down_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
+        _down_provider, _down_dry = _parse_cluster_args(command)
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -1019,17 +1055,26 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "down", _down_provider),
+            kwargs={"dry_run": _down_dry},
             daemon=True,
         ).start()
-        _notify_job(job_id, f"⬇️ *cluster-down* ({_down_provider}) — lab sandbox only — queued — job `{new_job_id}`")
+        _down_tag = " — DRY_RUN preview" if _down_dry else ""
+        _notify_job(job_id, f"⬇️ *cluster-down* ({_down_provider}){_down_tag} — lab sandbox only — queued — job `{new_job_id}`")
+
+    elif cmd == "cleanup-stale-sandbox":
+        _parts = command.strip().split()
+        _confirm = len(_parts) > 1 and _parts[1].lower() in ("confirm", "apply")
+        threading.Thread(target=_run_stale_sandbox_cleanup,
+                         args=(job_id, _confirm), daemon=True).start()
+        _tag = "apply" if _confirm else "dry-run"
+        _notify_job(job_id, f"🧹 *cleanup-stale-sandbox* ({_tag}) queued")
 
     elif cmd in ("cluster-up", "up"):
         running = _running_cluster_job()
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
-        _up_parts = command.strip().split()
-        _up_provider = _up_parts[1].lower() if len(_up_parts) >= 2 and _up_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
+        _up_provider, _up_dry = _parse_cluster_args(command)
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -1041,9 +1086,11 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "up", _up_provider),
+            kwargs={"dry_run": _up_dry},
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🚀 *cluster-up* ({_up_provider}) — lab sandbox only — queued — job `{new_job_id}`")
+        _up_tag = " — DRY_RUN preview" if _up_dry else ""
+        _notify_job(job_id, f"🚀 *cluster-up* ({_up_provider}){_up_tag} — lab sandbox only — queued — job `{new_job_id}`")
 
     elif cmd == "ask":
         _VALID_AGENTS = {"claude", "gemini", "codex"}
@@ -1103,7 +1150,7 @@ def _handle_thread_command(job_id, command, role="admin"):
     else:
         _notify_job(
             job_id,
-            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `/claude`, `/gemini`, `/codex`, `cluster-up`, `cluster-down`, `cluster-status`, `cluster-refresh`, `cluster-resume`",
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`, `cleanup-stale-sandbox [confirm]` (admin)",
         )
 
 
@@ -1678,6 +1725,7 @@ def _smoke_test_logins(provider, app_context):
     absence of credentials never reports red. Returns list of (name, ok, detail)."""
     import ssl
     import os
+    import time
     import urllib.parse
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -1706,7 +1754,8 @@ def _smoke_test_logins(provider, app_context):
         keycloak_base = "http://keycloak.shopping-cart.local"
         frontend_base = "http://frontend.shopping-cart.local"
     grafana_base = "https://grafana.3ai-talk.org"
-    argocd_base = "http://localhost:8080"
+    argocd_base = ("https://argocd.3ai-talk.org"
+                   if provider == "k3s-hostinger" else "http://localhost:8080")
 
     def _post(url, data, headers=None):
         body = urllib.parse.urlencode(data).encode() if isinstance(data, dict) else data
@@ -1754,22 +1803,31 @@ def _smoke_test_logins(provider, app_context):
     if kc_token is None:
         results.append(("Frontend login", None, "skipped (no Keycloak token)"))
     else:
-        try:
-            req = urllib.request.Request(
-                f"{frontend_base.rstrip('/')}{fe_path}",
-                headers={"User-Agent": "k3dm-smoketest/1",
-                         "Authorization": f"Bearer {kc_token}"},
-            )
-            with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
-                ok = 200 <= resp.status < 300
-                results.append(("Frontend login", ok, f"HTTP {resp.status} on {fe_path}"))
-        except urllib.error.HTTPError as exc:
-            if kc_via_smoke_client and exc.code in (401, 403):
-                results.append(("Frontend login", None, f"skipped (smoke-client token rejected: HTTP {exc.code} on {fe_path})"))
-            else:
-                results.append(("Frontend login", False, f"HTTP {exc.code} on {fe_path}"))
-        except Exception as exc:
-            results.append(("Frontend login", False, str(exc)[:200]))
+        _frontend_detail = ""
+        _frontend_ok = False
+        _frontend_skipped = False
+        for _attempt in range(_SMOKE_RETRIES):
+            try:
+                req = urllib.request.Request(
+                    f"{frontend_base.rstrip('/')}{fe_path}",
+                    headers={"User-Agent": "k3dm-smoketest/1",
+                             "Authorization": f"Bearer {kc_token}"},
+                )
+                with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                    _frontend_ok = 200 <= resp.status < 300
+                    _frontend_detail = f"HTTP {resp.status} on {fe_path}"
+            except urllib.error.HTTPError as exc:
+                if kc_via_smoke_client and exc.code in (401, 403):
+                    _frontend_skipped = True
+                    _frontend_detail = f"skipped (smoke-client token rejected: HTTP {exc.code} on {fe_path})"
+                else:
+                    _frontend_detail = f"HTTP {exc.code} on {fe_path}"
+            except Exception as exc:
+                _frontend_detail = str(exc)[:200]
+            if _frontend_ok or _frontend_skipped or _attempt == _SMOKE_RETRIES - 1:
+                break
+            time.sleep(_SMOKE_RETRY_SLEEP)
+        results.append(("Frontend login", None if _frontend_skipped else _frontend_ok, _frontend_detail))
 
     argo_user = os.environ.get("K3DM_SMOKE_ARGOCD_USER", "admin")
     argo_pass = os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _vault_secret("argocd/admin", "password") or _smoke_secret(
@@ -1834,17 +1892,25 @@ def _smoke_test_services(retries=None, provider=None):
         keycloak_url = "http://keycloak.shopping-cart.local/health/live"
 
     results = []
+    if provider == "k3s-hostinger":
+        argocd_health_url = "https://argocd.3ai-talk.org/healthz"
+        prometheus_ready_url = "https://prometheus.3ai-talk.org/-/ready"
+    else:
+        argocd_health_url = "http://localhost:8080/healthz"
+        prometheus_ready_url = "http://localhost:19090/-/ready"
+
     smoke_endpoints = [
-        ("ArgoCD", "http://localhost:8080/healthz", [200]),
+        ("ArgoCD", argocd_health_url, [200]),
         ("Frontend", frontend_url, [200]),
         ("Keycloak", keycloak_url, [200]),
-        ("Prometheus", "http://localhost:19090/-/ready", [200]),
+        ("Prometheus", prometheus_ready_url, [200]),
         ("Grafana", "https://grafana.3ai-talk.org/api/health", [200]),
     ]
     if _provider_supports_pushgateway(provider):
         smoke_endpoints.append(("Pushgateway", "http://localhost:9091/-/healthy", [200]))
 
-    for name, url, ok_codes in smoke_endpoints:
+    def _probe_endpoint(endpoint):
+        name, url, ok_codes = endpoint
         last_err = ""
         passed = False
         for attempt in range(_retries):
@@ -1861,7 +1927,14 @@ def _smoke_test_services(retries=None, provider=None):
                 last_err = str(exc)
             if attempt < _retries - 1:
                 time.sleep(_SMOKE_RETRY_SLEEP)
-        results.append((name, passed, last_err))
+        return name, passed, last_err
+
+    # These probes are independent. Running them serially made one slow API or
+    # tunnel consume the whole webhook request budget and collapse status to
+    # UNKNOWN; keep per-service failures but complete the response in parallel.
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=len(smoke_endpoints)) as _pool:
+        results.extend(_pool.map(_probe_endpoint, smoke_endpoints))
 
     if _provider_supports_pushgateway(provider):
         for _i, (_pn, _pok, _pd) in enumerate(results):
@@ -1877,27 +1950,32 @@ def _smoke_test_services(retries=None, provider=None):
                                    f"not deployed (no pushgateway pod on {app_context})")
                 break
 
-    # Product catalog: verify at least one product has a non-empty imageUrl
-    try:
-        products_url = f"{frontend_url.rstrip('/')}/api/products"
-        req = urllib.request.Request(
-            products_url,
-            headers={"User-Agent": "k3dm-smoketest/1"},
-        )
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            body = json.loads(resp.read())
-            # API returns {"items": [...]} or a plain list
-            products = body.get("items", body) if isinstance(body, dict) else body
-            if isinstance(products, list) and products:
-                with_images = sum(1 for p in products if p.get("imageUrl") or p.get("image_url"))
-                if with_images > 0:
-                    results.append(("Product images", True, f"{with_images}/{len(products)} have image_url"))
+    # Product catalog: verify at least one product has a non-empty imageUrl.
+    # This request follows the same retry contract as the health endpoints;
+    # during tunnel/node recovery a transient 502 must not become a false
+    # product-data failure.
+    _products_detail = ""
+    _products_ok = False
+    for _attempt in range(_SMOKE_RETRIES):
+        try:
+            products_url = f"{frontend_url.rstrip('/')}/api/products"
+            req = urllib.request.Request(products_url, headers={"User-Agent": "k3dm-smoketest/1"})
+            with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                body = json.loads(resp.read())
+                products = body.get("items", body) if isinstance(body, dict) else body
+                if isinstance(products, list) and products:
+                    with_images = sum(1 for p in products if p.get("imageUrl") or p.get("image_url"))
+                    _products_ok = with_images > 0
+                    _products_detail = (f"{with_images}/{len(products)} have image_url"
+                                        if _products_ok else f"0/{len(products)} have image_url")
                 else:
-                    results.append(("Product images", False, f"0/{len(products)} have image_url"))
-            else:
-                results.append(("Product images", False, "empty or non-list response"))
-    except Exception as exc:
-        results.append(("Product images", False, str(exc)))
+                    _products_detail = "empty or non-list response"
+        except Exception as exc:
+            _products_detail = str(exc)[:200]
+        if _products_ok or _attempt == _SMOKE_RETRIES - 1:
+            break
+        time.sleep(_SMOKE_RETRY_SLEEP)
+    results.append(("Product images", _products_ok, _products_detail))
 
     try:
         _css_out, _css_timeout = _posix_spawn_capture(
@@ -2144,6 +2222,10 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
     def _finish(status):
         (job_dir / "status").write_text(status)
         output = "".join(lines)
+        if len(output) > 3400:
+            output = (output[:1600]
+                      + "\n… middle of report truncated …\n"
+                      + output[-1800:])
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -2366,7 +2448,12 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        report = "".join(lines)
+        if len(report) > 3400:
+            report = (report[:1600]
+                      + "\n… middle of report truncated …\n"
+                      + report[-1800:])
+        output = report
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -2402,7 +2489,7 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
 
 def _format_status_summary_slack(payload, provider):
-    """Render bin/cluster-status --json as a concise, ANSI-free Slack message (contract §Slack)."""
+    """Render the same per-service status checks shown by ``make status``."""
     overall = str(payload.get("overall", "unknown"))
     emoji = {"healthy": ":white_check_mark:", "warn": ":warning:",
              "fail": ":x:", "unknown": ":grey_question:"}.get(overall, ":grey_question:")
@@ -2414,12 +2501,23 @@ def _format_status_summary_slack(payload, provider):
             counts.get("services_warning", 0),
             counts.get("services_failed", 0)))
     out = [header]
-    for item in payload.get("errors", []):
-        out.append(":x: {}: {}".format(
-            item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
-    for item in payload.get("warnings", []):
-        out.append(":warning: {}: {}".format(
-            item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
+    checks = payload.get("checks", []) or []
+    if checks:
+        icons = {"healthy": ":white_check_mark:", "warning": ":warning:", "error": ":x:"}
+        for item in checks:
+            status = item.get("status", "warning")
+            out.append("{} {}: {}".format(
+                icons.get(status, ":warning:"),
+                item.get("service") or item.get("id") or "?",
+                str(item.get("message", ""))[:250],
+            ))
+    else:
+        for item in payload.get("errors", []):
+            out.append(":x: {}: {}".format(
+                item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
+        for item in payload.get("warnings", []):
+            out.append(":warning: {}: {}".format(
+                item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
     if overall == "unknown":
         out.append("_status source unavailable — run `make restart-webhook` on the hub_")
     return "\n".join(out)
@@ -2437,7 +2535,12 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        report = "".join(lines)
+        if len(report) > 3400:
+            report = (report[:1600]
+                      + "\n… middle of report truncated …\n"
+                      + report[-1800:])
+        output = report
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -2446,39 +2549,29 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
 
     try:
         (job_dir / "status").write_text("running")
-        repo_root = Path(__file__).resolve().parent.parent
-        status_bin = repo_root / "bin" / "cluster-status"
-        # --json emits no ANSI; pass our own bearer token so the summary tool can
-        # reach /api/v1/health without a Keychain read (launchd children can't).
-        _status_env = dict(os.environ)
-        _status_env.update({"CLUSTER_PROVIDER": "k3s-hostinger", "NO_COLOR": "1",
-                            "K3DM_WEBHOOK_TOKEN": _get_token() or ""})
-        status_out, status_timeout = _posix_spawn_capture(
-            [str(status_bin), "--json"], timeout=180, env=_status_env,
-        )
-        if status_timeout:
-            _log("\n❌ *Hostinger status timed out* after 180s — run `make status CLUSTER_PROVIDER=k3s-hostinger` manually")
-            _finish("failed")
-            return
-        payload = None
-        for _line in reversed(status_out.strip().splitlines()):
-            _line = _line.strip()
-            if _line.startswith("{") and _line.endswith("}"):
-                try:
-                    payload = json.loads(_line)
-                    break
-                except ValueError:
-                    continue
-        if payload is not None:
-            _log(_format_status_summary_slack(payload, "k3s-hostinger"))
-        else:
-            # Fall back to the raw report if --json could not be parsed.
-            report = status_out.rstrip()
-            _log("🖥️ *Hostinger app cluster status*")
-            if report:
-                if len(report) > 3500:
-                    report = report[:1600] + "\n… (middle of report truncated) …\n" + report[-1800:]
-                _log("```\n{}\n```".format(report))
+        # A node recovery invalidates several forwards at once. Use the normal
+        # bounded retry window here so `/cluster-status` does not report a
+        # false outage while launchd is rebuilding those forwards.
+        smoke = _smoke_test_services(provider="k3s-hostinger")
+        checks = []
+        for name, ok, detail in smoke:
+            status = "healthy" if ok is True else ("warning" if ok is None else "error")
+            checks.append({"id": name.lower().replace(" ", "_"), "service": name,
+                           "status": status, "message": detail})
+        errors = [item for item in checks if item["status"] == "error"]
+        warnings = [item for item in checks if item["status"] == "warning"]
+        payload = {
+            "overall": "fail" if errors else ("warn" if warnings else "healthy"),
+            "checks": checks,
+            "errors": errors,
+            "warnings": warnings,
+            "counts": {
+                "services_healthy": sum(item["status"] == "healthy" for item in checks),
+                "services_warning": len(warnings),
+                "services_failed": len(errors),
+            },
+        }
+        _log(_format_status_summary_slack(payload, "k3s-hostinger"))
         _finish("success")
     except Exception as exc:
         _log(f"ERROR: {exc}")
@@ -3442,6 +3535,22 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
+        if self.path == "/api/v1/cleanup-stale-sandbox":
+            confirm = bool(body.get("confirm", False))
+            response_url = body.get("response_url", "")
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            if response_url:
+                (JOB_DIR / job_id / "response_url").write_text(response_url)
+            threading.Thread(
+                target=_run_stale_sandbox_cleanup,
+                args=(job_id, confirm),
+                daemon=True,
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
         if self.path == "/api/v1/analyze":
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
@@ -3490,7 +3599,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(400, {"error": "invalid api path"})
             return
         if self.path == "/api/v1/health":
-            services = _smoke_test_services(retries=1)
+            services = _smoke_test_services()
             result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]
             self._json(200, {"services": result,
                              "all_ok": all(r["ok"] is not False for r in result)})
@@ -3499,7 +3608,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             parsed = urllib.parse.urlsplit(self.path)
             params = urllib.parse.parse_qs(parsed.query)
             provider = params.get("provider", [None])[0]
-            services = _smoke_test_services(retries=1, provider=provider)
+            services = _smoke_test_services(provider=provider)
             result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]
             self._json(200, {"services": result,
                              "all_ok": all(r["ok"] is not False for r in result)})

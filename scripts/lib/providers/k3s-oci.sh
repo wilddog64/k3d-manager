@@ -70,10 +70,16 @@ HELP
     return 0
   fi
 
+  if _dry_run_active; then
+    _info "DRY_RUN: would provision OCI infrastructure and install k3s"
+    _info "DRY_RUN: would register OCI cluster with hub ArgoCD"
+    _info "DRY_RUN: would bootstrap OCI ArgoCD and storage"
+    return 0
+  fi
   _oci_validate_prereqs || return 1
 
   _info "[k3s-oci] Step 1/10 — Provision OCI infrastructure (idempotent)..."
-  _oci_provision_infrastructure || return 1
+  _dry_guard "provision OCI infrastructure" _oci_provision_infrastructure || return 1
 
   local _server_ip _agent_ip
   _server_ip=$(_oci_get_server_ip) || return 1
@@ -135,7 +141,7 @@ HELP
   [[ "${1:-}" == "--destroy-infra" ]] && _destroy_infra=true
 
   _info "[k3s-oci] Deregistering cluster from hub ArgoCD..."
-  _oci_deregister_cluster || true
+  _dry_guard "deregister OCI cluster from hub" _oci_deregister_cluster || true
 
   if [[ "${_destroy_infra}" == "true" ]]; then
     read -r -p "[k3s-oci] DESTROY OCI instance + VCN? This is irreversible. Type 'yes' to confirm: " _confirm
@@ -143,7 +149,7 @@ HELP
       _info "[k3s-oci] Aborted."
       return 1
     fi
-    _oci_destroy_infrastructure || return 1
+    _dry_guard "destroy OCI infrastructure" _oci_destroy_infrastructure || return 1
     _info "[k3s-oci] OCI infrastructure deleted."
   else
     _info "[k3s-oci] Instance preserved (pass --destroy-infra to delete)."

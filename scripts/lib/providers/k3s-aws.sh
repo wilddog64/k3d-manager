@@ -139,7 +139,7 @@ HELP
   fi
 
   _info "[k3s-aws] Extending sandbox TTL before deploy (pre-flight)..."
-  acg_extend_playwright "${_ACG_SANDBOX_URL}" \
+  _dry_guard "extend ACG sandbox TTL" acg_extend_playwright "${_ACG_SANDBOX_URL}" \
     || _info "[k3s-aws] Pre-flight extend failed — proceeding (sandbox may have sufficient TTL)"
 
   _info "[k3s-aws] Provisioning CloudFormation stack (server + agents)..."
@@ -149,15 +149,15 @@ HELP
   case "${_cf_stack_status}" in
     CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
       _info "[k3s-aws] CloudFormation stack is healthy (${_cf_stack_status}) — reusing without recreate"
-      acg_provision --confirm || return 1
+      _dry_guard "provision CloudFormation stack" acg_provision --confirm || return 1
       ;;
     ROLLBACK_COMPLETE|CREATE_FAILED|ROLLBACK_FAILED|UPDATE_ROLLBACK_FAILED|DELETE_FAILED)
       _info "[k3s-aws] CloudFormation stack is in broken state (${_cf_stack_status}) — recreating"
-      acg_provision --confirm --recreate || return 1
+      _dry_guard "recreate CloudFormation stack" acg_provision --confirm --recreate || return 1
       ;;
     *)
       _info "[k3s-aws] CloudFormation stack not found or unknown state (${_cf_stack_status:-none}) — creating"
-      acg_provision --confirm || return 1
+      _dry_guard "provision CloudFormation stack" acg_provision --confirm || return 1
       ;;
   esac
 
@@ -175,7 +175,11 @@ HELP
       _info "[k3s-aws] SSM tunnel mode active — ambient mesh (Cilium) unsupported this release; provisioning with flannel"
       _ambient_mesh="false"
     }
-    UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" K3S_AMBIENT_MESH="${_ambient_mesh}" deploy_app_cluster --confirm || return 1
+    local _prev_hosts="${UBUNTU_K3S_AGENT_HOSTS:-}" _prev_mesh="${K3S_AMBIENT_MESH:-}"
+    export UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" K3S_AMBIENT_MESH="${_ambient_mesh}"
+    _dry_guard "deploy application cluster" deploy_app_cluster --confirm || return 1
+    if [[ -n "${_prev_hosts}" ]]; then export UBUNTU_K3S_AGENT_HOSTS="${_prev_hosts}"; else unset UBUNTU_K3S_AGENT_HOSTS; fi
+    if [[ -n "${_prev_mesh}" ]]; then export K3S_AMBIENT_MESH="${_prev_mesh}"; else unset K3S_AMBIENT_MESH; fi
   fi
 
   if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
@@ -183,10 +187,10 @@ HELP
     local _server_id
     _server_id=$(_ssm_get_instance_id "${UBUNTU_K3S_SSH_HOST:-ubuntu}") || return 1
     _provider_k3s_aws_wait_ssm_registered "${_server_id}" || return 1
-    ssm_tunnel "${_server_id}" "6443" "6443" || return 1
+    _dry_guard "start SSM tunnel" ssm_tunnel "${_server_id}" "6443" "6443" || return 1
   else
     _info "[k3s-aws] Starting autossh tunnel..."
-    tunnel_start || return 1
+    _dry_guard "start autossh tunnel" tunnel_start || return 1
   fi
 
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
@@ -221,6 +225,53 @@ HELP
       --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null)
   fi
 
+  _dry_guard "start sandbox watcher" _k3s_aws_start_watcher
+
+  _info "[k3s-aws] Cluster ready. ${total_nodes}-node k3s cluster provisioned."
+  _info "[k3s-aws] Verify: kubectl --context ubuntu-k3s get nodes"
+}
+
+function _k3s_aws_deregister_cluster() {
+  local ctx="${K3S_AWS_KUBE_CONTEXT:-ubuntu-k3s}"
+  local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+  local secret_name="cluster-${ctx}"
+
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    printf 'DRY_RUN: delete hub ArgoCD secret %s in %s + generated Applications targeting %s\n' \
+      "${secret_name}" "${argocd_ns}" "${ctx}"
+    return 0
+  fi
+
+  if ! declare -f _argocd_hub_kubectl_cmd >/dev/null 2>&1; then
+    # shellcheck source=/dev/null
+    source "${SCRIPT_DIR}/plugins/argocd.sh" || {
+      _warn "[k3s-aws] argocd plugin unavailable — skipping hub deregister"
+      return 0
+    }
+  fi
+
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+
+  "${hub_kubectl[@]}" -n "${argocd_ns}" delete secret "${secret_name}" \
+    --ignore-not-found >/dev/null 2>&1 || true
+
+  local app
+  while IFS= read -r app; do
+    [[ -z "${app}" ]] && continue
+    "${hub_kubectl[@]}" -n "${argocd_ns}" patch "${app}" --type=merge \
+      -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
+    "${hub_kubectl[@]}" -n "${argocd_ns}" delete "${app}" --ignore-not-found >/dev/null 2>&1 || true
+  done < <(
+    "${hub_kubectl[@]}" -n "${argocd_ns}" get applications -o \
+      jsonpath='{range .items[?(@.spec.destination.name=="'"${ctx}"'")]}application/{.metadata.name}{"\n"}{end}' \
+      2>/dev/null
+  )
+
+  _info "[k3s-aws] Deregistered ${secret_name} + generated Applications from hub ArgoCD (${argocd_ns})"
+}
+
+function _k3s_aws_start_watcher() {
   _info "[k3s-aws] Starting sandbox watcher..."
   local _existing_pid
   if [[ -f "${_ACG_WATCH_PID_FILE}" ]]; then
@@ -239,9 +290,30 @@ HELP
     printf '%s\n' "${_watcher_pid}" > "${_ACG_WATCH_PID_FILE}"
     _info "[k3s-aws] Watcher PID: ${_watcher_pid} (stored in ${_ACG_WATCH_PID_FILE})"
   fi
+}
 
-  _info "[k3s-aws] Cluster ready. ${total_nodes}-node k3s cluster provisioned."
-  _info "[k3s-aws] Verify: kubectl --context ubuntu-k3s get nodes"
+function _k3s_aws_stop_watcher() {
+  if [[ -f "${_ACG_WATCH_PID_FILE}" ]]; then
+    local _watcher_pid
+    _watcher_pid=$(cat "${_ACG_WATCH_PID_FILE}")
+    if kill -0 "${_watcher_pid}" 2>/dev/null; then
+      _info "[k3s-aws] Stopping sandbox watcher (PID ${_watcher_pid})..."
+      kill "${_watcher_pid}" 2>/dev/null || true
+    fi
+    rm -f "${_ACG_WATCH_PID_FILE}"
+  fi
+}
+
+function _k3s_aws_stop_ssm_tunnel() {
+  if [[ -f "${_SSM_TUNNEL_FWD_PID_FILE}" ]]; then
+    local _ssm_pid
+    _ssm_pid=$(cat "${_SSM_TUNNEL_FWD_PID_FILE}")
+    if kill -0 "${_ssm_pid}" 2>/dev/null; then
+      _info "[k3s-aws] Stopping SSM tunnel (PID ${_ssm_pid})..."
+      kill "${_ssm_pid}" 2>/dev/null || true
+    fi
+    rm -f "${_SSM_TUNNEL_FWD_PID_FILE}"
+  fi
 }
 
 function _provider_k3s_aws_destroy_cluster() {
@@ -264,33 +336,25 @@ HELP
     return 1
   fi
 
-  if [[ -f "${_ACG_WATCH_PID_FILE}" ]]; then
-    local _watcher_pid
-    _watcher_pid=$(cat "${_ACG_WATCH_PID_FILE}")
-    if kill -0 "${_watcher_pid}" 2>/dev/null; then
-      _info "[k3s-aws] Stopping sandbox watcher (PID ${_watcher_pid})..."
-      kill "${_watcher_pid}" 2>/dev/null || true
-    fi
-    rm -f "${_ACG_WATCH_PID_FILE}"
-  fi
+  _dry_guard "stop sandbox watcher" _k3s_aws_stop_watcher
 
   if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
-    if [[ -f "${_SSM_TUNNEL_FWD_PID_FILE}" ]]; then
-      local _ssm_pid
-      _ssm_pid=$(cat "${_SSM_TUNNEL_FWD_PID_FILE}")
-      if kill -0 "${_ssm_pid}" 2>/dev/null; then
-        _info "[k3s-aws] Stopping SSM tunnel (PID ${_ssm_pid})..."
-        kill "${_ssm_pid}" 2>/dev/null || true
-      fi
-      rm -f "${_SSM_TUNNEL_FWD_PID_FILE}"
-    fi
+    _dry_guard "stop SSM tunnel" _k3s_aws_stop_ssm_tunnel
   else
     _info "[k3s-aws] Stopping tunnel..."
-    tunnel_stop || true
+    if _dry_run_active; then
+      _info "DRY_RUN: would stop autossh tunnel"
+    else
+      tunnel_stop || true
+    fi
   fi
 
+  _info "[k3s-aws] Deregistering sandbox from hub ArgoCD..."
+  _k3s_aws_deregister_cluster \
+    || _warn "[k3s-aws] hub deregister reported an issue — check hub for stale cluster-ubuntu-k3s"
+
   _info "[k3s-aws] Tearing down server EC2..."
-  acg_teardown --confirm || return 1
+  _dry_guard "tear down CloudFormation stack" acg_teardown --confirm || return 1
 
   _info "[k3s-aws] Cluster destroyed."
 }

@@ -5,6 +5,10 @@ K3DM_STATE_DIR="${HOME}/.local/share/k3d-manager"
 K3DM_TMP_ROOT="${K3DM_TMP_ROOT:-/tmp}"
 K3DM_TMP_RETENTION_DAYS="${K3DM_TMP_RETENTION_DAYS:-1}"
 K3DM_RUN_DIR="${K3DM_RUN_DIR:-${K3DM_STATE_DIR}/run}"
+K3DM_PACKER_CACHE_DIR="${K3DM_PACKER_CACHE_DIR:-${HOME}/.cache/packer}"
+K3DM_PACKER_RETENTION_DAYS="${K3DM_PACKER_RETENTION_DAYS:-30}"
+K3DM_PORT_CACHE_DIR="${K3DM_PORT_CACHE_DIR:-${HOME}/.cache/port}"
+K3DM_PORT_RETENTION_DAYS="${K3DM_PORT_RETENTION_DAYS:-7}"
 
 # Failure screenshots — keep most recent 10 in root, 10 in logs/
 _prune_pngs() {
@@ -117,6 +121,32 @@ _prune_old_paths_in_dir() {
   echo "k3dm-cleanup: pruned ${#matches[@]} ${label} from ${base_dir}"
 }
 
+# Packer artifacts are large and reproducible; remove only old, unreferenced
+# ISO/lock files from the exact Packer cache directory.
+_prune_packer_cache() {
+  local path
+  [[ -d "${K3DM_PACKER_CACHE_DIR}" ]] || return 0
+  while IFS= read -r path; do
+    if ! lsof -- "${path}" >/dev/null 2>&1; then
+      rm -f "${path}"
+      echo "k3dm-cleanup: removed stale Packer artifact ${path}"
+    fi
+  done < <(find "${K3DM_PACKER_CACHE_DIR}" -maxdepth 1 -type f \
+    \( -name '*.iso' -o -name '*.lock' \) -mtime "+${K3DM_PACKER_RETENTION_DAYS}" -print 2>/dev/null)
+}
+
+# The port helper leaves tiny marker files; prune only markers older than the
+# short retention window and never remove the directory itself.
+_prune_port_markers() {
+  local path
+  [[ -d "${K3DM_PORT_CACHE_DIR}" ]] || return 0
+  while IFS= read -r path; do
+    rm -f "${path}"
+    echo "k3dm-cleanup: removed stale port marker ${path}"
+  done < <(find "${K3DM_PORT_CACHE_DIR}" -maxdepth 1 -type f \
+    -mtime "+${K3DM_PORT_RETENTION_DAYS}" -print 2>/dev/null)
+}
+
 _prune_pngs "${K3DM_STATE_DIR}"
 _prune_pngs "${K3DM_STATE_DIR}/logs"
 _prune_chromium_cache "${K3DM_STATE_DIR}/profile"
@@ -143,5 +173,7 @@ _prune_old_paths 'k3d-manager-sudoers.*' f 'sudoers temp files'
 _prune_old_paths 'k3dm-gcp-creds.*' f 'GCP credential temp files'
 _prune_old_paths 'k3s-etcd-*.db' f 'k3s etcd snapshots'
 _prune_placeholder_tmpdirs
+_prune_packer_cache
+_prune_port_markers
 
 echo "k3dm-cleanup: done"

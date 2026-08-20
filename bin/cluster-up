@@ -19,8 +19,13 @@ set -euo pipefail
 
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
+if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+  export DRY_RUN=1
+fi
 _ACG_DIR="${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg"
-if ! NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('playwright')" >/dev/null 2>&1; then
+if ! _dry_run_active && ! NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('playwright')" >/dev/null 2>&1; then
   printf 'INFO: [acg-up] Bootstrapping ACG Playwright dependencies in %s...\n' "${_ACG_DIR}" >&2
   npm --prefix "${_ACG_DIR}" ci 2>&1
   npm --prefix "${_ACG_DIR}" exec -- playwright install chromium 2>&1
@@ -30,7 +35,7 @@ SCRIPT_DIR="${REPO_ROOT}/scripts"
 # shellcheck disable=SC2034
 PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 _ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
-mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
+_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
 _ACG_CHECKPOINT_DIR="${_ACG_STATE_DIR}/checkpoints"
 
 _cp_skip() {
@@ -38,10 +43,9 @@ _cp_skip() {
 }
 
 _cp_write() {
-  mkdir -p "${_ACG_CHECKPOINT_DIR}"
-  touch "${_ACG_CHECKPOINT_DIR}/${1}.done"
+  _dry_guard "create lifecycle checkpoint directory" mkdir -p "${_ACG_CHECKPOINT_DIR}"
+  _dry_guard "write lifecycle checkpoint ${1}" touch "${_ACG_CHECKPOINT_DIR}/${1}.done"
 }
-source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
@@ -50,7 +54,6 @@ source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 source "${REPO_ROOT}/scripts/plugins/keycloak.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
-
 : "${_kc_admin_pass:=}"
 : "${_kc_db_pass:=}"
 : "${_argocd_client_secret:=}"
@@ -151,12 +154,14 @@ if [[ "$login_prompt" -eq 1 ]]; then
 fi
 
 if [[ "${K3DM_RESUME:-0}" != "1" ]]; then
-  rm -rf "${_ACG_CHECKPOINT_DIR}"
+  _dry_guard "clear lifecycle checkpoints" rm -rf "${_ACG_CHECKPOINT_DIR}"
 fi
 
 _info "[acg-up] Step 0/12 — Pruning stale public IPs from ~/.ssh/known_hosts..."
 _kh="${HOME}/.ssh/known_hosts"
-if [[ -f "${_kh}" ]]; then
+if _dry_run_active; then
+  _info "[acg-up] DRY_RUN: would prune stale public IPs from known_hosts"
+elif [[ -f "${_kh}" ]]; then
   cp -p "${_kh}" "${_kh}.bak"
   if command -v python3 >/dev/null 2>&1; then
     python3 - "${_kh}" <<'PY'
@@ -242,16 +247,19 @@ _info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
 if _cp_skip "step-2-cluster"; then
   _info "[acg-up] Step 2/12 — cluster already provisioned (checkpoint), skipping"
 else
-  deploy_cluster --provider "${_cluster_provider}" --confirm
+  _dry_guard "provision ${_cluster_provider} cluster (deploy_cluster --confirm)" \
+    deploy_cluster --provider "${_cluster_provider}" --confirm
   _cp_write "step-2-cluster"
 fi
 
 if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-az" ]]; then
   _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
-  tunnel_start
+  _dry_guard "start autossh tunnel" tunnel_start
 fi
 
-if ! docker info >/dev/null 2>&1; then
+if _dry_run_active; then
+  _info "[acg-up] DRY_RUN: would verify Docker/OrbStack availability"
+elif ! docker info >/dev/null 2>&1; then
   _info "[acg-up] Docker daemon not responding — checking OrbStack VM state..."
   if command -v orbctl >/dev/null 2>&1; then
     _orb_status=$(orbctl status 2>/dev/null || true)
@@ -290,11 +298,11 @@ if ! _command_exist k3d; then
 fi
 if ! k3d cluster list 2>/dev/null | grep -q "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]"; then
   _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — creating it now..."
-  deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
+  _dry_guard "create local Hub cluster" deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
   _hub_newly_created=1
 elif ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
   _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' is registered but not reachable — starting stopped containers..."
-  k3d cluster start "${HUB_CLUSTER_NAME:-k3d-cluster}"
+  _dry_guard "start local Hub cluster" k3d cluster start "${HUB_CLUSTER_NAME:-k3d-cluster}"
   _retry=0
   until kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1 || [[ "${_retry}" -ge 12 ]]; do
     _info "[acg-up] Waiting for Hub cluster API server... (${_retry}/12)"
@@ -311,18 +319,29 @@ _info "[acg-up] Local Hub cluster verified."
 if [[ "${_hub_newly_created}" -eq 1 ]]; then
   _info "[acg-up] Step 3.6/12 — Bootstrapping Hub cluster (Vault + LDAP + ArgoCD)..."
   kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
-  "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --confirm
-  "${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm
-  "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd --confirm
+  _dry_guard "deploy Vault" "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --confirm
+  _dry_guard "deploy LDAP" "${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm
+  _dry_guard "deploy ArgoCD" "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd --confirm
   _info "[acg-up] Hub cluster bootstrapped."
 elif ! _argocd_bootstrap_is_ready; then
   _info "[acg-up] Step 3.6/12 — Refreshing ArgoCD bootstrap resources on existing Hub cluster..."
   kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
-  "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd_bootstrap --confirm
+  _dry_guard "bootstrap ArgoCD" "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd_bootstrap --confirm
   _info "[acg-up] ArgoCD bootstrap resources refreshed."
 fi
 
 _vault_local_port="${TUNNEL_VAULT_LOCAL_PORT:-18200}"
+if _dry_run_active; then
+  _info "[acg-up] DRY_RUN: provisioning plan complete — the cluster was not created, so the"
+  _info "[acg-up] DRY_RUN: remaining configuration is skipped (would run against a live cluster):"
+  _info "[acg-up]   • Vault port-forward + LaunchAgent"
+  _info "[acg-up]   • Cloudflare tunnel credential sync + istio gateways + CoreDNS"
+  _info "[acg-up]   • Keycloak realm import + browser HTTPS/HTTP listeners"
+  _info "[acg-up]   • ArgoCD / Keycloak / frontend / Grafana / Pushgateway port-forwards"
+  _info "[acg-up]   • loopback alias + named Cloudflare tunnel"
+  _info "[acg-up] DRY_RUN: no changes were made."
+  exit 0
+fi
 _info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:${_vault_local_port})..."
 _vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
 mkdir -p "$(dirname "${_vault_pf_pid_file}")"
@@ -349,7 +368,9 @@ _vault_sealed=$(printf '%s' "${_vault_health}" | grep -o '"sealed":[^,}]*' | gre
 if [[ "${_vault_sealed}" == "true" ]]; then
   _info "[acg-up] Vault is sealed — attempting cached unseal recovery..."
   kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
-  if ! "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --re-unseal; then
+  if _dry_run_active; then
+    _info "DRY_RUN: would re-unseal Vault (deploy_vault --re-unseal)"
+  elif ! "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --re-unseal; then
     _err "[acg-up] Vault is sealed and cached unseal recovery failed. Check: ${_ACG_STATE_DIR}/logs/vault-pf.log"
   fi
   _vault_health=$(curl -s --max-time 5 "http://localhost:${_vault_local_port}/v1/sys/health" 2>/dev/null || echo '{}')

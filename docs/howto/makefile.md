@@ -31,6 +31,11 @@ make up URL=https://...      # provision with explicit sandbox URL
 `sync-apps` delegates to `bin/acg-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).
 
+Slack admin commands also support `cluster-up [provider] [dry-run]` and
+`cluster-down [provider] [dry-run]`. Dry-run tokens (`dry`, `dry-run`, `--dry-run`,
+or `dryrun`) may appear in any order and preview the lifecycle operation without
+changing the sandbox.
+
 `argocd-registration` reads the `ubuntu-k3s` kubeconfig, switches to `k3d-k3d-cluster`
 context, calls `register_app_cluster`, and restarts the ArgoCD application controller.
 

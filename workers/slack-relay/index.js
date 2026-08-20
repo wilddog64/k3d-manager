@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
 const ALL_PROVIDERS     = new Set(['aws', 'gcp', 'az', 'hostinger'])
 const PROVIDER_ALIASES  = { azure: 'az' }
@@ -11,6 +11,7 @@ const COMMAND_ROLES     = Object.freeze({
   '/cluster-down': 'admin',
   '/cluster-resume': 'admin',
   '/argocd-upgrade': 'admin',
+  '/cleanup-stale-sandbox': 'admin',
   '/ask': 'reader',
   '/claude': 'reader',
   '/gemini': 'reader',
@@ -267,6 +268,20 @@ async function handle(req, event) {
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`🔄 Resuming lab sandbox provision (${provider}) from last checkpoint…`, threadTs, true)
+  }
+
+  if (command === '/cleanup-stale-sandbox') {
+    const cleanupText = (text || '').trim().toLowerCase()
+    if (cleanupText && !['confirm', 'apply'].includes(cleanupText)) {
+      return jsonReply('Usage: /cleanup-stale-sandbox [confirm] — dry-run by default; confirm applies the cleanup', threadTs)
+    }
+    const confirm = ['confirm', 'apply'].includes(cleanupText)
+    event.waitUntil((async () => {
+      const { ok, conflict } = await relay('/api/v1/cleanup-stale-sandbox', { confirm, response_url: responseUrl }, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
+    return jsonReply(`🧹 ${confirm ? 'Applying' : 'Previewing'} stale ACG sandbox cleanup…`, threadTs, true)
   }
 
   if (command === '/ask' || command === '/claude' || command === '/gemini' || command === '/codex') {

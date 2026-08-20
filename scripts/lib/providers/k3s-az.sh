@@ -140,8 +140,16 @@ function _az_merge_kubeconfig() {
   tmp_kube="${HOME}/.kube/ubuntu-azure.tmp"
   tmp_merged="${HOME}/.kube/config.tmp"
   if kubectl config get-contexts "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1; then
-    kubectl config delete-context "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1 || true
-    _info "[k3s-az] Removed stale ${_AZ_KUBE_CONTEXT} context"
+    if _dry_run_active; then
+      _info "DRY_RUN: would remove kubeconfig context ${_AZ_KUBE_CONTEXT}"
+    else
+      kubectl config delete-context "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+    fi
+    if _dry_run_active; then
+      _info "[k3s-az] Would remove stale ${_AZ_KUBE_CONTEXT} context"
+    else
+      _info "[k3s-az] Removed stale ${_AZ_KUBE_CONTEXT} context"
+    fi
   fi
   cp "${_AZ_KUBECONFIG}" "${tmp_kube}"
   chmod 600 "${tmp_kube}"
@@ -198,8 +206,8 @@ HELP
 
   _az_ensure_ssh_key || return 1
 
-  _az_create_vm "${rg}" "${ssh_user}" "${ssh_key_pub}" || return 1
-  _az_open_k3s_port "${rg}" || return 1
+  _dry_guard "create Azure VM" _az_create_vm "${rg}" "${ssh_user}" "${ssh_key_pub}" || return 1
+  _dry_guard "open Azure k3s API port" _az_open_k3s_port "${rg}" || return 1
 
   local external_ip
   external_ip="$(_az_get_public_ip "${rg}")"
@@ -209,10 +217,10 @@ HELP
   fi
   _info "[k3s-az] VM public IP: ${external_ip}"
 
-  _az_update_ssh_config "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
+  _dry_guard "update Azure SSH config" _az_update_ssh_config "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
   _az_wait_for_ssh "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
-  _az_k3sup_install "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
-  _az_merge_kubeconfig || return 1
+  _dry_guard "install k3s on Azure VM" _az_k3sup_install "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
+  _dry_guard "merge Azure kubeconfig" _az_merge_kubeconfig || return 1
 
   _info "[k3s-az] Waiting for node to be Ready..."
   local attempts=0
@@ -269,7 +277,7 @@ HELP
   fi
 
   _info "[k3s-az] Deleting VM ${_AZ_VM_NAME}..."
-  az vm delete \
+  _dry_guard "delete Azure VM ${_AZ_VM_NAME}" az vm delete \
     --resource-group "${rg}" \
     --name "${_AZ_VM_NAME}" \
     --yes 2>/dev/null || \
@@ -289,8 +297,16 @@ HELP
 
   # Remove kubeconfig context
   if kubectl config get-contexts "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1; then
-    kubectl config delete-context "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1 || true
-    _info "[k3s-az] Removed kubeconfig context ${_AZ_KUBE_CONTEXT}"
+    if _dry_run_active; then
+      _info "DRY_RUN: would remove kubeconfig context ${_AZ_KUBE_CONTEXT}"
+    else
+      kubectl config delete-context "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+    fi
+    if _dry_run_active; then
+      _info "[k3s-az] Would remove kubeconfig context ${_AZ_KUBE_CONTEXT}"
+    else
+      _info "[k3s-az] Removed kubeconfig context ${_AZ_KUBE_CONTEXT}"
+    fi
   fi
 
   _info "[k3s-az] Azure cluster destroyed."

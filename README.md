@@ -2,8 +2,6 @@
 
 Modular Bash utility for creating and managing local Kubernetes development clusters. Supports a **two-cluster architecture** — an infra cluster (Vault, ESO, Istio, ArgoCD, OpenLDAP, Keycloak) and an app cluster (Ubuntu k3s) managed via ArgoCD GitOps.
 
-> **⚠️ Jenkins is deprecated** — disabled by default (`ENABLE_JENKINS=0`) and **not deployed** in the current environment. CI/CD is GitHub Actions; app delivery is ArgoCD GitOps. The Jenkins plugin code is **retained but unsupported** and documented below for reference only.
-
 The entry point is `./scripts/k3d-manager`, which dispatches to core libraries and lazily loads plugins on demand. On macOS with OrbStack running, the `orbstack` provider is auto-selected; otherwise `k3d` is the default. Linux hosts use `CLUSTER_PROVIDER=k3s`.
 
 The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_lint`, `_agent_audit`) that enforces spec-first development, architectural linting, and security checks on every commit via a pre-commit hook.
@@ -22,7 +20,6 @@ The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_l
 ./scripts/k3d-manager deploy_eso --confirm              # External Secrets Operator
 ./scripts/k3d-manager deploy_ldap --confirm             # OpenLDAP directory
 ./scripts/k3d-manager deploy_argocd --confirm           # ArgoCD GitOps engine
-ENABLE_JENKINS=1 ./scripts/k3d-manager deploy_jenkins --enable-vault            # DEPRECATED demo — not part of the default stack
 ./scripts/k3d-manager deploy_keycloak --confirm         # Keycloak identity provider
 ACME_EMAIL=you@example.com \
   ./scripts/k3d-manager deploy_cert_manager --confirm   # cert-manager + ACME ClusterIssuer
@@ -133,7 +130,6 @@ graph TD
     VAULT["Vault (PKI + Auth)"]
     ESO[ESO]
     ARGOCD[ArgoCD]
-    JENKINS["Jenkins (deprecated — not deployed)"]
     ISTIO[Istio]
     LDAP[LDAP / AD]
     TRIVY[Trivy Operator]
@@ -183,7 +179,7 @@ bin/                 # one-off convenience scripts (also exposed as Claude skill
 docs/
   architecture/      # design documents
   api/               # function reference and Vault PKI config
-  guides/            # jenkins auth, plugin development
+  guides/            # plugin development, security deep-dives
   providers/         # orbstack, k3s provider guides
   plans/             # feature planning and specifications
   howto/             # user guides
@@ -208,7 +204,6 @@ docs/
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
 | **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
 | **ESO** | `deploy_eso` | External Secrets Operator — syncs Vault/AKV secrets into Kubernetes |
-| **Jenkins** _(deprecated — not deployed by default)_ | `deploy_jenkins` | Jenkins StatefulSet + Vault sidecar + ESO cert rotation CronJob. Requires `ENABLE_JENKINS=1`; code retained but unsupported |
 | **LDAP** | `deploy_ldap`, `deploy_ad`, `ldap_get_user_password` | OpenLDAP or Active Directory directory service |
 | **Keycloak** | `deploy_keycloak`, `test_keycloak`, `keycloak_seed_smoke_user` | Keycloak identity provider + smoke test; seeds the `k3dm-smoke` login-verification client/user |
 | **cert-manager** | `deploy_cert_manager` | cert-manager + ACME ClusterIssuer (Let's Encrypt) |
@@ -223,11 +218,11 @@ docs/
 | **Hello** | `hello` | Minimal example plugin — Hello World; reference for new plugin authors |
 
 ### Guides
-- **[Jenkins Authentication](docs/guides/jenkins-authentication.md)** — Auth modes (built-in / LDAP / AD), Vault sidecar, password rotation
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
-- **[Jenkins Job DSL Setup](docs/jenkins-job-dsl-setup.md)** — Seed job + GitHub repo wiring
+- **[vCluster E2E Harness (Tier 1)](docs/guides/vcluster-e2e-harness.md)** — How `e2e_verify_vcluster` stands up the shopping-cart stack in a throwaway vCluster, runs Playwright as an in-cluster Job, and emits an exit-code-faithful pass/fail for the v1.26.0 promotion gate
 - **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
 - **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
+- **[Security & Vulnerability Management](docs/guides/security/)** — Deep-dive set on the security stack: Trivy CVE loop, Vault PKI, ESO, image signing/attestation, grounded in the actual implementation
 
 ### Providers
 - **[OrbStack](docs/providers/orbstack.md)** — macOS auto-detection and manual override
@@ -278,13 +273,10 @@ docs/
 
 **Virtual Clusters**
 - **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
+- **[vCluster E2E Harness (Tier 1)](docs/guides/vcluster-e2e-harness.md)** — `e2e_verify_vcluster`: throwaway-vCluster substrate + in-cluster Playwright Job + JSON pass/fail contract
 
 **Networking**
 - **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
-
-**Jenkins**
-- **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** — Trust Vault-issued certs for `jenkins-cli.jar`
-- **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)** — Verify dynamic pod agents in the infra cluster
 
 **LDAP / Directory**
 - **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** — Import users from a CSV into OpenLDAP

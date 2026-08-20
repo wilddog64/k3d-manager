@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+provider="${CLUSTER_PROVIDER:-k3s-aws}"
+confirm="${CONFIRM:-0}"
+if [[ "${1:-}" == "--confirm" ]]; then confirm=1; fi
+if [[ "${provider}" != "k3s-aws" ]]; then
+  printf 'cleanup-stale-sandbox is k3s-aws-only (CLUSTER_PROVIDER=%s)\n' "${provider}"
+  exit 1
+fi
+context="${ACG_KUBE_CONTEXT:-ubuntu-k3s}"
+agents=(com.k3d-manager.frontend-port-forward com.k3d-manager.pushgateway-port-forward)
+printf 'Stale ACG sandbox cleanup (provider=%s, context=%s)\n' "${provider}" "${context}"
+printf '  - stop launchd agents: %s\n' "${agents[*]}"
+printf '  - remove kube context: %s\n' "${context}"
+if [[ "${confirm}" != 1 ]]; then
+  printf 'DRY RUN: no changes made (rerun with CONFIRM=1 or --confirm)\n'
+  exit 0
+fi
+for label in "${agents[@]}"; do
+  launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true
+  rm -f "${HOME}/Library/LaunchAgents/${label}.plist"
+done
+kubectl config delete-context "${context}" >/dev/null 2>&1 || true
+printf 'Cleanup complete: stale sandbox agents stopped and context removed.\n'

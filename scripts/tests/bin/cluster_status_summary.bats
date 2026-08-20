@@ -52,3 +52,49 @@ teardown() { rm -rf "${TMP_DIR}"; }
   [ "${status}" -eq 1 ]
   python3 -c 'import json,sys; assert json.loads(sys.argv[1])["provider"] == "k3s-hostinger"' "${output}"
 }
+
+@test "hostinger edge-down 530s suggest refresh-edge" {
+  cat >"${TMP_DIR}/curl" <<'EOF'
+#!/bin/sh
+cat <<'JSON'
+{"services":[{"name":"ArgoCD","ok":false,"detail":"HTTP 530"},{"name":"Frontend","ok":false,"detail":"HTTP 530"},{"name":"Grafana","ok":true,"detail":"HTTP 200"}]}
+JSON
+EOF
+  chmod +x "${TMP_DIR}/curl"
+  mkdir -p "${TMP_DIR}/.local/share/k3d-manager"
+  printf '%s\n' k3s-hostinger >"${TMP_DIR}/.local/share/k3d-manager/active-provider"
+  unset CLUSTER_PROVIDER
+  HOME="${TMP_DIR}" run "${STATUS_SCRIPT}" --mode summary
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"Overall: FAIL"* ]]
+  [[ "${output}" == *"make refresh-edge CLUSTER_PROVIDER=k3s-hostinger"* ]]
+}
+
+@test "single hostinger 530 does not suggest refresh-edge" {
+  cat >"${TMP_DIR}/curl" <<'EOF'
+#!/bin/sh
+cat <<'JSON'
+{"services":[{"name":"ArgoCD","ok":false,"detail":"HTTP 530"},{"name":"Frontend","ok":false,"detail":"HTTP 503"},{"name":"Grafana","ok":true,"detail":"HTTP 200"}]}
+JSON
+EOF
+  chmod +x "${TMP_DIR}/curl"
+  mkdir -p "${TMP_DIR}/.local/share/k3d-manager"
+  printf '%s\n' k3s-hostinger >"${TMP_DIR}/.local/share/k3d-manager/active-provider"
+  unset CLUSTER_PROVIDER
+  HOME="${TMP_DIR}" run "${STATUS_SCRIPT}" --mode summary
+  [ "${status}" -eq 1 ]
+  [[ "${output}" != *"refresh-edge"* ]]
+}
+
+@test "non-hostinger provider does not suggest refresh-edge for multiple 530s" {
+  cat >"${TMP_DIR}/curl" <<'EOF'
+#!/bin/sh
+cat <<'JSON'
+{"services":[{"name":"ArgoCD","ok":false,"detail":"HTTP 530"},{"name":"Frontend","ok":false,"detail":"HTTP 530"},{"name":"Grafana","ok":true,"detail":"HTTP 200"}]}
+JSON
+EOF
+  chmod +x "${TMP_DIR}/curl"
+  CLUSTER_PROVIDER=k3d run "${STATUS_SCRIPT}" --mode summary
+  [ "${status}" -eq 1 ]
+  [[ "${output}" != *"refresh-edge"* ]]
+}

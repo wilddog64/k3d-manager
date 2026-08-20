@@ -527,10 +527,12 @@ __k3dm_deploy_guard_args() {
     done
 
     if (( dry_run_cli )); then
+        export DRY_RUN=1
         export K3DM_DEPLOY_DRY_RUN=1
     fi
 
-    local env_dry="${K3DM_DEPLOY_DRY_RUN:-0}"
+    local env_dry=0
+    _dry_run_active && env_dry=1
     if (( !confirm && !dry_run_cli && env_dry != 1 && ${#sanitized[@]} == 0 )); then
         __k3dm_print_deploy_usage "$fn"
         cat <<'EOF'

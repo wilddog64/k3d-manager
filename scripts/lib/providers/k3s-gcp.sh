@@ -140,8 +140,16 @@ function _gcp_merge_kubeconfig() {
   tmp_kube="${HOME}/.kube/ubuntu-gcp.tmp"
   tmp_merged="${HOME}/.kube/config.tmp"
   if kubectl config get-contexts "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1; then
-    kubectl config delete-context "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1 || true
-    _info "[k3s-gcp] Removed stale ${_GCP_KUBE_CONTEXT} context"
+    if _dry_run_active; then
+      _info "DRY_RUN: would remove kubeconfig context ${_GCP_KUBE_CONTEXT}"
+    else
+      kubectl config delete-context "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+    fi
+    if _dry_run_active; then
+      _info "[k3s-gcp] Would remove stale ${_GCP_KUBE_CONTEXT} context"
+    else
+      _info "[k3s-gcp] Removed stale ${_GCP_KUBE_CONTEXT} context"
+    fi
   fi
   cp "${_GCP_KUBECONFIG}" "${tmp_kube}"
   chmod 600 "${tmp_kube}"
@@ -194,8 +202,8 @@ HELP
     return 1
   fi
 
-  _gcp_ensure_firewall "${project}" || return 1
-  _gcp_create_instance "${project}" "${zone}" "${ssh_user}" "${ssh_key_pub}" || return 1
+  _dry_guard "ensure GCP firewall rule" _gcp_ensure_firewall "${project}" || return 1
+  _dry_guard "create GCE instance" _gcp_create_instance "${project}" "${zone}" "${ssh_user}" "${ssh_key_pub}" || return 1
 
   local external_ip
   external_ip="$(_gcp_get_external_ip "${project}" "${zone}")"
@@ -205,10 +213,10 @@ HELP
   fi
   _info "[k3s-gcp] Instance IP: ${external_ip}"
 
-  _gcp_update_ssh_config "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
+  _dry_guard "update GCP SSH config" _gcp_update_ssh_config "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
   _gcp_wait_for_ssh "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
-  _gcp_k3sup_install "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
-  _gcp_merge_kubeconfig || return 1
+  _dry_guard "install k3s on GCE" _gcp_k3sup_install "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
+  _dry_guard "merge GCP kubeconfig" _gcp_merge_kubeconfig || return 1
 
   _info "[k3s-gcp] Waiting for node to be Ready..."
   local attempts=0
@@ -262,14 +270,14 @@ HELP
   zone="$(_gcp_zone)"
 
   _info "[k3s-gcp] Deleting instance ${_GCP_INSTANCE_NAME}..."
-  gcloud compute instances delete "${_GCP_INSTANCE_NAME}" \
+  _dry_guard "delete GCE instance ${_GCP_INSTANCE_NAME}" gcloud compute instances delete "${_GCP_INSTANCE_NAME}" \
     --project="${project}" \
     --zone="${zone}" \
     --quiet 2>/dev/null || \
     _info "[k3s-gcp] Instance not found — skipping"
 
   _info "[k3s-gcp] Deleting firewall rule ${_GCP_FIREWALL_RULE}..."
-  gcloud compute firewall-rules delete "${_GCP_FIREWALL_RULE}" \
+  _dry_guard "delete GCP firewall rule ${_GCP_FIREWALL_RULE}" gcloud compute firewall-rules delete "${_GCP_FIREWALL_RULE}" \
     --project="${project}" \
     --quiet 2>/dev/null || \
     _info "[k3s-gcp] Firewall rule not found — skipping"
@@ -288,8 +296,16 @@ HELP
 
   # Remove kubeconfig context
   if kubectl config get-contexts "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1; then
-    kubectl config delete-context "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1 || true
-    _info "[k3s-gcp] Removed kubeconfig context ${_GCP_KUBE_CONTEXT}"
+    if _dry_run_active; then
+      _info "DRY_RUN: would remove kubeconfig context ${_GCP_KUBE_CONTEXT}"
+    else
+      kubectl config delete-context "${_GCP_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+    fi
+    if _dry_run_active; then
+      _info "[k3s-gcp] Would remove kubeconfig context ${_GCP_KUBE_CONTEXT}"
+    else
+      _info "[k3s-gcp] Removed kubeconfig context ${_GCP_KUBE_CONTEXT}"
+    fi
   fi
 
   _info "[k3s-gcp] GCP cluster destroyed."

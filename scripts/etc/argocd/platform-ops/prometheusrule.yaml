@@ -116,3 +116,25 @@ spec:
           annotations:
             summary: "CVE auto-patch in flight for {{ $labels.image_repository }}"
             description: "An auto-patch promotion is in flight for {{ $labels.image_repository }}; TrivyCriticalVulnerabilityDetected for this image is inhibited until the promotion completes."
+    - name: e2e.alerts
+      rules:
+        - alert: E2EVerificationFailing
+          expr: e2e_last_run_pass == 0
+          for: 10m
+          labels:
+            group: e2e
+            severity: warning
+            tier: e2e
+          annotations:
+            summary: "e2e {{ $labels.project }} failing on {{ $labels.tier }} for {{ $labels.service }}"
+            description: "The most recent e2e run for {{ $labels.service }}/{{ $labels.project }} on the {{ $labels.tier }} substrate failed and has stayed red for 10 minutes."
+        - alert: E2EVerificationStale
+          expr: time() - e2e_last_success_timestamp_seconds > 259200
+          for: 30m
+          labels:
+            group: e2e
+            severity: warning
+            tier: e2e
+          annotations:
+            summary: "no passing e2e for {{ $labels.service }}/{{ $labels.tier }} in >3d"
+            description: "No passing e2e run for {{ $labels.service }} on the {{ $labels.tier }} substrate in over 3 days; the verification signal is stale."
