@@ -3,7 +3,9 @@
 **2026-08-20 CDP test isolation fixed:** `scripts/tests/lib/acg_cdp.bats` now uses a per-test
 temporary `HOME` and mocks listener probes in launch scenarios, preventing tests from writing the
 operator's protected Chrome log or inspecting live port 9222. Clean-env BATS is 5/5 and the ACG Jest
-suite is 7 suites/22 tests green. Pending commit/push for this change.
+suite is 7 suites/22 tests green. The live upstream gate also passed: `make credential-test
+PROVIDER=aws` reused the authenticated CDP session, extracted four copyable inputs, wrote AWS
+credentials, and validated `sts:GetCallerIdentity`.
 
 ## Current State: `feat/v0.4.4` (as of 2026-07-13)
 
