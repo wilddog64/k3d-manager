@@ -23,6 +23,9 @@
 - Reconcile stale local port-forward/LaunchAgent state when public Grafana or status probes fail.
 - Keep the ArgoCD smoke credential-drift issue and k3s-aws SSM registration issue visible in `docs/issues/`
   and `docs/bugs/` until their live follow-ups are closed.
+- **SSM fallback fixed** in `fef71219`: k3s-aws now falls back to SSH when SSM registration or tunnel setup
+  fails, and fails only when both transports fail. Live account-level Default Host Management Role setup
+  remains optional infrastructure follow-up.
 
 ## Operating decisions
 

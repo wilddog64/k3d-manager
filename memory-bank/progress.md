@@ -20,6 +20,9 @@
 - [ ] E2E promotion-gate integration with durable success/failure artifacts.
 - [ ] Verify unknown/out-of-sync handling without mutating unrelated live Applications.
 - [ ] Keep all new work within the five-plan milestone limit.
+- [x] k3s-aws SSM registration fallback — recorded live account `218085830935` Default Host Management
+  Role failure in `docs/issues/2026-08-20-k3s-aws-ssm-fallback.md`; provider now falls back to SSH
+  (`fef71219`, pushed on `k3d-manager-v1.26.0`). BATS provider suite 11/11 and shellcheck passed.
 
 ## Verification record
 
