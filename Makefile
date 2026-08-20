@@ -614,6 +614,7 @@ help:
 	@echo "    make up CLUSTER_PROVIDER=k3s-gcp"
 	@echo "    make up CLUSTER_PROVIDER=k3s-oci"
 	@echo "    make down CLUSTER_PROVIDER=k3s-oci"
+	@echo "    make down CLEANUP_STALE=1                 # teardown + guarded stale-resource cleanup"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
 	@echo ""
 	@echo "  Default URL: $(URL)"
