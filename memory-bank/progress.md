@@ -69,5 +69,9 @@
   `s2` 404 route: retry the legacy Cloud Sandboxes URL (`7 suites/22 tests` green; issue record:
   `docs/issues/2026-08-20-acg-credential-s2-404.md`). Live `make credential-test PROVIDER=aws`
   remains unverified because the managed CDP browser exits during startup on port 9222.
+- [x] Fixed ACG CDP startup recovery after IPv4 probe failure with stale IPv4/IPv6 listeners
+  (`f6bb7bb`, `c7f7b37`, subtree-synced): listener reclaim BATS 5/5, shellcheck, and agent audit pass;
+  live credential extraction remains blocked by local Chrome/9222 state. See
+  `docs/bugs/2026-08-20-acg-cdp-listener-recovery.md`.
 - [x] Cloudflare tunnel/ArgoCD origin recovery: reloaded the tunnel and pinned ArgoCD ingress to
   IPv4 loopback (`929ebed7`); external Grafana returned 302 and ArgoCD returned 200.

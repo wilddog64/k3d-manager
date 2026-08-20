@@ -78,6 +78,10 @@
   `hands-on` route navigation. It now retries the legacy Cloud Sandboxes route; focused Playwright
   verification is 7 suites/22 tests green. The live credential gate remains unverified because the
   managed CDP browser exits during startup on port 9222. Details: `docs/issues/2026-08-20-acg-credential-s2-404.md`.
+- **ACG CDP listener recovery fixed** upstream in `f6bb7bb`/`c7f7b37` and subtree-synced: a failed
+  IPv4 probe now detects and reclaims IPv4/IPv6 listeners before relaunch, with explicit probe-status
+  handling under `set -e`. Focused CDP BATS is 5/5 green; the live credential gate remains blocked by
+  local Chrome/9222 state. Bug: `docs/bugs/2026-08-20-acg-cdp-listener-recovery.md`.
 
 ## Canonical pointers
 
