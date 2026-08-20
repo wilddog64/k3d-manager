@@ -43,14 +43,42 @@ async function navigateToSandbox(page, targetUrl) {
   try { currentPathname = new URL(currentUrl).pathname; } catch {}
 
   if (currentHostname !== 'app.pluralsight.com') {
-    console.error(`INFO: Navigating to ${targetUrl}...`);
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await _navigateWithStaleRouteRecovery(page, targetUrl);
   } else if (currentPathname === targetPathname || currentPathname.startsWith(targetPathname)) {
     // Already on the target page or a sandbox-specific subpath (e.g. /cloud-sandboxes/<id>)
     console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
   } else {
-    console.error(`INFO: Navigating to ${targetUrl}...`);
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await _navigateWithStaleRouteRecovery(page, targetUrl);
+  }
+}
+
+function _sandboxNavigationCandidates(targetUrl) {
+  const candidates = [targetUrl];
+  const legacyPath = '/cloud-playground/cloud-sandboxes';
+  const currentPath = '/hands-on/playground/cloud-sandboxes';
+  if (targetUrl.includes(currentPath)) {
+    candidates.push(targetUrl.replace(currentPath, legacyPath));
+  }
+  return [...new Set(candidates)];
+}
+
+function _isStalePluralsightRoute(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname === '/404.html' || parsed.hostname === 's2.pluralsight.com';
+  } catch {
+    return false;
+  }
+}
+
+async function _navigateWithStaleRouteRecovery(page, targetUrl) {
+  const candidates = _sandboxNavigationCandidates(targetUrl);
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    console.error(`INFO: Navigating to ${candidate}...`);
+    await page.goto(candidate, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    if (!_isStalePluralsightRoute(page.url()) || i === candidates.length - 1) return;
+    console.error(`WARN: Pluralsight returned stale route ${page.url()} — retrying sandbox URL...`);
   }
 }
 
@@ -636,4 +664,6 @@ module.exports = {
   startSandbox,
   _findScopedButton,
   _capturePageDebugState,
+  _sandboxNavigationCandidates,
+  _isStalePluralsightRoute,
 };
