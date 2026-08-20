@@ -9,7 +9,7 @@ setup() {
 set -e
 case "$*" in
   *'get secrets '*'-o json') cat "${FIXTURE_JSON}" ;;
-  *'get applications '*'-o json') printf '%s\n' '{"items":[{"metadata":{"name":"shopping-cart-app","labels":{"k3d-manager/managed":"true","k3d-manager/cluster":"ubuntu-k3s"}},"spec":{"destination":{"name":"ubuntu-k3s"}}}]}' ;;
+  *'get applications '*'-o json') printf '%s\n' '{"items":[{"metadata":{"name":"shopping-cart-app","labels":{"app-type":"service"}},"spec":{"destination":{"name":"ubuntu-k3s"}}},{"metadata":{"name":"ubuntu-k3s-eso","labels":{"app-type":"platform"}},"spec":{"destination":{"server":"https://dead-sandbox.example:6443"}}}]}' ;;
   *' delete '*|*' patch '*) printf '%s\n' "$*" >> "${KUBECTL_LOG}" ;;
   *) exit 1 ;;
 esac
@@ -19,7 +19,7 @@ EOF
   KUBECTL_LOG="${BATS_TEST_TMPDIR}/kubectl.log"
   cat > "${FIXTURE_JSON}" <<'EOF'
 {"items":[
- {"metadata":{"name":"cluster-expired","labels":{"argocd.argoproj.io/cluster-name":"ubuntu-k3s","k3d-manager/managed":"true","k3d-manager/provider":"k3s-aws"},"annotations":{"k3d-manager/expires-at":"2020-01-01T00:00:00Z","k3d-manager/sandbox-id":"sandbox-old"}}},
+ {"metadata":{"name":"cluster-expired","labels":{"argocd.argoproj.io/cluster-name":"ubuntu-k3s","k3d-manager/managed":"true","k3d-manager/provider":"k3s-aws"},"annotations":{"k3d-manager/expires-at":"2020-01-01T00:00:00Z","k3d-manager/sandbox-id":"sandbox-old"}},"data":{"server":"aHR0cHM6Ly9kZWFkLXNhbmRib3guZXhhbXBsZTo2NDQz"}},
  {"metadata":{"name":"cluster-hostinger","labels":{"argocd.argoproj.io/cluster-name":"ubuntu-hostinger","k3d-manager/managed":"true","k3d-manager/provider":"k3s-hostinger"},"annotations":{"k3d-manager/expires-at":"2020-01-01T00:00:00Z"}}}
 ]}
 EOF
@@ -46,5 +46,6 @@ EOF
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"removed cluster-expired"* ]]
   [[ "$(cat "${KUBECTL_LOG}")" == *"delete application/shopping-cart-app"* ]]
+  [[ "$(cat "${KUBECTL_LOG}")" == *"delete application/ubuntu-k3s-eso"* ]]
   [[ "$(cat "${KUBECTL_LOG}")" == *"delete secret cluster-expired"* ]]
 }

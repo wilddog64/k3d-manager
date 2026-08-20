@@ -57,7 +57,8 @@ mapfile -t registrations < <(printf '%s' "${secret_json}" | jq -r '.items[] |
    .metadata.labels["k3d-manager/provider"],
    .metadata.annotations["k3d-manager/expires-at"],
    .metadata.annotations["k3d-manager/sandbox-id"],
-   (.metadata.annotations["k3d-manager/retain"] // "false")] | @tsv')
+   (.metadata.annotations["k3d-manager/retain"] // "false"),
+   (.data.server // "")] | @tsv')
 
 printf 'Stale managed cluster cleanup (context=%s namespace=%s)\n' "${hub_context}" "${argocd_ns}"
 if (( ${#registrations[@]} == 0 )); then
@@ -66,7 +67,11 @@ if (( ${#registrations[@]} == 0 )); then
 fi
 
 for registration in "${registrations[@]}"; do
-  IFS=$'\t' read -r secret cluster provider expires sandbox retain <<< "${registration}"
+  IFS=$'\t' read -r secret cluster provider expires sandbox retain server_b64 <<< "${registration}"
+  server=""
+  if [[ -n "${server_b64}" ]]; then
+    server="$(printf '%s' "${server_b64}" | base64 --decode 2>/dev/null || true)"
+  fi
   [[ "${provider}" == "k3s-aws" ]] || { printf '  skip %s: provider=%s\n' "${secret}" "${provider:-missing}"; continue; }
   [[ "${retain}" != "true" ]] || { printf '  skip %s: retain=true\n' "${secret}"; continue; }
   if [[ -z "${expires}" ]]; then
@@ -121,9 +126,12 @@ for registration in "${registrations[@]}"; do
     "${kubectl_cmd[@]}" -n "${argocd_ns}" patch "application/${app}" --type=merge \
       -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
     "${kubectl_cmd[@]}" -n "${argocd_ns}" delete "application/${app}" --ignore-not-found >/dev/null 2>&1 || true
-  done < <("${kubectl_cmd[@]}" -n "${argocd_ns}" get applications -o json | jq -r --arg cluster "${cluster}" '
-    .items[] | select(.metadata.labels["k3d-manager/managed"] == "true") |
-    select((.spec.destination.name // "") == $cluster or (.metadata.labels["k3d-manager/cluster"] // "") == $cluster) |
+  done < <("${kubectl_cmd[@]}" -n "${argocd_ns}" get applications -o json | jq -r \
+    --arg cluster "${cluster}" --arg server "${server}" '
+    .items[] |
+    select((.spec.destination.name // "") == $cluster or
+      (.metadata.labels["k3d-manager/cluster"] // "") == $cluster or
+      ($server != "" and (.spec.destination.server // "") == $server)) |
     .metadata.name')
   "${kubectl_cmd[@]}" -n "${argocd_ns}" delete secret "${secret}" --ignore-not-found >/dev/null 2>&1 || true
   printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason expired_api_unreachable \
