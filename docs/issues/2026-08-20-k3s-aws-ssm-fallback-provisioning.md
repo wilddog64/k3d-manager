@@ -22,12 +22,13 @@ starting the SSM port-forward. However, `deploy_app_cluster` enters
 provider currently propagates that failure immediately, so execution never reaches
 `_provider_k3s_aws_start_tunnel` and its SSH fallback.
 
-## Recommended fix
+## Fix implemented
 
 Treat the SSM bootstrap as an optimistic transport attempt. If it fails, switch
 `K3S_AWS_SSM_ENABLED=false`, log the reason, and retry `deploy_app_cluster --confirm`
-through SSH. Provisioning should fail only when both the SSM bootstrap and the SSH
-retry fail. Add provider BATS coverage for an SSM readiness timeout followed by a
-successful SSH invocation, plus the existing both-transports-fail case.
+through SSH. Provisioning still fails when both the SSM bootstrap and SSH retry fail.
+The provider BATS suite covers an SSM readiness timeout followed by a successful SSH
+invocation, plus the both-transports-fail case.
 
-This investigation did not modify the provider or deploy the sandbox.
+The provider now implements this retry at the `deploy_app_cluster` boundary. No live
+sandbox was deployed for this source-only fix.

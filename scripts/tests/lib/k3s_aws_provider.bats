@@ -70,6 +70,63 @@
   [ "$(echo "$output" | grep -c "\[stub\] acg_provision")" -eq 1 ]
 }
 
+@test "k3s-aws retries app provisioning over SSH after SSM bootstrap fails" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _provider_k3s_aws_autoselect_tunnel_mode() { export K3S_AWS_SSM_ENABLED=true; }
+    _acg_extend_playwright() { return 0; }
+    acg_provision() { return 0; }
+    deploy_calls=0
+    deploy_app_cluster() {
+      deploy_calls=$((deploy_calls + 1))
+      printf "[stub] deploy %s mode=%s\n" "$deploy_calls" "${K3S_AWS_SSM_ENABLED}"
+      [[ "${K3S_AWS_SSM_ENABLED}" == "true" ]] && return 1
+      return 0
+    }
+    _provider_k3s_aws_start_tunnel() { return 0; }
+    KUBECTL_SEEN="$(mktemp)"; rm -f "${KUBECTL_SEEN}"
+    kubectl() {
+      if [[ ! -e "${KUBECTL_SEEN}" ]]; then touch "${KUBECTL_SEEN}"; return 1; fi
+      printf "n1 Ready\nn2 Ready\nn3 Ready\n"
+    }
+    acg_watch() { return 0; }
+    _ACG_WATCH_PID_FILE="$(mktemp)"; rm -f "${_ACG_WATCH_PID_FILE}"
+    _provider_k3s_aws_deploy_cluster
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SSM bootstrap failed — falling back to SSH provisioning"* ]]
+  [[ "$output" == *"[stub] deploy 1 mode=true"* ]]
+  [[ "$output" == *"[stub] deploy 2 mode=false"* ]]
+}
+
+@test "k3s-aws fails when SSM bootstrap and SSH retry both fail" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _provider_k3s_aws_autoselect_tunnel_mode() { export K3S_AWS_SSM_ENABLED=true; }
+    _acg_extend_playwright() { return 0; }
+    acg_provision() { return 0; }
+    deploy_app_cluster() { return 1; }
+    _provider_k3s_aws_start_tunnel() { return 0; }
+    KUBECTL_SEEN="$(mktemp)"; rm -f "${KUBECTL_SEEN}"
+    kubectl() {
+      if [[ ! -e "${KUBECTL_SEEN}" ]]; then touch "${KUBECTL_SEEN}"; return 1; fi
+      printf "n1 Ready\nn2 Ready\nn3 Ready\n"
+    }
+    _ACG_WATCH_PID_FILE="$(mktemp)"; rm -f "${_ACG_WATCH_PID_FILE}"
+    _provider_k3s_aws_deploy_cluster
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"SSM bootstrap failed — falling back to SSH provisioning"* ]]
+}
+
 @test "_provider_k3s_aws_destroy_cluster --confirm runs acg_teardown" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
