@@ -35,6 +35,9 @@
 - Unified cleanup is available as `make cleanup-stale-resources` (`f24c0c96`, pushed on
   `k3d-manager-v1.26.0`); `make down CLEANUP_STALE=1` now calls this wrapper, which runs the
   managed-registration cleanup for every provider and the local sandbox cleanup for k3s-aws.
+- **Open bug:** `deploy_app_cluster` can fail inside `_ssm_bootstrap_k3s` before the provider's
+  SSH fallback is reached when SSM readiness times out. Evidence and the recommended retry design
+  are recorded in `docs/issues/2026-08-20-k3s-aws-ssm-fallback-provisioning.md`.
 
 ## Operating decisions
 
