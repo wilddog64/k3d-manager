@@ -97,6 +97,18 @@ _provider_k3s_aws_wait_ssm_registered() {
 # K3S_AWS_SSM_ENABLED; otherwise probes iam:CreateRole and, when permitted,
 # enables SSM on the stack. Any failure degrades to the SSH tunnel.
 _provider_k3s_aws_autoselect_tunnel_mode() {
+  # The default laptop Vault profile depends on a reverse SSH tunnel and the
+  # node-side socat bridge. SSM only provides local port forwarding, so using
+  # it here would publish a dead vault-bridge endpoint and block ESO forever.
+  if [[ "${HUB_VAULT_USE_BRIDGE:-1}" == "1" ]]; then
+    if [[ "${K3S_AWS_SSM_ENABLED:-}" == "true" ]]; then
+      _warn "[k3s-aws] Vault reverse bridge requires SSH — switching from explicit SSM to SSH"
+    elif [[ -z "${K3S_AWS_SSM_ENABLED:-}" ]]; then
+      _info "[k3s-aws] Vault reverse bridge required — using SSH (SSM has no reverse forwarding)"
+    fi
+    export K3S_AWS_SSM_ENABLED=false
+    return 0
+  fi
   if [[ -n "${K3S_AWS_SSM_ENABLED:-}" ]]; then
     _info "[k3s-aws] Tunnel mode explicitly set (K3S_AWS_SSM_ENABLED=${K3S_AWS_SSM_ENABLED}) — skipping auto-detect"
     return 0

@@ -106,6 +106,39 @@
   [[ "$output" == *"[stub] deploy 2 mode=false"* ]]
 }
 
+@test "k3s-aws uses SSH when the laptop Vault reverse bridge is required" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    unset K3S_AWS_SSM_ENABLED
+    export HUB_VAULT_USE_BRIDGE=1
+    _provider_k3s_aws_autoselect_tunnel_mode
+    printf "mode=%s\n" "${K3S_AWS_SSM_ENABLED}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Vault reverse bridge required — using SSH"* ]]
+  [[ "$output" == *"mode=false"* ]]
+}
+
+@test "k3s-aws overrides explicit SSM when the laptop Vault reverse bridge is required" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    export K3S_AWS_SSM_ENABLED=true HUB_VAULT_USE_BRIDGE=1
+    _provider_k3s_aws_autoselect_tunnel_mode
+    printf "mode=%s\n" "${K3S_AWS_SSM_ENABLED}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Vault reverse bridge requires SSH"* ]]
+  [[ "$output" == *"mode=false"* ]]
+}
+
 @test "k3s-aws fails when SSM bootstrap and SSH retry both fail" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
