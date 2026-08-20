@@ -56,6 +56,11 @@
   an EXIT-trap result artifact before teardown.
 - Do not deploy source-only changes until their release branch/PR gates and live verification are explicit.
 
+- **SSM Vault bridge gap diagnosed (2026-08-20):** `ubuntu-k3s` `vault-backend` is `Ready=False`
+  because `vault-bridge:8201` points at the control-plane node but SSM bootstrap does not install
+  the `vault-bridge.service` socat listener. Evidence and the recommended SSM-native bridge fix are
+  recorded in `docs/issues/2026-08-20-ssm-vault-bridge-missing.md`; implementation is pending approval.
+
 ## Canonical pointers
 
 - Roadmap: `docs/roadmap.md`
