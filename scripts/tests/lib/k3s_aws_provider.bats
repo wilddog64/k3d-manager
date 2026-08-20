@@ -98,7 +98,10 @@
     _provider_k3s_aws_deploy_cluster
   '
   [ "$status" -eq 0 ]
+  [[ "$output" == *"Provisioning app cluster via SSM (SSH fallback armed)"* ]]
   [[ "$output" == *"SSM bootstrap failed — falling back to SSH provisioning"* ]]
+  [[ "$output" == *"Switching transport: SSM -> SSH; retrying app provisioning"* ]]
+  [[ "$output" == *"SSH provisioning retry succeeded"* ]]
   [[ "$output" == *"[stub] deploy 1 mode=true"* ]]
   [[ "$output" == *"[stub] deploy 2 mode=false"* ]]
 }

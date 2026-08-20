@@ -139,6 +139,23 @@ _provider_k3s_aws_start_tunnel() {
   _dry_guard "start autossh tunnel" tunnel_start
 }
 
+function _provider_k3s_aws_deploy_app_cluster() {
+  if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
+    _info "[k3s-aws] Provisioning app cluster via SSM (SSH fallback armed)"
+  fi
+  if _dry_guard "deploy application cluster" deploy_app_cluster --confirm; then
+    return 0
+  fi
+  [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]] || return 1
+  _warn "[k3s-aws] SSM bootstrap failed — falling back to SSH provisioning"
+  _info "[k3s-aws] Switching transport: SSM -> SSH; retrying app provisioning"
+  export K3S_AWS_SSM_ENABLED=false
+  if ! _dry_guard "retry application cluster over SSH" deploy_app_cluster --confirm; then
+    return 1
+  fi
+  _info "[k3s-aws] SSH provisioning retry succeeded"
+}
+
 function _provider_k3s_aws_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -205,15 +222,7 @@ HELP
     }
     local _prev_hosts="${UBUNTU_K3S_AGENT_HOSTS:-}" _prev_mesh="${K3S_AMBIENT_MESH:-}"
     export UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" K3S_AMBIENT_MESH="${_ambient_mesh}"
-    if ! _dry_guard "deploy application cluster" deploy_app_cluster --confirm; then
-      if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
-        _warn "[k3s-aws] SSM bootstrap failed — falling back to SSH provisioning"
-        export K3S_AWS_SSM_ENABLED=false
-        _dry_guard "retry application cluster over SSH" deploy_app_cluster --confirm || return 1
-      else
-        return 1
-      fi
-    fi
+    _provider_k3s_aws_deploy_app_cluster || return 1
     if [[ -n "${_prev_hosts}" ]]; then export UBUNTU_K3S_AGENT_HOSTS="${_prev_hosts}"; else unset UBUNTU_K3S_AGENT_HOSTS; fi
     if [[ -n "${_prev_mesh}" ]]; then export K3S_AMBIENT_MESH="${_prev_mesh}"; else unset K3S_AMBIENT_MESH; fi
   fi
