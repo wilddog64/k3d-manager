@@ -76,7 +76,8 @@
 - **ACG credential-route recovery fixed:** the persistent CDP session was authenticated, but the
   credential extractor could land on `https://s2.pluralsight.com/404.html` after the current
   `hands-on` route navigation. It now retries the legacy Cloud Sandboxes route; focused Playwright
-  verification is 7 suites/22 tests green. Details: `docs/issues/2026-08-20-acg-credential-s2-404.md`.
+  verification is 7 suites/22 tests green. The live credential gate remains unverified because the
+  managed CDP browser exits during startup on port 9222. Details: `docs/issues/2026-08-20-acg-credential-s2-404.md`.
 
 ## Canonical pointers
 

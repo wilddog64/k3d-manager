@@ -67,6 +67,7 @@
   recorded in `docs/issues/2026-08-20-stale-cleanup-unknown-applications.md`.
 - [x] Fixed ACG credential extraction after authenticated CDP navigation lands on the Pluralsight
   `s2` 404 route: retry the legacy Cloud Sandboxes URL (`7 suites/22 tests` green; issue record:
-  `docs/issues/2026-08-20-acg-credential-s2-404.md`).
+  `docs/issues/2026-08-20-acg-credential-s2-404.md`). Live `make credential-test PROVIDER=aws`
+  remains unverified because the managed CDP browser exits during startup on port 9222.
 - [x] Cloudflare tunnel/ArgoCD origin recovery: reloaded the tunnel and pinned ArgoCD ingress to
   IPv4 loopback (`929ebed7`); external Grafana returned 302 and ArgoCD returned 200.

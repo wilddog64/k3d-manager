@@ -42,3 +42,17 @@ Tests:       22 passed, 22 total
 ```
 
 `node --check playwright/*.js playwright/lib/*.js playwright/providers/*.js` also passed.
+
+## Live credential-test follow-up
+
+The requested `make test-credential PROVIDER=aws` target does not exist:
+
+```text
+make: *** No rule to make target `test-credential'.  Stop.
+test-credential exit=2
+```
+
+The canonical `make credential-test PROVIDER=aws` target was then run, but the managed CDP browser
+was unavailable on port 9222 and exited during startup (`bind() failed: Address already in use`).
+No live credential extraction result is claimed; the 7-suite, 22-test Jest run validates the changed
+route logic.
