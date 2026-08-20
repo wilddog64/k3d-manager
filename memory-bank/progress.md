@@ -60,3 +60,5 @@
   `docs/issues/2026-08-20-ssm-vault-bridge-missing.md`.
 - Live recovery verified: `vault-backend Ready=True/Valid`, all 13 ExternalSecrets `SecretSynced`;
   unrelated Grafana/frontend/product-image/data-layer health failures remain tracked separately.
+- [x] Cloudflare tunnel/ArgoCD origin recovery: reloaded the tunnel and pinned ArgoCD ingress to
+  IPv4 loopback (`929ebed7`); external Grafana returned 302 and ArgoCD returned 200.

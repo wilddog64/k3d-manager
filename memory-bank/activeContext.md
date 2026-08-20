@@ -63,6 +63,9 @@
 - Live recovery verified on the existing sandbox: installing the missing bridge and forcing ESO
   reconcile returned `Ready=True/Valid` and 13/13 `SecretSynced`; remaining `make status` failures
   are separate edge/application issues.
+- Cloudflare Error 1033/ArgoCD 502 diagnosed and fixed: the tunnel had stopped, and its ArgoCD
+  origin used IPv6-prone `localhost:8080`; `scripts/etc/cloudflared/config.yml` now pins
+  `127.0.0.1:8080`. Edge reload verified Grafana HTTP 302 and ArgoCD HTTP 200.
 
 ## Canonical pointers
 
