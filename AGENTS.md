@@ -1,37 +1,85 @@
-# Repository Guidelines
+# Repository Guidelines — lib-foundation
 
-## Project Structure & Module Organization
-`scripts/` houses the dispatcher (`k3d-manager`), shared libs in `scripts/lib/`, provider glue in `scripts/lib/providers/`, and optional `scripts/plugins/*.sh`. Tests live under `scripts/tests/` with helper BATS harness files beside suite directories (`lib`, `plugins`). Documentation is in `docs/` (architecture, providers, guides, issues) while `memory-bank/` tracks active spec context. Use `bin/` for helper binaries and keep user-specific scratch work in `scratch/`.
+## Project Overview
 
-## Build, Test, and Development Commands
-- `./scripts/k3d-manager <function>` — primary entrypoint; run `deploy_cluster`, `deploy_vault`, etc. from repo root.
-- All `deploy_*` invocations require explicit options or `--confirm`; add `--dry-run`/`-n` to print the planned commands and `--plan` (Vault) for a read-only state report.
-- `./scripts/k3d-manager test all` — runs the curated BATS bundles defined in `scripts/lib/test.sh`.
-- `bats scripts/tests` — executes every suite; handy before large refactors.
-- `shellcheck scripts/**/*.sh` — lint every touched shell file; CI blocks on failures.
-- `./install.sh` — bootstrap local deps (bash 5, bats, shellcheck, jq) if the host is fresh.
+Shared Bash foundation library consumed by `k3d-manager`, `rigor-cli`, and `shopping-carts` via git subtree.
+No dispatcher, no cluster — this is a pure Bash library. All work is code + tests.
 
-## Coding Style & Naming Conventions
-Write pure Bash with portable `#!/usr/bin/env bash`. Match the existing 2-space indentation used in `scripts/`, prefer snake_case for functions/files (`deploy_vault`, `plugins/shopping_cart.sh`), and guard sourced files with `# shellcheck source=` hints. Keep functions idempotent, avoid unbounded `if` depth (Agent Rigor flags this), and favor `_run_command` helpers instead of raw subshell pipelines. Templates in `scripts/etc/` should stay `.yaml.tmpl` and load values from `vars.sh`.
+## Project Structure
 
-## Testing Guidelines
-BATS is the canonical framework. Name suites `<area>.bats` and tests `@test "<component>: <expectation>"`. Extend shared helpers via `scripts/tests/test_helpers.bash` rather than duplicating logic. Every PR must keep `./scripts/k3d-manager test all` green, preserve or increase `@test` counts (enforced by `_agent_audit`), and document new suites in `docs/tests` if they cover novel flows. For provider-specific behavior, add focused suites under `scripts/tests/lib/provider_contract.bats` or create plugin-level suites mirroring the file under test.
+```
+scripts/lib/           # Library source files
+  core.sh              # Cluster lifecycle, provider abstraction, _resolve_script_dir
+  system.sh            # _run_command privilege model, package helpers, OS detection
+  agent_rigor.sh       # Agent audit tooling: _agent_checkpoint, _agent_audit, _agent_lint
+scripts/tests/lib/     # BATS unit tests (one suite per lib file)
+memory-bank/           # activeContext.md + progress.md — read first, update after
+docs/plans/            # Task specs — read the assigned spec before touching any file
+docs/issues/           # Post-mortems and issue logs
+```
+
+## Build, Test, and Quality Commands
+
+```bash
+# BATS unit tests — always use clean env
+env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" TMPDIR="$TMPDIR" \
+  bash --norc --noprofile -c 'bats scripts/tests/lib/system.bats scripts/tests/lib/core.bats scripts/tests/lib/agent_rigor.bats'
+
+# shellcheck — run on every touched .sh file before commit
+shellcheck scripts/lib/system.sh scripts/lib/core.sh scripts/lib/agent_rigor.sh
+
+# Agent rigor if-count audit
+AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/lib/system.sh
+```
+
+## Coding Style
+
+- `#!/usr/bin/env bash` + `set -euo pipefail` on all scripts
+- 2-space indentation, snake_case functions and variables
+- Public functions: no underscore. Private: `_` prefix
+- Double-quote all variable expansions — never bare `$var` in command args
+- No bare `sudo` — always `_run_command --prefer-sudo -- <cmd>`
+- LF line endings only
+
+## Bash 3.2 Compatibility (hard requirement)
+
+- **No `local -n`** (nameref, requires bash 4.3+)
+- **No `declare -A`** (associative arrays)
+- **No `mapfile` / `readarray`**
+- Use global temp vars (e.g., `_RCRS_RUNNER`) for array output from helper functions
+
+## `_run_command` — Privilege Escalation Wrapper
+
+Never call `sudo` directly. Always route through `_run_command`:
+
+```bash
+_run_command --prefer-sudo -- apt-get install -y jq    # sudo if available, else user
+_run_command --require-sudo -- mkdir /etc/myapp         # fail if sudo unavailable
+_run_command --probe 'config current-context' -- kubectl get nodes  # probe to decide
+_run_command --quiet -- command_that_might_fail         # suppress stderr, return exit code
+```
 
 ## Commit & Pull Request Guidelines
-Follow the short, Conventional-style prefixes seen in history (`docs:`, `fix:`, `v0.9.0 — …`). Squash unrelated work, explain *why* in the body, and mention linked issues or specs when possible. Before committing, run `_agent_checkpoint`, `_agent_lint`, and `_agent_audit` (pre-commit hook) to prove specs, lint, and security gates pass. Pull requests should state the scenario exercised, include command output for key flows (e.g., `bats` summary), and attach screenshots when UI manifests (Jenkins, ArgoCD) change. Keep branches rebased so Agent Rigor diffs stay tight.
+
+- Conventional-style prefixes: `fix:`, `feat:`, `docs:`, `test:`
+- Explain *why* in the commit body
+- Run shellcheck + BATS (`env -i`) + agent_rigor audit before every commit
+- **Do NOT create PRs** — that is Claude's job. Your task ends at: commit + push + memory-bank update
 
 ---
 
 ## Agent Session Rules (read every session — no exceptions)
 
 ### 1. Read memory-bank first
-Before touching any file, read both:
+
+Before touching any file, read:
 - `memory-bank/activeContext.md` — current branch, focus, open items
 - `memory-bank/progress.md` — what is complete, what is pending
 
 These contain decisions already made. Do not re-derive them from scratch.
 
 ### 2. Verify your machine
+
 First command of every session:
 ```bash
 hostname && uname -n
@@ -39,75 +87,39 @@ hostname && uname -n
 Confirm you are on the correct machine before doing anything else.
 
 ### 3. Proof of work — commit SHA + test results required
-Reporting "done" requires ALL of the following — paste actual output, not summaries:
 
-- **Commit SHA** — run `git log origin/<branch> --oneline -3` and paste the output
-- **BATS output** — paste the full `bats scripts/tests/...` result (pass/fail counts)
-- **shellcheck** — paste `shellcheck scripts/plugins/<touched>.sh` output (must be clean)
-- **`_agent_audit`** — must pass (all functions ≤ 8 if-blocks)
+Reporting "done" requires:
+- A real commit SHA pushed to the remote branch (`git log origin/<branch> --oneline -3`)
+- BATS output showing all tests passing (with `env -i`)
+- `shellcheck` clean on every touched `.sh` file
+- `AGENT_AUDIT_MAX_IF=8` audit passing — all functions ≤ 8 if-blocks
 
 A memory-bank update alone is NOT proof of completion.
-A summary like "all tests passed" without pasted output is NOT proof of completion.
 
 ### 4. Commit before reporting done
+
 Every task ends with a real git commit pushed to the remote branch.
 Never report completion without a verifiable commit SHA on the remote.
 
 ### 5. Do NOT create PRs — that is Claude's job
+
 Your task ends at: commit + push to branch + update memory-bank.
-Do NOT run `gh pr create`. Do NOT rerun CI jobs (`gh run rerun`).
-If CI fails, read the failure logs (`gh run view <id> --log-failed`), fix the root cause, and push a new commit.
+Do NOT run `gh pr create`. Do NOT rerun CI jobs.
+If CI fails, read the failure logs, fix the root cause, and push a new commit.
 
-### 6. Do not revert intentional decisions
-Comments marked `# DO NOT REMOVE` or `<!-- DO NOT REMOVE -->` in code must not be deleted.
-Decisions recorded in `memory-bank/` must not be silently reversed.
-If you believe a decision is wrong, report it — do not quietly undo it.
+### 6. Stay within spec scope
 
-### 7. Stay within spec scope
 Do not add features, refactor code, or make improvements beyond what the spec requires.
 Do not modify files outside the scope of the current task.
 If you find a bug outside your scope, report it in the memory-bank — do not fix it silently.
 
-### 8. Never bypass hooks
+### 7. Never bypass hooks
+
 - Never use `git commit --no-verify`
 - Never use `git push --force` on shared branches
-- Never use `git rebase` or `git reset --hard` on shared branches
 - If a pre-commit hook fails, fix the underlying issue and retry
 
-### 9. Update memory-bank on completion
+### 8. Update memory-bank on completion
+
 When your task is done, update `memory-bank/activeContext.md` and `memory-bank/progress.md`
-to reflect what you completed. Include the real commit SHA and PR URL.
-
-### 12. Document findings and create issue docs
-After every task — implementation or verification — you must:
-- Update `memory-bank/activeContext.md` and `memory-bank/progress.md` with results (pass, fail, or partial)
-- If anything failed, behaved unexpectedly, or was skipped: create `docs/issues/YYYY-MM-DD-<slug>.md` with:
-  - What was tested / attempted
-  - Actual output (paste verbatim — no summaries)
-  - Root cause if known
-  - Recommended follow-up
-- If the task was a live test, include the full terminal output in the issue doc or memory-bank notes
-- Do NOT omit issue docs to keep the report clean — unexpected behavior must be recorded
-
-### 11. Stop at 5 plan docs per milestone
-Each release is a sprint story with a maximum of 5 spec files. If the current milestone
-already has 5 or more files in `docs/plans/`, do not write another — flag it to Claude
-immediately. A 6th spec means the release is too large and must be split into two smaller
-releases. Claude decides how to split; you do not proceed until told to.
-
-### 13. `--approval-mode yolo` is for tightly scoped prompts only
-
-`--approval-mode yolo` disables all confirmation prompts for the inner gemini subprocess.
-It is only permitted when ALL of the following are true:
-
-- The prompt specifies **exactly one file to write** and **one command to run** — nothing else
-- The write target is inside `${HOME}/.gemini/tmp/k3d-manager/` — never the project workspace
-- The prompt contains **no open-ended instructions** ("fix issues", "clean up", "improve")
-
-Never use `--approval-mode yolo` with broad or ambiguous prompts. Violation = treat as a bug.
-
-### 10. If-count allowlist is for legacy code only
-The `_agent_audit` threshold stays at 8 `if` blocks per function. If you touch a file with
-legacy functions that still exceed the limit, document the specific `file:function` pair in
-`scripts/etc/agent/if-count-allowlist` (with a follow-up issue) instead of raising the
-threshold. New or refactored code must stay within the budget.
+to reflect what you completed. Include the real commit SHA.
