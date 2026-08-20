@@ -34,6 +34,8 @@
   cleanup (`f24c0c96`, pushed on `k3d-manager-v1.26.0`); Makefile BATS 3/3 passed.
 - [x] SSM bootstrap readiness now falls back to SSH and fails only when both transports fail
   (`40f1d19a`, pushed on `k3d-manager-v1.26.0`); provider BATS 13/13 and shellcheck passed.
+- [x] Added explicit SSM/SSH transition and success logs (`2424f55f`, pushed on
+  `k3d-manager-v1.26.0`); provider BATS 13/13 and `_agent_audit` passed.
 
 ## Verification record
 
