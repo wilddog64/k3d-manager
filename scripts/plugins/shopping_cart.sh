@@ -1020,6 +1020,83 @@ function _k3sup_join_agent() {
   _info "[shopping_cart] Agent ${agent_host} joined."
 }
 
+function _k3s_agent_address() {
+  local agent_host="$1"
+  local agent_ip=""
+  if _command_exist awk; then
+    agent_ip=$(awk -v host="${agent_host}" \
+      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
+      "${HOME}/.ssh/config" 2>/dev/null || true)
+  fi
+  printf '%s\n' "${agent_ip:-${agent_host}}"
+}
+
+function _k3s_agent_is_ready() {
+  local local_kubeconfig="$1" agent_host="$2" agent_ip="$3"
+  local _nodes
+  _nodes=$(KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers -o wide 2>/dev/null || true)
+  while IFS= read -r _node; do
+    [[ "${_node}" == *" Ready"* ]] || continue
+    [[ "${_node}" == *"${agent_host}"* || "${_node}" == *"${agent_ip}"* ]] && return 0
+  done <<< "${_nodes}"
+  return 1
+}
+
+function _k3s_wait_agent_ready() {
+  local local_kubeconfig="$1" agent_host="$2" agent_ip="$3"
+  local _attempt=0
+  while ! _k3s_agent_is_ready "${local_kubeconfig}" "${agent_host}" "${agent_ip}"; do
+    _attempt=$((_attempt + 1))
+    if (( _attempt >= 30 )); then
+      _err "[shopping_cart] Agent ${agent_host} did not become Ready after 150s"
+      return 1
+    fi
+    sleep 5
+  done
+  _info "[shopping_cart] Agent ${agent_host} is Ready."
+}
+
+function _k3sup_join_agent_worker() {
+  local agent_host="$1" server_ip="$2" local_kubeconfig="$3" failure_file="$4"
+  local agent_ip
+  agent_ip=$(_k3s_agent_address "${agent_host}")
+  if _k3s_agent_is_ready "${local_kubeconfig}" "${agent_host}" "${agent_ip}"; then
+    _info "[shopping_cart] Agent ${agent_host} already Ready — skipping join"
+    return 0
+  fi
+  if ! _k3sup_join_agent "${agent_host}" "${server_ip}"; then
+    printf '%s\n' "${agent_host}" >> "${failure_file}"
+    return 1
+  fi
+  if ! _k3s_wait_agent_ready "${local_kubeconfig}" "${agent_host}" "${agent_ip}"; then
+    printf '%s\n' "${agent_host}" >> "${failure_file}"
+    return 1
+  fi
+}
+
+function _k3sup_join_agents_parallel() {
+  local hosts_csv="$1" server_ip="$2" local_kubeconfig="$3"
+  local failure_file="${local_kubeconfig}.join-failures.$$"
+  local -a _join_pids=() _agent_hosts
+  local _agent_host _join_pid _join_rc=0
+  : > "${failure_file}"
+  IFS=',' read -ra _agent_hosts <<< "${hosts_csv}"
+  for _agent_host in "${_agent_hosts[@]}"; do
+    _k3sup_join_agent_worker "${_agent_host}" "${server_ip}" "${local_kubeconfig}" "${failure_file}" &
+    _join_pids+=("$!")
+  done
+  for _join_pid in "${_join_pids[@]}"; do
+    wait "${_join_pid}" || _join_rc=1
+  done
+  if [[ -s "${failure_file}" ]]; then
+    _err "[shopping_cart] Agent join/readiness failures: $(tr '\n' ' ' < "${failure_file}")"
+    rm -f "${failure_file}"
+    return 1
+  fi
+  rm -f "${failure_file}"
+  return "${_join_rc}"
+}
+
 function _setup_vault_bridge() {
   local ssh_host="${1}"
   local ssh_key="${2}"
@@ -1145,14 +1222,21 @@ HELP
   local kube_context="ubuntu-k3s"
   local kubeconfig_dir="${local_kubeconfig%/*}"
 
-  _ensure_k3sup
+  local _server_ready=0
+  if KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready"; then
+    _server_ready=1
+    _info "[shopping_cart] k3s server already Ready — skipping server install"
+  fi
 
-  [[ -f "${ssh_key}" ]] || {
-    _err "[shopping_cart] SSH key not found: ${ssh_key}"
-    return 1
-  }
+  if (( _server_ready == 0 )); then
+    _ensure_k3sup
 
-  mkdir -p "${kubeconfig_dir}" "${HOME}/.kube"
+    [[ -f "${ssh_key}" ]] || {
+      _err "[shopping_cart] SSH key not found: ${ssh_key}"
+      return 1
+    }
+
+    mkdir -p "${kubeconfig_dir}" "${HOME}/.kube"
 
   _info "[shopping_cart] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
   _ubuntu_k3s_trust_host "${external_ip}"
@@ -1194,7 +1278,8 @@ REMOTE
     fi
     sleep 5
   done
-  _info "[shopping_cart] Node Ready."
+    _info "[shopping_cart] Node Ready."
+  fi
 
   _info "[shopping_cart] Merging ubuntu-k3s context into ~/.kube/config"
   local tmp_kube tmp_merged
@@ -1213,13 +1298,9 @@ REMOTE
   _info "[shopping_cart] ${kube_context} context merged into ~/.kube/config"
 
   if [[ -n "${UBUNTU_K3S_AGENT_HOSTS:-}" ]]; then
-    local -a _agent_hosts
-    IFS=',' read -ra _agent_hosts <<< "${UBUNTU_K3S_AGENT_HOSTS}"
-    local agent_host
-    for agent_host in "${_agent_hosts[@]}"; do
-      _k3sup_join_agent "${agent_host}" "${external_ip}" || return 1
-    done
-    _info "[shopping_cart] All agent nodes joined."
+    _info "[shopping_cart] Joining agent nodes in parallel..."
+    _k3sup_join_agents_parallel "${UBUNTU_K3S_AGENT_HOSTS}" "${external_ip}" "${local_kubeconfig}" || return 1
+    _info "[shopping_cart] All agent nodes joined and Ready."
   fi
 
   _setup_vault_bridge "${ssh_host}" "${ssh_key}" || return 1
@@ -1231,6 +1312,57 @@ REMOTE
   _info "       ssh ${ssh_host} kubectl create token argocd-manager -n kube-system --duration=8760h"
   _info "  2. Register with ArgoCD:"
   _info "       ARGOCD_APP_CLUSTER_TOKEN=<token> ./scripts/k3d-manager register_app_cluster"
+}
+
+function _ssm_join_agent_worker() {
+  local agent_alias="$1" server_ip="$2" k3s_token="$3" local_kubeconfig="$4" failure_file="$5"
+  if _k3s_agent_is_ready "${local_kubeconfig}" "${agent_alias}" "${agent_alias}"; then
+    _info "[shopping_cart] Agent ${agent_alias} already Ready — skipping SSM join"
+    return 0
+  fi
+  local agent_id
+  if ! agent_id=$(_ssm_get_instance_id "${agent_alias}"); then
+    printf '%s\n' "${agent_alias}" >> "${failure_file}"
+    return 1
+  fi
+  if ! ssm_wait "${agent_id}"; then
+    printf '%s\n' "${agent_alias}" >> "${failure_file}"
+    return 1
+  fi
+  _info "[shopping_cart] Joining agent ${agent_alias} to server ${server_ip} via SSM..."
+  if ! ssm_exec "${agent_id}" \
+      "curl -sfL https://get.k3s.io | K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -"; then
+    printf '%s\n' "${agent_alias}" >> "${failure_file}"
+    return 1
+  fi
+  if ! _k3s_wait_agent_ready "${local_kubeconfig}" "${agent_alias}" "${agent_alias}"; then
+    printf '%s\n' "${agent_alias}" >> "${failure_file}"
+    return 1
+  fi
+}
+
+function _ssm_join_agents_parallel() {
+  local hosts_csv="$1" server_ip="$2" k3s_token="$3" local_kubeconfig="$4"
+  local failure_file="${local_kubeconfig}.ssm-join-failures.$$"
+  local -a _join_pids=() _agent_hosts
+  local _agent_host _join_pid _join_rc=0
+  : > "${failure_file}"
+  IFS=',' read -ra _agent_hosts <<< "${hosts_csv}"
+  for _agent_host in "${_agent_hosts[@]}"; do
+    _ssm_join_agent_worker "${_agent_host}" "${server_ip}" "${k3s_token}" \
+      "${local_kubeconfig}" "${failure_file}" &
+    _join_pids+=("$!")
+  done
+  for _join_pid in "${_join_pids[@]}"; do
+    wait "${_join_pid}" || _join_rc=1
+  done
+  if [[ -s "${failure_file}" ]]; then
+    _err "[shopping_cart] SSM agent join/readiness failures: $(tr '\n' ' ' < "${failure_file}")"
+    rm -f "${failure_file}"
+    return 1
+  fi
+  rm -f "${failure_file}"
+  return "${_join_rc}"
 }
 
 function _ssm_bootstrap_k3s() {
@@ -1284,18 +1416,9 @@ function _ssm_bootstrap_k3s() {
     "cat /var/lib/rancher/k3s/server/node-token") || return 1
 
   if [[ -n "${UBUNTU_K3S_AGENT_HOSTS:-}" ]]; then
-    local -a _agent_hosts
-    IFS=',' read -ra _agent_hosts <<< "${UBUNTU_K3S_AGENT_HOSTS}"
-    local agent_alias agent_id
-    for agent_alias in "${_agent_hosts[@]}"; do
-      agent_id=$(_ssm_get_instance_id "${agent_alias}") || return 1
-      ssm_wait "${agent_id}" || return 1
-      _info "[shopping_cart] Joining agent ${agent_alias} to server ${server_ip}..."
-      ssm_exec "${agent_id}" \
-        "curl -sfL https://get.k3s.io | K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -" \
-        || return 1
-      _info "[shopping_cart] Agent ${agent_alias} joined."
-    done
+    _info "[shopping_cart] Joining agent nodes in parallel via SSM..."
+    _ssm_join_agents_parallel "${UBUNTU_K3S_AGENT_HOSTS}" "${server_ip}" "${k3s_token}" \
+      "${local_kubeconfig}" || return 1
   fi
 
   local tmp_kube tmp_merged

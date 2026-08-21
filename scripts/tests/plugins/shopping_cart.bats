@@ -134,3 +134,54 @@
   '
   [ "$status" -eq 0 ]
 }
+
+@test "agent joins fan out in parallel and wait for every worker" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    log="$(mktemp)"
+    _k3s_agent_is_ready() { return 1; }
+    _k3s_agent_address() { printf "%s\n" "$1"; }
+    _k3sup_join_agent() { printf "join %s\n" "$1" >> "$log"; }
+    _k3s_wait_agent_ready() { printf "ready %s\n" "$2" >> "$log"; }
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3,ubuntu-4 server "$(mktemp)"
+    cat "$log"
+  '
+  [ "$status" -eq 0 ]
+  [ "$(printf "%s\n" "$output" | grep -c '^join ')" -eq 4 ]
+  [ "$(printf "%s\n" "$output" | grep -c '^ready ')" -eq 4 ]
+}
+
+@test "agent join failures are collected without aborting other workers" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    _k3s_agent_is_ready() { return 1; }
+    _k3s_agent_address() { printf "%s\n" "$1"; }
+    _k3sup_join_agent() { [[ "$1" != ubuntu-2 ]]; }
+    _k3s_wait_agent_ready() { return 0; }
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3 server "$(mktemp)"
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"ubuntu-2"* ]]
+}
+
+@test "already-ready agents are skipped on an idempotent rerun" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    log="$(mktemp)"
+    _k3s_agent_is_ready() { return 0; }
+    _k3s_agent_address() { printf "%s\n" "$1"; }
+    _k3sup_join_agent() { printf "unexpected join\n" >> "$log"; return 1; }
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2 server "$(mktemp)"
+    [ ! -s "$log" ]
+  '
+  [ "$status" -eq 0 ]
+}

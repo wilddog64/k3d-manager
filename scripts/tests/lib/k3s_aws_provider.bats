@@ -163,6 +163,72 @@
   [[ "$output" == *"SSM bootstrap failed — falling back to SSH provisioning"* ]]
 }
 
+@test "k3s-aws derives four agent hosts and five total nodes from ACG_AGENT_COUNT" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    export ACG_AGENT_COUNT=4
+    _acg_extend_playwright() { return 0; }
+    acg_provision() { return 0; }
+    _provider_k3s_aws_autoselect_tunnel_mode() { export K3S_AWS_SSM_ENABLED=false; }
+    _provider_k3s_aws_start_tunnel() { return 0; }
+    _provider_k3s_aws_deploy_app_cluster() { printf "hosts=%s\n" "$UBUNTU_K3S_AGENT_HOSTS"; }
+    _k3s_aws_start_watcher() { return 0; }
+    kubectl() {
+      if [[ "$*" == *"--context ubuntu-k3s"* ]]; then return 1; fi
+      printf "n1 Ready\nn2 Ready\nn3 Ready\nn4 Ready\nn5 Ready\n"
+    }
+    _provider_k3s_aws_deploy_cluster
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"hosts=ubuntu-1,ubuntu-2,ubuntu-3,ubuntu-4"* ]]
+  [[ "$output" == *"5-node k3s cluster provisioned"* ]]
+}
+
+@test "k3s-aws preserves two-agent default and three-node total" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    unset ACG_AGENT_COUNT
+    _acg_extend_playwright() { return 0; }
+    acg_provision() { return 0; }
+    _provider_k3s_aws_autoselect_tunnel_mode() { export K3S_AWS_SSM_ENABLED=false; }
+    _provider_k3s_aws_start_tunnel() { return 0; }
+    _provider_k3s_aws_deploy_app_cluster() { printf "hosts=%s\n" "$UBUNTU_K3S_AGENT_HOSTS"; }
+    _k3s_aws_start_watcher() { return 0; }
+    kubectl() {
+      if [[ "$*" == *"--context ubuntu-k3s"* ]]; then return 1; fi
+      printf "n1 Ready\nn2 Ready\nn3 Ready\n"
+    }
+    _provider_k3s_aws_deploy_cluster
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"hosts=ubuntu-1,ubuntu-2"* ]]
+  [[ "$output" == *"3-node k3s cluster provisioned"* ]]
+}
+
+@test "k3s-aws rejects a malformed ACG_AGENT_COUNT before provisioning" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    export ACG_AGENT_COUNT=zero
+    acg_provision() { echo unexpected; }
+    _provider_k3s_aws_deploy_cluster
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"ACG_AGENT_COUNT must be a positive integer"* ]]
+  [[ "$output" != *"unexpected"* ]]
+}
+
 @test "_provider_k3s_aws_destroy_cluster --confirm runs acg_teardown" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"

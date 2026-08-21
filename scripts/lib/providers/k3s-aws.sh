@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# scripts/lib/providers/k3s-aws.sh — k3s on ACG AWS sandbox (3-node cluster)
+# scripts/lib/providers/k3s-aws.sh — count-driven k3s fleet on ACG AWS sandbox
 #
 # Provider actions:
 #   deploy_cluster  — acg_provision (CloudFormation stack) → deploy_app_cluster
@@ -173,7 +173,7 @@ function _provider_k3s_aws_deploy_cluster() {
     cat <<'HELP'
 Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager deploy_cluster
 
-Provision a 3-node k3s cluster on ACG AWS sandbox:
+Provision a k3s cluster on ACG AWS sandbox (1 server + ACG_AGENT_COUNT agents):
   1. acg_extend_playwright       — pre-flight TTL extend
   2. acg_provision --confirm     — CloudFormation stack (server + agents)
   3. deploy_app_cluster --confirm — install k3s + join agents; kubeconfig merge
@@ -181,11 +181,11 @@ Provision a 3-node k3s cluster on ACG AWS sandbox:
   5. kubectl label nodes         — k3d-manager/node-type=server|agent
   6. acg_watch (background)      — sandbox TTL watcher
 
-Milestone gate: kubectl --context ubuntu-k3s get nodes shows 3 nodes Ready.
+Milestone gate: kubectl --context ubuntu-k3s get nodes shows all expected nodes Ready.
 
 Config (env overrides):
   ACG_REGION              AWS region (default: us-west-2)
-  ACG_AGENT_COUNT         Number of agent nodes (default: 2)
+  ACG_AGENT_COUNT         Number of agent nodes (default: 2; total nodes = 1 + count)
   UBUNTU_K3S_SSH_HOST     SSH host alias for server (default: ubuntu)
   UBUNTU_K3S_SSH_USER     SSH user (default: ubuntu)
   UBUNTU_K3S_SSH_KEY      SSH key path (default: ~/.ssh/k3d-manager-key.pem)
@@ -194,6 +194,13 @@ Config (env overrides):
 HELP
     return 0
   fi
+
+  local _agent_count="${ACG_AGENT_COUNT:-2}"
+  if [[ ! "${_agent_count}" =~ ^[1-9][0-9]*$ ]]; then
+    _err "[k3s-aws] ACG_AGENT_COUNT must be a positive integer (got: ${_agent_count})"
+    return 1
+  fi
+  local total_nodes=$((1 + _agent_count))
 
   _info "[k3s-aws] Extending sandbox TTL before deploy (pre-flight)..."
   _dry_guard "extend ACG sandbox TTL" acg_extend_playwright "${_ACG_SANDBOX_URL}" \
@@ -223,8 +230,8 @@ HELP
   local _ready_nodes
   _ready_nodes=$(kubectl get nodes --context ubuntu-k3s --no-headers 2>/dev/null \
     | grep -c " Ready" || true)
-  if [[ "${_ready_nodes}" -ge 3 ]]; then
-    _info "[k3s-aws] k3s nodes already Ready (${_ready_nodes}/3) — skipping deploy_app_cluster"
+  if [[ "${_ready_nodes}" -ge "${total_nodes}" ]]; then
+    _info "[k3s-aws] k3s nodes already Ready (${_ready_nodes}/${total_nodes}) — skipping deploy_app_cluster"
   else
     _info "[k3s-aws] Installing k3s server + joining agents..."
     local _ambient_mesh="${K3S_AMBIENT_MESH:-true}"
@@ -233,7 +240,12 @@ HELP
       _ambient_mesh="false"
     }
     local _prev_hosts="${UBUNTU_K3S_AGENT_HOSTS:-}" _prev_mesh="${K3S_AMBIENT_MESH:-}"
-    export UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" K3S_AMBIENT_MESH="${_ambient_mesh}"
+    local _agent_hosts="" _agent_index
+    for ((_agent_index = 1; _agent_index <= _agent_count; _agent_index++)); do
+      [[ -n "${_agent_hosts}" ]] && _agent_hosts+=","
+      _agent_hosts+="ubuntu-${_agent_index}"
+    done
+    export UBUNTU_K3S_AGENT_HOSTS="${_agent_hosts}" K3S_AMBIENT_MESH="${_ambient_mesh}"
     _provider_k3s_aws_deploy_app_cluster || return 1
     if [[ -n "${_prev_hosts}" ]]; then export UBUNTU_K3S_AGENT_HOSTS="${_prev_hosts}"; else unset UBUNTU_K3S_AGENT_HOSTS; fi
     if [[ -n "${_prev_mesh}" ]]; then export K3S_AMBIENT_MESH="${_prev_mesh}"; else unset K3S_AMBIENT_MESH; fi
@@ -242,8 +254,6 @@ HELP
   _provider_k3s_aws_start_tunnel || return 1
 
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
-  local total_nodes=3
-
   _info "[k3s-aws] Waiting for all ${total_nodes} nodes to be Ready..."
   local node_attempts=0
   until [[ "$(KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready")" -ge "${total_nodes}" ]]; do
@@ -369,7 +379,7 @@ function _provider_k3s_aws_destroy_cluster() {
     cat <<'HELP'
 Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager destroy_cluster --confirm
 
-Tear down the 3-node k3s-aws cluster:
+Tear down the k3s-aws fleet (1 server + ACG_AGENT_COUNT agents):
   1. Stop sandbox watcher
   2. tunnel_stop                — stop autossh tunnel
   3. acg_teardown --confirm     — delete CloudFormation stack; remove ubuntu-k3s kubeconfig context
