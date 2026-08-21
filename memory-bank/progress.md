@@ -14,15 +14,21 @@
 
 ## v1.26.0 queue
 
-- [ ] **Fleet node lifecycle (count-agnostic) — PHASE A DONE + VERIFIED 2026-08-21; GATE + Phase B pending.**
+- [ ] **Fleet node lifecycle (count-agnostic) — PHASE A RELEASED + SUBTREE-PULLED 2026-08-21; Phase B pending.**
+  **GATE DONE 2026-08-21:** user squash-merged PR #43 → lib-foundation main (`c4f3211`); Copilot review
+  addressed in `32ce9c9` (portable `mktemp -t`, `--help` count-agnostic text, guard regex
+  `Agent[12]([^0-9]|$)`); Claude stamped `v0.4.12` (`c1df1be`, direct fast-forward — ruleset blocks only
+  force-push/deletion, no PR requirement), tag `v0.4.12` + GitHub release live, lib-foundation next branch
+  `feat/v0.4.13` + v0.4.12 retro (`c4ab19dc`). **Subtree-pulled into k3d-manager `scripts/lib/foundation`**
+  (`e60dff69`, squash `2c083258` `0b574b13..c1df1bed`) on `k3d-manager-v1.26.0`, pushed + origin-verified.
+  **NEXT: hand Phase B to Codex.**
   Phase A (lib-foundation `feat/v0.4.12` `8148e33`, docs `249a8bd`): generated N-agent CFN via awk emitter
   + dynamic `Agent*PublicIP` discovery + validate-before-AWS + new `scripts/tests/lib/acg.bats`. Claude
   verified independently: only 2 files touched (no vendored), tree clean, 6/6 BATS + shellcheck-default +
   `bash -n` all green run by Claude, render preserves every per-agent property (incl. SSM `!If`) against
-  the drifted k3d-manager template. Carry-forwards: lexical `sort_by(&OutputKey)` breaks label order at
-  N≥10 (harmless at ACG N≤4; numeric-sort touch-up); B1 corrected (do NOT regen k3d-manager template from
-  upstream — would revert the SSM `!If` fix). NEXT: Claude runs the GATE (lib-foundation release +
-  subtree-pull), then Codex Phase B. Scope decision "both, fleet first" — fleet before the foundation-vcluster-CLI + M2
+  the drifted k3d-manager template. Carry-forwards RESOLVED in the release: numeric agent-IP ordering
+  shipped (awk-index `sort -n` + `Agent10` BATS test — no longer lexical); B1 corrected (do NOT regen
+  k3d-manager template from upstream — would revert the SSM `!If` fix). Codex Phase B next. Scope decision "both, fleet first" — fleet before the foundation-vcluster-CLI + M2
   remote-runner plans. Design spec `docs/plans/v1.26.0-fleet-node-lifecycle.md` + implementation
   assignment `docs/plans/v1.26.0-fleet-node-lifecycle-codex-task.md` (ONE scope, two files — fleet stays
   plan #4 of 5; file-count in docs/plans is 5, watch the cap for the NEXT new scope). Upstream-first
