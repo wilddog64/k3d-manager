@@ -86,8 +86,11 @@
 
 - [x] Subtree sync: pulled lib-foundation v0.4.10 (`bc70cef`) into `scripts/lib/foundation/`
   (`74a29b4f`, changelog-only 24-line stamp). Pushed to `origin/k3d-manager-v1.26.0`.
-- [~] Dependabot alert #6 (js-yaml `3.15.0`, CVE-2026-59870, HIGH but dev-only transitive via
-  jest->@istanbuljs/load-nyc-config): fix prepared UPSTREAM in lib-foundation `feat/v0.4.11`
-  (`166df37`, lockfile bump to `3.15.1`, within existing `^3.13.1`). Alert stays OPEN on k3d-manager
-  until lib-foundation v0.4.11 is merged/released and subtree-pulled. Issue note:
-  lib-foundation `docs/issues/2026-08-20-js-yaml-omap-cpu-dos-devdep.md`. Merge gated on user go.
+- [x] Dependabot alert #6 (js-yaml `3.15.0`, CVE-2026-59870, HIGH but dev-only transitive via
+  jest->@istanbuljs/load-nyc-config): fixed UPSTREAM as lib-foundation **v0.4.11** (PR #42 merged
+  `b92f494`, stamp `0b574b1`, tag/release v0.4.11) — lockfile bump to `3.15.1`, within existing
+  `^3.13.1`. Subtree-pulled into `k3d-manager-v1.26.0` (`1bf1d2ce`); vendored lockfile now shows
+  `3.15.1`. NOTE: alert #6 still reads `open` because Dependabot evaluates the **default branch**
+  (main = v1.25.0); it auto-closes (`fixed_at`) when v1.26.0 merges to main. Remediation is complete
+  and staged, closure coupled to the v1.26.0 release. Issue:
+  lib-foundation `docs/issues/2026-08-20-js-yaml-omap-cpu-dos-devdep.md`.

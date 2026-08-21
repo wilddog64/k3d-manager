@@ -16,10 +16,11 @@
 
 ## Open follow-ups
 
-- **Dependabot alert #6 (js-yaml) fix pending release.** Bump to `3.15.1` is committed on
-  lib-foundation `feat/v0.4.11` (`166df37`); alert stays open on k3d-manager until v0.4.11 is
-  merged/released and subtree-pulled. Dev-only transitive dep (jest coverage), no untrusted-YAML
-  surface — low effective risk. Merge gated on user go (never auto-merge).
+- **Dependabot alert #6 (js-yaml) remediated + staged.** Fixed as lib-foundation **v0.4.11**
+  (PR #42 `b92f494`, tag/release live), subtree-pulled into `k3d-manager-v1.26.0` (`1bf1d2ce`,
+  vendored lockfile now `3.15.1`). Alert still reads `open` only because Dependabot scans the default
+  branch (main = v1.25.0) — it auto-closes when v1.26.0 ships to main. Dev-only transitive dep, low
+  effective risk.
 
 - Validate the v1.26.0 sandbox deregistration/unknown-resource cleanup flow on a real expired sandbox; source-only
   implementation is pushed, and no live cleanup has been run.
