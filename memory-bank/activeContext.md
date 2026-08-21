@@ -11,7 +11,9 @@
   (354 files all trace to v1.26.0 milestone work). **Copilot review addressed + thread resolved**
   — its one comment (no test coverage for the managed `register_app_cluster` fail-closed guard +
   labels/annotations) fixed in `525d69d0` with 2 focused `provider_contract.bats` cases (54/54).
-  PENDING before merge: the user's explicit merge go. Ships 3/5 scopes (fleet A+B, E2E gate, stale-cleanup); the
+  PENDING before merge: the user's explicit merge go. **`enforce_admins` DISABLED on `main`
+  2026-08-21 for the user's admin-override merge (was enabled, 1 required approval) — MUST be
+  restored in `/post-merge` Step 2 via bodyless `POST …/enforce_admins`.** Ships 3/5 scopes (fleet A+B, E2E gate, stale-cleanup); the
   foundation-vcluster-CLI and M2-runner scopes remain specs. Merge auto-closes Dependabot #6.
   **Do NOT auto-merge.** Post-merge: run `/post-merge` (tag `v1.26.0` from CHANGELOG, restore
   protection, next branch, retro).
