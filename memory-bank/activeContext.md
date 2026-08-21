@@ -6,19 +6,15 @@
 
 ## Current focus
 
-- **v1.26.0 RELEASE PR OPEN — #117** (`k3d-manager-v1.26.0` → `main`, head `525d69d0`).
-  CI green (lint, CodeQL×3, GitGuardian, detect; stage2 skips on PR); Claude scope check PASS
-  (354 files all trace to v1.26.0 milestone work). **Copilot review addressed + thread resolved**
-  — its one comment (no test coverage for the managed `register_app_cluster` fail-closed guard +
-  labels/annotations) fixed in `525d69d0` with 2 focused `provider_contract.bats` cases (54/54).
-  PENDING before merge: the user's explicit merge go. **`enforce_admins` DISABLED on `main`
-  2026-08-21 for the user's admin-override merge (was enabled, 1 required approval) — MUST be
-  restored in `/post-merge` Step 2 via bodyless `POST …/enforce_admins`.** Ships 3/5 scopes (fleet A+B, E2E gate, stale-cleanup); the
-  foundation-vcluster-CLI and M2-runner scopes remain specs. Merge auto-closes Dependabot #6.
-  **Do NOT auto-merge.** Post-merge: run `/post-merge` (tag `v1.26.0` from CHANGELOG, restore
-  protection, next branch, retro).
-- **v1.25.0 released** (PR #116 `d48e465f`, tag/release live). Main protection restored to
-  one required approval, administrators enforced.
+- **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged to main, tag/release published. Branch protection restored (`enforce_admins=true`, 1 required approval). Shipped 3/5 scopes (fleet node lifecycle count-agnostic, E2E promotion gate + observability, managed registration cleanup). Retrospective: `docs/retro/2026-08-21-v1.26.0-retrospective.md`.
+
+- **v1.27.0 active branch** (`k3d-manager-v1.27.0`, branched from merge commit). Image signing/attestation + adaptive checkout load testing in scope for next milestone.
+
+- **Deferred findings from v1.26.0** (filed as tracked issues, not blocking):
+  - Finding 1a — exporter empty duration metric (cosmetic). `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
+  - Finding 2b — dispatcher `--confirm` strip on `deploy_app_cluster`. `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
+
+- **v1.25.0 released** (PR #116 `d48e465f`, tag/release live).
 - **Milestone v1.26.0 — committed work is DONE and pushed on `k3d-manager-v1.26.0`:**
   - **Fleet node lifecycle (count-agnostic)** — Phase A shipped as lib-foundation `v0.4.12`
     (PR #43, subtree-pulled `e60dff69`/`2c083258`); Phase B implemented `b0fe320a` and

@@ -7,7 +7,7 @@
 
 | Version | State |
 |---|---|
-| v1.26.0 | **PR #117 OPEN** — `k3d-manager-v1.26.0` → main (head `89f49b00`); CI green, scope check pass; awaiting Copilot review (add via UI) + merge go. Ships 3/5 scopes |
+| v1.26.0 | RELEASED — PR #117 `1bbe5439`, tag v1.26.0 + GitHub release published, branch protection restored (enforce_admins=true, 1 required approval). Shipped 3/5 scopes. |
 | v1.25.0 | RELEASED — PR #116 `d48e465f`, tag/release published, protection restored |
 | v1.24.1 | RELEASED — PR #115, tag and GitHub release published |
 | v1.24.0 | RELEASED — PR #113, tag and GitHub release published |
