@@ -8,7 +8,19 @@
 
 - **v1.25.0 is released.** PR #116 merged as `d48e465f`; tag and GitHub release `v1.25.0` are live.
 - Main protection is restored to one required approval with administrators enforced.
-- **Current milestone: v1.26.0** — sandbox registration lifecycle cleanup and E2E promotion-gate integration.
+- **Current milestone: v1.26.0** — sandbox registration lifecycle cleanup, E2E promotion-gate
+  integration, and (scope decision 2026-08-20 "both, fleet first") the **count-agnostic fleet node
+  lifecycle** refactor. Sequence: fleet first, then foundation-managed vCluster CLI → M2 remote E2E
+  runner. Plan docs at 4/5 (fleet spec `docs/plans/v1.26.0-fleet-node-lifecycle.md` just added) —
+  watch the cap.
+- **Next action: fleet spec + Codex task written and handed to Codex (2026-08-20).** Implementation
+  assignment `docs/plans/v1.26.0-fleet-node-lifecycle-codex-task.md` (phased). Codex does Part A upstream
+  (lib-foundation lib-acg `acg.sh`: generated N-agent CFN + dynamic `Agent*PublicIP` discovery) + Rung-0
+  offline gates, then STOPS. **GATE (Claude):** release lib-foundation + subtree-pull. Then Codex does
+  Part B (k3d-manager `k3s-aws.sh` derive hosts/`total_nodes`; `shopping_cart.sh:deploy_app_cluster()`
+  parallel+readiness+idempotent; `make fleet-render|validate|plan|up` targets). **Live acceptance is
+  Claude's:** `ACG_AGENT_COUNT=4 deploy_cluster` (= 5 nodes, the ACG cap) via `make fleet-up` — node-join
+  only, NOT `make up` — serialized per the live-sandbox rule; Codex must not touch the sandbox.
 - **Lifecycle cleanup foundation landed** in `f90c8e0d` on `k3d-manager-v1.26.0`: registration metadata,
   expiry/API-grace guarded `make cleanup-stale-clusters` (dry-run default), provider safety, and JSONL audit.
 - v1.27.0 remains planned for image signing/attestation and adaptive checkout load testing;

@@ -14,6 +14,21 @@
 
 ## v1.26.0 queue
 
+- [ ] **Fleet node lifecycle (count-agnostic) — SPEC + CODEX TASK WRITTEN 2026-08-20, handed to Codex;
+  not implemented.** Scope decision "both, fleet first" — fleet before the foundation-vcluster-CLI + M2
+  remote-runner plans. Design spec `docs/plans/v1.26.0-fleet-node-lifecycle.md` + implementation
+  assignment `docs/plans/v1.26.0-fleet-node-lifecycle-codex-task.md` (ONE scope, two files — fleet stays
+  plan #4 of 5; file-count in docs/plans is 5, watch the cap for the NEXT new scope). Upstream-first
+  (lib-foundation lib-acg `acg.sh`: generated N-agent CFN + dynamic `Agent*PublicIP` discovery), then
+  k3d-manager (`k3s-aws.sh` derive hosts/`total_nodes` from `ACG_AGENT_COUNT`; `shopping_cart.sh`
+  `deploy_app_cluster()` parallel join + per-node readiness + idempotent). Re-wires `ACG_AGENT_COUNT`
+  (removed in v1.0.1 for template/join drift) with a single-source-of-truth design so drift can't recur.
+  **Test at the ACG 5-node cap:** `ACG_AGENT_COUNT=4` (server + 4 = 5 nodes = the cap; ACG_AGENT_COUNT=5
+  would be 6 instances, over cap). 4-rung verification ladder shipped as `make fleet-render|validate|plan|up`
+  targets (render offline; validate/plan zero-instance; `fleet-up`=`deploy_cluster` node-join only, NOT
+  `make up`). **Division of labor:** Codex does all impl + Rung-0 offline (render/BATS/shellcheck/audit)
+  and must NOT touch the live sandbox; Claude runs Rungs 1–3 serialized. GATE between Part A and B (lib
+  release + subtree-pull) is Claude's, not Codex's.
 - [x] Lifecycle cleanup foundation — registration metadata plus dry-run/confirm `cleanup-stale-clusters`,
   provider/grace/retain guards, generated-Application-only deletion, and JSONL audit (`f90c8e0d`, pushed on
   `k3d-manager-v1.26.0`). Live expired-sandbox validation remains pending.
