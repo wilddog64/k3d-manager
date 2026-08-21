@@ -1031,21 +1031,41 @@ function _k3s_agent_address() {
   printf '%s\n' "${agent_ip:-${agent_host}}"
 }
 
+# Resolve an agent's primary private IPv4 over SSH (k3s registers nodes by this
+# address, not the ssh alias or public HostName). Empty on unreachable host.
+function _k3s_agent_private_ip() {
+  local agent_host="$1" agent_ip="$2"
+  local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
+  local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
+  local target="${agent_ip:-${agent_host}}" priv_ip
+  priv_ip=$(_run_command --soft --quiet -- ssh -i "${ssh_key}" \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o ConnectTimeout=5 -o BatchMode=yes "${ssh_user}@${target}" \
+    'ip -4 route get 1.1.1.1 2>/dev/null | sed -n "s/.*src \([0-9.][0-9.]*\).*/\1/p" | head -n1' \
+    2>/dev/null) || true
+  printf '%s\n' "${priv_ip}"
+}
+
+# Ready iff a node's STATUS is exactly Ready AND its INTERNAL-IP (column 6 of
+# `-o wide`) equals the agent's private IP — exact field match, no substring
+# aliasing (ip-10-0-1-1 vs -17/-168).
 function _k3s_agent_is_ready() {
-  local local_kubeconfig="$1" agent_host="$2" agent_ip="$3"
-  local _nodes
+  local local_kubeconfig="$1" agent_priv_ip="$2"
+  [[ -n "${agent_priv_ip}" ]] || return 1
+  local _nodes _name _status _roles _age _version _internal_ip
   _nodes=$(KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers -o wide 2>/dev/null || true)
   while IFS= read -r _node; do
-    [[ "${_node}" == *" Ready"* ]] || continue
-    [[ "${_node}" == *"${agent_host}"* || "${_node}" == *"${agent_ip}"* ]] && return 0
+    [[ -z "${_node}" ]] && continue
+    read -r _name _status _roles _age _version _internal_ip _ <<< "${_node}"
+    [[ "${_status}" == "Ready" && "${_internal_ip}" == "${agent_priv_ip}" ]] && return 0
   done <<< "${_nodes}"
   return 1
 }
 
 function _k3s_wait_agent_ready() {
-  local local_kubeconfig="$1" agent_host="$2" agent_ip="$3"
+  local local_kubeconfig="$1" agent_host="$2" agent_priv_ip="$3"
   local _attempt=0
-  while ! _k3s_agent_is_ready "${local_kubeconfig}" "${agent_host}" "${agent_ip}"; do
+  while ! _k3s_agent_is_ready "${local_kubeconfig}" "${agent_priv_ip}"; do
     _attempt=$((_attempt + 1))
     if (( _attempt >= 30 )); then
       _err "[shopping_cart] Agent ${agent_host} did not become Ready after 150s"
@@ -1058,9 +1078,10 @@ function _k3s_wait_agent_ready() {
 
 function _k3sup_join_agent_worker() {
   local agent_host="$1" server_ip="$2" local_kubeconfig="$3" failure_file="$4"
-  local agent_ip
+  local agent_ip agent_priv_ip
   agent_ip=$(_k3s_agent_address "${agent_host}")
-  if _k3s_agent_is_ready "${local_kubeconfig}" "${agent_host}" "${agent_ip}"; then
+  agent_priv_ip=$(_k3s_agent_private_ip "${agent_host}" "${agent_ip}")
+  if _k3s_agent_is_ready "${local_kubeconfig}" "${agent_priv_ip}"; then
     _info "[shopping_cart] Agent ${agent_host} already Ready — skipping join"
     return 0
   fi
@@ -1068,7 +1089,8 @@ function _k3sup_join_agent_worker() {
     printf '%s\n' "${agent_host}" >> "${failure_file}"
     return 1
   fi
-  if ! _k3s_wait_agent_ready "${local_kubeconfig}" "${agent_host}" "${agent_ip}"; then
+  [[ -n "${agent_priv_ip}" ]] || agent_priv_ip=$(_k3s_agent_private_ip "${agent_host}" "${agent_ip}")
+  if ! _k3s_wait_agent_ready "${local_kubeconfig}" "${agent_host}" "${agent_priv_ip}"; then
     printf '%s\n' "${agent_host}" >> "${failure_file}"
     return 1
   fi

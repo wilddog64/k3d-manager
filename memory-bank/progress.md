@@ -20,7 +20,18 @@
   readiness and collected failures, and Makefile fleet render/validate/plan/up rungs. The reference
   `scripts/etc/acg-cluster.yaml` remained unchanged. Offline gates: `bash -n` clean; focused BATS
   `1..39` all passed; shellcheck baseline comparison found no new findings; `_agent_audit` passed.
-  Claude owns live ACG Rungs 1–3 and must run `ACG_AGENT_COUNT=4` fleet acceptance separately.
+- [x] **Fleet Phase B live acceptance — GREEN 2026-08-21.** Claude ran live Rungs 1–3 at
+  `ACG_AGENT_COUNT=4` on ACG sandbox `851725327555`. First pass surfaced two live-only defects
+  (`docs/bugs/2026-08-21-fleet-phaseb-live-verification-findings.md`); **both now FIXED + re-verified
+  live**: (1) BLOCKING `_k3s_agent_is_ready` false-negative — fixed in `scripts/plugins/shopping_cart.sh`
+  (new `_k3s_agent_private_ip` SSH resolver + exact InternalIP-column match + `STATUS==Ready`; 2 new
+  BATS tests, suite 17/17); (2) `fleet-plan` invalid `--no-execute`/missing params — fixed in `Makefile`
+  (`create-change-set --change-set-type CREATE` on throwaway `k3d-manager-cluster-plan` stack, full
+  params + `CAPABILITY_NAMED_IAM` + EXIT-trap cleanup + `SHELL := /bin/bash`). Re-verify: Rung 2 plans
+  4 Agents + 1 Server then trap-cleans; Rung 3 `fleet-up` → `All agent nodes joined and Ready` /
+  `FLEET_UP_EXIT=0`. Teardown re-verified clean (0 EC2, stack gone, ArgoCD == baseline). Cosmetic
+  `Description` = upstream carry-forward (lib-foundation subtree). **Fixes + docs NOT yet committed** —
+  staged pending user go. **Phase B DONE.**
 
 - [x] **Fleet node lifecycle (count-agnostic) — PHASE A released/subtree-pulled and Phase B pushed 2026-08-21.**
   **GATE DONE 2026-08-21:** user squash-merged PR #43 → lib-foundation main (`c4f3211`); Copilot review

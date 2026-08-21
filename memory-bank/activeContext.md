@@ -38,7 +38,40 @@
   provide the offline-to-live rung sequence. `scripts/etc/acg-cluster.yaml` was intentionally
   unchanged. Rung-0 evidence: focused BATS 39/39, bash syntax clean, shellcheck showed only the
   pre-existing shopping-cart informational findings (no new findings), and `_agent_audit` passed.
-  Live `fleet-up`/AWS validation remains Claude-owned.
+- **LIVE RUNGS 1–3 RUN 2026-08-21 (Claude, ACG sandbox `851725327555`, `ACG_AGENT_COUNT=4`).**
+  Provisioning + parallel join **WORK** — CFN deployed "1 server + 4 agents", all 4 agents joined
+  concurrently, **all 5 nodes `Ready`**. Rung 1 `fleet-validate` PASS. **Two Phase B defects found**
+  (live-only, mocked BATS missed them) — recorded in
+  `docs/bugs/2026-08-21-fleet-phaseb-live-verification-findings.md`:
+  (1) **BLOCKING** `_k3s_agent_is_ready` (shopping_cart.sh ~L1034/1040) matches k3s node lines against
+  the SSH alias `ubuntu-N` or the **public** IP from `~/.ssh/config`, but k3s names nodes by the
+  **private** IP (`ip-10-0-1-104`/InternalIP `10.0.1.104`) → readiness always false-negatives →
+  `fleet-up` exits non-zero on a healthy 5-node cluster; also kills the idempotent-skip. Fix: match
+  on private IP/InternalIP (+ tighten substring for N≥10). (2) `fleet-plan` (Makefile ~L83) passes
+  invalid `--no-execute` to `create-change-set` AND omits required `--parameters`
+  (KeyName/AllowedCidr/AmiId) → Rung 2 unusable. Plus cosmetic: template `Description` still says
+  "3-node… 2 agents" (awk emitter doesn't rewrite it). **Teardown VERIFIED CLEAN:**
+  `make down CLUSTER_PROVIDER=k3s-aws CLEANUP_STALE=1` deleted the CFN stack (0 EC2 instances, stack
+  absent); ArgoCD apps + cluster secrets **identical to pre-test baseline** (23 apps, only
+  `cluster-ubuntu-hostinger`), zero Unknown/agent registrations; stale local `ubuntu-k3s` kube
+  context removed.
+- **✅ BOTH FINDINGS FIXED + RE-VERIFIED LIVE 2026-08-21 (Claude, same ACG sandbox `851725327555`).**
+  **Finding 1 (BLOCKING)** fixed in `scripts/plugins/shopping_cart.sh`: new `_k3s_agent_private_ip`
+  resolves each agent's primary private IPv4 over SSH (`ip -4 route get 1.1.1.1` → `src`), and
+  `_k3s_agent_is_ready` now does an **exact field match** on the InternalIP column (field 6 of
+  `kubectl get nodes -o wide`) + `STATUS == Ready` — kills both the public-IP/alias false-negative
+  and the N≥10 substring aliasing. `_k3sup_join_agent_worker` resolves the private IP for the
+  idempotent pre-check + re-resolves post-join if the pre-join SSH failed. 2 new BATS matcher tests
+  + `_k3s_agent_private_ip` stub in the 3 worker tests → suite **17/17**. **Finding 2** fixed in
+  `Makefile`: `fleet-plan` rewritten to `create-change-set --change-set-type CREATE` against a
+  throwaway `k3d-manager-cluster-plan` stack with all 4 params + `CAPABILITY_NAMED_IAM` + a trap
+  that deletes the plan stack (zero real resources), plus target-specific `SHELL := /bin/bash`.
+  **Live re-verify:** Rung 2 `fleet-plan` count=4 planned 4 Agents + 1 Server + VPC/SG/routing then
+  trap-deleted the plan stack; Rung 3 `fleet-up` count=4 → `Agent ubuntu-{1..4} is Ready` /
+  `All agent nodes joined and Ready` / **`FLEET_UP_EXIT=0`** (the 150s false-negative is gone).
+  Cosmetic `Description` rewrite = upstream carry-forward (awk emitter is in the lib-foundation
+  subtree — edit upstream, subtree-pull; NOT patched here). Teardown re-run + re-verified clean.
+  **NOT YET COMMITTED** — fixes + docs staged pending user go on `git commit`. **Phase B now DONE.**
 
 ## Open follow-ups
 

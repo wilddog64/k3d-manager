@@ -75,12 +75,34 @@ fleet-validate:
 	ACG_AGENT_COUNT="$(ACG_AGENT_COUNT)" bash -c 'source scripts/lib/foundation/scripts/lib/acg/acg.sh && _acg_validate_agent_count && _acg_render_template "$$_ACG_AGENT_COUNT" scripts/etc/acg-cluster.yaml "$$1"' _ "$$_rendered"; \
 	aws cloudformation validate-template --template-body "file://$$_rendered"
 
-## Plan an ACG fleet CloudFormation change set without executing it (live AWS; k3s-aws only)
+## Plan an ACG fleet CloudFormation change set without provisioning resources (live AWS; k3s-aws only)
+fleet-plan: SHELL := /bin/bash
 fleet-plan:
 	@if [ "$(CLUSTER_PROVIDER)" != "k3s-aws" ]; then echo "fleet-plan skipped (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER); k3s-aws-only)"; exit 0; fi; \
-	_rendered=$$(mktemp "$${TMPDIR:-/tmp}/k3d-manager-fleet.XXXXXX.yaml"); trap 'rm -f -- "$$_rendered"' EXIT; \
-	ACG_AGENT_COUNT="$(ACG_AGENT_COUNT)" bash -c 'source scripts/lib/foundation/scripts/lib/acg/acg.sh && _acg_validate_agent_count && _acg_render_template "$$_ACG_AGENT_COUNT" scripts/etc/acg-cluster.yaml "$$1"' _ "$$_rendered"; \
-	aws cloudformation create-change-set --stack-name k3d-manager-cluster --change-set-name "fleet-$$(date +%s)" --change-set-type UPDATE --template-body "file://$$_rendered" --no-execute
+	set -euo pipefail; \
+	source scripts/lib/foundation/scripts/lib/acg/acg.sh; \
+	ACG_AGENT_COUNT="$(ACG_AGENT_COUNT)" _acg_validate_agent_count; \
+	_region="$${ACG_REGION:-us-west-2}"; \
+	_ami=$$(aws ec2 describe-images --region "$$_region" --owners "$$_ACG_AMI_OWNER" \
+	  --filters "Name=name,Values=$$_ACG_AMI_FILTER" "Name=state,Values=available" \
+	  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text); \
+	_rendered=$$(mktemp "$${TMPDIR:-/tmp}/k3d-manager-fleet.XXXXXX.yaml"); \
+	_plan_stack="k3d-manager-cluster-plan"; _cs="fleet-plan-$$(date +%s)"; \
+	trap 'rm -f -- "$$_rendered"; aws cloudformation delete-stack --region "$$_region" --stack-name "$$_plan_stack" >/dev/null 2>&1 || true' EXIT; \
+	_acg_render_template "$$_ACG_AGENT_COUNT" scripts/etc/acg-cluster.yaml "$$_rendered"; \
+	aws cloudformation create-change-set --region "$$_region" --stack-name "$$_plan_stack" \
+	  --change-set-name "$$_cs" --change-set-type CREATE --template-body "file://$$_rendered" \
+	  --parameters ParameterKey=KeyName,ParameterValue="$$_ACG_KEY_NAME" \
+	    ParameterKey=AllowedCidr,ParameterValue="$$ACG_ALLOWED_CIDR" \
+	    ParameterKey=InstanceType,ParameterValue="$$_ACG_INSTANCE_TYPE" \
+	    ParameterKey=AmiId,ParameterValue="$$_ami" \
+	  --capabilities CAPABILITY_NAMED_IAM; \
+	aws cloudformation wait change-set-create-complete --region "$$_region" \
+	  --stack-name "$$_plan_stack" --change-set-name "$$_cs"; \
+	aws cloudformation describe-change-set --region "$$_region" \
+	  --stack-name "$$_plan_stack" --change-set-name "$$_cs" \
+	  --query 'Changes[].ResourceChange.{Action:Action,Type:ResourceType,LogicalId:LogicalResourceId}' \
+	  --output table
 
 ## Provision and join the count-driven ACG fleet (live node-join rung; k3s-aws only)
 fleet-up:
