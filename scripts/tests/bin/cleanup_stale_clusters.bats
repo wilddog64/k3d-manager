@@ -48,4 +48,14 @@ EOF
   [[ "$(cat "${KUBECTL_LOG}")" == *"delete application/shopping-cart-app"* ]]
   [[ "$(cat "${KUBECTL_LOG}")" == *"delete application/ubuntu-k3s-eso"* ]]
   [[ "$(cat "${KUBECTL_LOG}")" == *"delete secret cluster-expired"* ]]
+  # Ordering is load-bearing: the Secret must be deleted BEFORE the Applications, or the
+  # ApplicationSets regenerate them and ArgoCD blocks on the resources-finalizer against
+  # the dead cluster (live finding 2026-08-21).
+  secret_line="$(grep -n 'delete secret cluster-expired' "${KUBECTL_LOG}" | head -1 | cut -d: -f1)"
+  app_line="$(grep -n 'delete application/' "${KUBECTL_LOG}" | head -1 | cut -d: -f1)"
+  [ -n "${secret_line}" ] && [ -n "${app_line}" ]
+  [ "${secret_line}" -lt "${app_line}" ]
+  # Application deletes must be non-blocking (--wait=false) so a dead-cluster finalizer
+  # cannot hang the run.
+  [[ "$(grep 'delete application/' "${KUBECTL_LOG}")" == *"--wait=false"* ]]
 }

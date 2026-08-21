@@ -81,9 +81,18 @@
   branch (main = v1.25.0) — it auto-closes when v1.26.0 ships to main. Dev-only transitive dep, low
   effective risk.
 
-- Validate the v1.26.0 sandbox deregistration/unknown-resource cleanup flow on a real expired sandbox; source-only
-  implementation is pushed, and no live cleanup has been run.
-- Complete the E2E promotion-gate live acceptance and retain a result artifact for every run.
+- ✅ **DONE 2026-08-21 — sandbox deregistration/unknown-resource cleanup validated on a real expired sandbox.**
+  Full-ACG faithful run (provision k3s on fresh sandbox `604492140645` → MANAGED register → 10 appset apps →
+  delete CFN stack → API unreachable → cleanup). Semantics + safety GREEN (grace-hold → propose → 23
+  survivors exact match, hostinger untouched). Found + fixed BLOCKING Finding 2a (`cleanup-stale-clusters`
+  hung: deleted apps before Secret → appset regen + blocking delete on dead-cluster finalizer). Fix =
+  Secret-first + `--wait=false` (`bin/cleanup-stale-clusters`), BATS asserts order+wait (2/2); hub-only
+  synthetic re-verify: previously-hanging confirm now 3s, 0 orphans. Env fully cleaned. Findings:
+  `docs/bugs/2026-08-21-lifecycle-e2e-live-acceptance-findings.md`.
+- ✅ **DONE 2026-08-21 — E2E promotion-gate live acceptance + result artifact.** `e2e_verify_vcluster` live
+  on the hub → durable artifact `1787338912-32712.json` (fail captured faithfully), result-event ConfigMap,
+  exporter `e2e_*` gauges (`e2e_last_run_pass=0` fires `E2EVerificationFailing`). Full chain proven. Minor
+  Finding 1a (empty duration metric) filed.
 - Replace the interim in-cluster CVE promoter git-writer token with a fine-grained contents-write-only PAT.
 - Reconcile stale local port-forward/LaunchAgent state when public Grafana or status probes fail.
 - Keep the ArgoCD smoke credential-drift issue and k3s-aws SSM registration issue visible in `docs/issues/`

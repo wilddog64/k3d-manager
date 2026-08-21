@@ -30,8 +30,8 @@
   params + `CAPABILITY_NAMED_IAM` + EXIT-trap cleanup + `SHELL := /bin/bash`). Re-verify: Rung 2 plans
   4 Agents + 1 Server then trap-cleans; Rung 3 `fleet-up` → `All agent nodes joined and Ready` /
   `FLEET_UP_EXIT=0`. Teardown re-verified clean (0 EC2, stack gone, ArgoCD == baseline). Cosmetic
-  `Description` = upstream carry-forward (lib-foundation subtree). **Committed `46bfdf1c`** on
-  `k3d-manager-v1.26.0` (6 files; not pushed yet). **Phase B DONE.**
+  `Description` = upstream carry-forward (lib-foundation subtree). **Committed `46bfdf1c` + memory-bank
+  followup `35e9ecf2`, both PUSHED** to `origin/k3d-manager-v1.26.0` (origin-verified). **Phase B DONE.**
 
 - [x] **Fleet node lifecycle (count-agnostic) — PHASE A released/subtree-pulled and Phase B pushed 2026-08-21.**
   **GATE DONE 2026-08-21:** user squash-merged PR #43 → lib-foundation main (`c4f3211`); Copilot review
@@ -66,8 +66,27 @@
 - [x] Lifecycle cleanup foundation — registration metadata plus dry-run/confirm `cleanup-stale-clusters`,
   provider/grace/retain guards, generated-Application-only deletion, and JSONL audit (`f90c8e0d`, pushed on
   `k3d-manager-v1.26.0`). Live expired-sandbox validation remains pending.
-- [ ] E2E promotion-gate integration with durable success/failure artifacts.
-- [ ] Verify unknown/out-of-sync handling without mutating unrelated live Applications.
+- [x] **E2E promotion-gate integration with durable success/failure artifacts — GREEN live 2026-08-21.**
+  Ran `e2e_verify_vcluster` live on the hub (throwaway vCluster + Playwright Job). The Playwright suite
+  itself failed (`exit_code 1`, phase `running-playwright`) but the harness captured it faithfully:
+  durable artifact `~/.k3dm/e2e/1787338912-32712.json` (`result:fail`, commit `35e9ecf2`), result-event
+  ConfigMap `e2e-result-r2fl9` in `platform-ops`, and the exporter emits `e2e_run_info{…passed="false"}`,
+  `e2e_last_run_pass{…}=0` (fires `E2EVerificationFailing`), `e2e_last_run_timestamp_seconds`. Full chain
+  proven: run → artifact → event → exporter → `e2e_*` gauges → dashboard/alert. Minor finding 1a (empty
+  `e2e_last_run_duration_seconds` when duration null → default 0) filed. Evidence:
+  `docs/bugs/2026-08-21-lifecycle-e2e-live-acceptance-findings.md`.
+- [x] **Verify unknown/out-of-sync handling without mutating unrelated live Applications — GREEN live 2026-08-21.**
+  Full-ACG faithful acceptance: provisioned k3s on a fresh sandbox `604492140645`, registered it MANAGED
+  (`cluster-ubuntu-k3s`, expires-at past) → appsets generated 10 Applications; baseline 33 apps = 10
+  ubuntu-k3s + 23 survivors + hostinger (managed=false). Deleted the CFN stack (TTL-reclaim sim) → API
+  unreachable. Cleanup semantics + safety VERIFIED: dry-run grace-hold → propose (hostinger never
+  evaluated); post-cleanup 23 survivors EXACT match, hostinger untouched. **Found + fixed BLOCKING
+  Finding 2a**: `cleanup-stale-clusters --confirm` hung (deleted apps before the Secret → appsets
+  regenerate; blocking `kubectl delete` on dead-cluster resources-finalizer). Fix: delete Secret first +
+  non-blocking `--wait=false` app deletes (`bin/cleanup-stale-clusters`); BATS asserts order + wait-flag
+  (2/2). Live re-verify (hub-only synthetic unreachable reg): previously-hanging confirm now completes in
+  **3s**, 0 orphans, 23 survivors exact. Medium Finding 2b (dispatcher strips `--confirm` from
+  `deploy_app_cluster`) filed, not fixed (guard blast-radius). Env fully cleaned (no EC2/CFN/context/reg).
 - [ ] Keep all new work within the five-plan milestone limit.
 - [x] k3s-aws SSM registration fallback — recorded live account `218085830935` Default Host Management
   Role failure in `docs/issues/2026-08-20-k3s-aws-ssm-fallback.md`; provider now falls back to SSH

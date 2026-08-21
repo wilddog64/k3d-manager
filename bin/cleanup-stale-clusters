@@ -121,11 +121,20 @@ for registration in "${registrations[@]}"; do
     continue
   fi
 
+  # Delete the cluster Secret FIRST. This is load-bearing ordering: while the Secret
+  # still exists the ApplicationSets regenerate every generated Application as fast as
+  # it is deleted, and ArgoCD keeps trying to reach the dead cluster to run the
+  # resources-finalizer cascade, so a blocking delete hangs forever. Removing the
+  # Secret stops generation and lets ArgoCD fast-path finalizer removal (no cluster =>
+  # nothing to cascade-delete), so the appsets prune the Applications cleanly.
+  "${kubectl_cmd[@]}" -n "${argocd_ns}" delete secret "${secret}" --ignore-not-found >/dev/null 2>&1 || true
+  # Backstop: force-remove any Applications that linger (finalizer cleared, never a
+  # blocking delete against an unreachable cluster).
   while IFS= read -r app; do
     [[ -n "${app}" ]] || continue
     "${kubectl_cmd[@]}" -n "${argocd_ns}" patch "application/${app}" --type=merge \
       -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
-    "${kubectl_cmd[@]}" -n "${argocd_ns}" delete "application/${app}" --ignore-not-found >/dev/null 2>&1 || true
+    "${kubectl_cmd[@]}" -n "${argocd_ns}" delete "application/${app}" --wait=false --ignore-not-found >/dev/null 2>&1 || true
   done < <("${kubectl_cmd[@]}" -n "${argocd_ns}" get applications -o json | jq -r \
     --arg cluster "${cluster}" --arg server "${server}" '
     .items[] |
@@ -133,7 +142,6 @@ for registration in "${registrations[@]}"; do
       (.metadata.labels["k3d-manager/cluster"] // "") == $cluster or
       ($server != "" and (.spec.destination.server // "") == $server)) |
     .metadata.name')
-  "${kubectl_cmd[@]}" -n "${argocd_ns}" delete secret "${secret}" --ignore-not-found >/dev/null 2>&1 || true
   printf '%s\n' "$(jq -cn --arg cluster "${cluster}" --arg provider "${provider}" --arg reason expired_api_unreachable \
     '{cluster:$cluster,provider:$provider,decision:"delete",reason:$reason,timestamp:(now|floor)}')" >> "${audit_file}"
   rm -f "${state_file}"
