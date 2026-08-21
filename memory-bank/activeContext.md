@@ -8,7 +8,12 @@
 
 - **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged to main, tag/release published. Branch protection restored (`enforce_admins=true`, 1 required approval). Shipped 3/5 scopes (fleet node lifecycle count-agnostic, E2E promotion gate + observability, managed registration cleanup). Retrospective: `docs/retro/2026-08-21-v1.26.0-retrospective.md`.
 
-- **v1.27.0 active branch** (`k3d-manager-v1.27.0`, branched from merge commit). Image signing/attestation + adaptive checkout load testing in scope for next milestone.
+- **v1.27.0 active branch** (`k3d-manager-v1.27.0`, branched from merge commit). **Scope = 4 plan docs (4/5, under cap):**
+  1. `docs/plans/v1.27.0-foundation-managed-vcluster-cli.md` — load-split **prerequisite**; upstream-first lib-foundation `foundation_ensure_vcluster_cli`. **Must land first.**
+  2. `docs/plans/v1.27.0-m2-remote-e2e-runner.md` — the actual E2E load-split off the M4 laptop; depends on #1.
+  3. `docs/plans/v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce (multi-repo, heavy).
+  4. `docs/plans/v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry.
+  Plans #1 and #2 (both promoted from v1.26.0 deferred, 2026-08-21, "keep all four") are the dependency-ordered chain that moves E2E off the laptop — the response to Prometheus+Grafana over-stressing the M4.
 
 - **Deferred findings from v1.26.0** (filed as tracked issues, not blocking):
   - Finding 1a — exporter empty duration metric (cosmetic). `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
@@ -30,10 +35,9 @@
     `0274fdde`). **DONE.**
   - Live-acceptance findings: `docs/bugs/2026-08-21-lifecycle-e2e-live-acceptance-findings.md`
     and `docs/bugs/2026-08-21-fleet-phaseb-live-verification-findings.md`.
-- **Next in v1.26.0 sequence** (scope decision 2026-08-20 "both, fleet first" — fleet is
-  done): foundation-managed vCluster CLI → M2 remote E2E runner. Plan docs at **5/5** — the
-  cap is hit; split before adding a 6th scope.
-- v1.27.0 planned: image signing/attestation + adaptive checkout load testing.
+- **Load-split promoted into v1.27.0** (2026-08-21): the two v1.26.0-deferred plans
+  (foundation-managed vCluster CLI → M2 remote E2E runner) are renamed to `v1.27.0-*` and
+  are the leading dependency-ordered work. v1.27.0 now holds 4 plan docs (4/5, under cap).
   v1.28.0 planned: parallel multi-cloud provisioning + zero-downtime rollouts.
 
 ## Open follow-ups

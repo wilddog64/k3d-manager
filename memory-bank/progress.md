@@ -55,6 +55,24 @@
   upstream as lib-foundation `v0.4.11` (PR #42 `b92f494`), subtree-pulled (`1bf1d2ce`, lockfile
   `3.15.1`). Reads `open` only because Dependabot scans main; auto-closes when v1.26.0 → main.
 
+## v1.27.0 queue
+
+Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decision
+2026-08-21 "keep all four".
+
+- [ ] **Foundation-managed vCluster CLI** (`docs/plans/v1.27.0-foundation-managed-vcluster-cli.md`)
+  — upstream-first in lib-foundation (`foundation_ensure_vcluster_cli <version>`), then
+  subtree-pull + rewire `scripts/plugins/vcluster.sh`. **Prerequisite — must land first.**
+- [ ] **M2 remote E2E runner** (`docs/plans/v1.27.0-m2-remote-e2e-runner.md`) — SSH-dispatch
+  ephemeral E2E to m2-air, restricted M4-side publisher → hub ConfigMap → Grafana. The actual
+  E2E load-split off the M4 laptop. **Depends on the foundation vCluster CLI.**
+- [ ] **Image signing / CVE-loop closure** (`docs/plans/v1.27.0-image-signing-cve-loop-closure.md`)
+  — cosign sign+attest, Kyverno Audit→Enforce, promoter verify gate. Multi-repo, heavy.
+- [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
+  — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
+- Both load-split plans were promoted from v1.26.0-deferred (renamed `v1.26.0-*` →
+  `v1.27.0-*`, headers/cross-refs updated) on 2026-08-21.
+
 ## Verification record
 
 - v1.25.0 release validation: E2E BATS 16/16; webhook BATS 54/54; syntax/shellcheck gates
