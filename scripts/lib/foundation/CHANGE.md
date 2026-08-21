@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v0.4.11] — 2026-08-20
+
+### Security
+- Bump `js-yaml` `3.15.0` → `3.15.1` in the ACG lockfile to clear CVE-2026-59870 /
+  GHSA-5p4m-2wfm-xmqj (quadratic CPU consumption in `!!omap` resolution). Dev-only transitive
+  dependency (`jest` → `@istanbuljs/load-nyc-config` → `js-yaml`); the patched `3.15.1` satisfies the
+  existing `^3.13.1` constraint, so the fix is a lockfile-only bump with `package.json` untouched.
+  Surfaces as Dependabot alert #6 on the k3d-manager consumer that vendors this lockfile via subtree
+  (`166df37`). See `docs/issues/2026-08-20-js-yaml-omap-cpu-dos-devdep.md`.
+
 ## [v0.4.10] — 2026-08-20
 
 ACG sandbox and CDP-pipeline reliability hardening — recover credential navigation when the
