@@ -21,7 +21,9 @@
   force-push/deletion, no PR requirement), tag `v0.4.12` + GitHub release live, lib-foundation next branch
   `feat/v0.4.13` + v0.4.12 retro (`c4ab19dc`). **Subtree-pulled into k3d-manager `scripts/lib/foundation`**
   (`e60dff69`, squash `2c083258` `0b574b13..c1df1bed`) on `k3d-manager-v1.26.0`, pushed + origin-verified.
-  **NEXT: hand Phase B to Codex.**
+  **Phase B HANDED TO CODEX 2026-08-21** — GATE-DONE marker stamped into
+  `docs/plans/v1.26.0-fleet-node-lifecycle-codex-task.md`; Codex builds B1–B5 (impl + Rung-0 offline
+  only, no live sandbox), commits on `k3d-manager-v1.26.0`. Claude runs Rungs 1–3 live serialized.
   Phase A (lib-foundation `feat/v0.4.12` `8148e33`, docs `249a8bd`): generated N-agent CFN via awk emitter
   + dynamic `Agent*PublicIP` discovery + validate-before-AWS + new `scripts/tests/lib/acg.bats`. Claude
   verified independently: only 2 files touched (no vendored), tree clean, 6/6 BATS + shellcheck-default +
