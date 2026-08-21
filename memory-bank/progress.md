@@ -83,3 +83,11 @@
   listener probes; the complete CDP suite passes 5/5.
 - [x] Cloudflare tunnel/ArgoCD origin recovery: reloaded the tunnel and pinned ArgoCD ingress to
   IPv4 loopback (`929ebed7`); external Grafana returned 302 and ArgoCD returned 200.
+
+- [x] Subtree sync: pulled lib-foundation v0.4.10 (`bc70cef`) into `scripts/lib/foundation/`
+  (`74a29b4f`, changelog-only 24-line stamp). Pushed to `origin/k3d-manager-v1.26.0`.
+- [~] Dependabot alert #6 (js-yaml `3.15.0`, CVE-2026-59870, HIGH but dev-only transitive via
+  jest->@istanbuljs/load-nyc-config): fix prepared UPSTREAM in lib-foundation `feat/v0.4.11`
+  (`166df37`, lockfile bump to `3.15.1`, within existing `^3.13.1`). Alert stays OPEN on k3d-manager
+  until lib-foundation v0.4.11 is merged/released and subtree-pulled. Issue note:
+  lib-foundation `docs/issues/2026-08-20-js-yaml-omap-cpu-dos-devdep.md`. Merge gated on user go.

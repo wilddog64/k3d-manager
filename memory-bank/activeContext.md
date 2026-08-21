@@ -16,6 +16,11 @@
 
 ## Open follow-ups
 
+- **Dependabot alert #6 (js-yaml) fix pending release.** Bump to `3.15.1` is committed on
+  lib-foundation `feat/v0.4.11` (`166df37`); alert stays open on k3d-manager until v0.4.11 is
+  merged/released and subtree-pulled. Dev-only transitive dep (jest coverage), no untrusted-YAML
+  surface — low effective risk. Merge gated on user go (never auto-merge).
+
 - Validate the v1.26.0 sandbox deregistration/unknown-resource cleanup flow on a real expired sandbox; source-only
   implementation is pushed, and no live cleanup has been run.
 - Complete the E2E promotion-gate live acceptance and retain a result artifact for every run.
