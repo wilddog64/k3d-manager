@@ -30,7 +30,7 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "acg-down dry-run k3s-aws previews hub deregistration" {
-  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
@@ -199,13 +199,13 @@ STUB
 }
 
 @test "acg-down real k3s-aws path invokes hub deregistration once" {
-  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
   [ "$(wc -l < "${BATS_TEST_TMPDIR}/deregister.log")" -eq 1 ]
 }
 
 @test "acg-down dry-run k3s-aws does not invoke hub deregistration" {
-  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
@@ -222,7 +222,7 @@ fi
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/uname"
 
-  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm 2>&1'
 
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would run acg_teardown --confirm"* ]]
@@ -239,6 +239,8 @@ STUB
   [[ "$output" == *"keep-hub=1 hub-cluster=k3d-cluster"* ]]
   [[ "$output" == *"--keep-hub set — local Hub cluster preserved"* ]]
   [[ "$output" == *"Done. Remote cluster deleted; local Hub preserved."* ]]
+  [[ "$output" != *"Stopping ArgoCD port-forward launchd agent"* ]]
+  [[ "$output" != *"Stopping Cloudflare named tunnel launchd agent"* ]]
   [ ! -f "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
 }
 
@@ -258,7 +260,7 @@ STUB
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt"
-  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
   run grep -F 'launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist' "${BATS_TEST_TMPDIR}/launchctl.log"
@@ -271,7 +273,7 @@ STUB
 
 @test "acg-down warns and continues when the ArgoCD browser listener is not loaded" {
   export STUB_LAUNCHCTL_BOOTOUT_FAIL=1
-  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"existing ArgoCD browser HTTPS listener was not loaded; continuing"* ]]
 }
@@ -281,7 +283,7 @@ STUB
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping Keycloak browser HTTP listener launchd daemon"* ]]
   run grep -F '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/cluster-down

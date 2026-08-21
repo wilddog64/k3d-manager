@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# scripts/lib/providers/k3s-aws.sh — k3s on ACG AWS sandbox (3-node cluster)
+# scripts/lib/providers/k3s-aws.sh — count-driven k3s fleet on ACG AWS sandbox
 #
 # Provider actions:
 #   deploy_cluster  — acg_provision (CloudFormation stack) → deploy_app_cluster
@@ -97,6 +97,18 @@ _provider_k3s_aws_wait_ssm_registered() {
 # K3S_AWS_SSM_ENABLED; otherwise probes iam:CreateRole and, when permitted,
 # enables SSM on the stack. Any failure degrades to the SSH tunnel.
 _provider_k3s_aws_autoselect_tunnel_mode() {
+  # The default laptop Vault profile depends on a reverse SSH tunnel and the
+  # node-side socat bridge. SSM only provides local port forwarding, so using
+  # it here would publish a dead vault-bridge endpoint and block ESO forever.
+  if [[ "${HUB_VAULT_USE_BRIDGE:-1}" == "1" ]]; then
+    if [[ "${K3S_AWS_SSM_ENABLED:-}" == "true" ]]; then
+      _warn "[k3s-aws] Vault reverse bridge requires SSH — switching from explicit SSM to SSH"
+    elif [[ -z "${K3S_AWS_SSM_ENABLED:-}" ]]; then
+      _info "[k3s-aws] Vault reverse bridge required — using SSH (SSM has no reverse forwarding)"
+    fi
+    export K3S_AWS_SSM_ENABLED=false
+    return 0
+  fi
   if [[ -n "${K3S_AWS_SSM_ENABLED:-}" ]]; then
     _info "[k3s-aws] Tunnel mode explicitly set (K3S_AWS_SSM_ENABLED=${K3S_AWS_SSM_ENABLED}) — skipping auto-detect"
     return 0
@@ -111,12 +123,57 @@ _provider_k3s_aws_autoselect_tunnel_mode() {
   fi
 }
 
+# Start the selected API tunnel. SSM can be selected optimistically when the
+# stack has a profile, but the account-level Default Host Management Role may
+# still be missing. In that case fall back to SSH; provisioning fails only if
+# both transports fail.
+_provider_k3s_aws_start_tunnel() {
+  if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
+    _info "[k3s-aws] Starting SSM port-forwarding tunnel (k3s API :6443)..."
+    local _server_id="" _ssm_ok=1
+    if ! _server_id="$(_ssm_get_instance_id "${UBUNTU_K3S_SSH_HOST:-ubuntu}")"; then
+      _warn "[k3s-aws] Could not resolve the server instance for SSM"
+      _ssm_ok=0
+    elif ! _provider_k3s_aws_wait_ssm_registered "${_server_id}"; then
+      _warn "[k3s-aws] SSM agent is not Online — falling back to SSH tunnel"
+      _ssm_ok=0
+    elif ! _dry_guard "start SSM tunnel" ssm_tunnel "${_server_id}" "6443" "6443"; then
+      _warn "[k3s-aws] SSM tunnel failed to start — falling back to SSH tunnel"
+      _ssm_ok=0
+    fi
+    if (( _ssm_ok )); then
+      return 0
+    fi
+    export K3S_AWS_SSM_ENABLED=false
+  fi
+
+  _info "[k3s-aws] Starting autossh tunnel..."
+  _dry_guard "start autossh tunnel" tunnel_start
+}
+
+function _provider_k3s_aws_deploy_app_cluster() {
+  if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
+    _info "[k3s-aws] Provisioning app cluster via SSM (SSH fallback armed)"
+  fi
+  if _dry_guard "deploy application cluster" deploy_app_cluster --confirm; then
+    return 0
+  fi
+  [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]] || return 1
+  _warn "[k3s-aws] SSM bootstrap failed — falling back to SSH provisioning"
+  _info "[k3s-aws] Switching transport: SSM -> SSH; retrying app provisioning"
+  export K3S_AWS_SSM_ENABLED=false
+  if ! _dry_guard "retry application cluster over SSH" deploy_app_cluster --confirm; then
+    return 1
+  fi
+  _info "[k3s-aws] SSH provisioning retry succeeded"
+}
+
 function _provider_k3s_aws_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
 Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager deploy_cluster
 
-Provision a 3-node k3s cluster on ACG AWS sandbox:
+Provision a k3s cluster on ACG AWS sandbox (1 server + ACG_AGENT_COUNT agents):
   1. acg_extend_playwright       — pre-flight TTL extend
   2. acg_provision --confirm     — CloudFormation stack (server + agents)
   3. deploy_app_cluster --confirm — install k3s + join agents; kubeconfig merge
@@ -124,11 +181,11 @@ Provision a 3-node k3s cluster on ACG AWS sandbox:
   5. kubectl label nodes         — k3d-manager/node-type=server|agent
   6. acg_watch (background)      — sandbox TTL watcher
 
-Milestone gate: kubectl --context ubuntu-k3s get nodes shows 3 nodes Ready.
+Milestone gate: kubectl --context ubuntu-k3s get nodes shows all expected nodes Ready.
 
 Config (env overrides):
   ACG_REGION              AWS region (default: us-west-2)
-  ACG_AGENT_COUNT         Number of agent nodes (default: 2)
+  ACG_AGENT_COUNT         Number of agent nodes (default: 2; total nodes = 1 + count)
   UBUNTU_K3S_SSH_HOST     SSH host alias for server (default: ubuntu)
   UBUNTU_K3S_SSH_USER     SSH user (default: ubuntu)
   UBUNTU_K3S_SSH_KEY      SSH key path (default: ~/.ssh/k3d-manager-key.pem)
@@ -137,6 +194,13 @@ Config (env overrides):
 HELP
     return 0
   fi
+
+  local _agent_count="${ACG_AGENT_COUNT:-2}"
+  if [[ ! "${_agent_count}" =~ ^[1-9][0-9]*$ ]]; then
+    _err "[k3s-aws] ACG_AGENT_COUNT must be a positive integer (got: ${_agent_count})"
+    return 1
+  fi
+  local total_nodes=$((1 + _agent_count))
 
   _info "[k3s-aws] Extending sandbox TTL before deploy (pre-flight)..."
   _dry_guard "extend ACG sandbox TTL" acg_extend_playwright "${_ACG_SANDBOX_URL}" \
@@ -166,8 +230,8 @@ HELP
   local _ready_nodes
   _ready_nodes=$(kubectl get nodes --context ubuntu-k3s --no-headers 2>/dev/null \
     | grep -c " Ready" || true)
-  if [[ "${_ready_nodes}" -ge 3 ]]; then
-    _info "[k3s-aws] k3s nodes already Ready (${_ready_nodes}/3) — skipping deploy_app_cluster"
+  if [[ "${_ready_nodes}" -ge "${total_nodes}" ]]; then
+    _info "[k3s-aws] k3s nodes already Ready (${_ready_nodes}/${total_nodes}) — skipping deploy_app_cluster"
   else
     _info "[k3s-aws] Installing k3s server + joining agents..."
     local _ambient_mesh="${K3S_AMBIENT_MESH:-true}"
@@ -176,26 +240,20 @@ HELP
       _ambient_mesh="false"
     }
     local _prev_hosts="${UBUNTU_K3S_AGENT_HOSTS:-}" _prev_mesh="${K3S_AMBIENT_MESH:-}"
-    export UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" K3S_AMBIENT_MESH="${_ambient_mesh}"
-    _dry_guard "deploy application cluster" deploy_app_cluster --confirm || return 1
+    local _agent_hosts="" _agent_index
+    for ((_agent_index = 1; _agent_index <= _agent_count; _agent_index++)); do
+      [[ -n "${_agent_hosts}" ]] && _agent_hosts+=","
+      _agent_hosts+="ubuntu-${_agent_index}"
+    done
+    export UBUNTU_K3S_AGENT_HOSTS="${_agent_hosts}" K3S_AMBIENT_MESH="${_ambient_mesh}"
+    _provider_k3s_aws_deploy_app_cluster || return 1
     if [[ -n "${_prev_hosts}" ]]; then export UBUNTU_K3S_AGENT_HOSTS="${_prev_hosts}"; else unset UBUNTU_K3S_AGENT_HOSTS; fi
     if [[ -n "${_prev_mesh}" ]]; then export K3S_AMBIENT_MESH="${_prev_mesh}"; else unset K3S_AMBIENT_MESH; fi
   fi
 
-  if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
-    _info "[k3s-aws] Starting SSM port-forwarding tunnel (k3s API :6443)..."
-    local _server_id
-    _server_id=$(_ssm_get_instance_id "${UBUNTU_K3S_SSH_HOST:-ubuntu}") || return 1
-    _provider_k3s_aws_wait_ssm_registered "${_server_id}" || return 1
-    _dry_guard "start SSM tunnel" ssm_tunnel "${_server_id}" "6443" "6443" || return 1
-  else
-    _info "[k3s-aws] Starting autossh tunnel..."
-    _dry_guard "start autossh tunnel" tunnel_start || return 1
-  fi
+  _provider_k3s_aws_start_tunnel || return 1
 
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
-  local total_nodes=3
-
   _info "[k3s-aws] Waiting for all ${total_nodes} nodes to be Ready..."
   local node_attempts=0
   until [[ "$(KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready")" -ge "${total_nodes}" ]]; do
@@ -321,7 +379,7 @@ function _provider_k3s_aws_destroy_cluster() {
     cat <<'HELP'
 Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager destroy_cluster --confirm
 
-Tear down the 3-node k3s-aws cluster:
+Tear down the k3s-aws fleet (1 server + ACG_AGENT_COUNT agents):
   1. Stop sandbox watcher
   2. tunnel_stop                — stop autossh tunnel
   3. acg_teardown --confirm     — delete CloudFormation stack; remove ubuntu-k3s kubeconfig context

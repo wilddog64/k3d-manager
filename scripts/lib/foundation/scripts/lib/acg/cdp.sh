@@ -107,20 +107,31 @@ function _cdp_kill_port_listener() {
   fi
 }
 
+function _cdp_port_has_listener() {
+  local _cdp_port="${PLAYWRIGHT_CDP_PORT:-9222}"
+  _command_exist lsof || return 1
+  lsof -nP -iTCP:"${_cdp_port}" -sTCP:LISTEN -t >/dev/null 2>&1
+}
+
 function _browser_launch() {
   local _cdp_host="${PLAYWRIGHT_CDP_HOST:-127.0.0.1}"
   local _cdp_port="${PLAYWRIGHT_CDP_PORT:-9222}"
   local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
+  local _cdp_probe_rc=0
   if ! _command_exist curl; then
     _err "curl is required for Antigravity browser probe — install curl and retry"
   fi
-  if _run_command --soft -- curl -sf "http://${_cdp_host}:${_cdp_port}/json" >/dev/null 2>&1; then
+  _run_command --soft -- curl -sf "http://${_cdp_host}:${_cdp_port}/json" >/dev/null 2>&1 || _cdp_probe_rc=$?
+  if (( _cdp_probe_rc == 0 )); then
     if _cdp_connectable; then
       _info "[acg] Reusing existing CDP browser on :${_cdp_port}"
       _cdp_ensure_acg_session
       return $?
     fi
     _info "[acg] A browser is on :${_cdp_port} but Playwright cannot drive it (stale/zombie or version-mismatched) — reclaiming the port and relaunching the managed Chromium."
+    _cdp_kill_port_listener
+  elif _cdp_port_has_listener; then
+    _info "[acg] A browser listener is present on :${_cdp_port} but the CDP probe failed — reclaiming the port before relaunching managed Chromium."
     _cdp_kill_port_listener
   fi
   _cdp_stop_chrome_cdp_agent

@@ -9,6 +9,15 @@
   [ "$status" -eq 0 ]
 }
 
+@test "acg-up repairs the Hub host alias before ArgoCD registration" {
+  run grep -nF '_acg_repair_hub_host_alias' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -ge 2 ]
+  run bash -c "awk '/_acg_repair_hub_host_alias/{print NR; found=1} found && /register_app_cluster/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+}
+
 @test "acg-up does not capture the dry-run wrapper as its own base" {
   run grep -nF 'unset -f __k3dm_base_run_command' bin/cluster-up
   [ "$status" -ne 0 ]
@@ -20,6 +29,7 @@
 @test "acg-up dry-run previews core and never crosses the Step 4 seam" {
   local stub_bin="${BATS_TEST_TMPDIR}/bin"
   local stub_log="${BATS_TEST_TMPDIR}/stub.log"
+  export HOME="${BATS_TEST_TMPDIR}/home"
   mkdir -p "${stub_bin}" "${HOME}/.ssh"
   : > "${stub_log}"
 

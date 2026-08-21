@@ -2,6 +2,67 @@
 
 ## [Unreleased]
 
+## [v0.4.12] — 2026-08-21
+
+### Added
+- Count-agnostic ACG CloudFormation agent fleet. `ACG_AGENT_COUNT` (default `2`) now generates the
+  deployed template: `_acg_render_template` emits `Server` + `Agent{i}Instance` / `Agent{i}PublicIP`
+  for `i in 1..N` by cloning the reference agent block verbatim, so every per-agent property (instance
+  profile, security group, block-device mapping, tags) is preserved by construction. Non-numeric or
+  `< 1` counts fail before any `aws` call; the checked-in two-agent template stays the documented
+  reference (`8148e33`).
+- `_acg_discover_agent_ips`: dynamic, count-agnostic agent-IP discovery over every `Agent*PublicIP`
+  stack output, ordered **numerically** (so `Agent10` follows `Agent2`, not `Agent1`) — replaces the
+  hardcoded `Agent1`/`Agent2` reads.
+
+### Tests / tooling
+- `scripts/tests/lib/acg.bats`: fleet generation, default-2 preservation, numeric ordering (incl.
+  `Agent10`), pre-`aws` validation of malformed/zero counts, and a no-hardcoded-`Agent1/2` guard.
+- `Makefile`: `make shellcheck-lib` (all `scripts/lib/*.sh`, default severity) and `make bats`
+  (scrubbed-env `scripts/tests/lib/`) local-parity targets mirroring CI; both wired into `make all`.
+
+### Fixed
+- Copilot review hardening (`32ce9c9`): render the deployed template with the portable
+  `mktemp -t acg-cluster.XXXXXX` form (plus `|| return 1`) — the prior mid-string `XXXXXX.yaml`
+  template broke on BSD/macOS `mktemp`; `acg_provision --help` now documents the variable
+  `ACG_AGENT_COUNT` fleet and `ubuntu-<i>` agent hosts instead of a fixed 3-node cluster; the
+  no-hardcoded-agent guard regex is tightened to `Agent[12]([^0-9]|$)` so it no longer false-matches
+  `Agent10`/`Agent12`.
+
+## [v0.4.11] — 2026-08-20
+
+### Security
+- Bump `js-yaml` `3.15.0` → `3.15.1` in the ACG lockfile to clear CVE-2026-59870 /
+  GHSA-5p4m-2wfm-xmqj (quadratic CPU consumption in `!!omap` resolution). Dev-only transitive
+  dependency (`jest` → `@istanbuljs/load-nyc-config` → `js-yaml`); the patched `3.15.1` satisfies the
+  existing `^3.13.1` constraint, so the fix is a lockfile-only bump with `package.json` untouched.
+  Surfaces as Dependabot alert #6 on the k3d-manager consumer that vendors this lockfile via subtree
+  (`166df37`). See `docs/issues/2026-08-20-js-yaml-omap-cpu-dos-devdep.md`.
+
+## [v0.4.10] — 2026-08-20
+
+ACG sandbox and CDP-pipeline reliability hardening — recover credential navigation when the
+sandbox lands on a stale route, and stop a single CDP probe failure from wedging the browser-launch
+recovery path. Closes the "ACG login never works" / "unstable ACG pipeline" class of live failures.
+
+### Fixed
+- `scripts/lib/acg/playwright/lib/sandbox.js`: recover credential navigation when the sandbox opens
+  on a stale route instead of the expected cloud-sandbox page — the navigation is re-driven to the
+  correct route rather than scraping stale credentials from the wrong tab (`0a2c4cc`).
+- `scripts/lib/acg/cdp.sh`: reclaim the CDP port listener when the connectivity probe fails, so a
+  dead/undriveable listener is torn down and the managed Chromium is relaunched instead of the launch
+  path hanging on an unusable port (`f6bb7bb`).
+- `scripts/lib/acg/cdp.sh`: preserve the CDP recovery path after a probe failure — a failed probe no
+  longer short-circuits the reclaim-and-relaunch sequence (`c7f7b37`).
+
+### Tests
+- `scripts/tests/lib/acg_cdp.bats`: cover listener reclaim on probe failure and isolate the
+  browser-launch tests behind a per-test `HOME=$BATS_TEST_TMPDIR` + explicit listener-probe mocks, so
+  the suite no longer inspects live port 9222 or writes the operator's protected Chrome log/profile
+  (`f6bb7bb`, `bcd0f62`).
+- `scripts/lib/acg/tests/providers/sandbox.test.js`: Jest coverage for the stale-route credential
+  navigation recovery (`0a2c4cc`).
+
 ## [v0.4.9] — 2026-08-14
 
 DRY_RUN guard primitives — Phase 0 of the foundation-first DRY_RUN project. Ships the

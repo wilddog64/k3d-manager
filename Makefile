@@ -4,14 +4,16 @@
 .DEFAULT_GOAL := help
 
 CLUSTER_PROVIDER ?= k3s-aws
+ACG_AGENT_COUNT  ?= 2
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL    ?= 0
+CLEANUP_STALE ?= 0
 BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh cleanup-stale-sandbox status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -28,11 +30,22 @@ up:
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
 ## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
 down:
-	@case "$(CLUSTER_PROVIDER)" in \
-	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster ;; \
-	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager destroy_cluster --confirm ;; \
-	  *)       bin/cluster-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) ;; \
-	esac
+	@set +e; \
+	_down_rc=0; \
+	_keep_hub_flag=; \
+	if [ "$(KEEP_LOCAL)" = "1" ] || [ "$(CLEANUP_STALE)" = "1" ]; then \
+	  _keep_hub_flag=--keep-hub; \
+	fi; \
+	case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster || _down_rc=$$? ;; \
+	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager destroy_cluster --confirm || _down_rc=$$? ;; \
+	  *)       bin/cluster-down --confirm $$_keep_hub_flag || _down_rc=$$? ;; \
+	esac; \
+	if [ "$(CLEANUP_STALE)" = "1" ]; then \
+	  $(MAKE) --no-print-directory cleanup-stale-resources CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM=1 || _cleanup_rc=$$?; \
+	  if [ "$${_cleanup_rc:-0}" -ne 0 ]; then _down_rc=$${_cleanup_rc}; fi; \
+	fi; \
+	exit $$_down_rc
 
 ## Refresh credentials and restart tunnel (provider-aware)
 refresh:
@@ -41,9 +54,77 @@ refresh:
 	  *)       $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-refresh "$(URL)" ;; \
 	esac
 
+## Render the count-driven ACG CloudFormation fleet (offline; k3s-aws only)
+fleet-render:
+	@if [ "$(CLUSTER_PROVIDER)" != "k3s-aws" ]; then echo "fleet-render skipped (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER); k3s-aws-only)"; else ACG_AGENT_COUNT="$(ACG_AGENT_COUNT)" bash -c '\
+	  set -euo pipefail; \
+	  source scripts/lib/foundation/scripts/lib/acg/acg.sh; \
+	  _acg_validate_agent_count; \
+	  _rendered=$$(mktemp "$${TMPDIR:-/tmp}/k3d-manager-fleet.XXXXXX.yaml"); \
+	  trap "rm -f -- \"$$_rendered\"" EXIT; \
+	  _acg_render_template "$$_ACG_AGENT_COUNT" scripts/etc/acg-cluster.yaml "$$_rendered"; \
+	  _instances=$$(grep -c "^  Agent[0-9][0-9]*Instance:" "$$_rendered"); \
+	  _outputs=$$(grep -c "^  Agent[0-9][0-9]*PublicIP:" "$$_rendered"); \
+	  [ "$$_instances" -eq "$(ACG_AGENT_COUNT)" ] && [ "$$_outputs" -eq "$(ACG_AGENT_COUNT)" ] || { echo "fleet-render count assertion failed" >&2; exit 1; }; \
+	  cat "$$_rendered"'; fi
+
+## Validate the rendered ACG CloudFormation fleet (live AWS validation; k3s-aws only)
+fleet-validate:
+	@if [ "$(CLUSTER_PROVIDER)" != "k3s-aws" ]; then echo "fleet-validate skipped (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER); k3s-aws-only)"; exit 0; fi; \
+	_rendered=$$(mktemp "$${TMPDIR:-/tmp}/k3d-manager-fleet.XXXXXX.yaml"); trap 'rm -f -- "$$_rendered"' EXIT; \
+	ACG_AGENT_COUNT="$(ACG_AGENT_COUNT)" bash -c 'source scripts/lib/foundation/scripts/lib/acg/acg.sh && _acg_validate_agent_count && _acg_render_template "$$_ACG_AGENT_COUNT" scripts/etc/acg-cluster.yaml "$$1"' _ "$$_rendered"; \
+	aws cloudformation validate-template --template-body "file://$$_rendered"
+
+## Plan an ACG fleet CloudFormation change set without provisioning resources (live AWS; k3s-aws only)
+fleet-plan: SHELL := /bin/bash
+fleet-plan:
+	@if [ "$(CLUSTER_PROVIDER)" != "k3s-aws" ]; then echo "fleet-plan skipped (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER); k3s-aws-only)"; exit 0; fi; \
+	set -euo pipefail; \
+	source scripts/lib/foundation/scripts/lib/acg/acg.sh; \
+	ACG_AGENT_COUNT="$(ACG_AGENT_COUNT)" _acg_validate_agent_count; \
+	_region="$${ACG_REGION:-us-west-2}"; \
+	_ami=$$(aws ec2 describe-images --region "$$_region" --owners "$$_ACG_AMI_OWNER" \
+	  --filters "Name=name,Values=$$_ACG_AMI_FILTER" "Name=state,Values=available" \
+	  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text); \
+	_rendered=$$(mktemp "$${TMPDIR:-/tmp}/k3d-manager-fleet.XXXXXX.yaml"); \
+	_plan_stack="k3d-manager-cluster-plan"; _cs="fleet-plan-$$(date +%s)"; \
+	trap 'rm -f -- "$$_rendered"; aws cloudformation delete-stack --region "$$_region" --stack-name "$$_plan_stack" >/dev/null 2>&1 || true' EXIT; \
+	_acg_render_template "$$_ACG_AGENT_COUNT" scripts/etc/acg-cluster.yaml "$$_rendered"; \
+	aws cloudformation create-change-set --region "$$_region" --stack-name "$$_plan_stack" \
+	  --change-set-name "$$_cs" --change-set-type CREATE --template-body "file://$$_rendered" \
+	  --parameters ParameterKey=KeyName,ParameterValue="$$_ACG_KEY_NAME" \
+	    ParameterKey=AllowedCidr,ParameterValue="$$ACG_ALLOWED_CIDR" \
+	    ParameterKey=InstanceType,ParameterValue="$$_ACG_INSTANCE_TYPE" \
+	    ParameterKey=AmiId,ParameterValue="$$_ami" \
+	  --capabilities CAPABILITY_NAMED_IAM; \
+	aws cloudformation wait change-set-create-complete --region "$$_region" \
+	  --stack-name "$$_plan_stack" --change-set-name "$$_cs"; \
+	aws cloudformation describe-change-set --region "$$_region" \
+	  --stack-name "$$_plan_stack" --change-set-name "$$_cs" \
+	  --query 'Changes[].ResourceChange.{Action:Action,Type:ResourceType,LogicalId:LogicalResourceId}' \
+	  --output table
+
+## Provision and join the count-driven ACG fleet (live node-join rung; k3s-aws only)
+fleet-up:
+	@if [ "$(CLUSTER_PROVIDER)" != "k3s-aws" ]; then echo "fleet-up skipped (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER); k3s-aws-only)"; exit 0; fi
+	@ACG_AGENT_COUNT="$(ACG_AGENT_COUNT)" CLUSTER_PROVIDER=k3s-aws scripts/k3d-manager deploy_cluster --confirm
+
 ## Remove stale state from an expired k3s-aws sandbox (dry-run unless CONFIRM=1)
 cleanup-stale-sandbox:
 	@CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM="$(CONFIRM)" bin/cleanup-stale-sandbox
+
+## Remove expired, managed ephemeral ArgoCD cluster registrations (dry-run by default)
+cleanup-stale-clusters:
+	@ARGOCD_HUB_CONTEXT="$(INFRA_CONTEXT)" ARGOCD_NAMESPACE="$(ARGOCD_NS)" bin/cleanup-stale-clusters $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
+
+## Run both stale-resource cleanup paths (dry-run unless CONFIRM=1; sandbox path is k3s-aws-only)
+cleanup-stale-resources:
+	@$(MAKE) --no-print-directory cleanup-stale-clusters CONFIRM="$(CONFIRM)"
+	@if [ "$(CLUSTER_PROVIDER)" = "k3s-aws" ]; then \
+	  $(MAKE) --no-print-directory cleanup-stale-sandbox CLUSTER_PROVIDER=k3s-aws CONFIRM="$(if $(filter 1 true yes,$(CONFIRM)),1,0)"; \
+	else \
+	  echo "cleanup-stale-sandbox skipped (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER); k3s-aws-only)"; \
+	fi
 
 ## Restart the k3s-hostinger laptop edge only (cloudflared + port-forwards) — no GitOps reapply
 refresh-edge:
@@ -112,6 +193,11 @@ argocd-registration:
 	kubectl config use-context k3d-k3d-cluster >/dev/null || exit 1; \
 	ARGOCD_APP_CLUSTER_TOKEN="$$_token" \
 	ARGOCD_APP_CLUSTER_SERVER="$$_server" \
+	ARGOCD_APP_CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" \
+	ARGOCD_APP_CLUSTER_MANAGED="$(if $(and $(ACG_SANDBOX_ID),$(ACG_SANDBOX_EXPIRES_AT)),true,false)" \
+	ARGOCD_APP_CLUSTER_SANDBOX_ID="$(ACG_SANDBOX_ID)" \
+	ARGOCD_APP_CLUSTER_EXPIRES_AT="$(ACG_SANDBOX_EXPIRES_AT)" \
+	ARGOCD_APP_CLUSTER_RELEASE="$(BRANCH)" \
 	  scripts/k3d-manager register_app_cluster && \
 	kubectl rollout restart statefulset/argocd-application-controller \
 	  -n cicd --context k3d-k3d-cluster && \
@@ -554,6 +640,7 @@ help:
 	@echo "  Targets (set CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
 	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
+	@echo "    make down ... CLEANUP_STALE=1  Also remove expired managed registrations and stale AWS local state"
 	@echo "    make status        Show concise service health (SERVICE=<name> for focused detail)"
 	@echo "    make status-full   Show full pod and diagnostic report"
 	@echo "    make status-json   Emit concise status as JSON"
@@ -567,11 +654,18 @@ help:
 	@echo "    make chrome-cdp    Install Chrome CDP launchd agent (automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
+	@echo "    make cleanup-stale-sandbox  Preview/remove stale AWS sandbox local state (CONFIRM=1 to remove)"
+	@echo "    make cleanup-stale-clusters Preview/remove expired managed ArgoCD registrations (CONFIRM=1 to remove)"
+	@echo "    make cleanup-stale-resources Run both cleanup paths (CONFIRM=1 to remove)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make sync-branch           Point services-git at BRANCH (default: current branch) and refresh"
 	@echo "    make sync-main             Revert services-git to main and refresh"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
+	@echo "    make fleet-render          Render count-driven ACG fleet (offline)"
+	@echo "    make fleet-validate        Validate rendered ACG fleet with CloudFormation"
+	@echo "    make fleet-plan            Create a no-execute ACG fleet change set"
+	@echo "    make fleet-up              Provision/join the ACG fleet (node-join rung)"
 	@echo "    make install-sudoers       Install passwordless sudo rules (one-time macOS setup)"
 	@echo ""
 	@echo "  Observability / credentials:"
@@ -590,7 +684,10 @@ help:
 	@echo "    make up CLUSTER_PROVIDER=k3s-gcp"
 	@echo "    make up CLUSTER_PROVIDER=k3s-oci"
 	@echo "    make down CLUSTER_PROVIDER=k3s-oci"
+	@echo "    make down CLEANUP_STALE=1                 # teardown + guarded stale-resource cleanup"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
+	@echo "    make fleet-render ACG_AGENT_COUNT=4   # offline: render 4 agents / 5 nodes"
+	@echo "    make fleet-up ACG_AGENT_COUNT=4       # live node-join rung (k3s-aws only)"
 	@echo ""
 	@echo "  Default URL: $(URL)"
 	@echo ""

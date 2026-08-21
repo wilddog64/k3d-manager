@@ -124,6 +124,46 @@ function _acg_up_cleanup() {
 }
 trap _acg_up_cleanup EXIT
 
+# ArgoCD reaches the app cluster through host.k3d.internal.  Rebuilds and
+# CoreDNS restarts can drop the NodeHosts entry, which otherwise leaves the
+# data-layer Application stuck in Unknown before any service is deployed.
+function _acg_repair_hub_host_alias() {
+  local _host_ip _existing_nodes _new_node_hosts _patch_json
+
+  _info "[acg-up] Ensuring Hub CoreDNS resolves host.k3d.internal..."
+  _host_ip=$(docker exec k3d-k3d-cluster-server-0 sh -c \
+    "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1}'" 2>/dev/null || echo "")
+  if [[ -z "${_host_ip}" ]]; then
+    _warn "[acg-up] Could not detect host IP from host.docker.internal — CoreDNS host alias repair skipped"
+    return 0
+  fi
+
+  _existing_nodes=$(kubectl get configmap coredns -n kube-system \
+    --context k3d-k3d-cluster -o jsonpath='{.data.NodeHosts}' 2>/dev/null \
+    | grep -v "host\.k3d\.internal" || true)
+  _new_node_hosts="${_host_ip} host.k3d.internal"
+  if [[ -n "${_existing_nodes}" ]]; then
+    _new_node_hosts="${_new_node_hosts}"$'\n'"${_existing_nodes}"
+  fi
+  _patch_json=$(python3 -c \
+    "import json,sys; print(json.dumps({'data':{'NodeHosts':sys.argv[1]}}))" \
+    "${_new_node_hosts}")
+  if ! kubectl patch configmap coredns -n kube-system --context k3d-k3d-cluster \
+      --type merge -p "${_patch_json}" >/dev/null 2>&1; then
+    _warn "[acg-up] CoreDNS host alias patch failed — ArgoCD may not reach ubuntu-k3s"
+    return 0
+  fi
+  if kubectl rollout restart deployment/coredns -n kube-system \
+      --context k3d-k3d-cluster >/dev/null 2>&1; then
+    kubectl rollout status deployment/coredns -n kube-system \
+      --context k3d-k3d-cluster --timeout=30s >/dev/null 2>&1 \
+      || _warn "[acg-up] CoreDNS rollout status timed out — DNS may still be recovering"
+    _info "[acg-up] CoreDNS host.k3d.internal alias restored"
+  else
+    _warn "[acg-up] CoreDNS restart failed — ArgoCD may not reach ubuntu-k3s"
+  fi
+}
+
 login_prompt=0
 sandbox_url=""
 for arg in "$@"; do
@@ -703,6 +743,7 @@ kubectl create namespace cicd --context k3d-k3d-cluster \
   --dry-run=client -o yaml | kubectl apply --context k3d-k3d-cluster -f - >/dev/null
 kubectl label namespace cicd istio-injection=enabled --overwrite --context k3d-k3d-cluster >/dev/null
 kubectl config use-context k3d-k3d-cluster >/dev/null
+_acg_repair_hub_host_alias
 ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
   register_app_cluster
 if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then

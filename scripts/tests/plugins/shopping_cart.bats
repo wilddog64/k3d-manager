@@ -19,6 +19,13 @@
   [[ "$output" == *"k3sup not found"* ]]
 }
 
+@test "local k3s kubeconfig keeps loopback endpoint for tunneled TLS" {
+  run grep -nF "sed -e 's|https://localhost:|https://127.0.0.1:|g'" scripts/plugins/shopping_cart.sh
+  [ "$status" -eq 0 ]
+  run grep -nF 's|127.0.0.1|${external_ip}|g' scripts/plugins/shopping_cart.sh
+  [ "$status" -ne 0 ]
+}
+
 @test "register_shopping_cart_apps fails if argocd dir missing" {
   local repo_root
   repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." >/dev/null 2>&1 && pwd)"
@@ -126,4 +133,102 @@
     _ensure_k3sup; rc=$?; rm -f "$_state"; exit $rc
   '
   [ "$status" -eq 0 ]
+}
+
+@test "agent joins fan out in parallel and wait for every worker" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    log="$(mktemp)"
+    _k3s_agent_is_ready() { return 1; }
+    _k3s_agent_address() { printf "%s\n" "$1"; }
+    _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
+    _k3sup_join_agent() { printf "join %s\n" "$1" >> "$log"; }
+    _k3s_wait_agent_ready() { printf "ready %s\n" "$2" >> "$log"; }
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3,ubuntu-4 server "$(mktemp)"
+    cat "$log"
+  '
+  [ "$status" -eq 0 ]
+  [ "$(printf "%s\n" "$output" | grep -c '^join ')" -eq 4 ]
+  [ "$(printf "%s\n" "$output" | grep -c '^ready ')" -eq 4 ]
+}
+
+@test "agent join failures are collected without aborting other workers" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    _k3s_agent_is_ready() { return 1; }
+    _k3s_agent_address() { printf "%s\n" "$1"; }
+    _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
+    _k3sup_join_agent() { [[ "$1" != ubuntu-2 ]]; }
+    _k3s_wait_agent_ready() { return 0; }
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3 server "$(mktemp)"
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"ubuntu-2"* ]]
+}
+
+@test "already-ready agents are skipped on an idempotent rerun" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    log="$(mktemp)"
+    _k3s_agent_is_ready() { return 0; }
+    _k3s_agent_address() { printf "%s\n" "$1"; }
+    _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
+    _k3sup_join_agent() { printf "unexpected join\n" >> "$log"; return 1; }
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2 server "$(mktemp)"
+    [ ! -s "$log" ]
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "_k3s_agent_is_ready matches node InternalIP, not ssh alias or public IP" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    kubectl() {
+      cat <<EOF
+ip-10-0-1-168 Ready control-plane,master 10m v1.32.0+k3s1 10.0.1.168 1.2.3.4 Ubuntu 6.8 containerd
+ip-10-0-1-17 Ready <none> 9m v1.32.0+k3s1 10.0.1.17 5.6.7.8 Ubuntu 6.8 containerd
+ip-10-0-1-104 Ready <none> 9m v1.32.0+k3s1 10.0.1.104 9.9.9.9 Ubuntu 6.8 containerd
+EOF
+    }
+    export -f kubectl
+    _k3s_agent_is_ready /dev/null 10.0.1.104 && echo PRIV_MATCH
+    _k3s_agent_is_ready /dev/null 10.0.1.1 || echo NO_SUBSTR_ALIAS
+    _k3s_agent_is_ready /dev/null 1.2.3.4 || echo NO_PUBLIC
+    _k3s_agent_is_ready /dev/null ubuntu-1 || echo NO_ALIAS
+    _k3s_agent_is_ready /dev/null "" || echo NO_EMPTY
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PRIV_MATCH"* ]]
+  [[ "$output" == *"NO_SUBSTR_ALIAS"* ]]
+  [[ "$output" == *"NO_PUBLIC"* ]]
+  [[ "$output" == *"NO_ALIAS"* ]]
+  [[ "$output" == *"NO_EMPTY"* ]]
+}
+
+@test "_k3s_agent_is_ready is false when the matched node is NotReady" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    kubectl() {
+      printf "%s\n" "ip-10-0-1-104 NotReady <none> 9m v1.32.0+k3s1 10.0.1.104 9.9.9.9 Ubuntu 6.8 containerd"
+    }
+    export -f kubectl
+    _k3s_agent_is_ready /dev/null 10.0.1.104 || echo NOT_READY
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NOT_READY"* ]]
 }

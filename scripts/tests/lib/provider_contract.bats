@@ -680,6 +680,104 @@ JSON
   [[ "${output}" != *'"caData":'* ]]
 }
 
+@test "register_app_cluster fails closed when managed metadata is incomplete" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
+  _warn() { :; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _cleanup_trap_command() { printf 'rm -f %q' "$1"; }
+  source "${REPO_ROOT}/scripts/plugins/argocd.sh"
+
+  ARGOCD_NAMESPACE="cicd"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_SECRET_NAME="cluster-ubuntu-k3s"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_NAME="ubuntu-k3s"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_SERVER="https://host.k3d.internal:6443"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_TOKEN="app-token"
+  # managed registration but provider/sandbox-id/expires-at/release all missing
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_MANAGED="true"
+  unset ARGOCD_APP_CLUSTER_PROVIDER ARGOCD_APP_CLUSTER_SANDBOX_ID \
+    ARGOCD_APP_CLUSTER_EXPIRES_AT ARGOCD_APP_CLUSTER_RELEASE K3D_MANAGER_BRANCH
+
+  _kubectl() {
+    case "$*" in
+      apply\ -f\ *)
+        : > "${BATS_TEST_TMPDIR}/managed-apply-called"
+        return 0
+        ;;
+      *) return 1 ;;
+    esac
+  }
+  _argocd_set_active_app_cluster() { : > "${BATS_TEST_TMPDIR}/managed-active-set"; }
+  _info() { :; }
+
+  run register_app_cluster
+  [ "$status" -ne 0 ]
+  [[ "${output}" == *"managed registrations require provider, sandbox-id, expires-at, and release"* ]]
+  # fail-closed: no secret applied and no active-cluster mutation happened
+  [ ! -e "${BATS_TEST_TMPDIR}/managed-apply-called" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/managed-active-set" ]
+}
+
+@test "register_app_cluster emits managed labels and annotations when metadata is complete" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
+  _warn() { :; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _cleanup_trap_command() { printf 'rm -f %q' "$1"; }
+  source "${REPO_ROOT}/scripts/plugins/argocd.sh"
+
+  ARGOCD_NAMESPACE="cicd"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_SECRET_NAME="cluster-ubuntu-k3s"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_NAME="ubuntu-k3s"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_SERVER="https://host.k3d.internal:6443"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_INSECURE="true"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_TOKEN="app-token"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_MANAGED="true"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_PROVIDER="k3s-aws"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_SANDBOX_ID="acg-604492140645"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_EXPIRES_AT="2026-08-21T23:00:00Z"
+  # shellcheck disable=SC2034
+  ARGOCD_APP_CLUSTER_RELEASE="k3d-manager-v1.26.0"
+
+  _kubectl() {
+    case "$*" in
+      apply\ -f\ *)
+        local file="${*: -1}"
+        cp "${file}" "${BATS_TEST_TMPDIR}/managed-secret.yaml"
+        return 0
+        ;;
+      *) return 1 ;;
+    esac
+  }
+  _argocd_set_active_app_cluster() { :; }
+  _info() { :; }
+
+  run register_app_cluster
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/managed-secret.yaml"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *'k3d-manager/managed: "true"'* ]]
+  [[ "${output}" == *'k3d-manager/provider: "k3s-aws"'* ]]
+  [[ "${output}" == *'k3d-manager/release: "k3d-manager-v1.26.0"'* ]]
+  [[ "${output}" == *'k3d-manager/sandbox-id: "acg-604492140645"'* ]]
+  [[ "${output}" == *'k3d-manager/expires-at: "2026-08-21T23:00:00Z"'* ]]
+}
+
 @test "_hostinger_refresh_access_layer restarts argocd port-forward before cloudflared" {
   HOME="${BATS_TEST_TMPDIR}"
   _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"

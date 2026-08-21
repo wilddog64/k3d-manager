@@ -1,5 +1,21 @@
 # Active Context — lib-foundation
 
+**2026-08-20 fleet lifecycle Phase A COMPLETE (Codex, `8148e33`):** on `feat/v0.4.12`,
+`scripts/lib/acg/acg.sh` now validates `ACG_AGENT_COUNT` before any AWS call, renders an N-agent
+CloudFormation template into a temporary deploy file, and discovers ordered `Agent*PublicIP`
+outputs dynamically. New stubbed-AWS BATS cover four-agent rendering, the two-agent default,
+N-IP discovery, invalid/zero count fail-closed behavior, and hardcoded-name disappearance. Focused
+BATS (`acg.bats` + `acg_cdp.bats`) passed 11/11; default-severity shellcheck and agent-rigor audit
+passed. **Pushed to `origin/feat/v0.4.12`; Claude owns release/tag and the downstream subtree pull.
+Phase B in k3d-manager is intentionally not started.**
+
+**2026-08-20 CDP test isolation fixed:** `scripts/tests/lib/acg_cdp.bats` now uses a per-test
+temporary `HOME` and mocks listener probes in launch scenarios, preventing tests from writing the
+operator's protected Chrome log or inspecting live port 9222. Clean-env BATS is 5/5 and the ACG Jest
+suite is 7 suites/22 tests green. The live upstream gate also passed: `make credential-test
+PROVIDER=aws` reused the authenticated CDP session, extracted four copyable inputs, wrote AWS
+credentials, and validated `sts:GetCallerIdentity`.
+
 ## Current State: `feat/v0.4.4` (as of 2026-07-13)
 
 **v0.4.4 js-yaml advisory fix COMPLETE (Codex, 2026-07-13):** Dependabot advisory **GHSA-h67p-54hq-rp68** is fixed on `origin/feat/v0.4.4` by commit **`db9f5b2`** (`fix(acg): bump js-yaml to 3.15.0 to close DoS advisory GHSA-h67p-54hq-rp68`). Scope held to the exact 2 files from `docs/plans/v0.4.4-bugfix-js-yaml-dos.md`: `scripts/lib/acg/package-lock.json` now updates the dev-only transitive `js-yaml` node `3.14.2` → `3.15.0` with the expected 3-line lockfile diff only (`version`/`resolved`/`integrity`), and `CHANGE.md` adds the `### Security` note under `[Unreleased]`. `scripts/lib/acg/package.json` remained unchanged. Validation passed with `npm ci --prefix scripts/lib/acg` and `npm audit --prefix scripts/lib/acg` (`found 0 vulnerabilities`). Repo proof gates also passed: clean-env BATS `scripts/tests/lib/system.bats scripts/tests/lib/core.bats scripts/tests/lib/agent_rigor.bats` (`1..69`, all pass) and `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/lib/system.sh` (exit 0). **Follow-up remains Claude’s:** patch release/tag, then subtree-pull into `k3d-manager` to clear the downstream Dependabot alert.
