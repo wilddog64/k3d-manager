@@ -1,5 +1,14 @@
 # Active Context — lib-foundation
 
+**2026-08-20 fleet lifecycle Phase A COMPLETE (Codex, `8148e33`):** on `feat/v0.4.12`,
+`scripts/lib/acg/acg.sh` now validates `ACG_AGENT_COUNT` before any AWS call, renders an N-agent
+CloudFormation template into a temporary deploy file, and discovers ordered `Agent*PublicIP`
+outputs dynamically. New stubbed-AWS BATS cover four-agent rendering, the two-agent default,
+N-IP discovery, invalid/zero count fail-closed behavior, and hardcoded-name disappearance. Focused
+BATS (`acg.bats` + `acg_cdp.bats`) passed 11/11; default-severity shellcheck and agent-rigor audit
+passed. **Pushed to `origin/feat/v0.4.12`; Claude owns release/tag and the downstream subtree pull.
+Phase B in k3d-manager is intentionally not started.**
+
 **2026-08-20 CDP test isolation fixed:** `scripts/tests/lib/acg_cdp.bats` now uses a per-test
 temporary `HOME` and mocks listener probes in launch scenarios, preventing tests from writing the
 operator's protected Chrome log or inspecting live port 9222. Clean-env BATS is 5/5 and the ACG Jest

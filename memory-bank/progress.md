@@ -1,5 +1,13 @@
 # Progress — lib-foundation
 
+- [x] **v1.26.0 fleet lifecycle Phase A (2026-08-20):** commit `8148e33` (`feat(acg): make
+  CloudFormation agent fleet count-agnostic`) pushed to `origin/feat/v0.4.12`. The ACG module now
+  validates `ACG_AGENT_COUNT` before AWS access, emits N discrete agent resources/outputs to a
+  temporary template, and discovers all agent public IPs in order. Added `scripts/tests/lib/acg.bats`
+  (6 tests); focused lib-acg BATS 11/11, default shellcheck, and `AGENT_AUDIT_MAX_IF=8` passed.
+  Claude must release/tag lib-foundation and subtree-pull before Phase B begins; no live AWS action
+  was run by Codex.
+
 - [x] **ACG CDP BATS isolation (2026-08-20):** browser-launch tests now use `HOME=$BATS_TEST_TMPDIR`
   and explicit listener-probe mocks, eliminating false failures from the operator's live Chrome/CDP
   state and protected log path. Clean-env focused BATS 5/5 and ACG Jest 7 suites/22 tests pass;
