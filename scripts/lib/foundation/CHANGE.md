@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [v0.4.10] — 2026-08-20
+
+ACG sandbox and CDP-pipeline reliability hardening — recover credential navigation when the
+sandbox lands on a stale route, and stop a single CDP probe failure from wedging the browser-launch
+recovery path. Closes the "ACG login never works" / "unstable ACG pipeline" class of live failures.
+
+### Fixed
+- `scripts/lib/acg/playwright/lib/sandbox.js`: recover credential navigation when the sandbox opens
+  on a stale route instead of the expected cloud-sandbox page — the navigation is re-driven to the
+  correct route rather than scraping stale credentials from the wrong tab (`0a2c4cc`).
+- `scripts/lib/acg/cdp.sh`: reclaim the CDP port listener when the connectivity probe fails, so a
+  dead/undriveable listener is torn down and the managed Chromium is relaunched instead of the launch
+  path hanging on an unusable port (`f6bb7bb`).
+- `scripts/lib/acg/cdp.sh`: preserve the CDP recovery path after a probe failure — a failed probe no
+  longer short-circuits the reclaim-and-relaunch sequence (`c7f7b37`).
+
+### Tests
+- `scripts/tests/lib/acg_cdp.bats`: cover listener reclaim on probe failure and isolate the
+  browser-launch tests behind a per-test `HOME=$BATS_TEST_TMPDIR` + explicit listener-probe mocks, so
+  the suite no longer inspects live port 9222 or writes the operator's protected Chrome log/profile
+  (`f6bb7bb`, `bcd0f62`).
+- `scripts/lib/acg/tests/providers/sandbox.test.js`: Jest coverage for the stale-route credential
+  navigation recovery (`0a2c4cc`).
+
 ## [v0.4.9] — 2026-08-14
 
 DRY_RUN guard primitives — Phase 0 of the foundation-first DRY_RUN project. Ships the
