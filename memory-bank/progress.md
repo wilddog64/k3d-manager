@@ -14,8 +14,15 @@
 
 ## v1.26.0 queue
 
-- [ ] **Fleet node lifecycle (count-agnostic) — SPEC + CODEX TASK WRITTEN 2026-08-20, handed to Codex;
-  not implemented.** Scope decision "both, fleet first" — fleet before the foundation-vcluster-CLI + M2
+- [ ] **Fleet node lifecycle (count-agnostic) — PHASE A DONE + VERIFIED 2026-08-21; GATE + Phase B pending.**
+  Phase A (lib-foundation `feat/v0.4.12` `8148e33`, docs `249a8bd`): generated N-agent CFN via awk emitter
+  + dynamic `Agent*PublicIP` discovery + validate-before-AWS + new `scripts/tests/lib/acg.bats`. Claude
+  verified independently: only 2 files touched (no vendored), tree clean, 6/6 BATS + shellcheck-default +
+  `bash -n` all green run by Claude, render preserves every per-agent property (incl. SSM `!If`) against
+  the drifted k3d-manager template. Carry-forwards: lexical `sort_by(&OutputKey)` breaks label order at
+  N≥10 (harmless at ACG N≤4; numeric-sort touch-up); B1 corrected (do NOT regen k3d-manager template from
+  upstream — would revert the SSM `!If` fix). NEXT: Claude runs the GATE (lib-foundation release +
+  subtree-pull), then Codex Phase B. Scope decision "both, fleet first" — fleet before the foundation-vcluster-CLI + M2
   remote-runner plans. Design spec `docs/plans/v1.26.0-fleet-node-lifecycle.md` + implementation
   assignment `docs/plans/v1.26.0-fleet-node-lifecycle-codex-task.md` (ONE scope, two files — fleet stays
   plan #4 of 5; file-count in docs/plans is 5, watch the cap for the NEXT new scope). Upstream-first

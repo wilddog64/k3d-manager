@@ -13,14 +13,41 @@
   lifecycle** refactor. Sequence: fleet first, then foundation-managed vCluster CLI → M2 remote E2E
   runner. Plan docs at 4/5 (fleet spec `docs/plans/v1.26.0-fleet-node-lifecycle.md` just added) —
   watch the cap.
-- **Next action: fleet spec + Codex task written and handed to Codex (2026-08-20).** Implementation
-  assignment `docs/plans/v1.26.0-fleet-node-lifecycle-codex-task.md` (phased). Codex does Part A upstream
-  (lib-foundation lib-acg `acg.sh`: generated N-agent CFN + dynamic `Agent*PublicIP` discovery) + Rung-0
-  offline gates, then STOPS. **GATE (Claude):** release lib-foundation + subtree-pull. Then Codex does
-  Part B (k3d-manager `k3s-aws.sh` derive hosts/`total_nodes`; `shopping_cart.sh:deploy_app_cluster()`
-  parallel+readiness+idempotent; `make fleet-render|validate|plan|up` targets). **Live acceptance is
-  Claude's:** `ACG_AGENT_COUNT=4 deploy_cluster` (= 5 nodes, the ACG cap) via `make fleet-up` — node-join
-  only, NOT `make up` — serialized per the live-sandbox rule; Codex must not touch the sandbox.
+- **GATE IN PROGRESS (awaiting merge go 2026-08-21):** lib-foundation fleet Phase A completed +
+  bundled — commit `c61512e` on `feat/v0.4.12` (numeric agent-IP ordering replacing lexical
+  `sort_by(&OutputKey)` + `make shellcheck-lib`/`make bats` local-parity targets + CHANGE.md
+  [Unreleased]). Local green: `make bats` 117/117 (incl. new `Agent10` numeric-order test),
+  `make shellcheck-lib` clean, `bash -n` ok. **Copilot review addressed** in `32ce9c9` (pushed,
+  origin-verified): (1) mktemp → portable `-t acg-cluster.XXXXXX` + `|| return 1` (mid-string X's +
+  `.yaml` suffix broke on BSD/macOS mktemp); (2) `acg_provision --help` now documents variable
+  `ACG_AGENT_COUNT` fleet + `ubuntu-<i>` hosts; (3) guard regex tightened to `Agent[12]([^0-9]|$)`
+  (no false-match on `Agent10`/`Agent12`). Both inline threads replied + GraphQL-resolved. **PR #43**
+  (feat/v0.4.12 → main) open, **CI green on `32ce9c9`** (acg-node/bats/shellcheck all pass,
+  mergeStateStatus CLEAN). **RELEASED 2026-08-21:** user squash-merged #43 → main (`c4f3211`);
+  Claude stamped `v0.4.12` (`c1df1be`, direct fast-forward to main — ruleset blocks only
+  force-push/deletion, no PR requirement), tag `v0.4.12` + GitHub release live. **Subtree-pull into
+  k3d-manager `scripts/lib/foundation` NEXT**, then hand Phase B to Codex. NOTE (user Q resolved): the
+  `deploy_cluster`/node-provision+join test
+  target = k3d-manager `make fleet-up` (Phase B, post-subtree-pull) — lib-foundation structurally
+  can't host it (empty `scripts/lib/providers/`, no dispatcher/bin; k3s-join lives in k3d-manager).
+- **Next action: GATE is Claude's — release lib-foundation + subtree-pull, then hand Phase B to Codex.**
+  **Phase A VERIFIED 2026-08-21 (Claude, independently):** lib-foundation `feat/v0.4.12` commit
+  `8148e33` (on origin; docs `249a8bd` on top). Only `scripts/lib/acg/acg.sh` + new
+  `scripts/tests/lib/acg.bats` touched — no vendored files, tree clean. Ran by Claude: 6/6 BATS pass,
+  shellcheck clean (default severity), `bash -n` OK. Render verified against BOTH the upstream template
+  and the drifted k3d-manager runtime template — every per-agent property preserved incl. the SSM
+  `!If [SsmEnabled...]` conditional + `Conditions`/`EnableSsm` blocks; validate-before-AWS present at both
+  entrypoints. **Two carry-forwards (non-blockers):** (a) discovery uses lexical `sort_by(@, &OutputKey)`
+  → at N≥10 `Agent10` sorts before `Agent2` (harmless bijection in a homogeneous fleet, correct at ACG
+  N≤4, but undercuts the "written for N" story — numeric-sort + a ≥10 BATS case as a Phase B/A touch-up);
+  (b) **B1 corrected** — do NOT regenerate `scripts/etc/acg-cluster.yaml` from upstream (that would revert
+  the SSM `!If` IAM-restricted-sandbox fix `fef71219`/`40f1d19a`); the checked-in template stays the
+  2-agent reference and the runtime emitter generates N. **GATE (Claude):** release lib-foundation
+  (feat→PR→stamp→tag) + subtree-pull. Then Codex does Part B (k3d-manager `k3s-aws.sh` derive
+  hosts/`total_nodes`; `shopping_cart.sh:deploy_app_cluster()` parallel+readiness+idempotent;
+  `make fleet-render|validate|plan|up` targets). **Live acceptance is Claude's:** `ACG_AGENT_COUNT=4
+  deploy_cluster` (= 5 nodes, the ACG cap) via `make fleet-up` — node-join only, NOT `make up` —
+  serialized per the live-sandbox rule; Codex must not touch the sandbox.
 - **Lifecycle cleanup foundation landed** in `f90c8e0d` on `k3d-manager-v1.26.0`: registration metadata,
   expiry/API-grace guarded `make cleanup-stale-clusters` (dry-run default), provider safety, and JSONL audit.
 - v1.27.0 remains planned for image signing/attestation and adaptive checkout load testing;
