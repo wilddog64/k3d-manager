@@ -14,7 +14,15 @@
 
 ## v1.26.0 queue
 
-- [ ] **Fleet node lifecycle (count-agnostic) — PHASE A RELEASED + SUBTREE-PULLED 2026-08-21; Phase B pending.**
+- [x] **Fleet node lifecycle Phase B** implemented in `b0fe320a` and pushed to
+  `origin/k3d-manager-v1.26.0` on 2026-08-21. The implementation is count-agnostic via
+  `ACG_AGENT_COUNT` (default two agents), parallel/idempotent SSH and SSM joins with per-node
+  readiness and collected failures, and Makefile fleet render/validate/plan/up rungs. The reference
+  `scripts/etc/acg-cluster.yaml` remained unchanged. Offline gates: `bash -n` clean; focused BATS
+  `1..39` all passed; shellcheck baseline comparison found no new findings; `_agent_audit` passed.
+  Claude owns live ACG Rungs 1–3 and must run `ACG_AGENT_COUNT=4` fleet acceptance separately.
+
+- [x] **Fleet node lifecycle (count-agnostic) — PHASE A released/subtree-pulled and Phase B pushed 2026-08-21.**
   **GATE DONE 2026-08-21:** user squash-merged PR #43 → lib-foundation main (`c4f3211`); Copilot review
   addressed in `32ce9c9` (portable `mktemp -t`, `--help` count-agnostic text, guard regex
   `Agent[12]([^0-9]|$)`); Claude stamped `v0.4.12` (`c1df1be`, direct fast-forward — ruleset blocks only

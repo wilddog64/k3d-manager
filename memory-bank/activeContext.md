@@ -31,6 +31,14 @@
   expiry/API-grace guarded `make cleanup-stale-clusters` (dry-run default), provider safety, and JSONL audit.
 - v1.27.0 remains planned for image signing/attestation and adaptive checkout load testing;
   v1.28.0 remains planned for parallel multi-cloud provisioning and zero-downtime rollouts.
+- **Phase B fleet lifecycle implemented and pushed 2026-08-21** as `b0fe320a` on
+  `k3d-manager-v1.26.0`: k3s-aws now derives agent hosts/total nodes from `ACG_AGENT_COUNT`,
+  shopping-cart agent joins fan out with per-node readiness, failure collection, and idempotent
+  skips for both SSH and SSM paths, and `fleet-render|fleet-validate|fleet-plan|fleet-up` targets
+  provide the offline-to-live rung sequence. `scripts/etc/acg-cluster.yaml` was intentionally
+  unchanged. Rung-0 evidence: focused BATS 39/39, bash syntax clean, shellcheck showed only the
+  pre-existing shopping-cart informational findings (no new findings), and `_agent_audit` passed.
+  Live `fleet-up`/AWS validation remains Claude-owned.
 
 ## Open follow-ups
 
