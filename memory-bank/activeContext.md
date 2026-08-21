@@ -35,11 +35,12 @@
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
   Dependabot scans the default branch (main = v1.25.0); **auto-closes when v1.26.0 → main.**
   Dev-only transitive dep, low effective risk.
-- **Un-fixed findings** (filed, deliberately not code-fixed):
+- **Un-fixed findings** (filed as tracked issues, deferred out of v1.26.0):
   - Finding 1a — exporter emits empty `e2e_last_run_duration_seconds` when duration is null
-    (should default `0`). Cosmetic.
+    (should default `0`). Cosmetic. `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
   - Finding 2b — dispatcher `deploy_*` guard strips `--confirm` from `deploy_app_cluster`;
-    use a lib-sourcing wrapper. Shared-guard blast radius — don't patch casually.
+    use a lib-sourcing wrapper. Shared-guard blast radius.
+    `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
 - Replace the interim in-cluster CVE promoter git-writer token with a fine-grained
   contents-write-only PAT.
 - Reconcile stale local port-forward/LaunchAgent state when public Grafana or status probes
