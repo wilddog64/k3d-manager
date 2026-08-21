@@ -71,7 +71,7 @@
   `All agent nodes joined and Ready` / **`FLEET_UP_EXIT=0`** (the 150s false-negative is gone).
   Cosmetic `Description` rewrite = upstream carry-forward (awk emitter is in the lib-foundation
   subtree — edit upstream, subtree-pull; NOT patched here). Teardown re-run + re-verified clean.
-  **NOT YET COMMITTED** — fixes + docs staged pending user go on `git commit`. **Phase B now DONE.**
+  **COMMITTED `46bfdf1c`** on `k3d-manager-v1.26.0` (6 files; not pushed yet). **Phase B now DONE.**
 
 ## Open follow-ups
 

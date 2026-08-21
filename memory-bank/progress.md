@@ -30,8 +30,8 @@
   params + `CAPABILITY_NAMED_IAM` + EXIT-trap cleanup + `SHELL := /bin/bash`). Re-verify: Rung 2 plans
   4 Agents + 1 Server then trap-cleans; Rung 3 `fleet-up` → `All agent nodes joined and Ready` /
   `FLEET_UP_EXIT=0`. Teardown re-verified clean (0 EC2, stack gone, ArgoCD == baseline). Cosmetic
-  `Description` = upstream carry-forward (lib-foundation subtree). **Fixes + docs NOT yet committed** —
-  staged pending user go. **Phase B DONE.**
+  `Description` = upstream carry-forward (lib-foundation subtree). **Committed `46bfdf1c`** on
+  `k3d-manager-v1.26.0` (6 files; not pushed yet). **Phase B DONE.**
 
 - [x] **Fleet node lifecycle (count-agnostic) — PHASE A released/subtree-pulled and Phase B pushed 2026-08-21.**
   **GATE DONE 2026-08-21:** user squash-merged PR #43 → lib-foundation main (`c4f3211`); Copilot review
