@@ -6,6 +6,14 @@
 
 ## Current focus
 
+- **v1.26.0 RELEASE PR OPEN — #117** (`k3d-manager-v1.26.0` → `main`, head `89f49b00`).
+  CI green (lint, CodeQL×3, GitGuardian, detect; stage2 skips on PR); Claude scope check PASS
+  (354 files all trace to v1.26.0 milestone work). PENDING before merge: Copilot review (must
+  be added via the PR UI — the bot login can't be requested by CLI on a personal repo) and the
+  user's explicit merge go. Ships 3/5 scopes (fleet A+B, E2E gate, stale-cleanup); the
+  foundation-vcluster-CLI and M2-runner scopes remain specs. Merge auto-closes Dependabot #6.
+  **Do NOT auto-merge.** Post-merge: run `/post-merge` (tag `v1.26.0` from CHANGELOG, restore
+  protection, next branch, retro).
 - **v1.25.0 released** (PR #116 `d48e465f`, tag/release live). Main protection restored to
   one required approval, administrators enforced.
 - **Milestone v1.26.0 — committed work is DONE and pushed on `k3d-manager-v1.26.0`:**
