@@ -13,7 +13,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -637,6 +637,20 @@ e2e-remote:
 	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-remote RUNNER=m2 [DIGEST=sha256:...]" >&2; exit 2; fi
 	./scripts/k3d-manager e2e_runner_dispatch $(RUNNER) $(DIGEST)
 
+## Report hub health vs remote-runner availability as distinct states (RUNNER=m2 optional; unavailable runner is a warning).
+e2e-runner-health:
+	./scripts/k3d-manager e2e_runner_health $(RUNNER)
+
+## Bounded, explicit replay of a remote runner's retained publication_pending E2E results. RUNNER=m2 required.
+e2e-replay:
+	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-replay RUNNER=m2" >&2; exit 2; fi
+	./scripts/k3d-manager e2e_runner_replay $(RUNNER)
+
+## Clear a STALE remote-runner lock (bounded age + no-live-run checks; never automatic). RUNNER=m2 required.
+e2e-runner-unlock:
+	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-runner-unlock RUNNER=m2" >&2; exit 2; fi
+	./scripts/k3d-manager e2e_runner_unlock $(RUNNER)
+
 ## Show this help
 help:
 	@echo ""
@@ -652,6 +666,9 @@ help:
 	@echo "    make test          Run all BATS test suites"
 	@echo "    make e2e           Run Tier 1 e2e harness (vCluster + Playwright Job; DIGEST=<image digest> optional)"
 	@echo "    make e2e-remote    Run Tier 1 e2e harness on a remote runner off the M4 (RUNNER=m2 [DIGEST=<image digest>]; no local fallback)"
+	@echo "    make e2e-runner-health  Report hub health vs remote-runner availability (RUNNER=m2 optional)"
+	@echo "    make e2e-replay    Replay a runner's retained publication_pending E2E results (RUNNER=m2)"
+	@echo "    make e2e-runner-unlock  Clear a STALE remote-runner lock, guarded by age + no-live-run (RUNNER=m2)"
 	@echo "    make preflight     Spin up a throwaway vCluster + deploy the full stack via ArgoCD (NAME=<name> MODE=--auto|--keep|--reuse, default --auto)"
 	@echo ""
 	@echo "  k3s-aws / k3s-gcp only:"

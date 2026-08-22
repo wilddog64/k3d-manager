@@ -50,6 +50,19 @@ E2E_HUB_CONTEXT="${E2E_HUB_CONTEXT:-k3d-k3d-cluster}"
 E2E_PUBLISH_KUBECONFIG="${E2E_PUBLISH_KUBECONFIG:-${HOME}/.kube/config}"
 E2E_PUBLISH_MAX_BYTES="${E2E_PUBLISH_MAX_BYTES:-65536}"
 E2E_PUBLISH_AUDIT_LOG="${E2E_PUBLISH_AUDIT_LOG:-${E2E_REPORT_DIR}/publish-audit.log}"
+# Failure/operations (increment 6). The runner lock is a directory (mkdir is
+# atomic) holding an owner/timestamp marker; a stale lock is cleared only by the
+# explicit guarded unlock, never automatically, and only past this age with no
+# live run. Publish-back is the M2->M4 result hop over the dedicated key; when no
+# M4 target is configured the M2 retains the result as publication_pending for a
+# later bounded replay.
+E2E_M2_LOCK_MAX_AGE="${E2E_M2_LOCK_MAX_AGE:-7200}"
+E2E_M2_PUBLISH_BACK_HOST="${E2E_M2_PUBLISH_BACK_HOST:-}"
+E2E_M2_PUBLISH_BACK_KEY="${E2E_M2_PUBLISH_BACK_KEY:-\$HOME/.ssh/e2e-m4-publisher}"
+# Read by e2e_runner_publish_back when it runs ON the M2 (injected by dispatch
+# from the M4-side values above). Empty host => retain as publication_pending.
+E2E_PUBLISH_BACK_HOST="${E2E_PUBLISH_BACK_HOST:-}"
+E2E_PUBLISH_BACK_KEY="${E2E_PUBLISH_BACK_KEY:-${HOME}/.ssh/e2e-m4-publisher}"
 
 export E2E_M2_SSH_HOST E2E_M2_RUNNER_CLUSTER E2E_M2_RUNNER_CONTEXT
 export E2E_M2_KUBECONFIG E2E_M2_LOCK E2E_M2_REMOTE_REPORT_DIR
@@ -58,6 +71,8 @@ export E2E_M2_MIN_CPU_IDLE E2E_M2_MIN_MEM_FREE E2E_M2_MIN_DISK_GB
 export E2E_M2_REMOTE_PATH E2E_M2_REPO E2E_RUNNER_ALLOWLIST
 export E2E_REPORT_DIR E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP
 export E2E_HUB_CONTEXT E2E_PUBLISH_KUBECONFIG E2E_PUBLISH_MAX_BYTES E2E_PUBLISH_AUDIT_LOG
+export E2E_M2_LOCK_MAX_AGE E2E_M2_PUBLISH_BACK_HOST E2E_M2_PUBLISH_BACK_KEY
+export E2E_PUBLISH_BACK_HOST E2E_PUBLISH_BACK_KEY
 
 # Safe, non-interactive SSH options. BatchMode fails fast instead of prompting;
 # host identity is verified through the existing known_hosts — we never weaken it
@@ -108,7 +123,7 @@ if docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
 else
   echo docker_ok=0
 fi
-if [ -f "${E2E_M2_LOCK}" ]; then echo lock=1; else echo lock=0; fi
+if [ -e "${E2E_M2_LOCK}" ]; then echo lock=1; else echo lock=0; fi
 idx=0
 for v in \$(top -l 3 -n 0 -s 1 2>/dev/null | awk '/^CPU usage/{gsub(/%/,"",\$7); print \$7}'); do
   idx=\$((idx+1))
@@ -271,6 +286,26 @@ function _e2e_runner_allowed() {
   return 1
 }
 
+# A dispatch-owned token identifying this M4 process, safe for a grep -qxF match
+# (hostname, epoch, pid — no shell metacharacters).
+function _e2e_lock_token() {
+  printf 'owner=%s pid=%s ts=%s' "$(hostname -s 2>/dev/null || echo m4)" "$$" "$(date -u +%s)"
+}
+
+# Atomically claim the runner lock on the M2 (mkdir is atomic; a losing racer
+# gets a non-zero return and is treated as busy). Records the owner token so the
+# release and the guarded unlock can verify ownership.
+function _e2e_remote_lock_acquire() {
+  local token="$1"
+  _e2e_remote_ssh "mkdir \"${E2E_M2_LOCK}\" 2>/dev/null && printf '%s\n' \"${token}\" > \"${E2E_M2_LOCK}/meta\""
+}
+
+# Release the runner lock only when this process owns it — never blind rm.
+function _e2e_remote_lock_release() {
+  local token="$1"
+  _e2e_remote_ssh "if [ -f \"${E2E_M2_LOCK}/meta\" ] && grep -qxF \"${token}\" \"${E2E_M2_LOCK}/meta\"; then rm -rf \"${E2E_M2_LOCK}\"; fi"
+}
+
 # Public: run the existing E2E entry point on a remote runner. Validates the
 # runner allowlist and digest, gates on preflight, streams remote output while
 # persisting a local transcript, returns the remote exit code unchanged, and
@@ -294,17 +329,35 @@ function e2e_runner_dispatch() {
   fi
   _info "[e2e-remote] runner ${runner} available; dispatching E2E (digest=${digest:-none})"
 
+  local token
+  token="$(_e2e_lock_token)"
+  if ! _e2e_remote_lock_acquire "$token"; then
+    _err "[e2e-remote] runner ${runner} is busy (lock held); not dispatching, no local fallback"
+  fi
+  # shellcheck disable=SC2064
+  trap "_e2e_remote_lock_release '${token}' >/dev/null 2>&1 || true" RETURN
+
   mkdir -p "${E2E_REPORT_DIR}/dispatch"
   local ts transcript
   ts="$(date -u +%Y%m%dT%H%M%SZ)"
   transcript="${E2E_REPORT_DIR}/dispatch/${runner}-${ts}.log"
+
+  # When an M4 publish-back target is configured, hand it to the M2 so the runner
+  # can push its own result over the dedicated key; otherwise the M2 retains the
+  # result as publication_pending for a later replay.
+  local backenv=""
+  if [[ -n "$E2E_M2_PUBLISH_BACK_HOST" ]]; then
+    backenv="export E2E_PUBLISH_BACK_HOST=${E2E_M2_PUBLISH_BACK_HOST} E2E_PUBLISH_BACK_KEY=${E2E_M2_PUBLISH_BACK_KEY}; "
+  fi
 
   local -a opts
   mapfile -t opts < <(_e2e_remote_ssh_opts)
   local remote
   remote="export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; \
 export E2E_RUNNER=${runner} KUBECONFIG=${E2E_M2_KUBECONFIG} E2E_REPORT_DIR=${E2E_M2_REMOTE_REPORT_DIR}; \
-cd ${E2E_M2_REPO} && ./scripts/k3d-manager e2e_verify_vcluster ${digest}"
+${backenv}\
+cd ${E2E_M2_REPO} || exit 1; ./scripts/k3d-manager e2e_verify_vcluster ${digest}; rc=\$?; \
+./scripts/k3d-manager e2e_runner_publish_back \$rc || true; exit \$rc"
 
   ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$remote" 2>&1 | tee "$transcript"
   local rc="${PIPESTATUS[0]}"
@@ -558,4 +611,176 @@ function e2e_result_publisher_install() {
   entry="command=\"${dispatcher} e2e_result_publish\",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ${keyline} ${marker}"
   printf '%s\n' "$entry" >> "$authfile"
   _info "[e2e-publish] installed restricted M2 publisher principal in ${authfile}"
+}
+
+# --- Failure behavior and operations (increment 6) -------------------------
+
+# Newest run summary the local E2E writer produced, excluding the retention
+# markers. Prints the path or nothing.
+function _e2e_newest_summary() {
+  [[ -d "$E2E_REPORT_DIR" ]] || return 0
+  # Filenames are our own run_ids (safe charset); -t needs a time sort a glob
+  # cannot provide, so ls|grep is intentional here.
+  # shellcheck disable=SC2010
+  ls -1t "$E2E_REPORT_DIR"/*.json 2>/dev/null \
+    | grep -vE '\.(publication_pending|published)\.json$' | head -n1
+}
+
+# Build a minimal, schema-valid failed summary for a run that produced none
+# (a crash before the E2E writer ran). Prints the file path on success.
+function _e2e_synth_summary() {
+  local rc="${1:-1}" file
+  file="${E2E_REPORT_DIR}/synth-$(date -u +%Y%m%dT%H%M%SZ).json"
+  E2E_SYNTH_FILE="$file" \
+  E2E_SYNTH_RC="$rc" \
+  E2E_SYNTH_RUNNER="${E2E_RUNNER:-local-m4}" \
+  E2E_SYNTH_SERVICE="${E2E_SERVICE_UNDER_TEST:-shopping-cart}" \
+  python3 <<'PY' || return 1
+import datetime, json, os
+rc = int(os.environ.get("E2E_SYNTH_RC") or "1")
+rc = rc if 0 <= rc <= 255 else 1
+now = datetime.datetime.now(datetime.timezone.utc)
+summary = {
+    "run_id": "synth-" + now.strftime("%Y%m%dT%H%M%SZ"),
+    "tier": "vcluster",
+    "runner": os.environ.get("E2E_SYNTH_RUNNER") or "local-m4",
+    "service": os.environ.get("E2E_SYNTH_SERVICE") or "shopping-cart",
+    "candidate_digest": None, "project": "api+flows",
+    "passed": None, "total": None, "failed": None, "duration_seconds": None,
+    "timestamp": now.isoformat(), "commit": "unknown",
+    "exit_code": rc, "phase": "dispatch-crash", "result": "fail",
+}
+with open(os.environ["E2E_SYNTH_FILE"], "w", encoding="utf-8") as fh:
+    json.dump(summary, fh)
+PY
+  printf '%s' "$file"
+}
+
+# Push one local result file to the M4 forced-command publisher over the
+# dedicated key. Non-zero when no target is configured or the hop fails.
+function _e2e_publish_back_push() {
+  local file="$1"
+  [[ -n "$E2E_PUBLISH_BACK_HOST" ]] || return 1
+  local -a opts
+  mapfile -t opts < <(_e2e_remote_ssh_opts)
+  ssh -i "$E2E_PUBLISH_BACK_KEY" "${opts[@]}" -- "$E2E_PUBLISH_BACK_HOST" < "$file"
+}
+
+# Public (runs ON the runner): after an E2E run, push the result to the M4 hub.
+# Synthesizes a failed summary when the run left none, and — when no M4 target is
+# reachable/configured — retains the result as publication_pending for a bounded
+# replay. Always returns 0 so it can never mask the E2E exit code.
+function e2e_runner_publish_back() {
+  local rc="${1:-1}" summary
+  mkdir -p "$E2E_REPORT_DIR"
+  summary="$(_e2e_newest_summary)"
+  [[ -n "$summary" ]] || summary="$(_e2e_synth_summary "$rc")"
+  [[ -n "$summary" && -s "$summary" ]] || { _warn "[e2e-remote] no result to publish back"; return 0; }
+
+  if _e2e_publish_back_push "$summary"; then
+    _info "[e2e-remote] result ${summary##*/} published to M4 hub"
+    return 0
+  fi
+  local pending="${summary%.json}.publication_pending.json"
+  cp -f "$summary" "$pending" 2>/dev/null || true
+  _warn "[e2e-remote] M4 publication unavailable; retained ${pending##*/} for replay"
+  return 0
+}
+
+# Public (runs ON the runner): bounded replay of retained publication_pending
+# results. Publishes only already-retained local files; a published marker is
+# renamed so a re-run is idempotent. Never creates new results.
+function e2e_runner_publish_replay() {
+  local f done=0 pending=0
+  [[ -d "$E2E_REPORT_DIR" ]] || { _info "[e2e-remote] no report dir; nothing to replay"; return 0; }
+  shopt -s nullglob
+  for f in "$E2E_REPORT_DIR"/*.publication_pending.json; do
+    if _e2e_publish_back_push "$f"; then
+      mv -f "$f" "${f%.publication_pending.json}.published.json" 2>/dev/null || true
+      done=$((done + 1))
+    else
+      pending=$((pending + 1))
+    fi
+  done
+  shopt -u nullglob
+  _info "[e2e-remote] replay complete: published=${done} still_pending=${pending}"
+  [[ "$pending" -eq 0 ]]
+}
+
+# Public (M4): explicit, bounded replay of a remote runner's retained results.
+# Never runs automatically.
+function e2e_runner_replay() {
+  local runner="${1:-}"
+  [[ -n "$runner" ]] || _err "usage: e2e_runner_replay <runner>"
+  _e2e_runner_allowed "$runner" || _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+  if ! _e2e_remote_ssh "true"; then
+    _err "[e2e-remote] runner ${runner} unreachable; cannot replay"
+  fi
+  local backenv=""
+  if [[ -n "$E2E_M2_PUBLISH_BACK_HOST" ]]; then
+    backenv="export E2E_PUBLISH_BACK_HOST=${E2E_M2_PUBLISH_BACK_HOST} E2E_PUBLISH_BACK_KEY=${E2E_M2_PUBLISH_BACK_KEY}; "
+  fi
+  _e2e_remote_ssh "export E2E_REPORT_DIR=${E2E_M2_REMOTE_REPORT_DIR}; ${backenv}cd ${E2E_M2_REPO} && ./scripts/k3d-manager e2e_runner_publish_replay"
+}
+
+# Public (M4): clear a STALE runner lock with bounded age + no-live-run checks.
+# Never automatic; refuses a fresh lock or one whose runner still has an E2E
+# process running.
+function e2e_runner_unlock() {
+  local runner="${1:-}"
+  [[ -n "$runner" ]] || _err "usage: e2e_runner_unlock <runner>"
+  _e2e_runner_allowed "$runner" || _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+
+  local info age running
+  info="$(_e2e_remote_ssh "if [ -e \"${E2E_M2_LOCK}\" ]; then now=\$(date -u +%s); mt=\$(stat -f %m \"${E2E_M2_LOCK}\" 2>/dev/null || stat -c %Y \"${E2E_M2_LOCK}\" 2>/dev/null || echo \$now); echo age=\$((now-mt)); if pgrep -f e2e_verify_vcluster >/dev/null 2>&1; then echo running=1; else echo running=0; fi; else echo age=-1; fi" || true)"
+  age="$(_e2e_kv "$info" age)"
+  running="$(_e2e_kv "$info" running)"
+
+  if [[ "${age:--1}" == "-1" ]]; then
+    _info "[e2e-remote] no lock present on ${runner}; nothing to clear"
+    return 0
+  fi
+  if [[ "$running" == "1" ]]; then
+    _err "[e2e-remote] refusing to unlock ${runner}: an E2E run is still active"
+  fi
+  if _e2e_num_lt "$age" "$E2E_M2_LOCK_MAX_AGE"; then
+    _err "[e2e-remote] refusing to unlock ${runner}: lock age ${age}s < ${E2E_M2_LOCK_MAX_AGE}s (not yet stale)"
+  fi
+  _e2e_remote_ssh "rm -rf \"${E2E_M2_LOCK}\""
+  _info "[e2e-remote] cleared stale lock on ${runner} (age ${age}s)"
+}
+
+# Public (M4): report hub health and runner availability as DISTINCT lines so an
+# operator (and `make status`) can tell a hub outage from a runner outage. A
+# runner that is merely unavailable is a warning (exit 0) unless an E2E run was
+# explicitly requested (E2E_RUN_REQUESTED=1) or an E2E freshness alert is firing
+# (E2E_FRESHNESS_ALERT=1). A hub outage is always significant (non-zero).
+function e2e_runner_health() {
+  local hub="ok" hub_rc=0
+  if ! _kubectl --context "$E2E_HUB_CONTEXT" cluster-info >/dev/null 2>&1; then
+    hub="unreachable"
+    hub_rc=1
+  fi
+  printf 'hub_context=%s\nhub=%s\n' "$E2E_HUB_CONTEXT" "$hub"
+
+  local pf runner_status
+  pf="$(e2e_runner_status 2>/dev/null || true)"
+  runner_status="$(_e2e_kv "$pf" status)"
+  [[ -n "$runner_status" ]] || runner_status="unreachable"
+  printf 'runner=%s\nrunner_status=%s\n' "${E2E_M2_SSH_HOST}" "$runner_status"
+
+  if [[ "$hub_rc" -ne 0 ]]; then
+    printf 'severity=critical\n'
+    return 1
+  fi
+  if [[ "$runner_status" == "available" ]]; then
+    printf 'severity=ok\n'
+    return 0
+  fi
+  if [[ "${E2E_RUN_REQUESTED:-0}" == "1" || "${E2E_FRESHNESS_ALERT:-0}" == "1" ]]; then
+    printf 'severity=critical\n'
+    return 1
+  fi
+  printf 'severity=warning\n'
+  return 0
 }
