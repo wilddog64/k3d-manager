@@ -1,4 +1,8 @@
-# Hub openldap is on `dc=home,dc=org`, not `dc=shopping-cart,dc=local` → dev-user SSO can't be seeded (2026-08-22)
+# `bin/cluster-up` seeds LDAP/realm at `dc=shopping-cart,dc=local` but the directory is `dc=home,dc=org` → dev-user SSO can't be seeded (2026-08-22)
+
+> **Direction corrected 2026-08-22:** `dc=home,dc=org` is the *correct* designed
+> directory (per `scripts/etc/ldap/vars.sh`); the consumers in `bin/cluster-up`
+> are what's wrong. Original title implied the openldap was misconfigured — it is not.
 
 **Severity:** high (blocks admin/developer/operator SSO login + `bin/get-keycloak-password`).
 **Cluster:** hub `k3d-k3d-cluster`, ns `identity`.
@@ -37,28 +41,42 @@ Net: `secret/keycloak/users/{admin,developer,operator}` was never populated
 (the seed step has been silently failing), so `bin/get-keycloak-password admin`
 returns "not found" and dev SSO / frontend login cannot complete.
 
-## Likely cause
+## Root cause (CORRECTED 2026-08-22 — direction was inverted)
 
-The openldap chart on this hub was installed with default values
-(`dc=home,dc=org`, admin `ldap-admin`) rather than the shopping-cart values the
-rest of the stack expects — a config-drift / wrong-values install, probably from
-a rebuild that didn't pass the shopping-cart LDAP values (cf. the display-mirror
-loss noted in `docs/issues/2026-08-22-service-credentials-na-multi-root-cause.md`).
+**The openldap is NOT drifted. `dc=home,dc=org` + `ldap-admin` is the DESIGNED
+source of truth** — `scripts/etc/ldap/vars.sh` defaults `LDAP_DC_PRIMARY=home`,
+`LDAP_DC_SECONDARY=org`, `LDAP_ADMIN_USERNAME=ldap-admin`, `LDAP_BIND_DN=cn=ldap-admin,dc=home,dc=org`.
+A live search confirms the tree is fully correct and already holds the three dev users:
 
-## Remediation (needs a focused pass — do NOT hack live under time pressure)
+```
+dn: uid=admin,ou=users,dc=home,dc=org
+dn: uid=developer,ou=users,dc=home,dc=org
+dn: uid=operator,ou=users,dc=home,dc=org
+```
 
-Decide the source of truth for the directory schema, then make all three agree:
+The bug is **entirely consumer-side**: `bin/cluster-up` (seed loop + realm
+federation) hardcodes `dc=shopping-cart,dc=local` / `cn=admin` / `ldap.identity`
+host / port `389`-from-inside-the-pod / pod label `app.kubernetes.io/name=ldap`,
+none of which match the deployed instance (`dc=home,dc=org` / `cn=ldap-admin` /
+service `openldap` / in-pod port `1389` / label `app.kubernetes.io/name=openldap-stack-ha`).
 
-1. **openldap install values** — root DN, admin DN/username, and the `ou=users`
-   subtree + the three user entries (admin/developer/operator). Either redeploy
-   openldap with `dc=shopping-cart,dc=local` + `cn=admin`, or change the seeding +
-   realm to match `dc=home,dc=org` + `ldap-admin`. Prefer the former (the rest of
-   the stack already encodes shopping-cart).
-2. **`bin/cluster-up` seed loop** — fix the port `ldap://localhost:389` →
-   `:1389` (or use the `openldap` Service on 389), and bind DN/root to match (1).
-3. **Keycloak realm federation** — `connectionUrl` host `ldap` → `openldap`, and
-   `usersDn`/`bindDn` to match (1).
-4. Re-run the seed → `secret/keycloak/users/*` populated → verify
+> ⚠️ **DO NOT redeploy openldap with `dc=shopping-cart,dc=local`** — that would
+> DESTROY the correct, already-populated `dc=home,dc=org` tree. Fix the consumers
+> to match the deployment, not the other way around.
+
+## Remediation (fix the consumers — the tree is already correct)
+
+1. **`bin/cluster-up` seed loop (~1010–1053)** — four fixes:
+   - pod label `app.kubernetes.io/name=ldap` → `app.kubernetes.io/name=openldap-stack-ha`
+     (the current selector matches nothing → `_ldap_pod` empty → `exit 1`).
+   - in-pod URL `ldap://localhost:389` → `ldap://localhost:1389` (Bitnami listens on 1389).
+   - bind DN `cn=admin,dc=shopping-cart,dc=local` → `cn=ldap-admin,dc=home,dc=org`.
+   - user DN `uid=$1,ou=users,dc=shopping-cart,dc=local` → `...,ou=users,dc=home,dc=org`.
+2. **Keycloak realm federation (~1103)** — `connectionUrl`
+   `ldap://ldap.identity.svc.cluster.local:389` → `ldap://openldap.identity.svc.cluster.local:389`
+   (the `openldap` Service maps 389→1389, so 389 is right at the Service),
+   `usersDn`/`bindDn` → `ou=users,dc=home,dc=org` / `cn=ldap-admin,dc=home,dc=org`.
+3. Re-run the seed → `secret/keycloak/users/*` populated → verify
    `bin/get-keycloak-password admin` and an SSO login round-trip.
 
 ## Verification
