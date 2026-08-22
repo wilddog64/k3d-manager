@@ -37,12 +37,27 @@ E2E_M2_REPO="${E2E_M2_REPO:-\$HOME/src/gitrepo/personal/k3d-manager}"
 # Runners a dispatch may target. RUNNER is matched against this exact list and
 # then used verbatim as the run's provenance — never free-text from the caller.
 E2E_RUNNER_ALLOWLIST="${E2E_RUNNER_ALLOWLIST:-m2}"
+# This plugin can be lazy-loaded on its own (dispatcher sources only the file
+# holding the invoked function), so it must not depend on e2e.sh for the report
+# directory default. Keep this in sync with e2e.sh.
+E2E_REPORT_DIR="${E2E_REPORT_DIR:-${HOME}/.k3dm/e2e}"
+E2E_RESULT_EVENT_NAMESPACE="${E2E_RESULT_EVENT_NAMESPACE:-platform-ops}"
+E2E_RESULT_EVENT_KEEP="${E2E_RESULT_EVENT_KEEP:-20}"
+# Result-publisher (increment 5): the M4 hub is assigned internally, never taken
+# from the M2's payload; KUBECONFIG is pinned so an inherited one cannot redirect
+# the write to another cluster.
+E2E_HUB_CONTEXT="${E2E_HUB_CONTEXT:-k3d-k3d-cluster}"
+E2E_PUBLISH_KUBECONFIG="${E2E_PUBLISH_KUBECONFIG:-${HOME}/.kube/config}"
+E2E_PUBLISH_MAX_BYTES="${E2E_PUBLISH_MAX_BYTES:-65536}"
+E2E_PUBLISH_AUDIT_LOG="${E2E_PUBLISH_AUDIT_LOG:-${E2E_REPORT_DIR}/publish-audit.log}"
 
 export E2E_M2_SSH_HOST E2E_M2_RUNNER_CLUSTER E2E_M2_RUNNER_CONTEXT
 export E2E_M2_KUBECONFIG E2E_M2_LOCK E2E_M2_REMOTE_REPORT_DIR
 export E2E_M2_ORB_TIMEOUT E2E_M2_ORB_INTERVAL E2E_M2_SSH_CONNECT_TIMEOUT
 export E2E_M2_MIN_CPU_IDLE E2E_M2_MIN_MEM_FREE E2E_M2_MIN_DISK_GB
 export E2E_M2_REMOTE_PATH E2E_M2_REPO E2E_RUNNER_ALLOWLIST
+export E2E_REPORT_DIR E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP
+export E2E_HUB_CONTEXT E2E_PUBLISH_KUBECONFIG E2E_PUBLISH_MAX_BYTES E2E_PUBLISH_AUDIT_LOG
 
 # Safe, non-interactive SSH options. BatchMode fails fast instead of prompting;
 # host identity is verified through the existing known_hosts — we never weaken it
@@ -295,4 +310,252 @@ cd ${E2E_M2_REPO} && ./scripts/k3d-manager e2e_verify_vcluster ${digest}"
   local rc="${PIPESTATUS[0]}"
   _info "[e2e-remote] dispatch exit ${rc}; transcript: ${transcript}"
   return "$rc"
+}
+
+# --- Restricted result publication (increment 5) ---------------------------
+
+# Append one redacted line to the publisher audit trail. Deliberately records
+# only run id, runner, result, and outcome — never the payload or a digest.
+function _e2e_publish_audit() {
+  local outcome="$1" run_id="$2" runner="$3" result="$4"
+  mkdir -p "$(dirname "$E2E_PUBLISH_AUDIT_LOG")" 2>/dev/null || true
+  printf '%s outcome=%s run_id=%s runner=%s result=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "${outcome:-unknown}" "${run_id:-}" "${runner:-}" "${result:-}" \
+    >> "$E2E_PUBLISH_AUDIT_LOG" 2>/dev/null || true
+}
+
+# Strict validator + manifest builder. Reads the M2 payload from <infile>,
+# enforces the exact E2E result schema with bounded fields and no unexpected
+# keys, and — only on success — writes a deterministic-name ConfigMap manifest
+# to <outfile> and prints `name=… run_id=… runner=… result=…` on stdout. The
+# hub namespace and runner allowlist come from the environment (M4-controlled),
+# never from the payload. Exits non-zero with a reason on any violation.
+function _e2e_publish_build() {
+  local infile="$1" outfile="$2"
+  E2E_PUBLISH_IN="$infile" \
+  E2E_PUBLISH_OUT="$outfile" \
+  E2E_EVENT_NS="$E2E_RESULT_EVENT_NAMESPACE" \
+  E2E_PUBLISH_ALLOWLIST="$E2E_RUNNER_ALLOWLIST" \
+  python3 <<'PY'
+import datetime, hashlib, json, os, re, sys
+
+def die(msg):
+    sys.stderr.write("reject: %s\n" % msg)
+    sys.exit(1)
+
+ns = os.environ["E2E_EVENT_NS"]
+# The publisher only accepts remote runners; local-m4 publishes itself directly.
+allow = {r for r in os.environ.get("E2E_PUBLISH_ALLOWLIST", "").split() if r} - {"local-m4"}
+
+with open(os.environ["E2E_PUBLISH_IN"], encoding="utf-8") as fh:
+    raw = fh.read()
+try:
+    s = json.loads(raw)
+except Exception as e:
+    die("payload is not valid JSON (%s)" % e)
+if not isinstance(s, dict):
+    die("payload must be a JSON object")
+
+ALLOWED = {
+    "run_id", "tier", "runner", "service", "project", "candidate_digest",
+    "passed", "total", "failed", "duration_seconds", "timestamp", "commit",
+    "exit_code", "phase", "result",
+}
+REQUIRED = {
+    "run_id", "tier", "runner", "service", "project", "candidate_digest",
+    "duration_seconds", "timestamp", "exit_code", "phase", "result",
+}
+extra = set(s) - ALLOWED
+missing = REQUIRED - set(s)
+problems = []
+problems.extend(["unexpected keys: " + ",".join(sorted(extra))] if extra else [])
+problems.extend(["missing required keys: " + ",".join(sorted(missing))] if missing else [])
+if problems:
+    die("; ".join(problems))
+
+# candidate_digest is legitimately null when a run pins no candidate image.
+s["candidate_digest"] = s.get("candidate_digest") or ""
+
+def sstr(key, maxlen, pattern=None, allow_empty=False):
+    v = s.get(key)
+    ok = (isinstance(v, str) and len(v) <= maxlen
+          and (allow_empty or bool(v))
+          and (pattern is None or not v or re.match(pattern, v) is not None))
+    if not ok:
+        die("%s invalid (want string <=%d chars matching format)" % (key, maxlen))
+    return v
+
+# key, maxlen, pattern, allow_empty
+STR_FIELDS = [
+    ("run_id", 128, r"^[A-Za-z0-9._-]+$", False),
+    ("tier", 64, r"^[A-Za-z0-9._-]+$", False),
+    ("runner", 64, r"^[A-Za-z0-9._-]+$", False),
+    ("service", 128, r"^[A-Za-z0-9._/-]+$", False),
+    ("project", 128, r"^[A-Za-z0-9._+/ -]*$", True),
+    ("candidate_digest", 256, r"^([A-Za-z0-9._/-]+@)?sha256:[0-9a-f]{64}$", True),
+    ("timestamp", 64, r"^[0-9T:.+\-Z ]+$", False),
+    ("phase", 64, r"^[A-Za-z0-9._-]+$", False),
+    ("commit", 64, r"^[A-Za-z0-9._-]*$", True),
+]
+vals = {k: sstr(k, m, p, e) for (k, m, p, e) in STR_FIELDS}
+run_id, tier, runner = vals["run_id"], vals["tier"], vals["runner"]
+service, project, digest = vals["service"], vals["project"], vals["candidate_digest"]
+timestamp, commit = vals["timestamp"], vals["commit"]
+if runner not in allow:
+    die("runner %r not permitted for remote publication" % runner)
+
+result = s.get("result")
+if result not in ("pass", "fail"):
+    die("result must be 'pass' or 'fail'")
+
+ec = s.get("exit_code")
+if isinstance(ec, bool) or not isinstance(ec, int) or not (0 <= ec <= 255):
+    die("exit_code must be an int in 0..255")
+
+def isnum(v, allow_float):
+    types = (int, float) if allow_float else (int,)
+    return not isinstance(v, bool) and isinstance(v, types) and 0 <= v <= 10**7
+
+def numstr(key, allow_float=False):
+    v = s.get(key)
+    if v is not None and not isnum(v, allow_float):
+        die("%s must be a non-negative number" % key)
+    return "" if v is None else (repr(v) if isinstance(v, float) else str(v))
+
+passed = numstr("passed")
+total = numstr("total")
+failed = numstr("failed")
+dur_s = numstr("duration_seconds", allow_float=True)
+
+created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+event = {
+    "run_id": run_id, "tier": tier, "runner": runner, "service": service,
+    "project": project, "candidate_digest": digest,
+    "passed": "true" if result == "pass" else "false",
+    "total": total, "failed": failed, "duration_seconds": dur_s,
+    "timestamp": timestamp, "commit": commit,
+}
+
+# Deterministic name -> apply is idempotent per run id; SSH retries cannot
+# create duplicate observations.
+digest12 = hashlib.sha256(run_id.encode()).hexdigest()[:12]
+name = "e2e-result-%s-%s" % (re.sub(r"[^a-z0-9-]", "-", runner.lower()), digest12)
+
+manifest = {
+    "apiVersion": "v1", "kind": "ConfigMap",
+    "metadata": {
+        "name": name, "namespace": ns,
+        "labels": {
+            "k3dm.k3d.io/e2e-result": "true",
+            "k3dm.k3d.io/e2e-service": service,
+            "k3dm.k3d.io/e2e-tier": tier,
+            "k3dm.k3d.io/e2e-runner": runner,
+        },
+    },
+    "data": {"created_at": created_at, "event.json": json.dumps(event)},
+}
+with open(os.environ["E2E_PUBLISH_OUT"], "w", encoding="utf-8") as fh:
+    json.dump(manifest, fh)
+sys.stdout.write("name=%s run_id=%s runner=%s result=%s service=%s tier=%s\n"
+                 % (name, run_id, runner, result, service, tier))
+PY
+}
+
+# Retention keyed on (service,tier,runner), pinned to the hub context so a
+# stray current-context (e.g. an ACG sandbox) can never be the delete target.
+function _e2e_publish_prune() {
+  local service="$1" tier="$2" runner="$3"
+  local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${service},k3dm.k3d.io/e2e-tier=${tier},k3dm.k3d.io/e2e-runner=${runner}"
+  local names
+  names="$(_kubectl --context "$E2E_HUB_CONTEXT" -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
+    -l "$selector" --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
+  [[ -z "$names" ]] && return 0
+  local total keep_from stale name
+  total="$(printf '%s\n' "$names" | grep -c . || true)"
+  (( total <= E2E_RESULT_EVENT_KEEP )) && return 0
+  keep_from=$(( total - E2E_RESULT_EVENT_KEEP ))
+  stale="$(printf '%s\n' "$names" | head -n "$keep_from")"
+  while IFS= read -r name; do
+    [[ -z "$name" ]] && continue
+    _kubectl --context "$E2E_HUB_CONTEXT" -n "$E2E_RESULT_EVENT_NAMESPACE" \
+      delete configmap "$name" >/dev/null 2>&1 || true
+  done <<< "$stale"
+}
+
+# Public: the SSH forced command for the dedicated M2 principal. Reads exactly
+# one JSON result document on stdin, validates it, and is the ONLY writer of the
+# hub e2e-result ConfigMap for remote runs. It ignores SSH_ORIGINAL_COMMAND,
+# accepts no kubeconfig/namespace/manifest/kubectl args from the caller, assigns
+# the hub context internally, and is idempotent per run id.
+function e2e_result_publish() {
+  # Pin the target cluster; an inherited KUBECONFIG must not redirect the write.
+  export KUBECONFIG="$E2E_PUBLISH_KUBECONFIG"
+
+  local payload manifest
+  payload="$(mktemp -t e2e-publish-in.XXXXXX)"
+  manifest="$(mktemp -t e2e-publish-cm.XXXXXX)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$payload' '$manifest'" RETURN
+
+  # Bounded read: cap the payload so a runaway/hostile stream cannot exhaust M4.
+  head -c "$E2E_PUBLISH_MAX_BYTES" > "$payload"
+  if [[ ! -s "$payload" ]]; then
+    _e2e_publish_audit rejected "" "" ""
+    _err "[e2e-publish] empty payload on stdin"
+  fi
+
+  local meta
+  if ! meta="$(_e2e_publish_build "$payload" "$manifest")"; then
+    _e2e_publish_audit rejected "" "" ""
+    _err "[e2e-publish] payload rejected by schema validation"
+  fi
+
+  local run_id runner result service tier
+  run_id="$(sed -n 's/.*run_id=\([^ ]*\).*/\1/p' <<<"$meta")"
+  runner="$(sed -n 's/.*runner=\([^ ]*\).*/\1/p' <<<"$meta")"
+  result="$(sed -n 's/.*result=\([^ ]*\).*/\1/p' <<<"$meta")"
+  service="$(sed -n 's/.*service=\([^ ]*\).*/\1/p' <<<"$meta")"
+  tier="$(sed -n 's/.* tier=\([^ ]*\).*/\1/p' <<<"$meta")"
+
+  if _kubectl --context "$E2E_HUB_CONTEXT" -n "$E2E_RESULT_EVENT_NAMESPACE" \
+       apply -f "$manifest" >/dev/null 2>&1; then
+    _e2e_publish_audit applied "$run_id" "$runner" "$result"
+    _info "[e2e-publish] applied result for run ${run_id} (runner=${runner}, result=${result})"
+    _e2e_publish_prune "$service" "$tier" "$runner"
+    return 0
+  fi
+  _e2e_publish_audit apply_failed "$run_id" "$runner" "$result"
+  _err "[e2e-publish] kubectl apply failed for run ${run_id}"
+}
+
+# Install the dedicated, restricted authorized_keys entry for the M2 publisher
+# principal. Forces e2e_result_publish, disables pty/forwarding/shell, and is
+# idempotent via a marker comment. Never installs a personal/admin key.
+function e2e_result_publisher_install() {
+  local pubkey="${1:-}"
+  [[ -n "$pubkey" && -r "$pubkey" ]] || _err "usage: e2e_result_publisher_install <path-to-m2-publisher.pub>"
+
+  local keyline marker dispatcher authfile
+  keyline="$(tr -d '\n' < "$pubkey")"
+  [[ "$keyline" =~ ^(ssh-|ecdsa-|sk-) ]] || _err "[e2e-publish] '${pubkey}' does not look like an SSH public key"
+  marker="e2e-m2-publisher"
+
+  dispatcher="$(cd "${SCRIPT_DIR}" && pwd)/k3d-manager"
+  authfile="${HOME}/.ssh/authorized_keys"
+  mkdir -p "${HOME}/.ssh"
+  chmod 700 "${HOME}/.ssh"
+  touch "$authfile"
+  chmod 600 "$authfile"
+
+  if grep -qF "$marker" "$authfile" 2>/dev/null; then
+    _info "[e2e-publish] publisher principal already installed (marker ${marker})"
+    return 0
+  fi
+
+  local entry
+  entry="command=\"${dispatcher} e2e_result_publish\",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ${keyline} ${marker}"
+  printf '%s\n' "$entry" >> "$authfile"
+  _info "[e2e-publish] installed restricted M2 publisher principal in ${authfile}"
 }
