@@ -74,16 +74,18 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
     bare `vcluster-<os>-<arch>` via exact awk `$2==asset`). Non-blocking nit: bare `_err` on
     `mktemp` failure after lock acquisition leaks the lockdir (RETURN trap doesn't fire on exit;
     should use `_foundation_vcluster_abort`).
-  - **Release IN FLIGHT — PR #44 open + GREEN, awaiting user merge** (classifier blocks
-    auto-merge): `wilddog64/lib-foundation` PR #44 `feat/v0.4.13` HEAD `d388299f`. CI green
-    (bats/shellcheck/acg), Copilot review addressed — found a REAL bug (`curl -fsSL -- URL -o FILE`
-    puts `-o` after `--` → parsed as URLs, real download fails; stubbed tests missed it). Fixed:
-    `-o` before `--` + tightened BATS curl stub to honor `--` (proven to now fail tests 28/32/33 on
-    the buggy order). Both Copilot threads resolved. mergeStateStatus CLEAN. CHANGE.md stamped
-    `[v0.4.13]` in the PR; PR also lands the v0.4.12 retro. Nit fix (`f154dbe`) folded in.
-  - **REMAINING after user merges #44:** tag `v0.4.13` on the squash-merge → GitHub release →
-    `git subtree pull` into k3d-manager `scripts/lib/foundation` → THEN unblock Part B
-    (k3d-manager `vcluster.sh` rewire).
+  - **Part A RELEASED as lib-foundation v0.4.13 (2026-08-22).** PR #44 merged (`0a3e4043`);
+    Copilot found a REAL bug (`curl -fsSL -- URL -o FILE` put `-o` after `--` → parsed as URLs,
+    real download fails; stubbed tests missed it) — fixed `-o` before `--` + tightened the BATS
+    curl stub to honor `--` (proven to fail tests 28/32/33 on the buggy order). Nit fix
+    (`f154dbe`) folded in. Tag `v0.4.13` + GitHub release published on `0a3e4043`.
+    **Subtree-pulled into k3d-manager `scripts/lib/foundation`** — vendored copy verified:
+    `foundation_ensure_vcluster_cli` + 7 helpers present, curl fix intact (`-o` before `--`),
+    `bash -n` clean.
+  - **Part B NOW UNBLOCKED** — k3d-manager `scripts/plugins/vcluster.sh` rewire: delete
+    `_vcluster_install_cli`/`vcluster_install_cli`/`VCLUSTER_INSTALL_DIR`/Homebrew paths; call
+    `foundation_ensure_vcluster_cli "$VCLUSTER_VERSION"` in `_vcluster_check_prerequisites` and use
+    the returned path for all vcluster invocations; update help/tests/guide.
 - [ ] **M2 remote E2E runner** (`docs/plans/v1.27.0-m2-remote-e2e-runner.md`) — SSH-dispatch
   ephemeral E2E to m2-air, restricted M4-side publisher → hub ConfigMap → Grafana. The actual
   E2E load-split off the M4 laptop. **Depends on the foundation vCluster CLI.**

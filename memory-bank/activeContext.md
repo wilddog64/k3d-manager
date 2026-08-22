@@ -9,7 +9,7 @@
 - **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged to main, tag/release published. Branch protection restored (`enforce_admins=true`, 1 required approval). Shipped 3/5 scopes (fleet node lifecycle count-agnostic, E2E promotion gate + observability, managed registration cleanup). Retrospective: `docs/retro/2026-08-21-v1.26.0-retrospective.md`.
 
 - **v1.27.0 active branch** (`k3d-manager-v1.27.0`, branched from merge commit). **Scope = 4 plan docs (4/5, under cap):**
-  1. `docs/plans/v1.27.0-foundation-managed-vcluster-cli.md` — load-split **prerequisite**; upstream-first lib-foundation `foundation_ensure_vcluster_cli`. **Must land first.**
+  1. `docs/plans/v1.27.0-foundation-managed-vcluster-cli.md` — load-split **prerequisite**. **Part A DONE:** lib-foundation `v0.4.13` released (PR #44 `0a3e4043`, tag/release live), subtree-pulled into `scripts/lib/foundation` — `foundation_ensure_vcluster_cli` vendored + verified. **Part B UNBLOCKED (next up):** rewire `scripts/plugins/vcluster.sh` to call `foundation_ensure_vcluster_cli "$VCLUSTER_VERSION"`, drop the local installer/Homebrew paths.
   2. `docs/plans/v1.27.0-m2-remote-e2e-runner.md` — the actual E2E load-split off the M4 laptop; depends on #1.
   3. `docs/plans/v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce (multi-repo, heavy).
   4. `docs/plans/v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry.
