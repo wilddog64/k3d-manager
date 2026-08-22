@@ -63,11 +63,19 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [ ] **Foundation-managed vCluster CLI** (`docs/plans/v1.27.0-foundation-managed-vcluster-cli.md`)
   — upstream-first in lib-foundation (`foundation_ensure_vcluster_cli <version>`), then
   subtree-pull + rewire `scripts/plugins/vcluster.sh`. **Prerequisite — must land first.**
-  - [x] **Part B complete locally** — commit `6c2dd94d` removes the consumer installer and
-    routes all lifecycle calls through the foundation contract; help/docs and contract-stubbed
-    tests updated. BATS 36/36, shellcheck clean, `bash -n` clean, disappearance greps empty.
-    No PR URL: PR creation is explicitly out of scope for this task; push/live E2E remain Claude
-    gates.
+  - [x] **Part B DELIVERED (Codex) + VERIFIED (Claude) + PUSHED 2026-08-21** — HEAD `142fd06b`
+    on `origin/k3d-manager-v1.27.0` (Codex's own note said `6c2dd94d`, but that was amended away and
+    is NOT in history — real commit is `142fd06b`). Removes the consumer installer
+    (`vcluster_install_cli`/`_vcluster_install_cli`/`VCLUSTER_INSTALL_DIR`), adds module-scoped
+    `_VCLUSTER_BIN`, rewires `_vcluster_check_prerequisites` to
+    `foundation_ensure_vcluster_cli "$VCLUSTER_VERSION"` (guards both non-zero exit AND empty path),
+    routes all 6 lifecycle invocations through `"$_VCLUSTER_BIN"`; updates help/utils.sh,
+    functions.md (row removed), howto/vcluster.md, guide; reworks vcluster.bats to stub the contract
+    (deleted the 3 installer-era tests, added path-stored + failure-stops + empty-stops + destroy/list
+    contract tests); e2e.bats correctly untouched (no installer refs). **Claude re-ran gates
+    independently:** BATS 36/36, shellcheck clean, `bash -n` clean, both disappearance greps empty,
+    subtree untouched. **Remaining Claude gate:** one live `make e2e` when the hub is healthy
+    (ConfigMap → exporter → Grafana). No PR yet — PR is a v1.27.0-release-time step, not per-part.
   - Part A Codex task spec written 2026-08-21:
     `docs/plans/v1.27.0-foundation-managed-vcluster-cli-codex-task.md` — Part A only
     (lib-foundation `feat/v0.4.13`, `scripts/lib/system.sh`, stubbed BATS, STOP at gate).
