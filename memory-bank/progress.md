@@ -57,6 +57,12 @@
 
 ## v1.27.0 queue
 
+- [x] Investigated CVE dashboard empty tables (2026-08-22): platform data is present in Prometheus and
+  Grafana's datasource API; shopping-cart is empty because hub-only exporter scope excludes the remote
+  Hostinger cluster, and remediation event metrics have no current records. Issue evidence:
+  `docs/issues/2026-08-22-cve-dashboard-empty-tables.md`. Remote inventory aggregation and durable
+  remediation-event retention remain follow-up work.
+
 Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decision
 2026-08-21 "keep all four".
 

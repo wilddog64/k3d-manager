@@ -70,6 +70,14 @@
 
 ## Open follow-ups
 
+- **2026-08-22 CVE dashboard empty tables diagnosed:** the hub exporter is healthy (`up=1`, 3,701
+  `trivy_vulnerability_inventory` series) and the exact platform query returns 3,586 rows; Grafana's
+  datasource API also returns frames. Shopping-cart returns zero because its healthy Applications target
+  the separate `ubuntu-hostinger` cluster and the hub exporter has no remote-cluster reports. Remediation
+  event metrics are also zero because completed verifier jobs produced no event records. Evidence and
+  follow-up design are recorded in `docs/issues/2026-08-22-cve-dashboard-empty-tables.md`; no live or
+  dashboard changes were made.
+
 - **2026-08-22 service-credentials incident** (`docs/issues/2026-08-22-service-credentials-na-multi-root-cause.md`):
   `make show-service-passwords` all-N/A + no login had THREE independent causes.
   (1) ✅ FIXED: `com.k3d-manager.vault-port-forward` plist was missing from
