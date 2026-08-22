@@ -104,6 +104,23 @@
   (branch+PR+ArgoCD sync per shopping-cart discipline) OR bump the node >2 CPU.
   Recovery outcome: 2/3 (istiod+frontend up, product-catalog Pending pending durable fix).
 
+- **2026-08-22 Keycloak hub deploy — DONE (reachable), dev-users BLOCKED.**
+  `deploy_keycloak --enable-ldap --enable-vault`
+  (`KEYCLOAK_VIRTUALSERVICE_HOST=keycloak.3ai-talk.org`) → `keycloak-0` 1/1,
+  `keycloak-admin-secret` + `secret/keycloak/admin` seeded, VirtualService live.
+  **Port-forward bug found+fixed:** `bin/cluster-up:1544` installed the :8880
+  forward against remote port 80 but `svc/keycloak` is 8080 (+ healthz `/health/live`
+  404s) → every restart failed → public 502. Fixed source (`04cc1e14`, →8080 +
+  `/realms/master` healthz) + live stopgap on the installed wrapper + kickstart →
+  local :8880 and public `keycloak.3ai-talk.org/realms/master` both **200**. Spec
+  `docs/bugs/2026-08-22-keycloak-port-forward-wrong-remote-port.md`.
+  **STILL BLOCKED — dev SSO users:** hub `openldap-0` is on `dc=home,dc=org` /
+  admin `ldap-admin` (listens 1389), NOT the expected `dc=shopping-cart,dc=local`
+  / `cn=admin` that the cluster-up seed loop + realm federation assume (loop also
+  uses wrong `:389`). So `secret/keycloak/users/*` never seeded →
+  `bin/get-keycloak-password` N/A, frontend SSO can't complete. Needs a focused
+  fix pass: `docs/bugs/2026-08-22-hub-openldap-wrong-realm-blocks-sso-users.md`.
+
 - **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
   Dependabot scans the default branch (main = v1.25.0); **auto-closes when v1.26.0 → main.**
