@@ -24,7 +24,7 @@ resources:
 images:
 - name: shopping-cart-product-catalog
   newName: ghcr.io/wilddog64/shopping-cart-product-catalog
-  newTag: sha-6ca5e88d587d845217a51cb0b79b906d26f7b7ee
+  newTag: sha-505f758a6ab83b72aa78073e6a368dd760a9e08b
 - name: shopping-cart-basket
   newName: ghcr.io/wilddog64/shopping-cart-basket
   newTag: sha-f70d5801a4078434128d0a17b55cf2e93a028304
