@@ -189,6 +189,10 @@ Subcommands:
 
 Environment variables:
   CLUSTER_ROLE=infra|app   Select deployment profile (default: infra)
+
+vCluster prerequisite:
+  The pinned VCLUSTER_VERSION CLI is resolved automatically by
+  foundation_ensure_vcluster_cli; no manual installation is supported.
 EOF
     else
       printf 'Categories:\n'

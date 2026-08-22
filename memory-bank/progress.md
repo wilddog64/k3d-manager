@@ -63,6 +63,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [ ] **Foundation-managed vCluster CLI** (`docs/plans/v1.27.0-foundation-managed-vcluster-cli.md`)
   — upstream-first in lib-foundation (`foundation_ensure_vcluster_cli <version>`), then
   subtree-pull + rewire `scripts/plugins/vcluster.sh`. **Prerequisite — must land first.**
+  - [x] **Part B complete locally** — commit `6c2dd94d` removes the consumer installer and
+    routes all lifecycle calls through the foundation contract; help/docs and contract-stubbed
+    tests updated. BATS 36/36, shellcheck clean, `bash -n` clean, disappearance greps empty.
+    No PR URL: PR creation is explicitly out of scope for this task; push/live E2E remain Claude
+    gates.
   - Part A Codex task spec written 2026-08-21:
     `docs/plans/v1.27.0-foundation-managed-vcluster-cli-codex-task.md` — Part A only
     (lib-foundation `feat/v0.4.13`, `scripts/lib/system.sh`, stubbed BATS, STOP at gate).

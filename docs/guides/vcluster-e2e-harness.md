@@ -31,6 +31,10 @@ The harness builds on the existing `vcluster.sh` plugin
 (`vcluster_create` / `vcluster_destroy` / `_vcluster_kubeconfig_path`), which requires
 a host cluster context (`VCLUSTER_HOST_CONTEXT` or the current kube-context).
 
+**Prerequisite:** run `make e2e`; the foundation contract resolves the pinned vCluster
+CLI under `${XDG_DATA_HOME:-$HOME/.local/share}/lib-foundation/vcluster/<version>/`.
+No manual vCluster CLI installation is supported.
+
 ---
 
 ## The self-contained substrate bundle (`scripts/etc/e2e/`)

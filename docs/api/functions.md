@@ -103,7 +103,6 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `vcluster_destroy` | `scripts/plugins/vcluster.sh` | Delete a vCluster and remove its kubeconfig file |
 | `vcluster_use` | `scripts/plugins/vcluster.sh` | Merge vCluster kubeconfig into `~/.kube/config` and switch active context |
 | `vcluster_list` | `scripts/plugins/vcluster.sh` | List all vClusters in the active namespace |
-| `vcluster_install_cli` | `scripts/plugins/vcluster.sh` | Install the vcluster CLI (brew on macOS, binary download on Linux); auto-called by other vcluster commands |
 | `e2e_verify_vcluster` | `scripts/plugins/e2e.sh` | Tier 1 e2e: stand up the shopping-cart substrate in a throwaway vCluster, run the Playwright api+flows suite as an in-cluster Job, write an exit-code-faithful JSON summary, and tear the vCluster down on success or failure. Optional arg = candidate image ref for the service under test |
 | `ldap_get_user_password` | `scripts/plugins/ldap.sh` | Retrieve an LDAP user's current password from Vault |
 | `copilot_triage_pod` | `scripts/plugins/copilot.sh` | Collect `kubectl describe pod` + last 100 log lines and pass to `_ai_agent_review` for diagnosis; backend selected by `AI_REVIEW_FUNC`; requires `K3DM_ENABLE_AI=1` |

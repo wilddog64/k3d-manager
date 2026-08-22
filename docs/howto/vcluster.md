@@ -89,16 +89,7 @@ Lists all vClusters in the active namespace.
 ./scripts/k3d-manager vcluster_list
 ```
 
-### `vcluster_install_cli`
-
-Installs the vcluster CLI manually. Called automatically by all other commands if the CLI is missing.
-
-```bash
-./scripts/k3d-manager vcluster_install_cli
-```
-
-- macOS: `brew install loft-sh/tap/vcluster`
-- Linux: downloads binary from GitHub releases to `VCLUSTER_INSTALL_DIR` (`/usr/local/bin`)
+The vCluster CLI is provided automatically by the foundation contract at `VCLUSTER_VERSION`; no manual install is supported.
 
 ---
 
@@ -109,7 +100,6 @@ Installs the vcluster CLI manually. Called automatically by all other commands i
 | `VCLUSTER_NAMESPACE` | `vclusters` | Namespace where vClusters are deployed |
 | `VCLUSTER_VERSION` | `0.32.1` | Helm chart version |
 | `VCLUSTER_KUBECONFIG_DIR` | `~/.kube/vclusters` | Directory for per-vCluster kubeconfig files |
-| `VCLUSTER_INSTALL_DIR` | `/usr/local/bin` | Installation path for the vcluster CLI (Linux only) |
 
 ---
 

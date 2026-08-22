@@ -6,6 +6,12 @@
 
 ## Current focus
 
+- **v1.27.0 foundation-managed vCluster CLI Part B COMPLETE locally** — commit `6c2dd94d`
+  rewires `vcluster.sh` to `foundation_ensure_vcluster_cli`, removes the consumer installer,
+  updates help/docs, and adds contract-based BATS coverage. Gates: focused BATS 36/36,
+  shellcheck clean, `bash -n` clean, both required disappearance greps empty. No PR created
+  per task instructions; push/live E2E are Claude follow-up gates.
+
 - **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged to main, tag/release published. Branch protection restored (`enforce_admins=true`, 1 required approval). Shipped 3/5 scopes (fleet node lifecycle count-agnostic, E2E promotion gate + observability, managed registration cleanup). Retrospective: `docs/retro/2026-08-21-v1.26.0-retrospective.md`.
 
 - **v1.27.0 active branch** (`k3d-manager-v1.27.0`, branched from merge commit). **Scope = 4 plan docs (4/5, under cap):**
