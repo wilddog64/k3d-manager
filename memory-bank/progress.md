@@ -63,6 +63,10 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [ ] **Foundation-managed vCluster CLI** (`docs/plans/v1.27.0-foundation-managed-vcluster-cli.md`)
   — upstream-first in lib-foundation (`foundation_ensure_vcluster_cli <version>`), then
   subtree-pull + rewire `scripts/plugins/vcluster.sh`. **Prerequisite — must land first.**
+  - Part A Codex task spec written 2026-08-21:
+    `docs/plans/v1.27.0-foundation-managed-vcluster-cli-codex-task.md` — Part A only
+    (lib-foundation `feat/v0.4.13`, `scripts/lib/system.sh`, stubbed BATS, STOP at gate).
+    Ready for Codex hand-off. Part B (k3d-manager rewire) blocked on Claude's release+subtree gate.
 - [ ] **M2 remote E2E runner** (`docs/plans/v1.27.0-m2-remote-e2e-runner.md`) — SSH-dispatch
   ephemeral E2E to m2-air, restricted M4-side publisher → hub ConfigMap → Grafana. The actual
   E2E load-split off the M4 laptop. **Depends on the foundation vCluster CLI.**
