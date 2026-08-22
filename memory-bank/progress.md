@@ -74,8 +74,25 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
     (deleted the 3 installer-era tests, added path-stored + failure-stops + empty-stops + destroy/list
     contract tests); e2e.bats correctly untouched (no installer refs). **Claude re-ran gates
     independently:** BATS 36/36, shellcheck clean, `bash -n` clean, both disappearance greps empty,
-    subtree untouched. **Remaining Claude gate:** one live `make e2e` when the hub is healthy
-    (ConfigMap → exporter → Grafana). No PR yet — PR is a v1.27.0-release-time step, not per-part.
+    subtree untouched. **LIVE `make e2e` GATE PASSED for the CLI contract 2026-08-21** (hub
+    healthy, 4 nodes): `foundation_ensure_vcluster_cli` did a REAL download + SHA-256 verify +
+    atomic install of vcluster `0.32.1` into `~/.local/share/lib-foundation/vcluster/0.32.1/`
+    (managed binary reports `0.32.1`), the plugin used the managed binary — NOT the Homebrew
+    `vcluster` on PATH — to `vcluster create`/`connect` the throwaway vCluster (substrate
+    postgres/redis/product-catalog/basket/order all rolled out inside it), and teardown-on-failure
+    left the `vclusters` ns empty. Durable artifact + result ConfigMap (`e2e-result-h6df8`,
+    `passed=false`) + exporter (`e2e_run_info`/`e2e_last_run_pass=0`) all carry our commit
+    `9b3a5754`. The Playwright app Job failed at phase `running-playwright` (all playwright metrics
+    null) — a PRE-EXISTING app-test failure (same class as the v1.26.0 `35e9ecf2` run), NOT caused
+    by the CLI-contract change. Plan #1 (Parts A+B) is functionally COMPLETE; PR is a
+    v1.27.0-release-time step.
+  - ⚠️ **Finding 1a UPGRADED cosmetic → BLOCKING (live-discovered during this gate):** the empty
+    `e2e_last_run_duration_seconds` value (failed run → `duration_seconds=""`) is an invalid
+    Prometheus exposition line that fails the WHOLE scrape → `up{job="vulnerability-inventory-exporter"}=0`
+    → Prometheus drops ALL exporter series (every `e2e_*` AND all `trivy_*`/`cve_*`), blinding both
+    the E2E and CVE Grafana dashboards. Exporter's own `:8080` serves fine; only Prometheus ingest
+    is broken. Fix = coerce empty/null → `0` at `vulnerability-inventory-exporter.yaml:344`, redeploy
+    via `argocd.sh`. Doc corrected: `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
   - Part A Codex task spec written 2026-08-21:
     `docs/plans/v1.27.0-foundation-managed-vcluster-cli-codex-task.md` — Part A only
     (lib-foundation `feat/v0.4.13`, `scripts/lib/system.sh`, stubbed BATS, STOP at gate).

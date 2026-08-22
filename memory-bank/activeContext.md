@@ -12,8 +12,17 @@
   (module-scoped `_VCLUSTER_BIN`, guards non-zero + empty path), removes the consumer installer,
   updates help/docs, reworks BATS to stub the contract. **Claude re-ran gates independently:**
   BATS 36/36, shellcheck clean, `bash -n` clean, both disappearance greps empty, subtree
-  untouched. **Only remaining gate: one live `make e2e` when the hub is healthy.** No PR yet
-  (PR is a v1.27.0-release-time step). Part A already shipped as lib-foundation `v0.4.13`.
+  untouched. **LIVE `make e2e` gate PASSED for the CLI contract:** real download + SHA-verify +
+  atomic install of vcluster `0.32.1` (managed path, not PATH Homebrew), plugin created the
+  throwaway vCluster + substrate via the managed binary, teardown clean; artifact/ConfigMap/exporter
+  all carry commit `9b3a5754`. The Playwright app Job failed (`running-playwright`, pre-existing
+  app-test failure — NOT the CLI change). **Plan #1 (Parts A+B) functionally COMPLETE.** No PR yet
+  (v1.27.0-release-time step). Part A shipped as lib-foundation `v0.4.13`.
+  - ⚠️ **Finding 1a is BLOCKING, not cosmetic** (live-discovered): empty
+    `e2e_last_run_duration_seconds` breaks the whole Prometheus scrape
+    (`up{vulnerability-inventory-exporter}=0`), dropping ALL `e2e_*`+`trivy_*`/`cve_*` series →
+    both E2E and CVE Grafana dashboards blind. Fix at `vulnerability-inventory-exporter.yaml:344`,
+    redeploy via `argocd.sh`. `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
 
 - **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged to main, tag/release published. Branch protection restored (`enforce_admins=true`, 1 required approval). Shipped 3/5 scopes (fleet node lifecycle count-agnostic, E2E promotion gate + observability, managed registration cleanup). Retrospective: `docs/retro/2026-08-21-v1.26.0-retrospective.md`.
 
