@@ -69,6 +69,23 @@
 
 ## Open follow-ups
 
+- **2026-08-22 service-credentials incident** (`docs/issues/2026-08-22-service-credentials-na-multi-root-cause.md`):
+  `make show-service-passwords` all-N/A + no login had THREE independent causes.
+  (1) ✅ FIXED: `com.k3d-manager.vault-port-forward` plist was missing from
+  `~/Library/LaunchAgents/` (only the `vault-failover` watchdog remained, which does
+  NOT own :18200) → nothing on 127.0.0.1:18200 → every Vault-sourced cred N/A.
+  `make install-vault-port-forward` restored it (Grafana/Alertmanager resolve; ArgoCD
+  works via `argocd admin initial-password -n cicd`). (2) Vault KV lost its display-mirror
+  paths (only `ldap/`+`observability/` remain); ArgoCD/Prometheus/Alertmanager are NOT
+  ESO-managed so services are unaffected — display-only. ArgoCD re-seed one-liner handed to
+  user. (3) **Keycloak never deployed on the hub** (no pod/app/keycloak-Vault-paths) → the
+  only genuine login blocker (admin + frontend SSO); spec at
+  `docs/bugs/2026-08-22-keycloak-not-deployed-on-hub-sso-down.md`. NOTE: hub Prometheus is
+  UNAUTHENTICATED (empty `spec.web`, no edge basic-auth; prometheus.3ai-talk.org→:19090→200
+  open) — `observability_rotate_prometheus_basic_auth` targets the ACG app cluster, NOT the
+  hub, so it was deliberately NOT run. Also Makefile show-service-passwords reads wrong
+  keycloak secret name (`keycloak-secrets` vs deploy's `keycloak-admin-secret`).
+
 - **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
   Dependabot scans the default branch (main = v1.25.0); **auto-closes when v1.26.0 → main.**
