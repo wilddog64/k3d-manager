@@ -122,9 +122,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
     (row 106), howto/vcluster.md, guide; rework vcluster.bats + e2e.bats to stub the contract (delete
     the 3 installer-era tests). Gates + disappearance greps + STOP-at-gate; live `make e2e` is Claude's.
     **Awaiting go to push + hand off to Codex.**
-- [ ] **M2 remote E2E runner** (`docs/plans/v1.27.0-m2-remote-e2e-runner.md`) — SSH-dispatch
+- [~] **M2 remote E2E runner** (`docs/plans/v1.27.0-m2-remote-e2e-runner.md`) — SSH-dispatch
   ephemeral E2E to m2-air, restricted M4-side publisher → hub ConfigMap → Grafana. The actual
   E2E load-split off the M4 laptop. **Depends on the foundation vCluster CLI.**
+  Increments 1–6 DONE (inc 6 = failure behavior + operations, `b5fff9c4`, 68/68 BATS green).
+  **Remaining: 2-run live acceptance gate (1 fail + 1 pass via `make e2e-remote RUNNER=m2`)
+  + live redeploy of the inc-2 runner-labelled exporter/dashboard/rule — BLOCKED on hostinger
+  node CPU exhaustion (see activeContext incident).**
 - [ ] **Image signing / CVE-loop closure** (`docs/plans/v1.27.0-image-signing-cve-loop-closure.md`)
   — cosign sign+attest, Kyverno Audit→Enforce, promoter verify gate. Multi-repo, heavy.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
