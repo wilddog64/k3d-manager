@@ -66,7 +66,17 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   - Part A Codex task spec written 2026-08-21:
     `docs/plans/v1.27.0-foundation-managed-vcluster-cli-codex-task.md` — Part A only
     (lib-foundation `feat/v0.4.13`, `scripts/lib/system.sh`, stubbed BATS, STOP at gate).
-    Ready for Codex hand-off. Part B (k3d-manager rewire) blocked on Claude's release+subtree gate.
+  - **Part A DELIVERED + VERIFIED 2026-08-21** — Codex `b2adb8f2` on `origin/feat/v0.4.13`
+    (independently confirmed on origin). `foundation_ensure_vcluster_cli` + 7 private helpers;
+    +253/-0 across the 4 intended files only (system.sh, system.bats, README, functions.md).
+    Gates re-run by Claude: BATS 33/33 (7 vcluster cases green), shellcheck clean, `bash -n`
+    clean, if-count ≤2/fn (budget 8). Real asset names correct (`checksums.txt`,
+    bare `vcluster-<os>-<arch>` via exact awk `$2==asset`). Non-blocking nit: bare `_err` on
+    `mktemp` failure after lock acquisition leaks the lockdir (RETURN trap doesn't fire on exit;
+    should use `_foundation_vcluster_abort`).
+  - **GATE NEXT (Claude, needs go):** release lib-foundation `v0.4.13` (feat→PR→Copilot→stamp→
+    tag→release) → subtree-pull into `scripts/lib/foundation` → THEN unblock Part B
+    (k3d-manager `vcluster.sh` rewire).
 - [ ] **M2 remote E2E runner** (`docs/plans/v1.27.0-m2-remote-e2e-runner.md`) — SSH-dispatch
   ephemeral E2E to m2-air, restricted M4-side publisher → hub ConfigMap → Grafana. The actual
   E2E load-split off the M4 laptop. **Depends on the foundation vCluster CLI.**
