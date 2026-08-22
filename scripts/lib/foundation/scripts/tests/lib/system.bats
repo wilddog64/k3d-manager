@@ -7,6 +7,43 @@ setup() {
   source "$SYSTEM_LIB"
 }
 
+foundation_vcluster_fixture() {
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  export XDG_DATA_HOME="${BATS_TEST_TMPDIR}/data"
+  export FIXTURE="${BATS_TEST_TMPDIR}/fixture"
+  export VCLUSTER_STUB_BIN="${BATS_TEST_TMPDIR}/bin"
+  export CURL_LOG="${BATS_TEST_TMPDIR}/curl.log"
+  mkdir -p "${FIXTURE}" "${VCLUSTER_STUB_BIN}"
+  printf '#!/usr/bin/env bash\nprintf "vcluster version %s\\n"\n' "${VCLUSTER_FIXTURE_VERSION:-0.20.0}" > "${FIXTURE}/asset"
+  chmod 0755 "${FIXTURE}/asset"
+  shasum -a 256 "${FIXTURE}/asset" | awk '{print $1 "  vcluster-darwin-arm64"}' > "${FIXTURE}/checksums.txt"
+  cat > "${VCLUSTER_STUB_BIN}/curl" <<'EOF'
+#!/usr/bin/env bash
+set -e
+out=""
+previous=""
+endopts=0
+for arg in "$@"; do
+  if [[ "${endopts}" -eq 0 && "${arg}" == "--" ]]; then endopts=1; previous=""; continue; fi
+  if [[ "${endopts}" -eq 0 && "${previous}" == "-o" ]]; then out="${arg}"; fi
+  previous="${arg}"
+done
+printf '%s\n' "$*" >> "${CURL_LOG}"
+if [[ "$*" == *checksums.txt* ]]; then cp -- "${FIXTURE}/checksums.txt" "${out}"; else cp -- "${FIXTURE}/asset" "${out}"; fi
+EOF
+  cat > "${VCLUSTER_STUB_BIN}/uname" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-s" ]]; then printf '%s\n' "${UNAME_S:-Darwin}"; else printf '%s\n' "${UNAME_M:-arm64}"; fi
+EOF
+  chmod 0755 "${VCLUSTER_STUB_BIN}/curl" "${VCLUSTER_STUB_BIN}/uname"
+  PATH="${VCLUSTER_STUB_BIN}:${PATH}"
+  export PATH
+}
+
+foundation_vcluster_managed_binary() {
+  printf '%s/lib-foundation/vcluster/0.20.0/vcluster\n' "${XDG_DATA_HOME}"
+}
+
 bats_require_minimum_version 1.5.0
 
 @test "_dry_run_active true only when DRY_RUN=1" {
@@ -300,4 +337,92 @@ EOF
   run _antigravity_browser_ready 2
   [ "$status" -ne 0 ]
   unset -f _command_exist _run_command _err
+}
+
+@test "foundation_ensure_vcluster_cli: reuses exact verified binary without download" {
+  foundation_vcluster_fixture
+  managed="$(foundation_vcluster_managed_binary)"
+  mkdir -p "${managed%/*}"
+  cp -- "${FIXTURE}/asset" "${managed}"
+  chmod 0755 "${managed}"
+  run foundation_ensure_vcluster_cli 0.20.0
+  [ "$status" -eq 0 ]
+  [ "$output" = "${managed}" ]
+  [ ! -s "${CURL_LOG}" ]
+}
+
+@test "foundation_ensure_vcluster_cli: replaces mismatched binary through verified download" {
+  foundation_vcluster_fixture
+  managed="$(foundation_vcluster_managed_binary)"
+  mkdir -p "${managed%/*}"
+  printf '#!/usr/bin/env bash\nprintf "vcluster version 0.19.0\\n"\n' > "${managed}"
+  chmod 0755 "${managed}"
+  run foundation_ensure_vcluster_cli 0.20.0
+  [ "$status" -eq 0 ]
+  [ "$output" = "${managed}" ]
+  [[ "$("${managed}" --version)" == *"0.20.0"* ]]
+  [ "$(wc -l < "${CURL_LOG}")" -eq 2 ]
+}
+
+@test "foundation_ensure_vcluster_cli: malformed and unsupported inputs do not write" {
+  foundation_vcluster_fixture
+  run foundation_ensure_vcluster_cli v0.20.0
+  [ "$status" -ne 0 ]
+  [ ! -e "${XDG_DATA_HOME}/lib-foundation" ]
+  export UNAME_S="FreeBSD"
+  run foundation_ensure_vcluster_cli 0.20.0
+  [ "$status" -ne 0 ]
+  [ ! -e "${XDG_DATA_HOME}/lib-foundation" ]
+}
+
+@test "foundation_ensure_vcluster_cli: checksum mismatch preserves prior binary" {
+  foundation_vcluster_fixture
+  managed="$(foundation_vcluster_managed_binary)"
+  mkdir -p "${managed%/*}"
+  printf '#!/usr/bin/env bash\nprintf "vcluster version 0.19.0\\n"\n' > "${managed}"
+  chmod 0755 "${managed}"
+  printf '%064d  vcluster-darwin-arm64\n' 0 > "${FIXTURE}/checksums.txt"
+  run foundation_ensure_vcluster_cli 0.20.0
+  [ "$status" -ne 0 ]
+  [[ "$("${managed}" --version)" == *"0.19.0"* ]]
+  [ ! -e "${managed%/*}/.vcluster.$$" ]
+}
+
+@test "foundation_ensure_vcluster_cli: failed download preserves prior binary" {
+  foundation_vcluster_fixture
+  managed="$(foundation_vcluster_managed_binary)"
+  mkdir -p "${managed%/*}"
+  printf '#!/usr/bin/env bash\nprintf "vcluster version 0.19.0\\n"\n' > "${managed}"
+  chmod 0755 "${managed}"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 22' > "${VCLUSTER_STUB_BIN}/curl"
+  chmod 0755 "${VCLUSTER_STUB_BIN}/curl"
+  run foundation_ensure_vcluster_cli 0.20.0
+  [ "$status" -ne 0 ]
+  [[ "$("${managed}" --version)" == *"0.19.0"* ]]
+}
+
+@test "foundation_ensure_vcluster_cli: concurrent callers leave one binary and no lock" {
+  foundation_vcluster_fixture
+  output_one="${BATS_TEST_TMPDIR}/one.out"; output_two="${BATS_TEST_TMPDIR}/two.out"
+  (source "${SYSTEM_LIB}"; foundation_ensure_vcluster_cli 0.20.0 > "${output_one}") & first=$!
+  (source "${SYSTEM_LIB}"; foundation_ensure_vcluster_cli 0.20.0 > "${output_two}") & second=$!
+  wait "${first}"; first_status=$?
+  wait "${second}"; second_status=$?
+  [ "${first_status}" -eq 0 ]
+  [ "${second_status}" -eq 0 ]
+  [ -x "$(foundation_vcluster_managed_binary)" ]
+  [ ! -e "${XDG_DATA_HOME}/lib-foundation/vcluster/0.20.0.lock" ]
+  [ -z "$(find "${XDG_DATA_HOME}" -name '.vcluster.*' -o -name 'foundation-vcluster.*' 2>/dev/null)" ]
+}
+
+@test "foundation_ensure_vcluster_cli: never invokes package managers" {
+  foundation_vcluster_fixture
+  for manager in brew apt apt-get dnf npm pip; do
+    printf '#!/usr/bin/env bash\nprintf "%s\\n" invoked >> "${MANAGER_LOG}"\nexit 99\n' "${manager}" > "${VCLUSTER_STUB_BIN}/${manager}"
+    chmod 0755 "${VCLUSTER_STUB_BIN}/${manager}"
+  done
+  export MANAGER_LOG="${BATS_TEST_TMPDIR}/manager.log"
+  run foundation_ensure_vcluster_cli 0.20.0
+  [ "$status" -eq 0 ]
+  [ ! -e "${MANAGER_LOG}" ]
 }

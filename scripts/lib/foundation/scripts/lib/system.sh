@@ -1866,6 +1866,125 @@ function _err() {
    exit 1
 }
 
+function _foundation_vcluster_validate_version() {
+  local version="${1:-}"
+  [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    _err "vCluster version must be numeric major.minor.patch without a v prefix"
+  }
+}
+
+function _foundation_vcluster_platform() {
+  local os arch
+  os="$(uname -s 2>/dev/null || true)"
+  arch="$(uname -m 2>/dev/null || true)"
+  case "${os}:${arch}" in
+    Darwin:arm64|Darwin:aarch64) printf 'darwin arm64\n' ;;
+    Darwin:x86_64|Darwin:amd64) printf 'darwin amd64\n' ;;
+    Linux:arm64|Linux:aarch64) printf 'linux arm64\n' ;;
+    Linux:x86_64|Linux:amd64) printf 'linux amd64\n' ;;
+    *) printf 'ERROR: unsupported vCluster host platform or architecture: %s/%s\n' "${os}" "${arch}" >&2; return 1 ;;
+  esac
+}
+
+function _foundation_vcluster_managed_dir() {
+  local version="$1"
+  local data_home="${XDG_DATA_HOME:-${HOME}/.local/share}"
+  printf '%s/lib-foundation/vcluster/%s\n' "${data_home}" "${version}"
+}
+
+function _foundation_vcluster_matches_version() {
+  local binary="$1" version="$2" output
+  [[ -x "${binary}" ]] || return 1
+  output="$("${binary}" --version 2>/dev/null || true)"
+  [[ "${output}" == *"${version}"* ]]
+}
+
+function _foundation_vcluster_checksum() {
+  local asset="$1" expected="$2" actual
+  local -a checksum_command
+  if _command_exist shasum; then
+    checksum_command=(shasum -a 256)
+  elif _command_exist sha256sum; then
+    checksum_command=(sha256sum)
+  else
+    printf 'ERROR: vCluster CLI requires shasum or sha256sum for SHA-256 verification\n' >&2
+    return 1
+  fi
+  actual="$("${checksum_command[@]}" "${asset}" | awk '{print $1}')"
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'ERROR: vCluster CLI checksum mismatch for %s\n' "${asset}" >&2
+    return 1
+  }
+}
+
+function _foundation_vcluster_lock() {
+  local lock_dir="$1" attempt=0
+  while ! mkdir -- "${lock_dir}" 2>/dev/null; do
+    attempt=$((attempt + 1))
+    (( attempt < 120 )) || return 1
+    sleep 0.25
+  done
+}
+
+function _foundation_vcluster_download() {
+  local version="$1" asset_name="$2" destination="$3" checksum_file="$4"
+  local base_url="https://github.com/loft-sh/vcluster/releases/download/v${version}"
+  _run_command --quiet -- curl -fsSL -o "${checksum_file}" -- "${base_url}/checksums.txt" || return 1
+  _run_command --quiet -- curl -fsSL -o "${destination}" -- "${base_url}/${asset_name}" || return 1
+}
+
+function foundation_ensure_vcluster_cli() {
+  local version="${1:-}"
+  _foundation_vcluster_validate_version "${version}"
+  local platform arch platform_info
+  platform_info="$(_foundation_vcluster_platform)" || _err "unable to resolve a supported vCluster host platform"
+  read -r platform arch <<< "${platform_info}"
+  local managed_dir managed_binary lock_dir
+  managed_dir="$(_foundation_vcluster_managed_dir "${version}")"
+  managed_binary="${managed_dir}/vcluster"
+  lock_dir="${managed_dir}.lock"
+  if _foundation_vcluster_matches_version "${managed_binary}" "${version}"; then
+    printf '%s\n' "${managed_binary}"
+    return 0
+  fi
+  _command_exist curl || _err "curl is required to acquire vCluster CLI ${version}"
+  mkdir -p -- "${managed_dir%/*}" || _err "unable to create managed vCluster parent directory"
+  _foundation_vcluster_lock "${lock_dir}" || _err "timed out waiting for vCluster CLI lock: ${version}"
+  local temp_dir=""
+  local staged_binary=""
+  _foundation_vcluster_release() {
+    trap - RETURN
+    [[ -z "${temp_dir}" ]] || rm -rf -- "${temp_dir}"
+    [[ -z "${staged_binary}" ]] || rm -f -- "${staged_binary}"
+    rmdir -- "${lock_dir}" 2>/dev/null || true
+  }
+  _foundation_vcluster_abort() {
+    local message="$1"
+    _foundation_vcluster_release
+    _err "${message}"
+  }
+  trap _foundation_vcluster_release RETURN
+  if _foundation_vcluster_matches_version "${managed_binary}" "${version}"; then
+    printf '%s\n' "${managed_binary}"
+    return 0
+  fi
+  temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/foundation-vcluster.XXXXXX")" || _foundation_vcluster_abort "unable to create vCluster temporary directory"
+  local asset_name="vcluster-${platform}-${arch}"
+  local checksum_file="${temp_dir}/checksums.txt" asset_file="${temp_dir}/${asset_name}"
+  _foundation_vcluster_download "${version}" "${asset_name}" "${asset_file}" "${checksum_file}" || _foundation_vcluster_abort "unable to download vCluster CLI ${version} (${asset_name})"
+  local expected
+  expected="$(awk -v asset="${asset_name}" '$2==asset {print $1; exit}' "${checksum_file}")"
+  [[ "${expected}" =~ ^[0-9a-fA-F]{64}$ ]] || _foundation_vcluster_abort "checksum manifest has no SHA-256 entry for ${asset_name}"
+  _foundation_vcluster_checksum "${asset_file}" "${expected}" || _foundation_vcluster_abort "checksum verification failed for ${asset_name}"
+  mkdir -p -- "${managed_dir}" || _foundation_vcluster_abort "unable to create managed vCluster directory"
+  staged_binary="${managed_dir}/.vcluster.$$"
+  cp -- "${asset_file}" "${staged_binary}" || _foundation_vcluster_abort "unable to stage vCluster CLI"
+  chmod 0755 "${staged_binary}" || _foundation_vcluster_abort "unable to mark vCluster CLI executable"
+  mv -f -- "${staged_binary}" "${managed_binary}" || _foundation_vcluster_abort "unable to activate vCluster CLI"
+  _foundation_vcluster_matches_version "${managed_binary}" "${version}" || _foundation_vcluster_abort "acquired vCluster CLI reports an unexpected version"
+  printf '%s\n' "${managed_binary}"
+}
+
 function _no_trace() {
   local wasx=0
   case $- in *x*) wasx=1; set +x;; esac

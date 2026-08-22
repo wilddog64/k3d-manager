@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [v0.4.13] — 2026-08-21
+
+### Added
+- `foundation_ensure_vcluster_cli <version>` (`scripts/lib/system.sh`): the single owner of the
+  vCluster CLI dependency for all consumers. Validates a `major.minor.patch` version (no `v`
+  prefix), resolves the Loft release asset from `uname -s`/`uname -m` (`darwin`/`linux` ×
+  `arm64`/`amd64`), verifies the release SHA-256 against `checksums.txt` before activation, installs
+  atomically under `${XDG_DATA_HOME:-$HOME/.local/share}/lib-foundation/vcluster/<version>/vcluster`
+  behind a per-version lock, reuses an already-verified binary offline, and prints only the absolute
+  executable path on stdout. No package manager, no system-directory writes, and no fallback to an
+  arbitrary `vcluster` on `PATH` (`b2adb8f`).
+
+### Tests / tooling
+- `scripts/tests/lib/system.bats`: seven stubbed-`curl`/`uname`/`vcluster` cases — offline reuse
+  without download, verified replacement of a version mismatch, malformed/unsupported inputs writing
+  nothing, checksum mismatch never activating, failed download preserving a prior binary, concurrent
+  callers leaving one binary and no stale lock, and no package-manager invocation.
+
+### Fixed
+- Release the per-version lock and temp state when `mktemp` fails after the lock is acquired: the
+  bare `_err` ran past a `RETURN` trap (which does not fire on `exit`), leaking the lockdir; routed
+  through `_foundation_vcluster_abort` like every other post-lock failure (`f154dbe`).
+
 ## [v0.4.12] — 2026-08-21
 
 ### Added
