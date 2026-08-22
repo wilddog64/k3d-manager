@@ -4,8 +4,31 @@
 **Branch found on:** `k3d-manager-v1.26.0`; re-observed live on `k3d-manager-v1.27.0`
 **Severity:** ~~Minor / cosmetic~~ **HIGH / BLOCKING** — the invalid line breaks the entire
 exporter scrape, not just this one metric.
-**Status:** OPEN
+**Status:** ✅ FIXED + LIVE-VERIFIED 2026-08-21 (`5cd67228`)
 **Origin:** Finding 1a of `docs/bugs/2026-08-21-lifecycle-e2e-live-acceptance-findings.md`
+
+## Resolution (2026-08-21, `5cd67228`)
+
+Added a `num()` helper next to `esc()` that coerces `None`/empty/non-numeric to `"0"` and
+preserves integer display for timestamps (`str(int(f)) if f.is_integer() else repr(f)`).
+Routed **every** numeric gauge emission through it — `e2e_last_run_timestamp_seconds`,
+`e2e_last_run_duration_seconds`, `e2e_last_success_timestamp_seconds`,
+`cve_remediation_requested_timestamp_seconds`, `cve_remediation_applied_timestamp_seconds` —
+so no single malformed value can ever zero out the whole scrape again.
+
+Verified: `py_compile` clean; `num()` unit cases pass (`''`/`None`/garbage → `0`, timestamps
+stay integer-formatted, fractional durations preserved). Redeployed via `kubectl apply` +
+`rollout restart` (argocd.sh path). Live confirmation:
+
+```
+up{job="vulnerability-inventory-exporter"} = 1   (new pod, 3711 samples scraped)
+e2e_last_run_duration_seconds{tier="vcluster",service="product-catalog",project="api+flows"} 0
+e2e_run_info                    -> 2 series (back)
+trivy_vulnerability_inventory   -> 3706 series (back — CVE dashboard restored)
+```
+
+No metric line ends with an empty value. Both the E2E and CVE/vulnerability dashboards are
+receiving data again.
 
 ## Symptom
 

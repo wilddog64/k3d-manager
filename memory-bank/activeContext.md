@@ -18,11 +18,13 @@
   all carry commit `9b3a5754`. The Playwright app Job failed (`running-playwright`, pre-existing
   app-test failure — NOT the CLI change). **Plan #1 (Parts A+B) functionally COMPLETE.** No PR yet
   (v1.27.0-release-time step). Part A shipped as lib-foundation `v0.4.13`.
-  - ⚠️ **Finding 1a is BLOCKING, not cosmetic** (live-discovered): empty
-    `e2e_last_run_duration_seconds` breaks the whole Prometheus scrape
-    (`up{vulnerability-inventory-exporter}=0`), dropping ALL `e2e_*`+`trivy_*`/`cve_*` series →
-    both E2E and CVE Grafana dashboards blind. Fix at `vulnerability-inventory-exporter.yaml:344`,
-    redeploy via `argocd.sh`. `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
+  - ✅ **Finding 1a FIXED + LIVE-VERIFIED** (`5cd67228`): added a `num()` helper coercing
+    empty/None/non-numeric → `0` (timestamps keep integer display), routed every numeric gauge
+    emission through it so no single malformed value can zero out the whole scrape. Redeployed
+    via `kubectl apply` + `rollout restart`; live-confirmed `up{exporter}=1` (new pod, 3711
+    samples), `e2e_last_run_duration_seconds … 0`, `trivy_vulnerability_inventory`=3706 series
+    back — both E2E and CVE dashboards receiving data again.
+    `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
 
 - **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged to main, tag/release published. Branch protection restored (`enforce_admins=true`, 1 required approval). Shipped 3/5 scopes (fleet node lifecycle count-agnostic, E2E promotion gate + observability, managed registration cleanup). Retrospective: `docs/retro/2026-08-21-v1.26.0-retrospective.md`.
 
@@ -33,9 +35,9 @@
   4. `docs/plans/v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry.
   Plans #1 and #2 (both promoted from v1.26.0 deferred, 2026-08-21, "keep all four") are the dependency-ordered chain that moves E2E off the laptop — the response to Prometheus+Grafana over-stressing the M4.
 
-- **Deferred findings from v1.26.0** (filed as tracked issues, not blocking):
-  - Finding 1a — exporter empty duration metric (cosmetic). `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
-  - Finding 2b — dispatcher `--confirm` strip on `deploy_app_cluster`. `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
+- **Deferred findings from v1.26.0** (filed as tracked issues):
+  - Finding 1a — ✅ FIXED + live-verified `5cd67228` (was BLOCKING, not cosmetic). `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
+  - Finding 2b — dispatcher `--confirm` strip on `deploy_app_cluster` (OPEN). `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
 
 - **v1.25.0 released** (PR #116 `d48e465f`, tag/release live).
 - **Milestone v1.26.0 — committed work is DONE and pushed on `k3d-manager-v1.26.0`:**
@@ -65,8 +67,6 @@
   Dependabot scans the default branch (main = v1.25.0); **auto-closes when v1.26.0 → main.**
   Dev-only transitive dep, low effective risk.
 - **Un-fixed findings** (filed as tracked issues, deferred out of v1.26.0):
-  - Finding 1a — exporter emits empty `e2e_last_run_duration_seconds` when duration is null
-    (should default `0`). Cosmetic. `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
   - Finding 2b — dispatcher `deploy_*` guard strips `--confirm` from `deploy_app_cluster`;
     use a lib-sourcing wrapper. Shared-guard blast radius.
     `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
