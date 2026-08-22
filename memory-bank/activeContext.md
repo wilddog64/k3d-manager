@@ -100,18 +100,20 @@
   **But `product-catalog` (Product images) can't be restored by break-glass:** node
   is ~10m too tight to run it *alongside* istiod, and **ArgoCD reverts any scale-down
   in ~14s** (trivy-server `--replicas=0` self-restored). Durable fix REQUIRED —
-  **Fix MERGED but NOT yet live — PR #49 `505f758a` (shopping-cart-product-catalog):**
-  cpu 100m→50m trimmed in `k8s/base/deployment.yaml:63`. **ArgoCD source gotcha:** the
-  hub app `ubuntu-hostinger-shopping-cart-product-catalog` (ns `cicd`) reads
+  **RESOLVED — PR #49 `505f758a` (shopping-cart-product-catalog):** cpu 100m→50m
+  trimmed in `k8s/base/deployment.yaml:63`. **ArgoCD source gotcha (keep):** the hub app
+  `ubuntu-hostinger-shopping-cart-product-catalog` (ns `cicd`) reads
   `repo=k3d-manager path=services/shopping-cart-product-catalog rev=k3d-manager-v1.26.0`,
   whose kustomization pulls a REMOTE base `shopping-cart-product-catalog//k8s/base?ref=main`.
   So #49 IS in the render path, but ArgoCD's tracked revision (k3d-manager) never changed,
-  so it kept a cached 100m render and reported Synced. A `argocd.argoproj.io/refresh=hard`
-  annotation re-fetched `ref=main` → app now **OutOfSync** (target 50m vs live 100m) but
-  selfHeal has not applied it (app Progressing/stuck on the 41m-Pending pod). **Blocked:**
-  the sync/patch to finish it (kubectl patch, argocd sync/login) are all denied by the
-  auto-mode classifier — needs the user to run the sync or patch manually.
-  Recovery outcome: still 2/3 (istiod+frontend up; product-catalog Pending until sync lands).
+  so it kept a cached 100m render and reported Synced. Sequence that landed it:
+  (1) `argocd.argoproj.io/refresh=hard` annotation → re-fetched `ref=main`, app went
+  **OutOfSync** (target 50m vs live 100m); (2) selfHeal stalled (app Progressing on the
+  41m-Pending pod) and manual `kubectl patch`/`argocd sync` were auto-mode-classifier
+  BLOCKED; (3) user ran the `kubectl patch deploy … cpu=50m` manually → new pod scheduled
+  in the ~90m headroom, went 1/1 Ready, app now **Synced + Healthy**, seed/fts-index jobs
+  fired. Patch is durable (live==git 50m, selfHeal won't revert).
+  Recovery outcome: **3/3** (istiod + frontend + product-catalog all up).
 
 - **2026-08-22 Keycloak hub deploy — DONE (reachable), dev-users BLOCKED.**
   `deploy_keycloak --enable-ldap --enable-vault`
