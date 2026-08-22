@@ -342,6 +342,7 @@ function _e2e_write_summary() {
   E2E_PHASE="$phase" \
   E2E_COMMIT="$commit" \
   E2E_LOG="$log_file" \
+  E2E_RUNNER="${E2E_RUNNER:-local-m4}" \
   python3 - "$summary_file" <<'PY'
 import json, os, re, sys
 
@@ -353,6 +354,7 @@ rc = int(os.environ["E2E_RC"])
 phase = os.environ.get("E2E_PHASE", "unknown")
 commit = os.environ["E2E_COMMIT"]
 log_path = os.environ["E2E_LOG"]
+runner = os.environ.get("E2E_RUNNER") or "local-m4"
 
 passed = total = failed = duration = None
 try:
@@ -377,6 +379,7 @@ except Exception:
 summary = {
     "run_id": run_id,
     "tier": "vcluster",
+    "runner": runner,
     "service": service,
     "candidate_digest": candidate,
     "project": "api+flows",
@@ -424,9 +427,11 @@ with open(os.environ["E2E_SUMMARY_FILE"], encoding="utf-8") as fh:
 created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 service = s.get("service") or "unknown"
 tier = s.get("tier") or "unknown"
+runner = s.get("runner") or "local-m4"
 event = {
     "run_id": str(s.get("run_id", "")),
     "tier": tier,
+    "runner": runner,
     "service": service,
     "project": s.get("project") or "",
     "candidate_digest": s.get("candidate_digest") or "",
@@ -448,6 +453,7 @@ manifest = {
             "k3dm.k3d.io/e2e-result": "true",
             "k3dm.k3d.io/e2e-service": service,
             "k3dm.k3d.io/e2e-tier": tier,
+            "k3dm.k3d.io/e2e-runner": runner,
         },
     },
     "data": {
@@ -474,11 +480,13 @@ PY
 }
 
 # Writer-side bound: keep only the most recent E2E_RESULT_EVENT_KEEP event
-# ConfigMaps per (service,tier) so etcd does not accumulate. The exporter read is
-# separately capped, so this is defence in depth. Best-effort.
+# ConfigMaps per (service,tier,runner) so etcd does not accumulate and runners do
+# not evict each other's events. The exporter read is separately capped, so this
+# is defence in depth. Best-effort.
 function _e2e_prune_result_events() {
   local svc="$E2E_SERVICE_UNDER_TEST"
-  local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=vcluster"
+  local runner="${E2E_RUNNER:-local-m4}"
+  local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=vcluster,k3dm.k3d.io/e2e-runner=${runner}"
   local names
   names="$(_kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
     -l "$selector" --sort-by=.metadata.creationTimestamp \

@@ -120,6 +120,20 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F -- '"run_id"' "$summary"
   [ "$status" -eq 0 ]
+  run grep -F -- '"runner": "local-m4"' "$summary"
+  [ "$status" -eq 0 ]
+}
+
+@test "E2E_RUNNER overrides the default runner in the summary" {
+  _e2e_wait_job() { return 0; }
+  export E2E_RUNNER=m2
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  local summary
+  summary="$(ls "$E2E_REPORT_DIR"/*.json | head -1)"
+  run grep -F -- '"runner": "m2"' "$summary"
+  [ "$status" -eq 0 ]
 }
 
 @test "failed job summary is exit-code-faithful (result fail, non-zero exit_code)" {
@@ -209,10 +223,38 @@ labels = m["metadata"]["labels"]
 assert labels["k3dm.k3d.io/e2e-result"] == "true"
 assert labels["k3dm.k3d.io/e2e-service"] == "product-catalog"
 assert labels["k3dm.k3d.io/e2e-tier"] == "vcluster"
+assert labels["k3dm.k3d.io/e2e-runner"] == "local-m4", labels.get("k3dm.k3d.io/e2e-runner")
 event = json.loads(m["data"]["event.json"])
 assert event["passed"] == "true", event["passed"]
 assert event["service"] == "product-catalog"
 assert event["tier"] == "vcluster"
+assert event["runner"] == "local-m4", event.get("runner")
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+}
+
+@test "result event carries the runner label/field from the summary" {
+  if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
+  mkdir -p "$E2E_REPORT_DIR"
+  cat > "$E2E_REPORT_DIR/m2run.json" <<'JSON'
+{"run_id":"m2run","tier":"vcluster","runner":"m2","service":"product-catalog","project":"api+flows","candidate_digest":null,"passed":6,"total":6,"failed":0,"duration_seconds":12.3,"timestamp":"2026-08-16T00:00:00+00:00","commit":"abc123","exit_code":0,"result":"pass"}
+JSON
+  local capture="$BATS_TEST_TMPDIR/m2-manifest.json"
+  _kubectl() {
+    if [[ "$1" == "create" && "$2" == "-f" ]]; then cp "$3" "$capture"; return 0; fi
+    return 0
+  }
+  run _e2e_write_result_event "m2run"
+  [ "$status" -eq 0 ]
+  [ -f "$capture" ]
+  run python3 - "$capture" <<'PY'
+import sys, json
+m = json.load(open(sys.argv[1]))
+assert m["metadata"]["labels"]["k3dm.k3d.io/e2e-runner"] == "m2"
+event = json.loads(m["data"]["event.json"])
+assert event["runner"] == "m2", event.get("runner")
 print("ok")
 PY
   [ "$status" -eq 0 ]
