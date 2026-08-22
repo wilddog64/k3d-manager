@@ -82,10 +82,16 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
     **Subtree-pulled into k3d-manager `scripts/lib/foundation`** — vendored copy verified:
     `foundation_ensure_vcluster_cli` + 7 helpers present, curl fix intact (`-o` before `--`),
     `bash -n` clean.
-  - **Part B NOW UNBLOCKED** — k3d-manager `scripts/plugins/vcluster.sh` rewire: delete
-    `_vcluster_install_cli`/`vcluster_install_cli`/`VCLUSTER_INSTALL_DIR`/Homebrew paths; call
-    `foundation_ensure_vcluster_cli "$VCLUSTER_VERSION"` in `_vcluster_check_prerequisites` and use
-    the returned path for all vcluster invocations; update help/tests/guide.
+  - **Part B UNBLOCKED — Codex task spec written 2026-08-21:**
+    `docs/plans/v1.27.0-foundation-managed-vcluster-cli-part-b-codex-task.md` (k3d-manager only,
+    `k3d-manager-v1.27.0`). Grounded in real anchors: delete `VCLUSTER_INSTALL_DIR` (vcluster.sh:7,13),
+    `vcluster_install_cli` (174-176) + `_vcluster_install_cli` (178-218); rewire
+    `_vcluster_check_prerequisites` (220-232) to `_VCLUSTER_BIN="$(foundation_ensure_vcluster_cli
+    "$VCLUSTER_VERSION")"` (module-scoped, not local — helpers 254/289/325 need it); route all 6
+    invocations (49/75/171/263/289/325) through `"$_VCLUSTER_BIN"`; update help/utils.sh, functions.md
+    (row 106), howto/vcluster.md, guide; rework vcluster.bats + e2e.bats to stub the contract (delete
+    the 3 installer-era tests). Gates + disappearance greps + STOP-at-gate; live `make e2e` is Claude's.
+    **Awaiting go to push + hand off to Codex.**
 - [ ] **M2 remote E2E runner** (`docs/plans/v1.27.0-m2-remote-e2e-runner.md`) — SSH-dispatch
   ephemeral E2E to m2-air, restricted M4-side publisher → hub ConfigMap → Grafana. The actual
   E2E load-split off the M4 laptop. **Depends on the foundation vCluster CLI.**
