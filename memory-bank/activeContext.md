@@ -169,11 +169,22 @@
   3. **Bootstrap ran** (`e2e_runner_bootstrap`): k3d `e2e-runner` cluster created on M2 +
      `~/.kube/e2e-runner.yaml` written (fixed the "Host cluster context not available"
      error). WARN VCLUSTER_VERSION unset → CLI pin check skipped (non-fatal).
-  ONLY remaining blocker: **M2 CPU idle keeps dipping below the 35% floor** (`E2E_M2_MIN_CPU_IDLE`)
-  — Spotlight reindexing the rsync'd files + k3d warmup + active media/Phone on M2 drove
-  idle to 13-16%. Gate correctly refuses (no local fallback). Retry once M2 quiets, or
-  override floor for a forced run. Runs so far all capacity/setup-gated; NO passing result
-  published yet; one `publication_pending` retained on M2 from the host-context failure.
+  4. **Bootstrap kubeconfig bugs (code, doc `c679f3ad`):** `_e2e_remote_reconcile_cluster`
+     uses `--kubeconfig-update-default=false` → k3d writes NO kubeconfig; and
+     `--kubeconfig-switch-context=false` → no current-context. Harness fails "Host cluster
+     context not available". Workaround live: `ssh m2jump 'k3d kubeconfig get e2e-runner >
+     ~/.kube/e2e-runner.yaml'`. Fix = `k3d kubeconfig get` after create.
+  With all four cleared, the **full E2E ran end-to-end on M2** (run8): vcluster created +
+  API ready, substrate applied, **postgres + redis rolled out**. It then FAILED (real,
+  not infra) on **product-catalog/basket/order `ImagePullBackOff` → 403 pulling
+  `ghcr.io/wilddog64/shopping-cart-*`**. Cause: off-hub ghcr-pull-secret path tries Vault
+  (no hub ctx on M2 → errors) then falls back to M2 `gh` token — logged in as wilddog64
+  (owner) but scopes lack **`read:packages`** → 403. FIX (one-time on M2):
+  `gh auth refresh -h github.com -s read:packages`. Also **publish-back unconfigured**
+  (`E2E_M2_PUBLISH_BACK_HOST` empty) → results retained `publication_pending`, never reach
+  hub/Grafana; need publish-back set OR `make e2e-replay RUNNER=m2`. All in doc
+  `docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md`. NO passing
+  result yet; NEXT = user runs the gh scope refresh on M2, then retry.
 
 - **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
