@@ -151,6 +151,24 @@
   (scratchpad `seed-prometheus-display-cred.sh`; classifier-blocked in-agent).
   Cross-ref `reference_show_service_passwords_na_root_causes` cause (2).
 
+- **2026-08-22 v1.27.0 plan #2 live-acceptance — M2 runner NOT provisioned; gate BLOCKED
+  on runner setup, not hostinger.** Connection verified green (SSH `m2jump`→`m2-air.local`,
+  OrbStack Running, `e2e-runner-health` hub=ok/runner=available). Passing dispatch
+  (`make e2e-remote RUNNER=m2`) surfaced three runner-side gaps:
+  1. **Lock-acquire false-busy (code bug, spec filed `89d4c67f`):** `_e2e_remote_lock_acquire`
+     bare `mkdir` (no `-p`) misreports a missing parent `$HOME/.k3dm/e2e` as "busy (lock
+     held)"; `e2e-runner-unlock`/`health` disagree (they use `[ -e ]`). Fix = `mkdir -p`
+     parent before atomic leaf mkdir. `docs/bugs/2026-08-22-e2e-m2-runner-lock-acquire-missing-parent-dir.md`.
+     Worked around live by `ssh m2jump 'mkdir -p ~/.k3dm/e2e'`.
+  2. **M2 repo stale at `k3d-manager-v1.7.2`** → `e2e_verify_vcluster` (plugins/e2e.sh) +
+     `e2e_runner_publish_back` (e2e_remote.sh) "not found in plugins"; dispatch has no
+     repo-sync step (assumes runner already at dispatched rev).
+  3. **M2 has no GitHub fetch access** (`git@github.com: Permission denied (publickey)`) →
+     can't `git pull` to advance the repo. Decision needed: how M2 authenticates to GitHub
+     + whether bootstrap should sync the runner repo, WITHOUT persisting an M4 credential
+     on M2 (plan security constraint). Passing run capacity-bounced once too (WebKit tab
+     pegging M2 CPU → idle 12.9% < 35% floor; recovered).
+
 - **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
   Dependabot scans the default branch (main = v1.25.0); **auto-closes when v1.26.0 → main.**
