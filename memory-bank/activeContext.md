@@ -125,7 +125,7 @@
   `/realms/master` healthz) + live stopgap on the installed wrapper + kickstart →
   local :8880 and public `keycloak.3ai-talk.org/realms/master` both **200**. Spec
   `docs/bugs/2026-08-22-keycloak-port-forward-wrong-remote-port.md`.
-  **dev SSO — root-caused + code-fixed (`9efb23f7`), live seed pending.** The
+  **dev SSO — RESOLVED 2026-08-22 (code-fixed `9efb23f7`; live seed applied).** The
   direction was inverted: `dc=home,dc=org` + `ldap-admin` + realm **`home`** is the
   DESIGNED truth (`ldap/vars.sh`, `keycloak/vars.sh:38 KEYCLOAK_REALM_NAME=home`);
   `shopping-cart` is only the smoke realm. Live-verified: realm `home` already has
@@ -136,9 +136,12 @@
   `ou=users,dc=home,dc=org`). Steps 10d.6/10d.7 (realm-federation reconcile) are
   broken (target realm `shopping-cart`, path `/opt/keycloak/bin` vs Bitnami
   `/opt/bitnami/keycloak/bin`, no writable HOME) AND redundant → follow-up: delete
-  or retarget to `-r home`. Live fix = run the 3-user password seed (scratchpad
-  `seed-dev-sso-passwords.sh`; classifier-blocked in-agent → user runs it).
-  `docs/bugs/2026-08-22-hub-openldap-wrong-realm-blocks-sso-users.md`.
+  or retarget to `-r home`. Live fix applied: `seed-dev-sso-passwords.sh` run
+  out-of-band (classifier-blocked in-agent), all 3 users "LDAP password set +
+  verified" via ldapwhoami; passwords mirrored into `secret/keycloak/users/*`.
+  Retrieve with `bin/vault-exec --namespace secrets -- vault kv get -field=password
+  secret/keycloak/users/admin`. SSO login round-trip to realm `home` still to be
+  confirmed by user. `docs/bugs/2026-08-22-hub-openldap-wrong-realm-blocks-sso-users.md`.
 
 - **2026-08-22 Prometheus password N/A in `make show-service-passwords`.** Root
   cause: the entire `secret/k3d-manager` Vault subtree was wiped in a rebuild
