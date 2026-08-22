@@ -151,23 +151,29 @@
   (scratchpad `seed-prometheus-display-cred.sh`; classifier-blocked in-agent).
   Cross-ref `reference_show_service_passwords_na_root_causes` cause (2).
 
-- **2026-08-22 v1.27.0 plan #2 live-acceptance — M2 runner NOT provisioned; gate BLOCKED
-  on runner setup, not hostinger.** Connection verified green (SSH `m2jump`→`m2-air.local`,
-  OrbStack Running, `e2e-runner-health` hub=ok/runner=available). Passing dispatch
-  (`make e2e-remote RUNNER=m2`) surfaced three runner-side gaps:
+- **2026-08-22 v1.27.0 plan #2 live-acceptance — M2 runner PROVISIONED; gate now only
+  capacity-gated on M2 interactive load (NOT hostinger, NOT setup).** Connection verified
+  green (SSH `m2jump`→`m2-air.local`, OrbStack Running, `e2e-runner-health`
+  hub=ok/runner=available). Full provisioning completed this session:
   1. **Lock-acquire false-busy (code bug, spec filed `89d4c67f`):** `_e2e_remote_lock_acquire`
-     bare `mkdir` (no `-p`) misreports a missing parent `$HOME/.k3dm/e2e` as "busy (lock
-     held)"; `e2e-runner-unlock`/`health` disagree (they use `[ -e ]`). Fix = `mkdir -p`
-     parent before atomic leaf mkdir. `docs/bugs/2026-08-22-e2e-m2-runner-lock-acquire-missing-parent-dir.md`.
-     Worked around live by `ssh m2jump 'mkdir -p ~/.k3dm/e2e'`.
-  2. **M2 repo stale at `k3d-manager-v1.7.2`** → `e2e_verify_vcluster` (plugins/e2e.sh) +
-     `e2e_runner_publish_back` (e2e_remote.sh) "not found in plugins"; dispatch has no
-     repo-sync step (assumes runner already at dispatched rev).
-  3. **M2 has no GitHub fetch access** (`git@github.com: Permission denied (publickey)`) →
-     can't `git pull` to advance the repo. Decision needed: how M2 authenticates to GitHub
-     + whether bootstrap should sync the runner repo, WITHOUT persisting an M4 credential
-     on M2 (plan security constraint). Passing run capacity-bounced once too (WebKit tab
-     pegging M2 CPU → idle 12.9% < 35% floor; recovered).
+     bare `mkdir` (no `-p`) misreports missing parent `$HOME/.k3dm/e2e` as "busy (lock
+     held)"; `unlock`/`health` disagree (`[ -e ]`). Fix = `mkdir -p` parent before atomic
+     leaf mkdir. `docs/bugs/2026-08-22-e2e-m2-runner-lock-acquire-missing-parent-dir.md`.
+     Worked around live (`ssh m2jump 'mkdir -p ~/.k3dm/e2e'`). CODE FIX STILL TODO.
+  2. **M2 repo was stale at `k3d-manager-v1.7.2`** (e2e fns absent) + **no GitHub fetch
+     access** (`Permission denied (publickey)`). Fixed by user-approved **rsync overlay
+     M4→M2** (no `--delete` — M2 has its own docs/scratch; excluded `.git/ node_modules/
+     scratch/`). e2e_verify_vcluster + e2e_runner_publish_back now present on M2. Durable
+     gap remains: dispatch has NO repo-sync step + bootstrap doesn't pin runner repo rev
+     → re-rsync each release until addressed (noted in the lock bug doc's follow-up).
+  3. **Bootstrap ran** (`e2e_runner_bootstrap`): k3d `e2e-runner` cluster created on M2 +
+     `~/.kube/e2e-runner.yaml` written (fixed the "Host cluster context not available"
+     error). WARN VCLUSTER_VERSION unset → CLI pin check skipped (non-fatal).
+  ONLY remaining blocker: **M2 CPU idle keeps dipping below the 35% floor** (`E2E_M2_MIN_CPU_IDLE`)
+  — Spotlight reindexing the rsync'd files + k3d warmup + active media/Phone on M2 drove
+  idle to 13-16%. Gate correctly refuses (no local fallback). Retry once M2 quiets, or
+  override floor for a forced run. Runs so far all capacity/setup-gated; NO passing result
+  published yet; one `publication_pending` retained on M2 from the host-context failure.
 
 - **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
