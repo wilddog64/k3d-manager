@@ -1,87 +1,158 @@
-# Active Context — k3d-manager
+# Active Context — lib-foundation
 
-> Compressed 2026-08-21 (v1.26.0 committed work complete). Settled fixes collapsed to
-> pointers; detail lives in `memory-bank/archive/`, `CHANGELOG.md`, `docs/retro/`,
-> `docs/issues/`, `docs/bugs/`, and git history.
+**2026-08-20 fleet lifecycle Phase A COMPLETE (Codex, `8148e33`):** on `feat/v0.4.12`,
+`scripts/lib/acg/acg.sh` now validates `ACG_AGENT_COUNT` before any AWS call, renders an N-agent
+CloudFormation template into a temporary deploy file, and discovers ordered `Agent*PublicIP`
+outputs dynamically. New stubbed-AWS BATS cover four-agent rendering, the two-agent default,
+N-IP discovery, invalid/zero count fail-closed behavior, and hardcoded-name disappearance. Focused
+BATS (`acg.bats` + `acg_cdp.bats`) passed 11/11; default-severity shellcheck and agent-rigor audit
+passed. **Pushed to `origin/feat/v0.4.12`; Claude owns release/tag and the downstream subtree pull.
+Phase B in k3d-manager is intentionally not started.**
 
-## Current focus
+**2026-08-20 CDP test isolation fixed:** `scripts/tests/lib/acg_cdp.bats` now uses a per-test
+temporary `HOME` and mocks listener probes in launch scenarios, preventing tests from writing the
+operator's protected Chrome log or inspecting live port 9222. Clean-env BATS is 5/5 and the ACG Jest
+suite is 7 suites/22 tests green. The live upstream gate also passed: `make credential-test
+PROVIDER=aws` reused the authenticated CDP session, extracted four copyable inputs, wrote AWS
+credentials, and validated `sts:GetCallerIdentity`.
 
-- **v1.26.0 RELEASE PR OPEN — #117** (`k3d-manager-v1.26.0` → `main`, head `525d69d0`).
-  CI green (lint, CodeQL×3, GitGuardian, detect; stage2 skips on PR); Claude scope check PASS
-  (354 files all trace to v1.26.0 milestone work). **Copilot review addressed + thread resolved**
-  — its one comment (no test coverage for the managed `register_app_cluster` fail-closed guard +
-  labels/annotations) fixed in `525d69d0` with 2 focused `provider_contract.bats` cases (54/54).
-  PENDING before merge: the user's explicit merge go. **`enforce_admins` DISABLED on `main`
-  2026-08-21 for the user's admin-override merge (was enabled, 1 required approval) — MUST be
-  restored in `/post-merge` Step 2 via bodyless `POST …/enforce_admins`.** Ships 3/5 scopes (fleet A+B, E2E gate, stale-cleanup); the
-  foundation-vcluster-CLI and M2-runner scopes remain specs. Merge auto-closes Dependabot #6.
-  **Do NOT auto-merge.** Post-merge: run `/post-merge` (tag `v1.26.0` from CHANGELOG, restore
-  protection, next branch, retro).
-- **v1.25.0 released** (PR #116 `d48e465f`, tag/release live). Main protection restored to
-  one required approval, administrators enforced.
-- **Milestone v1.26.0 — committed work is DONE and pushed on `k3d-manager-v1.26.0`:**
-  - **Fleet node lifecycle (count-agnostic)** — Phase A shipped as lib-foundation `v0.4.12`
-    (PR #43, subtree-pulled `e60dff69`/`2c083258`); Phase B implemented `b0fe320a` and
-    live-verified at `ACG_AGENT_COUNT=4` (5 nodes = ACG cap). Two live-only defects found +
-    fixed (`_k3s_agent_is_ready` private-IP match; `fleet-plan` change-set) — `46bfdf1c`,
-    memory-bank followup `35e9ecf2`. Suite 17/17, teardown clean. **DONE.**
-  - **E2E promotion-gate + durable artifacts** — live acceptance GREEN 2026-08-21: run →
-    `~/.k3dm/e2e/*.json` artifact → result-event ConfigMap → exporter `e2e_*` gauges →
-    dashboard/alert. **DONE.**
-  - **Stale managed-registration cleanup** — live acceptance GREEN 2026-08-21 on a real
-    expired sandbox; 23 unrelated survivors exact-match, hostinger untouched. Found + fixed
-    BLOCKING Finding 2a (`cleanup-stale-clusters` hung — Secret-first + `--wait=false` fix,
-    `0274fdde`). **DONE.**
-  - Live-acceptance findings: `docs/bugs/2026-08-21-lifecycle-e2e-live-acceptance-findings.md`
-    and `docs/bugs/2026-08-21-fleet-phaseb-live-verification-findings.md`.
-- **Next in v1.26.0 sequence** (scope decision 2026-08-20 "both, fleet first" — fleet is
-  done): foundation-managed vCluster CLI → M2 remote E2E runner. Plan docs at **5/5** — the
-  cap is hit; split before adding a 6th scope.
-- v1.27.0 planned: image signing/attestation + adaptive checkout load testing.
-  v1.28.0 planned: parallel multi-cloud provisioning + zero-downtime rollouts.
+## Current State: `feat/v0.4.4` (as of 2026-07-13)
 
-## Open follow-ups
+**v0.4.4 js-yaml advisory fix COMPLETE (Codex, 2026-07-13):** Dependabot advisory **GHSA-h67p-54hq-rp68** is fixed on `origin/feat/v0.4.4` by commit **`db9f5b2`** (`fix(acg): bump js-yaml to 3.15.0 to close DoS advisory GHSA-h67p-54hq-rp68`). Scope held to the exact 2 files from `docs/plans/v0.4.4-bugfix-js-yaml-dos.md`: `scripts/lib/acg/package-lock.json` now updates the dev-only transitive `js-yaml` node `3.14.2` → `3.15.0` with the expected 3-line lockfile diff only (`version`/`resolved`/`integrity`), and `CHANGE.md` adds the `### Security` note under `[Unreleased]`. `scripts/lib/acg/package.json` remained unchanged. Validation passed with `npm ci --prefix scripts/lib/acg` and `npm audit --prefix scripts/lib/acg` (`found 0 vulnerabilities`). Repo proof gates also passed: clean-env BATS `scripts/tests/lib/system.bats scripts/tests/lib/core.bats scripts/tests/lib/agent_rigor.bats` (`1..69`, all pass) and `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/lib/system.sh` (exit 0). **Follow-up remains Claude’s:** patch release/tag, then subtree-pull into `k3d-manager` to clear the downstream Dependabot alert.
 
-- **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
-  subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
-  Dependabot scans the default branch (main = v1.25.0); **auto-closes when v1.26.0 → main.**
-  Dev-only transitive dep, low effective risk.
-- **Un-fixed findings** (filed as tracked issues, deferred out of v1.26.0):
-  - Finding 1a — exporter emits empty `e2e_last_run_duration_seconds` when duration is null
-    (should default `0`). Cosmetic. `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
-  - Finding 2b — dispatcher `deploy_*` guard strips `--confirm` from `deploy_app_cluster`;
-    use a lib-sourcing wrapper. Shared-guard blast radius.
-    `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
-- Replace the interim in-cluster CVE promoter git-writer token with a fine-grained
-  contents-write-only PAT.
-- Reconcile stale local port-forward/LaunchAgent state when public Grafana or status probes
-  fail (see `reference_single_service_502_zombie_port_forward` in auto-memory).
-- Keep the ArgoCD smoke credential-drift and k3s-aws SSM registration issues visible in
-  `docs/issues/`/`docs/bugs/` until their live follow-ups close.
-- 2026-08-20 provisioning/recovery batch (all landed + pushed, recorded in `docs/issues/`):
-  k3s-aws SSM→SSH fallback (`fef71219`/`40f1d19a`/`2424f55f`), kubeconfig TLS SAN loopback
-  fix (`3603b60c`), SSM Vault-bridge selects SSH, data-layer CoreDNS alias + guarded
-  `make down CLEANUP_STALE=1` (`316f26d2`/`f24c0c96`, implies `--keep-hub`), hostinger-only
-  hub rebuild, cloudflared IPv4-loopback pin. Account-level SSM Default Host Management Role
-  remains an optional infra follow-up.
+**v0.4.3 SHIPPED — PR #35 squash-merged to main (`b7d08b3`, 2026-07-07).** ACG session-check render-race false-negative fix. Post-merge done: main fast-forwarded, release stamped `## [v0.4.3] — 2026-07-07` in CHANGE.md via direct-to-main commit `5a9bfbe` (matches v0.4.0–v0.4.2 pattern), **TAGGED v0.4.3** (annotated tag at `5a9bfbe`; GitHub release published https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.3), `feat/v0.4.4` cut from the stamp commit, retro `docs/retro/2026-07-07-v0.4.3-retrospective.md` written. No branch protection on main → no enforce_admins to restore. **Downstream: k3d-manager subtree-pulled v0.4.3** into `scripts/lib/foundation/` (merge `f39b2282`, squash split `8cd7cee5`, `0ce4d0b8..5a9bfbe0`) on branch `k3d-manager-v1.14.0`, pushed; parallel-`anyVisible` + v0.4.3 changelog verified present in the subtree copy. **Follow-up still open:** `gcp_login.js:157` latent no-op `disconnect()` → `close()` in a separate change. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-## Operating decisions
+### v0.4.3 history (feat/v0.4.3, shipped)
 
-- `make status` follows the active provider (concise/full/JSON modes); Slack reuses the same
-  summary contract.
-- CVE remediation current-state excludes terminal `superseded`/`deployment_advanced` events;
-  history keeps the audit trail. Verifier cadence/bounds stay conservative under hub load.
-- E2E runs use a throwaway vCluster, pinned service images, runtime-generated datastore
-  credentials, and an EXIT-trap result artifact written before teardown.
-- Do not deploy source-only changes until their release-branch/PR gates and live verification
-  are explicit.
-- When the laptop Vault reverse bridge is required (`HUB_VAULT_USE_BRIDGE=1`, default),
-  k3s-aws selects SSH and overrides explicit SSM with a warning; SSM stays available for
-  non-bridge Vault profiles.
+**[x] COMPLETE (Claude applied directly, 2026-07-07) — commit `d803a00` on `origin/feat/v0.4.3`. 4 files: Change 4 = `tests/providers/acg_session_check.test.js` mock gains `waitForLoadState` so `_main`'s new `networkidle` settle doesn't crash the two existing tests (spec gap Codex correctly flagged mid-task rather than silently expanding scope; spec amended in `92180ee` to list the 4th file). Gates green (`node --check acg_session_check.js`, `npm run check`, `npm test` 15/15); regression proven — reverting only Change 1 turns the `attempts:4` test red while `attempts:1` stays green. **PR #35 OPEN** (main ← feat/v0.4.3), CHANGE.md stamped under `[Unreleased]` (`d84937d`). Copilot raised 4 threads (3× worst-case probe timing, 1× `.catch` can't catch a sync `TypeError` on a mock lacking `waitForLoadState`): timing **fixed** by parallelizing `anyVisible` with early-return so each attempt is bounded by one `perSelectorTimeoutMs` (`487b2f9`, npm test still 15/15); the `.catch` one resolved by-design (real Page always has the method; the mock was fixed by Change 4). All 4 threads replied + resolved; findings doc `docs/issues/2026-07-07-copilot-pr35-review-findings.md` (`fa291b2`). CI green. enforce_admins disabled for merge. NEXT: user merges PR #35, then tag v0.4.3 + subtree-pull into k3d-manager `scripts/lib/foundation/`. — ACG session check false-negatives on a slow-rendering sandbox page:** `docs/bugs/2026-07-07-acg-session-check-render-race-false-negative.md`, branch `feat/v0.4.3`. Diagnosed live from a `CLUSTER_PROVIDER=k3s-aws make up` run that reused an already-signed-in CDP browser yet still prompted `ACTION REQUIRED: Please log into Pluralsight`. Tab 0 was already at `SANDBOX_URL` and logged in; probing the six `LOGGED_IN_SELECTORS` moments later showed `Cloud Sandboxes`/`Open Sandbox` VISIBLE — so selectors + session are fine. Root cause = render-timing race: `acg_session_check.js` navigates with `waitUntil:'domcontentloaded'` (fires before the SPA paints), swallows nav failure with `.catch(()=>{})`, then runs the **single-shot** `pageLooksLoggedIn` (1.5s/selector, no retry) → all six miss on a not-yet-painted page → false logged-out. Creds unset so headless auto-login was skipped → dropped to manual prompt. Fix (3 files): `pageLooksLoggedIn` gains a backward-compatible `{attempts,perSelectorTimeoutMs,settleMs}` retry loop; `acg_session_check.js` waits for `networkidle` + retries the initial probe with `{attempts:4}` and logs (not swallows) nav failure; jest regression test proves single-shot misses a slow render and retry detects it. NO selector or credential-gating changes. Commit msg: `fix(acg): retry logged-in detection to stop session-check render-race false negative`. Gates: `node --check scripts/lib/acg/acg_session_check.js` (NOT covered by `npm run check`), `npm run check`, `npm test`. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-## Canonical pointers
+**v0.4.2 SHIPPED — PR #34 merged to main (`ae9fc73`, 2026-07-06).** ACG headless CDP auto-login + stale-browser reclaim/reuse (BUG #1–#5). Post-merge done: main synced, **TAGGED v0.4.2** (annotated tag at merge `ae9fc73`; GitHub release published, targetCommitish main, not draft/prerelease), CHANGE.md stamped `## [v0.4.2] — 2026-07-06` (`0ce4d0b`), `feat/v0.4.3` cut from main, retro `docs/retro/2026-07-06-v0.4.2-retrospective.md` written. No branch protection on main → no enforce_admins to restore. Standing docs: `copilot-instructions.md` current (acg already covered), acg API lives in `docs/api/acg.md` (no new public shell functions — `_cdp_connectable`/`_cdp_kill_port_listener` are `_`-private), `projectbrief.md` n/a for lib-foundation. **Downstream: k3d-manager subtree-pulled v0.4.2** into `scripts/lib/foundation/` (merge `c116e655`, split `b6141505`, 14 files under prefix; cdp.sh verified diff-identical to upstream, `bash -n` clean). Two process rules from the milestone (retro): run default-severity shellcheck before push (CI catches `info`-level SC2016 that local `-S warning` hides); update `acg_cdp.bats` in the same commit as any `_browser_launch`/CDP behavior change. **Follow-up still open:** `gcp_login.js:157` latent no-op `disconnect()` → replace with `close()` in a separate change. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-- Roadmap: `docs/roadmap.md`
-- v1.26.0 plans: `docs/plans/`
-- Active bugs/incidents: `docs/bugs/` and `docs/issues/`
-- Release history: `CHANGELOG.md` and `docs/retro/`
+**PR #34 — v0.4.2 ACG headless-gate line (BUG #1–#5), merged (2026-07-06):** https://github.com/wilddog64/lib-foundation/pull/34, `feat/v0.4.2` → `main`, head `9be232a`, merge `ae9fc73`. **Operator ran the live acceptance gate — `make credential-test PROVIDER=aws` works headlessly (user-confirmed).** CI first ran the `acg_cdp.bats` + shellcheck jobs on this PR and surfaced accumulated debt across the whole line: (1) two `_browser_launch` BATS tests had drifted (test 2 broke at BUG #3's managed-Chromium launch, test 1 at BUG #5's `_cdp_connectable` gate) — fixed test-only in **`d9ff95e`** (mock `_cdp_connectable`, stub `node`, drop dead `open` mock, + new reclaim/relaunch-branch test); (2) CI shellcheck runs at default severity and flagged SC2016 (info) on the `_cdp_connectable` node `-e` template literal — added a `# shellcheck disable=SC2016` directive; also reworded the Unreleased CHANGE.md bullet that still described BUG #4's superseded profile-identity hard-reject — both in **`9be232a`**. **CI green on `9be232a`.** Copilot round: 6 findings — 4 fixed (3 test-drift → `d9ff95e`, 1 changelog → `9be232a`), 2 declined-with-rationale (node validation already handled by the empty-`_pw_chrome_bin` `_err`; `lsof`-unavailable is unreachable on the macOS-only launch path); all 6 threads resolved. `main` has no branch protection → no `enforce_admins` to disable. **Next: user merges PR #34 → tag v0.4.2 → subtree-pull into k3d-manager → confirm `CLUSTER_PROVIDER=k3s-aws make up`.** Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
+
+**BUG #5 COMPLETE (Codex, 2026-07-06) — reuse a healthy CDP browser; reclaim a stale/zombie one instead of erroring:** `docs/bugs/2026-07-06-cdp-reclaim-unhealthy-browser-instead-of-error.md`, branch `feat/v0.4.2`. Root cause after BUG #4 was NOT version drift: the same managed CFT binary/version (`Chrome/148.0.7778.96`, `chromium-1223`, Playwright 1.60.0) on the same `pw-profile` failed `connectOverCDP` as a lingering zombie process but succeeded when freshly launched. BUG #4's profile-identity guard therefore used the wrong signal: it adopted an undriveable zombie when the profile matched, and hard-errored on a foreign listener instead of reclaiming the port. **Implemented as `db5b8e23dc2f33ea6a2be36636266cec03806a70`** (`fix(acg): reclaim stale CDP browser and reuse healthy one instead of erroring`), pushed to `origin/feat/v0.4.2`. Scope held to the 2 listed files: `scripts/lib/acg/cdp.sh` now adds `_cdp_connectable` (Playwright `connectOverCDP` connect+close health probe) and `_cdp_kill_port_listener` (`lsof -t` TERM→KILL reclaim), and rewrites `_browser_launch` to reuse an existing `:9222` browser only when Playwright can actually drive it, otherwise reclaim the port and fall through to the existing managed-Chromium relaunch path; `CHANGE.md` `[Unreleased]` gained the required `### Fixed` entry. `_cdp_profile_in_use` remains defined and is still used by the agent-stop and singleton-lock helpers, but `_browser_launch` no longer hard-`_err`s on the reuse path. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh`, `npm run check`, `npm test`, and sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch _cdp_connectable _cdp_kill_port_listener >/dev/null'`. **USER acceptance remains operator-run only:** with a healthy managed browser on `:9222`, `make credential-test PROVIDER=aws` must reuse it; with a stale or zombie listener on `:9222`, it must reclaim the port, relaunch managed CFT, and continue without a manual `kill`. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
+
+**BUG #4 COMPLETE (Codex, 2026-07-06) — credential-test now launches the managed browser and `_browser_launch` rejects a foreign CDP browser:** `docs/bugs/2026-07-06-credential-test-launch-and-browser-identity-guard.md`, branch `feat/v0.4.2`. Root cause was the two residual gaps after `e136f55`: (A) `_browser_launch` (cdp.sh:72–75) adopted ANY browser already on `:9222` without checking identity, so a stale system Chrome 150 on the old `profile` dir could be adopted and reintroduce CDP drift; (B) `bin/acg-credential-test` never called `_browser_launch` at all — after `36c3bb1` it curl-guarded `:9222` then only `_cdp_ensure_acg_session` (connect-only, never launches), so the managed-Chromium launch path was unreachable from `make credential-test`. **Implemented as `2918d5c0d818b73ebdde6ba3a5c18a12af604c10`** (`fix(acg): route credential-test through _browser_launch and guard CDP browser identity`), pushed to `origin/feat/v0.4.2`. Scope held to the 3 listed files: `scripts/lib/acg/cdp.sh` now hoists `_cdp_profile_dir` and rejects an existing `:9222` listener unless `_cdp_profile_in_use` confirms the Playwright-managed `pw-profile`; `scripts/lib/acg/bin/acg-credential-test` now sources `cdp.sh` and calls `_browser_launch`, removing the stale `open -a "Google Chrome"` guidance and restoring the managed-browser self-launch path; `CHANGE.md` `[Unreleased]` gained the required `### Fixed` entry. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh scripts/lib/acg/bin/acg-credential-test`, `npm run check`, `npm test`, and sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch >/dev/null'`. **USER acceptance remains operator-run only:** with `:9222` free, `make credential-test PROVIDER=aws` must launch Chrome-for-Testing, sign in headlessly, and extract creds; with a foreign Chrome on `:9222`, it must fail fast with the new guard message. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
+
+**BUG #3 COMPLETE (Codex, 2026-07-06) — CDP now launches Playwright-managed Chromium, not system Chrome:** `docs/bugs/2026-07-06-cdp-use-playwright-managed-chromium.md`, branch `feat/v0.4.2`. **Root cause (diagnosed live this session):** `_browser_launch` (`scripts/lib/acg/cdp.sh`) launched system `/Applications/Google Chrome.app`; every ACG node script then `chromium.connectOverCDP`ed to it. System Chrome auto-updated independently and drifted past the pinned Playwright's DevTools-protocol support — observed Chrome 150 vs Playwright 1.60 (→ Chromium 148) failing `browserType.connectOverCDP: Protocol error (Browser.setDownloadBehavior): Browser context management is not supported`, dead-ending BOTH `make credential-test PROVIDER=aws` and the `make up` ACG path before the headless gate ran. **Empirically proven this session:** upgrading Playwright to 1.61.1 did NOT durably fix it (same failure — Chrome updates again); launching Playwright's own version-locked Chromium (`require('playwright').chromium.executablePath()` → `…/ms-playwright/chromium-1223/chrome-mac-arm64/Google Chrome for Testing.app/...`, confirmed EXISTS) and connecting over CDP returned `CONNECT_OK contexts=1`. **Implemented `e136f55ea39ea590c5ddccfa9fa4d064c42f4402`** (`fix(acg): launch Playwright-managed Chromium for CDP instead of system Chrome`), pushed to `origin/feat/v0.4.2`. Scope held exactly to the 3 listed files: `scripts/lib/acg/cdp.sh` now resolves the binary via `require('playwright').chromium.executablePath()` and hard-fails with an `npm install` message if absent (NO system-Chrome fallback), all 3 `cdp.sh` profile defaults now use `…/k3d-manager/pw-profile`, and `scripts/lib/acg/playwright/lib/output.js` `AUTH_DIR` now matches `pw-profile`. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh`, `npm run check`, `npm test`, sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch >/dev/null'`, and negative grep confirmed no `open -a "Google Chrome"` or `/Applications/Google Chrome.app` remained in `cdp.sh`. **USER acceptance gate (not Codex):** quit any stale system Chrome on `:9222`, then `make credential-test PROVIDER=aws` must launch Chrome-for-Testing, sign in headlessly, and extract creds before any subtree-pull. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]], [[project_antigravity_migration]].
+
+**v0.4.1 SHIPPED — PR #33 merged to main (`b7c849c`, 2026-07-06T02:56Z).** Headless Pluralsight auto-login + non-interactive fast-fail for unattended AWS-sandbox provisioning. Post-merge done: main synced, **TAGGED v0.4.1** (annotated tag at merge `b7c849c`; GitHub release published), `feat/v0.4.2` cut from the merge SHA, retro `docs/retro/2026-07-06-v0.4.1-retrospective.md` written, CHANGE.md `[Unreleased]` → `## [v0.4.1] — 2026-07-06`. No branch protection on main → no enforce_admins to restore. Standing docs current (change is JS-internal + a 9-line `cdp.sh` cred-load; no new public shell functions → `docs/api/functions.md` unaffected). Copilot round on PR #33: 4 findings, 3 fixed + 1 declined-with-evidence (`browser.close()` kept; `Browser.disconnect()` does not exist in Playwright 1.60.0) — triage `docs/issues/2026-07-05-copilot-pr33-review-findings.md`. **Downstream:** k3d-manager subtree-pull of v0.4.1 into `scripts/lib/foundation/` now unblocked (tag exists) — DONE (merge `67b466db`). **v0.4.2 BUG FILED (2026-07-06):** the v0.4.1 headless gate `_cdp_ensure_acg_session`→`acg_session_check.js`→`loginWithPage` shipped but is **never called** in any production path — `_browser_launch` only ensures CDP Chrome is up, not that Pluralsight is signed in. `make up`'s only sign-in (`sandbox.js:handleSignIn`) relies on Google Password Manager autofill, which can't fire in the `--password-store=basic` dedicated profile → no sign-in / no sandbox / no AWS env → CloudFormation `InvalidClientTokenId`. **Fix (spec `docs/bugs/2026-07-06-acg-session-gate-not-wired-into-browser-launch.md`):** call `_cdp_ensure_acg_session` on both `_browser_launch` paths; reuses tested v0.4.1 code, preserves fast-fail + `K3DM_ACG_SKIP_SESSION_CHECK` opt-out; no JS change. **IMPLEMENTED `96bea46`** (pushed `origin/feat/v0.4.2`; cdp.sh + acg_cdp.bats + CHANGE.md; shellcheck clean, 3 BATS cases). **v0.4.2 BUG #2 COMPLETE (Codex, 2026-07-06) — credential-test path now reuses the same gate and avoids the locked-profile fallback:** spec `docs/bugs/2026-07-06-acg-session-gate-not-wired-into-credential-test.md` implemented as commit **`36c3bb16ee832f09223693f59d25aa57c9ab0210`** (`fix(acg): wire _cdp_ensure_acg_session into acg-credential-test + guard connectBrowser CDP fallback`), pushed to `origin/feat/v0.4.2`. Scope held exactly to the 3 listed files: `scripts/lib/acg/bin/acg-credential-test` now sources `cdp.sh` and calls `_cdp_ensure_acg_session` after the CDP-alive check; `scripts/lib/acg/playwright/lib/browser.js` now throws a clear error instead of attempting `launchPersistentContext` when CDP is reachable but exposes no usable context; `CHANGE.md` `[Unreleased]` gained the required `### Fixed` entry. Required gates passed: `shellcheck -S warning scripts/lib/acg/bin/acg-credential-test`, `npm run check`, `npm test`, and the sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _cdp_ensure_acg_session >/dev/null'` exited 0. **Acceptance gate remains user-run only:** `make credential-test PROVIDER=aws` in lib-foundation must be exercised by the operator before any subtree-pull or downstream claim. **Follow-up:** correct latent no-op `disconnect()` idiom in `gcp_login.js:157`.
+
+## Current State: `feat/v0.4.1` (as of 2026-06-22)
+
+**v0.4.0 SHIPPED — PR #32 merged to main (`aed8c56`, 2026-06-23T01:14Z).** lib-acg absorbed as optional module `scripts/lib/acg/` (9 commits, 44 files). Post-merge done: main fast-forwarded, `feat/v0.4.1` cut from merge SHA, retro `docs/retro/2026-06-22-v0.4.0-retrospective.md` written. **TAGGED v0.4.0** (`647408a` on feat/v0.4.1 split `[Unreleased]` → `## [v0.4.0]` + back-filled `## [v0.3.19]`; tag at merge `aed8c56`; GitHub release published). Drift resolved: tag v0.3.19 (`45040e2`) had been cut with no section; v0.3.18 + v0.3.20 never existed as tags. No branch protection on main → no enforce_admins to restore. Standing docs current (`copilot-instructions.md` has acg; acg API in `docs/api/acg.md`). **Next:** Phase 2 = rewire k3d-manager (scoping now); pre-existing `_sts_valid` bug + agy-cli/Antigravity CDP retarget tracked. History below.
+
+**feat/v0.4.0 — Phase 1 follow-up + regression fix complete (`cf3ad7a`, 2026-06-22)** — absorb lib-acg into lib-foundation as optional module `scripts/lib/acg/`. REGRESSION FIX (`cf3ad7a`): `e6cecef`'s repo-root `bin/` hoist broke the live `make credential-test PROVIDER=aws` Playwright sandbox-delete flow ("Element is outside of the viewport"). A byte-for-byte lib-acg copy experiment isolated the cause — both layouts resolve `REPO_ROOT` to the same absolute path, so the only runtime difference is the **working directory at launch** (repo root vs `scripts/lib/acg`). Reverted: `bin/` is module-local again (`scripts/lib/acg/bin/`, `REPO_ROOT=".."`), Makefile `cd`s into the module first, CI shellcheck override dropped, `.gitignore` added (node_modules/, test-results/). **Live `make credential-test PROVIDER=aws` PASSED**; PR pending. Phase 0 done (lib-acg `v0.1.9` tagged; migration source SHA `7708ae31`). Decisions locked: v0.4.0 / clean tree-copy / `npm ci`. Spec: `docs/plans/v0.4.0-phase1-import-acg-module.md` (overview: `v0.4.0-absorb-lib-acg.md`). Phase 1 follow-up delivered: `scripts/lib/acg/playwright.config.js` imported, `bin/acg-credential-test` + `bin/acg-extend-test` moved to repo-root `bin/`, root `Makefile` added, `REPO_ROOT` repointed to `../scripts/lib/acg`, `acg` CI shellcheck path fixed, and docs/CHANGE updated. Validation passed (`npm ci`, `npm run check`, `npm test`, `shellcheck -S warning bin/acg-credential-test bin/acg-extend-test`, `make help`, `make lint`, `make test`, `git diff --check`). The first Playwright run hit a sandbox-only `EPERM` mkdir on `scripts/lib/acg/test-results`; the rerun with elevated access passed and is recorded in `docs/issues/2026-06-22-lib-foundation-playwright-test-results-permission.md`. Phase 2 = rewire k3d-manager; Phase 3 = archive lib-acg.
+
+## Current State: `feat/v0.3.21` (as of 2026-05-30)
+
+**v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
+**v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored. Antigravity IDE install + Playwright MCP config helpers.
+**v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored. Fix `_antigravity_browser_ready` curl probe (`_run_command --soft`).
+**v0.3.14 SHIPPED** — PR #20 squash-merged to main (`bbbaf053`) 2026-03-27. Tagged v0.3.14, GitHub release created. `enforce_admins` restored. 5 deferred Copilot PR #51 findings: agy binary detection, curl fast-fail, NUL audit loops, doc fix, CHANGE.md versioning.
+**v0.3.19 SHIPPED** — tag `45040e2` (2026-05-03). `_copilot_auth_check` rewrite (orig. planned as v0.3.18, never tagged) + `_copilot_review` --allow-all-tools/deny-tool fix. CHANGE.md section back-filled 2026-06-22 (`647408a`).
+**PR #29 (sudo no-TTY fallback, `2f46d4be`, 2026-05-30)** — merged to main; NOT a v0.3.20 (no such tag). Folded into v0.4.0 CHANGE.md section.
+**feat/v0.3.21 COMPLETE** — commit `f7a9178` merged and pushed to `origin/feat/v0.3.21`; `scripts/lib/core.sh` now consults optional `_cluster_provider_is_extra_supported` hooks in both provider validation case blocks, the contract BATS coverage was extended, and `CHANGE.md` records the change under `[Unreleased]`; next step is the k3d-manager consumer-side registration spec.
+
+---
+
+## Purpose
+
+Shared Bash foundation library. Contains:
+- `scripts/lib/core.sh` — cluster lifecycle, provider abstraction, `_resolve_script_dir`
+- `scripts/lib/system.sh` — `_run_command`, `_run_command_resolve_sudo`, `_detect_platform`, package helpers, BATS install
+- `scripts/lib/agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`
+
+Consumed by downstream repos via git subtree pull.
+API reference: `docs/api/functions.md`
+
+---
+
+## Version Roadmap
+
+| Version | Status | Notes |
+|---|---|---|
+| v0.1.0–v0.3.3 | released | See `docs/releases.md` |
+| v0.3.4 | **SHIPPED** | PR #11 merged (`dbfafe9`) — doc fixes + upstream lib sync; tagged + released 2026-03-22 |
+| v0.3.5 | **SHIPPED** | PR #10 merged (`2f895a99`) — doc-hygiene hook; 2026-03-23 |
+| v0.3.6 | **SHIPPED** | PR #12 merged (`d8b4c48`) — code-fence exclusion + CoreDNS Check 4; 2026-03-23 |
+| v0.3.7 | **SHIPPED** | PR #13 merged (`071c270`) — system.sh if-count cleanup; 2026-03-24; tagged v0.3.7 retroactively |
+| v0.3.8 | **SHIPPED** | PR #14 merged (`a669a63`) — tab indentation enforcement in `_agent_audit`; 2026-03-24; tagged v0.3.8 retroactively |
+| v0.3.9 | **SHIPPED** | PR #15 merged (`fb09921`) — release history backfill + memory-bank reconciliation; 2026-03-24; no tag (docs-only) |
+| v0.3.10 | **SHIPPED** | PR #16 merged (`c5662c9`) — `.clinerules` fix; 2026-03-24; no tag (docs-only) |
+| v0.3.11 | **SHIPPED** | PR #17 merged (`2625683`) — YAML IP check in `_agent_audit`; 2026-03-25; tagged v0.3.11 |
+| v0.3.12 | **SHIPPED** | PR #18 merged (`91340d62`) — Antigravity IDE + MCP helpers; 7 BATS; 2026-03-25; tagged v0.3.12 |
+| v0.3.13 | **SHIPPED** | PR #19 merged (`e870c6d9`) — `_antigravity_browser_ready` curl probe fix; 2026-03-25; tagged v0.3.13 |
+| v0.3.14 | **SHIPPED** | PR #20 merged (`bbbaf053`) 2026-03-27 |
+| v0.3.15–v0.3.17 | **SHIPPED** | PRs #21–#24 merged; v0.3.17 at `108924b9` 2026-05-01 |
+| v0.3.18 | **IN PROGRESS** | branch `feat/v0.3.18`; PR #25 open |
+| v0.3.20 | **SHIPPED** | PR #29 merged to main (`2f46d4be`) 2026-05-30; unreleased |
+
+---
+
+## v0.3.18 Open Items
+
+- [x] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — DONE (`f0e29d9`, `eede5c3`). Spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md`. Removed `K3DM_ENABLE_AI` gate; checks env tokens → `~/.config/github-copilot/apps.json` → `gh auth status`; clear error on failure. New `scripts/tests/lib/copilot_auth.bats` (6 tests).
+- [ ] **Copilot review non-interactive permissions** — OPEN. `docs/issues/2026-05-02-copilot-review-noninteractive-permissions.md`. `_copilot_review` still emits a non-interactive Copilot call without the CLI permission mode the help text describes as required.
+
+---
+
+## Pre-v0.3.18 Open Items
+
+- [x] **PR #10 doc-hygiene hook** — staged-only `_agent_audit` BATS test added in commit `bdd60e7`; spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`. Branch: `feat/doc-hygiene-hook`.
+- [x] **Doc hygiene staged-content read** — commit `d00bccb` implements `_dh_grep` index reader per `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`; branch pushed `feat/doc-hygiene-hook`.
+- [x] **Doc hygiene staged-mode follow-ups** — commit `aeb1396` localizes `_DHC_STAGED`, gates staged file existence via `git cat-file`, and replaces staged-mode BATS per `docs/plans/v0.3.5-doc-hygiene-copilot-pr10-round2.md`.
+- [ ] **k3d-manager subtree pull** — pull v0.3.5 into k3d-manager (PR #10 now merged)
+- [x] **v0.3.6: Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, optional `_dh_grep --strip-fences`, and 3 BATS tests per `docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`.
+- [x] **v0.3.6: CoreDNS Check 4** — commit `c352c1b` adds YAML-only warn on `<svc>.<ns>.svc(.cluster.local)` + 4 BATS tests per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
+- [x] **v0.3.6: indented fence fix** — commit `02e7418` updates `_dh_strip_fences` to handle indented fences + adds indented BATS per `docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`.
+- [x] **v0.3.11: YAML hardcoded IP check** — commit `11e653b` adds staged `.yaml/.yml` IP detection to `_agent_audit` per `docs/plans/v0.3.11-agent-audit-yaml-ip-check.md`.
+- [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`), bash 3.2 fix (`8ae57bc`), gist installer (`310fd16`); lib-foundation spec: `docs/plans/v0.3.10-rigor-cli-init.md`; rigor-cli specs tracked in that repo (`plans/v0.1.1-mapfile-compat.md`, `plans/v0.1.1-gist-install-script.md`).
+- [x] **v0.3.12: Antigravity helpers** — commit `ae0e8b9` adds `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` per `docs/plans/v0.3.12-ensure-antigravity.md`.
+- [x] **v0.3.13: antigravity browser probe fix** — commit `9350ecd` switches `_antigravity_browser_ready` to `_run_command --soft -- curl` per `docs/plans/v0.3.13-antigravity-browser-ready-fix.md`.
+- [x] **v0.3.14: k3d-manager Copilot PR #51 deferred findings** — `e52b819` fixes all 5 upstream gaps per `docs/plans/v0.3.14-copilot-pr51-deferred-fixes.md`:
+  - `_ensure_antigravity_ide` now detects `agy` binaries first
+  - `_antigravity_browser_ready` fails fast when `curl` missing
+  - `_agent_audit` tab scan iterates staged files via NUL-delimited loop
+  - `docs/api/functions.md` explains `PLAYWRIGHT_MCP_VERSION` pinned MCP default
+  - `CHANGE.md` versions the v0.3.12/v0.3.13 release notes
+- [ ] `shopping-carts` as consumer (future)
+
+---
+
+## Key Contracts (must not change without coordinating all consumers)
+
+- `_run_command [--prefer-sudo|--require-sudo|--interactive-sudo|--probe '<subcmd>'|--quiet|--soft] -- <cmd>`
+- `_detect_platform` → `mac | wsl | debian | redhat | linux`
+- `_cluster_provider` → `k3d | k3s | orbstack`
+- `_resolve_script_dir` → absolute canonical path of calling script's real directory
+- `_DCRS_PROVIDER` — global temp set by `_deploy_cluster_resolve_provider` (no command substitution — preserves TTY)
+- `_RCRS_RUNNER` — global temp set by `_run_command_resolve_sudo`
+
+---
+
+## Consumers
+
+| Repo | Integration | Status |
+|---|---|---|
+| `k3d-manager` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.13 pending |
+| `rigor-cli` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.13 pending |
+| `shopping-carts` | git subtree (planned) | future |
+
+---
+
+## Engineering Protocol
+
+- **Tests**: always run with `env -i PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'bats scripts/tests/lib/'`
+- **shellcheck**: run on every touched `.sh` file before commit
+- **No bare sudo**: always `_run_command --interactive-sudo` for install helpers, `--prefer-sudo` for non-interactive
+- **All changes originate here** — never edit consumer subtree copies directly
+- **Release flow**: PR → merge → tag → GitHub release → consumers run `git subtree pull`
+
+## Lessons Learned
+
+- `local -n` nameref requires bash 4.3+ — use global temp vars (`_RCRS_RUNNER`, `_DCRS_PROVIDER`) for output from helpers
+- Command substitution `$()` creates a subshell — `[[ -t 0 && -t 1 ]]` is always false inside; use global temp vars instead
+- `--prefer-sudo` silently drops to non-root when password sudo required — use `--interactive-sudo` for install helpers
+- `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override in consumers
+- BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes
