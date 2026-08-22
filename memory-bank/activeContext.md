@@ -125,12 +125,28 @@
   `/realms/master` healthz) + live stopgap on the installed wrapper + kickstart →
   local :8880 and public `keycloak.3ai-talk.org/realms/master` both **200**. Spec
   `docs/bugs/2026-08-22-keycloak-port-forward-wrong-remote-port.md`.
-  **STILL BLOCKED — dev SSO users:** hub `openldap-0` is on `dc=home,dc=org` /
-  admin `ldap-admin` (listens 1389), NOT the expected `dc=shopping-cart,dc=local`
-  / `cn=admin` that the cluster-up seed loop + realm federation assume (loop also
-  uses wrong `:389`). So `secret/keycloak/users/*` never seeded →
-  `bin/get-keycloak-password` N/A, frontend SSO can't complete. Needs a focused
-  fix pass: `docs/bugs/2026-08-22-hub-openldap-wrong-realm-blocks-sso-users.md`.
+  **dev SSO — root-caused + code-fixed (`9efb23f7`), live seed pending.** The
+  direction was inverted: `dc=home,dc=org` + `ldap-admin` + realm **`home`** is the
+  DESIGNED truth (`ldap/vars.sh`, `keycloak/vars.sh:38 KEYCLOAK_REALM_NAME=home`);
+  `shopping-cart` is only the smoke realm. Live-verified: realm `home` already has
+  working LDAP federation (`realm-config.json.tmpl`), and admin/developer/operator
+  are already synced into Keycloak — the ONLY gap is those 3 have **no LDAP
+  password** (login can't validate). Fixed `bin/cluster-up` step 10d.5 seed loop
+  (label `openldap-stack-ha`, port 1389, `cn=ldap-admin,dc=home,dc=org`,
+  `ou=users,dc=home,dc=org`). Steps 10d.6/10d.7 (realm-federation reconcile) are
+  broken (target realm `shopping-cart`, path `/opt/keycloak/bin` vs Bitnami
+  `/opt/bitnami/keycloak/bin`, no writable HOME) AND redundant → follow-up: delete
+  or retarget to `-r home`. Live fix = run the 3-user password seed (scratchpad
+  `seed-dev-sso-passwords.sh`; classifier-blocked in-agent → user runs it).
+  `docs/bugs/2026-08-22-hub-openldap-wrong-realm-blocks-sso-users.md`.
+
+- **2026-08-22 Prometheus password N/A in `make show-service-passwords`.** Root
+  cause: the entire `secret/k3d-manager` Vault subtree was wiped in a rebuild
+  (display-only mirror, not ESO-managed), so `secret/k3d-manager/prometheus-basic-auth`
+  is absent. :18200 port-forward is UP; hub Prometheus does not enforce basic-auth
+  (`.spec.web` empty) so the value is display-only. Fix = re-seed the Vault path
+  (scratchpad `seed-prometheus-display-cred.sh`; classifier-blocked in-agent).
+  Cross-ref `reference_show_service_passwords_na_root_causes` cause (2).
 
 - **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
