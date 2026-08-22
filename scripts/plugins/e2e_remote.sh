@@ -32,12 +32,17 @@ E2E_M2_REMOTE_PATH="${E2E_M2_REMOTE_PATH:-/opt/homebrew/bin:/usr/local/bin}"
 E2E_M2_MIN_CPU_IDLE="${E2E_M2_MIN_CPU_IDLE:-35}"
 E2E_M2_MIN_MEM_FREE="${E2E_M2_MIN_MEM_FREE:-25}"
 E2E_M2_MIN_DISK_GB="${E2E_M2_MIN_DISK_GB:-40}"
+# The k3d-manager checkout on the M2 that owns the remote E2E entry point.
+E2E_M2_REPO="${E2E_M2_REPO:-\$HOME/src/gitrepo/personal/k3d-manager}"
+# Runners a dispatch may target. RUNNER is matched against this exact list and
+# then used verbatim as the run's provenance — never free-text from the caller.
+E2E_RUNNER_ALLOWLIST="${E2E_RUNNER_ALLOWLIST:-m2}"
 
 export E2E_M2_SSH_HOST E2E_M2_RUNNER_CLUSTER E2E_M2_RUNNER_CONTEXT
 export E2E_M2_KUBECONFIG E2E_M2_LOCK E2E_M2_REMOTE_REPORT_DIR
 export E2E_M2_ORB_TIMEOUT E2E_M2_ORB_INTERVAL E2E_M2_SSH_CONNECT_TIMEOUT
 export E2E_M2_MIN_CPU_IDLE E2E_M2_MIN_MEM_FREE E2E_M2_MIN_DISK_GB
-export E2E_M2_REMOTE_PATH
+export E2E_M2_REMOTE_PATH E2E_M2_REPO E2E_RUNNER_ALLOWLIST
 
 # Safe, non-interactive SSH options. BatchMode fails fast instead of prompting;
 # host identity is verified through the existing known_hosts — we never weaken it
@@ -230,4 +235,64 @@ function e2e_runner_status() {
   fi
   printf 'runner=%s\nreachable=1\n' "${E2E_M2_SSH_HOST}"
   e2e_runner_preflight
+}
+
+# --- Remote dispatch (increment 4) -----------------------------------------
+
+# Empty (optional) or a conservative image reference pinned by digest. The value
+# is interpolated into the remote command and a kubectl set-image, so anything
+# outside [repo@]sha256:<64 hex> is rejected before it can cross SSH.
+function _e2e_valid_digest() {
+  local d="${1:-}"
+  [[ -z "$d" ]] && return 0
+  [[ "$d" =~ ^([A-Za-z0-9._/-]+@)?sha256:[0-9a-f]{64}$ ]]
+}
+
+function _e2e_runner_allowed() {
+  local want="${1:-}" allowed
+  for allowed in $E2E_RUNNER_ALLOWLIST; do
+    [[ "$want" == "$allowed" ]] && return 0
+  done
+  return 1
+}
+
+# Public: run the existing E2E entry point on a remote runner. Validates the
+# runner allowlist and digest, gates on preflight, streams remote output while
+# persisting a local transcript, returns the remote exit code unchanged, and
+# never falls back to running the workload locally on M4.
+function e2e_runner_dispatch() {
+  local runner="${1:-}" digest="${2:-}"
+
+  [[ -n "$runner" ]] || _err "usage: e2e_runner_dispatch <runner> [digest]"
+  if ! _e2e_runner_allowed "$runner"; then
+    _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+  fi
+  if ! _e2e_valid_digest "$digest"; then
+    _err "[e2e-remote] invalid DIGEST '${digest}' (expected empty or [repo@]sha256:<64 hex>)"
+  fi
+
+  local pf status
+  if ! pf="$(e2e_runner_preflight)"; then
+    printf '%s\n' "$pf"
+    status="$(_e2e_kv "$pf" status)"
+    _err "[e2e-remote] runner ${runner} not available (status=${status:-unknown}); not dispatching, no local fallback"
+  fi
+  _info "[e2e-remote] runner ${runner} available; dispatching E2E (digest=${digest:-none})"
+
+  mkdir -p "${E2E_REPORT_DIR}/dispatch"
+  local ts transcript
+  ts="$(date -u +%Y%m%dT%H%M%SZ)"
+  transcript="${E2E_REPORT_DIR}/dispatch/${runner}-${ts}.log"
+
+  local -a opts
+  mapfile -t opts < <(_e2e_remote_ssh_opts)
+  local remote
+  remote="export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; \
+export E2E_RUNNER=${runner} KUBECONFIG=${E2E_M2_KUBECONFIG} E2E_REPORT_DIR=${E2E_M2_REMOTE_REPORT_DIR}; \
+cd ${E2E_M2_REPO} && ./scripts/k3d-manager e2e_verify_vcluster ${digest}"
+
+  ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$remote" 2>&1 | tee "$transcript"
+  local rc="${PIPESTATUS[0]}"
+  _info "[e2e-remote] dispatch exit ${rc}; transcript: ${transcript}"
+  return "$rc"
 }

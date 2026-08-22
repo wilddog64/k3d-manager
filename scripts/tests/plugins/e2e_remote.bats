@@ -134,3 +134,82 @@ _healthy_blob() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"status=unreachable"* ]]
 }
+
+# --- Remote dispatch (increment 4) -----------------------------------------
+
+@test "valid_digest accepts empty, bare, and repo-qualified sha256 digests" {
+  local hex="0000000000000000000000000000000000000000000000000000000000000000"
+  run _e2e_valid_digest ""; [ "$status" -eq 0 ]
+  run _e2e_valid_digest "sha256:${hex}"; [ "$status" -eq 0 ]
+  run _e2e_valid_digest "ghcr.io/wilddog64/product-catalog@sha256:${hex}"; [ "$status" -eq 0 ]
+}
+
+@test "valid_digest rejects malformed or injection-y digests" {
+  run _e2e_valid_digest "sha256:short"; [ "$status" -ne 0 ]
+  run _e2e_valid_digest "latest"; [ "$status" -ne 0 ]
+  run _e2e_valid_digest "sha256:0000; rm -rf /"; [ "$status" -ne 0 ]
+  run _e2e_valid_digest 'sha256:$(whoami)'; [ "$status" -ne 0 ]
+}
+
+@test "runner_allowed enforces the allowlist" {
+  run _e2e_runner_allowed "m2"; [ "$status" -eq 0 ]
+  run _e2e_runner_allowed "local-m4"; [ "$status" -ne 0 ]
+  run _e2e_runner_allowed "; ssh evil"; [ "$status" -ne 0 ]
+}
+
+@test "dispatch rejects a runner outside the allowlist" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  run e2e_runner_dispatch "local-m4"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not in allowlist"* ]]
+}
+
+@test "dispatch rejects an invalid digest" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  run e2e_runner_dispatch "m2" "not-a-digest"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"invalid DIGEST"* ]]
+}
+
+@test "dispatch refuses to run and never falls back locally when preflight fails" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  e2e_runner_preflight() { printf 'status=busy\n'; return 1; }
+  ssh() { echo "SSH SHOULD NOT RUN" >&2; return 0; }
+  run e2e_runner_dispatch "m2"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"status=busy"* ]]
+  [[ "$output" == *"no local fallback"* ]]
+  [[ "$output" != *"SSH SHOULD NOT RUN"* ]]
+}
+
+@test "dispatch builds the correct remote command and records a transcript" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  local hex="0000000000000000000000000000000000000000000000000000000000000000"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
+  ssh() { printf '%s\n' "$*" > "$SSH_LOG"; echo "remote stdout"; return 0; }
+  run e2e_runner_dispatch "m2" "sha256:${hex}"
+  [ "$status" -eq 0 ]
+  run cat "$SSH_LOG"
+  [[ "$output" == *"e2e_verify_vcluster sha256:${hex}"* ]]
+  [[ "$output" == *"E2E_RUNNER=m2"* ]]
+  [[ "$output" == *"KUBECONFIG="* ]]
+  [[ "$output" == *"e2e-runner.yaml"* ]]
+  run bash -c 'ls "$1"/dispatch/m2-*.log' "" "$E2E_REPORT_DIR"
+  [ "$status" -eq 0 ]
+}
+
+@test "dispatch returns the remote exit code unchanged" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  ssh() { echo "remote failed"; return 7; }
+  run e2e_runner_dispatch "m2"
+  [ "$status" -eq 7 ]
+}
+
+@test "make e2e-remote requires RUNNER and wires to the dispatcher" {
+  run grep -F -- 'e2e_runner_dispatch $(RUNNER) $(DIGEST)' Makefile
+  [ "$status" -eq 0 ]
+  run grep -F -- 'usage: make e2e-remote RUNNER=m2' Makefile
+  [ "$status" -eq 0 ]
+}
