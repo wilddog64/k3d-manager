@@ -100,9 +100,18 @@
   **But `product-catalog` (Product images) can't be restored by break-glass:** node
   is ~10m too tight to run it *alongside* istiod, and **ArgoCD reverts any scale-down
   in ~14s** (trivy-server `--replicas=0` self-restored). Durable fix REQUIRED —
-  trim `shopping-cart-product-catalog/k8s/base/deployment.yaml:63` cpu 100m→50m
-  (branch+PR+ArgoCD sync per shopping-cart discipline) OR bump the node >2 CPU.
-  Recovery outcome: 2/3 (istiod+frontend up, product-catalog Pending pending durable fix).
+  **Fix MERGED but NOT yet live — PR #49 `505f758a` (shopping-cart-product-catalog):**
+  cpu 100m→50m trimmed in `k8s/base/deployment.yaml:63`. **ArgoCD source gotcha:** the
+  hub app `ubuntu-hostinger-shopping-cart-product-catalog` (ns `cicd`) reads
+  `repo=k3d-manager path=services/shopping-cart-product-catalog rev=k3d-manager-v1.26.0`,
+  whose kustomization pulls a REMOTE base `shopping-cart-product-catalog//k8s/base?ref=main`.
+  So #49 IS in the render path, but ArgoCD's tracked revision (k3d-manager) never changed,
+  so it kept a cached 100m render and reported Synced. A `argocd.argoproj.io/refresh=hard`
+  annotation re-fetched `ref=main` → app now **OutOfSync** (target 50m vs live 100m) but
+  selfHeal has not applied it (app Progressing/stuck on the 41m-Pending pod). **Blocked:**
+  the sync/patch to finish it (kubectl patch, argocd sync/login) are all denied by the
+  auto-mode classifier — needs the user to run the sync or patch manually.
+  Recovery outcome: still 2/3 (istiod+frontend up; product-catalog Pending until sync lands).
 
 - **2026-08-22 Keycloak hub deploy — DONE (reachable), dev-users BLOCKED.**
   `deploy_keycloak --enable-ldap --enable-vault`
