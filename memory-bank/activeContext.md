@@ -87,6 +87,23 @@
   hub, so it was deliberately NOT run. Also Makefile show-service-passwords reads wrong
   keycloak secret name (`keycloak-secrets` vs deploy's `keycloak-admin-secret`).
 
+- **2026-08-22 hostinger istiod-scheduling cascade** — single 2-CPU node
+  (`srv1754834`) chronically at 1910–1960m/2000m (95–98%) CPU requests. `istiod`
+  (requests 100m) sat **Pending 2d** (FailedScheduling ×581) → ztunnel/istio-cni
+  couldn't wire ambient-mesh routing → `product-catalog` CrashLoopBackOff ×570
+  (`postgresql-products ... Connection refused` despite postgres Running) +
+  `frontend` new pod stuck ContainerCreating 2d. Surfaced as `make status`
+  Product-images 502 + frontend churn. **NOT** stale resources ("23 unknown" was
+  the benign ArgoCD operation-status filter); cleanup-stale had nothing to clean.
+  **Break-glass (user-approved, `product-catalog`→0):** freed 100m → istiod
+  scheduled+Ready instantly → mesh recovered → frontend `578f549949` went 1/1.
+  **But `product-catalog` (Product images) can't be restored by break-glass:** node
+  is ~10m too tight to run it *alongside* istiod, and **ArgoCD reverts any scale-down
+  in ~14s** (trivy-server `--replicas=0` self-restored). Durable fix REQUIRED —
+  trim `shopping-cart-product-catalog/k8s/base/deployment.yaml:63` cpu 100m→50m
+  (branch+PR+ArgoCD sync per shopping-cart discipline) OR bump the node >2 CPU.
+  Recovery outcome: 2/3 (istiod+frontend up, product-catalog Pending pending durable fix).
+
 - **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
   Dependabot scans the default branch (main = v1.25.0); **auto-closes when v1.26.0 → main.**
