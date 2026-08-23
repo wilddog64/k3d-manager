@@ -209,6 +209,10 @@
      `docs/plans/e2e-image-multiarch.md` on branch `feat/e2e-image-multiarch` (`dc8bb43`) —
      add `setup-qemu-action` + `platforms: linux/amd64,linux/arm64` to `publish-image.yml`
      (Dockerfile is arch-clean, no change). Acceptance gate unblocks once that merges + rebuilds.
+     **Codex implemented it directly via `codex exec` (Option B, danger-full-access) — SHA
+     `52ffe10a` on `origin/feat/e2e-image-multiarch`, INDEPENDENTLY VERIFIED** (only the
+     workflow changed, +3 lines, actions pinned, main untouched, no PR). NEXT (gated): PR →
+     merge to main so publish-image.yml rebuilds multi-arch `latest`, then re-run M2 E2E.
   **Runner harness is proven end-to-end** (dispatch→SSH→OrbStack→k3d→vCluster→substrate→
   Playwright launch); the ONLY remaining failure is the external e2e-tests image arch.
   **The 2-run acceptance gate (1 pass) is BLOCKED on that multi-arch rebuild.** Publish-back
