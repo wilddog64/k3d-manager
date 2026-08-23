@@ -118,12 +118,22 @@
       trivy *server* request; now the scan *jobs* can't fit either).
     - trivy config is **ArgoCD-managed** (`argocd.argoproj.io/tracking-id`) → live edits revert;
       durable fix belongs in git.
-  - **DECISION NEEDED (user):** free node CPU so scans can run — options: (a) bump the hostinger
-    node to more vCPU (durable, correct — node is undersized for workload + scanning);
-    (b) trim CPU *requests* in git on the biggest reservers (payment/rabbitmq 200m each) and/or
-    trivy scan-job requests; (c) temporarily scale down a non-critical workload to let one scan
-    cycle produce reports (persist ~24h TTL), then scale back. Panel ② fills automatically once
-    reports exist — the exporter pipeline is proven.
+  - **DECISION (user, 2026-08-23): durable request trim in git.** Chose to trim the trivy
+    scan-job CPU *request* (fully k3d-manager-scoped, app workloads untouched, matches the
+    v1.16.0 precedent) over app-workload trims (payment/rabbitmq live in shopping-cart repos,
+    would need cross-repo PRs). Spec:
+    `docs/bugs/2026-08-23-hostinger-trivy-scanjob-cpu-request-unschedulable.md`.
+  - **FIX SHIPPED** (`8bfcbcc9`): `trivy.resources.requests.cpu 50m→10m` in
+    `scripts/etc/helm/observability/trivy-operator-acg-values.yaml` (limits kept at 500m so real
+    scans burst; memory untouched — OOM risk). A 3-container scan pod now reserves 30m, fits the
+    ~40m headroom. **Made live:** `acg-trivy-operator` is multi-source with `$values` frozen at
+    v1.26.0 — reapplied the `observability-acg` ApplicationSet at
+    `K3D_MANAGER_BRANCH=k3d-manager-v1.27.0 APP_CLUSTER_NAME=ubuntu-hostinger ARGOCD_NAMESPACE=cicd`
+    (⚠️ first reapply forgot `APP_CLUSTER_NAME` → literal in appset; fixed on the 2nd apply).
+    `$values` ref now v1.27.0; ArgoCD auto-sync re-rendering the Helm release.
+  - **PENDING VERIFY:** configmap `trivy-operator-trivy-config` reflects `10m` → recycle the stuck
+    50m Pending scan jobs (delete so operator recreates at 10m) → scan pods schedule → reports
+    appear → exporter emits `cluster="ubuntu-hostinger"` series → panel ② fills.
 
 - **2026-08-22 CVE dashboard empty tables diagnosed:** the hub exporter is healthy (`up=1`, 3,701
   `trivy_vulnerability_inventory` series) and the exact platform query returns 3,586 rows; Grafana's
