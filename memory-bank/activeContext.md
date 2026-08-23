@@ -205,6 +205,10 @@
      App images ARE multi-arch (pull fine). M4 worked only via OrbStack amd64 emulation.
      **Fix = rebuild e2e-tests multi-arch (buildx amd64+arm64) in the shopping-cart repo.**
      Doc `docs/bugs/2026-08-22-e2e-tests-image-amd64-only-blocks-arm64-m2-runner.md` (`f445c0d1`).
+     **Fix SPEC'd + handed to Codex** in the shopping-cart-e2e-tests repo:
+     `docs/plans/e2e-image-multiarch.md` on branch `feat/e2e-image-multiarch` (`dc8bb43`) —
+     add `setup-qemu-action` + `platforms: linux/amd64,linux/arm64` to `publish-image.yml`
+     (Dockerfile is arch-clean, no change). Acceptance gate unblocks once that merges + rebuilds.
   **Runner harness is proven end-to-end** (dispatch→SSH→OrbStack→k3d→vCluster→substrate→
   Playwright launch); the ONLY remaining failure is the external e2e-tests image arch.
   **The 2-run acceptance gate (1 pass) is BLOCKED on that multi-arch rebuild.** Publish-back
