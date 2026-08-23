@@ -10,6 +10,8 @@ trivy:
     tag: "0.72.0"
   ignoreUnfixed: true
   severity: CRITICAL,HIGH
+  slow: true
+  timeout: 15m0s
   resources:
     requests:
       memory: 256Mi

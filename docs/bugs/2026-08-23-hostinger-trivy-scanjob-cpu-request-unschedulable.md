@@ -77,6 +77,19 @@ A commit to `k3d-manager-v1.27.0` is **inert** until that appset is reapplied at
 `K3D_MANAGER_BRANCH=k3d-manager-v1.27.0` (repoints `$values` → v1.27.0, auto-sync then re-renders).
 Reapply per the CLAUDE.md rule, confirm with `argocd_check_values_branch`.
 
+## Follow-on: scans schedule but hit `DeadlineExceeded` (5m → 15m)
+
+After the 10m request trim let scan pods schedule, every scan job then failed with
+`DeadlineExceeded` (`Job was active longer than specified deadline`) at exactly 5 minutes —
+`trivy.timeout: 5m0s`. In `ClientServer` mode with `trivy.slow: true` on a CPU-contended node,
+client-side image analysis (layer download + extraction) for the larger workload images
+(postgres, minio) does not finish inside 5m. trivy-server itself is healthy (DB downloaded,
+endpoint live) — the timeout is client-side.
+
+Fix: raise `trivy.timeout` to `15m0s`, keep `slow: true` (memory safety — do not disable it, the
+scan jobs OOM without it). Added `trivy.slow`/`trivy.timeout` explicitly to the values file so both
+are pinned rather than chart-defaulted.
+
 ## Definition of Done
 
 - [ ] `trivy.resources.requests.cpu: 10m`; limits unchanged (`cpu: 500m`); memory unchanged.
