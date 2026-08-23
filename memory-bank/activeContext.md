@@ -78,6 +78,25 @@
   `docs/issues/2026-08-22-manifest-authoring-test-failures.md`. PR: none (user explicitly
   requested commit+push without opening a PR).
 
+- **2026-08-23 CVE panel ② LIVE WIRING (Claude ran the GitOps half; user runs Vault half):**
+  - Re-applied `platform` AppProject (`envsubst '$ARGOCD_NAMESPACE'=cicd` on
+    `projects/platform.yaml.tmpl` + `kubectl apply --server-side`) → cleared the
+    `InvalidSpecError` (live project lacked the `platform-ops` destination Codex added to
+    the template — classic "committed config inert until reapplied"). ArgoCD ns is **cicd**.
+  - **ESO schema bug found + fixed** (`9c9c8bb8`): Codex's `app-cluster-kubeconfig-externalsecret.yaml`
+    used `spec.target.template.stringData` — not a field in the `external-secrets.io/v1`
+    template schema; ArgoCD apply failed `field not declared in schema`. Renamed to `data:`
+    (rendered-string map). Committed+pushed to `k3d-manager-v1.27.0`.
+  - Had to **terminate a stuck sync operation** (json patch `remove /operation`) that was
+    retrying the old `stringData` manifest and blocking new syncs, then hard-refresh + re-sync.
+  - `hub-platform-ops` now **Synced/Succeeded**; ExternalSecret `app-cluster-kubeconfig`
+    **created** in `platform-ops`, currently `SecretSyncedError: could not get secret data
+    from provider` — expected, Vault lacks `secret/data/platform-ops/app-cluster-hostinger`.
+  - **NEXT (user-run, classifier-gated to the user):** `cve-panel2-live.sh` mints the
+    read-only hostinger SA token + writes it to Vault. Then Claude forces the ES refresh,
+    does Step B (exporter rollout restart) + Step C (Prometheus count check).
+    Prereqs verified live: both kube contexts present, Vault `:18200` healthy (200), jq present.
+
 - **2026-08-22 CVE dashboard empty tables diagnosed:** the hub exporter is healthy (`up=1`, 3,701
   `trivy_vulnerability_inventory` series) and the exact platform query returns 3,586 rows; Grafana's
   datasource API also returns frames. Shopping-cart returns zero because its healthy Applications target
