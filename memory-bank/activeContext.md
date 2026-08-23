@@ -219,11 +219,16 @@
      (Dockerfile is arch-clean, no change). Acceptance gate unblocks once that merges + rebuilds.
      **Codex implemented it directly via `codex exec` (Option B, danger-full-access) — SHA
      `52ffe10a` on `origin/feat/e2e-image-multiarch`, INDEPENDENTLY VERIFIED** (only the
-     workflow changed, +3 lines, actions pinned, main untouched, no PR). NEXT (gated): PR →
-     merge to main so publish-image.yml rebuilds multi-arch `latest`, then re-run M2 E2E.
+     workflow changed, +3 lines, actions pinned, main untouched).
+     **2026-08-22 eve: PROVEN + PR OPEN.** Dispatched `Publish E2E Image` on the branch
+     (run 32613454907) → green in 10m (arm64 QEMU leg slow but OK); `sha-52ffe10a` tag is
+     now multi-arch (`docker manifest inspect` → amd64 + arm64, `provenance:false` dropped
+     the unknown/unknown entry). PR **#7** opened (base main). **MERGE is gated — awaiting
+     user go.** On merge, publish-image.yml rebuilds `:latest` (gated to default branch) →
+     then re-run `make e2e-remote RUNNER=m2` for the first real Playwright pass.
   **Runner harness is proven end-to-end** (dispatch→SSH→OrbStack→k3d→vCluster→substrate→
   Playwright launch); the ONLY remaining failure is the external e2e-tests image arch.
-  **The 2-run acceptance gate (1 pass) is BLOCKED on that multi-arch rebuild.** Publish-back
+  **The 2-run acceptance gate (1 pass) is BLOCKED on PR #7 merge + rebuild.** Publish-back
   still unconfigured (results retained `publication_pending`) — separate gap.
 
 - **2026-08-22 CVE dashboard shopping-cart panel — root-caused + spec'd + HANDED TO CODEX.**
@@ -234,7 +239,21 @@
   — hub-side config gap, NOT a federation build. Fix = read-only hostinger SA token via
   Vault+ESO → materialize `app-cluster-kubeconfig` (keys `server`+`config`). Spec
   `docs/bugs/2026-08-22-cve-dashboard-shopping-cart-hostinger-app-cluster-secret.md` (`4d591157`),
-  assigned to Codex. Panels ① (platform — works, screenshot was transient) and ③
+  assigned to Codex.
+  **DELIVERED by Codex (Option B) — SHA `84817d88` on `origin/k3d-manager-v1.27.0`,
+  INDEPENDENTLY VERIFIED.** Manifests only, NO live mutation performed: `rbac.yaml`
+  (dedicated SA in ns `platform`, ClusterRole get/list/watch on `vulnerabilityreports`
+  only — no cluster-admin), `app-cluster-kubeconfig-externalsecret.yaml` (ESO
+  `vault-backend` ClusterSecretStore, all values from Vault `platform-ops/app-cluster-hostinger`,
+  bearerToken not admin cert, keys `server`+`config` match contract, no secrets in git),
+  `platform-ops.yaml`/`hostinger-cve-inventory-reader.yaml` appsets + `platform.yaml.tmpl`
+  destination + `k3s-hostinger.sh` reapply + BATS contract; exporter.py got a one-line
+  stderr warning (mount/optional:true untouched, no dashboard JSON change). Matched
+  `external-secrets.io/v1` + `vault-backend` idiom of sibling `grafana-admin-externalsecret.yaml`.
+  **REMAINING (user, live): mint the read-only hostinger SA token, write server/caData/
+  bearerToken to Vault `platform-ops/app-cluster-hostinger`, apply the appset to hostinger;
+  then verify `count(trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}) > 0`.**
+  Panels ① (platform — works, screenshot was transient) and ③
   (remediation — `cve_remediation_event_info`=0, no remediation has run on a 2d cluster;
   scans fire 1st/15th) are OUT OF SCOPE (expected-empty). Ref Codex investigation
   `docs/issues/2026-08-22-cve-dashboard-empty-tables.md`.
