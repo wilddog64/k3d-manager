@@ -131,9 +131,24 @@
     `K3D_MANAGER_BRANCH=k3d-manager-v1.27.0 APP_CLUSTER_NAME=ubuntu-hostinger ARGOCD_NAMESPACE=cicd`
     (⚠️ first reapply forgot `APP_CLUSTER_NAME` → literal in appset; fixed on the 2nd apply).
     `$values` ref now v1.27.0; ArgoCD auto-sync re-rendering the Helm release.
-  - **PENDING VERIFY:** configmap `trivy-operator-trivy-config` reflects `10m` → recycle the stuck
-    50m Pending scan jobs (delete so operator recreates at 10m) → scan pods schedule → reports
-    appear → exporter emits `cluster="ubuntu-hostinger"` series → panel ② fills.
+  - **BLOCKED by an ArgoCD render bug** (`docs/bugs/2026-08-23-argocd-multisource-values-stale-render.md`):
+    ArgoCD renders a STALE `50m` for this multi-source app's `$values` ref and selfHeal reverts any
+    manual 10m patch (~10s), even though it resolves the correct SHA `b97c9dcd` and a fresh
+    `git clone` INSIDE the repo-server pod returns `10m`. Tried: hard-refresh ×N, restart
+    repo-server / application-controller / redis (×2), Replace sync, non-cascading app delete +
+    appset regen, SHA-pinned `$values` — none applied 10m. Known ArgoCD multi-source ref-source
+    stale-render class. **The durable git fix (`8bfcbcc9`) is correct and in place; ArgoCD just
+    won't apply it.**
+  - **IMMEDIATE UNBLOCK (user-run — classifier blocks appset syncPolicy edits + configmap patches
+    get selfHeal-reverted for Claude):** `scratchpad/cve-panel2-unblock-scans.sh` disables the
+    `observability-acg` appset auto-sync, patches the configmap to 10m, restarts the operator,
+    clears stuck scan jobs → scans run → reports appear → panel ② fills. Leave auto-sync off until
+    the ArgoCD bug is fixed.
+  - **Follow-ups:** upgrade/patch ArgoCD for the ref-source cache bug; consider de-multi-sourcing the
+    obs apps; add `argocd_check_values_branch` to the release checklist. (⚠️ observability-acg appset
+    was reapplied to v1.27.0 during this — a required release step per CLAUDE.md was thus done for
+    this appset; the hub-side platform-ops appset + hostinger CVE-reader appset still need wiring/
+    reapply as noted earlier.)
 
 - **2026-08-22 CVE dashboard empty tables diagnosed:** the hub exporter is healthy (`up=1`, 3,701
   `trivy_vulnerability_inventory` series) and the exact platform query returns 3,586 rows; Grafana's
