@@ -250,9 +250,22 @@
   destination + `k3s-hostinger.sh` reapply + BATS contract; exporter.py got a one-line
   stderr warning (mount/optional:true untouched, no dashboard JSON change). Matched
   `external-secrets.io/v1` + `vault-backend` idiom of sibling `grafana-admin-externalsecret.yaml`.
-  **REMAINING (user, live): mint the read-only hostinger SA token, write server/caData/
-  bearerToken to Vault `platform-ops/app-cluster-hostinger`, apply the appset to hostinger;
-  then verify `count(trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}) > 0`.**
+  **REMAINING (user, live): run scratchpad `cve-panel2-live.sh` (applies RBAC to hostinger
+  directly + mints long-lived SA token Secret + writes server/caData/bearerToken to Vault
+  `secret/platform-ops/app-cluster-hostinger` via REST, token via header file). THEN the
+  hub sync: (A) `envsubst < applicationsets/platform-ops.yaml | kubectl apply` (hub ArgoCD)
+  → ESO renders `app-cluster-kubeconfig`; (B) `kubectl apply -f
+  platform-ops/vulnerability-inventory-exporter.yaml` + `rollout restart` the exporter;
+  (C) verify `count(trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}) > 0`.**
+  **TWO WIRING GAPS found tracing the delivery (v1.27.0 follow-ups):**
+  (1) the new hub `platform-ops` ApplicationSet is NOT applied by anything —
+  `deploy_argocd_platform_ops` applies platform-ops files one-by-one and does NOT include the
+  ExternalSecret; only the DE-SCOPED OCI provider loops `applicationsets/*.yaml`. Needs a
+  hub-side appset reapply (or fold the ExternalSecret into `deploy_argocd_platform_ops`).
+  (2) the `hostinger-cve-inventory-reader` appset destination `ubuntu-hostinger` won't resolve
+  — hostinger is NOT registered as an ArgoCD cluster secret on the hub (per the spec's own
+  Follow-up). RBAC works today only because the live script `kubectl apply`s it directly to
+  the hostinger context; ArgoCD-managed durability is blocked on cluster registration.
   Panels ① (platform — works, screenshot was transient) and ③
   (remediation — `cve_remediation_event_info`=0, no remediation has run on a 2d cluster;
   scans fire 1st/15th) are OUT OF SCOPE (expected-empty). Ref Codex investigation
