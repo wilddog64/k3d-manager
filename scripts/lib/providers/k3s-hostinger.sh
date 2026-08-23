@@ -825,6 +825,7 @@ function _hostinger_reapply_gitops_applicationsets() {
     "services-git.yaml"
     "platform-helm.yaml"
     "istio-ambient.yaml"
+    "hostinger-cve-inventory-reader.yaml"
   )
 
   for appset in "${appsets[@]}"; do

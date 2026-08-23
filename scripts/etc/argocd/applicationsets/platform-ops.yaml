@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-ops
+  namespace: ${ARGOCD_NAMESPACE}
+  labels:
+    managed-by: k3d-manager
+    app-type: platform
+spec:
+  generators:
+    - list:
+        elements:
+          - name: hub
+  goTemplate: true
+  template:
+    metadata:
+      name: '{{.name}}-platform-ops'
+      labels:
+        app-type: platform
+    spec:
+      project: platform
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: platform-ops
+      source:
+        repoURL: https://github.com/wilddog64/k3d-manager
+        targetRevision: '${K3D_MANAGER_BRANCH}'
+        path: scripts/etc/argocd/platform-ops
+        directory:
+          include: 'app-cluster-kubeconfig-externalsecret.yaml'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
