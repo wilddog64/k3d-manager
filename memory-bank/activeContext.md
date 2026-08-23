@@ -191,8 +191,37 @@
   `gh auth refresh -h github.com -s read:packages`. Also **publish-back unconfigured**
   (`E2E_M2_PUBLISH_BACK_HOST` empty) → results retained `publication_pending`, never reach
   hub/Grafana; need publish-back set OR `make e2e-replay RUNNER=m2`. All in doc
-  `docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md`. NO passing
-  result yet; NEXT = user runs the gh scope refresh on M2, then retry.
+  `docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md`.
+  5. **ghcr auth fixed** (user ran `gh auth refresh -s read:packages` on M2 — scopes now
+     include `read:packages`) + **stale product-catalog pin fixed** (`sha-6ca5e88d…` aged
+     out of ghcr 404 → bumped to `sha-505f758a…`, committed `d719cc72`; doc
+     `2026-08-22-e2e-substrate-stale-product-catalog-image-pin.md`). With those, **run10
+     (2026-08-22) had the substrate FULLY green** — postgres/redis/**product-catalog/basket/
+     order all rolled out**, seed job complete, Playwright Job launched.
+  6. **7th blocker (external, HIGH): the Playwright image is amd64-only.**
+     `ghcr.io/wilddog64/shopping-cart-e2e-tests:latest` OCI index has only `amd64/linux`
+     (verified via ghcr manifest) — the M2 arm64 k3d node refuses the pull ("no match for
+     platform in manifest") → job `DeadlineExceeded`, result `fail`/phase running-playwright.
+     App images ARE multi-arch (pull fine). M4 worked only via OrbStack amd64 emulation.
+     **Fix = rebuild e2e-tests multi-arch (buildx amd64+arm64) in the shopping-cart repo.**
+     Doc `docs/bugs/2026-08-22-e2e-tests-image-amd64-only-blocks-arm64-m2-runner.md` (`f445c0d1`).
+  **Runner harness is proven end-to-end** (dispatch→SSH→OrbStack→k3d→vCluster→substrate→
+  Playwright launch); the ONLY remaining failure is the external e2e-tests image arch.
+  **The 2-run acceptance gate (1 pass) is BLOCKED on that multi-arch rebuild.** Publish-back
+  still unconfigured (results retained `publication_pending`) — separate gap.
+
+- **2026-08-22 CVE dashboard shopping-cart panel — root-caused + spec'd + HANDED TO CODEX.**
+  Panel ② ("Shopping-cart Unique CVEs") empty because hub exporter Secret
+  `app-cluster-kubeconfig` is ABSENT in platform-ops (optional mount → empty
+  `/etc/app-cluster` → `app_target()` returns None → hostinger never queried). Hostinger HAS
+  the reports (trivy-operator running, fresh `wilddog64/shopping-cart-*` VulnerabilityReports)
+  — hub-side config gap, NOT a federation build. Fix = read-only hostinger SA token via
+  Vault+ESO → materialize `app-cluster-kubeconfig` (keys `server`+`config`). Spec
+  `docs/bugs/2026-08-22-cve-dashboard-shopping-cart-hostinger-app-cluster-secret.md` (`4d591157`),
+  assigned to Codex. Panels ① (platform — works, screenshot was transient) and ③
+  (remediation — `cve_remediation_event_info`=0, no remediation has run on a 2d cluster;
+  scans fire 1st/15th) are OUT OF SCOPE (expected-empty). Ref Codex investigation
+  `docs/issues/2026-08-22-cve-dashboard-empty-tables.md`.
 
 - **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
   subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
