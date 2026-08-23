@@ -70,6 +70,14 @@
 
 ## Open follow-ups
 
+- **2026-08-22 CVE dashboard Hostinger manifest-authoring fix committed** — `84817d88`
+  adds a Hostinger-only read-only vulnerabilityreports reader ApplicationSet/RBAC, hub
+  platform-ops ESO wiring for `app-cluster-kubeconfig`, and the minimal exporter stderr
+  warning. No live cluster, ServiceAccount token, or Vault mutation was performed. Focused
+  provider suite passed 54/54. Curated suite recorded unrelated failures in
+  `docs/issues/2026-08-22-manifest-authoring-test-failures.md`. PR: none (user explicitly
+  requested commit+push without opening a PR).
+
 - **2026-08-22 CVE dashboard empty tables diagnosed:** the hub exporter is healthy (`up=1`, 3,701
   `trivy_vulnerability_inventory` series) and the exact platform query returns 3,586 rows; Grafana's
   datasource API also returns frames. Shopping-cart returns zero because its healthy Applications target

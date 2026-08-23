@@ -57,6 +57,13 @@
 
 ## v1.27.0 queue
 
+- [x] **Hostinger CVE inventory manifest authoring** — commit `84817d88`: added the
+  Hostinger-only read-only SA/ClusterRole/Binding ApplicationSet, Vault-backed ESO
+  `app-cluster-kubeconfig` ExternalSecret, platform-ops ApplicationSet wiring, and minimal
+  exporter warning. Focused provider suite 54/54; full curated-suite failures are recorded in
+  `docs/issues/2026-08-22-manifest-authoring-test-failures.md`. No live mutations performed;
+  pushed to `k3d-manager-v1.27.0`. PR: none per user instruction.
+
 - [x] Investigated CVE dashboard empty tables (2026-08-22): platform data is present in Prometheus and
   Grafana's datasource API; shopping-cart is empty because hub-only exporter scope excludes the remote
   Hostinger cluster, and remediation event metrics have no current records. Issue evidence:
