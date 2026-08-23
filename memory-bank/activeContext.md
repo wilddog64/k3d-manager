@@ -92,10 +92,38 @@
   - `hub-platform-ops` now **Synced/Succeeded**; ExternalSecret `app-cluster-kubeconfig`
     **created** in `platform-ops`, currently `SecretSyncedError: could not get secret data
     from provider` — expected, Vault lacks `secret/data/platform-ops/app-cluster-hostinger`.
-  - **NEXT (user-run, classifier-gated to the user):** `cve-panel2-live.sh` mints the
-    read-only hostinger SA token + writes it to Vault. Then Claude forces the ES refresh,
-    does Step B (exporter rollout restart) + Step C (Prometheus count check).
-    Prereqs verified live: both kube contexts present, Vault `:18200` healthy (200), jq present.
+  - **Vault credential written** (user ran `cve-panel2-live.sh`): read-only hostinger SA
+    (`platform/hub-cve-inventory-reader`, get/list/watch vulnerabilityreports only) minted,
+    `{server,caData,bearerToken}` in Vault `secret/data/platform-ops/app-cluster-hostinger`.
+  - **ESO Vault-policy gap found + fixed** (`0f7ea0ad` durable + live-patched via
+    `cve-panel2-vault-policy.sh`): `eso-ldap-directory` policy (generated from
+    `LDAP_VAULT_POLICY_PREFIX` in `scripts/etc/ldap/vars.sh`) didn't grant `platform-ops`
+    → 403. Added `platform-ops` to the prefix (durable) + wrote the live policy. ES then
+    `Ready=True SecretSynced`; Secret `app-cluster-kubeconfig` (keys `config`,`server`) materialized.
+  - **WIRING NOW COMPLETE + VERIFIED END-TO-END.** Exporter restarted, mounts
+    `/etc/app-cluster/{config,server}`, `app_target()` succeeds (no WARNING), SA can list
+    hostinger vulnerabilityreports (`auth can-i` → yes). Exporter `/metrics` = 3706 series.
+  - **REMAINING BLOCKER IS NOT THE WIRING — it's hostinger having ZERO vulnerabilityreports.**
+    Panel ② is empty because hostinger produces no Trivy reports:
+    - trivy-operator (`acg-trivy-operator`) + trivy-server-0 both Running/healthy;
+      shopping-cart workloads all Running; `OPERATOR_TARGET_NAMESPACES=` (all ns, in scope).
+    - Scan jobs from ~28h ago died `connection refused` to `trivy-service:4954` (transient
+      during trivy-server-0's restart). Self-healed, but no report ⇒ no TTL ⇒ no rescan trigger.
+    - Restarted the operator (2026-08-23) → it spawned 11 fresh scan jobs → **all `Pending`,
+      `FailedScheduling: Insufficient cpu`.** Node `srv1754834` is **2 CPU, 1960m/2000m (98%)
+      requests reserved** by legit workloads (payment 200m, rabbitmq 200m, 3×postgres, minio,
+      order, basket, loki, istio, coredns, metrics-server). ~40m free; each scan pod needs
+      ~100m+ (trivy 50m + install-cni 50m + istio-proxy). Same 2-CPU squeeze as
+      `docs/bugs/2026-07-22-hostinger-trivy-cpu-oversubscription-502.md` (that fix trimmed the
+      trivy *server* request; now the scan *jobs* can't fit either).
+    - trivy config is **ArgoCD-managed** (`argocd.argoproj.io/tracking-id`) → live edits revert;
+      durable fix belongs in git.
+  - **DECISION NEEDED (user):** free node CPU so scans can run — options: (a) bump the hostinger
+    node to more vCPU (durable, correct — node is undersized for workload + scanning);
+    (b) trim CPU *requests* in git on the biggest reservers (payment/rabbitmq 200m each) and/or
+    trivy scan-job requests; (c) temporarily scale down a non-critical workload to let one scan
+    cycle produce reports (persist ~24h TTL), then scale back. Panel ② fills automatically once
+    reports exist — the exporter pipeline is proven.
 
 - **2026-08-22 CVE dashboard empty tables diagnosed:** the hub exporter is healthy (`up=1`, 3,701
   `trivy_vulnerability_inventory` series) and the exact platform query returns 3,586 rows; Grafana's
