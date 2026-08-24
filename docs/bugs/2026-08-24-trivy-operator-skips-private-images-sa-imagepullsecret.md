@@ -107,7 +107,12 @@ The native `privateRegistryScanSecretsNames` fix (above) supersedes all three.
 - [x] Native durable fix (`privateRegistryScanSecretsNames`) committed `aac9cb27` + live-verified.
 - [x] Panel ② populated (75 actionable series) + Prometheus-verified; native reports self-refresh (24h TTL).
 - [x] Manual-CR stopgap deleted; earlier config-lever drift reverted.
-- [ ] `acg-trivy-operator` ArgoCD app synced to git (3 resources OutOfSync from live patching; needs
-      `argocd app sync` or release-time observability-acg appset reapply at v1.27.0). Live behavior
-      already correct.
-- [ ] `allow-cve-scan-egress` NetworkPolicy made durable in the shopping-cart-payment repo (companion).
+- [x] `acg-trivy-operator` ArgoCD app synced to git (2026-08-24) — converged the 3 OutOfSync
+      resources via a manual sync operation (app `$values` ref = `k3d-manager-v1.27.0`, which
+      contains `aac9cb27`, so the sync preserved `OPERATOR_PRIVATE_REGISTRY_SCAN_SECRETS_NAMES` +
+      `ACCESS_GLOBAL_SECRETS=true`). App now **Synced/Healthy**, operator 1/1, all 5 private
+      workloads still scanned (28–33m fresh); panel ② held at 75 across the sync.
+- [x] `allow-cve-scan-egress` NetworkPolicy durable home spec'd in the shopping-cart-payment repo —
+      `docs/plans/durable-trivy-scan-coverage.md`, branch `feat/trivy-scan-egress-netpol` (`3ca0dca`,
+      pushed, PR gated). Flags the kustomize `commonLabels`→selector gotcha; also covers the optional
+      SA `imagePullSecrets` hardening. Live netpol remains drift until that merges + reconciles.

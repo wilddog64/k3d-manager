@@ -67,8 +67,10 @@
   named-secret-per-namespace config is the fix. Live-verified; manual-CR stopgap (352 all-sev) was
   deleted in favor of native (75 actionable). Bug doc:
   `docs/bugs/2026-08-24-trivy-operator-skips-private-images-sa-imagepullsecret.md`.
-  **Remaining (release mechanics, non-blocking):** `argocd app sync acg-trivy-operator` (3 res
-  OutOfSync from live patching) + durable `allow-cve-scan-egress` netpol in shopping-cart-payment repo.
+  **Close-out (2026-08-24):** `acg-trivy-operator` ArgoCD-synced (3 OutOfSync res converged; ref
+  contains `aac9cb27` so private-registry env survived; Synced/Healthy, panel ② held at 75) +
+  `allow-cve-scan-egress` netpol durable-home spec'd + pushed to shopping-cart-payment
+  (`feat/trivy-scan-egress-netpol` `3ca0dca`, PR gated).
 
 - [x] **Hostinger CVE inventory manifest authoring** — commit `84817d88`: added the
   Hostinger-only read-only SA/ClusterRole/Binding ApplicationSet, Vault-backed ESO

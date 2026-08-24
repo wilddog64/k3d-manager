@@ -54,14 +54,15 @@
   live Vault SA + policy fixes `9c9c8bb8`/`0f7ea0ad`) complete + verified end-to-end.
   Bug: `docs/bugs/2026-08-24-trivy-operator-skips-private-images-sa-imagepullsecret.md`.
   Auto-memory: `reference_trivy_operator_node_cred_private_image_skip`.
-  - **Remaining (release mechanics, non-blocking; live behavior already correct):**
-    (a) `acg-trivy-operator` shows 3 resources OutOfSync (two configmaps + deployment env patched
-    live) → converge via `argocd app sync acg-trivy-operator` or release-time observability-acg
-    appset reapply at v1.27.0. (b) `allow-cve-scan-egress` netpol (live-applied, podSelector
-    `app.kubernetes.io/managed-by=trivy-operator`, needed because payment's `default-deny-all` blocks
-    the in-namespace scan pod) needs a durable home in the **shopping-cart-payment** repo (cross-repo,
-    spec+Codex, gated). The originally-planned (a) pod-spec imagePullSecrets / (b) scan-CR CronJob /
-    (c) operator upgrade are UNNECESSARY / redundant+harmful / dead — see bug doc "reassessed".
+  - **Close-out (2026-08-24, both done):** (a) `acg-trivy-operator` **ArgoCD-synced** — the 3
+    OutOfSync resources converged via a manual sync (ref `k3d-manager-v1.27.0` contains `aac9cb27`,
+    so the private-registry env survived); app Synced/Healthy, panel ② held at 75 (payment 52 / order
+    11 / basket 8 / product-catalog 4). (b) `allow-cve-scan-egress` netpol given a durable home —
+    **spec'd + pushed** to shopping-cart-payment `docs/plans/durable-trivy-scan-coverage.md` (branch
+    `feat/trivy-scan-egress-netpol`, `3ca0dca`, PR gated); flags the kustomize `commonLabels`→selector
+    gotcha + optional SA imagePullSecrets hardening. Live netpol stays drift until that merges. The
+    originally-planned pod-spec imagePullSecrets / scan-CR CronJob / operator upgrade are
+    UNNECESSARY / redundant+harmful / dead — see bug doc "reassessed".
   - ⚠️ The 2026-08-23 "ArgoCD stale-render bug" was a **mis-diagnosis** (I read the hub's own trivy
     configmap, not hostinger's `acg-trivy-operator`, which has no `automated` syncPolicy so manual
     patches stick). Durable git fixes are correct + live.
