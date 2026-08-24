@@ -33,6 +33,10 @@ operator:
   builtInTrivyServer: true
   vulnerabilityReportsPlugin: Trivy
   configAuditScannerEnabled: true
+  accessGlobalSecretsAndServiceAccount: true
+  privateRegistryScanSecretsNames:
+    shopping-cart-apps: ghcr-pull-secret
+    shopping-cart-payment: ghcr-pull-secret
   resources:
     requests:
       memory: 32Mi
