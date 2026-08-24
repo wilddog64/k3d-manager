@@ -44,11 +44,14 @@ Both mitigations live **outside the repo** (M4 `authorized_keys`, M2 `~/.ssh/con
 ## Proposed fix (minimal patch)
 
 1. **`e2e_result_publisher_install()`** — accept an optional source pin via env
-   (e.g. `E2E_PUBLISH_FROM`) and, when set, prefix the entry with
-   `from="${E2E_PUBLISH_FROM}",`. Default subnet `192.168.39.0/24`. Keep the
-   existing marker/idempotency. Update the BATS assertion in
-   `scripts/tests/plugins/e2e_remote.bats` (publisher-install test) to cover the
-   pinned form.
+   `E2E_PUBLISH_FROM`, **default empty** (no `from=`, byte-identical to today's
+   line — backward compatible). When non-empty, prefix the entry with
+   `from="${E2E_PUBLISH_FROM}",`. Do NOT hardcode a subnet default — the
+   home-LAN value (`192.168.39.0/24`) is operator config, exported at install
+   time, never baked into this general tool. Keep the existing marker/idempotency.
+   Update the BATS assertion in `scripts/tests/plugins/e2e_remote.bats`
+   (publisher-install test) to cover BOTH the unpinned default and the
+   `E2E_PUBLISH_FROM`-set pinned form.
 2. **`_e2e_publish_back_push()`** (or `_e2e_remote_ssh_opts` if shared is
    acceptable) — add `-o AddressFamily=inet` so IPv4 is forced in-code and the
    publish path no longer depends on M2's `~/.ssh/config`.
