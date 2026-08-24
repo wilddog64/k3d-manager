@@ -108,11 +108,9 @@
   (a) `services-git` appset re-rendered at v1.27.0 (server-diff = ONLY the branch ref moves) — apply
   BLOCKED by classifier, handed to user as a `!` command (`kubectl apply -f
   .../services-git-v127.yaml`). (b) rabbitmq 200m→50m committed `1a85dc7a` on branch
-  `feat/rabbitmq-cpu-request-trim` in `shopping-cart-infra` → **PR #93 OPEN** (CI running, Kustomize
-  Build green; all 4 CI checks green; data-layer app reads ref=main so it goes live on merge).
-  **2026-08-24: `enforce_admins` DISABLED on `shopping-cart-infra/main` (DELETE) at user request so
-  they can admin-override merge PR #93 — MUST be re-enabled post-merge via bodyless POST
-  `.../branches/main/protection/enforce_admins`. required_reviews still =1.**
+  `feat/rabbitmq-cpu-request-trim` in `shopping-cart-infra` → **PR #93 MERGED** `59ed6342` on
+  2026-08-24. `enforce_admins` RESTORED (confirmed `true`); `required_reviews` remains 1. Rabbitmq trim
+  now live on ref=main (ArgoCD will roll to hostinger via data-layer app read).
   (c) istiod pilot cpu 100m→50m committed `1dbe68dc` on v1.27.0 in
   `scripts/etc/argocd/applicationsets/istio-ambient.yaml` — istiod `maxSurge=100%` is a hardcoded istio
   chart default (NOT helm-overridable in a pure-helm ArgoCD source), so the request trim shrinks the
