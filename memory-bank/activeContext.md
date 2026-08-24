@@ -78,6 +78,39 @@
   `docs/issues/2026-08-22-manifest-authoring-test-failures.md`. PR: none (user explicitly
   requested commit+push without opening a PR).
 
+- **2026-08-24 CVE panel ② ✅ POPULATED + PROMETHEUS-VERIFIED (352 series).** The empty-panel saga
+  is closed. Two fixes + one workaround got real shopping-cart CVEs flowing:
+  1. **Timeout fix (durable, `49477017`):** after the `10m` request trim let scan pods schedule,
+     every job died `DeadlineExceeded` at 5m (`trivy.timeout: 5m0s` too short in ClientServer+slow on
+     the CPU-contended node). Added `trivy.slow: true` + `trivy.timeout: 15m0s` to
+     `trivy-operator-acg-values.yaml`; live configmap patched to 15m. Public-image scans then
+     completed → **13 public-image reports** flowing.
+  2. **Root cause of the *remaining* gap — trivy-operator 0.32.0 silently skips private images whose
+     pull cred is a ServiceAccount `imagePullSecrets`** (the `ghcr.io/wilddog64/shopping-cart-*`
+     workloads). No scan job, no error. Config levers (`useGCRServiceAccount=false`,
+     `scanJobsInSameNamespace=true`, `OPERATOR_ACCESS_GLOBAL_SECRETS_SERVICE_ACCOUNTS=true`) ALL
+     no-op; reverted. Proven scannable via a one-off Job mounting `ghcr-pull-secret` (~5s success).
+     Bug: `docs/bugs/2026-08-24-trivy-operator-skips-private-images-sa-imagepullsecret.md`.
+  3. **Workaround (stopgap):** ran real trivy client scans of all 5 private images (mounting
+     `ghcr-pull-secret`), transformed JSON → `VulnerabilityReport` CRs mirroring the operator's
+     name/labels/ownerRefs, `kubectl apply --server-side` to hostinger. CRD requires per-vuln
+     `publishedDate`+`lastModifiedDate` (else rejected). Counts: basket 9, order 20, payment 120,
+     product-catalog 203, frontend 0. Hub exporter now emits **352**
+     `trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}` series;
+     Prometheus `count(...)=352`. **Panel ② fills.** Also added a scoped `allow-cve-scan-egress`
+     NetworkPolicy in `shopping-cart-payment` (default-deny-all blocked scan-pod egress; selector
+     `cve-scan: "true"`, inert for real workloads) — kept for future re-scans.
+  - **CORRECTION to the 2026-08-23 "ArgoCD stale-render bug" below:** that was a mis-diagnosis — I
+    was reading the *hub's own* trivy-operator configmap, not hostinger's `acg-trivy-operator`.
+    Hostinger's configmap already read `10m`; the `acg-trivy-operator` app has NO `automated`
+    syncPolicy (selfHeal off) so manual patches stick. The durable `8bfcbcc9`/`49477017` git fixes
+    are correct and live.
+  - **⚠️ Live drift note:** `observability-acg` appset auto-sync was disabled during the saga and the
+    manual CRs are a **point-in-time snapshot that will drift**. Durable path is the user's call —
+    options in the bug doc: (a) add `imagePullSecrets` to pod specs (shopping-cart PRs, needs CPU
+    headroom), (b) productize scan→CR as a hostinger CronJob (`scratchpad/gen-cve-reports.py` is the
+    prototype), (c) upgrade trivy-operator past 0.32.0.
+
 - **2026-08-23 CVE panel ② LIVE WIRING (Claude ran the GitOps half; user runs Vault half):**
   - Re-applied `platform` AppProject (`envsubst '$ARGOCD_NAMESPACE'=cicd` on
     `projects/platform.yaml.tmpl` + `kubectl apply --server-side`) → cleared the
