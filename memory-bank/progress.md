@@ -85,6 +85,13 @@
   `docs/issues/2026-08-22-cve-dashboard-empty-tables.md`. Remote inventory aggregation and durable
   remediation-event retention remain follow-up work.
 
+- [~] **hostinger CPU right-sizing (2026-08-24)** — node `srv1754834` request-bound (98% CPU
+  requests / ~20% actual). Durable overlay fix committed `6851b5b0`: payment cpu 200m→50m +
+  maxSurge=0 on basket/order/frontend (deadlock class). Builds verified. **Inert until the
+  `services-git` appset is reapplied at v1.27.0** (frozen at v1.26.0; `services/` byte-identical so
+  only this fix moves). Live patch won't stick (selfHeal). Follow-ups: rabbitmq 200m→50m
+  (`shopping-cart-infra`) + istiod surge=100% (istio appset).
+
 Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decision
 2026-08-21 "keep all four".
 

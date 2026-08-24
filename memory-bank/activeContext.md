@@ -94,6 +94,21 @@
   `shopping-cart-product-catalog//k8s/base?ref=main`; a `refresh=hard` annotation re-fetched `ref=main`
   → OutOfSync, user-run `kubectl patch cpu=50m` landed it (durable, selfHeal won't revert).
 
+- **hostinger CPU right-sizing — durable fix committed, ACTIVATION PENDING (2026-08-24).**
+  Investigated: node `srv1754834` is **request-bound, not load-bound** — CPU *requests* 98%
+  booked (1960m/2000m, 40m free) while *actual* usage ~20% (419m). 0 pending / no FailedScheduling
+  at rest; the risk is a future rollout deadlock (surge pod > 40m free → the
+  `hostinger_maxsurge_rollout_deadlock` / istiod-cascade class). Durable overlay patches committed
+  `6851b5b0` on `k3d-manager-v1.27.0` (`services/shopping-cart-*/kustomization.yaml`): payment
+  requests.cpu 200m→50m (+150m); basket/order/frontend maxSurge=1/unavail=0 → maxSurge=0/unavail=1.
+  Each `kubectl kustomize` build verified. **INERT until activated:** the `services-git` appset renders
+  app `targetRevision` from `${K3D_MANAGER_BRANCH}`, frozen at `k3d-manager-v1.26.0`; `services/` is
+  byte-identical v1.26.0↔v1.27.0 so reapplying at `k3d-manager-v1.27.0` pulls ONLY this fix. Live
+  patches will NOT stick (all 5 apps `selfHeal=true`). Activation = reapply `services-git` appset at
+  v1.27.0 (gated, live hub mutation) OR wait for v1.27.0 release step. **Remaining separate homes:**
+  rabbitmq 200m→50m (biggest single win, `shopping-cart-infra` `data-layer`, ref=main) + istiod
+  surge=100% (istio appset) — both gated follow-ups, not yet done.
+
 - **Other live/tracked follow-ups:**
   - Replace the interim in-cluster CVE promoter git-writer token with a fine-grained
     contents-write-only PAT.
