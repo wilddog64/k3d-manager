@@ -32,6 +32,14 @@
      `k3d-manager/.envrc` (`source_up` preserves parent thinking-cap). Smoke-tested M2→M4: publisher
      key auths, forced command fires (no-pty confirmed), invalid payload rejected by schema (no
      ConfigMap written). Hub write target (`platform-ops`, ctx `k3d-k3d-cluster`) reachable.
+     **Key ROTATED 2026-08-24:** old ed25519 `SwC+H3C7…` retired (M4 authorized_keys line removed →
+     old key now `Permission denied`; old private overwritten on M2); new ed25519
+     `SHA256:WwhGtx7C5KUt…` (comment `e2e-m2-publisher@m2-air-20260824`) installed at same canonical
+     path `~/.ssh/e2e-m4-publisher` behind the identical forced-command restriction — no code/config
+     change (path+host unchanged). Verified: neg-test old rejected, prod-path smoke passes. Still
+     passphraseless BY DESIGN (unattended publish-back); real control is the `command="…
+     e2e_result_publish",restrict,no-pty,no-*-forwarding` lock. Optional future hardening: `from=`
+     source-pin to M2's address. M4 `~/.ssh/authorized_keys.bak-rotate-20260824T225550Z` = rollback.
      **Still BLOCKED** on (b) hostinger node CPU exhaustion (the last gate for the 2-run acceptance).
      M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
