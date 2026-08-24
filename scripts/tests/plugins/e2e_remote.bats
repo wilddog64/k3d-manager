@@ -363,11 +363,13 @@ print("ok")' "$outf"
 @test "publisher install builds a restricted forced-command authorized_keys entry" {
   export HOME="$BATS_TEST_TMPDIR/home"
   mkdir -p "$HOME"
+  unset E2E_PUBLISH_FROM
   local pub="$BATS_TEST_TMPDIR/m2.pub"
   echo "ssh-ed25519 AAAAC3NzaC1fakekeymaterial m2-runner" > "$pub"
   run e2e_result_publisher_install "$pub"
   [ "$status" -eq 0 ]
   run cat "$HOME/.ssh/authorized_keys"
+  [[ "$output" != *'from='* ]]
   [[ "$output" == *'command="'* ]]
   [[ "$output" == *"e2e_result_publish"* ]]
   [[ "$output" == *"restrict"* ]]
@@ -378,6 +380,14 @@ print("ok")' "$outf"
   [ "$status" -eq 0 ]
   run grep -c "e2e-m2-publisher" "$HOME/.ssh/authorized_keys"
   [ "$output" -eq 1 ]
+
+  export HOME="$BATS_TEST_TMPDIR/pinned-home"
+  mkdir -p "$HOME"
+  export E2E_PUBLISH_FROM="192.168.39.0/24"
+  run e2e_result_publisher_install "$pub"
+  [ "$status" -eq 0 ]
+  run cat "$HOME/.ssh/authorized_keys"
+  [[ "$output" == 'from="192.168.39.0/24",command='* ]]
 }
 
 @test "publisher install refuses a non-key file" {
@@ -525,6 +535,7 @@ print("ok")' "$f"
   [ "$status" -eq 0 ]
   run cat "$SSH_LOG"
   [[ "$output" == *"-i /keys/e2e-m4-publisher"* ]]
+  [[ "$output" == *"-o AddressFamily=inet"* ]]
   [[ "$output" == *"m4host"* ]]
   run cat "$STDIN_LOG"
   [ "$output" = "PAYLOAD-BODY" ]

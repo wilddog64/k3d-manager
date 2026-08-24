@@ -607,8 +607,12 @@ function e2e_result_publisher_install() {
     return 0
   fi
 
-  local entry
-  entry="command=\"${dispatcher} e2e_result_publish\",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ${keyline} ${marker}"
+  local entry publish_from="${E2E_PUBLISH_FROM:-}"
+  if [[ -n "$publish_from" ]]; then
+    entry="from=\"${publish_from}\",command=\"${dispatcher} e2e_result_publish\",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ${keyline} ${marker}"
+  else
+    entry="command=\"${dispatcher} e2e_result_publish\",restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ${keyline} ${marker}"
+  fi
   printf '%s\n' "$entry" >> "$authfile"
   _info "[e2e-publish] installed restricted M2 publisher principal in ${authfile}"
 }
@@ -663,7 +667,8 @@ function _e2e_publish_back_push() {
   [[ -n "$E2E_PUBLISH_BACK_HOST" ]] || return 1
   local -a opts
   mapfile -t opts < <(_e2e_remote_ssh_opts)
-  ssh -i "$E2E_PUBLISH_BACK_KEY" "${opts[@]}" -- "$E2E_PUBLISH_BACK_HOST" < "$file"
+  # Force IPv4 because the source pin is an IPv4 subnet and mDNS may resolve M4 to IPv6.
+  ssh -i "$E2E_PUBLISH_BACK_KEY" -o AddressFamily=inet "${opts[@]}" -- "$E2E_PUBLISH_BACK_HOST" < "$file"
 }
 
 # Public (runs ON the runner): after an E2E run, push the result to the M4 hub.
