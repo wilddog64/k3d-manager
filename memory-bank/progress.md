@@ -89,8 +89,11 @@
   requests / ~20% actual). Durable overlay fix committed `6851b5b0`: payment cpu 200m→50m +
   maxSurge=0 on basket/order/frontend (deadlock class). Builds verified. **Inert until the
   `services-git` appset is reapplied at v1.27.0** (frozen at v1.26.0; `services/` byte-identical so
-  only this fix moves). Live patch won't stick (selfHeal). Follow-ups: rabbitmq 200m→50m
-  (`shopping-cart-infra`) + istiod surge=100% (istio appset).
+  only this fix moves). Live patch won't stick (selfHeal). **All 3 prepped 2026-08-24:** (a) services-git
+  reapply rendered+diff-verified (apply classifier-blocked → user `!` cmd); (b) rabbitmq 200m→50m
+  `1a85dc7a` on `feat/rabbitmq-cpu-request-trim` (shopping-cart-infra, PR gated); (c) istiod pilot cpu
+  100m→50m `1dbe68dc` (maxSurge=100% is a non-overridable istio chart default; request trim shrinks the
+  surge pod; reapply rendered+diff-verified → user `!` cmd).
 
 Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decision
 2026-08-21 "keep all four".

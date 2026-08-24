@@ -104,10 +104,17 @@
   Each `kubectl kustomize` build verified. **INERT until activated:** the `services-git` appset renders
   app `targetRevision` from `${K3D_MANAGER_BRANCH}`, frozen at `k3d-manager-v1.26.0`; `services/` is
   byte-identical v1.26.0↔v1.27.0 so reapplying at `k3d-manager-v1.27.0` pulls ONLY this fix. Live
-  patches will NOT stick (all 5 apps `selfHeal=true`). Activation = reapply `services-git` appset at
-  v1.27.0 (gated, live hub mutation) OR wait for v1.27.0 release step. **Remaining separate homes:**
-  rabbitmq 200m→50m (biggest single win, `shopping-cart-infra` `data-layer`, ref=main) + istiod
-  surge=100% (istio appset) — both gated follow-ups, not yet done.
+  patches will NOT stick (all 5 apps `selfHeal=true`). **All three prepped 2026-08-24:**
+  (a) `services-git` appset re-rendered at v1.27.0 (server-diff = ONLY the branch ref moves) — apply
+  BLOCKED by classifier, handed to user as a `!` command (`kubectl apply -f
+  .../services-git-v127.yaml`). (b) rabbitmq 200m→50m committed `1a85dc7a` on branch
+  `feat/rabbitmq-cpu-request-trim` in `shopping-cart-infra` (pushed; **PR gated**; data-layer app reads
+  ref=main so it goes live on merge). (c) istiod pilot cpu 100m→50m committed `1dbe68dc` on v1.27.0 in
+  `scripts/etc/argocd/applicationsets/istio-ambient.yaml` — istiod `maxSurge=100%` is a hardcoded istio
+  chart default (NOT helm-overridable in a pure-helm ArgoCD source), so the request trim shrinks the
+  surge-pod footprint instead; re-rendered + server-diff = ONLY pilot cpu; apply BLOCKED by classifier,
+  handed to user (`kubectl apply -f .../istio-ambient-v127.yaml`). Net once all live: ~300m reclaimed
+  (40m→~340m free) + rollout-deadlock class eliminated.
 
 - **Other live/tracked follow-ups:**
   - Replace the interim in-cluster CVE promoter git-writer token with a fine-grained
