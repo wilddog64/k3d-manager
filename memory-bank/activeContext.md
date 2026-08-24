@@ -108,8 +108,9 @@
   (a) `services-git` appset re-rendered at v1.27.0 (server-diff = ONLY the branch ref moves) — apply
   BLOCKED by classifier, handed to user as a `!` command (`kubectl apply -f
   .../services-git-v127.yaml`). (b) rabbitmq 200m→50m committed `1a85dc7a` on branch
-  `feat/rabbitmq-cpu-request-trim` in `shopping-cart-infra` (pushed; **PR gated**; data-layer app reads
-  ref=main so it goes live on merge). (c) istiod pilot cpu 100m→50m committed `1dbe68dc` on v1.27.0 in
+  `feat/rabbitmq-cpu-request-trim` in `shopping-cart-infra` → **PR #93 OPEN** (CI running, Kustomize
+  Build green; **merge gated**; data-layer app reads ref=main so it goes live on merge).
+  (c) istiod pilot cpu 100m→50m committed `1dbe68dc` on v1.27.0 in
   `scripts/etc/argocd/applicationsets/istio-ambient.yaml` — istiod `maxSurge=100%` is a hardcoded istio
   chart default (NOT helm-overridable in a pure-helm ArgoCD source), so the request trim shrinks the
   surge-pod footprint instead; re-rendered + server-diff = ONLY pilot cpu; apply BLOCKED by classifier,
