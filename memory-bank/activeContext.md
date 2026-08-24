@@ -115,8 +115,12 @@
   `scripts/etc/argocd/applicationsets/istio-ambient.yaml` — istiod `maxSurge=100%` is a hardcoded istio
   chart default (NOT helm-overridable in a pure-helm ArgoCD source), so the request trim shrinks the
   surge-pod footprint instead; re-rendered + server-diff = ONLY pilot cpu; apply BLOCKED by classifier,
-  handed to user (`kubectl apply -f .../istio-ambient-v127.yaml`). Net once all live: ~300m reclaimed
-  (40m→~340m free) + rollout-deadlock class eliminated.
+  handed to user (`kubectl apply -f .../istio-ambient-v127.yaml`).
+  **✅ ALL THREE LIVE + VERIFIED 2026-08-24:** both appsets reapplied at v1.27.0 (services-git
+  `targetRevision` v1.26.0→v1.27.0; istiod appset pilot cpu 50m). basket/frontend/order Synced+Healthy,
+  payment rolled (50m), istiod Synced/Healthy (surge pod scheduled), rabbitmq rolled via data-layer.
+  Hostinger node `srv1754834` CPU requests **1960m (98%) → 1610m (80%)** = ~350m reclaimed (~40m→~390m
+  free); zero Pending pods. Rollout-deadlock class eliminated. hostinger CPU right-sizing CLOSED.
 
 - **Other live/tracked follow-ups:**
   - Replace the interim in-cluster CVE promoter git-writer token with a fine-grained
