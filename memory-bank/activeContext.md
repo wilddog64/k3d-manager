@@ -38,8 +38,18 @@
      path `~/.ssh/e2e-m4-publisher` behind the identical forced-command restriction — no code/config
      change (path+host unchanged). Verified: neg-test old rejected, prod-path smoke passes. Still
      passphraseless BY DESIGN (unattended publish-back); real control is the `command="…
-     e2e_result_publish",restrict,no-pty,no-*-forwarding` lock. Optional future hardening: `from=`
-     source-pin to M2's address. M4 `~/.ssh/authorized_keys.bak-rotate-20260824T225550Z` = rollback.
+     e2e_result_publish",restrict,no-pty,no-*-forwarding` lock. M4
+     `~/.ssh/authorized_keys.bak-rotate-20260824T225550Z` = rollback.
+     **Policy DECIDED 2026-08-24: source-pin only, NO scheduled rotation** (per-deploy + time-based
+     auto both declined — blast radius = one schema-validated ConfigMap write behind a forced command;
+     frequent rotation adds silent-lockout risk for ~no gain). **`from="192.168.39.0/24"` pin APPLIED**
+     to the live M4 line (M2=192.168.39.164, M4=192.168.39.169). Gotcha: mDNS resolves `m4-air.local`
+     to IPv6 link-local too → default ssh went v6 → outside the v4 /24 → legit M2 rejected; fixed with
+     M2 `~/.ssh/config` `Host m4-air.local\n AddressFamily inet`. Default publish path re-verified
+     passing. **Both mitigations are OUT-OF-REPO** → durability spec
+     `docs/issues/2026-08-24-e2e-publish-back-source-pin-durability.md` (bake `from=` into
+     `e2e_result_publisher_install` via `E2E_PUBLISH_FROM` + `-o AddressFamily=inet` into
+     `_e2e_publish_back_push`; a future reinstall/rotation currently DROPS the pin).
      **Still BLOCKED** on (b) hostinger node CPU exhaustion (the last gate for the 2-run acceptance).
      M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
