@@ -1,425 +1,117 @@
 # Active Context — k3d-manager
 
-> Compressed 2026-08-21 (v1.26.0 committed work complete). Settled fixes collapsed to
-> pointers; detail lives in `memory-bank/archive/`, `CHANGELOG.md`, `docs/retro/`,
-> `docs/issues/`, `docs/bugs/`, and git history.
+> Compressed 2026-08-24 (CVE panel ② saga closed → collapsed to pointers). Settled fixes
+> live as pointers; detail in `memory-bank/archive/`, `CHANGELOG.md`, `docs/retro/`,
+> `docs/issues/`, `docs/bugs/`, git history, and auto-memory.
 
 ## Current focus
 
-- **v1.27.0 foundation-managed vCluster CLI Part B DELIVERED + VERIFIED + PUSHED** — HEAD
-  `142fd06b` on `origin/k3d-manager-v1.27.0` (Codex; its own note cited `6c2dd94d` which was
-  amended away and is not in history). Rewires `vcluster.sh` to `foundation_ensure_vcluster_cli`
-  (module-scoped `_VCLUSTER_BIN`, guards non-zero + empty path), removes the consumer installer,
-  updates help/docs, reworks BATS to stub the contract. **Claude re-ran gates independently:**
-  BATS 36/36, shellcheck clean, `bash -n` clean, both disappearance greps empty, subtree
-  untouched. **LIVE `make e2e` gate PASSED for the CLI contract:** real download + SHA-verify +
-  atomic install of vcluster `0.32.1` (managed path, not PATH Homebrew), plugin created the
-  throwaway vCluster + substrate via the managed binary, teardown clean; artifact/ConfigMap/exporter
-  all carry commit `9b3a5754`. The Playwright app Job failed (`running-playwright`, pre-existing
-  app-test failure — NOT the CLI change). **Plan #1 (Parts A+B) functionally COMPLETE.** No PR yet
-  (v1.27.0-release-time step). Part A shipped as lib-foundation `v0.4.13`.
-  - ✅ **Finding 1a FIXED + LIVE-VERIFIED** (`5cd67228`): added a `num()` helper coercing
-    empty/None/non-numeric → `0` (timestamps keep integer display), routed every numeric gauge
-    emission through it so no single malformed value can zero out the whole scrape. Redeployed
-    via `kubectl apply` + `rollout restart`; live-confirmed `up{exporter}=1` (new pod, 3711
-    samples), `e2e_last_run_duration_seconds … 0`, `trivy_vulnerability_inventory`=3706 series
-    back — both E2E and CVE dashboards receiving data again.
+- **v1.27.0 active branch** (`k3d-manager-v1.27.0`, branched from v1.26.0 merge). **Scope = 4 plan
+  docs (4/5, under cap)**, dependency-ordered load-split leads (decision 2026-08-21 "keep all four"):
+  1. `v1.27.0-foundation-managed-vcluster-cli.md` — **COMPLETE.** Part A = lib-foundation `v0.4.13`
+     (PR #44 `0a3e4043`, subtree-pulled). Part B = HEAD `142fd06b` rewires `vcluster.sh` to
+     `foundation_ensure_vcluster_cli` (module-scoped `_VCLUSTER_BIN`, guards non-zero+empty). Claude
+     re-ran gates (BATS 36/36, shellcheck/`bash -n` clean, disappearance greps empty, subtree
+     untouched) + **live `make e2e` CLI-contract gate PASSED** (real download+SHA+atomic install of
+     vcluster `0.32.1` managed path; substrate rolled out; artifact/ConfigMap/exporter carry
+     `9b3a5754`). Playwright app Job failed pre-existing (not the CLI change). No PR yet (release-time).
+  2. `v1.27.0-m2-remote-e2e-runner.md` — **Increments 1–6 DONE** (inc 6 `b5fff9c4`, BATS 68/68).
+     Producer runner-provenance, consumer/exporter+Grafana `runner` dim, `e2e_remote.sh`
+     preflight/bootstrap/dispatch/restricted-publisher/lock+ops, `make e2e-remote|e2e-runner-health|
+     e2e-replay|e2e-runner-unlock`. **Remaining: 2-run live acceptance gate** (1 fail + 1 pass via
+     `make e2e-remote RUNNER=m2`) + deferred live redeploy of the inc-2 runner-labelled
+     exporter/dashboard/rule via `argocd.sh`. **BLOCKED** on (a) e2e-tests image arch — PR **#7**
+     (multiarch, `sha-52ffe10a` proven amd64+arm64) awaiting merge → rebuild `:latest`; (b) hostinger
+     node CPU exhaustion. Publish-back still unconfigured (`E2E_M2_PUBLISH_BACK_HOST` empty → results
+     retained `publication_pending`). M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
+     OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
+  3. `v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce, promoter
+     verify gate. Multi-repo, heavy. **Not started.**
+  4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **Not started.**
+  - Finding 1a — ✅ FIXED + live-verified `5cd67228` (`num()` coerces empty/None→0 so one malformed
+    value can't zero the scrape; `up{exporter}=1`, both E2E + CVE dashboards receiving data).
     `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
+  - Finding 2b — dispatcher `--confirm` strip on `deploy_app_cluster` (OPEN).
+    `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
 
-- **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged to main, tag/release published. Branch protection restored (`enforce_admins=true`, 1 required approval). Shipped 3/5 scopes (fleet node lifecycle count-agnostic, E2E promotion gate + observability, managed registration cleanup). Retrospective: `docs/retro/2026-08-21-v1.26.0-retrospective.md`.
-
-- **v1.27.0 active branch** (`k3d-manager-v1.27.0`, branched from merge commit). **Scope = 4 plan docs (4/5, under cap):**
-  1. `docs/plans/v1.27.0-foundation-managed-vcluster-cli.md` — load-split **prerequisite**. **Part A DONE:** lib-foundation `v0.4.13` released (PR #44 `0a3e4043`, tag/release live), subtree-pulled into `scripts/lib/foundation` — `foundation_ensure_vcluster_cli` vendored + verified. **Part B UNBLOCKED (next up):** rewire `scripts/plugins/vcluster.sh` to call `foundation_ensure_vcluster_cli "$VCLUSTER_VERSION"`, drop the local installer/Homebrew paths.
-  2. `docs/plans/v1.27.0-m2-remote-e2e-runner.md` — the actual E2E load-split off the M4 laptop; depends on #1 (now met). **STARTED.**
-     - Increment 1 DONE (`5c863dcc`): producer-side runner-provenance contract — E2E summary + result-event ConfigMap carry a `runner` field (default `local-m4`, `E2E_RUNNER` override), `k3dm.k3d.io/e2e-runner` label, prune keyed per (service,tier,runner). Backward-compatible; BATS 18/18 + 10/10.
-     - Increment 2 DONE (`6d2ce551`): consumer side — exporter reads `runner` (legacy→`local-m4`), adds it to metric dims + `e2e_run_info` + emitted label body; Grafana e2e dashboard gains a `runner` template var (multi/includeAll/All default), every panel filters `runner=~"$runner"`; e2e alert summaries include runner. RBAC unchanged. BATS 11/11 (+1). ⚠️ **LIVE redeploy of these platform-ops manifests DEFERRED to the plan-#2 live-accept gate** (when real `runner=m2` data exists) — live exporter is still the Finding 1a hotfix (`5cd67228`); source is ahead by the runner label. Redeploy exporter+dashboard+rule via `argocd.sh` at acceptance.
-     - Increment 3 DONE (new plugin `scripts/plugins/e2e_remote.sh`): M2 bootstrap/preflight — public `e2e_runner_preflight`/`e2e_runner_bootstrap`/`e2e_runner_status`. Pure BATS-testable gate core (`_e2e_remote_eval_gates`) + SSH probe; gates docker-up/lock-free/CPU-idle≥35% (2 samples)/mem≥25%/disk≥40GiB → structured `status=` (available|busy|docker_down|capacity_*|unreachable). Bootstrap: reachability → start OrbStack only if stopped (bounded wait) → reconcile a **dedicated** `k3d-e2e-runner` cluster (refuses hub name `k3d-cluster`) → verify vCluster CLI via foundation contract. Safe SSH opts (BatchMode, no StrictHostKeyChecking=no). BATS 17/17, shellcheck clean, `bash -n` clean. **LIVE-VERIFIED against real M2** (`k3d-manager e2e_runner_preflight` → `status=available`, cpu 70/72%, mem 46%, disk 153GiB).
-     - **M2 live resource re-check (2026-08-22, user-requested):** M2 = `m2jump`→`m2-air.local` (hostname `Mac`, user cliang), 8 cores/16 GiB, macOS 26.5.1. Host gates pass (CPU idle ~60-73%, mem 45-46% free, disk 153 GiB). **Caveats found:** (a) real container budget is the **OrbStack Linux VM cap = 7.818 GiB**, not 16 GiB — and a pre-existing `k3d-k3d-cluster` (server+3 agents) already eats ~1.8 GiB of it + ~6 GiB host swap in use → ~6 GiB free in the VM for the ephemeral E2E vCluster (workable but tight; consider tearing down M2's stray hub-shaped cluster or raising the VM mem cap before acceptance). (b) `/opt/homebrew/bin` (k3d, vcluster) is **not** on M2's non-interactive SSH PATH → remote cmds 127 without a PATH prefix; fixed via `E2E_M2_REMOTE_PATH=/opt/homebrew/bin:/usr/local/bin` injected by `_e2e_remote_ssh`. (c) An earlier probe caught OrbStack mid-`Stopped`/VM-start-timeout; it is **Running** now — the preflight's docker gate is exactly the right guard for that transient.
-     - Increment 4 DONE (`e2e_remote.sh` + Makefile): `make e2e-remote RUNNER=m2 [DIGEST=sha256:…]` → `e2e_runner_dispatch`. Validates RUNNER against an allowlist (`E2E_RUNNER_ALLOWLIST`, default `m2`; value reused verbatim as provenance, never free text) + DIGEST against `^([repo]@)?sha256:<64hex>$` (rejects injection), gates on `e2e_runner_preflight` (busy/capacity/unreachable → abort, **no local fallback**), SSHes the remote `e2e_verify_vcluster <digest>` with `E2E_RUNNER=m2`/runner KUBECONFIG/remote report dir, streams output via `tee` to a local transcript (`~/.k3dm/e2e/dispatch/m2-<ts>.log`), returns the remote exit code unchanged (`PIPESTATUS[0]`). `make e2e` unchanged. BATS 26/26, shellcheck clean, `bash -n` clean; Makefile guard verified (no RUNNER → usage+exit 2). Not live-dispatched (would consume M2 — reserved for the inc-6 acceptance).
-     - Increment 5 DONE (`e2e_remote.sh`): restricted M4-side result publisher — public `e2e_result_publish` (SSH forced command) + `e2e_result_publisher_install`. `e2e_result_publish` reads ONE JSON doc on stdin (bounded by `E2E_PUBLISH_MAX_BYTES`=64KB), strict-validates the exact E2E schema via `_e2e_publish_build` (exact allowed-key set → rejects namespace/kubeconfig/labels/annotations injection; required keys; bounded lengths + safe charsets; runner must be a **remote** allowlist member, local-m4 rejected; digest `[repo@]sha256:<64hex>` or null; exit_code 0..255; result pass|fail), then `_kubectl --context k3d-k3d-cluster -n platform-ops apply -f` a **deterministic-name** ConfigMap (`e2e-result-<runner>-<sha256_12(run_id)>`) → **idempotent per run id** (SSH retries can't dup). Hub context + namespace assigned INTERNALLY (never from payload); KUBECONFIG pinned so an inherited/sandbox context can't redirect the write; retention pruning also pinned to the hub context. Redacted audit log (run_id/runner/result/outcome only — no digest/payload). `e2e_result_publisher_install <pub>` writes an idempotent `command="…e2e_result_publish",restrict,no-pty,no-*-forwarding` authorized_keys entry (marker `e2e-m2-publisher`), refuses non-keys. Static disappearance test confirms no scp/rsync/VAULT_TOKEN/cloudflare/StrictHostKeyChecking=no and the M4 publish-kubeconfig never crosses SSH. Also fixed an inc-4 latent bug: `e2e_remote.sh` now self-defines `E2E_REPORT_DIR`/`E2E_RESULT_EVENT_*` defaults (lazy-load sources only the matched plugin, so it can't rely on e2e.sh under `set -u`). BATS 40/40, shellcheck clean, `bash -n` clean; e2e.bats(18)+e2e_observability.bats(11) still green (no regression). Publisher not live-installed (needs the dedicated M2 key — inc-6 acceptance).
-     - Increment 6 DONE (`b5fff9c4`, `e2e_remote.sh` + Makefile + BATS): §5 failure/ops. Runner lock is now an **atomic directory** (`mkdir`) holding an owner-token `meta`; `_e2e_remote_lock_acquire`/`_release` claim/free by token (release only when `grep -qxF` matches — never blind `rm`); dispatch claims the lock (busy → `_err`, **no local fallback**), sets a RETURN trap to release, and chains `e2e_runner_publish_back $rc` after the E2E preserving the remote exit code. **Publish-back (M2-side):** `e2e_runner_publish_back` finds the newest run summary (`_e2e_newest_summary`, excludes markers) or synthesizes a schema-valid failed one (`_e2e_synth_summary`, clamps exit 0..255) when a crash left none, pushes it to the M4 forced-command publisher over the dedicated key (`_e2e_publish_back_push`, `ssh -i`), else retains `*.publication_pending.json`; **always returns 0** so it can't mask the E2E rc. `e2e_runner_publish_replay` (nullglob) replays retained pendings → `*.published.json` (idempotent), non-zero while any still pending. **M4-side ops:** `e2e_runner_replay <runner>` (allowlist + reachability guarded) drives the remote replay; `e2e_runner_unlock <runner>` clears a lock ONLY past `E2E_M2_LOCK_MAX_AGE`=7200s with no live `e2e_verify_vcluster` (refuses fresh/running — never automatic, never restarts OrbStack, never deletes a cluster); `e2e_runner_health` prints **hub vs runner as distinct lines** — hub outage=critical(rc1), runner-merely-unavailable=warning(rc0) unless `E2E_RUN_REQUESTED=1`/`E2E_FRESHNESS_ALERT=1`→critical. `make e2e-runner-health`/`e2e-replay`/`e2e-runner-unlock` wired (RUNNER-guarded). BATS **68/68** (27 new), shellcheck + `bash -n` clean. Not live-dispatched yet.
-     - **Remaining:** the **2-run live acceptance gate** (1 failing + 1 passing E2E via `make e2e-remote RUNNER=m2`; confirm each result lands once in platform-ops, runner-labelled Grafana metrics, unavailable-M2 warning) — folds in the deferred live redeploy of the inc-2 runner-labelled exporter/dashboard/rule via `argocd.sh`. **BLOCKED on hostinger capacity** (see incident below): the hostinger node is CPU-saturated and istiod is down — acceptance against the full stack should wait until that is resolved.
-  3. `docs/plans/v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce (multi-repo, heavy).
-  4. `docs/plans/v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry.
-  Plans #1 and #2 (both promoted from v1.26.0 deferred, 2026-08-21, "keep all four") are the dependency-ordered chain that moves E2E off the laptop — the response to Prometheus+Grafana over-stressing the M4.
-
-- **Deferred findings from v1.26.0** (filed as tracked issues):
-  - Finding 1a — ✅ FIXED + live-verified `5cd67228` (was BLOCKING, not cosmetic). `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
-  - Finding 2b — dispatcher `--confirm` strip on `deploy_app_cluster` (OPEN). `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
-
-- **v1.25.0 released** (PR #116 `d48e465f`, tag/release live).
-- **Milestone v1.26.0 — committed work is DONE and pushed on `k3d-manager-v1.26.0`:**
-  - **Fleet node lifecycle (count-agnostic)** — Phase A shipped as lib-foundation `v0.4.12`
-    (PR #43, subtree-pulled `e60dff69`/`2c083258`); Phase B implemented `b0fe320a` and
-    live-verified at `ACG_AGENT_COUNT=4` (5 nodes = ACG cap). Two live-only defects found +
-    fixed (`_k3s_agent_is_ready` private-IP match; `fleet-plan` change-set) — `46bfdf1c`,
-    memory-bank followup `35e9ecf2`. Suite 17/17, teardown clean. **DONE.**
-  - **E2E promotion-gate + durable artifacts** — live acceptance GREEN 2026-08-21: run →
-    `~/.k3dm/e2e/*.json` artifact → result-event ConfigMap → exporter `e2e_*` gauges →
-    dashboard/alert. **DONE.**
-  - **Stale managed-registration cleanup** — live acceptance GREEN 2026-08-21 on a real
-    expired sandbox; 23 unrelated survivors exact-match, hostinger untouched. Found + fixed
-    BLOCKING Finding 2a (`cleanup-stale-clusters` hung — Secret-first + `--wait=false` fix,
-    `0274fdde`). **DONE.**
-  - Live-acceptance findings: `docs/bugs/2026-08-21-lifecycle-e2e-live-acceptance-findings.md`
-    and `docs/bugs/2026-08-21-fleet-phaseb-live-verification-findings.md`.
-- **Load-split promoted into v1.27.0** (2026-08-21): the two v1.26.0-deferred plans
-  (foundation-managed vCluster CLI → M2 remote E2E runner) are renamed to `v1.27.0-*` and
-  are the leading dependency-ordered work. v1.27.0 now holds 4 plan docs (4/5, under cap).
-  v1.28.0 planned: parallel multi-cloud provisioning + zero-downtime rollouts.
+- **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged, tag/release published, protection restored
+  (`enforce_admins=true`, 1 approval). Shipped 3/5 scopes (fleet count-agnostic lifecycle, E2E
+  promotion gate + observability, managed registration cleanup). Retro
+  `docs/retro/2026-08-21-v1.26.0-retrospective.md`. v1.25.0 = PR #116 `d48e465f`.
+- v1.28.0 planned: parallel multi-cloud provisioning + zero-downtime rollouts.
 
 ## Open follow-ups
 
-- **2026-08-22 CVE dashboard Hostinger manifest-authoring fix committed** — `84817d88`
-  adds a Hostinger-only read-only vulnerabilityreports reader ApplicationSet/RBAC, hub
-  platform-ops ESO wiring for `app-cluster-kubeconfig`, and the minimal exporter stderr
-  warning. No live cluster, ServiceAccount token, or Vault mutation was performed. Focused
-  provider suite passed 54/54. Curated suite recorded unrelated failures in
-  `docs/issues/2026-08-22-manifest-authoring-test-failures.md`. PR: none (user explicitly
-  requested commit+push without opening a PR).
+- **✅ CVE panel ② ("Shopping-cart Unique CVEs") — RESOLVED + DURABLE (2026-08-24).** 75 actionable
+  `trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}` series, native
+  operator-generated (self-refreshing 24h TTL), Prometheus-verified. Three durable commits in
+  `trivy-operator-acg-values.yaml`: `49477017` (`trivy.slow`+`timeout 15m0s`) + `8bfcbcc9` (scan-job
+  CPU request `50m→10m`) + **`aac9cb27` (`operator.privateRegistryScanSecretsNames` +
+  `accessGlobalSecretsAndServiceAccount: true`)**. Real root cause: workloads carry NO imagePullSecret
+  anywhere (pod spec AND `default` SA empty) → private images pull via node-level containerd cred,
+  invisible to the operator → silent skip; operator-upgrade is a dead end. Manual-CR stopgap (352
+  all-sev) deleted in favor of native (75 actionable). Hub-side wiring (RBAC/ESO/appset `84817d88`,
+  live Vault SA + policy fixes `9c9c8bb8`/`0f7ea0ad`) complete + verified end-to-end.
+  Bug: `docs/bugs/2026-08-24-trivy-operator-skips-private-images-sa-imagepullsecret.md`.
+  Auto-memory: `reference_trivy_operator_node_cred_private_image_skip`.
+  - **Remaining (release mechanics, non-blocking; live behavior already correct):**
+    (a) `acg-trivy-operator` shows 3 resources OutOfSync (two configmaps + deployment env patched
+    live) → converge via `argocd app sync acg-trivy-operator` or release-time observability-acg
+    appset reapply at v1.27.0. (b) `allow-cve-scan-egress` netpol (live-applied, podSelector
+    `app.kubernetes.io/managed-by=trivy-operator`, needed because payment's `default-deny-all` blocks
+    the in-namespace scan pod) needs a durable home in the **shopping-cart-payment** repo (cross-repo,
+    spec+Codex, gated). The originally-planned (a) pod-spec imagePullSecrets / (b) scan-CR CronJob /
+    (c) operator upgrade are UNNECESSARY / redundant+harmful / dead — see bug doc "reassessed".
+  - ⚠️ The 2026-08-23 "ArgoCD stale-render bug" was a **mis-diagnosis** (I read the hub's own trivy
+    configmap, not hostinger's `acg-trivy-operator`, which has no `automated` syncPolicy so manual
+    patches stick). Durable git fixes are correct + live.
 
-- **2026-08-24 CVE panel ② ✅ POPULATED + PROMETHEUS-VERIFIED (352 series).** The empty-panel saga
-  is closed. Two fixes + one workaround got real shopping-cart CVEs flowing:
-  1. **Timeout fix (durable, `49477017`):** after the `10m` request trim let scan pods schedule,
-     every job died `DeadlineExceeded` at 5m (`trivy.timeout: 5m0s` too short in ClientServer+slow on
-     the CPU-contended node). Added `trivy.slow: true` + `trivy.timeout: 15m0s` to
-     `trivy-operator-acg-values.yaml`; live configmap patched to 15m. Public-image scans then
-     completed → **13 public-image reports** flowing.
-  2. **Root cause of the *remaining* gap — trivy-operator 0.32.0 silently skips private images whose
-     pull cred is a ServiceAccount `imagePullSecrets`** (the `ghcr.io/wilddog64/shopping-cart-*`
-     workloads). No scan job, no error. Config levers (`useGCRServiceAccount=false`,
-     `scanJobsInSameNamespace=true`, `OPERATOR_ACCESS_GLOBAL_SECRETS_SERVICE_ACCOUNTS=true`) ALL
-     no-op; reverted. Proven scannable via a one-off Job mounting `ghcr-pull-secret` (~5s success).
-     Bug: `docs/bugs/2026-08-24-trivy-operator-skips-private-images-sa-imagepullsecret.md`.
-  3. **CORRECTED root cause + NATIVE DURABLE FIX (`aac9cb27`):** the real cause was NOT
-     "SA-level imagePullSecret unresolved" — the workloads carry **no imagePullSecret anywhere**
-     (pod spec AND `default` SA both empty); they pull via a **node-level k3s/containerd registry
-     cred**, invisible to the operator. So an operator *upgrade* is a dead end (nothing to discover).
-     Native fix = `operator.privateRegistryScanSecretsNames: {shopping-cart-apps: ghcr-pull-secret,
-     shopping-cart-payment: ghcr-pull-secret}` + pinned `accessGlobalSecretsAndServiceAccount: true`
-     in `trivy-operator-acg-values.yaml`. Operator then runs its own in-namespace scan jobs (mounts
-     the secret) → self-refreshing reports (24h TTL) under its `ignoreUnfixed`+`CRITICAL,HIGH` policy.
-     **Live-verified:** all 5 workloads scanned natively; hub Prometheus panel ② = **75 actionable
-     series** (was 352 from the deleted manual CRs — the drop is correct: manual = all-sev+unfixed,
-     native = actionable only, consistent with every other service). Manual CRs deleted; earlier
-     config-lever drift reverted. **`allow-cve-scan-egress` netpol retargeted** to
-     `app.kubernetes.io/managed-by=trivy-operator` (payment's default-deny-all blocks the in-ns scan
-     pod's egress) — durable home is the shopping-cart-payment repo (cross-repo companion).
-  - **CORRECTION to the 2026-08-23 "ArgoCD stale-render bug" below:** that was a mis-diagnosis — I
-    was reading the *hub's own* trivy-operator configmap, not hostinger's `acg-trivy-operator`.
-    Hostinger's configmap already read `10m`; the `acg-trivy-operator` app has NO `automated`
-    syncPolicy (selfHeal off) so manual patches stick. The durable `8bfcbcc9`/`49477017` git fixes
-    are correct and live.
-  - **⚠️ Remaining (non-blocking, release mechanics):** (a) `acg-trivy-operator` shows 3 resources
-    OutOfSync (the two configmaps + deployment env I patched live) — converge with `argocd app sync`
-    or the release-time observability-acg appset reapply at v1.27.0; live behavior already correct.
-    (b) the `allow-cve-scan-egress` netpol needs a durable home in the shopping-cart-payment repo.
-    The originally-planned (a) pod-spec imagePullSecrets / (b) scan-CR CronJob / (c) operator upgrade
-    are now UNNECESSARY/redundant/dead — see bug doc "reassessed".
+- **Keycloak hub deploy DONE + dev SSO RESOLVED (2026-08-22).** `keycloak-0` 1/1, VirtualService
+  live (`keycloak.3ai-talk.org/realms/master` 200); port-forward remote-port bug fixed (`04cc1e14`,
+  →8080). Realm `home` (`dc=home,dc=org`) is the DESIGNED truth; admin/developer/operator synced,
+  the only gap was missing LDAP passwords — fixed `bin/cluster-up` step 10d.5 seed loop (`9efb23f7`)
+  + live `seed-dev-sso-passwords.sh` (all 3 verified via ldapwhoami, mirrored to
+  `secret/keycloak/users/*`). Steps 10d.6/10d.7 realm-federation reconcile are broken+redundant →
+  follow-up: delete or retarget `-r home`. **SSO login round-trip to realm `home` still to be
+  confirmed by user.** Docs `docs/bugs/2026-08-22-keycloak-*`, `-hub-openldap-wrong-realm-*`.
 
-- **2026-08-23 CVE panel ② LIVE WIRING (Claude ran the GitOps half; user runs Vault half):**
-  - Re-applied `platform` AppProject (`envsubst '$ARGOCD_NAMESPACE'=cicd` on
-    `projects/platform.yaml.tmpl` + `kubectl apply --server-side`) → cleared the
-    `InvalidSpecError` (live project lacked the `platform-ops` destination Codex added to
-    the template — classic "committed config inert until reapplied"). ArgoCD ns is **cicd**.
-  - **ESO schema bug found + fixed** (`9c9c8bb8`): Codex's `app-cluster-kubeconfig-externalsecret.yaml`
-    used `spec.target.template.stringData` — not a field in the `external-secrets.io/v1`
-    template schema; ArgoCD apply failed `field not declared in schema`. Renamed to `data:`
-    (rendered-string map). Committed+pushed to `k3d-manager-v1.27.0`.
-  - Had to **terminate a stuck sync operation** (json patch `remove /operation`) that was
-    retrying the old `stringData` manifest and blocking new syncs, then hard-refresh + re-sync.
-  - `hub-platform-ops` now **Synced/Succeeded**; ExternalSecret `app-cluster-kubeconfig`
-    **created** in `platform-ops`, currently `SecretSyncedError: could not get secret data
-    from provider` — expected, Vault lacks `secret/data/platform-ops/app-cluster-hostinger`.
-  - **Vault credential written** (user ran `cve-panel2-live.sh`): read-only hostinger SA
-    (`platform/hub-cve-inventory-reader`, get/list/watch vulnerabilityreports only) minted,
-    `{server,caData,bearerToken}` in Vault `secret/data/platform-ops/app-cluster-hostinger`.
-  - **ESO Vault-policy gap found + fixed** (`0f7ea0ad` durable + live-patched via
-    `cve-panel2-vault-policy.sh`): `eso-ldap-directory` policy (generated from
-    `LDAP_VAULT_POLICY_PREFIX` in `scripts/etc/ldap/vars.sh`) didn't grant `platform-ops`
-    → 403. Added `platform-ops` to the prefix (durable) + wrote the live policy. ES then
-    `Ready=True SecretSynced`; Secret `app-cluster-kubeconfig` (keys `config`,`server`) materialized.
-  - **WIRING NOW COMPLETE + VERIFIED END-TO-END.** Exporter restarted, mounts
-    `/etc/app-cluster/{config,server}`, `app_target()` succeeds (no WARNING), SA can list
-    hostinger vulnerabilityreports (`auth can-i` → yes). Exporter `/metrics` = 3706 series.
-  - **REMAINING BLOCKER IS NOT THE WIRING — it's hostinger having ZERO vulnerabilityreports.**
-    Panel ② is empty because hostinger produces no Trivy reports:
-    - trivy-operator (`acg-trivy-operator`) + trivy-server-0 both Running/healthy;
-      shopping-cart workloads all Running; `OPERATOR_TARGET_NAMESPACES=` (all ns, in scope).
-    - Scan jobs from ~28h ago died `connection refused` to `trivy-service:4954` (transient
-      during trivy-server-0's restart). Self-healed, but no report ⇒ no TTL ⇒ no rescan trigger.
-    - Restarted the operator (2026-08-23) → it spawned 11 fresh scan jobs → **all `Pending`,
-      `FailedScheduling: Insufficient cpu`.** Node `srv1754834` is **2 CPU, 1960m/2000m (98%)
-      requests reserved** by legit workloads (payment 200m, rabbitmq 200m, 3×postgres, minio,
-      order, basket, loki, istio, coredns, metrics-server). ~40m free; each scan pod needs
-      ~100m+ (trivy 50m + install-cni 50m + istio-proxy). Same 2-CPU squeeze as
-      `docs/bugs/2026-07-22-hostinger-trivy-cpu-oversubscription-502.md` (that fix trimmed the
-      trivy *server* request; now the scan *jobs* can't fit either).
-    - trivy config is **ArgoCD-managed** (`argocd.argoproj.io/tracking-id`) → live edits revert;
-      durable fix belongs in git.
-  - **DECISION (user, 2026-08-23): durable request trim in git.** Chose to trim the trivy
-    scan-job CPU *request* (fully k3d-manager-scoped, app workloads untouched, matches the
-    v1.16.0 precedent) over app-workload trims (payment/rabbitmq live in shopping-cart repos,
-    would need cross-repo PRs). Spec:
-    `docs/bugs/2026-08-23-hostinger-trivy-scanjob-cpu-request-unschedulable.md`.
-  - **FIX SHIPPED** (`8bfcbcc9`): `trivy.resources.requests.cpu 50m→10m` in
-    `scripts/etc/helm/observability/trivy-operator-acg-values.yaml` (limits kept at 500m so real
-    scans burst; memory untouched — OOM risk). A 3-container scan pod now reserves 30m, fits the
-    ~40m headroom. **Made live:** `acg-trivy-operator` is multi-source with `$values` frozen at
-    v1.26.0 — reapplied the `observability-acg` ApplicationSet at
-    `K3D_MANAGER_BRANCH=k3d-manager-v1.27.0 APP_CLUSTER_NAME=ubuntu-hostinger ARGOCD_NAMESPACE=cicd`
-    (⚠️ first reapply forgot `APP_CLUSTER_NAME` → literal in appset; fixed on the 2nd apply).
-    `$values` ref now v1.27.0; ArgoCD auto-sync re-rendering the Helm release.
-  - **BLOCKED by an ArgoCD render bug** (`docs/bugs/2026-08-23-argocd-multisource-values-stale-render.md`):
-    ArgoCD renders a STALE `50m` for this multi-source app's `$values` ref and selfHeal reverts any
-    manual 10m patch (~10s), even though it resolves the correct SHA `b97c9dcd` and a fresh
-    `git clone` INSIDE the repo-server pod returns `10m`. Tried: hard-refresh ×N, restart
-    repo-server / application-controller / redis (×2), Replace sync, non-cascading app delete +
-    appset regen, SHA-pinned `$values` — none applied 10m. Known ArgoCD multi-source ref-source
-    stale-render class. **The durable git fix (`8bfcbcc9`) is correct and in place; ArgoCD just
-    won't apply it.**
-  - **IMMEDIATE UNBLOCK (user-run — classifier blocks appset syncPolicy edits + configmap patches
-    get selfHeal-reverted for Claude):** `scratchpad/cve-panel2-unblock-scans.sh` disables the
-    `observability-acg` appset auto-sync, patches the configmap to 10m, restarts the operator,
-    clears stuck scan jobs → scans run → reports appear → panel ② fills. Leave auto-sync off until
-    the ArgoCD bug is fixed.
-  - **Follow-ups:** upgrade/patch ArgoCD for the ref-source cache bug; consider de-multi-sourcing the
-    obs apps; add `argocd_check_values_branch` to the release checklist. (⚠️ observability-acg appset
-    was reapplied to v1.27.0 during this — a required release step per CLAUDE.md was thus done for
-    this appset; the hub-side platform-ops appset + hostinger CVE-reader appset still need wiring/
-    reapply as noted earlier.)
+- **hostinger istiod-scheduling cascade RESOLVED — 3/3 (2026-08-22).** Single 2-CPU node
+  `srv1754834` chronically 95–98% CPU requests; istiod Pending 2d → ambient mesh down →
+  product-catalog CrashLoop + frontend stuck. Break-glass restored istiod+frontend; product-catalog
+  durable via PR #49 `505f758a` (cpu 100m→50m). **ArgoCD source gotcha (keep):** the hub app reads
+  `repo=k3d-manager rev=k3d-manager-v1.26.0` whose kustomization pulls REMOTE
+  `shopping-cart-product-catalog//k8s/base?ref=main`; a `refresh=hard` annotation re-fetched `ref=main`
+  → OutOfSync, user-run `kubectl patch cpu=50m` landed it (durable, selfHeal won't revert).
 
-- **2026-08-22 CVE dashboard empty tables diagnosed:** the hub exporter is healthy (`up=1`, 3,701
-  `trivy_vulnerability_inventory` series) and the exact platform query returns 3,586 rows; Grafana's
-  datasource API also returns frames. Shopping-cart returns zero because its healthy Applications target
-  the separate `ubuntu-hostinger` cluster and the hub exporter has no remote-cluster reports. Remediation
-  event metrics are also zero because completed verifier jobs produced no event records. Evidence and
-  follow-up design are recorded in `docs/issues/2026-08-22-cve-dashboard-empty-tables.md`; no live or
-  dashboard changes were made.
-
-- **2026-08-22 service-credentials incident** (`docs/issues/2026-08-22-service-credentials-na-multi-root-cause.md`):
-  `make show-service-passwords` all-N/A + no login had THREE independent causes.
-  (1) ✅ FIXED: `com.k3d-manager.vault-port-forward` plist was missing from
-  `~/Library/LaunchAgents/` (only the `vault-failover` watchdog remained, which does
-  NOT own :18200) → nothing on 127.0.0.1:18200 → every Vault-sourced cred N/A.
-  `make install-vault-port-forward` restored it (Grafana/Alertmanager resolve; ArgoCD
-  works via `argocd admin initial-password -n cicd`). (2) Vault KV lost its display-mirror
-  paths (only `ldap/`+`observability/` remain); ArgoCD/Prometheus/Alertmanager are NOT
-  ESO-managed so services are unaffected — display-only. ArgoCD re-seed one-liner handed to
-  user. (3) **Keycloak never deployed on the hub** (no pod/app/keycloak-Vault-paths) → the
-  only genuine login blocker (admin + frontend SSO); spec at
-  `docs/bugs/2026-08-22-keycloak-not-deployed-on-hub-sso-down.md`. NOTE: hub Prometheus is
-  UNAUTHENTICATED (empty `spec.web`, no edge basic-auth; prometheus.3ai-talk.org→:19090→200
-  open) — `observability_rotate_prometheus_basic_auth` targets the ACG app cluster, NOT the
-  hub, so it was deliberately NOT run. Also Makefile show-service-passwords reads wrong
-  keycloak secret name (`keycloak-secrets` vs deploy's `keycloak-admin-secret`).
-
-- **2026-08-22 hostinger istiod-scheduling cascade** — single 2-CPU node
-  (`srv1754834`) chronically at 1910–1960m/2000m (95–98%) CPU requests. `istiod`
-  (requests 100m) sat **Pending 2d** (FailedScheduling ×581) → ztunnel/istio-cni
-  couldn't wire ambient-mesh routing → `product-catalog` CrashLoopBackOff ×570
-  (`postgresql-products ... Connection refused` despite postgres Running) +
-  `frontend` new pod stuck ContainerCreating 2d. Surfaced as `make status`
-  Product-images 502 + frontend churn. **NOT** stale resources ("23 unknown" was
-  the benign ArgoCD operation-status filter); cleanup-stale had nothing to clean.
-  **Break-glass (user-approved, `product-catalog`→0):** freed 100m → istiod
-  scheduled+Ready instantly → mesh recovered → frontend `578f549949` went 1/1.
-  **But `product-catalog` (Product images) can't be restored by break-glass:** node
-  is ~10m too tight to run it *alongside* istiod, and **ArgoCD reverts any scale-down
-  in ~14s** (trivy-server `--replicas=0` self-restored). Durable fix REQUIRED —
-  **RESOLVED — PR #49 `505f758a` (shopping-cart-product-catalog):** cpu 100m→50m
-  trimmed in `k8s/base/deployment.yaml:63`. **ArgoCD source gotcha (keep):** the hub app
-  `ubuntu-hostinger-shopping-cart-product-catalog` (ns `cicd`) reads
-  `repo=k3d-manager path=services/shopping-cart-product-catalog rev=k3d-manager-v1.26.0`,
-  whose kustomization pulls a REMOTE base `shopping-cart-product-catalog//k8s/base?ref=main`.
-  So #49 IS in the render path, but ArgoCD's tracked revision (k3d-manager) never changed,
-  so it kept a cached 100m render and reported Synced. Sequence that landed it:
-  (1) `argocd.argoproj.io/refresh=hard` annotation → re-fetched `ref=main`, app went
-  **OutOfSync** (target 50m vs live 100m); (2) selfHeal stalled (app Progressing on the
-  41m-Pending pod) and manual `kubectl patch`/`argocd sync` were auto-mode-classifier
-  BLOCKED; (3) user ran the `kubectl patch deploy … cpu=50m` manually → new pod scheduled
-  in the ~90m headroom, went 1/1 Ready, app now **Synced + Healthy**, seed/fts-index jobs
-  fired. Patch is durable (live==git 50m, selfHeal won't revert).
-  Recovery outcome: **3/3** (istiod + frontend + product-catalog all up).
-
-- **2026-08-22 Keycloak hub deploy — DONE (reachable), dev-users BLOCKED.**
-  `deploy_keycloak --enable-ldap --enable-vault`
-  (`KEYCLOAK_VIRTUALSERVICE_HOST=keycloak.3ai-talk.org`) → `keycloak-0` 1/1,
-  `keycloak-admin-secret` + `secret/keycloak/admin` seeded, VirtualService live.
-  **Port-forward bug found+fixed:** `bin/cluster-up:1544` installed the :8880
-  forward against remote port 80 but `svc/keycloak` is 8080 (+ healthz `/health/live`
-  404s) → every restart failed → public 502. Fixed source (`04cc1e14`, →8080 +
-  `/realms/master` healthz) + live stopgap on the installed wrapper + kickstart →
-  local :8880 and public `keycloak.3ai-talk.org/realms/master` both **200**. Spec
-  `docs/bugs/2026-08-22-keycloak-port-forward-wrong-remote-port.md`.
-  **dev SSO — RESOLVED 2026-08-22 (code-fixed `9efb23f7`; live seed applied).** The
-  direction was inverted: `dc=home,dc=org` + `ldap-admin` + realm **`home`** is the
-  DESIGNED truth (`ldap/vars.sh`, `keycloak/vars.sh:38 KEYCLOAK_REALM_NAME=home`);
-  `shopping-cart` is only the smoke realm. Live-verified: realm `home` already has
-  working LDAP federation (`realm-config.json.tmpl`), and admin/developer/operator
-  are already synced into Keycloak — the ONLY gap is those 3 have **no LDAP
-  password** (login can't validate). Fixed `bin/cluster-up` step 10d.5 seed loop
-  (label `openldap-stack-ha`, port 1389, `cn=ldap-admin,dc=home,dc=org`,
-  `ou=users,dc=home,dc=org`). Steps 10d.6/10d.7 (realm-federation reconcile) are
-  broken (target realm `shopping-cart`, path `/opt/keycloak/bin` vs Bitnami
-  `/opt/bitnami/keycloak/bin`, no writable HOME) AND redundant → follow-up: delete
-  or retarget to `-r home`. Live fix applied: `seed-dev-sso-passwords.sh` run
-  out-of-band (classifier-blocked in-agent), all 3 users "LDAP password set +
-  verified" via ldapwhoami; passwords mirrored into `secret/keycloak/users/*`.
-  Retrieve with `bin/vault-exec --namespace secrets -- vault kv get -field=password
-  secret/keycloak/users/admin`. SSO login round-trip to realm `home` still to be
-  confirmed by user. `docs/bugs/2026-08-22-hub-openldap-wrong-realm-blocks-sso-users.md`.
-
-- **2026-08-22 Prometheus password N/A in `make show-service-passwords`.** Root
-  cause: the entire `secret/k3d-manager` Vault subtree was wiped in a rebuild
-  (display-only mirror, not ESO-managed), so `secret/k3d-manager/prometheus-basic-auth`
-  is absent. :18200 port-forward is UP; hub Prometheus does not enforce basic-auth
-  (`.spec.web` empty) so the value is display-only. Fix = re-seed the Vault path
-  (scratchpad `seed-prometheus-display-cred.sh`; classifier-blocked in-agent).
-  Cross-ref `reference_show_service_passwords_na_root_causes` cause (2).
-
-- **2026-08-22 v1.27.0 plan #2 live-acceptance — M2 runner PROVISIONED; gate now only
-  capacity-gated on M2 interactive load (NOT hostinger, NOT setup).** Connection verified
-  green (SSH `m2jump`→`m2-air.local`, OrbStack Running, `e2e-runner-health`
-  hub=ok/runner=available). Full provisioning completed this session:
-  1. **Lock-acquire false-busy (code bug, spec filed `89d4c67f`):** `_e2e_remote_lock_acquire`
-     bare `mkdir` (no `-p`) misreports missing parent `$HOME/.k3dm/e2e` as "busy (lock
-     held)"; `unlock`/`health` disagree (`[ -e ]`). Fix = `mkdir -p` parent before atomic
-     leaf mkdir. `docs/bugs/2026-08-22-e2e-m2-runner-lock-acquire-missing-parent-dir.md`.
-     Worked around live (`ssh m2jump 'mkdir -p ~/.k3dm/e2e'`). CODE FIX STILL TODO.
-  2. **M2 repo was stale at `k3d-manager-v1.7.2`** (e2e fns absent) + **no GitHub fetch
-     access** (`Permission denied (publickey)`). Fixed by user-approved **rsync overlay
-     M4→M2** (no `--delete` — M2 has its own docs/scratch; excluded `.git/ node_modules/
-     scratch/`). e2e_verify_vcluster + e2e_runner_publish_back now present on M2. Durable
-     gap remains: dispatch has NO repo-sync step + bootstrap doesn't pin runner repo rev
-     → re-rsync each release until addressed (noted in the lock bug doc's follow-up).
-  3. **Bootstrap ran** (`e2e_runner_bootstrap`): k3d `e2e-runner` cluster created on M2 +
-     `~/.kube/e2e-runner.yaml` written (fixed the "Host cluster context not available"
-     error). WARN VCLUSTER_VERSION unset → CLI pin check skipped (non-fatal).
-  4. **Bootstrap kubeconfig bugs (code, doc `c679f3ad`):** `_e2e_remote_reconcile_cluster`
-     uses `--kubeconfig-update-default=false` → k3d writes NO kubeconfig; and
-     `--kubeconfig-switch-context=false` → no current-context. Harness fails "Host cluster
-     context not available". Workaround live: `ssh m2jump 'k3d kubeconfig get e2e-runner >
-     ~/.kube/e2e-runner.yaml'`. Fix = `k3d kubeconfig get` after create.
-  With all four cleared, the **full E2E ran end-to-end on M2** (run8): vcluster created +
-  API ready, substrate applied, **postgres + redis rolled out**. It then FAILED (real,
-  not infra) on **product-catalog/basket/order `ImagePullBackOff` → 403 pulling
-  `ghcr.io/wilddog64/shopping-cart-*`**. Cause: off-hub ghcr-pull-secret path tries Vault
-  (no hub ctx on M2 → errors) then falls back to M2 `gh` token — logged in as wilddog64
-  (owner) but scopes lack **`read:packages`** → 403. FIX (one-time on M2):
-  `gh auth refresh -h github.com -s read:packages`. Also **publish-back unconfigured**
-  (`E2E_M2_PUBLISH_BACK_HOST` empty) → results retained `publication_pending`, never reach
-  hub/Grafana; need publish-back set OR `make e2e-replay RUNNER=m2`. All in doc
-  `docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md`.
-  5. **ghcr auth fixed** (user ran `gh auth refresh -s read:packages` on M2 — scopes now
-     include `read:packages`) + **stale product-catalog pin fixed** (`sha-6ca5e88d…` aged
-     out of ghcr 404 → bumped to `sha-505f758a…`, committed `d719cc72`; doc
-     `2026-08-22-e2e-substrate-stale-product-catalog-image-pin.md`). With those, **run10
-     (2026-08-22) had the substrate FULLY green** — postgres/redis/**product-catalog/basket/
-     order all rolled out**, seed job complete, Playwright Job launched.
-  6. **7th blocker (external, HIGH): the Playwright image is amd64-only.**
-     `ghcr.io/wilddog64/shopping-cart-e2e-tests:latest` OCI index has only `amd64/linux`
-     (verified via ghcr manifest) — the M2 arm64 k3d node refuses the pull ("no match for
-     platform in manifest") → job `DeadlineExceeded`, result `fail`/phase running-playwright.
-     App images ARE multi-arch (pull fine). M4 worked only via OrbStack amd64 emulation.
-     **Fix = rebuild e2e-tests multi-arch (buildx amd64+arm64) in the shopping-cart repo.**
-     Doc `docs/bugs/2026-08-22-e2e-tests-image-amd64-only-blocks-arm64-m2-runner.md` (`f445c0d1`).
-     **Fix SPEC'd + handed to Codex** in the shopping-cart-e2e-tests repo:
-     `docs/plans/e2e-image-multiarch.md` on branch `feat/e2e-image-multiarch` (`dc8bb43`) —
-     add `setup-qemu-action` + `platforms: linux/amd64,linux/arm64` to `publish-image.yml`
-     (Dockerfile is arch-clean, no change). Acceptance gate unblocks once that merges + rebuilds.
-     **Codex implemented it directly via `codex exec` (Option B, danger-full-access) — SHA
-     `52ffe10a` on `origin/feat/e2e-image-multiarch`, INDEPENDENTLY VERIFIED** (only the
-     workflow changed, +3 lines, actions pinned, main untouched).
-     **2026-08-22 eve: PROVEN + PR OPEN.** Dispatched `Publish E2E Image` on the branch
-     (run 32613454907) → green in 10m (arm64 QEMU leg slow but OK); `sha-52ffe10a` tag is
-     now multi-arch (`docker manifest inspect` → amd64 + arm64, `provenance:false` dropped
-     the unknown/unknown entry). PR **#7** opened (base main). **MERGE is gated — awaiting
-     user go.** On merge, publish-image.yml rebuilds `:latest` (gated to default branch) →
-     then re-run `make e2e-remote RUNNER=m2` for the first real Playwright pass.
-  **Runner harness is proven end-to-end** (dispatch→SSH→OrbStack→k3d→vCluster→substrate→
-  Playwright launch); the ONLY remaining failure is the external e2e-tests image arch.
-  **The 2-run acceptance gate (1 pass) is BLOCKED on PR #7 merge + rebuild.** Publish-back
-  still unconfigured (results retained `publication_pending`) — separate gap.
-
-- **2026-08-22 CVE dashboard shopping-cart panel — root-caused + spec'd + HANDED TO CODEX.**
-  Panel ② ("Shopping-cart Unique CVEs") empty because hub exporter Secret
-  `app-cluster-kubeconfig` is ABSENT in platform-ops (optional mount → empty
-  `/etc/app-cluster` → `app_target()` returns None → hostinger never queried). Hostinger HAS
-  the reports (trivy-operator running, fresh `wilddog64/shopping-cart-*` VulnerabilityReports)
-  — hub-side config gap, NOT a federation build. Fix = read-only hostinger SA token via
-  Vault+ESO → materialize `app-cluster-kubeconfig` (keys `server`+`config`). Spec
-  `docs/bugs/2026-08-22-cve-dashboard-shopping-cart-hostinger-app-cluster-secret.md` (`4d591157`),
-  assigned to Codex.
-  **DELIVERED by Codex (Option B) — SHA `84817d88` on `origin/k3d-manager-v1.27.0`,
-  INDEPENDENTLY VERIFIED.** Manifests only, NO live mutation performed: `rbac.yaml`
-  (dedicated SA in ns `platform`, ClusterRole get/list/watch on `vulnerabilityreports`
-  only — no cluster-admin), `app-cluster-kubeconfig-externalsecret.yaml` (ESO
-  `vault-backend` ClusterSecretStore, all values from Vault `platform-ops/app-cluster-hostinger`,
-  bearerToken not admin cert, keys `server`+`config` match contract, no secrets in git),
-  `platform-ops.yaml`/`hostinger-cve-inventory-reader.yaml` appsets + `platform.yaml.tmpl`
-  destination + `k3s-hostinger.sh` reapply + BATS contract; exporter.py got a one-line
-  stderr warning (mount/optional:true untouched, no dashboard JSON change). Matched
-  `external-secrets.io/v1` + `vault-backend` idiom of sibling `grafana-admin-externalsecret.yaml`.
-  **REMAINING (user, live): run scratchpad `cve-panel2-live.sh` (applies RBAC to hostinger
-  directly + mints long-lived SA token Secret + writes server/caData/bearerToken to Vault
-  `secret/platform-ops/app-cluster-hostinger` via REST, token via header file). THEN the
-  hub sync: (A) `envsubst < applicationsets/platform-ops.yaml | kubectl apply` (hub ArgoCD)
-  → ESO renders `app-cluster-kubeconfig`; (B) `kubectl apply -f
-  platform-ops/vulnerability-inventory-exporter.yaml` + `rollout restart` the exporter;
-  (C) verify `count(trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}) > 0`.**
-  **TWO WIRING GAPS found tracing the delivery (v1.27.0 follow-ups):**
-  (1) the new hub `platform-ops` ApplicationSet is NOT applied by anything —
-  `deploy_argocd_platform_ops` applies platform-ops files one-by-one and does NOT include the
-  ExternalSecret; only the DE-SCOPED OCI provider loops `applicationsets/*.yaml`. Needs a
-  hub-side appset reapply (or fold the ExternalSecret into `deploy_argocd_platform_ops`).
-  (2) the `hostinger-cve-inventory-reader` appset destination `ubuntu-hostinger` won't resolve
-  — hostinger is NOT registered as an ArgoCD cluster secret on the hub (per the spec's own
-  Follow-up). RBAC works today only because the live script `kubectl apply`s it directly to
-  the hostinger context; ArgoCD-managed durability is blocked on cluster registration.
-  Panels ① (platform — works, screenshot was transient) and ③
-  (remediation — `cve_remediation_event_info`=0, no remediation has run on a 2d cluster;
-  scans fire 1st/15th) are OUT OF SCOPE (expected-empty). Ref Codex investigation
-  `docs/issues/2026-08-22-cve-dashboard-empty-tables.md`.
-
-- **Dependabot alert #6 (js-yaml)** — remediated upstream as lib-foundation `v0.4.11`,
-  subtree-pulled (`1bf1d2ce`, vendored lockfile `3.15.1`). Still reads `open` only because
-  Dependabot scans the default branch (main = v1.25.0); **auto-closes when v1.26.0 → main.**
-  Dev-only transitive dep, low effective risk.
-- **Un-fixed findings** (filed as tracked issues, deferred out of v1.26.0):
-  - Finding 2b — dispatcher `deploy_*` guard strips `--confirm` from `deploy_app_cluster`;
-    use a lib-sourcing wrapper. Shared-guard blast radius.
-    `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
-- Replace the interim in-cluster CVE promoter git-writer token with a fine-grained
-  contents-write-only PAT.
-- Reconcile stale local port-forward/LaunchAgent state when public Grafana or status probes
-  fail (see `reference_single_service_502_zombie_port_forward` in auto-memory).
-- Keep the ArgoCD smoke credential-drift and k3s-aws SSM registration issues visible in
-  `docs/issues/`/`docs/bugs/` until their live follow-ups close.
-- 2026-08-20 provisioning/recovery batch (all landed + pushed, recorded in `docs/issues/`):
-  k3s-aws SSM→SSH fallback (`fef71219`/`40f1d19a`/`2424f55f`), kubeconfig TLS SAN loopback
-  fix (`3603b60c`), SSM Vault-bridge selects SSH, data-layer CoreDNS alias + guarded
-  `make down CLEANUP_STALE=1` (`316f26d2`/`f24c0c96`, implies `--keep-hub`), hostinger-only
-  hub rebuild, cloudflared IPv4-loopback pin. Account-level SSM Default Host Management Role
-  remains an optional infra follow-up.
+- **Other live/tracked follow-ups:**
+  - Replace the interim in-cluster CVE promoter git-writer token with a fine-grained
+    contents-write-only PAT.
+  - Reconcile stale port-forward/LaunchAgent state on public Grafana/status probe failures
+    (`reference_single_service_502_zombie_port_forward` in auto-memory).
+  - Re-seed display-only Vault paths wiped in rebuild (Prometheus basic-auth, ArgoCD/Grafana
+    mirrors) — display-only, not ESO-managed; `make show-service-passwords` triage in
+    `reference_show_service_passwords_na_root_causes`. Hub Prometheus is UNAUTHENTICATED (rotate fn
+    targets ACG, not hub).
+  - Keep ArgoCD smoke credential-drift + k3s-aws SSM registration issues visible in `docs/issues/`
+    until their live follow-ups close. Account-level SSM Default Host Management Role optional.
+  - Dependabot alert #6 (js-yaml) remediated as lib-foundation `v0.4.11` (subtree `1bf1d2ce`,
+    lockfile `3.15.1`); reads `open` only because Dependabot scans main → auto-closes when
+    v1.26.0 → main. Dev-only transitive, low risk.
 
 ## Operating decisions
 
-- `make status` follows the active provider (concise/full/JSON modes); Slack reuses the same
-  summary contract.
-- CVE remediation current-state excludes terminal `superseded`/`deployment_advanced` events;
-  history keeps the audit trail. Verifier cadence/bounds stay conservative under hub load.
-- E2E runs use a throwaway vCluster, pinned service images, runtime-generated datastore
-  credentials, and an EXIT-trap result artifact written before teardown.
-- Do not deploy source-only changes until their release-branch/PR gates and live verification
-  are explicit.
-- When the laptop Vault reverse bridge is required (`HUB_VAULT_USE_BRIDGE=1`, default),
-  k3s-aws selects SSH and overrides explicit SSM with a warning; SSM stays available for
-  non-bridge Vault profiles.
+- `make status` follows the active provider (concise/full/JSON); Slack reuses the same summary contract.
+- CVE remediation current-state excludes terminal `superseded`/`deployment_advanced` events; history
+  keeps the audit trail. Verifier cadence/bounds stay conservative under hub load.
+- E2E runs use a throwaway vCluster, pinned service images, runtime-generated datastore credentials,
+  and an EXIT-trap result artifact written before teardown.
+- Do not deploy source-only changes until their release-branch/PR gates + live verification are explicit.
+- When the laptop Vault reverse bridge is required (`HUB_VAULT_USE_BRIDGE=1`, default), k3s-aws selects
+  SSH and overrides explicit SSM with a warning; SSM stays available for non-bridge Vault profiles.
 
 ## Canonical pointers
 
 - Roadmap: `docs/roadmap.md`
-- v1.26.0 plans: `docs/plans/`
+- v1.27.0 plans: `docs/plans/v1.27.0-*`
 - Active bugs/incidents: `docs/bugs/` and `docs/issues/`
 - Release history: `CHANGELOG.md` and `docs/retro/`

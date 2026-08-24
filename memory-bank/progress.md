@@ -86,68 +86,20 @@
 Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decision
 2026-08-21 "keep all four".
 
-- [ ] **Foundation-managed vCluster CLI** (`docs/plans/v1.27.0-foundation-managed-vcluster-cli.md`)
-  — upstream-first in lib-foundation (`foundation_ensure_vcluster_cli <version>`), then
-  subtree-pull + rewire `scripts/plugins/vcluster.sh`. **Prerequisite — must land first.**
-  - [x] **Part B DELIVERED (Codex) + VERIFIED (Claude) + PUSHED 2026-08-21** — HEAD `142fd06b`
-    on `origin/k3d-manager-v1.27.0` (Codex's own note said `6c2dd94d`, but that was amended away and
-    is NOT in history — real commit is `142fd06b`). Removes the consumer installer
-    (`vcluster_install_cli`/`_vcluster_install_cli`/`VCLUSTER_INSTALL_DIR`), adds module-scoped
-    `_VCLUSTER_BIN`, rewires `_vcluster_check_prerequisites` to
-    `foundation_ensure_vcluster_cli "$VCLUSTER_VERSION"` (guards both non-zero exit AND empty path),
-    routes all 6 lifecycle invocations through `"$_VCLUSTER_BIN"`; updates help/utils.sh,
-    functions.md (row removed), howto/vcluster.md, guide; reworks vcluster.bats to stub the contract
-    (deleted the 3 installer-era tests, added path-stored + failure-stops + empty-stops + destroy/list
-    contract tests); e2e.bats correctly untouched (no installer refs). **Claude re-ran gates
-    independently:** BATS 36/36, shellcheck clean, `bash -n` clean, both disappearance greps empty,
-    subtree untouched. **LIVE `make e2e` GATE PASSED for the CLI contract 2026-08-21** (hub
-    healthy, 4 nodes): `foundation_ensure_vcluster_cli` did a REAL download + SHA-256 verify +
-    atomic install of vcluster `0.32.1` into `~/.local/share/lib-foundation/vcluster/0.32.1/`
-    (managed binary reports `0.32.1`), the plugin used the managed binary — NOT the Homebrew
-    `vcluster` on PATH — to `vcluster create`/`connect` the throwaway vCluster (substrate
-    postgres/redis/product-catalog/basket/order all rolled out inside it), and teardown-on-failure
-    left the `vclusters` ns empty. Durable artifact + result ConfigMap (`e2e-result-h6df8`,
-    `passed=false`) + exporter (`e2e_run_info`/`e2e_last_run_pass=0`) all carry our commit
-    `9b3a5754`. The Playwright app Job failed at phase `running-playwright` (all playwright metrics
-    null) — a PRE-EXISTING app-test failure (same class as the v1.26.0 `35e9ecf2` run), NOT caused
-    by the CLI-contract change. Plan #1 (Parts A+B) is functionally COMPLETE; PR is a
-    v1.27.0-release-time step.
-  - ⚠️ **Finding 1a UPGRADED cosmetic → BLOCKING (live-discovered during this gate):** the empty
-    `e2e_last_run_duration_seconds` value (failed run → `duration_seconds=""`) is an invalid
-    Prometheus exposition line that fails the WHOLE scrape → `up{job="vulnerability-inventory-exporter"}=0`
-    → Prometheus drops ALL exporter series (every `e2e_*` AND all `trivy_*`/`cve_*`), blinding both
-    the E2E and CVE Grafana dashboards. Exporter's own `:8080` serves fine; only Prometheus ingest
-    is broken. Fix = coerce empty/null → `0` at `vulnerability-inventory-exporter.yaml:344`, redeploy
-    via `argocd.sh`. Doc corrected: `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
-  - Part A Codex task spec written 2026-08-21:
-    `docs/plans/v1.27.0-foundation-managed-vcluster-cli-codex-task.md` — Part A only
-    (lib-foundation `feat/v0.4.13`, `scripts/lib/system.sh`, stubbed BATS, STOP at gate).
-  - **Part A DELIVERED + VERIFIED 2026-08-21** — Codex `b2adb8f2` on `origin/feat/v0.4.13`
-    (independently confirmed on origin). `foundation_ensure_vcluster_cli` + 7 private helpers;
-    +253/-0 across the 4 intended files only (system.sh, system.bats, README, functions.md).
-    Gates re-run by Claude: BATS 33/33 (7 vcluster cases green), shellcheck clean, `bash -n`
-    clean, if-count ≤2/fn (budget 8). Real asset names correct (`checksums.txt`,
-    bare `vcluster-<os>-<arch>` via exact awk `$2==asset`). Non-blocking nit: bare `_err` on
-    `mktemp` failure after lock acquisition leaks the lockdir (RETURN trap doesn't fire on exit;
-    should use `_foundation_vcluster_abort`).
-  - **Part A RELEASED as lib-foundation v0.4.13 (2026-08-22).** PR #44 merged (`0a3e4043`);
-    Copilot found a REAL bug (`curl -fsSL -- URL -o FILE` put `-o` after `--` → parsed as URLs,
-    real download fails; stubbed tests missed it) — fixed `-o` before `--` + tightened the BATS
-    curl stub to honor `--` (proven to fail tests 28/32/33 on the buggy order). Nit fix
-    (`f154dbe`) folded in. Tag `v0.4.13` + GitHub release published on `0a3e4043`.
-    **Subtree-pulled into k3d-manager `scripts/lib/foundation`** — vendored copy verified:
-    `foundation_ensure_vcluster_cli` + 7 helpers present, curl fix intact (`-o` before `--`),
-    `bash -n` clean.
-  - **Part B UNBLOCKED — Codex task spec written 2026-08-21:**
-    `docs/plans/v1.27.0-foundation-managed-vcluster-cli-part-b-codex-task.md` (k3d-manager only,
-    `k3d-manager-v1.27.0`). Grounded in real anchors: delete `VCLUSTER_INSTALL_DIR` (vcluster.sh:7,13),
-    `vcluster_install_cli` (174-176) + `_vcluster_install_cli` (178-218); rewire
-    `_vcluster_check_prerequisites` (220-232) to `_VCLUSTER_BIN="$(foundation_ensure_vcluster_cli
-    "$VCLUSTER_VERSION")"` (module-scoped, not local — helpers 254/289/325 need it); route all 6
-    invocations (49/75/171/263/289/325) through `"$_VCLUSTER_BIN"`; update help/utils.sh, functions.md
-    (row 106), howto/vcluster.md, guide; rework vcluster.bats + e2e.bats to stub the contract (delete
-    the 3 installer-era tests). Gates + disappearance greps + STOP-at-gate; live `make e2e` is Claude's.
-    **Awaiting go to push + hand off to Codex.**
+- [x] **Foundation-managed vCluster CLI** (`docs/plans/v1.27.0-foundation-managed-vcluster-cli.md`)
+  — **COMPLETE.** Part A = lib-foundation `v0.4.13` (Codex `b2adb8f2` → PR #44 `0a3e4043`; Copilot
+  caught a real `curl -o` after-`--` bug, fixed + BATS-tightened; subtree-pulled into
+  `scripts/lib/foundation`, curl fix intact). Part B = HEAD `142fd06b` on `origin/k3d-manager-v1.27.0`
+  (Codex; its `6c2dd94d` note was amended away): removes the consumer installer, adds module-scoped
+  `_VCLUSTER_BIN`, rewires `_vcluster_check_prerequisites` to
+  `foundation_ensure_vcluster_cli "$VCLUSTER_VERSION"` (guards non-zero+empty), routes all 6 lifecycle
+  invocations through it, updates help/docs, reworks BATS to stub the contract. Claude re-ran gates
+  (BATS 36/36, shellcheck/`bash -n` clean, disappearance greps empty, subtree untouched) + **live
+  `make e2e` CLI-contract gate PASSED** (real download+SHA+atomic install of vcluster `0.32.1` managed
+  path, substrate rolled out inside the throwaway vCluster; artifact/ConfigMap/exporter carry
+  `9b3a5754`). Playwright app Job failed pre-existing (not the CLI change). PR = release-time step.
+  - ⚠️ Finding 1a (empty `e2e_last_run_duration_seconds` failing the whole scrape) — ✅ FIXED
+    `5cd67228` (`num()` coercion). `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
 - [~] **M2 remote E2E runner** (`docs/plans/v1.27.0-m2-remote-e2e-runner.md`) — SSH-dispatch
   ephemeral E2E to m2-air, restricted M4-side publisher → hub ConfigMap → Grafana. The actual
   E2E load-split off the M4 laptop. **Depends on the foundation vCluster CLI.**
