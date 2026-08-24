@@ -50,6 +50,10 @@
      `docs/issues/2026-08-24-e2e-publish-back-source-pin-durability.md` (bake `from=` into
      `e2e_result_publisher_install` via `E2E_PUBLISH_FROM` + `-o AddressFamily=inet` into
      `_e2e_publish_back_push`; a future reinstall/rotation currently DROPS the pin).
+     **Durability implemented 2026-08-24:** commit `0cf69e28` makes the source pin optional
+     (`E2E_PUBLISH_FROM`, empty preserves the legacy line) and forces IPv4 on publish-back;
+     focused BATS `68/68`, `bash -n`, ShellCheck, and an explicit unpinned install proof passed.
+     No live SSH or authorized_keys access was performed. PR = none per task instruction.
      **Still BLOCKED** on (b) hostinger node CPU exhaustion (the last gate for the 2-run acceptance).
      M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.

@@ -116,6 +116,10 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   ephemeral E2E to m2-air, restricted M4-side publisher → hub ConfigMap → Grafana. The actual
   E2E load-split off the M4 laptop. **Depends on the foundation vCluster CLI.**
   Increments 1–6 DONE (inc 6 = failure behavior + operations, `b5fff9c4`, 68/68 BATS green).
+  **Publish-back source-pin durability DONE 2026-08-24:** commit `0cf69e28` adds optional
+  `E2E_PUBLISH_FROM` handling while preserving the unpinned authorized_keys line, and forces
+  `AddressFamily=inet` for publish-back SSH. Focused BATS `68/68`, `bash -n`, ShellCheck, and
+  explicit default-path proof passed. No live SSH or authorized_keys access; no PR per instruction.
   **Remaining: 2-run live acceptance gate (1 fail + 1 pass via `make e2e-remote RUNNER=m2`)
   + live redeploy of the inc-2 runner-labelled exporter/dashboard/rule.** Image-arch blocker
   CLEARED 2026-08-24: multiarch PR **#7 MERGED** (`90c13994`, shopping-cart-e2e-tests) →
