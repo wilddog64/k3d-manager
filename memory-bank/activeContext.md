@@ -20,9 +20,12 @@
      preflight/bootstrap/dispatch/restricted-publisher/lock+ops, `make e2e-remote|e2e-runner-health|
      e2e-replay|e2e-runner-unlock`. **Remaining: 2-run live acceptance gate** (1 fail + 1 pass via
      `make e2e-remote RUNNER=m2`) + deferred live redeploy of the inc-2 runner-labelled
-     exporter/dashboard/rule via `argocd.sh`. **BLOCKED** on (a) e2e-tests image arch — PR **#7**
-     (multiarch, `sha-52ffe10a` proven amd64+arm64) awaiting merge → rebuild `:latest`; (b) hostinger
-     node CPU exhaustion. Publish-back still unconfigured (`E2E_M2_PUBLISH_BACK_HOST` empty → results
+     exporter/dashboard/rule via `argocd.sh`. **Blocker (a) CLEARED 2026-08-24:** e2e-tests image
+     multiarch — PR **#7 MERGED** (`90c13994`, shopping-cart-e2e-tests; protection lowered→merge→
+     restored, enforce_admins back on); Publish E2E Image reran on main push → `:latest` rebuilt
+     **multiarch, VERIFIED** `docker manifest inspect` = `linux/amd64` + `linux/arm64`
+     (QEMU+`platforms`+`provenance:false`, run `32725667211` success).
+     **Still BLOCKED** on (b) hostinger node CPU exhaustion. Publish-back still unconfigured (`E2E_M2_PUBLISH_BACK_HOST` empty → results
      retained `publication_pending`). M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
   3. `v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce, promoter

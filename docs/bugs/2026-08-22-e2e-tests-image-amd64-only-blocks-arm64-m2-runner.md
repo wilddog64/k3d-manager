@@ -1,5 +1,13 @@
 # E2E Playwright image `shopping-cart-e2e-tests` is amd64-only — blocks the M2 (arm64) remote runner (2026-08-22)
 
+> **RESOLVED 2026-08-24.** Multiarch build shipped: `wilddog64/shopping-cart-e2e-tests`
+> **PR #7 MERGED** (`90c13994`) — adds `docker/setup-qemu-action` + `platforms:
+> linux/amd64,linux/arm64` + `provenance: false` to `publish-image.yml`. `:latest` rebuilt on
+> the main push (run `32725667211`, success) and **verified multiarch**:
+> `docker manifest inspect …:latest` → `linux/amd64` + `linux/arm64`. The arm64 pull failure on
+> the M2 node is gone. Remaining M2 acceptance-gate blockers are unrelated (hostinger node CPU
+> exhaustion; publish-back unconfigured).
+
 **Severity:** high (the v1.27.0 plan #2 M2 remote runner can NEVER complete a passing
 Playwright run on Apple Silicon until this is fixed; every dispatch fails identically).
 **Component:** the `shopping-cart-e2e-tests` image build (lives in the shopping-cart repo's
