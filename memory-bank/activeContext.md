@@ -25,8 +25,15 @@
      restored, enforce_admins back on); Publish E2E Image reran on main push → `:latest` rebuilt
      **multiarch, VERIFIED** `docker manifest inspect` = `linux/amd64` + `linux/arm64`
      (QEMU+`platforms`+`provenance:false`, run `32725667211` success).
-     **Still BLOCKED** on (b) hostinger node CPU exhaustion. Publish-back still unconfigured (`E2E_M2_PUBLISH_BACK_HOST` empty → results
-     retained `publication_pending`). M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
+     **Publish-back CONFIGURED 2026-08-24:** dedicated restricted key `~/.ssh/e2e-m4-publisher`
+     generated on M2 (private stays on M2); M4 `authorized_keys` restricted forced-command entry
+     (`command="…/k3d-manager e2e_result_publish",restrict,no-pty,no-forwarding`) installed via
+     `e2e_result_publisher_install`; `E2E_M2_PUBLISH_BACK_HOST=cliang@m4-air.local` set in gitignored
+     `k3d-manager/.envrc` (`source_up` preserves parent thinking-cap). Smoke-tested M2→M4: publisher
+     key auths, forced command fires (no-pty confirmed), invalid payload rejected by schema (no
+     ConfigMap written). Hub write target (`platform-ops`, ctx `k3d-k3d-cluster`) reachable.
+     **Still BLOCKED** on (b) hostinger node CPU exhaustion (the last gate for the 2-run acceptance).
+     M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
   3. `v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce, promoter
      verify gate. Multi-repo, heavy. **Not started.**

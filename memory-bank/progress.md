@@ -110,7 +110,10 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   + live redeploy of the inc-2 runner-labelled exporter/dashboard/rule.** Image-arch blocker
   CLEARED 2026-08-24: multiarch PR **#7 MERGED** (`90c13994`, shopping-cart-e2e-tests) →
   `:latest` rebuilt multiarch, VERIFIED amd64+arm64 (`docker manifest inspect`, run
-  `32725667211`). Still BLOCKED on hostinger node CPU exhaustion (see activeContext incident).
+  `32725667211`). Publish-back CONFIGURED 2026-08-24: restricted key `~/.ssh/e2e-m4-publisher`
+  on M2 + M4 forced-command `authorized_keys` entry + `E2E_M2_PUBLISH_BACK_HOST=cliang@m4-air.local`
+  in gitignored `.envrc` (`source_up`); M2→M4 smoke test auths + forced command fires + bad payload
+  rejected (no ConfigMap). Only remaining gate = hostinger node CPU exhaustion (see activeContext).
 - [ ] **Image signing / CVE-loop closure** (`docs/plans/v1.27.0-image-signing-cve-loop-closure.md`)
   — cosign sign+attest, Kyverno Audit→Enforce, promoter verify gate. Multi-repo, heavy.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)

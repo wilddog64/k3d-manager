@@ -85,6 +85,17 @@ scoped, short-lived GHCR token over the dispatch env (not written to disk).
 
 ## Gap 4 — results never reach the hub (no publish-back configured)
 
+> **RESOLVED 2026-08-24.** Publish-back wired: dedicated restricted key
+> `~/.ssh/e2e-m4-publisher` generated on M2 (private key stays on M2); M4 `authorized_keys`
+> gained the restricted forced-command entry (`command="…/k3d-manager e2e_result_publish",
+> restrict,no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding`) via
+> `e2e_result_publisher_install`; `E2E_M2_PUBLISH_BACK_HOST=cliang@m4-air.local` set in the
+> gitignored `k3d-manager/.envrc` (with `source_up` to preserve the parent thinking-cap).
+> M2→M4 smoke test confirmed: publisher key authenticates, the forced command fires (no-pty),
+> and an invalid payload is rejected by schema validation with **no** ConfigMap written. Hub
+> write target (`platform-ops`, ctx `k3d-k3d-cluster`) reachable. A real passing `make
+> e2e-remote RUNNER=m2` will now land in the hub ConfigMap → Prometheus → Grafana.
+
 Every run ended with:
 
 ```
