@@ -57,16 +57,18 @@
 
 ## v1.27.0 queue
 
-- [x] **CVE panel ② ("Shopping-cart Unique CVEs") POPULATED + Prometheus-verified (2026-08-24)** —
-  352 `trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}` series
-  (basket 9, order 20, payment 120, product-catalog 203; frontend 0). Two durable fixes:
-  scan-job CPU request `50m→10m` (`8bfcbcc9`) + `trivy.slow`/`timeout 15m0s` (`49477017`) in
-  `trivy-operator-acg-values.yaml`. Root-caused the private-image gap to trivy-operator 0.32.0
-  not resolving SA-level `imagePullSecrets`
-  (`docs/bugs/2026-08-24-trivy-operator-skips-private-images-sa-imagepullsecret.md`); stopgap =
-  manual VulnerabilityReport CRs from real scans (mounting `ghcr-pull-secret`). **Durable
-  private-image scanning path still OPEN** (add imagePullSecrets to pod specs / scan-CronJob /
-  operator upgrade — see bug doc). Manual CRs will drift.
+- [x] **CVE panel ② ("Shopping-cart Unique CVEs") POPULATED + Prometheus-verified + DURABLE
+  (2026-08-24)** — 75 actionable `trivy_vulnerability_inventory{image_repository=~"wilddog64/
+  shopping-cart-.*"}` series, native operator-generated (self-refreshing 24h TTL). Three commits:
+  scan-job CPU request `50m→10m` (`8bfcbcc9`) + `trivy.slow`/`timeout 15m0s` (`49477017`) +
+  **native private-image scanning via `operator.privateRegistryScanSecretsNames` (`aac9cb27`)** in
+  `trivy-operator-acg-values.yaml`. Real root cause: workloads carry NO imagePullSecret anywhere
+  (node-level containerd cred, invisible to operator) — so operator-upgrade is a dead end; the
+  named-secret-per-namespace config is the fix. Live-verified; manual-CR stopgap (352 all-sev) was
+  deleted in favor of native (75 actionable). Bug doc:
+  `docs/bugs/2026-08-24-trivy-operator-skips-private-images-sa-imagepullsecret.md`.
+  **Remaining (release mechanics, non-blocking):** `argocd app sync acg-trivy-operator` (3 res
+  OutOfSync from live patching) + durable `allow-cve-scan-egress` netpol in shopping-cart-payment repo.
 
 - [x] **Hostinger CVE inventory manifest authoring** — commit `84817d88`: added the
   Hostinger-only read-only SA/ClusterRole/Binding ApplicationSet, Vault-backed ESO
