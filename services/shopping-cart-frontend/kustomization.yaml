@@ -16,3 +16,16 @@ patches:
     target:
       kind: Deployment
       name: frontend
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: frontend
+      spec:
+        strategy:
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
+    target:
+      kind: Deployment
+      name: frontend

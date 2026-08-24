@@ -72,3 +72,16 @@ patches:
     target:
       kind: ServiceAccount
       name: order-service
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: order-service
+      spec:
+        strategy:
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
+    target:
+      kind: Deployment
+      name: order-service
