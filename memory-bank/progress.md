@@ -142,13 +142,16 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   idempotent applies; ESO 403 → `_signing_grant_eso_read` auto-discovers the store's Vault role
   (`eso-ldap-directory`) and merges `cosign-verify` (`7d335b1a`). BATS 6/6.
 - [~] **Image-signing Stage C** — CI cosign **sign-by-digest** (attestation deferred). Spec
-  `7779e4d6` (`v1.27.0-image-signing-stage-c-ci-sign-codex-task.md`). Codex IN-FLIGHT (session
-  `01a0365f`, workdir `~/src/gitrepo/personal`, `--skip-git-repo-check`). 6 work repos on branch
-  `feat/cosign-sign-attest`: sign in reusable `shopping-cart-infra/build-push-deploy.yml` (covers
-  basket/order/product-catalog/payment) + `shopping-cart-frontend/ci.yml` direct + COSIGN secret
-  passthrough in the 4 callers. Pin `sigstore/cosign-installer@v3.7.0`. Verify per-repo on origin
-  before trusting. Then C2 (Claude): seed `COSIGN_KEY`/`COSIGN_PASSWORD` GH secrets from Keychain in
-  the 5 app repos, PR+merge (GATED), trigger builds, `cosign verify` signatures exist → unblocks D.
+  `7779e4d6`. **Code DONE + Claude-verified on origin** (Codex session `01a0365f`). 6 repos on
+  `feat/cosign-sign-attest`, all SHAs matched on origin, 1 workflow file each, YAML valid:
+  infra `a46a1691` (reusable build-push-deploy.yml: workflow_call COSIGN secrets, job-env COSIGN_KEY
+  for the gate, `id: push`, cosign-installer@v3.7.0, sign `${image-name}@${push.digest}` BEFORE
+  promote), frontend `70776c6e` (direct, same pattern), basket `c6e38a0e` / order `b0af5a56` /
+  product-catalog `1e3d6065` / payment `33e917a0` (COSIGN_KEY/PASSWORD passthrough in the
+  build-push-deploy caller's secrets:). Gated `if: env.COSIGN_KEY != ''` so builds don't fail
+  pre-seed. **STOPPED AT MERGE GATE** (never auto-merge). Remaining: C2 seed
+  `COSIGN_KEY`/`COSIGN_PASSWORD` GH secrets from Keychain (5 app repos) → PRs+merge (needs go) →
+  builds sign → `cosign verify` proves signatures → unblocks D.
 - [ ] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
   `cosign verify` gate (Claude live; needs signed images from C before Enforce).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
