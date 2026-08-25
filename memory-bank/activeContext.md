@@ -65,10 +65,20 @@
      bash -n / shellcheck clean / BATS 6/6. **Review trim before commit:** dropped Codex's
      `_signing_configure_writer` — it bound a create/read/update Vault role to the kyverno namespace
      (no consumer; seed goes via direct pod-exec, CI gets the key as GH secrets) and violated parent
-     plan line 270 ("read-only … do NOT grant Kyverno broad Vault access", OWASP A01). B=live Stage-0
-     seed (Vault+Keychain+ESO pub) [Claude];
-     C=CI sign+attest across 5 shopping-cart repos [specs→Codex]; D=Kyverno install+ClusterPolicy
-     Audit→Enforce + promoter `cosign verify` gate [Claude live]. Verify Codex SHA on origin per
+     plan line 270 ("read-only … do NOT grant Kyverno broad Vault access", OWASP A01).
+     B=live Stage-0 seed → **✅ DONE + live-verified 2026-08-24** (`7d335b1a`). cosign 3.1.3 (brew)
+     seeded `secret/cosign/signing` (key/password/pub), Keychain backup, `kyverno` ns created,
+     read-only `cosign-verify` policy, ESO `cosign-public-key` in kyverno = **SecretSynced True,
+     cosign.pub ONLY** (private key withheld). **3 live-found signing.sh bugs fixed:** (i) no
+     `_vault_login` before Vault ops → 403 (`6f3c6dd3`); (ii) signing_init returned early when key
+     existed → never re-applied ESO/policy — now guards only key-gen, applies always run; (iii) ESO
+     403 because no identity could read the path — added `_signing_grant_eso_read` (auto-discovers
+     the ClusterSecretStore role `SIGNING_ESO_STORE`/`SIGNING_ESO_ROLE`, merges `cosign-verify` into
+     it; store here uses role `eso-ldap-directory`, NOT eso-reader) (ii+iii `7d335b1a`). Note: ESO
+     needs a controller restart after a role policy change (cached token freezes policies at issue).
+     C=CI sign+attest across 5 shopping-cart repos [specs→Codex, branch now free]; D=Kyverno
+     install+ClusterPolicy Audit→Enforce + promoter `cosign verify` gate [Claude live; kyverno ns +
+     pub secret already staged]. Verify Codex SHA on origin per
      [[feedback_codex_verification_protocol]] before trusting.
   4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **STARTED
      2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests →

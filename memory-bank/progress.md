@@ -135,6 +135,15 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   read-only Vault policy, structural BATS 6/6; shellcheck clean. Codex generated (session
   `01a0363c`); Claude committed (Codex sandbox `.git` read-only) after trimming an over-privileged
   `_signing_configure_writer` (kyverno-bound create/update role — parent-plan line 270 / OWASP A01).
+- [x] **Image-signing Stage B — live Stage-0 seed** — DONE + live-verified 2026-08-24 (`7d335b1a`).
+  cosign 3.1.3 seeded Vault `secret/cosign/signing` + Keychain backup; `kyverno` ns; read-only
+  `cosign-verify` policy; ESO `cosign-public-key` SecretSynced=True projecting **cosign.pub only**.
+  Fixed 3 live-found signing.sh bugs: missing `_vault_login` (`6f3c6dd3`); early-return skipped
+  idempotent applies; ESO 403 → `_signing_grant_eso_read` auto-discovers the store's Vault role
+  (`eso-ldap-directory`) and merges `cosign-verify` (`7d335b1a`). BATS 6/6.
+- [ ] **Image-signing Stage C** — CI sign+attest by digest across 5 shopping-cart repos (spec→Codex).
+- [ ] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
+  `cosign verify` gate (Claude live; needs signed images from C before Enforce).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
   - [x] Part 0 controller (Slice E) — commit `17be2e69` pushed to
