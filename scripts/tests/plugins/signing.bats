@@ -9,6 +9,10 @@ setup() {
   export SIGNING_TEST_LOG="${BATS_TEST_TMPDIR}/signing.log"
   : > "${SIGNING_TEST_LOG}"
 
+  _vault_login() {
+    printf 'vault_login %s\n' "$*" >> "${SIGNING_TEST_LOG}"
+    return 0
+  }
   _vault_exec() {
     printf 'vault_exec %s\n' "$*" >> "${SIGNING_TEST_LOG}"
     [[ "${SIGNING_TEST_VAULT_KEY}" == "1" ]] && return 0
@@ -39,7 +43,7 @@ setup() {
     fi
     [[ "${SIGNING_TEST_PUB}" == "1" ]]
   }
-  export -f _vault_exec _vault_exec_stream
+  export -f _vault_login _vault_exec _vault_exec_stream
   export -f _run_command _secret_store_data _secret_load_data _kubectl
 }
 

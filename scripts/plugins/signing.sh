@@ -102,6 +102,7 @@ function _signing_seed_vault_key() {
 function signing_init() {
   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
   local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+  _vault_login "${vault_ns}" "${vault_release}"
   if _signing_vault_key_exists "${vault_ns}" "${vault_release}"; then
     _info "[signing] Vault key already present at ${SIGNING_VAULT_PATH}; skipping seed"
     return 0
@@ -115,6 +116,7 @@ function signing_init() {
 function signing_rotate_key() {
   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
   local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+  _vault_login "${vault_ns}" "${vault_release}"
   _signing_seed_vault_key "${vault_ns}" "${vault_release}" || return 1
   _signing_apply_pub_externalsecret
   _signing_apply_vault_policy "${vault_ns}" "${vault_release}"
@@ -126,6 +128,7 @@ function signing_status() {
   local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
   local key_status=absent keychain_status=absent pub_status=absent
   local status=0
+  _vault_login "${vault_ns}" "${vault_release}"
   if _signing_vault_key_exists "${vault_ns}" "${vault_release}"; then key_status=present; else status=1; fi
   if declare -f _secret_load_data >/dev/null 2>&1 && \
     _secret_load_data "${SIGNING_KEYCHAIN_SERVICE}" "${SIGNING_KEYCHAIN_KEY_ACCOUNT}" >/dev/null 2>&1 && \
