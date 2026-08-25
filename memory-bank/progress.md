@@ -141,7 +141,14 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Fixed 3 live-found signing.sh bugs: missing `_vault_login` (`6f3c6dd3`); early-return skipped
   idempotent applies; ESO 403 → `_signing_grant_eso_read` auto-discovers the store's Vault role
   (`eso-ldap-directory`) and merges `cosign-verify` (`7d335b1a`). BATS 6/6.
-- [ ] **Image-signing Stage C** — CI sign+attest by digest across 5 shopping-cart repos (spec→Codex).
+- [~] **Image-signing Stage C** — CI cosign **sign-by-digest** (attestation deferred). Spec
+  `7779e4d6` (`v1.27.0-image-signing-stage-c-ci-sign-codex-task.md`). Codex IN-FLIGHT (session
+  `01a0365f`, workdir `~/src/gitrepo/personal`, `--skip-git-repo-check`). 6 work repos on branch
+  `feat/cosign-sign-attest`: sign in reusable `shopping-cart-infra/build-push-deploy.yml` (covers
+  basket/order/product-catalog/payment) + `shopping-cart-frontend/ci.yml` direct + COSIGN secret
+  passthrough in the 4 callers. Pin `sigstore/cosign-installer@v3.7.0`. Verify per-repo on origin
+  before trusting. Then C2 (Claude): seed `COSIGN_KEY`/`COSIGN_PASSWORD` GH secrets from Keychain in
+  the 5 app repos, PR+merge (GATED), trigger builds, `cosign verify` signatures exist → unblocks D.
 - [ ] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
   `cosign verify` gate (Claude live; needs signed images from C before Enforce).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
