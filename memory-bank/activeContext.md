@@ -102,11 +102,18 @@
 
 ## Open follow-ups
 
-- **CVE remediation panels empty (2026-08-24):** `Current CVE Remediation Status` and
-  `Remediation History (audit)` both query `cve_remediation_event_info`, currently
-  exposed as zero series. Inventory metrics remain present. This is documented in
-  `docs/issues/2026-08-24-cve-remediation-panels-empty.md`; durable event reconstruction
-  and an explicit dashboard no-data state are follow-up work.
+- **CVE remediation panels empty (2026-08-24) — ROOT-CAUSED (Claude 2026-08-25).**
+  Codex's RC (in-memory/no durable source) was WRONG: the durable source (ConfigMaps
+  labeled `k3dm.k3d.io/cve-remediation-event=true`) exists and the exporter reconstructs
+  from it every scrape. 0 series is CORRECT — 0 event ConfigMaps exist. Actual RC:
+  Keychain item `platform-ops-app-rebuild/k3dm` is ABSENT → `argocd_sync_app_rebuild_secret`
+  (argocd.sh:1405) silently skips → Secret `platform-ops-app-rebuild` never created →
+  `app-cve-scan` job pod wedged 32h in `CreateContainerConfigError` (job `cve-auto-1787541034`,
+  8851 retries) → requester never runs → no events. **User action:** store a scoped PAT as
+  `platform-ops-app-rebuild/k3dm`, re-run `argocd_sync_app_rebuild_secret`, delete the wedged
+  job. Hardening: fail-loud on missing app-rebuild secret + bounded backoff/deadline on the
+  CronJob; UX: dashboard no-data annotation. Corrected diagnosis appended to
+  `docs/issues/2026-08-24-cve-remediation-panels-empty.md`.
 
 - **✅ CVE panel ② ("Shopping-cart Unique CVEs") — RESOLVED + DURABLE (2026-08-24).** 75 actionable
   `trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}` series, native

@@ -57,10 +57,13 @@
 
 ## v1.27.0 queue
 
-- [ ] **CVE remediation event panels empty (2026-08-24)** — exporter exposes no
-  `cve_remediation_event_info` series, so current and audit tables show `No data` even
-  when inventory metrics are present. Issue: `docs/issues/2026-08-24-cve-remediation-panels-empty.md`.
-  Needs durable event reconstruction and a dashboard no-data explanation.
+- [ ] **CVE remediation event panels empty (2026-08-24) — ROOT-CAUSED 2026-08-25.**
+  NOT a durability bug (Codex RC wrong). Durable source (event ConfigMaps) exists; 0 series
+  is correct because 0 events exist. Real RC: Keychain `platform-ops-app-rebuild/k3dm` absent
+  → secret never synced → `app-cve-scan` pod wedged in `CreateContainerConfigError` → requester
+  never runs. Fix = user stores scoped PAT + re-run `argocd_sync_app_rebuild_secret` + delete
+  wedged job `cve-auto-1787541034`; then hardening (fail-loud + bounded backoff) + dashboard
+  no-data annotation. Corrected diagnosis in `docs/issues/2026-08-24-cve-remediation-panels-empty.md`.
 
 - [x] **CVE panel ② ("Shopping-cart Unique CVEs") POPULATED + Prometheus-verified + DURABLE
   (2026-08-24)** — 75 actionable `trivy_vulnerability_inventory{image_repository=~"wilddog64/
