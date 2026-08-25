@@ -10,6 +10,8 @@ SIGNING_PUB_SECRET_NAME="${SIGNING_PUB_SECRET_NAME:-cosign-public-key}"
 SIGNING_KEYCHAIN_SERVICE="${SIGNING_KEYCHAIN_SERVICE:-k3d-manager-signing}"
 SIGNING_KEYCHAIN_KEY_ACCOUNT="${SIGNING_KEYCHAIN_KEY_ACCOUNT:-k3dm-cosign-key}"
 SIGNING_KEYCHAIN_PASSWORD_ACCOUNT="${SIGNING_KEYCHAIN_PASSWORD_ACCOUNT:-k3dm-cosign-password}"
+SIGNING_ESO_STORE="${SIGNING_ESO_STORE:-vault-backend}"
+SIGNING_ESO_ROLE="${SIGNING_ESO_ROLE:-}"
 
 function _signing_vault_key_exists() {
   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
@@ -82,6 +84,42 @@ function _signing_apply_vault_policy() {
     vault policy write "${SIGNING_VAULT_POLICY}" - < "${policy_file}"
 }
 
+function _signing_grant_eso_read() {
+  local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+  local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+  local role="${SIGNING_ESO_ROLE}"
+  if [[ -z "${role}" ]]; then
+    role=$(_kubectl --no-exit get clustersecretstore "${SIGNING_ESO_STORE}" \
+      -o jsonpath='{.spec.provider.vault.auth.kubernetes.role}' 2>/dev/null || true)
+  fi
+  if [[ -z "${role}" ]]; then
+    _warn "[signing] could not resolve ESO Vault role from store ${SIGNING_ESO_STORE}; set SIGNING_ESO_ROLE to grant read on ${SIGNING_VAULT_PATH}"
+    return 0
+  fi
+
+  local role_json policies bound_names bound_ns
+  role_json=$(_vault_exec --no-exit "${vault_ns}" \
+    "vault read -format=json auth/kubernetes/role/${role}" "${vault_release}" 2>/dev/null || true)
+  if [[ -z "${role_json}" ]]; then
+    _warn "[signing] could not read Vault role ${role}; skipping ESO read grant"
+    return 0
+  fi
+  policies=$(printf '%s' "${role_json}" | jq -r '.data.token_policies // [] | join(",")')
+  if printf '%s' "${policies}" | tr ',' '\n' | grep -qx "${SIGNING_VAULT_POLICY}"; then
+    _info "[signing] ESO role ${role} already grants ${SIGNING_VAULT_POLICY}"
+    return 0
+  fi
+  bound_names=$(printf '%s' "${role_json}" | jq -r '.data.bound_service_account_names // [] | join(",")')
+  bound_ns=$(printf '%s' "${role_json}" | jq -r '.data.bound_service_account_namespaces // [] | join(",")')
+  _vault_exec_stream --no-exit "${vault_ns}" "${vault_release}" -- \
+    vault write "auth/kubernetes/role/${role}" \
+      bound_service_account_names="${bound_names}" \
+      bound_service_account_namespaces="${bound_ns}" \
+      policies="${policies},${SIGNING_VAULT_POLICY}" \
+      ttl=1h
+  _info "[signing] granted ${SIGNING_VAULT_POLICY} read to ESO role ${role}"
+}
+
 function _signing_seed_vault_key() {
   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
   local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
@@ -105,12 +143,13 @@ function signing_init() {
   _vault_login "${vault_ns}" "${vault_release}"
   if _signing_vault_key_exists "${vault_ns}" "${vault_release}"; then
     _info "[signing] Vault key already present at ${SIGNING_VAULT_PATH}; skipping seed"
-    return 0
+  else
+    _signing_seed_vault_key "${vault_ns}" "${vault_release}" || return 1
+    _info "[signing] cosign key material seeded"
   fi
-  _signing_seed_vault_key "${vault_ns}" "${vault_release}" || return 1
-  _signing_apply_pub_externalsecret
   _signing_apply_vault_policy "${vault_ns}" "${vault_release}"
-  _info "[signing] cosign key material seeded"
+  _signing_grant_eso_read "${vault_ns}" "${vault_release}"
+  _signing_apply_pub_externalsecret
 }
 
 function signing_rotate_key() {
@@ -118,8 +157,9 @@ function signing_rotate_key() {
   local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
   _vault_login "${vault_ns}" "${vault_release}"
   _signing_seed_vault_key "${vault_ns}" "${vault_release}" || return 1
-  _signing_apply_pub_externalsecret
   _signing_apply_vault_policy "${vault_ns}" "${vault_release}"
+  _signing_grant_eso_read "${vault_ns}" "${vault_release}"
+  _signing_apply_pub_externalsecret
   _warn "[signing] key rotated; retain the old public key or re-sign old images for overlap"
 }
 

@@ -15,6 +15,10 @@ setup() {
   }
   _vault_exec() {
     printf 'vault_exec %s\n' "$*" >> "${SIGNING_TEST_LOG}"
+    if [[ "$*" == *"auth/kubernetes/role/"* ]]; then
+      printf '{"data":{"token_policies":["eso-test-role"],"bound_service_account_names":["eso-sa"],"bound_service_account_namespaces":["identity"]}}'
+      return 0
+    fi
     [[ "${SIGNING_TEST_VAULT_KEY}" == "1" ]] && return 0
     return 1
   }
@@ -41,6 +45,10 @@ setup() {
       printf 'kubectl apply\n' >> "${SIGNING_TEST_LOG}"
       return 0
     fi
+    if [[ "$*" == *"clustersecretstore"* ]]; then
+      printf 'eso-test-role'
+      return 0
+    fi
     [[ "${SIGNING_TEST_PUB}" == "1" ]]
   }
   export -f _vault_login _vault_exec _vault_exec_stream
@@ -53,7 +61,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"already present"* ]]
   ! grep -q 'generate-key-pair' "${SIGNING_TEST_LOG}"
-  ! grep -q 'vault_stream' "${SIGNING_TEST_LOG}"
+  ! grep -q 'keychain' "${SIGNING_TEST_LOG}"
 }
 
 @test "fresh signing_init seeds Vault, backs up both values, and applies manifests" {
@@ -66,6 +74,7 @@ setup() {
   grep -q 'keychain .*k3dm-cosign-password' "${SIGNING_TEST_LOG}"
   grep -q 'kubectl apply' "${SIGNING_TEST_LOG}"
   grep -q 'vault_stream.*policy write' "${SIGNING_TEST_LOG}"
+  grep -q 'vault_stream.*auth/kubernetes/role/eso-test-role' "${SIGNING_TEST_LOG}"
 }
 
 @test "cosign key material is not placed in command text and env key syntax is documented" {
