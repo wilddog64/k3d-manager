@@ -127,8 +127,11 @@
   with `services/shopping-cart-payment/kustomization.yaml` at HEAD 7a830dd on k3d-manager-v1.27.0
   (no push). A pre-fix `cve-auto` pod on 08-25 had again logged `GITWRITE … clone … failed`,
   confirming the bug was 100% live before the fix. Deployed live by re-creating the
-  `argocd-cve-scan-script` CM. Hardening/UX (fail-loud on missing secret, bounded backoff/deadline,
-  dashboard no-data annotation) still open. Full trail in
+  `argocd-cve-scan-script` CM. **Hardening/UX DONE (`65bf4e31`):** (1) `argocd_sync_app_rebuild_secret`
+  `_warn`s loudly when PAT absent + CronJob exists + no Secret (the wedge condition), stays optional
+  otherwise; (2) `activeDeadlineSeconds: 1200` on the app-cve-scan CronJob (live) so a
+  CreateContainerConfigError pod self-terminates in 20m vs the 32h backoffLimit-never-trips wedge;
+  (3) no-data `description` on both remediation panels (live in monitoring CM). Full trail in
   `docs/issues/2026-08-24-cve-remediation-panels-empty.md` +
   `docs/bugs/2026-08-25-git-persist-clone-into-nonempty-dir.md`.
 
