@@ -58,8 +58,17 @@
      M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
   3. `v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce, promoter
-     verify gate. Multi-repo, heavy. **Not started.**
-  4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **Not started.**
+     verify gate. Multi-repo, heavy. **STARTED 2026-08-24 (sliced).** Full milestone decomposed into
+     isolated shell/logic units (Codex, no cluster) vs live-rollout stages (Claude, live hub):
+     A=`signing.sh` plugin (Part 0) → **Codex IN-FLIGHT** (spec `…-image-signing-part0-signing-plugin-
+     codex-task.md` `0fb8c70e`; dispatched via `codex exec`, session `01a0363c`, structural BATS,
+     no live cosign/vault/kubectl); B=live Stage-0 seed (Vault+Keychain+ESO pub) [Claude];
+     C=CI sign+attest across 5 shopping-cart repos [specs→Codex]; D=Kyverno install+ClusterPolicy
+     Audit→Enforce + promoter `cosign verify` gate [Claude live]. Verify Codex SHA on origin per
+     [[feedback_codex_verification_protocol]] before trusting.
+  4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **Sliced, not
+     yet dispatched.** E=adaptive controller + stop-condition logic + unit tests (Codex, no cluster);
+     F=k6/Go generator + Grafana dashboard + live capacity run [Claude live, Stripe test-mode].
   - Finding 1a — ✅ FIXED + live-verified `5cd67228` (`num()` coerces empty/None→0 so one malformed
     value can't zero the scrape; `up{exporter}=1`, both E2E + CVE dashboards receiving data).
     `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
