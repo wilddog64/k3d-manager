@@ -120,10 +120,13 @@
   durable `cve-remediation-event` CM via new `_emit_remediation_event()` — **verified end-to-end**
   (applied one such CM live → exporter emitted `cve_remediation_event_info{current="true"}`, the
   panels' query, cve_ids parsed; test CM deleted). (B) `_git_persist_promotion()` clones into
-  `${_p_work}/repo` so the askpass helper no longer poisons the dest — **code done, not yet
-  exercised** (the 08-25 verify run skipped product-catalog/payment: "no VulnerabilityReport" after
-  the prior promotion rolled them + constrained hostinger trivy-operator hadn't re-scanned; confirm
-  `GITWRITE … committed` on next real promotion). Deployed live by re-creating the
+  `${_p_work}/repo` so the askpass helper no longer poisons the dest — **VERIFIED LIVE
+  (deterministic, `7a830dda`+repro):** the failure is CVE-independent, so confirmed with a repro pod
+  on real `aquasec/trivy:0.63.0` + live `platform-ops-git-writer/git-token` — OLD path reproduced
+  `fatal: destination path '…' already exists and is not an empty directory`, NEW path cloned OK
+  with `services/shopping-cart-payment/kustomization.yaml` at HEAD 7a830dd on k3d-manager-v1.27.0
+  (no push). A pre-fix `cve-auto` pod on 08-25 had again logged `GITWRITE … clone … failed`,
+  confirming the bug was 100% live before the fix. Deployed live by re-creating the
   `argocd-cve-scan-script` CM. Hardening/UX (fail-loud on missing secret, bounded backoff/deadline,
   dashboard no-data annotation) still open. Full trail in
   `docs/issues/2026-08-24-cve-remediation-panels-empty.md` +

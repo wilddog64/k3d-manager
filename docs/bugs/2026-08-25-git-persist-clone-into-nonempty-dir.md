@@ -44,7 +44,17 @@ git clone --depth 1 --branch "${_p_branch}" \
 askpass file lives in `_p_work`, the clone fails **every time, independent of credentials** —
 git-persist has never succeeded.
 
-## Fix (proposed — not yet applied)
+## Status — FIXED + VERIFIED LIVE (2026-08-25, commit `915d1459`)
+
+Applied in `_git_persist_promotion()`: `_p_repo="${_p_work}/repo"` clone target, askpass kept at
+`${_p_work}/git-askpass` in the parent, all later refs moved to `${_p_repo}`. Deployed live via the
+`argocd-cve-scan-script` ConfigMap. Verified deterministically (the failure is CVE-independent) with
+a repro pod on the real `aquasec/trivy:0.63.0` image and the live `platform-ops-git-writer/git-token`:
+OLD path reproduced `fatal: destination path '…' already exists and is not an empty directory`; NEW
+path cloned successfully with `services/shopping-cart-payment/kustomization.yaml` present at
+`HEAD 7a830dd` on `k3d-manager-v1.27.0`. No push performed.
+
+## Fix (as applied)
 
 Put the askpass helper **outside** the clone destination. Minimal patch: give the clone its
 own subdir, keep the helper in the parent.
