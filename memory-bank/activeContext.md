@@ -60,15 +60,24 @@
   3. `v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce, promoter
      verify gate. Multi-repo, heavy. **STARTED 2026-08-24 (sliced).** Full milestone decomposed into
      isolated shell/logic units (Codex, no cluster) vs live-rollout stages (Claude, live hub):
-     A=`signing.sh` plugin (Part 0) → **Codex IN-FLIGHT** (spec `…-image-signing-part0-signing-plugin-
-     codex-task.md` `0fb8c70e`; dispatched via `codex exec`, session `01a0363c`, structural BATS,
-     no live cosign/vault/kubectl); B=live Stage-0 seed (Vault+Keychain+ESO pub) [Claude];
+     A=`signing.sh` plugin (Part 0) → **✅ DONE + Claude-verified `e1ef0037`** (spec `0fb8c70e`; Codex
+     session `01a0363c` generated, `.git` was read-only in its sandbox so Claude committed). Gates:
+     bash -n / shellcheck clean / BATS 6/6. **Review trim before commit:** dropped Codex's
+     `_signing_configure_writer` — it bound a create/read/update Vault role to the kyverno namespace
+     (no consumer; seed goes via direct pod-exec, CI gets the key as GH secrets) and violated parent
+     plan line 270 ("read-only … do NOT grant Kyverno broad Vault access", OWASP A01). B=live Stage-0
+     seed (Vault+Keychain+ESO pub) [Claude];
      C=CI sign+attest across 5 shopping-cart repos [specs→Codex]; D=Kyverno install+ClusterPolicy
      Audit→Enforce + promoter `cosign verify` gate [Claude live]. Verify Codex SHA on origin per
      [[feedback_codex_verification_protocol]] before trusting.
-  4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **Sliced, not
-     yet dispatched.** E=adaptive controller + stop-condition logic + unit tests (Codex, no cluster);
+  4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **STARTED
+     2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests → **Codex
+     IN-FLIGHT** (spec `…-adaptive-load-part0-controller-codex-task.md` `ff01d036`; dispatched via
+     `codex exec`, session `01a03647`; pure decision logic + BATS, no cluster/Prometheus/k6/Stripe);
      F=k6/Go generator + Grafana dashboard + live capacity run [Claude live, Stripe test-mode].
+     Verify Codex output on origin per [[feedback_codex_verification_protocol]] before trusting;
+     note the `codex exec` sandbox has `.git` read-only, so expect Codex to leave files uncommitted
+     and Claude commits after review (as with Slice A).
   - Finding 1a — ✅ FIXED + live-verified `5cd67228` (`num()` coerces empty/None→0 so one malformed
     value can't zero the scrape; `up{exporter}=1`, both E2E + CVE dashboards receiving data).
     `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
