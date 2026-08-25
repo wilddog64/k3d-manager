@@ -102,18 +102,25 @@
 
 ## Open follow-ups
 
-- **CVE remediation panels empty (2026-08-24) — ROOT-CAUSED (Claude 2026-08-25).**
-  Codex's RC (in-memory/no durable source) was WRONG: the durable source (ConfigMaps
-  labeled `k3dm.k3d.io/cve-remediation-event=true`) exists and the exporter reconstructs
-  from it every scrape. 0 series is CORRECT — 0 event ConfigMaps exist. Actual RC:
-  Keychain item `platform-ops-app-rebuild/k3dm` is ABSENT → `argocd_sync_app_rebuild_secret`
-  (argocd.sh:1405) silently skips → Secret `platform-ops-app-rebuild` never created →
-  `app-cve-scan` job pod wedged 32h in `CreateContainerConfigError` (job `cve-auto-1787541034`,
-  8851 retries) → requester never runs → no events. **User action:** store a scoped PAT as
-  `platform-ops-app-rebuild/k3dm`, re-run `argocd_sync_app_rebuild_secret`, delete the wedged
-  job. Hardening: fail-loud on missing app-rebuild secret + bounded backoff/deadline on the
-  CronJob; UX: dashboard no-data annotation. Corrected diagnosis appended to
-  `docs/issues/2026-08-24-cve-remediation-panels-empty.md`.
+- **CVE remediation panels empty — FINAL root cause (Claude 2026-08-25).** Two prior RCs were
+  incomplete: Codex's "in-memory/no durable source" was WRONG (the CM-based durable source
+  exists); my own "missing app-rebuild secret" was NECESSARY-BUT-NOT-SUFFICIENT. **Fixed the
+  secret half (live):** stored classic PAT (`repo`+`read:packages`) as Keychain
+  `platform-ops-app-rebuild/k3dm` → `argocd_sync_app_rebuild_secret` created the Secret →
+  deleted 32h-wedged job `cve-auto-1787541034` → manual run `cve-verify-1787657822` completed
+  clean, GHCR auth works, `product-catalog`+`payment` PROMOTED for real HIGH/CRIT CVEs.
+  **Panels STILL empty → true RC (Bug A):** *nothing in the repo CREATES* the
+  `k3dm.k3d.io/cve-remediation-event=true` ConfigMaps — `cve-remediation-verify.sh` only
+  reads/transitions them, the exporter only reads them, and `app-cve-scan.sh` `_promote_image()`
+  does live-patch+git-persist+notify but emits NO event CM. Consumer+exporter read events the
+  producer never writes. **Bug B surfaced:** `_git_persist_promotion()` writes its askpass helper
+  into the same dir it `git clone`s into → clone fails 100% ("destination not empty"), promotions
+  are live-patch-only (revert on next ArgoCD sync). Token/netpol/git+CA all ruled out.
+  **Fixes proposed, NOT applied (spec-before-implement, awaiting go):** (A) emit a
+  `promotion_requested` event CM in `_promote_image()` with the fields verify+exporter read;
+  (B) clone into a subdir (bug doc `docs/bugs/2026-08-25-git-persist-clone-into-nonempty-dir.md`).
+  Hardening/UX (fail-loud on missing secret, bounded backoff/deadline, dashboard no-data
+  annotation) still stand. Full diagnosis in `docs/issues/2026-08-24-cve-remediation-panels-empty.md`.
 
 - **✅ CVE panel ② ("Shopping-cart Unique CVEs") — RESOLVED + DURABLE (2026-08-24).** 75 actionable
   `trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}` series, native
