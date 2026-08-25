@@ -102,6 +102,12 @@
 
 ## Open follow-ups
 
+- **CVE remediation panels empty (2026-08-24):** `Current CVE Remediation Status` and
+  `Remediation History (audit)` both query `cve_remediation_event_info`, currently
+  exposed as zero series. Inventory metrics remain present. This is documented in
+  `docs/issues/2026-08-24-cve-remediation-panels-empty.md`; durable event reconstruction
+  and an explicit dashboard no-data state are follow-up work.
+
 - **✅ CVE panel ② ("Shopping-cart Unique CVEs") — RESOLVED + DURABLE (2026-08-24).** 75 actionable
   `trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}` series, native
   operator-generated (self-refreshing 24h TTL), Prometheus-verified. Three durable commits in

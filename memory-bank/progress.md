@@ -57,6 +57,11 @@
 
 ## v1.27.0 queue
 
+- [ ] **CVE remediation event panels empty (2026-08-24)** — exporter exposes no
+  `cve_remediation_event_info` series, so current and audit tables show `No data` even
+  when inventory metrics are present. Issue: `docs/issues/2026-08-24-cve-remediation-panels-empty.md`.
+  Needs durable event reconstruction and a dashboard no-data explanation.
+
 - [x] **CVE panel ② ("Shopping-cart Unique CVEs") POPULATED + Prometheus-verified + DURABLE
   (2026-08-24)** — 75 actionable `trivy_vulnerability_inventory{image_repository=~"wilddog64/
   shopping-cart-.*"}` series, native operator-generated (self-refreshing 24h TTL). Three commits:
