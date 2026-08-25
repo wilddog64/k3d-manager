@@ -116,11 +116,18 @@
   producer never writes. **Bug B surfaced:** `_git_persist_promotion()` writes its askpass helper
   into the same dir it `git clone`s into → clone fails 100% ("destination not empty"), promotions
   are live-patch-only (revert on next ArgoCD sync). Token/netpol/git+CA all ruled out.
-  **Fixes proposed, NOT applied (spec-before-implement, awaiting go):** (A) emit a
-  `promotion_requested` event CM in `_promote_image()` with the fields verify+exporter read;
-  (B) clone into a subdir (bug doc `docs/bugs/2026-08-25-git-persist-clone-into-nonempty-dir.md`).
-  Hardening/UX (fail-loud on missing secret, bounded backoff/deadline, dashboard no-data
-  annotation) still stand. Full diagnosis in `docs/issues/2026-08-24-cve-remediation-panels-empty.md`.
+  **Fixes APPLIED + live-deployed (commit `915d1459`):** (A) `_promote_image()` now emits a
+  durable `cve-remediation-event` CM via new `_emit_remediation_event()` — **verified end-to-end**
+  (applied one such CM live → exporter emitted `cve_remediation_event_info{current="true"}`, the
+  panels' query, cve_ids parsed; test CM deleted). (B) `_git_persist_promotion()` clones into
+  `${_p_work}/repo` so the askpass helper no longer poisons the dest — **code done, not yet
+  exercised** (the 08-25 verify run skipped product-catalog/payment: "no VulnerabilityReport" after
+  the prior promotion rolled them + constrained hostinger trivy-operator hadn't re-scanned; confirm
+  `GITWRITE … committed` on next real promotion). Deployed live by re-creating the
+  `argocd-cve-scan-script` CM. Hardening/UX (fail-loud on missing secret, bounded backoff/deadline,
+  dashboard no-data annotation) still open. Full trail in
+  `docs/issues/2026-08-24-cve-remediation-panels-empty.md` +
+  `docs/bugs/2026-08-25-git-persist-clone-into-nonempty-dir.md`.
 
 - **✅ CVE panel ② ("Shopping-cart Unique CVEs") — RESOLVED + DURABLE (2026-08-24).** 75 actionable
   `trivy_vulnerability_inventory{image_repository=~"wilddog64/shopping-cart-.*"}` series, native
