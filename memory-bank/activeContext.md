@@ -71,9 +71,9 @@
      Audit→Enforce + promoter `cosign verify` gate [Claude live]. Verify Codex SHA on origin per
      [[feedback_codex_verification_protocol]] before trusting.
   4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **STARTED
-     2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests → **Codex
-     IN-FLIGHT** (spec `…-adaptive-load-part0-controller-codex-task.md` `ff01d036`; dispatched via
-     `codex exec`, session `01a03647`; pure decision logic + BATS, no cluster/Prometheus/k6/Stripe);
+     2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests →
+     **DONE** Codex commit `17be2e69`, pushed to `origin/k3d-manager-v1.27.0`; pure decision logic +
+     BATS 9/9, no cluster/Prometheus/k6/Stripe. PR URL: none (task prohibits PR creation);
      F=k6/Go generator + Grafana dashboard + live capacity run [Claude live, Stripe test-mode].
      Verify Codex output on origin per [[feedback_codex_verification_protocol]] before trusting;
      note the `codex exec` sandbox has `.git` read-only, so expect Codex to leave files uncommitted

@@ -137,9 +137,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `_signing_configure_writer` (kyverno-bound create/update role — parent-plan line 270 / OWASP A01).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
-  - [~] Part 0 controller (Slice E) — Codex IN-FLIGHT (spec `ff01d036`, session `01a03647`): pure
-    stage-ladder + stop-condition-hysteresis decision logic + BATS. No cluster/Prometheus/k6/Stripe
-    (that is Slice F, live). Verify on origin before trusting.
+  - [x] Part 0 controller (Slice E) — commit `17be2e69` pushed to
+    `origin/k3d-manager-v1.27.0`: pure stage-ladder + stop-condition-hysteresis decision logic,
+    immutable jq summaries, opt-in guard, and BATS 9/9. Syntax, warning-level ShellCheck, and
+    Bash `_agent_audit` passed. No cluster/Prometheus/k6/Stripe (that is Slice F, live). PR URL:
+    none (task prohibits PR creation).
 - Both load-split plans were promoted from v1.26.0-deferred (renamed `v1.26.0-*` →
   `v1.27.0-*`, headers/cross-refs updated) on 2026-08-21.
 
