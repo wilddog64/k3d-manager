@@ -64,6 +64,9 @@
      retry and should be treated as a follow-up idempotency bug. The Grafana E2E dashboard table
      also exposes duplicate raw service labels and blank legacy totals; this is documented in
      `docs/issues/2026-08-25-e2e-grafana-table-raw-labels.md`.
+     **Dashboard fix committed `cfe925fc` and pushed:** service variables/queries now use
+     `exported_service`, the exporter identity `service` is hidden, and table labels are renamed
+     to concise names. The E2E client contract fix remains pending in shopping-cart-e2e-tests.
      M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
   3. `v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce, promoter
