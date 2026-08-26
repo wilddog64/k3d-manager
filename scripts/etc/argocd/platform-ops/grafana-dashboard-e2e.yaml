@@ -25,7 +25,7 @@ data:
             "name": "service",
             "type": "query",
             "datasource": { "type": "prometheus", "uid": "prometheus" },
-            "query": "label_values(e2e_run_info, service)",
+            "query": "label_values(e2e_run_info, exported_service)",
             "refresh": 2,
             "includeAll": true,
             "multi": true,
@@ -60,7 +60,7 @@ data:
           "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
           "id": 1,
           "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
-          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_last_run_pass{service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "legendFormat": "{{runner}}: {{tier}}/{{service}}/{{project}}", "instant": true, "refId": "A" } ],
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_last_run_pass{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "legendFormat": "{{runner}}: {{tier}}/{{exported_service}}/{{project}}", "instant": true, "refId": "A" } ],
           "title": "Status by runner/service/tier/project",
           "type": "stat"
         },
@@ -70,7 +70,7 @@ data:
           "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
           "id": 2,
           "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
-          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - e2e_last_success_timestamp_seconds{service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "legendFormat": "{{runner}}: {{tier}}/{{service}}/{{project}}", "instant": true, "refId": "A" } ],
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - e2e_last_success_timestamp_seconds{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "legendFormat": "{{runner}}: {{tier}}/{{exported_service}}/{{project}}", "instant": true, "refId": "A" } ],
           "title": "Last success age",
           "type": "stat"
         },
@@ -80,7 +80,7 @@ data:
           "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
           "id": 3,
           "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
-          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "count(e2e_run_info{passed=\"false\",service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}) or vector(0)", "instant": true, "refId": "A" } ],
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "count(e2e_run_info{passed=\"false\",exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}) or vector(0)", "instant": true, "refId": "A" } ],
           "title": "Failing runs in window",
           "type": "stat"
         },
@@ -90,7 +90,7 @@ data:
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
           "id": 4,
           "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["last"] }, "tooltip": { "mode": "multi" } },
-          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_last_run_duration_seconds{service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "legendFormat": "{{runner}}: {{tier}}/{{service}}/{{project}}", "refId": "A" } ],
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_last_run_duration_seconds{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "legendFormat": "{{runner}}: {{tier}}/{{exported_service}}/{{project}}", "refId": "A" } ],
           "title": "Duration trend",
           "type": "timeseries"
         },
@@ -100,8 +100,8 @@ data:
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
           "id": 5,
           "options": { "showHeader": true },
-          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_run_info{service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "service_label": true }, "indexByName": {} } } ],
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_run_info{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "service": true, "service_label": true }, "indexByName": {}, "renameByName": { "exported_service": "Service", "run_id": "Run ID", "candidate_digest": "Candidate digest", "passed": "Passed", "failed": "Failed", "total": "Total", "duration_seconds": "Duration (s)", "timestamp": "Timestamp", "commit": "Commit", "project": "Project", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Recent runs",
           "type": "table"
         }
