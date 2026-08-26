@@ -142,7 +142,9 @@
   Keycloak forward from service port 80 to 8080, pins tunnel/health probes to IPv4, and uses the
   valid `/realms/master` status path. Focused BATS 68/68, shellcheck, and `_agent_audit` passed.
   Repeated direct public probes reached ArgoCD/Keycloak 200; wrapper flapping remains a live
-  follow-up when transient port-forward client resets occur. Incident:
+  follow-up when transient port-forward client resets occur. The shared wrapper now tolerates
+  three consecutive health failures, retries after 2 seconds, and binds kubectl to IPv4; local
+  ArgoCD and Keycloak checks returned 200 after regeneration. Incident:
   `docs/issues/2026-08-26-hostinger-keycloak-port-forward-service-port.md`.
 
 - **Hostinger capacity check (2026-08-26):** live node `srv1754834` has 2 vCPU / 7.75 GiB RAM;

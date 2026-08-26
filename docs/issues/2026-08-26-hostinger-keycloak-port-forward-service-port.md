@@ -61,3 +61,29 @@ The final service check also exposed two access-layer follow-ups: the hub Promet
 agent was absent after the edge refresh, and the Hostinger status probe still used Keycloak's
 nonexistent `/health/live` path. The live recovery installed the existing Prometheus LaunchAgent;
 the Hostinger probe now uses `/realms/master`.
+
+## Follow-up: transient port-forward flapping
+
+The subsequent status showed ArgoCD's health probe passing while its login request returned 502,
+and Keycloak also returned 502. The forwarder logs captured the race:
+
+```text
+E0826 13:56:28.412565   35674 portforward.go:502] "Unhandled Error" err="error copying from local connection to remote stream: writeto tcp4 127.0.0.1:8080->127.0.0.1:64887: read tcp4 127.0.0.1:8080->127.0.0.1:64887: read: connection reset by peer"
+[argocd-pf] healthz check failed (1/3)
+E0826 13:56:46.288125   35674 portforward.go:502] "Unhandled Error" err="error copying from local connection to remote stream: writeto tcp4 127.0.0.1:8080->127.0.0.1:64934: read tcp4 127.0.0.1:8080->127.0.0.1:64934: read: connection reset by peer"
+[argocd-pf] healthz check failed (1/3)
+```
+
+The shared wrapper was restarting immediately on the first failed one-second health check and
+waiting 30 seconds before retrying. It now binds kubectl explicitly to `127.0.0.1`, tolerates
+three consecutive health failures, and retries after 2 seconds. After regeneration, both local
+endpoints returned HTTP 200:
+
+```text
+local-argocd-health 200
+local-keycloak-realm 200
+```
+
+Public DNS checks from the agent shell were skipped because this environment could not resolve
+`argocd.3ai-talk.org` or `keycloak.3ai-talk.org`; verify them from the user's normal shell with
+`make status` after the tunnel has had a few seconds to settle.

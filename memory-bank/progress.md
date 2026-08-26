@@ -213,6 +213,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   instead of skipping them (`15c7d072`, pushed); installed/reloaded via `make install-node-health-watch`.
   BATS 2/2, ShellCheck, and `_agent_audit` passed.
 
+- **2026-08-26 port-forward flapping follow-up:** hardened the shared ArgoCD/Keycloak forwarder
+  with IPv4 binding, three-failure health hysteresis, and a 2-second restart delay. Regenerated
+  launchd wrappers; local ArgoCD and Keycloak endpoints returned HTTP 200. Public DNS verification
+  was unavailable from the agent shell. Details: `docs/issues/2026-08-26-hostinger-keycloak-port-forward-service-port.md`.
+
 - v1.25.0 release validation: E2E BATS 16/16; webhook BATS 54/54; syntax/shellcheck gates
   passed; Copilot findings resolved before merge.
 - Node-health watchdog and E2E diagnostics hardening shipped in the released branch.
