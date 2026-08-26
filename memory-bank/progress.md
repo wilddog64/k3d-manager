@@ -58,9 +58,12 @@
 ## v1.27.0 queue
 
 - [~] **M2 E2E live acceptance (2026-08-25):** bootstrap/preflight passed; intentional
-  invalid-digest run timed out as expected and left a `publication_pending` artifact. Replay
-  and the required passing run are blocked by `m2jump` failing to resolve `m2-air.local`.
-  See `docs/issues/2026-08-25-m2-e2e-acceptance-blocked.md`.
+  invalid-digest run published a failed artifact. The required passing retry
+  `1787708603-5833` completed but failed 45/102 tests because the current E2E image/client expects
+  flat API responses and numeric prices while deployed APIs return `{data: ...}` envelopes and
+  string prices. The result published exactly once to `platform-ops`; stale vCluster cleanup was
+  needed before retry. Acceptance remains blocked pending an aligned E2E image and rerun.
+  Evidence: `docs/issues/2026-08-25-m2-e2e-acceptance-contract-mismatch.md`.
 
 - [ ] **Dependabot CI/merge automation** — queued in
   `docs/plans/v1.27.0-dependabot-automation.md`. PR #51 investigation: the

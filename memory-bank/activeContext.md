@@ -54,7 +54,14 @@
      (`E2E_PUBLISH_FROM`, empty preserves the legacy line) and forces IPv4 on publish-back;
      focused BATS `68/68`, `bash -n`, ShellCheck, and an explicit unpinned install proof passed.
      No live SSH or authorized_keys access was performed. PR = none per task instruction.
-     **Still BLOCKED** on (b) hostinger node CPU exhaustion (the last gate for the 2-run acceptance).
+     **Still BLOCKED** on the 2-run live acceptance gate. M2 bootstrap/preflight passed and the
+     intentional invalid-digest run published a failure. The required passing retry
+     `1787708603-5833` completed but failed 45/102 tests: current E2E image/client expects flat
+     responses and numeric prices while deployed APIs return `{data: ...}` envelopes and string
+     prices. Result was published once to `platform-ops`; no M2 transport/publisher failure.
+     Evidence: `docs/issues/2026-08-25-m2-e2e-acceptance-contract-mismatch.md`. Rebuild/publish an
+     aligned E2E image, then rerun the passing gate. Stale vCluster cleanup was required before
+     retry and should be treated as a follow-up idempotency bug.
      M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
   3. `v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce, promoter
