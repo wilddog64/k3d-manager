@@ -145,6 +145,13 @@
   follow-up when transient port-forward client resets occur. Incident:
   `docs/issues/2026-08-26-hostinger-keycloak-port-forward-service-port.md`.
 
+- **Hostinger capacity check (2026-08-26):** live node `srv1754834` has 2 vCPU / 7.75 GiB RAM;
+  current requests are 1610m CPU (80%) and 4880Mi memory (61%), while observed usage is 404m CPU
+  (20%) and 5496Mi node memory (69%). It currently runs 44 pods, including ArgoCD, Vault, ESO,
+  Prometheus, Loki, Trivy, and all shopping-cart services. Moving Keycloak+PostgreSQL there would
+  fit steady-state usage but leaves inadequate CPU/request and rollout-failure headroom; defer until
+  the node is upgraded to at least 4 vCPU/16 GiB or a second worker is added.
+
 - **M2 E2E acceptance blocked (2026-08-25):** bootstrap/preflight passed and the intentional
   invalid-digest run produced a failed artifact, but publisher variables were absent. Replay
   and the passing run are blocked because `m2jump` cannot resolve `m2-air.local`. Evidence:
