@@ -285,6 +285,11 @@
 
 ## Operating decisions
 
+- **2026-08-26 hub outage:** an exited k3d agent caused node-affine Prometheus/Loki pods to hang and
+  Kine/SQLite readiness to fail, producing edge 502s. Agent/server restart plus stale pod cleanup
+  restored the workloads; public forwards still require live verification. See
+  `docs/issues/2026-08-26-hub-control-plane-and-edge-forward-outage.md`.
+
 - `make status` follows the active provider (concise/full/JSON); Slack reuses the same summary contract.
 - CVE remediation current-state excludes terminal `superseded`/`deployment_advanced` events; history
   keeps the audit trail. Verifier cadence/bounds stay conservative under hub load.

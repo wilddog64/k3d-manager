@@ -229,5 +229,8 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - Every implementation updates this file and `activeContext.md` with the real commit/PR SHA.
 - Unexpected live failures get a dated `docs/issues/YYYY-MM-DD-*.md` record with verbatim
   evidence.
+- **2026-08-26 hub outage:** recorded agent-0/Kine control-plane failure and IPv4 tunnel-origin
+  remediation in `docs/issues/2026-08-26-hub-control-plane-and-edge-forward-outage.md`; service
+  recovery remains pending final public `make status` verification.
 - Historical specs/issues are archived only when superseded or unreferenced; files are never
   deleted.
