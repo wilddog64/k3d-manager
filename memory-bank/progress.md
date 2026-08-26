@@ -57,6 +57,11 @@
 
 ## v1.27.0 queue
 
+- [~] **M2 E2E live acceptance (2026-08-25):** bootstrap/preflight passed; intentional
+  invalid-digest run timed out as expected and left a `publication_pending` artifact. Replay
+  and the required passing run are blocked by `m2jump` failing to resolve `m2-air.local`.
+  See `docs/issues/2026-08-25-m2-e2e-acceptance-blocked.md`.
+
 - [ ] **Dependabot CI/merge automation** — queued in
   `docs/plans/v1.27.0-dependabot-automation.md`. PR #51 investigation: the
   Dependabot-only job was correctly skipped for a human-authored feature PR; no fix is

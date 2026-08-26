@@ -121,6 +121,11 @@
 
 ## Open follow-ups
 
+- **M2 E2E acceptance blocked (2026-08-25):** bootstrap/preflight passed and the intentional
+  invalid-digest run produced a failed artifact, but publisher variables were absent. Replay
+  and the passing run are blocked because `m2jump` cannot resolve `m2-air.local`. Evidence:
+  `docs/issues/2026-08-25-m2-e2e-acceptance-blocked.md`.
+
 - **CVE remediation panels empty — FINAL root cause (Claude 2026-08-25).** Two prior RCs were
   incomplete: Codex's "in-memory/no durable source" was WRONG (the CM-based durable source
   exists); my own "missing app-rebuild secret" was NECESSARY-BUT-NOT-SUFFICIENT. **Fixed the
