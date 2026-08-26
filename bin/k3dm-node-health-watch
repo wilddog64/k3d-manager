@@ -31,18 +31,21 @@ _ready() {
 }
 
 _recover() {
-  local last=0 now
+  local last=0 now container_status recovery_command
   [[ "$enabled" == 1 ]] || { _log "agent unhealthy (recovery disabled)"; return 0; }
   last="$(cat "$state_file" 2>/dev/null || echo 0)"
   now="$(date +%s)"
   (( now - last >= cooldown )) || { _log "agent unhealthy (recovery cooldown active)"; return 0; }
-  if ! docker inspect -f '{{.State.Status}}' "$node" 2>/dev/null | grep -qx running; then
-    _log "agent container ${node} is not running; no restart attempted"
-    return 0
-  fi
+  container_status="$(docker inspect -f '{{.State.Status}}' "$node" 2>/dev/null || true)"
+  case "$container_status" in
+    running) recovery_command="restart" ;;
+    created|exited|paused) recovery_command="start" ;;
+    "") _log "agent container ${node} not found; no restart attempted"; return 0 ;;
+    *) _log "agent container ${node} has unexpected state ${container_status}; no restart attempted"; return 0 ;;
+  esac
   printf '%s\n' "$now" >"$state_file"
-  _log "restarting ${node} after ${threshold} consecutive kubelet-proxy failures"
-  docker restart "$node" >>"$log_file" 2>&1 || { _log "restart failed"; return 1; }
+  _log "${recovery_command}ing ${node} after ${threshold} consecutive kubelet-proxy failures"
+  "${DOCKER_BIN:-docker}" "$recovery_command" "$node" >>"$log_file" 2>&1 || { _log "${recovery_command} failed"; return 1; }
   for _ in {1..20}; do
     _ready && _healthy && { _log "${node} recovered"; return 0; }
     sleep 5
