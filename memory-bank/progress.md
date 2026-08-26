@@ -209,6 +209,10 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   with safe failure/rollout margin. Recommended capacity before migration: 4 vCPU / 16 GiB, or a
   second worker node.
 
+- **2026-08-26 k3d agent watchdog:** fixed the bounded watchdog to start stopped agent containers
+  instead of skipping them (`15c7d072`, pushed); installed/reloaded via `make install-node-health-watch`.
+  BATS 2/2, ShellCheck, and `_agent_audit` passed.
+
 - v1.25.0 release validation: E2E BATS 16/16; webhook BATS 54/54; syntax/shellcheck gates
   passed; Copilot findings resolved before merge.
 - Node-health watchdog and E2E diagnostics hardening shipped in the released branch.

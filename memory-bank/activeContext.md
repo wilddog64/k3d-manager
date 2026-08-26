@@ -275,6 +275,11 @@
     lockfile `3.15.1`); reads `open` only because Dependabot scans main → auto-closes when
     v1.26.0 → main. Dev-only transitive, low risk.
 
+- **k3d agent watchdog hardening (2026-08-26):** existing bounded `node-health-watch` previously
+  skipped exited containers; commit `15c7d072` now uses `docker start` for `created`/`exited`/`paused`
+  states and `docker restart` only for running containers. Focused BATS 2/2, ShellCheck, and
+  `_agent_audit` passed. Watchdog reinstalled live with the existing 3-failure/300-second cooldown.
+
 ## Operating decisions
 
 - `make status` follows the active provider (concise/full/JSON); Slack reuses the same summary contract.
