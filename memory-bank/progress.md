@@ -70,8 +70,9 @@
   panel shows duplicate exporter/application service columns plus blank legacy totals. Bugs:
   `docs/issues/2026-08-25-e2e-grafana-table-raw-labels.md` and the contract-mismatch issue above.
   Dashboard source fix `cfe925fc` is pushed; it uses `exported_service` as the canonical service
-  filter, hides exporter `service`, and renames table fields. The E2E client/image contract fix
-  still requires the separate shopping-cart-e2e-tests repository.
+  filter, hides exporter `service`, and renames table fields. E2E client fix `0c2505b` is pushed
+  on `shopping-cart-e2e-tests:feat/e2e-image-multiarch`; full repo `tsc` remains red only on
+  pre-existing unrelated test strictness/type errors.
 
 - [ ] **Dependabot CI/merge automation** — queued in
   `docs/plans/v1.27.0-dependabot-automation.md`. PR #51 investigation: the
