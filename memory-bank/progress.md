@@ -65,6 +65,11 @@
   needed before retry. Acceptance remains blocked pending an aligned E2E image and rerun.
   Evidence: `docs/issues/2026-08-25-m2-e2e-acceptance-contract-mismatch.md`.
 
+- [ ] **E2E observability follow-up:** M2 result ConfigMaps publish correctly, but the live
+  Prometheus deployment currently has no `e2e_run_info` series and the `Recent runs` Grafana
+  panel shows duplicate exporter/application service columns plus blank legacy totals. Bugs:
+  `docs/issues/2026-08-25-e2e-grafana-table-raw-labels.md` and the contract-mismatch issue above.
+
 - [ ] **Dependabot CI/merge automation** — queued in
   `docs/plans/v1.27.0-dependabot-automation.md`. PR #51 investigation: the
   Dependabot-only job was correctly skipped for a human-authored feature PR; no fix is

@@ -61,7 +61,9 @@
      prices. Result was published once to `platform-ops`; no M2 transport/publisher failure.
      Evidence: `docs/issues/2026-08-25-m2-e2e-acceptance-contract-mismatch.md`. Rebuild/publish an
      aligned E2E image, then rerun the passing gate. Stale vCluster cleanup was required before
-     retry and should be treated as a follow-up idempotency bug.
+     retry and should be treated as a follow-up idempotency bug. The Grafana E2E dashboard table
+     also exposes duplicate raw service labels and blank legacy totals; this is documented in
+     `docs/issues/2026-08-25-e2e-grafana-table-raw-labels.md`.
      M2 runner fully provisioned + proven end-to-end (dispatch→SSH→
      OrbStack→k3d→vCluster→substrate→Playwright launch). See M2 bug docs under `docs/bugs/2026-08-22-*`.
   3. `v1.27.0-image-signing-cve-loop-closure.md` — cosign sign+attest, Kyverno Audit→Enforce, promoter
