@@ -1886,7 +1886,7 @@ def _smoke_test_services(retries=None, provider=None):
 
     if provider == "k3s-hostinger":
         frontend_url = "https://frontend.3ai-talk.org/"
-        keycloak_url = "https://keycloak.3ai-talk.org/health/live"
+        keycloak_url = "https://keycloak.3ai-talk.org/realms/master"
     else:
         frontend_url = "http://frontend.shopping-cart.local/"
         keycloak_url = "http://keycloak.shopping-cart.local/health/live"

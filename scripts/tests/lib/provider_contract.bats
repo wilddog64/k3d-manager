@@ -913,7 +913,9 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F -- 'svc/keycloak' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   [ "$status" -eq 0 ]
-  run grep -F -- '8880:80' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  run grep -F -- '8880:8080' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- '127.0.0.1:8880/realms/master' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   [ "$status" -eq 0 ]
   run grep -F 'tunnel' "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
   [ "$status" -eq 0 ]

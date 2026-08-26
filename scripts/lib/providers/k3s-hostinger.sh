@@ -321,7 +321,7 @@ function _hostinger_write_argocd_port_forward_wrapper() {
   SERVICE="svc/argocd-server" \
   LOCAL_PORT="8080" \
   REMOTE_PORT="80" \
-  HEALTHZ_URL="http://localhost:8080/healthz" \
+  HEALTHZ_URL="http://127.0.0.1:8080/healthz" \
   STARTUP_TIMEOUT="30" \
     envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
       < "${template_path}" > "${wrapper_path}"
@@ -348,8 +348,8 @@ function _hostinger_write_keycloak_port_forward_wrapper() {
   CONTEXT="k3d-k3d-cluster" \
   SERVICE="svc/keycloak" \
   LOCAL_PORT="8880" \
-  REMOTE_PORT="80" \
-  HEALTHZ_URL="http://localhost:8880/health/live" \
+  REMOTE_PORT="8080" \
+  HEALTHZ_URL="http://127.0.0.1:8880/realms/master" \
   STARTUP_TIMEOUT="30" \
     envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
       < "${template_path}" > "${wrapper_path}"
