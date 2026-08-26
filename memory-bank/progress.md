@@ -196,6 +196,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 
 ## Verification record
 
+- **2026-08-26 Hostinger outage recovery:** restarted exited `k3d-k3d-cluster-agent-0` (exit 143);
+  all hub nodes returned Ready and Prometheus was recreated/replayed. Commit `44de06f7` pushed to
+  `origin/k3d-manager-v1.27.0` fixes Keycloak service-port 8080, IPv4-pins tunnel/health probes,
+  and corrects the Hostinger Keycloak status URL. Focused BATS 68/68, shellcheck, and
+  `_agent_audit` passed. Public ArgoCD/Keycloak repeated probes reached 200; intermittent wrapper
+  resets remain documented in the incident issue.
+
 - v1.25.0 release validation: E2E BATS 16/16; webhook BATS 54/54; syntax/shellcheck gates
   passed; Copilot findings resolved before merge.
 - Node-health watchdog and E2E diagnostics hardening shipped in the released branch.

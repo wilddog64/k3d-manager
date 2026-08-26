@@ -136,6 +136,15 @@
 
 ## Open follow-ups
 
+- **Hostinger access-layer recovery (2026-08-26):** k3d agent-0 exited (143), causing hub workload
+  evictions and local ArgoCD/Keycloak/Prometheus 502s; restarting the single stopped container
+  restored all hub nodes to Ready and Prometheus replayed its WAL. Commit `44de06f7` fixes the
+  Keycloak forward from service port 80 to 8080, pins tunnel/health probes to IPv4, and uses the
+  valid `/realms/master` status path. Focused BATS 68/68, shellcheck, and `_agent_audit` passed.
+  Repeated direct public probes reached ArgoCD/Keycloak 200; wrapper flapping remains a live
+  follow-up when transient port-forward client resets occur. Incident:
+  `docs/issues/2026-08-26-hostinger-keycloak-port-forward-service-port.md`.
+
 - **M2 E2E acceptance blocked (2026-08-25):** bootstrap/preflight passed and the intentional
   invalid-digest run produced a failed artifact, but publisher variables were absent. Replay
   and the passing run are blocked because `m2jump` cannot resolve `m2-air.local`. Evidence:
