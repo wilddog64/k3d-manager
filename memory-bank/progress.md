@@ -57,6 +57,11 @@
 
 ## v1.27.0 queue
 
+- [ ] **Dependabot CI/merge automation** — queued in
+  `docs/plans/v1.27.0-dependabot-automation.md`. PR #51 investigation: the
+  Dependabot-only job was correctly skipped for a human-authored feature PR; no fix is
+  needed for that run.
+
 - [ ] **CVE remediation event panels empty (2026-08-24) — ROOT-CAUSED 2026-08-25.**
   NOT a durability bug (Codex RC wrong). Durable source (event ConfigMaps) exists; 0 series
   is correct because 0 events exist. Real RC: Keychain `platform-ops-app-rebuild/k3dm` absent

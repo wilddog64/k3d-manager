@@ -135,7 +135,9 @@ These have scope docs and committed version numbers; they ship in this order.
   Stripe test mode, Prometheus metrics, and Grafana capacity reporting; browser validation remains
   a small cohort rather than thousands of sessions. Scopes:
   `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`,
-  `docs/plans/v1.27.0-adaptive-checkout-load-testing.md`.
+  `docs/plans/v1.27.0-adaptive-checkout-load-testing.md`,
+  `docs/plans/v1.27.0-dependabot-automation.md` (queued automation for CI failures,
+  rebases, review, and guarded auto-merge).
 - **v1.28.0 — platform zero-downtime rollouts** — scale the stateless hub tier, add probes/PDBs and
   rolling-update guarantees, validate capacity, and separately design failover for each stateful
   service before claiming no downtime. Scope: `docs/plans/v1.28.0-platform-zero-downtime-rollouts.md`.

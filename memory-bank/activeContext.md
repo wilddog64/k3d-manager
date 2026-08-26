@@ -108,6 +108,11 @@
   - Finding 2b — dispatcher `--confirm` strip on `deploy_app_cluster` (OPEN).
     `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
 
+- **Dependabot automation queued (2026-08-25):** `docs/plans/v1.27.0-dependabot-automation.md`
+  defines guarded CI retry, Dependabot rebase, Copilot review, Slack escalation, and
+  allowlisted auto-merge behavior. Product-catalog PR #51's skipped Dependabot job is
+  expected because its author is `wilddog64`, not `dependabot[bot]`.
+
 - **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged, tag/release published, protection restored
   (`enforce_admins=true`, 1 approval). Shipped 3/5 scopes (fleet count-agnostic lifecycle, E2E
   promotion gate + observability, managed registration cleanup). Retro
