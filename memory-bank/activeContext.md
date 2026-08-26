@@ -144,7 +144,8 @@
   Repeated direct public probes reached ArgoCD/Keycloak 200; wrapper flapping remains a live
   follow-up when transient port-forward client resets occur. The shared wrapper now tolerates
   three consecutive health failures, retries after 2 seconds, and binds kubectl to IPv4; local
-  ArgoCD and Keycloak checks returned 200 after regeneration. Incident:
+  ArgoCD and Keycloak checks returned 200 after regeneration. Fix commit `a5dc3967` is pushed.
+  Incident:
   `docs/issues/2026-08-26-hostinger-keycloak-port-forward-service-port.md`.
 
 - **Hostinger capacity check (2026-08-26):** live node `srv1754834` has 2 vCPU / 7.75 GiB RAM;

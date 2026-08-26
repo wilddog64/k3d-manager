@@ -214,7 +214,7 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   BATS 2/2, ShellCheck, and `_agent_audit` passed.
 
 - **2026-08-26 port-forward flapping follow-up:** hardened the shared ArgoCD/Keycloak forwarder
-  with IPv4 binding, three-failure health hysteresis, and a 2-second restart delay. Regenerated
+  with IPv4 binding, three-failure health hysteresis, and a 2-second restart delay (`a5dc3967`). Regenerated
   launchd wrappers; local ArgoCD and Keycloak endpoints returned HTTP 200. Public DNS verification
   was unavailable from the agent shell. Details: `docs/issues/2026-08-26-hostinger-keycloak-port-forward-service-port.md`.
 
