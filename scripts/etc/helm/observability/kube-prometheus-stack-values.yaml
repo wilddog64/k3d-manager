@@ -35,7 +35,7 @@ prometheus:
             action: keep
             regex: istiod
       - job_name: federate-acg
-        scrape_interval: 30s
+        scrape_interval: 60s
         honor_labels: true
         metrics_path: /federate
         params:
