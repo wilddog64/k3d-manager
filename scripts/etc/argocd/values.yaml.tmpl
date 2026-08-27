@@ -37,6 +37,15 @@ configs:
 server:
   replicas: ${ARGOCD_SERVER_REPLICAS}
 
+  # Bound on the single-node hub so no component starves the API server.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
   service:
     type: ClusterIP
 
@@ -56,6 +65,14 @@ server:
 repoServer:
   replicas: ${ARGOCD_REPO_SERVER_REPLICAS}
 
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
   metrics:
     enabled: true
     serviceMonitor:
@@ -71,6 +88,15 @@ controller:
     - --status-processors=5
     - --operation-processors=2
 
+  # Ceiling (not a throttle): headroom to reconcile all apps without pinning the node.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
   metrics:
     enabled: true
     serviceMonitor:
@@ -81,12 +107,38 @@ controller:
 applicationSet:
   replicas: ${ARGOCD_APPLICATIONSET_REPLICAS}
 
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
   metrics:
     enabled: true
     serviceMonitor:
       enabled: true
       additionalLabels:
         release: kube-prometheus-stack
+
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+notifications:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 150m
+      memory: 256Mi
 
 dex:
   enabled: false

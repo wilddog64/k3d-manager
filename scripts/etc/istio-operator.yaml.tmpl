@@ -8,18 +8,33 @@ spec:
   components:
     pilot:
       k8s:
+        # Single-node hub: pin to 1 replica. The default HPA (max 5 @ 80% of a
+        # small request) scales out under CPU pressure and worsens overcommit.
+        hpaSpec:
+          minReplicas: 1
+          maxReplicas: 1
         resources:
           requests:
             cpu: "${PILOT_K8S_CPU}" # 100m
             memory: "${PILOT_K8S_MEM}" # 256Mi
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
     ingressGateways:
       - name: istio-ingressgateway
         enabled: true
         k8s:
+          # Pin to 1 replica on the single-node hub (see pilot note above).
+          hpaSpec:
+            minReplicas: 1
+            maxReplicas: 1
           resources:
             requests:
               cpu: "${ING_K8S_CPU}" # 100m
               memory: "${ING_K8S_MEM}" # 256Mi
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
           service:
             type: LoadBalancer
   values:
