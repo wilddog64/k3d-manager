@@ -330,6 +330,13 @@ assert not _verify_slack_signature(b"\xff", "0", "v0=x")
     [ "${status}" -eq 0 ]
 }
 
+@test "status smoke login falls back to the deployed Keycloak admin Secret" {
+    run grep -F -- 'keycloak-admin-secret' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- 'admin-cli' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+}
+
 @test "Slack ignores signed unknown and user-less commands without creating anchors" {
     local before after response
     before="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"

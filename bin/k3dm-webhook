@@ -1779,6 +1779,15 @@ def _smoke_test_logins(provider, app_context):
             if "K3DM_SMOKE_KC_CLIENT" not in os.environ:
                 kc_client = "k3dm-smoke"
             kc_via_smoke_client = True
+        else:
+            # Helm's deployed admin Secret is password-only and targets the
+            # master realm/admin-cli client, rather than the smoke client.
+            seeded_pass = _smoke_secret("identity", "password", "keycloak-admin-secret", context="k3d-k3d-cluster")
+            if seeded_pass:
+                kc_user = kc_user or "admin"
+                kc_pass = seeded_pass
+                kc_realm = os.environ.get("K3DM_SMOKE_KC_REALM", "master")
+                kc_client = os.environ.get("K3DM_SMOKE_KC_CLIENT", "admin-cli")
     kc_token = None
     if not (kc_user and kc_pass):
         results.append(("Keycloak login", None, "no credentials (k3dm-smoke-user Secret absent; set K3DM_SMOKE_KC_USER/PASS)"))
