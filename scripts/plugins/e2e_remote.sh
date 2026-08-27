@@ -349,13 +349,19 @@ function e2e_runner_dispatch() {
   if [[ -n "$E2E_M2_PUBLISH_BACK_HOST" ]]; then
     backenv="export E2E_PUBLISH_BACK_HOST=${E2E_M2_PUBLISH_BACK_HOST} E2E_PUBLISH_BACK_KEY=${E2E_M2_PUBLISH_BACK_KEY}; "
   fi
+  local imageenv=""
+  if [[ -n "${E2E_IMAGE_TAG:-}" ]]; then
+    local _image_tag_q
+    printf -v _image_tag_q '%q' "${E2E_IMAGE_TAG}"
+    imageenv="export E2E_IMAGE_TAG=${_image_tag_q}; "
+  fi
 
   local -a opts
   mapfile -t opts < <(_e2e_remote_ssh_opts)
   local remote
   remote="export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; \
 export E2E_RUNNER=${runner} KUBECONFIG=${E2E_M2_KUBECONFIG} E2E_REPORT_DIR=${E2E_M2_REMOTE_REPORT_DIR}; \
-${backenv}\
+${imageenv}${backenv}\
 cd ${E2E_M2_REPO} || exit 1; ./scripts/k3d-manager e2e_verify_vcluster ${digest}; rc=\$?; \
 ./scripts/k3d-manager e2e_runner_publish_back \$rc || true; exit \$rc"
 
