@@ -237,6 +237,10 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `33073207387` from `0c2505bb`; remote live acceptance is pending. M4 disk check: root 58% used /
   196 GB free, OrbStack 26% / 184 GB free; Docker API inventory was unavailable because the socket
   did not respond within the bounded check.
+- **2026-08-27 M2 acceptance:** run `1787838531-2562` used image
+  `sha-0c2505bbdc09b4ad12e5ea251ce9a8eeb7975e00` and completed with 26 passed, 31 failed, and 45
+  skipped. Product-catalog passed; basket/order contract assertions and payment tests failed. The
+  result was not accepted; evidence is in `docs/issues/2026-08-27-m2-e2e-acceptance-after-immutable-image.md`.
 
 - Every implementation updates this file and `activeContext.md` with the real commit/PR SHA.
 - Unexpected live failures get a dated `docs/issues/YYYY-MM-DD-*.md` record with verbatim

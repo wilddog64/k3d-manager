@@ -308,6 +308,9 @@
   `E2E_IMAGE_TAG` to the M2 runner (`0f16f0de` on `k3d-manager-v1.27.0`). The corrected image build
   (`shopping-cart-e2e-tests` run `33073207387`, source `0c2505bb`) passed; live M2 acceptance remains
   the next verification step. M4 storage is healthy (58% root, 196 GB free; OrbStack 26%, 184 GB free).
+  The 2026-08-27 M2 run used the immutable tag but failed 31/102 (26 passed, 45 skipped), with
+  basket/order response-shape failures and payment-suite failures; see
+  `docs/issues/2026-08-27-m2-e2e-acceptance-after-immutable-image.md`.
 - Do not deploy source-only changes until their release-branch/PR gates + live verification are explicit.
 - When the laptop Vault reverse bridge is required (`HUB_VAULT_USE_BRIDGE=1`, default), k3s-aws selects
   SSH and overrides explicit SSM with a warning; SSM stays available for non-bridge Vault profiles.
