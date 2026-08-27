@@ -57,6 +57,11 @@
 
 ## v1.27.0 queue
 
+- [x] **E2E transient-resource cleanup (2026-08-27)** — `6b20cced` pushed. Teardown now cleans
+  orphaned kubeconfig/proxy state and removes transient logs; JSON summaries remain as audit data.
+  Focused E2E tests and ShellCheck passed. Full suite has a pre-existing hang after the initial
+  tests; follow-up is to observe m4 load and use m2 for E2E if saturation persists.
+
 - [~] **M2 E2E live acceptance (2026-08-25):** bootstrap/preflight passed; intentional
   invalid-digest run published a failed artifact. The required passing retry
   `1787708603-5833` completed but failed 45/102 tests because the current E2E image/client expects

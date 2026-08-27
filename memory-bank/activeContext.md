@@ -136,6 +136,11 @@
 
 ## Open follow-ups
 
+- **E2E transient cleanup (2026-08-27):** commit `6b20cced` pushed on `k3d-manager-v1.27.0`.
+  `_e2e_teardown` now best-effort removes orphaned vCluster kubeconfigs/proxies and transient
+  per-run logs while retaining JSON audit summaries; regression coverage added. Host remains
+  CPU-saturated by OrbStack/browser workloads, so m2 remains the preferred E2E runner.
+
 - **Hostinger access-layer recovery (2026-08-26):** k3d agent-0 exited (143), causing hub workload
   evictions and local ArgoCD/Keycloak/Prometheus 502s; restarting the single stopped container
   restored all hub nodes to Ready and Prometheus replayed its WAL. Commit `44de06f7` fixes the
