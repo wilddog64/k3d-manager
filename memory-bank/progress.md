@@ -231,6 +231,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 
 ## Process
 
+- **2026-08-27 M2 E2E migration wiring:** committed and pushed `0f16f0de` (`fix(e2e): forward
+  immutable image tag to remote runner`) so `make e2e-remote RUNNER=m2` cannot silently use stale
+  `latest` when `E2E_IMAGE_TAG` is supplied. The source image build completed successfully as run
+  `33073207387` from `0c2505bb`; remote live acceptance is pending. M4 disk check: root 58% used /
+  196 GB free, OrbStack 26% / 184 GB free; Docker API inventory was unavailable because the socket
+  did not respond within the bounded check.
+
 - Every implementation updates this file and `activeContext.md` with the real commit/PR SHA.
 - Unexpected live failures get a dated `docs/issues/YYYY-MM-DD-*.md` record with verbatim
   evidence.
