@@ -136,18 +136,25 @@
 
 ## Open follow-ups
 
-- **2026-08-27 hub CPU overcommit — governance spec (SPEC, commit `85518a88`):**
+- **2026-08-27 hub CPU overcommit — Step 1 IMPLEMENTED + live-applied (`85518a88`→`2a38670c`):**
   `docs/bugs/2026-08-27-hub-cpu-overcommit-resource-governance.md`. Diagnosed the CPU stress the
   federation-scrape tweak (`977d9e11`) could not fix: single 10-CPU/12.6GB hub VM oversubscribed
-  (`docker stats` ~1378% vs 1000%; agent-2 426%, load avg 70). Root = zero resource governance →
-  unbounded `argocd-application-controller`/`repo-server` (`resources: {}`) starve apiserver
-  (`/livez` 1.4–5.3s) → 24s status patches → ~4s hot reconcile loop on 25 apps → probe-kill restart
-  storm (repo-server 216, svclb-ingressgateway 453, coredns 138, keycloak 51). Plus istiod +
-  istio-ingressgateway HPAs pinned 5/5 @80%-of-tiny-request (scale-out death spiral). **Step 1
-  (this spec) = resource limits on ArgoCD components (`scripts/etc/argocd/values.yaml.tmpl`) +
-  disable istiod/ingressgateway autoscale (`istio-ambient.yaml`; ingressgateway install TBD —
-  do not guess the file).** Step 2 (load-shed prometheus/loki/istio footprint) = separate spec.
-  `kubectl top nodes` UNDERCOUNTS (showed agent-2 ~15%); trust `docker stats`. NOT YET IMPLEMENTED.
+  (`docker stats` ~1414% vs 1000%; agent-2 426%, load avg 70; `/livez` 1.4–5.3s). Root = zero
+  resource governance → unbounded `argocd-application-controller`/`repo-server` (`resources: {}`)
+  starve apiserver → 24s status patches → ~4s hot reconcile loop on 25 apps → probe-kill restart
+  storm (repo-server 221, svclb 465, coredns 143, keycloak 57). Plus istiod + istio-ingressgateway
+  HPAs pinned 5/5 @80%-of-tiny-request (scale-out death spiral). **Both istio HPAs are IstioOperator-
+  owned (`scripts/etc/istio-operator.yaml.tmpl` via `_istioctl install` in `k3d.sh`), NOT the ambient
+  appset** (that targets remote clusters). **Committed:** requests+limits on all 6 ArgoCD components
+  (`values.yaml.tmpl`; controller mem limit 2Gi to avoid OOM — CPU is the constraint) + pilot/ingress
+  `hpaSpec:{min=max=1}`+limits (`istio-operator.yaml.tmpl`). **Live-applied** (ArgoCD is Helm-managed,
+  no self-Application; no live istio operator reconciler → patches durable): `kubectl patch hpa
+  istiod|istio-ingressgateway maxReplicas=1` (5→1 each) + `kubectl patch` controller/repo-server
+  resources. **Result:** total CPU ~1414%→~1144% (~2.7 CPU freed); `/livez` 5.3s→~0.4s; agent-2 load
+  70→39↓; new repo-server pod 0 restarts; restart storm FROZEN. `kubectl top nodes` UNDERCOUNTS
+  (showed agent-2 ~15%); trust `docker stats`. **Durable rollout still owed:** apply committed values
+  via `argocd.sh` helm-upgrade path + re-run istio install so config (not just live patches) carries
+  the fix on next redeploy. **Step 2 (load-shed prometheus/loki footprint)** = separate spec, TODO.
 
 - **2026-08-27 federation scrape tuning:** source commit `977d9e11` changes the hub `federate-acg`
   Prometheus scrape interval from 30s to 60s; the vulnerability exporter remains at 60s. YAML
