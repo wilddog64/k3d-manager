@@ -12,7 +12,7 @@ LOCAL_PORT=${LOCAL_PORT}
 REMOTE_PORT=${REMOTE_PORT}
 HEALTHZ_URL=${HEALTHZ_URL}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT}
-HEALTH_FAILURE_THRESHOLD=3
+HEALTH_FAILURE_THRESHOLD=6
 RESTART_DELAY=2
 LOCK_DIR="${LOG_FILE}.lock"
 
@@ -123,7 +123,7 @@ while true; do
       if ! _pf_alive; then
          break
       fi
-      "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 && _pf_alive && {
+      "${CURL_BIN}" -sf --max-time 5 "${HEALTHZ_URL}" >/dev/null 2>&1 && _pf_alive && {
          _ready=1
          break
       }
@@ -149,7 +149,7 @@ while true; do
    printf '%s\n' "[argocd-pf] healthz reachable — monitoring backend availability" >> "${LOG_FILE}"
    _health_failures=0
    while _pf_alive; do
-      if "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1; then
+      if "${CURL_BIN}" -sf --max-time 5 "${HEALTHZ_URL}" >/dev/null 2>&1; then
          _health_failures=0
       else
          _health_failures=$((_health_failures + 1))
