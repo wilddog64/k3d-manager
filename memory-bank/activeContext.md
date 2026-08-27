@@ -136,6 +136,19 @@
 
 ## Open follow-ups
 
+- **2026-08-27 hub CPU overcommit — governance spec (SPEC, commit `85518a88`):**
+  `docs/bugs/2026-08-27-hub-cpu-overcommit-resource-governance.md`. Diagnosed the CPU stress the
+  federation-scrape tweak (`977d9e11`) could not fix: single 10-CPU/12.6GB hub VM oversubscribed
+  (`docker stats` ~1378% vs 1000%; agent-2 426%, load avg 70). Root = zero resource governance →
+  unbounded `argocd-application-controller`/`repo-server` (`resources: {}`) starve apiserver
+  (`/livez` 1.4–5.3s) → 24s status patches → ~4s hot reconcile loop on 25 apps → probe-kill restart
+  storm (repo-server 216, svclb-ingressgateway 453, coredns 138, keycloak 51). Plus istiod +
+  istio-ingressgateway HPAs pinned 5/5 @80%-of-tiny-request (scale-out death spiral). **Step 1
+  (this spec) = resource limits on ArgoCD components (`scripts/etc/argocd/values.yaml.tmpl`) +
+  disable istiod/ingressgateway autoscale (`istio-ambient.yaml`; ingressgateway install TBD —
+  do not guess the file).** Step 2 (load-shed prometheus/loki/istio footprint) = separate spec.
+  `kubectl top nodes` UNDERCOUNTS (showed agent-2 ~15%); trust `docker stats`. NOT YET IMPLEMENTED.
+
 - **2026-08-27 federation scrape tuning:** source commit `977d9e11` changes the hub `federate-acg`
   Prometheus scrape interval from 30s to 60s; the vulnerability exporter remains at 60s. YAML
   parsing passed. Requires the observability values to be reapplied before live effect; monitor
