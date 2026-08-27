@@ -136,6 +136,10 @@
 
 ## Open follow-ups
 
+- **2026-08-27 hub control-plane outage:** restarting agent-0 and the k3s server did not restore
+  the API. Kine reported slow SQL/handler timeouts and hub containers saturated CPU; Prometheus
+  remained unavailable. Incident recorded in `docs/issues/2026-08-27-hub-control-plane-still-unavailable.md`.
+
 - **E2E transient cleanup (2026-08-27):** commit `6b20cced` pushed on `k3d-manager-v1.27.0`.
   `_e2e_teardown` now best-effort removes orphaned vCluster kubeconfigs/proxies and transient
   per-run logs while retaining JSON audit summaries; regression coverage added. Host remains

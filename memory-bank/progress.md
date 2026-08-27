@@ -201,6 +201,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 
 ## Verification record
 
+- **2026-08-27 hub outage follow-up:** agent-0 and server restarts did not recover the Kubernetes
+  API; Kine/API timeouts persisted under high container CPU. See
+  `docs/issues/2026-08-27-hub-control-plane-still-unavailable.md`; OrbStack runtime recovery is
+  required before further service verification.
+
 - **2026-08-26 Hostinger outage recovery:** restarted exited `k3d-k3d-cluster-agent-0` (exit 143);
   all hub nodes returned Ready and Prometheus was recreated/replayed. Commit `44de06f7` pushed to
   `origin/k3d-manager-v1.27.0` fixes Keycloak service-port 8080, IPv4-pins tunnel/health probes,
