@@ -136,6 +136,11 @@
 
 ## Open follow-ups
 
+- **2026-08-27 federation scrape tuning:** source commit `977d9e11` changes the hub `federate-acg`
+  Prometheus scrape interval from 30s to 60s; the vulnerability exporter remains at 60s. YAML
+  parsing passed. Requires the observability values to be reapplied before live effect; monitor
+  M4 CPU/API latency afterward.
+
 - **2026-08-27 status credential discovery:** commit `f07adea8` adds fallback to the deployed
   password-only `identity/keycloak-admin-secret` (master realm/admin-cli) for smoke login checks;
   webhook tests pass. Prometheus/public endpoints recovered after OrbStack + edge restart, but the
