@@ -120,33 +120,34 @@ Notes:
 Pin the mesh control plane / gateway to 1 replica; on a single node there is nothing to gain
 from horizontal scaling and the 80%-of-tiny-request target guarantees max replicas.
 
-File: `scripts/etc/argocd/applicationsets/istio-ambient.yaml`, `istiod` element values
-(currently lines 22–28):
+**Verified 2026-08-27:** both the live `istiod` (chart `istiod-1.30.0`) and
+`istio-ingressgateway` (chart `istio-ingress-1.30.0`) are owned by the `istio-control-plane`
+**IstioOperator**, applied via `_istioctl install -y -f` in `scripts/lib/providers/k3d.sh`
+(and `k3s.sh`) from `scripts/etc/istio-operator.yaml.tmpl`. They are **NOT** the ambient
+ApplicationSet (`istio-ambient.yaml`) — that appset targets the *remote* app clusters
+(the live `istiod-ubuntu-hostinger` / `ztunnel-ubuntu-hostinger` Applications). There is no
+in-cluster operator reconciler (`istiooperator` CRD absent — `istioctl install` is one-shot),
+so a live `kubectl patch hpa … maxReplicas=1` is durable until the next install and is the
+safe immediate-relief lever.
+
+File: `scripts/etc/istio-operator.yaml.tmpl`. Add `hpaSpec` (min=max=1) + `limits` to both
+`spec.components.pilot.k8s` and `spec.components.ingressGateways[0].k8s`:
 
 ```yaml
-          - name: istiod
-            chart: istiod
-            wave: "1"
-            values: |
-              profile: ambient
-              pilot:
-                autoscaleEnabled: false      # was defaulting to min1/max5 @80%
-                resources:
-                  requests:
-                    cpu: 50m
-                    memory: 512Mi
-                  limits:
-                    cpu: 500m
-                    memory: 1Gi
+    pilot:
+      k8s:
+        hpaSpec: { minReplicas: 1, maxReplicas: 1 }
+        resources:
+          requests: { cpu: "${PILOT_K8S_CPU}", memory: "${PILOT_K8S_MEM}" }
+          limits:   { cpu: "500m", memory: "1Gi" }
+    ingressGateways:
+      - name: istio-ingressgateway
+        k8s:
+          hpaSpec: { minReplicas: 1, maxReplicas: 1 }
+          resources:
+            requests: { cpu: "${ING_K8S_CPU}", memory: "${ING_K8S_MEM}" }
+            limits:   { cpu: "500m", memory: "512Mi" }
 ```
-
-Ingress gateway HPA: the live `istio-ingressgateway` HPA (max 5) must get the same
-treatment. **Locate its install first** — the live cluster is ambient, but the ambient
-appset does not define a gateway, so it comes from a separate path (candidate:
-`scripts/etc/istio-operator.yaml.tmpl` `spec.components.ingressGateways[].k8s.hpaSpec`, or a
-standalone gateway chart). Set `autoscaleEnabled: false` (or `hpaSpec.maxReplicas: 1`) there.
-Do not guess the file — confirm which manifest actually renders the live gateway before
-editing.
 
 ## Out of scope (follow-up specs)
 
