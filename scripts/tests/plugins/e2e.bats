@@ -103,6 +103,27 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "teardown removes orphaned kubeconfig and transient log when destroy is incomplete" {
+  local name="e2e-orphaned"
+  local kubeconfig="$BATS_TEST_TMPDIR/${name}.kubeconfig"
+  local run_id="orphaned-run"
+  touch "$kubeconfig" "$E2E_REPORT_DIR/${run_id}.log"
+  vcluster_destroy() { return 1; }
+  _vcluster_remove_proxy() { echo "proxy_removed $*" >> "$VC_LOG"; }
+  _run_command() {
+    while [[ "$1" == --* ]]; do shift; done
+    [[ "$1" == -- ]] && shift
+    "$@"
+  }
+  export _E2E_RUN_ID="$run_id"
+  run _e2e_teardown "$name"
+  [ "$status" -eq 0 ]
+  [ ! -f "$kubeconfig" ]
+  [ ! -f "$E2E_REPORT_DIR/${run_id}.log" ]
+  run grep -F -- "proxy_removed ${name}" "$VC_LOG"
+  [ "$status" -eq 0 ]
+}
+
 @test "a JSON summary with the gate-consumable keys is written" {
   _e2e_wait_job() { return 0; }
   local rc=0

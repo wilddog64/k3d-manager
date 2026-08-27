@@ -130,6 +130,27 @@ function _e2e_teardown() {
   local name="${1:-}"
   [[ -z "$name" ]] && return 0
   vcluster_destroy "$name" || _warn "e2e: teardown of ${name} failed (manual cleanup may be needed)"
+
+  # Keep cleanup idempotent even when the vCluster API is already gone. In
+  # that case vcluster_destroy can return before removing its proxy and
+  # kubeconfig, leaving local processes and credentials behind after a failed
+  # run. These best-effort removals are safe when destroy already completed.
+  local kubeconfig=""
+  if declare -f _vcluster_kubeconfig_path >/dev/null 2>&1; then
+    kubeconfig="$(_vcluster_kubeconfig_path "$name" 2>/dev/null || true)"
+  fi
+  if [[ -n "$kubeconfig" && -f "$kubeconfig" ]]; then
+    _run_command -- rm -f "$kubeconfig" || true
+  fi
+  if declare -f _vcluster_remove_proxy >/dev/null 2>&1; then
+    _vcluster_remove_proxy "$name" || true
+  fi
+
+  # JSON summaries are the durable audit record; per-run logs are transient
+  # and can otherwise accumulate indefinitely on the host.
+  if [[ -n "${_E2E_RUN_ID:-}" && -n "${E2E_REPORT_DIR:-}" ]]; then
+    _run_command -- rm -f "${E2E_REPORT_DIR}/${_E2E_RUN_ID}.log" || true
+  fi
 }
 
 function _e2e_wait_vcluster_ready() {
