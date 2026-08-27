@@ -241,6 +241,9 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `sha-0c2505bbdc09b4ad12e5ea251ce9a8eeb7975e00` and completed with 26 passed, 31 failed, and 45
   skipped. Product-catalog passed; basket/order contract assertions and payment tests failed. The
   result was not accepted; evidence is in `docs/issues/2026-08-27-m2-e2e-acceptance-after-immutable-image.md`.
+- **2026-08-27 Keycloak smoke fallback:** pushed `931839ab` (`fix(keycloak): support password-only
+  admin secret in smoke check`) on `k3d-manager-v1.27.0`; focused `keycloak.bats` completed 12/12
+  and ShellCheck reported no findings.
 
 - Every implementation updates this file and `activeContext.md` with the real commit/PR SHA.
 - Unexpected live failures get a dated `docs/issues/YYYY-MM-DD-*.md` record with verbatim

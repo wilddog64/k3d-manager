@@ -311,6 +311,9 @@
   The 2026-08-27 M2 run used the immutable tag but failed 31/102 (26 passed, 45 skipped), with
   basket/order response-shape failures and payment-suite failures; see
   `docs/issues/2026-08-27-m2-e2e-acceptance-after-immutable-image.md`.
+- **2026-08-27 Keycloak smoke fallback:** committed `931839ab` on `k3d-manager-v1.27.0` to support
+  deployed password-only Keycloak admin Secrets while preserving the existing username/password path.
+  Focused Keycloak BATS passed 12/12 and ShellCheck was clean.
 - Do not deploy source-only changes until their release-branch/PR gates + live verification are explicit.
 - When the laptop Vault reverse bridge is required (`HUB_VAULT_USE_BRIDGE=1`, default), k3s-aws selects
   SSH and overrides explicit SSM with a warning; SSM stays available for non-bridge Vault profiles.
