@@ -232,5 +232,7 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - **2026-08-26 hub outage:** recorded agent-0/Kine control-plane failure and IPv4 tunnel-origin
   remediation in `docs/issues/2026-08-26-hub-control-plane-and-edge-forward-outage.md`; service
   recovery remains pending final public `make status` verification.
+- **2026-08-26 edge forward hardening:** pushed `ea91431d` with 5-second probes and six-failure
+  hysteresis; Prometheus/Grafana recovered, while ArgoCD/Keycloak remain pending API stabilization.
 - Historical specs/issues are archived only when superseded or unreferenced; files are never
   deleted.

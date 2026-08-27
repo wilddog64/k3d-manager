@@ -290,6 +290,10 @@
   restored the workloads; public forwards still require live verification. See
   `docs/issues/2026-08-26-hub-control-plane-and-edge-forward-outage.md`.
 
+- **Edge forward hardening:** `ea91431d` increases wrapper probe timeout/hysteresis (5s/6 failures)
+  to avoid restarting ArgoCD/Keycloak on transient control-plane latency. Public ArgoCD/Keycloak
+  checks still need re-verification once the k3s API settles.
+
 - `make status` follows the active provider (concise/full/JSON); Slack reuses the same summary contract.
 - CVE remediation current-state excludes terminal `superseded`/`deployment_advanced` events; history
   keeps the audit trail. Verifier cadence/bounds stay conservative under hub load.
