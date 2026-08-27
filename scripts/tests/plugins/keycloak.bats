@@ -87,6 +87,13 @@ setup() {
   [[ "$put_payload" == *"http://localhost:8080/*"* ]]
 }
 
+@test "smoke admin token supports the deployed password-only admin Secret" {
+  run grep -F 'KEYCLOAK_ADMIN_PASSWORD_KEY:-password' "$BATS_TEST_DIRNAME/../../plugins/keycloak.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'admin_user="${KEYCLOAK_ADMIN_USERNAME:-admin}"' "$BATS_TEST_DIRNAME/../../plugins/keycloak.sh"
+  [ "$status" -eq 0 ]
+}
+
 @test "_keycloak_remove_client_attribute deletes stale pkce attribute rows" {
   local exec_log="$BATS_TEST_TMPDIR/exec.log"
   : > "$exec_log"

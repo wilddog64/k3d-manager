@@ -375,6 +375,13 @@ function _keycloak_smoke_admin_token() {
    local admin_user admin_pass
    admin_user=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath='{.data.KEYCLOAK_ADMIN}' 2>/dev/null | base64 --decode 2>/dev/null || true)
    admin_pass=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   if [[ -z "$admin_user" ]]; then
+      admin_user="${KEYCLOAK_ADMIN_USERNAME:-admin}"
+   fi
+   if [[ -z "$admin_pass" ]]; then
+      admin_pass=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" \
+         -o jsonpath="{.data.${KEYCLOAK_ADMIN_PASSWORD_KEY:-password}}" 2>/dev/null | base64 --decode 2>/dev/null || true)
+   fi
    if [[ -z "$admin_user" || -z "$admin_pass" ]]; then
       _warn "[keycloak] master admin creds not found in secret '$admin_secret'; skipping smoke seed"
       return 0
