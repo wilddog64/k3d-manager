@@ -201,6 +201,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 
 ## Verification record
 
+- **2026-08-27 status credential fix:** `f07adea8` pushed on `k3d-manager-v1.27.0`; Keycloak smoke
+  checks now discover the deployed admin Secret without requiring env credentials. Webhook BATS
+  55/55 and `py_compile` passed. Aggregate health verification remains pending because the live
+  webhook sweep exceeds the bounded shell check under current load.
+
 - **2026-08-27 hub outage follow-up:** agent-0 and server restarts did not recover the Kubernetes
   API; Kine/API timeouts persisted under high container CPU. See
   `docs/issues/2026-08-27-hub-control-plane-still-unavailable.md`; OrbStack runtime recovery is

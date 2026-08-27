@@ -136,6 +136,11 @@
 
 ## Open follow-ups
 
+- **2026-08-27 status credential discovery:** commit `f07adea8` adds fallback to the deployed
+  password-only `identity/keycloak-admin-secret` (master realm/admin-cli) for smoke login checks;
+  webhook tests pass. Prometheus/public endpoints recovered after OrbStack + edge restart, but the
+  aggregate health sweep remains slow under control-plane load.
+
 - **2026-08-27 hub control-plane outage:** restarting agent-0 and the k3s server did not restore
   the API. Kine reported slow SQL/handler timeouts and hub containers saturated CPU; Prometheus
   remained unavailable. Incident recorded in `docs/issues/2026-08-27-hub-control-plane-still-unavailable.md`.
