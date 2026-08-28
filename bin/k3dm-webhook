@@ -1771,6 +1771,7 @@ def _smoke_test_logins(provider, app_context):
     kc_realm = os.environ.get("K3DM_SMOKE_KC_REALM", "shopping-cart")
     kc_client = os.environ.get("K3DM_SMOKE_KC_CLIENT", "frontend")
     kc_via_smoke_client = False
+    kc_token_is_stub = False
     if not (kc_user and kc_pass):
         seeded_user = _smoke_secret("identity", "username", "k3dm-smoke-user", context="k3d-k3d-cluster")
         seeded_pass = _smoke_secret("identity", "password", "k3dm-smoke-user", context="k3d-k3d-cluster")
@@ -1779,6 +1780,7 @@ def _smoke_test_logins(provider, app_context):
             if "K3DM_SMOKE_KC_CLIENT" not in os.environ:
                 kc_client = "k3dm-smoke"
             kc_via_smoke_client = True
+            kc_token_is_stub = True
         else:
             # Helm's deployed admin Secret is password-only and targets the
             # master realm/admin-cli client, rather than the smoke client.
@@ -1788,6 +1790,7 @@ def _smoke_test_logins(provider, app_context):
                 kc_pass = seeded_pass
                 kc_realm = os.environ.get("K3DM_SMOKE_KC_REALM", "master")
                 kc_client = os.environ.get("K3DM_SMOKE_KC_CLIENT", "admin-cli")
+                kc_token_is_stub = True
     kc_token = None
     if not (kc_user and kc_pass):
         results.append(("Keycloak login", None, "no credentials (k3dm-smoke-user Secret absent; set K3DM_SMOKE_KC_USER/PASS)"))
@@ -1826,9 +1829,9 @@ def _smoke_test_logins(provider, app_context):
                     _frontend_ok = 200 <= resp.status < 300
                     _frontend_detail = f"HTTP {resp.status} on {fe_path}"
             except urllib.error.HTTPError as exc:
-                if kc_via_smoke_client and exc.code in (401, 403):
+                if kc_token_is_stub and exc.code in (401, 403):
                     _frontend_skipped = True
-                    _frontend_detail = f"skipped (smoke-client token rejected: HTTP {exc.code} on {fe_path})"
+                    _frontend_detail = f"skipped (stand-in token rejected: HTTP {exc.code} on {fe_path})"
                 else:
                     _frontend_detail = f"HTTP {exc.code} on {fe_path}"
             except Exception as exc:
