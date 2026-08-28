@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Bounded k3d agent recovery watchdog. It only restarts the configured agent
-# after repeated kubelet-proxy failures and a cooldown; keep it disabled when
+# after the node stays NotReady (the node controller's authoritative verdict)
+# across the failure threshold plus a cooldown; a Ready-but-slow /healthz is
+# advisory only and never triggers a restart (a slow node under CPU pressure is
+# alive, and bouncing it evicts pods and adds load). Keep it disabled when
 # running manually unless K3DM_NODE_RECOVERY_ENABLED=1 is explicitly set.
 set -u
 
@@ -9,8 +12,9 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
 context="${K3DM_NODE_RECOVERY_CONTEXT:-k3d-k3d-cluster}"
 node="${K3DM_NODE_RECOVERY_NODE:-k3d-k3d-cluster-agent-0}"
 interval="${K3DM_NODE_RECOVERY_INTERVAL:-30}"
-threshold="${K3DM_NODE_RECOVERY_FAILURE_THRESHOLD:-3}"
+threshold="${K3DM_NODE_RECOVERY_FAILURE_THRESHOLD:-5}"
 cooldown="${K3DM_NODE_RECOVERY_COOLDOWN:-300}"
+healthz_timeout="${K3DM_NODE_RECOVERY_HEALTHZ_TIMEOUT:-15s}"
 enabled="${K3DM_NODE_RECOVERY_ENABLED:-0}"
 log_file="${K3DM_NODE_RECOVERY_LOG:-${HOME}/.local/share/k3d-manager/logs/node-health-watch.log}"
 state_file="${K3DM_NODE_RECOVERY_STATE:-${HOME}/.local/share/k3d-manager/node-health-watch.state}"
@@ -21,7 +25,7 @@ _log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >>"$log_file";
 
 _healthy() {
   kubectl --context "$context" get --raw "/api/v1/nodes/${node}/proxy/healthz" \
-    --request-timeout=5s 2>/dev/null | grep -qx 'ok'
+    --request-timeout="$healthz_timeout" 2>/dev/null | grep -qx 'ok'
 }
 
 _ready() {
@@ -56,11 +60,12 @@ _recover() {
 
 failures=0
 while :; do
-  if _ready && _healthy; then
+  if _ready; then
     failures=0
+    _healthy || _log "${node} Ready but /healthz slow/unreachable (advisory, no restart)"
   else
     failures=$((failures + 1))
-    _log "${node} health probe failed (${failures}/${threshold})"
+    _log "${node} NotReady (${failures}/${threshold})"
     if (( failures >= threshold )); then
       _recover || true
       failures=0

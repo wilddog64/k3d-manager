@@ -193,6 +193,50 @@
   persist via k3s manifest override/HelmChartConfig, or land Step 2 load-shed so 1s probes stop
   failing at the source. This is fresh evidence Step 2 is no longer optional.
 
+- **2026-08-27 hub-wide CPU-starvation cascade INCIDENT (mitigated live).** The keycloak dig
+  uncovered that 1s liveness/readiness probes were failing platform-wide under CPU starvation,
+  crashlooping EVERY core component into a deadlock: coredns (DNS down), loki-canary (4 pods,
+  200+ restarts each), argocd-repo-server (probe-killed 40× → ArgoCD couldn't render manifests →
+  couldn't sync the Step 2 relief → deadlock), and **agent-0 node went NotReady** (kubelet
+  starved). User ran the Step 2 appset reapply (`applicationset observability configured`, now
+  `$values`=k3d-manager-v1.27.0), but ArgoCD sync stayed `Unknown` because repo-server was down
+  and then because rendering the big kube-prometheus-stack chart timed out (`DeadlineExceeded`).
+  Live mitigations (NOT all in git): (1) `kubectl patch deploy argocd-repo-server` → light
+  `/healthz` probes + startupProbe + 10s timeout (broke the deadlock; repo-server 1/1 stable);
+  (2) `kubectl delete ds loki-canary` + force-deleted its pods (biggest immediate CPU win);
+  (3) `kubectl patch prometheus kube-prometheus-stack-prometheus` → scrape/eval 30s→60s,
+  retention 7d→3d, retentionSize 8GB **directly on the CR** (bypasses the timed-out chart
+  render; operator regenerates config; ArgoCD sync is stuck so won't revert; and v1.27.0 values
+  ALSO say 60s so they AGREE when sync eventually lands). Result: all 4 nodes Ready again
+  (agent-0 self-recovered), keycloak/coredns/repo-server/argocd-server stable (restart counters
+  frozen), Prometheus cut to 60s + counter frozen, replaying TSDB toward 2/2. ⚠ Live-only debts
+  to reconcile: repo-server probe patch (ArgoCD-self-managed → reverts to 1s on next argocd
+  self-sync — OK once CPU is free), coredns patch (k3s-managed), metrics-server was briefly
+  unavailable. Durable resolution = the committed v1.27.0 Step 2 config syncing once repo-server
+  can render the chart under freed CPU. Prometheus prometheusSpec should also carry a startupProbe
+  headroom review, but its probes are already sane (not a 1s victim).
+
+- **2026-08-28 node-health-watch was bouncing agent-0 in a restart loop (mitigated live +
+  durable fix committed).** Morning regression: agent-0 `NotReady`, coredns `0/1` (DNS
+  endpoints empty), prometheus-0 `Pending`/`Unknown`. Root cause was NOT a new probe bug and
+  NOT OOM (`RestartCount=0 OOMKilled=false ExitCode=0` = external restarter). The launchd
+  watchdog `com.k3d-manager.node-health-watch` (`bin/k3dm-node-health-watch`,
+  `K3DM_NODE_RECOVERY_ENABLED=1`) polls `/healthz` with a 5s timeout; under CPU pressure that
+  times out on a **slow-but-`Ready`** node, 3 fails (~90s) → `docker restart agent-0`, 300s
+  cooldown, repeat ~every 6 min (log: restart 04:11→recover 04:13→fail→restart 04:17 PDT). Each
+  bounce takes DNS down (coredns is a single replica pinned to agent-0) and strands Prometheus
+  (its local-path PVC is on agent-0) → net-harmful. This is the **node-level instance of the
+  1s-probe disease** ([[reference_one_second_probes_cpu_starvation_kill_loop]]). Live mitigation:
+  `launchctl bootout gui/$(id -u)/com.k3d-manager.node-health-watch` → restarts stopped, agent-0
+  holds Ready on its own (self-recovers), coredns 1/1, DNS restored, Prometheus rescheduled and
+  replaying TSDB. Durable fix committed: `bin/k3dm-node-health-watch` now triggers recovery only
+  on the authoritative `_ready`=False verdict (a Ready-but-slow `/healthz` is advisory, no
+  restart), healthz timeout 5s→15s (`K3DM_NODE_RECOVERY_HEALTHZ_TIMEOUT`), threshold 3→5. Spec
+  `docs/bugs/2026-08-28-node-health-watch-restart-loop-slow-node.md`. ⚠ Watchdog is currently
+  **unloaded** — reload it (`launchctl bootstrap`) only after the fixed script is the one on
+  disk AND the hub CPU has calmed; follow-up fragility: coredns SPOF + prometheus PVC both
+  hostage to agent-0.
+
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo
   pins `ARGOCD_CHART_VERSION=7.8.1` (`argocd.sh:53`). Running full `deploy_argocd` could unintentionally
