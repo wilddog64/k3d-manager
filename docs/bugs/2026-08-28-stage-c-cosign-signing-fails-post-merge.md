@@ -2,8 +2,25 @@
 
 **Filed:** 2026-08-28
 **Milestone:** v1.27.0 image-signing / CVE-loop closure (Stage C follow-up)
-**Status:** OPEN — blocks Stage D (Kyverno Audit→Enforce would reject unsigned images)
+**Status:** ✅ RESOLVED 2026-08-28 — all 5 image callers now sign; `cosign verify` passes on every one.
 **Severity:** high — all shopping-cart images are pushed to GHCR **unsigned**
+
+## Resolution (2026-08-28)
+
+- **RC1 fixed** — re-seeded `COSIGN_KEY` in all 5 callers from the true PEM bytes (Keychain hex
+  `xxd -r -p` → file → `gh secret set … < file`; key+password pre-verified in cosign locally).
+  `COSIGN_PASSWORD` left as-is (single-line, uncorrupted).
+- **RC2 fixed** — frontend PR #101 (`fix/cosign-publish-job-env`, `d47e675c`) added job-level
+  `env.COSIGN_KEY` to `publish`; merged squash `85265e7b`.
+- Re-triggered every caller's main build. `Sign image by digest` = **success** on all 5.
+- **Proof — `cosign verify --key <derived cosign.pub>` PASSES on all 5** signed digests
+  (GHCR now carries a `sha256-<digest>.sig` tag for each): basket `4a96cf41…`, order `ca2d398b…`,
+  product-catalog `3db7b8da…`, payment `3b5f478c…`, frontend `ca25a636…`.
+- ⚠ **Separate, out-of-scope:** product-catalog's main run is still red on a **different** step,
+  "Fail when image promotion did not complete" (after the kustomization tag update) — a pre-existing
+  GitOps-promotion failure (its main builds were red before Stage C too). Signing itself passed.
+  Tracked separately, does NOT block Stage D signing readiness.
+- Stage D (Kyverno Audit→Enforce) is now unblocked from the signature-availability standpoint.
 
 ## Summary
 

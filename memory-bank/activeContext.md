@@ -126,12 +126,14 @@
     as-is (45-byte single-line, no newline → `security -w` returned it verbatim, uncorrupted). ✅ **RC2 PR
     open** — frontend `fix/cosign-publish-job-env` commit `d47e675c` adds job-level `env.COSIGN_KEY` to
     `publish` (diff verified clean +2, no newline strip); **PR #101** (https://github.com/wilddog64/
-    shopping-cart-frontend/pull/101), **MERGED 2026-08-28 (user go), squash `85265e7b`** — post-merge main
-    build `33215231258` exercises signing with BOTH fixes. **NEXT:** rerun the 4 non-frontend main builds
-    (RC1-only, secrets re-read at runtime) + `cosign verify --key /tmp/cosign-verify.pub` proves sigs; after
-    #101 merges, rerun frontend too. → THEN Stage D (Kyverno Audit→Enforce; Enforce must NOT go live until
-    images actually carry signatures). Also /post-merge housekeeping (sync mains, prune
-    `feat/cosign-sign-attest` branches incl. basket's net-zero commits).
+    shopping-cart-frontend/pull/101), **MERGED 2026-08-28 (user go), squash `85265e7b`**. ✅ **BLOCKER
+    RESOLVED 2026-08-28:** all 5 main builds re-triggered → `Sign image by digest` = success; **`cosign
+    verify --key <derived pub>` PASSES on all 5** (GHCR `sha256-<digest>.sig` present): basket `4a96cf41…`,
+    order `ca2d398b…`, product-catalog `3db7b8da…`, payment `3b5f478c…`, frontend `ca25a636…`. ⚠
+    product-catalog run still red on a SEPARATE pre-existing step "Fail when image promotion did not
+    complete" (GitOps promotion, NOT signing; its main was red pre-Stage-C) — tracked apart. **NEXT:** Stage
+    D (Kyverno Audit→Enforce + promoter `cosign verify` gate — now unblocked; Enforce still staged) + /post-
+    merge housekeeping (sync mains, prune `feat/cosign-sign-attest` branches incl. basket's net-zero commits).
   4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **STARTED
      2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests →
      **DONE** Codex commit `17be2e69`, pushed to `origin/k3d-manager-v1.27.0`; pure decision logic +

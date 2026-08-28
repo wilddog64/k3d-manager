@@ -192,7 +192,7 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Fixed 3 live-found signing.sh bugs: missing `_vault_login` (`6f3c6dd3`); early-return skipped
   idempotent applies; ESO 403 → `_signing_grant_eso_read` auto-discovers the store's Vault role
   (`eso-ldap-directory`) and merges `cosign-verify` (`7d335b1a`). BATS 6/6.
-- [~] **Image-signing Stage C** — PRs merged, but SIGNING BROKEN post-merge (see blocker below).
+- [x] **Image-signing Stage C** — PRs merged AND signing verified working post-merge (blocker resolved).
   CI cosign **sign-by-digest** (attestation deferred). Spec
   `7779e4d6`. Code on `feat/cosign-sign-attest`, Claude-verified on origin (Codex session `01a0365f`):
   infra reusable `build-push-deploy.yml` (workflow_call COSIGN secrets, job-env COSIGN_KEY, `id: push`,
@@ -209,10 +209,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   cosign `invalid pem block`; fix = re-seed from true PEM via file. RC2 (frontend): `publish` job lacks
   job-level `env.COSIGN_KEY` → `Install cosign` skipped → `cosign: command not found`; fix = add job-level
   env. Spec `docs/bugs/2026-08-28-stage-c-cosign-signing-fails-post-merge.md`.
-  **FIX IN PROGRESS (user go 2026-08-28):** RC1 ✅ re-seeded `COSIGN_KEY` in all 5 callers from true PEM via
-  file (key+password verified loading in cosign locally first). RC2 ✅ frontend PR #101
-  (`fix/cosign-publish-job-env`, `d47e675c`) — MERGE GATED. Remaining: rerun 4 non-frontend main builds +
-  `cosign verify` proof; rerun frontend after #101 merges. Blocks D until `cosign verify` proves signatures.
+  **✅ RESOLVED 2026-08-28 (user go):** RC1 re-seeded `COSIGN_KEY` in all 5 callers from true PEM via file
+  (key+password verified in cosign locally first). RC2 frontend PR #101 (`fix/cosign-publish-job-env`,
+  `d47e675c`) merged squash `85265e7b`. All 5 main builds re-triggered → `Sign image by digest` = success;
+  **`cosign verify --key <derived pub>` PASSES on all 5** (GHCR `sha256-<digest>.sig` present): basket
+  `4a96cf41…`, order `ca2d398b…`, product-catalog `3db7b8da…`, payment `3b5f478c…`, frontend `ca25a636…`.
+  ⚠ product-catalog run still red on a SEPARATE pre-existing step "Fail when image promotion did not
+  complete" (GitOps promotion, not signing) — tracked apart, does not block D.
 - [ ] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
   `cosign verify` gate (Claude live; needs signed images from C before Enforce).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
