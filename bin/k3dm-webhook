@@ -1885,7 +1885,36 @@ def _smoke_test_logins(provider, app_context):
         except Exception as exc:
             results.append(("Grafana login", False, str(exc)[:200]))
 
+    # A deliberately paused hub monitoring stack is not a login failure. Grafana
+    # is hub-hosted in every provider mode, so this applies regardless of provider.
+    for _i, (_n, _ok, _d) in enumerate(results):
+        if _n == "Grafana login" and _ok is False and _monitoring_paused():
+            results[_i] = (_n, None, "monitoring paused (make monitoring-resume)")
+
     return results
+
+
+def _monitoring_paused(context=None, argons=None):
+    """True iff the hub observability stack is DELIBERATELY paused by
+    observability_pause. Signal: the kube-prometheus-stack ArgoCD Application
+    exists and its spec.syncPolicy.automated is empty (exactly what the pause
+    sets). This distinguishes an intentional pause from a crash — a
+    broken-but-managed stack still has automated set, so it stays a real FAIL.
+    The observability stack and its ArgoCD Applications always live on the hub
+    (infra) context, never the app-cluster context. Any uncertainty (kubectl
+    absent, timeout) returns False (not known paused)."""
+    context = context or os.environ.get("INFRA_CONTEXT", "k3d-k3d-cluster")
+    argons = argons or os.environ.get("ARGOCD_NAMESPACE", "cicd")
+    out, timed_out = _posix_spawn_capture(
+        ["kubectl", "get", "application", "kube-prometheus-stack",
+         "-n", argons, "--context", context,
+         "-o", "jsonpath={.metadata.name}={.spec.syncPolicy.automated}",
+         "--request-timeout=5s"],
+        timeout=8,
+    )
+    if timed_out or _kubectl_absent(out):
+        return False
+    return out.strip() == "kube-prometheus-stack="
 
 
 def _smoke_test_services(retries=None, provider=None):
@@ -1950,6 +1979,19 @@ def _smoke_test_services(retries=None, provider=None):
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=len(smoke_endpoints)) as _pool:
         results.extend(_pool.map(_probe_endpoint, smoke_endpoints))
+
+    # A deliberately paused hub monitoring stack (make monitoring-pause) is not a
+    # failure — downgrade its expected 502s to a skip so status stays green. The
+    # Prometheus/Grafana URLs front the hub monitoring in every provider mode
+    # (the public *.3ai-talk.org names route to the hub via cloudflared), so this
+    # applies regardless of provider — the hub-specific paused signal is the gate.
+    _paused = None
+    for _i, (_n, _ok, _d) in enumerate(results):
+        if _ok is False and _n in ("Prometheus", "Grafana"):
+            if _paused is None:
+                _paused = _monitoring_paused()
+            if _paused:
+                results[_i] = (_n, None, "monitoring paused (make monitoring-resume)")
 
     if _provider_supports_pushgateway(provider):
         for _i, (_pn, _pok, _pd) in enumerate(results):
