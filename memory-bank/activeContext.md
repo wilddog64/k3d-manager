@@ -493,6 +493,32 @@
 - When the laptop Vault reverse bridge is required (`HUB_VAULT_USE_BRIDGE=1`, default), k3s-aws selects
   SSH and overrides explicit SSM with a warning; SSM stays available for non-bridge Vault profiles.
 
+- **2026-08-28 hub last-mile close-out** (`k3d-manager-v1.27.0`): four follow-ups from the CPU-crisis
+  resolution actioned.
+  - **Governance already durable (verified, no-op):** `argocd_check_values_branch` → all 6 Applications
+    track `k3d-manager-v1.27.0` (no drift); live `monitoring` ns confirms Step 2 governance is applied —
+    loki-canary=0, prom scrapeInterval/eval=60s, retention=3d, retentionSize=8GB. ApplicationSets were
+    already reapplied; nothing inert.
+  - **Vault auto-unseal watchdog deployed + fixed:** installed `vault_install_unseal_watchdog` (CronJob
+    `vault-unseal-watchdog`, ns `secrets`, `* * * * *`, Forbid). Found + fixed two bugs — (1) stale
+    pinned image `1.18.3` vs live `1.20.1`, and vars.sh unconditionally exporting the stale default,
+    defeating derivation; now `vault.sh` derives the image from the running Vault StatefulSet and vars.sh
+    leaves `VAULT_UNSEAL_IMAGE` empty; (2) per-node k3d image cache + `activeDeadlineSeconds:50` killed a
+    cold pull → raised to 150. Validated: manual job SUCCEEDED ~12s, logs `vault already unsealed`. Note:
+    a real restart preserves node image caches, so the cold-pull only bites first-deploy. Spec:
+    `docs/bugs/2026-08-28-vault-unseal-watchdog-stale-image.md`.
+  - **Frontend-login false-red fixed:** `bin/k3dm-webhook` skip guard extended from `kc_via_smoke_client`
+    to a new `kc_token_is_stub` flag (True on both smoke-client AND admin-cli fallback paths), so an
+    expected 401 on `/api/cart` from a stand-in admin token is a SKIP not a hard FAIL. `make status` now
+    `WARN (1 warning)` — the lone warning is the honest "no real smoke user seeded" skip; everything else
+    green. Real outages still FAIL (guard is 401/403-only). Spec:
+    `docs/bugs/2026-08-28-smoke-frontend-login-stub-token-false-fail.md`. Durable follow-up (out of scope):
+    seed a real `k3dm-smoke-user` in the shopping-cart realm to make this a true PASS.
+  - **loki re-shed declined (data-driven):** offered when server-0 was ~360% cold-start; it has since
+    settled to **95–130%** with canary already gone. A manual `loki=0` would be reverted by ArgoCD
+    selfHeal (git declares 1) and would remove log aggregation for CPU that is no longer pressured — left
+    loki at 1/1. One-command shed remains available if headroom is ever needed.
+
 ## Canonical pointers
 
 - Roadmap: `docs/roadmap.md`

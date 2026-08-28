@@ -285,3 +285,10 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   hysteresis; Prometheus/Grafana recovered, while ArgoCD/Keycloak remain pending API stabilization.
 - Historical specs/issues are archived only when superseded or unreferenced; files are never
   deleted.
+- **2026-08-28 hub last-mile close-out** (`k3d-manager-v1.27.0`): [x] governance durability verified
+  (no drift; Step 2 governance live in `monitoring`); [x] Vault auto-unseal watchdog deployed +
+  two bugs fixed (image derivation + `activeDeadlineSeconds` 50→150), validated live (job SUCCEEDED
+  ~12s, `vault already unsealed`); [x] frontend-login false-red fixed (`kc_token_is_stub` skip guard),
+  `make status` FAIL→WARN with everything else green; [x] loki re-shed declined (server-0 at 95–130%,
+  no pressure; selfHeal would revert). Specs: `docs/bugs/2026-08-28-vault-unseal-watchdog-stale-image.md`,
+  `docs/bugs/2026-08-28-smoke-frontend-login-stub-token-false-fail.md`.
