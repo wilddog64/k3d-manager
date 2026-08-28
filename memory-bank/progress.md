@@ -208,8 +208,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   is the **hex encoding** of the PEM (seeded via `security -w`, which hex-encodes multi-line values) →
   cosign `invalid pem block`; fix = re-seed from true PEM via file. RC2 (frontend): `publish` job lacks
   job-level `env.COSIGN_KEY` → `Install cosign` skipped → `cosign: command not found`; fix = add job-level
-  env. Spec `docs/bugs/2026-08-28-stage-c-cosign-signing-fails-post-merge.md`. Needs user go for the live
-  5-repo secret re-seed. Blocks D until `cosign verify` proves signatures.
+  env. Spec `docs/bugs/2026-08-28-stage-c-cosign-signing-fails-post-merge.md`.
+  **FIX IN PROGRESS (user go 2026-08-28):** RC1 ✅ re-seeded `COSIGN_KEY` in all 5 callers from true PEM via
+  file (key+password verified loading in cosign locally first). RC2 ✅ frontend PR #101
+  (`fix/cosign-publish-job-env`, `d47e675c`) — MERGE GATED. Remaining: rerun 4 non-frontend main builds +
+  `cosign verify` proof; rerun frontend after #101 merges. Blocks D until `cosign verify` proves signatures.
 - [ ] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
   `cosign verify` gate (Claude live; needs signed images from C before Enforce).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)

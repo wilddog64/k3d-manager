@@ -119,10 +119,18 @@
     `ci.yml` `publish` job has NO job-level `env.COSIGN_KEY` (it's on the `docker` job) → `Install cosign`
     (`if: env.COSIGN_KEY != ''`) skips while `Sign image` (own step-env) runs → `cosign: command not found`
     (exit 127). Fix = add job-level `env.COSIGN_KEY` to `publish`. infra #94 builds no app image (n/a).
-    **NEXT (needs user go for the live re-seed — outward-facing, 5 repos, prod signing secret):** re-seed
-    RC1 + commit RC2 fix (branch→PR→merge gated) + rerun builds + `cosign verify` proves sigs → THEN Stage D
-    (Kyverno Audit→Enforce; Enforce must NOT go live until images actually carry signatures). Also /post-merge
-    housekeeping (sync mains, prune `feat/cosign-sign-attest` branches incl. basket's net-zero commits).
+    **FIX IN PROGRESS (user go given 2026-08-28):** ✅ **RC1 re-seeded** — recovered true PEM via Keychain
+    `xxd -r -p`, verified key+password load in cosign locally (derived pub saved `/tmp/cosign-verify.pub`),
+    `gh secret set COSIGN_KEY --repo R < file` across all 5 image callers (frontend/basket/order/
+    product-catalog/payment); private key never in argv, temp files 0600 + removed. `COSIGN_PASSWORD` left
+    as-is (45-byte single-line, no newline → `security -w` returned it verbatim, uncorrupted). ✅ **RC2 PR
+    open** — frontend `fix/cosign-publish-job-env` commit `d47e675c` adds job-level `env.COSIGN_KEY` to
+    `publish` (diff verified clean +2, no newline strip); **PR #101** (https://github.com/wilddog64/
+    shopping-cart-frontend/pull/101), **MERGE GATED**. **NEXT:** rerun the 4 non-frontend main builds
+    (RC1-only, secrets re-read at runtime) + `cosign verify --key /tmp/cosign-verify.pub` proves sigs; after
+    #101 merges, rerun frontend too. → THEN Stage D (Kyverno Audit→Enforce; Enforce must NOT go live until
+    images actually carry signatures). Also /post-merge housekeeping (sync mains, prune
+    `feat/cosign-sign-attest` branches incl. basket's net-zero commits).
   4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **STARTED
      2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests →
      **DONE** Codex commit `17be2e69`, pushed to `origin/k3d-manager-v1.27.0`; pure decision logic +
