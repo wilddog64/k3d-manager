@@ -269,8 +269,15 @@
     + in-cluster `vault-unseal` Secret, both present). vault-0 → 1/1. ⚠ The `vault_install_unseal_watchdog`
     is NOT deployed, so Vault will need a manual `deploy_vault --re-unseal` after every restart until
     the watchdog is installed.
-  - **Still shed (not yet restored):** `trivy-operator`=0, `loki`=0, `loki-gateway`=0. Hub is healthy
-    at these levels; restore when scanning/log-aggregation is wanted (they add load back).
+  - **RESTORED 2026-08-28 (user-authorized):** `trivy-operator`, `loki`, `loki-gateway` back to 1
+    (all Running/Ready). ⚠ **CPU tradeoff quantified:** with them shed server-0 sat at **50%**; with
+    them restored server-0 settled at **~360%** (a 617% loki cold-start spike that decayed) — 7× the
+    shed headroom and much closer to the pressure edge that caused the incident. Still functional
+    (apiserver responsive, nodes Ready), but loki is the heavy one; re-shed loki if steady-state
+    headroom feels tight on this M4 Air. Also re-enabled the `node-health-watch` watchdog
+    (`launchctl bootstrap`, PID confirmed) now running the FIXED script (`2b2d5705`) — validated live:
+    logged `agent-0 Ready but /healthz slow/unreachable (advisory, no restart)` and `NotReady (1/5)`
+    then stopped (self-recovered before threshold 5) — did NOT bounce the node.
   - **`make status` final: all hub infra GREEN** (ArgoCD/Keycloak/Prometheus/Grafana 200, ESO 18/18,
     data 4/4, Keycloak+ArgoCD+Grafana login OK). Sole remaining red = **`Frontend login: HTTP 401 on
     /api/cart` — a smoke-harness artifact, NOT a hub fault**: `k3dm-smoke-user` Secret absent →
