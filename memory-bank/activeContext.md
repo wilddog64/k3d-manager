@@ -255,6 +255,30 @@
   control-plane churn live (candidate: `trivy-operator` scale-to-0 — reversible, non-user-facing)
   vs. force the committed governance to sync. Same disease family as
   [[reference_one_second_probes_cpu_starvation_kill_loop]].
+  - **RESOLVED 2026-08-28 via cluster restart (user-authorized).** Live shed alone did NOT help:
+    scaled `trivy-operator` (trivy-system) → 0 and `loki`/`loki-gateway` (monitoring) → 0, but
+    server-0 kept *climbing* (492→707→867%, oscillating 540-845% over 90s) because the bottleneck
+    is the apiserver's own list/watch/reconcile churn, and pod terminations add to it — shedding
+    agent workloads doesn't relieve the control plane. `k3d cluster stop/start k3d-cluster` cleared
+    the accumulated churn: server-0 settled 607→**50%**, all 4 nodes Ready throughout, **coredns
+    stayed 1/1 on the way up** (looser probes + startupProbe held — no DNS outage). Post-restart:
+    apiserver responsive, `make status` completes. Recovery lesson: for a churn-storm on the k3d
+    control plane, a cluster restart is the effective lever, NOT workload shedding.
+  - **Post-restart Vault was sealed** (expected — raft/shamir, threshold 1). Unsealed via cached
+    shards: `./scripts/k3d-manager deploy_vault --re-unseal` (keys in Keychain `k3d-manager-vault-unseal`
+    + in-cluster `vault-unseal` Secret, both present). vault-0 → 1/1. ⚠ The `vault_install_unseal_watchdog`
+    is NOT deployed, so Vault will need a manual `deploy_vault --re-unseal` after every restart until
+    the watchdog is installed.
+  - **Still shed (not yet restored):** `trivy-operator`=0, `loki`=0, `loki-gateway`=0. Hub is healthy
+    at these levels; restore when scanning/log-aggregation is wanted (they add load back).
+  - **`make status` final: all hub infra GREEN** (ArgoCD/Keycloak/Prometheus/Grafana 200, ESO 18/18,
+    data 4/4, Keycloak+ArgoCD+Grafana login OK). Sole remaining red = **`Frontend login: HTTP 401 on
+    /api/cart` — a smoke-harness artifact, NOT a hub fault**: `k3dm-smoke-user` Secret absent →
+    Keycloak login falls back to the Helm admin Secret (master-realm `admin-cli` token) → that admin
+    token correctly can't authenticate to the app frontend, and the graceful 401/403 skip guard
+    (`bin/k3dm-webhook` ~1831) only fires for `kc_via_smoke_client`, not the admin-cli fallback, so a
+    correct 401 is reported as a hard FAIL. Fix candidate: extend the skip guard to the admin-cli
+    fallback, or seed a real `k3dm-smoke-user`. Matches the known status-login false-green limitation.
 
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo
