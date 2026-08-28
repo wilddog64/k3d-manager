@@ -107,9 +107,22 @@
     `gh auth refresh -s workflow`. Gotcha memory'd: [[reference_gh_contents_put_trailing_newline]]. **Ruleset
     handling:** order+payment enforce via `main-protection` rulesets (not classic protection) — order merged
     via enforcement disabled→merge→**restored to `active`**; payment merged via branch-update (ruleset left
-    intact); both **gh-verified `active` 2026-08-28**. **NEXT:** /post-merge housekeeping (sync mains, prune
-    `feat/cosign-sign-attest` branches incl. basket's net-zero commits, verify signing actually runs on each
-    caller's post-merge main build), then Stage D (Kyverno install + Audit→Enforce + promoter `cosign verify`).
+    intact); both **gh-verified `active` 2026-08-28**. **⚠ POST-MERGE SIGNING BLOCKER (found 2026-08-28,
+    spec `docs/bugs/2026-08-28-stage-c-cosign-signing-fails-post-merge.md`):** the cosign SIGN step FAILS on
+    every image-building caller's post-merge main build — images are pushed to GHCR **unsigned**. TWO root
+    causes: **(RC1)** basket/order/product-catalog/payment fail `getting signer: reading key: invalid pem
+    block` — the `COSIGN_KEY` GH secret is the **hex encoding** of the PEM, because seeding piped
+    `security find-generic-password -w` (which hex-encodes any value containing newlines) straight into `gh
+    secret set`. The key itself is VALID (Keychain hex → `xxd -r -p` = clean 11-line `ENCRYPTED SIGSTORE
+    PRIVATE KEY` PEM). Fix = re-seed `COSIGN_KEY` from true PEM via a **file** (`gh secret set COSIGN_KEY
+    --repo R < cosign.key`), never `--body "$(security -w)"`. **(RC2, frontend only)** frontend's direct
+    `ci.yml` `publish` job has NO job-level `env.COSIGN_KEY` (it's on the `docker` job) → `Install cosign`
+    (`if: env.COSIGN_KEY != ''`) skips while `Sign image` (own step-env) runs → `cosign: command not found`
+    (exit 127). Fix = add job-level `env.COSIGN_KEY` to `publish`. infra #94 builds no app image (n/a).
+    **NEXT (needs user go for the live re-seed — outward-facing, 5 repos, prod signing secret):** re-seed
+    RC1 + commit RC2 fix (branch→PR→merge gated) + rerun builds + `cosign verify` proves sigs → THEN Stage D
+    (Kyverno Audit→Enforce; Enforce must NOT go live until images actually carry signatures). Also /post-merge
+    housekeeping (sync mains, prune `feat/cosign-sign-attest` branches incl. basket's net-zero commits).
   4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **STARTED
      2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests →
      **DONE** Codex commit `17be2e69`, pushed to `origin/k3d-manager-v1.27.0`; pure decision logic +

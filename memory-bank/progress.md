@@ -192,7 +192,8 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Fixed 3 live-found signing.sh bugs: missing `_vault_login` (`6f3c6dd3`); early-return skipped
   idempotent applies; ESO 403 → `_signing_grant_eso_read` auto-discovers the store's Vault role
   (`eso-ldap-directory`) and merges `cosign-verify` (`7d335b1a`). BATS 6/6.
-- [x] **Image-signing Stage C** — CI cosign **sign-by-digest** (attestation deferred). Spec
+- [~] **Image-signing Stage C** — PRs merged, but SIGNING BROKEN post-merge (see blocker below).
+  CI cosign **sign-by-digest** (attestation deferred). Spec
   `7779e4d6`. Code on `feat/cosign-sign-attest`, Claude-verified on origin (Codex session `01a0365f`):
   infra reusable `build-push-deploy.yml` (workflow_call COSIGN secrets, job-env COSIGN_KEY, `id: push`,
   cosign-installer@v3.7.0, sign `${image-name}@${push.digest}` BEFORE promote), frontend direct + 4
@@ -201,9 +202,14 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   order #72 `cb4403db`, product-catalog #51 `c42a5ccd`, payment #63 `fa396eef`. Backend callers pin the
   signing-enabled reusable workflow `@1fa7ab0` (pin-bump commits order `da8fcc2e` / product-catalog
   `00665840` / payment `be796c6d`; basket via `14f5b1257`). Workflow-scope blocker resolved (`gh auth
-  refresh -s workflow`); order+payment `main-protection` rulesets verified `active` post-merge. Remaining:
-  /post-merge (sync mains, prune `feat/cosign-sign-attest` branches, verify signing runs on each caller's
-  post-merge main build) → unblocks D.
+  refresh -s workflow`); order+payment `main-protection` rulesets verified `active` post-merge.
+  **⚠ SIGNING BLOCKER (2026-08-28):** the `Sign image by digest` step FAILS on every caller's post-merge
+  main build → images pushed **unsigned**. RC1 (basket/order/product-catalog/payment): `COSIGN_KEY` secret
+  is the **hex encoding** of the PEM (seeded via `security -w`, which hex-encodes multi-line values) →
+  cosign `invalid pem block`; fix = re-seed from true PEM via file. RC2 (frontend): `publish` job lacks
+  job-level `env.COSIGN_KEY` → `Install cosign` skipped → `cosign: command not found`; fix = add job-level
+  env. Spec `docs/bugs/2026-08-28-stage-c-cosign-signing-fails-post-merge.md`. Needs user go for the live
+  5-repo secret re-seed. Blocks D until `cosign verify` proves signatures.
 - [ ] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
   `cosign verify` gate (Claude live; needs signed images from C before Enforce).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
