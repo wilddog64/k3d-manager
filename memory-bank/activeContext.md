@@ -301,18 +301,31 @@
     **Webhook code change:** removed `kc_token_is_stub=True` from the smoke-client branch (a real seeded
     smoke user must green on 200 / red on genuine 401; only admin-cli/master fallback stays a skip) +
     reads optional `realm` key from the Secret. Spec: `docs/bugs/2026-08-28-smoke-frontend-login-stub-token-false-fail.md`
-    (durable-follow-up section). ⚠ **Live realm/LDAP/client/user/Secret are ephemeral — lost on hub
-    rebuild.** Codification (durable `keycloak_provision_shopping_cart_realm`, deriving frontendUrl from
-    ingress + real bindCredential + generated smoke pw) is PROPOSED, NOT yet implemented; existing
-    `keycloak_seed_smoke_user` (`keycloak.sh:473`) is wrong for this deployment (see spec).
+    (durable-follow-up section). ⚠ Live realm/LDAP/client/user/Secret WERE ephemeral — **now codified**:
+    **`keycloak_provision_shopping_cart_realm`** (`keycloak.sh`) idempotently creates the realm + pins
+    `frontendUrl` (`KEYCLOAK_SMOKE_ISSUER_BASE_URL`, overridable), clones the LDAP provider from `home`
+    and repairs the masked `bindCredential` from Secret `openldap-admin`, creates the `k3dm-smoke` client,
+    adds the LDAP smoke user (bind pw via stdin→0600 pod file, generated user pw), and writes
+    `identity/k3dm-smoke-user`. Live-verified idempotent: re-run → `iss=…/realms/shopping-cart` →
+    `/api/cart` **200**. Reach admin API with `KEYCLOAK_BASE_URL=http://localhost:8880` (keycloak PF up).
+    Older `keycloak_seed_smoke_user` retained but wrong for this deployment (see spec) — prefer the new fn.
   - **⚠ 2026-08-28 hub CPU crisis recurred mid-session** — while completing the above, `docker stats`
     showed server-0 **454–568%**, agents ~200–330% each (~1170–1550% total on the M4 Air), and
     `/readyz` flapped `etcd failed`/`etcd-readiness failed`. Symptoms: `:8880` keycloak PF dropping to
     `000`, coredns 4× restarts → keycloak `UnknownHostException: keycloak-postgresql`, keycloak DB pool
     500s. Steady hogs (`kubectl top`): argocd-application-controller 733m, prometheus 681m; plus a
     trivy scan burst (10+ scan pods). Same disease family as the chronic overcommit above — the Step 1/2
-    governance is committed but **inert until ArgoCD syncs it**. Flagged to user; not separately
-    remediated this pass (frontend-login fix pushed through with retry-resilient scripting).
+    governance is committed but **inert until ArgoCD syncs it**.
+    - **CPU-reduction pass applied 2026-08-28** (durable in-repo + live): (1) `vault-unseal-watchdog`
+      CronJob cadence **`* * * * *` → `*/5 * * * *`** (`scripts/etc/vault/unseal-watchdog.yaml.tmpl`) —
+      cuts 1,440 pod-spawns/day of node churn 5×; (2) ArgoCD `timeout.reconciliation` **120s (chart
+      default) → 180s** (`scripts/etc/argocd/values.yaml.tmpl` `configs.cm` + live `argocd-cm` patch) —
+      relaxes the 727m application-controller's full-resync cadence; takes effect on next controller
+      restart (NOT force-restarted — a restart triggers a full re-sync burst). Prometheus already
+      conservative (60s scrape / 3d retention) — left as-is. Snapshot at time of pass: prometheus 754m,
+      argocd-application-controller 727m, argocd-repo-server 386m, vault-0 368m, keycloak 162m. Biggest
+      *optional* lever NOT taken: scaling the monitoring stack (prometheus+grafana+loki ≈ 1 core) to zero
+      when not actively debugging — loses observability, so left for user call.
 
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo

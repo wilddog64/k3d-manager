@@ -11,6 +11,10 @@ configs:
   cm:
     url: https://${ARGOCD_VIRTUALSERVICE_HOST}
 
+    # Single-node hub: relax full-resync cadence above the 120s chart default to
+    # cut application-controller CPU. Webhook + manual syncs are unaffected.
+    timeout.reconciliation: 180s
+
     resource.customizations.ignoreResourceUpdates.ConfigMap: |
       jqPathExpressions:
         # Istio leader-election renewals are volatile metadata, not desired state.

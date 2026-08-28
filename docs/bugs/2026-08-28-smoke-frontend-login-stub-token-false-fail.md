@@ -121,25 +121,38 @@ Secret the harness still falls to the admin-cli stub → skip, never a false red
 - `shopping-cart` realm + `frontendUrl` + LDAP component (real bind cred) +
   `k3dm-smoke` client + `k3dm-smoke` LDAP user.
 
-### Codification (durable — proposed, NOT yet implemented)
+### Codification (durable — DONE 2026-08-28)
 
-These live changes are lost on a hub rebuild. A durable
-`keycloak_provision_shopping_cart_realm` (or a fixed `keycloak_seed_smoke_user`)
-should, idempotently:
-- create the `shopping-cart` realm with `frontendUrl` pinned to the public
-  Keycloak URL (drop the hard-coded value — derive from the ingress host);
-- create the LDAP `UserStorageProvider` with `bindCredential` read from Secret
-  `openldap-admin` (**never** cloned from the API's masked value);
-- create the `k3dm-smoke` public direct-grant client;
-- add the `k3dm-smoke` LDAP user with a **generated** password (not the
-  proof value `k3dm-smoke-proof-pw`);
-- write the `k3dm-smoke-user` Secret (password via stdin).
+Implemented as **`keycloak_provision_shopping_cart_realm`** in
+`scripts/plugins/keycloak.sh`. Idempotent; warns + returns 0 on any missing
+prerequisite (never a hard failure). It:
+- creates the `shopping-cart` realm and pins `attributes.frontendUrl` to
+  `KEYCLOAK_SMOKE_ISSUER_BASE_URL` (default `https://keycloak.3ai-talk.org`,
+  overridable to match the deployed app's `OAUTH2_ISSUER_URI` base) so every
+  locally-minted token carries the public `iss` — no Cloudflare round-trip;
+- clones the LDAP `UserStorageProvider` from `KEYCLOAK_SMOKE_SRC_REALM` (`home`)
+  and **repairs the masked `bindCredential`** with the real LDAP admin password
+  read from Secret `openldap-admin` (`_keycloak_smoke_ensure_ldap_component`);
+- creates the `k3dm-smoke` public direct-grant client;
+- adds the `k3dm-smoke` **LDAP entry** (`cn=k3dm-smoke,ou=users,dc=home,dc=org`)
+  via `ldapadd`/`ldapmodify` in `openldap-0` — the READ_ONLY federation refuses
+  local Keycloak users — with a **generated** password (reused from the existing
+  Secret if present); bind password staged to a 0600 pod file over stdin, never
+  on argv (`_keycloak_smoke_ensure_ldap_user`);
+- writes Secret `identity/k3dm-smoke-user` (keys `username`, `password`, `realm`,
+  `client`) for the webhook smoke harness.
 
-Note the existing `keycloak_seed_smoke_user` (`scripts/plugins/keycloak.sh:473`)
-is currently wrong for this deployment: it targets Secret `keycloak-secrets`
-(actual: `keycloak-admin-secret`), base URL `keycloak.shopping-cart.local`
-(actual admin PF: `localhost:8880`), creates a **local** Keycloak user (refused
-under READ_ONLY LDAP), and does not create the realm or pin `frontendUrl`.
+Admin API is reached via `_keycloak_smoke_base_url`; set
+`KEYCLOAK_BASE_URL=http://localhost:8880` (keycloak port-forward up) for a
+reliable path. Verified live-idempotent: re-run over the hand-seeded state →
+token `iss=https://keycloak.3ai-talk.org/realms/shopping-cart` → `/api/cart` 200.
+
+The older `keycloak_seed_smoke_user` (`scripts/plugins/keycloak.sh`) remains but
+is **not** the right entrypoint for this deployment: it targets Secret
+`keycloak-secrets` (actual: `keycloak-admin-secret`), base URL
+`keycloak.shopping-cart.local` (actual admin PF: `localhost:8880`), creates a
+**local** Keycloak user (refused under READ_ONLY LDAP), and does not create the
+realm or pin `frontendUrl`. Prefer `keycloak_provision_shopping_cart_realm`.
 
 ## Verification
 

@@ -57,6 +57,19 @@ fi
 : "${KEYCLOAK_SMOKE_CLIENT_ID:=k3dm-smoke}"
 : "${KEYCLOAK_SMOKE_USERNAME:=k3dm-smoke}"
 : "${KEYCLOAK_SMOKE_SECRET_NAME:=k3dm-smoke-user}"
+# Realm the LDAP UserStorageProvider is cloned from (its config carries the
+# proven field set; only bindCredential is repaired post-clone).
+: "${KEYCLOAK_SMOKE_SRC_REALM:=home}"
+# Master-admin secret actually deployed on this hub (Bitnami chart) — key 'password'.
+: "${KEYCLOAK_SMOKE_ADMIN_SECRET_NAME:=keycloak-admin-secret}"
+# frontendUrl pinned on the app realm so every locally-minted token carries the
+# public issuer basket-service trusts (OAUTH2_ISSUER_URI base). Override to match
+# the deployed app's issuer if it differs.
+: "${KEYCLOAK_SMOKE_ISSUER_BASE_URL:=https://keycloak.3ai-talk.org}"
+# LDAP admin bind for the READ_ONLY-federated smoke user (created as an LDAP entry).
+: "${KEYCLOAK_LDAP_ADMIN_SECRET_NAME:=openldap-admin}"
+: "${KEYCLOAK_LDAP_BIND_DN:=cn=ldap-admin,dc=home,dc=org}"
+: "${KEYCLOAK_LDAP_POD:=openldap-0}"
 
 function deploy_keycloak() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
@@ -533,6 +546,203 @@ HELP
 
    _keycloak_smoke_write_secret "$ns" "$secret_name" "$username" "$password" "$wd"
    _info "[keycloak] smoke user '${username}' seeded in realm '${realm}' (secret ${ns}/${secret_name})"
+}
+
+function _keycloak_smoke_ensure_realm() {
+   local base_url="$1" token="$2" realm="$3" frontend_url="$4" wd="$5"
+   if ! _curl -sf -o /dev/null -H "Authorization: Bearer ${token}" \
+        "${base_url}/admin/realms/${realm}"; then
+      if ! _curl -sf -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: application/json" \
+            --data-binary "$(jq -n --arg r "$realm" --arg fu "$frontend_url" \
+               '{realm:$r, enabled:true, displayName:"Shopping Cart", sslRequired:"external", registrationAllowed:false, loginWithEmailAllowed:true, attributes:{frontendUrl:$fu}}')" \
+            "${base_url}/admin/realms" >/dev/null; then
+         return 1
+      fi
+      _info "[keycloak] created realm '${realm}'"
+   fi
+   local rep
+   rep=$(_curl -sf -H "Authorization: Bearer ${token}" "${base_url}/admin/realms/${realm}" 2>/dev/null || true)
+   [[ -z "$rep" ]] && return 1
+   printf '%s' "$rep" | jq --arg fu "$frontend_url" \
+      '.attributes = ((.attributes // {}) + {frontendUrl:$fu})' > "$wd/realm.json"
+   _curl -sf -X PUT -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+      --data-binary "@$wd/realm.json" "${base_url}/admin/realms/${realm}" >/dev/null || return 1
+   return 0
+}
+
+function _keycloak_smoke_ensure_ldap_component() {
+   local base_url="$1" token="$2" realm="$3" src_realm="$4" bind_pw="$5" wd="$6"
+   local comp_id
+   comp_id=$(_curl -sf -H "Authorization: Bearer ${token}" \
+      "${base_url}/admin/realms/${realm}/components?type=org.keycloak.storage.UserStorageProvider" \
+      | jq -r '.[0].id // empty' 2>/dev/null || true)
+   if [[ -z "$comp_id" ]]; then
+      local src
+      src=$(_curl -sf -H "Authorization: Bearer ${token}" \
+         "${base_url}/admin/realms/${src_realm}/components?type=org.keycloak.storage.UserStorageProvider" \
+         | jq -r '.[0] // empty' 2>/dev/null || true)
+      if [[ -z "$src" || "$src" == "null" ]]; then
+         return 2
+      fi
+      printf '%s' "$src" | jq 'del(.id) | del(.parentId)' > "$wd/ldap.json"
+      _curl -sf -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+         --data-binary "@$wd/ldap.json" \
+         "${base_url}/admin/realms/${realm}/components" >/dev/null || return 1
+      comp_id=$(_curl -sf -H "Authorization: Bearer ${token}" \
+         "${base_url}/admin/realms/${realm}/components?type=org.keycloak.storage.UserStorageProvider" \
+         | jq -r '.[0].id // empty' 2>/dev/null || true)
+      _info "[keycloak] cloned LDAP provider into realm '${realm}'"
+   fi
+   [[ -z "$comp_id" ]] && return 1
+   # The clone copies the masked bindCredential ('**********') — replace it with
+   # the real bind password or every federated-user mint fails LDAP error 49.
+   local comp
+   comp=$(_curl -sf -H "Authorization: Bearer ${token}" \
+      "${base_url}/admin/realms/${realm}/components/${comp_id}" 2>/dev/null || true)
+   [[ -z "$comp" ]] && return 1
+   printf '%s' "$comp" | jq --arg pw "$bind_pw" '.config.bindCredential=[$pw]' > "$wd/ldapfix.json"
+   _curl -sf -X PUT -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+      --data-binary "@$wd/ldapfix.json" \
+      "${base_url}/admin/realms/${realm}/components/${comp_id}" >/dev/null || return 1
+   return 0
+}
+
+function _keycloak_smoke_ensure_ldap_user() {
+   local ns="$1" pod="$2" ldap_url="$3" bind_dn="$4" bind_pw="$5"
+   local user_dn="$6" username="$7" user_pw="$8"
+   # Stage the admin bind password inside the pod at 0600 — never on argv.
+   if ! printf '%s' "$bind_pw" | _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
+        sh -c 'umask 077; cat > /tmp/.kcbind' >/dev/null 2>&1; then
+      return 1
+   fi
+   local rc=0
+   if ! _kubectl --no-exit -n "$ns" exec "$pod" -- \
+        ldapsearch -x -LLL -D "$bind_dn" -y /tmp/.kcbind -H "$ldap_url" -b "$user_dn" dn >/dev/null 2>&1; then
+      if ! printf 'dn: %s\nobjectClass: inetOrgPerson\ncn: %s\nsn: smoke\nuid: %s\nmail: %s@k3dm.local\nuserPassword: %s\n' \
+            "$user_dn" "$username" "$username" "$username" "$user_pw" \
+            | _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
+               ldapadd -x -D "$bind_dn" -y /tmp/.kcbind -H "$ldap_url" >/dev/null 2>&1; then
+         rc=1
+      fi
+   fi
+   # Always assert the password so the written Secret is guaranteed to authenticate.
+   if [[ $rc -eq 0 ]]; then
+      if ! printf 'dn: %s\nchangetype: modify\nreplace: userPassword\nuserPassword: %s\n' \
+            "$user_dn" "$user_pw" \
+            | _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
+               ldapmodify -x -D "$bind_dn" -y /tmp/.kcbind -H "$ldap_url" >/dev/null 2>&1; then
+         rc=1
+      fi
+   fi
+   _kubectl --no-exit -n "$ns" exec "$pod" -- rm -f /tmp/.kcbind >/dev/null 2>&1 || true
+   return $rc
+}
+
+function keycloak_provision_shopping_cart_realm() {
+   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+      cat <<'HELP'
+Usage: keycloak_provision_shopping_cart_realm
+
+Idempotently provision the LDAP-backed 'shopping-cart' realm on the hub Keycloak so
+the make-status login smoke test proves a real end-to-end 200 through /api/cart:
+
+  - creates the realm and pins attributes.frontendUrl to the public issuer
+    (KEYCLOAK_SMOKE_ISSUER_BASE_URL) so every locally-minted token carries the
+    'iss' basket-service trusts — no Cloudflare round-trip;
+  - clones the LDAP UserStorageProvider from KEYCLOAK_SMOKE_SRC_REALM and repairs
+    the masked bindCredential with the real LDAP admin password;
+  - creates the public direct-grant client (KEYCLOAK_SMOKE_CLIENT_ID);
+  - adds the smoke user as an LDAP entry (READ_ONLY federation refuses local users)
+    with a generated password (reused from the existing Secret if present);
+  - writes Secret <namespace>/<KEYCLOAK_SMOKE_SECRET_NAME> (keys username, password,
+    realm, client) for the webhook smoke harness.
+
+The admin API is reached via _keycloak_smoke_base_url; set KEYCLOAK_BASE_URL
+(e.g. http://localhost:8880 with the keycloak port-forward up) for a reliable path.
+Warns and returns 0 if a prerequisite is missing — never a hard failure.
+HELP
+      return 0
+   fi
+
+   local realm="${KEYCLOAK_SMOKE_REALM:-shopping-cart}"
+   local src_realm="${KEYCLOAK_SMOKE_SRC_REALM:-home}"
+   local client_id="${KEYCLOAK_SMOKE_CLIENT_ID:-k3dm-smoke}"
+   local username="${KEYCLOAK_SMOKE_USERNAME:-k3dm-smoke}"
+   local secret_name="${KEYCLOAK_SMOKE_SECRET_NAME:-k3dm-smoke-user}"
+   local ns="${KEYCLOAK_NAMESPACE:-identity}"
+   local admin_secret="${KEYCLOAK_SMOKE_ADMIN_SECRET_NAME:-keycloak-admin-secret}"
+   local frontend_url="${KEYCLOAK_SMOKE_ISSUER_BASE_URL:-https://keycloak.3ai-talk.org}"
+
+   local ldap_secret="${KEYCLOAK_LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
+   local ldap_pw_key="${KEYCLOAK_LDAP_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
+   local ldap_bind_dn="${KEYCLOAK_LDAP_BIND_DN:-cn=ldap-admin,dc=home,dc=org}"
+   local ldap_pod="${KEYCLOAK_LDAP_POD:-openldap-0}"
+   local ldap_url="ldap://${KEYCLOAK_LDAP_HOST:-openldap.identity.svc.cluster.local}:${KEYCLOAK_LDAP_PORT:-389}"
+   local user_dn="cn=${username},${KEYCLOAK_LDAP_USERS_DN:-ou=users,dc=home,dc=org}"
+
+   local wd
+   wd=$(mktemp -d -t kc-provision.XXXXXX)
+   trap 'rm -rf "$wd"' RETURN
+
+   local base_url token
+   base_url=$(_keycloak_smoke_base_url)
+   token=$(_keycloak_smoke_admin_token "$base_url" "$ns" "$admin_secret" "$wd")
+   if [[ -z "$token" ]]; then
+      _warn "[keycloak] could not mint master admin token at ${base_url}; skipping realm provision"
+      return 0
+   fi
+
+   local ldap_pw
+   ldap_pw=$(_kubectl --no-exit -n "$ns" get secret "$ldap_secret" \
+      -o jsonpath="{.data.${ldap_pw_key}}" 2>/dev/null | base64 --decode 2>/dev/null || true)
+   if [[ -z "$ldap_pw" ]]; then
+      _warn "[keycloak] LDAP admin password not found in secret '${ldap_secret}'; skipping realm provision"
+      return 0
+   fi
+
+   if ! _keycloak_smoke_ensure_realm "$base_url" "$token" "$realm" "$frontend_url" "$wd"; then
+      _warn "[keycloak] failed to provision realm '${realm}'"
+      return 0
+   fi
+
+   _keycloak_smoke_ensure_ldap_component "$base_url" "$token" "$realm" "$src_realm" "$ldap_pw" "$wd"
+   case $? in
+      0) : ;;
+      2) _warn "[keycloak] no LDAP provider in source realm '${src_realm}'; skipping realm provision"; return 0 ;;
+      *) _warn "[keycloak] failed to provision LDAP provider in realm '${realm}'"; return 0 ;;
+   esac
+
+   if ! _keycloak_smoke_ensure_client "$base_url" "$token" "$realm" "$client_id"; then
+      _warn "[keycloak] failed to create smoke client '${client_id}'"
+      return 0
+   fi
+
+   local password
+   password=$(_kubectl --no-exit -n "$ns" get secret "$secret_name" \
+      -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   if [[ -z "$password" ]]; then
+      password=$(openssl rand -hex 24)
+   fi
+
+   if ! _keycloak_smoke_ensure_ldap_user "$ns" "$ldap_pod" "$ldap_url" "$ldap_bind_dn" "$ldap_pw" \
+        "$user_dn" "$username" "$password"; then
+      _warn "[keycloak] failed to seed LDAP smoke user '${user_dn}'"
+      return 0
+   fi
+
+   printf '%s' "$username" > "$wd/uname"
+   printf '%s' "$password" > "$wd/pword"
+   printf '%s' "$realm" > "$wd/realmkey"
+   printf '%s' "$client_id" > "$wd/clientkey"
+   _kubectl -n "$ns" create secret generic "$secret_name" \
+      --from-file=username="$wd/uname" \
+      --from-file=password="$wd/pword" \
+      --from-file=realm="$wd/realmkey" \
+      --from-file=client="$wd/clientkey" \
+      --dry-run=client -o yaml | _kubectl apply -f - >/dev/null
+   _info "[keycloak] provisioned realm '${realm}' (frontendUrl=${frontend_url}); smoke user '${username}' seeded (secret ${ns}/${secret_name})"
 }
 
 function test_keycloak() {
