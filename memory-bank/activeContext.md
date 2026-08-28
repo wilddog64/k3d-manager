@@ -323,9 +323,24 @@
       relaxes the 727m application-controller's full-resync cadence; takes effect on next controller
       restart (NOT force-restarted — a restart triggers a full re-sync burst). Prometheus already
       conservative (60s scrape / 3d retention) — left as-is. Snapshot at time of pass: prometheus 754m,
-      argocd-application-controller 727m, argocd-repo-server 386m, vault-0 368m, keycloak 162m. Biggest
-      *optional* lever NOT taken: scaling the monitoring stack (prometheus+grafana+loki ≈ 1 core) to zero
-      when not actively debugging — loses observability, so left for user call.
+      argocd-application-controller 727m, argocd-repo-server 386m, vault-0 368m, keycloak 162m.
+    - **Monitoring pause/resume toggle — DONE + live-verified 2026-08-28** (the "biggest optional lever",
+      now built): `observability_pause` / `observability_resume` (`scripts/plugins/observability.sh`) +
+      `make monitoring-pause` / `make monitoring-resume`. Scales the whole hub observability stack
+      (prometheus+grafana+loki+alertmanager+kube-state-metrics+trivy) to zero on demand — reclaims
+      **~1.1 cores** (measured: prometheus 730m + grafana 273m + alertmanager 37m + ksm 18m); node-exporter
+      DaemonSet (~15m) left running. **Keeps production-grade config fully intact** — pause only scales
+      replicas + suspends auto-sync; resume reconciles the identical committed chart values (scrape 60s /
+      retention 3d / all rules unchanged). Nothing deleted, PVCs untouched → history survives within 3d.
+      **Two-controller mechanism** (both required, learned live): (1) selfHeal defeated by patching each
+      app `spec.syncPolicy.automated=null`; (2) that patch made durable by committing
+      `ignoreApplicationDifferences: [/spec/syncPolicy/automated]` to the `observability` ApplicationSet
+      (the app-level `skip-reconcile` annotation is STRIPPED by appset re-templating within seconds — does
+      NOT work); (3) prometheus/alertmanager are operator-reconciled CRs — scale via the CR, not the STS.
+      Resume scales workloads back **explicitly** (operator→CRs→deploy/sts to 1), NOT via ArgoCD sync —
+      sync goes `Unknown`/slow exactly under the CPU starvation this feature targets. Spec:
+      `docs/bugs/2026-08-28-monitoring-pause-resume-toggle.md`. Config-tune levers (#1 scrape, #2 retention)
+      confirmed already spent; trivy is event-driven not cron — so the toggle is the remaining real lever.
 
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo
