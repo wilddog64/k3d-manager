@@ -152,9 +152,25 @@
   istiod|istio-ingressgateway maxReplicas=1` (5→1 each) + `kubectl patch` controller/repo-server
   resources. **Result:** total CPU ~1414%→~1144% (~2.7 CPU freed); `/livez` 5.3s→~0.4s; agent-2 load
   70→39↓; new repo-server pod 0 restarts; restart storm FROZEN. `kubectl top nodes` UNDERCOUNTS
-  (showed agent-2 ~15%); trust `docker stats`. **Durable rollout still owed:** apply committed values
-  via `argocd.sh` helm-upgrade path + re-run istio install so config (not just live patches) carries
-  the fix on next redeploy. **Step 2 (load-shed prometheus/loki footprint)** = separate spec, TODO.
+  (showed agent-2 ~15%); trust `docker stats`. **Istio durable rollout DONE via real tool:**
+  `istioctl install -f <rendered istio-operator.yaml.tmpl>` (v1.30.0) reconciled live from committed
+  config — HPAs now durably `MINPODS=1 MAXPODS=1` (operator-owned, not just the hand HPA patch),
+  istiod limits 500m/1Gi + gateway 500m/512Mi applied, both pods fresh/healthy at ~44% CPU.
+  (`istioctl install` foreground-times-out at 2m on the loaded hub — benign, k8s finishes the roll;
+  verify with `kubectl get deploy/hpa -n istio-system`.) **ArgoCD formal redeploy DEFERRED** — see
+  chart-drift follow-up; fix stays live (patched) + committed. **Step 2 load-shed spec written**
+  (`docs/bugs/2026-08-27-hub-load-shed-observability-footprint.md`): prometheus-0 is now the top
+  hog (916m/1.67Gi); drop loki-canary DaemonSet (4 pods ~193m) + cut prom scrape/retention. TODO.
+
+- **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
+  `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo
+  pins `ARGOCD_CHART_VERSION=7.8.1` (`argocd.sh:53`). Running full `deploy_argocd` could unintentionally
+  change the chart version → regression risk, so the Step-1 argocd resource limits were NOT applied via
+  helm (only live `kubectl patch` on controller+repo-server + committed to `values.yaml.tmpl`). Helm
+  release state has no resource values → a non-tmpl `helm upgrade --reuse-values` would strip them
+  (normal `deploy_argocd` re-renders the tmpl → keeps them). **Reconcile the pin (7.8.1→10.4.0, or
+  downgrade live) BEFORE any formal argocd redeploy.** Surgical durable option if needed sooner:
+  `helm upgrade argocd argo/argo-cd --version 10.4.0 -n cicd --reuse-values -f <resources-only overlay>`.
 
 - **2026-08-27 federation scrape tuning:** source commit `977d9e11` changes the hub `federate-acg`
   Prometheus scrape interval from 30s to 60s; the vulnerability exporter remains at 60s. YAML
