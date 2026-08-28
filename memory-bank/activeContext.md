@@ -237,6 +237,25 @@
   disk AND the hub CPU has calmed; follow-up fragility: coredns SPOF + prometheus PVC both
   hostage to agent-0.
 
+- **2026-08-28 chronic hub CPU overcommit persists after the watchdog fix — `make status` blocked
+  on a pegged control plane.** With the self-inflicted node bounces stopped, all 4 nodes hold Ready,
+  but the hub is still CPU-overcommitted at the source. `docker stats --no-stream`: server-0
+  **492%**, agent-1 344%, agent-2 270%, agent-0 226% (~1333% total). Inside server-0: `/bin/k3s
+  server` (embedded apiserver+etcd+controller-manager+scheduler) at **71%** of the node with **load
+  average 60**; co-located discretionary load = `trivy server` (29% VSZ), an istio ingress-gateway
+  envoy, kube-state-metrics, access-log-exporter, node_exporter. Consequence: every `kubectl` LIST
+  times out (single-namespace `get pods` fails at 30s; `top nodes` times out), and the webhook
+  `/api/v1/health` aggregator times out at 90s → `make status` reports `Overall: UNKNOWN / status
+  source: webhook unavailable`. The webhook process itself is healthy (listening :7443, 401 without
+  a token) — restarting it will NOT help; the blocker is the pegged apiserver, not the webhook.
+  Durable fix = the committed Step 1+Step 2 load-shed governance (recent commits on
+  `k3d-manager-v1.27.0`), but it is **inert** until ArgoCD reapplies it, and ArgoCD can't
+  render/sync while the control plane is drowning (chicken-and-egg). Prior live sheds (prom 60s
+  scrape, loki-canary off) are live but insufficient. Decision pending: reduce discretionary
+  control-plane churn live (candidate: `trivy-operator` scale-to-0 — reversible, non-user-facing)
+  vs. force the committed governance to sync. Same disease family as
+  [[reference_one_second_probes_cpu_starvation_kill_loop]].
+
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo
   pins `ARGOCD_CHART_VERSION=7.8.1` (`argocd.sh:53`). Running full `deploy_argocd` could unintentionally
