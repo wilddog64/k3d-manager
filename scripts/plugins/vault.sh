@@ -1046,6 +1046,7 @@ EOF
    _enable_kv2_k8s_auth "$ns" "$release"
    _vault_seed_ldap_service_accounts "$ns" "$release"
    _vault_setup_pki "$ns" "$release"
+   vault_install_unseal_watchdog "$ns" || _warn "[vault] unseal watchdog install reported a problem — auto-unseal after restart may be unavailable"
 
    if (( re_unseal )); then
       _vault_replay_cached_unseal "$ns" "$release"

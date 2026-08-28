@@ -87,7 +87,20 @@ seconds.
    `vault already unsealed` (cached image → instant start, no deadline hit).
 4. Shard secret `vault-unseal/shard-1` present in `secrets` ns (already true).
 
+## Auto-install from deploy_vault (decided: yes)
+
+Previously "not in scope" pending a decision. Decision 2026-08-28: **yes** —
+`deploy_vault` now calls `vault_install_unseal_watchdog "$ns"` on its
+successful full-deploy path (after `_vault_setup_pki`, before the optional
+re-unseal branch), guarded with `|| _warn` so a watchdog hiccup never fails
+the deploy. Rationale: the watchdog is idempotent and safe, and its whole
+purpose (auto-unseal after a restart) should survive a hub rebuild without an
+operator remembering a second command — the same "survives rebuild" pattern
+already used for `deploy_argocd_platform_ops` in the ArgoCD bootstrap. An
+explicit standalone `vault_install_unseal_watchdog` call remains available.
+
 ## Not in scope
 
-- Auto-installing the watchdog from `deploy_vault` (separate decision — today
-  it is an explicit opt-in call).
+- Auto-installing the shard secret itself — the watchdog mounts `vault-unseal`
+  `optional: true` and no-ops when it is absent; shard caching stays owned by
+  the existing unseal/bootstrap paths.

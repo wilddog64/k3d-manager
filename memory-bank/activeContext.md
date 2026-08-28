@@ -518,6 +518,20 @@
     settled to **95–130%** with canary already gone. A manual `loki=0` would be reverted by ArgoCD
     selfHeal (git declares 1) and would remove log aggregation for CPU that is no longer pressured — left
     loki at 1/1. One-command shed remains available if headroom is ever needed.
+- **2026-08-28 optional durable follow-ups:**
+  - **deploy_vault now auto-installs the unseal watchdog** (`vault.sh`, after `_vault_setup_pki`, guarded
+    `|| _warn`) so auto-unseal survives a hub rebuild without a second command — same pattern as
+    platform-ops in the ArgoCD bootstrap. Decision folded into
+    `docs/bugs/2026-08-28-vault-unseal-watchdog-stale-image.md`.
+  - **Real smoke-user seed NOT applicable on the hub — architecture finding.** `keycloak_seed_smoke_user`
+    targets a `shopping-cart` realm, but the hub Keycloak (identity ns, reached at
+    `keycloak.shopping-cart.local`) has only `home` + `master` realms — no `shopping-cart` realm and no
+    frontend/app client (`home` has only default clients). The shopping-cart frontend + its realm live on
+    the **app-cluster (ACG)**, not the hub. So seeding a hub user cannot produce a true Frontend-login PASS
+    without first provisioning the shopping-cart realm + frontend client on the hub Keycloak (a real setup
+    task, not a last-mile seed). The honest SKIP from the `kc_token_is_stub` fix is the correct state. Seed
+    aborted at the realm-existence check — created nothing (verified: no `k3dm-smoke-user` secret, no
+    `k3dm-smoke` client). Also noted: codebase default realm `shopping-cart` is stale vs live hub `home`.
 
 ## Canonical pointers
 
