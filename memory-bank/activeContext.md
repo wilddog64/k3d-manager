@@ -126,7 +126,8 @@
     as-is (45-byte single-line, no newline → `security -w` returned it verbatim, uncorrupted). ✅ **RC2 PR
     open** — frontend `fix/cosign-publish-job-env` commit `d47e675c` adds job-level `env.COSIGN_KEY` to
     `publish` (diff verified clean +2, no newline strip); **PR #101** (https://github.com/wilddog64/
-    shopping-cart-frontend/pull/101), **MERGE GATED**. **NEXT:** rerun the 4 non-frontend main builds
+    shopping-cart-frontend/pull/101), **MERGED 2026-08-28 (user go), squash `85265e7b`** — post-merge main
+    build `33215231258` exercises signing with BOTH fixes. **NEXT:** rerun the 4 non-frontend main builds
     (RC1-only, secrets re-read at runtime) + `cosign verify --key /tmp/cosign-verify.pub` proves sigs; after
     #101 merges, rerun frontend too. → THEN Stage D (Kyverno Audit→Enforce; Enforce must NOT go live until
     images actually carry signatures). Also /post-merge housekeeping (sync mains, prune
