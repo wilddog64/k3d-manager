@@ -171,6 +171,28 @@
   Monitoring loop still running — hub was oscillating hot (load ~35–50, livez bursting to 20s)
   after Step 1, exactly the demand Step 2 removes.
 
+- **2026-08-27 keycloak-0 restart loop FIXED live + committed + CoreDNS collateral fixed live**
+  (`docs/bugs/2026-08-27-keycloak-restart-loop-tight-probes.md`): root cause was the SAME hub
+  CPU starvation making Bitnami's **1-second probes** fail. keycloak-0 (67 restarts) was killed
+  by liveness `tcpSocket period=1s failureThreshold=3` (SIGTERM 143) — NOT OOM. Fix in
+  `scripts/etc/keycloak/values.yaml.tmpl` (previously set no probes/resources): liveness
+  `period 1→10s failureThreshold 3→5`, readiness `timeout 1→5s`, **NEW startupProbe** (30s +
+  40×10s = 430s grace), resources `750m/768Mi → 1000m/1Gi`. The startupProbe is the critical
+  piece — Bitnami `start-dev` re-runs Quarkus augmentation every boot: live logs measured
+  `augmentation 172742ms` + `started in 154.023s` = **~326s cold start**, so the old ~170s
+  liveness window killed it mid-boot forever. Applied LIVE via `kubectl patch statefulset/keycloak`
+  (KEYCLOAK_HELM_CHART_VERSION is empty=latest, so a `helm upgrade`/`deploy_keycloak` would risk a
+  chart bump off `keycloak-25.2.0` + Bitnami-deprecation pull failure — patch was the low-risk
+  path; template edit makes it durable at next deploy). keycloak-0 now **1/1, 0 restarts**.
+  ⚠ **Rolling the pod exposed CoreDNS in CrashLoopBackOff (155 restarts, deploy 0/1)** — same
+  1s-probe-under-CPU-starvation disease (`plugin/health … took more than 1s: 1.93s` → liveness
+  SIGTERM). DNS was cluster-wide down; only cached-connection pods survived. Live-patched
+  `deploy/coredns` liveness `timeout 1→5s failureThreshold 3→5`, readiness `timeout 1→3s` →
+  CoreDNS `1/1` stable, DNS restored. **⚠ CoreDNS patch NOT in git — k3s-managed**
+  (`k3s.cattle.io` owner, on-node `coredns.yaml`); k3s addon controller may revert. FOLLOW-UP:
+  persist via k3s manifest override/HelmChartConfig, or land Step 2 load-shed so 1s probes stop
+  failing at the source. This is fresh evidence Step 2 is no longer optional.
+
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo
   pins `ARGOCD_CHART_VERSION=7.8.1` (`argocd.sh:53`). Running full `deploy_argocd` could unintentionally

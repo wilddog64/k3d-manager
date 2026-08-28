@@ -64,6 +64,15 @@
   `lokiCanary.enabled: false` + prom scrape/eval 30s→60s, retention 7d→3d/8GB. Detail in
   activeContext. Blocker for full argocd redeploy: chart-drift (live 10.4.0 vs pin 7.8.1).
 
+- [x] **keycloak-0 restart-loop FIXED + CoreDNS collateral FIXED (2026-08-27)** —
+  `docs/bugs/2026-08-27-keycloak-restart-loop-tight-probes.md`. Same CPU-starvation-vs-1s-probes
+  root cause. keycloak: values.yaml.tmpl now sets startupProbe (430s grace, covers the ~326s
+  Quarkus `start-dev` cold start) + loosened liveness/readiness + 1000m/1Gi; live-patched onto
+  the sts → keycloak-0 **1/1, 0 restarts**. CoreDNS was crashlooping (155 restarts, 0/1) from the
+  identical disease → live-patched loosened liveness → **1/1 stable, DNS restored**. ⚠ CoreDNS
+  patch NOT in git (k3s-managed, may revert) — FOLLOW-UP: persist via k3s manifest override or
+  land Step 2. Fresh evidence Step 2 is no longer optional.
+
 - [x] **E2E transient-resource cleanup (2026-08-27)** — `6b20cced` pushed. Teardown now cleans
   orphaned kubeconfig/proxy state and removes transient logs; JSON summaries remain as audit data.
   Focused E2E tests and ShellCheck passed. Full suite has a pre-existing hang after the initial
