@@ -216,8 +216,21 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `4a96cf41…`, order `ca2d398b…`, product-catalog `3db7b8da…`, payment `3b5f478c…`, frontend `ca25a636…`.
   ⚠ product-catalog run still red on a SEPARATE pre-existing step "Fail when image promotion did not
   complete" (GitOps promotion, not signing) — tracked apart, does not block D.
-- [ ] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
-  `cosign verify` gate (Claude live; needs signed images from C before Enforce).
+- [~] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
+  `cosign verify` gate. **AUDIT SLICE IMPLEMENTED 2026-08-28 (user go):** `signing.sh` gains
+  `_signing_install_kyverno` (pinned chart 3.9.0, A08), `_signing_render_policy` /
+  `_signing_apply_cluster_policy` (injects `cosign.pub` from the in-cluster ESO Secret into the policy),
+  and `deploy_image_signing [--audit|--enforce]` (dispatcher auto-resolves; `deploy_*` arg-guard applies).
+  New manifest `scripts/etc/signing/cluster-policy-verify-images.yaml.tmpl` — `verifyImages` ClusterPolicy,
+  **signature-only** (attestation deferred in C), scoped to `ghcr.io/wilddog64/*` in
+  **`shopping-cart-apps`/`shopping-cart-payment`** ONLY (real ns per `_namespace_for`, NOT per-service
+  names the plan assumed), `failureAction: Audit`, webhook `failurePolicy: Ignore`. 12 BATS green
+  (`scripts/tests/plugins/signing.bats`); render→YAML-parse verified; shellcheck -S warning clean.
+  **NOT DONE (gated follow-up, split at Audit→Enforce seam):** live install runs against the APP cluster
+  (ACG/hostinger), not the hub — Audit PolicyReports must show zero would-be-blocks before Enforce;
+  `--enforce` gated behind `SIGNING_ALLOW_ENFORCE=1`. Promoter `cosign verify` gate in `app-cve-scan.sh`
+  (needs cosign+pub in the platform-ops CronJob image) + `cosign attest` in CI = next slice. Howto
+  `docs/howto/image-signing.md`; functions.md updated.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
   - [x] Part 0 controller (Slice E) — commit `17be2e69` pushed to

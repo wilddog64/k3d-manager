@@ -13,6 +13,19 @@ SIGNING_KEYCHAIN_PASSWORD_ACCOUNT="${SIGNING_KEYCHAIN_PASSWORD_ACCOUNT:-k3dm-cos
 SIGNING_ESO_STORE="${SIGNING_ESO_STORE:-vault-backend}"
 SIGNING_ESO_ROLE="${SIGNING_ESO_ROLE:-}"
 
+# --- Admission verification (Kyverno) -----------------------------------------
+SIGNING_KYVERNO_HELM_REPO_NAME="${SIGNING_KYVERNO_HELM_REPO_NAME:-kyverno}"
+SIGNING_KYVERNO_HELM_REPO_URL="${SIGNING_KYVERNO_HELM_REPO_URL:-https://kyverno.github.io/kyverno/}"
+SIGNING_KYVERNO_HELM_CHART_REF="${SIGNING_KYVERNO_HELM_CHART_REF:-kyverno/kyverno}"
+SIGNING_KYVERNO_HELM_RELEASE="${SIGNING_KYVERNO_HELM_RELEASE:-kyverno}"
+# A08: pin the chart version explicitly -- never floating latest.
+SIGNING_KYVERNO_HELM_CHART_VERSION="${SIGNING_KYVERNO_HELM_CHART_VERSION:-3.9.0}"
+SIGNING_POLICY_NAME="${SIGNING_POLICY_NAME:-verify-first-party-images}"
+SIGNING_IMAGE_REFERENCES="${SIGNING_IMAGE_REFERENCES:-ghcr.io/wilddog64/*}"
+# D2: default to Audit. Enforce is a gated, deliberate flip (see deploy_image_signing).
+SIGNING_VALIDATION_FAILURE_ACTION="${SIGNING_VALIDATION_FAILURE_ACTION:-Audit}"
+SIGNING_WEBHOOK_FAILURE_POLICY="${SIGNING_WEBHOOK_FAILURE_POLICY:-Ignore}"
+
 function _signing_vault_key_exists() {
   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
   local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
@@ -135,6 +148,127 @@ function _signing_seed_vault_key() {
       "${SIGNING_GENERATED_KEY_FILE}" "${SIGNING_GENERATED_PASSWORD}" "${SIGNING_GENERATED_PUB_FILE}"
     _signing_backup_keychain "${SIGNING_GENERATED_KEY_FILE}" "${SIGNING_GENERATED_PASSWORD}"
   )
+}
+
+function _signing_install_kyverno() {
+  local skip_repo_ops=0
+  case "${SIGNING_KYVERNO_HELM_CHART_REF}" in
+    /*|./*|../*|file://*) skip_repo_ops=1 ;;
+  esac
+  case "${SIGNING_KYVERNO_HELM_REPO_URL}" in
+    ""|/*|./*|../*|file://*) skip_repo_ops=1 ;;
+  esac
+
+  if (( ! skip_repo_ops )); then
+    _helm repo add "${SIGNING_KYVERNO_HELM_REPO_NAME}" "${SIGNING_KYVERNO_HELM_REPO_URL}"
+    _helm repo update >/dev/null 2>&1
+  fi
+
+  local -a helm_args=(--create-namespace)
+  if [[ -n "${SIGNING_KYVERNO_HELM_CHART_VERSION:-}" ]]; then
+    helm_args+=(--version "${SIGNING_KYVERNO_HELM_CHART_VERSION}")
+  fi
+
+  _helm upgrade --install \
+    -n "${SIGNING_ADMISSION_NAMESPACE}" \
+    "${SIGNING_KYVERNO_HELM_RELEASE}" \
+    "${SIGNING_KYVERNO_HELM_CHART_REF}" \
+    "${helm_args[@]}"
+}
+
+function _signing_wait_kyverno() {
+  _kubectl --no-exit -n "${SIGNING_ADMISSION_NAMESPACE}" wait \
+    --for=condition=available --timeout=180s \
+    deployment -l app.kubernetes.io/part-of=kyverno >/dev/null 2>&1
+}
+
+function _signing_render_policy() {
+  local pub_file="${1:?public key file required}"
+  local template="${2:?policy template required}"
+  export SIGNING_POLICY_NAME SIGNING_IMAGE_REFERENCES \
+    SIGNING_VALIDATION_FAILURE_ACTION SIGNING_WEBHOOK_FAILURE_POLICY
+  # shellcheck disable=SC2016
+  envsubst '$SIGNING_POLICY_NAME $SIGNING_IMAGE_REFERENCES $SIGNING_VALIDATION_FAILURE_ACTION $SIGNING_WEBHOOK_FAILURE_POLICY' \
+    < "${template}" |
+    awk -v pf="${pub_file}" '
+      /^# __PUBLIC_KEY__$/ {
+        while ((getline line < pf) > 0) { print "                      " line }
+        close(pf)
+        next
+      }
+      { print }
+    '
+}
+
+function _signing_apply_cluster_policy() {
+  local template="${SCRIPT_DIR}/etc/signing/cluster-policy-verify-images.yaml.tmpl"
+  [[ -r "${template}" ]] || { _err "[signing] policy template not found: ${template}"; return 1; }
+
+  local pub_file
+  pub_file="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '${pub_file}'" RETURN
+
+  _kubectl --no-exit -n "${SIGNING_ADMISSION_NAMESPACE}" get secret "${SIGNING_PUB_SECRET_NAME}" \
+    -o jsonpath='{.data.cosign\.pub}' 2>/dev/null | base64 -d > "${pub_file}" || true
+  if [[ ! -s "${pub_file}" ]] || ! grep -q "BEGIN PUBLIC KEY" "${pub_file}"; then
+    _err "[signing] no valid cosign.pub in ${SIGNING_ADMISSION_NAMESPACE}/${SIGNING_PUB_SECRET_NAME}; run signing_init first"
+    return 1
+  fi
+
+  _signing_render_policy "${pub_file}" "${template}" | _kubectl apply -f -
+}
+
+function deploy_image_signing() {
+  local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
+  local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+  local action="${SIGNING_VALIDATION_FAILURE_ACTION}"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --audit) action="Audit"; shift ;;
+      --enforce) action="Enforce"; shift ;;
+      -h|--help)
+        cat <<'USAGE'
+Usage: deploy_image_signing [--audit|--enforce]
+
+Install Kyverno (pinned chart) and apply the first-party cosign verifyImages
+ClusterPolicy scoped to the shopping-cart app namespaces.
+
+  --audit    (default) failureAction=Audit -- report would-be-blocks only.
+  --enforce  reject unsigned first-party pods. GATED (decision D2): only after
+             the Audit PolicyReports show zero would-be-blocks for current
+             first-party images. Requires SIGNING_ALLOW_ENFORCE=1 to confirm.
+USAGE
+        return 0 ;;
+      *) _err "[signing] Unknown option: $1"; return 1 ;;
+    esac
+  done
+
+  if [[ "${action}" == "Enforce" && "${SIGNING_ALLOW_ENFORCE:-0}" != "1" ]]; then
+    _err "[signing] --enforce is gated: confirm Audit is clean, then set SIGNING_ALLOW_ENFORCE=1 (D2)."
+    return 1
+  fi
+  SIGNING_VALIDATION_FAILURE_ACTION="${action}"
+
+  _info "[signing] ensuring cosign key material (idempotent)"
+  signing_init "${vault_ns}" "${vault_release}" || return 1
+
+  _info "[signing] installing Kyverno (chart ${SIGNING_KYVERNO_HELM_CHART_VERSION})"
+  _signing_install_kyverno || return 1
+  if ! _signing_wait_kyverno; then
+    _err "[signing] Kyverno did not become Ready"
+    return 1
+  fi
+
+  _info "[signing] applying verifyImages ClusterPolicy (${SIGNING_VALIDATION_FAILURE_ACTION})"
+  _signing_apply_cluster_policy || return 1
+
+  if [[ "${SIGNING_VALIDATION_FAILURE_ACTION}" == "Enforce" ]]; then
+    _warn "[signing] ${SIGNING_POLICY_NAME} is ENFORCING on shopping-cart-apps/shopping-cart-payment"
+  else
+    _info "[signing] ${SIGNING_POLICY_NAME} in Audit -- inspect PolicyReports before --enforce"
+  fi
 }
 
 function signing_init() {

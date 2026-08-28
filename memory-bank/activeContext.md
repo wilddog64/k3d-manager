@@ -131,9 +131,16 @@
     verify --key <derived pub>` PASSES on all 5** (GHCR `sha256-<digest>.sig` present): basket `4a96cf41…`,
     order `ca2d398b…`, product-catalog `3db7b8da…`, payment `3b5f478c…`, frontend `ca25a636…`. ⚠
     product-catalog run still red on a SEPARATE pre-existing step "Fail when image promotion did not
-    complete" (GitOps promotion, NOT signing; its main was red pre-Stage-C) — tracked apart. **NEXT:** Stage
-    D (Kyverno Audit→Enforce + promoter `cosign verify` gate — now unblocked; Enforce still staged) + /post-
-    merge housekeeping (sync mains, prune `feat/cosign-sign-attest` branches incl. basket's net-zero commits).
+    complete" (GitOps promotion, NOT signing; its main was red pre-Stage-C) — tracked apart. ✅ **Stage D
+    AUDIT SLICE IMPLEMENTED 2026-08-28 (user go):** `signing.sh` +`_signing_install_kyverno`/
+    `_signing_render_policy`/`_signing_apply_cluster_policy`/`deploy_image_signing [--audit|--enforce]`; new
+    `cluster-policy-verify-images.yaml.tmpl` (verifyImages, **sig-only**, `ghcr.io/wilddog64/*` in
+    `shopping-cart-apps`/`shopping-cart-payment` ONLY, Audit, webhook failurePolicy Ignore); Kyverno chart
+    pinned 3.9.0; 12 BATS green; howto+functions.md. **NEXT (gated follow-up):** run `deploy_image_signing
+    --audit` against the APP cluster (ACG/hostinger — NOT the hub; no app ns there), watch PolicyReports →
+    zero would-be-blocks → `SIGNING_ALLOW_ENFORCE=1 --enforce`; then promoter `cosign verify` gate in
+    `app-cve-scan.sh` (needs cosign+pub in platform-ops CronJob image) + `cosign attest` in CI. Also
+    /post-merge housekeeping (sync mains, prune `feat/cosign-sign-attest` branches incl. basket net-zero).
   4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **STARTED
      2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests →
      **DONE** Codex commit `17be2e69`, pushed to `origin/k3d-manager-v1.27.0`; pure decision logic +

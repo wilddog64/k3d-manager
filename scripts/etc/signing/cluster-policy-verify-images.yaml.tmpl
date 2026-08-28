@@ -1,0 +1,65 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: ${SIGNING_POLICY_NAME}
+  annotations:
+    policies.kyverno.io/title: Verify first-party image signatures
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Requires a valid cosign signature by the k3d-manager signing key for
+      first-party (${SIGNING_IMAGE_REFERENCES}) images scheduled into the app
+      namespaces. Signature-only for now (Trivy/SBOM attestation is deferred);
+      the verify block tightens to require a vuln attestation once CI produces
+      one. Staged Audit -> Enforce per decision D2 -- never flip to Enforce
+      before the Audit dashboard shows zero would-be-blocks for current
+      first-party images.
+spec:
+  # D2: staged rollout. Audit first (dashboards show would-be-blocks), Enforce
+  # only after Audit is clean, and ONLY on app namespaces below.
+  background: false
+  webhookConfiguration:
+    # Fail-open while Audit (a webhook outage must not wedge app scheduling on a
+    # solo-operated fleet). Revisit deliberately for Enforce.
+    failurePolicy: ${SIGNING_WEBHOOK_FAILURE_POLICY}
+  rules:
+    - name: verify-cosign-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              # SCOPE BOUNDARY (critical): app namespaces ONLY. Never hub/system.
+              # These are the real deployment namespaces (see _namespace_for in
+              # cve-remediation-verify.sh): all services land in shopping-cart-apps
+              # except payment, which is isolated in shopping-cart-payment.
+              namespaces:
+                - shopping-cart-apps
+                - shopping-cart-payment
+      verifyImages:
+        # Only first-party images are signed. Upstream images (postgres, redis,
+        # rabbitmq, argocd, alpine/k8s, ...) are NOT signed and MUST be left
+        # untouched, else the whole platform is blocked. imageReferences scopes
+        # the check to our registry namespace only.
+        - imageReferences:
+            - "${SIGNING_IMAGE_REFERENCES}"
+          # Audit | Enforce -- templated by SIGNING_VALIDATION_FAILURE_ACTION.
+          failureAction: ${SIGNING_VALIDATION_FAILURE_ACTION}
+          # Do not rewrite the workload's image ref; the promoter already pins
+          # by digest. We only verify.
+          mutateDigest: false
+          verifyDigest: false
+          required: true
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    # Public half of the Vault-held cosign key, injected at apply
+                    # time from the ESO-projected Secret (cosign-public-key). On
+                    # key rotation, re-run the apply to refresh this block.
+                    publicKeys: |-
+# __PUBLIC_KEY__
+                    ctlog:
+                      ignore: true
+                    rekor:
+                      ignore: true

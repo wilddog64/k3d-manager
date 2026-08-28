@@ -152,6 +152,26 @@ Starts a background loop that extends the ACG sandbox TTL via `_acg_extend_playw
 
 **Usage:** `acg_watch [interval_seconds]` (typically called as `acg_watch &` from `_provider_k3s_aws_deploy_cluster`)
 
+### `signing_init`
+
+Idempotently seeds the cosign signing key pair. If Vault `secret/cosign/signing` already holds `cosign.key`, does nothing. Otherwise generates a password-encrypted key pair, writes `cosign.key`/`cosign.password`/`cosign.pub` to Vault, backs the private key + password up to the macOS Keychain (`k3d-manager-signing`), applies the read-only verifier Vault policy, grants ESO read, and projects `cosign.pub` into the admission namespace as the `cosign-public-key` Secret via ESO. Key material never appears in argv/logs. Source: `scripts/plugins/signing.sh`.
+
+**Usage:** `./scripts/k3d-manager signing_init [vault_ns] [vault_release]`
+
+### `signing_status`
+
+Reports `vault_key`, `keychain_backup`, and `eso_public_secret` presence; returns non-zero if any is absent. Source: `scripts/plugins/signing.sh`.
+
+### `signing_rotate_key`
+
+Generates a fresh key pair and re-seeds Vault + Keychain + ESO pub Secret. Warns that previously-signed images must be re-signed or the old public key retained for an overlap window. Source: `scripts/plugins/signing.sh`.
+
+### `deploy_image_signing`
+
+Installs Kyverno (pinned chart `SIGNING_KYVERNO_HELM_CHART_VERSION`, A08) and applies the `verify-first-party-images` cosign `verifyImages` ClusterPolicy, scoped to `ghcr.io/wilddog64/*` images in the `shopping-cart-apps`/`shopping-cart-payment` namespaces only. The public key is injected at apply time from the in-cluster `cosign-public-key` ESO Secret. Staged **Audit → Enforce** (decision D2): `--audit` (default) reports would-be-blocks; `--enforce` blocks unsigned first-party pods and is gated behind `SIGNING_ALLOW_ENFORCE=1` (flip only after Audit is clean). Run against the **app cluster** context, not the hub. Source: `scripts/plugins/signing.sh`. See `docs/howto/image-signing.md`.
+
+**Usage:** `./scripts/k3d-manager deploy_image_signing [--audit|--enforce]`
+
 ## Running Tests
 
 ```bash

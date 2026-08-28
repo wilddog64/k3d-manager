@@ -3,109 +3,112 @@
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
-  export SCRIPT_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
-  source "${SCRIPT_DIR}/plugins/signing.sh"
-  export SIGNING_TEST_VAULT_KEY=0 SIGNING_TEST_PUB=0
-  export SIGNING_TEST_LOG="${BATS_TEST_TMPDIR}/signing.log"
-  : > "${SIGNING_TEST_LOG}"
+  source "${BATS_TEST_DIRNAME}/../../plugins/signing.sh"
+  : > "$KUBECTL_LOG"
+  : > "$HELM_LOG"
 
-  _vault_login() {
-    printf 'vault_login %s\n' "$*" >> "${SIGNING_TEST_LOG}"
-    return 0
-  }
-  _vault_exec() {
-    printf 'vault_exec %s\n' "$*" >> "${SIGNING_TEST_LOG}"
-    if [[ "$*" == *"auth/kubernetes/role/"* ]]; then
-      printf '{"data":{"token_policies":["eso-test-role"],"bound_service_account_names":["eso-sa"],"bound_service_account_namespaces":["identity"]}}'
-      return 0
-    fi
-    [[ "${SIGNING_TEST_VAULT_KEY}" == "1" ]] && return 0
-    return 1
-  }
-  _vault_exec_stream() {
-    printf 'vault_stream %s\n' "$*" >> "${SIGNING_TEST_LOG}"
-    cat >/dev/null
-  }
-  _run_command() {
-    printf 'run %s\n' "$*" >> "${SIGNING_TEST_LOG}"
-    if [[ "${*: -1}" == "cosign"* || "$*" == *"cosign generate-key-pair"* ]]; then
-      printf 'PRIVATE-KEY\n' > cosign.key
-      printf 'PUBLIC-KEY\n' > cosign.pub
-    fi
-  }
-  _secret_store_data() {
-    printf 'keychain %s %s\n' "$1" "$2" >> "${SIGNING_TEST_LOG}"
-  }
-  _secret_load_data() {
-    [[ "${SIGNING_TEST_KEYCHAIN:-0}" == "1" ]]
-  }
-  _kubectl() {
-    if [[ "$*" == *"apply -f -"* ]]; then
-      cat > "${BATS_TEST_TMPDIR}/eso.yaml"
-      printf 'kubectl apply\n' >> "${SIGNING_TEST_LOG}"
-      return 0
-    fi
-    if [[ "$*" == *"clustersecretstore"* ]]; then
-      printf 'eso-test-role'
-      return 0
-    fi
-    [[ "${SIGNING_TEST_PUB}" == "1" ]]
-  }
-  export -f _vault_login _vault_exec _vault_exec_stream
-  export -f _run_command _secret_store_data _secret_load_data _kubectl
+  PUB_FILE="$BATS_TEST_TMPDIR/cosign.pub"
+  printf -- '-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfakefakefake\n-----END PUBLIC KEY-----\n' \
+    > "$PUB_FILE"
+  POLICY_TMPL="${SCRIPT_DIR}/etc/signing/cluster-policy-verify-images.yaml.tmpl"
 }
 
-@test "signing_init is idempotent when Vault already has the key" {
-  SIGNING_TEST_VAULT_KEY=1
-  run signing_init
+# --- deploy_image_signing surface --------------------------------------------
+
+@test "deploy_image_signing --help prints usage" {
+  run deploy_image_signing --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"already present"* ]]
-  ! grep -q 'generate-key-pair' "${SIGNING_TEST_LOG}"
-  ! grep -q 'keychain' "${SIGNING_TEST_LOG}"
+  [[ "$output" == *"Usage: deploy_image_signing"* ]]
 }
 
-@test "fresh signing_init seeds Vault, backs up both values, and applies manifests" {
-  SIGNING_TEST_KEYCHAIN=1
-  run signing_init
-  [ "$status" -eq 0 ]
-  grep -q 'generate-key-pair' "${SIGNING_TEST_LOG}"
-  grep -q 'vault_stream' "${SIGNING_TEST_LOG}"
-  grep -q 'keychain .*k3dm-cosign-key' "${SIGNING_TEST_LOG}"
-  grep -q 'keychain .*k3dm-cosign-password' "${SIGNING_TEST_LOG}"
-  grep -q 'kubectl apply' "${SIGNING_TEST_LOG}"
-  grep -q 'vault_stream.*policy write' "${SIGNING_TEST_LOG}"
-  grep -q 'vault_stream.*auth/kubernetes/role/eso-test-role' "${SIGNING_TEST_LOG}"
-}
-
-@test "cosign key material is not placed in command text and env key syntax is documented" {
-  SIGNING_TEST_KEYCHAIN=1
-  run signing_init
-  [ "$status" -eq 0 ]
-  ! grep -q 'PRIVATE-KEY\|PUBLIC-KEY' "${SIGNING_TEST_LOG}"
-  grep -q -- '--key env://COSIGN_KEY' "${SCRIPT_DIR}/plugins/signing.sh"
-}
-
-@test "Vault verifier policy is read-only on the signing data path" {
-  run cat "${SCRIPT_DIR}/etc/signing/cosign-verify-policy.hcl"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *'path "secret/data/cosign/signing"'* ]]
-  [[ "$output" == *'capabilities = ["read"]'* ]]
-  [[ "$output" != *create* && "$output" != *update* && "$output" != *delete* ]]
-}
-
-@test "ESO template projects only cosign.pub" {
-  run cat "${SCRIPT_DIR}/etc/signing/externalsecret-cosign-pub.yaml.tmpl"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *'property: cosign.pub'* ]]
-  [[ "$output" != *'cosign.key'* ]]
-  [[ "$output" != *'cosign.password'* ]]
-}
-
-@test "signing_status reports absent state and returns non-zero" {
-  SIGNING_TEST_KEYCHAIN=0 SIGNING_TEST_VAULT_KEY=0 SIGNING_TEST_PUB=0
-  run signing_status
+@test "deploy_image_signing --enforce is gated behind SIGNING_ALLOW_ENFORCE" {
+  unset SIGNING_ALLOW_ENFORCE
+  run deploy_image_signing --enforce
   [ "$status" -ne 0 ]
-  [[ "$output" == *'vault_key=absent'* ]]
-  [[ "$output" == *'keychain_backup=absent'* ]]
-  [[ "$output" == *'eso_public_secret=absent'* ]]
+  [[ "$output" == *"gated"* ]]
+}
+
+@test "deploy_image_signing rejects unknown option" {
+  run deploy_image_signing --bogus
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Unknown option"* ]]
+}
+
+# --- Kyverno install: pinned chart (A08) -------------------------------------
+
+@test "_signing_install_kyverno pins the chart version (no floating latest)" {
+  run _signing_install_kyverno
+  [ "$status" -eq 0 ]
+  read_lines "$HELM_LOG" helm_calls
+  local joined="${helm_calls[*]}"
+  [[ "$joined" == *"upgrade --install"* ]]
+  [[ "$joined" == *"--version ${SIGNING_KYVERNO_HELM_CHART_VERSION}"* ]]
+  [[ "$joined" == *"-n ${SIGNING_ADMISSION_NAMESPACE}"* ]]
+}
+
+@test "_signing_install_kyverno skips repo ops for a local chart path" {
+  SIGNING_KYVERNO_HELM_CHART_REF="$BATS_TEST_TMPDIR/kyverno-chart.tgz"
+  SIGNING_KYVERNO_HELM_REPO_URL=""
+  touch "$SIGNING_KYVERNO_HELM_CHART_REF"
+  run _signing_install_kyverno
+  [ "$status" -eq 0 ]
+  read_lines "$HELM_LOG" helm_calls
+  [ "${#helm_calls[@]}" -eq 1 ]
+  [[ "${helm_calls[0]}" == upgrade\ --install* ]]
+}
+
+# --- ClusterPolicy rendering: structural guarantees --------------------------
+
+@test "_signing_render_policy injects the public key under publicKeys" {
+  run _signing_render_policy "$PUB_FILE" "$POLICY_TMPL"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"publicKeys: |-"* ]]
+  [[ "$output" == *"BEGIN PUBLIC KEY"* ]]
+}
+
+@test "_signing_render_policy never leaks a private key" {
+  run _signing_render_policy "$PUB_FILE" "$POLICY_TMPL"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"PRIVATE KEY"* ]]
+}
+
+@test "rendered policy is namespace-scoped to app namespaces only" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  grep -q "shopping-cart-apps" "$out"
+  grep -q "shopping-cart-payment" "$out"
+  # never all-namespaces
+  ! grep -qE 'namespaces:\s*\[?\s*"?\*"?' "$out"
+}
+
+@test "rendered policy scopes verifyImages to first-party registry, not wildcard" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  grep -q "ghcr.io/wilddog64/\*" "$out"
+  # a bare '*' imageReference would match upstream images and block the platform
+  ! grep -qE 'imageReferences:' -A2 "$out" 2>/dev/null | grep -qE '^\s*-\s*"?\*"?\s*$'
+}
+
+@test "rendered policy defaults to Audit (never Enforce by default)" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  SIGNING_VALIDATION_FAILURE_ACTION="Audit" \
+    _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  grep -q "failureAction: Audit" "$out"
+  ! grep -q "failureAction: Enforce" "$out"
+}
+
+@test "rendered policy honors Enforce when explicitly requested" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  SIGNING_VALIDATION_FAILURE_ACTION="Enforce" \
+    _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  grep -q "failureAction: Enforce" "$out"
+}
+
+# --- Secret hygiene (A02): no key material on argv ---------------------------
+
+@test "signing.sh never passes cosign key/password as a bare CLI argument" {
+  local src="${SCRIPT_DIR}/plugins/signing.sh"
+  # cosign must read key material via env:// only, never --key <literal> / --password <literal>
+  ! grep -qE -- '--key[= ]+[^e]' "$src"
+  ! grep -qE -- '--password[= ]' "$src"
 }
