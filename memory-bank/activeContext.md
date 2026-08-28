@@ -95,20 +95,21 @@
      install+ClusterPolicy Audit→Enforce + promoter `cosign verify` gate [Claude live; kyverno ns +
      pub secret already staged]. Verify Codex SHA on origin per
      [[feedback_codex_verification_protocol]] before trusting.
-  - **Stage C merges IN PROGRESS (2026-08-25, user go given):** all 6 PRs gate-clean. **infra #94
-    MERGED** (squash `1fa7ab005b57148468d0d23c6aa33fcc193baff5`; review lowered→merge→restored to 1;
-    signing step confirmed on infra main). **basket #39 MERGED** — its own commit `14f5b1257`
-    ("use signing-enabled reusable workflow") already pinned `1fa7ab0`; main verified. (Two harmless
-    net-zero newline commits `b55c11eb`+`e67290ab` landed on the post-merge branch; branch cleanup in
-    /post-merge.) **Pin bumps DONE on remaining 3 callers → `1fa7ab0` on `feat/cosign-sign-attest`:**
-    order #72 `da8fcc2e` (was 47769da), product-catalog #51 `00665840` (was 6163fdf), payment #63
-    `be796c6d` (was 47769da) — all clean +1/-1 single-line diffs. **BLOCKER RESOLVED:** the
-    workflow-file writes needed the `workflow` OAuth scope (not just the classifier permission);
-    user ran `gh auth refresh -s workflow` → scope now present. Gotcha hit + memory'd:
-    [[reference_gh_contents_put_trailing_newline]] (`$(...)` round-trip strips trailing newline).
-    **NOW:** CI in_progress on order/product-catalog/payment heads; frontend #99 branch-updated
-    (was `BEHIND`), checks re-running. Next: await green → merge (lower/restore review where
-    protected: order=REVIEW_REQUIRED), then /post-merge + Stage D.
+  - **Stage C merges ✅ ALL 6 MERGED (2026-08-25/26, user go given; merge SHAs gh-verified 2026-08-28):**
+    infra #94 `1fa7ab005b57148468d0d23c6aa33fcc193baff5`, frontend #99 `000bdcc0945fcc62f38c366c843193da72b9e88a`,
+    basket #39 `6f5a57c90e66d6a0be5eb0c1fd4ab43a86a5dfc7`, order #72 `cb4403db0a16eace10e0ff06c900849f8d483c03`,
+    product-catalog #51 `c42a5ccdc860a01c2cdd328136bce1e2364ec486`, payment #63 `fa396eef56f18445d4b52e0da07e59fe44e08a76`.
+    All 5 backend callers now pin the signing-enabled infra reusable workflow `build-push-deploy.yml@1fa7ab0`.
+    Pin bumps (on `feat/cosign-sign-attest`): order `da8fcc2e` (was 47769da), product-catalog `00665840`
+    (was 6163fdf), payment `be796c6d` (was 47769da) — clean +1/-1 diffs; basket already pinned via its own
+    `14f5b1257` (two harmless net-zero newline commits `b55c11eb`+`e67290ab` on its post-merge branch → prune
+    in /post-merge). **BLOCKER RESOLVED:** workflow-file writes needed the `workflow` OAuth scope; user ran
+    `gh auth refresh -s workflow`. Gotcha memory'd: [[reference_gh_contents_put_trailing_newline]]. **Ruleset
+    handling:** order+payment enforce via `main-protection` rulesets (not classic protection) — order merged
+    via enforcement disabled→merge→**restored to `active`**; payment merged via branch-update (ruleset left
+    intact); both **gh-verified `active` 2026-08-28**. **NEXT:** /post-merge housekeeping (sync mains, prune
+    `feat/cosign-sign-attest` branches incl. basket's net-zero commits, verify signing actually runs on each
+    caller's post-merge main build), then Stage D (Kyverno install + Audit→Enforce + promoter `cosign verify`).
   4. `v1.27.0-adaptive-checkout-load-testing.md` — API-level checkout load + telemetry. **STARTED
      2026-08-24 (sliced).** E=adaptive controller + stop-condition hysteresis + unit tests →
      **DONE** Codex commit `17be2e69`, pushed to `origin/k3d-manager-v1.27.0`; pure decision logic +

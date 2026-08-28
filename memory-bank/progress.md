@@ -192,17 +192,18 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Fixed 3 live-found signing.sh bugs: missing `_vault_login` (`6f3c6dd3`); early-return skipped
   idempotent applies; ESO 403 → `_signing_grant_eso_read` auto-discovers the store's Vault role
   (`eso-ldap-directory`) and merges `cosign-verify` (`7d335b1a`). BATS 6/6.
-- [~] **Image-signing Stage C** — CI cosign **sign-by-digest** (attestation deferred). Spec
-  `7779e4d6`. **Code DONE + Claude-verified on origin** (Codex session `01a0365f`). 6 repos on
-  `feat/cosign-sign-attest`, all SHAs matched on origin, 1 workflow file each, YAML valid:
-  infra `a46a1691` (reusable build-push-deploy.yml: workflow_call COSIGN secrets, job-env COSIGN_KEY
-  for the gate, `id: push`, cosign-installer@v3.7.0, sign `${image-name}@${push.digest}` BEFORE
-  promote), frontend `70776c6e` (direct, same pattern), basket `c6e38a0e` / order `b0af5a56` /
-  product-catalog `1e3d6065` / payment `33e917a0` (COSIGN_KEY/PASSWORD passthrough in the
-  build-push-deploy caller's secrets:). Gated `if: env.COSIGN_KEY != ''` so builds don't fail
-  pre-seed. **STOPPED AT MERGE GATE** (never auto-merge). Remaining: C2 seed
-  `COSIGN_KEY`/`COSIGN_PASSWORD` GH secrets from Keychain (5 app repos) → PRs+merge (needs go) →
-  builds sign → `cosign verify` proves signatures → unblocks D.
+- [x] **Image-signing Stage C** — CI cosign **sign-by-digest** (attestation deferred). Spec
+  `7779e4d6`. Code on `feat/cosign-sign-attest`, Claude-verified on origin (Codex session `01a0365f`):
+  infra reusable `build-push-deploy.yml` (workflow_call COSIGN secrets, job-env COSIGN_KEY, `id: push`,
+  cosign-installer@v3.7.0, sign `${image-name}@${push.digest}` BEFORE promote), frontend direct + 4
+  backend callers passing COSIGN_KEY/PASSWORD through. Gated `if: env.COSIGN_KEY != ''`. **✅ ALL 6 PRs
+  MERGED (gh-verified 2026-08-28):** infra #94 `1fa7ab0`, frontend #99 `000bdcc0`, basket #39 `6f5a57c9`,
+  order #72 `cb4403db`, product-catalog #51 `c42a5ccd`, payment #63 `fa396eef`. Backend callers pin the
+  signing-enabled reusable workflow `@1fa7ab0` (pin-bump commits order `da8fcc2e` / product-catalog
+  `00665840` / payment `be796c6d`; basket via `14f5b1257`). Workflow-scope blocker resolved (`gh auth
+  refresh -s workflow`); order+payment `main-protection` rulesets verified `active` post-merge. Remaining:
+  /post-merge (sync mains, prune `feat/cosign-sign-attest` branches, verify signing runs on each caller's
+  post-merge main build) → unblocks D.
 - [ ] **Image-signing Stage D** — Kyverno install + ClusterPolicy Audit→Enforce + promoter
   `cosign verify` gate (Claude live; needs signed images from C before Enforce).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
