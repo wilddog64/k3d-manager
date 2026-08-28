@@ -57,6 +57,13 @@
 
 ## v1.27.0 queue
 
+- [~] **Hub CPU overcommit fix (2026-08-27)** — Step 1 (resource governance) IMPLEMENTED +
+  live-applied; Step 2 (load-shed) config IMPLEMENTED, ROLLOUT PENDING (reapply `observability`
+  appset @ `k3d-manager-v1.27.0`). Specs: `docs/bugs/2026-08-27-hub-cpu-overcommit-resource-
+  governance.md`, `docs/bugs/2026-08-27-hub-load-shed-observability-footprint.md`. Step 2 edits:
+  `lokiCanary.enabled: false` + prom scrape/eval 30s→60s, retention 7d→3d/8GB. Detail in
+  activeContext. Blocker for full argocd redeploy: chart-drift (live 10.4.0 vs pin 7.8.1).
+
 - [x] **E2E transient-resource cleanup (2026-08-27)** — `6b20cced` pushed. Teardown now cleans
   orphaned kubeconfig/proxy state and removes transient logs; JSON summaries remain as audit data.
   Focused E2E tests and ShellCheck passed. Full suite has a pre-existing hang after the initial

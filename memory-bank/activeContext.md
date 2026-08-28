@@ -158,9 +158,18 @@
   istiod limits 500m/1Gi + gateway 500m/512Mi applied, both pods fresh/healthy at ~44% CPU.
   (`istioctl install` foreground-times-out at 2m on the loaded hub — benign, k8s finishes the roll;
   verify with `kubectl get deploy/hpa -n istio-system`.) **ArgoCD formal redeploy DEFERRED** — see
-  chart-drift follow-up; fix stays live (patched) + committed. **Step 2 load-shed spec written**
-  (`docs/bugs/2026-08-27-hub-load-shed-observability-footprint.md`): prometheus-0 is now the top
-  hog (916m/1.67Gi); drop loki-canary DaemonSet (4 pods ~193m) + cut prom scrape/retention. TODO.
+  chart-drift follow-up; fix stays live (patched) + committed. **Step 2 load-shed IMPLEMENTED
+  (config committed 2026-08-27; awaiting observability appset reapply for live rollout)**
+  (`docs/bugs/2026-08-27-hub-load-shed-observability-footprint.md`): `lokiCanary.enabled: false`
+  in `loki-values.yaml` (chart `loki-18.2.0`, canary is a top-level key — no selfMonitoring
+  sub-block); `kube-prometheus-stack-values.yaml` `scrapeInterval`+`evaluationInterval` 30s→60s
+  (the big CPU lever), `retention` 7d→3d, `retentionSize` 20GB→8GB. Prometheus CPU limit was
+  already 1500m and etcd/scheduler/CM/coredns/kube-proxy scrapes already disabled — so those
+  parts of the spec were pre-existing. **ROLLOUT PENDING:** reapply the `observability` appset
+  with `K3D_MANAGER_BRANCH=k3d-manager-v1.27.0` so `$values` tracks the release branch, then
+  ArgoCD selfHeal picks up the new values (loki-canary DaemonSet should disappear; prom CPU drops).
+  Monitoring loop still running — hub was oscillating hot (load ~35–50, livez bursting to 20s)
+  after Step 1, exactly the demand Step 2 removes.
 
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo

@@ -3,7 +3,11 @@
 **Filed:** 2026-08-27
 **Severity:** Medium — durable capacity fix; follows Step 1 governance
 (`2026-08-27-hub-cpu-overcommit-resource-governance.md`).
-**Status:** SPEC
+**Status:** IMPLEMENTED (config committed 2026-08-27; awaiting observability ApplicationSet
+reapply for live rollout). Note on inspection: Prometheus already carried a 1500m CPU limit and
+had kube-etcd/scheduler/controller-manager/coredns/kube-proxy scrapes + several apiserver rules
+disabled — so the remaining levers were 2a (loki-canary) and the scrape-frequency/retention cuts
+in 2b, not a new CPU limit.
 
 ## Why
 
@@ -24,6 +28,13 @@ hub carries a full multi-tenant observability stack sized for a real cluster.
 | kube-state-metrics / alertmanager / operator | ~78m | | keep |
 
 ## Fix (highest impact first)
+
+**Applied (2026-08-27):** loki chart is `loki-18.2.0` (grafana-community mirror); canary is a
+top-level `lokiCanary.enabled` (no `monitoring.selfMonitoring` sub-block in this version) — set
+`lokiCanary.enabled: false`. Prometheus (`kube-prometheus-stack-67.9.0`):
+`prometheusSpec.scrapeInterval` + `evaluationInterval` 30s→60s, `retention` 7d→3d,
+`retentionSize` 20GB→8GB (PVC stays 25Gi — can't shrink a live claim; retentionSize governs
+usage). CPU limit was already 1500m.
 
 ### 2a. Drop the `loki-canary` DaemonSet (~193m, 4 pods)
 
