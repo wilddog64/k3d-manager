@@ -286,6 +286,33 @@
     (`bin/k3dm-webhook` ~1831) only fires for `kc_via_smoke_client`, not the admin-cli fallback, so a
     correct 401 is reported as a hard FAIL. Fix candidate: extend the skip guard to the admin-cli
     fallback, or seed a real `k3dm-smoke-user`. Matches the known status-login false-green limitation.
+  - **2026-08-28 Frontend login → TRUE GREEN** (`✓ Frontend login: HTTP 200 on /api/cart`). Root cause
+    was 3 factors, all live-fixed on the hub Keycloak: (1) no `shopping-cart` realm existed — created it
+    mirroring `home` (LDAP federation) + a public direct-grant client `k3dm-smoke`; (2) issuer mismatch —
+    tokens minted locally carried a `localhost`/`.local` `iss`, never basket-service's trusted
+    `https://keycloak.3ai-talk.org/realms/shopping-cart`; fixed by pinning the realm
+    `attributes.frontendUrl=https://keycloak.3ai-talk.org` so **every** locally-minted token carries the
+    public `iss` (no Cloudflare round-trip, verified via `.well-known`); (3) cloned LDAP component bound
+    with a **masked** `bindCredential` (`**********` from the admin API) → `LDAP error 49 Invalid
+    Credentials` on every federated mint; fixed by PUTting the real `LDAP_ADMIN_PASSWORD` (Secret
+    `openldap-admin`, bindDn `cn=ldap-admin,dc=home,dc=org`). Smoke **user** is an LDAP entry
+    (`cn=k3dm-smoke,ou=users,dc=home,dc=org`) — READ_ONLY LDAP refuses local Keycloak user creation.
+    Seeded Secret `identity/k3dm-smoke-user` (username/password/realm/client; pw via stdin, not argv).
+    **Webhook code change:** removed `kc_token_is_stub=True` from the smoke-client branch (a real seeded
+    smoke user must green on 200 / red on genuine 401; only admin-cli/master fallback stays a skip) +
+    reads optional `realm` key from the Secret. Spec: `docs/bugs/2026-08-28-smoke-frontend-login-stub-token-false-fail.md`
+    (durable-follow-up section). ⚠ **Live realm/LDAP/client/user/Secret are ephemeral — lost on hub
+    rebuild.** Codification (durable `keycloak_provision_shopping_cart_realm`, deriving frontendUrl from
+    ingress + real bindCredential + generated smoke pw) is PROPOSED, NOT yet implemented; existing
+    `keycloak_seed_smoke_user` (`keycloak.sh:473`) is wrong for this deployment (see spec).
+  - **⚠ 2026-08-28 hub CPU crisis recurred mid-session** — while completing the above, `docker stats`
+    showed server-0 **454–568%**, agents ~200–330% each (~1170–1550% total on the M4 Air), and
+    `/readyz` flapped `etcd failed`/`etcd-readiness failed`. Symptoms: `:8880` keycloak PF dropping to
+    `000`, coredns 4× restarts → keycloak `UnknownHostException: keycloak-postgresql`, keycloak DB pool
+    500s. Steady hogs (`kubectl top`): argocd-application-controller 733m, prometheus 681m; plus a
+    trivy scan burst (10+ scan pods). Same disease family as the chronic overcommit above — the Step 1/2
+    governance is committed but **inert until ArgoCD syncs it**. Flagged to user; not separately
+    remediated this pass (frontend-login fix pushed through with retry-resilient scripting).
 
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo

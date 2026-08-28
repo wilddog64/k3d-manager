@@ -1779,8 +1779,11 @@ def _smoke_test_logins(provider, app_context):
             kc_user, kc_pass = seeded_user, seeded_pass
             if "K3DM_SMOKE_KC_CLIENT" not in os.environ:
                 kc_client = "k3dm-smoke"
+            if "K3DM_SMOKE_KC_REALM" not in os.environ:
+                seeded_realm = _smoke_secret("identity", "realm", "k3dm-smoke-user", context="k3d-k3d-cluster")
+                if seeded_realm:
+                    kc_realm = seeded_realm
             kc_via_smoke_client = True
-            kc_token_is_stub = True
         else:
             # Helm's deployed admin Secret is password-only and targets the
             # master realm/admin-cli client, rather than the smoke client.

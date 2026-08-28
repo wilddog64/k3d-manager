@@ -62,14 +62,86 @@ stand-in token* is downgraded to a skip. When a real
 realm) is supplied, `kc_token_is_stub` stays False and a 401 is again a
 genuine FAIL.
 
-## Durable follow-up (not required for this fix)
+## Durable follow-up — DONE (skip → true green)
 
-Seed a real `k3dm-smoke-user` in the shopping-cart realm so the frontend login
-exercises a true end-user path and actually asserts a 200 — turning this from
-a skip into a real positive check. Tracked separately; the guard fix above
-stops the false-red today.
+**Status:** DONE 2026-08-28. The frontend-login line now asserts a real 200:
+
+```
+✓ Keycloak login: token minted (realm=shopping-cart)
+✓ Frontend login: HTTP 200 on /api/cart
+```
+
+### What was actually wrong (three factors, all live-fixed)
+
+1. **No `shopping-cart` realm** on the hub Keycloak. basket-service
+   (`shopping-cart-apps` on `ubuntu-hostinger`) validates
+   `OAUTH2_ISSUER_URI=https://keycloak.3ai-talk.org/realms/shopping-cart`, but
+   the hub only had the LDAP-backed `home` realm. Created `shopping-cart`
+   mirroring `home` (LDAP federation), plus a public direct-grant client
+   `k3dm-smoke`.
+
+2. **Issuer mismatch.** A token minted through any local host
+   (`localhost:8880`, `keycloak.shopping-cart.local`) carried an `iss` of that
+   host — never the public URL basket-service trusts. Keycloak derives `iss`
+   from the request host **unless** the realm's `frontendUrl` is pinned. Set
+   the `shopping-cart` realm `attributes.frontendUrl =
+   https://keycloak.3ai-talk.org`. Now **every** token for that realm — minted
+   locally, no Cloudflare round-trip — carries
+   `iss=https://keycloak.3ai-talk.org/realms/shopping-cart`. Verified via
+   `.well-known/openid-configuration`.
+
+3. **LDAP bind broken on the cloned component.** The realm's LDAP
+   `UserStorageProvider` was cloned from `home` via the admin API, which
+   **masks** `bindCredential` as `**********`. The clone therefore bound with a
+   literal `**********` → `LDAP error code 49 (Invalid Credentials)` →
+   `unknown_error` on every federated-user token mint. Fixed by PUTting the
+   real `LDAP_ADMIN_PASSWORD` (from Secret `openldap-admin`, key
+   `LDAP_ADMIN_PASSWORD`; bindDn `cn=ldap-admin,dc=home,dc=org`) onto the
+   component's `bindCredential`.
+
+The smoke **user** is an LDAP entry (`cn=k3dm-smoke,ou=users,dc=home,dc=org`,
+`inetOrgPerson`), because the READ_ONLY LDAP federation refuses local Keycloak
+user creation (400 `Could not create user`).
+
+### Webhook change (stub semantics)
+
+With a real seeded smoke user, the `k3dm-smoke` path is **no longer a stub** —
+it must green on 200 and *red* on a genuine 401 (a real regression), while only
+the admin-cli/master fallback stays a graceful skip. Removed
+`kc_token_is_stub = True` from the smoke-client branch (kept it on the
+admin-cli fallback). Also made the seeded Secret authoritative for the realm:
+the branch now reads an optional `realm` key from `k3dm-smoke-user`.
+Graceful degradation on a fresh hub is preserved: with no `k3dm-smoke-user`
+Secret the harness still falls to the admin-cli stub → skip, never a false red.
+
+### Live state seeded (ephemeral — see codification below)
+
+- Secret `identity/k3dm-smoke-user` (keys `username`, `password`, `realm`,
+  `client`). Password supplied to `kubectl` via **stdin**, never argv.
+- `shopping-cart` realm + `frontendUrl` + LDAP component (real bind cred) +
+  `k3dm-smoke` client + `k3dm-smoke` LDAP user.
+
+### Codification (durable — proposed, NOT yet implemented)
+
+These live changes are lost on a hub rebuild. A durable
+`keycloak_provision_shopping_cart_realm` (or a fixed `keycloak_seed_smoke_user`)
+should, idempotently:
+- create the `shopping-cart` realm with `frontendUrl` pinned to the public
+  Keycloak URL (drop the hard-coded value — derive from the ingress host);
+- create the LDAP `UserStorageProvider` with `bindCredential` read from Secret
+  `openldap-admin` (**never** cloned from the API's masked value);
+- create the `k3dm-smoke` public direct-grant client;
+- add the `k3dm-smoke` LDAP user with a **generated** password (not the
+  proof value `k3dm-smoke-proof-pw`);
+- write the `k3dm-smoke-user` Secret (password via stdin).
+
+Note the existing `keycloak_seed_smoke_user` (`scripts/plugins/keycloak.sh:473`)
+is currently wrong for this deployment: it targets Secret `keycloak-secrets`
+(actual: `keycloak-admin-secret`), base URL `keycloak.shopping-cart.local`
+(actual admin PF: `localhost:8880`), creates a **local** Keycloak user (refused
+under READ_ONLY LDAP), and does not create the realm or pin `frontendUrl`.
 
 ## Verification
 
 1. Edit `bin/k3dm-webhook`; `make restart-webhook`.
-2. `make status` → `Frontend login: SKIP — stand-in token rejected (HTTP 401 on /api/cart)`; overall no longer red on this line.
+2. `make status` → `✓ Frontend login: HTTP 200 on /api/cart` (was the false-red).
