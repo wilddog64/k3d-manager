@@ -1220,7 +1220,7 @@ HELP
     return 0
   fi
 
-  if [[ "${1:-}" != "--confirm" ]]; then
+  if [[ "${1:-}" != "--confirm" && "${K3DM_DEPLOY_CONFIRMED:-0}" != "1" ]]; then
     _err "[shopping_cart] deploy_app_cluster requires --confirm to prevent accidental runs"
     return 1
   fi

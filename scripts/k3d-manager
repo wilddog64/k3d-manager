@@ -542,6 +542,7 @@ EOF
         exit 1
     fi
 
+    K3DM_DEPLOY_CONFIRMED="${confirm}"
     __K3DM_DEPLOY_SANITIZED_ARGS=("${sanitized[@]}")
 }
 
