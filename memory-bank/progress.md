@@ -244,8 +244,12 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   (extended `app-cluster-reader`). Kyverno 4/4 Running, `cosign-public-key` SecretSynced, `verify-first-party-images`
   ClusterPolicy Ready (Audit). **⚠ AUDIT FINDING → would-be-block under Enforce:** Kyverno gets 401
   UNAUTHORIZED pulling private `ghcr.io/wilddog64/*` (registry auth, NOT signature; sigs known-good per C).
-  `docs/issues/2026-08-29-kyverno-verifyimages-ghcr-registry-auth.md`. **NEXT (before Enforce):** wire ghcr
-  pull creds into Kyverno (`--imagePullSecrets`, secret in kyverno ns) → re-audit clean → gated `--enforce`.
+  `docs/issues/2026-08-29-kyverno-verifyimages-ghcr-registry-auth.md`. **REGISTRY CREDS WIRED but STILL
+  401:** ghcr `ExternalSecret` in kyverno ns + `existingImagePullSecrets[0]=ghcr-pull-secret` (flag confirmed
+  on admission ctrl); credential VALID (curl→ghcr token endpoint 200) but Kyverno's cosign verifier sends no
+  auth (Kyverno 1.19 ignores `--imagePullSecrets` for the cosign path). **NEXT (before Enforce):** resolve
+  Kyverno keychain issue (version bump / mount dockerconfig as DefaultKeychain) → re-audit clean → gated
+  `--enforce`. Then codify app-Vault seed/grant + kyverno-ns ghcr ES into signing.sh.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
   - [x] Part 0 controller (Slice E) — commit `17be2e69` pushed to
