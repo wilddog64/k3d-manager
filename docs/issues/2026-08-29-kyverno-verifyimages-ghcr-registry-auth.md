@@ -47,6 +47,40 @@ Give the Kyverno admission controller ghcr.io pull credentials:
 Related prior art: `reference_trivy_operator_node_cred_private_image_skip` — same class of
 "private registry, no creds → silent/again-visible verification gap".
 
+## UPDATE 2026-08-29 — registry creds wired, but Kyverno's cosign path ignores them
+
+Wired the standard fix and it did **not** resolve the 401:
+- Created ExternalSecret `ghcr-pull-secret` in the `kyverno` ns (mirrors the app one:
+  Vault `secret/data/github/pat` → dockerconfigjson for `ghcr.io`, user `wilddog64`).
+  `SecretSynced=True`, type `kubernetes.io/dockerconfigjson`.
+- helm-upgraded Kyverno with `existingImagePullSecrets[0]=ghcr-pull-secret` →
+  admission controller now runs `--imagePullSecrets=ghcr-pull-secret` (verified in the
+  Deployment args), rolled out 1/1, SA can `get` the secret.
+
+**The credential is valid:** decoding the secret and calling
+`GET https://ghcr.io/token?scope=repository:wilddog64/shopping-cart-basket:pull` with
+`Authorization: Basic <auth>` returns **HTTP 200**. The token is a 40-char `gho_` OAuth
+token.
+
+**But Kyverno still 401s** on the SAME token endpoint (fresh, uncached image too — logs show
+`cache entry not found` then the 401). The cosign verifier
+(`pkg/image/verifiers/cpol/cosign/verifier.go`) sends **no auth** to the token endpoint,
+i.e. it is NOT using the `--imagePullSecrets` credential for the sigstore/cosign registry
+access. This looks like the cosign path using an ambient/default keychain rather than
+Kyverno's configured registry credentials.
+
+**Candidate fixes to try next (own investigation):**
+1. Bump the Kyverno chart to a version where verifyImages consumes `--imagePullSecrets` for
+   the cosign registry client (possible 1.19.0-specific regression).
+2. Mount the dockerconfigjson at `/root/.docker/config.json` (or `$DOCKER_CONFIG`) in the
+   admission controller so cosign's DefaultKeychain finds it (helm volume/volumeMount).
+3. Check for a Kyverno registry-credentials ConfigMap / `imageVerify` registry option in
+   3.9.0 that the cosign verifier actually reads.
+
+Live state left in place: Kyverno healthy, policy in **Audit** (fail-open — no workload
+impact), `ghcr-pull-secret` present in kyverno ns, flag set. Rollback = `helm uninstall
+kyverno -n kyverno` + delete the ClusterPolicy.
+
 ## Why not fixed in this slice
 
 Stopping before Enforce per the release plan (D2) and the operator's instruction. Wiring
