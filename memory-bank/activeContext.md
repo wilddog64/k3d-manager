@@ -656,6 +656,20 @@
   resume → HEALTHY. By design panels show "No data" while paused (UI reachable, not live data). To
   restore the old all-or-nothing sweep set `OBSERVABILITY_PAUSE_KEEP=""`.
 
+- **2026-08-29 layered `monitoring-resume` — LIVE-VERIFIED (1bdbe3c6, pushed):** `make
+  monitoring-resume LAYER=1` brings up **Grafana + Prometheus only** (live dashboards), all else 0;
+  `LAYER=2` or no arg = full stack (existing body, verbatim). Added `_observability_normalize_layer`
+  (1→1, 2/empty/unknown→2 — forgiving) + `_observability_resume_layer1` (keeps ArgoCD `automated:null`
+  so selfHeal can't resurrect the 0-set; explicit replica drive; idempotent from pause/L1/L2), reusing
+  the keep-list predicate with `OBSERVABILITY_LAYER1_UP=kube-prometheus-stack-grafana
+  prometheus-kube-prometheus-stack-prometheus`. Makefile `$(LAYER)` passthrough + help. 5 pure BATS
+  normalize cases. Spec `docs/bugs/2026-08-29-layered-monitoring-resume.md`. Coded by Codex,
+  Claude-verified (BATS 10/10, `bash -n` clean, SC2016 pre-existing only, diff==spec, scope==3 files).
+  **Live hub:** L2→`LAYER=1` dropped to grafana 1/1 + prometheus 1/1 (rest 0/0), Prometheus `up` query
+  returned series + Grafana `database:ok`; `LAYER=2` restored all 7 workloads 1/1, `make status`
+  HEALTHY. One manual touch during the L2 ramp: deleted a stale `Unknown` prometheus pod from the known
+  CPU-starvation cascade (full stack starting at once) — not a feature defect.
+
 ## Canonical pointers
 
 - Roadmap: `docs/roadmap.md`

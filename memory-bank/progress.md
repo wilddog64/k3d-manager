@@ -328,3 +328,16 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   stays 1/1 (health `database:ok`, loginable) while prometheus/alertmanager/loki/loki-gateway/ksm/
   operator → 0/0; `make monitoring-resume` → all back, `make status` HEALTHY. Caveat by design: paged
   panels show "No data" while paused (UI reachable ≠ live data).
+
+- **2026-08-29 layered `monitoring-resume` (LAYER=1 lite / LAYER=2 full) — DONE + LIVE-VERIFIED
+  (1bdbe3c6, pushed):** `make monitoring-resume LAYER=1` = Grafana + Prometheus only (live dashboards,
+  everything else 0); `LAYER=2` or no arg = full stack (existing body unchanged). Added
+  `_observability_normalize_layer` (1→1, else→2, forgiving) + `_observability_resume_layer1` (keeps
+  ArgoCD `automated:null`, explicit replica drive via the keep-list predicate,
+  `OBSERVABILITY_LAYER1_UP` default = grafana + prometheus STS, idempotent from any start), Makefile
+  `$(LAYER)` passthrough + help, 5 pure BATS normalize cases. Spec
+  `docs/bugs/2026-08-29-layered-monitoring-resume.md`. Coded by Codex, Claude-verified: BATS 10/10,
+  `bash -n` clean, ShellCheck only pre-existing SC2016, diff==spec, scope==observability.sh + new BATS +
+  Makefile. **Live hub:** L2→`LAYER=1` = grafana 1/1 + prometheus 1/1, rest 0/0, Prometheus `up` query
+  + Grafana `database:ok` proven live; `LAYER=2` = all 7 workloads 1/1, `make status` HEALTHY (one stale
+  `Unknown` prometheus pod deleted during the ramp — known CPU-starvation cascade, not a feature bug).
