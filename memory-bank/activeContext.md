@@ -167,6 +167,18 @@
      **DONE** Codex commit `17be2e69`, pushed to `origin/k3d-manager-v1.27.0`; pure decision logic +
      BATS 9/9, no cluster/Prometheus/k6/Stripe. PR URL: none (task prohibits PR creation);
      F=k6/Go generator + Grafana dashboard + live capacity run [Claude live, Stripe test-mode].
+     **Slice F BLUEPRINT (2026-08-29, `docs/bugs/2026-08-29-loadtest-slice-f-generator.md`):** discovered +
+     verified the full build: checkout = `POST /api/orders` on order-service (ns shopping-cart-apps, ClusterIP
+     :8081, NodePort 30081) with `{customerId,items[{productId,productName,quantity,unitPrice}],shippingAddress,
+     currency}` — synthetic items OK (no real product IDs needed); payment downstream (queue→payment-svc,
+     Stripe test). Generator runs on laptop via `kubectl port-forward` (off the measured node). Metrics:
+     `prometheus-pushgateway` (monitoring :9091) deployed, or enable Prometheus `enableRemoteWriteReceiver` +
+     k6 `experimental-prometheus-rw`. **AUTH:** 401 without Bearer; issuer `https://keycloak.3ai-talk.org/
+     realms/shopping-cart` is PUBLIC (no in-cluster trick). Token recipe: password grant, `client_id=
+     order-service` (confidential, directAccessGrants=true, secret=Vault-resolved `${ORDER_SERVICE_CLIENT_
+     SECRET}`), users federated from OpenLDAP (realm has no local users; `alice/password` dev). **NEXT:** fetch
+     order-service client secret + confirm LDAP user → prove one authed `POST /api/orders` 201 → build k6 +
+     wire Slice E stubs (`_loadtest_fetch_metrics`, `loadtest_run`) + Grafana dashboard + staged live run.
      Verify Codex output on origin per [[feedback_codex_verification_protocol]] before trusting;
      note the `codex exec` sandbox has `.git` read-only, so expect Codex to leave files uncommitted
      and Claude commits after review (as with Slice A).
