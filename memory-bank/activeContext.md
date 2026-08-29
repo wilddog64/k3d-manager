@@ -59,8 +59,17 @@
      `1787708603-5833` completed but failed 45/102 tests: current E2E image/client expects flat
      responses and numeric prices while deployed APIs return `{data: ...}` envelopes and string
      prices. Result was published once to `platform-ops`; no M2 transport/publisher failure.
-     Evidence: `docs/issues/2026-08-25-m2-e2e-acceptance-contract-mismatch.md`. Rebuild/publish an
-     aligned E2E image, then rerun the passing gate. Stale vCluster cleanup was required before
+     Evidence: `docs/issues/2026-08-25-m2-e2e-acceptance-contract-mismatch.md`. **RERUN 2026-08-29 with the
+     aligned image `sha-0c2505bbdc09b4ad12e5ea251ce9a8eeb7975e00` (Tier-1 vcluster, `E2E_IMAGE_TAG=…
+     e2e_verify_vcluster`) STILL FAILS: 26 passed / 31 failed / 45 skipped (exit 1).** TWO issues: (1)
+     CONFIRMED — payment-service is NOT in the Tier-1 substrate (`scripts/etc/e2e/` has no payment manifest)
+     → 27 payments.spec + payment-dependent cross-service can't pass in vcluster; that's Tier-2/ACG's job.
+     (2) orders.spec fails — root cause NOT confirmed; `orders is not iterable` (136×) is a cleanup SYMPTOM,
+     and the client's `getOrdersByCustomer` DOES unwrap `{data}` (so the list-envelope hypothesis is
+     unlikely); per-test errors lost on teardown (saved .log empty). **NEXT: rerun capturing Playwright
+     reporter output to root-cause orders.spec, fix the real cause + rebuild image; decide payment coverage
+     (add payment to Tier-1 substrate OR move payment acceptance to Tier-2).** Do NOT claim a list-unwrap fix
+     without evidence. Stale vCluster cleanup was required before
      retry and should be treated as a follow-up idempotency bug. The Grafana E2E dashboard table
      also exposes duplicate raw service labels and blank legacy totals; this is documented in
      `docs/issues/2026-08-25-e2e-grafana-table-raw-labels.md`.

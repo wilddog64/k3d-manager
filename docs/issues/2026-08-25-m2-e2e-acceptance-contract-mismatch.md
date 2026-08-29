@@ -85,3 +85,41 @@ blocked by the test/image contract mismatch.
 Align the E2E image's API client/tests with the deployed response envelope and
 numeric price contract, rebuild/publish `:latest`, then rerun the passing M2
 acceptance. Do not treat this run as a passing acceptance result.
+
+---
+
+## Update 2026-08-29 — Tier-1 rerun with the aligned image: still FAILS (fix was incomplete)
+
+Reran the gate on the hub via `E2E_IMAGE_TAG=sha-0c2505bbdc09b4ad12e5ea251ce9a8eeb7975e00
+./scripts/k3d-manager e2e_verify_vcluster` (the client-fix commit `0c2505bb` on
+`feat/e2e-image-multiarch`; image confirmed in GHCR). Result (`~/.k3dm/e2e/1788032108-14707.json`):
+
+```
+total=102  passed=26  failed=31  skipped=45  exit_code=1  tier=vcluster  runner=local-m4
+```
+
+Failure spread by spec (✘ lines incl. retries): orders 42, payments 27, cross-service 21,
+cart 3. Two findings — one CONFIRMED, one NOT yet root-caused:
+
+1. **Payment-service absent from the Tier-1 substrate (CONFIRMED, structural — not a
+   contract bug).** `scripts/etc/e2e/` deploys postgres/redis/product-catalog/basket/order
+   but has **no payment manifest**, so payments.spec (27) and payment-dependent
+   cross-service tests cannot pass in the vcluster Tier-1 gate. Full payment/Stripe-test
+   coverage is the Tier-2/ACG substrate's job — the Tier-1 vcluster gate is NOT expected to
+   green the payment specs. (Either add a payment manifest to the Tier-1 substrate, or scope
+   Tier-1 acceptance to the non-payment specs and gate payment on Tier-2.)
+
+2. **orders.spec failures — root cause NOT confirmed.** The recurring
+   `Order cleanup skipped: orders is not iterable` (136×) is a teardown SYMPTOM, not a proven
+   cause: the client's `getOrdersByCustomer` (`tests/helpers/api-client.ts`) DOES route
+   through the `responseData<Order[]>` `{data}`-envelope unwrap, so the earlier "list envelope
+   not unwrapped" hypothesis is unlikely. The primary per-test assertion errors were lost when
+   the vcluster torn down (`~/.k3dm/e2e/1788032108-14707.log` came back empty; pod gone).
+   **To root-cause: rerun capturing the Playwright reporter output to a file (or `kubectl logs`
+   before teardown) and read the actual createOrder/list assertion, rather than the cleanup
+   symptom.** Do not assume a list-unwrap fix without that evidence.
+
+**So the gate is NOT green.** Next: (a) capture the real orders.spec errors and fix the
+actual cause in `shopping-cart-e2e-tests` (+ rebuild image), and (b) decide payment coverage —
+Tier-1 substrate gains a payment manifest, or payment/cross-service acceptance moves to
+Tier-2 (ACG, payment deployed, Stripe test). Only then is M2 acceptance passable.
