@@ -386,7 +386,20 @@
       restart-webhook` required after edits. Spec: `docs/bugs/2026-08-28-status-monitoring-paused-false-fail.md`.
     - **Live CPU proof (2026-08-28):** monitoring running → Keycloak `/realms/master` 1.6–6.3s (erratic) →
       login smoke read-timeout FAILs; after `monitoring-pause` → **9–26ms**, server-node CPU recovers from
-      `<unknown>`. Concrete evidence the stack starves Keycloak + API server. Hub currently LEFT PAUSED.
+      `<unknown>`. Concrete evidence the stack starves Keycloak + API server.
+    - **RESUMED to Layer 1 2026-08-28** (decision: user wants Layer 1 = reduced-rate stack always on,
+      loginable Grafana, `monitoring-pause`/`resume` as the on-demand escape hatch — pause is NOT the
+      default). `make monitoring-resume` restored all workloads to 1; `make status` → **HEALTHY** (all
+      green incl. Grafana HTTP 200 + Grafana login 200 + Keycloak token minted). Note: pause scales
+      **Grafana too** → no login while paused (Grafana without Prometheus shows empty panels anyway);
+      "always loginable" = live in Layer 1, don't pause.
+    - **⚠️ Resume gotcha — laptop-sleep clock jump (2026-08-28):** during resume the M4 slept; the k3d
+      Docker VM clock froze (~20:54Z) then jumped forward ~3h on wake. Forward jump made
+      CrashLoopBackOff burst-fire all pending restarts (ksm/operator counters shot to 43/33) + Prometheus
+      "out-of-order samples" + operator "context deadline exceeded". NOT a resume bug. Recovery: clocks
+      re-sync on their own; **delete the stateless scarred pods** (ksm, operator — no PVC) so they restart
+      with `restarts=0`. Verified clean (both came up 0 restarts, stable). See auto-memory
+      `reference_laptop_sleep_clock_jump_crashloop`.
 
 - **2026-08-27 ArgoCD chart-version drift (BLOCKS formal deploy_argocd redeploy):** live helm release
   `argocd` is chart **`argo-cd-10.4.0`** (app v3.5.1, revision 1, deployed 2026-08-20) but the repo
