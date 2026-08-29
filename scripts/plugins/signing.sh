@@ -168,6 +168,10 @@ function _signing_install_kyverno() {
   if [[ -n "${SIGNING_KYVERNO_HELM_CHART_VERSION:-}" ]]; then
     helm_args+=(--version "${SIGNING_KYVERNO_HELM_CHART_VERSION}")
   fi
+  local _set
+  for _set in ${SIGNING_KYVERNO_HELM_SET:-}; do
+    helm_args+=(--set "${_set}")
+  done
 
   _helm upgrade --install \
     -n "${SIGNING_ADMISSION_NAMESPACE}" \
@@ -180,6 +184,21 @@ function _signing_wait_kyverno() {
   _kubectl --no-exit -n "${SIGNING_ADMISSION_NAMESPACE}" wait \
     --for=condition=available --timeout=180s \
     deployment -l app.kubernetes.io/part-of=kyverno >/dev/null 2>&1
+}
+
+function _signing_wait_pub_secret() {
+  local _tries="${SIGNING_PUB_SECRET_WAIT_TRIES:-30}" _i=0
+  while (( _i < _tries )); do
+    if _kubectl --no-exit -n "${SIGNING_ADMISSION_NAMESPACE}" \
+      get secret "${SIGNING_PUB_SECRET_NAME}" \
+      -o 'jsonpath={.data.cosign\.pub}' 2>/dev/null | grep -q .; then
+      return 0
+    fi
+    _i=$(( _i + 1 ))
+    sleep 5
+  done
+  _err "[signing] ESO did not populate ${SIGNING_ADMISSION_NAMESPACE}/${SIGNING_PUB_SECRET_NAME} in time"
+  return 1
 }
 
 function _signing_render_policy() {
@@ -223,22 +242,27 @@ function deploy_image_signing() {
   local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
   local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
   local action="${SIGNING_VALIDATION_FAILURE_ACTION}"
+  local app_cluster=0
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --audit) action="Audit"; shift ;;
       --enforce) action="Enforce"; shift ;;
+      --app-cluster|--skip-vault-init) app_cluster=1; shift ;;
       -h|--help)
         cat <<'USAGE'
-Usage: deploy_image_signing [--audit|--enforce]
+Usage: deploy_image_signing [--audit|--enforce] [--app-cluster]
 
 Install Kyverno (pinned chart) and apply the first-party cosign verifyImages
 ClusterPolicy scoped to the shopping-cart app namespaces.
 
-  --audit    (default) failureAction=Audit -- report would-be-blocks only.
-  --enforce  reject unsigned first-party pods. GATED (decision D2): only after
-             the Audit PolicyReports show zero would-be-blocks for current
-             first-party images. Requires SIGNING_ALLOW_ENFORCE=1 to confirm.
+  --audit        (default) failureAction=Audit -- report would-be-blocks only.
+  --enforce      reject unsigned first-party pods. GATED (decision D2): only after
+                 the Audit PolicyReports show zero would-be-blocks for current
+                 first-party images. Requires SIGNING_ALLOW_ENFORCE=1 to confirm.
+  --app-cluster  target a remote app cluster (no hub Vault): skip signing_init and
+                 pull cosign.pub via the ESO ClusterSecretStore. Alias:
+                 --skip-vault-init.
 USAGE
         return 0 ;;
       *) _err "[signing] Unknown option: $1"; return 1 ;;
@@ -251,14 +275,24 @@ USAGE
   fi
   SIGNING_VALIDATION_FAILURE_ACTION="${action}"
 
-  _info "[signing] ensuring cosign key material (idempotent)"
-  signing_init "${vault_ns}" "${vault_release}" || return 1
+  if (( app_cluster )); then
+    _info "[signing] --app-cluster: skipping hub Vault init; cosign.pub arrives via ESO ClusterSecretStore ${SIGNING_ESO_STORE}"
+  else
+    _info "[signing] ensuring cosign key material (idempotent)"
+    signing_init "${vault_ns}" "${vault_release}" || return 1
+  fi
 
   _info "[signing] installing Kyverno (chart ${SIGNING_KYVERNO_HELM_CHART_VERSION})"
   _signing_install_kyverno || return 1
   if ! _signing_wait_kyverno; then
     _err "[signing] Kyverno did not become Ready"
     return 1
+  fi
+
+  if (( app_cluster )); then
+    _info "[signing] applying cosign.pub ExternalSecret; waiting for ESO sync"
+    _signing_apply_pub_externalsecret || return 1
+    _signing_wait_pub_secret || return 1
   fi
 
   _info "[signing] applying verifyImages ClusterPolicy (${SIGNING_VALIDATION_FAILURE_ACTION})"

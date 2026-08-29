@@ -34,6 +34,13 @@ setup() {
   [[ "$output" == *"Unknown option"* ]]
 }
 
+@test "deploy_image_signing --help documents --app-cluster" {
+  run deploy_image_signing --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--app-cluster"* ]]
+  [[ "$output" == *"no hub Vault"* ]]
+}
+
 # --- Kyverno install: pinned chart (A08) -------------------------------------
 
 @test "_signing_install_kyverno pins the chart version (no floating latest)" {
@@ -44,6 +51,24 @@ setup() {
   [[ "$joined" == *"upgrade --install"* ]]
   [[ "$joined" == *"--version ${SIGNING_KYVERNO_HELM_CHART_VERSION}"* ]]
   [[ "$joined" == *"-n ${SIGNING_ADMISSION_NAMESPACE}"* ]]
+}
+
+@test "_signing_install_kyverno appends --set for each SIGNING_KYVERNO_HELM_SET entry" {
+  SIGNING_KYVERNO_HELM_SET="admissionController.replicas=1 reportsController.replicas=1"
+  run _signing_install_kyverno
+  [ "$status" -eq 0 ]
+  read_lines "$HELM_LOG" helm_calls
+  local joined="${helm_calls[*]}"
+  [[ "$joined" == *"--set admissionController.replicas=1"* ]]
+  [[ "$joined" == *"--set reportsController.replicas=1"* ]]
+}
+
+@test "_signing_install_kyverno emits no --set when SIGNING_KYVERNO_HELM_SET is empty" {
+  SIGNING_KYVERNO_HELM_SET=""
+  run _signing_install_kyverno
+  [ "$status" -eq 0 ]
+  read_lines "$HELM_LOG" helm_calls
+  [[ "${helm_calls[*]}" != *"--set"* ]]
 }
 
 @test "_signing_install_kyverno skips repo ops for a local chart path" {
