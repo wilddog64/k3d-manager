@@ -318,3 +318,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `make status` FAIL→WARN with everything else green; [x] loki re-shed declined (server-0 at 95–130%,
   no pressure; selfHeal would revert). Specs: `docs/bugs/2026-08-28-vault-unseal-watchdog-stale-image.md`,
   `docs/bugs/2026-08-28-smoke-frontend-login-stub-token-false-fail.md`.
+
+- **2026-08-29 monitoring-pause Grafana keep-list — DONE + LIVE-VERIFIED (8506f5fe, pushed):** added
+  pure whole-word keep-list predicate `_observability_workload_in_keep_list`, default
+  `OBSERVABILITY_PAUSE_KEEP=kube-prometheus-stack-grafana` exemption in the pause sweep (resume
+  unchanged), five pure BATS tests, and Makefile help text. Spec
+  `docs/bugs/2026-08-29-pause-keep-grafana-up.md`. Coded by Codex, Claude-verified: BATS 5/5, `bash -n`
+  clean, ShellCheck only pre-existing SC2016. **Live hub test:** `make monitoring-pause` → grafana
+  stays 1/1 (health `database:ok`, loginable) while prometheus/alertmanager/loki/loki-gateway/ksm/
+  operator → 0/0; `make monitoring-resume` → all back, `make status` HEALTHY. Caveat by design: paged
+  panels show "No data" while paused (UI reachable ≠ live data).

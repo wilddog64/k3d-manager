@@ -647,6 +647,15 @@
     aborted at the realm-existence check — created nothing (verified: no `k3dm-smoke-user` secret, no
     `k3dm-smoke` client). Also noted: codebase default realm `shopping-cart` is stale vs live hub `home`.
 
+- **2026-08-29 monitoring-pause Grafana keep-list — LIVE-VERIFIED (8506f5fe, pushed):** pure
+  whole-word `_observability_workload_in_keep_list` + default
+  `OBSERVABILITY_PAUSE_KEEP=kube-prometheus-stack-grafana` pause-sweep exemption; resume unchanged.
+  Five pure BATS cases + Makefile help. Spec `docs/bugs/2026-08-29-pause-keep-grafana-up.md`. Coded by
+  Codex, Claude-verified (BATS 5/5, `bash -n` clean, SC2016 pre-existing only). Live hub:
+  `make monitoring-pause` keeps grafana 1/1 (loginable, `database:ok`) while everything else → 0/0;
+  resume → HEALTHY. By design panels show "No data" while paused (UI reachable, not live data). To
+  restore the old all-or-nothing sweep set `OBSERVABILITY_PAUSE_KEEP=""`.
+
 ## Canonical pointers
 
 - Roadmap: `docs/roadmap.md`
