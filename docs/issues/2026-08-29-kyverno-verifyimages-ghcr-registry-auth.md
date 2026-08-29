@@ -77,9 +77,21 @@ Kyverno's configured registry credentials.
 3. Check for a Kyverno registry-credentials ConfigMap / `imageVerify` registry option in
    3.9.0 that the cosign verifier actually reads.
 
+**DefaultKeychain mount also FAILED (2026-08-29).** Patched the admission-controller
+Deployment: mounted `ghcr-pull-secret`'s `.dockerconfigjson` as `config.json` at
+`/kyverno-docker` + set `DOCKER_CONFIG=/kyverno-docker` (both confirmed in the Deployment
+spec; the container is distroless so no in-pod shell to cat it). A fresh order-service
+dry-run STILL 401s. So BOTH documented mechanisms — `--imagePullSecrets` and cosign's
+`DOCKER_CONFIG`/DefaultKeychain — are ignored. This pins the cause on Kyverno 1.19.0's
+cosign verifier (`pkg/image/verifiers/cpol/cosign/verifier.go`) constructing its own
+credential-less registry client for the ghcr token request, bypassing both. **This is an
+upstream/version matter — not resolvable at the config or pod level.** Next avenue = a
+Kyverno chart version bump (or upstream issue), tracked as a separate task.
+
 Live state left in place: Kyverno healthy, policy in **Audit** (fail-open — no workload
-impact), `ghcr-pull-secret` present in kyverno ns, flag set. Rollback = `helm uninstall
-kyverno -n kyverno` + delete the ClusterPolicy.
+impact), `ghcr-pull-secret` present in kyverno ns, flag set, admission-controller Deployment
+carries the experimental docker-config mount (harmless; removed by the next helm upgrade).
+Rollback = `helm uninstall kyverno -n kyverno` + delete the ClusterPolicy.
 
 ## Why not fixed in this slice
 

@@ -150,11 +150,13 @@
      (Vault `github/pat`→dockerconfigjson), helm-set `existingImagePullSecrets[0]=ghcr-pull-secret` →
      admission ctrl runs `--imagePullSecrets=ghcr-pull-secret`. Credential is VALID (curl Basic→ghcr token
      endpoint = 200) but Kyverno's cosign verifier sends NO auth (401 at token endpoint, fresh/uncached) —
-     Kyverno 1.19 cosign path ignores `--imagePullSecrets` (ambient-keychain bug/regression). Candidate
-     fixes in the issue doc: chart version bump, mount dockerconfig as `/root/.docker/config.json`
-     (DefaultKeychain), or a registry-creds ConfigMap. **NEXT (before Enforce):** resolve that Kyverno
-     keychain issue → re-audit clean → `SIGNING_ALLOW_ENFORCE=1 --enforce`; then promoter `cosign verify`
-     gate + `cosign attest` in CI. Codify: the app-Vault seed/grant + kyverno-ns ghcr ES into signing.sh.
+     Kyverno 1.19 cosign path ignores `--imagePullSecrets`. **DefaultKeychain mount ALSO FAILED** (patched
+     admission ctrl: `DOCKER_CONFIG=/kyverno-docker` + dockerconfig mount → fresh order-service dry-run still
+     401). BOTH documented mechanisms ignored → Kyverno 1.19.0 cosign verifier builds its own cred-less
+     registry client (upstream/version issue, not config-fixable). **NEXT (before Enforce):** Kyverno chart
+     version bump (or upstream issue) — SEPARATE task → re-audit clean → `SIGNING_ALLOW_ENFORCE=1 --enforce`;
+     then promoter `cosign verify` gate + `cosign attest` in CI. Codify: app-Vault seed/grant + kyverno-ns
+     ghcr ES into signing.sh. Full diag: `docs/issues/2026-08-29-kyverno-verifyimages-ghcr-registry-auth.md`.
      **[SUPERSEDED next-line:]** run `deploy_image_signing
     --audit` against the APP cluster (ACG/hostinger — NOT the hub; no app ns there), watch PolicyReports →
     zero would-be-blocks → `SIGNING_ALLOW_ENFORCE=1 --enforce`; then promoter `cosign verify` gate in
