@@ -114,6 +114,15 @@ setup() {
   ! grep -qE 'imageReferences:' -A2 "$out" 2>/dev/null | grep -qE '^\s*-\s*"?\*"?\s*$'
 }
 
+@test "rendered policy uses Kyverno 1.19 tlog/SCT field names (not bare 'ignore')" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  grep -q "ignoreTlog: true" "$out"
+  grep -q "ignoreSCT: true" "$out"
+  # the pre-1.19 'ignore: true' under ctlog/rekor is a strict-decoding error
+  ! grep -qE '^\s*ignore: true\s*$' "$out"
+}
+
 @test "rendered policy defaults to Audit (never Enforce by default)" {
   local out="$BATS_TEST_TMPDIR/policy.yaml"
   SIGNING_VALIDATION_FAILURE_ACTION="Audit" \
