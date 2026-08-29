@@ -571,7 +571,7 @@ monitoring-pause:
 
 ## Restore the hub observability stack paused by monitoring-pause
 monitoring-resume:
-	./scripts/k3d-manager observability_resume
+	./scripts/k3d-manager observability_resume $(LAYER)
 
 ## Print VulnerabilityReport summary for both clusters
 vuln-scan trivy-scan-report:
@@ -704,7 +704,7 @@ help:
 	@echo "    make observability-acg          Deploy Prometheus+Trivy to ACG ubuntu-k3s"
 	@echo "    make observability-status       Show monitoring pod status on both clusters"
 	@echo "    make monitoring-pause           Scale hub monitoring to zero, keep Grafana up (~1 core back)"
-	@echo "    make monitoring-resume          Restore hub monitoring after a pause"
+	@echo "    make monitoring-resume [LAYER=1|2]  Resume hub monitoring: 1=Grafana+Prometheus, 2=full (default)"
 	@echo "    make vuln-scan                  Print VulnerabilityReport summary"
 	@echo "    make show-service-passwords     Show all service login credentials"
 	@echo "    make alertmanager-secret        Store Alertmanager Gmail+SMS creds in Vault (run once)"
