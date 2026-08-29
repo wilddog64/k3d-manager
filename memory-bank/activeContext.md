@@ -192,10 +192,18 @@
     (5/5) proves `--confirm` reaches the confirmed path. Spec
     `docs/bugs/2026-08-29-dispatcher-confirm-flag-deploy-app-cluster.md`; issue closed.
 
-- **Dependabot automation queued (2026-08-25):** `docs/plans/v1.27.0-dependabot-automation.md`
-  defines guarded CI retry, Dependabot rebase, Copilot review, Slack escalation, and
-  allowlisted auto-merge behavior. Product-catalog PR #51's skipped Dependabot job is
-  expected because its author is `wilddog64`, not `dependabot[bot]`.
+- **Dependabot automation — IMPLEMENTATION-READY (2026-08-29, `aa3bcc50`):**
+  `docs/plans/v1.27.0-dependabot-automation.md` now carries the concrete reusable
+  `workflow_call` workflow for `shopping-cart-infra` (author-gated on `dependabot[bot]`,
+  `permissions:{}` default, pinned `fetch-metadata`, labels, rebase-on-dirty, allowlisted
+  `--auto` merge, Slack-on-failure) + the thin per-repo caller + rollout order + pre-merge
+  actionlint validation. Grounded in the existing baseline
+  `shopping-cart-product-catalog/.github/workflows/dependabot-automerge.yml` (7 sc repos;
+  product-catalog + basket/order/frontend/payment/e2e). Copilot-request + transient-retry
+  = best-effort follow-ons. **Routes via branch+PR per sc spec-not-direct + PR-gate — NOT a
+  direct push;** land in infra first, pin callers to the merged SHA, validate on one repo's
+  real Dependabot PR, then roll to the rest. Product-catalog PR #51's skipped job is correct
+  (author `wilddog64`, not `dependabot[bot]`).
 
 - **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged, tag/release published, protection restored
   (`enforce_admins=true`, 1 approval). Shipped 3/5 scopes (fleet count-agnostic lifecycle, E2E

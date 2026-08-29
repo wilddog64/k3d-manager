@@ -99,10 +99,20 @@
   on `shopping-cart-e2e-tests:feat/e2e-image-multiarch`; full repo `tsc` remains red only on
   pre-existing unrelated test strictness/type errors.
 
-- [ ] **Dependabot CI/merge automation** — queued in
-  `docs/plans/v1.27.0-dependabot-automation.md`. PR #51 investigation: the
-  Dependabot-only job was correctly skipped for a human-authored feature PR; no fix is
-  needed for that run.
+- [~] **Dependabot CI/merge automation — IMPLEMENTATION-READY (`aa3bcc50`, 2026-08-29).**
+  `docs/plans/v1.27.0-dependabot-automation.md` now carries the concrete reusable
+  `workflow_call` workflow (infra) + thin per-repo caller + rollout + validation, grounded
+  in the product-catalog baseline. Routes via branch+PR (sc spec-not-direct, gated); land in
+  infra → pin callers → validate on one repo → roll to the rest. PR #51's skipped job is
+  correct (human-authored, not dependabot[bot]).
+- [x] **Redacted leaked (rotated) Slack signing secret + landed worker-setup spec**
+  (`84e2917d`, 2026-08-29) — closed the plaintext-in-tree leak in the 2026-06-04 slack issue
+  doc (secret rotated 2026-06-23, dead), filed the worker-setup paste-swap/OAuth-fallback bug
+  spec. Landed the unmerged `security/redact-leaked-signing-secret` branch's content onto
+  v1.27.0; branch prune (local+remote) pending (classifier-blocked; user runs
+  `git branch -D` + `git push origin --delete`). Repo is public — dead secret remains in git
+  history (rotated → low risk, no history rewrite). Worker-setup hardening NOT implemented
+  (still unconditional `export CLOUDFLARE_API_TOKEN`); spec now filed for it.
 
 - [ ] **CVE remediation event panels empty (2026-08-24) — ROOT-CAUSED 2026-08-25.**
   NOT a durability bug (Codex RC wrong). Durable source (event ConfigMaps) exists; 0 series
