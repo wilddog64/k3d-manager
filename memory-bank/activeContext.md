@@ -136,7 +136,19 @@
     `_signing_render_policy`/`_signing_apply_cluster_policy`/`deploy_image_signing [--audit|--enforce]`; new
     `cluster-policy-verify-images.yaml.tmpl` (verifyImages, **sig-only**, `ghcr.io/wilddog64/*` in
     `shopping-cart-apps`/`shopping-cart-payment` ONLY, Audit, webhook failurePolicy Ignore); Kyverno chart
-    pinned 3.9.0; 12 BATS green; howto+functions.md. **NEXT (gated follow-up):** run `deploy_image_signing
+    pinned 3.9.0; 12 BATS green; howto+functions.md. ✅ **Stage D AUDIT LIVE on hostinger 2026-08-29** (user go): added
+     `deploy_image_signing --app-cluster` (skips hub Vault; ESO CSS `vault-backend` on the app cluster) +
+     Kyverno-install-first reorder + `_signing_wait_pub_secret` + `SIGNING_KYVERNO_HELM_SET` (`ec746ade`,
+     spec `docs/bugs/2026-08-29-signing-app-cluster-mode.md`, 16 BATS). Kyverno 1.19 field-name fix
+     `ignoreTlog`/`ignoreSCT` (`bbbacfe0`; template used pre-1.19 `ignore:true` → strict-decode reject).
+     hostinger runs its OWN Vault (bridged, not a KV replica) — had to seed cosign.pub (public ONLY) + grant
+     `eso-app-cluster` role read on the app-cluster Vault (extended `app-cluster-reader`). Kyverno 4/4 Running
+     (1 replica, tiny requests, node fine), `cosign-public-key` SecretSynced, ClusterPolicy Ready (Audit).
+     **⚠ AUDIT FINDING:** Kyverno can't verify private `ghcr.io/wilddog64/*` — **401 UNAUTHORIZED** (registry
+     auth, NOT signature; sigs known-good per Stage C). `docs/issues/2026-08-29-kyverno-verifyimages-ghcr-registry-auth.md`.
+     **NEXT (gated, before Enforce):** wire ghcr pull creds into Kyverno (`--imagePullSecrets`) → re-audit
+     clean → `SIGNING_ALLOW_ENFORCE=1 --enforce`; then promoter `cosign verify` gate + `cosign attest` in CI.
+     **[SUPERSEDED next-line:]** run `deploy_image_signing
     --audit` against the APP cluster (ACG/hostinger — NOT the hub; no app ns there), watch PolicyReports →
     zero would-be-blocks → `SIGNING_ALLOW_ENFORCE=1 --enforce`; then promoter `cosign verify` gate in
     `app-cve-scan.sh` (needs cosign+pub in platform-ops CronJob image) + `cosign attest` in CI. Also

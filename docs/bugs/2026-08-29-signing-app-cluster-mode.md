@@ -91,3 +91,34 @@ unchanged.
    record the count. STOP before `--enforce`.
 6. Rollback lever if the node cannot schedule Kyverno: `helm uninstall kyverno -n kyverno`
    + delete the ClusterPolicy (fail-open Audit means no workload impact meanwhile).
+
+## Discovered live prerequisites (2026-08-29, hostinger) — the portability seam in full
+
+The app cluster runs its **own** Vault (`vault-0` in `secrets`, bridged to the hub via
+`vault-bridge`, NOT a KV replica). So the pub-key ExternalSecret's
+`ClusterSecretStore vault-backend` reads the **app-cluster** Vault, where the cosign
+material and the ESO read-grant did NOT exist. Two one-time app-Vault provisioning steps
+are required and are currently manual (candidates to codify into a `signing`-owned helper):
+
+1. **Seed the public key into the app-cluster Vault:** `vault kv put secret/cosign/signing
+   cosign.pub=<PEM>` on the app-cluster Vault (public key ONLY — the private key stays
+   hub-side; least privilege). Read the PEM from the hub Vault
+   (`vault kv get -field=cosign.pub secret/cosign/signing`).
+2. **Grant the app-cluster ESO role read:** the CSS uses Vault role `eso-app-cluster`
+   (auth mount `kubernetes-ubuntu-hostinger`, policy `app-cluster-reader`). Add
+   `secret/data/cosign/*` (read) + `secret/metadata/cosign/*` (read,list) to
+   `app-cluster-reader` (extend the existing policy — do NOT partial-write the role, which
+   resets omitted fields). Root token via stdin, never argv.
+
+Then the ExternalSecret goes `SecretSynced` and `_signing_wait_pub_secret` succeeds.
+
+**Follow-on finding (registry auth):** even with the policy live, Kyverno cannot verify the
+private `ghcr.io/wilddog64/*` images — 401 UNAUTHORIZED — so it reports them `unverified`.
+See `docs/issues/2026-08-29-kyverno-verifyimages-ghcr-registry-auth.md`. Kyverno needs
+ghcr pull creds (`--imagePullSecrets`) before Enforce is safe. Signatures are known-good
+(Stage C). This is the next Stage D increment.
+
+## Live status (2026-08-29)
+- `--app-cluster` flag + Kyverno reorder + `_signing_wait_pub_secret` + `SIGNING_KYVERNO_HELM_SET`: shipped (`ec746ade`).
+- Kyverno 1.19 field-name fix (`ignoreTlog`/`ignoreSCT`): shipped (`bbbacfe0`).
+- Live on hostinger: Kyverno 4/4 Running (1 replica each, node scheduled fine), pub key seeded + ESO grant applied, `cosign-public-key` SecretSynced, `verify-first-party-images` ClusterPolicy Ready (Audit). **Blocked on registry-auth finding before Enforce.**

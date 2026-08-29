@@ -235,6 +235,17 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `--enforce` gated behind `SIGNING_ALLOW_ENFORCE=1`. Promoter `cosign verify` gate in `app-cve-scan.sh`
   (needs cosign+pub in the platform-ops CronJob image) + `cosign attest` in CI = next slice. Howto
   `docs/howto/image-signing.md`; functions.md updated.
+  **✅ AUDIT LIVE on hostinger 2026-08-29 (user go):** `deploy_image_signing --app-cluster` added
+  (`ec746ade`, spec `docs/bugs/2026-08-29-signing-app-cluster-mode.md`, 16 BATS) — skips hub Vault
+  (`signing_init`), installs Kyverno first (creates ns), applies pub ExternalSecret, `_signing_wait_pub_secret`,
+  then policy; `SIGNING_KYVERNO_HELM_SET` shrinks replicas/requests for the tight node. Kyverno 1.19
+  field-name fix `ignoreTlog`/`ignoreSCT` (`bbbacfe0`; `ignore:true` was strict-decode-rejected). Live:
+  hostinger has its OWN Vault (bridged) — seeded cosign.pub (public only) + granted `eso-app-cluster` read
+  (extended `app-cluster-reader`). Kyverno 4/4 Running, `cosign-public-key` SecretSynced, `verify-first-party-images`
+  ClusterPolicy Ready (Audit). **⚠ AUDIT FINDING → would-be-block under Enforce:** Kyverno gets 401
+  UNAUTHORIZED pulling private `ghcr.io/wilddog64/*` (registry auth, NOT signature; sigs known-good per C).
+  `docs/issues/2026-08-29-kyverno-verifyimages-ghcr-registry-auth.md`. **NEXT (before Enforce):** wire ghcr
+  pull creds into Kyverno (`--imagePullSecrets`, secret in kyverno ns) → re-audit clean → gated `--enforce`.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
   - [x] Part 0 controller (Slice E) — commit `17be2e69` pushed to
