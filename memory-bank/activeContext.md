@@ -152,8 +152,12 @@
   - Finding 1a — ✅ FIXED + live-verified `5cd67228` (`num()` coerces empty/None→0 so one malformed
     value can't zero the scrape; `up{exporter}=1`, both E2E + CVE dashboards receiving data).
     `docs/issues/2026-08-21-e2e-exporter-empty-duration-metric.md`.
-  - Finding 2b — dispatcher `--confirm` strip on `deploy_app_cluster` (OPEN).
-    `docs/issues/2026-08-21-dispatcher-strips-confirm-deploy-app-cluster.md`.
+  - Finding 2b — dispatcher `--confirm` strip on `deploy_app_cluster` — ✅ RESOLVED 2026-08-29
+    (`3a6dddb0`). Guard publishes `K3DM_DEPLOY_CONFIRMED`; `deploy_app_cluster` honors it
+    (additive, no blast radius; 5 other `--confirm`-as-`$1` sites are subtree
+    `_provider_*_destroy_cluster`, not guard-gated). BATS `deploy_app_cluster_confirm.bats`
+    (5/5) proves `--confirm` reaches the confirmed path. Spec
+    `docs/bugs/2026-08-29-dispatcher-confirm-flag-deploy-app-cluster.md`; issue closed.
 
 - **Dependabot automation queued (2026-08-25):** `docs/plans/v1.27.0-dependabot-automation.md`
   defines guarded CI retry, Dependabot rebase, Copilot review, Slack escalation, and

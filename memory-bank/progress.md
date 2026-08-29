@@ -40,6 +40,10 @@
   untouched. Found + fixed BLOCKING Finding 2a (`cleanup-stale-clusters` hung — now deletes
   Secret first + non-blocking `--wait=false`; BATS asserts order+wait 2/2; re-verify 3s, 0
   orphans). Commit `0274fdde`, pushed. Medium Finding 2b (dispatcher strips `--confirm`) filed.
+- [x] Finding 2b RESOLVED (`3a6dddb0`, 2026-08-29, v1.27.0) — dispatcher guard publishes
+  `K3DM_DEPLOY_CONFIRMED`; `deploy_app_cluster` honors it (additive). BATS
+  `deploy_app_cluster_confirm.bats` 5/5. Spec
+  `docs/bugs/2026-08-29-dispatcher-confirm-flag-deploy-app-cluster.md`.
 - [x] Lifecycle cleanup foundation — registration metadata + dry-run/confirm
   `cleanup-stale-clusters`, provider/grace/retain guards, generated-Application-only deletion,
   JSONL audit (`f90c8e0d`).
