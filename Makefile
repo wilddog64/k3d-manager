@@ -703,7 +703,7 @@ help:
 	@echo "    make observability              Deploy Prometheus+Grafana+Trivy to Hub k3d"
 	@echo "    make observability-acg          Deploy Prometheus+Trivy to ACG ubuntu-k3s"
 	@echo "    make observability-status       Show monitoring pod status on both clusters"
-	@echo "    make monitoring-pause           Scale hub monitoring to zero (~1.1 cores back)"
+	@echo "    make monitoring-pause           Scale hub monitoring to zero, keep Grafana up (~1 core back)"
 	@echo "    make monitoring-resume          Restore hub monitoring after a pause"
 	@echo "    make vuln-scan                  Print VulnerabilityReport summary"
 	@echo "    make show-service-passwords     Show all service login credentials"

@@ -175,6 +175,14 @@ function _observability_port_listening() {
     && lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
 }
 
+function _observability_workload_in_keep_list() {
+  local _name="$1" _keep="$2"
+  case " ${_keep} " in
+    *" ${_name} "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 function _observability_wait_for_port() {
   local port="${1:-}"
   local _attempt
@@ -667,6 +675,7 @@ function observability_pause() {
   local _argons="${ARGOCD_NAMESPACE:-cicd}"
   local _apps="${OBSERVABILITY_APPS:-kube-prometheus-stack hub-loki trivy-operator}"
   local _nss="${OBSERVABILITY_WORKLOAD_NS:-monitoring trivy-system}"
+  local _keep="${OBSERVABILITY_PAUSE_KEEP:-kube-prometheus-stack-grafana}"
   _info "[observability] Pausing hub observability stack to reclaim CPU..."
 
   local _app _paused=0
@@ -699,6 +708,10 @@ function observability_pause() {
     for _type in deployment statefulset; do
       while read -r _name; do
         [[ -z "${_name}" ]] && continue
+        if _observability_workload_in_keep_list "${_name}" "${_keep}"; then
+          _info "[observability]   ${_ns}/${_name}: kept up (keep-list)"
+          continue
+        fi
         _kubectl scale "${_type}/${_name}" -n "${_ns}" --context "${_ctx}" \
           --replicas=0 >/dev/null 2>&1 || true
       done < <(_kubectl get "${_type}" -n "${_ns}" --context "${_ctx}" \
