@@ -39,7 +39,9 @@ Wrong path (was configured):
 
 2. Re-synced Worker secrets:
    ```bash
-   echo "44af57828359a6c3f5e94251852e519f" | npx wrangler secret put SLACK_SIGNING_SECRET --name k3dm-slack-relay
+   # NOTE: signing secret redacted + rotated 2026-06-23 (was committed here in plaintext — leak closed)
+   security find-generic-password -s "k3dm-slack-signing-secret" -a "k3dm" -w \
+     | npx wrangler secret put SLACK_SIGNING_SECRET --name k3dm-slack-relay
    WEBHOOK_TOKEN=$(security find-generic-password -s "k3dm-webhook-token" -a "k3dm" -w) && \
      echo "$WEBHOOK_TOKEN" | npx wrangler secret put WEBHOOK_TOKEN --name k3dm-slack-relay
    ```
