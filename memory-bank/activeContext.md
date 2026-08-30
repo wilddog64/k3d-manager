@@ -19,8 +19,14 @@
   `required,min=0` + handler deref + gin binding test `{}`→400/`{qty:0}`→200). e2e #8 also merged
   main in (`bcc63da`) to drop already-merged multiarch workflow from the diff + fixed PR desc.
   Deferred: order-management.spec flow-status rewrite → `docs/issues/2026-08-29-e2e-order-management-flow-status-alignment.md`.
-  Re-validating basket pointer fix in Tier-1 (rebuild+import). **MERGE STILL GATED** — awaiting user go. Post-merge: bump substrate basket newTag +
-  e2e image to merged SHAs. (History below.) Substrate fix DONE+verified (`aa2f2190`
+  **Copilot threads ALL RESOLVED (2026-08-29):** e2e #8 3/3, basket #44 1/1 — replied w/ fix
+  rationale + `resolveReviewThread` on each (api-client normalize thread auto-resolved; the other
+  three replied+resolved). **Basket pointer-fix (`65fdb96`) re-validated live on Tier-1** (rebuilt
+  `sha-65fdb96` + `k3d image import`, temp substrate tag, e2e img `sha-9202b194`): run
+  `1788057617-1177` = **48 pass / 9 fail / 45 skip** (all 9 = payment/Tier-2) — no regression;
+  vCluster self-cleaned; substrate `kustomization.yaml` basket newTag **reverted** to CI
+  `sha-f70d5801` (65fdb96 is local-import only, not in GHCR). **MERGE STILL GATED** — awaiting user
+  go. Post-merge: bump substrate basket newTag + e2e image to merged SHAs. (History below.) Substrate fix DONE+verified (`aa2f2190`
   postgres initdb `orders`/`order_items` schema matched to deployed Go order `5603388`), gate
   26/31/45 → **45/12/45**. Residual 12 = 9 payment (structural → Tier-2/ACG) + 2 order-status
   e2e-test bugs + 1 basket-service bug. User decision: fix e2e tests AND basket, payment→Tier-2.

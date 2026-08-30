@@ -420,4 +420,6 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - e2e #8: merged main in (bcc63da) → dropped already-merged multiarch workflow/plan-doc from diff; PR desc corrected. Codex 6cb808d = +PROCESSING to Order union, Number() normalize create/update product.
 - basket #44: Codex 65fdb96 = Quantity *int (required,min=0) + handler deref + gin binding test.
 - Deferred (follow-up issue): order-management.spec flow-status rewrite (not Tier-1-run).
-- Re-validating basket pointer fix in Tier-1; then reply+resolve Copilot threads. Merge gated.
+- Codex fixes verified on origin (e2e tip 6cb808d, basket tip 65fdb96).
+- Basket pointer fix RE-VALIDATED live: Tier-1 run 1788057617-1177 = 48 pass / 9 fail / 45 skip (all 9 payment/Tier-2) — no regression; vCluster self-cleaned; substrate basket newTag reverted to CI sha-f70d5801 (65fdb96 = local-import only).
+- Copilot threads ALL RESOLVED: e2e #8 3/3, basket #44 1/1 (replied w/ rationale + resolveReviewThread; api-client thread auto-resolved). Merge gated — awaiting user go.
