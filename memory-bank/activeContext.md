@@ -11,8 +11,15 @@
   rerun = **48 pass / 9 fail / 45 skip** (was 45/12/45) — all 9 fails are `payments.spec` (Tier-2/ACG).
   Order-status + cart qty-0 now green. **PRs OPEN (2026-08-29, user go-ahead):**
   e2e-tests **#8** (`fix/e2e-order-status-enum`, base main), basket **#44**
-  (`fix/basket-update-quantity-zero`, base main). CI: e2e GitGuardian pass; basket test pass +
-  lint pending. **MERGE STILL GATED** — awaiting user go. Post-merge: bump substrate basket newTag +
+  (`fix/basket-update-quantity-zero`, base main). CI: e2e GitGuardian pass; basket all green.
+  **Copilot review requested+addressed (2026-08-29):** requested via GraphQL `requestReviews`
+  (REST bot-login no-ops; bot node `BOT_kgDOCnlnWA`). Fixes via Codex (spec
+  `docs/issues/2026-08-29-copilot-pr-findings-e2e-basket.md`): e2e `6cb808d` (add PROCESSING to
+  Order union + Number() normalize create/update product); basket `65fdb96` (`Quantity *int`
+  `required,min=0` + handler deref + gin binding test `{}`→400/`{qty:0}`→200). e2e #8 also merged
+  main in (`bcc63da`) to drop already-merged multiarch workflow from the diff + fixed PR desc.
+  Deferred: order-management.spec flow-status rewrite → `docs/issues/2026-08-29-e2e-order-management-flow-status-alignment.md`.
+  Re-validating basket pointer fix in Tier-1 (rebuild+import). **MERGE STILL GATED** — awaiting user go. Post-merge: bump substrate basket newTag +
   e2e image to merged SHAs. (History below.) Substrate fix DONE+verified (`aa2f2190`
   postgres initdb `orders`/`order_items` schema matched to deployed Go order `5603388`), gate
   26/31/45 → **45/12/45**. Residual 12 = 9 payment (structural → Tier-2/ACG) + 2 order-status

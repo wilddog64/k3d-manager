@@ -414,3 +414,10 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - e2e-tests PR #8 `fix/e2e-order-status-enum` (SHA 9202b194) — orders.spec CONFIRMED→PAID/legal chain.
 - basket PR #44 `fix/basket-update-quantity-zero` (SHA 8614773e) — cart.go:151 drop `required` binding.
 - CI: e2e GitGuardian pass; basket test pass, lint pending. Merge awaits explicit user go.
+
+### 2026-08-29 — Copilot review requested + addressed on e2e #8 / basket #44
+- Requested Copilot via GraphQL requestReviews (REST bot-login silently no-ops; bot node BOT_kgDOCnlnWA).
+- e2e #8: merged main in (bcc63da) → dropped already-merged multiarch workflow/plan-doc from diff; PR desc corrected. Codex 6cb808d = +PROCESSING to Order union, Number() normalize create/update product.
+- basket #44: Codex 65fdb96 = Quantity *int (required,min=0) + handler deref + gin binding test.
+- Deferred (follow-up issue): order-management.spec flow-status rewrite (not Tier-1-run).
+- Re-validating basket pointer fix in Tier-1; then reply+resolve Copilot threads. Merge gated.
