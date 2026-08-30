@@ -27,7 +27,7 @@ images:
   newTag: sha-505f758a6ab83b72aa78073e6a368dd760a9e08b
 - name: shopping-cart-basket
   newName: ghcr.io/wilddog64/shopping-cart-basket
-  newTag: sha-f70d5801a4078434128d0a17b55cf2e93a028304
+  newTag: sha-4b42ecc755d599e2d673ec0a22341c62e8363493
 - name: shopping-cart-order
   newName: ghcr.io/wilddog64/shopping-cart-order
   newTag: sha-56033880a16e77ad5df0752eac8ad1c00c4a258a
