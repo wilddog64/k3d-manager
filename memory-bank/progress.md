@@ -396,3 +396,16 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   NO PR, NO main, NO live cluster. Claude then rebuilds images + re-runs Tier-1. Specs:
   `docs/bugs/2026-08-29-e2e-order-status-enum-mismatch.md`,
   `docs/issues/2026-08-29-basket-update-quantity-zero-required.md`.
+
+- **2026-08-29 Tier-1 rerun with both fixed images — GREEN on everything Tier-1 covers.**
+  Codex fixes verified (e2e `9202b194` off `feat/e2e-image-multiarch`, envelope fix preserved;
+  basket `8614773e` off main, `go build`/`go test` re-run clean). e2e image built via CI
+  workflow_dispatch on the branch (run `33285863490` success → `ghcr.io/...e2e-tests:sha-9202b194`,
+  multiarch verified); basket built locally + `k3d image import`ed as `sha-8614773e` (IfNotPresent).
+  Tier-1 rerun (`E2E_IMAGE_TAG=sha-9202b194 e2e_verify_vcluster`; harness killed the foreground
+  task mid-suite so read the Playwright pod logs live before teardown): **48 passed / 9 failed /
+  45 skipped** (was 45/12/45). ALL 9 failures are `payments.spec.ts` (27 ✘ = 9 tests × 3 tries),
+  ZERO non-payment failures — both order-status tests + cart qty-0 now green. Residual 9 = payment,
+  structural → Tier-2/ACG. Cleanup: kustomization reverted (basket newTag stays `f70d5801` —
+  `8614773e` is a local-only build, NOT in GHCR), vcluster deleted. **GATED next: PR + merge both
+  fix branches (user go), then bump substrate basket newTag + e2e image to the merged SHAs.**

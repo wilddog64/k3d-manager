@@ -6,7 +6,11 @@
 
 ## Current focus
 
-- **E2E Tier-1 gate → green (2026-08-29, IN PROGRESS).** Substrate fix DONE+verified (`aa2f2190`
+- **E2E Tier-1 gate → GREEN on everything it covers (2026-08-29).** Both Codex fixes verified,
+  images built (e2e via CI `sha-9202b194`; basket local `k3d image import` `sha-8614773e`), Tier-1
+  rerun = **48 pass / 9 fail / 45 skip** (was 45/12/45) — all 9 fails are `payments.spec` (Tier-2/ACG).
+  Order-status + cart qty-0 now green. GATED next: PR+merge both fix branches, then bump substrate
+  basket newTag + e2e image to merged SHAs. (History below.) Substrate fix DONE+verified (`aa2f2190`
   postgres initdb `orders`/`order_items` schema matched to deployed Go order `5603388`), gate
   26/31/45 → **45/12/45**. Residual 12 = 9 payment (structural → Tier-2/ACG) + 2 order-status
   e2e-test bugs + 1 basket-service bug. User decision: fix e2e tests AND basket, payment→Tier-2.
