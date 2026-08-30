@@ -161,8 +161,15 @@
     cosign path ignores `--imagePullSecrets` AND a mounted `DOCKER_CONFIG` (both tested, both failed).
     Fix = match workload controllers (Deployment/StatefulSet/DaemonSet/Job/CronJob) not `Pod` in the policy
     template; basket+order verify clean, 0 UNAUTHORIZED, BATS 17/17. `docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md`.
-    ⚠ Still blocking Enforce: (a) live policy is a hand-patch — re-apply via `deploy_image_signing --app-cluster`;
-    (b) NEW finding: `product-catalog` deployed digest `sha256:53e668…` = `no signatures found` → re-sign/re-promote first.
+  - **Stage D AUDIT NOW CLEAN — all 5 first-party PASS, 0 FAIL 2026-08-30 (`ce4374ff`+`d7375188`, pushed).** Closed
+    all Enforce blockers: (a) re-pinned two unsigned deployed digests (product-catalog `53e668…`→`3db7b8da…`,
+    payment `95f2680…`→`3b5f478c…`, both signed 2026-08-28 builds) — ArgoCD synced, both PASS; (b) re-applied the
+    policy durably from the committed template via `deploy_image_signing --app-cluster --audit` (helm rev 5, values
+    preserved via `SIGNING_KYVERNO_HELM_SET`; stray `ghcr-docker` volume removed); (c) **refined root cause** — frontend
+    still 401'd at controller level b/c it ran as `default` SA (cred only on pod-template, which cosign ignores); the
+    other 4 use a dedicated SA. Fix = dedicated `frontend` SA (`services/shopping-cart-frontend/`). So verify needs BOTH
+    controller-match AND a dedicated non-default SA carrying the ghcr cred. **Enforce gate now OPEN — flip via
+    `SIGNING_ALLOW_ENFORCE=1 deploy_image_signing --enforce --app-cluster` pending user go.**
   - **Stage C merges ✅ ALL 6 MERGED (2026-08-25/26, user go given; merge SHAs gh-verified 2026-08-28):**
     infra #94 `1fa7ab005b57148468d0d23c6aa33fcc193baff5`, frontend #99 `000bdcc0945fcc62f38c366c843193da72b9e88a`,
     basket #39 `6f5a57c90e66d6a0be5eb0c1fd4ab43a86a5dfc7`, order #72 `cb4403db0a16eace10e0ff06c900849f8d483c03`,

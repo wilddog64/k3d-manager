@@ -264,11 +264,26 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   repeated rolls; BATS 17/17 (added bare-Pod-never guard). Trade-off (bare Pods unverified) + full tree
   documented in `docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md`. Steps 1 (restart) + 2 (SA creds /
   DefaultKeychain mount) both failed and were reverted; kyverno admission-ctrl restored to helm baseline.
-  **⚠ NEW Audit finding (separate, blocks Enforce):** `product-catalog` deployed digest
-  `sha256:53e66832…` returns `no signatures found` — that digest predates signing or was never signed;
-  must re-sign/re-promote before `--enforce`. **NEXT (before Enforce):** apply the template fix on the app
-  cluster via `deploy_image_signing --app-cluster` (live policy is currently a hand-patch), resolve
-  product-catalog signed digest, confirm zero would-be-blocks → gated `--enforce`. Then codify app-Vault
+  **✅ AUDIT NOW CLEAN — all 5 first-party services PASS, 0 FAIL 2026-08-30 (user go, `ce4374ff`+`d7375188`).**
+  Three follow-ups closed:
+  (1) **Unsigned deployed digests re-pinned (`ce4374ff`):** auditing ALL five (not just basket+order)
+  surfaced TWO `no signatures found` — product-catalog `53e668…` AND payment `95f2680…` (both 2026-08-26
+  builds predating signing CI). Re-pinned to the current signed release digests (2026-08-28, cosign-verified,
+  multi-arch amd64+arm64): product-catalog→`3db7b8da…`, payment→`3b5f478c…` in
+  `services/shopping-cart-{product-catalog,payment}/kustomization.yaml`; ArgoCD (hub cicd) synced, both PASS.
+  (2) **Policy re-applied durably from the committed template** via `deploy_image_signing --app-cluster --audit`
+  (helm rev 5; live values preserved through `SIGNING_KYVERNO_HELM_SET`; ESO cosign.pub re-synced; match kinds
+  `[Deployment,StatefulSet,DaemonSet,Job,CronJob]`) — no longer a hand-patch. Stray `ghcr-docker` volume removed;
+  admission-ctrl at helm baseline `[sigstore,apicall-token]`, 1/1.
+  (3) **frontend dedicated-SA fix (`d7375188`) — refined root cause:** frontend 401'd even at controller level
+  while basket/order passed. Isolation (re-verify passing basket the identical way → still passes) proved it is
+  workload wiring: Kyverno's cosign path resolves the ghcr keychain from the **dedicated named SA's**
+  imagePullSecrets; frontend alone ran as `default` SA with the cred only on the pod-template (a source cosign
+  ignores). Fix = add a dedicated `frontend` SA + repoint the Deployment (`services/shopping-cart-frontend/`),
+  mirroring the other four. So verify needs BOTH: controller-match AND a dedicated non-default SA carrying the cred.
+  **Enforce gate now open** (all 3 conditions met: template re-applied, all digests signed, zero would-be-blocks) —
+  flip via `SIGNING_ALLOW_ENFORCE=1 deploy_image_signing --enforce --app-cluster` **pending user go**.
+  **Still deferred:** promoter `cosign verify` gate in `app-cve-scan.sh` + `cosign attest` in CI; codify app-Vault
   seed/grant + kyverno-ns ghcr ES into signing.sh.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
