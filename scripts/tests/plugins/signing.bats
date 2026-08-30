@@ -106,6 +106,16 @@ setup() {
   ! grep -qE 'namespaces:\s*\[?\s*"?\*"?' "$out"
 }
 
+@test "rendered policy gates workload controllers, not bare Pod (401 root-cause fix)" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  grep -q "Deployment" "$out"
+  grep -q "StatefulSet" "$out"
+  # A bare Pod match reintroduces the generateName empty-namespace 401 on
+  # private ghcr (docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md).
+  ! grep -qE '^\s*-\s*Pod\s*$' "$out"
+}
+
 @test "rendered policy scopes verifyImages to first-party registry, not wildcard" {
   local out="$BATS_TEST_TMPDIR/policy.yaml"
   _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"

@@ -27,8 +27,22 @@ spec:
       match:
         any:
           - resources:
+              # Match workload CONTROLLERS, not bare Pod. Kyverno's cosign
+              # verifier resolves registry creds against the admitted object's
+              # metadata.namespace; a ReplicaSet-created Pod (generateName) has
+              # an empty object namespace at CREATE, so cred resolution finds
+              # nothing and 401s on private ghcr -- and the cosign path does NOT
+              # fall back to --imagePullSecrets or a mounted DOCKER_CONFIG.
+              # Controllers carry a populated namespace, so verification works.
+              # See docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md.
+              # Trade-off: bare Pods are not verified (all app workloads here are
+              # controllers; the CVE-loop threat is the deploy pipeline).
               kinds:
-                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - Job
+                - CronJob
               # SCOPE BOUNDARY (critical): app namespaces ONLY. Never hub/system.
               # These are the real deployment namespaces (see _namespace_for in
               # cve-remediation-verify.sh): all services land in shopping-cart-apps
