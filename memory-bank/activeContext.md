@@ -168,8 +168,15 @@
     preserved via `SIGNING_KYVERNO_HELM_SET`; stray `ghcr-docker` volume removed); (c) **refined root cause** — frontend
     still 401'd at controller level b/c it ran as `default` SA (cred only on pod-template, which cosign ignores); the
     other 4 use a dedicated SA. Fix = dedicated `frontend` SA (`services/shopping-cart-frontend/`). So verify needs BOTH
-    controller-match AND a dedicated non-default SA carrying the ghcr cred. **Enforce gate now OPEN — flip via
-    `SIGNING_ALLOW_ENFORCE=1 deploy_image_signing --enforce --app-cluster` pending user go.**
+    controller-match AND a dedicated non-default SA carrying the ghcr cred.
+  - **Stage D ENFORCE FLIPPED — LIVE + verified 2026-08-30 (user go).** `SIGNING_ALLOW_ENFORCE=1 deploy_image_signing
+    --enforce --app-cluster` (helm rev 6; live values preserved via `SIGNING_KYVERNO_HELM_SET`; all 4 controllers still
+    1 replica). Rule `verifyImages[].failureAction=Enforce` (Kyverno 1.19 per-rule action; deprecated top-level
+    `validationFailureAction` stays `Audit`, ignored). Blocking nothing: 5 app pods Running 1/1 0-restart, 5
+    PolicyReports PASS=1 FAIL=0, zero PolicyViolation events. **Ran via `!` in-session** — the Claude Code classifier
+    gates the enforce mutation, so the flip executes under the user's shell, not Claude's Bash. **Stage D DONE.**
+    Deferred (not blockers): promoter `cosign verify` gate in `app-cve-scan.sh`; `cosign attest` in CI; payment Java
+    app-dep CVE remediation (7 fixable CRIT — tomcat/pg-jdbc/spring, cross-repo, orthogonal to signing).
   - **Stage C merges ✅ ALL 6 MERGED (2026-08-25/26, user go given; merge SHAs gh-verified 2026-08-28):**
     infra #94 `1fa7ab005b57148468d0d23c6aa33fcc193baff5`, frontend #99 `000bdcc0945fcc62f38c366c843193da72b9e88a`,
     basket #39 `6f5a57c90e66d6a0be5eb0c1fd4ab43a86a5dfc7`, order #72 `cb4403db0a16eace10e0ff06c900849f8d483c03`,

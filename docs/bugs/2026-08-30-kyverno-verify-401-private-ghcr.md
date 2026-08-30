@@ -105,10 +105,25 @@ The live policy was a hand-patch. Re-applied durably from the committed template
 match kinds `[Deployment,StatefulSet,DaemonSet,Job,CronJob]`, Audit). The stray `ghcr-docker`
 volume left on the admission controller by the Step-2 experiment was removed.
 
-## Enforce gate
+## Enforce gate — CLEARED, flipped 2026-08-30
 
-Do NOT flip `--enforce` until all first-party services report `pass` in Audit. As of
-2026-08-30 the four passing (basket, order, product-catalog, payment) + frontend (after the
-dedicated-SA fix syncs) cover all five. Confirm zero `fail` in the PolicyReports across
-`shopping-cart-apps` + `shopping-cart-payment`, then `SIGNING_ALLOW_ENFORCE=1
-deploy_image_signing --enforce --app-cluster`.
+All five first-party services reported `pass` in Audit (zero `fail` across
+`shopping-cart-apps` + `shopping-cart-payment`), so the gate was cleared and Enforce flipped:
+
+```
+SIGNING_ALLOW_ENFORCE=1 SIGNING_KYVERNO_HELM_SET="…live values…" \
+  deploy_image_signing --enforce --app-cluster
+```
+
+Result (helm rev 6, live values preserved — all 4 controllers still 1 replica): policy rule
+`verifyImages[].failureAction=Enforce` (Kyverno 1.19 honors the per-rule action; the deprecated
+top-level `validationFailureAction` remains `Audit` and is ignored). Post-flip verification —
+Enforce blocks nothing: all 5 app pods `Running 1/1` 0-restart, 5 PolicyReports `PASS=1 FAIL=0`,
+zero `PolicyViolation` events.
+
+**Operational note:** the enforce run must be invoked with the same `SIGNING_KYVERNO_HELM_SET`
+value-preservation string used for Audit — `deploy_image_signing` re-runs `helm upgrade --install`
+unconditionally and Helm does not reuse values, so a bare run would reset the admission controller
+to its 3-replica default and can wedge scheduling on the ~86%-CPU node. The Claude Code classifier
+also gates the enforce mutation, so the flip runs under the user's own shell (`!` prefix), not
+Claude's Bash.

@@ -281,8 +281,12 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   imagePullSecrets; frontend alone ran as `default` SA with the cred only on the pod-template (a source cosign
   ignores). Fix = add a dedicated `frontend` SA + repoint the Deployment (`services/shopping-cart-frontend/`),
   mirroring the other four. So verify needs BOTH: controller-match AND a dedicated non-default SA carrying the cred.
-  **Enforce gate now open** (all 3 conditions met: template re-applied, all digests signed, zero would-be-blocks) —
-  flip via `SIGNING_ALLOW_ENFORCE=1 deploy_image_signing --enforce --app-cluster` **pending user go**.
+  **ENFORCE FLIPPED — LIVE on hostinger 2026-08-30 (user go).** `SIGNING_ALLOW_ENFORCE=1 deploy_image_signing
+  --enforce --app-cluster` (helm rev 6, live values preserved via `SIGNING_KYVERNO_HELM_SET` — all 4 controllers
+  still 1 replica). Policy `verify-first-party-images` rule `verifyImages[].failureAction=Enforce` (Kyverno 1.19
+  uses the per-rule action; the deprecated top-level `validationFailureAction` stays `Audit` and is ignored).
+  **Verified blocking nothing:** all 5 app pods Running 1/1 0-restart, 5 PolicyReports PASS=1 FAIL=0 across both ns,
+  zero PolicyViolation events. Stage D DONE. (Ran via `!` in-session — classifier gates the enforce mutation from Claude.)
   **CVE cross-check of the re-pinned digests (trivy, ignoreUnfixed=true, HIGH/CRIT) 2026-08-30:** signing Enforce is
   orthogonal to CVEs (Kyverno verifies the SIGNATURE, not vulns — all 5 signed, so nothing is blocked). Per-service
   fixable posture: basket/frontend/order **0C/0H clean**; product-catalog `3db7b8da` **0C/6H** (== old `53e668` on
