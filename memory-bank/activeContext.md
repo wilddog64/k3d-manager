@@ -175,8 +175,14 @@
     `validationFailureAction` stays `Audit`, ignored). Blocking nothing: 5 app pods Running 1/1 0-restart, 5
     PolicyReports PASS=1 FAIL=0, zero PolicyViolation events. **Ran via `!` in-session** — the Claude Code classifier
     gates the enforce mutation, so the flip executes under the user's shell, not Claude's Bash. **Stage D DONE.**
-    Deferred (not blockers): promoter `cosign verify` gate in `app-cve-scan.sh`; `cosign attest` in CI; payment Java
-    app-dep CVE remediation (7 fixable CRIT — tomcat/pg-jdbc/spring, cross-repo, orthogonal to signing).
+    Deferred (not blockers): promoter `cosign verify` gate in `app-cve-scan.sh`; `cosign attest` in CI.
+  - **Payment Java CVE remediation — spec written + ASSIGNED CODEX 2026-08-30.** Spec
+    `docs/issues/2026-08-30-payment-cve-remediation.md`. Root cause: 7 fixable CRIT + 42 HIGH are ALL transitive from
+    `spring-boot-starter-parent 3.2.0` (nothing pinned in pom). Fix = single BOM bump to latest 3.5.x + targeted
+    `<tomcat.version>`/`<postgresql.version>` overrides (spring-security-web CRIT floor is 6.5.9 → forces the 3.5.x
+    line). Codex branch `fix/payment-cve-spring-boot-bump`; gate `./mvnw clean verify` green + dependency:tree proof.
+    Codex does NOT build/sign image or re-pin digest — CI signs on merge; trivy re-verify + digest re-pin are Claude's
+    downstream steps. Verify Codex's SHA on origin before trusting.
   - **Stage C merges ✅ ALL 6 MERGED (2026-08-25/26, user go given; merge SHAs gh-verified 2026-08-28):**
     infra #94 `1fa7ab005b57148468d0d23c6aa33fcc193baff5`, frontend #99 `000bdcc0945fcc62f38c366c843193da72b9e88a`,
     basket #39 `6f5a57c90e66d6a0be5eb0c1fd4ab43a86a5dfc7`, order #72 `cb4403db0a16eace10e0ff06c900849f8d483c03`,

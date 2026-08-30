@@ -297,6 +297,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Enforce flip (which admits it either way, being signed).
   **Still deferred:** promoter `cosign verify` gate in `app-cve-scan.sh` + `cosign attest` in CI; codify app-Vault
   seed/grant + kyverno-ns ghcr ES into signing.sh.
+- [~] **Payment Java CVE remediation** (`docs/issues/2026-08-30-payment-cve-remediation.md`) — ASSIGNED CODEX
+  2026-08-30, branch `fix/payment-cve-spring-boot-bump` in shopping-cart-payment. 7 fixable CRIT + 42 HIGH all
+  transitive from `spring-boot-starter-parent 3.2.0`; fix = BOM bump to latest 3.5.x + targeted overrides. Gate:
+  `./mvnw clean verify` green + dependency:tree proof (tomcat ≥10.1.55, spring-security-web ≥6.5.9, postgresql ≥42.7.2).
+  CI re-signs on merge; trivy re-verify + digest re-pin = Claude downstream. Orthogonal to signing Enforce (already live).
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
   - [~] Slice F (generator + dashboard + live run) — **BLUEPRINT DONE 2026-08-29**
