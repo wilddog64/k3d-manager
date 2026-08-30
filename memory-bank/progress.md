@@ -302,6 +302,23 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   transitive from `spring-boot-starter-parent 3.2.0`; fix = BOM bump to latest 3.5.x + targeted overrides. Gate:
   `./mvnw clean verify` green + dependency:tree proof (tomcat ≥10.1.55, spring-security-web ≥6.5.9, postgresql ≥42.7.2).
   CI re-signs on merge; trivy re-verify + digest re-pin = Claude downstream. Orthogonal to signing Enforce (already live).
+  RE-DISPATCHED v2 2026-08-30 (`b8r8nmk0l`): v1 was launched from k3d-manager so the workspace-write sandbox couldn't
+  reach the sibling payment repo — re-launched from inside the payment repo with an inlined self-contained spec.
+  **BLOCKED ON SCOPE DECISION 2026-08-30 (Claude drove the gate in a maven:3.9-eclipse-temurin-21 container — no host JDK).**
+  Codex made the pom-only parent bump 3.2.0→3.5.16 (SecurityConfig already modern SecurityFilterChain, ZERO auth-code change)
+  then correctly STOPPED (its sandbox has no JDK). Claude ran `mvn clean verify` via DooD (Docker socket mounted, Testcontainers).
+  ALL unit + web-slice tests PASS on 3.5.16. The 3.2→3.5 bump surfaced TWO latent breakages the CVE fix does not itself cause:
+  (1) FIXED — Flyway version skew: pom hardcoded `flyway-database-postgresql 13.3.0` while SB-managed `flyway-core`=11.7.2 →
+  `NoSuchMethodError PluginRegister.getExact`; fix = pin database-postgresql to `${flyway.version}` (both →11.7.2). Committed? NO — uncommitted.
+  (2) BLOCKER — Spring Cloud compat: `CompatibilityNotMetException: Spring Boot [3.5.16] not compatible with this Spring Cloud
+  release train (needs 3.2.x)`. Spring Cloud is NOT in the payment pom — it's transitive via `com.shoppingcart:rabbitmq-client`
+  (Vault integration), pinned to the SB-3.2 train. The verifier fires even though `rabbitmq.vault.enabled` defaults FALSE.
+  Fix options = (A) override spring-cloud-dependencies BOM to 2025.0.x train in payment pom; (B) disable the compat verifier;
+  (C) upgrade+republish rabbitmq-client to a 3.5 baseline (cross-repo).
+  **USER CHOSE (C) 2026-08-30** — root-cause fix in `rabbitmq-client-java`: bump its Spring Cloud train → 2025.0.x (Boot 3.5),
+  rebuild + republish (e.g. 1.0.1-SNAPSHOT), THEN payment bumps `<rabbitmq-client.version>` to it and finishes. Own task/spec.
+  Payment branch `fix/payment-cve-spring-boot-bump` PAUSED with 2 GOOD edits uncommitted (parent 3.5.16 + flyway `${flyway.version}`) —
+  do not lose them; they resume once the new library version is published. Nothing committed/pushed on payment.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
   - [~] Slice F (generator + dashboard + live run) — **BLUEPRINT DONE 2026-08-29**

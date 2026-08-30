@@ -183,6 +183,26 @@
     line). Codex branch `fix/payment-cve-spring-boot-bump`; gate `./mvnw clean verify` green + dependency:tree proof.
     Codex does NOT build/sign image or re-pin digest — CI signs on merge; trivy re-verify + digest re-pin are Claude's
     downstream steps. Verify Codex's SHA on origin before trusting.
+    **RE-DISPATCH 2026-08-30 (v2):** first `codex exec` was launched from k3d-manager → its workspace-write sandbox
+    was confined to k3d-manager, so the sibling payment repo was unwritable (`.git/index.lock: Operation not permitted`);
+    Codex worked around it by cloning into `k3d-manager/scratch/` — killed + cleaned. Re-launched from INSIDE the payment
+    repo (self-contained inlined-spec prompt, no k3d-manager touch) so the sandbox root IS the payment repo. Task
+    `b8r8nmk0l`, session `01a05415`. Codex-v1 found: SecurityConfig already uses modern `SecurityFilterChain`
+    (minimal/no code change expected); it proposed parent 3.5.16.
+    **PAYMENT PAUSED — cross-repo blocker + user decision 2026-08-30.** Claude ran the mvn gate in a
+    `maven:3.9-eclipse-temurin-21` container (no host JDK; DooD socket mounted for Testcontainers). ALL unit + web-slice tests
+    PASS on 3.5.16; SecurityConfig needed ZERO code change. Two latent breakages the bump surfaced: (1) FIXED (uncommitted) —
+    Flyway skew, pom hardcoded `flyway-database-postgresql 13.3.0` vs SB-managed `flyway-core 11.7.2` → `NoSuchMethodError
+    getExact`; fix = pin to `${flyway.version}`. (2) BLOCKER — Spring Cloud `CompatibilityNotMetException` (Boot 3.5.16 needs
+    the 3.2.x train); Spring Cloud is transitive via `com.shoppingcart:rabbitmq-client` (Vault), NOT in the payment pom; verifier
+    fires even though `rabbitmq.vault.enabled` defaults false. **User chose Option C: fix rabbitmq-client-java first.** Payment
+    branch left with 2 good uncommitted pom edits; resumes after the library republishes.
+  - **rabbitmq-client-java Boot 3.5 upgrade — spec written 2026-08-30 (unblocks payment CVE).** Spec
+    `docs/issues/2026-08-30-rabbitmq-client-spring-boot-3.5-upgrade.md`. Bump `<spring-boot.version>` 3.2.0→3.5.16 +
+    `<spring-cloud.version>` 2023.0.0→2025.0.x in `~/src/gitrepo/personal/shopping-carts/rabbitmq-client-java` (multi-module,
+    v1.0.1, uses `VaultTemplate`/`spring-cloud-starter-vault-config`). Version bump 1.0.1→1.0.2, republish to GH Packages (CI
+    on merge), then payment repins `<rabbitmq-client.version>`. Branch `feat/spring-boot-3.5-upgrade`. Execute same as payment:
+    edits via Codex (its sandbox has no JDK), Claude container-verifies. Testcontainers (RabbitMQ+Vault) → needs Docker.
   - **Stage C merges ✅ ALL 6 MERGED (2026-08-25/26, user go given; merge SHAs gh-verified 2026-08-28):**
     infra #94 `1fa7ab005b57148468d0d23c6aa33fcc193baff5`, frontend #99 `000bdcc0945fcc62f38c366c843193da72b9e88a`,
     basket #39 `6f5a57c90e66d6a0be5eb0c1fd4ab43a86a5dfc7`, order #72 `cb4403db0a16eace10e0ff06c900849f8d483c03`,
