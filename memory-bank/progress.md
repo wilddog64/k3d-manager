@@ -385,3 +385,14 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Live-validated: POST → 201 full contract, GET list → 200. Payment specs remain Tier-2/ACG scope.
   Spec `docs/bugs/2026-08-29-e2e-order-schema-missing.md`; durable service self-migrate follow-up in
   `docs/issues/2026-08-29-order-service-no-startup-migration.md`.
+
+- **2026-08-29 Tier-1 residual test/service fixes — HANDED OFF TO CODEX (both repos):** after the
+  substrate fix greened 45/12/45, user chose to fix e2e tests + basket (payment → Tier-2). Two
+  cross-repo fixes dispatched to Codex per spec+Codex discipline: (1) `shopping-cart-e2e-tests`
+  orders.spec:149/163 `CONFIRMED`→`PAID`/legal chain `PENDING→PAID→PROCESSING→SHIPPED` (branch
+  `fix/e2e-order-status-enum` off `feat/e2e-image-multiarch` — deployed `0c2505b` NOT in main);
+  (2) `shopping-cart-basket` `internal/model/cart.go:151` `binding:"required,min=0"`→`"min=0"`
+  (branch `fix/basket-update-quantity-zero` off `origin/main`). Codex: branch+commit+push only —
+  NO PR, NO main, NO live cluster. Claude then rebuilds images + re-runs Tier-1. Specs:
+  `docs/bugs/2026-08-29-e2e-order-status-enum-mismatch.md`,
+  `docs/issues/2026-08-29-basket-update-quantity-zero-required.md`.

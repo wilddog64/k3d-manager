@@ -6,6 +6,18 @@
 
 ## Current focus
 
+- **E2E Tier-1 gate → green (2026-08-29, IN PROGRESS).** Substrate fix DONE+verified (`aa2f2190`
+  postgres initdb `orders`/`order_items` schema matched to deployed Go order `5603388`), gate
+  26/31/45 → **45/12/45**. Residual 12 = 9 payment (structural → Tier-2/ACG) + 2 order-status
+  e2e-test bugs + 1 basket-service bug. User decision: fix e2e tests AND basket, payment→Tier-2.
+  **Handed off to Codex (both repos):** (a) `shopping-cart-e2e-tests` orders.spec `CONFIRMED`→
+  `PAID`/legal chain (branch `fix/e2e-order-status-enum` off `feat/e2e-image-multiarch` — the
+  deployed image `0c2505b` is NOT in main, must preserve envelope fix); (b) `shopping-cart-basket`
+  `internal/model/cart.go:151` `binding:"required,min=0"`→`"min=0"` (branch off `origin/main`).
+  Specs: `docs/bugs/2026-08-29-e2e-order-status-enum-mismatch.md`,
+  `docs/issues/2026-08-29-basket-update-quantity-zero-required.md`. Next after Codex: rebuild both
+  images, Claude re-runs Tier-1 (residual should drop to the 9 payment specs only). PR/merge GATED.
+
 - **v1.27.0 active branch** (`k3d-manager-v1.27.0`, branched from v1.26.0 merge). **Scope = 4 plan
   docs (4/5, under cap)**, dependency-ordered load-split leads (decision 2026-08-21 "keep all four"):
   1. `v1.27.0-foundation-managed-vcluster-cli.md` — **COMPLETE.** Part A = lib-foundation `v0.4.13`
