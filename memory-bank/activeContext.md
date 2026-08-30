@@ -154,6 +154,15 @@
      install+ClusterPolicy Audit→Enforce + promoter `cosign verify` gate [Claude live; kyverno ns +
      pub secret already staged]. Verify Codex SHA on origin per
      [[feedback_codex_verification_protocol]] before trusting.
+  - **Stage D Kyverno 401 → RESOLVED 2026-08-30 (`8d8b2251`, pushed).** Live decision tree on hostinger:
+    NOT a credential problem (kyverno-ns == app-ns `ghcr-pull-secret` byte-identical; same token passes the
+    Deployment/autogen verify). Kyverno's cosign verifier resolves creds against the admitted object's
+    `metadata.namespace`; a ReplicaSet Pod (`generateName`) has empty object ns at CREATE → 401, and the
+    cosign path ignores `--imagePullSecrets` AND a mounted `DOCKER_CONFIG` (both tested, both failed).
+    Fix = match workload controllers (Deployment/StatefulSet/DaemonSet/Job/CronJob) not `Pod` in the policy
+    template; basket+order verify clean, 0 UNAUTHORIZED, BATS 17/17. `docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md`.
+    ⚠ Still blocking Enforce: (a) live policy is a hand-patch — re-apply via `deploy_image_signing --app-cluster`;
+    (b) NEW finding: `product-catalog` deployed digest `sha256:53e668…` = `no signatures found` → re-sign/re-promote first.
   - **Stage C merges ✅ ALL 6 MERGED (2026-08-25/26, user go given; merge SHAs gh-verified 2026-08-28):**
     infra #94 `1fa7ab005b57148468d0d23c6aa33fcc193baff5`, frontend #99 `000bdcc0945fcc62f38c366c843193da72b9e88a`,
     basket #39 `6f5a57c90e66d6a0be5eb0c1fd4ab43a86a5dfc7`, order #72 `cb4403db0a16eace10e0ff06c900849f8d483c03`,

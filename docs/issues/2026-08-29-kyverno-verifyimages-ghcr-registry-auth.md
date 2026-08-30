@@ -3,7 +3,11 @@
 **Date:** 2026-08-29
 **Found on:** `k3d-manager-v1.27.0`, live on the hostinger app cluster (`ubuntu-hostinger`)
 **Severity:** High — blocks the Audit→Enforce boundary (D2). Enforce is unsafe until fixed.
-**Status:** OPEN
+**Status:** RESOLVED 2026-08-30 (`8d8b2251`). Root cause was NOT registry auth — it is Kyverno's
+cosign verifier resolving creds against the admitted object's (empty) `metadata.namespace` on
+`generateName` Pods; the cosign path ignores `--imagePullSecrets` and a mounted `DOCKER_CONFIG`.
+Fixed by gating at workload controllers instead of `Pod`. Full diagnosis, decision tree, and the
+separate product-catalog unsigned-digest follow-up: `docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md`.
 **Context:** Stage D Audit slice (`deploy_image_signing --audit --app-cluster`, `bbbacfe0`)
 
 ## What Audit surfaced

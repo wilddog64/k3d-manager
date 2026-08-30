@@ -252,14 +252,24 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   field-name fix `ignoreTlog`/`ignoreSCT` (`bbbacfe0`; `ignore:true` was strict-decode-rejected). Live:
   hostinger has its OWN Vault (bridged) — seeded cosign.pub (public only) + granted `eso-app-cluster` read
   (extended `app-cluster-reader`). Kyverno 4/4 Running, `cosign-public-key` SecretSynced, `verify-first-party-images`
-  ClusterPolicy Ready (Audit). **⚠ AUDIT FINDING → would-be-block under Enforce:** Kyverno gets 401
-  UNAUTHORIZED pulling private `ghcr.io/wilddog64/*` (registry auth, NOT signature; sigs known-good per C).
-  `docs/issues/2026-08-29-kyverno-verifyimages-ghcr-registry-auth.md`. **REGISTRY CREDS WIRED but STILL
-  401:** ghcr `ExternalSecret` in kyverno ns + `existingImagePullSecrets[0]=ghcr-pull-secret` (flag confirmed
-  on admission ctrl); credential VALID (curl→ghcr token endpoint 200) but Kyverno's cosign verifier sends no
-  auth (Kyverno 1.19 ignores `--imagePullSecrets` for the cosign path). **NEXT (before Enforce):** resolve
-  Kyverno keychain issue (version bump / mount dockerconfig as DefaultKeychain) → re-audit clean → gated
-  `--enforce`. Then codify app-Vault seed/grant + kyverno-ns ghcr ES into signing.sh.
+  ClusterPolicy Ready (Audit). **⚠ 401 UNAUTHORIZED → RESOLVED 2026-08-30 (`8d8b2251`).**
+  **Real root cause (live-diagnosed, decision tree run):** NOT the credential (kyverno-ns and app-ns
+  `ghcr-pull-secret` are byte-identical; the same token pulls app pods + passes the Deployment/autogen
+  verify). Kyverno's cosign verifier builds its keychain ONLY from secrets resolved against the admitted
+  object's `metadata.namespace`; a ReplicaSet-created Pod (`generateName`) has an EMPTY object namespace at
+  CREATE → resolves nothing → 401. The cosign path does NOT fall back to `--imagePullSecrets` NOR to a
+  mounted `DOCKER_CONFIG` DefaultKeychain (both tested live, both failed). Controllers carry a populated
+  namespace → verify works. **Fix:** match `Deployment/StatefulSet/DaemonSet/Job/CronJob` instead of `Pod`
+  in `cluster-policy-verify-images.yaml.tmpl`. Live Audit: basket + order verify clean, 0 UNAUTHORIZED across
+  repeated rolls; BATS 17/17 (added bare-Pod-never guard). Trade-off (bare Pods unverified) + full tree
+  documented in `docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md`. Steps 1 (restart) + 2 (SA creds /
+  DefaultKeychain mount) both failed and were reverted; kyverno admission-ctrl restored to helm baseline.
+  **⚠ NEW Audit finding (separate, blocks Enforce):** `product-catalog` deployed digest
+  `sha256:53e66832…` returns `no signatures found` — that digest predates signing or was never signed;
+  must re-sign/re-promote before `--enforce`. **NEXT (before Enforce):** apply the template fix on the app
+  cluster via `deploy_image_signing --app-cluster` (live policy is currently a hand-patch), resolve
+  product-catalog signed digest, confirm zero would-be-blocks → gated `--enforce`. Then codify app-Vault
+  seed/grant + kyverno-ns ghcr ES into signing.sh.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
   - [~] Slice F (generator + dashboard + live run) — **BLUEPRINT DONE 2026-08-29**
