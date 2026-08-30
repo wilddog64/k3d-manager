@@ -756,7 +756,23 @@
   (shopping-cart-e2e-tests, spec-not-direct); (c) 1 cart remove-qty-0 — `cart.items` undefined,
   pre-existing basket/e2e mismatch. Substrate fix is COMPLETE for its scope. To green the gate:
   cross-repo — fix the 3 test-contract bugs in the e2e repo (+ rebuild image) and decide payment
-  (Tier-1 manifest vs scope-to-non-payment + Tier-2). Awaiting user direction; PR/merge gated.
+  (Tier-1 manifest vs scope-to-non-payment + Tier-2). User chose (2026-08-29): **fix e2e tests,
+  payment→Tier-2.**
+
+- **2026-08-29 e2e residual triage — CART RECLASSIFIED as a basket-service bug (specs written,
+  Codex handoff pending):** on grounding the 3 residuals, only 2 are e2e-test bugs; the cart one is
+  a service bug:
+  - **Order status (2, e2e-test bug):** tests send status `CONFIRMED`, absent from the deployed
+    `OrderStatus` enum (PENDING/PAID/PROCESSING/SHIPPED/COMPLETED/CANCELLED) + illegal transitions
+    (PENDING→only PAID/CANCELLED). Fix = use real enum + legal chain (PENDING→PAID; history
+    PENDING→PAID→PROCESSING→SHIPPED). Spec `docs/bugs/2026-08-29-e2e-order-status-enum-mismatch.md`
+    (repo `shopping-cart-e2e-tests`).
+  - **Cart qty-0 (1, BASKET-service bug, NOT a test bug):** basket `UpdateItemRequest.Quantity`
+    is `binding:"required,min=0"`; gin treats int 0 as "missing" so `{quantity:0}` → 400 before the
+    handler's `quantity<=0` remove path runs. Test is CORRECT. Fix = drop `required` (use `min=0`).
+    Issue `docs/issues/2026-08-29-basket-update-quantity-zero-required.md` (repo `shopping-cart-basket`).
+  Both are shopping-cart repos → spec+Codex, branch+PR, rebuild image (spec-not-direct). Codex handoff
+  + image rebuild + Tier-1 re-verify still to do; PR/merge gated.
 
 ## Canonical pointers
 
