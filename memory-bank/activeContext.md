@@ -38,7 +38,12 @@
   which `latest` now also points to — same digest, so `E2E_IMAGE_TAG:-latest` default already tracks
   the merged e2e code, no `e2e.sh` change). `kustomization.yaml` basket newTag → `sha-4b42ecc7`;
   Tier-1 re-run against REAL GHCR images (basket pulled from GHCR, not local-import) = **48/9/45**
-  (9 payment/Tier-2). **E2E Tier-1 order-status + cart-qty-0 loop FULLY CLOSED.** No release
+  (9 payment/Tier-2). **E2E Tier-1 order-status + cart-qty-0 loop FULLY CLOSED.**
+  **Docker-space follow-up (2026-08-30):** Tier A+B cleanup done (14GB orphan vol + 18 dangling +
+  10 superseded tags freed ~19GB inside Docker; OrbStack backend reclaims to host over time). New
+  helper `e2e_prune_images` (`2e8799c2`, dry-run-default) prunes >N-day images NOT in the E2E
+  working set — dispatch `./scripts/k3d-manager e2e_prune_images [--days N] [--apply]`; protects all
+  substrate images + running containers + `E2E_IMAGE_PRUNE_KEEP`. See progress.md. No release
   tag/retro (service-repo fix PRs, no version bump). (History below.) Substrate fix DONE+verified (`aa2f2190`
   postgres initdb `orders`/`order_items` schema matched to deployed Go order `5603388`), gate
   26/31/45 → **45/12/45**. Residual 12 = 9 payment (structural → Tier-2/ACG) + 2 order-status
