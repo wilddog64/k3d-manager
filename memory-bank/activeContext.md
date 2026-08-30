@@ -747,8 +747,16 @@
   no change needed. Payments.spec (27) + payment cross-service stay Tier-1-out-of-scope (no payment
   manifest = Tier-2/ACG's job). Spec `docs/bugs/2026-08-29-e2e-order-schema-missing.md`; durable
   service-side self-migrate follow-up `docs/issues/2026-08-29-order-service-no-startup-migration.md`.
-  Full-gate confirming rerun in progress (expect orders + order-dependent cross-service to green;
-  residual = payment-absent set only).
+  Confirming rerun DONE (`~/.k3dm/e2e/1788051374-25838.json`, commit 86298144): **passed 26→45,
+  failed 31→12, skipped 45**. Cross-service fully greened (21→0), orders 42→2. **Residual 12 =
+  ZERO substrate bugs**: (a) 9 payments `ECONNREFUSED :8084` — no payment svc in Tier-1
+  (Tier-2/ACG's job); (b) 2 order status-update — e2e test sends status `CONFIRMED` which is NOT
+  in the deployed `OrderStatus` enum (PENDING/PAID/PROCESSING/SHIPPED/COMPLETED/CANCELLED) + illegal
+  transitions (PENDING→only PAID/CANCELLED) → PATCH 400 → status undefined = **e2e-test contract bug**
+  (shopping-cart-e2e-tests, spec-not-direct); (c) 1 cart remove-qty-0 — `cart.items` undefined,
+  pre-existing basket/e2e mismatch. Substrate fix is COMPLETE for its scope. To green the gate:
+  cross-repo — fix the 3 test-contract bugs in the e2e repo (+ rebuild image) and decide payment
+  (Tier-1 manifest vs scope-to-non-payment + Tier-2). Awaiting user direction; PR/merge gated.
 
 ## Canonical pointers
 

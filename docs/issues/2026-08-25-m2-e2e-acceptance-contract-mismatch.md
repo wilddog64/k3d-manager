@@ -123,3 +123,42 @@ cart 3. Two findings — one CONFIRMED, one NOT yet root-caused:
 actual cause in `shopping-cart-e2e-tests` (+ rebuild image), and (b) decide payment coverage —
 Tier-1 substrate gains a payment manifest, or payment/cross-service acceptance moves to
 Tier-2 (ACG, payment deployed, Stripe test). Only then is M2 acceptance passable.
+
+---
+
+## Update 2026-08-29 (later) — orders.spec ROOT-CAUSED and FIXED; rerun 45/12/45
+
+The orders.spec cause was **not** a client-contract bug. Captured the Playwright
+`results.json` from the live pod before teardown and replayed the payload directly: the
+deployed order image `sha-56033880` is the **Go** rewrite (commit `5603388`) with **no
+runtime migration**, and the substrate created the `orders` database but never its
+`orders`/`order_items` tables → HTTP 500 `relation "orders" does not exist` (42P01) on every
+order DB op. Fixed in k3d-manager `aa2f2190` (`20-orders-schema.sql` in
+`scripts/etc/e2e/postgres.yaml`, DDL matched to the deployed commit — order_items **without**
+`total_price`). See `k3d-manager/docs/bugs/2026-08-29-e2e-order-schema-missing.md`.
+
+Confirming rerun (`~/.k3dm/e2e/1788051374-25838.json`, commit `86298144`):
+
+```
+total=102  passed=45  failed=12  skipped=45  (was 26/31/45)
+```
+
+Cross-service fully greened (21 → 0); orders 42 → 2. **The residual 12 contain zero
+substrate bugs**, in three classes:
+
+1. **Payment absent (9)** — `payments.spec` all fail `connect ECONNREFUSED ::1:8084`; no
+   payment service in Tier-1. Structural → Tier-2/ACG (Stripe test).
+2. **Order status-update (2)** — `orders.spec:149/163` send status **`CONFIRMED`**, which is
+   **not in the deployed service's `OrderStatus` enum** (PENDING/PAID/PROCESSING/SHIPPED/
+   COMPLETED/CANCELLED), and assume free transitions the service forbids (PENDING → only
+   PAID/CANCELLED). PATCH returns 400 → `updatedOrder.status` undefined. **E2E-test bug** in
+   `shopping-cart-e2e-tests` — align to the real enum + `CanTransitionTo` rules (or the
+   service must add CONFIRMED). Not a substrate issue.
+3. **Cart remove-qty-0 (1)** — `cart.spec:98`: after setting qty 0, `cart.items` is undefined
+   → `toHaveLength(0)` throws. Basket/e2e contract mismatch, pre-existing (cart failed
+   pre-fix too). E2E-test/basket concern, not substrate.
+
+**To reach a green Tier-1 gate**, the substrate fix is done; remaining is cross-repo/strategy:
+fix the 3 test-contract bugs in `shopping-cart-e2e-tests` (+ rebuild image), and decide
+payment (Tier-1 payment manifest vs. scope Tier-1 to non-payment and gate payment on Tier-2).
+Optionally quarantine the 3 known test-contract bugs so Tier-1 greens on what it covers now.
