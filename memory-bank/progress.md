@@ -375,3 +375,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Makefile. **Live hub:** L2→`LAYER=1` = grafana 1/1 + prometheus 1/1, rest 0/0, Prometheus `up` query
   + Grafana `database:ok` proven live; `LAYER=2` = all 7 workloads 1/1, `make status` HEALTHY (one stale
   `Unknown` prometheus pod deleted during the ramp — known CPU-starvation cascade, not a feature bug).
+
+- **2026-08-29 Tier-1 E2E orders.spec fix — DONE + LIVE-VALIDATED, full-gate rerun confirming
+  (aa2f2190, pushed):** root-caused the orders.spec wholesale failure to a missing DB schema, NOT a
+  test-contract bug. Deployed order image `sha-56033880` = the **Go** rewrite (commit `5603388`) with
+  no runtime migration; substrate created the `orders` database but not its tables → HTTP 500 (42P01).
+  Fix = `20-orders-schema.sql` in `scripts/etc/e2e/postgres.yaml` initdb, DDL matched to the deployed
+  commit (order_items **without** `total_price` — the HEAD/testdata column would 500 with 23502).
+  Live-validated: POST → 201 full contract, GET list → 200. Payment specs remain Tier-2/ACG scope.
+  Spec `docs/bugs/2026-08-29-e2e-order-schema-missing.md`; durable service self-migrate follow-up in
+  `docs/issues/2026-08-29-order-service-no-startup-migration.md`.

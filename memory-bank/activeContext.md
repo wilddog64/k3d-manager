@@ -730,6 +730,26 @@
   HEALTHY. One manual touch during the L2 ramp: deleted a stale `Unknown` prometheus pod from the known
   CPU-starvation cascade (full stack starting at once) — not a feature defect.
 
+- **2026-08-29 Tier-1 E2E orders.spec ROOT-CAUSED + FIXED (aa2f2190, pushed) — gate rerun
+  confirming:** the orders.spec wholesale failure (42 ✘) was NOT a client-contract bug. Ground
+  truth (captured Playwright `results.json` from the live pod before teardown + direct
+  port-forward replay): the deployed order image `sha-56033880` is the **Go** rewrite (commit
+  `5603388`), not Java (earlier Dockerfile read was wrong), and it ships **no runtime migration** —
+  the substrate created the `orders` DATABASE but never the `orders`/`order_items` TABLES →
+  every order DB op HTTP 500 (`relation "orders" does not exist`, 42P01). Fix: added
+  `20-orders-schema.sql` to `scripts/etc/e2e/postgres.yaml` initdb (`\connect orders` + DDL).
+  Critical nuance: DDL must match the **deployed** commit `5603388` — its `order_items` has **no
+  `total_price`** column; copying repo-HEAD/testdata DDL (which added `total_price NOT NULL`) 500s on
+  insert (23502) since that binary never writes it. **Live-validated** against the running substrate:
+  `POST /api/orders → 201` with full contract (id, status PENDING, items[].subtotal, totalAmount,
+  shippingAddress, currency USD), `GET …?customerId=X` (X-User-ID header) → 200 with the order. List
+  filters by `X-User-ID` (MockAuthMiddleware), not the query param — e2e client sends it consistently,
+  no change needed. Payments.spec (27) + payment cross-service stay Tier-1-out-of-scope (no payment
+  manifest = Tier-2/ACG's job). Spec `docs/bugs/2026-08-29-e2e-order-schema-missing.md`; durable
+  service-side self-migrate follow-up `docs/issues/2026-08-29-order-service-no-startup-migration.md`.
+  Full-gate confirming rerun in progress (expect orders + order-dependent cross-service to green;
+  residual = payment-absent set only).
+
 ## Canonical pointers
 
 - Roadmap: `docs/roadmap.md`
