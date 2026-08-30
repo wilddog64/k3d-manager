@@ -33,9 +33,12 @@
   admin override, squash `7601aa14` on main).** **/post-merge done (Haiku subagent + Claude
   verify):** e2e-tests `enforce_admins` **RE-ENABLED** (verified `true`, reviews=1); basket ruleset
   untouched (no restore needed); both mains synced (e2e `7601aa14`, basket `4b42ecc7`);
-  `docs/next-improvements` already exists in both. **TODO (Claude, k3d-manager substrate): once
-  main publish CI finishes — bump `scripts/etc/e2e/kustomization.yaml` basket newTag → `sha-4b42ecc7`
-  and confirm e2e Playwright image republished on main (`sha-7601aa14`, multi-arch).** No release
+  `docs/next-improvements` already exists in both. **SUBSTRATE BUMP DONE + VALIDATED (`e06abead`):**
+  main publish CI green for both → GHCR images confirmed (basket `sha-4b42ecc7`, e2e `sha-7601aa14`
+  which `latest` now also points to — same digest, so `E2E_IMAGE_TAG:-latest` default already tracks
+  the merged e2e code, no `e2e.sh` change). `kustomization.yaml` basket newTag → `sha-4b42ecc7`;
+  Tier-1 re-run against REAL GHCR images (basket pulled from GHCR, not local-import) = **48/9/45**
+  (9 payment/Tier-2). **E2E Tier-1 order-status + cart-qty-0 loop FULLY CLOSED.** No release
   tag/retro (service-repo fix PRs, no version bump). (History below.) Substrate fix DONE+verified (`aa2f2190`
   postgres initdb `orders`/`order_items` schema matched to deployed Go order `5603388`), gate
   26/31/45 → **45/12/45**. Residual 12 = 9 payment (structural → Tier-2/ACG) + 2 order-status

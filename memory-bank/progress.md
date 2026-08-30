@@ -433,4 +433,5 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 ### 2026-08-30 — e2e #8 ALSO merged; /post-merge housekeeping done
 - e2e-tests #8 merged via admin override → main squash `7601aa14` (user merged in UI while enforce_admins was disabled).
 - /post-merge (Haiku subagent, Claude-verified): e2e-tests `enforce_admins` RE-ENABLED (independently verified `true`, reviews=1); basket ruleset left intact (no restore); both mains synced (e2e 7601aa14, basket 4b42ecc7); `docs/next-improvements` already exists in both repos. No tag/retro (service-repo fix PRs, no version bump).
-- Watching main publish CI (basket Go CI 33309808174 + e2e Publish E2E Image on 7601aa14) → then bump substrate basket newTag → sha-4b42ecc7 and confirm e2e image sha-7601aa14.
+- Main publish CI green (basket Go CI + e2e Publish E2E Image). GHCR confirmed: basket sha-4b42ecc7, e2e sha-7601aa14 (e2e `latest` = same digest → default E2E_IMAGE_TAG:-latest tracks merged code, no e2e.sh change).
+- Substrate bump DONE (`e06abead`): kustomization.yaml basket newTag → sha-4b42ecc7. Tier-1 re-run against REAL GHCR images = 48/9/45 (9 payment/Tier-2). **E2E Tier-1 order-status + cart-qty-0 loop CLOSED.**
