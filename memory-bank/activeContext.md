@@ -203,6 +203,14 @@
     v1.0.1, uses `VaultTemplate`/`spring-cloud-starter-vault-config`). Version bump 1.0.1→1.0.2, republish to GH Packages (CI
     on merge), then payment repins `<rabbitmq-client.version>`. Branch `feat/spring-boot-3.5-upgrade`. Execute same as payment:
     edits via Codex (its sandbox has no JDK), Claude container-verifies. Testcontainers (RabbitMQ+Vault) → needs Docker.
+    **✅ DONE + VERIFIED + PUSHED 2026-08-30 — `51fa46fa` on `origin/feat/spring-boot-3.5-upgrade`.** Codex made the pom-only
+    edits (spring-boot 3.5.16, spring-cloud **2025.0.3**, version 1.0.1→1.0.2 across parent+3 modules) but its sandbox blocked
+    `.git` writes (`.git/index.lock: Operation not permitted` even as workdir) → Claude created the branch + committed+pushed.
+    Claude container-verified (maven:3.9-eclipse-temurin-21): clean compile of ALL Vault code + **73 unit tests pass, 0 fail,
+    NO code changes**. NOTE: the library's live-Vault integration suite runs via a dedicated CI job (`-P integration-tests`
+    with Vault+RabbitMQ *services*, not Testcontainers) — that runs on the PR, NOT on feature-branch push (CI push trigger is
+    main/develop/fix-ci-stabilization only). NEXT (gated): PR on the library → CI incl. integration job → merge → CI republishes
+    1.0.2 to GH Packages → payment repins `<rabbitmq-client.version>` 1.0.0-SNAPSHOT→1.0.2 + finishes (commit the 2 held pom edits).
   - **Stage C merges ✅ ALL 6 MERGED (2026-08-25/26, user go given; merge SHAs gh-verified 2026-08-28):**
     infra #94 `1fa7ab005b57148468d0d23c6aa33fcc193baff5`, frontend #99 `000bdcc0945fcc62f38c366c843193da72b9e88a`,
     basket #39 `6f5a57c90e66d6a0be5eb0c1fd4ab43a86a5dfc7`, order #72 `cb4403db0a16eace10e0ff06c900849f8d483c03`,
