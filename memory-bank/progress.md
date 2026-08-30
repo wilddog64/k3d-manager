@@ -283,6 +283,14 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   mirroring the other four. So verify needs BOTH: controller-match AND a dedicated non-default SA carrying the cred.
   **Enforce gate now open** (all 3 conditions met: template re-applied, all digests signed, zero would-be-blocks) —
   flip via `SIGNING_ALLOW_ENFORCE=1 deploy_image_signing --enforce --app-cluster` **pending user go**.
+  **CVE cross-check of the re-pinned digests (trivy, ignoreUnfixed=true, HIGH/CRIT) 2026-08-30:** signing Enforce is
+  orthogonal to CVEs (Kyverno verifies the SIGNATURE, not vulns — all 5 signed, so nothing is blocked). Per-service
+  fixable posture: basket/frontend/order **0C/0H clean**; product-catalog `3db7b8da` **0C/6H** (== old `53e668` on
+  fixable terms, +dropped 3 unfixable CRIT — NO regression, no upstream fix yet); payment `3b5f478c` **7C/42H** —
+  all Java app-dep CVEs (tomcat-embed 10.1.16, postgresql-jdbc 42.6.0, spring-security-web 6.2.0), == old `95f2680`
+  (7C/45H, marginally better — NO regression). **payment's 7 fixable CRITs are pre-existing app-dependency debt**
+  needing a pom bump + rebuild + re-sign in shopping-cart-payment — a CVE-loop task, NOT a blocker for the signing
+  Enforce flip (which admits it either way, being signed).
   **Still deferred:** promoter `cosign verify` gate in `app-cve-scan.sh` + `cosign attest` in CI; codify app-Vault
   seed/grant + kyverno-ns ghcr ES into signing.sh.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
