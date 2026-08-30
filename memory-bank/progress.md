@@ -409,3 +409,8 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   structural → Tier-2/ACG. Cleanup: kustomization reverted (basket newTag stays `f70d5801` —
   `8614773e` is a local-only build, NOT in GHCR), vcluster deleted. **GATED next: PR + merge both
   fix branches (user go), then bump substrate basket newTag + e2e image to the merged SHAs.**
+
+### 2026-08-29 — E2E Tier-1 fix PRs opened (merge gated)
+- e2e-tests PR #8 `fix/e2e-order-status-enum` (SHA 9202b194) — orders.spec CONFIRMED→PAID/legal chain.
+- basket PR #44 `fix/basket-update-quantity-zero` (SHA 8614773e) — cart.go:151 drop `required` binding.
+- CI: e2e GitGuardian pass; basket test pass, lint pending. Merge awaits explicit user go.
