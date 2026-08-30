@@ -319,10 +319,12 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   rebuild + republish (e.g. 1.0.1-SNAPSHOT), THEN payment bumps `<rabbitmq-client.version>` to it and finishes. Own task/spec.
   Payment branch `fix/payment-cve-spring-boot-bump` PAUSED with 2 GOOD edits uncommitted (parent 3.5.16 + flyway `${flyway.version}`) —
   do not lose them; they resume once the new library version is published. Nothing committed/pushed on payment.
-- [~] **rabbitmq-client-java Boot 3.5 upgrade** (`docs/issues/2026-08-30-rabbitmq-client-spring-boot-3.5-upgrade.md`) —
-  ✅ DONE+VERIFIED+PUSHED 2026-08-30 `51fa46fa` on `origin/feat/spring-boot-3.5-upgrade`. spring-boot 3.5.16 + spring-cloud
+- [x] **rabbitmq-client-java Boot 3.5 upgrade** (`docs/issues/2026-08-30-rabbitmq-client-spring-boot-3.5-upgrade.md`) —
+  ✅ DONE+MERGED+PUBLISHED 2026-08-30. Branch `feat/spring-boot-3.5-upgrade` `51fa46fa`; spring-boot 3.5.16 + spring-cloud
   2025.0.3 + version 1.0.1→1.0.2 (parent+3 modules), pom-only. Container-verified: clean compile + 73 unit tests pass, 0 fail.
-  Live-Vault integration suite is a CI-only job (runs on PR). NEXT (gated): PR → merge → CI republishes 1.0.2 → payment repins+finishes.
+  **PR #8 admin-squash-merged `a4a4640f` on main** (user go = "do all 4"; enforce_admins off→merge→restored true). Post-merge CI
+  ALL GREEN incl. **live-Vault Integration Tests** + Publish → **`1.0.2` confirmed in GH Packages**. Copilot N/A on repo; `CI`
+  required-check is a phantom (real = `Build and Test`). Unblocks payment.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
   - [~] Slice F (generator + dashboard + live run) — **BLUEPRINT DONE 2026-08-29**
