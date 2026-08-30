@@ -214,6 +214,12 @@
   real Dependabot PR, then roll to the rest. Product-catalog PR #51's skipped job is correct
   (author `wilddog64`, not `dependabot[bot]`).
 
+- **Slack-secret redaction + branch prune — DONE (2026-08-29):** plaintext signing secret
+  redacted from `docs/issues/2026-06-04-slack-slash-commands-wrong-url.md` and landed on `main`
+  via `84e2917d`. Stale branch `security/redact-leaked-signing-secret` (was `b81c3da0`) pruned
+  local + origin 2026-08-29 (content already on main; secret was already rotated/dead). No open
+  branch or leak remaining.
+
 - **v1.26.0 RELEASED** — PR #117 `1bbe5439` merged, tag/release published, protection restored
   (`enforce_admins=true`, 1 approval). Shipped 3/5 scopes (fleet count-agnostic lifecycle, E2E
   promotion gate + observability, managed registration cleanup). Retro
