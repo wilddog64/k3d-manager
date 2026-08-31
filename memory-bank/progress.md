@@ -315,13 +315,18 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   sign squash-merged as PR #94/`1fa7ab0`). **MERGED as PR #95 → main `45def89e` 2026-08-31.** Follow-ups now:
   extend the promoter gate + Kyverno policy with `verify-attestation --type vuln`; codify app-cluster Vault
   seed/grant + kyverno-ns ghcr ES into `signing.sh`.
-- [x] **Re-pin 4 callers to attest SHA — ✅ CODE DONE + VERIFIED 2026-08-31, 4 PRs PENDING (user-gated).** Codex
+- [x] **Re-pin 4 callers to attest SHA — ✅ CODE DONE + VERIFIED 2026-08-31, 4 PRs OPEN (user-gated merge).** Codex
   (session `01a057f5`, task `bi5vx45pp`) bumped infra reusable-workflow pin `@1fa7ab0`→`@45def89e` on branch
   `feat/repin-infra-attest` (from each `origin/main`): basket `a5fb8809` (`go-ci.yml`), order `38d70585`
   (`ci.yml`), payment `28abe731` (`ci.yaml`), product-catalog `9dc3b59f` (`ci.yml`). Claude-verified on origin
   (branch SHA + file bytes): all 1-file/new=1/old=0, exact msg `ci: re-pin infra reusable workflow to attest SHA
-  45def89e`. Spec `docs/plans/v1.27.0-image-signing-attest-repin-callers-codex-task.md`. **4 PRs prepare-and-stopped**
-  (base main), NOT opened — user-gated. **Frontend OUT of scope** (inlines own build/sign; needs separate inline-attest spec).
+  45def89e`. Spec `docs/plans/v1.27.0-image-signing-attest-repin-callers-codex-task.md`. **4 PRs OPENED + MERGEABLE
+  2026-08-31 — basket #45, order #74, payment #69, product-catalog #52** (base main); merge user-gated (Never auto-merge).
+- [ ] **Frontend inline attest — spec WRITTEN 2026-08-31, Codex NOT dispatched.** `shopping-cart-frontend` inlines its
+  own build/sign in `ci.yml` `publish` job (no reusable-workflow `uses:`) — signs but no attestation. Spec
+  `docs/plans/v1.27.0-image-signing-frontend-inline-attest-codex-task.md`: insert 3 steps (trivy `cosign-vuln` +
+  `spdx-json` predicates by digest → `cosign attest --type vuln`/`--type spdxjson`) after `Sign image by digest`, trivy
+  pin reused `v0.36.0`, branch `feat/frontend-inline-attest`, exact msg `ci: attest frontend image (vuln + SBOM) inline by digest`.
 - [x] **Payment Java CVE remediation — ✅ CVE→SIGN→VERIFY LOOP CLOSED 2026-08-31.** PR #68 MERGED `ecdb421f`; Copilot #68 threads
   replied **+ RESOLVED** both. Step 4 done: sign run `33345512446` (all 6 jobs green) pushed+cosign-signed new digest
   `sha256:8f195e336cb702c347e1b78193e9ad96143a82716d3cecaec7713307c21daab1` (tlog 2656526539); **cosign verify PASSES**;

@@ -186,7 +186,7 @@
     manual `--from=cronjob/app-cve-scan` job grepping `SIGGATE`. Preflight confirmed: hub Vault `vault_key=present`,
     `vault-backend` CSS Ready, `platform-ops/cosign-public-key` not-yet-present (clean first deploy). **User runs it via `!`
     (deploy-path mutation, classifier-gated for Claude Bash).**
-  - **CVE-loop closure #2b — RE-PIN 4 callers to attest SHA ✅ DONE + VERIFIED, PRs PENDING 2026-08-31.** Codex
+  - **CVE-loop closure #2b — RE-PIN 4 callers to attest SHA ✅ DONE + VERIFIED, 4 PRs OPEN (user-gated) 2026-08-31.** Codex
     (session `01a057f5`, task `bi5vx45pp`) bumped each caller's infra reusable-workflow pin
     `@1fa7ab0`→`@45def89e` on branch `feat/repin-infra-attest` (from each `origin/main`). **Claude-verified
     on origin** (branch SHA + `contents?ref=` bytes, not Codex's word): basket `a5fb8809`
@@ -194,9 +194,13 @@
     product-catalog `9dc3b59f` (`ci.yml`) — all: 1 file changed, new SHA=1/old SHA=0, exact msg
     `ci: re-pin infra reusable workflow to attest SHA 45def89e`. Spec
     `docs/plans/v1.27.0-image-signing-attest-repin-callers-codex-task.md` (`2dbfa354`).
-    **4 PRs prepare-and-stopped** (base main ← `feat/repin-infra-attest`) — user-gated merge, NOT opened yet.
-    **Frontend OUT of scope** — `shopping-cart-frontend` inlines its own build/sign (no reusable-workflow
-    `uses:`); attest there needs inline steps added to its `ci.yml` = separate follow-up spec. Remaining
+    **4 PRs OPENED + MERGEABLE 2026-08-31, merge user-gated (Never auto-merge):** basket #45, order #74,
+    payment #69, product-catalog #52 (all base main ← `feat/repin-infra-attest`; order also has unrelated
+    dependabot #73). **Frontend inline-attest spec WRITTEN 2026-08-31** —
+    `docs/plans/v1.27.0-image-signing-frontend-inline-attest-codex-task.md`: adds 3 steps (trivy `cosign-vuln`
+    + `spdx-json` predicates by digest → `cosign attest --type vuln`/`--type spdxjson`) inline into
+    `shopping-cart-frontend/.github/workflows/ci.yml` `publish` job after `Sign image by digest`, trivy pin
+    reused at `v0.36.0`, branch `feat/frontend-inline-attest`. NOT yet dispatched to Codex. Remaining
     follow-ups: verify side (promoter `app-cve-scan.sh` + Kyverno `verify-attestation --type vuln`); codify
     app-cluster Vault seed/grant + kyverno-ns ghcr ES into `signing.sh`.
   - **CVE-loop closure #2 — CI `cosign attest` (vuln+SBOM) ✅ CODE DONE + VERIFIED + MERGED 2026-08-31.** **PR #95**
