@@ -220,10 +220,12 @@
     **✅ PAYMENT VERIFIED + PR OPEN 2026-08-30.** Container `mvn clean verify` = **BUILD SUCCESS, 130 tests 0 fail/err/skip** (incl. Testcontainers
     Postgres integration; Spring context loads clean on Boot 3.5.16 — compat blocker gone). 3 pom edits committed `2bc05325` on
     `origin/fix/payment-cve-spring-boot-bump` (parent 3.5.16 + rabbitmq 1.0.2 + flyway `${flyway.version}`), zero code changes. **PR #68 OPEN**
-    (`fix(deps): bump spring-boot-starter-parent 3.2.0 -> 3.5.16 …`), Copilot review requested. **#68 CI all-green; Copilot addressed** — its one nit
-    (drop the flyway `${flyway.version}` override) DECLINED w/ justification on-thread (binding = BOM flyway-core 11.7.2, keeps modules aligned; removal
-    risks unmanaged resolution; build verified 130 tests). branch-updated 08-30 → CI re-running. NEXT: #68 CLEAN → merge (gated) → CI rebuild+cosign-sign
-    payment image → trivy re-verify → re-pin signed digest in substrate `kustomization.yaml` (closes CVE→sign loop).
+    (`fix(deps): bump spring-boot-starter-parent 3.2.0 -> 3.5.16 …`). **#68 MERGED** `ecdb421f` 08-31T00:45Z (squash). Copilot addressed both nits:
+    flyway `${flyway.version}` override DECLINED w/ justification on-thread (binding = BOM flyway-core 11.7.2, keeps modules aligned); missing lib
+    `v1.0.2` tag/release — CREATED on `rabbitmq-client-java` @ `a4a4640f` (package was published but git tag absent). Merge treadmill note: each merge
+    fires a `ci: update ... [skip ci]` image-pin auto-commit on main → next PR goes BEHIND under the up-to-date ruleset; needs re-update-branch +
+    Copilot re-request (review is per-head). NEXT (Step 4): payment main CI rebuild+cosign-sign new image → trivy re-verify → re-pin signed digest in
+    k3d-manager substrate `services/shopping-cart-payment/kustomization.yaml` (closes CVE→sign→verify loop).
     **Dependabot cleanup (payment repo, user go):** #67 (parent→4.1.1) CLOSED as superseded (4.x breaks the 2025.0.3 train + oversized).
     #66 (fetch-metadata 2.3.0→3.1.0) **MERGED**; #65 (setup-java 5→6) **MERGED** 08-31T00:25Z (each merge invalidates the next under the up-to-date
     ruleset). Copilot review on payment repo IS enabled (`copilot-pull-request-reviewer`); user REQUIRES it — request via raw-JSON `--input -`.

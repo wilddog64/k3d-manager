@@ -300,8 +300,8 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [~] **Payment Java CVE remediation** — ✅ VERIFIED + **PR #68 OPEN** 2026-08-30. Container `mvn clean verify` = BUILD SUCCESS,
   **130 tests 0 fail/err/skip** (incl. Testcontainers integration; clean context on Boot 3.5.16). Commit `2bc05325` on
   `origin/fix/payment-cve-spring-boot-bump` = 3 pom edits (parent 3.5.16 + rabbitmq **1.0.2** + flyway `${flyway.version}`), zero code.
-  #68 CI **all-green**; Copilot's one nit (drop flyway `${flyway.version}` override) DECLINED w/ on-thread justification; branch-updated → CI re-running.
-  NEXT: #68 CLEAN → merge (gated) → CI rebuild+cosign-sign → trivy re-verify → digest re-pin.
+  **#68 MERGED** `ecdb421f` 08-31T00:45Z (squash). Copilot both nits addressed: flyway override DECLINED w/ justification; missing lib `v1.0.2` tag CREATED
+  on rabbitmq-client-java @ `a4a4640f`. NEXT (Step 4): payment main CI rebuild+cosign-sign → trivy re-verify → re-pin signed digest in substrate kustomization.
   Dependabot: #67 (4.1.1) CLOSED superseded; #66 (fetch-metadata) MERGED; #65 (setup-java 6) **MERGED** 08-31T00:25Z. (History ↓.)
 - [~] **Payment Java CVE remediation (history)** (`docs/issues/2026-08-30-payment-cve-remediation.md`) — ASSIGNED CODEX
   2026-08-30, branch `fix/payment-cve-spring-boot-bump` in shopping-cart-payment. 7 fixable CRIT + 42 HIGH all
