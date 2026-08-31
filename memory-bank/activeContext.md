@@ -175,7 +175,15 @@
     `validationFailureAction` stays `Audit`, ignored). Blocking nothing: 5 app pods Running 1/1 0-restart, 5
     PolicyReports PASS=1 FAIL=0, zero PolicyViolation events. **Ran via `!` in-session** — the Claude Code classifier
     gates the enforce mutation, so the flip executes under the user's shell, not Claude's Bash. **Stage D DONE.**
-    Deferred (not blockers): promoter `cosign verify` gate in `app-cve-scan.sh`; `cosign attest` in CI.
+  - **CVE-loop closure #1 — promoter cosign-verify gate ✅ CODE DONE 2026-08-31 (`98b0dc4a`).** Spec
+    `docs/bugs/2026-08-31-promoter-cosign-verify-gate.md`. `app-cve-scan.sh` now runs `cosign verify --key <pub>
+    --insecure-ignore-tlog=true` on a clean candidate digest **before** pinning it — unverifiable = **refused**
+    (fail-closed, `App CVE Promotion Blocked (unsigned)` notify). Mirrors the Kyverno policy stance exactly. Pub key via
+    new ESO `cosign-pub-externalsecret.yaml` (Hub Vault `cosign/signing` → `platform-ops/cosign-public-key`) mounted at
+    `/cosign`; `COSIGN_VERSION=v2.4.1` (matches CI signer). BATS 12/12, shellcheck clean, howto updated. **NEXT: deploy live**
+    (re-run the platform-ops deploy so the CronJob picks up the env/mount + ESO syncs the pub Secret on the Hub; confirm a
+    signed candidate verifies). Then remaining deferrals: `cosign attest` in CI (cross-repo → Codex) + `verify-attestation`;
+    codify app-cluster Vault seed/grant + kyverno-ns ghcr ES into `signing.sh`.
   - **Payment Java CVE remediation — spec written + ASSIGNED CODEX 2026-08-30.** Spec
     `docs/issues/2026-08-30-payment-cve-remediation.md`. Root cause: 7 fixable CRIT + 42 HIGH are ALL transitive from
     `spring-boot-starter-parent 3.2.0` (nothing pinned in pom). Fix = single BOM bump to latest 3.5.x + targeted

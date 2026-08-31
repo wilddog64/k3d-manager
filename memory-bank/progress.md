@@ -295,8 +295,17 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   (7C/45H, marginally better — NO regression). **payment's 7 fixable CRITs are pre-existing app-dependency debt**
   needing a pom bump + rebuild + re-sign in shopping-cart-payment — a CVE-loop task, NOT a blocker for the signing
   Enforce flip (which admits it either way, being signed).
-  **Still deferred:** promoter `cosign verify` gate in `app-cve-scan.sh` + `cosign attest` in CI; codify app-Vault
-  seed/grant + kyverno-ns ghcr ES into signing.sh.
+  **Promoter cosign-verify gate — ✅ CODE DONE 2026-08-31 (`98b0dc4a`, spec `docs/bugs/2026-08-31-promoter-cosign-verify-gate.md`).**
+  `app-cve-scan.sh` gains `_ensure_cosign` (wget pinned `COSIGN_VERSION=v2.4.1`, matches CI signer), `_cosign_registry_auth`
+  (GH_TOKEN → 0600 DOCKER_CONFIG, never argv), `_verify_candidate_signature` (`cosign verify --key <pub> --insecure-ignore-tlog=true`,
+  mirrors the ClusterPolicy `rekor.ignoreTlog`), and a MAIN gate before `_promote_image`: an unverifiable clean candidate is
+  **refused** (skip + `App CVE Promotion Blocked (unsigned)` notify) — **fail-closed**. `COSIGN_VERIFY=0` default keeps every
+  other invocation unchanged; the CronJob sets `1`. Pub key: new ESO `cosign-pub-externalsecret.yaml` (Hub Vault `cosign/signing`
+  → `platform-ops/cosign-public-key`) mounted read-only at `/cosign` (optional secret → missing key = fail-closed skip). Wired into
+  `argocd.sh` deploy path. BATS 12/12 (2 new gate tests: signed→promote, unsigned→refuse); shellcheck clean (only pre-existing
+  SC2329 on the `_cleanup` trap). Howto `docs/howto/image-signing.md` updated. **NOT yet deployed live** (Hub CronJob apply + ESO
+  sync verification pending). **Still deferred:** `cosign attest` (vuln+SBOM) in CI reusable workflow (cross-repo → Codex) then
+  extend the gate + policy with `verify-attestation --type vuln`; codify app-cluster Vault seed/grant + kyverno-ns ghcr ES into `signing.sh`.
 - [x] **Payment Java CVE remediation — ✅ CVE→SIGN→VERIFY LOOP CLOSED 2026-08-31.** PR #68 MERGED `ecdb421f`; Copilot #68 threads
   replied **+ RESOLVED** both. Step 4 done: sign run `33345512446` (all 6 jobs green) pushed+cosign-signed new digest
   `sha256:8f195e336cb702c347e1b78193e9ad96143a82716d3cecaec7713307c21daab1` (tlog 2656526539); **cosign verify PASSES**;
