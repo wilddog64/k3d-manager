@@ -127,6 +127,49 @@ downloaded (pinned `COSIGN_VERSION`) at runtime the same way `kubectl` is.
 | `COSIGN_PUBLIC_KEY_FILE` | `/cosign/cosign.pub` | ESO-projected public key path |
 | `COSIGN_VERIFY_FLAGS` | `--insecure-ignore-tlog=true` | Mirrors the Kyverno policy's `rekor.ignoreTlog` |
 
+### Deploying the gate live (Hub)
+
+The gate is a GitOps CronJob change: it takes effect only when the platform-ops
+tier is re-applied on the **Hub** (`k3d-k3d-cluster`) so the CronJob picks up the
+new env/mount and ESO projects the public key. Prerequisite: the Hub Vault already
+holds `cosign/signing` (`./scripts/k3d-manager signing_status` → `vault_key=present`)
+and the `vault-backend` ClusterSecretStore is `Ready`.
+
+```bash
+# 0. Preflight — must be on the Hub
+kubectl config current-context                       # expect k3d-k3d-cluster
+./scripts/k3d-manager signing_status                 # vault_key=present
+kubectl get clustersecretstore vault-backend         # READY=True
+
+# 1. Apply (targeted — minimal blast radius)
+D=scripts/etc/argocd/platform-ops
+kubectl apply -f "$D/cosign-pub-externalsecret.yaml"
+kubectl apply -f "$D/app-cve-scan-cronjob.yaml"
+kubectl -n platform-ops create configmap argocd-cve-scan-script \
+  --from-file=cve-scan.sh="$D/cve-scan.sh" \
+  --from-file=app-cve-scan.sh="$D/app-cve-scan.sh" \
+  --from-file=notify.sh="$D/notify.sh" \
+  --dry-run=client -o yaml | kubectl apply -f -
+# (or the full supported path: ./scripts/k3d-manager deploy_argocd_platform_ops)
+
+# 2. Verify ESO synced the public key (give it a few seconds)
+kubectl -n platform-ops get externalsecret cosign-public-key   # STATUS SecretSynced / READY True
+kubectl -n platform-ops get secret cosign-public-key \
+  -o jsonpath='{.data.cosign\.pub}' | base64 -d | head -1      # -----BEGIN PUBLIC KEY-----
+
+# 3. Smoke the gate against the live candidates
+J=app-cve-scan-siggate-$(date +%s)
+kubectl -n platform-ops create job "$J" --from=cronjob/app-cve-scan
+kubectl -n platform-ops wait --for=condition=complete job/"$J" --timeout=300s
+kubectl -n platform-ops logs job/"$J" | grep -iE 'SIGGATE|cosign|Promotion Blocked'
+```
+
+Reading the smoke output: `SIGGATE <svc>: candidate …@sha256:… cosign-verified`
+means a signed candidate passed and promotion is allowed; `App CVE Promotion Blocked
+(unsigned)` is the fail-closed refusal (gate working, image genuinely unsigned).
+**No** SIGGATE lines while `COSIGN_VERIFY=1` means the key never mounted — check the
+ExternalSecret (step 2) before trusting a green run.
+
 ## Not yet done (follow-up slice)
 
 - **Attestation.** Stage C signs but does not `cosign attest` (Trivy vuln + SBOM)

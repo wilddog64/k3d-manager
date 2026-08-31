@@ -180,10 +180,20 @@
     --insecure-ignore-tlog=true` on a clean candidate digest **before** pinning it — unverifiable = **refused**
     (fail-closed, `App CVE Promotion Blocked (unsigned)` notify). Mirrors the Kyverno policy stance exactly. Pub key via
     new ESO `cosign-pub-externalsecret.yaml` (Hub Vault `cosign/signing` → `platform-ops/cosign-public-key`) mounted at
-    `/cosign`; `COSIGN_VERSION=v2.4.1` (matches CI signer). BATS 12/12, shellcheck clean, howto updated. **NEXT: deploy live**
-    (re-run the platform-ops deploy so the CronJob picks up the env/mount + ESO syncs the pub Secret on the Hub; confirm a
-    signed candidate verifies). Then remaining deferrals: `cosign attest` in CI (cross-repo → Codex) + `verify-attestation`;
-    codify app-cluster Vault seed/grant + kyverno-ns ghcr ES into `signing.sh`.
+    `/cosign`; `COSIGN_VERSION=v2.4.1` (matches CI signer). BATS 12/12, shellcheck clean, howto updated.
+    **LIVE-DEPLOY RUNBOOK ready 2026-08-31** — in `docs/howto/image-signing.md` (§Deploying the gate live): targeted
+    apply of the ES + CronJob + script ConfigMap on the Hub (`k3d-k3d-cluster`), verify ESO `SecretSynced`, smoke via a
+    manual `--from=cronjob/app-cve-scan` job grepping `SIGGATE`. Preflight confirmed: hub Vault `vault_key=present`,
+    `vault-backend` CSS Ready, `platform-ops/cosign-public-key` not-yet-present (clean first deploy). **User runs it via `!`
+    (deploy-path mutation, classifier-gated for Claude Bash).**
+  - **CVE-loop closure #2 — CI `cosign attest` (vuln+SBOM) → ASSIGNED CODEX 2026-08-31.** Spec
+    `docs/plans/v1.27.0-image-signing-attest-codex-task.md`. Adds 3 steps to shopping-cart-infra reusable
+    `build-push-deploy.yml` (trivy `cosign-vuln` + `spdx-json` predicates → `cosign attest --type vuln` / `--type spdxjson`),
+    guarded `if: env.COSIGN_KEY != ''`, reusing already-pinned trivy-action@v0.35.0 + cosign-installer@v3.7.0 (no new versions).
+    Branch `feat/cosign-attest` **from origin/main** (the local `feat/cosign-sign-attest` is spent — sign step squash-merged as
+    PR #94/`1fa7ab0`, callers pin that SHA). Codex must NOT touch callers or the verify side. Follow-ups: re-pin the 5 callers
+    post-merge; then extend the promoter gate + Kyverno policy with `verify-attestation --type vuln`. Then codify app-cluster
+    Vault seed/grant + kyverno-ns ghcr ES into `signing.sh`.
   - **Payment Java CVE remediation — spec written + ASSIGNED CODEX 2026-08-30.** Spec
     `docs/issues/2026-08-30-payment-cve-remediation.md`. Root cause: 7 fixable CRIT + 42 HIGH are ALL transitive from
     `spring-boot-starter-parent 3.2.0` (nothing pinned in pom). Fix = single BOM bump to latest 3.5.x + targeted

@@ -303,9 +303,15 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   other invocation unchanged; the CronJob sets `1`. Pub key: new ESO `cosign-pub-externalsecret.yaml` (Hub Vault `cosign/signing`
   → `platform-ops/cosign-public-key`) mounted read-only at `/cosign` (optional secret → missing key = fail-closed skip). Wired into
   `argocd.sh` deploy path. BATS 12/12 (2 new gate tests: signed→promote, unsigned→refuse); shellcheck clean (only pre-existing
-  SC2329 on the `_cleanup` trap). Howto `docs/howto/image-signing.md` updated. **NOT yet deployed live** (Hub CronJob apply + ESO
-  sync verification pending). **Still deferred:** `cosign attest` (vuln+SBOM) in CI reusable workflow (cross-repo → Codex) then
-  extend the gate + policy with `verify-attestation --type vuln`; codify app-cluster Vault seed/grant + kyverno-ns ghcr ES into `signing.sh`.
+  SC2329 on the `_cleanup` trap). Howto `docs/howto/image-signing.md` updated. **Live-deploy runbook ready 2026-08-31**
+  (howto §Deploying the gate live; targeted Hub apply + ESO verify + manual-job SIGGATE smoke; preflight confirmed vault_key
+  present, CSS Ready, clean first deploy) — **user runs it via `!`** (deploy-path mutation, classifier-gated for Claude).
+  **Still not deployed live** pending that run.
+  **CI `cosign attest` (vuln+SBOM) — ASSIGNED CODEX 2026-08-31**, spec `docs/plans/v1.27.0-image-signing-attest-codex-task.md`:
+  3 steps into shopping-cart-infra reusable `build-push-deploy.yml` (trivy `cosign-vuln`+`spdx-json` predicates →
+  `cosign attest --type vuln`/`--type spdxjson`), branch `feat/cosign-attest` from origin/main (the `feat/cosign-sign-attest`
+  branch is spent — sign squash-merged as PR #94/`1fa7ab0`). Follow-ups: re-pin the 5 callers post-merge; extend the promoter
+  gate + Kyverno policy with `verify-attestation --type vuln`; codify app-cluster Vault seed/grant + kyverno-ns ghcr ES into `signing.sh`.
 - [x] **Payment Java CVE remediation — ✅ CVE→SIGN→VERIFY LOOP CLOSED 2026-08-31.** PR #68 MERGED `ecdb421f`; Copilot #68 threads
   replied **+ RESOLVED** both. Step 4 done: sign run `33345512446` (all 6 jobs green) pushed+cosign-signed new digest
   `sha256:8f195e336cb702c347e1b78193e9ad96143a82716d3cecaec7713307c21daab1` (tlog 2656526539); **cosign verify PASSES**;
