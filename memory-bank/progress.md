@@ -297,7 +297,12 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Enforce flip (which admits it either way, being signed).
   **Still deferred:** promoter `cosign verify` gate in `app-cve-scan.sh` + `cosign attest` in CI; codify app-Vault
   seed/grant + kyverno-ns ghcr ES into signing.sh.
-- [~] **Payment Java CVE remediation** (`docs/issues/2026-08-30-payment-cve-remediation.md`) — ASSIGNED CODEX
+- [~] **Payment Java CVE remediation** — ✅ VERIFIED + **PR #68 OPEN** 2026-08-30. Container `mvn clean verify` = BUILD SUCCESS,
+  **130 tests 0 fail/err/skip** (incl. Testcontainers integration; clean context on Boot 3.5.16). Commit `2bc05325` on
+  `origin/fix/payment-cve-spring-boot-bump` = 3 pom edits (parent 3.5.16 + rabbitmq **1.0.2** + flyway `${flyway.version}`), zero code.
+  Copilot review requested on #68. NEXT: #68 CI green + Copilot addressed → merge (gated) → CI rebuild+cosign-sign → trivy re-verify → digest re-pin.
+  Dependabot: #67 (4.1.1) CLOSED superseded; #66 (fetch-metadata) MERGED; #65 (setup-java 6) Copilot-approved, re-updating to merge. (History ↓.)
+- [~] **Payment Java CVE remediation (history)** (`docs/issues/2026-08-30-payment-cve-remediation.md`) — ASSIGNED CODEX
   2026-08-30, branch `fix/payment-cve-spring-boot-bump` in shopping-cart-payment. 7 fixable CRIT + 42 HIGH all
   transitive from `spring-boot-starter-parent 3.2.0`; fix = BOM bump to latest 3.5.x + targeted overrides. Gate:
   `./mvnw clean verify` green + dependency:tree proof (tomcat ≥10.1.55, spring-security-web ≥6.5.9, postgresql ≥42.7.2).

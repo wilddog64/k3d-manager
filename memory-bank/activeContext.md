@@ -217,6 +217,14 @@
     enforce_admins toggled off→merge→**restored true**. Copilot reviewer N/A on this repo (`Could not resolve login 'copilot'`); required check `CI`
     is a phantom context (actual check = `Build and Test`). **PAYMENT RESUMED**: repinned `<rabbitmq-client.version>`→1.0.2 (uncommitted, joins the 2 held
     pom edits), full container verify re-running (should clear the Spring Cloud CompatibilityNotMetException now that 1.0.2 carries the 2025.0.3 train).
+    **✅ PAYMENT VERIFIED + PR OPEN 2026-08-30.** Container `mvn clean verify` = **BUILD SUCCESS, 130 tests 0 fail/err/skip** (incl. Testcontainers
+    Postgres integration; Spring context loads clean on Boot 3.5.16 — compat blocker gone). 3 pom edits committed `2bc05325` on
+    `origin/fix/payment-cve-spring-boot-bump` (parent 3.5.16 + rabbitmq 1.0.2 + flyway `${flyway.version}`), zero code changes. **PR #68 OPEN**
+    (`fix(deps): bump spring-boot-starter-parent 3.2.0 -> 3.5.16 …`), Copilot review requested. NEXT: #68 CI green + Copilot addressed → merge
+    (gated) → CI rebuild+cosign-sign payment image → trivy re-verify → re-pin signed digest in substrate `kustomization.yaml` (closes CVE→sign loop).
+    **Dependabot cleanup (payment repo, user go):** #67 (parent→4.1.1) CLOSED as superseded (4.x breaks the 2025.0.3 train + oversized). #66
+    (fetch-metadata 2.3.0→3.1.0) **MERGED** squash; #65 (setup-java 5→6) Copilot-approved+CI-green, re-updating branch to merge (each merge
+    invalidates the next under the up-to-date ruleset). Copilot review on payment repo IS enabled (`copilot-pull-request-reviewer`); user REQUIRES it.
   - **Stage C merges ✅ ALL 6 MERGED (2026-08-25/26, user go given; merge SHAs gh-verified 2026-08-28):**
     infra #94 `1fa7ab005b57148468d0d23c6aa33fcc193baff5`, frontend #99 `000bdcc0945fcc62f38c366c843193da72b9e88a`,
     basket #39 `6f5a57c90e66d6a0be5eb0c1fd4ab43a86a5dfc7`, order #72 `cb4403db0a16eace10e0ff06c900849f8d483c03`,
