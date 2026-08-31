@@ -186,8 +186,10 @@
     manual `--from=cronjob/app-cve-scan` job grepping `SIGGATE`. Preflight confirmed: hub Vault `vault_key=present`,
     `vault-backend` CSS Ready, `platform-ops/cosign-public-key` not-yet-present (clean first deploy). **User runs it via `!`
     (deploy-path mutation, classifier-gated for Claude Bash).**
-  - **CVE-loop closure #2 — CI `cosign attest` (vuln+SBOM) → ASSIGNED CODEX 2026-08-31.** Spec
-    `docs/plans/v1.27.0-image-signing-attest-codex-task.md`. Adds 3 steps to shopping-cart-infra reusable
+  - **CVE-loop closure #2 — CI `cosign attest` (vuln+SBOM) ✅ CODE DONE + VERIFIED 2026-08-31 (`6bfee7f5` on `origin/feat/cosign-attest`).**
+    Codex session `01a05793`; Claude-verified on origin (SHA match, 1 file/33-ins, exact msg, descended from origin/main, yaml ok,
+    order Sign→Generate-vuln→Generate-SBOM→Attest→promote, all guarded `if: env.COSIGN_KEY != ''`). **NOT merged** (needs PR + gates).
+    Spec `docs/plans/v1.27.0-image-signing-attest-codex-task.md`. Adds 3 steps to shopping-cart-infra reusable
     `build-push-deploy.yml` (trivy `cosign-vuln` + `spdx-json` predicates → `cosign attest --type vuln` / `--type spdxjson`),
     guarded `if: env.COSIGN_KEY != ''`, reusing already-pinned trivy-action@v0.35.0 + cosign-installer@v3.7.0 (no new versions).
     Branch `feat/cosign-attest` **from origin/main** (the local `feat/cosign-sign-attest` is spent — sign step squash-merged as
