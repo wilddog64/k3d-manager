@@ -224,8 +224,15 @@
     flyway `${flyway.version}` override DECLINED w/ justification on-thread (binding = BOM flyway-core 11.7.2, keeps modules aligned); missing lib
     `v1.0.2` tag/release — CREATED on `rabbitmq-client-java` @ `a4a4640f` (package was published but git tag absent). Merge treadmill note: each merge
     fires a `ci: update ... [skip ci]` image-pin auto-commit on main → next PR goes BEHIND under the up-to-date ruleset; needs re-update-branch +
-    Copilot re-request (review is per-head). NEXT (Step 4): payment main CI rebuild+cosign-sign new image → trivy re-verify → re-pin signed digest in
-    k3d-manager substrate `services/shopping-cart-payment/kustomization.yaml` (closes CVE→sign→verify loop).
+    Copilot re-request (review is per-head). Copilot #68 threads: replied + **RESOLVED** both (missed on first pass — user caught it;
+    lesson [[feedback_copilot_resolve_threads_not_just_reply]]: "addressed" = REPLY + RESOLVE, sweep `isResolved:false` as a pre-merge gate).
+    **✅ STEP 4 DONE — CVE→SIGN→VERIFY LOOP CLOSED 2026-08-31.** Payment main sign run `33345512446` (sha `ecdb421f`) all 6 jobs green;
+    `Build, Scan & Push` pushed+**cosign-signed** new digest `sha256:8f195e336cb702c347e1b78193e9ad96143a82716d3cecaec7713307c21daab1`
+    (tlog index 2656526539). **cosign verify PASSES** against the kyverno-synced pub key (logIndex matches CI). **trivy re-verify (fixed-only
+    CRIT/HIGH): 0 CRITICAL (was 7 fixable), HIGH 42→9.** Residual 9 HIGH are NOT pom-fixable here: 3 base-image OpenSSL (alpine `libcrypto3`/
+    `libssl3`/`openssl` 3.5.7→3.5.8, needs base rebuild), 3 `com.rabbitmq:amqp-client` 5.25.0→5.33.x (library-transitive → next rabbitmq-client-java
+    bump), 2 `httpcore5` 5.3.6→5.4.3, 1 `postgresql` 42.7.11→42.7.12 → follow-ups, not blockers. Substrate re-pinned
+    `services/shopping-cart-payment/kustomization.yaml` digest `3b5f478c…`→`8f195e33…`. "Do all 4" chain COMPLETE.
     **Dependabot cleanup (payment repo, user go):** #67 (parent→4.1.1) CLOSED as superseded (4.x breaks the 2025.0.3 train + oversized).
     #66 (fetch-metadata 2.3.0→3.1.0) **MERGED**; #65 (setup-java 5→6) **MERGED** 08-31T00:25Z (each merge invalidates the next under the up-to-date
     ruleset). Copilot review on payment repo IS enabled (`copilot-pull-request-reviewer`); user REQUIRES it — request via raw-JSON `--input -`.

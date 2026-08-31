@@ -297,12 +297,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Enforce flip (which admits it either way, being signed).
   **Still deferred:** promoter `cosign verify` gate in `app-cve-scan.sh` + `cosign attest` in CI; codify app-Vault
   seed/grant + kyverno-ns ghcr ES into signing.sh.
-- [~] **Payment Java CVE remediation** — ✅ VERIFIED + **PR #68 OPEN** 2026-08-30. Container `mvn clean verify` = BUILD SUCCESS,
-  **130 tests 0 fail/err/skip** (incl. Testcontainers integration; clean context on Boot 3.5.16). Commit `2bc05325` on
-  `origin/fix/payment-cve-spring-boot-bump` = 3 pom edits (parent 3.5.16 + rabbitmq **1.0.2** + flyway `${flyway.version}`), zero code.
-  **#68 MERGED** `ecdb421f` 08-31T00:45Z (squash). Copilot both nits addressed: flyway override DECLINED w/ justification; missing lib `v1.0.2` tag CREATED
-  on rabbitmq-client-java @ `a4a4640f`. NEXT (Step 4): payment main CI rebuild+cosign-sign → trivy re-verify → re-pin signed digest in substrate kustomization.
-  Dependabot: #67 (4.1.1) CLOSED superseded; #66 (fetch-metadata) MERGED; #65 (setup-java 6) **MERGED** 08-31T00:25Z. (History ↓.)
+- [x] **Payment Java CVE remediation — ✅ CVE→SIGN→VERIFY LOOP CLOSED 2026-08-31.** PR #68 MERGED `ecdb421f`; Copilot #68 threads
+  replied **+ RESOLVED** both. Step 4 done: sign run `33345512446` (all 6 jobs green) pushed+cosign-signed new digest
+  `sha256:8f195e336cb702c347e1b78193e9ad96143a82716d3cecaec7713307c21daab1` (tlog 2656526539); **cosign verify PASSES**;
+  **trivy fixed-only CRIT/HIGH: 0 CRIT (was 7), HIGH 42→9** (residual = 3 base OpenSSL + 3 amqp-client + 2 httpcore5 + 1 postgresql,
+  all transitive/base → follow-ups not blockers). Substrate `services/shopping-cart-payment/kustomization.yaml` re-pinned
+  `3b5f478c…`→`8f195e33…`. Commit `2bc05325` on payment main = 3 pom edits (parent 3.5.16 + rabbitmq **1.0.2** + flyway `${flyway.version}`).
+  Dependabot: #67 (4.1.1) CLOSED superseded; #66 (fetch-metadata) MERGED; #65 (setup-java 6) MERGED. "Do all 4" chain COMPLETE. (History ↓.)
 - [~] **Payment Java CVE remediation (history)** (`docs/issues/2026-08-30-payment-cve-remediation.md`) — ASSIGNED CODEX
   2026-08-30, branch `fix/payment-cve-spring-boot-bump` in shopping-cart-payment. 7 fixable CRIT + 42 HIGH all
   transitive from `spring-boot-starter-parent 3.2.0`; fix = BOM bump to latest 3.5.x + targeted overrides. Gate:
