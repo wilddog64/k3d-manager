@@ -104,12 +104,34 @@ deliberately for Enforce on a solo-operated fleet.
 | `SIGNING_VALIDATION_FAILURE_ACTION` | `Audit` | `Audit` or `Enforce` (Enforce also needs `SIGNING_ALLOW_ENFORCE=1`) |
 | `SIGNING_WEBHOOK_FAILURE_POLICY` | `Ignore` | Admission webhook failure policy |
 
+## Promoter verify gate (the third latch)
+
+The Hub CVE promoter (`scripts/etc/argocd/platform-ops/app-cve-scan.sh`, CronJob
+`app-cve-scan`) runs `cosign verify --key <our pub>` on a clean `sha-*` candidate
+digest **before** it pins that digest into the ArgoCD Application. An unverifiable
+candidate is not a promotable candidate: the promoter skips it, notifies
+(`App CVE Promotion Blocked (unsigned)`), and moves on — **fail-closed**. This keeps
+the promoter and Kyverno admission agreeing on what "signed" means (key-based,
+`--insecure-ignore-tlog=true`, mirroring the ClusterPolicy's `rekor.ignoreTlog: true`)
+so a promotion can never dead-end at admission on an unsigned image.
+
+The public key reaches the CronJob via an ESO `ExternalSecret`
+(`cosign-pub-externalsecret.yaml`) projecting Hub Vault `cosign/signing` → Secret
+`platform-ops/cosign-public-key`, mounted read-only at `/cosign`. `cosign` is
+downloaded (pinned `COSIGN_VERSION`) at runtime the same way `kubectl` is.
+
+| Env Var | Default | Description |
+|---|---|---|
+| `COSIGN_VERIFY` | `1` (CronJob) | Master switch for the promoter verify gate |
+| `COSIGN_VERSION` | `v2.4.1` | Pinned cosign release (matches CI signer; A08) |
+| `COSIGN_PUBLIC_KEY_FILE` | `/cosign/cosign.pub` | ESO-projected public key path |
+| `COSIGN_VERIFY_FLAGS` | `--insecure-ignore-tlog=true` | Mirrors the Kyverno policy's `rekor.ignoreTlog` |
+
 ## Not yet done (follow-up slice)
 
 - **Attestation.** Stage C signs but does not `cosign attest` (Trivy vuln + SBOM)
-  yet, so the policy is **signature-only**. Tighten the `verifyImages` block to
-  require a passing vuln attestation once CI produces one.
-- **Promoter gate.** Wire `cosign verify` into the CVE promoter
-  (`app-cve-scan.sh`) before it pins a candidate digest — needs `cosign` + the
-  public key available inside the platform-ops CronJob image.
-- **Enforce.** Flip to Enforce only after Audit is clean on the live fleet.
+  yet, so both the policy and the promoter gate are **signature-only**. Add
+  `cosign attest` in CI, then tighten each verify to require a passing vuln
+  attestation (`verify-attestation --type vuln`).
+- **Codify app-cluster wiring.** Fold the hand-run hostinger steps (app Vault
+  cosign.pub seed/grant, kyverno-ns ghcr imagePullSecret ES) into `signing.sh`.

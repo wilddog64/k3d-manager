@@ -1502,6 +1502,9 @@ EOF
    _info "[argocd] Deploying app-image CVE scan CronJob..."
    _kubectl apply -f "${_dir}/app-cve-scan-cronjob.yaml"
 
+   _info "[argocd] Deploying cosign public-key ExternalSecret (promoter verify gate)..."
+   _kubectl apply -f "${_dir}/cosign-pub-externalsecret.yaml"
+
    _info "[argocd] Deploying scan script ConfigMap..."
    _kubectl create configmap argocd-cve-scan-script \
       --from-file=cve-scan.sh="${_dir}/cve-scan.sh" \
