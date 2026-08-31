@@ -73,10 +73,74 @@ setup() {
   [[ "${output}" == *refusing* ]]
 }
 
-@test "loadtest: confirmation flag initializes without live calls" {
-  run loadtest_run --confirm
+@test "loadtest: token endpoint is derived from the issuer" {
+  run _loadtest_token_endpoint "https://kc.example/realms/shopping-cart"
+  [ "${output}" = "https://kc.example/realms/shopping-cart/protocol/openid-connect/token" ]
+  run _loadtest_token_endpoint "https://kc.example/realms/shopping-cart/"
+  [ "${output}" = "https://kc.example/realms/shopping-cart/protocol/openid-connect/token" ]
+}
+
+@test "loadtest: mint token refuses without credentials" {
+  unset LOADTEST_CLIENT_SECRET LOADTEST_USERNAME LOADTEST_PASSWORD
+  run _loadtest_mint_token
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *LOADTEST_CLIENT_SECRET* ]]
+}
+
+@test "loadtest: prom query returns 0 for empty/failed result" {
+  _loadtest_curl() { return 1; }
+  run _loadtest_prom_query "up"
   [ "${status}" -eq 0 ]
-  [[ "${output}" == *"not wired"* ]]
+  [ "${output}" = "0" ]
+}
+
+@test "loadtest: prom query parses a scalar value" {
+  _loadtest_curl() { printf '{"data":{"result":[{"value":[0,"1.75"]}]}}'; }
+  run _loadtest_prom_query "some_query"
+  [ "${output}" = "1.75" ]
+}
+
+@test "loadtest: prom flag maps positive to 1 and zero to 0" {
+  _loadtest_curl() { printf '{"data":{"result":[{"value":[0,"3"]}]}}'; }
+  run _loadtest_prom_flag "q"
+  [ "${output}" = "1" ]
+  _loadtest_curl() { printf '{"data":{"result":[{"value":[0,"0"]}]}}'; }
+  run _loadtest_prom_flag "q"
+  [ "${output}" = "0" ]
+}
+
+@test "loadtest: fetch metrics emits the 8-positional snapshot" {
+  _loadtest_curl() { printf '{"data":{"result":[{"value":[0,"0"]}]}}'; }
+  run _loadtest_fetch_metrics
+  [ "${status}" -eq 0 ]
+  set -- ${output}
+  [ "$#" -eq 8 ]
+}
+
+@test "loadtest: dry-run ramps through green stages and writes a summary each" {
+  export LOADTEST_STAGES="100 250 500"
+  export LOADTEST_RESULT_DIR="${BATS_TEST_TMPDIR}/results"
+  export LOADTEST_RUN_ID="run-dry-green"
+  export LOADTEST_DRY_METRICS="0 0 0 0 0 0 0 0"
+  run loadtest_run --confirm --dry-run
+  [ "${status}" -eq 0 ]
+  [ -f "${LOADTEST_RESULT_DIR}/run-dry-green/stage-0-100.json" ]
+  [ -f "${LOADTEST_RESULT_DIR}/run-dry-green/stage-2-500.json" ]
+  jq -e '.decision == "increase"' "${LOADTEST_RESULT_DIR}/run-dry-green/stage-0-100.json"
+}
+
+@test "loadtest: dry-run stops after hysteresis on a persistent breach" {
+  export LOADTEST_STAGES="100 250 500"
+  export LOADTEST_RESULT_DIR="${BATS_TEST_TMPDIR}/results"
+  export LOADTEST_RUN_ID="run-dry-breach"
+  export LOADTEST_BREACH_INTERVALS=2
+  export LOADTEST_DRY_METRICS="5 0 0 0 0 0 0 0"
+  run loadtest_run --confirm --dry-run
+  [ "${status}" -eq 0 ]
+  [ -f "${LOADTEST_RESULT_DIR}/run-dry-breach/stage-0-100.json" ]
+  [ -f "${LOADTEST_RESULT_DIR}/run-dry-breach/stage-1-250.json" ]
+  [ ! -f "${LOADTEST_RESULT_DIR}/run-dry-breach/stage-2-500.json" ]
+  jq -e '.decision == "stop"' "${LOADTEST_RESULT_DIR}/run-dry-breach/stage-1-250.json"
 }
 
 @test "loadtest: stage summary is valid and immutable" {

@@ -320,6 +320,16 @@
      SECRET}`), users federated from OpenLDAP (realm has no local users; `alice/password` dev). **NEXT:** fetch
      order-service client secret + confirm LDAP user → prove one authed `POST /api/orders` 201 → build k6 +
      wire Slice E stubs (`_loadtest_fetch_metrics`, `loadtest_run`) + Grafana dashboard + staged live run.
+     **✅ SLICE F CODE COMPLETE 2026-08-31 (live-run gated).** Built + validated all deterministic artifacts:
+     `scripts/etc/loadtest/checkout.js` (k6 gen, `POST /api/orders` synthetic items + idempotency key, `checkout_load_*`
+     metrics), `loadtest.sh` wiring (`_loadtest_mint_token` password-grant via 0600 curl `--config` — secrets off argv;
+     `_loadtest_prom_query`/`_loadtest_fetch_metrics` → 8-positional snapshot for `_loadtest_evaluate_gates`, PromQL
+     overridable; real staged `loadtest_run` mint→k6→fetch→decide→immutable JSON; `--confirm` kept + `--dry-run` full-ladder
+     path), Grafana dashboard CM (7 panels, `run_id` var). BATS 16/16 (was 9), shellcheck/`bash -n` clean, dispatcher loads.
+     **LIVE-RUN GATE:** needs Vault read (`secret/keycloak/clients`→`order_service_client_secret`, hub ns `secrets`) + LDAP
+     user — both classifier-gated secret reads; k6 not installed (`brew install k6`). Steps in blueprint Status 2026-08-31.
+     Hub Keycloak ns=`identity`, Vault ns=`secrets` (NOT `keycloak`/`vault`); order-service is pure resource-server (JWT
+     validate only, no client secret in-pod). Substantial v1.27.0 work now down to live runs + release.
      Verify Codex output on origin per [[feedback_codex_verification_protocol]] before trusting;
      note the `codex exec` sandbox has `.git` read-only, so expect Codex to leave files uncommitted
      and Claude commits after review (as with Slice A).

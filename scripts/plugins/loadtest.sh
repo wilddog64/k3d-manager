@@ -115,9 +115,134 @@ function _loadtest_write_stage_summary() {
     > "${output_path}"
 }
 
+# --- Slice F: auth, generator, and metric wiring ------------------------------
+
+LOADTEST_KEYCLOAK_ISSUER="${LOADTEST_KEYCLOAK_ISSUER:-https://keycloak.3ai-talk.org/realms/shopping-cart}"
+LOADTEST_CLIENT_ID="${LOADTEST_CLIENT_ID:-order-service}"
+LOADTEST_TARGET_URL="${LOADTEST_TARGET_URL:-http://localhost:18081}"
+LOADTEST_PROM_URL="${LOADTEST_PROM_URL:-http://localhost:19090}"
+LOADTEST_STAGE_DURATION="${LOADTEST_STAGE_DURATION:-60s}"
+LOADTEST_POLL_INTERVAL="${LOADTEST_POLL_INTERVAL:-15}"
+LOADTEST_K6_SCRIPT="${LOADTEST_K6_SCRIPT:-${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/etc/loadtest/checkout.js}"
+LOADTEST_RESULT_DIR="${LOADTEST_RESULT_DIR:-${TMPDIR:-/tmp}/k3dm-loadtest}"
+
+# Metric names remote-written by k6 carry the k6_ prefix; PromQL below matches that.
+LOADTEST_PROMQL_ERROR_RATE="${LOADTEST_PROMQL_ERROR_RATE:-100 * (sum(rate(k6_checkout_load_requests_total{result=\"error\"}[1m])) / clamp_min(sum(rate(k6_checkout_load_requests_total[1m])), 1))}"
+LOADTEST_PROMQL_P95="${LOADTEST_PROMQL_P95:-histogram_quantile(0.95, sum(rate(k6_checkout_load_latency_seconds_bucket[1m])) by (le))}"
+LOADTEST_PROMQL_CPU="${LOADTEST_PROMQL_CPU:-100 * max(sum(rate(container_cpu_usage_seconds_total{namespace=\"shopping-cart-apps\"}[1m])) / sum(kube_pod_container_resource_limits{namespace=\"shopping-cart-apps\",resource=\"cpu\"}))}"
+LOADTEST_PROMQL_STRIPE_RL="${LOADTEST_PROMQL_STRIPE_RL:-sum(increase(payment_stripe_rate_limited_total[1m]))}"
+LOADTEST_PROMQL_DB_POOL="${LOADTEST_PROMQL_DB_POOL:-max(hikaricp_connections_pending{namespace=\"shopping-cart-apps\"})}"
+LOADTEST_PROMQL_CONTROL_PLANE="${LOADTEST_PROMQL_CONTROL_PLANE:-sum(increase(apiserver_request_total{code=~\"5..\"}[1m]))}"
+LOADTEST_PROMQL_EVICTION="${LOADTEST_PROMQL_EVICTION:-sum(kube_node_status_condition{condition=~\"DiskPressure|PIDPressure\",status=\"true\"})}"
+LOADTEST_PROMQL_MEMORY="${LOADTEST_PROMQL_MEMORY:-sum(kube_node_status_condition{condition=\"MemoryPressure\",status=\"true\"})}"
+
+# Pure: build the OIDC token endpoint from an issuer URL.
+function _loadtest_token_endpoint() {
+  local issuer="${1:?issuer required}"
+  printf '%s/protocol/openid-connect/token\n' "${issuer%/}"
+}
+
+# Thin wrapper around the k6 binary so BATS can stub it.
+function _loadtest_k6_bin() {
+  command k6 "$@"
+}
+
+# Thin wrapper around curl so BATS can stub network calls.
+function _loadtest_curl() {
+  command curl "$@"
+}
+
+# Mint an OAuth2 access token via the Keycloak password grant. Secrets are read
+# from env (LOADTEST_CLIENT_SECRET / LOADTEST_USERNAME / LOADTEST_PASSWORD) and
+# passed to curl via a 0600 config file so they never appear in argv or `ps`.
+function _loadtest_mint_token() {
+  local issuer="${LOADTEST_KEYCLOAK_ISSUER}" client_id="${LOADTEST_CLIENT_ID}"
+  local secret="${LOADTEST_CLIENT_SECRET:-}" user="${LOADTEST_USERNAME:-}" pass="${LOADTEST_PASSWORD:-}"
+  if [[ -z "${secret}" || -z "${user}" || -z "${pass}" ]]; then
+    _err "[loadtest] mint token needs LOADTEST_CLIENT_SECRET, LOADTEST_USERNAME, LOADTEST_PASSWORD"
+    return 1
+  fi
+  local endpoint cfg raw token
+  endpoint=$(_loadtest_token_endpoint "${issuer}")
+  cfg=$(mktemp "${TMPDIR:-/tmp}/k3dm-loadtest-tok.XXXXXX") || return 1
+  chmod 600 "${cfg}"
+  {
+    printf 'data-urlencode = "grant_type=password"\n'
+    printf 'data-urlencode = "client_id=%s"\n' "${client_id}"
+    printf 'data-urlencode = "client_secret=%s"\n' "${secret}"
+    printf 'data-urlencode = "username=%s"\n' "${user}"
+    printf 'data-urlencode = "password=%s"\n' "${pass}"
+  } > "${cfg}"
+  raw=$(_loadtest_curl -sf --config "${cfg}" "${endpoint}" 2>/dev/null)
+  local rc=$?
+  rm -f "${cfg}" 2>/dev/null || true
+  if ((rc != 0)); then
+    _err "[loadtest] token mint failed against ${endpoint} (client_id=${client_id})"
+    return 1
+  fi
+  token=$(printf '%s' "${raw}" | jq -r '.access_token // empty')
+  if [[ -z "${token}" ]]; then
+    _err "[loadtest] token endpoint returned no access_token"
+    return 1
+  fi
+  printf '%s\n' "${token}"
+}
+
+# Query Prometheus for a single instant scalar; empty result -> 0.
+function _loadtest_prom_query() {
+  local query="${1:?query required}" raw value
+  raw=$(_loadtest_curl -sf -G "${LOADTEST_PROM_URL}/api/v1/query" \
+    --data-urlencode "query=${query}" 2>/dev/null) || { printf '0\n'; return 0; }
+  value=$(printf '%s' "${raw}" | jq -r '.data.result[0].value[1] // empty' 2>/dev/null)
+  if [[ -z "${value}" || "${value}" == "null" || "${value}" == "NaN" ]]; then
+    printf '0\n'
+  else
+    printf '%s\n' "${value}"
+  fi
+}
+
+# Emit "> 0 -> 1, else 0" for the boolean saturation flags.
+function _loadtest_prom_flag() {
+  local query="${1:?query required}" value
+  value=$(_loadtest_prom_query "${query}")
+  if _loadtest_is_greater "${value}" "0"; then
+    printf '1\n'
+  else
+    printf '0\n'
+  fi
+}
+
+# Produce the 8-positional snapshot that _loadtest_evaluate_gates consumes:
+#   error_rate p95_seconds cpu_pct stripe db_pool control_plane eviction memory
 function _loadtest_fetch_metrics() {
-  _err "[loadtest] metric fetcher is not wired in this slice"
-  return 1
+  local error_rate p95 cpu stripe db_pool control_plane eviction memory
+  error_rate=$(_loadtest_prom_query "${LOADTEST_PROMQL_ERROR_RATE}")
+  p95=$(_loadtest_prom_query "${LOADTEST_PROMQL_P95}")
+  cpu=$(_loadtest_prom_query "${LOADTEST_PROMQL_CPU}")
+  stripe=$(_loadtest_prom_flag "${LOADTEST_PROMQL_STRIPE_RL}")
+  db_pool=$(_loadtest_prom_flag "${LOADTEST_PROMQL_DB_POOL}")
+  control_plane=$(_loadtest_prom_flag "${LOADTEST_PROMQL_CONTROL_PLANE}")
+  eviction=$(_loadtest_prom_flag "${LOADTEST_PROMQL_EVICTION}")
+  memory=$(_loadtest_prom_flag "${LOADTEST_PROMQL_MEMORY}")
+  printf '%s %s %s %s %s %s %s %s\n' \
+    "${error_rate}" "${p95}" "${cpu}" "${stripe}" "${db_pool}" \
+    "${control_plane}" "${eviction}" "${memory}"
+}
+
+# Launch k6 for a single stage at the given concurrency. Returns k6's exit code.
+function _loadtest_k6_stage() {
+  local stage="${1:?stage required}" vus="${2:?vus required}" duration="${3:?duration required}"
+  local token="${4:-${LOADTEST_TOKEN:-}}"
+  LOADTEST_RUN_ID="${LOADTEST_RUN_ID}" \
+  LOADTEST_STAGE="${stage}" \
+  LOADTEST_VUS="${vus}" \
+  LOADTEST_DURATION="${duration}" \
+  LOADTEST_TARGET_URL="${LOADTEST_TARGET_URL}" \
+  LOADTEST_TOKEN="${token}" \
+  LOADTEST_POLL_ORDER="${LOADTEST_POLL_ORDER:-0}" \
+    _loadtest_k6_bin run \
+      ${LOADTEST_K6_OUT:+--out "${LOADTEST_K6_OUT}"} \
+      "${LOADTEST_K6_SCRIPT}"
 }
 
 function loadtest_run() {
@@ -126,6 +251,7 @@ function loadtest_run() {
   for arg in "$@"; do
     case "${arg}" in
       --confirm) confirmed=1 ;;
+      --dry-run) LOADTEST_DRY_RUN=1 ;;
       *)
         _err "[loadtest] unknown option: ${arg}"
         return 2
@@ -141,11 +267,57 @@ function loadtest_run() {
   fi
 
   LOADTEST_RUN_ID="${LOADTEST_RUN_ID:-loadtest-$(date -u +%Y%m%dT%H%M%SZ)}"
-  _info "[loadtest] initialized ${LOADTEST_RUN_ID}; live generator and metric poller are not wired (Slice F)"
+  local dry="${LOADTEST_DRY_RUN:-0}"
+  local run_dir="${LOADTEST_RESULT_DIR}/${LOADTEST_RUN_ID}"
+  mkdir -p "${run_dir}"
+
+  local stages=()
+  read -r -a stages <<< "${LOADTEST_STAGES}"
+  local stage_count="${#stages[@]}"
+  _info "[loadtest] ${LOADTEST_RUN_ID}: ${stage_count} stage(s), results in ${run_dir} (dry_run=${dry})"
+
+  local idx breach_count=0 target token="${LOADTEST_TOKEN:-}"
+  for ((idx = 0; idx < stage_count; idx++)); do
+    target="${stages[idx]}"
+
+    if [[ "${dry}" != "1" ]]; then
+      token=$(_loadtest_mint_token) || { _err "[loadtest] aborting: token mint failed at stage ${target}"; return 1; }
+      _loadtest_k6_stage "${target}" "${target}" "${LOADTEST_STAGE_DURATION}" "${token}" \
+        || _info "[loadtest] k6 stage ${target} exited non-zero (client-side); trusting Prometheus gates"
+    fi
+
+    local snapshot breaches
+    if [[ "${dry}" == "1" ]]; then
+      snapshot="${LOADTEST_DRY_METRICS:-0 0 0 0 0 0 0 0}"
+    else
+      snapshot=$(_loadtest_fetch_metrics)
+    fi
+    # shellcheck disable=SC2086
+    breaches=$(_loadtest_evaluate_gates ${snapshot})
+
+    local decision_out decision next_count
+    decision_out=$(_loadtest_decide "${idx}" "${breaches}" "${breach_count}")
+    decision=$(printf '%s\n' "${decision_out}" | sed -n '1p')
+    next_count=$(printf '%s\n' "${decision_out}" | sed -n '2p')
+    breach_count="${next_count}"
+
+    _loadtest_write_stage_summary "${LOADTEST_RUN_ID}" "${target}" "${target}" 0 \
+      "${decision}" "${breaches}" "${run_dir}/stage-${idx}-${target}.json"
+    _info "[loadtest] stage ${target}: decision=${decision} breaches=[${breaches}]"
+
+    if [[ "${decision}" == "stop" ]]; then
+      _info "[loadtest] stop condition reached at stage ${target}; ending run"
+      break
+    fi
+  done
+
+  _info "[loadtest] ${LOADTEST_RUN_ID} complete; per-stage summaries under ${run_dir}"
 }
 
 function loadtest_status() {
-  printf 'stages=%s\nmax_error_rate=%s\nmax_p95_seconds=%s\nmax_cpu_pct=%s\nbreach_intervals=%s\n' \
+  printf 'stages=%s\nmax_error_rate=%s\nmax_p95_seconds=%s\nmax_cpu_pct=%s\nbreach_intervals=%s\nissuer=%s\nclient_id=%s\ntarget_url=%s\nprom_url=%s\nk6_script=%s\n' \
     "${LOADTEST_STAGES}" "${LOADTEST_MAX_ERROR_RATE}" "${LOADTEST_MAX_P95_SECONDS}" \
-    "${LOADTEST_MAX_CPU_PCT}" "${LOADTEST_BREACH_INTERVALS}"
+    "${LOADTEST_MAX_CPU_PCT}" "${LOADTEST_BREACH_INTERVALS}" \
+    "${LOADTEST_KEYCLOAK_ISSUER}" "${LOADTEST_CLIENT_ID}" "${LOADTEST_TARGET_URL}" \
+    "${LOADTEST_PROM_URL}" "${LOADTEST_K6_SCRIPT}"
 }

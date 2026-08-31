@@ -334,11 +334,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   required-check is a phantom (real = `Build and Test`). Unblocks payment.
 - [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
   — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
-  - [~] Slice F (generator + dashboard + live run) — **BLUEPRINT DONE 2026-08-29**
-    (`docs/bugs/2026-08-29-loadtest-slice-f-generator.md`): checkout=`POST /api/orders` (synthetic items OK,
-    payment downstream Stripe test), generator on laptop via port-forward, metrics via pushgateway/remote-write,
-    auth=password grant `client_id=order-service` against PUBLIC keycloak issuer, users from OpenLDAP. NEXT:
-    fetch client secret + LDAP user → one authed 201 → build k6 + wire Slice E stubs + dashboard + live run.
+  - [~] Slice F (generator + dashboard + live run) — **CODE COMPLETE 2026-08-31 (live-run gated)**
+    (`docs/bugs/2026-08-29-loadtest-slice-f-generator.md`). Built: `scripts/etc/loadtest/checkout.js` (k6 gen),
+    `loadtest.sh` wiring (`_loadtest_mint_token` password-grant via 0600 curl `--config`, `_loadtest_fetch_metrics`
+    → 8-positional PromQL snapshot, real staged `loadtest_run` w/ `--confirm`+`--dry-run`), Grafana dashboard CM
+    (7 panels). **BATS 16/16**, shellcheck/`bash -n` clean, dashboard JSON valid, dispatcher loads. **LIVE-RUN GATE:**
+    needs Vault read (`secret/keycloak/clients`→`order_service_client_secret`, hub ns `secrets`) + LDAP user (both
+    classifier-gated) + `brew install k6` → one authed 201 → low-conc validation → staged ladder + capacity report.
   - [x] Part 0 controller (Slice E) — commit `17be2e69` pushed to
     `origin/k3d-manager-v1.27.0`: pure stage-ladder + stop-condition-hysteresis decision logic,
     immutable jq summaries, opt-in guard, and BATS 9/9. Syntax, warning-level ShellCheck, and

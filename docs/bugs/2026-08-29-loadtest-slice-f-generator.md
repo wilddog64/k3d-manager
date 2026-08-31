@@ -110,3 +110,32 @@ written yet — this spec is the build blueprint. **Immediate next step:** fetch
 `order-service` client secret (Vault / k8s secret) + confirm an OpenLDAP test user, mint a
 token, prove ONE authenticated `POST /api/orders` → 201, then build the k6 script and wire
 the Slice E stubs.
+
+## Status 2026-08-31 — CODE COMPLETE (live-run gated)
+All deterministic artifacts built + validated:
+- `scripts/etc/loadtest/checkout.js` — k6 generator: per-VU `POST /api/orders` with
+  deterministic synthetic items + unique `customerId`/idempotency key, optional order poll,
+  `checkout_load_*` custom metrics tagged `{stage,run_id,result,state}` (remote-write → `k6_`
+  prefix). `node --check` clean.
+- `scripts/plugins/loadtest.sh` — wired the two Slice E stubs + helpers:
+  `_loadtest_mint_token` (Keycloak password grant, secrets via a 0600 curl `--config` file so
+  they never hit argv/`ps`), `_loadtest_token_endpoint` (pure), `_loadtest_prom_query`/
+  `_loadtest_prom_flag`/`_loadtest_fetch_metrics` (emit the 8-positional snapshot
+  `_loadtest_evaluate_gates` consumes; PromQL overridable via `LOADTEST_PROMQL_*`),
+  `_loadtest_k6_stage`, and a real staged `loadtest_run` loop (mint→k6→fetch→evaluate→decide→
+  immutable per-stage JSON; `--confirm`/`LOADTEST_CONFIRM` gate kept; `--dry-run` exercises the
+  whole ladder with `LOADTEST_DRY_METRICS`, no cluster).
+- `scripts/etc/grafana/dashboards/checkout-loadtest-configmap.yaml` — 7 panels (throughput,
+  p50/p95/p99, error %, orders/payments by state, CPU-of-limits, idempotency failures, peak VUs),
+  `run_id` template var; `grafana_dashboard: "1"` sidecar convention.
+- BATS 16/16 (was 9), shellcheck + `bash -n` clean, dashboard JSON valid, dispatcher loads.
+
+**Live-run GATE (remaining):** needs Vault read for the `order-service` client secret
+(`secret/keycloak/clients` → `order_service_client_secret`, hub Vault ns `secrets`) + an
+OpenLDAP user — both are classifier-gated secret reads. Live steps once secrets are available:
+(1) export `LOADTEST_CLIENT_SECRET`/`LOADTEST_USERNAME`/`LOADTEST_PASSWORD`; (2) prove ONE
+authed `POST /api/orders` → 201 (blueprint gate); (3) `kubectl port-forward svc/order-service
+-n shopping-cart-apps 18081:8081 --context ubuntu-hostinger` + a Prometheus port-forward on
+`:19090`; (4) `k6` install; (5) low-concurrency validation (~10 VUs, 1 stage) then the staged
+ladder with health-gated backoff; capture the immutable per-stage JSON + capacity report.
+k6 is NOT installed locally yet (`brew install k6`).
