@@ -80,11 +80,11 @@ setup() {
   [ "${output}" = "https://kc.example/realms/shopping-cart/protocol/openid-connect/token" ]
 }
 
-@test "loadtest: mint token refuses without credentials" {
+@test "loadtest: mint token refuses without user credentials" {
   unset LOADTEST_CLIENT_SECRET LOADTEST_USERNAME LOADTEST_PASSWORD
   run _loadtest_mint_token
   [ "${status}" -ne 0 ]
-  [[ "${output}" == *LOADTEST_CLIENT_SECRET* ]]
+  [[ "${output}" == *LOADTEST_USERNAME* ]]
 }
 
 @test "loadtest: prom query returns 0 for empty/failed result" {

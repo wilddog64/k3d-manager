@@ -158,8 +158,8 @@ function _loadtest_curl() {
 function _loadtest_mint_token() {
   local issuer="${LOADTEST_KEYCLOAK_ISSUER}" client_id="${LOADTEST_CLIENT_ID}"
   local secret="${LOADTEST_CLIENT_SECRET:-}" user="${LOADTEST_USERNAME:-}" pass="${LOADTEST_PASSWORD:-}"
-  if [[ -z "${secret}" || -z "${user}" || -z "${pass}" ]]; then
-    _err "[loadtest] mint token needs LOADTEST_CLIENT_SECRET, LOADTEST_USERNAME, LOADTEST_PASSWORD"
+  if [[ -z "${user}" || -z "${pass}" ]]; then
+    _err "[loadtest] mint token needs LOADTEST_USERNAME and LOADTEST_PASSWORD (LOADTEST_CLIENT_SECRET only for a confidential client)"
     return 1
   fi
   local endpoint cfg raw token
@@ -169,7 +169,7 @@ function _loadtest_mint_token() {
   {
     printf 'data-urlencode = "grant_type=password"\n'
     printf 'data-urlencode = "client_id=%s"\n' "${client_id}"
-    printf 'data-urlencode = "client_secret=%s"\n' "${secret}"
+    [[ -n "${secret}" ]] && printf 'data-urlencode = "client_secret=%s"\n' "${secret}"
     printf 'data-urlencode = "username=%s"\n' "${user}"
     printf 'data-urlencode = "password=%s"\n' "${pass}"
   } > "${cfg}"
