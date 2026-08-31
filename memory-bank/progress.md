@@ -332,15 +332,25 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   **PR #8 admin-squash-merged `a4a4640f` on main** (user go = "do all 4"; enforce_admins off→merge→restored true). Post-merge CI
   ALL GREEN incl. **live-Vault Integration Tests** + Publish → **`1.0.2` confirmed in GH Packages**. Copilot N/A on repo; `CI`
   required-check is a phantom (real = `Build and Test`). Unblocks payment.
-- [ ] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
-  — API-level checkout load + Grafana/Prometheus telemetry + small browser cohort.
-  - [~] Slice F (generator + dashboard + live run) — **CODE COMPLETE 2026-08-31 (live-run gated)**
-    (`docs/bugs/2026-08-29-loadtest-slice-f-generator.md`). Built: `scripts/etc/loadtest/checkout.js` (k6 gen),
-    `loadtest.sh` wiring (`_loadtest_mint_token` password-grant via 0600 curl `--config`, `_loadtest_fetch_metrics`
-    → 8-positional PromQL snapshot, real staged `loadtest_run` w/ `--confirm`+`--dry-run`), Grafana dashboard CM
-    (7 panels). **BATS 16/16**, shellcheck/`bash -n` clean, dashboard JSON valid, dispatcher loads. **LIVE-RUN GATE:**
-    needs Vault read (`secret/keycloak/clients`→`order_service_client_secret`, hub ns `secrets`) + LDAP user (both
-    classifier-gated) + `brew install k6` → one authed 201 → low-conc validation → staged ladder + capacity report.
+- [x] **Adaptive checkout load testing** (`docs/plans/v1.27.0-adaptive-checkout-load-testing.md`)
+  — API-level checkout load + Grafana/Prometheus telemetry. Slice E (controller) + Slice F (generator +
+  dashboard + live run) both DONE 2026-08-31; capacity ceiling characterized (~20–21 req/s rate limiter).
+  - [x] Slice F (generator + dashboard + live run) — **DONE 2026-08-31 (live run executed)**
+    (`docs/bugs/2026-08-29-loadtest-slice-f-generator.md`). Live run via `k3dm-smoke` Keycloak public
+    client (password grant, secret off argv). **Two gate bugs found + fixed:** (1) all `LOADTEST_PROMQL_*`
+    defaults with a `{...}` selector were corrupted by `${VAR:-default}` brace-termination (first `}`
+    closed the expansion → invalid PromQL → Prom 400 → `_loadtest_prom_query` 0 fallback → `breaches=[]`
+    at 88% real errors; BATS missed it — stubbed `_loadtest_curl`). Fix = `_loadtest_promql_default`
+    helper (single-quoted, `printf -v`), all 8 defaults converted + pinned-string BATS test. (2) operational:
+    a stale hub `port-forward svc/prometheus-operated 19090:9090 --context k3d-k3d-cluster` squatted :19090,
+    so k6 wrote / gates queried the **hub** Prom (no receiver, 404) not hostinger — killed squatter, bound
+    hostinger pod, verified via runtimeinfo + POST /write→415. Also fixed: checkout.js status-0 mistag
+    (`>=200 && <400`), and `loadtest_run` now records real `actual_throughput` (new `LOADTEST_PROMQL_THROUGHPUT`).
+    **BATS 17/17.** **Gate verified end-to-end:** 25→200 VU confirm = stage25 `hold[error_rate]` → stage200
+    `stop[error_rate]` (hysteresis); 15-VU green = `hold[]` `actual_throughput 10.64`. **Capacity finding:**
+    order-service checkout ceiling ~20–21 req/s (app rate limiter in `httpx/middleware.go`, 429-sheds excess);
+    node (2CPU/8Gi) never the constraint (mem plateau ~88%, no MemoryPressure). p95 POST 0.16/0.21/0.88s at
+    50/100/200 VUs. Full findings appended to the docs/bugs spec.
   - [x] Part 0 controller (Slice E) — commit `17be2e69` pushed to
     `origin/k3d-manager-v1.27.0`: pure stage-ladder + stop-condition-hysteresis decision logic,
     immutable jq summaries, opt-in guard, and BATS 9/9. Syntax, warning-level ShellCheck, and

@@ -21,7 +21,7 @@ data:
             "name": "run_id",
             "type": "query",
             "datasource": "Prometheus",
-            "query": "label_values(k6_checkout_load_requests_total, run_id)",
+            "query": "label_values(k6_checkout_load_requests_total_total, run_id)",
             "refresh": 2,
             "includeAll": false,
             "sort": 5
@@ -36,7 +36,7 @@ data:
           "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
           "targets": [
             {
-              "expr": "sum(rate(k6_checkout_load_requests_total{run_id=~\"$run_id\"}[1m])) by (stage)",
+              "expr": "sum(rate(k6_checkout_load_requests_total_total{run_id=~\"$run_id\"}[1m])) by (stage)",
               "legendFormat": "stage {{stage}}"
             }
           ]
@@ -49,16 +49,16 @@ data:
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum(rate(k6_checkout_load_latency_seconds_bucket{run_id=~\"$run_id\"}[1m])) by (le))",
-              "legendFormat": "p50"
+              "expr": "k6_checkout_load_latency_seconds_med{run_id=~\"$run_id\"}",
+              "legendFormat": "p50 stage {{stage}}"
             },
             {
-              "expr": "histogram_quantile(0.95, sum(rate(k6_checkout_load_latency_seconds_bucket{run_id=~\"$run_id\"}[1m])) by (le))",
-              "legendFormat": "p95"
+              "expr": "k6_checkout_load_latency_seconds_p95{run_id=~\"$run_id\"}",
+              "legendFormat": "p95 stage {{stage}}"
             },
             {
-              "expr": "histogram_quantile(0.99, sum(rate(k6_checkout_load_latency_seconds_bucket{run_id=~\"$run_id\"}[1m])) by (le))",
-              "legendFormat": "p99"
+              "expr": "k6_checkout_load_latency_seconds_p99{run_id=~\"$run_id\"}",
+              "legendFormat": "p99 stage {{stage}}"
             }
           ]
         },
@@ -70,7 +70,7 @@ data:
           "fieldConfig": { "defaults": { "unit": "percent", "max": 100 } },
           "targets": [
             {
-              "expr": "100 * (sum(rate(k6_checkout_load_requests_total{run_id=~\"$run_id\",result=\"error\"}[1m])) / clamp_min(sum(rate(k6_checkout_load_requests_total{run_id=~\"$run_id\"}[1m])), 1))",
+              "expr": "100 * (sum(rate(k6_checkout_load_requests_total_total{run_id=~\"$run_id\",result=\"error\"}[1m])) / clamp_min(sum(rate(k6_checkout_load_requests_total_total{run_id=~\"$run_id\"}[1m])), 1))",
               "legendFormat": "error %"
             }
           ],
@@ -83,11 +83,11 @@ data:
           "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
           "targets": [
             {
-              "expr": "sum(rate(k6_checkout_load_orders_total{run_id=~\"$run_id\"}[1m])) by (state)",
+              "expr": "sum(rate(k6_checkout_load_orders_total_total{run_id=~\"$run_id\"}[1m])) by (state)",
               "legendFormat": "orders {{state}}"
             },
             {
-              "expr": "sum(rate(k6_checkout_load_payments_total{run_id=~\"$run_id\"}[1m])) by (state)",
+              "expr": "sum(rate(k6_checkout_load_payments_total_total{run_id=~\"$run_id\"}[1m])) by (state)",
               "legendFormat": "payments {{state}}"
             }
           ]
@@ -113,7 +113,7 @@ data:
           "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
           "targets": [
             {
-              "expr": "sum(k6_checkout_load_idempotency_failures_total{run_id=~\"$run_id\"})",
+              "expr": "sum(k6_checkout_load_idempotency_failures_total_total{run_id=~\"$run_id\"})",
               "legendFormat": "idempotency failures"
             }
           ]

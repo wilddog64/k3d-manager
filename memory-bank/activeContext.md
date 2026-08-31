@@ -320,16 +320,24 @@
      SECRET}`), users federated from OpenLDAP (realm has no local users; `alice/password` dev). **NEXT:** fetch
      order-service client secret + confirm LDAP user → prove one authed `POST /api/orders` 201 → build k6 +
      wire Slice E stubs (`_loadtest_fetch_metrics`, `loadtest_run`) + Grafana dashboard + staged live run.
-     **✅ SLICE F CODE COMPLETE 2026-08-31 (live-run gated).** Built + validated all deterministic artifacts:
-     `scripts/etc/loadtest/checkout.js` (k6 gen, `POST /api/orders` synthetic items + idempotency key, `checkout_load_*`
-     metrics), `loadtest.sh` wiring (`_loadtest_mint_token` password-grant via 0600 curl `--config` — secrets off argv;
-     `_loadtest_prom_query`/`_loadtest_fetch_metrics` → 8-positional snapshot for `_loadtest_evaluate_gates`, PromQL
-     overridable; real staged `loadtest_run` mint→k6→fetch→decide→immutable JSON; `--confirm` kept + `--dry-run` full-ladder
-     path), Grafana dashboard CM (7 panels, `run_id` var). BATS 16/16 (was 9), shellcheck/`bash -n` clean, dispatcher loads.
-     **LIVE-RUN GATE:** needs Vault read (`secret/keycloak/clients`→`order_service_client_secret`, hub ns `secrets`) + LDAP
-     user — both classifier-gated secret reads; k6 not installed (`brew install k6`). Steps in blueprint Status 2026-08-31.
-     Hub Keycloak ns=`identity`, Vault ns=`secrets` (NOT `keycloak`/`vault`); order-service is pure resource-server (JWT
-     validate only, no client secret in-pod). Substantial v1.27.0 work now down to live runs + release.
+     **✅ SLICE F DONE 2026-08-31 — live run executed, gate correctness fixed + verified.** Live run used
+     the `k3dm-smoke` Keycloak public client (password grant; secret off argv). **Two gate bugs found + fixed:**
+     (1) every `LOADTEST_PROMQL_*` default with a `{...}` label selector was corrupted by `${VAR:-default}`
+     brace-termination — the first `}` closed the parameter expansion → invalid PromQL → Prometheus 400 →
+     `_loadtest_prom_query`'s `curl -sf` fails → `0` fallback → `breaches=[]` even at 88% real HTTP-429 errors.
+     BATS never caught it (stubbed `_loadtest_curl`, never hit a real parser). Fix = `_loadtest_promql_default`
+     helper (single-quoted default via `printf -v`; every `}` stays literal), all 8 defaults converted, new
+     pinned-string BATS regression test → 17/17. (2) operational, not code: a stale hub port-forward
+     `svc/prometheus-operated 19090:9090 --context k3d-k3d-cluster` squatted :19090, so k6 remote-wrote to /
+     gates queried the **hub** Prometheus (no receiver → POST /write 404, no k6 series) instead of hostinger —
+     confirm run still `breaches=[]` until found; fix = kill squatter, bind hostinger pod to :19090, verify via
+     `runtimeinfo.startTime` + POST /write→415. Also: checkout.js status-0 mistag fixed (`>=200 && <400`);
+     `loadtest_run` now records real `actual_throughput` (`LOADTEST_PROMQL_THROUGHPUT`). **Gate verified E2E:**
+     25→200 VU confirm = stage25 `hold[error_rate]` → stage200 `stop[error_rate]`; 15-VU green = `hold[]`
+     `actual_throughput 10.64`. **Capacity finding:** checkout ceiling ~20–21 req/s (app rate limiter in
+     order-service `httpx/middleware.go`, 429-sheds excess); hostinger node (2CPU/8Gi) never the constraint.
+     Full detail in `docs/bugs/2026-08-29-loadtest-slice-f-generator.md` (Status 2026-08-31 session 2).
+     Substantial v1.27.0 work now down to remaining signing deferrals + remote-e2e acceptance gate + release.
      Verify Codex output on origin per [[feedback_codex_verification_protocol]] before trusting;
      note the `codex exec` sandbox has `.git` read-only, so expect Codex to leave files uncommitted
      and Claude commits after review (as with Slice A).

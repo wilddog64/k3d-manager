@@ -87,6 +87,16 @@ setup() {
   [[ "${output}" == *LOADTEST_USERNAME* ]]
 }
 
+@test "loadtest: default PromQL gate queries are well-formed" {
+  [ "${LOADTEST_PROMQL_ERROR_RATE}" = '100 * (sum(rate(k6_checkout_load_requests_total_total{result="error"}[1m])) / clamp_min(sum(rate(k6_checkout_load_requests_total_total[1m])), 1))' ]
+  [ "${LOADTEST_PROMQL_CPU}" = '100 * max(sum(rate(container_cpu_usage_seconds_total{namespace="shopping-cart-apps"}[1m])) / sum(kube_pod_container_resource_limits{namespace="shopping-cart-apps",resource="cpu"}))' ]
+  [ "${LOADTEST_PROMQL_MEMORY}" = 'sum(kube_node_status_condition{condition="MemoryPressure",status="true"})' ]
+  for q in "${LOADTEST_PROMQL_ERROR_RATE}" "${LOADTEST_PROMQL_CPU}" "${LOADTEST_PROMQL_DB_POOL}" "${LOADTEST_PROMQL_CONTROL_PLANE}" "${LOADTEST_PROMQL_EVICTION}" "${LOADTEST_PROMQL_MEMORY}"; do
+    [[ "${q}" != *'"['* ]]
+    [[ "${q}" == *'}'* ]]
+  done
+}
+
 @test "loadtest: prom query returns 0 for empty/failed result" {
   _loadtest_curl() { return 1; }
   run _loadtest_prom_query "up"

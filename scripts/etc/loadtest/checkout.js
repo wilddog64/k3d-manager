@@ -28,7 +28,7 @@ const THINK = parseFloat(__ENV.LOADTEST_SLEEP || '1');
 
 // Bounded-label custom metrics (plan §2). k6's remote-write output prefixes these
 // with `k6_` (so the dashboard queries `k6_checkout_load_*`).
-const latency = new Trend('checkout_load_latency_seconds', true);
+const latency = new Trend('checkout_load_latency_seconds');
 const requests = new Counter('checkout_load_requests_total');
 const orders = new Counter('checkout_load_orders_total');
 const payments = new Counter('checkout_load_payments_total');
@@ -91,7 +91,7 @@ export default function () {
   });
 
   latency.add(res.timings.duration / 1000.0, tags);
-  requests.add(1, Object.assign({ result: res.status < 400 ? 'ok' : 'error' }, tags));
+  requests.add(1, Object.assign({ result: res.status >= 200 && res.status < 400 ? 'ok' : 'error' }, tags));
   const created = check(res, {
     'order created (201)': (r) => r.status === 201,
   });

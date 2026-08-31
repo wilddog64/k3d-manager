@@ -139,3 +139,68 @@ authed `POST /api/orders` → 201 (blueprint gate); (3) `kubectl port-forward sv
 `:19090`; (4) `k6` install; (5) low-concurrency validation (~10 VUs, 1 stage) then the staged
 ladder with health-gated backoff; capture the immutable per-stage JSON + capacity report.
 k6 is NOT installed locally yet (`brew install k6`).
+
+## Status 2026-08-31 (session 2) — LIVE RUN DONE + two gate bugs fixed
+
+Drove the full live run directly (auth → validation → staged ladder). Two defects were found
+and fixed that had silently disabled the health gate; both are now verified end-to-end.
+
+### Bug 1 — dead PromQL gate queries (`${VAR:-default}` brace-termination)
+All `LOADTEST_PROMQL_*` defaults with a `{...}` label selector were corrupted at source time.
+In `LOADTEST_PROMQL_ERROR_RATE="${LOADTEST_PROMQL_ERROR_RATE:-...{result="error"}[1m]...}"`,
+the **first literal `}`** (closing the label selector) terminates the parameter expansion, so
+everything after it is appended as literal text — yielding invalid PromQL
+(`...{result="error"[1m]...))}`). Prometheus rejects it (`parse error: unexpected character
+inside braces: '['`, HTTP 400); `_loadtest_prom_query` runs `curl -sf`, the 400 fails the
+curl, and the function returns its `0` fallback. Result: error_rate/cpu/db_pool/control_plane/
+eviction/memory gates all read 0 → `breaches=[]` every stage even at 88% real HTTP-429 errors.
+Only p95 and stripe (no braces) survived. **BATS never caught it** because every prom test
+stubs `_loadtest_curl` — the malformed query string was never sent to a real parser.
+**Fix:** `_loadtest_promql_default <var> '<single-quoted default>'` helper (`printf -v`), which
+keeps every `}` literal. All 8 defaults converted. New BATS test pins the well-formed strings
+(`loadtest: default PromQL gate queries are well-formed`); suite now 17/17.
+
+### Bug 2 (operational, not committed code) — wrong Prometheus on :19090
+A stale `kubectl port-forward svc/prometheus-operated 19090:9090 --context k3d-k3d-cluster`
+(the **hub** Prometheus) was squatting on :19090, so every hostinger forward silently failed
+(`address already in use`). The controller then gated against — and k6 remote-wrote to — the
+hub Prometheus, which has no remote-write receiver (POST /api/v1/write → 404) and no k6 series.
+First confirmation run still showed `breaches=[]` until this was found. **Fix:** kill the hub
+squatter, bind the hostinger pod to :19090 (`kubectl port-forward pod/prometheus-acg-...-0`),
+confirm `runtimeinfo.startTime` matches the hostinger pod and POST /api/v1/write → 415 (enabled,
+rejects only the empty body). Lesson: the run driver must verify :19090 actually serves the
+target-cluster Prometheus before trusting a green ladder.
+
+### Bug 3 (latent, fixed) — checkout.js status-0 mistag
+`result: res.status < 400 ? 'ok' : 'error'` tagged status 0 (timeout/conn-refused) as `ok`.
+Did not bite this run (errors were 429, status ≥ 400) but would under-report on network faults.
+Fixed to `res.status >= 200 && res.status < 400`.
+
+### Also fixed — stage summary now records real throughput
+`loadtest_run` passed a literal `0` for `actual_throughput` in every per-stage JSON. Added
+`LOADTEST_PROMQL_THROUGHPUT` (`sum(rate(k6_..._requests_total_total{result="ok"}[1m]))`) and
+threaded it into the summary (dry-run stays 0). Verified: a green 15-VU stage recorded
+`actual_throughput: 10.64`.
+
+### Gate verification (end-to-end, against hostinger Prometheus)
+- 2-stage confirm (25 → 200 VUs, thresholds err 2% / p95 2s, hysteresis 2): stage 25
+  `hold breaches=[error_rate]` (first breach), stage 200 `stop breaches=[error_rate]` (second
+  consecutive → ladder stopped). Gate fires, records breaches, hysteresis works.
+- 1-stage green (15 VUs, err 5%): `hold breaches=[]`, `actual_throughput: 10.64` (terminal-rung
+  healthy `increase`→`hold` is expected, loadtest.sh:71-73).
+
+### Capacity finding — order-service checkout ceiling ≈ 20–21 req/s (app rate limiter)
+Successful order throughput plateaus at **~20.7 orders/s** regardless of offered load
+(25 → 200 VUs). The order-service (`httpx/middleware.go`) enforces an app-level rate limit
+~20–21 req/s; excess is shed as HTTP 429 in ~5µs. The hostinger node (srv1754834, 2 CPU / 8Gi)
+is **never** the constraint — memory plateaued ~88% (MemoryPressure=False), CPU was not the
+limiter. Per-stage (50/100/200 VUs): throughput 20.8 / 20.7 / 20.7 orders/s; POST p95 latency
+0.16 / 0.21 / 0.88 s; error (429-shed) rate 54.5% / 76.9% / 87.6%. CQRS read-after-write lag
+makes an immediate `GET /api/orders/{id}` after `POST` return 404 (poll disabled for the run).
+**Takeaway:** the checkout path degrades gracefully by shedding, not collapsing; a durable
+capacity increase means raising the app rate limit (and validating DB/Stripe headroom), not
+adding node CPU.
+
+**Files changed this session:** `scripts/plugins/loadtest.sh` (brace-safe PromQL helper + 8
+defaults + throughput query/threading), `scripts/etc/loadtest/checkout.js` (status-tag),
+`scripts/tests/plugins/loadtest.bats` (well-formed-query regression test, 17/17).

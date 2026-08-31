@@ -121,20 +121,40 @@ LOADTEST_KEYCLOAK_ISSUER="${LOADTEST_KEYCLOAK_ISSUER:-https://keycloak.3ai-talk.
 LOADTEST_CLIENT_ID="${LOADTEST_CLIENT_ID:-order-service}"
 LOADTEST_TARGET_URL="${LOADTEST_TARGET_URL:-http://localhost:18081}"
 LOADTEST_PROM_URL="${LOADTEST_PROM_URL:-http://localhost:19090}"
+# k6 output + remote-write wiring. TREND_STATS must include p(95) — k6's default is
+# p(99) only, which would never emit the k6_..._latency_seconds_p95 series the p95 gate
+# reads. RW url derives from the Prometheus base unless overridden.
+LOADTEST_K6_OUT="${LOADTEST_K6_OUT:-experimental-prometheus-rw}"
+LOADTEST_K6_RW_URL="${LOADTEST_K6_RW_URL:-${LOADTEST_PROM_URL}/api/v1/write}"
+LOADTEST_K6_TREND_STATS="${LOADTEST_K6_TREND_STATS:-p(95),p(99),avg,med}"
 LOADTEST_STAGE_DURATION="${LOADTEST_STAGE_DURATION:-60s}"
 LOADTEST_POLL_INTERVAL="${LOADTEST_POLL_INTERVAL:-15}"
 LOADTEST_K6_SCRIPT="${LOADTEST_K6_SCRIPT:-${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/etc/loadtest/checkout.js}"
 LOADTEST_RESULT_DIR="${LOADTEST_RESULT_DIR:-${TMPDIR:-/tmp}/k3dm-loadtest}"
 
-# Metric names remote-written by k6 carry the k6_ prefix; PromQL below matches that.
-LOADTEST_PROMQL_ERROR_RATE="${LOADTEST_PROMQL_ERROR_RATE:-100 * (sum(rate(k6_checkout_load_requests_total{result=\"error\"}[1m])) / clamp_min(sum(rate(k6_checkout_load_requests_total[1m])), 1))}"
-LOADTEST_PROMQL_P95="${LOADTEST_PROMQL_P95:-histogram_quantile(0.95, sum(rate(k6_checkout_load_latency_seconds_bucket[1m])) by (le))}"
-LOADTEST_PROMQL_CPU="${LOADTEST_PROMQL_CPU:-100 * max(sum(rate(container_cpu_usage_seconds_total{namespace=\"shopping-cart-apps\"}[1m])) / sum(kube_pod_container_resource_limits{namespace=\"shopping-cart-apps\",resource=\"cpu\"}))}"
-LOADTEST_PROMQL_STRIPE_RL="${LOADTEST_PROMQL_STRIPE_RL:-sum(increase(payment_stripe_rate_limited_total[1m]))}"
-LOADTEST_PROMQL_DB_POOL="${LOADTEST_PROMQL_DB_POOL:-max(hikaricp_connections_pending{namespace=\"shopping-cart-apps\"})}"
-LOADTEST_PROMQL_CONTROL_PLANE="${LOADTEST_PROMQL_CONTROL_PLANE:-sum(increase(apiserver_request_total{code=~\"5..\"}[1m]))}"
-LOADTEST_PROMQL_EVICTION="${LOADTEST_PROMQL_EVICTION:-sum(kube_node_status_condition{condition=~\"DiskPressure|PIDPressure\",status=\"true\"})}"
-LOADTEST_PROMQL_MEMORY="${LOADTEST_PROMQL_MEMORY:-sum(kube_node_status_condition{condition=\"MemoryPressure\",status=\"true\"})}"
+# Assigns $1 (a variable name) to $2 only when it is currently unset or empty. Required for
+# PromQL defaults: the ${VAR:-default} form is terminated by the first literal '}' in the
+# default, so a label selector like {result="error"} closes the expansion early and corrupts
+# the query. Passing the default as a plain single-quoted argument keeps every '}' literal.
+function _loadtest_promql_default() {
+  local __name="$1"
+  [[ -n "${!__name:-}" ]] || printf -v "$__name" '%s' "$2"
+}
+
+# Metric names remote-written by k6 carry the k6_ prefix. k6's prometheus-rw output
+# suffixes Counters with _total (so requests_total -> k6_..._requests_total_total) and
+# exports each Trend stat as its own gauge (k6_..._latency_seconds_p95, already in
+# seconds) rather than _bucket histogram series. The p95 gauge is scoped with
+# last_over_time so a prior stage's stale series does not keep the gate tripped.
+_loadtest_promql_default LOADTEST_PROMQL_ERROR_RATE '100 * (sum(rate(k6_checkout_load_requests_total_total{result="error"}[1m])) / clamp_min(sum(rate(k6_checkout_load_requests_total_total[1m])), 1))'
+_loadtest_promql_default LOADTEST_PROMQL_P95 'max(last_over_time(k6_checkout_load_latency_seconds_p95[45s]))'
+_loadtest_promql_default LOADTEST_PROMQL_CPU '100 * max(sum(rate(container_cpu_usage_seconds_total{namespace="shopping-cart-apps"}[1m])) / sum(kube_pod_container_resource_limits{namespace="shopping-cart-apps",resource="cpu"}))'
+_loadtest_promql_default LOADTEST_PROMQL_STRIPE_RL 'sum(increase(payment_stripe_rate_limited_total[1m]))'
+_loadtest_promql_default LOADTEST_PROMQL_DB_POOL 'max(hikaricp_connections_pending{namespace="shopping-cart-apps"})'
+_loadtest_promql_default LOADTEST_PROMQL_CONTROL_PLANE 'sum(increase(apiserver_request_total{code=~"5.."}[1m]))'
+_loadtest_promql_default LOADTEST_PROMQL_EVICTION 'sum(kube_node_status_condition{condition=~"DiskPressure|PIDPressure",status="true"})'
+_loadtest_promql_default LOADTEST_PROMQL_MEMORY 'sum(kube_node_status_condition{condition="MemoryPressure",status="true"})'
+_loadtest_promql_default LOADTEST_PROMQL_THROUGHPUT 'sum(rate(k6_checkout_load_requests_total_total{result="ok"}[1m]))'
 
 # Pure: build the OIDC token endpoint from an issuer URL.
 function _loadtest_token_endpoint() {
@@ -240,6 +260,8 @@ function _loadtest_k6_stage() {
   LOADTEST_TARGET_URL="${LOADTEST_TARGET_URL}" \
   LOADTEST_TOKEN="${token}" \
   LOADTEST_POLL_ORDER="${LOADTEST_POLL_ORDER:-0}" \
+  K6_PROMETHEUS_RW_SERVER_URL="${LOADTEST_K6_RW_URL}" \
+  K6_PROMETHEUS_RW_TREND_STATS="${LOADTEST_K6_TREND_STATS}" \
     _loadtest_k6_bin run \
       ${LOADTEST_K6_OUT:+--out "${LOADTEST_K6_OUT}"} \
       "${LOADTEST_K6_SCRIPT}"
@@ -301,7 +323,11 @@ function loadtest_run() {
     next_count=$(printf '%s\n' "${decision_out}" | sed -n '2p')
     breach_count="${next_count}"
 
-    _loadtest_write_stage_summary "${LOADTEST_RUN_ID}" "${target}" "${target}" 0 \
+    local throughput=0
+    if [[ "${dry}" != "1" ]]; then
+      throughput=$(_loadtest_prom_query "${LOADTEST_PROMQL_THROUGHPUT}")
+    fi
+    _loadtest_write_stage_summary "${LOADTEST_RUN_ID}" "${target}" "${target}" "${throughput}" \
       "${decision}" "${breaches}" "${run_dir}/stage-${idx}-${target}.json"
     _info "[loadtest] stage ${target}: decision=${decision} breaches=[${breaches}]"
 
