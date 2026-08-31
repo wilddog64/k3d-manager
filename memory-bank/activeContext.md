@@ -186,14 +186,13 @@
     manual `--from=cronjob/app-cve-scan` job grepping `SIGGATE`. Preflight confirmed: hub Vault `vault_key=present`,
     `vault-backend` CSS Ready, `platform-ops/cosign-public-key` not-yet-present (clean first deploy). **User runs it via `!`
     (deploy-path mutation, classifier-gated for Claude Bash).**
-  - **CVE-loop closure #2 — CI `cosign attest` (vuln+SBOM) ✅ CODE DONE + VERIFIED + PR OPEN 2026-08-31.** **PR #95**
-    https://github.com/wilddog64/shopping-cart-infra/pull/95 (`6bfee7f5`, base main). **CI all green** (GitGuardian, Kubeconform,
+  - **CVE-loop closure #2 — CI `cosign attest` (vuln+SBOM) ✅ CODE DONE + VERIFIED + MERGED 2026-08-31.** **PR #95**
+    https://github.com/wilddog64/shopping-cart-infra/pull/95, merge SHA `45def89e151bc9d3506f7d641f46d045bc84029d` (base main). **CI all green** (GitGuardian, Kubeconform,
     Kustomize Build, YAML Lint). Codex session `01a05793`; Claude-verified on origin (SHA match, 1 file/33-ins, exact msg, descended
     from origin/main, yaml ok, order Sign→Generate-vuln→Generate-SBOM→Attest→promote, all guarded `if: env.COSIGN_KEY != ''`).
     **Copilot review N/A on infra repo** — REST `requested_reviewers` POST (both `Copilot` + `copilot-pull-request-reviewer[bot]`)
     returns 200 but silently drops the reviewer; only `copilot-swe-agent` is assignable, and PR #94 had zero Copilot reviews →
-    Copilot code-review is not enabled on shopping-cart-infra (user's Copilot-required rule is payment-repo-specific). **PREPARED-AND-STOPPED
-    — awaiting user merge go.** **NOT merged.**
+    Copilot code-review is not enabled on shopping-cart-infra (user's Copilot-required rule is payment-repo-specific). **USER-MERGED 2026-08-31** (user ran `gh pr merge 95`; self-merge via enforce_admins override). **ADMIN OVERRIDE RESTORED 2026-08-31:** `enforce_admins` restored to `true` (verified `gh api ... --jq '.enabled'`) on shopping-cart-infra main post-merge.
     Spec `docs/plans/v1.27.0-image-signing-attest-codex-task.md`. Adds 3 steps to shopping-cart-infra reusable
     `build-push-deploy.yml` (trivy `cosign-vuln` + `spdx-json` predicates → `cosign attest --type vuln` / `--type spdxjson`),
     guarded `if: env.COSIGN_KEY != ''`, reusing already-pinned trivy-action@v0.35.0 + cosign-installer@v3.7.0 (no new versions).
