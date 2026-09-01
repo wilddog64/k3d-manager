@@ -194,9 +194,11 @@
     product-catalog `9dc3b59f` (`ci.yml`) — all: 1 file changed, new SHA=1/old SHA=0, exact msg
     `ci: re-pin infra reusable workflow to attest SHA 45def89e`. Spec
     `docs/plans/v1.27.0-image-signing-attest-repin-callers-codex-task.md` (`2dbfa354`).
-    **4 PRs OPENED + MERGEABLE 2026-08-31, merge user-gated (Never auto-merge):** basket #45, order #74,
-    payment #69, product-catalog #52 (all base main ← `feat/repin-infra-attest`; order also has unrelated
-    dependabot #73). **Frontend inline-attest spec WRITTEN 2026-08-31** —
+    **4 PRs ✅ MERGED + VERIFIED (gh) 2026-09-01:** basket #45 `b84a534d`, order #74 `33e269b7`,
+    payment #69 `a672ee42`, product-catalog #52 `0540db3d` (all base main ← `feat/repin-infra-attest`).
+    Branch protection intact: all 4 use `main-protection` rulesets (still `active`) — nothing was lowered,
+    nothing to restore. BUILD latch now emits vuln+SBOM attestations for all 4 reusable-workflow callers.
+    **Frontend inline-attest spec WRITTEN 2026-08-31** —
     `docs/plans/v1.27.0-image-signing-frontend-inline-attest-codex-task.md`: adds 3 steps (trivy `cosign-vuln`
     + `spdx-json` predicates by digest → `cosign attest --type vuln`/`--type spdxjson`) inline into
     `shopping-cart-frontend/.github/workflows/ci.yml` `publish` job after `Sign image by digest`, trivy pin
@@ -418,6 +420,12 @@
 - v1.28.0 planned: parallel multi-cloud provisioning + zero-downtime rollouts.
 
 ## Open follow-ups
+
+- **2026-09-01 frontend Keycloak login:** Hostinger frontend bundle uses the `frontend` client in
+  realm `shopping-cart`, but the Keycloak realm has no such client (`clientId=frontend` returned
+  `[]`), producing the browser's “Client not found” page. Bug recorded in
+  `docs/issues/2026-09-01-frontend-keycloak-client-not-found.md`; create/reconcile the public
+  client with the production callback before retesting.
 
 - **2026-08-27 hub CPU overcommit — Step 1 IMPLEMENTED + live-applied (`85518a88`→`2a38670c`):**
   `docs/bugs/2026-08-27-hub-cpu-overcommit-resource-governance.md`. Diagnosed the CPU stress the

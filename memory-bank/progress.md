@@ -391,6 +391,12 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 
 ## Verification record
 
+- **2026-09-01 frontend login investigation:** confirmed the deployed bundle points at
+  `https://keycloak.3ai-talk.org/realms/shopping-cart` with client `frontend`, while Keycloak's
+  admin API returns no `frontend` client. Browser “Client not found” is therefore a missing
+  realm-client registration, not a user credential failure. See
+  `docs/issues/2026-09-01-frontend-keycloak-client-not-found.md`.
+
 - **2026-08-27 scrape interval:** `977d9e11` pushed to `k3d-manager-v1.27.0` (remote tip also
   includes concurrent CVE pin commits). `kube-prometheus-stack-values.yaml` parses cleanly and
   changes only federation from 30s to 60s; exporter remains 60s. Live reapply/measurement pending.
