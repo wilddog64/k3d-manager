@@ -984,3 +984,5 @@
 - v1.27.0 plans: `docs/plans/v1.27.0-*`
 - Active bugs/incidents: `docs/bugs/` and `docs/issues/`
 - Release history: `CHANGELOG.md` and `docs/retro/`
+### 2026-09-01 — status blind spot documented
+- Filed `docs/issues/2026-09-01-status-blind-spot-on-exited-hub-agent.md`: when a hub agent exits, webhook-backed `make status` reports only `UNKNOWN` and omits node evidence. Recommended bounded local Docker/node fallback; no automatic restart.
