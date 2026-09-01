@@ -568,3 +568,5 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - Live client created and verified (HTTP 201 / client present). Public login verification is pending restoration of `keycloak.3ai-talk.org` DNS/tunnel (currently unresolved).
 ### 2026-09-01 — status diagnosis issue filed
 - Documented the exited hub-agent → webhook-unavailable status blind spot and captured exact 502 evidence. Live services are currently recovered and `make status` is healthy.
+### 2026-09-01 — status/credential fixes
+- Corrected Keycloak admin secret name/key and added bounded local agent-state evidence to UNKNOWN status responses. `bash -n` and `cluster_status_summary.bats` (8/8) pass.

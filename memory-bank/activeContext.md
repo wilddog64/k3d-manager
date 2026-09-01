@@ -986,3 +986,6 @@
 - Release history: `CHANGELOG.md` and `docs/retro/`
 ### 2026-09-01 — status blind spot documented
 - Filed `docs/issues/2026-09-01-status-blind-spot-on-exited-hub-agent.md`: when a hub agent exits, webhook-backed `make status` reports only `UNKNOWN` and omits node evidence. Recommended bounded local Docker/node fallback; no automatic restart.
+### 2026-09-01 — status fallback and Keycloak credential lookup fixed
+- `make show-service-passwords` now reads `identity/keycloak-admin-secret` key `password`; verified it reports admin present without exposing the value.
+- `bin/cluster-status-summary` now adds local `k3d-k3d-cluster-agent-0` Docker state to webhook-unavailable output. Syntax and all 8 BATS tests pass.
