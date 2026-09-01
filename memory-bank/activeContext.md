@@ -975,6 +975,11 @@
 
 ## Canonical pointers
 
+### 2026-09-01 — live frontend Keycloak client hotfix
+- Created missing public OIDC client `frontend` in hub `shopping-cart` realm (Keycloak admin API returned HTTP 201); verified by an in-pod admin query.
+- Configured callback `https://frontend.3ai-talk.org/callback` and web origin `https://frontend.3ai-talk.org`, matching the deployed frontend bundle.
+- Public `keycloak.3ai-talk.org` DNS currently fails to resolve from the workstation, so browser verification remains blocked by the edge/tunnel path, not Keycloak client configuration.
+
 - Roadmap: `docs/roadmap.md`
 - v1.27.0 plans: `docs/plans/v1.27.0-*`
 - Active bugs/incidents: `docs/bugs/` and `docs/issues/`

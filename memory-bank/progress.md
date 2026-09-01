@@ -563,3 +563,6 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - Pure helpers `_e2e_kustomization_images`/`_e2e_substrate_images`/`_e2e_ref_matches_globs`/`_e2e_image_epoch` covered by `scripts/tests/plugins/e2e_image_prune.bats` (10 tests, green). shellcheck clean. `_agent_audit` if-count gate satisfied (8, extracted glob-match helper to drop from 9→8).
 - Live dry-run @2026-08-30: protected-refs=9, 19 would-remove / 7 kept (stale one-offs: rabbitmq, maven, golang:1.21, osixia/openldap, old golangci/trivy/k3s tags; substrate infra `.4-alpine` tags correctly protected). Not applied — informational.
 - **APPLIED 2026-08-30** (`--apply`): removed 19, kept 7, 0 skipped (none still-referenced). Image store 9.307GB→3.916GB (26→7 images; reclaimable 6.625GB/71% → 1.234GB/31%). Hub k3d-cluster 5 containers still running; working set intact (e2e-tests:latest, vcluster-pro:0.36.1). Host disk 64%→61%.
+### 2026-09-01 — frontend login live hotfix
+- Root cause confirmed: Keycloak `shopping-cart` realm lacked the `frontend` client required by the deployed SPA.
+- Live client created and verified (HTTP 201 / client present). Public login verification is pending restoration of `keycloak.3ai-talk.org` DNS/tunnel (currently unresolved).
