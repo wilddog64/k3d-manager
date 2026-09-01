@@ -15,7 +15,23 @@ _token="${K3DM_WEBHOOK_TOKEN:-$(security find-generic-password -s k3dm-webhook-t
 # degraded hub it can legitimately take longer than the individual probe timeout; do not collapse
 # that structured response into the misleading "webhook unavailable" result too early.
 if [[ -z "${_token}" ]] || ! curl -sf --max-time 90 -H "Authorization: Bearer ${_token}" "http://localhost:${_port}/api/v1/health?provider=${_provider}" >"${_tmp}" 2>/dev/null; then
-  if [[ "${_mode}" == json ]]; then printf '{"overall":"unknown","provider":"%s","context":"%s","errors":[],"warnings":[{"id":"status_source","status":"unknown","reason":"webhook unavailable"}],"checks":[],"counts":{}}\n' "${_provider}" "${_context}"; else printf '%s\n' "$(_color 33 'Overall: UNKNOWN')" '  ! status source: webhook unavailable' '  hint: make restart-webhook'; fi; exit 2
+  _agent_state=""
+  if command -v docker >/dev/null 2>&1; then
+    _agent_state="$(docker ps -a --filter name=k3d-k3d-cluster-agent-0 --format '{{.Status}}' 2>/dev/null | head -1 || true)"
+  fi
+  if [[ "${_mode}" == json ]]; then
+    _detail="webhook unavailable"
+    [[ -n "${_agent_state}" ]] && _detail="webhook unavailable; hub agent-0: ${_agent_state}"
+    python3 - "${_provider}" "${_context}" "${_detail}" <<'PY'
+import json,sys
+print(json.dumps({"overall":"unknown","provider":sys.argv[1],"context":sys.argv[2],"errors":[],"warnings":[{"id":"status_source","status":"unknown","reason":sys.argv[3]}],"checks":[],"counts":{}}))
+PY
+  else
+    printf '%s\n' "$(_color 33 'Overall: UNKNOWN')" '  ! status source: webhook unavailable'
+    [[ -n "${_agent_state}" ]] && printf '  ! hub agent-0: %s\n' "${_agent_state}"
+    printf '%s\n' '  hint: make restart-webhook'
+  fi
+  exit 2
 fi
 _parsed="$(python3 - "${_tmp}" "${_service}" <<'PY'
 import json,re,sys

@@ -33,6 +33,13 @@ report the webhook failure plus available local hub evidence (for example,
 Docker state for `k3d-k3d-cluster-*` and a concise remediation hint), without
 claiming service health or attempting a restart automatically.
 
+## Follow-up applied
+
+`bin/cluster-status-summary` now includes the detected `agent-0` Docker status
+in the `UNKNOWN` report when the webhook is unavailable. The Keycloak admin
+credential lookup in `make show-service-passwords` was also corrected to use
+the managed `keycloak-admin-secret` and its `password` key.
+
 ## Evidence
 
 The hub server log contained repeated errors of the form:
@@ -46,4 +53,3 @@ Container inspection showed:
 ```text
 k3d-k3d-cluster-agent-0   Exited (143) 4 minutes ago
 ```
-
