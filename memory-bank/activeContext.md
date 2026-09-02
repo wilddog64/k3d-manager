@@ -10,6 +10,10 @@
   k3s API/etcd readiness failure and severe server CPU saturation (~650–880%). Agents/server were
   restarted; API remained unstable. Evidence and recovery attempts: `docs/issues/2026-09-02-hub-control-plane-saturation-causing-public-502.md`.
 
+- **2026-09-02 follow-up:** `shopping-cart-identity` remains degraded from Argo strategic-merge
+  duplicate Keycloak ports; Grafana/Frontend public origins flap during recurring API saturation,
+  and Grafana has a stale dashboard route. Evidence: `docs/issues/2026-09-02-argocd-identity-drift-and-dashboard-502.md`.
+
 - **E2E Tier-1 gate → GREEN on everything it covers (2026-08-29).** Both Codex fixes verified,
   images built (e2e via CI `sha-9202b194`; basket local `k3d image import` `sha-8614773e`), Tier-1
   rerun = **48 pass / 9 fail / 45 skip** (was 45/12/45) — all 9 fails are `payments.spec` (Tier-2/ACG).

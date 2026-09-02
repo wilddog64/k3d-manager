@@ -67,6 +67,10 @@
   `docs/issues/2026-09-02-hub-control-plane-saturation-causing-public-502.md`; workload-level
   mitigation and durable URL/status fixes remain pending.
 
+- [ ] **Argo identity drift + stale dashboard route (2026-09-02):** Git Keycloak Service renders
+  valid ports but Argo strategic merge still produces duplicate `http`; Grafana dashboard links
+  include a stale route. Bug: `docs/issues/2026-09-02-argocd-identity-drift-and-dashboard-502.md`.
+
 - [~] **Hub CPU overcommit fix (2026-08-27)** — Step 1 (resource governance) IMPLEMENTED +
   live-applied; Step 2 (load-shed) config IMPLEMENTED, ROLLOUT PENDING (reapply `observability`
   appset @ `k3d-manager-v1.27.0`). Specs: `docs/bugs/2026-08-27-hub-cpu-overcommit-resource-
