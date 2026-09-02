@@ -61,6 +61,12 @@
 
 ## v1.27.0 queue
 
+- [ ] **Hub control-plane saturation/public 502 incident (2026-09-02):** API `/readyz` reports
+  etcd failures while k3s server reaches ~880% CPU; Grafana port-forward flaps and ArgoCD public
+  OAuth URL drifted to the local hostname. Bug recorded in
+  `docs/issues/2026-09-02-hub-control-plane-saturation-causing-public-502.md`; workload-level
+  mitigation and durable URL/status fixes remain pending.
+
 - [~] **Hub CPU overcommit fix (2026-08-27)** — Step 1 (resource governance) IMPLEMENTED +
   live-applied; Step 2 (load-shed) config IMPLEMENTED, ROLLOUT PENDING (reapply `observability`
   appset @ `k3d-manager-v1.27.0`). Specs: `docs/bugs/2026-08-27-hub-cpu-overcommit-resource-
