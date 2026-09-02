@@ -153,6 +153,13 @@ milestone only when it gets a scope doc.
 - **k3dm-mcp** — persistent MCP server, HTTP transport default (`K3DM_MCP_TRANSPORT=http|stdio`),
   FastMCP/Python; CLIs connect at `http://localhost:8765/mcp`. Read-only tool set for verify
   agents; `.git/` excluded from writable paths.
+- **Hermes event-driven operations automation (candidate v1.28.x or later)** — optional Hermes
+  coordinator for Alertmanager, GitHub Actions, ArgoCD, tunnel, and webhook events. Phase 1 is
+  read-only health/CI monitoring with bounded polling and Slack summaries; Phase 2 adds
+  allowlisted, approval-gated repairs (restart webhook, refresh edge, retry transient CI); Phase 3
+  adds cooldowns, daily token/iteration budgets, audit records, and post-repair verification.
+  Hermes does not replace the k3d-manager webhook or receive unrestricted cluster, cloud, Git, or
+  branch-protection credentials. A scope document is required before assigning a release.
 - **Distribution packages** — deb/rpm/brew. Long-standing vision item, never scoped.
 - **Home lab** — `CLUSTER_PROVIDER=k3s-local-arm64` on a Mac Mini M5 (hardware target ~Oct 2026),
   bare-metal ingress via **MetalLB + Envoy Gateway (Gateway API)** replacing the Istio
