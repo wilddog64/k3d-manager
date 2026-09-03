@@ -22,8 +22,14 @@
   required check so it does NOT block merge. Cannot dismiss via API — gh token lacks `security_events`
   scope; clean close needs the GitHub Security UI (or a scoped token). Live webhook needs
   `make restart-webhook` if we want it current.
-  **NOT merged — awaiting user go (never-auto-merge).** Remaining gates: Copilot addressed+resolved,
-  Gemini live smoke. Decision pending: dismiss CodeQL in UI vs proceed with documented FP. Retro at post-merge.
+  **Copilot review DONE** — `COMMENTED`, empty body, 0 inline comments (clean; nothing to address).
+  Correct request login = `copilot-pull-request-reviewer[bot]` ([[reference_copilot_review_request_raw_json]]);
+  `"Copilot"` 201s-but-no-ops. **`mergeStateStatus: BLOCKED`** — main protection = `required_reviews:1` +
+  `enforce_admins:true`; Copilot COMMENTED ≠ approval, so merge needs an approving review OR the temporary
+  lower (required_reviews→0 + enforce_admins off), merge, then restore (bodyless POST for enforce_admins).
+  **NOT merged — awaiting user go (never-auto-merge).** User chose: dismiss CodeQL via API once they add a
+  `security_events`-scoped token (`gh auth refresh -s security_events`), pending. Gemini live smoke not run
+  (user picked retry-Copilot instead). Retro at post-merge.
 
 - **2026-09-03 PRE-PR BATS GATE — branch was RED; 9 test-only fixes applied, branch now green-minus-env.**
   A single-threaded local `bats scripts/tests/ --recursive` on `k3d-manager-v1.27.0` found **13 failures**.
