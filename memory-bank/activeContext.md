@@ -194,6 +194,40 @@
     manual `--from=cronjob/app-cve-scan` job grepping `SIGGATE`. Preflight confirmed: hub Vault `vault_key=present`,
     `vault-backend` CSS Ready, `platform-ops/cosign-public-key` not-yet-present (clean first deploy). **User runs it via `!`
     (deploy-path mutation, classifier-gated for Claude Bash).**
+  - **HUB STABILITY / PUBLIC 502 — LIVE DIAGNOSIS 2026-09-02 (Claude-verified live).** Root cause = single-node
+    hub CPU oversubscription driving a self-reinforcing control-plane storm. Live snapshot: `k3d-cluster-server-0`
+    646% CPU, agent-1 578%, agent-0 322% (M4 Air ~8-10 cores → oversubscribed). Storm drivers (live):
+    `svclb-istio-ingressgateway` **600 restarts** (klipper ServiceLB host-port fight), `coredns` 93 restarts +
+    `node-exporter` 322 restarts (CPU-starvation SIGTERM kills — cf [[reference_one_second_probes_cpu_starvation_kill_loop]]),
+    `argocd-application-controller-0` **901m CPU** (top) continuously reconciling the stuck `shopping-cart-identity`
+    app + kube-prom CRD comparison timeouts, `prometheus-0` 698m, `postgres-keycloak` **CreateContainerConfigError**
+    (Keycloak DB won't start → identity never Healthy → Argo retries forever = feedback loop). Chain:
+    CPU-oversubscribe → pod restarts (coredns/svclb) → DNS+API churn → Argo reconcile storm → kine/sqlite slow →
+    API timeouts → port-forward health-checks fail (grafana launchd last-exit -15 SIGTERM, keycloak -9 SIGKILL) →
+    Cloudflare **502**. NOT a cloudflared split-brain — stray `com.cloudflare.cloudflared` connector is `.disabled`,
+    only `com.k3d-manager.cloudflare-tunnel` live. Codex fixes VERIFIED: `e64111d7` CVE-exporter background-refresh
+    thread (line 370 `Thread(...,daemon=True).start()` ✅ correct), `94682a78` status hub-agent surfacing + Makefile
+    keycloak secret `keycloak-admin-secret`/`password` (live secret-name confirm pending), `0bca3e21` `Replace=true`
+    on shopping-cart-identity app — CORRECT lever for the duplicate-`http`-port strategic-merge drift but blanket
+    blast radius (also force-replaces Keycloak STS/PVC → cf `docs/issues/2026-09-02-secure-argocd-sync-and-pvc-blocker.md`);
+    commit msg "secure credential piping" NOT reflected in the 1-line diff. Roadmap Hermes theme `41f2f68c` VERIFIED
+    (well-scoped, 3-phase, no unrestricted creds, scope-doc-gated) — roadmap-ONLY, no code/repo; keep parked until hub
+    stable + scope doc; this incident is its Phase-1 justification.
+  - **HUB STABILITY — STAGE A EXECUTED 2026-09-02, 502s RESOLVED (Claude live).** Actions (ALL REVERSIBLE, must resume):
+    (1) `make monitoring-pause` → suspended auto-sync on kube-prometheus-stack/hub-loki/trivy-operator (grafana kept);
+    prometheus-0 scaled down (shed ~698m). My 240s timeout killed the make wrapper (Terminated:15) but the suspend
+    landed. (2) `kubectl -n cicd patch application shopping-cart-identity {syncPolicy.automated:null}` — suspended the
+    identity app's tight retry storm (the 901m app-controller driver). **RESULT: grafana.3ai-talk.org 302, argocd 200
+    (were 502); agents near-idle.** ⚠️ RESIDUAL: `server-0` control-plane still ~713% CPU — single-node hub structurally
+    over capacity (Stage C). **RESUME LEVERS when stable:** `make monitoring-resume` + re-add identity
+    `syncPolicy.automated:{prune,selfHeal}`. **keycloak-secrets ROOT CAUSE PINNED:** NOT manifest/seal/auth —
+    SecretStore `vault-kv-store` is Ready=True (auth OK), Vault unsealed+active; the ExternalSecret fails because the
+    **Vault KV DATA is missing** at `secret/keycloak/admin` (props `admin_password`,`db_password`) + `secret/ldap/admin`
+    (`admin_password`) — a Vault-seeding gap (cf [[reference_show_service_passwords_na_root_causes]]). keycloak-0 still
+    Running on the legacy Bitnami `keycloak-postgresql` STS so SSO likely unaffected; the git-rendered `postgres-keycloak`
+    Deployment is a half-done DB migration blocked on that seed. NEXT: seed Vault keycloak/ldap KV → force ES reconcile →
+    resume identity auto-sync → verify Synced/Healthy; then Stage B (resource requests/priorityClasses, calm
+    svclb-istio-ingressgateway 600-restart churn, sustained public probes in make status) + Stage C structural offload.
   - **CVE-loop closure #2b — RE-PIN 4 callers to attest SHA ✅ DONE + VERIFIED, 4 PRs OPEN (user-gated) 2026-08-31.** Codex
     (session `01a057f5`, task `bi5vx45pp`) bumped each caller's infra reusable-workflow pin
     `@1fa7ab0`→`@45def89e` on branch `feat/repin-infra-attest` (from each `origin/main`). **Claude-verified
@@ -1015,3 +1049,25 @@
 - `bin/cluster-status-summary` now adds local `k3d-k3d-cluster-agent-0` Docker state to webhook-unavailable output. Syntax and all 8 BATS tests pass.
 ### 2026-09-01 — Hermes automation roadmap
 - Added an unversioned forward theme for optional Hermes event-driven operations automation: read-only monitoring first, then approval-gated repairs, cooldowns/budgets, audit, and verification. k3d-manager webhook remains authoritative.
+
+### 2026-09-03 — keycloak-secrets ES root cause = Vault FIELD SCHISM (not missing data)
+- Live `keycloak-0` is DECOUPLED from `keycloak-secrets`/`postgres-keycloak`: it connects to
+  `jdbc:postgresql://keycloak-postgresql:5432/bitnami_keycloak` (legacy Bitnami PG, user `bn_keycloak`)
+  with a FILE-based password (`KC_DB_PASSWORD_FILE`) from configmap `keycloak-env-vars`. SSO is safe to
+  touch these secrets — nothing live reads them.
+- The failing ExternalSecrets (`keycloak-secrets`, `keycloak-client-secrets`, `ldap-secrets`) all use
+  store `vault-kv-store`; the WORKING ones (`keycloak-admin-secret`, `keycloak-ldap-secret`, `openldap-admin`)
+  use `keycloak-vault-store`. Error is `cannot find secret data for key: "admin_password"` at
+  `secret/data/keycloak/admin` — the secret is READABLE but the FIELD is misnamed.
+- `secret/keycloak/admin` holds only `password` (keycloak.sh convention); the infra ES wants `admin_password`
+  + `db_password` (shopping_cart.sh convention). `secret/ldap/admin` does not exist; canonical ldap admin pw
+  is `secret/ldap/openldap-admin#LDAP_ADMIN_PASSWORD`.
+- FIX (operational seed, NOT a manifest change): patch `secret/keycloak/admin` to ADD
+  `admin_password`(=existing `password`) + fresh `db_password`; create `secret/ldap/admin#admin_password`
+  (=openldap-admin LDAP_ADMIN_PASSWORD). Auto-mode classifier blocked the read-into-var+write script twice;
+  handed the exact command to the user to run via `!`.
+- Live identity app syncOptions = ["CreateNamespace=true","Replace=true"] (Codex 0bca3e21 IS live) with
+  automated=null (Stage A suspension holds). DO NOT resume auto-sync until Replace=true is scoped to the
+  Keycloak Service only (Stage B) — resuming with blanket Replace=true would force-replace Keycloak STS/PVC.
+- Sequence once seeded: ES reconciles (15m or forced) → keycloak-secrets syncs → postgres-keycloak leaves
+  CreateContainerConfigError → identity app heals to Healthy while auto-sync STAYS suspended (safe hold).

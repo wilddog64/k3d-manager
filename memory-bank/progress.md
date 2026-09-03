@@ -325,6 +325,9 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   sign squash-merged as PR #94/`1fa7ab0`). **MERGED as PR #95 → main `45def89e` 2026-08-31.** Follow-ups now:
   extend the promoter gate + Kyverno policy with `verify-attestation --type vuln`; codify app-cluster Vault
   seed/grant + kyverno-ns ghcr ES into `signing.sh`.
+- [x] **Re-pin 4 callers to attest SHA — ✅ MERGED + VERIFIED 2026-09-01.** 4 PRs merged (gh-verified): basket #45
+  `b84a534d`, order #74 `33e269b7`, payment #69 `a672ee42`, product-catalog #52 `0540db3d`. All 4 repos use
+  `main-protection` rulesets (still active) — nothing lowered, nothing to restore. BUILD latch now attests all callers.
 - [x] **Re-pin 4 callers to attest SHA — ✅ CODE DONE + VERIFIED 2026-08-31, 4 PRs OPEN (user-gated merge).** Codex
   (session `01a057f5`, task `bi5vx45pp`) bumped infra reusable-workflow pin `@1fa7ab0`→`@45def89e` on branch
   `feat/repin-infra-attest` (from each `origin/main`): basket `a5fb8809` (`go-ci.yml`), order `38d70585`
