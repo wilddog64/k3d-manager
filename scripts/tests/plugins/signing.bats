@@ -148,6 +148,40 @@ setup() {
   grep -q "failureAction: Enforce" "$out"
 }
 
+# --- ADMIT latch: vuln attestation block (CVE-loop closure) ------------------
+
+@test "rendered policy requires a cosign vuln attestation (ADMIT latch)" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  run yq -r '.spec.rules[0].verifyImages[0].attestations[0].type' "$out"
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://cosign.sigstore.dev/attestation/vuln/v1" ]
+}
+
+@test "rendered policy is valid YAML with the key injected at BOTH depths" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  # The deeper attestations block re-indents the key by hand (a fixed-indent
+  # awk injector renders invalid YAML at the second depth if unguarded); parse
+  # with yq to prove both blocks landed at a structurally valid indent.
+  run yq -e '.spec.rules[0].verifyImages[0].attestors[0].entries[0].keys.publicKeys' "$out"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BEGIN PUBLIC KEY"* ]]
+  run yq -e '.spec.rules[0].verifyImages[0].attestations[0].attestors[0].entries[0].keys.publicKeys' "$out"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BEGIN PUBLIC KEY"* ]]
+}
+
+@test "attestation block inherits the staged failureAction (no separate gate)" {
+  local out="$BATS_TEST_TMPDIR/policy.yaml"
+  SIGNING_VALIDATION_FAILURE_ACTION="Audit" \
+    _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
+  # Exactly one failureAction on the verifyImages entry -- the attestation check
+  # rides the same Audit->Enforce staging as the signature check (D2).
+  run yq -r '.spec.rules[0].verifyImages[0].failureAction' "$out"
+  [ "$output" = "Audit" ]
+}
+
 # --- Secret hygiene (A02): no key material on argv ---------------------------
 
 @test "signing.sh never passes cosign key/password as a bare CLI argument" {

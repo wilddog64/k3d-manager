@@ -215,6 +215,11 @@ function _signing_render_policy() {
         close(pf)
         next
       }
+      /^# __PUBLIC_KEY_ATTEST__$/ {
+        while ((getline line < pf) > 0) { print "                          " line }
+        close(pf)
+        next
+      }
       { print }
     '
 }

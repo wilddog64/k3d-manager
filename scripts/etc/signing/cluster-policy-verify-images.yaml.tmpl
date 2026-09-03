@@ -77,3 +77,22 @@ spec:
                       ignoreSCT: true
                     rekor:
                       ignoreTlog: true
+          # ADMIT latch (CVE loop): beyond a valid signature, require a Trivy vuln
+          # attestation signed by the same key. This closes the loop with the
+          # promoter's verify-attestation gate -- an image may be signed yet carry
+          # no scan result; here we insist the scan attestation exists and is ours.
+          # Produced by CI 'cosign attest --type vuln' (predicateType below). Rides
+          # the SAME failureAction as the signature check, so it inherits the staged
+          # Audit -> Enforce rollout (D2) -- never blocks before Audit is clean.
+          attestations:
+            - type: https://cosign.sigstore.dev/attestation/vuln/v1
+              attestors:
+                - count: 1
+                  entries:
+                    - keys:
+                        publicKeys: |-
+# __PUBLIC_KEY_ATTEST__
+                        ctlog:
+                          ignoreSCT: true
+                        rekor:
+                          ignoreTlog: true
