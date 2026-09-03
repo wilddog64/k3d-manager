@@ -6,6 +6,15 @@
 
 ## Current focus
 
+- **2026-09-03 v1.27.0 PR #118 OPEN** — https://github.com/wilddog64/k3d-manager/pull/118
+  (base `main`, head `k3d-manager-v1.27.0` @ `5cfc30ec`, MERGEABLE, not draft). Opened after the
+  pre-PR BATS gate went green-minus-env + CHANGELOG `[1.27.0]` landed. Copilot review requested
+  (raw-JSON POST). CI `pull_request` run `33786672642` in progress. **NOT merged — awaiting user go
+  (never-auto-merge).** Remaining pre-merge gates: CI green, Copilot threads addressed+resolved,
+  Gemini live smoke, scope check (scope check done: 240 commits/165 files, bulk docs+etc templates,
+  core in signing/vcluster/e2e/loadtest plugins; secret scan clean; no workflow/action changes).
+  Retro doc still to write at post-merge.
+
 - **2026-09-03 PRE-PR BATS GATE — branch was RED; 9 test-only fixes applied, branch now green-minus-env.**
   A single-threaded local `bats scripts/tests/ --recursive` on `k3d-manager-v1.27.0` found **13 failures**.
   Bucketed by running affected files on `main` (CI-green) vs branch, in isolation: **9 branch-related

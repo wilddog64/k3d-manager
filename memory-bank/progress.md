@@ -61,6 +61,12 @@
 
 ## v1.27.0 queue
 
+- [ ] **PR #118 OPEN (2026-09-03):** https://github.com/wilddog64/k3d-manager/pull/118 — base `main`,
+  head `k3d-manager-v1.27.0` @ `5cfc30ec`. Copilot requested, CI `pull_request` run in progress.
+  NOT merged (awaiting user go). Pre-merge gates remaining: CI green, Copilot addressed+resolved,
+  Gemini live smoke. Post-merge TODO: retro doc, tag/release v1.27.0, protection restore, reapply
+  ApplicationSets (hub + ACG), next branch.
+
 - [x] **Pre-PR BATS gate green-minus-env (2026-09-03):** local full suite went 13→4 failures.
   9 branch failures fixed (test-only; code correct) across 6 files — LDAP chart migration guards,
   ghcr-pull-secret-via-SA guard, node-health threshold, argocd self-healing template values, and
