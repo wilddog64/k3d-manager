@@ -328,6 +328,21 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [x] **Re-pin 4 callers to attest SHA — ✅ MERGED + VERIFIED 2026-09-01.** 4 PRs merged (gh-verified): basket #45
   `b84a534d`, order #74 `33e269b7`, payment #69 `a672ee42`, product-catalog #52 `0540db3d`. All 4 repos use
   `main-protection` rulesets (still active) — nothing lowered, nothing to restore. BUILD latch now attests all callers.
+- [x] **Promoter vuln-attestation gate (PROMOTE latch) — ✅ CODE DONE + VERIFIED 2026-09-03 (`588aab3e` on `origin/k3d-manager-v1.27.0`).**
+  Closes the PROMOTE half of the CVE loop. BUILD latch verified live first: `shopping-cart-infra/build-push-deploy.yml` on
+  main signs **and** attests by digest (`cosign sign` + `cosign attest --type vuln --predicate trivy-vuln.json` + `--type
+  spdxjson`). `app-cve-scan.sh` gains `COSIGN_VERIFY_ATTESTATION` (default 0) + `_verify_candidate_attestation` running
+  `cosign verify-attestation --type vuln` **after** the signature gate; signed-but-unattested candidate refused with
+  `ATTESTGATE ... Promotion Blocked (unattested)`. No behaviour change until **both** `COSIGN_VERIFY=1` and
+  `COSIGN_VERIFY_ATTESTATION=1`. BATS 14/14 (2 new: signed+attested→promote, signed-unattested→refuse; cosign mock now
+  verify-attestation-aware), shellcheck clean. Spec appended to `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`
+  (§ Closure implementation) — respects the 5-plan-doc cap (v1.27.0 already at 13; no new file added).
+- [ ] **Kyverno vuln-attestation block (ADMIT latch) — SPEC ONLY, next slice.** Add an `attestations:` block
+  (`type: https://cosign.sigstore.dev/attestation/vuln/v1`) to `cluster-policy-verify-images.yaml.tmpl`. **Blocker in the
+  same change:** `_signing_render_policy` (signing.sh) injects the pub key at a **fixed 22-space indent** for every
+  `^# __PUBLIC_KEY__$` marker → a second marker at the deeper attestations depth renders invalid YAML. Needs a distinct
+  second marker + indent-aware awk branch + a BATS assertion that the rendered policy is valid YAML with the key at both
+  depths. Staged Audit→Enforce (D2 — never Enforce before Audit dashboard is clean). Ship after PROMOTE gate is exercised live.
 - [x] **Re-pin 4 callers to attest SHA — ✅ CODE DONE + VERIFIED 2026-08-31, 4 PRs OPEN (user-gated merge).** Codex
   (session `01a057f5`, task `bi5vx45pp`) bumped infra reusable-workflow pin `@1fa7ab0`→`@45def89e` on branch
   `feat/repin-infra-attest` (from each `origin/main`): basket `a5fb8809` (`go-ci.yml`), order `38d70585`

@@ -6,6 +6,16 @@
 
 ## Current focus
 
+- **2026-09-03 v1.27.0 CVE-loop — PROMOTE latch attestation gate SHIPPED (`588aab3e`, pushed).**
+  Verified the BUILD latch is real (infra `build-push-deploy.yml` signs + `cosign attest --type vuln`
+  + spdxjson by digest), then added `COSIGN_VERIFY_ATTESTATION` + `_verify_candidate_attestation`
+  (`cosign verify-attestation --type vuln`) to `app-cve-scan.sh`, running after the signature gate.
+  Default-off (needs both `COSIGN_VERIFY=1` **and** `COSIGN_VERIFY_ATTESTATION=1`). BATS 14/14 (+2),
+  shellcheck clean. **Remaining CVE-loop gap = ADMIT latch (Kyverno `attestations:` block)**, specced
+  in the closure plan but NOT implemented — it needs a `_signing_render_policy` indentation fix (fixed
+  22-space awk marker breaks a second deeper key injection) + BATS. No PR yet (still on the milestone
+  branch, per gate).
+
 - **2026-09-02 hub outage:** Cloudflare Grafana 502 and ArgoCD OAuth redirect failures traced to
   k3s API/etcd readiness failure and severe server CPU saturation (~650–880%). Agents/server were
   restarted; API remained unstable. Evidence and recovery attempts: `docs/issues/2026-09-02-hub-control-plane-saturation-causing-public-502.md`.
