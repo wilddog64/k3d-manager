@@ -222,7 +222,10 @@ EOF
   cat >"${TEST_BIN_DIR}/cosign" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >>"${COSIGN_LOG}"
-exit "${TEST_COSIGN_EXIT:-0}"
+case "$1" in
+  verify-attestation) exit "${TEST_COSIGN_ATTEST_EXIT:-${TEST_COSIGN_EXIT:-0}}" ;;
+  *) exit "${TEST_COSIGN_EXIT:-0}" ;;
+esac
 EOF
   chmod +x "${TEST_BIN_DIR}/cosign"
 
@@ -395,6 +398,77 @@ EOF
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"FAILED cosign verify — refusing to promote"* ]]
   grep -q 'warning|App CVE Promotion Blocked (unsigned): shopping-cart-basket|' "${NOTIFY_LOG}"
+  run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+}
+
+@test "COSIGN_VERIFY_ATTESTATION=1: signed + attested clean candidate is promoted" {
+  export APP_SERVICES="shopping-cart-basket"
+  export TEST_SHA_TAG="sha-basket-new"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+  export TEST_LATEST_CVES_shopping_cart_basket=0
+  export TEST_LATEST_DIGEST="sha256:feedbeef"
+
+  run env -i \
+    PATH="${PATH}" \
+    TRIVY_LOG="${TRIVY_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" \
+    KUBECTL_LOG="${KUBECTL_LOG}" \
+    COSIGN_LOG="${COSIGN_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
+    TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" \
+    TEST_SHA_TAG="${TEST_SHA_TAG}" \
+    TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_basket_report="${TEST_REPORT_DETAILS_basket_report}" \
+    TEST_LATEST_CVES_shopping_cart_basket="${TEST_LATEST_CVES_shopping_cart_basket}" \
+    TEST_LATEST_DIGEST="${TEST_LATEST_DIGEST}" \
+    COSIGN_VERIFY=1 \
+    COSIGN_VERIFY_ATTESTATION=1 \
+    COSIGN_PUBLIC_KEY_FILE="${TEST_COSIGN_PUB}" \
+    TEST_COSIGN_EXIT=0 \
+    /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  grep -q 'verify-attestation --type vuln --key .* --insecure-ignore-tlog=true ghcr.io/wilddog64/shopping-cart-basket@sha256:feedbeef' "${COSIGN_LOG}"
+  [[ "${output}" == *"ATTESTGATE shopping-cart-basket: candidate ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeef vuln-attestation verified"* ]]
+  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+}
+
+@test "COSIGN_VERIFY_ATTESTATION=1: signed but unattested candidate is refused (no promotion)" {
+  export APP_SERVICES="shopping-cart-basket"
+  export TEST_SHA_TAG="sha-basket-new"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+  export TEST_LATEST_CVES_shopping_cart_basket=0
+  export TEST_LATEST_DIGEST="sha256:feedbeef"
+
+  run env -i \
+    PATH="${PATH}" \
+    TRIVY_LOG="${TRIVY_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" \
+    KUBECTL_LOG="${KUBECTL_LOG}" \
+    COSIGN_LOG="${COSIGN_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
+    TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" \
+    TEST_SHA_TAG="${TEST_SHA_TAG}" \
+    TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_basket_report="${TEST_REPORT_DETAILS_basket_report}" \
+    TEST_LATEST_CVES_shopping_cart_basket="${TEST_LATEST_CVES_shopping_cart_basket}" \
+    TEST_LATEST_DIGEST="${TEST_LATEST_DIGEST}" \
+    COSIGN_VERIFY=1 \
+    COSIGN_VERIFY_ATTESTATION=1 \
+    COSIGN_PUBLIC_KEY_FILE="${TEST_COSIGN_PUB}" \
+    TEST_COSIGN_EXIT=0 \
+    TEST_COSIGN_ATTEST_EXIT=1 \
+    /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"FAILED vuln-attestation verify — refusing to promote unattested image"* ]]
+  grep -q 'warning|App CVE Promotion Blocked (unattested): shopping-cart-basket|' "${NOTIFY_LOG}"
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
 }
 
