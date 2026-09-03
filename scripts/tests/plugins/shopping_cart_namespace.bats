@@ -23,9 +23,18 @@ setup() {
 }
 
 @test "shopping-cart-frontend deployment uses ghcr pull secret" {
-  run grep -qF -- "imagePullSecrets:" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/kustomization.yaml"
+  run test -f "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/serviceaccount.yaml"
   [ "$status" -eq 0 ]
 
-  run grep -qF -- "- name: ghcr-pull-secret" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/kustomization.yaml"
+  run grep -qF -- "imagePullSecrets:" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/serviceaccount.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -qF -- "- name: ghcr-pull-secret" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/serviceaccount.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -qF -- "serviceaccount.yaml" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/kustomization.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -qF -- "serviceAccountName: frontend" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/kustomization.yaml"
   [ "$status" -eq 0 ]
 }

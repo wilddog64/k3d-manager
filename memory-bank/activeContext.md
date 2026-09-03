@@ -6,6 +6,20 @@
 
 ## Current focus
 
+- **2026-09-03 PRE-PR BATS GATE — branch was RED; 9 test-only fixes applied, branch now green-minus-env.**
+  A single-threaded local `bats scripts/tests/ --recursive` on `k3d-manager-v1.27.0` found **13 failures**.
+  Bucketed by running affected files on `main` (CI-green) vs branch, in isolation: **9 branch-related
+  (all test-only — code is correct/intentional)** + **4 pre-existing local-macOS-env** (fail on `main` too,
+  pass in CI → NOT PR-blocking; tracked in `docs/issues/2026-09-03-bats-preexisting-local-macos-env-failures.md`).
+  Spec: `docs/bugs/2026-09-03-bats-red-branch-stale-guards-and-vcluster-harness.md`. The 9:
+  stale guards from intentional milestone changes — LDAP chart migration to `openldap-stack-ha`
+  (`:389→:1389`, `dc=shopping-cart,dc=local→dc=home,dc=org`) [53/54]; ghcr pull secret moved to a
+  `frontend` ServiceAccount [720]; node-health threshold `3→5` [81]; argocd port-forward self-healing
+  rework (`sleep 30→RESTART_DELAY=2`, `HEALTH_FAILURE_THRESHOLD 3→6`) [288/518]; plus vcluster harness
+  bugs from `142fd06b` (`_vcluster_wait_ready` 60s stub timeout, `run`-subshell drops `_VCLUSTER_BIN`,
+  bare-`vcluster` vs `$VCLUSTER_STUB` string) [850/851/854]. 6 affected files re-run → 104 ok / 0 not ok.
+  Full-suite confirmation (expect 4 env-only failures) in progress. NOT committed yet. **PR still gated.**
+
 - **2026-09-03 v1.27.0 CVE-loop CODE-COMPLETE — ADMIT latch SHIPPED (`5e5bd33b`, pushed).**
   Kyverno `verifyImages` now carries an `attestations:` block (`type:
   https://cosign.sigstore.dev/attestation/vuln/v1`) beside the signature `attestors:`, so a first-party

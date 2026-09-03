@@ -15,7 +15,7 @@ setup() {
 }
 
 @test "node health watchdog preserves bounded recovery controls" {
-  run grep -F 'threshold="${K3DM_NODE_RECOVERY_FAILURE_THRESHOLD:-3}"' \
+  run grep -F 'threshold="${K3DM_NODE_RECOVERY_FAILURE_THRESHOLD:-5}"' \
     "${BATS_TEST_DIRNAME}/../../../bin/k3dm-node-health-watch"
   [ "$status" -eq 0 ]
 

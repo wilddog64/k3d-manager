@@ -899,7 +899,7 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F 'for (( _attempt=1; _attempt<=30; _attempt++ ))' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
-  run grep -F 'sleep 30' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  run grep -F 'RESTART_DELAY=2' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
   run grep -F 'LOCK_DIR=' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]

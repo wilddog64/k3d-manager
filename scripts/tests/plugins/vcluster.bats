@@ -38,6 +38,7 @@ STUB
     printf '%s\n' "$VCLUSTER_STUB"
   }
   _VCLUSTER_BIN="$VCLUSTER_STUB"
+  _vcluster_wait_ready() { :; }
 }
 
 @test "vcluster_create: uses foundation-managed CLI path" {
@@ -51,8 +52,7 @@ STUB
 @test "_vcluster_check_prerequisites: stores the contract path" {
   local managed_path="${BATS_TEST_TMPDIR}/managed-vcluster"
   foundation_ensure_vcluster_cli() { printf '%s\n' "$managed_path"; }
-  run _vcluster_check_prerequisites
-  [ "$status" -eq 0 ]
+  _vcluster_check_prerequisites
   [ "$_VCLUSTER_BIN" = "$managed_path" ]
 }
 
@@ -79,7 +79,7 @@ STUB
   [ "$status" -eq 0 ]
   local -a run_calls
   read_lines "$RUN_LOG" run_calls
-  [ "${run_calls[0]}" = "vcluster create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${override_values}" ]
+  [ "${run_calls[0]}" = "$VCLUSTER_STUB create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${override_values}" ]
 }
 
 @test "vcluster_create: fails without active host context" {

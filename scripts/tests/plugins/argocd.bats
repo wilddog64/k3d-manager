@@ -144,7 +144,7 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'STARTUP_TIMEOUT=${STARTUP_TIMEOUT}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -F 'HEALTH_FAILURE_THRESHOLD=3' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -F 'HEALTH_FAILURE_THRESHOLD=6' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'RESTART_DELAY=2' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]

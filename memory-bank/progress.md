@@ -61,6 +61,13 @@
 
 ## v1.27.0 queue
 
+- [x] **Pre-PR BATS gate green-minus-env (2026-09-03):** local full suite went 13→4 failures.
+  9 branch failures fixed (test-only; code correct) across 6 files — LDAP chart migration guards,
+  ghcr-pull-secret-via-SA guard, node-health threshold, argocd self-healing template values, and
+  vcluster harness bugs. Remaining 4 (455/457/767/773) are pre-existing local-macOS-env, fail on
+  `main` too, pass in CI → not PR-blocking. Spec `docs/bugs/2026-09-03-bats-red-branch-stale-guards-and-vcluster-harness.md`,
+  env issue `docs/issues/2026-09-03-bats-preexisting-local-macos-env-failures.md`. Full suite: 871 ok / 4 env.
+
 - [ ] **Hub control-plane saturation/public 502 incident (2026-09-02):** API `/readyz` reports
   etcd failures while k3s server reaches ~880% CPU; Grafana port-forward flaps and ArgoCD public
   OAuth URL drifted to the local hostname. Bug recorded in
