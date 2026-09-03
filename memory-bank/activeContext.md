@@ -992,6 +992,14 @@
 - v1.27.0 plans: `docs/plans/v1.27.0-*`
 - Active bugs/incidents: `docs/bugs/` and `docs/issues/`
 - Release history: `CHANGELOG.md` and `docs/retro/`
+
+### 2026-09-02 — ArgoCD identity sync recovery and secure credential handling
+- ArgoCD password was handled only in process memory via a Kubernetes-secret-to-API
+  pipeline; no password file, shell argument, log, or output was created.
+- Recreated the stuck `argocd-application-controller-0` pod and cleared its stale
+  operation. Identity sync now reaches the immutable `postgres-keycloak-pvc` blocker.
+- Added `Replace=true` to the identity Application template in `bin/cluster-up`.
+- Follow-up issue: `docs/issues/2026-09-02-secure-argocd-sync-and-pvc-blocker.md`.
 ### 2026-09-01 — status blind spot documented
 - Filed `docs/issues/2026-09-01-status-blind-spot-on-exited-hub-agent.md`: when a hub agent exits, webhook-backed `make status` reports only `UNKNOWN` and omits node evidence. Recommended bounded local Docker/node fallback; no automatic restart.
 ### 2026-09-01 — status fallback and Keycloak credential lookup fixed

@@ -582,3 +582,12 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - Corrected Keycloak admin secret name/key and added bounded local agent-state evidence to UNKNOWN status responses. `bash -n` and `cluster_status_summary.bats` (8/8) pass.
 ### 2026-09-01 — Hermes roadmap theme recorded
 - Roadmap now tracks a candidate v1.28.x-or-later Hermes coordinator for health, CI, ArgoCD, tunnel, and webhook events with strict allowlists and token/iteration controls.
+
+### 2026-09-02 — identity sync blocker and secret-piping remediation
+- Recovered the terminating ArgoCD application controller and cleared the stale
+  identity operation. A replacement sync was attempted without persisting or
+  exposing the ArgoCD password; the remaining failure is the immutable bound
+  `postgres-keycloak-pvc`.
+- Added the durable identity sync strategy change (`Replace=true`) in `bin/cluster-up`;
+  PVC migration/resource-scoped replacement remains follow-up.
+- See `docs/issues/2026-09-02-secure-argocd-sync-and-pvc-blocker.md`.
