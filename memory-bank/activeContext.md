@@ -7,13 +7,23 @@
 ## Current focus
 
 - **2026-09-03 v1.27.0 PR #118 OPEN** — https://github.com/wilddog64/k3d-manager/pull/118
-  (base `main`, head `k3d-manager-v1.27.0` @ `5cfc30ec`, MERGEABLE, not draft). Opened after the
-  pre-PR BATS gate went green-minus-env + CHANGELOG `[1.27.0]` landed. Copilot review requested
-  (raw-JSON POST). CI `pull_request` run `33786672642` in progress. **NOT merged — awaiting user go
-  (never-auto-merge).** Remaining pre-merge gates: CI green, Copilot threads addressed+resolved,
-  Gemini live smoke, scope check (scope check done: 240 commits/165 files, bulk docs+etc templates,
-  core in signing/vcluster/e2e/loadtest plugins; secret scan clean; no workflow/action changes).
-  Retro doc still to write at post-merge.
+  (base `main`, head `k3d-manager-v1.27.0` @ `fc9fa3d5`, MERGEABLE, not draft). Opened after the
+  pre-PR BATS gate went green-minus-env + CHANGELOG `[1.27.0]`. Copilot review requested. CI green
+  (lint✓ detect✓ stage2 skipped-by-design behind `ci:cluster-tests` label). `main` has **no required
+  status checks**. **CodeQL raised 2 HIGH `py/clear-text-storage-sensitive-data`** at pre-existing
+  `bin/k3dm-webhook` output writes (2286/2601) — traced to a value-insensitive FP (smoke password only
+  hits the login POST body, never the written output). User chose **harden defensively**: added a secret
+  redaction barrier (`_register_secret`/`_redact_secrets`, registered at `_smoke_secret`/`_vault_secret`/
+  env password reads, scrubbing all 5 status `_finish` handlers) — commit `fc9fa3d5`, spec
+  `docs/bugs/2026-09-03-webhook-cleartext-secret-storage-codeql.md`.
+  **CodeQL re-check on `fc9fa3d5`: still 2 HIGH at the same sinks (now 2315/2630)** — barrier is real
+  but code-scanning propagates taint through `.replace()` and doesn't recognize it (as predicted).
+  **FP CONFIRMED** (correct sanitizer in place, secret never reaches the sink). Check stays red; NOT a
+  required check so it does NOT block merge. Cannot dismiss via API — gh token lacks `security_events`
+  scope; clean close needs the GitHub Security UI (or a scoped token). Live webhook needs
+  `make restart-webhook` if we want it current.
+  **NOT merged — awaiting user go (never-auto-merge).** Remaining gates: Copilot addressed+resolved,
+  Gemini live smoke. Decision pending: dismiss CodeQL in UI vs proceed with documented FP. Retro at post-merge.
 
 - **2026-09-03 PRE-PR BATS GATE — branch was RED; 9 test-only fixes applied, branch now green-minus-env.**
   A single-threaded local `bats scripts/tests/ --recursive` on `k3d-manager-v1.27.0` found **13 failures**.
