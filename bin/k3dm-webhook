@@ -1170,6 +1170,35 @@ def _archive_acg_screenshot(screenshot_path):
         return screenshot_path
 
 
+_REDACT_VALUES = set()
+
+
+def _register_secret(value):
+    """Record a secret value so _redact_secrets can scrub it from any job output.
+
+    Returns the value unchanged so callers can wrap a return in place. Short or
+    non-string values are ignored to avoid over-broad redaction of common tokens.
+    """
+    if isinstance(value, str) and len(value) >= 4:
+        _REDACT_VALUES.add(value)
+    return value
+
+
+def _redact_secrets(text):
+    """Replace every registered secret value in text with a redaction marker.
+
+    Defense in depth for status handlers that write kubectl diagnostics to
+    job_dir/output and post them to Slack: a credential the webhook has read
+    never leaves the process in clear text even if it lands in captured output.
+    """
+    if not text:
+        return text
+    for _v in _REDACT_VALUES:
+        if _v:
+            text = text.replace(_v, "***REDACTED***")
+    return text
+
+
 def _notify_job(job_id, text):
     """Post a Slack message in the thread for job_id.
 
@@ -1713,7 +1742,7 @@ def _smoke_secret(namespace, key, secret_name, context=None):
     if timed_out or not out.strip():
         return None
     try:
-        return _b64.b64decode(out.strip()).decode("utf-8", "replace")
+        return _register_secret(_b64.b64decode(out.strip()).decode("utf-8", "replace"))
     except Exception:
         return None
 
@@ -1743,7 +1772,7 @@ def _smoke_test_logins(provider, app_context):
                 headers={"X-Vault-Token": token},
             )
             with urllib.request.urlopen(req, timeout=8) as resp:
-                return json.loads(resp.read()).get("data", {}).get("data", {}).get(key)
+                return _register_secret(json.loads(resp.read()).get("data", {}).get("data", {}).get(key))
         except Exception:
             return None
 
@@ -1767,7 +1796,7 @@ def _smoke_test_logins(provider, app_context):
             return resp.status, resp.read()
 
     kc_user = os.environ.get("K3DM_SMOKE_KC_USER")
-    kc_pass = os.environ.get("K3DM_SMOKE_KC_PASS")
+    kc_pass = _register_secret(os.environ.get("K3DM_SMOKE_KC_PASS"))
     kc_realm = os.environ.get("K3DM_SMOKE_KC_REALM", "shopping-cart")
     kc_client = os.environ.get("K3DM_SMOKE_KC_CLIENT", "frontend")
     kc_via_smoke_client = False
@@ -1845,8 +1874,8 @@ def _smoke_test_logins(provider, app_context):
         results.append(("Frontend login", None if _frontend_skipped else _frontend_ok, _frontend_detail))
 
     argo_user = os.environ.get("K3DM_SMOKE_ARGOCD_USER", "admin")
-    argo_pass = os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _vault_secret("argocd/admin", "password") or _smoke_secret(
-        "cicd", "password", "argocd-initial-admin-secret", context="k3d-k3d-cluster")
+    argo_pass = _register_secret(os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _vault_secret("argocd/admin", "password") or _smoke_secret(
+        "cicd", "password", "argocd-initial-admin-secret", context="k3d-k3d-cluster"))
     if not argo_pass:
         results.append(("ArgoCD login", None, "no credentials (argocd-initial-admin-secret absent; set K3DM_SMOKE_ARGOCD_PASS)"))
     else:
@@ -1868,8 +1897,8 @@ def _smoke_test_logins(provider, app_context):
                  or _smoke_secret("monitoring", "admin-user",
                                   "grafana-admin-credentials", context="k3d-k3d-cluster")
                  or "admin")
-    graf_pass = os.environ.get("K3DM_SMOKE_GRAFANA_PASS") or _vault_secret("observability/grafana", "password") or _smoke_secret(
-        "monitoring", "admin-password", "grafana-admin-credentials", context="k3d-k3d-cluster")
+    graf_pass = _register_secret(os.environ.get("K3DM_SMOKE_GRAFANA_PASS") or _vault_secret("observability/grafana", "password") or _smoke_secret(
+        "monitoring", "admin-password", "grafana-admin-credentials", context="k3d-k3d-cluster"))
     if not graf_pass:
         results.append(("Grafana login", None, "no credentials (acg-kube-prometheus-stack-grafana absent; set K3DM_SMOKE_GRAFANA_PASS)"))
     else:
@@ -2278,7 +2307,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        output = _redact_secrets("".join(lines))
         if len(output) > 3400:
             output = (output[:1600]
                       + "\n… middle of report truncated …\n"
@@ -2505,7 +2534,7 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        report = "".join(lines)
+        report = _redact_secrets("".join(lines))
         if len(report) > 3400:
             report = (report[:1600]
                       + "\n… middle of report truncated …\n"
@@ -2592,7 +2621,7 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        report = "".join(lines)
+        report = _redact_secrets("".join(lines))
         if len(report) > 3400:
             report = (report[:1600]
                       + "\n… middle of report truncated …\n"
@@ -2647,7 +2676,7 @@ def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        output = _redact_secrets("".join(lines))
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -2693,7 +2722,7 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        output = _redact_secrets("".join(lines))
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
