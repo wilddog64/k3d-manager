@@ -159,7 +159,9 @@ milestone only when it gets a scope doc.
   allowlisted, approval-gated repairs (restart webhook, refresh edge, retry transient CI); Phase 3
   adds cooldowns, daily token/iteration budgets, audit records, and post-repair verification.
   Hermes does not replace the k3d-manager webhook or receive unrestricted cluster, cloud, Git, or
-  branch-protection credentials. A scope document is required before assigning a release.
+  branch-protection credentials. A scope document is required before assigning a release — Phase 1
+  is scoped in `docs/architecture/hermes-phase1-monitoring-scope.md` (read-only; webhook is
+  authoritative; least-privilege; health-degraded ≠ safe-to-repair).
 - **Distribution packages** — deb/rpm/brew. Long-standing vision item, never scoped.
 - **Home lab** — `CLUSTER_PROVIDER=k3s-local-arm64` on a Mac Mini M5 (hardware target ~Oct 2026),
   bare-metal ingress via **MetalLB + Envoy Gateway (Gateway API)** replacing the Istio
