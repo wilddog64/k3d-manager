@@ -6,15 +6,17 @@
 
 ## Current focus
 
-- **2026-09-03 v1.27.0 CVE-loop — PROMOTE latch attestation gate SHIPPED (`588aab3e`, pushed).**
-  Verified the BUILD latch is real (infra `build-push-deploy.yml` signs + `cosign attest --type vuln`
-  + spdxjson by digest), then added `COSIGN_VERIFY_ATTESTATION` + `_verify_candidate_attestation`
-  (`cosign verify-attestation --type vuln`) to `app-cve-scan.sh`, running after the signature gate.
-  Default-off (needs both `COSIGN_VERIFY=1` **and** `COSIGN_VERIFY_ATTESTATION=1`). BATS 14/14 (+2),
-  shellcheck clean. **Remaining CVE-loop gap = ADMIT latch (Kyverno `attestations:` block)**, specced
-  in the closure plan but NOT implemented — it needs a `_signing_render_policy` indentation fix (fixed
-  22-space awk marker breaks a second deeper key injection) + BATS. No PR yet (still on the milestone
-  branch, per gate).
+- **2026-09-03 v1.27.0 CVE-loop CODE-COMPLETE — ADMIT latch SHIPPED (`5e5bd33b`, pushed).**
+  Kyverno `verifyImages` now carries an `attestations:` block (`type:
+  https://cosign.sigstore.dev/attestation/vuln/v1`) beside the signature `attestors:`, so a first-party
+  image must carry a vuln attestation signed by our key. Renderer blocker fixed: `_signing_render_policy`
+  got a `# __PUBLIC_KEY_ATTEST__` awk branch injecting at 26 spaces (fixed-22 signature branch untouched).
+  signing.bats 20/20 (+3, yq-parsed), shellcheck clean. **Three-latch loop code-complete: BUILD ✅ /
+  PROMOTE ✅ (`588aab3e`) / ADMIT ✅ (`5e5bd33b`).** All ship inert: PROMOTE default-off (`COSIGN_VERIFY=1`
+  **and** `COSIGN_VERIFY_ATTESTATION=1`); ADMIT default `Audit`, Enforce gated behind
+  `SIGNING_ALLOW_ENFORCE=1` + clean Audit dashboard (D2). **Remaining = live enablement only**, in order:
+  exercise PROMOTE gate → ADMIT Audit dashboard clean → ADMIT `--enforce`. No PR yet (still on the
+  milestone branch, per gate).
 
 - **2026-09-02 hub outage:** Cloudflare Grafana 502 and ArgoCD OAuth redirect failures traced to
   k3s API/etcd readiness failure and severe server CPU saturation (~650–880%). Agents/server were

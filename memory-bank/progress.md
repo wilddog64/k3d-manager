@@ -337,12 +337,15 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `COSIGN_VERIFY_ATTESTATION=1`. BATS 14/14 (2 new: signed+attested→promote, signed-unattested→refuse; cosign mock now
   verify-attestation-aware), shellcheck clean. Spec appended to `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`
   (§ Closure implementation) — respects the 5-plan-doc cap (v1.27.0 already at 13; no new file added).
-- [ ] **Kyverno vuln-attestation block (ADMIT latch) — SPEC ONLY, next slice.** Add an `attestations:` block
-  (`type: https://cosign.sigstore.dev/attestation/vuln/v1`) to `cluster-policy-verify-images.yaml.tmpl`. **Blocker in the
-  same change:** `_signing_render_policy` (signing.sh) injects the pub key at a **fixed 22-space indent** for every
-  `^# __PUBLIC_KEY__$` marker → a second marker at the deeper attestations depth renders invalid YAML. Needs a distinct
-  second marker + indent-aware awk branch + a BATS assertion that the rendered policy is valid YAML with the key at both
-  depths. Staged Audit→Enforce (D2 — never Enforce before Audit dashboard is clean). Ship after PROMOTE gate is exercised live.
+- [x] **Kyverno vuln-attestation block (ADMIT latch) — ✅ CODE DONE + VERIFIED 2026-09-03 (`5e5bd33b` on `origin/k3d-manager-v1.27.0`).**
+  Added an `attestations:` block (`type: https://cosign.sigstore.dev/attestation/vuln/v1`) as a sibling of the signature
+  `attestors:` in `cluster-policy-verify-images.yaml.tmpl`. Renderer blocker resolved: `_signing_render_policy` (signing.sh)
+  got a distinct `# __PUBLIC_KEY_ATTEST__` awk branch injecting the key at **26 spaces** (+4 over the untouched fixed-22
+  signature branch), fixing the invalid-YAML-at-depth issue. BATS: yq-parsed guards (valid YAML, key at BOTH depths, vuln
+  predicate type, single `failureAction` governs both) — **signing.bats 20/20 green**, shellcheck clean (sole SC2016 line 67
+  pre-exists). Ships **inert**: default `Audit`, Enforce still gated behind `SIGNING_ALLOW_ENFORCE=1` + clean Audit dashboard (D2).
+  **Three-latch CVE loop now code-complete (BUILD ✅ / PROMOTE ✅ / ADMIT ✅).** Remaining = live enablement order:
+  exercise PROMOTE gate → ADMIT Audit dashboard clean → ADMIT Enforce.
 - [x] **Re-pin 4 callers to attest SHA — ✅ CODE DONE + VERIFIED 2026-08-31, 4 PRs OPEN (user-gated merge).** Codex
   (session `01a057f5`, task `bi5vx45pp`) bumped infra reusable-workflow pin `@1fa7ab0`→`@45def89e` on branch
   `feat/repin-infra-attest` (from each `origin/main`): basket `a5fb8809` (`go-ci.yml`), order `38d70585`
