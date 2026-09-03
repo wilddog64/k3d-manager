@@ -591,3 +591,12 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - Added the durable identity sync strategy change (`Replace=true`) in `bin/cluster-up`;
   PVC migration/resource-scoped replacement remains follow-up.
 - See `docs/issues/2026-09-02-secure-argocd-sync-and-pvc-blocker.md`.
+
+### 2026-09-03 — exporter timeout fix for empty Grafana CVE tables
+- Root cause: synchronous exporter refresh exceeded Prometheus's scrape timeout;
+  source Prometheus metrics existed but the exporter target was down.
+- Implemented background cached refresh (60s) in
+  `vulnerability-inventory-exporter.yaml`, compiled the embedded Python, and
+  applied the manifest. Live target/table verification remains pending while the
+  Kubernetes API is intermittently slow.
+- See `docs/issues/2026-09-03-grafana-cve-tables-empty-exporter-timeout.md`.

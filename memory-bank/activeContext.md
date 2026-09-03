@@ -1000,6 +1000,14 @@
   operation. Identity sync now reaches the immutable `postgres-keycloak-pvc` blocker.
 - Added `Replace=true` to the identity Application template in `bin/cluster-up`.
 - Follow-up issue: `docs/issues/2026-09-02-secure-argocd-sync-and-pvc-blocker.md`.
+
+### 2026-09-03 — Grafana CVE panels empty
+- Prometheus retained 6,066 vulnerability series and 6 remediation events, but the
+  vulnerability exporter target was down on scrape timeout because `/metrics`
+  synchronously refreshed both clusters.
+- Exporter now refreshes in a 60-second daemon loop and serves the cached snapshot
+  immediately. Manifest applied; post-rollout scrape confirmation is pending.
+- Issue: `docs/issues/2026-09-03-grafana-cve-tables-empty-exporter-timeout.md`.
 ### 2026-09-01 — status blind spot documented
 - Filed `docs/issues/2026-09-01-status-blind-spot-on-exited-hub-agent.md`: when a hub agent exits, webhook-backed `make status` reports only `UNKNOWN` and omits node evidence. Recommended bounded local Docker/node fallback; no automatic restart.
 ### 2026-09-01 — status fallback and Keycloak credential lookup fixed
