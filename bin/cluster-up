@@ -34,9 +34,7 @@ fi
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 # shellcheck disable=SC2034
 PLUGINS_DIR="${SCRIPT_DIR}/plugins"
-_ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
-_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
-_ACG_CHECKPOINT_DIR="${_ACG_STATE_DIR}/checkpoints"
+_ACG_STATE_BASE="${HOME}/.local/share/k3d-manager"
 
 _cp_skip() {
   [[ -f "${_ACG_CHECKPOINT_DIR}/${1}.done" ]]
@@ -79,6 +77,12 @@ case "${_cluster_provider}" in
     _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp, k3s-az)"
     ;;
 esac
+
+_acg_state_provider="$(_acg_normalize_provider "${_cluster_provider}")"
+_ACG_STATE_DIR="${_ACG_STATE_BASE}/${_acg_state_provider}"
+_dry_guard "migrate flat state dir to a per-provider dir" _acg_migrate_flat_state "${_ACG_STATE_BASE}" "${_acg_state_provider}"
+_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
+_ACG_CHECKPOINT_DIR="${_ACG_STATE_DIR}/checkpoints"
 
 function _argocd_open_browser_url() {
   local url="$1"

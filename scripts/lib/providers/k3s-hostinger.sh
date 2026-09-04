@@ -1004,7 +1004,7 @@ HELP
   fi
 
   _dry_guard "remove Hostinger kubeconfig" rm -f "${_HOSTINGER_KUBECONFIG}"
-  _dry_guard "remove Hostinger active-provider marker" rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
+  _dry_guard "remove Hostinger active-provider marker" _acg_unrecord_provider "k3s-hostinger"
   _info "[k3s-hostinger] k3s uninstalled; VPS preserved."
 }
 

@@ -43,6 +43,15 @@
     downtime, (#1, done) detect edge reachability failures honestly, (#2) provision multiple providers
     concurrently without local-state corruption. 3 of 5 plan-doc slots (cap not in the way). Remaining
     to complete: `v1.28.0-parallel-multi-cloud-provisioning` + `v1.28.0-platform-zero-downtime-rollouts`.
+  - **DONE (offline slice) 2026-09-04 — parallel-multi-cloud Phase 1+2.** Provider-scoped
+    `_ACG_STATE_DIR` + `_acg_migrate_flat_state` one-time migration (decision "all scoped, migrate on
+    first run"); `active-providers/` marker-dir set (`_acg_record_provider`/`_acg_unrecord_provider`/
+    `_acg_list_active_providers`) fixing `k3s-hostinger.sh:1007` whole-file delete; set-aware
+    best-effort resolver fallback. 14/14 new BATS (`provider_active_set.bats`) + 54/54 contract
+    regression + shellcheck clean. Implementation-ready detail appended to the spec. DEFERRED:
+    Phase 3 (ports/labels + make down/status refuse-when-ambiguous), Phase 4 (hub+kubeconfig flock),
+    live two-cloud DoD. Recon corrections: webhook `_ACTIVE_PROVIDER_FILE` is a dead constant; the
+    resolver already picks by context reachability (the file is only an offline fallback).
 
 - **2026-09-03 v1.27.0 PR #118 MERGED & RELEASED** — https://github.com/wilddog64/k3d-manager/pull/118
   (base `main`, head `k3d-manager-v1.27.0`, merged SHA `62c9ff27`, tag/release v1.27.0 published

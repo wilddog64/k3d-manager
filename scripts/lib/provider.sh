@@ -77,6 +77,7 @@ function _cluster_provider_call() {
 }
 
 _ACG_ACTIVE_PROVIDER_FILE="${_ACG_ACTIVE_PROVIDER_FILE:-${HOME}/.local/share/k3d-manager/active-provider}"
+_ACG_ACTIVE_PROVIDERS_DIR="${_ACG_ACTIVE_PROVIDERS_DIR:-${HOME}/.local/share/k3d-manager/active-providers}"
 
 function _acg_normalize_provider() {
     case "${1:-}" in
@@ -104,8 +105,63 @@ function _acg_record_provider() {
     local provider
     provider="$(_acg_normalize_provider "${1:-}")"
     [[ -z "${provider}" ]] && return 0
+    mkdir -p "${_ACG_ACTIVE_PROVIDERS_DIR}"
+    : > "${_ACG_ACTIVE_PROVIDERS_DIR}/${provider}"
     mkdir -p "$(dirname "${_ACG_ACTIVE_PROVIDER_FILE}")"
     printf '%s\n' "${provider}" > "${_ACG_ACTIVE_PROVIDER_FILE}"
+}
+
+function _acg_unrecord_provider() {
+    local provider
+    provider="$(_acg_normalize_provider "${1:-}")"
+    [[ -z "${provider}" ]] && return 0
+    rm -f "${_ACG_ACTIVE_PROVIDERS_DIR}/${provider}"
+    if [[ -f "${_ACG_ACTIVE_PROVIDER_FILE}" ]]; then
+        local cur
+        cur="$(_acg_normalize_provider "$(cat "${_ACG_ACTIVE_PROVIDER_FILE}" 2>/dev/null || true)")"
+        [[ "${cur}" == "${provider}" ]] && rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
+    fi
+    return 0
+}
+
+function _acg_migrate_flat_state() {
+    # One-time migration: pre-scoping runs kept a single flat state dir under $1.
+    # If flat state exists and no scoped dir claims it yet, move it under the
+    # provider named by the legacy active-provider marker (its rightful owner),
+    # else this run's provider ($2, already normalized).
+    local base="${1:-}" run_provider="${2:-}"
+    [[ -z "${base}" || -z "${run_provider}" ]] && return 0
+    [[ -d "${base}/run" || -d "${base}/logs" || -d "${base}/checkpoints" ]] || return 0
+    local owner="${run_provider}"
+    if [[ -f "${base}/active-provider" ]]; then
+        local marked
+        marked="$(_acg_normalize_provider "$(cat "${base}/active-provider" 2>/dev/null || true)")"
+        [[ -n "${marked}" ]] && owner="${marked}"
+    fi
+    local target="${base}/${owner}"
+    [[ -d "${target}" ]] && return 0
+    mkdir -p "${target}"
+    local sub
+    for sub in run logs bin checkpoints; do
+        [[ -e "${base}/${sub}" ]] && mv "${base}/${sub}" "${target}/${sub}"
+    done
+    [[ -e "${base}/acg-state.json" ]] && mv "${base}/acg-state.json" "${target}/acg-state.json"
+    return 0
+}
+
+function _acg_list_active_providers() {
+    if [[ -d "${_ACG_ACTIVE_PROVIDERS_DIR}" ]]; then
+        local _f _n=0
+        for _f in "${_ACG_ACTIVE_PROVIDERS_DIR}"/*; do
+            [[ -e "${_f}" ]] || continue
+            printf '%s\n' "$(basename "${_f}")"
+            _n=$((_n + 1))
+        done
+        [[ "${_n}" -gt 0 ]] && return 0
+    fi
+    [[ -f "${_ACG_ACTIVE_PROVIDER_FILE}" ]] && \
+        _acg_normalize_provider "$(cat "${_ACG_ACTIVE_PROVIDER_FILE}" 2>/dev/null || true)"
+    return 0
 }
 
 # Reachability preflight: true only if the kube-context answers /readyz within a
@@ -134,8 +190,14 @@ function _acg_resolve_provider() {
             fi
         done
     fi
-    if [[ -z "${provider}" && -f "${_ACG_ACTIVE_PROVIDER_FILE}" ]]; then
-        provider="$(cat "${_ACG_ACTIVE_PROVIDER_FILE}" 2>/dev/null || true)"
+    if [[ -z "${provider}" ]]; then
+        local -a _live=()
+        mapfile -t _live < <(_acg_list_active_providers)
+        if [[ "${#_live[@]}" -eq 1 ]]; then
+            provider="${_live[0]}"
+        elif [[ "${#_live[@]}" -gt 1 && -f "${_ACG_ACTIVE_PROVIDER_FILE}" ]]; then
+            provider="$(cat "${_ACG_ACTIVE_PROVIDER_FILE}" 2>/dev/null || true)"
+        fi
     fi
     _acg_normalize_provider "${provider:-k3s-hostinger}"
 }
