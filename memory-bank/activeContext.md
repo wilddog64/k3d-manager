@@ -56,6 +56,15 @@
     Phase 3 (ports/labels + make down/status refuse-when-ambiguous), Phase 4 (hub+kubeconfig flock),
     live two-cloud DoD. Recon corrections: webhook `_ACTIVE_PROVIDER_FILE` is a dead constant; the
     resolver already picks by context reachability (the file is only an offline fallback).
+  - **DONE (offline core) 2026-09-04 — parallel-multi-cloud Phase 3+4.** mkdir-based hub lock
+    (`_acg_lock_acquire`/`_acg_lock_release` — macOS lacks `flock(1)`; pid stale-reclaim; bounded wait
+    then proceed) wrapping `cluster-up` Step 3.5+3.6 hub verify+bootstrap; `_acg_provider_port_offset`
+    (k3s-aws=0 so single-cloud is byte-identical) applied to the ACG Prometheus forward (`19090+offset`).
+    Key recon correction: hub-shared forwards (Vault 18200 → `k3d-k3d-cluster`, hub ArgoCD) are NOT
+    offset — created once + reused, serialized by the lock; only per-app-cluster forwards (19090 →
+    app context) offset. BATS 20/20 + contract 54/54, shellcheck + parse clean. DEFERRED (Phase 3b):
+    kubeconfig-merge lock, full per-app-cluster launchd-label suffix audit, make down/status
+    refuse-when-ambiguous (touches Makefile global CLUSTER_PROVIDER default), live two-cloud DoD.
 
 - **2026-09-03 v1.27.0 PR #118 MERGED & RELEASED** — https://github.com/wilddog64/k3d-manager/pull/118
   (base `main`, head `k3d-manager-v1.27.0`, merged SHA `62c9ff27`, tag/release v1.27.0 published

@@ -127,3 +127,48 @@ _stub_kubectl_all_unreachable() {
   [[ -f "${base}/run/vault-pf.pid" ]]          # left in place, not moved
   [[ ! -e "${base}/k3s-aws/run" ]]
 }
+
+# --- Phase 4: hub bootstrap lock (mkdir-based; macOS has no flock) ---
+
+@test "_acg_lock_acquire creates the lock and records the pid; release removes it" {
+  local lk="${BATS_TEST_TMPDIR}/hub.lock"
+  _acg_lock_acquire "${lk}" 5
+  [[ -d "${lk}" ]]
+  [[ "$(cat "${lk}/pid")" == "$$" ]]
+  _acg_lock_release "${lk}"
+  [[ ! -e "${lk}" ]]
+}
+
+@test "_acg_lock_acquire reclaims a stale lock whose owner is dead" {
+  local lk="${BATS_TEST_TMPDIR}/hub.lock"
+  mkdir "${lk}"
+  sh -c 'exit 0' & local dead=$!
+  wait "${dead}" 2>/dev/null || true
+  printf '%s\n' "${dead}" > "${lk}/pid"
+  _acg_lock_acquire "${lk}" 5
+  [[ "$(cat "${lk}/pid")" == "$$" ]]   # reclaimed and now owned by us
+  _acg_lock_release "${lk}"
+}
+
+@test "_acg_lock_acquire with an empty lock dir is a no-op success" {
+  run _acg_lock_acquire "" 5
+  [[ "${status}" -eq 0 ]]
+}
+
+# --- Phase 3: per-provider port offset ---
+
+@test "_acg_provider_port_offset is 0 for the default provider (k3s-aws)" {
+  [[ "$(_acg_provider_port_offset k3s-aws)" == "0" ]]
+  [[ "$(_acg_provider_port_offset aws)" == "0" ]]
+}
+
+@test "_acg_provider_port_offset gives distinct non-zero offsets to other providers" {
+  [[ "$(_acg_provider_port_offset k3s-hostinger)" == "10" ]]
+  [[ "$(_acg_provider_port_offset k3s-az)" == "20" ]]
+  [[ "$(_acg_provider_port_offset k3s-gcp)" == "30" ]]
+  [[ "$(_acg_provider_port_offset k3s-oci)" == "40" ]]
+}
+
+@test "_acg_provider_port_offset defaults to 0 for unknown providers" {
+  [[ "$(_acg_provider_port_offset foo)" == "0" ]]
+}

@@ -27,10 +27,16 @@
   `_acg_list_active_providers`; resolver fallback set-aware, best-effort (refuse-when-ambiguous
   deferred to the make down/status wrapper). Files: `bin/cluster-up`, `scripts/lib/provider.sh`,
   `scripts/lib/providers/k3s-hostinger.sh`, new `scripts/tests/lib/provider_active_set.bats` (14/14).
-  shellcheck-clean; provider_contract 54/54 regression green. **Deferred:** Phase 3 (per-provider
-  ports + launchd labels + make down/status refuse-when-ambiguous), Phase 4 (hub-bootstrap +
-  kubeconfig `flock`), live two-cloud DoD (needs two real clouds up). webhook `_ACTIVE_PROVIDER_FILE`
-  found to be a dead constant — no change needed.
+  shellcheck-clean; provider_contract 54/54 regression green. webhook `_ACTIVE_PROVIDER_FILE`
+  found to be a dead constant — no change needed. **Phase 3+4 core also shipped:** mkdir-based
+  hub-bootstrap lock (`_acg_lock_acquire`/`_acg_lock_release`, macOS has no `flock(1)`) wrapping
+  `cluster-up:337-375` (Step 3.5+3.6) so concurrent runs can't double-create/bootstrap the shared
+  hub; `_acg_provider_port_offset` (k3s-aws=0 ⇒ single-cloud unchanged) applied to the per-app-cluster
+  ACG Prometheus forward (`19090+offset`). Recon correction: hub-shared forwards (Vault 18200, hub
+  ArgoCD) stay fixed — only per-app-cluster forwards offset; the lock covers the shared ones. BATS now
+  20/20 (`provider_active_set.bats`). **Still deferred (Phase 3b):** kubeconfig-merge lock
+  (`cluster-up:677+`), full per-app-cluster launchd-label suffix audit, `make down/status`
+  refuse-when-ambiguous (changes Makefile global `CLUSTER_PROVIDER ?= k3s-aws` default), live two-cloud DoD.
 - [ ] **v1.28.0-platform-zero-downtime-rollouts — QUEUED, hardware-gated** (deferred 2026-09-04).
   No CPU headroom on the M4 Air 24GB hub for 2+ replicas of the stateless tier (hub CPU-starves at
   single replicas). Gated on the Mac Mini M5 upgrade (Oct 2026). Spec stays on disk; do NOT implement

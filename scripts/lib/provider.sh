@@ -124,6 +124,55 @@ function _acg_unrecord_provider() {
     return 0
 }
 
+function _acg_lock_acquire() {
+    # Portable advisory lock (macOS has no flock(1)). Serializes the shared-hub
+    # bootstrap across concurrent per-provider bring-ups. mkdir is atomic; a pid
+    # file lets a later run reclaim a lock whose owner died. Bounded wait then
+    # proceeds without the lock rather than deadlocking.
+    # Usage: _acg_lock_acquire <lock-dir> [timeout-seconds]
+    local lockdir="${1:-}" timeout="${2:-120}" waited=0
+    [[ -z "${lockdir}" ]] && return 0
+    while ! mkdir "${lockdir}" 2>/dev/null; do
+        if [[ -f "${lockdir}/pid" ]]; then
+            local owner
+            owner="$(cat "${lockdir}/pid" 2>/dev/null || true)"
+            if [[ -n "${owner}" ]] && ! kill -0 "${owner}" 2>/dev/null; then
+                rm -rf "${lockdir}"
+                continue
+            fi
+        fi
+        if [[ "${waited}" -ge "${timeout}" ]]; then
+            _warn "[lock] timed out after ${timeout}s waiting for ${lockdir}; proceeding without it"
+            return 0
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+    printf '%s\n' "$$" > "${lockdir}/pid"
+    return 0
+}
+
+function _acg_lock_release() {
+    local lockdir="${1:-}"
+    [[ -z "${lockdir}" ]] && return 0
+    rm -rf "${lockdir}"
+    return 0
+}
+
+function _acg_provider_port_offset() {
+    # Deterministic per-provider local-port offset so concurrent app-cluster
+    # port-forwards do not collide. k3s-aws (cluster-up's default) = 0 so
+    # single-cloud users keep the historical fixed ports unchanged.
+    case "$(_acg_normalize_provider "${1:-}")" in
+        k3s-aws)       printf '0\n' ;;
+        k3s-hostinger) printf '10\n' ;;
+        k3s-az)        printf '20\n' ;;
+        k3s-gcp)       printf '30\n' ;;
+        k3s-oci)       printf '40\n' ;;
+        *)             printf '0\n' ;;
+    esac
+}
+
 function _acg_migrate_flat_state() {
     # One-time migration: pre-scoping runs kept a single flat state dir under $1.
     # If flat state exists and no scoped dir claims it yet, move it under the
