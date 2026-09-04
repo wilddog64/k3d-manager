@@ -1287,3 +1287,15 @@
   jenkins values tmpls, smoke-test-jenkins, ad/vars.sh jenkins-admin path. Source-only cleanup — live
   openldap-0 keeps jenkins-admin until a fresh bootstrap; SSO (osixia ldap) unaffected.
 - Spec: docs/bugs/2026-09-04-prune-unconditional-jenkins-ldap-fixtures.md.
+
+### 2026-09-04 (cont.) — DECISION: leave bootstrap-ad-schema.ldif Jenkins fixtures as-is
+- After pruning the default-directory Jenkins clutter (d9ee756b), checked the AD-testing schema
+  scripts/etc/ldap/bootstrap-ad-schema.ldif (dc=corp,dc=example,dc=com; "Jenkins Service"/"Jenkins Admins").
+- FINDING (non-obvious): its Jenkins entries are LOAD-BEARING for a live CI suite —
+  scripts/tests/lib/dirservices_activedirectory.bats:227 asserts "CN=Jenkins Admins,OU=Groups,DC=corp,...".
+  The whole `activedirectory` directory-service provider is a Jenkins-AD integration feature
+  (_dirservice_activedirectory_generate_jcasc/authz, deploy_ad → _ldap_run_ad_smoke_test, AD_BIND_DN=svc-jenkins).
+  It loads ONLY under explicit AD testing (ldap.sh:1207 deploy_ad), NOT in the default openldap-0 directory.
+- USER DECISION 2026-09-04: LEAVE IT. Removing Jenkins here isn't a fixture tidy — it's "remove the whole
+  Jenkins-AD provider + its BATS suite", a separate larger task that conflicts with keep-deprecated-Jenkins.
+  Do NOT re-open as "tidy" work. See [[project_jenkins_deprecation]].
