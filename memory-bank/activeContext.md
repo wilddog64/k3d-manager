@@ -6,6 +6,28 @@
 
 ## Current focus
 
+- **2026-09-04 v1.28.0 PLANNING — Claude weekly-quota lever + Hermes install decision.**
+  Context: user on $20/mo flat rate hits Claude's weekly quota fast; under flat-rate the goal
+  is routing work OFF Claude's constrained quota onto Codex/Gemini (other flat plans) + Haiku
+  (cheaper Claude), NOT reducing total tokens. Two-part plan agreed: **(1)** workflow-defaults
+  audit + tighten [started]; **(2)** Hermes as a Claude-last-resort ops router [deferred, scope
+  doc gated].
+  - **DECISION #1 (2026-09-04): keep Opus 4.8 as the global default** (`settings.json`
+    `"model": "opus"` UNCHANGED). User wants Opus interactively for orchestration/judgment/verify;
+    quota relief comes from subagent routing of mechanical lanes, not from flipping the default.
+  - **DONE — `~/.claude/commands/create-pr.md` Phase 2 Opus→Sonnet.** Was labeled "Sonnet" but ran
+    in the Opus main conversation → Copilot-fix read+edit burned Opus. Now a real **Sonnet
+    subagent**; Opus only trust-but-verifies the returned fix rationales. (Config repo, not k3d-manager.)
+  - **DONE — DECISION #2 (2026-09-04): `/bugfix` + `/handoff` spec-authoring → Sonnet subagent.**
+    Both commands now draft the spec (read source + write exact old/new blocks) on a Sonnet
+    subagent; Opus reviews the draft for exact-code-block precision before handoff. Edits in
+    `~/.claude/commands/bugfix.md` (step 3) + `handoff.md` (steps 1–2). (Config repo, not k3d-manager.)
+  - **Hermes install decision recorded** in `docs/architecture/hermes-phase1-monitoring-scope.md`
+    §10: `_install_hermes_agent` in **lib-foundation** (subtree-first), installs Hermes **off-hub**
+    (laptop tier, like `bin/k3dm-webhook`) — which also resolves the §9 hub-stability gate without
+    waiting for the M5. Deferred to Hermes impl phase; no code yet. (Hermes theme = roadmap
+    candidate v1.28.x, `docs/roadmap.md:156`.)
+
 - **2026-09-03 v1.27.0 PR #118 MERGED & RELEASED** — https://github.com/wilddog64/k3d-manager/pull/118
   (base `main`, head `k3d-manager-v1.27.0`, merged SHA `62c9ff27`, tag/release v1.27.0 published
   2026-09-03). CI green (lint✓ detect✓ stage2 skipped-by-design). CodeQL FP fixed in code
