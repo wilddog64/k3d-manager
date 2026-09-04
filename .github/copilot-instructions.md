@@ -1,114 +1,105 @@
-# GitHub Copilot Instructions — k3d-manager
+# GitHub Copilot Instructions — lib-foundation
 
-k3d-manager is a modular Bash utility for managing local Kubernetes development clusters.
+lib-foundation is a shared Bash library consumed by `k3d-manager`, `rigor-cli`, and `shopping-carts`
+via git subtree. No dispatcher, no cluster — pure Bash with BATS unit tests.
+
 Use the rules below to shape all code suggestions and PR reviews.
 
 ---
 
 ## Architecture
 
-- **Entry point**: `scripts/k3d-manager` — dispatcher with lazy plugin loading.
-- **Core libraries**: `scripts/lib/system.sh`, `scripts/lib/core.sh`, `scripts/lib/agent_rigor.sh`.
-- **Plugins**: `scripts/plugins/` — sourced on demand, no side effects at source time.
-- **Privilege escalation**: always via `_run_command --prefer-sudo` or `--require-sudo` — never bare `sudo`.
-- **OS detection**: always via `_detect_platform` — never inline `_is_mac`/`_is_debian_family` dispatch chains.
-- **Secret backends**: interface in `scripts/lib/secret_backends/` — Vault is complete, others stubbed.
-- **Cluster providers**: `scripts/lib/providers/` — `k3d`, `orbstack`, `k3s-aws`, `k3s-oci`, `k3s-gcp`, `k3s-az`, `k3s-hostinger`. Active provider is recorded to `${_ACG_STATE_DIR}/active-provider` at provision time; `bin/acg-refresh` and `bin/acg-status` self-resolve provider/context (explicit env > active-provider file > reachable-context probe > default `k3s-aws`).
-- **ACG plugin**: `scripts/plugins/acg.sh` — `acg_get_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_watch`, `acg_teardown`. Manages Pluralsight ACG sandbox lifecycle via CloudFormation + k3sup (AWS) or GCP.
-- **GCP plugin**: `scripts/plugins/gcp.sh` — `gcp_login`, `gcp_get_credentials`. OAuth automation via CDP; GCE cluster provisioning via k3sup.
-- **Playwright**: `scripts/lib/foundation/scripts/lib/acg/playwright/` — static Node.js scripts: `acg_credentials.js` (AWS/GCP credential extraction), `acg_extend.js` (sandbox TTL extend), `gcp_login.js` (Google OAuth flow automation). All connect to Chrome via CDP (`localhost:9222`). Source of truth is `wilddog64/lib-foundation` (the standalone `lib-acg` repo was absorbed into lib-foundation as of v1.8.0); pulled into k3d-manager as part of the lib-foundation git subtree under `scripts/lib/foundation/`.
-- **Browser automation**: `scripts/plugins/gemini.sh` — `_browser_launch`. Launches Chrome with `--remote-debugging-port=9222 --password-store=basic`. On Linux, `--no-sandbox` is added only when running as root (`$EUID -eq 0`) or `ANTIGRAVITY_CHROME_NO_SANDBOX=1`. As of v1.8.0 the Copilot-review functions invoke the Go-based Antigravity CLI (`agy --dangerously-skip-permissions`) — the retired `@google/gemini-cli` is no longer used; public `gemini_*` names are retained.
-- **ACG module (absorbed)**: `scripts/lib/foundation/scripts/lib/acg/` — ACG/GCP Playwright automation library, now part of lib-foundation (`wilddog64/lib-foundation`). Contains `scripts/plugins/acg.sh`, `scripts/plugins/gcp.sh`, `scripts/lib/cdp.sh`, `playwright/` scripts, and `scripts/vars.sh`. k3d-manager stubs in `scripts/plugins/acg.sh`, `scripts/plugins/gcp.sh`, and `scripts/plugins/gemini.sh`, plus `bin/cluster-up`/`bin/cluster-refresh`, repoint here. The standalone `scripts/lib/acg/` subtree and its `lib-acg` git remote were removed in v1.8.0.
-- **Tunnel**: `scripts/plugins/tunnel.sh` — `tunnel_start`, `tunnel_stop`, `tunnel_status`. autossh + launchd; forward tunnel (k3s API :6443) + reverse tunnel (Vault :8200).
-- **Vault plugin**: `scripts/plugins/vault.sh` — `vault_init`, `vault_install_unseal_watchdog` (Tier 3 P2a in-cluster unseal watchdog CronJob), `configure_vault_app_auth_for_context` (provider-agnostic Kubernetes auth for app clusters, v1.10.0+), `vault_deploy_hub_into_context` (hub-Vault relocation into app cluster, v1.10.0+). Vault server lifecycle and app-cluster auth config; portable across providers (EKS/AKS/ACG/Azure/OCI/Hostinger).
-- **AWS helpers**: `scripts/plugins/aws.sh` — `aws_import_credentials`.
-- **Shopping Cart plugin**: `scripts/plugins/shopping_cart.sh` — `add_ubuntu_k3s_cluster`, `deploy_shopping_cart_data`, `shopping_cart_sync_vault_backed_secrets`, `shopping_cart_load_ghcr_pat_*`, `shopping_cart_resolve_ghcr_pat`, `shopping_cart_create_ghcr_pull_secret`, `shopping_cart_create_vault_bridge`, `shopping_cart_install_helm_and_eso`, `shopping_cart_apply_vault_token_and_cluster_secret_store`, `shopping_cart_seed_sandbox_vault_kv`, `shopping_cart_prepare_*`, `shopping_cart_reconcile_*`, `register_shopping_cart_apps`, `deploy_app_cluster`. Manages full-stack shopping-cart app deployment with ESO credential sync, Vault integration, and ArgoCD GitOps.
-- **OCI Storage plugin**: `scripts/lib/providers/k3s-oci-storage.sh` — `oci_backup` (etcd snapshot → OCI object storage), `oci_restore` (restore from OCI object storage → etcd). Auto-backup runs after `k3s-oci` deploy. Snapshot names validated against `^k3s-etcd-[0-9]{8}-[0-9]{6}\.db$` pattern.
-- **Copilot plugin**: `scripts/plugins/copilot.sh` — `copilot_triage_pod <ns> <pod>` (collects kubectl describe + logs → Copilot diagnosis), `copilot_draft_spec '<desc>'` (collects git context → scaffolds a `docs/bugs/` spec). Both require `K3DM_ENABLE_AI=1`. Route through `_ai_agent_review` in `scripts/lib/system.sh` and keep `_copilot_review` as the backend implementation.
-- **Observability plugin**: `scripts/plugins/observability.sh` — `deploy_observability` (Hub kube-prometheus-stack + Trivy via ArgoCD), `deploy_observability_acg` (ACG minimal Prometheus + Trivy via ArgoCD), `observability_status`, `trivy_scan_report`. Hub Grafana federates ACG Prometheus via `host.internal:19090`; `bin/acg-up` Step 14 starts the port-forward (`acg-prom-pf.pid`); `bin/acg-down` kills it. ApplicationSets: `scripts/etc/argocd/applicationsets/observability.yaml` (Hub) and `observability-acg.yaml` (ACG). Helm values under `scripts/etc/helm/observability/`.
-- **Istio Ambient plugin**: `scripts/plugins/istio_ambient.sh` — `deploy_istio_ambient` (v1.16.0+). Applies the istio-ambient ApplicationSet to deploy Istio in ambient mode (ztunnel + istio-cni, zero sidecar containers, HBONE/mTLS). Substrate-aware: resolves CNI conf/bin directories to Cilium defaults (`/etc/cni/net.d`, `/opt/cni/bin`) or k3s flannel paths via `AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR` environment variables.
-- **Keycloak plugin**: `scripts/plugins/keycloak.sh` — `deploy_keycloak`, `test_keycloak`, `keycloak_seed_smoke_user` (v1.17.0+). Keycloak lifecycle, LDAP federation, and the login-verification smoke identity: `keycloak_seed_smoke_user` seeds a k3d-manager-owned `k3dm-smoke` public client (direct-access-grant enabled) plus a local user, storing the generated password in the `identity/k3dm-smoke-user` Secret. It exists because the app-owned `frontend` client has `directAccessGrantsEnabled=false`, so a password grant can never succeed against it. Idempotent — re-run to restore after an app-owned realm reconcile. Seeded users MUST carry the Keycloak 24+ required User Profile attributes (`email`, `firstName`, `lastName`, `emailVerified`) or the direct-grant mint fails `invalid_grant "Account is not fully set up"`.
-- **Health smoke login checks**: `bin/k3dm-webhook` `_smoke_test_logins` — verifies **real logins** (credentialed token POST / authed request) for Keycloak, Frontend, ArgoCD, Grafana rather than fetching health pages, which false-green on a stale-session HTTP 200. Grading contract: 2xx→pass, a smoke-client `401`/`403`→skip (`ok=None`, audience-strict deployment), anything else→fail.
-- **Convenience scripts**: `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `bin/acg-status`, `bin/acg-sync-apps`, `bin/rotate-ghcr-pat`, `bin/cluster-status`, `bin/cluster-status-summary` — orchestrate plugin calls for common one-shot operations. `bin/cluster-status` is the backend for Make targets `make status` (concise service-health summary, default), `make status-full` (detailed diagnostics), and `make status-json` (stable machine-readable output); accepts `--service <name>` for single-service focus (v1.24.1+).
+- **Core libraries**: `scripts/lib/system.sh`, `scripts/lib/core.sh`, `scripts/lib/agent_rigor.sh`
+- **Optional module**: `scripts/lib/acg/` for browser automation. Public shell API is `acg_*`
+  (AWS sandbox lifecycle) and `gcp_*` (GCP credential extraction).
+- **Privilege escalation**: always via `_run_command --prefer-sudo` or `--require-sudo` — never bare `sudo`
+- **OS detection**: always via `_detect_platform` — returns `mac | wsl | debian | redhat | linux`
+- **Unit tests**: `scripts/tests/lib/` — always run with `env -i` clean environment
+- **Consumers** pull this repo via `git subtree` — breaking changes require cross-consumer coordination
+- **Node/Playwright isolation**: the ACG module keeps its own `package-lock.json`; use `npm ci` in
+  `scripts/lib/acg/` and keep browser automation changes out of core shellcheck/BATS scope.
 
 ---
 
 ## Review Focus
 
-### Shell Injection (OWASP A03)
-- All variable expansions in command arguments must be double-quoted: `"$var"`, not `$var`.
-- Never pass user-supplied or external input to `eval`.
-- Use `--` to separate options from arguments where arguments may contain hyphens.
-- Variables expanded via `envsubst` in `*.yaml.tmpl` files must not contain shell metacharacters.
+### Bash 3.2 Compatibility (P1 — macOS ships /bin/bash 3.2)
+
+Flag any of the following as blocking issues:
+
+- **`local -n`** (nameref) — requires bash 4.3+; breaks on macOS. Use a global temp var instead:
+  ```bash
+  # Wrong:
+  local -n _out="$1"
+  # Right: caller declares _MYVAR=(); callee sets _MYVAR=(...); caller reads and unsets
+  ```
+- **`declare -A`** (associative arrays) — not available in bash 3.2
+- **`mapfile`** / **`readarray`** — not available in bash 3.2
 
 ### Privilege Escalation
-- Bare `sudo` calls in production code are a bug — all privilege escalation must go through `_run_command`.
-- `_run_command --prefer-sudo` for operations that may succeed without sudo.
-- `_run_command --require-sudo` for operations that always need root.
-- Flag any multi-attempt permission cascades (trying the same operation 2+ times with escalating privilege).
-- When reviewing shell scripts, check that every privileged operation is routed through `_run_command`; only the runner internals may call `sudo` directly.
-- When reviewing shell scripts, call out unquoted variables, direct `eval`, ad hoc `sudo`, and commands that will fail non-interactively in CI.
 
-### Platform Detection
-- `_detect_platform` is the single source of truth for OS detection in `core.sh`.
-- Flag inline dispatch chains (`if _is_mac; elif _is_debian_family; elif ...`) with more than 2 branches — these should route through `_detect_platform`.
-- `linux` returned by `_detect_platform` means an unsupported generic Linux — do not route it into Debian or RedHat install paths.
-- **`base64` decode flag:** use `base64 --decode` — it is the only spelling accepted by BOTH GNU coreutils and BSD/macOS. Do **not** suggest `base64 -D` or a `--decode || -D` fallback: `-D` is rejected by GNU coreutils (`invalid option`), so the fallback arm can only fail on Linux, and in a pipeline (`cmd | base64 --decode || base64 -D`) the fallback re-runs with no stdin of its own and silently decodes nothing. `-d` also works on current macOS but is not the house form. (Measured v1.17.0 — see `docs/issues/2026-07-24-copilot-pr107-review-findings.md`.)
+- Bare `sudo` calls in lib code are a bug — all privilege escalation must go through `_run_command`
+- `_run_command -- sudo <cmd>` is also wrong — `sudo` must not appear as a program argument:
+  ```bash
+  # Wrong:
+  _run_command -- sudo apt-get install -y jq
+  # Right:
+  _run_command --prefer-sudo -- apt-get install -y jq
+  ```
+- `--prefer-sudo`: use sudo if available, fall back to current user
+- `--require-sudo`: fail (return 127) if sudo unavailable
+- `--probe '<subcmd>'`: run probe subcommand to decide privilege level
+- Flag bare `sudo` in pipes (e.g. `echo "..." | sudo tee /etc/...`) — wrap with `_run_command --prefer-sudo -- tee`
+
+### Shell Injection (OWASP A03)
+
+- All variable expansions in command arguments must be double-quoted: `"$var"`, not `$var`
+- Never pass user-supplied or external input to `eval`
+- Use `--` to separate options from arguments where arguments may contain hyphens
+
+### If-Block Complexity
+
+- `_agent_audit` enforces ≤ 8 if-blocks per function (`AGENT_AUDIT_MAX_IF=8`)
+- Flag functions with deeply nested conditionals — extract helpers to reduce if-count
+- `_run_command` and `_run_command_resolve_sudo` are the primary targets — both must stay under threshold
 
 ### Secret Hygiene (OWASP A02)
-- Vault tokens and passwords must never appear in `kubectl exec` command strings — they would be visible in `/proc/*/cmdline` and logs.
-- New sensitive CLI flags (e.g. `--token`, `--password`, `--secret`) must be registered in `_args_have_sensitive_flag` in `system.sh`.
-- No hardcoded credentials, tokens, or IP addresses in any file.
-- Test credentials (`alice/password`, etc.) are dev-only — flag if they appear outside test files.
 
-### Least Privilege (OWASP A01)
-- New Vault policies must grant only the minimum required paths (`read` unless `write` is explicitly needed).
-- New Kubernetes ServiceAccounts must not use `cluster-admin` — use namespace-scoped Role + RoleBinding.
-- Every new deployed service must use its own namespace — never `default`.
-
-### Multi-Cloud / Kubeconfig Portability
-- **Kubeconfig context ≠ cluster name:** in kubeconfig, a context name and its cluster name are independent fields. When reading cluster server/CA from kubeconfig, always resolve `.contexts[?(@.name=="<context>")].context.cluster` first to get the cluster name, then query `.clusters[?(@.name=="<cluster-name>")]`. Never key `.clusters[]` directly on the context name — this breaks on EKS/AKS/GCP where names differ. See `configure_vault_app_auth_for_context` for correct pattern.
-- **Base64 portability:** `base64 -d` is GNU-only; use `base64 --decode || base64 -D` dual-flag fallback for macOS/BSD compatibility. Precedent: `scripts/lib/identity_tools.sh:36`.
-
-### Cryptographic Failures (OWASP A02)
-- `insecureSkipVerify: true` and `TRUST_ALL_CERTIFICATES` are dev-only — flag if introduced in production paths.
-- Vault PKI leaf cert TTL must stay ≤720h — flag increases without justification.
-- Never add `--insecure` or `-k` to scripts that may run against production endpoints.
+- No hardcoded credentials, tokens, or IP addresses in any file
+- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in `system.sh`
 
 ### Supply Chain (OWASP A08)
-- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
-- Container image references in `*.yaml.tmpl` must use a pinned tag, not `latest`.
 
-### ACG / Playwright / Browser Automation
-- AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`) must never appear in log output — even at INFO level. Use redacted placeholders or omit entirely.
-- `PLURALSIGHT_EMAIL` and `PLURALSIGHT_PASSWORD` must never be logged or echoed.
-- `acg_provision`, `acg_teardown` must check for existing resources before creating/deleting — "resource already exists" is not an error (`--soft` pattern or describe-stacks check).
-- CloudFormation stack operations must always check stack existence before delete: `describe-stacks` → if None, skip.
-- Playwright selectors (`input[aria-label="Copyable input"]`) are fragile — flag hardcoded positional index fallbacks that assume a fixed UI layout without a comment explaining why.
-- For Playwright scripts that may attach via CDP: in the `finally` block, only call `browserContext.close()` when the context was launched by the script (`!_cdpBrowser`). Never call `browser.close()` on a CDP-attached session — it shuts down the entire Chrome process and disrupts other sessions.
-- Chrome must always be launched with `--password-store=basic` and a dedicated `--user-data-dir` — flag any launch path that omits these flags.
-- `GHCR_PAT` and GitHub PATs must be passed via stdin or env var — never as CLI arguments visible in `ps aux`.
+- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`
 
 ### Idempotency
-- Every public function must be safe to run more than once.
-- "Resource already exists" → skip, not error.
-- "Helm release already deployed" → upgrade, not re-install.
+
+- Every public function must be safe to run more than once
+- "Resource already exists" → skip, not error
+
+### ACG Module Review
+
+- `scripts/lib/acg/` changes must keep `npm run check` and `npm test` green in the module dir.
+- `npm run test:e2e` / `make credential-test` are manual browser checks and are not required in CI.
+- Keep module Playwright code and fixtures isolated from the Bash core; do not add Node deps to
+  `scripts/lib/system.sh` or `scripts/lib/core.sh`.
 
 ---
 
 ## Skip / Do Not Flag
 
-- Pre-existing `shellcheck` warnings (SC2164 `pushd`/`popd`, etc.) in lines that were **not changed** by the PR.
-- `_is_mac` / `_is_wsl` guards used as simple feature-skip (1–2 branch guards) — these are legitimate, not bloat.
-- `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` in existing dev config files — already documented as dev-only.
-- Test stubs and helper overrides in `scripts/tests/` — these intentionally override production functions.
-- `set -euo pipefail` absence in sourced library files (`scripts/lib/`) — these are sourced, not executed directly.
+- Pre-existing `shellcheck` warnings in lines **not changed** by the PR
+- `set -euo pipefail` absence in sourced library files — these are sourced, not executed directly
+- Test stubs and helper overrides in `scripts/tests/` — these intentionally override production functions
+- `_RCRS_RUNNER` global temp variable pattern — this is the intentional bash 3.2 compat replacement for `local -n`
+- `sudo -n` inside `_run_command_resolve_sudo` — this is the internals of the privilege resolver, not a bare sudo call
 
 ---
 
 ## Code Style
-- Public functions: no leading underscore.
-- Private/helper functions: prefix with `_`.
-- All new bash scripts must have `set -euo pipefail`.
-- LF line endings only — no CRLF.
-- No inline comments unless logic is non-obvious.
+
+- Public functions: no leading underscore
+- Private/helper functions: prefix with `_`
+- All new bash scripts must have `set -euo pipefail`
+- LF line endings only — no CRLF
+- No inline comments unless logic is non-obvious
