@@ -668,3 +668,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   applied the manifest. Live target/table verification remains pending while the
   Kubernetes API is intermittently slow.
 - See `docs/issues/2026-09-03-grafana-cve-tables-empty-exporter-timeout.md`.
+
+### 2026-09-04 — fresh-hub make up unblock: guard Prometheus-Operator CR applies
+- Fixed `scripts/plugins/argocd.sh`: PrometheusRule/AlertmanagerConfig/vulnerability-inventory-exporter
+  applies now gated on `prometheusrules.monitoring.coreos.com` CRD presence (mirrors ServiceMonitor
+  guard at line 512). Fresh-hub `make up` was aborting here before `register_app_cluster`.
+- Spec `docs/bugs/argocd-prometheus-operator-unguarded-crd-apply.md`; shellcheck clean.
+- Live-verify pending: re-run `make up CLUSTER_PROVIDER=k3s-aws` reaches register_app_cluster (both
+  clouds' nodes + hub already up; ArgoCD was bare due to the abort).

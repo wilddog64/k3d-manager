@@ -1198,3 +1198,20 @@
   Keycloak Service only (Stage B) — resuming with blanket Replace=true would force-replace Keycloak STS/PVC.
 - Sequence once seeded: ES reconciles (15m or forced) → keycloak-secrets syncs → postgres-keycloak leaves
   CreateContainerConfigError → identity app heals to Healthy while auto-sync STAYS suspended (safe hold).
+
+### 2026-09-04 — v1.28.0 two-cloud bring-up: fresh-hub `make up` aborted on unguarded PrometheusRule apply
+- Live two-cloud validation (AWS EC2 k3s + hostinger): both clouds' nodes + hub came up
+  (`ubuntu-k3s` 3 nodes Ready, `ubuntu-hostinger` 1 node Ready, hub k3d Up), but ArgoCD stayed BARE
+  (0 registered clusters, 0 ApplicationSets, 0 Applications). `make up` had errored, not completed.
+- Root cause: `scripts/plugins/argocd.sh` applied `PrometheusRule` (1540), `AlertmanagerConfig` (1546),
+  and `vulnerability-inventory-exporter` (1549, bundles a ServiceMonitor) WITHOUT a CRD guard — on a
+  fresh hub the Prometheus-Operator CRDs aren't installed yet, so `PrometheusRule` hard-failed
+  (`no matches for kind "PrometheusRule" in version "monitoring.coreos.com/v1"`) and aborted the deploy
+  BEFORE `register_app_cluster` (bin/cluster-up:758) ever ran. The ServiceMonitor ensure (argocd.sh:512)
+  already had the correct guard; these three missed it.
+- FIX (this branch): added a single `prometheusrules.monitoring.coreos.com` CRD-presence guard
+  (`_prom_operator_present`) mirroring line 512; gated all three applies, left the Grafana ConfigMap
+  unconditional. shellcheck clean. Spec: `docs/bugs/argocd-prometheus-operator-unguarded-crd-apply.md`.
+- Next: re-run idempotent `make up CLUSTER_PROVIDER=k3s-aws` → confirm it clears platform-ops and reaches
+  `register_app_cluster`, then reapply ApplicationSets (hub + ACG) + `argocd_check_values_branch`, then
+  inspect the v1.28.0 multi-cloud internals (scoped state dirs, active-providers, port offsets, hub-lock).

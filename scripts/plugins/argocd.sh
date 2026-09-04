@@ -1536,24 +1536,28 @@ EOF
    _info "[argocd] Deploying ACG expiry CronJob..."
    _kubectl apply -f "${_dir}/acg-expiry-cronjob.yaml"
 
-   _info "[argocd] Deploying PrometheusRule..."
-   _kubectl apply -f "${_dir}/prometheusrule.yaml"
+   if _kubectl --no-exit get crd prometheusrules.monitoring.coreos.com >/dev/null 2>&1; then
+      _info "[argocd] Deploying PrometheusRule..."
+      _kubectl apply -f "${_dir}/prometheusrule.yaml"
 
-   _info "[argocd] Deploying Grafana dashboard (ArgoCD apps + image-updater sync)..."
-   _kubectl apply -f "${_dir}/grafana-dashboard-argocd.yaml"
+      _info "[argocd] Deploying Grafana dashboard (ArgoCD apps + image-updater sync)..."
+      _kubectl apply -f "${_dir}/grafana-dashboard-argocd.yaml"
 
-   _info "[argocd] Deploying AlertmanagerConfig..."
-   _kubectl apply -f "${_dir}/alertmanager-config.yaml"
+      _info "[argocd] Deploying AlertmanagerConfig..."
+      _kubectl apply -f "${_dir}/alertmanager-config.yaml"
 
-   _info "[argocd] Deploying vulnerability inventory exporter..."
-   _kubectl apply -f "${_dir}/vulnerability-inventory-exporter.yaml"
-   _kubectl rollout restart deployment/vulnerability-inventory-exporter -n platform-ops >/dev/null 2>&1 || true
+      _info "[argocd] Deploying vulnerability inventory exporter..."
+      _kubectl apply -f "${_dir}/vulnerability-inventory-exporter.yaml"
+      _kubectl rollout restart deployment/vulnerability-inventory-exporter -n platform-ops >/dev/null 2>&1 || true
 
-   _info "[argocd] Deploying CVE auto-patch Grafana dashboard..."
-   _kubectl apply -f "${_dir}/grafana-dashboard-cve-autopatch.yaml"
+      _info "[argocd] Deploying CVE auto-patch Grafana dashboard..."
+      _kubectl apply -f "${_dir}/grafana-dashboard-cve-autopatch.yaml"
 
-   _info "[argocd] Deploying E2E verification Grafana dashboard..."
-   _kubectl apply -f "${_dir}/grafana-dashboard-e2e.yaml"
+      _info "[argocd] Deploying E2E verification Grafana dashboard..."
+      _kubectl apply -f "${_dir}/grafana-dashboard-e2e.yaml"
+   else
+      _info "[argocd] Prometheus-Operator CRDs / monitoring namespace absent; skipping PrometheusRule, AlertmanagerConfig, inventory-exporter, and Grafana dashboards (monitoring stack not yet installed)"
+   fi
 
    _info "[argocd] Syncing secrets from Keychain (DR — see argocd_sync_webhook_token_secret / argocd_sync_app_rebuild_secret)..."
    argocd_sync_webhook_token_secret cicd
