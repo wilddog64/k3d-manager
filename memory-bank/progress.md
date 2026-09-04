@@ -676,3 +676,13 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - Spec `docs/bugs/argocd-prometheus-operator-unguarded-crd-apply.md`; shellcheck clean.
 - Live-verify pending: re-run `make up CLUSTER_PROVIDER=k3s-aws` reaches register_app_cluster (both
   clouds' nodes + hub already up; ArgoCD was bare due to the abort).
+
+### 2026-09-04 (cont.) — two v1.28.0 fresh-hub bring-up blockers fixed + shipped
+- [x] argocd platform-ops unguarded monitoring-resource applies → single CRD guard (all six). `5f4526fd`.
+      Live-verified: platform-ops clears, ubuntu-k3s registers into hub ArgoCD.
+- [x] LDAP seed verify trailing-newline in `-y` file → `printf '%s'`. `41389804`. shellcheck + bats 8/8.
+- [ ] Re-run make up (bsqm1ma34) to confirm Step 10d.5/14 clears with the newline fix.
+- [ ] Reapply ApplicationSets (hub + ACG) pinned to release branch → argocd_check_values_branch.
+- [ ] Inspect v1.28.0 multi-cloud internals (scoped state dirs, active-providers, port offsets, hub-lock).
+- Note (follow-up, unfiled): two LDAP instances in identity ns (openldap-0 StatefulSet + stray ldap
+  Deployment) — confirm Keycloak federation binds openldap-0, not the stray, before v1.28.0 PR.

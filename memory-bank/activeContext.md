@@ -1215,3 +1215,25 @@
 - Next: re-run idempotent `make up CLUSTER_PROVIDER=k3s-aws` → confirm it clears platform-ops and reaches
   `register_app_cluster`, then reapply ApplicationSets (hub + ACG) + `argocd_check_values_branch`, then
   inspect the v1.28.0 multi-cloud internals (scoped state dirs, active-providers, port offsets, hub-lock).
+
+### 2026-09-04 (cont.) — argocd guard SHIPPED + verified; next blocker LDAP verify newline FIXED
+- argocd guard FINAL scope = ALL SIX monitoring-stack-dependent applies behind one
+  `prometheusrules.monitoring.coreos.com` CRD guard: PrometheusRule, AlertmanagerConfig,
+  vulnerability-inventory-exporter(+rollout restart), and the argocd/cve-autopatch/e2e Grafana dashboard
+  ConfigMaps (all target `namespace: monitoring`, also absent on fresh hub). The earlier "leave the
+  ConfigMap unconditional" note was WRONG — corrected before commit. Committed `5f4526fd` (pushed).
+- LIVE-VERIFIED: guard fired ("Prometheus-Operator CRDs / monitoring namespace absent; skipping..."),
+  platform-ops cleared, `ubuntu-k3s` registered into hub ArgoCD, app stack built through the identity phase.
+- NEXT blocker hit at Step 10d.5/14 (LDAP password seed): ldappasswd -S set OK but ldapwhoami verify failed
+  Invalid credentials(49) for admin/developer/operator → checkpoint not written → `make up` Error 1.
+- Root cause: verify pipe `printf '%s\n'` wrote `<password>\n` to the `-y` file; ldapwhoami -y uses the whole
+  file incl. newline as bind password. PROVEN live on openldap-0: -y w/newline → invalid creds(49);
+  w/o newline → bind OK. FIX: `printf '%s\n'` → `printf '%s'` at bin/cluster-up:1045 (verify only; the
+  ldappasswd -S set step's newlines are prompt delimiters, left as-is). shellcheck clean, bats 8/8.
+  Committed `41389804` (pushed). Spec: docs/bugs/2026-09-04-ldap-verify-ldapwhoami-trailing-newline.md.
+- Observation (separate, NOT fixed): two LDAP instances in `identity` on hub — openldap-0 (Helm
+  openldap-stack-ha StatefulSet, the seed target, holds all real users) + a stray `ldap` Deployment
+  (name=ldap, component=directory). Immaterial to the newline bug; matters for Keycloak federation (10d.6).
+- IN FLIGHT: `make up CLUSTER_PROVIDER=k3s-aws` re-run (task bsqm1ma34) to confirm 10d.5 clears.
+- STILL PENDING after make up completes: reapply ApplicationSets pinned to release branch (hub + ACG) →
+  argocd_check_values_branch → inspect v1.28.0 multi-cloud internals across both clouds. No PR yet (gated).
