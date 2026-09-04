@@ -7,7 +7,7 @@
 ## Current focus
 
 - **2026-09-03 v1.27.0 PR #118 OPEN** — https://github.com/wilddog64/k3d-manager/pull/118
-  (base `main`, head `k3d-manager-v1.27.0` @ `fc9fa3d5`, MERGEABLE, not draft). Opened after the
+  (base `main`, head `k3d-manager-v1.27.0` @ `0b028b5f`, MERGEABLE, not draft). Opened after the
   pre-PR BATS gate went green-minus-env + CHANGELOG `[1.27.0]`. Copilot review requested. CI green
   (lint✓ detect✓ stage2 skipped-by-design behind `ci:cluster-tests` label). `main` has **no required
   status checks**. **CodeQL raised 2 HIGH `py/clear-text-storage-sensitive-data`** at pre-existing
@@ -22,8 +22,15 @@
   required check so it does NOT block merge. Cannot dismiss via API — gh token lacks `security_events`
   scope; clean close needs the GitHub Security UI (or a scoped token). Live webhook needs
   `make restart-webhook` if we want it current.
-  **Copilot review DONE** — `COMMENTED`, empty body, 0 inline comments (clean; nothing to address).
-  Correct request login = `copilot-pull-request-reviewer[bot]` ([[reference_copilot_review_request_raw_json]]);
+  **Copilot review ADDRESSED** — first review `COMMENTED` empty; then Copilot posted **4 inline
+  comments** (found via the pulls/comments endpoint, not the review body). All 4 valid + fixed in
+  `0b028b5f`: (1) app-cve-scan-cronjob `COSIGN_VERIFY` `1`→`0` (ship PROMOTE latch inert, matches
+  script default + staging intent); (2) exporter `refresh_loop` now logs a stderr warning instead of
+  `except Exception: pass`; (3) cloudflared `webhook.*` `localhost`→`127.0.0.1:7443` (server binds
+  127.0.0.1 @ k3dm-webhook:3739, avoids `::1` 502); (4) verify-images policy description reworded to
+  signature **+** vuln-attestation (matches the `attestations:` block). **All 4 threads replied +
+  resolved** (GraphQL `resolveReviewThread`; 2 auto-resolved on push, 2 explicit). Correct request
+  login = `copilot-pull-request-reviewer[bot]` ([[reference_copilot_review_request_raw_json]]);
   `"Copilot"` 201s-but-no-ops. **`mergeStateStatus: BLOCKED`** — main protection = `required_reviews:1` +
   `enforce_admins:true`; Copilot COMMENTED ≠ approval, so merge needs an approving review OR the temporary
   lower (required_reviews→0 + enforce_admins off), merge, then restore (bodyless POST for enforce_admins).
