@@ -1254,3 +1254,20 @@
 - OBSERVATION 2: ubuntu-hostinger-platform app HEALTH=Unknown (others Synced+Healthy) — likely reconciling; recheck.
 - MILESTONE STATUS: v1.28.0 two-cloud multi-provider is LIVE-VALIDATED. Remaining before PR (gated): resolve/close
   the two observations, lib-foundation acg-robust-click PR (credential-test first), two-LDAP-instance federation check.
+
+### 2026-09-04 (cont.) — Two v1.28.0 follow-ups CLOSED
+- FOLLOW-UP 1 (deploy_cluster scoped-state asymmetry): NO CODE CHANGE — rationale already in
+  docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md (~L420: hostinger deliberately flat, "collides
+  with nothing", full scoping = tracked future work). Added a dated Live-validation note confirming it:
+  hostinger's deploy_cluster path created NO scoped subtree AND no local PF footprint (edge + in-cluster
+  Vault), did not disturb k3s-aws state. Sequential two-cloud coexistence PROVEN; literal simultaneity
+  (Phase 3/4 ports+flock) still untested.
+- FOLLOW-UP 2 (two-LDAP federation check): RESOLVED the question, found a REAL high-sev bug (needs a
+  decision, NOT blind-fixed). Keycloak shopping-cart realm federates the osixia `ldap` Deployment
+  (ArgoCD-managed by shopping-cart-identity, dc=shopping-cart,dc=local, connectionUrl
+  ldap.identity.svc:389), NOT openldap-0. The cluster-up Step 10d.5 seed writes openldap-0
+  (dc=home,dc=org) + Vault → DECOUPLED from SSO. PROVEN: Vault dev password fails to bind osixia ldap
+  (Invalid credentials 49). So get-keycloak-password returns a non-working-for-SSO password.
+  Filed docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md with 3 decision
+  options (A osixia canonical / B openldap canonical / C two-dirs-by-design) + verification steps.
+  Supersedes the pre-osixia 2026-08-22 doc. ESCALATED to user — awaiting canonical-directory decision.
