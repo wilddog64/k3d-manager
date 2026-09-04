@@ -17,7 +17,7 @@ VAULT_ROOT_TOKEN_SECRET="${VAULT_ROOT_TOKEN_SECRET:-vault-root}"
 VAULT_ROOT_TOKEN_KEY="${VAULT_ROOT_TOKEN_KEY:-token}"
 
 # Users to rotate (comma-separated)
-USERS_TO_ROTATE="${USERS_TO_ROTATE:-chengkai.liang,jenkins-admin,test-user}"
+USERS_TO_ROTATE="${USERS_TO_ROTATE:-chengkai.liang,test-user}"
 
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"

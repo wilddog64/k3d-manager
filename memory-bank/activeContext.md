@@ -1271,3 +1271,19 @@
   Filed docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md with 3 decision
   options (A osixia canonical / B openldap canonical / C two-dirs-by-design) + verification steps.
   Supersedes the pre-osixia 2026-08-22 doc. ESCALATED to user — awaiting canonical-directory decision.
+
+### 2026-09-04 (cont.) — Tidy-up: pruned unconditional Jenkins fixtures from LDAP bootstrap seed
+- User asked why jenkins-admin appears in openldap-0 though Jenkins was never deployed. Answer: static
+  seed fixture in bootstrap-basic-schema.ldif (Jenkins is deprecated/never deployed; 0 jenkins pods on
+  hub/aws/hostinger). The ldap.sh generator already GATES jenkins entries behind enable_jenkins; only the
+  static bootstrap seeded them unconditionally.
+- Pruned (dc=home,dc=org tidy surface, self-consistent): deleted dead jenkins-users-groups.ldif (unloaded);
+  removed jenkins-admin user + jenkins-admins group + it-devops dangling jenkins-admin member from
+  bootstrap-basic-schema.ldif (kept it-devops w/ chengkai.liang); dropped jenkins-admin from
+  test-directory-auto-load user+group loops; dropped jenkins-admin from rotation defaults (vars.sh
+  LDAP_USERS_TO_ROTATE + ldap-password-rotator.sh + .yaml.tmpl). shellcheck clean; group blocks keep >=1 member.
+- Deliberately KEPT (deprecated-but-gated / separate scope): ldap.sh gated generator, vars.sh LDAP_JENKINS_*
+  config block, bootstrap-ad-schema.ldif (separate AD dc=corp,... testing dir), dirservices RBAC,
+  jenkins values tmpls, smoke-test-jenkins, ad/vars.sh jenkins-admin path. Source-only cleanup — live
+  openldap-0 keeps jenkins-admin until a fresh bootstrap; SSO (osixia ldap) unaffected.
+- Spec: docs/bugs/2026-09-04-prune-unconditional-jenkins-ldap-fixtures.md.
