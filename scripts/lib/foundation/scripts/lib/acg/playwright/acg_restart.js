@@ -303,7 +303,7 @@ async function restartSandbox() {
         ).catch(() => []);
         throw new Error(`Neither Delete Sandbox nor Open Sandbox visible. URL: ${url} | Buttons: ${JSON.stringify(btns)}`);
       }
-      await openBtn.click({ force: true });
+      await _robustClick(openBtn);
       // Poll for Delete Sandbox — dismiss Extend dialog on every tick so a late-appearing
       // dialog cannot block for more than one 500 ms interval.
       const _deletePollDeadline = Date.now() + 15000;
