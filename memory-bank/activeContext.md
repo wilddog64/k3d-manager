@@ -13,8 +13,12 @@
   needed). Copilot review 4 inline comments all valid + fixed in `0b028b5f` + all 4 threads
   replied+resolved via GraphQL. **Post-merge steps COMPLETE:** retrospective doc `2e9b5ade`,
   tag v1.27.0 pushed, GitHub release published, `enforce_admins` restored to `true` (verified),
-  next branch k3d-manager-v1.28.0 created. **PENDING:** reapply ApplicationSets on hub+ACG
-  (separate post-merge step, deferred per task spec).
+  next branch k3d-manager-v1.28.0 created. **ApplicationSets REAPPLIED 2026-09-03** pinned to
+  `K3D_MANAGER_BRANCH=k3d-manager-v1.27.0` (NOT the checked-out v1.28.0 dev branch): `hub-platform-ops`
+  (signing config) was already on v1.27.0; the only drift was `grafana-dashboards-hub` +
+  `grafana-dashboards-acg` still on v1.26.0 — reapplied both appsets, apps flipped to v1.27.0.
+  `argocd_check_values_branch k3d-manager-v1.27.0` GREEN (6/6 values refs). Only `rollout-demo-*`
+  remain off-version (intentional HEAD-pin). Full post-merge close-out DONE.
 
 - **2026-09-03 PRE-PR BATS GATE — branch was RED; 9 test-only fixes applied, branch now green-minus-env.**
   A single-threaded local `bats scripts/tests/ --recursive` on `k3d-manager-v1.27.0` found **13 failures**.
