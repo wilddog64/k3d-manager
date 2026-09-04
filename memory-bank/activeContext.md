@@ -6,6 +6,20 @@
 
 ## Current focus
 
+- **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
+  Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
+  ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
+  and its manifests live in a SEPARATE repo — `wilddog64/shopping-cart-infra` (`identity/keycloak`, `identity/ldap`).
+  Keycloak federating its bundled osixia `ldap` (`dc=shopping-cart,dc=local`) is intentional upstream design; the
+  k3d-manager cluster-up seed + `get-keycloak-password` target openldap-0 (`dc=home,dc=org`) and mislead by implying
+  they feed SSO. User chose **Option B: unify on openldap-0** (repoint keycloak → openldap-0, retire osixia). Spec:
+  `docs/bugs/2026-09-04-sso-federate-openldap0-retire-osixia.md` (exact old/new blocks for 3 files + Phase-2 osixia
+  retirement; CROSS-REPO shopping-cart-infra → Codex on `fix/sso-federate-openldap0`, never direct/imperative — ESO+ArgoCD
+  revert). NO live changes made. Caveat to resolve first: live App is OutOfSync (k3d-manager source pointer removed #74).
+  Issue doc corrected across CORRECTION 1 + 2: `docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md`.
+  Commits on k3d-manager-v1.29.0: `4cd7918d`, `bfacf896` (doc), spec commit next. **NEXT:** await user go to hand the
+  spec to Codex + resolve the OutOfSync app-source wiring.
+
 - **2026-09-04 v1.28.0 RELEASED — PR #119 merged, tag pushed, branch protection restored.**
   Post-merge housekeeping COMPLETE: retrospective doc `7d321adf`, tag v1.28.0 pushed, GitHub release published, `enforce_admins` restored to `true` (verified), next branch k3d-manager-v1.29.0 created. Two open follow-ups carried forward to v1.29.0+: (1) LDAP↔SSO decoupling decision A/B/C (docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md), (2) hub CPU overcommit durable fix (queued until Mac Mini M5 upgrade, Oct 2026). Zero-downtime-rollouts spec remains in git, marked hardware-gated.
 
