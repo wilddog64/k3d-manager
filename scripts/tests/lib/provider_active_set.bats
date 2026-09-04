@@ -172,3 +172,34 @@ _stub_kubectl_all_unreachable() {
 @test "_acg_provider_port_offset defaults to 0 for unknown providers" {
   [[ "$(_acg_provider_port_offset foo)" == "0" ]]
 }
+
+# --- Phase 3b: require-unambiguous-provider guard (bin) ---
+
+@test "require-unambiguous-provider refuses when >1 live and provider not explicit" {
+  local dir="${BATS_TEST_TMPDIR}/active-providers"
+  mkdir -p "${dir}"; : > "${dir}/k3s-aws"; : > "${dir}/k3s-hostinger"
+  run env _ACG_ACTIVE_PROVIDERS_DIR="${dir}" \
+          _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/none" \
+          "${REPO_ROOT}/bin/require-unambiguous-provider" 0
+  [[ "${status}" -eq 3 ]]
+  [[ "${output}" == *"providers are live"* ]]
+  [[ "${output}" == *"k3s-aws"* ]]
+}
+
+@test "require-unambiguous-provider allows >1 live when provider is explicit" {
+  local dir="${BATS_TEST_TMPDIR}/active-providers"
+  mkdir -p "${dir}"; : > "${dir}/k3s-aws"; : > "${dir}/k3s-hostinger"
+  run env _ACG_ACTIVE_PROVIDERS_DIR="${dir}" \
+          _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/none" \
+          "${REPO_ROOT}/bin/require-unambiguous-provider" 1
+  [[ "${status}" -eq 0 ]]
+}
+
+@test "require-unambiguous-provider allows a single live provider" {
+  local dir="${BATS_TEST_TMPDIR}/active-providers"
+  mkdir -p "${dir}"; : > "${dir}/k3s-aws"
+  run env _ACG_ACTIVE_PROVIDERS_DIR="${dir}" \
+          _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/none" \
+          "${REPO_ROOT}/bin/require-unambiguous-provider" 0
+  [[ "${status}" -eq 0 ]]
+}

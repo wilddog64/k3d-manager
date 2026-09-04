@@ -37,6 +37,12 @@
   20/20 (`provider_active_set.bats`). **Still deferred (Phase 3b):** kubeconfig-merge lock
   (`cluster-up:677+`), full per-app-cluster launchd-label suffix audit, `make down/status`
   refuse-when-ambiguous (changes Makefile global `CLUSTER_PROVIDER ?= k3s-aws` default), live two-cloud DoD.
+  **Phase 3b (partial) also shipped:** kubeconfig-merge lock around `cluster-up`'s k3s app-context fetch
+  (`kubeconfig.lock`); new `bin/require-unambiguous-provider` refuses bare `make down`/`status`/`status-json`
+  when ≥2 providers live + no explicit `CLUSTER_PROVIDER` (purely additive, verified end-to-end through
+  make). BATS 23/23. **Still deferred (live-only):** per-app-cluster launchd-label suffix audit (topology
+  classification, no offline test, mis-class breaks single-cloud teardown), k3s-hostinger kubeconfig lock
+  path, live two-cloud DoD.
 - [ ] **v1.28.0-platform-zero-downtime-rollouts — QUEUED, hardware-gated** (deferred 2026-09-04).
   No CPU headroom on the M4 Air 24GB hub for 2+ replicas of the stateless tier (hub CPU-starves at
   single replicas). Gated on the Mac Mini M5 upgrade (Oct 2026). Spec stays on disk; do NOT implement

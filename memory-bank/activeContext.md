@@ -65,6 +65,15 @@
     app context) offset. BATS 20/20 + contract 54/54, shellcheck + parse clean. DEFERRED (Phase 3b):
     kubeconfig-merge lock, full per-app-cluster launchd-label suffix audit, make down/status
     refuse-when-ambiguous (touches Makefile global CLUSTER_PROVIDER default), live two-cloud DoD.
+  - **DONE (offline) 2026-09-04 — parallel-multi-cloud Phase 3b partial.** kubeconfig-merge lock around
+    `cluster-up`'s k3s app-context fetch; new `bin/require-unambiguous-provider` (purely additive) wired
+    into `make down`/`status`/`status-json` — refuses bare invocation when ≥2 providers live + no explicit
+    CLUSTER_PROVIDER, verified end-to-end through make. BATS 23/23, contract 54/54, shellcheck clean.
+    STILL DEFERRED to the live two-cloud session: the per-app-cluster launchd-LABEL suffix audit across
+    observability.sh/argocd.sh/k3s-hostinger.sh (topology classification, no offline test — mis-classifying
+    a hub-shared label breaks single-cloud teardown), the k3s-hostinger kubeconfig lock path, and the live
+    two-cloud DoD. **v1.28.0 parallel-multi-cloud is now feature-complete for everything offline-verifiable;
+    the remainder is genuinely live-gated.**
 
 - **2026-09-03 v1.27.0 PR #118 MERGED & RELEASED** — https://github.com/wilddog64/k3d-manager/pull/118
   (base `main`, head `k3d-manager-v1.27.0`, merged SHA `62c9ff27`, tag/release v1.27.0 published

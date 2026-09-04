@@ -30,6 +30,7 @@ up:
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
 ## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
 down:
+	@MAKE_TARGET=down bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
 	@set +e; \
 	_down_rc=0; \
 	_keep_hub_flag=; \
@@ -135,6 +136,7 @@ refresh-edge:
 
 ## Show cluster nodes, pods, endpoint + ESO health (provider-aware)
 status:
+	@MAKE_TARGET=status bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
 	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ]; then _provider=k3s-hostinger; if [ -r "$(HOME)/.local/share/k3d-manager/active-provider" ]; then _provider="$$(cat "$(HOME)/.local/share/k3d-manager/active-provider")"; fi; fi; case "$$_provider" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
@@ -146,6 +148,7 @@ status-full:
 	@$(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status --full
 
 status-json:
+	@MAKE_TARGET=status-json bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
 	@$(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status --json $(if $(SERVICE),--service "$(SERVICE)",)
 
 ## Sustained multi-sample probe of public Cloudflare-fronted hostnames (Hermes Phase-1 sensor #1; SAMPLES/INTERVAL/MIN_OK optional)
