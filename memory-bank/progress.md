@@ -31,7 +31,10 @@
   ports + launchd labels + make down/status refuse-when-ambiguous), Phase 4 (hub-bootstrap +
   kubeconfig `flock`), live two-cloud DoD (needs two real clouds up). webhook `_ACTIVE_PROVIDER_FILE`
   found to be a dead constant — no change needed.
-- [ ] v1.28.0-platform-zero-downtime-rollouts (spec present, not started)
+- [ ] **v1.28.0-platform-zero-downtime-rollouts — QUEUED, hardware-gated** (deferred 2026-09-04).
+  No CPU headroom on the M4 Air 24GB hub for 2+ replicas of the stateless tier (hub CPU-starves at
+  single replicas). Gated on the Mac Mini M5 upgrade (Oct 2026). Spec stays on disk; do NOT implement
+  until the hardware lands.
 
 ## v1.26.0 queue
 

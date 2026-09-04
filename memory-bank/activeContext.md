@@ -37,12 +37,16 @@
     stubbed curl. Webhook untouched (§4 stays authoritative). This is the ONLY Hermes work this
     session — sensor set / correlator / Slack / guide stay deferred as a separate release story.
     Uses **1 of the 3 remaining v1.28.0 plan-doc slots** (now 3 v1.28.0 docs).
-  - **DECISION 2026-09-04 — NO SPLIT. v1.28.0 = operational-resilience release, all 3 docs completed
-    here.** User rejected pushing a scope to v1.29.0: the three are related and finish together.
-    Through-line: operate the laptop hub + Cloudflare edge safely — (#3) update the platform without
-    downtime, (#1, done) detect edge reachability failures honestly, (#2) provision multiple providers
-    concurrently without local-state corruption. 3 of 5 plan-doc slots (cap not in the way). Remaining
-    to complete: `v1.28.0-parallel-multi-cloud-provisioning` + `v1.28.0-platform-zero-downtime-rollouts`.
+  - **DECISION 2026-09-04 (amended) — v1.28.0 = TWO themes: Hermes probe (done) + parallel-multi-cloud.
+    Zero-downtime-rollouts QUEUED until hardware upgrade.** Original "all 3 in one release" call was
+    reversed the same day: there is **no CPU headroom** on the current M4 Air 24GB hub for 2+ replicas
+    of the stateless tier — the hub already CPU-starves at single replicas (`reference_one_second_
+    probes_cpu_starvation_kill_loop`, `reference_hostinger_maxsurge_rollout_deadlock`: maxSurge=1 needs
+    2× CPU on a 2-CPU node → FailedScheduling). Zero-downtime is a hardware story, gated on the Mac Mini
+    M5 (Oct 2026 target, [[user_hardware]]). Operational-resilience through-line still holds for the two
+    that ship: (#1, done) detect edge reachability honestly; (#2) provision providers concurrently
+    without local-state corruption. `v1.28.0-platform-zero-downtime-rollouts` spec stays on disk, marked
+    queued/hardware-gated.
   - **DONE (offline slice) 2026-09-04 — parallel-multi-cloud Phase 1+2.** Provider-scoped
     `_ACG_STATE_DIR` + `_acg_migrate_flat_state` one-time migration (decision "all scoped, migrate on
     first run"); `active-providers/` marker-dir set (`_acg_record_provider`/`_acg_unrecord_provider`/
