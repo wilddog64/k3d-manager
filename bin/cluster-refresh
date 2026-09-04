@@ -30,7 +30,7 @@ source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 PLUGINS_DIR="${PLUGINS_DIR:-${REPO_ROOT}/scripts/plugins}"
 source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 
-_ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
+_ACG_STATE_DIR="$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-aws}")"
 
 login_prompt=0
 sandbox_url=""

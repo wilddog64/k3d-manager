@@ -60,7 +60,7 @@ echo ""
 # Step 6: Verify users (disable tracing to protect credentials)
 echo "5. Verifying test users..."
 { set +x; } 2>/dev/null
-for user in chengkai.liang jenkins-admin test-user; do
+for user in chengkai.liang test-user; do
   if kubectl -n directory exec "$LDAP_POD" -- ldapsearch -x -H ldap://127.0.0.1:1389 \
     -D "cn=ldap-admin,dc=home,dc=org" \
     -w "$LDAP_PASS" \
@@ -78,7 +78,7 @@ echo ""
 # Step 7: Verify groups (disable tracing to protect credentials)
 echo "6. Verifying test groups..."
 { set +x; } 2>/dev/null
-for group in jenkins-admins it-devops developers; do
+for group in it-devops developers; do
   if kubectl -n directory exec "$LDAP_POD" -- ldapsearch -x -H ldap://127.0.0.1:1389 \
     -D "cn=ldap-admin,dc=home,dc=org" \
     -w "$LDAP_PASS" \
@@ -108,13 +108,12 @@ echo "=========================================="
 echo ""
 echo "Summary:"
 echo "- Bootstrap LDIF automatically loaded from Vault"
-echo "- 10 directory entries created (1 base DN + 3 OUs + 3 users + 3 groups)"
-echo "- All test users present: chengkai.liang, jenkins-admin, test-user"
-echo "- All test groups present: jenkins-admins, it-devops, developers"
+echo "- 11 directory entries created (1 base DN + 3 OUs + 5 users + 2 groups)"
+echo "- All test users present: chengkai.liang, test-user, admin, developer, operator"
+echo "- All test groups present: it-devops, developers"
 echo ""
 echo "Test user groups:"
-echo "  chengkai.liang: jenkins-admins, it-devops"
-echo "  jenkins-admin:  jenkins-admins, it-devops"
+echo "  chengkai.liang: it-devops"
 echo "  test-user:      developers"
 echo ""
 echo "Note: Test user passwords are defined in scripts/etc/ldap/bootstrap-basic-schema.ldif"

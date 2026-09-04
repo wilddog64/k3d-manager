@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+# bin/public-endpoint-probe
+#
+# Sustained multi-sample public-endpoint probe (Hermes Phase-1 sensor #1).
+#
+# A single-shot health-URL check false-greens when Cloudflare cannot reach a
+# service but the service itself still returns 200 to a direct/stale-session
+# check (2026-09-02 502 incident; docs/architecture/hermes-phase1-monitoring-scope.md
+# §5). This probe samples each public hostname K times over a short window
+# and reports a host healthy only if >= M of K samples return 2xx/3xx.
+#
+# It also discriminates two different root causes with different fixes:
+#   - ALL hosts fail            -> edge-down       Cloudflare tunnel/edge issue
+#                                   (reference_cloudflared_split_brain: a stray
+#                                   second cloudflared connector serving stale
+#                                   ingress)
+#   - SOME (not all) hosts fail -> single-service   one host's backend is down
+#                                   while siblings pass
+#                                   (reference_single_service_502_zombie_port_forward:
+#                                   a zombie `kubectl port-forward` after pod
+#                                   recreation)
+#
+# Read-only. Safe to run at any time. Emits machine-readable --json output so
+# a future Hermes sensor can consume it without scraping human text.
+#
+# Usage:
+#   bin/public-endpoint-probe [--samples K] [--interval S] [--min-ok M]
+#                              [--config PATH] [--json] [--help]
+#
+# Exit codes:
+#   0  verdict == ok              (all hosts healthy)
+#   1  verdict == single-service  (some, but not all, hosts unhealthy)
+#   2  verdict == edge-down       (all hosts unhealthy)
+#   3  usage/config error
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+source "${REPO_ROOT}/scripts/lib/system.sh"
+
+_pep_samples=5
+_pep_interval=2
+_pep_min_ok=3
+_pep_json=0
+_pep_config="${REPO_ROOT}/scripts/etc/cloudflared/config.yml"
+
+function _public_endpoint_probe_usage() {
+  cat <<'EOF'
+Usage: bin/public-endpoint-probe [OPTIONS]
+
+Sample every public hostname in the cloudflared ingress config K times over
+a short window and report per-host + overall reachability.
+
+Options:
+  --samples K     Samples per host (default: 5)
+  --interval S    Seconds to sleep between sample rounds (default: 2)
+  --min-ok M      Minimum ok samples (2xx/3xx) for a host to count healthy (default: 3)
+  --config PATH   Path to cloudflared ingress config (default: scripts/etc/cloudflared/config.yml)
+  --json          Emit machine-readable JSON instead of human-readable text
+  --help, -h      Show this help
+
+Exit codes:
+  0  all hosts healthy (verdict: ok)
+  1  some, but not all, hosts unhealthy (verdict: single-service)
+  2  all hosts unhealthy (verdict: edge-down)
+  3  usage/config error
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --samples)
+      [[ $# -ge 2 ]] || { echo "--samples requires a value" >&2; exit 3; }
+      _pep_samples="$2"; shift ;;
+    --interval)
+      [[ $# -ge 2 ]] || { echo "--interval requires a value" >&2; exit 3; }
+      _pep_interval="$2"; shift ;;
+    --min-ok)
+      [[ $# -ge 2 ]] || { echo "--min-ok requires a value" >&2; exit 3; }
+      _pep_min_ok="$2"; shift ;;
+    --config)
+      [[ $# -ge 2 ]] || { echo "--config requires a value" >&2; exit 3; }
+      _pep_config="$2"; shift ;;
+    --json) _pep_json=1 ;;
+    --help|-h) _public_endpoint_probe_usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; _public_endpoint_probe_usage >&2; exit 3 ;;
+  esac
+  shift
+done
+
+if ! [[ "${_pep_samples}" =~ ^[0-9]+$ ]] || [[ "${_pep_samples}" -lt 1 ]]; then
+  echo "--samples must be a positive integer" >&2
+  exit 3
+fi
+if ! [[ "${_pep_interval}" =~ ^[0-9]+$ ]]; then
+  echo "--interval must be a non-negative integer" >&2
+  exit 3
+fi
+if ! [[ "${_pep_min_ok}" =~ ^[0-9]+$ ]] || [[ "${_pep_min_ok}" -lt 1 ]] || [[ "${_pep_min_ok}" -gt "${_pep_samples}" ]]; then
+  echo "--min-ok must be a positive integer <= --samples" >&2
+  exit 3
+fi
+if [[ ! -r "${_pep_config}" ]]; then
+  echo "cannot read cloudflared config: ${_pep_config}" >&2
+  exit 3
+fi
+
+function _public_endpoint_probe_hostnames() {
+  # Enumerate `hostname: <value>` entries under `ingress:` in the cloudflared
+  # config, skipping the catch-all entry (which carries no hostname key, only
+  # `service: http_status:404`).
+  grep -E '^[[:space:]]*-[[:space:]]*hostname:[[:space:]]*' "${_pep_config}" \
+    | sed -E 's/^[[:space:]]*-[[:space:]]*hostname:[[:space:]]*//; s/[[:space:]]+$//'
+}
+
+mapfile -t _pep_hosts < <(_public_endpoint_probe_hostnames)
+
+if [[ "${#_pep_hosts[@]}" -eq 0 ]]; then
+  echo "no hostnames found in ${_pep_config}" >&2
+  exit 3
+fi
+
+declare -a _pep_host_ok=()
+declare -a _pep_host_codes=()
+
+_pep_h_idx=0
+for _pep_host in "${_pep_hosts[@]}"; do
+  _pep_host_ok[_pep_h_idx]=0
+  _pep_host_codes[_pep_h_idx]=""
+  _pep_h_idx=$((_pep_h_idx + 1))
+done
+
+for ((_pep_s = 1; _pep_s <= _pep_samples; _pep_s++)); do
+  _pep_h_idx=0
+  for _pep_host in "${_pep_hosts[@]}"; do
+    _pep_url="https://${_pep_host}/"
+    _pep_code="$(curl -s --max-time 3 -o /dev/null -w '%{http_code}' -- "${_pep_url}" 2>/dev/null || echo 000)"
+    case "${_pep_code}" in
+      2??|3??) _pep_host_ok[_pep_h_idx]=$((_pep_host_ok[_pep_h_idx] + 1)) ;;
+    esac
+    if [[ -z "${_pep_host_codes[_pep_h_idx]}" ]]; then
+      _pep_host_codes[_pep_h_idx]="${_pep_code}"
+    else
+      _pep_host_codes[_pep_h_idx]="${_pep_host_codes[_pep_h_idx]},${_pep_code}"
+    fi
+    _pep_h_idx=$((_pep_h_idx + 1))
+  done
+  if [[ "${_pep_s}" -lt "${_pep_samples}" ]]; then
+    sleep "${_pep_interval}"
+  fi
+done
+
+_pep_healthy_count=0
+_pep_unhealthy_count=0
+declare -a _pep_unhealthy_hosts=()
+
+_pep_h_idx=0
+for _pep_host in "${_pep_hosts[@]}"; do
+  if [[ "${_pep_host_ok[_pep_h_idx]}" -ge "${_pep_min_ok}" ]]; then
+    _pep_healthy_count=$((_pep_healthy_count + 1))
+  else
+    _pep_unhealthy_count=$((_pep_unhealthy_count + 1))
+    _pep_unhealthy_hosts+=("${_pep_host}")
+  fi
+  _pep_h_idx=$((_pep_h_idx + 1))
+done
+
+if [[ "${_pep_unhealthy_count}" -eq 0 ]]; then
+  _pep_verdict=ok
+  _pep_exit=0
+elif [[ "${_pep_healthy_count}" -eq 0 ]]; then
+  _pep_verdict=edge-down
+  _pep_exit=2
+else
+  _pep_verdict=single-service
+  _pep_exit=1
+fi
+
+if [[ "${_pep_json}" -eq 1 ]]; then
+  _pep_out="{\"verdict\":\"${_pep_verdict}\",\"samples\":${_pep_samples},\"min_ok\":${_pep_min_ok},\"hosts\":["
+  _pep_h_idx=0
+  for _pep_host in "${_pep_hosts[@]}"; do
+    [[ "${_pep_h_idx}" -gt 0 ]] && _pep_out+=","
+    _pep_codes_json="$(printf '%s' "${_pep_host_codes[_pep_h_idx]}" | awk -F, '{for(i=1;i<=NF;i++){printf (i>1?",":"") "\"" $i "\""}}')"
+    _pep_host_healthy=false
+    [[ "${_pep_host_ok[_pep_h_idx]}" -ge "${_pep_min_ok}" ]] && _pep_host_healthy=true
+    _pep_out+="{\"host\":\"${_pep_host}\",\"ok\":${_pep_host_ok[_pep_h_idx]},\"total\":${_pep_samples},\"codes\":[${_pep_codes_json}],\"healthy\":${_pep_host_healthy}}"
+    _pep_h_idx=$((_pep_h_idx + 1))
+  done
+  _pep_out+="]}"
+  printf '%s\n' "${_pep_out}"
+else
+  echo "=== Public endpoint probe (${_pep_samples} samples, min-ok ${_pep_min_ok}, interval ${_pep_interval}s) ==="
+  _pep_h_idx=0
+  for _pep_host in "${_pep_hosts[@]}"; do
+    if [[ "${_pep_host_ok[_pep_h_idx]}" -ge "${_pep_min_ok}" ]]; then
+      printf '  OK   %-32s %d/%d  [%s]\n' "${_pep_host}" "${_pep_host_ok[_pep_h_idx]}" "${_pep_samples}" "${_pep_host_codes[_pep_h_idx]}"
+    else
+      printf '  FAIL %-32s %d/%d  [%s]\n' "${_pep_host}" "${_pep_host_ok[_pep_h_idx]}" "${_pep_samples}" "${_pep_host_codes[_pep_h_idx]}"
+    fi
+    _pep_h_idx=$((_pep_h_idx + 1))
+  done
+  echo ""
+  case "${_pep_verdict}" in
+    ok)
+      echo "Verdict: OK — all ${#_pep_hosts[@]} hosts healthy"
+      ;;
+    edge-down)
+      echo "Verdict: EDGE-DOWN — all hosts unhealthy (likely Cloudflare tunnel/edge issue, e.g. a stray second cloudflared connector serving stale ingress; see reference_cloudflared_split_brain)"
+      ;;
+    single-service)
+      echo "Verdict: SINGLE-SERVICE — unhealthy: ${_pep_unhealthy_hosts[*]} (likely a single backend down, e.g. a zombie port-forward after pod recreation; see reference_single_service_502_zombie_port_forward)"
+      ;;
+  esac
+fi
+
+exit "${_pep_exit}"

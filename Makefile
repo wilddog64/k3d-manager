@@ -13,7 +13,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -30,6 +30,7 @@ up:
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
 ## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
 down:
+	@MAKE_TARGET=down bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
 	@set +e; \
 	_down_rc=0; \
 	_keep_hub_flag=; \
@@ -135,6 +136,7 @@ refresh-edge:
 
 ## Show cluster nodes, pods, endpoint + ESO health (provider-aware)
 status:
+	@MAKE_TARGET=status bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
 	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ]; then _provider=k3s-hostinger; if [ -r "$(HOME)/.local/share/k3d-manager/active-provider" ]; then _provider="$$(cat "$(HOME)/.local/share/k3d-manager/active-provider")"; fi; fi; case "$$_provider" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
@@ -146,7 +148,12 @@ status-full:
 	@$(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status --full
 
 status-json:
+	@MAKE_TARGET=status-json bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
 	@$(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status --json $(if $(SERVICE),--service "$(SERVICE)",)
+
+## Sustained multi-sample probe of public Cloudflare-fronted hostnames (Hermes Phase-1 sensor #1; SAMPLES/INTERVAL/MIN_OK optional)
+status-public:
+	@bin/public-endpoint-probe $(if $(SAMPLES),--samples "$(SAMPLES)",) $(if $(INTERVAL),--interval "$(INTERVAL)",) $(if $(MIN_OK),--min-ok "$(MIN_OK)",) $(if $(filter 1,$(JSON)),--json,)
 
 ## Spin up a vCluster and deploy the full stack via ArgoCD (NAME=<name>; MODE=--auto|--keep, default --auto)
 preflight:
@@ -671,6 +678,7 @@ help:
 	@echo "    make status        Show concise service health (SERVICE=<name> for focused detail)"
 	@echo "    make status-full   Show full pod and diagnostic report"
 	@echo "    make status-json   Emit concise status as JSON"
+	@echo "    make status-public Sustained multi-sample public-endpoint probe (JSON=1 for machine output)"
 	@echo "    make test          Run all BATS test suites"
 	@echo "    make e2e           Run Tier 1 e2e harness (vCluster + Playwright Job; DIGEST=<image digest> optional)"
 	@echo "    make e2e-remote    Run Tier 1 e2e harness on a remote runner off the M4 (RUNNER=m2 [DIGEST=<image digest>]; no local fallback)"

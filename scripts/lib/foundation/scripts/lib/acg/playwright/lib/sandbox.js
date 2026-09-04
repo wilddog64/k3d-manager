@@ -4,6 +4,16 @@ const path = require('path');
 
 const SCREENSHOT_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'screenshots');
 
+// The Pluralsight sandbox SPA ignores Playwright's synthetic click (force:true only skips
+// actionability checks — it still issues the click the SPA drops). Reveal/provision buttons
+// must be driven with a dispatched DOM MouseEvent after scrolling into view.
+async function _robustClick(locator) {
+  await locator.evaluate(el => {
+    el.scrollIntoView({ block: 'center', inline: 'center' });
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+  }).catch(() => {});
+}
+
 async function findOrCreatePage(context) {
   const allPages = context.pages();
   let page = allPages.find(p => {
@@ -261,7 +271,7 @@ async function _waitForCredentials(page, providerLabel) {
           const startAfterDelete = await _findScopedButton(page, 'Start Sandbox', providerLabel, 180000);
           if (startAfterDelete) {
             console.error('INFO: Azure sandbox deleted — clicking Start Sandbox...');
-            await startAfterDelete.click({ force: true }).catch(() => {});
+            await _robustClick(startAfterDelete);
           } else {
             console.error('WARN: Start Sandbox not found after deletion — continuing to wait...');
           }
@@ -303,7 +313,7 @@ async function _waitForCredentials(page, providerLabel) {
       }
       if (panelStartBtn) {
         console.error(`INFO: ${providerLabel} panel open but sandbox not started — clicking Start Sandbox...`);
-        await panelStartBtn.click({ force: true }).catch(() => {});
+        await _robustClick(panelStartBtn);
         await page.waitForTimeout(5000);
         continue;
       }
@@ -327,7 +337,7 @@ async function _waitForCredentials(page, providerLabel) {
       }
       reopenCount++;
       console.error(`INFO: ${providerLabel} panel closed — re-opening to retrieve credentials (attempt ${reopenCount})...`);
-      await reopenBtn.click({ force: true }).catch(() => {});
+      await _robustClick(reopenBtn);
       await page.waitForTimeout(8000);
       continue;
     }
@@ -440,7 +450,7 @@ async function _deleteConflictingSandbox(page, targetProvider) {
       console.error(`WARN: Could not find Open Sandbox for conflicting ${conflictingLabel} sandbox — proceeding anyway`);
       return;
     }
-    await openConflictBtn.click({ force: true });
+    await _robustClick(openConflictBtn);
     deleteBtn = await _findScopedButton(page, 'Delete Sandbox', conflictingLabel, 15000);
   }
 
@@ -485,7 +495,7 @@ async function startSandbox(page, targetUrl, provider) {
         const openBtn = await _findScopedButton(page, 'Open Sandbox', providerLabel, 3000).catch(() => null);
         if (openBtn) {
           console.error('INFO: Credential panel closed after toast dismiss — re-opening...');
-          await openBtn.click({ force: true }).catch(() => {});
+          await _robustClick(openBtn);
           await page.waitForTimeout(1000);
         }
       }
@@ -544,8 +554,7 @@ async function startSandbox(page, targetUrl, provider) {
     const startEnabled = await startButton.isEnabled({ timeout: 1000 }).catch(() => false);
     if (startEnabled) {
       console.error('INFO: Clicking Start Sandbox...');
-      await startButton.scrollIntoViewIfNeeded().catch(() => {});
-      await startButton.click({ force: true });
+      await _robustClick(startButton);
     } else {
       const conflictBanner = await page.evaluate(() => {
         const t = document.body ? (document.body.innerText || '') : '';
@@ -556,8 +565,7 @@ async function startSandbox(page, targetUrl, provider) {
         await _deleteConflictingSandbox(page, provider);
         const retryStart = await _findScopedButton(page, 'Start Sandbox', providerLabel, 10000);
         if (retryStart && await retryStart.isEnabled({ timeout: 1000 }).catch(() => false)) {
-          await retryStart.scrollIntoViewIfNeeded().catch(() => {});
-          await retryStart.click({ force: true });
+          await _robustClick(retryStart);
         }
       } else {
         console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
@@ -566,7 +574,7 @@ async function startSandbox(page, targetUrl, provider) {
     await _waitForCredentials(page, providerLabel);
   } else if (openButton) {
     console.error('INFO: Clicking Open Sandbox...');
-    await openButton.click({ force: true });
+    await _robustClick(openButton);
     await page.waitForTimeout(3000);
 
     const conflictWarningText = await page.evaluate(() => {
@@ -584,7 +592,7 @@ async function startSandbox(page, targetUrl, provider) {
         if (!_conflictDeleteBtn) {
           const _conflictOpenBtn = await _findScopedButton(page, 'Open Sandbox', _conflictingProvider, 5000);
           if (_conflictOpenBtn) {
-            await _conflictOpenBtn.click({ force: true });
+            await _robustClick(_conflictOpenBtn);
             _conflictDeleteBtn = await _findScopedButton(page, 'Delete Sandbox', _conflictingProvider, 15000);
           }
         }
@@ -605,7 +613,7 @@ async function startSandbox(page, targetUrl, provider) {
       }
       const retryOpen = await _findScopedButton(page, 'Open Sandbox', providerLabel, 10000);
       if (retryOpen) {
-        await retryOpen.click({ force: true });
+        await _robustClick(retryOpen);
         await page.waitForTimeout(3000);
       }
     }
@@ -639,8 +647,7 @@ async function startSandbox(page, targetUrl, provider) {
       const startEnabled2 = await startButton2.isEnabled({ timeout: 1000 }).catch(() => false);
       if (startEnabled2) {
         console.error('INFO: Clicking Start Sandbox (Step 2)...');
-        await startButton2.scrollIntoViewIfNeeded().catch(() => {});
-        await startButton2.click({ force: true });
+        await _robustClick(startButton2);
       } else {
         console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
       }
@@ -650,8 +657,7 @@ async function startSandbox(page, targetUrl, provider) {
     await _waitForCredentials(page, providerLabel);
   } else if (resumeButton) {
     console.error('INFO: Clicking Resume Sandbox...');
-    await resumeButton.scrollIntoViewIfNeeded().catch(() => {});
-    await resumeButton.click({ force: true });
+    await _robustClick(resumeButton);
     await _waitForCredentials(page, providerLabel);
   }
 }

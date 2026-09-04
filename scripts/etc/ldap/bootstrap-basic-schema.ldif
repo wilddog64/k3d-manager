@@ -1,5 +1,5 @@
 # Basic LDAP Schema Bootstrap - Test Users and Groups
-# This LDIF creates a basic LDAP structure for testing Jenkins authentication
+# This LDIF creates a basic LDAP structure with platform test users and groups
 # Structure: dc=home,dc=org (matches current LDAP deployment)
 # Password for all users: test1234 (SSHA hash)
 #
@@ -48,23 +48,7 @@ homeDirectory: /home/chengkai.liang
 mail: chengkai.liang@home.org
 userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
 
-# User 2: jenkins-admin (Service Account)
-dn: cn=jenkins-admin,ou=users,dc=home,dc=org
-objectClass: inetOrgPerson
-objectClass: posixAccount
-objectClass: top
-cn: jenkins-admin
-sn: Admin
-givenName: Jenkins
-displayName: Jenkins Administrator
-uid: jenkins-admin
-uidNumber: 10002
-gidNumber: 10000
-homeDirectory: /home/jenkins-admin
-mail: jenkins-admin@home.org
-userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
-
-# User 3: test-user (Regular User)
+# User 2: test-user (Regular User)
 dn: cn=test-user,ou=users,dc=home,dc=org
 objectClass: inetOrgPerson
 objectClass: posixAccount
@@ -80,7 +64,7 @@ homeDirectory: /home/test-user
 mail: test-user@home.org
 userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
 
-# User 4-6: platform login accounts. Step 10d.5 of cluster-up sets their
+# User 3-5: platform login accounts. Step 10d.5 of cluster-up sets their
 # Vault-backed passwords immediately after the directory bootstrap.
 dn: uid=admin,ou=users,dc=home,dc=org
 objectClass: inetOrgPerson
@@ -116,23 +100,14 @@ gidNumber: 10000
 homeDirectory: /home/operator
 
 # Groups
-# Group 1: jenkins-admins (Jenkins Administrators)
-dn: cn=jenkins-admins,ou=groups,dc=home,dc=org
-objectClass: groupOfNames
-cn: jenkins-admins
-description: Jenkins Administrators Group
-member: cn=chengkai.liang,ou=users,dc=home,dc=org
-member: cn=jenkins-admin,ou=users,dc=home,dc=org
-
-# Group 2: it-devops (IT DevOps Team - matches baseline branch)
+# Group 1: it-devops (IT DevOps Team - matches baseline branch)
 dn: cn=it-devops,ou=groups,dc=home,dc=org
 objectClass: groupOfNames
 cn: it-devops
 description: IT DevOps Team (baseline branch alignment)
 member: cn=chengkai.liang,ou=users,dc=home,dc=org
-member: cn=jenkins-admin,ou=users,dc=home,dc=org
 
-# Group 3: developers (Development Team)
+# Group 2: developers (Development Team)
 dn: cn=developers,ou=groups,dc=home,dc=org
 objectClass: groupOfNames
 cn: developers

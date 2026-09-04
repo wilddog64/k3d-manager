@@ -156,3 +156,4 @@ API reference: `docs/api/functions.md`
 - `--prefer-sudo` silently drops to non-root when password sudo required — use `--interactive-sudo` for install helpers
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override in consumers
 - BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes
+- ACG sandbox SPA ignores Playwright `click({force:true})` on reveal/provision buttons (Open/Start/Resume/reopen) — panel silently never opens. Fix = `_robustClick` (dispatched DOM `MouseEvent` after `scrollIntoView`). `force:true` only skips actionability checks, not the SPA's dropped click. Branch `fix/acg-sandbox-robust-click`; spec `docs/bugs/acg-sandbox-force-click-panel-noop.md`.

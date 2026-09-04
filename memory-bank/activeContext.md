@@ -6,45 +6,106 @@
 
 ## Current focus
 
-- **2026-09-03 v1.27.0 PR #118 OPEN** — https://github.com/wilddog64/k3d-manager/pull/118
-  (base `main`, head `k3d-manager-v1.27.0` @ `26e1a1ff`, MERGEABLE, not draft). Opened after the
-  pre-PR BATS gate went green-minus-env + CHANGELOG `[1.27.0]`. Copilot review requested. CI green
-  (lint✓ detect✓ stage2 skipped-by-design behind `ci:cluster-tests` label). `main` has **no required
-  status checks**. **CodeQL raised 2 HIGH `py/clear-text-storage-sensitive-data`** at pre-existing
-  `bin/k3dm-webhook` output writes (2286/2601) — traced to a value-insensitive FP (smoke password only
-  hits the login POST body, never the written output). User chose **harden defensively**: added a secret
-  redaction barrier (`_register_secret`/`_redact_secrets`, registered at `_smoke_secret`/`_vault_secret`/
-  env password reads, scrubbing all 5 status `_finish` handlers) — commit `fc9fa3d5`, spec
-  `docs/bugs/2026-09-03-webhook-cleartext-secret-storage-codeql.md`.
-  **CodeQL now GREEN on `26e1a1ff`** — "No new alerts." **Fixed the FP in code (no token needed)** by
-  breaking BOTH value-insensitive taint edges into the two status-handler `output` writes:
-  (1) `_redact_secrets` used `text.replace(secret, …)` — static taint models the `.replace` ARGUMENT as
-  flowing into the result, so the barrier that REMOVES secrets was modeled as INJECTING them. Switched to
-  a precompiled `re.escape` alternation applied via `re.sub` (sub output is tainted only by subject +
-  replacement, not the pattern built from secrets); also compiles once, not per-call. (2) The Keycloak
-  smoke success line interpolated `kc_realm`, which in the seeded path comes from
-  `_smoke_secret("identity","realm",…)` (a generic Secret reader CodeQL marks sensitive) → the only
-  `_smoke_secret`-derived value in any returned `detail`; dropped it to `"token minted"`. Behavior
-  unchanged (webhook.bats 55/55, request-hardening 6/6). Commit `26e1a1ff`, spec
-  `docs/bugs/2026-09-03-webhook-cleartext-secret-storage-codeql.md`. Live webhook restarted
-  (`make restart-webhook`). **No `security_events` token needed after all** — the earlier dismiss-via-API
-  plan is moot.
-  **LESSON:** a `str.replace(secret, repl)` redaction barrier TRIPS `py/clear-text-storage` (taint from the
-  replaced-away arg) — use a precompiled `re.sub` alternation so the secret is only in the opaque pattern.
-  **Copilot review ADDRESSED** — first review `COMMENTED` empty; then Copilot posted **4 inline
-  comments** (found via the pulls/comments endpoint, not the review body). All 4 valid + fixed in
-  `0b028b5f`: (1) app-cve-scan-cronjob `COSIGN_VERIFY` `1`→`0` (ship PROMOTE latch inert, matches
-  script default + staging intent); (2) exporter `refresh_loop` now logs a stderr warning instead of
-  `except Exception: pass`; (3) cloudflared `webhook.*` `localhost`→`127.0.0.1:7443` (server binds
-  127.0.0.1 @ k3dm-webhook:3739, avoids `::1` 502); (4) verify-images policy description reworded to
-  signature **+** vuln-attestation (matches the `attestations:` block). **All 4 threads replied +
-  resolved** (GraphQL `resolveReviewThread`; 2 auto-resolved on push, 2 explicit). Correct request
-  login = `copilot-pull-request-reviewer[bot]` ([[reference_copilot_review_request_raw_json]]);
-  `"Copilot"` 201s-but-no-ops. **`mergeStateStatus: BLOCKED`** — main protection = `required_reviews:1` +
-  `enforce_admins:true`; Copilot COMMENTED ≠ approval, so merge needs an approving review OR the temporary
-  lower (required_reviews→0 + enforce_admins off), merge, then restore (bodyless POST for enforce_admins).
-  **NOT merged — awaiting user go (never-auto-merge).** CodeQL FP fixed in code (green) — no token needed.
-  Gemini live smoke not run (user picked retry-Copilot instead). Retro at post-merge.
+- **2026-09-04 v1.28.0 PLANNING — Claude weekly-quota lever + Hermes install decision.**
+  Context: user on $20/mo flat rate hits Claude's weekly quota fast; under flat-rate the goal
+  is routing work OFF Claude's constrained quota onto Codex/Gemini (other flat plans) + Haiku
+  (cheaper Claude), NOT reducing total tokens. Two-part plan agreed: **(1)** workflow-defaults
+  audit + tighten [started]; **(2)** Hermes as a Claude-last-resort ops router [deferred, scope
+  doc gated].
+  - **DECISION #1 (2026-09-04): keep Opus 4.8 as the global default** (`settings.json`
+    `"model": "opus"` UNCHANGED). User wants Opus interactively for orchestration/judgment/verify;
+    quota relief comes from subagent routing of mechanical lanes, not from flipping the default.
+  - **DONE — `~/.claude/commands/create-pr.md` Phase 2 Opus→Sonnet.** Was labeled "Sonnet" but ran
+    in the Opus main conversation → Copilot-fix read+edit burned Opus. Now a real **Sonnet
+    subagent**; Opus only trust-but-verifies the returned fix rationales. (Config repo, not k3d-manager.)
+  - **DONE — DECISION #2 (2026-09-04): `/bugfix` + `/handoff` spec-authoring → Sonnet subagent.**
+    Both commands now draft the spec (read source + write exact old/new blocks) on a Sonnet
+    subagent; Opus reviews the draft for exact-code-block precision before handoff. Edits in
+    `~/.claude/commands/bugfix.md` (step 3) + `handoff.md` (steps 1–2). (Config repo, not k3d-manager.)
+  - **Hermes install decision recorded** in `docs/architecture/hermes-phase1-monitoring-scope.md`
+    §10: `_install_hermes_agent` in **lib-foundation** (subtree-first), installs Hermes **off-hub**
+    (laptop tier, like `bin/k3dm-webhook`) — which also resolves the §9 hub-stability gate without
+    waiting for the M5. Deferred to Hermes impl phase; no code yet. (Hermes theme = roadmap
+    candidate v1.28.x, `docs/roadmap.md:156`.)
+  - **DONE — Hermes Phase-1 first deliverable (§5) shipped: `bin/public-endpoint-probe`.**
+    New self-contained, read-only script + `make status-public` target. Samples each public
+    hostname (enumerated from `scripts/etc/cloudflared/config.yml` ingress) K×, host healthy only
+    if ≥M/K return 2xx/3xx; discriminates **edge-down** (all fail → cloudflared split-brain) vs
+    **single-service** (one fails → zombie port-forward) with exit codes 0/1/2/3; `--json` for
+    Hermes to consume later. Spec `docs/plans/v1.28.0-hermes-status-probe.md` (drafted by Sonnet
+    subagent, Opus-reviewed). shellcheck-clean; all 3 verdict paths + JSON validity verified via
+    stubbed curl. Webhook untouched (§4 stays authoritative). This is the ONLY Hermes work this
+    session — sensor set / correlator / Slack / guide stay deferred as a separate release story.
+    Uses **1 of the 3 remaining v1.28.0 plan-doc slots** (now 3 v1.28.0 docs).
+  - **DECISION 2026-09-04 (amended) — v1.28.0 = TWO themes: Hermes probe (done) + parallel-multi-cloud.
+    Zero-downtime-rollouts QUEUED until hardware upgrade.** Original "all 3 in one release" call was
+    reversed the same day: there is **no CPU headroom** on the current M4 Air 24GB hub for 2+ replicas
+    of the stateless tier — the hub already CPU-starves at single replicas (`reference_one_second_
+    probes_cpu_starvation_kill_loop`, `reference_hostinger_maxsurge_rollout_deadlock`: maxSurge=1 needs
+    2× CPU on a 2-CPU node → FailedScheduling). Zero-downtime is a hardware story, gated on the Mac Mini
+    M5 (Oct 2026 target, [[user_hardware]]). Operational-resilience through-line still holds for the two
+    that ship: (#1, done) detect edge reachability honestly; (#2) provision providers concurrently
+    without local-state corruption. `v1.28.0-platform-zero-downtime-rollouts` spec stays on disk, marked
+    queued/hardware-gated.
+  - **DONE (offline slice) 2026-09-04 — parallel-multi-cloud Phase 1+2.** Provider-scoped
+    `_ACG_STATE_DIR` + `_acg_migrate_flat_state` one-time migration (decision "all scoped, migrate on
+    first run"); `active-providers/` marker-dir set (`_acg_record_provider`/`_acg_unrecord_provider`/
+    `_acg_list_active_providers`) fixing `k3s-hostinger.sh:1007` whole-file delete; set-aware
+    best-effort resolver fallback. 14/14 new BATS (`provider_active_set.bats`) + 54/54 contract
+    regression + shellcheck clean. Implementation-ready detail appended to the spec. DEFERRED:
+    Phase 3 (ports/labels + make down/status refuse-when-ambiguous), Phase 4 (hub+kubeconfig flock),
+    live two-cloud DoD. Recon corrections: webhook `_ACTIVE_PROVIDER_FILE` is a dead constant; the
+    resolver already picks by context reachability (the file is only an offline fallback).
+  - **DONE (offline core) 2026-09-04 — parallel-multi-cloud Phase 3+4.** mkdir-based hub lock
+    (`_acg_lock_acquire`/`_acg_lock_release` — macOS lacks `flock(1)`; pid stale-reclaim; bounded wait
+    then proceed) wrapping `cluster-up` Step 3.5+3.6 hub verify+bootstrap; `_acg_provider_port_offset`
+    (k3s-aws=0 so single-cloud is byte-identical) applied to the ACG Prometheus forward (`19090+offset`).
+    Key recon correction: hub-shared forwards (Vault 18200 → `k3d-k3d-cluster`, hub ArgoCD) are NOT
+    offset — created once + reused, serialized by the lock; only per-app-cluster forwards (19090 →
+    app context) offset. BATS 20/20 + contract 54/54, shellcheck + parse clean. DEFERRED (Phase 3b):
+    kubeconfig-merge lock, full per-app-cluster launchd-label suffix audit, make down/status
+    refuse-when-ambiguous (touches Makefile global CLUSTER_PROVIDER default), live two-cloud DoD.
+  - **DONE (offline) 2026-09-04 — parallel-multi-cloud Phase 3b partial.** kubeconfig-merge lock around
+    `cluster-up`'s k3s app-context fetch; new `bin/require-unambiguous-provider` (purely additive) wired
+    into `make down`/`status`/`status-json` — refuses bare invocation when ≥2 providers live + no explicit
+    CLUSTER_PROVIDER, verified end-to-end through make. BATS 23/23, contract 54/54, shellcheck clean.
+    STILL DEFERRED to the live two-cloud session: the per-app-cluster launchd-LABEL suffix audit across
+    observability.sh/argocd.sh/k3s-hostinger.sh (topology classification, no offline test — mis-classifying
+    a hub-shared label breaks single-cloud teardown), the k3s-hostinger kubeconfig lock path, and the live
+    two-cloud DoD. **v1.28.0 parallel-multi-cloud is now feature-complete for everything offline-verifiable;
+    the remainder is genuinely live-gated.**
+  - **FIX 2026-09-04 — Phase 1 scoping consistency (caught by live smoke).** Phase 1 scoped the
+    producer (`cluster-up`) but not consumers → after migration, teardown/refresh would look in the
+    flat path and break. Corrected: new single-source `_acg_provider_state_dir` helper used by
+    `cluster-up`/`cluster-down`/`cluster-refresh` (the k3s-aws/gcp trio; `cluster-down` now sources
+    provider.sh). **Architecture fact:** k3s-hostinger/oci use the dispatcher `deploy_cluster`
+    (NOT `bin/cluster-up`); `k3s-hostinger.sh` is its own producer+consumer at the flat path →
+    internally consistent, deliberately left flat (collides with nothing; aws/gcp live under
+    `<base>/<provider>/`). Migration now reachability-guarded: with no legacy scalar it claims flat
+    state for the run provider ONLY if that provider's context is reachable — so a `make up k3s-aws`
+    (sandbox down) never steals a live hostinger's flat state. BATS 25/25, full lib 323/0.
+  - **LIVE OPS 2026-09-04 — hostinger edge FIXED, hub still DOWN.** Public endpoints were all-530
+    (EDGE-DOWN, validated live by the new `status-public` probe — 7/7 530). Root cause: no cloudflared
+    connector running (stray `com.cloudflare.cloudflared` already `.disabled`, not split-brain). Fixed
+    via `refresh_access_layer` (k3s-hostinger) — tunnel restarted, frontend now 200. **Remaining 502s
+    (argocd/keycloak/prometheus/grafana) = the laptop hub (k3d) is DOWN** — only `ubuntu-hostinger`
+    context exists; those services live on the hub. User decision: bring the hub up (pending — verify
+    whether the hostinger dispatcher path does hub setup, or if hub needs `make up`). PR: HOLD until
+    milestone complete.
+
+- **2026-09-03 v1.27.0 PR #118 MERGED & RELEASED** — https://github.com/wilddog64/k3d-manager/pull/118
+  (base `main`, head `k3d-manager-v1.27.0`, merged SHA `62c9ff27`, tag/release v1.27.0 published
+  2026-09-03). CI green (lint✓ detect✓ stage2 skipped-by-design). CodeQL FP fixed in code
+  (`26e1a1ff`: precompiled `re.sub` regex barrier + dropped `kc_realm` interpolation; no token
+  needed). Copilot review 4 inline comments all valid + fixed in `0b028b5f` + all 4 threads
+  replied+resolved via GraphQL. **Post-merge steps COMPLETE:** retrospective doc `2e9b5ade`,
+  tag v1.27.0 pushed, GitHub release published, `enforce_admins` restored to `true` (verified),
+  next branch k3d-manager-v1.28.0 created. **ApplicationSets REAPPLIED 2026-09-03** pinned to
+  `K3D_MANAGER_BRANCH=k3d-manager-v1.27.0` (NOT the checked-out v1.28.0 dev branch): `hub-platform-ops`
+  (signing config) was already on v1.27.0; the only drift was `grafana-dashboards-hub` +
+  `grafana-dashboards-acg` still on v1.26.0 — reapplied both appsets, apps flipped to v1.27.0.
+  `argocd_check_values_branch k3d-manager-v1.27.0` GREEN (6/6 values refs). Only `rollout-demo-*`
+  remain off-version (intentional HEAD-pin). Full post-merge close-out DONE.
 
 - **2026-09-03 PRE-PR BATS GATE — branch was RED; 9 test-only fixes applied, branch now green-minus-env.**
   A single-threaded local `bats scripts/tests/ --recursive` on `k3d-manager-v1.27.0` found **13 failures**.
@@ -1137,3 +1198,132 @@
   Keycloak Service only (Stage B) — resuming with blanket Replace=true would force-replace Keycloak STS/PVC.
 - Sequence once seeded: ES reconciles (15m or forced) → keycloak-secrets syncs → postgres-keycloak leaves
   CreateContainerConfigError → identity app heals to Healthy while auto-sync STAYS suspended (safe hold).
+
+### 2026-09-04 — v1.28.0 two-cloud bring-up: fresh-hub `make up` aborted on unguarded PrometheusRule apply
+- Live two-cloud validation (AWS EC2 k3s + hostinger): both clouds' nodes + hub came up
+  (`ubuntu-k3s` 3 nodes Ready, `ubuntu-hostinger` 1 node Ready, hub k3d Up), but ArgoCD stayed BARE
+  (0 registered clusters, 0 ApplicationSets, 0 Applications). `make up` had errored, not completed.
+- Root cause: `scripts/plugins/argocd.sh` applied `PrometheusRule` (1540), `AlertmanagerConfig` (1546),
+  and `vulnerability-inventory-exporter` (1549, bundles a ServiceMonitor) WITHOUT a CRD guard — on a
+  fresh hub the Prometheus-Operator CRDs aren't installed yet, so `PrometheusRule` hard-failed
+  (`no matches for kind "PrometheusRule" in version "monitoring.coreos.com/v1"`) and aborted the deploy
+  BEFORE `register_app_cluster` (bin/cluster-up:758) ever ran. The ServiceMonitor ensure (argocd.sh:512)
+  already had the correct guard; these three missed it.
+- FIX (this branch): added a single `prometheusrules.monitoring.coreos.com` CRD-presence guard
+  (`_prom_operator_present`) mirroring line 512; gated all three applies, left the Grafana ConfigMap
+  unconditional. shellcheck clean. Spec: `docs/bugs/argocd-prometheus-operator-unguarded-crd-apply.md`.
+- Next: re-run idempotent `make up CLUSTER_PROVIDER=k3s-aws` → confirm it clears platform-ops and reaches
+  `register_app_cluster`, then reapply ApplicationSets (hub + ACG) + `argocd_check_values_branch`, then
+  inspect the v1.28.0 multi-cloud internals (scoped state dirs, active-providers, port offsets, hub-lock).
+
+### 2026-09-04 (cont.) — argocd guard SHIPPED + verified; next blocker LDAP verify newline FIXED
+- argocd guard FINAL scope = ALL SIX monitoring-stack-dependent applies behind one
+  `prometheusrules.monitoring.coreos.com` CRD guard: PrometheusRule, AlertmanagerConfig,
+  vulnerability-inventory-exporter(+rollout restart), and the argocd/cve-autopatch/e2e Grafana dashboard
+  ConfigMaps (all target `namespace: monitoring`, also absent on fresh hub). The earlier "leave the
+  ConfigMap unconditional" note was WRONG — corrected before commit. Committed `5f4526fd` (pushed).
+- LIVE-VERIFIED: guard fired ("Prometheus-Operator CRDs / monitoring namespace absent; skipping..."),
+  platform-ops cleared, `ubuntu-k3s` registered into hub ArgoCD, app stack built through the identity phase.
+- NEXT blocker hit at Step 10d.5/14 (LDAP password seed): ldappasswd -S set OK but ldapwhoami verify failed
+  Invalid credentials(49) for admin/developer/operator → checkpoint not written → `make up` Error 1.
+- Root cause: verify pipe `printf '%s\n'` wrote `<password>\n` to the `-y` file; ldapwhoami -y uses the whole
+  file incl. newline as bind password. PROVEN live on openldap-0: -y w/newline → invalid creds(49);
+  w/o newline → bind OK. FIX: `printf '%s\n'` → `printf '%s'` at bin/cluster-up:1045 (verify only; the
+  ldappasswd -S set step's newlines are prompt delimiters, left as-is). shellcheck clean, bats 8/8.
+  Committed `41389804` (pushed). Spec: docs/bugs/2026-09-04-ldap-verify-ldapwhoami-trailing-newline.md.
+- Observation (separate, NOT fixed): two LDAP instances in `identity` on hub — openldap-0 (Helm
+  openldap-stack-ha StatefulSet, the seed target, holds all real users) + a stray `ldap` Deployment
+  (name=ldap, component=directory). Immaterial to the newline bug; matters for Keycloak federation (10d.6).
+- IN FLIGHT: `make up CLUSTER_PROVIDER=k3s-aws` re-run (task bsqm1ma34) to confirm 10d.5 clears.
+- STILL PENDING after make up completes: reapply ApplicationSets pinned to release branch (hub + ACG) →
+  argocd_check_values_branch → inspect v1.28.0 multi-cloud internals across both clouds. No PR yet (gated).
+
+### 2026-09-04 (cont.) — TWO-CLOUD validation COMPLETE (AWS + hostinger, both fixes verified)
+- Brought up hostinger as 2nd cloud (`make up CLUSTER_PROVIDER=k3s-hostinger`, task bzqq4i5i6, exit 0).
+  Path = deploy_cluster (NOT bin/cluster-up): k3sup install ran idempotently ("Skipping...already exists",
+  workloads persist — never touches the VM), merged ubuntu-hostinger kubeconfig, registered into hub
+  (ubuntu-hostinger -> https://2.25.146.252:6443), recorded active-providers/k3s-hostinger marker.
+- VERIFIED two-cloud state: BOTH cluster secrets in hub cicd (cluster-ubuntu-k3s + cluster-ubuntu-hostinger);
+  BOTH active-providers markers coexist; ArgoCD generating ubuntu-hostinger-* apps (data-layer/eso/
+  shopping-cart-* Synced+Healthy); both node contexts reachable (k3s=3, hostinger=1); argocd_check_values_branch
+  green on k3d-manager-v1.28.0 after BOTH runs; k3s-aws scoped state intact (not clobbered).
+- OBSERVATION 1 (consistency, not a bug): k3s-hostinger/ has NO scoped state subtree — deploy_cluster path
+  isn't checkpoint-scoped like bin/cluster-up. hostinger uses Cloudflare edge + in-cluster Vault (HUB_VAULT_PROFILE
+  =hostinger), so no local port-forward footprint to scope/offset. Port-offset table (aws=0/hostinger=10/...) applies
+  to the cluster-up local-PF path only. Candidate v1.28.0 follow-up: scope deploy_cluster state too, or document why not.
+- OBSERVATION 2: ubuntu-hostinger-platform app HEALTH=Unknown (others Synced+Healthy) — likely reconciling; recheck.
+- MILESTONE STATUS: v1.28.0 two-cloud multi-provider is LIVE-VALIDATED. Remaining before PR (gated): resolve/close
+  the two observations, lib-foundation acg-robust-click PR (credential-test first), two-LDAP-instance federation check.
+
+### 2026-09-04 (cont.) — Two v1.28.0 follow-ups CLOSED
+- FOLLOW-UP 1 (deploy_cluster scoped-state asymmetry): NO CODE CHANGE — rationale already in
+  docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md (~L420: hostinger deliberately flat, "collides
+  with nothing", full scoping = tracked future work). Added a dated Live-validation note confirming it:
+  hostinger's deploy_cluster path created NO scoped subtree AND no local PF footprint (edge + in-cluster
+  Vault), did not disturb k3s-aws state. Sequential two-cloud coexistence PROVEN; literal simultaneity
+  (Phase 3/4 ports+flock) still untested.
+- FOLLOW-UP 2 (two-LDAP federation check): RESOLVED the question, found a REAL high-sev bug (needs a
+  decision, NOT blind-fixed). Keycloak shopping-cart realm federates the osixia `ldap` Deployment
+  (ArgoCD-managed by shopping-cart-identity, dc=shopping-cart,dc=local, connectionUrl
+  ldap.identity.svc:389), NOT openldap-0. The cluster-up Step 10d.5 seed writes openldap-0
+  (dc=home,dc=org) + Vault → DECOUPLED from SSO. PROVEN: Vault dev password fails to bind osixia ldap
+  (Invalid credentials 49). So get-keycloak-password returns a non-working-for-SSO password.
+  Filed docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md with 3 decision
+  options (A osixia canonical / B openldap canonical / C two-dirs-by-design) + verification steps.
+  Supersedes the pre-osixia 2026-08-22 doc. ESCALATED to user — awaiting canonical-directory decision.
+
+### 2026-09-04 (cont.) — Tidy-up: pruned unconditional Jenkins fixtures from LDAP bootstrap seed
+- User asked why jenkins-admin appears in openldap-0 though Jenkins was never deployed. Answer: static
+  seed fixture in bootstrap-basic-schema.ldif (Jenkins is deprecated/never deployed; 0 jenkins pods on
+  hub/aws/hostinger). The ldap.sh generator already GATES jenkins entries behind enable_jenkins; only the
+  static bootstrap seeded them unconditionally.
+- Pruned (dc=home,dc=org tidy surface, self-consistent): deleted dead jenkins-users-groups.ldif (unloaded);
+  removed jenkins-admin user + jenkins-admins group + it-devops dangling jenkins-admin member from
+  bootstrap-basic-schema.ldif (kept it-devops w/ chengkai.liang); dropped jenkins-admin from
+  test-directory-auto-load user+group loops; dropped jenkins-admin from rotation defaults (vars.sh
+  LDAP_USERS_TO_ROTATE + ldap-password-rotator.sh + .yaml.tmpl). shellcheck clean; group blocks keep >=1 member.
+- Deliberately KEPT (deprecated-but-gated / separate scope): ldap.sh gated generator, vars.sh LDAP_JENKINS_*
+  config block, bootstrap-ad-schema.ldif (separate AD dc=corp,... testing dir), dirservices RBAC,
+  jenkins values tmpls, smoke-test-jenkins, ad/vars.sh jenkins-admin path. Source-only cleanup — live
+  openldap-0 keeps jenkins-admin until a fresh bootstrap; SSO (osixia ldap) unaffected.
+- Spec: docs/bugs/2026-09-04-prune-unconditional-jenkins-ldap-fixtures.md.
+
+### 2026-09-04 (cont.) — DECISION: leave bootstrap-ad-schema.ldif Jenkins fixtures as-is
+- After pruning the default-directory Jenkins clutter (d9ee756b), checked the AD-testing schema
+  scripts/etc/ldap/bootstrap-ad-schema.ldif (dc=corp,dc=example,dc=com; "Jenkins Service"/"Jenkins Admins").
+- FINDING (non-obvious): its Jenkins entries are LOAD-BEARING for a live CI suite —
+  scripts/tests/lib/dirservices_activedirectory.bats:227 asserts "CN=Jenkins Admins,OU=Groups,DC=corp,...".
+  The whole `activedirectory` directory-service provider is a Jenkins-AD integration feature
+  (_dirservice_activedirectory_generate_jcasc/authz, deploy_ad → _ldap_run_ad_smoke_test, AD_BIND_DN=svc-jenkins).
+  It loads ONLY under explicit AD testing (ldap.sh:1207 deploy_ad), NOT in the default openldap-0 directory.
+- USER DECISION 2026-09-04: LEAVE IT. Removing Jenkins here isn't a fixture tidy — it's "remove the whole
+  Jenkins-AD provider + its BATS suite", a separate larger task that conflicts with keep-deprecated-Jenkins.
+  Do NOT re-open as "tidy" work. See [[project_jenkins_deprecation]].
+
+### 2026-09-04 (cont.) — lib-foundation PR #45 created (acg robust-click), gates green, AWAITING MERGE GO
+- Sequence (user-directed 2026-09-04): (1) lib-foundation PR → (2) subtree-pull into k3d-manager → (3) v1.28.0 PR.
+- STEP 1 DONE (prepared, gated): PR https://github.com/wilddog64/lib-foundation/pull/45
+  (fix/acg-sandbox-robust-click, commit 91f0f12: _robustClick dispatched MouseEvent for sandbox reveal/provision).
+  Gates: make credential-test PASS (extracted + sts-validated AWS creds); CI acg/bats/shellcheck all green;
+  scope clean. Copilot NOT attached (appears disabled on lib-foundation; not a payment PR). k3dm overlay
+  (scripts/lib/foundation/.../acg/playwright/{sandbox.js,acg_restart.js}) is IDENTICAL to 91f0f12 — no un-upstreamed drift.
+- HOLD: never-auto-merge. Awaiting user go to merge #45.
+- STEP 2 (after merge): tag lib-foundation v0.4.14 → git subtree pull into k3d-manager (replaces the uncommitted
+  overlay). STEP 3: create v1.28.0 k3d-manager PR (branch k3d-manager-v1.28.0, all this session's commits).
+
+### 2026-09-04 (cont.) — STEP 1+2 DONE: lib-foundation v0.4.14 merged + subtree-synced into k3d-manager
+- #45 merged (squash dddc18cb); tagged+released lib-foundation v0.4.14; git subtree pull --prefix=scripts/lib/foundation
+  lib-foundation v0.4.14 --squash → commits 05c5e952 (squash) + 09dab403 (merge). Overlay now formalized; tree clean.
+  Verified: pulled subtree JS identical to v0.4.14, _robustClick present. Pushed origin/k3d-manager-v1.28.0.
+- STEP 3 NEXT: create v1.28.0 k3d-manager PR (base main). Pre-PR gates to run: CI green on branch, scope check,
+  live smoke. Never-auto-merge holds for the v1.28.0 merge.
+
+### 2026-09-04 (cont.) — STEP 3 DONE: v1.28.0 PR #119 created, CI GREEN, AWAITING MERGE GO
+- PR https://github.com/wilddog64/k3d-manager/pull/119 (base main ← k3d-manager-v1.28.0, 24 commits, merge-base 62c9ff27).
+- Gates: CI all green (CodeQL actions/js-ts/python, lint, detect, GitGuardian; stage2 skipped-conditional);
+  local lib bats 323 exit 0; shellcheck clean; live two-cloud smoke done; scope clean.
+- Copilot: NOT attached (requested_reviewers empty on both #45 and #119 via raw-JSON POST — appears Copilot code
+  review not enabled on these repos right now). Flagged to user; not a payment PR.
+- HOLD: never-auto-merge. Awaiting user go to merge #119. On merge: /post-merge (restore protection, tag v1.28.0,
+  release, next branch, retro, standing-docs audit, memory-bank).
+- Sequence COMPLETE up to the gate: lib-foundation #45 merged+v0.4.14+subtree-synced → v1.28.0 PR #119 up & green.

@@ -148,6 +148,7 @@
 - [x] **Indented fence fix** — commit `02e7418` updates `_dh_strip_fences` for indented fenced blocks + indented BATS (`docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`).
 - [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`, branch feat/init); mapfile compat fix (`8ae57bc`) + gist installer (`310fd16`).
 - [ ] Consumer integration: `shopping-carts`
+- [ ] `fix/acg-sandbox-robust-click` — ACG sandbox Open/Start/Resume/reopen clicks converted from `click({force:true})` to `_robustClick` (dispatched MouseEvent); spec `docs/bugs/acg-sandbox-force-click-panel-noop.md`. `npm run check` + jest 22/22 green. Pending: push, live gate, PR/tag/subtree-pull.
 
 ---
 

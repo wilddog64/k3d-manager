@@ -125,7 +125,27 @@ a single degraded signal, and must know the blast radius of the action it propos
 ## 9 — Exit criteria before assigning a release
 
 - Hub is structurally stable (single-node control-plane over-capacity addressed — the
-  roadmap home-lab / Mac Mini M5 tier, or workload offload). Do not stand up a monitoring
-  agent on top of an unstable substrate it would spend its time reporting on.
+  roadmap home-lab / Mac Mini M5 tier, or workload offload), **or** Hermes runs off-hub
+  (on the laptop, like `bin/k3dm-webhook`) so it does not compete for the substrate it
+  observes. The §9 intent — "don't monitor from inside the failure domain" — is satisfied
+  by off-hub placement without waiting for the M5 tier.
 - This scope document reviewed and the access model (§6) confirmed least-privilege.
 - Phase 2 explicitly deferred with its own scope document as the gate.
+
+## 10 — Installation (`_install_hermes_agent`, lib-foundation)
+
+Decision (2026-09-04): installation is handled by a new **`_install_hermes_agent`** helper
+in **lib-foundation**, subtree-pulled into k3d-manager (edit lib-foundation upstream first,
+then pull — never edit `scripts/lib/` subtrees directly). Rationale and constraints:
+
+- **Off-hub placement.** The helper installs and supervises the Hermes agent on the laptop
+  (the same tier as `bin/k3dm-webhook`), not as an in-cluster workload — this is what
+  satisfies §9 without the M5 tier.
+- **No new privilege at install time.** The installer provisions only the read-only access
+  of §6; it must not create write verbs, cluster-admin, cloud-write, or Git tokens.
+- **Least-resort LLM routing baked in.** Per the token-economy invariant (below), the agent
+  the installer stands up does deterministic sensing in code, calls an LLM only on sustained
+  multi-signal degradation, and defaults that LLM to a **non-Claude** agent (Codex/Gemini),
+  escalating to Claude only for verification — with a per-day call budget from day one.
+- Deferred to the Hermes implementation phase; recorded here so the design carries it. No
+  code lands until this Phase-1 scope is assigned to a release.

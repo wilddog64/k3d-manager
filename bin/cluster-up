@@ -34,9 +34,7 @@ fi
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 # shellcheck disable=SC2034
 PLUGINS_DIR="${SCRIPT_DIR}/plugins"
-_ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
-_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
-_ACG_CHECKPOINT_DIR="${_ACG_STATE_DIR}/checkpoints"
+_ACG_STATE_BASE="${HOME}/.local/share/k3d-manager"
 
 _cp_skip() {
   [[ -f "${_ACG_CHECKPOINT_DIR}/${1}.done" ]]
@@ -79,6 +77,12 @@ case "${_cluster_provider}" in
     _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp, k3s-az)"
     ;;
 esac
+
+_acg_state_provider="$(_acg_normalize_provider "${_cluster_provider}")"
+_ACG_STATE_DIR="$(_acg_provider_state_dir "${_acg_state_provider}")"
+_dry_guard "migrate flat state dir to a per-provider dir" _acg_migrate_flat_state "${_ACG_STATE_BASE}" "${_acg_state_provider}"
+_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
+_ACG_CHECKPOINT_DIR="${_ACG_STATE_DIR}/checkpoints"
 
 function _argocd_open_browser_url() {
   local url="$1"
@@ -330,6 +334,8 @@ elif ! docker info >/dev/null 2>&1; then
 fi
 
 _HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
+_acg_hub_lock="${_ACG_STATE_BASE}/hub-bootstrap.lock"
+_acg_lock_acquire "${_acg_hub_lock}" 600
 _hub_newly_created=0
 _info "[acg-up] Step 3.5/12 — Verifying local Hub cluster (create if missing)..."
 if ! _command_exist k3d; then
@@ -369,6 +375,7 @@ elif ! _argocd_bootstrap_is_ready; then
   _dry_guard "bootstrap ArgoCD" "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd_bootstrap --confirm
   _info "[acg-up] ArgoCD bootstrap resources refreshed."
 fi
+_acg_lock_release "${_acg_hub_lock}"
 
 _vault_local_port="${TUNNEL_VAULT_LOCAL_PORT:-18200}"
 if _dry_run_active; then
@@ -672,6 +679,8 @@ fi
 if ! kubectl config get-contexts ubuntu-k3s &>/dev/null; then
   _info "[acg-up] ubuntu-k3s context missing — re-fetching kubeconfig via SSH tunnel..."
   _k3s_kubeconfig_fetched=0
+  _acg_kubeconfig_lock="${_ACG_STATE_BASE}/kubeconfig.lock"
+  _acg_lock_acquire "${_acg_kubeconfig_lock}" 120
   for _attempt in 1 2 3; do
     if add_ubuntu_k3s_cluster; then
       _k3s_kubeconfig_fetched=1
@@ -680,6 +689,7 @@ if ! kubectl config get-contexts ubuntu-k3s &>/dev/null; then
     _warn "[acg-up] kubeconfig fetch attempt ${_attempt}/3 failed — waiting 5s before retry..."
     sleep 5
   done
+  _acg_lock_release "${_acg_kubeconfig_lock}"
   if [[ "${_k3s_kubeconfig_fetched}" -eq 0 ]]; then
     _err "[acg-up] Failed to fetch ubuntu-k3s kubeconfig after 3 attempts — SSH tunnel may not be fully up. Retry via /acg-resume in Slack."
   fi
@@ -1032,7 +1042,7 @@ else
                 -w "$LDAP_ADMIN_PASSWORD" \
                 -S "uid=$1,ou=users,dc=home,dc=org"
             ' sh "${_ldap_user}" >/dev/null 2>&1; then
-        if printf '%s\n' "${_ldap_user_pass}" | \
+        if printf '%s' "${_ldap_user_pass}" | \
             kubectl exec -i -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
               sh -ceu '
                 _ldap_password_file=$(mktemp)
@@ -1838,19 +1848,20 @@ source "${REPO_ROOT}/scripts/plugins/observability.sh"
 _acg_observability_context="$(_acg_provider_context "$(_acg_resolve_provider)")"
 deploy_observability_acg "${_acg_observability_context}"
 
-_info "[acg-up] Step 14b/14 — Starting ACG Prometheus port-forward (${_acg_observability_context} → localhost:19090)..."
+_acg_prom_local_port=$((19090 + $(_acg_provider_port_offset "${_cluster_provider}")))
+_info "[acg-up] Step 14b/14 — Starting ACG Prometheus port-forward (${_acg_observability_context} → localhost:${_acg_prom_local_port})..."
 _acg_prom_pf_pid_file="${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
 if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
   kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_acg_prom_pf_pid_file}"
 fi
-kubectl port-forward svc/prometheus-operated 19090:9090 \
+kubectl port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
   -n monitoring --context "${_acg_observability_context}" --address 0.0.0.0 \
   >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
 _acg_prom_pf_pid=$!
 echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
 disown "${_acg_prom_pf_pid}"
-_info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:19090 → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
+_info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
 
 _info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9091 → ${_acg_observability_context})..."
 _pgw_pf_label="com.k3d-manager.pushgateway-port-forward"

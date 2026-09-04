@@ -13,6 +13,41 @@
 | v1.24.0 | RELEASED — PR #113, tag and GitHub release published |
 | v1.23.0 and earlier | RELEASED — see `CHANGELOG.md` |
 
+## v1.28.0 queue
+
+- [x] **Hermes Phase-1 §5 — sustained public-endpoint probe** — `bin/public-endpoint-probe`
+  (new, read-only) + `make status-public`. K-sample / M-of-K reachability of the cloudflared
+  ingress hostnames; edge-down vs single-service discrimination; `--json` machine output for a
+  future Hermes sensor. Spec `docs/plans/v1.28.0-hermes-status-probe.md`. shellcheck-clean, all
+  verdict paths verified. Committed on `k3d-manager-v1.28.0`. Rest of Hermes Phase 1 deferred.
+- [~] **v1.28.0-parallel-multi-cloud-provisioning — Phase 1+2 shipped (offline slice).**
+  Provider-scoped `_ACG_STATE_DIR` + one-time flat-state migration (`_acg_migrate_flat_state`);
+  `active-providers/` marker-dir SET with `_acg_record_provider` (marker+scalar), new
+  `_acg_unrecord_provider` (targeted; fixes `k3s-hostinger.sh:1007` whole-file delete) +
+  `_acg_list_active_providers`; resolver fallback set-aware, best-effort (refuse-when-ambiguous
+  deferred to the make down/status wrapper). Files: `bin/cluster-up`, `scripts/lib/provider.sh`,
+  `scripts/lib/providers/k3s-hostinger.sh`, new `scripts/tests/lib/provider_active_set.bats` (14/14).
+  shellcheck-clean; provider_contract 54/54 regression green. webhook `_ACTIVE_PROVIDER_FILE`
+  found to be a dead constant — no change needed. **Phase 3+4 core also shipped:** mkdir-based
+  hub-bootstrap lock (`_acg_lock_acquire`/`_acg_lock_release`, macOS has no `flock(1)`) wrapping
+  `cluster-up:337-375` (Step 3.5+3.6) so concurrent runs can't double-create/bootstrap the shared
+  hub; `_acg_provider_port_offset` (k3s-aws=0 ⇒ single-cloud unchanged) applied to the per-app-cluster
+  ACG Prometheus forward (`19090+offset`). Recon correction: hub-shared forwards (Vault 18200, hub
+  ArgoCD) stay fixed — only per-app-cluster forwards offset; the lock covers the shared ones. BATS now
+  20/20 (`provider_active_set.bats`). **Still deferred (Phase 3b):** kubeconfig-merge lock
+  (`cluster-up:677+`), full per-app-cluster launchd-label suffix audit, `make down/status`
+  refuse-when-ambiguous (changes Makefile global `CLUSTER_PROVIDER ?= k3s-aws` default), live two-cloud DoD.
+  **Phase 3b (partial) also shipped:** kubeconfig-merge lock around `cluster-up`'s k3s app-context fetch
+  (`kubeconfig.lock`); new `bin/require-unambiguous-provider` refuses bare `make down`/`status`/`status-json`
+  when ≥2 providers live + no explicit `CLUSTER_PROVIDER` (purely additive, verified end-to-end through
+  make). BATS 23/23. **Still deferred (live-only):** per-app-cluster launchd-label suffix audit (topology
+  classification, no offline test, mis-class breaks single-cloud teardown), k3s-hostinger kubeconfig lock
+  path, live two-cloud DoD.
+- [ ] **v1.28.0-platform-zero-downtime-rollouts — QUEUED, hardware-gated** (deferred 2026-09-04).
+  No CPU headroom on the M4 Air 24GB hub for 2+ replicas of the stateless tier (hub CPU-starves at
+  single replicas). Gated on the Mac Mini M5 upgrade (Oct 2026). Spec stays on disk; do NOT implement
+  until the hardware lands.
+
 ## v1.26.0 queue
 
 - [x] **Fleet node lifecycle (count-agnostic)** — Phase A shipped as lib-foundation `v0.4.12`
@@ -61,11 +96,10 @@
 
 ## v1.27.0 queue
 
-- [ ] **PR #118 OPEN (2026-09-03):** https://github.com/wilddog64/k3d-manager/pull/118 — base `main`,
-  head `k3d-manager-v1.27.0` @ `5cfc30ec`. Copilot requested, CI `pull_request` run in progress.
-  NOT merged (awaiting user go). Pre-merge gates remaining: CI green, Copilot addressed+resolved,
-  Gemini live smoke. Post-merge TODO: retro doc, tag/release v1.27.0, protection restore, reapply
-  ApplicationSets (hub + ACG), next branch.
+- [x] **PR #118 MERGED (2026-09-03):** https://github.com/wilddog64/k3d-manager/pull/118 — base `main`,
+  head `k3d-manager-v1.27.0` @ `5cfc30ec`, merged SHA `62c9ff27`. Copilot review 4 comments
+  addressed+resolved. Post-merge DONE: retro doc (2e9b5ade), tag v1.27.0 pushed, release published,
+  enforce_admins restored (true), next branch k3d-manager-v1.28.0 created.
 
 - [x] **Pre-PR BATS gate green-minus-env (2026-09-03):** local full suite went 13→4 failures.
   9 branch failures fixed (test-only; code correct) across 6 files — LDAP chart migration guards,
@@ -634,3 +668,22 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   applied the manifest. Live target/table verification remains pending while the
   Kubernetes API is intermittently slow.
 - See `docs/issues/2026-09-03-grafana-cve-tables-empty-exporter-timeout.md`.
+
+### 2026-09-04 — fresh-hub make up unblock: guard Prometheus-Operator CR applies
+- Fixed `scripts/plugins/argocd.sh`: PrometheusRule/AlertmanagerConfig/vulnerability-inventory-exporter
+  applies now gated on `prometheusrules.monitoring.coreos.com` CRD presence (mirrors ServiceMonitor
+  guard at line 512). Fresh-hub `make up` was aborting here before `register_app_cluster`.
+- Spec `docs/bugs/argocd-prometheus-operator-unguarded-crd-apply.md`; shellcheck clean.
+- Live-verify pending: re-run `make up CLUSTER_PROVIDER=k3s-aws` reaches register_app_cluster (both
+  clouds' nodes + hub already up; ArgoCD was bare due to the abort).
+
+### 2026-09-04 (cont.) — two v1.28.0 fresh-hub bring-up blockers fixed + shipped
+- [x] argocd platform-ops unguarded monitoring-resource applies → single CRD guard (all six). `5f4526fd`.
+      Live-verified: platform-ops clears, ubuntu-k3s registers into hub ArgoCD.
+- [x] LDAP seed verify trailing-newline in `-y` file → `printf '%s'`. `41389804`. shellcheck + bats 8/8.
+- [x] Re-run make up (bsqm1ma34) — full 14-step AWS bring-up COMPLETE, exit 0; LDAP admin/developer/operator set-and-verified; step-10d5-ldap-passwords.done written.
+- [x] ApplicationSets pinned to release branch — argocd_check_values_branch: all values refs on k3d-manager-v1.28.0 (applied by the bring-up; 12 appsets present, cluster-ubuntu-k3s registered).
+- [x] v1.28.0 multi-cloud internals validated: scoped state dir ~/.local/share/k3d-manager/k3s-aws/ (checkpoints/logs/run/tunnel-urls), active-providers/ registry marker, deterministic port offsets (_acg_provider_port_offset: aws=0/hostinger=10/az=20/gcp=30/oci=40), per-provider .lock files.
+- [ ] TWO-CLOUD (hostinger as 2nd registered cluster) NOT yet done — this run was k3s-aws only; hostinger node up but not registered into hub.
+- Note (follow-up, unfiled): two LDAP instances in identity ns (openldap-0 StatefulSet + stray ldap
+  Deployment) — confirm Keycloak federation binds openldap-0, not the stray, before v1.28.0 PR.
