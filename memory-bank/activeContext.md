@@ -37,6 +37,12 @@
     stubbed curl. Webhook untouched (§4 stays authoritative). This is the ONLY Hermes work this
     session — sensor set / correlator / Slack / guide stay deferred as a separate release story.
     Uses **1 of the 3 remaining v1.28.0 plan-doc slots** (now 3 v1.28.0 docs).
+  - **DECISION 2026-09-04 — NO SPLIT. v1.28.0 = operational-resilience release, all 3 docs completed
+    here.** User rejected pushing a scope to v1.29.0: the three are related and finish together.
+    Through-line: operate the laptop hub + Cloudflare edge safely — (#3) update the platform without
+    downtime, (#1, done) detect edge reachability failures honestly, (#2) provision multiple providers
+    concurrently without local-state corruption. 3 of 5 plan-doc slots (cap not in the way). Remaining
+    to complete: `v1.28.0-parallel-multi-cloud-provisioning` + `v1.28.0-platform-zero-downtime-rollouts`.
 
 - **2026-09-03 v1.27.0 PR #118 MERGED & RELEASED** — https://github.com/wilddog64/k3d-manager/pull/118
   (base `main`, head `k3d-manager-v1.27.0`, merged SHA `62c9ff27`, tag/release v1.27.0 published
