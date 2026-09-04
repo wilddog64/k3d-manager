@@ -27,6 +27,16 @@
     (laptop tier, like `bin/k3dm-webhook`) — which also resolves the §9 hub-stability gate without
     waiting for the M5. Deferred to Hermes impl phase; no code yet. (Hermes theme = roadmap
     candidate v1.28.x, `docs/roadmap.md:156`.)
+  - **DONE — Hermes Phase-1 first deliverable (§5) shipped: `bin/public-endpoint-probe`.**
+    New self-contained, read-only script + `make status-public` target. Samples each public
+    hostname (enumerated from `scripts/etc/cloudflared/config.yml` ingress) K×, host healthy only
+    if ≥M/K return 2xx/3xx; discriminates **edge-down** (all fail → cloudflared split-brain) vs
+    **single-service** (one fails → zombie port-forward) with exit codes 0/1/2/3; `--json` for
+    Hermes to consume later. Spec `docs/plans/v1.28.0-hermes-status-probe.md` (drafted by Sonnet
+    subagent, Opus-reviewed). shellcheck-clean; all 3 verdict paths + JSON validity verified via
+    stubbed curl. Webhook untouched (§4 stays authoritative). This is the ONLY Hermes work this
+    session — sensor set / correlator / Slack / guide stay deferred as a separate release story.
+    Uses **1 of the 3 remaining v1.28.0 plan-doc slots** (now 3 v1.28.0 docs).
 
 - **2026-09-03 v1.27.0 PR #118 MERGED & RELEASED** — https://github.com/wilddog64/k3d-manager/pull/118
   (base `main`, head `k3d-manager-v1.27.0`, merged SHA `62c9ff27`, tag/release v1.27.0 published

@@ -13,6 +13,16 @@
 | v1.24.0 | RELEASED — PR #113, tag and GitHub release published |
 | v1.23.0 and earlier | RELEASED — see `CHANGELOG.md` |
 
+## v1.28.0 queue
+
+- [x] **Hermes Phase-1 §5 — sustained public-endpoint probe** — `bin/public-endpoint-probe`
+  (new, read-only) + `make status-public`. K-sample / M-of-K reachability of the cloudflared
+  ingress hostnames; edge-down vs single-service discrimination; `--json` machine output for a
+  future Hermes sensor. Spec `docs/plans/v1.28.0-hermes-status-probe.md`. shellcheck-clean, all
+  verdict paths verified. Committed on `k3d-manager-v1.28.0`. Rest of Hermes Phase 1 deferred.
+- [ ] v1.28.0-parallel-multi-cloud-provisioning (spec present, not started)
+- [ ] v1.28.0-platform-zero-downtime-rollouts (spec present, not started)
+
 ## v1.26.0 queue
 
 - [x] **Fleet node lifecycle (count-agnostic)** — Phase A shipped as lib-foundation `v0.4.12`
