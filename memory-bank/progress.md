@@ -681,8 +681,9 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [x] argocd platform-ops unguarded monitoring-resource applies → single CRD guard (all six). `5f4526fd`.
       Live-verified: platform-ops clears, ubuntu-k3s registers into hub ArgoCD.
 - [x] LDAP seed verify trailing-newline in `-y` file → `printf '%s'`. `41389804`. shellcheck + bats 8/8.
-- [ ] Re-run make up (bsqm1ma34) to confirm Step 10d.5/14 clears with the newline fix.
-- [ ] Reapply ApplicationSets (hub + ACG) pinned to release branch → argocd_check_values_branch.
-- [ ] Inspect v1.28.0 multi-cloud internals (scoped state dirs, active-providers, port offsets, hub-lock).
+- [x] Re-run make up (bsqm1ma34) — full 14-step AWS bring-up COMPLETE, exit 0; LDAP admin/developer/operator set-and-verified; step-10d5-ldap-passwords.done written.
+- [x] ApplicationSets pinned to release branch — argocd_check_values_branch: all values refs on k3d-manager-v1.28.0 (applied by the bring-up; 12 appsets present, cluster-ubuntu-k3s registered).
+- [x] v1.28.0 multi-cloud internals validated: scoped state dir ~/.local/share/k3d-manager/k3s-aws/ (checkpoints/logs/run/tunnel-urls), active-providers/ registry marker, deterministic port offsets (_acg_provider_port_offset: aws=0/hostinger=10/az=20/gcp=30/oci=40), per-provider .lock files.
+- [ ] TWO-CLOUD (hostinger as 2nd registered cluster) NOT yet done — this run was k3s-aws only; hostinger node up but not registered into hub.
 - Note (follow-up, unfiled): two LDAP instances in identity ns (openldap-0 StatefulSet + stray ldap
   Deployment) — confirm Keycloak federation binds openldap-0, not the stray, before v1.28.0 PR.
