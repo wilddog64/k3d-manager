@@ -9,11 +9,11 @@ metadata:
     policies.kyverno.io/description: >-
       Requires a valid cosign signature by the k3d-manager signing key for
       first-party (${SIGNING_IMAGE_REFERENCES}) images scheduled into the app
-      namespaces. Signature-only for now (Trivy/SBOM attestation is deferred);
-      the verify block tightens to require a vuln attestation once CI produces
-      one. Staged Audit -> Enforce per decision D2 -- never flip to Enforce
-      before the Audit dashboard shows zero would-be-blocks for current
-      first-party images.
+      namespaces, plus a Trivy vuln attestation (type
+      https://cosign.sigstore.dev/attestation/vuln/v1) signed by the same key.
+      Staged Audit -> Enforce per decision D2 -- never flip to Enforce before
+      the Audit dashboard shows zero would-be-blocks for current first-party
+      images.
 spec:
   # D2: staged rollout. Audit first (dashboards show would-be-blocks), Enforce
   # only after Audit is clean, and ONLY on app namespaces below.

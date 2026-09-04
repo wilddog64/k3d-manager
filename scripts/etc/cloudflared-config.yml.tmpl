@@ -10,5 +10,5 @@ ingress:
     service: http://127.0.0.1:8880
   # k3dm-webhook — ArgoCD CVE upgrade pipeline trigger
   - hostname: webhook.${CLOUDFLARE_DOMAIN}
-    service: http://localhost:7443
+    service: http://127.0.0.1:7443
   - service: http_status:404
