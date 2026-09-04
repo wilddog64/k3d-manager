@@ -6,6 +6,9 @@
 
 ## Current focus
 
+- **2026-09-04 v1.28.0 RELEASED — PR #119 merged, tag pushed, branch protection restored.**
+  Post-merge housekeeping COMPLETE: retrospective doc `7d321adf`, tag v1.28.0 pushed, GitHub release published, `enforce_admins` restored to `true` (verified), next branch k3d-manager-v1.29.0 created. Two open follow-ups carried forward to v1.29.0+: (1) LDAP↔SSO decoupling decision A/B/C (docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md), (2) hub CPU overcommit durable fix (queued until Mac Mini M5 upgrade, Oct 2026). Zero-downtime-rollouts spec remains in git, marked hardware-gated.
+
 - **2026-09-04 v1.28.0 PLANNING — Claude weekly-quota lever + Hermes install decision.**
   Context: user on $20/mo flat rate hits Claude's weekly quota fast; under flat-rate the goal
   is routing work OFF Claude's constrained quota onto Codex/Gemini (other flat plans) + Haiku

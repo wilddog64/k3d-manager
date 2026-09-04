@@ -7,6 +7,8 @@
 
 | Version | State |
 |---|---|
+| v1.28.0 | RELEASED — PR #119 `46d9f2e7`, tag v1.28.0 + GitHub release published, branch protection restored (enforce_admins=true, 1 required approval). Shipped parallel multi-cloud Phase 1–3b + Hermes public-endpoint probe. |
+| v1.27.0 | RELEASED — PR #118 `62c9ff27`, tag/release published, protection restored |
 | v1.26.0 | RELEASED — PR #117 `1bbe5439`, tag v1.26.0 + GitHub release published, branch protection restored (enforce_admins=true, 1 required approval). Shipped 3/5 scopes. |
 | v1.25.0 | RELEASED — PR #116 `d48e465f`, tag/release published, protection restored |
 | v1.24.1 | RELEASED — PR #115, tag and GitHub release published |

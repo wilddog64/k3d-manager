@@ -71,8 +71,10 @@ directory integration plugin, mirroring the same pattern as cluster providers.
 ## Scope
 
 **In scope:**
+- **Parallel multi-cloud provisioning (v1.28.0+):** multiple cloud providers (k3s-aws, k3s-hostinger) can be active concurrently; provider-scoped state prevents collision; concurrent teardown/refresh supported via explicit `CLUSTER_PROVIDER` or refuse-when-ambiguous gate.
 - Local k3d (Docker-based) and k3s (systemd-based) clusters (`CLUSTER_PROVIDER=k3d`, `orbstack`).
 - Remote 3-node k3s on AWS EC2 ACG sandbox via CloudFormation + k3sup (`CLUSTER_PROVIDER=k3s-aws`).
+- Permanent app-cluster on Hostinger VPS via SSH/k3sup (`CLUSTER_PROVIDER=k3s-hostinger`).
 - HashiCorp Vault with PKI, K8s auth, and ESO integration.
 - Jenkins with Vault-issued TLS, cert rotation CronJob, and optional LDAP/AD auth
   **(deprecated — disabled by default, not deployed; code retained but unsupported)**.
