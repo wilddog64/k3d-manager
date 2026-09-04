@@ -105,11 +105,22 @@ _stub_kubectl_all_unreachable() {
   [[ ! -e "${base}/run" ]]
 }
 
-@test "_acg_migrate_flat_state uses the run provider when no legacy owner marker" {
+@test "_acg_migrate_flat_state claims flat state for the run provider when its context is reachable (no marker)" {
+  _acg_context_reachable() { return 0; }
   local base="${BATS_TEST_TMPDIR}/state"
   mkdir -p "${base}/logs"
   _acg_migrate_flat_state "${base}" "k3s-aws"
   [[ -d "${base}/k3s-aws/logs" ]]
+}
+
+@test "_acg_migrate_flat_state leaves flat state untouched when no marker AND run provider context unreachable" {
+  _acg_context_reachable() { return 1; }
+  local base="${BATS_TEST_TMPDIR}/state"
+  mkdir -p "${base}/run"
+  printf 'pid\n' > "${base}/run/vault-pf.pid"
+  _acg_migrate_flat_state "${base}" "k3s-aws"
+  [[ -f "${base}/run/vault-pf.pid" ]]          # not misattributed to k3s-aws
+  [[ ! -e "${base}/k3s-aws" ]]
 }
 
 @test "_acg_migrate_flat_state is a no-op when there is no flat state" {
@@ -120,12 +131,19 @@ _stub_kubectl_all_unreachable() {
 }
 
 @test "_acg_migrate_flat_state skips when the target subdir already exists" {
+  _acg_context_reachable() { return 0; }
   local base="${BATS_TEST_TMPDIR}/state"
   mkdir -p "${base}/run" "${base}/k3s-aws"
   printf 'pid\n' > "${base}/run/vault-pf.pid"
   _acg_migrate_flat_state "${base}" "k3s-aws"
   [[ -f "${base}/run/vault-pf.pid" ]]          # left in place, not moved
   [[ ! -e "${base}/k3s-aws/run" ]]
+}
+
+@test "_acg_provider_state_dir returns the scoped per-provider path" {
+  _ACG_STATE_BASE="${BATS_TEST_TMPDIR}/base"
+  [[ "$(_acg_provider_state_dir k3s-aws)" == "${BATS_TEST_TMPDIR}/base/k3s-aws" ]]
+  [[ "$(_acg_provider_state_dir hostinger)" == "${BATS_TEST_TMPDIR}/base/k3s-hostinger" ]]
 }
 
 # --- Phase 4: hub bootstrap lock (mkdir-based; macOS has no flock) ---

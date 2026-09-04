@@ -173,19 +173,34 @@ function _acg_provider_port_offset() {
     esac
 }
 
+function _acg_provider_state_dir() {
+    # Single source of truth for the per-provider local state dir. Every entry
+    # point that scopes state (cluster-up / cluster-down / cluster-refresh) must
+    # derive _ACG_STATE_DIR from this so the producer and consumers never diverge.
+    local base="${_ACG_STATE_BASE:-${HOME}/.local/share/k3d-manager}"
+    printf '%s/%s\n' "${base}" "$(_acg_normalize_provider "${1:-}")"
+}
+
 function _acg_migrate_flat_state() {
     # One-time migration: pre-scoping runs kept a single flat state dir under $1.
-    # If flat state exists and no scoped dir claims it yet, move it under the
-    # provider named by the legacy active-provider marker (its rightful owner),
-    # else this run's provider ($2, already normalized).
+    # If flat state exists and no scoped dir claims it yet, move it under its
+    # rightful owner: the provider named by the legacy active-provider marker, or
+    # — when there is no marker — this run's provider ($2) ONLY IF that provider's
+    # context is actually reachable. Without a reachable signal the flat state
+    # belongs to some other live provider and must not be misattributed; leave it.
     local base="${1:-}" run_provider="${2:-}"
     [[ -z "${base}" || -z "${run_provider}" ]] && return 0
     [[ -d "${base}/run" || -d "${base}/logs" || -d "${base}/checkpoints" ]] || return 0
-    local owner="${run_provider}"
+    local owner=""
     if [[ -f "${base}/active-provider" ]]; then
-        local marked
-        marked="$(_acg_normalize_provider "$(cat "${base}/active-provider" 2>/dev/null || true)")"
-        [[ -n "${marked}" ]] && owner="${marked}"
+        owner="$(_acg_normalize_provider "$(cat "${base}/active-provider" 2>/dev/null || true)")"
+    fi
+    if [[ -z "${owner}" ]]; then
+        if _acg_context_reachable "$(_acg_provider_context "${run_provider}")"; then
+            owner="$(_acg_normalize_provider "${run_provider}")"
+        else
+            return 0
+        fi
     fi
     local target="${base}/${owner}"
     [[ -d "${target}" ]] && return 0

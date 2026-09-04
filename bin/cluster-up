@@ -79,7 +79,7 @@ case "${_cluster_provider}" in
 esac
 
 _acg_state_provider="$(_acg_normalize_provider "${_cluster_provider}")"
-_ACG_STATE_DIR="${_ACG_STATE_BASE}/${_acg_state_provider}"
+_ACG_STATE_DIR="$(_acg_provider_state_dir "${_acg_state_provider}")"
 _dry_guard "migrate flat state dir to a per-provider dir" _acg_migrate_flat_state "${_ACG_STATE_BASE}" "${_acg_state_provider}"
 _dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
 _ACG_CHECKPOINT_DIR="${_ACG_STATE_DIR}/checkpoints"

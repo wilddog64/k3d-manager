@@ -74,6 +74,24 @@
     a hub-shared label breaks single-cloud teardown), the k3s-hostinger kubeconfig lock path, and the live
     two-cloud DoD. **v1.28.0 parallel-multi-cloud is now feature-complete for everything offline-verifiable;
     the remainder is genuinely live-gated.**
+  - **FIX 2026-09-04 — Phase 1 scoping consistency (caught by live smoke).** Phase 1 scoped the
+    producer (`cluster-up`) but not consumers → after migration, teardown/refresh would look in the
+    flat path and break. Corrected: new single-source `_acg_provider_state_dir` helper used by
+    `cluster-up`/`cluster-down`/`cluster-refresh` (the k3s-aws/gcp trio; `cluster-down` now sources
+    provider.sh). **Architecture fact:** k3s-hostinger/oci use the dispatcher `deploy_cluster`
+    (NOT `bin/cluster-up`); `k3s-hostinger.sh` is its own producer+consumer at the flat path →
+    internally consistent, deliberately left flat (collides with nothing; aws/gcp live under
+    `<base>/<provider>/`). Migration now reachability-guarded: with no legacy scalar it claims flat
+    state for the run provider ONLY if that provider's context is reachable — so a `make up k3s-aws`
+    (sandbox down) never steals a live hostinger's flat state. BATS 25/25, full lib 323/0.
+  - **LIVE OPS 2026-09-04 — hostinger edge FIXED, hub still DOWN.** Public endpoints were all-530
+    (EDGE-DOWN, validated live by the new `status-public` probe — 7/7 530). Root cause: no cloudflared
+    connector running (stray `com.cloudflare.cloudflared` already `.disabled`, not split-brain). Fixed
+    via `refresh_access_layer` (k3s-hostinger) — tunnel restarted, frontend now 200. **Remaining 502s
+    (argocd/keycloak/prometheus/grafana) = the laptop hub (k3d) is DOWN** — only `ubuntu-hostinger`
+    context exists; those services live on the hub. User decision: bring the hub up (pending — verify
+    whether the hostinger dispatcher path does hub setup, or if hub needs `make up`). PR: HOLD until
+    milestone complete.
 
 - **2026-09-03 v1.27.0 PR #118 MERGED & RELEASED** — https://github.com/wilddog64/k3d-manager/pull/118
   (base `main`, head `k3d-manager-v1.27.0`, merged SHA `62c9ff27`, tag/release v1.27.0 published
