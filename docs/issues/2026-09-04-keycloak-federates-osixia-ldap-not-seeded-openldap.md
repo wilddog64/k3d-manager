@@ -50,7 +50,71 @@ the osixia `ldap` Deployment shipped by the `shopping-cart-identity` ArgoCD app 
 **different** from the one the cluster-up seed targets (`openldap-0` / `dc=home,dc=org`). The two
 were wired independently and never reconciled after osixia `ldap` was introduced.
 
-## Decision needed (do NOT implement blind)
+## Decision RESOLVED (2026-09-04) — Option B: openldap-0 is canonical; osixia `ldap` is orphaned drift
+
+Investigation on the v1.29.0 branch settled the ambiguity decisively:
+
+- **The osixia `ldap` source was deliberately retired.** `services/shopping-cart-identity`
+  (the kustomization that created the osixia `ldap` Deployment) was added in PR #72
+  (`b5601cb5`, an ACG-era experiment with hardcoded declarative passwords `Admin@Cart2024` /
+  `Dev@Cart2024` / `Ops@Cart2024`) and **removed in PR #74** (`8f93df25`,
+  `v1.4.5-bugfix-services-git-identity-exclude` — "exclude shopping-cart-identity from the
+  services-git ApplicationSet generator … remove dead kustomization"). It exists on NO current
+  branch (main, v1.28.0, v1.29.0).
+- **The code defaults already target openldap-0.** `KEYCLOAK_LDAP_HOST=openldap.identity.svc`,
+  `KEYCLOAK_LDAP_BASE_DN=dc=home,dc=org`, `KEYCLOAK_LDAP_USERS_DN=ou=users,dc=home,dc=org`
+  (`scripts/etc/keycloak/vars.sh:32-35`). The seed (Step 10d.5), the Vault mirror, and
+  `bin/get-keycloak-password` all target openldap-0. Everything in code is self-consistent on
+  openldap-0.
+- **Live proof of orphan status:** the `shopping-cart-identity` Application is `OutOfSync`
+  (Healthy) — its git source was removed, so ArgoCD has live resources with no matching source.
+  It is excluded from the appset generator, so it will NOT regenerate once pruned.
+
+**Direction confirmed by the human user's account:** `chengkai.liang` exists ONLY in openldap-0
+(cluster-up-seeded + Vault-mirrored), NOT in osixia `ldap` (which has only the #72 declarative
+admin/developer/operator). For a real person to log in to shopping-cart SSO as `chengkai.liang`,
+Keycloak MUST federate openldap-0. So openldap-0 is the correct end-state.
+
+### CORRECTION (2026-09-04, deeper trace) — the drift is coherent + multi-layer, NOT one stale component
+
+Live investigation on the hub found the **entire live SSO stack coherently points at osixia**, not
+just the Keycloak realm component. This is bigger than the original spec assumed:
+
+| Layer | Live value | Managed by |
+|-------|-----------|------------|
+| Keycloak `shopping-cart` realm LDAP component (DB) | `ldap://ldap.identity.svc:389`, `dc=shopping-cart,dc=local`, `cn=admin` | Keycloak DB (id `4ae1e29a…`) |
+| Keycloak Deployment pod env (`LDAP_CONNECTION_URL`/`LDAP_BIND_DN`/`LDAP_USERS_DN`) | osixia values | keycloak **Deployment manifest** (git/ArgoCD) |
+| `LDAP_BIND_CREDENTIAL` | Vault `secret/ldap/admin` → `admin_password` (the **osixia** admin pw) | **ESO** `keycloak-secrets` (15m refresh) |
+| osixia `ldap` Deployment + `shopping-cart-identity` App | present, App `OutOfSync` | orphaned (git source removed #74) |
+
+The only things already on openldap-0: the code **defaults** (`vars.sh`/`keycloak.sh`), the
+cluster-up seed (Step 10d.5), Vault `secret/ldap/openldap-admin`, and — notably — the component's
+**group-mapper** (`groups.dn=ou=groups,dc=home,dc=org`). So the mapper and the connection already
+disagree inside the same component.
+
+**Consequence for remediation — do NOT hand-patch live.** Because `keycloak-secrets` is ESO-managed
+(reverts in ≤15m) and the pod env comes from the keycloak Deployment manifest (ArgoCD reconciles),
+imperative `kcadm`/`kubectl`/`vault` edits would be reverted. This must be a **git-first** change:
+
+1. **Keycloak Deployment manifest** — repoint `LDAP_CONNECTION_URL`/`LDAP_BIND_DN`/`LDAP_USERS_DN`
+   to openldap-0 (`ldap://openldap.identity.svc:389`, `cn=ldap-admin,dc=home,dc=org`,
+   `ou=users,dc=home,dc=org`). (Confirm which services/ path or plugin templates it.)
+2. **ESO source** — point `LDAP_BIND_CREDENTIAL`'s `remoteRef` at Vault `secret/ldap/openldap-admin`
+   (the openldap-0 admin pw), OR reseed `secret/ldap/admin` to the openldap-0 value. Decide one
+   canonical Vault path for the LDAP bind credential.
+3. **Realm component (DB)** — re-import / update component `4ae1e29a…` connection fields to
+   openldap-0 (its group-mapper is already correct), then full-sync. Keycloak does not reconcile its
+   DB from env on a running pod, so this needs an explicit step (realm re-provision or kcadm update).
+4. **Prune orphan** — delete `shopping-cart-identity` App + osixia `ldap` Deployment/Service (per
+   [[reference_appset_generated_app_cleanup_ordering]] — App first).
+5. **Drift guard** — `make status` / cluster-up assertion that the live realm `connectionUrl`
+   matches `KEYCLOAK_LDAP_HOST`.
+
+**Status: NOT executed.** Investigation stopped before mutating live SSO once the blast radius was
+found to span a git-managed Deployment manifest + ESO/Vault + Keycloak DB + an ArgoCD app. Next
+action is a staged remediation spec (git changes, not imperative surgery), then execute.
+
+Rejected options (retained for the record):
 
 Which directory is canonical for shopping-cart SSO?
 
