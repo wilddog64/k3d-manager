@@ -1536,7 +1536,8 @@ EOF
    _info "[argocd] Deploying ACG expiry CronJob..."
    _kubectl apply -f "${_dir}/acg-expiry-cronjob.yaml"
 
-   if _kubectl --no-exit get crd prometheusrules.monitoring.coreos.com >/dev/null 2>&1; then
+   if _kubectl --no-exit get crd prometheusrules.monitoring.coreos.com >/dev/null 2>&1 && \
+      _kubectl --no-exit get namespace monitoring >/dev/null 2>&1; then
       _info "[argocd] Deploying PrometheusRule..."
       _kubectl apply -f "${_dir}/prometheusrule.yaml"
 

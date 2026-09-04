@@ -43,12 +43,15 @@ is simply the first reached; fixing it alone exposes the next (`grafana-dashboar
 ## Fix
 
 Mirror the existing ServiceMonitor guard (argocd.sh:512–515): wrap the whole run of
-monitoring-stack-dependent applies in a single Prometheus-Operator CRD-presence check (a good proxy for
-"monitoring stack installed" — the CRDs and the `monitoring` namespace arrive together), and skip with one
-info log when absent:
+monitoring-stack-dependent applies behind a guard that checks **both** preconditions — the
+Prometheus-Operator CRD **and** the `monitoring` namespace — and skip with one info log when either is
+absent. (Copilot flagged 2026-09-04 on PR #119 that a CRD-only check would still let the dashboard
+ConfigMap applies fail if the CRDs exist cluster-wide but `monitoring` was deleted; checking both matches
+the log message and the resources' true prerequisites.):
 
 ```bash
-   if _kubectl --no-exit get crd prometheusrules.monitoring.coreos.com >/dev/null 2>&1; then
+   if _kubectl --no-exit get crd prometheusrules.monitoring.coreos.com >/dev/null 2>&1 && \
+      _kubectl --no-exit get namespace monitoring >/dev/null 2>&1; then
       _info "[argocd] Deploying PrometheusRule..."
       _kubectl apply -f "${_dir}/prometheusrule.yaml"
 
@@ -81,7 +84,7 @@ Once the monitoring stack is installed (CRDs + `monitoring` namespace present), 
 
 ## Definition of Done
 
-- [ ] Single CRD-presence guard wraps ALL monitoring-stack-dependent applies in the platform-ops deploy:
+- [ ] Guard checks BOTH the Prometheus-Operator CRD AND the `monitoring` namespace, wrapping ALL monitoring-stack-dependent applies in the platform-ops deploy:
       `PrometheusRule`, `AlertmanagerConfig`, `vulnerability-inventory-exporter` (+ its rollout restart),
       and the three Grafana dashboard ConfigMaps (`argocd`, `cve-autopatch`, `e2e`).
 - [ ] `shellcheck scripts/plugins/argocd.sh` clean (no new warnings).
