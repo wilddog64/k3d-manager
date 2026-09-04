@@ -25,6 +25,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 |---|---|
 | `_detect_platform` | Prints the current platform to stdout: one of `mac`, `wsl`, `debian`, `redhat`, or `linux`. Calls `_err` on unsupported platforms. Does not cache — use `_is_mac` / `_is_linux` etc. for repeated checks. |
 | `_is_mac` / `_is_linux` / `_is_wsl` / `_is_redhat_family` / `_is_debian_family` | Predicates returning 0 when the current system matches the given platform family. |
+| `foundation_ensure_vcluster_cli <version>` | Validate, acquire, SHA-256 verify, and return the absolute path to the versioned managed vCluster CLI. Supports Darwin/Linux `arm64`/`amd64`; uses `${XDG_DATA_HOME:-$HOME/.local/share}/lib-foundation/vcluster/<version>/vcluster`, requires `curl` only when acquisition is needed, and reuses verified binaries offline without PATH fallback. |
 
 ### Logging & Trace Control
 

@@ -64,6 +64,16 @@ _run_command --quiet -- command_that_might_fail            # suppress stderr, re
 
 Single source of truth for OS detection. Returns: `mac`, `wsl`, `debian`, `redhat`, `linux`.
 
+### `foundation_ensure_vcluster_cli <version>` (system.sh)
+
+Ensures the requested vCluster CLI version (without a leading `v`) is available and returns its
+absolute managed executable path on stdout. The verified binary is stored at
+`${XDG_DATA_HOME:-$HOME/.local/share}/lib-foundation/vcluster/<version>/vcluster`.
+The helper supports macOS and Linux on `arm64`/`amd64`, requires only the existing `curl`
+prerequisite for acquisition, verifies the release SHA-256 before activation, and serializes
+concurrent installs per version. An already verified managed binary is reused offline; there is
+no package-manager installation or fallback to an arbitrary `vcluster` on `PATH`.
+
 ### `_cluster_provider` (core.sh)
 
 Returns active provider string (`k3d`, `k3s`, `orbstack`). Controlled by

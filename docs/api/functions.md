@@ -103,7 +103,6 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `vcluster_destroy` | `scripts/plugins/vcluster.sh` | Delete a vCluster and remove its kubeconfig file |
 | `vcluster_use` | `scripts/plugins/vcluster.sh` | Merge vCluster kubeconfig into `~/.kube/config` and switch active context |
 | `vcluster_list` | `scripts/plugins/vcluster.sh` | List all vClusters in the active namespace |
-| `vcluster_install_cli` | `scripts/plugins/vcluster.sh` | Install the vcluster CLI (brew on macOS, binary download on Linux); auto-called by other vcluster commands |
 | `e2e_verify_vcluster` | `scripts/plugins/e2e.sh` | Tier 1 e2e: stand up the shopping-cart substrate in a throwaway vCluster, run the Playwright api+flows suite as an in-cluster Job, write an exit-code-faithful JSON summary, and tear the vCluster down on success or failure. Optional arg = candidate image ref for the service under test |
 | `ldap_get_user_password` | `scripts/plugins/ldap.sh` | Retrieve an LDAP user's current password from Vault |
 | `copilot_triage_pod` | `scripts/plugins/copilot.sh` | Collect `kubectl describe pod` + last 100 log lines and pass to `_ai_agent_review` for diagnosis; backend selected by `AI_REVIEW_FUNC`; requires `K3DM_ENABLE_AI=1` |
@@ -152,6 +151,26 @@ Provisions the ACG sandbox EC2 instance. Requires `--confirm`. With `--recreate`
 Starts a background loop that extends the ACG sandbox TTL via `_acg_extend_playwright` every `interval_seconds` (default 12600 = 3.5h). Stops automatically when the EC2 instance is gone.
 
 **Usage:** `acg_watch [interval_seconds]` (typically called as `acg_watch &` from `_provider_k3s_aws_deploy_cluster`)
+
+### `signing_init`
+
+Idempotently seeds the cosign signing key pair. If Vault `secret/cosign/signing` already holds `cosign.key`, does nothing. Otherwise generates a password-encrypted key pair, writes `cosign.key`/`cosign.password`/`cosign.pub` to Vault, backs the private key + password up to the macOS Keychain (`k3d-manager-signing`), applies the read-only verifier Vault policy, grants ESO read, and projects `cosign.pub` into the admission namespace as the `cosign-public-key` Secret via ESO. Key material never appears in argv/logs. Source: `scripts/plugins/signing.sh`.
+
+**Usage:** `./scripts/k3d-manager signing_init [vault_ns] [vault_release]`
+
+### `signing_status`
+
+Reports `vault_key`, `keychain_backup`, and `eso_public_secret` presence; returns non-zero if any is absent. Source: `scripts/plugins/signing.sh`.
+
+### `signing_rotate_key`
+
+Generates a fresh key pair and re-seeds Vault + Keychain + ESO pub Secret. Warns that previously-signed images must be re-signed or the old public key retained for an overlap window. Source: `scripts/plugins/signing.sh`.
+
+### `deploy_image_signing`
+
+Installs Kyverno (pinned chart `SIGNING_KYVERNO_HELM_CHART_VERSION`, A08) and applies the `verify-first-party-images` cosign `verifyImages` ClusterPolicy, scoped to `ghcr.io/wilddog64/*` images in the `shopping-cart-apps`/`shopping-cart-payment` namespaces only. The public key is injected at apply time from the in-cluster `cosign-public-key` ESO Secret. Staged **Audit → Enforce** (decision D2): `--audit` (default) reports would-be-blocks; `--enforce` blocks unsigned first-party pods and is gated behind `SIGNING_ALLOW_ENFORCE=1` (flip only after Audit is clean). Run against the **app cluster** context, not the hub. Source: `scripts/plugins/signing.sh`. See `docs/howto/image-signing.md`.
+
+**Usage:** `./scripts/k3d-manager deploy_image_signing [--audit|--enforce]`
 
 ## Running Tests
 

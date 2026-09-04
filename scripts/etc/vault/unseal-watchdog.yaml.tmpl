@@ -7,14 +7,14 @@ metadata:
     app.kubernetes.io/name: vault-unseal-watchdog
     app.kubernetes.io/part-of: vault
 spec:
-  schedule: "* * * * *"
+  schedule: "*/5 * * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
       backoffLimit: 0
-      activeDeadlineSeconds: 50
+      activeDeadlineSeconds: 150
       template:
         metadata:
           labels:

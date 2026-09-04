@@ -144,6 +144,12 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'STARTUP_TIMEOUT=${STARTUP_TIMEOUT}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
+  run grep -F 'HEALTH_FAILURE_THRESHOLD=6' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'RESTART_DELAY=2' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'healthz check failed (${_health_failures}/${HEALTH_FAILURE_THRESHOLD})' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
   run grep -F 'KUBECONFIG_FILE=${KUBECONFIG_FILE}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'if [[ -n "${KUBECONFIG_FILE}" ]]; then' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
@@ -159,7 +165,7 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F '_kubectl_context_arg=""' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -F '"${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -F '"${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward --address=127.0.0.1 "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
 }
 

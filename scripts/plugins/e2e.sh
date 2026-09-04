@@ -130,6 +130,27 @@ function _e2e_teardown() {
   local name="${1:-}"
   [[ -z "$name" ]] && return 0
   vcluster_destroy "$name" || _warn "e2e: teardown of ${name} failed (manual cleanup may be needed)"
+
+  # Keep cleanup idempotent even when the vCluster API is already gone. In
+  # that case vcluster_destroy can return before removing its proxy and
+  # kubeconfig, leaving local processes and credentials behind after a failed
+  # run. These best-effort removals are safe when destroy already completed.
+  local kubeconfig=""
+  if declare -f _vcluster_kubeconfig_path >/dev/null 2>&1; then
+    kubeconfig="$(_vcluster_kubeconfig_path "$name" 2>/dev/null || true)"
+  fi
+  if [[ -n "$kubeconfig" && -f "$kubeconfig" ]]; then
+    _run_command -- rm -f "$kubeconfig" || true
+  fi
+  if declare -f _vcluster_remove_proxy >/dev/null 2>&1; then
+    _vcluster_remove_proxy "$name" || true
+  fi
+
+  # JSON summaries are the durable audit record; per-run logs are transient
+  # and can otherwise accumulate indefinitely on the host.
+  if [[ -n "${_E2E_RUN_ID:-}" && -n "${E2E_REPORT_DIR:-}" ]]; then
+    _run_command -- rm -f "${E2E_REPORT_DIR}/${_E2E_RUN_ID}.log" || true
+  fi
 }
 
 function _e2e_wait_vcluster_ready() {
@@ -342,6 +363,7 @@ function _e2e_write_summary() {
   E2E_PHASE="$phase" \
   E2E_COMMIT="$commit" \
   E2E_LOG="$log_file" \
+  E2E_RUNNER="${E2E_RUNNER:-local-m4}" \
   python3 - "$summary_file" <<'PY'
 import json, os, re, sys
 
@@ -353,6 +375,7 @@ rc = int(os.environ["E2E_RC"])
 phase = os.environ.get("E2E_PHASE", "unknown")
 commit = os.environ["E2E_COMMIT"]
 log_path = os.environ["E2E_LOG"]
+runner = os.environ.get("E2E_RUNNER") or "local-m4"
 
 passed = total = failed = duration = None
 try:
@@ -377,6 +400,7 @@ except Exception:
 summary = {
     "run_id": run_id,
     "tier": "vcluster",
+    "runner": runner,
     "service": service,
     "candidate_digest": candidate,
     "project": "api+flows",
@@ -424,9 +448,11 @@ with open(os.environ["E2E_SUMMARY_FILE"], encoding="utf-8") as fh:
 created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 service = s.get("service") or "unknown"
 tier = s.get("tier") or "unknown"
+runner = s.get("runner") or "local-m4"
 event = {
     "run_id": str(s.get("run_id", "")),
     "tier": tier,
+    "runner": runner,
     "service": service,
     "project": s.get("project") or "",
     "candidate_digest": s.get("candidate_digest") or "",
@@ -448,6 +474,7 @@ manifest = {
             "k3dm.k3d.io/e2e-result": "true",
             "k3dm.k3d.io/e2e-service": service,
             "k3dm.k3d.io/e2e-tier": tier,
+            "k3dm.k3d.io/e2e-runner": runner,
         },
     },
     "data": {
@@ -474,11 +501,13 @@ PY
 }
 
 # Writer-side bound: keep only the most recent E2E_RESULT_EVENT_KEEP event
-# ConfigMaps per (service,tier) so etcd does not accumulate. The exporter read is
-# separately capped, so this is defence in depth. Best-effort.
+# ConfigMaps per (service,tier,runner) so etcd does not accumulate and runners do
+# not evict each other's events. The exporter read is separately capped, so this
+# is defence in depth. Best-effort.
 function _e2e_prune_result_events() {
   local svc="$E2E_SERVICE_UNDER_TEST"
-  local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=vcluster"
+  local runner="${E2E_RUNNER:-local-m4}"
+  local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=vcluster,k3dm.k3d.io/e2e-runner=${runner}"
   local names
   names="$(_kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
     -l "$selector" --sort-by=.metadata.creationTimestamp \
@@ -494,4 +523,176 @@ function _e2e_prune_result_events() {
     [[ -z "$name" ]] && continue
     _kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" delete configmap "$name" >/dev/null 2>&1 || true
   done <<< "$stale"
+}
+
+# Extract the concrete "newName:newTag" image references pinned in a kustomize
+# overlay. Only images with BOTH a newName and a newTag are emitted — those are
+# the real registry refs the substrate pulls. Pure text parsing (no docker), so
+# it is unit-testable.
+function _e2e_kustomization_images() {
+  local file="$1"
+  [[ -r "$file" ]] || return 0
+  awk '
+    /^[[:space:]]*newName:[[:space:]]/ { name = $2; next }
+    /^[[:space:]]*newTag:[[:space:]]/  {
+      if (name != "") { print name ":" $2; name = "" }
+    }
+  ' "$file"
+}
+
+# Every concrete image the E2E substrate pulls: the kustomize newName:newTag
+# overrides (the app images) unioned with the already-tagged images referenced
+# literally in the manifests (postgres, redis, alpine, python, ...). Bare
+# kustomize placeholder names (no ':') are skipped — they are remapped by the
+# override block above. Pure text parsing, unit-testable.
+function _e2e_substrate_images() {
+  local dir="$1"
+  [[ -d "$dir" ]] || return 0
+  _e2e_kustomization_images "${dir}/kustomization.yaml"
+  awk '$1 == "image:" && $2 ~ /:/ { print $2 }' "${dir}"/*.yaml 2>/dev/null
+}
+
+# Convert a `docker images` .CreatedAt string ("2026-08-17 10:23:45 -0700 PDT")
+# to a Unix epoch. Tries BSD date (macOS) first, then GNU date (Linux/CI).
+# Prints nothing and returns 1 when the timestamp cannot be parsed. Pure logic.
+function _e2e_image_epoch() {
+  local ts="$1"
+  local dt="${ts%% [-+]*}"
+  date -j -f "%Y-%m-%d %H:%M:%S" "$dt" +%s 2>/dev/null && return 0
+  date -d "$dt" +%s 2>/dev/null && return 0
+  return 1
+}
+
+# Return 0 if ref matches any of the remaining glob patterns. With no patterns
+# it returns 1 (matches nothing). Pattern side is intentionally unquoted so
+# globs like "*/vcluster-pro" work. Pure logic, unit-testable.
+function _e2e_ref_matches_globs() {
+  local ref="$1"
+  shift
+  local glob
+  for glob in "$@"; do
+    # shellcheck disable=SC2053
+    [[ "$ref" == $glob ]] && return 0
+  done
+  return 1
+}
+
+function _e2e_prune_images_usage() {
+  cat >&2 <<'USAGE'
+Usage: e2e_prune_images [--days N] [--apply]
+
+Prune local Docker images older than N days that are NOT part of the E2E
+working set. Dry-run by default — prints what WOULD be removed and changes
+nothing until you pass --apply.
+
+Protected (never removed), regardless of age:
+  - every image the E2E substrate (scripts/etc/e2e) pulls: the kustomize
+    newName:newTag app images plus the tagged infra images referenced in the
+    manifests (postgres, redis, alpine, python, ...)
+  - the E2E test-runner image (E2E_IMAGE:E2E_IMAGE_TAG)
+  - any image currently backing a container (running or stopped)
+  - any repo:tag matching a pattern in E2E_IMAGE_PRUNE_KEEP (space-separated globs)
+
+Options:
+  --days N     age threshold in days (default: E2E_IMAGE_PRUNE_DAYS or 30)
+  --apply      actually remove candidates (omit for a dry run)
+  --dry-run    force dry run (default)
+  -h, --help   show this help
+
+Removal uses `docker image rm` (not -f): an image still referenced elsewhere is
+skipped, not force-deleted. Dangling (<none>:<none>) images are left for
+`docker image prune`.
+USAGE
+}
+
+function e2e_prune_images() {
+  local days="${E2E_IMAGE_PRUNE_DAYS:-30}"
+  local apply=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --days) days="${2:-}"; shift 2 ;;
+      --days=*) days="${1#*=}"; shift ;;
+      --apply|--force) apply=1; shift ;;
+      --dry-run) apply=0; shift ;;
+      -h|--help) _e2e_prune_images_usage; return 0 ;;
+      *) _e2e_prune_images_usage; _err "e2e_prune_images: unknown argument: $1" ;;
+    esac
+  done
+
+  [[ "$days" =~ ^[0-9]+$ ]] || _err "e2e_prune_images: --days must be a non-negative integer (got: ${days})"
+  command -v docker >/dev/null 2>&1 || _err "e2e_prune_images: docker not found on PATH"
+
+  local substrate_dir="${SCRIPT_DIR}/etc/e2e"
+
+  local -a protect_refs=("${E2E_IMAGE}:${E2E_IMAGE_TAG}")
+  local ref
+  while IFS= read -r ref; do
+    [[ -n "$ref" ]] && protect_refs+=("$ref")
+  done < <(_e2e_substrate_images "$substrate_dir")
+
+  local -A protect_ids=()
+  local id
+  for ref in "${protect_refs[@]}"; do
+    id="$(_run_command --quiet -- docker image inspect -f '{{.Id}}' "$ref" 2>/dev/null || true)"
+    [[ -n "$id" ]] && protect_ids["$id"]=1
+  done
+
+  local cid
+  while IFS= read -r cid; do
+    [[ -z "$cid" ]] && continue
+    id="$(_run_command --quiet -- docker inspect -f '{{.Image}}' "$cid" 2>/dev/null || true)"
+    [[ -n "$id" ]] && protect_ids["$id"]=1
+  done < <(_run_command --quiet -- docker ps -aq 2>/dev/null || true)
+
+  local -a keep_globs=()
+  if [[ -n "${E2E_IMAGE_PRUNE_KEEP:-}" ]]; then
+    read -r -a keep_globs <<< "${E2E_IMAGE_PRUNE_KEEP}"
+  fi
+
+  local now cutoff
+  now="$(date +%s)"
+  cutoff=$(( now - days * 86400 ))
+
+  local removed=0 kept=0 img_id repo_tag created_at created_epoch
+  _info "[e2e-prune] mode=$([[ $apply -eq 1 ]] && echo APPLY || echo DRY-RUN) threshold=${days}d protected-refs=${#protect_refs[@]}"
+
+  while IFS='|' read -r img_id repo_tag created_at; do
+    [[ -z "$img_id" ]] && continue
+    [[ "$repo_tag" == "<none>:<none>" ]] && continue
+
+    if [[ -n "${protect_ids[$img_id]:-}" ]]; then
+      kept=$((kept + 1)); continue
+    fi
+
+    if _e2e_ref_matches_globs "$repo_tag" "${keep_globs[@]}"; then
+      kept=$((kept + 1)); continue
+    fi
+
+    if ! created_epoch="$(_e2e_image_epoch "$created_at")"; then
+      kept=$((kept + 1)); continue
+    fi
+    if (( created_epoch >= cutoff )); then
+      kept=$((kept + 1)); continue
+    fi
+
+    if (( apply )); then
+      if _run_command --quiet -- docker image rm "$img_id" >/dev/null 2>&1; then
+        _info "[e2e-prune] removed ${repo_tag} (${created_at})"
+        removed=$((removed + 1))
+      else
+        _warn "[e2e-prune] still referenced, skipped: ${repo_tag}"
+        kept=$((kept + 1))
+      fi
+    else
+      printf 'WOULD REMOVE  %-64s %s\n' "$repo_tag" "$created_at" >&2
+      removed=$((removed + 1))
+    fi
+  done < <(_run_command --quiet -- docker images --no-trunc --format '{{.ID}}|{{.Repository}}:{{.Tag}}|{{.CreatedAt}}' 2>/dev/null || true)
+
+  if (( apply )); then
+    _info "[e2e-prune] done: removed ${removed}, kept ${kept}"
+  else
+    _info "[e2e-prune] dry run: ${removed} would be removed, ${kept} kept. Re-run with --apply to delete."
+  fi
 }

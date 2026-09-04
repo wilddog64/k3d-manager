@@ -182,7 +182,7 @@ STUB
 }
 
 @test "acg-up verifies every LDAP password before checkpointing the seed" {
-  run grep -nF 'ldapwhoami -x -H ldap://localhost:389' bin/cluster-up
+  run grep -nF 'ldapwhoami -x -H ldap://localhost:1389' bin/cluster-up
   [ "$status" -eq 0 ]
 
   run grep -nF 'LDAP password seed failed verification; checkpoint not written' bin/cluster-up
@@ -197,10 +197,10 @@ STUB
 }
 
 @test "acg-up keeps LDAP user passwords out of command arguments" {
-  run grep -nF 'ldappasswd -x -H ldap://localhost:389' bin/cluster-up
+  run grep -nF 'ldappasswd -x -H ldap://localhost:1389' bin/cluster-up
   [ "$status" -eq 0 ]
 
-  run grep -nF -- "-S \"uid=\$1,ou=users,dc=shopping-cart,dc=local\"" bin/cluster-up
+  run grep -nF -- "-S \"uid=\$1,ou=users,dc=home,dc=org\"" bin/cluster-up
   [ "$status" -eq 0 ]
 
   run grep -nF -- '-y "${_ldap_password_file}"' bin/cluster-up

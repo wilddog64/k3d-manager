@@ -34,33 +34,42 @@ STUB
   export VCLUSTER_LIST_OUTPUT=""
   unset KUBECONFIG
   source "${BATS_TEST_DIRNAME}/../../plugins/vcluster.sh"
+  foundation_ensure_vcluster_cli() {
+    printf '%s\n' "$VCLUSTER_STUB"
+  }
+  _VCLUSTER_BIN="$VCLUSTER_STUB"
+  _vcluster_wait_ready() { :; }
 }
 
-@test "vcluster_create: installs CLI when binary missing" {
-  rm -f "$VCLUSTER_STUB"
-  _command_exist() {
-    if [[ "$1" == "vcluster" ]]; then
-      return 1
-    fi
-    command -v "$1" >/dev/null 2>&1
-  }
-  _vcluster_install_cli() {
-    cat <<'BIN' > "$VCLUSTER_STUB"
-#!/usr/bin/env bash
-if [[ "$1" == "list" ]]; then
-  echo "NAME   NAMESPACE"
-else
-  exit 0
-fi
-BIN
-    chmod +x "$VCLUSTER_STUB"
-  }
+@test "vcluster_create: uses foundation-managed CLI path" {
   run vcluster_create demo
   [ "$status" -eq 0 ]
-  [[ "$output" == *"vcluster CLI not found"* ]]
   local -a run_calls
   read_lines "$RUN_LOG" run_calls
-  [ "${run_calls[0]}" = "vcluster create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${SCRIPT_DIR}/etc/vcluster/values.yaml" ]
+  [ "${run_calls[0]}" = "$VCLUSTER_STUB create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${SCRIPT_DIR}/etc/vcluster/values.yaml" ]
+}
+
+@test "_vcluster_check_prerequisites: stores the contract path" {
+  local managed_path="${BATS_TEST_TMPDIR}/managed-vcluster"
+  foundation_ensure_vcluster_cli() { printf '%s\n' "$managed_path"; }
+  _vcluster_check_prerequisites
+  [ "$_VCLUSTER_BIN" = "$managed_path" ]
+}
+
+@test "foundation contract failure stops before lifecycle work" {
+  foundation_ensure_vcluster_cli() { return 1; }
+  run vcluster_create demo
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Unable to resolve the vCluster CLI"* ]]
+  ! grep -qE 'create|connect|delete' "$RUN_LOG"
+}
+
+@test "empty foundation contract path stops before lifecycle work" {
+  foundation_ensure_vcluster_cli() { printf '\n'; }
+  run vcluster_create demo
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Unable to resolve the vCluster CLI"* ]]
+  ! grep -qE 'create|connect|delete' "$RUN_LOG"
 }
 
 @test "vcluster_create: honors VCLUSTER_VALUES_FILE override" {
@@ -70,7 +79,7 @@ BIN
   [ "$status" -eq 0 ]
   local -a run_calls
   read_lines "$RUN_LOG" run_calls
-  [ "${run_calls[0]}" = "vcluster create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${override_values}" ]
+  [ "${run_calls[0]}" = "$VCLUSTER_STUB create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${override_values}" ]
 }
 
 @test "vcluster_create: fails without active host context" {
@@ -109,7 +118,24 @@ BIN
   local -a run_calls
   run_calls=()
   read_lines "$RUN_LOG" run_calls
-  [ "${run_calls[0]}" = "vcluster list -n vclusters" ]
+  [ "${run_calls[0]}" = "$VCLUSTER_STUB list -n vclusters" ]
+}
+
+@test "vcluster_list: uses the contract-returned CLI path" {
+  run vcluster_list
+  [ "$status" -eq 0 ]
+  run grep -F -- "$VCLUSTER_STUB list -n vclusters" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "vcluster_destroy: uses the contract-returned CLI path" {
+  local kubeconfig="${VCLUSTER_KUBECONFIG_DIR}/demo.yaml"
+  printf 'current-context: vc-demo\n' > "$kubeconfig"
+  _vcluster_deregister_from_hub() { :; }
+  run vcluster_destroy demo
+  [ "$status" -eq 0 ]
+  run grep -F -- "$VCLUSTER_STUB delete demo -n vclusters --wait" "$RUN_LOG"
+  [ "$status" -eq 0 ]
 }
 
 @test "vcluster_use: fails when kubeconfig file missing" {
@@ -127,22 +153,6 @@ BIN
   [ "$VCLUSTER_NAMESPACE" = "vclusters" ]
 }
 
-@test "_vcluster_install_cli: skips if binary already exists" {
-  _command_exist() {
-    if [[ "$1" == "vcluster" ]]; then
-      return 0
-    fi
-    command -v "$1" >/dev/null 2>&1
-  }
-  run _vcluster_install_cli
-  [ "$status" -eq 0 ]
-  [ ! -s "$RUN_LOG" ]
-}
-
-@test "VCLUSTER_INSTALL_DIR defaults to /usr/local/bin" {
-  [ "$VCLUSTER_INSTALL_DIR" = "/usr/local/bin" ]
-}
-
 @test "VCLUSTER_LOCAL_PORT defaults to 11443" {
   [ "$VCLUSTER_LOCAL_PORT" = "11443" ]
 }
@@ -151,7 +161,7 @@ BIN
   _write_sensitive_file() { :; }
   run _vcluster_export_kubeconfig demo
   [ "$status" -eq 0 ]
-  run grep -F -- "vcluster connect demo -n vclusters --local-port 11443 --print" "$RUN_LOG"
+  run grep -F -- "$VCLUSTER_STUB connect demo -n vclusters --local-port 11443 --print" "$RUN_LOG"
   [ "$status" -eq 0 ]
 }
 
@@ -188,12 +198,7 @@ BIN
   [ "$status" -eq 0 ]
   run grep -F -- "docker rm -f vcluster_demo_vclusters_k3d-k3d-cluster_background_proxy" "$RUN_LOG"
   [ "$status" -eq 0 ]
-  run grep -F -- "vcluster connect demo -n vclusters --local-port 11443 --print" "$RUN_LOG"
-  [ "$status" -eq 0 ]
-}
-
-@test "vcluster_install_cli is a public function" {
-  run grep -n "^function vcluster_install_cli" "${BATS_TEST_DIRNAME}/../../plugins/vcluster.sh"
+  run grep -F -- "$VCLUSTER_STUB connect demo -n vclusters --local-port 11443 --print" "$RUN_LOG"
   [ "$status" -eq 0 ]
 }
 

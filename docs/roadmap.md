@@ -135,7 +135,9 @@ These have scope docs and committed version numbers; they ship in this order.
   Stripe test mode, Prometheus metrics, and Grafana capacity reporting; browser validation remains
   a small cohort rather than thousands of sessions. Scopes:
   `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`,
-  `docs/plans/v1.27.0-adaptive-checkout-load-testing.md`.
+  `docs/plans/v1.27.0-adaptive-checkout-load-testing.md`,
+  `docs/plans/v1.27.0-dependabot-automation.md` (queued automation for CI failures,
+  rebases, review, and guarded auto-merge).
 - **v1.28.0 — platform zero-downtime rollouts** — scale the stateless hub tier, add probes/PDBs and
   rolling-update guarantees, validate capacity, and separately design failover for each stateful
   service before claiming no downtime. Scope: `docs/plans/v1.28.0-platform-zero-downtime-rollouts.md`.
@@ -151,6 +153,15 @@ milestone only when it gets a scope doc.
 - **k3dm-mcp** — persistent MCP server, HTTP transport default (`K3DM_MCP_TRANSPORT=http|stdio`),
   FastMCP/Python; CLIs connect at `http://localhost:8765/mcp`. Read-only tool set for verify
   agents; `.git/` excluded from writable paths.
+- **Hermes event-driven operations automation (candidate v1.28.x or later)** — optional Hermes
+  coordinator for Alertmanager, GitHub Actions, ArgoCD, tunnel, and webhook events. Phase 1 is
+  read-only health/CI monitoring with bounded polling and Slack summaries; Phase 2 adds
+  allowlisted, approval-gated repairs (restart webhook, refresh edge, retry transient CI); Phase 3
+  adds cooldowns, daily token/iteration budgets, audit records, and post-repair verification.
+  Hermes does not replace the k3d-manager webhook or receive unrestricted cluster, cloud, Git, or
+  branch-protection credentials. A scope document is required before assigning a release — Phase 1
+  is scoped in `docs/architecture/hermes-phase1-monitoring-scope.md` (read-only; webhook is
+  authoritative; least-privilege; health-degraded ≠ safe-to-repair).
 - **Distribution packages** — deb/rpm/brew. Long-standing vision item, never scoped.
 - **Home lab** — `CLUSTER_PROVIDER=k3s-local-arm64` on a Mac Mini M5 (hardware target ~Oct 2026),
   bare-metal ingress via **MetalLB + Envoy Gateway (Gateway API)** replacing the Istio

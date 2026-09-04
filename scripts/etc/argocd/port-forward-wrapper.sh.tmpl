@@ -12,6 +12,8 @@ LOCAL_PORT=${LOCAL_PORT}
 REMOTE_PORT=${REMOTE_PORT}
 HEALTHZ_URL=${HEALTHZ_URL}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT}
+HEALTH_FAILURE_THRESHOLD=6
+RESTART_DELAY=2
 LOCK_DIR="${LOG_FILE}.lock"
 
 if [[ -n "${KUBECONFIG_FILE}" ]]; then
@@ -110,9 +112,9 @@ while true; do
    printf '%s\n' "[argocd-pf] starting port-forward: ${SERVICE} -> localhost:${LOCAL_PORT}" >> "${LOG_FILE}"
    if [[ -n "${_kubectl_context_arg}" ]]; then
       # shellcheck disable=SC2086
-      "${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
+      "${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward --address=127.0.0.1 "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
    else
-      "${KUBECTL_BIN}" port-forward "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
+      "${KUBECTL_BIN}" port-forward --address=127.0.0.1 "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
    fi
    _pf_pid=$!
 
@@ -121,7 +123,7 @@ while true; do
       if ! _pf_alive; then
          break
       fi
-      "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 && _pf_alive && {
+      "${CURL_BIN}" -sf --max-time 5 "${HEALTHZ_URL}" >/dev/null 2>&1 && _pf_alive && {
          _ready=1
          break
       }
@@ -139,23 +141,30 @@ while true; do
          wait "${_pf_pid}" 2>/dev/null || true
          _pf_pid=""
          _clear_stale_listeners
-         sleep 30
+         sleep "${RESTART_DELAY}"
          continue
          ;;
    esac
 
    printf '%s\n' "[argocd-pf] healthz reachable — monitoring backend availability" >> "${LOG_FILE}"
+   _health_failures=0
    while _pf_alive; do
-      "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 || {
-         printf '%s\n' "[argocd-pf] healthz lost — restarting" >> "${LOG_FILE}"
-         kill "${_pf_pid}" 2>/dev/null || true
-         wait "${_pf_pid}" 2>/dev/null || true
-         _pf_pid=""
-         _clear_stale_listeners
-         break
-      }
+      if "${CURL_BIN}" -sf --max-time 5 "${HEALTHZ_URL}" >/dev/null 2>&1; then
+         _health_failures=0
+      else
+         _health_failures=$((_health_failures + 1))
+         printf '%s\n' "[argocd-pf] healthz check failed (${_health_failures}/${HEALTH_FAILURE_THRESHOLD})" >> "${LOG_FILE}"
+         if (( _health_failures >= HEALTH_FAILURE_THRESHOLD )); then
+            printf '%s\n' "[argocd-pf] healthz lost — restarting" >> "${LOG_FILE}"
+            kill "${_pf_pid}" 2>/dev/null || true
+            wait "${_pf_pid}" 2>/dev/null || true
+            _pf_pid=""
+            _clear_stale_listeners
+            break
+         fi
+      fi
       sleep 5
    done
 
-   sleep 30
+   sleep "${RESTART_DELAY}"
 done

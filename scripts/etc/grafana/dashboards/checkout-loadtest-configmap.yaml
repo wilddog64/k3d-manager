@@ -1,0 +1,135 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: checkout-loadtest-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  checkout-loadtest.json: |
+    {
+      "title": "Checkout Load Test",
+      "uid": "checkout-loadtest",
+      "tags": ["k3dm", "loadtest", "checkout"],
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "10s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "run_id",
+            "type": "query",
+            "datasource": "Prometheus",
+            "query": "label_values(k6_checkout_load_requests_total_total, run_id)",
+            "refresh": 2,
+            "includeAll": false,
+            "sort": 5
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Throughput (req/s) by stage",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(k6_checkout_load_requests_total_total{run_id=~\"$run_id\"}[1m])) by (stage)",
+              "legendFormat": "stage {{stage}}"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Checkout latency p50 / p95 / p99 (s)",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            {
+              "expr": "k6_checkout_load_latency_seconds_med{run_id=~\"$run_id\"}",
+              "legendFormat": "p50 stage {{stage}}"
+            },
+            {
+              "expr": "k6_checkout_load_latency_seconds_p95{run_id=~\"$run_id\"}",
+              "legendFormat": "p95 stage {{stage}}"
+            },
+            {
+              "expr": "k6_checkout_load_latency_seconds_p99{run_id=~\"$run_id\"}",
+              "legendFormat": "p99 stage {{stage}}"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "Checkout error rate (%)",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "fieldConfig": { "defaults": { "unit": "percent", "max": 100 } },
+          "targets": [
+            {
+              "expr": "100 * (sum(rate(k6_checkout_load_requests_total_total{run_id=~\"$run_id\",result=\"error\"}[1m])) / clamp_min(sum(rate(k6_checkout_load_requests_total_total{run_id=~\"$run_id\"}[1m])), 1))",
+              "legendFormat": "error %"
+            }
+          ],
+          "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 2 } ] }
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Orders / payments by state",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(k6_checkout_load_orders_total_total{run_id=~\"$run_id\"}[1m])) by (state)",
+              "legendFormat": "orders {{state}}"
+            },
+            {
+              "expr": "sum(rate(k6_checkout_load_payments_total_total{run_id=~\"$run_id\"}[1m])) by (state)",
+              "legendFormat": "payments {{state}}"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "shopping-cart-apps CPU saturation (% of limits)",
+          "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+          "fieldConfig": { "defaults": { "unit": "percent" } },
+          "targets": [
+            {
+              "expr": "100 * (sum(rate(container_cpu_usage_seconds_total{namespace=\"shopping-cart-apps\"}[1m])) / clamp_min(sum(kube_pod_container_resource_limits{namespace=\"shopping-cart-apps\",resource=\"cpu\"}), 1))",
+              "legendFormat": "cpu % of limit"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Idempotency failures (total)",
+          "gridPos": { "x": 12, "y": 16, "w": 6, "h": 8 },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+          "targets": [
+            {
+              "expr": "sum(k6_checkout_load_idempotency_failures_total_total{run_id=~\"$run_id\"})",
+              "legendFormat": "idempotency failures"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "stat",
+          "title": "Peak concurrency reached (VUs)",
+          "gridPos": { "x": 18, "y": 16, "w": 6, "h": 8 },
+          "options": { "reduceOptions": { "calcs": ["max"] }, "colorMode": "value" },
+          "targets": [
+            {
+              "expr": "max(k6_vus{run_id=~\"$run_id\"})",
+              "legendFormat": "peak VUs"
+            }
+          ]
+        }
+      ]
+    }

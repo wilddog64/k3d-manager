@@ -3,7 +3,7 @@
 **Date:** 2026-08-21
 **Branch found on:** `k3d-manager-v1.26.0`
 **Severity:** Medium — usability / shared-guard blast radius
-**Status:** OPEN (deferred out of v1.26.0)
+**Status:** RESOLVED 2026-08-29 (`3a6dddb0`, v1.27.0) — guard publishes `K3DM_DEPLOY_CONFIRMED`; spec `docs/bugs/2026-08-29-dispatcher-confirm-flag-deploy-app-cluster.md`
 **Origin:** Finding 2b of `docs/bugs/2026-08-21-lifecycle-e2e-live-acceptance-findings.md`
 
 ## Symptom

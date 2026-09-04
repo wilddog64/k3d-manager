@@ -175,6 +175,22 @@ function _observability_port_listening() {
     && lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
 }
 
+function _observability_normalize_layer() {
+  case "${1:-2}" in
+    1) printf '1\n' ;;
+    2|"") printf '2\n' ;;
+    *) printf '2\n' ;;
+  esac
+}
+
+function _observability_workload_in_keep_list() {
+  local _name="$1" _keep="$2"
+  case " ${_keep} " in
+    *" ${_name} "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 function _observability_wait_for_port() {
   local port="${1:-}"
   local _attempt
@@ -660,6 +676,156 @@ function observability_status() {
     _info "[observability] --- ${_ns} ---"
     _kubectl get pods -n "${_ns}" --context "${_app_context}" --no-headers 2>/dev/null || true
   done
+}
+
+function observability_pause() {
+  local _ctx="${OBSERVABILITY_HUB_CONTEXT:-k3d-k3d-cluster}"
+  local _argons="${ARGOCD_NAMESPACE:-cicd}"
+  local _apps="${OBSERVABILITY_APPS:-kube-prometheus-stack hub-loki trivy-operator}"
+  local _nss="${OBSERVABILITY_WORKLOAD_NS:-monitoring trivy-system}"
+  local _keep="${OBSERVABILITY_PAUSE_KEEP:-kube-prometheus-stack-grafana}"
+  _info "[observability] Pausing hub observability stack to reclaim CPU..."
+
+  local _app _paused=0
+  for _app in ${_apps}; do
+    if ! _kubectl get application "${_app}" -n "${_argons}" --context "${_ctx}" >/dev/null 2>&1; then
+      _warn "[observability] Application ${_app} not found — skipping"
+      continue
+    fi
+    _kubectl patch application "${_app}" -n "${_argons}" --context "${_ctx}" \
+      --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}' >/dev/null 2>&1 || true
+    _info "[observability]   ${_app}: auto-sync suspended"
+    _paused=1
+  done
+  if [[ "${_paused}" -eq 0 ]]; then
+    _warn "[observability] No observability Applications found — nothing to pause"
+    return 0
+  fi
+
+  local _cr
+  while read -r _cr; do
+    [[ -z "${_cr}" ]] && continue
+    _kubectl patch "${_cr}" -n monitoring --context "${_ctx}" \
+      --type merge -p '{"spec":{"replicas":0}}' >/dev/null 2>&1 || true
+  done < <(_kubectl get prometheus,alertmanager -n monitoring --context "${_ctx}" \
+    -o name 2>/dev/null)
+
+  local _ns _type _name
+  for _ns in ${_nss}; do
+    _kubectl get namespace "${_ns}" --context "${_ctx}" >/dev/null 2>&1 || continue
+    for _type in deployment statefulset; do
+      while read -r _name; do
+        [[ -z "${_name}" ]] && continue
+        if _observability_workload_in_keep_list "${_name}" "${_keep}"; then
+          _info "[observability]   ${_ns}/${_name}: kept up (keep-list)"
+          continue
+        fi
+        _kubectl scale "${_type}/${_name}" -n "${_ns}" --context "${_ctx}" \
+          --replicas=0 >/dev/null 2>&1 || true
+      done < <(_kubectl get "${_type}" -n "${_ns}" --context "${_ctx}" \
+        -o name 2>/dev/null | sed 's#.*/##')
+    done
+    _info "[observability]   ${_ns}: workloads scaled to 0"
+  done
+  _info "[observability] Paused. Run 'observability_resume' (make monitoring-resume) to restore."
+}
+
+function _observability_resume_layer1() {
+  local _ctx="$1" _argons="$2" _apps="$3" _nss="$4" _l1_up="$5"
+  _info "[observability] Resuming to Layer 1 (lite: Grafana + Prometheus)..."
+  local _app
+  for _app in ${_apps}; do
+    _kubectl get application "${_app}" -n "${_argons}" --context "${_ctx}" >/dev/null 2>&1 || continue
+    _kubectl patch application "${_app}" -n "${_argons}" --context "${_ctx}" \
+      --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}' >/dev/null 2>&1 || true
+  done
+  local _ns _type _name _repl
+  for _ns in ${_nss}; do
+    _kubectl get namespace "${_ns}" --context "${_ctx}" >/dev/null 2>&1 || continue
+    for _type in deployment statefulset; do
+      while read -r _name; do
+        [[ -z "${_name}" ]] && continue
+        if _observability_workload_in_keep_list "${_name}" "${_l1_up}"; then
+          _repl=1
+        else
+          _repl=0
+        fi
+        _kubectl scale "${_type}/${_name}" -n "${_ns}" --context "${_ctx}" \
+          --replicas="${_repl}" >/dev/null 2>&1 || true
+      done < <(_kubectl get "${_type}" -n "${_ns}" --context "${_ctx}" \
+        -o name 2>/dev/null | sed 's#.*/##')
+    done
+  done
+  _kubectl patch prometheus kube-prometheus-stack-prometheus -n monitoring --context "${_ctx}" \
+    --type merge -p '{"spec":{"replicas":1}}' >/dev/null 2>&1 || true
+  _kubectl patch alertmanager kube-prometheus-stack-alertmanager -n monitoring --context "${_ctx}" \
+    --type merge -p '{"spec":{"replicas":0}}' >/dev/null 2>&1 || true
+  _info "[observability] Layer 1 up: grafana + prometheus (live dashboards). Alertmanager/Loki/Trivy remain at 0."
+}
+
+function observability_resume() {
+  local _ctx="${OBSERVABILITY_HUB_CONTEXT:-k3d-k3d-cluster}"
+  local _argons="${ARGOCD_NAMESPACE:-cicd}"
+  local _apps="${OBSERVABILITY_APPS:-kube-prometheus-stack hub-loki trivy-operator}"
+  local _nss="${OBSERVABILITY_WORKLOAD_NS:-monitoring trivy-system}"
+  local _layer; _layer="$(_observability_normalize_layer "${1:-}")"
+  local _l1_up="${OBSERVABILITY_LAYER1_UP:-kube-prometheus-stack-grafana prometheus-kube-prometheus-stack-prometheus}"
+  if [[ "${_layer}" == "1" ]]; then
+    _observability_resume_layer1 "${_ctx}" "${_argons}" "${_apps}" "${_nss}" "${_l1_up}"
+    return
+  fi
+  _info "[observability] Resuming hub observability stack..."
+
+  local _app _resumed=0
+  for _app in ${_apps}; do
+    if ! _kubectl get application "${_app}" -n "${_argons}" --context "${_ctx}" >/dev/null 2>&1; then
+      _warn "[observability] Application ${_app} not found — skipping"
+      continue
+    fi
+    _kubectl patch application "${_app}" -n "${_argons}" --context "${_ctx}" \
+      --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' >/dev/null 2>&1 || true
+    _info "[observability]   ${_app}: auto-sync restored"
+    _resumed=1
+  done
+  if [[ "${_resumed}" -eq 0 ]]; then
+    _warn "[observability] No observability Applications found — nothing to resume"
+    return 0
+  fi
+
+  # Scale back explicitly rather than waiting on an ArgoCD sync, which is slow or
+  # reports Unknown exactly when the node is CPU-starved. The single-node hub
+  # runs one replica of each; the re-enabled selfHeal above corrects any true
+  # desired count on the next reconcile. Operator first so it can reconcile the
+  # prometheus/alertmanager CRs.
+  _kubectl scale deployment kube-prometheus-stack-operator \
+    -n monitoring --context "${_ctx}" --replicas=1 >/dev/null 2>&1 || true
+  local _cr
+  while read -r _cr; do
+    [[ -z "${_cr}" ]] && continue
+    _kubectl patch "${_cr}" -n monitoring --context "${_ctx}" \
+      --type merge -p '{"spec":{"replicas":1}}' >/dev/null 2>&1 || true
+  done < <(_kubectl get prometheus,alertmanager -n monitoring --context "${_ctx}" \
+    -o name 2>/dev/null)
+
+  local _ns _type _name
+  for _ns in ${_nss}; do
+    _kubectl get namespace "${_ns}" --context "${_ctx}" >/dev/null 2>&1 || continue
+    for _type in deployment statefulset; do
+      while read -r _name; do
+        [[ -z "${_name}" ]] && continue
+        _kubectl scale "${_type}/${_name}" -n "${_ns}" --context "${_ctx}" \
+          --replicas=1 >/dev/null 2>&1 || true
+      done < <(_kubectl get "${_type}" -n "${_ns}" --context "${_ctx}" \
+        -o name 2>/dev/null | sed 's#.*/##')
+    done
+    _info "[observability]   ${_ns}: workloads scaled back up"
+  done
+
+  for _app in ${_apps}; do
+    _kubectl annotate application "${_app}" -n "${_argons}" --context "${_ctx}" \
+      argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+  done
+  _info "[observability] Resumed. Pods returning; ArgoCD reconciles to Synced."
 }
 
 function trivy_scan_report() {

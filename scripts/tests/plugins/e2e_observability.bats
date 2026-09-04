@@ -22,6 +22,27 @@ ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   done
 }
 
+@test "exporter labels e2e gauges with the runner dimension" {
+  if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
+  run python3 - "${EXPORTER}" <<'PY'
+import sys, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+# event carries a runner (defaulting to local-m4 for legacy events)
+assert 'payload.get("runner") or "local-m4"' in src, "event runner default missing"
+# runner is part of the per-run metric dimensions and the emitted label body
+assert 'event["runner"]' in src, "runner not in metric dims"
+assert 'runner="%s"' in src, "runner not in emitted label body"
+# e2e_run_info info tuple includes runner
+assert '"run_id", "tier", "runner", "service"' in src, "runner not in e2e_run_info"
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "embedded exporter.py compiles cleanly" {
   if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
   run python3 - "${EXPORTER}" <<'PY'
@@ -120,6 +141,12 @@ assert dash["uid"] == "e2e-verification"
 for m in ("e2e_last_run_pass", "e2e_last_success_timestamp_seconds",
           "e2e_last_run_duration_seconds", "e2e_run_info"):
     assert m in blob, "dashboard missing " + m
+vars = {v["name"]: v for v in dash["templating"]["list"]}
+assert "runner" in vars, "dashboard missing runner template variable"
+assert vars["runner"]["current"]["value"] == "$__all", "runner var must default to All"
+for p in dash["panels"]:
+    for t in p.get("targets", []):
+        assert 'runner=~"$runner"' in t["expr"], "panel %s not filtered by runner" % p["id"]
 print("ok")
 PY
   [ "${status}" -eq 0 ]
@@ -132,8 +159,11 @@ import sys, yaml
 r = list(yaml.safe_load_all(open(sys.argv[1])))[0]
 groups = {g["name"]: g for g in r["spec"]["groups"]}
 assert "e2e.alerts" in groups, list(groups)
-alerts = [rule["alert"] for rule in groups["e2e.alerts"]["rules"]]
+rules = groups["e2e.alerts"]["rules"]
+alerts = [rule["alert"] for rule in rules]
 assert alerts == ["E2EVerificationFailing", "E2EVerificationStale"], alerts
+for rule in rules:
+    assert "$labels.runner" in rule["annotations"]["summary"], rule["alert"]
 print("ok")
 PY
   [ "${status}" -eq 0 ]

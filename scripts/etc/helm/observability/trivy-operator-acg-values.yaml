@@ -10,10 +10,12 @@ trivy:
     tag: "0.72.0"
   ignoreUnfixed: true
   severity: CRITICAL,HIGH
+  slow: true
+  timeout: 15m0s
   resources:
     requests:
       memory: 256Mi
-      cpu: 50m
+      cpu: 10m
     limits:
       memory: 1Gi
       cpu: 500m
@@ -31,6 +33,10 @@ operator:
   builtInTrivyServer: true
   vulnerabilityReportsPlugin: Trivy
   configAuditScannerEnabled: true
+  accessGlobalSecretsAndServiceAccount: true
+  privateRegistryScanSecretsNames:
+    shopping-cart-apps: ghcr-pull-secret
+    shopping-cart-payment: ghcr-pull-secret
   resources:
     requests:
       memory: 32Mi

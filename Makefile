@@ -13,7 +13,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -525,8 +525,8 @@ show-service-passwords:
 	echo "    user:     $${_am_user:-admin}";\
 	echo "    password: $${_am_pass:-N/A}";\
 	echo ""
-	@_kc=$$(kubectl get secret keycloak-secrets -n identity \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 --decode); \
+	@_kc=$$(kubectl get secret keycloak-admin-secret -n identity \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode); \
 	_realm_admin=$$(./bin/get-keycloak-password admin -q 2>/dev/null || true); \
 	_dev=$$(./bin/get-keycloak-password developer -q 2>/dev/null || true); \
 	_op=$$(./bin/get-keycloak-password operator -q 2>/dev/null || true); \
@@ -564,6 +564,14 @@ observability-acg:
 ## Show pod status for monitoring/trivy-system on both clusters
 observability-status:
 	./scripts/k3d-manager observability_status
+
+## Scale the hub observability stack to zero to reclaim ~1.1 CPU cores
+monitoring-pause:
+	./scripts/k3d-manager observability_pause
+
+## Restore the hub observability stack paused by monitoring-pause
+monitoring-resume:
+	./scripts/k3d-manager observability_resume $(LAYER)
 
 ## Print VulnerabilityReport summary for both clusters
 vuln-scan trivy-scan-report:
@@ -632,6 +640,25 @@ test:
 e2e:
 	./scripts/k3d-manager e2e_verify_vcluster $(DIGEST)
 
+## Run the Tier 1 e2e harness on a remote runner off the M4 laptop. RUNNER=m2 required, DIGEST=<image digest> optional. No local fallback.
+e2e-remote:
+	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-remote RUNNER=m2 [DIGEST=sha256:...]" >&2; exit 2; fi
+	./scripts/k3d-manager e2e_runner_dispatch $(RUNNER) $(DIGEST)
+
+## Report hub health vs remote-runner availability as distinct states (RUNNER=m2 optional; unavailable runner is a warning).
+e2e-runner-health:
+	./scripts/k3d-manager e2e_runner_health $(RUNNER)
+
+## Bounded, explicit replay of a remote runner's retained publication_pending E2E results. RUNNER=m2 required.
+e2e-replay:
+	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-replay RUNNER=m2" >&2; exit 2; fi
+	./scripts/k3d-manager e2e_runner_replay $(RUNNER)
+
+## Clear a STALE remote-runner lock (bounded age + no-live-run checks; never automatic). RUNNER=m2 required.
+e2e-runner-unlock:
+	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-runner-unlock RUNNER=m2" >&2; exit 2; fi
+	./scripts/k3d-manager e2e_runner_unlock $(RUNNER)
+
 ## Show this help
 help:
 	@echo ""
@@ -646,6 +673,10 @@ help:
 	@echo "    make status-json   Emit concise status as JSON"
 	@echo "    make test          Run all BATS test suites"
 	@echo "    make e2e           Run Tier 1 e2e harness (vCluster + Playwright Job; DIGEST=<image digest> optional)"
+	@echo "    make e2e-remote    Run Tier 1 e2e harness on a remote runner off the M4 (RUNNER=m2 [DIGEST=<image digest>]; no local fallback)"
+	@echo "    make e2e-runner-health  Report hub health vs remote-runner availability (RUNNER=m2 optional)"
+	@echo "    make e2e-replay    Replay a runner's retained publication_pending E2E results (RUNNER=m2)"
+	@echo "    make e2e-runner-unlock  Clear a STALE remote-runner lock, guarded by age + no-live-run (RUNNER=m2)"
 	@echo "    make preflight     Spin up a throwaway vCluster + deploy the full stack via ArgoCD (NAME=<name> MODE=--auto|--keep|--reuse, default --auto)"
 	@echo ""
 	@echo "  k3s-aws / k3s-gcp only:"
@@ -672,6 +703,8 @@ help:
 	@echo "    make observability              Deploy Prometheus+Grafana+Trivy to Hub k3d"
 	@echo "    make observability-acg          Deploy Prometheus+Trivy to ACG ubuntu-k3s"
 	@echo "    make observability-status       Show monitoring pod status on both clusters"
+	@echo "    make monitoring-pause           Scale hub monitoring to zero, keep Grafana up (~1 core back)"
+	@echo "    make monitoring-resume [LAYER=1|2]  Resume hub monitoring: 1=Grafana+Prometheus, 2=full (default)"
 	@echo "    make vuln-scan                  Print VulnerabilityReport summary"
 	@echo "    make show-service-passwords     Show all service login credentials"
 	@echo "    make alertmanager-secret        Store Alertmanager Gmail+SMS creds in Vault (run once)"

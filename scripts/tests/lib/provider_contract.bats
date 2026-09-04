@@ -453,7 +453,7 @@ teardown_file() {
   [[ "$output" == *"provider k3s-hostinger"* ]]
 }
 
-@test "_hostinger_reapply_gitops_applicationsets reapplies data, services, platform, and istio-ambient appsets from the current branch" {
+@test "_hostinger_reapply_gitops_applicationsets reapplies data, services, platform, istio-ambient, and CVE reader appsets from the current branch" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
@@ -487,7 +487,7 @@ teardown_file() {
 
   run cat "${BATS_TEST_TMPDIR}/appsets.log"
   [ "$status" -eq 0 ]
-  [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 4 ]]
+  [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 5 ]]
   [[ "$output" == *"--context k3d-k3d-cluster apply -f -"* ]]
 
   run cat "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
@@ -502,6 +502,7 @@ teardown_file() {
   [[ "$output" == *"name: '{{.name}}-platform'"* ]]
   [[ "$output" == *"name: istio-ambient"* ]]
   [[ "$output" == *"name: ztunnel"* ]]
+  [[ "$output" == *"name: hostinger-cve-inventory-reader"* ]]
 }
 
 @test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership and refreshes apps" {
@@ -898,7 +899,7 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F 'for (( _attempt=1; _attempt<=30; _attempt++ ))' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
-  run grep -F 'sleep 30' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  run grep -F 'RESTART_DELAY=2' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
   run grep -F 'LOCK_DIR=' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
@@ -912,7 +913,9 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F -- 'svc/keycloak' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   [ "$status" -eq 0 ]
-  run grep -F -- '8880:80' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  run grep -F -- '8880:8080' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- '127.0.0.1:8880/realms/master' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   [ "$status" -eq 0 ]
   run grep -F 'tunnel' "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
   [ "$status" -eq 0 ]

@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-09-03
+
+**Theme: close the CVE loop with cryptographically verifiable image provenance, and make the platform observably cheaper to run.** This release lands a **three-latch supply-chain gate** — images are **signed and get a vulnerability attestation at BUILD**, the **PROMOTE** step refuses to advance a candidate that cannot present a cosign-verifiable vuln attestation, and **ADMIT** (Kyverno `verifyImages`) requires a first-party image to carry both a signature and a vuln attestation signed by our key. All three latches ship **inert by default** and are enabled in a staged Audit→Enforce ladder. Alongside the signing work: an **adaptive checkout load-testing** harness (k6 stage-ladder controller with stop-condition hysteresis), a **foundation-managed vCluster CLI** (single contract resolves the pinned binary), the **M2 remote E2E runner** (dispatch the Tier-1 suite to a remote substrate with restricted result publishing), several **observability cost controls** (monitoring-pause/resume, layered resume, reduced federation scrape), and **Dependabot automation**. The signing key handling survived a multi-repo `COSIGN_KEY` corruption incident (macOS `security -w` hex-encoding of multi-line PEMs) that is now documented and guarded.
+
+### Added
+- **Image signing plugin (`scripts/plugins/signing.sh`)** — `deploy_image_signing` seeds/rotates a cosign keypair into Vault, mirrors the public key through ESO, and installs a read-only Vault policy; `--app-cluster` mode deploys the verify gate without requiring hub Vault. Status/seed/rotate subcommands, `signing.bats` coverage, and a signing guide.
+- **CVE-loop BUILD latch** — CI signs first-party images and attaches a cosign **vuln attestation** (`type: https://cosign.sigstore.dev/attestation/vuln/v1`) at build time (Stage C).
+- **CVE-loop PROMOTE latch** — the promoter refuses to advance a CVE-remediation candidate unless it passes `cosign verify` **and** `cosign verify-attestation`; default-off behind `COSIGN_VERIFY=1` **and** `COSIGN_VERIFY_ATTESTATION=1`.
+- **CVE-loop ADMIT latch** — a Kyverno `verifyImages` ClusterPolicy (Stage D) whose `attestations:` block requires the vuln attestation beside the signature `attestors:`; ships in `Audit`, with Enforce gated behind `SIGNING_ALLOW_ENFORCE=1` and a clean Audit dashboard.
+- **Adaptive checkout load testing** — a k6 checkout generator (Slice F) driven by an adaptive controller (stage ladder, stop-condition hysteresis, opt-in guard) with a wired dashboard; see `docs/plans/v1.27.0-adaptive-checkout-load-testing.md`.
+- **Foundation-managed vCluster CLI** — `vcluster_*` now resolve the pinned CLI through a single `foundation_ensure_vcluster_cli` contract instead of ambient `PATH`, with self-healing connection refresh and hub deregistration on destroy; see `docs/plans/v1.27.0-foundation-managed-vcluster-cli.md`.
+- **M2 remote E2E runner** — `e2e-remote RUNNER=m2` bootstraps and preflights a remote substrate, runs the Tier-1 suite there, and publishes results back through a restricted M4-side publisher with runner provenance threaded through the summary, result event, exporter, Grafana, and alerts; see `docs/plans/v1.27.0-m2-remote-e2e-runner.md`.
+- **Observability cost controls** — `make monitoring-pause/resume` scales the monitoring stack to zero (reclaiming ~1.1 cores) while keeping Grafana up; layered resume (`LAYER=1` lite / `LAYER=2` full); reduced hub federation scrape frequency; the Vault unseal watchdog auto-installs with `deploy_vault`.
+- **E2E image GC** — `e2e_prune_images`, a dry-run-default Docker image garbage collector scoped to the E2E working set.
+- **Dependabot automation** — reusable update/automerge surface; see `docs/plans/v1.27.0-dependabot-automation.md`.
+
+### Fixed
+- **CVE remediation reporting** — cached CVE metrics are served without a scrape timeout; `superseded`/`deployment_advanced` events stay in audit history but are excluded from the Current Remediation Status table; Trivy-vs-remediation `image_repository` label mismatch and multi-arch index-digest false negatives are corrected.
+- **`COSIGN_KEY` corruption across repos** — macOS `security -w` hex-encodes any multi-line value (PEM keys); the key is now decoded correctly and the failure mode is documented as a guard.
+- **Hub stability under load** — probe/CPU tuning and layered monitoring resume keep control-plane and monitoring workloads from restart loops during expensive CVE queries.
+- **Keycloak realm churn** — shopping-cart realm provisioning is codified to cut hub CPU churn.
+- **Pre-PR BATS gate** — stale source-grep guards and vCluster test-harness bugs on the milestone branch were corrected (test-only; production code unchanged); the local suite is green except four pre-existing local-macOS-env failures that pass in CI (`docs/issues/2026-09-03-bats-preexisting-local-macos-env-failures.md`).
+
 ## [1.26.0] - 2026-08-21
 
 **Theme: ephemeral fleet lifecycle, a trustworthy E2E promotion gate, and safe reclamation of dead app-cluster registrations.** This release makes the k3s-aws app-cluster fleet **count-agnostic** (any number of agents provisions and joins the same way, replacing the two hardcoded agents), turns the Tier 1 vCluster E2E harness into a real **promotion gate** with durable pass/fail artifacts and Grafana/Alertmanager observability, and lets stale, expired managed sandbox registrations be **reclaimed without touching unrelated live Applications** — each verified end-to-end on a live ACG sandbox and the hub. Two further v1.26.0 scopes (the foundation-managed vCluster CLI and the M2 remote E2E runner) remain scoped as specs in `docs/plans/` for a follow-up; two deferred defects are tracked in `docs/issues/2026-08-21-*`.

@@ -8,8 +8,10 @@ defaultRules:
 
 prometheus:
   prometheusSpec:
-    retention: 7d
-    retentionSize: 20GB
+    scrapeInterval: 60s
+    evaluationInterval: 60s
+    retention: 3d
+    retentionSize: 8GB
     storageSpec:
       volumeClaimTemplate:
         spec:
@@ -35,7 +37,7 @@ prometheus:
             action: keep
             regex: istiod
       - job_name: federate-acg
-        scrape_interval: 30s
+        scrape_interval: 60s
         honor_labels: true
         metrics_path: /federate
         params:

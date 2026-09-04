@@ -4,13 +4,12 @@ set -euo pipefail
 VCLUSTER_NAMESPACE="${VCLUSTER_NAMESPACE:-vclusters}"
 VCLUSTER_VERSION="${VCLUSTER_VERSION:-0.32.1}"
 VCLUSTER_KUBECONFIG_DIR="${VCLUSTER_KUBECONFIG_DIR:-${HOME}/.kube/vclusters}"
-VCLUSTER_INSTALL_DIR="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
 VCLUSTER_VALUES_FILE="${VCLUSTER_VALUES_FILE:-}"
 VCLUSTER_LOCAL_PORT="${VCLUSTER_LOCAL_PORT:-11443}"
+_VCLUSTER_BIN=""
 export VCLUSTER_NAMESPACE
 export VCLUSTER_VERSION
 export VCLUSTER_KUBECONFIG_DIR
-export VCLUSTER_INSTALL_DIR
 export VCLUSTER_VALUES_FILE
 export VCLUSTER_LOCAL_PORT
 
@@ -46,7 +45,7 @@ function vcluster_create() {
     return 0
   fi
 
-  _run_command -- vcluster create "$name" -n "$VCLUSTER_NAMESPACE" \
+  _run_command -- "$_VCLUSTER_BIN" create "$name" -n "$VCLUSTER_NAMESPACE" \
     --chart-version "$VCLUSTER_VERSION" --connect=false -f "$values_file"
   _vcluster_wait_ready "$name"
   _vcluster_export_kubeconfig "$name"
@@ -72,7 +71,7 @@ function vcluster_destroy() {
   fi
 
   _vcluster_deregister_from_hub "$name"
-  if ! _run_command --no-exit -- vcluster delete "$name" -n "$VCLUSTER_NAMESPACE" --wait; then
+  if ! _run_command --no-exit -- "$_VCLUSTER_BIN" delete "$name" -n "$VCLUSTER_NAMESPACE" --wait; then
     _warn "vcluster delete '$name' failed (child API may be unreachable); falling back to helm uninstall"
     _run_command --no-exit -- helm -n "$VCLUSTER_NAMESPACE" uninstall "$name" --wait || true
   fi
@@ -168,59 +167,12 @@ function vcluster_use() {
 
 function vcluster_list() {
   _vcluster_check_prerequisites
-  _run_command -- vcluster list -n "$VCLUSTER_NAMESPACE"
-}
-
-function vcluster_install_cli() {
-  _vcluster_install_cli
-}
-
-function _vcluster_install_cli() {
-  if _command_exist vcluster; then
-    _info "vcluster already installed, skipping"
-    return 0
-  fi
-
-  local platform
-  platform="$(_detect_platform)"
-  case "$platform" in
-    mac)
-      _run_command -- brew install loft-sh/tap/vcluster
-      ;;
-    debian|redhat|wsl)
-      local install_dir="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
-      local tmp_file
-      tmp_file="$(mktemp -t vcluster-cli.XXXXXX)"
-      trap '$(_cleanup_trap_command "$tmp_file")' RETURN
-      local machine_arch
-      machine_arch="$(uname -m)"
-      local dl_arch
-      case "$machine_arch" in
-        x86_64)        dl_arch="amd64" ;;
-        aarch64|arm64) dl_arch="arm64" ;;
-        *)             _err "Unsupported architecture for vcluster CLI install: $machine_arch" ;;
-      esac
-      local url="https://github.com/loft-sh/vcluster/releases/download/v${VCLUSTER_VERSION}/vcluster-linux-${dl_arch}"
-      _run_command -- curl -fsSL -o "$tmp_file" "$url"
-      _run_command -- chmod +x "$tmp_file"
-      _run_command --prefer-sudo -- mkdir -p "$install_dir"
-      _run_command --prefer-sudo -- mv "$tmp_file" "${install_dir%/}/vcluster"
-      trap - RETURN
-      ;;
-    *)
-      _err "Unsupported platform for vcluster CLI install: $platform"
-      ;;
-  esac
-
-  if ! _command_exist vcluster; then
-    _err "vcluster CLI installation failed"
-  fi
+  _run_command -- "$_VCLUSTER_BIN" list -n "$VCLUSTER_NAMESPACE"
 }
 
 function _vcluster_check_prerequisites() {
-  if ! _command_exist vcluster; then
-    _info "vcluster CLI not found — installing automatically"
-    _vcluster_install_cli
+  if ! _VCLUSTER_BIN="$(foundation_ensure_vcluster_cli "$VCLUSTER_VERSION")" || [[ -z "${_VCLUSTER_BIN}" ]]; then
+    _err "Unable to resolve the vCluster CLI through foundation_ensure_vcluster_cli for version ${VCLUSTER_VERSION}"
   fi
   local host_context="${VCLUSTER_HOST_CONTEXT:-$(_kubectl config current-context 2>/dev/null || true)}"
   if [[ -z "${host_context}" ]]; then
@@ -260,7 +212,7 @@ function _vcluster_export_kubeconfig() {
   local kubeconfig
   kubeconfig="$(_vcluster_kubeconfig_path "$name")"
   local config
-  config="$(_run_command -- vcluster connect "$name" -n "$VCLUSTER_NAMESPACE" \
+  config="$(_run_command -- "$_VCLUSTER_BIN" connect "$name" -n "$VCLUSTER_NAMESPACE" \
     --local-port "$VCLUSTER_LOCAL_PORT" --print)"
   _write_sensitive_file "$kubeconfig" "$config"
   _info "Kubeconfig written to $kubeconfig"
@@ -286,7 +238,7 @@ function _vcluster_refresh_connection() {
     _err "vCluster name required"
   fi
   _vcluster_remove_proxy "$name"
-  _run_command --quiet -- vcluster connect "$name" -n "$VCLUSTER_NAMESPACE" \
+  _run_command --quiet -- "$_VCLUSTER_BIN" connect "$name" -n "$VCLUSTER_NAMESPACE" \
     --local-port "$VCLUSTER_LOCAL_PORT" --print >/dev/null 2>&1 || true
 }
 
@@ -322,7 +274,7 @@ function _vcluster_ensure_exists() {
     return 0
   fi
   local list_output=""
-  if ! list_output="$(_run_command --no-exit --quiet -- vcluster list -n "$VCLUSTER_NAMESPACE")"; then
+  if ! list_output="$(_run_command --no-exit --quiet -- "$_VCLUSTER_BIN" list -n "$VCLUSTER_NAMESPACE")"; then
     _err "vCluster '$name' not found in namespace '$VCLUSTER_NAMESPACE'"
   fi
   local found=0 line cluster_name

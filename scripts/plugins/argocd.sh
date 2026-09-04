@@ -1412,7 +1412,13 @@ function argocd_sync_app_rebuild_secret() {
    _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
-      _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — optional app-rebuild gh-token; skipping (store a dedicated PAT there to enable auto-sync — do NOT reuse a broad gh CLI token)"
+      if _kubectl get secret "${_name}" -n "${_ns}" >/dev/null 2>&1; then
+         _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — Secret already present in ${_ns}; leaving as-is"
+      elif _kubectl get cronjob app-cve-scan -n "${_ns}" >/dev/null 2>&1; then
+         _warn "[argocd] ${_service} MISSING from Keychain (${_service}/${_account}) AND no ${_name} Secret in ${_ns}: the app-cve-scan CronJob will wedge on CreateContainerConfigError until a dedicated PAT is stored. Store a dedicated PAT (do NOT reuse a broad gh CLI token), then re-run argocd_sync_app_rebuild_secret ${_ns}."
+      else
+         _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — optional app-rebuild gh-token; skipping (store a dedicated PAT there to enable auto-sync — do NOT reuse a broad gh CLI token)"
+      fi
       return 0
    fi
 
@@ -1495,6 +1501,9 @@ EOF
 
    _info "[argocd] Deploying app-image CVE scan CronJob..."
    _kubectl apply -f "${_dir}/app-cve-scan-cronjob.yaml"
+
+   _info "[argocd] Deploying cosign public-key ExternalSecret (promoter verify gate)..."
+   _kubectl apply -f "${_dir}/cosign-pub-externalsecret.yaml"
 
    _info "[argocd] Deploying scan script ConfigMap..."
    _kubectl create configmap argocd-cve-scan-script \

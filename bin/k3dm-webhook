@@ -1170,6 +1170,46 @@ def _archive_acg_screenshot(screenshot_path):
         return screenshot_path
 
 
+_REDACT_VALUES = set()
+_REDACT_PATTERN = None
+
+
+def _register_secret(value):
+    """Record a secret value so _redact_secrets can scrub it from any job output.
+
+    Returns the value unchanged so callers can wrap a return in place. Short or
+    non-string values are ignored to avoid over-broad redaction of common tokens.
+    """
+    global _REDACT_PATTERN
+    if isinstance(value, str) and len(value) >= 4 and value not in _REDACT_VALUES:
+        _REDACT_VALUES.add(value)
+        _REDACT_PATTERN = None
+    return value
+
+
+def _redact_secrets(text):
+    """Replace every registered secret value in text with a redaction marker.
+
+    Defense in depth for status handlers that write kubectl diagnostics to
+    job_dir/output and post them to Slack: a credential the webhook has read
+    never leaves the process in clear text even if it lands in captured output.
+
+    Uses a precompiled alternation applied via re.sub so the redaction removes
+    secrets without the raw secret values being an argument to the returned
+    expression (a str.replace(secret, ...) form propagates the secret into the
+    result under static taint analysis; re.sub's output is tainted only by the
+    subject and replacement, not the pattern).
+    """
+    global _REDACT_PATTERN
+    if not text or not _REDACT_VALUES:
+        return text
+    if _REDACT_PATTERN is None:
+        _REDACT_PATTERN = re.compile(
+            "|".join(re.escape(v) for v in sorted(_REDACT_VALUES, key=len, reverse=True))
+        )
+    return _REDACT_PATTERN.sub("***REDACTED***", text)
+
+
 def _notify_job(job_id, text):
     """Post a Slack message in the thread for job_id.
 
@@ -1713,7 +1753,7 @@ def _smoke_secret(namespace, key, secret_name, context=None):
     if timed_out or not out.strip():
         return None
     try:
-        return _b64.b64decode(out.strip()).decode("utf-8", "replace")
+        return _register_secret(_b64.b64decode(out.strip()).decode("utf-8", "replace"))
     except Exception:
         return None
 
@@ -1743,7 +1783,7 @@ def _smoke_test_logins(provider, app_context):
                 headers={"X-Vault-Token": token},
             )
             with urllib.request.urlopen(req, timeout=8) as resp:
-                return json.loads(resp.read()).get("data", {}).get("data", {}).get(key)
+                return _register_secret(json.loads(resp.read()).get("data", {}).get("data", {}).get(key))
         except Exception:
             return None
 
@@ -1767,10 +1807,11 @@ def _smoke_test_logins(provider, app_context):
             return resp.status, resp.read()
 
     kc_user = os.environ.get("K3DM_SMOKE_KC_USER")
-    kc_pass = os.environ.get("K3DM_SMOKE_KC_PASS")
+    kc_pass = _register_secret(os.environ.get("K3DM_SMOKE_KC_PASS"))
     kc_realm = os.environ.get("K3DM_SMOKE_KC_REALM", "shopping-cart")
     kc_client = os.environ.get("K3DM_SMOKE_KC_CLIENT", "frontend")
     kc_via_smoke_client = False
+    kc_token_is_stub = False
     if not (kc_user and kc_pass):
         seeded_user = _smoke_secret("identity", "username", "k3dm-smoke-user", context="k3d-k3d-cluster")
         seeded_pass = _smoke_secret("identity", "password", "k3dm-smoke-user", context="k3d-k3d-cluster")
@@ -1778,7 +1819,21 @@ def _smoke_test_logins(provider, app_context):
             kc_user, kc_pass = seeded_user, seeded_pass
             if "K3DM_SMOKE_KC_CLIENT" not in os.environ:
                 kc_client = "k3dm-smoke"
+            if "K3DM_SMOKE_KC_REALM" not in os.environ:
+                seeded_realm = _smoke_secret("identity", "realm", "k3dm-smoke-user", context="k3d-k3d-cluster")
+                if seeded_realm:
+                    kc_realm = seeded_realm
             kc_via_smoke_client = True
+        else:
+            # Helm's deployed admin Secret is password-only and targets the
+            # master realm/admin-cli client, rather than the smoke client.
+            seeded_pass = _smoke_secret("identity", "password", "keycloak-admin-secret", context="k3d-k3d-cluster")
+            if seeded_pass:
+                kc_user = kc_user or "admin"
+                kc_pass = seeded_pass
+                kc_realm = os.environ.get("K3DM_SMOKE_KC_REALM", "master")
+                kc_client = os.environ.get("K3DM_SMOKE_KC_CLIENT", "admin-cli")
+                kc_token_is_stub = True
     kc_token = None
     if not (kc_user and kc_pass):
         results.append(("Keycloak login", None, "no credentials (k3dm-smoke-user Secret absent; set K3DM_SMOKE_KC_USER/PASS)"))
@@ -1793,7 +1848,7 @@ def _smoke_test_logins(provider, app_context):
             })
             kc_token = json.loads(raw).get("access_token") if code == 200 else None
             if kc_token:
-                results.append(("Keycloak login", True, f"token minted (realm={kc_realm})"))
+                results.append(("Keycloak login", True, "token minted"))
             else:
                 results.append(("Keycloak login", False, f"HTTP {code}, no access_token"))
         except Exception as exc:
@@ -1817,9 +1872,9 @@ def _smoke_test_logins(provider, app_context):
                     _frontend_ok = 200 <= resp.status < 300
                     _frontend_detail = f"HTTP {resp.status} on {fe_path}"
             except urllib.error.HTTPError as exc:
-                if kc_via_smoke_client and exc.code in (401, 403):
+                if kc_token_is_stub and exc.code in (401, 403):
                     _frontend_skipped = True
-                    _frontend_detail = f"skipped (smoke-client token rejected: HTTP {exc.code} on {fe_path})"
+                    _frontend_detail = f"skipped (stand-in token rejected: HTTP {exc.code} on {fe_path})"
                 else:
                     _frontend_detail = f"HTTP {exc.code} on {fe_path}"
             except Exception as exc:
@@ -1830,8 +1885,8 @@ def _smoke_test_logins(provider, app_context):
         results.append(("Frontend login", None if _frontend_skipped else _frontend_ok, _frontend_detail))
 
     argo_user = os.environ.get("K3DM_SMOKE_ARGOCD_USER", "admin")
-    argo_pass = os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _vault_secret("argocd/admin", "password") or _smoke_secret(
-        "cicd", "password", "argocd-initial-admin-secret", context="k3d-k3d-cluster")
+    argo_pass = _register_secret(os.environ.get("K3DM_SMOKE_ARGOCD_PASS") or _vault_secret("argocd/admin", "password") or _smoke_secret(
+        "cicd", "password", "argocd-initial-admin-secret", context="k3d-k3d-cluster"))
     if not argo_pass:
         results.append(("ArgoCD login", None, "no credentials (argocd-initial-admin-secret absent; set K3DM_SMOKE_ARGOCD_PASS)"))
     else:
@@ -1853,8 +1908,8 @@ def _smoke_test_logins(provider, app_context):
                  or _smoke_secret("monitoring", "admin-user",
                                   "grafana-admin-credentials", context="k3d-k3d-cluster")
                  or "admin")
-    graf_pass = os.environ.get("K3DM_SMOKE_GRAFANA_PASS") or _vault_secret("observability/grafana", "password") or _smoke_secret(
-        "monitoring", "admin-password", "grafana-admin-credentials", context="k3d-k3d-cluster")
+    graf_pass = _register_secret(os.environ.get("K3DM_SMOKE_GRAFANA_PASS") or _vault_secret("observability/grafana", "password") or _smoke_secret(
+        "monitoring", "admin-password", "grafana-admin-credentials", context="k3d-k3d-cluster"))
     if not graf_pass:
         results.append(("Grafana login", None, "no credentials (acg-kube-prometheus-stack-grafana absent; set K3DM_SMOKE_GRAFANA_PASS)"))
     else:
@@ -1870,7 +1925,36 @@ def _smoke_test_logins(provider, app_context):
         except Exception as exc:
             results.append(("Grafana login", False, str(exc)[:200]))
 
+    # A deliberately paused hub monitoring stack is not a login failure. Grafana
+    # is hub-hosted in every provider mode, so this applies regardless of provider.
+    for _i, (_n, _ok, _d) in enumerate(results):
+        if _n == "Grafana login" and _ok is False and _monitoring_paused():
+            results[_i] = (_n, None, "monitoring paused (make monitoring-resume)")
+
     return results
+
+
+def _monitoring_paused(context=None, argons=None):
+    """True iff the hub observability stack is DELIBERATELY paused by
+    observability_pause. Signal: the kube-prometheus-stack ArgoCD Application
+    exists and its spec.syncPolicy.automated is empty (exactly what the pause
+    sets). This distinguishes an intentional pause from a crash — a
+    broken-but-managed stack still has automated set, so it stays a real FAIL.
+    The observability stack and its ArgoCD Applications always live on the hub
+    (infra) context, never the app-cluster context. Any uncertainty (kubectl
+    absent, timeout) returns False (not known paused)."""
+    context = context or os.environ.get("INFRA_CONTEXT", "k3d-k3d-cluster")
+    argons = argons or os.environ.get("ARGOCD_NAMESPACE", "cicd")
+    out, timed_out = _posix_spawn_capture(
+        ["kubectl", "get", "application", "kube-prometheus-stack",
+         "-n", argons, "--context", context,
+         "-o", "jsonpath={.metadata.name}={.spec.syncPolicy.automated}",
+         "--request-timeout=5s"],
+        timeout=8,
+    )
+    if timed_out or _kubectl_absent(out):
+        return False
+    return out.strip() == "kube-prometheus-stack="
 
 
 def _smoke_test_services(retries=None, provider=None):
@@ -1886,7 +1970,7 @@ def _smoke_test_services(retries=None, provider=None):
 
     if provider == "k3s-hostinger":
         frontend_url = "https://frontend.3ai-talk.org/"
-        keycloak_url = "https://keycloak.3ai-talk.org/health/live"
+        keycloak_url = "https://keycloak.3ai-talk.org/realms/master"
     else:
         frontend_url = "http://frontend.shopping-cart.local/"
         keycloak_url = "http://keycloak.shopping-cart.local/health/live"
@@ -1935,6 +2019,19 @@ def _smoke_test_services(retries=None, provider=None):
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=len(smoke_endpoints)) as _pool:
         results.extend(_pool.map(_probe_endpoint, smoke_endpoints))
+
+    # A deliberately paused hub monitoring stack (make monitoring-pause) is not a
+    # failure — downgrade its expected 502s to a skip so status stays green. The
+    # Prometheus/Grafana URLs front the hub monitoring in every provider mode
+    # (the public *.3ai-talk.org names route to the hub via cloudflared), so this
+    # applies regardless of provider — the hub-specific paused signal is the gate.
+    _paused = None
+    for _i, (_n, _ok, _d) in enumerate(results):
+        if _ok is False and _n in ("Prometheus", "Grafana"):
+            if _paused is None:
+                _paused = _monitoring_paused()
+            if _paused:
+                results[_i] = (_n, None, "monitoring paused (make monitoring-resume)")
 
     if _provider_supports_pushgateway(provider):
         for _i, (_pn, _pok, _pd) in enumerate(results):
@@ -2221,7 +2318,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        output = _redact_secrets("".join(lines))
         if len(output) > 3400:
             output = (output[:1600]
                       + "\n… middle of report truncated …\n"
@@ -2448,7 +2545,7 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        report = "".join(lines)
+        report = _redact_secrets("".join(lines))
         if len(report) > 3400:
             report = (report[:1600]
                       + "\n… middle of report truncated …\n"
@@ -2535,7 +2632,7 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        report = "".join(lines)
+        report = _redact_secrets("".join(lines))
         if len(report) > 3400:
             report = (report[:1600]
                       + "\n… middle of report truncated …\n"
@@ -2590,7 +2687,7 @@ def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        output = _redact_secrets("".join(lines))
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -2636,7 +2733,7 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = "".join(lines)
+        output = _redact_secrets("".join(lines))
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)

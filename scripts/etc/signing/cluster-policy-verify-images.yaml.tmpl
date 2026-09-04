@@ -1,0 +1,98 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: ${SIGNING_POLICY_NAME}
+  annotations:
+    policies.kyverno.io/title: Verify first-party image signatures
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Requires a valid cosign signature by the k3d-manager signing key for
+      first-party (${SIGNING_IMAGE_REFERENCES}) images scheduled into the app
+      namespaces, plus a Trivy vuln attestation (type
+      https://cosign.sigstore.dev/attestation/vuln/v1) signed by the same key.
+      Staged Audit -> Enforce per decision D2 -- never flip to Enforce before
+      the Audit dashboard shows zero would-be-blocks for current first-party
+      images.
+spec:
+  # D2: staged rollout. Audit first (dashboards show would-be-blocks), Enforce
+  # only after Audit is clean, and ONLY on app namespaces below.
+  background: false
+  webhookConfiguration:
+    # Fail-open while Audit (a webhook outage must not wedge app scheduling on a
+    # solo-operated fleet). Revisit deliberately for Enforce.
+    failurePolicy: ${SIGNING_WEBHOOK_FAILURE_POLICY}
+  rules:
+    - name: verify-cosign-signature
+      match:
+        any:
+          - resources:
+              # Match workload CONTROLLERS, not bare Pod. Kyverno's cosign
+              # verifier resolves registry creds against the admitted object's
+              # metadata.namespace; a ReplicaSet-created Pod (generateName) has
+              # an empty object namespace at CREATE, so cred resolution finds
+              # nothing and 401s on private ghcr -- and the cosign path does NOT
+              # fall back to --imagePullSecrets or a mounted DOCKER_CONFIG.
+              # Controllers carry a populated namespace, so verification works.
+              # See docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md.
+              # Trade-off: bare Pods are not verified (all app workloads here are
+              # controllers; the CVE-loop threat is the deploy pipeline).
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - Job
+                - CronJob
+              # SCOPE BOUNDARY (critical): app namespaces ONLY. Never hub/system.
+              # These are the real deployment namespaces (see _namespace_for in
+              # cve-remediation-verify.sh): all services land in shopping-cart-apps
+              # except payment, which is isolated in shopping-cart-payment.
+              namespaces:
+                - shopping-cart-apps
+                - shopping-cart-payment
+      verifyImages:
+        # Only first-party images are signed. Upstream images (postgres, redis,
+        # rabbitmq, argocd, alpine/k8s, ...) are NOT signed and MUST be left
+        # untouched, else the whole platform is blocked. imageReferences scopes
+        # the check to our registry namespace only.
+        - imageReferences:
+            - "${SIGNING_IMAGE_REFERENCES}"
+          # Audit | Enforce -- templated by SIGNING_VALIDATION_FAILURE_ACTION.
+          failureAction: ${SIGNING_VALIDATION_FAILURE_ACTION}
+          # Do not rewrite the workload's image ref; the promoter already pins
+          # by digest. We only verify.
+          mutateDigest: false
+          verifyDigest: false
+          required: true
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    # Public half of the Vault-held cosign key, injected at apply
+                    # time from the ESO-projected Secret (cosign-public-key). On
+                    # key rotation, re-run the apply to refresh this block.
+                    publicKeys: |-
+# __PUBLIC_KEY__
+                    ctlog:
+                      ignoreSCT: true
+                    rekor:
+                      ignoreTlog: true
+          # ADMIT latch (CVE loop): beyond a valid signature, require a Trivy vuln
+          # attestation signed by the same key. This closes the loop with the
+          # promoter's verify-attestation gate -- an image may be signed yet carry
+          # no scan result; here we insist the scan attestation exists and is ours.
+          # Produced by CI 'cosign attest --type vuln' (predicateType below). Rides
+          # the SAME failureAction as the signature check, so it inherits the staged
+          # Audit -> Enforce rollout (D2) -- never blocks before Audit is clean.
+          attestations:
+            - type: https://cosign.sigstore.dev/attestation/vuln/v1
+              attestors:
+                - count: 1
+                  entries:
+                    - keys:
+                        publicKeys: |-
+# __PUBLIC_KEY_ATTEST__
+                        ctlog:
+                          ignoreSCT: true
+                        rekor:
+                          ignoreTlog: true

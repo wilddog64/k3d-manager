@@ -537,6 +537,12 @@ EOF
   run grep -F -- 'alertmanager.3ai-talk.org' scripts/etc/cloudflared/config.yml
   [ "$status" -eq 0 ]
 
+  run grep -F -- 'service: http://127.0.0.1:8880' scripts/etc/cloudflared/config.yml
+  [ "$status" -eq 0 ]
+
+  run grep -F -- 'service: http://127.0.0.1:8080' scripts/etc/cloudflared/config.yml
+  [ "$status" -eq 0 ]
+
   run grep -F -- 'install-alertmanager-port-forward' Makefile
   [ "$status" -eq 0 ]
 

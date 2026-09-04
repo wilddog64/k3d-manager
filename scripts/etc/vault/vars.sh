@@ -106,5 +106,8 @@ HUB_VAULT_CSS_AUTH="$(_hub_vault_css_resolve HUB_VAULT_CSS_AUTH "${_hub_css_auth
 export HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH
 unset _hub_css_server_default _hub_use_bridge_default _hub_css_auth_default _hub_profile_context
 
-# Auto-unseal watchdog (Tier 3 P2a) — pinned image for the in-cluster unseal CronJob.
-export VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-hashicorp/vault:1.18.3}"
+# Auto-unseal watchdog (Tier 3 P2a) — image for the in-cluster unseal CronJob.
+# Left empty by default so vault_install_unseal_watchdog derives it from the
+# running Vault StatefulSet (guaranteed cached on-node). An explicit override
+# here or in the environment is still honored.
+export VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-}"
