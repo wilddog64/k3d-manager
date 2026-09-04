@@ -75,7 +75,50 @@ Investigation on the v1.29.0 branch settled the ambiguity decisively:
 admin/developer/operator). For a real person to log in to shopping-cart SSO as `chengkai.liang`,
 Keycloak MUST federate openldap-0. So openldap-0 is the correct end-state.
 
-### CORRECTION (2026-09-04, deeper trace) — the drift is coherent + multi-layer, NOT one stale component
+### CORRECTION 2 (2026-09-04, ownership trace) — osixia is an INTENTIONAL upstream SSO stack, NOT orphaned drift; do NOT delete it
+
+**Retract the "orphan / prune" framing below — it is wrong and dangerous.** The
+`shopping-cart-identity` ArgoCD Application owns the **entire live identity stack**, not a stray
+Deployment: `Deployment/keycloak`, `Deployment/postgres-keycloak`, `Deployment/ldap` (osixia),
+their Services + PVCs, the `keycloak-config`/`keycloak-realm-import`/`ldap-*` ConfigMaps, and the
+`keycloak-secrets`/`keycloak-client-secrets`/`ldap-secrets` ExternalSecrets. **Deleting this
+Application would destroy live SSO (Keycloak + its Postgres + the federated directory).** Do NOT
+prune it.
+
+**Where the manifests actually live:** a **separate repo** — `github.com/wilddog64/shopping-cart-infra`,
+paths `//identity/keycloak` and `//identity/ldap` (ref `main`). The k3d-manager
+`services/shopping-cart-identity/kustomization.yaml` was only a 5-line remote-base reference to those
+two upstream paths. #74 removed that k3d-manager pointer (excluding it from the services-git appset),
+which is why the live App is now `OutOfSync` — its k3d-manager source pointer was deleted while the
+real manifests still live upstream. Keycloak federating its own bundled osixia `ldap`
+(`dc=shopping-cart,dc=local`) is the **intended design of the shopping-cart-infra identity stack**, a
+self-contained Keycloak + osixia-LDAP SSO unit with declaratively-seeded shopping-cart users.
+
+**So the decision is genuinely the user's product call (not derivable from k3d-manager code):**
+- **Option A / C — osixia (shopping-cart-infra) is canonical for shopping-cart SSO.** Then
+  k3d-manager's cluster-up Step 10d.5 seed + `bin/get-keycloak-password` are mislabeled — they target
+  openldap-0, which SSO never reads. Fix on the k3d-manager side by renaming/rescoping them (stop
+  implying they feed SSO); seed real SSO users (incl. `chengkai.liang`) into osixia **in the
+  shopping-cart-infra repo**. openldap-0 stays the general/Jenkins directory.
+- **Option B — unify on openldap-0.** Repoint the shopping-cart-infra keycloak to federate openldap-0
+  (`ldap://openldap.identity.svc:389`, `dc=home,dc=org`, `cn=ldap-admin`) and retire its bundled
+  osixia `ldap`. This is a change **in shopping-cart-infra** (Keycloak Deployment env / realm-import
+  ConfigMap + the `ldap-secrets`/`keycloak-secrets` ESO remoteRefs → Vault `secret/ldap/openldap-admin`).
+
+**Either direction is a CROSS-REPO change in `shopping-cart-infra`** — per the shopping-cart repo
+discipline ([[feedback_shopping_cart_spec_not_direct]], [[feedback_shopping_cart_branch_discipline]])
+it must go through a `docs/plans/` spec + Codex on a feature branch, never a direct edit and never
+imperative kcadm/kubectl/vault surgery (ESO + ArgoCD would revert it). Separately, the live App being
+`OutOfSync` (k3d-manager source pointer removed while upstream manifests remain) is its own latent
+risk — a hard refresh/prune could disrupt the stack — and should be reconciled before any identity
+change; see also `docs/issues/2026-09-02-argocd-identity-drift-and-dashboard-502.md`.
+
+**Superseded below:** the "CORRECTION 1" multi-layer table and its git-first steps are accurate about
+*where* the values live, but their remediation wrongly assumed a k3d-manager-local Deployment manifest
+and treated osixia as prunable. The authoritative source is shopping-cart-infra; read CORRECTION 2 as
+the operative decision framing.
+
+### CORRECTION 1 (2026-09-04, deeper trace) — the drift is coherent + multi-layer, NOT one stale component
 
 Live investigation on the hub found the **entire live SSO stack coherently points at osixia**, not
 just the Keycloak realm component. This is bigger than the original spec assumed:
