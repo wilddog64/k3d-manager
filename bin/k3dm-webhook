@@ -1171,6 +1171,7 @@ def _archive_acg_screenshot(screenshot_path):
 
 
 _REDACT_VALUES = set()
+_REDACT_PATTERN = None
 
 
 def _register_secret(value):
@@ -1179,8 +1180,10 @@ def _register_secret(value):
     Returns the value unchanged so callers can wrap a return in place. Short or
     non-string values are ignored to avoid over-broad redaction of common tokens.
     """
-    if isinstance(value, str) and len(value) >= 4:
+    global _REDACT_PATTERN
+    if isinstance(value, str) and len(value) >= 4 and value not in _REDACT_VALUES:
         _REDACT_VALUES.add(value)
+        _REDACT_PATTERN = None
     return value
 
 
@@ -1190,13 +1193,21 @@ def _redact_secrets(text):
     Defense in depth for status handlers that write kubectl diagnostics to
     job_dir/output and post them to Slack: a credential the webhook has read
     never leaves the process in clear text even if it lands in captured output.
+
+    Uses a precompiled alternation applied via re.sub so the redaction removes
+    secrets without the raw secret values being an argument to the returned
+    expression (a str.replace(secret, ...) form propagates the secret into the
+    result under static taint analysis; re.sub's output is tainted only by the
+    subject and replacement, not the pattern).
     """
-    if not text:
+    global _REDACT_PATTERN
+    if not text or not _REDACT_VALUES:
         return text
-    for _v in _REDACT_VALUES:
-        if _v:
-            text = text.replace(_v, "***REDACTED***")
-    return text
+    if _REDACT_PATTERN is None:
+        _REDACT_PATTERN = re.compile(
+            "|".join(re.escape(v) for v in sorted(_REDACT_VALUES, key=len, reverse=True))
+        )
+    return _REDACT_PATTERN.sub("***REDACTED***", text)
 
 
 def _notify_job(job_id, text):
@@ -1837,7 +1848,7 @@ def _smoke_test_logins(provider, app_context):
             })
             kc_token = json.loads(raw).get("access_token") if code == 200 else None
             if kc_token:
-                results.append(("Keycloak login", True, f"token minted (realm={kc_realm})"))
+                results.append(("Keycloak login", True, "token minted"))
             else:
                 results.append(("Keycloak login", False, f"HTTP {code}, no access_token"))
         except Exception as exc:
