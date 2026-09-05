@@ -125,11 +125,28 @@ STOP after Phase 1 and confirm SSO works before Phase 2.
 - [ ] Pushed to `origin/fix/sso-federate-openldap0`; no PR, no merge.
 - [ ] memory-bank (k3d-manager) updated with status + SHAs.
 
-## Caveat to resolve during execution — broken app source
+## Deployment mechanics (verified 2026-09-04 — a git push auto-applies; no app-source surgery)
 
-The live `shopping-cart-identity` Application is `OutOfSync`: its k3d-manager source pointer
-(`services/shopping-cart-identity/kustomization.yaml`, a remote-base reference to
-`shopping-cart-infra//identity/{ldap,keycloak}?ref=main`) was removed in #74. Determine how the stack
-is currently wired to ArgoCD on the hub and reconcile the source BEFORE relying on a sync to apply
-these changes — otherwise a git change upstream will not reach the cluster (or a hard refresh could
-disrupt the stack). See `docs/issues/2026-09-02-argocd-identity-drift-and-dashboard-502.md`.
+The live `shopping-cart-identity` Application is a **multi-source** ArgoCD app pointing DIRECTLY at
+`shopping-cart-infra.git` HEAD (`identity/keycloak` + `identity/ldap`) — NOT at the removed k3d-manager
+kustomization (#74 excluded that from the services-git ApplicationSet so the appset would not stamp a
+conflicting duplicate; this standalone app is canonical). Its `syncPolicy` is
+`automated: {prune: true, selfHeal: true}`. So:
+
+- A push to shopping-cart-infra `main` is **auto-synced** — no manual app-source fix needed.
+- `selfHeal: true` reverts any imperative live edit → confirms the git-only rule above.
+- The `OutOfSync` state is **benign**: only the three ExternalSecrets (`keycloak-secrets`,
+  `keycloak-client-secrets`, `ldap-secrets`) diff, the classic ArgoCD↔ESO noise (ESO mutates the
+  Secret after apply). All workloads (keycloak, ldap, postgres, Deployments, Services) are Synced. It
+  is NOT a broken source and NOT a blocker.
+
+**Why the change propagates end-to-end on sync:**
+1. `configMapGenerator` for `keycloak-config` has no `disableNameSuffixHash`, so editing the LDAP
+   literals changes the generated ConfigMap's hash-suffixed name → the keycloak Deployment's
+   `envFrom.configMapRef` name changes → **keycloak rolls out** with the new LDAP env.
+2. ESO refreshes `keycloak-secrets` so `LDAP_BIND_CREDENTIAL` becomes the openldap-0 admin password
+   (from the repointed remoteRef).
+3. `keycloak-realm-reconcile` is a **PostSync hook** (`hook-delete-policy:
+   BeforeHookCreation,HookSucceeded`) → it re-runs on every sync and `kcadm partialImport`s the
+   rendered realm → the live realm component's `connectionUrl`/`usersDn`/`bindDn` are updated in
+   Keycloak's DB. No manual kcadm step is required.

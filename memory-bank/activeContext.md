@@ -15,7 +15,9 @@
   they feed SSO. User chose **Option B: unify on openldap-0** (repoint keycloak → openldap-0, retire osixia). Spec:
   `docs/bugs/2026-09-04-sso-federate-openldap0-retire-osixia.md` (exact old/new blocks for 3 files + Phase-2 osixia
   retirement; CROSS-REPO shopping-cart-infra → Codex on `fix/sso-federate-openldap0`, never direct/imperative — ESO+ArgoCD
-  revert). NO live changes made. Caveat to resolve first: live App is OutOfSync (k3d-manager source pointer removed #74).
+  revert). NO live changes made. App-source verified HEALTHY: shopping-cart-identity is a multi-source ArgoCD app pointing
+  DIRECTLY at shopping-cart-infra HEAD with automated{prune,selfHeal}; OutOfSync is benign (3 ESO secrets only); a push
+  auto-applies (keycloak-config hash rolls keycloak; keycloak-realm-reconcile PostSync hook re-imports realm). No app-source fix needed.
   Issue doc corrected across CORRECTION 1 + 2: `docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md`.
   Commits on k3d-manager-v1.29.0: `4cd7918d`, `bfacf896` (doc), spec commit next. **NEXT:** await user go to hand the
   spec to Codex + resolve the OutOfSync app-source wiring.

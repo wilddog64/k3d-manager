@@ -107,11 +107,18 @@ self-contained Keycloak + osixia-LDAP SSO unit with declaratively-seeded shoppin
 
 **Either direction is a CROSS-REPO change in `shopping-cart-infra`** — per the shopping-cart repo
 discipline ([[feedback_shopping_cart_spec_not_direct]], [[feedback_shopping_cart_branch_discipline]])
-it must go through a `docs/plans/` spec + Codex on a feature branch, never a direct edit and never
-imperative kcadm/kubectl/vault surgery (ESO + ArgoCD would revert it). Separately, the live App being
-`OutOfSync` (k3d-manager source pointer removed while upstream manifests remain) is its own latent
-risk — a hard refresh/prune could disrupt the stack — and should be reconciled before any identity
-change; see also `docs/issues/2026-09-02-argocd-identity-drift-and-dashboard-502.md`.
+it must go through a spec + Codex on a feature branch, never a direct edit and never imperative
+kcadm/kubectl/vault surgery (ESO + ArgoCD `selfHeal` would revert it).
+
+**App-source is healthy (corrected 2026-09-04):** the `shopping-cart-identity` Application is a
+**multi-source** app pointing DIRECTLY at `shopping-cart-infra.git` HEAD (`identity/keycloak` +
+`identity/ldap`), with `automated: {prune, selfHeal}`. #74 excluded it from the services-git
+ApplicationSet only to stop the appset stamping a duplicate; this standalone app is canonical. The
+`OutOfSync` is benign — only the three ExternalSecrets diff (ArgoCD↔ESO noise); all workloads are
+Synced. So a push to shopping-cart-infra `main` auto-applies (keycloak-config hash-suffix rolls
+keycloak; the `keycloak-realm-reconcile` PostSync hook re-imports the realm). No app-source fix is
+needed — the earlier "resolve the broken source first" concern was mistaken. Full remediation:
+`docs/bugs/2026-09-04-sso-federate-openldap0-retire-osixia.md`.
 
 **Superseded below:** the "CORRECTION 1" multi-layer table and its git-first steps are accurate about
 *where* the values live, but their remediation wrongly assumed a k3d-manager-local Deployment manifest
