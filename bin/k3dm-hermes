@@ -33,9 +33,11 @@ def _save_state(path, state):
     path.chmod(0o600)
 
 
-def _http_json(url, headers):
+def _http_json(url, headers, timeout=None):
+    if timeout is None:
+        timeout = float(os.environ.get("K3DM_HERMES_HTTP_TIMEOUT", "90"))
     request = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(request, timeout=10) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read())
 
 
@@ -67,7 +69,7 @@ def main():
     def webhook_fetch(path, headers):
         separator = "&" if "?" in path else "?"
         suffix = f"{separator}provider={provider}" if provider else ""
-        return _http_json(f"https://{webhook_host}{path}{suffix}", headers)
+        return _http_json(f"http://{webhook_host}{path}{suffix}", headers)
 
     def github_fetch(path, headers):
         return _http_json(f"https://api.github.com{path}", headers)

@@ -34,7 +34,7 @@ def _unavailable(sensor, service):
 
 
 def _webhook_services(fetch, token, provider):
-    url = f"https://{provider}/api/v1/health" if provider else "/api/v1/health"
+    url = f"http://{provider}/api/v1/health" if provider else "/api/v1/health"
     payload = fetch(url, {"Authorization": f"Bearer {token}"})
     if not isinstance(payload, dict) or not isinstance(payload.get("services"), list):
         raise ValueError("invalid webhook payload")
