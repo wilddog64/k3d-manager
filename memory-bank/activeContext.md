@@ -171,6 +171,25 @@
   Uninstall: `bin/k3dm-hermes-setup --uninstall` (leaves Keychain creds intact). Note: git status snapshot shows branch
   `k3d-manager-v1.28.0` but working branch is `k3d-manager-v1.29.0` (confirmed via `git branch --show-current`).
 
+  **INCIDENT REMEDIATION — GRAFANA VAULT-SEED (user go "please address that incident") 2026-09-05.**
+  Hermes surfaced eso "1/20 not synced" + Grafana in the node_pressure webhook failures. Root cause: Vault healthy but
+  KV path `secret/observability/grafana` was **entirely missing** → ExternalSecret `monitoring/grafana-admin-credentials`
+  `SecretSyncedError` "could not get secret data from provider" → grafana pod `CreateContainerConfigError` stuck **27h**.
+  The `grafana-credential-rotator` CronJob can rotate but CANNOT bootstrap an empty path (its `restore()` reads OLD pw
+  under `set -eu` → 404 aborts). Fix executed by the **user via `!`** (classifier blocks Claude live privileged Vault
+  writes): seeded `secret/observability/grafana` `{username:admin, password:<fresh 24-byte hex>}` — schema matching the
+  rotator's `restore()`. Correct stdin pattern: `{ printf RT; printf PW; } | kubectl exec -i vault-0 -- sh -c '<script>'`
+  (script in `-c` argv = no secrets; secrets on stdin via `read`; NOT a heredoc — heredoc+pipe collide on fd 0 and the
+  token gets executed as a command → 403). Result: `SEEDED`, ES flipped to **SecretSynced True**, secret created with
+  `admin-user`+`admin-password`, old grafana pod recovered `0/3 CreateContainerConfigError → 2/3 Running`, rollout
+  restarted to fully clear. **STILL PENDING: cosign restore** (`secret/cosign/signing` also missing → `cosign-public-key`
+  ES errored, but Audit-mode gate = no outage). MUST restore from Keychain backup `k3d-manager-signing`
+  (`k3dm-cosign-key`/`k3dm-cosign-password`), derive `cosign.pub` via `cosign public-key`, write cosign.key/password/pub,
+  force-sync `platform-ops/cosign-public-key` ES. **NEVER run `signing_init`/`deploy_image_signing`** — `_signing_seed_vault_key`
+  regenerates the keypair AND clobbers the Keychain backup, destroying the original signing key. (`security -w` may hex-encode
+  multi-line values → decode `xxd -r -p`, see [[reference_security_w_hex_encodes_multiline]].) Keycloak 502 / argocd-repo-server
+  restart-loop = separate CPU-pressure thread (ties to hub CPU overcommit Step 2 load-shed), NOT addressed here.
+
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
   ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
