@@ -104,6 +104,20 @@
   `bin/k3dm-hermes`) + verify (no-mutation grep, no kubeconfig, off-hub). Consumer files NOT yet written. Then WS4
   `docs/guides/hermes.md`.**
 
+  **WS3 lib-foundation PR #46 OPEN — ALL GATES GREEN, AWAITING MERGE GO (2026-09-05).**
+  https://github.com/wilddog64/lib-foundation/pull/46 (base main ← feat/v0.4.15, head `6dbdbb1`). Gates: CI
+  `completed/success` on `6dbdbb1`; `make credential-test PROVIDER=aws` live ACG gate passed (ACG_SESSION_OK, STS OK);
+  Copilot reviewed — 4 findings, ALL FIXED in `6dbdbb1` + all 4 threads resolved (0 unresolved); scope 3 files
+  additive. Copilot findings were legit: (1) plist render used sed — `&`/delimiter in a path could corrupt it →
+  switched to literal bash `${//}` AND disable bash 5.2+ `patsub_replacement` around it (the `&`-as-match hazard bit
+  in bats' bash 5.3; my new special-char BATS test caught it); (2) bootstrap wasn't `--soft` (could `_err`-exit the
+  caller's shell) + always echoed success → checked plist write, `--soft` bootstrap returns nonzero on failure;
+  (3) `_uninstall_hermes_agent` lacked `_is_mac` guard → added; (4) "WS0" wording leaked into foundation doc →
+  genericized. BATS now 8 hermes cases, full suite 132/132 green, shellcheck-lib clean. **NEVER AUTO-MERGE —
+  prepare-and-stop. On user go: merge #46 → tag `v0.4.15` → `git subtree pull --prefix=scripts/lib/foundation` into
+  k3d-manager-v1.29.0 → add consumer files (plist tmpl + `bin/k3dm-hermes-setup` + `K3DM_HERMES_JITTER` in
+  `bin/k3dm-hermes`) → verify → WS4 guide. Consumer files NOT yet written.**
+
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
   ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
