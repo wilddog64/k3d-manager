@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [v0.4.15] — 2026-09-05
+
+### Added
+- `_install_hermes_agent [repo_root]` / `_uninstall_hermes_agent` (`scripts/lib/system.sh`): install
+  and remove the off-hub Hermes read-only monitoring agent as a macOS launchd LaunchAgent (same tier
+  as `bin/k3dm-webhook`, never in-cluster). Read-only by construction — the installer preflights that
+  the three consumer-side read-only credentials plus the Slack relay already exist in the login
+  Keychain (`security find-generic-password`, no `-w`, no secret read into the process) and **refuses
+  to run if any is missing; it never mints, writes, or deletes a credential** and stands up no
+  privilege at install time. Renders the consumer's `com.k3d-manager.hermes.plist.tmpl` and
+  `bootout`/`bootstrap`s the agent via `_run_command`; `_is_mac` guards non-macOS hosts. Uninstall
+  boots out the agent and removes the rendered plist only, leaving the user-minted Keychain
+  credentials intact.
+
+### Tests / tooling
+- `scripts/tests/lib/hermes_install.bats`: five stubbed-`security`/`launchctl`/`uname` cases —
+  happy-path render + `bootout`-then-`bootstrap`, missing-credential preflight installing nothing,
+  non-macOS refusal, absent-template failure, and uninstall boot-out + plist removal.
+
 ## [v0.4.13] — 2026-08-21
 
 ### Added
