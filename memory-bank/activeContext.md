@@ -28,7 +28,30 @@
   which the webhook JSON omits); (3) NEW GitHub fine-grained read-only PAT (USER mints) for sensor e (CI). Manifest
   committed to branch, NOT applied (prepare-and-stop): live activation = reapply ArgoCD helm values on hub +
   `argocd account generate-token --account hermes` (→ laptop Keychain) + user mints GH PAT, then run DoD checks.
-  **NEXT:** on user go — activate WS0 live creds + run DoD; then WS1 sensor set.
+
+  **WS0 LIVE ACTIVATION (2026-09-05):**
+  - GH PAT (cred #3) VERIFIED read-only: Actions read 200, metadata 200, write attempt 403. Keychain `k3dm-hermes-gh-token -a k3dm`.
+  - **CRITICAL DRIFT DISCOVERY:** the live `argocd-cm`/`argocd-rbac-cm` are NOT sourced from `values.yaml.tmpl`.
+    Both carry a `kubectl.kubernetes.io/last-applied-configuration` (a separate `kubectl apply` overwrote what Helm
+    created). Live argocd-rbac-cm holds a RICH policy (platform-admins, argocd-developers/viewers, platform-dev/ops,
+    order-admin, catalog-admin — Keycloak/LDAP groups) that has NEVER been in values.yaml.tmpl history (`git -S` = 0).
+    Live argocd-cm has `resource.customizations.health.*` Lua + `admin.enabled:true` but LACKS the tmpl's
+    `timeout.reconciliation:180s` + `ignoreResourceUpdates.ConfigMap`. `deploy_argocd_bootstrap` does NOT apply these
+    CMs. ⇒ a `helm upgrade` with the tmpl would DESTROY the live RBAC (real SSO group access). So helm-reapply is the
+    WRONG activation path here; used an ADDITIVE patch instead.
+  - **DONE (additive, non-destructive live patches, context=hub k3d-k3d-cluster):**
+    `kubectl -n cicd patch cm argocd-cm` → added `accounts.hermes: apiKey`;
+    `kubectl -n cicd patch cm argocd-rbac-cm` → appended `p, role:hermes-readonly, applications, get, */*, allow` +
+    `g, hermes, role:hermes-readonly` (rich policy preserved, verified 67 lines, platform-admins/order-admin intact).
+  - **PENDING (handed to user — admin-password step; auto-mode classifier blocked Claude extracting the argocd admin
+    secret, same clean division as GH PAT):** user runs `argocd login` (admin) + `argocd account generate-token
+    --account hermes` → Keychain `k3dm-hermes-argocd-token -a k3dm`. Then Claude runs DoD (can-i sync=no/get=yes,
+    account get hermes = apiKey capability only).
+  - **DRIFT REMEDIATION (separate, flagged to user):** the live argocd-cm/rbac-cm are unmanaged (only in-cluster, not
+    git). A hub rebuild via `deploy_argocd` would silently LOSE the rich RBAC. Recommend capturing live CMs into a
+    git-tracked manifest as authoritative. My values.yaml.tmpl hermes edit is correct as a clean-deploy template but
+    is NOT what the live cluster reads today.
+  **NEXT:** user generates hermes token → Claude runs WS0 DoD + records → then WS1 sensor set.
 
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`

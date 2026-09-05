@@ -22,6 +22,12 @@
   `scripts/etc/argocd/values.yaml.tmpl`; NEW GH fine-grained read-only PAT — user mints). Discovery: webhook
   already reports ESO + node health → NO direct K8s credential needed. Manifest committed, NOT applied
   (prepare-and-stop: reapply helm values + generate-token + mint PAT + run DoD).
+  **ACTIVATION 2026-09-05:** GH PAT verified read-only (200/200/403, Keychain `k3dm-hermes-gh-token`). DRIFT FOUND:
+  live argocd-cm/rbac-cm are `kubectl apply`-managed (rich Keycloak/LDAP RBAC), NOT from values.yaml.tmpl → helm
+  reapply would DESTROY live RBAC; used ADDITIVE `kubectl patch` instead (added `accounts.hermes: apiKey` +
+  `hermes-readonly get` policy, rich policy preserved). PENDING: user runs `argocd account generate-token
+  --account hermes` (admin-auth; classifier blocked Claude from the admin secret) → Keychain
+  `k3dm-hermes-argocd-token`; then Claude runs DoD. Flagged: capture live CMs into git (unmanaged drift).
 - [ ] WS1 sensors · WS2 correlator+Slack · WS3 `_install_hermes_agent` (lib-foundation) · WS4 guide — pending WS0.
 
 ## v1.28.0 queue
