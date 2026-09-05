@@ -133,6 +133,16 @@
   workstream; release DoD). Also still pending for v1.29.0: reapply hub+ACG ApplicationSets pinned to
   k3d-manager-v1.29.0 + `argocd_check_values_branch`; hub CPU overcommit Step 2 load-shed.**
 
+  **WS4 DONE 2026-09-05 — `docs/guides/hermes.md` commit `c7fa27a8`. ALL HERMES PHASE-1 CODE WORKSTREAMS
+  (WS0-WS4) COMPLETE.** Guide grounded in real code, passes `_doc_hygiene_check` (the memory's
+  `scripts/check-doc-links.sh` does NOT exist in this repo — the real .md gate is `_doc_hygiene_check` in
+  lib-foundation `doc_hygiene.sh`: no placeholder tokens + https-only; no relative-link-existence check), all
+  relative links verified to resolve. **REMAINING FOR v1.29.0 RELEASE:** (1) LIVE activation prepare-and-stop —
+  user mints WS0 creds (ArgoCD `hermes` token + GH read-only PAT → laptop Keychain), then `bin/k3dm-hermes-setup`
+  + re-run WS0 read-only DoD; (2) reapply hub+ACG ApplicationSets pinned to `k3d-manager-v1.29.0` +
+  `argocd_check_values_branch`; (3) hub CPU overcommit Step 2 load-shed; (4) then v1.29.0 PR (gated: CI + Copilot +
+  Gemini smoke + Claude scope; never auto-merge).**
+
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
   ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
