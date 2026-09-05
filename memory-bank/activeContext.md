@@ -16,8 +16,19 @@
   subtree, off-hub launchd), WS4 guide. HARD constraints: read-only reports-and-stops (NO mutation path in
   codebase), webhook authoritative (bin/cluster-status-summary → /api/v1/health), least-privilege, LLM
   least-resort (non-Claude default + per-day budget). Phase-1 first deliverable (public-endpoint probe) already
-  shipped v1.28.0. **NEXT:** begin WS0 (access model) — it gates all other workstreams. SSO fix branch
-  d02e6622 recommended to merge as a STANDALONE fix (independent of this milestone).
+  shipped v1.28.0. SSO fix branch d02e6622 recommended to merge as a STANDALONE fix (independent of this milestone).
+  **WS0 STARTED (2026-09-04):** spec `docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md` (WS0 now; WS3 stub).
+  KEY DISCOVERY: the authoritative webhook payload (`_smoke_test_services`, bin/k3dm-webhook) ALREADY reports
+  `ESO ClusterSecretStore`, `ESO ExternalSecrets {n}/{n} synced`, per-service, Data layer, and ArgoCD-server liveness
+  — so routing ESO (sensor a) + node pressure (d) through the webhook means Hermes needs ZERO direct kube-apiserver
+  credential (a direct K8s Role would be a forbidden "second health model"). Access model = 3 read-only creds:
+  (1) existing webhook bearer token (reused, GET-only); (2) NEW ArgoCD read-only local account `hermes` — added
+  `accounts.hermes: apiKey` + policy `p, role:hermes-readonly, applications, get, */*` to
+  `scripts/etc/argocd/values.yaml.tmpl` (get only, no sync/write) for sensor b (per-Application Degraded/OutOfSync,
+  which the webhook JSON omits); (3) NEW GitHub fine-grained read-only PAT (USER mints) for sensor e (CI). Manifest
+  committed to branch, NOT applied (prepare-and-stop): live activation = reapply ArgoCD helm values on hub +
+  `argocd account generate-token --account hermes` (→ laptop Keychain) + user mints GH PAT, then run DoD checks.
+  **NEXT:** on user go — activate WS0 live creds + run DoD; then WS1 sensor set.
 
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`

@@ -15,6 +15,15 @@
 | v1.24.0 | RELEASED — PR #113, tag and GitHub release published |
 | v1.23.0 and earlier | RELEASED — see `CHANGELOG.md` |
 
+## v1.29.0 queue (Hermes Phase-1)
+
+- [ ] **WS0 — access model** — STARTED 2026-09-04. Spec `docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`.
+  3 read-only creds (webhook token reused; NEW ArgoCD read-only account `hermes` in
+  `scripts/etc/argocd/values.yaml.tmpl`; NEW GH fine-grained read-only PAT — user mints). Discovery: webhook
+  already reports ESO + node health → NO direct K8s credential needed. Manifest committed, NOT applied
+  (prepare-and-stop: reapply helm values + generate-token + mint PAT + run DoD).
+- [ ] WS1 sensors · WS2 correlator+Slack · WS3 `_install_hermes_agent` (lib-foundation) · WS4 guide — pending WS0.
+
 ## v1.28.0 queue
 
 - [x] **Hermes Phase-1 §5 — sustained public-endpoint probe** — `bin/public-endpoint-probe`

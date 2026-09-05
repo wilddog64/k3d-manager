@@ -11,6 +11,11 @@ configs:
   cm:
     url: https://${ARGOCD_VIRTUALSERVICE_HOST}
 
+    # Hermes Phase-1 read-only observer (off-hub). apiKey only — no web login, no
+    # password. Token minted with `argocd account generate-token --account hermes`
+    # and stored off-hub (laptop Keychain), never in git. RBAC below grants get only.
+    accounts.hermes: apiKey
+
     # Single-node hub: relax full-resync cadence above the 120s chart default to
     # cut application-controller CPU. Webhook + manual syncs are unaffected.
     timeout.reconciliation: 180s
@@ -37,6 +42,8 @@ configs:
     policy.default: ${ARGOCD_RBAC_DEFAULT_POLICY}
     policy.csv: |
       g, "${ARGOCD_RBAC_ADMIN_GROUP}", role:admin
+      p, role:hermes-readonly, applications, get, */*, allow
+      g, hermes, role:hermes-readonly
 
 server:
   replicas: ${ARGOCD_SERVER_REPLICAS}
