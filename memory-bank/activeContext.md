@@ -18,6 +18,13 @@
   revert). NO live changes made. App-source verified HEALTHY: shopping-cart-identity is a multi-source ArgoCD app pointing
   DIRECTLY at shopping-cart-infra HEAD with automated{prune,selfHeal}; OutOfSync is benign (3 ESO secrets only); a push
   auto-applies (keycloak-config hash rolls keycloak; keycloak-realm-reconcile PostSync hook re-imports realm). No app-source fix needed.
+  **Phase 1 IMPLEMENTED by Codex + Claude-verified (2026-09-04):** shopping-cart-infra branch `fix/sso-federate-openldap0`,
+  commit `d02e6622` (on origin). 3 files, exact spec diff (kustomization keycloak-config literals, realm-shopping-cart.json
+  LDAP component, keycloak-secrets ES remoteRef → secret/ldap/openldap-admin·LDAP_ADMIN_PASSWORD; rdnLDAPAttribute uid→cn;
+  usernameLDAPAttribute/bindCredential untouched). Independently verified: SHA on origin, only 3 files, JSON valid,
+  `kustomize build` renders openldap-0 env. NO PR/merge (gated), identity/ldap untouched (Phase 2 pending). **NEXT:** user
+  decides PR+merge of the shopping-cart-infra branch (auto-applies to live SSO on merge to main) → then live-verify SSO
+  (get-keycloak-password developer binds; real login) → then Phase 2 (retire osixia).
   Issue doc corrected across CORRECTION 1 + 2: `docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md`.
   Commits on k3d-manager-v1.29.0: `4cd7918d`, `bfacf896` (doc), spec commit next. **NEXT:** await user go to hand the
   spec to Codex + resolve the OutOfSync app-source wiring.
