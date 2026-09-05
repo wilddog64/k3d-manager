@@ -17,7 +17,7 @@
 
 ## v1.29.0 queue (Hermes Phase-1)
 
-- [ ] **WS0 — access model** — STARTED 2026-09-04. Spec `docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`.
+- [x] **WS0 — access model — COMPLETE 2026-09-05.** Spec `docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`.
   3 read-only creds (webhook token reused; NEW ArgoCD read-only account `hermes` in
   `scripts/etc/argocd/values.yaml.tmpl`; NEW GH fine-grained read-only PAT — user mints). Discovery: webhook
   already reports ESO + node health → NO direct K8s credential needed. Manifest committed, NOT applied
@@ -27,7 +27,9 @@
   reapply would DESTROY live RBAC; used ADDITIVE `kubectl patch` instead (added `accounts.hermes: apiKey` +
   `hermes-readonly get` policy, rich policy preserved). PENDING: user runs `argocd account generate-token
   --account hermes` (admin-auth; classifier blocked Claude from the admin secret) → Keychain
-  `k3dm-hermes-argocd-token`; then Claude runs DoD. DRIFT REMEDIATION DONE 2026-09-05 (user go): captured live
+  `k3dm-hermes-argocd-token`. **DoD VERIFIED 2026-09-05:** token minted (237-char JWT, `sub: hermes`); can-i
+  get=yes / sync=no / delete=no; app list=38; live sync refused server-side (`PermissionDenied`); no hermes K8s
+  SA, no kubeconfig context. All 3 creds present (#1 webhook, #2 argocd, #3 gh). DRIFT REMEDIATION DONE 2026-09-05 (user go): captured live
   argocd-cm/rbac-cm at-risk content (rich policy.csv verbatim, scopes, admin.enabled, 2 health Lua blocks) into
   `values.yaml.tmpl`; verified render==live via envsubst-allowlist diff (policy.csv/health IDENTICAL). Chart-default
   keys deliberately not captured. See activeContext for root-cause (last-applied-configuration analysis).

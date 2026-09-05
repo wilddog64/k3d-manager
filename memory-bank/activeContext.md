@@ -43,10 +43,14 @@
     `kubectl -n cicd patch cm argocd-cm` → added `accounts.hermes: apiKey`;
     `kubectl -n cicd patch cm argocd-rbac-cm` → appended `p, role:hermes-readonly, applications, get, */*, allow` +
     `g, hermes, role:hermes-readonly` (rich policy preserved, verified 67 lines, platform-admins/order-admin intact).
-  - **PENDING (handed to user — admin-password step; auto-mode classifier blocked Claude extracting the argocd admin
-    secret, same clean division as GH PAT):** user runs `argocd login` (admin) + `argocd account generate-token
-    --account hermes` → Keychain `k3dm-hermes-argocd-token -a k3dm`. Then Claude runs DoD (can-i sync=no/get=yes,
-    account get hermes = apiKey capability only).
+  - **hermes ArgoCD token (cred #2) — DONE + DoD VERIFIED 2026-09-05 (user minted, Claude verified):** user ran
+    `argocd login` (admin) + `argocd account generate-token --account hermes` → stored Keychain
+    `k3dm-hermes-argocd-token -a k3dm` (created 12:17:02Z, 237-char JWT, `sub: hermes`). WS0 DoD all green:
+    `can-i get applications */*` = **yes**; `can-i sync */*` = **no**; `can-i delete */*` = **no**; functional
+    `app list` = 38 apps; live `app sync --dry-run` refused server-side (`PermissionDenied … sync … sub: hermes`);
+    NO hermes K8s ServiceAccount (all namespaces), NO hermes kubeconfig context — off-hub model intact. All 3
+    creds now present: `k3dm-webhook-token` (#1, GET-only), `k3dm-hermes-argocd-token` (#2, get-only), 
+    `k3dm-hermes-gh-token` (#3, read-only PAT).
   - **DRIFT REMEDIATION — DONE 2026-09-05 (user go "yes, please"):** captured the live argocd-cm/rbac-cm at-risk
     content into `scripts/etc/argocd/values.yaml.tmpl` so a `deploy_argocd`/helm reapply reproduces the live hub
     instead of destroying it. Root cause pinpointed via each CM's `last-applied-configuration`: the rich RBAC,
@@ -61,7 +65,7 @@
     IDENTICAL, scopes/policy.default match, both health blocks IDENTICAL, admin.enabled match, YAML parses.
     NOTE: template values file feeds helm ONLY on the LDAP/Keycloak deploy path (`_argocd_helm_deploy_release`
     else-branch skips it) — that IS the production hub path, so the risk was real.
-  **NEXT:** user generates hermes token → Claude runs WS0 DoD + records → then WS1 sensor set.
+  **WS0 COMPLETE 2026-09-05.** 3-credential read-only access model live + verified. **NEXT: WS1 sensor set.**
 
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
