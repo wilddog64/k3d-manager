@@ -33,8 +33,8 @@
   argocd-cm/rbac-cm at-risk content (rich policy.csv verbatim, scopes, admin.enabled, 2 health Lua blocks) into
   `values.yaml.tmpl`; verified render==live via envsubst-allowlist diff (policy.csv/health IDENTICAL). Chart-default
   keys deliberately not captured. See activeContext for root-cause (last-applied-configuration analysis).
-- [ ] **WS1 sensors + WS2 correlator/Slack — SPEC WRITTEN 2026-09-05** (`docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md`, plan doc #3/5). Python 3 stdlib-only agent `bin/k3dm-hermes` + `scripts/lib/hermes/`; 5 sensors grounded in real interfaces (webhook `/api/v1/health`, `argocd app list -o json` via hermes token, `public-endpoint-probe --json`, GitHub Actions API); normalized record + unknown-on-unavailable (constraint 2); multi-signal correlator + budgeted LLM (constraint 4); DoD greps enforce zero mutation. NEXT: implement (Claude or Codex).
-- [ ] WS3 `_install_hermes_agent` (lib-foundation) · WS4 guide — pending WS1/WS2.
+- [x] **WS1 sensors + WS2 correlator/Slack — IMPLEMENTED + VERIFIED 2026-09-05, commit `4e9d3e6e` on `origin/k3d-manager-v1.29.0`** (spec `docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md`, plan doc #3/5). Python 3 stdlib-only agent `bin/k3dm-hermes` + `scripts/lib/hermes/` (records/sensors/correlator/slack); 5 sensors on real interfaces (webhook `/api/v1/health`, `argocd app list -o json --grpc-web` via hermes token, `public-endpoint-probe --json`, GitHub Actions API); normalized record + unknown-on-unavailable (constraint 2); multi-signal correlator (≥2 degraded in-window, dedupe + resolved note) + budgeted LLM (default gemini, Claude never authors, cap 10/day + deterministic fallback — constraint 4). Codex-dispatched (`codex exec`); Codex hit sandbox `.git` lock, Claude committed+pushed after independent verify. Gates: py_compile clean, 8/8 pytest green (temp venv), both DoD greps 0 matches (no mutation, no kubeconfig), stdlib-only, secrets via `security -w`. NEXT: WS3.
+- [ ] WS3 `_install_hermes_agent` (lib-foundation) · WS4 guide — pending, next up.
 
 ## v1.28.0 queue
 
