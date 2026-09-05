@@ -25,6 +25,48 @@ configs:
         # Istio leader-election renewals are volatile metadata, not desired state.
         - '.metadata.annotations."control-plane.alpha.kubernetes.io/leader"'
 
+    # Admin account enabled (matches the live hub; chart default is also true, kept
+    # explicit so a rebuild reproduces the live access model).
+    admin.enabled: "true"
+
+    # Custom resource health checks captured from the live hub. These are NOT chart
+    # defaults — they were applied out-of-band and drive the health signal the webhook
+    # reports (ESO) and the Slack digest (App-of-Apps). A rebuild without them would
+    # silently lose ExternalSecret Degraded/Ready reporting.
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Healthy"
+      hs.message = ""
+      if obj.status ~= nil then
+        if obj.status.health ~= nil then
+          hs.status = obj.status.health.status
+          if obj.status.health.message ~= nil then
+            hs.message = obj.status.health.message
+          end
+        end
+      end
+      return hs
+
+    resource.customizations.health.external-secrets.io_ExternalSecret: |
+      hs = {}
+      if obj.status ~= nil then
+        for _, condition in ipairs(obj.status.conditions or {}) do
+          if condition.type == "Ready" then
+            if condition.status == "True" then
+              hs.status = "Healthy"
+              hs.message = condition.message or ""
+            else
+              hs.status = "Degraded"
+              hs.message = condition.message or ""
+            end
+            return hs
+          end
+        end
+      end
+      hs.status = "Progressing"
+      hs.message = "Waiting for ExternalSecret to sync"
+      return hs
+
     oidc.config: |
       name: Keycloak
       issuer: ${ARGOCD_KEYCLOAK_REALM_URL}
@@ -40,8 +82,78 @@ configs:
 
   rbac:
     policy.default: ${ARGOCD_RBAC_DEFAULT_POLICY}
+    scopes: '[groups, email]'
+    # Authoritative RBAC captured verbatim from the live hub (2026-09-05). Previously
+    # this template shipped a single ${ARGOCD_RBAC_ADMIN_GROUP} line whose default is a
+    # stale LDAP DN (cn=admins,ou=groups,dc=home,dc=org) — it does NOT match the live
+    # Keycloak group model below, so a helm reapply would have destroyed all of it.
+    # Group names are hardcoded because they are Keycloak groups, not templated.
     policy.csv: |
-      g, "${ARGOCD_RBAC_ADMIN_GROUP}", role:admin
+      # ============================================
+      # Group-based policies (from Keycloak/LDAP)
+      # ============================================
+
+      # Platform Admins - Full access to everything
+      g, platform-admins, role:admin
+
+      # ArgoCD Admins - Full access to ArgoCD
+      g, argocd-admins, role:admin
+
+      # ArgoCD Developers - Can view and sync applications
+      p, role:argocd-developer, applications, get, */*, allow
+      p, role:argocd-developer, applications, sync, */*, allow
+      p, role:argocd-developer, applications, action/*, */*, allow
+      p, role:argocd-developer, logs, get, */*, allow
+      p, role:argocd-developer, exec, create, */*, allow
+      p, role:argocd-developer, repositories, get, *, allow
+      p, role:argocd-developer, clusters, get, *, allow
+      p, role:argocd-developer, projects, get, *, allow
+      g, argocd-developers, role:argocd-developer
+
+      # ArgoCD Viewers - Read-only access
+      p, role:argocd-viewer, applications, get, */*, allow
+      p, role:argocd-viewer, logs, get, */*, allow
+      p, role:argocd-viewer, repositories, get, *, allow
+      p, role:argocd-viewer, clusters, get, *, allow
+      p, role:argocd-viewer, projects, get, *, allow
+      g, argocd-viewers, role:argocd-viewer
+
+      # Platform Developers - Access to shopping-cart project only
+      p, role:platform-developer, applications, get, shopping-cart/*, allow
+      p, role:platform-developer, applications, sync, shopping-cart/*, allow
+      p, role:platform-developer, applications, action/*, shopping-cart/*, allow
+      p, role:platform-developer, logs, get, shopping-cart/*, allow
+      p, role:platform-developer, exec, create, shopping-cart/*, allow
+      p, role:platform-developer, repositories, get, *, allow
+      p, role:platform-developer, clusters, get, *, allow
+      p, role:platform-developer, projects, get, shopping-cart, allow
+      g, platform-developers, role:platform-developer
+
+      # Platform Operators - Read-only access to shopping-cart project
+      p, role:platform-operator, applications, get, shopping-cart/*, allow
+      p, role:platform-operator, logs, get, shopping-cart/*, allow
+      p, role:platform-operator, repositories, get, *, allow
+      p, role:platform-operator, clusters, get, *, allow
+      p, role:platform-operator, projects, get, shopping-cart, allow
+      g, platform-operators, role:platform-operator
+
+      # ============================================
+      # Application-specific policies
+      # ============================================
+
+      # Order Service Admins - Full access to shopping-cart-order app
+      p, role:order-admin, applications, *, shopping-cart/shopping-cart-order, allow
+      p, role:order-admin, logs, get, shopping-cart/shopping-cart-order, allow
+      p, role:order-admin, exec, create, shopping-cart/shopping-cart-order, allow
+      g, order-admins, role:order-admin
+
+      # Product Catalog Admins - Full access to product-catalog app
+      p, role:catalog-admin, applications, *, shopping-cart/shopping-cart-product-catalog, allow
+      p, role:catalog-admin, logs, get, shopping-cart/shopping-cart-product-catalog, allow
+      p, role:catalog-admin, exec, create, shopping-cart/shopping-cart-product-catalog, allow
+      g, catalog-admins, role:catalog-admin
+
+      # Hermes Phase-1 read-only observer (off-hub) — get only, no sync/update/delete
       p, role:hermes-readonly, applications, get, */*, allow
       g, hermes, role:hermes-readonly
 

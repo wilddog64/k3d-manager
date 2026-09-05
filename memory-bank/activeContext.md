@@ -47,10 +47,20 @@
     secret, same clean division as GH PAT):** user runs `argocd login` (admin) + `argocd account generate-token
     --account hermes` → Keychain `k3dm-hermes-argocd-token -a k3dm`. Then Claude runs DoD (can-i sync=no/get=yes,
     account get hermes = apiKey capability only).
-  - **DRIFT REMEDIATION (separate, flagged to user):** the live argocd-cm/rbac-cm are unmanaged (only in-cluster, not
-    git). A hub rebuild via `deploy_argocd` would silently LOSE the rich RBAC. Recommend capturing live CMs into a
-    git-tracked manifest as authoritative. My values.yaml.tmpl hermes edit is correct as a clean-deploy template but
-    is NOT what the live cluster reads today.
+  - **DRIFT REMEDIATION — DONE 2026-09-05 (user go "yes, please"):** captured the live argocd-cm/rbac-cm at-risk
+    content into `scripts/etc/argocd/values.yaml.tmpl` so a `deploy_argocd`/helm reapply reproduces the live hub
+    instead of destroying it. Root cause pinpointed via each CM's `last-applied-configuration`: the rich RBAC,
+    `scopes: '[groups, email]'`, and the two `resource.customizations.health.*` Lua blocks (App-of-Apps + ESO
+    ExternalSecret) were MANUAL applies (not chart defaults) → helm would drop them; the stale template also
+    rendered `${ARGOCD_RBAC_ADMIN_GROUP}` = an LDAP DN (`cn=admins,ou=groups,dc=home,dc=org`) that does NOT match
+    the live Keycloak group model. Fix: embedded the live rich policy.csv VERBATIM (8 groups + hermes, hardcoded
+    Keycloak group names), added `scopes`, `admin.enabled: "true"`, and both health Lua blocks. The many
+    `ignoreResourceUpdates.*`/`resource.exclusions`/`timeout.*`/`impersonation`/`statusbadge` keys were confirmed
+    chart defaults (absent from last-applied) → helm regenerates them, deliberately NOT captured (minimal patch).
+    VERIFIED by rendering the tmpl through the plugin's exact envsubst allowlist + diffing vs live: policy.csv
+    IDENTICAL, scopes/policy.default match, both health blocks IDENTICAL, admin.enabled match, YAML parses.
+    NOTE: template values file feeds helm ONLY on the LDAP/Keycloak deploy path (`_argocd_helm_deploy_release`
+    else-branch skips it) — that IS the production hub path, so the risk was real.
   **NEXT:** user generates hermes token → Claude runs WS0 DoD + records → then WS1 sensor set.
 
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**

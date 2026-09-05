@@ -27,7 +27,10 @@
   reapply would DESTROY live RBAC; used ADDITIVE `kubectl patch` instead (added `accounts.hermes: apiKey` +
   `hermes-readonly get` policy, rich policy preserved). PENDING: user runs `argocd account generate-token
   --account hermes` (admin-auth; classifier blocked Claude from the admin secret) → Keychain
-  `k3dm-hermes-argocd-token`; then Claude runs DoD. Flagged: capture live CMs into git (unmanaged drift).
+  `k3dm-hermes-argocd-token`; then Claude runs DoD. DRIFT REMEDIATION DONE 2026-09-05 (user go): captured live
+  argocd-cm/rbac-cm at-risk content (rich policy.csv verbatim, scopes, admin.enabled, 2 health Lua blocks) into
+  `values.yaml.tmpl`; verified render==live via envsubst-allowlist diff (policy.csv/health IDENTICAL). Chart-default
+  keys deliberately not captured. See activeContext for root-cause (last-applied-configuration analysis).
 - [ ] WS1 sensors · WS2 correlator+Slack · WS3 `_install_hermes_agent` (lib-foundation) · WS4 guide — pending WS0.
 
 ## v1.28.0 queue
