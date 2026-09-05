@@ -1,307 +1,117 @@
-# k3d-manager
+# lib-foundation
 
-Modular Bash utility for creating and managing local Kubernetes development clusters. Supports a **two-cluster architecture** — an infra cluster (Vault, ESO, Istio, ArgoCD, OpenLDAP, Keycloak) and an app cluster (Ubuntu k3s) managed via ArgoCD GitOps.
+Shared Bash foundation library extracted from [`k3d-manager`](https://github.com/wilddog64/k3d-manager).
 
-The entry point is `./scripts/k3d-manager`, which dispatches to core libraries and lazily loads plugins on demand. On macOS with OrbStack running, the `orbstack` provider is auto-selected; otherwise `k3d` is the default. Linux hosts use `CLUSTER_PROVIDER=k3s`.
+## Contents
 
-The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_lint`, `_agent_audit`) that enforces spec-first development, architectural linting, and security checks on every commit via a pre-commit hook.
+| File | Purpose |
+|---|---|
+| `scripts/lib/core.sh` | Cluster lifecycle operations — create, destroy, deploy, provider abstraction |
+| `scripts/lib/system.sh` | System utilities — `_run_command` privilege model, package helpers, OS detection, BATS install |
+| `scripts/lib/agent_rigor.sh` | Agent audit tooling — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`, pre-commit hook |
+| `scripts/lib/acg/` | Optional ACG module — `acg_*` AWS sandbox lifecycle, `gcp_*` credential extraction, Playwright/CDP helpers |
 
-![Three AI agents — Codex, Gemini, and Claude — working simultaneously on k3d-manager](docs/assets/multi-agents.png)
+## Integration
 
----
-
-## Quick Start: Two-Cluster Journey
-
-### 1. Bootstrap the infra cluster (local — OrbStack or k3d)
-
-```bash
-./scripts/k3d-manager deploy_cluster --confirm          # create cluster + install Istio
-./scripts/k3d-manager deploy_vault --confirm            # Vault HA + PKI
-./scripts/k3d-manager deploy_eso --confirm              # External Secrets Operator
-./scripts/k3d-manager deploy_ldap --confirm             # OpenLDAP directory
-./scripts/k3d-manager deploy_argocd --confirm           # ArgoCD GitOps engine
-./scripts/k3d-manager deploy_keycloak --confirm         # Keycloak identity provider
-ACME_EMAIL=you@example.com \
-  ./scripts/k3d-manager deploy_cert_manager --confirm   # cert-manager + ACME ClusterIssuer
-```
-
-### 2. Provision the ACG sandbox (app cluster on AWS EC2)
+This library is embedded into consumers via **git subtree**. The core library stays zero-node; the
+optional `scripts/lib/acg/` module is opt-in and installs its own Node deps only when needed:
 
 ```bash
-# Extract AWS credentials from the Pluralsight sandbox (run before acg_provision)
-./scripts/k3d-manager acg_get_credentials              # Playwright auto-extract via Chrome CDP
-pbpaste | ./scripts/k3d-manager acg_import_credentials # fallback: paste from clipboard
+# Add as subtree (first time)
+git subtree add --prefix=scripts/lib/foundation \
+  https://github.com/wilddog64/lib-foundation.git main --squash
 
-acg_provision --confirm           # VPC + SG + key pair + t3.medium EC2; updates ~/.ssh/config
-acg_status                        # verify instance state + k3s health
-acg_extend                        # open browser to extend sandbox TTL (+4h)
-acg_teardown --confirm            # terminate instance; remove ubuntu-k3s kubeconfig context
+# Pull updates
+git subtree pull --prefix=scripts/lib/foundation \
+  https://github.com/wilddog64/lib-foundation.git main --squash
 ```
 
-> Set `ACG_ALLOWED_CIDR=<your-ip>/32` to restrict SSH/6443 ingress (default: `0.0.0.0/0`).
->
-> **First run:** `acg_extend_playwright` will open Google Chrome and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the browser session check.
+## Consumers
 
-### 3. Add the Ubuntu k3s app cluster
+- [`k3d-manager`](https://github.com/wilddog64/k3d-manager) — local Kubernetes platform manager
+- `rigor-cli` — agent audit tooling (planned)
+- `shopping-carts` — app cluster deployment (planned)
+
+## Optional ACG Module
+
+`scripts/lib/acg/` is the browser-automation module imported from lib-acg. Its public shell API is
+`acg_*` for AWS sandbox lifecycle and `gcp_*` for GCP credential extraction. The module sources
+`scripts/lib/system.sh` via `../system.sh`, keeps its Node/Playwright dependencies isolated in the
+module directory, and uses `npm ci` from `package-lock.json` when you want to run the acg CI/tests.
+
+- `npm run check` in `scripts/lib/acg/` runs `node --check` over the module JS files.
+- `npm test` in `scripts/lib/acg/` runs the Jest unit tests.
+- `npm run test:e2e` / `make credential-test` remain manual browser gates and are not part of core
+  shellcheck/BATS validation.
+- When reviewing changes under `scripts/lib/acg/playwright/**/*.js`, keep the Playwright helpers and
+  fixtures isolated from the core Bash library.
+
+## Key Contracts
+
+### `_run_command` (system.sh)
+
+Privilege escalation wrapper. Never call `sudo` directly — use this instead.
 
 ```bash
-UBUNTU_K3S_SSH_HOST=ubuntu \
-  ./scripts/k3d-manager add_ubuntu_k3s_cluster    # export kubeconfig + register in ArgoCD
-./scripts/k3d-manager configure_vault_app_auth    # cross-cluster Vault auth
-./scripts/k3d-manager register_shopping_cart_apps # deploy shopping cart via ArgoCD
+_run_command --interactive-sudo -- apt-get install -y jq  # prompt for sudo if needed (install helpers)
+_run_command --prefer-sudo -- some-cmd                     # sudo if available, else current user (non-interactive)
+_run_command --require-sudo -- mkdir /etc/myapp            # fail if sudo unavailable
+_run_command --probe 'config current-context' -- kubectl get nodes  # probe then decide
+_run_command --quiet -- command_that_might_fail            # suppress stderr, return exit code
 ```
 
-### 4. Verify
+### `_detect_platform` (system.sh)
 
-```bash
-./scripts/k3d-manager test all    # run all BATS suites
-```
+Single source of truth for OS detection. Returns: `mac`, `wsl`, `debian`, `redhat`, `linux`.
 
----
+### `foundation_ensure_vcluster_cli <version>` (system.sh)
 
-## Usage
+Ensures the requested vCluster CLI version (without a leading `v`) is available and returns its
+absolute managed executable path on stdout. The verified binary is stored at
+`${XDG_DATA_HOME:-$HOME/.local/share}/lib-foundation/vcluster/<version>/vcluster`.
+The helper supports macOS and Linux on `arm64`/`amd64`, requires only the existing `curl`
+prerequisite for acquisition, verifies the release SHA-256 before activation, and serializes
+concurrent installs per version. An already verified managed binary is reused offline; there is
+no package-manager installation or fallback to an arbitrary `vcluster` on `PATH`.
 
-```bash
-./scripts/k3d-manager                     # short summary: categories + function counts
-./scripts/k3d-manager --help              # full function list grouped by category
-./scripts/k3d-manager <function> [args]   # invoke a core or plugin function
-```
+### `_cluster_provider` (core.sh)
 
-Running without arguments prints a concise overview:
+Returns active provider string (`k3d`, `k3s`, `orbstack`). Controlled by
+`CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER`.
 
-```
-Usage: ./k3d-manager <function> [args]
+## Contributed Scripts and Templates
 
-Categories:
-  Cluster lifecycle      (9 functions)
-  Infrastructure         (5 functions)
-  Secrets                (7 functions)
-  Directory service      (9 functions)
-  Networking             (4 functions)
-  Shopping cart          (2 functions)
-  Testing                (9 functions)
+Standalone tools for the spec-driven multi-agent workflow — copy into your repo or
+Claude Code installation. Not part of the Bash library.
 
-Run ./scripts/k3d-manager --help for full function list.
-```
-
-`--help` expands each category with the full function list, cluster provider info, and environment variables.
-
-```bash
-./scripts/k3d-manager create_cluster mycluster          # default 8000/8443
-./scripts/k3d-manager create_cluster second 9090 9443   # custom ports
-CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-interactive
-```
-
-### Safety Gates, Dry-Run, and Plans
-
-- Running any `deploy_*` function with no arguments now shows the help text instead of executing. Pass explicit options or `--confirm` to apply the defaults, e.g. `./scripts/k3d-manager deploy_vault --confirm --namespace secrets`.
-- Add `--dry-run` (or `-n`) to print every command that would run without executing, useful for reviewing changes or validating permissions. Sets `K3DM_DEPLOY_DRY_RUN=1`—set it in the environment to dry-run full sessions.
-- `deploy_vault --plan` inspects the current cluster state (namespace, Helm release, Vault status, PKI/policy setup) and prints a Terraform-style plan before you run the real deployment.
-
----
-
-## Provider Selection
-
-| Provider | When | How |
+| File | Purpose | Install to |
 |---|---|---|
-| `orbstack` | macOS + OrbStack running | Auto-detected (or `CLUSTER_PROVIDER=orbstack`) |
-| `k3d` | macOS, no OrbStack | Default fallback |
-| `k3s` | Linux bare-metal | `CLUSTER_PROVIDER=k3s` |
-| `k3s-aws` | AWS EC2 via ACG sandbox | `CLUSTER_PROVIDER=k3s-aws` |
-| `k3s-gcp` | GCP compute instance via ACG sandbox | `CLUSTER_PROVIDER=k3s-gcp` |
-| `k3s-hostinger` | Permanent single-node app cluster on a Hostinger KVM VPS | `CLUSTER_PROVIDER=k3s-hostinger` |
+| `scripts/etc/contrib/agent-pickup.sh` | Agent orientation on session start | `bin/agent-pickup.sh` in your repo |
+| `scripts/etc/contrib/handoff-skill.md` | Claude Code `/handoff` skill template | `~/.claude/commands/handoff.md` |
+| `scripts/etc/contrib/statusline.sh` | Claude Code status line | via `/statusline-setup` skill |
 
-See **[docs/providers/](docs/providers/)** for per-provider guides:
-- [OrbStack](docs/providers/orbstack.md)
-- [k3s (bare-metal)](docs/providers/k3s.md)
-- [k3s-aws / k3s-gcp (ACG sandbox)](docs/howto/acg.md)
+[Full contrib docs →](docs/contrib.md)
 
 ---
 
-## Architecture
+## Development
 
-```mermaid
-graph TD
-  U[User CLI] --> KM[./scripts/k3d-manager]
-  KM --> LIB["lib/ — system · core · providers"]
-  KM --|lazy-load|--> PLUG["plugins/ — acg · aws · gemini · tunnel · ..."]
+```bash
+# Run BATS tests (requires bats ≥ 1.11) — always use env -i for clean environment
+env -i PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" \
+  bash --norc --noprofile -c 'bats scripts/tests/lib/'
 
-  subgraph Infra ["Infra Cluster — OrbStack / k3d / k3s (local)"]
-    VAULT["Vault (PKI + Auth)"]
-    ESO[ESO]
-    ARGOCD[ArgoCD]
-    ISTIO[Istio]
-    LDAP[LDAP / AD]
-    TRIVY[Trivy Operator]
-    ESO -->|sync| VAULT
-    ARGOCD -->|deploys| TRIVY
-  end
-
-  subgraph AppCluster ["App Cluster — k3s-aws (EC2)"]
-    K3S[k3s node]
-    APPS[Shopping Cart pods]
-    K3S --> APPS
-  end
-
-  ANTG["Chrome (Playwright CDP :9222)"]
-  AWSC["aws.sh — credential import"]
-
-  PLUG -->|deploy stack| Infra
-  PLUG -->|acg_provision — EC2 + k3sup| AppCluster
-  PLUG -->|browser automation| ANTG
-  PLUG -->|credential import| AWSC
-  ANTG -->|extract from Pluralsight| AWSC
-  AWSC -->|auth| AppCluster
-  PLUG -.->|tunnel.sh — autossh :6443| K3S
-  ARGOCD -->|GitOps deploy| APPS
-  TRIVY -.->|vuln scan| APPS
-  VAULT -.->|cross-cluster auth| K3S
-  ESO -.->|sync| AKV[Azure Key Vault]
+# shellcheck
+shellcheck scripts/lib/core.sh scripts/lib/system.sh
 ```
 
----
+## Code Style
 
-## Directory Layout
-
-```
-scripts/
-  k3d-manager        # dispatcher
-  lib/               # core functionality (system.sh, core.sh, cluster_provider.sh)
-  plugins/           # optional features loaded on demand
-  etc/               # templates and configs (*.yaml.tmpl, vars.sh)
-  tests/             # BATS suites (pure logic — no cluster mocks)
-bin/                 # one-off convenience scripts (also exposed as Claude skills)
-  acg-up             # full provision: creds → cluster → tunnel → watcher → ghcr-pull-secret
-  acg-down           # teardown: tunnel stop → CloudFormation delete
-  acg-refresh        # refresh AWS credentials + restart tunnel (daily driver)
-  acg-status         # read-only snapshot: tunnel, nodes, pods, ArgoCD, AWS creds
-  rotate-ghcr-pat    # update PACKAGES_TOKEN in all shopping-cart repos via stdin
-docs/
-  architecture/      # design documents
-  api/               # function reference and Vault PKI config
-  guides/            # plugin development, security deep-dives
-  providers/         # orbstack, k3s provider guides
-  plans/             # feature planning and specifications
-  howto/             # user guides
-  issues/            # tracked bugs and debt
-```
-
----
-
-## Documentation
-
-### API Reference
-- **[Public Functions](docs/api/functions.md)** — All callable functions with source locations
-- **[Vault PKI Configuration](docs/api/vault-pki.md)** — PKI variables, example workflow, air-gapped setup
-
-### Plugins
-
-| Plugin | Key Functions | Description |
-|---|---|---|
-| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_extend_playwright`, `acg_watch`, `acg_teardown` | AWS/GCP ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, cloud VM provisioning, background TTL watcher; [spec](docs/plans/archive/v0.9.6-acg-plugin.md) |
-| **AWS** | `aws_import_credentials` | Generic AWS credential import — supports CSV (IAM Download), quoted/unquoted export, labeled (Pluralsight), credentials file formats; writes `~/.aws/credentials` |
-| **Gemini** | `gemini_install`, `gemini_trigger_copilot_review`, `gemini_poll_task` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger |
-| **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
-| **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
-| **ESO** | `deploy_eso` | External Secrets Operator — syncs Vault/AKV secrets into Kubernetes |
-| **LDAP** | `deploy_ldap`, `deploy_ad`, `ldap_get_user_password` | OpenLDAP or Active Directory directory service |
-| **Keycloak** | `deploy_keycloak`, `test_keycloak`, `keycloak_seed_smoke_user` | Keycloak identity provider + smoke test; seeds the `k3dm-smoke` login-verification client/user |
-| **cert-manager** | `deploy_cert_manager` | cert-manager + ACME ClusterIssuer (Let's Encrypt) |
-| **vCluster** | `vcluster_create`, `vcluster_destroy`, `vcluster_use`, `vcluster_list` | Virtual cluster lifecycle on top of the infra cluster |
-| **Tunnel** | `tunnel_start`, `tunnel_stop`, `tunnel_status` | autossh persistent tunnel with launchd boot persistence |
-| **Azure** | `create_az_sp`, `deploy_azure_eso`, `eso_akv` | Azure Service Principal + ESO with Azure Key Vault backend |
-| **SMB CSI** | `deploy_smb_csi` | SMB CSI driver for Windows-compatible persistent volumes |
-| **Shopping Cart** | `register_shopping_cart_apps`, `deploy_app_cluster` | Demo app cluster bootstrap — k3sup EC2 install + ArgoCD app registration |
-| **Copilot** | `copilot_triage_pod`, `copilot_draft_spec` | AI-assisted pod failure diagnosis and bug spec drafting via `_ai_agent_review`; backend selected by `AI_REVIEW_FUNC`; requires `K3DM_ENABLE_AI=1` |
-| **SSM** | `ssm_wait`, `ssm_exec`, `ssm_tunnel` | AWS Systems Manager helpers — wait for SSM registration, run commands on EC2, open SSM port-forward tunnel; opt-in via `K3S_AWS_SSM_ENABLED=true` |
-| **Observability** | `deploy_observability`, `deploy_observability_acg`, `observability_status`, `trivy_scan_report` | Prometheus+Grafana+Trivy on Hub k3d + ACG ubuntu-k3s; Hub Grafana federates ACG metrics via `host.internal:19090`; `make observability` / `make vuln-scan` |
-| **Hello** | `hello` | Minimal example plugin — Hello World; reference for new plugin authors |
-
-### Guides
-- **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
-- **[vCluster E2E Harness (Tier 1)](docs/guides/vcluster-e2e-harness.md)** — How `e2e_verify_vcluster` stands up the shopping-cart stack in a throwaway vCluster, runs Playwright as an in-cluster Job, and emits an exit-code-faithful pass/fail for the v1.26.0 promotion gate
-- **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
-- **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
-- **[Security & Vulnerability Management](docs/guides/security/)** — Deep-dive set on the security stack: Trivy CVE loop, Vault PKI, ESO, image signing/attestation, grounded in the actual implementation
-
-### Providers
-- **[OrbStack](docs/providers/orbstack.md)** — macOS auto-detection and manual override
-- **[k3s (bare-metal)](docs/providers/k3s.md)** — Auto-install, existing cluster, k3d vs k3s differences
-
-### Architecture
-- **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** — Core design principle
-- **[Strategic Roadmap v1.0](docs/plans/archive/roadmap-v1.md)** — v0.8.0 → v1.0.0 roadmap
-- **[Two-Cluster Architecture](docs/plans/two-cluster-infra.md)** — Infra + app cluster design
-- **[Cloudflare Tunnel + Slack Relay](docs/architecture/cloudflare-slack-relay.md)** — Ingress routing and Slack slash command dispatch with Mermaid diagrams
-- **[Webhook Server](docs/architecture/webhook-server.md)** — `bin/k3dm-webhook` + `scripts/lib/webhook/` module layout after the v1.13.0 modularization, request flow, and remaining phases
-- **[OpenLDAP Directory Service](docs/architecture/openldap-directory-service.md)** — Symas `jp-gouin/openldap-stack-ha` topology, credential model, and consumer wiring after the v1.22.0 `bitnamilegacy` migration
-- **[CVE Detection and Remediation Pipeline](docs/architecture/cve-remediation-pipeline.md)** — Trivy alert → webhook → immutable-image promotion/rebuild, plus Dependabot escalation
-- **[Trivy Operator Observability](docs/architecture/trivy-operator-observability.md)** — Trivy Operator reconcile-error logs, scan-job failure alerts, and metrics scraping
-
-### How-To
-
-**Secrets & Identity**
-- **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth
-- **[ESO](docs/howto/eso.md)** — Deploy, connect a secret store, troubleshoot sync failures
-- **[Keycloak](docs/howto/keycloak.md)** — Deploy, smoke test, LDAP federation
-
-**GitOps & CI/CD**
-- **[ArgoCD](docs/howto/argocd.md)** — Deploy, register app cluster, configure deploy keys
-- **[ArgoCD Alerts](docs/howto/argocd-alerts.md)** — ArgoCD Degraded/OutOfSync alert wiring, visibility, and test steps
-- **[cert-manager](docs/howto/cert-manager.md)** — Deploy, Vault + ACME issuers, certificate lifecycle
-
-**Cloud Sandbox**
-- **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
-- **[Gemini Browser Automation](docs/howto/gemini.md)** — First-run setup, ACG extend, Copilot agent trigger
-- **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
-- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/claude` / `/gemini` / `/codex`, `/acg-up` / `/acg-down` / `/acg-status` / `/acg-refresh` / `/acg-resume`, and `/argocd-upgrade`
-
-**Convenience Scripts** (`bin/` — also available as Claude `/skills`)
-
-- **[Makefile Reference](docs/howto/makefile.md)** — All `make` targets with usage, env vars, and when to use each
-
-| Script | Claude Skill | When to use |
-|---|---|---|
-| `bin/acg-up [--login-prompt]` | `/acg-up` | Start from scratch — full provision + ghcr-pull-secret |
-| `bin/acg-down --confirm` | `/acg-down` | Tear down cluster and tunnel |
-| `bin/acg-refresh [--login-prompt]` | `/acg-refresh` | Creds expired or tunnel dropped — daily driver |
-| `bin/acg-status` | `/acg-status` | Read-only health check — nodes, pods, ArgoCD, AWS |
-| `bin/rotate-ghcr-pat` | — | Rotate `PACKAGES_TOKEN` in all shopping-cart repos |
-
-> `GHCR_PAT` env var must be set before `acg-up` (used to create `ghcr-pull-secret`).
-> Pass tokens via `pbpaste | bin/rotate-ghcr-pat` — never paste into chat.
-
-**Virtual Clusters**
-- **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
-- **[vCluster E2E Harness (Tier 1)](docs/guides/vcluster-e2e-harness.md)** — `e2e_verify_vcluster`: throwaway-vCluster substrate + in-cluster Playwright Job + JSON pass/fail contract
-
-**Networking**
-- **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
-
-**LDAP / Directory**
-- **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** — Import users from a CSV into OpenLDAP
-- **[LDAP Password Rotation](docs/howto/ldap-password-rotation.md)** — Rotate user passwords via the rotator CronJob
-
-**AI Tooling**
-- **[Copilot CLI Integration](docs/howto/copilot.md)** — Setup, `copilot_triage_pod` / `copilot_draft_spec` examples, pre-commit AI lint, cross-project adoption via lib-foundation subtree
-
----
-
-## Issue Logs
-
-All tracked bugs, investigations, and debt are filed in **[docs/issues/](docs/issues/)** — one Markdown file per incident.
-
-Recent entries:
-
-| Date | Issue | Component |
-|---|---|---|
-| 2026-08-13 | [make status-json default provider](docs/issues/2026-08-13-status-json-default-provider.md) | v1.24.1: `make status-json` now follows the active provider (from `~/.local/share/k3d-manager/active-provider`) like `make status`; live JSON result is `overall=healthy`, provider `k3s-hostinger` |
-| 2026-08-13 | [Stale Istio ubuntu-k3s Applications](docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md) | Live-ops: stale Istio `ubuntu-k3s` Applications were deletion-tombstoned objects targeting a retired `host.k3d.internal`; finalizers removed and ArgoCD deleted them — hostinger Istio stays Synced/Healthy |
-| 2026-08-12 | [Webhook token restored, status verified](docs/issues/2026-08-12-webhook-token-restored-status-verification.md) | v1.24.1: `bin/k3dm-webhook-setup` restored the existing Keychain token, refreshed the GitHub secret, and reinstalled the LaunchAgent; health recovered to HTTP 200 and concise status works |
-| 2026-08-12 | [Status login credentials + LaunchAgent KUBECONFIG](docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md) | v1.24.1: login smoke goes green after reading hub-scoped Keycloak creds and current ArgoCD/Grafana values from Vault; the LaunchAgent renderer substitutes the real `$HOME` in KUBECONFIG |
-| 2026-08-12 | [Status provider selection + optional Pushgateway](docs/issues/2026-08-12-status-provider-and-optional-pushgateway.md) | v1.24.1: `make status` selects the provider from the active-provider file and classifies an optional Pushgateway connection refusal as a warning, not a failure |
-
-[All issues →](docs/issues/)
+- `set -euo pipefail` on all scripts
+- Public functions: no leading underscore
+- Private functions: prefix with `_`
+- Double-quote all variable expansions
+- No bare `sudo` — use `_run_command --interactive-sudo` for install helpers, `--prefer-sudo` for non-interactive contexts
 
 ---
 
@@ -309,70 +119,22 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v1.26.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.26.0) | 2026-08-21 | Ephemeral fleet lifecycle, a trustworthy E2E promotion gate, and safe reclamation of dead app-cluster registrations. The k3s-aws fleet is now **count-agnostic** — the provider derives agent hosts/total nodes from `ACG_AGENT_COUNT` and fans agent joins out in parallel with per-node readiness, collected failures, and idempotent SSH/SSM skips, backed by a lib-foundation `v0.4.12` awk emitter that generates the N-agent CloudFormation stack and a `make fleet-render|validate|plan|up` offline-to-live ladder; live-verified at 5 nodes (`46bfdf1c`). The Tier 1 vCluster E2E harness becomes a real **promotion gate**: each run writes a durable exit-code-faithful artifact **and** a result-event ConfigMap, the `vulnerability-inventory-exporter` emits `e2e_run_info`/`e2e_last_run_pass`/`e2e_last_run_*` gauges, and a new E2E Grafana dashboard + `E2EVerificationFailing`/`Stale` alerts close the loop (proven live: a failed run drove the gate red). Stale, expired **managed** sandbox registrations can be reclaimed without touching unrelated live Applications, and the confirm path no longer hangs — it deletes the registration Secret first, then non-blocking `--wait=false` on any leftover generated Applications (`0274fdde`); live-accepted on a real expired sandbox (23 unrelated survivors exact-match, hostinger untouched). Also: js-yaml `3.15.1` (lib-foundation `v0.4.11`, dev-only transitive DoS). Two v1.26.0 scopes — the foundation-managed vCluster CLI and the M2 remote E2E runner — remain scoped specs for a follow-up. |
-| [v1.24.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.24.1) | 2026-08-13 | Make cluster status legible — a point release on v1.24.0. `make status` now defaults to a concise color-coded service-health summary (with `make status-full` for the detailed report and a stable `make status-json` for Slack/CI), follows the active cluster provider, and takes `SERVICE=<name>` for focused per-service diagnostics (`7ed82b89`). The same summary reaches Slack: `/cluster-status` renders an emoji-severity one-liner (`:x:`/`:warning:`/`:white_check_mark:` + `N ok / N warn / N fail`) instead of an ANSI wall (`5b9442cf`). The CVE remediation dashboard splits **Current CVE Remediation Status** from **Remediation History (audit)**, the exporter marks superseded / `deployment_advanced` failed events, and both dashboard and inventory tables hide repeated Prometheus scrape metadata behind concise headers (`d471d075`, `a119fdde`). Status fixes: follow the active provider in all modes + soften optional Pushgateway to a warning (`2758e626`, `7c000254`), read the webhook token from the keyed Keychain account (`15579e7a`), and use current Vault-sourced ArgoCD/Grafana + hub-scoped Keycloak credentials so logins stop false-failing after rotation (`a729e8ce`). Verified live — `make status-json` → healthy for k3s-hostinger; the Slack path renders the concise HEALTHY summary from 13 real services. |
-| [v1.24.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.24.0) | 2026-08-11 | Platform hardening — reconcile live drift into git, automate credential rotation, and make CVE remediation durable. The internet-facing k3dm webhook now **fails closed** on malformed Slack signature input and enforces the Slack `user`→role allowlist as real code (dead until now), so an invalid identity resolves to reader, never admin (`3fddcf3e`). Istio-ambient + hostinger-CNI fixes that had only ever been applied live (committed to the archive branch) are reconciled onto the release branch so a rebuild reproduces them — `ServerSideDiff` + istiod webhook `ignoreDifferences`, and the Istio CNI DaemonSet pointed at k3s/flannel paths (`357edf52`). Two persistent credentials gain recurring rotation: a least-privilege in-cluster ArgoCD admin rotator (monthly CronJob, bcrypt fed via stdin, sidecar-excluded so the Job completes) and a host-side Prometheus basic-auth launchd timer (`3db193cb`), with the weak `admin/password` Prometheus default removed at the source (`e1256d0a`); live verify caught four latent rotator defects the structural test missed — bcrypt `fatal EOF` (no newline), the `Password:` prompt captured into the hash, an istio sidecar deadlock in `cicd`, and a nonexistent `bin/k3d-manager` launchd path (`84232cc0`). The CVE remediation promoter stops live-patching the ArgoCD Application (lost on rebuild) and persists the pinned `digest:` to git on the app's tracked branch, `GIT_WRITE_TOKEN` optional with a live-patch fallback (`3df62fbf`); the webhook's headless CVE analysis returns real text instead of auto-denying (`69e21e15`); `make show-service-passwords` reads the ArgoCD admin password from Vault so it survives rotation (`33e42905`). Verified live — one-shot ArgoCD rotation advanced `argocd-secret` mtime, wrote a clean bcrypt, and the new Vault password logged into `/api/v1/session`; the promoter git-persist path dry-ran end-to-end (clone → awk-pin → `push --dry-run` authenticates) leaving the remote untouched |
-| [v1.23.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.23.0) | 2026-08-09 | Make CVE remediation observable and self-verifying — v1.20.0 made the auto-patch loop run, this makes it trustworthy. A CVE inventory dashboard + a `vulnerability-inventory-exporter` show **what** is vulnerable and **where** (real namespace/image/resource) and self-GC the event ledger to the newest N terminal events per service so stale `manual_review` rows clear (`9168edd7`, 70→15 live). The remediation verifier confirms the **Deployment-pinned spec digest** + readiness instead of the pod runtime `imageID` — which containerd aliases to a different OCI index digest for multi-arch images, producing false `ready_pod_digest_mismatch` on images that were in fact patched (`33b45a41`) — and looks in each service's real namespace (`payment` → `shopping-cart-payment`, `8a8566e8`). A new `CVERemediationInFlight` alert inhibits `TrivyCriticalVulnerabilityDetected` for the same image during an active auto-patch and the analyze route caps re-notification at 12h (`ed52cf0c`), the source alert normalizing `image_repository` with `label_replace` so the host-qualified `cve_remediation_state` matches the bare Trivy labels (`72be9383`); TrivyCritical no longer pages on an empty `image_repository` (`5302ea54`). Two Bitnami-removal outages are closed by re-pinning the remediation verifier and LDAP rotator off the deleted `bitnami/kubectl` to `alpine/k8s:1.31.4` (`33b151ba`, `ddc68c90`), and the pulled-forward Grafana Vault-sourced monthly rotator (`5b418dd7`) runs end-to-end after four latent blockers (runAsUser `a66463e1`, openssl-free password `4557cdeb`, rollout-status RBAC `a0bb46c2`, DB-apply + hub-scope smoke `816835fd`). Also: webhook rate-limit moved after auth + `Content-Length` guard (`ee32837d`), and the alert-analysis / `gemini.sh` model ids retired off the removed `gemini-2.5-flash` (`8e7a5c79`, `612ca86d`). Verified live end-to-end on the hub — the verifier flips matching-digest payment events `promotion_requested → applied` and Alertmanager suppresses the paired TrivyCritical during an in-flight remediation, lifting on completion |
-<details>
-<summary>Older releases</summary>
+| [v0.3.17](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.17) | 2026-05-01 | `_ai_agent_review` dispatch wrapper (`AI_REVIEW_FUNC`/`AI_REVIEW_MODEL`); `_copilot_review` rename; `K3DM_ENABLE_AI` gate removed from backend; `_agent_lint` glob expanded to `.sh`/`.js`/`.md`; 3 BATS |
+| [v0.3.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.16) | 2026-04-05 | `_agent_audit` IP allowlist: `grep -Fqx -- "$file"` prevents dash-prefix paths from being parsed as grep flags; 2 BATS |
+| [v0.3.15](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.15) | 2026-03-31 | `_agent_audit` IP allowlist — `AGENT_IP_ALLOWLIST` env var skips IP check for listed paths; 2 BATS |
+
+<details><summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v1.22.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.22.0) | 2026-08-07 | Migrate OpenLDAP off the retired Bitnami image to the Symas chart — Bitnami's `bitnamilegacy` OpenLDAP images are unmaintained, so the directory service moves to the community `jp-gouin/openldap-stack-ha` chart (4.3.3) with every consumer reconciled so the cutover is transparent: admin/config passwords are generated delimiter-safe (hex) so the chart's `sed`-based value templating can't corrupt them (`7fb1ad28`), the platform `admin`/`developer`/`operator` users survive the swap via a durable Vault-seeded bootstrap instead of a one-shot (`c6195bb2`), and Keycloak LDAP federation + the password-rotator labels reconcile to the new `openldap.identity.svc.cluster.local` service (`0b23884b`, `e9fa00cc`); verified live — the Symas chart is running, `developer` login succeeds through Keycloak, and Jenkins LDAP auth is reconciled; `ldap_chart_passwords` 2/2 BATS green, shellcheck clean |
-| [v1.21.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.21.0) | 2026-08-03 | Harden the k3dm webhook auth surface — a security review of the internet-facing webhook (Cloudflare Worker → tunnel → `127.0.0.1:7443`) found the bearer token was the only real boundary and it grants full admin, so this release adds defense-in-depth: the Slack command path enforces the same RBAC as the HTTP path via a `user`→role allowlist (`K3DM_SLACK_ROLE_MAP`, unknown → reader) plus a minimum-role check in `_handle_thread_command` (`490756e1`); roles fail **closed** — a present-but-invalid role header resolves to reader instead of admin (absent header = direct-token admin, unchanged); the `/ask` bash sandbox blocks interpreters, nested shells, and redirection in `k3dm-ask-bash`; and the server gains a fixed-window `429` rate limiter, guarded POST `json.loads` (`400` on malformed), a bounded `_seen_event_ids` cache (OrderedDict cap 2048), a `TOKEN_FILE` permission check, and drops the `GEMINI_CLI_TRUST_WORKSPACE` escape hatch; `make show-service-passwords` shows the current Keycloak user passwords (`21cf3a38`); verified live on a restarted `:7443` (401/403-fail-closed/400/429 all confirmed) with 13/13 smoke checks and 49/49 BATS green. **Owner deploy note:** populate `K3DM_SLACK_ROLE_MAP` or all Slack users are reader-only |
-| [v1.20.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.20.0) | 2026-08-01 | Make the CVE auto-patch loop actually run — v1.18.0 wired the Trivy→webhook→`app-cve-scan` detect→patch loop; this release fixes the many ways it broke in practice: `app-cve-scan` patches ArgoCD Applications by their cluster-prefixed name (root cause of 26 remediation jobs that ran but patched nothing, `9f7cdfe0`), resolves multi-arch digests via OCI image-index media types (`17f5f0e0`), authenticates registry reads with the scan pod's BusyBox `wget --header` not the GNU-only `--config` (`47c2e2d7`), and exits 0 on a completed scan so a still-pending per-service remediation no longer marks the whole CronJob Failed (which had a triage bot looping on a misleading "Trivy exits 1 on CRITICAL" diagnosis), with `app`/`app.kubernetes.io/name` labels on both scan pods so alerts render the workload name (`03fe5684`); CVE scan no longer retries an unresolvable candidate (`0136571f`), CronJobs bound `backoffLimit`/`ttlSecondsAfterFinished` so failed pods stop accumulating (`bda65d5c`), the Hub chart is read from live deployment metadata (`699da11b`), LDAP password seeds are verified on bring-up (`bb5b5653`), and `make up` reconciles platform-ops so the CVE stack is present after a cold bring-up (`0a316fb6`); v1.19.0 was a shopping-cart-only Dependabot milestone with no k3d-manager changes |
-| [v1.18.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.18.0) | 2026-07-28 | Close the first-mile CVE gap — a Trivy vulnerability alert now drives an automatic patch end-to-end: the alert fires the k3dm webhook, which re-runs `app-cve-scan` for the affected workload (event-driven auto-patch, `1684190c`); for the app dependencies Trivy can't rebuild, Dependabot version + security updates are enabled on all five shopping-cart repos so dependency CVEs self-heal into PRs, with branch protection made Dependabot-mergeable (real required checks replacing the phantom `Go CI`, `required_approving_review_count: 0`); platform-ops (CVE scan + dashboards + webhook-token sync) now deploys from the ArgoCD bootstrap so it survives a cold rebuild (`8537f27e`); a hub Grafana dashboard makes the auto-patch loop observable (`29a087cf`); webhook-token disaster recovery syncs the `k3dm-webhook-token` Secret from the macOS Keychain on every platform-ops deploy, generalized so the app-rebuild `gh-token` follows the same path (`b0bc5a21`, `907f6259`); `make status` reports ApplicationSet values-branch drift (`3e847b26`, `c704d669`); Alertmanager `matcherStrategy: None` for cluster-wide CVE routing (`5af5e3a7`); fixes — `app-cve-scan` authenticates ghcr reads with `GH_TOKEN` for private packages (`191d9f4a`) and matches reports on the registry-less path (`43e63b53`), Keycloak LDAP federation self-heals on rebuild (`989dc8e4`), `make show-service-passwords` shows the correct dev users (`ad96c028`), Trivy reconcile Grafana panel rendered as a per-container instant-query bar gauge; lib-foundation subtree **v0.4.8** (brace-expansion 1.1.16 CVE fix) |
-| [v1.17.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.17.0) | 2026-07-24 | The smoke test proves real logins — `make status` used to false-green because the health smoke only fetched health URLs (a Keycloak stale-session page returns HTTP 200 and counted as a pass); it now performs credentialed logins for Keycloak, the frontend, ArgoCD and Grafana; k3d-manager seeds its own `k3dm-smoke` Keycloak client + user (`keycloak_seed_smoke_user`, credential in the `identity/k3dm-smoke-user` Secret) because the app-owned `frontend` client has `directAccessGrantsEnabled=false` so a password grant can never succeed against it; ArgoCD/Grafana admin credentials auto-discovered from their in-cluster Secrets instead of env vars; fixes — seeded smoke user gets the Keycloak 24+ required User Profile attributes (`email`/`firstName`/`lastName`/`emailVerified`, repaired idempotently) so the direct-grant mint no longer fails `invalid_grant "Account is not fully set up"` on a fresh cluster, frontend login smoke attempts the authed `/api/cart` request instead of unconditionally skipping (2xx passes, smoke-client `401`/`403` skips, anything else fails), `_ambient_install_cilium` builds `ssh_cmd` as an array so all three remote invocations quote correctly; dead `_argocd_configure_post_deploy` removed |
-| [v1.16.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.16.0) | 2026-07-23 | Ambient mesh comes to the app tier — hostinger `shopping-cart-apps` migrated from sidecar injection to Istio **ambient** (ztunnel HBONE + mTLS, zero `istio-proxy` sidecars), verified live carrying real traffic; ambient made durable across `make refresh` (reapply `istio-ambient` appset) and cold `k3s-aws` rebuilds (`set -e`-safe wait loops, pinned `k3sup --k3s-version`, default `K3S_AMBIENT_MESH`, Cilium/rancher CNI-substrate-aware conf/bin dirs); multi-cluster ArgoCD hardened — appsets derive `APP_CLUSTER_NAME` from the active cluster and key `services-git` names by cluster so a second app cluster no longer clobbers the first, shopping-cart `AppProject` added, `envsubst` fails loudly on unset vars; `cluster-status` reports mesh/CNI/ambient; 2-CPU hostinger right-sizing — `istiod`/`ztunnel` CPU trimmed and the built-in Trivy server reservation cut `200m`→`50m` so `product-catalog` schedules; app-CVE scan via `wget` + fail-loud on absent secret; `mktemp` trap-guards; lib-foundation subtree **v0.4.7** (`acg_restart`, artifact sweep, `set -e`-safe node-exit captures) |
-| [v1.15.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.15.0) | 2026-07-13 | Security & multi-cluster provider hardening — Trivy Operator migrated Standalone→ClientServer via the chart's built-in shared Trivy server, ending per-job vuln-DB `cache may be in use by another process: timeout` scan failures under concurrent scans; js-yaml DoS advisory (GHSA-h67p-54hq-rp68, medium) closed via the lib-foundation v0.4.4 subtree bump (dev-only transitive `3.14.2`→`3.15.0`) plus the ACG Extend sandbox-tab routing fix; per-context hub-Vault ClusterSecretStore connectivity overrides keyed by app context so a second app cluster no longer clobbers the first's profile; default cluster provider demoted off `k3s-aws` with a reachability preflight so a bare invocation no longer defaults to AWS and an unreachable target fails fast |
-| [v1.14.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.14.0) | 2026-07-12 | Observability & multi-cluster reliability hardening (21 bug specs, 19 shipped) — Vault per-context app-cluster auth mount `kubernetes-<sanitized-context>` (`_vault_app_auth_mount` threaded through all 3 mount sites + `APP_K8S_AUTH_MOUNT` migration override) ending last-cluster-wins ESO-auth clobber; observability fidelity — Grafana memory + Prometheus PVCs (hub + app-cluster 15d), hub Grafana public-route fix, Trivy dashboard drilldown/alerts/ownership/dedupe, Image Updater log-counter parse, Loki logs panels filtered/formatted, Trivy scan-job OOMKill fix (512Mi→1Gi); ACG lifecycle — `exit-22` seed-addr freeze, KV write HTTP status, absent-sandbox vs tunnel-loss classification, `k3s-oci` context mapping, SSM/SSH tunnel auto-select; hub-Vault profile state scoped by app context; lib-foundation subtree v0.4.3 |
-| [v1.13.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.13.0) | 2026-07-05 | Webhook modularization Phase 1 — pure helpers extracted verbatim from the `bin/k3dm-webhook` monolith into `scripts/lib/webhook/` (`config`/`render`/`proc`/`auth`), no command-behavior or Slack/Worker-contract change; isolated webhook-server smoke gate (`bin/smoke-test-webhook`) hitting `/api/v1/health` on an overridden job dir; post-refactor architecture doc (`docs/architecture/webhook-server.md`); fixes — Vault token delivered via stdin (out of argv), Trivy Operator RBAC chart-pin realigned to the `0.31.2` image + own ServiceMonitor `release` label, webhook BATS isolation (`make`/`K3DM_GEMINI_BIN` stubs + `K3DM_JOB_DIR`/`K3DM_RUN_DIR` isolation to stop live launches and false Slack orphan alerts) |
-| [v1.12.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.12.0) | 2026-07-03 | App-image CVE auto-update pipeline (ArgoCD Image Updater + Trivy-gated promotion, immutable SHA write-back, GHCR pull secret); app CVE visibility in `make status` + a hub Grafana dashboard; remote operator access over Slack/Cloudflare with per-command RBAC (`X-K3DM-Role`/`Actor`), a JSONL audit trail, and a read-only `/cluster-diagnose`; public Alertmanager basic-auth proxy; Trivy Operator observability with alert rules; fixes — Hostinger refresh hardening, Vault token hygiene, Slack `/cluster-status` reliability, Trivy chart-pin rendering, Loki/Grafana wiring, debug artifacts moved out of `/tmp` |
-| [v1.11.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.11.0) | 2026-06-28 | Tier 3 P3 canonical-source Vault seeding (`vault_seed_hub_into_context`, idempotent `redis/*` + `rabbitmq/default`); Tier 3 P4 assisted-failover watchdog (`vault_failover_hub_into_context` probe→profile-flip→re-seed→CSS reconcile, `vault_install_failover_watchdog` LaunchAgent + `bin/k3dm-vault-failover`); failover hardening (launchd PATH fix + subshell-isolated re-seed, active-profile resolution); app-cluster Vault auth in-cluster-context targeting + role audience binding; `deploy_eso` skips Helm install when ESO is ArgoCD-managed; `k3s-hostinger` enable-before-bootstrap launchd healing |
-| [v1.10.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.10.0) | 2026-06-27 | Provider-agnostic app-cluster Vault auth keyed on kube-context (`configure_vault_app_auth_for_context`); `HUB_VAULT_PROFILE` endpoint seam (`laptop`/`hostinger`) selecting the hub-Vault server URL + bridge (Tier 3 P1); in-cluster auto-unseal watchdog CronJob (Tier 3 P2a); `vault_deploy_hub_into_context` + least-privilege `app-cluster-reader` policy + kubernetes-auth CSS variant (Tier 3 P2b); Hostinger refresh ensures the `vault-port-forward` LaunchAgent; ArgoCD `data-layer` ApplicationSet ignores injected `volumeClaimTemplates[]` fields |
-| [v1.8.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.8.0) | 2026-06-26 | ESO operator install on app clusters via an ArgoCD ApplicationSet cluster generator; lib-foundation subtree synced to v0.4.0 (lib-acg absorbed, `_ensure_agy_cli`); ACG module now sourced from lib-foundation (`acg`/`gcp`/`gemini` stubs repointed — absorption Phase 2); `gemini.sh` browser automation retargeted to the Antigravity CLI (`agy`); Hostinger fixes (ghcr-pull-secret reconcile, CA-verified TLS + argocd-manager SA, provider-aware refresh/status, provider-state precedence, vcluster deregister, observability); standalone `lib-acg` subtree removed |
-| [v1.7.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.7.1) | 2026-06-20 | vCluster preflight runner (`bin/cluster-preflight`) — webhook-as-runner throwaway vCluster on the Hostinger host; ArgoCD app-cluster label generator for shopping-cart + data-layer routing; `bin/acg-*`→`bin/cluster-*` and Slack `/acg-*`→`/cluster-*` rename; Hostinger defaults + provider-aware `cluster-status`; pre-push/pre-commit hooks under `.githooks/`; `/codex` last-message fix |
-| [v1.7.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.7.0) | 2026-06-13 | `k3s-hostinger` cluster provider — single-node k3s app cluster on a permanent Hostinger KVM VPS via SSH/k3sup (no VM lifecycle); app-cluster registration with the hub ArgoCD via mTLS cluster secret; `bin/hostinger-status` read-only status report wired into `make status`; `APP_CLUSTER_NAME` ApplicationSet destination parameter |
-| [v1.6.5](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.5) | 2026-06-13 | `k3s-az` Azure provider (VM provision + k3sup + shopping-cart deploy); provider argument for `/acg-up`/`/acg-down`/`/acg-resume`; provider-aware `make refresh`/`make status` via recorded active-provider state; Azure credential-path hardening; lib-acg subtree v0.1.7; lib-foundation extensible cluster-provider hook |
-| [v1.6.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.4) | 2026-06-10 | Slack Events API text commands (`acg-status`/`acg-refresh`/`ask`/`claude`/`gemini`/`codex` from thread replies + channel messages); Slack thread context for text commands; Prometheus deploy metrics + Grafana dashboard + non-interactive auth bootstrap; `make show-service-passwords`; ACG restart-failure screenshot archival; webhook `posix_spawn` NEF-safety; lib-acg subtree v0.1.4 |
-| [v1.6.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.3) | 2026-06-07 | `/acg-resume` checkpoint re-entry; `/ask` multi-agent troubleshooting; Slack thread context injection for agents; Webhook NEF SIGSEGV fix (`posix_spawn`); Webhook read-only bash sandbox for `/ask` agents; Keycloak group-ldap-mapper reconciliation |
-| [v1.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.2) | 2026-06-05 | `/acg-refresh` Slack slash command with worker relay; ACG LaunchAgent self-healing; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
-| [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up` |
-| [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix |
-| [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
-| [v1.4.10](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.10) | 2026-05-29 | ArgoCD stability, bootstrap reliability, /tmp cleanup |
-| [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-22 | ACG credential wait + extraction visibility fixes; Cloudflare tunnel named config; CoreDNS duplicate hosts patch |
-| [v1.4.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.8) | 2026-05-19 | vault.sh temp file leak fixes, acg_extend.js CDP disconnect hang, Keycloak frontendUrl + named Cloudflare tunnel |
-| [v1.4.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.7) | 2026-05-18 | Keycloak public URL via Cloudflare + CoreDNS; cross-cluster Keycloak JWT issuer URI alignment |
-| [v1.4.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.4) | 2026-05-08 | Identity SSO fixes — Keycloak ExternalSecret bootstrapping, KV seeding, OIDC realm; lib-foundation + lib-acg subtree pulls |
-| [v1.4.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.2) | 2026-05-07 | `_ai_agent_review` generic dispatch + ArgoCD bootstrap hardening + lib-acg cdp.sh fixes — `launchctl bootout`, dead Linux else-block removal, configurable `ARGOCD_SERVER_WAIT_TIMEOUT`, Hub bootstrap refresh |
-| [v1.2.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.2.0) | 2026-04-30 | lib-acg extraction + shopping-cart bootstrap + GHCR hardening — ACG/GCP automation extracted to `scripts/lib/acg/` subtree; `deploy_shopping_cart_data()` in `acg-up`; Vault-first GHCR fail-closed; ArgoCD launchd port-forward; ApplicationSet branch var; Vault sealed-state recovery |
-| [v1.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.1.0) | 2026-04-24 | Unified ACG automation AWS + GCP — GCP provider (`k3s-gcp`), OAuth automation, CDP headless Linux, `bin/acg-sync-apps` port-forward hardening, Hub auto-create + bootstrap, provider-aware teardown |
-| [v1.0.6](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.6) | 2026-04-11 | AWS SSM support — `ssm_wait`/`ssm_exec`/`ssm_tunnel` helpers; `K3S_AWS_SSM_ENABLED` opt-in; IAM role + instance profile in CloudFormation; `--capabilities CAPABILITY_NAMED_IAM` fix; `make ssm`/`provision` targets |
-| [v1.0.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.4) | 2026-04-10 | ACG extend hardening — button-first search; midnight date-wrap fix; random passwords in `bin/acg-up`; sandbox-expired guidance in `_acg_check_credentials`; Pluralsight URL standardization |
-| [v1.0.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.3) | 2026-04-05 | ACG full stack fixes — ESO 1.0.0; ClusterSecretStore `v1`; ArgoCD context + server URL fix; `GHCR_PAT` masking; Chrome CDP launchd agent; `make sync-apps` + `make argocd-registration` |
-| [v1.0.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.2) | 2026-04-03 | full stack automation — `make up` 12-step provision; Vault port-forward; vault-bridge Service; argocd-manager bootstrap; helm + ESO install; `bin/` SCRIPT_DIR fix |
-| [v1.0.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.1) | 2026-03-31 | multi-node k3s-aws + CloudFormation + Playwright hardening — 3-node CF stack; auto sign-in; remove Antigravity pre-calls from `acg_get_credentials`; `AGENT_IP_ALLOWLIST` in pre-commit hook |
-| [v1.0.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.0) | 2026-03-29 | k3s-aws provider foundation — `CLUSTER_PROVIDER=k3s-aws` end-to-end deploy; `aws_import_credentials`; `acg_provision --recreate`; `acg_watch` background TTL watcher; keypair idempotency + `page.goto()` fix |
-| [v0.9.21](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.21) | 2026-03-29 | `_ensure_k3sup` auto-install helper — `deploy_app_cluster` now auto-installs k3sup via brew or curl; consistent with `_ensure_node`/`_ensure_copilot_cli` pattern |
-| [v0.9.20](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.20) | 2026-03-29 | ACG Chrome launch fix — `_antigravity_launch` now opens Chrome (not browser IDE) with `--password-store=basic`; `acg_credentials.js` SPA nav guard avoids hard reload |
-| [v0.9.19](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.19) | 2026-03-28 | ACG automated credential extraction — `acg_get_credentials` (Playwright CDP), `acg_import_credentials` (stdin), static `acg_credentials.js`; live-verified against Pluralsight sandbox |
-| [v0.9.18](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.18) | 2026-03-28 | Pluralsight URL migration — `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` updated to `app.pluralsight.com` |
-| [v0.9.17](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.17) | 2026-03-27 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo` + workspace temp path) |
-| [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Gemini browser automation + CDP browser automation — gemini CLI + Playwright engine; `gemini_install`, `gemini_trigger_copilot_review`, `gemini_acg_extend`; ldap stdin hardening |
-| [v0.9.11](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.11) | 2026-03-22 | dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs; maps plugin changes to targeted smoke tests |
-| [v0.9.10](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.10) | 2026-03-22 | if-count allowlist elimination (jenkins) — 8 helpers extracted; allowlist now `system.sh` only |
-| [v0.9.9](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.9) | 2026-03-22 | if-count allowlist elimination — 11 ldap helpers + 6 vault helpers extracted; allowlist down to `system.sh` only |
-| [v0.9.7](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.7) | 2026-03-22 | lib-foundation sync (`--interactive-sudo`, `_run_command_resolve_sudo`), `deploy_cluster` no-args guard, `bin/` `_kubectl` wrapper, BATS stub fixes, Copilot PR #41 findings |
-| [v0.9.6](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.6) | 2026-03-22 | ACG sandbox plugin (`acg_provision/status/extend/teardown`), VPC/SG idempotency, `ACG_ALLOWED_CIDR` security, kops-for-k3s reframe |
-| [v0.9.5](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.5) | 2026-03-21 | `deploy_app_cluster` — EC2 k3sup install + kubeconfig merge + ArgoCD registration; replaces manual rebuild |
-| [v0.9.4](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.4) | 2026-03-21 | autossh tunnel plugin, ArgoCD cluster registration, smoke-test gate, `_run_command` TTY fallback, lib-foundation v0.3.3 |
-| [v0.9.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.3) | 2026-03-16 | TTY fix (`_DCRS_PROVIDER` global), lib-foundation v0.3.2 subtree, cluster rebuild smoke test |
-| [v0.9.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.2) | 2026-03-15 | vCluster E2E composite actions, 11-finding Copilot hardening (curl safety, mktemp, sudo -n, input validation) |
-| [v0.9.1](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.1) | 2026-03-15 | vCluster plugin (`create/destroy/use/list`), two-tier `--help`, `function test()` refactor, 11 Copilot findings fixed |
-| [v0.9.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.0) | 2026-03-15 | k3dm-mcp planning, agent workflow lessons, roadmap restructure |
-| [v0.8.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.8.0) | 2026-03-13 | Vault-managed ArgoCD deploy keys, `deploy_cert_manager` (ACME/Let's Encrypt), Istio IngressClass |
-
-[Full release history →](docs/releases.md)
+| [v0.3.14](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.14) | 2026-03-27 | `agy` binary detection, `_antigravity_browser_ready` curl fast-fail, NUL-safe tab scan, doc + CHANGE.md fixes; 78 BATS |
+| [v0.3.13](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.13) | 2026-03-25 | `_antigravity_browser_ready` curl probe fix — `_run_command --soft -- curl` replaces `_curl` to allow polling retries |
+| [v0.3.12](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.12) | 2026-03-25 | `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` — Antigravity IDE install + Playwright MCP config helpers; 7 BATS |
+| [v0.3.11](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.11) | 2026-03-25 | `_agent_audit` YAML hardcoded-IP check — staged `.yaml`/`.yml` files with IPv4 addresses fail pre-commit |
+| [v0.3.8](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.8) | 2026-03-24 | `_agent_audit` tab indentation enforcement — staged `.sh` files with tab/mixed indent fail pre-commit; 15 BATS |
+| [v0.3.7](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.7) | 2026-03-24 | `system.sh` if-count cleanup — extract `_run_command_handle_failure` + `_node_install_via_redhat`; clears k3d-manager allowlist |
+| [v0.3.6](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.6) | 2026-03-23 | `doc_hygiene.sh`: exclude fenced code blocks from Check 2; add CoreDNS Check 4 (21 BATS) |
 
 </details>
+
+[Full release history →](docs/releases.md)
