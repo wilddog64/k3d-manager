@@ -118,6 +118,21 @@
   k3d-manager-v1.29.0 → add consumer files (plist tmpl + `bin/k3dm-hermes-setup` + `K3DM_HERMES_JITTER` in
   `bin/k3dm-hermes`) → verify → WS4 guide. Consumer files NOT yet written.**
 
+  **WS3 DONE (code) 2026-09-05.** lib-foundation PR #46 MERGED (squash `e558888` on main) → released **v0.4.15**
+  (`31be1f79`, CHANGE.md promoted) → `git subtree pull` into k3d-manager (`67de00cb` squash + `5c9e9577` pull commit)
+  → consumer files committed `6aad603d` on `origin/k3d-manager-v1.29.0`: `scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl`
+  (StartInterval=300, RunAtLoad, NO KeepAlive, no secrets), `bin/k3dm-hermes-setup [--uninstall]` (sources foundation
+  subtree, calls `_install_hermes_agent`/`_uninstall_hermes_agent`), `bin/k3dm-hermes` `K3DM_HERMES_JITTER` initial
+  sleep 0-30s. VERIFIED: py_compile clean, pytest 8/8, setup shellcheck+`bash -n` clean, both install/uninstall fns
+  reachable via the setup source path, real-template dry render resolves all placeholders (StartInterval present, no
+  KeepAlive), DoD greps clean (no mutation path, no kubeconfig across the added bin/plist files). Dispatcher already
+  prefers the foundation copy (`scripts/k3d-manager:70`) so the fn is live at runtime.
+  **LIVE INSTALL = prepare-and-stop (NOT done):** needs WS0 creds minted first (ArgoCD `hermes` token +
+  GH read-only PAT into laptop Keychain — user actions per WS0 Live steps), then `bin/k3dm-hermes-setup` +
+  `launchctl print` check + re-run WS0 read-only DoD post-install. **NEXT: WS4 `docs/guides/hermes.md` (last
+  workstream; release DoD). Also still pending for v1.29.0: reapply hub+ACG ApplicationSets pinned to
+  k3d-manager-v1.29.0 + `argocd_check_values_branch`; hub CPU overcommit Step 2 load-shed.**
+
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
   ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
