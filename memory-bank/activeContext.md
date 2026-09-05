@@ -65,7 +65,17 @@
     IDENTICAL, scopes/policy.default match, both health blocks IDENTICAL, admin.enabled match, YAML parses.
     NOTE: template values file feeds helm ONLY on the LDAP/Keycloak deploy path (`_argocd_helm_deploy_release`
     else-branch skips it) — that IS the production hub path, so the risk was real.
-  **WS0 COMPLETE 2026-09-05.** 3-credential read-only access model live + verified. **NEXT: WS1 sensor set.**
+  **WS0 COMPLETE 2026-09-05.** 3-credential read-only access model live + verified.
+  **WS1+WS2 SPEC WRITTEN 2026-09-05:** `docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md` (plan doc #3/5).
+  Agent = Python 3 stdlib-only, `bin/k3dm-hermes` + `scripts/lib/hermes/` (sensors/correlator/slack/records),
+  pytest in `scripts/tests/hermes/`. 5 sensors grounded in REAL interfaces: (a) ESO via `/api/v1/health`
+  `services[]` entries `ESO ClusterSecretStore`/`ESO ExternalSecrets`; (b) ArgoCD `app list -o json` (hermes
+  token, get-only); (c) `bin/public-endpoint-probe --json` verdict; (d) node/data-layer = `Data layer` entry +
+  aggregate `ok:false` (webhook-authoritative proxy, NO direct node probe); (e) GitHub Actions read API (gh PAT).
+  Normalized record `{sensor,status,evidence,sampled_at}`, status enum healthy/degraded/UNKNOWN (unknown when
+  source unavailable — constraint 2, no fabricated verdict). Debounce >N cycles. WS2 fires ONE Slack summary only
+  on sustained multi-signal (≥2 degraded in-window), LLM only on trip (default non-Claude, per-day budget cap —
+  constraint 4). DoD greps enforce ZERO mutation path + no kubeconfig. **NEXT: implement WS1+WS2 (Claude or Codex).**
 
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`

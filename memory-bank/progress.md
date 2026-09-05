@@ -33,7 +33,8 @@
   argocd-cm/rbac-cm at-risk content (rich policy.csv verbatim, scopes, admin.enabled, 2 health Lua blocks) into
   `values.yaml.tmpl`; verified render==live via envsubst-allowlist diff (policy.csv/health IDENTICAL). Chart-default
   keys deliberately not captured. See activeContext for root-cause (last-applied-configuration analysis).
-- [ ] WS1 sensors · WS2 correlator+Slack · WS3 `_install_hermes_agent` (lib-foundation) · WS4 guide — pending WS0.
+- [ ] **WS1 sensors + WS2 correlator/Slack — SPEC WRITTEN 2026-09-05** (`docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md`, plan doc #3/5). Python 3 stdlib-only agent `bin/k3dm-hermes` + `scripts/lib/hermes/`; 5 sensors grounded in real interfaces (webhook `/api/v1/health`, `argocd app list -o json` via hermes token, `public-endpoint-probe --json`, GitHub Actions API); normalized record + unknown-on-unavailable (constraint 2); multi-signal correlator + budgeted LLM (constraint 4); DoD greps enforce zero mutation. NEXT: implement (Claude or Codex).
+- [ ] WS3 `_install_hermes_agent` (lib-foundation) · WS4 guide — pending WS1/WS2.
 
 ## v1.28.0 queue
 
