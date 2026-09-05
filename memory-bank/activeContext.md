@@ -91,8 +91,18 @@
   Execution path is HEAVYWEIGHT + Claude-owned (NOT codex-exec-able): edit lib-foundation upstream → shellcheck +
   BATS + `make credential-test` live gate → PR (user go) → tag (~v0.4.15) → `git subtree pull` into
   `scripts/lib/foundation/` → add consumer files in k3d-manager → verify (no-mutation grep, no kubeconfig,
-  off-hub). **NEXT: on go, do the lib-foundation upstream edit + BATS, prepare-and-stop at the lib-foundation PR
-  gate. Then WS4 `docs/guides/hermes.md`.**
+  off-hub).
+
+  **WS3 lib-foundation UPSTREAM DONE 2026-09-05 — commit `dce8d2a` on `origin/feat/v0.4.15` (lib-foundation repo).**
+  `_install_hermes_agent`/`_uninstall_hermes_agent` in `scripts/lib/system.sh` + `scripts/tests/lib/hermes_install.bats`
+  (5 tests) + CHANGE.md Unreleased entry. GATES GREEN LOCALLY: shellcheck `system.sh` + full `shellcheck-lib` clean;
+  full BATS 129/129 green (CI-scrubbed `env -i`), incl. the 5 new. **PREPARE-AND-STOP at the lib-foundation PR gate:**
+  before PR, lib-foundation requires `make credential-test` LIVE ACG gate (serialize-live-sandbox; needs a live ACG
+  sandbox) + Copilot + Claude scope; never auto-merge (await user go). After merge → tag `v0.4.15` → `git subtree
+  pull --prefix=scripts/lib/foundation` into `k3d-manager-v1.29.0` → THEN add k3d-manager consumer files
+  (`scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl`, `bin/k3dm-hermes-setup`, `K3DM_HERMES_JITTER` add to
+  `bin/k3dm-hermes`) + verify (no-mutation grep, no kubeconfig, off-hub). Consumer files NOT yet written. Then WS4
+  `docs/guides/hermes.md`.**
 
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
