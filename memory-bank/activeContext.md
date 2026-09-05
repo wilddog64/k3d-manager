@@ -143,6 +143,20 @@
   `argocd_check_values_branch`; (3) hub CPU overcommit Step 2 load-shed; (4) then v1.29.0 PR (gated: CI + Copilot +
   Gemini smoke + Claude scope; never auto-merge).**
 
+  **WS0 LIVE-ACTIVATION RE-VERIFY 2026-09-05 (this session) — all 3 creds still present + read-only posture confirmed.**
+  Re-ran the WS0 DoD before installing the LaunchAgent: ArgoCD `hermes` token (Keychain `k3dm-hermes-argocd-token`,
+  pulled via `security -w` into `ARGOCD_AUTH_TOKEN` env, never argv) → `Username: hermes`, `can-i get`=yes,
+  `can-i sync`=no, `can-i delete`=no (the bare `argocd account can-i` on the CLI reports **admin**'s privilege — must
+  test AS the hermes token). GH PAT read path 200. Webhook running (PID on `127.0.0.1:7443`, launchd `com.k3d-manager.webhook`).
+
+  **BUG FOUND + FIXED during activation 2026-09-05 — commit `9ad90782` (see progress.md).** The webhook is **plain HTTP**
+  (`ThreadingHTTPServer`, TLS terminated at Cloudflare edge — `bin/k3dm-webhook:3750`, no `wrap_socket`; `_k3d_ssl_ctx`
+  is a *client* ctx for the kube-apiserver, not the listener), but Hermes built `https://` → both webhook sensors always
+  `unknown`. Also `_http_json` `timeout=10` << the ~46s authenticated `/api/v1/health` (runs the full smoke test). Fixed
+  scheme (webhook `http`, github stays `https`) + env-overridable `K3DM_HERMES_HTTP_TIMEOUT` (default 90). Live-verified:
+  eso + node_pressure now return real payload data. **LaunchAgent NOT yet installed** — this fix precedes `bin/k3dm-hermes-setup`.
+  Remaining activation: run `bin/k3dm-hermes-setup`, `launchctl print` check, watch `~/Library/Logs/k3dm-hermes.log` for a clean cycle.
+
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
   ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
