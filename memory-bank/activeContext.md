@@ -6,6 +6,19 @@
 
 ## Current focus
 
+- **2026-09-04 v1.29.0 MILESTONE = Hermes Phase-1 (the "hermes-agent") — IMPLEMENTATION PLAN DRAFTED.**
+  User set the v1.29.0 theme to Hermes Phase-1 (read-only ops monitoring). Gate satisfied: runs OFF-HUB
+  (laptop, like bin/k3dm-webhook) per scope §9 → NOT hardware-gated (no M5 wait). Master plan:
+  `docs/plans/v1.29.0-hermes-phase1-implementation.md` (executes scope doc
+  `docs/architecture/hermes-phase1-monitoring-scope.md`). Workstreams: WS0 access model (§6, read-only,
+  FIRST), WS1 sensor set (§3 — ESO/ArgoCD/reachability[shipped bin/public-endpoint-probe]/node-pressure-via-webhook/CI),
+  WS2 correlator+Slack (§8, fires only on sustained multi-signal), WS3 `_install_hermes_agent` (lib-foundation
+  subtree, off-hub launchd), WS4 guide. HARD constraints: read-only reports-and-stops (NO mutation path in
+  codebase), webhook authoritative (bin/cluster-status-summary → /api/v1/health), least-privilege, LLM
+  least-resort (non-Claude default + per-day budget). Phase-1 first deliverable (public-endpoint probe) already
+  shipped v1.28.0. **NEXT:** begin WS0 (access model) — it gates all other workstreams. SSO fix branch
+  d02e6622 recommended to merge as a STANDALONE fix (independent of this milestone).
+
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
   ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
