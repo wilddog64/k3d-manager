@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""Hermes Phase 1: off-hub, read-only sensor and advisory correlator."""
+
+import json
+import os
+import subprocess
+import sys
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+
+from hermes.correlator import Correlator
+from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
+                            _keychain_secret, argocd, ci, eso, node_pressure,
+                            reachability)
+from hermes.slack import post_summary
+
+
+def _load_state(path):
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_state(path, state):
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.write_text(json.dumps(state, sort_keys=True))
+    path.chmod(0o600)
+
+
+def _http_json(url, headers):
+    request = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())
+
+
+def _argocd_run(command, additions):
+    env = os.environ.copy()
+    env.update(additions)
+    result = subprocess.run(command, capture_output=True, text=True, env=env,
+                            timeout=20, check=False)
+    return result.returncode, result.stdout
+
+
+def _probe_run(command, _additions):
+    result = subprocess.run(command, capture_output=True, text=True, cwd=ROOT,
+                            timeout=60, check=False)
+    return result.returncode, result.stdout
+
+
+def main():
+    state_path = Path(os.environ.get("K3DM_HERMES_STATE", Path.home() / ".k3dm/hermes/state.json"))
+    state = _load_state(state_path)
+    webhook = _keychain_secret(WEBHOOK_SERVICE)
+    argo_token = _keychain_secret(ARGOCD_SERVICE)
+    github = _keychain_secret(GITHUB_SERVICE)
+    webhook_host = os.environ.get("K3DM_HERMES_WEBHOOK_HOST", "127.0.0.1:7443")
+    provider = os.environ.get("K3DM_HERMES_PROVIDER", "")
+
+    def webhook_fetch(path, headers):
+        separator = "&" if "?" in path else "?"
+        suffix = f"{separator}provider={provider}" if provider else ""
+        return _http_json(f"https://{webhook_host}{path}{suffix}", headers)
+
+    def github_fetch(path, headers):
+        return _http_json(f"https://api.github.com{path}", headers)
+
+    records = [
+        eso(webhook_fetch, state, token=webhook),
+        argocd(_argocd_run, state, token=argo_token),
+        reachability(_probe_run, state),
+        node_pressure(webhook_fetch, state, token=webhook),
+        ci(github_fetch, state, token=github),
+    ]
+    correlator = Correlator(
+        correlation_window=int(os.environ.get("K3DM_HERMES_CORRELATION_WINDOW", "3")),
+        daily_budget=int(os.environ.get("K3DM_HERMES_LLM_DAILY_BUDGET", "10")),
+        provider=os.environ.get("K3DM_HERMES_LLM_PROVIDER", "gemini"),
+    )
+    event = correlator.process(records, state)
+    if event:
+        relay = _keychain_secret("k3dm-slack-webhook")
+        post_summary(relay, event["text"])
+    _save_state(state_path, state)
+    print(json.dumps({"records": records, "event": event}))
+
+
+if __name__ == "__main__":
+    main()
