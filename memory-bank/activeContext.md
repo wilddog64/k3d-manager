@@ -157,6 +157,20 @@
   eso + node_pressure now return real payload data. **LaunchAgent NOT yet installed** — this fix precedes `bin/k3dm-hermes-setup`.
   Remaining activation: run `bin/k3dm-hermes-setup`, `launchctl print` check, watch `~/Library/Logs/k3dm-hermes.log` for a clean cycle.
 
+  **HERMES LAUNCHAGENT INSTALLED + FIRST CYCLE VERIFIED 2026-09-05 (user go "then go ahead to install hermes").**
+  Ran `bin/k3dm-hermes-setup` (→ `_install_hermes_agent` in lib-foundation v0.4.15) → `~/Library/LaunchAgents/com.k3d-manager.hermes.plist`
+  written, `launchctl bootstrap gui/$(id -u)` OK, `launchctl print` → `state = running`, `RunAtLoad` fired pid 43258
+  immediately on the bounded 300s `StartInterval` (no `KeepAlive`, logs `~/Library/Logs/k3dm-hermes.log`). The benign
+  `Boot-out failed: 3: No such process` is the installer's idempotent pre-clean (no prior instance). First cycle finished
+  in ~75s: **all 5 sensors returned real data, zero `unknown`** — the scheme+timeout fix holds live under launchd
+  (eso "1/20 not synced: cosign-public-key"; argocd per-app Degraded/OutOfSync; reachability 4/7; node_pressure "webhook
+  failures: Keycloak, Grafana, ESO ExternalSecrets"; ci ok). State `debounce {eso:1, argocd:1, node_pressure:1, reachability:1}`
+  — raw signals degraded but not yet flipped (eso threshold 2, argocd 3 = anti-flap working). `correlation_history [[]]`,
+  `event: null` → **no incident, no Slack post** (correct; needs ≥2 distinct flipped-degraded sensors in the window). If the
+  hub stays degraded, expect eso/node_pressure to flip within a cycle or two, then one Slack incident ~10–15 min out.
+  Uninstall: `bin/k3dm-hermes-setup --uninstall` (leaves Keychain creds intact). Note: git status snapshot shows branch
+  `k3d-manager-v1.28.0` but working branch is `k3d-manager-v1.29.0` (confirmed via `git branch --show-current`).
+
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
   ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
