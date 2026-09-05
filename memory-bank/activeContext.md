@@ -79,8 +79,20 @@
   sustained multi-signal (≥2 degraded in-window), LLM only on trip (default `gemini`, Claude never authors, per-day
   budget cap default 10 w/ deterministic fallback — constraint 4). VERIFIED by Claude: py_compile clean, 8/8 pytest
   green (via temp venv — repo py3.14 has no pytest), both DoD greps 0 matches (no mutation verb, no kubeconfig),
-  stdlib-only, secrets via `security -w` never in argv, only spec-listed files touched. **NEXT: WS3
-  `_install_hermes_agent` (lib-foundation subtree) → WS4 `docs/guides/hermes.md`.**
+  stdlib-only, secrets via `security -w` never in argv, only spec-listed files touched.
+
+  **WS3 SPEC WRITTEN 2026-09-05** — filled the stub in `docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`
+  (no new plan doc — stays within the ≤5 cap). Design: `_install_hermes_agent`/`_uninstall_hermes_agent` in
+  **lib-foundation `scripts/lib/system.sh`** (mac-only guard, read-only Keychain preflight of the 3 WS0 creds +
+  slack relay — NEVER mints/deletes a cred, all via `_run_command`/`_security`), rendering a NEW consumer template
+  `scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl` (Label `com.k3d-manager.hermes`, `StartInterval=300`, NO
+  `KeepAlive`, no secrets in plist) via a thin `bin/k3dm-hermes-setup` entrypoint (mirrors `bin/k3dm-webhook-setup`
+  `[--uninstall]`); plus a minimal `K3DM_HERMES_JITTER`-gated jitter add to `bin/k3dm-hermes` main() (constraint 5).
+  Execution path is HEAVYWEIGHT + Claude-owned (NOT codex-exec-able): edit lib-foundation upstream → shellcheck +
+  BATS + `make credential-test` live gate → PR (user go) → tag (~v0.4.15) → `git subtree pull` into
+  `scripts/lib/foundation/` → add consumer files in k3d-manager → verify (no-mutation grep, no kubeconfig,
+  off-hub). **NEXT: on go, do the lib-foundation upstream edit + BATS, prepare-and-stop at the lib-foundation PR
+  gate. Then WS4 `docs/guides/hermes.md`.**
 
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
