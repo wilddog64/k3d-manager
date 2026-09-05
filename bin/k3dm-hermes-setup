@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Install / uninstall the off-hub Hermes read-only monitoring LaunchAgent.
+# Usage: bin/k3dm-hermes-setup [--uninstall]
+#
+# Read-only by construction: delegates to _install_hermes_agent (lib-foundation),
+# which preflights the read-only Keychain credentials and never creates or modifies
+# any credential. Provision the read-only creds first (see docs/guides/hermes.md).
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Prefer the lib-foundation subtree copy (matches scripts/k3d-manager), fall back
+# to the local library during the subtree transition.
+if [[ -f "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/system.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/system.sh"
+else
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/system.sh"
+fi
+
+if ! declare -F _install_hermes_agent >/dev/null; then
+  echo "[k3dm-hermes-setup] _install_hermes_agent not found — is the lib-foundation subtree present?" >&2
+  exit 1
+fi
+
+if [[ "${1:-}" == "--uninstall" ]]; then
+  _uninstall_hermes_agent
+  exit 0
+fi
+
+_install_hermes_agent "${REPO_ROOT}"

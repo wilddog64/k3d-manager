@@ -3,8 +3,10 @@
 
 import json
 import os
+import random
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -52,6 +54,8 @@ def _probe_run(command, _additions):
 
 
 def main():
+    if os.environ.get("K3DM_HERMES_JITTER"):
+        time.sleep(random.uniform(0, 30))
     state_path = Path(os.environ.get("K3DM_HERMES_STATE", Path.home() / ".k3dm/hermes/state.json"))
     state = _load_state(state_path)
     webhook = _keychain_secret(WEBHOOK_SERVICE)
