@@ -16,8 +16,14 @@
   Keycloak trap), least-privilege access delta (**R1–R3 need NO new cluster/cloud write** — off-hub local levers; only
   R4 adds `actions:write` to the GH PAT), 3 approval mechanisms (A propose-only / **B CLI `k3dm-hermes approve` = recommended**
   / C Slack-interactive). NON-goals: no ArgoCD sync, no kubectl mutation, no auto-execution, closed allowlist.
-  **REMAINING: user signs off on (1) approval mechanism, (2) allowlist scope incl. whether R4/actions:write is in →
-  then write `docs/plans/` implementation spec → dispatch to Codex.** NO code yet. Phase 3 (cooldowns/budgets/audit) deferred.
+  **SIGN-OFF (2026-09-06):** approval mechanism = **B CLI `k3dm-hermes approve <action-id>`**; allowlist = **all
+  four incl. R4** (so GH PAT gains `actions:write` — user-provisioned prereq; code degrades R4→propose-only if absent).
+  Implementation spec `docs/plans/v1.30.0-hermes-phase2-repairs.md` committed `0840fc86` on origin (plan doc #1/5).
+  **DISPATCHED TO CODEX 2026-09-06** (codex exec, session `01a077af`, gpt-5.6-terra, background) — pure code+pytest,
+  no live cluster. Codex to implement records.py `data` field, sensor `data` attach, `repairs.py` allowlist+propose/
+  approve, bin/k3dm-hermes `_run_cycle`+approve subcommand, test_repairs.py; commit+push to k3d-manager-v1.30.0.
+  **REMAINING: verify Codex output independently (SHA on origin, pytest green, scope, invariant-1 grep) — do NOT
+  trust the done report. Then user-owned: add actions:write to k3dm-hermes-gh-token PAT for R4.** Phase 3 deferred.
 
 ## Merged releases
 
