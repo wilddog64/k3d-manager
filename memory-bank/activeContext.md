@@ -6,7 +6,8 @@
 
 ## Current focus
 
-- **Next milestone: v1.30.0 branch** (`k3d-manager-v1.30.0` created 2026-09-06, origin tracking). Release-ledger backfill + standing-doc audits + retrospective + memory-bank updates committed on this branch.
+- **Next milestone: v1.31.0 branch** (`k3d-manager-v1.31.0` created 2026-09-06 from `8e71692b`, origin tracking). First scoped item: **Hermes R4 GitHub App installation-token auth** (`docs/plans/v1.31.0-hermes-r4-github-app-auth.md`) — replace the manual `actions:write` PAT with a short-lived auto-scoped App token + a DI-testable `k3dm-hermes preflight`. NOT yet started. v1.30.0 release-ledger backfill (CHANGELOG/releases.md/README v1.30.0 rows) also lands on this branch, per the one-release-later cadence.
+- **v1.30.0 tag + GitHub release: PENDING user go** — the merge commit `8e71692b` is ready to tag `v1.30.0`, but there is no v1.30.0 CHANGELOG entry yet (ledger backfill is a v1.31.0-branch step) and publishing a release is outward-facing. Awaiting explicit go on the tag/release publish.
 
 - **2026-09-06 — HERMES PHASE 2 STARTED (user go: "go ahead with phase 2 and work with codex").** Per the Phase-1
   gate, Phase 2 begins as a SCOPE DOC (no code until user sign-off). Scope doc `docs/architecture/hermes-phase2-repair-scope.md`
@@ -74,8 +75,13 @@
   py_compile clean, scope check clean (NO subtree edits, v1.30.0 plan docs=1, no token literals in argv). Live smoke:
   `k3dm-hermes list` verified on the real binary (state-driven, side-effect-free); approve unknown-id refusal is
   unit-proven (a live approve triggers a full live sensor re-sample by design → not run standalone as smoke; live
-  poll cycle is a post-merge activation step like Phase 1). **NEXT: confirm final CI+Copilot on `b6c9f02a` green →
-  STOP at merge gate for user's explicit go. NEVER auto-merge; enforce_admins stays true.**
+  poll cycle is a post-merge activation step like Phase 1).
+  **MERGED 2026-09-06 (`8e71692b`).** User self-merged PR #121 after the gate. Post-merge housekeeping done:
+  enforce_admins re-enabled (verified true), main pulled (fast-forward `cd38a7e5..8e71692b`), next branch
+  `k3d-manager-v1.31.0` created + checked out, retro `docs/retro/2026-09-06-v1.30.0-retrospective.md`, memory-bank
+  updated. **Process rule learned:** disable `enforce_admins` PROACTIVELY at every PR merge-ready (user self-merges,
+  needs admin override on) — not "if needed"; `/post-merge` re-enables it. (Recorded in auto-memory
+  `feedback_notify_pr_review_before_merge`.) v1.30.0 tag/release publish still PENDING user go (see Current focus).
 
 ## Merged releases
 
