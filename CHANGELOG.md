@@ -15,6 +15,17 @@
 - **Hermes webhook sensors** — use `http` on the loopback webhook and tolerate a slow health check (scheme + timeout fix), so all five sensors return real data under launchd instead of `unknown`.
 - **`signing_restore` unusable standalone** — it never called `_vault_login` (every restore-path Vault call 403'd) and the grafana seed had no public entrypoint; both fixed, plus a graceful skip of the cosign public-key ExternalSecret when the Kyverno admission namespace is absent (self-heal is safe to run anytime). See `docs/bugs/v1.29.0-bugfix-signing-restore-no-login-grafana-seed-no-public-entry.md`.
 
+## [1.28.0] - 2026-09-04
+
+**Theme: parallelize multi-cloud provisioning, and land the first Hermes Phase-1 deliverable.** Multi-cloud app-cluster provisioning and join now run concurrently rather than serially (Phase 1–3b), cutting bring-up wall-clock across providers. This release also ships `bin/public-endpoint-probe` — a standalone read-only reachability probe that later becomes the reachability sensor Hermes Phase-1 consumes. The originally-scoped platform **zero-downtime rollouts** work was deferred (hardware-gated, awaiting the Mac Mini M5) and did **not** ship in this tag.
+
+### Added
+- **Parallel multi-cloud provisioning (Phase 1–3b)** — app-cluster provisioning and join execute concurrently with per-target readiness and collected failures, instead of one provider at a time.
+- **`bin/public-endpoint-probe`** — a read-only public-endpoint reachability probe; the first Hermes Phase-1 deliverable, later wired in as a Hermes sensor (v1.29.0).
+
+### Deferred
+- **Platform zero-downtime rollouts** — hardware-gated (awaiting the Mac Mini M5); carried forward, not shipped in this tag.
+
 ## [1.27.0] - 2026-09-03
 
 **Theme: close the CVE loop with cryptographically verifiable image provenance, and make the platform observably cheaper to run.** This release lands a **three-latch supply-chain gate** — images are **signed and get a vulnerability attestation at BUILD**, the **PROMOTE** step refuses to advance a candidate that cannot present a cosign-verifiable vuln attestation, and **ADMIT** (Kyverno `verifyImages`) requires a first-party image to carry both a signature and a vuln attestation signed by our key. All three latches ship **inert by default** and are enabled in a staged Audit→Enforce ladder. Alongside the signing work: an **adaptive checkout load-testing** harness (k6 stage-ladder controller with stop-condition hysteresis), a **foundation-managed vCluster CLI** (single contract resolves the pinned binary), the **M2 remote E2E runner** (dispatch the Tier-1 suite to a remote substrate with restricted result publishing), several **observability cost controls** (monitoring-pause/resume, layered resume, reduced federation scrape), and **Dependabot automation**. The signing key handling survived a multi-repo `COSIGN_KEY` corruption incident (macOS `security -w` hex-encoding of multi-line PEMs) that is now documented and guarded.
