@@ -10,7 +10,7 @@ def timestamp():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def record(sensor, status, evidence, sampled_at=None):
+def record(sensor, status, evidence, sampled_at=None, data=None):
     """Create the uniform, source-agnostic sensor record."""
     if status not in STATUSES:
         raise ValueError("invalid Hermes status")
@@ -19,4 +19,5 @@ def record(sensor, status, evidence, sampled_at=None):
         "status": status,
         "evidence": str(evidence)[:200],
         "sampled_at": sampled_at or timestamp(),
+        "data": dict(data) if data else {},
     }

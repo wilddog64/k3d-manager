@@ -1,16 +1,17 @@
-# Hermes — Phase-1 read-only ops monitoring (off-hub)
+# Hermes — Phase-2 approval-gated operations (off-hub)
 
-Hermes is the k3d-manager monitoring agent. **Phase 1 only observes, correlates, and reports.**
-It has no command surface and no mutation path: it never runs `kubectl apply/patch/delete`, never
-syncs ArgoCD, never restarts pods, never writes to Git, and holds no write credential. Those are
-deferred to Phases 2/3, each of which requires its own scope document before any code lands
-(see [What is NOT implemented](#what-is-not-implemented)).
+Hermes is the k3d-manager monitoring agent. Phase 1 observes, correlates, and reports; Phase 2
+adds only a closed, approval-gated repair allowlist. The poll cycle never executes a repair: it
+stores proposals and includes their exact commands and action IDs in the incident Slack summary.
+A human must approve an action from their own laptop shell. Hermes never runs `kubectl
+apply/patch/delete`, syncs ArgoCD, restarts pods, writes Git, or performs cloud writes.
 
 It runs **off-hub** — on the laptop, the same tier as [`bin/k3dm-webhook`](../../bin/k3dm-webhook) —
 so it can still report when the hub cluster is degraded. That placement is what satisfies the
 "don't monitor from inside the failure domain" requirement without waiting for dedicated hardware.
 
-**Scope authority:** [`docs/architecture/hermes-phase1-monitoring-scope.md`](../architecture/hermes-phase1-monitoring-scope.md).
+**Scope authorities:** [`docs/architecture/hermes-phase1-monitoring-scope.md`](../architecture/hermes-phase1-monitoring-scope.md)
+and [`docs/architecture/hermes-phase2-repair-scope.md`](../architecture/hermes-phase2-repair-scope.md).
 **Implementation plans:** [`docs/plans/v1.29.0-hermes-phase1-implementation.md`](../plans/v1.29.0-hermes-phase1-implementation.md),
 [`docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md`](../plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md),
 [`docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`](../plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md).
@@ -22,7 +23,7 @@ so it can still report when the hub cluster is degraded. That placement is what 
 | Component | File | Role |
 |-----------|------|------|
 | Agent entrypoint | [`bin/k3dm-hermes`](../../bin/k3dm-hermes) | One sense → correlate → report cycle per run; persists state |
-| Records | [`scripts/lib/hermes/records.py`](../../scripts/lib/hermes/records.py) | Normalized `{sensor, status, evidence, sampled_at}` record; status enum |
+| Records | [`scripts/lib/hermes/records.py`](../../scripts/lib/hermes/records.py) | Normalized `{sensor, status, evidence, sampled_at, data}` record; status enum |
 | Sensors | [`scripts/lib/hermes/sensors.py`](../../scripts/lib/hermes/sensors.py) | The five read-only sensors |
 | Correlator | [`scripts/lib/hermes/correlator.py`](../../scripts/lib/hermes/correlator.py) | Deterministic multi-signal fire + bounded LLM enrichment |
 | Slack relay | [`scripts/lib/hermes/slack.py`](../../scripts/lib/hermes/slack.py) | One-way summary POST (no command surface) |
@@ -31,6 +32,33 @@ so it can still report when the hub cluster is degraded. That placement is what 
 | Tests | [`scripts/tests/hermes/test_hermes.py`](../../scripts/tests/hermes/test_hermes.py) | Sensors, correlator, budget, Slack |
 
 The agent is Python 3 standard-library only — no third-party runtime dependency.
+
+---
+
+## Phase 2 repairs and approval
+
+The allowlist is closed in [`repairs.py`](../../scripts/lib/hermes/repairs.py): no arbitrary
+command or Slack control path exists. A proposal is valid only while its multi-signal precondition
+holds, and `approve` takes a fresh sensor cycle before executing it.
+
+| Key | Repair | Preconditions | Exact local / scoped lever |
+|-----|--------|---------------|----------------------------|
+| R1 | Restart webhook | both webhook-backed sensors unavailable for two cycles | `make restart-webhook` |
+| R2 | Kick zombie port-forward | one mapped public host fails while the substrate is healthy | `launchctl kickstart -k <known PF label>` |
+| R3 | Refresh Hostinger edge access | all public hosts fail for two cycles | `scripts/k3d-manager refresh_access_layer` (the public wrapper for `_hostinger_refresh_access_layer`; never `make refresh`) |
+| R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using only the Hermes PAT in `GH_TOKEN` |
+
+When an incident prints a pending action ID, inspect it and approve only that exact ID:
+
+```bash
+bin/k3dm-hermes list
+bin/k3dm-hermes approve r2-<action-id-suffix>
+```
+
+Approval refuses unknown IDs, non-allowlisted keys, and stale preconditions. It records the
+command, result, and exit code in Hermes state, then re-samples once to report whether the
+precondition cleared. R4 needs the `k3dm-hermes-gh-token` Keychain PAT to have `actions:write`; a
+403 degrades safely to `skipped: token lacks actions:write`, without using ambient GitHub auth.
 
 ---
 
@@ -102,7 +130,7 @@ risk for no signal.
 |---------|------------------|-------|
 | Webhook status (ESO, node pressure, service health) | `k3dm-webhook-token` | Existing token, reused; GET-only in use |
 | ArgoCD per-app status | `k3dm-hermes-argocd-token` | `hermes` local account, `apiKey` capability only, RBAC `get` only |
-| CI / required-check status | `k3dm-hermes-gh-token` | GitHub fine-grained PAT, read-only permissions only |
+| CI / required-check status and R4 re-run | `k3dm-hermes-gh-token` | GitHub fine-grained PAT; `actions:write` is used only for the approved R4 POST, never for contents or branch protection |
 | Slack summary delivery | `k3dm-slack-webhook` | Existing incoming-webhook relay |
 
 The ArgoCD `hermes` account and its RBAC (`get` only, no `sync`/`update`/`delete`) live in
@@ -181,13 +209,12 @@ env -i HOME="$HOME" PATH="$PATH" \
 
 ## What is NOT implemented
 
-Phase 1 is deliberately advisory-only. The following are **not** built and each requires its own
-scope document before any code is written:
+Phase 3 is **not implemented** and requires its own scope document before any code is written:
 
-- **Phase 2** — any action surface (remediation, sync, restart, edge refresh, Git or
-  branch-protection changes). Hermes holds no write credential today, by design.
-- **Phase 3** — autonomous or scheduled remediation.
+- cooldowns, daily action budgets, durable audit records, and automatic post-repair verification;
+- autonomous or scheduled remediation, Slack-interactive approvals, ArgoCD sync, Kubernetes
+  mutation, Git writes, or cloud writes.
 
-If you are reading this to add a mutating capability: stop and write the Phase-2 scope doc first.
-The "no mutation path in the codebase" property is grep-assertable and is part of the release
-Definition of Done — keep it that way.
+If you are reading this to expand the repair surface: stop and write the Phase-3 scope document
+first. The closed allowlist and approval-only execution property are grep-assertable release
+requirements.

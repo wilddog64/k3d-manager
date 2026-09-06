@@ -101,8 +101,12 @@ def reachability(run, state, threshold=2):
             return record("reachability", "healthy", "public endpoints healthy")
         hosts = payload.get("hosts", [])
         failed = sum(1 for host in hosts if not host.get("healthy"))
+        failed_hosts = [host.get("host") or host.get("name") or host.get("url")
+                        for host in hosts if not host.get("healthy")]
         status = "degraded" if _debounced("reachability", True, threshold, state) else "healthy"
-        return record("reachability", status, f"{verdict} {failed}/{len(hosts)} hosts healthy")
+        return record("reachability", status, f"{verdict} {failed}/{len(hosts)} hosts healthy",
+                      data={"verdict": verdict,
+                            "failed_hosts": [host for host in failed_hosts if host]})
     except Exception:
         return record("reachability", "unknown", "public probe source unavailable")
 
@@ -145,6 +149,7 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
     now = now or datetime.now(timezone.utc)
     try:
         bad = []
+        ci_data = {}
         for repo_name in repos:
             run = fetch(f"/repos/{repo_name}/actions/runs", {"Authorization": f"token {token}"})
             runs = run.get("workflow_runs", []) if isinstance(run, dict) else []
@@ -158,12 +163,18 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
             for check in checks.get("check_runs", []):
                 if check.get("conclusion") in ("failure", "timed_out", "cancelled"):
                     bad.append(f"{repo_name} {check.get('name', 'check')} {check.get('conclusion')}")
+                    if check.get("conclusion") in ("timed_out", "cancelled") and not ci_data:
+                        ci_data = {"repo": repo_name, "run_id": latest["id"],
+                                   "conclusion": check["conclusion"]}
                 elif check.get("status") == "in_progress" and _older_than(
                         check.get("started_at"), max_age_seconds, now):
                     bad.append(f"{repo_name} {check.get('name', 'check')} stuck")
+                    if not ci_data:
+                        ci_data = {"repo": repo_name, "run_id": latest["id"],
+                                   "conclusion": "stuck"}
         if bad:
             status = "degraded" if _debounced("ci", True, threshold, state) else "healthy"
-            return record("ci", status, ", ".join(bad[:3]))
+            return record("ci", status, ", ".join(bad[:3]), data=ci_data)
         _debounced("ci", False, threshold, state)
         return record("ci", "healthy", "required CI checks successful")
     except Exception:
