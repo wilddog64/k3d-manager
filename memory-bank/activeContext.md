@@ -33,9 +33,26 @@
   that don't exist; omitted real vault). Grounded against `scripts/etc/cloudflared/config.yml` ingress ports vs the
   3 real `com.k3d-manager.*-port-forward.plist` listen ports → only `prometheus.3ai-talk.org`→`com.k3d-manager.prometheus-port-forward`
   matches exactly (alertmanager ingress :9093 ≠ PF :19093; argocd/keycloak/grafana served by other mechanisms). R2 map
-  reduced to that one grounded entry + comment; test fixture updated. **REMAINING: (a) decide PR boundary for v1.30.0
-  (Phase 2 alone vs accumulate) then run PR gate (CI/Copilot/live-smoke/scope) → STOP at merge; (b) user-owned: add
-  actions:write to k3dm-hermes-gh-token PAT for R4 (code degrades R4→propose-only until then).** Phase 3 deferred.
+  reduced to that one grounded entry + comment; test fixture updated.
+  **2026-09-06 — R4 actions:write PROVISIONED + LIVE-VERIFIED (user go, PR boundary = provision PAT first).** User set
+  the `k3dm-hermes-gh-token` fine-grained PAT to **Actions: Read and write** (screenshot-confirmed; fine-grained →
+  token value unchanged, no Keychain re-save). Claude verified the token R4 actually reads (`GITHUB_SERVICE =
+  k3dm-hermes-gh-token`, sensors.py:11/18): authenticates as wilddog64, Actions **read** confirmed; **write** confirmed
+  via the real code path (`repairs._r4_command` → `_keychain_secret(GITHUB_SERVICE)` → POST rerun-failed-jobs on a
+  **succeeded** run) returning `403 "This workflow run cannot be retried"` (business-logic reject reached only AFTER
+  authorization) rather than `"Resource not accessible by personal access token"` → token HOLDS actions:write. R4 fully
+  live (not propose-only). (Note: a smoke-script VERDICT heuristic misfired on GitHub's wording — raw API response is
+  authoritative; token has write.)
+  **2026-09-06 — v1.30.0 PR OPENED: PR #121** https://github.com/wilddog64/k3d-manager/pull/121 (base main ← k3d-manager-v1.30.0,
+  head `a7e457d6`). PR boundary decision (user "Ship + file App follow-up"): ship Phase 2 alone. Copilot review requested
+  (GraphQL-confirmed Bot `copilot-pull-request-reviewer`); CI in_progress. **PR gate in progress → STOP at merge (NEVER
+  auto-merge; enforce_admins stays true).** enforce_admins verified true before PR.
+  **Token-management follow-up filed:** user flagged PAT scoping as poor token mgmt (GitHub has no API to mint/re-scope
+  PATs → manual by design). Filed `docs/plans/v1.31.0-hermes-r4-github-app-auth.md` — replace R4 PAT auth with a
+  **GitHub App installation token** (short-lived ~1h, auto-scoped, no Keychain PAT) + a DI-testable **scope preflight**
+  (`k3dm-hermes preflight`, deferred from v1.30.0 into this follow-up since it couples with the App work and belongs as a
+  tested hermes-package fn, not a bin bolt-on). Auth-swap only; Phase 2 repair logic unchanged. Phase 3 (cooldowns/
+  budgets/durable audit/auto-verify) still deferred, separate scope doc.
 
 ## Merged releases
 

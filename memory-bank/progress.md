@@ -7,6 +7,7 @@
 
 | Version | State |
 |---|---|
+| v1.30.0 | PR OPEN — PR #121 (base main ← k3d-manager-v1.30.0, head `a7e457d6`). Hermes Phase 2: allowlisted, approval-gated repairs (R1 restart-webhook, R2 kick zombie PF, R3 refresh Hostinger edge, R4 rerun transient CI). R4 `actions:write` PAT provisioned + live-verified. Gates pre-PR: pytest 18/18, py_compile clean, invariant-1 grep-proven. PR gate in progress (CI + Copilot); STOP at merge. Follow-up filed: `docs/plans/v1.31.0-hermes-r4-github-app-auth.md` (App-token auth + scope preflight). |
 | v1.29.0 | RELEASED — PR #120 `cd38a7e5`, tag v1.29.0 + GitHub release published, branch protection restored (enforce_admins=true, 1 required approval). Shipped Hermes Phase-1 read-only monitoring agent + self-healing Vault seeders (grafana/cosign KV) + `deploy_argocd_applicationsets` reapply entrypoint. |
 | v1.28.0 | RELEASED — PR #119 `46d9f2e7`, tag v1.28.0 + GitHub release published, branch protection restored (enforce_admins=true, 1 required approval). Shipped parallel multi-cloud Phase 1–3b + Hermes public-endpoint probe. |
 | v1.27.0 | RELEASED — PR #118 `62c9ff27`, tag/release published, protection restored |
