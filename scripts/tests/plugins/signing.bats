@@ -190,3 +190,116 @@ setup() {
   ! grep -qE -- '--key[= ]+[^e]' "$src"
   ! grep -qE -- '--password[= ]' "$src"
 }
+
+# --- Vault bring-up recovery --------------------------------------------------
+
+@test "signing_restore is a declared function" {
+  declare -f signing_restore
+}
+
+@test "signing_restore preserves present key material and reapplies configuration" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { :; }
+  _signing_vault_key_exists() { return 0; }
+  _signing_restore_vault_from_keychain() { printf 'restore\n' >> "$calls"; }
+  _signing_apply_vault_policy() { printf 'policy\n' >> "$calls"; }
+  _signing_grant_eso_read() { printf 'grant\n' >> "$calls"; }
+  _signing_apply_pub_externalsecret() { printf 'externalsecret\n' >> "$calls"; }
+
+  run signing_restore
+  [ "$status" -eq 0 ]
+  ! grep -q 'restore' "$calls"
+  grep -q 'policy' "$calls"
+  grep -q 'grant' "$calls"
+  grep -q 'externalsecret' "$calls"
+}
+
+@test "signing_restore restores absent key material from a backup" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { :; }
+  _signing_vault_key_exists() { return 1; }
+  _signing_keychain_backup_exists() { return 0; }
+  _signing_restore_vault_from_keychain() { printf 'restore\n' >> "$calls"; }
+  _signing_seed_vault_key() { printf 'seed\n' >> "$calls"; }
+  _signing_apply_vault_policy() { :; }
+  _signing_grant_eso_read() { :; }
+  _signing_apply_pub_externalsecret() { :; }
+
+  run signing_restore
+  [ "$status" -eq 0 ]
+  grep -q 'restore' "$calls"
+  ! grep -q 'seed' "$calls"
+}
+
+@test "signing_restore fails without Vault key or Keychain backup" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { :; }
+  _signing_vault_key_exists() { return 1; }
+  _signing_keychain_backup_exists() { return 1; }
+  _signing_apply_vault_policy() { printf 'policy\n' >> "$calls"; }
+  _signing_grant_eso_read() { printf 'grant\n' >> "$calls"; }
+  _signing_apply_pub_externalsecret() { printf 'externalsecret\n' >> "$calls"; }
+
+  run signing_restore
+  [ "$status" -ne 0 ]
+  [ ! -e "$calls" ]
+}
+
+@test "_signing_apply_pub_externalsecret skips when admission namespace is absent" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _kubectl() {
+    if [[ "$1" == "--no-exit" && "$2" == "get" && "$3" == "namespace" ]]; then
+      return 1
+    fi
+    printf 'apply\n' >> "$calls"
+  }
+
+  run _signing_apply_pub_externalsecret
+  [ "$status" -eq 0 ]
+  [ ! -e "$calls" ]
+}
+
+@test "_signing_apply_pub_externalsecret applies when admission namespace exists" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _kubectl() {
+    if [[ "$1" == "--no-exit" && "$2" == "get" && "$3" == "namespace" ]]; then
+      return 0
+    fi
+    cat >/dev/null 2>&1 || true
+    printf 'apply\n' >> "$calls"
+  }
+
+  run _signing_apply_pub_externalsecret
+  [ "$status" -eq 0 ]
+  grep -q 'apply' "$calls"
+}
+
+@test "signing_restore logs into Vault before probing key material" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { printf 'login\n' >> "$calls"; }
+  _signing_vault_key_exists() { printf 'probe\n' >> "$calls"; return 0; }
+  _signing_apply_vault_policy() { :; }
+  _signing_grant_eso_read() { :; }
+  _signing_apply_pub_externalsecret() { :; }
+
+  run signing_restore
+  [ "$status" -eq 0 ]
+  [ "$(head -n1 "$calls")" = "login" ]
+}
+
+@test "signing_init prefers restore over regenerate when a backup exists" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { :; }
+  _signing_vault_key_exists() { return 1; }
+  _signing_keychain_backup_exists() { return 0; }
+  _signing_restore_vault_from_keychain() { printf 'restore\n' >> "$calls"; }
+  _signing_seed_vault_key() { printf 'seed\n' >> "$calls"; }
+  _signing_apply_vault_policy() { :; }
+  _signing_grant_eso_read() { :; }
+  _signing_apply_pub_externalsecret() { :; }
+
+  run signing_init
+  [ "$status" -eq 0 ]
+  grep -q 'restore' "$calls"
+  ! grep -q 'seed' "$calls"
+}

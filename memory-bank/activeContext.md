@@ -6,6 +6,300 @@
 
 ## Current focus
 
+- **2026-09-06 — v1.29.0 RELEASE-CLOSE SWEEP (user go "go ahead").** (1) **ApplicationSet values-branch
+  reapply PREPARED + DIFF-VERIFIED, apply user-gated:** `argocd_check_values_branch k3d-manager-v1.29.0`
+  found 6 Applications still on `v1.28.0` (kube-prometheus-stack, loki, trivy-operator + their acg/hub
+  variants, from the `observability`/`observability-acg` sets). Re-rendered both sets
+  (`ARGOCD_NAMESPACE=cicd K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 APP_CLUSTER_NAME=ubuntu-k3s`) and
+  `kubectl diff`-proved the ONLY change is `$values` targetRevision `v1.28.0→v1.29.0`. `kubectl apply`
+  classifier-blocked → user runs it via `!`, then re-check with `argocd_check_values_branch`.
+  **Superseded by a durable entrypoint (2026-09-06):** added public `deploy_argocd_applicationsets`
+  (argocd.sh) — surgical reapply-ALL sets + auto-verify, no temp files, repeatable every release.
+  Realized the scratchpad render only covered 2 of ~7 branch-pinned sets, so it would not have cleared
+  all 6 drifted apps. User now runs `! K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 ./scripts/k3d-manager
+  deploy_argocd_applicationsets --confirm` (`--confirm` required — `deploy_*` deploy-guard). 4 BATS green, shellcheck clean, in `docs/api/functions.md`. (2) **Hub
+  CPU load-shed Step 2 = ALREADY LIVE** (verified: no loki-canary pods, prom 60s intervals, retention
+  3d/8GB — it shipped with the v1.28.0 pin; corrected the stale "ROLLOUT PENDING" note in progress.md).
+  (3) **Roadmap refresh `bbe3438c`:** `docs/roadmap.md` was stale (named v1.14.0 active, v1.24.1–v1.28.0
+  queued though shipped) → current milestone now v1.29.0, arc table extended v1.14–v1.28, Hermes forward
+  theme advanced to Phase 2/3; ledger backfilled (`docs/releases.md` v1.25.0–v1.28.0). (4) **ApplicationSet
+  reapply DONE 2026-09-06** — `deploy_argocd_applicationsets --confirm` applied 12/12 sets; after a reconcile
+  cycle `argocd_check_values_branch k3d-manager-v1.29.0` reports *All Applications reference values branch
+  k3d-manager-v1.29.0* (first check showed 3 stale = controller reconcile lag, not a failure). All
+  cluster-side release steps DONE.
+- **v1.29.0 PR #120 CREATED 2026-09-06** (https://github.com/wilddog64/k3d-manager/pull/120), base `main` ←
+  `k3d-manager-v1.29.0` @ `1f56d04e`, 40 files. Pre-open **release-ledger backfill** (`1f56d04e`): README
+  releases table was 3 versions behind (added v1.28.0/v1.27.0/v1.25.0 from `docs/releases.md`) + CHANGELOG
+  `[1.28.0]` added (`[1.25.0]` gap intentional — folded into 1.26.0). Copilot requested (raw-JSON POST) and
+  **verified attached via GraphQL** (Bot `copilot-pull-request-reviewer`; REST `requested_reviewers` GET is
+  blind to bots — do not trust its empty array). CI running on the PR. **REMAINING: CI green + Copilot review
+  addressed, then STOP at merge gate for user go. NEVER auto-merge.** v1.29.0's own README/releases.md row
+  deferred to the v1.30.0 branch per convention.
+
+- **2026-09-05 — VAULT SEEDER SELF-HEAL: spec'd + dispatched to Codex (user go "dispatch to codex to fix the issue").**
+  Fixes the recurring post-incident exposure (grafana KV + cosign KV/policy wiped on every cluster rebuild). Spec
+  `docs/plans/v1.29.0-vault-seeder-self-heal-grafana-cosign.md` committed `c7fa6cbd` on `origin/k3d-manager-v1.29.0`.
+  Decisions locked: grafana = **fresh-generate-if-absent** (user-chosen; no backup exists to restore), cosign =
+  **non-destructive restore from Keychain** (`signing_restore` + `signing_init` prefers restore over regenerate).
+  Codex dispatched via `codex exec` for code + BATS only; live seeder run vs hub is a SEPARATE deferred Claude step
+  (classifier gates live Vault writes).
+  **IMPLEMENTED + VERIFIED 2026-09-05, commit `43ce7732`** — Codex authored code+BATS, hit sandbox `.git`-lock →
+  Claude committed after independent verify. Claude added two necessary fixes the literal impl surfaced:
+  (1) observability.sh sources vault.sh via `VAULT_PLUGIN` idiom (dispatcher lazy-loads only the invoked plugin →
+  `_vault_exec`/`_vault_exec_stream` were undefined during `deploy_observability`, seed would silently no-op on real
+  bring-up; also makes the pre-existing `declare -f`-guarded writer-role config finally fire); (2) stubbed the seed in
+  `lib/observability.bats`. Gates: targeted 27/27 green, all 6 observability suites green, shellcheck only 2
+  pre-existing SC2016 infos. Remaining `make test` failures (argocd_deploy_keys #6/#8, slack #5/#10) proven
+  pre-existing & unrelated (those suites don't reference observability/signing).
+  **2026-09-06 — LIVE RUN surfaced two bugs in `43ce7732` (BATS stubbed Vault → slipped verify), FIXED `7eaaf897`:**
+  (1) `signing_restore` never called `_vault_login` (siblings init/rotate/status all do) → standalone run 403'd on the
+  key probe; (2) grafana seed was private-only → dispatcher refused `_observability_seed_grafana_if_absent`. Fix: added
+  `_vault_login` to `signing_restore` + new public `observability_seed_grafana` wrapper (both ns=secrets release=vault).
+  Bug doc `docs/bugs/v1.29.0-bugfix-signing-restore-no-login-grafana-seed-no-public-entry.md`. BATS 30/30 (was 27; +3),
+  shellcheck 2 pre-existing infos only. Pushed, local===origin===`7eaaf897`. Live state observed pre-fix:
+  `signing_status secrets vault` → `vault_key=present keychain_backup=present eso_public_secret=absent` (cosign material
+  safe; the ESO public secret is what needs healing). **NEXT: user re-runs the now-working commands** —
+  `./scripts/k3d-manager signing_restore secrets vault` (heals eso_public_secret) and
+  `./scripts/k3d-manager observability_seed_grafana secrets vault` (seeds grafana KV if absent); then read-only verify.
+  **2026-09-06 — LIVE RE-RUN (chained 4 cmds): ALL FOUR original remediation targets HEALTHY** — grafana KV present
+  (seed skipped), cosign KV present (restore skipped), `cosign-verify` policy re-applied ("Success! Uploaded policy"),
+  ESO role grant present (role `eso-ldap-directory` already grants cosign-verify). Login fix works: no more 403 on the
+  probe; `observability_seed_grafana` dispatchable. Two non-regressions noted: (a) `eso_public_secret=absent` +
+  `namespaces "kyverno" not found` — this cluster has no Kyverno admission stack, so the public-key ExternalSecret
+  (targets `SIGNING_ADMISSION_NAMESPACE`=kyverno) has nowhere to land; NOT one of the 4 targets; (b) the raw
+  standalone `_vault_exec` verify 403'd because each dispatcher call is a fresh process w/o `_vault_login` — my
+  command flaw, not a bug. **HARDENING commit `ae9d8cb4`:** `_signing_apply_pub_externalsecret` now `_warn`+`return 0`
+  (skip) when the admission namespace is absent, instead of hard-erroring — keeps `signing_restore` idempotent/safe
+  anytime. BATS 32/32 (+2), shellcheck 2 pre-existing infos. Bug doc DoD all checked. **Seeder self-heal fully DONE;
+  nothing pending here.**
+
+- **2026-09-04 v1.29.0 MILESTONE = Hermes Phase-1 (the "hermes-agent") — IMPLEMENTATION PLAN DRAFTED.**
+  User set the v1.29.0 theme to Hermes Phase-1 (read-only ops monitoring). Gate satisfied: runs OFF-HUB
+  (laptop, like bin/k3dm-webhook) per scope §9 → NOT hardware-gated (no M5 wait). Master plan:
+  `docs/plans/v1.29.0-hermes-phase1-implementation.md` (executes scope doc
+  `docs/architecture/hermes-phase1-monitoring-scope.md`). Workstreams: WS0 access model (§6, read-only,
+  FIRST), WS1 sensor set (§3 — ESO/ArgoCD/reachability[shipped bin/public-endpoint-probe]/node-pressure-via-webhook/CI),
+  WS2 correlator+Slack (§8, fires only on sustained multi-signal), WS3 `_install_hermes_agent` (lib-foundation
+  subtree, off-hub launchd), WS4 guide. HARD constraints: read-only reports-and-stops (NO mutation path in
+  codebase), webhook authoritative (bin/cluster-status-summary → /api/v1/health), least-privilege, LLM
+  least-resort (non-Claude default + per-day budget). Phase-1 first deliverable (public-endpoint probe) already
+  shipped v1.28.0. SSO fix branch d02e6622 recommended to merge as a STANDALONE fix (independent of this milestone).
+  **WS0 STARTED (2026-09-04):** spec `docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md` (WS0 now; WS3 stub).
+  KEY DISCOVERY: the authoritative webhook payload (`_smoke_test_services`, bin/k3dm-webhook) ALREADY reports
+  `ESO ClusterSecretStore`, `ESO ExternalSecrets {n}/{n} synced`, per-service, Data layer, and ArgoCD-server liveness
+  — so routing ESO (sensor a) + node pressure (d) through the webhook means Hermes needs ZERO direct kube-apiserver
+  credential (a direct K8s Role would be a forbidden "second health model"). Access model = 3 read-only creds:
+  (1) existing webhook bearer token (reused, GET-only); (2) NEW ArgoCD read-only local account `hermes` — added
+  `accounts.hermes: apiKey` + policy `p, role:hermes-readonly, applications, get, */*` to
+  `scripts/etc/argocd/values.yaml.tmpl` (get only, no sync/write) for sensor b (per-Application Degraded/OutOfSync,
+  which the webhook JSON omits); (3) NEW GitHub fine-grained read-only PAT (USER mints) for sensor e (CI). Manifest
+  committed to branch, NOT applied (prepare-and-stop): live activation = reapply ArgoCD helm values on hub +
+  `argocd account generate-token --account hermes` (→ laptop Keychain) + user mints GH PAT, then run DoD checks.
+
+  **WS0 LIVE ACTIVATION (2026-09-05):**
+  - GH PAT (cred #3) VERIFIED read-only: Actions read 200, metadata 200, write attempt 403. Keychain `k3dm-hermes-gh-token -a k3dm`.
+  - **CRITICAL DRIFT DISCOVERY:** the live `argocd-cm`/`argocd-rbac-cm` are NOT sourced from `values.yaml.tmpl`.
+    Both carry a `kubectl.kubernetes.io/last-applied-configuration` (a separate `kubectl apply` overwrote what Helm
+    created). Live argocd-rbac-cm holds a RICH policy (platform-admins, argocd-developers/viewers, platform-dev/ops,
+    order-admin, catalog-admin — Keycloak/LDAP groups) that has NEVER been in values.yaml.tmpl history (`git -S` = 0).
+    Live argocd-cm has `resource.customizations.health.*` Lua + `admin.enabled:true` but LACKS the tmpl's
+    `timeout.reconciliation:180s` + `ignoreResourceUpdates.ConfigMap`. `deploy_argocd_bootstrap` does NOT apply these
+    CMs. ⇒ a `helm upgrade` with the tmpl would DESTROY the live RBAC (real SSO group access). So helm-reapply is the
+    WRONG activation path here; used an ADDITIVE patch instead.
+  - **DONE (additive, non-destructive live patches, context=hub k3d-k3d-cluster):**
+    `kubectl -n cicd patch cm argocd-cm` → added `accounts.hermes: apiKey`;
+    `kubectl -n cicd patch cm argocd-rbac-cm` → appended `p, role:hermes-readonly, applications, get, */*, allow` +
+    `g, hermes, role:hermes-readonly` (rich policy preserved, verified 67 lines, platform-admins/order-admin intact).
+  - **hermes ArgoCD token (cred #2) — DONE + DoD VERIFIED 2026-09-05 (user minted, Claude verified):** user ran
+    `argocd login` (admin) + `argocd account generate-token --account hermes` → stored Keychain
+    `k3dm-hermes-argocd-token -a k3dm` (created 12:17:02Z, 237-char JWT, `sub: hermes`). WS0 DoD all green:
+    `can-i get applications */*` = **yes**; `can-i sync */*` = **no**; `can-i delete */*` = **no**; functional
+    `app list` = 38 apps; live `app sync --dry-run` refused server-side (`PermissionDenied … sync … sub: hermes`);
+    NO hermes K8s ServiceAccount (all namespaces), NO hermes kubeconfig context — off-hub model intact. All 3
+    creds now present: `k3dm-webhook-token` (#1, GET-only), `k3dm-hermes-argocd-token` (#2, get-only), 
+    `k3dm-hermes-gh-token` (#3, read-only PAT).
+  - **DRIFT REMEDIATION — DONE 2026-09-05 (user go "yes, please"):** captured the live argocd-cm/rbac-cm at-risk
+    content into `scripts/etc/argocd/values.yaml.tmpl` so a `deploy_argocd`/helm reapply reproduces the live hub
+    instead of destroying it. Root cause pinpointed via each CM's `last-applied-configuration`: the rich RBAC,
+    `scopes: '[groups, email]'`, and the two `resource.customizations.health.*` Lua blocks (App-of-Apps + ESO
+    ExternalSecret) were MANUAL applies (not chart defaults) → helm would drop them; the stale template also
+    rendered `${ARGOCD_RBAC_ADMIN_GROUP}` = an LDAP DN (`cn=admins,ou=groups,dc=home,dc=org`) that does NOT match
+    the live Keycloak group model. Fix: embedded the live rich policy.csv VERBATIM (8 groups + hermes, hardcoded
+    Keycloak group names), added `scopes`, `admin.enabled: "true"`, and both health Lua blocks. The many
+    `ignoreResourceUpdates.*`/`resource.exclusions`/`timeout.*`/`impersonation`/`statusbadge` keys were confirmed
+    chart defaults (absent from last-applied) → helm regenerates them, deliberately NOT captured (minimal patch).
+    VERIFIED by rendering the tmpl through the plugin's exact envsubst allowlist + diffing vs live: policy.csv
+    IDENTICAL, scopes/policy.default match, both health blocks IDENTICAL, admin.enabled match, YAML parses.
+    NOTE: template values file feeds helm ONLY on the LDAP/Keycloak deploy path (`_argocd_helm_deploy_release`
+    else-branch skips it) — that IS the production hub path, so the risk was real.
+  **WS0 COMPLETE 2026-09-05.** 3-credential read-only access model live + verified.
+  **WS1+WS2 IMPLEMENTED + VERIFIED 2026-09-05 — commit `4e9d3e6e` on `origin/k3d-manager-v1.29.0`.**
+  Spec `docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md` (plan doc #3/5). Codex-dispatched via `codex exec`
+  (session `01a0718e`); Codex hit sandbox `.git` lock so Claude committed + pushed after independent verification.
+  Agent = Python 3 stdlib-only: `bin/k3dm-hermes` + `scripts/lib/hermes/` (sensors/correlator/slack/records),
+  pytest `scripts/tests/hermes/test_hermes.py` (8 tests, all green). 5 sensors grounded in REAL interfaces: (a) ESO
+  via `/api/v1/health` `services[]` entries `ESO ClusterSecretStore`/`ESO ExternalSecrets`; (b) ArgoCD `app list -o
+  json --grpc-web` (hermes token, get-only); (c) `bin/public-endpoint-probe --json` verdict; (d) node/data-layer =
+  `Data layer` entry + aggregate `ok:false` (webhook-authoritative proxy, NO direct node probe); (e) GitHub Actions
+  read API (gh PAT). Normalized record `{sensor,status,evidence,sampled_at}`, status enum healthy/degraded/UNKNOWN
+  (unknown when source unavailable — constraint 2). Debounce >N cycles. WS2 fires ONE Slack summary only on
+  sustained multi-signal (≥2 degraded in-window), LLM only on trip (default `gemini`, Claude never authors, per-day
+  budget cap default 10 w/ deterministic fallback — constraint 4). VERIFIED by Claude: py_compile clean, 8/8 pytest
+  green (via temp venv — repo py3.14 has no pytest), both DoD greps 0 matches (no mutation verb, no kubeconfig),
+  stdlib-only, secrets via `security -w` never in argv, only spec-listed files touched.
+
+  **WS3 SPEC WRITTEN 2026-09-05** — filled the stub in `docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`
+  (no new plan doc — stays within the ≤5 cap). Design: `_install_hermes_agent`/`_uninstall_hermes_agent` in
+  **lib-foundation `scripts/lib/system.sh`** (mac-only guard, read-only Keychain preflight of the 3 WS0 creds +
+  slack relay — NEVER mints/deletes a cred, all via `_run_command`/`_security`), rendering a NEW consumer template
+  `scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl` (Label `com.k3d-manager.hermes`, `StartInterval=300`, NO
+  `KeepAlive`, no secrets in plist) via a thin `bin/k3dm-hermes-setup` entrypoint (mirrors `bin/k3dm-webhook-setup`
+  `[--uninstall]`); plus a minimal `K3DM_HERMES_JITTER`-gated jitter add to `bin/k3dm-hermes` main() (constraint 5).
+  Execution path is HEAVYWEIGHT + Claude-owned (NOT codex-exec-able): edit lib-foundation upstream → shellcheck +
+  BATS + `make credential-test` live gate → PR (user go) → tag (~v0.4.15) → `git subtree pull` into
+  `scripts/lib/foundation/` → add consumer files in k3d-manager → verify (no-mutation grep, no kubeconfig,
+  off-hub).
+
+  **WS3 lib-foundation UPSTREAM DONE 2026-09-05 — commit `dce8d2a` on `origin/feat/v0.4.15` (lib-foundation repo).**
+  `_install_hermes_agent`/`_uninstall_hermes_agent` in `scripts/lib/system.sh` + `scripts/tests/lib/hermes_install.bats`
+  (5 tests) + CHANGE.md Unreleased entry. GATES GREEN LOCALLY: shellcheck `system.sh` + full `shellcheck-lib` clean;
+  full BATS 129/129 green (CI-scrubbed `env -i`), incl. the 5 new. **PREPARE-AND-STOP at the lib-foundation PR gate:**
+  before PR, lib-foundation requires `make credential-test` LIVE ACG gate (serialize-live-sandbox; needs a live ACG
+  sandbox) + Copilot + Claude scope; never auto-merge (await user go). After merge → tag `v0.4.15` → `git subtree
+  pull --prefix=scripts/lib/foundation` into `k3d-manager-v1.29.0` → THEN add k3d-manager consumer files
+  (`scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl`, `bin/k3dm-hermes-setup`, `K3DM_HERMES_JITTER` add to
+  `bin/k3dm-hermes`) + verify (no-mutation grep, no kubeconfig, off-hub). Consumer files NOT yet written. Then WS4
+  `docs/guides/hermes.md`.**
+
+  **WS3 lib-foundation PR #46 OPEN — ALL GATES GREEN, AWAITING MERGE GO (2026-09-05).**
+  https://github.com/wilddog64/lib-foundation/pull/46 (base main ← feat/v0.4.15, head `6dbdbb1`). Gates: CI
+  `completed/success` on `6dbdbb1`; `make credential-test PROVIDER=aws` live ACG gate passed (ACG_SESSION_OK, STS OK);
+  Copilot reviewed — 4 findings, ALL FIXED in `6dbdbb1` + all 4 threads resolved (0 unresolved); scope 3 files
+  additive. Copilot findings were legit: (1) plist render used sed — `&`/delimiter in a path could corrupt it →
+  switched to literal bash `${//}` AND disable bash 5.2+ `patsub_replacement` around it (the `&`-as-match hazard bit
+  in bats' bash 5.3; my new special-char BATS test caught it); (2) bootstrap wasn't `--soft` (could `_err`-exit the
+  caller's shell) + always echoed success → checked plist write, `--soft` bootstrap returns nonzero on failure;
+  (3) `_uninstall_hermes_agent` lacked `_is_mac` guard → added; (4) "WS0" wording leaked into foundation doc →
+  genericized. BATS now 8 hermes cases, full suite 132/132 green, shellcheck-lib clean. **NEVER AUTO-MERGE —
+  prepare-and-stop. On user go: merge #46 → tag `v0.4.15` → `git subtree pull --prefix=scripts/lib/foundation` into
+  k3d-manager-v1.29.0 → add consumer files (plist tmpl + `bin/k3dm-hermes-setup` + `K3DM_HERMES_JITTER` in
+  `bin/k3dm-hermes`) → verify → WS4 guide. Consumer files NOT yet written.**
+
+  **WS3 DONE (code) 2026-09-05.** lib-foundation PR #46 MERGED (squash `e558888` on main) → released **v0.4.15**
+  (`31be1f79`, CHANGE.md promoted) → `git subtree pull` into k3d-manager (`67de00cb` squash + `5c9e9577` pull commit)
+  → consumer files committed `6aad603d` on `origin/k3d-manager-v1.29.0`: `scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl`
+  (StartInterval=300, RunAtLoad, NO KeepAlive, no secrets), `bin/k3dm-hermes-setup [--uninstall]` (sources foundation
+  subtree, calls `_install_hermes_agent`/`_uninstall_hermes_agent`), `bin/k3dm-hermes` `K3DM_HERMES_JITTER` initial
+  sleep 0-30s. VERIFIED: py_compile clean, pytest 8/8, setup shellcheck+`bash -n` clean, both install/uninstall fns
+  reachable via the setup source path, real-template dry render resolves all placeholders (StartInterval present, no
+  KeepAlive), DoD greps clean (no mutation path, no kubeconfig across the added bin/plist files). Dispatcher already
+  prefers the foundation copy (`scripts/k3d-manager:70`) so the fn is live at runtime.
+  **LIVE INSTALL = prepare-and-stop (NOT done):** needs WS0 creds minted first (ArgoCD `hermes` token +
+  GH read-only PAT into laptop Keychain — user actions per WS0 Live steps), then `bin/k3dm-hermes-setup` +
+  `launchctl print` check + re-run WS0 read-only DoD post-install. **NEXT: WS4 `docs/guides/hermes.md` (last
+  workstream; release DoD). Also still pending for v1.29.0: reapply hub+ACG ApplicationSets pinned to
+  k3d-manager-v1.29.0 + `argocd_check_values_branch`; hub CPU overcommit Step 2 load-shed.**
+
+  **WS4 DONE 2026-09-05 — `docs/guides/hermes.md` commit `c7fa27a8`. ALL HERMES PHASE-1 CODE WORKSTREAMS
+  (WS0-WS4) COMPLETE.** Guide grounded in real code, passes `_doc_hygiene_check` (the memory's
+  `scripts/check-doc-links.sh` does NOT exist in this repo — the real .md gate is `_doc_hygiene_check` in
+  lib-foundation `doc_hygiene.sh`: no placeholder tokens + https-only; no relative-link-existence check), all
+  relative links verified to resolve. **REMAINING FOR v1.29.0 RELEASE:** (1) LIVE activation prepare-and-stop —
+  user mints WS0 creds (ArgoCD `hermes` token + GH read-only PAT → laptop Keychain), then `bin/k3dm-hermes-setup`
+  + re-run WS0 read-only DoD; (2) reapply hub+ACG ApplicationSets pinned to `k3d-manager-v1.29.0` +
+  `argocd_check_values_branch`; (3) hub CPU overcommit Step 2 load-shed; (4) then v1.29.0 PR (gated: CI + Copilot +
+  Gemini smoke + Claude scope; never auto-merge).**
+
+  **WS0 LIVE-ACTIVATION RE-VERIFY 2026-09-05 (this session) — all 3 creds still present + read-only posture confirmed.**
+  Re-ran the WS0 DoD before installing the LaunchAgent: ArgoCD `hermes` token (Keychain `k3dm-hermes-argocd-token`,
+  pulled via `security -w` into `ARGOCD_AUTH_TOKEN` env, never argv) → `Username: hermes`, `can-i get`=yes,
+  `can-i sync`=no, `can-i delete`=no (the bare `argocd account can-i` on the CLI reports **admin**'s privilege — must
+  test AS the hermes token). GH PAT read path 200. Webhook running (PID on `127.0.0.1:7443`, launchd `com.k3d-manager.webhook`).
+
+  **BUG FOUND + FIXED during activation 2026-09-05 — commit `9ad90782` (see progress.md).** The webhook is **plain HTTP**
+  (`ThreadingHTTPServer`, TLS terminated at Cloudflare edge — `bin/k3dm-webhook:3750`, no `wrap_socket`; `_k3d_ssl_ctx`
+  is a *client* ctx for the kube-apiserver, not the listener), but Hermes built `https://` → both webhook sensors always
+  `unknown`. Also `_http_json` `timeout=10` << the ~46s authenticated `/api/v1/health` (runs the full smoke test). Fixed
+  scheme (webhook `http`, github stays `https`) + env-overridable `K3DM_HERMES_HTTP_TIMEOUT` (default 90). Live-verified:
+  eso + node_pressure now return real payload data. **LaunchAgent NOT yet installed** — this fix precedes `bin/k3dm-hermes-setup`.
+  Remaining activation: run `bin/k3dm-hermes-setup`, `launchctl print` check, watch `~/Library/Logs/k3dm-hermes.log` for a clean cycle.
+
+  **HERMES LAUNCHAGENT INSTALLED + FIRST CYCLE VERIFIED 2026-09-05 (user go "then go ahead to install hermes").**
+  Ran `bin/k3dm-hermes-setup` (→ `_install_hermes_agent` in lib-foundation v0.4.15) → `~/Library/LaunchAgents/com.k3d-manager.hermes.plist`
+  written, `launchctl bootstrap gui/$(id -u)` OK, `launchctl print` → `state = running`, `RunAtLoad` fired pid 43258
+  immediately on the bounded 300s `StartInterval` (no `KeepAlive`, logs `~/Library/Logs/k3dm-hermes.log`). The benign
+  `Boot-out failed: 3: No such process` is the installer's idempotent pre-clean (no prior instance). First cycle finished
+  in ~75s: **all 5 sensors returned real data, zero `unknown`** — the scheme+timeout fix holds live under launchd
+  (eso "1/20 not synced: cosign-public-key"; argocd per-app Degraded/OutOfSync; reachability 4/7; node_pressure "webhook
+  failures: Keycloak, Grafana, ESO ExternalSecrets"; ci ok). State `debounce {eso:1, argocd:1, node_pressure:1, reachability:1}`
+  — raw signals degraded but not yet flipped (eso threshold 2, argocd 3 = anti-flap working). `correlation_history [[]]`,
+  `event: null` → **no incident, no Slack post** (correct; needs ≥2 distinct flipped-degraded sensors in the window). If the
+  hub stays degraded, expect eso/node_pressure to flip within a cycle or two, then one Slack incident ~10–15 min out.
+  Uninstall: `bin/k3dm-hermes-setup --uninstall` (leaves Keychain creds intact). Note: git status snapshot shows branch
+  `k3d-manager-v1.28.0` but working branch is `k3d-manager-v1.29.0` (confirmed via `git branch --show-current`).
+
+  **INCIDENT REMEDIATION — GRAFANA VAULT-SEED (user go "please address that incident") 2026-09-05.**
+  Hermes surfaced eso "1/20 not synced" + Grafana in the node_pressure webhook failures. Root cause: Vault healthy but
+  KV path `secret/observability/grafana` was **entirely missing** → ExternalSecret `monitoring/grafana-admin-credentials`
+  `SecretSyncedError` "could not get secret data from provider" → grafana pod `CreateContainerConfigError` stuck **27h**.
+  The `grafana-credential-rotator` CronJob can rotate but CANNOT bootstrap an empty path (its `restore()` reads OLD pw
+  under `set -eu` → 404 aborts). Fix executed by the **user via `!`** (classifier blocks Claude live privileged Vault
+  writes): seeded `secret/observability/grafana` `{username:admin, password:<fresh 24-byte hex>}` — schema matching the
+  rotator's `restore()`. Correct stdin pattern: `{ printf RT; printf PW; } | kubectl exec -i vault-0 -- sh -c '<script>'`
+  (script in `-c` argv = no secrets; secrets on stdin via `read`; NOT a heredoc — heredoc+pipe collide on fd 0 and the
+  token gets executed as a command → 403). Result: `SEEDED`, ES flipped to **SecretSynced True**, secret created with
+  `admin-user`+`admin-password`, old grafana pod recovered `0/3 CreateContainerConfigError → 2/3 Running`, rollout
+  restarted to fully clear.
+
+  **COSIGN RESTORE — DONE 2026-09-05.** Two-part fix (both user-run via `!`; scripts in session scratchpad
+  `cosign-restore.sh` + `cosign-eso-policy.sh`). **Part 1 — data:** `secret/cosign/signing` was also missing.
+  RESTORED the ORIGINAL key from Keychain backup `k3d-manager-signing` (NOT regenerated — never ran `signing_init`):
+  read `k3dm-cosign-key`/`k3dm-cosign-password`, decoded the `security -w` hex-encoded multi-line PEM (`xxd -r -p`,
+  [[reference_security_w_hex_encodes_multiline]]), derived `cosign.pub` on host via `cosign public-key`, wrote the
+  cosign.key/cosign.password/cosign.pub triple to Vault (base64 over stdin, `key=@file` in pod). **Part 2 — the real
+  blocker (403, not data):** seeding the data was NOT enough — the ESO read still 403'd on `secret/data/cosign/signing`.
+  Root cause: the ESO Vault **policy** grant was also lost. The shared ClusterSecretStore `vault-backend` authenticates
+  via k8s-auth role `eso-ldap-directory` (SA `eso-ldap-sa`/`identity`, ttl 3600); it held only policy `eso-ldap-directory`
+  (grants observability/* — why Grafana worked) but NOT cosign. Fix mirrors `signing.sh` `_signing_apply_vault_policy` +
+  `_signing_grant_eso_read`: wrote policy `cosign-verify` (`read` on `secret/data/cosign/signing`, from
+  `scripts/etc/signing/cosign-verify-policy.hcl`) and appended it to the role, **preserving every existing field**
+  (all others were already Vault defaults, so Grafana + the other vault-backend ES are unaffected). ESO re-authed on
+  force-sync → `cosign-public-key` ES now **SecretSynced**, secret created (`cosign.pub`). (Benign `audience` warning =
+  Vault v1.21+ forward-compat; hub is v1.20.1.) **NEVER run `signing_init`/`deploy_image_signing`** — `_signing_seed_vault_key`
+  regenerates the keypair AND clobbers the Keychain backup, destroying the original signing key.
+
+  **INCIDENT CLOSED.** Cluster-wide ESO sweep: all synced except `platform-ops/app-cluster-kubeconfig` (SEPARATE, EXPECTED
+  — [[project_app_cluster_vault_auth_portability]] open seam; no app-cluster registered → its KV path is intentionally
+  empty; not Hermes-flagged, untouched by this remediation). Keycloak 502 / argocd-repo-server restart-loop = separate
+  CPU-pressure thread (ties to hub CPU overcommit Step 2 load-shed), NOT addressed here.
+  Post-incident note filed: docs/issues/2026-09-05-vault-kv-and-eso-policy-loss-grafana-cosign.md
+
+- **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
+  Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
+  ArgoCD Application owns the ENTIRE live identity stack (keycloak + postgres + osixia `ldap` + ExternalSecrets),
+  and its manifests live in a SEPARATE repo — `wilddog64/shopping-cart-infra` (`identity/keycloak`, `identity/ldap`).
+  Keycloak federating its bundled osixia `ldap` (`dc=shopping-cart,dc=local`) is intentional upstream design; the
+  k3d-manager cluster-up seed + `get-keycloak-password` target openldap-0 (`dc=home,dc=org`) and mislead by implying
+  they feed SSO. User chose **Option B: unify on openldap-0** (repoint keycloak → openldap-0, retire osixia). Spec:
+  `docs/bugs/2026-09-04-sso-federate-openldap0-retire-osixia.md` (exact old/new blocks for 3 files + Phase-2 osixia
+  retirement; CROSS-REPO shopping-cart-infra → Codex on `fix/sso-federate-openldap0`, never direct/imperative — ESO+ArgoCD
+  revert). NO live changes made. App-source verified HEALTHY: shopping-cart-identity is a multi-source ArgoCD app pointing
+  DIRECTLY at shopping-cart-infra HEAD with automated{prune,selfHeal}; OutOfSync is benign (3 ESO secrets only); a push
+  auto-applies (keycloak-config hash rolls keycloak; keycloak-realm-reconcile PostSync hook re-imports realm). No app-source fix needed.
+  **Phase 1 IMPLEMENTED by Codex + Claude-verified (2026-09-04):** shopping-cart-infra branch `fix/sso-federate-openldap0`,
+  commit `d02e6622` (on origin). 3 files, exact spec diff (kustomization keycloak-config literals, realm-shopping-cart.json
+  LDAP component, keycloak-secrets ES remoteRef → secret/ldap/openldap-admin·LDAP_ADMIN_PASSWORD; rdnLDAPAttribute uid→cn;
+  usernameLDAPAttribute/bindCredential untouched). Independently verified: SHA on origin, only 3 files, JSON valid,
+  `kustomize build` renders openldap-0 env. NO PR/merge (gated), identity/ldap untouched (Phase 2 pending). **NEXT:** user
+  decides PR+merge of the shopping-cart-infra branch (auto-applies to live SSO on merge to main) → then live-verify SSO
+  (get-keycloak-password developer binds; real login) → then Phase 2 (retire osixia).
+  Issue doc corrected across CORRECTION 1 + 2: `docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md`.
+  Commits on k3d-manager-v1.29.0: `4cd7918d`, `bfacf896` (doc), spec commit next. **NEXT:** await user go to hand the
+  spec to Codex + resolve the OutOfSync app-source wiring.
+
+- **2026-09-04 v1.28.0 RELEASED — PR #119 merged, tag pushed, branch protection restored.**
+  Post-merge housekeeping COMPLETE: retrospective doc `7d321adf`, tag v1.28.0 pushed, GitHub release published, `enforce_admins` restored to `true` (verified), next branch k3d-manager-v1.29.0 created. Two open follow-ups carried forward to v1.29.0+: (1) LDAP↔SSO decoupling decision A/B/C (docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md), (2) hub CPU overcommit durable fix (queued until Mac Mini M5 upgrade, Oct 2026). Zero-downtime-rollouts spec remains in git, marked hardware-gated.
+
 - **2026-09-04 v1.28.0 PLANNING — Claude weekly-quota lever + Hermes install decision.**
   Context: user on $20/mo flat rate hits Claude's weekly quota fast; under flat-rate the goal
   is routing work OFF Claude's constrained quota onto Codex/Gemini (other flat plans) + Haiku

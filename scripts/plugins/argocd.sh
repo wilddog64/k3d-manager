@@ -1172,6 +1172,59 @@ function _argocd_deploy_image_updater() {
    _info "[argocd] ArgoCD Image Updater install complete"
 }
 
+function deploy_argocd_applicationsets() {
+   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+      cat <<'EOF'
+Usage: deploy_argocd_applicationsets [--no-verify]
+
+Reapply every ApplicationSet under scripts/etc/argocd/applicationsets/ so each
+`$values` source is re-pinned to the current release branch. Required per-release
+step (see CLAUDE.md): ApplicationSets freeze their values ref to
+${K3D_MANAGER_BRANCH} at apply time, so config committed to a newer branch stays
+inert in-cluster until the sets are reapplied. Surgical — unlike
+deploy_argocd_bootstrap it does NOT redeploy the image updater or platform-ops.
+
+After reapplying it confirms the pin with argocd_check_values_branch unless
+--no-verify is given.
+
+As a deploy_* entrypoint this mutates the cluster, so the dispatcher deploy-guard
+requires --confirm (or --dry-run/-n) when no other option is passed.
+
+Options:
+   --confirm     Required to apply (consumed by the dispatcher deploy-guard)
+   --no-verify   Skip the post-apply argocd_check_values_branch confirmation
+   -h, --help    Show this help message
+
+Environment Variables:
+   K3D_MANAGER_BRANCH   Values branch to pin (default: current git branch)
+   APP_CLUSTER_NAME     App-cluster name for ACG variants (default: resolved/ubuntu-k3s)
+   ARGOCD_NAMESPACE     Namespace for Argo CD (default: cicd)
+
+Examples:
+   # Reapply + verify, pinning to the checked-out release branch
+   ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+
+   # Pin explicitly (e.g. from a detached checkout or a release-close sweep)
+   K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+EOF
+      return 0
+   fi
+
+   local verify=1
+   case "${1:-}" in
+      "") ;;
+      --no-verify) verify=0 ;;
+      *) _err "[argocd] Unknown option: $1"; return 1 ;;
+   esac
+
+   _argocd_deploy_applicationsets || return 1
+
+   if (( verify )) && declare -f argocd_check_values_branch >/dev/null 2>&1; then
+      _info "[argocd] Confirming values-branch pin (${K3D_MANAGER_BRANCH})"
+      argocd_check_values_branch "${K3D_MANAGER_BRANCH}"
+   fi
+}
+
 function _argocd_deploy_applicationsets() {
    _info "[argocd] Deploying sample ApplicationSets"
 

@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # scripts/plugins/observability.sh
 
+# Source Vault plugin so _vault_exec/_vault_exec_stream/_vault_configure_secret_writer_role
+# are available during deploy_observability (the dispatcher lazy-loads only this plugin).
+VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"
+if [[ -r "$VAULT_PLUGIN" ]]; then
+   # shellcheck disable=SC1090
+   source "$VAULT_PLUGIN"
+fi
+
 function deploy_observability() {
   _info "[observability] Deploying Hub observability stack..."
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability.yaml"
@@ -100,7 +108,48 @@ function deploy_observability() {
   _deploy_promtail_acg "${_hub_context}"
 }
 
+function _observability_seed_grafana_if_absent() {
+  local vault_ns="${1:-secrets}" vault_release="${2:-vault}"
+  local mount="secret" path="observability/grafana"
+  local check_cmd
+  printf -v check_cmd 'vault kv get -mount=%q %q >/dev/null 2>&1' "${mount}" "${path}"
+  if _vault_exec --no-exit "${vault_ns}" "${check_cmd}" "${vault_release}" >/dev/null 2>&1; then
+    _info "[observability] Grafana admin credential already present in Vault; skipping seed"
+    return 0
+  fi
+  local password
+  local _wasx=0
+  case $- in *x*) _wasx=1; set +x;; esac
+  password="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  if [[ -z "${password}" ]]; then
+    (( _wasx )) && set -x
+    _err "[observability] failed to generate Grafana admin password"
+    return 1
+  fi
+  local put_cmd
+  printf -v put_cmd 'vault kv put -mount=%q %q username=%q password=%q >/dev/null && echo SEEDED' \
+    "${mount}" "${path}" "admin" "${password}"
+  printf '%s\n' "${put_cmd}" \
+    | _no_trace _vault_exec_stream --no-exit --stdin "${vault_ns}" "${vault_release}" -- sh -s >/dev/null
+  local _seed_rc=$?
+  (( _wasx )) && set -x
+  if (( _seed_rc == 0 )); then
+    _info "[observability] Seeded Grafana admin credential in Vault (fresh password)"
+  else
+    _err "[observability] failed to seed Grafana admin credential in Vault"
+    return 1
+  fi
+}
+
+function observability_seed_grafana() {
+  local vault_ns="${1:-secrets}" vault_release="${2:-vault}"
+  _vault_login "${vault_ns}" "${vault_release}"
+  _observability_seed_grafana_if_absent "${vault_ns}" "${vault_release}"
+}
+
 function _observability_apply_grafana_rotator() {
+  _observability_seed_grafana_if_absent "secrets" "vault" \
+    || _err "[observability] Grafana credential seed skipped/failed"
   local manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-credential-rotator.yaml"
   [[ -f "${manifest}" ]] || return 0
   _kubectl apply -f "${manifest}" >/dev/null \

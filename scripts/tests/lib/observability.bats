@@ -70,7 +70,8 @@ EOF
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
     _is_mac() { return 0; }
-    export -f envsubst _kubectl curl kubectl launchctl _is_mac
+    _observability_seed_grafana_if_absent() { :; }
+    export -f envsubst _kubectl curl kubectl launchctl _is_mac _observability_seed_grafana_if_absent
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability
   '

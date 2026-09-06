@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-09-06
+
+**Theme: watch the platform without touching it, and stop losing secrets on rebuild.** This release lands **Hermes Phase-1** — an optional off-hub monitoring agent that runs on the laptop like `bin/k3dm-webhook`, samples cluster/CI health only through existing **read-only** interfaces, and posts a single Slack summary on sustained, multi-signal degradation. Hermes is **reports-and-stops by design**: there is no mutation path in the codebase, the k3d-manager webhook stays authoritative, it holds only three read-only credentials (a GET-only webhook bearer, a get-only ArgoCD `hermes` local account, and a read-only GitHub PAT) with **no direct kube-apiserver credential and no kubeconfig**, and it uses an LLM only as a budgeted last resort with a deterministic fallback. Alongside it, **self-healing Vault seeders** close a recurring rebuild exposure — a cluster rebuild wipes the Vault raft, and grafana + cosign KV had no bring-up seeders — so those now regenerate/restore on bring-up. This release also adds a **durable per-release ApplicationSet reapply entrypoint** so the required values-branch re-pin is a single repeatable command instead of an ad-hoc render.
+
+### Added
+- **Hermes Phase-1 read-only monitoring agent** — five stdlib-only sensors (ESO sync, ArgoCD per-app health via a get-only local account, public-endpoint reachability, node/data-layer via the webhook, GitHub Actions), a deterministic multi-signal correlator with anti-flap debounce, and a bounded Slack summarizer that posts only on sustained multi-signal degradation. Off-hub launchd agent (`bin/k3dm-hermes`, `bin/k3dm-hermes-setup`, `com.k3d-manager.hermes.plist.tmpl`) installed via lib-foundation **v0.4.15** `_install_hermes_agent`/`_uninstall_hermes_agent`, with a bounded `StartInterval` and jitter. Read-only access model captured in `scripts/etc/argocd/values.yaml.tmpl` (ArgoCD `hermes` get-only account + live argocd-cm/rbac-cm drift). Guide: `docs/guides/hermes.md`. Scope: `docs/architecture/hermes-phase1-monitoring-scope.md`.
+- **Self-healing Vault bring-up seeders** — `observability_seed_grafana` (public wrapper; fresh-generate-if-absent) and a hardened `signing_restore` so grafana + cosign KV self-heal after a cluster rebuild wipes the Vault raft. Specs in `docs/plans/` and `docs/bugs/`.
+- **`deploy_argocd_applicationsets`** — a public dispatcher entrypoint that surgically reapplies **all** ApplicationSets so each `$values` source is re-pinned to the current release branch, then self-verifies with `argocd_check_values_branch` (`--no-verify` to skip). Unlike `deploy_argocd_bootstrap` it does not redeploy the image updater or platform-ops. This is the durable per-release values-branch reapply step (see CLAUDE.md).
+
+### Fixed
+- **Hermes webhook sensors** — use `http` on the loopback webhook and tolerate a slow health check (scheme + timeout fix), so all five sensors return real data under launchd instead of `unknown`.
+- **`signing_restore` unusable standalone** — it never called `_vault_login` (every restore-path Vault call 403'd) and the grafana seed had no public entrypoint; both fixed, plus a graceful skip of the cosign public-key ExternalSecret when the Kyverno admission namespace is absent (self-heal is safe to run anytime). See `docs/bugs/v1.29.0-bugfix-signing-restore-no-login-grafana-seed-no-public-entry.md`.
+
+## [1.28.0] - 2026-09-04
+
+**Theme: parallelize multi-cloud provisioning, and land the first Hermes Phase-1 deliverable.** Multi-cloud app-cluster provisioning and join now run concurrently rather than serially (Phase 1–3b), cutting bring-up wall-clock across providers. This release also ships `bin/public-endpoint-probe` — a standalone read-only reachability probe that later becomes the reachability sensor Hermes Phase-1 consumes. The originally-scoped platform **zero-downtime rollouts** work was deferred (hardware-gated, awaiting the Mac Mini M5) and did **not** ship in this tag.
+
+### Added
+- **Parallel multi-cloud provisioning (Phase 1–3b)** — app-cluster provisioning and join execute concurrently with per-target readiness and collected failures, instead of one provider at a time.
+- **`bin/public-endpoint-probe`** — a read-only public-endpoint reachability probe; the first Hermes Phase-1 deliverable, later wired in as a Hermes sensor (v1.29.0).
+
+### Deferred
+- **Platform zero-downtime rollouts** — hardware-gated (awaiting the Mac Mini M5); carried forward, not shipped in this tag.
+
 ## [1.27.0] - 2026-09-03
 
 **Theme: close the CVE loop with cryptographically verifiable image provenance, and make the platform observably cheaper to run.** This release lands a **three-latch supply-chain gate** — images are **signed and get a vulnerability attestation at BUILD**, the **PROMOTE** step refuses to advance a candidate that cannot present a cosign-verifiable vuln attestation, and **ADMIT** (Kyverno `verifyImages`) requires a first-party image to carry both a signature and a vuln attestation signed by our key. All three latches ship **inert by default** and are enabled in a staged Audit→Enforce ladder. Alongside the signing work: an **adaptive checkout load-testing** harness (k6 stage-ladder controller with stop-condition hysteresis), a **foundation-managed vCluster CLI** (single contract resolves the pinned binary), the **M2 remote E2E runner** (dispatch the Tier-1 suite to a remote substrate with restricted result publishing), several **observability cost controls** (monitoring-pause/resume, layered resume, reduced federation scrape), and **Dependabot automation**. The signing key handling survived a multi-repo `COSIGN_KEY` corruption incident (macOS `security -w` hex-encoding of multi-line PEMs) that is now documented and guarded.
