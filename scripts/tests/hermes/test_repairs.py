@@ -118,6 +118,14 @@ def test_approve_refuses_second_action_for_already_attempted_key():
     assert outcome["outcome"] == "refused: repair already attempted this incident"
 
 
+def test_propose_is_idempotent_per_condition():
+    current = state()
+    first = repairs.propose(r2_records(), current)
+    second = repairs.propose(r2_records(), current)
+    assert first[0]["action_id"] == second[0]["action_id"]
+    assert list(current["pending_repairs"]) == [first[0]["action_id"]]
+
+
 def test_r4_precondition_requires_repo_to_avoid_keyerror():
     records = [record("ci", "degraded", data={"run_id": 123, "conclusion": "timed_out"})]
     assert repairs.propose(records, state()) == []

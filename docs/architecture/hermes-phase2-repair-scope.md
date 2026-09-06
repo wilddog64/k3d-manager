@@ -41,9 +41,14 @@ degraded signal would have caused real, irreversible damage.
 
 Phase 2 therefore encodes three hard rules for **every** allowlisted repair:
 
-1. **Multi-signal precondition.** A repair is proposable only when its specific
-   precondition (a named signal pattern, not "something is degraded") holds. A single
-   degraded sensor never triggers a repair proposal.
+1. **Structured-signal precondition.** A repair is proposable only when its specific
+   precondition holds — a named signal *pattern* (a structured sensor verdict such as
+   `single-service`, `edge-down`, or a transient CI conclusion), never a bare
+   "something is degraded". Some patterns require corroborating signals (R1 needs both
+   webhook-derived sensors unavailable; R2 requires a healthy substrate alongside the
+   single-service verdict); others key on one sensor's structured verdict, sometimes
+   sustained across cycles (R3 edge-down for ≥2 cycles, R4 a transient CI conclusion).
+   A raw `degraded` status with no matching pattern never triggers a proposal.
 2. **Known, bounded blast radius.** Each allowlist entry declares exactly what it
    touches and why that is reversible. Anything whose worst case is data loss or an
    irreversible cluster mutation is **not eligible** for the allowlist (see §5).

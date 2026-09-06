@@ -53,7 +53,7 @@
   (`k3dm-hermes preflight`, deferred from v1.30.0 into this follow-up since it couples with the App work and belongs as a
   tested hermes-package fn, not a bin bolt-on). Auth-swap only; Phase 2 repair logic unchanged. Phase 3 (cooldowns/
   budgets/durable audit/auto-verify) still deferred, separate scope doc.
-  **2026-09-06 — PR #121 GATE RUN (all green so far).** CI green on every head. **Copilot: 7 findings across 3 rounds,
+  **2026-09-06 — PR #121 GATE RUN (all green so far).** CI green on every head. **Copilot: 10 findings across 4 rounds,
   ALL fixed** (fix→push→reply→resolve; 0 unresolved threads): round 1 (`0065e1fe`) — (1) approve() one-attempt guard
   vs stale pending action_id, (2) R4 403 misclassification (any "403" → now only "resource not accessible" = missing
   scope; business-logic 403s fall through to "failed"), (3) reachability evidence "hosts healthy"→"hosts failing"
@@ -62,7 +62,12 @@
   once acted on (no stale ids in `list`, no unbounded state growth); round 3 (`<pending>`, summary-level, no threads)
   — (6) approve CLI exit code now 0 ONLY for outcome "executed" (failed/skipped/refused all non-zero; was masking),
   (7) Slack approval string uses `bin/k3dm-hermes approve` (matches the real entrypoint + guide; bare `k3dm-hermes`
-  is not on PATH — plist runs it by absolute path). Gates: pytest **22/22** (was 18; +4 regression),
+  is not on PATH — plist runs it by absolute path); round 4 (`2a459419`, summary-level, no threads) — (8) propose()
+  now uses a STABLE action_id (sha1 of key+command, dropped proposed_at) so pending_repairs is idempotent per
+  condition (was minting a new id every cycle → unbounded growth), (9) copilot-instructions.md dropped the
+  non-existent `--config <path>` flag (CLI is no-arg poll + list/approve), (10) scope-doc rule 1 reworded from
+  "multi-signal / single degraded sensor never triggers" to "structured-signal precondition" (R3/R4 legitimately
+  key on one sensor's structured verdict). Gates: pytest **23/23** (was 18; +5 regression),
   py_compile clean, scope check clean (NO subtree edits, v1.30.0 plan docs=1, no token literals in argv). Live smoke:
   `k3dm-hermes list` verified on the real binary (state-driven, side-effect-free); approve unknown-id refusal is
   unit-proven (a live approve triggers a full live sensor re-sample by design → not run standalone as smoke; live

@@ -154,7 +154,7 @@ def propose(records, state):
         argv, _env = repair["build_command"](records)
         command = shlex.join(argv)
         proposed_at = timestamp()
-        action_id = f"{key}-" + hashlib.sha1((key + command + proposed_at).encode()).hexdigest()[:8]
+        action_id = f"{key}-" + hashlib.sha1((key + command).encode()).hexdigest()[:8]
         proposal = {"action_id": action_id, "key": key, "name": repair["name"],
                     "command": command, "blast_radius": repair["blast_radius"],
                     "proposed_at": proposed_at, "evidence": _evidence(records, key)}
