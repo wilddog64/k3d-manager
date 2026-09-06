@@ -6,35 +6,81 @@
 
 ## Current focus
 
-- **2026-09-06 — v1.29.0 RELEASE-CLOSE SWEEP (user go "go ahead").** (1) **ApplicationSet values-branch
-  reapply PREPARED + DIFF-VERIFIED, apply user-gated:** `argocd_check_values_branch k3d-manager-v1.29.0`
-  found 6 Applications still on `v1.28.0` (kube-prometheus-stack, loki, trivy-operator + their acg/hub
-  variants, from the `observability`/`observability-acg` sets). Re-rendered both sets
-  (`ARGOCD_NAMESPACE=cicd K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 APP_CLUSTER_NAME=ubuntu-k3s`) and
-  `kubectl diff`-proved the ONLY change is `$values` targetRevision `v1.28.0→v1.29.0`. `kubectl apply`
-  classifier-blocked → user runs it via `!`, then re-check with `argocd_check_values_branch`.
-  **Superseded by a durable entrypoint (2026-09-06):** added public `deploy_argocd_applicationsets`
-  (argocd.sh) — surgical reapply-ALL sets + auto-verify, no temp files, repeatable every release.
-  Realized the scratchpad render only covered 2 of ~7 branch-pinned sets, so it would not have cleared
-  all 6 drifted apps. User now runs `! K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 ./scripts/k3d-manager
-  deploy_argocd_applicationsets --confirm` (`--confirm` required — `deploy_*` deploy-guard). 4 BATS green, shellcheck clean, in `docs/api/functions.md`. (2) **Hub
-  CPU load-shed Step 2 = ALREADY LIVE** (verified: no loki-canary pods, prom 60s intervals, retention
-  3d/8GB — it shipped with the v1.28.0 pin; corrected the stale "ROLLOUT PENDING" note in progress.md).
-  (3) **Roadmap refresh `bbe3438c`:** `docs/roadmap.md` was stale (named v1.14.0 active, v1.24.1–v1.28.0
-  queued though shipped) → current milestone now v1.29.0, arc table extended v1.14–v1.28, Hermes forward
-  theme advanced to Phase 2/3; ledger backfilled (`docs/releases.md` v1.25.0–v1.28.0). (4) **ApplicationSet
-  reapply DONE 2026-09-06** — `deploy_argocd_applicationsets --confirm` applied 12/12 sets; after a reconcile
-  cycle `argocd_check_values_branch k3d-manager-v1.29.0` reports *All Applications reference values branch
-  k3d-manager-v1.29.0* (first check showed 3 stale = controller reconcile lag, not a failure). All
-  cluster-side release steps DONE.
-- **v1.29.0 PR #120 CREATED 2026-09-06** (https://github.com/wilddog64/k3d-manager/pull/120), base `main` ←
-  `k3d-manager-v1.29.0` @ `1f56d04e`, 40 files. Pre-open **release-ledger backfill** (`1f56d04e`): README
-  releases table was 3 versions behind (added v1.28.0/v1.27.0/v1.25.0 from `docs/releases.md`) + CHANGELOG
-  `[1.28.0]` added (`[1.25.0]` gap intentional — folded into 1.26.0). Copilot requested (raw-JSON POST) and
-  **verified attached via GraphQL** (Bot `copilot-pull-request-reviewer`; REST `requested_reviewers` GET is
-  blind to bots — do not trust its empty array). CI running on the PR. **REMAINING: CI green + Copilot review
-  addressed, then STOP at merge gate for user go. NEVER auto-merge.** v1.29.0's own README/releases.md row
-  deferred to the v1.30.0 branch per convention.
+- **Next milestone: v1.30.0 branch** (`k3d-manager-v1.30.0` created 2026-09-06, origin tracking). Release-ledger backfill + standing-doc audits + retrospective + memory-bank updates committed on this branch.
+
+- **2026-09-06 — HERMES PHASE 2 STARTED (user go: "go ahead with phase 2 and work with codex").** Per the Phase-1
+  gate, Phase 2 begins as a SCOPE DOC (no code until user sign-off). Scope doc `docs/architecture/hermes-phase2-repair-scope.md`
+  committed `77873f7d` on `origin/k3d-manager-v1.30.0`. Defines: closed **repair allowlist** (R1 `make restart-webhook`,
+  R2 zombie-PF `launchctl kickstart -k`, R3 `_hostinger_refresh_access_layer` edge refresh, R4 `gh run rerun --failed`
+  transient CI), multi-signal preconditions, governing principle "health-degraded ≠ safe-to-repair" (the Replace=true
+  Keycloak trap), least-privilege access delta (**R1–R3 need NO new cluster/cloud write** — off-hub local levers; only
+  R4 adds `actions:write` to the GH PAT), 3 approval mechanisms (A propose-only / **B CLI `k3dm-hermes approve` = recommended**
+  / C Slack-interactive). NON-goals: no ArgoCD sync, no kubectl mutation, no auto-execution, closed allowlist.
+  **SIGN-OFF (2026-09-06):** approval mechanism = **B CLI `k3dm-hermes approve <action-id>`**; allowlist = **all
+  four incl. R4** (so GH PAT gains `actions:write` — user-provisioned prereq; code degrades R4→propose-only if absent).
+  Implementation spec `docs/plans/v1.30.0-hermes-phase2-repairs.md` committed `0840fc86` on origin (plan doc #1/5).
+  **DISPATCHED TO CODEX 2026-09-06** (codex exec, session `01a077af`, gpt-5.6-terra, background) — pure code+pytest,
+  no live cluster. Codex to implement records.py `data` field, sensor `data` attach, `repairs.py` allowlist+propose/
+  approve, bin/k3dm-hermes `_run_cycle`+approve subcommand, test_repairs.py; commit+push to k3d-manager-v1.30.0.
+  **IMPLEMENTED + VERIFIED 2026-09-06 — commit `ddda256b` on origin/k3d-manager-v1.30.0.** Codex was sandbox-blocked
+  on `.git` (index.lock EPERM) so it wrote the working tree only; Claude verified independently then committed.
+  Files: records.py (`data` field), sensors.py (reachability verdict+failed_hosts, ci repo/run_id/conclusion —
+  transient=timed_out|cancelled|stuck ONLY), NEW repairs.py (REPAIRS R1-R4 + propose/approve + one-incident guard),
+  bin/k3dm-hermes (`_run_cycle`, propose→Slack, `approve`/`list` subcommands, post-repair re-sample), test_repairs.py,
+  docs/guides/hermes.md. **Gates (Claude-run, not trusted from Codex):** pytest 18/18 (scratch venv pytest 9.1.1),
+  py_compile clean, invariant-1 grep-proven (runner() only in approve(), approve only from CLI subcommand).
+  **DEFECT CAUGHT + FIXED by Claude:** Codex FABRICATED R2 port-forward labels (argocd/keycloak/grafana PF labels
+  that don't exist; omitted real vault). Grounded against `scripts/etc/cloudflared/config.yml` ingress ports vs the
+  3 real `com.k3d-manager.*-port-forward.plist` listen ports → only `prometheus.3ai-talk.org`→`com.k3d-manager.prometheus-port-forward`
+  matches exactly (alertmanager ingress :9093 ≠ PF :19093; argocd/keycloak/grafana served by other mechanisms). R2 map
+  reduced to that one grounded entry + comment; test fixture updated.
+  **2026-09-06 — R4 actions:write PROVISIONED + LIVE-VERIFIED (user go, PR boundary = provision PAT first).** User set
+  the `k3dm-hermes-gh-token` fine-grained PAT to **Actions: Read and write** (screenshot-confirmed; fine-grained →
+  token value unchanged, no Keychain re-save). Claude verified the token R4 actually reads (`GITHUB_SERVICE =
+  k3dm-hermes-gh-token`, sensors.py:11/18): authenticates as wilddog64, Actions **read** confirmed; **write** confirmed
+  via the real code path (`repairs._r4_command` → `_keychain_secret(GITHUB_SERVICE)` → POST rerun-failed-jobs on a
+  **succeeded** run) returning `403 "This workflow run cannot be retried"` (business-logic reject reached only AFTER
+  authorization) rather than `"Resource not accessible by personal access token"` → token HOLDS actions:write. R4 fully
+  live (not propose-only). (Note: a smoke-script VERDICT heuristic misfired on GitHub's wording — raw API response is
+  authoritative; token has write.)
+  **2026-09-06 — v1.30.0 PR OPENED: PR #121** https://github.com/wilddog64/k3d-manager/pull/121 (base main ← k3d-manager-v1.30.0,
+  head `a7e457d6`). PR boundary decision (user "Ship + file App follow-up"): ship Phase 2 alone. Copilot review requested
+  (GraphQL-confirmed Bot `copilot-pull-request-reviewer`); CI in_progress. **PR gate in progress → STOP at merge (NEVER
+  auto-merge; enforce_admins stays true).** enforce_admins verified true before PR.
+  **Token-management follow-up filed:** user flagged PAT scoping as poor token mgmt (GitHub has no API to mint/re-scope
+  PATs → manual by design). Filed `docs/plans/v1.31.0-hermes-r4-github-app-auth.md` — replace R4 PAT auth with a
+  **GitHub App installation token** (short-lived ~1h, auto-scoped, no Keychain PAT) + a DI-testable **scope preflight**
+  (`k3dm-hermes preflight`, deferred from v1.30.0 into this follow-up since it couples with the App work and belongs as a
+  tested hermes-package fn, not a bin bolt-on). Auth-swap only; Phase 2 repair logic unchanged. Phase 3 (cooldowns/
+  budgets/durable audit/auto-verify) still deferred, separate scope doc.
+  **2026-09-06 — PR #121 GATE RUN (all green so far).** CI green on every head. **Copilot: 11 findings across 5 rounds,
+  ALL fixed** (fix→push→reply→resolve; 0 unresolved threads): round 1 (`0065e1fe`) — (1) approve() one-attempt guard
+  vs stale pending action_id, (2) R4 403 misclassification (any "403" → now only "resource not accessible" = missing
+  scope; business-logic 403s fall through to "failed"), (3) reachability evidence "hosts healthy"→"hosts failing"
+  (inverted); round 2 suppressed (`b6c9f02a`, no threads → addressed via PR comment) — (4) _r4_precondition now
+  requires data["repo"] (avoids KeyError in _r4_command on repo-less ci record), (5) approve() pops pending_repairs
+  once acted on (no stale ids in `list`, no unbounded state growth); round 3 (`<pending>`, summary-level, no threads)
+  — (6) approve CLI exit code now 0 ONLY for outcome "executed" (failed/skipped/refused all non-zero; was masking),
+  (7) Slack approval string uses `bin/k3dm-hermes approve` (matches the real entrypoint + guide; bare `k3dm-hermes`
+  is not on PATH — plist runs it by absolute path); round 4 (`2a459419`, summary-level, no threads) — (8) propose()
+  now uses a STABLE action_id (sha1 of key+command, dropped proposed_at) so pending_repairs is idempotent per
+  condition (was minting a new id every cycle → unbounded growth), (9) copilot-instructions.md dropped the
+  non-existent `--config <path>` flag (CLI is no-arg poll + list/approve), (10) scope-doc rule 1 reworded from
+  "multi-signal / single degraded sensor never triggers" to "structured-signal precondition" (R3/R4 legitimately
+  key on one sensor's structured verdict); round 5 (`f37c8321`, 1 thread, replied+resolved) — (11) SECURITY: R4 no
+  longer falls back to ambient gh auth — approve() skips R4 ("skipped: hermes GitHub token unavailable") when the
+  hermes PAT read is empty, before runner and before recording attempted (empty GH_TOKEN would let gh use the
+  laptop's ambient OAuth, violating no-ambient-auth/least-privilege). Gates: pytest **24/24** (was 18; +6 regression),
+  py_compile clean, scope check clean (NO subtree edits, v1.30.0 plan docs=1, no token literals in argv). Live smoke:
+  `k3dm-hermes list` verified on the real binary (state-driven, side-effect-free); approve unknown-id refusal is
+  unit-proven (a live approve triggers a full live sensor re-sample by design → not run standalone as smoke; live
+  poll cycle is a post-merge activation step like Phase 1). **NEXT: confirm final CI+Copilot on `b6c9f02a` green →
+  STOP at merge gate for user's explicit go. NEVER auto-merge; enforce_admins stays true.**
+
+## Merged releases
+
+- **v1.29.0 RELEASED 2026-09-06** (PR #120 merged `cd38a7e5`). All v1.29.0 release steps completed:
+  (1) **ApplicationSet reapply done** — `deploy_argocd_applicationsets --confirm` applied 12/12 sets, all Applications re-pinned to k3d-manager-v1.29.0. (2) **enforce_admins restored to true** on main branch (verified via gh api). (3) **v1.29.0 tag + GitHub release published** (tag created, HTTPS-pushed, release created from CHANGELOG excerpt). (4) **Release-ledger backfill** — README + docs/releases.md rows added for v1.29.0, v1.28.0, v1.27.0 (v1.25.0 folded into v1.26.0 as documented). (5) **Retrospective written** — docs/retro/2026-09-06-v1.29.0-retrospective.md covers Hermes Phase-1 shipping, seeder fixes, ApplicationSet reapply entrypoint, Copilot xtrace findings + process rules added. (6) **Standing-doc audits deferred** to v1.30.0 branch (non-stale entries confirmed: projectbrief.md, copilot-instructions.md, api/functions.md all current). (7) **Memory-bank updates** — progress.md + activeContext.md updated with v1.29.0 merged state, v1.30.0 branch noted as next active. Shipped: Hermes Phase-1 read-only monitoring (5 stdlib-only sensors, off-hub launchd, read-only 3-cred access), self-healing Vault seeders (grafana fresh-gen, cosign restore-first), durable ApplicationSet reapply entrypoint.
 
 - **2026-09-05 — VAULT SEEDER SELF-HEAL: spec'd + dispatched to Codex (user go "dispatch to codex to fix the issue").**
   Fixes the recurring post-incident exposure (grafana KV + cosign KV/policy wiped on every cluster rebuild). Spec

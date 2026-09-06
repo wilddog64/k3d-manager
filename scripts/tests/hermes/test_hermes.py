@@ -18,7 +18,7 @@ def webhook(payload):
 
 
 def assert_normalized(item, sensor):
-    assert set(item) == {"sensor", "status", "evidence", "sampled_at"}
+    assert set(item) == {"sensor", "status", "evidence", "sampled_at", "data"}
     assert item["sensor"] == sensor
     assert item["status"] in {"healthy", "degraded", "unknown"}
 
@@ -80,7 +80,7 @@ def test_ci_healthy_degraded_unknown_and_debounce():
     def source(conclusion="success", status="completed"):
         def fetch(url, _headers):
             if "actions/runs" in url:
-                return {"workflow_runs": [{"head_sha": "abc"}]}
+                return {"workflow_runs": [{"head_sha": "abc", "id": 123}]}
             return {"check_runs": [{"name": "test", "conclusion": conclusion, "status": status,
                                     "started_at": "2026-09-05T00:00:00Z"}]}
         return fetch
@@ -96,7 +96,8 @@ def test_ci_healthy_degraded_unknown_and_debounce():
 
 
 def sensor(name, status):
-    return {"sensor": name, "status": status, "evidence": name, "sampled_at": "2026-09-05T12:00:00Z"}
+    return {"sensor": name, "status": status, "evidence": name,
+            "sampled_at": "2026-09-05T12:00:00Z", "data": {}}
 
 
 def test_correlator_fire_silence_dedupe_resolved_and_unknown():

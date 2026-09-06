@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hermes Phase 1: off-hub, read-only sensor and advisory correlator."""
+"""Hermes Phase 2: off-hub monitoring with human-approved repairs only."""
 
 import json
 import os
@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 from hermes.correlator import Correlator
+from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, argocd, ci, eso, node_pressure,
                             reachability)
@@ -55,11 +56,8 @@ def _probe_run(command, _additions):
     return result.returncode, result.stdout
 
 
-def main():
-    if os.environ.get("K3DM_HERMES_JITTER"):
-        time.sleep(random.uniform(0, 30))
-    state_path = Path(os.environ.get("K3DM_HERMES_STATE", Path.home() / ".k3dm/hermes/state.json"))
-    state = _load_state(state_path)
+def _run_cycle(state):
+    """Sample the Phase 1 sensors and propose, but never execute, repairs."""
     webhook = _keychain_secret(WEBHOOK_SERVICE)
     argo_token = _keychain_secret(ARGOCD_SERVICE)
     github = _keychain_secret(GITHUB_SERVICE)
@@ -87,12 +85,62 @@ def main():
         provider=os.environ.get("K3DM_HERMES_LLM_PROVIDER", "gemini"),
     )
     event = correlator.process(records, state)
+    if event and event["kind"] == "resolved":
+        state["repairs_attempted_this_incident"] = []
+    proposals = repairs.propose(records, state)
+    if event and event["kind"] == "incident" and proposals:
+        lines = [f"Approve with: bin/k3dm-hermes approve {item['action_id']} ({item['command']})"
+                 for item in proposals]
+        event["text"] += "\nPending allowlisted repairs:\n" + "\n".join(lines)
+    return records, event
+
+
+def _repair_runner(argv, env, cwd):
+    result = subprocess.run(argv, env={**os.environ, **env}, cwd=cwd,
+                            capture_output=True, text=True, check=False)
+    return result.returncode, result.stdout + result.stderr
+
+
+def _usage():
+    print("Usage: k3dm-hermes [approve <action-id>|list]", file=sys.stderr)
+
+
+def main():
+    args = sys.argv[1:]
+    if not args and os.environ.get("K3DM_HERMES_JITTER"):
+        time.sleep(random.uniform(0, 30))
+    state_path = Path(os.environ.get("K3DM_HERMES_STATE", Path.home() / ".k3dm/hermes/state.json"))
+    state = _load_state(state_path)
+    if args and args[0] == "list" and len(args) == 1:
+        print(json.dumps(state.get("pending_repairs", {}), sort_keys=True))
+        return 0
+    if args and (args[0] != "approve" or len(args) != 2):
+        _usage()
+        return 2
+
+    if args:
+        action_id = args[1]
+        proposal = state.get("pending_repairs", {}).get(action_id, {})
+        records_now, _event = _run_cycle(state)
+        outcome = repairs.approve(action_id, state, records_now, _repair_runner)
+        if outcome.get("outcome") == "executed":
+            records_after, _event = _run_cycle(state)
+            repair = repairs.REPAIRS.get(proposal.get("key"))
+            if repair:
+                outcome["post_repair_precondition_cleared"] = not repair["precondition"](
+                    records_after, state.get("correlation_history", []), state)
+        _save_state(state_path, state)
+        print(json.dumps(outcome, sort_keys=True))
+        return 0 if outcome.get("outcome") == "executed" else 1
+
+    records, event = _run_cycle(state)
     if event:
         relay = _keychain_secret("k3dm-slack-webhook")
         post_summary(relay, event["text"])
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event}))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
