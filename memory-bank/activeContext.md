@@ -6,7 +6,18 @@
 
 ## Current focus
 
-- **Next milestone: v1.30.0 branch** (`k3d-manager-v1.30.0` created 2026-09-06, origin tracking). Release-ledger backfill + standing-doc audits + retrospective + memory-bank updates committed on this branch. Ready for new scopes (Hermes Phase 2–3 candidates: ArgoCD per-app-health sensor + multi-signal correlator, Slack incident posts, guide/APM feedback loop).
+- **Next milestone: v1.30.0 branch** (`k3d-manager-v1.30.0` created 2026-09-06, origin tracking). Release-ledger backfill + standing-doc audits + retrospective + memory-bank updates committed on this branch.
+
+- **2026-09-06 — HERMES PHASE 2 STARTED (user go: "go ahead with phase 2 and work with codex").** Per the Phase-1
+  gate, Phase 2 begins as a SCOPE DOC (no code until user sign-off). Scope doc `docs/architecture/hermes-phase2-repair-scope.md`
+  committed `77873f7d` on `origin/k3d-manager-v1.30.0`. Defines: closed **repair allowlist** (R1 `make restart-webhook`,
+  R2 zombie-PF `launchctl kickstart -k`, R3 `_hostinger_refresh_access_layer` edge refresh, R4 `gh run rerun --failed`
+  transient CI), multi-signal preconditions, governing principle "health-degraded ≠ safe-to-repair" (the Replace=true
+  Keycloak trap), least-privilege access delta (**R1–R3 need NO new cluster/cloud write** — off-hub local levers; only
+  R4 adds `actions:write` to the GH PAT), 3 approval mechanisms (A propose-only / **B CLI `k3dm-hermes approve` = recommended**
+  / C Slack-interactive). NON-goals: no ArgoCD sync, no kubectl mutation, no auto-execution, closed allowlist.
+  **REMAINING: user signs off on (1) approval mechanism, (2) allowlist scope incl. whether R4/actions:write is in →
+  then write `docs/plans/` implementation spec → dispatch to Codex.** NO code yet. Phase 3 (cooldowns/budgets/audit) deferred.
 
 ## Merged releases
 
