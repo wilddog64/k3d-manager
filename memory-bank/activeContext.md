@@ -22,8 +22,20 @@
   **DISPATCHED TO CODEX 2026-09-06** (codex exec, session `01a077af`, gpt-5.6-terra, background) — pure code+pytest,
   no live cluster. Codex to implement records.py `data` field, sensor `data` attach, `repairs.py` allowlist+propose/
   approve, bin/k3dm-hermes `_run_cycle`+approve subcommand, test_repairs.py; commit+push to k3d-manager-v1.30.0.
-  **REMAINING: verify Codex output independently (SHA on origin, pytest green, scope, invariant-1 grep) — do NOT
-  trust the done report. Then user-owned: add actions:write to k3dm-hermes-gh-token PAT for R4.** Phase 3 deferred.
+  **IMPLEMENTED + VERIFIED 2026-09-06 — commit `ddda256b` on origin/k3d-manager-v1.30.0.** Codex was sandbox-blocked
+  on `.git` (index.lock EPERM) so it wrote the working tree only; Claude verified independently then committed.
+  Files: records.py (`data` field), sensors.py (reachability verdict+failed_hosts, ci repo/run_id/conclusion —
+  transient=timed_out|cancelled|stuck ONLY), NEW repairs.py (REPAIRS R1-R4 + propose/approve + one-incident guard),
+  bin/k3dm-hermes (`_run_cycle`, propose→Slack, `approve`/`list` subcommands, post-repair re-sample), test_repairs.py,
+  docs/guides/hermes.md. **Gates (Claude-run, not trusted from Codex):** pytest 18/18 (scratch venv pytest 9.1.1),
+  py_compile clean, invariant-1 grep-proven (runner() only in approve(), approve only from CLI subcommand).
+  **DEFECT CAUGHT + FIXED by Claude:** Codex FABRICATED R2 port-forward labels (argocd/keycloak/grafana PF labels
+  that don't exist; omitted real vault). Grounded against `scripts/etc/cloudflared/config.yml` ingress ports vs the
+  3 real `com.k3d-manager.*-port-forward.plist` listen ports → only `prometheus.3ai-talk.org`→`com.k3d-manager.prometheus-port-forward`
+  matches exactly (alertmanager ingress :9093 ≠ PF :19093; argocd/keycloak/grafana served by other mechanisms). R2 map
+  reduced to that one grounded entry + comment; test fixture updated. **REMAINING: (a) decide PR boundary for v1.30.0
+  (Phase 2 alone vs accumulate) then run PR gate (CI/Copilot/live-smoke/scope) → STOP at merge; (b) user-owned: add
+  actions:write to k3dm-hermes-gh-token PAT for R4 (code degrades R4→propose-only until then).** Phase 3 deferred.
 
 ## Merged releases
 
