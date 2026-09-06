@@ -118,13 +118,22 @@ function _observability_seed_grafana_if_absent() {
     return 0
   fi
   local password
+  local _wasx=0
+  case $- in *x*) _wasx=1; set +x;; esac
   password="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  [[ -n "${password}" ]] || { _err "[observability] failed to generate Grafana admin password"; return 1; }
+  if [[ -z "${password}" ]]; then
+    (( _wasx )) && set -x
+    _err "[observability] failed to generate Grafana admin password"
+    return 1
+  fi
   local put_cmd
   printf -v put_cmd 'vault kv put -mount=%q %q username=%q password=%q >/dev/null && echo SEEDED' \
     "${mount}" "${path}" "admin" "${password}"
-  if printf '%s\n' "${put_cmd}" \
-      | _no_trace _vault_exec_stream --no-exit --stdin "${vault_ns}" "${vault_release}" -- sh -s >/dev/null; then
+  printf '%s\n' "${put_cmd}" \
+    | _no_trace _vault_exec_stream --no-exit --stdin "${vault_ns}" "${vault_release}" -- sh -s >/dev/null
+  local _seed_rc=$?
+  (( _wasx )) && set -x
+  if (( _seed_rc == 0 )); then
     _info "[observability] Seeded Grafana admin credential in Vault (fresh password)"
   else
     _err "[observability] failed to seed Grafana admin credential in Vault"

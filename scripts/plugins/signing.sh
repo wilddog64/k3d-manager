@@ -171,6 +171,9 @@ function _signing_restore_vault_from_keychain() {
     "${SIGNING_KEYCHAIN_PASSWORD_ACCOUNT}") || return 1
   [[ -n "${key}" && -n "${password}" ]] || return 1
 
+  local _wasx=0
+  case $- in *x*) _wasx=1; set +x;; esac
+
   # `security -w` hex-encodes multi-line values (the PEM key); decode when the
   # value did not come back as a PEM block.
   case "${key}" in
@@ -195,6 +198,9 @@ function _signing_restore_vault_from_keychain() {
     _signing_write_vault "${vault_ns}" "${vault_release}" \
       "${workdir}/cosign.key" "${password}" "${workdir}/cosign.pub"
   )
+  local _rc=$?
+  (( _wasx )) && set -x
+  return "${_rc}"
 }
 
 function _signing_install_kyverno() {
