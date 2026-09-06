@@ -102,7 +102,7 @@ def _repair_runner(argv, env, cwd):
 
 
 def _usage():
-    print("Usage: k3dm-hermes [approve <action-id>|list]", file=sys.stderr)
+    print("Usage: k3dm-hermes [approve <action-id>|list|preflight]", file=sys.stderr)
 
 
 def main():
@@ -114,6 +114,11 @@ def main():
     if args and args[0] == "list" and len(args) == 1:
         print(json.dumps(state.get("pending_repairs", {}), sort_keys=True))
         return 0
+    if args and args[0] == "preflight" and len(args) == 1:
+        from hermes.preflight import run_preflight
+        report, code = run_preflight(_keychain_secret, _repair_runner)
+        print(json.dumps(report, sort_keys=True))
+        return code
     if args and (args[0] != "approve" or len(args) != 2):
         _usage()
         return 2

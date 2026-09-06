@@ -46,7 +46,7 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 | R1 | Restart webhook | both webhook-backed sensors unavailable for two cycles | `make restart-webhook` |
 | R2 | Kick zombie port-forward | one mapped public host fails while the substrate is healthy | `launchctl kickstart -k <known PF label>` |
 | R3 | Refresh Hostinger edge access | all public hosts fail for two cycles | `scripts/k3d-manager refresh_access_layer` (the public wrapper for `_hostinger_refresh_access_layer`; never `make refresh`) |
-| R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using only the Hermes PAT in `GH_TOKEN` |
+| R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using a short-lived Hermes GitHub App installation token in `GH_TOKEN` (PAT fallback only) |
 
 When an incident prints a pending action ID, inspect it and approve only that exact ID:
 
@@ -57,8 +57,33 @@ bin/k3dm-hermes approve r2-<action-id-suffix>
 
 Approval refuses unknown IDs, non-allowlisted keys, and stale preconditions. It records the
 command, result, and exit code in Hermes state, then re-samples once to report whether the
-precondition cleared. R4 needs the `k3dm-hermes-gh-token` Keychain PAT to have `actions:write`; a
-403 degrades safely to `skipped: token lacks actions:write`, without using ambient GitHub auth.
+precondition cleared. R4 uses the GitHub App installation token when all App Keychain items are
+present; otherwise its `k3dm-hermes-gh-token` PAT fallback must have `actions:write`. A 403
+degrades safely to `skipped: token lacks actions:write`, without using ambient GitHub auth.
+
+## R4 GitHub App registration and scope preflight
+
+Register the `k3dm-hermes` GitHub App manually on `wilddog64`, grant it **Actions: Read and
+write**, and install it only on `wilddog64/k3d-manager`. Add **Contents: Read** only if the CI
+sensor's authenticated reads require it. Store these three values in the login Keychain under the
+`k3dm` account; never commit them:
+
+| Keychain service | Value |
+|------------------|-------|
+| `k3dm-hermes-app-id` | GitHub App ID |
+| `k3dm-hermes-app-installation-id` | Installation ID for `wilddog64/k3d-manager` |
+| `k3dm-hermes-app-private-key` | GitHub App private key |
+
+The App registration and Keychain writes are manual steps. Before relying on R4, run the
+dependency-safe scope probe:
+
+```bash
+bin/k3dm-hermes preflight
+```
+
+It reports required-secret presence plus GitHub Actions read/write status, and exits non-zero if a
+required secret or `actions:write` is unavailable. The write probe targets the most recent
+succeeded run; GitHub's `cannot be retried` response confirms authorization without rerunning it.
 
 ---
 
@@ -130,7 +155,7 @@ risk for no signal.
 |---------|------------------|-------|
 | Webhook status (ESO, node pressure, service health) | `k3dm-webhook-token` | Existing token, reused; GET-only in use |
 | ArgoCD per-app status | `k3dm-hermes-argocd-token` | `hermes` local account, `apiKey` capability only, RBAC `get` only |
-| CI / required-check status and R4 re-run | `k3dm-hermes-gh-token` | GitHub fine-grained PAT; `actions:write` is used only for the approved R4 POST, never for contents or branch protection |
+| CI / required-check status and R4 re-run | `k3dm-hermes-gh-token` | GitHub fine-grained PAT fallback; the GitHub App installation token is preferred for approved R4 POSTs |
 | Slack summary delivery | `k3dm-slack-webhook` | Existing incoming-webhook relay |
 
 The ArgoCD `hermes` account and its RBAC (`get` only, no `sync`/`update`/`delete`) live in

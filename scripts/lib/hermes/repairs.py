@@ -13,6 +13,10 @@ import subprocess
 from hermes.records import timestamp
 from hermes.sensors import GITHUB_SERVICE, _keychain_secret
 
+APP_ID_SERVICE = "k3dm-hermes-app-id"
+APP_INSTALLATION_SERVICE = "k3dm-hermes-app-installation-id"
+APP_PRIVATE_KEY_SERVICE = "k3dm-hermes-app-private-key"
+
 ROOT = Path(__file__).resolve().parents[3]
 WEBHOOK_LABEL = "com.k3d-manager.webhook"
 # Public host -> the launchd port-forward label that actually serves it. Grounded
@@ -102,11 +106,23 @@ def _r3_command(_records):
     return ["scripts/k3d-manager", "refresh_access_layer"], {}
 
 
+def _r4_token():
+    """Return (token, backend). Prefer the GitHub App installation token; fall back to the PAT."""
+    app_id = _keychain_secret(APP_ID_SERVICE)
+    installation_id = _keychain_secret(APP_INSTALLATION_SERVICE)
+    private_key = _keychain_secret(APP_PRIVATE_KEY_SERVICE)
+    if app_id and installation_id and private_key:
+        from hermes import github_app
+        return github_app.installation_token(app_id, installation_id, private_key), "github-app"
+    return _keychain_secret(GITHUB_SERVICE), "pat"
+
+
 def _r4_command(records):
     data = (_rec(records, "ci") or {}).get("data", {})
+    token, _backend = _r4_token()
     return (["gh", "api", "--method", "POST",
              f"/repos/{data['repo']}/actions/runs/{data['run_id']}/rerun-failed-jobs"],
-            {"GH_TOKEN": _keychain_secret(GITHUB_SERVICE)})
+            {"GH_TOKEN": token})
 
 
 REPAIRS = {
