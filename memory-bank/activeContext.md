@@ -31,6 +31,17 @@
   safe; the ESO public secret is what needs healing). **NEXT: user re-runs the now-working commands** —
   `./scripts/k3d-manager signing_restore secrets vault` (heals eso_public_secret) and
   `./scripts/k3d-manager observability_seed_grafana secrets vault` (seeds grafana KV if absent); then read-only verify.
+  **2026-09-06 — LIVE RE-RUN (chained 4 cmds): ALL FOUR original remediation targets HEALTHY** — grafana KV present
+  (seed skipped), cosign KV present (restore skipped), `cosign-verify` policy re-applied ("Success! Uploaded policy"),
+  ESO role grant present (role `eso-ldap-directory` already grants cosign-verify). Login fix works: no more 403 on the
+  probe; `observability_seed_grafana` dispatchable. Two non-regressions noted: (a) `eso_public_secret=absent` +
+  `namespaces "kyverno" not found` — this cluster has no Kyverno admission stack, so the public-key ExternalSecret
+  (targets `SIGNING_ADMISSION_NAMESPACE`=kyverno) has nowhere to land; NOT one of the 4 targets; (b) the raw
+  standalone `_vault_exec` verify 403'd because each dispatcher call is a fresh process w/o `_vault_login` — my
+  command flaw, not a bug. **HARDENING commit `ae9d8cb4`:** `_signing_apply_pub_externalsecret` now `_warn`+`return 0`
+  (skip) when the admission namespace is absent, instead of hard-erroring — keeps `signing_restore` idempotent/safe
+  anytime. BATS 32/32 (+2), shellcheck 2 pre-existing infos. Bug doc DoD all checked. **Seeder self-heal fully DONE;
+  nothing pending here.**
 
 - **2026-09-04 v1.29.0 MILESTONE = Hermes Phase-1 (the "hermes-agent") — IMPLEMENTATION PLAN DRAFTED.**
   User set the v1.29.0 theme to Hermes Phase-1 (read-only ops monitoring). Gate satisfied: runs OFF-HUB
