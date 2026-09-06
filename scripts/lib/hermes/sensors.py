@@ -104,7 +104,7 @@ def reachability(run, state, threshold=2):
         failed_hosts = [host.get("host") or host.get("name") or host.get("url")
                         for host in hosts if not host.get("healthy")]
         status = "degraded" if _debounced("reachability", True, threshold, state) else "healthy"
-        return record("reachability", status, f"{verdict} {failed}/{len(hosts)} hosts healthy",
+        return record("reachability", status, f"{verdict} {failed}/{len(hosts)} hosts failing",
                       data={"verdict": verdict,
                             "failed_hosts": [host for host in failed_hosts if host]})
     except Exception:

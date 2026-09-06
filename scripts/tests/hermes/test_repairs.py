@@ -95,8 +95,27 @@ def test_r4_degrades_to_skipped_on_permission_error(monkeypatch):
     current = state()
     proposal = repairs.propose(r4_records(), current)[0]
     outcome = repairs.approve(proposal["action_id"], current, r4_records(),
-                              lambda *_: (1, "HTTP 403 Forbidden"))
+                              lambda *_: (1, "Resource not accessible by personal access token"))
     assert outcome["outcome"] == "skipped: token lacks actions:write"
+
+
+def test_r4_business_logic_403_is_not_misclassified_as_missing_scope(monkeypatch):
+    monkeypatch.setattr(repairs, "_keychain_secret", lambda _service: "token")
+    current = state()
+    proposal = repairs.propose(r4_records(), current)[0]
+    outcome = repairs.approve(proposal["action_id"], current, r4_records(),
+                              lambda *_: (1, "This workflow run cannot be retried (HTTP 403)"))
+    assert outcome["outcome"] == "failed"
+
+
+def test_approve_refuses_second_action_for_already_attempted_key():
+    current = state()
+    proposal = repairs.propose(r2_records(), current)[0]
+    assert repairs.approve(proposal["action_id"], current, r2_records(),
+                           lambda *_: (0, "done"))["outcome"] == "executed"
+    current["pending_repairs"]["r2-stale"] = {**proposal, "action_id": "r2-stale"}
+    outcome = repairs.approve("r2-stale", current, r2_records(), lambda *_: (0, "done"))
+    assert outcome["outcome"] == "refused: repair already attempted this incident"
 
 
 def test_no_repair_runs_in_poll_path():

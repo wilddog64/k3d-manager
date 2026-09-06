@@ -180,6 +180,8 @@ def approve(action_id, state, records_now, runner):
     repair = REPAIRS.get(key)
     if not repair:
         return {"outcome": "refused: action is not allowlisted", "action_id": action_id}
+    if key in state.get("repairs_attempted_this_incident", []):
+        return {"outcome": "refused: repair already attempted this incident", "action_id": action_id}
     history = state.setdefault("correlation_history", [])
     if not repair["precondition"](records_now, history, state):
         return {"outcome": "refused: precondition no longer holds", "action_id": action_id}
@@ -193,7 +195,7 @@ def approve(action_id, state, records_now, runner):
              "approved_at": timestamp(), "rc": rc}
     state.setdefault("repair_audit", []).append(audit)
     state.setdefault("repairs_attempted_this_incident", []).append(key)
-    if key == "r4" and (rc == 403 or "403" in output or "actions:write" in output.lower()):
+    if key == "r4" and "resource not accessible" in output.lower():
         return {"outcome": "skipped: token lacks actions:write", "action_id": action_id,
                 "rc": rc}
     return {"outcome": "executed" if rc == 0 else "failed", "action_id": action_id,
