@@ -22,9 +22,12 @@
   3d/8GB — it shipped with the v1.28.0 pin; corrected the stale "ROLLOUT PENDING" note in progress.md).
   (3) **Roadmap refresh `bbe3438c`:** `docs/roadmap.md` was stale (named v1.14.0 active, v1.24.1–v1.28.0
   queued though shipped) → current milestone now v1.29.0, arc table extended v1.14–v1.28, Hermes forward
-  theme advanced to Phase 2/3; `docs/releases.md` ledger catch-up for v1.25+ still pending. **REMAINING
-  for v1.29.0: user applies the ApplicationSet reapply via `!`; then the v1.29.0 PR gate (CI + Copilot +
-  Gemini smoke + Claude scope; NEVER auto-merge).**
+  theme advanced to Phase 2/3; ledger backfilled (`docs/releases.md` v1.25.0–v1.28.0). (4) **ApplicationSet
+  reapply DONE 2026-09-06** — `deploy_argocd_applicationsets --confirm` applied 12/12 sets; after a reconcile
+  cycle `argocd_check_values_branch k3d-manager-v1.29.0` reports *All Applications reference values branch
+  k3d-manager-v1.29.0* (first check showed 3 stale = controller reconcile lag, not a failure). **REMAINING
+  for v1.29.0: ONLY the v1.29.0 PR gate (CI + Copilot + Gemini smoke + Claude scope; NEVER auto-merge). All
+  cluster-side release steps DONE.**
 
 - **2026-09-05 — VAULT SEEDER SELF-HEAL: spec'd + dispatched to Codex (user go "dispatch to codex to fix the issue").**
   Fixes the recurring post-incident exposure (grafana KV + cosign KV/policy wiped on every cluster rebuild). Spec
