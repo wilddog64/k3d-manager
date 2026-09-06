@@ -12,7 +12,12 @@
   variants, from the `observability`/`observability-acg` sets). Re-rendered both sets
   (`ARGOCD_NAMESPACE=cicd K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 APP_CLUSTER_NAME=ubuntu-k3s`) and
   `kubectl diff`-proved the ONLY change is `$values` targetRevision `v1.28.0→v1.29.0`. `kubectl apply`
-  classifier-blocked → user runs it via `!`, then re-check with `argocd_check_values_branch`. (2) **Hub
+  classifier-blocked → user runs it via `!`, then re-check with `argocd_check_values_branch`.
+  **Superseded by a durable entrypoint (2026-09-06):** added public `deploy_argocd_applicationsets`
+  (argocd.sh) — surgical reapply-ALL sets + auto-verify, no temp files, repeatable every release.
+  Realized the scratchpad render only covered 2 of ~7 branch-pinned sets, so it would not have cleared
+  all 6 drifted apps. User now runs `! K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 ./scripts/k3d-manager
+  deploy_argocd_applicationsets`. 4 BATS green, shellcheck clean, in `docs/api/functions.md`. (2) **Hub
   CPU load-shed Step 2 = ALREADY LIVE** (verified: no loki-canary pods, prom 60s intervals, retention
   3d/8GB — it shipped with the v1.28.0 pin; corrected the stale "ROLLOUT PENDING" note in progress.md).
   (3) **Roadmap refresh `bbe3438c`:** `docs/roadmap.md` was stale (named v1.14.0 active, v1.24.1–v1.28.0

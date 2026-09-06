@@ -69,6 +69,36 @@ setup() {
   [ "${calls[1]}" = "-n cicd get deployment argocd-server" ]
 }
 
+@test "deploy_argocd_applicationsets --help shows usage" {
+  run deploy_argocd_applicationsets --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: deploy_argocd_applicationsets"* ]]
+}
+
+@test "deploy_argocd_applicationsets reapplies then verifies the values-branch pin" {
+  _argocd_deploy_applicationsets() { echo "REAPPLY"; K3D_MANAGER_BRANCH="test-branch"; export K3D_MANAGER_BRANCH; }
+  argocd_check_values_branch() { echo "VERIFY:$1"; }
+  run deploy_argocd_applicationsets
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"REAPPLY"* ]]
+  [[ "$output" == *"VERIFY:test-branch"* ]]
+}
+
+@test "deploy_argocd_applicationsets --no-verify skips the values-branch check" {
+  _argocd_deploy_applicationsets() { echo "REAPPLY"; }
+  argocd_check_values_branch() { echo "VERIFY-SHOULD-NOT-RUN"; }
+  run deploy_argocd_applicationsets --no-verify
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"REAPPLY"* ]]
+  [[ "$output" != *"VERIFY-SHOULD-NOT-RUN"* ]]
+}
+
+@test "deploy_argocd_applicationsets rejects unknown options" {
+  run deploy_argocd_applicationsets --bogus
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Unknown option"* ]]
+}
+
 @test "_argocd_bootstrap_is_ready returns 0 when AppProject and ApplicationSets exist" {
   : > "$KUBECTL_LOG"
   KUBECTL_EXIT_CODES=()
