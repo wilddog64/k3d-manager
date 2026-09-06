@@ -205,6 +205,7 @@
   — [[project_app_cluster_vault_auth_portability]] open seam; no app-cluster registered → its KV path is intentionally
   empty; not Hermes-flagged, untouched by this remediation). Keycloak 502 / argocd-repo-server restart-loop = separate
   CPU-pressure thread (ties to hub CPU overcommit Step 2 load-shed), NOT addressed here.
+  Post-incident note filed: docs/issues/2026-09-05-vault-kv-and-eso-policy-loss-grafana-cosign.md
 
 - **2026-09-04 LDAP↔SSO decoupling — DECISION RESOLVED (Option B) + REMEDIATION SPEC WRITTEN (not executed).**
   Investigation on the live hub refuted the earlier "osixia is orphaned drift" read: the `shopping-cart-identity`
