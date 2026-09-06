@@ -118,6 +118,19 @@ def test_approve_refuses_second_action_for_already_attempted_key():
     assert outcome["outcome"] == "refused: repair already attempted this incident"
 
 
+def test_r4_precondition_requires_repo_to_avoid_keyerror():
+    records = [record("ci", "degraded", data={"run_id": 123, "conclusion": "timed_out"})]
+    assert repairs.propose(records, state()) == []
+
+
+def test_approve_pops_pending_proposal():
+    current = state()
+    proposal = repairs.propose(r2_records(), current)[0]
+    assert proposal["action_id"] in current["pending_repairs"]
+    repairs.approve(proposal["action_id"], current, r2_records(), lambda *_: (0, "done"))
+    assert proposal["action_id"] not in current["pending_repairs"]
+
+
 def test_no_repair_runs_in_poll_path():
     current = state()
     proposals = repairs.propose(r2_records(), current)

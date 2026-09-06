@@ -83,7 +83,8 @@ def _r3_precondition(records, history, _state):
 def _r4_precondition(records, _history, _state):
     ci = _rec(records, "ci") or {}
     data = ci.get("data", {})
-    return (_status(records, "ci") == "degraded" and bool(data.get("run_id")) and
+    return (_status(records, "ci") == "degraded" and
+            bool(data.get("run_id")) and bool(data.get("repo")) and
             data.get("conclusion") in ("timed_out", "cancelled", "stuck"))
 
 
@@ -176,6 +177,7 @@ def approve(action_id, state, records_now, runner):
     proposal = state.setdefault("pending_repairs", {}).get(action_id)
     if not proposal:
         return {"outcome": "refused: unknown action-id", "action_id": action_id}
+    state["pending_repairs"].pop(action_id, None)
     key = proposal.get("key")
     repair = REPAIRS.get(key)
     if not repair:
