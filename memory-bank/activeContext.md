@@ -12,8 +12,16 @@
   Decisions locked: grafana = **fresh-generate-if-absent** (user-chosen; no backup exists to restore), cosign =
   **non-destructive restore from Keychain** (`signing_restore` + `signing_init` prefers restore over regenerate).
   Codex dispatched via `codex exec` for code + BATS only; live seeder run vs hub is a SEPARATE deferred Claude step
-  (classifier gates live Vault writes). AWAITING Codex completion → verify (SHA on origin, BATS, scope) → Claude
-  commits (expect sandbox `.git`-lock blocks Codex's own commit) → then offer live verification.
+  (classifier gates live Vault writes).
+  **IMPLEMENTED + VERIFIED 2026-09-05, commit `43ce7732`** — Codex authored code+BATS, hit sandbox `.git`-lock →
+  Claude committed after independent verify. Claude added two necessary fixes the literal impl surfaced:
+  (1) observability.sh sources vault.sh via `VAULT_PLUGIN` idiom (dispatcher lazy-loads only the invoked plugin →
+  `_vault_exec`/`_vault_exec_stream` were undefined during `deploy_observability`, seed would silently no-op on real
+  bring-up; also makes the pre-existing `declare -f`-guarded writer-role config finally fire); (2) stubbed the seed in
+  `lib/observability.bats`. Gates: targeted 27/27 green, all 6 observability suites green, shellcheck only 2
+  pre-existing SC2016 infos. Remaining `make test` failures (argocd_deploy_keys #6/#8, slack #5/#10) proven
+  pre-existing & unrelated (those suites don't reference observability/signing). **NEXT: offer live seeder run vs
+  hub** (Claude classifier-gated on live Vault writes — likely user runs via `!`, or verifies present state read-only).
 
 - **2026-09-04 v1.29.0 MILESTONE = Hermes Phase-1 (the "hermes-agent") — IMPLEMENTATION PLAN DRAFTED.**
   User set the v1.29.0 theme to Hermes Phase-1 (read-only ops monitoring). Gate satisfied: runs OFF-HUB
