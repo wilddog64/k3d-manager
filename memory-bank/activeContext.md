@@ -20,8 +20,17 @@
   bring-up; also makes the pre-existing `declare -f`-guarded writer-role config finally fire); (2) stubbed the seed in
   `lib/observability.bats`. Gates: targeted 27/27 green, all 6 observability suites green, shellcheck only 2
   pre-existing SC2016 infos. Remaining `make test` failures (argocd_deploy_keys #6/#8, slack #5/#10) proven
-  pre-existing & unrelated (those suites don't reference observability/signing). **NEXT: offer live seeder run vs
-  hub** (Claude classifier-gated on live Vault writes — likely user runs via `!`, or verifies present state read-only).
+  pre-existing & unrelated (those suites don't reference observability/signing).
+  **2026-09-06 — LIVE RUN surfaced two bugs in `43ce7732` (BATS stubbed Vault → slipped verify), FIXED `7eaaf897`:**
+  (1) `signing_restore` never called `_vault_login` (siblings init/rotate/status all do) → standalone run 403'd on the
+  key probe; (2) grafana seed was private-only → dispatcher refused `_observability_seed_grafana_if_absent`. Fix: added
+  `_vault_login` to `signing_restore` + new public `observability_seed_grafana` wrapper (both ns=secrets release=vault).
+  Bug doc `docs/bugs/v1.29.0-bugfix-signing-restore-no-login-grafana-seed-no-public-entry.md`. BATS 30/30 (was 27; +3),
+  shellcheck 2 pre-existing infos only. Pushed, local===origin===`7eaaf897`. Live state observed pre-fix:
+  `signing_status secrets vault` → `vault_key=present keychain_backup=present eso_public_secret=absent` (cosign material
+  safe; the ESO public secret is what needs healing). **NEXT: user re-runs the now-working commands** —
+  `./scripts/k3d-manager signing_restore secrets vault` (heals eso_public_secret) and
+  `./scripts/k3d-manager observability_seed_grafana secrets vault` (seeds grafana KV if absent); then read-only verify.
 
 - **2026-09-04 v1.29.0 MILESTONE = Hermes Phase-1 (the "hermes-agent") — IMPLEMENTATION PLAN DRAFTED.**
   User set the v1.29.0 theme to Hermes Phase-1 (read-only ops monitoring). Gate satisfied: runs OFF-HUB
