@@ -25,9 +25,16 @@
   theme advanced to Phase 2/3; ledger backfilled (`docs/releases.md` v1.25.0–v1.28.0). (4) **ApplicationSet
   reapply DONE 2026-09-06** — `deploy_argocd_applicationsets --confirm` applied 12/12 sets; after a reconcile
   cycle `argocd_check_values_branch k3d-manager-v1.29.0` reports *All Applications reference values branch
-  k3d-manager-v1.29.0* (first check showed 3 stale = controller reconcile lag, not a failure). **REMAINING
-  for v1.29.0: ONLY the v1.29.0 PR gate (CI + Copilot + Gemini smoke + Claude scope; NEVER auto-merge). All
-  cluster-side release steps DONE.**
+  k3d-manager-v1.29.0* (first check showed 3 stale = controller reconcile lag, not a failure). All
+  cluster-side release steps DONE.
+- **v1.29.0 PR #120 CREATED 2026-09-06** (https://github.com/wilddog64/k3d-manager/pull/120), base `main` ←
+  `k3d-manager-v1.29.0` @ `1f56d04e`, 40 files. Pre-open **release-ledger backfill** (`1f56d04e`): README
+  releases table was 3 versions behind (added v1.28.0/v1.27.0/v1.25.0 from `docs/releases.md`) + CHANGELOG
+  `[1.28.0]` added (`[1.25.0]` gap intentional — folded into 1.26.0). Copilot requested (raw-JSON POST) and
+  **verified attached via GraphQL** (Bot `copilot-pull-request-reviewer`; REST `requested_reviewers` GET is
+  blind to bots — do not trust its empty array). CI running on the PR. **REMAINING: CI green + Copilot review
+  addressed, then STOP at merge gate for user go. NEVER auto-merge.** v1.29.0's own README/releases.md row
+  deferred to the v1.30.0 branch per convention.
 
 - **2026-09-05 — VAULT SEEDER SELF-HEAL: spec'd + dispatched to Codex (user go "dispatch to codex to fix the issue").**
   Fixes the recurring post-incident exposure (grafana KV + cosign KV/policy wiped on every cluster rebuild). Spec
