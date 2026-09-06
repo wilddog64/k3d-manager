@@ -150,6 +150,49 @@ function _signing_seed_vault_key() {
   )
 }
 
+function _signing_keychain_backup_exists() {
+  _no_trace _secret_load_data "${SIGNING_KEYCHAIN_SERVICE}" \
+    "${SIGNING_KEYCHAIN_KEY_ACCOUNT}" >/dev/null 2>&1 \
+    && _no_trace _secret_load_data "${SIGNING_KEYCHAIN_SERVICE}" \
+      "${SIGNING_KEYCHAIN_PASSWORD_ACCOUNT}" >/dev/null 2>&1
+}
+
+function _signing_restore_vault_from_keychain() {
+  local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+  local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+  local key password
+  key=$(_no_trace _secret_load_data "${SIGNING_KEYCHAIN_SERVICE}" \
+    "${SIGNING_KEYCHAIN_KEY_ACCOUNT}") || return 1
+  password=$(_no_trace _secret_load_data "${SIGNING_KEYCHAIN_SERVICE}" \
+    "${SIGNING_KEYCHAIN_PASSWORD_ACCOUNT}") || return 1
+  [[ -n "${key}" && -n "${password}" ]] || return 1
+
+  # `security -w` hex-encodes multi-line values (the PEM key); decode when the
+  # value did not come back as a PEM block.
+  case "${key}" in
+    *BEGIN*) : ;;
+    *) key=$(printf '%s' "${key}" | xxd -r -p) ;;
+  esac
+
+  (
+    local workdir
+    workdir="$(mktemp -d "${TMPDIR:-/tmp}/k3dm-signing.XXXXXX")"
+    trap 'rm -rf -- "${workdir}"' EXIT
+    printf '%s\n' "${key}" > "${workdir}/cosign.key"
+    if ! COSIGN_PASSWORD="${password}" _no_trace _run_command -- \
+        cosign public-key --key "${workdir}/cosign.key" > "${workdir}/cosign.pub" 2>/dev/null; then
+      _err "[signing] could not derive public key from Keychain backup; aborting restore"
+      return 1
+    fi
+    [[ -s "${workdir}/cosign.pub" ]] || {
+      _err "[signing] empty public key derived from backup; aborting restore"
+      return 1
+    }
+    _signing_write_vault "${vault_ns}" "${vault_release}" \
+      "${workdir}/cosign.key" "${password}" "${workdir}/cosign.pub"
+  )
+}
+
 function _signing_install_kyverno() {
   local skip_repo_ops=0
   case "${SIGNING_KYVERNO_HELM_CHART_REF}" in
@@ -316,6 +359,9 @@ function signing_init() {
   _vault_login "${vault_ns}" "${vault_release}"
   if _signing_vault_key_exists "${vault_ns}" "${vault_release}"; then
     _info "[signing] Vault key already present at ${SIGNING_VAULT_PATH}; skipping seed"
+  elif _signing_keychain_backup_exists; then
+    _info "[signing] Vault key absent but Keychain backup present — restoring (no regenerate)"
+    _signing_restore_vault_from_keychain "${vault_ns}" "${vault_release}" || return 1
   else
     _signing_seed_vault_key "${vault_ns}" "${vault_release}" || return 1
     _info "[signing] cosign key material seeded"
@@ -334,6 +380,23 @@ function signing_rotate_key() {
   _signing_grant_eso_read "${vault_ns}" "${vault_release}"
   _signing_apply_pub_externalsecret
   _warn "[signing] key rotated; retain the old public key or re-sign old images for overlap"
+}
+
+function signing_restore() {
+  local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+  local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+  if _signing_vault_key_exists "${vault_ns}" "${vault_release}"; then
+    _info "[signing] Vault key already present at ${SIGNING_VAULT_PATH}; not restoring key material"
+  elif _signing_keychain_backup_exists; then
+    _signing_restore_vault_from_keychain "${vault_ns}" "${vault_release}" || return 1
+    _info "[signing] restored cosign signing material from Keychain backup"
+  else
+    _err "[signing] no Vault key and no Keychain backup — nothing to restore; run signing_init to generate"
+    return 1
+  fi
+  _signing_apply_vault_policy "${vault_ns}" "${vault_release}"
+  _signing_grant_eso_read "${vault_ns}" "${vault_release}"
+  _signing_apply_pub_externalsecret
 }
 
 function signing_status() {
