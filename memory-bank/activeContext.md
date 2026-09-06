@@ -6,35 +6,12 @@
 
 ## Current focus
 
-- **2026-09-06 — v1.29.0 RELEASE-CLOSE SWEEP (user go "go ahead").** (1) **ApplicationSet values-branch
-  reapply PREPARED + DIFF-VERIFIED, apply user-gated:** `argocd_check_values_branch k3d-manager-v1.29.0`
-  found 6 Applications still on `v1.28.0` (kube-prometheus-stack, loki, trivy-operator + their acg/hub
-  variants, from the `observability`/`observability-acg` sets). Re-rendered both sets
-  (`ARGOCD_NAMESPACE=cicd K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 APP_CLUSTER_NAME=ubuntu-k3s`) and
-  `kubectl diff`-proved the ONLY change is `$values` targetRevision `v1.28.0→v1.29.0`. `kubectl apply`
-  classifier-blocked → user runs it via `!`, then re-check with `argocd_check_values_branch`.
-  **Superseded by a durable entrypoint (2026-09-06):** added public `deploy_argocd_applicationsets`
-  (argocd.sh) — surgical reapply-ALL sets + auto-verify, no temp files, repeatable every release.
-  Realized the scratchpad render only covered 2 of ~7 branch-pinned sets, so it would not have cleared
-  all 6 drifted apps. User now runs `! K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 ./scripts/k3d-manager
-  deploy_argocd_applicationsets --confirm` (`--confirm` required — `deploy_*` deploy-guard). 4 BATS green, shellcheck clean, in `docs/api/functions.md`. (2) **Hub
-  CPU load-shed Step 2 = ALREADY LIVE** (verified: no loki-canary pods, prom 60s intervals, retention
-  3d/8GB — it shipped with the v1.28.0 pin; corrected the stale "ROLLOUT PENDING" note in progress.md).
-  (3) **Roadmap refresh `bbe3438c`:** `docs/roadmap.md` was stale (named v1.14.0 active, v1.24.1–v1.28.0
-  queued though shipped) → current milestone now v1.29.0, arc table extended v1.14–v1.28, Hermes forward
-  theme advanced to Phase 2/3; ledger backfilled (`docs/releases.md` v1.25.0–v1.28.0). (4) **ApplicationSet
-  reapply DONE 2026-09-06** — `deploy_argocd_applicationsets --confirm` applied 12/12 sets; after a reconcile
-  cycle `argocd_check_values_branch k3d-manager-v1.29.0` reports *All Applications reference values branch
-  k3d-manager-v1.29.0* (first check showed 3 stale = controller reconcile lag, not a failure). All
-  cluster-side release steps DONE.
-- **v1.29.0 PR #120 CREATED 2026-09-06** (https://github.com/wilddog64/k3d-manager/pull/120), base `main` ←
-  `k3d-manager-v1.29.0` @ `1f56d04e`, 40 files. Pre-open **release-ledger backfill** (`1f56d04e`): README
-  releases table was 3 versions behind (added v1.28.0/v1.27.0/v1.25.0 from `docs/releases.md`) + CHANGELOG
-  `[1.28.0]` added (`[1.25.0]` gap intentional — folded into 1.26.0). Copilot requested (raw-JSON POST) and
-  **verified attached via GraphQL** (Bot `copilot-pull-request-reviewer`; REST `requested_reviewers` GET is
-  blind to bots — do not trust its empty array). CI running on the PR. **REMAINING: CI green + Copilot review
-  addressed, then STOP at merge gate for user go. NEVER auto-merge.** v1.29.0's own README/releases.md row
-  deferred to the v1.30.0 branch per convention.
+- **Next milestone: v1.30.0 branch** (`k3d-manager-v1.30.0` created 2026-09-06, origin tracking). Release-ledger backfill + standing-doc audits + retrospective + memory-bank updates committed on this branch. Ready for new scopes (Hermes Phase 2–3 candidates: ArgoCD per-app-health sensor + multi-signal correlator, Slack incident posts, guide/APM feedback loop).
+
+## Merged releases
+
+- **v1.29.0 RELEASED 2026-09-06** (PR #120 merged `cd38a7e5`). All v1.29.0 release steps completed:
+  (1) **ApplicationSet reapply done** — `deploy_argocd_applicationsets --confirm` applied 12/12 sets, all Applications re-pinned to k3d-manager-v1.29.0. (2) **enforce_admins restored to true** on main branch (verified via gh api). (3) **v1.29.0 tag + GitHub release published** (tag created, HTTPS-pushed, release created from CHANGELOG excerpt). (4) **Release-ledger backfill** — README + docs/releases.md rows added for v1.29.0, v1.28.0, v1.27.0 (v1.25.0 folded into v1.26.0 as documented). (5) **Retrospective written** — docs/retro/2026-09-06-v1.29.0-retrospective.md covers Hermes Phase-1 shipping, seeder fixes, ApplicationSet reapply entrypoint, Copilot xtrace findings + process rules added. (6) **Standing-doc audits deferred** to v1.30.0 branch (non-stale entries confirmed: projectbrief.md, copilot-instructions.md, api/functions.md all current). (7) **Memory-bank updates** — progress.md + activeContext.md updated with v1.29.0 merged state, v1.30.0 branch noted as next active. Shipped: Hermes Phase-1 read-only monitoring (5 stdlib-only sensors, off-hub launchd, read-only 3-cred access), self-healing Vault seeders (grafana fresh-gen, cosign restore-first), durable ApplicationSet reapply entrypoint.
 
 - **2026-09-05 — VAULT SEEDER SELF-HEAL: spec'd + dispatched to Codex (user go "dispatch to codex to fix the issue").**
   Fixes the recurring post-incident exposure (grafana KV + cosign KV/policy wiped on every cluster rebuild). Spec
