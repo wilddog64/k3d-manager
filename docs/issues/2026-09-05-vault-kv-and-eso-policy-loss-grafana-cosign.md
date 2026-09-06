@@ -32,10 +32,39 @@ the shared `eso-ldap-directory` Kubernetes-auth role had also been lost. Grafana
 **not** hit this second layer only because the existing `eso-ldap-directory` policy
 already granted `observability/*`.
 
-Why these specific paths and the one policy grant disappeared from a healthy Vault
-(rather than broad data loss) is **unconfirmed** — see Follow-up. The scoped,
-surgical nature of the loss suggests these paths were simply never re-bootstrapped
-after some Vault lifecycle event, not a general wipe.
+### Confirmed mechanism (2026-09-05 forensics)
+
+The initial "scoped, surgical loss" reading was **wrong** — it *was* a general wipe.
+Forensics on the live hub:
+
+- **The entire k3d cluster was rebuilt on 2026-09-04 (~10:28).** All four nodes and
+  *every* PVC are the same age with **new PVC UIDs** — a full `k3d` teardown+recreate,
+  not a restart (a restart preserves PVC age/UID).
+- **Vault uses raft storage on `data-vault-0` (`local-path`).** `local-path` volumes
+  are node-local and destroyed on cluster teardown, so **Vault's raft store started
+  empty and Vault was re-initialized from scratch** (fresh cluster ID, "Active Since
+  2026-09-04T17:29:39Z"). Every KV entry is `version 1, oldest_version 0` — zero
+  history, consistent with a brand-new store. No audit device is enabled, so there is
+  no per-operation trail, but the metadata is conclusive.
+- **The loss was total; only the *reseeders* differ.** KV `created_time` proves it:
+  `ldap/openldap-admin` was recreated at `2026-09-04T17:30:02Z` (~23s after Vault went
+  active — automation, not a human), and `ldap/admin` / `keycloak/*` at
+  `2026-09-04T20:17Z` when the identity stack deployed. `observability/grafana`
+  (`2026-09-05T23:28Z`) and `cosign/signing` (`2026-09-05T23:42Z`) carry the manual
+  restore timestamps — they had **no** automatic bring-up seeder:
+  - **grafana:** `_observability_apply_grafana_rotator` (`observability.sh`) creates
+    the `grafana-rotation` *policy* + writer *role* (`_vault_configure_secret_writer_role`,
+    `vault.sh`) but **never writes the KV data**. So the policy reappeared while the
+    secret did not, and the rotator CronJob cannot bootstrap an empty path.
+  - **cosign:** the KV data, the `cosign-verify` policy, and the ESO role grant are
+    seeded **only** by the manual, opt-in `signing_init` / `deploy_image_signing`
+    (`signing.sh`) — never by standard bring-up. All three share that one seeder,
+    which is why all three were absent together; re-running it would *regenerate* the
+    key (destructive), so the correct fix was the manual restore, not `signing_init`.
+
+The 2026-09-04 rebuild itself is a cluster-lifecycle event external to Vault (a
+`k3d`/`make` rebuild or an OrbStack/laptop reset); its exact trigger is not recorded
+in-cluster.
 
 ## Remediation
 
@@ -81,12 +110,22 @@ after some Vault lifecycle event, not a general wipe.
 
 ## Follow-up
 
-- **Confirm the mechanism of loss (open).** Determine why `secret/observability/grafana`,
-  `secret/cosign/signing`, and the `cosign-verify` policy grant vanished while the
-  rest of Vault stayed intact. Rule out a partial restore, an unseal/re-init event,
-  or a namespace/mount recreation.
-- **Add an idempotent bootstrap/reconcile guard** so these required KV paths and the
-  ESO policy grants are re-seeded (not regenerated) on startup if absent — a missing
-  path should self-heal to a synced state rather than requiring manual remediation.
-  Note: `grafana-credential-rotator` can rotate but cannot bootstrap an empty path
-  (its `restore()` reads the old password under `set -eu`; a 404 aborts).
+- **Mechanism of loss — RESOLVED** (see Confirmed mechanism above): full cluster
+  rebuild wiped Vault's raft store; grafana KV data and the cosign
+  data/policy/role-grant have no automatic bring-up seeder. This is a recurring
+  exposure — it recurs on **every** cluster rebuild, not a one-off.
+- **Give both secrets an idempotent, restore-from-backup bring-up seeder** so a
+  missing path self-heals to a synced state instead of needing manual remediation:
+  - **grafana:** have the observability bring-up seed `secret/observability/grafana`
+    from the Keychain/k8s backup (matching the rotator `restore()` schema) when the
+    path is absent — the writer role/policy are already created there; only the data
+    write is missing. Do not rely on the rotator CronJob (it cannot bootstrap an
+    empty path — its `restore()` reads the old password under `set -eu`; a 404 aborts).
+  - **cosign:** add a **restore** path (distinct from `signing_init`'s regenerate)
+    that re-seeds `secret/cosign/signing` from the `k3d-manager-signing` Keychain
+    backup and re-applies the `cosign-verify` policy + ESO role grant when absent,
+    without touching the keypair. `signing_init` / `deploy_image_signing` must never
+    be the recovery path — they regenerate and clobber the Keychain backup.
+- **Consider enabling a Vault audit device** so future secret loss has a per-operation
+  trail (none was enabled here, so the KV `created_time` metadata was the only
+  evidence).
