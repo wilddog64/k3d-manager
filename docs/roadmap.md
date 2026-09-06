@@ -79,7 +79,8 @@ is absent). Live-verified: all four remediation targets healthy. Bug doc:
 - [ ] Reapply hub + ACG observability ApplicationSets pinned to `k3d-manager-v1.29.0`, confirm with
       `argocd_check_values_branch` (6 Applications were on `v1.28.0`; render + `kubectl diff` verified
       the only change is the values branch — apply pending, live-write gated).
-- [ ] Hub CPU overcommit Step 2 load-shed.
+- [x] Hub CPU overcommit Step 2 load-shed — **already live** (verified 2026-09-06: no loki-canary
+      pods, prometheus scrape/eval 60s, retention 3d/8GB); shipped with the v1.28.0 values pin.
 - [ ] `/create-pr` gate met (CI green + Copilot addressed + Gemini smoke + Claude scope), PR merged,
       tag `v1.29.0`, retro written. **Never auto-merge.**
 

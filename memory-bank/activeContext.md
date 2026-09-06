@@ -6,6 +6,21 @@
 
 ## Current focus
 
+- **2026-09-06 — v1.29.0 RELEASE-CLOSE SWEEP (user go "go ahead").** (1) **ApplicationSet values-branch
+  reapply PREPARED + DIFF-VERIFIED, apply user-gated:** `argocd_check_values_branch k3d-manager-v1.29.0`
+  found 6 Applications still on `v1.28.0` (kube-prometheus-stack, loki, trivy-operator + their acg/hub
+  variants, from the `observability`/`observability-acg` sets). Re-rendered both sets
+  (`ARGOCD_NAMESPACE=cicd K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 APP_CLUSTER_NAME=ubuntu-k3s`) and
+  `kubectl diff`-proved the ONLY change is `$values` targetRevision `v1.28.0→v1.29.0`. `kubectl apply`
+  classifier-blocked → user runs it via `!`, then re-check with `argocd_check_values_branch`. (2) **Hub
+  CPU load-shed Step 2 = ALREADY LIVE** (verified: no loki-canary pods, prom 60s intervals, retention
+  3d/8GB — it shipped with the v1.28.0 pin; corrected the stale "ROLLOUT PENDING" note in progress.md).
+  (3) **Roadmap refresh `bbe3438c`:** `docs/roadmap.md` was stale (named v1.14.0 active, v1.24.1–v1.28.0
+  queued though shipped) → current milestone now v1.29.0, arc table extended v1.14–v1.28, Hermes forward
+  theme advanced to Phase 2/3; `docs/releases.md` ledger catch-up for v1.25+ still pending. **REMAINING
+  for v1.29.0: user applies the ApplicationSet reapply via `!`; then the v1.29.0 PR gate (CI + Copilot +
+  Gemini smoke + Claude scope; NEVER auto-merge).**
+
 - **2026-09-05 — VAULT SEEDER SELF-HEAL: spec'd + dispatched to Codex (user go "dispatch to codex to fix the issue").**
   Fixes the recurring post-incident exposure (grafana KV + cosign KV/policy wiped on every cluster rebuild). Spec
   `docs/plans/v1.29.0-vault-seeder-self-heal-grafana-cosign.md` committed `c7fa6cbd` on `origin/k3d-manager-v1.29.0`.
