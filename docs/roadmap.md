@@ -37,110 +37,62 @@ The project ships fast, small releases (see `docs/releases.md`). Condensed arc:
 | **v1.10–v1.11** | **Provider-agnostic app-cluster Vault auth** (kube-context keyed), hub-Vault profile seam, in-cluster auto-unseal, assisted-failover watchdog |
 | **v1.12** | App-image CVE auto-update pipeline (Image Updater + Trivy-gated promotion), remote operator access over Slack with RBAC + audit trail |
 | **v1.13** | Webhook modularization Phase 1 (`scripts/lib/webhook/`), isolated smoke gate |
+| **v1.14** | Observability fidelity/persistence + ACG lifecycle robustness + Vault per-context auth mount Phase 1 (21 bug specs; reactive hardening sprint) |
+| **v1.15–v1.23** | Ongoing hardening + feature releases — see `docs/releases.md` for the per-version ledger |
+| **v1.24.1** | Cluster status output contract: concise/JSON `make status`, `SERVICE=` focus, Slack emoji summary, CVE-dashboard polish |
+| **v1.25.0** | E2E verification harness (Tier 1 vCluster + Tier 2 ACG Stripe) + Stripe/Go live acceptance |
+| **v1.26.0** | Sandbox registration lifecycle hygiene (TTL watchdog, resource-preserving Application cleanup) + Fleet node lifecycle for Lambda |
+| **v1.27.0** | Image signing + attestation (cosign sign/attest, Kyverno verify Audit→Enforce) + adaptive checkout load testing |
+| **v1.28.0** | Platform zero-downtime rollouts (hub tier scale, probes/PDBs, rolling-update guarantees) + public-endpoint probe |
 
 ---
 
-## Current milestone — v1.14.0 (active)
+## Current milestone — v1.29.0 (active)
 
-**Theme: observability & multi-cluster reliability hardening.** Not a planned-feature milestone —
-this is a reactive hardening sprint that emerged from operating the v1.12 observability stack and
-the multi-cluster (laptop / Hostinger / OCI / ACG) fleet under real load. Captured as **21 bug
-specs** in `docs/bugs/`, of which **19 have shipped** as `fix(...)` commits on
-`origin/k3d-manager-v1.14.0`.
+**Theme: Hermes Phase-1 — read-only operations monitoring.** An optional off-hub agent (runs on
+the laptop like `bin/k3dm-webhook`, so **not** hardware-gated) that samples cluster/CI health from
+existing read-only interfaces and posts a single Slack summary only on sustained, multi-signal
+degradation. Hard constraints: reports-and-stops (NO mutation path in the codebase), the
+k3d-manager webhook stays authoritative, least-privilege (three read-only creds, no direct
+kube-apiserver credential), and LLM as last resort (non-Claude default, per-day budget, deterministic
+fallback). Scope: `docs/architecture/hermes-phase1-monitoring-scope.md`.
 
-### Workstream 1 — Observability fidelity & persistence — **shipped**
-Grafana stability, Prometheus durability, and dashboard correctness for the CVE/Trivy/Image-Updater
-hub dashboard.
+### Workstreams — all code complete + verified
 
-| Spec (`docs/bugs/`) | Status | Fix |
+| WS | Scope | Status |
 |---|---|---|
-| `2026-07-06-grafana-restarting-frequently` | ✅ | `1af49f44` raise Grafana memory limit |
-| `2026-07-06-grafana-repeatedly-killed-by-liveness-probe…` | ✅ | `1af49f44` (memory) |
-| `2026-07-06-prometheus-tsdb-on-emptydir` | ✅ | `6ae2f758` persist TSDB on a PVC |
-| `2026-07-07-app-cluster-prometheus-keeps-only-2h` | ✅ | `23e5d67f` PVC + 15d retention |
-| `2026-07-08-grafana-public-route-must-serve-hub-dashboard-instance` | ✅ | `65dcf6e8` route hub domain to hub Grafana |
-| `2026-07-08-image-updater-processing-results-need-parsed-drilldown` | ✅ | `06813683` parse log counters |
-| `2026-07-08-trivy-infra-panels-need-object-level-drilldown` | ✅ | `f4560d56`/`d0a2d92f`/`76752337` |
-| `2026-07-08-trivy-findings-should-trigger-actionable-alerts` | ✅ | `a95fda82` drilldown summaries |
-| `2026-07-09-trivy-finding-ownership-classification-and-fixed-state` | ✅ | `215a4157`/`68b71222`/`44488f88` |
-| `2026-07-10-trivy-drilldown-panels-redundant-and-banner-newlines-literal` | ✅ | `ae088b34` |
-| `2026-07-10-loki-logs-panels-render-empty-and-raw-json` | ✅ | `7e39ffaa` (verified + deployed by Claude) |
+| WS0 | Read-only access model — reuse webhook bearer (GET-only) + new ArgoCD `hermes` local account (get-only) + new GitHub read-only PAT | ✅ live + DoD-verified (`can-i get`=yes, `sync`/`delete`=no; no K8s SA, no kubeconfig) |
+| WS1+WS2 | Five sensors (ESO, ArgoCD per-app, reachability probe, node/data-layer via webhook, GitHub Actions) + correlator + Slack (`4e9d3e6e`) | ✅ Python stdlib-only, pytest 8/8, no mutation verb / no kubeconfig |
+| WS3 | `_install_hermes_agent`/`_uninstall_hermes_agent` in lib-foundation **v0.4.15** → subtree-pulled → consumer files (`6aad603d`): launchd plist, `bin/k3dm-hermes-setup`, jitter | ✅ LaunchAgent installed, first cycle 5/5 sensors real data |
+| WS4 | `docs/guides/hermes.md` (`c7fa27a8`) | ✅ passes `_doc_hygiene_check` |
 
-### Workstream 2 — ACG sandbox lifecycle robustness — **shipped**
+### Also shipped in v1.29.0 — self-healing Vault seeders
+Cluster rebuilds wipe the Vault raft; grafana + cosign KV had no bring-up seeders (`43ce7732`).
+Added `observability_seed_grafana` (fresh-generate-if-absent) and fixed `signing_restore`
+(`7eaaf897`: missing `_vault_login`; `ae9d8cb4`: graceful skip when the Kyverno admission namespace
+is absent). Live-verified: all four remediation targets healthy. Bug doc:
+`docs/bugs/v1.29.0-bugfix-signing-restore-no-login-grafana-seed-no-public-entry.md`.
 
-| Spec | Status | Fix |
-|---|---|---|
-| `2026-07-06-acg-up-seed-vault-empty-port-exit-22` | ✅ | `ac5e3fde` resolve seed Vault addr at call time |
-| `2026-07-07-acg-up-vault-kv-put-swallows-http-status` | ✅ | `44c1aec8` surface KV write HTTP status |
-| `2026-07-08-acg-sandbox-expiry-is-not-just-tunnel-loss` | ✅ | `e2c79595` classify absent sandbox vs tunnel loss |
-| `2026-07-10-acg-provider-context-missing-k3s-oci-case` | ✅ | `80ac1ba0` map k3s-oci to its own context |
-| `v1.14.0-bugfix-acg-pluralsight-autologin` | ✅ | shipped |
-| `v1.14.0-bugfix-acg-tunnel-mode-autoselect` | ✅ | `2834e1d3` probe iam:CreateRole to pick SSM vs SSH |
-
-### Workstream 3 — Vault multi-cluster portability — **pulled into v1.14.0 (2026-07-12)**
-Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth-mount work is now
-**in scope for v1.14.0**. Phase 1 implementation spec written; Phases 2–3 are the milestone tail
-(ship within v1.14.0 or split — see closing condition).
-
-| Spec | Status | Note |
-|---|---|---|
-| `2026-07-07-global-hub-vault-profile-is-shared-across-clusters` | ✅ | `e7fc432e` scope profile state by app context |
-| `2026-07-07-stale-kube-context-assumptions` | ✅ | addressed via `80ac1ba0`/`e7fc432e` |
-| `2026-07-12-vault-per-context-auth-mount-phase1` | ✅ shipped | `6f74303a` mount `kubernetes-<sanitized-context>`, all 3 mount sites + `APP_K8S_AUTH_MOUNT` migration; helper in `scripts/lib/core.sh`; Claude-verified on origin + BATS 15/15 + css 5/5 |
-| `2026-07-07-app-cluster-vault-portability` | 🎨 design | signed-off design doc behind the Phase 1 spec above (do NOT hand off directly) |
-| `2026-07-07-vault-kubernetes-auth-mount-is-single-target` | 🎨 design | consolidated into the design doc; single-target root cause |
-| Phase 2 — per-context hub-Vault profile | ⏭️ split to v1.15.0 | follows Phase 1; not yet specced — deferred at v1.14.0 close (2026-07-12) |
-| Phase 3 — `ubuntu-k3s` demote + reachability preflight | ⏭️ split to v1.15.0 | re-scoped by decision #1; not a mass rename — deferred at v1.14.0 close (2026-07-12) |
-
-### Closing condition for v1.14.0
-- [x] Workstream 1 (observability) verified live on hub **and** app cluster (2026-07-12): Grafana
-      512Mi + 0 restarts since 2026-07-09 on both; hub Prometheus PVC 25Gi Bound / 7d-20GB;
-      app-cluster Prometheus PVC 10Gi Bound / 15d-8GB; trivy dedupe + loki panels deployed.
-- [ ] Workstream 2 (ACG lifecycle) is shell-logic — covered by BATS; live verification requires
-      exercising an `acg-up`/refresh cycle, deferred (not triggered casually).
-- [x] Workstream 3 resolved (2026-07-12): **Phase 1 shipped** (`6f74303a`, Claude-verified on origin).
-      **Decision: Phases 2–3 split to v1.15.0** — v1.14.0 is already a large reactive-hardening sprint;
-      Phase 1 closes the acute last-cluster-wins bug, while Phases 2–3 are net-new scoped work that
-      reads cleaner as its own milestone.
-- [x] Untracked `docs/bugs/2026-07-08-refresh-output-is-healthy.md` triaged (2026-07-12): deleted — it
-      was a non-bug stub (no root cause / repro / fix / target files), so it could not become a real spec.
-- [ ] `/create-pr` gate met, PR merged, tag `v1.14.0`, retro written.
+### Closing condition for v1.29.0
+- [x] Hermes WS0–WS4 code complete, verified, LaunchAgent installed + first cycle clean.
+- [x] Vault seeder self-heal shipped + live-verified (grafana + cosign).
+- [ ] Reapply hub + ACG observability ApplicationSets pinned to `k3d-manager-v1.29.0`, confirm with
+      `argocd_check_values_branch` (6 Applications were on `v1.28.0`; render + `kubectl diff` verified
+      the only change is the values branch — apply pending, live-write gated).
+- [ ] Hub CPU overcommit Step 2 load-shed.
+- [ ] `/create-pr` gate met (CI green + Copilot addressed + Gemini smoke + Claude scope), PR merged,
+      tag `v1.29.0`, retro written. **Never auto-merge.**
 
 ---
 
 ## Queued milestones (scoped)
 
-These have scope docs and committed version numbers; they ship in this order.
-
-- **v1.24.1 — cluster status output contract + observability polish (point release)** — concise
-  color-coded / JSON `make status` modes with `SERVICE=<name>` focus, Slack `/cluster-status` rendered
-  as a concise emoji summary, CVE-dashboard header cleanup, and Dependabot auto-merge observability.
-  Implemented on the `k3d-manager-v1.24.1` branch (PR #115). Scope:
-  `docs/plans/v1.24.1-status-output-contract.md`,
-  `docs/plans/v1.24.1-dependabot-automerge-observability.md`,
-  `docs/bugs/v1.24.1-bugfix-slack-cluster-status-summary-wiring.md`.
-- **v1.25.0 — Stripe/Go live acceptance + E2E verification harness (workstream G)** — BLOCKED
-  (cross-repo): merge the order-repo schema fix + promote the image → rerun the Stripe live E2E (2/4
-  now); hostinger capacity. Plus the substrate-agnostic E2E harness (Tier 1 vCluster blocking + Tier 2
-  ACG sandbox periodic) and its Grafana observability. Scope:
-  `docs/plans/v1.25.0-e2e-verification-harness.md`, `docs/plans/v1.25.0-e2e-observability-path-a.md`.
-- **v1.26.0 — sandbox registration lifecycle hygiene** — managed registration metadata, explicit
-  provider teardown, a TTL/grace-period watchdog for stale ArgoCD cluster registrations,
-  resource-preserving Application cleanup, and Grafana/Slack visibility. Prevents destroyed ephemeral
-  sandboxes from leaving misleading `Unknown` Applications while protecting live clusters from
-  false-positive cleanup. Scope: `docs/plans/v1.26.0-sandbox-registration-lifecycle-cleanup.md`.
-- **v1.27.0 — image signing + attestation and adaptive checkout load testing** — cosign sign +
-  Trivy vuln/SBOM attest at build; `cosign verify` at promotion and admission (Kyverno, staged
-  Audit→Enforce), closing the CVE loop. Add staged API checkout load with adaptive concurrency,
-  Stripe test mode, Prometheus metrics, and Grafana capacity reporting; browser validation remains
-  a small cohort rather than thousands of sessions. Scopes:
-  `docs/plans/v1.27.0-image-signing-cve-loop-closure.md`,
-  `docs/plans/v1.27.0-adaptive-checkout-load-testing.md`,
-  `docs/plans/v1.27.0-dependabot-automation.md` (queued automation for CI failures,
-  rebases, review, and guarded auto-merge).
-- **v1.28.0 — platform zero-downtime rollouts** — scale the stateless hub tier, add probes/PDBs and
-  rolling-update guarantees, validate capacity, and separately design failover for each stateful
-  service before claiming no downtime. Scope: `docs/plans/v1.28.0-platform-zero-downtime-rollouts.md`.
+None currently queued with a committed version number. The previously queued block
+(**v1.24.1** status output contract, **v1.25.0** E2E verification harness + Stripe/Go acceptance,
+**v1.26.0** sandbox registration lifecycle hygiene, **v1.27.0** image signing + adaptive checkout
+load, **v1.28.0** platform zero-downtime rollouts) has all shipped — see the arc table above and
+`docs/releases.md` (ledger catch-up for v1.25+ is pending). The next milestone will be chosen from
+Forward themes below once it gets a scope doc.
 
 ## Forward themes (unversioned until scoped)
 
@@ -153,15 +105,14 @@ milestone only when it gets a scope doc.
 - **k3dm-mcp** — persistent MCP server, HTTP transport default (`K3DM_MCP_TRANSPORT=http|stdio`),
   FastMCP/Python; CLIs connect at `http://localhost:8765/mcp`. Read-only tool set for verify
   agents; `.git/` excluded from writable paths.
-- **Hermes event-driven operations automation (candidate v1.28.x or later)** — optional Hermes
-  coordinator for Alertmanager, GitHub Actions, ArgoCD, tunnel, and webhook events. Phase 1 is
-  read-only health/CI monitoring with bounded polling and Slack summaries; Phase 2 adds
-  allowlisted, approval-gated repairs (restart webhook, refresh edge, retry transient CI); Phase 3
-  adds cooldowns, daily token/iteration budgets, audit records, and post-repair verification.
-  Hermes does not replace the k3d-manager webhook or receive unrestricted cluster, cloud, Git, or
-  branch-protection credentials. A scope document is required before assigning a release — Phase 1
-  is scoped in `docs/architecture/hermes-phase1-monitoring-scope.md` (read-only; webhook is
-  authoritative; least-privilege; health-degraded ≠ safe-to-repair).
+- **Hermes Phase 2 / Phase 3 (event-driven operations automation)** — **Phase 1 shipped as v1.29.0**
+  (read-only health/CI monitoring, bounded polling, Slack summaries — the current milestone above).
+  Phase 2 adds allowlisted, approval-gated repairs (restart webhook, refresh edge, retry transient
+  CI); Phase 3 adds cooldowns, daily token/iteration budgets, audit records, and post-repair
+  verification. Hermes does not replace the k3d-manager webhook or receive unrestricted cluster,
+  cloud, Git, or branch-protection credentials. Each phase needs its own scope doc before a release
+  is assigned (health-degraded ≠ safe-to-repair). Phase 1 scope:
+  `docs/architecture/hermes-phase1-monitoring-scope.md`.
 - **Distribution packages** — deb/rpm/brew. Long-standing vision item, never scoped.
 - **Home lab** — `CLUSTER_PROVIDER=k3s-local-arm64` on a Mac Mini M5 (hardware target ~Oct 2026),
   bare-metal ingress via **MetalLB + Envoy Gateway (Gateway API)** replacing the Istio
