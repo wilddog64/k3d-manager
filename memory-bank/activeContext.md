@@ -6,6 +6,15 @@
 
 ## Current focus
 
+- **2026-09-05 — VAULT SEEDER SELF-HEAL: spec'd + dispatched to Codex (user go "dispatch to codex to fix the issue").**
+  Fixes the recurring post-incident exposure (grafana KV + cosign KV/policy wiped on every cluster rebuild). Spec
+  `docs/plans/v1.29.0-vault-seeder-self-heal-grafana-cosign.md` committed `c7fa6cbd` on `origin/k3d-manager-v1.29.0`.
+  Decisions locked: grafana = **fresh-generate-if-absent** (user-chosen; no backup exists to restore), cosign =
+  **non-destructive restore from Keychain** (`signing_restore` + `signing_init` prefers restore over regenerate).
+  Codex dispatched via `codex exec` for code + BATS only; live seeder run vs hub is a SEPARATE deferred Claude step
+  (classifier gates live Vault writes). AWAITING Codex completion → verify (SHA on origin, BATS, scope) → Claude
+  commits (expect sandbox `.git`-lock blocks Codex's own commit) → then offer live verification.
+
 - **2026-09-04 v1.29.0 MILESTONE = Hermes Phase-1 (the "hermes-agent") — IMPLEMENTATION PLAN DRAFTED.**
   User set the v1.29.0 theme to Hermes Phase-1 (read-only ops monitoring). Gate satisfied: runs OFF-HUB
   (laptop, like bin/k3dm-webhook) per scope §9 → NOT hardware-gated (no M5 wait). Master plan:
