@@ -191,6 +191,8 @@ def approve(action_id, state, records_now, runner):
         return {"outcome": "refused: webhook LaunchAgent not present", "action_id": action_id}
 
     argv, env = repair["build_command"](records_now)
+    if key == "r4" and not env.get("GH_TOKEN"):
+        return {"outcome": "skipped: hermes GitHub token unavailable", "action_id": action_id}
     command = shlex.join(argv)
     rc, output = runner(argv, env, repair["cwd"])
     audit = {"action_id": action_id, "command": command, "key": key,

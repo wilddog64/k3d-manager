@@ -99,6 +99,18 @@ def test_r4_degrades_to_skipped_on_permission_error(monkeypatch):
     assert outcome["outcome"] == "skipped: token lacks actions:write"
 
 
+def test_r4_refuses_when_hermes_token_missing_no_ambient_auth(monkeypatch):
+    monkeypatch.setattr(repairs, "_keychain_secret", lambda _service: "")
+    current = state()
+    proposal = repairs.propose(r4_records(), current)[0]
+    calls = []
+    outcome = repairs.approve(proposal["action_id"], current, r4_records(),
+                              lambda *a: calls.append(a) or (0, ""))
+    assert outcome["outcome"] == "skipped: hermes GitHub token unavailable"
+    assert not calls
+    assert "r4" not in current.get("repairs_attempted_this_incident", [])
+
+
 def test_r4_business_logic_403_is_not_misclassified_as_missing_scope(monkeypatch):
     monkeypatch.setattr(repairs, "_keychain_secret", lambda _service: "token")
     current = state()
