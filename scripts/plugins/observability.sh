@@ -132,6 +132,12 @@ function _observability_seed_grafana_if_absent() {
   fi
 }
 
+function observability_seed_grafana() {
+  local vault_ns="${1:-secrets}" vault_release="${2:-vault}"
+  _vault_login "${vault_ns}" "${vault_release}"
+  _observability_seed_grafana_if_absent "${vault_ns}" "${vault_release}"
+}
+
 function _observability_apply_grafana_rotator() {
   _observability_seed_grafana_if_absent "secrets" "vault" \
     || _err "[observability] Grafana credential seed skipped/failed"

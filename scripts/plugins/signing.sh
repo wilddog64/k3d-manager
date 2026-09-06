@@ -385,6 +385,7 @@ function signing_rotate_key() {
 function signing_restore() {
   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
   local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+  _vault_login "${vault_ns}" "${vault_release}"
   if _signing_vault_key_exists "${vault_ns}" "${vault_release}"; then
     _info "[signing] Vault key already present at ${SIGNING_VAULT_PATH}; not restoring key material"
   elif _signing_keychain_backup_exists; then

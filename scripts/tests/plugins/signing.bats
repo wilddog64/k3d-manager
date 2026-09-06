@@ -199,6 +199,7 @@ setup() {
 
 @test "signing_restore preserves present key material and reapplies configuration" {
   local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { :; }
   _signing_vault_key_exists() { return 0; }
   _signing_restore_vault_from_keychain() { printf 'restore\n' >> "$calls"; }
   _signing_apply_vault_policy() { printf 'policy\n' >> "$calls"; }
@@ -215,6 +216,7 @@ setup() {
 
 @test "signing_restore restores absent key material from a backup" {
   local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { :; }
   _signing_vault_key_exists() { return 1; }
   _signing_keychain_backup_exists() { return 0; }
   _signing_restore_vault_from_keychain() { printf 'restore\n' >> "$calls"; }
@@ -231,6 +233,7 @@ setup() {
 
 @test "signing_restore fails without Vault key or Keychain backup" {
   local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { :; }
   _signing_vault_key_exists() { return 1; }
   _signing_keychain_backup_exists() { return 1; }
   _signing_apply_vault_policy() { printf 'policy\n' >> "$calls"; }
@@ -240,6 +243,19 @@ setup() {
   run signing_restore
   [ "$status" -ne 0 ]
   [ ! -e "$calls" ]
+}
+
+@test "signing_restore logs into Vault before probing key material" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { printf 'login\n' >> "$calls"; }
+  _signing_vault_key_exists() { printf 'probe\n' >> "$calls"; return 0; }
+  _signing_apply_vault_policy() { :; }
+  _signing_grant_eso_read() { :; }
+  _signing_apply_pub_externalsecret() { :; }
+
+  run signing_restore
+  [ "$status" -eq 0 ]
+  [ "$(head -n1 "$calls")" = "login" ]
 }
 
 @test "signing_init prefers restore over regenerate when a backup exists" {
