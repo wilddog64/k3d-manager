@@ -245,6 +245,35 @@ setup() {
   [ ! -e "$calls" ]
 }
 
+@test "_signing_apply_pub_externalsecret skips when admission namespace is absent" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _kubectl() {
+    if [[ "$1" == "--no-exit" && "$2" == "get" && "$3" == "namespace" ]]; then
+      return 1
+    fi
+    printf 'apply\n' >> "$calls"
+  }
+
+  run _signing_apply_pub_externalsecret
+  [ "$status" -eq 0 ]
+  [ ! -e "$calls" ]
+}
+
+@test "_signing_apply_pub_externalsecret applies when admission namespace exists" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _kubectl() {
+    if [[ "$1" == "--no-exit" && "$2" == "get" && "$3" == "namespace" ]]; then
+      return 0
+    fi
+    cat >/dev/null 2>&1 || true
+    printf 'apply\n' >> "$calls"
+  }
+
+  run _signing_apply_pub_externalsecret
+  [ "$status" -eq 0 ]
+  grep -q 'apply' "$calls"
+}
+
 @test "signing_restore logs into Vault before probing key material" {
   local calls="$BATS_TEST_TMPDIR/calls"
   _vault_login() { printf 'login\n' >> "$calls"; }

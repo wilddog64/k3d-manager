@@ -83,6 +83,10 @@ function _signing_backup_keychain() {
 function _signing_apply_pub_externalsecret() {
   local template="${SCRIPT_DIR}/etc/signing/externalsecret-cosign-pub.yaml.tmpl"
   [[ -r "${template}" ]] || { _err "[signing] ESO template not found: ${template}"; return 1; }
+  if ! _kubectl --no-exit get namespace "${SIGNING_ADMISSION_NAMESPACE}" >/dev/null 2>&1; then
+    _warn "[signing] admission namespace ${SIGNING_ADMISSION_NAMESPACE} not found; skipping cosign public-key ExternalSecret (deploy image signing admission first)"
+    return 0
+  fi
   export SIGNING_ADMISSION_NAMESPACE SIGNING_PUB_SECRET_NAME
   # shellcheck disable=SC2016
   envsubst '$SIGNING_ADMISSION_NAMESPACE $SIGNING_PUB_SECRET_NAME' < "${template}" | _kubectl apply -f -
