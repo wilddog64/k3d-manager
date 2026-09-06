@@ -17,6 +17,20 @@
 | v1.24.0 | RELEASED — PR #113, tag and GitHub release published |
 | v1.23.0 and earlier | RELEASED — see `CHANGELOG.md` |
 
+## v1.31.0 queue (Hermes R4 App-token auth + scope preflight)
+
+- [ ] **WS1 — R4 GitHub App installation-token auth + `k3dm-hermes preflight` — DISPATCHED TO CODEX 2026-09-06.**
+  Spec `docs/plans/v1.31.0-hermes-r4-github-app-auth.md` (hardened for handoff 2026-09-06). Auth-swap only —
+  Phase 2 repair logic (allowlist/preconditions/propose/approve/invariants) unchanged. New DI-testable
+  `scripts/lib/hermes/github_app.py` (installation-token minter; **JWT signed via `openssl` subprocess through an
+  injected `signer`, HTTP via injected callable — NO PyJWT/cryptography dep**) + `scripts/lib/hermes/preflight.py`
+  (`run_preflight(keychain, runner, now=...) -> (report, exit_code)`, fully DI). Wire `_r4_command` token source to
+  app-token-with-PAT-fallback (backend name logged, never the token); add `preflight` subcommand to `bin/k3dm-hermes`
+  dispatch + `_usage`. Gates: `pytest scripts/tests/hermes/ -q` green, `py_compile bin/k3dm-hermes
+  scripts/lib/hermes/*.py` clean, no secret in argv/logs. App registration + Keychain storage
+  (`k3dm-hermes-app-id`/`-installation-id`/`-private-key`) is MANUAL/user (documented in `docs/guides/hermes.md`),
+  NOT automated. PAT fallback retained this release. Codex: code + pytest only (no live GitHub, no PR, no main).
+
 ## v1.29.0 queue (Hermes Phase-1)
 
 - [x] **WS0 — access model — COMPLETE 2026-09-05.** Spec `docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`.
