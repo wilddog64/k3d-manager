@@ -40,10 +40,10 @@ The project ships fast, small releases (see `docs/releases.md`). Condensed arc:
 | **v1.14** | Observability fidelity/persistence + ACG lifecycle robustness + Vault per-context auth mount Phase 1 (21 bug specs; reactive hardening sprint) |
 | **v1.15–v1.23** | Ongoing hardening + feature releases — see `docs/releases.md` for the per-version ledger |
 | **v1.24.1** | Cluster status output contract: concise/JSON `make status`, `SERVICE=` focus, Slack emoji summary, CVE-dashboard polish |
-| **v1.25.0** | E2E verification harness (Tier 1 vCluster + Tier 2 ACG Stripe) + Stripe/Go live acceptance |
-| **v1.26.0** | Sandbox registration lifecycle hygiene (TTL watchdog, resource-preserving Application cleanup) + Fleet node lifecycle for Lambda |
-| **v1.27.0** | Image signing + attestation (cosign sign/attest, Kyverno verify Audit→Enforce) + adaptive checkout load testing |
-| **v1.28.0** | Platform zero-downtime rollouts (hub tier scale, probes/PDBs, rolling-update guarantees) + public-endpoint probe |
+| **v1.25.0** | Tier 1 vCluster E2E verification harness + lifecycle dry-run standardization (`DRY_RUN`, sandbox+hub deregister on `make down`) |
+| **v1.26.0** | Count-agnostic k3s-aws fleet node lifecycle + E2E promotion gate (durable artifacts, Grafana/alerts) + safe reclamation of dead sandbox registrations |
+| **v1.27.0** | Image signing + attestation (cosign sign/attest, three-latch BUILD/PROMOTE/ADMIT via Kyverno, Audit→Enforce) + adaptive checkout load testing |
+| **v1.28.0** | Parallel multi-cloud provisioning (Phase 1–3b) + public-endpoint probe (Hermes Phase-1 first deliverable); zero-downtime rollouts deferred (hardware-gated) |
 
 ---
 
@@ -88,12 +88,13 @@ is absent). Live-verified: all four remediation targets healthy. Bug doc:
 
 ## Queued milestones (scoped)
 
-None currently queued with a committed version number. The previously queued block
-(**v1.24.1** status output contract, **v1.25.0** E2E verification harness + Stripe/Go acceptance,
-**v1.26.0** sandbox registration lifecycle hygiene, **v1.27.0** image signing + adaptive checkout
-load, **v1.28.0** platform zero-downtime rollouts) has all shipped — see the arc table above and
-`docs/releases.md` (ledger catch-up for v1.25+ is pending). The next milestone will be chosen from
-Forward themes below once it gets a scope doc.
+None currently queued with a committed version number. The previously queued block has all shipped
+(**v1.24.1** status output contract, **v1.25.0** Tier 1 E2E harness + dry-run standardization,
+**v1.26.0** fleet node lifecycle + E2E promotion gate + sandbox-registration cleanup, **v1.27.0**
+image signing + adaptive checkout load) — see the arc table above and `docs/releases.md`. The
+originally-queued **v1.28.0 platform zero-downtime rollouts** was deferred (hardware-gated); the
+v1.28.0 tag instead shipped parallel multi-cloud provisioning + the public-endpoint probe. The next
+milestone will be chosen from Forward themes below once it gets a scope doc.
 
 ## Forward themes (unversioned until scoped)
 
