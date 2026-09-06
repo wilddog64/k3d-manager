@@ -1187,7 +1187,11 @@ deploy_argocd_bootstrap it does NOT redeploy the image updater or platform-ops.
 After reapplying it confirms the pin with argocd_check_values_branch unless
 --no-verify is given.
 
+As a deploy_* entrypoint this mutates the cluster, so the dispatcher deploy-guard
+requires --confirm (or --dry-run/-n) when no other option is passed.
+
 Options:
+   --confirm     Required to apply (consumed by the dispatcher deploy-guard)
    --no-verify   Skip the post-apply argocd_check_values_branch confirmation
    -h, --help    Show this help message
 
@@ -1198,10 +1202,10 @@ Environment Variables:
 
 Examples:
    # Reapply + verify, pinning to the checked-out release branch
-   ./scripts/k3d-manager deploy_argocd_applicationsets
+   ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 
    # Pin explicitly (e.g. from a detached checkout or a release-close sweep)
-   K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 ./scripts/k3d-manager deploy_argocd_applicationsets
+   K3D_MANAGER_BRANCH=k3d-manager-v1.29.0 ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 EOF
       return 0
    fi

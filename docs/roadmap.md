@@ -78,7 +78,7 @@ is absent). Live-verified: all four remediation targets healthy. Bug doc:
 - [x] Vault seeder self-heal shipped + live-verified (grafana + cosign).
 - [ ] Reapply **all** ApplicationSets pinned to `k3d-manager-v1.29.0`, confirm with
       `argocd_check_values_branch` (6 Applications were on `v1.28.0`). Durable entrypoint added this
-      release: `./scripts/k3d-manager deploy_argocd_applicationsets` (surgical reapply-all +
+      release: `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` (surgical reapply-all +
       self-verify; no image-updater/platform-ops redeploy). Apply pending, live-write gated.
       *Note:* the earlier scratchpad render+diff only covered `observability`/`observability-acg` —
       2 of the ~7 branch-pinned sets — so it would not have cleared all 6 drifted apps. The
