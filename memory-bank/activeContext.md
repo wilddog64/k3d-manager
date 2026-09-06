@@ -6,8 +6,8 @@
 
 ## Current focus
 
-- **Next milestone: v1.31.0 branch** (`k3d-manager-v1.31.0` created 2026-09-06 from `8e71692b`, origin tracking). First scoped item: **Hermes R4 GitHub App installation-token auth** (`docs/plans/v1.31.0-hermes-r4-github-app-auth.md`) — replace the manual `actions:write` PAT with a short-lived auto-scoped App token + a DI-testable `k3dm-hermes preflight`. NOT yet started. v1.30.0 release-ledger backfill (CHANGELOG/releases.md/README v1.30.0 rows) also lands on this branch, per the one-release-later cadence.
-- **v1.30.0 tag + GitHub release: PENDING user go** — the merge commit `8e71692b` is ready to tag `v1.30.0`, but there is no v1.30.0 CHANGELOG entry yet (ledger backfill is a v1.31.0-branch step) and publishing a release is outward-facing. Awaiting explicit go on the tag/release publish.
+- **Next milestone: v1.31.0 branch** (`k3d-manager-v1.31.0` created 2026-09-06 from `8e71692b`, origin tracking). First scoped item: **Hermes R4 GitHub App installation-token auth** (`docs/plans/v1.31.0-hermes-r4-github-app-auth.md`) — replace the manual `actions:write` PAT with a short-lived auto-scoped App token + a DI-testable `k3dm-hermes preflight`. NOT yet started. v1.30.0 release-ledger backfill (CHANGELOG/releases.md/README v1.30.0 rows) landed on this branch (`06164a04`), per the one-release-later cadence.
+- **v1.30.0 tag + GitHub release: PUBLISHED 2026-09-06** — tag `v1.30.0` created at `8e71692b`, pushed, GitHub release published (latest, non-draft). Post-merge fully closed.
 
 - **2026-09-06 — HERMES PHASE 2 STARTED (user go: "go ahead with phase 2 and work with codex").** Per the Phase-1
   gate, Phase 2 begins as a SCOPE DOC (no code until user sign-off). Scope doc `docs/architecture/hermes-phase2-repair-scope.md`
@@ -81,7 +81,7 @@
   `k3d-manager-v1.31.0` created + checked out, retro `docs/retro/2026-09-06-v1.30.0-retrospective.md`, memory-bank
   updated. **Process rule learned:** disable `enforce_admins` PROACTIVELY at every PR merge-ready (user self-merges,
   needs admin override on) — not "if needed"; `/post-merge` re-enables it. (Recorded in auto-memory
-  `feedback_notify_pr_review_before_merge`.) v1.30.0 tag/release publish still PENDING user go (see Current focus).
+  `feedback_notify_pr_review_before_merge`.) v1.30.0 tag/release PUBLISHED 2026-09-06 (`8e71692b`); ledger backfill on v1.31.0 (`06164a04`); branch cleanup done — 11 shipped tag-backed branches pruned local+remote, v1.19.0/v1.21.1 escalated (no tag, not main-ancestors). See Current focus.
 
 ## Merged releases
 
