@@ -52,6 +52,13 @@ PROTECTION_OK = {"enforce_admins": {"enabled": True},
                  "required_pull_request_reviews": {"required_approving_review_count": 1}}
 
 
+def bats_runner(rc=0, tap="1..2\nok 1 first\nok 2 second\n"):
+    def run(argv):
+        assert "--tap" in argv and "--filter" in argv
+        return rc, tap
+    return run
+
+
 def test_clean_month_reports_no_attention():
     report, digest = run_audit(
         github_get(protection=PROTECTION_OK), header_fetch(), keychain(), now=NOW)
@@ -149,6 +156,49 @@ def test_monthly_advisory_makes_no_network_call_when_already_run():
         exploding_get, header_fetch(), keychain(), state, "2026-09", now=NOW)
 
     assert result is None
+
+
+def test_security_regressions_skipped_by_default():
+    report, digest = run_audit(
+        github_get(protection=PROTECTION_OK), header_fetch(), keychain(), now=NOW)
+
+    assert report["security_regressions"]["status"] == "skipped"
+    assert report["attention"] == []
+    assert "skipped" in digest
+
+
+def test_security_regressions_pass_when_bats_green():
+    report, digest = run_audit(
+        github_get(protection=PROTECTION_OK), header_fetch(), keychain(), now=NOW,
+        bats_runner=bats_runner(), run_bats=True)
+
+    sr = report["security_regressions"]
+    assert sr["status"] == "pass" and sr["passed"] == 2 and sr["failed"] == 0
+    assert report["attention"] == []
+    assert "2 passed, 0 failed" in digest and "✅" in digest
+
+
+def test_security_regressions_fail_surfaces_attention():
+    tap = "1..2\nok 1 first\nnot ok 2 second\n"
+    report, digest = run_audit(
+        github_get(protection=PROTECTION_OK), header_fetch(), keychain(), now=NOW,
+        bats_runner=bats_runner(rc=1, tap=tap), run_bats=True)
+
+    sr = report["security_regressions"]
+    assert sr["status"] == "fail" and sr["failed"] == 1
+    assert any("security regression" in item for item in report["attention"])
+    assert "⚠️" in digest
+
+
+def test_security_regressions_not_run_when_disabled():
+    def exploding_bats(argv):
+        raise AssertionError("bats must not run when K3DM_HERMES_AUDIT_RUN_BATS is unset")
+
+    report, _digest = run_audit(
+        github_get(protection=PROTECTION_OK), header_fetch(), keychain(), now=NOW,
+        bats_runner=exploding_bats, run_bats=False)
+
+    assert report["security_regressions"]["status"] == "skipped"
 
 
 def test_audit_never_writes_or_touches_repairs():

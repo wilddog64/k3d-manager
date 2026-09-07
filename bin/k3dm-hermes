@@ -103,6 +103,12 @@ def _run_cycle(state):
     return records, event
 
 
+def _bats_run(argv):
+    result = subprocess.run(argv, capture_output=True, text=True, cwd=ROOT,
+                            timeout=300, check=False)
+    return result.returncode, result.stdout + result.stderr
+
+
 def _repair_runner(argv, env, cwd):
     result = subprocess.run(argv, env={**os.environ, **env}, cwd=cwd,
                             capture_output=True, text=True, check=False)
@@ -133,7 +139,9 @@ def main():
         def audit_get(path, headers):
             return _http_json(f"https://api.github.com{path}", headers)
 
-        report, digest = run_audit(audit_get, _github_headers, _keychain_secret)
+        run_bats = os.environ.get("K3DM_HERMES_AUDIT_RUN_BATS") == "1"
+        report, digest = run_audit(audit_get, _github_headers, _keychain_secret,
+                                   bats_runner=_bats_run, run_bats=run_bats)
         print(digest)
         print(json.dumps(report, sort_keys=True))
         return 0
@@ -169,8 +177,10 @@ def main():
     def audit_get(path, headers):
         return _http_json(f"https://api.github.com{path}", headers)
 
+    run_bats = os.environ.get("K3DM_HERMES_AUDIT_RUN_BATS") == "1"
     digest = monthly_audit_advisory(audit_get, _github_headers, _keychain_secret,
-                                    state, timestamp()[:7])
+                                    state, timestamp()[:7],
+                                    bats_runner=_bats_run, run_bats=run_bats)
     if digest:
         post_summary(relay, digest)
     _save_state(state_path, state)

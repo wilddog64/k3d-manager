@@ -31,3 +31,13 @@ if [[ "${1:-}" == "--uninstall" ]]; then
 fi
 
 _install_hermes_agent "${REPO_ROOT}"
+
+# Advisory only (non-fatal): the monthly security audit uses an optional read-only token.
+# The lib-foundation installer preflights only the four required credentials; this one is
+# checked here so a fresh install surfaces it. Absent → the audit reports its checks
+# "unavailable" and the poll continues (see docs/guides/hermes.md#monthly-security-audit).
+if security find-generic-password -a k3dm -s k3dm-hermes-audit-token >/dev/null 2>&1; then
+  echo "[k3dm-hermes-setup] monthly security-audit token present (k3dm-hermes-audit-token)."
+else
+  echo "[k3dm-hermes-setup] note: k3dm-hermes-audit-token not found — the monthly security audit will report its checks unavailable until you provision it (docs/guides/hermes.md#monthly-security-audit)." >&2
+fi

@@ -17,6 +17,11 @@ AUDIT_SERVICE = "k3dm-hermes-audit-token"
 _SEVERITIES = ("critical", "high", "medium", "low")
 _EXPIRY_WARN_DAYS = 30
 
+# Group-B (optional): the webhook security-regression subset — F1 role gating +
+# fix-mode escalation, and F3 Slack-host allowlist. Gated behind K3DM_HERMES_AUDIT_RUN_BATS.
+BATS_SUITE = "scripts/tests/lib/webhook.bats"
+BATS_FILTER = "role|fix mode|Slack host"
+
 
 def _reason(exc):
     code = getattr(exc, "code", None)
@@ -104,6 +109,31 @@ def _credential(header_fetch, token, service, now):
             "expires_at": expires.isoformat().replace("+00:00", "Z")}
 
 
+def _tap_counts(output):
+    passed = failed = 0
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("not ok"):
+            failed += 1
+        elif stripped.startswith("ok"):
+            passed += 1
+    return passed, failed
+
+
+def _security_regressions(bats_runner, run_bats):
+    if not run_bats:
+        return {"status": "skipped", "detail": "K3DM_HERMES_AUDIT_RUN_BATS unset"}
+    if bats_runner is None:
+        return {"status": "skipped", "detail": "no bats runner injected"}
+    try:
+        rc, output = bats_runner(["bats", "--tap", "--filter", BATS_FILTER, BATS_SUITE])
+    except Exception as exc:
+        return {"status": "unavailable", "detail": _reason(exc)}
+    passed, failed = _tap_counts(output)
+    status = "pass" if rc == 0 and failed == 0 and passed > 0 else "fail"
+    return {"status": status, "passed": passed, "failed": failed}
+
+
 def _attention(report):
     items = []
     cs = report["code_scanning"]
@@ -126,15 +156,22 @@ def _attention(report):
     for cred in report["credentials"]:
         if cred["status"] == "expires" and cred["days"] < _EXPIRY_WARN_DAYS:
             items.append(f"{cred['service']} expires in {cred['days']}d")
+    sr = report.get("security_regressions")
+    if sr and sr["status"] == "fail":
+        items.append(f"security regressions: {sr['failed']} failing")
+    elif sr and sr["status"] == "unavailable":
+        items.append(f"security regressions {sr['detail']}")
     return items
 
 
-def run_audit(github_get, header_fetch, keychain, repo=REPOSITORY, now=None):
-    """Run the read-only Group-A security audit and return (report_dict, digest_text).
+def run_audit(github_get, header_fetch, keychain, repo=REPOSITORY, now=None,
+              bats_runner=None, run_bats=False):
+    """Run the read-only security audit and return (report_dict, digest_text).
 
     github_get(path, headers) -> parsed JSON (raises on HTTP error).
     header_fetch(path, headers) -> lowercased response-header dict (HEAD).
     keychain(service) -> token string ("" when absent).
+    bats_runner(argv) -> (rc, output); only called when run_bats is True (Group B).
     """
     now = now or datetime.now(timezone.utc)
     token = keychain(AUDIT_SERVICE)
@@ -153,13 +190,14 @@ def run_audit(github_get, header_fetch, keychain, repo=REPOSITORY, now=None):
             {"service": WEBHOOK_SERVICE, "status": "no expiry"},
             {"service": ARGOCD_SERVICE, "status": "no expiry"},
         ],
+        "security_regressions": _security_regressions(bats_runner, run_bats),
     }
     report["attention"] = _attention(report)
     return report, _digest(report)
 
 
 def monthly_audit_advisory(github_get, header_fetch, keychain, state, this_month,
-                           repo=REPOSITORY, now=None):
+                           repo=REPOSITORY, now=None, bats_runner=None, run_bats=False):
     """Once-per-calendar-month gate (mirrors sensors.token_expiry_advisory).
 
     Returns the audit digest the first time `this_month` (YYYY-MM) is seen, then stamps
@@ -168,7 +206,8 @@ def monthly_audit_advisory(github_get, header_fetch, keychain, state, this_month
     """
     if state.get("last_security_audit_month") == this_month:
         return None
-    _report, digest = run_audit(github_get, header_fetch, keychain, repo=repo, now=now)
+    _report, digest = run_audit(github_get, header_fetch, keychain, repo=repo, now=now,
+                                bats_runner=bats_runner, run_bats=run_bats)
     state["last_security_audit_month"] = this_month
     return digest
 
@@ -207,6 +246,17 @@ def _digest(report):
         else:
             creds.append(f"{cred['service']} = {cred['status']}")
     lines.append("Credentials: " + "; ".join(creds))
+
+    sr = report.get("security_regressions")
+    if sr:
+        if sr["status"] == "skipped":
+            lines.append(f"Security regressions (bats): skipped ({sr['detail']})")
+        elif sr["status"] in ("pass", "fail"):
+            mark = "✅" if sr["status"] == "pass" else "⚠️"
+            lines.append(f"Security regressions (bats): {sr['passed']} passed, "
+                         f"{sr['failed']} failed  {mark}")
+        else:
+            lines.append(f"Security regressions (bats): {sr['detail']}")
 
     attention = report["attention"]
     if attention:
