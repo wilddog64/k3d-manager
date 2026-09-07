@@ -78,11 +78,12 @@ dict — the same family of taint-model false positives documented for this repo
 (`str.replace` redaction tripping the same rule). CodeQL is **not** a required status check on
 `main` (`required_status_checks: []`), so this does not block merge.
 
-**Disposition:** surfaced to the maintainer for the accept-vs-dismiss decision — no code change
-applied, since the printed output demonstrably carries no secret. If a green dashboard is
-preferred over a documented false positive, the presence flags can be rederived through a
-comparison CodeQL treats as a barrier (candidate: `len(keychain(<service>) or "") > 0`),
-verified against a re-scan.
+**Disposition:** dismissed as a false positive on 2026-09-07 (alert #21 → `state: dismissed`,
+`dismissed_reason: "false positive"`), since the printed output demonstrably carries no secret.
+Dismissal flipped the PR's "Code scanning results / CodeQL" check to pass. No code change was
+applied — a scanner-dodging rewrite (candidate: `len(keychain(<service>) or "") > 0`) was
+rejected as it evades the query without fixing a real defect. The alert can be reopened if the
+analysis is ever revisited.
 
 ## Process note
 

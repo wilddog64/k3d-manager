@@ -53,8 +53,11 @@
   a write-capable PAT still gets non-zero rc from `rerun-failed-jobs` on a successful run). +2 regression tests (33 passed).
   Both Copilot threads resolved. **CodeQL: 1 finding = FALSE POSITIVE** (`bin/k3dm-hermes:128` clear-text logging) —
   `report` holds only booleans + `"pat"`; the token flows only into subprocess `env`, never into the printed dict. Non-blocking
-  (CodeQL not a required check on main). Thread left OPEN + replied; accept-vs-dismiss surfaced to user. Findings doc:
-  `docs/issues/2026-09-07-copilot-pr122-review-findings.md`. NEXT: CI green on `30122821` → disable enforce_admins → user merges.
+  (CodeQL not a required check on main). **DISMISSED as false positive 2026-09-07 (alert #21 → `state: dismissed`), which
+  flipped the PR's "Code scanning results / CodeQL" check to pass** (user had flagged the red X — it was Code *scanning*, not
+  code *signing*). Findings doc: `docs/issues/2026-09-07-copilot-pr122-review-findings.md`. **CI green on final head `75dd2a36`
+  (run 34125525353) + all checks pass + `enforce_admins` DISABLED 2026-09-07 (`.enabled: false`). PR is MERGE-READY — user
+  merges (`mergeable_state: blocked` is only the review requirement; admin override bypasses it). NEVER auto-merge.**
 
 ## v1.29.0 queue (Hermes Phase-1)
 
