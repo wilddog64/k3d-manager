@@ -34,7 +34,7 @@
   DI `run_preflight(keychain, runner)` + `preflight` subcommand + `test_preflight.py`, rescoped PAT-only. Gates
   2026-09-07 (Claude-run): `pytest scripts/tests/hermes/ -q` **29 passed**, `py_compile` clean, no protected-subtree
   edits, straggler grep for App references = none.
-- [ ] **WS2 — GitHub token-expiry advisory — SPEC'D + DISPATCHED TO CODEX 2026-09-07.** Spec
+- [x] **WS2 — GitHub token-expiry advisory — IMPLEMENTED 2026-09-07, commit `6ff32c7f` on `origin/k3d-manager-v1.31.0`; pytest 31 passed, py_compile clean.** Spec
   `docs/plans/v1.31.0-hermes-token-expiry-advisory.md`. Hermes posts a once-per-day Slack advisory when the
   `k3dm-hermes-gh-token` PAT is within a window (default 14d, `K3DM_HERMES_TOKEN_WARN_DAYS`) of expiry, and stays
   silent once a no-expiration classic PAT is in the slot (no expiry header → no advisory). **Key design constraint:**
