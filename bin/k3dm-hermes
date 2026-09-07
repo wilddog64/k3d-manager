@@ -164,6 +164,15 @@ def main():
     advisory = token_expiry_advisory(_github_headers, state, timestamp()[:10], warn_days=warn_days)
     if advisory:
         post_summary(relay, advisory)
+    from hermes.audit import monthly_audit_advisory
+
+    def audit_get(path, headers):
+        return _http_json(f"https://api.github.com{path}", headers)
+
+    digest = monthly_audit_advisory(audit_get, _github_headers, _keychain_secret,
+                                    state, timestamp()[:7])
+    if digest:
+        post_summary(relay, digest)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event}))
     return 0

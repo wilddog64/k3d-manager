@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
-from hermes.audit import AUDIT_SERVICE, run_audit
+from hermes.audit import AUDIT_SERVICE, monthly_audit_advisory, run_audit
 
 NOW = datetime(2026, 9, 7, tzinfo=timezone.utc)
 
@@ -117,6 +117,38 @@ def test_credential_expiry_reported_with_days():
     assert audit_cred["status"] == "expires"
     assert audit_cred["days"] == 88
     assert "Credentials:" in digest
+
+
+def test_monthly_advisory_fires_once_then_dedups_same_month():
+    state = {}
+    get = github_get(protection=PROTECTION_OK)
+
+    first = monthly_audit_advisory(get, header_fetch(), keychain(), state, "2026-09", now=NOW)
+    assert first is not None and "security audit" in first
+    assert state["last_security_audit_month"] == "2026-09"
+
+    second = monthly_audit_advisory(get, header_fetch(), keychain(), state, "2026-09", now=NOW)
+    assert second is None
+
+
+def test_monthly_advisory_fires_again_on_month_rollover():
+    state = {"last_security_audit_month": "2026-09"}
+    digest = monthly_audit_advisory(
+        github_get(protection=PROTECTION_OK), header_fetch(), keychain(), state, "2026-10", now=NOW)
+
+    assert digest is not None
+    assert state["last_security_audit_month"] == "2026-10"
+
+
+def test_monthly_advisory_makes_no_network_call_when_already_run():
+    def exploding_get(path, headers):
+        raise AssertionError("must not fetch when already audited this month")
+
+    state = {"last_security_audit_month": "2026-09"}
+    result = monthly_audit_advisory(
+        exploding_get, header_fetch(), keychain(), state, "2026-09", now=NOW)
+
+    assert result is None
 
 
 def test_audit_never_writes_or_touches_repairs():

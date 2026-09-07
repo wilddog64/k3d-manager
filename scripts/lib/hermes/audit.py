@@ -158,6 +158,21 @@ def run_audit(github_get, header_fetch, keychain, repo=REPOSITORY, now=None):
     return report, _digest(report)
 
 
+def monthly_audit_advisory(github_get, header_fetch, keychain, state, this_month,
+                           repo=REPOSITORY, now=None):
+    """Once-per-calendar-month gate (mirrors sensors.token_expiry_advisory).
+
+    Returns the audit digest the first time `this_month` (YYYY-MM) is seen, then stamps
+    state["last_security_audit_month"]; returns None (and makes no network call) on any
+    later poll in the same month. The caller persists state and posts the digest.
+    """
+    if state.get("last_security_audit_month") == this_month:
+        return None
+    _report, digest = run_audit(github_get, header_fetch, keychain, repo=repo, now=now)
+    state["last_security_audit_month"] = this_month
+    return digest
+
+
 def _severity_line(counts):
     return ", ".join(f"{counts[level]} {level}" for level in _SEVERITIES)
 
