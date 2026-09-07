@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- **`/ask` fix-mode privilege escalation (webhook audit F1)** — fix mode (write-capable agent, `K3DM_FIX_MODE=1`) is no longer decided by the question text alone. Because `_FIX_RE` matches diagnostic phrasing too ("restart", "resync"…) and `ask` is `reader`-scoped, a reader could previously unlock state-changing operations (make `fix-*`, `kubectl rollout restart`, `argocd app sync`) just by phrasing the question. The caller's role is now threaded into `_run_cluster_ask` and gated through `_fix_mode_enabled(question, role)`, which requires `operator+`. A reader's fix-phrased question is **downgraded to read-only** (not rejected — the regex is broad) with a one-line notice. See `docs/bugs/2026-09-07-webhook-ask-fix-mode-role-gating.md`.
+- **`response_url` SSRF / output exfil (webhook audit F3)** — `_slack_post` now rejects any `url` that is not `https://` on a Slack host (`hooks.slack.com` / `slack.com`) via `_is_allowed_slack_url`. Previously it POSTed job output to whatever `response_url` the request body carried, enabling output exfiltration and a blind-SSRF POST primitive against loopback services (Vault, ArgoCD, k8s API). See `docs/bugs/2026-09-07-webhook-ask-fix-mode-role-gating.md`.
+
 ## [1.31.0] - 2026-09-07
 
 **Theme: Hermes learns to watch its own credentials.** This release closes the loop on the one Hermes dependency it cannot self-repair — the `k3dm-hermes-gh-token` PAT. A new `bin/k3dm-hermes preflight` verifies the three Hermes secrets are present and that the PAT actually carries Actions **read and write** scope (the R4 rerun path), and a **token-expiry advisory** posts a once-per-day Slack reminder when the PAT is within a configurable window of expiring — going silent again the moment it is renewed to a no-expiration classic PAT. It also retires the dead R4 GitHub App auth experiment: the App could not obtain the required Actions permission on a personal repo, so R4 stays on the least-privilege PAT.

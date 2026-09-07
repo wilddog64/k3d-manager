@@ -854,3 +854,38 @@ assert _slack_user_role("Uunknown") == "reader"
 '
     [ "$status" -eq 0 ]
 }
+
+@test "webhook fix mode requires operator+ role, not question phrasing" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run env PYTHONPATH="${repo_root}/scripts/lib" K3DM_WEBHOOK_TOKEN="" K3DM_WEBHOOK_PATH="${repo_root}/bin/k3dm-webhook" python3 -c '
+import importlib.machinery
+import os
+webhook = importlib.machinery.SourceFileLoader("k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]).load_module()
+assert webhook._fix_mode_enabled("restart the crashlooping pod", "reader") is False
+assert webhook._fix_mode_enabled("resync app foo", "reader") is False
+assert webhook._fix_mode_enabled("restart the crashlooping pod", "operator") is True
+assert webhook._fix_mode_enabled("force-sync argocd", "admin") is True
+assert webhook._fix_mode_enabled("why does the pod keep restarting", "reader") is False
+assert webhook._fix_mode_enabled("what pods are running", "operator") is False
+'
+    [ "$status" -eq 0 ]
+}
+
+@test "webhook _slack_post only targets https Slack hosts" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run env PYTHONPATH="${repo_root}/scripts/lib" python3 -c '
+from webhook.render import _is_allowed_slack_url
+assert _is_allowed_slack_url("https://hooks.slack.com/services/T/B/x") is True
+assert _is_allowed_slack_url("https://slack.com/api/chat.postMessage") is True
+assert _is_allowed_slack_url("http://hooks.slack.com/services/T/B/x") is False
+assert _is_allowed_slack_url("https://attacker.example/collect") is False
+assert _is_allowed_slack_url("https://127.0.0.1:18200/v1/sys") is False
+assert _is_allowed_slack_url("https://hooks.slack.com.attacker.example/x") is False
+assert _is_allowed_slack_url("https://hooks.slack.com@attacker.example/x") is False
+assert _is_allowed_slack_url("") is False
+assert _is_allowed_slack_url(None) is False
+'
+    [ "$status" -eq 0 ]
+}
