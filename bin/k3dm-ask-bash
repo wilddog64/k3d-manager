@@ -136,6 +136,16 @@ if echo "$CMD" | grep -qE '\bgit\b.*(reset\s+--hard|clean\s+-f|push\s+--force|pu
   _deny "$CMD"
 fi
 
+# git subcommands that reach the network are another egress path — a reader could exfil
+# readable files by pushing/cloning to an attacker remote, bypassing the client block above.
+# Local read-only inspection (log/status/diff/show/rev-parse/blame/…) stays allowed.
+if echo "$CMD" | grep -qE '\bgit\b.*\b(clone|fetch|pull|push|remote|ls-remote|submodule|send-pack|fetch-pack|upload-pack|request-pull|daemon)\b'; then
+  _deny "$CMD"
+fi
+if echo "$CMD" | grep -qE '\bgit\b.*--remote\b'; then
+  _deny "$CMD"
+fi
+
 # Block file access outside allowed repos (absolute path arguments only)
 # Read-only system paths allowed for cluster diagnosis
 _DIAG_PATHS=(
