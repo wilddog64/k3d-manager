@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-09-07
+
 **Theme: Hermes learns to watch its own credentials.** This release closes the loop on the one Hermes dependency it cannot self-repair — the `k3dm-hermes-gh-token` PAT. A new `bin/k3dm-hermes preflight` verifies the three Hermes secrets are present and that the PAT actually carries Actions **read and write** scope (the R4 rerun path), and a **token-expiry advisory** posts a once-per-day Slack reminder when the PAT is within a configurable window of expiring — going silent again the moment it is renewed to a no-expiration classic PAT. It also retires the dead R4 GitHub App auth experiment: the App could not obtain the required Actions permission on a personal repo, so R4 stays on the least-privilege PAT.
 
 ### Added
