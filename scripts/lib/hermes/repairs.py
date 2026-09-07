@@ -104,9 +104,10 @@ def _r3_command(_records):
 
 def _r4_command(records):
     data = (_rec(records, "ci") or {}).get("data", {})
+    token = _keychain_secret(GITHUB_SERVICE)
     return (["gh", "api", "--method", "POST",
              f"/repos/{data['repo']}/actions/runs/{data['run_id']}/rerun-failed-jobs"],
-            {"GH_TOKEN": _keychain_secret(GITHUB_SERVICE)})
+            {"GH_TOKEN": token})
 
 
 REPAIRS = {

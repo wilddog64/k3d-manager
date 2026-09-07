@@ -14,10 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 from hermes.correlator import Correlator
+from hermes.records import timestamp
 from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, argocd, ci, eso, node_pressure,
-                            reachability)
+                            reachability, token_expiry_advisory)
 from hermes.slack import post_summary
 
 
@@ -40,6 +41,13 @@ def _http_json(url, headers, timeout=None):
     request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read())
+
+
+def _github_headers(path, headers):
+    timeout = float(os.environ.get("K3DM_HERMES_HTTP_TIMEOUT", "90"))
+    request = urllib.request.Request(f"https://api.github.com{path}", headers=headers, method="HEAD")
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return {key.lower(): value for key, value in response.headers.items()}
 
 
 def _argocd_run(command, additions):
@@ -102,7 +110,7 @@ def _repair_runner(argv, env, cwd):
 
 
 def _usage():
-    print("Usage: k3dm-hermes [approve <action-id>|list]", file=sys.stderr)
+    print("Usage: k3dm-hermes [approve <action-id>|list|preflight]", file=sys.stderr)
 
 
 def main():
@@ -114,6 +122,11 @@ def main():
     if args and args[0] == "list" and len(args) == 1:
         print(json.dumps(state.get("pending_repairs", {}), sort_keys=True))
         return 0
+    if args and args[0] == "preflight" and len(args) == 1:
+        from hermes.preflight import run_preflight
+        report, code = run_preflight(_keychain_secret, _repair_runner)
+        print(json.dumps(report, sort_keys=True))
+        return code
     if args and (args[0] != "approve" or len(args) != 2):
         _usage()
         return 2
@@ -134,9 +147,13 @@ def main():
         return 0 if outcome.get("outcome") == "executed" else 1
 
     records, event = _run_cycle(state)
+    relay = _keychain_secret("k3dm-slack-webhook")
     if event:
-        relay = _keychain_secret("k3dm-slack-webhook")
         post_summary(relay, event["text"])
+    warn_days = int(os.environ.get("K3DM_HERMES_TOKEN_WARN_DAYS", "14"))
+    advisory = token_expiry_advisory(_github_headers, state, timestamp()[:10], warn_days=warn_days)
+    if advisory:
+        post_summary(relay, advisory)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event}))
     return 0

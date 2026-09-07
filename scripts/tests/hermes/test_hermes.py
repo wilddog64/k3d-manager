@@ -6,7 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
 from hermes.correlator import Correlator
-from hermes.sensors import argocd, ci, eso, node_pressure, reachability
+from hermes.sensors import (argocd, ci, eso, github_token_expiry, node_pressure,
+                            reachability, token_expiry_advisory)
 
 
 def health(entries):
@@ -128,3 +129,31 @@ def test_claude_is_not_an_llm_summary_author():
         lambda *_: calls.append(True), "2026-09-05")
     assert not calls
     assert event["text"].startswith("Hermes incident:")
+
+
+def token_headers(mapping):
+    return lambda _url, _headers: mapping
+
+
+def test_github_token_expiry_window_and_no_header():
+    now = datetime(2026, 11, 25, tzinfo=timezone.utc)
+    hdr = token_headers({"github-authentication-token-expiration": "2026-12-04 02:33:02 UTC"})
+    info = github_token_expiry(hdr, token="x", warn_days=14, now=now)
+    assert info == {"service": "k3dm-hermes-gh-token", "days": 9,
+                    "expires_at": "2026-12-04T02:33:02Z"}
+    assert github_token_expiry(hdr, token="x", warn_days=5, now=now) is None
+    assert github_token_expiry(token_headers({}), token="x", now=now) is None
+    assert github_token_expiry(hdr, token="", now=now) is None
+
+
+def test_token_expiry_advisory_dedup_and_silence():
+    now = datetime(2026, 11, 25, tzinfo=timezone.utc)
+    hdr = token_headers({"github-authentication-token-expiration": "2026-12-04 02:33:02 UTC"})
+    state = {}
+    first = token_expiry_advisory(hdr, state, "2026-11-25", token="x", now=now)
+    assert first is not None and "k3dm-hermes-gh-token" in first and "preflight" in first
+    assert token_expiry_advisory(hdr, state, "2026-11-25", token="x", now=now) is None
+    assert token_expiry_advisory(hdr, state, "2026-11-26", token="x", now=now) is not None
+    far = token_headers({"github-authentication-token-expiration": "2027-06-01 00:00:00 UTC"})
+    assert token_expiry_advisory(far, {}, "2026-11-25", token="x", now=now) is None
+    assert token_expiry_advisory(token_headers({}), {}, "2026-11-25", token="x", now=now) is None
