@@ -25,7 +25,7 @@ def run_preflight(keychain, runner):
 
     env = {"GH_TOKEN": keychain(GITHUB_SERVICE)}
     read_rc, read_output = runner(
-        ["gh", "api", f"/repos/{REPOSITORY}/actions/runs?per_page=1"], env, None)
+        ["gh", "api", f"/repos/{REPOSITORY}/actions/runs?per_page=30"], env, None)
     if read_rc != 0:
         return report, 1
     report["actions_read"] = True
@@ -38,5 +38,5 @@ def run_preflight(keychain, runner):
     _write_rc, write_output = runner(
         ["gh", "api", "--method", "POST",
          f"/repos/{REPOSITORY}/actions/runs/{run_id}/rerun-failed-jobs"], env, None)
-    report["actions_write"] = "resource not accessible" not in write_output.lower()
+    report["actions_write"] = bool(write_output) and "resource not accessible" not in write_output.lower()
     return report, 0 if report["actions_write"] else 1

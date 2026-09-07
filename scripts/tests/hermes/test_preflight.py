@@ -60,3 +60,26 @@ def test_preflight_accepts_cannot_be_retried_as_actions_write_present():
     assert code == 0
     assert report["actions_read"] is True
     assert report["actions_write"] is True
+
+
+def test_preflight_write_probe_empty_output_is_not_success():
+    report, code = run_preflight(keychain(secrets()), runner(write_output=""))
+
+    assert code == 1
+    assert report["actions_read"] is True
+    assert report["actions_write"] is False
+
+
+def test_preflight_finds_success_beyond_latest_run():
+    def run(argv, env, cwd):
+        if "--method" in argv:
+            return 1, "This workflow run cannot be retried"
+        return 0, json.dumps({"workflow_runs": [
+            {"id": 1, "conclusion": None},
+            {"id": 2, "conclusion": "failure"},
+            {"id": 3, "conclusion": "success"}]})
+
+    report, code = run_preflight(keychain(secrets()), run)
+
+    assert code == 0
+    assert report["actions_write"] is True

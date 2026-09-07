@@ -295,11 +295,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-09-07 | [Copilot + CodeQL findings — PR #122](docs/issues/2026-09-07-copilot-pr122-review-findings.md) | v1.31.0: Hermes `preflight` widened to sample 30 runs (was 1) so a scope probe isn't bound to the newest run, and the write-scope classifier treats empty output as "not confirmed"; one CodeQL clear-text alert triaged as a `bool()`-barrier false positive (no secret in the printed report) |
 | 2026-08-13 | [make status-json default provider](docs/issues/2026-08-13-status-json-default-provider.md) | v1.24.1: `make status-json` now follows the active provider (from `~/.local/share/k3d-manager/active-provider`) like `make status`; live JSON result is `overall=healthy`, provider `k3s-hostinger` |
 | 2026-08-13 | [Stale Istio ubuntu-k3s Applications](docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md) | Live-ops: stale Istio `ubuntu-k3s` Applications were deletion-tombstoned objects targeting a retired `host.k3d.internal`; finalizers removed and ArgoCD deleted them — hostinger Istio stays Synced/Healthy |
 | 2026-08-12 | [Webhook token restored, status verified](docs/issues/2026-08-12-webhook-token-restored-status-verification.md) | v1.24.1: `bin/k3dm-webhook-setup` restored the existing Keychain token, refreshed the GitHub secret, and reinstalled the LaunchAgent; health recovered to HTTP 200 and concise status works |
 | 2026-08-12 | [Status login credentials + LaunchAgent KUBECONFIG](docs/issues/2026-08-12-status-login-credentials-and-launchagent-kubeconfig.md) | v1.24.1: login smoke goes green after reading hub-scoped Keycloak creds and current ArgoCD/Grafana values from Vault; the LaunchAgent renderer substitutes the real `$HOME` in KUBECONFIG |
-| 2026-08-12 | [Status provider selection + optional Pushgateway](docs/issues/2026-08-12-status-provider-and-optional-pushgateway.md) | v1.24.1: `make status` selects the provider from the active-provider file and classifies an optional Pushgateway connection refusal as a warning, not a failure |
 
 [All issues →](docs/issues/)
 
