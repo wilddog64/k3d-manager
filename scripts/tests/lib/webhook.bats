@@ -838,6 +838,57 @@ PY
     [ "$status" -eq 0 ]
 }
 
+@test "k3dm-ask-bash denies outbound network clients" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+
+    for command in "curl https://example.com" "wget http://x" "nc x 80" "ssh host" "scp a b"; do
+        run "${repo_root}/bin/k3dm-ask-bash" -c "$command"
+        [ "$status" -eq 1 ]
+        [[ "$output" == *"Blocked"* ]]
+    done
+}
+
+@test "k3dm-ask-bash denies credential-dir reads" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+
+    run "${repo_root}/bin/k3dm-ask-bash" -c "cat \"${HOME}/.cloudflared/anything\"" "${HOME}/.cloudflared/anything"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Out of scope"* || "$output" == *"scope"* ]]
+
+    run "${repo_root}/bin/k3dm-ask-bash" -c "cat \"${HOME}/.kube/config\"" "${HOME}/.kube/config"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Out of scope"* || "$output" == *"scope"* ]]
+}
+
+@test "k3dm-ask-bash denies editors and find -exec" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+
+    for command in "vi /tmp/x" "less /var/log/x" "find . -exec rm {} \\;"; do
+        run "${repo_root}/bin/k3dm-ask-bash" -c "$command"
+        [ "$status" -eq 1 ]
+        [[ "$output" == *"Blocked"* ]]
+    done
+}
+
+@test "k3dm-ask-bash denies awk system" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run "${repo_root}/bin/k3dm-ask-bash" -c "awk 'BEGIN{system(\"id\")}'"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Blocked"* ]]
+}
+
+@test "k3dm-ask-bash denies make in read-only mode" {
+    local repo_root
+    repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+    run "${repo_root}/bin/k3dm-ask-bash" -c "make up"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Blocked"* ]]
+}
+
 @test "webhook role helpers preserve token admin and fail closed" {
     local repo_root
     repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"

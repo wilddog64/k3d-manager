@@ -3040,7 +3040,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         "ALLOWED diagnostic tools — use freely, no permission needed:\n"
         "  kubectl get/describe/logs/top/events (any context, any namespace)\n"
         "  grep, sed, awk, cut, sort, uniq, wc, head, tail, cat, diff, jq, python3\n"
-        "  curl (GET only — no -X POST/PUT/DELETE/PATCH), dig, nslookup, ping, ss, netstat\n"
+        "  dig, nslookup, ping, ss, netstat\n"
         "  git log/diff/show/status (read-only)\n\n"
         "BLOCKED — modifies state, do not use:\n"
         "  kubectl delete/apply/create/edit/patch/scale/drain/rollout restart\n"

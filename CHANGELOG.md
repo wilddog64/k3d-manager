@@ -5,6 +5,7 @@
 ### Fixed
 - **`/ask` fix-mode privilege escalation (webhook audit F1)** — fix mode (write-capable agent, `K3DM_FIX_MODE=1`) is no longer decided by the question text alone. Because `_FIX_RE` matches diagnostic phrasing too ("restart", "resync"…) and `ask` is `reader`-scoped, a reader could previously unlock state-changing operations (make `fix-*`, `kubectl rollout restart`, `argocd app sync`) just by phrasing the question. The caller's role is now threaded into `_run_cluster_ask` and gated through `_fix_mode_enabled(question, role)`, which requires `operator+`. A reader's fix-phrased question is **downgraded to read-only** (not rejected — the regex is broad) with a one-line notice. See `docs/bugs/2026-09-07-webhook-ask-fix-mode-role-gating.md`.
 - **`response_url` SSRF / output exfil (webhook audit F3)** — `_slack_post` now rejects any `url` that is not `https://` on a Slack host (`hooks.slack.com` / `slack.com`) via `_is_allowed_slack_url`. Previously it POSTed job output to whatever `response_url` the request body carried, enabling output exfiltration and a blind-SSRF POST primitive against loopback services (Vault, ArgoCD, k8s API). See `docs/bugs/2026-09-07-webhook-ask-fix-mode-role-gating.md`.
+- **`/ask` sandbox hardening (webhook audit F2)** — dropped credential/system diagnostic paths and blocked outbound egress plus shell-escape vectors. See `docs/plans/v1.32.0-ask-bash-sandbox-hardening.md`.
 
 ## [1.31.0] - 2026-09-07
 
