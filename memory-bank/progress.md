@@ -44,6 +44,17 @@
   (header transport injected), `_github_headers` HEAD transport + wiring in `bin/k3dm-hermes` main cycle, 2 tests in
   `test_hermes.py`. Live header format confirmed: `github-authentication-token-expiration: 2026-12-04 02:33:02 UTC`.
   Gates required of Codex: pytest 31 passed + py_compile clean, commit + push to `origin/k3d-manager-v1.31.0`, no PR.
+- [x] **v1.31.0 PR — OPEN 2026-09-07. PR [#122](https://github.com/wilddog64/k3d-manager/pull/122)** (base `main` ← `k3d-manager-v1.31.0`).
+  Scope: `preflight` scope-check tool (WS1b) + token-expiry advisory (WS2) + R4 App-auth revert (WS1) + v1.30.0
+  ledger backfill that never reached main. CHANGELOG `[Unreleased]` entry added (`c2355178`). CI green on head `c2355178`
+  (lint/detect/Analyze python·js·actions/GitGuardian all pass). **Copilot: 2 findings, both fixed in `30122821`** —
+  (1) preflight bound its verdict to the single newest Actions run (`per_page=1`) → widened to `per_page=30`; (2) write-scope
+  probe misread empty/transport-error output as success → now requires non-empty output (rc intentionally NOT the gate, since
+  a write-capable PAT still gets non-zero rc from `rerun-failed-jobs` on a successful run). +2 regression tests (33 passed).
+  Both Copilot threads resolved. **CodeQL: 1 finding = FALSE POSITIVE** (`bin/k3dm-hermes:128` clear-text logging) —
+  `report` holds only booleans + `"pat"`; the token flows only into subprocess `env`, never into the printed dict. Non-blocking
+  (CodeQL not a required check on main). Thread left OPEN + replied; accept-vs-dismiss surfaced to user. Findings doc:
+  `docs/issues/2026-09-07-copilot-pr122-review-findings.md`. NEXT: CI green on `30122821` → disable enforce_admins → user merges.
 
 ## v1.29.0 queue (Hermes Phase-1)
 
