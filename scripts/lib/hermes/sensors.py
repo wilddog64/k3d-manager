@@ -179,3 +179,50 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
         return record("ci", "healthy", "required CI checks successful")
     except Exception:
         return record("ci", "unknown", "CI status source unavailable")
+
+
+GITHUB_EXPIRY_HEADER = "github-authentication-token-expiration"
+
+
+def _parse_expiry(raw):
+    value = str(raw).strip()
+    if value.endswith(" UTC"):
+        value = value[:-4].strip()
+    try:
+        return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def github_token_expiry(header_fetch, token=None, warn_days=14, now=None):
+    token = token if token is not None else _keychain_secret(GITHUB_SERVICE)
+    if not token:
+        return None
+    now = now or datetime.now(timezone.utc)
+    try:
+        headers = header_fetch("/", {"Authorization": f"token {token}"})
+        raw = headers.get(GITHUB_EXPIRY_HEADER, "") if isinstance(headers, dict) else ""
+        if not raw:
+            return None
+        expires = _parse_expiry(raw)
+    except Exception:
+        return None
+    if (expires - now).total_seconds() > warn_days * 86400:
+        return None
+    return {"service": GITHUB_SERVICE, "days": (expires - now).days,
+            "expires_at": expires.isoformat().replace("+00:00", "Z")}
+
+
+def token_expiry_advisory(header_fetch, state, today, token=None, warn_days=14, now=None):
+    info = github_token_expiry(header_fetch, token=token, warn_days=warn_days, now=now)
+    if not info:
+        return None
+    if state.get("token_expiry_notified_on") == today:
+        return None
+    state["token_expiry_notified_on"] = today
+    days = info["days"]
+    horizon = f"in {days} day(s)" if days >= 0 else f"{abs(days)} day(s) ago"
+    return (f"Hermes advisory: GitHub token {info['service']} expires {horizon} "
+            f"({info['expires_at']}). Renew as a no-expiration classic PAT "
+            f"(scopes: repo + workflow) in the same Keychain slot, then verify: "
+            f"bin/k3dm-hermes preflight.")
