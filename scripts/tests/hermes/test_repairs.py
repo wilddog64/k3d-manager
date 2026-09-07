@@ -50,7 +50,7 @@ def test_r3_fires_on_edge_down_sustained():
 
 
 def test_r4_fires_only_on_transient_conclusion(monkeypatch):
-    monkeypatch.setattr(repairs, "_r4_token", lambda: ("token", "pat"))
+    monkeypatch.setattr(repairs, "_keychain_secret", lambda service: "token")
     assert [item["key"] for item in repairs.propose(r4_records(), state())] == ["r4"]
     assert repairs.propose(r4_records("failure"), state()) == []
 
@@ -91,7 +91,7 @@ def test_approve_runs_lever_and_records_audit():
 
 
 def test_r4_degrades_to_skipped_on_permission_error(monkeypatch):
-    monkeypatch.setattr(repairs, "_r4_token", lambda: ("token", "pat"))
+    monkeypatch.setattr(repairs, "_keychain_secret", lambda service: "token")
     current = state()
     proposal = repairs.propose(r4_records(), current)[0]
     outcome = repairs.approve(proposal["action_id"], current, r4_records(),
@@ -100,7 +100,7 @@ def test_r4_degrades_to_skipped_on_permission_error(monkeypatch):
 
 
 def test_r4_refuses_when_hermes_token_missing_no_ambient_auth(monkeypatch):
-    monkeypatch.setattr(repairs, "_r4_token", lambda: ("", "pat"))
+    monkeypatch.setattr(repairs, "_keychain_secret", lambda service: "")
     current = state()
     proposal = repairs.propose(r4_records(), current)[0]
     calls = []
@@ -112,7 +112,7 @@ def test_r4_refuses_when_hermes_token_missing_no_ambient_auth(monkeypatch):
 
 
 def test_r4_business_logic_403_is_not_misclassified_as_missing_scope(monkeypatch):
-    monkeypatch.setattr(repairs, "_r4_token", lambda: ("token", "pat"))
+    monkeypatch.setattr(repairs, "_keychain_secret", lambda service: "token")
     current = state()
     proposal = repairs.propose(r4_records(), current)[0]
     outcome = repairs.approve(proposal["action_id"], current, r4_records(),
@@ -157,25 +157,7 @@ def test_no_repair_runs_in_poll_path():
     assert proposals and "repair_audit" not in current
 
 
-def test_r4_uses_github_app_token_when_app_credentials_are_present(monkeypatch):
-    secrets = {
-        repairs.APP_ID_SERVICE: "app-id",
-        repairs.APP_INSTALLATION_SERVICE: "installation-id",
-        repairs.APP_PRIVATE_KEY_SERVICE: "private-key",
-    }
-    monkeypatch.setattr(repairs, "_keychain_secret", lambda service: secrets.get(service, ""))
-    from hermes import github_app
-    calls = []
-    monkeypatch.setattr(github_app, "installation_token",
-                        lambda *args: calls.append(args) or "app-token")
-
-    _argv, env = repairs._r4_command(r4_records())
-
-    assert calls == [("app-id", "installation-id", "private-key")]
-    assert env == {"GH_TOKEN": "app-token"}
-
-
-def test_r4_falls_back_to_pat_when_app_credentials_are_absent(monkeypatch):
+def test_r4_command_uses_keychain_pat(monkeypatch):
     monkeypatch.setattr(repairs, "_keychain_secret",
                         lambda service: "pat-token" if service == repairs.GITHUB_SERVICE else "")
 

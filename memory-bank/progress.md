@@ -17,15 +17,23 @@
 | v1.24.0 | RELEASED — PR #113, tag and GitHub release published |
 | v1.23.0 and earlier | RELEASED — see `CHANGELOG.md` |
 
-## v1.31.0 queue (Hermes R4 App-token auth + scope preflight)
+## v1.31.0 queue (Hermes R4 scope preflight — App-token auth REJECTED)
 
-- [x] **WS1 — R4 GitHub App installation-token auth + `k3dm-hermes preflight` — COMPLETE 2026-09-06, implementation commit `37c144fe88895b35fd20a09422dfde2fa16fd72c`.**
-  Spec `docs/plans/v1.31.0-hermes-r4-github-app-auth.md`. Auth-swap only — Phase 2 repair logic
-  (allowlist/preconditions/propose/approve/invariants) unchanged. Added stdlib-only `github_app.py` (injected
-  signer/HTTP, `openssl` RS256 JWT and installation-token expiry cache), DI `preflight.py`, App-token-with-PAT-fallback
-  `_r4_token()`, preflight CLI dispatch, guide, and tests. Gates: `pytest scripts/tests/hermes/ -q` **32 passed**;
-  `py_compile` clean; secret-hygiene grep verified values never reach argv or output. App registration and Keychain
-  storage remain MANUAL/user; no live GitHub call, PR, or main mutation.
+- [x] **WS1 — R4 GitHub App installation-token auth — REJECTED + REVERTED 2026-09-07.**
+  Codex implemented it (commit `37c144fe`) but the approach is a **dead end**: a GitHub App cannot be
+  granted the permission R4 needs on this personal repo (user-confirmed — same wall as the Aug 2026 3-app
+  episode, see memory `reference_github_actions_bot_no_ruleset_bypass_personal_repo`). The App-token code was
+  inert (behind a PAT fallback the App trio would never satisfy) and misleadingly ended in a "register an app"
+  manual step for a non-problem. **Removed** `github_app.py` + `test_github_app.py`; stripped the App branch from
+  `repairs.py` (`_r4_command` reads `k3dm-hermes-gh-token` PAT directly) and `preflight.py`; dropped App docs from
+  the guide. Plan doc `docs/plans/v1.31.0-hermes-r4-github-app-auth.md` deleted. **R4 stays on the PAT** —
+  live-verified 2026-09-07: `bin/k3dm-hermes preflight` → `actions_read:true, actions_write:true, exit=0`. PAT
+  expires **2026-12-04**; the durable fix for that recurrence is a no-expiration classic PAT (`repo`+`workflow`)
+  in the same Keychain slot, not an App. No PR, no main mutation.
+- [x] **WS1b — `k3dm-hermes preflight` scope-check tool — KEPT (the one salvageable deliverable).**
+  DI `run_preflight(keychain, runner)` + `preflight` subcommand + `test_preflight.py`, rescoped PAT-only. Gates
+  2026-09-07 (Claude-run): `pytest scripts/tests/hermes/ -q` **29 passed**, `py_compile` clean, no protected-subtree
+  edits, straggler grep for App references = none.
 
 ## v1.29.0 queue (Hermes Phase-1)
 
