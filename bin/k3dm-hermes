@@ -103,6 +103,12 @@ def _run_cycle(state):
     return records, event
 
 
+def _bats_run(argv):
+    result = subprocess.run(argv, capture_output=True, text=True, cwd=ROOT,
+                            timeout=300, check=False)
+    return result.returncode, result.stdout + result.stderr
+
+
 def _repair_runner(argv, env, cwd):
     result = subprocess.run(argv, env={**os.environ, **env}, cwd=cwd,
                             capture_output=True, text=True, check=False)
@@ -110,7 +116,7 @@ def _repair_runner(argv, env, cwd):
 
 
 def _usage():
-    print("Usage: k3dm-hermes [approve <action-id>|list|preflight]", file=sys.stderr)
+    print("Usage: k3dm-hermes [approve <action-id>|list|preflight|audit]", file=sys.stderr)
 
 
 def main():
@@ -127,6 +133,18 @@ def main():
         report, code = run_preflight(_keychain_secret, _repair_runner)
         print(json.dumps(report, sort_keys=True))
         return code
+    if args and args[0] == "audit" and len(args) == 1:
+        from hermes.audit import run_audit
+
+        def audit_get(path, headers):
+            return _http_json(f"https://api.github.com{path}", headers)
+
+        run_bats = os.environ.get("K3DM_HERMES_AUDIT_RUN_BATS") == "1"
+        report, digest = run_audit(audit_get, _github_headers, _keychain_secret,
+                                   bats_runner=_bats_run, run_bats=run_bats)
+        print(digest)
+        print(json.dumps(report, sort_keys=True))
+        return 0
     if args and (args[0] != "approve" or len(args) != 2):
         _usage()
         return 2
@@ -154,6 +172,17 @@ def main():
     advisory = token_expiry_advisory(_github_headers, state, timestamp()[:10], warn_days=warn_days)
     if advisory:
         post_summary(relay, advisory)
+    from hermes.audit import monthly_audit_advisory
+
+    def audit_get(path, headers):
+        return _http_json(f"https://api.github.com{path}", headers)
+
+    run_bats = os.environ.get("K3DM_HERMES_AUDIT_RUN_BATS") == "1"
+    digest = monthly_audit_advisory(audit_get, _github_headers, _keychain_secret,
+                                    state, timestamp()[:7],
+                                    bats_runner=_bats_run, run_bats=run_bats)
+    if digest:
+        post_summary(relay, digest)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event}))
     return 0

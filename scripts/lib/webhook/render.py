@@ -14,9 +14,26 @@ import urllib.request
 from webhook.config import SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
 
 
+_SLACK_POST_ALLOWED_HOSTS = frozenset({"hooks.slack.com", "slack.com"})
+
+
+def _is_allowed_slack_url(url):
+    """True only for https URLs whose host is a Slack response/webhook host.
+
+    response_url arrives in the request body and is trusted downstream, so an
+    attacker-controlled value would turn _slack_post into an output-exfil /
+    blind-SSRF primitive against loopback services. Slack's real response_url
+    is always https://hooks.slack.com/... — reject anything else.
+    """
+    if not url:
+        return False
+    parsed = urllib.parse.urlparse(url)
+    return parsed.scheme == "https" and parsed.hostname in _SLACK_POST_ALLOWED_HOSTS
+
+
 def _slack_post(url, text):
     """POST a text message to a Slack incoming webhook or response_url."""
-    if not url:
+    if not _is_allowed_slack_url(url):
         return
     data = json.dumps({"text": text, "response_type": "in_channel"}).encode()
     req = urllib.request.Request(url, data=data,

@@ -1142,7 +1142,7 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_cluster_ask,
             args=(new_job_id, agent, question, ""),
-            kwargs={"thread_ts": thread_ts, "max_turns": ask_max_turns},
+            kwargs={"thread_ts": thread_ts, "max_turns": ask_max_turns, "role": role},
             daemon=True,
         ).start()
         _notify_job(job_id, f"🤖 Asking *{agent}*…")
@@ -2899,6 +2899,16 @@ def _is_fix_request(question: str) -> bool:
     return bool(_FIX_RE.search(question))
 
 
+def _fix_mode_enabled(question: str, role: str) -> bool:
+    """Fix mode (write-capable agent) requires BOTH fix intent AND operator+ role.
+
+    _FIX_RE matches diagnostic phrasing too ("why does the pod keep restarting"),
+    so a reader is downgraded to read-only rather than rejected — but the caller's
+    role, not the question text, decides whether K3DM_FIX_MODE is unlocked.
+    """
+    return _is_fix_request(question) and _role_allows(role, "operator")
+
+
 _FILING_RE = re.compile(
     r'\b(file|report|document|write\s+up|write\s+a\s+(bug|issue)|'
     r'open\s+(an?\s+)?(bug|issue)|create\s+(an?\s+)?(bug|issue)|'
@@ -2987,7 +2997,7 @@ def _parse_gemini_observations(raw):
     return answer, filed
 
 
-def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None):
+def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None, role="admin"):
     """Spawn claude/gemini/codex with the user's question; post the answer to Slack."""
     if max_turns is None:
         max_turns = _ASK_MAX_TURNS_DEFAULT
@@ -2996,8 +3006,11 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         (job_dir / "thread_ts").write_text(thread_ts)
     _ANSI = re.compile(r'\x1b\[[0-9;]*[mK]')
     thread_context = _fetch_thread_context(thread_ts) if thread_ts else ""
+    _fix_denied = False
 
     def _finish(text, status="success"):
+        if _fix_denied:
+            text = "⚠️ Fix actions require *operator* role — ran read-only.\n\n" + text
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text(text)
         if response_url:
@@ -3027,7 +3040,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         "ALLOWED diagnostic tools — use freely, no permission needed:\n"
         "  kubectl get/describe/logs/top/events (any context, any namespace)\n"
         "  grep, sed, awk, cut, sort, uniq, wc, head, tail, cat, diff, jq, python3\n"
-        "  curl (GET only — no -X POST/PUT/DELETE/PATCH), dig, nslookup, ping, ss, netstat\n"
+        "  dig, nslookup, ping, ss, netstat\n"
         "  git log/diff/show/status (read-only)\n\n"
         "BLOCKED — modifies state, do not use:\n"
         "  kubectl delete/apply/create/edit/patch/scale/drain/rollout restart\n"
@@ -3101,7 +3114,9 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         _observe = False
         if agent == "claude":
             filing = _is_filing_request(question)
-            fixing = _is_fix_request(question)
+            fixing = _fix_mode_enabled(question, role)
+            if _is_fix_request(question) and not fixing:
+                _fix_denied = True
             user_prompt = (
                 f"{_ctx_block}\n\n---USER QUESTION START---\n{question}\n---USER QUESTION END---"
                 if thread_context else
@@ -3677,7 +3692,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             threading.Thread(
                 target=_run_cluster_ask,
                 args=(job_id, agent, question, response_url),
-                kwargs={"thread_ts": thread_ts},
+                kwargs={"thread_ts": thread_ts, "role": request_role},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})

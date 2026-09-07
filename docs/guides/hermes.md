@@ -133,7 +133,7 @@ Slack relay by [`slack.py`](../../scripts/lib/hermes/slack.py) — there is no i
 
 ## Access model (least privilege, read-only)
 
-Hermes holds three read-only credentials, all off-hub in the laptop login Keychain (account
+Hermes holds only read-only credentials, all off-hub in the laptop login Keychain (account
 `k3dm`). It provisions **no** direct Kubernetes credential — no ServiceAccount, no kubeconfig — by
 design: the webhook already is the authoritative read path, so a second cluster credential would add
 risk for no signal.
@@ -144,6 +144,7 @@ risk for no signal.
 | ArgoCD per-app status | `k3dm-hermes-argocd-token` | `hermes` local account, `apiKey` capability only, RBAC `get` only |
 | CI / required-check status and R4 re-run | `k3dm-hermes-gh-token` | GitHub fine-grained PAT with `actions:write` for approved R4 POSTs |
 | Slack summary delivery | `k3dm-slack-webhook` | Existing incoming-webhook relay |
+| Monthly security audit (optional) | `k3dm-hermes-audit-token` | Read-only fine-grained PAT; see [Monthly security audit](#monthly-security-audit). Absent → the audit reports its checks "unavailable" and the poll continues |
 
 The ArgoCD `hermes` account and its RBAC (`get` only, no `sync`/`update`/`delete`) live in
 [`scripts/etc/argocd/values.yaml.tmpl`](../../scripts/etc/argocd/values.yaml.tmpl). The ArgoCD token
@@ -201,6 +202,80 @@ align to a hard boundary.
 | `K3DM_HERMES_LLM_PROVIDER` | `gemini` | LLM provider on trip (never `claude` as author) |
 | `K3DM_HERMES_LLM_DAILY_BUDGET` | `10` | Max LLM calls per day before template fallback |
 | `K3DM_HERMES_JITTER` | (unset) | When set, sleep 0–30s before sensing |
+| `K3DM_HERMES_AUDIT_RUN_BATS` | (unset) | When `1`, the monthly audit runs the webhook security-regression bats subset (Group B); otherwise reported "skipped" |
+
+---
+
+## Monthly security audit
+
+Hermes posts a **once-a-month, read-only security-posture digest** to Slack. It is a report, not an
+actuator: it writes nothing, proposes nothing, and never touches the repair path. It closes the loop
+the one-off webhook audit opened — posture drifts silently between manual reviews, so a monthly nudge
+surfaces regressions (a re-opened alert, a weakened protection rule, a token nearing expiry) while
+they are still cheap to fix.
+
+**Cadence — no new timer.** The audit reuses the daily-advisory pattern at monthly granularity, inside
+the existing poll. On each cycle Hermes compares `timestamp()[:7]` (`YYYY-MM`) against
+`state["last_security_audit_month"]`; the first poll of a new calendar month runs the audit, posts the
+digest, and stamps the state. Every later poll that month is a no-op — and makes **no** GitHub call.
+State is persisted, so it survives restarts. No second LaunchAgent or plist.
+
+**What it checks (all read-only):**
+
+- **Group A — GitHub API.** Open code-scanning (CodeQL) alerts by severity; open Dependabot alerts by
+  severity (with alert numbers); `main` branch-protection posture (`enforce_admins` on,
+  `required_approving_review_count >= 1`); and a credential-expiry sweep (days-to-expiry for every
+  Hermes credential that exposes one). Any check whose token lacks a scope **degrades gracefully** —
+  it reports "unavailable: token lacks required scope (403)" rather than crashing the poll or
+  fabricating a clean bill of health.
+- **Group B — repo-local regression status (optional).** With `K3DM_HERMES_AUDIT_RUN_BATS=1`, runs the
+  webhook security-regression bats subset (`bats --filter "role|fix mode|Slack host"
+  scripts/tests/lib/webhook.bats` — the F1 role/fix-mode gating and F3 Slack-host allowlist tests) and
+  reports pass/fail. Unset → reported "skipped". It couples Hermes to the repo layout and `bats`, so it
+  is off by default.
+
+**Run it on demand** (no dedup write, does not affect the monthly stamp):
+
+```bash
+bin/k3dm-hermes audit                          # Group A only
+K3DM_HERMES_AUDIT_RUN_BATS=1 bin/k3dm-hermes audit   # + Group B bats subset
+```
+
+It prints the human digest followed by the full JSON report. Example digest:
+
+```
+🛡️ Hermes monthly security audit — 2026-09 (wilddog64/k3d-manager)
+Code scanning: 0 critical, 0 high, 0 medium, 0 low open
+Dependabot: 0 critical, 1 high, 0 medium, 0 low open (#9)
+Branch protection: enforce_admins=on, reviews=1  ✅
+Credentials: k3dm-hermes-audit-token in 90d; k3dm-hermes-gh-token in 87d; k3dm-webhook-token = no expiry; k3dm-hermes-argocd-token = no expiry
+Security regressions (bats): 8 passed, 0 failed  ✅
+Overall: 1 item(s) need attention → dependabot 1 open (#9)
+```
+
+**Provision the audit token (manual, one-time).** The audit uses a dedicated read-only fine-grained PAT
+(`k3dm-hermes-audit-token`) — kept separate from the R4 `k3dm-hermes-gh-token` so the audit credential
+carries no write scope anywhere. Create it in GitHub → Settings → Developer settings → **Fine-grained
+tokens**, scoped to **`wilddog64/k3d-manager` only**, with these repository **Read-only** permissions:
+
+| Check | Fine-grained PAT permission (Read-only) |
+|-------|------------------------------------------|
+| Code-scanning alerts | **Code scanning alerts: Read** |
+| Dependabot alerts | **Dependabot alerts: Read** |
+| Branch-protection posture | **Administration: Read** |
+| (baseline, auto-included) | **Metadata: Read** |
+
+Then store it in the login Keychain under account `k3dm` (never in argv/logs/git — pipe the value on
+stdin):
+
+```bash
+security add-generic-password -a k3dm -s k3dm-hermes-audit-token -w
+# (paste the token at the prompt, then press Return)
+```
+
+The token is **optional**: if it is absent the audit reports its Group-A checks "unavailable" and the
+poll continues. `bin/k3dm-hermes-setup` prints a non-fatal note when it is missing (the lib-foundation
+installer preflights only the four required credentials, never this one).
 
 ---
 
