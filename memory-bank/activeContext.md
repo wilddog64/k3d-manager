@@ -22,8 +22,9 @@
   read-only evidence is now 8,831,115,264 bytes and repeated Slow SQL with no
   COMPACT event in a 30-minute window. New v1.33 plan/bug introduce a bounded,
   opt-in stale-ACG circuit breaker; never raw SQLite retention deletion. It is
-  intentionally not enabled in the live LaunchAgent until stale generated ACG
-  applications are removed and controller resumption is validated. Live
+  is enabled in the live LaunchAgent (`K3DM_HERMES_AUTO_KINE_GUARD=1`) and
+  launchd-verified running. It cannot act on the current state because stale
+  registration is false. Live
   read-only probe verified after push: 8,831,115,264 bytes / 3 Slow SQL events /
   recent compaction seen / stale registration false; therefore it will monitor
   but cannot trigger the circuit breaker on the current signature.

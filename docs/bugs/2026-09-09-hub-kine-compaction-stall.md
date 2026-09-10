@@ -31,6 +31,11 @@ database remains above the 8 GiB protection threshold. The stale registration
 is absent now, so the automatic circuit breaker cannot pause anything merely
 because of historical DB size.
 
+The local Hermes LaunchAgent was then armed with
+`K3DM_HERMES_AUTO_KINE_GUARD=1` and restarted. Its launchd state is `running`;
+the first two new samples recorded the Kine metrics and executed no repair,
+because `stale_acg_registration` remains `false`.
+
 ## Root cause
 
 Kine compaction was not keeping pace with revision churn. The stale ACG

@@ -795,4 +795,6 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   commit `0e86974d` is pushed on `k3d-manager-v1.33.0`. Scope is a
   read-only datastore sensor plus an opt-in, once-per-incident pause of the hub
   ArgoCD application controller only for the exact stale ACG registration +
-  sustained >=8GiB Kine signature. No Kine deletion/VACUUM automation.
+  sustained >=8GiB Kine signature. The local Hermes LaunchAgent is armed with
+  `K3DM_HERMES_AUTO_KINE_GUARD=1` and running; current stale signature=false,
+  so no action was taken. No Kine deletion/VACUUM automation.
