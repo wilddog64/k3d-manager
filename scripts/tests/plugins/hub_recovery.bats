@@ -1,0 +1,85 @@
+#!/usr/bin/env bats
+
+setup() {
+  source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  init_test_env
+  source "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
+  RECOVERY_ROOT="${BATS_TEST_TMPDIR}/recovery"
+  mkdir -p "$RECOVERY_ROOT/server-db"
+  : > "$RECOVERY_ROOT/server-db/state.db"
+  : > "$RECOVERY_ROOT/server-token"
+  cat > "$RECOVERY_ROOT/pv-pvc.yaml" <<'YAML'
+kind: PersistentVolumeClaim
+metadata:
+  name: data-vault-0
+YAML
+  local record node namespace claim storage
+  while IFS='|' read -r node namespace claim storage; do
+    mkdir -p "$RECOVERY_ROOT/$storage/pvc-00000000-0000-0000-0000-000000000000_${namespace}_${claim}"
+    printf '%s\n' "  name: $claim" >> "$RECOVERY_ROOT/pv-pvc.yaml"
+  done < <(_hub_recovery_records)
+  TARGET_ROOT="${BATS_TEST_TMPDIR}/targets"
+  export HUB_RECOVERY_LOCAL_PATH_ROOT="$TARGET_ROOT"
+  TARGETS_FILE="${BATS_TEST_TMPDIR}/targets.tsv"
+  local uuid
+  while IFS='|' read -r node namespace claim storage; do
+    uuid="00000000-0000-0000-0000-000000000001"
+    mkdir -p "$TARGET_ROOT/pvc-${uuid}_${namespace}_${claim}"
+    printf '%s|%s|%s|%s/pvc-%s_%s_%s\n' "$node" "$namespace" "$claim" "$TARGET_ROOT" "$uuid" "$namespace" "$claim" >> "$TARGETS_FILE"
+  done < <(_hub_recovery_records)
+}
+
+@test "hub_recovery_validate: accepts the complete seven-claim source map" {
+  run hub_recovery_validate "$RECOVERY_ROOT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"seven logical claims"* ]]
+}
+
+@test "hub_recovery_plan: emits the dependency map by logical claim" {
+  run hub_recovery_plan "$RECOVERY_ROOT"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 7 ]
+  [[ "$output" == *"node=server-0 claim=secrets/data-vault-0"* ]]
+  [[ "$output" == *"node=agent-1 claim=identity/postgres-keycloak-pvc"* ]]
+}
+
+@test "hub_recovery_validate: rejects a missing captured claim" {
+  rm -rf "$RECOVERY_ROOT/node-agent-2-storage"
+  run hub_recovery_validate "$RECOVERY_ROOT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"trivy-system/data-trivy-server-0"* ]]
+}
+
+@test "hub_recovery_validate: rejects a duplicate captured claim" {
+  mkdir -p "$RECOVERY_ROOT/node-agent-2-storage/pvc-11111111-1111-1111-1111-111111111111_trivy-system_data-trivy-server-0"
+  run hub_recovery_validate "$RECOVERY_ROOT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Expected exactly one source tree"* ]]
+}
+
+@test "hub_recovery_validate: rejects an unexpected PVC tree" {
+  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-22222222-2222-2222-2222-222222222222_extra_unknown"
+  run hub_recovery_validate "$RECOVERY_ROOT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"expected 7"* ]]
+}
+
+@test "hub_recovery_validate: ignores files below a mapped PVC root" {
+  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-00000000-0000-0000-0000-000000000000_identity_ldap-data-pvc/database"
+  run hub_recovery_validate "$RECOVERY_ROOT"
+  [ "$status" -eq 0 ]
+}
+
+@test "hub_recovery_restore: plans all mapped claims by default" {
+  run hub_recovery_restore "$RECOVERY_ROOT" "$TARGETS_FILE"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 7 ]
+  [[ "$output" == *"Dry-run only"* ]]
+}
+
+@test "hub_recovery_restore: rejects a target with the wrong logical claim" {
+  sed -i.bak 's/data-vault-0$/other-claim/' "$TARGETS_FILE"
+  run hub_recovery_restore "$RECOVERY_ROOT" "$TARGETS_FILE"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Invalid or absent target for secrets/data-vault-0"* ]]
+}

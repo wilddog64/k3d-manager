@@ -825,3 +825,9 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Restore-mapped execution plan is `docs/plans/v1.33.0-hub-local-path-restore.md`
   (plan #4/5): logical identity is `(namespace, claim)`; it records all seven
   source trees and the required Vault→PostgreSQL/LDAP→Keycloak dependency order.
+  **M2 copy is now checksum-verified:** `COPY_CHECKSUM_VERIFIED` recorded on
+  2026-09-10 after a transient SSH timeout and resumable retry. The timeout and
+  monitor gap are recorded in `docs/issues/2026-09-10-hub-backup-monitor-ssh-retry-gap.md`.
+  The new offline recovery helper (`scripts/plugins/hub_recovery.sh`) validates
+  the seven exact claim sources and renders/guards their ordered restore; it
+  does not recreate a cluster or delete a volume.
