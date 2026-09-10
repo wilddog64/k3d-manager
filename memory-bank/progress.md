@@ -5,6 +5,20 @@
 
 ## Releases
 
+- [~] **HUB KINE / HOSTINGER ESO INCIDENT 2026-09-09 — mitigated.** Webhook
+  `UNKNOWN` was caused by a saturated hub K3s/Kine datastore, not Hostinger:
+  `state.db=8.3G`, WAL `537M`, 1,013,597 Kine rows, zero freelist. Offline
+  integrity + VACUUM copy gave no reduction, so the original database was
+  restarted unchanged. Stale ACG registration was unlabelled and ArgoCD
+  application controller paused to stop its retry storm. Fixed signing-role
+  mount drift (`SIGNING_ESO_AUTH_MOUNT`, default `kubernetes`, provider override
+  supports Hostinger `kubernetes-ubuntu-hostinger`); restored the Hostinger
+  `eso-app-cluster` role and forced `kyverno/cosign-public-key` to Ready=True.
+  Verified `make status CLUSTER_PROVIDER=k3s-hostinger`: all public services
+  200, ESO `20/20`, `Overall: WARN (4 warnings)` solely for intentionally
+  paused monitoring and optional absent Keycloak smoke credentials. Detailed
+  evidence/follow-up: `docs/issues/2026-09-09-hub-kine-history-and-hostinger-cosign-role.md`.
+
 | Version | State |
 |---|---|
 | v1.32.0 | MERGED — PR #123 `f65549f0` (base main ← k3d-manager-v1.32.0), merged 2026-09-07. Webhook security remediation (F1 fix-mode role gating, F3 response_url host allowlist, F2 sandbox egress hardening) + Hermes monthly security-audit (read-only CodeQL/Dependabot/branch-protection/credential-expiry digest, optional BATS security-regression subset). Hermes↔Slack Option A split to v1.33.0. Codex-authored F2 sandbox tests verified only on macOS → caught Linux-only failure (HOME=mktemp under /tmp on Linux = in-scope) on first CI run; root-caused in container, pinned to fixed paths. Copilot caught git-egress bypass in F2 (clone/fetch/pull/push/remote/ls-remote not blocked) → added fail-closed guard + 2 regression tests. pytest 47 hermes / webhook.bats 64/64 on macOS, sandbox 11/11 on Linux, shellcheck clean. 1 lint failure + 2 Copilot findings, all fixed before merge. Tag `v1.32.0` + GitHub release PUBLISHED 2026-09-07 at `f65549f0` (latest, non-draft); release-ledger backfill (CHANGELOG `[1.32.0]`, releases.md/README rows, retrospective) + memory-bank update committed on `k3d-manager-v1.33.0` post-merge. enforce_admins restored true post-merge. |

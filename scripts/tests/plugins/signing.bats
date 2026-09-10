@@ -197,6 +197,21 @@ setup() {
   declare -f signing_restore
 }
 
+@test "_signing_grant_eso_read honors the configured ESO auth mount" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  SIGNING_ESO_ROLE="eso-app-cluster"
+  SIGNING_ESO_AUTH_MOUNT="kubernetes-ubuntu-hostinger"
+  _vault_exec() {
+    printf '%s\n' "$*" >> "$calls"
+    printf '%s\n' '{"data":{"token_policies":["default"],"bound_service_account_names":["external-secrets"],"bound_service_account_namespaces":["secrets"]}}'
+  }
+  _vault_exec_stream() { printf '%s\n' "$*" >> "$calls"; }
+
+  run _signing_grant_eso_read
+  [ "$status" -eq 0 ]
+  grep -q 'auth/kubernetes-ubuntu-hostinger/role/eso-app-cluster' "$calls"
+}
+
 @test "signing_restore preserves present key material and reapplies configuration" {
   local calls="$BATS_TEST_TMPDIR/calls"
   _vault_login() { :; }
