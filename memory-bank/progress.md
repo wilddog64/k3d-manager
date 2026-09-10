@@ -822,3 +822,6 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   new-PVC restore mapping exists. Do not execute the rebuild until a
   claim-to-local-path restore rehearsal passes. Issue:
   `docs/issues/2026-09-10-hub-rebuild-agent-volume-restore-gap.md`.
+  Restore-mapped execution plan is `docs/plans/v1.33.0-hub-local-path-restore.md`
+  (plan #4/5): logical identity is `(namespace, claim)`; it records all seven
+  source trees and the required Vault→PostgreSQL/LDAP→Keycloak dependency order.
