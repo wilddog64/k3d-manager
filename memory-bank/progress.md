@@ -815,3 +815,5 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   macOS rsync rejected Linux-only `-A` and `--info=progress2`; the active copy
   uses `-aHE --partial --progress`. It must complete and pass a checksum
   comparison before any destructive rung can be proposed.
+  Owner authorization for the controlled rebuild after that gate was recorded
+  on 2026-09-09; it does not authorize bypassing verification.
