@@ -817,3 +817,8 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   comparison before any destructive rung can be proposed.
   Owner authorization for the controlled rebuild after that gate was recorded
   on 2026-09-09; it does not authorize bypassing verification.
+  **New blocking design finding (2026-09-10):** normal k3d recreate replaces
+  all agents while durable local-path data is agent-local; no old-PVC to
+  new-PVC restore mapping exists. Do not execute the rebuild until a
+  claim-to-local-path restore rehearsal passes. Issue:
+  `docs/issues/2026-09-10-hub-rebuild-agent-volume-restore-gap.md`.

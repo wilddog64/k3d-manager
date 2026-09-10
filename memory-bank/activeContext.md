@@ -39,6 +39,11 @@
   intermittent mDNS; macOS rsync requires `-aHE --partial --progress` (not
   Linux `-A`/`--info=progress2`). Rung 4 remains blocked pending a complete,
   checksum-verified second copy.
+  **Additional rebuild blocker (2026-09-10):** k3d normal recreate replaces
+  all agents, but durable local-path data is agent-local and has no tested
+  old-PVC→new-PVC restore mapping. See
+  `docs/issues/2026-09-10-hub-rebuild-agent-volume-restore-gap.md`; do not
+  run a cluster recreation until a restore rehearsal exists.
 
 - **v1.32.0 RELEASED 2026-09-07** — PR #123 MERGED (`f65549f0`). Shipped webhook security remediation (F1 fix-mode role gating, F3 response_url host allowlist, F2 sandbox egress hardening) + Hermes monthly security-audit (read-only CodeQL/Dependabot/branch-protection/credential-expiry digest, optional BATS security-regression subset). Gates: pytest 47 hermes / webhook.bats 64/64 on macOS, sandbox 11/11 on Linux, shellcheck clean. 1 lint failure + 2 Copilot findings in CI, all fixed before merge. Hermes↔Slack Option A split to v1.33.0 (PULL model with Slack approver MFA + 24h re-auth). Post-merge housekeeping COMPLETE 2026-09-07: enforce_admins restored true (verified), tag/release v1.32.0 published at `f65549f0` (latest, non-draft), release-ledger backfill (CHANGELOG `[1.32.0]` + releases.md/README rows + retrospective doc `docs/retro/2026-09-07-v1.32.0-retrospective.md`) + memory-bank update committed on `k3d-manager-v1.33.0`.
 
