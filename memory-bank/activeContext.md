@@ -6,6 +6,11 @@
 
 ## Current focus
 
+- **Hub recovery execution:** M2 copy is checksum-verified. The new recovery
+  helper has read-only validated seven source claims, resolved all seven live PV
+  targets, and rendered a container-aware dry run. Next guarded rung is the
+  control-plane replacement; no cluster volume has been deleted.
+
 - **Hub incident 2026-09-09 — mitigated, durable retention work OPEN.** Hub K3s
   Kine SQLite state was 8.3G plus a 537M WAL, with 1,013,597 retained rows and
   zero freelist pages; integrity check and offline `VACUUM INTO` proved it was

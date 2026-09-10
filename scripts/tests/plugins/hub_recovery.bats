@@ -33,7 +33,7 @@ YAML
   while IFS='|' read -r node namespace claim storage; do
     uuid="00000000-0000-0000-0000-000000000001"
     mkdir -p "$TARGET_ROOT/pvc-${uuid}_${namespace}_${claim}"
-    printf '%s|%s|%s|%s/pvc-%s_%s_%s\n' "$node" "$namespace" "$claim" "$TARGET_ROOT" "$uuid" "$namespace" "$claim" >> "$TARGETS_FILE"
+    printf '%s|%s|%s|k3d-k3d-cluster-%s|%s/pvc-%s_%s_%s\n' "$node" "$namespace" "$claim" "$node" "$TARGET_ROOT" "$uuid" "$namespace" "$claim" >> "$TARGETS_FILE"
   done < <(_hub_recovery_records)
 }
 
@@ -96,7 +96,7 @@ YAML
   run hub_recovery_targets
   [ "$status" -eq 0 ]
   [ "$(printf '%s\n' "$output" | grep -c '^agent\|^server' )" -eq 7 ]
-  [[ "$output" == *"server-0|secrets|data-vault-0|${TARGET_ROOT}/pvc-"* ]]
+  [[ "$output" == *"server-0|secrets|data-vault-0|k3d-k3d-cluster-server-0|${TARGET_ROOT}/pvc-"* ]]
 }
 
 @test "hub_recovery_targets: rejects a PV assigned to the wrong node" {

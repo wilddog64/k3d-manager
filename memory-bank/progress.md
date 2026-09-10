@@ -791,6 +791,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   Deployment) — confirm Keycloak federation binds openldap-0, not the stray, before v1.28.0 PR.
 # 2026-09-09 — Hermes Kine guard in progress
 
+- [~] **Hub recovery restore rehearsal:** checksum-verified M2 copy; all seven
+  live PV targets resolved read-only; container-aware restore dry run rendered
+  seven ordered operations with no write. Control-plane replacement remains the
+  next guarded rung.
+
 - [x] Added the v1.33.0 Kine circuit-breaker plan and bug record; implementation
   commit `0e86974d` is pushed on `k3d-manager-v1.33.0`. Scope is a
   read-only datastore sensor plus an opt-in, once-per-incident pause of the hub

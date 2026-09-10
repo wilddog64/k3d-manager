@@ -7,6 +7,7 @@ set -euo pipefail
 HUB_RECOVERY_SOURCE_DIR="${HUB_RECOVERY_SOURCE_DIR:-}"
 HUB_RECOVERY_LOCAL_PATH_ROOT="${HUB_RECOVERY_LOCAL_PATH_ROOT:-/var/lib/rancher/k3s/storage}"
 HUB_RECOVERY_TAR_BIN="${HUB_RECOVERY_TAR_BIN:-tar}"
+HUB_RECOVERY_DOCKER_BIN="${HUB_RECOVERY_DOCKER_BIN:-docker}"
 
 function _hub_recovery_records() {
   cat <<'EOF'
@@ -102,7 +103,7 @@ function _hub_recovery_target_path() {
   local targets_file="$1" node="$2" namespace="$3" claim="$4"
   local -a matches=()
   mapfile -t matches < <(awk -F '|' -v n="$node" -v ns="$namespace" -v c="$claim" \
-    '$1 == n && $2 == ns && $3 == c { print $4 }' "$targets_file")
+    '$1 == n && $2 == ns && $3 == c { print $5 }' "$targets_file")
   if (( ${#matches[@]} != 1 )); then
     echo "Expected exactly one target for ${namespace}/${claim}; found ${#matches[@]}." >&2
     return 1
@@ -110,15 +111,21 @@ function _hub_recovery_target_path() {
   printf '%s\n' "${matches[0]}"
 }
 
+function _hub_recovery_target_node() {
+  awk -F '|' -v n="$2" -v ns="$3" -v c="$4" '$1 == n && $2 == ns && $3 == c { print $4 }' "$1"
+}
+
 function _hub_recovery_validate_targets() {
-  local targets_file="$1" node namespace claim storage_dir target
+  local targets_file="$1" node namespace claim storage_dir target target_node logical_node
   if [[ ! -r "$targets_file" ]]; then
     echo "Recovery target map is required and must be readable." >&2
     return 1
   fi
   while IFS='|' read -r node namespace claim storage_dir; do
     target="$(_hub_recovery_target_path "$targets_file" "$node" "$namespace" "$claim")" || return 1
-    if [[ "$target" != "$HUB_RECOVERY_LOCAL_PATH_ROOT"/pvc-*"_${namespace}_${claim}" || ! -d "$target" ]]; then
+    target_node="$(_hub_recovery_target_node "$targets_file" "$node" "$namespace" "$claim")"
+    logical_node="$(_hub_recovery_logical_node "$target_node")" || return 1
+    if [[ "$target" != "$HUB_RECOVERY_LOCAL_PATH_ROOT"/pvc-*"_${namespace}_${claim}" || "$logical_node" != "$node" ]]; then
       echo "Invalid or absent target for ${namespace}/${claim}." >&2
       return 1
     fi
@@ -126,10 +133,10 @@ function _hub_recovery_validate_targets() {
 }
 
 function _hub_recovery_restore_one() {
-  local source_tree="$1" target="$2" node="$3" namespace="$4" claim="$5" apply="$6"
+  local source_tree="$1" target="$2" target_node="$3" node="$4" namespace="$5" claim="$6" apply="$7"
   printf 'RESTORE node=%s claim=%s/%s target=%s\n' "$node" "$namespace" "$claim" "$target"
   if [[ "$apply" == "1" ]]; then
-    "$HUB_RECOVERY_TAR_BIN" -C "$source_tree" -cpf - . | "$HUB_RECOVERY_TAR_BIN" -C "$target" -xpf -
+    "$HUB_RECOVERY_TAR_BIN" -C "$source_tree" -cpf - . | "$HUB_RECOVERY_DOCKER_BIN" exec -i "$target_node" "$HUB_RECOVERY_TAR_BIN" -C "$target" -xpf -
   fi
 }
 
@@ -173,7 +180,7 @@ function hub_recovery_targets() {
       echo "PV target node mismatch for ${namespace}/${claim}." >&2
       return 1
     fi
-    printf '%s|%s|%s|%s\n' "$node" "$namespace" "$claim" "$path"
+    printf '%s|%s|%s|%s|%s\n' "$node" "$namespace" "$claim" "$node_name" "$path"
   done < <(_hub_recovery_records)
 }
 
@@ -193,11 +200,12 @@ function hub_recovery_restore() {
   _hub_recovery_validate_files "$source_dir" || return 1
   _hub_recovery_validate_claims "$source_dir" || return 1
   _hub_recovery_validate_targets "$targets_file" || return 1
-  local node namespace claim storage_dir source_tree target
+  local node namespace claim storage_dir source_tree target target_node
   while IFS='|' read -r node namespace claim storage_dir; do
     source_tree="$(_hub_recovery_claim_tree "$source_dir" "$namespace" "$claim" "$storage_dir")" || return 1
     target="$(_hub_recovery_target_path "$targets_file" "$node" "$namespace" "$claim")" || return 1
-    _hub_recovery_restore_one "$source_tree" "$target" "$node" "$namespace" "$claim" "$apply"
+    target_node="$(_hub_recovery_target_node "$targets_file" "$node" "$namespace" "$claim")"
+    _hub_recovery_restore_one "$source_tree" "$target" "$target_node" "$node" "$namespace" "$claim" "$apply"
   done < <(_hub_recovery_records)
   if (( ! apply )); then
     echo "Dry-run only. Re-run with --confirm after stateful consumers are scaled down."
