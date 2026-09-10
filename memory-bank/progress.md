@@ -809,3 +809,9 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   no destructive action taken. Issue:
   `docs/issues/2026-09-09-hub-rebuild-online-kine-backup-truncated.md`.
   Hub nodes were restarted after offline capture; `/readyz` returned `ok`.
+  M2 is the independent recovery destination. Its SSH host key matches the
+  existing `m2-air.local` trust record; because mDNS was intermittent, the
+  resumable copy uses the verified MeshHome address with `HostKeyAlias`.
+  macOS rsync rejected Linux-only `-A` and `--info=progress2`; the active copy
+  uses `-aHE --partial --progress`. It must complete and pass a checksum
+  comparison before any destructive rung can be proposed.

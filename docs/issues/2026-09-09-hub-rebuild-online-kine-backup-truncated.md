@@ -37,3 +37,17 @@ rebuild gate until a persistent copy/verification run succeeds.
 Capture the Kine database only after the control plane is stopped/quiesced, then
 list and checksum-verify the archive before progressing. Preserve the valid
 manifest/Secret/PV exports separately; do not rely on the invalid DB stream.
+
+## External-copy attempt (2026-09-10)
+
+The consistent raw offline inputs are being copied from M4 to M2 as the second
+recovery copy. M2's SSH host key was verified against the existing
+`m2-air.local` trust record. mDNS resolution of `m2-air.local` was intermittent,
+so the transfer uses its verified MeshHome address with
+`HostKeyAlias=m2-air.local`; this preserves strict host-key verification.
+
+Two initial transfer invocations failed before copying data because the macOS
+system `rsync` does not support the Linux-only `-A` or `--info=progress2`
+options. The corrected resumable command uses `rsync -aHE --partial --progress`.
+It must finish and then pass a checksum comparison before the destructive rung
+can be considered. No invalid `.tgz` file is a recovery artifact.
