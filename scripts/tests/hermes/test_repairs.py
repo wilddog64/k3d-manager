@@ -26,6 +26,12 @@ def r4_records(conclusion="timed_out"):
                    "run_id": 123, "conclusion": conclusion})]
 
 
+def r5_records(stale=True):
+    return [record("kine", "degraded", data={"state_db_bytes": 9 * 1024 * 1024 * 1024,
+                   "slow_sql_count": 2, "compaction_recent": False,
+                   "stale_acg_registration": stale})]
+
+
 def test_single_degraded_sensor_proposes_nothing():
     assert repairs.propose([record("eso", "degraded", "bad")], state()) == []
 
@@ -53,6 +59,24 @@ def test_r4_fires_only_on_transient_conclusion(monkeypatch):
     monkeypatch.setattr(repairs, "_keychain_secret", lambda service: "token")
     assert [item["key"] for item in repairs.propose(r4_records(), state())] == ["r4"]
     assert repairs.propose(r4_records("failure"), state()) == []
+
+
+def test_r5_requires_the_specific_stale_acg_kine_signature():
+    proposal = repairs.propose(r5_records(), state())[0]
+    assert proposal["key"] == "r5"
+    assert repairs.propose(r5_records(False), state()) == []
+
+
+def test_r5_auto_guard_is_opt_in_and_runs_once():
+    current, calls = state(), []
+    assert repairs.auto_remediate_kine(r5_records(), current, lambda *args: calls.append(args), False) is None
+    proposal = repairs.propose(r5_records(), current)[0]
+    outcome = repairs.auto_remediate_kine(r5_records(), current,
+                                          lambda *args: calls.append(args) or (0, "paused"), True)
+    assert outcome["outcome"] == "executed" and outcome["automatic"] is True
+    assert calls[-1][0][-1] == "--replicas=0"
+    assert proposal["action_id"] not in current["pending_repairs"]
+    assert repairs.auto_remediate_kine(r5_records(), current, lambda *_: (0, ""), True) is None
 
 
 def test_approve_refuses_when_precondition_no_longer_holds():

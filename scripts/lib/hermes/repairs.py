@@ -88,6 +88,14 @@ def _r4_precondition(records, _history, _state):
             data.get("conclusion") in ("timed_out", "cancelled", "stuck"))
 
 
+def _r5_precondition(records, _history, _state):
+    kine = _rec(records, "kine") or {}
+    data = kine.get("data", {})
+    return (_status(records, "kine") == "degraded" and
+            data.get("stale_acg_registration") is True and
+            data.get("state_db_bytes", 0) >= 8 * 1024 * 1024 * 1024)
+
+
 def _r1_command(_records):
     return ["make", "restart-webhook"], {}
 
@@ -110,6 +118,11 @@ def _r4_command(records):
             {"GH_TOKEN": token})
 
 
+def _r5_command(_records):
+    return (["kubectl", "--context", "k3d-k3d-cluster", "-n", "cicd", "scale",
+             "statefulset/argocd-application-controller", "--replicas=0"], {})
+
+
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
@@ -127,6 +140,10 @@ REPAIRS = {
            "build_command": _r4_command, "cwd": None,
            "blast_radius": "one GitHub Actions run re-execution", "reversible": True,
            "needs_scope": "actions:write"},
+    "r5": {"key": "r5", "name": "Quarantine stale ACG reconciliation", "precondition": _r5_precondition,
+           "build_command": _r5_command, "cwd": None,
+           "blast_radius": "hub ArgoCD application controller; GitOps reconciliation pauses", "reversible": True,
+           "needs_scope": "local hub kubeconfig"},
 }
 
 
@@ -137,7 +154,7 @@ def _update_r1_debounce(records, state):
 
 def _evidence(records, key):
     relevant = {"r1": ("eso", "node_pressure"), "r2": ("reachability", "node_pressure"),
-                "r3": ("reachability",), "r4": ("ci",)}[key]
+                "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
 
@@ -205,3 +222,22 @@ def approve(action_id, state, records_now, runner):
                 "rc": rc}
     return {"outcome": "executed" if rc == 0 else "failed", "action_id": action_id,
             "rc": rc, "output": output}
+
+
+def auto_remediate_kine(records, state, runner, enabled=False):
+    """Execute only the opt-in, bounded Kine circuit breaker once per incident."""
+    if not enabled or "r5" in state.get("repairs_attempted_this_incident", []):
+        return None
+    repair = REPAIRS["r5"]
+    if not repair["precondition"](records, state.get("correlation_history", []), state):
+        return None
+    argv, env = repair["build_command"](records)
+    rc, output = runner(argv, env, repair["cwd"])
+    action_id = "r5-" + hashlib.sha1(("r5" + shlex.join(argv)).encode()).hexdigest()[:8]
+    state.setdefault("pending_repairs", {}).pop(action_id, None)
+    state.setdefault("repair_audit", []).append(
+        {"action_id": action_id, "command": shlex.join(argv), "key": "r5",
+         "approved_at": timestamp(), "rc": rc, "automatic": True})
+    state.setdefault("repairs_attempted_this_incident", []).append("r5")
+    return {"outcome": "executed" if rc == 0 else "failed", "action_id": action_id,
+            "rc": rc, "output": output, "automatic": True}

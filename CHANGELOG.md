@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Hermes Kine circuit breaker** — a read-only hub-datastore sensor detects
+  stalled Kine compaction from `state.db` size plus K3s slow-SQL/compaction
+  signals. The only automatic response is explicit opt-in
+  (`K3DM_HERMES_AUTO_KINE_GUARD=1`) and requires the exact stale ACG
+  registration signature before pausing the hub ArgoCD application controller
+  once per incident. It never deletes Kine rows or performs SQLite maintenance.
+
 ## [1.32.0] - 2026-09-07
 
 **Theme: Hermes gains a monthly security conscience, and the `/ask` webhook is hardened for the Slack-driven control that's coming.** Two threads land together. First, a **read-only monthly security-audit report** for Hermes: once per calendar month (state-deduped inside the existing poll, no new launchd job) it posts a Slack digest of open CodeQL alerts, open Dependabot alerts, branch-protection posture, and credential expiry, plus an optional repo-local security-regression bats subset. It is a **report, not an actuator** — no proposals, no repair path, `repairs.py` untouched, and every check **degrades gracefully to "unavailable"** on a missing scope rather than fabricating a clean bill of health. Second, three **webhook-server audit fixes** (F1/F2/F3) close privilege-escalation, SSRF/exfil, and sandbox-escape vectors in `/ask` before its audience is widened for interactive Slack approval (v1.33.0).

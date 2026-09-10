@@ -47,6 +47,22 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 | R2 | Kick zombie port-forward | one mapped public host fails while the substrate is healthy | `launchctl kickstart -k <known PF label>` |
 | R3 | Refresh Hostinger edge access | all public hosts fail for two cycles | `scripts/k3d-manager refresh_access_layer` (the public wrapper for `_hostinger_refresh_access_layer`; never `make refresh`) |
 | R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using the `k3dm-hermes-gh-token` PAT in `GH_TOKEN` |
+| R5 | Quarantine stale ACG reconciliation | sustained Kine pressure, `state.db` >= 8 GiB, and the known stale `host.k3d.internal` registration | pause hub ArgoCD application-controller (opt-in automatic circuit breaker only) |
+
+## Hub Kine circuit breaker
+
+Hermes samples the local hub datastore read-only: `state.db` size, recent K3s
+`Slow SQL`/`COMPACT` messages, and ArgoCD cluster-registration metadata. Kine
+history is Kubernetes control-plane state—not observability data—so Hermes
+never deletes rows, runs `VACUUM`, or applies a five-day retention rule.
+
+Set `K3DM_HERMES_AUTO_KINE_GUARD=1` only after reviewing
+[`v1.33.0-hermes-kine-circuit-breaker.md`](../plans/v1.33.0-hermes-kine-circuit-breaker.md).
+With that explicit opt-in, Hermes pauses the hub ArgoCD application controller
+once per incident only when all three facts are true: sustained Kine pressure,
+an 8 GiB-or-larger database, and the exact stale ACG registration. This
+protects the API server without deleting state, but deliberately pauses GitOps;
+an operator must remove stale generated applications before resuming it.
 
 When an incident prints a pending action ID, inspect it and approve only that exact ID:
 

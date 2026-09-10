@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
 from hermes.correlator import Correlator
-from hermes.sensors import (argocd, ci, eso, github_token_expiry, node_pressure,
+from hermes.sensors import (argocd, ci, eso, github_token_expiry, kine, node_pressure,
                             reachability, token_expiry_advisory)
 
 
@@ -74,6 +74,19 @@ def test_node_pressure_healthy_degraded_unknown_and_debounce():
     assert [node_pressure(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
     assert node_pressure(webhook(health([{"name": "Data layer", "ok": None}])), {}, token="x")["status"] == "unknown"
     assert node_pressure(webhook(good), {}, token="")["status"] == "unknown"
+
+
+def test_kine_degraded_only_for_stalled_compaction_or_size_and_never_writes():
+    healthy = json.dumps({"available": True, "state_db_bytes": 1024,
+                          "slow_sql_count": 0, "compaction_recent": True,
+                          "stale_acg_registration": False})
+    bad = json.dumps({"available": True, "state_db_bytes": 9 * 1024 * 1024 * 1024,
+                      "slow_sql_count": 2, "compaction_recent": False,
+                      "stale_acg_registration": True})
+    assert kine(lambda *_: (0, healthy), {})["status"] == "healthy"
+    state = {}
+    assert [kine(lambda *_: (0, bad), state)["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
+    assert kine(lambda *_: (1, ""), {})["status"] == "unknown"
 
 
 def test_ci_healthy_degraded_unknown_and_debounce():

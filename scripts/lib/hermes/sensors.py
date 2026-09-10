@@ -133,6 +133,37 @@ def node_pressure(fetch, state, provider="", token=None, threshold=2, service_th
         return record("node_pressure", "unknown", "node status source unavailable")
 
 
+def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024):
+    """Report local hub Kine pressure from a read-only, injected probe."""
+    try:
+        code, output = run(["bin/k3dm-hub-datastore-status", "--json"], {})
+        payload = json.loads(output) if code == 0 and output else {}
+        required = ("available", "state_db_bytes", "slow_sql_count",
+                    "compaction_recent", "stale_acg_registration")
+        if not all(name in payload for name in required) or not payload["available"]:
+            raise ValueError("invalid datastore probe")
+        db_bytes = int(payload["state_db_bytes"])
+        slow_sql = int(payload["slow_sql_count"])
+        compacting = bool(payload["compaction_recent"])
+        stale = bool(payload["stale_acg_registration"])
+        raw = db_bytes >= max_db_bytes or (slow_sql > 0 and not compacting)
+        if raw:
+            status = "degraded" if _debounced("kine", True, threshold, state) else "healthy"
+            evidence = (f"state.db={db_bytes}B, slow_sql={slow_sql}, "
+                        f"compaction_recent={compacting}")
+            return record("kine", status, evidence,
+                          data={"state_db_bytes": db_bytes, "slow_sql_count": slow_sql,
+                                "compaction_recent": compacting,
+                                "stale_acg_registration": stale})
+        _debounced("kine", False, threshold, state)
+        return record("kine", "healthy", f"state.db={db_bytes}B; compaction recent",
+                      data={"state_db_bytes": db_bytes, "slow_sql_count": slow_sql,
+                            "compaction_recent": compacting,
+                            "stale_acg_registration": stale})
+    except Exception:
+        return record("kine", "unknown", "hub datastore status source unavailable")
+
+
 def _older_than(value, max_age_seconds, now):
     try:
         then = datetime.fromisoformat(value.replace("Z", "+00:00"))

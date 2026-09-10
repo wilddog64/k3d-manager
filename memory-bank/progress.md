@@ -789,3 +789,9 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [ ] TWO-CLOUD (hostinger as 2nd registered cluster) NOT yet done — this run was k3s-aws only; hostinger node up but not registered into hub.
 - Note (follow-up, unfiled): two LDAP instances in identity ns (openldap-0 StatefulSet + stray ldap
   Deployment) — confirm Keycloak federation binds openldap-0, not the stray, before v1.28.0 PR.
+# 2026-09-09 — Hermes Kine guard in progress
+
+- [~] Added the v1.33.0 Kine circuit-breaker plan and bug record. Scope is a
+  read-only datastore sensor plus an opt-in, once-per-incident pause of the hub
+  ArgoCD application controller only for the exact stale ACG registration +
+  sustained >=8GiB Kine signature. No Kine deletion/VACUUM automation.
