@@ -831,3 +831,7 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   The new offline recovery helper (`scripts/plugins/hub_recovery.sh`) validates
   the seven exact claim sources and renders/guards their ordered restore; it
   does not recreate a cluster or delete a volume.
+  **Read-only target rehearsal passed:** `hub_recovery_targets k3d-k3d-cluster`
+  resolved all seven live PVs exactly once with the expected logical node.
+  Follow-up in progress: restore must use `docker exec` into the resolved k3d
+  node because `/var/lib/rancher/k3s/storage/...` is container-local.

@@ -133,6 +133,50 @@ function _hub_recovery_restore_one() {
   fi
 }
 
+function _hub_recovery_logical_node() {
+  local hostname="$1"
+  case "$hostname" in
+    *-server-0) printf '%s\n' server-0 ;;
+    *-agent-0) printf '%s\n' agent-0 ;;
+    *-agent-1) printf '%s\n' agent-1 ;;
+    *-agent-2) printf '%s\n' agent-2 ;;
+    *) echo "Unsupported recovery node hostname: $hostname" >&2; return 1 ;;
+  esac
+}
+
+function _hub_recovery_pv_target() {
+  local pv_json="$1" namespace="$2" claim="$3" output
+  output=$(jq -r --arg ns "$namespace" --arg claim "$claim" '
+    [.items[] | select(.spec.claimRef.namespace == $ns and .spec.claimRef.name == $claim)
+      | [([.spec.nodeAffinity.required.nodeSelectorTerms[].matchExpressions[]?
+           | select(.key == "kubernetes.io/hostname") | .values[]] | first), .spec.local.path] | @tsv][]
+  ' <<<"$pv_json")
+  if [[ "$(printf '%s\n' "$output" | sed '/^$/d' | wc -l | tr -d ' ')" != "1" ]]; then
+    echo "Expected exactly one PV target for ${namespace}/${claim}." >&2
+    return 1
+  fi
+  printf '%s\n' "$output"
+}
+
+function hub_recovery_targets() {
+  if [[ "${1:-}" == "--help" ]]; then
+    echo "Usage: hub_recovery_targets [kube-context=k3d-k3d-cluster]"
+    return 0
+  fi
+  local context="${1:-k3d-k3d-cluster}" pv_json node namespace claim storage_dir target node_name path logical_node
+  pv_json="$(_kubectl --quiet -- --context "$context" get pv -o json)" || return 1
+  while IFS='|' read -r node namespace claim storage_dir; do
+    target="$(_hub_recovery_pv_target "$pv_json" "$namespace" "$claim")" || return 1
+    IFS=$'\t' read -r node_name path <<<"$target"
+    logical_node="$(_hub_recovery_logical_node "$node_name")" || return 1
+    if [[ "$logical_node" != "$node" || -z "$path" ]]; then
+      echo "PV target node mismatch for ${namespace}/${claim}." >&2
+      return 1
+    fi
+    printf '%s|%s|%s|%s\n' "$node" "$namespace" "$claim" "$path"
+  done < <(_hub_recovery_records)
+}
+
 function hub_recovery_restore() {
   if [[ "${1:-}" == "--help" ]]; then
     echo "Usage: hub_recovery_restore <captured-recovery-directory> <new-targets.tsv> [--confirm]"

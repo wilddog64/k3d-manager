@@ -43,6 +43,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `deploy_vault` | `scripts/plugins/vault.sh` | Deploy HashiCorp Vault |
 | `hub_recovery_plan` | `scripts/plugins/hub_recovery.sh` | Read-only render of the seven durable hub local-path claim sources captured for a Kine control-plane recovery; uses stable `(namespace, claim)` identity rather than PVC UID. |
 | `hub_recovery_validate` | `scripts/plugins/hub_recovery.sh` | Read-only fail-closed validation of the captured Kine database/token/PV export and exactly one source tree for each of the seven approved durable claims. |
+| `hub_recovery_targets` | `scripts/plugins/hub_recovery.sh` | Read-only resolve of the current PV claim references, node affinity, and local-path targets into the exact target-map format accepted by recovery restore. |
 | `hub_recovery_restore` | `scripts/plugins/hub_recovery.sh` | Render, or with explicit `--confirm` copy, the validated source claims into an exact new-target map after stateful consumers have been stopped. Does not recreate a cluster or delete a volume. |
 | `configure_vault_app_auth_for_context` | `scripts/plugins/vault.sh` | Provider-agnostic Kubernetes auth configuration for app cluster; resolves kubeconfig context to cluster name before CA/server lookup (v1.10.0+) |
 | `vault_install_unseal_watchdog` | `scripts/plugins/vault.sh` | Deploy in-cluster Vault auto-unseal watchdog CronJob (Tier 3 P2a); replays Shamir shard on `vault status` exit-code trigger |

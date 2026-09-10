@@ -21,6 +21,14 @@ YAML
   TARGET_ROOT="${BATS_TEST_TMPDIR}/targets"
   export HUB_RECOVERY_LOCAL_PATH_ROOT="$TARGET_ROOT"
   TARGETS_FILE="${BATS_TEST_TMPDIR}/targets.tsv"
+  PV_JSON='{"items":['
+  local separator=""
+  while IFS='|' read -r node namespace claim storage; do
+    PV_JSON+="${separator}{\"spec\":{\"claimRef\":{\"namespace\":\"${namespace}\",\"name\":\"${claim}\"},\"local\":{\"path\":\"${TARGET_ROOT}/pvc-00000000-0000-0000-0000-000000000001_${namespace}_${claim}\"},\"nodeAffinity\":{\"required\":{\"nodeSelectorTerms\":[{\"matchExpressions\":[{\"key\":\"kubernetes.io/hostname\",\"values\":[\"k3d-k3d-cluster-${node}\"]}]}]}}}}"
+    separator=','
+  done < <(_hub_recovery_records)
+  PV_JSON+=']}'
+  _kubectl() { printf '%s\n' "$PV_JSON"; }
   local uuid
   while IFS='|' read -r node namespace claim storage; do
     uuid="00000000-0000-0000-0000-000000000001"
@@ -82,4 +90,18 @@ YAML
   run hub_recovery_restore "$RECOVERY_ROOT" "$TARGETS_FILE"
   [ "$status" -ne 0 ]
   [[ "$output" == *"Invalid or absent target for secrets/data-vault-0"* ]]
+}
+
+@test "hub_recovery_targets: renders exactly one current PV target per claim" {
+  run hub_recovery_targets
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^agent\|^server' )" -eq 7 ]
+  [[ "$output" == *"server-0|secrets|data-vault-0|${TARGET_ROOT}/pvc-"* ]]
+}
+
+@test "hub_recovery_targets: rejects a PV assigned to the wrong node" {
+  PV_JSON="${PV_JSON/k3d-k3d-cluster-agent-1/k3d-k3d-cluster-agent-2}"
+  run hub_recovery_targets
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"PV target node mismatch"* ]]
 }
