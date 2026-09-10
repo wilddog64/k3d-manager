@@ -20,6 +20,17 @@ No `COMPACT` event appeared in the preceding 30-minute K3s log window. The
 same incident included an ArgoCD registration for an expired ACG endpoint
 (`host.k3d.internal`), which drove reconciliation retries.
 
+The implemented Hermes probe was then live-verified read-only:
+
+```text
+(0, '{"available": true, "state_db_bytes": 8831115264, "slow_sql_count": 3, "compaction_recent": true, "stale_acg_registration": false}')
+```
+
+This later sample observed a compaction event in its 20-minute window, but the
+database remains above the 8 GiB protection threshold. The stale registration
+is absent now, so the automatic circuit breaker cannot pause anything merely
+because of historical DB size.
+
 ## Root cause
 
 Kine compaction was not keeping pace with revision churn. The stale ACG
