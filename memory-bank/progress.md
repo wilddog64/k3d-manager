@@ -798,3 +798,14 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   sustained >=8GiB Kine signature. The local Hermes LaunchAgent is armed with
   `K3DM_HERMES_AUTO_KINE_GUARD=1` and running; current stale signature=false,
   so no action was taken. No Kine deletion/VACUUM automation.
+
+- [~] **Controlled hub Kine rebuild** authorized. Inventory complete: seven
+  local-path PVCs with Delete reclaim policy, ~4.8 GiB actual node storage,
+  8.3 GiB state DB, 186 GiB host free. Plan is v1.33.0 plan #3/5. Capturing
+  verified backups now; destructive rebuild is blocked until a second copy is
+  verified.
+  **Blocked safely:** initial online Kine rollback stream was truncated (`tar`
+  expected 8,831,115,264 bytes, received EOF). Invalid archive rejected;
+  no destructive action taken. Issue:
+  `docs/issues/2026-09-09-hub-rebuild-online-kine-backup-truncated.md`.
+  Hub nodes were restarted after offline capture; `/readyz` returned `ok`.

@@ -28,6 +28,13 @@
   read-only probe verified after push: 8,831,115,264 bytes / 3 Slow SQL events /
   recent compaction seen / stale registration false; therefore it will monitor
   but cannot trigger the circuit breaker on the current signature.
+  **Controlled rebuild execution authorized:** plan
+  `docs/plans/v1.33.0-hub-kine-controlled-rebuild.md`; backup/inventory rung
+  started. Hard gate: second verified archive copy before any datastore-volume
+  removal. First capture safely BLOCKED on an invalid/truncated archive; raw
+  offline inputs exist but are unverified. Hub restarted and `/readyz=ok`; no
+  data/volume deletion occurred. Details:
+  `docs/issues/2026-09-09-hub-rebuild-online-kine-backup-truncated.md`.
 
 - **v1.32.0 RELEASED 2026-09-07** — PR #123 MERGED (`f65549f0`). Shipped webhook security remediation (F1 fix-mode role gating, F3 response_url host allowlist, F2 sandbox egress hardening) + Hermes monthly security-audit (read-only CodeQL/Dependabot/branch-protection/credential-expiry digest, optional BATS security-regression subset). Gates: pytest 47 hermes / webhook.bats 64/64 on macOS, sandbox 11/11 on Linux, shellcheck clean. 1 lint failure + 2 Copilot findings in CI, all fixed before merge. Hermes↔Slack Option A split to v1.33.0 (PULL model with Slack approver MFA + 24h re-auth). Post-merge housekeeping COMPLETE 2026-09-07: enforce_admins restored true (verified), tag/release v1.32.0 published at `f65549f0` (latest, non-draft), release-ledger backfill (CHANGELOG `[1.32.0]` + releases.md/README rows + retrospective doc `docs/retro/2026-09-07-v1.32.0-retrospective.md`) + memory-bank update committed on `k3d-manager-v1.33.0`.
 
