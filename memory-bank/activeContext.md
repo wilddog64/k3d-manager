@@ -1840,3 +1840,27 @@ name) and Finding 8 (R5 precondition still cannot fire on a compaction stall).
 - **Finding 6 deferred with reason**: 12 Applications + 16 appset references use
   `destination.name: ubuntu-k3s`; renaming churns 28 Applications right after a
   compaction recovery. Sequence into the same window.
+
+### M2 backup verified — DO NOT DELETE (2026-09-11)
+
+Owner asked if Codex's M2 backup can be deleted. **No — the M4 source is GONE**
+(`~/k3dm-backups`, `~/k3dm-hub-rebuild-20260909`, `.local/share/k3d-manager/backups`
+all absent; only `~/Library/Logs/k3dm-hub-rebuild-{copy,monitor}.log` remain).
+The plan's two-copy retention is already violated; **M2 is the only copy**.
+
+Verified read-only at `m2-air.local:~/k3dm-backups/k3dm-hub-rebuild-20260909`:
+`state.db` page_size 4096 x page_count 2156034 = 8831115264 == file size exactly
+(proves NOT truncated — the failure that killed the earlier .tgz); quick_check ok;
+769843 kine rows; WAL 0 bytes; all 7 logical claims present matching
+`_hub_recovery_records()`; 4 YAML exports valid; no rsync partials.
+
+Two caveats that can never be closed: `COPY_CHECKSUM_VERIFIED` records no value
+or method (Codex marker, not evidence), and a 2.57 GiB gap vs the monitor-logged
+16347868 KB (likely `--partial` cleanup, unprovable without the source).
+
+Earliest reconsideration **2026-09-17**; make a second copy first.
+Details: `docs/issues/2026-09-11-m2-backup-verification-and-lost-source.md`.
+
+Hub fully recovered after my stop/blocked-restart incident: frontend+argocd 200,
+56 pods Running, 4 nodes Ready. Residual 2 CreateContainerError / 4 Pending are
+the pre-existing Findings 3 and 4, unchanged.
