@@ -848,3 +848,18 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   ArgoCD, Grafana, and Prometheus probes.
 - Recorded root causes and follow-up in
   `docs/issues/2026-09-11-hub-recovery-public-origin-and-eso.md`.
+
+# 2026-09-11 post-recovery findings close-out
+
+- [x] Monitoring fully resumed (`make monitoring-resume`) — auto-sync restored on
+  kube-prometheus-stack, hub-loki, trivy-operator.
+- [x] Finding 6 closed as **misdiagnosed** — `ubuntu-k3s` is the documented
+  default `APP_CLUSTER_NAME`, not AWS drift. Real cause was a name collision with
+  a stale kube context pointing at the dead `18.236.123.91:6443`; context,
+  cluster and user deleted, Argo registration left untouched. No spec, no Codex
+  handoff — scoping killed the task. SHA `da89d156`.
+- [ ] **Finding 10 — assigned to Codex.** Spec:
+  `docs/bugs/2026-09-11-shopping-cart-deletes-default-kubeconfig-entries.md`.
+  `add_ubuntu_k3s_cluster` unconditionally deletes the `default` cluster/user
+  that the hub context depends on. Awaiting SHA on
+  `origin/k3d-manager-v1.33.0`.

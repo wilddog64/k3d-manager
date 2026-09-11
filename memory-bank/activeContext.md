@@ -1956,3 +1956,21 @@ k3d-cluster`. Pick it up on the next `shopping_cart` change.
 
 Details: `docs/issues/2026-09-11-hub-post-rebuild-verification-gaps.md`
 (Findings 6 and 10).
+
+### Finding 10 spec written, assigned to Codex (2026-09-11)
+
+`docs/bugs/2026-09-11-shopping-cart-deletes-default-kubeconfig-entries.md`.
+`add_ubuntu_k3s_cluster` unconditionally deletes the `default` cluster and user;
+the hub context `k3d-k3d-cluster` maps to exactly those, so the next run orphans
+it silently (both deletes are `&>/dev/null || true`). Fix replaces the two lines
+with `_shopping_cart_prune_orphan_default_entries`, which deletes a `default`
+entry only when no remaining context references it — preserving the original
+cleanup (an entry left by a prior merge is unreferenced once the `ubuntu-k3s`
+context is removed, so it still gets pruned).
+
+Helper prototyped against three kubeconfig fixtures before filing: hub-style
+(both kept), orphan (both deleted), and an empty config with no `contexts:` key
+(no delete attempted, exit 0 under `set -euo pipefail`).
+
+**Status: assigned to Codex, awaiting SHA.** Bug spec — exempt from the 5-plan-doc
+cap, so the v1.33.0 plan-doc budget is untouched at 4/5.
