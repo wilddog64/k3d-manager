@@ -155,6 +155,57 @@ that honoured the command would fail closed.
 - Findings 2, 3 and 4 share a root cause and should be resolved together by
   re-adopting the control-plane node under k3d with correct mount propagation.
 
+## Recovery outcome (2026-09-11)
+
+Finding 1 is resolved. Two levers were applied in order.
+
+**Lever 1 - pause the Argo CD application controller** (`scale
+statefulset/argocd-application-controller --replicas=0`, `cicd`). This relieved
+the pressure but did not revive compaction:
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Revision churn | ~1000 / 5 min | 557 / 5 min |
+| Slow SQL | 133 / 30 min | ~0 |
+| Load average | ~17 | 9.7 |
+| `state.db` | growing | stable, then slow creep |
+| Real compaction events | 0 | 0 |
+
+Twelve minutes of sampling produced zero compaction events, confirming a dead
+compaction goroutine rather than a slow one. Note Argo CD accounted for only
+~45% of churn; the 557/5min remainder is ordinary baseline (lease renewals,
+kubelet status) and is not pathological. Churn was never the real problem -
+nothing was being reclaimed.
+
+**Lever 2 - restart the K3s server.** `docker restart
+k3d-k3d-cluster-server-0` at 14:46:33 (safe: `AutoRemove=false`,
+`RestartPolicy=unless-stopped`). K3s restarted cleanly, Kine came up, apiserver
+`/readyz` passed in ~30s, all four nodes returned `Ready`.
+
+Compaction revived immediately and cleared the entire backlog:
+
+```text
+14:51:52 COMPACT deleted 1001 rows ... - compacted to 46000/121724
+14:51:53 COMPACT deleted 998 rows  ... - compacted to 50000/121732
+         ... compacted to 120613/121763
+```
+
+`compactRev` moved from `12000` - where it had been pinned for 3h20m - to
+`120613`, a normal small window behind `currentRev` `121763`, with **zero**
+`Compact failed` events. The Argo CD controller was then restored to
+`replicas=1` and compaction remained healthy with it running.
+
+`state.db` went 618 MiB -> 595 MiB and the WAL 150 MiB -> 59 MiB. The file does
+not shrink further without an offline `VACUUM`, which is not required: freed
+pages are reused, and the runaway growth has stopped.
+
+Post-recovery: 7 of 9 public probes green. The two `prometheus` 502s are the
+expected consequence of `make monitoring-pause` still being in effect
+(Prometheus is scaled to zero); reverse with `make monitoring-resume`. Load
+fell from ~17 to 11.2.
+
+Findings 2, 3, 4 and 6 remain open and were not addressed by this recovery.
+
 ## Follow-up
 
 Treat the recovery as open, not closed. A closing verification note must assert

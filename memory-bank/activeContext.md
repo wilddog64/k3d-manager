@@ -1800,3 +1800,22 @@ revive the loop — NOT yet performed; awaiting owner go because the server was
 rebuilt outside k3d. `make monitoring-pause` is currently applied (reverse with
 `make monitoring-resume`); it cut slow-SQL but not load, since the churn source
 is ArgoCD reconciliation of 9 degraded apps, not monitoring.
+
+### Compaction recovered (2026-09-11 14:52 UTC)
+
+Two levers, in order. Pausing the hub ArgoCD application controller cut churn
+1000->557 rev/5min, slow SQL to ~0 and load 17->9.7, but produced zero
+compaction events in 12 min — proving a dead goroutine, not a slow one. ArgoCD
+was only ~45% of churn; the rest is ordinary baseline.
+
+`docker restart k3d-k3d-cluster-server-0` (14:46:33) revived it. compactRev
+12000 (pinned 3h20m) -> 120613 vs currentRev 121763, **zero** Compact failed.
+ArgoCD controller restored to replicas=1; compaction stayed healthy with it back.
+state.db 618->595 MiB, WAL 150->59 MiB. Load 17->11.2. Keycloak recovered to 200.
+
+Monitoring remains PAUSED by owner request — the two prometheus 502s are that,
+not a fault. `make monitoring-resume` reverses it.
+
+Still open: Findings 2/3/4/6 (server outside k3d management -> mount propagation
+breaks istio-cni-node + node-exporter, svclb Pending, ubuntu-k3s registration
+name) and Finding 8 (R5 precondition still cannot fire on a compaction stall).
