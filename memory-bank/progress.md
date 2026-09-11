@@ -5,6 +5,18 @@
 
 ## Releases
 
+- [x] **Product catalog empty-DB incident 2026-09-11 — RESOLVED.** Stranded
+  ArgoCD PostSync hooks (seed + FTS index) after a repo-server crash-loop aborted
+  the sync pre-PostSync; app stayed `Synced/Healthy` so auto-sync never replayed
+  them. Repaired via operator-initiated sync; verified 1000 product rows and API
+  HTTP 200 with real items. Detail in `memory-bank/activeContext.md`.
+- [~] **Hermes ArgoCD operation-phase blind spot — spec dispatched to Codex.**
+  `docs/bugs/v1.33.0-bugfix-hermes-argocd-operation-phase-blindspot.md` on
+  `k3d-manager-v1.33.0`. Gate: `pytest scripts/tests/hermes/ -q` must go 55 → 58
+  passed. No PR yet.
+- [ ] **`ubuntu-k3s-data-layer` OutOfSync** since `11:18:51Z` (same repo-server
+  outage) — needs the same operator sync or an explanation.
+
 - [~] **HUB KINE / HOSTINGER ESO INCIDENT 2026-09-09 — mitigated.** Webhook
   `UNKNOWN` was caused by a saturated hub K3s/Kine datastore, not Hostinger:
   `state.db=8.3G`, WAL `537M`, 1,013,597 Kine rows, zero freelist. Offline

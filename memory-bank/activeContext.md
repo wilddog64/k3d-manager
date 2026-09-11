@@ -6,6 +6,40 @@
 
 ## Current focus
 
+- **Product catalog empty DB — ROOT-CAUSED AND REPAIRED 2026-09-11.** The
+  `product-catalog` API served `HTTP 200` over a zero-row database for ~12h.
+  `argocd-repo-server` was crash-looping (28 restarts) during the
+  `11:11:44Z → 11:18:51Z` sync, which died on `ComparisonError: ... dial tcp
+  10.43.86.193:8081: connection refused (retried 5 times)` **before the PostSync
+  phase**, so the `product-catalog-seed` and `product-catalog-fts-index` hooks
+  never ran. Because every tracked resource still compared `Synced`, there was no
+  drift and auto-sync could never replay them — the app sat green indefinitely.
+  Repaired by an operator-initiated sync (`kubectl patch application
+  ubuntu-k3s-shopping-cart-product-catalog --type merge -p
+  '{"operation":{...,"sync":{"syncStrategy":{"hook":{}}}}}'`); both hooks ran and
+  self-deleted per `HookSucceeded`. Verified: 1000 rows (Accessories 350,
+  Electronics 250, Monitors 200, Peripherals 200) and
+  `https://frontend.3ai-talk.org/api/products` returns HTTP 200 with real items.
+  Note `shopping_cart_reconcile_product_catalog()` could not have helped — every
+  kubectl call in it hardcodes `--context ubuntu-k3s`, which does not exist
+  locally, and all failures are swallowed by `|| _info WARN`.
+
+- **Hermes ArgoCD operation-phase blind spot — SPEC WRITTEN, DISPATCHED TO CODEX
+  2026-09-11.** `argocd()` in `scripts/lib/hermes/sensors.py` classifies apps by
+  `health`/`sync` only and never reads `status.operationState.phase`, so the
+  failure class above is undetectable. Live proof still open:
+  `shopping-cart-identity` is `Synced/Healthy` with `operationState.phase=Failed`
+  (`01:54:41Z`) and Hermes calls it healthy. Spec:
+  `docs/bugs/v1.33.0-bugfix-hermes-argocd-operation-phase-blindspot.md` — adds
+  `TERMINAL_OPERATION_FAILURES = ("Error", "Failed")`, resolves app name/project
+  from the CR (`app.get('name','unnamed')` currently renders every alert as
+  `default/unnamed`), and appends `(+N more)` on truncation. Detection only; no
+  auto-remediation.
+
+- **`ubuntu-k3s-data-layer` still OutOfSync** from the same `11:18:51Z`
+  repo-server outage, `operationState.phase=Error`. It has drift so auto-sync
+  could recover it, but has not in 12h. Not yet touched.
+
 - **Hub recovery execution:** M2 copy is checksum-verified. The new recovery
   helper has read-only validated seven source claims, resolved all seven live PV
   targets, and rendered a container-aware dry run. Next guarded rung is the
