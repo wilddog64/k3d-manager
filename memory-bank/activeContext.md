@@ -1779,3 +1779,24 @@ The closing "final verification" commit overstated completion. Six gaps filed in
 In progress: compaction recovery — `make monitoring-pause` applied to relieve
 control-plane CPU (was 314% on server-0, host load 15.84) before restarting the
 K3s server to revive the stopped compaction loop.
+
+### Kine sensor blind spot fixed (2026-09-11)
+
+Root cause of why Hermes never fired during the stall: `compaction_recent` was
+computed as `"compact" in text.lower()`. Every Kine `Slow SQL` line contains
+`compact_rev_key`, so the signal was true exactly when compaction was stalled.
+Live 20m window measured 132 slow-SQL lines, 107 bare-substring matches, and
+**zero** real compaction events. Fixed via `kine_log_signals()` (event-marker
+matching + new `compaction_failed`); 52/52 hermes tests pass.
+
+R5's precondition left unchanged on purpose — it still requires
+`stale_acg_registration` AND >=8 GiB, so it cannot fire on a compaction stall at
+0.7 GiB. Widening an auto-actuator that scales the hub ArgoCD controller to zero
+needs owner sign-off.
+
+Open live action: compaction loop is dead (0 attempts in 40m+, `compactRev`
+pinned at 12000, db 554->566 MiB and growing). Remedy is a K3s server restart to
+revive the loop — NOT yet performed; awaiting owner go because the server was
+rebuilt outside k3d. `make monitoring-pause` is currently applied (reverse with
+`make monitoring-resume`); it cut slow-SQL but not load, since the churn source
+is ArgoCD reconciliation of 9 degraded apps, not monitoring.
