@@ -1755,3 +1755,27 @@
 - HOLD: never-auto-merge. Awaiting user go to merge #119. On merge: /post-merge (restore protection, tag v1.28.0,
   release, next branch, retro, standing-docs audit, memory-bank).
 - Sequence COMPLETE up to the gate: lib-foundation #45 merged+v0.4.14+subtree-synced → v1.28.0 PR #119 up & green.
+
+## 2026-09-11 — Hub rebuild verification (Claude)
+
+Independently verified Codex's hub rebuild + sqlite compaction (`c62a0f63`).
+Headline claims hold: Kine 8.3 GiB -> 554 MiB, 4 nodes Ready, all 14 PVCs Bound,
+all 9 public probes reproduced exactly, `hub_recovery.bats` 10/10, shellcheck clean.
+
+The closing "final verification" commit overstated completion. Six gaps filed in
+`docs/issues/2026-09-11-hub-post-rebuild-verification-gaps.md`:
+
+1. Kine compaction stalled again — `compactRev` pinned at 12000 vs `currentRev`
+   92579; last compaction line 11:35:52, no retry for 2h17m. The rebuild reset the
+   symptom, not the cause. PRIMARY.
+2. Rebuilt server is outside k3d management (`k3d cluster list` -> SERVERS 0/0;
+   no `k3d.cluster`/`k3d.role` labels; hostname `457182e619fc`).
+3. Missing mount propagation -> `istio-cni-node` and `node-exporter` stuck in
+   CreateContainerError on the control-plane node (526/538 events).
+4. Four `svclb-istio-ingressgateway` pods Pending; 2 keycloak-realm-reconcile Error.
+5. `hub_recovery.bats` was absent from the CI BATS list — now added.
+6. Argo app-cluster registration recorded as `ubuntu-k3s` (dead AWS context name).
+
+In progress: compaction recovery — `make monitoring-pause` applied to relieve
+control-plane CPU (was 314% on server-0, host load 15.84) before restarting the
+K3s server to revive the stopped compaction loop.
