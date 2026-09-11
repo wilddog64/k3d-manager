@@ -26,6 +26,60 @@
   [ "$status" -ne 0 ]
 }
 
+@test "keeps default when a context still references it" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    calls="$(mktemp)"
+    kubectl() {
+      if [[ "$1 $2 $3" == "config view -o" ]]; then
+        printf "%s\\n" default
+      else
+        printf "%s\\n" "$*" >> "$calls"
+      fi
+    }
+    _shopping_cart_prune_orphan_default_entries
+    cat "$calls"
+    rm -f "$calls"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Keeping kubeconfig cluster 'default'"* ]]
+  [[ "$output" != *"delete-cluster default"* ]]
+  [[ "$output" != *"delete-user default"* ]]
+}
+
+@test "prunes default when nothing references it" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    calls="$(mktemp)"
+    kubectl() {
+      if [[ "$1 $2 $3" == "config view -o" ]]; then
+        printf "%s\\n" ubuntu-hostinger
+      else
+        printf "%s\\n" "$*" >> "$calls"
+      fi
+    }
+    _shopping_cart_prune_orphan_default_entries
+    cat "$calls"
+    rm -f "$calls"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"delete-cluster default"* ]]
+  [[ "$output" == *"delete-user default"* ]]
+}
+
+@test "add_ubuntu_k3s_cluster does not unconditionally delete default kubeconfig entries" {
+  run grep -nE '^  kubectl config delete-(cluster|user) default' scripts/plugins/shopping_cart.sh
+  [ "$status" -ne 0 ]
+  run grep -nF '_shopping_cart_prune_orphan_default_entries' scripts/plugins/shopping_cart.sh
+  [ "$status" -eq 0 ]
+}
+
 @test "register_shopping_cart_apps fails if argocd dir missing" {
   local repo_root
   repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." >/dev/null 2>&1 && pwd)"
