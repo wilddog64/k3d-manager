@@ -47,6 +47,12 @@ https://grafana.3ai-talk.org/api/health 200
 https://prometheus.3ai-talk.org/-/ready 200
 ```
 
+After rescheduling workloads away from the temporarily NotReady worker and
+allowing the local-PV PostgreSQL orders pod to return to its node-affined
+worker, the final probes remained green. Frontend, basket, order,
+product-catalog, payment, all data pods, and all four Kubernetes nodes were
+Ready; frontend `/api/products` returned HTTP 200.
+
 ## Follow-up
 
 Make the app-cluster registration and Vault ESO policy declarative in the
