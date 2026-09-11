@@ -9,6 +9,7 @@ from hermes.records import record
 WEBHOOK_SERVICE = "k3dm-webhook-token"
 ARGOCD_SERVICE = "k3dm-hermes-argocd-token"
 GITHUB_SERVICE = "k3dm-hermes-gh-token"
+TERMINAL_OPERATION_FAILURES = ("Error", "Failed")
 
 
 def _keychain_secret(service):
@@ -78,11 +79,19 @@ def argocd(run, state, token=None, threshold=3, server="argocd.3ai-talk.org"):
             status = app.get("status", {})
             health = status.get("health", {}).get("status")
             sync = status.get("sync", {}).get("status")
+            phase = status.get("operationState", {}).get("phase")
+            name = app.get("name") or app.get("metadata", {}).get("name", "unnamed")
+            project = app.get("project") or app.get("spec", {}).get("project", "default")
             if health == "Degraded" or sync == "OutOfSync":
-                bad.append(f"{app.get('project', 'default')}/{app.get('name', 'unnamed')} {health}/{sync}")
+                bad.append(f"{project}/{name} {health}/{sync}")
+            elif phase in TERMINAL_OPERATION_FAILURES:
+                bad.append(f"{project}/{name} {health}/{sync} last-op={phase}")
         if bad:
             status = "degraded" if _debounced("argocd", True, threshold, state) else "healthy"
-            return record("argocd", status, ", ".join(bad[:3]))
+            detail = ", ".join(bad[:3])
+            if len(bad) > 3:
+                detail = f"{detail} (+{len(bad) - 3} more)"
+            return record("argocd", status, detail)
         _debounced("argocd", False, threshold, state)
         return record("argocd", "healthy", f"{len(apps)} applications healthy")
     except Exception:

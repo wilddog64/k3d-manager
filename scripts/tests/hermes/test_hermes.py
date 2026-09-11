@@ -52,6 +52,45 @@ def test_argocd_healthy_degraded_unknown_and_debounce():
     assert argocd(lambda *_: (0, good), {}, token="")["status"] == "unknown"
 
 
+def test_argocd_flags_failed_operation_behind_green_status():
+    def app(name, health, sync, phase):
+        status = {"health": {"status": health}, "sync": {"status": sync}}
+        if phase:
+            status["operationState"] = {"phase": phase}
+        return {"metadata": {"name": name}, "spec": {"project": "shop"}, "status": status}
+
+    green_failed = json.dumps([app("identity", "Healthy", "Synced", "Failed")])
+    state = {}
+    results = [argocd(lambda *_: (0, green_failed), state, token="x") for _ in range(4)]
+    assert [r["status"] for r in results] == ["healthy", "healthy", "healthy", "degraded"]
+    assert "shop/identity" in results[-1]["evidence"]
+    assert "last-op=Failed" in results[-1]["evidence"]
+
+    green_error = json.dumps([app("data-layer", "Healthy", "Synced", "Error")])
+    error_state = {}
+    assert [argocd(lambda *_: (0, green_error), error_state, token="x")["status"]
+            for _ in range(4)][-1] == "degraded"
+
+    for benign in ("Succeeded", "Running", "Terminating", None):
+        payload = json.dumps([app("ok", "Healthy", "Synced", benign)])
+        out = argocd(lambda *_: (0, payload), {}, token="x")
+        assert out["status"] == "healthy", f"phase {benign} must not alert"
+        assert out["evidence"] == "1 applications healthy"
+
+
+def test_argocd_evidence_names_apps_from_cr_shape_and_truncates():
+    apps = [{"metadata": {"name": f"app{i}"}, "spec": {"project": "shop"},
+             "status": {"health": {"status": "Degraded"}, "sync": {"status": "OutOfSync"}}}
+            for i in range(5)]
+    state = {}
+    for _ in range(4):
+        out = argocd(lambda *_: (0, json.dumps(apps)), state, token="x")
+    assert out["status"] == "degraded"
+    assert "shop/app0" in out["evidence"]
+    assert "unnamed" not in out["evidence"]
+    assert "(+2 more)" in out["evidence"]
+
+
 def test_reachability_healthy_degraded_unknown_and_debounce():
     good = json.dumps({"verdict": "ok", "hosts": []})
     bad = json.dumps({"verdict": "edge-down", "hosts": [{"healthy": False}]})
