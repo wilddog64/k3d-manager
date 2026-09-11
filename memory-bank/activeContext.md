@@ -2040,3 +2040,34 @@ correct — that pod carries both label styles.
 **Checked before "fixing":** the webhook's `keycloak-admin-secret`/`password`
 fallback looked wrong but is the documented default (`keycloak.sh:37-38`) — the
 Secret is just absent. Verifying that avoided a wrong patch.
+
+### Hub Vault auth repaired; ESO 1/25 -> 24/25 (2026-09-11)
+
+User ran the `vault write auth/kubernetes/config` reviewer-JWT refresh. Both
+stores now `Ready=True`, hub ExternalSecrets 24/25.
+
+**Post-repair status lags ~60s+.** Immediately after the write both stores still
+read `Ready=False/InvalidProviderConfig` and every ES stayed failed — the
+controller had not revalidated. `force-sync` annotations flipped the stores, then
+the ExternalSecrets individually (refreshInterval 1h, so they would have trailed
+by up to an hour). Do not judge this repair on a status read taken right after it.
+
+**Grafana 401 is NOT the ESO problem** — proven, not inferred. With the resynced
+Secret, Grafana answers `{"messageId":"password-auth.failed"}`. Persistent
+`grafana.db` predates the Secret and `GF_SECURITY_ADMIN_PASSWORD` only applies at
+first DB init. Needs `grafana cli admin reset-admin-password` (blocked: exec).
+
+**Cloudflare 1010 gotcha (cost real triage time).** A UA-less probe of
+`grafana.3ai-talk.org/login` returns HTTP 403 + `error code: 1010` — a Cloudflare
+bot block, not an app response. Same request with `User-Agent: k3dm-smoketest/1`
+returns the real 401. Always send a UA when probing `*.3ai-talk.org` by hand;
+read `1010` as "edge blocked me", never as an app verdict.
+
+**`keycloak_seed_smoke_user` needs `CLUSTER_PROVIDER=k3s-hostinger`** — otherwise
+`_keycloak_smoke_base_url` (keycloak.sh:376-382) dials
+`http://keycloak.shopping-cart.local` and fails with curl exit 7.
+
+**New: `platform-ops/app-cluster-kubeconfig`** is the last failed hub ES, and it
+is not auth — `secret/platform-ops` does not exist in Vault and no seeder for it
+exists in the repo. Consumer mounts it `optional: true`, so it degrades
+gracefully. Decide: seed or drop.

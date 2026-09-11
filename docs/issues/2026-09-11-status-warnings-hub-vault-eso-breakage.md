@@ -163,3 +163,97 @@ checked and does exist on that pod (it carries both label styles).
 4. Re-run `make status`; if Grafana still 401s, reset `grafana.db` admin password (Finding 3).
 5. Reseed the product catalog (Finding 6).
 6. Spec the hub-ESO coverage gap (Finding 2).
+
+---
+
+## Resolution log (2026-09-11, same day)
+
+### Finding 1 — FIXED. Hub ESO recovered 1/25 → 24/25
+
+The user ran the `vault write auth/kubernetes/config` repair. `Success! Data
+written`. Confirmed working end-to-end:
+
+```
+ClusterSecretStore vault-backend        Ready=True  "store validated"
+SecretStore identity/vault-kv-store     Ready=True  "store validated"
+hub ExternalSecrets                     24/25 Ready=True
+```
+
+**Both stores lag the fix.** Immediately after the write both still reported
+`Ready=False / InvalidProviderConfig`, and the ExternalSecrets stayed failed —
+the controller had not revalidated yet. Annotating with `force-sync` flipped the
+stores to `Ready=True`; the ExternalSecrets then needed their own `force-sync`
+(refreshInterval is 1h, so they would otherwise have trailed by up to an hour).
+Do not read a post-repair status within the first ~60s as evidence the repair
+failed.
+
+### Finding 3 — CONFIRMED genuine, still open. Grafana admin password diverged
+
+Now proven rather than inferred. With the freshly-resynced Secret, Grafana itself
+answers:
+
+```json
+{"message":"Invalid username or password","messageId":"password-auth.failed","statusCode":401}
+```
+
+So ESO was only half the story: the Secret is now current, and Grafana still
+rejects it. The persistent `grafana.db` holds an admin password predating the
+current Secret, and `GF_SECURITY_ADMIN_PASSWORD` is only applied at first DB
+init. Repair (needs `kubectl exec`):
+
+```bash
+GP=$(kubectl --context k3d-k3d-cluster -n monitoring get secret grafana-admin-credentials \
+      -o jsonpath='{.data.admin-password}' | base64 -d)
+kubectl --context k3d-k3d-cluster -n monitoring exec deploy/kube-prometheus-stack-grafana \
+  -c grafana -- grafana cli admin reset-admin-password "$GP"
+```
+
+### Finding 8 — NEW. Cloudflare blocks User-Agent-less probes (error 1010)
+
+A probe of `https://grafana.3ai-talk.org/login` with no `User-Agent` returns
+**HTTP 403, body `error code: 1010`** — a Cloudflare browser-integrity block, not
+a Grafana response. The identical request with `User-Agent: k3dm-smoketest/1`
+reaches Grafana and returns a real 401 JSON body.
+
+This nearly derailed the triage: the 403 looked like a second, different auth
+failure. Any manual probe of a `*.3ai-talk.org` host must send a User-Agent, and
+any `1010` body should be read as "edge blocked me", never as an application
+verdict. The smoke tests already set a UA, so they are unaffected.
+
+### Finding 4/5 — still open, command corrected
+
+`keycloak_seed_smoke_user` must run with the provider set, or
+`_keycloak_smoke_base_url` (`keycloak.sh:376-382`) falls back to
+`http://keycloak.shopping-cart.local` and dies with curl exit 7:
+
+```bash
+CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager keycloak_seed_smoke_user
+```
+
+Its admin-token source (`keycloak-secrets`) is now resynced, so this should
+succeed. `https://keycloak.3ai-talk.org/realms/master/.well-known/openid-configuration`
+returns HTTP 200.
+
+### Finding 9 — NEW. `platform-ops/app-cluster-kubeconfig` has no source data
+
+The one remaining failed hub ExternalSecret. Not an auth problem — the Vault path
+does not exist at all:
+
+```
+vault kv list secret/platform-ops -> No value found at secret/metadata/platform-ops
+```
+
+No seeder for `platform-ops/app-cluster-hostinger` exists anywhere in the repo.
+Its only consumer (`vulnerability-inventory-exporter.yaml:398`) mounts it
+`optional: true`, so this degrades gracefully rather than breaking the exporter.
+Needs a decision: seed it, or drop the ExternalSecret.
+
+### Still open after this pass
+
+| # | Item | Blocked on |
+|---|---|---|
+| 3 | Grafana admin password reset | `kubectl exec` (classifier) |
+| 4/5 | Keycloak smoke-user reseed | classifier |
+| 6 | Product catalog empty | data seed, root cause unknown |
+| 9 | `app-cluster-kubeconfig` Vault path | decision: seed or drop |
+| 2 | Hub-ESO coverage gap in `make status` | needs a spec |

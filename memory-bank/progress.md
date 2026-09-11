@@ -872,12 +872,14 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   3 causes, plus 2 defects the run never reported.
 - [x] **Fixed product-catalog triage selector** — `5f356e90`; `app=product-catalog`
   matched no pods (real label `app.kubernetes.io/name=product-catalog`).
-- [ ] **BLOCKED on user: refresh hub Vault `token_reviewer_jwt`** — classifier denied
-  the `vault write` (Secret-Store Writes). Unblocks 24/25 hub ExternalSecrets.
-  Command in the issue doc.
+- [x] **Hub Vault `token_reviewer_jwt` refreshed** — user ran it; both stores
+  `Ready=True`, hub ExternalSecrets **1/25 -> 24/25**. Needed `force-sync`
+  annotations to revalidate; status lags the repair by 60s+.
 - [ ] **Reseed `k3dm-smoke-user`** — `scripts/k3d-manager keycloak_seed_smoke_user`,
   after the Vault fix (seeder reads the ESO-stale `keycloak-secrets`).
 - [ ] **Grafana admin password** — may need `grafana cli admin reset-admin-password`;
   persistent `grafana.db` diverged from the Secret.
 - [ ] **Reseed product catalog** — API healthy, zero rows.
 - [ ] **Spec hub-ESO coverage in `make status`** — hub ESO currently unmonitored.
+- [ ] **`platform-ops/app-cluster-kubeconfig`** — last failed hub ES; `secret/platform-ops`
+  absent from Vault, no seeder in repo, consumer mounts it `optional: true`. Seed or drop.
