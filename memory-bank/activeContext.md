@@ -1893,3 +1893,33 @@ reclaimed. Rollback value had inverted — restoring it would reintroduce the
 REMAINING: Finding 6 only (ArgoCD registration named `ubuntu-k3s` for the local
 hub; 12 Applications + 16 appset refs — needs coordinated git change + appset
 reapply, not a live edit).
+
+### Load was swap thrash, not CPU (2026-09-11) — corrects standing notes
+
+Hub load 16-17 on a 10-core M4 Air was NOT CPU saturation. macOS load counts
+I/O-blocked processes; the box was thrashing a 93.5%-full swap file. Freeing
+~3.7 GB of browser memory (stale 69-day Safari holding 2.2 GB in one
+`WebKit.WebContent`, then Playwright `Chrome for Testing`) dropped load
+**16.79/15.35/15.03 -> 3.72/4.11/7.98** and shrank swap 19,456M -> 12,288M,
+memory free 36% -> 68%.
+
+**Check `sysctl vm.swapusage` + `vm_stat` BEFORE reaching for
+`make monitoring-pause`** — if swap is near full, reclaiming host memory is the
+faster and far larger lever. `reference_one_second_probes_cpu_starvation_kill_loop`
+should be read as a memory pattern presenting as CPU load. Mac Mini M5 upgrade is
+a MEMORY argument, not core count.
+
+Likely also the real mechanism behind today's Kine compaction stall: swap-induced
+I/O latency pushing the compaction transaction past its window, consistent with
+`Compact failed: ... transaction has already been committed or rolled back`.
+
+Safe to kill the ACG browser: profile `~/.local/share/k3d-manager/pw-profile` is
+persistent (login survives) and `scripts/lib/acg/cdp.sh` auto-reclaims/relaunches
+`:9222`. This SUPERSEDES `reference_acg_login_reuses_cdp_session`'s manual-login
+warning. Unloaded `com.k3d-manager.acg-watch` (fired every 3.5h to extend a
+non-existent sandbox and would relaunch Chrome); plist retained, re-bootstrap for
+long sandbox sessions.
+
+Observability resumed at **Layer 1** (Grafana + Prometheus): measured 313m CPU,
+~1.5 GiB. All 9 public probes green. Trivy/Loki/alertmanager stay at 0.
+Details: `docs/issues/2026-09-11-hub-load-was-swap-thrash-not-cpu.md`.
