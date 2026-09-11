@@ -206,6 +206,55 @@ fell from ~17 to 11.2.
 
 Findings 2, 3, 4 and 6 remain open and were not addressed by this recovery.
 
+## Findings 2, 3 and 4 resolved (2026-09-11)
+
+The control-plane node was re-adopted under k3d per
+`docs/bugs/2026-09-11-hub-control-plane-readoption.md`, with one improvement on
+the written plan: **the container hostname was deliberately kept as
+`457182e619fc`**. k3d identifies nodes by label and the agents reach the server
+by container name, both already correct, so only the hostname was wrong. Keeping
+it meant the Kubernetes node name never changed and the three PVs pinned to it
+were never stranded - removing the plan's blocking constraint entirely. No PV
+repin or workload drain was needed.
+
+The container was recreated with the full k3d label set, the k3d entrypoint, the
+existing data volume, and `--disable=traefik`, then the Traefik HelmChart CRs
+were deleted so the helm controller uninstalled the release.
+
+Acceptance, all met:
+
+```text
+k3d:        SERVERS 1/1  AGENTS 3/3      (was SERVERS 0/0)
+mount:      shared:272                   (was private)
+nodes:      4/4 Ready
+PVCs:       14/14 Bound
+pods:       57 Running, 0 CreateContainerError, 0 Pending
+compaction: 2 successes, 0 failures
+probes:     7/9 green (the two prometheus 502s are `make monitoring-pause`)
+```
+
+`istio-ingressgateway` now holds a real EXTERNAL-IP on all four node addresses,
+and all four `svclb-istio-ingressgateway` pods are `Running`.
+
+### Execution finding - the k3d entrypoint is not in the stock image
+
+The first recreate failed with exit 127 because `/bin/k3d-entrypoint.sh` does
+**not** exist in `rancher/k3s:v1.32.0-k3s1`; k3d writes the entrypoint scripts
+into the container at creation time. Recovery was to `docker cp` the four
+`k3d-entrypoint-*.sh` scripts from a live agent into the `Created` container
+before starting it.
+
+This is almost certainly the original defect: whoever rebuilt the server by hand
+used the stock image with `Entrypoint=/bin/k3s`, which skips
+`k3d-entrypoint-mounts.sh` - literally `mount --make-rshared /` - and that single
+omission produced Finding 3. Any future manual node build must inject these
+scripts or reuse k3d's own creation path.
+
+A second process note: the failing `docker run` had its output suppressed with
+`>/dev/null 2>&1`, so the failure was silent and the cluster sat with no server
+container while the cause was diagnosed. Never suppress stderr on a destructive
+step.
+
 ## Follow-up
 
 Treat the recovery as open, not closed. A closing verification note must assert

@@ -85,3 +85,17 @@ is not evidence.
 The backup monitor must write actual checksum values and the comparison method
 into its log, not a bare `COPY_CHECKSUM_VERIFIED` token, and must never be read
 as proof on its own.
+
+## Disposition (2026-09-11)
+
+The owner directed deletion once the hub was restored. Acceptance was reached
+first: Findings 2, 3 and 4 were fixed and verified green before anything was
+removed. The rollback value of the copy had also inverted by then - restoring it
+would have reintroduced the 8.3 GiB compaction-stalled datastore that the
+rebuild existed to escape.
+
+The copy at `m2-air.local:~/k3dm-backups/k3dm-hub-rebuild-20260909` was deleted,
+reclaiming 13 GiB. The verification above is retained as the record of what it
+contained. Note that no copy of the pre-rebuild hub state now exists anywhere.
+
+The process fix below still stands for future backups.

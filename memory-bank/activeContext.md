@@ -1864,3 +1864,32 @@ Details: `docs/issues/2026-09-11-m2-backup-verification-and-lost-source.md`.
 Hub fully recovered after my stop/blocked-restart incident: frontend+argocd 200,
 56 pods Running, 4 nodes Ready. Residual 2 CreateContainerError / 4 Pending are
 the pre-existing Findings 3 and 4, unchanged.
+
+### Findings 2/3/4 RESOLVED + M2 backup deleted (2026-09-11)
+
+Re-adopted the control-plane node under k3d. **Key improvement on the spec: kept
+the container hostname `457182e619fc`.** k3d identifies nodes by label and agents
+reach the server by container name — both already correct — so only the hostname
+was wrong. Keeping it meant the k8s node name never changed and the 3 pinned PVs
+were never stranded. The spec's blocking constraint evaporated; no repin/drain.
+
+Acceptance all green: k3d SERVERS 1/1 (was 0/0), mount `shared:272` (was private),
+4/4 nodes, 14/14 PVCs Bound, 57 Running / 0 CreateContainerError / 0 Pending,
+compaction 2 ok 0 fails, 7/9 probes (2 prometheus 502 = monitoring-pause).
+istio-ingressgateway now has a real EXTERNAL-IP on all 4 node IPs.
+
+**GOTCHA — `/bin/k3d-entrypoint.sh` is NOT in `rancher/k3s` stock image**; k3d
+writes it in at creation. First recreate died exit 127. Fix: `docker cp` the four
+`k3d-entrypoint-*.sh` from a live agent into the Created container, then start.
+This is almost certainly the original defect — the hand-rebuild used
+`Entrypoint=/bin/k3s`, skipping `k3d-entrypoint-mounts.sh` (= `mount --make-rshared /`),
+which caused Finding 3. Also: never `>/dev/null 2>&1` a destructive docker run —
+the failure was silent and the cluster sat serverless during diagnosis.
+
+**M2 backup DELETED** per owner direction, after acceptance was green. 13 GiB
+reclaimed. Rollback value had inverted — restoring it would reintroduce the
+8.3 GiB stalled datastore. **No copy of pre-rebuild hub state exists anywhere now.**
+
+REMAINING: Finding 6 only (ArgoCD registration named `ubuntu-k3s` for the local
+hub; 12 Applications + 16 appset refs — needs coordinated git change + appset
+reapply, not a live edit).
