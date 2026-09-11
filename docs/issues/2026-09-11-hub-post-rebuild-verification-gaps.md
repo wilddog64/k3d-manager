@@ -88,11 +88,68 @@ pod ports, 3 node(s) didn't satisfy plugin(s) [NodeAffinity]`. Two
 include `scripts/tests/plugins/hub_recovery.bats`. The suite therefore only ran
 locally and could regress without any CI signal.
 
-## Finding 6 - Confusing registration name
+## Finding 6 - MISDIAGNOSED; real cause was a stale kube context, now deleted
 
-The recovery note records the Argo CD app-cluster registration recreated as
-`ubuntu-k3s`, which is the dead/renamed AWS context name, for what is the local
-hub. This is cosmetic but misleading during an incident.
+**Original claim (wrong):** the Argo CD app-cluster registration was recreated
+under `ubuntu-k3s`, "the dead/renamed AWS context name", and should be renamed.
+
+**Why that was wrong.** `ubuntu-k3s` is not AWS leftover -- it is the project's
+documented default name for whatever cluster fills the *app-cluster role*:
+
+```text
+scripts/plugins/argocd.sh:1200        APP_CLUSTER_NAME  App-cluster name for ACG variants (default: resolved/ubuntu-k3s)
+scripts/plugins/istio_ambient.sh:23   : "${APP_CLUSTER_NAME:=${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}}"
+```
+
+`scripts/plugins/shopping_cart.sh` uses it as the app-cluster context name
+throughout, 12 Applications carry `destination.name: ubuntu-k3s`, and the
+ApplicationSets carry 16 references. The hub currently fills the app-cluster
+role, so the registration is correct as built:
+
+```text
+secret ubuntu-k3s-app-cluster -> name=ubuntu-k3s  server=https://kubernetes.default.svc
+                                 labels k3d-manager/provider=k3d, role=app-cluster
+```
+
+Renaming it would have broken a documented convention across 28+ references to
+fix nothing.
+
+**The real defect.** A *kube context* of the same name survived the AWS
+teardown and still pointed at the dead EC2 endpoint:
+
+```text
+context ubuntu-k3s -> cluster ubuntu-k3s -> https://18.236.123.91:6443   (times out)
+```
+
+Two unrelated objects shared the name `ubuntu-k3s`: a working Argo CD
+registration and a dead kube context. That collision is what made the
+registration look wrong. The dead context is also what the Grafana port-forward
+dialed during this incident, so it was an active failure source, not cosmetic.
+
+`scripts/plugins/shopping_cart.sh:55-58` already contains the removal --
+*"Removed stale ubuntu-k3s context - will re-merge with fresh credentials"* --
+it simply had not been reached on this machine.
+
+**Resolution (2026-09-11).** Deleted the stale context, cluster and user entries;
+kubeconfig backed up first. The Argo CD registration was deliberately left
+untouched.
+
+```bash
+kubectl config delete-context ubuntu-k3s
+kubectl config delete-cluster ubuntu-k3s
+kubectl config delete-user ubuntu-k3s
+```
+
+Verified after: remaining contexts are `k3d-k3d-cluster` (current) and
+`ubuntu-hostinger`; the hub still answers `get nodes` with 4/4 Ready; the
+registration secret still reads `name=ubuntu-k3s
+server=https://kubernetes.default.svc`. `shopping_cart.sh` re-merges a fresh
+context when it next needs one, so no follow-up work is required.
+
+**Lesson.** "This name looks like it came from the dead environment" is a
+hypothesis, not a finding. Grep for the name's *defined default* before
+proposing a rename -- a name shared by a live object and a dead one is a
+collision to resolve, not a misnaming to correct.
 
 ## Finding 7 - The Kine sensor cannot detect a compaction stall (root cause of the blind spot)
 
@@ -136,6 +193,39 @@ The sensor passes `bin/k3dm-hub-datastore-status` as its command, but that
 script exists on no branch and has never been committed. `_datastore_run`
 ignores the argument and probes inline, so nothing breaks today, but any runner
 that honoured the command would fail closed.
+
+## Finding 10 - `shopping_cart.sh` unconditionally deletes the `default` cluster and user, which the hub context uses
+
+Found while resolving Finding 6. Immediately after the stale-context removal,
+`scripts/plugins/shopping_cart.sh:59-60` runs unconditionally:
+
+```bash
+kubectl config delete-cluster default &>/dev/null || true
+kubectl config delete-user default &>/dev/null || true
+```
+
+On this machine the hub context depends on exactly those two entries:
+
+```text
+CURRENT   NAME              CLUSTER   AUTHINFO
+*         k3d-k3d-cluster   default   default
+```
+
+So the next `shopping_cart` run that reaches this block orphans the hub
+context: `k3d-k3d-cluster` would keep pointing at a `default` cluster and user
+that no longer exist, and every `kubectl --context k3d-k3d-cluster` call fails
+until the context is rebuilt. This is pre-existing -- it was true in the
+kubeconfig backup taken before the Finding 6 deletion, so it is not a
+side effect of that work.
+
+`default` is a generic name with no owner, which is why deleting it looked
+safe when written. Recovery is cheap (`k3d kubeconfig merge k3d-cluster`), and
+an unused `k3d-k3d-cluster` cluster entry already exists alongside it, but the
+plugin should not delete kubeconfig entries it does not own.
+
+Suggested fix: drop both lines, or guard them so they only remove a `default`
+entry that no remaining context references. Not yet fixed -- filed here so the
+next `shopping_cart` change picks it up.
 
 ## Fix
 

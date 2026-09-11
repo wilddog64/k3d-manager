@@ -1923,3 +1923,36 @@ long sandbox sessions.
 Observability resumed at **Layer 1** (Grafana + Prometheus): measured 313m CPU,
 ~1.5 GiB. All 9 public probes green. Trivy/Loki/alertmanager stay at 0.
 Details: `docs/issues/2026-09-11-hub-load-was-swap-thrash-not-cpu.md`.
+
+### Monitoring fully resumed; Finding 6 closed as misdiagnosed (2026-09-11)
+
+`make monitoring-resume` completed: auto-sync restored on kube-prometheus-stack,
+hub-loki and trivy-operator; monitoring and trivy-system workloads scaled back up.
+Layer 1 (Grafana + Prometheus) had already been verified green before the full
+resume, and host memory headroom from the browser reclaim held.
+
+**Finding 6 was wrong and is now closed as misdiagnosed.** It claimed the Argo CD
+app-cluster registration `ubuntu-k3s` was dead AWS naming that should be renamed.
+`ubuntu-k3s` is in fact the project's documented default `APP_CLUSTER_NAME`
+(`argocd.sh:1200`, `istio_ambient.sh:23`) for whatever cluster fills the
+app-cluster role — the hub fills it today, and the registration correctly reads
+`server=https://kubernetes.default.svc`. A rename would have broken 28+
+references (`shopping_cart.sh`, 12 Applications, 16 AppSet refs) to fix nothing.
+**No spec written and nothing handed to Codex** — the scoping pass killed the task.
+
+The real defect was a name collision: a stale *kube context* of the same name
+still pointed at the dead EC2 endpoint `https://18.236.123.91:6443`, and was what
+the Grafana port-forward dialed during this incident. Deleted (context + cluster +
+user; kubeconfig backed up first). Verified after: contexts are now
+`k3d-k3d-cluster` (current) + `ubuntu-hostinger`, hub answers `get nodes` 4/4
+Ready, registration secret untouched.
+
+**New Finding 10 (not fixed, filed only):** `shopping_cart.sh:59-60`
+unconditionally runs `kubectl config delete-cluster default` / `delete-user
+default`, and the hub context `k3d-k3d-cluster` maps to exactly those entries —
+so the next `shopping_cart` run orphans the hub context. Pre-existing (confirmed
+in the pre-deletion kubeconfig backup), recovery is `k3d kubeconfig merge
+k3d-cluster`. Pick it up on the next `shopping_cart` change.
+
+Details: `docs/issues/2026-09-11-hub-post-rebuild-verification-gaps.md`
+(Findings 6 and 10).
