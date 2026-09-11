@@ -865,3 +865,19 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `0cfbb15e` on `origin/k3d-manager-v1.33.0`. Implemented by `codex exec`,
   committed by Claude (sandbox blocks `.git` writes). Verified: shellcheck
   rc=0, BATS 20/20 ok, only the two spec'd files touched.
+
+# 2026-09-11 make status triage
+- [x] **Triaged `make status` 2 errors + 2 warnings** — issue doc
+  `docs/issues/2026-09-11-status-warnings-hub-vault-eso-breakage.md`. 4 symptoms,
+  3 causes, plus 2 defects the run never reported.
+- [x] **Fixed product-catalog triage selector** — `5f356e90`; `app=product-catalog`
+  matched no pods (real label `app.kubernetes.io/name=product-catalog`).
+- [ ] **BLOCKED on user: refresh hub Vault `token_reviewer_jwt`** — classifier denied
+  the `vault write` (Secret-Store Writes). Unblocks 24/25 hub ExternalSecrets.
+  Command in the issue doc.
+- [ ] **Reseed `k3dm-smoke-user`** — `scripts/k3d-manager keycloak_seed_smoke_user`,
+  after the Vault fix (seeder reads the ESO-stale `keycloak-secrets`).
+- [ ] **Grafana admin password** — may need `grafana cli admin reset-admin-password`;
+  persistent `grafana.db` diverged from the Secret.
+- [ ] **Reseed product catalog** — API healthy, zero rows.
+- [ ] **Spec hub-ESO coverage in `make status`** — hub ESO currently unmonitored.

@@ -2001,3 +2001,42 @@ itself — confirmed by running it (test 7 failed). The two-space anchor pins th
 `add_ubuntu_k3s_cluster` body indent level and excludes the helper. Lesson: an
 anchored-indent guard must be run against the post-fix file, not just reasoned
 about when writing the spec.
+
+### make status triage: hub Vault k8s auth broken, 24/25 hub ESOs down (2026-09-11)
+
+`make status CLUSTER_PROVIDER=k3s-hostinger` reported 2 errors + 2 warnings.
+Triage: `docs/issues/2026-09-11-status-warnings-hub-vault-eso-breakage.md`.
+
+**Biggest problem was not in the output.** Hub Vault `auth/kubernetes/login`
+returns 403; `ClusterSecretStore vault-backend` is `Ready=False`
+(InvalidProviderConfig) and **24 of 25 hub ExternalSecrets are failing**. Ruled
+out by direct check: Vault sealed (no — unsealed, running), CA rotation (no —
+Vault-stored and live CA fingerprints identical), auth-delegator RBAC (present),
+roles deleted (all four present). Cause is the stale `token_reviewer_jwt` —
+already documented at `scripts/lib/test.sh:710-726` ("projected SA tokens rotate
+every ~24h"); `vault-0` restarted 3x. Repair command is in the issue doc.
+**BLOCKED: the auto-mode classifier denied the `vault write` (Secret-Store
+Writes); the user must run it.**
+
+**`make status` has a hub-ESO blind spot.** It printed `ESO ExternalSecrets:
+20/20 synced ✓` — true for the *app* cluster, which really is 20/20 — while the
+hub was 24/25 broken. Hub ESO is never sampled, yet hub-hosted credentials
+(Grafana/Keycloak/ArgoCD) are what the smoke logins use. Needs a spec.
+
+Downstream/other: Grafana 401 = stale ESO-frozen Secret **and** a persistent
+`grafana.db` whose admin password diverged (env only applies at first DB init) —
+verified the Secret's current password also 401s. Keycloak "no credentials" is
+correct, not a bug — `identity/k3dm-smoke-user` did not survive the hub rebuild;
+reseed with `keycloak_seed_smoke_user`. Frontend login is a pure cascade of that.
+Product images = catalog genuinely empty (`HTTP 200`, `{"items":[],"total":0}`)
+on an app cluster whose ESO is healthy — a data seed gap, not a credential one.
+
+**Fixed (`5f356e90`):** both smoke-triage maps in `bin/k3dm-webhook` selected
+product-catalog pods by `app=product-catalog`; the pod only carries
+`app.kubernetes.io/name=product-catalog`, so failure triage printed no pod state
+precisely when it was needed. `Frontend`'s `app=frontend` was checked and is
+correct — that pod carries both label styles.
+
+**Checked before "fixing":** the webhook's `keycloak-admin-secret`/`password`
+fallback looked wrong but is the documented default (`keycloak.sh:37-38`) — the
+Secret is just absent. Verifying that avoided a wrong patch.
