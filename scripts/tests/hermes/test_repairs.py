@@ -61,10 +61,41 @@ def test_r4_fires_only_on_transient_conclusion(monkeypatch):
     assert repairs.propose(r4_records("failure"), state()) == []
 
 
+def r6_records(slow_sql=2, recent=False, failed=False, db_bytes=554 * 1024 * 1024):
+    return [record("kine", "degraded", data={"state_db_bytes": db_bytes,
+                   "slow_sql_count": slow_sql, "compaction_recent": recent,
+                   "compaction_failed": failed, "stale_acg_registration": False})]
+
+
 def test_r5_requires_the_specific_stale_acg_kine_signature():
-    proposal = repairs.propose(r5_records(), state())[0]
-    assert proposal["key"] == "r5"
-    assert repairs.propose(r5_records(False), state()) == []
+    keys = [item["key"] for item in repairs.propose(r5_records(), state())]
+    assert keys[0] == "r5"
+    # Without the stale ACG signature R5 must not fire, but a compaction stall
+    # is still a real incident, so R6 proposes the lever that actually works.
+    assert [item["key"] for item in repairs.propose(r5_records(False), state())] == ["r6"]
+
+
+def test_r6_proposes_server_restart_on_compaction_stall_below_size_threshold():
+    proposal = repairs.propose(r6_records(), state())[0]
+    assert proposal["key"] == "r6"
+    assert proposal["command"] == "docker restart k3d-k3d-cluster-server-0"
+    assert repairs.propose(r6_records(failed=True, slow_sql=0, recent=True),
+                           state())[0]["key"] == "r6"
+
+
+def test_r6_silent_when_compaction_is_progressing():
+    assert repairs.propose(r6_records(slow_sql=2, recent=True), state()) == []
+    assert repairs.propose(r6_records(slow_sql=0, recent=False), state()) == []
+
+
+def test_r6_is_never_auto_executed_by_the_kine_guard():
+    """The auto guard is R5-only; restarting the control plane stays human-approved."""
+    current, calls = state(), []
+    outcome = repairs.auto_remediate_kine(
+        r6_records(), current, lambda *args: calls.append(args) or (0, ""), True)
+    assert outcome is None
+    assert calls == []
+    assert "r6" not in current.get("repairs_attempted_this_incident", [])
 
 
 def test_r5_auto_guard_is_opt_in_and_runs_once():

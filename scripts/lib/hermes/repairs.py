@@ -15,6 +15,7 @@ from hermes.sensors import GITHUB_SERVICE, _keychain_secret
 
 ROOT = Path(__file__).resolve().parents[3]
 WEBHOOK_LABEL = "com.k3d-manager.webhook"
+HUB_K3S_CONTAINER = "k3d-k3d-cluster-server-0"
 # Public host -> the launchd port-forward label that actually serves it. Grounded
 # in scripts/etc/cloudflared/config.yml (ingress local port) matched against the
 # installed com.k3d-manager.*-port-forward.plist listen ports: only
@@ -123,6 +124,23 @@ def _r5_command(_records):
              "statefulset/argocd-application-controller", "--replicas=0"], {})
 
 
+def _compaction_stalled(data):
+    """True when Kine reports compaction failing or not progressing under load."""
+    return (data.get("compaction_failed") is True or
+            (data.get("slow_sql_count", 0) > 0 and
+             data.get("compaction_recent") is False))
+
+
+def _r6_precondition(records, _history, _state):
+    kine = _rec(records, "kine") or {}
+    return (_status(records, "kine") == "degraded" and
+            _compaction_stalled(kine.get("data", {})))
+
+
+def _r6_command(_records):
+    return (["docker", "restart", HUB_K3S_CONTAINER], {})
+
+
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
@@ -144,6 +162,15 @@ REPAIRS = {
            "build_command": _r5_command, "cwd": None,
            "blast_radius": "hub ArgoCD application controller; GitOps reconciliation pauses", "reversible": True,
            "needs_scope": "local hub kubeconfig"},
+    # Proposal-only on purpose. The 2026-09-11 incident established that pausing
+    # the ArgoCD controller (R5) relieves Kine pressure but does NOT revive a
+    # stalled compaction goroutine -- only restarting the K3s server did. R5 is
+    # therefore the wrong lever for a stall, and this one is never auto-executed:
+    # restarting the control plane is a human decision.
+    "r6": {"key": "r6", "name": "Restart hub K3s server to revive stalled Kine compaction",
+           "precondition": _r6_precondition, "build_command": _r6_command, "cwd": None,
+           "blast_radius": "hub control plane restarts; brief apiserver outage", "reversible": False,
+           "needs_scope": "local docker socket"},
 }
 
 
@@ -154,7 +181,8 @@ def _update_r1_debounce(records, state):
 
 def _evidence(records, key):
     relevant = {"r1": ("eso", "node_pressure"), "r2": ("reachability", "node_pressure"),
-                "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",)}[key]
+                "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
+                "r6": ("kine",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
 
