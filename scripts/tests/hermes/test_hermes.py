@@ -6,8 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
 from hermes.correlator import Correlator
-from hermes.sensors import (argocd, ci, eso, github_token_expiry, kine, node_pressure,
-                            reachability, token_expiry_advisory)
+from hermes.sensors import (argocd, ci, eso, github_token_expiry, kine, kine_log_signals,
+                            node_pressure, reachability, token_expiry_advisory)
 
 
 def health(entries):
@@ -74,6 +74,45 @@ def test_node_pressure_healthy_degraded_unknown_and_debounce():
     assert [node_pressure(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
     assert node_pressure(webhook(health([{"name": "Data layer", "ok": None}])), {}, token="x")["status"] == "unknown"
     assert node_pressure(webhook(good), {}, token="")["status"] == "unknown"
+
+
+def test_kine_log_signals_ignores_compact_rev_key_in_slow_sql():
+    """A stalled hub emits Slow SQL lines that embed compact_rev_key.
+
+    Regression guard for the 2026-09-11 blind spot: a bare "compact" substring
+    test reported compaction_recent=True during a total compaction outage,
+    making the stall branch of the kine sensor unreachable.
+    """
+    stalled = (
+        'time="..." level=info msg="Slow SQL (total time: 2.37s): SELECT '
+        "( SELECT MAX(crkv.prev_revision) FROM kine AS crkv WHERE "
+        "crkv.name = 'compact_rev_key'), kv.id FROM kine AS kv\"\n"
+    ) * 3
+    signals = kine_log_signals(stalled)
+    assert signals["slow_sql_count"] == 3
+    assert signals["compaction_recent"] is False
+    assert signals["compaction_failed"] is False
+
+    progressing = stalled + (
+        'time="..." level=info msg="COMPACT deleted 467 rows from 1000 '
+        'revisions in 3.49s - compacted to 1000/91537"\n'
+    )
+    assert kine_log_signals(progressing)["compaction_recent"] is True
+
+    failing = stalled + (
+        'time="..." level=error msg="Compact failed: failed to record compact '
+        'revision: sql: transaction has already been committed or rolled back"\n'
+    )
+    assert kine_log_signals(failing)["compaction_failed"] is True
+
+
+def test_kine_degrades_on_reported_compaction_failure_below_size_threshold():
+    failing = json.dumps({"available": True, "state_db_bytes": 554 * 1024 * 1024,
+                          "slow_sql_count": 133, "compaction_recent": False,
+                          "compaction_failed": True, "stale_acg_registration": False})
+    state = {}
+    assert [kine(lambda *_: (0, failing), state)["status"]
+            for _ in range(3)] == ["healthy", "healthy", "degraded"]
 
 
 def test_kine_degraded_only_for_stalled_compaction_or_size_and_never_writes():

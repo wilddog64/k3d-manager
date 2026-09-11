@@ -17,8 +17,8 @@ from hermes.correlator import Correlator
 from hermes.records import timestamp
 from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
-                            _keychain_secret, argocd, ci, eso, kine, node_pressure,
-                            reachability, token_expiry_advisory)
+                            _keychain_secret, argocd, ci, eso, kine, kine_log_signals,
+                            node_pressure, reachability, token_expiry_advisory)
 from hermes.slack import post_summary
 
 
@@ -81,11 +81,9 @@ def _datastore_run(_command, _additions):
     try:
         registrations = json.loads(secrets.stdout).get("items", [])
         stale = any("host.k3d.internal" in json.dumps(item) for item in registrations)
-        text = logs.stdout + logs.stderr
+        signals = kine_log_signals(logs.stdout + logs.stderr)
         return 0, json.dumps({"available": True, "state_db_bytes": int(db.stdout.strip()),
-                              "slow_sql_count": text.lower().count("slow sql"),
-                              "compaction_recent": "compact" in text.lower(),
-                              "stale_acg_registration": stale})
+                              "stale_acg_registration": stale, **signals})
     except (TypeError, ValueError, json.JSONDecodeError):
         return 1, json.dumps({"available": False})
 

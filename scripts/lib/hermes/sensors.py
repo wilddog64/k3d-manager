@@ -133,6 +133,23 @@ def node_pressure(fetch, state, provider="", token=None, threshold=2, service_th
         return record("node_pressure", "unknown", "node status source unavailable")
 
 
+def kine_log_signals(text):
+    """Extract Kine compaction signals from raw K3s log text.
+
+    Compaction progress must be matched on the K3s event markers, never on the
+    bare substring "compact": every Kine "Slow SQL" line embeds the literal
+    column name compact_rev_key, so a substring test reports compaction as
+    recent precisely when compaction has stalled and Slow SQL is spiking.
+    """
+    lowered = text.lower()
+    return {
+        "slow_sql_count": lowered.count("slow sql"),
+        "compaction_recent": ("compact compacted from" in lowered or
+                              "compact deleted" in lowered),
+        "compaction_failed": "compact failed" in lowered,
+    }
+
+
 def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024):
     """Report local hub Kine pressure from a read-only, injected probe."""
     try:
@@ -146,20 +163,19 @@ def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024):
         slow_sql = int(payload["slow_sql_count"])
         compacting = bool(payload["compaction_recent"])
         stale = bool(payload["stale_acg_registration"])
-        raw = db_bytes >= max_db_bytes or (slow_sql > 0 and not compacting)
+        failed = bool(payload.get("compaction_failed", False))
+        data = {"state_db_bytes": db_bytes, "slow_sql_count": slow_sql,
+                "compaction_recent": compacting, "compaction_failed": failed,
+                "stale_acg_registration": stale}
+        raw = db_bytes >= max_db_bytes or failed or (slow_sql > 0 and not compacting)
         if raw:
             status = "degraded" if _debounced("kine", True, threshold, state) else "healthy"
             evidence = (f"state.db={db_bytes}B, slow_sql={slow_sql}, "
-                        f"compaction_recent={compacting}")
-            return record("kine", status, evidence,
-                          data={"state_db_bytes": db_bytes, "slow_sql_count": slow_sql,
-                                "compaction_recent": compacting,
-                                "stale_acg_registration": stale})
+                        f"compaction_recent={compacting}, compaction_failed={failed}")
+            return record("kine", status, evidence, data=data)
         _debounced("kine", False, threshold, state)
         return record("kine", "healthy", f"state.db={db_bytes}B; compaction recent",
-                      data={"state_db_bytes": db_bytes, "slow_sql_count": slow_sql,
-                            "compaction_recent": compacting,
-                            "stale_acg_registration": stale})
+                      data=data)
     except Exception:
         return record("kine", "unknown", "hub datastore status source unavailable")
 
