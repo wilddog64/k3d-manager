@@ -840,3 +840,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   resolved all seven live PVs exactly once with the expected logical node.
   Follow-up in progress: restore must use `docker exec` into the resolved k3d
   node because `/var/lib/rancher/k3s/storage/...` is container-local.
+# 2026-09-11 hub recovery continuation
+
+- Recovered Argo app-cluster registration, Vault ESO application-secret access,
+  GHCR pulls, service/data Applications, and Istio serverlb routing.
+- Corrected stale Cloudflare origins and verified public frontend, Keycloak,
+  ArgoCD, Grafana, and Prometheus probes.
+- Recorded root causes and follow-up in
+  `docs/issues/2026-09-11-hub-recovery-public-origin-and-eso.md`.

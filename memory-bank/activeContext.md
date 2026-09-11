@@ -60,6 +60,18 @@
   seven PVs; restore implementation must stream into k3d node containers,
   because target local-path values are not host filesystem paths.
 
+- **Hub recovery public-origin repair 2026-09-11:** control-plane rebuild is
+  serving all four nodes again. Lost Argo `app-cluster` registration was
+  restored as `ubuntu-k3s`; Vault ESO received a scoped `eso-apps` policy and
+  application secrets/GHCR pulls recovered. Recovered serverlb now routes
+  HTTP through Istio NodePort `192.168.97.5:31284`; Cloudflare origins were
+  corrected (frontend→8000, ArgoCD→8080, Keycloak→8880). Public probes passed
+  frontend API 200, Keycloak 200/302, ArgoCD UI 200, Grafana health 200, and
+  Prometheus ready 200. Details:
+  `docs/issues/2026-09-11-hub-recovery-public-origin-and-eso.md`. Remaining
+  durability work: declare the registration/policy/origin mapping in recovery,
+  and resolve intermittent Kine/API saturation plus slow payment startup.
+
 - **v1.32.0 RELEASED 2026-09-07** — PR #123 MERGED (`f65549f0`). Shipped webhook security remediation (F1 fix-mode role gating, F3 response_url host allowlist, F2 sandbox egress hardening) + Hermes monthly security-audit (read-only CodeQL/Dependabot/branch-protection/credential-expiry digest, optional BATS security-regression subset). Gates: pytest 47 hermes / webhook.bats 64/64 on macOS, sandbox 11/11 on Linux, shellcheck clean. 1 lint failure + 2 Copilot findings in CI, all fixed before merge. Hermes↔Slack Option A split to v1.33.0 (PULL model with Slack approver MFA + 24h re-auth). Post-merge housekeeping COMPLETE 2026-09-07: enforce_admins restored true (verified), tag/release v1.32.0 published at `f65549f0` (latest, non-draft), release-ledger backfill (CHANGELOG `[1.32.0]` + releases.md/README rows + retrospective doc `docs/retro/2026-09-07-v1.32.0-retrospective.md`) + memory-bank update committed on `k3d-manager-v1.33.0`.
 
 - **Next milestone: v1.33.0 branch** (`k3d-manager-v1.33.0` created 2026-09-07 from `f65549f0`, origin tracking). Scope: Hermes↔Slack integration **Option A** (interactive Approve/Deny buttons via PULL model: Slack approver allowlist + `24h /hermes-auth` re-auth MFA → Cloudflare KV → Hermes drains on poll → `repairs.approve()`). Spec: `docs/plans/v1.33.0-hermes-slack-approval.md`. Also pending: TwinkleAI real-estate gen-AI × MCP research platform prototype (plan-patch queued for Codex).
