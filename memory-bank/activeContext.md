@@ -1819,3 +1819,24 @@ not a fault. `make monitoring-resume` reverses it.
 Still open: Findings 2/3/4/6 (server outside k3d management -> mount propagation
 breaks istio-cni-node + node-exporter, svclb Pending, ubuntu-k3s registration
 name) and Finding 8 (R5 precondition still cannot fire on a compaction stall).
+
+### Findings work (2026-09-11, later)
+
+- **Finding 8 DONE** — added Hermes R6 (`docs/bugs`-free, code): proposes
+  `docker restart k3d-k3d-cluster-server-0` on a compaction stall. Deliberately
+  did NOT widen R5: today proved R5's lever (pause ArgoCD) relieves pressure but
+  does not revive a dead compaction goroutine. R6 is proposal-only and excluded
+  from the auto guard. 55/55 hermes tests pass.
+- **Findings 2/3/4 = one defect**, spec'd in
+  `docs/bugs/2026-09-11-hub-control-plane-readoption.md`. The hand-rebuilt server
+  lacks k3d labels, shared mount propagation, and `--disable=traefik`. Traefik's
+  svclb squats ports 80/443 so Istio's svclb can never schedule.
+  **Blocking constraint found: 3 PVs are pinned to node name `457182e619fc`**
+  (rabbitmq, postgres-keycloak, trivy-server) and will be stranded by the
+  rename — must be repinned/drained inside the window.
+  Live `docker exec` fixes (`mount --make-rshared /`, writing
+  `/etc/rancher/k3s/config.yaml`) were rejected: they vanish on container
+  recreation and leave the node invisible to k3d. Also blocked by the sandbox.
+- **Finding 6 deferred with reason**: 12 Applications + 16 appset references use
+  `destination.name: ubuntu-k3s`; renaming churns 28 Applications right after a
+  compaction recovery. Sequence into the same window.
