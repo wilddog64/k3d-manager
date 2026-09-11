@@ -858,8 +858,10 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   a stale kube context pointing at the dead `18.236.123.91:6443`; context,
   cluster and user deleted, Argo registration left untouched. No spec, no Codex
   handoff — scoping killed the task. SHA `da89d156`.
-- [ ] **Finding 10 — assigned to Codex.** Spec:
+- [x] **Finding 10 — fixed.** Spec:
   `docs/bugs/2026-09-11-shopping-cart-deletes-default-kubeconfig-entries.md`.
-  `add_ubuntu_k3s_cluster` unconditionally deletes the `default` cluster/user
-  that the hub context depends on. Awaiting SHA on
-  `origin/k3d-manager-v1.33.0`.
+  `add_ubuntu_k3s_cluster` unconditionally deleted the `default` cluster/user
+  that the hub context depends on; now pruned only when unreferenced. SHA
+  `0cfbb15e` on `origin/k3d-manager-v1.33.0`. Implemented by `codex exec`,
+  committed by Claude (sandbox blocks `.git` writes). Verified: shellcheck
+  rc=0, BATS 20/20 ok, only the two spec'd files touched.

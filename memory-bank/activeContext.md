@@ -1972,5 +1972,32 @@ Helper prototyped against three kubeconfig fixtures before filing: hub-style
 (both kept), orphan (both deleted), and an empty config with no `contexts:` key
 (no delete attempted, exit 0 under `set -euo pipefail`).
 
-**Status: assigned to Codex, awaiting SHA.** Bug spec — exempt from the 5-plan-doc
+**Status: DONE — SHA `0cfbb15e` on `origin/k3d-manager-v1.33.0`.** Bug spec — exempt from the 5-plan-doc
 cap, so the v1.33.0 plan-doc budget is untouched at 4/5.
+
+
+### Finding 10 fixed; codex exec cannot commit (2026-09-11)
+
+`0cfbb15e` — `_shopping_cart_prune_orphan_default_entries` replaces the two
+unconditional deletes; 3 new BATS tests. Verified independently: shellcheck
+`-S error` rc=0, `bats scripts/tests/plugins/shopping_cart.bats` 20/20 ok,
+diff touches only `scripts/plugins/shopping_cart.sh` and
+`scripts/tests/plugins/shopping_cart.bats`.
+
+**`codex exec --sandbox workspace-write` cannot commit.** It implemented and ran
+the gates correctly, then blocked on
+`fatal: Unable to create '.git/index.lock': Operation not permitted` — the
+sandbox denies writes to `.git` even with `network_access=true` (that override
+only lifts the network block, not the `.git` write block). Codex reported the
+failure honestly rather than claiming success. **Claude must commit and push
+Codex's working-tree changes itself after verifying them**; do not expect a SHA
+back from a `codex exec` dispatch.
+
+**The spec's grep guard was wrong and Codex was right to deviate.** The spec
+specified `^\s*kubectl config delete-(cluster|user) default`; Codex used a
+literal two-space anchor. `^\s*`/`^[[:space:]]*` also matches the new helper's
+own legitimate 4-space-indented delete calls, so the guard fires on the fix
+itself — confirmed by running it (test 7 failed). The two-space anchor pins the
+`add_ubuntu_k3s_cluster` body indent level and excludes the helper. Lesson: an
+anchored-indent guard must be run against the post-fix file, not just reasoned
+about when writing the spec.
