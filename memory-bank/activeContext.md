@@ -39,14 +39,26 @@
 - **lib-foundation PR #50 OPEN — AWAITING USER MERGE.** `fix(acg): dead identity host,
   profile split-brain, and a destructive STS probe`,
   https://github.com/wilddog64/lib-foundation/pull/50 — head `685031a`, base `cf62d41`,
-  10 commits. **CI 3/3 green** (shellcheck, bats, acg node), `mergeable: MERGEABLE`,
-  `mergeStateStatus: CLEAN`. Claude does NOT merge.
-  **Copilot produced NO review.** The reviewer request was POSTed twice as raw JSON
-  (`--input -`, the documented-correct form) and returned HTTP 200 both times, yet
-  `reviewRequests` stays `[]` and no review or inline comment appeared after ~2 min of
-  polling — the known silent no-op. `main`'s ruleset DOES carry `copilot_code_review`, but
-  it is not blocking: merge state is CLEAN. If a Copilot pass is wanted, request it from the
-  web UI.
+  now head `7e9eae5` (11 commits), base `cf62d41`. **CI 3/3 green** (shellcheck, bats, acg
+  node), `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`, **all review threads resolved**.
+  Claude does NOT merge.
+  **Copilot DID review — it was just slow, not a no-op.** `reviewRequests` stayed `[]` and
+  ~2 min of polling found nothing, so it was recorded as the known silent no-op; the review
+  in fact landed later, unprompted. **Lesson: `reviewRequests: []` plus a short poll is not
+  evidence Copilot declined — it is evidence it has not answered YET. Re-check `gh pr view
+  --json reviews` before claiming a Copilot gate is unobtainable.**
+  **Copilot's single finding was VALID and was REBASE DAMAGE — fixed in `7e9eae5`.**
+  `CHANGE.md` carried 12 resurrected lines: the pre-correction wording of the
+  signed-out-detection entry (present only in `308bb3c`, rewritten out by `e547147`), minus
+  its `- ` bullet marker and the blank line before `### Security`. It contradicted the
+  CORRECTION carried by the surviving bullet. One of the four hand-resolutions during the
+  rebase onto post-#49 main reinstated it, so `e547147`'s removal had nothing left to remove.
+  **Root cause of the MISS: the post-rebase integrity check ran
+  `git diff --stat backup/prism-pre-rebase HEAD -- . ':(exclude)CHANGE.md'` — it excluded the
+  ONLY hand-resolved file, so it could not have caught this by construction.** Correct form is
+  a positive assertion on the conflicted file itself: `git diff <backup> HEAD -- CHANGE.md`
+  must equal exactly what the new base contributed (verified: only #49's Security entry).
+  Documented in lib-foundation `docs/issues/2026-09-12-copilot-pr50-review-findings.md`.
   #49 MERGED as `cf62d41`; the prism branch was rebased onto it and force-pushed by the USER
   (`e12d41a...685031a`, forced) after the classifier denied Claude the force-push.
 
