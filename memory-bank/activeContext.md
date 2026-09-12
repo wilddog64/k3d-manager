@@ -6,6 +6,40 @@
 
 ## Current focus
 
+- **ACG credential-test failure — ROOT CAUSE CORRECTED 2026-09-12. `id.pluralsight.com`
+  IS DEAD.** The earlier false-green diagnosis was WRONG and is retracted. Measured, not
+  inferred: a throwaway signed-out Chrome profile navigating to `SANDBOX_URL` **redirects
+  to `https://app.pluralsight.com/id`**, where `text=/Cloud Sandboxes/i` has **count 0** —
+  absent from the DOM, so it cannot false-green. Pre-fix commit `a8342e1` run against that
+  profile printed `ACG_SESSION_EXPIRED` in **8 seconds**. The specified bug does not exist.
+  **Real cause:** `scripts/lib/acg/playwright/lib/sandbox.js:112` — `handleSignIn` does
+  `waitForURL('**id.pluralsight.com**', {timeout: 300000})`, and `id.pluralsight.com`
+  **does not resolve** (`dig` empty, `curl` → "Could not resolve host"). Pluralsight moved
+  identity to a PATH on the main host. The glob can never match → deterministic 300s hang,
+  twice per run (extraction + restart path). Spec:
+  `docs/bugs/2026-09-12-acg-signin-wait-targets-dead-id-pluralsight-host.md` (`e547147`).
+  Also stale: the `a[href*="id.pluralsight.com"]` alternative at `sandbox.js:104`, and the
+  post-login wait at `:143` which matches `app.pluralsight.com/id` itself so it can return
+  while still unauthenticated. NOT yet dispatched to Codex.
+  `308bb3c` (negative gate) is KEPT — the same measurement validates it (all 3
+  `SIGNED_OUT_SELECTORS` match the real signed-out page) — but it is no longer described
+  as a bug fix; CHANGE.md corrected.
+
+- **ACG session survives only as long as the browser process — NOT an idle timeout.**
+  Read from `pw-profile/Default/Cookies`: the auth cookie `.pluralsight.com
+  Identity.Session` is **non-persistent** (`is_persistent=0`, `has_expires=0`, no expiry).
+  Killing Chrome discards it. The 2026-09-12 cleanup ("ensure Chrome is not active after
+  test") is therefore what logged the user out. `~/Library/LaunchAgents/
+  com.k3d-manager.chrome-cdp.plist` exists to hold a long-lived CDP Chrome but is **NOT
+  loaded**, and is **stale — do NOT load as-is**: it points at
+  `/Applications/Google Chrome.app` (the user's personal Chrome, superseded by the
+  Playwright-managed Chromium) and `--user-data-dir=.../k3d-manager/profile` (current is
+  `pw-profile`), and its `KeepAlive` would fight `cdp.sh` port reclaim.
+
+- **Method note: a throwaway `--user-data-dir` is a guaranteed signed-out profile.** It
+  reproduces the signed-out path in ~1 minute on a spare port without touching `:9222` or
+  the operator's session. Use it BEFORE writing a spec from log-reading.
+
 - **ACG session-check false-green — BUG FILED, CODEX WORKING (2026-09-12).** The live
   `make credential-test PROVIDER=aws` gate on lib-foundation
   `fix/acg-prism-monogram-selector` RAN and FAILED. Root cause is not the selector fix:
