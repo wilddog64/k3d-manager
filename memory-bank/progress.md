@@ -119,12 +119,16 @@
   by the auto-mode classifier) now RUN against merged main: `git merge-tree origin/main
   <branch>` → exit 0, merged tree `6678e606`, no conflict section = merges cleanly.
   Needs: own CHANGELOG entry (deferred to avoid colliding with #96's), Copilot review, CI.
-- [~] **lib-acg absorption Phase 3 (archive)** — stale lib-acg PR #47 triaged and closed
-  unmerged 2026-09-12; the one unported change (Prism monogram selector) carried forward as
-  `docs/bugs/2026-09-12-acg-logged-in-selectors-missing-prism-monogram.md` in lib-foundation
-  PR #48. Archive flip (`gh api repos/wilddog64/lib-acg -X PATCH -F archived=true`) held
-  until #48 merges. See [[project_lib_acg_absorption]].
-- [ ] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: DO NOT MERGE AS-IS.**
+- [x] **lib-acg absorption Phase 3 (archive) — DONE 2026-09-12.** Stale lib-acg PR #47
+  triaged and closed unmerged; the one unported change (Prism monogram selector) carried
+  forward as `docs/bugs/2026-09-12-acg-logged-in-selectors-missing-prism-monogram.md`, which
+  reached lib-foundation `main` via PR #48. `wilddog64/lib-acg` then archived
+  (`gh api repos/wilddog64/lib-acg -X PATCH -F archived=true` → `archived: true`).
+  Still open, tracked in that bug doc: porting the selector into lib-foundation's
+  `LOGGED_IN_SELECTORS` behind a live `make credential-test PROVIDER=aws` gate.
+  Stale references to the dead lib-acg remote remain in `.githooks/pre-commit` (lines 27-29,
+  message text only) and `.claude/settings.local.json`. See [[project_lib_acg_absorption]].
+- [x] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: CLOSED unmerged 2026-09-12, fixed upstream instead.**
   Patches `scripts/lib/foundation/scripts/lib/acg/package-lock.json` inside the
   lib-foundation subtree → violates edit-upstream-first; next `git subtree pull` would
   revert or conflict. Transitive dep (via jest/babel `^4.24.0`), not in lib-acg
@@ -136,9 +140,11 @@
   lockfile), Copilot approval / 0 findings, `mergeable_state: clean`. **MERGED 2026-09-12
   as `12aa9a06`.** ("main unprotected" was wrong — it is ruleset-protected; see
   [[reference_classic_protection_404_on_ruleset_repos]]. #47 needed no override anyway.)
-  Release stamp follows in **lib-foundation PR #48** (`release/v0.4.16`, `2ef907c`,
-  docs-only, CI green, Copilot 0 comments, `mergeStateStatus: CLEAN`) — awaiting merge.
-  Then: tag `v0.4.16` + release → subtree pull → close #124.
+  Release stamp landed in **lib-foundation PR #48** (`release/v0.4.16`, docs-only, CI green,
+  Copilot 0 comments) — **MERGED as `10de7f4c`**. Chain completed same day: tag `v0.4.16`
+  pushed → GitHub release v0.4.16 → `git subtree pull --prefix=scripts/lib/foundation
+  lib-foundation main --squash` on `k3d-manager-v1.33.0` (`1de3b1e0`, vendored
+  `browserslist` verified at 4.28.9) → #124 closed with a comment explaining the routing.
   Out of scope but surfaced by `npm audit` on that lockfile: 2 unrelated highs still open —
   `brace-expansion` (new advisories BEYOND the GHSA-3jxr-9vmj-r5cp bump already landed, one
   bypassing the CVE-2026-14257 mitigation) and `js-yaml` (`maxTotalMergeKeys` does not limit

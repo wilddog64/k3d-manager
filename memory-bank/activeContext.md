@@ -57,16 +57,20 @@
   **Release follow-up: lib-foundation PR #48** (`release/v0.4.16`, `2ef907c`) — promotes
   `CHANGE.md` `[Unreleased]` → `## [v0.4.16] — 2026-09-12` and records the unported
   lib-acg selector (below). Docs-only, 2 files. CI green, Copilot review completed with
-  0 comments, `mergeStateStatus: CLEAN`. Awaiting user merge. NOTE: release stamps used to
+  0 comments, `mergeStateStatus: CLEAN`. **MERGED 2026-09-12 as `10de7f4c`.** NOTE: release stamps used to
   go straight to `main` (`31be1f7`, `c1df1be`); this session's auto-mode classifier denies
   both `git commit` on `main` ([CI Bypass]) and `git push origin main` ([Merge Without
   Review]), so the stamp went through a PR instead.
-  Remaining chain after #48 merges: tag `v0.4.16` + GitHub release → `git subtree pull`
-  into k3d-manager → close #124. k3d-manager itself has no `.github/dependabot.yml` —
-  this PR came from default security-updates-only.
+  **Chain COMPLETE 2026-09-12:** tag `v0.4.16` pushed on `10de7f4c` → GitHub release
+  https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.16 → `git subtree pull
+  --prefix=scripts/lib/foundation lib-foundation main --squash` on `k3d-manager-v1.33.0`
+  (`1de3b1e0`; vendored `browserslist` now 4.28.9, verified in the lockfile) → **k3d-manager
+  #124 CLOSED** unmerged with a comment explaining the subtree routing. k3d-manager itself
+  has no `.github/dependabot.yml` — this PR came from default security-updates-only, and
+  adding one to lib-foundation remains the open structural fix.
 
-- **lib-acg absorption Phase 3 (archive) — PREREQUISITES DONE 2026-09-12, ARCHIVE FLIP
-  PENDING.** `wilddog64/lib-acg` is `archived: false`, last pushed 2026-07-30. Its one
+- **lib-acg absorption Phase 3 (archive) — DONE 2026-09-12.** `wilddog64/lib-acg` is now
+  `archived: true` (flipped after #48 merged; API confirmed). Last pushed 2026-07-30. Its one
   stale open PR (#47, `fix/acg-session-profile-selector`) was triaged and **closed**
   unmerged with a pointer comment. Triage result: the `bin/acg-credential-test`
   undefined-`_sts_valid` half was already fixed in lib-foundation earlier
@@ -76,8 +80,9 @@
   `scripts/lib/acg/playwright/lib/pluralsight_login.js` still lacks it. Carried forward as
   `docs/bugs/2026-09-12-acg-logged-in-selectors-missing-prism-monogram.md` (in PR #48).
   It needs a live `make credential-test PROVIDER=aws` gate, so it is tracked not
-  blind-ported. Archive flip deliberately held until #48 merges, so the carry-forward
-  record is on lib-foundation's default branch first. See
+  blind-ported. Archive flip was held until #48 merged so the carry-forward record reached
+  lib-foundation's default branch first — verified present on `origin/main` before the flip.
+  Archiving does not delete lib-acg's PR branches or diffs; they stay readable read-only. See
   [[project_lib_acg_absorption]].
 
 - **Product catalog empty DB — ROOT-CAUSED AND REPAIRED 2026-09-11.** The
