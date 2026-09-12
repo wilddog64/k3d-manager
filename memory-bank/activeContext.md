@@ -67,6 +67,9 @@
   ONLY through PRs — a direct promotion commit to main was offered and declined.** After #51
   merges: tag `v0.4.17` at the merge commit, cut the release from that section body (notes ==
   section body verbatim, per v0.4.16), then `git subtree pull` the ACG tree into k3d-manager.
+  **All gates GREEN on #51: CI 3/3, Copilot 🟢 Approval recommended (0 findings), 0 unresolved
+  threads, `mergeStateStatus: CLEAN`.** Copilot again answered only after `reviewRequests` had
+  read `[]` — consistent with the #50 lesson: poll `reviews`, not `reviewRequests`.
   Claude does NOT merge.
   Branch-protection restore is **N/A for lib-foundation** — ruleset-guarded
   (`deletion`, `non_fast_forward`, `copilot_code_review`), no `enforce_admins` or
