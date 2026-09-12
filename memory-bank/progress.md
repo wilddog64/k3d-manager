@@ -162,7 +162,11 @@
   `LOGGED_IN_SELECTORS`, adds `SIGNED_OUT_SELECTORS` + `pageLooksSignedOut` /
   `urlLooksSignedOut` as a negative gate, and makes `acg_session_check.js` say out loud
   when the `k3dm-acg-pluralsight` Keychain item is missing. Handed to Codex via
-  `codex exec` (no commit — Codex cannot write `.git`; Claude commits the tree).
+  `codex exec`. **IMPLEMENTED `308bb3c`** (Codex authored; Codex could not write `.git`,
+  so Claude re-ran every gate and committed). Gates Claude ran, not taken on trust:
+  `npm run check` clean, jest 25/25 across 7 suites, `make lint`, `make shellcheck-lib`,
+  132 BATS — all green. CHANGE.md `[Unreleased]` entry added by Claude; still collides
+  with lib-foundation #49, rebase whichever lands second.
   Files in scope: `pluralsight_login.js`, `acg_session_check.js`,
   `tests/providers/pluralsight_login.test.js`. Operator action still required before the
   live gate can pass: create Keychain item `k3dm-acg-pluralsight` (username+password) OR
