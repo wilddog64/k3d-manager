@@ -308,6 +308,45 @@ place and replace only the `else` body with:
 so that if the invariant is ever broken by a later edit, it fails loudly rather
 than silently skipping every mapper.
 
+### B.3 — known limitation: create-if-absent is not reconcile-to-desired
+
+The B.2 fix creates the component **only when it is absent**. It does not update an
+existing component whose live config has drifted from the realm file. That is
+deliberate — updating in place is a larger change and needs its own decision about
+whether the hook is allowed to mutate a working federation — but it has a concrete
+consequence that the operator must know about.
+
+There is an **unmerged** branch in `shopping-cart-infra`,
+`fix/sso-federate-openldap0` (`d02e6622`, 2026-09-04, not an ancestor of
+`origin/main`), which rewrites this exact LDAP component to retire the osixia
+`ldap` service in favour of `openldap-0` (the user's "Option B" decision):
+
+```
+rdnLDAPAttribute   uid                                    -> cn
+connectionUrl      ldap://ldap.identity.svc...            -> ldap://openldap.identity.svc...
+usersDn            ou=users,dc=shopping-cart,dc=local     -> ou=users,dc=home,dc=org
+bindDn             cn=admin,dc=shopping-cart,dc=local     -> cn=ldap-admin,dc=home,dc=org
+```
+
+The fix itself is **config-agnostic** — it extracts whatever the rendered realm
+file declares at run time, so it creates the correct component under either
+branch, and nothing about it is hardcoded to osixia. The two branches also touch
+disjoint files, so they will not conflict in git.
+
+**But the landing order matters.** If this fix lands first, the next sync creates
+an osixia-pointed federation. When `fix/sso-federate-openldap0` later lands, the
+realm file changes but the component already exists, so create-if-absent does
+nothing and the live federation stays pointed at the retired directory —
+`partialImport` does not reliably update it either (that is the whole premise of
+this bug). The operator would have to delete the component by hand.
+
+Recommended order: land `fix/sso-federate-openldap0` first, then this fix. If this
+fix lands first instead, deleting the stale component once is the remedy.
+
+Follow-up (out of scope here): decide whether the hook should reconcile an existing
+component's config toward the realm file, which would remove this ordering
+constraint entirely.
+
 ## Rules
 
 - Work **only** in `shopping-cart-infra`, only in
