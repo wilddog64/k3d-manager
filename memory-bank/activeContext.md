@@ -47,11 +47,38 @@
   23+/23- over the same six packages as Dependabot's = identical scope. Gates: CI **3/3
   green** incl. the `acg (node)` job that runs `npm ci` from the committed lockfile;
   Copilot **approval recommended, 0 comments, 0 unresolved**; `npm audit` no longer
-  reports either browserslist advisory; `mergeable_state: clean`. lib-foundation `main`
-  is UNPROTECTED (404 Branch not protected) → no `enforce_admins` dance needed.
-  Awaiting user merge → lib-foundation release → subtree pull into k3d-manager →
-  close #124. k3d-manager itself has no `.github/dependabot.yml` — this PR came from
-  default security-updates-only.
+  reports either browserslist advisory; `mergeable_state: clean`. **MERGED 2026-09-12 as
+  `12aa9a06`.** Correction: lib-foundation `main` is NOT unprotected — the classic
+  `/branches/main/protection` endpoint 404s because it is guarded by **ruleset `13934293`**
+  ("Copilot review for default branch", `enforcement: active`, `bypass_actors: []`, rules
+  `deletion`/`non_fast_forward`/`copilot_code_review`); see
+  [[reference_classic_protection_404_on_ruleset_repos]]. #47 still needed no override —
+  Copilot had reviewed it, so the rule was satisfied.
+  **Release follow-up: lib-foundation PR #48** (`release/v0.4.16`, `2ef907c`) — promotes
+  `CHANGE.md` `[Unreleased]` → `## [v0.4.16] — 2026-09-12` and records the unported
+  lib-acg selector (below). Docs-only, 2 files. CI green, Copilot review completed with
+  0 comments, `mergeStateStatus: CLEAN`. Awaiting user merge. NOTE: release stamps used to
+  go straight to `main` (`31be1f7`, `c1df1be`); this session's auto-mode classifier denies
+  both `git commit` on `main` ([CI Bypass]) and `git push origin main` ([Merge Without
+  Review]), so the stamp went through a PR instead.
+  Remaining chain after #48 merges: tag `v0.4.16` + GitHub release → `git subtree pull`
+  into k3d-manager → close #124. k3d-manager itself has no `.github/dependabot.yml` —
+  this PR came from default security-updates-only.
+
+- **lib-acg absorption Phase 3 (archive) — PREREQUISITES DONE 2026-09-12, ARCHIVE FLIP
+  PENDING.** `wilddog64/lib-acg` is `archived: false`, last pushed 2026-07-30. Its one
+  stale open PR (#47, `fix/acg-session-profile-selector`) was triaged and **closed**
+  unmerged with a pointer comment. Triage result: the `bin/acg-credential-test`
+  undefined-`_sts_valid` half was already fixed in lib-foundation earlier
+  (`docs/bugs/2026-06-23-acg-credential-test-undefined-sts-valid.md`), but the
+  `.psPrismAvatar .psPrismMonogram[aria-label]` selector was **genuinely never ported** —
+  lib-foundation's `LOGGED_IN_SELECTORS` in
+  `scripts/lib/acg/playwright/lib/pluralsight_login.js` still lacks it. Carried forward as
+  `docs/bugs/2026-09-12-acg-logged-in-selectors-missing-prism-monogram.md` (in PR #48).
+  It needs a live `make credential-test PROVIDER=aws` gate, so it is tracked not
+  blind-ported. Archive flip deliberately held until #48 merges, so the carry-forward
+  record is on lib-foundation's default branch first. See
+  [[project_lib_acg_absorption]].
 
 - **Product catalog empty DB — ROOT-CAUSED AND REPAIRED 2026-09-11.** The
   `product-catalog` API served `HTTP 200` over a zero-row database for ~12h.
