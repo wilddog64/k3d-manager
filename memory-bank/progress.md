@@ -126,7 +126,14 @@
   `package.json`. Both upstreams at 4.28.2 and neither has `.github/dependabot.yml`, so
   upstream can't file it itself. Alert GHSA-73wf-gq98-2v4g (high, open) needs an untrusted
   `browserslist-stats.json` — none here; GHSA-c83g-rgw3-j3cx already auto-dismissed.
-  Fix upstream in lib-acg/lib-foundation, subtree-pull, then close #124.
+  Fixed upstream in **lib-foundation PR #47** @ `7b2adbd` (lib-acg is legacy — see
+  [[project_lib_acg_absorption]]): CI 3/3 green (incl. `acg (node)` = `npm ci` from the
+  lockfile), Copilot approval / 0 findings, `mergeable_state: clean`, main unprotected.
+  Awaiting merge → lib-foundation release → subtree pull → close #124.
+  Out of scope but surfaced by `npm audit` on that lockfile: 2 unrelated highs still open —
+  `brace-expansion` (new advisories BEYOND the GHSA-3jxr-9vmj-r5cp bump already landed, one
+  bypassing the CVE-2026-14257 mitigation) and `js-yaml` (`maxTotalMergeKeys` does not limit
+  CPU for empty merge sources, beyond the GHSA-h67p-54hq-rp68 bump). Each needs its own PR.
 - [ ] **Portability Phase 3 inventory recorded** in
   `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (24 `--context ubuntu-k3s`
   sites in `shopping_cart.sh`, 3 functions, resolver already present). Still needs the

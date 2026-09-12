@@ -38,8 +38,18 @@
   the structural gap. Backing alert is real but effectively unreachable here:
   GHSA-73wf-gq98-2v4g (high, open, alert #9) needs an untrusted
   `browserslist-stats.json`, which this repo has none of; GHSA-c83g-rgw3-j3cx
-  (alert #8) is already auto-dismissed. Correct fix: bump in `wilddog64/lib-acg`
-  (or lib-foundation, if lib-acg is being archived per Phase 3), subtree-pull down,
+  (alert #8) is already auto-dismissed.
+  **Fix landed upstream: lib-foundation PR #47** (`fix/browserslist-4.28.9-ghsa-73wf`
+  @ `7b2adbd`). Routing settled by [[project_lib_acg_absorption]]: standalone `lib-acg`
+  is LEGACY/diverged, so acg fixes belong in lib-foundation's native `scripts/lib/acg/`
+  (precedent: brace-expansion bump `efaf31b`) — NOT lib-acg. Lockfile regenerated with
+  `npm update --package-lock-only browserslist` (not hand-patched); resulting diff is
+  23+/23- over the same six packages as Dependabot's = identical scope. Gates: CI **3/3
+  green** incl. the `acg (node)` job that runs `npm ci` from the committed lockfile;
+  Copilot **approval recommended, 0 comments, 0 unresolved**; `npm audit` no longer
+  reports either browserslist advisory; `mergeable_state: clean`. lib-foundation `main`
+  is UNPROTECTED (404 Branch not protected) → no `enforce_admins` dance needed.
+  Awaiting user merge → lib-foundation release → subtree pull into k3d-manager →
   close #124. k3d-manager itself has no `.github/dependabot.yml` — this PR came from
   default security-updates-only.
 
