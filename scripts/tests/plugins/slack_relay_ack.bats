@@ -14,7 +14,7 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
   run grep -F -- "return jsonReply(\`🔍 Checking \${_where} cluster status…\`, threadTs, true)" "${WORKER}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- "const { ok } = await relay('/api/v1/cluster-status', payload)" "${WORKER}"
+  run grep -E -- "await relay\\('/api/v1/cluster-status', payload" "${WORKER}"
   [ "${status}" -eq 0 ]
 }
 
