@@ -285,6 +285,32 @@
   Archiving does not delete lib-acg's PR branches or diffs; they stay readable read-only. See
   [[project_lib_acg_absorption]].
 
+- **lib-acg residue cleanup — 2026-09-12.** Three leftovers from the absorption, handled:
+  (1) **Package identity re-homed.** `scripts/lib/acg/package.json` + `package-lock.json` in
+  lib-foundation still declared `"name": "lib-acg"` — inherited by the v0.4.0 verbatim
+  tree-copy. Renamed `lib-acg` → `lib-foundation-acg` on branch
+  `fix/acg-package-name-identity` (`a63884c`, pushed), spec
+  `docs/bugs/2026-09-12-acg-package-name-still-lib-acg.md`. Diff is exactly 3 identity lines;
+  `private: true`, never published, nothing resolves it by name; jest 28/28 green after.
+  **PR deliberately NOT opened — #51 is still open and a second concurrent PR in the same
+  repo is the exception, not the rule.** Open it after #51 merges.
+  The ~89 other `lib-acg` references (CHANGE.md, docs/plans, docs/bugs, docs/issues,
+  README.md, docs/api/acg.md) are **provenance and deliberately unchanged** — rewriting them
+  would falsify where the code came from.
+  (2) **Orphaned `scripts/lib/acg/` in k3d-manager DELETED** — 51M / 4,482 files, 0 tracked,
+  contents were `node_modules` only. The real subtree lives at
+  `scripts/lib/foundation/scripts/lib/acg/`; the standalone path was retired in v1.8.0.
+  (3) **Local `~/src/gitrepo/personal/lib-acg` clone NOT deleted — classifier-denied, user
+  must run it.** First made it safe: 175 commits across 48 local branches were unreachable
+  from remote `main` `7708ae31b` (35 branch tips + 2 stashes). Mostly pre-squash history of
+  merged PRs, but not provably all. Bundled every ref to
+  `~/src/gitrepo/personal/lib-acg-final-archive-2026-09-12.bundle` (860K, 76 refs,
+  `git bundle verify` = "complete history"), with the two stashes preserved as tags
+  `archive/stash-0` / `archive/stash-1`. **Test-restored from the bundle (50 branches,
+  15 tags, stash commits intact) before declaring it safe** — so deleting the clone is
+  reversible via `git clone <bundle>`. All remote tags (v0.4.0/v0.3.0/v0.1.9…) survive on
+  the archived repo independently.
+
 - **Product catalog empty DB — ROOT-CAUSED AND REPAIRED 2026-09-11.** The
   `product-catalog` API served `HTTP 200` over a zero-row database for ~12h.
   `argocd-repo-server` was crash-looping (28 restarts) during the
