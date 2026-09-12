@@ -35,8 +35,32 @@
   reconcile hook silently, making its own no-LDAP guard unreachable (5 sites); (B) the
   `shopping-cart` realm has zero users and no LDAP `UserStorageProvider` despite the
   realm JSON declaring one — nothing can authenticate. Work repo `shopping-cart-infra`,
-  branch `fix/keycloak-reconcile-pipefail-ldap-federation`. Needs B.1 answered
-  empirically first. Not dispatched.
+  branch `fix/keycloak-reconcile-pipefail-ldap-federation` (created by Claude from
+  `origin/main` @ `45def89`; the sandbox cannot write `.git`).
+  **DISPATCHED to Codex 2026-09-12** (`codex exec`, gpt-5.6-terra, session
+  `01a0936a-bc9a-7b33-bd66-a8b748992a9f`) after the spec was made dispatchable in
+  `cd424371` + `fe041b83`:
+  - **B.1 demoted from blocker to open question** — settling whether `partialImport`
+    creates the component needs a scratch realm on live Keycloak (operator action),
+    and B.2's shape is identical under either answer, so it does not gate the code.
+  - **Container toolchain constraint found and verified:** `keycloak:24.0` has **no
+    `jq`, no `python`/`python3`, no `awk`** — only `sed`. The component body is
+    therefore lifted out of the *rendered* realm JSON by a `sed` range extract
+    (verified locally: valid JSON, all 24 `config` entries, credential intact);
+    `providerType` injected, `parentId` omitted so Keycloak defaults it to the realm.
+  - A.2 now gives all five pipeline lines literally with exact indentation (120, 138,
+    160, **182**, **257** — the last two differ only by two leading spaces, so no
+    global replace).
+  - `else` branch decided: replace the silent skip with a hard failure rather than
+    dedent ~100 lines.
+  - **Landing-order constraint recorded (B.3):** the fix is create-if-absent, not
+    reconcile-to-desired. Unmerged branch `fix/sso-federate-openldap0` (`d02e6622`,
+    NOT an ancestor of `origin/main`) rewrites the same LDAP component to retire
+    osixia for `openldap-0`. The fix is config-agnostic and the branches touch
+    disjoint files, but if the fix lands first the component is created pointing at
+    the retired directory and create-if-absent will never update it. Land
+    `fix/sso-federate-openldap0` first, or delete the stale component once.
+  Claude commits + pushes after independent verify (Codex cannot).
 - [ ] **Portability Phase 3 inventory recorded** in
   `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (24 `--context ubuntu-k3s`
   sites in `shopping_cart.sh`, 3 functions, resolver already present). Still needs the

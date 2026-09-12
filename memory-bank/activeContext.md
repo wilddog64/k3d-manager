@@ -76,10 +76,28 @@
   Keycloak smoke-user / frontend-login warnings (Findings 4/5), which have been
   triaged as seed/credential problems. It also **contradicts**
   `shopping-cart-infra/docs/bugs/2026-05-15-keycloak-ldap-mappers-missing-from-reconcile.md`,
-  which claims partialImport *does* create the top-level component; the spec requires
-  settling that empirically before coding, since `|| true` alone would convert a
-  crashing job into a green job that configures nothing. Work repo is
-  `shopping-cart-infra` (spec-first, Codex-only, feature branch).
+  which claims partialImport *does* create the top-level component. `|| true` alone
+  would convert a crashing job into a green job that configures nothing, so the fix
+  must also create the component or fail loudly. Work repo is `shopping-cart-infra`
+  (spec-first, Codex-only, feature branch).
+  **DISPATCHED to Codex 2026-09-12** — spec made dispatchable in `cd424371` +
+  `fe041b83`; branch `fix/keycloak-reconcile-pipefail-ldap-federation` created by
+  Claude from `origin/main` @ `45def89` because the codex sandbox denies `.git`
+  writes (it also cannot `checkout`/`fetch`, not just `commit`). Changes that
+  unblocked it: **B.1 demoted from blocker to open question** (needs a scratch realm
+  on live Keycloak = operator action; B.2 is correct under either answer);
+  **`keycloak:24.0` ships no `jq`/`python`/`awk`, only `sed`** (probed the image), so
+  the component body is `sed`-range-extracted from the *rendered* realm JSON —
+  verified locally as valid JSON with all 24 `config` entries, `providerType`
+  injected and `parentId` omitted so Keycloak defaults it to the realm; all five
+  `grep` sites given literally (120/138/160/**182**/**257** — the last two differ
+  only by two spaces); the silent `else` skip replaced by a hard failure instead of
+  dedenting ~100 lines. **B.3 landing-order constraint:** create-if-absent is not
+  reconcile-to-desired, and unmerged `fix/sso-federate-openldap0` (`d02e6622`, not in
+  `origin/main`) repoints this same component from osixia to `openldap-0` — the fix
+  is config-agnostic and the branches touch disjoint files, but landing the fix first
+  creates a federation aimed at the retired directory that will never be updated.
+  Land `fix/sso-federate-openldap0` first, else delete the stale component once.
 
 - **Hardcoded `ubuntu-k3s` context — folded into the existing portability spec, NOT a
   new bug doc.** `docs/bugs/2026-07-07-app-cluster-vault-portability.md` already owns
