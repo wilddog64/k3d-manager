@@ -24,21 +24,76 @@
   kubectl call in it hardcodes `--context ubuntu-k3s`, which does not exist
   locally, and all failures are swallowed by `|| _info WARN`.
 
-- **Hermes ArgoCD operation-phase blind spot — SPEC WRITTEN, DISPATCHED TO CODEX
-  2026-09-11.** `argocd()` in `scripts/lib/hermes/sensors.py` classifies apps by
-  `health`/`sync` only and never reads `status.operationState.phase`, so the
-  failure class above is undetectable. Live proof still open:
-  `shopping-cart-identity` is `Synced/Healthy` with `operationState.phase=Failed`
-  (`01:54:41Z`) and Hermes calls it healthy. Spec:
-  `docs/bugs/v1.33.0-bugfix-hermes-argocd-operation-phase-blindspot.md` — adds
-  `TERMINAL_OPERATION_FAILURES = ("Error", "Failed")`, resolves app name/project
-  from the CR (`app.get('name','unnamed')` currently renders every alert as
-  `default/unnamed`), and appends `(+N more)` on truncation. Detection only; no
-  auto-remediation.
+- **Hermes ArgoCD operation-phase blind spot — IMPLEMENTED + VERIFIED 2026-09-11,
+  commit `6014235f` on `origin/k3d-manager-v1.33.0`.** `argocd()` in
+  `scripts/lib/hermes/sensors.py` classified apps by `health`/`sync` only and never
+  read `status.operationState.phase`, so the failure class above was undetectable.
+  Spec: `docs/bugs/v1.33.0-bugfix-hermes-argocd-operation-phase-blindspot.md`. Added
+  module constant `TERMINAL_OPERATION_FAILURES = ("Error", "Failed")` and an `elif`
+  branch (deliberately not a third `or`, so existing alert text stays byte-identical
+  and the signal is purely additive); resolves app name/project from the real CR
+  shape (`metadata.name`/`spec.project` — the old `app.get('name','unnamed')`
+  rendered every alert as `default/unnamed`); appends `(+N more)` on truncation.
+  Debounce channel stays `"argocd"` — no new sensor name, record type, or Slack
+  route. Detection only; no auto-remediation. Gate: `pytest scripts/tests/hermes/ -q`
+  → **57 passed**. Codex implemented `sensors.py` exactly per spec, then correctly
+  REFUSED to commit because one of my spec's test lines was defective (a fresh `{}`
+  constructed per comprehension iteration reset `_debounced`'s counter, so it could
+  never cross `threshold=3`); Claude fixed it with a shared `error_state` and
+  committed. My spec's predicted `58 passed` was wrong arithmetic (2 new tests on a
+  55 baseline) — corrected to 57 in the same commit. Non-vacuity proven by stashing
+  only `sensors.py`: `2 failed, 55 passed`.
 
-- **`ubuntu-k3s-data-layer` still OutOfSync** from the same `11:18:51Z`
-  repo-server outage, `operationState.phase=Error`. It has drift so auto-sync
-  could recover it, but has not in 12h. Not yet touched.
+- **`ubuntu-k3s-data-layer` RECOVERED 2026-09-12** by operator-initiated sync
+  (same lever as product-catalog). The drift was NOT caused by the outage: three
+  `shopping-cart-payment` ExternalSecrets (`payment-encryption-secret`,
+  `payment-gateway-secrets`, `postgres-payment-app`) stored `refreshInterval: 15m0s`
+  where git has `15m`. `kubectl diff` confirmed that was the only real difference,
+  and `git log -S'15m0s'` in `shopping-cart-infra` returns zero matches — so the
+  normalized value came from an out-of-band `kubectl apply` during the 2026-09-11
+  hub ESO recovery, not from the repo. **Key mechanism learned:** the app had
+  `syncPolicy.automated.selfHeal: true` and real drift, yet self-heal never fired
+  for 14h — ArgoCD suppresses automated retry of a revision whose last operation
+  terminally failed. So `operationState.phase=Error` blocks self-heal *even when
+  drift exists*; my earlier note that "it has drift so auto-sync could recover it"
+  was wrong. This widens the blast radius of the blind spot the Hermes fix above
+  now detects.
+
+- **`shopping-cart-identity` root-caused 2026-09-12 — SPEC WRITTEN, NOT IMPLEMENTED.**
+  `docs/bugs/2026-09-12-bugfix-keycloak-reconcile-pipefail-and-missing-ldap-federation.md`.
+  Its `keycloak-realm-reconcile` PostSync hook has been `Failed` since
+  `2026-09-11T01:54:41Z`, exiting 1 with **no error output** and a success line as its
+  last log entry. Cause: the script runs `/bin/bash -euo pipefail`, and
+  `ldap_id="$( kcadm get components ... | grep '"id"' | ... )"` returns nothing, so
+  `grep` exits 1, `pipefail` propagates it, and `set -e` kills the script on a plain
+  assignment — making the `else` "No LDAP component found; skipping mapper setup"
+  branch **unreachable**. Four more unguarded `grep`-in-`$()` sites have the same
+  latent silent-death (their explicit `ERROR: could not resolve ...` diagnostics can
+  never print). **Second, worse defect:** the `shopping-cart` realm has **zero users
+  and no `UserStorageProvider` component** even though `realm-shopping-cart.json:359`
+  declares an LDAP one, the `ldap` pod is Running, and `partialImport` exited 0 — so
+  nothing can authenticate against that realm. This is the likely real origin of the
+  Keycloak smoke-user / frontend-login warnings (Findings 4/5), which have been
+  triaged as seed/credential problems. It also **contradicts**
+  `shopping-cart-infra/docs/bugs/2026-05-15-keycloak-ldap-mappers-missing-from-reconcile.md`,
+  which claims partialImport *does* create the top-level component; the spec requires
+  settling that empirically before coding, since `|| true` alone would convert a
+  crashing job into a green job that configures nothing. Work repo is
+  `shopping-cart-infra` (spec-first, Codex-only, feature branch).
+
+- **Hardcoded `ubuntu-k3s` context — folded into the existing portability spec, NOT a
+  new bug doc.** `docs/bugs/2026-07-07-app-cluster-vault-portability.md` already owns
+  this as Phase 3, so per the dedup rule the measured inventory was appended there:
+  24 literal `--context ubuntu-k3s` occurrences in `scripts/plugins/shopping_cart.sh`
+  across exactly three functions (`shopping_cart_reconcile_product_catalog` 13,
+  `shopping_cart_reconcile_order_service` 6, `deploy_shopping_cart_data` 5), with the
+  default-preserving resolver `_shopping_cart_resolve_app_context()` already present
+  in the same file at `:553-563` and already consumed at `:161/:221/:407/:498`.
+  **Correction to my earlier note:** this is not "dead code" — `ubuntu-k3s` is the ACG
+  sandbox context and these functions belong to the `acg-up`/`bin/cluster-up:1831`
+  flow where it is correct; the defect is the coupling plus the fact that every call
+  swallows failure via `|| _info WARN`, so the function reports success while doing
+  nothing. Phase 3 still needs its decision-#1 re-scope before an implementation spec.
 
 - **Hub recovery execution:** M2 copy is checksum-verified. The new recovery
   helper has read-only validated seven source claims, resolved all seven live PV

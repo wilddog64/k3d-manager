@@ -89,11 +89,57 @@ Introduce `APP_CLUSTER_CONTEXT` (resolved from provider, default preserves today
    implementation spec (exact old/new blocks, `## Before You Start`, `## Definition of Done`,
    migration path), but it is **not handed off yet**.
 
+## Phase 3 — grounded evidence (added 2026-09-12)
+
+The 2026-09-11 product-catalog empty-DB incident put a concrete, measured cost on
+Phase 3, so the "25+ sites" estimate can now be replaced with an exact inventory
+for the highest-value file. `scripts/plugins/shopping_cart.sh` contains **24**
+literal `--context ubuntu-k3s` occurrences, confined to three functions:
+
+| Function | Occurrences | Lines |
+|---|---|---|
+| `shopping_cart_reconcile_product_catalog` | 13 | 841–899 |
+| `shopping_cart_reconcile_order_service` | 6 | 922–943 |
+| `deploy_shopping_cart_data` | 5 | 114–140 |
+
+**The resolver already exists in this same file.** `_shopping_cart_resolve_app_context()`
+(`:553-563`) resolves the provider via `_acg_resolve_provider` → `_acg_provider_context`
+and falls back to the literal `ubuntu-k3s`, preserving today's behavior exactly as
+decision #1 requires. Five other call sites in the file already consume it as
+`_app_context` (`:161`, `:221`, `:407`, `:498`). So for this file Phase 3 is not a
+find-replace against an unknown target — it is threading an existing, tested,
+default-preserving resolver into three functions that were written before it.
+
+**Why this matters more than it looks.** During the incident
+`shopping_cart_reconcile_product_catalog` was the named remediation path for an
+empty product catalog, and it could not have helped: on a machine where the app
+cluster is reached under a different provider, all 13 of its `kubectl` calls target
+a context that is not present, and **every failure is swallowed** — each call ends
+in `|| _info WARN` (and several in `2>/dev/null`), so the function runs to
+completion and reports success while doing nothing. Per the 2026-07-10 correction
+above, an *expired-but-still-resolvable* sandbox context makes this worse, not
+better: the calls hang against a dead endpoint before warning.
+
+This is the second defect class in one incident where a real failure was reported
+as success. Whatever shape Phase 3 takes, the swallowed-failure behavior in these
+three functions should be fixed **with** the context threading, not after it —
+otherwise the fix is unverifiable from logs.
+
+Note this is *not* dead code in its intended setting: these functions belong to the
+ACG `acg-up` / `bin/cluster-up:1831` flow, where `ubuntu-k3s` is the correct sandbox
+context. The defect is the coupling, not the function's existence.
+
+Incident detail: `docs/issues/2026-09-11-status-warnings-hub-vault-eso-breakage.md`
+Findings 10 and 12.
+
 ## Status
 
 - **Phase 1** — unblocked by the decisions above; needs a proper implementation spec written. **Queued.**
 - **Phase 2** — unblocked; follows Phase 1.
 - **Phase 3** — scope changed by decision #1: this is now "demote `k3s-aws` + add reachability preflight," **not** a mass rename. Re-scope before writing.
+- **Phase 3 inventory** — `shopping_cart.sh` half is now measured (24 sites, 3 functions,
+  resolver already present). Still needs the re-scope from decision #1 plus the
+  swallowed-failure fix before a spec is written.
 
 ## What NOT to Do
 

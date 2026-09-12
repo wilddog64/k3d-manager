@@ -257,3 +257,156 @@ Needs a decision: seed it, or drop the ExternalSecret.
 | 6 | Product catalog empty | data seed, root cause unknown |
 | 9 | `app-cluster-kubeconfig` Vault path | decision: seed or drop |
 | 2 | Hub-ESO coverage gap in `make status` | needs a spec |
+
+### Finding 10 — NEW. A failed ArgoCD operation hides behind a green app and blocks self-heal
+
+This is the defect *class* behind Finding 6, and it has now been observed three
+times in one day. When a sync operation errors **before reaching the PostSync
+phase**, every *tracked* resource still compares `Synced` — the resources really
+were applied. Only hooks are missing, and hooks are not tracked resources. So the
+Application reports `Synced/Healthy` while `status.operationState.phase` is
+`Error` or `Failed`.
+
+| App | sync/health | `operationState.phase` | finishedAt | What was actually broken |
+|---|---|---|---|---|
+| `ubuntu-k3s-shopping-cart-product-catalog` | `Synced/Healthy` | `Error` | `2026-09-11T11:18:51Z` | seed + FTS-index PostSync hooks never ran → empty DB behind HTTP 200 |
+| `ubuntu-k3s-data-layer` | `OutOfSync/Healthy` | `Error` | `2026-09-11T11:18:51Z` | 3 ExternalSecrets drifted; self-heal suppressed for 14h |
+| `shopping-cart-identity` | `Synced/Healthy` | `Failed` | `2026-09-11T01:54:41Z` | `keycloak-realm-reconcile` hook Job failed (Finding 11) |
+
+Both `Error` cases share the same origin: `argocd-repo-server` was crash-looping
+(28 restarts) during the `11:11:44Z → 11:18:51Z` window and the operation died on
+`ComparisonError: ... dial tcp 10.43.86.193:8081: connection refused (retried 5
+times)`.
+
+**The important correction.** It is tempting to assume the `Synced` case is the
+dangerous one and a drifted app will self-heal. It will not.
+`ubuntu-k3s-data-layer` had `syncPolicy.automated.selfHeal: true` **and** real
+drift, and still sat broken for 14h: ArgoCD suppresses automated retry of a
+revision whose last operation terminally failed, so it will not hot-loop on a
+known-bad revision. The `Error` phase is the blocker, not the absence of drift.
+Neither auto-sync nor self-heal can recover either shape without an operator.
+
+Consequences:
+
+- **Detection.** `argocd()` in `scripts/lib/hermes/sensors.py` keyed only on
+  `health`/`sync` and was blind to all three rows above. Fixed 2026-09-11 in
+  `6014235f`; spec
+  `docs/bugs/v1.33.0-bugfix-hermes-argocd-operation-phase-blindspot.md`. Only
+  `Error` and `Failed` alert — `Running`/`Terminating` are in-flight and a missing
+  `operationState` yields `phase=None`, which must stay silent (`hub-loki` has no
+  `operationState` at all).
+- **Recovery lever** (operator-initiated; the only thing that works):
+
+  ```bash
+  kubectl -n cicd patch application <app> --type merge \
+    -p '{"operation":{"initiatedBy":{"username":"<operator>"},"sync":{"revision":"HEAD"}}}'
+  ```
+
+`ubuntu-k3s-data-layer` was recovered this way at `2026-09-12T01:51:26Z`
+(`Succeeded/Synced/Healthy`). Its drift turned out **not** to be the outage's
+fault: three `shopping-cart-payment` ExternalSecrets
+(`payment-encryption-secret`, `payment-gateway-secrets`, `postgres-payment-app`)
+stored `refreshInterval: 15m0s` where git has `15m`. `kubectl diff` confirmed
+that was the only real difference, and `git log -S'15m0s'` in
+`shopping-cart-infra` returns zero matches — so the normalized value came from an
+out-of-band `kubectl apply` during the Finding 1 ESO recovery, not from the repo.
+After the sync all three read `15m` with `Ready=True`, and the value did not
+re-normalize, so this will not recur on its own.
+
+### Finding 11 — NEW. `keycloak-realm-reconcile` fails on `pipefail` when the realm has no LDAP provider
+
+Root cause of the `shopping-cart-identity` row above, and the likely real origin
+of the standing Keycloak smoke-user warning (Findings 4/5).
+
+The hook Job is `Failed` with `backoffLimit: 1` (both pods exit 1), but its logs
+end on a **success** line and emit no error:
+
+```
+browser-with-conditional-otp flow already exists; skipping creation
+browser-with-conditional-otp flow activated
+```
+
+The next statement in the inlined script — which runs under
+`/bin/bash -euo pipefail` — is:
+
+```bash
+ldap_id="$(
+  /opt/keycloak/bin/kcadm.sh get components \
+    -r "${KC_REALM}" -q type=org.keycloak.storage.UserStorageProvider \
+    --fields id 2>/dev/null \
+  | grep '"id"' | head -1 | sed 's/.*"id" : "\([^"]*\)".*/\1/'
+)"
+
+if [ -n "${ldap_id}" ]; then
+  ...
+else
+  echo "No LDAP component found; skipping mapper setup"
+fi
+```
+
+The realm genuinely has no LDAP provider — verified live:
+
+```
+kcadm.sh get components -r shopping-cart \
+  -q type=org.keycloak.storage.UserStorageProvider --fields id,name
+[ ]
+```
+
+So `grep '"id"'` matches nothing and exits 1. Under `pipefail` the whole pipeline
+returns 1, and because this is a plain assignment, `set -e` kills the script
+immediately with **no diagnostic**. The `else` branch that exists precisely to
+handle "no LDAP component" is therefore **unreachable** — the script dies before
+the `if` is ever evaluated.
+
+Two defects, not one:
+
+1. The guard is dead code. `|| true` (or `grep ... || :`) on the pipeline is the
+   minimal fix, letting `ldap_id` be empty and the `else` branch run.
+2. The failure is silent. Exit 1 with a success line as the last output is the
+   worst possible signature — it is what made this look like a Keycloak problem
+   rather than a shell problem.
+
+Not fixed here: the Job manifest lives in `shopping-cart-infra`, which is
+spec-first and Codex-only. Spec required before any edit.
+
+### Finding 12 — NEW. `shopping_cart_reconcile_product_catalog()` is provider-coupled and swallows every failure
+
+Named in Finding 6's remediation path, but it could not have helped here. All 13
+of its `kubectl` calls hardcode `--context ubuntu-k3s`, and every one of them ends
+in `|| _info WARN` (several also `2>/dev/null`), so the function runs to completion
+and reports success while doing nothing.
+
+**Correction to the first draft of this finding:** this is *not* "dead code". Per
+`docs/bugs/2026-07-07-stale-kube-context-assumptions.md`, `ubuntu-k3s` is the **ACG
+AWS sandbox context**, and these functions belong to the `acg-up` /
+`bin/cluster-up:1831` flow where that context is correct. A sandbox lives 4h
+(extendable to 8h), so its absence is the normal steady state, not drift. The
+defect is the provider coupling plus the swallowed failures — not the function's
+existence. It also means the worse failure mode is a **hang against an
+expired-but-still-resolvable endpoint**, not a clean "context not found".
+
+The swallowed failures are the more serious half: they are the same
+reported-success-over-real-failure pattern as Finding 10, in the very function
+meant to remediate it.
+
+Not filed as a new bug doc — `docs/bugs/2026-07-07-app-cluster-vault-portability.md`
+already owns this as **Phase 3 (De-hardcode `ubuntu-k3s`)**. The measured inventory
+(24 sites across 3 functions in `scripts/plugins/shopping_cart.sh`, with the
+default-preserving resolver `_shopping_cart_resolve_app_context()` already present
+in the same file at `:553-563`) was appended there instead. That phase still needs
+its re-scope and an implementation spec before any edit (`scripts/plugins/` is
+spec-first).
+
+### Still open after this pass (updated 2026-09-12)
+
+| # | Item | Blocked on |
+|---|---|---|
+| 3 | Grafana admin password reset | `kubectl exec` (classifier) |
+| 4/5 | Keycloak smoke-user reseed | classifier; likely downstream of Finding 11 |
+| 9 | `app-cluster-kubeconfig` Vault path | decision: seed or drop |
+| 2 | Hub-ESO coverage gap in `make status` | needs a spec |
+| 11 | `keycloak-realm-reconcile` pipefail | spec + Codex in `shopping-cart-infra` |
+| 12 | `shopping_cart_reconcile_product_catalog` context + swallowed failures | folded into portability Phase 3; needs re-scope + spec |
+
+Closed this pass: Finding 6 (product catalog, repaired + root-caused), Finding 10
+(detection shipped in `6014235f`; `ubuntu-k3s-data-layer` recovered).

@@ -10,12 +10,37 @@
   the sync pre-PostSync; app stayed `Synced/Healthy` so auto-sync never replayed
   them. Repaired via operator-initiated sync; verified 1000 product rows and API
   HTTP 200 with real items. Detail in `memory-bank/activeContext.md`.
-- [~] **Hermes ArgoCD operation-phase blind spot — spec dispatched to Codex.**
-  `docs/bugs/v1.33.0-bugfix-hermes-argocd-operation-phase-blindspot.md` on
-  `k3d-manager-v1.33.0`. Gate: `pytest scripts/tests/hermes/ -q` must go 55 → 58
-  passed. No PR yet.
-- [ ] **`ubuntu-k3s-data-layer` OutOfSync** since `11:18:51Z` (same repo-server
-  outage) — needs the same operator sync or an explanation.
+- [x] **Hermes ArgoCD operation-phase blind spot — IMPLEMENTED + VERIFIED
+  2026-09-11, `6014235f` on `origin/k3d-manager-v1.33.0`.** Spec
+  `docs/bugs/v1.33.0-bugfix-hermes-argocd-operation-phase-blindspot.md`. `argocd()`
+  now flags `status.operationState.phase in ("Error","Failed")` behind a green
+  `health`/`sync` pair, resolves app name/project from the CR shape, and truncates
+  with `(+N more)`. Gate: `pytest scripts/tests/hermes/ -q` → **57 passed** (55
+  baseline + 2 new tests; the spec's predicted 58 was wrong arithmetic, corrected in
+  the same commit). Non-vacuity proven: reverting only `sensors.py` gives `2 failed,
+  55 passed`. Pre-existing argocd test untouched → strictly additive. No PR yet.
+- [x] **`ubuntu-k3s-data-layer` recovered 2026-09-12** via operator-initiated sync.
+  Drift was NOT the outage itself: three `shopping-cart-payment` ExternalSecrets
+  (`payment-encryption-secret`, `payment-gateway-secrets`, `postgres-payment-app`)
+  stored `refreshInterval: 15m0s` against git's `15m`. `15m0s` has never existed in
+  `shopping-cart-infra` history (`git log -S` = 0 matches), so it came from an
+  out-of-band apply during the 2026-09-11 ESO recovery. Auto-sync could not heal it
+  despite `selfHeal: true` because ArgoCD suppresses automated retry of a revision
+  whose last operation terminally failed — the `Error` phase was the blocker, not the
+  absence of drift.
+
+- [~] **`shopping-cart-identity` hook failure — spec written, not implemented.**
+  `docs/bugs/2026-09-12-bugfix-keycloak-reconcile-pipefail-and-missing-ldap-federation.md`.
+  Two defects: (A) `grep` in a command substitution under `set -euo pipefail` kills the
+  reconcile hook silently, making its own no-LDAP guard unreachable (5 sites); (B) the
+  `shopping-cart` realm has zero users and no LDAP `UserStorageProvider` despite the
+  realm JSON declaring one — nothing can authenticate. Work repo `shopping-cart-infra`,
+  branch `fix/keycloak-reconcile-pipefail-ldap-federation`. Needs B.1 answered
+  empirically first. Not dispatched.
+- [ ] **Portability Phase 3 inventory recorded** in
+  `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (24 `--context ubuntu-k3s`
+  sites in `shopping_cart.sh`, 3 functions, resolver already present). Still needs the
+  decision-#1 re-scope + swallowed-failure fix before a spec.
 
 - [~] **HUB KINE / HOSTINGER ESO INCIDENT 2026-09-09 — mitigated.** Webhook
   `UNKNOWN` was caused by a saturated hub K3s/Kine datastore, not Hostinger:
