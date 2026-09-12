@@ -28,7 +28,21 @@
   and only the latter justifies the restart. Spec filed:
   `docs/bugs/2026-09-12-acg-sts-probe-conflates-broken-cli-with-invalid-credentials.md`
   (`1838f08`): preflight `aws --version`, keep the probe's stderr, restart ONLY on
-  recognized rejection codes, same guard for `_az_sp_valid`. NOT yet dispatched to Codex.
+  recognized rejection codes, same guard for the Azure paths. **FIXED `e12d41a`** (Codex;
+  Claude verified + committed). Restart-worthy codes: `InvalidClientTokenId`, `ExpiredToken`,
+  `AuthFailure`, `SignatureDoesNotMatch`, `AccessDenied`, `UnrecognizedClientException`.
+  All three Azure paths guarded; `_azure_auth_failed` confirmed non-destructive (prints +
+  `exit 1`, no restart). **Claude proved the guard is real, not just green:** the PRE-fix
+  script run against a stubbed broken CLI restarts once (bug reproduced); post-fix does not
+  restart at all. Gates: lint, shellcheck-lib, **137 BATS** (3 new), npm check, jest 28/28.
+
+- **HOST `aws` CLI IS STILL BROKEN — BLOCKED ON USER, `brew upgrade` denied by classifier.**
+  `brew update` revealed BOTH `awscli` and `aws-c-s3` are outdated (a rebuilt bottle exists);
+  `brew reinstall awscli` does NOT fix it (refetches the same bottle). The fix is
+  **`brew upgrade awscli aws-c-s3`** — Claude attempted it and the Claude Code auto-mode
+  classifier denied the action. The user must run it (e.g. `! brew upgrade awscli aws-c-s3`).
+  Until then `make credential-test` CANNOT pass, because passing is defined by that CLI
+  succeeding — even though the extracted credentials are provably valid.
   **The PR gate is still unmet** — but for the first time nothing in the ACG automation is
   implicated.
 
