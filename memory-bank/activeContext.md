@@ -98,6 +98,15 @@
   is config-agnostic and the branches touch disjoint files, but landing the fix first
   creates a federation aimed at the retired directory that will never be updated.
   Land `fix/sso-federate-openldap0` first, else delete the stale component once.
+  **2026-09-12 — user chose the B.3 order ("Land openldap repoint first, then fix,
+  then sync"). `fix/sso-federate-openldap0` is now PR #96, merge-ready:** CI 4/4,
+  Copilot 2/2 fixed (`7be63e3`) + resolved, `enforce_admins` disabled (RE-ENABLE
+  AFTER MERGE). Copilot found a defect I missed — the hook's group mapper still used
+  `ou=groups,dc=shopping-cart,dc=local`, which would have broken group sync and
+  ArgoCD RBAC; also corrected `membership.user.ldap.attribute` uid→`cn` to match the
+  seeded `member: cn=...` DNs. Verified the fix's `sed` extraction against this
+  branch's realm JSON in the real image — composes correctly, yields openldap values.
+  Nothing merged, nothing synced.
   **IMPLEMENTED + VERIFIED 2026-09-12 — `a5838c19`, pushed, local == origin.** Codex
   wrote it, Claude verified and committed. 1 file, +38/-6. `YAML OK`; shellcheck 0
   warnings both before and after; `bash -n` clean; five spec sites guarded

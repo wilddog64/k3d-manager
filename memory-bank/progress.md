@@ -77,6 +77,41 @@
   store. NOT synced — landing the manifest is the deliverable; no PR (gated).
   Remaining before the app can go green: an operator sync with hook replay, and the
   B.3 ordering decision.
+- [~] **openldap-0 SSO federation — PR #96 OPEN, MERGE-READY (2026-09-12).**
+  `https://github.com/wilddog64/shopping-cart-infra/pull/96`, branch
+  `fix/sso-federate-openldap0` @ `7be63e3`. User chose the B.3-correct landing order
+  (repoint first, then the hook fix, then one sync), so this PR is the **prerequisite**
+  for `fix/keycloak-reconcile-pipefail-ldap-federation`.
+  Gates: CI **4/4 green** (yamllint, kubeconform, kustomize build, GitGuardian);
+  Copilot **2 findings, both fixed in `7be63e3`, replied + threads resolved (0
+  unresolved)**; scope check clean. `enforce_admins` **disabled** on
+  `shopping-cart-infra` main — **must be re-enabled after merge** (bodyless POST).
+  **Copilot caught a real defect I had missed:** the reconcile hook's LDAP group
+  mapper still hardcoded `groups.dn: ou=groups,dc=shopping-cart,dc=local`, so group
+  sync — and ArgoCD RBAC, which depends on it — would have broken once federation
+  moved to `dc=home,dc=org`. Fixed. Its follow-on suspicion was also right:
+  `membership.user.ldap.attribute` was `uid`, but
+  `scripts/etc/ldap/bootstrap-basic-schema.ldif` seeds membership as DN-valued
+  `member: cn=chengkai.liang,ou=users,dc=home,dc=org` (**`cn` RDN**), so member
+  lookup by `uid` would have matched nothing even with the right `groups.dn` →
+  changed to `cn`.
+  Pre-merge verification: the keycloak fix's `sed` extraction was re-run against
+  **this branch's** realm JSON inside `quay.io/keycloak/keycloak:24.0` — still valid
+  JSON, 24 `config` entries, and it yields the openldap values
+  (`ldap://openldap.identity.svc.cluster.local:389`, `ou=users,dc=home,dc=org`,
+  `cn=ldap-admin,dc=home,dc=org`, `rdnLDAPAttribute=cn`), so the two changes compose.
+  Credential path `secret/data/ldap/openldap-admin`/`LDAP_ADMIN_PASSWORD` proven
+  resolvable: `identity/openldap-admin` ES already reads it, `Ready=True`, same
+  `vault-kv-store` SecretStore.
+  **Known, NOT changed:** the seed's `admin`/`developer`/`operator` entries use a
+  `uid=` RDN while `rdnLDAPAttribute` is now `cn`. Harmless here because
+  `editMode: READ_ONLY` means Keycloak never constructs DNs for writes, but it is an
+  inconsistency in the seed worth revisiting.
+  **NOT merged** (never auto-merge) and **NOT synced**. Sequence still owed:
+  merge #96 → re-enable `enforce_admins` → PR the hook fix (`a5838c19`) → merge →
+  operator sync with hook replay → verify realm has a `UserStorageProvider` and users.
+  The app tracks `targetRevision: HEAD`, currently `45def89`, which is why no sync can
+  help until these land.
 - [ ] **Portability Phase 3 inventory recorded** in
   `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (24 `--context ubuntu-k3s`
   sites in `shopping_cart.sh`, 3 functions, resolver already present). Still needs the
