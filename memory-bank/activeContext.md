@@ -71,14 +71,30 @@
   `gcp.js` logs `[set]`/`[empty]` only. Diff was fully contained inside
   `scripts/lib/foundation/` (0 files outside the prefix). Gates: `bash -n` OK on all 4
   changed shell files, shellcheck clean, acg jest **28/28 across 7 suites**.
-  **k3d-manager full BATS `test all`: 820 pass / 4 fail — none caused by the pull.**
-  3 are pre-existing (confirmed by re-running the same suites at pre-pull `e7d54b16`:
-  `configure_vault_argocd_repos --dry-run makes no kubectl calls`,
-  `... --dry-run --seed-vault prints actions only`,
-  `slack relay allowlist includes cluster-status and hostinger-status`). The 4th,
-  `slack relay cluster-status acks before webhook completes`, is a **load-only flake** —
-  it passed 3/3 in isolation on BOTH the pre-pull and post-pull trees, and only fails
-  inside the full-suite run. Neither failing suite references `foundation` at all.
+  **k3d-manager full BATS `test all`: was 820 pass / 4 fail — none caused by the pull;
+  now 824 pass / 0 fail as of `64bc7af4` (2026-09-12).**
+  All 4 were **stale test assertions, not product bugs** — fixed by Codex against spec
+  `docs/bugs/v1.33.0-bugfix-stale-bats-grep-assertions.md` (`f6be494b`), commit
+  `64bc7af4` (test files only, 3 files / +16 / -2). Verified independently by Claude:
+  diff contained to the 3 permitted test files, all 3 suites green, full suite re-run
+  `1..824` with **0 `not ok`**.
+  Root causes: (1+2) `argocd_deploy_keys.bats` ran under `env -i` **without
+  `CLUSTER_PROVIDER`**, so `_acg_resolve_provider` (`scripts/lib/provider.sh:246`)
+  auto-detected a context by probing `kubectl get --raw=/readyz`; `stub_kubectl_command`
+  routes bare `kubectl` into `_kubectl`, so the probe both polluted `KUBECTL_LOG` (breaking
+  `[ ! -s ... ]`) **and consumed one `KUBECTL_EXIT_CODES` entry** — meaning the two
+  exit-code-scripted tests were passing for the wrong reason. Fixed by pinning
+  `CLUSTER_PROVIDER=k3s-hostinger` in `BASE_ENV`. (3) `slack_slash_commands.bats` grepped
+  the whole frozen `ALLOWED_COMMANDS` line, which broke when `/cleanup-stale-sandbox` was
+  added to the worker; the worker and `docs/howto/slack-slash-commands.md` were already
+  correct. Now asserts membership per command (still requires all 12 — a narrowing, not a
+  weakening). (4) `slack_relay_ack.bats` grepped `const { ok } = await relay(...)`, but the
+  worker now destructures `conflict` and passes `meta`; now asserts the relay target only.
+  **CORRECTION to the earlier entry: `slack relay cluster-status acks before webhook
+  completes` was NOT a load-only flake.** It is a `grep` against a static file and fails
+  3/3 deterministically in isolation — the earlier "passes in isolation" claim was wrong.
+  Neither failing suite referenced `foundation`, so the not-caused-by-the-pull conclusion
+  stands on the containment diff independently.
   **Retro written: lib-foundation `docs/retro/2026-09-12-v0.4.17-retrospective.md` on branch
   `docs/v0.4.17-retrospective` (`e6fff6a`, pushed, NO PR).** Put on its own branch so the
   package-rename PR's diff stays at exactly 3 identity lines. Note v0.4.13–v0.4.16 have no

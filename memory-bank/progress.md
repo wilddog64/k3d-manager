@@ -167,11 +167,23 @@
   `SIGNED_OUT_SELECTORS`/`pageLooksSignedOut` present, **0** `id.pluralsight.com` left in
   `playwright/lib/`, `gcp.js` masking to `[set]`/`[empty]`. Pull touched 0 files outside the
   subtree prefix. Gates: `bash -n` + shellcheck clean, acg jest 28/28 across 7 suites,
-  k3d-manager `test all` **820 pass / 4 fail — all 4 pre-existing or flaky, none from the pull**
-  (3 reproduce at pre-pull `e7d54b16`; the 4th, `slack relay cluster-status acks before
-  webhook completes`, passes 3/3 in isolation on both trees and only fails under full-suite
-  load). Retro: lib-foundation `docs/retro/2026-09-12-v0.4.17-retrospective.md` on
+  k3d-manager `test all` **820 pass / 4 fail at the time of the pull — none from the pull**
+  (all 4 later proven to be stale test assertions; see the next item). Retro:
+  lib-foundation `docs/retro/2026-09-12-v0.4.17-retrospective.md` on
   `docs/v0.4.17-retrospective` (`e6fff6a`, pushed, no PR).
+- [x] **BATS back to 824 pass / 0 fail (2026-09-12) — Codex, spec `f6be494b`, fix `64bc7af4`.**
+  All 4 failures were **stale assertions, not product bugs**. Spec:
+  `docs/bugs/v1.33.0-bugfix-stale-bats-grep-assertions.md`. Test files only (3 files,
+  +16/-2); no production code touched. Claude verified independently: diff contained to the
+  3 permitted test files, each suite green, full suite re-run `1..824` with 0 `not ok`.
+  Causes: missing `CLUSTER_PROVIDER` in `argocd_deploy_keys.bats` `BASE_ENV` let
+  `_acg_resolve_provider` probe `/readyz` through the kubectl stub (polluting `KUBECTL_LOG`
+  *and* eating a scripted exit code); two frozen whole-line `grep -F` assertions in the
+  slack suites had drifted from the worker (`/cleanup-stale-sandbox` added;
+  `const { ok, conflict } = await relay(..., meta)`). **Correction: `slack relay
+  cluster-status acks before webhook completes` was NOT a load flake — it greps a static
+  file and failed 3/3 in isolation.** Codex could not commit (sandbox denied
+  `.git/index.lock`, the known limit) — Claude committed and pushed.
 - [ ] **lib-foundation `fix/acg-package-name-identity` — ready for PR, not opened.**
   Brought forward onto v0.4.17 main as a MERGE (tip `31a648f`; `2556023` merges `92d8852`),
   not a rebase — the rebase would have needed a classifier-denied `--force-with-lease`. Merge
