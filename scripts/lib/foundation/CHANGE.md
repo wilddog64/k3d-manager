@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [v0.4.16] — 2026-09-12
+
+### Security
+- `scripts/lib/acg/package-lock.json`: bump the dev-only transitive `browserslist` family
+  — `browserslist` 4.28.2 → 4.28.9, plus its pinned companions `baseline-browser-mapping`
+  2.10.34 → 2.11.22, `caniuse-lite` 1.0.30001793 → 1.0.30001810, `electron-to-chromium`
+  1.5.368 → 1.5.427, `node-releases` 2.0.47 → 2.0.55 and `update-browserslist-db`
+  1.2.3 → 1.3.3 — to clear two high-severity advisories: GHSA-73wf-gq98-2v4g (uncaught
+  crash / prototype write via untrusted `browserslist-stats.json` custom stats in
+  `normalizeStats`, patched in 4.28.7) and GHSA-c83g-rgw3-j3cx (unbounded memory growth
+  from a query cache with no eviction, patched in 4.28.7). `browserslist` is pulled in
+  only by the jest/babel test toolchain at `^4.24.0`, so `package.json` is unchanged and
+  the dependency shape is identical — lockfile-only, regenerated with
+  `npm update --package-lock-only browserslist`; `npm ci --dry-run` resolves and
+  `npm audit` no longer reports either advisory. Neither advisory is reachable in this
+  module: nothing here writes or reads a `browserslist-stats.json`, and the cache growth
+  needs a long-lived process issuing distinct queries. Surfaces as Dependabot alerts #9
+  and #8 on the k3d-manager consumer that vendors this lockfile via subtree; that
+  consumer's own PR must NOT be merged, since it would write inside the
+  `scripts/lib/foundation/` subtree and be reverted by the next subtree pull. Reaches
+  k3d-manager via the next lib-foundation release + subtree pull.
+
 ## [v0.4.15] — 2026-09-05
 
 ### Added
