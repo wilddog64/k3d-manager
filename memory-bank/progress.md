@@ -150,11 +150,10 @@
   `enforce_admins` DISABLED on `shopping-cart-infra` main for the merge — **re-enable after
   merge with the bodyless POST**. No Copilot review: the repo has no Copilot review workflow
   and the `requested_reviewers` POST silently no-ops there (returns 200, list stays empty).
-- [x] **lib-foundation PR #49 OPEN 2026-09-12** — `fix/acg-gcp-username-log-masking` (`44d43bd`),
-  the gcp.js username masking split off the selector branch. CI success, Copilot reviewed
-  (COMMENTED, **0 inline findings**), `mergeable_state: clean` — no `enforce_admins` lever
-  needed (main is ruleset-guarded, ruleset 13934293). Awaiting user merge, then tag/release +
-  `git subtree pull` to carry it into k3d-manager.
+- [x] **lib-foundation PR #49 MERGED 2026-09-12 as `cf62d41`** — `fix/acg-gcp-username-log-masking`
+  (`44d43bd`), the gcp.js username masking split off the selector branch. CI success, Copilot
+  reviewed (COMMENTED, **0 inline findings**), no `enforce_admins` lever needed (main is
+  ruleset-guarded, ruleset 13934293). Release + `git subtree pull` tracked under PR #51 below.
 - [ ] **lib-foundation: ACG session-check false-green — bug filed, Codex assigned.**
   Spec `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`
   (commit `ecfc15f`, pushed on `fix/acg-prism-monogram-selector`). Removes the two
@@ -173,8 +172,12 @@
   sign in once manually in `~/.local/share/k3d-manager/pw-profile`. MFA accounts can only
   use the manual path.
 
-- [x] **lib-foundation `fix/acg-prism-monogram-selector` — LIVE GATE GREEN 2026-09-12; PR
-  NOT YET OPENED.** Branch carries `a8342e1`, `308bb3c`, `87f4af7`, `4389e03`, `e12d41a`
+- [x] **lib-foundation PR #50 MERGED 2026-09-12 as `c87196d0`** (`fix/acg-prism-monogram-selector`,
+  head `7e9eae5`) — live gate GREEN, CI 3/3, all review threads resolved. Copilot DID review,
+  late: its one finding was VALID and was rebase damage in `CHANGE.md` (12 resurrected lines of
+  the pre-correction false-green wording, fixed in `7e9eae5`). **The post-rebase integrity check
+  had excluded `CHANGE.md` — the only hand-resolved file — so it could not have caught it.**
+  Branch carries `a8342e1`, `308bb3c`, `87f4af7`, `4389e03`, `e12d41a`
   plus four `docs/bugs/` specs. `make credential-test PROVIDER=aws` now passes end to end
   (session OK → sandbox tab reused → 4 copyable inputs → creds written →
   `sts:GetCallerIdentity OK`, **no restart**). The earlier "false-green `text=/Cloud

@@ -36,7 +36,7 @@
   script run against a stubbed broken CLI restarts once (bug reproduced); post-fix does not
   restart at all. Gates: lint, shellcheck-lib, **137 BATS** (3 new), npm check, jest 28/28.
 
-- **lib-foundation PR #50 OPEN — AWAITING USER MERGE.** `fix(acg): dead identity host,
+- **lib-foundation PR #50 MERGED 2026-09-12 as `c87196d0`.** `fix(acg): dead identity host,
   profile split-brain, and a destructive STS probe`,
   https://github.com/wilddog64/lib-foundation/pull/50 — head `685031a`, base `cf62d41`,
   now head `7e9eae5` (11 commits), base `cf62d41`. **CI 3/3 green** (shellcheck, bats, acg
@@ -59,6 +59,21 @@
   a positive assertion on the conflicted file itself: `git diff <backup> HEAD -- CHANGE.md`
   must equal exactly what the new base contributed (verified: only #49's Security entry).
   Documented in lib-foundation `docs/issues/2026-09-12-copilot-pr50-review-findings.md`.
+  **NEXT: lib-foundation PR #51 OPEN — release v0.4.17.**
+  https://github.com/wilddog64/lib-foundation/pull/51 — branch `release/v0.4.17`, commit
+  `058b209`, promotes `CHANGE.md` `[Unreleased]` to `## [v0.4.17] — 2026-09-12` and nothing
+  else (diff is 2 added lines, 0 removed; verified). Empty `[Unreleased]` kept per the
+  `31be1f7` (v0.4.15) precedent. **Decision 2026-09-12 (user): lib-foundation `main` advances
+  ONLY through PRs — a direct promotion commit to main was offered and declined.** After #51
+  merges: tag `v0.4.17` at the merge commit, cut the release from that section body (notes ==
+  section body verbatim, per v0.4.16), then `git subtree pull` the ACG tree into k3d-manager.
+  Claude does NOT merge.
+  Branch-protection restore is **N/A for lib-foundation** — ruleset-guarded
+  (`deletion`, `non_fast_forward`, `copilot_code_review`), no `enforce_admins` or
+  required-approval lever; `/branches/main/protection` 404s by design.
+  **`shopping-cart-infra` #97 still OPEN, `enforce_admins` still `false` — correctly so, it is
+  needed for that merge. Restore it only after #97 lands.**
+
   #49 MERGED as `cf62d41`; the prism branch was rebased onto it and force-pushed by the USER
   (`e12d41a...685031a`, forced) after the classifier denied Claude the force-push.
 
