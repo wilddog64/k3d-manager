@@ -182,9 +182,10 @@
   `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md` CORRECTION.
   The real defects were the dead `id.pluralsight.com` host (`87f4af7`) and the
   `PLAYWRIGHT_AUTH_DIR` profile split-brain (`4389e03`). The gate's last apparent blocker —
-  a broken Homebrew `aws` v2 — was not a blocker either: a working **aws-cli/1.45.3 at
-  `~/.pyenv/shims/aws`** was already installed; run the gate with
-  `PATH="$HOME/.pyenv/shims:$PATH"`. All four pre-PR gates are now met.
+  a broken Homebrew `aws` v2 — was not a blocker either (a working **aws-cli/1.45.3 at
+  `~/.pyenv/shims/aws`** was already installed), and the v2 is now repaired as well:
+  `brew upgrade awscli` pulled `aws-c-s3` 1.1.1 + the `awscli` 2.36.44_1 revision bottle.
+  Gate re-verified on the plain default PATH. All four pre-PR gates are now met.
   Still conflicts with #49 in `CHANGE.md` `[Unreleased]` — rebase whichever lands second.
 - [x] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: CLOSED unmerged 2026-09-12, fixed upstream instead.**
   Patches `scripts/lib/foundation/scripts/lib/acg/package-lock.json` inside the

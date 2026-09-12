@@ -48,9 +48,11 @@
   `arn:aws:iam::<account>:user/cloud_user`, rc=0.
   **Lesson: check for a second, working copy of a broken tool before declaring a blocker.**
   `which -a <tool>` costs nothing; "blocked on the user" was wrong for a full session.
-  Homebrew's v2 is still broken and both `awscli` and `aws-c-s3` are still outdated —
-  repairing it (`brew upgrade awscli aws-c-s3`, denied twice by the Claude Code auto-mode
-  classifier, so the user must run it) is now **cosmetic, not a blocker**.
+  Homebrew's v2 is **also fixed now** — the user ran `brew upgrade awscli` (2026-09-12),
+  which pulled `aws-c-s3` 1.1.0 → 1.1.1 and the `awscli` 2.36.44 → 2.36.44_1 revision
+  bottle that links against it. `/opt/homebrew/bin/aws` reports `aws-cli/2.36.44` and
+  `sts get-caller-identity` returns rc=0. The gate was re-run on the **default PATH** with
+  no shim and passed identically, so no PATH workaround is needed going forward.
   **The PR gate for `fix/acg-prism-monogram-selector` is now MET.**
 
 - **ACG credential-test failure — ROOT CAUSE CORRECTED 2026-09-12. `id.pluralsight.com`
