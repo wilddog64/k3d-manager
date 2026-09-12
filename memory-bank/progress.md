@@ -145,8 +145,20 @@
   — DONE 2026-09-12 (`bd6c9e8`, pushed).** Written by Codex against the follow-up scope
   appended to `docs/bugs/2026-09-12-bugfix-keycloak-reconcile-pipefail-and-missing-ldap-federation.md`
   (spec commit `93ed35b8`); Claude verified the diff (1 file, 1 insertion, 0 deletions, hook
-  YAML untouched, HEAD unmoved) and committed. Branch is now PR-ready — step 2 of the B.3
-  landing order.
+  YAML untouched, HEAD unmoved) and committed. **PR #97 OPEN 2026-09-12** — step 2 of the
+  B.3 landing order; all 4 checks pass (GitGuardian, Kubeconform, Kustomize Build, YAML Lint);
+  `enforce_admins` DISABLED on `shopping-cart-infra` main for the merge — **re-enable after
+  merge with the bodyless POST**. No Copilot review: the repo has no Copilot review workflow
+  and the `requested_reviewers` POST silently no-ops there (returns 200, list stays empty).
+- [x] **lib-foundation PR #49 OPEN 2026-09-12** — `fix/acg-gcp-username-log-masking` (`44d43bd`),
+  the gcp.js username masking split off the selector branch. CI success, Copilot reviewed
+  (COMMENTED, **0 inline findings**), `mergeable_state: clean` — no `enforce_admins` lever
+  needed (main is ruleset-guarded, ruleset 13934293). Awaiting user merge, then tag/release +
+  `git subtree pull` to carry it into k3d-manager.
+- [ ] **lib-foundation `fix/acg-prism-monogram-selector` (`a8342e1`) — NO PR.** Live
+  `make credential-test PROVIDER=aws` gate still unrun (CDP on :9222 down, needs one-time
+  manual Pluralsight login). Will conflict with #49 in `CHANGE.md` `[Unreleased]` — rebase
+  whichever lands second.
 - [x] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: CLOSED unmerged 2026-09-12, fixed upstream instead.**
   Patches `scripts/lib/foundation/scripts/lib/acg/package-lock.json` inside the
   lib-foundation subtree → violates edit-upstream-first; next `git subtree pull` would
