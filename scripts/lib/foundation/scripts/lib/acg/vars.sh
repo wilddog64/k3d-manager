@@ -18,4 +18,4 @@ export PLAYWRIGHT_CDP_PORT="9222"
 # Persistent Chrome profile used for CDP automation (shared with launchd job
 # com.k3d-manager.chrome-cdp). Path must match _ACG_CHROME_CDP_AUTH_DIR in
 # scripts/lib/acg/acg.sh.
-export PLAYWRIGHT_AUTH_DIR="${HOME}/.local/share/k3d-manager/profile"
+export PLAYWRIGHT_AUTH_DIR="${HOME}/.local/share/k3d-manager/pw-profile"
