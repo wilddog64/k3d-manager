@@ -2,6 +2,88 @@
 
 ## [Unreleased]
 
+## [v0.4.17] — 2026-09-12
+
+### Fixed
+- `scripts/lib/acg/playwright/lib/pluralsight_login.js`: add
+  `.psPrismAvatar .psPrismMonogram[aria-label]` to `LOGGED_IN_SELECTORS`. The current
+  Pluralsight UI renders the signed-in identity as a Prism monogram, which none of the
+  existing user-menu / account-label / avatar-image selectors match, so the only
+  identity-based signal was missing and `pageLooksLoggedIn` fell back entirely on the
+  sandbox-page text selectors (`Cloud Sandboxes` / `Open Sandbox`). Carried forward from
+  the retired `wilddog64/lib-acg` PR #47; see
+  `docs/bugs/2026-09-12-acg-logged-in-selectors-missing-prism-monogram.md`. The second half
+  of that legacy change (an unconditional `pageLooksLoggedIn` probe before navigating) is
+  deliberately NOT ported — `acg_session_check.js` here already handles navigation failure
+  via `navigatedToSandbox` and retries.
+- `scripts/lib/acg/playwright/lib/pluralsight_login.js`, `scripts/lib/acg/acg_session_check.js`:
+  make signed-out detection explicit instead of inferring it from the absence of positive
+  signals. Adds `SIGNED_OUT_SELECTORS` plus `pageLooksSignedOut` / `urlLooksSignedOut`, so
+  `pageLooksLoggedIn` short-circuits to false on a recognizably signed-out page without
+  burning its remaining retry attempts. Measured against a throwaway signed-out profile: a
+  signed-out `SANDBOX_URL` redirects to `https://app.pluralsight.com/id`, where all three
+  signed-out selectors match. The page-content markers `text=/Cloud Sandboxes/i` and
+  `text=/Open Sandbox/i` are dropped from `LOGGED_IN_SELECTORS` as hygiene — they describe
+  page content, not identity — leaving the Prism monogram as the identity signal.
+  `acg_session_check.js` now warns explicitly when the `k3dm-acg-pluralsight` Keychain item
+  is absent instead of silently skipping unattended login. See
+  `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`, including its
+  CORRECTION section: this change does **not** fix the 2026-09-12 `credential-test` failure,
+  whose real cause is tracked in
+  `docs/bugs/2026-09-12-acg-signin-wait-targets-dead-id-pluralsight-host.md`.
+- `scripts/lib/acg/vars.sh`, `scripts/lib/acg/acg.sh`, `scripts/lib/acg/cdp.sh`: make the
+  `com.k3d-manager.chrome-cdp` launchd agent actually usable. It is the mechanism that keeps
+  a long-lived CDP browser — and therefore the Pluralsight session — alive between runs,
+  which matters because the auth cookie `Identity.Session` is non-persistent and dies with
+  the browser process. It had two defects that made it worse than useless: the plist
+  hardcoded `/Applications/Google Chrome.app` (the operator's personal Chrome, superseded by
+  the Playwright-managed Chromium that `cdp.sh` resolves), and `PLAYWRIGHT_AUTH_DIR` pointed
+  at `~/.local/share/k3d-manager/profile` while the automation actually runs against
+  `pw-profile` — measured at 0 vs 34 Pluralsight cookies. With `KeepAlive` set, loading it
+  would have respawned a signed-out personal Chrome onto port 9222 after every reclaim.
+  `PLAYWRIGHT_AUTH_DIR` now names `pw-profile`; browser resolution is extracted into a
+  single shared `_acg_resolve_cdp_browser_bin` used by both `_browser_launch` and the plist
+  writer; and the writer now fails without emitting a plist when the browser cannot be
+  resolved. Neither profile directory is deleted or migrated. See
+  `docs/bugs/2026-09-12-chrome-cdp-launchd-agent-wrong-browser-and-dead-profile.md`.
+  Installing the agent remains a manual operator step.
+- `scripts/lib/acg/bin/acg-credential-test`: stop treating an unusable CLI as invalid
+  credentials, and stop destroying a working sandbox because of it. The STS probe ran as
+  `aws sts get-caller-identity >/dev/null 2>&1` and keyed only on exit status, so "the aws
+  binary cannot start" was indistinguishable from "STS rejected these credentials" — and
+  only the latter justifies the delete-and-restart it triggered. Observed live on
+  2026-09-12: a Homebrew ABI mismatch (`awscli` 2.36.44 linking `libaws-c-s3.1.0.dylib`
+  against an installed `aws-c-s3` 1.1.0) made the CLI unable to start, so the tool deleted a
+  live ACG sandbox and exited 1 — while the credentials it had extracted were valid,
+  confirmed by a direct SigV4 call to `sts.amazonaws.com`. The restart was also futile by
+  construction, since a CLI that cannot start will not start after a restart either.
+  Now: `aws --version` is preflighted and an unusable CLI exits without restarting; the
+  probe's stderr is retained and surfaced instead of discarded; and a restart happens only
+  for recognized rejection codes (`InvalidClientTokenId`, `ExpiredToken`, `AuthFailure`,
+  `SignatureDoesNotMatch`, `AccessDenied`, `UnrecognizedClientException`) — any other
+  failure, including a network error, reports and exits without destroying anything. The
+  same preflight guards all three Azure validation paths. See
+  `docs/bugs/2026-09-12-acg-sts-probe-conflates-broken-cli-with-invalid-credentials.md`.
+- `scripts/lib/acg/playwright/lib/sandbox.js`: stop waiting 300 seconds on a hostname that
+  no longer exists. `handleSignIn` waited for `**id.pluralsight.com**`, but that host does
+  not resolve in DNS (`dig` returns nothing; `curl` reports "Could not resolve host") —
+  Pluralsight moved identity to a path on the main host, `https://app.pluralsight.com/id`.
+  The glob could never match, so every sign-in recovery burned its full 300000ms timeout,
+  twice per run (extraction, then the sandbox-restart path). The wait now uses a predicate
+  built on `urlLooksSignedOut` with a 60s timeout, the sign-in link locator drops the dead
+  host, and the post-login wait additionally requires having LEFT the identity path — it
+  previously matched `app.pluralsight.com/id` itself and so could return while still
+  unauthenticated. This is the actual cause of the failed 2026-09-12
+  `make credential-test PROVIDER=aws` gate. See
+  `docs/bugs/2026-09-12-acg-signin-wait-targets-dead-id-pluralsight-host.md`.
+
+### Security
+- `scripts/lib/acg/playwright/providers/gcp.js`: stop logging the first 30 characters of the
+  captured GCP sandbox username — log `[set]`/`[empty]` presence only, matching the
+  convention already used for `password` and by the debug loop at line 17. Originally raised
+  as a k3d-manager Copilot finding (PR #91, 2026-06-05) and deferred there as "lib-acg
+  upstream debt"; that routing died with the lib-acg archive, so the fix lands here.
+
 ## [v0.4.16] — 2026-09-12
 
 ### Security

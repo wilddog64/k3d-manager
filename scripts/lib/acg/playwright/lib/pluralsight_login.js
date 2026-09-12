@@ -10,8 +10,13 @@ const LOGGED_IN_SELECTORS = [
   '[aria-label="User menu"]',
   '[aria-label*="account" i]',
   'img[alt*="avatar" i]',
-  'text=/Cloud Sandboxes/i',
-  'text=/Open Sandbox/i',
+  '.psPrismAvatar .psPrismMonogram[aria-label]',
+];
+
+const SIGNED_OUT_SELECTORS = [
+  'a[href*="/id/signin"]',
+  'button:has-text("Sign in")',
+  'a:has-text("Sign in")',
 ];
 const MFA_SELECTORS = [
   'input[autocomplete="one-time-code"]',
@@ -41,9 +46,23 @@ async function anyVisible(page, selectors, timeoutMs) {
   });
 }
 
+function urlLooksSignedOut(url) {
+  return typeof url === 'string' && /^https:\/\/app\.pluralsight\.com\/id(\/|$|\?)/.test(url);
+}
+
+async function pageLooksSignedOut(page, timeoutMs = 1500) {
+  if (urlLooksSignedOut(page.url())) {
+    return true;
+  }
+  return anyVisible(page, SIGNED_OUT_SELECTORS, timeoutMs);
+}
+
 async function pageLooksLoggedIn(page, options) {
   const { attempts = 1, perSelectorTimeoutMs = 1500, settleMs = 1000 } = options || {};
   for (let i = 0; i < attempts; i += 1) {
+    if (await pageLooksSignedOut(page, perSelectorTimeoutMs)) {
+      return false;
+    }
     if (await anyVisible(page, LOGGED_IN_SELECTORS, perSelectorTimeoutMs)) {
       return true;
     }
@@ -104,9 +123,12 @@ module.exports = {
   MFA_SELECTORS,
   PASSWORD_SELECTOR,
   SANDBOX_URL,
+  SIGNED_OUT_SELECTORS,
   SIGNIN_URL,
   SUBMIT_SELECTOR,
   anyVisible,
   loginWithPage,
   pageLooksLoggedIn,
+  pageLooksSignedOut,
+  urlLooksSignedOut,
 };
