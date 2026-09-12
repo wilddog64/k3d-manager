@@ -6,6 +6,26 @@
 
 ## Current focus
 
+- **ACG session-check false-green — BUG FILED, CODEX WORKING (2026-09-12).** The live
+  `make credential-test PROVIDER=aws` gate on lib-foundation
+  `fix/acg-prism-monogram-selector` RAN and FAILED. Root cause is not the selector fix:
+  `pageLooksLoggedIn` lists `text=/Cloud Sandboxes/i` as a logged-in marker, and that
+  string renders on the signed-OUT view of `SANDBOX_URL`, so `acg_session_check.js`
+  printed `ACG_SESSION_OK` for an expired session. Both escape hatches were therefore
+  skipped — the `K3DM_NONINTERACTIVE=1` hard fail AND the interactive manual-login
+  prompt — and the run burned two 300s `waitForURL` timeouts before dying in the restart
+  path. That is why "the script still needs a human login after a while" shows up as a
+  mystery timeout instead of a prompt.
+  Spec: `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md` in
+  lib-foundation (`ecfc15f`, pushed). Fix = drop the two content selectors, add
+  `SIGNED_OUT_SELECTORS` + `pageLooksSignedOut`/`urlLooksSignedOut` negative gate,
+  warn when the `k3dm-acg-pluralsight` Keychain item is absent. Dispatched to Codex via
+  `codex exec` from the lib-foundation repo; Codex leaves the tree dirty, Claude commits.
+  **Blocked on the user either way:** the live gate cannot pass until the
+  `k3dm-acg-pluralsight` Keychain item exists (username+password) or someone signs in
+  once manually in `~/.local/share/k3d-manager/pw-profile`. MFA accounts = manual only.
+  Still NO PR for `fix/acg-prism-monogram-selector`.
+
 - **Keycloak/LDAP landing sequence — STEP 1 OF 3 DONE 2026-09-12.** User chose the
   B.3-correct order: land the openldap repoint first, then the hook fix, then one
   operator sync. **PR #96 `fix/sso-federate-openldap0` MERGED** to

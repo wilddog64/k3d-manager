@@ -155,6 +155,20 @@
   (COMMENTED, **0 inline findings**), `mergeable_state: clean` — no `enforce_admins` lever
   needed (main is ruleset-guarded, ruleset 13934293). Awaiting user merge, then tag/release +
   `git subtree pull` to carry it into k3d-manager.
+- [ ] **lib-foundation: ACG session-check false-green — bug filed, Codex assigned.**
+  Spec `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`
+  (commit `ecfc15f`, pushed on `fix/acg-prism-monogram-selector`). Removes the two
+  page-CONTENT selectors (`text=/Cloud Sandboxes/i`, `text=/Open Sandbox/i`) from
+  `LOGGED_IN_SELECTORS`, adds `SIGNED_OUT_SELECTORS` + `pageLooksSignedOut` /
+  `urlLooksSignedOut` as a negative gate, and makes `acg_session_check.js` say out loud
+  when the `k3dm-acg-pluralsight` Keychain item is missing. Handed to Codex via
+  `codex exec` (no commit — Codex cannot write `.git`; Claude commits the tree).
+  Files in scope: `pluralsight_login.js`, `acg_session_check.js`,
+  `tests/providers/pluralsight_login.test.js`. Operator action still required before the
+  live gate can pass: create Keychain item `k3dm-acg-pluralsight` (username+password) OR
+  sign in once manually in `~/.local/share/k3d-manager/pw-profile`. MFA accounts can only
+  use the manual path.
+
 - [ ] **lib-foundation `fix/acg-prism-monogram-selector` (`a8342e1`) — NO PR.** Live
   `make credential-test PROVIDER=aws` **RAN 2026-09-12 and FAILED** — blocked on session,
   not on the selector fix. Sequence: `_browser_launch` started the Playwright Chromium on
