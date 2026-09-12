@@ -36,6 +36,29 @@
   script run against a stubbed broken CLI restarts once (bug reproduced); post-fix does not
   restart at all. Gates: lint, shellcheck-lib, **137 BATS** (3 new), npm check, jest 28/28.
 
+- **lib-foundation #49 MERGED (`cf62d41`); `fix/acg-prism-monogram-selector` REBASED onto it
+  — PUSH BLOCKED.** User merged #49 (`fix(acg): mask GCP username in provider debug log`)
+  2026-09-12. Claude rebased the 10-commit prism branch onto the new `origin/main`;
+  new tip `685031a` (was `e12d41a`), backup ref `backup/prism-pre-rebase` kept at `e12d41a`.
+  The only conflicting file was `CHANGE.md` `[Unreleased]` and it conflicted **4 times**,
+  not once — 6 of the 10 commits touch it, so each replayed CHANGE.md commit re-conflicted
+  against #49's `### Security` block. Every resolution was the same: keep BOTH sides, my
+  bullet appended under `### Fixed`, #49's `### Security` after it (Keep-a-Changelog order).
+  Verified: `[Unreleased]` has exactly `### Fixed` + `### Security`, 6 bullets, #49's entry
+  present exactly once, zero conflict markers, and `git diff backup/prism-pre-rebase HEAD`
+  over all non-CHANGE.md paths shows **only** #49's `gcp.js` line — i.e. none of my code
+  moved. Gates re-run green on the rewritten SHAs: `make check`, `make lint`,
+  `make shellcheck-lib`, **137 BATS**, Playwright e2e 7/7, **jest 28/28**
+  (`npm test` in `scripts/lib/acg` — `make test` runs only the Playwright set, they are
+  DIFFERENT suites), and the **live `make credential-test PROVIDER=aws` again green with no
+  restart**.
+  **BLOCKER: `git push --force-with-lease` was denied by the Claude Code auto-mode
+  classifier (`[Git Destructive]`).** The rebase exists only locally. No PR yet.
+  Options for the user: (a) run the force-push themselves, or (b) have Claude redo the
+  integration as a MERGE of `origin/main` into the un-rewritten `e12d41a` branch, which
+  needs one conflict resolution and only a plain non-force push.
+  **Do NOT force-push the k3d-manager or lib-foundation `main`** — feature branch only.
+
 - **LIVE GATE PASSED 2026-09-12 — `make credential-test PROVIDER=aws` is GREEN.** It was
   never blocked on Homebrew. The host already has a **working aws CLI v1 at
   `~/.pyenv/shims/aws` (aws-cli/1.45.3, botocore/1.43.3)** — pure-Python, no `awscrt`
