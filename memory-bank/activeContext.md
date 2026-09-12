@@ -59,9 +59,32 @@
   a positive assertion on the conflicted file itself: `git diff <backup> HEAD -- CHANGE.md`
   must equal exactly what the new base contributed (verified: only #49's Security entry).
   Documented in lib-foundation `docs/issues/2026-09-12-copilot-pr50-review-findings.md`.
-  **NEXT: lib-foundation PR #51 OPEN — release v0.4.17.**
-  https://github.com/wilddog64/lib-foundation/pull/51 — branch `release/v0.4.17`, commit
-  `058b209`, promotes `CHANGE.md` `[Unreleased]` to `## [v0.4.17] — 2026-09-12` and nothing
+  **lib-foundation PR #51 MERGED 2026-09-12 21:40Z as `92d885272daeae411dc62e7226ffe84c3986f557` — release v0.4.17 SHIPPED.**
+  Tag `v0.4.17` pushed at the merge commit; GitHub release published from the CHANGE.md
+  `[v0.4.17]` section body verbatim (81 lines):
+  https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.17
+  **Subtree pulled into k3d-manager `k3d-manager-v1.33.0` — `d1aeea19` (merge) + `45d91ce5`
+  (squash `10de7f4c..92d88527`), pushed.** Brought in #49 + #50 + #51. Verified by positive
+  assertion, not by the diffstat: `psPrismMonogram` selector present at
+  `playwright/lib/pluralsight_login.js:13`; `SIGNED_OUT_SELECTORS`/`pageLooksSignedOut`
+  present (6 hits); **zero** `id.pluralsight.com` occurrences left in `playwright/lib/`;
+  `gcp.js` logs `[set]`/`[empty]` only. Diff was fully contained inside
+  `scripts/lib/foundation/` (0 files outside the prefix). Gates: `bash -n` OK on all 4
+  changed shell files, shellcheck clean, acg jest **28/28 across 7 suites**.
+  **k3d-manager full BATS `test all`: 820 pass / 4 fail — none caused by the pull.**
+  3 are pre-existing (confirmed by re-running the same suites at pre-pull `e7d54b16`:
+  `configure_vault_argocd_repos --dry-run makes no kubectl calls`,
+  `... --dry-run --seed-vault prints actions only`,
+  `slack relay allowlist includes cluster-status and hostinger-status`). The 4th,
+  `slack relay cluster-status acks before webhook completes`, is a **load-only flake** —
+  it passed 3/3 in isolation on BOTH the pre-pull and post-pull trees, and only fails
+  inside the full-suite run. Neither failing suite references `foundation` at all.
+  **Retro written: lib-foundation `docs/retro/2026-09-12-v0.4.17-retrospective.md` on branch
+  `docs/v0.4.17-retrospective` (`e6fff6a`, pushed, NO PR).** Put on its own branch so the
+  package-rename PR's diff stays at exactly 3 identity lines. Note v0.4.13–v0.4.16 have no
+  retro; this resumes the practice rather than back-filling.
+  Superseded detail (kept for the record): #51 was branch `release/v0.4.17`, commit
+  `058b209`, and promoted `CHANGE.md` `[Unreleased]` to `## [v0.4.17] — 2026-09-12` and nothing
   else (diff is 2 added lines, 0 removed; verified). Empty `[Unreleased]` kept per the
   `31be1f7` (v0.4.15) precedent. **Decision 2026-09-12 (user): lib-foundation `main` advances
   ONLY through PRs — a direct promotion commit to main was offered and declined.** After #51
@@ -292,8 +315,27 @@
   `fix/acg-package-name-identity` (`a63884c`, pushed), spec
   `docs/bugs/2026-09-12-acg-package-name-still-lib-acg.md`. Diff is exactly 3 identity lines;
   `private: true`, never published, nothing resolves it by name; jest 28/28 green after.
-  **PR deliberately NOT opened — #51 is still open and a second concurrent PR in the same
-  repo is the exception, not the rule.** Open it after #51 merges.
+  **Brought forward onto v0.4.17 main 2026-09-12 — branch tip is now `31a648f`
+  (`2556023` = merge of `92d8852`, then `31a648f`).** Deliberately done as a MERGE, not a
+  rebase: the rebase (tried first in a throwaway worktree) rewrote the branch and would have
+  needed `--force-with-lease`, which the classifier denies on feature branches. The merge
+  path was proven equivalent by **tree equality** — both produce tree
+  `254e952f179e6ace5e0605d1365318924725e89f` — and pushed as a plain fast-forward.
+  **Real defect the rebase exposed:** #51 promoted `[Unreleased]` to `## [v0.4.17]` while this
+  branch was open, so the rename entry — placed at the END of `[Unreleased]` precisely to
+  dodge a conflict — silently ended up INSIDE the shipped v0.4.17 section. It applied without
+  conflict, so nothing flagged it. Moved to `[Unreleased]` in `31a648f`; verified the v0.4.17
+  section is byte-untouched (CHANGE.md diff vs main is additions only, 0 deletions).
+  **Lesson: a clean rebase is not a correct rebase — conflict-avoiding placement can be
+  semantically wrong once the anchor it dodged gets promoted.**
+  Post-merge state re-verified: `npm ls` → `lib-foundation-acg@0.4.0`, jest 28/28.
+  **PR still NOT opened.** #51 is now merged and lib-foundation has 0 open PRs, so the
+  open-PR block is gone; the branch is ready for `/create-pr`. lib-foundation CI is
+  PR-triggered (0 runs exist for this branch), so the "CI green" gate can only be satisfied
+  by opening the PR. Awaiting the user's call.
+  **NOTE: the k3d-manager subtree still reads `"name": "lib-acg"`** at
+  `scripts/lib/foundation/scripts/lib/acg/package.json:2` — expected, the rename is unmerged.
+  It needs a second subtree pull after this branch lands.
   The ~89 other `lib-acg` references (CHANGE.md, docs/plans, docs/bugs, docs/issues,
   README.md, docs/api/acg.md) are **provenance and deliberately unchanged** — rewriting them
   would falsify where the code came from.

@@ -156,6 +156,32 @@
   (`44d43bd`), the gcp.js username masking split off the selector branch. CI success, Copilot
   reviewed (COMMENTED, **0 inline findings**), no `enforce_admins` lever needed (main is
   ruleset-guarded, ruleset 13934293). Release + `git subtree pull` tracked under PR #51 below.
+- [x] **lib-foundation PR #51 MERGED 2026-09-12 21:40Z as `92d8852` — v0.4.17 released, subtree pulled.**
+  Post-merge chain complete: main ff `c87196d..92d8852`; tag `v0.4.17` pushed at the merge
+  commit; GitHub release published with notes == the CHANGE.md `[v0.4.17]` section verbatim
+  (https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.17); `git subtree pull
+  --prefix=scripts/lib/foundation` on `k3d-manager-v1.33.0` → `45d91ce5` (squash
+  `10de7f4c..92d88527`) + `d1aeea19` (merge), pushed. Carried #49 + #50 + #51 across.
+  `enforce_admins` restore **N/A** — lib-foundation main is ruleset-guarded, no such lever.
+  Verified by positive assertion: `psPrismMonogram` at `pluralsight_login.js:13`,
+  `SIGNED_OUT_SELECTORS`/`pageLooksSignedOut` present, **0** `id.pluralsight.com` left in
+  `playwright/lib/`, `gcp.js` masking to `[set]`/`[empty]`. Pull touched 0 files outside the
+  subtree prefix. Gates: `bash -n` + shellcheck clean, acg jest 28/28 across 7 suites,
+  k3d-manager `test all` **820 pass / 4 fail — all 4 pre-existing or flaky, none from the pull**
+  (3 reproduce at pre-pull `e7d54b16`; the 4th, `slack relay cluster-status acks before
+  webhook completes`, passes 3/3 in isolation on both trees and only fails under full-suite
+  load). Retro: lib-foundation `docs/retro/2026-09-12-v0.4.17-retrospective.md` on
+  `docs/v0.4.17-retrospective` (`e6fff6a`, pushed, no PR).
+- [ ] **lib-foundation `fix/acg-package-name-identity` — ready for PR, not opened.**
+  Brought forward onto v0.4.17 main as a MERGE (tip `31a648f`; `2556023` merges `92d8852`),
+  not a rebase — the rebase would have needed a classifier-denied `--force-with-lease`. Merge
+  proven equivalent to the rebase by tree equality (`254e952f...`). The rebase DID surface a
+  real defect: #51's promotion of `[Unreleased]` left the rename's CHANGE.md entry inside the
+  shipped v0.4.17 section with no conflict; moved to `[Unreleased]` in `31a648f`, v0.4.17
+  section byte-untouched. `npm ls` → `lib-foundation-acg@0.4.0`, jest 28/28.
+  lib-foundation has 0 open PRs now, so the open-PR block is lifted; CI is PR-triggered so
+  the CI gate needs the PR to exist. **The k3d-manager subtree still reads `"name": "lib-acg"`
+  until this lands — a second subtree pull is required after it merges.**
 - [ ] **lib-foundation: ACG session-check false-green — bug filed, Codex assigned.**
   Spec `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`
   (commit `ecfc15f`, pushed on `fix/acg-prism-monogram-selector`). Removes the two
