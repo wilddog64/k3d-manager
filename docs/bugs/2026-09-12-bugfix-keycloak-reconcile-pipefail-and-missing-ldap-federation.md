@@ -413,3 +413,50 @@ constraint entirely.
 - Do NOT modify any file other than `identity/keycloak/keycloak-reconcile-hook-job.yaml`.
 - Do NOT run `argocd app sync` or mutate any live cluster resource.
 - Do NOT attempt to answer B.1 — no scratch realms, no live `kcadm.sh` calls.
+
+---
+
+## Follow-up scope — CHANGELOG entry (2026-09-12)
+
+The code fix landed as `a5838c19` on
+`fix/keycloak-reconcile-pipefail-ldap-federation`. The branch cannot go to PR
+without a `CHANGELOG.md` entry (pre-PR gate). This section **supersedes** the
+"Do NOT modify any file other than
+`identity/keycloak/keycloak-reconcile-hook-job.yaml`" rule above, and **only**
+for `CHANGELOG.md`. Every other prohibition still stands.
+
+**Repo:** `~/src/gitrepo/personal/shopping-carts/shopping-cart-infra`
+**Branch:** `fix/keycloak-reconcile-pipefail-ldap-federation` (already exists on
+`origin`, already checked out — do NOT create a new branch, do NOT rebase)
+
+**Where:** `CHANGELOG.md`, under `## [Unreleased]`, as the **first bullet of the
+first `### Fixed` block** that appears under `[Unreleased]` (the block that
+currently starts with the `ESO ExternalSecrets: lower refreshInterval` bullet).
+Do not create a new `### Fixed` heading; do not reorder or reword any existing
+bullet; do not touch any other section.
+
+**Exact text to insert** (one bullet, one line, no wrapping):
+
+    - `identity/keycloak/keycloak-reconcile-hook-job.yaml`: guard the five `grep`-in-command-substitution pipelines with `|| true` and create the LDAP `UserStorageProvider` when the realm has none. Under `set -euo pipefail` a non-matching `grep` made the whole command substitution exit non-zero and aborted the reconcile job mid-run; the surviving `else` branch then logged `No LDAP component found; skipping mapper setup` and exited 0, leaving the realm with no user store at all so no LDAP user could resolve. The absent-component path now extracts the `org.keycloak.storage.UserStorageProvider` block from the rendered realm, creates it via `kcadm.sh create components`, re-resolves the id, and fails loudly if it is still empty instead of silently skipping mapper setup and `triggerFullSync`.
+
+### Definition of Done (follow-up)
+
+- [ ] `git diff --stat` shows exactly one file changed: `CHANGELOG.md`,
+      `1 insertion(+)`, `0 deletions`.
+- [ ] The bullet is inside `## [Unreleased]` → first `### Fixed`, as the first
+      bullet of that block.
+- [ ] Text matches the block above byte-for-byte (backticks included).
+- [ ] Leave the change **uncommitted** in the working tree and report the diff.
+      `.git` writes are denied in the `codex exec` sandbox; Claude commits and
+      pushes with the exact message:
+
+      docs(changelog): record keycloak reconcile pipefail + LDAP federation fix
+
+### What NOT to Do (follow-up)
+
+- Do NOT re-edit `identity/keycloak/keycloak-reconcile-hook-job.yaml` — that fix
+  is already committed as `a5838c19` and is correct.
+- Do NOT create a PR, merge, or push.
+- Do NOT commit to `main` or switch branches.
+- Do NOT run `git commit`, `git rebase`, or any `.git`-mutating command.
+- Do NOT touch any live cluster, ArgoCD app, or Keycloak instance.
