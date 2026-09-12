@@ -60,7 +60,23 @@
     disjoint files, but if the fix lands first the component is created pointing at
     the retired directory and create-if-absent will never update it. Land
     `fix/sso-federate-openldap0` first, or delete the stale component once.
-  Claude commits + pushes after independent verify (Codex cannot).
+  **IMPLEMENTED + VERIFIED 2026-09-12, commit `a5838c19` on
+  `origin/fix/keycloak-reconcile-pipefail-ldap-federation`** (local == origin).
+  Codex produced the edit; Claude verified independently and committed (Codex
+  cannot write `.git`). Diff: 1 file, +38/-6. Gates Claude re-ran:
+  `YAML OK`; shellcheck **0 warnings before and after**; `bash -n` clean; exactly
+  five spec sites guarded (120/138/160/182/288) plus the new re-resolve at 207;
+  `realm-shopping-cart.json` untouched; `pipefail` still present.
+  **Functional verification beyond the spec's gates** — the `sed` extraction was run
+  *inside* `quay.io/keycloak/keycloak:24.0` itself (host `sed` is BSD, the container's
+  is GNU, and the recipe relies on `\n` in the replacement): produced 1781 bytes of
+  valid JSON, `providerType` injected, 24 `config` entries, `bindCredential`
+  substituted, no `${...}` placeholder left. **Negative test also run:** reindenting
+  the realm file to 8 spaces makes the extraction empty and the `[ ! -s ]` guard
+  fires, so a future reformat fails loudly instead of silently skipping the user
+  store. NOT synced — landing the manifest is the deliverable; no PR (gated).
+  Remaining before the app can go green: an operator sync with hook replay, and the
+  B.3 ordering decision.
 - [ ] **Portability Phase 3 inventory recorded** in
   `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (24 `--context ubuntu-k3s`
   sites in `shopping_cart.sh`, 3 functions, resolver already present). Still needs the

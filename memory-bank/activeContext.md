@@ -98,6 +98,19 @@
   is config-agnostic and the branches touch disjoint files, but landing the fix first
   creates a federation aimed at the retired directory that will never be updated.
   Land `fix/sso-federate-openldap0` first, else delete the stale component once.
+  **IMPLEMENTED + VERIFIED 2026-09-12 — `a5838c19`, pushed, local == origin.** Codex
+  wrote it, Claude verified and committed. 1 file, +38/-6. `YAML OK`; shellcheck 0
+  warnings both before and after; `bash -n` clean; five spec sites guarded
+  (120/138/160/182/288) + the new re-resolve at 207; realm JSON untouched; `pipefail`
+  intact. Went past the spec's gates and **executed the `sed` extraction inside
+  `quay.io/keycloak/keycloak:24.0`** — necessary because the host runs BSD `sed` while
+  the recipe depends on GNU `sed` honouring `\n` in the replacement: 1781 bytes of
+  valid JSON, `providerType` present, 24 `config` entries, credential substituted, no
+  placeholder left. **Negative test:** reindenting the realm file to 8 spaces empties
+  the extraction and trips the `[ ! -s ]` guard, so a future reformat fails loudly
+  rather than silently skipping the user store. `shopping-cart-identity` is still
+  `Failed` — the manifest is landed but nothing has synced it, and no PR exists
+  (gated).
 
 - **Hardcoded `ubuntu-k3s` context — folded into the existing portability spec, NOT a
   new bug doc.** `docs/bugs/2026-07-07-app-cluster-vault-portability.md` already owns
