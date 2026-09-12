@@ -20,7 +20,11 @@
   lib-foundation (`ecfc15f`, pushed). Fix = drop the two content selectors, add
   `SIGNED_OUT_SELECTORS` + `pageLooksSignedOut`/`urlLooksSignedOut` negative gate,
   warn when the `k3dm-acg-pluralsight` Keychain item is absent. Dispatched to Codex via
-  `codex exec` from the lib-foundation repo; Codex leaves the tree dirty, Claude commits.
+  `codex exec` from the lib-foundation repo. **DONE + VERIFIED 2026-09-12** — commit
+  `308bb3c` on `fix/acg-prism-monogram-selector` (pushed, `origin` confirmed). Diff touched
+  exactly the 3 spec'd files plus a CHANGE.md entry Claude added. Gates re-run by Claude,
+  not taken on trust: `npm run check` clean, jest 25/25 in 7 suites, `make lint`,
+  `make shellcheck-lib`, 132 BATS all green.
   **Blocked on the user either way:** the live gate cannot pass until the
   `k3dm-acg-pluralsight` Keychain item exists (username+password) or someone signs in
   once manually in `~/.local/share/k3d-manager/pw-profile`. MFA accounts = manual only.
