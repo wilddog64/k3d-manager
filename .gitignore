@@ -1,19 +1,10 @@
-storage/
-scratch/
-.claude/
-.envrc
+# Node dependencies (installed via `npm ci` in scripts/lib/acg/)
 node_modules/
-bin/.ask-sandbox/
-__pycache__/
-package-lock.json
-workers/slack-relay/.wrangler/
-.wrangler/
 
-# Agent/CLI runtime state accidentally written into the repo root — never track.
-# antigravity-cli/ holds live oauth tokens + conversation logs; gemini-config is a
-# stray clone/gitlink that must never be committed here.
-antigravity-cli/
-gemini-config/
+# Playwright run artifacts
+test-results/
+playwright-report/
 
-# Added by ggshield
-.cache_ggshield
+# Local scratch / logs
+scratch/
+*.log

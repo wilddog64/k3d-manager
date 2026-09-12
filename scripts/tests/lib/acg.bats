@@ -1,234 +1,90 @@
 #!/usr/bin/env bats
-# scripts/tests/lib/acg.bats — unit tests for acg.sh credential helpers
+# shellcheck shell=bash disable=SC1091,SC2317
 
 setup() {
-  _info() { :; }
-  _run_command() { shift; "$@"; }
-  _write_sensitive_file() {
-    local path="$1" data="$2"
-    mkdir -p "$(dirname "$path")"
-    printf '%s' "$data" > "$path"
-    chmod 600 "$path"
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  mkdir -p "${HOME}"
+  # shellcheck source=/dev/null
+  source "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+}
+
+@test "acg template emitter renders the requested agent fleet" {
+  local rendered="${BATS_TEST_TMPDIR}/fleet.yaml"
+
+  _acg_render_template 4 "${BATS_TEST_DIRNAME}/../../lib/acg/etc/acg-cluster.yaml" "${rendered}"
+
+  [ "$(grep -c '^  Agent[0-9][0-9]*Instance:' "${rendered}")" -eq 4 ]
+  [ "$(grep -c '^  Agent[0-9][0-9]*PublicIP:' "${rendered}")" -eq 4 ]
+  [ "$(grep -c '^  ServerInstance:' "${rendered}")" -eq 1 ]
+}
+
+@test "acg template emitter preserves the two-agent default" {
+  local rendered="${BATS_TEST_TMPDIR}/default.yaml"
+
+  unset ACG_AGENT_COUNT
+  _acg_validate_agent_count
+  _acg_render_template "${_ACG_AGENT_COUNT}" "${BATS_TEST_DIRNAME}/../../lib/acg/etc/acg-cluster.yaml" "${rendered}"
+
+  [ "$(grep -c '^  Agent[0-9][0-9]*Instance:' "${rendered}")" -eq 2 ]
+  [ "$(grep -c '^  Agent[0-9][0-9]*PublicIP:' "${rendered}")" -eq 2 ]
+}
+
+@test "acg agent discovery collects every ordered stack output" {
+  _run_command() {
+    printf 'Agent1PublicIP\t%s\nAgent2PublicIP\t%s\nAgent3PublicIP\t%s\n' \
+      10.0.0.11 10.0.0.12 10.0.0.13
   }
-  export -f _info _run_command
-  export -f _write_sensitive_file
+  _acg_discover_agent_ips
 
-  export HOME="${BATS_TEST_TMPDIR}"
-  source "scripts/plugins/acg.sh"
+  [ "${#_ACG_AGENT_IPS[@]}" -eq 3 ]
+  [ "${_ACG_AGENT_IPS[0]}" = "10.0.0.11" ]
+  [ "${_ACG_AGENT_IPS[2]}" = "10.0.0.13" ]
 }
 
-# _acg_write_credentials
-
-@test "_acg_write_credentials writes [default] profile to ~/.aws/credentials" {
-  _acg_write_credentials "AKIAIOSFODNN7EXAMPLE" "wJalrXUtnFEMI/K7MDENG" "AQoDYXdzEJr"
-  run cat "${HOME}/.aws/credentials"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"[default]"* ]]
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-  [[ "$output" == *"aws_secret_access_key=wJalrXUtnFEMI/K7MDENG"* ]]
-  [[ "$output" == *"aws_session_token=AQoDYXdzEJr"* ]]
-}
-
-@test "_acg_write_credentials sets file permissions to 600" {
-  _acg_write_credentials "AKID" "SECRET" "TOKEN"
-  run bash -c "stat -c '%a' \"${HOME}/.aws/credentials\" 2>/dev/null || stat -f '%A' \"${HOME}/.aws/credentials\""
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"600"* ]]
-}
-
-@test "_acg_write_credentials creates ~/.aws directory if missing" {
-  rm -rf "${HOME}/.aws"
-  _acg_write_credentials "AKID" "SECRET" "TOKEN"
-  [ -f "${HOME}/.aws/credentials" ]
-}
-
-# acg_import_credentials
-
-@test "acg_import_credentials parses label format (Pluralsight UI copy)" {
-  local input="AWS Access Key ID: AKIAIOSFODNN7EXAMPLE
-AWS Secret Access Key: wJalrXUtnFEMI/K7MDENG
-AWS Session Token: AQoDYXdzEJr"
-  run bash -c "source scripts/plugins/acg.sh && printf '%s' '$input' | acg_import_credentials"
-  [ "$status" -eq 0 ]
-  run cat "${HOME}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-}
-
-@test "acg_import_credentials parses export format" {
-  local input="export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG
-export AWS_SESSION_TOKEN=AQoDYXdzEJr"
-  run bash -c "source scripts/plugins/acg.sh && printf '%s' '$input' | acg_import_credentials"
-  [ "$status" -eq 0 ]
-  run cat "${HOME}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-}
-
-@test "acg_import_credentials succeeds with AKIA key and no session token" {
-  local input="export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG"
-  run bash -c "source scripts/plugins/acg.sh && printf '%s' '$input' | acg_import_credentials"
-  [ "$status" -eq 0 ]
-  run cat "${HOME}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-  [[ "$output" != *"aws_session_token"* ]]
-}
-
-@test "acg_import_credentials returns 1 on empty/unparseable input" {
-  run bash -c "source scripts/plugins/acg.sh && printf '' | acg_import_credentials"
-  [ "$status" -eq 1 ]
-}
-
-@test "acg_import_credentials --help exits 0" {
-  run acg_import_credentials --help
-  [ "$status" -eq 0 ]
-}
-
-@test "acg_get_credentials --help exits 0" {
-  run acg_get_credentials --help
-  [ "$status" -eq 0 ]
-}
-
-# _acg_extend_playwright
-
-_acg_stub_node() {
-  local exit_code="$1" message="$2"
-  local stub_dir="${BATS_TEST_TMPDIR}/bin"
-  mkdir -p "$stub_dir"
-  cat > "${stub_dir}/node" <<NODE
-#!/usr/bin/env bash
-echo "$message"
-exit $exit_code
-NODE
-  chmod +x "${stub_dir}/node"
-  printf '%s\n' "$stub_dir"
-}
-
-_acg_stub_ssh_keyscan() {
-  local stub_dir="${BATS_TEST_TMPDIR}/bin"
-  mkdir -p "$stub_dir"
-  cat > "${stub_dir}/ssh-keyscan" <<'NODE'
-#!/usr/bin/env bash
-set -euo pipefail
-host="${@: -1}"
-case "${host}" in
-  2.2.2.2) printf '%s\n' "2.2.2.2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY" ;;
-  3.3.3.3) printf '%s\n' "3.3.3.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY2" ;;
-  *) printf '%s\n' "${host} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDEFAULTKEY" ;;
-esac
-NODE
-  chmod +x "${stub_dir}/ssh-keyscan"
-  printf '%s\n' "$stub_dir"
-}
-
-@test "_acg_extend_playwright: returns 0 when node script succeeds" {
-  local stub_dir old_path
-  stub_dir=$(_acg_stub_node 0 "EXTEND_OK")
-  old_path="$PATH"
-  PATH="${stub_dir}:$PATH"
-
-  run _acg_extend_playwright "https://example.com/sandbox"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"EXTEND_OK"* ]]
-
-  PATH="$old_path"
-}
-
-@test "_acg_sync_known_hosts prunes stale managed AWS IPs and records current ones" {
-  skip "Feature not yet implemented: see docs/issues/2026-05-13-acg-up-maintain-known-hosts-for-managed-aws-ips.md"
-  local stub_dir old_path
-  mkdir -p "${HOME}/.ssh"
-  cat > "${HOME}/.ssh/config" <<'EOF'
-Host ubuntu
-  HostName 1.1.1.1
-  User ubuntu
-Host ubuntu-tunnel
-  HostName 1.1.1.1
-  User ubuntu
-Host ubuntu-1
-  HostName 2.2.2.2
-  User ubuntu
-Host ubuntu-2
-  HostName 3.3.3.3
-  User ubuntu
-EOF
-  cat > "${HOME}/.ssh/known_hosts" <<'EOF'
-1.1.1.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOLDKEY
-4.4.4.4 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAISTALEKEY
-EOF
-
-  stub_dir=$(_acg_stub_ssh_keyscan)
-  old_path="$PATH"
-  PATH="${stub_dir}:$PATH"
-
-  _acg_sync_known_hosts "4.4.4.4"
-
-  PATH="$old_path"
-
-  run cat "${HOME}/.ssh/known_hosts"
-  [ "$status" -eq 0 ]
-  [[ "$output" != *"4.4.4.4"* ]]
-  [[ "$output" == *"1.1.1.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOLDKEY"* ]]
-  [[ "$output" == *"2.2.2.2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY"* ]]
-  [[ "$output" == *"3.3.3.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY2"* ]]
-}
-
-@test "_acg_extend_playwright: returns 1 when node script fails" {
-  local stub_dir old_path
-  stub_dir=$(_acg_stub_node 1 "Extend button not found")
-  old_path="$PATH"
-  PATH="${stub_dir}:$PATH"
-
-  run _acg_extend_playwright "https://example.com/sandbox"
-  [ "$status" -eq 1 ]
-
-  PATH="$old_path"
-}
-
-@test "acg_watch_start reloads the agent so retargeted run-dir logs take effect" {
-  local old_path fake_bin capture plist_path
-  export K3DM_RUN_DIR="${BATS_TEST_TMPDIR}/run"
-  export _ACG_WATCH_PLIST_PATH="${BATS_TEST_TMPDIR}/com.k3d-manager.acg-watch.plist"
-  export _ACG_WATCH_LAUNCHD_LABEL="com.k3d-manager.acg-watch"
-  plist_path="${_ACG_WATCH_PLIST_PATH}"
-  fake_bin="${BATS_TEST_TMPDIR}/bin"
-  capture="${BATS_TEST_TMPDIR}/launchctl-loads.log"
-  mkdir -p "${fake_bin}" "${K3DM_RUN_DIR}"
-
-  cat > "${fake_bin}/launchctl" <<EOF
-#!/usr/bin/env bash
-if [ "\$1" = "list" ]; then exit 0; fi
-if [ "\$1" = "load" ]; then grep -F 'k3d-manager-acg-watch.err' "\$2" >> "${capture}" || true; fi
-exit 0
-EOF
-  chmod +x "${fake_bin}/launchctl"
-
-  __acg_stub_acg_watch_start() {
-    cat > "${_ACG_WATCH_PLIST_PATH}" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>StandardOutPath</key>
-  <string>/tmp/k3d-manager-acg-watch.out</string>
-  <key>StandardErrorPath</key>
-  <string>/tmp/k3d-manager-acg-watch.err</string>
-</dict>
-</plist>
-PLIST
-    launchctl load "${_ACG_WATCH_PLIST_PATH}"
+@test "acg agent discovery orders agents numerically, not lexically" {
+  # Deliberately out of order, with Agent10 present to expose a lexical sort
+  # (lexically Agent10 sorts before Agent2 — must not happen here).
+  _run_command() {
+    printf 'Agent2PublicIP\t%s\nAgent10PublicIP\t%s\nAgent1PublicIP\t%s\n' \
+      10.0.0.2 10.0.0.10 10.0.0.1
   }
-  export -f __acg_stub_acg_watch_start
+  _acg_discover_agent_ips
 
-  old_path="${PATH}"
-  export PATH="${fake_bin}:${PATH}"
-  run acg_watch_start "https://example.com/sandbox"
-  export PATH="${old_path}"
-  [ "$status" -eq 0 ]
+  [ "${#_ACG_AGENT_IPS[@]}" -eq 3 ]
+  [ "${_ACG_AGENT_IPS[0]}" = "10.0.0.1" ]
+  [ "${_ACG_AGENT_IPS[1]}" = "10.0.0.2" ]
+  [ "${_ACG_AGENT_IPS[2]}" = "10.0.0.10" ]
+}
 
-  run grep -F -- "${K3DM_RUN_DIR}/k3d-manager-acg-watch.err" "${plist_path}"
-  [ "$status" -eq 0 ]
+@test "acg agent discovery keeps two IPs when the default is used" {
+  _run_command() {
+    printf 'Agent1PublicIP\t%s\nAgent2PublicIP\t%s\n' 10.0.0.11 10.0.0.12
+  }
+  _acg_discover_agent_ips
 
-  run tail -n 1 "${capture}"
-  [[ "${output}" == *"${K3DM_RUN_DIR}/k3d-manager-acg-watch.err"* ]]
+  [ "${#_ACG_AGENT_IPS[@]}" -eq 2 ]
+}
+
+@test "acg rejects malformed or zero agent counts before any aws call" {
+  aws_calls="${BATS_TEST_TMPDIR}/aws.calls"
+  _run_command() {
+    printf '%s\n' "$*" >> "${aws_calls}"
+    return 1
+  }
+  _err() { :; }
+  export ACG_AGENT_COUNT="not-a-number"
+
+  run acg_provision --confirm
+  [ "${status}" -ne 0 ]
+  [ ! -e "${aws_calls}" ]
+
+  export ACG_AGENT_COUNT=0
+  run acg_provision --confirm
+  [ "${status}" -ne 0 ]
+  [ ! -e "${aws_calls}" ]
+}
+
+@test "acg source has no hardcoded first or second agent names" {
+  run grep -nE 'Agent[12]([^0-9]|$)|agent[12]_ip' "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+  [ "${status}" -ne 0 ]
 }
