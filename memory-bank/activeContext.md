@@ -34,7 +34,14 @@
   loaded**, and is **stale — do NOT load as-is**: it points at
   `/Applications/Google Chrome.app` (the user's personal Chrome, superseded by the
   Playwright-managed Chromium) and `--user-data-dir=.../k3d-manager/profile` (current is
-  `pw-profile`), and its `KeepAlive` would fight `cdp.sh` port reclaim.
+  `pw-profile`), and its `KeepAlive` would fight `cdp.sh` port reclaim. **Measured drift:**
+  `vars.sh:21` exports `PLAYWRIGHT_AUTH_DIR=.../k3d-manager/profile` (0 pluralsight
+  cookies, mtime Aug 20) while `cdp.sh` falls back to `.../pw-profile` (34 cookies incl.
+  the live `Identity.Session`, mtime today) — the `credential-test` path never sources
+  `vars.sh`. Spec filed:
+  `docs/bugs/2026-09-12-chrome-cdp-launchd-agent-wrong-browser-and-dead-profile.md`
+  (`7b7a403`). NOT yet dispatched to Codex; `launchctl load` is an operator step and is
+  explicitly out of scope for any agent.
 
 - **Method note: a throwaway `--user-data-dir` is a guaranteed signed-out profile.** It
   reproduces the signed-out path in ~1 minute on a spare port without touching `:9222` or
