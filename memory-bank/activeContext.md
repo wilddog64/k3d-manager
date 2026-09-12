@@ -40,8 +40,20 @@
   the live `Identity.Session`, mtime today) — the `credential-test` path never sources
   `vars.sh`. Spec filed:
   `docs/bugs/2026-09-12-chrome-cdp-launchd-agent-wrong-browser-and-dead-profile.md`
-  (`7b7a403`). NOT yet dispatched to Codex; `launchctl load` is an operator step and is
-  explicitly out of scope for any agent.
+  (`7b7a403`). **FIXED `4389e03`** (Codex; Claude verified + committed). `vars.sh` now names
+  `pw-profile`; browser resolution extracted to ONE shared `_acg_resolve_cdp_browser_bin`
+  called by both `_browser_launch` and `_acg_chrome_cdp_write_plist` (so they cannot drift
+  again); writer fails without emitting a plist when the browser is unresolvable, replacing
+  the old `/Applications` existence check in `acg_chrome_cdp_install`.
+  Claude verified beyond the gates: rendered plist passes `plutil -lint` (the added XML
+  comment is valid) and macOS parses `ProgramArguments` to the Chrome for Testing binary
+  with `--user-data-dir=.../pw-profile`; the REAL `~/Library/LaunchAgents` plist is
+  byte-identical after the suite (BATS redirects `HOME` in `setup()`); agent still unloaded;
+  `:9222` and its `Identity.Session` intact. Gates: lint, shellcheck-lib, **134 BATS**
+  (2 new), npm check, jest 28/28, both dead-reference greps clean.
+  **STILL AN OPERATOR STEP — not automated, deliberately:** `launchctl load` the agent, and
+  only while :9222 is free (installing it against a running Chrome collides on the profile's
+  `SingletonLock`).
 
 - **Method note: a throwaway `--user-data-dir` is a guaranteed signed-out profile.** It
   reproduces the signed-out path in ~1 minute on a spare port without touching `:9222` or
