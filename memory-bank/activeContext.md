@@ -36,8 +36,21 @@
   script run against a stubbed broken CLI restarts once (bug reproduced); post-fix does not
   restart at all. Gates: lint, shellcheck-lib, **137 BATS** (3 new), npm check, jest 28/28.
 
-- **lib-foundation #49 MERGED (`cf62d41`); `fix/acg-prism-monogram-selector` REBASED onto it
-  — PUSH BLOCKED.** User merged #49 (`fix(acg): mask GCP username in provider debug log`)
+- **lib-foundation PR #50 OPEN — AWAITING USER MERGE.** `fix(acg): dead identity host,
+  profile split-brain, and a destructive STS probe`,
+  https://github.com/wilddog64/lib-foundation/pull/50 — head `685031a`, base `cf62d41`,
+  10 commits. **CI 3/3 green** (shellcheck, bats, acg node), `mergeable: MERGEABLE`,
+  `mergeStateStatus: CLEAN`. Claude does NOT merge.
+  **Copilot produced NO review.** The reviewer request was POSTed twice as raw JSON
+  (`--input -`, the documented-correct form) and returned HTTP 200 both times, yet
+  `reviewRequests` stays `[]` and no review or inline comment appeared after ~2 min of
+  polling — the known silent no-op. `main`'s ruleset DOES carry `copilot_code_review`, but
+  it is not blocking: merge state is CLEAN. If a Copilot pass is wanted, request it from the
+  web UI.
+  #49 MERGED as `cf62d41`; the prism branch was rebased onto it and force-pushed by the USER
+  (`e12d41a...685031a`, forced) after the classifier denied Claude the force-push.
+
+  **Rebase detail:** User merged #49 (`fix(acg): mask GCP username in provider debug log`)
   2026-09-12. Claude rebased the 10-commit prism branch onto the new `origin/main`;
   new tip `685031a` (was `e12d41a`), backup ref `backup/prism-pre-rebase` kept at `e12d41a`.
   The only conflicting file was `CHANGE.md` `[Unreleased]` and it conflicted **4 times**,
@@ -52,11 +65,10 @@
   (`npm test` in `scripts/lib/acg` — `make test` runs only the Playwright set, they are
   DIFFERENT suites), and the **live `make credential-test PROVIDER=aws` again green with no
   restart**.
-  **BLOCKER: `git push --force-with-lease` was denied by the Claude Code auto-mode
-  classifier (`[Git Destructive]`).** The rebase exists only locally. No PR yet.
-  Options for the user: (a) run the force-push themselves, or (b) have Claude redo the
-  integration as a MERGE of `origin/main` into the un-rewritten `e12d41a` branch, which
-  needs one conflict resolution and only a plain non-force push.
+  Claude's `git push --force-with-lease` was denied by the auto-mode classifier
+  (`[Git Destructive]`); the user ran it instead. Lesson: a post-rebase force-push of a
+  FEATURE branch is Claude-blocked — plan on handing it to the user, or integrate with a
+  merge commit instead of a rebase.
   **Do NOT force-push the k3d-manager or lib-foundation `main`** — feature branch only.
 
 - **LIVE GATE PASSED 2026-09-12 — `make credential-test PROVIDER=aws` is GREEN.** It was
