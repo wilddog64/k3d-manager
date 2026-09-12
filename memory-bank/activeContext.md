@@ -6,6 +6,32 @@
 
 ## Current focus
 
+- **LIVE GATE RUN 2026-09-12 10:50 — browser automation now WORKS; failure moved to a
+  broken host `aws` CLI.** `make credential-test PROVIDER=aws` on `4389e03` ran in **101s**
+  (was 10+ min). `ACG_SESSION_OK` was legitimate, `handleSignIn` never fired, extraction
+  succeeded, sandbox restart succeeded, second extraction succeeded. The dead-host and
+  session-check fixes are confirmed working on live infrastructure.
+  **New failure:** `ERROR: sts:GetCallerIdentity failed — credentials invalid after all
+  attempts.` **The credentials were NOT invalid** — verified with a stdlib SigV4 POST to
+  `sts.amazonaws.com`: `STS RESULT: VALID, arn:aws:iam::<account>:user/cloud_user`.
+  **Real cause:** the host `aws` CLI cannot start —
+  `ImportError: dlopen(_awscrt.abi3.so): Library not loaded .../libaws-c-s3.1.0.dylib`.
+  `awscli` 2.36.44's bottle links `aws-c-s3` **1.0**; installed is **1.1.0**, which ships
+  only `libaws-c-s3.1.1.0.dylib`. `brew reinstall awscli` does NOT fix it (same bottle) and
+  `brew outdated` lists neither formula. Remaining options, all operator calls:
+  `brew reinstall --build-from-source awscli`, the official AWS pkg installer, or wait for a
+  rebuilt bottle. Claude did NOT run `--build-from-source` — long toolchain rebuild, out of
+  scope for ACG work.
+  **DESTRUCTIVE SIDE EFFECT — the sandbox was deleted and restarted for nothing.**
+  `acg-credential-test` probes `aws sts get-caller-identity >/dev/null 2>&1` and keys only
+  on exit status, so "CLI cannot start" is indistinguishable from "STS rejected creds" —
+  and only the latter justifies the restart. Spec filed:
+  `docs/bugs/2026-09-12-acg-sts-probe-conflates-broken-cli-with-invalid-credentials.md`
+  (`1838f08`): preflight `aws --version`, keep the probe's stderr, restart ONLY on
+  recognized rejection codes, same guard for `_az_sp_valid`. NOT yet dispatched to Codex.
+  **The PR gate is still unmet** — but for the first time nothing in the ACG automation is
+  implicated.
+
 - **ACG credential-test failure — ROOT CAUSE CORRECTED 2026-09-12. `id.pluralsight.com`
   IS DEAD.** The earlier false-green diagnosis was WRONG and is retracted. Measured, not
   inferred: a throwaway signed-out Chrome profile navigating to `SANDBOX_URL` **redirects
@@ -95,13 +121,19 @@
   (would have broken group sync and ArgoCD RBAC), and `membership.user.ldap.attribute`
   had to go `uid`→`cn` because the seed stores `member: cn=<user>,ou=users,dc=home,dc=org`.
   Both fixed in `7be63e3`.
-  **STEP 2 (next): PR the hook fix** — branch `fix/keycloak-reconcile-pipefail-ldap-federation`
-  @ `a5838c19`, single commit ahead of main. Conflict pre-check now UNBLOCKED and RUN:
-  `git merge-tree origin/main <branch>` → exit 0, merged tree `6678e606`, no conflict
-  section = **merges cleanly**. Still needs its own CHANGELOG entry (deliberately
-  deferred to avoid colliding with PR #96's entry), Copilot review, CI.
+  **STEP 2 (IN REVIEW 2026-09-12): PR #97 the hook fix** — branch
+  `fix/keycloak-reconcile-pipefail-ldap-federation` @ `a5838c19`, now **PR #97 OPEN**.
+  State (verified 2026-09-12): **MERGEABLE, CI 4/4 green** (YAML Lint, Kubeconform,
+  Kustomize Build, GitGuardian), blocked only on `REVIEW_REQUIRED` (needs 1 approval).
+  CHANGELOG entry landed. NOT merged — awaiting user go (merge is gated).
   **STEP 3: operator sync with hook replay**, then verify the realm has a
   `UserStorageProvider` and users resolve from `ou=users,dc=home,dc=org`.
+  **Live impact confirmed 2026-09-12:** neither fix synced to the cluster yet — the
+  `shopping-cart` realm has **0 users** and no `UserStorageProvider` (osixia `ldap`
+  pod still live, not `openldap-0`), so ALL logins fail — this is the true cause of
+  the `make status` "Keycloak login" red, NOT a keycloak crash. The 67-restart
+  `keycloak-0` StatefulSet is gone; keycloak is now a healthy Deployment
+  (`keycloak-55d5d4c998-*`, 0 restarts).
 
 - **k3d-manager PR #124 (dependabot browserslist 4.28.2→4.28.9) — REVIEWED 2026-09-12,
   DO NOT MERGE AS-IS.** It patches
