@@ -156,9 +156,22 @@
   needed (main is ruleset-guarded, ruleset 13934293). Awaiting user merge, then tag/release +
   `git subtree pull` to carry it into k3d-manager.
 - [ ] **lib-foundation `fix/acg-prism-monogram-selector` (`a8342e1`) — NO PR.** Live
-  `make credential-test PROVIDER=aws` gate still unrun (CDP on :9222 down, needs one-time
-  manual Pluralsight login). Will conflict with #49 in `CHANGE.md` `[Unreleased]` — rebase
-  whichever lands second.
+  `make credential-test PROVIDER=aws` **RAN 2026-09-12 and FAILED** — blocked on session,
+  not on the selector fix. Sequence: `_browser_launch` started the Playwright Chromium on
+  :9222, `acg_session_check.js` printed `ACG_SESSION_OK`, then extraction reported
+  `Not signed in — clicking Sign In...` and died on
+  `page.waitForURL **id.pluralsight.com` after 300s; the restart path then found only a
+  `Sign in` button and exited 1. Two root causes, both pre-existing:
+  (1) the `pw-profile` Pluralsight session is signed out and Keychain item
+  `k3dm-acg-pluralsight` **does not exist**, so `_autoLogin` had no credentials — this is
+  the one-time MANUAL login of [[reference_acg_login_reuses_cdp_session]], which the user
+  must bootstrap; (2) **`pageLooksLoggedIn` false-green** — `LOGGED_IN_SELECTORS` includes
+  `text=/Cloud Sandboxes/i`, which matches the signed-OUT page at `SANDBOX_URL`, so the
+  session check reports OK on a logged-out profile. Fix (2) upstream before this gate can
+  be trusted; it is NOT caused by `a8342e1` (that commit only ADDS
+  `.psPrismAvatar .psPrismMonogram[aria-label]`). Test browser terminated after the run —
+  :9222 released, `Google Chrome for Testing` gone, the user's own Chrome untouched.
+  Still will conflict with #49 in `CHANGE.md` `[Unreleased]` — rebase whichever lands second.
 - [x] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: CLOSED unmerged 2026-09-12, fixed upstream instead.**
   Patches `scripts/lib/foundation/scripts/lib/acg/package-lock.json` inside the
   lib-foundation subtree → violates edit-upstream-first; next `git subtree pull` would
