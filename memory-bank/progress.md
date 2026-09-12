@@ -77,15 +77,17 @@
   store. NOT synced — landing the manifest is the deliverable; no PR (gated).
   Remaining before the app can go green: an operator sync with hook replay, and the
   B.3 ordering decision.
-- [~] **openldap-0 SSO federation — PR #96 OPEN, MERGE-READY (2026-09-12).**
+- [x] **openldap-0 SSO federation — PR #96 MERGED 2026-09-12 as `4263d36b`.**
   `https://github.com/wilddog64/shopping-cart-infra/pull/96`, branch
-  `fix/sso-federate-openldap0` @ `7be63e3`. User chose the B.3-correct landing order
+  `fix/sso-federate-openldap0` @ `7be63e3`. Post-merge: `enforce_admins` re-enabled
+  (verified `enabled=true`), `required_approving_review_count=1` intact, local main
+  synced (`45def89..4263d36`); CHANGELOG `[Unreleased]` only → no tag/release. User chose the B.3-correct landing order
   (repoint first, then the hook fix, then one sync), so this PR is the **prerequisite**
   for `fix/keycloak-reconcile-pipefail-ldap-federation`.
   Gates: CI **4/4 green** (yamllint, kubeconform, kustomize build, GitGuardian);
   Copilot **2 findings, both fixed in `7be63e3`, replied + threads resolved (0
   unresolved)**; scope check clean. `enforce_admins` **disabled** on
-  `shopping-cart-infra` main — **must be re-enabled after merge** (bodyless POST).
+  `shopping-cart-infra` main during merge — **re-enabled and verified after merge**.
   **Copilot caught a real defect I had missed:** the reconcile hook's LDAP group
   mapper still hardcoded `groups.dn: ou=groups,dc=shopping-cart,dc=local`, so group
   sync — and ArgoCD RBAC, which depends on it — would have broken once federation
@@ -112,6 +114,19 @@
   operator sync with hook replay → verify realm has a `UserStorageProvider` and users.
   The app tracks `targetRevision: HEAD`, currently `45def89`, which is why no sync can
   help until these land.
+- [ ] **Hook fix PR (step 2 of 3)** — branch `fix/keycloak-reconcile-pipefail-ldap-federation`
+  @ `a5838c19`, one commit ahead of the new main. Conflict pre-check (previously blocked
+  by the auto-mode classifier) now RUN against merged main: `git merge-tree origin/main
+  <branch>` → exit 0, merged tree `6678e606`, no conflict section = merges cleanly.
+  Needs: own CHANGELOG entry (deferred to avoid colliding with #96's), Copilot review, CI.
+- [ ] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: DO NOT MERGE AS-IS.**
+  Patches `scripts/lib/foundation/scripts/lib/acg/package-lock.json` inside the
+  lib-foundation subtree → violates edit-upstream-first; next `git subtree pull` would
+  revert or conflict. Transitive dep (via jest/babel `^4.24.0`), not in lib-acg
+  `package.json`. Both upstreams at 4.28.2 and neither has `.github/dependabot.yml`, so
+  upstream can't file it itself. Alert GHSA-73wf-gq98-2v4g (high, open) needs an untrusted
+  `browserslist-stats.json` — none here; GHSA-c83g-rgw3-j3cx already auto-dismissed.
+  Fix upstream in lib-acg/lib-foundation, subtree-pull, then close #124.
 - [ ] **Portability Phase 3 inventory recorded** in
   `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (24 `--context ubuntu-k3s`
   sites in `shopping_cart.sh`, 3 functions, resolver already present). Still needs the

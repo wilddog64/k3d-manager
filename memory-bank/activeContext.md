@@ -6,6 +6,43 @@
 
 ## Current focus
 
+- **Keycloak/LDAP landing sequence — STEP 1 OF 3 DONE 2026-09-12.** User chose the
+  B.3-correct order: land the openldap repoint first, then the hook fix, then one
+  operator sync. **PR #96 `fix/sso-federate-openldap0` MERGED** to
+  `shopping-cart-infra` main as `4263d36b` (11:49Z); `45def89..4263d36`.
+  Post-merge done: `enforce_admins` re-enabled (verified `enabled=true`),
+  `required_approving_review_count=1` intact, local main synced. CHANGELOG is
+  `[Unreleased]` only → no tag, no release.
+  Copilot caught a real defect Claude missed on that PR: the reconcile hook's LDAP
+  group mapper still hardcoded `groups.dn: ou=groups,dc=shopping-cart,dc=local`
+  (would have broken group sync and ArgoCD RBAC), and `membership.user.ldap.attribute`
+  had to go `uid`→`cn` because the seed stores `member: cn=<user>,ou=users,dc=home,dc=org`.
+  Both fixed in `7be63e3`.
+  **STEP 2 (next): PR the hook fix** — branch `fix/keycloak-reconcile-pipefail-ldap-federation`
+  @ `a5838c19`, single commit ahead of main. Conflict pre-check now UNBLOCKED and RUN:
+  `git merge-tree origin/main <branch>` → exit 0, merged tree `6678e606`, no conflict
+  section = **merges cleanly**. Still needs its own CHANGELOG entry (deliberately
+  deferred to avoid colliding with PR #96's entry), Copilot review, CI.
+  **STEP 3: operator sync with hook replay**, then verify the realm has a
+  `UserStorageProvider` and users resolve from `ou=users,dc=home,dc=org`.
+
+- **k3d-manager PR #124 (dependabot browserslist 4.28.2→4.28.9) — REVIEWED 2026-09-12,
+  DO NOT MERGE AS-IS.** It patches
+  `scripts/lib/foundation/scripts/lib/acg/package-lock.json`, i.e. **inside the
+  lib-foundation subtree** (and the nested lib-acg copy) — merging it writes straight
+  into a subtree, which the edit-upstream-first rule exists to prevent; the next
+  `git subtree pull` would conflict or silently revert it. `browserslist` is a
+  **transitive** dep (not in lib-acg's `package.json`; pulled in via jest/babel at
+  `^4.24.0`). Both upstreams are still at 4.28.2 and NEITHER has a
+  `.github/dependabot.yml`, so upstream will never file this bump itself — that is
+  the structural gap. Backing alert is real but effectively unreachable here:
+  GHSA-73wf-gq98-2v4g (high, open, alert #9) needs an untrusted
+  `browserslist-stats.json`, which this repo has none of; GHSA-c83g-rgw3-j3cx
+  (alert #8) is already auto-dismissed. Correct fix: bump in `wilddog64/lib-acg`
+  (or lib-foundation, if lib-acg is being archived per Phase 3), subtree-pull down,
+  close #124. k3d-manager itself has no `.github/dependabot.yml` — this PR came from
+  default security-updates-only.
+
 - **Product catalog empty DB — ROOT-CAUSED AND REPAIRED 2026-09-11.** The
   `product-catalog` API served `HTTP 200` over a zero-row database for ~12h.
   `argocd-repo-server` was crash-looping (28 restarts) during the
