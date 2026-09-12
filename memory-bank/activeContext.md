@@ -74,8 +74,9 @@
   Branch-protection restore is **N/A for lib-foundation** — ruleset-guarded
   (`deletion`, `non_fast_forward`, `copilot_code_review`), no `enforce_admins` or
   required-approval lever; `/branches/main/protection` 404s by design.
-  **`shopping-cart-infra` #97 still OPEN, `enforce_admins` still `false` — correctly so, it is
-  needed for that merge. Restore it only after #97 lands.**
+  **`shopping-cart-infra` #97 MERGED 2026-09-12 20:25Z as `1b35d962` — `enforce_admins`
+  RESTORED to `true` (verified `.enabled: true` via bodyless POST). Main pulled
+  fast-forward `4263d36..1b35d96`. No tag: CHANGELOG has only `[Unreleased]`.**
 
   #49 MERGED as `cf62d41`; the prism branch was rebased onto it and force-pushed by the USER
   (`e12d41a...685031a`, forced) after the classifier denied Claude the force-push.
@@ -209,11 +210,13 @@
   (would have broken group sync and ArgoCD RBAC), and `membership.user.ldap.attribute`
   had to go `uid`→`cn` because the seed stores `member: cn=<user>,ou=users,dc=home,dc=org`.
   Both fixed in `7be63e3`.
-  **STEP 2 (IN REVIEW 2026-09-12): PR #97 the hook fix** — branch
-  `fix/keycloak-reconcile-pipefail-ldap-federation` @ `a5838c19`, now **PR #97 OPEN**.
-  State (verified 2026-09-12): **MERGEABLE, CI 4/4 green** (YAML Lint, Kubeconform,
-  Kustomize Build, GitGuardian), blocked only on `REVIEW_REQUIRED` (needs 1 approval).
-  CHANGELOG entry landed. NOT merged — awaiting user go (merge is gated).
+  **STEP 2 DONE 2026-09-12: PR #97 the hook fix MERGED as `1b35d962`** — branch
+  `fix/keycloak-reconcile-pipefail-ldap-federation` @ `a5838c19`; CI was 4/4 green
+  (YAML Lint, Kubeconform, Kustomize Build, GitGuardian). CHANGELOG entry landed.
+  Post-merge: `enforce_admins` re-enabled on `shopping-cart-infra` main (verified
+  `enabled=true`), local main fast-forwarded `4263d36..1b35d96`. No tag/release —
+  CHANGELOG carries only `[Unreleased]`, so the skip-tagging rule applies.
+  **Both B.3 code fixes are now on main; the remaining gap is purely cluster-side.**
   **STEP 3: operator sync with hook replay**, then verify the realm has a
   `UserStorageProvider` and users resolve from `ou=users,dc=home,dc=org`.
   **Live impact confirmed 2026-09-12:** neither fix synced to the cluster yet — the
