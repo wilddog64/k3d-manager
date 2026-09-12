@@ -95,32 +95,69 @@ line 181 leaves four latent silent-death sites, so fix all five.
 
 ### A.2 — required change
 
-For each of lines **120, 138, 160, 181, 256**, append `|| true` to the pipeline
-inside the command substitution, matching the existing style at 203/235. Example
-for 181:
+Append ` || true` to the **last line of the pipeline** inside each of the five
+unguarded command substitutions, matching the existing guarded style at 203/235
+(`| grep -c '"id"' || true`). `|| true` binds to the whole pipeline, which is what
+is wanted: an empty result must yield an empty string, not a dead script.
 
-**Old**
+The five lines are given literally below with their exact leading whitespace.
+Indentation must be preserved byte-for-byte — the script is embedded in YAML, so a
+shifted line changes the manifest.
+
+**1. line 120** (14 spaces)
 ```bash
-            | grep '"id"' | head -1 \
+              | grep "otp-conditional-subflow" | cut -d',' -f1 | tr -d '"'
+```
+→
+```bash
+              | grep "otp-conditional-subflow" | cut -d',' -f1 | tr -d '"' || true
+```
+
+**2. line 138** (14 spaces)
+```bash
+              | grep "conditional-user-role" | cut -d',' -f1 | tr -d '"'
+```
+→
+```bash
+              | grep "conditional-user-role" | cut -d',' -f1 | tr -d '"' || true
+```
+
+**3. line 160** (14 spaces)
+```bash
+              | grep "auth-otp-form" | cut -d',' -f1 | tr -d '"'
+```
+→
+```bash
+              | grep "auth-otp-form" | cut -d',' -f1 | tr -d '"' || true
+```
+
+**4. line 182** (12 spaces — the `ldap_id` assignment opens at 181)
+```bash
             | sed 's/.*"id" : "\([^"]*\)".*/\1/'
-          )"
 ```
-
-**New**
+→
 ```bash
-            | grep '"id"' | head -1 \
             | sed 's/.*"id" : "\([^"]*\)".*/\1/' || true
-          )"
 ```
 
-`|| true` binds to the whole pipeline, which is what is wanted: an empty result
-must yield an empty string, not a dead script. Do **not** remove `pipefail` — it is
-load-bearing for the rest of the script.
+**5. line 257** (14 spaces — the `_gm_id` assignment opens at 256)
+```bash
+              | sed 's/.*"id" : "\([^"]*\)".*/\1/'
+```
+→
+```bash
+              | sed 's/.*"id" : "\([^"]*\)".*/\1/' || true
+```
 
-Preserve indentation exactly (the script is embedded in YAML; a shifted line
-changes the manifest).
+Sites 4 and 5 are byte-identical apart from two leading spaces. Do **not** use a
+global replace for them — match on the full line including indentation, or edit by
+line number, and confirm afterwards that both lines changed and nothing else did.
 
----
+Do **not** remove `pipefail` — it is load-bearing for the rest of the script.
+
+Once guarded, the three `ERROR: could not resolve ... execution ID` diagnostics at
+121-123 / 139-141 / 161-163 become reachable for the first time. Leave them exactly
+as they are; they are correct, they were merely unreachable.
 
 ## Defect B — the realm has no LDAP user federation and no users
 
@@ -153,7 +190,7 @@ origin of the standing Keycloak smoke-user and frontend-login warnings
 (Findings 4/5) — they have been triaged as credential/seed problems, but the realm
 has no user store.
 
-### B.1 — this contradicts an existing bug doc; resolve before coding
+### B.1 — this contradicts an existing bug doc (open question, NOT a blocker)
 
 `shopping-cart-infra/docs/bugs/2026-05-15-keycloak-ldap-mappers-missing-from-reconcile.md`
 asserts:
@@ -164,50 +201,139 @@ asserts:
 The live evidence above is consistent with partialImport creating **neither**. That
 May 2026 claim may have been an inference rather than a verified observation, or
 the component may have been lost in a later realm recreation (the hub was rebuilt
-on 2026-09-11). **Do not assume either way.** First establish the fact:
+on 2026-09-11).
 
-1. On a scratch realm, `create partialImport` from `realm-shopping-cart.json` and
-   query `get components -q type=org.keycloak.storage.UserStorageProvider`.
-2. Record the answer in this spec before writing the fix.
+**Decision 2026-09-12 — do not block on this.** Settling it empirically requires
+creating a scratch realm on the live Keycloak, which is an operator action, not an
+implementation action. It is deliberately **out of scope for this fix** and is
+tracked as an open question in the incident doc. The reason it is safe to defer:
+B.2's shape is identical either way. "Resolve the component; create it if absent;
+fail loudly if it is still absent" is correct whether partialImport creates the
+component, creates it sometimes, or never creates it. If it does create it, the
+new code is a no-op on a healthy realm.
 
-### B.2 — the fix shape, whichever way B.1 lands
+**Consequence for the implementer:** treat "partialImport may or may not create the
+component" as the contract. Do not add code that depends on either answer, and do
+not attempt to verify it against a live cluster.
 
-Either way the durable fix is the same in kind as the May 2026 mapper fix:
-**create the component imperatively if absent**, rather than trusting the import.
-Add, immediately after Defect A's `ldap_id` resolution and before the
-`if [ -n "${ldap_id}" ]` branch:
+### B.2 — the fix (verified recipe)
 
-- if `ldap_id` is empty, `kcadm.sh create components` with the
-  `UserStorageProvider` body taken from `realm-shopping-cart.json:359` (single
-  source of truth — do not retype the config; the bind credential must keep coming
-  from `${LDAP_BIND_CREDENTIAL}` via the existing `render_realm` substitution, and
-  must never be echoed);
-- re-resolve `ldap_id`, and if it is *still* empty, `echo` a real diagnostic to
-  stderr and `exit 1`. A missing user store is a genuine failure — it must fail
-  loudly, not skip.
+**Container toolchain constraint — verified 2026-09-12.** `quay.io/keycloak/keycloak:24.0`
+ships **no `jq`, no `python`/`python3`, and no `awk`**. Only `sed` is available:
 
-The existing mapper and group-sync code below the branch then runs unchanged.
+```
+$ docker run --rm --entrypoint sh quay.io/keycloak/keycloak:24.0 -c 'command -v jq python3 awk sed'
+jq       MISSING
+python3  MISSING
+awk      MISSING
+sed      /usr/bin/sed
+```
 
-Keep the `else` "No LDAP component found; skipping mapper setup" branch only if
-B.1 shows a legitimate no-LDAP deployment mode exists. If it does not, that branch
-is the bug and should be replaced by the hard failure above.
+So the component body must be lifted out of the rendered realm JSON with `sed`
+alone. Do not add a JSON tool, an initContainer, or a second image.
 
----
+The extraction below was run against the real `realm-shopping-cart.json` and its
+output parses as valid JSON with all **24** `config` entries and the
+`bindCredential` value intact. Read it from
+`/tmp/realm-shopping-cart.rendered.json` (the output of `render_realm`), **not**
+from `/realm/realm-shopping-cart.json`, so the credential is already substituted.
+
+`providerType` must be injected because the realm-file form encodes it as the map
+key. `parentId` must be **omitted** — Keycloak defaults a component's `parentId` to
+the realm when it is absent, and the realm's internal id is not the realm name.
+
+Insert this immediately after Defect A's `ldap_id` resolution and before the
+existing `if [ -n "${ldap_id}" ]; then` line, at the same indentation as that line:
+
+```bash
+          if [ -z "${ldap_id}" ]; then
+            echo "No LDAP UserStorageProvider in realm ${KC_REALM}; creating it from the rendered realm"
+            _usp_file="/tmp/ldap-userstorageprovider.json"
+            sed -n '/^    "org\.keycloak\.storage\.UserStorageProvider": \[$/,/^    \]$/p' \
+              /tmp/realm-shopping-cart.rendered.json \
+              | sed -e '1d' -e '$d' \
+                    -e 's|^        "providerId": "ldap",$|        "providerId": "ldap",\n        "providerType": "org.keycloak.storage.UserStorageProvider",|' \
+              > "${_usp_file}"
+            if [ ! -s "${_usp_file}" ]; then
+              echo "ERROR: could not extract the LDAP UserStorageProvider block from the rendered realm" >&2
+              exit 1
+            fi
+            /opt/keycloak/bin/kcadm.sh create components \
+              -r "${KC_REALM}" -f "${_usp_file}" >/dev/null
+            rm -f "${_usp_file}"
+            ldap_id="$(
+              /opt/keycloak/bin/kcadm.sh get components \
+                -r "${KC_REALM}" \
+                -q type=org.keycloak.storage.UserStorageProvider \
+                --fields id \
+                2>/dev/null \
+              | grep '"id"' | head -1 \
+              | sed 's/.*"id" : "\([^"]*\)".*/\1/' || true
+            )"
+          fi
+
+          if [ -z "${ldap_id}" ]; then
+            echo "ERROR: realm ${KC_REALM} still has no LDAP UserStorageProvider after create attempt; refusing to continue with no user store" >&2
+            exit 1
+          fi
+```
+
+Notes on that block:
+
+- `${_usp_file}` transiently holds the bind credential. It is written by
+  redirection (never echoed to stdout) and `rm -f`'d immediately after use. This
+  adds no new exposure class: `/tmp/realm-shopping-cart.rendered.json` in the same
+  container already holds the same secret for the same reason.
+- The two `sed` expressions are anchored to 4-space and 8-space indentation in
+  `realm-shopping-cart.json`. That is why `realm-shopping-cart.json` must **not** be
+  reformatted by this change — reindenting it silently breaks the extraction. The
+  `[ ! -s ]` guard is what turns such a break into a loud failure instead of a
+  skipped user store.
+- The re-resolve deliberately repeats the query rather than factoring it into a
+  helper — a helper would be a larger diff than the duplication saves.
+
+**The `else` branch.** With the hard failure above, the existing
+`else echo "No LDAP component found; skipping mapper setup"` is unreachable. Do
+**not** dedent and unwrap the ~100-line `if [ -n "${ldap_id}" ]` body to remove it
+— that is a large diff for no behavioural gain. Instead leave the `if` wrapper in
+place and replace only the `else` body with:
+
+```bash
+          else
+            echo "ERROR: LDAP component id unexpectedly empty" >&2
+            exit 1
+          fi
+```
+
+so that if the invariant is ever broken by a later edit, it fails loudly rather
+than silently skipping every mapper.
 
 ## Rules
 
 - Work **only** in `shopping-cart-infra`, only in
-  `identity/keycloak/keycloak-reconcile-hook-job.yaml` (plus
-  `realm-shopping-cart.json` if and only if B.1 requires it).
+  `identity/keycloak/keycloak-reconcile-hook-job.yaml`. Read
+  `realm-shopping-cart.json` for the component body, but do not modify it.
 - Create and work on `fix/keycloak-reconcile-pipefail-ldap-federation` from
   `origin/main`. Never commit to `main`.
-- The script is embedded in YAML. After editing, verify the manifest still parses
-  and the script still lints:
+- The script is embedded in YAML (`spec.template.spec.containers[0].command[4]`,
+  a `- |` block under `command: [/bin/bash, -euo, pipefail, -c]`). After editing,
+  run **both** gates and paste their output:
+
   ```bash
-  python3 -c 'import yaml,sys; yaml.safe_load(open("identity/keycloak/keycloak-reconcile-hook-job.yaml"))'
+  python3 -c 'import yaml; yaml.safe_load(open("identity/keycloak/keycloak-reconcile-hook-job.yaml"))' \
+    && echo "YAML OK"
+
+  python3 -c '
+  import yaml
+  d = yaml.safe_load(open("identity/keycloak/keycloak-reconcile-hook-job.yaml"))
+  open("/tmp/hook.sh","w").write(d["spec"]["template"]["spec"]["containers"][0]["command"][4])
+  '
+  shellcheck -s bash /tmp/hook.sh
   ```
-  and extract the `command` string and run `shellcheck` on it (the file already
-  carries `# shellcheck shell=bash` / `disable=SC2153` directives for this).
+
+  The file already carries `# shellcheck shell=bash` / `disable=SC2153` directives
+  for this. Record the shellcheck warning count before and after your change — the
+  gate is **no new warnings**, not zero warnings.
 - No secret values in logs, argv, or commit messages. `LDAP_BIND_CREDENTIAL`,
   `KEYCLOAK_ADMIN_PASSWORD` and the `*_CLIENT_SECRET` vars must stay in env and
   template substitution only.
@@ -217,18 +343,25 @@ is the bug and should be replaced by the hard failure above.
 
 ## Definition of Done
 
-- [ ] All five unguarded `grep`-in-command-substitution sites (120, 138, 160, 181,
-      256) guarded; indentation unchanged.
-- [ ] B.1 answered empirically, and the answer written into this spec.
-- [ ] Absent-LDAP-component path either creates the component and re-resolves, or
-      fails loudly — never silently skips.
-- [ ] YAML parses; extracted script passes shellcheck with no new warnings.
+- [ ] All five unguarded `grep`-in-command-substitution pipelines guarded with
+      `|| true` (lines 120, 138, 160, 182, 257); indentation unchanged byte-for-byte.
+- [ ] `git diff --stat` shows exactly one file changed.
+- [ ] Absent-LDAP-component path creates the component, re-resolves, and fails
+      loudly if still empty — never silently skips.
+- [ ] The `else` "No LDAP component found; skipping mapper setup" skip is gone.
+- [ ] `YAML OK` printed; extracted script's shellcheck warning count is unchanged
+      from `origin/main` (paste both counts).
 - [ ] Commit message exactly:
 
       fix(keycloak): guard grep pipelines and create LDAP federation if absent
 
-- [ ] Pushed to `origin/fix/keycloak-reconcile-pipefail-ldap-federation`; report
-      the SHA and confirm `git rev-parse origin/<branch>` matches local.
+- [ ] Committed on `fix/keycloak-reconcile-pipefail-ldap-federation` and pushed;
+      `git rev-parse origin/<branch>` matches local.
+
+      **Note for a sandboxed `codex exec` dispatch:** `.git` writes are denied in
+      that sandbox, so Codex cannot satisfy this item. Codex leaves the edit in the
+      working tree and reports the diff; Claude reviews, commits with the exact
+      message above, and pushes.
 
 ## What NOT to Do
 
@@ -238,5 +371,6 @@ is the bug and should be replaced by the hard failure above.
 - Do NOT remove `set -euo pipefail`.
 - Do NOT "fix" this by making the job always exit 0, or by adding
   `ignore-errors` / removing the hook. A failed user-store setup must be visible.
-- Do NOT modify files outside the two named above.
+- Do NOT modify any file other than `identity/keycloak/keycloak-reconcile-hook-job.yaml`.
 - Do NOT run `argocd app sync` or mutate any live cluster resource.
+- Do NOT attempt to answer B.1 — no scratch realms, no live `kcadm.sh` calls.
