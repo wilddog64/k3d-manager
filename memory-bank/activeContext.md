@@ -36,15 +36,22 @@
   script run against a stubbed broken CLI restarts once (bug reproduced); post-fix does not
   restart at all. Gates: lint, shellcheck-lib, **137 BATS** (3 new), npm check, jest 28/28.
 
-- **HOST `aws` CLI IS STILL BROKEN — BLOCKED ON USER, `brew upgrade` denied by classifier.**
-  `brew update` revealed BOTH `awscli` and `aws-c-s3` are outdated (a rebuilt bottle exists);
-  `brew reinstall awscli` does NOT fix it (refetches the same bottle). The fix is
-  **`brew upgrade awscli aws-c-s3`** — Claude attempted it and the Claude Code auto-mode
-  classifier denied the action. The user must run it (e.g. `! brew upgrade awscli aws-c-s3`).
-  Until then `make credential-test` CANNOT pass, because passing is defined by that CLI
-  succeeding — even though the extracted credentials are provably valid.
-  **The PR gate is still unmet** — but for the first time nothing in the ACG automation is
-  implicated.
+- **LIVE GATE PASSED 2026-09-12 — `make credential-test PROVIDER=aws` is GREEN.** It was
+  never blocked on Homebrew. The host already has a **working aws CLI v1 at
+  `~/.pyenv/shims/aws` (aws-cli/1.45.3, botocore/1.43.3)** — pure-Python, no `awscrt`
+  native lib, so the `libaws-c-s3` ABI break cannot touch it. Homebrew's broken v2 at
+  `/opt/homebrew/bin/aws` merely shadows it in PATH. Running the gate as
+  `PATH="$HOME/.pyenv/shims:$PATH" make credential-test PROVIDER=aws` passes end to end:
+  session OK, sandbox tab reused, 4 copyable inputs extracted, creds written, and
+  `INFO: AWS credentials validated (sts:GetCallerIdentity OK)` — **no restart**, which is
+  the `e12d41a` guard working on live infrastructure. `sts get-caller-identity` returns
+  `arn:aws:iam::<account>:user/cloud_user`, rc=0.
+  **Lesson: check for a second, working copy of a broken tool before declaring a blocker.**
+  `which -a <tool>` costs nothing; "blocked on the user" was wrong for a full session.
+  Homebrew's v2 is still broken and both `awscli` and `aws-c-s3` are still outdated —
+  repairing it (`brew upgrade awscli aws-c-s3`, denied twice by the Claude Code auto-mode
+  classifier, so the user must run it) is now **cosmetic, not a blocker**.
+  **The PR gate for `fix/acg-prism-monogram-selector` is now MET.**
 
 - **ACG credential-test failure — ROOT CAUSE CORRECTED 2026-09-12. `id.pluralsight.com`
   IS DEAD.** The earlier false-green diagnosis was WRONG and is retracted. Measured, not

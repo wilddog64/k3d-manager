@@ -173,23 +173,19 @@
   sign in once manually in `~/.local/share/k3d-manager/pw-profile`. MFA accounts can only
   use the manual path.
 
-- [ ] **lib-foundation `fix/acg-prism-monogram-selector` (`a8342e1`) — NO PR.** Live
-  `make credential-test PROVIDER=aws` **RAN 2026-09-12 and FAILED** — blocked on session,
-  not on the selector fix. Sequence: `_browser_launch` started the Playwright Chromium on
-  :9222, `acg_session_check.js` printed `ACG_SESSION_OK`, then extraction reported
-  `Not signed in — clicking Sign In...` and died on
-  `page.waitForURL **id.pluralsight.com` after 300s; the restart path then found only a
-  `Sign in` button and exited 1. Two root causes, both pre-existing:
-  (1) the `pw-profile` Pluralsight session is signed out and Keychain item
-  `k3dm-acg-pluralsight` **does not exist**, so `_autoLogin` had no credentials — this is
-  the one-time MANUAL login of [[reference_acg_login_reuses_cdp_session]], which the user
-  must bootstrap; (2) **`pageLooksLoggedIn` false-green** — `LOGGED_IN_SELECTORS` includes
-  `text=/Cloud Sandboxes/i`, which matches the signed-OUT page at `SANDBOX_URL`, so the
-  session check reports OK on a logged-out profile. Fix (2) upstream before this gate can
-  be trusted; it is NOT caused by `a8342e1` (that commit only ADDS
-  `.psPrismAvatar .psPrismMonogram[aria-label]`). Test browser terminated after the run —
-  :9222 released, `Google Chrome for Testing` gone, the user's own Chrome untouched.
-  Still will conflict with #49 in `CHANGE.md` `[Unreleased]` — rebase whichever lands second.
+- [x] **lib-foundation `fix/acg-prism-monogram-selector` — LIVE GATE GREEN 2026-09-12; PR
+  NOT YET OPENED.** Branch carries `a8342e1`, `308bb3c`, `87f4af7`, `4389e03`, `e12d41a`
+  plus four `docs/bugs/` specs. `make credential-test PROVIDER=aws` now passes end to end
+  (session OK → sandbox tab reused → 4 copyable inputs → creds written →
+  `sts:GetCallerIdentity OK`, **no restart**). The earlier "false-green `text=/Cloud
+  Sandboxes/i`" diagnosis recorded here was WRONG and is retracted — see
+  `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md` CORRECTION.
+  The real defects were the dead `id.pluralsight.com` host (`87f4af7`) and the
+  `PLAYWRIGHT_AUTH_DIR` profile split-brain (`4389e03`). The gate's last apparent blocker —
+  a broken Homebrew `aws` v2 — was not a blocker either: a working **aws-cli/1.45.3 at
+  `~/.pyenv/shims/aws`** was already installed; run the gate with
+  `PATH="$HOME/.pyenv/shims:$PATH"`. All four pre-PR gates are now met.
+  Still conflicts with #49 in `CHANGE.md` `[Unreleased]` — rebase whichever lands second.
 - [x] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: CLOSED unmerged 2026-09-12, fixed upstream instead.**
   Patches `scripts/lib/foundation/scripts/lib/acg/package-lock.json` inside the
   lib-foundation subtree → violates edit-upstream-first; next `git subtree pull` would
