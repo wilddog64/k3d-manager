@@ -124,10 +124,20 @@
   forward as `docs/bugs/2026-09-12-acg-logged-in-selectors-missing-prism-monogram.md`, which
   reached lib-foundation `main` via PR #48. `wilddog64/lib-acg` then archived
   (`gh api repos/wilddog64/lib-acg -X PATCH -F archived=true` → `archived: true`).
-  Still open, tracked in that bug doc: porting the selector into lib-foundation's
-  `LOGGED_IN_SELECTORS` behind a live `make credential-test PROVIDER=aws` gate.
-  Stale references to the dead lib-acg remote remain in `.githooks/pre-commit` (lines 27-29,
-  message text only) and `.claude/settings.local.json`. See [[project_lib_acg_absorption]].
+  **Leftovers cleared 2026-09-12:** (a) selector ported — lib-foundation
+  `fix/acg-prism-monogram-selector` (`3c5e478`) adds
+  `.psPrismAvatar .psPrismMonogram[aria-label]` to `LOGGED_IN_SELECTORS`; offline gates green
+  (node --check, shellcheck, 132 BATS, 7 Playwright) but the **live `make credential-test
+  PROVIDER=aws` gate has NOT run** (no CDP on :9222; needs a one-time manual Pluralsight
+  login) — NO PR until it passes. (b) dead `scripts/lib/acg/` subtree guard removed from
+  `.githooks/pre-commit` (nothing tracked under that path since v1.8.0 Phase 2, and no
+  `lib-acg` git remote); 23 stale lib-acg permission entries stripped from
+  `.claude/settings.local.json` (gitignored, local-only). (c) third casualty found and fixed:
+  `docs/issues/2026-06-05-copilot-pr91-review-findings.md` had deferred a real
+  credential-logging leak (`gcp.js` logging `username.slice(0, 30)`) as "lib-acg upstream
+  debt" — dead routing stranded it for three months; masked on the same lib-foundation
+  branch. **Lesson: when deprecating a repo, re-point every doc that defers work to it.**
+  See [[project_lib_acg_absorption]].
 - [x] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: CLOSED unmerged 2026-09-12, fixed upstream instead.**
   Patches `scripts/lib/foundation/scripts/lib/acg/package-lock.json` inside the
   lib-foundation subtree → violates edit-upstream-first; next `git subtree pull` would

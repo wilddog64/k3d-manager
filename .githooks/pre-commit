@@ -21,17 +21,6 @@ if [[ "${K3DM_SUBTREE_SYNC:-0}" != "1" ]]; then
       printf '  %s\n' "${foundation_changes}" >&2
       exit 1
    fi
-   acg_changes="$(git diff --cached --name-only | grep '^scripts/lib/acg/' || true)"
-   if [[ -n "$acg_changes" ]]; then
-      echo "Pre-commit hook: direct edits to scripts/lib/acg/ are not allowed." >&2
-      echo "This directory is a git subtree from lib-acg." >&2
-      echo "Fix the issue upstream in lib-acg, then run:" >&2
-      echo "  K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/acg lib-acg main --squash" >&2
-      echo "" >&2
-      echo "Blocked files:" >&2
-      printf '  %s\n' "${acg_changes}" >&2
-      exit 1
-   fi
 fi
 
 # shellcheck source=/dev/null

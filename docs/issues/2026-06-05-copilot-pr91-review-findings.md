@@ -29,7 +29,9 @@ console.error(`INFO: username="${username ? '[set]' : '[empty]'}" password="${pa
 **Root cause:**
 `gcp.js` was written before the logging hygiene convention (mask credentials, log only presence) was established in the other providers (`aws.js` already uses `[set]`/`[empty]` for all credentials).
 
-**Status:** DEFERRED — `scripts/lib/acg/` is a subtree from lib-acg. This file cannot be edited directly in k3d-manager; the fix must go to lib-acg upstream first, then a subtree pull brings it here. Tracked as lib-acg upstream debt.
+**Status:** FIXED UPSTREAM 2026-09-12 in lib-foundation `fix/acg-prism-monogram-selector` (`3c5e478`) — reaches k3d-manager via the next lib-foundation release + `git subtree pull`.
+
+**Routing correction:** the original deferral pointed at `wilddog64/lib-acg`, which is now archived and was already legacy/diverged well before that. The acg module lives in lib-foundation at `scripts/lib/acg/` (vendored here under `scripts/lib/foundation/`), so that is where acg fixes go. This finding sat stranded for three months because the deferral named a repo nobody was shipping from — when deprecating a repo, re-point every doc that defers work to it.
 
 **Process note:**
 Add to lib-acg spec template: new providers must log credentials as `[set]`/`[empty]` — never log partial values. Code-review checklist should flag any `slice(0, N)` on credential variables.
