@@ -125,7 +125,7 @@
   reached lib-foundation `main` via PR #48. `wilddog64/lib-acg` then archived
   (`gh api repos/wilddog64/lib-acg -X PATCH -F archived=true` → `archived: true`).
   **Leftovers cleared 2026-09-12:** (a) selector ported — lib-foundation
-  `fix/acg-prism-monogram-selector` (`3c5e478`) adds
+  `fix/acg-prism-monogram-selector` (`a8342e1`) adds
   `.psPrismAvatar .psPrismMonogram[aria-label]` to `LOGGED_IN_SELECTORS`; offline gates green
   (node --check, shellcheck, 132 BATS, 7 Playwright) but the **live `make credential-test
   PROVIDER=aws` gate has NOT run** (no CDP on :9222; needs a one-time manual Pluralsight
@@ -135,9 +135,18 @@
   `.claude/settings.local.json` (gitignored, local-only). (c) third casualty found and fixed:
   `docs/issues/2026-06-05-copilot-pr91-review-findings.md` had deferred a real
   credential-logging leak (`gcp.js` logging `username.slice(0, 30)`) as "lib-acg upstream
-  debt" — dead routing stranded it for three months; masked on the same lib-foundation
-  branch. **Lesson: when deprecating a repo, re-point every doc that defers work to it.**
-  See [[project_lib_acg_absorption]].
+  debt" — dead routing stranded it for three months; masked to `[set]`/`[empty]`. **Split
+  2026-09-12 onto its own lib-foundation branch `fix/acg-gcp-username-log-masking`
+  (`44d43bd`, pushed, offline gates green)** so the security fix is not blocked by the
+  selector branch's live credential-test gate; `fix/acg-prism-monogram-selector` was
+  rewritten to `a8342e1` (selector only) and force-pushed. **Lesson: when deprecating a
+  repo, re-point every doc that defers work to it.** See [[project_lib_acg_absorption]].
+- [x] **shopping-cart-infra `fix/keycloak-reconcile-pipefail-ldap-federation` CHANGELOG entry
+  — DONE 2026-09-12 (`bd6c9e8`, pushed).** Written by Codex against the follow-up scope
+  appended to `docs/bugs/2026-09-12-bugfix-keycloak-reconcile-pipefail-and-missing-ldap-federation.md`
+  (spec commit `93ed35b8`); Claude verified the diff (1 file, 1 insertion, 0 deletions, hook
+  YAML untouched, HEAD unmoved) and committed. Branch is now PR-ready — step 2 of the B.3
+  landing order.
 - [x] **k3d-manager PR #124 — dependabot browserslist 4.28.2→4.28.9: CLOSED unmerged 2026-09-12, fixed upstream instead.**
   Patches `scripts/lib/foundation/scripts/lib/acg/package-lock.json` inside the
   lib-foundation subtree → violates edit-upstream-first; next `git subtree pull` would

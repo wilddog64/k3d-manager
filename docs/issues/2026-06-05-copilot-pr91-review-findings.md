@@ -29,7 +29,7 @@ console.error(`INFO: username="${username ? '[set]' : '[empty]'}" password="${pa
 **Root cause:**
 `gcp.js` was written before the logging hygiene convention (mask credentials, log only presence) was established in the other providers (`aws.js` already uses `[set]`/`[empty]` for all credentials).
 
-**Status:** FIXED UPSTREAM 2026-09-12 in lib-foundation `fix/acg-prism-monogram-selector` (`3c5e478`) — reaches k3d-manager via the next lib-foundation release + `git subtree pull`.
+**Status:** FIXED UPSTREAM 2026-09-12 in lib-foundation `fix/acg-gcp-username-log-masking` (`44d43bd`) — reaches k3d-manager via the next lib-foundation release + `git subtree pull`. (First staged on `fix/acg-prism-monogram-selector`, then split onto its own branch so this security fix does not wait on that branch's live `make credential-test` gate.)
 
 **Routing correction:** the original deferral pointed at `wilddog64/lib-acg`, which is now archived and was already legacy/diverged well before that. The acg module lives in lib-foundation at `scripts/lib/acg/` (vendored here under `scripts/lib/foundation/`), so that is where acg fixes go. This finding sat stranded for three months because the deferral named a repo nobody was shipping from — when deprecating a repo, re-point every doc that defers work to it.
 
