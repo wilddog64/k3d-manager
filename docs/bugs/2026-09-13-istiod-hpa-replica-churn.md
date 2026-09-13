@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.33.0`
 **Files:** `scripts/etc/argocd/applicationsets/istio-ambient.yaml`, `CHANGELOG.md`
-**Status:** FIXED in git — live ApplicationSet reapply pending user go
+**Status:** DONE — live reapply verified 2026-09-13
 
 ## Problem
 
@@ -45,3 +45,11 @@ APP_CLUSTER_NAME=ubuntu-k3s ARGOCD_CONTEXT=k3d-k3d-cluster ./scripts/k3d-manager
 The hub cluster Secret carries `k3d-manager/provider=k3d`, so the CNI dirs render identical to the live values; the only diff is the istiod HPA.
 
 Verify: `kubectl --context k3d-k3d-cluster -n istio-system get hpa istiod` shows `MAXPODS 2`; `istiod-ubuntu-k3s` Synced/Healthy; no `SuccessfulRescale` beyond 2 over the next hour.
+
+## Live Result (2026-09-13)
+
+User ran the `--confirm` command above: `applicationset.argoproj.io/istio-ambient configured`. Verified read-only:
+
+- HPA `istiod`: `min 1 / max 2`, `behavior` scaleUp 120s / scaleDown 900s; 2 replicas at 15%/80% (will settle to 1 after the 900s window).
+- `istio-base`, `istiod`, `istio-cni`, `ztunnel` `-ubuntu-k3s`: Synced/Healthy, operation Succeeded; no istiod pod restarts from the reapply.
+- `bin/smoke-test-cluster-health`: 9 passed, 0 failed.
