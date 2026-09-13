@@ -1778,11 +1778,13 @@ HCL
   printf -v safe_eso_sa '%q' "$eso_sa"
   printf -v safe_eso_ns '%q' "$eso_ns"
   printf -v safe_audience '%q' "$audience"
+  local safe_policies
+  safe_policies=$(_vault_role_merged_policies "$ns" "$release" "auth/${mount}/role/${role}" "app-cluster-reader")
   _vault_exec "$ns" "vault write ${safe_mount_role} \
     bound_service_account_names=${safe_eso_sa} \
     bound_service_account_namespaces=${safe_eso_ns} \
     audience=${safe_audience} \
-    policies=app-cluster-reader \
+    policies=${safe_policies} \
     ttl=1h" "$release"
 
   _info "[vault] app cluster auth configured successfully"
@@ -2040,6 +2042,16 @@ function _vault_build_policy_hcl() {
    fi
 }
 
+function _vault_role_merged_policies() {
+  local ns="$1" release="$2" role_path="$3" desired="$4"
+  local role_json="" existing=""
+  role_json=$(_vault_exec --no-exit "$ns" "vault read -format=json ${role_path}" "$release" 2>/dev/null || true)
+  existing=$(printf '%s' "$role_json" | jq -r '(.data.token_policies // [])[]' 2>/dev/null || true)
+  printf '%s\n%s\n' "${desired//,/$'\n'}" "$existing" \
+    | awk '/^[A-Za-z0-9._-]+$/ && $0 != "default" && !seen[$0]++' \
+    | paste -sd, -
+}
+
 function _vault_configure_secret_reader_role() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
@@ -2105,6 +2117,7 @@ SH
   if [[ "$role" == "eso-ldap-directory" && -n "$apps_policy" ]]; then
      role_policies="${apps_policy},${policy}"
   fi
+  role_policies=$(_vault_role_merged_policies "$ns" "$release" "auth/kubernetes/role/${role}" "$role_policies")
   printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"'      "$role" "$service_account" "$bound_namespaces" "$role_policies" "$token_audience"
 
   _vault_exec "$ns" "$role_cmd" "$release"
