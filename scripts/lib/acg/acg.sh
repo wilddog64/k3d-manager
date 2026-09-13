@@ -325,7 +325,7 @@ PLIST
 
 _acg_chrome_cdp_write_plist() {
   local _chrome_bin
-  _chrome_bin="$(_acg_resolve_cdp_browser_bin)" || return 1
+  _chrome_bin="$(_acg_resolve_cdp_browser_bin)" || _chrome_bin=""
   if [[ -z "${_chrome_bin}" || ! -x "${_chrome_bin}" ]]; then
     _err "[acg] Playwright-managed Chromium not found — run 'npm install' in ${_LIB_ACG_ROOT} before installing the CDP agent"
     return 1
