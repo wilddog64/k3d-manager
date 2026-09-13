@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- `hub_recovery_reconcile` mirrors the verified ArgoCD admin password into Vault `secret/argocd/admin` when missing (`make show-service-passwords` ArgoCD N/A after hub restore)
 - Keycloak smoke-user/realm-provision RETURN traps no longer leak into callers (`hub_recovery_reconcile --confirm` exited 1 with `wd: unbound variable`)
 - ACG cluster-up/cluster-refresh no longer overwrite the hub Grafana port-forward agent (recurring grafana.3ai-talk.org 502/401)
 - deploy_istio_ambient picks CNI conf/bin dirs from the target's provider label (k3d hub no longer gets Cilium paths)

@@ -114,6 +114,30 @@ function _hub_recovery_replay_identity_hook() {
   return 1
 }
 
+function _hub_recovery_mirror_argocd_admin() {
+  local hub_context="$1" root_token password payload_file argocd_url="${HUB_RECOVERY_ARGOCD_URL:-https://argocd.3ai-talk.org}" code
+  root_token=$(_kubectl -- --context "$hub_context" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+  [[ -n "$root_token" ]] || { _err "[hub-recovery] Vault root token unavailable for ArgoCD admin mirror"; return 1; }
+  if printf '%s\n' "$root_token" | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=password argocd/admin >/dev/null 2>&1'; then
+    return 0
+  fi
+  password=$(_kubectl -- --context "$hub_context" -n cicd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+  if [[ -z "$password" ]]; then
+    _warn "[hub-recovery] argocd-initial-admin-secret unavailable; cannot mirror ArgoCD admin password into Vault"
+    return 0
+  fi
+  payload_file=$(mktemp)
+  trap 'trap - RETURN; rm -f "'"${payload_file}"'" 2>/dev/null || true' RETURN
+  jq -n --arg username admin --arg password "$password" '{username:$username,password:$password}' > "$payload_file"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-hub-recovery/1' -H 'Content-Type: application/json' --data @"$payload_file" "${argocd_url}/api/v1/session" || true)
+  if [[ "$code" != "200" ]]; then
+    _warn "[hub-recovery] argocd-initial-admin-secret password rejected by ArgoCD (HTTP ${code:-000}); not mirroring into Vault"
+    return 0
+  fi
+  { printf '%s\n' "$root_token"; cat "$payload_file"; } | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put -mount=secret argocd/admin -' >/dev/null || return 1
+  _info "[hub-recovery] ArgoCD admin password mirrored into Vault secret/argocd/admin"
+}
+
 function _hub_recovery_install_cloudflared_config() {
   local config_dir="${HOME}/.cloudflared" config_file="${HOME}/.cloudflared/config.yml" source_file="$SCRIPT_DIR/etc/cloudflared/config.yml" table="$SCRIPT_DIR/etc/cloudflared/origins.tsv" rendered timestamp
   rendered=$(mktemp -t hub-recovery-cloudflared.XXXXXX)
@@ -140,7 +164,7 @@ function hub_recovery_reconcile() {
   local confirm=0 hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}" app_context="${HUB_RECOVERY_APP_CONTEXT:-ubuntu-hostinger}"
   if [[ "${1:-}" == "--confirm" ]]; then confirm=1
   elif [[ -n "${1:-}" ]]; then _err "[hub-recovery] only --confirm is accepted"; return 1; fi
-  local -a steps=("Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "Cloudflare origins")
+  local -a steps=("Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins")
   local index
   if (( ! confirm )); then
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
@@ -153,6 +177,7 @@ function hub_recovery_reconcile() {
   _hub_recovery_scale_openldap "$hub_context" || return 1
   _hub_recovery_replay_identity_hook "$hub_context" || return 1
   KEYCLOAK_BASE_URL="${KEYCLOAK_BASE_URL:-https://keycloak.3ai-talk.org}" keycloak_seed_smoke_user || return 1
+  _hub_recovery_mirror_argocd_admin "$hub_context" || return 1
   _hub_recovery_install_cloudflared_config
 }
 
