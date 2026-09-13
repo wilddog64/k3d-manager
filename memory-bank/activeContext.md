@@ -634,7 +634,7 @@
   `docs/bugs/2026-07-17-ambient-istio-cni-conf-bin-dir-mismatch.md` "Spec 2026-09-13"
   (provider-aware AMBIENT_CNI_* defaults), and
   `docs/bugs/2026-09-13-grafana-port-forward-plist-overwritten-by-acg-writers.md`.
-  DISPATCHED to Codex 2026-09-13 (user ran chain). A=reconcile DONE `b71e587a` (Codex .git write blocked → Claude verified diff + shellcheck + 77 BATS green, committed + pushed). B=CNI, C=grafana plist pending (user re-runs chain per spec). M2 rollback window ends 2026-09-18.
+  DISPATCHED to Codex 2026-09-13 (user ran chain). A=reconcile DONE `b71e587a` (Codex .git write blocked → Claude verified diff + shellcheck + 77 BATS green, committed + pushed). B=CNI DONE `35388b47` (Codex committed+pushed; Claude verified shellcheck + 4 BATS). C=grafana plist DONE `45be3aec` (Codex blocked by BATS hang → Claude verified diff, shellcheck parity 18/6, cluster_refresh 3/3 + cluster_up 8/8 filtered, committed). FOLLOW-UP: pre-existing hang in scripts/tests/bin/cluster_up.bats "acg-up dry-run previews core and never crosses the Step 4 seam" — hangs on pristine HEAD too (timeout 150s), needs a bug spec. Next: live `hub_recovery_reconcile` dry-run on hub (operator), then v1.33.0 PR gates. M2 rollback window ends 2026-09-18.
 
 - **Hub red-items pass 2026-09-13 (Claude):** `make status CLUSTER_PROVIDER=k3s-hostinger`
   → no control-plane errors; only ✗ Grafana login 401 (+2 known Keycloak/frontend
