@@ -283,6 +283,61 @@ JSON
   [ "$status" -ne 0 ]
 }
 
+@test "register_app_cluster: in-cluster secret does not match platform-helm" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/in-cluster-platform-secret.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  export ARGOCD_APP_CLUSTER_ENVIRONMENT=infra
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -c '^    environment:' "$RENDERED_FILE"
+  [ "$output" = "0" ]
+  run grep -c 'argocd-chart-version' "$RENDERED_FILE"
+  [ "$output" = "0" ]
+  run grep -c 'argocd-replicas' "$RENDERED_FILE"
+  [ "$output" = "0" ]
+  run grep -c '^    k3d-manager/managed:' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  run grep -c 'argocd.argoproj.io/secret-type: cluster' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  if command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' >/dev/null 2>&1; then
+    run python3 -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1]))' "$RENDERED_FILE"
+    [ "$status" -eq 0 ]
+  fi
+}
+
+@test "register_app_cluster: remote secret keeps platform-helm labels" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/remote-platform-secret.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_ENVIRONMENT
+  ARGOCD_APP_CLUSTER_SERVER=https://remote.example.invalid \
+    ARGOCD_APP_CLUSTER_TOKEN=dummy-token \
+    ARGOCD_CHART_VERSION=9.9.9 run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -c '^    environment: "dev"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  run grep -c '^    argocd-chart-version: "9.9.9"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  run grep -c '^    argocd-replicas: "2"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  run grep -c '^    k3d-manager/managed:' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+}
+
 @test "register_app_cluster: requires a token for remote registrations" {
   unset ARGOCD_APP_CLUSTER_TOKEN
   ARGOCD_APP_CLUSTER_SERVER=https://remote.example.invalid run register_app_cluster

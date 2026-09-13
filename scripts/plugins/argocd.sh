@@ -1352,9 +1352,10 @@ HELP
 
   _info "[argocd] registering app cluster '${ARGOCD_APP_CLUSTER_NAME}' -> ${ARGOCD_APP_CLUSTER_SERVER}"
 
-  local app_cluster_environment="${ARGOCD_APP_CLUSTER_ENVIRONMENT:-dev}"
-  if [[ "${ARGOCD_APP_CLUSTER_SERVER}" == "https://kubernetes.default.svc" ]]; then
-    app_cluster_environment="${ARGOCD_APP_CLUSTER_ENVIRONMENT:-infra}"
+  local _platform_labels=""
+  if (( ! _in_cluster )); then
+    printf -v _platform_labels '    environment: "%s"\n    argocd-chart-version: "%s"\n    argocd-replicas: "2"\n' \
+      "${ARGOCD_APP_CLUSTER_ENVIRONMENT:-dev}" "${ARGOCD_CHART_VERSION}"
   fi
 
   local _tls_client_config
@@ -1400,10 +1401,7 @@ metadata:
   labels:
     argocd.argoproj.io/secret-type: cluster
     argocd.argoproj.io/cluster-name: "${ARGOCD_APP_CLUSTER_NAME}"
-    environment: "${app_cluster_environment}"
-    argocd-chart-version: "${ARGOCD_CHART_VERSION}"
-    argocd-replicas: "2"
-    k3d-manager/managed: "${_managed}"
+${_platform_labels}    k3d-manager/managed: "${_managed}"
     k3d-manager/provider: "${ARGOCD_APP_CLUSTER_PROVIDER:-unknown}"
     k3d-manager/release: "${_release_label}"
   annotations:
