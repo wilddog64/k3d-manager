@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.33.0`
 **Filed:** 2026-09-13
-**Status:** SPECCED — dispatched to Codex
+**Status:** FIXED `b3bc737c` (Codex; Claude verified: diff = spec, shellcheck 0, BATS 101/101; Claude pushed) — live grant restore pending (operator)
 **Files:** `scripts/plugins/vault.sh`, `scripts/tests/plugins/vault_role_policy_merge.bats` (new), `CHANGELOG.md`
 **Related:** `docs/issues/2026-09-05-vault-kv-and-eso-policy-loss-grafana-cosign.md`, `docs/issues/2026-09-09-hub-kine-history-and-hostinger-cosign-role.md`
 
