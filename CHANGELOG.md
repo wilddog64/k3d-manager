@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- istiod HPA no longer churns 1→5→1 replicas on the hub: `istio-ambient` caps it at 2 replicas with 120s scale-up / 900s scale-down stabilization (CPU request stays 50m for the 2-CPU hostinger node)
 - `register_app_cluster` no longer labels in-cluster registrations for `platform-helm`, which had installed a second ArgoCD into the hub `cicd` namespace
 - `platform-ops` ApplicationSet enables `ServerSideDiff=true` so `hub-platform-ops` no longer sits OutOfSync on ESO-defaulted ExternalSecret fields
 - `bin/smoke-test-cluster-health` defaults to the live `ubuntu-hostinger` context and `ubuntu-k3s-` ArgoCD app names, and reports kubectl failures instead of exiting 1 silently
