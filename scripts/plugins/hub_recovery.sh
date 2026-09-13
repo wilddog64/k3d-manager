@@ -117,7 +117,7 @@ function _hub_recovery_replay_identity_hook() {
 function _hub_recovery_install_cloudflared_config() {
   local config_dir="${HOME}/.cloudflared" config_file="${HOME}/.cloudflared/config.yml" source_file="$SCRIPT_DIR/etc/cloudflared/config.yml" table="$SCRIPT_DIR/etc/cloudflared/origins.tsv" rendered timestamp
   rendered=$(mktemp -t hub-recovery-cloudflared.XXXXXX)
-  trap 'rm -f "$rendered"' RETURN
+  trap 'trap - RETURN; rm -f "'"${rendered}"'" 2>/dev/null || true' RETURN
   _hub_recovery_render_cloudflared_config k3d "$source_file" "$table" > "$rendered"
   if ! cmp -s "$rendered" "$config_file"; then
     mkdir -p "$config_dir"

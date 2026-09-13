@@ -505,7 +505,7 @@ HELP
 
    local wd
    wd=$(mktemp -d -t kc-smoke.XXXXXX)
-   trap 'rm -rf "$wd"' RETURN
+   trap 'trap - RETURN; rm -rf "'"${wd}"'" 2>/dev/null || true' RETURN
 
    local base_url token
    base_url=$(_keycloak_smoke_base_url)
@@ -684,7 +684,7 @@ HELP
 
    local wd
    wd=$(mktemp -d -t kc-provision.XXXXXX)
-   trap 'rm -rf "$wd"' RETURN
+   trap 'trap - RETURN; rm -rf "'"${wd}"'" 2>/dev/null || true' RETURN
 
    local base_url token
    base_url=$(_keycloak_smoke_base_url)
