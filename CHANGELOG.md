@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- hub recovery reconcile — in-cluster registration, eso-apps policy, CVE reader seed, Vault root token Keychain backup, OpenLDAP scale-up, identity hook replay, smoke user, provider-aware Cloudflare origins
+
 ### Added
 
 - **Hermes Kine circuit breaker** — a read-only hub-datastore sensor detects

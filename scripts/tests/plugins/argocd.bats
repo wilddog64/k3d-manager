@@ -260,6 +260,35 @@ JSON
   [ "$ARGOCD_NAMESPACE" = "cicd" ]
 }
 
+@test "register_app_cluster: permits token-less in-cluster registration" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/in-cluster-secret.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc \
+    ARGOCD_APP_CLUSTER_NAME=ubuntu-k3s \
+    ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster \
+    ARGOCD_NAMESPACE=cicd run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -A1 '^  config: |' "$RENDERED_FILE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"    {}"* ]]
+  run grep -F bearerToken "$RENDERED_FILE"
+  [ "$status" -ne 0 ]
+}
+
+@test "register_app_cluster: requires a token for remote registrations" {
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  ARGOCD_APP_CLUSTER_SERVER=https://remote.example.invalid run register_app_cluster
+  [ "$status" -eq 1 ]
+}
+
 @test "ArgoCD Helm values substitute Keycloak OIDC settings" {
   local render_vars='$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS'
   local rendered

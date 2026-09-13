@@ -1336,12 +1336,15 @@ Config (override via env or scripts/etc/argocd/vars.sh):
   ARGOCD_APP_CLUSTER_SERVER        API server    (default: https://host.k3d.internal:6443)
   ARGOCD_APP_CLUSTER_INSECURE      Skip TLS      (default: true — dev only)
   ARGOCD_APP_CLUSTER_CA_DATA       CA bundle     (optional, base64; when set forces insecure=false)
-  ARGOCD_APP_CLUSTER_TOKEN         Bearer token  (required — no default)
+  ARGOCD_APP_CLUSTER_TOKEN         Bearer token  (required unless SERVER=https://kubernetes.default.svc)
 HELP
     return 0
   fi
 
-  if [[ -z "${ARGOCD_APP_CLUSTER_TOKEN:-}" ]]; then
+  local _in_cluster=0
+  [[ "${ARGOCD_APP_CLUSTER_SERVER:-}" == "https://kubernetes.default.svc" ]] && _in_cluster=1
+
+  if (( ! _in_cluster )) && [[ -z "${ARGOCD_APP_CLUSTER_TOKEN:-}" ]]; then
     _err "[argocd] ARGOCD_APP_CLUSTER_TOKEN is required — get it with:"
     _err "  ssh ubuntu kubectl create token argocd-manager -n kube-system --duration=8760h"
     return 1
@@ -1381,6 +1384,13 @@ HELP
 
   local _wasx=0
   case $- in *x*) _wasx=1; set +x;; esac
+  local _config_json
+  if (( _in_cluster )); then
+    _config_json="{}"
+  else
+    printf -v _config_json '{\n      "bearerToken": "%s",\n      "tlsClientConfig": { %s }\n    }' \
+      "${ARGOCD_APP_CLUSTER_TOKEN}" "${_tls_client_config}"
+  fi
   cat > "$rendered" <<EOF
 apiVersion: v1
 kind: Secret
@@ -1405,10 +1415,7 @@ stringData:
   name: ${ARGOCD_APP_CLUSTER_NAME}
   server: ${ARGOCD_APP_CLUSTER_SERVER}
   config: |
-    {
-      "bearerToken": "${ARGOCD_APP_CLUSTER_TOKEN}",
-      "tlsClientConfig": { ${_tls_client_config} }
-    }
+    ${_config_json}
 EOF
   _kubectl apply -f "$rendered"
   rm -f "$rendered"

@@ -376,7 +376,7 @@ KEYCLOAK_PSQL
 function _keycloak_smoke_base_url() {
    if [[ -n "${KEYCLOAK_BASE_URL:-}" ]]; then
       printf '%s' "$KEYCLOAK_BASE_URL"
-   elif [[ "${CLUSTER_PROVIDER:-}" == "k3s-hostinger" ]]; then
+   elif [[ "${CLUSTER_PROVIDER:-}" == "k3s-hostinger" || "${CLUSTER_PROVIDER:-}" == "k3d" ]]; then
       printf '%s' "https://keycloak.3ai-talk.org"
    else
       printf '%s' "http://keycloak.shopping-cart.local"

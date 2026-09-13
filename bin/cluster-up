@@ -52,6 +52,7 @@ source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 source "${REPO_ROOT}/scripts/plugins/keycloak.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
+source "${REPO_ROOT}/scripts/plugins/hub_recovery.sh"
 : "${_kc_admin_pass:=}"
 : "${_kc_db_pass:=}"
 : "${_argocd_client_secret:=}"
@@ -1721,7 +1722,8 @@ if _is_mac; then
       fi
     fi
     if [[ -f "${_cf_static_config}" ]]; then
-      cp "${_cf_static_config}" "${_cloudflared_config}"
+      _hub_recovery_render_cloudflared_config "${CLUSTER_PROVIDER:-k3s-aws}" "${_cf_static_config}" \
+        "${REPO_ROOT}/scripts/etc/cloudflared/origins.tsv" > "${_cloudflared_config}"
       _info "[acg-up] Cloudflare config installed from repo (prometheus + grafana + argocd + frontend + keycloak)"
     else
       _warn "[acg-up] ${_cf_static_config} not found — skipping config install"

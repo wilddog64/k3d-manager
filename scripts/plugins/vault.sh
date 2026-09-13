@@ -2100,9 +2100,30 @@ SH
   fi
 
   local role_cmd=""
-  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"'      "$role" "$service_account" "$bound_namespaces" "$policy" "$token_audience"
+  local role_policies="$policy"
+  local apps_policy="${VAULT_ESO_APPS_POLICY-eso-apps}"
+  if [[ "$role" == "eso-ldap-directory" && -n "$apps_policy" ]]; then
+     role_policies="${apps_policy},${policy}"
+  fi
+  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"'      "$role" "$service_account" "$bound_namespaces" "$role_policies" "$token_audience"
 
   _vault_exec "$ns" "$role_cmd" "$release"
+}
+
+function _vault_ensure_eso_apps_policy() {
+  local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" mount="${3:-secret}"
+  local policy="${VAULT_ESO_APPS_POLICY:-eso-apps}"
+  local prefixes="${VAULT_ESO_APPS_PREFIXES:-github/pat,minio,payment,postgres,rabbitmq,redis}"
+  local pod="${release}-0"
+  local -a secret_prefixes=()
+  read -r -a secret_prefixes <<< "${prefixes//,/ }"
+  _vault_build_policy_hcl "${mount%/}" "${secret_prefixes[@]}"
+  _vault_login "$ns" "$release"
+  if ! printf '%s\n' "$_VAULT_POLICY_HCL" | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
+     _err "[vault] failed to apply policy ${policy}"
+     return 1
+  fi
+  _info "[vault] policy ${policy} applied (${prefixes})"
 }
 
 function _vault_configure_secret_writer_role() {

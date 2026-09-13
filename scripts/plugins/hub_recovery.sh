@@ -9,6 +9,153 @@ HUB_RECOVERY_LOCAL_PATH_ROOT="${HUB_RECOVERY_LOCAL_PATH_ROOT:-/var/lib/rancher/k
 HUB_RECOVERY_TAR_BIN="${HUB_RECOVERY_TAR_BIN:-tar}"
 HUB_RECOVERY_DOCKER_BIN="${HUB_RECOVERY_DOCKER_BIN:-docker}"
 
+VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"
+if [[ -r "$VAULT_PLUGIN" ]]; then
+  # shellcheck disable=SC1090
+  source "$VAULT_PLUGIN"
+fi
+ARGOCD_PLUGIN="$PLUGINS_DIR/argocd.sh"
+if [[ -r "$ARGOCD_PLUGIN" ]]; then
+  # shellcheck disable=SC1090
+  source "$ARGOCD_PLUGIN"
+fi
+KEYCLOAK_PLUGIN="$PLUGINS_DIR/keycloak.sh"
+if [[ -r "$KEYCLOAK_PLUGIN" ]]; then
+  # shellcheck disable=SC1090
+  source "$KEYCLOAK_PLUGIN"
+fi
+
+function _hub_recovery_render_cloudflared_config() {
+  local provider="$1" in_file="$2" table="$3"
+  awk -v provider="$provider" -v table="$table" '
+    BEGIN {
+      while ((getline line < table) > 0) {
+        if (line ~ /^#/ || line == "") continue
+        split(line, f, "\\t")
+        if (f[2] == provider) origin[f[1]] = f[3]
+      }
+    }
+    /^[[:space:]]*-[[:space:]]*hostname:/ { host = $NF; print; next }
+    /^[[:space:]]*service:/ {
+      if (host != "" && (host in origin)) sub(/service:.*/, "service: " origin[host])
+      host = ""; print; next
+    }
+    { print }
+  ' "$in_file"
+}
+
+function _hub_recovery_sync_vault_root_token() {
+  local hub_context="$1" root_token=""
+  if ! _is_mac; then
+    _info "[hub-recovery] Vault root token Keychain sync skipped (macOS only)"
+    return 0
+  fi
+  root_token=$(_kubectl -- --context "$hub_context" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+  if [[ -n "$root_token" ]]; then
+    printf 'add-generic-password -U -s %s -a %s -w %s\n' "k3dm-vault-root-token" "$hub_context" "$root_token" | _no_trace security -i >/dev/null
+    return 0
+  fi
+  root_token=$(_no_trace security find-generic-password -s "k3dm-vault-root-token" -a "$hub_context" -w 2>/dev/null || true)
+  if [[ -z "$root_token" ]]; then
+    _err "[hub-recovery] Vault root token is absent from both cluster and Keychain"
+    return 1
+  fi
+  jq -n --arg root_token "$root_token" '{apiVersion:"v1",kind:"Secret",metadata:{name:"vault-root",namespace:"secrets"},type:"Opaque",stringData:{root_token:$root_token}}' | _kubectl -- --context "$hub_context" apply -f -
+}
+
+function _hub_recovery_ensure_eso_apps_role() {
+  local ldap_vars_file="$SCRIPT_DIR/etc/ldap/vars.sh" role_json
+  # shellcheck disable=SC1090
+  source "$ldap_vars_file"
+  _vault_ensure_eso_apps_policy secrets vault secret || return 1
+  role_json=$(_vault_exec --no-exit secrets "vault read -format=json auth/kubernetes/role/${LDAP_ESO_ROLE}" vault 2>/dev/null || true)
+  if ! printf '%s' "$role_json" | jq -e '.data.token_policies | index("eso-apps")' >/dev/null 2>&1; then
+    _vault_configure_secret_reader_role secrets vault "$LDAP_ESO_SERVICE_ACCOUNT" "$LDAP_NAMESPACE" "$LDAP_VAULT_KV_MOUNT" "$LDAP_VAULT_POLICY_PREFIX" "$LDAP_ESO_ROLE" || return 1
+  fi
+}
+
+function _hub_recovery_seed_app_cluster_reader() {
+  local hub_context="$1" app_context="$2" server ca_data bearer_token root_token payload
+  if ! _kubectl -- --context "$app_context" get namespace platform >/dev/null 2>&1; then
+    _warn "[hub-recovery] app context '${app_context}' unavailable; skipping CVE reader seed"
+    return 0
+  fi
+  server=$(_kubectl -- --context "$app_context" config view -o "jsonpath={.clusters[?(@.name==\"${app_context}\")].cluster.server}" 2>/dev/null || true)
+  ca_data=$(_kubectl -- --context "$app_context" -n platform get secret hub-cve-inventory-reader-token -o jsonpath='{.data.ca\.crt}' 2>/dev/null || true)
+  bearer_token=$(_kubectl -- --context "$app_context" -n platform get secret hub-cve-inventory-reader-token -o jsonpath='{.data.token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+  payload=$(jq -n --arg server "$server" --arg caData "$ca_data" --arg bearerToken "$bearer_token" '{server:$server,caData:$caData,bearerToken:$bearerToken}')
+  if ! printf '%s' "$payload" | jq -e '.server != "" and .caData != "" and .bearerToken != ""' >/dev/null; then
+    _warn "[hub-recovery] CVE reader ServiceAccount Secret unavailable; skipping seed"
+    return 0
+  fi
+  root_token=$(_kubectl -- --context "$hub_context" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+  [[ -n "$root_token" ]] || { _err "[hub-recovery] Vault root token unavailable for CVE reader seed"; return 1; }
+  printf '%s\n%s\n' "$root_token" "$payload" | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put -mount=secret platform-ops/app-cluster-hostinger -'
+}
+
+function _hub_recovery_scale_openldap() {
+  local hub_context="$1" replicas target_replicas="${HUB_RECOVERY_OPENLDAP_REPLICAS:-1}"
+  replicas=$(_kubectl -- --context "$hub_context" -n identity get sts openldap -o jsonpath='{.spec.replicas}' 2>/dev/null || true)
+  if [[ "$replicas" == "0" ]]; then
+    _kubectl -- --context "$hub_context" -n identity scale sts openldap --replicas="$target_replicas" || return 1
+    _kubectl -- --context "$hub_context" -n identity rollout status sts/openldap --timeout=180s
+  fi
+}
+
+function _hub_recovery_replay_identity_hook() {
+  local hub_context="$1" phase="" elapsed
+  _kubectl -- --context "$hub_context" -n cicd patch application shopping-cart-identity --type merge -p '{"operation":{"initiatedBy":{"username":"hub_recovery_reconcile"},"sync":{"prune":false,"syncStrategy":{"hook":{}}}}}' || return 1
+  for ((elapsed=0; elapsed<300; elapsed+=5)); do
+    phase=$(_kubectl -- --context "$hub_context" -n cicd get application shopping-cart-identity -o jsonpath='{.status.operationState.phase}' 2>/dev/null || true)
+    [[ "$phase" == "Succeeded" ]] && return 0
+    sleep 5
+  done
+  _err "[hub-recovery] identity hook replay did not succeed (phase: ${phase:-unknown})"
+  return 1
+}
+
+function _hub_recovery_install_cloudflared_config() {
+  local config_dir="${HOME}/.cloudflared" config_file="${HOME}/.cloudflared/config.yml" source_file="$SCRIPT_DIR/etc/cloudflared/config.yml" table="$SCRIPT_DIR/etc/cloudflared/origins.tsv" rendered timestamp
+  rendered=$(mktemp -t hub-recovery-cloudflared.XXXXXX)
+  trap 'rm -f "$rendered"' RETURN
+  _hub_recovery_render_cloudflared_config k3d "$source_file" "$table" > "$rendered"
+  if ! cmp -s "$rendered" "$config_file"; then
+    mkdir -p "$config_dir"
+    if [[ -f "$config_file" ]]; then
+      timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+      cp "$config_file" "${config_file}.bak.${timestamp}"
+    fi
+    cp "$rendered" "$config_file"
+  fi
+  trap - RETURN
+  rm -f "$rendered"
+  _info "[hub-recovery] reload with: launchctl kickstart -k \"gui/$(id -u)/com.k3d-manager.cloudflare-tunnel\""
+}
+
+function hub_recovery_reconcile() {
+  if [[ "${1:-}" == "--help" ]]; then
+    echo "Usage: hub_recovery_reconcile [--confirm]"
+    return 0
+  fi
+  local confirm=0 hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}" app_context="${HUB_RECOVERY_APP_CONTEXT:-ubuntu-hostinger}"
+  if [[ "${1:-}" == "--confirm" ]]; then confirm=1
+  elif [[ -n "${1:-}" ]]; then _err "[hub-recovery] only --confirm is accepted"; return 1; fi
+  local -a steps=("Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "Cloudflare origins")
+  local index
+  if (( ! confirm )); then
+    for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
+    return 0
+  fi
+  _hub_recovery_sync_vault_root_token "$hub_context" || return 1
+  _hub_recovery_ensure_eso_apps_role || return 1
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc ARGOCD_APP_CLUSTER_NAME=ubuntu-k3s ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster ARGOCD_APP_CLUSTER_PROVIDER=k3d ARGOCD_NAMESPACE=cicd register_app_cluster || return 1
+  _hub_recovery_seed_app_cluster_reader "$hub_context" "$app_context" || return 1
+  _hub_recovery_scale_openldap "$hub_context" || return 1
+  _hub_recovery_replay_identity_hook "$hub_context" || return 1
+  KEYCLOAK_BASE_URL="${KEYCLOAK_BASE_URL:-https://keycloak.3ai-talk.org}" keycloak_seed_smoke_user || return 1
+  _hub_recovery_install_cloudflared_config
+}
+
 function _hub_recovery_records() {
   cat <<'EOF'
 server-0|secrets|data-vault-0|node-server-0-storage
@@ -208,6 +355,6 @@ function hub_recovery_restore() {
     _hub_recovery_restore_one "$source_tree" "$target" "$target_node" "$node" "$namespace" "$claim" "$apply"
   done < <(_hub_recovery_records)
   if (( ! apply )); then
-    echo "Dry-run only. Re-run with --confirm after stateful consumers are scaled down."
+    echo "Dry-run only. Re-run with --confirm after stateful consumers are scaled down. Then run: hub_recovery_reconcile --confirm"
   fi
 }

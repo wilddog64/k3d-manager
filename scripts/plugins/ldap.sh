@@ -1134,6 +1134,7 @@ function deploy_ldap() {
    _ldap_seed_ldif_secret || return 1
 
    _vault_configure_secret_reader_role       "$vault_ns" "$vault_release"       "$LDAP_ESO_SERVICE_ACCOUNT" "$namespace"       "$LDAP_VAULT_KV_MOUNT" "$LDAP_VAULT_POLICY_PREFIX" "$LDAP_ESO_ROLE" ||       { _err "[ldap] failed to configure Vault role ${LDAP_ESO_ROLE} for namespace ${namespace}"; return 1; }
+   _vault_ensure_eso_apps_policy "$vault_ns" "$vault_release" "$LDAP_VAULT_KV_MOUNT" ||       { _err "[ldap] failed to apply eso-apps Vault policy"; return 1; }
 
    _ldap_ensure_namespace "$namespace" || return 1
    _ldap_apply_eso_resources "$namespace" || return 1

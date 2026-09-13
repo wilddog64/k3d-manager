@@ -105,3 +105,41 @@ YAML
   [ "$status" -ne 0 ]
   [[ "$output" == *"PV target node mismatch"* ]]
 }
+
+@test "_hub_recovery_render_cloudflared_config: k3d overrides only the frontend origin" {
+  local config="${BATS_TEST_DIRNAME}/../../etc/cloudflared/config.yml"
+  local table="${BATS_TEST_DIRNAME}/../../etc/cloudflared/origins.tsv"
+  run _hub_recovery_render_cloudflared_config k3d "$config" "$table"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq "$(wc -l < "$config" | tr -d ' ')" ]
+  [[ "$output" == *"service: http://127.0.0.1:8000"* ]]
+  [[ "$output" != *"frontend.3ai-talk.org"$'\n'"    service: http://127.0.0.2:80"* ]]
+}
+
+@test "_hub_recovery_render_cloudflared_config: hostinger and unknown providers preserve config" {
+  local config="${BATS_TEST_DIRNAME}/../../etc/cloudflared/config.yml"
+  local table="${BATS_TEST_DIRNAME}/../../etc/cloudflared/origins.tsv"
+  local expected
+  expected=$(<"$config")
+  run _hub_recovery_render_cloudflared_config k3s-hostinger "$config" "$table"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$expected" ]
+  run _hub_recovery_render_cloudflared_config unknown "$config" "$table"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$expected" ]
+}
+
+@test "hub_recovery_reconcile: dry run prints steps and invokes no operations" {
+  local calls="${BATS_TEST_TMPDIR}/reconcile-calls"
+  : > "$calls"
+  _kubectl() { echo kubectl >> "$calls"; }
+  security() { echo security >> "$calls"; }
+  register_app_cluster() { echo register >> "$calls"; }
+  export -f _kubectl security register_app_cluster
+  run hub_recovery_reconcile
+  [ "$status" -eq 0 ]
+  for step in {1..8}; do
+    [[ "$output" == *"${step}."* ]]
+  done
+  [ ! -s "$calls" ]
+}

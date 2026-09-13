@@ -168,6 +168,16 @@ JSON
   [[ "$output" == *"Usage: deploy_vault"* ]]
 }
 
+@test "_vault_build_policy_hcl: eso-apps prefixes are read-only and scoped" {
+  _vault_build_policy_hcl secret github/pat minio payment postgres rabbitmq redis
+  [[ "$_VAULT_POLICY_HCL" == *'secret/data/redis/*'* ]]
+  [[ "$_VAULT_POLICY_HCL" == *'secret/data/github/pat'* ]]
+  [[ "$_VAULT_POLICY_HCL" != *create* ]]
+  [[ "$_VAULT_POLICY_HCL" != *update* ]]
+  [[ "$_VAULT_POLICY_HCL" != *delete* ]]
+  [[ "$_VAULT_POLICY_HCL" != *'secret/data/*'* ]]
+}
+
 @test "deploy_vault loads optional config when vars file exists" {
   local stub_root="${BATS_TEST_TMPDIR}/vault-config"
   local real_root="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"

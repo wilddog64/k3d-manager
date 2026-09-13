@@ -1,0 +1,4 @@
+# hostname	provider	origin
+frontend.3ai-talk.org	k3d	http://127.0.0.1:8000
+frontend.3ai-talk.org	k3s-hostinger	http://127.0.0.2:80
+frontend.3ai-talk.org	k3s-aws	http://127.0.0.2:80
