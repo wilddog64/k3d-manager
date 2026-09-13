@@ -6,7 +6,7 @@
 
 ## Current focus
 
-- **2026-09-13 post-hub-remediation follow-ups.** (1) Stale Running operationState on kube-prometheus-stack / shopping-cart-identity / ubuntu-k3s-data-layer: Claude patch denied by classifier, user runs it. (2) istiod "flap" = HPA scale churn (50m request, 80% target), not crashes. (3) Smoke pod-check fix DONE `57f8af1f`, live 9/0 on hub pods. NEW: hostinger shopping-cart workloads are orphaned (no `ubuntu-hostinger-*` apps on the hub); needs user decision.
+- **2026-09-13 post-hub-remediation follow-ups.** (1) Stale Running operationState on kube-prometheus-stack / shopping-cart-identity / ubuntu-k3s-data-layer: DONE — user ran the patch via `!`; Claude verified all three Synced/Healthy with empty operationState. (2) istiod "flap" = HPA scale churn (50m request, 80% target), not crashes. (3) Smoke pod-check fix DONE `57f8af1f`, live 9/0 on hub pods. NEW: hostinger shopping-cart workloads are orphaned (no `ubuntu-hostinger-*` apps on the hub); needs user decision.
 
 - **LIVE GATE RUN 2026-09-12 10:50 — browser automation now WORKS; failure moved to a
   broken host `aws` CLI.** `make credential-test PROVIDER=aws` on `4389e03` ran in **101s**
@@ -2687,4 +2687,4 @@ exists in the repo. Consumer mounts it `optional: true`, so it degrades
 gracefully. Decide: seed or drop.
 
 - **2026-09-13 register_app_cluster label fix** — spec `docs/bugs/2026-09-13-register-app-cluster-in-cluster-labels-trigger-platform-helm.md` Codex DONE `1fe0e7fd`, Claude-verified (BATS 26/26, shellcheck clean, scope OK). Hub runbook still NOT run (classifier denied; user to run `! bash <scratchpad>/hubfix/hubfix-step1.sh`). Do not run `hub_recovery_reconcile` with the fix until the runbook has stripped the `ubuntu-k3s-platform` finalizer.
-- **2026-09-13 ~17:05Z hub rogue ArgoCD REMOVED** — runbook run #2 succeeded, Claude-verified read-only (see progress.md). Reconcile with `1fe0e7fd` is now safe (no generated app/finalizer left). Open: 3 stale Running operationStates (needs user go to clear).
+- **2026-09-13 ~17:05Z hub rogue ArgoCD REMOVED** — runbook run #2 succeeded, Claude-verified read-only (see progress.md). Reconcile with `1fe0e7fd` is now safe (no generated app/finalizer left). 3 stale Running operationStates cleared 2026-09-13 (user ran patch; verified).
