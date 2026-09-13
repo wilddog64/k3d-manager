@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- `platform-ops` ApplicationSet enables `ServerSideDiff=true` so `hub-platform-ops` no longer sits OutOfSync on ESO-defaulted ExternalSecret fields
 - `bin/smoke-test-cluster-health` defaults to the live `ubuntu-hostinger` context and `ubuntu-k3s-` ArgoCD app names, and reports kubectl failures instead of exiting 1 silently
 - `hub_recovery_reconcile` mirrors the verified ArgoCD admin password into Vault `secret/argocd/admin` when missing (`make show-service-passwords` ArgoCD N/A after hub restore)
 - Keycloak smoke-user/realm-provision RETURN traps no longer leak into callers (`hub_recovery_reconcile --confirm` exited 1 with `wd: unbound variable`)
