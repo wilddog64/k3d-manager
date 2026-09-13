@@ -611,6 +611,31 @@
   seven PVs; restore implementation must stream into k3d node containers,
   because target local-path values are not host filesystem paths.
 
+- **Hub red items ALL CLOSED 2026-09-13 (Claude, user said "close those open items"):**
+  `make status CLUSTER_PROVIDER=k3s-hostinger` → **Overall: HEALTHY** (Keycloak token
+  minted, Frontend /api/cart 200, ArgoCD 200, Grafana 200). All Argo apps Healthy.
+  (1) Identity hook: first hook sync FAILED at LDAP sync — `identity/sts/openldap`
+  was left at `replicas: 0` by the restore (helm declares 1); scaled to 1, replayed
+  hook sync → Succeeded (realm now has LDAP UserStorageProvider + mappers). (2)
+  Smoke user `identity/k3dm-smoke-user` was absent → `KEYCLOAK_BASE_URL=https://keycloak.3ai-talk.org
+  keycloak_seed_smoke_user` (default `keycloak.shopping-cart.local` unresolvable on hub).
+  (3) User chose RE-SEED: Vault `secret/platform-ops/app-cluster-hostinger` seeded
+  via stdin from hostinger read-only SA `platform/hub-cve-inventory-reader-token`
+  → ES SecretSynced, exporter serves 62 shopping-cart CVE series; hub-platform-ops
+  Healthy (residual OutOfSync on the ES is a defaulted-field diff, auto-sync
+  Succeeded). (4) Vault root token stored in Keychain service `k3dm-vault-root-token`
+  account `k3d-k3d-cluster` (user request; via `security -i` stdin). (5) Specs READY
+  FOR CODEX (decisions answered: extend register_app_cluster; eso-apps as 2nd policy
+  on eso-ldap-directory; provider-keyed `origins.tsv`; separate
+  `hub_recovery_reconcile --confirm`; user wants all of it automated):
+  `docs/bugs/2026-09-13-hub-recovery-manual-fixes-not-declarative.md` (6 defects,
+  C1-C6; found latent bug: `_vault_configure_secret_reader_role` overwrites role
+  policies → LDAP re-run detaches eso-apps),
+  `docs/bugs/2026-07-17-ambient-istio-cni-conf-bin-dir-mismatch.md` "Spec 2026-09-13"
+  (provider-aware AMBIENT_CNI_* defaults), and
+  `docs/bugs/2026-09-13-grafana-port-forward-plist-overwritten-by-acg-writers.md`.
+  NOT dispatched to Codex yet — awaiting user go. M2 rollback window ends 2026-09-18.
+
 - **Hub red-items pass 2026-09-13 (Claude):** `make status CLUSTER_PROVIDER=k3s-hostinger`
   → no control-plane errors; only ✗ Grafana login 401 (+2 known Keycloak/frontend
   login warnings). Root cause: installed grafana PF plist was a stale

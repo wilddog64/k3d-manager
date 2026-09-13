@@ -226,3 +226,90 @@ env vars alone do not satisfy it). Verified by Claude:
   `istioctl ztunnel-config workloads --workload-namespace shopping-cart-apps`
   lists basket, frontend, order, product-catalog as `HBONE`.
 - Public frontend `/api/products`, Keycloak realm, Grafana health still 200.
+
+## Spec 2026-09-13 — provider-aware `AMBIENT_CNI_*` defaults (READY FOR CODEX)
+
+**Branch:** `k3d-manager-v1.33.0`
+**Targets:** `scripts/plugins/istio_ambient.sh`, `scripts/tests/plugins/istio_ambient_cni_dirs.bats` (new), `CHANGELOG.md`
+
+### Before You Start
+
+- `git pull origin k3d-manager-v1.33.0`; read `memory-bank/activeContext.md` and `memory-bank/progress.md`.
+- Read in full: `scripts/plugins/istio_ambient.sh` and `_hostinger_reapply_gitops_applicationsets` in `scripts/lib/providers/k3s-hostinger.sh` (~808). That function already exports explicit hostinger paths and must keep winning.
+- The registration Secret for the hub in-cluster target carries the label `k3d-manager/provider=k3d` and has `.data.name` (base64) `ubuntu-k3s`.
+
+### Change
+
+In `deploy_istio_ambient`, replace:
+
+```bash
+  : "${AMBIENT_CNI_CONF_DIR:=/etc/cni/net.d}"
+  : "${AMBIENT_CNI_BIN_DIR:=/opt/cni/bin}"
+```
+
+with:
+
+```bash
+  if [[ -z "${AMBIENT_CNI_CONF_DIR:-}" || -z "${AMBIENT_CNI_BIN_DIR:-}" ]]; then
+    local _cni_provider _cni_dirs
+    _cni_provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT}" "${ARGOCD_NAMESPACE}" "${APP_CLUSTER_NAME}")}"
+    _cni_dirs="$(_istio_ambient_cni_dirs "${_cni_provider}")"
+    : "${AMBIENT_CNI_CONF_DIR:=${_cni_dirs%% *}}"
+    : "${AMBIENT_CNI_BIN_DIR:=${_cni_dirs##* }}"
+    _info "[istio_ambient] CNI dirs for provider '${_cni_provider:-unknown}': ${AMBIENT_CNI_CONF_DIR} ${AMBIENT_CNI_BIN_DIR}"
+  fi
+```
+
+Append after `deploy_istio_ambient`:
+
+```bash
+function _istio_ambient_cni_dirs() {
+  case "${1:-}" in
+    k3d)           printf '%s %s\n' /var/lib/rancher/k3s/agent/etc/cni/net.d /bin ;;
+    k3s-hostinger) printf '%s %s\n' /var/lib/rancher/k3s/agent/etc/cni/net.d /var/lib/rancher/k3s/data/cni ;;
+    *)             printf '%s %s\n' /etc/cni/net.d /opt/cni/bin ;;
+  esac
+}
+
+function _istio_ambient_target_provider() {
+  local context="$1" namespace="$2" cluster_name="$3" secret name
+  while IFS= read -r secret; do
+    [[ -z "${secret}" ]] && continue
+    name="$(_kubectl --no-exit --context "${context}" -n "${namespace}" get "${secret}" -o jsonpath='{.data.name}' 2>/dev/null | base64 --decode 2>/dev/null || true)"
+    if [[ "${name}" == "${cluster_name}" ]]; then
+      _kubectl --no-exit --context "${context}" -n "${namespace}" get "${secret}" -o jsonpath='{.metadata.labels.k3d-manager/provider}' 2>/dev/null || true
+      return 0
+    fi
+  done < <(_kubectl --no-exit --context "${context}" -n "${namespace}" get secrets -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
+}
+```
+
+In the help text, replace the two lines starting with `Defaults suit Cilium` with:
+
+```text
+    Defaults follow the target's k3d-manager/provider label (override with
+    AMBIENT_CNI_PROVIDER): k3d → /var/lib/rancher/k3s/agent/etc/cni/net.d + /bin;
+    k3s-hostinger → /var/lib/rancher/k3s/agent/etc/cni/net.d + /var/lib/rancher/k3s/data/cni;
+    anything else (Cilium) → /etc/cni/net.d + /opt/cni/bin.
+```
+
+### Tests — `scripts/tests/plugins/istio_ambient_cni_dirs.bats` (pure logic)
+
+- `_istio_ambient_cni_dirs k3d` prints `/var/lib/rancher/k3s/agent/etc/cni/net.d /bin`.
+- `_istio_ambient_cni_dirs k3s-hostinger` prints the hostinger pair.
+- `_istio_ambient_cni_dirs ""` and `_istio_ambient_cni_dirs k3s-aws` print `/etc/cni/net.d /opt/cni/bin`.
+- `deploy_istio_ambient` with both `AMBIENT_CNI_*` preset and `_kubectl` stubbed never calls `_istio_ambient_target_provider`; assert by stubbing it to write a marker file.
+
+### Definition of Done
+
+- [ ] `shellcheck -x scripts/plugins/istio_ambient.sh` clean
+- [ ] `bats scripts/tests/plugins/istio_ambient_cni_dirs.bats` green — paste the summary
+- [ ] CHANGELOG `## [Unreleased]` → `### Fixed`: "deploy_istio_ambient picks CNI conf/bin dirs from the target's provider label (k3d hub no longer gets Cilium paths)"
+- [ ] Commit message verbatim: `fix(istio-ambient): provider-aware istio-cni conf/bin dir defaults`
+- [ ] Pushed to `origin/k3d-manager-v1.33.0`; report the SHA
+
+### What NOT to Do
+
+- Do NOT create a PR, commit to `main`, or use `--no-verify`
+- Do NOT modify files outside the targets (leave `k3s-hostinger.sh` untouched)
+- Do NOT run anything against a live cluster

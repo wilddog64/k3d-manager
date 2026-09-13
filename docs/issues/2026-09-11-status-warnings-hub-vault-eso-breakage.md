@@ -428,3 +428,18 @@ Closed this pass: Finding 6 (product catalog, repaired + root-caused), Finding 1
   Job run (`2026-09-12T12:04:19Z`) predates the merge and ran the old script.
   Operator sync with hook replay still owed; an agent-initiated sync was denied
   as a shared-cluster mutation.
+
+### Closure 2026-09-13
+
+- Finding 9 (`app-cluster-kubeconfig`): user chose re-seed. Vault
+  `secret/platform-ops/app-cluster-hostinger` was written over stdin from the hostinger read-only
+  SA token `platform/hub-cve-inventory-reader-token`. Results: ES `SecretSynced`, exporter
+  serves 62 shopping-cart CVE series, `hub-platform-ops` Healthy.
+- Finding 11 (realm reconcile): the first hook replay failed at LDAP sync with
+  `openldap.identity.svc.cluster.local:389 Connection refused` because `identity/sts/openldap`
+  had been left at `replicas: 0` after the PV restore (Helm declares 1). After scaling it to 1,
+  the hook sync succeeded.
+- Keycloak smoke login: `identity/k3dm-smoke-user` was absent. It was re-seeded with
+  `KEYCLOAK_BASE_URL=https://keycloak.3ai-talk.org keycloak_seed_smoke_user`.
+- `make status CLUSTER_PROVIDER=k3s-hostinger` → **Overall: HEALTHY**.
+- Automation spec: `docs/bugs/2026-09-13-hub-recovery-manual-fixes-not-declarative.md`.
