@@ -57,8 +57,10 @@ New:
 ```bash
 APP_CONTEXT="${APP_CONTEXT:-ubuntu-hostinger}"
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
-ARGOCD_APP_PREFIX="${ARGOCD_APP_PREFIX:-ubuntu-k3s-}"
+ARGOCD_APP_PREFIX="${ARGOCD_APP_PREFIX-ubuntu-k3s-}"
 ```
+
+`ARGOCD_APP_PREFIX` uses `-` (not `:-`) on purpose, so an explicitly empty `ARGOCD_APP_PREFIX=""` is kept (test 4). `APP_CONTEXT` keeps `:-`.
 
 ### S3 — every `_kubectl --quiet --` call gets `--no-exit`
 
