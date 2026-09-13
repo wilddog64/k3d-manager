@@ -164,6 +164,7 @@ EOF
   run _acg_chrome_cdp_write_plist
 
   [ "${status}" -ne 0 ]
+  [[ "${output}" == *'Playwright-managed Chromium not found'* ]]
   [ ! -e "${_ACG_CHROME_CDP_PLIST}" ]
 }
 
@@ -176,6 +177,24 @@ EOF
 
   [ "${status}" -ne 0 ]
   [[ "${output}" == *'the aws CLI is present but cannot run'* ]]
+  [ ! -e "${sentinel}" ]
+}
+
+@test "acg credential test does not restart when aws CLI is missing" {
+  local fixture_dir sentinel="${BATS_TEST_TMPDIR}/restart-sentinel"
+  fixture_dir=$(_acg_credential_test_fixture)
+  rm -f "${fixture_dir}/bin/aws"
+  ln -s "$(command -v bash)" "${fixture_dir}/bin/bash"
+  if env PATH="${fixture_dir}/bin:/usr/bin:/bin" bash -c 'command -v aws' >/dev/null 2>&1; then
+    skip "aws is installed in /usr/bin or /bin; cannot exercise the missing-CLI branch on this host"
+  fi
+
+  run env PATH="${fixture_dir}/bin:/usr/bin:/bin" ACG_RESTART_SENTINEL="${sentinel}" \
+    "${fixture_dir}/bin/acg-credential-test" 'https://example.test/sandbox' --provider aws
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *'the aws CLI is not installed or not on PATH'* ]]
+  [[ "${output}" != *'present but cannot run'* ]]
   [ ! -e "${sentinel}" ]
 }
 
