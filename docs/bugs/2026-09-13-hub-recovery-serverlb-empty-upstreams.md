@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.33.0`
 **Filed:** 2026-09-13
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED `8e6d84b2` (Codex; Claude verified)
 **Files:** `scripts/plugins/hub_recovery.sh`, `scripts/tests/plugins/hub_recovery.bats`, `CHANGELOG.md`
 **Parent incident:** `2026-09-13-hub-orbstack-restart-serverlb-empty-config.md` (Defect 1)
 
