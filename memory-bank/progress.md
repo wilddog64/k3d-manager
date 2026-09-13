@@ -184,7 +184,10 @@
   cluster-status acks before webhook completes` was NOT a load flake — it greps a static
   file and failed 3/3 in isolation.** Codex could not commit (sandbox denied
   `.git/index.lock`, the known limit) — Claude committed and pushed.
-- [x] **lib-foundation `fix/acg-package-name-identity` — PR #52 OPEN and merge-ready (2026-09-12).**
+- [x] **lib-foundation `fix/acg-package-name-identity` — PR #52 MERGED 2026-09-13 as `a1331a6` (by the user).**
+  Post-merge: local `main` synced; rename entry verified under `[Unreleased]` on main; no version
+  heading → **no tag/release** (a later release PR promotes `[Unreleased]`); no protection to restore
+  (ruleset-only `main`). Merged branch not deleted (branch cleanup not due / not requested).
   Brought forward onto v0.4.17 main as a MERGE (tip `31a648f`; `2556023` merges `92d8852`),
   not a rebase — the rebase would have needed a classifier-denied `--force-with-lease`. Merge
   proven equivalent to the rebase by tree equality (`254e952f...`). The rebase DID surface a
@@ -219,8 +222,14 @@
   `### Security` subsection that belongs to the shipped `[v0.4.17]` section, not
   `[Unreleased]`. Moved in `1d48a68` and asserted positively. My spec's "create it if absent"
   wording invited the mistake by not naming the section.
-  **NO PR YET** — #52 is already open and a second concurrent PR in one repo needs the user's
-  word under the open-PR-check rule.
+  **PR #53 OPENED 2026-09-13 after #52 merged** (0 open PRs at the time). `main` merged into the
+  branch as `52f97ff` (not rebased — no force-push); only conflict was CHANGE.md `[Unreleased]`,
+  resolved keeping #52's `### Changed` then this `### Security`; both entries asserted under
+  `[Unreleased]`, released sections byte-identical to main, 0 deleted lines. Gates re-run after the
+  merge: `npm ci` 0 vulns, 28/28 jest, lockfile diff vs main = only the 2 bumps. CI 3/3 green,
+  Copilot **approval recommended, 0 comments**. **Merge-ready; the user merges.**
+  **NEXT after #53 merges: ONE subtree pull into k3d-manager** carrying both #52 (package rename) and
+  #53 (bumps) — deliberately not pulled after #52 alone to avoid two back-to-back squash pulls.
 - [ ] **lib-foundation: ACG session-check false-green — bug filed, Codex assigned.**
   Spec `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`
   (commit `ecfc15f`, pushed on `fix/acg-prism-monogram-selector`). Removes the two

@@ -356,10 +356,10 @@
   Gates re-run by Claude independently: `npm ci` → `found 0 vulnerabilities`, `npm audit` → 0,
   `npm test` → 7 suites / 28 tests, installed versions 1.1.18 / 3.15.2, diff contained to
   exactly 3 files, `package.json` untouched.
-  **PR HELD.** lib-foundation #52 is already open and the open-PR-check rule makes a second
-  concurrent PR in one repo the exception, not the default — needs the user's word, or #52
-  merging first. Note the ruleset requires `copilot_code_review`, so a PR is required to merge
-  regardless.
+  **PR #53 OPEN 2026-09-13, head `52f97ff`, merge-ready** — opened once #52 merged. `main` merged
+  in (CHANGE.md `[Unreleased]` conflict resolved keeping both entries, placement asserted), gates
+  re-run, CI 3/3 green, Copilot approval recommended with 0 comments. The user merges.
+  **Then ONE subtree pull into k3d-manager for #52 + #53 together.**
 
 - **lib-acg residue cleanup — 2026-09-12.** Three leftovers from the absorption, handled:
   (1) **Package identity re-homed.** `scripts/lib/acg/package.json` + `package-lock.json` in
@@ -393,7 +393,7 @@
   **No admin-override step exists or is needed here** — `main` carries a ruleset with only
   `deletion` / `non_fast_forward` / `copilot_code_review` (classic protection 404s, as
   [[reference_classic_protection_404_on_ruleset_repos]] predicts), so there is no required-review
-  or `enforce_admins` lever to drop. **#52 is merge-ready; the user merges.**
+  or `enforce_admins` lever to drop. **#52 MERGED 2026-09-13 as `a1331a6` by the user.**
   The live `make credential-test PROVIDER=aws` gate was deliberately NOT run for #52 and that
   is recorded in the PR body: it covers ACG login/credential behaviour, and this change touches
   no runtime path — two JSON metadata fields in a private, never-published package. The gate
