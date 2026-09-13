@@ -86,7 +86,7 @@ Keep the `for app in shopping-cart-basket ...` list and the `_pass "${app}: Sync
 
 Put a stub `kubectl` executable on `PATH` in a `BATS_TEST_TMPDIR` dir. It reads env vars to decide its behaviour and appends its args to a call-log file. No real cluster.
 
-1. **All healthy:** `get secret` exits 0; `get application` prints `Synced`; `get pods` prints 3 `Running` lines for `shopping-cart-apps` and 2 for `shopping-cart-payment`. Assert rc 0 and that output contains `11 passed, 0 failed`.
+1. **All healthy:** `get secret` exits 0; `get application` prints `Synced`; `get pods` prints 3 `Running` lines for `shopping-cart-apps` and 2 for `shopping-cart-payment`. Assert rc 0 and that output contains `9 passed, 0 failed` (3 secret + 5 app + 1 pod check).
 2. **Defaults:** with `APP_CONTEXT`, `INFRA_CONTEXT` and `ARGOCD_APP_PREFIX` unset, run the healthy stub. Assert the call log contains `--context=ubuntu-hostinger` and `ubuntu-k3s-shopping-cart-basket`, and does not contain `--context=ubuntu-k3s `.
 3. **kubectl failure is reported, not silent:** the stub exits 1 on every call. Assert rc 1, output contains `=== Result:`, and output contains `NotFound (expected Synced)`.
 4. **Override:** with `ARGOCD_APP_PREFIX=""`, the call log contains `get application shopping-cart-basket`.
