@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- `make show-service-passwords` showed the Keycloak master admin password as `N/A` on the hub: it read `keycloak-admin-secret`/`password`, but the hub Keycloak is fed by the ESO-synced `keycloak-secrets`/`KEYCLOAK_ADMIN_PASSWORD`; it now reads that first and falls back to the old secret
 - `_signing_grant_eso_read` no longer logs "granted cosign-verify read" when the Vault role read returns non-JSON (wrong kube context / missing auth mount) or the role write fails; it now warns "ESO read grant NOT applied", skips the write on an unreadable role (which would have wiped the role's policies and SA bindings), and `signing_init` / `signing_rotate_key` / `signing_restore` return non-zero
 - Vault ESO role writers (`configure_vault_app_auth`, `_vault_configure_secret_reader_role`) now merge their policies with those already on the role instead of replacing them, so a rebuild or hub recovery no longer silently strips the `cosign-verify` grant and breaks the `cosign-public-key` ExternalSecret with a Vault 403
 - `bin/k3dm-node-health-watch` no longer restarts a healthy agent when the host cannot reach the API server (e.g. a broken k3d serverlb): a NotReady result only counts toward the restart threshold when `/readyz` answers, otherwise it logs an advisory and resets the streak
