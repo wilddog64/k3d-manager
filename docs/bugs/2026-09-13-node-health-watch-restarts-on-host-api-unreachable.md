@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.33.0`
 **Filed:** 2026-09-13
-**Status:** FIXED `2eb9c7cf` + comment placement `c7ee484e` (Codex; Claude verified) — operator kickstart pending
+**Status:** FIXED `2eb9c7cf` + comment placement `c7ee484e` (Codex; Claude verified) — watchdog kickstarted 2026-09-13 13:52, live
 **Files:** `bin/k3dm-node-health-watch`, `scripts/tests/bin/node_health_watch.bats`, `CHANGELOG.md`
 **Parent incident:** `2026-09-13-hub-orbstack-restart-serverlb-empty-config.md` (Defect 2)
 **Related:** `2026-08-28-node-health-watch-restart-loop-slow-node.md`
