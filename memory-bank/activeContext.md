@@ -6,7 +6,7 @@
 
 ## Current focus
 
-- **2026-09-13 post-hub-remediation follow-ups.** (1) Stale Running operationState on kube-prometheus-stack / shopping-cart-identity / ubuntu-k3s-data-layer: Claude patch denied by classifier, user runs it. (2) istiod stable post-remediation (3/3 Ready); keep watching. (3) Smoke pod-check context spec `docs/bugs/2026-09-13-smoke-test-cluster-health-pods-checked-on-wrong-cluster.md` dispatched to Codex. NEW: hostinger shopping-cart workloads are orphaned (no `ubuntu-hostinger-*` apps on the hub); needs user decision.
+- **2026-09-13 post-hub-remediation follow-ups.** (1) Stale Running operationState on kube-prometheus-stack / shopping-cart-identity / ubuntu-k3s-data-layer: Claude patch denied by classifier, user runs it. (2) istiod "flap" = HPA scale churn (50m request, 80% target), not crashes. (3) Smoke pod-check fix DONE `57f8af1f`, live 9/0 on hub pods. NEW: hostinger shopping-cart workloads are orphaned (no `ubuntu-hostinger-*` apps on the hub); needs user decision.
 
 - **LIVE GATE RUN 2026-09-12 10:50 — browser automation now WORKS; failure moved to a
   broken host `aws` CLI.** `make credential-test PROVIDER=aws` on `4389e03` ran in **101s**
