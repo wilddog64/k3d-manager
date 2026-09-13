@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` re-registers Hostinger with the hub ArgoCD only (additive; no GitOps reapply, no edge changes) — restores the `ubuntu-hostinger-*` apps lost in the hub restore
+
 ### Fixed
 
 - `register_app_cluster` no longer labels in-cluster registrations for `platform-helm`, which had installed a second ArgoCD into the hub `cicd` namespace

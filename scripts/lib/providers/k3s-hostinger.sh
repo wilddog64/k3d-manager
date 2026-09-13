@@ -1016,6 +1016,18 @@ function _provider_k3s_hostinger_refresh_access_layer() {
   printf '%s\n' "__WEBHOOK_SUCCESS__"
 }
 
+function _provider_k3s_hostinger_refresh_registration() {
+  _hostinger_require_host >/dev/null || return 1
+  if [[ "${K3DM_EXCLUSIVE_APP_CLUSTER:-false}" == "true" ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] refresh_registration is additive-only; K3DM_EXCLUSIVE_APP_CLUSTER=true would strip the app-cluster role from the hub registration" >&2
+    return 1
+  fi
+  _info "[k3s-hostinger] Refreshing ArgoCD registration only (additive) — no GitOps reapply, no edge changes"
+  K3DM_EXCLUSIVE_APP_CLUSTER=false _hostinger_register_cluster || return 1
+  _info "[k3s-hostinger] Registration refresh complete"
+  printf '%s\n' "__WEBHOOK_SUCCESS__"
+}
+
 function _provider_k3s_hostinger_refresh_cluster() {
   _hostinger_require_host >/dev/null || return 1
   if [[ ! -f "${_HOSTINGER_KUBECONFIG}" ]]; then

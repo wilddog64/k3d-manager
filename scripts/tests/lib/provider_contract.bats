@@ -453,6 +453,66 @@ teardown_file() {
   [[ "$output" == *"provider k3s-hostinger"* ]]
 }
 
+@test "_provider_k3s_hostinger_refresh_registration registers only and never touches gitops, edge, or vault" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _hostinger_require_host() { printf '%s\n' "srv1754834.hstgr.cloud"; }
+  _hostinger_register_cluster() { printf 'register exclusive=%s\n' "${K3DM_EXCLUSIVE_APP_CLUSTER:-unset}" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_merge_kubeconfig() { printf '%s\n' "merge" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  deploy_observability_acg() { printf '%s\n' "observability" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_reapply_gitops_applicationsets() { printf '%s\n' "gitops-appsets" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_clear_stale_platform_tracking_ids() { printf '%s\n' "tracking-fix" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_reconcile_vault_cluster_store() { printf '%s\n' "vault" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_refresh_frontend_dns() { printf '%s\n' "frontend-dns" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_refresh_access_layer() { printf '%s\n' "access" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _info() { :; }
+  unset K3DM_EXCLUSIVE_APP_CLUSTER
+
+  run _provider_k3s_hostinger_refresh_registration
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"__WEBHOOK_SUCCESS__"* ]]
+
+  run cat "${BATS_TEST_TMPDIR}/refresh.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"register exclusive=false"* ]]
+  [[ "$output" != *"merge"* ]]
+  [[ "$output" != *"gitops-appsets"* ]]
+  [[ "$output" != *"access"* ]]
+  [[ "$output" != *"vault"* ]]
+  [[ "$output" != *"frontend-dns"* ]]
+  [[ "$output" != *"tracking-fix"* ]]
+  [[ "$output" != *"observability"* ]]
+}
+
+@test "_provider_k3s_hostinger_refresh_registration refuses exclusive mode" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _hostinger_require_host() { printf '%s\n' "srv1754834.hstgr.cloud"; }
+  _hostinger_register_cluster() { printf '%s\n' "register" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _info() { :; }
+  K3DM_EXCLUSIVE_APP_CLUSTER=true
+
+  run _provider_k3s_hostinger_refresh_registration
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"additive-only"* ]]
+  [[ ! -e "${BATS_TEST_TMPDIR}/refresh.log" ]] || ! grep -q "register" "${BATS_TEST_TMPDIR}/refresh.log"
+}
+
+@test "_provider_k3s_hostinger_refresh_registration propagates register failure" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _hostinger_require_host() { printf '%s\n' "srv1754834.hstgr.cloud"; }
+  _hostinger_register_cluster() { return 1; }
+  _info() { :; }
+
+  run _provider_k3s_hostinger_refresh_registration
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"__WEBHOOK_SUCCESS__"* ]]
+}
+
 @test "_hostinger_reapply_gitops_applicationsets reapplies data, services, platform, istio-ambient, and CVE reader appsets from the current branch" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"

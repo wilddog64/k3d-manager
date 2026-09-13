@@ -568,6 +568,10 @@ function refresh_access_layer() {
    _cluster_provider_call refresh_access_layer "$@"
 }
 
+function refresh_registration() {
+   _cluster_provider_call refresh_registration "$@"
+}
+
 function destroy_k3d_cluster() {
    destroy_cluster "$@"
 }
