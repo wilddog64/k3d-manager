@@ -327,7 +327,7 @@
 - **v1.32.1 SECURITY HOTFIX IN FLIGHT (2026-09-13) — k3d-manager PR #125.** Subtree pull of
   lib-foundation `9c0af5b` onto a branch from `main` to close Dependabot #9/#10. Blocked on 2 valid
   Copilot findings in vendored acg code, being fixed upstream on lib-foundation
-  `fix/acg-cdp-plist-silent-fail-and-missing-cli-msg` (spec `3e44aa0`, Codex running). Full detail in
+  `fix/acg-cdp-plist-silent-fail-and-missing-cli-msg` → **lib-foundation PR #54, merge-ready (`bb5ea46`)**. After the user merges: subtree re-pull into v1.32.1 + v1.33.0, reply/resolve #125 thread, then enforce_admins DELETE for #125. Full detail in
   progress.md. Worktree: `~/src/gitrepo/personal/k3d-manager-v1.32.1`.
 
 - **2 high npm advisories in the acg module — FIXED 2026-09-12 (Codex), NOT YET A PR.**

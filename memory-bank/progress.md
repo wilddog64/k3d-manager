@@ -219,7 +219,14 @@
   skips its own `_err` when the resolver fails; (2) `_aws_cli_usable`/`_az_cli_usable` say "present but
   cannot run" when the CLI is simply not installed. Per subtree rule fixed UPSTREAM: lib-foundation branch
   `fix/acg-cdp-plist-silent-fail-and-missing-cli-msg`, spec `3e44aa0`
-  (`docs/bugs/2026-09-13-acg-cdp-plist-silent-fail-and-missing-cli-message.md`), Codex dispatched.
+  (`docs/bugs/2026-09-13-acg-cdp-plist-silent-fail-and-missing-cli-message.md`). Codex implemented it but
+  was DENIED `.git/index.lock` this time (in lib-foundation, where it had committed fine hours earlier —
+  the limit is intermittent). Claude verified independently (tests stashed-code FAIL `not ok 9`/`not ok 11`,
+  then PASS; shellcheck 0→0; `make bats` 138/0; CHANGE.md under `[Unreleased]`, 0 deletions) and committed
+  `20b5770`. **lib-foundation PR #54** opened; CI 3/3; Copilot found 1 more valid issue — the missing-CLI
+  test's PATH still includes `/usr/bin:/bin`, so a host `aws` there would bypass the branch — fixed in
+  `bb5ea46` with an absence preflight + explicit `skip` (guard proven to trigger), replied + resolved.
+  **#54 head `bb5ea46`, CI 3/3 green, 0 unresolved, CLEAN — merge-ready; user merges.**
   Then: lib-foundation PR → user merges → re-pull subtree into v1.32.1 (and v1.33.0) → reply/resolve
   Copilot thread on #125. `main` protection: enforce_admins true, 1 required review — admin override
   needed at merge time. Gemini live smoke NOT run (stated in PR body).
