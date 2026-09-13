@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- deploy_istio_ambient picks CNI conf/bin dirs from the target's provider label (k3d hub no longer gets Cilium paths)
 - hub recovery reconcile — in-cluster registration, eso-apps policy, CVE reader seed, Vault root token Keychain backup, OpenLDAP scale-up, identity hook replay, smoke user, provider-aware Cloudflare origins
 
 ### Added
