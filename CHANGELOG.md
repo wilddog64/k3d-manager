@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.32.1] - 2026-09-13
+
+**Theme: security hotfix — clear the open Dependabot alerts on `main` without shipping the in-progress v1.33.0 milestone.** Squash subtree pulls of lib-foundation up to `023f76e` into `scripts/lib/foundation/`; nothing outside the subtree changes. The vendored tree is byte-identical to lib-foundation `023f76e`.
+
+### Security
+- Vendored acg lockfile (`scripts/lib/foundation/scripts/lib/acg/package-lock.json`): `browserslist` 4.28.2 → 4.28.9 (GHSA-73wf-gq98-2v4g, Dependabot #9, high) and `baseline-browser-mapping` 2.10.34 → 2.11.22 (GHSA-w5vr-8v7q-w6rv, Dependabot #10, medium), plus `brace-expansion` 1.1.16 → 1.1.18 (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895) and `js-yaml` 3.15.1 → 3.15.2 (GHSA-2883-xcg3-v3hh). All are dev/build-time transitives of jest/babel in the acg module, not reachable from runtime paths. Upstream: lib-foundation #47, #53.
+
+### Changed
+- Subtree also carries lib-foundation v0.4.16 / v0.4.17 and the post-v0.4.17 `[Unreleased]` changes already vendored on `k3d-manager-v1.33.0`: ACG Pluralsight signed-in/signed-out detection fixes, the sign-in wait no longer targeting a dead identity host, the chrome-cdp launchd agent pointed at the real browser/profile, the STS probe no longer restarting a sandbox because the aws CLI is broken, the GCP username masked in provider debug logs, and the acg package identity renamed `lib-acg` → `lib-foundation-acg`. See `scripts/lib/foundation/CHANGE.md`.
+
+### Fixed
+- Vendored acg (lib-foundation #54, found by Copilot on this PR): `acg_chrome_cdp_install` no longer exits 1 silently when node/playwright is missing — the "Playwright-managed Chromium not found — run 'npm install'" error now fires; `acg-credential-test` reports an uninstalled aws/az CLI as "not installed or not on PATH" instead of "present but cannot run". Both paths still fail closed.
+
 ## [1.32.0] - 2026-09-07
 
 **Theme: Hermes gains a monthly security conscience, and the `/ask` webhook is hardened for the Slack-driven control that's coming.** Two threads land together. First, a **read-only monthly security-audit report** for Hermes: once per calendar month (state-deduped inside the existing poll, no new launchd job) it posts a Slack digest of open CodeQL alerts, open Dependabot alerts, branch-protection posture, and credential expiry, plus an optional repo-local security-regression bats subset. It is a **report, not an actuator** — no proposals, no repair path, `repairs.py` untouched, and every check **degrades gracefully to "unavailable"** on a missing scope rather than fabricating a clean bill of health. Second, three **webhook-server audit fixes** (F1/F2/F3) close privilege-escalation, SSRF/exfil, and sandbox-escape vectors in `/ask` before its audience is widened for interactive Slack approval (v1.33.0).

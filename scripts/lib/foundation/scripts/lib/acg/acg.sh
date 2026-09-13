@@ -324,6 +324,13 @@ PLIST
 }
 
 _acg_chrome_cdp_write_plist() {
+  local _chrome_bin
+  _chrome_bin="$(_acg_resolve_cdp_browser_bin)" || _chrome_bin=""
+  if [[ -z "${_chrome_bin}" || ! -x "${_chrome_bin}" ]]; then
+    _err "[acg] Playwright-managed Chromium not found — run 'npm install' in ${_LIB_ACG_ROOT} before installing the CDP agent"
+    return 1
+  fi
+
   mkdir -p "$(dirname "${_ACG_CHROME_CDP_PLIST}")"
   mkdir -p "${_ACG_CHROME_CDP_AUTH_DIR}"
   cat > "${_ACG_CHROME_CDP_PLIST}" <<PLIST
@@ -335,7 +342,7 @@ _acg_chrome_cdp_write_plist() {
   <string>${_ACG_CHROME_CDP_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Applications/Google Chrome.app/Contents/MacOS/Google Chrome</string>
+    <string>${_chrome_bin}</string>
     <string>--remote-debugging-port=${_ACG_CHROME_CDP_PORT}</string>
     <string>--user-data-dir=${_ACG_CHROME_CDP_AUTH_DIR}</string>
     <string>--password-store=basic</string>
@@ -344,6 +351,7 @@ _acg_chrome_cdp_write_plist() {
   </array>
   <key>RunAtLoad</key>
   <true/>
+  <!-- _cdp_stop_chrome_cdp_agent must boot this agent out before reclaiming port 9222, or launchd will respawn into the reclaimed port. -->
   <key>KeepAlive</key>
   <true/>
   <key>StandardErrorPath</key>
@@ -768,11 +776,7 @@ function acg_chrome_cdp_install() {
     return 0
   fi
 
-  if [[ ! -f "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]]; then
-    _err "[acg] Google Chrome not found at /Applications/Google Chrome.app — install Chrome first"
-  fi
-
-  _acg_chrome_cdp_write_plist
+  _acg_chrome_cdp_write_plist || return 1
 
   if launchctl list "${_ACG_CHROME_CDP_LABEL}" >/dev/null 2>&1; then
     _info "[acg] Reloading Chrome CDP agent ${_ACG_CHROME_CDP_LABEL}..."
