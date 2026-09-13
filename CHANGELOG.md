@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- `bin/k3dm-node-health-watch` no longer restarts a healthy agent when the host cannot reach the API server (e.g. a broken k3d serverlb): a NotReady result only counts toward the restart threshold when `/readyz` answers, otherwise it logs an advisory and resets the streak
 - `hub_recovery_reconcile` now checks the k3d serverlb upstream list first and, when it has drifted from the k3d server/agent containers (e.g. the empty image default left by a rebuild), rewrites `/etc/confd/values.yaml` by container name, restarts only the LB, and waits for the host API — an OrbStack restart no longer leaves host `kubectl` failing with `EOF`
 - istiod HPA no longer churns 1→5→1 replicas on the hub: `istio-ambient` caps it at 2 replicas with 120s scale-up / 900s scale-down stabilization (CPU request stays 50m for the 2-CPU hostinger node)
 - `register_app_cluster` no longer labels in-cluster registrations for `platform-helm`, which had installed a second ArgoCD into the hub `cicd` namespace

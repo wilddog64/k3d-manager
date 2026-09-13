@@ -4,6 +4,7 @@
 # across the failure threshold plus a cooldown; a Ready-but-slow /healthz is
 # advisory only and never triggers a restart (a slow node under CPU pressure is
 # alive, and bouncing it evicts pods and adds load). Keep it disabled when
+# An unreachable API server (e.g. a broken k3d serverlb) is also advisory only: the node's state is unknown, so no restart.
 # running manually unless K3DM_NODE_RECOVERY_ENABLED=1 is explicitly set.
 set -u
 
@@ -34,6 +35,11 @@ _ready() {
     --request-timeout=5s 2>/dev/null | grep -qx 'True'
 }
 
+_api_reachable() {
+  kubectl --context "$context" get --raw /readyz \
+    --request-timeout=5s 2>/dev/null | grep -qx 'ok'
+}
+
 _recover() {
   local last=0 now container_status recovery_command
   [[ "$enabled" == 1 ]] || { _log "agent unhealthy (recovery disabled)"; return 0; }
@@ -59,10 +65,14 @@ _recover() {
 }
 
 failures=0
-while :; do
+
+_tick() {
   if _ready; then
     failures=0
     _healthy || _log "${node} Ready but /healthz slow/unreachable (advisory, no restart)"
+  elif ! _api_reachable; then
+    failures=0
+    _log "API server unreachable from host via ${context}; ${node} state unknown (advisory, no restart)"
   else
     failures=$((failures + 1))
     _log "${node} NotReady (${failures}/${threshold})"
@@ -71,5 +81,11 @@ while :; do
       failures=0
     fi
   fi
-  sleep "$interval"
-done
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  while :; do
+    _tick
+    sleep "$interval"
+  done
+fi
