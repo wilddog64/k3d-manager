@@ -625,7 +625,11 @@
   (Finding 9, seed-or-drop decision). Reconcile hook: fix merged (#97
   `1b35d962`), app tracks it, but last hook run predates merge → **operator sync
   with hook replay owed** (agent sync denied). istio-cni 4/4 pods 0/1, informers
-  wedged since 09-11 16:02Z → **operator `rollout restart ds/istio-cni-node` owed**.
+  0/1 → operator restarted 2026-09-13, STILL 0/4: real cause = hub `istio-ambient`
+  appset rendered with Cilium paths; k3d needs conf `/var/lib/rancher/k3s/agent/etc/cni/net.d`
+  + bin `/bin` → **operator `deploy_istio_ambient` reapply w/ k3d paths owed**
+  (recurrence in `docs/bugs/2026-07-17-ambient-istio-cni-conf-bin-dir-mismatch.md`).
+  Grafana PF reloaded by user → `make status` Grafana login 200, Overall WARN (0 errors).
   Declarative-recovery spec: `docs/bugs/2026-09-13-hub-recovery-manual-fixes-not-declarative.md`
   (4 design decisions open; repo static cloudflared config still has stale
   frontend `127.0.0.2:80`).

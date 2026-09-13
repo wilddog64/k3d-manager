@@ -1131,7 +1131,7 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `K3DM_HERMES_AUTO_KINE_GUARD=1` and running; current stale signature=false,
   so no action was taken. No Kine deletion/VACUUM automation.
 
-- [ ] **Hub post-rebuild red items (2026-09-13)** — DONE: Loki values fix `e047a718`; grafana PF plist regenerated (reload owed); declarative-recovery spec filed (decisions open). OWED (operator): grafana PF bootout+bootstrap, `shopping-cart-identity` sync w/ hook, `rollout restart ds/istio-cni-node`; DECISION: seed or drop `platform-ops/app-cluster-hostinger`.
+- [ ] **Hub post-rebuild red items (2026-09-13)** — DONE: Loki values fix `e047a718`; grafana PF plist regenerated (reload owed); declarative-recovery spec filed (decisions open). Grafana PF reloaded (user) → login 200, make status WARN/0 errors. OWED (operator): `shopping-cart-identity` sync w/ hook; istio-ambient reapply with k3d CNI paths (restart alone did not fix); DECISION: seed or drop `platform-ops/app-cluster-hostinger`.
 - [x] **Controlled hub Kine rebuild** — EXECUTED 2026-09-11; close-out verified 2026-09-13 (Kine 624 MiB, compaction healthy, SERVERS 1/1, 14 PVCs Bound, Vault unsealed; Grafana PF kickstarted → 200). Remaining red items tracked in activeContext "Hub Kine rebuild CLOSE-OUT". Original entry: Inventory complete: seven
   local-path PVCs with Delete reclaim policy, ~4.8 GiB actual node storage,
   8.3 GiB state DB, 186 GiB host free. Plan is v1.33.0 plan #3/5. Capturing

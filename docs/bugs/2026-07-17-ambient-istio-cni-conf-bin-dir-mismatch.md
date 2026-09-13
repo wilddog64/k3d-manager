@@ -157,3 +157,57 @@ passes (labeled ns, curl between two pods, ztunnel HBONE + mTLS log).
 - Do NOT commit to `main` — work on `k3d-manager-v1.16.0`.
 - Do NOT change the base/istiod/ztunnel elements or switch `helm.values` to `helm.parameters`.
 - Do NOT switch Cilium to the rancher CNI paths as the fix — align istio-cni to the Cilium defaults instead.
+
+---
+
+## Recurrence 2026-09-13 — hub (k3d/flannel) as app cluster
+
+**Status:** open — operator reapply + spec for a k3d-aware default
+
+After the 2026-09-11 hub rebuild the hub fills the `ubuntu-k3s` app-cluster role,
+but the hub `istio-ambient` ApplicationSet (created `2026-09-10T23:57:18Z`) was
+rendered with the Cilium defaults from `deploy_istio_ambient`
+(`scripts/plugins/istio_ambient.sh:25-26`): `cniConfDir: /etc/cni/net.d`,
+`cniBinDir: /opt/cni/bin`. The hub runs k3d flannel, so all four
+`istio-cni-node` pods sit `Running 0/1` (readiness 503) with the original
+signature:
+
+```text
+Istio CNI is configured as chained plugin, but cannot find existing CNI network config:
+no networks found in /host/etc/cni/net.d
+```
+
+`kubectl rollout restart ds/istio-cni-node` (operator, 2026-09-13) did not help —
+the paths are wrong, not the process. Measured on `k3d-k3d-cluster-agent-1`:
+
+```text
+/etc/cni/net.d:                              (empty)
+/var/lib/rancher/k3s/agent/etc/cni/net.d:    10-flannel.conflist
+/var/lib/rancher/k3s/data/cni:               does not exist
+/bin:                                        bridge cni flannel host-local loopback portmap
+containerd config.toml:                      bin_dir = "/bin"
+```
+
+So the k3d paths are conf `/var/lib/rancher/k3s/agent/etc/cni/net.d` and bin
+`/bin`. The help text in `istio_ambient.sh` (`/var/lib/rancher/k3s/data/cni`) is
+right for bare k3s (hostinger, `k3s-hostinger.sh:816-817`) but wrong for k3d.
+`ztunnel` is 4/4 Ready and `shopping-cart-apps` is ambient-labelled, but with
+istio-cni never ready no new pod can be enrolled into the mesh, so ambient
+traffic capture on the hub should be treated as not in effect until fixed.
+
+Operator reapply (hub ArgoCD, then Argo re-renders the DaemonSet):
+
+```bash
+AMBIENT_CNI_CONF_DIR=/var/lib/rancher/k3s/agent/etc/cni/net.d \
+AMBIENT_CNI_BIN_DIR=/bin \
+  ./scripts/k3d-manager deploy_istio_ambient
+```
+
+Verify: DaemonSet `cni-net-dir`/`cni-bin-dir` hostPaths match, `istio-cni-node`
+4/4 Ready, then restart `shopping-cart-apps` workloads one at a time and confirm
+ztunnel HBONE logs.
+
+Code follow-up (spec first, `scripts/plugins/` is guarded): choose
+`AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR` defaults from the app cluster's
+provider (`k3d` → the k3d paths above) instead of always defaulting to Cilium,
+and correct the help text.
