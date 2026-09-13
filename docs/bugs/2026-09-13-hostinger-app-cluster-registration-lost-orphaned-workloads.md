@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-13
 **Branch:** `k3d-manager-v1.33.0`
-**Status:** IMPLEMENTED `14f26f3d` (Claude-verified) — live re-registration pending user go
+**Status:** DONE — `14f26f3d`; live re-registration run by user 2026-09-13, Claude-verified
 **Decision (user, 2026-09-13):** re-register `ubuntu-hostinger` with the hub. This is additive: the hub stays an app cluster and keeps serving the public edge.
 
 ---
@@ -168,3 +168,10 @@ Run only after the code is merged to the branch and verified.
 - **Hostinger ExternalSecrets depend on the Vault bridge/tunnel**, which this action deliberately does not touch. If ESO stores go NotReady, that is a separate follow-up, not a reason to run `make refresh`.
 - **`istio-ambient` stays single-destination (hub).** Hostinger istio remains unmanaged. Making `istio-ambient` multi-cluster is out of scope.
 - **Rollback:** `kubectl --context k3d-k3d-cluster -n cicd label secret cluster-ubuntu-hostinger k3d-manager/role- environment-`, and only **after** confirming the generated apps preserve resources on deletion (see `reference_appset_generated_app_cleanup_ordering`, `reference_preserveresourcesondeletion_rename_trap`). Otherwise hostinger workloads would be pruned.
+
+## Live Result (2026-09-13)
+
+- `cluster-ubuntu-hostinger` created (role=app-cluster, environment=dev); hub `ubuntu-k3s-app-cluster` unchanged; 9 `ubuntu-k3s-*` apps unchanged.
+- 12 `ubuntu-hostinger-*` apps plus `observability-acg` apps (`acg-kube-prometheus-stack`, `acg-trivy-operator`, `loki`) generated and adopted the existing hostinger workloads — all Synced/Healthy, no pod restarts. `loki` ran one sync that pruned `loki-canary`.
+- Hub istiod unchanged (HPA 2-3 replicas); `bin/smoke-test-cluster-health` 9 passed / 0 failed.
+- Deviation from spec: `_hostinger_register_cluster` also (re)configures the Vault app-cluster auth mount `kubernetes-ubuntu-hostinger` + `app-cluster-reader` policy + `eso-app-cluster` role. Idempotent and required by hostinger ESO, but the spec's "no Vault" claim was wrong — the BATS stub of `_hostinger_register_cluster` hid it.
