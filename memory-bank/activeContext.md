@@ -324,10 +324,10 @@
   Archiving does not delete lib-acg's PR branches or diffs; they stay readable read-only. See
   [[project_lib_acg_absorption]].
 
-- **v1.32.1 SECURITY HOTFIX IN FLIGHT (2026-09-13) — k3d-manager PR #125.** Subtree pull of
+- **v1.32.1 SECURITY HOTFIX RELEASED (2026-09-13) — PR #125 MERGED `062dd9ab`; tag + release v1.32.1; enforce_admins re-enabled (verified true); Dependabot #9/#10 fixed (0 open); main merged into v1.33.0 `3a37ca1a`. Retro `docs/retro/2026-09-13-v1.32.1-retrospective.md`.** History: Subtree pull of
   lib-foundation `9c0af5b` onto a branch from `main` to close Dependabot #9/#10. Blocked on 2 valid
   Copilot findings in vendored acg code, being fixed upstream on lib-foundation
-  `fix/acg-cdp-plist-silent-fail-and-missing-cli-msg` → lib-foundation #54 MERGED `023f76e`, re-pulled into v1.32.1 + v1.33.0, #125 thread resolved, CI green. **#125 merge-ready.** enforce_admins on main is currently false (create-pr step 7); /post-merge restores it, tags + releases v1.32.1, and merges main into v1.33.0 (CHANGELOG conflict expected). Full detail in
+  `fix/acg-cdp-plist-silent-fail-and-missing-cli-msg` → lib-foundation #54 MERGED `023f76e`, re-pulled into v1.32.1 + v1.33.0, #125 thread resolved, CI green. **#125 merge-ready.** Post-merge done (see header). Full detail in
   progress.md. Worktree: `~/src/gitrepo/personal/k3d-manager-v1.32.1`.
 
 - **2 high npm advisories in the acg module — FIXED 2026-09-12 (Codex), NOT YET A PR.**
