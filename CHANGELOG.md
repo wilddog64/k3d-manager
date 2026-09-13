@@ -11,6 +11,13 @@
   registration signature before pausing the hub ArgoCD application controller
   once per incident. It never deletes Kine rows or performs SQLite maintenance.
 
+### Fixed
+
+- **hub-loki never rendered** — Loki chart 18.2.0 fails validation when
+  `lokiCanary.enabled=false` while the chart-default `test.enabled=true`;
+  `loki-values.yaml` now also disables the Helm test, so the hub and ACG
+  observability ApplicationSets can deploy Loki again.
+
 ## [1.32.1] - 2026-09-13
 
 **Theme: security hotfix — clear the open Dependabot alerts on `main` without shipping the in-progress v1.33.0 milestone.** Squash subtree pulls of lib-foundation up to `023f76e` into `scripts/lib/foundation/`; nothing outside the subtree changes. The vendored tree is byte-identical to lib-foundation `023f76e`.

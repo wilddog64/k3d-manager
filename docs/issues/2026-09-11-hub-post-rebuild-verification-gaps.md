@@ -350,3 +350,24 @@ step.
 Treat the recovery as open, not closed. A closing verification note must assert
 the follow-up gate of the incident it closes; here the gate was restated but
 never measured.
+
+## Update 2026-09-13
+
+- Finding 1 cleared: `COMPACT` runs every five minutes (e.g. `compacted from
+  393436 to 393954 in 1 transactions over 162ms`), `currentRev` about 1,000
+  ahead; Kine `state.db` 624 MiB, zero `Slow SQL` in the last hour.
+- Finding 2 cleared: `k3d cluster list` reports `SERVERS 1/1`.
+- Finding 3 changed shape: all four `istio-cni-node` pods are now `Running` but
+  `0/1` (readiness `/readyz` 503). Their last log lines are from
+  `2026-09-11T16:02Z` — `dial tcp 10.43.0.1:443: connect: no route to host` on
+  pod/namespace watches — and nothing since, so the informers appear wedged
+  from the rebuild window. `ztunnel` is 4/4 Ready and `shopping-cart-apps` is
+  ambient-enrolled. Suggested operator step (not run — cluster mutations by the
+  agent are denied): `kubectl --context k3d-k3d-cluster -n istio-system rollout
+  restart ds/istio-cni-node`, then confirm 4/4 Ready.
+- Separate finding: `hub-loki` never renders — chart `loki` 18.2.0 fails
+  `Helm test requires the Loki Canary to be enabled` because
+  `loki-values.yaml` disables `lokiCanary` but leaves chart default
+  `test.enabled: true`. No Loki pods exist on the hub. Fixed in
+  `scripts/etc/helm/observability/loki-values.yaml` (`test.enabled: false`);
+  verified with a local `helm template` of 18.2.0 (fails before, renders after).

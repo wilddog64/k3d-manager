@@ -410,3 +410,21 @@ spec-first).
 
 Closed this pass: Finding 6 (product catalog, repaired + root-caused), Finding 10
 (detection shipped in `6014235f`; `ubuntu-k3s-data-layer` recovered).
+
+### Update 2026-09-13
+
+- **Finding 3 — likely MISDIAGNOSED.** Both 401 proofs were logins to
+  `https://grafana.3ai-talk.org`, but `:3001` was port-forwarded to the
+  **hostinger** `acg-kube-prometheus-stack-grafana`, not the hub
+  `kube-prometheus-stack-grafana` whose Secret was used. The "diverged
+  `grafana.db` password" is therefore unproven; do NOT run
+  `reset-admin-password`. Repoint the port-forward to the hub (see recurrence
+  note in `docs/issues/2026-07-08-hostinger-grafana-502-from-wrong-refresh-port-forward-target.md`)
+  and re-run `make status` first.
+- **Finding 9** — unchanged: ESO reports `Secret does not exist` for
+  `platform-ops/app-cluster-hostinger`; still needs the seed-or-drop decision.
+- **Finding 11** — code fix merged as shopping-cart-infra PR #97 (`1b35d962`),
+  and `shopping-cart-identity` already tracks that revision, but the only hook
+  Job run (`2026-09-12T12:04:19Z`) predates the merge and ran the old script.
+  Operator sync with hook replay still owed; an agent-initiated sync was denied
+  as a shared-cluster mutation.

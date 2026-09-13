@@ -117,3 +117,39 @@ $ make status CLUSTER_PROVIDER=k3s-hostinger
   ✅ ESO ExternalSecrets: 18/18 synced
   ✅ Data layer: 4/4 ready
 ```
+
+## Recurrence (2026-09-13)
+
+Grafana public URL returned 502 again. The installed
+`~/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist` was once more
+a direct `kubectl port-forward svc/acg-kube-prometheus-stack-grafana --context
+ubuntu-hostinger`, logging under `k3s-aws/logs/`, instead of the hub wrapper
+`com.k3d-manager.grafana-port-forward.sh` that
+`_hostinger_write_monitoring_port_forward_plist` installs
+(`scripts/lib/providers/k3s-hostinger.sh:638`). The wrapper file on disk was
+correct; the plist no longer invoked it. The un-health-checked port-forward went
+zombie (listener up, HTTP 000).
+
+Writers that still emit the ACG target into the same plist path:
+
+- `bin/cluster-up` Step 10g.11 — unconditionally writes
+  `svc/acg-kube-prometheus-stack-grafana` on context `ubuntu-k3s`.
+- `bin/cluster-refresh` — writes the same target on `${_app_context}` when the
+  plist is missing, which yields `ubuntu-hostinger` when that is the app context.
+
+Side effect: `make status` "Grafana login: HTTP 401" — the smoke check reads hub
+credentials (`monitoring/grafana-admin-credentials` on `k3d-k3d-cluster`) but the
+public route was served by the hostinger ACG Grafana. See the correction on
+Finding 3 in `docs/issues/2026-09-11-status-warnings-hub-vault-eso-breakage.md`.
+
+Remediation 2026-09-13: `launchctl kickstart -k` restored 200 on the stale
+target; the plist was then regenerated from the repo function (hub wrapper). The
+running agent still needs an operator reload to pick it up:
+
+```bash
+launchctl bootout "gui/$(id -u)/com.k3d-manager.grafana-port-forward"
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist
+```
+
+Code follow-up (spec first): make `bin/cluster-up` / `bin/cluster-refresh` stop
+writing a hostinger/ACG Grafana target over the hub wrapper plist.
