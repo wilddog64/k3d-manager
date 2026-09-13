@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-13
 **Branch:** `k3d-manager-v1.33.0`
-**Status:** OPEN
+**Status:** DONE `1fe0e7fd`
 
 ---
 
