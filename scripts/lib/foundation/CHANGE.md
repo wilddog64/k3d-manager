@@ -2,6 +2,129 @@
 
 ## [Unreleased]
 
+### Changed
+- `scripts/lib/acg/package.json`, `scripts/lib/acg/package-lock.json`: rename the package
+  identity `lib-acg` → `lib-foundation-acg`. The name was inherited verbatim by the v0.4.0
+  absorption tree-copy and still claimed the standalone `wilddog64/lib-acg` repo, archived
+  2026-09-12. Metadata only: the package is `"private": true`, has never been published, and
+  nothing resolves it by name. `version` unchanged at `0.4.0`, no dependency graph change.
+  The ~89 historical `lib-acg` references in `CHANGE.md`, `docs/plans/`, `docs/bugs/`,
+  `docs/issues/`, `README.md` and `docs/api/acg.md` are provenance and deliberately left
+  as-is. Spec: `docs/bugs/2026-09-12-acg-package-name-still-lib-acg.md`.
+
+### Security
+- `scripts/lib/acg/package-lock.json`: bump `brace-expansion` 1.1.16 → 1.1.18
+  (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895) and `js-yaml` 3.15.1 → 3.15.2
+  (GHSA-2883-xcg3-v3hh), clearing both high-severity `npm audit` findings. Both are dev-only
+  transitive dependencies of `jest@29.7.0` and are not reachable from any runtime path; the
+  patched releases already satisfy the semver ranges jest requests, so this is a lockfile
+  refresh only — no `overrides`, no `package.json` change, no jest bump. Spec:
+  `docs/bugs/2026-09-12-acg-npm-audit-brace-expansion-js-yaml.md`.
+
+## [v0.4.17] — 2026-09-12
+
+### Fixed
+- `scripts/lib/acg/playwright/lib/pluralsight_login.js`: add
+  `.psPrismAvatar .psPrismMonogram[aria-label]` to `LOGGED_IN_SELECTORS`. The current
+  Pluralsight UI renders the signed-in identity as a Prism monogram, which none of the
+  existing user-menu / account-label / avatar-image selectors match, so the only
+  identity-based signal was missing and `pageLooksLoggedIn` fell back entirely on the
+  sandbox-page text selectors (`Cloud Sandboxes` / `Open Sandbox`). Carried forward from
+  the retired `wilddog64/lib-acg` PR #47; see
+  `docs/bugs/2026-09-12-acg-logged-in-selectors-missing-prism-monogram.md`. The second half
+  of that legacy change (an unconditional `pageLooksLoggedIn` probe before navigating) is
+  deliberately NOT ported — `acg_session_check.js` here already handles navigation failure
+  via `navigatedToSandbox` and retries.
+- `scripts/lib/acg/playwright/lib/pluralsight_login.js`, `scripts/lib/acg/acg_session_check.js`:
+  make signed-out detection explicit instead of inferring it from the absence of positive
+  signals. Adds `SIGNED_OUT_SELECTORS` plus `pageLooksSignedOut` / `urlLooksSignedOut`, so
+  `pageLooksLoggedIn` short-circuits to false on a recognizably signed-out page without
+  burning its remaining retry attempts. Measured against a throwaway signed-out profile: a
+  signed-out `SANDBOX_URL` redirects to `https://app.pluralsight.com/id`, where all three
+  signed-out selectors match. The page-content markers `text=/Cloud Sandboxes/i` and
+  `text=/Open Sandbox/i` are dropped from `LOGGED_IN_SELECTORS` as hygiene — they describe
+  page content, not identity — leaving the Prism monogram as the identity signal.
+  `acg_session_check.js` now warns explicitly when the `k3dm-acg-pluralsight` Keychain item
+  is absent instead of silently skipping unattended login. See
+  `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`, including its
+  CORRECTION section: this change does **not** fix the 2026-09-12 `credential-test` failure,
+  whose real cause is tracked in
+  `docs/bugs/2026-09-12-acg-signin-wait-targets-dead-id-pluralsight-host.md`.
+- `scripts/lib/acg/vars.sh`, `scripts/lib/acg/acg.sh`, `scripts/lib/acg/cdp.sh`: make the
+  `com.k3d-manager.chrome-cdp` launchd agent actually usable. It is the mechanism that keeps
+  a long-lived CDP browser — and therefore the Pluralsight session — alive between runs,
+  which matters because the auth cookie `Identity.Session` is non-persistent and dies with
+  the browser process. It had two defects that made it worse than useless: the plist
+  hardcoded `/Applications/Google Chrome.app` (the operator's personal Chrome, superseded by
+  the Playwright-managed Chromium that `cdp.sh` resolves), and `PLAYWRIGHT_AUTH_DIR` pointed
+  at `~/.local/share/k3d-manager/profile` while the automation actually runs against
+  `pw-profile` — measured at 0 vs 34 Pluralsight cookies. With `KeepAlive` set, loading it
+  would have respawned a signed-out personal Chrome onto port 9222 after every reclaim.
+  `PLAYWRIGHT_AUTH_DIR` now names `pw-profile`; browser resolution is extracted into a
+  single shared `_acg_resolve_cdp_browser_bin` used by both `_browser_launch` and the plist
+  writer; and the writer now fails without emitting a plist when the browser cannot be
+  resolved. Neither profile directory is deleted or migrated. See
+  `docs/bugs/2026-09-12-chrome-cdp-launchd-agent-wrong-browser-and-dead-profile.md`.
+  Installing the agent remains a manual operator step.
+- `scripts/lib/acg/bin/acg-credential-test`: stop treating an unusable CLI as invalid
+  credentials, and stop destroying a working sandbox because of it. The STS probe ran as
+  `aws sts get-caller-identity >/dev/null 2>&1` and keyed only on exit status, so "the aws
+  binary cannot start" was indistinguishable from "STS rejected these credentials" — and
+  only the latter justifies the delete-and-restart it triggered. Observed live on
+  2026-09-12: a Homebrew ABI mismatch (`awscli` 2.36.44 linking `libaws-c-s3.1.0.dylib`
+  against an installed `aws-c-s3` 1.1.0) made the CLI unable to start, so the tool deleted a
+  live ACG sandbox and exited 1 — while the credentials it had extracted were valid,
+  confirmed by a direct SigV4 call to `sts.amazonaws.com`. The restart was also futile by
+  construction, since a CLI that cannot start will not start after a restart either.
+  Now: `aws --version` is preflighted and an unusable CLI exits without restarting; the
+  probe's stderr is retained and surfaced instead of discarded; and a restart happens only
+  for recognized rejection codes (`InvalidClientTokenId`, `ExpiredToken`, `AuthFailure`,
+  `SignatureDoesNotMatch`, `AccessDenied`, `UnrecognizedClientException`) — any other
+  failure, including a network error, reports and exits without destroying anything. The
+  same preflight guards all three Azure validation paths. See
+  `docs/bugs/2026-09-12-acg-sts-probe-conflates-broken-cli-with-invalid-credentials.md`.
+- `scripts/lib/acg/playwright/lib/sandbox.js`: stop waiting 300 seconds on a hostname that
+  no longer exists. `handleSignIn` waited for `**id.pluralsight.com**`, but that host does
+  not resolve in DNS (`dig` returns nothing; `curl` reports "Could not resolve host") —
+  Pluralsight moved identity to a path on the main host, `https://app.pluralsight.com/id`.
+  The glob could never match, so every sign-in recovery burned its full 300000ms timeout,
+  twice per run (extraction, then the sandbox-restart path). The wait now uses a predicate
+  built on `urlLooksSignedOut` with a 60s timeout, the sign-in link locator drops the dead
+  host, and the post-login wait additionally requires having LEFT the identity path — it
+  previously matched `app.pluralsight.com/id` itself and so could return while still
+  unauthenticated. This is the actual cause of the failed 2026-09-12
+  `make credential-test PROVIDER=aws` gate. See
+  `docs/bugs/2026-09-12-acg-signin-wait-targets-dead-id-pluralsight-host.md`.
+
+### Security
+- `scripts/lib/acg/playwright/providers/gcp.js`: stop logging the first 30 characters of the
+  captured GCP sandbox username — log `[set]`/`[empty]` presence only, matching the
+  convention already used for `password` and by the debug loop at line 17. Originally raised
+  as a k3d-manager Copilot finding (PR #91, 2026-06-05) and deferred there as "lib-acg
+  upstream debt"; that routing died with the lib-acg archive, so the fix lands here.
+
+## [v0.4.16] — 2026-09-12
+
+### Security
+- `scripts/lib/acg/package-lock.json`: bump the dev-only transitive `browserslist` family
+  — `browserslist` 4.28.2 → 4.28.9, plus its pinned companions `baseline-browser-mapping`
+  2.10.34 → 2.11.22, `caniuse-lite` 1.0.30001793 → 1.0.30001810, `electron-to-chromium`
+  1.5.368 → 1.5.427, `node-releases` 2.0.47 → 2.0.55 and `update-browserslist-db`
+  1.2.3 → 1.3.3 — to clear two high-severity advisories: GHSA-73wf-gq98-2v4g (uncaught
+  crash / prototype write via untrusted `browserslist-stats.json` custom stats in
+  `normalizeStats`, patched in 4.28.7) and GHSA-c83g-rgw3-j3cx (unbounded memory growth
+  from a query cache with no eviction, patched in 4.28.7). `browserslist` is pulled in
+  only by the jest/babel test toolchain at `^4.24.0`, so `package.json` is unchanged and
+  the dependency shape is identical — lockfile-only, regenerated with
+  `npm update --package-lock-only browserslist`; `npm ci --dry-run` resolves and
+  `npm audit` no longer reports either advisory. Neither advisory is reachable in this
+  module: nothing here writes or reads a `browserslist-stats.json`, and the cache growth
+  needs a long-lived process issuing distinct queries. Surfaces as Dependabot alerts #9
+  and #8 on the k3d-manager consumer that vendors this lockfile via subtree; that
+  consumer's own PR must NOT be merged, since it would write inside the
+  `scripts/lib/foundation/` subtree and be reverted by the next subtree pull. Reaches
+  k3d-manager via the next lib-foundation release + subtree pull.
+
 ## [v0.4.15] — 2026-09-05
 
 ### Added

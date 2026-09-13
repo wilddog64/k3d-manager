@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { urlLooksSignedOut } = require('./pluralsight_login');
 
 const SCREENSHOT_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'screenshots');
 
@@ -101,7 +102,7 @@ async function waitForSkeleton(page) {
 }
 
 async function handleSignIn(page, targetUrl) {
-  const signInLink = page.locator('a[href*="id.pluralsight.com"], a:has-text("Sign In"), button:has-text("Sign In")').first();
+  const signInLink = page.locator('a[href*="/id/signin"], a[href*="/id"], a:has-text("Sign In"), button:has-text("Sign In")').first();
   const isSignInVisible = await signInLink.isVisible({ timeout: 10000 }).catch(() => false);
   if (!isSignInVisible) {
     return;
@@ -109,7 +110,10 @@ async function handleSignIn(page, targetUrl) {
 
   console.error('INFO: Not signed in — clicking Sign In...');
   await signInLink.click();
-  await page.waitForURL('**id.pluralsight.com**', { timeout: 300000 });
+  await page.waitForURL(
+    (url) => urlLooksSignedOut(url.toString()),
+    { timeout: 60000 },
+  );
 
   const emailInput = page.locator('input[type="email"], input[name="email"], input[id*="email"]').first();
   await emailInput.waitFor({ timeout: 30000 });
@@ -140,7 +144,11 @@ async function handleSignIn(page, targetUrl) {
     }
   }
 
-  await page.waitForURL('**app.pluralsight.com**', { timeout: 300000 });
+  await page.waitForURL(
+    (url) => /^https:\/\/app\.pluralsight\.com\//.test(url.toString())
+      && !urlLooksSignedOut(url.toString()),
+    { timeout: 300000 },
+  );
   console.error('INFO: Sign-in complete — resuming credential extraction...');
 
   await page.waitForFunction(

@@ -19,6 +19,10 @@ fi
 
 _CDP_CHROME_CDP_LABEL="${CDP_CHROME_CDP_LABEL:-com.k3d-manager.chrome-cdp}"
 
+function _acg_resolve_cdp_browser_bin() {
+  NODE_PATH="${_LIB_ACG_ROOT}/node_modules" node -e 'process.stdout.write(require("playwright").chromium.executablePath())' 2>/dev/null
+}
+
 function _cdp_profile_in_use() {
   local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
   local _profile_arg="--user-data-dir=${_cdp_profile_dir}"
@@ -139,7 +143,7 @@ function _browser_launch() {
   _info "Chrome not running — launching with --remote-debugging-port=${_cdp_port}..."
   if [[ "$(uname)" == "Darwin" ]]; then
     local _pw_chrome_bin
-    _pw_chrome_bin="$(NODE_PATH="${_LIB_ACG_ROOT}/node_modules" node -e 'process.stdout.write(require("playwright").chromium.executablePath())' 2>/dev/null || true)"
+    _pw_chrome_bin="$(_acg_resolve_cdp_browser_bin || true)"
     if [[ -z "${_pw_chrome_bin}" || ! -x "${_pw_chrome_bin}" ]]; then
       _err "[acg] Playwright-managed Chromium not found — run 'npm install' (or 'npx playwright install chromium') in ${_LIB_ACG_ROOT}"
     fi

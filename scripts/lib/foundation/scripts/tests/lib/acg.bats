@@ -8,6 +8,56 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
 }
 
+_acg_credential_test_fixture() {
+  local fixture_dir="${BATS_TEST_TMPDIR}/credential-test-fixture"
+  mkdir -p "${fixture_dir}/bin" "${fixture_dir}/playwright"
+  cp "${BATS_TEST_DIRNAME}/../../lib/acg/bin/acg-credential-test" "${fixture_dir}/bin/acg-credential-test"
+
+  cat > "${fixture_dir}/cdp.sh" <<'EOF'
+_browser_launch() { :; }
+EOF
+
+  cat > "${fixture_dir}/bin/node" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  */acg_credentials.js)
+    printf 'AWS_ACCESS_KEY_ID=test-key\nAWS_SECRET_ACCESS_KEY=test-secret\n'
+    ;;
+  */acg_restart.js)
+    printf 'restart\n' >> "${ACG_RESTART_SENTINEL}"
+    ;;
+esac
+EOF
+  chmod +x "${fixture_dir}/bin/node"
+
+  cat > "${fixture_dir}/bin/aws" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  --version)
+    if [[ "${AWS_STUB_SCENARIO}" == 'broken-cli' ]]; then
+      printf 'dyld: Library not loaded\n' >&2
+      exit 1
+    fi
+    printf 'aws-cli/2.test\n'
+    ;;
+  sts)
+    case "${AWS_STUB_SCENARIO}" in
+      invalid-credentials)
+        printf 'An error occurred (InvalidClientTokenId)\n' >&2
+        exit 1
+        ;;
+      network-error)
+        printf 'Could not connect to the endpoint URL\n' >&2
+        exit 1
+        ;;
+    esac
+    ;;
+esac
+EOF
+  chmod +x "${fixture_dir}/bin/aws"
+  printf '%s\n' "${fixture_dir}"
+}
+
 @test "acg template emitter renders the requested agent fleet" {
   local rendered="${BATS_TEST_TMPDIR}/fleet.yaml"
 
@@ -87,4 +137,67 @@ setup() {
 @test "acg source has no hardcoded first or second agent names" {
   run grep -nE 'Agent[12]([^0-9]|$)|agent[12]_ip' "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
   [ "${status}" -ne 0 ]
+}
+
+@test "acg CDP plist uses the Playwright browser and active profile" {
+  local browser_bin="${BATS_TEST_TMPDIR}/playwright-chromium"
+  touch "${browser_bin}"
+  chmod +x "${browser_bin}"
+  _acg_resolve_cdp_browser_bin() {
+    printf '%s\n' "${browser_bin}"
+  }
+
+  _acg_chrome_cdp_write_plist
+
+  [ -f "${_ACG_CHROME_CDP_PLIST}" ]
+  grep -F "<string>${browser_bin}</string>" "${_ACG_CHROME_CDP_PLIST}"
+  ! grep -F '/Applications/Google Chrome.app' "${_ACG_CHROME_CDP_PLIST}"
+  grep -F -- "--user-data-dir=${PLAYWRIGHT_AUTH_DIR}" "${_ACG_CHROME_CDP_PLIST}"
+  [[ "${PLAYWRIGHT_AUTH_DIR}" == */pw-profile ]]
+}
+
+@test "acg CDP plist is not written without a Playwright browser" {
+  _acg_resolve_cdp_browser_bin() {
+    return 1
+  }
+
+  run _acg_chrome_cdp_write_plist
+
+  [ "${status}" -ne 0 ]
+  [ ! -e "${_ACG_CHROME_CDP_PLIST}" ]
+}
+
+@test "acg credential test does not restart when aws CLI cannot run" {
+  local fixture_dir sentinel="${BATS_TEST_TMPDIR}/restart-sentinel"
+  fixture_dir=$(_acg_credential_test_fixture)
+
+  run env PATH="${fixture_dir}/bin:${PATH}" ACG_RESTART_SENTINEL="${sentinel}" AWS_STUB_SCENARIO=broken-cli \
+    "${fixture_dir}/bin/acg-credential-test" 'https://example.test/sandbox' --provider aws
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *'the aws CLI is present but cannot run'* ]]
+  [ ! -e "${sentinel}" ]
+}
+
+@test "acg credential test restarts once for rejected AWS credentials" {
+  local fixture_dir sentinel="${BATS_TEST_TMPDIR}/restart-sentinel"
+  fixture_dir=$(_acg_credential_test_fixture)
+
+  run env PATH="${fixture_dir}/bin:${PATH}" ACG_RESTART_SENTINEL="${sentinel}" AWS_STUB_SCENARIO=invalid-credentials \
+    "${fixture_dir}/bin/acg-credential-test" 'https://example.test/sandbox' --provider aws
+
+  [ "${status}" -ne 0 ]
+  [ "$(wc -l < "${sentinel}")" -eq 1 ]
+}
+
+@test "acg credential test does not restart for an AWS network error" {
+  local fixture_dir sentinel="${BATS_TEST_TMPDIR}/restart-sentinel"
+  fixture_dir=$(_acg_credential_test_fixture)
+
+  run env PATH="${fixture_dir}/bin:${PATH}" ACG_RESTART_SENTINEL="${sentinel}" AWS_STUB_SCENARIO=network-error \
+    "${fixture_dir}/bin/acg-credential-test" 'https://example.test/sandbox' --provider aws
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *'Could not connect to the endpoint URL'* ]]
+  [ ! -e "${sentinel}" ]
 }

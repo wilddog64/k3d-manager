@@ -24,7 +24,7 @@ async function extractCredentials(page, outputFn) {
   const password = inputs.length >= 2 ? await inputs[1].inputValue().catch(() => '') : '';
   const serviceAccountJson = inputs.length >= 3 ? await inputs[2].inputValue().catch(() => '') : '';
 
-  console.error(`INFO: username="${username.slice(0, 30)}" password="${password ? '[set]' : '[empty]'}" sa_json_len=${serviceAccountJson.length}`);
+  console.error(`INFO: username="${username ? '[set]' : '[empty]'}" password="${password ? '[set]' : '[empty]'}" sa_json_len=${serviceAccountJson.length}`);
 
   if (!serviceAccountJson) {
     throw new Error('Could not find Service Account Credentials field');

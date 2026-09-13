@@ -59,6 +59,10 @@ async function _main() {
       return;
     }
 
+    if (!process.env.ACG_USERNAME || !process.env.ACG_PASSWORD) {
+      console.error('WARN: No ACG credentials available — unattended login is disabled. Create the Keychain item k3dm-acg-pluralsight with username and password fields to enable it.');
+    }
+
     if (process.env.ACG_USERNAME && process.env.ACG_PASSWORD) {
       console.error('INFO: Session not authenticated — attempting headless Pluralsight login...');
       const loginOk = await _autoLogin(browser).catch(err => {

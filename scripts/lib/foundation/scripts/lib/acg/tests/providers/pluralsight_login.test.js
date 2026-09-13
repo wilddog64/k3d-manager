@@ -1,4 +1,10 @@
-const { loginWithPage, pageLooksLoggedIn } = require('../../playwright/lib/pluralsight_login');
+const {
+  loginWithPage,
+  pageLooksLoggedIn,
+  SANDBOX_URL,
+  SIGNED_OUT_SELECTORS,
+  urlLooksSignedOut,
+} = require('../../playwright/lib/pluralsight_login');
 
 function makeLocator(visible) {
   return {
@@ -19,9 +25,10 @@ function makePage({ mfaVisible = false, loggedInVisible = false } = {}) {
     }),
     locator: jest.fn((selector) => {
       if (!locators.has(selector)) {
-        const isLoggedInSelector = selector.includes('Cloud Sandboxes') || selector.includes('Open Sandbox');
+        const isLoggedInSelector = selector.includes('psPrismMonogram');
+        const isSignedOutSelector = SIGNED_OUT_SELECTORS.includes(selector);
         const isMfaSelector = selector.includes('one-time-code') || selector.includes('verification code') || selector.includes('two-?factor') || selector.includes('enter the code');
-        locators.set(selector, makeLocator(isMfaSelector ? mfaVisible : isLoggedInSelector ? loggedInVisible : true));
+        locators.set(selector, makeLocator(isMfaSelector ? mfaVisible : isLoggedInSelector ? loggedInVisible : isSignedOutSelector ? false : true));
       }
       return locators.get(selector);
     }),
@@ -49,11 +56,12 @@ function makeSlowRenderPage({ loggedInVisibleFromAttempt = 1 } = {}) {
   return {
     goto: jest.fn().mockResolvedValue(undefined),
     locator: jest.fn((selector) => {
-      const isLoggedInSelector = selector.includes('Cloud Sandboxes') || selector.includes('Open Sandbox');
+      const isLoggedInSelector = selector.includes('psPrismMonogram');
+      const isSignedOutSelector = SIGNED_OUT_SELECTORS.includes(selector);
       if (!locators.has(selector)) {
         locators.set(selector, {
           first: jest.fn().mockReturnThis(),
-          isVisible: jest.fn(async () => isLoggedInSelector && renderAttempt >= loggedInVisibleFromAttempt),
+          isVisible: jest.fn(async () => !isSignedOutSelector && isLoggedInSelector && renderAttempt >= loggedInVisibleFromAttempt),
         });
       }
       return locators.get(selector);
@@ -76,5 +84,35 @@ describe('pageLooksLoggedIn render-race hardening', () => {
     const result = await pageLooksLoggedIn(page, { attempts: 4, settleMs: 0 });
     expect(result).toBe(true);
     expect(page.waitForLoadState).toHaveBeenCalled();
+  });
+});
+
+describe('pageLooksLoggedIn signed-out detection', () => {
+  test('Cloud Sandboxes content alone does not indicate an authenticated session', async () => {
+    const page = {
+      locator: jest.fn((selector) => makeLocator(selector.includes('Cloud Sandboxes'))),
+      url: jest.fn(() => SANDBOX_URL),
+    };
+
+    await expect(pageLooksLoggedIn(page)).resolves.toBe(false);
+  });
+
+  test('visible Sign in marker short-circuits without retrying', async () => {
+    const page = {
+      locator: jest.fn((selector) => makeLocator(selector.includes('has-text("Sign in")'))),
+      url: jest.fn(() => SANDBOX_URL),
+      waitForLoadState: jest.fn().mockResolvedValue(undefined),
+      waitForTimeout: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(pageLooksLoggedIn(page, { attempts: 4, settleMs: 0 })).resolves.toBe(false);
+    expect(page.waitForLoadState).not.toHaveBeenCalled();
+  });
+
+  test('recognizes Pluralsight identity URLs as signed out', () => {
+    expect(urlLooksSignedOut('https://app.pluralsight.com/id')).toBe(true);
+    expect(urlLooksSignedOut('https://app.pluralsight.com/id/signin')).toBe(true);
+    expect(urlLooksSignedOut(SANDBOX_URL)).toBe(false);
+    expect(urlLooksSignedOut('https://app.pluralsight.com/identity-docs')).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 const {
   navigateToSandbox,
+  handleSignIn,
   _sandboxNavigationCandidates,
   _isStalePluralsightRoute,
 } = require('../../playwright/lib/sandbox');
@@ -19,6 +20,36 @@ function makePage(initialUrl, staleFirstRoute = false) {
     }),
     url: jest.fn(() => currentUrl),
   };
+}
+
+function makeSignInPage() {
+  const signInLink = {
+    isVisible: jest.fn().mockResolvedValue(true),
+    click: jest.fn(),
+  };
+  const emailInput = {
+    isVisible: jest.fn().mockResolvedValue(false),
+    waitFor: jest.fn(),
+    click: jest.fn(),
+    fill: jest.fn(),
+  };
+  const hiddenControl = {
+    isVisible: jest.fn().mockResolvedValue(false),
+    click: jest.fn(),
+  };
+  const page = {
+    locator: jest.fn((selector) => ({
+      first: jest.fn().mockReturnValue(
+        selector.startsWith('a[href*="/id/signin"]') ? signInLink
+          : selector.includes('input[type="email"]') ? emailInput
+            : hiddenControl
+      ),
+    })),
+    waitForURL: jest.fn(),
+    waitForFunction: jest.fn().mockResolvedValue(undefined),
+    waitForTimeout: jest.fn().mockResolvedValue(undefined),
+  };
+  return { page, signInLink };
 }
 
 describe('sandbox page routing', () => {
@@ -50,5 +81,36 @@ describe('sandbox page routing', () => {
       'https://app.pluralsight.com/cloud-playground/cloud-sandboxes',
       expect.any(Object)
     );
+  });
+});
+
+describe('sandbox sign-in', () => {
+  test('resolves when the page navigates to the current identity URL', async () => {
+    const { page } = makeSignInPage();
+    page.waitForURL
+      .mockImplementationOnce(async (predicate) => expect(predicate(new URL('https://app.pluralsight.com/id'))).toBe(true))
+      .mockImplementationOnce(async (predicate) => expect(predicate(new URL('https://app.pluralsight.com/hands-on/playground/cloud-sandboxes'))).toBe(true));
+
+    await expect(handleSignIn(page)).resolves.toBeUndefined();
+  });
+
+  test('does not include the retired identity host in the sign-in link locator', async () => {
+    const { page } = makeSignInPage();
+    page.waitForURL.mockResolvedValue(undefined);
+
+    await handleSignIn(page);
+
+    expect(page.locator.mock.calls[0][0]).not.toContain('id.pluralsight.com');
+  });
+
+  test('post-login wait rejects the identity URL and accepts a sandbox URL', async () => {
+    const { page } = makeSignInPage();
+    page.waitForURL.mockResolvedValue(undefined);
+
+    await handleSignIn(page);
+
+    const postLoginPredicate = page.waitForURL.mock.calls[1][0];
+    expect(postLoginPredicate(new URL('https://app.pluralsight.com/id'))).toBe(false);
+    expect(postLoginPredicate(new URL('https://app.pluralsight.com/hands-on/playground/cloud-sandboxes'))).toBe(true);
   });
 });
