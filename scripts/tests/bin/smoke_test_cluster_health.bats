@@ -40,16 +40,44 @@ EOF
   [[ "${output}" == *"9 passed, 0 failed"* ]]
 }
 
-@test "defaults use the live app context and prefixed ArgoCD names" {
+@test "defaults check pods on the infra context and use prefixed ArgoCD names" {
   run "${SMOKE_SCRIPT}"
 
   [ "${status}" -eq 0 ]
-  run grep -F -- '--context=ubuntu-hostinger' "${KUBECTL_CALL_LOG}"
+  run grep -E -- '--context=k3d-k3d-cluster get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=k3d-k3d-cluster get secret ghcr-pull-secret' "${KUBECTL_CALL_LOG}"
   [ "${status}" -eq 0 ]
   run grep -F -- 'ubuntu-k3s-shopping-cart-basket' "${KUBECTL_CALL_LOG}"
   [ "${status}" -eq 0 ]
-  run grep -F -- '--context=ubuntu-k3s ' "${KUBECTL_CALL_LOG}"
+  run grep -F -- 'ubuntu-hostinger' "${KUBECTL_CALL_LOG}"
   [ "${status}" -ne 0 ]
+}
+
+@test "INFRA_CONTEXT override flows to pod checks when APP_CONTEXT is unset" {
+  export INFRA_CONTEXT=hub-x
+
+  run "${SMOKE_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=hub-x get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- 'k3d-k3d-cluster' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "explicit APP_CONTEXT is honored for pods and secrets" {
+  export APP_CONTEXT=remote-y
+
+  run "${SMOKE_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=remote-y get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=remote-y get secret ghcr-pull-secret' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=k3d-k3d-cluster get application' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
 }
 
 @test "kubectl failure is reported rather than exiting silently" {

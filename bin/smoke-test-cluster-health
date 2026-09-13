@@ -12,7 +12,7 @@
 #
 # Environment:
 #   INFRA_CONTEXT      kubectl context for infra cluster (default: k3d-k3d-cluster)
-#   APP_CONTEXT        kubectl context for app cluster   (default: ubuntu-hostinger)
+#   APP_CONTEXT        kubectl context for app cluster   (default: $INFRA_CONTEXT — the hub is its own app cluster)
 #   ARGOCD_NAMESPACE   namespace ArgoCD runs in          (default: cicd)
 #   ARGOCD_APP_PREFIX  prefix of the per-cluster ArgoCD apps (default: ubuntu-k3s-)
 
@@ -24,7 +24,7 @@ REPO_ROOT="$(cd "${SMOKE_SCRIPT_DIR}/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
-APP_CONTEXT="${APP_CONTEXT:-ubuntu-hostinger}"
+APP_CONTEXT="${APP_CONTEXT:-${INFRA_CONTEXT}}"
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
 ARGOCD_APP_PREFIX="${ARGOCD_APP_PREFIX-ubuntu-k3s-}"
 SHOPPING_CART_APP_NS="shopping-cart-apps"
