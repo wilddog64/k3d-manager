@@ -1633,7 +1633,9 @@ PLIST
   _info "[acg-up] Frontend port-forward agent loaded (launchd: ${_frontend_pf_label})"
 fi
 
-if _is_mac; then
+if _is_mac && [[ -f "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.sh" ]]; then
+  _info "[acg-up] Step 10g.11/14 — hub Grafana port-forward wrapper present; leaving com.k3d-manager.grafana-port-forward untouched"
+elif _is_mac; then
   _info "[acg-up] Step 10g.11/14 — Installing Grafana port-forward launchd agent (localhost:3001 → ubuntu-k3s svc/acg-kube-prometheus-stack-grafana, auto-restart)..."
   _grafana_pf_label="com.k3d-manager.grafana-port-forward"
   _grafana_pf_plist="${HOME}/Library/LaunchAgents/${_grafana_pf_label}.plist"
