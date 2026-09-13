@@ -4,8 +4,8 @@
 # across the failure threshold plus a cooldown; a Ready-but-slow /healthz is
 # advisory only and never triggers a restart (a slow node under CPU pressure is
 # alive, and bouncing it evicts pods and adds load). Keep it disabled when
-# An unreachable API server (e.g. a broken k3d serverlb) is also advisory only: the node's state is unknown, so no restart.
 # running manually unless K3DM_NODE_RECOVERY_ENABLED=1 is explicitly set.
+# An unreachable API server (e.g. a broken k3d serverlb) is also advisory only: the node's state is unknown, so no restart.
 set -u
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
