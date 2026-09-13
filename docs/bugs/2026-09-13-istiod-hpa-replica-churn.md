@@ -39,7 +39,7 @@ Verified with `helm template` against `istiod-1.24.2`: the HPA renders `maxRepli
 The values are inline in the ApplicationSet, so the hub must re-read the file:
 
 ```
-APP_CLUSTER_NAME=ubuntu-k3s ARGOCD_CONTEXT=k3d-k3d-cluster ./scripts/k3d-manager deploy_istio_ambient
+APP_CLUSTER_NAME=ubuntu-k3s ARGOCD_CONTEXT=k3d-k3d-cluster ./scripts/k3d-manager deploy_istio_ambient --confirm
 ```
 
 The hub cluster Secret carries `k3d-manager/provider=k3d`, so the CNI dirs render identical to the live values; the only diff is the istiod HPA.
