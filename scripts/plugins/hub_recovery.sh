@@ -8,6 +8,7 @@ HUB_RECOVERY_SOURCE_DIR="${HUB_RECOVERY_SOURCE_DIR:-}"
 HUB_RECOVERY_LOCAL_PATH_ROOT="${HUB_RECOVERY_LOCAL_PATH_ROOT:-/var/lib/rancher/k3s/storage}"
 HUB_RECOVERY_TAR_BIN="${HUB_RECOVERY_TAR_BIN:-tar}"
 HUB_RECOVERY_DOCKER_BIN="${HUB_RECOVERY_DOCKER_BIN:-docker}"
+HUB_RECOVERY_K3D_CLUSTER="${HUB_RECOVERY_K3D_CLUSTER:-k3d-cluster}"
 
 VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"
 if [[ -r "$VAULT_PLUGIN" ]]; then
@@ -156,6 +157,76 @@ function _hub_recovery_install_cloudflared_config() {
   _info "[hub-recovery] reload with: launchctl kickstart -k \"gui/$(id -u)/com.k3d-manager.cloudflare-tunnel\""
 }
 
+function _hub_recovery_render_serverlb_values() {
+  sort -k1,1r -k2,2 | awk '
+    $1 == "server" { servers[++ns] = $2; upstreams[++nu] = $2 }
+    $1 == "agent" { upstreams[++nu] = $2 }
+    END {
+      if (ns == 0) exit 1
+      print "ports:"
+      print "  6443.tcp:"
+      for (i = 1; i <= ns; i++) print "  - " servers[i]
+      print "  80.tcp:"
+      for (i = 1; i <= nu; i++) print "  - " upstreams[i]
+      print "  443.tcp:"
+      for (i = 1; i <= nu; i++) print "  - " upstreams[i]
+      print "settings:"
+      print "  workerConnections: 1024"
+    }'
+}
+
+function _hub_recovery_serverlb_upstream_pairs() {
+  awk '
+    /^[^ ]/ { in_ports = ($1 == "ports:"); key = ""; next }
+    in_ports && /^  [0-9]+\.tcp:/ { key = $1; sub(/:$/, "", key); next }
+    in_ports && key != "" && /^  - / { print key "|" $2 }
+  ' | sort
+}
+
+function _hub_recovery_ensure_serverlb_upstreams() {
+  local hub_context="$1" cluster="${2:-$HUB_RECOVERY_K3D_CLUSTER}"
+  local lb="k3d-${cluster}-serverlb" nodes desired current rendered attempt
+  if ! nodes=$("$HUB_RECOVERY_DOCKER_BIN" ps -a --filter "label=k3d.cluster=${cluster}" --format '{{.Label "k3d.role"}} {{.Names}}'); then
+    _err "[hub-recovery] cannot list k3d containers for ${cluster}"
+    return 1
+  fi
+  if ! desired=$(printf '%s\n' "$nodes" | _hub_recovery_render_serverlb_values); then
+    _err "[hub-recovery] no k3d server container found for ${cluster}"
+    return 1
+  fi
+  if ! current=$("$HUB_RECOVERY_DOCKER_BIN" exec "$lb" cat /etc/confd/values.yaml 2>/dev/null); then
+    _err "[hub-recovery] cannot read ${lb}:/etc/confd/values.yaml"
+    return 1
+  fi
+  if [[ "$(printf '%s\n' "$current" | _hub_recovery_serverlb_upstream_pairs)" == "$(printf '%s\n' "$desired" | _hub_recovery_serverlb_upstream_pairs)" ]]; then
+    _info "[hub-recovery] ${lb} upstreams match k3d nodes"
+    return 0
+  fi
+  _warn "[hub-recovery] ${lb} upstreams drifted from k3d nodes; rewriting values.yaml and restarting ${lb}"
+  rendered=$(mktemp -t hub-recovery-serverlb.XXXXXX)
+  printf '%s\n' "$desired" > "$rendered"
+  if ! "$HUB_RECOVERY_DOCKER_BIN" cp "$rendered" "${lb}:/etc/confd/values.yaml"; then
+    rm -f "$rendered"
+    _err "[hub-recovery] failed to copy values.yaml into ${lb}"
+    return 1
+  fi
+  rm -f "$rendered"
+  if ! "$HUB_RECOVERY_DOCKER_BIN" restart "$lb" >/dev/null; then
+    _err "[hub-recovery] failed to restart ${lb}"
+    return 1
+  fi
+  # shellcheck disable=SC2034
+  for attempt in {1..30}; do
+    if _kubectl --no-exit --quiet --context "$hub_context" get --raw /readyz >/dev/null 2>&1; then
+      _info "[hub-recovery] ${lb} restarted; host API ready"
+      return 0
+    fi
+    sleep "${HUB_RECOVERY_SERVERLB_WAIT_SECONDS:-2}"
+  done
+  _err "[hub-recovery] host API not ready after restarting ${lb}"
+  return 1
+}
+
 function hub_recovery_reconcile() {
   if [[ "${1:-}" == "--help" ]]; then
     echo "Usage: hub_recovery_reconcile [--confirm]"
@@ -164,12 +235,13 @@ function hub_recovery_reconcile() {
   local confirm=0 hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}" app_context="${HUB_RECOVERY_APP_CONTEXT:-ubuntu-hostinger}"
   if [[ "${1:-}" == "--confirm" ]]; then confirm=1
   elif [[ -n "${1:-}" ]]; then _err "[hub-recovery] only --confirm is accepted"; return 1; fi
-  local -a steps=("Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins")
+  local -a steps=("k3d serverlb upstreams" "Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins")
   local index
   if (( ! confirm )); then
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
     return 0
   fi
+  _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1
   _hub_recovery_ensure_eso_apps_role || return 1
   ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc ARGOCD_APP_CLUSTER_NAME=ubuntu-k3s ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster ARGOCD_APP_CLUSTER_PROVIDER=k3d ARGOCD_NAMESPACE=cicd register_app_cluster || return 1

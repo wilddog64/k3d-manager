@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- `hub_recovery_reconcile` now checks the k3d serverlb upstream list first and, when it has drifted from the k3d server/agent containers (e.g. the empty image default left by a rebuild), rewrites `/etc/confd/values.yaml` by container name, restarts only the LB, and waits for the host API — an OrbStack restart no longer leaves host `kubectl` failing with `EOF`
 - istiod HPA no longer churns 1→5→1 replicas on the hub: `istio-ambient` caps it at 2 replicas with 120s scale-up / 900s scale-down stabilization (CPU request stays 50m for the 2-CPU hostinger node)
 - `register_app_cluster` no longer labels in-cluster registrations for `platform-helm`, which had installed a second ArgoCD into the hub `cicd` namespace
 - `platform-ops` ApplicationSet enables `ServerSideDiff=true` so `hub-platform-ops` no longer sits OutOfSync on ESO-defaulted ExternalSecret fields

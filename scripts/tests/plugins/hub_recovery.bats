@@ -135,14 +135,159 @@ YAML
   _kubectl() { echo kubectl >> "$calls"; }
   security() { echo security >> "$calls"; }
   register_app_cluster() { echo register >> "$calls"; }
-  export -f _kubectl security register_app_cluster
+  docker_stub() { echo docker >> "$calls"; }
+  export HUB_RECOVERY_DOCKER_BIN=docker_stub
+  export -f _kubectl security register_app_cluster docker_stub
   run hub_recovery_reconcile
   [ "$status" -eq 0 ]
-  for step in {1..9}; do
+  for step in {1..10}; do
     [[ "$output" == *"${step}."* ]]
   done
+  [[ "$output" == *"k3d serverlb upstreams"* ]]
   [[ "$output" == *"ArgoCD admin Vault mirror"* ]]
   [ ! -s "$calls" ]
+}
+
+@test "_hub_recovery_render_serverlb_values: servers on 6443, servers then agents on 80/443" {
+  local input expected
+  input=$'agent k3d-c-agent-1\nloadbalancer k3d-c-serverlb\nserver k3d-c-server-0\nagent k3d-c-agent-0'
+  expected=$(cat <<'YAML'
+ports:
+  6443.tcp:
+  - k3d-c-server-0
+  80.tcp:
+  - k3d-c-server-0
+  - k3d-c-agent-0
+  - k3d-c-agent-1
+  443.tcp:
+  - k3d-c-server-0
+  - k3d-c-agent-0
+  - k3d-c-agent-1
+settings:
+  workerConnections: 1024
+YAML
+)
+  run _hub_recovery_render_serverlb_values <<< "$input"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$expected" ]
+}
+
+@test "_hub_recovery_render_serverlb_values: fails with no server container" {
+  run _hub_recovery_render_serverlb_values <<< $'agent k3d-c-agent-0\nagent k3d-c-agent-1'
+  [ "$status" -ne 0 ]
+}
+
+@test "_hub_recovery_serverlb_upstream_pairs: empty inline lists yield no pairs" {
+  run _hub_recovery_serverlb_upstream_pairs <<'YAML'
+ports:
+  6443.tcp: []
+  80.tcp: []
+  443.tcp: []
+YAML
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "_hub_recovery_ensure_serverlb_upstreams: matching upstreams do not restart the LB" {
+  SERVERLB_CALLS="${BATS_TEST_TMPDIR}/serverlb-calls"
+  : > "$SERVERLB_CALLS"
+  docker_stub() {
+    case "$1" in
+      ps) printf '%s\n' 'agent k3d-c-agent-1' 'server k3d-c-server-0' 'agent k3d-c-agent-0' ;;
+      exec) cat <<'YAML'
+ports:
+  6443.tcp:
+  - k3d-c-server-0
+  80.tcp:
+  - k3d-c-agent-1
+  - k3d-c-server-0
+  - k3d-c-agent-0
+  443.tcp:
+  - k3d-c-agent-0
+  - k3d-c-agent-1
+  - k3d-c-server-0
+settings:
+  workerConnections: 1024
+YAML
+        ;;
+      cp|restart) printf '%s\n' "$1" >> "$SERVERLB_CALLS" ;;
+    esac
+  }
+  export HUB_RECOVERY_DOCKER_BIN=docker_stub SERVERLB_CALLS
+  export -f docker_stub
+  run _hub_recovery_ensure_serverlb_upstreams k3d-k3d-cluster c
+  [ "$status" -eq 0 ]
+  [ ! -s "$SERVERLB_CALLS" ]
+}
+
+@test "_hub_recovery_ensure_serverlb_upstreams: empty upstreams rewrite values and restart only the LB" {
+  SERVERLB_CALLS="${BATS_TEST_TMPDIR}/serverlb-calls"
+  SERVERLB_VALUES="${BATS_TEST_TMPDIR}/serverlb-values.yaml"
+  : > "$SERVERLB_CALLS"
+  docker_stub() {
+    case "$1" in
+      ps) printf '%s\n' 'agent k3d-c-agent-1' 'server k3d-c-server-0' 'agent k3d-c-agent-0' ;;
+      exec) cat <<'YAML'
+ports:
+  6443.tcp: []
+  80.tcp: []
+  443.tcp: []
+YAML
+        ;;
+      cp) cp "$2" "$SERVERLB_VALUES"; printf 'cp %s\n' "$3" >> "$SERVERLB_CALLS" ;;
+      restart) printf '%s\n' "$2" >> "$SERVERLB_CALLS" ;;
+    esac
+  }
+  _kubectl() { return 0; }
+  export HUB_RECOVERY_DOCKER_BIN=docker_stub SERVERLB_CALLS SERVERLB_VALUES
+  export -f docker_stub _kubectl
+  run _hub_recovery_ensure_serverlb_upstreams k3d-k3d-cluster c
+  [ "$status" -eq 0 ]
+  grep -qx 'cp k3d-c-serverlb:/etc/confd/values.yaml' "$SERVERLB_CALLS"
+  grep -A1 '^  6443.tcp:$' "$SERVERLB_VALUES" | grep -qx '  - k3d-c-server-0'
+  [ "$(tail -n 1 "$SERVERLB_CALLS")" = "k3d-c-serverlb" ]
+  [ "$(wc -l < "$SERVERLB_CALLS" | tr -d ' ')" -eq 2 ]
+}
+
+@test "_hub_recovery_ensure_serverlb_upstreams: fails when the host API never becomes ready" {
+  SERVERLB_CALLS="${BATS_TEST_TMPDIR}/serverlb-calls"
+  : > "$SERVERLB_CALLS"
+  docker_stub() {
+    case "$1" in
+      ps) printf '%s\n' 'server k3d-c-server-0' ;;
+      exec) cat <<'YAML'
+ports:
+  6443.tcp: []
+  80.tcp: []
+  443.tcp: []
+YAML
+        ;;
+      cp) : ;;
+      restart) printf '%s\n' "$2" >> "$SERVERLB_CALLS" ;;
+    esac
+  }
+  _kubectl() { return 1; }
+  export HUB_RECOVERY_DOCKER_BIN=docker_stub HUB_RECOVERY_SERVERLB_WAIT_SECONDS=0 SERVERLB_CALLS
+  export -f docker_stub _kubectl
+  run _hub_recovery_ensure_serverlb_upstreams k3d-k3d-cluster c
+  [ "$status" -ne 0 ]
+}
+
+@test "_hub_recovery_ensure_serverlb_upstreams: unreadable LB values fail without restart" {
+  SERVERLB_CALLS="${BATS_TEST_TMPDIR}/serverlb-calls"
+  : > "$SERVERLB_CALLS"
+  docker_stub() {
+    case "$1" in
+      ps) printf '%s\n' 'server k3d-c-server-0' ;;
+      exec) return 1 ;;
+      restart) printf '%s\n' "$2" >> "$SERVERLB_CALLS" ;;
+    esac
+  }
+  export HUB_RECOVERY_DOCKER_BIN=docker_stub SERVERLB_CALLS
+  export -f docker_stub
+  run _hub_recovery_ensure_serverlb_upstreams k3d-k3d-cluster c
+  [ "$status" -ne 0 ]
+  [ ! -s "$SERVERLB_CALLS" ]
 }
 
 function _stub_argocd_admin_mirror_dependencies() {
