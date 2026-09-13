@@ -228,8 +228,13 @@
   `[Unreleased]`, released sections byte-identical to main, 0 deleted lines. Gates re-run after the
   merge: `npm ci` 0 vulns, 28/28 jest, lockfile diff vs main = only the 2 bumps. CI 3/3 green,
   Copilot **approval recommended, 0 comments**. **Merge-ready; the user merges.**
-  **NEXT after #53 merges: ONE subtree pull into k3d-manager** carrying both #52 (package rename) and
-  #53 (bumps) — deliberately not pulled after #52 alone to avoid two back-to-back squash pulls.
+  **#53 MERGED 2026-09-13 as `9c0af5b` (by the user).** Both entries verified under `[Unreleased]`
+  on main; no version heading → no tag.
+  **Subtree pulled into k3d-manager 2026-09-13** — ONE squash pull for #52 + #53 (`a7073086` squash,
+  `3fa3df41` merge). Verified: nothing outside `scripts/lib/foundation/` changed; vendored tree
+  `490bc62c` == lib-foundation `9c0af5b^{tree}` exactly; vendored `package.json` now
+  `lib-foundation-acg`, lockfile brace-expansion 1.1.18 / js-yaml 3.15.2; vendored `npm ci` 0 vulns,
+  28/28 jest; full BATS `1..824`, 0 `not ok`.
 - [ ] **lib-foundation: ACG session-check false-green — bug filed, Codex assigned.**
   Spec `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`
   (commit `ecfc15f`, pushed on `fix/acg-prism-monogram-selector`). Removes the two

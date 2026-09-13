@@ -356,7 +356,8 @@
   Gates re-run by Claude independently: `npm ci` → `found 0 vulnerabilities`, `npm audit` → 0,
   `npm test` → 7 suites / 28 tests, installed versions 1.1.18 / 3.15.2, diff contained to
   exactly 3 files, `package.json` untouched.
-  **PR #53 OPEN 2026-09-13, head `52f97ff`, merge-ready** — opened once #52 merged. `main` merged
+  **PR #53 MERGED 2026-09-13 as `9c0af5b`; subtree pulled into k3d-manager (`3fa3df41`), vendored
+  tree == lib-foundation main, BATS 824/0.** (History: opened once #52 merged.) `main` merged
   in (CHANGE.md `[Unreleased]` conflict resolved keeping both entries, placement asserted), gates
   re-run, CI 3/3 green, Copilot approval recommended with 0 comments. The user merges.
   **Then ONE subtree pull into k3d-manager for #52 + #53 together.**
@@ -398,9 +399,8 @@
   is recorded in the PR body: it covers ACG login/credential behaviour, and this change touches
   no runtime path — two JSON metadata fields in a private, never-published package. The gate
   stays outstanding independently.
-  **NOTE: the k3d-manager subtree still reads `"name": "lib-acg"`** at
-  `scripts/lib/foundation/scripts/lib/acg/package.json:2` — expected, the rename is unmerged.
-  It needs a second subtree pull after this branch lands.
+  **RESOLVED 2026-09-13:** the k3d-manager subtree now reads `"name": "lib-foundation-acg"` after
+  the `3fa3df41` subtree pull (carried #52 + #53 together).
   The ~89 other `lib-acg` references (CHANGE.md, docs/plans, docs/bugs, docs/issues,
   README.md, docs/api/acg.md) are **provenance and deliberately unchanged** — rewriting them
   would falsify where the code came from.
