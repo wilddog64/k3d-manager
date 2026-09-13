@@ -611,6 +611,25 @@
   seven PVs; restore implementation must stream into k3d node containers,
   because target local-path values are not host filesystem paths.
 
+- **Hub red-items pass 2026-09-13 (Claude):** `make status CLUSTER_PROVIDER=k3s-hostinger`
+  → no control-plane errors; only ✗ Grafana login 401 (+2 known Keycloak/frontend
+  login warnings). Root cause: installed grafana PF plist was a stale
+  `bin/cluster-refresh`/`bin/cluster-up` variant pointing :3001 at hostinger
+  `acg-kube-prometheus-stack-grafana`, while the smoke check uses hub creds →
+  09-11 Finding 3 "diverged grafana.db password" is likely a MISDIAGNOSIS (do NOT
+  reset-admin-password). Plist regenerated on disk from repo function (hub
+  wrapper; backup in session scratchpad) — **operator reload owed**
+  (bootout+bootstrap denied to agent). `hub-loki` never rendered (chart 18.2.0
+  needs `test.enabled=false` when canary off) → fixed `e047a718` (pushed; Argo
+  will deploy Loki on hub). `app-cluster-kubeconfig`: Vault path never seeded
+  (Finding 9, seed-or-drop decision). Reconcile hook: fix merged (#97
+  `1b35d962`), app tracks it, but last hook run predates merge → **operator sync
+  with hook replay owed** (agent sync denied). istio-cni 4/4 pods 0/1, informers
+  wedged since 09-11 16:02Z → **operator `rollout restart ds/istio-cni-node` owed**.
+  Declarative-recovery spec: `docs/bugs/2026-09-13-hub-recovery-manual-fixes-not-declarative.md`
+  (4 design decisions open; repo static cloudflared config still has stale
+  frontend `127.0.0.2:80`).
+
 - **Hub Kine rebuild CLOSE-OUT 2026-09-13 (read-only verify, Claude):** rebuild
   executed 2026-09-11; both v1.33.0 plan docs now say EXECUTED. Verified: 4 nodes
   Ready, `/readyz` ok, `k3d cluster list` SERVERS 1/1, Kine 624 MiB (WAL 12.6 MiB),
