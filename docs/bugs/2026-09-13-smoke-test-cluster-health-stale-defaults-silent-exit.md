@@ -24,7 +24,7 @@ There are three causes:
 - Read `bin/smoke-test-cluster-health` in full (97 lines).
 - Read `scripts/lib/system.sh` `_kubectl` (around line 926), and how `_run_command` handles `--no-exit`. Read only; do NOT edit `system.sh`.
 
-### S1 — header comment block (lines 12-16)
+### S1 — header comment block (lines 14-16)
 
 Old:
 
@@ -64,9 +64,9 @@ ARGOCD_APP_PREFIX="${ARGOCD_APP_PREFIX-ubuntu-k3s-}"
 
 ### S3 — every `_kubectl --quiet --` call gets `--no-exit`
 
-All 6 call sites (lines 45, 58, 73, 74, 77, 78) change from `_kubectl --quiet -- ` to `_kubectl --no-exit --quiet -- `. Nothing else on those lines changes.
+All 6 call sites (lines 44, 57, 72, 73, 76, 77) change from `_kubectl --quiet -- ` to `_kubectl --no-exit --quiet -- `. Nothing else on those lines changes.
 
-### S4 — ArgoCD app lookup uses the prefix (line 58)
+### S4 — ArgoCD app lookup uses the prefix (line 57)
 
 Old:
 
