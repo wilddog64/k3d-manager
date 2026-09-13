@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- `bin/smoke-test-cluster-health` defaults to the live `ubuntu-hostinger` context and `ubuntu-k3s-` ArgoCD app names, and reports kubectl failures instead of exiting 1 silently
 - `hub_recovery_reconcile` mirrors the verified ArgoCD admin password into Vault `secret/argocd/admin` when missing (`make show-service-passwords` ArgoCD N/A after hub restore)
 - Keycloak smoke-user/realm-provision RETURN traps no longer leak into callers (`hub_recovery_reconcile --confirm` exited 1 with `wd: unbound variable`)
 - ACG cluster-up/cluster-refresh no longer overwrite the hub Grafana port-forward agent (recurring grafana.3ai-talk.org 502/401)

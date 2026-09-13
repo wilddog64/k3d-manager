@@ -12,8 +12,9 @@
 #
 # Environment:
 #   INFRA_CONTEXT      kubectl context for infra cluster (default: k3d-k3d-cluster)
-#   APP_CONTEXT        kubectl context for app cluster   (default: ubuntu-k3s)
+#   APP_CONTEXT        kubectl context for app cluster   (default: ubuntu-hostinger)
 #   ARGOCD_NAMESPACE   namespace ArgoCD runs in          (default: cicd)
+#   ARGOCD_APP_PREFIX  prefix of the per-cluster ArgoCD apps (default: ubuntu-k3s-)
 
 set -euo pipefail
 
@@ -23,8 +24,9 @@ REPO_ROOT="$(cd "${SMOKE_SCRIPT_DIR}/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
-APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
+APP_CONTEXT="${APP_CONTEXT:-ubuntu-hostinger}"
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
+ARGOCD_APP_PREFIX="${ARGOCD_APP_PREFIX-ubuntu-k3s-}"
 SHOPPING_CART_APP_NS="shopping-cart-apps"
 SHOPPING_CART_PAYMENT_NS="shopping-cart-payment"
 
@@ -42,7 +44,7 @@ echo ""
 # --- 1. ghcr-pull-secret in all 3 namespaces (app cluster) ---
 echo "-- ghcr-pull-secret --"
 for ns in shopping-cart-apps shopping-cart-data shopping-cart-payment; do
-  if _kubectl --quiet -- --context="${APP_CONTEXT}" get secret ghcr-pull-secret -n "${ns}" >/dev/null 2>&1; then
+  if _kubectl --no-exit --quiet -- --context="${APP_CONTEXT}" get secret ghcr-pull-secret -n "${ns}" >/dev/null 2>&1; then
     _pass "ghcr-pull-secret present in ${ns}"
   else
     _fail "ghcr-pull-secret MISSING in ${ns}"
@@ -55,7 +57,7 @@ echo ""
 echo "-- ArgoCD sync status --"
 for app in shopping-cart-basket shopping-cart-order shopping-cart-payment \
            shopping-cart-product-catalog shopping-cart-frontend; do
-  sync_status=$(_kubectl --quiet -- --context="${INFRA_CONTEXT}" get application "${app}" \
+  sync_status=$(_kubectl --no-exit --quiet -- --context="${INFRA_CONTEXT}" get application "${ARGOCD_APP_PREFIX}${app}" \
     -n "${ARGOCD_NAMESPACE}" \
     -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
   if [[ "${sync_status}" == "Synced" ]]; then
@@ -70,12 +72,12 @@ echo ""
 # --- 3. Pod status on app cluster ---
 echo "-- Pod status (${APP_CONTEXT}) --"
 running=$(
-  { _kubectl --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_APP_NS}" --no-headers 2>/dev/null
-    _kubectl --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_PAYMENT_NS}" --no-headers 2>/dev/null
+  { _kubectl --no-exit --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_APP_NS}" --no-headers 2>/dev/null
+    _kubectl --no-exit --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_PAYMENT_NS}" --no-headers 2>/dev/null
   } | grep -c "Running" || true)
 crashloop=$(
-  { _kubectl --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_APP_NS}" --no-headers 2>/dev/null
-    _kubectl --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_PAYMENT_NS}" --no-headers 2>/dev/null
+  { _kubectl --no-exit --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_APP_NS}" --no-headers 2>/dev/null
+    _kubectl --no-exit --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_PAYMENT_NS}" --no-headers 2>/dev/null
   } | grep -c "CrashLoopBackOff" || true)
 
 echo "  Running:            ${running}"
