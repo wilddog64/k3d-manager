@@ -611,6 +611,19 @@
   seven PVs; restore implementation must stream into k3d node containers,
   because target local-path values are not host filesystem paths.
 
+- **Hub Kine rebuild CLOSE-OUT 2026-09-13 (read-only verify, Claude):** rebuild
+  executed 2026-09-11; both v1.33.0 plan docs now say EXECUTED. Verified: 4 nodes
+  Ready, `/readyz` ok, `k3d cluster list` SERVERS 1/1, Kine 624 MiB (WAL 12.6 MiB),
+  0 Slow SQL/1h, COMPACT every 5m ~1000 revs behind (stall cleared), 7 mapped +
+  7 shopping-cart PVCs Bound, Vault unsealed. Grafana public 502 = zombie
+  hostinger PF → `launchctl kickstart -k com.k3d-manager.grafana-port-forward`
+  (user-approved) → local + public `/api/health` 200. Still open: `make status`
+  not run; keycloak-realm-reconcile PostSync Failed (logs end silently);
+  hub istio-cni-node 0/1 readiness 503; `platform-ops/app-cluster-kubeconfig` ES
+  fails → hub-platform-ops Degraded; hub-loki Unknown; declarative
+  registration/eso-apps/Cloudflare origins (needs `docs/bugs/` spec). M2
+  rollback window ends 2026-09-18.
+
 - **Hub recovery public-origin repair 2026-09-11:** control-plane rebuild is
   serving all four nodes again. Lost Argo `app-cluster` registration was
   restored as `ubuntu-k3s`; Vault ESO received a scoped `eso-apps` policy and

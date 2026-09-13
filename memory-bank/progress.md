@@ -1131,7 +1131,7 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
   `K3DM_HERMES_AUTO_KINE_GUARD=1` and running; current stale signature=false,
   so no action was taken. No Kine deletion/VACUUM automation.
 
-- [~] **Controlled hub Kine rebuild** authorized. Inventory complete: seven
+- [x] **Controlled hub Kine rebuild** — EXECUTED 2026-09-11; close-out verified 2026-09-13 (Kine 624 MiB, compaction healthy, SERVERS 1/1, 14 PVCs Bound, Vault unsealed; Grafana PF kickstarted → 200). Remaining red items tracked in activeContext "Hub Kine rebuild CLOSE-OUT". Original entry: Inventory complete: seven
   local-path PVCs with Delete reclaim policy, ~4.8 GiB actual node storage,
   8.3 GiB state DB, 186 GiB host free. Plan is v1.33.0 plan #3/5. Capturing
   verified backups now; destructive rebuild is blocked until a second copy is
