@@ -184,16 +184,43 @@
   cluster-status acks before webhook completes` was NOT a load flake — it greps a static
   file and failed 3/3 in isolation.** Codex could not commit (sandbox denied
   `.git/index.lock`, the known limit) — Claude committed and pushed.
-- [ ] **lib-foundation `fix/acg-package-name-identity` — ready for PR, not opened.**
+- [x] **lib-foundation `fix/acg-package-name-identity` — PR #52 OPEN and merge-ready (2026-09-12).**
   Brought forward onto v0.4.17 main as a MERGE (tip `31a648f`; `2556023` merges `92d8852`),
   not a rebase — the rebase would have needed a classifier-denied `--force-with-lease`. Merge
   proven equivalent to the rebase by tree equality (`254e952f...`). The rebase DID surface a
   real defect: #51's promotion of `[Unreleased]` left the rename's CHANGE.md entry inside the
   shipped v0.4.17 section with no conflict; moved to `[Unreleased]` in `31a648f`, v0.4.17
   section byte-untouched. `npm ls` → `lib-foundation-acg@0.4.0`, jest 28/28.
-  lib-foundation has 0 open PRs now, so the open-PR block is lifted; CI is PR-triggered so
-  the CI gate needs the PR to exist. **The k3d-manager subtree still reads `"name": "lib-acg"`
+  **PR #52 opened 2026-09-12 on the user's go-ahead; head `a2a61c3`.** Local pre-gates first
+  (`npm ci` clean, 28/28 jest), then CI `acg (node)` / `bats` / `shellcheck` all pass. Copilot
+  raised 1 valid inline finding — the spec claimed "the two files are the only ones changed"
+  while the branch also touches `CHANGE.md` and the spec doc — fixed in `a2a61c3`, replied,
+  resolved, 0 unresolved. No `enforce_admins` step exists: `main`'s ruleset carries only
+  `deletion` / `non_fast_forward` / `copilot_code_review`. **The user merges.**
+  The live `make credential-test PROVIDER=aws` gate was deliberately skipped and said so in the
+  PR body — metadata-only change, no runtime path.
+  **The k3d-manager subtree still reads `"name": "lib-acg"`
   until this lands — a second subtree pull is required after it merges.**
+- [x] **2 high npm advisories cleared in lib-foundation's acg module (2026-09-12) — Codex.**
+  `brace-expansion` 1.1.16 → 1.1.18 (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895) and `js-yaml`
+  3.15.1 → 3.15.2 (GHSA-2883-xcg3-v3hh). **Dev-only exposure** — both are transitive deps of
+  `jest@29.7.0`, `"dev": true`, unreachable from runtime. Patched releases already satisfied
+  jest's own semver ranges, so the fix is a lockfile refresh: no `overrides`, no
+  `package.json` change, no jest bump. Proven in a throwaway copy before the spec was written.
+  Branch `fix/acg-npm-audit-brace-expansion-js-yaml`: spec `1fa457c`, Codex fix `7d26515`,
+  Claude fix-up `1d48a68` (= `origin/...`, verified). Gates re-run by Claude, not taken from
+  Codex's report: `npm audit` → `found 0 vulnerabilities`, `npm ci` clean, 28/28 jest, diff
+  contained to 3 files, `package.json` untouched.
+  **Codex committed AND pushed here** (the `.git/index.lock` denial did not recur) but hit a
+  different sandbox wall: it cannot write `~/.npm`, so npm failed `EPERM` on `_cacache` with a
+  message wrongly blaming root-owned files. Codex fixed it itself with `NPM_CONFIG_CACHE`
+  pointed into `/private/tmp` — no sudo. Pre-set that in future npm handoffs.
+  **Verification caught a real defect:** Codex appended the CHANGE.md entry to an existing
+  `### Security` subsection that belongs to the shipped `[v0.4.17]` section, not
+  `[Unreleased]`. Moved in `1d48a68` and asserted positively. My spec's "create it if absent"
+  wording invited the mistake by not naming the section.
+  **NO PR YET** — #52 is already open and a second concurrent PR in one repo needs the user's
+  word under the open-PR-check rule.
 - [ ] **lib-foundation: ACG session-check false-green — bug filed, Codex assigned.**
   Spec `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`
   (commit `ecfc15f`, pushed on `fix/acg-prism-monogram-selector`). Removes the two
@@ -247,10 +274,13 @@
   pushed → GitHub release v0.4.16 → `git subtree pull --prefix=scripts/lib/foundation
   lib-foundation main --squash` on `k3d-manager-v1.33.0` (`1de3b1e0`, vendored
   `browserslist` verified at 4.28.9) → #124 closed with a comment explaining the routing.
-  Out of scope but surfaced by `npm audit` on that lockfile: 2 unrelated highs still open —
+  Out of scope at the time but surfaced by `npm audit` on that lockfile: 2 unrelated highs —
   `brace-expansion` (new advisories BEYOND the GHSA-3jxr-9vmj-r5cp bump already landed, one
   bypassing the CVE-2026-14257 mitigation) and `js-yaml` (`maxTotalMergeKeys` does not limit
-  CPU for empty merge sources, beyond the GHSA-h67p-54hq-rp68 bump). Each needs its own PR.
+  CPU for empty merge sources, beyond the GHSA-h67p-54hq-rp68 bump). **Both now fixed
+  upstream on `fix/acg-npm-audit-brace-expansion-js-yaml` — see the entry above.** They went
+  into ONE branch rather than one PR each: same root cause (a stale lockfile), same one-command
+  fix, and splitting them would have produced two conflicting lockfile diffs.
 - [ ] **Portability Phase 3 inventory recorded** in
   `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (24 `--context ubuntu-k3s`
   sites in `shopping_cart.sh`, 3 functions, resolver already present). Still needs the

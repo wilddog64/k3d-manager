@@ -324,6 +324,43 @@
   Archiving does not delete lib-acg's PR branches or diffs; they stay readable read-only. See
   [[project_lib_acg_absorption]].
 
+- **2 high npm advisories in the acg module — FIXED 2026-09-12 (Codex), NOT YET A PR.**
+  `npm audit` in lib-foundation `scripts/lib/acg/` reported `brace-expansion` 1.1.16
+  (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895) and `js-yaml` 3.15.1 (GHSA-2883-xcg3-v3hh),
+  both high. **Exposure is dev-only:** both are transitive deps of `jest@29.7.0`, marked
+  `"dev": true`, unreachable from any runtime path (the runtime dep is `playwright`) —
+  measured paths are in the spec. Patched releases already satisfied the semver ranges jest
+  requests (`^1.1.7` → 1.1.18, `^3.13.1` → 3.15.2), so **no `overrides`, no `package.json`
+  change, no jest bump** were needed — just a stale lockfile. Fix proven in a throwaway copy
+  BEFORE writing the spec: `npm update brace-expansion js-yaml --package-lock-only
+  --ignore-scripts` changes exactly 6 lines across 2 entries and yields `found 0
+  vulnerabilities`.
+  Branch `fix/acg-npm-audit-brace-expansion-js-yaml` off `origin/main` `92d8852`. Spec
+  `docs/bugs/2026-09-12-acg-npm-audit-brace-expansion-js-yaml.md` (`1fa457c`), Codex fix
+  `7d26515`, Claude follow-up `1d48a68`. Tip = `1d48a68` = `origin/...` (verified).
+  **Codex DID commit and push this time** — the `.git/index.lock` denial from the BATS task
+  did not recur in lib-foundation, so that limit is not universal; still verify, never assume.
+  **New sandbox boundary found:** `codex exec --sandbox workspace-write` cannot write
+  `~/.npm`, so npm dies with `EPERM ... /Users/cliang/.npm/_cacache` (whose message
+  misleadingly blames root-owned cache files and suggests `sudo chown`). Codex resolved it
+  cleanly on its own with `NPM_CONFIG_CACHE=/private/tmp/...` — no sudo, no chown. **Pre-set
+  `NPM_CONFIG_CACHE` inside the sandbox roots in any future npm handoff prompt.**
+  **Real defect in Codex's output, caught by verification:** the spec said to add the entry
+  under `[Unreleased]` "in a `### Security` subsection (create it if absent)" — Codex found an
+  existing `### Security` and appended to it, but that one belongs to the **already-shipped
+  `[v0.4.17]`** section. Moved to `[Unreleased]` under its own heading in `1d48a68`, asserted
+  positively (entry's nearest `## ` heading is `[Unreleased]`; 0 occurrences inside v0.4.17;
+  v0.4.17's `### Security` gcp.js entry still intact). Second instance of
+  [[feedback_clean_rebase_is_not_correct_rebase]] — this time from an agent, not a rebase.
+  **My spec wording invited it: "create it if absent" does not say which section's subsection.**
+  Gates re-run by Claude independently: `npm ci` → `found 0 vulnerabilities`, `npm audit` → 0,
+  `npm test` → 7 suites / 28 tests, installed versions 1.1.18 / 3.15.2, diff contained to
+  exactly 3 files, `package.json` untouched.
+  **PR HELD.** lib-foundation #52 is already open and the open-PR-check rule makes a second
+  concurrent PR in one repo the exception, not the default — needs the user's word, or #52
+  merging first. Note the ruleset requires `copilot_code_review`, so a PR is required to merge
+  regardless.
+
 - **lib-acg residue cleanup — 2026-09-12.** Three leftovers from the absorption, handled:
   (1) **Package identity re-homed.** `scripts/lib/acg/package.json` + `package-lock.json` in
   lib-foundation still declared `"name": "lib-acg"` — inherited by the v0.4.0 verbatim
@@ -345,10 +382,22 @@
   **Lesson: a clean rebase is not a correct rebase — conflict-avoiding placement can be
   semantically wrong once the anchor it dodged gets promoted.**
   Post-merge state re-verified: `npm ls` → `lib-foundation-acg@0.4.0`, jest 28/28.
-  **PR still NOT opened.** #51 is now merged and lib-foundation has 0 open PRs, so the
-  open-PR block is gone; the branch is ready for `/create-pr`. lib-foundation CI is
-  PR-triggered (0 runs exist for this branch), so the "CI green" gate can only be satisfied
-  by opening the PR. Awaiting the user's call.
+  **PR OPENED 2026-09-12 on the user's go-ahead: lib-foundation #52, head `a2a61c3`.**
+  Pre-PR gates run locally first: `npm ci` resolves under the new name with no lockfile churn,
+  `npm test` 7 suites / 28 jest green, both JSON files parse and agree on `name`. CI after the
+  PR: `acg (node)`, `bats`, `shellcheck` all **pass**. Copilot reviewed (COMMENTED, 1 inline
+  finding) and it was **right**: the spec's verification bullet claimed "the two files are the
+  only ones changed" while the branch also touches `CHANGE.md` and adds the spec doc itself.
+  Reworded in `a2a61c3` to scope the claim to the two metadata files and name the doc-only
+  files explicitly; thread replied + resolved via GraphQL, 0 unresolved.
+  **No admin-override step exists or is needed here** — `main` carries a ruleset with only
+  `deletion` / `non_fast_forward` / `copilot_code_review` (classic protection 404s, as
+  [[reference_classic_protection_404_on_ruleset_repos]] predicts), so there is no required-review
+  or `enforce_admins` lever to drop. **#52 is merge-ready; the user merges.**
+  The live `make credential-test PROVIDER=aws` gate was deliberately NOT run for #52 and that
+  is recorded in the PR body: it covers ACG login/credential behaviour, and this change touches
+  no runtime path — two JSON metadata fields in a private, never-published package. The gate
+  stays outstanding independently.
   **NOTE: the k3d-manager subtree still reads `"name": "lib-acg"`** at
   `scripts/lib/foundation/scripts/lib/acg/package.json:2` — expected, the rename is unmerged.
   It needs a second subtree pull after this branch lands.
@@ -358,8 +407,12 @@
   (2) **Orphaned `scripts/lib/acg/` in k3d-manager DELETED** — 51M / 4,482 files, 0 tracked,
   contents were `node_modules` only. The real subtree lives at
   `scripts/lib/foundation/scripts/lib/acg/`; the standalone path was retired in v1.8.0.
-  (3) **Local `~/src/gitrepo/personal/lib-acg` clone NOT deleted — classifier-denied, user
-  must run it.** First made it safe: 175 commits across 48 local branches were unreachable
+  (3) **Local `~/src/gitrepo/personal/lib-acg` clone — DELETION CANCELLED 2026-09-12 by the
+  user's explicit decision: "we don't need to remove lib-acg, archive github lib-acg is good
+  enough."** It stays on disk. This is no longer a pending user action — do not re-propose it.
+  The safety work below was already done and still holds, so the clone remains disposable at
+  any time if that ever changes.
+  (Original note: deletion was classifier-denied for Claude anyway.) First made it safe: 175 commits across 48 local branches were unreachable
   from remote `main` `7708ae31b` (35 branch tips + 2 stashes). Mostly pre-squash history of
   merged PRs, but not provably all. Bundled every ref to
   `~/src/gitrepo/personal/lib-acg-final-archive-2026-09-12.bundle` (860K, 76 refs,
