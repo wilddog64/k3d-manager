@@ -2685,3 +2685,4 @@ exists in the repo. Consumer mounts it `optional: true`, so it degrades
 gracefully. Decide: seed or drop.
 
 - **2026-09-13 register_app_cluster label fix** — spec `docs/bugs/2026-09-13-register-app-cluster-in-cluster-labels-trigger-platform-helm.md` Codex DONE `1fe0e7fd`, Claude-verified (BATS 26/26, shellcheck clean, scope OK). Hub runbook still NOT run (classifier denied; user to run `! bash <scratchpad>/hubfix/hubfix-step1.sh`). Do not run `hub_recovery_reconcile` with the fix until the runbook has stripped the `ubuntu-k3s-platform` finalizer.
+- **2026-09-13 ~17:05Z hub rogue ArgoCD REMOVED** — runbook run #2 succeeded, Claude-verified read-only (see progress.md). Reconcile with `1fe0e7fd` is now safe (no generated app/finalizer left). Open: 3 stale Running operationStates (needs user go to clear).
