@@ -2683,3 +2683,5 @@ read `1010` as "edge blocked me", never as an app verdict.
 is not auth — `secret/platform-ops` does not exist in Vault and no seeder for it
 exists in the repo. Consumer mounts it `optional: true`, so it degrades
 gracefully. Decide: seed or drop.
+
+- **2026-09-13 register_app_cluster label fix** — spec `docs/bugs/2026-09-13-register-app-cluster-in-cluster-labels-trigger-platform-helm.md` dispatched to Codex via codex exec. Hub runbook still NOT run (classifier denied; user to run `! bash <scratchpad>/hubfix/hubfix-step1.sh`). Do not run `hub_recovery_reconcile` with the fix until the runbook has stripped the `ubuntu-k3s-platform` finalizer.
