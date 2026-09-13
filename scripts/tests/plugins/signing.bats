@@ -212,6 +212,63 @@ setup() {
   grep -q 'auth/kubernetes-ubuntu-hostinger/role/eso-app-cluster' "$calls"
 }
 
+@test "_signing_grant_eso_read fails without writing when the role read is not JSON" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  : > "$calls"
+  SIGNING_ESO_ROLE="eso-app-cluster"
+  _vault_exec() {
+    printf '%s\n' 'No value found at auth/kubernetes-ubuntu-hostinger/role/eso-app-cluster'
+  }
+  _vault_exec_stream() { printf 'write\n' >> "$calls"; }
+
+  run _signing_grant_eso_read
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"NOT applied"* ]]
+  [[ "$output" != *"granted"* ]]
+  [[ "$output" != *"parse error"* ]]
+  ! grep -q 'write' "$calls"
+}
+
+@test "_signing_grant_eso_read fails and does not log granted when the role write fails" {
+  SIGNING_ESO_ROLE="eso-app-cluster"
+  _vault_exec() {
+    printf '%s\n' '{"data":{"token_policies":["default"],"bound_service_account_names":["external-secrets"],"bound_service_account_namespaces":["secrets"]}}'
+  }
+  _vault_exec_stream() { return 2; }
+
+  run _signing_grant_eso_read
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"NOT applied"* ]]
+  [[ "$output" != *"granted cosign-verify"* ]]
+}
+
+@test "_signing_grant_eso_read appends the policy without a leading comma on an empty policy list" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  SIGNING_ESO_ROLE="eso-app-cluster"
+  _vault_exec() {
+    printf '%s\n' '{"data":{"token_policies":[],"bound_service_account_names":["external-secrets"],"bound_service_account_namespaces":["secrets"]}}'
+  }
+  _vault_exec_stream() { printf '%s\n' "$*" >> "$calls"; }
+
+  run _signing_grant_eso_read
+  [ "$status" -eq 0 ]
+  grep -q 'policies=cosign-verify' "$calls"
+  ! grep -q 'policies=,' "$calls"
+}
+
+@test "signing_restore returns non-zero when the ESO grant fails but still applies the ExternalSecret" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { :; }
+  _signing_apply_vault_policy() { :; }
+  _signing_vault_key_exists() { return 0; }
+  _signing_grant_eso_read() { return 1; }
+  _signing_apply_pub_externalsecret() { printf 'es\n' >> "$calls"; }
+
+  run signing_restore
+  [ "$status" -ne 0 ]
+  grep -q 'es' "$calls"
+}
+
 @test "signing_restore preserves present key material and reapplies configuration" {
   local calls="$BATS_TEST_TMPDIR/calls"
   _vault_login() { :; }
