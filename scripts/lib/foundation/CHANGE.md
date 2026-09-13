@@ -21,6 +21,15 @@
   refresh only — no `overrides`, no `package.json` change, no jest bump. Spec:
   `docs/bugs/2026-09-12-acg-npm-audit-brace-expansion-js-yaml.md`.
 
+### Fixed
+- `scripts/lib/acg/acg.sh`: `_acg_chrome_cdp_write_plist` no longer returns 1 silently when
+  `_acg_resolve_cdp_browser_bin` fails (node or playwright missing) — the resolver failure now
+  falls through to the existing "Playwright-managed Chromium not found" error.
+- `scripts/lib/acg/bin/acg-credential-test`: `_aws_cli_usable` / `_az_cli_usable` report a CLI that
+  is not installed as "not installed or not on PATH" instead of "present but cannot run". Both
+  still fail closed and never restart the sandbox. Found by Copilot on k3d-manager PR #125. Spec:
+  `docs/bugs/2026-09-13-acg-cdp-plist-silent-fail-and-missing-cli-message.md`.
+
 ## [v0.4.17] — 2026-09-12
 
 ### Fixed
