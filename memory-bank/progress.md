@@ -204,6 +204,25 @@
   PR body — metadata-only change, no runtime path.
   **The k3d-manager subtree still reads `"name": "lib-acg"`
   until this lands — a second subtree pull is required after it merges.**
+- [ ] **v1.32.1 security hotfix — k3d-manager PR #125 OPEN (2026-09-13), NOT merge-ready yet.**
+  User chose a hotfix off `main` over shipping v1.33.0, to close Dependabot #9 (high, `browserslist`
+  ≤4.28.6) and #10 (medium, `baseline-browser-mapping` <2.11.0) — both in the vendored acg lockfile;
+  `main` had 4.28.2 / 2.10.34. Branch `k3d-manager-v1.32.1` (worktree
+  `~/src/gitrepo/personal/k3d-manager-v1.32.1`) from `f65549f0`: ONE subtree squash pull of lib-foundation
+  `9c0af5b` (`4512574a` + `586e9410`) + CHANGELOG `[1.32.1]` (`710d3510`). Verified: 0 files outside the
+  subtree besides CHANGELOG; vendored tree `490bc62c` == lib-foundation `9c0af5b`; vendored npm 0 vulns,
+  28/28 jest. Pull also carries lib-foundation v0.4.16/v0.4.17 ACG fixes (22 files) — unavoidable, same
+  bytes as on v1.33.0. BATS 806/810: the 4 failures are the known stale assertions, **proven identical on
+  untouched `main` in a detached baseline worktree**, and fixed only on v1.33.0 (`64bc7af4`).
+  CI (PR-triggered only): lint, CodeQL, GitGuardian, detect all pass. **Copilot: changes recommended, 2
+  valid findings in vendored lib-foundation code** — (1) `_acg_chrome_cdp_write_plist` `|| return 1`
+  skips its own `_err` when the resolver fails; (2) `_aws_cli_usable`/`_az_cli_usable` say "present but
+  cannot run" when the CLI is simply not installed. Per subtree rule fixed UPSTREAM: lib-foundation branch
+  `fix/acg-cdp-plist-silent-fail-and-missing-cli-msg`, spec `3e44aa0`
+  (`docs/bugs/2026-09-13-acg-cdp-plist-silent-fail-and-missing-cli-message.md`), Codex dispatched.
+  Then: lib-foundation PR → user merges → re-pull subtree into v1.32.1 (and v1.33.0) → reply/resolve
+  Copilot thread on #125. `main` protection: enforce_admins true, 1 required review — admin override
+  needed at merge time. Gemini live smoke NOT run (stated in PR body).
 - [x] **2 high npm advisories cleared in lib-foundation's acg module (2026-09-12) — Codex.**
   `brace-expansion` 1.1.16 → 1.1.18 (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895) and `js-yaml`
   3.15.1 → 3.15.2 (GHSA-2883-xcg3-v3hh). **Dev-only exposure** — both are transitive deps of

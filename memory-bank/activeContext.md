@@ -324,6 +324,12 @@
   Archiving does not delete lib-acg's PR branches or diffs; they stay readable read-only. See
   [[project_lib_acg_absorption]].
 
+- **v1.32.1 SECURITY HOTFIX IN FLIGHT (2026-09-13) — k3d-manager PR #125.** Subtree pull of
+  lib-foundation `9c0af5b` onto a branch from `main` to close Dependabot #9/#10. Blocked on 2 valid
+  Copilot findings in vendored acg code, being fixed upstream on lib-foundation
+  `fix/acg-cdp-plist-silent-fail-and-missing-cli-msg` (spec `3e44aa0`, Codex running). Full detail in
+  progress.md. Worktree: `~/src/gitrepo/personal/k3d-manager-v1.32.1`.
+
 - **2 high npm advisories in the acg module — FIXED 2026-09-12 (Codex), NOT YET A PR.**
   `npm audit` in lib-foundation `scripts/lib/acg/` reported `brace-expansion` 1.1.16
   (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895) and `js-yaml` 3.15.1 (GHSA-2883-xcg3-v3hh),
