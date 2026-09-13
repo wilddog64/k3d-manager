@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-13
 **Branch:** `k3d-manager-v1.33.0`
-**Status:** OPEN
+**Status:** IMPLEMENTED `14f26f3d` (Claude-verified) — live re-registration pending user go
 **Decision (user, 2026-09-13):** re-register `ubuntu-hostinger` with the hub. This is additive: the hub stays an app cluster and keeps serving the public edge.
 
 ---
