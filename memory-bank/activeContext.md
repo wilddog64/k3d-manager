@@ -627,7 +627,7 @@
   with hook replay owed** (agent sync denied). istio-cni 4/4 pods 0/1, informers
   0/1 → operator restarted 2026-09-13, STILL 0/4: real cause = hub `istio-ambient`
   appset rendered with Cilium paths; k3d needs conf `/var/lib/rancher/k3s/agent/etc/cni/net.d`
-  + bin `/bin` → **operator `deploy_istio_ambient` reapply w/ k3d paths owed**
+  + bin `/bin` → operator reapplied `deploy_istio_ambient --confirm` → istio-cni 4/4 Ready, 4 app pods HBONE (no restarts), FIXED
   (recurrence in `docs/bugs/2026-07-17-ambient-istio-cni-conf-bin-dir-mismatch.md`).
   Grafana PF reloaded by user → `make status` Grafana login 200, Overall WARN (0 errors).
   Declarative-recovery spec: `docs/bugs/2026-09-13-hub-recovery-manual-fixes-not-declarative.md`

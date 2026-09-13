@@ -162,7 +162,7 @@ passes (labeled ns, curl between two pods, ztunnel HBONE + mTLS log).
 
 ## Recurrence 2026-09-13 — hub (k3d/flannel) as app cluster
 
-**Status:** open — operator reapply + spec for a k3d-aware default
+**Status:** live hub FIXED 2026-09-13 (operator reapply); code default still needs a spec
 
 After the 2026-09-11 hub rebuild the hub fills the `ubuntu-k3s` app-cluster role,
 but the hub `istio-ambient` ApplicationSet (created `2026-09-10T23:57:18Z`) was
@@ -211,3 +211,18 @@ Code follow-up (spec first, `scripts/plugins/` is guarded): choose
 `AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR` defaults from the app cluster's
 provider (`k3d` → the k3d paths above) instead of always defaulting to Cilium,
 and correct the help text.
+
+### Resolution 2026-09-13
+
+Operator ran the reapply (the dispatcher's `deploy_*` gate requires `--confirm`;
+env vars alone do not satisfy it). Verified by Claude:
+
+- DaemonSet hostPaths `cni-net-dir=/var/lib/rancher/k3s/agent/etc/cni/net.d`,
+  `cni-bin-dir=/bin`; `istio-cni-node` 4/4 Ready; `istio-cni-ubuntu-k3s` Synced/Healthy.
+- `10-flannel.conflist` now chains `flannel, portmap, bandwidth, istio-cni`;
+  `/bin/istio-cni` present on the node.
+- No workload restart was needed: the CNI agent re-enrolled the running pods
+  (`inpod::statemanager pod received, starting proxy` at 12:19:52Z) and
+  `istioctl ztunnel-config workloads --workload-namespace shopping-cart-apps`
+  lists basket, frontend, order, product-catalog as `HBONE`.
+- Public frontend `/api/products`, Keycloak realm, Grafana health still 200.
