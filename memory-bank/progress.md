@@ -204,7 +204,7 @@
   PR body — metadata-only change, no runtime path.
   **The k3d-manager subtree still reads `"name": "lib-acg"`
   until this lands — a second subtree pull is required after it merges.**
-- [ ] **v1.32.1 security hotfix — k3d-manager PR #125 OPEN (2026-09-13), NOT merge-ready yet.**
+- [ ] **v1.32.1 security hotfix — k3d-manager PR #125 OPEN (2026-09-13), merge-ready.**
   User chose a hotfix off `main` over shipping v1.33.0, to close Dependabot #9 (high, `browserslist`
   ≤4.28.6) and #10 (medium, `baseline-browser-mapping` <2.11.0) — both in the vendored acg lockfile;
   `main` had 4.28.2 / 2.10.34. Branch `k3d-manager-v1.32.1` (worktree
@@ -226,7 +226,12 @@
   `20b5770`. **lib-foundation PR #54** opened; CI 3/3; Copilot found 1 more valid issue — the missing-CLI
   test's PATH still includes `/usr/bin:/bin`, so a host `aws` there would bypass the branch — fixed in
   `bb5ea46` with an absence preflight + explicit `skip` (guard proven to trigger), replied + resolved.
-  **#54 head `bb5ea46`, CI 3/3 green, 0 unresolved, CLEAN — merge-ready; user merges.**
+  **#54 MERGED 2026-09-13 as `023f76e`.** Subtree re-pulled into BOTH branches: v1.32.1 `1052f536`
+  (+ CHANGELOG `17ef1954`), v1.33.0 `c074b430`; each: 0 files outside subtree, vendored tree ==
+  lib-foundation `023f76e`, vendored acg.bats 0 fail. Full BATS: v1.33.0 824/0; v1.32.1 806/810 (same 4
+  pre-existing-on-main stale assertions). #125 CI green on `17ef1954`; Copilot thread replied + resolved,
+  0 unresolved. enforce_admins on k3d-manager main set to false 2026-09-13 per /create-pr step 7 so the
+  user can merge #125; restore it (bodyless POST) in /post-merge. #125 merge-ready; user merges.
   Then: lib-foundation PR → user merges → re-pull subtree into v1.32.1 (and v1.33.0) → reply/resolve
   Copilot thread on #125. `main` protection: enforce_admins true, 1 required review — admin override
   needed at merge time. Gemini live smoke NOT run (stated in PR body).
