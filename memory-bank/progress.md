@@ -362,12 +362,12 @@
 
 ## v1.34.0 queue (moved from v1.33.0, 2026-09-13 user decision)
 
-- [ ] **Bug: `cluster_up.bats` "dry-run previews core" test hangs** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-acg-lock-acquire-missing-state-dir-hangs.md` (root cause reproduced: `_acg_lock_acquire` mkdir without parent → 600s spin on fresh HOME). Codex queue #1.
-- [ ] **Hub-ESO coverage in `make status`** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-status-hub-eso-unmonitored.md` (webhook `_eso_health_results` helper + `Hub ESO …` rows). Codex queue #2.
+- [x] **Bug: `cluster_up.bats` "dry-run previews core" test hangs** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-acg-lock-acquire-missing-state-dir-hangs.md` (root cause reproduced: `_acg_lock_acquire` mkdir without parent → 600s spin on fresh HOME). Codex queue #1.
+- [x] **Hub-ESO coverage in `make status`** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-status-hub-eso-unmonitored.md` (webhook `_eso_health_results` helper + `Hub ESO …` rows). Codex queue #2.
 - [x] **Declarative registration / eso-apps role / Cloudflare origins** — ALREADY DONE by `b71e587a` (`docs/bugs/2026-09-13-hub-recovery-manual-fixes-not-declarative.md`); verified 2026-09-14 code present; spec Status flipped to DONE. No new spec.
-- [ ] **Per-set APP_CLUSTER_NAME / CNI on AppSet reapply** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-applicationset-reapply-single-app-cluster-name.md` (preserve live destination + istio-cni dirs; istio_ambient resolver fallback; `ARGOCD_APPSET_IGNORE_LIVE=1`). Codex queue #4.
-- [ ] **Port-19090 hub/app-cluster collision** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-prometheus-port-19090-hub-acg-collision.md` (hub keeps 19090; app-cluster forwards → 19190+offset). Codex queue #5.
-- [ ] **Hub ServiceMonitors/promtail on fresh hub** — spec `docs/bugs/2026-09-13-hub-rebuild-skips-argocd-servicemonitors-and-promtail.md`. Codex queue #6.
+- [x] **Per-set APP_CLUSTER_NAME / CNI on AppSet reapply** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-applicationset-reapply-single-app-cluster-name.md` (preserve live destination + istio-cni dirs; istio_ambient resolver fallback; `ARGOCD_APPSET_IGNORE_LIVE=1`). Codex queue #4.
+- [x] **Port-19090 hub/app-cluster collision** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-prometheus-port-19090-hub-acg-collision.md` (hub keeps 19090; app-cluster forwards → 19190+offset). Codex queue #5.
+- [x] **Hub ServiceMonitors/promtail on fresh hub** — spec `docs/bugs/2026-09-13-hub-rebuild-skips-argocd-servicemonitors-and-promtail.md`. Codex queue #6.
 - [ ] Operator: `make observability` on hub (user; reads Vault root token) — tracked in the v1.34.0 operator line below.
 - [x] Checked first daily CVE scan runs 2026-09-14 (read-only): app-cve-scan OK 08:03Z; **argocd-cve-scan FAILED** 08:30Z BackoffLimitExceeded — `aquasec/trivy:0.63.0` has no kubectl/curl (verified via docker run), so chart-label lookup silently empty. SPEC'D `docs/bugs/2026-09-14-argocd-cve-scan-no-kubectl-curl-in-trivy-image.md`. Codex queue #7.
 - [x] Release audit 2026-09-14 (Claude): no code items left for v1.34.0. Stale statuses flipped: signing-grant `58999f55`, grafana plist `45be3aec`, keycloak trap `ae661433`, smoke-test APP_CONTEXT (all already shipped in v1.33.0). Remaining = operator steps + release PR gates.
