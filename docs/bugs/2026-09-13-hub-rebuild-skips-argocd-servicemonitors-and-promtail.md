@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-13
-**Status:** OPEN — spec only (live stopgap applied 2026-09-13, see below)
+**Status:** FIXED `42c8723d` (Codex; Claude verified + committed) — operator: `make observability`
 **Files:** `scripts/plugins/observability.sh`, `scripts/tests/plugins/observability_hub_ordering.bats` (new), `CHANGELOG.md`
 
 ## Problem

@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
-**Status:** OPEN — ready for Codex
+**Status:** FIXED `2f2474e9` (Codex; Claude verified)
 **Files:** `scripts/lib/provider.sh`, `scripts/tests/lib/provider_active_set.bats`, `scripts/tests/bin/cluster_up.bats`, `CHANGELOG.md`
 
 ## Problem

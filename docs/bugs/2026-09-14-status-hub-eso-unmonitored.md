@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
-**Status:** OPEN — ready for Codex
+**Status:** FIXED `3eeaef5b` (Codex; Claude verified + committed) — operator: `make restart-webhook`
 **Files:** `bin/k3dm-webhook`, `scripts/tests/lib/webhook_hub_eso.bats` (new), `CHANGELOG.md`
 **Incident:** `docs/issues/2026-09-11-status-warnings-hub-vault-eso-breakage.md`
 

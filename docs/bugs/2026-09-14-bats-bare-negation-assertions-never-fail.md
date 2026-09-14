@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
-**Status:** OPEN — ready for Codex
+**Status:** FIXED `81048cea` (Codex; Claude verified + committed, incl. S5 signing.sh env://COSIGN_KEY)
 **Files:** the 14 `.bats` files listed below, `scripts/plugins/signing.sh` (S5), `scripts/tests/lib/bats_negation_lint.bats` (new), `CHANGELOG.md`
 
 ## Problem

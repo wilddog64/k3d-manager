@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
-**Status:** OPEN — ready for Codex
+**Status:** FIXED `31e69c56` (Codex; Claude verified) — operator follow-up pending
 **Files:** `bin/cluster-up`, `bin/cluster-refresh`, `bin/k3dm-webhook`, `scripts/plugins/loadtest.sh`, `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml`, `docs/howto/slack-slash-commands.md`, `scripts/tests/bin/prometheus_port_split.bats` (new), `CHANGELOG.md`
 **Related:** `docs/bugs/2026-09-13-hub-federate-acg-self-scrape-duplicates-series.md` (symptom fixed; this is the cause)
 

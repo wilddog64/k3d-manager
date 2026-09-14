@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
-**Status:** OPEN — ready for Codex
+**Status:** FIXED `397a7fcc` (Codex; Claude verified + committed)
 **Files:** `scripts/plugins/argocd.sh`, `scripts/tests/plugins/argocd_appset_live_overrides.bats` (new), `CHANGELOG.md`
 **Related:** memory `reference_preserveresourcesondeletion_rename_trap`; `scripts/plugins/istio_ambient.sh`
 
