@@ -71,7 +71,8 @@ EOF
     }
     _is_mac() { return 0; }
     _observability_seed_grafana_if_absent() { :; }
-    export -f envsubst _kubectl curl kubectl launchctl _is_mac _observability_seed_grafana_if_absent
+    _vault_login() { :; }
+    export -f envsubst _kubectl curl kubectl launchctl _is_mac _observability_seed_grafana_if_absent _vault_login
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability
   '

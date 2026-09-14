@@ -150,6 +150,7 @@ function observability_seed_grafana() {
 }
 
 function _observability_apply_grafana_rotator() {
+  _vault_login "secrets" "vault"
   _observability_seed_grafana_if_absent "secrets" "vault" \
     || _err "[observability] Grafana credential seed skipped/failed"
   local manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-credential-rotator.yaml"

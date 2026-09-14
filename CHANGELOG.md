@@ -21,6 +21,7 @@
 - App-cluster Prometheus port-forwards moved from `localhost:19090` to `19190` + provider offset, so they no longer collide with the hub's KeepAlive `prometheus-port-forward` agent (which keeps `19090` for `prometheus.3ai-talk.org`); hub federation, the `acg-prometheus` Grafana datasource, the webhook ACG smoke check and the load-test Prometheus default follow the new port, and `bin/cluster-refresh` now applies the per-provider offset it previously ignored
 - `deploy_observability` now creates the ArgoCD ServiceMonitors from the live Helm release once the ServiceMonitor CRD exists, and applies promtail and the ArgoCD dashboard before any Vault-dependent step; on a fresh hub the CRD arrives after `deploy_argocd`, so ArgoCD metrics were never scraped and Loki received no logs
 - `argocd-cve-scan` can run again: its `aquasec/trivy` image ships neither `kubectl` nor `curl`, so the Hub chart-label lookup silently returned empty and every run failed with `cannot read the Hub Argo CD chart label` (first daily run 2026-09-14 08:30Z, BackoffLimitExceeded); the scanner now fetches kubectl with BusyBox `wget` and uses `wget` for artifacthub lookups, matching `app-cve-scan`
+- `make observability` logs in to the hub Vault before checking for the Grafana admin credential; the unauthenticated check read as "absent", attempted to seed a fresh password, and aborted the deploy with `failed to seed Grafana admin credential in Vault`
 
 ## [1.33.0] - 2026-09-13
 
