@@ -183,7 +183,8 @@ setup() {
   run shopping_cart_seed_sandbox_vault_kv
   [ "$status" -eq 0 ]
   grep -q 'http://example:9999/v1/secret/data/redis/cart' "$CURL_LOG"
-  ! grep -q 'http://localhost:8200/v1/secret/data/redis/cart' "$CURL_LOG"
+  run grep -q 'http://localhost:8200/v1/secret/data/redis/cart' "$CURL_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "copies redis/cart from canonical source Vault when absent in target" {

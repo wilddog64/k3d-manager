@@ -50,7 +50,8 @@ _stub_objects() {
   run argocd_reclaim_release_ownership
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"--confirm"* ]]
-  ! rg -q ' (patch|label|delete) ' "${BATS_TEST_TMPDIR}/calls"
+  run rg -q ' (patch|label|delete) ' "${BATS_TEST_TMPDIR}/calls"
+  [ "$status" -ne 0 ]
 }
 
 @test "argocd reclaim ownership: confirm patches, removes tracking, and deletes only serviceaccounts" {
@@ -66,7 +67,8 @@ _stub_objects() {
   [[ "${secret_patch%%/metadata/managedFields/0*}" == *"/metadata/managedFields/2"* ]]
   rg -q 'label configmap argocd-cm.*argocd.argoproj.io/instance-' "${BATS_TEST_TMPDIR}/calls"
   rg -q 'delete serviceaccount argocd-dex-server' "${BATS_TEST_TMPDIR}/calls"
-  ! rg -q 'delete secret' "${BATS_TEST_TMPDIR}/calls"
+  run rg -q 'delete secret' "${BATS_TEST_TMPDIR}/calls"
+  [ "$status" -ne 0 ]
 }
 
 @test "argocd reclaim ownership: failed patch leaves tracking label untouched" {
@@ -78,7 +80,8 @@ _stub_objects() {
   run argocd_reclaim_release_ownership --confirm
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"managedFields strip failed"* ]]
-  ! rg -q 'label configmap argocd-cm' "${BATS_TEST_TMPDIR}/calls"
+  run rg -q 'label configmap argocd-cm' "${BATS_TEST_TMPDIR}/calls"
+  [ "$status" -ne 0 ]
 }
 
 @test "argocd reclaim ownership: unreadable objects return 2" {

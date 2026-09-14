@@ -23,7 +23,8 @@
   [ "$status" -eq 0 ]
   grep -q '<string>/bin/bash</string>' "${plist}"
   grep -q 'com.k3d-manager.grafana-port-forward.sh' "${plist}"
-  ! grep -q 'acg-kube-prometheus-stack-grafana' "${plist}"
+  run grep -q 'acg-kube-prometheus-stack-grafana' "${plist}"
+  [ "$status" -ne 0 ]
 }
 
 @test "cluster-refresh retains the ACG Grafana plist when the hub wrapper is absent" {

@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
 **Status:** OPEN — ready for Codex
-**Files:** the 14 `.bats` files listed below, `scripts/tests/lib/bats_negation_lint.bats` (new), `CHANGELOG.md`
+**Files:** the 14 `.bats` files listed below, `scripts/plugins/signing.sh` (S5), `scripts/tests/lib/bats_negation_lint.bats` (new), `CHANGELOG.md`
 
 ## Problem
 
@@ -128,6 +128,32 @@ New:
 ### If a converted assertion now fails
 
 That is a real test or product defect the bare `!` was hiding. **Do not** weaken the assertion or revert the conversion. Stop, and report the file, test name, line and the matched content. Claude will triage it separately.
+
+### S5 — exposed defect (triaged 2026-09-14): `signing.sh` passes a key-file path to `cosign --key`
+
+After the conversion, `signing.bats` "signing.sh never passes cosign key/password as a bare CLI argument" fails. It matches `scripts/plugins/signing.sh:195`:
+`cosign public-key --key "${workdir}/cosign.key"`.
+
+- The bare `!` had hidden this since `cd38a7e5` (v1.29.0).
+- The file's own policy comment (line 44) says cosign must read key material via `--key env://COSIGN_KEY`.
+- The temp file is still needed afterwards for `_signing_write_vault`, but cosign does not need to read it.
+- Verified locally with a throwaway keypair (cosign v3.1.3): `cosign public-key --key env://COSIGN_KEY` produces the same public key as `--key <file>`.
+
+The assertion is not weakened. Instead, `scripts/plugins/signing.sh`:
+
+Old:
+
+```bash
+    if ! COSIGN_PASSWORD="${password}" _no_trace _run_command -- \
+        cosign public-key --key "${workdir}/cosign.key" > "${workdir}/cosign.pub" 2>/dev/null; then
+```
+
+New:
+
+```bash
+    if ! COSIGN_KEY="${key}" COSIGN_PASSWORD="${password}" _no_trace _run_command -- \
+        cosign public-key --key env://COSIGN_KEY > "${workdir}/cosign.pub" 2>/dev/null; then
+```
 
 ## CHANGELOG
 

@@ -203,7 +203,8 @@ setup() {
   [ "$status" -eq 0 ]
 
   grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
-  ! grep -q "vault policy write eso-reader" "$VAULT_EXEC_STREAM_LOG"
+  run grep -q "vault policy write eso-reader" "$VAULT_EXEC_STREAM_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "configure_vault_app_auth is idempotent" {
