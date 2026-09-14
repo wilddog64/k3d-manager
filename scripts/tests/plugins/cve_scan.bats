@@ -144,12 +144,15 @@ EOF2
     KUBECTL_BIN="${BATS_TEST_TMPDIR}/bin/kubectl" sh "${SCAN_SCRIPT}"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"major upgrade 7.8.1 -> 10.9.1 held"* ]]
+  [[ "${output}" == *"Done: no cluster patched to 10.9.1"* ]]
+  [[ "${output}" != *"upgrade complete"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/patch.log" ]
 
   run env PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin" STUB_DEV_CHART=10.8.4 \
     KUBECTL_BIN="${BATS_TEST_TMPDIR}/bin/kubectl" sh "${SCAN_SCRIPT}"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"patched cluster-ubuntu-hostinger to 10.9.1"* ]]
+  [[ "${output}" == *"Done: patched to 10.9.1"* ]]
   [ -s "${BATS_TEST_TMPDIR}/patch.log" ]
 }
 
