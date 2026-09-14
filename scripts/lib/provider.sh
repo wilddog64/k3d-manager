@@ -132,6 +132,7 @@ function _acg_lock_acquire() {
     # Usage: _acg_lock_acquire <lock-dir> [timeout-seconds]
     local lockdir="${1:-}" timeout="${2:-120}" waited=0
     [[ -z "${lockdir}" ]] && return 0
+    mkdir -p "$(dirname "${lockdir}")" 2>/dev/null || true
     while ! mkdir "${lockdir}" 2>/dev/null; do
         if [[ -f "${lockdir}/pid" ]]; then
             local owner

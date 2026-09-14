@@ -173,6 +173,14 @@ _stub_kubectl_all_unreachable() {
   [[ "${status}" -eq 0 ]]
 }
 
+@test "_acg_lock_acquire creates a missing parent directory instead of spinning" {
+  local lk="${BATS_TEST_TMPDIR}/absent/state/hub.lock"
+  run timeout 10 bash -c 'source "$1"; _warn() { :; }; _acg_lock_acquire "$2" 600' _ "${BATS_TEST_DIRNAME}/../../lib/provider.sh" "${lk}"
+  [ "$status" -eq 0 ]
+  [ -d "${lk}" ]
+  [ -f "${lk}/pid" ]
+}
+
 # --- Phase 3: per-provider port offset ---
 
 @test "_acg_provider_port_offset is 0 for the default provider (k3s-aws)" {

@@ -14,6 +14,7 @@
 ### Fixed
 
 - Hub Prometheus no longer stores every node-exporter/kubelet/kube-state-metrics/istiod/envoy series twice: `federate-acg` scrapes `host.internal:19090`, which serves the hub's own Prometheus whenever no ACG sandbox holds that port, so the self-scraped copies (labelled `cluster="acg"`) duplicated alerts such as `KubeJobFailed`/`TargetDown`; the job now drops samples that do not carry the ACG Prometheus's own `cluster` external label, and the ArgoCD dashboard's Image Updater replica stats aggregate with `max()`
+- `_acg_lock_acquire` now creates the lock's parent directory, so a first `make up` on a machine without `~/.local/share/k3d-manager` no longer spins silently for the full 600 s hub-bootstrap lock timeout; this was also the cause of the hanging `cluster_up.bats` dry-run test
 
 ## [1.33.0] - 2026-09-13
 
