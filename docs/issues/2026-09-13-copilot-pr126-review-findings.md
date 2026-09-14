@@ -41,3 +41,10 @@ This is the same `%q` idiom the neighbouring role writers already use. The new B
 **Root cause:** a later commit appended new heading blocks instead of adding its bullets to the existing sections.
 
 **Process note:** CHANGELOG instructions in specs must say "add to the existing `### <Type>` under `[Unreleased]`".
+
+## F4 — `scripts/tests/plugins/platform_ops_appset_diff.bats:22` nested `bash -c 'awk '\'' …` quoting
+
+**Flagged:** Copilot said the nested quoting was syntactically invalid and would fail the suite.
+**Verdict:** The correctness claim is a false positive (`'\''` is valid, and the suite passed 3/3). The readability point stands.
+**Fix:** Run `awk` directly and assert both tokens on `$output`. A negative check with `ServerSideDiff=false` in a temp fixture makes test 1 fail, so the assertion is live.
+**Process note:** In BATS, prefer `run <cmd>` plus `$output` glob assertions over `bash -c` pipelines with nested quoting.
