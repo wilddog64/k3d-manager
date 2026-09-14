@@ -1695,3 +1695,148 @@ for app in doc.get("items", []):
 print("[argocd] checked {} values references".format(checked), file=sys.stderr)
 ' "${_expected}" "${_repo}"
 }
+
+function argocd_reclaim_release_ownership() {
+   local _context="k3d-k3d-cluster"
+   local _namespace="${ARGOCD_NAMESPACE:-cicd}"
+   local _release="${ARGOCD_HELM_RELEASE:-argocd}"
+   local _apply=0
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         --context)
+            if [[ -z "${2:-}" ]]; then
+               _warn "[argocd] --context requires a value"
+               return 2
+            fi
+            _context="$2"
+            shift 2
+            ;;
+         --confirm)
+            _apply=1
+            shift
+            ;;
+         -h|--help)
+            cat <<'EOF'
+Usage: argocd_reclaim_release_ownership [--context <kube-context>] [--confirm]
+
+Find ArgoCD Helm release objects (ConfigMaps, Secrets, ServiceAccounts) whose labels
+were taken over by an ArgoCD Application (field manager argocd-controller), and
+orphans that Application left behind. Dry run by default.
+
+  --context   Kube context (default: k3d-k3d-cluster)
+  --confirm   Strip the argocd-controller managedFields entries and the
+              argocd.argoproj.io/instance label from release objects, and
+              delete orphan ServiceAccounts. Orphan ConfigMaps/Secrets are
+              only reported.
+EOF
+            return 0
+            ;;
+         *)
+            _warn "[argocd] Unknown option: $1"
+            return 2
+            ;;
+      esac
+   done
+
+   local _objects _apps _plan
+   _objects="$(_kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+      get configmap,secret,serviceaccount -o json --show-managed-fields 2>/dev/null)"
+   [[ -n "${_objects}" ]] || {
+      _warn "[argocd] Could not read ConfigMaps/Secrets/ServiceAccounts from ${_context}/${_namespace}"
+      return 2
+   }
+   _apps="$(_kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+      get applications.argoproj.io -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)"
+
+   if ! _plan="$(printf '%s' "${_objects}" | _argocd_foreign_ownership_plan "${_release}" "${_apps}")"; then
+      _warn "[argocd] Could not parse objects from ${_context}/${_namespace}"
+      return 2
+   fi
+   [[ -n "${_plan}" ]] || {
+      _info "[argocd] No foreign ownership on ${_namespace} objects of Helm release ${_release}"
+      return 0
+   }
+
+   local _action _kind _name _indices _instance _patch _idx _rc=0
+   local -a _idx_list
+   while IFS=$'\t' read -r _action _kind _name _indices _instance; do
+      case "${_action}" in
+         strip)
+            _info "[argocd] ${_kind}/${_name}: argocd-controller managedFields [${_indices}], tracking label ${_instance}"
+            (( _apply )) || continue
+            if [[ "${_indices}" != "-" ]]; then
+               _patch="["
+               IFS=',' read -r -a _idx_list <<<"${_indices}"
+               for _idx in "${_idx_list[@]}"; do
+                  _patch+="{\"op\":\"test\",\"path\":\"/metadata/managedFields/${_idx}/manager\",\"value\":\"argocd-controller\"},"
+                  _patch+="{\"op\":\"remove\",\"path\":\"/metadata/managedFields/${_idx}\"},"
+               done
+               _patch="${_patch%,}]"
+               if ! _kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+                  patch "${_kind}" "${_name}" --type=json -p "${_patch}" >/dev/null; then
+                  _warn "[argocd] ${_kind}/${_name}: managedFields strip failed"
+                  _rc=1
+                  continue
+               fi
+            fi
+            if [[ "${_instance}" != "-" ]]; then
+               if ! _kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+                  label "${_kind}" "${_name}" argocd.argoproj.io/instance- >/dev/null; then
+                  _warn "[argocd] ${_kind}/${_name}: tracking label removal failed"
+                  _rc=1
+               fi
+            fi
+            ;;
+         orphan)
+            _info "[argocd] ${_kind}/${_name}: orphan of removed Application ${_instance}"
+            (( _apply )) || continue
+            if ! _kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+               delete "${_kind}" "${_name}" >/dev/null; then
+               _warn "[argocd] ${_kind}/${_name}: delete failed"
+               _rc=1
+            fi
+            ;;
+         review)
+            _warn "[argocd] ${_kind}/${_name}: orphan of removed Application ${_instance}; review manually (not deleted)"
+            ;;
+      esac
+   done <<<"${_plan}"
+
+   if (( ! _apply )); then
+      _info "[argocd] Dry run; rerun with --confirm to apply"
+   fi
+   return "${_rc}"
+}
+
+function _argocd_foreign_ownership_plan() {
+   python3 -c '
+import json
+import sys
+
+release = sys.argv[1]
+apps = set(sys.argv[2].split())
+tracking = "argocd.argoproj.io/instance"
+
+try:
+    doc = json.load(sys.stdin)
+except ValueError:
+    sys.exit(3)
+
+for obj in doc.get("items", []):
+    meta = obj.get("metadata", {})
+    kind = obj.get("kind", "").lower()
+    name = meta.get("name", "")
+    labels = meta.get("labels") or {}
+    annotations = meta.get("annotations") or {}
+    instance = labels.get(tracking, "")
+    if annotations.get("meta.helm.sh/release-name") == release:
+        indices = [str(i) for i, entry in enumerate(meta.get("managedFields") or [])
+                   if entry.get("manager") == "argocd-controller"]
+        if indices or instance:
+            print("\t".join(["strip", kind, name, ",".join(reversed(indices)) or "-", instance or "-"]))
+    elif instance and instance not in apps and labels.get("app.kubernetes.io/part-of") == "argocd":
+        action = "orphan" if kind == "serviceaccount" else "review"
+        print("\t".join([action, kind, name, "-", instance]))
+' "$1" "${2:-}"
+}
