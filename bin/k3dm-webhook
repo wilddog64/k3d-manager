@@ -53,6 +53,12 @@ from webhook.auth import (  # noqa: E402
     _slack_user_is_allowlisted,
     _slack_user_role,
 )
+from webhook.make_targets import (  # noqa: E402
+    MAKE_JOB_TIMEOUT_DEFAULT,
+    MAKE_TARGETS,
+    make_target_help,
+    parse_make_request,
+)
 
 
 def _normalize_provider(provider):
@@ -313,6 +319,20 @@ def _request_role(headers):
     return raw if raw in _ROLE_LEVELS else "reader"  # present-but-invalid → fail closed
 
 
+_MAKE_JOB_LOCK = threading.Lock()
+
+
+def _effective_make_role(headers, body):
+    """Cap a relayed /k3dm role at the caller's mapped Slack role (unknown → reader)."""
+    header_role = _request_role(headers)
+    if headers.get("X-K3DM-Role") is None:
+        return header_role
+    user_role = _slack_user_role(str(body.get("slack_user_id", "")))
+    if user_role not in _ROLE_LEVELS:
+        user_role = "reader"
+    return header_role if _ROLE_LEVELS[header_role] <= _ROLE_LEVELS[user_role] else user_role
+
+
 def _request_actor(headers):
     actor = (headers.get("X-K3DM-Actor", "") or "").strip()
     return actor or "direct-token"
@@ -344,6 +364,10 @@ def _action_policy(path, body):
             return {"name": "cluster-kill", "min_role": "operator"}
         if action in ("up", "down"):
             return {"name": f"cluster-{action}", "min_role": "admin"}
+    if path == "/api/v1/make":
+        target = str(body.get("target", "")).strip()
+        spec = MAKE_TARGETS.get(target)
+        return {"name": f"make:{target or 'help'}", "min_role": spec["min_role"] if spec else "reader"}
     return _ACTION_POLICY.get(path)
 
 
@@ -540,6 +564,29 @@ def _run_stale_sandbox_cleanup(job_id, confirm=False):
         _notify_job(job_id, "⚠️ *Stale sandbox cleanup timed out*")
     else:
         _notify_job(job_id, f"🧹 *Stale sandbox cleanup*\n```{output.strip()}```")
+
+
+def _run_make_target(job_id, argv_tail, timeout, actor):
+    """Run one allowlisted /k3dm make target and post the tail of its output."""
+    label = " ".join(argv_tail)
+    try:
+        (JOB_DIR / job_id / "status").write_text("running")
+        _notify_job(job_id, f"🛠️ *make {label}* started by {actor}")
+        cmd = ["/bin/bash", "-c", 'make --no-print-directory "$@"; echo "__K3DM_MAKE_RC=$?"', "k3dm-make", *argv_tail]
+        output, timed_out = _posix_spawn_capture(cmd, timeout=timeout, cwd=REPO_ROOT)
+        lines = output.rstrip().splitlines()
+        rc_line = lines.pop() if lines and lines[-1].startswith("__K3DM_MAKE_RC=") else ""
+        tail = "\n".join(lines[-40:])[-3000:]
+        if timed_out:
+            status, icon, verdict = "failed", "⏱️", f"timed out after {timeout}s"
+        elif rc_line == "__K3DM_MAKE_RC=0":
+            status, icon, verdict = "success", "✅", "succeeded"
+        else:
+            status, icon, verdict = "failed", "❌", f"failed (rc {rc_line.partition('=')[2] or 'unknown'})"
+        (JOB_DIR / job_id / "status").write_text(status)
+        _notify_job(job_id, f"{icon} *make {label}* {verdict}\n```{tail or '(no output)'}```")
+    finally:
+        _MAKE_JOB_LOCK.release()
 
 
 def _run_upgrade(job_id, chart_version, stage):
@@ -3439,6 +3486,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
         body["_source_command"] = _request_source_command(self.headers)
         request_role = _request_role(self.headers)
+        if self.path == "/api/v1/make":
+            request_role = _effective_make_role(self.headers, body)
         request_actor = _request_actor(self.headers)
         action_policy = _action_policy(self.path, body)
         if action_policy:
@@ -3670,6 +3719,32 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             threading.Thread(
                 target=_run_stale_sandbox_cleanup,
                 args=(job_id, confirm),
+                daemon=True,
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if self.path == "/api/v1/make":
+            target = str(body.get("target", "")).strip()
+            if target in ("", "help"):
+                self._json(200, {"text": f"*/k3dm targets for role {request_role}*\n{make_target_help(request_role, _role_allows)}"})
+                return
+            argv_tail, error = parse_make_request(target, body.get("args", {}), body.get("confirm") is True)
+            if error:
+                self._json(400, {"error": error})
+                return
+            if not _MAKE_JOB_LOCK.acquire(blocking=False):
+                self._json(409, {"error": "a /k3dm job is already running"})
+                return
+            response_url = body.get("response_url", "")
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            if response_url:
+                (JOB_DIR / job_id / "response_url").write_text(response_url)
+            threading.Thread(
+                target=_run_make_target,
+                args=(job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), request_actor),
                 daemon=True,
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
