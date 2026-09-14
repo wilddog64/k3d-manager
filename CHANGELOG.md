@@ -23,6 +23,7 @@
 - `argocd-cve-scan` can run again: its `aquasec/trivy` image ships neither `kubectl` nor `curl`, so the Hub chart-label lookup silently returned empty and every run failed with `cannot read the Hub Argo CD chart label` (first daily run 2026-09-14 08:30Z, BackoffLimitExceeded); the scanner now fetches kubectl with BusyBox `wget` and uses `wget` for artifacthub lookups, matching `app-cve-scan`
 - `make observability` logs in to the hub Vault before checking for the Grafana admin credential; the unauthenticated check read as "absent", attempted to seed a fresh password, and aborted the deploy with `failed to seed Grafana admin credential in Vault`
 - `argocd-cve-scan` now scans the image the Hub is actually running (`argocd-server`'s container image, e.g. `quay.io/argoproj/argocd:v3.5.2`) and fails loudly when the image or the trivy run cannot be resolved; it previously grepped a non-existent `appVersion` field from artifacthub (exiting 0 without scanning) and would have scanned the non-existent Docker Hub `argoproj/argocd` tag, reporting "No HIGH/CRITICAL CVEs" from the pull error
+- Alertmanager now loads `alertmanager-smtp-secret`: `configSecret` moved under `alertmanager.alertmanagerSpec` with `useExistingSecret: true` in both kube-prometheus-stack values files (the top-level key was ignored since v1.5.0, so critical-alert SMS never sent); `TrivyCriticalVulnerabilityDetected` routes to `null` ahead of the SMS route
 
 ## [1.33.0] - 2026-09-13
 

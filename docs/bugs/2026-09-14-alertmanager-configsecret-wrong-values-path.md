@@ -2,8 +2,8 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
-**Status:** OPEN — awaiting user go (enabling it sends real SMS)
-**Files:** `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml`, `scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml`, `scripts/tests/plugins/` (new BATS), `CHANGELOG.md`
+**Status:** FIXED (Claude; BATS 2/2; user chose fix + mute Trivy criticals)
+**Files:** `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml`, `scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml`, `scripts/etc/prometheus/alertmanager.yaml.tmpl`, `scripts/tests/plugins/alertmanager_config_secret.bats` (new), `CHANGELOG.md`
 
 ## Problem
 
@@ -50,6 +50,14 @@ New (move under `alertmanagerSpec`, alongside its other keys):
 ### S2 — guard for a missing secret
 
 With `useExistingSecret: true` and no secret, the operator has no config to load. `deploy_observability` already skips secret creation when the Vault credentials are absent. Before landing S1, confirm the operator's behaviour when the secret is missing (the prometheus-operator falls back to an empty config, and Alertmanager stays up). If it does not fall back, have the no-credentials path create a null-receiver `alertmanager-smtp-secret`.
+
+### S2 resolution
+
+No guard code is needed. prometheus-operator `v0.79.2` `loadConfigurationFromSecret` logs `config secret not found, using default Alertmanager configuration` and returns the default config. It also forces `continue: true` on AlertmanagerConfig top-level routes, so the `cicd/k3dm-analyze` CVE webhooks still receive alerts ahead of the base routes. (`ubuntu-hostinger` has no `alertmanager-smtp-secret` and relies on this.)
+
+### S2b — mute Trivy criticals (user decision 2026-09-14)
+
+`scripts/etc/prometheus/alertmanager.yaml.tmpl`: a first route sends `alertname = TrivyCriticalVulnerabilityDetected` to `'null'`, before the `severity = critical` → `sms-critical` route. Auto-remediation webhooks are unaffected (AlertmanagerConfig routes).
 
 ### S3 — tests
 

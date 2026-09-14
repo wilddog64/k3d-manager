@@ -91,7 +91,8 @@ alertmanager:
       limits:
         memory: 64Mi
         cpu: 50m
-  configSecret: alertmanager-smtp-secret
+    useExistingSecret: true
+    configSecret: alertmanager-smtp-secret
 
 kubeEtcd:
   enabled: false
