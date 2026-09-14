@@ -342,7 +342,7 @@ probe fails and Gemini triages it automatically.
 | ArgoCD | `http://localhost:8080/healthz` | 200 |
 | Frontend | `http://frontend.shopping-cart.local/` | 200 |
 | Keycloak | `http://keycloak.shopping-cart.local/health/live` | 200 |
-| Prometheus | `http://localhost:19090/-/ready` | 200 |
+| Prometheus | `http://localhost:19190/-/ready` (app cluster; hostinger uses `https://prometheus.3ai-talk.org/-/ready`) | 200 |
 | Grafana | `https://grafana.3ai-talk.org/api/health` | 200 |
 | **Pushgateway** | `http://localhost:9091/-/healthy` | 200 |
 

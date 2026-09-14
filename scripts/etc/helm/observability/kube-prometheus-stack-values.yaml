@@ -45,7 +45,7 @@ prometheus:
             - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}'
         static_configs:
           - targets:
-              - 'host.internal:19090'
+              - 'host.internal:19190'
             labels:
               cluster: acg
         metric_relabel_configs:
@@ -68,7 +68,7 @@ grafana:
   additionalDataSources:
     - name: acg-prometheus
       type: prometheus
-      url: http://host.internal:19090
+      url: http://host.internal:19190
       access: proxy
       jsonData:
         timeInterval: 30s

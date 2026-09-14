@@ -120,7 +120,7 @@ function _loadtest_write_stage_summary() {
 LOADTEST_KEYCLOAK_ISSUER="${LOADTEST_KEYCLOAK_ISSUER:-https://keycloak.3ai-talk.org/realms/shopping-cart}"
 LOADTEST_CLIENT_ID="${LOADTEST_CLIENT_ID:-order-service}"
 LOADTEST_TARGET_URL="${LOADTEST_TARGET_URL:-http://localhost:18081}"
-LOADTEST_PROM_URL="${LOADTEST_PROM_URL:-http://localhost:19090}"
+LOADTEST_PROM_URL="${LOADTEST_PROM_URL:-http://localhost:19190}"
 # k6 output + remote-write wiring. TREND_STATS must include p(95) — k6's default is
 # p(99) only, which would never emit the k6_..._latency_seconds_p95 series the p95 gate
 # reads. RW url derives from the Prometheus base unless overridden.

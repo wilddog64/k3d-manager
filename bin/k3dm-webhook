@@ -1702,7 +1702,7 @@ Service dependencies:
 Local port-forwards (Mac → app-specific endpoints, managed by LaunchAgents):
   - ArgoCD UI: localhost:18080 → cicd/argocd-server:80
   - Frontend:  frontend.shopping-cart.local on ACG, frontend.3ai-talk.org on Hostinger
-  - Prometheus: localhost:19090 → monitoring/prometheus-operated:9090 (NOT on ubuntu-k3s ingress)
+  - Prometheus: hub localhost:19090 (prometheus.3ai-talk.org); app cluster localhost:19190+provider offset → monitoring/prometheus-operated:9090 (NOT on ubuntu-k3s ingress)
   - Grafana: grafana.3ai-talk.org → monitoring/grafana via Cloudflare tunnel; only root path "/" is exposed
 
 Local-only services (NOT on ubuntu-k3s, only on k3d-k3d-cluster):
@@ -2042,7 +2042,7 @@ def _smoke_test_services(retries=None, provider=None):
         prometheus_ready_url = "https://prometheus.3ai-talk.org/-/ready"
     else:
         argocd_health_url = "http://localhost:8080/healthz"
-        prometheus_ready_url = "http://localhost:19090/-/ready"
+        prometheus_ready_url = "http://localhost:19190/-/ready"
 
     smoke_endpoints = [
         ("ArgoCD", argocd_health_url, [200]),
