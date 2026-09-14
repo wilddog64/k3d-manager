@@ -114,3 +114,40 @@ EOF
   run grep -c 'curl ' "${SCAN_SCRIPT}"
   [ "${output}" -eq 0 ]
 }
+
+@test "cve scan holds major chart upgrades but patches same-major ones" {
+  mkdir -p "${BATS_TEST_TMPDIR}/bin"
+
+  cat > "${BATS_TEST_TMPDIR}/bin/kubectl" <<'EOF2'
+#!/bin/sh
+case " $* " in
+  *" patch "*) printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/patch.log" ;;
+  *"helm"*"chart"*) printf '%s' 'argo-cd-10.8.4' ;;
+  *"containers[0].image"*) printf '%s' 'quay.io/argoproj/argocd:v3.5.2' ;;
+  *"argocd-chart-version"*) printf '%s' "${STUB_DEV_CHART}" ;;
+  *"metadata.name"*) printf '%s' 'cluster-ubuntu-hostinger' ;;
+esac
+EOF2
+  cat > "${BATS_TEST_TMPDIR}/bin/wget" <<'EOF2'
+#!/bin/sh
+printf '%s' '{"version":"10.9.1","app_version":"v3.5.3"}'
+EOF2
+  cat > "${BATS_TEST_TMPDIR}/bin/trivy" <<'EOF2'
+#!/bin/sh
+echo "argocd  CVE-2026-0001  CRITICAL"
+EOF2
+  chmod +x "${BATS_TEST_TMPDIR}/bin/kubectl" "${BATS_TEST_TMPDIR}/bin/wget" \
+    "${BATS_TEST_TMPDIR}/bin/trivy"
+
+  run env PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin" STUB_DEV_CHART=7.8.1 \
+    KUBECTL_BIN="${BATS_TEST_TMPDIR}/bin/kubectl" sh "${SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"major upgrade 7.8.1 -> 10.9.1 held"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/patch.log" ]
+
+  run env PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin" STUB_DEV_CHART=10.8.4 \
+    KUBECTL_BIN="${BATS_TEST_TMPDIR}/bin/kubectl" sh "${SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"patched cluster-ubuntu-hostinger to 10.9.1"* ]]
+  [ -s "${BATS_TEST_TMPDIR}/patch.log" ]
+}
