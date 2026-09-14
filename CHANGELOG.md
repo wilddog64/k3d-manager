@@ -17,6 +17,7 @@
 - `_acg_lock_acquire` now creates the lock's parent directory, so a first `make up` on a machine without `~/.local/share/k3d-manager` no longer spins silently for the full 600 s hub-bootstrap lock timeout; this was also the cause of the hanging `cluster_up.bats` dry-run test
 - `make status` (webhook `/api/v1/health`) now reports hub ESO health as `Hub ESO ClusterSecretStore` / `Hub ESO ExternalSecrets` alongside the app-cluster rows; previously only the app cluster was sampled, so a hub with 24/25 failing ExternalSecrets still printed `ESO ExternalSecrets: 20/20 synced`
 - BATS suites no longer use bare `! cmd` assertions, which `set -e` ignores anywhere but the last line of a test: 42 lines across 14 suites now use `run …; [ "$status" -ne 0 ]` (13 were silently ineffective, and the `signing.bats` wildcard-imageReference guard could never fail), and a new lint test rejects the pattern; the now-effective secret-hygiene guard caught `_signing_restore_vault_from_keychain` passing a key-file path to `cosign public-key --key`, which now reads `env://COSIGN_KEY`
+- `deploy_argocd_applicationsets` now keeps each live ApplicationSet's destination cluster and istio-cni dirs when it re-pins the values branch (falling back to the `deploy_istio_ambient` CNI resolver for sets not yet applied); previously one `APP_CLUSTER_NAME` and the Cilium CNI defaults were applied to every set, which renamed the `istio-*-ubuntu-k3s` Applications and retargeted `observability-acg`. Set `ARGOCD_APPSET_IGNORE_LIVE=1` to retarget deliberately
 
 ## [1.33.0] - 2026-09-13
 

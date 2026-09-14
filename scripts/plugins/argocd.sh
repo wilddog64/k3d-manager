@@ -1197,8 +1197,11 @@ Options:
 
 Environment Variables:
    K3D_MANAGER_BRANCH   Values branch to pin (default: current git branch)
-   APP_CLUSTER_NAME     App-cluster name for ACG variants (default: resolved/ubuntu-k3s)
+   APP_CLUSTER_NAME     App-cluster name for sets not yet live (default: resolved/ubuntu-k3s)
    ARGOCD_NAMESPACE     Namespace for Argo CD (default: cicd)
+   ARGOCD_APPSET_IGNORE_LIVE
+                        1 = do not preserve each live set's destination cluster and
+                        istio-cni dirs (default: preserve; a reapply never retargets)
 
 Examples:
    # Reapply + verify, pinning to the checked-out release branch
@@ -1223,6 +1226,45 @@ EOF
       _info "[argocd] Confirming values-branch pin (${K3D_MANAGER_BRANCH})"
       argocd_check_values_branch "${K3D_MANAGER_BRANCH}"
    fi
+}
+
+function _argocd_appset_live_overrides() {
+   local file="$1" name live value conf bin provider dirs
+   name="$(sed -n 's/^  name: //p' "$file" | head -1)"
+   [[ -z "${name}" ]] && return 0
+   live="$(_kubectl --no-exit get applicationset "${name}" -n "${ARGOCD_NAMESPACE:-cicd}" -o json 2>/dev/null || true)"
+   [[ -z "${live}" ]] || printf '%s' "${live}" | jq -e '.kind == "ApplicationSet"' >/dev/null 2>&1 || live=""
+
+   if grep -q '\${APP_CLUSTER_NAME}' "$file" && [[ -n "${live}" ]]; then
+      value="$(printf '%s' "${live}" | jq -r '.spec.template.spec.destination.name // ""')"
+      [[ -z "${value}" || "${value}" == *'{{'* || "${value}" == *'$'* ]] || printf 'APP_CLUSTER_NAME=%s\n' "${value}"
+   fi
+
+   if grep -q '\${AMBIENT_CNI_CONF_DIR}' "$file"; then
+      if [[ -n "${live}" ]]; then
+         value="$(printf '%s' "${live}" | jq -r '[.spec.generators[]?.list.elements[]? | select(.name == "istio-cni") | .values][0] // ""')"
+         conf="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniConfDir:[[:space:]]*//p' | head -1)"
+         bin="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniBinDir:[[:space:]]*//p' | head -1)"
+      fi
+      if [[ -z "${conf:-}" || -z "${bin:-}" ]]; then
+         if ! declare -f _istio_ambient_cni_dirs >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/istio_ambient.sh" ]]; then
+            # shellcheck disable=SC1090,SC1091
+            source "${PLUGINS_DIR}/istio_ambient.sh"
+         fi
+         if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
+            provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${APP_CLUSTER_NAME:-ubuntu-k3s}")}"
+            if [[ -n "${provider}" ]]; then
+               dirs="$(_istio_ambient_cni_dirs "${provider}")"
+               conf="${dirs%% *}"
+               bin="${dirs##* }"
+            fi
+         fi
+      fi
+      if [[ -n "${conf:-}" && -n "${bin:-}" ]]; then
+         printf 'AMBIENT_CNI_CONF_DIR=%s\nAMBIENT_CNI_BIN_DIR=%s\n' "${conf}" "${bin}"
+      fi
+   fi
+   return 0
 }
 
 function _argocd_deploy_applicationsets() {
@@ -1278,7 +1320,17 @@ function _argocd_deploy_applicationsets() {
          _err "[argocd] Refusing to apply ${filename}: unset variable(s):${_unset}"
          continue
       fi
-      if envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
+      local -a _overrides=()
+      local _ov
+      if [[ "${ARGOCD_APPSET_IGNORE_LIVE:-0}" != "1" ]]; then
+         while IFS= read -r _ov; do
+            [[ -n "${_ov}" ]] && _overrides+=("${_ov}")
+         done < <(_argocd_appset_live_overrides "$file")
+      fi
+      if (( ${#_overrides[@]} > 0 )); then
+         _info "[argocd] ${filename}: keeping live ${_overrides[*]}"
+      fi
+      if env ${_overrides[@]+"${_overrides[@]}"} envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
          ((deployed_count++))
       else
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"
