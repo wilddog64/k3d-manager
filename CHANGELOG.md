@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `app-cve-scan` now runs daily at 01:00 America/Los_Angeles (was 00:00 UTC on the 1st and 15th), with `startingDeadlineSeconds: 3600` and CPU/memory requests and limits; a rebuild dispatch per service is rate-limited by `REBUILD_COOLDOWN_SECONDS` (default 3 days, state in ConfigMap `platform-ops/app-cve-scan-rebuild-state`), so an unfixable candidate no longer triggers a GitHub Actions rebuild and warning every night
+
 ## [1.33.0] - 2026-09-13
 
 **Theme: Hermes Slack approvals, Kine circuit breaker, hub recovery hardening.** Hermes gets interactive Slack incident proposals (opt-in pull model via `k3dm-slack-relay` worker, inactive by default), a read-only hub-datastore circuit breaker to detect Kine stalls and gate ArgoCD pause (explicit opt-in), and major hub-recovery hardening (19 bug fixes including hub restore Vault role policy merge, Keycloak admin secret fallback, istiod HPA replica churn, platform-ops OutOfSync, Loki chart validation, smoke tests on right cluster/context, and provider-aware service discovery).
