@@ -4,6 +4,7 @@
 
 ### Added
 
+- Hermes Slack approvals (opt-in, pull model): incident proposals carry Approve/Deny buttons; the `k3dm-slack-relay` worker verifies the Slack signature, an approver allowlist and a 24h `/hermes-auth` re-auth before recording an approval in Cloudflare KV, and Hermes drains it on its next poll into the unchanged `repairs.approve()`; inactive until `K3DM_HERMES_APPROVAL_DRAIN_URL` and the relay KV/secrets are configured
 - `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` re-registers Hostinger with the hub ArgoCD only (additive; no GitOps reapply, no edge changes) — restores the `ubuntu-hostinger-*` apps lost in the hub restore
 
 ### Fixed

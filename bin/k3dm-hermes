@@ -4,6 +4,7 @@
 import json
 import os
 import random
+import secrets
 import subprocess
 import sys
 import time
@@ -19,7 +20,9 @@ from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, argocd, ci, eso, kine, kine_log_signals,
                             node_pressure, reachability, token_expiry_advisory)
-from hermes.slack import post_summary
+from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
+                              interactive_blocks)
+from hermes.slack import post_interactive, post_summary
 
 
 def _load_state(path):
@@ -118,8 +121,11 @@ def _run_cycle(state):
         provider=os.environ.get("K3DM_HERMES_LLM_PROVIDER", "gemini"),
     )
     event = correlator.process(records, state)
+    if event and event["kind"] == "incident":
+        state["incident_nonce"] = secrets.token_hex(8)
     if event and event["kind"] == "resolved":
         state["repairs_attempted_this_incident"] = []
+        state.pop("incident_nonce", None)
     proposals = repairs.propose(records, state)
     automatic = repairs.auto_remediate_kine(
         records, state, _repair_runner,
@@ -131,6 +137,8 @@ def _run_cycle(state):
         lines = [f"Approve with: bin/k3dm-hermes approve {item['action_id']} ({item['command']})"
                  for item in proposals]
         event["text"] += "\nPending allowlisted repairs:\n" + "\n".join(lines)
+        event["proposals"] = proposals
+        event["nonce"] = state.setdefault("incident_nonce", secrets.token_hex(8))
     return records, event
 
 
@@ -144,6 +152,28 @@ def _repair_runner(argv, env, cwd):
     result = subprocess.run(argv, env={**os.environ, **env}, cwd=cwd,
                             capture_output=True, text=True, check=False)
     return result.returncode, result.stdout + result.stderr
+
+
+def _drain_approvals(state, relay, drain_url):
+    """Apply Slack-approved repairs through the unchanged repairs.approve() path."""
+    if not drain_url:
+        return []
+    token = _keychain_secret(APPROVAL_DRAIN_SERVICE)
+    outcomes = []
+    for item in fetch_approvals(drain_url, token):
+        action_id = item["action_id"]
+        proposal = state.get("pending_repairs", {}).get(action_id)
+        if not proposal or item["nonce"] != state.get("incident_nonce"):
+            delete_approval(drain_url, token, action_id)
+            outcomes.append({"action_id": action_id, "outcome": "dropped: stale or unknown approval"})
+            continue
+        records_now, _event = _run_cycle(state)
+        outcome = repairs.approve(action_id, state, records_now, _repair_runner)
+        delete_approval(drain_url, token, action_id)
+        post_summary(relay, f"Hermes repair {action_id} ({proposal.get('name', '')}) approved in Slack "
+                            f"by <@{item['approved_by']}>: {outcome.get('outcome')}")
+        outcomes.append({"action_id": action_id, "outcome": outcome.get("outcome")})
+    return outcomes
 
 
 def _usage():
@@ -197,8 +227,15 @@ def main():
 
     records, event = _run_cycle(state)
     relay = _keychain_secret("k3dm-slack-webhook")
+    drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
     if event:
-        post_summary(relay, event["text"])
+        if drain_url and event.get("proposals"):
+            blocks = interactive_blocks(event["text"], event["proposals"], event["nonce"])
+            if not post_interactive(relay, event["text"], blocks):
+                post_summary(relay, event["text"])
+        else:
+            post_summary(relay, event["text"])
+    approvals = _drain_approvals(state, relay, drain_url)
     warn_days = int(os.environ.get("K3DM_HERMES_TOKEN_WARN_DAYS", "14"))
     advisory = token_expiry_advisory(_github_headers, state, timestamp()[:10], warn_days=warn_days)
     if advisory:
@@ -215,7 +252,7 @@ def main():
     if digest:
         post_summary(relay, digest)
     _save_state(state_path, state)
-    print(json.dumps({"records": records, "event": event}))
+    print(json.dumps({"records": records, "event": event, "approvals": approvals}))
     return 0
 
 

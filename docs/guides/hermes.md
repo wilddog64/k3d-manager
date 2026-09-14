@@ -26,7 +26,8 @@ and [`docs/architecture/hermes-phase2-repair-scope.md`](../architecture/hermes-p
 | Records | [`scripts/lib/hermes/records.py`](../../scripts/lib/hermes/records.py) | Normalized `{sensor, status, evidence, sampled_at, data}` record; status enum |
 | Sensors | [`scripts/lib/hermes/sensors.py`](../../scripts/lib/hermes/sensors.py) | The five read-only sensors |
 | Correlator | [`scripts/lib/hermes/correlator.py`](../../scripts/lib/hermes/correlator.py) | Deterministic multi-signal fire + bounded LLM enrichment |
-| Slack relay | [`scripts/lib/hermes/slack.py`](../../scripts/lib/hermes/slack.py) | One-way summary POST (no command surface) |
+| Slack relay | [`scripts/lib/hermes/slack.py`](../../scripts/lib/hermes/slack.py) | Summary POST + optional Approve/Deny buttons (see Slack approvals) |
+| Slack approvals | [`scripts/lib/hermes/approvals.py`](../../scripts/lib/hermes/approvals.py) | Drain approved action-ids from the relay worker (opt-in) |
 | Installer | [`bin/k3dm-hermes-setup`](../../bin/k3dm-hermes-setup) → `_install_hermes_agent` (lib-foundation) | launchd LaunchAgent install/uninstall |
 | LaunchAgent template | [`scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl`](../../scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl) | Bounded-poll launchd job |
 | Tests | [`scripts/tests/hermes/test_hermes.py`](../../scripts/tests/hermes/test_hermes.py) | Sensors, correlator, budget, Slack |
@@ -38,7 +39,7 @@ The agent is Python 3 standard-library only — no third-party runtime dependenc
 ## Phase 2 repairs and approval
 
 The allowlist is closed in [`repairs.py`](../../scripts/lib/hermes/repairs.py): no arbitrary
-command or Slack control path exists. A proposal is valid only while its multi-signal precondition
+command path exists; the optional Slack approval path (below) only feeds action-ids into the same `approve()`. A proposal is valid only while its multi-signal precondition
 holds, and `approve` takes a fresh sensor cycle before executing it.
 
 | Key | Repair | Preconditions | Exact local / scoped lever |
@@ -48,6 +49,24 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 | R3 | Refresh Hostinger edge access | all public hosts fail for two cycles | `scripts/k3d-manager refresh_access_layer` (the public wrapper for `_hostinger_refresh_access_layer`; never `make refresh`) |
 | R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using the `k3dm-hermes-gh-token` PAT in `GH_TOKEN` |
 | R5 | Quarantine stale ACG reconciliation | sustained Kine pressure, `state.db` >= 8 GiB, and the known stale `host.k3d.internal` registration | pause hub ArgoCD application-controller (opt-in automatic circuit breaker only) |
+
+## Slack approvals (opt-in)
+
+The relay worker records approval intent in Cloudflare KV; Hermes drains it on its next normal poll,
+up to ~5 minutes later. Every drained action still passes through `approve()`, which re-validates
+the precondition and preserves the one-attempt-per-incident invariant. Approvers are allowlisted by
+Slack user ID, separately from slash-command roles. `/hermes-auth` grants a 24-hour re-auth; enforce
+MFA at the Slack workspace or channel level. Deny dismisses only and writes no approval, so Hermes
+may re-propose the repair. Each incident carries a random nonce, and buttons from a previous incident
+are dropped.
+
+Operator setup (document secret names only):
+
+1. `cd workers/slack-relay && wrangler kv namespace create APPROVALS_KV`, then uncomment the binding in `wrangler.toml` with the id and commit.
+2. `wrangler secret put APPROVER_ALLOWLIST` and `wrangler secret put APPROVAL_DRAIN_TOKEN` (random, >= 32 characters).
+3. Store the same drain token in the Keychain as `k3dm-hermes-approval-drain-token` (account `k3dm`), entered via prompt, not argv: `security add-generic-password -a k3dm -s k3dm-hermes-approval-drain-token -w`.
+4. In the Slack app, enable Interactivity with Request URL `https://<relay-host>/slack/interactivity`, and register `/hermes-auth`.
+5. Add `K3DM_HERMES_APPROVAL_DRAIN_URL=https://<relay-host>/hermes/approvals` to the Hermes LaunchAgent `EnvironmentVariables`, then reload the agent.
 
 ## Hub Kine circuit breaker
 
@@ -219,6 +238,7 @@ align to a hard boundary.
 | `K3DM_HERMES_LLM_DAILY_BUDGET` | `10` | Max LLM calls per day before template fallback |
 | `K3DM_HERMES_JITTER` | (unset) | When set, sleep 0–30s before sensing |
 | `K3DM_HERMES_AUDIT_RUN_BATS` | (unset) | When `1`, the monthly audit runs the webhook security-regression bats subset (Group B); otherwise reported "skipped" |
+| `K3DM_HERMES_APPROVAL_DRAIN_URL` | (unset) | Opt-in Slack approvals: relay drain URL (https). Unset = no buttons, no drain |
 
 ---
 
@@ -302,6 +322,7 @@ installer preflights only the four required credentials, never this one).
 python3 -m venv /tmp/k3dm-hermes-pytest
 /tmp/k3dm-hermes-pytest/bin/pip install pytest
 /tmp/k3dm-hermes-pytest/bin/pytest -q scripts/tests/hermes/
+node --test workers/slack-relay/test/
 
 # lib-foundation installer unit tests (bash)
 env -i HOME="$HOME" PATH="$PATH" \
@@ -315,7 +336,7 @@ env -i HOME="$HOME" PATH="$PATH" \
 Phase 3 is **not implemented** and requires its own scope document before any code is written:
 
 - cooldowns, daily action budgets, durable audit records, and automatic post-repair verification;
-- autonomous or scheduled remediation, Slack-interactive approvals, ArgoCD sync, Kubernetes
+- autonomous or scheduled remediation, ArgoCD sync, Kubernetes
   mutation, Git writes, or cloud writes.
 
 If you are reading this to expand the repair surface: stop and write the Phase-3 scope document
