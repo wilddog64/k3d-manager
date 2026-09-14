@@ -369,7 +369,9 @@
 - [ ] **Port-19090 hub/app-cluster collision** — SPEC'D 2026-09-14 `docs/bugs/2026-09-14-prometheus-port-19090-hub-acg-collision.md` (hub keeps 19090; app-cluster forwards → 19190+offset). Codex queue #5.
 - [ ] **Hub ServiceMonitors/promtail on fresh hub** — spec `docs/bugs/2026-09-13-hub-rebuild-skips-argocd-servicemonitors-and-promtail.md`. Codex queue #6.
 - [ ] Operator: `make observability` on hub (user; reads Vault root token).
-- [ ] Check first daily CVE scan runs (app 01:00 / argocd 01:30 PDT 2026-09-14).
+- [x] Checked first daily CVE scan runs 2026-09-14 (read-only): app-cve-scan OK 08:03Z; **argocd-cve-scan FAILED** 08:30Z BackoffLimitExceeded — `aquasec/trivy:0.63.0` has no kubectl/curl (verified via docker run), so chart-label lookup silently empty. SPEC'D `docs/bugs/2026-09-14-argocd-cve-scan-no-kubectl-curl-in-trivy-image.md`. Codex queue #7.
+- [x] Codex #1 lock hang — `2f2474e9` VERIFIED by Claude (diff = spec, 4 files).
+- [x] Codex #2 hub ESO status — Codex stopped (pytest missing on python3.14); Claude verified diff = spec, py_compile ok, BATS webhook_hub_eso 4/4 + webhook 68/68 (Codex run), pytest hermes 69/69 via pyenv python3.13; Claude committed `3eeaef5b`. Operator: `make restart-webhook`.
 
 ## v1.33.0 close-out verification (2026-09-13, read-only, Claude)
 
