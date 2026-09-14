@@ -24,6 +24,7 @@
 - `make observability` logs in to the hub Vault before checking for the Grafana admin credential; the unauthenticated check read as "absent", attempted to seed a fresh password, and aborted the deploy with `failed to seed Grafana admin credential in Vault`
 - `argocd-cve-scan` now scans the image the Hub is actually running (`argocd-server`'s container image, e.g. `quay.io/argoproj/argocd:v3.5.2`) and fails loudly when the image or the trivy run cannot be resolved; it previously grepped a non-existent `appVersion` field from artifacthub (exiting 0 without scanning) and would have scanned the non-existent Docker Hub `argoproj/argocd` tag, reporting "No HIGH/CRITICAL CVEs" from the pull error
 - Alertmanager now loads `alertmanager-smtp-secret`: `configSecret` moved under `alertmanager.alertmanagerSpec` with `useExistingSecret: true` in both kube-prometheus-stack values files (the top-level key was ignored since v1.5.0, so critical-alert SMS never sent); `TrivyCriticalVulnerabilityDetected` routes to `null` ahead of the SMS route
+- `make alertmanager-secret` refuses empty input (a non-interactive run stored three empty strings and still printed "Credentials stored"), and `make observability` treats empty Alertmanager Vault values as absent instead of rendering a config prometheus-operator rejects with `missing to address in email config`
 
 ## [1.33.0] - 2026-09-13
 

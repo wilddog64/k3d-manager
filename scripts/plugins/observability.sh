@@ -57,7 +57,7 @@ function deploy_observability() {
       -H "@${_vault_hdr}" \
       "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager" 2>/dev/null \
       | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
-        print(d['gmail_from']+'|'+d['gmail_app_pw']+'|'+d['sms_gateway'])" 2>/dev/null); then
+        v=[d['gmail_from'],d['gmail_app_pw'],d['sms_gateway']]; all(v) or sys.exit(1); print('|'.join(v))" 2>/dev/null); then
     _am_creds=""
   fi
   rm -f "${_vault_hdr}"
@@ -475,7 +475,7 @@ function deploy_observability_acg() {
       --header "@${_vault_hdr}" \
       "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager" 2>/dev/null \
       | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
-        print(d['gmail_from']+'|'+d['gmail_app_pw']+'|'+d['sms_gateway'])" 2>/dev/null); then
+        v=[d['gmail_from'],d['gmail_app_pw'],d['sms_gateway']]; all(v) or sys.exit(1); print('|'.join(v))" 2>/dev/null); then
     _am_creds=""
   fi
   rm -f "${_vault_hdr}"

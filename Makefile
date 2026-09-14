@@ -559,6 +559,9 @@ alertmanager-secret:
 	read -r -p "Gmail from address: " _gmail; \
 	read -r -s -p "Gmail app password: " _pw; echo; \
 	read -r -p "T-Mobile SMS gateway (10digits@tmomail.net): " _sms; \
+	if [ -z "$$_gmail" ] || [ -z "$$_pw" ] || [ -z "$$_sms" ]; then \
+	  echo "[alertmanager-secret] ERROR: all three values are required (run in an interactive terminal)" >&2; exit 1; \
+	fi; \
 	curl -sf -X POST \
 	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager" \

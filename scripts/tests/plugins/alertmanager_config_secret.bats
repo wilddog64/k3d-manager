@@ -38,3 +38,22 @@ setup() {
   [ "${status}" -eq 0 ]
   [ "${output}" = "sms-critical" ]
 }
+
+@test "make alertmanager-secret rejects empty input without calling Vault" {
+  local stub_dir="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_dir}"
+  printf '#!/bin/sh\nexit 0\n' > "${stub_dir}/kubectl"
+  printf '#!/bin/sh\ntouch "%s/curl-called"\n' "${BATS_TEST_TMPDIR}" > "${stub_dir}/curl"
+  chmod +x "${stub_dir}/kubectl" "${stub_dir}/curl"
+
+  run env PATH="${stub_dir}:${PATH}" make -s -C "${BATS_TEST_DIRNAME}/../../.." alertmanager-secret < /dev/null
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"all three values are required"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/curl-called" ]
+}
+
+@test "observability treats empty Alertmanager Vault values as absent" {
+  run grep -c 'all(v) or sys.exit(1)' "${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "2" ]
+}
