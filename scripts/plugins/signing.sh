@@ -12,6 +12,7 @@ SIGNING_KEYCHAIN_KEY_ACCOUNT="${SIGNING_KEYCHAIN_KEY_ACCOUNT:-k3dm-cosign-key}"
 SIGNING_KEYCHAIN_PASSWORD_ACCOUNT="${SIGNING_KEYCHAIN_PASSWORD_ACCOUNT:-k3dm-cosign-password}"
 SIGNING_ESO_STORE="${SIGNING_ESO_STORE:-vault-backend}"
 SIGNING_ESO_ROLE="${SIGNING_ESO_ROLE:-}"
+SIGNING_ESO_AUTH_MOUNT="${SIGNING_ESO_AUTH_MOUNT:-kubernetes}"
 
 # --- Admission verification (Kyverno) -----------------------------------------
 SIGNING_KYVERNO_HELM_REPO_NAME="${SIGNING_KYVERNO_HELM_REPO_NAME:-kyverno}"
@@ -105,6 +106,7 @@ function _signing_grant_eso_read() {
   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
   local vault_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
   local role="${SIGNING_ESO_ROLE}"
+  local auth_mount="${SIGNING_ESO_AUTH_MOUNT}"
   if [[ -z "${role}" ]]; then
     role=$(_kubectl --no-exit get clustersecretstore "${SIGNING_ESO_STORE}" \
       -o jsonpath='{.spec.provider.vault.auth.kubernetes.role}' 2>/dev/null || true)
@@ -116,10 +118,10 @@ function _signing_grant_eso_read() {
 
   local role_json policies bound_names bound_ns
   role_json=$(_vault_exec --no-exit "${vault_ns}" \
-    "vault read -format=json auth/kubernetes/role/${role}" "${vault_release}" 2>/dev/null || true)
-  if [[ -z "${role_json}" ]]; then
-    _warn "[signing] could not read Vault role ${role}; skipping ESO read grant"
-    return 0
+    "vault read -format=json auth/${auth_mount}/role/${role}" "${vault_release}" 2>/dev/null || true)
+  if [[ -z "${role_json}" ]] || ! printf '%s' "${role_json}" | jq -e '.data | type == "object"' >/dev/null 2>&1; then
+    _warn "[signing] could not read Vault role auth/${auth_mount}/role/${role} (wrong kube context or SIGNING_ESO_AUTH_MOUNT?); ESO read grant NOT applied"
+    return 1
   fi
   policies=$(printf '%s' "${role_json}" | jq -r '.data.token_policies // [] | join(",")')
   if printf '%s' "${policies}" | tr ',' '\n' | grep -qx "${SIGNING_VAULT_POLICY}"; then
@@ -128,12 +130,15 @@ function _signing_grant_eso_read() {
   fi
   bound_names=$(printf '%s' "${role_json}" | jq -r '.data.bound_service_account_names // [] | join(",")')
   bound_ns=$(printf '%s' "${role_json}" | jq -r '.data.bound_service_account_namespaces // [] | join(",")')
-  _vault_exec_stream --no-exit "${vault_ns}" "${vault_release}" -- \
-    vault write "auth/kubernetes/role/${role}" \
+  if ! _vault_exec_stream --no-exit "${vault_ns}" "${vault_release}" -- \
+    vault write "auth/${auth_mount}/role/${role}" \
       bound_service_account_names="${bound_names}" \
       bound_service_account_namespaces="${bound_ns}" \
-      policies="${policies},${SIGNING_VAULT_POLICY}" \
-      ttl=1h
+      policies="${policies:+${policies},}${SIGNING_VAULT_POLICY}" \
+      ttl=1h; then
+    _warn "[signing] failed to write Vault role auth/${auth_mount}/role/${role}; ESO read grant NOT applied"
+    return 1
+  fi
   _info "[signing] granted ${SIGNING_VAULT_POLICY} read to ESO role ${role}"
 }
 
@@ -377,8 +382,10 @@ function signing_init() {
     _info "[signing] cosign key material seeded"
   fi
   _signing_apply_vault_policy "${vault_ns}" "${vault_release}"
-  _signing_grant_eso_read "${vault_ns}" "${vault_release}"
+  local grant_rc=0
+  _signing_grant_eso_read "${vault_ns}" "${vault_release}" || grant_rc=$?
   _signing_apply_pub_externalsecret
+  return "${grant_rc}"
 }
 
 function signing_rotate_key() {
@@ -387,9 +394,11 @@ function signing_rotate_key() {
   _vault_login "${vault_ns}" "${vault_release}"
   _signing_seed_vault_key "${vault_ns}" "${vault_release}" || return 1
   _signing_apply_vault_policy "${vault_ns}" "${vault_release}"
-  _signing_grant_eso_read "${vault_ns}" "${vault_release}"
+  local grant_rc=0
+  _signing_grant_eso_read "${vault_ns}" "${vault_release}" || grant_rc=$?
   _signing_apply_pub_externalsecret
   _warn "[signing] key rotated; retain the old public key or re-sign old images for overlap"
+  return "${grant_rc}"
 }
 
 function signing_restore() {
@@ -406,8 +415,10 @@ function signing_restore() {
     return 1
   fi
   _signing_apply_vault_policy "${vault_ns}" "${vault_release}"
-  _signing_grant_eso_read "${vault_ns}" "${vault_release}"
+  local grant_rc=0
+  _signing_grant_eso_read "${vault_ns}" "${vault_release}" || grant_rc=$?
   _signing_apply_pub_externalsecret
+  return "${grant_rc}"
 }
 
 function signing_status() {

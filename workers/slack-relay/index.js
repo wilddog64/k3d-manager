@@ -1,4 +1,8 @@
-const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth'])
+const APPROVAL_TTL_SECONDS = 3600
+const REAUTH_TTL_SECONDS   = 86400
+const HERMES_ACTION_ID_RE  = /^r[0-9]+-[0-9a-f]{8}$/
+const HERMES_NONCE_RE      = /^[0-9a-f]{16}$/
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
 const ALL_PROVIDERS     = new Set(['aws', 'gcp', 'az', 'hostinger'])
 const PROVIDER_ALIASES  = { azure: 'az' }
@@ -12,6 +16,7 @@ const COMMAND_ROLES     = Object.freeze({
   '/cluster-resume': 'admin',
   '/argocd-upgrade': 'admin',
   '/cleanup-stale-sandbox': 'admin',
+  '/hermes-auth': 'admin',
   '/ask': 'reader',
   '/claude': 'reader',
   '/gemini': 'reader',
@@ -90,6 +95,91 @@ async function verifySlack(request, body) {
   return diff === 0
 }
 
+function constantTimeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+function approvalsKv() {
+  return typeof APPROVALS_KV === 'undefined' ? null : APPROVALS_KV
+}
+
+function approverAllowed(userId) {
+  const raw = typeof APPROVER_ALLOWLIST === 'undefined' ? '' : String(APPROVER_ALLOWLIST)
+  return !!userId && raw.split(',').map(s => s.trim()).filter(Boolean).includes(userId)
+}
+
+function drainAuthorized(req) {
+  const token = typeof APPROVAL_DRAIN_TOKEN === 'undefined' ? '' : String(APPROVAL_DRAIN_TOKEN)
+  if (token.length < 32) return false
+  return constantTimeEqual(req.headers.get('Authorization') || '', `Bearer ${token}`)
+}
+
+async function handleDrain(req, pathname) {
+  if (!drainAuthorized(req)) return new Response('Unauthorized', { status: 401 })
+  const kv = approvalsKv()
+  if (!kv) return new Response('Approvals not configured', { status: 503 })
+  if (req.method === 'GET' && pathname === '/hermes/approvals') {
+    const listed = await kv.list({ prefix: 'approval:', limit: 50 })
+    const items = []
+    for (const key of listed.keys || []) {
+      const raw = await kv.get(key.name)
+      if (!raw) continue
+      let value
+      try { value = JSON.parse(raw) } catch (_) { continue }
+      items.push({
+        action_id: key.name.slice('approval:'.length),
+        approved_by: String(value.approved_by || ''),
+        approved_at: Number(value.approved_at || 0),
+        nonce: String(value.nonce || ''),
+      })
+    }
+    return new Response(JSON.stringify(items), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
+  const match = pathname.match(/^\/hermes\/approvals\/([A-Za-z0-9-]{1,64})$/)
+  if (req.method === 'DELETE' && match) {
+    await kv.delete(`approval:${match[1]}`)
+    return new Response(null, { status: 204 })
+  }
+  return new Response('Not Found', { status: 404 })
+}
+
+async function handleInteractivity(req, event) {
+  const body = await req.text()
+  if (!await verifySlack(req, body)) return new Response('Unauthorized', { status: 401 })
+  let payload
+  try { payload = JSON.parse(new URLSearchParams(body).get('payload') || '') } catch (_) {
+    return new Response('Bad Request', { status: 400 })
+  }
+  if (!payload || payload.type !== 'block_actions') return new Response('', { status: 200 })
+  const action      = (payload.actions || [])[0] || {}
+  const userId      = (payload.user && payload.user.id) || ''
+  const responseUrl = payload.response_url || ''
+  const [actionId, nonce] = String(action.value || '').split('|')
+  if (!['hermes_approve', 'hermes_deny'].includes(action.action_id) ||
+      !HERMES_ACTION_ID_RE.test(actionId || '') || !HERMES_NONCE_RE.test(nonce || '')) {
+    return new Response('', { status: 200 })
+  }
+  event.waitUntil((async () => {
+    const kv = approvalsKv()
+    if (!kv) return postResponseUrl(responseUrl, '⚠️ Hermes approvals are not configured on the relay')
+    if (!approverAllowed(userId)) return postResponseUrl(responseUrl, '⛔ You are not authorized to approve Hermes repairs')
+    if (!await kv.get(`reauth:${userId}`)) {
+      return postResponseUrl(responseUrl, '🔐 Re-authenticate first: run `/hermes-auth` (valid for 24h)')
+    }
+    if (action.action_id === 'hermes_approve') {
+      await kv.put(`approval:${actionId}`,
+        JSON.stringify({ approved_by: userId, approved_at: Date.now(), nonce }),
+        { expirationTtl: APPROVAL_TTL_SECONDS })
+      return replaceResponseUrl(responseUrl, `✅ ${actionId} approved by <@${userId}> — applying on the next Hermes poll (up to ~5 min)`)
+    }
+    return replaceResponseUrl(responseUrl, `🚫 ${actionId} denied by <@${userId}> — dismissed; Hermes may propose it again`)
+  })())
+  return new Response('', { status: 200 })
+}
+
 async function relay(endpoint, payload, meta = {}) {
   try {
     const resp = await fetch(`${WEBHOOK_URL}${endpoint}`, {
@@ -127,6 +217,15 @@ async function postResponseUrl(url, text, ephemeral = true) {
   }).catch(() => {})
 }
 
+async function replaceResponseUrl(url, text) {
+  if (!url) return
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, replace_original: true }),
+  }).catch(() => {})
+}
+
 function jsonReply(text, threadTs, ephemeral = false) {
   const body = { text, response_type: ephemeral ? 'ephemeral' : 'in_channel' }
   if (threadTs && !ephemeral) body.thread_ts = threadTs
@@ -139,9 +238,15 @@ addEventListener('fetch', event => {
 })
 
 async function handle(req, event) {
+  const pathname = new URL(req.url).pathname
+  if (pathname === '/hermes/approvals' || pathname.startsWith('/hermes/approvals/')) {
+    return handleDrain(req, pathname)
+  }
   if (req.method !== 'POST') return new Response('Not Found', { status: 404 })
 
-  if (new URL(req.url).pathname === '/slack/events') {
+  if (pathname === '/slack/interactivity') return handleInteractivity(req, event)
+
+  if (pathname === '/slack/events') {
     const body = await req.text()
     if (!await verifySlack(req, body)) return new Response('Unauthorized', { status: 401 })
     const upstream = await fetch(`${WEBHOOK_URL}/slack/events`, {
@@ -175,6 +280,14 @@ async function handle(req, event) {
   const meta        = { role, actor, sourceCommand: command }
 
   if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`, threadTs)
+
+  if (command === '/hermes-auth') {
+    const kv = approvalsKv()
+    if (!kv) return jsonReply('⚠️ Hermes approvals are not configured on the relay', threadTs, true)
+    if (!approverAllowed(userId)) return jsonReply('⛔ You are not authorized to approve Hermes repairs', threadTs, true)
+    await kv.put(`reauth:${userId}`, '1', { expirationTtl: REAUTH_TTL_SECONDS })
+    return jsonReply('🔐 Re-authenticated for 24h — you can now approve Hermes repairs.', threadTs, true)
+  }
 
   if (command === '/cluster-up') {
     const provider = resolveProvider(text, 'hostinger')

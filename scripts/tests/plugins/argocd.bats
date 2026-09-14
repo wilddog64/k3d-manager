@@ -260,6 +260,90 @@ JSON
   [ "$ARGOCD_NAMESPACE" = "cicd" ]
 }
 
+@test "register_app_cluster: permits token-less in-cluster registration" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/in-cluster-secret.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc \
+    ARGOCD_APP_CLUSTER_NAME=ubuntu-k3s \
+    ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster \
+    ARGOCD_NAMESPACE=cicd run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -A1 '^  config: |' "$RENDERED_FILE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"    {}"* ]]
+  run grep -F bearerToken "$RENDERED_FILE"
+  [ "$status" -ne 0 ]
+}
+
+@test "register_app_cluster: in-cluster secret does not match platform-helm" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/in-cluster-platform-secret.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  export ARGOCD_APP_CLUSTER_ENVIRONMENT=infra
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -c '^    environment:' "$RENDERED_FILE"
+  [ "$output" = "0" ]
+  run grep -c 'argocd-chart-version' "$RENDERED_FILE"
+  [ "$output" = "0" ]
+  run grep -c 'argocd-replicas' "$RENDERED_FILE"
+  [ "$output" = "0" ]
+  run grep -c '^    k3d-manager/managed:' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  run grep -c 'argocd.argoproj.io/secret-type: cluster' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  if command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' >/dev/null 2>&1; then
+    run python3 -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1]))' "$RENDERED_FILE"
+    [ "$status" -eq 0 ]
+  fi
+}
+
+@test "register_app_cluster: remote secret keeps platform-helm labels" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/remote-platform-secret.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_ENVIRONMENT
+  ARGOCD_APP_CLUSTER_SERVER=https://remote.example.invalid \
+    ARGOCD_APP_CLUSTER_TOKEN=dummy-token \
+    ARGOCD_CHART_VERSION=9.9.9 run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -c '^    environment: "dev"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  run grep -c '^    argocd-chart-version: "9.9.9"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  run grep -c '^    argocd-replicas: "2"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+  run grep -c '^    k3d-manager/managed:' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+}
+
+@test "register_app_cluster: requires a token for remote registrations" {
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  ARGOCD_APP_CLUSTER_SERVER=https://remote.example.invalid run register_app_cluster
+  [ "$status" -eq 1 ]
+}
+
 @test "ArgoCD Helm values substitute Keycloak OIDC settings" {
   local render_vars='$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS'
   local rendered

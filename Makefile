@@ -13,7 +13,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -132,6 +132,13 @@ refresh-edge:
 	@case "$(CLUSTER_PROVIDER)" in \
 	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_access_layer ;; \
 	  *) echo "refresh-edge is k3s-hostinger-only (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER))"; exit 1 ;; \
+	esac
+
+## Re-register k3s-hostinger with the hub ArgoCD only (additive) — no GitOps reapply, no edge changes
+refresh-registration:
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_registration ;; \
+	  *) echo "refresh-registration is k3s-hostinger-only (CLUSTER_PROVIDER=$(CLUSTER_PROVIDER))"; exit 1 ;; \
 	esac
 
 ## Show cluster nodes, pods, endpoint + ESO health (provider-aware)
@@ -532,7 +539,9 @@ show-service-passwords:
 	echo "    user:     $${_am_user:-admin}";\
 	echo "    password: $${_am_pass:-N/A}";\
 	echo ""
-	@_kc=$$(kubectl get secret keycloak-admin-secret -n identity \
+	@_kc=$$(kubectl get secret keycloak-secrets -n identity \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 --decode); \
+	[ -n "$$_kc" ] || _kc=$$(kubectl get secret keycloak-admin-secret -n identity \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode); \
 	_realm_admin=$$(./bin/get-keycloak-password admin -q 2>/dev/null || true); \
 	_dev=$$(./bin/get-keycloak-password developer -q 2>/dev/null || true); \

@@ -15,6 +15,7 @@ from hermes.sensors import GITHUB_SERVICE, _keychain_secret
 
 ROOT = Path(__file__).resolve().parents[3]
 WEBHOOK_LABEL = "com.k3d-manager.webhook"
+HUB_K3S_CONTAINER = "k3d-k3d-cluster-server-0"
 # Public host -> the launchd port-forward label that actually serves it. Grounded
 # in scripts/etc/cloudflared/config.yml (ingress local port) matched against the
 # installed com.k3d-manager.*-port-forward.plist listen ports: only
@@ -88,6 +89,14 @@ def _r4_precondition(records, _history, _state):
             data.get("conclusion") in ("timed_out", "cancelled", "stuck"))
 
 
+def _r5_precondition(records, _history, _state):
+    kine = _rec(records, "kine") or {}
+    data = kine.get("data", {})
+    return (_status(records, "kine") == "degraded" and
+            data.get("stale_acg_registration") is True and
+            data.get("state_db_bytes", 0) >= 8 * 1024 * 1024 * 1024)
+
+
 def _r1_command(_records):
     return ["make", "restart-webhook"], {}
 
@@ -110,6 +119,28 @@ def _r4_command(records):
             {"GH_TOKEN": token})
 
 
+def _r5_command(_records):
+    return (["kubectl", "--context", "k3d-k3d-cluster", "-n", "cicd", "scale",
+             "statefulset/argocd-application-controller", "--replicas=0"], {})
+
+
+def _compaction_stalled(data):
+    """True when Kine reports compaction failing or not progressing under load."""
+    return (data.get("compaction_failed") is True or
+            (data.get("slow_sql_count", 0) > 0 and
+             data.get("compaction_recent") is False))
+
+
+def _r6_precondition(records, _history, _state):
+    kine = _rec(records, "kine") or {}
+    return (_status(records, "kine") == "degraded" and
+            _compaction_stalled(kine.get("data", {})))
+
+
+def _r6_command(_records):
+    return (["docker", "restart", HUB_K3S_CONTAINER], {})
+
+
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
@@ -127,6 +158,19 @@ REPAIRS = {
            "build_command": _r4_command, "cwd": None,
            "blast_radius": "one GitHub Actions run re-execution", "reversible": True,
            "needs_scope": "actions:write"},
+    "r5": {"key": "r5", "name": "Quarantine stale ACG reconciliation", "precondition": _r5_precondition,
+           "build_command": _r5_command, "cwd": None,
+           "blast_radius": "hub ArgoCD application controller; GitOps reconciliation pauses", "reversible": True,
+           "needs_scope": "local hub kubeconfig"},
+    # Proposal-only on purpose. The 2026-09-11 incident established that pausing
+    # the ArgoCD controller (R5) relieves Kine pressure but does NOT revive a
+    # stalled compaction goroutine -- only restarting the K3s server did. R5 is
+    # therefore the wrong lever for a stall, and this one is never auto-executed:
+    # restarting the control plane is a human decision.
+    "r6": {"key": "r6", "name": "Restart hub K3s server to revive stalled Kine compaction",
+           "precondition": _r6_precondition, "build_command": _r6_command, "cwd": None,
+           "blast_radius": "hub control plane restarts; brief apiserver outage", "reversible": False,
+           "needs_scope": "local docker socket"},
 }
 
 
@@ -137,7 +181,8 @@ def _update_r1_debounce(records, state):
 
 def _evidence(records, key):
     relevant = {"r1": ("eso", "node_pressure"), "r2": ("reachability", "node_pressure"),
-                "r3": ("reachability",), "r4": ("ci",)}[key]
+                "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
+                "r6": ("kine",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
 
@@ -205,3 +250,22 @@ def approve(action_id, state, records_now, runner):
                 "rc": rc}
     return {"outcome": "executed" if rc == 0 else "failed", "action_id": action_id,
             "rc": rc, "output": output}
+
+
+def auto_remediate_kine(records, state, runner, enabled=False):
+    """Execute only the opt-in, bounded Kine circuit breaker once per incident."""
+    if not enabled or "r5" in state.get("repairs_attempted_this_incident", []):
+        return None
+    repair = REPAIRS["r5"]
+    if not repair["precondition"](records, state.get("correlation_history", []), state):
+        return None
+    argv, env = repair["build_command"](records)
+    rc, output = runner(argv, env, repair["cwd"])
+    action_id = "r5-" + hashlib.sha1(("r5" + shlex.join(argv)).encode()).hexdigest()[:8]
+    state.setdefault("pending_repairs", {}).pop(action_id, None)
+    state.setdefault("repair_audit", []).append(
+        {"action_id": action_id, "command": shlex.join(argv), "key": "r5",
+         "approved_at": timestamp(), "rc": rc, "automatic": True})
+    state.setdefault("repairs_attempted_this_incident", []).append("r5")
+    return {"outcome": "executed" if rc == 0 else "failed", "action_id": action_id,
+            "rc": rc, "output": output, "automatic": True}

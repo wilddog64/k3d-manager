@@ -90,8 +90,21 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
 }
 
 @test "slack relay allowlist includes cluster-status and hostinger-status" {
-  run grep -F -- "const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])" "${WORKER}"
+  run grep -F -- 'const ALLOWED_COMMANDS = new Set([' "${WORKER}"
   [ "${status}" -eq 0 ]
+
+  local _allowlist
+  _allowlist="$(grep -m1 -F -- 'const ALLOWED_COMMANDS = new Set([' "${WORKER}")"
+
+  local _cmd
+  for _cmd in /cluster-up /cluster-down /cluster-status /cluster-diagnose \
+              /cluster-refresh /cluster-resume /hostinger-status /ask /claude \
+              /gemini /codex /argocd-upgrade; do
+    if [[ "${_allowlist}" != *"'${_cmd}'"* ]]; then
+      echo "ALLOWED_COMMANDS is missing ${_cmd}: ${_allowlist}"
+      return 1
+    fi
+  done
 }
 
 @test "slack relay assigns remote-operator roles to cluster commands" {

@@ -1,5 +1,11 @@
 #!/usr/bin/env bats
 
+@test "acg-up leaves the hub Grafana port-forward wrapper path untouched" {
+  run grep -c 'grafana-port-forward.sh" ]]; then' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+}
+
 @test "acg-up sources overrides and exits at the dry-run Step 4 seam" {
   run grep -nF 'source "${REPO_ROOT}/scripts/lib/system_overrides.sh"' bin/cluster-up
   [ "$status" -eq 0 ]
@@ -64,6 +70,14 @@ STUB
 #!/usr/bin/env bash
 printf 'MUTATION: deploy_vault %s\n' "$*" >> "${STUB_LOG}"
 exit 0
+STUB
+  cat > "${stub_bin}/aws" <<'STUB'
+#!/usr/bin/env bash
+printf 'arn:aws:iam::000000000000:user/test\n'
+STUB
+  cat > "${stub_bin}/node" <<'STUB'
+#!/usr/bin/env bash
+exit 1
 STUB
   chmod +x "${stub_bin}"/*
 

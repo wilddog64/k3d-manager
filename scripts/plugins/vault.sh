@@ -1778,11 +1778,13 @@ HCL
   printf -v safe_eso_sa '%q' "$eso_sa"
   printf -v safe_eso_ns '%q' "$eso_ns"
   printf -v safe_audience '%q' "$audience"
+  local safe_policies
+  safe_policies=$(_vault_role_merged_policies "$ns" "$release" "auth/${mount}/role/${role}" "app-cluster-reader")
   _vault_exec "$ns" "vault write ${safe_mount_role} \
     bound_service_account_names=${safe_eso_sa} \
     bound_service_account_namespaces=${safe_eso_ns} \
     audience=${safe_audience} \
-    policies=app-cluster-reader \
+    policies=${safe_policies} \
     ttl=1h" "$release"
 
   _info "[vault] app cluster auth configured successfully"
@@ -2040,6 +2042,17 @@ function _vault_build_policy_hcl() {
    fi
 }
 
+function _vault_role_merged_policies() {
+  local ns="$1" release="$2" role_path="$3" desired="$4"
+  local role_json="" existing="" safe_role_path=""
+  printf -v safe_role_path '%q' "$role_path"
+  role_json=$(_vault_exec --no-exit "$ns" "vault read -format=json ${safe_role_path}" "$release" 2>/dev/null || true)
+  existing=$(printf '%s' "$role_json" | jq -r '(.data.token_policies // [])[]' 2>/dev/null || true)
+  printf '%s\n%s\n' "${desired//,/$'\n'}" "$existing" \
+    | awk '/^[A-Za-z0-9._-]+$/ && $0 != "default" && !seen[$0]++' \
+    | paste -sd, -
+}
+
 function _vault_configure_secret_reader_role() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
@@ -2100,9 +2113,31 @@ SH
   fi
 
   local role_cmd=""
-  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"'      "$role" "$service_account" "$bound_namespaces" "$policy" "$token_audience"
+  local role_policies="$policy"
+  local apps_policy="${VAULT_ESO_APPS_POLICY-eso-apps}"
+  if [[ "$role" == "eso-ldap-directory" && -n "$apps_policy" ]]; then
+     role_policies="${apps_policy},${policy}"
+  fi
+  role_policies=$(_vault_role_merged_policies "$ns" "$release" "auth/kubernetes/role/${role}" "$role_policies")
+  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"'      "$role" "$service_account" "$bound_namespaces" "$role_policies" "$token_audience"
 
   _vault_exec "$ns" "$role_cmd" "$release"
+}
+
+function _vault_ensure_eso_apps_policy() {
+  local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" mount="${3:-secret}"
+  local policy="${VAULT_ESO_APPS_POLICY:-eso-apps}"
+  local prefixes="${VAULT_ESO_APPS_PREFIXES:-github/pat,minio,payment,postgres,rabbitmq,redis}"
+  local pod="${release}-0"
+  local -a secret_prefixes=()
+  read -r -a secret_prefixes <<< "${prefixes//,/ }"
+  _vault_build_policy_hcl "${mount%/}" "${secret_prefixes[@]}"
+  _vault_login "$ns" "$release"
+  if ! printf '%s\n' "$_VAULT_POLICY_HCL" | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
+     _err "[vault] failed to apply policy ${policy}"
+     return 1
+  fi
+  _info "[vault] policy ${policy} applied (${prefixes})"
 }
 
 function _vault_configure_secret_writer_role() {

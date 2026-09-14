@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Added
+
+- Hermes Slack approvals (opt-in, pull model): incident proposals carry Approve/Deny buttons; the `k3dm-slack-relay` worker verifies the Slack signature, an approver allowlist and a 24h `/hermes-auth` re-auth before recording an approval in Cloudflare KV, and Hermes drains it on its next poll into the unchanged `repairs.approve()`; inactive until `K3DM_HERMES_APPROVAL_DRAIN_URL` and the relay KV/secrets are configured
+- `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` re-registers Hostinger with the hub ArgoCD only (additive; no GitOps reapply, no edge changes) — restores the `ubuntu-hostinger-*` apps lost in the hub restore
+- **Hermes Kine circuit breaker** — a read-only hub-datastore sensor detects
+  stalled Kine compaction from `state.db` size plus K3s slow-SQL/compaction
+  signals. The only automatic response is explicit opt-in
+  (`K3DM_HERMES_AUTO_KINE_GUARD=1`) and requires the exact stale ACG
+  registration signature before pausing the hub ArgoCD application controller
+  once per incident (the registration check base64-decodes the ArgoCD cluster
+  Secret data, which is never plain text). It never deletes Kine rows or performs SQLite maintenance.
+
+### Fixed
+
+- `make show-service-passwords` showed the Keycloak master admin password as `N/A` on the hub: it read `keycloak-admin-secret`/`password`, but the hub Keycloak is fed by the ESO-synced `keycloak-secrets`/`KEYCLOAK_ADMIN_PASSWORD`; it now reads that first and falls back to the old secret
+- `_signing_grant_eso_read` no longer logs "granted cosign-verify read" when the Vault role read returns non-JSON (wrong kube context / missing auth mount) or the role write fails; it now warns "ESO read grant NOT applied", skips the write on an unreadable role (which would have wiped the role's policies and SA bindings), and `signing_init` / `signing_rotate_key` / `signing_restore` return non-zero
+- Vault ESO role writers (`configure_vault_app_auth`, `_vault_configure_secret_reader_role`) now merge their policies with those already on the role instead of replacing them, so a rebuild or hub recovery no longer silently strips the `cosign-verify` grant and breaks the `cosign-public-key` ExternalSecret with a Vault 403
+- `bin/k3dm-node-health-watch` no longer restarts a healthy agent when the host cannot reach the API server (e.g. a broken k3d serverlb): a NotReady result only counts toward the restart threshold when `/readyz` answers, otherwise it logs an advisory and resets the streak
+- `hub_recovery_reconcile` now checks the k3d serverlb upstream list first and, when it has drifted from the k3d server/agent containers (e.g. the empty image default left by a rebuild), rewrites `/etc/confd/values.yaml` by container name, restarts only the LB, and waits for the host API — an OrbStack restart no longer leaves host `kubectl` failing with `EOF`
+- istiod HPA no longer churns 1→5→1 replicas on the hub: `istio-ambient` caps it at 2 replicas with 120s scale-up / 900s scale-down stabilization (CPU request stays 50m for the 2-CPU hostinger node)
+- `register_app_cluster` no longer labels in-cluster registrations for `platform-helm`, which had installed a second ArgoCD into the hub `cicd` namespace
+- `platform-ops` ApplicationSet enables `ServerSideDiff=true` so `hub-platform-ops` no longer sits OutOfSync on ESO-defaulted ExternalSecret fields
+- `bin/smoke-test-cluster-health` defaults to the live `ubuntu-hostinger` context and `ubuntu-k3s-` ArgoCD app names, and reports kubectl failures instead of exiting 1 silently
+- `bin/smoke-test-cluster-health` checks pull secrets and pods on the same cluster its ArgoCD apps deploy to (`APP_CONTEXT` defaults to `INFRA_CONTEXT`, since the hub is its own app cluster)
+- `hub_recovery_reconcile` mirrors the verified ArgoCD admin password into Vault `secret/argocd/admin` when missing (`make show-service-passwords` ArgoCD N/A after hub restore)
+- Keycloak smoke-user/realm-provision RETURN traps no longer leak into callers (`hub_recovery_reconcile --confirm` exited 1 with `wd: unbound variable`)
+- ACG cluster-up/cluster-refresh no longer overwrite the hub Grafana port-forward agent (recurring grafana.3ai-talk.org 502/401)
+- deploy_istio_ambient picks CNI conf/bin dirs from the target's provider label (k3d hub no longer gets Cilium paths)
+- hub recovery reconcile — in-cluster registration, eso-apps policy, CVE reader seed, Vault root token Keychain backup, OpenLDAP scale-up, identity hook replay, smoke user, provider-aware Cloudflare origins
+- **hub-loki never rendered** — Loki chart 18.2.0 fails validation when
+  `lokiCanary.enabled=false` while the chart-default `test.enabled=true`;
+  `loki-values.yaml` now also disables the Helm test, so the hub and ACG
+  observability ApplicationSets can deploy Loki again.
+
 ## [1.32.1] - 2026-09-13
 
 **Theme: security hotfix — clear the open Dependabot alerts on `main` without shipping the in-progress v1.33.0 milestone.** Squash subtree pulls of lib-foundation up to `023f76e` into `scripts/lib/foundation/`; nothing outside the subtree changes. The vendored tree is byte-identical to lib-foundation `023f76e`.

@@ -10,8 +10,10 @@ Applies the istio-ambient ApplicationSet to the hub ArgoCD (ARGOCD_CONTEXT, defa
 k3d-k3d-cluster), targeting APP_CLUSTER_NAME (default ubuntu-k3s). Preconditions:
   - The target cluster is registered with the hub ArgoCD (register_app_cluster).
   - AMBIENT_CNI_CONF_DIR/AMBIENT_CNI_BIN_DIR match the target cluster's CNI substrate.
-    Defaults suit Cilium (/etc/cni/net.d, /opt/cni/bin); for bare k3s flannel use
-    /var/lib/rancher/k3s/agent/etc/cni/net.d and /var/lib/rancher/k3s/data/cni.
+    Defaults follow the target's k3d-manager/provider label (override with
+    AMBIENT_CNI_PROVIDER): k3d → /var/lib/rancher/k3s/agent/etc/cni/net.d + /bin;
+    k3s-hostinger → /var/lib/rancher/k3s/agent/etc/cni/net.d + /var/lib/rancher/k3s/data/cni;
+    anything else (Cilium) → /etc/cni/net.d + /opt/cni/bin.
   - The platform AppProject permits istio-system as a destination for the target cluster.
 HELP
     return 0
@@ -22,8 +24,14 @@ HELP
   : "${ARGOCD_CONTEXT:=k3d-k3d-cluster}"
   : "${APP_CLUSTER_NAME:=${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}}"
   : "${AMBIENT_ISTIO_VERSION:=1.24.2}"
-  : "${AMBIENT_CNI_CONF_DIR:=/etc/cni/net.d}"
-  : "${AMBIENT_CNI_BIN_DIR:=/opt/cni/bin}"
+  if [[ -z "${AMBIENT_CNI_CONF_DIR:-}" || -z "${AMBIENT_CNI_BIN_DIR:-}" ]]; then
+    local _cni_provider _cni_dirs
+    _cni_provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT}" "${ARGOCD_NAMESPACE}" "${APP_CLUSTER_NAME}")}"
+    _cni_dirs="$(_istio_ambient_cni_dirs "${_cni_provider}")"
+    : "${AMBIENT_CNI_CONF_DIR:=${_cni_dirs%% *}}"
+    : "${AMBIENT_CNI_BIN_DIR:=${_cni_dirs##* }}"
+    _info "[istio_ambient] CNI dirs for provider '${_cni_provider:-unknown}': ${AMBIENT_CNI_CONF_DIR} ${AMBIENT_CNI_BIN_DIR}"
+  fi
   export ARGOCD_NAMESPACE APP_CLUSTER_NAME AMBIENT_ISTIO_VERSION
   export AMBIENT_CNI_CONF_DIR AMBIENT_CNI_BIN_DIR
 
@@ -41,4 +49,24 @@ HELP
     _err "[istio_ambient] Failed to apply istio-ambient ApplicationSet"
     return 1
   fi
+}
+
+function _istio_ambient_cni_dirs() {
+  case "${1:-}" in
+    k3d)           printf '%s %s\n' /var/lib/rancher/k3s/agent/etc/cni/net.d /bin ;;
+    k3s-hostinger) printf '%s %s\n' /var/lib/rancher/k3s/agent/etc/cni/net.d /var/lib/rancher/k3s/data/cni ;;
+    *)             printf '%s %s\n' /etc/cni/net.d /opt/cni/bin ;;
+  esac
+}
+
+function _istio_ambient_target_provider() {
+  local context="$1" namespace="$2" cluster_name="$3" secret name
+  while IFS= read -r secret; do
+    [[ -z "${secret}" ]] && continue
+    name="$(_kubectl --no-exit --context "${context}" -n "${namespace}" get "${secret}" -o jsonpath='{.data.name}' 2>/dev/null | base64 --decode 2>/dev/null || true)"
+    if [[ "${name}" == "${cluster_name}" ]]; then
+      _kubectl --no-exit --context "${context}" -n "${namespace}" get "${secret}" -o jsonpath='{.metadata.labels.k3d-manager/provider}' 2>/dev/null || true
+      return 0
+    fi
+  done < <(_kubectl --no-exit --context "${context}" -n "${namespace}" get secrets -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
 }

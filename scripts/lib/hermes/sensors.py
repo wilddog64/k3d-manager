@@ -1,5 +1,7 @@
 """Read-only Hermes sensors; callers inject transport functions for testability."""
 
+import base64
+import binascii
 import json
 import subprocess
 from datetime import datetime, timezone
@@ -9,6 +11,7 @@ from hermes.records import record
 WEBHOOK_SERVICE = "k3dm-webhook-token"
 ARGOCD_SERVICE = "k3dm-hermes-argocd-token"
 GITHUB_SERVICE = "k3dm-hermes-gh-token"
+TERMINAL_OPERATION_FAILURES = ("Error", "Failed")
 
 
 def _keychain_secret(service):
@@ -78,11 +81,19 @@ def argocd(run, state, token=None, threshold=3, server="argocd.3ai-talk.org"):
             status = app.get("status", {})
             health = status.get("health", {}).get("status")
             sync = status.get("sync", {}).get("status")
+            phase = status.get("operationState", {}).get("phase")
+            name = app.get("name") or app.get("metadata", {}).get("name", "unnamed")
+            project = app.get("project") or app.get("spec", {}).get("project", "default")
             if health == "Degraded" or sync == "OutOfSync":
-                bad.append(f"{app.get('project', 'default')}/{app.get('name', 'unnamed')} {health}/{sync}")
+                bad.append(f"{project}/{name} {health}/{sync}")
+            elif phase in TERMINAL_OPERATION_FAILURES:
+                bad.append(f"{project}/{name} {health}/{sync} last-op={phase}")
         if bad:
             status = "degraded" if _debounced("argocd", True, threshold, state) else "healthy"
-            return record("argocd", status, ", ".join(bad[:3]))
+            detail = ", ".join(bad[:3])
+            if len(bad) > 3:
+                detail = f"{detail} (+{len(bad) - 3} more)"
+            return record("argocd", status, detail)
         _debounced("argocd", False, threshold, state)
         return record("argocd", "healthy", f"{len(apps)} applications healthy")
     except Exception:
@@ -131,6 +142,73 @@ def node_pressure(fetch, state, provider="", token=None, threshold=2, service_th
         return record("node_pressure", "healthy", "webhook data layer and services healthy")
     except Exception:
         return record("node_pressure", "unknown", "node status source unavailable")
+
+
+def stale_acg_registration(items, marker="host.k3d.internal"):
+    """Return True when an ArgoCD cluster Secret points at the retired ACG endpoint.
+
+    Secret ``data`` values are base64-encoded, so they are decoded before matching;
+    ``stringData`` and metadata are matched as plain text.
+    """
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        texts = [json.dumps(item.get("metadata") or {}), json.dumps(item.get("stringData") or {})]
+        for value in (item.get("data") or {}).values():
+            try:
+                texts.append(base64.b64decode(value, validate=True).decode("utf-8", "replace"))
+            except (binascii.Error, TypeError, ValueError):
+                continue
+        if any(marker in text for text in texts):
+            return True
+    return False
+
+
+def kine_log_signals(text):
+    """Extract Kine compaction signals from raw K3s log text.
+
+    Compaction progress must be matched on the K3s event markers, never on the
+    bare substring "compact": every Kine "Slow SQL" line embeds the literal
+    column name compact_rev_key, so a substring test reports compaction as
+    recent precisely when compaction has stalled and Slow SQL is spiking.
+    """
+    lowered = text.lower()
+    return {
+        "slow_sql_count": lowered.count("slow sql"),
+        "compaction_recent": ("compact compacted from" in lowered or
+                              "compact deleted" in lowered),
+        "compaction_failed": "compact failed" in lowered,
+    }
+
+
+def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024):
+    """Report local hub Kine pressure from a read-only, injected probe."""
+    try:
+        code, output = run(["bin/k3dm-hub-datastore-status", "--json"], {})
+        payload = json.loads(output) if code == 0 and output else {}
+        required = ("available", "state_db_bytes", "slow_sql_count",
+                    "compaction_recent", "stale_acg_registration")
+        if not all(name in payload for name in required) or not payload["available"]:
+            raise ValueError("invalid datastore probe")
+        db_bytes = int(payload["state_db_bytes"])
+        slow_sql = int(payload["slow_sql_count"])
+        compacting = bool(payload["compaction_recent"])
+        stale = bool(payload["stale_acg_registration"])
+        failed = bool(payload.get("compaction_failed", False))
+        data = {"state_db_bytes": db_bytes, "slow_sql_count": slow_sql,
+                "compaction_recent": compacting, "compaction_failed": failed,
+                "stale_acg_registration": stale}
+        raw = db_bytes >= max_db_bytes or failed or (slow_sql > 0 and not compacting)
+        if raw:
+            status = "degraded" if _debounced("kine", True, threshold, state) else "healthy"
+            evidence = (f"state.db={db_bytes}B, slow_sql={slow_sql}, "
+                        f"compaction_recent={compacting}, compaction_failed={failed}")
+            return record("kine", status, evidence, data=data)
+        _debounced("kine", False, threshold, state)
+        return record("kine", "healthy", f"state.db={db_bytes}B; compaction recent",
+                      data=data)
+    except Exception:
+        return record("kine", "unknown", "hub datastore status source unavailable")
 
 
 def _older_than(value, max_age_seconds, now):

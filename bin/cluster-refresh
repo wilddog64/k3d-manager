@@ -411,7 +411,34 @@ PLIST
   _grafana_pf_label="com.k3d-manager.grafana-port-forward"
   _grafana_pf_plist="${HOME}/Library/LaunchAgents/${_grafana_pf_label}.plist"
   _grafana_pf_log="${_ACG_STATE_DIR}/logs/grafana-pf.log"
-  if [[ ! -f "${_grafana_pf_plist}" ]]; then
+  _grafana_pf_wrapper="${_grafana_pf_plist%.plist}.sh"
+  if [[ ! -f "${_grafana_pf_plist}" && -f "${_grafana_pf_wrapper}" ]]; then
+    _info "[acg-refresh] Grafana port-forward plist missing — regenerating from hub wrapper..."
+    mkdir -p "$(dirname "${_grafana_pf_log}")"
+    cat > "${_grafana_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_grafana_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_grafana_pf_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_grafana_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_grafana_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  elif [[ ! -f "${_grafana_pf_plist}" ]]; then
     _info "[acg-refresh] Grafana port-forward plist missing — regenerating..."
     _grafana_pf_kubectl="$(command -v kubectl)"
     _grafana_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/${_app_context}.yaml:${_provider_kubeconfig}"

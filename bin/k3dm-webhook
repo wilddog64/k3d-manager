@@ -2261,7 +2261,7 @@ def _run_post_provision_check(job_id, provider):
         # Gather relevant pod state from the active app cluster
         ns_map = {
             "Frontend": ("shopping-cart-apps", "app=frontend"),
-            "Product images": ("shopping-cart-apps", "app=product-catalog"),
+            "Product images": ("shopping-cart-apps", "app.kubernetes.io/name=product-catalog"),
             "Keycloak": ("identity", "app.kubernetes.io/name=keycloak"),
             "Prometheus": ("monitoring", "app.kubernetes.io/name=prometheus"),
             "Grafana": ("monitoring", "app.kubernetes.io/name=grafana"),
@@ -2495,7 +2495,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
             diag_parts = [f"Service `{svc_name}` failed HTTP smoke test: {err_detail}"]
             ns_map = {
                 "Frontend":              ("shopping-cart-apps", "app=frontend"),
-                "Product images":        ("shopping-cart-apps", "app=product-catalog"),
+                "Product images":        ("shopping-cart-apps", "app.kubernetes.io/name=product-catalog"),
                 "Keycloak":              ("identity",            "app.kubernetes.io/name=keycloak"),
                 "Prometheus":            ("monitoring",          "app.kubernetes.io/name=prometheus"),
                 "Grafana":               ("monitoring",          "app.kubernetes.io/name=grafana"),

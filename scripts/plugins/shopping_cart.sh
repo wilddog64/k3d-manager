@@ -16,6 +16,24 @@ set -euo pipefail
 : "${SEED_K8S_BACKUP_NS:=secrets}"
 : "${SEED_K8S_BACKUP_NAME:=vault-seed-backup}"
 
+function _shopping_cart_prune_orphan_default_entries() {
+  local _refs
+  _refs=$(kubectl config view \
+    -o jsonpath='{range .contexts[*]}{.context.cluster}{"\n"}{end}' 2>/dev/null || true)
+  if printf '%s\n' "${_refs}" | grep -qx "default"; then
+    _info "[shopping_cart] Keeping kubeconfig cluster 'default' — still referenced by a context"
+  else
+    kubectl config delete-cluster default &>/dev/null || true
+  fi
+  _refs=$(kubectl config view \
+    -o jsonpath='{range .contexts[*]}{.context.user}{"\n"}{end}' 2>/dev/null || true)
+  if printf '%s\n' "${_refs}" | grep -qx "default"; then
+    _info "[shopping_cart] Keeping kubeconfig user 'default' — still referenced by a context"
+  else
+    kubectl config delete-user default &>/dev/null || true
+  fi
+}
+
 function add_ubuntu_k3s_cluster() {
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
@@ -56,8 +74,7 @@ function add_ubuntu_k3s_cluster() {
     kubectl config delete-context ubuntu-k3s &>/dev/null || true
     _info "[shopping_cart] Removed stale ubuntu-k3s context — will re-merge with fresh credentials"
   fi
-  kubectl config delete-cluster default &>/dev/null || true
-  kubectl config delete-user default &>/dev/null || true
+  _shopping_cart_prune_orphan_default_entries
   cp "${local_kubeconfig}" "${_tmp_kube}"
   chmod 600 "${_tmp_kube}"
   local _src_context
