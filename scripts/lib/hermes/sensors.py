@@ -1,5 +1,7 @@
 """Read-only Hermes sensors; callers inject transport functions for testability."""
 
+import base64
+import binascii
 import json
 import subprocess
 from datetime import datetime, timezone
@@ -140,6 +142,26 @@ def node_pressure(fetch, state, provider="", token=None, threshold=2, service_th
         return record("node_pressure", "healthy", "webhook data layer and services healthy")
     except Exception:
         return record("node_pressure", "unknown", "node status source unavailable")
+
+
+def stale_acg_registration(items, marker="host.k3d.internal"):
+    """Return True when an ArgoCD cluster Secret points at the retired ACG endpoint.
+
+    Secret ``data`` values are base64-encoded, so they are decoded before matching;
+    ``stringData`` and metadata are matched as plain text.
+    """
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        texts = [json.dumps(item.get("metadata") or {}), json.dumps(item.get("stringData") or {})]
+        for value in (item.get("data") or {}).values():
+            try:
+                texts.append(base64.b64decode(value, validate=True).decode("utf-8", "replace"))
+            except (binascii.Error, TypeError, ValueError):
+                continue
+        if any(marker in text for text in texts):
+            return True
+    return False
 
 
 def kine_log_signals(text):

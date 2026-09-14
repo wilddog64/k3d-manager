@@ -1,3 +1,4 @@
+import base64
 import json
 import sys
 from datetime import datetime, timezone
@@ -7,7 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
 from hermes.correlator import Correlator
 from hermes.sensors import (argocd, ci, eso, github_token_expiry, kine, kine_log_signals,
-                            node_pressure, reachability, token_expiry_advisory)
+                            node_pressure, reachability, stale_acg_registration,
+                            token_expiry_advisory)
 
 
 def health(entries):
@@ -143,6 +145,18 @@ def test_kine_log_signals_ignores_compact_rev_key_in_slow_sql():
         'revision: sql: transaction has already been committed or rolled back"\n'
     )
     assert kine_log_signals(failing)["compaction_failed"] is True
+
+
+def test_stale_acg_registration_decodes_base64_secret_data():
+    def secret(server):
+        return {"metadata": {"name": "cluster-x"},
+                "data": {"server": base64.b64encode(server.encode()).decode()}}
+    assert "host.k3d.internal" not in json.dumps(secret("https://host.k3d.internal:6443"))
+    assert stale_acg_registration([secret("https://host.k3d.internal:6443")]) is True
+    assert stale_acg_registration([secret("https://kubernetes.default.svc")]) is False
+    assert stale_acg_registration([{"data": {"server": "not base64!"}}]) is False
+    assert stale_acg_registration([{"stringData": {"server": "https://host.k3d.internal:6443"}}]) is True
+    assert stale_acg_registration([]) is False
 
 
 def test_kine_degrades_on_reported_compaction_failure_below_size_threshold():

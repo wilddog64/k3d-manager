@@ -71,6 +71,17 @@ setup() {
   [ "${output}" = "app-cluster-reader" ]
 }
 
+@test "_vault_role_merged_policies shell-escapes the role path in the read command" {
+  ROLE_JSON=''
+
+  run _vault_role_merged_policies secrets vault 'auth/kubernetes/role/r x;id' app-cluster-reader
+
+  [ "${status}" -eq 0 ]
+  grep -q 'role/r\\ x\\;id' "${BATS_TEST_TMPDIR}/vault.log"
+  run grep -q 'role/r x;id' "${BATS_TEST_TMPDIR}/vault.log"
+  [ "${status}" -ne 0 ]
+}
+
 @test "configure_vault_app_auth preserves an existing cosign-verify grant" {
   ROLE_JSON='{"data":{"token_policies":["app-cluster-reader","cosign-verify"]}}'
   local ca_path="${BATS_TEST_TMPDIR}/app-ca.crt"

@@ -2044,8 +2044,9 @@ function _vault_build_policy_hcl() {
 
 function _vault_role_merged_policies() {
   local ns="$1" release="$2" role_path="$3" desired="$4"
-  local role_json="" existing=""
-  role_json=$(_vault_exec --no-exit "$ns" "vault read -format=json ${role_path}" "$release" 2>/dev/null || true)
+  local role_json="" existing="" safe_role_path=""
+  printf -v safe_role_path '%q' "$role_path"
+  role_json=$(_vault_exec --no-exit "$ns" "vault read -format=json ${safe_role_path}" "$release" 2>/dev/null || true)
   existing=$(printf '%s' "$role_json" | jq -r '(.data.token_policies // [])[]' 2>/dev/null || true)
   printf '%s\n%s\n' "${desired//,/$'\n'}" "$existing" \
     | awk '/^[A-Za-z0-9._-]+$/ && $0 != "default" && !seen[$0]++' \

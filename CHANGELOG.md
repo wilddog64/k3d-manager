@@ -6,6 +6,13 @@
 
 - Hermes Slack approvals (opt-in, pull model): incident proposals carry Approve/Deny buttons; the `k3dm-slack-relay` worker verifies the Slack signature, an approver allowlist and a 24h `/hermes-auth` re-auth before recording an approval in Cloudflare KV, and Hermes drains it on its next poll into the unchanged `repairs.approve()`; inactive until `K3DM_HERMES_APPROVAL_DRAIN_URL` and the relay KV/secrets are configured
 - `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` re-registers Hostinger with the hub ArgoCD only (additive; no GitOps reapply, no edge changes) — restores the `ubuntu-hostinger-*` apps lost in the hub restore
+- **Hermes Kine circuit breaker** — a read-only hub-datastore sensor detects
+  stalled Kine compaction from `state.db` size plus K3s slow-SQL/compaction
+  signals. The only automatic response is explicit opt-in
+  (`K3DM_HERMES_AUTO_KINE_GUARD=1`) and requires the exact stale ACG
+  registration signature before pausing the hub ArgoCD application controller
+  once per incident (the registration check base64-decodes the ArgoCD cluster
+  Secret data, which is never plain text). It never deletes Kine rows or performs SQLite maintenance.
 
 ### Fixed
 
@@ -24,18 +31,6 @@
 - ACG cluster-up/cluster-refresh no longer overwrite the hub Grafana port-forward agent (recurring grafana.3ai-talk.org 502/401)
 - deploy_istio_ambient picks CNI conf/bin dirs from the target's provider label (k3d hub no longer gets Cilium paths)
 - hub recovery reconcile — in-cluster registration, eso-apps policy, CVE reader seed, Vault root token Keychain backup, OpenLDAP scale-up, identity hook replay, smoke user, provider-aware Cloudflare origins
-
-### Added
-
-- **Hermes Kine circuit breaker** — a read-only hub-datastore sensor detects
-  stalled Kine compaction from `state.db` size plus K3s slow-SQL/compaction
-  signals. The only automatic response is explicit opt-in
-  (`K3DM_HERMES_AUTO_KINE_GUARD=1`) and requires the exact stale ACG
-  registration signature before pausing the hub ArgoCD application controller
-  once per incident. It never deletes Kine rows or performs SQLite maintenance.
-
-### Fixed
-
 - **hub-loki never rendered** — Loki chart 18.2.0 fails validation when
   `lokiCanary.enabled=false` while the chart-default `test.enabled=true`;
   `loki-values.yaml` now also disables the Helm test, so the hub and ACG

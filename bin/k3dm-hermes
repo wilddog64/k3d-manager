@@ -19,7 +19,8 @@ from hermes.records import timestamp
 from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, argocd, ci, eso, kine, kine_log_signals,
-                            node_pressure, reachability, token_expiry_advisory)
+                            node_pressure, reachability, stale_acg_registration,
+                            token_expiry_advisory)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
 from hermes.slack import post_interactive, post_summary
@@ -83,7 +84,7 @@ def _datastore_run(_command, _additions):
         return 1, json.dumps({"available": False})
     try:
         registrations = json.loads(secrets.stdout).get("items", [])
-        stale = any("host.k3d.internal" in json.dumps(item) for item in registrations)
+        stale = stale_acg_registration(registrations)
         signals = kine_log_signals(logs.stdout + logs.stderr)
         return 0, json.dumps({"available": True, "state_db_bytes": int(db.stdout.strip()),
                               "stale_acg_registration": stale, **signals})
