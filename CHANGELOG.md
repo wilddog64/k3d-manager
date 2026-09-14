@@ -11,6 +11,10 @@
 
 - `argocd_reclaim_release_ownership [--context <ctx>] [--confirm]` reports, and with `--confirm` removes, ArgoCD Application ownership (`argocd-controller` managedFields and `argocd.argoproj.io/instance` labels) on the ArgoCD Helm release's own ConfigMaps/Secrets/ServiceAccounts, plus orphan ServiceAccounts; it clears the SSA conflicts that made `helm upgrade argocd` fail on the hub after `ubuntu-k3s-platform` rendered argo-cd 7.8.1 into `cicd`
 
+### Fixed
+
+- Hub Prometheus no longer stores every node-exporter/kubelet/kube-state-metrics/istiod/envoy series twice: `federate-acg` scrapes `host.internal:19090`, which serves the hub's own Prometheus whenever no ACG sandbox holds that port, so the self-scraped copies (labelled `cluster="acg"`) duplicated alerts such as `KubeJobFailed`/`TargetDown`; the job now drops samples that do not carry the ACG Prometheus's own `cluster` external label, and the ArgoCD dashboard's Image Updater replica stats aggregate with `max()`
+
 ## [1.33.0] - 2026-09-13
 
 **Theme: Hermes Slack approvals, Kine circuit breaker, hub recovery hardening.** Hermes gets interactive Slack incident proposals (opt-in pull model via `k3dm-slack-relay` worker, inactive by default), a read-only hub-datastore circuit breaker to detect Kine stalls and gate ArgoCD pause (explicit opt-in), and major hub-recovery hardening (19 bug fixes including hub restore Vault role policy merge, Keycloak admin secret fallback, istiod HPA replica churn, platform-ops OutOfSync, Loki chart validation, smoke tests on right cluster/context, and provider-aware service discovery).

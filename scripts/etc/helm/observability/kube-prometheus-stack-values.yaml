@@ -48,6 +48,10 @@ prometheus:
               - 'host.internal:19090'
             labels:
               cluster: acg
+        metric_relabel_configs:
+          - source_labels: [cluster]
+            regex: acg
+            action: drop
 
 grafana:
   admin:
