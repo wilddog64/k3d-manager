@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-13
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED — Codex implementation verified by Claude; live rollout done 2026-09-13
 **Files:** `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml`, `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`, `scripts/tests/plugins/observability_federate_self_scrape.bats` (new), `scripts/tests/plugins/argocd_metrics_servicemonitor.bats`, `CHANGELOG.md`
 **Related:** `docs/bugs/archive/2026-08-20-pre-v1.26/2026-06-06-prometheus-oomkill-federation-too-broad.md`
 

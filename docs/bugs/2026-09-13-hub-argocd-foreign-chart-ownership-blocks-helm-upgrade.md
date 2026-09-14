@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-13
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED — Codex implementation verified by Claude; live rollout done 2026-09-13
 **Files:** `scripts/plugins/argocd.sh`, `scripts/tests/plugins/argocd_reclaim_release_ownership.bats` (new), `docs/api/functions.md`, `CHANGELOG.md`
 **Related:** `docs/bugs/2026-09-13-hub-rebuild-skips-argocd-servicemonitors-and-promtail.md`, `docs/issues/2026-06-29-argocd-helm-ssa-conflict-sso-cm.md`
 
