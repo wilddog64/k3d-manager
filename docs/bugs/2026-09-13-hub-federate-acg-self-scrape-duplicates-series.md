@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-13
 **Status:** OPEN — assigned to Codex
-**Files:** `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml`, `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`, `scripts/tests/plugins/observability_federate_self_scrape.bats` (new), `CHANGELOG.md`
+**Files:** `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml`, `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`, `scripts/tests/plugins/observability_federate_self_scrape.bats` (new), `scripts/tests/plugins/argocd_metrics_servicemonitor.bats`, `CHANGELOG.md`
 **Related:** `docs/bugs/archive/2026-08-20-pre-v1.26/2026-06-06-prometheus-oomkill-federation-too-broad.md`
 
 ## Problem
@@ -86,6 +86,36 @@ New:
 
 Change no other panel.
 
+### S2b — `argocd_metrics_servicemonitor.bats`: loosen the two replica-expression assertions
+
+The existing test "metrics: dashboard includes image updater deployment readiness panels" pins the old expressions, including the closing `}`, so S2 breaks it. Drop the trailing `}` so the assertion matches the metric selector tokens in both the old and new forms.
+
+Old:
+
+```
+  run grep -F -- 'kube_deployment_status_replicas_available{namespace=\"cicd\",deployment=\"argocd-image-updater\"}' "${DASH}"
+```
+
+New:
+
+```
+  run grep -F -- 'kube_deployment_status_replicas_available{namespace=\"cicd\",deployment=\"argocd-image-updater\"' "${DASH}"
+```
+
+Old:
+
+```
+  run grep -F -- 'kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\"}' "${DASH}"
+```
+
+New:
+
+```
+  run grep -F -- 'kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\"' "${DASH}"
+```
+
+Change nothing else in that file.
+
 ### S3 — tests: `scripts/tests/plugins/observability_federate_self_scrape.bats` (new)
 
 Use `yq -r` (mikefarah v4, as in `grafana_dashboard_appsets.bats`) and `jq`. Assert tokens only; never `grep -F` a whole source line.
@@ -112,7 +142,7 @@ Under `## [Unreleased]` → `### Fixed`, as the last bullet of that section:
 
 ## Definition of Done
 
-- [ ] S1–S3 applied; no other lines changed in the two config files.
+- [ ] S1, S2, S2b, S3 applied; no other lines changed in the two config files or `argocd_metrics_servicemonitor.bats`.
 - [ ] `yq -e . scripts/etc/helm/observability/kube-prometheus-stack-values.yaml >/dev/null` and `yq -e . scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml >/dev/null` both exit 0.
 - [ ] `bats scripts/tests/plugins/observability_federate_self_scrape.bats scripts/tests/plugins/argocd_metrics_servicemonitor.bats scripts/tests/plugins/argocd_loki.bats`: all pass (paste the summary).
 - [ ] CHANGELOG bullet added.
