@@ -37,23 +37,19 @@ RBAC_MANIFEST="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/rbac.yaml"
   cat > "${BATS_TEST_TMPDIR}/bin/kubectl" <<'EOF'
 #!/bin/sh
 case " $* " in
-  *" get deployment argocd-server "*) printf '%s' 'argo-cd-10.8.4' ;;
+  *"helm"*"chart"*) printf '%s' 'argo-cd-10.8.4' ;;
+  *"containers[0].image"*) printf '%s' "${STUB_ARGOCD_IMAGE-quay.io/argoproj/argocd:v3.5.2}" ;;
   *) printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log" ;;
 esac
 EOF
-cat > "${BATS_TEST_TMPDIR}/bin/wget" <<'EOF'
+  cat > "${BATS_TEST_TMPDIR}/bin/wget" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/wget.log"
-url=""
-for arg in "$@"; do
-  url="${arg}"
-done
-case "${url}" in
-  */argo-cd/10.8.4) printf '%s' '{"appVersion":"v3.5.2"}' ;;
-esac
 EOF
   cat > "${BATS_TEST_TMPDIR}/bin/trivy" <<'EOF'
 #!/bin/sh
+printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/trivy.log"
+[ -z "${STUB_TRIVY_FAIL:-}" ] || { echo "FATAL image pull failed"; exit 1; }
 exit 0
 EOF
   cat > "${BATS_TEST_TMPDIR}/bin/curl" <<'EOF'
@@ -72,6 +68,18 @@ EOF
   [[ "${output}" == *"App version: v3.5.2"* ]]
   [[ "${output}" == *"No HIGH/CRITICAL CVEs"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/curl.log" ]
+  run grep -c 'quay.io/argoproj/argocd:v3.5.2' "${BATS_TEST_TMPDIR}/trivy.log"
+  [ "${output}" -eq 1 ]
+
+  run env PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin" STUB_TRIVY_FAIL=1 \
+    KUBECTL_BIN="${BATS_TEST_TMPDIR}/bin/kubectl" sh "${SCAN_SCRIPT}"
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"trivy scan of quay.io/argoproj/argocd:v3.5.2 failed"* ]]
+
+  run env PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin" STUB_ARGOCD_IMAGE="" \
+    KUBECTL_BIN="${BATS_TEST_TMPDIR}/bin/kubectl" sh "${SCAN_SCRIPT}"
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"cannot read the argocd-server image tag"* ]]
 }
 
 @test "cve scan downloads kubectl when absent" {
