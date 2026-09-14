@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 SCAN_SCRIPT="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/cve-scan.sh"
+CRONJOB_MANIFEST="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/cve-scan-cronjob.yaml"
 RBAC_MANIFEST="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/rbac.yaml"
 
 @test "cve scan reads the Hub chart label from argocd-server" {
@@ -150,4 +151,10 @@ EOF2
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"patched cluster-ubuntu-hostinger to 10.9.1"* ]]
   [ -s "${BATS_TEST_TMPDIR}/patch.log" ]
+}
+
+@test "cve scan cronjob gives trivy a writable HOME" {
+  run grep -A1 -F -- '- name: HOME' "${CRONJOB_MANIFEST}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'value: "/tmp"'* ]]
 }
