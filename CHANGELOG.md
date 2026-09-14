@@ -5,6 +5,7 @@
 ### Changed
 
 - `app-cve-scan` now runs daily at 01:00 America/Los_Angeles (was 00:00 UTC on the 1st and 15th), with `startingDeadlineSeconds: 3600` and CPU/memory requests and limits; a rebuild dispatch per service is rate-limited by `REBUILD_COOLDOWN_SECONDS` (default 3 days, state in ConfigMap `platform-ops/app-cve-scan-rebuild-state`), so an unfixable candidate no longer triggers a GitHub Actions rebuild and warning every night
+- `argocd-cve-scan` now runs daily at 01:30 America/Los_Angeles (was 00:00 UTC on the 1st and 15th), with `startingDeadlineSeconds: 3600`, 30 minutes after `app-cve-scan` so the two Trivy jobs do not overlap
 
 ## [1.33.0] - 2026-09-13
 
