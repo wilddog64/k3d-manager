@@ -360,6 +360,16 @@
 | v1.24.0 | RELEASED — PR #113, tag and GitHub release published |
 | v1.23.0 and earlier | RELEASED — see `CHANGELOG.md` |
 
+## v1.34.0 queue (moved from v1.33.0, 2026-09-13 user decision)
+
+- [ ] **Bug: `cluster_up.bats` "dry-run previews core" test hangs** — pre-existing on HEAD `35388b47`; spec in `docs/bugs/` first.
+- [ ] **Spec hub-ESO coverage in `make status`** — hub ESO currently unmonitored.
+- [ ] **Spec declarative registration / eso-apps role / Cloudflare origins** — from the hub Kine rebuild close-out; `docs/bugs/` spec first.
+
+## v1.33.0 close-out verification (2026-09-13, read-only, Claude)
+
+- [x] Items 1–6 of the remaining list verified green: smoke-user login 200; Grafana admin 200; catalog 20 items; `app-cluster-kubeconfig` synced (hub ES 25/25, apps 37/37 Synced/Healthy); hub `cicd/k3dm-webhook-token` accepted by live webhook (auth passes → 404 on probe path; bogus token 401) so `argocd_sync_webhook_token_secret` NOT needed; Kine close-out leftovers clear (istio-cni-node 4/4 1/1, hub-loki + loki Healthy, shopping-cart-identity Synced/Healthy, no failed identity jobs). Remaining v1.33.0: Hermes↔Slack decision, ApplicationSet reapply + `argocd_check_values_branch`, PR gates.
+
 ## v1.31.0 queue (Hermes R4 scope preflight — App-token auth REJECTED)
 
 - [x] **WS1 — R4 GitHub App installation-token auth — REJECTED + REVERTED 2026-09-07.**
@@ -1146,7 +1156,7 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [x] **ESO cosign-public-key SecretSyncedError (hub platform-ops + hostinger kyverno)** — 2026-09-13 Slack alert. Vault 403 on `secret/data/cosign/signing`: ESO roles `eso-ldap-directory` (hub) and `eso-app-cluster` (mount `kubernetes-ubuntu-hostinger`) lack `cosign-verify`. Role rewriters (`_vault_configure_secret_reader_role`, `vault.sh` app-cluster role `policies=app-cluster-reader`) replace policies wholesale; grant loss masked by ESO's cached Vault token until the OrbStack restart forced re-login. Impact low: existing `cosign-public-key` Secrets retained; 24/25 hub + 19/20 hostinger ES synced. Also open: `make status` "webhook unavailable" (Keychain NOT proven locked — Claude/`!` shell cannot use Keychain; user to run diag in a real terminal) and `show-service-passwords` all N/A. Live fix = `signing_restore` per cluster (user runs). Durable fix SPECCED `docs/bugs/2026-09-13-vault-eso-role-rewrite-drops-cosign-verify.md` (`_vault_role_merged_policies` merge helper in both role writers) — dispatched to Codex 2026-09-13. Codex `b3bc737c` (committed; push failed — sandbox has no GitHub auth); Claude verified diff == S1–S3, shellcheck 0, BATS 101/101, pushed. Pending: operator live grant restore (hub: `./scripts/k3d-manager signing_restore`; hostinger: same with `SIGNING_ESO_ROLE=eso-app-cluster SIGNING_ESO_AUTH_MOUNT=kubernetes-ubuntu-hostinger`, both from hub context — hub has no kyverno ns so ES apply is skipped) then verify SecretSynced both clusters. 2026-09-13 update: hostinger run from HUB context hit the hub Vault (hostinger has its OWN Vault, mount `kubernetes-ubuntu-hostinger` lives there) → 404, yet logged false `granted`. Correct hostinger invocation = context `ubuntu-hostinger`. False-success bug SPECCED `docs/bugs/2026-09-13-signing-grant-eso-read-false-success.md` (validate role JSON, check write rc, callers return non-zero) — dispatched to Codex 2026-09-13. Codex `58999f55` (committed, not pushed); Claude verified diff == S1/S2 + 4 BATS + CHANGELOG (3 files), shellcheck 1→1 (no new), BATS 37/37, pushed. Live: hostinger `signing_restore` from context `ubuntu-hostinger` wrote the role OK; hub ES SecretSynced 23:47Z; hostinger ES force-synced (user go) → SecretSynced 23:51Z, no ESO restart needed — DONE both clusters.
 - [x] **Login Keychain LOCKED (not deleted) → webhook 401 → `make status` "webhook unavailable" — 2026-09-13.** All k3dm-* items were present (`security dump-keychain` names; `find-generic-password` rc=0) but `-w` value reads returned empty (earlier rc=44 checks were misleading). `~/.k3dm/webhook-token` fallback absent, so `auth.py _get_token` returned None → every request 401. `make restart-webhook` could not fix it. FIX: user ran `security unlock-keychain ~/Library/Keychains/login.keychain-db` → token len=64, authenticated health `code=200` (10.9s); no webhook restart needed (token read per request). Token was also rotated earlier via `bin/k3dm-webhook-setup --rotate` + deploy-worker. Follow-ups: (a) hub Secret `cicd/k3dm-webhook-token` still holds the pre-rotate token → user runs `argocd_sync_webhook_token_secret cicd` with context `k3d-k3d-cluster`; (b) optional `security set-keychain-settings` to disable auto-lock; (c) `show-service-passwords` Keycloak admin N/A FIXED 2026-09-13 — Makefile read nonexistent `keycloak-admin-secret`/`password`; hub pod uses ESO `keycloak-secrets`/`KEYCLOAK_ADMIN_PASSWORD` (now read first, old name fallback); verified masked: admin + 3 dev users present; keychain-restore spec NOT needed.
 - [x] **istiod flap watch** — 2026-09-13: NOT crashes. HPA churn: istiod requests cpu 50m, target 80% (=40m/pod); config-push bursts (e.g. ArgoCD restarts) scaled 3→5, then down to 2. Pods idle ~12m, 0 restarts. Optional tuning (raise request or scaleDown stabilization) not done.
-- [ ] **Bug: `cluster_up.bats` "dry-run previews core" test hangs** — pre-existing on HEAD `35388b47` (not caused by C); spec in `docs/bugs/` first.
+- [→] **Bug: `cluster_up.bats` "dry-run previews core" test hangs** — MOVED to v1.34.0 queue 2026-09-13 (user decision).
 - [x] **Controlled hub Kine rebuild** — EXECUTED 2026-09-11; close-out verified 2026-09-13 (Kine 624 MiB, compaction healthy, SERVERS 1/1, 14 PVCs Bound, Vault unsealed; Grafana PF kickstarted → 200). Remaining red items tracked in activeContext "Hub Kine rebuild CLOSE-OUT". Original entry: Inventory complete: seven
   local-path PVCs with Delete reclaim policy, ~4.8 GiB actual node storage,
   8.3 GiB state DB, 186 GiB host free. Plan is v1.33.0 plan #3/5. Capturing
@@ -1218,11 +1228,11 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [x] **Hub Vault `token_reviewer_jwt` refreshed** — user ran it; both stores
   `Ready=True`, hub ExternalSecrets **1/25 -> 24/25**. Needed `force-sync`
   annotations to revalidate; status lags the repair by 60s+.
-- [ ] **Reseed `k3dm-smoke-user`** — `scripts/k3d-manager keycloak_seed_smoke_user`,
-  after the Vault fix (seeder reads the ESO-stale `keycloak-secrets`).
-- [ ] **Grafana admin password** — may need `grafana cli admin reset-admin-password`;
-  persistent `grafana.db` diverged from the Secret.
-- [ ] **Reseed product catalog** — API healthy, zero rows.
-- [ ] **Spec hub-ESO coverage in `make status`** — hub ESO currently unmonitored.
-- [ ] **`platform-ops/app-cluster-kubeconfig`** — last failed hub ES; `secret/platform-ops`
+- [x] **Reseed `k3dm-smoke-user`** — `scripts/k3d-manager keycloak_seed_smoke_user`,
+  after the Vault fix (seeder reads the ESO-stale `keycloak-secrets`). VERIFIED 2026-09-13: Secret present (12:35Z), password-grant login to realm shopping-cart via client k3dm-smoke → HTTP 200 + access_token (masked). Seeder uses `keycloak-secrets` (line 504); `KEYCLOAK_SMOKE_ADMIN_SECRET_NAME` default only affects realm provision path — not a blocker.
+- [x] **Grafana admin password** — may need `grafana cli admin reset-admin-password`;
+  persistent `grafana.db` diverged from the Secret. VERIFIED 2026-09-13: `monitoring/grafana-admin-credentials` creds → `https://grafana.3ai-talk.org/api/user` HTTP 200; no reset needed.
+- [x] **Reseed product catalog** — API healthy, zero rows. VERIFIED 2026-09-13: `product-catalog-seed` job Complete (10h ago); `/api/products` returns 20 items.
+- [→] **Spec hub-ESO coverage in `make status`** — MOVED to v1.34.0 queue 2026-09-13.
+- [x] **`platform-ops/app-cluster-kubeconfig`** — VERIFIED 2026-09-13: SecretSynced True; hub ES 25/25 synced; hub-platform-ops Synced/Healthy. Was: last failed hub ES; `secret/platform-ops`
   absent from Vault, no seeder in repo, consumer mounts it `optional: true`. Seed or drop.
