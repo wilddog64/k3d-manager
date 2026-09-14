@@ -68,8 +68,8 @@ No guard code is needed. prometheus-operator `v0.79.2` `loadConfigurationFromSec
 
 ## Definition of Done
 
-- [ ] S1–S3 applied; `bats` on the new test passes.
-- [ ] Live, after the observability app syncs: `kubectl get alertmanager -n monitoring -o jsonpath='{.items[0].spec.configSecret}'` = `alertmanager-smtp-secret`; the Alertmanager `/api/v2/status` config shows the `sms-critical` receiver.
+- [x] S1–S3 applied; `bats` on the new test passes.
+- [x] Live (verified 2026-09-14 23:24Z, after user re-ran `make alertmanager-secret`; operator errors since secret update = 0), after the observability app syncs: `kubectl get alertmanager -n monitoring -o jsonpath='{.items[0].spec.configSecret}'` = `alertmanager-smtp-secret`; the Alertmanager `/api/v2/status` config shows the `sms-critical` receiver.
 
 ## What NOT to Do
 
