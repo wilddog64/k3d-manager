@@ -40,6 +40,10 @@ function deploy_observability() {
     return 1
   fi
 
+  _observability_apply_argocd_dashboard "${_hub_context}"
+  _deploy_promtail_acg "${_hub_context}"
+  _observability_ensure_argocd_servicemonitors "${_hub_context}"
+
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
@@ -104,8 +108,6 @@ function deploy_observability() {
   _observability_ensure_alertmanager_login
   _observability_install_alertmanager_port_forward
   _observability_install_alertmanager_auth_proxy
-  _observability_apply_argocd_dashboard "${_hub_context}"
-  _deploy_promtail_acg "${_hub_context}"
 }
 
 function _observability_seed_grafana_if_absent() {
@@ -562,6 +564,46 @@ function _observability_apply_argocd_dashboard() {
     _kubectl apply --context "${_app_context}" -f "${_dashboard_manifest}" >/dev/null \
       && _info "[observability] ArgoCD/Image Updater dashboard applied on ${_app_context}"
   fi
+}
+
+function _observability_ensure_argocd_servicemonitors() {
+  local _ctx="${1:-k3d-k3d-cluster}"
+  local _ns="${ARGOCD_NAMESPACE:-cicd}"
+  local _release="${ARGOCD_HELM_RELEASE:-argocd}"
+  local _chart_ref="${ARGOCD_HELM_CHART_REF:-argo/argo-cd}"
+  local _waited=0 _timeout="${OBSERVABILITY_CRD_WAIT_SECONDS:-300}"
+  while ! _kubectl --no-exit --context "${_ctx}" get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; do
+    if (( _waited >= _timeout )); then
+      _warn "[observability] ServiceMonitor CRD not present after ${_timeout}s; ArgoCD ServiceMonitors NOT ensured"
+      return 0
+    fi
+    sleep 10
+    _waited=$((_waited + 10))
+  done
+
+  local _chart_version _values _rendered
+  _chart_version="$(_helm --kube-context "${_ctx}" -n "${_ns}" list --filter "^${_release}\$" -o json 2>/dev/null \
+    | jq -r '.[0].chart // "" | sub("^argo-cd-"; "")')"
+  if [[ -z "${_chart_version}" ]]; then
+    _warn "[observability] ArgoCD release ${_ns}/${_release} not found; skipping ServiceMonitor ensure"
+    return 0
+  fi
+  _values="$(mktemp)"
+  if ! _helm --kube-context "${_ctx}" -n "${_ns}" get values "${_release}" -o yaml > "${_values}" 2>/dev/null; then
+    rm -f "${_values}"
+    _warn "[observability] could not read ArgoCD release values; skipping ServiceMonitor ensure"
+    return 0
+  fi
+  _rendered="$(_helm template "${_release}" "${_chart_ref}" -n "${_ns}" --version "${_chart_version}" \
+    -f "${_values}" --api-versions monitoring.coreos.com/v1 \
+    | yq eval-all 'select(.kind == "ServiceMonitor")' -)"
+  rm -f "${_values}"
+  if [[ -z "${_rendered}" ]]; then
+    _info "[observability] No ArgoCD ServiceMonitors rendered; skipping apply"
+    return 0
+  fi
+  printf '%s\n' "${_rendered}" | _kubectl --context "${_ctx}" apply -f - >/dev/null \
+    && _info "[observability] ArgoCD ServiceMonitors ensured on ${_ctx}"
 }
 
 function _observability_apply_trivy_dashboard() {
