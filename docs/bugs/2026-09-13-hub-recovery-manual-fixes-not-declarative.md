@@ -3,7 +3,7 @@
 **Filed:** 2026-09-13
 **Branch:** `k3d-manager-v1.33.0`
 **Incident:** `docs/issues/2026-09-11-hub-recovery-public-origin-and-eso.md`
-**Status:** READY FOR CODEX — design decisions answered by the user 2026-09-13 (see "Decisions")
+**Status:** DONE — `b71e587a` (Claude-verified); live `hub_recovery_reconcile --confirm` run 2026-09-13; confirmed implemented 2026-09-14 (`_vault_ensure_eso_apps_policy`, `origins.tsv`, `_hub_recovery_render_cloudflared_config` present)
 
 ---
 
