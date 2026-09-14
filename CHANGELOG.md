@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-09-13
+
+**Theme: Hermes Slack approvals, Kine circuit breaker, hub recovery hardening.** Hermes gets interactive Slack incident proposals (opt-in pull model via `k3dm-slack-relay` worker, inactive by default), a read-only hub-datastore circuit breaker to detect Kine stalls and gate ArgoCD pause (explicit opt-in), and major hub-recovery hardening (19 bug fixes including hub restore Vault role policy merge, Keycloak admin secret fallback, istiod HPA replica churn, platform-ops OutOfSync, Loki chart validation, smoke tests on right cluster/context, and provider-aware service discovery).
+
 ### Added
 
 - Hermes Slack approvals (opt-in, pull model): incident proposals carry Approve/Deny buttons; the `k3dm-slack-relay` worker verifies the Slack signature, an approver allowlist and a 24h `/hermes-auth` re-auth before recording an approval in Cloudflare KV, and Hermes drains it on its next poll into the unchanged `repairs.approve()`; inactive until `K3DM_HERMES_APPROVAL_DRAIN_URL` and the relay KV/secrets are configured

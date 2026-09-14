@@ -41,6 +41,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | Function | Location | Description |
 |---|---|---|
 | `deploy_vault` | `scripts/plugins/vault.sh` | Deploy HashiCorp Vault |
+| `hub_recovery_reconcile` | `scripts/plugins/hub_recovery.sh` | Reconcile a post-rebuild hub cluster by restoring captured local-path PV claims, mirroring Vault root token + ArgoCD credentials, applying durable in-cluster registration, ESO policies, CVE reader Vault role, Keycloak/LDAP bootstrap, and provider-aware Cloudflare config. Runs plan/validate/targets internally; interactive prompts for sensitive writes via `--confirm` (v1.33.0+) |
 | `hub_recovery_plan` | `scripts/plugins/hub_recovery.sh` | Read-only render of the seven durable hub local-path claim sources captured for a Kine control-plane recovery; uses stable `(namespace, claim)` identity rather than PVC UID. |
 | `hub_recovery_validate` | `scripts/plugins/hub_recovery.sh` | Read-only fail-closed validation of the captured Kine database/token/PV export and exactly one source tree for each of the seven approved durable claims. |
 | `hub_recovery_targets` | `scripts/plugins/hub_recovery.sh` | Read-only resolve of the current PV claim references, node affinity, and local-path targets into the exact target-map format accepted by recovery restore. |
