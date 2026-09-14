@@ -1957,6 +1957,67 @@ def _monitoring_paused(context=None, argons=None):
     return out.strip() == "kube-prometheus-stack="
 
 
+def _eso_health_results(context, label_prefix=""):
+    """ClusterSecretStore + ExternalSecret health on one kube context.
+    Returns [(name, ok, detail), ...] named '<label_prefix>ESO ...'."""
+    results = []
+    css_name = f"{label_prefix}ESO ClusterSecretStore"
+    es_name = f"{label_prefix}ESO ExternalSecrets"
+    try:
+        _css_out, _css_timeout = _posix_spawn_capture(
+            ["kubectl", "get", "clustersecretstore", "vault-backend",
+             "--context", context, "-o", "json"],
+            timeout=8,
+        )
+        if _css_timeout:
+            raise RuntimeError("kubectl clustersecretstore timed out")
+        if _kubectl_absent(_css_out):
+            results.append((css_name, None,
+                            f"not installed (no ClusterSecretStore on {context})"))
+        else:
+            _data = json.loads(_css_out)
+            _conds = _data.get("status", {}).get("conditions", [])
+            _ready = next((c for c in _conds if c.get("type") == "Ready"), None)
+            _val = f"Ready={_ready.get('status', 'Unknown')}" if _ready else "no conditions"
+            results.append((css_name, _val == "Ready=True", _val))
+    except Exception as _exc:
+        results.append((css_name, False, str(_exc)[:200]))
+
+    try:
+        _es_out, _es_timeout = _posix_spawn_capture(
+            ["kubectl", "get", "externalsecret", "-A",
+             "--context", context, "-o", "json"],
+            timeout=10,
+        )
+        if _es_timeout:
+            raise RuntimeError("kubectl externalsecret timed out")
+        if _kubectl_absent(_es_out):
+            results.append((es_name, None,
+                            f"not installed (no ExternalSecret CRD on {context})"))
+            _es_data = None
+        else:
+            _es_data = json.loads(_es_out)
+        if _es_data is not None:
+            _items = _es_data.get("items", [])
+            _not_ready = [
+                it["metadata"]["name"]
+                for it in _items
+                if not any(
+                    c.get("type") == "Ready" and c.get("status") == "True"
+                    for c in it.get("status", {}).get("conditions", [])
+                )
+            ]
+            _total = len(_items)
+            if _not_ready:
+                results.append((es_name, False,
+                                f"{len(_not_ready)}/{_total} not synced: {', '.join(_not_ready[:3])}"))
+            else:
+                results.append((es_name, True, f"{_total}/{_total} synced"))
+    except Exception as _exc:
+        results.append((es_name, False, str(_exc)[:200]))
+    return results
+
+
 def _smoke_test_services(retries=None, provider=None):
     """HTTP smoke test for each service. Returns list of (name, ok, detail) tuples."""
     import ssl
@@ -2074,58 +2135,9 @@ def _smoke_test_services(retries=None, provider=None):
         time.sleep(_SMOKE_RETRY_SLEEP)
     results.append(("Product images", _products_ok, _products_detail))
 
-    try:
-        _css_out, _css_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "clustersecretstore", "vault-backend",
-             "--context", app_context, "-o", "json"],
-            timeout=8,
-        )
-        if _css_timeout:
-            raise RuntimeError("kubectl clustersecretstore timed out")
-        if _kubectl_absent(_css_out):
-            results.append(("ESO ClusterSecretStore", None,
-                            f"not installed (no ClusterSecretStore on {app_context})"))
-        else:
-            _data = json.loads(_css_out)
-            _conds = _data.get("status", {}).get("conditions", [])
-            _ready = next((c for c in _conds if c.get("type") == "Ready"), None)
-            _val = f"Ready={_ready.get('status', 'Unknown')}" if _ready else "no conditions"
-            results.append(("ESO ClusterSecretStore", _val == "Ready=True", _val))
-    except Exception as _exc:
-        results.append(("ESO ClusterSecretStore", False, str(_exc)[:200]))
-
-    try:
-        _es_out, _es_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "externalsecret", "-A",
-             "--context", app_context, "-o", "json"],
-            timeout=10,
-        )
-        if _es_timeout:
-            raise RuntimeError("kubectl externalsecret timed out")
-        if _kubectl_absent(_es_out):
-            results.append(("ESO ExternalSecrets", None,
-                            f"not installed (no ExternalSecret CRD on {app_context})"))
-            _es_data = None
-        else:
-            _es_data = json.loads(_es_out)
-        if _es_data is not None:
-            _items = _es_data.get("items", [])
-            _not_ready = [
-                it["metadata"]["name"]
-                for it in _items
-                if not any(
-                    c.get("type") == "Ready" and c.get("status") == "True"
-                    for c in it.get("status", {}).get("conditions", [])
-                )
-            ]
-            _total = len(_items)
-            if _not_ready:
-                results.append(("ESO ExternalSecrets", False,
-                                 f"{len(_not_ready)}/{_total} not synced: {', '.join(_not_ready[:3])}"))
-            else:
-                results.append(("ESO ExternalSecrets", True, f"{_total}/{_total} synced"))
-    except Exception as _exc:
-        results.append(("ESO ExternalSecrets", False, str(_exc)[:200]))
+    results.extend(_eso_health_results(app_context))
+    if app_context != "k3d-k3d-cluster":
+        results.extend(_eso_health_results("k3d-k3d-cluster", "Hub "))
 
     # Data-layer StatefulSet readiness for the active app cluster — uses posix_spawn, safe after NEF load
     _dl_ns_out, _dl_ns_timeout = _posix_spawn_capture(
