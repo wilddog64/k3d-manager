@@ -243,6 +243,35 @@ align to a hard boundary.
 | `K3DM_HERMES_AUDIT_RUN_BATS` | (unset) | When `1`, the monthly audit runs the webhook security-regression bats subset (Group B); otherwise reported "skipped" |
 | `K3DM_HERMES_APPROVAL_DRAIN_URL` | (unset) | Opt-in Slack approvals: relay drain URL (https). Unset = no buttons, no drain |
 | `K3DM_HERMES_SMS_DAILY_BUDGET` | `10` | Max SMS pages per UTC day |
+| `K3DM_HERMES_E2E_ENABLED` | (enabled) | Set to `0` to disable scheduled E2E dispatch |
+| `K3DM_HERMES_E2E_SCHEDULE` | `wed,sat@02:00` | Strict local-time E2E schedule |
+
+---
+
+## Scheduled e2e
+
+Hermes schedules an M2 E2E run on Wednesday and Saturday at 02:00 local time. The
+existing five-minute poll catches up later that day if the laptop was asleep. Set
+`K3DM_HERMES_E2E_ENABLED=0` to disable it, or set
+`K3DM_HERMES_E2E_SCHEDULE=wed,sat@02:00` to a strict comma-separated weekday list
+and 24-hour time. An invalid value disables the schedule and produces one Slack
+notice per day.
+
+Claims and final markers are kept separately from the poll state in
+`~/.k3dm/hermes/e2e/`; the detached run log is
+`~/Library/Logs/k3dm-hermes-e2e.log`. A failed preflight retries up to six times,
+30 minutes apart. For an immediate operator check, run:
+
+```bash
+bin/k3dm-hermes e2e now
+```
+
+Hermes reads the M2 summary and failure sidecars, redacts secrets before output,
+and rule-groups failures. New or recurring groups are filed only from the
+Hermes-owned `~/.k3dm/hermes/bugs-worktree`, committed and pushed to the current
+release branch; it never modifies the operator checkout or opens GitHub Issues.
+Those bug documents are triage records only: they remain unverified until a human
+confirms the root cause and writes the fix specification.
 
 ---
 

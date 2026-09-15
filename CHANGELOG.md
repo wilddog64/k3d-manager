@@ -9,6 +9,8 @@
 
 ### Added
 
+- Hermes scheduled E2E runs: the existing poll now dispatches M2 E2E every Wednesday and Saturday at 02:00 local time (with same-day catch-up and bounded preflight retries), rule-triages redacted failures, and files new or recurrent groups from its own worktree as unverified `docs/bugs/` records with a Slack summary. Run `bin/k3dm-hermes e2e now` for an immediate operator check.
+
 - Hermes SMS pager texts the operator (Gmail SMTP to the carrier SMS gateway, Keychain `k3dm-hermes-sms-from`/`-to` plus the existing `k3dm-alertmanager-gmail-app-password`, off until provisioned) when the webhook is down for 2 polls, any other sensor is stuck `unknown` for 6 polls, the Hermes poll job fails twice, or a new critical/high CodeQL/Dependabot alert opens; each page texts once down and once on recovery, mirrors to Slack, and is capped by `K3DM_HERMES_SMS_DAILY_BUDGET`. The `argocd` sensor now names a rejected credential in its evidence
 
 - `make restore-google-app-password` restores the Alertmanager Gmail App Password from the Keychain backup (`k3dm-alertmanager-gmail-app-password`) into Vault `secret/k3d-manager/alertmanager`, changing only `gmail_app_pw` (and failing if `gmail_from`/`sms_gateway` are missing), then runs `make observability` to rebuild `alertmanager-smtp-secret`; the token and password travel via env, never argv

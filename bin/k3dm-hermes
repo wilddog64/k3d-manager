@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,7 @@ from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_app
                               interactive_blocks)
 from hermes.slack import post_interactive, post_summary
 from hermes import pager
+from hermes import e2e_schedule, e2e_triage, e2e_bugs
 
 
 def _load_state(path):
@@ -201,6 +203,116 @@ def _page(state, texts, relay):
                          lambda text: pager.send_sms(_sms_keychain, text), budget=budget)
 
 
+def _e2e_dir():
+    return Path(os.environ.get("K3DM_HERMES_E2E_DIR", Path.home() / ".k3dm/hermes/e2e"))
+
+
+def _e2e_run(argv, timeout):
+    result = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True,
+                            timeout=timeout, check=False)
+    return result.returncode, result.stdout + result.stderr
+
+
+def _e2e_write(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.write_text(json.dumps(value, sort_keys=True))
+    path.chmod(0o600)
+
+
+def _e2e_results(started):
+    directory = Path(os.environ.get("K3DM_E2E_DISPATCH_DIR", Path.home() / ".k3dm/e2e/dispatch"))
+    choices = [path for path in directory.glob("m2-*.summary.json") if path.stat().st_mtime >= started]
+    if not choices:
+        return {}, []
+    summary_path = max(choices, key=lambda path: path.stat().st_mtime)
+    try:
+        summary = json.loads(summary_path.read_text())
+        failures = json.loads(summary_path.with_name(summary_path.name.replace(".summary.json", ".failures.json")).read_text())
+        return summary, failures if isinstance(failures, list) else []
+    except (OSError, ValueError):
+        return {}, []
+
+
+def _e2e_previous(directory, slot):
+    markers = [path for path in directory.glob("*.json") if path.stem != slot]
+    if not markers:
+        return []
+    return _load_state(max(markers, key=lambda path: path.stat().st_mtime)).get("groups", [])
+
+
+def _e2e_text(slot, run, summary, filed, changes):
+    passed, failed, total = (summary.get(key, 0) for key in ("passed", "failed", "total"))
+    head = f"Hermes e2e {slot} (run {run}, M2): "
+    head += f"PASS {passed}/{total}" if summary.get("result") == "pass" else f"FAIL — {passed} passed, {failed} failed, {max(total - passed - failed, 0)} skipped"
+    lines = [head]
+    for group in filed.get("groups", []):
+        lines.append(f"[{group['status']}] {group['kind']} {group['target']} ({group['count']} tests) → {group.get('path', '')}")
+    if changes["resolved"]:
+        lines.append("resolved: " + ", ".join(changes["resolved"]))
+    lines.append(filed.get("push", ""))
+    return "\n".join(lines)[:3500]
+
+
+def _run_e2e(slot, runner=_e2e_run, now=None):
+    """Run one E2E slot; preflight failure is deliberately a successful poll outcome."""
+    now = now or time.time()
+    directory = _e2e_dir()
+    manual = slot == "now"
+    if manual:
+        slot = "manual-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(now))
+    preflight, _output = runner([str(ROOT / "scripts/k3d-manager"), "e2e_runner_preflight", "m2"], 120)
+    if preflight != 0:
+        claim = e2e_schedule.retry_claim(directory, slot, datetime.fromtimestamp(now).astimezone())
+        if claim["attempts"] < 6 and not manual:
+            return 0
+        _e2e_write(directory / f"{slot}.json", {"outcome": "runner-unavailable"})
+        (directory / f"{slot}.claim").unlink(missing_ok=True)
+        post_summary(_keychain_secret("k3dm-slack-webhook"), f"Hermes e2e {slot}: skipped — M2 runner unavailable after 6 attempts")
+        return 0
+    started = time.time()
+    rc, transcript = runner([str(ROOT / "scripts/k3d-manager"), "e2e_runner_dispatch", "m2"], 5400)
+    summary, failures = _e2e_results(started)
+    if not summary:
+        summary = {"result": "fail", "phase": "dispatch", "run_id": "unknown", "passed": 0, "failed": 1, "total": 1}
+        failures = []
+    groups = e2e_triage.triage(summary, failures)
+    if not failures and groups:
+        groups[0]["samples"] = [e2e_triage.redact("\n".join(transcript.splitlines()[-5:]) + f" (rc={rc})")]
+    changes = e2e_triage.diff_groups(_e2e_previous(directory, slot), groups)
+    run = {"run_id": summary.get("run_id", "unknown"), "summary": summary}
+    filed = e2e_bugs.file_bugs(ROOT, groups, run, slot)
+    post_summary(_keychain_secret("k3dm-slack-webhook"), _e2e_text(slot, run["run_id"], summary, filed, changes))
+    _e2e_write(directory / f"{slot}.json", {"outcome": summary.get("result", "fail"), "run_id": run["run_id"],
+                                              "counts": {key: summary.get(key, 0) for key in ("passed", "failed", "total")},
+                                              "groups": [{key: group[key] for key in ("slug", "kind", "target", "count")} for group in groups]})
+    (directory / f"{slot}.claim").unlink(missing_ok=True)
+    return 0
+
+
+def _schedule_e2e(state):
+    schedule = e2e_schedule.configured_schedule()
+    relay = _keychain_secret("k3dm-slack-webhook")
+    today = timestamp()[:10]
+    if schedule is None:
+        if os.environ.get("K3DM_HERMES_E2E_ENABLED") != "0" and state.get("e2e_invalid_notice") != today:
+            post_summary(relay, "Hermes e2e schedule disabled: invalid K3DM_HERMES_E2E_SCHEDULE")
+            state["e2e_invalid_notice"] = today
+        return
+    now = datetime.now().astimezone()
+    directory = _e2e_dir()
+    slot = e2e_schedule.due_slot(now, directory, schedule)
+    if not slot or e2e_schedule.claim_slot(directory, slot, now) is None:
+        return
+    log_path = Path.home() / "Library/Logs/k3dm-hermes-e2e.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a") as log:
+        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "e2e", slot], start_new_session=True,
+                                 stdin=subprocess.DEVNULL, stdout=log, stderr=log)
+    claim = _load_state(directory / f"{slot}.claim")
+    claim["pid"] = child.pid
+    _e2e_write(directory / f"{slot}.claim", claim)
+
+
 def _poll(state, state_path):
     records, event = _run_cycle(state)
     relay = _keychain_secret("k3dm-slack-webhook")
@@ -233,6 +345,7 @@ def _poll(state, state_path):
                                    AUDIT_SERVICE, REPOSITORY)
     texts += pager.job_events(state, None)
     pages = _page(state, texts, relay)
+    _schedule_e2e(state)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event, "approvals": approvals,
                       "pages": pages}))
@@ -240,7 +353,7 @@ def _poll(state, state_path):
 
 
 def _usage():
-    print("Usage: k3dm-hermes [approve <action-id>|list|preflight|audit]", file=sys.stderr)
+    print("Usage: k3dm-hermes [approve <action-id>|list|preflight|audit|e2e <slot|now>]", file=sys.stderr)
 
 
 def main():
@@ -249,6 +362,8 @@ def main():
         time.sleep(random.uniform(0, 30))
     state_path = Path(os.environ.get("K3DM_HERMES_STATE", Path.home() / ".k3dm/hermes/state.json"))
     state = _load_state(state_path)
+    if args and args[0] == "e2e" and len(args) == 2:
+        return _run_e2e(args[1])
     if args and args[0] == "list" and len(args) == 1:
         print(json.dumps(state.get("pending_repairs", {}), sort_keys=True))
         return 0
