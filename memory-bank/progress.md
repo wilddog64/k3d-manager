@@ -1260,3 +1260,4 @@ Scope = 4 plan docs (4/5, under cap). Dependency-ordered load-split leads; decis
 - [→] **Spec hub-ESO coverage in `make status`** — MOVED to v1.34.0 queue 2026-09-13.
 - [x] **`platform-ops/app-cluster-kubeconfig`** — VERIFIED 2026-09-13: SecretSynced True; hub ES 25/25 synced; hub-platform-ops Synced/Healthy. Was: last failed hub ES; `secret/platform-ops`
   absent from Vault, no seeder in repo, consumer mounts it `optional: true`. Seed or drop.
+- [x] 2026-09-15 — `make restore-google-app-password` added (Keychain → Vault merge of `gmail_app_pw` only → `make observability`); spec `docs/bugs/2026-09-14-restore-google-app-password-target.md`; dry-run OK; operator live run pending

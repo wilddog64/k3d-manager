@@ -9,6 +9,8 @@
 
 ### Added
 
+- `make restore-google-app-password` restores the Alertmanager Gmail App Password from the Keychain backup (`k3dm-alertmanager-gmail-app-password`) into Vault `secret/k3d-manager/alertmanager`, changing only `gmail_app_pw` (and failing if `gmail_from`/`sms_gateway` are missing), then runs `make observability` to rebuild `alertmanager-smtp-secret`; the token and password travel via env, never argv
+
 - `/k3dm <target> [KEY=value …] [confirm]` Slack command runs allowlisted Makefile targets (`fix-*`, `e2e-remote`, `e2e-runner-health`, `e2e-replay`, `e2e-runner-unlock`, `vuln-scan`, `status-public`, `observability-status`, `sync-apps`, `monitoring-pause`/`monitoring-resume`) through a new `/api/v1/make` webhook endpoint; each target has a minimum role enforced against the caller's mapped Slack role, variables are regex-validated and passed as argv, destructive targets require `confirm`, and one job runs at a time
 
 - `argocd_reclaim_release_ownership [--context <ctx>] [--confirm]` reports, and with `--confirm` removes, ArgoCD Application ownership (`argocd-controller` managedFields and `argocd.argoproj.io/instance` labels) on the ArgoCD Helm release's own ConfigMaps/Secrets/ServiceAccounts, plus orphan ServiceAccounts; it clears the SSA conflicts that made `helm upgrade argocd` fail on the hub after `ubuntu-k3s-platform` rendered argo-cd 7.8.1 into `cicd`
