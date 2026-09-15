@@ -73,6 +73,9 @@ def argocd(run, state, token=None, threshold=3, server="argocd.3ai-talk.org"):
         result = run(["argocd", "app", "list", "-o", "json", "--grpc-web"],
                      {"ARGOCD_AUTH_TOKEN": token, "ARGOCD_SERVER": server})
         code, output = result
+        if code != 0 and "Unauthenticated" in (output or ""):
+            return record("argocd", "unknown",
+                          f"ArgoCD status source unavailable: credential rejected; re-mint {ARGOCD_SERVICE}")
         apps = json.loads(output) if code == 0 and output else None
         if not isinstance(apps, list):
             raise ValueError("invalid ArgoCD response")

@@ -180,6 +180,9 @@ risk for no signal.
 | CI / required-check status and R4 re-run | `k3dm-hermes-gh-token` | GitHub fine-grained PAT with `actions:write` for approved R4 POSTs |
 | Slack summary delivery | `k3dm-slack-webhook` | Existing incoming-webhook relay |
 | Monthly security audit (optional) | `k3dm-hermes-audit-token` | Read-only fine-grained PAT; see [Monthly security audit](#monthly-security-audit). Absent → the audit reports its checks "unavailable" and the poll continues |
+| SMS pager sender (optional) | `k3dm-hermes-sms-from` | Gmail address; see [SMS pager](#sms-pager) |
+| SMS pager password (optional) | `k3dm-hermes-sms-app-password` | Google App Password |
+| SMS pager recipient (optional) | `k3dm-hermes-sms-to` | Carrier SMS gateway address |
 
 The ArgoCD `hermes` account and its RBAC (`get` only, no `sync`/`update`/`delete`) live in
 [`scripts/etc/argocd/values.yaml.tmpl`](../../scripts/etc/argocd/values.yaml.tmpl). The ArgoCD token
@@ -239,6 +242,40 @@ align to a hard boundary.
 | `K3DM_HERMES_JITTER` | (unset) | When set, sleep 0–30s before sensing |
 | `K3DM_HERMES_AUDIT_RUN_BATS` | (unset) | When `1`, the monthly audit runs the webhook security-regression bats subset (Group B); otherwise reported "skipped" |
 | `K3DM_HERMES_APPROVAL_DRAIN_URL` | (unset) | Opt-in Slack approvals: relay drain URL (https). Unset = no buttons, no drain |
+| `K3DM_HERMES_SMS_DAILY_BUDGET` | `10` | Max SMS pages per UTC day |
+
+---
+
+## SMS pager
+
+Hermes texts the operator's phone for a short allowlist of must-know events. It covers the gaps
+Slack and Alertmanager cannot: Alertmanager runs inside the cluster, and Hermes sensors that read
+"unknown" never trip the two-signal correlator. Paging bypasses the correlator on purpose.
+
+| Event | Fires when | Recovery text |
+|-------|------------|---------------|
+| Webhook down | `eso` and `node_pressure` both `unknown` for 2 consecutive polls (~10 min) | yes |
+| Sensor stuck unknown | any other sensor `unknown` for 6 consecutive polls (~30 min); the text carries its evidence, e.g. `argocd ... credential rejected` | yes |
+| Poll job failing | the Hermes poll raises on 2 consecutive runs | yes |
+| Security | once per UTC hour, any **new** open critical/high CodeQL or Dependabot alert (read with `k3dm-hermes-audit-token`) | no |
+
+Each page is sent once on the way down and once on recovery, mirrored to Slack, and capped at
+`K3DM_HERMES_SMS_DAILY_BUDGET` texts per UTC day (default 10). The first security check after
+install texts once for every critical/high alert already open. If the laptop sleeps or dies,
+nothing pages.
+
+Delivery is Gmail SMTP (`smtp.gmail.com:587`, STARTTLS) to the carrier SMS gateway, the same route
+Alertmanager uses. Credentials come from the login Keychain (account `k3dm`) only, never Vault,
+because Vault lives in the cluster Hermes must outlive. The pager is off until all three items
+exist. Add each one at the prompt (never in argv):
+
+```bash
+security add-generic-password -a k3dm -s k3dm-hermes-sms-from -w          # Gmail address
+security add-generic-password -a k3dm -s k3dm-hermes-sms-app-password -w  # Google App Password
+security add-generic-password -a k3dm -s k3dm-hermes-sms-to -w            # 10digits@tmomail.net
+```
+
+No reload is needed: the next poll reads them.
 
 ---
 

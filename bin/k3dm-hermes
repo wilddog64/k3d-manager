@@ -24,6 +24,7 @@ from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
 from hermes.slack import post_interactive, post_summary
+from hermes import pager
 
 
 def _load_state(path):
@@ -59,7 +60,7 @@ def _argocd_run(command, additions):
     env.update(additions)
     result = subprocess.run(command, capture_output=True, text=True, env=env,
                             timeout=20, check=False)
-    return result.returncode, result.stdout
+    return result.returncode, result.stdout if result.returncode == 0 else result.stderr
 
 
 def _probe_run(command, _additions):
@@ -177,6 +178,53 @@ def _drain_approvals(state, relay, drain_url):
     return outcomes
 
 
+def _page(state, texts, relay):
+    """Mirror page texts to Slack, then text them within the daily SMS budget."""
+    for text in texts:
+        post_summary(relay, text)
+    budget = int(os.environ.get("K3DM_HERMES_SMS_DAILY_BUDGET", "10"))
+    return pager.deliver(texts, state, timestamp()[:10],
+                         lambda text: pager.send_sms(_keychain_secret, text), budget=budget)
+
+
+def _poll(state, state_path):
+    records, event = _run_cycle(state)
+    relay = _keychain_secret("k3dm-slack-webhook")
+    drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
+    if event:
+        if drain_url and event.get("proposals"):
+            blocks = interactive_blocks(event["text"], event["proposals"], event["nonce"])
+            if not post_interactive(relay, event["text"], blocks):
+                post_summary(relay, event["text"])
+        else:
+            post_summary(relay, event["text"])
+    approvals = _drain_approvals(state, relay, drain_url)
+    warn_days = int(os.environ.get("K3DM_HERMES_TOKEN_WARN_DAYS", "14"))
+    advisory = token_expiry_advisory(_github_headers, state, timestamp()[:10], warn_days=warn_days)
+    if advisory:
+        post_summary(relay, advisory)
+    from hermes.audit import AUDIT_SERVICE, REPOSITORY, monthly_audit_advisory
+
+    def audit_get(path, headers):
+        return _http_json(f"https://api.github.com{path}", headers)
+
+    run_bats = os.environ.get("K3DM_HERMES_AUDIT_RUN_BATS") == "1"
+    digest = monthly_audit_advisory(audit_get, _github_headers, _keychain_secret,
+                                    state, timestamp()[:7],
+                                    bats_runner=_bats_run, run_bats=run_bats)
+    if digest:
+        post_summary(relay, digest)
+    texts = pager.health_events(records, state)
+    texts += pager.security_events(audit_get, _keychain_secret, state, timestamp()[:13],
+                                   AUDIT_SERVICE, REPOSITORY)
+    texts += pager.job_events(state, None)
+    pages = _page(state, texts, relay)
+    _save_state(state_path, state)
+    print(json.dumps({"records": records, "event": event, "approvals": approvals,
+                      "pages": pages}))
+    return 0
+
+
 def _usage():
     print("Usage: k3dm-hermes [approve <action-id>|list|preflight|audit]", file=sys.stderr)
 
@@ -226,35 +274,14 @@ def main():
         print(json.dumps(outcome, sort_keys=True))
         return 0 if outcome.get("outcome") == "executed" else 1
 
-    records, event = _run_cycle(state)
-    relay = _keychain_secret("k3dm-slack-webhook")
-    drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
-    if event:
-        if drain_url and event.get("proposals"):
-            blocks = interactive_blocks(event["text"], event["proposals"], event["nonce"])
-            if not post_interactive(relay, event["text"], blocks):
-                post_summary(relay, event["text"])
-        else:
-            post_summary(relay, event["text"])
-    approvals = _drain_approvals(state, relay, drain_url)
-    warn_days = int(os.environ.get("K3DM_HERMES_TOKEN_WARN_DAYS", "14"))
-    advisory = token_expiry_advisory(_github_headers, state, timestamp()[:10], warn_days=warn_days)
-    if advisory:
-        post_summary(relay, advisory)
-    from hermes.audit import monthly_audit_advisory
-
-    def audit_get(path, headers):
-        return _http_json(f"https://api.github.com{path}", headers)
-
-    run_bats = os.environ.get("K3DM_HERMES_AUDIT_RUN_BATS") == "1"
-    digest = monthly_audit_advisory(audit_get, _github_headers, _keychain_secret,
-                                    state, timestamp()[:7],
-                                    bats_runner=_bats_run, run_bats=run_bats)
-    if digest:
-        post_summary(relay, digest)
-    _save_state(state_path, state)
-    print(json.dumps({"records": records, "event": event, "approvals": approvals}))
-    return 0
+    try:
+        return _poll(state, state_path)
+    except Exception as exc:
+        fresh = _load_state(state_path)
+        _page(fresh, pager.job_events(fresh, type(exc).__name__),
+              _keychain_secret("k3dm-slack-webhook"))
+        _save_state(state_path, fresh)
+        raise
 
 
 if __name__ == "__main__":

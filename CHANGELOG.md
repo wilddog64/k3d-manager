@@ -9,6 +9,8 @@
 
 ### Added
 
+- Hermes SMS pager texts the operator (Gmail SMTP to the carrier SMS gateway, Keychain `k3dm-hermes-sms-*`, off until provisioned) when the webhook is down for 2 polls, any other sensor is stuck `unknown` for 6 polls, the Hermes poll job fails twice, or a new critical/high CodeQL/Dependabot alert opens; each page texts once down and once on recovery, mirrors to Slack, and is capped by `K3DM_HERMES_SMS_DAILY_BUDGET`. The `argocd` sensor now names a rejected credential in its evidence
+
 - `make restore-google-app-password` restores the Alertmanager Gmail App Password from the Keychain backup (`k3dm-alertmanager-gmail-app-password`) into Vault `secret/k3d-manager/alertmanager`, changing only `gmail_app_pw` (and failing if `gmail_from`/`sms_gateway` are missing), then runs `make observability` to rebuild `alertmanager-smtp-secret`; the token and password travel via env, never argv
 
 - `/k3dm <target> [KEY=value …] [confirm]` Slack command runs allowlisted Makefile targets (`fix-*`, `e2e-remote`, `e2e-runner-health`, `e2e-replay`, `e2e-runner-unlock`, `vuln-scan`, `status-public`, `observability-status`, `sync-apps`, `monitoring-pause`/`monitoring-resume`) through a new `/api/v1/make` webhook endpoint; each target has a minimum role enforced against the caller's mapped Slack role, variables are regex-validated and passed as argv, destructive targets require `confirm`, and one job runs at a time
