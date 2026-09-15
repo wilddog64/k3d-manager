@@ -187,6 +187,13 @@ _healthy_blob() {
   export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
   local hex="0000000000000000000000000000000000000000000000000000000000000000"
   e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.34.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
   SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
   ssh() { printf '%s\n' "$*" > "$SSH_LOG"; echo "remote stdout"; return 0; }
   run e2e_runner_dispatch "m2" "sha256:${hex}"
@@ -196,8 +203,53 @@ _healthy_blob() {
   [[ "$output" == *"E2E_RUNNER=m2"* ]]
   [[ "$output" == *"KUBECONFIG="* ]]
   [[ "$output" == *"e2e-runner.yaml"* ]]
+  [[ "$output" == *"[ -d"* ]]
+  [[ "$output" == *"git clone --quiet https://github.com/wilddog64/k3d-manager.git"* ]]
+  [[ "$output" == *"fetch --quiet origin"* ]]
+  [[ "$output" == *"checkout --quiet --force --detach 0123456789abcdef"* ]]
   run bash -c 'ls "$1"/dispatch/m2-*.log' "" "$E2E_REPORT_DIR"
   [ "$status" -eq 0 ]
+}
+
+@test "dispatch refuses an unpushed SHA before SSH" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      return 0
+    fi
+    printf 'deadbeef\n'
+  }
+  ssh() { printf 'SSH SHOULD NOT RUN\n' >&2; return 0; }
+  run e2e_runner_dispatch "m2"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"is not pushed"* ]]
+  [[ "$output" != *"SSH SHOULD NOT RUN"* ]]
+}
+
+@test "dispatch refuses a malformed runner repository URL" {
+  export E2E_M2_REPO_URL="ssh://github.com/wilddog64/k3d-manager.git"
+  run e2e_runner_dispatch "m2"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"invalid E2E_M2_REPO_URL"* ]]
+}
+
+@test "dispatch uses an explicit runner repository override" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_REPO="/tmp/e2e-owned-runner"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.34.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
+  SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
+  ssh() { printf '%s\n' "$*" > "$SSH_LOG"; return 0; }
+  run e2e_runner_dispatch "m2"
+  [ "$status" -eq 0 ]
+  run cat "$SSH_LOG"
+  [[ "$output" == *"/tmp/e2e-owned-runner"* ]]
 }
 
 @test "dispatch returns the remote exit code unchanged" {

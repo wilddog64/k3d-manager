@@ -32,8 +32,10 @@ E2E_M2_REMOTE_PATH="${E2E_M2_REMOTE_PATH:-/opt/homebrew/bin:/usr/local/bin}"
 E2E_M2_MIN_CPU_IDLE="${E2E_M2_MIN_CPU_IDLE:-35}"
 E2E_M2_MIN_MEM_FREE="${E2E_M2_MIN_MEM_FREE:-25}"
 E2E_M2_MIN_DISK_GB="${E2E_M2_MIN_DISK_GB:-40}"
-# The k3d-manager checkout on the M2 that owns the remote E2E entry point.
-E2E_M2_REPO="${E2E_M2_REPO:-\$HOME/src/gitrepo/personal/k3d-manager}"
+# The clean, e2e-owned checkout on the M2 that owns the remote E2E entry point.
+E2E_M2_REPO="${E2E_M2_REPO:-\$HOME/.k3dm/e2e/runner-src}"
+E2E_M2_REPO_URL="${E2E_M2_REPO_URL:-https://github.com/wilddog64/k3d-manager.git}"
+REPO_ROOT="${REPO_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 # Runners a dispatch may target. RUNNER is matched against this exact list and
 # then used verbatim as the run's provenance — never free-text from the caller.
 E2E_RUNNER_ALLOWLIST="${E2E_RUNNER_ALLOWLIST:-m2}"
@@ -68,7 +70,7 @@ export E2E_M2_SSH_HOST E2E_M2_RUNNER_CLUSTER E2E_M2_RUNNER_CONTEXT
 export E2E_M2_KUBECONFIG E2E_M2_LOCK E2E_M2_REMOTE_REPORT_DIR
 export E2E_M2_ORB_TIMEOUT E2E_M2_ORB_INTERVAL E2E_M2_SSH_CONNECT_TIMEOUT
 export E2E_M2_MIN_CPU_IDLE E2E_M2_MIN_MEM_FREE E2E_M2_MIN_DISK_GB
-export E2E_M2_REMOTE_PATH E2E_M2_REPO E2E_RUNNER_ALLOWLIST
+export E2E_M2_REMOTE_PATH E2E_M2_REPO E2E_M2_REPO_URL E2E_RUNNER_ALLOWLIST
 export E2E_REPORT_DIR E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP
 export E2E_HUB_CONTEXT E2E_PUBLISH_KUBECONFIG E2E_PUBLISH_MAX_BYTES E2E_PUBLISH_AUDIT_LOG
 export E2E_M2_LOCK_MAX_AGE E2E_M2_PUBLISH_BACK_HOST E2E_M2_PUBLISH_BACK_KEY
@@ -278,6 +280,10 @@ function _e2e_valid_digest() {
   [[ "$d" =~ ^([A-Za-z0-9._/-]+@)?sha256:[0-9a-f]{64}$ ]]
 }
 
+function _e2e_valid_repo_url() {
+  [[ "${1:-}" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?$ ]]
+}
+
 function _e2e_runner_allowed() {
   local want="${1:-}" allowed
   for allowed in $E2E_RUNNER_ALLOWLIST; do
@@ -320,6 +326,15 @@ function e2e_runner_dispatch() {
   if ! _e2e_valid_digest "$digest"; then
     _err "[e2e-remote] invalid DIGEST '${digest}' (expected empty or [repo@]sha256:<64 hex>)"
   fi
+  if ! _e2e_valid_repo_url "$E2E_M2_REPO_URL"; then
+    _err "[e2e-remote] invalid E2E_M2_REPO_URL '${E2E_M2_REPO_URL}'"
+  fi
+
+  local sha
+  sha="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+  if [[ -z "$(git -C "$REPO_ROOT" branch -r --contains "$sha")" ]]; then
+    _err "[e2e-remote] HEAD ${sha} is not pushed; push the branch first"
+  fi
 
   local pf status
   if ! pf="$(e2e_runner_preflight)"; then
@@ -328,6 +343,7 @@ function e2e_runner_dispatch() {
     _err "[e2e-remote] runner ${runner} not available (status=${status:-unknown}); not dispatching, no local fallback"
   fi
   _info "[e2e-remote] runner ${runner} available; dispatching E2E (digest=${digest:-none})"
+  _info "[e2e-remote] runner source pinned to ${sha}"
 
   local token
   token="$(_e2e_lock_token)"
@@ -356,13 +372,22 @@ function e2e_runner_dispatch() {
     imageenv="export E2E_IMAGE_TAG=${_image_tag_q}; "
   fi
 
+  local repo_url_q sha_q
+  printf -v repo_url_q '%q' "$E2E_M2_REPO_URL"
+  printf -v sha_q '%q' "$sha"
+
   local -a opts
   mapfile -t opts < <(_e2e_remote_ssh_opts)
   local remote
+  # shellcheck disable=SC2027
   remote="export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; \
 export E2E_RUNNER=${runner} KUBECONFIG=${E2E_M2_KUBECONFIG} E2E_REPORT_DIR=${E2E_M2_REMOTE_REPORT_DIR}; \
 ${imageenv}${backenv}\
-cd ${E2E_M2_REPO} || exit 1; ./scripts/k3d-manager e2e_verify_vcluster ${digest}; rc=\$?; \
+[ -d "${E2E_M2_REPO}/.git" ] || git clone --quiet ${repo_url_q} "${E2E_M2_REPO}" || exit 1; \
+git -C "${E2E_M2_REPO}" fetch --quiet origin || exit 1; \
+git -C "${E2E_M2_REPO}" checkout --quiet --force --detach ${sha_q} || exit 1; \
+git -C "${E2E_M2_REPO}" clean -fdq -e .k3dm || exit 1; \
+cd "${E2E_M2_REPO}" || exit 1; ./scripts/k3d-manager e2e_verify_vcluster ${digest}; rc=\$?; \
 ./scripts/k3d-manager e2e_runner_publish_back \$rc || true; exit \$rc"
 
   ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$remote" 2>&1 | tee "$transcript"

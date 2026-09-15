@@ -19,6 +19,7 @@
 
 ### Fixed
 
+- `e2e-remote RUNNER=m2` now prepares an e2e-owned clean M2 clone pinned to the dispatched M4 commit, instead of running the operator's hand-synced checkout; dispatch refuses unpushed commits and malformed repository URLs before connecting
 - `make update-webhook-slack` no longer prints the Slack bot token or passes it in argv: it reads the token from Keychain `k3d-manager-slack-bot-token-bot` (or an exported `SLACK_BOT_TOKEN`), keeps the plist's existing `SLACK_CHANNEL_ID` unless one is exported, backs up the plist, and writes it via Python `plistlib` with the token in env
 - `make update-webhook-slack-secret` no longer passes the Slack signing secret in argv (PlistBuddy) and now fails closed: a missing or locked Keychain `k3dm-slack-signing-secret` stops before touching the plist, where the old `( ...; exit 1)` subshell let it write an empty secret and restart the webhook; the plist is backed up and written via Python `plistlib` with the secret in env
 - Hub Prometheus no longer stores every node-exporter/kubelet/kube-state-metrics/istiod/envoy series twice: `federate-acg` scrapes `host.internal:19090`, which serves the hub's own Prometheus whenever no ACG sandbox holds that port, so the self-scraped copies (labelled `cluster="acg"`) duplicated alerts such as `KubeJobFailed`/`TargetDown`; the job now drops samples that do not carry the ACG Prometheus's own `cluster` external label, and the ArgoCD dashboard's Image Updater replica stats aggregate with `max()`
