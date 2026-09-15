@@ -415,16 +415,16 @@ update-webhook-slack-roles:
 	$(MAKE) restart-webhook
 	@echo "K3DM_SLACK_ROLE_MAP stored in Keychain — webhook restarted"
 
-## Inject SLACK_SIGNING_SECRET from Keychain into the webhook LaunchAgent plist and restart
+## Inject SLACK_SIGNING_SECRET (Keychain k3dm-slack-signing-secret) into the webhook LaunchAgent plist and restart
 update-webhook-slack-secret:
-	@_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) || \
-	  (echo "ERROR: k3dm-slack-signing-secret not in Keychain — run: security add-generic-password -s k3dm-slack-signing-secret -a k3dm -w <secret>"; exit 1); \
-	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_SIGNING_SECRET" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true; \
-	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_SIGNING_SECRET string $$_sig" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
-	$(MAKE) restart-webhook
-	@echo "SLACK_SIGNING_SECRET injected from Keychain — webhook restarted"
+	@_sig="$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null)"; \
+	[ -n "$$_sig" ] || { echo "[update-webhook-slack-secret] ERROR: k3dm-slack-signing-secret not in Keychain (locked? run: security unlock-keychain; to add, run: security add-generic-password -s k3dm-slack-signing-secret -a k3dm -w  and paste at the prompt)" >&2; exit 1; }; \
+	_plist="$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
+	[ -f "$$_plist" ] || { echo "[update-webhook-slack-secret] ERROR: $$_plist not found — run: make setup-worker" >&2; exit 1; }; \
+	cp -p "$$_plist" "$$_plist.bak-$$(date +%Y%m%d%H%M%S)"; \
+	SLACK_SIG="$$_sig" PLIST="$$_plist" python3 -c 'import os,plistlib; p=os.environ["PLIST"]; d=plistlib.load(open(p,"rb")); d.setdefault("EnvironmentVariables",{})["SLACK_SIGNING_SECRET"]=os.environ["SLACK_SIG"]; plistlib.dump(d,open(p,"wb")); print("[update-webhook-slack-secret] plist updated (SLACK_SIGNING_SECRET)")'
+	@$(MAKE) --no-print-directory restart-webhook
+	@echo "[update-webhook-slack-secret] webhook restarted"
 
 ## Bootstrap Cloudflare Worker + webhook daemon (one-time per environment; safe to re-run)
 setup-worker:
