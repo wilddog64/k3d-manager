@@ -5,7 +5,7 @@
 
 ## Releases
 
-- [x] **`/k3dm` Slack command LIVE-VERIFIED 2026-09-15** — was registered in the wrong Slack app ("k3dm", different signing secret → 401); recreated in "k3d-manager" app. `/argocd-upgrade` + `/cleanup-stale-sandbox` also moved (user, 2026-09-15).
+- [x] **`/k3dm` Slack command LIVE-VERIFIED 2026-09-15** — was registered in the wrong Slack app ("k3dm", different signing secret → 401); recreated in "k3d-manager" app. `/argocd-upgrade` + `/cleanup-stale-sandbox` also moved; old "k3dm" app deleted (user, 2026-09-15).
 - [x] **Product catalog empty-DB incident 2026-09-11 — RESOLVED.** Stranded
   ArgoCD PostSync hooks (seed + FTS index) after a repo-server crash-loop aborted
   the sync pre-PostSync; app stayed `Synced/Healthy` so auto-sync never replayed
