@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** FIXED `39ecff4d` — verified; operator acceptance pending
+**Status:** FIXED `39ecff4d` — verified; operator acceptance passed
 **Files:** `Makefile`, `scripts/tests/bin/makefile_webhook_slack.bats` (new), `CHANGELOG.md`
 
 ## Problem

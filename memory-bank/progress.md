@@ -5,7 +5,7 @@
 
 ## Releases
 
-- [x] **`make update-webhook-slack` token echo** — VERIFIED by Claude 2026-09-15 (S1+S2 byte-match spec, 8/8 BATS, make -n sentinel hits 0; CHANGELOG under [Unreleased] Fixed) — operator acceptance pending: user runs `make update-webhook-slack`. Commit `39ecff4d` pushed to `origin/k3d-manager-v1.34.0`; spec `docs/bugs/2026-09-15-update-webhook-slack-token-echo.md`.
+- [x] **`make update-webhook-slack` token echo** — VERIFIED by Claude 2026-09-15 (S1+S2 byte-match spec, 8/8 BATS, make -n sentinel hits 0; CHANGELOG under [Unreleased] Fixed); operator acceptance PASSED 2026-09-15 (no token echoed, webhook restarted, auth.test ok bot B0B8BC72WPK). Commit `39ecff4d` pushed to `origin/k3d-manager-v1.34.0`; spec `docs/bugs/2026-09-15-update-webhook-slack-token-echo.md`.
 - [x] **`/k3dm` Slack command LIVE-VERIFIED 2026-09-15** — was registered in the wrong Slack app ("k3dm", different signing secret → 401); recreated in "k3d-manager" app. `/argocd-upgrade` + `/cleanup-stale-sandbox` also moved; old "k3dm" app deleted (user, 2026-09-15).
 - [x] **Product catalog empty-DB incident 2026-09-11 — RESOLVED.** Stranded
   ArgoCD PostSync hooks (seed + FTS index) after a repo-server crash-loop aborted
