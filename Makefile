@@ -396,20 +396,16 @@ uninstall-alertmanager-auth-proxy:
 	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
 	@echo "Alertmanager auth proxy removed"
 
-## Inject SLACK_BOT_TOKEN and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
+## Inject SLACK_BOT_TOKEN (Keychain k3d-manager-slack-bot-token-bot) and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
 update-webhook-slack:
-	@[ -n "$(SLACK_BOT_TOKEN)" ] || (echo "ERROR: SLACK_BOT_TOKEN not set — export it first"; exit 1)
-	@[ -n "$(SLACK_CHANNEL_ID)" ] || (echo "ERROR: SLACK_CHANNEL_ID not set — export it first"; exit 1)
-	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_BOT_TOKEN" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_BOT_TOKEN string $(SLACK_BOT_TOKEN)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
-	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_CHANNEL_ID" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_CHANNEL_ID string $(SLACK_CHANNEL_ID)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
-	$(MAKE) restart-webhook
-	@echo "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID injected — webhook restarted"
+	@_tok="$${SLACK_BOT_TOKEN:-$$(security find-generic-password -s k3d-manager-slack-bot-token-bot -w 2>/dev/null)}"; \
+	[ -n "$$_tok" ] || { echo "[update-webhook-slack] ERROR: k3d-manager-slack-bot-token-bot not in Keychain (locked? run: security unlock-keychain)" >&2; exit 1; }; \
+	_plist="$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
+	[ -f "$$_plist" ] || { echo "[update-webhook-slack] ERROR: $$_plist not found — run: make setup-worker" >&2; exit 1; }; \
+	cp -p "$$_plist" "$$_plist.bak-$$(date +%Y%m%d%H%M%S)"; \
+	SLACK_TOK="$$_tok" SLACK_CHAN="$${SLACK_CHANNEL_ID:-}" PLIST="$$_plist" python3 -c 'import os,plistlib,sys; p=os.environ["PLIST"]; d=plistlib.load(open(p,"rb")); e=d.setdefault("EnvironmentVariables",{}); c=os.environ["SLACK_CHAN"] or e.get("SLACK_CHANNEL_ID",""); c or sys.exit("[update-webhook-slack] ERROR: SLACK_CHANNEL_ID not set and not in plist - export SLACK_CHANNEL_ID first"); e["SLACK_BOT_TOKEN"]=os.environ["SLACK_TOK"]; e["SLACK_CHANNEL_ID"]=c; plistlib.dump(d,open(p,"wb")); print("[update-webhook-slack] plist updated (SLACK_BOT_TOKEN, SLACK_CHANNEL_ID)")'
+	@$(MAKE) --no-print-directory restart-webhook
+	@echo "[update-webhook-slack] webhook restarted"
 
 ## Store the Slack user→role allowlist in Keychain and restart the webhook
 ## Example: make update-webhook-slack-roles K3DM_SLACK_ROLE_MAP=U123:admin,U456:operator
