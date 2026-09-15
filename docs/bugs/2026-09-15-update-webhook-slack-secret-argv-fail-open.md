@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED `26e8b81f` — verified; operator acceptance pending
 **Files:** `Makefile`, `scripts/tests/bin/makefile_webhook_slack.bats`, `CHANGELOG.md`
 **Follow-up to:** `docs/bugs/2026-09-15-update-webhook-slack-token-echo.md` (fixed `39ecff4d`)
 
