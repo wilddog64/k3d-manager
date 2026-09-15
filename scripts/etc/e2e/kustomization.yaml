@@ -18,6 +18,7 @@ resources:
 - product-catalog.yaml
 - basket.yaml
 - order.yaml
+- payment.yaml
 - seed-configmap.yaml
 - seed-job.yaml
 
@@ -31,3 +32,6 @@ images:
 - name: shopping-cart-order
   newName: ghcr.io/wilddog64/shopping-cart-order
   newTag: sha-56033880a16e77ad5df0752eac8ad1c00c4a258a
+- name: shopping-cart-payment
+  newName: ghcr.io/wilddog64/shopping-cart-payment
+  newTag: sha-a672ee42f79db703f632baca3b05bf4f2b4d8718

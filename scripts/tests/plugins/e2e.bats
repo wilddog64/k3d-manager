@@ -60,18 +60,62 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "job manifest sets exactly the three ClusterIP service URLs and OAUTH2 disabled" {
+@test "job manifest sets all four ClusterIP service URLs and OAUTH2 disabled" {
   run _e2e_job_manifest "e2e-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
   [ "$status" -eq 0 ]
   [[ "$output" == *"PRODUCT_CATALOG_URL"* ]]
   [[ "$output" == *"http://product-catalog.shopping-cart-apps.svc:8000"* ]]
   [[ "$output" == *"http://basket.shopping-cart-apps.svc:8083"* ]]
   [[ "$output" == *"http://order.shopping-cart-apps.svc:8080"* ]]
+  [[ "$output" == *"PAYMENT_URL"* ]]
+  [[ "$output" == *"http://payment.shopping-cart-apps.svc:8084"* ]]
   [[ "$output" == *"OAUTH2_ENABLED"* ]]
   [[ "$output" == *'value: "false"'* ]]
   [[ "$output" == *"restartPolicy: Never"* ]]
   [[ "$output" == *"backoffLimit: 0"* ]]
   [[ "$output" == *"name: ghcr-pull-secret"* ]]
+}
+
+@test "payment is pinned in the E2E substrate kustomization" {
+  local kustomization="${BATS_TEST_DIRNAME}/../../etc/e2e/kustomization.yaml"
+  run awk '$1 == "-" && $2 == "payment.yaml" { found=1 } END { exit (found ? 0 : 1) }' "$kustomization"
+  [ "$status" -eq 0 ]
+  run awk '
+    $1 == "-" && $2 == "name:" && $3 == "shopping-cart-payment" { payment=1 }
+    payment && $1 == "newName:" && $2 == "ghcr.io/wilddog64/shopping-cart-payment" { image=1 }
+    payment && $1 == "newTag:" && $2 ~ /^sha-/ { tag=1 }
+    END { exit (payment && image && tag ? 0 : 1) }
+  ' "$kustomization"
+  [ "$status" -eq 0 ]
+}
+
+@test "substrate image inventory includes the pinned payment image" {
+  run _e2e_substrate_images "${BATS_TEST_DIRNAME}/../../etc/e2e"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ghcr.io/wilddog64/shopping-cart-payment:sha-"* ]]
+}
+
+@test "datastore secret includes a payment encryption key without echoing it" {
+  export E2E_PAYMENT_ENCRYPTION_KEY="payment-key-not-echoed"
+  run _e2e_provision_datastore_secret "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"$E2E_PAYMENT_ENCRYPTION_KEY"* ]]
+  run awk '/payment-encryption-key=payment-key-not-echoed/ { found=1 } END { exit (found ? 0 : 1) }' "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "substrate rollout waits for payment" {
+  run _e2e_deploy_substrate "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  run awk '/rollout status deployment\/payment/ { found=1 } END { exit (found ? 0 : 1) }' "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "payment substrate renders offline" {
+  if command -v kubectl >/dev/null 2>&1; then :; else skip "kubectl not installed"; fi
+  run env kubectl kustomize "${BATS_TEST_DIRNAME}/../../etc/e2e"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"name: payment"* ]]
 }
 
 @test "substrate bundle is applied via kustomize (-k scripts/etc/e2e)" {
