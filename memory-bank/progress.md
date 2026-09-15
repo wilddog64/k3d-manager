@@ -6,7 +6,7 @@
 ## Releases
 
 - [ ] **Hermes scheduled e2e (Wed+Sat 02:00, rule triage, docs/bugs filing)** — plan #3 `docs/plans/v1.34.0-hermes-scheduled-e2e.md`; blocked on the 3 e2e bugs below; ASSIGNED to Codex 2026-09-15 (codex exec, sequential run).
-- [ ] **e2e M2 runner checkout drift** — `docs/bugs/2026-09-15-e2e-m2-runner-checkout-drift.md`; ASSIGNED to Codex 2026-09-15 (codex exec, sequential run).
+- [x] **e2e M2 runner checkout drift** — `docs/bugs/2026-09-15-e2e-m2-runner-checkout-drift.md`; `3398c766` (Codex impl, Claude-verified: shellcheck clean, e2e+e2e_remote bats 90/90; committed by Claude — Codex sandbox denied .git/index.lock). Live acceptance pending (`make e2e-remote RUNNER=m2`).
 - [ ] **e2e substrate missing payment** — `docs/bugs/2026-09-15-e2e-substrate-missing-payment.md`; ASSIGNED to Codex 2026-09-15 (codex exec, sequential run).
 - [ ] **e2e remote results never reach Grafana** — `docs/bugs/2026-09-15-e2e-remote-results-never-reach-grafana.md`; operator step after fix: conf file + `make e2e-replay RUNNER=m2`; ASSIGNED to Codex 2026-09-15 (codex exec, sequential run).
 - [ ] **make status login checks not operator accounts** — `docs/bugs/2026-09-15-status-login-checks-not-operator-accounts.md`; ASSIGNED to Codex 2026-09-15 (codex exec, sequential run).
