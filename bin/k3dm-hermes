@@ -178,13 +178,27 @@ def _drain_approvals(state, relay, drain_url):
     return outcomes
 
 
+def _sms_keychain(service):
+    """Read an SMS item; the app password is the shared Alertmanager item (any account)."""
+    if service != pager.SMS_PASSWORD_SERVICE:
+        return _keychain_secret(service)
+    try:
+        result = subprocess.run(
+            ["security", "find-generic-password", "-s", pager.SMS_PASSWORD_SERVICE, "-w"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+        return result.stdout.strip() if result.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 def _page(state, texts, relay):
     """Mirror page texts to Slack, then text them within the daily SMS budget."""
     for text in texts:
         post_summary(relay, text)
     budget = int(os.environ.get("K3DM_HERMES_SMS_DAILY_BUDGET", "10"))
     return pager.deliver(texts, state, timestamp()[:10],
-                         lambda text: pager.send_sms(_keychain_secret, text), budget=budget)
+                         lambda text: pager.send_sms(_sms_keychain, text), budget=budget)
 
 
 def _poll(state, state_path):

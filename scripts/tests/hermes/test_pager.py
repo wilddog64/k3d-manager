@@ -214,3 +214,32 @@ def test_failed_poll_pages_job_failure_and_reraises(tmp_path, monkeypatch):
             raise AssertionError("main must re-raise")
     assert len(pages) == 1 and "poll job failing (RuntimeError)" in pages[0]
     assert json.loads(state_path.read_text())["pager_open"] == ["job"]
+
+
+class FakeRun:
+    def __init__(self, stdout, returncode=0):
+        self.calls = []
+        self.stdout = stdout
+        self.returncode = returncode
+
+    def __call__(self, argv, **_kwargs):
+        self.calls.append(argv)
+        return type("Result", (), {"stdout": self.stdout, "returncode": self.returncode})()
+
+
+def test_sms_password_reads_shared_alertmanager_item_without_duplicate(monkeypatch):
+    hermes = load_hermes()
+    run = FakeRun("shared-pw\n")
+    looked_up = []
+    monkeypatch.setattr(hermes.subprocess, "run", run)
+    monkeypatch.setattr(hermes, "_keychain_secret", lambda service: looked_up.append(service) or "k3dm-item")
+    assert pager.SMS_PASSWORD_SERVICE == "k3dm-alertmanager-gmail-app-password"
+    assert hermes._sms_keychain(pager.SMS_PASSWORD_SERVICE) == "shared-pw"
+    assert run.calls == [["security", "find-generic-password", "-s",
+                          "k3dm-alertmanager-gmail-app-password", "-w"]]
+    assert hermes._sms_keychain(pager.SMS_FROM_SERVICE) == "k3dm-item"
+    assert hermes._sms_keychain(pager.SMS_TO_SERVICE) == "k3dm-item"
+    assert looked_up == [pager.SMS_FROM_SERVICE, pager.SMS_TO_SERVICE]
+    assert len(run.calls) == 1
+    monkeypatch.setattr(hermes.subprocess, "run", FakeRun("", returncode=44))
+    assert hermes._sms_keychain(pager.SMS_PASSWORD_SERVICE) == ""

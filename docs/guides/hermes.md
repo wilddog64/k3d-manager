@@ -181,7 +181,7 @@ risk for no signal.
 | Slack summary delivery | `k3dm-slack-webhook` | Existing incoming-webhook relay |
 | Monthly security audit (optional) | `k3dm-hermes-audit-token` | Read-only fine-grained PAT; see [Monthly security audit](#monthly-security-audit). Absent → the audit reports its checks "unavailable" and the poll continues |
 | SMS pager sender (optional) | `k3dm-hermes-sms-from` | Gmail address; see [SMS pager](#sms-pager) |
-| SMS pager password (optional) | `k3dm-hermes-sms-app-password` | Google App Password |
+| SMS pager password (optional) | `k3dm-alertmanager-gmail-app-password` | Existing Google App Password item shared with Alertmanager (login-user account); not duplicated |
 | SMS pager recipient (optional) | `k3dm-hermes-sms-to` | Carrier SMS gateway address |
 
 The ArgoCD `hermes` account and its RBAC (`get` only, no `sync`/`update`/`delete`) live in
@@ -266,12 +266,13 @@ nothing pages.
 
 Delivery is Gmail SMTP (`smtp.gmail.com:587`, STARTTLS) to the carrier SMS gateway, the same route
 Alertmanager uses. Credentials come from the login Keychain (account `k3dm`) only, never Vault,
-because Vault lives in the cluster Hermes must outlive. The pager is off until all three items
-exist. Add each one at the prompt (never in argv):
+because Vault lives in the cluster Hermes must outlive. The app password is the existing
+`k3dm-alertmanager-gmail-app-password` item (the backup behind `make restore-google-app-password`),
+not a second copy. The pager is off until it and the two items below exist. Add each at the prompt
+(never in argv):
 
 ```bash
 security add-generic-password -a k3dm -s k3dm-hermes-sms-from -w          # Gmail address
-security add-generic-password -a k3dm -s k3dm-hermes-sms-app-password -w  # Google App Password
 security add-generic-password -a k3dm -s k3dm-hermes-sms-to -w            # 10digits@tmomail.net
 ```
 

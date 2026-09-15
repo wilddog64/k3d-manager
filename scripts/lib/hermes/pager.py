@@ -11,7 +11,7 @@ import smtplib
 from email.message import EmailMessage
 
 SMS_FROM_SERVICE = "k3dm-hermes-sms-from"
-SMS_PASSWORD_SERVICE = "k3dm-hermes-sms-app-password"
+SMS_PASSWORD_SERVICE = "k3dm-alertmanager-gmail-app-password"
 SMS_TO_SERVICE = "k3dm-hermes-sms-to"
 SMS_MAX_CHARS = 140
 SMTP_HOST = "smtp.gmail.com"
