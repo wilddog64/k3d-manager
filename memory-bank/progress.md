@@ -5,6 +5,11 @@
 
 ## Releases
 
+- [ ] **Hermes scheduled e2e (Wed+Sat 02:00, rule triage, docs/bugs filing)** — plan #3 `docs/plans/v1.34.0-hermes-scheduled-e2e.md`; blocked on the 3 e2e bugs below; not assigned.
+- [ ] **e2e M2 runner checkout drift** — `docs/bugs/2026-09-15-e2e-m2-runner-checkout-drift.md`; not assigned.
+- [ ] **e2e substrate missing payment** — `docs/bugs/2026-09-15-e2e-substrate-missing-payment.md`; not assigned.
+- [ ] **e2e remote results never reach Grafana** — `docs/bugs/2026-09-15-e2e-remote-results-never-reach-grafana.md`; operator step after fix: conf file + `make e2e-replay RUNNER=m2`; not assigned.
+- [ ] **make status login checks not operator accounts** — `docs/bugs/2026-09-15-status-login-checks-not-operator-accounts.md`; not assigned.
 - [x] **Hermes SMS pager** — VERIFIED (Claude) — live poll 13:17Z ran new code clean (`pages` key present, argocd evidence names rejected credential); commit `a18450d4`; plan `docs/plans/v1.34.0-hermes-sms-pager.md`; assigned to Codex 2026-09-15 (codex exec). Operator follow-ups: provision only `k3dm-hermes-sms-from` + `k3dm-hermes-sms-to` (F1 `612d8f63`: app password reuses existing `k3dm-alertmanager-gmail-app-password`, no duplicate); re-mint `k3dm-hermes-argocd-token` (ArgoCD reinstall 2026-09-10 invalidated it).
 - [x] **`make update-webhook-slack-secret` argv + fail-open** — VERIFIED (Claude) — fix `26e8b81f`: S1+S2 byte-match spec, 12/12 BATS (10 webhook_slack + 2 platform_ops), make -n OK, only 3 spec files touched; operator acceptance pending (user runs `make update-webhook-slack-secret` + a Slack slash command). Commit `26e8b81f` pushed to `origin/k3d-manager-v1.34.0`; spec `docs/bugs/2026-09-15-update-webhook-slack-secret-argv-fail-open.md`; assigned to Codex 2026-09-15 (codex exec).
 - [x] **`make update-webhook-slack` token echo** — VERIFIED by Claude 2026-09-15 (S1+S2 byte-match spec, 8/8 BATS, make -n sentinel hits 0; CHANGELOG under [Unreleased] Fixed); operator acceptance PASSED 2026-09-15 (no token echoed, webhook restarted, auth.test ok bot B0B8BC72WPK). Commit `39ecff4d` pushed to `origin/k3d-manager-v1.34.0`; spec `docs/bugs/2026-09-15-update-webhook-slack-token-echo.md`.
