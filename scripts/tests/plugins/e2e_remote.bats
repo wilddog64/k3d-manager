@@ -260,6 +260,63 @@ _healthy_blob() {
   [ "$status" -eq 7 ]
 }
 
+@test "publish-back host loads from the operator conf file and env wins" {
+  local conf="$BATS_TEST_TMPDIR/e2e-remote.env"
+  printf 'E2E_M2_PUBLISH_BACK_HOST=cliang@m4-air.local\n' > "$conf"
+  export K3DM_E2E_REMOTE_CONF="$conf"
+  E2E_M2_PUBLISH_BACK_HOST=""
+  _e2e_remote_load_conf
+  [ "$E2E_M2_PUBLISH_BACK_HOST" = "cliang@m4-air.local" ]
+
+  E2E_M2_PUBLISH_BACK_HOST="env-host"
+  _e2e_remote_load_conf
+  [ "$E2E_M2_PUBLISH_BACK_HOST" = "env-host" ]
+}
+
+@test "publish-back conf ignores shell metacharacters and warns when absent" {
+  local conf="$BATS_TEST_TMPDIR/e2e-remote.env"
+  printf 'E2E_M2_PUBLISH_BACK_HOST=a;rm -rf x\n' > "$conf"
+  export K3DM_E2E_REMOTE_CONF="$conf"
+  E2E_M2_PUBLISH_BACK_HOST=""
+  run _e2e_remote_load_conf
+  [ "$status" -eq 0 ]
+  [ -z "$E2E_M2_PUBLISH_BACK_HOST" ]
+  [[ "$output" == *"will NOT reach the hub/Grafana"* ]]
+}
+
+@test "dispatch copies remote result files and preserves a non-zero exit code" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_REMOTE_REPORT_DIR="/remote/reports"
+  export E2E_M2_PUBLISH_BACK_HOST="m4-host"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  _e2e_remote_lock_acquire() { return 0; }
+  _e2e_remote_lock_release() { return 0; }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.34.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
+  ssh() {
+    local cmd="${!#}"
+    case "$cmd" in
+      *e2e_verify_vcluster*)
+        printf 'Summary written to /remote/reports/123-456.json\n'
+        return 7
+        ;;
+      *123-456.failures.json*) printf '[{"status":"failed"}]\n' ;;
+      *123-456.json*) printf '{"run_id":"123-456"}\n' ;;
+    esac
+  }
+  run e2e_runner_dispatch "m2"
+  [ "$status" -eq 7 ]
+  local transcript
+  transcript="$(ls "$E2E_REPORT_DIR"/dispatch/m2-*.log)"
+  [ -s "${transcript%.log}.summary.json" ]
+  [ -s "${transcript%.log}.failures.json" ]
+}
+
 @test "make e2e-remote requires RUNNER and wires to the dispatcher" {
   run grep -F -- 'e2e_runner_dispatch $(RUNNER) $(DIGEST)' Makefile
   [ "$status" -eq 0 ]
@@ -540,6 +597,7 @@ print("ok")' "$outf"
   : > "$E2E_REPORT_DIR/b.json";        touch -t 202601020000 "$E2E_REPORT_DIR/b.json"
   : > "$E2E_REPORT_DIR/c.publication_pending.json"; touch -t 202601030000 "$E2E_REPORT_DIR/c.publication_pending.json"
   : > "$E2E_REPORT_DIR/d.published.json";           touch -t 202601040000 "$E2E_REPORT_DIR/d.published.json"
+  : > "$E2E_REPORT_DIR/e.failures.json";            touch -t 202601050000 "$E2E_REPORT_DIR/e.failures.json"
   run _e2e_newest_summary
   [ "$status" -eq 0 ]
   [[ "$output" == *"/b.json" ]]

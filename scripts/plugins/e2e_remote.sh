@@ -96,6 +96,24 @@ function _e2e_remote_ssh() {
   _run_command --soft --quiet -- ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$cmd"
 }
 
+function _e2e_remote_load_conf() {
+  [[ -n "$E2E_M2_PUBLISH_BACK_HOST" ]] && return 0
+
+  local conf="${K3DM_E2E_REMOTE_CONF:-$HOME/.config/k3d-manager/e2e-remote.env}"
+  local line
+  if [[ -r "$conf" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" =~ ^E2E_M2_PUBLISH_BACK_HOST=[A-Za-z0-9._@-]+$ ]]; then
+        E2E_M2_PUBLISH_BACK_HOST="${line#E2E_M2_PUBLISH_BACK_HOST=}"
+      fi
+    done < "$conf"
+  fi
+
+  if [[ -z "$E2E_M2_PUBLISH_BACK_HOST" ]]; then
+    _warn "[e2e-remote] publish-back host not configured; this result will NOT reach the hub/Grafana (set E2E_M2_PUBLISH_BACK_HOST in ${conf})"
+  fi
+}
+
 # Extract one key=value from probe output (last wins).
 function _e2e_kv() {
   local blob="$1" key="$2" line val=""
@@ -316,8 +334,38 @@ function _e2e_remote_lock_release() {
 # runner allowlist and digest, gates on preflight, streams remote output while
 # persisting a local transcript, returns the remote exit code unchanged, and
 # never falls back to running the workload locally on M4.
+function _e2e_remote_copy_results() {
+  local transcript="$1"
+  shift
+  local -a opts=("$@")
+  local run_id
+  run_id="$(sed -nE 's#.*Summary written to .*/([0-9]+-[0-9]+)\.json.*#\1#p' "$transcript" | tail -n1)"
+  if [[ "$run_id" =~ ^[0-9]+-[0-9]+$ ]]; then
+    local result suffix remote_file local_file temp_file summary_file failures_file
+    summary_file="${transcript%.log}.summary.json"
+    failures_file="${transcript%.log}.failures.json"
+    for result in summary failures; do
+      suffix=".json"
+      [[ "$result" == "failures" ]] && suffix=".failures.json"
+      remote_file="${E2E_M2_REMOTE_REPORT_DIR}/${run_id}${suffix}"
+      local_file="${transcript%.log}.${result}.json"
+      temp_file="${local_file}.tmp"
+      if ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" \
+          "[ -r \"${remote_file}\" ] && cat -- \"${remote_file}\" | head -c 262144" > "$temp_file"; then
+        mv -f "$temp_file" "$local_file"
+      else
+        rm -f "$temp_file"
+        _warn "[e2e-remote] result file unavailable: ${remote_file}"
+      fi
+    done
+    _info "[e2e-remote] result files: ${summary_file} ${failures_file}"
+  fi
+}
+
 function e2e_runner_dispatch() {
   local runner="${1:-}" digest="${2:-}"
+
+  _e2e_remote_load_conf
 
   [[ -n "$runner" ]] || _err "usage: e2e_runner_dispatch <runner> [digest]"
   if ! _e2e_runner_allowed "$runner"; then
@@ -392,6 +440,7 @@ cd "${E2E_M2_REPO}" || exit 1; ./scripts/k3d-manager e2e_verify_vcluster ${diges
 
   ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$remote" 2>&1 | tee "$transcript"
   local rc="${PIPESTATUS[0]}"
+  _e2e_remote_copy_results "$transcript" "${opts[@]}"
   _info "[e2e-remote] dispatch exit ${rc}; transcript: ${transcript}"
   return "$rc"
 }
@@ -658,7 +707,7 @@ function _e2e_newest_summary() {
   # cannot provide, so ls|grep is intentional here.
   # shellcheck disable=SC2010
   ls -1t "$E2E_REPORT_DIR"/*.json 2>/dev/null \
-    | grep -vE '\.(publication_pending|published)\.json$' | head -n1
+    | grep -vE '\.(publication_pending|published|failures)\.json$' | head -n1
 }
 
 # Build a minimal, schema-valid failed summary for a run that produced none
@@ -747,6 +796,7 @@ function e2e_runner_publish_replay() {
 # Never runs automatically.
 function e2e_runner_replay() {
   local runner="${1:-}"
+  _e2e_remote_load_conf
   [[ -n "$runner" ]] || _err "usage: e2e_runner_replay <runner>"
   _e2e_runner_allowed "$runner" || _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
   if ! _e2e_remote_ssh "true"; then

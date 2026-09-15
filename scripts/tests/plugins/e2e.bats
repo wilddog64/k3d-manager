@@ -176,7 +176,7 @@ setup() {
   run bash -c 'ls "$E2E_REPORT_DIR"/*.json'
   [ "$status" -eq 0 ]
   local summary
-  summary="$(ls "$E2E_REPORT_DIR"/*.json | head -1)"
+  summary="$(ls "$E2E_REPORT_DIR"/*.json | grep -vE '\.failures\.json$' | head -1)"
   run grep -F -- '"tier": "vcluster"' "$summary"
   [ "$status" -eq 0 ]
   run grep -F -- '"result": "pass"' "$summary"
@@ -196,7 +196,7 @@ setup() {
   ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 0 ]
   local summary
-  summary="$(ls "$E2E_REPORT_DIR"/*.json | head -1)"
+  summary="$(ls "$E2E_REPORT_DIR"/*.json | grep -vE '\.failures\.json$' | head -1)"
   run grep -F -- '"runner": "m2"' "$summary"
   [ "$status" -eq 0 ]
 }
@@ -207,8 +207,42 @@ setup() {
   ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
   [ "$rc" -ne 0 ]
   local summary
-  summary="$(ls "$E2E_REPORT_DIR"/*.json | head -1)"
+  summary="$(ls "$E2E_REPORT_DIR"/*.json | grep -vE '\.failures\.json$' | head -1)"
   run grep -F -- '"result": "fail"' "$summary"
+  [ "$status" -eq 0 ]
+}
+
+@test "summary writes a bounded ANSI-stripped failure sidecar from nested results" {
+  local run_id="123-456"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":1,"unexpected":3,"flaky":0,"skipped":0},"suites":[{"file":"api/cart.spec.ts","specs":[{"title":"adds cart item","tests":[{"results":[{"status":"failed","error":{"message":"\u001b[31mfirst line\u001b[0m\nsecond line\nthird line\nfourth line"}}]},{"results":[{"status":"passed"},{"status":"timedOut","error":{"message":"timeout"}}]}] }],"suites":[{"file":"api/nested.spec.ts","specs":[{"title":"nested failure","tests":[{"results":[{"status":"failed","error":{"message":"nested"}}]}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+assert len(d)==3, d
+assert [x["status"] for x in d]==["failed","timedOut","failed"], d
+assert d[0]["file"]=="api/cart.spec.ts", d[0]
+assert d[0]["error"]=="first line / second line / third line", d[0]
+assert all(len(x["error"])<=300 for x in d), d
+print("ok")' "$E2E_REPORT_DIR/${run_id}.failures.json"
+  [ "$status" -eq 0 ]
+  run python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+assert set(d)=={"run_id","tier","runner","service","candidate_digest","project","passed","total","failed","duration_seconds","timestamp","commit","exit_code","phase","result"}, d
+print("ok")' "$E2E_REPORT_DIR/${run_id}.json"
+  [ "$status" -eq 0 ]
+}
+
+@test "summary writes an empty failure sidecar when results are missing" {
+  local run_id="234-567"
+  printf 'no Playwright results here\n' > "$E2E_REPORT_DIR/${run_id}.log"
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))==[]; print("ok")' "$E2E_REPORT_DIR/${run_id}.failures.json"
   [ "$status" -eq 0 ]
 }
 

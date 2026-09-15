@@ -354,6 +354,7 @@ function _e2e_write_summary() {
   local phase="${4:-unknown}"
   local log_file="${E2E_REPORT_DIR}/${run_id}.log"
   local summary_file="${E2E_REPORT_DIR}/${run_id}.json"
+  local failures_file="${E2E_REPORT_DIR}/${run_id}.failures.json"
 
   _run_command -- mkdir -p "$E2E_REPORT_DIR"
 
@@ -368,10 +369,11 @@ function _e2e_write_summary() {
   E2E_COMMIT="$commit" \
   E2E_LOG="$log_file" \
   E2E_RUNNER="${E2E_RUNNER:-local-m4}" \
-  python3 - "$summary_file" <<'PY'
+  python3 - "$summary_file" "$failures_file" <<'PY'
 import json, os, re, sys
 
 summary_path = sys.argv[1]
+failures_path = sys.argv[2]
 run_id = os.environ["E2E_RUN_ID"]
 service = os.environ["E2E_SERVICE"]
 candidate = os.environ.get("E2E_CANDIDATE") or None
@@ -382,6 +384,7 @@ log_path = os.environ["E2E_LOG"]
 runner = os.environ.get("E2E_RUNNER") or "local-m4"
 
 passed = total = failed = duration = None
+failures = []
 try:
     with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
         raw = fh.read()
@@ -398,6 +401,35 @@ try:
         total = expected + unexpected + flaky + skipped
         if "duration" in stats:
             duration = round(stats["duration"] / 1000.0, 3)
+        def walk_suites(suites, inherited_file=""):
+            for suite in suites if isinstance(suites, list) else []:
+                if not isinstance(suite, dict):
+                    continue
+                suite_file = suite.get("file") or inherited_file
+                for spec in suite.get("specs", []) if isinstance(suite.get("specs"), list) else []:
+                    if not isinstance(spec, dict):
+                        continue
+                    spec_file = spec.get("file") or suite_file
+                    for test in spec.get("tests", []) if isinstance(spec.get("tests"), list) else []:
+                        if len(failures) >= 200 or not isinstance(test, dict):
+                            continue
+                        results = test.get("results")
+                        last = results[-1] if isinstance(results, list) and results else {}
+                        if not isinstance(last, dict) or last.get("status") not in ("failed", "timedOut"):
+                            continue
+                        error = last.get("error", "")
+                        if isinstance(error, dict):
+                            error = error.get("message", "")
+                        error = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", str(error))
+                        lines = [line.strip() for line in error.splitlines() if line.strip()]
+                        failures.append({
+                            "file": spec_file or "",
+                            "title": spec.get("title") or "",
+                            "status": last["status"],
+                            "error": " / ".join(lines[:3])[:300],
+                        })
+                walk_suites(suite.get("suites"), suite_file)
+        walk_suites(data.get("suites"))
 except Exception:
     pass
 
@@ -421,6 +453,12 @@ summary = {
 with open(summary_path, "w", encoding="utf-8") as fh:
     json.dump(summary, fh, indent=2, sort_keys=True)
     fh.write("\n")
+try:
+    with open(failures_path, "w", encoding="utf-8") as fh:
+        json.dump(failures, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+except Exception:
+    pass
 PY
 
   _info "[e2e] Summary written to ${summary_file} (exit_code=${rc})"
