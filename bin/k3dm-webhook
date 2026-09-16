@@ -1887,7 +1887,7 @@ def _smoke_code_flow(ctx, auth_url, redirect_uri, username, password):
         page = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
         page = exc.read().decode("utf-8", "replace")
-        return False, _smoke_code_flow_error(exc.code, page)
+        return False, _smoke_code_flow_error(exc.code, page, posted=False)
     except Exception:
         return False, "HTTP unavailable"
     parser = _SmokeLoginFormParser()
@@ -1895,7 +1895,7 @@ def _smoke_code_flow(ctx, auth_url, redirect_uri, username, password):
     if parser.required_action:
         return False, "required action pending"
     if not parser.action:
-        return False, _smoke_code_flow_error(getattr(response, "status", 200), page)
+        return False, _smoke_code_flow_error(getattr(response, "status", 200), page, posted=False)
     target = urllib.parse.urljoin(auth_url, parser.action)
     data = urllib.parse.urlencode({"username": username, "password": password,
                                    "credentialId": ""}).encode()
@@ -1914,8 +1914,14 @@ def _smoke_code_flow(ctx, auth_url, redirect_uri, username, password):
         return False, "HTTP unavailable"
 
 
-def _smoke_code_flow_error(code, page):
+def _smoke_code_flow_error(code, page, posted=True):
+    """Classify a failed code-flow step. `posted` is False before any credential is sent,
+    where Keycloak's generic error page reuses the invalid-credentials wording."""
     lower = page.lower()
+    if "invalid parameter: redirect_uri" in lower:
+        return "client redirect_uri rejected"
+    if not posted:
+        return f"authorization request rejected (HTTP {code})"
     if "invalid username or password" in lower:
         return "credentials rejected"
     if "invalid parameter: redirect_uri" in lower:

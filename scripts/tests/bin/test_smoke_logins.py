@@ -151,3 +151,19 @@ def test_grafana_failure_is_skipped_while_monitoring_is_paused(monkeypatch):
     assert "monitoring paused" in detail and SENTINEL not in detail
     monkeypatch.setattr(WEBHOOK, "_monitoring_paused", lambda *args, **kwargs: False)
     assert WEBHOOK._smoke_grafana_login(None)[1] is False
+
+
+def test_pre_form_error_is_not_labelled_credentials_rejected():
+    """Keycloak's 400 error page reuses the invalid-credentials wording before any
+    login form is served (2026-09-15 browser-flow regression); do not call that a
+    rejected credential."""
+    page = "<html><body>We are sorry... Invalid username or password.</body></html>"
+    assert WEBHOOK._smoke_code_flow_error(400, page, posted=False) == \
+        "authorization request rejected (HTTP 400)"
+    assert WEBHOOK._smoke_code_flow_error(200, page) == "credentials rejected"
+
+
+def test_redirect_uri_error_wins_before_and_after_post():
+    page = "<html>Invalid parameter: redirect_uri</html>"
+    assert WEBHOOK._smoke_code_flow_error(400, page, posted=False) == "client redirect_uri rejected"
+    assert WEBHOOK._smoke_code_flow_error(400, page) == "client redirect_uri rejected"
