@@ -50,6 +50,7 @@ fi
 : "${ARGOCD_HELM_REPO_URL:=https://argoproj.github.io/argo-helm}"
 : "${ARGOCD_HELM_CHART_REF:=argo/argo-cd}"
 : "${ARGOCD_VIRTUALSERVICE_HOST:=argocd.dev.local.me}"
+export ARGOCD_PUBLIC_URL="${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
 : "${ARGOCD_CHART_VERSION:=7.8.1}"
 : "${ARGOCD_SERVER_WAIT_TIMEOUT:=600s}"
 : "${ARGOCD_PORT_FORWARD_WAIT_TIMEOUT:=30}"
@@ -458,6 +459,7 @@ function _argocd_helm_deploy_release() {
 
    local -a helm_args=(
       --create-namespace
+      --set-string "configs.cm.url=${ARGOCD_PUBLIC_URL}"
       --set-string "redisSecretInit.podAnnotations.sidecar\.istio\.io/inject=false"
    )
 
@@ -469,7 +471,7 @@ function _argocd_helm_deploy_release() {
    if (( enable_ldap )); then
       _info "[argocd] Configuring LDAP/Dex authentication"
       values_file="/tmp/argocd-values-${RANDOM}.yaml"
-      envsubst '$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
+      envsubst '$ARGOCD_PUBLIC_URL $ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
          < "$ARGOCD_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
       helm_args+=(--values "$values_file")
    else

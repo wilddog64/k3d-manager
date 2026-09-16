@@ -345,15 +345,28 @@ JSON
 }
 
 @test "ArgoCD Helm values substitute Keycloak OIDC settings" {
-  local render_vars='$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS'
+  local render_vars='$ARGOCD_PUBLIC_URL $ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS'
   local rendered
 
   run grep -F -- "envsubst '${render_vars}'" "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   [ "$status" -eq 0 ]
 
   rendered="$(envsubst "$render_vars" < "${ARGOCD_CONFIG_DIR}/values.yaml.tmpl")"
+  [[ "$rendered" == *"url: ${ARGOCD_PUBLIC_URL}"* ]]
+  [[ "$rendered" == *"domain: ${ARGOCD_VIRTUALSERVICE_HOST}"* ]]
   [[ "$rendered" == *"issuer: ${ARGOCD_KEYCLOAK_REALM_URL}"* ]]
   [[ "$rendered" == *"clientID: ${ARGOCD_KEYCLOAK_CLIENT_ID}"* ]]
   [[ "$rendered" != *'${ARGOCD_KEYCLOAK_REALM_URL}'* ]]
   [[ "$rendered" != *'${ARGOCD_KEYCLOAK_CLIENT_ID}'* ]]
+}
+
+@test "ArgoCD public URL override is passed to Helm independently of routing host" {
+  export ARGOCD_PUBLIC_URL=https://argo.example.invalid
+  export ARGOCD_VIRTUALSERVICE_HOST=argo.internal.invalid
+  _helm() { printf '%s\n' "$@"; }
+  _argocd_ensure_servicemonitors() { :; }
+  run _argocd_helm_deploy_release 0 1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"configs.cm.url=https://argo.example.invalid"* ]]
+  [[ "$output" != *"configs.cm.url=https://argo.internal.invalid"* ]]
 }
