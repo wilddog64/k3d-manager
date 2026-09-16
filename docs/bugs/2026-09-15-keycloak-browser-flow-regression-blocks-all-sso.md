@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** OPEN
+**Status:** FIXED on branch (`c3a2c37`, shopping-cart-infra `fix/keycloak-browser-flow-top-level-otp`) — not applied live, no PR (user gate)
 **Severity:** high — no one can log in to the `shopping-cart` realm through a browser: the frontend and ArgoCD SSO both fail.
 **Fix lands in:** `shopping-cart-infra` — `identity/keycloak/keycloak-reconcile-hook-job.yaml`
 **Regression of:** `docs/bugs/archive/2026-08-20-pre-v1.26/v1.4.11-bugfix-keycloak-browser-flow-mixed-requirements.md` — diagnosed 2026-08, fixed **only by hand on the live cluster**, and its "Permanent fix needed" was never done.
@@ -106,3 +106,21 @@ SSO logins work again.
 - Do not touch the LDAP federation config; it is correct.
 - Do not print, log, or commit any credential.
 - No PR, no merge, no `main` commit, no force-push, no `--no-verify`.
+
+## kcadm contract (verified live, read-only, 2026-09-15)
+
+Six facts the first implementation got wrong. Any future edit to this hook must respect them:
+
+1. `GET authentication/flows/<alias>/executions` returns a **flattened** listing of every nested
+   execution, each carrying a `level` field. A level-0 invariant must filter on `level`, not on
+   row count.
+2. `--format csv` emits **no header row**. `NR == 1 { next }` drops the first real record.
+3. Copying a flow **prefixes nested subflow names**: the real alias is
+   `browser-with-conditional-otp Browser - Conditional OTP`, not `Browser - Conditional OTP`.
+4. An execution is deleted at `authentication/executions/<id>`. There is no
+   `authentication/flows/<alias>/executions/<id>` DELETE.
+5. `GET authentication/flows` lists **only top-level flows**, so a subflow alias cannot be
+   resolved from it. Derive it from the display name and percent-encode it — kcadm does not
+   encode, and a raw space fails with `Illegal character in path`.
+6. `authentication/executions/<id>/config` is **create-only**. Read the existing config id from
+   the execution's `authenticationConfig` field, or a second run 409s and aborts under `set -e`.
