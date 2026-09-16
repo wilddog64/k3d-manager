@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** PR OPEN — [shopping-cart-infra#98](https://github.com/wilddog64/shopping-cart-infra/pull/98) (`78403f0`, branch `fix/keycloak-browser-flow-top-level-otp`), CI green (YAML Lint / Kubeconform / Kustomize Build / GitGuardian), 1 Copilot finding fixed and its thread resolved, awaiting user merge. Not applied live until merged: the ArgoCD PostSync hook is what repairs the realm.
+**Status:** PR #98 MERGED 2026-09-16 as `af4b053d`. `enforce_admins` on shopping-cart-infra main RESTORED to true. Remaining: ArgoCD sync of `identity/keycloak/` and the PostSync reconcile hook run is outstanding (live verification, not yet confirmed; in progress).
 **Severity:** high — no one can log in to the `shopping-cart` realm through a browser: the frontend and ArgoCD SSO both fail.
 **Fix lands in:** `shopping-cart-infra` — `identity/keycloak/keycloak-reconcile-hook-job.yaml`
 **Regression of:** `docs/bugs/archive/2026-08-20-pre-v1.26/v1.4.11-bugfix-keycloak-browser-flow-mixed-requirements.md` — diagnosed 2026-08, fixed **only by hand on the live cluster**, and its "Permanent fix needed" was never done.
