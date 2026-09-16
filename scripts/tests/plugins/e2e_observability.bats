@@ -29,6 +29,22 @@ ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   [ "${status}" -eq 0 ]
 }
 
+@test "exporter normalizes nested JSON and skips invalid E2E payloads" {
+  run python3 - "${EXPORTER}" <<'PY'
+import sys, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+assert 'if isinstance(payload, str):' in src
+assert 'if not payload.get("run_id"):' in src
+assert 'continue' in src
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "exporter labels e2e gauges with the runner dimension" {
   if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
   run python3 - "${EXPORTER}" <<'PY'
