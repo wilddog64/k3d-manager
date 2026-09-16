@@ -5,6 +5,8 @@ Scope: finish the existing status-triage implementation and fix the issues found
 the user's requested review. Code validation passes; live acceptance remains pending.
 No PR created (repository policy assigns PR creation to Claude).
 
+Implementation landed as `e3e37f9671b9de4a14a87176e494de3a578642fa` on origin.
+
 ## Findings and fixes
 
 1. **Unknown status generated a duplicate SMS page.** The new record passed straight
@@ -137,3 +139,21 @@ aligned before committing.
 conflicts with this plan's explicit prohibition on `git add -A` in the inherited dirty
 worktree. Use explicit path staging and normal hooked commits; run the checkpoint
 helper once the worktree is clean, when it safely skips. No hook is bypassed.
+
+Post-commit checkpoint and first push attempt (verbatim):
+
+```text
+INFO: Working tree clean; checkpoint skipped
+ssh: Could not resolve hostname github.com: -65563
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+```
+
+The sandbox restricted network access. Retried with the required escalation; push succeeded:
+
+```text
+To github.com:wilddog64/k3d-manager.git
+   dadacf31..e3e37f96  k3d-manager-v1.34.0 -> k3d-manager-v1.34.0
+```
