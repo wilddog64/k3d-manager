@@ -473,6 +473,7 @@ summary = {
     "phase": phase,
     "result": "pass" if rc == 0 else "fail",
     "failure_groups": failure_groups,
+    "failure_details": failures,
 }
 with open(summary_path, "w", encoding="utf-8") as fh:
     json.dump(summary, fh, indent=2, sort_keys=True)
@@ -528,6 +529,8 @@ event = {
     "duration_seconds": str(s.get("duration_seconds") if s.get("duration_seconds") is not None else ""),
     "timestamp": s.get("timestamp") or created_at,
     "commit": s.get("commit") or "",
+    "failure_groups": s.get("failure_groups") or [],
+    "failure_details": s.get("failure_details") or [],
 }
 
 manifest = {

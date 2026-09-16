@@ -232,7 +232,7 @@ print("ok")' "$E2E_REPORT_DIR/${run_id}.failures.json"
   [ "$status" -eq 0 ]
   run python3 -c 'import json,sys
 d=json.load(open(sys.argv[1]))
-assert set(d)=={"run_id","tier","runner","service","candidate_digest","project","passed","total","failed","duration_seconds","timestamp","commit","exit_code","phase","result","failure_groups"}, d
+assert set(d)=={"run_id","tier","runner","service","candidate_digest","project","passed","total","failed","duration_seconds","timestamp","commit","exit_code","phase","result","failure_groups","failure_details"}, d
 print("ok")' "$E2E_REPORT_DIR/${run_id}.json"
   [ "$status" -eq 0 ]
 }

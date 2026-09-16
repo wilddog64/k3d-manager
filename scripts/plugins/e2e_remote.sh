@@ -495,6 +495,7 @@ ALLOWED = {
     "passed", "total", "failed", "duration_seconds", "timestamp", "commit",
     "exit_code", "phase", "result",
     "failure_groups",
+    "failure_details",
 }
 REQUIRED = {
     "run_id", "tier", "runner", "service", "project", "candidate_digest",
@@ -578,6 +579,16 @@ def validate_failure_groups(groups):
 groups = s.get("failure_groups", [])
 validate_failure_groups(groups)
 
+details = s.get("failure_details", [])
+if not isinstance(details, list) or len(details) > 200:
+    die("failure_details must be a list with at most 200 entries")
+for detail in details:
+    if not isinstance(detail, dict) or set(detail) != {"file", "title", "status", "error"}:
+        die("failure_details entries must contain file, title, status, error")
+    if any(not isinstance(detail[key], str) or len(detail[key]) > 512
+           for key in ("file", "title", "status", "error")):
+        die("failure_details entry contains an invalid string")
+
 created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 event = {
     "run_id": run_id, "tier": tier, "runner": runner, "service": service,
@@ -586,6 +597,7 @@ event = {
     "total": total, "failed": failed, "duration_seconds": dur_s,
     "timestamp": timestamp, "commit": commit,
     "failure_groups": groups,
+    "failure_details": details,
 }
 
 # Deterministic name -> apply is idempotent per run id; SSH retries cannot

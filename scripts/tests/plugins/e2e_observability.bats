@@ -29,6 +29,13 @@ ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   [ "${status}" -eq 0 ]
 }
 
+@test "exporter emits test-level failure metric and dashboard table" {
+  run grep -F -- 'e2e_failure_info{' "${EXPORTER}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '"title": "Failure details"' "${DASH}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "exporter normalizes nested JSON and skips invalid E2E payloads" {
   run python3 - "${EXPORTER}" <<'PY'
 import sys, yaml
