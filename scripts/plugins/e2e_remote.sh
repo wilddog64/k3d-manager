@@ -494,6 +494,7 @@ ALLOWED = {
     "run_id", "tier", "runner", "service", "project", "candidate_digest",
     "passed", "total", "failed", "duration_seconds", "timestamp", "commit",
     "exit_code", "phase", "result",
+    "failure_groups",
 }
 REQUIRED = {
     "run_id", "tier", "runner", "service", "project", "candidate_digest",
@@ -561,6 +562,22 @@ total = numstr("total")
 failed = numstr("failed")
 dur_s = numstr("duration_seconds", allow_float=True)
 
+def validate_failure_groups(groups):
+    try:
+        assert isinstance(groups, list) and len(groups) <= 100
+        for group in groups:
+            assert isinstance(group, dict) and set(group) == {"kind", "target", "count"}
+            for key in ("kind", "target"):
+                value = group[key]
+                assert isinstance(value, str) and value and len(value) <= 256
+            count = group["count"]
+            assert not isinstance(count, bool) and isinstance(count, int) and 0 <= count <= 100000
+    except (AssertionError, KeyError, TypeError):
+        die("invalid failure_groups")
+
+groups = s.get("failure_groups", [])
+validate_failure_groups(groups)
+
 created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 event = {
     "run_id": run_id, "tier": tier, "runner": runner, "service": service,
@@ -568,6 +585,7 @@ event = {
     "passed": "true" if result == "pass" else "false",
     "total": total, "failed": failed, "duration_seconds": dur_s,
     "timestamp": timestamp, "commit": commit,
+    "failure_groups": groups,
 }
 
 # Deterministic name -> apply is idempotent per run id; SSH retries cannot

@@ -101,8 +101,18 @@ data:
           "id": 5,
           "options": { "showHeader": true },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_run_info{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "service": true, "service_label": true }, "indexByName": {}, "renameByName": { "exported_service": "Service", "run_id": "Run ID", "candidate_digest": "Candidate digest", "passed": "Passed", "failed": "Failed", "total": "Total", "duration_seconds": "Duration (s)", "timestamp": "Timestamp", "commit": "Commit", "project": "Project", "tier": "Tier", "runner": "Runner" } } } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "service": true, "service_label": true }, "indexByName": {}, "renameByName": { "exported_service": "Service", "run_id": "Run ID", "candidate_digest": "Candidate digest", "passed": "Run result", "failed": "Failed tests", "total": "Total tests", "duration_seconds": "Duration (s)", "timestamp": "Timestamp", "commit": "Commit", "project": "Project", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Recent runs",
+          "type": "table"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+          "id": 6,
+          "options": { "showHeader": true },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_failure_group_info{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true }, "renameByName": { "run_id": "Run ID", "kind": "Failure kind", "target": "Target", "Value": "Count", "project": "Project", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
+          "title": "Failure groups",
           "type": "table"
         }
       ]

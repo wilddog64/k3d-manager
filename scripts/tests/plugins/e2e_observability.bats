@@ -22,6 +22,13 @@ ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   done
 }
 
+@test "exporter emits grouped e2e failure metric and dashboard table" {
+  run grep -F -- 'e2e_failure_group_info{' "${EXPORTER}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '"title": "Failure groups"' "${DASH}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "exporter labels e2e gauges with the runner dimension" {
   if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
   run python3 - "${EXPORTER}" <<'PY'

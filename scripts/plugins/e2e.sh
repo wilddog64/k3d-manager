@@ -385,6 +385,7 @@ runner = os.environ.get("E2E_RUNNER") or "local-m4"
 
 passed = total = failed = duration = None
 failures = []
+failure_groups = []
 try:
     with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
         raw = fh.read()
@@ -433,6 +434,28 @@ try:
 except Exception:
     pass
 
+groups = {}
+for failure in failures:
+    text = "%s %s" % (failure.get("title", ""), failure.get("error", ""))
+    spec = failure.get("file") or failure.get("title") or "unknown"
+    if re.search(r"ECONNREFUSED|ENOTFOUND|EAI_AGAIN|connect ETIMEDOUT", text, re.I):
+        kind = "service-unreachable"
+        targets = {"8000": "product-catalog", "8080": "order",
+                   "8083": "basket", "8084": "payment"}
+        match = re.search(r":(8000|8080|8083|8084)\b", text)
+        target = targets.get(match.group(1), "unknown") if match else "unknown"
+    elif re.search(r"timeout|timedOut|Timeout \d+ms exceeded", text, re.I):
+        kind, target = "timeout", spec
+    elif re.search(r"Received: undefined|Cannot read properties of undefined|must have a length property|received value must be a number|toHaveProperty", text, re.I):
+        kind, target = "contract-drift", spec
+    else:
+        kind, target = "assertion", spec
+    groups[(kind, target)] = groups.get((kind, target), 0) + 1
+failure_groups = [
+    {"kind": kind, "target": target, "count": count}
+    for (kind, target), count in sorted(groups.items())
+]
+
 summary = {
     "run_id": run_id,
     "tier": "vcluster",
@@ -449,6 +472,7 @@ summary = {
     "exit_code": rc,
     "phase": phase,
     "result": "pass" if rc == 0 else "fail",
+    "failure_groups": failure_groups,
 }
 with open(summary_path, "w", encoding="utf-8") as fh:
     json.dump(summary, fh, indent=2, sort_keys=True)
