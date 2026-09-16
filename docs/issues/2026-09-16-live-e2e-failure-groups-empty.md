@@ -32,9 +32,25 @@ The redacted sidecar for run `1789549631-2079` contains 33 failures:
 | assertion — `api/orders.spec.ts` | 2 |
 | assertion — `api/products.spec.ts` | 1 |
 
+## Resolution
+
+The exporter payload-normalization fix was committed as `8c80aeb9`, deployed,
+and the live exporter restarted. A durable backfill event was published for the
+latest retained run. The exporter now emits five group series:
+
+```text
+e2e_failure_group_info{kind="contract-drift",target="api/cart.spec.ts"} 11
+e2e_failure_group_info{kind="contract-drift",target="api/cross-service.spec.ts"} 10
+e2e_failure_group_info{kind="assertion",target="api/payments.spec.ts"} 9
+e2e_failure_group_info{kind="assertion",target="api/orders.spec.ts"} 2
+e2e_failure_group_info{kind="assertion",target="api/products.spec.ts"} 1
+```
+
+Refresh Grafana after its normal one-minute refresh interval. Future E2E
+publications will carry groups directly; the backfill is only for this retained
+run.
+
 ## Follow-up
 
-Make the exporter refresh path preserve and expose valid `event.json` payloads
-with `failure_groups`, add a focused live-shaped exporter test, then rerun the
-E2E publisher. Do not treat the dashboard as green until the group series and
-the full-run result are both visible.
+Keep the focused exporter test and verify the next scheduled E2E publication
+without a manual backfill.
