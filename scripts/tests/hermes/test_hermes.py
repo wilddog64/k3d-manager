@@ -1,4 +1,6 @@
 import base64
+import importlib.machinery
+import importlib.util
 import json
 import sys
 from datetime import datetime, timezone
@@ -9,7 +11,169 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 from hermes.correlator import Correlator
 from hermes.sensors import (argocd, ci, eso, github_token_expiry, kine, kine_log_signals,
                             node_pressure, reachability, stale_acg_registration,
-                            token_expiry_advisory)
+                            status_checks, token_expiry_advisory)
+
+ROOT = Path(__file__).resolve().parents[3]
+loader = importlib.machinery.SourceFileLoader("k3dm_hermes_status", str(ROOT / "bin" / "k3dm-hermes"))
+spec = importlib.util.spec_from_loader("k3dm_hermes_status", loader)
+k3dm_hermes = importlib.util.module_from_spec(spec)
+loader.exec_module(k3dm_hermes)
+
+
+def status_payload(overall, checks=None):
+    checks = checks or []
+    return json.dumps({"overall": overall, "checks": checks,
+                       "counts": {"services_failed": len([item for item in checks if item.get("status") == "error"]),
+                                  "services_warning": len([item for item in checks if item.get("status") == "warning"]),
+                                  "services_healthy": 0}})
+
+
+def test_status_checks_debounce_warn_and_unknown_contracts():
+    failed = [{"id": "frontend_sso_login", "status": "error", "message": "HTTP 400"},
+              {"id": "argocd_sso_login", "status": "error", "message": "HTTP 400"}]
+    state = {}
+    records = [status_checks(lambda *_: (1, status_payload("fail", failed)), state) for _ in range(2)]
+    assert [item["status"] for item in records] == ["healthy", "degraded"]
+    assert records[-1]["data"]["failed_ids"] == ["frontend_sso_login", "argocd_sso_login"]
+    warning = status_checks(lambda *_: (0, status_payload("warn", [{"id": "grafana", "status": "warning"}])), {})
+    assert warning["status"] == "healthy"
+    assert warning["data"]["warned_ids"] == ["grafana"]
+    assert status_checks(lambda *_: (2, status_payload("unknown")), {})["status"] == "unknown"
+
+
+def test_status_checks_handles_invalid_empty_and_timeout_output_as_unknown():
+    assert status_checks(lambda *_: (0, "not-json"), {})["status"] == "unknown"
+    assert status_checks(lambda *_: (0, ""), {})["status"] == "unknown"
+    assert status_checks(lambda *_: (_ for _ in ()).throw(TimeoutError()), {})["status"] == "unknown"
+
+
+def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "1")
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_: "")
+    monkeypatch.setenv("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")
+    calls = []
+    runner = lambda *_: calls.append(True) or (0, status_payload("healthy"))
+    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci"):
+        monkeypatch.setattr(k3dm_hermes, name,
+                            lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
+    state = {}
+    assert k3dm_hermes._status_due(state, 1_000)
+    records, _event = k3dm_hermes._run_cycle(state, runner)
+    state["status_last_run"] = 1_000
+    assert not k3dm_hermes._status_due(state, 1_000 + 38 * 60)
+    assert k3dm_hermes._status_due(state, 1_000 + 39 * 60)
+    assert calls == [True]
+    assert next(item for item in records if item["sensor"] == "status_checks")["status"] == "healthy"
+    monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "0")
+    assert not k3dm_hermes._status_due({}, 1_000)
+
+
+def test_status_notifications_are_state_change_only(monkeypatch):
+    posted = []
+    monkeypatch.setattr(k3dm_hermes, "post_summary", lambda _relay, text: posted.append(text))
+    monkeypatch.setattr(k3dm_hermes.e2e_bugs, "file_bugs", lambda *_args, **_kwargs: {"push": "stubbed"})
+    monkeypatch.setattr(k3dm_hermes, "_status_local_date", lambda: "2026-09-16")
+    record = {"data": {"checks": [{"id": "frontend_sso_login", "message": "HTTP 400", "status": "error"}], "counts": {"services_failed": 1}}}
+    state = {}
+    k3dm_hermes._status_notification(state, record, "relay")
+    assert len(posted) == 1 and "frontend_sso_login" in posted[0]
+    k3dm_hermes._status_notification(state, record, "relay")
+    assert len(posted) == 1
+    k3dm_hermes._status_notification(state, {"data": {"checks": [], "counts": {}}}, "relay")
+    assert len(posted) == 2 and "recovered" in posted[-1]
+
+
+def _stub_status_poll(monkeypatch, payload):
+    from hermes import audit
+    monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "1")
+    monkeypatch.setenv("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_: "")
+    monkeypatch.setattr(k3dm_hermes, "_drain_approvals", lambda *_: [])
+    monkeypatch.setattr(k3dm_hermes, "token_expiry_advisory", lambda *_args, **_kw: None)
+    monkeypatch.setattr(audit, "monthly_audit_advisory", lambda *_args, **_kw: None)
+    monkeypatch.setattr(k3dm_hermes.pager, "security_events", lambda *_: [])
+    monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
+    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci"):
+        monkeypatch.setattr(k3dm_hermes, name,
+                            lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
+    calls = []
+    return calls, lambda *_: calls.append(True) or (0, payload)
+
+
+def test_status_poll_advances_gate_only_when_sampled_and_defaults_off(monkeypatch, tmp_path, capsys):
+    calls, runner = _stub_status_poll(monkeypatch, status_payload("healthy"))
+    state, path = {}, tmp_path / "state.json"
+    monkeypatch.delenv("K3DM_HERMES_STATUS_ENABLED")
+    k3dm_hermes._poll(state, path, now=1000, status_runner=runner)
+    assert calls == [] and "status_last_run" not in state
+    monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "1")
+    for now in (1000, 1300, 3340):
+        k3dm_hermes._poll(state, path, now=now, status_runner=runner)
+    assert len(calls) == 2 and state["status_last_run"] == 3340
+    assert json.loads(path.read_text())["status_last_run"] == 3340
+    monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "0")
+    k3dm_hermes._poll(state, path, now=6000, status_runner=runner)
+    assert len(calls) == 2
+
+
+def test_unknown_status_poll_never_pages_or_files_and_preserves_open_groups(monkeypatch, tmp_path, capsys):
+    calls, runner = _stub_status_poll(monkeypatch, status_payload("unknown"))
+    def unexpected(*_args, **_kw):
+        raise AssertionError("unknown status must not notify or file")
+    monkeypatch.setattr(k3dm_hermes, "post_summary", unexpected)
+    monkeypatch.setattr(k3dm_hermes.e2e_bugs, "file_bugs", unexpected)
+    groups = [{"slug": "e2e-sso-auth-frontend-sso-login"}]
+    state = {"status_groups": groups}
+    for n in range(7):
+        k3dm_hermes._poll(state, tmp_path / "state.json", now=1000 + n * 2400, status_runner=runner)
+        output = json.loads(capsys.readouterr().out)
+        assert output["pages"] == []
+        assert output["records"][-1]["status"] == "unknown"
+    assert len(calls) == 7 and state["status_groups"] == groups
+
+
+def test_status_poll_redacts_nested_payload_before_stdout(monkeypatch, tmp_path, capsys):
+    payload = status_payload("fail", [{"id": "frontend_sso_login", "status": "error",
+                                      "message": "password=TEST_SENTINEL",
+                                      "extra": {"detail": ["Bearer NESTED_SENTINEL"]}}])
+    _calls, runner = _stub_status_poll(monkeypatch, payload)
+    k3dm_hermes._poll({}, tmp_path / "state.json", now=1000, status_runner=runner)
+    output = capsys.readouterr().out
+    assert "TEST_SENTINEL" not in output and "NESTED_SENTINEL" not in output
+    assert "<redacted>" in output
+
+
+def test_status_reminder_waits_for_local_midnight(monkeypatch):
+    from datetime import timedelta
+    class LocalClock:
+        current = datetime(2026, 9, 16, 23, 50, tzinfo=timezone(timedelta(hours=-7)))
+        @classmethod
+        def now(cls):
+            return cls
+        @classmethod
+        def astimezone(cls):
+            return cls.current
+    monkeypatch.setattr(k3dm_hermes, "datetime", LocalClock)
+    monkeypatch.setattr(k3dm_hermes, "timestamp", lambda: "2026-09-17T06:50:00Z")
+    posted, filed = [], []
+    monkeypatch.setattr(k3dm_hermes, "post_summary", lambda _relay, text: posted.append(text))
+    monkeypatch.setattr(k3dm_hermes.e2e_bugs, "file_bugs",
+                        lambda *args: filed.append(args) or {"push": "stubbed"})
+    record = {"sampled_at": "2026-09-17T06:50:00Z", "data": {"checks": [
+        {"id": "frontend_sso_login", "status": "error", "message": "HTTP 400"}],
+        "counts": {"services_failed": 1}}}
+    state = {}
+    k3dm_hermes._status_notification(state, record, "relay")
+    assert state["status_reminder_date"] == "2026-09-16"
+    assert filed[0][2]["source"] == "status" and filed[0][3] == "2026-09-16"
+    k3dm_hermes._status_notification(state, record, "relay")
+    assert len(posted) == 1
+    LocalClock.current += timedelta(minutes=20)
+    k3dm_hermes._status_notification(state, record, "relay")
+    k3dm_hermes._status_notification(state, record, "relay")
+    assert len(posted) == 2 and "ongoing" in posted[-1]
+    assert len(filed) == 1
 
 
 def health(entries):

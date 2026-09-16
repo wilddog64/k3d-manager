@@ -67,7 +67,31 @@ def _lines(group):
     return "\n".join(lines) or "- No individual test title was available"
 
 
+def _status_doc(group, run, branch, date):
+    return f'''# Bug: cluster status {redact(group["kind"])} — {redact(group["target"])}
+
+**Branch:** `{branch}`
+**Filed:** {date} by k3dm-hermes
+**Status:** OPEN — Hermes rule-based triage; unverified
+**Source:** `bin/cluster-status --json`
+**Sample:** `{redact(run.get("run_id", "unknown"))}`
+**Counts:** {redact(str(run.get("summary", {})))}
+
+## Failing checks ({group.get("count", 0)})
+{_lines(group)}
+
+## Sample errors
+{chr(10).join(f"- {redact(sample)}" for sample in group.get("samples", [])[:3]) or "- No sample error was available"}
+
+## Next step
+Verify the failing check and its underlying service. SSO and credential failures require
+human investigation; existing repair proposals still require approval.
+'''
+
+
 def _doc(group, run, branch, date):
+    if run.get("source") == "status":
+        return _status_doc(group, run, branch, date)
     summary = run.get("summary", {})
     return f'''# Bug: e2e {group["kind"]} — {group["target"]}
 
@@ -93,17 +117,20 @@ A human (or Claude) verifies the root cause, then writes the fix spec here befor
 
 def _reopen(path, group, run, date):
     text = path.read_text()
-    text = re.sub(r"^\*\*Status:\*\*.*$", f"**Status:** REOPENED {date} — recurred in Hermes e2e run {run.get('run_id', 'unknown')}", text, flags=re.M)
+    source = "cluster status sample" if run.get("source") == "status" else "e2e run"
+    unit = "check(s)" if run.get("source") == "status" else "test(s)"
+    text = re.sub(r"^\*\*Status:\*\*.*$", f"**Status:** REOPENED {date} — recurred in Hermes {source} {redact(run.get('run_id', 'unknown'))}", text, flags=re.M)
     samples = "\n".join(f"- {redact(value)}" for value in group.get("samples", [])[:3])
     path.write_text(text + f"\n## Recurrence {date} (run {run.get('run_id', 'unknown')})\n\n"
-                    f"{group.get('count', 0)} failing test(s).\n{_lines(group)}\n\n{samples}\n")
+                    f"{group.get('count', 0)} failing {unit}.\n{_lines(group)}\n\n{samples}\n")
 
 
 def _commit_push(worktree, paths, slot, run, branch):
     add = _run(["git", "-C", str(worktree), "add", "--", *map(str, paths)])
     if add.returncode != 0:
         return f"commit blocked by pre-commit: {_first_line(add.stderr)}"
-    commit = _run(["git", "-C", str(worktree), "commit", "-m", f"docs(bugs): Hermes e2e triage {slot} (run {run.get('run_id', 'unknown')})", "-m", "Filed-By: k3dm-hermes"])
+    source = "status" if run.get("source") == "status" else "e2e"
+    commit = _run(["git", "-C", str(worktree), "commit", "-m", f"docs(bugs): Hermes {source} triage {slot} (run {redact(run.get('run_id', 'unknown'))})", "-m", "Filed-By: k3dm-hermes"])
     if commit.returncode != 0:
         return f"commit blocked by pre-commit: {_first_line(commit.stderr or commit.stdout)}"
     push = _run(["git", "-C", str(worktree), "push", "origin", f"HEAD:refs/heads/{branch}"])

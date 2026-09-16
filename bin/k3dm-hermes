@@ -21,12 +21,13 @@ from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, argocd, ci, eso, kine, kine_log_signals,
                             node_pressure, reachability, stale_acg_registration,
-                            token_expiry_advisory)
+                            status_checks, token_expiry_advisory)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
 from hermes.slack import post_interactive, post_summary
 from hermes import pager
 from hermes import e2e_schedule, e2e_triage, e2e_bugs
+from hermes import status_triage
 
 
 def _load_state(path):
@@ -71,6 +72,13 @@ def _probe_run(command, _additions):
     return result.returncode, result.stdout
 
 
+def _status_run(command, _additions):
+    """Run the bounded JSON-only cluster-status probe inline with the Hermes poll."""
+    result = subprocess.run(command, capture_output=True, text=True, cwd=ROOT,
+                            timeout=120, check=False)
+    return result.returncode, result.stdout
+
+
 def _datastore_run(_command, _additions):
     """Read local hub Kine signals without opening or writing its SQLite database."""
     container = os.environ.get("K3DM_HUB_K3S_CONTAINER", "k3d-k3d-cluster-server-0")
@@ -95,7 +103,7 @@ def _datastore_run(_command, _additions):
         return 1, json.dumps({"available": False})
 
 
-def _run_cycle(state):
+def _run_cycle(state, status_runner=None):
     """Sample the Phase 1 sensors and propose, but never execute, repairs."""
     webhook = _keychain_secret(WEBHOOK_SERVICE)
     argo_token = _keychain_secret(ARGOCD_SERVICE)
@@ -119,6 +127,8 @@ def _run_cycle(state):
         kine(_datastore_run, state),
         ci(github_fetch, state, token=github),
     ]
+    if status_runner is not None:
+        records.append(status_checks(status_runner, state))
     correlator = Correlator(
         correlation_window=int(os.environ.get("K3DM_HERMES_CORRELATION_WINDOW", "3")),
         daily_budget=int(os.environ.get("K3DM_HERMES_LLM_DAILY_BUDGET", "10")),
@@ -313,8 +323,54 @@ def _schedule_e2e(state):
     _e2e_write(directory / f"{slot}.claim", claim)
 
 
-def _poll(state, state_path):
-    records, event = _run_cycle(state)
+def _status_due(state, now):
+    # Opt in only after the Prometheus authenticated status probe is verified.
+    if os.environ.get("K3DM_HERMES_STATUS_ENABLED", "0") != "1":
+        return False
+    if "status_last_run" not in state:
+        return True
+    interval = int(os.environ.get("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")) * 60
+    return now - float(state.get("status_last_run", 0)) >= interval
+
+
+def _status_local_date():
+    return datetime.now().astimezone().date().isoformat()
+
+
+def _status_notification(state, record, relay):
+    """Post/file status triage only on group changes, with one daily ongoing reminder."""
+    groups = status_triage.triage(record.get("data", {}).get("checks", []))
+    previous = state.get("status_groups", [])
+    changes = e2e_triage.diff_groups(previous, groups)
+    today = _status_local_date()
+    lines = []
+    new_groups = [group for group in groups if group["slug"] in changes["new"]]
+    if new_groups:
+        filed = e2e_bugs.file_bugs(ROOT, new_groups,
+                                   {"run_id": record.get("sampled_at", timestamp()),
+                                    "source": "status", "summary": record.get("data", {}).get("counts", {})},
+                                   today)
+        ids = ", ".join(check_id for group in new_groups for check_id in group["check_ids"])
+        lines.append(f"Hermes status new failures: {ids}; counts={record.get('data', {}).get('counts', {})}; {filed.get('push', '')}")
+    elif changes["ongoing"] and state.get("status_reminder_date") != today:
+        ids = ", ".join(check_id for group in groups for check_id in group["check_ids"])
+        lines.append(f"Hermes status ongoing failures: {ids}; counts={record.get('data', {}).get('counts', {})}")
+    if changes["resolved"]:
+        lines.append("Hermes status recovered: " + ", ".join(changes["resolved"]))
+    for line in lines:
+        post_summary(relay, e2e_triage.redact(line))
+    if changes["ongoing"] or new_groups:
+        state["status_reminder_date"] = today
+    state["status_groups"] = [{key: group[key] for key in ("slug", "kind", "target", "count")}
+                              for group in groups]
+
+
+def _poll(state, state_path, now=None, status_runner=_status_run):
+    now = time.time() if now is None else now
+    due = _status_due(state, now)
+    records, event = _run_cycle(state, status_runner if due else None)
+    if due:
+        state["status_last_run"] = now
     relay = _keychain_secret("k3dm-slack-webhook")
     drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
     if event:
@@ -340,11 +396,16 @@ def _poll(state, state_path):
                                     bats_runner=_bats_run, run_bats=run_bats)
     if digest:
         post_summary(relay, digest)
-    texts = pager.health_events(records, state)
+    # Unknown status belongs to the webhook detector, including SMS escalation.
+    texts = pager.health_events([item for item in records if item["sensor"] != "status_checks"], state)
     texts += pager.security_events(audit_get, _keychain_secret, state, timestamp()[:13],
                                    AUDIT_SERVICE, REPOSITORY)
     texts += pager.job_events(state, None)
     pages = _page(state, texts, relay)
+    status_record = next((item for item in records if item.get("sensor") == "status_checks"), None)
+    if (status_record and status_record.get("status") != "unknown" and
+            (status_record.get("status") == "degraded" or state.get("status_groups"))):
+        _status_notification(state, status_record, relay)
     _schedule_e2e(state)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event, "approvals": approvals,
@@ -353,7 +414,7 @@ def _poll(state, state_path):
 
 
 def _usage():
-    print("Usage: k3dm-hermes [approve <action-id>|list|preflight|audit|e2e <slot|now>]", file=sys.stderr)
+    print("Usage: k3dm-hermes [approve <action-id>|list|preflight|audit|e2e <slot|now>|status]", file=sys.stderr)
 
 
 def main():
@@ -362,6 +423,9 @@ def main():
         time.sleep(random.uniform(0, 30))
     state_path = Path(os.environ.get("K3DM_HERMES_STATE", Path.home() / ".k3dm/hermes/state.json"))
     state = _load_state(state_path)
+    if args and args[0] == "status" and len(args) == 1:
+        print(json.dumps(status_checks(_status_run, state), sort_keys=True))
+        return 0
     if args and args[0] == "e2e" and len(args) == 2:
         return _run_e2e(args[1])
     if args and args[0] == "list" and len(args) == 1:

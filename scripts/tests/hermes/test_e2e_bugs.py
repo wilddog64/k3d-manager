@@ -24,6 +24,26 @@ def test_template_only_names_bug_docs_path():
     assert Path("docs/bugs/2026-09-16-e2e-contract-drift-api-cart.md").parent == Path("docs/bugs")
 
 
+def test_status_bug_file_and_recurrence_use_status_context(tmp_path):
+    from hermes.status_triage import triage
+    _origin, clone = _repo(tmp_path)
+    groups = triage([{"id": "frontend_sso_login", "status": "error",
+                      "message": "password=STATUS_SENTINEL"}])
+    run = {"source": "status", "run_id": "2026-09-16T12:00:00Z",
+           "summary": {"services_failed": 1}}
+    result = e2e_bugs.file_bugs(clone, groups, run, "2026-09-16", hermes_root=tmp_path / "hermes")
+    assert result["push"].startswith("pushed")
+    path = tmp_path / "hermes/bugs-worktree" / result["groups"][0]["path"]
+    text = path.read_text()
+    assert "bin/cluster-status --json" in text and "Failing checks (1)" in text
+    assert "services_failed" in text and "STATUS_SENTINEL" not in text
+    assert "runner `m2`" not in text and "vcluster" not in text and "Failing tests" not in text
+    e2e_bugs._reopen(path, groups[0], run, "2026-09-17")
+    text = path.read_text()
+    assert "recurred in Hermes cluster status sample" in text and "failing check(s)" in text
+    assert "e2e run" not in text
+
+
 def _git(*args, cwd):
     subprocess.run(["git", *args], cwd=str(cwd), check=True,
                    capture_output=True, text=True, timeout=120)

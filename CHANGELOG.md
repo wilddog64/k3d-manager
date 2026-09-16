@@ -9,6 +9,8 @@
 
 ### Added
 
+- Hermes can run `bin/cluster-status --json` inline on a ~40-minute gate inside its existing 300-second poll, debounce failed status checks, rule-triage stable check ids, file new status bugs, and notify on new/recovered groups with a daily local-time reminder. Enable with `K3DM_HERMES_STATUS_ENABLED=1` after verifying the Prometheus probe-authentication dependency; the schedule defaults off. `bin/k3dm-hermes status` forces one JSON status sample. Status records are redacted before output, and unknown status sources remain non-paging so the existing webhook detector owns that incident.
+
 - Hermes scheduled E2E runs: the existing poll now dispatches M2 E2E every Wednesday and Saturday at 02:00 local time (with same-day catch-up and bounded preflight retries), rule-triages redacted failures, and files new or recurrent groups from its own worktree as unverified `docs/bugs/` records with a Slack summary. Run `bin/k3dm-hermes e2e now` for an immediate operator check.
 
 - Hermes SMS pager texts the operator (Gmail SMTP to the carrier SMS gateway, Keychain `k3dm-hermes-sms-from`/`-to` plus the existing `k3dm-alertmanager-gmail-app-password`, off until provisioned) when the webhook is down for 2 polls, any other sensor is stuck `unknown` for 6 polls, the Hermes poll job fails twice, or a new critical/high CodeQL/Dependabot alert opens; each page texts once down and once on recovery, mirrors to Slack, and is capped by `K3DM_HERMES_SMS_DAILY_BUDGET`. The `argocd` sensor now names a rejected credential in its evidence
