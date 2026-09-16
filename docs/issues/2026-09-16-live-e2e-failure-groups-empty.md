@@ -50,6 +50,12 @@ Refresh Grafana after its normal one-minute refresh interval. Future E2E
 publications will carry groups directly; the backfill is only for this retained
 run.
 
+The per-test detail backfill was subsequently published as
+`e2e-result-m2-detail-1789549631`. The exporter verified **33**
+`e2e_failure_info` series, including cart/cross-service undefined-response
+failures, payment JSON parsing failures, order status failures, and the product
+price-type assertion.
+
 ## Follow-up
 
 Keep the focused exporter test and verify the next scheduled E2E publication
