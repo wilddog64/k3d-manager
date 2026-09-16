@@ -87,6 +87,13 @@ Do **not** revive the operator `web.config.file` path; v1.6.1 documents why it f
 ## Acceptance (operator runs these; not part of the code change)
 
 1. `make observability` (or the targeted install) to write the credentials file and load the proxy.
+1b. `make install-prometheus-port-forward` — **required, and `make observability` does not do it.**
+   `deploy_observability` installs only the auth-proxy agent; the port-forward agent is rendered from
+   its template by this target alone. Until it is run, the live plist still binds `19090:9090`, the
+   proxy cannot bind `19090` (`OSError: [Errno 48] Address already in use`, crash-looping under
+   `KeepAlive`), `19091` is dead, and `19090` remains the **raw, unauthenticated** Prometheus — i.e.
+   the bug looks fixed in git while the public endpoint is still open. Observed live 2026-09-15.
+   Follow with `launchctl kickstart -k "gui/$(id -u)/com.k3d-manager.prometheus-auth-proxy"`.
 2. `curl -sS -o /dev/null -w '%{http_code}' -A k3dm-smoketest/1 https://prometheus.3ai-talk.org/api/v1/status/buildinfo` → **401**.
 3. The same URL with the operator's basic auth → **200**.
 4. `make status CLUSTER_PROVIDER=k3s-hostinger` → `✓ Prometheus login`.

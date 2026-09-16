@@ -355,7 +355,8 @@ install-prometheus-port-forward:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.prometheus-port-forward" 2>/dev/null || true
 	launchctl bootstrap "gui/$$(id -u)" \
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
-	@echo "Prometheus port-forward agent installed — port 19090 will stay open while ubuntu-k3s is reachable"
+	@echo "Prometheus port-forward agent installed — raw backend port 19091 will stay open while the hub cluster is reachable"
+	@echo "Run: launchctl kickstart -k \"gui/$$(id -u)/com.k3d-manager.prometheus-auth-proxy\" to bind the authenticated port 19090"
 
 uninstall-prometheus-port-forward:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.prometheus-port-forward" 2>/dev/null || true
