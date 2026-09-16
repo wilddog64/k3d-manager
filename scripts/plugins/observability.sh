@@ -108,6 +108,7 @@ function deploy_observability() {
   _observability_ensure_alertmanager_login
   _observability_install_alertmanager_port_forward
   _observability_install_alertmanager_auth_proxy
+  _observability_refresh_prometheus_auth_proxy
 }
 
 function _observability_seed_grafana_if_absent() {
@@ -259,6 +260,45 @@ function _observability_alertmanager_auth_file() {
   printf '%s/.local/share/k3d-manager/alertmanager-basic-auth.env\n' "${HOME}"
 }
 
+function _observability_prometheus_auth_file() {
+  printf '%s/.local/share/k3d-manager/prometheus-basic-auth.env\n' "${HOME}"
+}
+
+function _observability_ensure_prometheus_login() {
+  local _auth_file _vault_token _vault_hdr _prom_creds
+  _auth_file="$(_observability_prometheus_auth_file)"
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+
+  if ! _prom_creds=$(curl -sf \
+      --header "@${_vault_hdr}" \
+      "http://127.0.0.1:18200/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
+      | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+        print(d['user']+'|'+d['password'])" 2>/dev/null); then
+    _prom_creds=""
+  fi
+  rm -f "${_vault_hdr}"
+
+  if [[ -z "${_prom_creds}" ]]; then
+    _warn "[observability] Prometheus Vault credentials unreadable — skipping auth proxy"
+    return 1
+  fi
+
+  local _prom_user _prom_password
+  _prom_user="${_prom_creds%%|*}"
+  _prom_password="${_prom_creds#*|}"
+  mkdir -p "$(dirname "${_auth_file}")"
+  cat > "${_auth_file}" <<EOF
+PROMETHEUS_BASIC_AUTH_USER=${_prom_user}
+PROMETHEUS_BASIC_AUTH_PASSWORD=${_prom_password}
+PROMETHEUS_BACKEND_URL=http://127.0.0.1:19091
+EOF
+  chmod 600 "${_auth_file}"
+  _info "[observability] Prometheus login credentials ready (${_auth_file})"
+}
+
 function _observability_ensure_alertmanager_login() {
   local _auth_file
   _auth_file="$(_observability_alertmanager_auth_file)"
@@ -371,6 +411,45 @@ function _observability_install_alertmanager_auth_proxy() {
   launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
   launchctl bootstrap "gui/$(id -u)" "${_plist}"
   _info "[observability] Alertmanager auth proxy installed — localhost:9093 now requires login"
+}
+
+function _observability_install_prometheus_auth_proxy() {
+  if ! _is_mac; then
+    return 0
+  fi
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+    _warn "[observability] launchctl or python3 not available — skipping Prometheus auth proxy"
+    return 0
+  fi
+
+  local _auth_file _plist_template _plist
+  _auth_file="$(_observability_prometheus_auth_file)"
+  if [[ ! -f "${_auth_file}" ]]; then
+    _warn "[observability] Prometheus auth file missing — skipping auth proxy"
+    return 0
+  fi
+  _plist_template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.prometheus-auth-proxy.plist.tmpl"
+  _plist="${HOME}/Library/LaunchAgents/com.k3d-manager.prometheus-auth-proxy.plist"
+  if [[ ! -f "${_plist_template}" ]]; then
+    _warn "[observability] Prometheus auth proxy template missing — skipping"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${_plist}")"
+  sed \
+    -e "s|{{PYTHON3_PATH}}|$(command -v python3)|g" \
+    -e "s|{{PROMETHEUS_PROXY_BIN}}|${SCRIPT_DIR}/../bin/prometheus-auth-proxy|g" \
+    -e "s|{{PROMETHEUS_AUTH_FILE}}|${_auth_file}|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_plist_template}" > "${_plist}"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-auth-proxy" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _info "[observability] Prometheus auth proxy installed — localhost:19090 now requires login"
+}
+
+function _observability_refresh_prometheus_auth_proxy() {
+  _observability_ensure_prometheus_login || return 0
+  _observability_install_prometheus_auth_proxy
 }
 
 function _observability_restore_alertmanager_access_layer() {
@@ -515,6 +594,7 @@ function deploy_observability_acg() {
   _observability_ensure_alertmanager_login
   _observability_install_alertmanager_port_forward
   _observability_install_alertmanager_auth_proxy
+  _observability_refresh_prometheus_auth_proxy
 }
 
 function _deploy_pushgateway_acg() {
@@ -671,6 +751,7 @@ function observability_rotate_prometheus_basic_auth() {
     "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null
   rm -f "${_vault_hdr}"
   _prometheus_acg_web_config_secret "${1:-}" || return 1
+  _observability_refresh_prometheus_auth_proxy
   if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
     curl -sf --max-time 10 -X POST "${SLACK_WEBHOOK_URL}" \
       -H 'Content-Type: application/json' \

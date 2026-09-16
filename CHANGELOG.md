@@ -21,6 +21,7 @@
 
 ### Fixed
 
+- `prometheus.3ai-talk.org` now terminates basic authentication in a local reverse proxy on port 19090 before forwarding to the raw Prometheus port-forward on 19091, so the public endpoint no longer exposes metrics without the Vault-backed operator credential.
 - `make status` now tests the operator-facing Keycloak admin, frontend SSO, ArgoCD password and SSO, Prometheus, Alertmanager, and Grafana paths using the same credential sources and public URLs as `make show-service-passwords`; the retained synthetic token/API probes are explicitly labelled as smoke checks.
 - Remote E2E now loads the M2 publish-back host from the operator-only `~/.config/k3d-manager/e2e-remote.env` when launchd has no environment override, retains a bounded per-test failure sidecar, and copies the run summary and failures back beside the M4 dispatch transcript for Slack diagnostics.
 - E2E's Tier 1 substrate now deploys the payment service, including its isolated `payments` database and encryption key, so the API and flow payment checks target `payment:8084` instead of localhost. The payment image is pinned to `sha-a672ee42f79db703f632baca3b05bf4f2b4d8718`; RabbitMQ remains omitted because the service has no broker listener or startup connection.

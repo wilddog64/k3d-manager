@@ -4,6 +4,7 @@ REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
 VALUES="${REPO_ROOT}/scripts/etc/helm/observability/kube-prometheus-stack-values.yaml"
 HUB_PLIST="${REPO_ROOT}/scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl"
 CLOUDFLARED_CONFIG="${REPO_ROOT}/scripts/etc/cloudflared/config.yml"
+PROXY_PLIST="${REPO_ROOT}/scripts/etc/launchd/com.k3d-manager.prometheus-auth-proxy.plist.tmpl"
 
 @test "app-cluster Prometheus forwards use 19190 plus provider offset" {
   run grep -q '19190 + $(\_acg_provider_port_offset' "${REPO_ROOT}/bin/cluster-up"
@@ -30,14 +31,23 @@ CLOUDFLARED_CONFIG="${REPO_ROOT}/scripts/etc/cloudflared/config.yml"
   [ "${output}" = "http://host.internal:19190" ]
 }
 
-@test "hub Prometheus port remains unchanged" {
-  run grep -q '19090:9090' "${HUB_PLIST}"
+@test "hub Prometheus is published on 19090 through the auth proxy, raw backend on 19091" {
+  run grep -q '19091:9090' "${HUB_PLIST}"
   [ "${status}" -eq 0 ]
+
+  run grep -q '19090:9090' "${HUB_PLIST}"
+  [ "${status}" -ne 0 ]
 
   run grep -q 'k3d-k3d-cluster' "${HUB_PLIST}"
   [ "${status}" -eq 0 ]
 
   run grep -q '127.0.0.1:19090' "${CLOUDFLARED_CONFIG}"
+  [ "${status}" -eq 0 ]
+
+  run grep -q '127.0.0.1:19090' "${PROXY_PLIST}"
+  [ "${status}" -eq 0 ]
+
+  run grep -q '127.0.0.1:19091' "${REPO_ROOT}/bin/prometheus-auth-proxy"
   [ "${status}" -eq 0 ]
 }
 
