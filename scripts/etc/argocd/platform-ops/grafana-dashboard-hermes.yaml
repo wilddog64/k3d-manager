@@ -53,7 +53,7 @@ data:
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
           "options": { "showHeader": true },
           "targets": [ { "expr": "hermes_sensor_status", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "indexByName": { "sensor": 0, "status": 1, "evidence": 2, "namespace": 3 }, "renameByName": { "sensor": "Sensor", "status": "Status", "evidence": "Finding", "namespace": "Namespace" }, "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "pod": true, "service": true } } } ]
+          "transformations": [ { "id": "organize", "options": { "indexByName": { "sensor": 0, "status": 1, "evidence": 2, "target_namespace": 3 }, "renameByName": { "sensor": "Sensor", "status": "Status", "evidence": "Finding", "target_namespace": "Target namespace" }, "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "pod": true, "service": true, "namespace": true } } } ]
         },
         {
           "id": 6, "type": "timeseries", "title": "Sensor status history",

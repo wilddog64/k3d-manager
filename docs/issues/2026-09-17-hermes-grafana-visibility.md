@@ -42,10 +42,9 @@ rendered the label set instead of a clean scalar value. The stat queries now
 aggregate to one series, use instant evaluation, and clear the legend format.
 
 The findings table now hides scrape metadata (`container`, `endpoint`, `pod`,
-and exporter `service`). Its remaining `Namespace` field is the Prometheus
-scrape namespace (`platform-ops` for this exporter); Hermes does not currently
-publish an application target namespace, so the dashboard does not mislabel
-that field as a target namespace.
+and exporter `service`). It displays a `Target namespace` scope derived from
+the sensor (`platform-ops`, `cicd`, `external`, `node`, `hub-control-plane`, or
+`github-actions`) instead of the exporter scrape namespace.
 
 The live snapshot also contained a legacy `updated_at: "now"` value from the
 initial manual publication. That parsed as Unix epoch zero and produced a
