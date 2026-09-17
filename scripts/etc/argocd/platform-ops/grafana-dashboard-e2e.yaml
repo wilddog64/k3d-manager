@@ -97,7 +97,7 @@ data:
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": { "custom": { "align": "auto", "filterable": true } }, "overrides": [] },
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 38 },
           "id": 5,
           "options": { "showHeader": true },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_run_info{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
@@ -107,28 +107,28 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 48 },
           "id": 6,
           "options": { "showHeader": true },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true }, "renameByName": { "run_id": "Run ID", "kind": "Failure kind", "target": "Target", "Value": "Count", "service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true, "service": true }, "renameByName": { "run_id": "Run ID", "kind": "Failure kind", "target": "Target", "Value": "Count", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Failure groups",
           "type": "table"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 34 },
+          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 58 },
           "id": 7,
           "options": { "showHeader": true },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true }, "renameByName": { "run_id": "Run ID", "file": "Spec file", "title": "Test", "status": "Status", "error": "Error", "service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true, "service": true }, "renameByName": { "run_id": "Run ID", "file": "Spec file", "title": "Test", "status": "Status", "error": "Error", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Failure details",
           "type": "table"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "showPoints": "always" } }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
           "id": 8,
           "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["last", "max"] }, "tooltip": { "mode": "multi" } },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (service) (e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "legendFormat": "{{service}}", "refId": "A" } ],
@@ -138,7 +138,7 @@ data:
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
           "id": 9,
           "options": { "orientation": "horizontal", "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (service, kind) (e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "legendFormat": "{{service}} / {{kind}}", "refId": "A" } ],
@@ -148,7 +148,7 @@ data:
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
           "id": 10,
           "options": { "orientation": "horizontal", "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(10, sum by (service, file) (e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"}))", "legendFormat": "{{service}} / {{file}}", "refId": "A" } ],
