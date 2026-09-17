@@ -5,6 +5,8 @@
 
 ## Releases
 
+- [ ] **E2E Grafana trends/drill-down spec filed 2026-09-16.** Fifth and final v1.34.0 plan slot: `docs/plans/v1.34.0-e2e-grafana-trends-and-drilldown.md`. Implementation is not started; the milestone plan cap is now reached.
+
 - [x] **E2E failure groups in Grafana — committed/pushed 2026-09-16 (`6c8b834d`).** Added bounded root-cause grouping to E2E summaries, strict remote-publisher validation, exporter metric `e2e_failure_group_info`, and a Grafana Failure groups table. Also renamed the misleading Recent runs columns to `Run result`, `Failed tests`, and `Total tests`. Targeted BATS **112/112**, shellcheck clean, `_agent_audit` exit 0. Live platform-ops sync and a new E2E publication remain; old retained runs require a new enriched publication to populate groups.
 - [x] **Live E2E failure-groups table follow-up 2026-09-16.** Exporter normalization fix `8c80aeb9` deployed; durable backfill now emits five live `e2e_failure_group_info` series for run `1789549631-2079` (11 cart, 10 cross-service, 9 payments, 2 orders, 1 products). Grafana refresh pending only. Evidence: `docs/issues/2026-09-16-live-e2e-failure-groups-empty.md`.
 - [x] **E2E failure-details drill-down 2026-09-16 (`facb30fa`).** Added bounded, redacted per-test details to the publication schema, exporter metric `e2e_failure_info`, and a Grafana Failure details table. Targeted BATS **114/114**, shellcheck clean, `_agent_audit` exit 0; platform-ops deployed. Existing historical backfill has groups only; next E2E run publishes test-level details.
