@@ -7,6 +7,12 @@
 
 ## Current focus
 
+- **2026-09-17 — PR #127 CI failure + 2 Copilot findings fixed, `c40924d1`.** Stale
+  BATS test asserting the `keycloak-admin-secret` fallback `384b0202` deliberately
+  removed (now asserts `keycloak-secrets`/`KEYCLOAK_ADMIN_PASSWORD`/`admin-cli` +
+  disappearance gate), `cluster-status-summary` EXIT trap `_tmp` unset-under-`set -u`
+  fix, and Hermes dashboard duplicated-grep fix. Details: `docs/issues/2026-09-17-copilot-pr127-review-findings.md`.
+
 - **v1.34.0 is at the 5-plan cap (5/5).** The next spec opens v1.35.0. Plans:
   `hermes-scheduled-e2e` (OPEN), `hermes-sms-pager` (OPEN, Codex), `slack-k3dm-make-command`
   (SPEC, Codex), `hermes-scheduled-status-triage` (IMPLEMENTED `e3e37f96`),

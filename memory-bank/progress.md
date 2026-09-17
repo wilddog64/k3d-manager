@@ -7,6 +7,12 @@
 
 ## Open items
 
+- [ ] **PR #127 open, CI fix + Copilot findings pushed `c40924d1`.** Stale keycloak
+  smoke-test assertion, unset `_tmp` in `cluster-status-summary` EXIT trap, and a
+  duplicated Hermes dashboard grep — all fixed, gates green. See
+  `docs/issues/2026-09-17-copilot-pr127-review-findings.md`. PR still needs Copilot
+  reply/resolve sweep and final merge gates (not done here).
+
 - [ ] **HTTP/2 failure-rate observability** — deferred until Tier 2 E2E coverage publishes bounded protocol/version labels. Current dashboard intentionally does not claim HTTP/2-specific failure rates; see `docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`.
 
 - [ ] **Hermes scheduled `make status` sensor + triage — IMPLEMENTED `e3e37f96`, live acceptance pending.** Spec `docs/plans/v1.34.0-hermes-scheduled-status-triage.md`. Runs `bin/cluster-status --json` on a ~40 min gate inside the existing 300s Hermes poll, classifies reds by check id, notifies on state change only, files bugs via the e2e worktree path. No new launchd agent, no new REPAIRS entry, no auto-execution (proposal + Slack approval only). Offline gates green (Hermes pytest 106, status-summary BATS 8/8). **The schedule defaults off**: set `K3DM_HERMES_STATUS_ENABLED=1` only after the Prometheus authenticated-probe dependency is verified, or the first run pages on a false red. Corrections and findings: `docs/issues/2026-09-16-hermes-status-triage-review.md`.
