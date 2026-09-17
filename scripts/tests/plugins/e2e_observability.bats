@@ -2,6 +2,7 @@
 
 EXPORTER="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml"
 DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-e2e.yaml"
+HERMES_DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-hermes.yaml"
 RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
 
@@ -11,6 +12,15 @@ ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   run grep -F -- 'k3dm.k3d.io%2Fe2e-result%3Dtrue' "${EXPORTER}"
   [ "${status}" -eq 0 ]
   run grep -F -- 'refresh_e2e_events()' "${EXPORTER}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "Hermes dashboard exposes current findings and history" {
+  run grep -F -- 'hermes_status_check_info' "${HERMES_DASH}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- 'hermes_sensor_status' "${HERMES_DASH}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '"title": "Current Hermes findings"' "${HERMES_DASH}"
   [ "${status}" -eq 0 ]
 }
 

@@ -93,6 +93,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(audit, "monthly_audit_advisory", lambda *_args, **_kw: None)
     monkeypatch.setattr(k3dm_hermes.pager, "security_events", lambda *_: [])
     monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: True)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci"):
         monkeypatch.setattr(k3dm_hermes, name,

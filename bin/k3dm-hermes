@@ -365,6 +365,33 @@ def _status_notification(state, record, relay):
                               for group in groups]
 
 
+def _publish_status(records, state):
+    """Publish a redacted status snapshot for the cluster Hermes dashboard."""
+    status_record = next((item for item in records if item.get("sensor") == "status_checks"), None)
+    if not status_record or os.environ.get("K3DM_HERMES_PUBLISH_STATUS", "1") != "1":
+        return False
+    payload = {"records": records, "incident_active": bool(state.get("incident_active")),
+               "updated_at": timestamp()}
+    value = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    context = os.environ.get("K3DM_HERMES_STATUS_CONTEXT", "k3d-k3d-cluster")
+    namespace = os.environ.get("K3DM_HERMES_STATUS_NAMESPACE", "platform-ops")
+    name = os.environ.get("K3DM_HERMES_STATUS_CONFIGMAP", "hermes-status")
+    labels = "k3dm.k3.io/hermes-status=true"
+    try:
+        create = subprocess.run(
+            ["kubectl", "--context", context, "-n", namespace, "create", "configmap", name,
+             "--from-literal=status.json=" + value, "--dry-run=client", "-o", "yaml"],
+            capture_output=True, text=True, timeout=30, check=False)
+        if create.returncode != 0:
+            return False
+        manifest = create.stdout.replace("metadata:\n", "metadata:\n  labels:\n    " + labels + "\n", 1)
+        applied = subprocess.run(["kubectl", "--context", context, "-n", namespace, "apply", "-f", "-"],
+                                 input=manifest, capture_output=True, text=True, timeout=30, check=False)
+        return applied.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def _poll(state, state_path, now=None, status_runner=_status_run):
     now = time.time() if now is None else now
     due = _status_due(state, now)
@@ -406,6 +433,7 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
     if (status_record and status_record.get("status") != "unknown" and
             (status_record.get("status") == "degraded" or state.get("status_groups"))):
         _status_notification(state, status_record, relay)
+    _publish_status(records, state)
     _schedule_e2e(state)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event, "approvals": approvals,

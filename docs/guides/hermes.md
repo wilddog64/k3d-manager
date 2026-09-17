@@ -273,6 +273,16 @@ release branch; it never modifies the operator checkout or opens GitHub Issues.
 Those bug documents are triage records only: they remain unverified until a human
 confirms the root cause and writes the fix specification.
 
+## Hermes Status dashboard
+
+When the scheduled status sensor runs, Hermes publishes a redacted snapshot to
+the hub `platform-ops` namespace. The vulnerability exporter turns it into
+`hermes_sensor_status`, `hermes_status_check_info`, `hermes_incident_active`,
+and `hermes_last_poll_timestamp_seconds`. Open the Grafana **Hermes Status**
+dashboard to see current findings, incident state, poll age, and sensor history.
+The snapshot contains no tokens or raw local log lines. Set
+`K3DM_HERMES_PUBLISH_STATUS=0` only when deliberately disabling this publication.
+
 ---
 
 ## SMS pager
