@@ -111,7 +111,7 @@ data:
           "id": 6,
           "options": { "showHeader": true },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(200, e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true, "service": true }, "indexByName": { "run_id": 0, "runner": 1, "exported_service": 2, "kind": 3, "target": 4, "tier": 5 }, "renameByName": { "run_id": "Run ID", "kind": "Failure kind", "target": "Target", "Value": "Count", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true, "service": true }, "indexByName": { "run_id": 0, "runner": 1, "tier": 2, "target": 3, "exported_service": 4, "kind": 5 }, "renameByName": { "run_id": "Run ID", "kind": "Failure kind", "target": "Target", "Value": "Count", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Failure groups",
           "type": "table"
         },
@@ -121,7 +121,7 @@ data:
           "id": 7,
           "options": { "showHeader": true },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(300, e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"})", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true, "service": true }, "indexByName": { "run_id": 0, "runner": 1, "exported_service": 2, "file": 3, "status": 4, "error": 5, "title": 6, "tier": 7 }, "renameByName": { "run_id": "Run ID", "file": "Spec file", "title": "Test", "status": "Status", "error": "Error", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true, "service": true }, "indexByName": { "run_id": 0, "runner": 1, "tier": 2, "exported_service": 3, "file": 4, "title": 5, "error": 6, "status": 7 }, "renameByName": { "run_id": "Run ID", "file": "Spec file", "title": "Test", "status": "Status", "error": "Error", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Failure details",
           "type": "table"
         },

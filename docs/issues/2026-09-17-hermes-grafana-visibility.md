@@ -58,6 +58,11 @@ bar charts use instant aggregate queries so each category is rendered once;
 range-query samples had previously produced dense overlapping bars and unreadable
 timestamp labels.
 
+The E2E table column order was also aligned for readability: Failure groups
+now use `Run ID`, `Runner`, `Tier`, `Target`, `Service`, `Failure kind`; Failure
+details use `Run ID`, `Runner`, `Tier`, `Service`, `Spec file`, `Test`, `Error`,
+`Status`.
+
 ## 2026-09-17 Grafana responsiveness follow-up
 
 The E2E dashboard was refreshing every minute over seven days while rendering
