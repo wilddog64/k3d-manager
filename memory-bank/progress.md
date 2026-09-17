@@ -15,6 +15,7 @@
 - [x] **E2E result label clarification 2026-09-17.** Renamed the boolean run field to `E2E run passed`.
 - [x] **E2E failure ratio 2026-09-17.** Added and displayed the failed/total ratio in Recent runs.
 - [x] **E2E ratio cleanup 2026-09-17.** Filtered legacy rows and added percentage alongside the fraction.
+- [x] **E2E ratio rollout cleanup 2026-09-17.** Excluded intermediate fraction-only series from the table.
 - [x] **Hermes poll-age guard 2026-09-17.** Invalid legacy timestamps no longer produce a false multi-decade age in Grafana.
 - [x] **Hermes dashboard stat rendering follow-up 2026-09-17.** Aggregated top-panel PromQL to single scalar series, enabled instant evaluation, and suppressed legends to prevent scrape labels from appearing as values. See `docs/issues/2026-09-17-hermes-grafana-visibility.md`.
 - [ ] **E2E Grafana trends/drill-down spec filed 2026-09-16.** Fifth and final v1.34.0 plan slot: `docs/plans/v1.34.0-e2e-grafana-trends-and-drilldown.md`. Implementation is not started; the milestone plan cap is now reached.

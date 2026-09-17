@@ -74,6 +74,9 @@ The table filters out pre-ratio metric series left by the exporter rollout, so
 legacy rows cannot appear with an empty ratio. New values include both forms,
 for example `33/102 (32.4%)`.
 
+The filter now requires the percentage suffix as well, excluding the
+intermediate fraction-only series created during rollout.
+
 The boolean Recent runs field is labeled `E2E run passed` so `false` clearly
 means that one or more tests failed in that E2E run.
 
