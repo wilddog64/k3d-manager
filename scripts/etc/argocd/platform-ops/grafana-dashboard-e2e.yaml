@@ -141,7 +141,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
           "id": 9,
           "options": { "orientation": "horizontal", "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
-          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (exported_service, kind) (e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "legendFormat": "{{exported_service}} / {{kind}}", "refId": "A" } ],
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (exported_service, kind) (e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "instant": true, "legendFormat": "{{exported_service}} / {{kind}}", "refId": "A" } ],
           "title": "Failure causes by service",
           "type": "barchart"
         },
@@ -151,7 +151,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
           "id": 10,
           "options": { "orientation": "horizontal", "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
-          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(10, sum by (exported_service, file) (e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"}))", "legendFormat": "{{exported_service}} / {{file}}", "refId": "A" } ],
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(10, sum by (exported_service, file) (e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"}))", "instant": true, "legendFormat": "{{exported_service}} / {{file}}", "refId": "A" } ],
           "title": "Top failing specs",
           "type": "barchart"
         }

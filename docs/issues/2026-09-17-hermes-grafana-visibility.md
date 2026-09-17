@@ -51,3 +51,9 @@ initial manual publication. That parsed as Unix epoch zero and produced a
 misleading `56.7 years` age. The exporter now suppresses the age metric when
 the timestamp is invalid, so Grafana shows no data instead of a false age until
 Hermes publishes a valid ISO-8601 timestamp.
+
+The Hermes findings table keeps `Sensor` first and now orders columns as
+`Finding`, `Status`, and `Target namespace`. The E2E failure-cause and top-spec
+bar charts use instant aggregate queries so each category is rendered once;
+range-query samples had previously produced dense overlapping bars and unreadable
+timestamp labels.
