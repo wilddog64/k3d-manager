@@ -9,6 +9,12 @@
 
 ### Added
 
+- Grafana **Hermes Status** dashboard (`grafana-dashboard-hermes.yaml`): Hermes publishes a redacted snapshot of every sensor finding, and the exporter surfaces it as a findings table (Sensor, Finding, Status, Target namespace) plus poll-age and per-status stat panels. Regular sensors publish even while the optional `status_checks` schedule is disabled
+
+- E2E Grafana drill-down: bounded root-cause **failure groups** (`e2e_failure_group_info`) and **test-level failure details** are published by the E2E result pipeline, so a failed run can be traced from run → owning service → cause → individual spec without opening the M2 run files
+
+- E2E Grafana trend panels: failure trend by service, failure causes by service, and top failing specs, placed above the run and failure tables. Recent runs reports a `Failure ratio (failed/total)` such as `33/102 (32.4%)` in place of the former boolean pass field
+
 - Hermes can run `bin/cluster-status --json` inline on a ~40-minute gate inside its existing 300-second poll, debounce failed status checks, rule-triage stable check ids, file new status bugs, and notify on new/recovered groups with a daily local-time reminder. Enable with `K3DM_HERMES_STATUS_ENABLED=1` after verifying the Prometheus probe-authentication dependency; the schedule defaults off. `bin/k3dm-hermes status` forces one JSON status sample. Status records are redacted before output, and unknown status sources remain non-paging so the existing webhook detector owns that incident.
 
 - Hermes scheduled E2E runs: the existing poll now dispatches M2 E2E every Wednesday and Saturday at 02:00 local time (with same-day catch-up and bounded preflight retries), rule-triages redacted failures, and files new or recurrent groups from its own worktree as unverified `docs/bugs/` records with a Slack summary. Run `bin/k3dm-hermes e2e now` for an immediate operator check.
@@ -23,6 +29,9 @@
 
 ### Fixed
 
+- Grafana dashboards no longer stall the browser on large result sets: the E2E dashboard refreshes on 5m/24h with detail tables capped at 100/200/300 rows and automatic trend-point density, and both raw CVE tables use `topk(500, ...)` — `trivy_vulnerability_inventory` carries 7,409 live series and was sending every row to Grafana
+- Grafana tables no longer display Prometheus scrape metadata as data: the exporter's `container`, `endpoint`, `pod` and scrape-target `service` labels are hidden, E2E failure rows show the owning application service (`exported_service`) instead of the duplicate exporter service, the CVE tables drop the non-informative Service column, and Hermes top stat panels aggregate to a scalar with instant evaluation and no legend so `instance`/`job` are not rendered as values
+- The Hermes poll-age metric omits unparseable timestamps instead of publishing them: a legacy manual snapshot with `updated_at: "now"` rendered in Grafana as an age of `56.7 years`
 - `prometheus.3ai-talk.org` now terminates basic authentication in a local reverse proxy on port 19090 before forwarding to the raw Prometheus port-forward on 19091, so the public endpoint no longer exposes metrics without the Vault-backed operator credential.
 - `make status` now tests the operator-facing Keycloak admin, frontend SSO, ArgoCD password and SSO, Prometheus, Alertmanager, and Grafana paths using the same credential sources and public URLs as `make show-service-passwords`; the retained synthetic token/API probes are explicitly labelled as smoke checks.
 - Remote E2E now loads the M2 publish-back host from the operator-only `~/.config/k3d-manager/e2e-remote.env` when launchd has no environment override, retains a bounded per-test failure sidecar, and copies the run summary and failures back beside the M4 dispatch transcript for Slack diagnostics.
