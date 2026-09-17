@@ -19,6 +19,7 @@
 - [x] **Checkout load-test dashboard diagnosis 2026-09-17.** Confirmed no live k6 series are present; documented remote-write/loadtest prerequisites and panel meanings.
 - [x] **k3dm deployment dashboard diagnosis 2026-09-17.** Confirmed no deployment metrics or Pushgateway service; documented missing publisher and follow-up.
 - [x] **CVE dashboard freeze mitigation 2026-09-17.** Bounded raw vulnerability table queries to 500 rows after measuring 7,409 live series.
+- [x] **CVE table cleanup 2026-09-17.** Removed Service from both unique-CVE table transformations.
 - [x] **Hermes poll-age guard 2026-09-17.** Invalid legacy timestamps no longer produce a false multi-decade age in Grafana.
 - [x] **Hermes dashboard stat rendering follow-up 2026-09-17.** Aggregated top-panel PromQL to single scalar series, enabled instant evaluation, and suppressed legends to prevent scrape labels from appearing as values. See `docs/issues/2026-09-17-hermes-grafana-visibility.md`.
 - [ ] **E2E Grafana trends/drill-down spec filed 2026-09-16.** Fifth and final v1.34.0 plan slot: `docs/plans/v1.34.0-e2e-grafana-trends-and-drilldown.md`. Implementation is not started; the milestone plan cap is now reached.
