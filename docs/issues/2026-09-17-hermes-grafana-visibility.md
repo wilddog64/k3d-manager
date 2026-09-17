@@ -67,6 +67,9 @@ The Recent runs table now uses the triage order `Run ID`, `Runner`, `Tier`,
 `Runner commit`, `Services under test`, `Failed tests`, `Total tests`, `Test
 suite`, and `Run result`.
 
+The boolean Recent runs field is labeled `E2E run passed` so `false` clearly
+means that one or more tests failed in that E2E run.
+
 The final refinement places `Runner commit` before `Tier` and `Test suite`
 before `Services under test`.
 
