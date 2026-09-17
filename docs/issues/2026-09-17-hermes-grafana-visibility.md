@@ -67,6 +67,9 @@ The Recent runs table now uses the triage order `Run ID`, `Runner`, `Tier`,
 `Runner commit`, `Services under test`, `Failed tests`, `Total tests`, `Test
 suite`, and `Run result`.
 
+The final refinement places `Runner commit` before `Tier` and `Test suite`
+before `Services under test`.
+
 ## 2026-09-17 Grafana responsiveness follow-up
 
 The E2E dashboard was refreshing every minute over seven days while rendering

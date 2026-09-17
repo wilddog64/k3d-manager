@@ -10,6 +10,7 @@
 - [x] **Grafana responsiveness hardening 2026-09-17.** Bounded E2E dashboard refresh window, table result sizes, and chart point rendering.
 - [x] **E2E table column order 2026-09-17.** Reordered failure group/detail columns for the requested triage flow.
 - [x] **Recent runs column order 2026-09-17.** Reordered run summary fields for triage readability.
+- [x] **Recent runs column refinement 2026-09-17.** Moved Runner commit before Tier and Test suite before Services under test.
 - [x] **Hermes poll-age guard 2026-09-17.** Invalid legacy timestamps no longer produce a false multi-decade age in Grafana.
 - [x] **Hermes dashboard stat rendering follow-up 2026-09-17.** Aggregated top-panel PromQL to single scalar series, enabled instant evaluation, and suppressed legends to prevent scrape labels from appearing as values. See `docs/issues/2026-09-17-hermes-grafana-visibility.md`.
 - [ ] **E2E Grafana trends/drill-down spec filed 2026-09-16.** Fifth and final v1.34.0 plan slot: `docs/plans/v1.34.0-e2e-grafana-trends-and-drilldown.md`. Implementation is not started; the milestone plan cap is now reached.
