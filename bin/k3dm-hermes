@@ -367,8 +367,7 @@ def _status_notification(state, record, relay):
 
 def _publish_status(records, state):
     """Publish a redacted status snapshot for the cluster Hermes dashboard."""
-    status_record = next((item for item in records if item.get("sensor") == "status_checks"), None)
-    if not status_record or os.environ.get("K3DM_HERMES_PUBLISH_STATUS", "1") != "1":
+    if not records or os.environ.get("K3DM_HERMES_PUBLISH_STATUS", "1") != "1":
         return False
     payload = {"records": records, "incident_active": bool(state.get("incident_active")),
                "updated_at": timestamp()}

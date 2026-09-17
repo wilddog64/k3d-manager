@@ -52,8 +52,8 @@ data:
           "id": 5, "type": "table", "title": "Current Hermes findings",
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
           "options": { "showHeader": true },
-          "targets": [ { "expr": "hermes_status_check_info", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "indexByName": { "sensor": 0, "check_id": 1, "status": 2, "message": 3 }, "renameByName": { "sensor": "Sensor", "check_id": "Check", "status": "Status", "message": "Finding" }, "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true } } } ]
+          "targets": [ { "expr": "hermes_sensor_status", "format": "table", "instant": true, "refId": "A" } ],
+          "transformations": [ { "id": "organize", "options": { "indexByName": { "sensor": 0, "status": 1, "evidence": 2 }, "renameByName": { "sensor": "Sensor", "status": "Status", "evidence": "Finding" }, "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true } } } ]
         },
         {
           "id": 6, "type": "timeseries", "title": "Sensor status history",

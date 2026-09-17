@@ -1,7 +1,7 @@
 # Hermes findings visibility design
 
 **Date:** 2026-09-17
-**Status:** Implemented in the Hermes observability dashboard slice
+**Status:** Implemented; live dashboard deployed 2026-09-17
 
 ## Finding
 
@@ -23,6 +23,8 @@ this issue record is the design and acceptance record rather than a sixth plan.
 ## Acceptance
 
 - Hermes publishes the latest status record when the scheduled status sensor runs.
+- The publication also accepts the regular Hermes sensor records, so visibility
+  is useful even while the optional `status_checks` interval is disabled.
 - Prometheus exposes sensor status, incident state, last-poll age, and check details.
 - Grafana has a `Hermes Status` dashboard with current findings and history-friendly panels.
 - Existing Hermes and exporter tests remain green.
