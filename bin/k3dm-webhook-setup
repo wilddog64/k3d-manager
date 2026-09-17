@@ -27,7 +27,10 @@ _rotate=false
 _existing_token="$(security find-generic-password -s "${KEYCHAIN_SERVICE}" -a "${KEYCHAIN_ACCOUNT}" -w 2>/dev/null || true)"
 if [[ "${_rotate}" == "true" || -z "${_existing_token}" ]]; then
   TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
-  security add-generic-password -U -s "${KEYCHAIN_SERVICE}" -a "${KEYCHAIN_ACCOUNT}" -w "${TOKEN}"
+  if ! security add-generic-password -U -s "${KEYCHAIN_SERVICE}" -a "${KEYCHAIN_ACCOUNT}" -w "${TOKEN}"; then
+    echo "[k3dm-webhook-setup] ERROR: Keychain write was denied — unlock the login Keychain, then retry" >&2
+    exit 1
+  fi
   echo "[k3dm-webhook-setup] Token generated and stored in Keychain"
 else
   echo "[k3dm-webhook-setup] Token already exists in Keychain"

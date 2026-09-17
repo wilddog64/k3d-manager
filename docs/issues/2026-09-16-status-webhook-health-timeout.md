@@ -25,6 +25,10 @@ Deep-dive follow-up: the terminal could not write the replacement because macOS 
 
 Resolution: token rotation was not required. Unlocking the login Keychain restored access to the existing token; `make status CLUSTER_PROVIDER=k3s-hostinger` then returned ArgoCD, Frontend, Keycloak, and Grafana HTTP 200, with only the expected unauthenticated Prometheus readiness warning.
 
+## Prevention improvement
+
+`cluster-status-summary` now distinguishes an empty/missing Keychain token, a Keychain interaction denial, and a rejected exported token from a generic webhook outage. `bin/k3dm-webhook-setup` also reports the unlock action when macOS denies a Keychain write.
+
 Rotation initially failed because `bin/rotate-webhook-token` used the obsolete Keychain service `cloudflare-api-token`; the configured service is `k3dm-cloudflare-api-token`. That lookup is corrected. `make rotate-webhook-token` then succeeded, uploaded the Worker secret, restored a 64-byte local token, and verified the public endpoint (HTTP 404, proving authentication reached the route).
 
 ## Verification

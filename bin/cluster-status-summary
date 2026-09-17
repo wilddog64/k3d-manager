@@ -10,7 +10,12 @@ fi
 _provider="${_provider:-k3s-aws}"
 _context="${APP_CONTEXT:-}"
 _color() { local code="$1" text="$2"; if [[ "${_mode}" == json || "${NO_COLOR:-}" == 1 || "${STATUS_COLOR:-}" == never || ( ! -t 1 && "${STATUS_COLOR:-}" != always ) ]]; then printf '%s' "${text}"; else printf '\033[%sm%s\033[0m' "${code}" "${text}"; fi; }
-_token_from_env="${K3DM_WEBHOOK_TOKEN:-}"; _token="${_token_from_env:-$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null || true)}"; _port="${K3DM_WEBHOOK_PORT:-7443}"; _tmp="$(mktemp -t k3dm-status.XXXXXX)"; trap 'rm -f "${_tmp}"' EXIT
+_token_from_env="${K3DM_WEBHOOK_TOKEN:-}"; _keychain_err="$(mktemp -t k3dm-keychain.XXXXXX)"; trap 'rm -f "${_tmp}" "${_keychain_err}"' EXIT
+_token="${_token_from_env}"
+if [[ -z "${_token}" ]]; then
+  _token="$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>"${_keychain_err}" || true)"
+fi
+_port="${K3DM_WEBHOOK_PORT:-7443}"; _tmp="$(mktemp -t k3dm-status.XXXXXX)"
 # The webhook health sweep includes bounded service, Kubernetes, and credential probes. During a
 # degraded hub it can legitimately take longer than the individual probe timeout; do not collapse
 # that structured response into the misleading "webhook unavailable" result too early.
@@ -24,19 +29,28 @@ elif [[ -n "${_token_from_env}" ]]; then
   fi
 fi
 if (( _health_ok == 0 )); then
+  _detail="webhook unavailable"
+  if [[ -z "${_token}" ]]; then
+    if grep -qi 'user interaction is not allowed\|interaction is not allowed' "${_keychain_err}"; then
+      _detail="webhook token unavailable: unlock the login Keychain, then retry"
+    else
+      _detail="webhook token unavailable: run security find-generic-password -s k3dm-webhook-token -a k3dm -w"
+    fi
+  elif [[ -n "${_token_from_env}" ]]; then
+    _detail="webhook rejected K3DM_WEBHOOK_TOKEN; unset it to use the Keychain token"
+  fi
   _agent_state=""
   if command -v docker >/dev/null 2>&1; then
     _agent_state="$(docker ps -a --filter name=k3d-k3d-cluster-agent-0 --format '{{.Status}}' 2>/dev/null | head -1 || true)"
   fi
   if [[ "${_mode}" == json ]]; then
-    _detail="webhook unavailable"
-    [[ -n "${_agent_state}" ]] && _detail="webhook unavailable; hub agent-0: ${_agent_state}"
+    [[ -n "${_agent_state}" ]] && _detail="${_detail}; hub agent-0: ${_agent_state}"
     python3 - "${_provider}" "${_context}" "${_detail}" <<'PY'
 import json,sys
 print(json.dumps({"overall":"unknown","provider":sys.argv[1],"context":sys.argv[2],"errors":[],"warnings":[{"id":"status_source","status":"unknown","reason":sys.argv[3]}],"checks":[],"counts":{}}))
 PY
   else
-    printf '%s\n' "$(_color 33 'Overall: UNKNOWN')" '  ! status source: webhook unavailable'
+    printf '%s\n' "$(_color 33 'Overall: UNKNOWN')" "  ! status source: ${_detail}"
     [[ -n "${_agent_state}" ]] && printf '  ! hub agent-0: %s\n' "${_agent_state}"
     printf '%s\n' '  hint: make restart-webhook'
   fi
