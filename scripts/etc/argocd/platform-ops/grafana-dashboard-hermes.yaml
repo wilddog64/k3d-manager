@@ -25,28 +25,28 @@ data:
           "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
           "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
           "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" },
-          "targets": [ { "expr": "hermes_incident_active or vector(0)", "refId": "A" } ]
+          "targets": [ { "expr": "sum(hermes_incident_active) or vector(0)", "instant": true, "legendFormat": "", "refId": "A" } ]
         },
         {
           "id": 2, "type": "stat", "title": "Minutes since last poll",
           "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
           "fieldConfig": { "defaults": { "unit": "m", "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 45 }, { "color": "red", "value": 90 } ] } }, "overrides": [] },
           "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "area", "justifyMode": "center" },
-          "targets": [ { "expr": "(time() - hermes_last_poll_timestamp_seconds) / 60", "refId": "A" } ]
+          "targets": [ { "expr": "max((time() - hermes_last_poll_timestamp_seconds) / 60)", "instant": true, "legendFormat": "", "refId": "A" } ]
         },
         {
           "id": 3, "type": "stat", "title": "Degraded sensors",
           "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
           "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
           "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" },
-          "targets": [ { "expr": "count(hermes_sensor_status{status=\"degraded\"}) or vector(0)", "refId": "A" } ]
+          "targets": [ { "expr": "count(hermes_sensor_status{status=\"degraded\"}) or vector(0)", "instant": true, "legendFormat": "", "refId": "A" } ]
         },
         {
           "id": 4, "type": "stat", "title": "Unknown sensors",
           "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
           "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] } }, "overrides": [] },
           "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" },
-          "targets": [ { "expr": "count(hermes_sensor_status{status=\"unknown\"}) or vector(0)", "refId": "A" } ]
+          "targets": [ { "expr": "count(hermes_sensor_status{status=\"unknown\"}) or vector(0)", "instant": true, "legendFormat": "", "refId": "A" } ]
         },
         {
           "id": 5, "type": "table", "title": "Current Hermes findings",

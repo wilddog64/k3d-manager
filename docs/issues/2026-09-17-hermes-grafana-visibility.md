@@ -32,3 +32,11 @@ this issue record is the design and acceptance record rather than a sixth plan.
 The first live publication exposed a label-application gap; the publisher now
 labels the ConfigMap explicitly after applying it, and the existing snapshot
 was relabeled during rollout.
+
+## 2026-09-17 Grafana panel rendering follow-up
+
+The first dashboard view showed Prometheus labels such as `endpoint`, `instance`,
+`pod`, and `job` inside the top stat panels. Those panels were receiving a
+multi-series result (or falling back to Grafana's series display), so Grafana
+rendered the label set instead of a clean scalar value. The stat queries now
+aggregate to one series, use instant evaluation, and clear the legend format.
