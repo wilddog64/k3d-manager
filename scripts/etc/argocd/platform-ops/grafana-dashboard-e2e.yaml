@@ -111,7 +111,7 @@ data:
           "id": 6,
           "options": { "showHeader": true },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true }, "renameByName": { "run_id": "Run ID", "kind": "Failure kind", "target": "Target", "Value": "Count", "service": "Service", "project": "Project", "tier": "Tier", "runner": "Runner" } } } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true }, "renameByName": { "run_id": "Run ID", "kind": "Failure kind", "target": "Target", "Value": "Count", "service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Failure groups",
           "type": "table"
         },
@@ -121,7 +121,7 @@ data:
           "id": 7,
           "options": { "showHeader": true },
           "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true }, "renameByName": { "run_id": "Run ID", "file": "Spec file", "title": "Test", "status": "Status", "error": "Error", "service": "Service", "project": "Project", "tier": "Tier", "runner": "Runner" } } } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true }, "renameByName": { "run_id": "Run ID", "file": "Spec file", "title": "Test", "status": "Status", "error": "Error", "service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Failure details",
           "type": "table"
         }
