@@ -7,11 +7,10 @@
 
 ## Open items
 
-- [ ] **PR #127 open, CI fix + Copilot findings pushed `c40924d1`.** Stale keycloak
-  smoke-test assertion, unset `_tmp` in `cluster-status-summary` EXIT trap, and a
-  duplicated Hermes dashboard grep — all fixed, gates green. See
-  `docs/issues/2026-09-17-copilot-pr127-review-findings.md`. PR still needs Copilot
-  reply/resolve sweep and final merge gates (not done here).
+- [x] **PR #127 MERGED 2026-09-17, SHA `978ea60f`.** Hermes autonomy, Slack `/k3dm`,
+  E2E observability shipped. CI fixed (`c40924d1`), Copilot review swept (narrative
+  + inline), `enforce_admins` verified. Retrospective: `docs/retro/2026-09-17-v1.34.0-retrospective.md`.
+  Next phase: v1.35.0 branch, standing docs audit, ApplicationSet reapply for v1.34.0 config.
 
 - [ ] **HTTP/2 failure-rate observability** — deferred until Tier 2 E2E coverage publishes bounded protocol/version labels. Current dashboard intentionally does not claim HTTP/2-specific failure rates; see `docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`.
 

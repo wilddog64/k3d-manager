@@ -7,16 +7,17 @@
 
 ## Current focus
 
-- **2026-09-17 — PR #127 CI failure + 2 Copilot findings fixed, `c40924d1`.** Stale
-  BATS test asserting the `keycloak-admin-secret` fallback `384b0202` deliberately
-  removed (now asserts `keycloak-secrets`/`KEYCLOAK_ADMIN_PASSWORD`/`admin-cli` +
-  disappearance gate), `cluster-status-summary` EXIT trap `_tmp` unset-under-`set -u`
-  fix, and Hermes dashboard duplicated-grep fix. Details: `docs/issues/2026-09-17-copilot-pr127-review-findings.md`.
+- **2026-09-17 — PR #127 MERGED, SHA `978ea60f`.** Hermes autonomy, Slack `/k3dm`,
+  E2E observability shipped. Pre-merge gates (CI fix `c40924d1`, Copilot review
+  narrative + inline comments swept) all green. `enforce_admins: true` verified on
+  merge commit. Retrospective: `docs/retro/2026-09-17-v1.34.0-retrospective.md`.
+  Next branch: `k3d-manager-v1.35.0` (created 2026-09-17, branched at `978ea60f`).
 
-- **v1.34.0 is at the 5-plan cap (5/5).** The next spec opens v1.35.0. Plans:
-  `hermes-scheduled-e2e` (OPEN), `hermes-sms-pager` (OPEN, Codex), `slack-k3dm-make-command`
-  (SPEC, Codex), `hermes-scheduled-status-triage` (IMPLEMENTED `e3e37f96`),
-  `e2e-grafana-trends-and-drilldown` (IMPLEMENTED `3c33103a`/`387f019e`).
+- **v1.34.0 closed at the 5-plan cap (5/5).** v1.35.0 opens for new specs. Released
+  plans: `hermes-scheduled-e2e`, `hermes-sms-pager`, `slack-k3dm-make-command`,
+  `hermes-scheduled-status-triage`, `e2e-grafana-trends-and-drilldown`.
+  **Standing:** v1.34.0 release tag SKIPPED — CHANGELOG has `[Unreleased]`
+  only, no versioned heading. Tag procedure documented in retrospective.
 
 - **2026-09-17 — Grafana/observability block shipped and compressed.** ~40 commits delivered the
   Hermes Status dashboard, E2E failure groups / test-level details / trend panels / failure ratio,
