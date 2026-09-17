@@ -80,3 +80,8 @@ unbounded run, failure-group, and failure-detail series. That combination can
 stall the Grafana browser even when Prometheus is healthy. The dashboard now
 refreshes every five minutes over 24 hours, caps table queries at 100/200/300
 rows, and lets the trend panel choose point density automatically.
+
+Live checks found Grafana and Prometheus healthy, with 66 failure-detail and 20
+failure-group series. Because the intermittent stall was browser-side rendering
+during automatic refresh, E2E refresh is now manual (`off`) and failure details
+are capped at 100 rows; use Grafana's refresh button after a new run.

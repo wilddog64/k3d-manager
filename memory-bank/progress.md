@@ -8,6 +8,7 @@
 - [x] **Hermes findings table cleanup 2026-09-17.** Removed scrape metadata columns and replaced the exporter namespace with sensor-derived target namespace/scope labels.
 - [x] **Dashboard readability cleanup 2026-09-17.** Reordered Hermes findings columns and changed E2E failure charts to instant aggregate views.
 - [x] **Grafana responsiveness hardening 2026-09-17.** Bounded E2E dashboard refresh window, table result sizes, and chart point rendering.
+- [x] **Grafana freeze mitigation 2026-09-17.** Disabled automatic E2E refresh after live health/cardinality checks showed a browser rendering stall rather than backend failure.
 - [x] **E2E table column order 2026-09-17.** Reordered failure group/detail columns for the requested triage flow.
 - [x] **Recent runs column order 2026-09-17.** Reordered run summary fields for triage readability.
 - [x] **Recent runs column refinement 2026-09-17.** Moved Runner commit before Tier and Test suite before Services under test.

@@ -9,6 +9,7 @@
 - **2026-09-17 — Hermes findings table cleanup.** Scrape metadata (`container`, `endpoint`, `pod`, exporter `service`) is hidden. The table now displays a sensor-derived Target namespace/scope instead of the exporter scrape namespace.
 - **2026-09-17 — Dashboard readability cleanup.** Hermes findings columns are Sensor, Finding, Status, Target namespace. E2E failure charts now use instant aggregate queries to avoid dense repeated timestamp bars.
 - **2026-09-17 — Grafana responsiveness hardening.** E2E dashboard refresh is 5m/24h, detail tables are capped at 100/200/300 rows, and trend points use automatic density to reduce intermittent UI freezes.
+- **2026-09-17 — Grafana freeze mitigation.** Grafana/Prometheus were healthy (66 detail, 20 group, 8 run series); E2E dashboard auto-refresh is now off and details are capped at 100 rows to avoid browser-side refresh stalls.
 - **2026-09-17 — E2E table column order.** Failure groups place Tier after Runner and Target after Tier; failure details place Tier after Runner, Test after Spec file, and Status last.
 - **2026-09-17 — Recent runs column order.** Recent runs now places Tier and Runner commit after Runner, Failed tests before Total tests, and Run result last.
 - **2026-09-17 — Recent runs column refinement.** Runner commit now precedes Tier, and Test suite precedes Services under test.
