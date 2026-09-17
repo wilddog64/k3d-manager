@@ -3,7 +3,7 @@
 **Filed:** 2026-09-13
 **Branch:** `k3d-manager-v1.33.0`
 **Incident:** `docs/issues/2026-07-08-hostinger-grafana-502-from-wrong-refresh-port-forward-target.md` (Recurrence 2026-09-13)
-**Status:** READY FOR CODEX
+**Status:** FIXED `45be3aec` (Codex; Claude verified)
 
 ---
 

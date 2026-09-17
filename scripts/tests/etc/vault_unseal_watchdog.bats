@@ -19,7 +19,8 @@ teardown() {
 
 @test "watchdog image is pinned (not latest)" {
   grep -q "image: hashicorp/vault:1.18.3" "$RENDERED"
-  ! grep -qE "image:.*:latest" "$RENDERED"
+  run grep -qE "image:.*:latest" "$RENDERED"
+  [ "$status" -ne 0 ]
 }
 
 @test "watchdog mounts the vault-unseal secret optionally" {

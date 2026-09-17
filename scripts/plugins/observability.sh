@@ -40,6 +40,10 @@ function deploy_observability() {
     return 1
   fi
 
+  _observability_apply_argocd_dashboard "${_hub_context}"
+  _deploy_promtail_acg "${_hub_context}"
+  _observability_ensure_argocd_servicemonitors "${_hub_context}"
+
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
@@ -53,7 +57,7 @@ function deploy_observability() {
       -H "@${_vault_hdr}" \
       "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager" 2>/dev/null \
       | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
-        print(d['gmail_from']+'|'+d['gmail_app_pw']+'|'+d['sms_gateway'])" 2>/dev/null); then
+        v=[d['gmail_from'],d['gmail_app_pw'],d['sms_gateway']]; all(v) or sys.exit(1); print('|'.join(v))" 2>/dev/null); then
     _am_creds=""
   fi
   rm -f "${_vault_hdr}"
@@ -104,8 +108,7 @@ function deploy_observability() {
   _observability_ensure_alertmanager_login
   _observability_install_alertmanager_port_forward
   _observability_install_alertmanager_auth_proxy
-  _observability_apply_argocd_dashboard "${_hub_context}"
-  _deploy_promtail_acg "${_hub_context}"
+  _observability_refresh_prometheus_auth_proxy
 }
 
 function _observability_seed_grafana_if_absent() {
@@ -148,6 +151,7 @@ function observability_seed_grafana() {
 }
 
 function _observability_apply_grafana_rotator() {
+  _vault_login "secrets" "vault"
   _observability_seed_grafana_if_absent "secrets" "vault" \
     || _err "[observability] Grafana credential seed skipped/failed"
   local manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-credential-rotator.yaml"
@@ -254,6 +258,45 @@ function _observability_wait_for_port() {
 
 function _observability_alertmanager_auth_file() {
   printf '%s/.local/share/k3d-manager/alertmanager-basic-auth.env\n' "${HOME}"
+}
+
+function _observability_prometheus_auth_file() {
+  printf '%s/.local/share/k3d-manager/prometheus-basic-auth.env\n' "${HOME}"
+}
+
+function _observability_ensure_prometheus_login() {
+  local _auth_file _vault_token _vault_hdr _prom_creds
+  _auth_file="$(_observability_prometheus_auth_file)"
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+
+  if ! _prom_creds=$(curl -sf \
+      --header "@${_vault_hdr}" \
+      "http://127.0.0.1:18200/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
+      | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+        print(d['user']+'|'+d['password'])" 2>/dev/null); then
+    _prom_creds=""
+  fi
+  rm -f "${_vault_hdr}"
+
+  if [[ -z "${_prom_creds}" ]]; then
+    _warn "[observability] Prometheus Vault credentials unreadable — skipping auth proxy"
+    return 1
+  fi
+
+  local _prom_user _prom_password
+  _prom_user="${_prom_creds%%|*}"
+  _prom_password="${_prom_creds#*|}"
+  mkdir -p "$(dirname "${_auth_file}")"
+  cat > "${_auth_file}" <<EOF
+PROMETHEUS_BASIC_AUTH_USER=${_prom_user}
+PROMETHEUS_BASIC_AUTH_PASSWORD=${_prom_password}
+PROMETHEUS_BACKEND_URL=http://127.0.0.1:19091
+EOF
+  chmod 600 "${_auth_file}"
+  _info "[observability] Prometheus login credentials ready (${_auth_file})"
 }
 
 function _observability_ensure_alertmanager_login() {
@@ -370,6 +413,45 @@ function _observability_install_alertmanager_auth_proxy() {
   _info "[observability] Alertmanager auth proxy installed — localhost:9093 now requires login"
 }
 
+function _observability_install_prometheus_auth_proxy() {
+  if ! _is_mac; then
+    return 0
+  fi
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+    _warn "[observability] launchctl or python3 not available — skipping Prometheus auth proxy"
+    return 0
+  fi
+
+  local _auth_file _plist_template _plist
+  _auth_file="$(_observability_prometheus_auth_file)"
+  if [[ ! -f "${_auth_file}" ]]; then
+    _warn "[observability] Prometheus auth file missing — skipping auth proxy"
+    return 0
+  fi
+  _plist_template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.prometheus-auth-proxy.plist.tmpl"
+  _plist="${HOME}/Library/LaunchAgents/com.k3d-manager.prometheus-auth-proxy.plist"
+  if [[ ! -f "${_plist_template}" ]]; then
+    _warn "[observability] Prometheus auth proxy template missing — skipping"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${_plist}")"
+  sed \
+    -e "s|{{PYTHON3_PATH}}|$(command -v python3)|g" \
+    -e "s|{{PROMETHEUS_PROXY_BIN}}|${SCRIPT_DIR}/../bin/prometheus-auth-proxy|g" \
+    -e "s|{{PROMETHEUS_AUTH_FILE}}|${_auth_file}|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_plist_template}" > "${_plist}"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-auth-proxy" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _info "[observability] Prometheus auth proxy installed — localhost:19090 now requires login"
+}
+
+function _observability_refresh_prometheus_auth_proxy() {
+  _observability_ensure_prometheus_login || return 0
+  _observability_install_prometheus_auth_proxy
+}
+
 function _observability_restore_alertmanager_access_layer() {
   if ! _is_mac; then
     return 0
@@ -472,7 +554,7 @@ function deploy_observability_acg() {
       --header "@${_vault_hdr}" \
       "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager" 2>/dev/null \
       | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
-        print(d['gmail_from']+'|'+d['gmail_app_pw']+'|'+d['sms_gateway'])" 2>/dev/null); then
+        v=[d['gmail_from'],d['gmail_app_pw'],d['sms_gateway']]; all(v) or sys.exit(1); print('|'.join(v))" 2>/dev/null); then
     _am_creds=""
   fi
   rm -f "${_vault_hdr}"
@@ -512,6 +594,7 @@ function deploy_observability_acg() {
   _observability_ensure_alertmanager_login
   _observability_install_alertmanager_port_forward
   _observability_install_alertmanager_auth_proxy
+  _observability_refresh_prometheus_auth_proxy
 }
 
 function _deploy_pushgateway_acg() {
@@ -562,6 +645,46 @@ function _observability_apply_argocd_dashboard() {
     _kubectl apply --context "${_app_context}" -f "${_dashboard_manifest}" >/dev/null \
       && _info "[observability] ArgoCD/Image Updater dashboard applied on ${_app_context}"
   fi
+}
+
+function _observability_ensure_argocd_servicemonitors() {
+  local _ctx="${1:-k3d-k3d-cluster}"
+  local _ns="${ARGOCD_NAMESPACE:-cicd}"
+  local _release="${ARGOCD_HELM_RELEASE:-argocd}"
+  local _chart_ref="${ARGOCD_HELM_CHART_REF:-argo/argo-cd}"
+  local _waited=0 _timeout="${OBSERVABILITY_CRD_WAIT_SECONDS:-300}"
+  while ! _kubectl --no-exit --context "${_ctx}" get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; do
+    if (( _waited >= _timeout )); then
+      _warn "[observability] ServiceMonitor CRD not present after ${_timeout}s; ArgoCD ServiceMonitors NOT ensured"
+      return 0
+    fi
+    sleep 10
+    _waited=$((_waited + 10))
+  done
+
+  local _chart_version _values _rendered
+  _chart_version="$(_helm --kube-context "${_ctx}" -n "${_ns}" list --filter "^${_release}\$" -o json 2>/dev/null \
+    | jq -r '.[0].chart // "" | sub("^argo-cd-"; "")')"
+  if [[ -z "${_chart_version}" ]]; then
+    _warn "[observability] ArgoCD release ${_ns}/${_release} not found; skipping ServiceMonitor ensure"
+    return 0
+  fi
+  _values="$(mktemp)"
+  if ! _helm --kube-context "${_ctx}" -n "${_ns}" get values "${_release}" -o yaml > "${_values}" 2>/dev/null; then
+    rm -f "${_values}"
+    _warn "[observability] could not read ArgoCD release values; skipping ServiceMonitor ensure"
+    return 0
+  fi
+  _rendered="$(_helm template "${_release}" "${_chart_ref}" -n "${_ns}" --version "${_chart_version}" \
+    -f "${_values}" --api-versions monitoring.coreos.com/v1 \
+    | yq eval-all 'select(.kind == "ServiceMonitor")' -)"
+  rm -f "${_values}"
+  if [[ -z "${_rendered}" ]]; then
+    _info "[observability] No ArgoCD ServiceMonitors rendered; skipping apply"
+    return 0
+  fi
+  printf '%s\n' "${_rendered}" | _kubectl --context "${_ctx}" apply -f - >/dev/null \
+    && _info "[observability] ArgoCD ServiceMonitors ensured on ${_ctx}"
 }
 
 function _observability_apply_trivy_dashboard() {
@@ -628,6 +751,7 @@ function observability_rotate_prometheus_basic_auth() {
     "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null
   rm -f "${_vault_hdr}"
   _prometheus_acg_web_config_secret "${1:-}" || return 1
+  _observability_refresh_prometheus_auth_proxy
   if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
     curl -sf --max-time 10 -X POST "${SLACK_WEBHOOK_URL}" \
       -H 'Content-Type: application/json' \

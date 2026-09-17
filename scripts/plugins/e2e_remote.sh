@@ -32,8 +32,10 @@ E2E_M2_REMOTE_PATH="${E2E_M2_REMOTE_PATH:-/opt/homebrew/bin:/usr/local/bin}"
 E2E_M2_MIN_CPU_IDLE="${E2E_M2_MIN_CPU_IDLE:-35}"
 E2E_M2_MIN_MEM_FREE="${E2E_M2_MIN_MEM_FREE:-25}"
 E2E_M2_MIN_DISK_GB="${E2E_M2_MIN_DISK_GB:-40}"
-# The k3d-manager checkout on the M2 that owns the remote E2E entry point.
-E2E_M2_REPO="${E2E_M2_REPO:-\$HOME/src/gitrepo/personal/k3d-manager}"
+# The clean, e2e-owned checkout on the M2 that owns the remote E2E entry point.
+E2E_M2_REPO="${E2E_M2_REPO:-\$HOME/.k3dm/e2e/runner-src}"
+E2E_M2_REPO_URL="${E2E_M2_REPO_URL:-https://github.com/wilddog64/k3d-manager.git}"
+REPO_ROOT="${REPO_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 # Runners a dispatch may target. RUNNER is matched against this exact list and
 # then used verbatim as the run's provenance — never free-text from the caller.
 E2E_RUNNER_ALLOWLIST="${E2E_RUNNER_ALLOWLIST:-m2}"
@@ -68,7 +70,7 @@ export E2E_M2_SSH_HOST E2E_M2_RUNNER_CLUSTER E2E_M2_RUNNER_CONTEXT
 export E2E_M2_KUBECONFIG E2E_M2_LOCK E2E_M2_REMOTE_REPORT_DIR
 export E2E_M2_ORB_TIMEOUT E2E_M2_ORB_INTERVAL E2E_M2_SSH_CONNECT_TIMEOUT
 export E2E_M2_MIN_CPU_IDLE E2E_M2_MIN_MEM_FREE E2E_M2_MIN_DISK_GB
-export E2E_M2_REMOTE_PATH E2E_M2_REPO E2E_RUNNER_ALLOWLIST
+export E2E_M2_REMOTE_PATH E2E_M2_REPO E2E_M2_REPO_URL E2E_RUNNER_ALLOWLIST
 export E2E_REPORT_DIR E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP
 export E2E_HUB_CONTEXT E2E_PUBLISH_KUBECONFIG E2E_PUBLISH_MAX_BYTES E2E_PUBLISH_AUDIT_LOG
 export E2E_M2_LOCK_MAX_AGE E2E_M2_PUBLISH_BACK_HOST E2E_M2_PUBLISH_BACK_KEY
@@ -92,6 +94,24 @@ function _e2e_remote_ssh() {
   mapfile -t opts < <(_e2e_remote_ssh_opts)
   local cmd="export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; $*"
   _run_command --soft --quiet -- ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$cmd"
+}
+
+function _e2e_remote_load_conf() {
+  [[ -n "$E2E_M2_PUBLISH_BACK_HOST" ]] && return 0
+
+  local conf="${K3DM_E2E_REMOTE_CONF:-$HOME/.config/k3d-manager/e2e-remote.env}"
+  local line
+  if [[ -r "$conf" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" =~ ^E2E_M2_PUBLISH_BACK_HOST=[A-Za-z0-9._@-]+$ ]]; then
+        E2E_M2_PUBLISH_BACK_HOST="${line#E2E_M2_PUBLISH_BACK_HOST=}"
+      fi
+    done < "$conf"
+  fi
+
+  if [[ -z "$E2E_M2_PUBLISH_BACK_HOST" ]]; then
+    _warn "[e2e-remote] publish-back host not configured; this result will NOT reach the hub/Grafana (set E2E_M2_PUBLISH_BACK_HOST in ${conf})"
+  fi
 }
 
 # Extract one key=value from probe output (last wins).
@@ -278,6 +298,10 @@ function _e2e_valid_digest() {
   [[ "$d" =~ ^([A-Za-z0-9._/-]+@)?sha256:[0-9a-f]{64}$ ]]
 }
 
+function _e2e_valid_repo_url() {
+  [[ "${1:-}" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?$ ]]
+}
+
 function _e2e_runner_allowed() {
   local want="${1:-}" allowed
   for allowed in $E2E_RUNNER_ALLOWLIST; do
@@ -310,8 +334,38 @@ function _e2e_remote_lock_release() {
 # runner allowlist and digest, gates on preflight, streams remote output while
 # persisting a local transcript, returns the remote exit code unchanged, and
 # never falls back to running the workload locally on M4.
+function _e2e_remote_copy_results() {
+  local transcript="$1"
+  shift
+  local -a opts=("$@")
+  local run_id
+  run_id="$(sed -nE 's#.*Summary written to .*/([0-9]+-[0-9]+)\.json.*#\1#p' "$transcript" | tail -n1)"
+  if [[ "$run_id" =~ ^[0-9]+-[0-9]+$ ]]; then
+    local result suffix remote_file local_file temp_file summary_file failures_file
+    summary_file="${transcript%.log}.summary.json"
+    failures_file="${transcript%.log}.failures.json"
+    for result in summary failures; do
+      suffix=".json"
+      [[ "$result" == "failures" ]] && suffix=".failures.json"
+      remote_file="${E2E_M2_REMOTE_REPORT_DIR}/${run_id}${suffix}"
+      local_file="${transcript%.log}.${result}.json"
+      temp_file="${local_file}.tmp"
+      if ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" \
+          "[ -r \"${remote_file}\" ] && cat -- \"${remote_file}\" | head -c 262144" > "$temp_file"; then
+        mv -f "$temp_file" "$local_file"
+      else
+        rm -f "$temp_file"
+        _warn "[e2e-remote] result file unavailable: ${remote_file}"
+      fi
+    done
+    _info "[e2e-remote] result files: ${summary_file} ${failures_file}"
+  fi
+}
+
 function e2e_runner_dispatch() {
   local runner="${1:-}" digest="${2:-}"
+
+  _e2e_remote_load_conf
 
   [[ -n "$runner" ]] || _err "usage: e2e_runner_dispatch <runner> [digest]"
   if ! _e2e_runner_allowed "$runner"; then
@@ -319,6 +373,15 @@ function e2e_runner_dispatch() {
   fi
   if ! _e2e_valid_digest "$digest"; then
     _err "[e2e-remote] invalid DIGEST '${digest}' (expected empty or [repo@]sha256:<64 hex>)"
+  fi
+  if ! _e2e_valid_repo_url "$E2E_M2_REPO_URL"; then
+    _err "[e2e-remote] invalid E2E_M2_REPO_URL '${E2E_M2_REPO_URL}'"
+  fi
+
+  local sha
+  sha="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+  if [[ -z "$(git -C "$REPO_ROOT" branch -r --contains "$sha")" ]]; then
+    _err "[e2e-remote] HEAD ${sha} is not pushed; push the branch first"
   fi
 
   local pf status
@@ -328,6 +391,7 @@ function e2e_runner_dispatch() {
     _err "[e2e-remote] runner ${runner} not available (status=${status:-unknown}); not dispatching, no local fallback"
   fi
   _info "[e2e-remote] runner ${runner} available; dispatching E2E (digest=${digest:-none})"
+  _info "[e2e-remote] runner source pinned to ${sha}"
 
   local token
   token="$(_e2e_lock_token)"
@@ -356,17 +420,27 @@ function e2e_runner_dispatch() {
     imageenv="export E2E_IMAGE_TAG=${_image_tag_q}; "
   fi
 
+  local repo_url_q sha_q
+  printf -v repo_url_q '%q' "$E2E_M2_REPO_URL"
+  printf -v sha_q '%q' "$sha"
+
   local -a opts
   mapfile -t opts < <(_e2e_remote_ssh_opts)
   local remote
+  # shellcheck disable=SC2027
   remote="export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; \
 export E2E_RUNNER=${runner} KUBECONFIG=${E2E_M2_KUBECONFIG} E2E_REPORT_DIR=${E2E_M2_REMOTE_REPORT_DIR}; \
 ${imageenv}${backenv}\
-cd ${E2E_M2_REPO} || exit 1; ./scripts/k3d-manager e2e_verify_vcluster ${digest}; rc=\$?; \
+[ -d "${E2E_M2_REPO}/.git" ] || git clone --quiet ${repo_url_q} "${E2E_M2_REPO}" || exit 1; \
+git -C "${E2E_M2_REPO}" fetch --quiet origin || exit 1; \
+git -C "${E2E_M2_REPO}" checkout --quiet --force --detach ${sha_q} || exit 1; \
+git -C "${E2E_M2_REPO}" clean -fdq -e .k3dm || exit 1; \
+cd "${E2E_M2_REPO}" || exit 1; ./scripts/k3d-manager e2e_verify_vcluster ${digest}; rc=\$?; \
 ./scripts/k3d-manager e2e_runner_publish_back \$rc || true; exit \$rc"
 
   ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$remote" 2>&1 | tee "$transcript"
   local rc="${PIPESTATUS[0]}"
+  _e2e_remote_copy_results "$transcript" "${opts[@]}"
   _info "[e2e-remote] dispatch exit ${rc}; transcript: ${transcript}"
   return "$rc"
 }
@@ -420,6 +494,8 @@ ALLOWED = {
     "run_id", "tier", "runner", "service", "project", "candidate_digest",
     "passed", "total", "failed", "duration_seconds", "timestamp", "commit",
     "exit_code", "phase", "result",
+    "failure_groups",
+    "failure_details",
 }
 REQUIRED = {
     "run_id", "tier", "runner", "service", "project", "candidate_digest",
@@ -487,6 +563,33 @@ total = numstr("total")
 failed = numstr("failed")
 dur_s = numstr("duration_seconds", allow_float=True)
 
+def validate_failure_groups(groups):
+    try:
+        assert isinstance(groups, list) and len(groups) <= 100
+        for group in groups:
+            assert isinstance(group, dict) and set(group) == {"kind", "target", "count", "service"}
+            for key in ("kind", "target"):
+                value = group[key]
+                assert isinstance(value, str) and value and len(value) <= 256
+            count = group["count"]
+            assert not isinstance(count, bool) and isinstance(count, int) and 0 <= count <= 100000
+            assert isinstance(group["service"], str) and group["service"] and len(group["service"]) <= 128
+    except (AssertionError, KeyError, TypeError):
+        die("invalid failure_groups")
+
+groups = s.get("failure_groups", [])
+validate_failure_groups(groups)
+
+details = s.get("failure_details", [])
+if not isinstance(details, list) or len(details) > 200:
+    die("failure_details must be a list with at most 200 entries")
+for detail in details:
+    if not isinstance(detail, dict) or set(detail) != {"file", "title", "status", "error", "service"}:
+        die("failure_details entries must contain file, title, status, error, service")
+    if any(not isinstance(detail[key], str) or len(detail[key]) > 512
+           for key in ("file", "title", "status", "error", "service")):
+        die("failure_details entry contains an invalid string")
+
 created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 event = {
     "run_id": run_id, "tier": tier, "runner": runner, "service": service,
@@ -494,6 +597,8 @@ event = {
     "passed": "true" if result == "pass" else "false",
     "total": total, "failed": failed, "duration_seconds": dur_s,
     "timestamp": timestamp, "commit": commit,
+    "failure_groups": groups,
+    "failure_details": details,
 }
 
 # Deterministic name -> apply is idempotent per run id; SSH retries cannot
@@ -633,7 +738,7 @@ function _e2e_newest_summary() {
   # cannot provide, so ls|grep is intentional here.
   # shellcheck disable=SC2010
   ls -1t "$E2E_REPORT_DIR"/*.json 2>/dev/null \
-    | grep -vE '\.(publication_pending|published)\.json$' | head -n1
+    | grep -vE '\.(publication_pending|published|failures)\.json$' | head -n1
 }
 
 # Build a minimal, schema-valid failed summary for a run that produced none
@@ -722,6 +827,7 @@ function e2e_runner_publish_replay() {
 # Never runs automatically.
 function e2e_runner_replay() {
   local runner="${1:-}"
+  _e2e_remote_load_conf
   [[ -n "$runner" ]] || _err "usage: e2e_runner_replay <runner>"
   _e2e_runner_allowed "$runner" || _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
   if ! _e2e_remote_ssh "true"; then

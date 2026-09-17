@@ -61,7 +61,8 @@ STUB
   run vcluster_create demo
   [ "$status" -ne 0 ]
   [[ "$output" == *"Unable to resolve the vCluster CLI"* ]]
-  ! grep -qE 'create|connect|delete' "$RUN_LOG"
+  run grep -qE 'create|connect|delete' "$RUN_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "empty foundation contract path stops before lifecycle work" {
@@ -69,7 +70,8 @@ STUB
   run vcluster_create demo
   [ "$status" -ne 0 ]
   [[ "$output" == *"Unable to resolve the vCluster CLI"* ]]
-  ! grep -qE 'create|connect|delete' "$RUN_LOG"
+  run grep -qE 'create|connect|delete' "$RUN_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "vcluster_create: honors VCLUSTER_VALUES_FILE override" {

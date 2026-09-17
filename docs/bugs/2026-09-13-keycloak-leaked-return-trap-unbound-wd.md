@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-13
 **Branch:** `k3d-manager-v1.33.0`
-**Status:** READY FOR CODEX
+**Status:** FIXED `ae661433` (Codex; Claude verified)
 
 ---
 

@@ -203,7 +203,7 @@ function _e2e_deploy_substrate() {
   fi
 
   local rollout
-  for rollout in postgres redis product-catalog basket order; do
+  for rollout in postgres redis product-catalog basket order payment; do
     _info "[e2e] Waiting for rollout: ${rollout}"
     _e2e_kc "$kubeconfig" -n "$E2E_NAMESPACE" rollout status \
       "deployment/${rollout}" --timeout="${E2E_ROLLOUT_TIMEOUT}s"
@@ -236,12 +236,14 @@ function _e2e_provision_pull_secret() {
 }
 
 function _e2e_provision_datastore_secret() {
-  local kubeconfig="${1:-}" postgres_password redis_password
+  local kubeconfig="${1:-}" postgres_password redis_password payment_encryption_key
   postgres_password="${E2E_POSTGRES_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
   redis_password="${E2E_REDIS_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  payment_encryption_key="${E2E_PAYMENT_ENCRYPTION_KEY:-$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')}"
   _e2e_kc "$kubeconfig" create secret generic e2e-datastore-credentials \
     --from-literal=postgres-password="${postgres_password}" \
     --from-literal=redis-password="${redis_password}" \
+    --from-literal=payment-encryption-key="${payment_encryption_key}" \
     -n "$E2E_NAMESPACE" --dry-run=client -o yaml | _e2e_kc "$kubeconfig" apply -f -
 }
 
@@ -285,6 +287,8 @@ spec:
           value: http://basket.${E2E_NAMESPACE}.svc:8083
         - name: ORDER_URL
           value: http://order.${E2E_NAMESPACE}.svc:8080
+        - name: PAYMENT_URL
+          value: http://payment.${E2E_NAMESPACE}.svc:8084
         - name: OAUTH2_ENABLED
           value: "false"
         - name: CI
@@ -350,6 +354,7 @@ function _e2e_write_summary() {
   local phase="${4:-unknown}"
   local log_file="${E2E_REPORT_DIR}/${run_id}.log"
   local summary_file="${E2E_REPORT_DIR}/${run_id}.json"
+  local failures_file="${E2E_REPORT_DIR}/${run_id}.failures.json"
 
   _run_command -- mkdir -p "$E2E_REPORT_DIR"
 
@@ -364,10 +369,11 @@ function _e2e_write_summary() {
   E2E_COMMIT="$commit" \
   E2E_LOG="$log_file" \
   E2E_RUNNER="${E2E_RUNNER:-local-m4}" \
-  python3 - "$summary_file" <<'PY'
+  python3 - "$summary_file" "$failures_file" <<'PY'
 import json, os, re, sys
 
 summary_path = sys.argv[1]
+failures_path = sys.argv[2]
 run_id = os.environ["E2E_RUN_ID"]
 service = os.environ["E2E_SERVICE"]
 candidate = os.environ.get("E2E_CANDIDATE") or None
@@ -378,6 +384,8 @@ log_path = os.environ["E2E_LOG"]
 runner = os.environ.get("E2E_RUNNER") or "local-m4"
 
 passed = total = failed = duration = None
+failures = []
+failure_groups = []
 try:
     with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
         raw = fh.read()
@@ -394,8 +402,77 @@ try:
         total = expected + unexpected + flaky + skipped
         if "duration" in stats:
             duration = round(stats["duration"] / 1000.0, 3)
+        def walk_suites(suites, inherited_file=""):
+            for suite in suites if isinstance(suites, list) else []:
+                if not isinstance(suite, dict):
+                    continue
+                suite_file = suite.get("file") or inherited_file
+                for spec in suite.get("specs", []) if isinstance(suite.get("specs"), list) else []:
+                    if not isinstance(spec, dict):
+                        continue
+                    spec_file = spec.get("file") or suite_file
+                    for test in spec.get("tests", []) if isinstance(spec.get("tests"), list) else []:
+                        if len(failures) >= 200 or not isinstance(test, dict):
+                            continue
+                        results = test.get("results")
+                        last = results[-1] if isinstance(results, list) and results else {}
+                        if not isinstance(last, dict) or last.get("status") not in ("failed", "timedOut"):
+                            continue
+                        error = last.get("error", "")
+                        if isinstance(error, dict):
+                            error = error.get("message", "")
+                        error = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", str(error))
+                        lines = [line.strip() for line in error.splitlines() if line.strip()]
+                        failures.append({
+                            "file": spec_file or "",
+                            "title": spec.get("title") or "",
+                            "status": last["status"],
+                            "error": " / ".join(lines[:3])[:300],
+                        })
+                walk_suites(suite.get("suites"), suite_file)
+        walk_suites(data.get("suites"))
 except Exception:
     pass
+
+groups = {}
+for failure in failures:
+    text = "%s %s" % (failure.get("title", ""), failure.get("error", ""))
+    spec = failure.get("file") or failure.get("title") or "unknown"
+    if re.search(r"ECONNREFUSED|ENOTFOUND|EAI_AGAIN|connect ETIMEDOUT", text, re.I):
+        kind = "service-unreachable"
+        targets = {"8000": "product-catalog", "8080": "order",
+                   "8083": "basket", "8084": "payment"}
+        match = re.search(r":(8000|8080|8083|8084)\b", text)
+        target = targets.get(match.group(1), "unknown") if match else "unknown"
+    elif re.search(r"timeout|timedOut|Timeout \d+ms exceeded", text, re.I):
+        kind, target = "timeout", spec
+    elif re.search(r"Received: undefined|Cannot read properties of undefined|must have a length property|received value must be a number|toHaveProperty", text, re.I):
+        kind, target = "contract-drift", spec
+    else:
+        kind, target = "assertion", spec
+    groups[(kind, target)] = groups.get((kind, target), 0) + 1
+failure_groups = [
+    {"kind": kind, "target": target, "count": count}
+    for (kind, target), count in sorted(groups.items())
+]
+for group in failure_groups:
+    target = group["target"]
+    group["service"] = (
+        "basket" if "cart" in target else
+        "order" if "order" in target else
+        "payment" if "payment" in target else
+        "product-catalog" if "product" in target else
+        "cross-service"
+    )
+for failure in failures:
+    file_name = failure.get("file", "")
+    failure["service"] = (
+        "basket" if "cart" in file_name else
+        "order" if "order" in file_name else
+        "payment" if "payment" in file_name else
+        "product-catalog" if "product" in file_name else
+        "cross-service"
+    )
 
 summary = {
     "run_id": run_id,
@@ -413,10 +490,18 @@ summary = {
     "exit_code": rc,
     "phase": phase,
     "result": "pass" if rc == 0 else "fail",
+    "failure_groups": failure_groups,
+    "failure_details": failures,
 }
 with open(summary_path, "w", encoding="utf-8") as fh:
     json.dump(summary, fh, indent=2, sort_keys=True)
     fh.write("\n")
+try:
+    with open(failures_path, "w", encoding="utf-8") as fh:
+        json.dump(failures, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+except Exception:
+    pass
 PY
 
   _info "[e2e] Summary written to ${summary_file} (exit_code=${rc})"
@@ -462,6 +547,8 @@ event = {
     "duration_seconds": str(s.get("duration_seconds") if s.get("duration_seconds") is not None else ""),
     "timestamp": s.get("timestamp") or created_at,
     "commit": s.get("commit") or "",
+    "failure_groups": s.get("failure_groups") or [],
+    "failure_details": s.get("failure_details") or [],
 }
 
 manifest = {

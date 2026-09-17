@@ -40,3 +40,16 @@ setup() {
   [ "$(sed -n '1p' "$calls")" = "login secrets vault" ]
   [ "$(sed -n '2p' "$calls")" = "seed secrets vault" ]
 }
+
+@test "_observability_apply_grafana_rotator logs in to Vault before seeding" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  _vault_login() { printf 'login %s %s\n' "$1" "$2" >> "$calls"; }
+  _observability_seed_grafana_if_absent() { printf 'seed %s %s\n' "$1" "$2" >> "$calls"; }
+  _vault_configure_secret_writer_role() { printf 'role\n' >> "$calls"; }
+  _kubectl() { :; }
+
+  run _observability_apply_grafana_rotator
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$calls")" = "login secrets vault" ]
+  [ "$(sed -n '2p' "$calls")" = "seed secrets vault" ]
+}

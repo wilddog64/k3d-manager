@@ -83,7 +83,8 @@ EOF
   run "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Reusing existing argocd-server port-forward on 8080"* ]]
-  ! grep -q "port-forward svc/argocd-server" "${BATS_TEST_TMPDIR}/kubectl.log"
+  run grep -q "port-forward svc/argocd-server" "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "$status" -ne 0 ]
 }
 
 @test "acg-sync-apps replaces an unmanaged listener on 8080" {

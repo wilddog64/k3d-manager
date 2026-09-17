@@ -164,3 +164,31 @@ test('GET /slack/events returns 404', async () => {
   const worker = loadWorker()
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
 })
+
+test('/k3dm relays target, args, confirm and user id to /api/v1/make', async () => {
+  const worker = loadWorker()
+  const body = 'command=/k3dm&text=' + encodeURIComponent('fix-delete-pod APP=frontend NS=shopping-cart-apps confirm') +
+    '&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  assert.match(await response.text(), /Queuing/)
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/make')
+  assert.ok(call)
+  assert.deepEqual(JSON.parse(call.init.body), { target: 'fix-delete-pod', args: { APP: 'frontend', NS: 'shopping-cart-apps' },
+    confirm: true, slack_user_id: 'UOP1', response_url: 'https://hooks.slack.test/resp' })
+  assert.equal(call.init.headers['X-K3DM-Source-Command'], '/k3dm')
+})
+
+test('/k3dm rejects malformed arguments without relaying', async () => {
+  const worker = loadWorker()
+  const body = 'command=/k3dm&text=' + encodeURIComponent('fix-sync APP=$(id) extra') + '&user_id=UOP1'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  assert.match(await response.text(), /Usage: \/k3dm/)
+  assert.equal(worker.fetches.length, 0)
+})
+
+test('/k3dm with no text asks the webhook for help', async () => {
+  const worker = loadWorker()
+  await worker.dispatch(signed('/slack/commands', 'command=/k3dm&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/make')
+  assert.equal(JSON.parse(call.init.body).target, 'help')
+})

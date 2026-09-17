@@ -50,6 +50,7 @@ fi
 : "${ARGOCD_HELM_REPO_URL:=https://argoproj.github.io/argo-helm}"
 : "${ARGOCD_HELM_CHART_REF:=argo/argo-cd}"
 : "${ARGOCD_VIRTUALSERVICE_HOST:=argocd.dev.local.me}"
+export ARGOCD_PUBLIC_URL="${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
 : "${ARGOCD_CHART_VERSION:=7.8.1}"
 : "${ARGOCD_SERVER_WAIT_TIMEOUT:=600s}"
 : "${ARGOCD_PORT_FORWARD_WAIT_TIMEOUT:=30}"
@@ -458,6 +459,7 @@ function _argocd_helm_deploy_release() {
 
    local -a helm_args=(
       --create-namespace
+      --set-string "configs.cm.url=${ARGOCD_PUBLIC_URL}"
       --set-string "redisSecretInit.podAnnotations.sidecar\.istio\.io/inject=false"
    )
 
@@ -469,7 +471,7 @@ function _argocd_helm_deploy_release() {
    if (( enable_ldap )); then
       _info "[argocd] Configuring LDAP/Dex authentication"
       values_file="/tmp/argocd-values-${RANDOM}.yaml"
-      envsubst '$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
+      envsubst '$ARGOCD_PUBLIC_URL $ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
          < "$ARGOCD_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
       helm_args+=(--values "$values_file")
    else
@@ -1197,8 +1199,11 @@ Options:
 
 Environment Variables:
    K3D_MANAGER_BRANCH   Values branch to pin (default: current git branch)
-   APP_CLUSTER_NAME     App-cluster name for ACG variants (default: resolved/ubuntu-k3s)
+   APP_CLUSTER_NAME     App-cluster name for sets not yet live (default: resolved/ubuntu-k3s)
    ARGOCD_NAMESPACE     Namespace for Argo CD (default: cicd)
+   ARGOCD_APPSET_IGNORE_LIVE
+                        1 = do not preserve each live set's destination cluster and
+                        istio-cni dirs (default: preserve; a reapply never retargets)
 
 Examples:
    # Reapply + verify, pinning to the checked-out release branch
@@ -1223,6 +1228,45 @@ EOF
       _info "[argocd] Confirming values-branch pin (${K3D_MANAGER_BRANCH})"
       argocd_check_values_branch "${K3D_MANAGER_BRANCH}"
    fi
+}
+
+function _argocd_appset_live_overrides() {
+   local file="$1" name live value conf bin provider dirs
+   name="$(sed -n 's/^  name: //p' "$file" | head -1)"
+   [[ -z "${name}" ]] && return 0
+   live="$(_kubectl --no-exit get applicationset "${name}" -n "${ARGOCD_NAMESPACE:-cicd}" -o json 2>/dev/null || true)"
+   [[ -z "${live}" ]] || printf '%s' "${live}" | jq -e '.kind == "ApplicationSet"' >/dev/null 2>&1 || live=""
+
+   if grep -q '\${APP_CLUSTER_NAME}' "$file" && [[ -n "${live}" ]]; then
+      value="$(printf '%s' "${live}" | jq -r '.spec.template.spec.destination.name // ""')"
+      [[ -z "${value}" || "${value}" == *'{{'* || "${value}" == *'$'* ]] || printf 'APP_CLUSTER_NAME=%s\n' "${value}"
+   fi
+
+   if grep -q '\${AMBIENT_CNI_CONF_DIR}' "$file"; then
+      if [[ -n "${live}" ]]; then
+         value="$(printf '%s' "${live}" | jq -r '[.spec.generators[]?.list.elements[]? | select(.name == "istio-cni") | .values][0] // ""')"
+         conf="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniConfDir:[[:space:]]*//p' | head -1)"
+         bin="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniBinDir:[[:space:]]*//p' | head -1)"
+      fi
+      if [[ -z "${conf:-}" || -z "${bin:-}" ]]; then
+         if ! declare -f _istio_ambient_cni_dirs >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/istio_ambient.sh" ]]; then
+            # shellcheck disable=SC1090,SC1091
+            source "${PLUGINS_DIR}/istio_ambient.sh"
+         fi
+         if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
+            provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${APP_CLUSTER_NAME:-ubuntu-k3s}")}"
+            if [[ -n "${provider}" ]]; then
+               dirs="$(_istio_ambient_cni_dirs "${provider}")"
+               conf="${dirs%% *}"
+               bin="${dirs##* }"
+            fi
+         fi
+      fi
+      if [[ -n "${conf:-}" && -n "${bin:-}" ]]; then
+         printf 'AMBIENT_CNI_CONF_DIR=%s\nAMBIENT_CNI_BIN_DIR=%s\n' "${conf}" "${bin}"
+      fi
+   fi
+   return 0
 }
 
 function _argocd_deploy_applicationsets() {
@@ -1278,7 +1322,17 @@ function _argocd_deploy_applicationsets() {
          _err "[argocd] Refusing to apply ${filename}: unset variable(s):${_unset}"
          continue
       fi
-      if envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
+      local -a _overrides=()
+      local _ov
+      if [[ "${ARGOCD_APPSET_IGNORE_LIVE:-0}" != "1" ]]; then
+         while IFS= read -r _ov; do
+            [[ -n "${_ov}" ]] && _overrides+=("${_ov}")
+         done < <(_argocd_appset_live_overrides "$file")
+      fi
+      if (( ${#_overrides[@]} > 0 )); then
+         _info "[argocd] ${filename}: keeping live ${_overrides[*]}"
+      fi
+      if env ${_overrides[@]+"${_overrides[@]}"} envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
          ((deployed_count++))
       else
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"
@@ -1694,4 +1748,149 @@ for app in doc.get("items", []):
 
 print("[argocd] checked {} values references".format(checked), file=sys.stderr)
 ' "${_expected}" "${_repo}"
+}
+
+function argocd_reclaim_release_ownership() {
+   local _context="k3d-k3d-cluster"
+   local _namespace="${ARGOCD_NAMESPACE:-cicd}"
+   local _release="${ARGOCD_HELM_RELEASE:-argocd}"
+   local _apply=0
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         --context)
+            if [[ -z "${2:-}" ]]; then
+               _warn "[argocd] --context requires a value"
+               return 2
+            fi
+            _context="$2"
+            shift 2
+            ;;
+         --confirm)
+            _apply=1
+            shift
+            ;;
+         -h|--help)
+            cat <<'EOF'
+Usage: argocd_reclaim_release_ownership [--context <kube-context>] [--confirm]
+
+Find ArgoCD Helm release objects (ConfigMaps, Secrets, ServiceAccounts) whose labels
+were taken over by an ArgoCD Application (field manager argocd-controller), and
+orphans that Application left behind. Dry run by default.
+
+  --context   Kube context (default: k3d-k3d-cluster)
+  --confirm   Strip the argocd-controller managedFields entries and the
+              argocd.argoproj.io/instance label from release objects, and
+              delete orphan ServiceAccounts. Orphan ConfigMaps/Secrets are
+              only reported.
+EOF
+            return 0
+            ;;
+         *)
+            _warn "[argocd] Unknown option: $1"
+            return 2
+            ;;
+      esac
+   done
+
+   local _objects _apps _plan
+   _objects="$(_kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+      get configmap,secret,serviceaccount -o json --show-managed-fields 2>/dev/null)"
+   [[ -n "${_objects}" ]] || {
+      _warn "[argocd] Could not read ConfigMaps/Secrets/ServiceAccounts from ${_context}/${_namespace}"
+      return 2
+   }
+   _apps="$(_kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+      get applications.argoproj.io -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)"
+
+   if ! _plan="$(printf '%s' "${_objects}" | _argocd_foreign_ownership_plan "${_release}" "${_apps}")"; then
+      _warn "[argocd] Could not parse objects from ${_context}/${_namespace}"
+      return 2
+   fi
+   [[ -n "${_plan}" ]] || {
+      _info "[argocd] No foreign ownership on ${_namespace} objects of Helm release ${_release}"
+      return 0
+   }
+
+   local _action _kind _name _indices _instance _patch _idx _rc=0
+   local -a _idx_list
+   while IFS=$'\t' read -r _action _kind _name _indices _instance; do
+      case "${_action}" in
+         strip)
+            _info "[argocd] ${_kind}/${_name}: argocd-controller managedFields [${_indices}], tracking label ${_instance}"
+            (( _apply )) || continue
+            if [[ "${_indices}" != "-" ]]; then
+               _patch="["
+               IFS=',' read -r -a _idx_list <<<"${_indices}"
+               for _idx in "${_idx_list[@]}"; do
+                  _patch+="{\"op\":\"test\",\"path\":\"/metadata/managedFields/${_idx}/manager\",\"value\":\"argocd-controller\"},"
+                  _patch+="{\"op\":\"remove\",\"path\":\"/metadata/managedFields/${_idx}\"},"
+               done
+               _patch="${_patch%,}]"
+               if ! _kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+                  patch "${_kind}" "${_name}" --type=json -p "${_patch}" >/dev/null; then
+                  _warn "[argocd] ${_kind}/${_name}: managedFields strip failed"
+                  _rc=1
+                  continue
+               fi
+            fi
+            if [[ "${_instance}" != "-" ]]; then
+               if ! _kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+                  label "${_kind}" "${_name}" argocd.argoproj.io/instance- >/dev/null; then
+                  _warn "[argocd] ${_kind}/${_name}: tracking label removal failed"
+                  _rc=1
+               fi
+            fi
+            ;;
+         orphan)
+            _info "[argocd] ${_kind}/${_name}: orphan of removed Application ${_instance}"
+            (( _apply )) || continue
+            if ! _kubectl --no-exit --context "${_context}" -n "${_namespace}" \
+               delete "${_kind}" "${_name}" >/dev/null; then
+               _warn "[argocd] ${_kind}/${_name}: delete failed"
+               _rc=1
+            fi
+            ;;
+         review)
+            _warn "[argocd] ${_kind}/${_name}: orphan of removed Application ${_instance}; review manually (not deleted)"
+            ;;
+      esac
+   done <<<"${_plan}"
+
+   if (( ! _apply )); then
+      _info "[argocd] Dry run; rerun with --confirm to apply"
+   fi
+   return "${_rc}"
+}
+
+function _argocd_foreign_ownership_plan() {
+   python3 -c '
+import json
+import sys
+
+release = sys.argv[1]
+apps = set(sys.argv[2].split())
+tracking = "argocd.argoproj.io/instance"
+
+try:
+    doc = json.load(sys.stdin)
+except ValueError:
+    sys.exit(3)
+
+for obj in doc.get("items", []):
+    meta = obj.get("metadata", {})
+    kind = obj.get("kind", "").lower()
+    name = meta.get("name", "")
+    labels = meta.get("labels") or {}
+    annotations = meta.get("annotations") or {}
+    instance = labels.get(tracking, "")
+    if annotations.get("meta.helm.sh/release-name") == release:
+        indices = [str(i) for i, entry in enumerate(meta.get("managedFields") or [])
+                   if entry.get("manager") == "argocd-controller"]
+        if indices or instance:
+            print("\t".join(["strip", kind, name, ",".join(reversed(indices)) or "-", instance or "-"]))
+    elif instance and instance not in apps and labels.get("app.kubernetes.io/part-of") == "argocd":
+        action = "orphan" if kind == "serviceaccount" else "review"
+        print("\t".join([action, kind, name, "-", instance]))
+' "$1" "${2:-}"
 }

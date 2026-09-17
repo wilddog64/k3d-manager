@@ -2,6 +2,7 @@
 
 EXPORTER="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml"
 DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-e2e.yaml"
+HERMES_DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-hermes.yaml"
 RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
 
@@ -14,12 +15,51 @@ ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   [ "${status}" -eq 0 ]
 }
 
+@test "Hermes dashboard exposes current findings and history" {
+  run grep -F -- 'hermes_sensor_status' "${HERMES_DASH}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '"title": "Current Hermes findings"' "${HERMES_DASH}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '"title": "Sensor status history"' "${HERMES_DASH}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "exporter emits all five e2e_* gauges" {
   for metric in e2e_run_info e2e_last_run_pass e2e_last_run_timestamp_seconds \
                 e2e_last_run_duration_seconds e2e_last_success_timestamp_seconds; do
     run grep -F -- "${metric}{" "${EXPORTER}"
     [ "${status}" -eq 0 ]
   done
+}
+
+@test "exporter emits grouped e2e failure metric and dashboard table" {
+  run grep -F -- 'e2e_failure_group_info{' "${EXPORTER}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '"title": "Failure groups"' "${DASH}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "exporter emits test-level failure metric and dashboard table" {
+  run grep -F -- 'e2e_failure_info{' "${EXPORTER}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '"title": "Failure details"' "${DASH}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "exporter normalizes nested JSON and skips invalid E2E payloads" {
+  run python3 - "${EXPORTER}" <<'PY'
+import sys, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+assert 'if isinstance(payload, str):' in src
+assert 'if not payload.get("run_id"):' in src
+assert 'continue' in src
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
 }
 
 @test "exporter labels e2e gauges with the runner dimension" {

@@ -11,8 +11,10 @@ data:
   10-create-databases.sql: |
     CREATE DATABASE products;
     CREATE DATABASE orders;
+    CREATE DATABASE payments;
     GRANT ALL PRIVILEGES ON DATABASE products TO postgres;
     GRANT ALL PRIVILEGES ON DATABASE orders TO postgres;
+    GRANT ALL PRIVILEGES ON DATABASE payments TO postgres;
   20-orders-schema.sql: |
     \connect orders
     CREATE TABLE IF NOT EXISTS orders (

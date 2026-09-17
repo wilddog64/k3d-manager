@@ -34,6 +34,7 @@ setup() {
 
   run _install_kubernetes_cli
   [ "$status" -eq 0 ]
-  ! grep -q 'brew install kubectl' "$RUN_LOG"
+  run grep -q 'brew install kubectl' "$RUN_LOG"
+  [ "$status" -ne 0 ]
   grep -q 'apt-get install -y kubectl' "$RUN_LOG"
 }

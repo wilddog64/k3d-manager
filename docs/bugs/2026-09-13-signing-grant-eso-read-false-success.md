@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.33.0`
 **Filed:** 2026-09-13
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED `58999f55` (Codex; Claude verified)
 **Files:** `scripts/plugins/signing.sh`, `scripts/tests/plugins/signing.bats`, `CHANGELOG.md`
 **Related:** `docs/bugs/2026-09-13-vault-eso-role-rewrite-drops-cosign-verify.md`, `docs/issues/2026-09-09-hub-kine-history-and-hostinger-cosign-role.md`
 

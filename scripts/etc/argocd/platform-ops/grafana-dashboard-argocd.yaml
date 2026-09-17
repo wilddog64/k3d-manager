@@ -33,7 +33,7 @@ data:
           },
           "targets": [
             {
-              "expr": "kube_deployment_status_replicas_available{namespace=\"cicd\",deployment=\"argocd-image-updater\"}",
+              "expr": "max(kube_deployment_status_replicas_available{namespace=\"cicd\",deployment=\"argocd-image-updater\",cluster!=\"acg\"})",
               "refId": "A"
             }
           ],
@@ -59,7 +59,7 @@ data:
           },
           "targets": [
             {
-              "expr": "kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\"}",
+              "expr": "max(kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\",cluster!=\"acg\"})",
               "refId": "A"
             }
           ]

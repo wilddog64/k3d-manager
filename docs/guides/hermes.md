@@ -180,6 +180,9 @@ risk for no signal.
 | CI / required-check status and R4 re-run | `k3dm-hermes-gh-token` | GitHub fine-grained PAT with `actions:write` for approved R4 POSTs |
 | Slack summary delivery | `k3dm-slack-webhook` | Existing incoming-webhook relay |
 | Monthly security audit (optional) | `k3dm-hermes-audit-token` | Read-only fine-grained PAT; see [Monthly security audit](#monthly-security-audit). Absent → the audit reports its checks "unavailable" and the poll continues |
+| SMS pager sender (optional) | `k3dm-hermes-sms-from` | Gmail address; see [SMS pager](#sms-pager) |
+| SMS pager password (optional) | `k3dm-alertmanager-gmail-app-password` | Existing Google App Password item shared with Alertmanager (login-user account); not duplicated |
+| SMS pager recipient (optional) | `k3dm-hermes-sms-to` | Carrier SMS gateway address |
 
 The ArgoCD `hermes` account and its RBAC (`get` only, no `sync`/`update`/`delete`) live in
 [`scripts/etc/argocd/values.yaml.tmpl`](../../scripts/etc/argocd/values.yaml.tmpl). The ArgoCD token
@@ -239,6 +242,80 @@ align to a hard boundary.
 | `K3DM_HERMES_JITTER` | (unset) | When set, sleep 0–30s before sensing |
 | `K3DM_HERMES_AUDIT_RUN_BATS` | (unset) | When `1`, the monthly audit runs the webhook security-regression bats subset (Group B); otherwise reported "skipped" |
 | `K3DM_HERMES_APPROVAL_DRAIN_URL` | (unset) | Opt-in Slack approvals: relay drain URL (https). Unset = no buttons, no drain |
+| `K3DM_HERMES_SMS_DAILY_BUDGET` | `10` | Max SMS pages per UTC day |
+| `K3DM_HERMES_E2E_ENABLED` | (enabled) | Set to `0` to disable scheduled E2E dispatch |
+| `K3DM_HERMES_E2E_SCHEDULE` | `wed,sat@02:00` | Strict local-time E2E schedule |
+
+---
+
+## Scheduled e2e
+
+Hermes schedules an M2 E2E run on Wednesday and Saturday at 02:00 local time. The
+existing five-minute poll catches up later that day if the laptop was asleep. Set
+`K3DM_HERMES_E2E_ENABLED=0` to disable it, or set
+`K3DM_HERMES_E2E_SCHEDULE=wed,sat@02:00` to a strict comma-separated weekday list
+and 24-hour time. An invalid value disables the schedule and produces one Slack
+notice per day.
+
+Claims and final markers are kept separately from the poll state in
+`~/.k3dm/hermes/e2e/`; the detached run log is
+`~/Library/Logs/k3dm-hermes-e2e.log`. A failed preflight retries up to six times,
+30 minutes apart. For an immediate operator check, run:
+
+```bash
+bin/k3dm-hermes e2e now
+```
+
+Hermes reads the M2 summary and failure sidecars, redacts secrets before output,
+and rule-groups failures. New or recurring groups are filed only from the
+Hermes-owned `~/.k3dm/hermes/bugs-worktree`, committed and pushed to the current
+release branch; it never modifies the operator checkout or opens GitHub Issues.
+Those bug documents are triage records only: they remain unverified until a human
+confirms the root cause and writes the fix specification.
+
+## Hermes Status dashboard
+
+When the scheduled status sensor runs, Hermes publishes a redacted snapshot to
+the hub `platform-ops` namespace. The vulnerability exporter turns it into
+`hermes_sensor_status`, `hermes_status_check_info`, `hermes_incident_active`,
+and `hermes_last_poll_timestamp_seconds`. Open the Grafana **Hermes Status**
+dashboard to see current findings, incident state, poll age, and sensor history.
+The snapshot contains no tokens or raw local log lines. Set
+`K3DM_HERMES_PUBLISH_STATUS=0` only when deliberately disabling this publication.
+
+---
+
+## SMS pager
+
+Hermes texts the operator's phone for a short allowlist of must-know events. It covers the gaps
+Slack and Alertmanager cannot: Alertmanager runs inside the cluster, and Hermes sensors that read
+"unknown" never trip the two-signal correlator. Paging bypasses the correlator on purpose.
+
+| Event | Fires when | Recovery text |
+|-------|------------|---------------|
+| Webhook down | `eso` and `node_pressure` both `unknown` for 2 consecutive polls (~10 min) | yes |
+| Sensor stuck unknown | any other sensor `unknown` for 6 consecutive polls (~30 min); the text carries its evidence, e.g. `argocd ... credential rejected` | yes |
+| Poll job failing | the Hermes poll raises on 2 consecutive runs | yes |
+| Security | once per UTC hour, any **new** open critical/high CodeQL or Dependabot alert (read with `k3dm-hermes-audit-token`) | no |
+
+Each page is sent once on the way down and once on recovery, mirrored to Slack, and capped at
+`K3DM_HERMES_SMS_DAILY_BUDGET` texts per UTC day (default 10). The first security check after
+install texts once for every critical/high alert already open. If the laptop sleeps or dies,
+nothing pages.
+
+Delivery is Gmail SMTP (`smtp.gmail.com:587`, STARTTLS) to the carrier SMS gateway, the same route
+Alertmanager uses. Credentials come from the login Keychain (account `k3dm`) only, never Vault,
+because Vault lives in the cluster Hermes must outlive. The app password is the existing
+`k3dm-alertmanager-gmail-app-password` item (the backup behind `make restore-google-app-password`),
+not a second copy. The pager is off until it and the two items below exist. Add each at the prompt
+(never in argv):
+
+```bash
+security add-generic-password -a k3dm -s k3dm-hermes-sms-from -w          # Gmail address
+security add-generic-password -a k3dm -s k3dm-hermes-sms-to -w            # 10digits@tmomail.net
+```
+
+No reload is needed: the next poll reads them.
 
 ---
 

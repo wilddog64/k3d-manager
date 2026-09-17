@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,10 +21,13 @@ from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, argocd, ci, eso, kine, kine_log_signals,
                             node_pressure, reachability, stale_acg_registration,
-                            token_expiry_advisory)
+                            status_checks, token_expiry_advisory)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
 from hermes.slack import post_interactive, post_summary
+from hermes import pager
+from hermes import e2e_schedule, e2e_triage, e2e_bugs
+from hermes import status_triage
 
 
 def _load_state(path):
@@ -59,12 +63,19 @@ def _argocd_run(command, additions):
     env.update(additions)
     result = subprocess.run(command, capture_output=True, text=True, env=env,
                             timeout=20, check=False)
-    return result.returncode, result.stdout
+    return result.returncode, result.stdout if result.returncode == 0 else result.stderr
 
 
 def _probe_run(command, _additions):
     result = subprocess.run(command, capture_output=True, text=True, cwd=ROOT,
                             timeout=60, check=False)
+    return result.returncode, result.stdout
+
+
+def _status_run(command, _additions):
+    """Run the bounded JSON-only cluster-status probe inline with the Hermes poll."""
+    result = subprocess.run(command, capture_output=True, text=True, cwd=ROOT,
+                            timeout=120, check=False)
     return result.returncode, result.stdout
 
 
@@ -92,7 +103,7 @@ def _datastore_run(_command, _additions):
         return 1, json.dumps({"available": False})
 
 
-def _run_cycle(state):
+def _run_cycle(state, status_runner=None):
     """Sample the Phase 1 sensors and propose, but never execute, repairs."""
     webhook = _keychain_secret(WEBHOOK_SERVICE)
     argo_token = _keychain_secret(ARGOCD_SERVICE)
@@ -116,6 +127,8 @@ def _run_cycle(state):
         kine(_datastore_run, state),
         ci(github_fetch, state, token=github),
     ]
+    if status_runner is not None:
+        records.append(status_checks(status_runner, state))
     correlator = Correlator(
         correlation_window=int(os.environ.get("K3DM_HERMES_CORRELATION_WINDOW", "3")),
         daily_budget=int(os.environ.get("K3DM_HERMES_LLM_DAILY_BUDGET", "10")),
@@ -177,8 +190,263 @@ def _drain_approvals(state, relay, drain_url):
     return outcomes
 
 
+def _sms_keychain(service):
+    """Read an SMS item; the app password is the shared Alertmanager item (any account)."""
+    if service != pager.SMS_PASSWORD_SERVICE:
+        return _keychain_secret(service)
+    try:
+        result = subprocess.run(
+            ["security", "find-generic-password", "-s", pager.SMS_PASSWORD_SERVICE, "-w"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+        return result.stdout.strip() if result.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _page(state, texts, relay):
+    """Mirror page texts to Slack, then text them within the daily SMS budget."""
+    for text in texts:
+        post_summary(relay, text)
+    budget = int(os.environ.get("K3DM_HERMES_SMS_DAILY_BUDGET", "10"))
+    return pager.deliver(texts, state, timestamp()[:10],
+                         lambda text: pager.send_sms(_sms_keychain, text), budget=budget)
+
+
+def _e2e_dir():
+    return Path(os.environ.get("K3DM_HERMES_E2E_DIR", Path.home() / ".k3dm/hermes/e2e"))
+
+
+def _e2e_run(argv, timeout):
+    result = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True,
+                            timeout=timeout, check=False)
+    return result.returncode, result.stdout + result.stderr
+
+
+def _e2e_write(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.write_text(json.dumps(value, sort_keys=True))
+    path.chmod(0o600)
+
+
+def _e2e_results(started):
+    directory = Path(os.environ.get("K3DM_E2E_DISPATCH_DIR", Path.home() / ".k3dm/e2e/dispatch"))
+    choices = [path for path in directory.glob("m2-*.summary.json") if path.stat().st_mtime >= started]
+    if not choices:
+        return {}, []
+    summary_path = max(choices, key=lambda path: path.stat().st_mtime)
+    try:
+        summary = json.loads(summary_path.read_text())
+        failures = json.loads(summary_path.with_name(summary_path.name.replace(".summary.json", ".failures.json")).read_text())
+        return summary, failures if isinstance(failures, list) else []
+    except (OSError, ValueError):
+        return {}, []
+
+
+def _e2e_previous(directory, slot):
+    markers = [path for path in directory.glob("*.json") if path.stem != slot]
+    if not markers:
+        return []
+    return _load_state(max(markers, key=lambda path: path.stat().st_mtime)).get("groups", [])
+
+
+def _e2e_text(slot, run, summary, filed, changes):
+    passed, failed, total = (summary.get(key, 0) for key in ("passed", "failed", "total"))
+    head = f"Hermes e2e {slot} (run {run}, M2): "
+    head += f"PASS {passed}/{total}" if summary.get("result") == "pass" else f"FAIL — {passed} passed, {failed} failed, {max(total - passed - failed, 0)} skipped"
+    lines = [head]
+    for group in filed.get("groups", []):
+        lines.append(f"[{group['status']}] {group['kind']} {group['target']} ({group['count']} tests) → {group.get('path', '')}")
+    if changes["resolved"]:
+        lines.append("resolved: " + ", ".join(changes["resolved"]))
+    lines.append(filed.get("push", ""))
+    return "\n".join(lines)[:3500]
+
+
+def _run_e2e(slot, runner=_e2e_run, now=None):
+    """Run one E2E slot; preflight failure is deliberately a successful poll outcome."""
+    now = now or time.time()
+    directory = _e2e_dir()
+    manual = slot == "now"
+    if manual:
+        slot = "manual-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(now))
+    preflight, _output = runner([str(ROOT / "scripts/k3d-manager"), "e2e_runner_preflight", "m2"], 120)
+    if preflight != 0:
+        claim = e2e_schedule.retry_claim(directory, slot, datetime.fromtimestamp(now).astimezone())
+        if claim["attempts"] < 6 and not manual:
+            return 0
+        _e2e_write(directory / f"{slot}.json", {"outcome": "runner-unavailable"})
+        (directory / f"{slot}.claim").unlink(missing_ok=True)
+        post_summary(_keychain_secret("k3dm-slack-webhook"), f"Hermes e2e {slot}: skipped — M2 runner unavailable after 6 attempts")
+        return 0
+    started = time.time()
+    rc, transcript = runner([str(ROOT / "scripts/k3d-manager"), "e2e_runner_dispatch", "m2"], 5400)
+    summary, failures = _e2e_results(started)
+    if not summary:
+        summary = {"result": "fail", "phase": "dispatch", "run_id": "unknown", "passed": 0, "failed": 1, "total": 1}
+        failures = []
+    groups = e2e_triage.triage(summary, failures)
+    if not failures and groups:
+        groups[0]["samples"] = [e2e_triage.redact("\n".join(transcript.splitlines()[-5:]) + f" (rc={rc})")]
+    changes = e2e_triage.diff_groups(_e2e_previous(directory, slot), groups)
+    run = {"run_id": summary.get("run_id", "unknown"), "summary": summary}
+    filed = e2e_bugs.file_bugs(ROOT, groups, run, slot)
+    post_summary(_keychain_secret("k3dm-slack-webhook"), _e2e_text(slot, run["run_id"], summary, filed, changes))
+    _e2e_write(directory / f"{slot}.json", {"outcome": summary.get("result", "fail"), "run_id": run["run_id"],
+                                              "counts": {key: summary.get(key, 0) for key in ("passed", "failed", "total")},
+                                              "groups": [{key: group[key] for key in ("slug", "kind", "target", "count")} for group in groups]})
+    (directory / f"{slot}.claim").unlink(missing_ok=True)
+    return 0
+
+
+def _schedule_e2e(state):
+    schedule = e2e_schedule.configured_schedule()
+    relay = _keychain_secret("k3dm-slack-webhook")
+    today = timestamp()[:10]
+    if schedule is None:
+        if os.environ.get("K3DM_HERMES_E2E_ENABLED") != "0" and state.get("e2e_invalid_notice") != today:
+            post_summary(relay, "Hermes e2e schedule disabled: invalid K3DM_HERMES_E2E_SCHEDULE")
+            state["e2e_invalid_notice"] = today
+        return
+    now = datetime.now().astimezone()
+    directory = _e2e_dir()
+    slot = e2e_schedule.due_slot(now, directory, schedule)
+    if not slot or e2e_schedule.claim_slot(directory, slot, now) is None:
+        return
+    log_path = Path.home() / "Library/Logs/k3dm-hermes-e2e.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a") as log:
+        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "e2e", slot], start_new_session=True,
+                                 stdin=subprocess.DEVNULL, stdout=log, stderr=log)
+    claim = _load_state(directory / f"{slot}.claim")
+    claim["pid"] = child.pid
+    _e2e_write(directory / f"{slot}.claim", claim)
+
+
+def _status_due(state, now):
+    # Opt in only after the Prometheus authenticated status probe is verified.
+    if os.environ.get("K3DM_HERMES_STATUS_ENABLED", "0") != "1":
+        return False
+    if "status_last_run" not in state:
+        return True
+    interval = int(os.environ.get("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")) * 60
+    return now - float(state.get("status_last_run", 0)) >= interval
+
+
+def _status_local_date():
+    return datetime.now().astimezone().date().isoformat()
+
+
+def _status_notification(state, record, relay):
+    """Post/file status triage only on group changes, with one daily ongoing reminder."""
+    groups = status_triage.triage(record.get("data", {}).get("checks", []))
+    previous = state.get("status_groups", [])
+    changes = e2e_triage.diff_groups(previous, groups)
+    today = _status_local_date()
+    lines = []
+    new_groups = [group for group in groups if group["slug"] in changes["new"]]
+    if new_groups:
+        filed = e2e_bugs.file_bugs(ROOT, new_groups,
+                                   {"run_id": record.get("sampled_at", timestamp()),
+                                    "source": "status", "summary": record.get("data", {}).get("counts", {})},
+                                   today)
+        ids = ", ".join(check_id for group in new_groups for check_id in group["check_ids"])
+        lines.append(f"Hermes status new failures: {ids}; counts={record.get('data', {}).get('counts', {})}; {filed.get('push', '')}")
+    elif changes["ongoing"] and state.get("status_reminder_date") != today:
+        ids = ", ".join(check_id for group in groups for check_id in group["check_ids"])
+        lines.append(f"Hermes status ongoing failures: {ids}; counts={record.get('data', {}).get('counts', {})}")
+    if changes["resolved"]:
+        lines.append("Hermes status recovered: " + ", ".join(changes["resolved"]))
+    for line in lines:
+        post_summary(relay, e2e_triage.redact(line))
+    if changes["ongoing"] or new_groups:
+        state["status_reminder_date"] = today
+    state["status_groups"] = [{key: group[key] for key in ("slug", "kind", "target", "count")}
+                              for group in groups]
+
+
+def _publish_status(records, state):
+    """Publish a redacted status snapshot for the cluster Hermes dashboard."""
+    if not records or os.environ.get("K3DM_HERMES_PUBLISH_STATUS", "1") != "1":
+        return False
+    payload = {"records": records, "incident_active": bool(state.get("incident_active")),
+               "updated_at": timestamp()}
+    value = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    context = os.environ.get("K3DM_HERMES_STATUS_CONTEXT", "k3d-k3d-cluster")
+    namespace = os.environ.get("K3DM_HERMES_STATUS_NAMESPACE", "platform-ops")
+    name = os.environ.get("K3DM_HERMES_STATUS_CONFIGMAP", "hermes-status")
+    labels = "k3dm.k3.io/hermes-status=true"
+    try:
+        create = subprocess.run(
+            ["kubectl", "--context", context, "-n", namespace, "create", "configmap", name,
+             "--from-literal=status.json=" + value, "--dry-run=client", "-o", "yaml"],
+            capture_output=True, text=True, timeout=30, check=False)
+        if create.returncode != 0:
+            return False
+        manifest = create.stdout.replace("metadata:\n", "metadata:\n  labels:\n    " + labels + "\n", 1)
+        applied = subprocess.run(["kubectl", "--context", context, "-n", namespace, "apply", "-f", "-"],
+                                 input=manifest, capture_output=True, text=True, timeout=30, check=False)
+        if applied.returncode != 0:
+            return False
+        labeled = subprocess.run(["kubectl", "--context", context, "-n", namespace, "label",
+                                  "configmap", name, labels, "--overwrite"],
+                                 capture_output=True, text=True, timeout=30, check=False)
+        return labeled.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _poll(state, state_path, now=None, status_runner=_status_run):
+    now = time.time() if now is None else now
+    due = _status_due(state, now)
+    records, event = _run_cycle(state, status_runner if due else None)
+    if due:
+        state["status_last_run"] = now
+    relay = _keychain_secret("k3dm-slack-webhook")
+    drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
+    if event:
+        if drain_url and event.get("proposals"):
+            blocks = interactive_blocks(event["text"], event["proposals"], event["nonce"])
+            if not post_interactive(relay, event["text"], blocks):
+                post_summary(relay, event["text"])
+        else:
+            post_summary(relay, event["text"])
+    approvals = _drain_approvals(state, relay, drain_url)
+    warn_days = int(os.environ.get("K3DM_HERMES_TOKEN_WARN_DAYS", "14"))
+    advisory = token_expiry_advisory(_github_headers, state, timestamp()[:10], warn_days=warn_days)
+    if advisory:
+        post_summary(relay, advisory)
+    from hermes.audit import AUDIT_SERVICE, REPOSITORY, monthly_audit_advisory
+
+    def audit_get(path, headers):
+        return _http_json(f"https://api.github.com{path}", headers)
+
+    run_bats = os.environ.get("K3DM_HERMES_AUDIT_RUN_BATS") == "1"
+    digest = monthly_audit_advisory(audit_get, _github_headers, _keychain_secret,
+                                    state, timestamp()[:7],
+                                    bats_runner=_bats_run, run_bats=run_bats)
+    if digest:
+        post_summary(relay, digest)
+    # Unknown status belongs to the webhook detector, including SMS escalation.
+    texts = pager.health_events([item for item in records if item["sensor"] != "status_checks"], state)
+    texts += pager.security_events(audit_get, _keychain_secret, state, timestamp()[:13],
+                                   AUDIT_SERVICE, REPOSITORY)
+    texts += pager.job_events(state, None)
+    pages = _page(state, texts, relay)
+    status_record = next((item for item in records if item.get("sensor") == "status_checks"), None)
+    if (status_record and status_record.get("status") != "unknown" and
+            (status_record.get("status") == "degraded" or state.get("status_groups"))):
+        _status_notification(state, status_record, relay)
+    _publish_status(records, state)
+    _schedule_e2e(state)
+    _save_state(state_path, state)
+    print(json.dumps({"records": records, "event": event, "approvals": approvals,
+                      "pages": pages}))
+    return 0
+
+
 def _usage():
-    print("Usage: k3dm-hermes [approve <action-id>|list|preflight|audit]", file=sys.stderr)
+    print("Usage: k3dm-hermes [approve <action-id>|list|preflight|audit|e2e <slot|now>|status]", file=sys.stderr)
 
 
 def main():
@@ -187,6 +455,11 @@ def main():
         time.sleep(random.uniform(0, 30))
     state_path = Path(os.environ.get("K3DM_HERMES_STATE", Path.home() / ".k3dm/hermes/state.json"))
     state = _load_state(state_path)
+    if args and args[0] == "status" and len(args) == 1:
+        print(json.dumps(status_checks(_status_run, state), sort_keys=True))
+        return 0
+    if args and args[0] == "e2e" and len(args) == 2:
+        return _run_e2e(args[1])
     if args and args[0] == "list" and len(args) == 1:
         print(json.dumps(state.get("pending_repairs", {}), sort_keys=True))
         return 0
@@ -226,35 +499,14 @@ def main():
         print(json.dumps(outcome, sort_keys=True))
         return 0 if outcome.get("outcome") == "executed" else 1
 
-    records, event = _run_cycle(state)
-    relay = _keychain_secret("k3dm-slack-webhook")
-    drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
-    if event:
-        if drain_url and event.get("proposals"):
-            blocks = interactive_blocks(event["text"], event["proposals"], event["nonce"])
-            if not post_interactive(relay, event["text"], blocks):
-                post_summary(relay, event["text"])
-        else:
-            post_summary(relay, event["text"])
-    approvals = _drain_approvals(state, relay, drain_url)
-    warn_days = int(os.environ.get("K3DM_HERMES_TOKEN_WARN_DAYS", "14"))
-    advisory = token_expiry_advisory(_github_headers, state, timestamp()[:10], warn_days=warn_days)
-    if advisory:
-        post_summary(relay, advisory)
-    from hermes.audit import monthly_audit_advisory
-
-    def audit_get(path, headers):
-        return _http_json(f"https://api.github.com{path}", headers)
-
-    run_bats = os.environ.get("K3DM_HERMES_AUDIT_RUN_BATS") == "1"
-    digest = monthly_audit_advisory(audit_get, _github_headers, _keychain_secret,
-                                    state, timestamp()[:7],
-                                    bats_runner=_bats_run, run_bats=run_bats)
-    if digest:
-        post_summary(relay, digest)
-    _save_state(state_path, state)
-    print(json.dumps({"records": records, "event": event, "approvals": approvals}))
-    return 0
+    try:
+        return _poll(state, state_path)
+    except Exception as exc:
+        fresh = _load_state(state_path)
+        _page(fresh, pager.job_events(fresh, type(exc).__name__),
+              _keychain_secret("k3dm-slack-webhook"))
+        _save_state(state_path, fresh)
+        raise
 
 
 if __name__ == "__main__":

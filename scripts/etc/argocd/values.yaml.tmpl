@@ -9,7 +9,7 @@ configs:
     server.insecure: ${ARGOCD_SERVER_INSECURE}
 
   cm:
-    url: https://${ARGOCD_VIRTUALSERVICE_HOST}
+    url: ${ARGOCD_PUBLIC_URL}
 
     # Hermes Phase-1 read-only observer (off-hub). apiKey only — no web login, no
     # password. Token minted with `argocd account generate-token --account hermes`

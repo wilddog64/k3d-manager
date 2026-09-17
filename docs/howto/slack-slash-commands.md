@@ -1,7 +1,7 @@
 # Slack Slash Commands & Webhook Server
 
 Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/cluster-diagnose`, `/cluster-refresh`,
-`/cluster-resume`, `/hostinger-status`, `/cleanup-stale-sandbox`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
+`/cluster-resume`, `/hostinger-status`, `/cleanup-stale-sandbox`, `/k3dm`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
 that control the k3d-manager cluster from any Slack channel, plus thread-based AI troubleshooting
 and job control via thread replies.
 
@@ -67,6 +67,8 @@ remote-operator role. The webhook enforces that role before it queues work.
 | `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
 | `operator` | `/cluster-refresh` plus everything in `reader` |
 | `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade`, `/cleanup-stale-sandbox` plus everything in `operator` |
+
+`/k3dm <target>` runs an allowlisted Makefile target (`scripts/lib/webhook/make_targets.py`). The relay stamps it `admin`; the webhook caps that at the caller's `K3DM_SLACK_ROLE_MAP` role (unmapped users are `reader`), then applies the target's own minimum role. Destructive targets also require the `confirm` token.
 
 The relay forwards these metadata headers to the webhook:
 
@@ -162,6 +164,13 @@ Run once per machine. Safe to re-run.
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Clean expired k3s-aws sandbox state",
         "usage_hint": "[confirm]  (dry-run by default)",
+        "should_escape": false
+      },
+      {
+        "command": "/k3dm",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Run an allowlisted make target",
+        "usage_hint": "<target> [KEY=value …] [confirm]  (help lists targets)",
         "should_escape": false
       },
       {
@@ -309,10 +318,33 @@ bin/k3dm-webhook-setup --uninstall
 | `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
 | `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
 | `/cleanup-stale-sandbox [confirm]` | Clean expired k3s-aws sandbox state | `/cleanup-stale-sandbox` | Admin-only; dry-run by default, `confirm` applies |
+| `/k3dm <target> [KEY=value …] [confirm]` | Run an allowlisted make target | `/k3dm fix-status NS=cicd` | Role per target; `/k3dm help` lists yours; one job at a time |
 | `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/gemini <question>` | Multi-agent cluster troubleshooting | `/gemini why is data-layer out of sync?` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/codex <question>` | Multi-agent cluster troubleshooting | `/codex explain this ArgoCD drift` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade 9.5.15 infra` | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
+
+### /k3dm targets
+
+| Target | Role | Required | Optional | Confirm | Timeout |
+|---|---|---|---|---|---|
+| `fix-list` | reader | | | | 300 |
+| `fix-status` | reader | `NS` | `FIX_CONTEXT` | | 300 |
+| `status-public` | reader | | | | 300 |
+| `observability-status` | reader | | | | 300 |
+| `vuln-scan` | reader | | | | 300 |
+| `e2e-runner-health` | reader | | `RUNNER` | | 300 |
+| `e2e-remote` | operator | `RUNNER` | `DIGEST` | | 3600 |
+| `e2e-replay` | operator | `RUNNER` | | | 900 |
+| `sync-apps` | operator | | | | 600 |
+| `monitoring-pause` | operator | | | | 600 |
+| `monitoring-resume` | operator | | | | 600 |
+| `fix-restart` | operator | `APP`, `NS` | `FIX_CONTEXT` | | 300 |
+| `fix-sync` | operator | `APP` | | | 300 |
+| `fix-eso-refresh` | operator | | `FIX_CONTEXT` | | 300 |
+| `e2e-runner-unlock` | admin | `RUNNER` | | yes | 300 |
+| `fix-delete-pod` | admin | `APP`, `NS` | `FIX_CONTEXT` | yes | 300 |
+| `fix-force-sync` | admin | `APP` | | yes | 300 |
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
@@ -342,7 +374,7 @@ probe fails and Gemini triages it automatically.
 | ArgoCD | `http://localhost:8080/healthz` | 200 |
 | Frontend | `http://frontend.shopping-cart.local/` | 200 |
 | Keycloak | `http://keycloak.shopping-cart.local/health/live` | 200 |
-| Prometheus | `http://localhost:19090/-/ready` | 200 |
+| Prometheus | `http://localhost:19190/-/ready` (app cluster; hostinger uses `https://prometheus.3ai-talk.org/-/ready`) | 200 |
 | Grafana | `https://grafana.3ai-talk.org/api/health` | 200 |
 | **Pushgateway** | `http://localhost:9091/-/healthy` | 200 |
 

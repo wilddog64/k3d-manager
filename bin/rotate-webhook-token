@@ -9,8 +9,8 @@ _err() { echo "[rotate-webhook-token] ERROR: $*" >&2; exit 1; }
 NEW_TOKEN="$(openssl rand -hex 32)"
 
 _log "Reading Cloudflare API token from Keychain..."
-CF_TOKEN="$(security find-generic-password -s cloudflare-api-token -a k3dm -w 2>/dev/null)" \
-  || _err "cloudflare-api-token not found in Keychain — run make setup-worker first"
+CF_TOKEN="$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null)" \
+  || _err "k3dm-cloudflare-api-token not found in Keychain — run make setup-worker first"
 
 _log "Pushing new WEBHOOK_TOKEN to Cloudflare Worker..."
 printf '%s' "${NEW_TOKEN}" | \

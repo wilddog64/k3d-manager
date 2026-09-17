@@ -103,7 +103,8 @@ setup() {
   grep -q "shopping-cart-apps" "$out"
   grep -q "shopping-cart-payment" "$out"
   # never all-namespaces
-  ! grep -qE 'namespaces:\s*\[?\s*"?\*"?' "$out"
+  run grep -qE 'namespaces:\s*\[?\s*"?\*"?' "$out"
+  [ "$status" -ne 0 ]
 }
 
 @test "rendered policy gates workload controllers, not bare Pod (401 root-cause fix)" {
@@ -113,7 +114,8 @@ setup() {
   grep -q "StatefulSet" "$out"
   # A bare Pod match reintroduces the generateName empty-namespace 401 on
   # private ghcr (docs/bugs/2026-08-30-kyverno-verify-401-private-ghcr.md).
-  ! grep -qE '^\s*-\s*Pod\s*$' "$out"
+  run grep -qE '^\s*-\s*Pod\s*$' "$out"
+  [ "$status" -ne 0 ]
 }
 
 @test "rendered policy scopes verifyImages to first-party registry, not wildcard" {
@@ -121,7 +123,8 @@ setup() {
   _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
   grep -q "ghcr.io/wilddog64/\*" "$out"
   # a bare '*' imageReference would match upstream images and block the platform
-  ! grep -qE 'imageReferences:' -A2 "$out" 2>/dev/null | grep -qE '^\s*-\s*"?\*"?\s*$'
+  run bash -c 'grep -E -A2 "imageReferences:" "$1" | grep -qE "^[[:space:]]*-[[:space:]]*\"?\*\"?[[:space:]]*$"' _ "$out"
+  [ "$status" -ne 0 ]
 }
 
 @test "rendered policy uses Kyverno 1.19 tlog/SCT field names (not bare 'ignore')" {
@@ -130,7 +133,8 @@ setup() {
   grep -q "ignoreTlog: true" "$out"
   grep -q "ignoreSCT: true" "$out"
   # the pre-1.19 'ignore: true' under ctlog/rekor is a strict-decoding error
-  ! grep -qE '^\s*ignore: true\s*$' "$out"
+  run grep -qE '^\s*ignore: true\s*$' "$out"
+  [ "$status" -ne 0 ]
 }
 
 @test "rendered policy defaults to Audit (never Enforce by default)" {
@@ -138,7 +142,8 @@ setup() {
   SIGNING_VALIDATION_FAILURE_ACTION="Audit" \
     _signing_render_policy "$PUB_FILE" "$POLICY_TMPL" > "$out"
   grep -q "failureAction: Audit" "$out"
-  ! grep -q "failureAction: Enforce" "$out"
+  run grep -q "failureAction: Enforce" "$out"
+  [ "$status" -ne 0 ]
 }
 
 @test "rendered policy honors Enforce when explicitly requested" {
@@ -187,8 +192,10 @@ setup() {
 @test "signing.sh never passes cosign key/password as a bare CLI argument" {
   local src="${SCRIPT_DIR}/plugins/signing.sh"
   # cosign must read key material via env:// only, never --key <literal> / --password <literal>
-  ! grep -qE -- '--key[= ]+[^e]' "$src"
-  ! grep -qE -- '--password[= ]' "$src"
+  run grep -qE -- '--key[= ]+[^e]' "$src"
+  [ "$status" -ne 0 ]
+  run grep -qE -- '--password[= ]' "$src"
+  [ "$status" -ne 0 ]
 }
 
 # --- Vault bring-up recovery --------------------------------------------------
@@ -226,7 +233,8 @@ setup() {
   [[ "$output" == *"NOT applied"* ]]
   [[ "$output" != *"granted"* ]]
   [[ "$output" != *"parse error"* ]]
-  ! grep -q 'write' "$calls"
+  run grep -q 'write' "$calls"
+  [ "$status" -ne 0 ]
 }
 
 @test "_signing_grant_eso_read fails and does not log granted when the role write fails" {
@@ -253,7 +261,8 @@ setup() {
   run _signing_grant_eso_read
   [ "$status" -eq 0 ]
   grep -q 'policies=cosign-verify' "$calls"
-  ! grep -q 'policies=,' "$calls"
+  run grep -q 'policies=,' "$calls"
+  [ "$status" -ne 0 ]
 }
 
 @test "signing_restore returns non-zero when the ESO grant fails but still applies the ExternalSecret" {
@@ -280,7 +289,8 @@ setup() {
 
   run signing_restore
   [ "$status" -eq 0 ]
-  ! grep -q 'restore' "$calls"
+  run grep -q 'restore' "$calls"
+  [ "$status" -ne 0 ]
   grep -q 'policy' "$calls"
   grep -q 'grant' "$calls"
   grep -q 'externalsecret' "$calls"
@@ -300,7 +310,8 @@ setup() {
   run signing_restore
   [ "$status" -eq 0 ]
   grep -q 'restore' "$calls"
-  ! grep -q 'seed' "$calls"
+  run grep -q 'seed' "$calls"
+  [ "$status" -ne 0 ]
 }
 
 @test "signing_restore fails without Vault key or Keychain backup" {
@@ -373,5 +384,6 @@ setup() {
   run signing_init
   [ "$status" -eq 0 ]
   grep -q 'restore' "$calls"
-  ! grep -q 'seed' "$calls"
+  run grep -q 'seed' "$calls"
+  [ "$status" -ne 0 ]
 }

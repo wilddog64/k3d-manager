@@ -7,9 +7,10 @@ LDAP_PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/ldap.sh"
     _err() { :; }
     _no_trace() { "$@"; }
     source "$1"
-    _ldap_password_is_chart_safe "safePassword_123.-"
-    ! _ldap_password_is_chart_safe "unsafe/password"
-    ! _ldap_password_is_chart_safe "unsafe&password"
+    _ldap_password_is_chart_safe "safePassword_123.-" || exit 1
+    _ldap_password_is_chart_safe "unsafe/password" && exit 1
+    _ldap_password_is_chart_safe "unsafe&password" && exit 1
+    exit 0
   ' _ "${LDAP_PLUGIN}"
   [ "$status" -eq 0 ]
 }

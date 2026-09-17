@@ -324,9 +324,12 @@ function _stub_argocd_admin_mirror_dependencies() {
   MIRROR_KV_GET_STATUS=0
   run _hub_recovery_mirror_argocd_admin hub-context
   [ "$status" -eq 0 ]
-  ! grep -Fq curl "$MIRROR_CALLS"
-  ! grep -Fq 'kv put' "$MIRROR_CALLS"
-  ! grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  run grep -Fq curl "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  run grep -Fq 'kv put' "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
 }
 
 @test "_hub_recovery_mirror_argocd_admin: stores an ArgoCD-verified initial password" {
@@ -336,7 +339,8 @@ function _stub_argocd_admin_mirror_dependencies() {
   grep -Fq 'kv put' "$MIRROR_CALLS"
   grep -Fq argocd/admin "$MIRROR_CALLS"
   grep -Fq username "$MIRROR_CALLS"
-  ! grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
 }
 
 @test "_hub_recovery_mirror_argocd_admin: does not store a rejected initial password" {
@@ -345,8 +349,10 @@ function _stub_argocd_admin_mirror_dependencies() {
   run _hub_recovery_mirror_argocd_admin hub-context
   [ "$status" -eq 0 ]
   grep -Fq curl "$MIRROR_CALLS"
-  ! grep -Fq 'kv put' "$MIRROR_CALLS"
-  ! grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  run grep -Fq 'kv put' "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
 }
 
 @test "_hub_recovery_mirror_argocd_admin: skips an absent initial secret" {
@@ -354,9 +360,12 @@ function _stub_argocd_admin_mirror_dependencies() {
   MIRROR_PASSWORD_B64=""
   run _hub_recovery_mirror_argocd_admin hub-context
   [ "$status" -eq 0 ]
-  ! grep -Fq curl "$MIRROR_CALLS"
-  ! grep -Fq 'kv put' "$MIRROR_CALLS"
-  ! grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  run grep -Fq curl "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  run grep -Fq 'kv put' "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
 }
 
 @test "_hub_recovery_mirror_argocd_admin: fails when the Vault root token is absent" {
@@ -364,7 +373,10 @@ function _stub_argocd_admin_mirror_dependencies() {
   MIRROR_ROOT_TOKEN_B64=""
   run _hub_recovery_mirror_argocd_admin hub-context
   [ "$status" -eq 1 ]
-  ! grep -Fq curl "$MIRROR_CALLS"
-  ! grep -Fq 'kv put' "$MIRROR_CALLS"
-  ! grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  run grep -Fq curl "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  run grep -Fq 'kv put' "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
 }

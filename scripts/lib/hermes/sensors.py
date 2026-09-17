@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime, timezone
 
 from hermes.records import record
+from hermes.e2e_triage import redact
 
 WEBHOOK_SERVICE = "k3dm-webhook-token"
 ARGOCD_SERVICE = "k3dm-hermes-argocd-token"
@@ -73,6 +74,9 @@ def argocd(run, state, token=None, threshold=3, server="argocd.3ai-talk.org"):
         result = run(["argocd", "app", "list", "-o", "json", "--grpc-web"],
                      {"ARGOCD_AUTH_TOKEN": token, "ARGOCD_SERVER": server})
         code, output = result
+        if code != 0 and "Unauthenticated" in (output or ""):
+            return record("argocd", "unknown",
+                          f"ArgoCD status source unavailable: credential rejected; re-mint {ARGOCD_SERVICE}")
         apps = json.loads(output) if code == 0 and output else None
         if not isinstance(apps, list):
             raise ValueError("invalid ArgoCD response")
@@ -120,6 +124,44 @@ def reachability(run, state, threshold=2):
                             "failed_hosts": [host for host in failed_hosts if host]})
     except Exception:
         return record("reachability", "unknown", "public probe source unavailable")
+
+
+def _redact_status(value):
+    """Sanitize the entire JSON boundary before records can reach stdout or state."""
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, list):
+        return [_redact_status(item) for item in value]
+    if isinstance(value, dict):
+        return {redact(key): _redact_status(item) for key, item in value.items()}
+    return value
+
+
+def status_checks(run, state, threshold=2):
+    """Sample the machine-readable cluster status contract without scraping text."""
+    try:
+        code, output = run(["bin/cluster-status", "--json"], {})
+        payload = _redact_status(json.loads(output)) if code in (0, 1, 2) and output else {}
+        overall = payload.get("overall")
+        checks = payload.get("checks", [])
+        counts = payload.get("counts", {})
+        if overall not in ("healthy", "warn", "fail", "unknown") or not isinstance(checks, list):
+            raise ValueError("invalid status output")
+        failed = [item for item in checks if isinstance(item, dict) and item.get("status") == "error"]
+        warned = [item for item in checks if isinstance(item, dict) and item.get("status") == "warning"]
+        data = {"failed_ids": [item.get("id") for item in failed if item.get("id")],
+                "warned_ids": [item.get("id") for item in warned if item.get("id")],
+                "counts": counts if isinstance(counts, dict) else {}, "checks": failed}
+        if overall == "unknown":
+            return record("status_checks", "unknown", "cluster status source unavailable", data=data)
+        if overall == "fail":
+            status = "degraded" if _debounced("status_checks", True, threshold - 1, state) else "healthy"
+            return record("status_checks", status, f"{len(failed)} status checks failing", data=data)
+        _debounced("status_checks", False, threshold, state)
+        evidence = "status warnings present" if overall == "warn" else "cluster status healthy"
+        return record("status_checks", "healthy", evidence, data=data)
+    except Exception:
+        return record("status_checks", "unknown", "cluster status source unavailable")
 
 
 def node_pressure(fetch, state, provider="", token=None, threshold=2, service_threshold=2):

@@ -71,7 +71,8 @@ EOF
     }
     _is_mac() { return 0; }
     _observability_seed_grafana_if_absent() { :; }
-    export -f envsubst _kubectl curl kubectl launchctl _is_mac _observability_seed_grafana_if_absent
+    _vault_login() { :; }
+    export -f envsubst _kubectl curl kubectl launchctl _is_mac _observability_seed_grafana_if_absent _vault_login
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability
   '
@@ -296,6 +297,101 @@ EOF
   [[ "$output" == *"auth-proxy"* ]]
   [[ "$output" == *"wait:19093"* ]]
   [[ "$output" == *"wait:9093"* ]]
+}
+
+@test "prometheus auth proxy keeps the public and raw backend ports separate" {
+  run sed -n '1,80p' scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"19091:9090"* ]]
+
+  run sed -n '1,100p' scripts/etc/launchd/com.k3d-manager.prometheus-auth-proxy.plist.tmpl
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"com.k3d-manager.prometheus-auth-proxy"* ]]
+  [[ "$output" == *"127.0.0.1:19090"* ]]
+}
+
+@test "prometheus login writes protected credentials without printing the password" {
+  local auth_file mode
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _kubectl() { printf "%s" "dG9rZW4="; }
+    curl() {
+      printf "%s\\n" "{\"data\":{\"data\":{\"user\":\"admin\",\"password\":\"prometheus-sentinel\"}}}"
+    }
+    _observability_ensure_prometheus_login
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"prometheus-sentinel"* ]]
+  auth_file="${HOME}/.local/share/k3d-manager/prometheus-basic-auth.env"
+  [[ -f "${auth_file}" ]]
+  local contents
+  contents="$(<"${auth_file}")"
+  [[ "$contents" == *"PROMETHEUS_BASIC_AUTH_USER=admin"* ]]
+  [[ "$contents" == *"PROMETHEUS_BASIC_AUTH_PASSWORD=prometheus-sentinel"* ]]
+  mode="$(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "${auth_file}")"
+  [ "$mode" -eq 600 ]
+}
+
+@test "prometheus auth proxy skips unreadable Vault credentials and missing auth files" {
+  local calls_log auth_file
+  calls_log="${BATS_TEST_TMPDIR}/prometheus-launchctl.log"
+  auth_file="${HOME}/.local/share/k3d-manager/prometheus-basic-auth.env"
+  export CALLS_LOG="${calls_log}"
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _kubectl() { printf "%s" "dG9rZW4="; }
+    curl() { return 22; }
+    _is_mac() { return 0; }
+    launchctl() { printf "%s\\n" "$*" >> "${CALLS_LOG}"; }
+    _observability_ensure_prometheus_login
+    _observability_install_prometheus_auth_proxy
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Prometheus Vault credentials unreadable"* ]]
+  [[ "$output" == *"Prometheus auth file missing"* ]]
+  run test -f "${auth_file}"
+  [ "$status" -ne 0 ]
+  run test -e "${calls_log}"
+  [ "$status" -ne 0 ]
+}
+
+@test "prometheus auth proxy bootout precedes bootstrap" {
+  local auth_file calls_log
+  auth_file="${HOME}/.local/share/k3d-manager/prometheus-basic-auth.env"
+  calls_log="${BATS_TEST_TMPDIR}/prometheus-launchctl-order.log"
+  mkdir -p "$(dirname "${auth_file}")"
+  printf '%s\n' 'PROMETHEUS_BASIC_AUTH_USER=admin' > "${auth_file}"
+  printf '%s\n' 'PROMETHEUS_BASIC_AUTH_PASSWORD=test-password' >> "${auth_file}"
+  chmod 600 "${auth_file}"
+  export CALLS_LOG="${calls_log}"
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _is_mac() { return 0; }
+    launchctl() { printf "%s\\n" "$*" >> "${CALLS_LOG}"; }
+    _observability_install_prometheus_auth_proxy
+  '
+  [ "$status" -eq 0 ]
+  run sed -n '1p' "${calls_log}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bootout"* ]]
+  run sed -n '2p' "${calls_log}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bootstrap"* ]]
 }
 
 @test "trivy_scan_report calls kubectl get vulnerabilityreports -A for Hub context" {

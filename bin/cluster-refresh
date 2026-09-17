@@ -321,10 +321,11 @@ _pf_ensure "Vault port-forward" \
   "${_ACG_STATE_DIR}/logs/vault-pf.log" \
   port-forward svc/vault -n secrets --context k3d-k3d-cluster 18200:8200
 
+_acg_prom_local_port=$((19190 + $(_acg_provider_port_offset "${_cluster_provider}")))
 _pf_ensure "ACG Prometheus port-forward" \
   "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" \
   "${_ACG_STATE_DIR}/logs/acg-prom-pf.log" \
-  port-forward svc/prometheus-operated 19090:9090 \
+  port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
   -n monitoring --context "${_app_context}" --address 0.0.0.0
 
 # ── 4. launchd agents (user-domain, self-heal via KeepAlive) ──────────────────

@@ -12,6 +12,9 @@ route:
   repeat_interval: 24h
   routes:
     - matchers:
+        - alertname = TrivyCriticalVulnerabilityDetected
+      receiver: 'null'
+    - matchers:
         - severity = critical
       receiver: sms-critical
 

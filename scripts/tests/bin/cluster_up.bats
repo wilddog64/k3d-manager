@@ -91,7 +91,8 @@ STUB
   [[ "$output" == *"DRY_RUN: would create local Hub cluster"* ]]
   [[ "$output" == *"DRY_RUN: provisioning plan complete"* ]]
   [[ "$output" == *"DRY_RUN: no changes were made."* ]]
-  ! grep -q 'MUTATION:' "${stub_log}"
+  run grep -q 'MUTATION:' "${stub_log}"
+  [ "$status" -ne 0 ]
 }
 
 @test "acg-up sources the Argo CD plugin before readiness checks" {

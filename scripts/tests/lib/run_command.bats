@@ -25,7 +25,8 @@ setup() {
   run _run_command --prefer-sudo -- echo hi
   [ "$status" -eq 0 ]
   [[ "$output" = "hi" ]]
-  ! grep -q 'sudo -n echo hi' "$RUN_LOG"
+  run grep -q 'sudo -n echo hi' "$RUN_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "--interactive-sudo runs without -n flag" {
@@ -84,7 +85,8 @@ setup() {
   export -f fakecmd sudo
   run _run_command --probe 'version --short' -- fakecmd run
   [ "$status" -eq 0 ]
-  ! grep -q 'sudo -n fakecmd run' "$RUN_LOG"
+  run grep -q 'sudo -n fakecmd run' "$RUN_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "--probe escalates to sudo when user probe fails" {

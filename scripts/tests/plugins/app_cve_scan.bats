@@ -205,6 +205,14 @@ case "$*" in
     printf '%s' "${TEST_REPORT_DETAILS_product_catalog_report:-}"
     exit 0
     ;;
+  -n\ platform-ops\ get\ configmap\ app-cve-scan-rebuild-state\ *)
+    [ -n "${TEST_REBUILD_LAST_DISPATCH:-}" ] || exit 1
+    printf '%s' "${TEST_REBUILD_LAST_DISPATCH}"
+    exit 0
+    ;;
+  -n\ platform-ops\ patch\ configmap\ app-cve-scan-rebuild-state\ *)
+    exit 0
+    ;;
   -n\ cicd\ patch\ application\ *\ --type\ merge\ -p\ *)
     exit 0
     ;;
@@ -300,6 +308,60 @@ EOF
   grep -q 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${WGET_LOG}"
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-order' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE: shopping-cart-order|' "${NOTIFY_LOG}"
+}
+
+@test "rebuild dispatched within the cooldown is skipped without notifying" {
+  run env -i \
+    PATH="${PATH}" \
+    TRIVY_LOG="${TRIVY_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" \
+    KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
+    TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="shopping-cart-order" \
+    GH_TOKEN="test-token" \
+    TEST_SHA_TAG="sha-order-new" \
+    TEST_LATEST_DIGEST="sha256:deadbeef" \
+    TEST_REPORT_ROWS="shopping-cart-apps order-report ghcr.io/wilddog64/shopping-cart-order sha-old 1 1" \
+    TEST_REPORT_DETAILS_order_report="CRITICAL|CVE-1|2.0.0" \
+    TEST_LATEST_CVES_shopping_cart_order=2 \
+    TEST_REBUILD_LAST_DISPATCH="$(( $(date -u +%s) - 3600 ))" \
+    /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"within cooldown"* ]]
+  run grep -c 'dispatches' "${WGET_LOG}"
+  [ "${output}" = "0" ]
+  run grep -c 'App CVE: shopping-cart-order' "${NOTIFY_LOG}"
+  [ "${output}" = "0" ]
+}
+
+@test "rebuild dispatched after the cooldown expires dispatches and records the time" {
+  run env -i \
+    PATH="${PATH}" \
+    TRIVY_LOG="${TRIVY_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" \
+    KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
+    TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="shopping-cart-order" \
+    GH_TOKEN="test-token" \
+    TEST_SHA_TAG="sha-order-new" \
+    TEST_LATEST_DIGEST="sha256:deadbeef" \
+    TEST_REPORT_ROWS="shopping-cart-apps order-report ghcr.io/wilddog64/shopping-cart-order sha-old 1 1" \
+    TEST_REPORT_DETAILS_order_report="CRITICAL|CVE-1|2.0.0" \
+    TEST_LATEST_CVES_shopping_cart_order=2 \
+    TEST_REBUILD_LAST_DISPATCH="$(( $(date -u +%s) - 300000 ))" \
+    /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *"within cooldown"* ]]
+  run grep -c 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${WGET_LOG}"
+  [ "${output}" -ge 1 ]
+  run grep -c 'patch configmap app-cve-scan-rebuild-state' "${KUBECTL_LOG}"
+  [ "${output}" -ge 1 ]
 }
 
 @test "vulnerable deployed image with clean latest promotes exact digest via application patch" {

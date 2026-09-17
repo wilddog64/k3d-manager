@@ -43,7 +43,8 @@ setup() {
 
   run _ensure_bats
   [ "$status" -eq 0 ]
-  ! grep -q '^apt-get ' "$RUN_LOG"
+  run grep -q '^apt-get ' "$RUN_LOG"
+  [ "$status" -ne 0 ]
   grep -q 'install-bats-source' "$RUN_LOG"
 }
 
@@ -102,5 +103,6 @@ setup() {
   [ "$status" -eq 0 ]
   grep -q '^apt-get update' "$RUN_LOG"
   grep -q '^apt-get install -y bats' "$RUN_LOG"
-  ! grep -q 'unexpected-source' "$RUN_LOG"
+  run grep -q 'unexpected-source' "$RUN_LOG"
+  [ "$status" -ne 0 ]
 }

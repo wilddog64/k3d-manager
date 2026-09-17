@@ -17,8 +17,8 @@ data:
       "tags": ["e2e", "verification", "shopping-cart", "vcluster"],
       "schemaVersion": 39,
       "version": 1,
-      "refresh": "1m",
-      "time": { "from": "now-7d", "to": "now" },
+      "refresh": "off",
+      "time": { "from": "now-24h", "to": "now" },
       "templating": {
         "list": [
           {
@@ -97,13 +97,63 @@ data:
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": { "custom": { "align": "auto", "filterable": true } }, "overrides": [] },
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 38 },
           "id": 5,
           "options": { "showHeader": true },
-          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "e2e_run_info{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\"}", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "service": true, "service_label": true }, "indexByName": {}, "renameByName": { "exported_service": "Service", "run_id": "Run ID", "candidate_digest": "Candidate digest", "passed": "Passed", "failed": "Failed", "total": "Total", "duration_seconds": "Duration (s)", "timestamp": "Timestamp", "commit": "Commit", "project": "Project", "tier": "Tier", "runner": "Runner" } } } ],
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(100, e2e_run_info{exported_service=~\"$service\",tier=~\"$tier\",runner=~\"$runner\",failure_ratio=~\".*%.*\"})", "format": "table", "instant": true, "refId": "A" } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "service": true, "service_label": true, "exported_service": true, "passed": true }, "indexByName": { "run_id": 0, "runner": 1, "commit": 2, "tier": 3, "project": 4, "services": 5, "failed": 6, "total": 7, "failure_ratio": 8, "candidate_digest": 9, "duration_seconds": 10, "timestamp": 11 }, "renameByName": { "services": "Services under test", "run_id": "Run ID", "candidate_digest": "Application image digest", "failure_ratio": "Failure ratio (failed/total)", "failed": "Failed tests", "total": "Total tests", "duration_seconds": "Duration (s)", "timestamp": "Timestamp", "commit": "Runner commit", "project": "Test suite", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Recent runs",
           "type": "table"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 48 },
+          "id": 6,
+          "options": { "showHeader": true },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(200, e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "format": "table", "instant": true, "refId": "A" } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true, "service": true }, "indexByName": { "run_id": 0, "runner": 1, "tier": 2, "target": 3, "exported_service": 4, "kind": 5 }, "renameByName": { "run_id": "Run ID", "kind": "Failure kind", "target": "Target", "Value": "Count", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
+          "title": "Failure groups",
+          "type": "table"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 58 },
+          "id": 7,
+          "options": { "showHeader": true },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(100, e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"})", "format": "table", "instant": true, "refId": "A" } ],
+          "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true, "service": true }, "indexByName": { "run_id": 0, "runner": 1, "tier": 2, "exported_service": 3, "file": 4, "title": 5, "error": 6, "status": 7 }, "renameByName": { "run_id": "Run ID", "file": "Spec file", "title": "Test", "status": "Status", "error": "Error", "exported_service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
+          "title": "Failure details",
+          "type": "table"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "showPoints": "auto" } }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+          "id": 8,
+          "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["last", "max"] }, "tooltip": { "mode": "multi" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (exported_service) (e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "legendFormat": "{{exported_service}}", "refId": "A" } ],
+          "title": "Failure trend by service",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+          "id": 9,
+          "options": { "orientation": "horizontal", "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (exported_service, kind) (e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "instant": true, "legendFormat": "{{exported_service}} / {{kind}}", "refId": "A" } ],
+          "title": "Failure causes by service",
+          "type": "barchart"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+          "id": 10,
+          "options": { "orientation": "horizontal", "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(10, sum by (exported_service, file) (e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"}))", "instant": true, "legendFormat": "{{exported_service}} / {{file}}", "refId": "A" } ],
+          "title": "Top failing specs",
+          "type": "barchart"
         }
       ]
     }

@@ -191,8 +191,8 @@ function _signing_restore_vault_from_keychain() {
     workdir="$(mktemp -d "${TMPDIR:-/tmp}/k3dm-signing.XXXXXX")"
     trap 'rm -rf -- "${workdir}"' EXIT
     printf '%s\n' "${key}" > "${workdir}/cosign.key"
-    if ! COSIGN_PASSWORD="${password}" _no_trace _run_command -- \
-        cosign public-key --key "${workdir}/cosign.key" > "${workdir}/cosign.pub" 2>/dev/null; then
+    if ! COSIGN_KEY="${key}" COSIGN_PASSWORD="${password}" _no_trace _run_command -- \
+        cosign public-key --key env://COSIGN_KEY > "${workdir}/cosign.pub" 2>/dev/null; then
       _err "[signing] could not derive public key from Keychain backup; aborting restore"
       return 1
     fi

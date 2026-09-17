@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-hermes
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    release: kube-prometheus-stack
+data:
+  hermes.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "graphTooltip": 0,
+      "title": "Hermes Status",
+      "uid": "hermes-status",
+      "tags": ["hermes", "k3d-manager", "status"],
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "1m",
+      "time": { "from": "now-24h", "to": "now" },
+      "panels": [
+        {
+          "id": 1, "type": "stat", "title": "Active incident",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" },
+          "targets": [ { "expr": "sum(hermes_incident_active) or vector(0)", "instant": true, "legendFormat": "", "refId": "A" } ]
+        },
+        {
+          "id": 2, "type": "stat", "title": "Minutes since last poll",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "m", "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 45 }, { "color": "red", "value": 90 } ] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "area", "justifyMode": "center" },
+          "targets": [ { "expr": "max((time() - hermes_last_poll_timestamp_seconds) / 60)", "instant": true, "legendFormat": "", "refId": "A" } ]
+        },
+        {
+          "id": 3, "type": "stat", "title": "Degraded sensors",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" },
+          "targets": [ { "expr": "count(hermes_sensor_status{status=\"degraded\"}) or vector(0)", "instant": true, "legendFormat": "", "refId": "A" } ]
+        },
+        {
+          "id": 4, "type": "stat", "title": "Unknown sensors",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+          "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "justifyMode": "center" },
+          "targets": [ { "expr": "count(hermes_sensor_status{status=\"unknown\"}) or vector(0)", "instant": true, "legendFormat": "", "refId": "A" } ]
+        },
+        {
+          "id": 5, "type": "table", "title": "Current Hermes findings",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
+          "options": { "showHeader": true },
+          "targets": [ { "expr": "hermes_sensor_status", "format": "table", "instant": true, "refId": "A" } ],
+          "transformations": [ { "id": "organize", "options": { "indexByName": { "sensor": 0, "evidence": 1, "status": 2, "target_namespace": 3 }, "renameByName": { "sensor": "Sensor", "evidence": "Finding", "status": "Status", "target_namespace": "Target namespace" }, "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "pod": true, "service": true, "namespace": true } } } ]
+        },
+        {
+          "id": 6, "type": "timeseries", "title": "Sensor status history",
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 15 },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "stepped", "spanNulls": true }, "min": 0, "max": 2 }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
+          "targets": [ { "expr": "hermes_sensor_status", "legendFormat": "{{sensor}} ({{status}})", "refId": "A" } ]
+        }
+      ]
+    }

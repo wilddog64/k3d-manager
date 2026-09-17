@@ -33,10 +33,10 @@ TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-con
 }
 
 @test "metrics: dashboard includes image updater deployment readiness panels" {
-  run grep -F -- 'kube_deployment_status_replicas_available{namespace=\"cicd\",deployment=\"argocd-image-updater\"}' "${DASH}"
+  run grep -F -- 'kube_deployment_status_replicas_available{namespace=\"cicd\",deployment=\"argocd-image-updater\"' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\"}' "${DASH}"
+  run grep -F -- 'kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\"' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -cF -- '"textMode": "value"' "${DASH}"

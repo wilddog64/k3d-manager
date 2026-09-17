@@ -13,7 +13,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -272,8 +272,11 @@ install-sudoers:
 
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+	@if ! launchctl kickstart -k "gui/$$(id -u)/com.k3d-manager.webhook"; then \
+		echo "[restart-webhook] service is not loaded; bootstrapping LaunchAgent" >&2; \
+		launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true; \
+		launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
+	fi
 
 ## Remove k3d-manager-owned /tmp files
 clean-tmp:
@@ -355,7 +358,8 @@ install-prometheus-port-forward:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.prometheus-port-forward" 2>/dev/null || true
 	launchctl bootstrap "gui/$$(id -u)" \
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
-	@echo "Prometheus port-forward agent installed — port 19090 will stay open while ubuntu-k3s is reachable"
+	@echo "Prometheus port-forward agent installed — raw backend port 19091 will stay open while the hub cluster is reachable"
+	@echo "Run: launchctl kickstart -k \"gui/$$(id -u)/com.k3d-manager.prometheus-auth-proxy\" to bind the authenticated port 19090"
 
 uninstall-prometheus-port-forward:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.prometheus-port-forward" 2>/dev/null || true
@@ -396,20 +400,16 @@ uninstall-alertmanager-auth-proxy:
 	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
 	@echo "Alertmanager auth proxy removed"
 
-## Inject SLACK_BOT_TOKEN and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
+## Inject SLACK_BOT_TOKEN (Keychain k3d-manager-slack-bot-token-bot) and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
 update-webhook-slack:
-	@[ -n "$(SLACK_BOT_TOKEN)" ] || (echo "ERROR: SLACK_BOT_TOKEN not set — export it first"; exit 1)
-	@[ -n "$(SLACK_CHANNEL_ID)" ] || (echo "ERROR: SLACK_CHANNEL_ID not set — export it first"; exit 1)
-	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_BOT_TOKEN" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_BOT_TOKEN string $(SLACK_BOT_TOKEN)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
-	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_CHANNEL_ID" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_CHANNEL_ID string $(SLACK_CHANNEL_ID)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
-	$(MAKE) restart-webhook
-	@echo "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID injected — webhook restarted"
+	@_tok="$${SLACK_BOT_TOKEN:-$$(security find-generic-password -s k3d-manager-slack-bot-token-bot -w 2>/dev/null)}"; \
+	[ -n "$$_tok" ] || { echo "[update-webhook-slack] ERROR: k3d-manager-slack-bot-token-bot not in Keychain (locked? run: security unlock-keychain)" >&2; exit 1; }; \
+	_plist="$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
+	[ -f "$$_plist" ] || { echo "[update-webhook-slack] ERROR: $$_plist not found — run: make setup-worker" >&2; exit 1; }; \
+	cp -p "$$_plist" "$$_plist.bak-$$(date +%Y%m%d%H%M%S)"; \
+	SLACK_TOK="$$_tok" SLACK_CHAN="$${SLACK_CHANNEL_ID:-}" PLIST="$$_plist" python3 -c 'import os,plistlib,sys; p=os.environ["PLIST"]; d=plistlib.load(open(p,"rb")); e=d.setdefault("EnvironmentVariables",{}); c=os.environ["SLACK_CHAN"] or e.get("SLACK_CHANNEL_ID",""); c or sys.exit("[update-webhook-slack] ERROR: SLACK_CHANNEL_ID not set and not in plist - export SLACK_CHANNEL_ID first"); e["SLACK_BOT_TOKEN"]=os.environ["SLACK_TOK"]; e["SLACK_CHANNEL_ID"]=c; plistlib.dump(d,open(p,"wb")); print("[update-webhook-slack] plist updated (SLACK_BOT_TOKEN, SLACK_CHANNEL_ID)")'
+	@$(MAKE) --no-print-directory restart-webhook
+	@echo "[update-webhook-slack] webhook restarted"
 
 ## Store the Slack user→role allowlist in Keychain and restart the webhook
 ## Example: make update-webhook-slack-roles K3DM_SLACK_ROLE_MAP=U123:admin,U456:operator
@@ -419,16 +419,16 @@ update-webhook-slack-roles:
 	$(MAKE) restart-webhook
 	@echo "K3DM_SLACK_ROLE_MAP stored in Keychain — webhook restarted"
 
-## Inject SLACK_SIGNING_SECRET from Keychain into the webhook LaunchAgent plist and restart
+## Inject SLACK_SIGNING_SECRET (Keychain k3dm-slack-signing-secret) into the webhook LaunchAgent plist and restart
 update-webhook-slack-secret:
-	@_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) || \
-	  (echo "ERROR: k3dm-slack-signing-secret not in Keychain — run: security add-generic-password -s k3dm-slack-signing-secret -a k3dm -w <secret>"; exit 1); \
-	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_SIGNING_SECRET" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true; \
-	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_SIGNING_SECRET string $$_sig" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
-	$(MAKE) restart-webhook
-	@echo "SLACK_SIGNING_SECRET injected from Keychain — webhook restarted"
+	@_sig="$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null)"; \
+	[ -n "$$_sig" ] || { echo "[update-webhook-slack-secret] ERROR: k3dm-slack-signing-secret not in Keychain (locked? run: security unlock-keychain; to add, run: security add-generic-password -s k3dm-slack-signing-secret -a k3dm -w  and paste at the prompt)" >&2; exit 1; }; \
+	_plist="$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
+	[ -f "$$_plist" ] || { echo "[update-webhook-slack-secret] ERROR: $$_plist not found — run: make setup-worker" >&2; exit 1; }; \
+	cp -p "$$_plist" "$$_plist.bak-$$(date +%Y%m%d%H%M%S)"; \
+	SLACK_SIG="$$_sig" PLIST="$$_plist" python3 -c 'import os,plistlib; p=os.environ["PLIST"]; d=plistlib.load(open(p,"rb")); d.setdefault("EnvironmentVariables",{})["SLACK_SIGNING_SECRET"]=os.environ["SLACK_SIG"]; plistlib.dump(d,open(p,"wb")); print("[update-webhook-slack-secret] plist updated (SLACK_SIGNING_SECRET)")'
+	@$(MAKE) --no-print-directory restart-webhook
+	@echo "[update-webhook-slack-secret] webhook restarted"
 
 ## Bootstrap Cloudflare Worker + webhook daemon (one-time per environment; safe to re-run)
 setup-worker:
@@ -488,6 +488,19 @@ restore:
 
 ## Show all service login credentials (Hub k3d cluster must be running)
 show-service-passwords:
+	@_vault_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
+	[ -n "$$_vault_tok" ] || { echo "[show-service-passwords] ERROR: cannot read secrets/vault-root (check k3d-k3d-cluster context)" >&2; exit 1; }; \
+	_vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
+	if ! curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" -o /dev/null 2>/dev/null; then \
+		echo "[show-service-passwords] Vault credential lookup unavailable; restarting its port-forward" >&2; \
+		$$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
+		__vault_ready=0; \
+		for __vault_attempt in 1 2 3 4 5 6 7 8 9 10; do \
+			sleep 1; \
+			if curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
+		done; \
+		[ "$$__vault_ready" -eq 1 ] || { echo "[show-service-passwords] ERROR: Vault credential lookup still unavailable (check Vault token and port-forward)" >&2; exit 1; }; \
+	fi
 	@echo ""
 	@echo "  === Service Credentials ==="
 	@echo ""
@@ -559,11 +572,25 @@ alertmanager-secret:
 	read -r -p "Gmail from address: " _gmail; \
 	read -r -s -p "Gmail app password: " _pw; echo; \
 	read -r -p "T-Mobile SMS gateway (10digits@tmomail.net): " _sms; \
+	if [ -z "$$_gmail" ] || [ -z "$$_pw" ] || [ -z "$$_sms" ]; then \
+	  echo "[alertmanager-secret] ERROR: all three values are required (run in an interactive terminal)" >&2; exit 1; \
+	fi; \
 	curl -sf -X POST \
 	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager" \
 	  -d "$$(GMAIL_FROM="$$_gmail" GMAIL_PW="$$_pw" SMS_GW="$$_sms" python3 -c 'import json,os; print(json.dumps({"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}))')" >/dev/null && \
 	echo "[alertmanager-secret] Credentials stored in Vault"
+
+## Restore the Alertmanager Gmail App Password from Keychain into Vault, then rebuild the Alertmanager Secret
+restore-google-app-password:
+	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	[ -n "$$_tok" ] || { echo "[restore-google-app-password] ERROR: cannot read Hub Vault root token" >&2; exit 1; }; \
+	_pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>/dev/null); \
+	[ -n "$$_pw" ] || { echo "[restore-google-app-password] ERROR: k3dm-alertmanager-gmail-app-password not in Keychain (locked? run: security unlock-keychain)" >&2; exit 1; }; \
+	VAULT_TOKEN="$$_tok" GMAIL_PW="$$_pw" python3 -c 'import json,os,sys,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; d=json.load(u.urlopen(u.Request(a,headers=h)))["data"]["data"]; m=[k for k in ("gmail_from","sms_gateway") if not d.get(k)]; m and sys.exit("[restore-google-app-password] ERROR: Vault missing "+",".join(m)+" - run: make alertmanager-secret"); d["gmail_app_pw"]=os.environ["GMAIL_PW"]; u.urlopen(u.Request(a,data=json.dumps({"data":d}).encode(),headers=h,method="POST"))' && \
+	echo "[restore-google-app-password] Vault updated — rebuilding Alertmanager Secret" && \
+	$(MAKE) observability
 
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:
@@ -725,6 +752,7 @@ help:
 	@echo "    make vuln-scan                  Print VulnerabilityReport summary"
 	@echo "    make show-service-passwords     Show all service login credentials"
 	@echo "    make alertmanager-secret        Store Alertmanager Gmail+SMS creds in Vault (run once)"
+	@echo "    make restore-google-app-password   Restore Gmail App Password from Keychain → Vault → Alertmanager"
 	@echo "    make install-alertmanager-auth-proxy   Install Alertmanager auth proxy LaunchAgent"
 	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"

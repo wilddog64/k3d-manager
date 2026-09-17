@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth'])
+const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
 const APPROVAL_TTL_SECONDS = 3600
 const REAUTH_TTL_SECONDS   = 86400
 const HERMES_ACTION_ID_RE  = /^r[0-9]+-[0-9a-f]{8}$/
@@ -21,6 +21,7 @@ const COMMAND_ROLES     = Object.freeze({
   '/claude': 'reader',
   '/gemini': 'reader',
   '/codex': 'reader',
+  '/k3dm': 'admin',
 })
 
 function resolveProvider(text, dflt) {
@@ -73,6 +74,23 @@ function parseClusterDiagnose(text) {
     return { payload: { provider: target, action: 'get-appsets' } }
   }
   return { error: 'Unsupported diagnostic. Use pods, describe-pod, logs, apps, app, or appsets.' }
+}
+
+const K3DM_USAGE = 'Usage: /k3dm <target> [KEY=value …] [confirm] — `/k3dm help` lists targets for your role'
+
+function parseK3dm(text) {
+  const parts = (text || '').trim().split(/\s+/).filter(Boolean)
+  const target = (parts.shift() || 'help').toLowerCase()
+  if (!/^[a-z][a-z0-9-]{0,40}$/.test(target)) return { error: K3DM_USAGE }
+  const args = {}
+  let confirm = false
+  for (const part of parts) {
+    if (part.toLowerCase() === 'confirm') { confirm = true; continue }
+    const m = /^([A-Z][A-Z_]{0,31})=(\S{1,256})$/.exec(part)
+    if (!m) return { error: K3DM_USAGE }
+    args[m[1]] = m[2]
+  }
+  return { payload: { target, args, confirm } }
 }
 
 async function verifySlack(request, body) {
@@ -193,15 +211,11 @@ async function relay(endpoint, payload, meta = {}) {
       },
       body: JSON.stringify(payload)
     })
-    if (resp.status === 409) {
-      const data = await resp.json().catch(() => ({}))
-      return { ok: false, conflict: data.error || 'cluster job already running' }
-    }
-    if (resp.status === 403) {
-      const data = await resp.json().catch(() => ({}))
-      return { ok: false, conflict: data.error || 'forbidden' }
-    }
-    return { ok: resp.ok, conflict: null }
+    const data = await resp.json().catch(() => ({}))
+    if (resp.status === 409) return { ok: false, conflict: data.error || 'cluster job already running' }
+    if (resp.status === 403) return { ok: false, conflict: data.error || 'forbidden' }
+    if (resp.status === 400) return { ok: false, conflict: data.error || 'bad request' }
+    return { ok: resp.ok, conflict: null, data }
   } catch (_) {
     return { ok: false, conflict: null }
   }
@@ -395,6 +409,20 @@ async function handle(req, event) {
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`🧹 ${confirm ? 'Applying' : 'Previewing'} stale ACG sandbox cleanup…`, threadTs, true)
+  }
+
+  if (command === '/k3dm') {
+    const parsed = parseK3dm(text)
+    if (parsed.error) return jsonReply(parsed.error, threadTs, true)
+    const payload = { ...parsed.payload, slack_user_id: userId, response_url: responseUrl }
+    const isHelp = payload.target === 'help'
+    event.waitUntil((async () => {
+      const { ok, conflict, data } = await relay('/api/v1/make', payload, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+      else if (isHelp && data && data.text) await postResponseUrl(responseUrl, data.text)
+    })())
+    return jsonReply(isHelp ? '📋 Fetching /k3dm targets…' : `🛠️ Queuing \`make ${payload.target}\`…`, threadTs, true)
   }
 
   if (command === '/ask' || command === '/claude' || command === '/gemini' || command === '/codex') {

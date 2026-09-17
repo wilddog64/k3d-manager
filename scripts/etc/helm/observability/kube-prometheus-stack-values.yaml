@@ -45,9 +45,13 @@ prometheus:
             - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}'
         static_configs:
           - targets:
-              - 'host.internal:19090'
+              - 'host.internal:19190'
             labels:
               cluster: acg
+        metric_relabel_configs:
+          - source_labels: [cluster]
+            regex: acg
+            action: drop
 
 grafana:
   admin:
@@ -64,7 +68,7 @@ grafana:
   additionalDataSources:
     - name: acg-prometheus
       type: prometheus
-      url: http://host.internal:19090
+      url: http://host.internal:19190
       access: proxy
       jsonData:
         timeInterval: 30s
@@ -87,7 +91,8 @@ alertmanager:
       limits:
         memory: 64Mi
         cpu: 50m
-  configSecret: alertmanager-smtp-secret
+    useExistingSecret: true
+    configSecret: alertmanager-smtp-secret
 
 kubeEtcd:
   enabled: false
