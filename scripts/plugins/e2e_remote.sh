@@ -567,12 +567,13 @@ def validate_failure_groups(groups):
     try:
         assert isinstance(groups, list) and len(groups) <= 100
         for group in groups:
-            assert isinstance(group, dict) and set(group) == {"kind", "target", "count"}
+            assert isinstance(group, dict) and set(group) == {"kind", "target", "count", "service"}
             for key in ("kind", "target"):
                 value = group[key]
                 assert isinstance(value, str) and value and len(value) <= 256
             count = group["count"]
             assert not isinstance(count, bool) and isinstance(count, int) and 0 <= count <= 100000
+            assert isinstance(group["service"], str) and group["service"] and len(group["service"]) <= 128
     except (AssertionError, KeyError, TypeError):
         die("invalid failure_groups")
 
@@ -583,10 +584,10 @@ details = s.get("failure_details", [])
 if not isinstance(details, list) or len(details) > 200:
     die("failure_details must be a list with at most 200 entries")
 for detail in details:
-    if not isinstance(detail, dict) or set(detail) != {"file", "title", "status", "error"}:
-        die("failure_details entries must contain file, title, status, error")
+    if not isinstance(detail, dict) or set(detail) != {"file", "title", "status", "error", "service"}:
+        die("failure_details entries must contain file, title, status, error, service")
     if any(not isinstance(detail[key], str) or len(detail[key]) > 512
-           for key in ("file", "title", "status", "error")):
+           for key in ("file", "title", "status", "error", "service")):
         die("failure_details entry contains an invalid string")
 
 created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()

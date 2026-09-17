@@ -455,6 +455,24 @@ failure_groups = [
     {"kind": kind, "target": target, "count": count}
     for (kind, target), count in sorted(groups.items())
 ]
+for group in failure_groups:
+    target = group["target"]
+    group["service"] = (
+        "basket" if "cart" in target else
+        "order" if "order" in target else
+        "payment" if "payment" in target else
+        "product-catalog" if "product" in target else
+        "cross-service"
+    )
+for failure in failures:
+    file_name = failure.get("file", "")
+    failure["service"] = (
+        "basket" if "cart" in file_name else
+        "order" if "order" in file_name else
+        "payment" if "payment" in file_name else
+        "product-catalog" if "product" in file_name else
+        "cross-service"
+    )
 
 summary = {
     "run_id": run_id,
