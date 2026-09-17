@@ -28,3 +28,7 @@ this issue record is the design and acceptance record rather than a sixth plan.
 - Prometheus exposes sensor status, incident state, last-poll age, and check details.
 - Grafana has a `Hermes Status` dashboard with current findings and history-friendly panels.
 - Existing Hermes and exporter tests remain green.
+
+The first live publication exposed a label-application gap; the publisher now
+labels the ConfigMap explicitly after applying it, and the existing snapshot
+was relabeled during rollout.
