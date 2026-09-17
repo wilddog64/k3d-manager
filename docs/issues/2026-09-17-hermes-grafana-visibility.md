@@ -70,6 +70,10 @@ suite`, and `Run result`.
 The Recent runs boolean has been replaced with `Failure ratio (failed/total)`;
 for example, `33/102` means 33 failed tests out of 102 total.
 
+The table filters out pre-ratio metric series left by the exporter rollout, so
+legacy rows cannot appear with an empty ratio. New values include both forms,
+for example `33/102 (32.4%)`.
+
 The boolean Recent runs field is labeled `E2E run passed` so `false` clearly
 means that one or more tests failed in that E2E run.
 

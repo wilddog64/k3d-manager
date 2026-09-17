@@ -15,6 +15,7 @@
 - **2026-09-17 — Recent runs column refinement.** Runner commit now precedes Tier, and Test suite precedes Services under test.
 - **2026-09-17 — E2E result label clarification.** Recent runs now labels the boolean `passed` field `E2E run passed` instead of the ambiguous `Run result`.
 - **2026-09-17 — E2E failure ratio.** Recent runs now displays `Failure ratio (failed/total)` instead of the boolean pass field.
+- **2026-09-17 — E2E ratio cleanup.** Recent runs filters legacy pre-ratio series and displays `failed/total (percent)` values such as `33/102 (32.4%)`.
 - **2026-09-17 — Hermes poll-age guard.** A legacy manual snapshot used `updated_at: "now"`, which rendered as `56.7 years`; invalid timestamps are now omitted from the exporter age metric instead of displayed as a false value.
 - **2026-09-17 — Hermes dashboard stat rendering follow-up.** Grafana top stat queries now aggregate to scalar results, use instant evaluation, and suppress legends so Prometheus scrape labels (`endpoint`, `instance`, `pod`, `job`) are not displayed as values. Details: `docs/issues/2026-09-17-hermes-grafana-visibility.md`.
 - **2026-09-16 — Final v1.34.0 plan slot used for E2E Grafana trends/drill-down.** Spec: `docs/plans/v1.34.0-e2e-grafana-trends-and-drilldown.md`. Four prior v1.34.0 plans existed; this is the fifth and final slot. Scope covers service/cause trends, failure rate, top failing specs, and preserving the existing redacted detail tables. No implementation yet.
