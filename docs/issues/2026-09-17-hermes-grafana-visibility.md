@@ -40,3 +40,15 @@ The first dashboard view showed Prometheus labels such as `endpoint`, `instance`
 multi-series result (or falling back to Grafana's series display), so Grafana
 rendered the label set instead of a clean scalar value. The stat queries now
 aggregate to one series, use instant evaluation, and clear the legend format.
+
+The findings table now hides scrape metadata (`container`, `endpoint`, `pod`,
+and exporter `service`). Its remaining `Namespace` field is the Prometheus
+scrape namespace (`platform-ops` for this exporter); Hermes does not currently
+publish an application target namespace, so the dashboard does not mislabel
+that field as a target namespace.
+
+The live snapshot also contained a legacy `updated_at: "now"` value from the
+initial manual publication. That parsed as Unix epoch zero and produced a
+misleading `56.7 years` age. The exporter now suppresses the age metric when
+the timestamp is invalid, so Grafana shows no data instead of a false age until
+Hermes publishes a valid ISO-8601 timestamp.

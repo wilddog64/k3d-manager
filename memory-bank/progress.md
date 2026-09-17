@@ -5,6 +5,8 @@
 
 ## Releases
 
+- [x] **Hermes findings table cleanup 2026-09-17.** Removed scrape metadata columns and retained the scrape namespace with an explicit label; application target namespaces require a future Hermes payload field.
+- [x] **Hermes poll-age guard 2026-09-17.** Invalid legacy timestamps no longer produce a false multi-decade age in Grafana.
 - [x] **Hermes dashboard stat rendering follow-up 2026-09-17.** Aggregated top-panel PromQL to single scalar series, enabled instant evaluation, and suppressed legends to prevent scrape labels from appearing as values. See `docs/issues/2026-09-17-hermes-grafana-visibility.md`.
 - [ ] **E2E Grafana trends/drill-down spec filed 2026-09-16.** Fifth and final v1.34.0 plan slot: `docs/plans/v1.34.0-e2e-grafana-trends-and-drilldown.md`. Implementation is not started; the milestone plan cap is now reached.
 - [x] **E2E Grafana trend panels implemented 2026-09-16 (`3c33103a`).** Added Failure trend by service, Failure causes by service, and Top failing specs panels. Dashboard applied live and Grafana restarted; BATS 14/14, shellcheck clean, `_agent_audit` exit 0. Failure-rate panel remains follow-up work.
