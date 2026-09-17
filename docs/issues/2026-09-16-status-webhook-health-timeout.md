@@ -17,6 +17,8 @@ The webhook health endpoint now supports `quick=1`. It returns the bounded publi
 
 Prometheus returning HTTP 401 is classified as a warning in the quick liveness view because the public endpoint intentionally requires basic authentication. The full login checks remain responsible for validating authenticated Prometheus access.
 
+The summary command also retries the Keychain token when an explicitly exported `K3DM_WEBHOOK_TOKEN` is rejected. This prevents a stale shell environment value from masking a valid rotated Keychain token as `webhook unavailable`.
+
 ## Verification
 
 The live result after restarting the webhook is:
