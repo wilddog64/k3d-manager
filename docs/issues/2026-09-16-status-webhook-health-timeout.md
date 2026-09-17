@@ -19,6 +19,8 @@ Prometheus returning HTTP 401 is classified as a warning in the quick liveness v
 
 The summary command also retries the Keychain token when an explicitly exported `K3DM_WEBHOOK_TOKEN` is rejected. This prevents a stale shell environment value from masking a valid rotated Keychain token as `webhook unavailable`.
 
+The live incident added a second authentication failure mode: the Keychain item existed but its password was empty (`security find-generic-password ... -w` exited cleanly with zero bytes). Public Grafana remained reachable because it uses a separate Cloudflare route. `bin/k3dm-webhook-setup` now treats an empty Keychain value as missing and regenerates it.
+
 ## Verification
 
 The live result after restarting the webhook is:
