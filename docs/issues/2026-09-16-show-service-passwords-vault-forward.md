@@ -51,4 +51,4 @@ The first command reinstalls/bootstraps `com.k3d-manager.vault-port-forward`; th
 
 ## Follow-up
 
-Consider changing the target to print a concise `Vault unavailable (run make install-vault-port-forward)` diagnostic while retaining `N/A` only for an actual missing field. Do not print Vault tokens or credential values in diagnostics.
+The target now probes unauthenticated Vault health before reading credentials. If the local API is unavailable, it automatically runs `make install-vault-port-forward`, retries for up to ten seconds, and fails with a concise diagnostic if Vault remains unavailable. It does not print Vault tokens or credential values in recovery diagnostics.

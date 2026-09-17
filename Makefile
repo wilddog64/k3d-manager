@@ -272,8 +272,11 @@ install-sudoers:
 
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+	@if ! launchctl kickstart -k "gui/$$(id -u)/com.k3d-manager.webhook"; then \
+		echo "[restart-webhook] service is not loaded; bootstrapping LaunchAgent" >&2; \
+		launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true; \
+		launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
+	fi
 
 ## Remove k3d-manager-owned /tmp files
 clean-tmp:
@@ -485,6 +488,18 @@ restore:
 
 ## Show all service login credentials (Hub k3d cluster must be running)
 show-service-passwords:
+	@_vault_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
+	_vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
+	if ! curl -sf "http://127.0.0.1:18200/v1/sys/health" >/dev/null 2>&1; then \
+		echo "[show-service-passwords] Vault port-forward unavailable; restarting it" >&2; \
+		$$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
+		__vault_ready=0; \
+		for __vault_attempt in 1 2 3 4 5 6 7 8 9 10; do \
+			sleep 1; \
+			if curl -sf "http://127.0.0.1:18200/v1/sys/health" >/dev/null 2>&1; then __vault_ready=1; break; fi; \
+		done; \
+		[ "$$__vault_ready" -eq 1 ] || { echo "[show-service-passwords] ERROR: Vault is still unavailable after port-forward restart" >&2; exit 1; }; \
+	fi
 	@echo ""
 	@echo "  === Service Credentials ==="
 	@echo ""
