@@ -63,6 +63,10 @@ now use `Run ID`, `Runner`, `Tier`, `Target`, `Service`, `Failure kind`; Failure
 details use `Run ID`, `Runner`, `Tier`, `Service`, `Spec file`, `Test`, `Error`,
 `Status`.
 
+The Recent runs table now uses the triage order `Run ID`, `Runner`, `Tier`,
+`Runner commit`, `Services under test`, `Failed tests`, `Total tests`, `Test
+suite`, and `Run result`.
+
 ## 2026-09-17 Grafana responsiveness follow-up
 
 The E2E dashboard was refreshing every minute over seven days while rendering
