@@ -330,11 +330,15 @@ assert not _verify_slack_signature(b"\xff", "0", "v0=x")
     [ "${status}" -eq 0 ]
 }
 
-@test "status smoke login falls back to the deployed Keycloak admin Secret" {
-    run grep -F -- 'keycloak-admin-secret' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+@test "status smoke Keycloak admin login uses the operator keycloak-secrets account" {
+    run grep -F -- 'keycloak-secrets' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- 'KEYCLOAK_ADMIN_PASSWORD' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "${status}" -eq 0 ]
     run grep -F -- 'admin-cli' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "${status}" -eq 0 ]
+    run grep -F -- 'keycloak-admin-secret' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -ne 0 ]
 }
 
 @test "Slack ignores signed unknown and user-less commands without creating anchors" {

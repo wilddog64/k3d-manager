@@ -10,7 +10,7 @@ fi
 _provider="${_provider:-k3s-aws}"
 _context="${APP_CONTEXT:-}"
 _color() { local code="$1" text="$2"; if [[ "${_mode}" == json || "${NO_COLOR:-}" == 1 || "${STATUS_COLOR:-}" == never || ( ! -t 1 && "${STATUS_COLOR:-}" != always ) ]]; then printf '%s' "${text}"; else printf '\033[%sm%s\033[0m' "${code}" "${text}"; fi; }
-_token_from_env="${K3DM_WEBHOOK_TOKEN:-}"; _keychain_err="$(mktemp -t k3dm-keychain.XXXXXX)"; trap 'rm -f "${_tmp}" "${_keychain_err}"' EXIT
+_token_from_env="${K3DM_WEBHOOK_TOKEN:-}"; _keychain_err="$(mktemp -t k3dm-keychain.XXXXXX)"; trap 'rm -f "${_tmp:-}" "${_keychain_err}"' EXIT
 _token="${_token_from_env}"
 if [[ -z "${_token}" ]]; then
   _token="$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>"${_keychain_err}" || true)"

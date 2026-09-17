@@ -18,9 +18,9 @@ ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
 @test "Hermes dashboard exposes current findings and history" {
   run grep -F -- 'hermes_sensor_status' "${HERMES_DASH}"
   [ "${status}" -eq 0 ]
-  run grep -F -- 'hermes_sensor_status' "${HERMES_DASH}"
-  [ "${status}" -eq 0 ]
   run grep -F -- '"title": "Current Hermes findings"' "${HERMES_DASH}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '"title": "Sensor status history"' "${HERMES_DASH}"
   [ "${status}" -eq 0 ]
 }
 
