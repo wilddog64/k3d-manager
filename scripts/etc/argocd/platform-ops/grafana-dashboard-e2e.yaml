@@ -124,6 +124,36 @@ data:
           "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "namespace": true, "pod": true, "project": true }, "renameByName": { "run_id": "Run ID", "file": "Spec file", "title": "Test", "status": "Status", "error": "Error", "service": "Service", "tier": "Tier", "runner": "Runner" } } } ],
           "title": "Failure details",
           "type": "table"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "showPoints": "always" } }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+          "id": 8,
+          "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["last", "max"] }, "tooltip": { "mode": "multi" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (service) (e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "legendFormat": "{{service}}", "refId": "A" } ],
+          "title": "Failure trend by service",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
+          "id": 9,
+          "options": { "orientation": "horizontal", "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (service, kind) (e2e_failure_group_info{tier=~\"$tier\",runner=~\"$runner\"})", "legendFormat": "{{service}} / {{kind}}", "refId": "A" } ],
+          "title": "Failure causes by service",
+          "type": "barchart"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
+          "id": 10,
+          "options": { "orientation": "horizontal", "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "topk(10, sum by (service, file) (e2e_failure_info{tier=~\"$tier\",runner=~\"$runner\"}))", "legendFormat": "{{service}} / {{file}}", "refId": "A" } ],
+          "title": "Top failing specs",
+          "type": "barchart"
         }
       ]
     }
