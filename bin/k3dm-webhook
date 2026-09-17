@@ -2190,7 +2190,7 @@ def _eso_health_results(context, label_prefix=""):
     return results
 
 
-def _smoke_test_services(retries=None, provider=None):
+def _smoke_test_services(retries=None, provider=None, quick=False):
     """HTTP smoke test for each service. Returns list of (name, ok, detail) tuples."""
     import ssl
     import time
@@ -2239,7 +2239,13 @@ def _smoke_test_services(retries=None, provider=None):
                         passed = True
                         last_err = f"HTTP {code}"
                         break
+                    if name == "Prometheus" and code == 401:
+                        return name, None, "HTTP 401 (authentication required)"
                     last_err = f"HTTP {code}"
+            except urllib.error.HTTPError as exc:
+                if name == "Prometheus" and exc.code == 401:
+                    return name, None, "HTTP 401 (authentication required)"
+                last_err = str(exc)
             except Exception as exc:
                 last_err = str(exc)
             if attempt < _retries - 1:
@@ -2252,6 +2258,12 @@ def _smoke_test_services(retries=None, provider=None):
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=len(smoke_endpoints)) as _pool:
         results.extend(_pool.map(_probe_endpoint, smoke_endpoints))
+
+    # The summary status command needs a bounded liveness snapshot.  The full
+    # sweep below also checks Vault, ESO, Kubernetes, and browser logins and can
+    # legitimately take longer than a CLI status probe should wait.
+    if quick:
+        return results
 
     # A deliberately paused hub monitoring stack (make monitoring-pause) is not a
     # failure — downgrade its expected 502s to a skip so status stays green. The
@@ -3932,7 +3944,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             parsed = urllib.parse.urlsplit(self.path)
             params = urllib.parse.parse_qs(parsed.query)
             provider = params.get("provider", [None])[0]
-            services = _smoke_test_services(provider=provider)
+            quick = params.get("quick", ["0"])[0] == "1"
+            services = _smoke_test_services(retries=1 if quick else None, provider=provider, quick=quick)
             result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]
             self._json(200, {"services": result,
                              "all_ok": all(r["ok"] is not False for r in result)})
