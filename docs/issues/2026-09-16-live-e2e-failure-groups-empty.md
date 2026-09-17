@@ -60,3 +60,8 @@ price-type assertion.
 
 Keep the focused exporter test and verify the next scheduled E2E publication
 without a manual backfill.
+
+The Grafana dashboard ConfigMap later retained an older panel definition after
+the platform-ops rollout. Applying `grafana-dashboard-e2e.yaml` directly
+updated both panels to exclude `container`, `endpoint`, `namespace`, and `pod`;
+the live ConfigMap now reflects those exclusions.
