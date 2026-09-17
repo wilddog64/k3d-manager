@@ -21,6 +21,8 @@ The summary command also retries the Keychain token when an explicitly exported 
 
 The live incident added a second authentication failure mode: the Keychain item existed but its password was empty (`security find-generic-password ... -w` exited cleanly with zero bytes). Public Grafana remained reachable because it uses a separate Cloudflare route. `bin/k3dm-webhook-setup` now treats an empty Keychain value as missing and regenerates it.
 
+Deep-dive follow-up: the terminal could not write the replacement because macOS returned `User interaction is not allowed` for `security add-generic-password`. The login Keychain item exists, but the current terminal/session is not authorized to read/write its value. Unlock the login Keychain in Keychain Access (or with `security unlock-keychain` interactively) before rotating; do not bypass this with a plaintext token file.
+
 Rotation initially failed because `bin/rotate-webhook-token` used the obsolete Keychain service `cloudflare-api-token`; the configured service is `k3dm-cloudflare-api-token`. That lookup is corrected. `make rotate-webhook-token` then succeeded, uploaded the Worker secret, restored a 64-byte local token, and verified the public endpoint (HTTP 404, proving authentication reached the route).
 
 ## Verification
