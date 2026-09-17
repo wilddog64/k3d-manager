@@ -8,6 +8,7 @@
 
 - **2026-09-17 — Hermes findings table cleanup.** Scrape metadata (`container`, `endpoint`, `pod`, exporter `service`) is hidden. The table now displays a sensor-derived Target namespace/scope instead of the exporter scrape namespace.
 - **2026-09-17 — Dashboard readability cleanup.** Hermes findings columns are Sensor, Finding, Status, Target namespace. E2E failure charts now use instant aggregate queries to avoid dense repeated timestamp bars.
+- **2026-09-17 — Grafana responsiveness hardening.** E2E dashboard refresh is 5m/24h, detail tables are capped at 100/200/300 rows, and trend points use automatic density to reduce intermittent UI freezes.
 - **2026-09-17 — Hermes poll-age guard.** A legacy manual snapshot used `updated_at: "now"`, which rendered as `56.7 years`; invalid timestamps are now omitted from the exporter age metric instead of displayed as a false value.
 - **2026-09-17 — Hermes dashboard stat rendering follow-up.** Grafana top stat queries now aggregate to scalar results, use instant evaluation, and suppress legends so Prometheus scrape labels (`endpoint`, `instance`, `pod`, `job`) are not displayed as values. Details: `docs/issues/2026-09-17-hermes-grafana-visibility.md`.
 - **2026-09-16 — Final v1.34.0 plan slot used for E2E Grafana trends/drill-down.** Spec: `docs/plans/v1.34.0-e2e-grafana-trends-and-drilldown.md`. Four prior v1.34.0 plans existed; this is the fifth and final slot. Scope covers service/cause trends, failure rate, top failing specs, and preserving the existing redacted detail tables. No implementation yet.

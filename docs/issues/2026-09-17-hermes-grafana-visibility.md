@@ -57,3 +57,11 @@ The Hermes findings table keeps `Sensor` first and now orders columns as
 bar charts use instant aggregate queries so each category is rendered once;
 range-query samples had previously produced dense overlapping bars and unreadable
 timestamp labels.
+
+## 2026-09-17 Grafana responsiveness follow-up
+
+The E2E dashboard was refreshing every minute over seven days while rendering
+unbounded run, failure-group, and failure-detail series. That combination can
+stall the Grafana browser even when Prometheus is healthy. The dashboard now
+refreshes every five minutes over 24 hours, caps table queries at 100/200/300
+rows, and lets the trend panel choose point density automatically.
