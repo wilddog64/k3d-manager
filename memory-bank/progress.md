@@ -31,11 +31,21 @@
   main green. Fix is one discovery mechanism: CI calls the Makefile targets. Enumerate failures
   on macOS *and* under a Linux-simulating `uname` stub BEFORE editing `ci.yml`; any failure that
   turns out to be a real production bug must be reported, not fixed or disabled.
-- [ ] **2026-09-17 — ArgoCD browser TLS dir is provider-agnostic.** ASSIGNED to Codex, spec
-  `docs/bugs/2026-09-17-argocd-browser-tls-path-unification.md` (filed `842b4ac8`). Follow-up to
+- [x] **2026-09-17 — ArgoCD browser TLS dir is provider-agnostic. FIXED `2c908554`** (spec
+  `docs/bugs/2026-09-17-argocd-browser-tls-path-unification.md`, filed `842b4ac8`). Follow-up to
   the `4184d23e` containment fix. `argocd.sh:61`'s `:=` **assigns**, killing the correct scoped
   `:-` fallback in `bin/cluster-up` and `bin/cluster-refresh`; the flat dir is shared across all
   four `k3s-*` providers, so one bring-up overwrites another's cert and key. No migration.
+  Codex wrote the code but hit the known `.git/index.lock` sandbox wall, so Claude reviewed the
+  full diff and committed on its behalf. Gates re-run by Claude, not taken on report:
+  `make test` `MAKETEST_EXIT=0` with `ok=928 notok=0` (924 + 4 new argocd cases, unpiped against
+  a surviving log), `make test-bin` `ok 108`/`notok=0`, `shellcheck -S error` exit 0, and the DoD
+  grep returning only `bin/cluster-down:231`. One out-of-scope edit was REVERTED: Codex had split
+  the flat literal in `scripts/tests/bin/cluster_down.bats` across two assignments purely so the
+  DoD grep would stop matching. The fault was the gate's — it scoped `scripts/` and so swept in a
+  test that legitimately holds that literal to prove the legacy dir gets cleaned. Gate narrowed to
+  `scripts/plugins/ scripts/lib/ bin/` and the spec now states outright that rewriting a string to
+  dodge a grep is gate evasion, not a fix.
 - [x] **2026-09-17 — v1.34.0 release CUT (was merged but never published).** PR #127 merged at
   `978ea60f` on 2026-09-17 with no version heading, so `/post-merge` Step 4 skipped tagging and
   the release went unrecorded: no tag, no GitHub release, no releases row. Now published: tag

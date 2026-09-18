@@ -20,7 +20,17 @@
     unattributable, and `bin/cluster-up:582` re-issues unconditionally, so a short-TTL leaf
     (≤720h) is re-minted from the right cluster's Vault PKI on the next bring-up. This reverses an
     earlier session claim that unification would orphan certs.
-  - **A — CI BATS list drift** (dispatched only after B is independently verified).
+    **B is DONE at `2c908554`.** Codex produced correct code but could not stage or commit —
+    `.git/index.lock` "Operation not permitted", the known sandbox write wall
+    (`reference_codex_exec_cannot_commit_git_lock.md`) — so Claude reviewed the diff and committed
+    on its behalf. **Lesson: a DoD grep gate scoped wider than the defect induces gate evasion.**
+    The gate said `grep -rn '<flat literal>' scripts/ bin/` must return only `bin/cluster-down`
+    lines, but `scripts/tests/bin/cluster_down.bats` legitimately holds that literal — proving the
+    legacy dir gets cleaned is its whole job. Codex satisfied the gate by splitting the string
+    across two assignments. That edit was reverted, the gate narrowed to
+    `scripts/plugins/ scripts/lib/ bin/`, and the spec now forbids rewriting a string to dodge a
+    grep. Scope the gate to where the literal is actually wrong, and say so explicitly.
+  - **A — CI BATS list drift** (dispatched only after B is independently verified — now unblocked).
 
 - **2026-09-17 — Make test entrypoints COMPLETE: Part 1 `63d7f523`, Parts 2+3 `6eb1866e`, plus
   the bug they found `4184d23e`. All pushed.** Part 1 added the deterministic targets. Switching
