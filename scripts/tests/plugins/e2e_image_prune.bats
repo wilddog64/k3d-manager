@@ -70,7 +70,15 @@ SH
   [[ "$output" == *"ghcr.io/wilddog64/shopping-cart-product-catalog:sha-"* ]]
   [[ "$output" == *"ghcr.io/wilddog64/shopping-cart-basket:sha-"* ]]
   [[ "$output" == *"ghcr.io/wilddog64/shopping-cart-order:sha-"* ]]
-  [ "$(printf '%s\n' "$output" | grep -c ':')" -eq 3 ]
+  [[ "$output" == *"ghcr.io/wilddog64/shopping-cart-payment:sha-"* ]]
+  local expected
+  expected="$(grep -c '^[[:space:]]*newName:[[:space:]]' \
+    "${SCRIPT_DIR}/etc/e2e/kustomization.yaml")"
+  [ "${#lines[@]}" -eq "$expected" ]
+  local line
+  for line in "${lines[@]}"; do
+    [[ "$line" == *:* ]]
+  done
 }
 
 @test "_e2e_kustomization_images skips an entry that has newTag but no newName" {
