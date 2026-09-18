@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- `bin/cluster-down` now deletes the ArgoCD browser TLS material from the legacy flat state directory as well as the provider-scoped one. `bin/cluster-up` and `bin/cluster-refresh` source `scripts/plugins/argocd.sh`, whose `ARGOCD_BROWSER_TLS_DIR` default is flat, while `cluster-down` does not source it and so resolved the provider-scoped path instead — meaning teardown removed a directory nothing had ever written, and the Vault-PKI-issued `tls.key` survived every `cluster-down --confirm`. Removal stays limited to the four named cert files, never a wildcard or a directory
 - The webhook now registers its own control token for redaction: `_auth` wraps `_get_token()` in `_register_secret`, so the bearer token that authorises every `/run`, `/ask` and make-target dispatch can no longer pass through job output unscrubbed. `_register_secret` also counts values it declines to register (`None`, non-string, shorter than 4 characters) in `_REDACT_SKIPPED` by reason, never by value, so a renamed Vault key no longer fails registration silently. Note: redaction remains fetch-scoped — secrets arriving from a subprocess (`kubectl get secret -o yaml`, pod logs, `bin/cluster-status`) are structurally invisible to the registry
 
 ## [1.34.0] - 2026-09-17
