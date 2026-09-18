@@ -15,14 +15,27 @@
   a `cluster-down` TLS-key leak (`4184d23e`) and three host-OS-dependent BATS tests made
   portable via `_stub_uname_darwin`. Verified 108/108 BATS on macOS and under a simulated
   Linux `uname`; 120 pytest tests green on Python 3.13.6 and 3.14.7.
-- [ ] **2026-09-17 — `make test` is RED and CI cannot see it.** Case 525
-  (`_e2e_kustomization_images pairs newName with newTag from the real substrate`,
-  `scripts/tests/plugins/e2e_image_prune.bats`) fails on a `grep -c ':'` count gate expecting 3.
-  Pre-existing and unrelated to the entrypoint work. CI runs a hand-maintained bats list that
-  excludes this file, so `make test` has been failing while main stayed green. Two things to
-  decide: whether the assertion or the code is wrong, and whether CI should run `make test`
-  rather than its own drifted list. Count gates like this are the pattern the
-  prefer-disappearance-gates rule warns about.
+- [x] **2026-09-17 — `make test` RED at case 525: FIXED, `842b4ac8`.** The assertion was stale,
+  not the code: `978ea60f` (v1.34.0) added a fourth app to `scripts/etc/e2e/kustomization.yaml`
+  and the hardcoded `grep -c ':' -eq 3` was never updated. The count is now derived from the
+  substrate's own `newName` entries and the `':'` guard is a per-line assertion — deliberately
+  NOT bumped `3`→`4`, which would re-arm the trap for the fifth app. Exactly the pattern the
+  prefer-disappearance-gates rule warns about. Verified: 924/924 `ok`, zero `not ok`,
+  `MAKE_EXIT=0` from an unpiped run (an earlier `make test | tail -5` reported *tail's* exit code
+  and was retracted). Spec:
+  `docs/bugs/2026-09-17-e2e-kustomization-images-hardcoded-count.md`.
+- [ ] **2026-09-17 — CI's hand-maintained BATS list has drifted from `make test`.** ASSIGNED to
+  Codex, spec `docs/bugs/2026-09-17-ci-bats-list-drift-from-make-test.md` (filed `842b4ac8`).
+  **54 files (3 `core` + 51 `plugins`) run in `make test` and never in CI**; `scripts/tests/etc`
+  runs in CI and not in `make test`. This is why case 525 stayed red for a whole release with
+  main green. Fix is one discovery mechanism: CI calls the Makefile targets. Enumerate failures
+  on macOS *and* under a Linux-simulating `uname` stub BEFORE editing `ci.yml`; any failure that
+  turns out to be a real production bug must be reported, not fixed or disabled.
+- [ ] **2026-09-17 — ArgoCD browser TLS dir is provider-agnostic.** ASSIGNED to Codex, spec
+  `docs/bugs/2026-09-17-argocd-browser-tls-path-unification.md` (filed `842b4ac8`). Follow-up to
+  the `4184d23e` containment fix. `argocd.sh:61`'s `:=` **assigns**, killing the correct scoped
+  `:-` fallback in `bin/cluster-up` and `bin/cluster-refresh`; the flat dir is shared across all
+  four `k3s-*` providers, so one bring-up overwrites another's cert and key. No migration.
 - [x] **2026-09-17 — v1.34.0 release CUT (was merged but never published).** PR #127 merged at
   `978ea60f` on 2026-09-17 with no version heading, so `/post-merge` Step 4 skipped tagging and
   the release went unrecorded: no tag, no GitHub release, no releases row. Now published: tag

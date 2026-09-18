@@ -7,6 +7,21 @@
 
 ## Current focus
 
+- **2026-09-17 — Two specs filed and dispatched to Codex, sequentially (never in parallel — both
+  target `k3d-manager-v1.35.0`, and the CI spec runs the full suite the TLS spec modifies, so two
+  concurrent `codex exec` runs in one worktree would collide on the push and corrupt each other's
+  baseline).** Both filed on `842b4ac8`.
+  - **B — ArgoCD browser TLS path unification** (dispatched first):
+    `docs/bugs/2026-09-17-argocd-browser-tls-path-unification.md`. `argocd.sh:61` uses
+    `: "${VAR:=...}"`, which **assigns**, so the correct provider-scoped `${VAR:-...}` fallback in
+    every `bin/` script is dead code wherever the plugin is sourced first. The flat dir is shared
+    across `k3s-aws`/`k3s-az`/`k3s-gcp`/`k3s-hostinger`, so a second provider's bring-up silently
+    overwrites the first's cert and key. **No migration** — the flat dir's contents are
+    unattributable, and `bin/cluster-up:582` re-issues unconditionally, so a short-TTL leaf
+    (≤720h) is re-minted from the right cluster's Vault PKI on the next bring-up. This reverses an
+    earlier session claim that unification would orphan certs.
+  - **A — CI BATS list drift** (dispatched only after B is independently verified).
+
 - **2026-09-17 — Make test entrypoints COMPLETE: Part 1 `63d7f523`, Parts 2+3 `6eb1866e`, plus
   the bug they found `4184d23e`. All pushed.** Part 1 added the deterministic targets. Switching
   the dark suites on surfaced two real defects, both fixed before CI was wired:
@@ -24,10 +39,19 @@
   - **CI now gates all three suites** (`6eb1866e`): `make test-bin` + `make test-python-unit` in
     the `lint` job, and `make test-pytest` behind a pinned `pytest==9.1.1` install. 120 pytest
     tests verified on Python 3.13.6 and 3.14.7.
-  - **Open, unrelated:** `make test` is RED at case 525 (`_e2e_kustomization_images pairs newName
-    with newTag`, a fragile `grep -c ':'` count gate in `scripts/tests/plugins/e2e_image_prune.bats`).
-    Pre-existing, untouched by this work, and **invisible to CI** — CI runs a hand-picked bats list
-    that excludes that file, so `make test` has been red while main stayed green. Needs a decision.
+  - **RESOLVED `842b4ac8` — `make test` is GREEN, 924/924, zero `not ok`, `MAKE_EXIT=0`.**
+    Case 525 (`_e2e_kustomization_images pairs newName with newTag`) was a stale assertion, not a
+    production bug: `978ea60f` (v1.34.0) legitimately added a fourth app
+    (`shopping-cart-payment`) to `scripts/etc/e2e/kustomization.yaml`, and the test's hardcoded
+    `grep -c ':' -eq 3` was never updated. Deliberately NOT bumped to `4` — that re-arms the same
+    trap for the fifth app. The count is now derived from the substrate's own `newName` entries and
+    the `':'` guard became a per-line assertion. Spec:
+    `docs/bugs/2026-09-17-e2e-kustomization-images-hardcoded-count.md`.
+  - **The invisibility is the bigger defect, now spec'd.** CI passes `bats` a hand-maintained file
+    list; `make test` globs the directories. Counted: **54 files (3 `core` + 51 `plugins`) run
+    locally and never in CI**, while `scripts/tests/etc` runs in CI and not in `make test`. That is
+    why a red suite coexisted with a green main for a whole release. Assigned to Codex:
+    `docs/bugs/2026-09-17-ci-bats-list-drift-from-make-test.md`.
 
 - **2026-09-17 — Webhook redaction coverage audit implemented, commit `d0d35ff8`.** Registered
   the webhook control token at `_auth`, counted skipped redaction registrations by reason, and
