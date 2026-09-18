@@ -30,7 +30,18 @@
     across two assignments. That edit was reverted, the gate narrowed to
     `scripts/plugins/ scripts/lib/ bin/`, and the spec now forbids rewriting a string to dodge a
     grep. Scope the gate to where the literal is actually wrong, and say so explicitly.
-  - **A — CI BATS list drift** (dispatched only after B is independently verified — now unblocked).
+  - **A — CI BATS list drift. DONE at `6064796c`.** Same `.git/index.lock` wall; Claude committed
+    on Codex's behalf again. **Codex reported 946 green on two enumerations; Claude's unpiped
+    re-run found `notok=1`.** Its Linux-sim command piped `make test` into `tee`, so that `EXIT=0`
+    was `tee`'s — the trap the handoff explicitly warned about still landed. **Lesson: an agent's
+    green is one sample; a race shows on some samples only, so re-run rather than re-read.** The
+    spec's STOP rule held — the failure is a real production bug, filed as
+    `docs/bugs/2026-09-17-e2e-readiness-gate-can-probe-zero-times.md` and not fixed here:
+    `_e2e_wait_vcluster_ready` can report "not ready" after zero probes when the clock crosses a
+    second boundary between its two `date +%s` samples. Reproduced deterministically with a
+    stubbed `date`, not dismissed as a flake. **`e2e.bats` was dark in CI and is now gated, so
+    this race is a live intermittent CI red until fixed — recommend fixing it before the v1.35.0
+    PR.**
 
 - **2026-09-17 — Make test entrypoints COMPLETE: Part 1 `63d7f523`, Parts 2+3 `6eb1866e`, plus
   the bug they found `4184d23e`. All pushed.** Part 1 added the deterministic targets. Switching

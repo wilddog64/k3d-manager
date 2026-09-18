@@ -24,13 +24,30 @@
   `MAKE_EXIT=0` from an unpiped run (an earlier `make test | tail -5` reported *tail's* exit code
   and was retracted). Spec:
   `docs/bugs/2026-09-17-e2e-kustomization-images-hardcoded-count.md`.
-- [ ] **2026-09-17 — CI's hand-maintained BATS list has drifted from `make test`.** ASSIGNED to
-  Codex, spec `docs/bugs/2026-09-17-ci-bats-list-drift-from-make-test.md` (filed `842b4ac8`).
+- [x] **2026-09-17 — CI's hand-maintained BATS list has drifted from `make test`. FIXED
+  `6064796c`.** Spec `docs/bugs/2026-09-17-ci-bats-list-drift-from-make-test.md` (filed
+  `842b4ac8`).
   **54 files (3 `core` + 51 `plugins`) run in `make test` and never in CI**; `scripts/tests/etc`
   runs in CI and not in `make test`. This is why case 525 stayed red for a whole release with
   main green. Fix is one discovery mechanism: CI calls the Makefile targets. Enumerate failures
   on macOS *and* under a Linux-simulating `uname` stub BEFORE editing `ci.yml`; any failure that
   turns out to be a real production bug must be reported, not fixed or disabled.
+  Codex did the work and hit the same `.git/index.lock` sandbox wall as spec B, so Claude
+  reviewed the diff, re-ran every gate, and committed on its behalf. **Codex's report did not
+  survive verification.** It claimed `EXIT=0` / 946 green on both enumerations; Claude's unpiped
+  re-run returned `MAKETEST_EXIT=2`, `ok=945 notok=1`. Two lessons: (1) Codex's Linux-sim command
+  piped `make test` into `tee`, so its `EXIT=0` was `tee`'s status — the exact trap the handoff
+  warned about, and it still slipped through on the second of two runs; (2) an agent's green is
+  one sample, and a race only shows on some samples. The STOP rule worked: the surfaced failure is
+  a **real production bug**, filed as
+  `docs/bugs/2026-09-17-e2e-readiness-gate-can-probe-zero-times.md` and deliberately NOT fixed,
+  skipped, or hidden. `_e2e_wait_vcluster_ready` samples `date +%s` twice with integer-second
+  resolution, so a second-boundary crossing between the deadline computation and the loop guard
+  makes it report "not ready" after **zero** probes. Named the nondeterminism rather than calling
+  it a flake, then reproduced it deterministically with a stubbed `date` (100 then 101):
+  `probes logged: 0`. Gates Claude re-ran: `make test-bin` `ok 108`/0, `shellcheck -S error` 0,
+  `yamllint ci.yml` 0. **Open consequence: `scripts/tests/plugins/e2e.bats` was dark in CI and
+  this commit gates it, so that race is now an intermittently red CI until it is fixed.**
 - [x] **2026-09-17 — ArgoCD browser TLS dir is provider-agnostic. FIXED `2c908554`** (spec
   `docs/bugs/2026-09-17-argocd-browser-tls-path-unification.md`, filed `842b4ac8`). Follow-up to
   the `4184d23e` containment fix. `argocd.sh:61`'s `:=` **assigns**, killing the correct scoped
