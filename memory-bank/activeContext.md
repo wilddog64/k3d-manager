@@ -7,6 +7,12 @@
 
 ## Current focus
 
+- **2026-09-17 — Make test entrypoints Part 1 committed `63d7f523` and pushed.** Added the
+  deterministic bin BATS and Python suite targets plus the `[Unreleased]` CHANGELOG entry.
+  `make test-python-unit` passed; `make test-bin` failed at `cluster_down.bats` test 15, so
+  conditional Part 2 CI wiring was not written. `make test-pytest` exited 2 as expected because
+  pytest is not installed; `make test` also reported existing failures at cases 15 and 551.
+
 - **2026-09-17 — Webhook redaction coverage audit implemented, commit `d0d35ff8`.** Registered
   the webhook control token at `_auth`, counted skipped redaction registrations by reason, and
   added six direct regression tests. Required gates passed. No PR created per task instruction.

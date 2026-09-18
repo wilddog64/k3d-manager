@@ -7,6 +7,13 @@
 
 ## Open items
 
+- [x] **2026-09-17 — Deterministic Make test entrypoints Part 1 committed `63d7f523` and
+  pushed to `k3d-manager-v1.35.0`.** Added `test-bin`, `test-python-unit`, `test-pytest`,
+  `test-python`, and `test-all`, plus `.PHONY`, help, and CHANGELOG coverage-gap entries.
+  `make test-python-unit` passed; `make test-bin` failed at `cluster_down.bats` test 15, so
+  Part 2 CI wiring was correctly omitted. `make test-pytest` exited 2 with the expected missing
+  pytest message. `make test` reported failures at cases 15 and 551.
+
 - [x] **2026-09-17 — Webhook redaction coverage audit implemented, commit `d0d35ff8`.** The
   webhook control token is registered for redaction, skipped values are counted by reason, and
   six direct regression tests were added. Required gates passed. No PR created per instruction.
