@@ -7,6 +7,14 @@
 
 ## Open items
 
+- [x] **2026-09-18 — v1.35.0 PR #128 created, CI green, Copilot resolved, merge-ready** at
+  `c8ea57c4`. `enforce_admins` disabled (re-enable post-merge, **bodyless POST**). Three CI reds
+  fixed en route (`287cc71a` rg/sibling-fixture, `2c205e3e` Makefile SHELL, `c8ea57c4` Copilot
+  F2/F3). Awaiting the user's merge — never auto-merge.
+- [ ] **After merge:** `/post-merge` — re-enable `enforce_admins` (bodyless POST), tag `v1.35.0` on
+  the merge SHA (the CHANGELOG heading is promoted, so Step 4 will NOT skip this time), GitHub
+  release, next branch `k3d-manager-v1.36.0`, retro doc, then the ApplicationSet reapply.
+
 - [x] **2026-09-18 — CI red #2 FIXED: `SHELL := /bin/bash` in the Makefile.** make defaulted to
   `/bin/sh` (dash on Ubuntu), which rejects `set -euo pipefail`; killed `make test-bin` on CI and
   also affected `fleet-render`/`fleet-plan`. Reproduced locally with `make SHELL=/bin/dash
