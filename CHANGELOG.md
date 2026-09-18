@@ -2,14 +2,25 @@
 
 ## [Unreleased]
 
-### Changed
-
-- `app-cve-scan` now runs daily at 01:00 America/Los_Angeles (was 00:00 UTC on the 1st and 15th), with `startingDeadlineSeconds: 3600` and CPU/memory requests and limits; a rebuild dispatch per service is rate-limited by `REBUILD_COOLDOWN_SECONDS` (default 3 days, state in ConfigMap `platform-ops/app-cve-scan-rebuild-state`), so an unfixable candidate no longer triggers a GitHub Actions rebuild and warning every night
-- `argocd-cve-scan` now runs daily at 01:30 America/Los_Angeles (was 00:00 UTC on the 1st and 15th), with `startingDeadlineSeconds: 3600`, 30 minutes after `app-cve-scan` so the two Trivy jobs do not overlap
-
 ### Added
 
 - Deterministic `make test-bin`, `make test-python-unit`, `make test-pytest`, `make test-python`, and `make test-all` entrypoints close the coverage gap for the previously orphaned bin BATS and Python test suites
+
+
+### Fixed
+
+- The webhook now registers its own control token for redaction: `_auth` wraps `_get_token()` in `_register_secret`, so the bearer token that authorises every `/run`, `/ask` and make-target dispatch can no longer pass through job output unscrubbed. `_register_secret` also counts values it declines to register (`None`, non-string, shorter than 4 characters) in `_REDACT_SKIPPED` by reason, never by value, so a renamed Vault key no longer fails registration silently. Note: redaction remains fetch-scoped — secrets arriving from a subprocess (`kubectl get secret -o yaml`, pod logs, `bin/cluster-status`) are structurally invisible to the registry
+
+## [1.34.0] - 2026-09-17
+
+### Changed
+
+- `app-cve-scan` now runs daily at 01:00 America/Los_Angeles (was 00:00 UTC on the 1st and 15th), with `startingDeadlineSeconds: 3600` and CPU/memory requests and limits; a rebuild dispatch per service is rate-limited by `REBUILD_COOLDOWN_SECONDS` (default 3 days, state in ConfigMap `platform-ops/app-cve-scan-rebuild-state`), so an unfixable candidate no longer triggers a GitHub Actions rebuild and warning every night
+
+- `argocd-cve-scan` now runs daily at 01:30 America/Los_Angeles (was 00:00 UTC on the 1st and 15th), with `startingDeadlineSeconds: 3600`, 30 minutes after `app-cve-scan` so the two Trivy jobs do not overlap
+
+
+### Added
 
 - Grafana **Hermes Status** dashboard (`grafana-dashboard-hermes.yaml`): Hermes publishes a redacted snapshot of every sensor finding, and the exporter surfaces it as a findings table (Sensor, Finding, Status, Target namespace) plus poll-age and per-status stat panels. Regular sensors publish even while the optional `status_checks` schedule is disabled
 
@@ -29,33 +40,57 @@
 
 - `argocd_reclaim_release_ownership [--context <ctx>] [--confirm]` reports, and with `--confirm` removes, ArgoCD Application ownership (`argocd-controller` managedFields and `argocd.argoproj.io/instance` labels) on the ArgoCD Helm release's own ConfigMaps/Secrets/ServiceAccounts, plus orphan ServiceAccounts; it clears the SSA conflicts that made `helm upgrade argocd` fail on the hub after `ubuntu-k3s-platform` rendered argo-cd 7.8.1 into `cicd`
 
+
 ### Fixed
 
-- The webhook now registers its own control token for redaction: `_auth` wraps `_get_token()` in `_register_secret`, so the bearer token that authorises every `/run`, `/ask` and make-target dispatch can no longer pass through job output unscrubbed. `_register_secret` also counts values it declines to register (`None`, non-string, shorter than 4 characters) in `_REDACT_SKIPPED` by reason, never by value, so a renamed Vault key no longer fails registration silently. Note: redaction remains fetch-scoped — secrets arriving from a subprocess (`kubectl get secret -o yaml`, pod logs, `bin/cluster-status`) are structurally invisible to the registry
 - Grafana dashboards no longer stall the browser on large result sets: the E2E dashboard refreshes on 5m/24h with detail tables capped at 100/200/300 rows and automatic trend-point density, and both raw CVE tables use `topk(500, ...)` — `trivy_vulnerability_inventory` carries 7,409 live series and was sending every row to Grafana
+
 - Grafana tables no longer display Prometheus scrape metadata as data: the exporter's `container`, `endpoint`, `pod` and scrape-target `service` labels are hidden, E2E failure rows show the owning application service (`exported_service`) instead of the duplicate exporter service, the CVE tables drop the non-informative Service column, and Hermes top stat panels aggregate to a scalar with instant evaluation and no legend so `instance`/`job` are not rendered as values
+
 - The Hermes poll-age metric omits unparseable timestamps instead of publishing them: a legacy manual snapshot with `updated_at: "now"` rendered in Grafana as an age of `56.7 years`
+
 - `prometheus.3ai-talk.org` now terminates basic authentication in a local reverse proxy on port 19090 before forwarding to the raw Prometheus port-forward on 19091, so the public endpoint no longer exposes metrics without the Vault-backed operator credential.
+
 - `make status` now tests the operator-facing Keycloak admin, frontend SSO, ArgoCD password and SSO, Prometheus, Alertmanager, and Grafana paths using the same credential sources and public URLs as `make show-service-passwords`; the retained synthetic token/API probes are explicitly labelled as smoke checks.
+
 - Remote E2E now loads the M2 publish-back host from the operator-only `~/.config/k3d-manager/e2e-remote.env` when launchd has no environment override, retains a bounded per-test failure sidecar, and copies the run summary and failures back beside the M4 dispatch transcript for Slack diagnostics.
+
 - E2E's Tier 1 substrate now deploys the payment service, including its isolated `payments` database and encryption key, so the API and flow payment checks target `payment:8084` instead of localhost. The payment image is pinned to `sha-a672ee42f79db703f632baca3b05bf4f2b4d8718`; RabbitMQ remains omitted because the service has no broker listener or startup connection.
+
 - `e2e-remote RUNNER=m2` now prepares an e2e-owned clean M2 clone pinned to the dispatched M4 commit, instead of running the operator's hand-synced checkout; dispatch refuses unpushed commits and malformed repository URLs before connecting
+
 - `make update-webhook-slack` no longer prints the Slack bot token or passes it in argv: it reads the token from Keychain `k3d-manager-slack-bot-token-bot` (or an exported `SLACK_BOT_TOKEN`), keeps the plist's existing `SLACK_CHANNEL_ID` unless one is exported, backs up the plist, and writes it via Python `plistlib` with the token in env
+
 - `make update-webhook-slack-secret` no longer passes the Slack signing secret in argv (PlistBuddy) and now fails closed: a missing or locked Keychain `k3dm-slack-signing-secret` stops before touching the plist, where the old `( ...; exit 1)` subshell let it write an empty secret and restart the webhook; the plist is backed up and written via Python `plistlib` with the secret in env
+
 - Hub Prometheus no longer stores every node-exporter/kubelet/kube-state-metrics/istiod/envoy series twice: `federate-acg` scrapes `host.internal:19090`, which serves the hub's own Prometheus whenever no ACG sandbox holds that port, so the self-scraped copies (labelled `cluster="acg"`) duplicated alerts such as `KubeJobFailed`/`TargetDown`; the job now drops samples that do not carry the ACG Prometheus's own `cluster` external label, and the ArgoCD dashboard's Image Updater replica stats aggregate with `max()`
+
 - `_acg_lock_acquire` now creates the lock's parent directory, so a first `make up` on a machine without `~/.local/share/k3d-manager` no longer spins silently for the full 600 s hub-bootstrap lock timeout; this was also the cause of the hanging `cluster_up.bats` dry-run test
+
 - `make status` (webhook `/api/v1/health`) now reports hub ESO health as `Hub ESO ClusterSecretStore` / `Hub ESO ExternalSecrets` alongside the app-cluster rows; previously only the app cluster was sampled, so a hub with 24/25 failing ExternalSecrets still printed `ESO ExternalSecrets: 20/20 synced`
+
 - BATS suites no longer use bare `! cmd` assertions, which `set -e` ignores anywhere but the last line of a test: 42 lines across 14 suites now use `run …; [ "$status" -ne 0 ]` (13 were silently ineffective, and the `signing.bats` wildcard-imageReference guard could never fail), and a new lint test rejects the pattern; the now-effective secret-hygiene guard caught `_signing_restore_vault_from_keychain` passing a key-file path to `cosign public-key --key`, which now reads `env://COSIGN_KEY`
+
 - `deploy_argocd_applicationsets` now keeps each live ApplicationSet's destination cluster and istio-cni dirs when it re-pins the values branch (falling back to the `deploy_istio_ambient` CNI resolver for sets not yet applied); previously one `APP_CLUSTER_NAME` and the Cilium CNI defaults were applied to every set, which renamed the `istio-*-ubuntu-k3s` Applications and retargeted `observability-acg`. Set `ARGOCD_APPSET_IGNORE_LIVE=1` to retarget deliberately
+
 - App-cluster Prometheus port-forwards moved from `localhost:19090` to `19190` + provider offset, so they no longer collide with the hub's KeepAlive `prometheus-port-forward` agent (which keeps `19090` for `prometheus.3ai-talk.org`); hub federation, the `acg-prometheus` Grafana datasource, the webhook ACG smoke check and the load-test Prometheus default follow the new port, and `bin/cluster-refresh` now applies the per-provider offset it previously ignored
+
 - `deploy_observability` now creates the ArgoCD ServiceMonitors from the live Helm release once the ServiceMonitor CRD exists, and applies promtail and the ArgoCD dashboard before any Vault-dependent step; on a fresh hub the CRD arrives after `deploy_argocd`, so ArgoCD metrics were never scraped and Loki received no logs
+
 - `argocd-cve-scan` can run again: its `aquasec/trivy` image ships neither `kubectl` nor `curl`, so the Hub chart-label lookup silently returned empty and every run failed with `cannot read the Hub Argo CD chart label` (first daily run 2026-09-14 08:30Z, BackoffLimitExceeded); the scanner now fetches kubectl with BusyBox `wget` and uses `wget` for artifacthub lookups, matching `app-cve-scan`
+
 - `make observability` logs in to the hub Vault before checking for the Grafana admin credential; the unauthenticated check read as "absent", attempted to seed a fresh password, and aborted the deploy with `failed to seed Grafana admin credential in Vault`
+
 - `argocd-cve-scan` now scans the image the Hub is actually running (`argocd-server`'s container image, e.g. `quay.io/argoproj/argocd:v3.5.2`) and fails loudly when the image or the trivy run cannot be resolved; it previously grepped a non-existent `appVersion` field from artifacthub (exiting 0 without scanning) and would have scanned the non-existent Docker Hub `argoproj/argocd` tag, reporting "No HIGH/CRITICAL CVEs" from the pull error
+
 - `argocd-cve-scan` no longer auto-upgrades a remote Argo CD across a major chart version: a jump such as hostinger's `7.8.1` → `10.9.1` is held with a `warning` notification (manual upgrade required) unless `ARGOCD_ALLOW_MAJOR_UPGRADE=true`; same-major upgrades still patch the cluster Secret label
+
 - `argocd-cve-scan` CronJob sets `HOME=/tmp` so trivy (running as UID 65534) can write its vulnerability DB cache; every scan failed with `mkdir /.cache: permission denied`
+
 - `argocd-cve-scan` no longer reports "ArgoCD upgrade complete" / "CVEs resolved" when every stage was held or skipped; it logs `Done: no cluster patched to <chart>` and sends the info notification only when a cluster was actually patched
+
 - Alertmanager now loads `alertmanager-smtp-secret`: `configSecret` moved under `alertmanager.alertmanagerSpec` with `useExistingSecret: true` in both kube-prometheus-stack values files (the top-level key was ignored since v1.5.0, so critical-alert SMS never sent); `TrivyCriticalVulnerabilityDetected` routes to `null` ahead of the SMS route
+
 - `make alertmanager-secret` refuses empty input (a non-interactive run stored three empty strings and still printed "Credentials stored"), and `make observability` treats empty Alertmanager Vault values as absent instead of rendering a config prometheus-operator rejects with `missing to address in email config`
 
 ## [1.33.0] - 2026-09-13
