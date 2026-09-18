@@ -7,6 +7,22 @@
 
 ## Open items
 
+- [x] **2026-09-17 — Orphaned test suites: Makefile entrypoints + CI gating COMPLETE.**
+  Part 1 `63d7f523` (five `make test-*` targets), Parts 2+3 `6eb1866e` (CI steps in the `lint`
+  job for `make test-bin`, `make test-python-unit`, and `make test-pytest` behind a pinned
+  `pytest==9.1.1`). Spec: `docs/bugs/2026-09-17-orphaned-test-suites-no-makefile-entrypoint.md`.
+  Switching on the dark coverage found two real defects first — both fixed, neither masked:
+  a `cluster-down` TLS-key leak (`4184d23e`) and three host-OS-dependent BATS tests made
+  portable via `_stub_uname_darwin`. Verified 108/108 BATS on macOS and under a simulated
+  Linux `uname`; 120 pytest tests green on Python 3.13.6 and 3.14.7.
+- [ ] **2026-09-17 — `make test` is RED and CI cannot see it.** Case 525
+  (`_e2e_kustomization_images pairs newName with newTag from the real substrate`,
+  `scripts/tests/plugins/e2e_image_prune.bats`) fails on a `grep -c ':'` count gate expecting 3.
+  Pre-existing and unrelated to the entrypoint work. CI runs a hand-maintained bats list that
+  excludes this file, so `make test` has been failing while main stayed green. Two things to
+  decide: whether the assertion or the code is wrong, and whether CI should run `make test`
+  rather than its own drifted list. Count gates like this are the pattern the
+  prefer-disappearance-gates rule warns about.
 - [x] **2026-09-17 — v1.34.0 release CUT (was merged but never published).** PR #127 merged at
   `978ea60f` on 2026-09-17 with no version heading, so `/post-merge` Step 4 skipped tagging and
   the release went unrecorded: no tag, no GitHub release, no releases row. Now published: tag

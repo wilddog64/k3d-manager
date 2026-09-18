@@ -7,11 +7,27 @@
 
 ## Current focus
 
-- **2026-09-17 — Make test entrypoints Part 1 committed `63d7f523` and pushed.** Added the
-  deterministic bin BATS and Python suite targets plus the `[Unreleased]` CHANGELOG entry.
-  `make test-python-unit` passed; `make test-bin` failed at `cluster_down.bats` test 15, so
-  conditional Part 2 CI wiring was not written. `make test-pytest` exited 2 as expected because
-  pytest is not installed; `make test` reported an existing failure at case 551.
+- **2026-09-17 — Make test entrypoints COMPLETE: Part 1 `63d7f523`, Parts 2+3 `6eb1866e`, plus
+  the bug they found `4184d23e`. All pushed.** Part 1 added the deterministic targets. Switching
+  the dark suites on surfaced two real defects, both fixed before CI was wired:
+  - **A `cluster-down` bug, not a stale test** (`4184d23e`, spec
+    `docs/bugs/2026-09-17-cluster-down-argocd-browser-tls-key-not-removed.md`). `cluster-up`/
+    `cluster-refresh` source `plugins/argocd.sh`, whose `ARGOCD_BROWSER_TLS_DIR` default is the
+    flat path, so they write there; `cluster-down` does not source it and removed the
+    provider-scoped path instead. The Vault-PKI `tls.key` survived every teardown. `cluster-down`
+    now removes both paths (four named files, no wildcard). `cluster_down.bats` test 15 was
+    correct all along — an earlier session note calling it stale was wrong.
+  - **`make test-bin` was not portable to `ubuntu-latest`.** Three tests read the host OS instead
+    of declaring it (`if _is_mac` launchd block, no `uname` stub), so they passed on macOS and
+    would have reddened main. They now call a shared `_stub_uname_darwin` helper. Verified
+    108/108 on the macOS host AND with a `uname -s` → `Linux` stub ahead of `PATH`.
+  - **CI now gates all three suites** (`6eb1866e`): `make test-bin` + `make test-python-unit` in
+    the `lint` job, and `make test-pytest` behind a pinned `pytest==9.1.1` install. 120 pytest
+    tests verified on Python 3.13.6 and 3.14.7.
+  - **Open, unrelated:** `make test` is RED at case 525 (`_e2e_kustomization_images pairs newName
+    with newTag`, a fragile `grep -c ':'` count gate in `scripts/tests/plugins/e2e_image_prune.bats`).
+    Pre-existing, untouched by this work, and **invisible to CI** — CI runs a hand-picked bats list
+    that excludes that file, so `make test` has been red while main stayed green. Needs a decision.
 
 - **2026-09-17 — Webhook redaction coverage audit implemented, commit `d0d35ff8`.** Registered
   the webhook control token at `_auth`, counted skipped redaction registrations by reason, and
@@ -26,8 +42,11 @@
 - **v1.34.0 closed at the 5-plan cap (5/5).** v1.35.0 opens for new specs. Released
   plans: `hermes-scheduled-e2e`, `hermes-sms-pager`, `slack-k3dm-make-command`,
   `hermes-scheduled-status-triage`, `e2e-grafana-trends-and-drilldown`.
-  **Standing:** v1.34.0 release tag SKIPPED — CHANGELOG has `[Unreleased]`
-  only, no versioned heading. Tag procedure documented in retrospective.
+  **v1.34.0 IS CUT** (2026-09-17): CHANGELOG `## [1.34.0]` `a56cd27a`, tag `v1.34.0` at
+  `978ea60f`, GitHub release marked Latest, `docs/releases.md` + README rows `bd67710a`.
+  The earlier "tag SKIPPED" note was the process hole, now closed in `/create-pr`
+  pre-flight 3b (promote the heading before the milestone PR) and `/post-merge` Step 4
+  (a missing tag on a milestone merge reports loudly instead of skipping silently).
 
 - **2026-09-17 — Grafana/observability block shipped and compressed.** ~40 commits delivered the
   Hermes Status dashboard, E2E failure groups / test-level details / trend panels / failure ratio,
