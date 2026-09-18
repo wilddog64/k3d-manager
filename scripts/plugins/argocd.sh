@@ -3,12 +3,16 @@
 # scripts/plugins/argocd.sh
 # Argo CD GitOps plugin for k3d-manager
 
-# Source provider helpers for provider-scoped state
+# Source provider helpers for provider-scoped state. This is required, not
+# optional: ARGOCD_BROWSER_TLS_DIR below resolves through _acg_provider_state_dir,
+# and a silent skip here would leave the TLS material at a wrong absolute path.
 PROVIDER_LIB="$SCRIPT_DIR/lib/provider.sh"
-if [[ -r "$PROVIDER_LIB" ]]; then
-   # shellcheck disable=SC1090
-   source "$PROVIDER_LIB"
+if [[ ! -r "$PROVIDER_LIB" ]]; then
+   printf '[argocd] required provider helpers not readable: %s\n' "$PROVIDER_LIB" >&2
+   return 1 2>/dev/null || exit 1
 fi
+# shellcheck disable=SC1090
+source "$PROVIDER_LIB"
 
 # Source Vault plugin for PKI and secret management
 VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"

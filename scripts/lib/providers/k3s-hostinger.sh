@@ -4,6 +4,10 @@
 # The VPS is provisioned out-of-band (Hostinger panel); this provider never creates or
 # deletes the VM — it only installs/uninstalls k3s over SSH and registers the context.
 
+# _acg_provider_state_dir resolves the provider-scoped TLS paths below; source it
+# here rather than relying on the dispatcher having loaded it first.
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/provider.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null
