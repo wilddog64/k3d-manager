@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- The vCluster readiness gate now probes `/readyz` at least once before enforcing its timeout, preventing an integer-second clock boundary from reporting not-ready without a probe
 - ArgoCD browser TLS material now uses provider-scoped state directories for the plugin and Hostinger listener wrapper, preventing one provider from overwriting another provider's certificate and key
 - `make test` had been red since v1.34.0 while CI stayed green: `_e2e_kustomization_images pairs newName with newTag from the real substrate` asserted a hardcoded count of 3 images against the real E2E substrate, which gained a fourth app (`shopping-cart-payment`) in `978ea60f`. The gate now derives the expected count from `scripts/etc/e2e/kustomization.yaml` itself and checks per line that every emitted reference is tagged, so adding a fifth app cannot redden it again. CI never saw the failure because `scripts/tests/plugins/e2e_image_prune.bats` is not in CI's hand-maintained BATS file list — that drift is tracked separately
 - Three `cluster_down.bats` tests exercised the `if _is_mac` launchd block without stubbing `uname`, so they passed on a macOS workstation and would have failed on the Linux CI runner. They now declare the OS under test via a shared `_stub_uname_darwin` helper, making `make test-bin` portable enough to gate in CI

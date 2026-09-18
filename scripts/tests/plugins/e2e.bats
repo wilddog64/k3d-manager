@@ -269,6 +269,20 @@ print("ok")' "$E2E_REPORT_DIR/${run_id}.json"
   [ "$status" -eq 0 ]
 }
 
+@test "readiness gate always probes at least once even if the deadline has already passed" {
+  export E2E_VCLUSTER_READY_TIMEOUT=1
+  local date_state="$BATS_TEST_TMPDIR/date.calls"
+  date() {
+    if [[ -e "$date_state" ]]; then echo 101; else : > "$date_state"; echo 100; fi
+  }
+  _run_command() { echo "$*" >> "$RUN_LOG"; return 1; }
+  local rc=0
+  ( _e2e_wait_vcluster_ready "$BATS_TEST_TMPDIR/kc" ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  run grep -F -- "get --raw=/readyz" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
 @test "readiness probe is soft (--no-exit) so a not-ready probe cannot exit the harness" {
   export E2E_VCLUSTER_READY_TIMEOUT=1
   local probe_log="$BATS_TEST_TMPDIR/probe.log"
