@@ -9,6 +9,8 @@
 
 ### Added
 
+- Deterministic `make test-bin`, `make test-python-unit`, `make test-pytest`, `make test-python`, and `make test-all` entrypoints close the coverage gap for the previously orphaned bin BATS and Python test suites
+
 - Grafana **Hermes Status** dashboard (`grafana-dashboard-hermes.yaml`): Hermes publishes a redacted snapshot of every sensor finding, and the exporter surfaces it as a findings table (Sensor, Finding, Status, Target namespace) plus poll-age and per-status stat panels. Regular sensors publish even while the optional `status_checks` schedule is disabled
 
 - E2E Grafana drill-down: bounded root-cause **failure groups** (`e2e_failure_group_info`) and **test-level failure details** are published by the E2E result pipeline, so a failed run can be traced from run → owning service → cause → individual spec without opening the M2 run files
