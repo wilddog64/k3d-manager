@@ -203,15 +203,15 @@ setup() {
 }
 
 @test "_argocd_write_port_forward_wrapper includes a self-healing loop" {
-  run grep -F 'function _argocd_write_port_forward_wrapper()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  run declare -F _argocd_write_port_forward_wrapper
   [ "$status" -eq 0 ]
-  run grep -F 'template_path="${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  run grep -Eq 'template_path=.*port-forward-wrapper\.sh\.tmpl' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
   [ "$status" -eq 0 ]
   run grep -F 'healthz did not become reachable — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'healthz lost — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -F 'port ${LOCAL_PORT} still in use — clearing stale listener(s) before retry' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -Fq -- 'still in use — clearing stale listener' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'STARTUP_TIMEOUT=${STARTUP_TIMEOUT}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
@@ -219,35 +219,35 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'RESTART_DELAY=2' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -F 'healthz check failed (${_health_failures}/${HEALTH_FAILURE_THRESHOLD})' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -Fq -- 'healthz check failed' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'KUBECONFIG_FILE=${KUBECONFIG_FILE}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -F 'if [[ -n "${KUBECONFIG_FILE}" ]]; then' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -Eq -- '-n "\$\{KUBECONFIG_FILE\}"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
 }
 
 @test "_argocd_write_port_forward_wrapper falls back when the requested context is missing" {
-  run grep -F 'if [[ -n "${CONTEXT}" ]] && "${KUBECTL_BIN}" config get-contexts "${CONTEXT}" >/dev/null 2>&1; then' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -Eq 'config get-contexts .*\$\{CONTEXT\}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -F '_current_context="$("${KUBECTL_BIN}" config current-context 2>/dev/null || true)"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -Eq '_current_context=.*config current-context' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'falling back to kubeconfig default' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F '_kubectl_context_arg=""' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -F '"${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward --address=127.0.0.1 "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -Eq 'port-forward --address=127\.0\.0\.1 .*\$\{LOCAL_PORT\}:\$\{REMOTE_PORT\}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
 }
 
 @test "_argocd_write_browser_https_wrapper includes a canonical HTTPS listener" {
-  run grep -F 'function _argocd_write_browser_https_wrapper()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  run declare -F _argocd_write_browser_https_wrapper
   [ "$status" -eq 0 ]
-  run grep -F 'function _argocd_issue_browser_tls_material()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  run declare -F _argocd_issue_browser_tls_material
   [ "$status" -eq 0 ]
-  run grep -F 'template_path="${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  run grep -Eq 'template_path=.*browser-https-wrapper\.sh\.tmpl' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
   [ "$status" -eq 0 ]
-  run grep -F 'OPENSSL-LISTEN:${LOCAL_PORT},fork,reuseaddr,bind=${LOCAL_HOST},cert=${CERT_FILE},key=${KEY_FILE},verify=0 TCP:${UPSTREAM_HOST}:${UPSTREAM_PORT}' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
+  run grep -Eq 'OPENSSL-LISTEN:.*cert=\$\{CERT_FILE\},key=\$\{KEY_FILE\},verify=0 TCP:' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'healthz lost — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]

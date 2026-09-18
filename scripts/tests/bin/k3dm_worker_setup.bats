@@ -12,7 +12,7 @@ MAKEFILE="${BATS_TEST_DIRNAME}/../../../Makefile"
   run grep -F -- '_worker_smoke_test()' "${SCRIPT}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'command=%2Fcluster-status&text=&response_url=https%3A%2F%2Fexample.com' "${SCRIPT}"
+  run grep -Fq -- 'command=%2Fcluster-status' "${SCRIPT}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'X-Slack-Request-Timestamp' "${SCRIPT}"

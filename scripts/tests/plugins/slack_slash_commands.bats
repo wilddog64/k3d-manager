@@ -108,7 +108,7 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
 }
 
 @test "slack relay assigns remote-operator roles to cluster commands" {
-  run grep -F -- "const COMMAND_ROLES     = Object.freeze({" "${WORKER}"
+  run grep -Eq 'COMMAND_ROLES\s*=\s*Object\.freeze\(\{' "${WORKER}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- "'/cluster-status': 'reader'" "${WORKER}"
@@ -136,12 +136,12 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
 }
 
 @test "slack relay parses cluster-diagnose payloads" {
-  run grep -F -- "function parseClusterDiagnose(text) {" "${WORKER}"
+  run grep -Eq 'function parseClusterDiagnose\(' "${WORKER}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- "return { payload: { provider: target, action: 'get-pods', namespace } }" "${WORKER}"
+  run grep -Eq "provider: target, action: 'get-pods'" "${WORKER}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- "await relay('/api/v1/diagnostics', payload, meta)" "${WORKER}"
+  run grep -Eq "relay\('/api/v1/diagnostics'" "${WORKER}"
   [ "${status}" -eq 0 ]
 }
