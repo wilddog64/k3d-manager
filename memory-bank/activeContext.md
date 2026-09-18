@@ -7,6 +7,32 @@
 
 ## Current focus
 
+- **2026-09-18 — whole-line `grep -F` BATS audit rebased onto v1.35.0, `1d8c7cd1`. NO PR YET.**
+  Branch `fix/bats-whole-line-grep-assertions`, now based on `main` @ `e259c718` (the v1.35.0
+  squash) instead of `978ea60f`. 45 whole-line-against-source assertions across 8 suites narrowed
+  to 3 deliberate keeps; 42 converted. Spec
+  `docs/bugs/2026-09-18-bats-whole-line-grep-assertion-audit.md`. Proved by 13 mutations, not by
+  green — the decisive case is that ADDING a compatible 4th webhook role now passes where the old
+  whole-line grep broke the build.
+  **The rebase was conflict-free and that was not luck worth trusting on its own:** these edits sit
+  at `provider_contract.bats:952` while #128's rework of the same file was at `:241`. Verified by
+  reading the merged result, not by git's silence.
+  Post-rebase gates: `make test-bin` **108 ok / 0 not ok** (was 107/1 — #128 fixed the
+  `cluster_down` launchd failure), and `make test` **947 ok / 0 not ok** once the branch is pushed.
+  Two facts the rebase invalidated, both corrected in the spec:
+  - **`make test-bin` now EXISTS.** v1.35.0 added `test-bin`, `test-python-unit`, `test-pytest`,
+    `test-python` and `test-all`, and wired `test-bin` into the CI `lint` job. The pre-rebase spec
+    asserted no such target existed — true when written, false after #128. A DoD written against
+    one base does not survive a rebase unexamined.
+  - The `bin/` suite is now **gated by CI for the first time**, so this branch's
+    `k3dm_worker_setup.bats` change is verified by something other than my own local run.
+  **New finding — 4 `e2e_remote.bats` dispatch tests depend on the repo's push state.**
+  `e2e_runner_dispatch` refuses with `HEAD <sha> is not pushed` before reaching the test's stubs,
+  so tests 23/28/52/53 fail deterministically on any locally-committed-but-unpushed HEAD and pass
+  once pushed. Not caused by this branch: clean `main` @ `e259c718` passes in a worktree and keeps
+  passing on re-run, which ruled out environmental drift. It is a latent portability smell — the
+  suite is green in CI only because CI always tests a pushed ref.
+
 - **2026-09-18 — PR #128 open and MERGE-READY at `c8ea57c4`.** v1.35.0.
   https://github.com/wilddog64/k3d-manager/pull/128
   All gates green: `lint` pass, `detect` pass, CodeQL (actions/js/python) pass, GitGuardian pass,

@@ -7,6 +7,22 @@
 
 ## Open items
 
+- [ ] **Whole-line `grep -F` BATS audit — REBASED onto v1.35.0 as `1d8c7cd1`, NO PR (intentional,
+  awaiting the user's go).** Branch `fix/bats-whole-line-grep-assertions`, base `main` @
+  `e259c718`. Spec `docs/bugs/2026-09-18-bats-whole-line-grep-assertion-audit.md`. 45 whole-line
+  assertions -> 3 deliberate keeps across 8 suites (argocd 12, webhook 16, slack_slash 5,
+  provider_contract 5, slack_relay_ack 3, image_updater 2, worker_setup 1, observability 1).
+  Gates post-rebase: `make test` 947 ok / 0 not ok, `make test-bin` 108 ok / 0 not ok. 13 mutation
+  tests all bit. Rebase was conflict-free and verified by reading the merged `provider_contract.bats`,
+  not by trusting git's silence.
+  Next step: the user's go, then `/create-pr`. The pre-rebase "hold until #128 merges" blocker is
+  resolved — #128 merged as `e259c718`.
+- [ ] **`e2e_remote.bats` dispatch tests depend on the repo's push state** — tests 23/28/52/53 fail
+  with `HEAD <sha> is not pushed` on any locally-committed, unpushed HEAD, because
+  `e2e_runner_dispatch`'s push guard fires before the tests' stubs are reached. Green in CI only
+  because CI always tests a pushed ref. Found while verifying the rebase above; not filed as a bug
+  yet and NOT in this branch's scope.
+
 - [x] **2026-09-18 — v1.35.0 PR #128 created, CI green, Copilot resolved, merge-ready** at
   `c8ea57c4`. `enforce_admins` disabled (re-enable post-merge, **bodyless POST**). Three CI reds
   fixed en route (`287cc71a` rg/sibling-fixture, `2c205e3e` Makefile SHELL, `c8ea57c4` Copilot

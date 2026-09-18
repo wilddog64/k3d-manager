@@ -1,7 +1,9 @@
 # Bugfix — tree-wide audit of whole-line `grep -F` assertions in BATS
 
 **Date:** 2026-09-18
-**Branch:** `fix/bats-whole-line-grep-assertions` (based on `main` @ `978ea60f`)
+**Branch:** `fix/bats-whole-line-grep-assertions` — authored on `main` @ `978ea60f`, rebased onto
+`main` @ `e259c718` (the v1.35.0 squash) once PR #128 merged. The rebase was conflict-free: these
+edits sit at `provider_contract.bats:952`, while #128's rework of the same file was at `:241`.
 **Reported by:** Claude, at the user's request after the v1.35.0 close-out.
 **Predecessor:** `docs/bugs/v1.33.0-bugfix-stale-bats-grep-assertions.md` — fixed 4 named
 sites reactively, after they had already broken CI. This audit applies that spec's fix
@@ -127,18 +129,27 @@ For Python targets the suite does not source, fall back to (a):
       The 3 survivors are deliberate keeps, listed under **Deliberate keeps** below.
       Measure by regenerating the raw snapshot first — a classifier reading a stale
       `grepF-raw.txt` will happily report success against the pre-fix tree.
-- [x] Both suites pass with **no net change in test count** and zero new failures:
-      `make test` → **923 ok / 1 not ok**, and `bats scripts/tests/bin/` → **107 ok / 1 not ok**.
-      Both failures are pre-existing and were reproduced on a clean `origin/main` worktree:
-      `e2e_image_prune.bats:73` (the `grep -c ':'` count gate, fixed on `k3d-manager-v1.35.0`)
-      and `cluster_down.bats` "acg-down removes the ArgoCD browser HTTPS listener".
-      **There is no `make test-bin` target** — `make test` runs `./scripts/k3d-manager test all`,
-      which covers `scripts/tests/{lib,core,plugins,etc}` and **not** `scripts/tests/bin/`.
-      The `bin/` suite must be invoked directly with `bats scripts/tests/bin/` or a change there
-      is verified by nothing. See `feedback_verify_makefile_targets`.
-- [ ] Each converted assertion demonstrably still fails when its requirement is removed —
-      spot-check at least one per file by temporarily breaking the source.
-- [ ] `git diff --stat` touches only files under `scripts/tests/` plus this spec.
+- [x] Both suites pass with **no net change in test count** and zero new failures. Measured twice,
+      because the rebase changed which targets exist and which suites CI runs:
+
+      *Pre-rebase, on `main` @ `978ea60f`:* `make test` → 923 ok / 1 not ok, and the `bin/` suite
+      → 107 ok / 1 not ok. At that base **there was no `make test-bin` target** — `make test` ran
+      `./scripts/k3d-manager test all`, covering `scripts/tests/{lib,core,plugins,etc}` and **not**
+      `scripts/tests/bin/`, so the `bin/` suite had to be invoked directly as `bats
+      scripts/tests/bin/` or the change there was verified by nothing. That is the
+      `feedback_verify_makefile_targets` lesson, and it is why the measurement was taken by hand.
+
+      *Post-rebase, on `main` @ `e259c718`:* **v1.35.0 added `make test-bin`** (plus
+      `test-python-unit`, `test-pytest`, `test-python` and the `test-all` aggregate) and wired
+      `test-bin` into the CI `lint` job. So the `bin/` change in this branch is now gated by CI for
+      the first time, and the correct invocation is `make test-bin`, not a bare `bats`. Numbers
+      recorded below under **Post-rebase verification**.
+
+      A DoD written against one base does not survive a rebase unexamined. This item asserted
+      "there is no `make test-bin` target" — true when written, false the moment #128 landed.
+- [x] Each converted assertion demonstrably still fails when its requirement is removed —
+      13 mutations, at least one per file, tabulated under **Proof obligation** below.
+- [x] `git diff --stat` touches only files under `scripts/tests/` plus this spec.
 
 ## Deliberate keeps — 3 classifier matches that are NOT defects
 
@@ -185,7 +196,11 @@ invites chasing a failure that does not exist.
 
 ## What NOT to Do
 
-- Do NOT create a PR while #128 is open — this branch is based on `main` and lacks
-  v1.35.0's `SHELL := /bin/bash`, `rg`→`grep` and keycloak-skip fixes, so CI here is red
-  for unrelated reasons. Rebase onto `main` after #128 merges, then PR.
+- ~~Do NOT create a PR while #128 is open~~ — **resolved.** #128 merged as `e259c718` on
+  2026-09-18 and this branch has been rebased onto it, so it now carries v1.35.0's
+  `SHELL := /bin/bash`, `rg`→`grep` and keycloak-skip fixes. CI on this branch can now be
+  trusted; before the rebase it would have gone red for three reasons unrelated to this change.
 - Do NOT merge anything. Do NOT commit to `main`. Do NOT `--no-verify`.
+- Do NOT re-paste a source line to fix a future red. If one of these 42 assertions breaks, the
+  question is whether the *requirement* changed — and if it did, the assertion should be
+  rewritten to state the new requirement, not widened until it passes.
