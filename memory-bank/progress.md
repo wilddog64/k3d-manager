@@ -7,6 +7,11 @@
 
 ## Open items
 
+- [x] **2026-09-18 — CI red #2 FIXED: `SHELL := /bin/bash` in the Makefile.** make defaulted to
+  `/bin/sh` (dash on Ubuntu), which rejects `set -euo pipefail`; killed `make test-bin` on CI and
+  also affected `fleet-render`/`fleet-plan`. Reproduced locally with `make SHELL=/bin/dash
+  test-bin` — `/bin/dash` is installed on this Mac, so no CI round trip is needed for this class.
+
 - [x] **2026-09-18 — CI red on PR #128 FIXED (3 suites, workstation dependencies).** `rg` →
   `grep` in `argocd_reclaim_release_ownership.bats` + `argocd_appset_live_overrides.bats`
   (2 of those call sites were vacuous-green on CI, not red — a missing binary satisfied a

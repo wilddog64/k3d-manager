@@ -3,6 +3,12 @@
 
 .DEFAULT_GOAL := help
 
+# Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
+# /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
+# those recipes died on the CI runner while passing on macOS, whose /bin/sh is
+# bash in sh mode. bash is already a hard dependency of this project.
+SHELL := /bin/bash
+
 CLUSTER_PROVIDER ?= k3s-aws
 ACG_AGENT_COUNT  ?= 2
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes

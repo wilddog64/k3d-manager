@@ -7,6 +7,22 @@
 
 ## Current focus
 
+- **2026-09-18 — CI red #2 on PR #128: the Makefile had no `SHELL`, so recipes ran under dash. FIXED.**
+  All 947 BATS passed on the runner this time; the step died afterwards at `make test-bin` with
+  `/bin/sh: 1: set: Illegal option -o pipefail`. Root cause: make defaults to `/bin/sh`, which is
+  **dash** on Ubuntu and has no `pipefail`, while macOS `/bin/sh` is bash in sh mode and accepts
+  it. Five recipes use `set -euo pipefail`: the three new v1.35.0 test targets **plus
+  `fleet-render` and `fleet-plan`** — two live AWS targets that carried the same latent defect and
+  would have failed on any Linux host. Fixed with one line, `SHELL := /bin/bash`; bash is already
+  a hard dependency of the dispatcher. **Reproduced deterministically before fixing**:
+  `make SHELL=/bin/dash test-bin` reproduces the CI error verbatim, and `/bin/dash` turns out to
+  be installed on this Mac — so this class of failure is locally reproducible from now on and
+  does not need a CI round trip. `SHELL :=` confirmed honored via a probe (`ps -o comm=` in the
+  recipe reports `/bin/bash`).
+  Pattern worth keeping: **three CI reds in a row on this PR were all "passes on the maintainer's
+  macOS box, fails on Linux"** — `rg` vs `grep`, a sibling-repo fixture, and `sh` vs `bash`. The
+  release that turned the lights on immediately found three of them in its own tooling.
+
 - **2026-09-18 — CI red on PR #128: three BATS suites depended on the maintainer's laptop. FIXED.**
   Local `make test` was 947/947 green on macOS and CI was red — the exact failure mode this release
   exists to close, reproduced on the release PR itself. Two defects, both pre-existing and both
