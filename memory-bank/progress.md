@@ -7,6 +7,14 @@
 
 ## Open items
 
+- [x] **2026-09-18 — CI red on PR #128 FIXED (3 suites, workstation dependencies).** `rg` →
+  `grep` in `argocd_reclaim_release_ownership.bats` + `argocd_appset_live_overrides.bats`
+  (2 of those call sites were vacuous-green on CI, not red — a missing binary satisfied a
+  negative assertion); `keycloak.bats` now skips with a reason when the shopping-cart-infra realm
+  fixture is unreachable. Spec
+  `docs/bugs/2026-09-18-bats-host-tool-and-sibling-repo-dependencies.md`. Proved in a
+  sibling-free worktree: 24/24. `make test` 947/947, `make test-bin` 108/108.
+
 - [x] **2026-09-18 — v1.35.0 repo-local close-out COMPLETE.** CHANGELOG promoted to
   `## [1.35.0] - 2026-09-18` (the gate whose absence shipped v1.34.0 merged-but-untagged),
   `docs/api/functions.md` +12 public E2E functions (the whole `e2e_remote.sh` surface was

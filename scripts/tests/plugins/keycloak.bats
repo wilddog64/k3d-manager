@@ -42,7 +42,12 @@ setup() {
 
 @test "_keycloak_reconcile_realm_client updates argocd redirect URIs" {
   local realm_json="$BATS_TEST_TMPDIR/realm-shopping-cart.json"
-  cp "${BATS_TEST_DIRNAME}/../../../../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json" "$realm_json"
+  local realm_src
+  realm_src="${BATS_TEST_DIRNAME}/../../../../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json"
+  if [[ ! -r "$realm_src" ]]; then
+    skip "shopping-cart-infra realm fixture not reachable: ${realm_src}"
+  fi
+  cp "$realm_src" "$realm_json"
 
   local curl_log="$BATS_TEST_TMPDIR/curl.log"
   local put_body="$BATS_TEST_TMPDIR/put-body.json"

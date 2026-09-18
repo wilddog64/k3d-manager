@@ -7,6 +7,28 @@
 
 ## Current focus
 
+- **2026-09-18 — CI red on PR #128: three BATS suites depended on the maintainer's laptop. FIXED.**
+  Local `make test` was 947/947 green on macOS and CI was red — the exact failure mode this release
+  exists to close, reproduced on the release PR itself. Two defects, both pre-existing and both
+  dark until `6064796c`:
+  (a) `argocd_reclaim_release_ownership.bats` (7 sites) and `argocd_appset_live_overrides.bats`
+  (1 site) invoked **`rg`**, which is not a repo dependency and is absent on `ubuntu-latest`.
+  Worth noting: two of those sites were `run rg …` + `[ "$status" -ne 0 ]`, so a missing binary
+  (127) *satisfied* the negative assertion — those cases were silently **vacuous** on CI, not red.
+  That is the more dangerous half: a suite can be green and assert nothing.
+  (b) `keycloak.bats:45` `cp`'d a realm fixture from the **sibling repo**
+  `shopping-carts/shopping-cart-infra`, which CI never clones. The correct idiom already existed
+  at `shopping_cart.bats:86` (a `[[ -d ]]` guard), so keycloak.bats was the outlier, not the
+  precedent. Fixture deliberately NOT vendored — it is owned by shopping-cart-infra and a copy
+  would drift from the realm actually deployed.
+  Spec `docs/bugs/2026-09-18-bats-host-tool-and-sibling-repo-dependencies.md`. Verified the way
+  the bug demanded: a detached **worktree in the scratchpad with no sibling repo**, mirroring CI —
+  24/24 pass there, the keycloak case skipping with its reason printed and the reclaim case
+  passing with real `grep`. Local `make test` 947/947 `EXIT=0`, `make test-bin` 108/108.
+  Lesson, now also a Copilot review rule: `rg` is aliased to `grep` on this machine, so a test
+  that uses it passes locally and cannot run in CI. Sweep with
+  `command grep -rn '\brg\b' scripts/tests/` before trusting a local green.
+
 - **2026-09-18 — v1.35.0 release close-out (repo-local) DONE.** Four items, no cluster touched:
   1. **CHANGELOG promoted** `[Unreleased]` → `## [1.35.0] - 2026-09-18`. This is the gate that
      shipped v1.34.0 merged-but-untagged: `/post-merge` Step 4 skips tagging when it finds no
