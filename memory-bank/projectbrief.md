@@ -129,9 +129,13 @@ k3d-manager/
 │   ├── etc/                 ← config templates & var files
 │   └── tests/               ← Bats test suites
 ├── docs/
-│   ├── plans/               ← design docs and task specs
-│   ├── tests/               ← test plans and results
-│   └── issues/              ← post-mortems and resolved bugs
+│   ├── plans/               ← design docs and task specs (max 5 per milestone)
+│   ├── bugs/                ← unplanned bug-fix specs (exempt from the 5-plan cap)
+│   ├── issues/              ← Copilot findings and post-incident notes
+│   ├── guides/              ← one guide per major technology
+│   ├── retro/               ← per-milestone retrospectives
+│   ├── api/                 ← public function reference
+│   └── tests/               ← test plans and results
 ├── bin/                     ← standalone helper scripts
 ├── memory-bank/             ← cross-agent documentation substrate
 ├── CLAUDE.md                ← authoritative dev guide
@@ -174,14 +178,22 @@ It is the single source of truth for current branch, task status, decisions, and
 
 - `activeContext.md` — current milestone, shipped versions, operational notes
 - `progress.md` — task checklist: what's done, what's pending, what's blocked
-- `projectBrief.md` — this file; stable project identity
+- `projectbrief.md` — this file; stable project identity
 - `systemPatterns.md` — architectural patterns, conventions, anti-patterns
 
-### Pure Bash, Zero Framework Dependencies
+### Bash Core, Stdlib-Only Satellites
 
-The runtime is plain Bash — no Python, no Go, no Node.js in the critical path. This
-means k3d-manager installs and runs on any Linux or macOS machine with only standard
-POSIX tools + kubectl + helm. Playwright (Node.js) is used for browser automation — ACG sandbox TTL extend (`scripts/plugins/acg.sh`) and Antigravity Copilot agent trigger (`scripts/plugins/antigravity.sh`).
+The **cluster-lifecycle runtime** is plain Bash — no Go, no framework — so the provider
+and plugin path installs and runs on any Linux or macOS machine with only standard POSIX
+tools + kubectl + helm. Two satellites sit outside that core and are **Python
+stdlib-only, no pip dependency at runtime**: the webhook server (`bin/k3dm-webhook`) and
+the Hermes monitoring agent (`scripts/lib/hermes/`, `bin/k3dm-hermes`). Both are optional
+— a cluster comes up without either. Playwright (Node.js) is used only for browser
+automation: ACG sandbox TTL extend (`scripts/plugins/acg.sh`) and the Antigravity Copilot
+agent trigger (`scripts/plugins/antigravity.sh`).
+
+Consequence for testing: the repo has **two** test roots and two languages, so there is no
+single green. See Enforcement at Commit Time below.
 
 ### Enforcement at Commit Time
 
@@ -191,6 +203,23 @@ Pre-commit hooks enforce code quality before any commit lands:
 - Hooks cannot be bypassed (`--no-verify` is prohibited in all agent specs)
 
 Violations are bugs. Agents fix their own hook failures and recommit — they do not skip.
+
+**There is no single green (v1.35.0+).** The entrypoints are not interchangeable:
+
+| Target | Runs | Root |
+|---|---|---|
+| `make test` | `scripts/tests/{lib,core,plugins,etc}` by directory discovery | dispatcher |
+| `make test-bin` | `scripts/tests/bin` | `bats` directly |
+| `make test-python-unit` | `scripts/tests/bin/*.py` (stdlib `unittest`) | python |
+| `make test-pytest` | `scripts/tests/hermes` + `scripts/tests/bin/test_smoke_logins.py` | pytest |
+| `make test-all` | all of the above | — |
+
+`make test` deliberately does **not** include `scripts/tests/bin` — a different runner
+root. So "`make test` passed" is a narrower claim than "the suite passed"; only
+`make test-all` is the whole suite, and CI gates the four leaf targets individually.
+Discovery is by **directory**, never a hand-maintained file list: a hand-maintained list
+is how one plugin suite stayed dark in CI for a full release while `make test` was red
+locally.
 
 ### Subtree-Managed Core Library
 

@@ -126,7 +126,7 @@ _applied_for() {
 
   run _argocd_deploy_applicationsets
   [ "$status" -eq 0 ]
-  run rg 'get applicationset' "${KUBECTL_LOG}"
+  run grep -q -- 'get applicationset' "${KUBECTL_LOG}"
   [ "$status" -ne 0 ]
 
   local acg

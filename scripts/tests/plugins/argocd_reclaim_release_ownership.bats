@@ -50,7 +50,7 @@ _stub_objects() {
   run argocd_reclaim_release_ownership
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"--confirm"* ]]
-  run rg -q ' (patch|label|delete) ' "${BATS_TEST_TMPDIR}/calls"
+  run grep -Eq ' (patch|label|delete) ' "${BATS_TEST_TMPDIR}/calls"
   [ "$status" -ne 0 ]
 }
 
@@ -60,14 +60,14 @@ _stub_objects() {
   run argocd_reclaim_release_ownership --confirm
   [ "${status}" -eq 0 ]
   local configmap_patch secret_patch
-  configmap_patch="$(rg 'patch configmap argocd-cm' "${BATS_TEST_TMPDIR}/calls")"
-  secret_patch="$(rg 'patch secret argocd-secret' "${BATS_TEST_TMPDIR}/calls")"
+  configmap_patch="$(grep -- 'patch configmap argocd-cm' "${BATS_TEST_TMPDIR}/calls")"
+  secret_patch="$(grep -- 'patch secret argocd-secret' "${BATS_TEST_TMPDIR}/calls")"
   [[ "${configmap_patch}" == *"/metadata/managedFields/1/manager"* ]]
   [[ "${configmap_patch}" == *'"op":"test"'* ]]
   [[ "${secret_patch%%/metadata/managedFields/0*}" == *"/metadata/managedFields/2"* ]]
-  rg -q 'label configmap argocd-cm.*argocd.argoproj.io/instance-' "${BATS_TEST_TMPDIR}/calls"
-  rg -q 'delete serviceaccount argocd-dex-server' "${BATS_TEST_TMPDIR}/calls"
-  run rg -q 'delete secret' "${BATS_TEST_TMPDIR}/calls"
+  grep -q -- 'label configmap argocd-cm.*argocd.argoproj.io/instance-' "${BATS_TEST_TMPDIR}/calls"
+  grep -q -- 'delete serviceaccount argocd-dex-server' "${BATS_TEST_TMPDIR}/calls"
+  run grep -q -- 'delete secret' "${BATS_TEST_TMPDIR}/calls"
   [ "$status" -ne 0 ]
 }
 
@@ -80,7 +80,7 @@ _stub_objects() {
   run argocd_reclaim_release_ownership --confirm
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"managedFields strip failed"* ]]
-  run rg -q 'label configmap argocd-cm' "${BATS_TEST_TMPDIR}/calls"
+  run grep -q -- 'label configmap argocd-cm' "${BATS_TEST_TMPDIR}/calls"
   [ "$status" -ne 0 ]
 }
 

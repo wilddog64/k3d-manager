@@ -228,6 +228,14 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   fi
   _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" >/dev/null 2>&1 || true
   _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" >/dev/null 2>&1 || true
+  _argocd_browser_tls_dir_legacy="${HOME}/.local/share/k3d-manager/argocd-browser-https-tls"
+  if [[ "${_argocd_browser_tls_dir_legacy}" != "${_argocd_browser_tls_dir}" ]]; then
+    _run_command --prefer-sudo --soft -- rm -f \
+      "${_argocd_browser_tls_dir_legacy}/fullchain.crt" \
+      "${_argocd_browser_tls_dir_legacy}/tls.key" \
+      "${_argocd_browser_tls_dir_legacy}/ca.crt" \
+      "${_argocd_browser_tls_dir_legacy}/tls.crt" >/dev/null 2>&1 || true
+  fi
 
   _info "[acg-down] Stopping Cloudflare named tunnel launchd agent..."
   _cf_tunnel_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"

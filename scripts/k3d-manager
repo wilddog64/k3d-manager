@@ -436,7 +436,7 @@ function test() {
     _ensure_bats
 
     local tests_root="${SCRIPT_DIR}/tests"
-    local -a search_dirs=("${tests_root}/lib" "${tests_root}/core" "${tests_root}/plugins")
+    local -a search_dirs=("${tests_root}/lib" "${tests_root}/core" "${tests_root}/plugins" "${tests_root}/etc")
     local -a tests=()
     while IFS= read -r test_file; do
         tests+=("$test_file")

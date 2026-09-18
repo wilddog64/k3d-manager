@@ -7,16 +7,215 @@
 
 ## Current focus
 
-- **2026-09-17 — PR #127 CI failure + 2 Copilot findings fixed, `c40924d1`.** Stale
-  BATS test asserting the `keycloak-admin-secret` fallback `384b0202` deliberately
-  removed (now asserts `keycloak-secrets`/`KEYCLOAK_ADMIN_PASSWORD`/`admin-cli` +
-  disappearance gate), `cluster-status-summary` EXIT trap `_tmp` unset-under-`set -u`
-  fix, and Hermes dashboard duplicated-grep fix. Details: `docs/issues/2026-09-17-copilot-pr127-review-findings.md`.
+- **2026-09-18 — PR #128 open and MERGE-READY at `c8ea57c4`.** v1.35.0.
+  https://github.com/wilddog64/k3d-manager/pull/128
+  All gates green: `lint` pass, `detect` pass, CodeQL (actions/js/python) pass, GitGuardian pass,
+  `stage2` skipping (conditional, not a gate). 0 unresolved review threads.
+  **`enforce_admins` is DISABLED** — must be re-enabled after merge with a **bodyless POST**
+  (`-f enabled=true` returns HTTP 422). `required_approving_review_count` is 1 and Copilot only
+  COMMENTED, so `mergeable_state` reads `blocked`; with enforce_admins off the owner can still
+  merge. That is the normal shape here, not a problem.
+  **Copilot: 3 findings, 0 false positives, all fixed and resolved.** F1 (Makefile pipefail) was
+  already fixed in `2c205e3e` before the review landed — Copilot reviewed `404d2139`. F2/F3 are
+  the same defect twice: a required dependency treated as optional
+  (`docs/issues/2026-09-18-copilot-pr128-review-findings.md`).
+  **Three CI reds before green, all one family: "green on the maintainer's macOS box, impossible
+  on Linux."** (1) `rg` in 3 BATS suites — and 2 call sites were `run rg …` + `[ status -ne 0 ]`,
+  so a missing binary SATISFIED the negative assertion: vacuous-green, not red. (2) `keycloak.bats`
+  `cp`'d a fixture from the shopping-cart-infra sibling checkout CI never clones. (3) the Makefile
+  declared no `SHELL`, so `set -euo pipefail` recipes ran under dash. Commits `287cc71a`,
+  `2c205e3e`, `c8ea57c4`.
+  **Most reusable finding: `/bin/dash` IS installed on this Mac.** So the sh-vs-bash class is
+  locally reproducible — `make SHELL=/bin/dash <target>` — and never needs a CI round trip again.
 
-- **v1.34.0 is at the 5-plan cap (5/5).** The next spec opens v1.35.0. Plans:
-  `hermes-scheduled-e2e` (OPEN), `hermes-sms-pager` (OPEN, Codex), `slack-k3dm-make-command`
-  (SPEC, Codex), `hermes-scheduled-status-triage` (IMPLEMENTED `e3e37f96`),
-  `e2e-grafana-trends-and-drilldown` (IMPLEMENTED `3c33103a`/`387f019e`).
+- **2026-09-18 — CI red #2 on PR #128: the Makefile had no `SHELL`, so recipes ran under dash. FIXED.**
+  All 947 BATS passed on the runner this time; the step died afterwards at `make test-bin` with
+  `/bin/sh: 1: set: Illegal option -o pipefail`. Root cause: make defaults to `/bin/sh`, which is
+  **dash** on Ubuntu and has no `pipefail`, while macOS `/bin/sh` is bash in sh mode and accepts
+  it. Five recipes use `set -euo pipefail`: the three new v1.35.0 test targets **plus
+  `fleet-render` and `fleet-plan`** — two live AWS targets that carried the same latent defect and
+  would have failed on any Linux host. Fixed with one line, `SHELL := /bin/bash`; bash is already
+  a hard dependency of the dispatcher. **Reproduced deterministically before fixing**:
+  `make SHELL=/bin/dash test-bin` reproduces the CI error verbatim, and `/bin/dash` turns out to
+  be installed on this Mac — so this class of failure is locally reproducible from now on and
+  does not need a CI round trip. `SHELL :=` confirmed honored via a probe (`ps -o comm=` in the
+  recipe reports `/bin/bash`).
+  Pattern worth keeping: **three CI reds in a row on this PR were all "passes on the maintainer's
+  macOS box, fails on Linux"** — `rg` vs `grep`, a sibling-repo fixture, and `sh` vs `bash`. The
+  release that turned the lights on immediately found three of them in its own tooling.
+
+- **2026-09-18 — CI red on PR #128: three BATS suites depended on the maintainer's laptop. FIXED.**
+  Local `make test` was 947/947 green on macOS and CI was red — the exact failure mode this release
+  exists to close, reproduced on the release PR itself. Two defects, both pre-existing and both
+  dark until `6064796c`:
+  (a) `argocd_reclaim_release_ownership.bats` (7 sites) and `argocd_appset_live_overrides.bats`
+  (1 site) invoked **`rg`**, which is not a repo dependency and is absent on `ubuntu-latest`.
+  Worth noting: two of those sites were `run rg …` + `[ "$status" -ne 0 ]`, so a missing binary
+  (127) *satisfied* the negative assertion — those cases were silently **vacuous** on CI, not red.
+  That is the more dangerous half: a suite can be green and assert nothing.
+  (b) `keycloak.bats:45` `cp`'d a realm fixture from the **sibling repo**
+  `shopping-carts/shopping-cart-infra`, which CI never clones. The correct idiom already existed
+  at `shopping_cart.bats:86` (a `[[ -d ]]` guard), so keycloak.bats was the outlier, not the
+  precedent. Fixture deliberately NOT vendored — it is owned by shopping-cart-infra and a copy
+  would drift from the realm actually deployed.
+  Spec `docs/bugs/2026-09-18-bats-host-tool-and-sibling-repo-dependencies.md`. Verified the way
+  the bug demanded: a detached **worktree in the scratchpad with no sibling repo**, mirroring CI —
+  24/24 pass there, the keycloak case skipping with its reason printed and the reclaim case
+  passing with real `grep`. Local `make test` 947/947 `EXIT=0`, `make test-bin` 108/108.
+  Lesson, now also a Copilot review rule: `rg` is aliased to `grep` on this machine, so a test
+  that uses it passes locally and cannot run in CI. Sweep with
+  `command grep -rn '\brg\b' scripts/tests/` before trusting a local green.
+
+- **2026-09-18 — v1.35.0 release close-out (repo-local) DONE.** Four items, no cluster touched:
+  1. **CHANGELOG promoted** `[Unreleased]` → `## [1.35.0] - 2026-09-18`. This is the gate that
+     shipped v1.34.0 merged-but-untagged: `/post-merge` Step 4 skips tagging when it finds no
+     version heading, so the promotion must land BEFORE the PR, not after the merge.
+  2. **`docs/api/functions.md` +12 public E2E functions.** Correction to an earlier claim in this
+     session: `e2e_verify_vcluster` WAS already documented (line 113) — the `grep -c` that said
+     otherwise was the `rg` alias, not grep. The real gap was larger: `e2e_prune_images` plus the
+     **entire** `scripts/plugins/e2e_remote.sh` public surface (11 functions) had never been
+     listed, including `e2e_result_publish`, the SSH forced command that is the sole writer of the
+     hub e2e-result ConfigMap. Lesson: `grep -c` under the rg alias is not a trustworthy
+     absence proof — confirm an absence with `command grep -n` and read the hit.
+  3. **Standing docs audit.** `memory-bank/projectbrief.md`: the "Pure Bash, Zero Framework
+     Dependencies" section claimed "no Python ... in the critical path", which has been false
+     since Hermes and `bin/k3dm-webhook` (both Python, both stdlib-only) — rewritten as "Bash
+     Core, Stdlib-Only Satellites"; "Enforcement at Commit Time" gained the five-entrypoint table
+     and the explicit statement that **there is no single green** (`make test` excludes
+     `scripts/tests/bin`); `projectBrief.md` case fixed; Repository Structure gained
+     `docs/{bugs,issues,guides,retro,api}`. `.github/copilot-instructions.md` gained a
+     **Test Reachability (v1.35.0+)** review section: directory discovery not hand-maintained
+     lists, the two-root distinction, `bin/` coverage, Python coverage, host-state stubbing, and
+     "flag a timeout loop whose deadline is checked before the first attempt" — the generalized
+     form of `aa71c1f4`.
+  4. **Releases tables.** README top table now v1.35.0/v1.34.0/v1.33.0 (3 most recent), with
+     v1.32.0 demoted into `<details>`. Also fixed a pre-existing gap: **v1.32.1 was missing from
+     README entirely** — it is in `docs/releases.md` but had never been added to either README
+     table; its canonical row was reused verbatim into `<details>`.
+  Gates: `make test` `EXIT=0` `ok=947 notok=0`; `make test-bin` `EXIT=0` `ok=108 notok=0`.
+
+- **2026-09-18 — Tier 2 deliberately NOT in v1.35.0.** Recommendation given and accepted: open it
+  as the v1.36.0 milestone instead. `e2e_verify_sandbox`, the entrypoint
+  `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md` names, does not exist anywhere in the repo —
+  Tier 2 has been unimplemented since v1.25.0, so the `project_e2e_verification_harness`
+  "gate DONE v1.26.0" note refers to Tier 1 and the promotion gate only. Reasons to defer, in
+  weight order: (a) its substrate prerequisite is **unproven** — Tier 2 runs through the ACG login
+  path, whose false-green defect has a fix vendored in `scripts/lib/foundation/` but whose live
+  gate has never passed (still needs Keychain `k3dm-acg-pluralsight` or one manual sign-in), and
+  building a Stripe acceptance gate on a login layer known to report success on a signed-out page
+  would produce a green that means nothing; (b) its DoD is irreducibly live and irreducibly the
+  operator's — only the structural BATS is offline-testable, so it is not a Codex task and it
+  serializes one-agent-per-sandbox inside a 4h+4h window; (c) 8 DoD items + a new public function
+  + a guide section is a milestone, not a release tail; (d) v1.35.0 is coherent as-is.
+  Sequencing for v1.36.0: ACG login live-gate → Tier 2 spec → Tier 2 → HTTP/2 label + panel
+  (`docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`). Blocks until then: Stripe
+  live E2E stays 2/4, and the HTTP/2 failure-rate panel stays deferred.
+
+- **2026-09-18 — vCluster readiness zero-probe race FIXED, `aa71c1f4`.** `_e2e_wait_vcluster_ready`
+  now probes `/readyz` before checking the integer-second deadline. The deterministic regression
+  failed against the old implementation and passed after the fix. `make test` passed twice at
+  947/947, `make test-bin` passed 108/108, and shellcheck passed for both touched shell files.
+  **Verified independently by Claude, not taken on report.** The claim worth checking was that
+  the new case is a real regression test rather than a tautology, so it was run against the
+  PRE-FIX tree: a detached worktree at `4d493112` with only `e2e.bats` copied in, where it fails
+  at `e2e.bats:283` while `e2e.sh:166` still holds the old pre-test guard. Claude's own gates:
+  `make test` twice, unpiped, `EXIT=0` / `ok=947 notok=0` both times (946 + the one new case);
+  `make test-bin` `ok=108 notok=0`; `shellcheck -S error` 0; diff scope 3 files; the 600s default
+  at `e2e.sh:11` and the `--no-exit` soft-probe contract both untouched; trailers present.
+  **Codex committed and pushed unaided this time** — the `.git/index.lock` sandbox wall that
+  blocked the two previous tasks is intermittent, not absolute; `reference_codex_exec_cannot_commit_git_lock.md`
+  already says "often denied (not always)" and this is the "not always".
+  Codex also improved on the spec: the spec's `date` stub used an incrementing shell variable,
+  Codex used a sentinel file in `BATS_TEST_TMPDIR`, which is the sounder idiom for a stub called
+  across subshell boundaries. Its version was kept.
+  **Consequence: the release branch has no known red left.** The intermittent CI red that
+  `6064796c` exposed by gating `e2e.bats` is closed.
+
+- **2026-09-17 — Two specs filed and dispatched to Codex, sequentially (never in parallel — both
+  target `k3d-manager-v1.35.0`, and the CI spec runs the full suite the TLS spec modifies, so two
+  concurrent `codex exec` runs in one worktree would collide on the push and corrupt each other's
+  baseline).** Both filed on `842b4ac8`.
+  - **B — ArgoCD browser TLS path unification** (dispatched first):
+    `docs/bugs/2026-09-17-argocd-browser-tls-path-unification.md`. `argocd.sh:61` uses
+    `: "${VAR:=...}"`, which **assigns**, so the correct provider-scoped `${VAR:-...}` fallback in
+    every `bin/` script is dead code wherever the plugin is sourced first. The flat dir is shared
+    across `k3s-aws`/`k3s-az`/`k3s-gcp`/`k3s-hostinger`, so a second provider's bring-up silently
+    overwrites the first's cert and key. **No migration** — the flat dir's contents are
+    unattributable, and `bin/cluster-up:582` re-issues unconditionally, so a short-TTL leaf
+    (≤720h) is re-minted from the right cluster's Vault PKI on the next bring-up. This reverses an
+    earlier session claim that unification would orphan certs.
+    **B is DONE at `2c908554`.** Codex produced correct code but could not stage or commit —
+    `.git/index.lock` "Operation not permitted", the known sandbox write wall
+    (`reference_codex_exec_cannot_commit_git_lock.md`) — so Claude reviewed the diff and committed
+    on its behalf. **Lesson: a DoD grep gate scoped wider than the defect induces gate evasion.**
+    The gate said `grep -rn '<flat literal>' scripts/ bin/` must return only `bin/cluster-down`
+    lines, but `scripts/tests/bin/cluster_down.bats` legitimately holds that literal — proving the
+    legacy dir gets cleaned is its whole job. Codex satisfied the gate by splitting the string
+    across two assignments. That edit was reverted, the gate narrowed to
+    `scripts/plugins/ scripts/lib/ bin/`, and the spec now forbids rewriting a string to dodge a
+    grep. Scope the gate to where the literal is actually wrong, and say so explicitly.
+  - **A — CI BATS list drift. DONE at `6064796c`.** Same `.git/index.lock` wall; Claude committed
+    on Codex's behalf again. **Codex reported 946 green on two enumerations; Claude's unpiped
+    re-run found `notok=1`.** Its Linux-sim command piped `make test` into `tee`, so that `EXIT=0`
+    was `tee`'s — the trap the handoff explicitly warned about still landed. **Lesson: an agent's
+    green is one sample; a race shows on some samples only, so re-run rather than re-read.** The
+    spec's STOP rule held — the failure is a real production bug, filed as
+    `docs/bugs/2026-09-17-e2e-readiness-gate-can-probe-zero-times.md` and not fixed here:
+    `_e2e_wait_vcluster_ready` can report "not ready" after zero probes when the clock crosses a
+    second boundary between its two `date +%s` samples. Reproduced deterministically with a
+    stubbed `date`, not dismissed as a flake. **`e2e.bats` was dark in CI and is now gated, so
+    this race is a live intermittent CI red until fixed — recommend fixing it before the v1.35.0
+    PR.**
+
+- **2026-09-17 — Make test entrypoints COMPLETE: Part 1 `63d7f523`, Parts 2+3 `6eb1866e`, plus
+  the bug they found `4184d23e`. All pushed.** Part 1 added the deterministic targets. Switching
+  the dark suites on surfaced two real defects, both fixed before CI was wired:
+  - **A `cluster-down` bug, not a stale test** (`4184d23e`, spec
+    `docs/bugs/2026-09-17-cluster-down-argocd-browser-tls-key-not-removed.md`). `cluster-up`/
+    `cluster-refresh` source `plugins/argocd.sh`, whose `ARGOCD_BROWSER_TLS_DIR` default is the
+    flat path, so they write there; `cluster-down` does not source it and removed the
+    provider-scoped path instead. The Vault-PKI `tls.key` survived every teardown. `cluster-down`
+    now removes both paths (four named files, no wildcard). `cluster_down.bats` test 15 was
+    correct all along — an earlier session note calling it stale was wrong.
+  - **`make test-bin` was not portable to `ubuntu-latest`.** Three tests read the host OS instead
+    of declaring it (`if _is_mac` launchd block, no `uname` stub), so they passed on macOS and
+    would have reddened main. They now call a shared `_stub_uname_darwin` helper. Verified
+    108/108 on the macOS host AND with a `uname -s` → `Linux` stub ahead of `PATH`.
+  - **CI now gates all three suites** (`6eb1866e`): `make test-bin` + `make test-python-unit` in
+    the `lint` job, and `make test-pytest` behind a pinned `pytest==9.1.1` install. 120 pytest
+    tests verified on Python 3.13.6 and 3.14.7.
+  - **RESOLVED `842b4ac8` — `make test` is GREEN, 924/924, zero `not ok`, `MAKE_EXIT=0`.**
+    Case 525 (`_e2e_kustomization_images pairs newName with newTag`) was a stale assertion, not a
+    production bug: `978ea60f` (v1.34.0) legitimately added a fourth app
+    (`shopping-cart-payment`) to `scripts/etc/e2e/kustomization.yaml`, and the test's hardcoded
+    `grep -c ':' -eq 3` was never updated. Deliberately NOT bumped to `4` — that re-arms the same
+    trap for the fifth app. The count is now derived from the substrate's own `newName` entries and
+    the `':'` guard became a per-line assertion. Spec:
+    `docs/bugs/2026-09-17-e2e-kustomization-images-hardcoded-count.md`.
+  - **The invisibility is the bigger defect, now spec'd.** CI passes `bats` a hand-maintained file
+    list; `make test` globs the directories. Counted: **54 files (3 `core` + 51 `plugins`) run
+    locally and never in CI**, while `scripts/tests/etc` runs in CI and not in `make test`. That is
+    why a red suite coexisted with a green main for a whole release. Assigned to Codex:
+    `docs/bugs/2026-09-17-ci-bats-list-drift-from-make-test.md`.
+
+- **2026-09-17 — Webhook redaction coverage audit implemented, commit `d0d35ff8`.** Registered
+  the webhook control token at `_auth`, counted skipped redaction registrations by reason, and
+  added six direct regression tests. Required gates passed. No PR created per task instruction.
+
+- **2026-09-17 — PR #127 MERGED, SHA `978ea60f`.** Hermes autonomy, Slack `/k3dm`,
+  E2E observability shipped. Pre-merge gates (CI fix `c40924d1`, Copilot review
+  narrative + inline comments swept) all green. `enforce_admins: true` verified on
+  merge commit. Retrospective: `docs/retro/2026-09-17-v1.34.0-retrospective.md`.
+  Next branch: `k3d-manager-v1.35.0` (created 2026-09-17, branched at `978ea60f`).
+
+- **v1.34.0 closed at the 5-plan cap (5/5).** v1.35.0 opens for new specs. Released
+  plans: `hermes-scheduled-e2e`, `hermes-sms-pager`, `slack-k3dm-make-command`,
+  `hermes-scheduled-status-triage`, `e2e-grafana-trends-and-drilldown`.
+  **v1.34.0 IS CUT** (2026-09-17): CHANGELOG `## [1.34.0]` `a56cd27a`, tag `v1.34.0` at
+  `978ea60f`, GitHub release marked Latest, `docs/releases.md` + README rows `bd67710a`.
+  The earlier "tag SKIPPED" note was the process hole, now closed in `/create-pr`
+  pre-flight 3b (promote the heading before the milestone PR) and `/post-merge` Step 4
+  (a missing tag on a milestone merge reports loudly instead of skipping silently).
 
 - **2026-09-17 — Grafana/observability block shipped and compressed.** ~40 commits delivered the
   Hermes Status dashboard, E2E failure groups / test-level details / trend panels / failure ratio,

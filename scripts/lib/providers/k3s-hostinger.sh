@@ -4,6 +4,10 @@
 # The VPS is provisioned out-of-band (Hostinger panel); this provider never creates or
 # deletes the VM — it only installs/uninstalls k3s over SSH and registers the context.
 
+# _acg_provider_state_dir resolves the provider-scoped TLS paths below; source it
+# here rather than relying on the dispatcher having loaded it first.
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/provider.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null
@@ -375,8 +379,8 @@ function _hostinger_write_argocd_browser_https_wrapper() {
   LOCAL_PORT="${ARGOCD_BROWSER_PORT:-443}" \
   UPSTREAM_HOST="127.0.0.1" \
   UPSTREAM_PORT="8080" \
-  CERT_FILE="${ARGOCD_BROWSER_TLS_CERT_FILE:-${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt}" \
-  KEY_FILE="${ARGOCD_BROWSER_TLS_KEY_FILE:-${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key}" \
+  CERT_FILE="${ARGOCD_BROWSER_TLS_CERT_FILE:-$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-hostinger}")/argocd-browser-https-tls/fullchain.crt}" \
+  KEY_FILE="${ARGOCD_BROWSER_TLS_KEY_FILE:-$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-hostinger}")/argocd-browser-https-tls/tls.key}" \
   HEALTHZ_URL="https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz" \
   STARTUP_TIMEOUT="${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:-30}" \
     envsubst '$SOCAT_BIN $CURL_BIN $LOG_FILE $LOCAL_HOST $LOCAL_PORT $UPSTREAM_HOST $UPSTREAM_PORT $CERT_FILE $KEY_FILE $HEALTHZ_URL $STARTUP_TIMEOUT' \

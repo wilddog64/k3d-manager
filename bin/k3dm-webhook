@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """k3dm-webhook — authenticated webhook server for k3d-manager laptop automation."""
 
+import collections
 import datetime
 import base64
 import hashlib
@@ -1224,18 +1225,33 @@ def _archive_acg_screenshot(screenshot_path):
 
 _REDACT_VALUES = set()
 _REDACT_PATTERN = None
+_REDACT_SKIPPED = collections.Counter()
+
+
+def _redact_skip_reason(value):
+    """Classify why a value was not registered for redaction. Never returns the value."""
+    if value is None:
+        return "none"
+    if not isinstance(value, str):
+        return "not-str"
+    return "too-short"
 
 
 def _register_secret(value):
     """Record a secret value so _redact_secrets can scrub it from any job output.
 
     Returns the value unchanged so callers can wrap a return in place. Short or
-    non-string values are ignored to avoid over-broad redaction of common tokens.
+    non-string values are ignored to avoid over-broad redaction of common tokens;
+    that skip is counted in _REDACT_SKIPPED so an unregistered fetch is visible
+    without ever logging the value itself.
     """
     global _REDACT_PATTERN
-    if isinstance(value, str) and len(value) >= 4 and value not in _REDACT_VALUES:
-        _REDACT_VALUES.add(value)
-        _REDACT_PATTERN = None
+    if isinstance(value, str) and len(value) >= 4:
+        if value not in _REDACT_VALUES:
+            _REDACT_VALUES.add(value)
+            _REDACT_PATTERN = None
+    else:
+        _REDACT_SKIPPED[_redact_skip_reason(value)] += 1
     return value
 
 
@@ -3480,7 +3496,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
 
 class _Handler(http.server.BaseHTTPRequestHandler):
     def _auth(self):
-        token = _get_token()
+        token = _register_secret(_get_token())
         if not token:
             return False
         return hmac.compare_digest(

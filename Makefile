@@ -3,6 +3,12 @@
 
 .DEFAULT_GOAL := help
 
+# Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
+# /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
+# those recipes died on the CI runner while passing on macOS, whose /bin/sh is
+# bash in sh mode. bash is already a hard dependency of this project.
+SHELL := /bin/bash
+
 CLUSTER_PROVIDER ?= k3s-aws
 ACG_AGENT_COUNT  ?= 2
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
@@ -13,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest test-python test-all e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -679,6 +685,40 @@ file-bug: ## FILE_TITLE and FILE_BODY required — write docs/bugs/<date>-<slug>
 test:
 	./scripts/k3d-manager test all
 
+## Run the BATS suites under scripts/tests/bin (not covered by `make test`)
+test-bin:
+	@set -euo pipefail; \
+	 command -v bats >/dev/null 2>&1 || { \
+	   echo "[make] bats not found — install with: brew install bats-core" >&2; exit 2; }; \
+	 bats scripts/tests/bin
+
+## Run the stdlib-unittest Python suites (scripts/tests/bin/*.py, excluding test_*.py)
+test-python-unit:
+	@set -euo pipefail; \
+	 found=0; \
+	 for f in scripts/tests/bin/*.py; do \
+	   case "$$(basename "$$f")" in test_*) continue;; esac; \
+	   found=1; \
+	   echo "[make] python3 $$f"; \
+	   python3 "$$f"; \
+	 done; \
+	 if [ "$$found" -eq 0 ]; then echo "[make] no unittest suites found" >&2; exit 2; fi
+
+## Run the pytest suites (scripts/tests/hermes + scripts/tests/bin/test_*.py)
+test-pytest:
+	@set -euo pipefail; \
+	 python3 -m pytest --version >/dev/null 2>&1 || { \
+	   echo "[make] pytest not installed for $$(python3 --version 2>&1)." >&2; \
+	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
+	   exit 2; }; \
+	 python3 -m pytest scripts/tests/hermes scripts/tests/bin/test_smoke_logins.py
+
+## Run every Python suite (unittest + pytest)
+test-python: test-python-unit test-pytest
+
+## Run every offline suite: BATS (dispatcher) + BATS bin + Python
+test-all: test test-bin test-python
+
 ## Run the Tier 1 e2e verification harness (throwaway vCluster + in-cluster Playwright Job). DIGEST=<candidate image digest> optional.
 e2e:
 	./scripts/k3d-manager e2e_verify_vcluster $(DIGEST)
@@ -716,6 +756,9 @@ help:
 	@echo "    make status-json   Emit concise status as JSON"
 	@echo "    make status-public Sustained multi-sample public-endpoint probe (JSON=1 for machine output)"
 	@echo "    make test          Run all BATS test suites"
+	@echo "    make test-all      Run every offline suite (BATS dispatcher + bin BATS + Python)"
+	@echo "    make test-bin      Run the BATS suites under scripts/tests/bin"
+	@echo "    make test-python   Run every Python suite (unittest + pytest)"
 	@echo "    make e2e           Run Tier 1 e2e harness (vCluster + Playwright Job; DIGEST=<image digest> optional)"
 	@echo "    make e2e-remote    Run Tier 1 e2e harness on a remote runner off the M4 (RUNNER=m2 [DIGEST=<image digest>]; no local fallback)"
 	@echo "    make e2e-runner-health  Report hub health vs remote-runner availability (RUNNER=m2 optional)"

@@ -163,7 +163,11 @@ function _e2e_wait_vcluster_ready() {
   deadline=$(( now + E2E_VCLUSTER_READY_TIMEOUT ))
   next_refresh=$(( now + E2E_VCLUSTER_READY_REFRESH_INTERVAL ))
   _info "[e2e] Waiting for vCluster API to be ready (timeout ${E2E_VCLUSTER_READY_TIMEOUT}s)"
-  while now=$(date +%s); (( now < deadline )); do
+  # Do-while: the deadline bounds how long to keep retrying, never whether to
+  # try at all. date +%s is integer-second, so a pre-test guard can see the
+  # clock tick past a short deadline before the first probe and return
+  # not-ready having asked nothing.
+  while :; do
     # Soft probe: a failed /readyz must RETURN non-zero, never exit. A bare
     # _run_command calls _err -> exit on failure, which (bypassing this if)
     # would kill the whole harness on the first not-ready probe.
@@ -181,6 +185,8 @@ function _e2e_wait_vcluster_ready() {
       _vcluster_refresh_connection "$name"
       next_refresh=$(( now + E2E_VCLUSTER_READY_REFRESH_INTERVAL ))
     fi
+    now=$(date +%s)
+    (( now < deadline )) || break
     sleep "$E2E_VCLUSTER_READY_INTERVAL"
   done
   _err "e2e: vCluster API not ready within ${E2E_VCLUSTER_READY_TIMEOUT}s"
