@@ -11,6 +11,21 @@
   now probes `/readyz` before checking the integer-second deadline. The deterministic regression
   failed against the old implementation and passed after the fix. `make test` passed twice at
   947/947, `make test-bin` passed 108/108, and shellcheck passed for both touched shell files.
+  **Verified independently by Claude, not taken on report.** The claim worth checking was that
+  the new case is a real regression test rather than a tautology, so it was run against the
+  PRE-FIX tree: a detached worktree at `4d493112` with only `e2e.bats` copied in, where it fails
+  at `e2e.bats:283` while `e2e.sh:166` still holds the old pre-test guard. Claude's own gates:
+  `make test` twice, unpiped, `EXIT=0` / `ok=947 notok=0` both times (946 + the one new case);
+  `make test-bin` `ok=108 notok=0`; `shellcheck -S error` 0; diff scope 3 files; the 600s default
+  at `e2e.sh:11` and the `--no-exit` soft-probe contract both untouched; trailers present.
+  **Codex committed and pushed unaided this time** — the `.git/index.lock` sandbox wall that
+  blocked the two previous tasks is intermittent, not absolute; `reference_codex_exec_cannot_commit_git_lock.md`
+  already says "often denied (not always)" and this is the "not always".
+  Codex also improved on the spec: the spec's `date` stub used an incrementing shell variable,
+  Codex used a sentinel file in `BATS_TEST_TMPDIR`, which is the sounder idiom for a stub called
+  across subshell boundaries. Its version was kept.
+  **Consequence: the release branch has no known red left.** The intermittent CI red that
+  `6064796c` exposed by gating `e2e.bats` is closed.
 
 - **2026-09-17 — Two specs filed and dispatched to Codex, sequentially (never in parallel — both
   target `k3d-manager-v1.35.0`, and the CI spec runs the full suite the TLS spec modifies, so two

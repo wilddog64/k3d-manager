@@ -1,7 +1,7 @@
 # e2e readiness gate can return "not ready" after zero probes
 
 **Filed:** 2026-09-17
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED `aa71c1f4` (2026-09-18) — verified independently by Claude
 **Branch:** `k3d-manager-v1.35.0`
 **Component:** `scripts/plugins/e2e.sh` — `_e2e_wait_vcluster_ready` (lines 156-166)
 **Severity:** low in production, medium in CI

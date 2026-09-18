@@ -11,6 +11,12 @@
   100→101 clock-boundary regression that failed before the fix and passed after it; the gate now
   always probes `/readyz` before enforcing the deadline. `make test` passed twice at 947/947,
   `make test-bin` passed 108/108, and shellcheck passed.
+  Spec `docs/bugs/2026-09-17-e2e-readiness-gate-can-probe-zero-times.md`, now closed. Claude
+  re-ran every gate and additionally verified the new case is a genuine regression test by running
+  it against a detached worktree at the pre-fix commit `4d493112` — it fails there at
+  `e2e.bats:283`. Two unpiped `make test` runs, `EXIT=0` / `ok=947 notok=0` each, because one
+  green run of a race is one sample rather than proof. **Closes the intermittent CI red that
+  `6064796c` exposed when it gated the previously dark `e2e.bats`.**
 
 - [x] **2026-09-17 — Orphaned test suites: Makefile entrypoints + CI gating COMPLETE.**
   Part 1 `63d7f523` (five `make test-*` targets), Parts 2+3 `6eb1866e` (CI steps in the `lint`
