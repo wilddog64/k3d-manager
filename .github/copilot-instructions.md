@@ -98,6 +98,14 @@ Use the rules below to shape all code suggestions and PR reviews.
 - "Resource already exists" → skip, not error.
 - "Helm release already deployed" → upgrade, not re-install.
 
+### Test Reachability (v1.35.0+)
+- A new BATS suite must be reachable by the dispatcher's **directory discovery** (`scripts/tests/{lib,core,plugins,etc}`), never added to a hand-maintained file list. A hand-maintained list is how `scripts/tests/plugins/e2e_image_prune.bats` stayed dark in CI while `make test` was red locally.
+- A suite placed in `scripts/tests/bin/` is run by `make test-bin`, **not** `make test` — the two are different runner roots. "make test is green" is not "the suite is green"; only `make test-all` covers both.
+- A new `bin/` script should come with a `scripts/tests/bin/*.bats` case. Credential-rotation scripts are the priority — silent failure there is expensive.
+- A new Python module under `scripts/lib/hermes/` or a new `bin/` Python script must be covered by `make test-pytest` or `make test-python-unit`. Neither ran in any automated path before v1.35.0.
+- Flag any test that reads host state (`uname`, `date`, `$HOME`, the real clock) without stubbing it. Such a test passes on the author's macOS workstation and fails on the Linux CI runner — or, worse, passes on both and asserts nothing.
+- Flag a timeout loop whose deadline is checked **before** the first attempt. `date +%s` is integer-second, so a pre-test guard can expire before one probe is issued and report failure having asked nothing. The budget bounds how long to keep retrying, never whether to try.
+
 ---
 
 ## Skip / Do Not Flag

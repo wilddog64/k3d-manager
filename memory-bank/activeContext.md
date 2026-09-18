@@ -7,6 +7,51 @@
 
 ## Current focus
 
+- **2026-09-18 — v1.35.0 release close-out (repo-local) DONE.** Four items, no cluster touched:
+  1. **CHANGELOG promoted** `[Unreleased]` → `## [1.35.0] - 2026-09-18`. This is the gate that
+     shipped v1.34.0 merged-but-untagged: `/post-merge` Step 4 skips tagging when it finds no
+     version heading, so the promotion must land BEFORE the PR, not after the merge.
+  2. **`docs/api/functions.md` +12 public E2E functions.** Correction to an earlier claim in this
+     session: `e2e_verify_vcluster` WAS already documented (line 113) — the `grep -c` that said
+     otherwise was the `rg` alias, not grep. The real gap was larger: `e2e_prune_images` plus the
+     **entire** `scripts/plugins/e2e_remote.sh` public surface (11 functions) had never been
+     listed, including `e2e_result_publish`, the SSH forced command that is the sole writer of the
+     hub e2e-result ConfigMap. Lesson: `grep -c` under the rg alias is not a trustworthy
+     absence proof — confirm an absence with `command grep -n` and read the hit.
+  3. **Standing docs audit.** `memory-bank/projectbrief.md`: the "Pure Bash, Zero Framework
+     Dependencies" section claimed "no Python ... in the critical path", which has been false
+     since Hermes and `bin/k3dm-webhook` (both Python, both stdlib-only) — rewritten as "Bash
+     Core, Stdlib-Only Satellites"; "Enforcement at Commit Time" gained the five-entrypoint table
+     and the explicit statement that **there is no single green** (`make test` excludes
+     `scripts/tests/bin`); `projectBrief.md` case fixed; Repository Structure gained
+     `docs/{bugs,issues,guides,retro,api}`. `.github/copilot-instructions.md` gained a
+     **Test Reachability (v1.35.0+)** review section: directory discovery not hand-maintained
+     lists, the two-root distinction, `bin/` coverage, Python coverage, host-state stubbing, and
+     "flag a timeout loop whose deadline is checked before the first attempt" — the generalized
+     form of `aa71c1f4`.
+  4. **Releases tables.** README top table now v1.35.0/v1.34.0/v1.33.0 (3 most recent), with
+     v1.32.0 demoted into `<details>`. Also fixed a pre-existing gap: **v1.32.1 was missing from
+     README entirely** — it is in `docs/releases.md` but had never been added to either README
+     table; its canonical row was reused verbatim into `<details>`.
+  Gates: `make test` `EXIT=0` `ok=947 notok=0`; `make test-bin` `EXIT=0` `ok=108 notok=0`.
+
+- **2026-09-18 — Tier 2 deliberately NOT in v1.35.0.** Recommendation given and accepted: open it
+  as the v1.36.0 milestone instead. `e2e_verify_sandbox`, the entrypoint
+  `docs/plans/v1.25.0-e2e-harness-tier2-sandbox.md` names, does not exist anywhere in the repo —
+  Tier 2 has been unimplemented since v1.25.0, so the `project_e2e_verification_harness`
+  "gate DONE v1.26.0" note refers to Tier 1 and the promotion gate only. Reasons to defer, in
+  weight order: (a) its substrate prerequisite is **unproven** — Tier 2 runs through the ACG login
+  path, whose false-green defect has a fix vendored in `scripts/lib/foundation/` but whose live
+  gate has never passed (still needs Keychain `k3dm-acg-pluralsight` or one manual sign-in), and
+  building a Stripe acceptance gate on a login layer known to report success on a signed-out page
+  would produce a green that means nothing; (b) its DoD is irreducibly live and irreducibly the
+  operator's — only the structural BATS is offline-testable, so it is not a Codex task and it
+  serializes one-agent-per-sandbox inside a 4h+4h window; (c) 8 DoD items + a new public function
+  + a guide section is a milestone, not a release tail; (d) v1.35.0 is coherent as-is.
+  Sequencing for v1.36.0: ACG login live-gate → Tier 2 spec → Tier 2 → HTTP/2 label + panel
+  (`docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`). Blocks until then: Stripe
+  live E2E stays 2/4, and the HTTP/2 failure-rate panel stays deferred.
+
 - **2026-09-18 — vCluster readiness zero-probe race FIXED, `aa71c1f4`.** `_e2e_wait_vcluster_ready`
   now probes `/readyz` before checking the integer-second deadline. The deterministic regression
   failed against the old implementation and passed after the fix. `make test` passed twice at

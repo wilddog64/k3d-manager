@@ -7,6 +7,28 @@
 
 ## Open items
 
+- [x] **2026-09-18 — v1.35.0 repo-local close-out COMPLETE.** CHANGELOG promoted to
+  `## [1.35.0] - 2026-09-18` (the gate whose absence shipped v1.34.0 merged-but-untagged),
+  `docs/api/functions.md` +12 public E2E functions (the whole `e2e_remote.sh` surface was
+  undocumented; `e2e_verify_vcluster` was already there — the earlier "stale doc" claim was an
+  `rg`-alias `grep -c` artifact), standing docs audited (`projectbrief.md` no-Python claim
+  corrected, five-entrypoint table + "no single green" added; `copilot-instructions.md` gained a
+  Test Reachability review section), README/`docs/releases.md` rows added and v1.32.1's
+  never-listed README row backfilled. `make test` 947/947 `EXIT=0`, `make test-bin` 108/108.
+
+- [ ] **v1.35.0 PR → CI → Copilot → merge.** Remaining release steps that are NOT repo-local.
+- [ ] **Reapply the ApplicationSets (hub AND ACG), then `argocd_check_values_branch`** — the
+  operator's, live cluster. **Outstanding for v1.34.0's config as well as v1.35.0's**: the sets
+  template `$values` at `${K3D_MANAGER_BRANCH}`, so config on a newer branch is inert in-cluster
+  until they are reapplied. Two releases of config may currently be unread by any cluster.
+
+- [ ] **Tier 2 → v1.36.0, deliberately deferred (decided 2026-09-18).** `e2e_verify_sandbox` does
+  not exist; unimplemented since v1.25.0. Precondition before the spec: the **ACG login live gate**
+  (Keychain `k3dm-acg-pluralsight`, or one manual sign-in in `pw-profile`) — the false-green fix is
+  vendored but has never passed live, and Tier 2's Stripe acceptance would sit on top of it.
+  Then: Tier 2 spec → implementation → HTTP/2 protocol label + failure-rate panel. Still blocked
+  meanwhile: Stripe live E2E at 2/4, and `docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`.
+
 - [x] **2026-09-18 — E2E readiness gate zero-probe race FIXED, `aa71c1f4`.** Added a deterministic
   100→101 clock-boundary regression that failed before the fix and passed after it; the gate now
   always probes `/readyz` before enforcing the deadline. `make test` passed twice at 947/947,

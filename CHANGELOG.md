@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.35.0] - 2026-09-18
 
 ### Added
 
@@ -10,6 +10,8 @@
 ### Changed
 
 - CI now runs the Makefile's complete offline BATS discovery through `make test`, including `scripts/tests/etc`, so new suites are gated without a hand-maintained file list
+
+- `docs/api/functions.md` now documents all 13 public E2E functions. `e2e_prune_images` and the 11 public functions in `scripts/plugins/e2e_remote.sh` (`e2e_runner_preflight`, `e2e_runner_bootstrap`, `e2e_runner_status`, `e2e_runner_dispatch`, `e2e_runner_health`, `e2e_runner_replay`, `e2e_runner_unlock`, `e2e_runner_publish_back`, `e2e_runner_publish_replay`, `e2e_result_publish`, `e2e_result_publisher_install`) had never been listed, so the remote-runner surface — including the SSH forced command that is the sole writer of the hub e2e-result ConfigMap — was undiscoverable from the API reference
 
 
 ### Fixed
