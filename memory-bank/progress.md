@@ -12,7 +12,7 @@
   `test-python`, and `test-all`, plus `.PHONY`, help, and CHANGELOG coverage-gap entries.
   `make test-python-unit` passed; `make test-bin` failed at `cluster_down.bats` test 15, so
   Part 2 CI wiring was correctly omitted. `make test-pytest` exited 2 with the expected missing
-  pytest message. `make test` reported failures at cases 15 and 551.
+  pytest message. `make test` reported a failure at case 551.
 
 - [x] **2026-09-17 — Webhook redaction coverage audit implemented, commit `d0d35ff8`.** The
   webhook control token is registered for redaction, skipped values are counted by reason, and
