@@ -54,6 +54,18 @@ STUB
     [ -e "${_sentinel}" ]
 }
 
+_stub_uname_darwin() {
+  cat > "${BATS_TEST_TMPDIR}/bin/uname" <<'STUB'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-s" ]]; then
+  printf 'Darwin\n'
+else
+  /usr/bin/uname "$@"
+fi
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/uname"
+}
+
 setup() {
   export HOME="${BATS_TEST_TMPDIR}/home"
   export PATH="${BATS_TEST_TMPDIR}/bin:$PATH"
@@ -254,6 +266,7 @@ STUB
 }
 
 @test "acg-down removes the ArgoCD browser HTTPS listener" {
+  _stub_uname_darwin
   mkdir -p "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls"
   touch \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt" \
@@ -272,6 +285,7 @@ STUB
 }
 
 @test "acg-down warns and continues when the ArgoCD browser listener is not loaded" {
+  _stub_uname_darwin
   export STUB_LAUNCHCTL_BOOTOUT_FAIL=1
   run bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
@@ -279,6 +293,7 @@ STUB
 }
 
 @test "acg-down removes the Keycloak browser HTTP listener" {
+  _stub_uname_darwin
   touch \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" \

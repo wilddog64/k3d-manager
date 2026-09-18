@@ -164,6 +164,111 @@ Run `make test-bin` and `make test-python-unit` locally first.
   a separate finding and need a decision before anyone touches them — a test that has
   been dark for months may be asserting something the code intentionally stopped doing.
 
+### Part 2 outcome (2026-09-17)
+
+Part 2 was correctly withheld. Switching the coverage on surfaced **two** real defects,
+exactly as predicted:
+
+1. **A production bug, not a stale test.** `cluster_down.bats` test 15 failed because
+   `bin/cluster-down` deletes the ArgoCD browser TLS material from a provider-scoped
+   directory while `bin/cluster-up` writes it to a flat one, so the Vault-issued private
+   key survived every teardown. Filed and fixed:
+   `docs/bugs/2026-09-17-cluster-down-argocd-browser-tls-key-not-removed.md`.
+   The test was asserting correct behaviour all along.
+
+2. **`make test-bin` is not portable to `ubuntu-latest`.** Three tests exercise the
+   `if _is_mac; then` launchd block in `bin/cluster-down` without stubbing `uname`, so
+   they pass on the macOS workstation and fail on a Linux runner. Verified by re-running
+   the suite with a `uname -s` → `Linux` stub ahead of `PATH`:
+
+   ```
+   not ok 15 acg-down removes the ArgoCD browser HTTPS listener
+   not ok 16 acg-down warns and continues when the ArgoCD browser listener is not loaded
+   not ok 17 acg-down removes the Keycloak browser HTTP listener
+   ```
+
+   Wiring `make test-bin` into the Linux `lint` job before fixing this would have turned
+   main red on the first PR.
+
+---
+
+## Fix — Part 3: make `test-bin` portable, then wire all three suites into CI
+
+### 3a — Platform-independence for the three launchd tests
+
+The three tests assert real, wanted behaviour; the defect is that they read the *host's*
+OS instead of declaring the OS they are testing. `cluster_down.bats` already establishes
+the idiom for this — tests 5 and 14 stub `uname` to `Darwin` inline.
+
+This is **not** weakening a test to reach green: the assertions are unchanged and still
+run. It removes a hidden dependency on the developer's laptop, which is what made these
+tests unfit for CI in the first place.
+
+Add a helper immediately above `setup()`:
+
+```bash
+_stub_uname_darwin() {
+  cat > "${BATS_TEST_TMPDIR}/bin/uname" <<'STUB'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-s" ]]; then
+  printf 'Darwin\n'
+else
+  /usr/bin/uname "$@"
+fi
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/uname"
+}
+```
+
+Call `_stub_uname_darwin` as the first line of the bodies of tests 15, 16 and 17. Do
+**not** rewrite the two existing inline copies in tests 5 and 14 — they work, and
+rewriting them is an unsolicited refactor.
+
+Gate: the suite must be green **both** ways —
+
+```bash
+make test-bin                                   # macOS host
+PATH="<stubdir>:$PATH" bats scripts/tests/bin    # stubdir/uname prints Linux
+```
+
+### 3b — CI steps
+
+pytest is now verified: **120 tests pass** (`scripts/tests/hermes` +
+`scripts/tests/bin/test_smoke_logins.py`) under pytest 9.1.1 in a throwaway venv. The
+Python suites contain no platform-dependent assertions — `test_repairs.py`'s `launchctl`
+references are string comparisons against mocked calls, not real invocations.
+
+Add to `.github/workflows/ci.yml`, in the `lint` job, immediately after the existing
+`Run unit BATS (lib + etc + trivy plugin)` step:
+
+```yaml
+      - name: Run bin BATS + Python unit suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          make test-bin
+          make test-python-unit
+
+      - name: Install pytest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user pytest==9.1.1
+
+      - name: Run pytest suites (hermes + bin)
+        shell: bash
+        run: |
+          set -euo pipefail
+          make test-pytest
+```
+
+`pytest==9.1.1` is pinned deliberately — per the supply-chain rule in `CLAUDE.md`, no
+floating `latest`. It is the version the 120 tests were verified against.
+
+No `GITHUB_PATH` line is needed: `.github/actions/setup` already appends
+`$HOME/.local/bin` when it pip-installs yamllint, and `make test-pytest` invokes
+`python3 -m pytest`, which resolves the module rather than a console script.
+
 ---
 
 ## Before You Start
