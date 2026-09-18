@@ -6,6 +6,47 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
 }
 
+@test "browser TLS defaults to the k3s-aws provider-scoped state dir" {
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  unset ARGOCD_BROWSER_TLS_DIR ARGOCD_BROWSER_TLS_CERT_FILE ARGOCD_BROWSER_TLS_KEY_FILE ARGOCD_BROWSER_TLS_CA_FILE
+  export CLUSTER_PROVIDER="k3s-aws"
+  source "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  local expected_dir
+  expected_dir="$(_acg_provider_state_dir "k3s-aws")/argocd-browser-https-tls"
+  [ "$ARGOCD_BROWSER_TLS_DIR" = "$expected_dir" ]
+}
+
+@test "browser TLS dirs differ between k3s-aws and k3s-hostinger" {
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  unset ARGOCD_BROWSER_TLS_DIR ARGOCD_BROWSER_TLS_CERT_FILE ARGOCD_BROWSER_TLS_KEY_FILE ARGOCD_BROWSER_TLS_CA_FILE
+  export CLUSTER_PROVIDER="k3s-aws"
+  source "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  local aws_dir="$ARGOCD_BROWSER_TLS_DIR"
+  unset ARGOCD_BROWSER_TLS_DIR ARGOCD_BROWSER_TLS_CERT_FILE ARGOCD_BROWSER_TLS_KEY_FILE ARGOCD_BROWSER_TLS_CA_FILE
+  export CLUSTER_PROVIDER="k3s-hostinger"
+  source "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  [ "$ARGOCD_BROWSER_TLS_DIR" != "$aws_dir" ]
+}
+
+@test "explicit browser TLS dir overrides the provider-scoped default" {
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  export CLUSTER_PROVIDER="k3s-aws"
+  export ARGOCD_BROWSER_TLS_DIR="/tmp/custom"
+  unset ARGOCD_BROWSER_TLS_CERT_FILE ARGOCD_BROWSER_TLS_KEY_FILE ARGOCD_BROWSER_TLS_CA_FILE
+  source "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  [ "$ARGOCD_BROWSER_TLS_DIR" = "/tmp/custom" ]
+}
+
+@test "browser TLS files are inside the selected directory" {
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  unset ARGOCD_BROWSER_TLS_DIR ARGOCD_BROWSER_TLS_CERT_FILE ARGOCD_BROWSER_TLS_KEY_FILE ARGOCD_BROWSER_TLS_CA_FILE
+  export CLUSTER_PROVIDER="k3s-hostinger"
+  source "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  [[ "$ARGOCD_BROWSER_TLS_CERT_FILE" == "$ARGOCD_BROWSER_TLS_DIR/"* ]]
+  [[ "$ARGOCD_BROWSER_TLS_KEY_FILE" == "$ARGOCD_BROWSER_TLS_DIR/"* ]]
+  [[ "$ARGOCD_BROWSER_TLS_CA_FILE" == "$ARGOCD_BROWSER_TLS_DIR/"* ]]
+}
+
 @test "deploy_argocd --help shows usage" {
   run deploy_argocd --help
   [ "$status" -eq 0 ]

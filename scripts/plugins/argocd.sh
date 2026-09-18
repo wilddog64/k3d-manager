@@ -3,6 +3,13 @@
 # scripts/plugins/argocd.sh
 # Argo CD GitOps plugin for k3d-manager
 
+# Source provider helpers for provider-scoped state
+PROVIDER_LIB="$SCRIPT_DIR/lib/provider.sh"
+if [[ -r "$PROVIDER_LIB" ]]; then
+   # shellcheck disable=SC1090
+   source "$PROVIDER_LIB"
+fi
+
 # Source Vault plugin for PKI and secret management
 VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"
 if [[ -r "$VAULT_PLUGIN" ]]; then
@@ -58,7 +65,7 @@ export ARGOCD_PUBLIC_URL="${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
 : "${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:=30}"
 : "${ARGOCD_BROWSER_HOST:=argocd.shopping-cart.local}"
 : "${ARGOCD_BROWSER_PORT:=443}"
-: "${ARGOCD_BROWSER_TLS_DIR:=${HOME}/.local/share/k3d-manager/argocd-browser-https-tls}"
+: "${ARGOCD_BROWSER_TLS_DIR:=$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-aws}")/argocd-browser-https-tls}"
 : "${ARGOCD_BROWSER_TLS_CERT_FILE:=${ARGOCD_BROWSER_TLS_DIR}/fullchain.crt}"
 : "${ARGOCD_BROWSER_TLS_KEY_FILE:=${ARGOCD_BROWSER_TLS_DIR}/tls.key}"
 : "${ARGOCD_BROWSER_TLS_CA_FILE:=${ARGOCD_BROWSER_TLS_DIR}/ca.crt}"

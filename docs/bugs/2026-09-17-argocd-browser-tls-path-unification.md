@@ -154,9 +154,12 @@ Set `HOME` to `${BATS_TEST_TMPDIR}/home` so nothing touches the real state dir. 
 - [ ] `argocd.sh` sources `lib/provider.sh` via the file's existing guarded-source idiom.
 - [ ] `argocd.sh:61` default is provider-scoped; 62-64 unchanged.
 - [ ] `k3s-hostinger.sh:378-379` no longer contain a hardcoded flat path.
-- [ ] `command grep -rn 'share/k3d-manager/argocd-browser-https-tls' scripts/ bin/` returns
+- [ ] `command grep -rn 'share/k3d-manager/argocd-browser-https-tls' scripts/plugins/ scripts/lib/ bin/` returns
       **only** the legacy-cleanup lines in `bin/cluster-down` — that is the one place the
-      literal is still correct, because it exists to delete it.
+      literal is still correct, because it exists to delete it. The gate deliberately does
+      **not** cover `scripts/tests/` — `cluster_down.bats` holds the same literal on purpose,
+      because its job is to prove the legacy dir gets cleaned. Do NOT split or rewrite that
+      string to make a grep stop matching; that is gate evasion, not a fix.
 - [ ] New BATS coverage per the Tests section, including the not-equal assertion.
 - [ ] `make test` green; `make test-bin` green (108 cases).
 - [ ] `shellcheck -S error` clean.
