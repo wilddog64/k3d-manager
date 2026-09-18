@@ -151,6 +151,45 @@ For Python targets the suite does not source, fall back to (a):
       13 mutations, at least one per file, tabulated under **Proof obligation** below.
 - [x] `git diff --stat` touches only files under `scripts/tests/` plus this spec.
 
+## Post-rebase verification
+
+Measured on `fix/bats-whole-line-grep-assertions` @ `cf76ebbe`, base `main` @ `e259c718`, with a
+clean tree and no mutation in flight:
+
+| Gate | This branch | Clean `main` @ `e259c718` |
+|---|---|---|
+| `make test` | **947 ok / 0 not ok** | 947 ok / 0 not ok |
+| `make test-bin` | **108 ok / 0 not ok** | (108 ok / 0 not ok) |
+
+Identical totals, zero failures, no net change in test count. Both pre-rebase failures are gone
+because #128 fixed them, not because anything here hid them: `e2e_image_prune.bats:73` (the
+`grep -c ':'` count gate) and `cluster_down.bats` (the unstubbed `uname` launchd cases).
+
+### A 4-failure scare that was not this branch
+
+An intermediate `make test` on the rebased branch reported **943 ok / 4 not ok** — all four in
+`scripts/tests/plugins/e2e_remote.bats`, a file this branch does not touch. The diagnosis matters
+more than the result:
+
+1. Clean `main` in a detached worktree gave 947 ok / 0 not ok, so the failures tracked the branch.
+2. A fresh worktree of *this branch* reproduced all four, so it was not local dirt in the checkout.
+3. Re-running clean `main` **afterwards** still gave 0 failures, which ruled out environmental drift
+   — the thing that would otherwise have looked identical.
+4. `git diff --name-only` confirmed neither `e2e_remote.bats`, `test_helpers.bash` nor
+   `scripts/plugins/e2e_remote.sh` differed from `main`. So the mechanism could not be the code.
+5. Reading the actual failure output — rather than reasoning further — gave it away:
+   `ERROR: [e2e-remote] HEAD 1d8c7cd1… is not pushed; push the branch first`.
+
+`e2e_runner_dispatch` has a push guard that fires before the tests' stubs are reached, so
+**those four tests fail on any locally-committed-but-unpushed HEAD** and pass once the branch is
+on origin. Pushing, with no code change, took the suite to 947/0 as predicted. That prediction
+passing is the evidence the diagnosis was right.
+
+This is a latent portability smell, not a defect in this branch: the suite is green in CI only
+because CI always tests a pushed ref. It is recorded in `memory-bank/progress.md` as an open item
+and deliberately **not** fixed here — it is out of scope, and bundling it would blur what this PR
+is for.
+
 ## Deliberate keeps — 3 classifier matches that are NOT defects
 
 The classifier is a heuristic; these three match it and are correct as written. Do not
