@@ -7,26 +7,14 @@
 
 ## Current focus
 
-- **2026-09-18 — PR #128 open and MERGE-READY at `c8ea57c4`.** v1.35.0.
-  https://github.com/wilddog64/k3d-manager/pull/128
-  All gates green: `lint` pass, `detect` pass, CodeQL (actions/js/python) pass, GitGuardian pass,
-  `stage2` skipping (conditional, not a gate). 0 unresolved review threads.
-  **`enforce_admins` is DISABLED** — must be re-enabled after merge with a **bodyless POST**
-  (`-f enabled=true` returns HTTP 422). `required_approving_review_count` is 1 and Copilot only
-  COMMENTED, so `mergeable_state` reads `blocked`; with enforce_admins off the owner can still
-  merge. That is the normal shape here, not a problem.
-  **Copilot: 3 findings, 0 false positives, all fixed and resolved.** F1 (Makefile pipefail) was
-  already fixed in `2c205e3e` before the review landed — Copilot reviewed `404d2139`. F2/F3 are
-  the same defect twice: a required dependency treated as optional
-  (`docs/issues/2026-09-18-copilot-pr128-review-findings.md`).
-  **Three CI reds before green, all one family: "green on the maintainer's macOS box, impossible
-  on Linux."** (1) `rg` in 3 BATS suites — and 2 call sites were `run rg …` + `[ status -ne 0 ]`,
-  so a missing binary SATISFIED the negative assertion: vacuous-green, not red. (2) `keycloak.bats`
-  `cp`'d a fixture from the shopping-cart-infra sibling checkout CI never clones. (3) the Makefile
-  declared no `SHELL`, so `set -euo pipefail` recipes ran under dash. Commits `287cc71a`,
-  `2c205e3e`, `c8ea57c4`.
-  **Most reusable finding: `/bin/dash` IS installed on this Mac.** So the sh-vs-bash class is
-  locally reproducible — `make SHELL=/bin/dash <target>` — and never needs a CI round trip again.
+- **2026-09-18 — v1.35.0 RELEASED at `e259c718` (merged 17:35:07Z, tag+release pushed).** Post-merge
+  complete: `enforce_admins` re-enabled via bodyless POST (verified `enabled=true`); tag `v1.35.0`
+  created and pushed to origin; GitHub release published with full CHANGELOG notes;
+  `k3d-manager-v1.36.0` branch created on the merge SHA; retrospective doc written at
+  `docs/retro/2026-09-18-v1.35.0-retrospective.md`. **ApplicationSet reapply is the operator's
+  action** on the live cluster (hub + ACG, both required to pick up v1.35.0 config; deployment
+  on main and k3d-manager-v1.36.0 is currently inert until sets are reapplied — the issue was
+  first identified and documented in v1.33.0 and remains unfixed operationally).
 
 - **2026-09-18 — CI red #2 on PR #128: the Makefile had no `SHELL`, so recipes ran under dash. FIXED.**
   All 947 BATS passed on the runner this time; the step died afterwards at `make test-bin` with

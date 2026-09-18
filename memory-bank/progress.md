@@ -11,9 +11,11 @@
   `c8ea57c4`. `enforce_admins` disabled (re-enable post-merge, **bodyless POST**). Three CI reds
   fixed en route (`287cc71a` rg/sibling-fixture, `2c205e3e` Makefile SHELL, `c8ea57c4` Copilot
   F2/F3). Awaiting the user's merge — never auto-merge.
-- [ ] **After merge:** `/post-merge` — re-enable `enforce_admins` (bodyless POST), tag `v1.35.0` on
-  the merge SHA (the CHANGELOG heading is promoted, so Step 4 will NOT skip this time), GitHub
-  release, next branch `k3d-manager-v1.36.0`, retro doc, then the ApplicationSet reapply.
+- [x] **MERGED 2026-09-18T17:35:07Z at `e259c718`.** `/post-merge` completed: `enforce_admins`
+  re-enabled (bodyless POST), tag `v1.35.0` created and pushed, GitHub release `v1.35.0`
+  published, next branch `k3d-manager-v1.36.0` created, retro doc written. **ApplicationSet
+  reapply is the operator's action** (live cluster, hub + ACG both); config on `main` and
+  `k3d-manager-v1.36.0` is inert until reapplied.
 
 - [x] **2026-09-18 — CI red #2 FIXED: `SHELL := /bin/bash` in the Makefile.** make defaulted to
   `/bin/sh` (dash on Ubuntu), which rejects `set -euo pipefail`; killed `make test-bin` on CI and
