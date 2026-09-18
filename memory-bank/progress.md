@@ -7,6 +7,10 @@
 
 ## Open items
 
+- [x] **2026-09-17 — Webhook redaction coverage audit implemented, commit `d0d35ff8`.** The
+  webhook control token is registered for redaction, skipped values are counted by reason, and
+  six direct regression tests were added. Required gates passed. No PR created per instruction.
+
 - [x] **PR #127 MERGED 2026-09-17, SHA `978ea60f`.** Hermes autonomy, Slack `/k3dm`,
   E2E observability shipped. CI fixed (`c40924d1`), Copilot review swept (narrative
   + inline), `enforce_admins` verified. Retrospective: `docs/retro/2026-09-17-v1.34.0-retrospective.md`.

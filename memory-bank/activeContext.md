@@ -7,6 +7,10 @@
 
 ## Current focus
 
+- **2026-09-17 — Webhook redaction coverage audit implemented, commit `d0d35ff8`.** Registered
+  the webhook control token at `_auth`, counted skipped redaction registrations by reason, and
+  added six direct regression tests. Required gates passed. No PR created per task instruction.
+
 - **2026-09-17 — PR #127 MERGED, SHA `978ea60f`.** Hermes autonomy, Slack `/k3dm`,
   E2E observability shipped. Pre-merge gates (CI fix `c40924d1`, Copilot review
   narrative + inline comments swept) all green. `enforce_admins: true` verified on
