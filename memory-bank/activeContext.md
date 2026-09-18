@@ -7,6 +7,11 @@
 
 ## Current focus
 
+- **2026-09-18 — vCluster readiness zero-probe race FIXED, `aa71c1f4`.** `_e2e_wait_vcluster_ready`
+  now probes `/readyz` before checking the integer-second deadline. The deterministic regression
+  failed against the old implementation and passed after the fix. `make test` passed twice at
+  947/947, `make test-bin` passed 108/108, and shellcheck passed for both touched shell files.
+
 - **2026-09-17 — Two specs filed and dispatched to Codex, sequentially (never in parallel — both
   target `k3d-manager-v1.35.0`, and the CI spec runs the full suite the TLS spec modifies, so two
   concurrent `codex exec` runs in one worktree would collide on the push and corrupt each other's

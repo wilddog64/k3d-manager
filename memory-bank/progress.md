@@ -7,6 +7,11 @@
 
 ## Open items
 
+- [x] **2026-09-18 — E2E readiness gate zero-probe race FIXED, `aa71c1f4`.** Added a deterministic
+  100→101 clock-boundary regression that failed before the fix and passed after it; the gate now
+  always probes `/readyz` before enforcing the deadline. `make test` passed twice at 947/947,
+  `make test-bin` passed 108/108, and shellcheck passed.
+
 - [x] **2026-09-17 — Orphaned test suites: Makefile entrypoints + CI gating COMPLETE.**
   Part 1 `63d7f523` (five `make test-*` targets), Parts 2+3 `6eb1866e` (CI steps in the `lint`
   job for `make test-bin`, `make test-python-unit`, and `make test-pytest` behind a pinned
