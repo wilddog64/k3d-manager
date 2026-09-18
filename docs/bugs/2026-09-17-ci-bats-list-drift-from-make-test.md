@@ -170,3 +170,69 @@ default.
 - Do NOT run `git add -A` — stage named paths only.
 - Do NOT touch any live cluster, `kubectl`, `helm`, or `docker` state. This task is code
   plus BATS only.
+
+## Outcome
+
+### macOS
+
+Command: `make test > /tmp/maketest.log 2>&1; echo "EXIT=$?"; rg '^not ok' /tmp/maketest.log`
+
+Exit: `EXIT=0`
+
+Verbatim `not ok` output:
+
+```text
+
+```
+
+### Linux-sim
+
+Command: `PATH="/tmp/linuxsim/bin:$PATH" make test 2>&1 | tee /tmp/linuxsim/make-test-linux.log` followed by `grep -E '^not ok' /tmp/linuxsim/make-test-linux.log`
+
+Exit: `EXIT=0`
+
+Verbatim `not ok` output:
+
+```text
+
+```
+
+### Classification
+
+**Codex's enumeration was incomplete. Corrected by Claude on independent re-run.**
+
+Two caveats on the agent-reported numbers above:
+
+1. The Linux-sim `EXIT=0` is **not trustworthy** — that command pipes `make test` into `tee`, so
+   `$?` is `tee`'s status, not `make`'s. The handoff warned against exactly this shape and it
+   still slipped through on the second of the two runs.
+2. Claude's own unpiped re-run of `make test` on macOS, against a surviving log, returned
+   **`MAKETEST_EXIT=2`, `ok=945 notok=1`** — one failure Codex's two runs did not hit:
+
+```text
+not ok 661 readiness gate honours E2E_VCLUSTER_READY_TIMEOUT and fails when never ready
+# (in test file scripts/tests/plugins/e2e.bats, line 269)
+#   `[ "$status" -eq 0 ]' failed
+```
+
+The test passes 8/8 in isolation and failed only under full-suite load, which is the shape of a
+flake — but per the repo's own rule, a flake claim requires **naming** the nondeterminism, not
+asserting it. Named and then reproduced deterministically:
+
+`_e2e_wait_vcluster_ready` (`scripts/plugins/e2e.sh:156-166`) samples `date +%s` twice —
+once to compute `deadline=$(( now + E2E_VCLUSTER_READY_TIMEOUT ))`, then again in the loop
+guard `while now=$(date +%s); (( now < deadline ))`. `date +%s` has integer-second
+resolution, so if the wall clock crosses a second boundary between those two samples, with
+`E2E_VCLUSTER_READY_TIMEOUT=1` the guard is already false and the loop body **never runs**:
+the function reports "not ready" having issued **zero** probes. Proven with a stubbed `date`
+returning 100 then 101 — `probes logged: 0`.
+
+**Classification: real production bug — third bucket. NOT fixed here, per this spec's own STOP
+rule.** A timeout loop that can perform zero probes is wrong independent of the test: it reports
+a negative result without having asked the question. Production impact is small but real (the
+default timeout is 600s, so the window is ~1 second in 600 per call); the practical impact is
+that this suite was **dark in CI before this change and is gated by it**, so the race becomes an
+intermittently red CI.
+
+Filed as `docs/bugs/2026-09-17-e2e-readiness-gate-can-probe-zero-times.md`. It is not fixed in
+this commit and was not silenced, disabled, or skipped.

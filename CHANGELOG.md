@@ -7,6 +7,10 @@
 - Deterministic `make test-bin`, `make test-python-unit`, `make test-pytest`, `make test-python`, and `make test-all` entrypoints close the coverage gap for the previously orphaned bin BATS and Python test suites
 - CI now runs the previously dark suites: `make test-bin` and `make test-python-unit` in the `lint` job, plus the 120 pytest tests under `scripts/tests/hermes` and `scripts/tests/bin/test_smoke_logins.py` behind a pinned `pytest==9.1.1` install step. None of these had been executed by any automated path before
 
+### Changed
+
+- CI now runs the Makefile's complete offline BATS discovery through `make test`, including `scripts/tests/etc`, so new suites are gated without a hand-maintained file list
+
 
 ### Fixed
 
