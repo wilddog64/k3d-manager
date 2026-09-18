@@ -7,6 +7,17 @@
 
 ## Open items
 
+- [x] **2026-09-17 — v1.34.0 release CUT (was merged but never published).** PR #127 merged at
+  `978ea60f` on 2026-09-17 with no version heading, so `/post-merge` Step 4 skipped tagging and
+  the release went unrecorded: no tag, no GitHub release, no releases row. Now published: tag
+  `v1.34.0` at `978ea60f`, GitHub release (**Latest**), `docs/releases.md` + README rows
+  (`bd67710a`, v1.31.0 moved into the collapsible block), CHANGELOG promoted to
+  `## [1.34.0] - 2026-09-17` (`a56cd27a`) with the 2 post-merge bullets left in `[Unreleased]`
+  as v1.35.0 work. Root cause: no skill step promoted `[Unreleased]` to a version — `/create-pr`
+  only checked an entry existed, `/post-merge` only read the heading. Fixed in both skills:
+  `~/.claude/commands/create-pr.md` pre-flight 3b (blocking promotion for `k3d-manager-v<version>`
+  branches) and `~/.claude/commands/post-merge.md` Step 4 (skip must be loud + user-gated).
+
 - [x] **2026-09-17 — Deterministic Make test entrypoints Part 1 committed `63d7f523` and
   pushed to `k3d-manager-v1.35.0`.** Added `test-bin`, `test-python-unit`, `test-pytest`,
   `test-python`, and `test-all`, plus `.PHONY`, help, and CHANGELOG coverage-gap entries.
