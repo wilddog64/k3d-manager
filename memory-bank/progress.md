@@ -7,6 +7,14 @@
 
 ## Open items
 
+- [x] **2026-09-19 — v1.36.0 Tier 2 `e2e_verify_sandbox` implementation COMPLETE at `ffeb9ba2`.**
+  Exact commit pushed to `origin/k3d-manager-v1.36.0`; no PR URL because PR creation was explicitly
+  forbidden. Task A report tier/project plumbing, six-step sandbox sequence, TokenReview Vault
+  substrate, rendered overrides, OAuth2/Stripe Job, no-registration/no-teardown invariants, API/guide/
+  README/CHANGELOG docs, and namespace-label tracker closure are complete. Final gates: shellcheck
+  `-S warning` clean, `make test` `ok=954 not ok=0`, `make test-bin` `ok=108 not ok=0`, and every
+  new structural case mutation-verified as real=PASS / mutated=FAIL.
+
 - [x] **Whole-line `grep -F` BATS audit — MERGED as `f20d100b` (PR #129, 2026-09-19 13:52:35Z).**
   Post-merge done: `enforce_admins` restored (verified `true`), no tag/release (a `fix/*` head,
   not a milestone — entry stays under `[Unreleased]`), no retro for the same reason,

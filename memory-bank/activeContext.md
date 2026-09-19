@@ -7,6 +7,15 @@
 
 ## Current focus
 
+- **2026-09-19 — Tier 2 sandbox harness implemented and pushed as `ffeb9ba2`.**
+  `e2e_verify_sandbox` now follows the locked v1.25.0 six-step sequence with disposable in-sandbox
+  ArgoCD, TokenReview Vault wiring, rendered order/payment overrides, OAuth2/Stripe Job settings,
+  shared sandbox reporting, no hub registration, and no teardown. Task A parameterizes tier/project,
+  extends 8081/8082 attribution, and makes replay tier-aware. Structural BATS covers all six contract
+  points plus public dispatchability. Gates: shellcheck `-S warning` clean; `make test` 954/0;
+  `make test-bin` 108/0; six mutation pairs real=PASS/mutated=FAIL. Namespace-label tracker marked
+  CLOSED. Pushed to `origin/k3d-manager-v1.36.0`; no PR created (explicitly forbidden).
+
 - **2026-09-19 — whole-line `grep -F` audit MERGED as `f20d100b` (PR #129, merged 13:52:35Z).**
   Post-merge complete: `enforce_admins` re-enabled via bodyless POST (verified `enabled=true`),
   `main` synced locally, `k3d-manager-v1.36.0` forward-merged onto the new `main`. **No tag or
