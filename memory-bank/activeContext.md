@@ -7,6 +7,30 @@
 
 ## Current focus
 
+- **2026-09-19 — `istiod` scrape job missing a port filter: spec filed `96766915`, ASSIGNED to Codex.**
+  Operator reported a "Target disappeared from Prometheus target discovery" alert. Nothing
+  disappeared — the live rule is kube-prometheus-stack `TargetDown`, and `job=istiod` has been
+  firing since 2026-09-11T16:39:47Z. Root cause: the `istiod` `additionalScrapeConfigs` entry in
+  `kube-prometheus-stack-values.yaml:29-38` keeps targets by **service name with no port filter**,
+  so all istiod endpoint ports are scraped. Only `15014` (`http-monitoring`) serves metrics; 15010
+  is gRPC/XDS (its HTTP/2 preface reads as a malformed HTTP/1 response), 15012 is XDS over TLS
+  (`EOF`), 15017 is the injection webhook (`400`), and 8080 has no `/metrics` handler (`404`).
+  8 of 10 targets down = 80% > the 10% threshold. **Metrics collection is healthy** —
+  both `http-monitoring` targets `up`, `count(pilot_xds)` = 4 — so this is pure alert noise that
+  trains the operator to ignore `TargetDown`. `kube-prometheus-stack-acg-values.yaml:82-91` carries
+  a byte-identical block with the same defect. Fix is one `keep` on
+  `__meta_kubernetes_endpoint_port_name` = `http-monitoring` in both files, plus `yq` BATS coverage
+  in `observability_federate_self_scrape.bats`. Note the `8080` target arrives with an **empty**
+  endpoint port name (the `endpoints` role also emits unmatched pod container ports), so a keep on
+  the port *name* drops it while a port-number test would not — keep the good port, do not blacklist
+  the bad ones. Spec: `docs/bugs/2026-09-19-istiod-scrape-job-missing-port-filter.md`.
+  **Applying the config to the live cluster is the operator's, explicitly out of scope.**
+  Two adjacent findings deliberately left out of scope: `job=federate-acg` is also `TargetDown`
+  (`host.internal:19190` refused) but is a genuinely dead endpoint, expected with no live ACG
+  sandbox; and `kube-prometheus-stack-apiserver/0` is down with `context deadline exceeded` on
+  `https://192.168.97.5:6443/metrics`, correlating with the firing `NodeSystemSaturation` and
+  `CPUThrottlingHigh` alerts, so it reads as node CPU starvation rather than an apiserver fault.
+
 - **2026-09-19 — Tier 2 sandbox harness implemented and pushed as `ffeb9ba2`.**
   `e2e_verify_sandbox` now follows the locked v1.25.0 six-step sequence with disposable in-sandbox
   ArgoCD, TokenReview Vault wiring, rendered order/payment overrides, OAuth2/Stripe Job settings,

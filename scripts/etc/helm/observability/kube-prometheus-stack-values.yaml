@@ -36,6 +36,9 @@ prometheus:
           - source_labels: [__meta_kubernetes_service_name]
             action: keep
             regex: istiod
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: http-monitoring
       - job_name: federate-acg
         scrape_interval: 60s
         honor_labels: true

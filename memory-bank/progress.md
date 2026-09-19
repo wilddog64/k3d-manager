@@ -7,6 +7,15 @@
 
 ## Open items
 
+- [ ] **2026-09-19 — `istiod` scrape job missing a port filter — spec `96766915`, ASSIGNED to Codex.**
+  `TargetDown` has fired for `job=istiod` since 2026-09-11 because the `additionalScrapeConfigs`
+  entry keeps by service name with no port filter, so all istiod endpoint ports are scraped and only
+  `15014` (`http-monitoring`) serves metrics — 8 of 10 targets permanently down while metrics
+  collection is actually healthy. Same defect in the hub and ACG values files. Fix is one `keep` on
+  `__meta_kubernetes_endpoint_port_name` plus `yq` BATS coverage. Spec:
+  `docs/bugs/2026-09-19-istiod-scrape-job-missing-port-filter.md`. Applying the config to the live
+  cluster is the operator's and is out of scope.
+
 - [x] **2026-09-19 — v1.36.0 Tier 2 `e2e_verify_sandbox` implementation COMPLETE at `ffeb9ba2`.**
   Exact commit pushed to `origin/k3d-manager-v1.36.0`; no PR URL because PR creation was explicitly
   forbidden. Task A report tier/project plumbing, six-step sandbox sequence, TokenReview Vault
