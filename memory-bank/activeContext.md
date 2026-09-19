@@ -7,6 +7,22 @@
 
 ## Current focus
 
+- **2026-09-19 — whole-line `grep -F` audit MERGED as `f20d100b` (PR #129, merged 13:52:35Z).**
+  Post-merge complete: `enforce_admins` re-enabled via bodyless POST (verified `enabled=true`),
+  `main` synced locally, `k3d-manager-v1.36.0` forward-merged onto the new `main`. **No tag or
+  release** — the head was `fix/bats-whole-line-grep-assertions`, not a milestone branch, so its
+  entry correctly stays under `[Unreleased]`; nothing was skipped silently. No retro, for the same
+  reason. 42 whole-line source assertions narrowed across 8 suites; `make test` 947/0,
+  `make test-bin` 108/0. **Copilot found 3 issues, all valid, and two were real semantic losses in
+  my own narrowing** — the `get-pods` payload gate had dropped `namespace` and the diagnostics
+  relay gate had dropped `payload` and `meta`, so either could have been removed from the worker
+  undetected. Sweeping the other 40 conversions for the same shape found a third Copilot missed:
+  the ask-transcript gate had dropped `delete=False`, where deletion destroys the transcript the
+  test claims to capture. Three further candidates were left narrowed deliberately, because the
+  dropped token is not part of what the `@test` name claims. All four restored tokens were
+  mutation-verified. Findings: `docs/issues/2026-09-19-copilot-pr129-review-findings.md`.
+  **Lesson: a green suite cannot detect a weakening — only mutation can.**
+
 - **2026-09-19 — `.github/copilot-instructions.md` gained an **Assertion Strength (v1.36.0+)**
   review section.** Closes the gap noted after v1.35.0: the release's most reusable lesson — that
   `run <binary>` plus a non-zero-status assertion is **vacuously green** when the binary is absent,
@@ -29,6 +45,26 @@
   action** on the live cluster (hub + ACG, both required to pick up v1.35.0 config; deployment
   on main and k3d-manager-v1.36.0 is currently inert until sets are reapplied — the issue was
   first identified and documented in v1.33.0 and remains unfixed operationally).
+- **2026-09-18 — PR #128 open and MERGE-READY at `c8ea57c4`.** v1.35.0.
+  https://github.com/wilddog64/k3d-manager/pull/128
+  All gates green: `lint` pass, `detect` pass, CodeQL (actions/js/python) pass, GitGuardian pass,
+  `stage2` skipping (conditional, not a gate). 0 unresolved review threads.
+  **`enforce_admins` is DISABLED** — must be re-enabled after merge with a **bodyless POST**
+  (`-f enabled=true` returns HTTP 422). `required_approving_review_count` is 1 and Copilot only
+  COMMENTED, so `mergeable_state` reads `blocked`; with enforce_admins off the owner can still
+  merge. That is the normal shape here, not a problem.
+  **Copilot: 3 findings, 0 false positives, all fixed and resolved.** F1 (Makefile pipefail) was
+  already fixed in `2c205e3e` before the review landed — Copilot reviewed `404d2139`. F2/F3 are
+  the same defect twice: a required dependency treated as optional
+  (`docs/issues/2026-09-18-copilot-pr128-review-findings.md`).
+  **Three CI reds before green, all one family: "green on the maintainer's macOS box, impossible
+  on Linux."** (1) `rg` in 3 BATS suites — and 2 call sites were `run rg …` + `[ status -ne 0 ]`,
+  so a missing binary SATISFIED the negative assertion: vacuous-green, not red. (2) `keycloak.bats`
+  `cp`'d a fixture from the shopping-cart-infra sibling checkout CI never clones. (3) the Makefile
+  declared no `SHELL`, so `set -euo pipefail` recipes ran under dash. Commits `287cc71a`,
+  `2c205e3e`, `c8ea57c4`.
+  **Most reusable finding: `/bin/dash` IS installed on this Mac.** So the sh-vs-bash class is
+  locally reproducible — `make SHELL=/bin/dash <target>` — and never needs a CI round trip again.
 
 - **2026-09-18 — CI red #2 on PR #128: the Makefile had no `SHELL`, so recipes ran under dash. FIXED.**
   All 947 BATS passed on the runner this time; the step died afterwards at `make test-bin` with
