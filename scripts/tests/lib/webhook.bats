@@ -598,7 +598,7 @@ PY
     run grep -Eq 'RUN_DIR = .*"K3DM_RUN_DIR"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
     [ "$status" -eq 0 ]
 
-    run grep -Eq 'prefix="k3dm-ask-".*dir=str\(RUN_DIR\)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq 'prefix="k3dm-ask-".*delete=False.*dir=str\(RUN_DIR\)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 }
 

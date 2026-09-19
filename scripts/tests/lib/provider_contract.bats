@@ -958,7 +958,7 @@ EOF
   [ "$status" -eq 0 ]
   run test -x "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
-  run grep -Eq '_attempt<=30' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  run grep -Eq '_attempt\s*<=\s*30' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
   run grep -F 'RESTART_DELAY=2' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]

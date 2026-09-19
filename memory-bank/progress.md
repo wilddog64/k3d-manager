@@ -7,8 +7,8 @@
 
 ## Open items
 
-- [ ] **Whole-line `grep -F` BATS audit — REBASED onto v1.35.0 as `1d8c7cd1`, NO PR (intentional,
-  awaiting the user's go).** Branch `fix/bats-whole-line-grep-assertions`, base `main` @
+- [ ] **Whole-line `grep -F` BATS audit — PR #129 OPEN (opened 2026-09-19), CI green, NOT merged.**
+  https://github.com/wilddog64/k3d-manager/pull/129 — Branch `fix/bats-whole-line-grep-assertions`, base `main` @
   `e259c718`. Spec `docs/bugs/2026-09-18-bats-whole-line-grep-assertion-audit.md`. 45 whole-line
   assertions -> 3 deliberate keeps across 8 suites (argocd 12, webhook 16, slack_slash 5,
   provider_contract 5, slack_relay_ack 3, image_updater 2, worker_setup 1, observability 1).

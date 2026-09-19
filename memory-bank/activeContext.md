@@ -7,6 +7,22 @@
 
 ## Current focus
 
+- **2026-09-19 — whole-line `grep -F` audit is PR #129, CI green, awaiting merge.**
+  https://github.com/wilddog64/k3d-manager/pull/129. Copilot found 3 issues and **two were real
+  semantic losses in the narrowing** — the `get-pods` payload assertion had dropped `namespace`,
+  and the diagnostics relay assertion had dropped both `payload` and `meta`, so the test would
+  have passed with either argument removed. That is *weakening*, which the spec explicitly
+  forbids, not narrowing. Reviewing the rest of the diff for the same shape surfaced one more
+  Copilot missed: the ask-transcript test had dropped `delete=False`, whose absence would destroy
+  the transcript the test claims is captured. Three other candidates were judged acceptable
+  because the dropped token was not what the test's name gates (`-n NAMESPACE` in a
+  context-fallback test, `thread_ts` in a provider-dispatch test, `.local/share` in a
+  policy-definition test). All four restored tokens were mutation-verified to gate. CHANGELOG
+  reworded from "shell source" to "source code": the suites assert against Python, JS and
+  `*.sh.tmpl` too. Lesson: a narrowing that keeps the *distinctive* token can still drop a
+  *required* one — the test's name is the contract to check each dropped token against.
+  See [[feedback_whole_line_grep_test_assertions_rot]].
+
 - **2026-09-18 — whole-line `grep -F` BATS audit rebased onto v1.35.0, `1d8c7cd1`. NO PR YET.**
   Branch `fix/bats-whole-line-grep-assertions`, now based on `main` @ `e259c718` (the v1.35.0
   squash) instead of `978ea60f`. 45 whole-line-against-source assertions across 8 suites narrowed

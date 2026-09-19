@@ -139,9 +139,9 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
   run grep -Eq 'function parseClusterDiagnose\(' "${WORKER}"
   [ "${status}" -eq 0 ]
 
-  run grep -Eq "provider: target, action: 'get-pods'" "${WORKER}"
+  run grep -Eq "provider: target.*action: 'get-pods'.*namespace" "${WORKER}"
   [ "${status}" -eq 0 ]
 
-  run grep -Eq "relay\('/api/v1/diagnostics'" "${WORKER}"
+  run grep -Eq "relay\('/api/v1/diagnostics',\s*payload,\s*meta" "${WORKER}"
   [ "${status}" -eq 0 ]
 }
