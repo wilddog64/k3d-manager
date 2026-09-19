@@ -7,6 +7,20 @@
 
 ## Current focus
 
+- **2026-09-19 — `.github/copilot-instructions.md` gained an **Assertion Strength (v1.36.0+)**
+  review section.** Closes the gap noted after v1.35.0: the release's most reusable lesson — that
+  `run <binary>` plus a non-zero-status assertion is **vacuously green** when the binary is absent,
+  because exit 127 satisfies it — was in the CHANGELOG and the retro but in no review instruction,
+  so nothing would have caught the next instance. Three rules added, all of which pass CI by
+  construction and therefore must be caught by a human or Copilot: (1) `run <binary>` + non-zero
+  status, requiring a positive `output` assertion or a `command -v` + `skip` guard; (2) `grep -F`
+  of a whole line of source code, with the narrower idioms including `declare -F`; (3) a narrowing
+  that dropped a token the `@test` name claims — the PR #129 defect class, where three assertions
+  dropped `namespace`, `payload`/`meta` and `delete=False` respectively while staying green.
+  Filed on this branch rather than on `fix/bats-whole-line-grep-assertions` per `/post-merge`
+  Step 7b (standing-doc updates belong in the first commit on the next feature branch), and to
+  avoid re-opening a Copilot-reviewed, merge-ready PR.
+
 - **2026-09-18 — v1.35.0 RELEASED at `e259c718` (merged 17:35:07Z, tag+release pushed).** Post-merge
   complete: `enforce_admins` re-enabled via bodyless POST (verified `enabled=true`); tag `v1.35.0`
   created and pushed to origin; GitHub release published with full CHANGELOG notes;
