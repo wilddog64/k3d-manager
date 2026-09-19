@@ -657,7 +657,7 @@ EOF
 }
 
 @test "Prometheus rotation entrypoint and launchd template are value-free" {
-  run grep -F -- 'function observability_rotate_prometheus_basic_auth()' "${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
+  run grep -Eq '^(function )?observability_rotate_prometheus_basic_auth\(\)' "${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   [ "$status" -eq 0 ]
   run grep -F -- 'observability_rotate_prometheus_basic_auth' "${BATS_TEST_DIRNAME}/../../etc/launchd/com.k3d-manager.prometheus-credential-rotator.plist.tmpl"
   [ "$status" -eq 0 ]

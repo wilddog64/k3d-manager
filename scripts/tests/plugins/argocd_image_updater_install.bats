@@ -4,7 +4,7 @@ SRC="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
 KUST="${BATS_TEST_DIRNAME}/../../etc/argocd/image-updater/kustomization.yaml"
 
 @test "image-updater install: deploy function defined" {
-  run grep -F -- 'function _argocd_deploy_image_updater()' "${SRC}"
+  run grep -Eq '^(function )?_argocd_deploy_image_updater\(\)' "${SRC}"
   [ "${status}" -eq 0 ]
 }
 
@@ -30,7 +30,7 @@ KUST="${BATS_TEST_DIRNAME}/../../etc/argocd/image-updater/kustomization.yaml"
 }
 
 @test "image-updater pull-secret: ensure function defined" {
-  run grep -F -- 'function _argocd_ensure_ghcr_pull_secret()' "${SRC}"
+  run grep -Eq '^(function )?_argocd_ensure_ghcr_pull_secret\(\)' "${SRC}"
   [ "${status}" -eq 0 ]
 }
 

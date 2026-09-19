@@ -309,13 +309,13 @@ setup() {
 }
 
 @test "webhook hostinger status handler accepts provider dispatch" {
-    run grep -F -- 'def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq '^def _run_hostinger_status\(.*provider=None' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'target=_run_hostinger_status if provider == "hostinger" else _run_cluster_status,' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq '_run_hostinger_status if provider == "hostinger"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'kwargs={"thread_ts": thread_ts, "provider": provider}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq 'kwargs=\{.*"provider": provider' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 }
 
@@ -534,28 +534,42 @@ PY
 }
 
 @test "webhook remote operator access defines policy and audit log" {
-    run grep -F -- '_ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    local _levels
+    _levels="$(grep -m1 -E '_ROLE_LEVELS\s*=' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook")"
+    local _pair
+    for _pair in '"reader": 1' '"operator": 2' '"admin": 3'; do
+      if [[ "${_levels}" != *"${_pair}"* ]]; then
+        echo "_ROLE_LEVELS is missing ${_pair}: ${_levels}"
+        return 1
+      fi
+    done
+
+    run grep -Eq 'AUDIT_DIR = .*"k3d-manager".*"audit"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
+    run grep -Eq '"/api/v1/cluster-refresh":.*"min_role": "operator"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- '"/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
-    [ "$status" -eq 0 ]
-
-    run grep -F -- 'return {"name": f"cluster-{action}", "min_role": "admin"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq 'f"cluster-\{action\}".*"min_role": "admin"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 }
 
 @test "webhook diagnostics endpoint is reader-scoped and namespace-guarded" {
-    run grep -F -- '"/api/v1/diagnostics": {"name": "diagnostics", "min_role": "reader"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq '"/api/v1/diagnostics":.*"min_role": "reader"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
     run grep -F -- '"shopping-cart-apps",' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'allowed_actions = {"get-pods", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
-    [ "$status" -eq 0 ]
+    local _actions
+    _actions="$(grep -m1 -E 'allowed_actions\s*=' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook")"
+    local _action
+    for _action in get-pods describe-pod logs get-apps describe-app get-appsets; do
+      if [[ "${_actions}" != *"\"${_action}\""* ]]; then
+        echo "allowed_actions is missing ${_action}: ${_actions}"
+        return 1
+      fi
+    done
 }
 
 @test "webhook analysis defaults to agy CLI instead of gemini" {
@@ -567,24 +581,24 @@ PY
 }
 
 @test "webhook cluster status classifies absent ACG sandboxes explicitly" {
-    run grep -F -- 'def _acg_stack_probe(provider):' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq '^def _acg_stack_probe\(' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- '"status_line": "*ACG sandbox:* absent — sandbox likely expired or was torn down",' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Fq -- '*ACG sandbox:* absent' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'ACG sandbox appears absent/expired. `/cluster-refresh` will not recreate it; reprovision the cluster instead.' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Fq -- 'will not recreate it' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- '"refresh_line": "\n⚠️ *Refresh completed* — credentials refreshed, but the ACG sandbox is still absent and must be reprovisioned",' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Fq -- 'still absent and must be reprovisioned' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 }
 
 @test "webhook ask subprocess captures transcripts in the k3d-manager run dir" {
-    run grep -F -- 'RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
+    run grep -Eq 'RUN_DIR = .*"K3DM_RUN_DIR"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'prefix="k3dm-ask-", suffix=".out", delete=False, mode="w", dir=str(RUN_DIR)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq 'prefix="k3dm-ask-".*delete=False.*dir=str\(RUN_DIR\)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 }
 

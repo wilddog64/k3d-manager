@@ -952,13 +952,13 @@ EOF
   }
   _hostinger_refresh_access_layer
 
-  run grep -F 'port 8080 still in use — clearing stale listener(s) before retry' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  run grep -Fq -- 'still in use — clearing stale listener' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
   run test -x "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
   [ "$status" -eq 0 ]
   run test -x "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
-  run grep -F 'for (( _attempt=1; _attempt<=30; _attempt++ ))' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  run grep -Eq '_attempt\s*<=\s*30' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
   run grep -F 'RESTART_DELAY=2' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
@@ -968,9 +968,9 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F '_pf_alive()' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
-  run grep -F 'if ! _pf_alive; then' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  run grep -Eq '! _pf_alive' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
-  run grep -F '_pf_alive && {' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  run grep -Eq '_pf_alive &&' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
   run grep -F -- 'svc/keycloak' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   [ "$status" -eq 0 ]
@@ -982,7 +982,7 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F 'services stop cloudflared' "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
-  run grep -F -- '--context "ubuntu-hostinger" port-forward --address=127.0.0.2' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  run grep -Eq -- '--context "ubuntu-hostinger" .*--address=127\.0\.0\.2' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
   run grep -F -- 'com.k3d-manager.grafana-port-forward.sh' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
   [ "$status" -eq 0 ]

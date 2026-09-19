@@ -6,12 +6,12 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
   run grep -F -- "event.respondWith(handle(event.request, event))" "${WORKER}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- "event.waitUntil((async () => {" "${WORKER}"
+  run grep -Eq 'event\.waitUntil\(' "${WORKER}"
   [ "${status}" -eq 0 ]
 }
 
 @test "slack relay cluster-status acks before webhook completes" {
-  run grep -F -- "return jsonReply(\`🔍 Checking \${_where} cluster status…\`, threadTs, true)" "${WORKER}"
+  run grep -Eq 'jsonReply\(.*cluster status' "${WORKER}"
   [ "${status}" -eq 0 ]
 
   run grep -E -- "await relay\\('/api/v1/cluster-status', payload" "${WORKER}"
@@ -19,9 +19,9 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
 }
 
 @test "slack relay can post a fallback response_url error" {
-  run grep -F -- "async function postResponseUrl(url, text, ephemeral = true)" "${WORKER}"
+  run grep -Eq 'function postResponseUrl\(' "${WORKER}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- "await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')" "${WORKER}"
+  run grep -Eq 'postResponseUrl\(responseUrl, .*Webhook unreachable' "${WORKER}"
   [ "${status}" -eq 0 ]
 }

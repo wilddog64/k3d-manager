@@ -295,11 +295,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-09-19 | [PR #129 review findings](docs/issues/2026-09-19-copilot-pr129-review-findings.md) | Three of the 42 narrowed BATS assertions had become *weakenings*: the cluster-diagnose payload gate dropped `namespace`, the diagnostics relay gate dropped `payload` and `meta`, and the ask-transcript gate dropped `delete=False`. Two found by Copilot, the third by sweeping the rest of the diff for the same shape; all four restored tokens mutation-verified |
+| 2026-09-18 | [PR #128 review findings](docs/issues/2026-09-18-copilot-pr128-review-findings.md) | Provider helpers were an implicit global rather than a declared dependency: `argocd.sh` sourced `lib/provider.sh` behind an `if [[ -r ]]` guard while needing `_acg_provider_state_dir`, and `k3s-hostinger.sh` never sourced it at all |
 | 2026-09-17 | [PR #127 review findings](docs/issues/2026-09-17-copilot-pr127-review-findings.md) | Stale BATS assertion for a deliberately removed Keycloak seeded-password fallback (CI failure), an EXIT trap referencing an unset `_tmp` under `set -u` in `cluster-status-summary`, and a duplicated grep in the Hermes dashboard history test |
 | 2026-09-17 | [Hermes findings visibility](docs/issues/2026-09-17-hermes-grafana-visibility.md) | Hermes polled fine but its findings existed only in local state; adds a redacted findings publication, exporter metrics and a Hermes Status Grafana dashboard, with stat panels aggregated to scalars so Prometheus scrape labels stop rendering as values |
 | 2026-09-17 | [CVE dashboard freeze](docs/issues/2026-09-17-cve-dashboard-freeze.md) | Both raw CVE tables streamed all 7,409 `trivy_vulnerability_inventory` series to Grafana and froze the browser; bounded to `topk(500, ...)` |
-| 2026-09-17 | [k3dm deployment dashboard no-data](docs/issues/2026-09-17-k3dm-deployment-dashboard-no-data.md) | Dashboard is installed but deployment-event publishing was never wired: no `k3dm_deployment_*` series and no Pushgateway service |
-| 2026-09-16 | [Live SSO and remote E2E recovery](docs/issues/2026-09-16-live-sso-e2e-recovery.md) | The Keycloak PostSync hook failed because `quay.io/keycloak/keycloak:24.0` ships no `awk`, plus two further independent gaps found during live recovery |
 
 [All issues →](docs/issues/)
 
