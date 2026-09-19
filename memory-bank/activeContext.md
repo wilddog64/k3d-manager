@@ -7,7 +7,10 @@
 
 ## Current focus
 
-- **2026-09-19 — whole-line `grep -F` audit is PR #129, CI green, awaiting merge.**
+- **2026-09-19 — whole-line `grep -F` audit is PR #129 @ `a07e3a2a`: CI green, 3/3 Copilot
+  threads replied and resolved, findings filed at
+  `docs/issues/2026-09-19-copilot-pr129-review-findings.md`, `enforce_admins` disabled for the
+  merge. NOT MERGED — the merge is the user's.**
   https://github.com/wilddog64/k3d-manager/pull/129. Copilot found 3 issues and **two were real
   semantic losses in the narrowing** — the `get-pods` payload assertion had dropped `namespace`,
   and the diagnostics relay assertion had dropped both `payload` and `meta`, so the test would

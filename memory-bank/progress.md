@@ -7,7 +7,8 @@
 
 ## Open items
 
-- [ ] **Whole-line `grep -F` BATS audit — PR #129 OPEN (opened 2026-09-19), CI green, NOT merged.**
+- [ ] **Whole-line `grep -F` BATS audit — PR #129 OPEN @ `a07e3a2a`, CI green, Copilot resolved,
+  `enforce_admins` disabled, NOT merged (the merge is the user's).**
   https://github.com/wilddog64/k3d-manager/pull/129 — Branch `fix/bats-whole-line-grep-assertions`, base `main` @
   `e259c718`. Spec `docs/bugs/2026-09-18-bats-whole-line-grep-assertion-audit.md`. 45 whole-line
   assertions -> 3 deliberate keeps across 8 suites (argocd 12, webhook 16, slack_slash 5,
