@@ -31,6 +31,14 @@
   `https://192.168.97.5:6443/metrics`, correlating with the firing `NodeSystemSaturation` and
   `CPUThrottlingHigh` alerts, so it reads as node CPU starvation rather than an apiserver fault.
 
+- **2026-09-19 — `istiod` scrape port filter FIXED and pushed as `a255d8d5`.** Added the literal
+  `http-monitoring` endpoint-port `keep` relabel rule to both hub and ACG values, with six parsed-YAML
+  BATS cases covering the new regex/action and additive service-name rule. YAML parsing passed; focused
+  BATS passed 10/10; mutation evidence was real=PASS / mutated=FAIL for all six assertions. The full
+  captured `make test` emitted 960 `^ok` and 0 `^not ok` lines; its wrapper remained in post-suite
+  cleanup and was stopped after the final case. No cluster was touched and no out-of-scope jobs/files
+  were changed. Exact feature commit `a255d8d5` is on `origin/k3d-manager-v1.36.0`.
+
 - **2026-09-19 — Tier 2 sandbox harness implemented and pushed as `ffeb9ba2`.**
   `e2e_verify_sandbox` now follows the locked v1.25.0 six-step sequence with disposable in-sandbox
   ArgoCD, TokenReview Vault wiring, rendered order/payment overrides, OAuth2/Stripe Job settings,

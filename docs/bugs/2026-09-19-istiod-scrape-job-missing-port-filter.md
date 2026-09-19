@@ -135,20 +135,20 @@ Assert against the **parsed YAML via `yq`**, never a `grep -F` of a source line.
 
 ## Definition of Done
 
-- [ ] `keep` on `__meta_kubernetes_endpoint_port_name` = `http-monitoring` added to the `istiod`
+- [x] `keep` on `__meta_kubernetes_endpoint_port_name` = `http-monitoring` added to the `istiod`
       job in **both** `kube-prometheus-stack-values.yaml` and `kube-prometheus-stack-acg-values.yaml`
-- [ ] Both files still parse: `yq -e '.prometheus.prometheusSpec.additionalScrapeConfigs' <file>`
-- [ ] New BATS cases in `scripts/tests/plugins/observability_federate_self_scrape.bats` cover
+- [x] Both files still parse: `yq -e '.prometheus.prometheusSpec.additionalScrapeConfigs' <file>`
+- [x] New BATS cases in `scripts/tests/plugins/observability_federate_self_scrape.bats` cover
       both files, all three assertions above
-- [ ] Mutation evidence: each new assertion PASSES against the real tree and FAILS against a
+- [x] Mutation evidence: each new assertion PASSES against the real tree and FAILS against a
       scratch copy with the asserted token removed or changed. Paste one `real=PASS /
       mutated=FAIL` row per assertion.
-- [ ] `make test` — paste `^ok ` and `^not ok ` counts, counted from a captured file (do **not**
+- [x] `make test` — paste `^ok ` and `^not ok ` counts, counted from a captured file (do **not**
       pipe through `tail` and read `$?`)
-- [ ] CHANGELOG `[Unreleased]` → `### Fixed` entry
-- [ ] Committed and pushed to `origin/k3d-manager-v1.36.0`, SHA proven with
+- [x] CHANGELOG `[Unreleased]` → `### Fixed` entry
+- [x] Committed and pushed to `origin/k3d-manager-v1.36.0`, SHA proven with
       `git rev-parse HEAD origin/k3d-manager-v1.36.0`
-- [ ] `memory-bank/activeContext.md` and `memory-bank/progress.md` updated with the SHA
+- [x] `memory-bank/activeContext.md` and `memory-bank/progress.md` updated with the SHA
 
 ## Commit message (exact)
 
