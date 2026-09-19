@@ -163,6 +163,23 @@ image), `E2E_NAMESPACE`, `E2E_JOB_TIMEOUT`, `E2E_ROLLOUT_TIMEOUT`, `E2E_REPORT_D
 > `Dockerfile` + `publish-image.yml` + a `workflow_call` surface on `e2e-tests.yml`).
 > Pin `E2E_IMAGE_TAG` to a `sha-<gitsha>` tag for reproducible runs.
 
+## Tier 2: ACG sandbox Stripe verification
+
+`e2e_verify_sandbox` is the opt-in, periodic Tier 2 path for the Stripe checkout
+flow. It extends the ACG sandbox TTL, installs disposable ArgoCD inside the
+`ubuntu-k3s` sandbox, applies the four ApplicationSets plus the sandbox-only
+order/payment overrides, and runs the `flows` Playwright project with
+`OAUTH2_ENABLED=true` and `STRIPE_E2E=true`.
+
+```bash
+./scripts/k3d-manager e2e_verify_sandbox
+```
+
+The sandbox is never registered with hub ArgoCD and is not torn down by the
+harness; ACG TTL expiry provides cleanup. Tier 2 is best-effort and periodic,
+never a blocking per-candidate gate. Its summaries use `tier: sandbox` and
+`project: stripe` in the shared report directory.
+
 ---
 
 ## Safety rules baked in

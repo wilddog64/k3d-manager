@@ -49,6 +49,102 @@ setup() {
   [[ "$BATS_TEST_DESCRIPTION" != _* ]]
 }
 
+@test "e2e_verify_sandbox is a public function (no leading underscore)" {
+  run declare -f e2e_verify_sandbox
+  [ "$status" -eq 0 ]
+  [[ "$BATS_TEST_DESCRIPTION" != _* ]]
+}
+
+@test "sandbox verification never invokes register_app_cluster" {
+  local marker="$BATS_TEST_TMPDIR/register-app-cluster-called"
+  acg_extend_playwright() { :; }
+  shopping_cart_create_vault_bridge() { :; }
+  _e2e_sandbox_kc() { :; }
+  _e2e_sandbox_wait_job() { :; }
+  _e2e_sandbox_job_manifest() { :; }
+  _e2e_write_summary() { :; }
+  _e2e_write_result_event() { :; }
+  register_app_cluster() { : > "$marker"; return 1; }
+  local rc=0
+  ( e2e_verify_sandbox ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  [ ! -e "$marker" ]
+}
+
+@test "sandbox job manifest exports OAuth2 and Stripe mode before Job creation" {
+  run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'name: OAUTH2_ENABLED\n              value: "true"'* ]]
+  [[ "$output" == *$'name: STRIPE_E2E\n              value: "true"'* ]]
+  [[ "$output" == *"KEYCLOAK_URL"*"https://keycloak.3ai-talk.org/realms/shopping-cart"* ]]
+  [[ "$output" == *"stripe-checkout-orchestrator.spec.ts"* ]]
+}
+
+@test "sandbox rendered overrides contain the three substrate changes" {
+  run _e2e_sandbox_render_overrides
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"name: order-service-config"*"BASKET_URL: http://basket-service.shopping-cart-apps:8083"* ]]
+  [[ "$output" == *"PAYMENT_URL: http://payment-service.shopping-cart-payment:8084"* ]]
+  [[ "$output" == *"payment.gateway.default: stripe"*"mock.gateway.enabled: \"false\""* ]]
+  [[ "$output" == *"oauth2.jwk-set-uri: https://keycloak.3ai-talk.org/realms/shopping-cart/protocol/openid-connect/certs"* ]]
+}
+
+@test "sandbox summary carries the sandbox tier and Stripe project" {
+  local run_id="sandbox-summary"
+  printf 'no Playwright results here\n' > "$E2E_REPORT_DIR/${run_id}.log"
+  export E2E_TIER=sandbox E2E_PROJECT=stripe
+  run _e2e_write_summary "$run_id" "" 0 "recording-result"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+assert summary["tier"] == "sandbox", summary
+assert summary["project"] == "stripe", summary
+assert summary["exit_code"] == 0, summary
+print("sandbox summary ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sandbox summary ok"* ]]
+}
+
+@test "Tier 1 summary defaults remain vcluster and api+flows" {
+  local run_id="tier1-summary"
+  unset E2E_TIER E2E_PROJECT
+  printf 'no Playwright results here\n' > "$E2E_REPORT_DIR/${run_id}.log"
+  run _e2e_write_summary "$run_id" "" 0 "recording-result"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+assert summary["tier"] == "vcluster", summary
+assert summary["project"] == "api+flows", summary
+print("Tier 1 summary unchanged")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Tier 1 summary unchanged"* ]]
+}
+
+@test "sandbox port attribution covers order 8081 and product-catalog 8082" {
+  local run_id="sandbox-ports"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":0,"unexpected":2,"flaky":0,"skipped":0},"suites":[{"file":"flows/stripe.spec.ts","specs":[{"title":"order :8081 ECONNREFUSED","tests":[{"results":[{"status":"failed","error":"connect ECONNREFUSED 10.0.0.1:8081"}]}]},{"title":"product :8082 ECONNREFUSED","tests":[{"results":[{"status":"failed","error":"connect ECONNREFUSED 10.0.0.2:8082"}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+groups = {(item["kind"], item["target"]) for item in summary["failure_groups"]}
+assert ("service-unreachable", "order") in groups, groups
+assert ("service-unreachable", "product-catalog") in groups, groups
+print("port attribution ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"port attribution ok"* ]]
+}
+
 @test "e2e.sh sources cleanly under set -euo pipefail" {
   run bash -c '
     set -euo pipefail

@@ -274,6 +274,7 @@ docs/
 **Virtual Clusters**
 - **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
 - **[vCluster E2E Harness (Tier 1)](docs/guides/vcluster-e2e-harness.md)** — `e2e_verify_vcluster`: throwaway-vCluster substrate + in-cluster Playwright Job + JSON pass/fail contract
+- **[vCluster E2E Harness (Tier 2)](docs/guides/vcluster-e2e-harness.md)** — `e2e_verify_sandbox`: opt-in ACG sandbox Stripe flow with in-sandbox ArgoCD and non-blocking JSON reporting
 
 **Networking**
 - **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access

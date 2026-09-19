@@ -1,4 +1,4 @@
-# Bugfix: v1.25.0 — namespace labels missing for payment NetworkPolicy selectors
+# CLOSED — Bugfix: v1.25.0 — namespace labels missing for payment NetworkPolicy selectors
 
 **Branch:** `k3d-manager-v1.25.0`
 **Files:** `services/shopping-cart-namespace/namespace.yaml`, `scripts/etc/argocd/applicationsets/data-git.yaml`
@@ -154,13 +154,13 @@ argo-cd 10.1.4).
 
 ## Definition of Done
 
-- [ ] `shopping-cart-apps` namespace carries `app.kubernetes.io/name=shopping-cart`
+- [x] `shopping-cart-apps` namespace carries `app.kubernetes.io/name=shopping-cart`
       and `app.kubernetes.io/component=application`.
-- [ ] `data-git` appset stamps `app.kubernetes.io/component=data` on the created
+- [x] `data-git` appset stamps `app.kubernetes.io/component=data` on the created
       `shopping-cart-data` namespace via `managedNamespaceMetadata`.
-- [ ] `kubectl kustomize services/shopping-cart-namespace` renders without error.
-- [ ] Committed and pushed to `k3d-manager-v1.25.0`.
-- [ ] memory-bank updated with commit SHA and task status.
+- [x] `kubectl kustomize services/shopping-cart-namespace` renders without error.
+- [x] Committed and pushed to `k3d-manager-v1.25.0`.
+- [x] memory-bank updated with commit SHA and task status.
 
 **Commit message (exact):**
 ```
