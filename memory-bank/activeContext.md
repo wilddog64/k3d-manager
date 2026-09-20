@@ -1171,6 +1171,22 @@ Spec `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md` ext
 explicitly off limits — code + BATS only. Awaiting its report; SHA, gate output and the
 mutation table all require independent verification before being trusted.
 
+## 2026-09-20 — Alertmanager notification errors: 50m CPU limit, throttled 83%
+
+Alert `PrometheusErrorSendingAlertsToAnyAlertmanager` (>3% send errors) deep-dived.
+Root cause: `kube-prometheus-stack-values.yaml:96` caps alertmanager at `cpu: 50m`, so it is
+CFS-throttled in 83–87% of every period, flat over 24 h. Batches of up to 46 alerts (61 firing)
+exceed Prometheus's 10 s notifier timeout → `context deadline exceeded`. 168/1469 = 11.4%
+cumulative. Memory fine (28 MiB / 64 MiB).
+Secondary mode: `no route to host` to stale alertmanager pod IPs (4 distinct IPs in 24 h,
+5 restarts) — spiked the ratio to 1.0 during the 14:30–14:50Z k3s crash loop. Amplifier, not
+cause.
+**Independent of the kine stall** — errors begin 09-17 23:00, before compaction died 09-18
+02:16Z, and the throttle fraction is unchanged across it.
+Spec: `docs/bugs/2026-09-20-alertmanager-cpu-limit-throttles-notifications.md` — proposes
+limits `cpu: 500m` / `memory: 128Mi`, requests `cpu: 50m` / `memory: 64Mi`. ACG variant has no
+resources block, unaffected. **Not applied — needs the operator's go.**
+
 ## 2026-09-20 — Kine compaction root cause found; Tier 2 fix landed
 
 **Kine (`docs/bugs/2026-09-09-hub-kine-compaction-stall.md`, deep dive appended `160fe63b`).**
