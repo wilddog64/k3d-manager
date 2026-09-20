@@ -162,3 +162,73 @@ Every new assertion needs a real=PASS / mutated=FAIL pair. A green run is not ev
 - The HTTP/2 protocol label and failure-rate panel
   (`docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`), which remain gated on a
   Tier 2 run that publishes bounded labels.
+
+## Before You Start
+
+1. `git pull origin k3d-manager-v1.36.0` — work on branch `k3d-manager-v1.36.0`, never `main`.
+2. Read `memory-bank/activeContext.md` and `memory-bank/progress.md`.
+3. Read these in full before editing:
+   - `scripts/plugins/e2e.sh` — lines 1-20 (env defaults), 140-160
+     (`_e2e_sandbox_render_overrides`), 200-260 (`_e2e_sandbox_job_manifest`),
+     266-338 (`e2e_verify_sandbox`), 455-530 (the Tier 1 path you are modelling on),
+     620-660 (the summary parser).
+   - `scripts/tests/plugins/e2e.bats` — the existing sandbox cases live here (34 tests; the
+     sandbox ones are at lines 52-135). Add the new cases to this file, not a new suite.
+4. Note the Tier 1 path at `e2e.sh:462-487` is the model for secret provisioning. Do not change
+   Tier 1.
+
+## Rules
+
+- `set -euo pipefail` semantics already apply; double-quote every expansion.
+- `shellcheck -S warning scripts/plugins/e2e.sh` must exit 0. Paste the output.
+- Run the focused BATS suite and paste the real output (`ok`/`not ok` counts).
+- Run `make test` and paste the counts plus exit status. **It takes ~15 minutes — it is not
+  hung.** Capture to a file and count with
+  `awk '/^ok /{o++} /^not ok /{n++} END{print o+0, n+0}'`. Do not pipe `make` through `tail`.
+- Every new assertion needs a real=PASS / mutated=FAIL pair. Mutate in a scratch copy, record
+  which test caught it, then restore. A green run alone is not evidence.
+- No inline comments in shell blocks. Minimal patch — no unsolicited refactors.
+- The Stripe key must never appear in argv. Use env or stdin. If you add a sensitive flag,
+  register it in `_args_have_sensitive_flag` in `scripts/lib/system.sh`.
+
+## What NOT to Do
+
+- Do NOT create a PR.
+- Do NOT merge anything.
+- Do NOT commit to `main` — only `k3d-manager-v1.36.0`.
+- Do NOT force-push.
+- Do NOT skip pre-commit hooks (`--no-verify`).
+- Do NOT `git add -A` — stage only the files listed in this spec.
+- Do NOT edit `scripts/lib/foundation/` or `scripts/lib/acg/` — they are subtrees, fixed upstream.
+- Do NOT touch the Tier 1 vCluster path.
+- Do NOT run anything against a live cluster or ACG sandbox. This task is code + BATS only.
+- Do NOT modify files outside: `scripts/plugins/e2e.sh`, `scripts/tests/plugins/e2e.bats`,
+  `CHANGELOG.md`, `memory-bank/activeContext.md`, `memory-bank/progress.md`.
+
+## Commit message (exact)
+
+```
+fix(e2e): correct Tier 2 sandbox Service names, result markers and Secret provisioning
+
+The Tier 2 sandbox Job manifest was written as a near-copy of the Tier 1 manifest and
+diverged where the substrates differ. Tier 1 deploys its own fixtures where the Services
+really are named basket/order/payment; Tier 2 runs against the ArgoCD-deployed charts where
+they are basket-service/order-service/payment-service. Three defects followed:
+
+- Job env pointed at three Service names that do not resolve (ports were already correct).
+- The Job command omitted the __E2E_RESULTS_BEGIN__/__E2E_RESULTS_END__ wrapper the summary
+  parser regexes for, so passed/total/failed were always None.
+- Neither ghcr-pull-secret nor stripe-e2e was ever created, so the Job could not start.
+
+Adds a sandbox preflight modelled on the Tier 1 path that ensures the namespace and both
+Secrets idempotently, reading the Stripe test key from Keychain via stdin so it never
+reaches argv, and failing loudly rather than creating an empty Secret.
+```
+
+## If you cannot commit
+
+`.git` writes have been denied to you in this workspace three times
+(`fatal: Unable to create '.git/index.lock': Operation not permitted`). If that happens
+again: **do not fabricate a SHA and do not claim done.** Leave the changes in the working
+tree, say plainly that the commit was blocked, and list exactly which files you modified.
+Claude will commit on your behalf.
