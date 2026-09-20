@@ -368,3 +368,16 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - Historical specs/issues are archived only when superseded or unreferenced; files are never deleted.
 - Keep all new work within the five-plan milestone limit. **v1.34.0 is at 5/5 — the next spec opens v1.35.0.**
 - Reapply the ApplicationSets (hub and ACG) every release, then run `argocd_check_values_branch`.
+
+## 2026-09-20 — Seed payment secrets
+
+- [x] Guard `payment/encryption`, `payment/stripe`, and `payment/paypal` against unconditional writes;
+  Stripe restores from Keychain before the placeholder fallback.
+- [x] Add six idempotency/source-copy BATS cases and the `[Unreleased]` changelog entry.
+- [x] Gates: focused BATS 14/14; `make test` 980/980, exit 0; shellcheck has only unrelated
+  pre-existing warnings in `shopping_cart.sh` lines 882–975.
+- [x] `_stripe_sk` made `local` (line 630) — Claude's fix for a spec omission that would have
+  leaked the real Stripe key into a global after the function returned.
+- [x] Committed and pushed by Claude after independent verification (diff scope, 14/14 BATS,
+  shellcheck parity against `git show HEAD:`). Codex could not commit: `.git/index.lock`
+  Operation not permitted.

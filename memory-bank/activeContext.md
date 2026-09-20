@@ -1283,3 +1283,26 @@ at `e2e.sh:31`. Stripe key goes in via `--from-file=sk_test=/dev/stdin`, never a
 Still outstanding: full `deploy_observability` (deferred, operator's call); Tier 2 live run is the
 operator's (`acg_restart` then `e2e_verify_sandbox`); ApplicationSet reapply for v1.34.0/v1.35.0
 config, which conflicts with the datastore situation until compaction is restored.
+
+## 2026-09-20 — Payment secret seed clobber fix in progress
+
+Implemented the literal replacement from `docs/bugs/2026-09-20-seed-clobbers-real-payment-secrets.md`
+in `shopping_cart_seed_sandbox_vault_kv`: payment encryption, Stripe, and PayPal now reuse the
+target secret, copy canonical source data, and only then use their existing fallback; Stripe also
+uses the exact no-account Keychain accessor specified by the bug. Added six focused BATS cases and
+the `[Unreleased]` changelog entry. Keychain existence check without `-w` reported account `cliang`.
+Focused BATS: 14/14 passed. `shellcheck scripts/plugins/shopping_cart.sh` reported only the
+pre-existing SC2015/SC2016/SC2153 findings in unrelated lines 882–975 — Claude confirmed these are
+pre-existing by running shellcheck against `git show HEAD:` of the same file and getting identical
+counts (5/3/2), so the change adds zero new warnings. Full `make test` completed 980/980, exit 0.
+
+Implemented by Codex, verified and committed by Claude — Codex again could not commit
+(`.git/index.lock: Operation not permitted`), the same sandbox wall as the Hermes fix. See
+[[reference_codex_exec_cannot_commit_git_lock]].
+
+**Claude correction on top of Codex's diff:** `_stripe_sk` was assigned without a `local`
+declaration, so the real Stripe secret key would have persisted as a **global** for the life of the
+shell after `shopping_cart_seed_sandbox_vault_kv` returned. `_src_json` beside it *is* local
+(line 630). This was **Claude's spec omission**, not a Codex error — the spec's literal block did
+not declare it and Codex copied the block faithfully, as instructed. Fixed by adding `_stripe_sk=""`
+to the existing `local` on line 630.

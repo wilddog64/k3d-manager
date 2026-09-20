@@ -627,7 +627,7 @@ function shopping_cart_seed_sandbox_vault_kv() {
   local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
   local _src_addr="${SEED_VAULT_SOURCE_ADDR:-${_seed_addr}}"
   local _src_token="${SEED_VAULT_SOURCE_TOKEN:-${_seed_token}}"
-  local _src_hdr="" _src_json=""
+  local _src_hdr="" _src_json="" _stripe_sk=""
   _src_hdr=$(_seed_vault_header_file "${_src_token}") || { _err "[acg-up] could not create temp header file"; return 1; }
   # Canonical source reader (Vault = source of truth). Returns the raw KV-v2 data object as JSON,
   # empty string if the key is absent in the source Vault.
@@ -713,9 +713,48 @@ function shopping_cart_seed_sandbox_vault_kv() {
       _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"               postgres/payment
     fi
   fi
-  _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
-  _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
-  _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
+  if _vault_kv_exists "payment/encryption"; then
+    _info "[acg-up] Reusing existing Vault secret payment/encryption"
+  else
+    _src_json=$(_seed_source_data "payment/encryption")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying payment/encryption from canonical source Vault"
+      _vault_kv_put "${_src_json}" payment/encryption
+    else
+      _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}' payment/encryption
+    fi
+  fi
+
+  if _vault_kv_exists "payment/stripe"; then
+    _info "[acg-up] Reusing existing Vault secret payment/stripe"
+  else
+    _src_json=$(_seed_source_data "payment/stripe")
+    if [[ -z "${_src_json}" ]]; then
+      _stripe_sk="$(_no_trace security find-generic-password -s k3dm-stripe-sk-test -w 2>/dev/null || true)"
+      if [[ -n "${_stripe_sk}" ]]; then
+        _info "[acg-up] Restoring payment/stripe api_key from Keychain backup"
+        _src_json=$(jq -cn --arg k "${_stripe_sk}" '{api_key:$k,webhook_secret:"whsec_placeholder"}')
+      fi
+    fi
+    if [[ -n "${_src_json}" ]]; then
+      _vault_kv_put "${_src_json}" payment/stripe
+    else
+      _warn "[acg-up] no Stripe key available — writing placeholder; Stripe calls will fail"
+      _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}' payment/stripe
+    fi
+  fi
+
+  if _vault_kv_exists "payment/paypal"; then
+    _info "[acg-up] Reusing existing Vault secret payment/paypal"
+  else
+    _src_json=$(_seed_source_data "payment/paypal")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying payment/paypal from canonical source Vault"
+      _vault_kv_put "${_src_json}" payment/paypal
+    else
+      _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
+    fi
+  fi
   if _vault_kv_exists "rabbitmq/default"; then
     _info "[acg-up] Reusing existing Vault secret rabbitmq/default"
     _rabbitmq_pass=$(_vault_kv_get_field "rabbitmq/default" "password")
