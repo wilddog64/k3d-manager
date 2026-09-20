@@ -247,3 +247,69 @@ any restart or rebuild is the operator's action.
 The durable fix belongs in the Hermes sensor, whose current predicate cannot see this failure:
 detect **compaction liveness** (no `msg="COMPACT deleted"` for more than ~15 minutes) rather than
 only absolute database size plus the 2026-09-09 stale-registration signature.
+
+---
+
+## Restart attempted 2026-09-20 14:26Z — DID NOT FIX IT, and made the cluster worse
+
+The "revised remedy" above (restart the k3s server process) was **wrong**. The operator ran
+`docker restart k3d-k3d-cluster-server-0`. Result:
+
+**Compaction resumed but cannot complete.** It picked up at exactly the revision where it died,
+confirming the loop was simply unscheduled — then failed, repeatedly, at the same target:
+
+```text
+14:32:12 msg="COMPACT compactRev=1159837 targetCompactRev=1160837 currentRev=1566699"
+14:37:53 msg="COMPACT compactRev=1159837 targetCompactRev=1160837 currentRev=1567207"
+14:38:03 level=error msg="Compact failed: failed to compact to revision 1160837: sql: transaction has already been committed or rolled back"
+14:44:10 msg="COMPACT compactRev=1159837 targetCompactRev=1160837 currentRev=1567694"
+14:44:15 level=error msg="Compact failed: failed to compact to revision 1160837: sql: transaction has already been committed or rolled back"
+```
+
+`compactRev` never advances from 1159837. Zero progress across every attempt.
+
+Two things this reveals that the pre-restart evidence could not:
+
+1. **The original 2026-09-18 death was the same failure, not a fluke.** The transaction is rolled
+   back underneath the compactor because the delete cannot finish in its window against a 2.36 GiB
+   table. So it is self-reinforcing: compaction must complete to shrink the database, and the
+   database is too large for compaction to complete. A restart cannot break that.
+2. **Backlog is ~407,000 revisions** (`currentRev` 1,567,694 vs `compactRev` 1,159,837), and kine
+   advances the target by only **1000 revisions per cycle** when the gap is large (healthy cycles
+   set `target = currentRev - 1000`; here it is `compactRev + 1000`). Even if every cycle
+   succeeded, that is ~407 cycles ≈ **34 hours minimum** of convalescence.
+
+**The restart also put the k3s server into a crash loop**, which it was not in before:
+
+```text
+14:32:13 level=fatal msg="failed to start controllers: failed to create new server context: failed to register CRDs: failed to list apiextensions.k8s.io/v1, Kind=CustomResourceDefinition ... stream error: stream ID 27; INTERNAL_ERROR"
+14:38:21 level=fatal msg="failed to start controllers: ... failed to register CRDs: failed to list..."
+14:44:46 level=fatal msg="failed to start controllers: ... failed to register CRDs: failed to list..."
+14:49:23 level=fatal msg="cloud-controller-manager panic: F0920 ... error building co..."
+```
+
+`RestartCount` went 0 → 4 in 23 minutes, one fatal every 5–6 minutes, `ExitCode 0`,
+`OOMKilled false`. Every incarnation must re-list CRDs during bootstrap; those reads cannot be
+served in time by the saturated datastore, so k3s exits fatal before it finishes starting. It gets
+exactly one compaction attempt per incarnation, which fails, and then the process dies. The API
+does still answer between restarts and all four nodes report `Ready`, so this is a bootstrap loop
+rather than an outage — but it is strictly worse than the pre-restart state, where the cluster was
+stable and only retention was broken.
+
+**Lesson: a long-running k3s server holding a saturated kine is stable only because it has already
+bootstrapped.** Restarting it forfeits that and forces it to re-read the CRD set through the same
+bottleneck. Do not restart a k3s server to fix compaction unless the datastore can serve a
+bootstrap.
+
+### Revised remedy (again)
+
+A controlled **rebuild from GitOps/Vault** — the path the original 2026-09-09 follow-up
+contemplated — is now the indicated fix, not a restart and not waiting. The evidence is that this
+database cannot be compacted in place on this hardware.
+
+If a rebuild is not acceptable, the only in-place avenue worth trying is to quiesce churn first so
+that a single compaction transaction can finish: stop the ArgoCD application controller and the
+agent nodes, give the control plane the datastore to itself, and watch for the first
+`COMPACT deleted` line. That is unproven, costs ~34 h at 1000 revisions/cycle, and is the
+operator's decision. Raw SQLite retention deletion remains forbidden, and the `profile` and
+`pw-profile` directories must not be deleted.
