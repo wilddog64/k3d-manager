@@ -29,13 +29,14 @@
 
 
 - **2026-09-20 — KubeAPIDown flapping apiserver scrape timeout implementation complete; commit
-  pending push.** Added `_observability_ensure_apiserver_scrape_timeout` to patch only the existing
+  blocked by the session's read-only `.git` metadata.** Added `_observability_ensure_apiserver_scrape_timeout` to patch only the existing
   hub ServiceMonitor endpoint with the default `45s` timeout, preserve idempotency, degrade safely
   when the CRD or ServiceMonitor is unavailable, and wire it immediately after the ArgoCD
   ServiceMonitor ensure. Added six offline BATS cases and the `[Unreleased]` CHANGELOG entry.
   Focused suite passed 6/6; shellcheck `-S warning` passed; captured `make test` finished with
   `966` ok, `0` not ok, `MAKE_EXIT=0`. Mutation evidence is recorded in the task handoff; no
-  cluster was touched.
+  cluster was touched. Explicit `git add` failed twice with `fatal: Unable to create
+  .git/index.lock: Operation not permitted`; no commit or push SHA exists yet.
 
 - **2026-09-19 — `istiod` scrape job missing a port filter: spec filed `96766915`, ASSIGNED to Codex.**
   Operator reported a "Target disappeared from Prometheus target discovery" alert. Nothing

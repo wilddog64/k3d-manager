@@ -17,8 +17,10 @@
 
 
 - [x] **2026-09-20 — KubeAPIDown flapping apiserver scrape timeout:** implementation and offline
-  verification complete; commit/push SHA pending. Focused BATS `6/6`, shellcheck warning-level
-  clean, and captured full `make test` `966/0` with `MAKE_EXIT=0`. No live cluster access used.
+  verification complete; commit/push blocked by read-only `.git` metadata. Focused BATS `6/6`,
+  shellcheck warning-level clean, and captured full `make test` `966/0` with `MAKE_EXIT=0`. No
+  live cluster access used. `git add` failed twice with `.git/index.lock: Operation not permitted`,
+  so no commit SHA exists yet.
 
 - [x] **2026-09-19 — `istiod` scrape job missing a port filter — FIXED `a255d8d5`.**
   `TargetDown` has fired for `job=istiod` since 2026-09-11 because the `additionalScrapeConfigs`

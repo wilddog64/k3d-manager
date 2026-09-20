@@ -43,6 +43,7 @@ function deploy_observability() {
   _observability_apply_argocd_dashboard "${_hub_context}"
   _deploy_promtail_acg "${_hub_context}"
   _observability_ensure_argocd_servicemonitors "${_hub_context}"
+  _observability_ensure_apiserver_scrape_timeout "${_hub_context}"
 
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
@@ -685,6 +686,41 @@ function _observability_ensure_argocd_servicemonitors() {
   fi
   printf '%s\n' "${_rendered}" | _kubectl --context "${_ctx}" apply -f - >/dev/null \
     && _info "[observability] ArgoCD ServiceMonitors ensured on ${_ctx}"
+}
+
+function _observability_ensure_apiserver_scrape_timeout() {
+  local _ctx="${1:-k3d-k3d-cluster}"
+  local _timeout_value="${OBSERVABILITY_APISERVER_SCRAPE_TIMEOUT:-45s}"
+  local _waited=0 _timeout="${OBSERVABILITY_CRD_WAIT_SECONDS:-300}"
+  while ! _kubectl --no-exit --context "${_ctx}" get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; do
+    if (( _waited >= _timeout )); then
+      _warn "[observability] ServiceMonitor CRD not present after ${_timeout}s; apiserver scrape timeout NOT ensured"
+      return 0
+    fi
+    sleep 10
+    _waited=$((_waited + 10))
+  done
+
+  local _current_timeout
+  if ! _current_timeout=$(_kubectl --no-exit --context "${_ctx}" -n monitoring \
+      get servicemonitor kube-prometheus-stack-apiserver -o jsonpath='{.spec.endpoints[0].scrapeTimeout}' 2>/dev/null); then
+    _warn "[observability] ServiceMonitor monitoring/kube-prometheus-stack-apiserver not found; apiserver scrape timeout NOT ensured"
+    return 0
+  fi
+  if [[ "${_current_timeout}" == "${_timeout_value}" ]]; then
+    _info "[observability] Apiserver ServiceMonitor scrape timeout already ${_timeout_value}"
+    return 0
+  fi
+
+  local _patch
+  _patch="[{\"op\":\"add\",\"path\":\"/spec/endpoints/0/scrapeTimeout\",\"value\":\"${_timeout_value}\"}]"
+  if _kubectl --context "${_ctx}" -n monitoring patch servicemonitor kube-prometheus-stack-apiserver \
+      --type=json -p "${_patch}" >/dev/null; then
+    _info "[observability] Apiserver ServiceMonitor scrape timeout set to ${_timeout_value}"
+  else
+    _warn "[observability] failed to patch apiserver ServiceMonitor scrape timeout; continuing"
+  fi
+  return 0
 }
 
 function _observability_apply_trivy_dashboard() {

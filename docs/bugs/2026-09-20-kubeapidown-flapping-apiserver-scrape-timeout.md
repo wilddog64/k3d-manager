@@ -186,19 +186,19 @@ source. No bare `!` in BATS. No `run <binary>` followed only by a non-zero-statu
 
 ## Definition of Done
 
-- [ ] `_observability_ensure_apiserver_scrape_timeout()` added, following the existing ensure idiom
-- [ ] Wired into the hub deploy path after `_observability_ensure_argocd_servicemonitors`
-- [ ] Default `45s`, overridable via `OBSERVABILITY_APISERVER_SCRAPE_TIMEOUT`
-- [ ] Idempotent: no patch when the value already matches
-- [ ] Every degraded path `_warn`s and returns 0 — the deploy never fails on this
-- [ ] New BATS suite with all 6 cases above
-- [ ] Mutation evidence: each new assertion PASSES on the real tree and FAILS against a mutated
+- [x] `_observability_ensure_apiserver_scrape_timeout()` added, following the existing ensure idiom
+- [x] Wired into the hub deploy path after `_observability_ensure_argocd_servicemonitors`
+- [x] Default `45s`, overridable via `OBSERVABILITY_APISERVER_SCRAPE_TIMEOUT`
+- [x] Idempotent: no patch when the value already matches
+- [x] Every degraded path `_warn`s and returns 0 — the deploy never fails on this
+- [x] New BATS suite with all 6 cases above
+- [x] Mutation evidence: each new assertion PASSES on the real tree and FAILS against a mutated
       copy. One `real=PASS / mutated=FAIL` row per assertion. Include specifically: changing the
       default `45s` to a value exceeding the `1m` interval must redden a test.
-- [ ] `shellcheck -S warning` clean on `scripts/plugins/observability.sh`
-- [ ] `make test` — paste `^ok ` / `^not ok ` counts from a captured file. **The suite takes
+- [x] `shellcheck -S warning` clean on `scripts/plugins/observability.sh`
+- [x] `make test` — paste `^ok ` / `^not ok ` counts from a captured file. **The suite takes
       ~15 minutes and ~960 cases; it is not hung. Let it finish and report `MAKE_EXIT`.**
-- [ ] CHANGELOG `[Unreleased]` → `### Fixed`
+- [x] CHANGELOG `[Unreleased]` → `### Fixed`
 - [ ] Pushed to `origin/k3d-manager-v1.36.0`, proven with `git rev-parse HEAD origin/k3d-manager-v1.36.0`
 - [ ] `memory-bank/activeContext.md` and `memory-bank/progress.md` updated with the SHA
 
