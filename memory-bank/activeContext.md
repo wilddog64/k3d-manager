@@ -7,6 +7,36 @@
 
 ## Current focus
 
+- **2026-09-20 — Tier 2 live-run blockers filed as `5edf557e`.** Spec
+  `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md`. Tier 2
+  (`e2e_verify_sandbox`, implemented `ffeb9ba2`) is code-complete and structurally green but has
+  never executed live; three defects in the sandbox Job path would fail the first run:
+  (1) three of four service hostnames do not exist — `basket`/`order`/`payment` instead of
+  `basket-service`/`order-service`/`payment-service`, all four ports already correct, and
+  `_e2e_sandbox_render_overrides` (`e2e.sh:149-150`) already uses the right names, so the file
+  contradicts itself; (2) the Job command omits the `__E2E_RESULTS_BEGIN__`/`__E2E_RESULTS_END__`
+  wrapper the parser at `e2e.sh:636` requires, so `passed`/`total`/`failed` stay `None` and
+  pass/fail attribution is dead; (3) neither `ghcr-pull-secret` nor `stripe-e2e` is ever created
+  in the sandbox — `stripe-e2e` has exactly one repo-wide reference, the `secretKeyRef` that
+  consumes it — so the Job never starts. All three are Tier 2 only; Tier 1 is correct in each
+  case, which is why review missed them: the sandbox manifest is a near-copy of the Tier 1 one and
+  diverged where Tier 2's substrate differs. The structural BATS suite asserts manifest shape and
+  cannot detect any of them. **The ACG login is NOT a blocker** — it is a routine step run many
+  times before; `acg_restart` fronts any Tier 2 run. No `ubuntu-k3s` context exists right now, so
+  the sandbox is simply not provisioned at the moment.
+  Spec commit is local only, NOT pushed — Codex is mid-run on the same branch and pushing first
+  would hand it a non-fast-forward. Push after Codex reports.
+
+
+- **2026-09-20 — KubeAPIDown flapping apiserver scrape timeout implementation complete; commit
+  pending push.** Added `_observability_ensure_apiserver_scrape_timeout` to patch only the existing
+  hub ServiceMonitor endpoint with the default `45s` timeout, preserve idempotency, degrade safely
+  when the CRD or ServiceMonitor is unavailable, and wire it immediately after the ArgoCD
+  ServiceMonitor ensure. Added six offline BATS cases and the `[Unreleased]` CHANGELOG entry.
+  Focused suite passed 6/6; shellcheck `-S warning` passed; captured `make test` finished with
+  `966` ok, `0` not ok, `MAKE_EXIT=0`. Mutation evidence is recorded in the task handoff; no
+  cluster was touched.
+
 - **2026-09-19 — `istiod` scrape job missing a port filter: spec filed `96766915`, ASSIGNED to Codex.**
   Operator reported a "Target disappeared from Prometheus target discovery" alert. Nothing
   disappeared — the live rule is kube-prometheus-stack `TargetDown`, and `job=istiod` has been

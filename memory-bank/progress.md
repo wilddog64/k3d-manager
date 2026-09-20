@@ -7,6 +7,19 @@
 
 ## Open items
 
+- [ ] **Tier 2 live-run blockers — spec filed `5edf557e`, fix NOT started.**
+  `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md`. Three defects in
+  `_e2e_sandbox_job_manifest()` / `e2e_verify_sandbox()`: wrong service hostnames (3 of 4),
+  missing `__E2E_RESULTS_BEGIN__`/`__E2E_RESULTS_END__` wrapper, and `ghcr-pull-secret` +
+  `stripe-e2e` never created. 8 test cases specified, each needing a real=PASS / mutated=FAIL
+  pair. Tier 1 is unaffected. Awaiting the user's call on who implements. Running Tier 2 live
+  (`acg_restart` then `e2e_verify_sandbox`) stays the operator's action.
+
+
+- [x] **2026-09-20 — KubeAPIDown flapping apiserver scrape timeout:** implementation and offline
+  verification complete; commit/push SHA pending. Focused BATS `6/6`, shellcheck warning-level
+  clean, and captured full `make test` `966/0` with `MAKE_EXIT=0`. No live cluster access used.
+
 - [x] **2026-09-19 — `istiod` scrape job missing a port filter — FIXED `a255d8d5`.**
   `TargetDown` has fired for `job=istiod` since 2026-09-11 because the `additionalScrapeConfigs`
   entry keeps by service name with no port filter, so all istiod endpoint ports are scraped and only
