@@ -29,7 +29,26 @@
 
 
 - **2026-09-20 — KubeAPIDown flapping apiserver scrape timeout implementation complete; commit
-  blocked by the session's read-only `.git` metadata.** Added `_observability_ensure_apiserver_scrape_timeout` to patch only the existing
+  COMMITTED and PUSHED as `0d663a40`.** Codex could not commit (`.git/index.lock:
+  Operation not permitted`) and honestly refused to claim a SHA; Claude staged the six allowed
+  files and committed with the spec's exact message. **Independent verification by Claude:**
+  scope 6 files all on the allowed list; `shellcheck -S warning` exit 0; focused suite 6/6;
+  four mutations run in an isolated worktree all reddened a real assertion — default `45s`->`90s`
+  (tests 1,2), idempotency removed (test 2), patch also rewriting `jobLabel` (tests 1,5), patch
+  path -> `interval` (tests 1,5). The last two are Claude's own additions and prove test 5, the
+  alert-inversion guard, has real teeth. **Live read-only checks confirmed the design against the
+  cluster rather than the spec:** SM `monitoring/kube-prometheus-stack-apiserver` exists with
+  `jobLabel: component`, exactly one endpoint, and an EMPTY `scrapeTimeout`; the SM sets no
+  `interval`, so it inherits the global `scrapeInterval=60s`, which is what makes `45s` valid
+  (the spec had asserted a 1m interval without measuring it); and kubelet endpoint 2 really does
+  carry `interval: 10s`, independently confirming the rejected global-timeout lever. NOTE: the
+  four `has("jobLabel")|not`-style clauses in test 5 are REDUNDANT — a JSON-patch op element
+  cannot carry those keys, so they cannot fail under mutation; `length == 1` plus the exact
+  `path` equality is what actually carries the guard. **`make test` caveat:** Claude's first run
+  read 962 ok / 4 not ok / MAKE_EXIT=2, but all four failures were `e2e_remote.bats` push-state
+  tests reddened by Claude's own unpushed doc commits, NOT by this change; after the push
+  `e2e_remote.bats` alone is 74/0. Applying the patch to the live cluster remains the operator's
+  action — the code is inert until `deploy_observability` runs. Added `_observability_ensure_apiserver_scrape_timeout` to patch only the existing
   hub ServiceMonitor endpoint with the default `45s` timeout, preserve idempotency, degrade safely
   when the CRD or ServiceMonitor is unavailable, and wire it immediately after the ArgoCD
   ServiceMonitor ensure. Added six offline BATS cases and the `[Unreleased]` CHANGELOG entry.
