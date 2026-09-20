@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- Tier 2 sandbox E2E Jobs now use the deployed Service names, emit the result markers consumed by the summary parser, and provision the GHCR and Stripe Secrets idempotently before execution. The Stripe test key is read from Keychain via stdin and missing credentials fail loudly.
+
 - Hub observability now patches the existing apiserver ServiceMonitor with a 45s endpoint scrape timeout, preventing slow 8.36 MB `/metrics` scrapes from making `KubeAPIDown` flap against the inherited 10s timeout.
 
 - `istiod` Prometheus scraping now keeps only the `http-monitoring` endpoint port in the hub and ACG values, preventing non-metrics ports from holding `TargetDown` open.

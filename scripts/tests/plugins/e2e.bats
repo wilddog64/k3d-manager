@@ -17,6 +17,7 @@ setup() {
   export E2E_ROLLOUT_TIMEOUT=5
   export E2E_VCLUSTER_READY_INTERVAL=0
   export E2E_VCLUSTER_READY_REFRESH_INTERVAL=0
+  export E2E_STRIPE_SECRET_KEY=test-stripe-key
 
   _run_command() {
     while [[ $# -gt 0 ]]; do
@@ -78,6 +79,117 @@ setup() {
   [[ "$output" == *$'name: STRIPE_E2E\n              value: "true"'* ]]
   [[ "$output" == *"KEYCLOAK_URL"*"https://keycloak.3ai-talk.org/realms/shopping-cart"* ]]
   [[ "$output" == *"stripe-checkout-orchestrator.spec.ts"* ]]
+}
+
+@test "sandbox Job uses the real Tier 2 Service hostnames" {
+  run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"http://basket-service.shopping-cart-apps.svc:8083"* ]]
+  [[ "$output" == *"http://order-service.shopping-cart-apps.svc:8081"* ]]
+  [[ "$output" == *"http://payment-service.shopping-cart-payment.svc:8084"* ]]
+  [[ "$output" != *"http://basket.shopping-cart-apps.svc:"* ]]
+  [[ "$output" != *"http://order.shopping-cart-apps.svc:"* ]]
+  [[ "$output" != *"http://payment.shopping-cart-payment.svc:"* ]]
+}
+
+@test "sandbox Job preserves all four service ports" {
+  run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"product-catalog.shopping-cart-apps.svc:8082"* ]]
+  [[ "$output" == *"basket-service.shopping-cart-apps.svc:8083"* ]]
+  [[ "$output" == *"order-service.shopping-cart-apps.svc:8081"* ]]
+  [[ "$output" == *"payment-service.shopping-cart-payment.svc:8084"* ]]
+}
+
+@test "sandbox Job command emits result markers and preserves Playwright status" {
+  run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"__E2E_RESULTS_BEGIN__"* ]]
+  [[ "$output" == *"__E2E_RESULTS_END__"* ]]
+  [[ "$output" == *'rc=$?'* ]]
+  [[ "$output" == *'exit $rc'* ]]
+}
+
+@test "sandbox summary parser extracts marked Playwright results" {
+  local run_id="sandbox-marked-summary"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":4,"unexpected":1,"flaky":0,"skipped":0,"duration":1250}}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+assert summary["passed"] == 4, summary
+assert summary["total"] == 5, summary
+assert summary["failed"] == 1, summary
+print("marked parser ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"marked parser ok"* ]]
+}
+
+@test "sandbox preflight creates both Secrets before completion" {
+  local calls="$BATS_TEST_TMPDIR/sandbox-preflight-calls"
+  : > "$calls"
+  _e2e_sandbox_kc() {
+    printf '%s\n' "$*" >> "$calls"
+    case "$*" in
+      *"create namespace"*) printf 'namespace-manifest\n' ;;
+      *"create secret docker-registry"*) printf 'ghcr-manifest\n' ;;
+      *"create secret generic stripe-e2e"*) cat >/dev/null; printf 'stripe-manifest\n' ;;
+      *"apply -f -"*) cat >/dev/null ;;
+    esac
+  }
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -eq 0 ]
+  run awk '/create secret docker-registry ghcr-pull-secret/{ghcr=NR} /create secret generic stripe-e2e/{stripe=NR} END{exit !(ghcr && stripe && ghcr < stripe)}' "$calls"
+  [ "$status" -eq 0 ]
+}
+
+@test "sandbox preflight is idempotent" {
+  _e2e_sandbox_kc() {
+    case "$*" in
+      *"create namespace"*|*"create secret docker-registry"*|*"create secret generic stripe-e2e"*)
+        [[ "$*" == *"--dry-run=client -o yaml"* ]] || return 1
+        ;;
+    esac
+    case "$*" in
+      *"create secret generic stripe-e2e"*) cat >/dev/null; printf 'stripe-manifest\n' ;;
+      *"apply -f -"*) cat >/dev/null ;;
+    esac
+  }
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -eq 0 ]
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -eq 0 ]
+}
+
+@test "sandbox preflight rejects a missing Stripe Keychain item" {
+  unset E2E_STRIPE_SECRET_KEY
+  security() { return 1; }
+  _warn() { printf '%s\n' "$*"; }
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"k3dm-stripe-sk-test is missing"* ]]
+}
+
+@test "sandbox preflight never places the Stripe key in kubectl argv" {
+  local calls="$BATS_TEST_TMPDIR/sandbox-secret-argv"
+  : > "$calls"
+  _e2e_sandbox_kc() {
+    printf '%s\n' "$*" >> "$calls"
+    case "$*" in
+      *"create secret generic stripe-e2e"*) cat >/dev/null; printf 'stripe-manifest\n' ;;
+      *"apply -f -"*) cat >/dev/null ;;
+    esac
+  }
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -eq 0 ]
+  run grep -F -- "test-stripe-key" "$calls"
+  [ "$status" -ne 0 ]
 }
 
 @test "sandbox rendered overrides contain the three substrate changes" {

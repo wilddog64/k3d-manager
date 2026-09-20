@@ -219,16 +219,16 @@ spec:
           command:
             - sh
             - -c
-            - npx playwright test --project=flows --no-deps tests/flows/stripe-checkout-orchestrator.spec.ts
+            - 'npx playwright test --project=flows --no-deps tests/flows/stripe-checkout-orchestrator.spec.ts; rc=\$?; echo "__E2E_RESULTS_BEGIN__"; cat test-results/results.json 2>/dev/null || true; echo "__E2E_RESULTS_END__"; exit \$rc'
           env:
             - name: PRODUCT_CATALOG_URL
               value: http://product-catalog.shopping-cart-apps.svc:8082
             - name: BASKET_URL
-              value: http://basket.shopping-cart-apps.svc:8083
+              value: http://basket-service.shopping-cart-apps.svc:8083
             - name: ORDER_URL
-              value: http://order.shopping-cart-apps.svc:8081
+              value: http://order-service.shopping-cart-apps.svc:8081
             - name: PAYMENT_URL
-              value: http://payment.shopping-cart-payment.svc:8084
+              value: http://payment-service.shopping-cart-payment.svc:8084
             - name: OAUTH2_ENABLED
               value: "true"
             - name: STRIPE_E2E
@@ -263,6 +263,34 @@ function _e2e_sandbox_wait_job() {
   done
 }
 
+function _e2e_sandbox_provision_secrets() {
+  local _github_user="" _ghcr_pat="" stripe_secret_key=""
+  shopping_cart_resolve_ghcr_pat
+  stripe_secret_key="${E2E_STRIPE_SECRET_KEY:-}"
+  if [[ -z "$stripe_secret_key" ]]; then
+    stripe_secret_key="$(_no_trace security find-generic-password -s k3dm-stripe-sk-test -w 2>/dev/null || true)"
+  fi
+  if [[ -z "$stripe_secret_key" ]]; then
+    _warn "[e2e] Keychain item k3dm-stripe-sk-test is missing"
+    return 1
+  fi
+
+  _e2e_sandbox_kc create namespace "$E2E_NAMESPACE" \
+    --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
+  _e2e_sandbox_kc create secret docker-registry ghcr-pull-secret \
+    --docker-server=ghcr.io \
+    --docker-username="${_github_user}" \
+    --docker-password="${_ghcr_pat}" \
+    -n "$E2E_NAMESPACE" \
+    --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
+  _e2e_sandbox_kc -n "$E2E_NAMESPACE" patch serviceaccount default \
+    -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
+  printf '%s' "$stripe_secret_key" | _e2e_sandbox_kc create secret generic stripe-e2e \
+    --from-file=sk_test=/dev/stdin \
+    -n "$E2E_NAMESPACE" \
+    --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
+}
+
 function e2e_verify_sandbox() {
   local run_id candidate_digest="${1:-}" job_name image manifest_file rc=1
   local old_tier="${E2E_TIER}" old_project="${E2E_PROJECT}"
@@ -287,6 +315,8 @@ function e2e_verify_sandbox() {
   acg_extend_playwright "${_ACG_SANDBOX_URL:-}"
   _E2E_ACTIVE_PHASE="checking-nodes"
   _e2e_sandbox_kc get nodes -o wide
+  _E2E_ACTIVE_PHASE="provisioning-secrets"
+  _e2e_sandbox_provision_secrets
 
   _E2E_ACTIVE_PHASE="installing-argocd"
   _run_command -- helm upgrade --install argocd argo/argo-cd --kube-context ubuntu-k3s \
