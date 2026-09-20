@@ -1128,3 +1128,45 @@ Archived to `memory-bank/archive/activeContext-2026-09-17.md`; the durable findi
 - HOLD: never-auto-merge. Awaiting user go to merge #119. On merge: /post-merge (restore protection, tag v1.28.0,
   release, next branch, retro, standing-docs audit, memory-bank).
 - Sequence COMPLETE up to the gate: lib-foundation #45 merged+v0.4.14+subtree-synced → v1.28.0 PR #119 up & green.
+
+## 2026-09-20 — deploy_observability deliberately NOT run; hub control plane degraded
+
+Asked to run `deploy_observability` against the hub. **Stopped short and applied only the
+targeted piece.** Live read-only diagnosis found the hub control plane actively failing:
+
+- `state.db` 2.16 GiB + 499 MiB WAL, **zero `COMPACT` events in 24 h**; kine SQL 1–5 s.
+- apiserver `/healthz` = `[-]etcd failed` (5/5 probes); storage metrics time out.
+- Control-plane node `457182e619fc` `Ready=False (KubeletNotReady) container runtime is down`,
+  taint added 13:47:57Z; its own `kube-node-lease` renewals fail.
+- Server container 511% CPU, in-container load average 60.03 on `nproc=10`; host load 21.56/10.
+- ArgoCD repo-server `10.43.86.193:8081` connection refused → ~20 Applications `sync=Unknown`.
+
+`deploy_observability` reapplies two ApplicationSets at `K3D_MANAGER_BRANCH=k3d-manager-v1.36.0`
+(up from v1.35.0), which would repoint `$values` and trigger a full monitoring/trivy resync —
+a write burst into the exact datastore that is the bottleneck. Adding that load to a control
+plane that cannot renew its own lease was the wrong call, so it was not run.
+
+**Applied instead:** the one mutation that mattered, by hand —
+`kubectl -n monitoring patch servicemonitor kube-prometheus-stack-apiserver --type=json`
+setting `/spec/endpoints/0/scrapeTimeout` to `45s`. Verified after: `scrapeTimeout=45s`,
+`jobLabel=component` intact, `interval` still unset (inherits global 60s). This is the same
+single write `_observability_ensure_apiserver_scrape_timeout` (`0d663a40`) performs.
+
+**Running the full `deploy_observability` remains outstanding and is the operator's call**,
+ideally after the datastore is addressed.
+
+This is a recurrence of `docs/bugs/2026-09-09-hub-kine-compaction-stall.md` — appended a
+`## Recurrence — 2026-09-20` section there rather than filing a duplicate. Key new finding: the
+`K3DM_HERMES_AUTO_KINE_GUARD` circuit breaker is **inert** for this recurrence, because it
+requires the 2026-09-09 `stale_acg_registration` signature AND an 8 GiB threshold. Growth is
+~310 MB/day since the 2026-09-13 rebuild, so it re-reaches 8 GiB in ~19 days unattended.
+The `0d663a40` scrape-timeout fix treats a symptom of this and does not close it.
+
+## 2026-09-20 — Tier 2 sandbox defects dispatched to Codex
+
+Spec `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md` extended with
+`## Before You Start`, `## Rules`, `## What NOT to Do`, `## Commit message (exact)` and an
+`## If you cannot commit` fallback; pushed as `8ed24cc0`. Dispatched via `codex exec`
+(session `01a0bf1a-c1dc-7f41-b03f-bb9402f3f9c5`, model `gpt-5.6-luna`) with the cluster
+explicitly off limits — code + BATS only. Awaiting its report; SHA, gate output and the
+mutation table all require independent verification before being trusted.
