@@ -7,6 +7,7 @@
 
 ## Open items
 
+
 - [ ] **Hermes never re-pages once an incident latches — spec filed, ASSIGNED TO CODEX.** Spec
   `docs/bugs/2026-09-20-hermes-correlator-never-re-pages-after-incident-latches.md`. Hermes
   detected the Grafana CF 502 outage for hours and sent nothing: `Correlator.process` emits only

@@ -7,6 +7,20 @@
 
 ## Current focus
 
+- **2026-09-20 — Hermes re-page fix landed.** Implemented by Codex, verified and committed by
+  Claude (Codex hit the known `.git/index.lock` sandbox wall and could not commit — see
+  `reference_codex_exec_cannot_commit_git_lock`). `Correlator.process` now emits an `escalation`
+  event when a sensor joins an active incident, keeping the notified set monotonic until resolve so
+  a flapping sensor cannot re-page; both `kind == "incident"` gates in `bin/k3dm-hermes._run_cycle`
+  widened to `("incident", "escalation")`, without which the new event would have been emitted and
+  then dropped by its own consumer; `bin/public-endpoint-probe` counts 401/403 as reachable while
+  still reporting the real code. Verified independently: diff touches only the 7 in-scope files,
+  `pytest scripts/tests/hermes/test_hermes.py` = **26 passed** (note: pytest lives on the pyenv
+  shim, not `/opt/homebrew/bin/python3`, which has no pytest module), and a read-only
+  `bin/public-endpoint-probe --json` showed prometheus/alertmanager/webhook all
+  `"codes":["401"...] "healthy":true`. **Codex's `make test` was incomplete** — it stopped at
+  `ok 724` of `1..974` with no `not ok`, so the full suite is re-run by Claude after commit.
+
 - **2026-09-20 — Grafana Cloudflare 502 root-caused; Hermes escalation gap filed.** The 502 on
   `grafana.3ai-talk.org` is **not** Grafana and **not** Cloudflare. Grafana is `3/3 Running`, all
   containers `ready=true`, limits `500m`/`512Mi`, 26% CFS throttle. The tunnel holds 4 healthy
