@@ -1170,3 +1170,39 @@ Spec `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md` ext
 (session `01a0bf1a-c1dc-7f41-b03f-bb9402f3f9c5`, model `gpt-5.6-luna`) with the cluster
 explicitly off limits — code + BATS only. Awaiting its report; SHA, gate output and the
 mutation table all require independent verification before being trusted.
+
+## 2026-09-20 — Kine compaction root cause found; Tier 2 fix landed
+
+**Kine (`docs/bugs/2026-09-09-hub-kine-compaction-stall.md`, deep dive appended `160fe63b`).**
+Compaction did **not** fall behind churn. It died at `2026-09-18T02:16:19Z` on `Compact failed:
+failed to record compact revision: sql: transaction has already been committed or rolled back`
+and was never rescheduled — 288 events/day (one per 5 min) through 09-17, then nothing for 2.5
+days. My earlier "zero COMPACT events in 24 h" was a **measurement error**: case-insensitive
+`grep compact` matches `compact_rev_key` inside Slow SQL text (50,039 lines). Use
+`grep 'msg="COMPACT'`.
+
+Corrections to the recurrence section: growth is ~580 MB/day measured post-failure (not 310),
+so the 8 GiB deadline is ~7–10 days (not 19); WAL checkpointing is **healthy** (constant size +
+advancing mtime = in-place reuse, Q3 was a false alarm); the repo-server CrashLoop is an
+**effect** (`exitCode 0 / Completed` on kubelet SIGTERM, `timeoutSeconds=1` probes vs 1.1–11.3 s
+health checks) that then amplifies via 27 Applications retrying at `sync=Unknown`. All four nodes
+returned to `Ready` on their own; in-container load 67–75 comes with 26% idle, so this is
+datastore lock contention (631 `error in txn compare`), not CPU exhaustion.
+
+**Remedy is a k3s server process restart — operator's action, not run.** No rebuild indicated by
+this evidence. Raw SQLite retention deletion still forbidden. Durable fix: replace the Hermes
+size-plus-stale-registration predicate with a **compaction liveness** check (no
+`msg="COMPACT deleted"` for >15 min), which would have caught this at normal DB size. Spec not
+yet filed.
+
+**Tier 2 sandbox defects — DONE, `56df33f5`.** Codex implemented; `.git` writes denied for the
+fourth time, so it reported the block honestly without fabricating a SHA and Claude committed on
+its behalf. Independently verified: scope limited to the three allowed files, `shellcheck -S
+warning` exit 0, `e2e.bats` 42/0 (34 → 42, +8 new cases), full `make test` 974/0 `MAKE_EXIT=0`,
+and all 8 mutations caught by their intended test. It mirrored the Tier 1 `_e2e_provision_pull_secret`
+precedent, and the `declare -f shopping_cart_resolve_ghcr_pat` cross-plugin guard already existed
+at `e2e.sh:31`. Stripe key goes in via `--from-file=sk_test=/dev/stdin`, never argv.
+
+Still outstanding: full `deploy_observability` (deferred, operator's call); Tier 2 live run is the
+operator's (`acg_restart` then `e2e_verify_sandbox`); ApplicationSet reapply for v1.34.0/v1.35.0
+config, which conflicts with the datastore situation until compaction is restored.
