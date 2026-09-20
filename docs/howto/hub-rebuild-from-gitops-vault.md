@@ -111,13 +111,18 @@ targets.
 
 ApplicationSets template their `$values` source at `${K3D_MANAGER_BRANCH}`, frozen to whatever
 branch was checked out when they were last applied. Config on a newer branch stays **inert** until
-they are reapplied. Do both variants, then verify:
+they are reapplied.
 
 ```bash
-./scripts/k3d-manager argocd_check_values_branch
+./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 ```
 
-Per-set overrides only — no blanket `deploy_argocd_applicationsets --confirm`.
+`K3D_MANAGER_BRANCH` defaults to the checked-out branch, which is what you want here. This
+entrypoint is surgical: unlike `deploy_argocd_bootstrap` it does **not** redeploy the image updater
+or platform-ops, and it preserves each live set's destination cluster and `istio-cni` dirs by
+default — a reapply never retargets. It also runs `argocd_check_values_branch` itself afterwards
+unless `--no-verify` is passed, so no separate verify call is needed. Do not set
+`ARGOCD_APPSET_IGNORE_LIVE=1`.
 
 ### 5. Verify
 
