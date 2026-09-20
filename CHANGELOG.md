@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- Alertmanager CPU limit raised from `50m` to `500m` (requests `10m` -> `50m`, memory `32Mi/64Mi` -> `64Mi/128Mi`). The `50m` limit left the container 83-87% CFS-throttled, so notification batches blew past Prometheus's 10s notifier timeout and `PrometheusErrorSendingAlertsToAnyAlertmanager` fired continuously.
+
 - Hermes now re-pages when a new sensor joins an active incident, and the public endpoint probe counts authenticated 401/403 responses as reachable while preserving the reported status code.
 
 - Tier 2 sandbox E2E Jobs now use the deployed Service names, emit the result markers consumed by the summary parser, and provision the GHCR and Stripe Secrets idempotently before execution. The Stripe test key is read from Keychain via stdin and missing credentials fail loudly.

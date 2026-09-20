@@ -7,8 +7,36 @@
 
 ## Open items
 
+- [ ] **BLOCKER for the hub rebuild: seeding clobbers the real Stripe/PayPal/encryption secrets.**
+  Spec `docs/bugs/2026-09-20-seed-clobbers-real-payment-secrets.md`.
+  `scripts/plugins/shopping_cart.sh:716-718` writes `payment/encryption`, `payment/stripe` and
+  `payment/paypal` **unconditionally** — no `_vault_kv_exists` guard, no `_seed_source_data`
+  fallback — while all ten other keys in the same function are guarded. `bin/cluster-up:851` calls
+  it, so **every `make up` overwrites the real Stripe test key with `sk_test_placeholder`.** This is
+  the unfinished third instalment of a staged parity effort: `176ec5a6` did the six single-password
+  branches, `docs/bugs/v1.12.0-bugfix-seed-source-parity-minio-ldap-keycloak.md` did the four
+  multi-field branches, and these three were skipped by both because they are unconditional literal
+  writes that neither pass's pattern matched. They are the worst three to have left — the only
+  externally-issued keys, which cannot be correctly regenerated. Keychain fallback
+  `k3dm-stripe-sk-test` verified present. **A rebuild before this lands comes back up with broken
+  payments.** NOT dispatched to Codex yet.
+- [ ] **Hub rebuild runbook written; execution is the operator's.**
+  `docs/howto/hub-rebuild-from-gitops-vault.md`. Verified during authoring: all **14** canonical KV
+  keys are present in Keychain `k3d-manager-app-cluster-secrets`, so the rebuild does not lose
+  secrets; `bin/cluster-down:330` runs `k3d cluster delete` (destroys the Vault PVC — the cached
+  unseal shards are worthless without it, and `bin/cluster-up:417-432` re-unseals from cache);
+  `bin/cluster-up` sequence is cluster → vault → ldap → argocd → bootstrap → shopping-cart-data,
+  then `make up` adds observability + platform-ops. Vault lives at `secrets/vault-0`, currently
+  `0/1`. `kubectl exec` and `logs` both fail with `net/http: TLS handshake timeout`, so no live KV
+  dump is possible — Keychain is the source. Gated on the Stripe blocker above.
 
-- [ ] **Hermes never re-pages once an incident latches — spec filed, ASSIGNED TO CODEX.** Spec
+
+- [x] **Hermes never re-pages once an incident latches — FIXED `71681100`.** Implemented by Codex,
+  verified and committed by Claude (Codex could not commit: `.git/index.lock` Operation not
+  permitted). `pytest scripts/tests/hermes/test_hermes.py` = 26 passed; read-only probe confirms
+  the three 401 hosts now count healthy with code 401 still reported. Codex's `make test` was
+  incomplete (stopped at `ok 724` of 974, no `not ok`); Claude re-ran the full suite after commit.
+  Original spec:
   `docs/bugs/2026-09-20-hermes-correlator-never-re-pages-after-incident-latches.md`. Hermes
   detected the Grafana CF 502 outage for hours and sent nothing: `Correlator.process` emits only
   on the `False → True` edge of `incident_active`, latched by the kine stall, so a newly degraded

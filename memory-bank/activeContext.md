@@ -7,6 +7,14 @@
 
 ## Current focus
 
+- **2026-09-20 — alertmanager CPU fix committed git-only; applies via the rebuild.**
+  `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml` alertmanagerSpec now
+  `requests` 64Mi/50m, `limits` 128Mi/500m (was 32Mi/10m, 64Mi/**50m** — the 50m limit was the
+  83-87% CFS throttle). Deliberately **not** applied with a live `helm upgrade`: a hub rebuild is
+  the indicated remedy for the kine stall and would discard it, so git is the durable place. It
+  lands automatically when `make up` runs `observability`. Verify the throttle fraction drops from
+  ~0.83 afterwards — see [[reference_alertmanager_cpu_limit_throttles_notifications]].
+
 - **2026-09-20 — Hermes re-page fix landed.** Implemented by Codex, verified and committed by
   Claude (Codex hit the known `.git/index.lock` sandbox wall and could not commit — see
   `reference_codex_exec_cannot_commit_git_lock`). `Correlator.process` now emits an `escalation`
