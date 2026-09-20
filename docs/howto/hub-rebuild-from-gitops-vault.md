@@ -89,12 +89,42 @@ holds all 14 keys — it is the better source.
 
 ### 2. Tear down
 
+**Use the explicit provider. A bare `make down` is wrong here and destructive beyond the hub.**
+
 ```bash
-make down
+make down CLUSTER_PROVIDER=k3d
 ```
 
-This runs `bin/cluster-down --confirm`: unloads the port-forward launchd agents, deletes the k3d
-hub cluster, and prunes Docker. Expect several minutes.
+Why the override matters — verified 2026-09-20:
+
+- The Makefile defaults to `CLUSTER_PROVIDER ?= k3s-aws` (line 12), **not** the local hub. With
+  that default, `bin/cluster-down` enters its `k3s-aws` branch and runs
+  `acg_teardown --confirm`, which **deletes the ACG CloudFormation stack** and deregisters the
+  sandbox from hub ArgoCD. That is out of scope for a hub rebuild.
+- `CLUSTER_PROVIDER=k3s-hostinger` would destroy the **hostinger** cluster — there is a live
+  `ubuntu-hostinger` context. Never use it here.
+- `CLUSTER_PROVIDER=k3d` falls to the `*)` branch, which logs
+  `Unknown CLUSTER_PROVIDER 'k3d' — skipping remote teardown` and proceeds to the local hub only.
+- A bare `make down` also **refuses** outright: `bin/require-unambiguous-provider` exits 3 because
+  two providers are live (`k3s-aws`, `k3s-hostinger`) and `CLUSTER_PROVIDER` was not set
+  explicitly. That guard is doing its job — do not defeat it, give it the right provider.
+
+**Dry-run first and read the scope before committing to it:**
+
+```bash
+DRY_RUN=1 make down CLUSTER_PROVIDER=k3d
+```
+
+The dry run must print `skipping remote teardown` and must **not** mention `acg_teardown`,
+CloudFormation or deregistration. If it does, stop.
+
+The real run unloads the port-forward launchd agents (vault, argocd, keycloak, alertmanager and its
+auth proxy, pushgateway, frontend, and the Cloudflare named tunnel), deletes the k3d hub cluster,
+prunes Docker, and cleans stale `/tmp` files. Expect several minutes.
+
+Note the Grafana port-forward supervisor (`com.k3d-manager.grafana-port-forward`) is **not** in
+that list, so it keeps looping against the dead cluster during the rebuild. That is harmless noise;
+it recovers once the cluster is back.
 
 ### 3. Rebuild
 
