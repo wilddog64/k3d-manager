@@ -109,8 +109,8 @@ fallback before the placeholder. Replace lines 716–718 with:
     _info "[acg-up] Reusing existing Vault secret payment/stripe"
   else
     _src_json=$(_seed_source_data "payment/stripe")
-    if [[ -z "${_src_json}" ]] && declare -f _secret_load_data >/dev/null 2>&1; then
-      _stripe_sk=$(_secret_load_data "k3dm-stripe-sk-test" "sk_test" 2>/dev/null || true)
+    if [[ -z "${_src_json}" ]]; then
+      _stripe_sk="$(_no_trace security find-generic-password -s k3dm-stripe-sk-test -w 2>/dev/null || true)"
       if [[ -n "${_stripe_sk}" ]]; then
         _info "[acg-up] Restoring payment/stripe api_key from Keychain backup"
         _src_json=$(jq -cn --arg k "${_stripe_sk}" '{api_key:$k,webhook_secret:"whsec_placeholder"}')
@@ -137,11 +137,17 @@ fallback before the placeholder. Replace lines 716–718 with:
   fi
 ```
 
-**Verify the Keychain account name before relying on it.** The spec assumes service
-`k3dm-stripe-sk-test` with account `sk_test`. Confirm with an existence check that prints no
-value — `security find-generic-password -s k3dm-stripe-sk-test -a sk_test` with **no `-w`** — and
-if the account differs, use the real one and say so in your report. Do **not** run `security` with
-`-w`, and never echo the key.
+**The Keychain accessor is the one already proven in this repo** — `scripts/plugins/e2e.sh:271`:
+
+```bash
+stripe_secret_key="$(_no_trace security find-generic-password -s k3dm-stripe-sk-test -w 2>/dev/null || true)"
+```
+
+Service `k3dm-stripe-sk-test`, **no `-a`** (there is exactly one item for that service; its account
+is the local username, so do not hardcode an account name), wrapped in `_no_trace` so the value
+never reaches a trace or log. Reuse that form exactly. Do not invent a different helper — an
+earlier draft of this spec used `_secret_load_data ... "sk_test"`, which is wrong on both the helper
+and the account. Never echo, log or commit the key.
 
 ## Tests
 
