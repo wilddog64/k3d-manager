@@ -7,6 +7,20 @@
 
 ## Open items
 
+- [ ] **Hermes never re-pages once an incident latches — spec filed, ASSIGNED TO CODEX.** Spec
+  `docs/bugs/2026-09-20-hermes-correlator-never-re-pages-after-incident-latches.md`. Hermes
+  detected the Grafana CF 502 outage for hours and sent nothing: `Correlator.process` emits only
+  on the `False → True` edge of `incident_active`, latched by the kine stall, so a newly degraded
+  `reachability` was absorbed (`"event": null, "pages": []`). Fix = an `escalation` event when the
+  contributor set grows + widen both `kind == "incident"` gates in `bin/k3dm-hermes._run_cycle`
+  (138, 150), and stop `bin/public-endpoint-probe` counting HTTP 401 as unhealthy (prometheus,
+  alertmanager, webhook are permanent false failures that skew the verdict to `edge-down`). Two
+  pytest cases specified; no probe BATS suite exists and none is to be created.
+- [ ] **Grafana CF 502 is downstream of the kine stall — no independent fix.** Port-forward
+  restarted 18,211 times, ~every 35 s, because the apiserver is unreachable. All 7 tunnel hosts
+  flap. Grafana, cloudflared, Cloudflare and the supervisor probe are all exonerated. Clears only
+  on the hub rebuild, which remains the operator's decision.
+
 - [ ] **Tier 2 live-run blockers — spec filed `5edf557e`, fix NOT started.**
   `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md`. Three defects in
   `_e2e_sandbox_job_manifest()` / `e2e_verify_sandbox()`: wrong service hostnames (3 of 4),

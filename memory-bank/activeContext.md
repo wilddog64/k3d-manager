@@ -7,6 +7,45 @@
 
 ## Current focus
 
+- **2026-09-20 — Grafana Cloudflare 502 root-caused; Hermes escalation gap filed.** The 502 on
+  `grafana.3ai-talk.org` is **not** Grafana and **not** Cloudflare. Grafana is `3/3 Running`, all
+  containers `ready=true`, limits `500m`/`512Mi`, 26% CFS throttle. The tunnel holds 4 healthy
+  edge connections and `~/.cloudflared/config.yml` was loaded at process start (config mtime
+  `2026-09-11 05:07:20` vs PID 73552 `lstart` one second later), so no stale-ingress drift. The
+  chain is: **kine compaction stall** (`state.db` 2.398 → 2.414 GiB across three cycles,
+  `slow_sql` 447 → 616 → 898, `compaction_recent=False`) → apiserver unreachable
+  (`Unable to connect to the server: net/http: TLS handshake timeout`; a test pod could not even
+  schedule) → `kubectl port-forward`'s SPDY stream breaks within ~30 s
+  (`portforward.go:512 ... write: broken pipe`) → the launchd supervisor's `/api/health` check
+  correctly kills and respawns it → **18,211 restarts** in
+  `~/.local/share/k3d-manager/logs/grafana-pf.log`, one every ~35 s → no listener on
+  `127.0.0.1:3001` for most of every minute → cloudflared gets connection refused → CF 502.
+  A 30 s sample caught all three port-forward states: listening+200, **listening but refusing
+  (`http=000` with the PID still bound — the zombie window)**, then gone, then respawned.
+  This is **not Grafana-specific**: `bin/public-endpoint-probe` returned `edge-down` with argocd
+  502, frontend 503, keycloak 502, grafana 502 while direct curls seconds earlier gave argocd 200
+  and keycloak 302. Every port-forward-backed endpoint flaps for the same reason, so this is
+  downstream of the datastore — like the kube-state-metrics CrashLoop (now 356 restarts) — and
+  **only the hub rebuild clears it**. The supervisor probe was explicitly tested against
+  `reference_one_second_probes_cpu_starvation_kill_loop` and **exonerated**: it is detecting a
+  genuinely dead forward, not killing a healthy one.
+  **Hermes already detected this and sent nothing.** Filed
+  `docs/bugs/2026-09-20-hermes-correlator-never-re-pages-after-incident-latches.md`:
+  (1) `Correlator.process` is edge-triggered — it emits only on the `False → True` transition of
+  `incident_active`, which the kine stall latched days ago, so `reachability` going degraded was
+  absorbed silently (`"event": null, "pages": []` every cycle); fix is an `escalation` event when
+  the contributor set grows, plus widening both `kind == "incident"` gates in
+  `bin/k3dm-hermes._run_cycle` (lines 138, 150) so it is actually pageable;
+  (2) `bin/public-endpoint-probe` counts HTTP **401** as unhealthy, so `prometheus`,
+  `alertmanager` and `webhook` — all correctly answering 401 behind auth proxies — are permanent
+  false failures that both help keep the latch set and skew the verdict toward `edge-down`.
+  `sensors.kine`'s 8 GiB `max_db_bytes` was checked and deliberately left alone: the sensor
+  reported the stall correctly via its `slow_sql > 0 and not compacting` arm.
+  Correction on the record: my mid-investigation claim that `bin/k3dm-hub-datastore-status`
+  is missing and that that was why Hermes never fired was **wrong on the causal half**. The file
+  is genuinely absent, but `bin/k3dm-hermes:82` injects its own `_datastore_run`, which does not
+  use that path; the kine sensor produces live data. The silence is the correlator.
+
 - **2026-09-20 — Tier 2 live-run blockers filed as `5edf557e`.** Spec
   `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md`. Tier 2
   (`e2e_verify_sandbox`, implemented `ffeb9ba2`) is code-complete and structurally green but has
