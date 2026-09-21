@@ -1451,3 +1451,15 @@ picked up by the operator after the Vault write, so an immediate `/api/v2/status
 intended Trivy-noise design, not a routing bug. One email notification attempt, zero failures for
 every reason label. Still operator-confirmable only: whether the text physically arrived and reads
 well on the handset.
+
+**FIXED 2026-09-21 — `make show-service-passwords` died on `Error: invalid function name: '—'`.** The
+recovery branch that restarts the Vault port-forward was written `$$(MAKE)`, so make emitted a
+literal `$(MAKE)` to the shell and the shell ran it as a command substitution instead of make running
+a recursive sub-make. APFS is case-insensitive, so `MAKE` resolved to `/usr/bin/MAKE` and actually
+ran `make`; `.DEFAULT_GOAL := help` printed the help text; that captured stdout was word-split and
+executed, and the help's first line carries a UTF-8 em-dash, which reached the dispatcher as a
+function name. The error was only the symptom — `install-vault-port-forward` never ran, so the Vault
+credential lookup could never recover and the target died on its own 10-attempt retry guard. Fixed to
+`$(MAKE)` at `Makefile:502`; it was the only `$$(MAKE)` in the file against 9 correct uses. Verified
+with a standalone probe makefile rather than by running the target, which prints live credentials:
+`$(MAKE)` expands to the make binary path, `$$(MAKE)` expands to the stdout of a nested make.

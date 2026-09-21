@@ -8,6 +8,17 @@
 
 ### Fixed
 
+- `make show-service-passwords` never restarted the Vault port-forward it announced it was
+  restarting, and failed with `Error: invalid function name: '—'` instead. The recipe used
+  `$$(MAKE)`, which expands to a literal `$(MAKE)` handed to the *shell*, so the shell performed
+  command substitution instead of invoking the recursive make. On macOS APFS is case-insensitive, so
+  `MAKE` resolved to `/usr/bin/MAKE` and really ran `make`; with `.DEFAULT_GOAL := help` that printed
+  the help text, whose captured stdout was then word-split and executed as a command. The help's
+  first line contains a UTF-8 em-dash, so the dispatcher was invoked with `—` as a function name and
+  rejected it. The visible error was only the symptom: the real damage was that
+  `install-vault-port-forward` never ran, so the credential lookup could not recover and the target
+  died on its own retry guard. Now `$(MAKE)`, which make expands to the running make binary.
+
 - `make alertmanager-secret` could only ever run from a real terminal, and the one recovery path
   that did not need a terminal could not succeed. All three values came from `read -r -p`, so
   running the target anywhere without a TTY — a `!` shell, a script, an agent session — silently

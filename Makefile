@@ -499,7 +499,7 @@ show-service-passwords:
 	_vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
 	if ! curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" -o /dev/null 2>/dev/null; then \
 		echo "[show-service-passwords] Vault credential lookup unavailable; restarting its port-forward" >&2; \
-		$$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
+		$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
 		__vault_ready=0; \
 		for __vault_attempt in 1 2 3 4 5 6 7 8 9 10; do \
 			sleep 1; \
