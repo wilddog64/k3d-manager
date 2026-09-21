@@ -1592,3 +1592,46 @@ feature branch created — `fix/pass-promoter-ssh-key` is still the live one.
 
 Left alone, pending the user's word: rebasing `fix/pass-promoter-ssh-key` onto the new main, and
 opening its PR.
+
+### 2026-09-21 — promoter-fix PRs opened; the failure mode proved live on main first
+
+User gave the go. Before opening anything, the #54 merge's own main run
+(`35668727231`, head `1f45062c`) finished and proved the prediction rather than leaving it
+asserted. Build, push, cosign sign and both attestations succeeded; the promote step failed:
+
+```
+Load key "/home/runner/.ssh/promoter_key": error in libcrypto
+git@github.com: Permission denied (publickey).
+```
+
+twice — once on the initial `git push`, once on the `git pull --rebase` fallback retry. So the
+minted keypair changed nothing on `main`, exactly because `ci.yml` never forwards the secret. Worth
+recording: the keypair was necessary but not sufficient, and merging the Dependabot pin bump moved
+the pin *past* nothing useful.
+
+**Blast-radius enumeration before proposing the infra guard** (the guard hard-fails on an empty key,
+so "who breaks?" had to be answered by reading, not assumed):
+
+| Caller | Workflow file | Forwards `PROMOTER_SSH_KEY` |
+|---|---|---|
+| shopping-cart-basket | `go-ci.yml` | yes |
+| shopping-cart-order | `ci.yml` | yes |
+| shopping-cart-payment | **`ci.yaml`** | yes |
+| shopping-cart-product-catalog | `ci.yml` | **no** |
+| shopping-cart-frontend | — | does not call it |
+
+Payment's `.yaml` extension is itself the reason the 2026-08-09 rollout skipped a repo: a `*.yml`
+glob does not match it. Same family as
+[[reference_run_success_hides_skipped_publish_job]] and
+[[reference_unenumerated_api_rollout_misses_repos]].
+
+PRs: product-catalog [#55], infra [#99]. product-catalog's branch was rebased onto the new main
+(`31fd3b3`) and force-pushed with `--force-with-lease`; both got a CHANGELOG entry under
+`[Unreleased] / ### Fixed` carrying the **corrected** 2026-08-12 date, since the commit messages
+still say 2026-08-26. Both `mergeable: true`, state `blocked` (checks pending, not conflicted),
+Copilot requested on each. NOT merged — awaiting CI, Copilot, and the user's merge.
+
+Chose a guard over `required: true` deliberately: `required: true` hard-fails every caller at
+workflow-resolution time including any that legitimately does not promote, whereas the guard fires
+only on the path that needs the key and its message names the secret, the block to add and the repo
+to check.

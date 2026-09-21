@@ -592,7 +592,19 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   main at PR #98 (keycloak, 09-16); it predates the promoter guard `94b16bc9`, which is still
   unmerged on `fix/pass-promoter-ssh-key`. So the pin moved to a SHA that has neither the guard
   nor the rebase-fallback fix.
-- [ ] **product-catalog promotion is STILL BROKEN after the #54 merge** — main's `ci.yml:141-144`
+- [x] **PRs OPENED for the promoter fix** — user's go 2026-09-21. product-catalog
+      [#55](https://github.com/wilddog64/shopping-cart-product-catalog/pull/55) (`5d5d59b7`, rebased
+      onto main `1f45062c` as `31fd3b3` + CHANGELOG) and infra
+      [#99](https://github.com/wilddog64/shopping-cart-infra/pull/99) (`9fafa459`). Both
+      `mergeable: true`, Copilot requested. Independent — product-catalog's pin `af4b053dc` does not
+      contain the infra guard, so either order works; the forwarding in #55 is what restores
+      promotion.
+- [x] **Blast radius of the infra guard verified by enumeration** — all four callers read from
+      `main`: basket `go-ci.yml`, order `ci.yml`, payment **`ci.yaml`** all forward
+      `PROMOTER_SSH_KEY`; only product-catalog `ci.yml` does not. frontend does not call the
+      workflow. The guard therefore hard-fails exactly the one misconfigured repo. Payment's
+      `.yaml` extension is why a `*.yml` glob missed it in the 2026-08-09 rollout.
+- [ ] **product-catalog promotion is STILL BROKEN on main until #55 merges** — main's `ci.yml:141-144`
   forwards `PACKAGES_TOKEN`, `COSIGN_KEY`, `COSIGN_PASSWORD` and **not** `PROMOTER_SSH_KEY`. The
   newly minted secret therefore never reaches the reusable workflow, which declares it
   `required: false`, so the promote step still writes an empty key file and dies at
