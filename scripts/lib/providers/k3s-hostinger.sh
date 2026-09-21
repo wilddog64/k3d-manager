@@ -419,19 +419,29 @@ function _hostinger_write_monitoring_port_forward_wrapper() {
 set -u
 _log="${log_file}"
 _health_url="http://127.0.0.1:${local_port}${health_path}"
+_health_timeout="\${K3DM_PF_HEALTH_TIMEOUT:-8}"
+_health_threshold="\${K3DM_PF_HEALTH_THRESHOLD:-3}"
 while true; do
   printf '%s\\n' "[\$(date)] starting ${service} port-forward" >> "\${_log}"
   "${kubectl_bin}" --context "${context_name}" port-forward "${service}" \\
     --namespace monitoring "${local_port}:${remote_port}" >> "\${_log}" 2>&1 &
   _pf_pid=\$!
   _elapsed=0
+  _fails=0
   while kill -0 "\${_pf_pid}" 2>/dev/null; do
     sleep 5
     ((_elapsed += 5))
-    if ((_elapsed >= 30)) && ! curl -fsS --max-time 3 "\${_health_url}" >/dev/null 2>&1; then
-      printf '%s\\n' "[\$(date)] health check failed — restarting stale port-forward" >> "\${_log}"
-      kill "\${_pf_pid}" 2>/dev/null || true
-      break
+    if ((_elapsed >= 30)); then
+      if curl -fsS --max-time "\${_health_timeout}" "\${_health_url}" >/dev/null 2>&1; then
+        _fails=0
+      else
+        ((_fails += 1))
+        if ((_fails >= _health_threshold)); then
+          printf '%s\\n' "[\$(date)] health check failed \${_fails}x — restarting stale port-forward" >> "\${_log}"
+          kill "\${_pf_pid}" 2>/dev/null || true
+          break
+        fi
+      fi
     fi
   done
   wait "\${_pf_pid}" 2>/dev/null || true

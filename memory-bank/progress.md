@@ -7,7 +7,48 @@
 
 ## Open items
 
-- [ ] **BLOCKER for the hub rebuild: seeding clobbers the real Stripe/PayPal/encryption secrets.**
+- [x] **Hub rebuild EXECUTED 2026-09-20 — kine compaction stall CLEARED.** Operator ran the
+  teardown; Claude completed and monitored the rebuild. `state.db` 2.72 GiB → 25.8 MB, WAL 678 MB →
+  10 MB, `kubectl get nodes` 5.5s → 0.05s, `COMPACT deleted` on a 5-minute cadence (288/day
+  baseline) after zero matches beforehand. Runbook corrected against reality:
+  `docs/howto/hub-rebuild-from-gitops-vault.md`.
+
+- [x] **Grafana port-forward flapping fixed** — `K3DM_PF_HEALTH_THRESHOLD`/`_TIMEOUT`, spec
+  `docs/bugs/2026-09-20-pf-supervisor-kills-healthy-forward-on-single-slow-probe.md`. 0 restarts
+  post-fix vs ~1 per 45s before.
+
+- [ ] **Post-rebuild Vault KV is nearly empty — 12 of 14 canonical keys unseeded.**
+  `vault kv list secret` returns only `ldap/` and `observability/` (and `observability/` holds only
+  `grafana`). The hub-only rebuild sequence does **not** run `deploy_shopping_cart_data`, so
+  `redis/*`, `postgres/*`, `payment/*`, `rabbitmq/default`, `minio/credentials`, `keycloak/*` and
+  `github/pat` are absent. All 14 are in the Keychain backup, and the `f28a4539` seed fix will
+  restore the Stripe key from it, so this is recoverable — it just has not been done. Decide whether
+  to run `deploy_shopping_cart_data` (deploys the data tier + ~7 PVCs) or leave the hub lean.
+
+- [ ] **Two platform-ops ExternalSecrets cannot sync** — `app-cluster-kubeconfig` and
+  `cosign-public-key`, both `SecretSyncedError: could not get secret data from provider`, which is
+  what makes ArgoCD `hub-platform-ops` **Degraded**. Neither key is among the 14 backed-up canonical
+  keys, so both were genuinely lost with the Vault PVC. `app-cluster-kubeconfig` is moot until an
+  app cluster is registered with the new hub; `cosign-public-key` belongs to the v1.27.0 image
+  signing work and needs a recovery path that is **not** `signing_init` (forbidden).
+  `monitoring/grafana-admin-credentials` **does** sync, so Grafana login is intact.
+
+- [ ] **`observability/alertmanager` and `observability/prometheus` unseeded** — `make observability`
+  warned `Alertmanager Vault secret not found — skipping SMS config`, `Failed to create Alertmanager
+  login secret in Vault — using generated local credentials for this run`, and `Prometheus Vault
+  credentials unreadable — skipping auth proxy`. The Prometheus auth proxy is therefore **not
+  running**, which also means `K3DM_HERMES_STATUS_ENABLED=1` must stay unset. Run
+  `make alertmanager-secret`.
+
+- [ ] **`ServiceMonitor monitoring/kube-prometheus-stack-apiserver not found`** — the 45s apiserver
+  scrape-timeout patch landed earlier this release had nothing to patch on a fresh cluster, so the
+  `KubeAPIDown` flap guard is **not** in place. Re-run once the ServiceMonitor exists.
+
+- [ ] **Hermes ArgoCD token needs re-minting** — the hub ArgoCD is new, so
+  `k3dm-hermes-argocd-token` is stale by construction.
+
+- [x] **BLOCKER for the hub rebuild: seeding clobbers the real Stripe/PayPal/encryption secrets.**
+  Landed `f28a4539` before the rebuild ran.
   Spec `docs/bugs/2026-09-20-seed-clobbers-real-payment-secrets.md`.
   `scripts/plugins/shopping_cart.sh:716-718` writes `payment/encryption`, `payment/stripe` and
   `payment/paypal` **unconditionally** — no `_vault_kv_exists` guard, no `_seed_source_data`

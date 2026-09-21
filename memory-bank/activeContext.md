@@ -7,6 +7,40 @@
 
 ## Current focus
 
+- **2026-09-20 — HUB REBUILD EXECUTED. The kine compaction stall is CLEARED.** The operator ran
+  `make down CLUSTER_PROVIDER=k3d`; Claude completed the rebuild and monitored it. Evidence the
+  root fault is gone: `state.db` **2.72 GiB → 25.8 MB**, WAL **678 MB → 10 MB**,
+  `kubectl get nodes` **5.5s → 0.05s**, and `COMPACT deleted` is logging on a **5-minute cadence**
+  (= 288/day, the healthy baseline) having caught the backlog up to rev 1445/2445. Before the
+  rebuild that predicate had **zero** matches in the entire retained log. `kubectl exec` works
+  again. See `docs/bugs/2026-09-09-hub-kine-compaction-stall.md`.
+
+  Two procedural traps found the hard way, both now fixed in
+  `docs/howto/hub-rebuild-from-gitops-vault.md`:
+  1. **`make up CLUSTER_PROVIDER=k3d` fails** — `bin/cluster-up:78` rejects it
+     (`supported: k3s-aws, k3s-gcp, k3s-az`). But **bare `make up` is also wrong for a hub-only
+     rebuild**: it defaults to `k3s-aws` and runs the full 12-step ACG path including Playwright
+     credential extraction and an interactive `read -r -p` prompt. The hub-only sequence is
+     `deploy_cluster --provider k3d k3d-cluster` → `deploy_vault` → `deploy_ldap` →
+     `deploy_argocd` → `make observability` → `make platform-ops`, which is exactly what
+     `bin/cluster-up` Step 3.5/3.6 does internally.
+  2. **`k3d cluster delete` left debris that blocks re-creation** — `k3d-k3d-cluster-agent-1`
+     could not be killed ("did not receive an exit event"), which then held the network
+     (`has active endpoints`) and the `k3d-k3d-cluster-images` volume. Remove the three by exact
+     name before rebuilding; never by wildcard.
+
+- **2026-09-20 — port-forward supervisor fix (the residual Grafana flap).** With the apiserver
+  healthy the Grafana forward *still* restarted ~every 45s — five times in two minutes — because
+  `_hostinger_write_monitoring_port_forward_wrapper` killed it on a **single** failed
+  `curl -fsS --max-time 3`. Grafana `/api/health` measures ~0.2s median with a tail past 3s and
+  occasional 503s during dashboard reload, so the supervisor was manufacturing the ~2s listener
+  gaps cloudflared reports as **502**. Now requires `K3DM_PF_HEALTH_THRESHOLD` (default 3)
+  consecutive failures with `K3DM_PF_HEALTH_TIMEOUT` (default 8s), counter reset on success.
+  Live wrapper regenerated + agent kickstarted: **0 restarts**, all probes 200 at 0.005–0.47s.
+  The generator is shared, so this covers hostinger too. Spec:
+  `docs/bugs/2026-09-20-pf-supervisor-kills-healthy-forward-on-single-slow-probe.md`.
+  Same disease family as [[reference_one_second_probes_cpu_starvation_kill_loop]].
+
 - **2026-09-20 — alertmanager CPU fix committed git-only; applies via the rebuild.**
   `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml` alertmanagerSpec now
   `requests` 64Mi/50m, `limits` 128Mi/500m (was 32Mi/10m, 64Mi/**50m** — the 50m limit was the

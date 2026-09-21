@@ -1,7 +1,10 @@
 # How-To: Controlled hub rebuild from GitOps + Vault
 
 **Audience:** the operator. **Not** an agent task.
-**Status:** procedure prepared 2026-09-20; execution pending, one blocker open.
+**Status:** **EXECUTED 2026-09-20** — the kine stall is cleared. `state.db` 2.72 GiB → 25.8 MB,
+`kubectl get nodes` 5.5s → 0.05s, and `COMPACT deleted` is logging on a 5-minute cadence after
+having had **zero** matches in the entire retained log beforehand. The procedure below is corrected
+against what actually happened; two steps as originally written were wrong (see §2b and §3).
 
 This is the indicated remedy for the kine compaction stall
 (`docs/bugs/2026-09-09-hub-kine-compaction-stall.md`): the hub's `state.db` cannot be compacted in
@@ -47,14 +50,18 @@ None of these have independent fixes. The rebuild clears all of them together.
 - All PersistentVolumes: Postgres, Redis, RabbitMQ, MinIO data.
 - Docker build cache and unused images (`bin/cluster-down` runs `docker system prune --force`).
 
-## BLOCKER — do not rebuild until this lands
+## BLOCKER — CLEARED in `f28a4539` before the rebuild ran
 
-`scripts/plugins/shopping_cart.sh:716-718` writes `payment/encryption`, `payment/stripe` and
+`scripts/plugins/shopping_cart.sh:716-718` wrote `payment/encryption`, `payment/stripe` and
 `payment/paypal` **unconditionally** on every run, and `bin/cluster-up:851` calls that function.
-A rebuild today would come back up with `api_key: sk_test_placeholder` and silently broken
-payments.
+A rebuild would have come back up with `api_key: sk_test_placeholder` and silently broken payments.
+All three are now guarded `reuse → copy-from-source → Keychain (Stripe only) → placeholder`.
 
-Spec: `docs/bugs/2026-09-20-seed-clobbers-real-payment-secrets.md`. Land that first.
+Spec: `docs/bugs/2026-09-20-seed-clobbers-real-payment-secrets.md`.
+
+Note the hub-only sequence in §3 does **not** run `deploy_shopping_cart_data`, so on a hub-only
+rebuild the payment keys are not seeded at all until that runs. Verify with the Stripe check in §5
+before trusting payments.
 
 The other eleven keys are safe: ten are guarded `reuse → copy-from-source → generate`, and for
 infra passwords regeneration is harmless because the services are redeployed in the same run and
@@ -126,16 +133,68 @@ Note the Grafana port-forward supervisor (`com.k3d-manager.grafana-port-forward`
 that list, so it keeps looping against the dead cluster during the rebuild. That is harmless noise;
 it recovers once the cluster is back.
 
-### 3. Rebuild
+### 2b. Clear teardown debris before rebuilding — verified necessary 2026-09-20
 
-```bash
-make up
+`k3d cluster delete` does **not** reliably finish. On the 2026-09-20 run it reported:
+
+```
+ERRO docker failed to remove the container 'k3d-k3d-cluster-agent-1': ... tried to kill
+     container, but did not receive an exit event
+WARN Failed to delete cluster network 'k3d-k3d-cluster': ... has active endpoints
+WARN Failed to delete volume 'k3d-k3d-cluster-images': ... volume is in use
 ```
 
-`bin/cluster-up` then: creates the k3d cluster → `deploy_vault` → `deploy_ldap` →
-`deploy_argocd` → `deploy_argocd_bootstrap` → re-unseals Vault from cached shards if sealed →
-`deploy_shopping_cart_data` → and `make up` finishes with the `observability` and `platform-ops`
-targets.
+The orphaned container pins the network, which pins the volume. Cluster creation then fails.
+Remove all three **by exact name** — never with a wildcard, and never touch `profile` or
+`pw-profile`:
+
+```bash
+docker rm -f k3d-k3d-cluster-agent-1
+docker network rm k3d-k3d-cluster
+docker volume rm k3d-k3d-cluster-images
+```
+
+Then confirm the slate is clean before proceeding:
+
+```bash
+docker ps -a --filter name=k3d --format '{{.Names}}'   # expect empty
+k3d cluster list                                       # expect header only
+```
+
+Leave `k3d-k3d-cluster-recovery-server-data` alone.
+
+### 3. Rebuild — hub only
+
+**Do not run `make up` for a hub-only rebuild.** Both obvious forms are wrong:
+
+- `make up CLUSTER_PROVIDER=k3d` **fails outright**: `bin/cluster-up:78` rejects it with
+  `Unsupported CLUSTER_PROVIDER: k3d (supported: k3s-aws, k3s-gcp, k3s-az)`. The k3d hub is not a
+  `bin/cluster-up` provider — it is the *local* cluster that script manages alongside a remote one.
+- Bare `make up` defaults to `CLUSTER_PROVIDER=k3s-aws` and runs the **full 12-step ACG path**:
+  Playwright AWS credential extraction, sandbox TTL checks, remote 3-node provisioning, SSH tunnel,
+  and an interactive `read -r -p "Press Enter once you are signed in..."` prompt. That is a
+  sandbox bring-up, not a hub rebuild.
+
+Run the hub-only sequence instead — this is exactly what `bin/cluster-up` Steps 3.5 and 3.6 do
+internally when it finds the hub missing:
+
+```bash
+./scripts/k3d-manager deploy_cluster --provider k3d k3d-cluster
+kubectl config use-context k3d-k3d-cluster
+./scripts/k3d-manager deploy_vault --confirm
+./scripts/k3d-manager deploy_ldap --confirm
+./scripts/k3d-manager deploy_argocd --confirm
+make observability
+make platform-ops
+```
+
+Timings from the 2026-09-20 run: cluster + Istio ~2 min, Vault ~2 min, LDAP ~1.5 min, ArgoCD
+~3.5 min (deploys 12/12 ApplicationSets itself), observability ~2 min. Grafana reaches `3/3` about
+3 min after the observability ApplicationSet syncs.
+
+Vault came back **initialized and unsealed** on this run — no `--re-unseal` was needed. If it does
+report sealed, `bin/cluster-up:417-432` handles it via `deploy_vault --re-unseal` from the cached
+shards.
 
 ### 4. Reapply the ApplicationSets — required, not optional
 
