@@ -278,7 +278,7 @@ flowchart LR
         ATRIVY --> APROM
     end
 
-    subgraph HOST["M4 host — managed by acg-up / acg-down"]
+    subgraph HOST["M4 host — managed by cluster-up / cluster-down"]
         PF["kubectl port-forward<br/>svc/prometheus-operated 19090:9090 -n monitoring<br/>--context ubuntu-k3s --address 0.0.0.0<br/>PID → ~/.local/share/k3d-manager/run/acg-prom-pf.pid"]
     end
 

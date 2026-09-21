@@ -90,7 +90,7 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
   - `-L 0.0.0.0:6443:localhost:6443` — forward local 6443 → k3s API on EC2
   - `-R 8200:127.0.0.1:18200` — reverse-forward EC2:8200 → local Vault (for ESO)
 - **Install:** `tunnel_start` (writes and bootstraps the plist dynamically with current EC2 IP)
-- **Target host:** `ubuntu` user on ACG EC2 IP (updated on each `acg-up`)
+- **Target host:** `ubuntu` user on ACG EC2 IP (updated on each `cluster-up`)
 
 ### `com.k3d-manager.cloudflare-tunnel`
 - **Tool:** `cloudflared`

@@ -244,10 +244,15 @@ bypassing the correlator — see `docs/guides/hermes.md`.
 | Last Deployment Time | `k3dm_deployment_last_timestamp_seconds * 1000` |
 | Deployment Duration Over Time | `k3dm_deployment_duration_seconds` |
 
+> **The panel titles say `acg-up` / `acg-down`, which are the pre-v1.7.1 script names**
+> (now `bin/cluster-up` / `bin/cluster-down`). The titles are literal strings in
+> `k3dm-deployments-configmap.yaml`, so the table above quotes the dashboard as deployed.
+> Renaming them means editing the ConfigMap and reapplying `make observability-acg`.
+
 Fed by `k3dm-webhook`'s `_push_metrics()` → Pushgateway, and this is the **only** dashboard
 whose producer is a push, not a scrape. The chain has three host-side links that each fail
 independently: the webhook LaunchAgent, the Pushgateway port-forward LaunchAgent on
-`localhost:9091` (installed by `bin/acg-up` Step 14c), and the Pushgateway pod itself.
+`localhost:9091` (installed by `bin/cluster-up` Step 14c), and the Pushgateway pod itself.
 
 **The hub has no Pushgateway** — the webhook pushes only for the ACG provider. This
 dashboard being empty on the hub is by design, not a regression. See

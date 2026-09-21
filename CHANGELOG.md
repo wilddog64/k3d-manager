@@ -24,6 +24,8 @@
   on purpose.
 
 ### Fixed
+- Standing docs still told readers to run `bin/acg-up` / `acg-down` / `acg-refresh` / `acg-status` / `acg-sync-apps` and the `/acg-*` Slack commands, all renamed to `cluster-*` in **v1.7.1** (`0c9b2707`). 48 occurrences corrected across README, `docs/architecture/cloudflare-slack-relay.md`, `docs/howto/makefile.md`, `docs/howto/launchd-daemons.md`, `docs/guides/grafana-dashboards.md`, `memory-bank/projectbrief.md` and `memory-bank/systemPatterns.md`. Historical records (the README/`docs/releases.md` release tables, `docs/bugs/`, `docs/issues/`, `docs/retro/`, `memory-bank/archive/`) keep the old names — that is what shipped. The `acg-sync-apps-argocd-pf` state-file constant inside `bin/cluster-sync-apps` is deliberately unchanged, per `docs/plans/v1.7.1-rename-acg-to-cluster-binaries.md`.
+- `docs/architecture/cloudflare-slack-relay.md` quoted a 409 Slack message the webhook does not emit (`use /acg-status to check progress`); replaced with the real text from `bin/k3dm-webhook`.
 - 13 broken doc links found by the new checker. Retargeted in standing docs: `vault-pki-setup.md` → `guides/security/04-vault-pki.md` (twice), a dead `README.md#jenkins-authentication-modes` → `guides/jenkins-authentication.md`, `../bin/get-ldap-password` → `../../bin/…`, and `#create-slack-app` → `#1-create-slack-app`. In four historical issue docs and one archived plan the dead links were unlinked to inline code rather than repointed, so the record still reads without a false promise of a working link.
 - README listed the vCluster E2E harness guide **three times**, twice labelled "(Tier 1)", and all
   three links pointed at the bare file — the Tier 2 entry led to the Tier 1 title. Root cause: the

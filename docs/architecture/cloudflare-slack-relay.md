@@ -8,7 +8,7 @@ internet and accept Slack slash commands that drive cluster lifecycle.
 ## 1 — Cloudflare Named Tunnel (ingress)
 
 `cloudflared` runs as a macOS LaunchAgent (`com.k3d-manager.cloudflare-tunnel`)
-installed by `bin/acg-up` Step 10h. It dials outbound to the Cloudflare edge
+installed by `bin/cluster-up` Step 10h. It dials outbound to the Cloudflare edge
 (no inbound firewall holes required) and routes public hostnames to local
 port-forwarded services on the Mac.
 
@@ -59,11 +59,11 @@ flowchart LR
 | `scripts/etc/cloudflared/config.yml` | Static ingress rules (hostname → local service) |
 | `com.k3d-manager.alertmanager-auth-proxy` | LaunchAgent that keeps the Alertmanager login proxy on `localhost:9093` available for Cloudflare |
 | `com.k3d-manager.alertmanager-port-forward` | LaunchAgent that keeps raw Alertmanager on `localhost:19093` available for the proxy |
-| `~/.cloudflared/<tunnel-id>.json` | Tunnel credentials (restored from Keychain by `acg-up`) |
+| `~/.cloudflared/<tunnel-id>.json` | Tunnel credentials (restored from Keychain by `cluster-up`) |
 | `~/.cloudflared/cert.pem` | Cloudflare origin cert (restored from Keychain) |
-| `bin/acg-up` Step 10h | Installs/updates the Cloudflare tunnel LaunchAgent plist |
-| `bin/acg-up` Step 14c | Installs Pushgateway port-forward LaunchAgent (localhost:9091) |
-| `bin/acg-down` | Unloads and removes all LaunchAgent plists |
+| `bin/cluster-up` Step 10h | Installs/updates the Cloudflare tunnel LaunchAgent plist |
+| `bin/cluster-up` Step 14c | Installs Pushgateway port-forward LaunchAgent (localhost:9091) |
+| `bin/cluster-down` | Unloads and removes all LaunchAgent plists |
 
 ---
 
@@ -91,10 +91,10 @@ sequenceDiagram
     participant Tunnel as Cloudflare Tunnel<br/>webhook.3ai-talk.org
     participant WH as k3dm-webhook<br/>bin/k3dm-webhook<br/>127.0.0.1:7443
     participant Job as Background Thread<br/>~/.local/share/k3d-manager/webhook-jobs/<id>/
-    participant Bin as bin/acg-up etc.
+    participant Bin as bin/cluster-up etc.
 
     note over User,Bin: Path A — Slash command
-    User->>Slack: /acg-up aws
+    User->>Slack: /cluster-up aws
     Slack->>Worker: POST /slack/commands<br/>(X-Slack-Signature, response_url)
     Note over Worker: HMAC-SHA256 verify<br/>timestamp ±300s replay guard
     Worker->>Slack: 200 ⏳ Bringing up ACG cluster…
@@ -126,20 +126,20 @@ target's own `min_role`). A request below the floor is a 403 **and** an audit re
 
 | Method | Path | Min role | Action |
 |--------|------|----------|--------|
-| `POST` | `/api/v1/cluster` | `admin` (up/down), `operator` (kill) | `bin/acg-up` or `bin/acg-down` |
+| `POST` | `/api/v1/cluster` | `admin` (up/down), `operator` (kill) | `bin/cluster-up` or `bin/cluster-down` |
 | `POST` | `/api/v1/cluster-status` | `reader` | cluster health check → Slack |
 | `POST` | `/api/v1/diagnostics` | `reader` | read-only kubectl / ArgoCD diagnostics against approved contexts |
 | `POST` | `/api/v1/hostinger-status` | `reader` | Hostinger edge + workload status → Slack |
 | `POST` | `/api/v1/make` | per target | **allowlisted `make` target** (`/k3dm`) — see below |
-| `POST` | `/api/v1/cluster-refresh` | `operator` | `bin/acg-refresh` — restore tunnel + credentials |
+| `POST` | `/api/v1/cluster-refresh` | `operator` | `bin/cluster-refresh` — restore tunnel + credentials |
 | `POST` | `/api/v1/cve-remediate` | `operator` | trigger a CVE remediation scan (cooldown-guarded) |
 | `POST` | `/api/v1/analyze` | `operator` | Alertmanager payload → failure analysis → Slack |
-| `POST` | `/api/v1/cluster-resume` | `admin` | `bin/acg-up` from last checkpoint |
+| `POST` | `/api/v1/cluster-resume` | `admin` | `bin/cluster-up` from last checkpoint |
 | `POST` | `/api/v1/cleanup-stale-sandbox` | `admin` | reap a dead ACG sandbox (requires `confirm`) |
 | `POST` | `/api/v1/argocd-upgrade` | `admin` | ArgoCD label-patch workflow (`chart_version`, stage: `acg` \| `infra`) |
 | `POST` | `/api/v1/ask` | `reader` | AI agent question (claude / gemini / codex) → Slack |
 | `POST` | `/slack/events` | (Slack-signed) | Slack Events API — thread replies, URL verification |
-| `GET`  | `/api/v1/health` | — | JSON smoke-test report (used by `bin/acg-status`) — includes Pushgateway |
+| `GET`  | `/api/v1/health` | — | JSON smoke-test report (used by `bin/cluster-status`) — includes Pushgateway |
 | `GET`  | `/api/v1/make` | `reader` | target help for the caller's role |
 | `GET`  | `/api/v1/status/<job_id>` | — | Poll job status + last 2 KB of output |
 
@@ -211,13 +211,13 @@ Webhook token     macOS Keychain (k3dm-webhook-token) read by bin/k3dm-webhook a
 `POST /api/v1/cluster` returns `409` if a cluster job (`up` or `down`) is
 already running. The Worker surfaces this to Slack as:
 
-> ⚠️ cluster job already running — use /acg-status to check progress
+> ⚠️ cluster job already running: `<job_id>` (`<action>`)
 
 ---
 
 ## 3 — Deployment Metrics (Prometheus Pushgateway)
 
-After every `acg-up`, `acg-down`, or `acg-resume` job completes, `k3dm-webhook`
+After every `cluster-up`, `cluster-down`, or `cluster-resume` job completes, `k3dm-webhook`
 pushes metrics to the Prometheus Pushgateway running in the cluster.
 
 ```mermaid
@@ -252,8 +252,8 @@ pushes without changing code.
 | File | Purpose |
 |------|---------|
 | `bin/k3dm-webhook` | `_push_metrics()` — pushes after each job `_finish()` |
-| `bin/acg-up` Step 14c | Installs Pushgateway port-forward LaunchAgent (localhost:9091) |
-| `bin/acg-down` | Unloads Pushgateway port-forward LaunchAgent |
+| `bin/cluster-up` Step 14c | Installs Pushgateway port-forward LaunchAgent (localhost:9091) |
+| `bin/cluster-down` | Unloads Pushgateway port-forward LaunchAgent |
 | `scripts/plugins/observability.sh` | `_deploy_pushgateway_acg()` — Helm install + dashboard ConfigMap |
 | `scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml` | Adds `pushgateway` scrape job |
 | `scripts/etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | Grafana dashboard ConfigMap |
