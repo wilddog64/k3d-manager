@@ -7,6 +7,43 @@
 
 ## Current focus
 
+- **2026-09-20 — CRITICAL: hub PVC data has no backup and `make down` destroys it.** Asked to
+  confirm restorability; the answer for the seven stateful hub claims is **no**. Three independent
+  causes: (1) `hub_recovery_plan/validate/restore` all consume a
+  `<captured-recovery-directory>` that **nothing in the repo produces** — the consumer half of the
+  feature shipped, the producer never did, and no such directory exists on the host; (2) every PV
+  is `reclaimPolicy: Delete` (`local-path` SC default, cluster-wide); (3) `bin/cluster-down:330`
+  runs `k3d cluster delete` unconditionally with **zero** backup/capture hits in the file, which is
+  the exact command `docs/plans/v1.33.0-hub-local-path-restore.md` precondition 5 forbids. Nothing
+  is scheduled either — no crontab, no backup launchd agent. v1.33.0 only worked because an ad-hoc
+  external "M2 monitor" did the capture.
+  **What IS covered:** the 14 canonical app secrets have three copies (Keychain
+  `k3d-manager-app-cluster-secrets` — all 14 verified present by existence probe; hostinger
+  `secrets/vault-seed-backup`, 14 keys, 61d stale; plus `vault-root`). That layer is proven — the
+  Stripe key restored from Keychain today.
+  **What is NOT:** Vault's full KV (this is why `cosign-public-key` is genuinely lost — not one of
+  the 14), Keycloak Postgres, all three OpenLDAP volumes, Prometheus history, Trivy cache.
+  Current hub data is unprotected *right now*. Spec:
+  `docs/bugs/2026-09-20-no-capture-producer-hub-pvc-data-unrecoverable.md`. **Awaiting the user's
+  go** for a manual capture of the live claims (live `docker exec`).
+
+- **2026-09-20 — Keycloak `make status` error root-caused: the daemon is on the WRONG CLUSTER.**
+  `com.k3d-manager.keycloak-browser-http` (pid 30083, up **16 days**, `runs = 1`, never exited)
+  logs `services "istio-ingressgateway" not found` while the service plainly exists on the hub.
+  Caught its own child's argv by polling `ps`: `kubectl --context ubuntu-hostinger port-forward
+  svc/istio-ingressgateway -n istio-system 80:80` — and hostinger's `istio-system` has `istiod`
+  only. Three defects in `scripts/etc/argocd/port-forward-wrapper.sh.tmpl`: context resolved
+  **once outside** `while true` so a cluster rebuild can never be picked up; the current-context
+  fallback branch **logs nothing** (`grep -c WARNING` over 90 MB = 0), so the log accuses the
+  cluster of missing a present service; and `_clear_stale_listeners` sweeps
+  `lsof -iTCP:${LOCAL_PORT}` **address-blind**, so it kills the frontend daemon's legitimate
+  `127.0.0.2:80` forward. Causation measured: keycloak log grew and frontend died in the **same
+  second** (18:01:51), a ~31s beat, `forks = 23015`, frontend log 69 MB. Deployed wrapper is also
+  a stale generation (`sleep 30`, `--max-time 1`, no `--address`) because nothing regenerates it.
+  Spec: `docs/bugs/2026-09-20-pf-wrapper-silent-wrong-context-and-address-blind-port-sweep.md`.
+  Note: `sudo launchctl` is **not** passwordless — `/etc/sudoers.d/k3d-manager` exists (0440) but
+  `sudo -n launchctl` is refused.
+
 - **2026-09-20 — HUB REBUILD EXECUTED. The kine compaction stall is CLEARED.** The operator ran
   `make down CLUSTER_PROVIDER=k3d`; Claude completed the rebuild and monitored it. Evidence the
   root fault is gone: `state.db` **2.72 GiB → 25.8 MB**, WAL **678 MB → 10 MB**,
