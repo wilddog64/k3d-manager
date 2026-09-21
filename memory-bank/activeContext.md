@@ -1481,3 +1481,67 @@ Caught before commit: inserting the panel-title caveat mid-table split a markdow
 orphaning three rows. Moved below the table.
 
 Verified: `check-doc-links` 1726 OK; mermaid 6 blocks 0 failed; 23 pytest pass.
+
+## 2026-09-21 — Tier 1 e2e RAN (first ever e2e data on Grafana); Tier 2 blocked
+
+**User asked for one Tier 1 + one Tier 2 run so Grafana has data.** Tier 1 ran; Tier 2 could
+not start.
+
+### Tier 1 — ran, failed at `deploying-substrate`, but DID publish
+`./scripts/k3d-manager e2e_verify_vcluster`, run `1790025545-10464`, host context
+`k3d-k3d-cluster`. vCluster `e2e-1790025545-10464` created in ns `vclusters`, API ready, then:
+
+```
+[acg-up] GHCR_PAT not in env — checking Vault...
+[acg-up] gh CLI token cannot pull from ghcr.io — ... excludes read:packages, NOT saved to Vault
+ERROR: [acg-up] GHCR_PAT not set and no valid PAT in Vault
+```
+
+`result: fail`, `exit_code: 1`, `phase: deploying-substrate`. The `EXIT` trap tore the vCluster
+down cleanly (deregistered from hub ArgoCD, namespace deleted) — no leak.
+
+**The observability chain is PROVEN END TO END**, which is the lasting win here:
+run → `platform-ops` ConfigMap `e2e-result-cxdm5`
+(`e2e-result=true,e2e-runner=local-m4,e2e-service=product-catalog,e2e-tier=vcluster`) →
+`vulnerability-inventory-exporter` → metrics. Read off the exporter's `:8080/metrics`:
+`e2e_last_run_pass{tier="vcluster",service="product-catalog",runner="local-m4"} 0`,
+plus `e2e_run_info`, `e2e_last_run_timestamp_seconds`, `e2e_last_run_duration_seconds`.
+**Before this run the hub had ZERO `e2e-result` ConfigMaps** — the E2E Verification dashboard
+now has its first series. Note this is a *local* run, so it does not clear the OPEN remote bug
+`docs/bugs/2026-09-15-e2e-remote-results-never-reach-grafana.md` (that is about
+`E2E_M2_PUBLISH_BACK_HOST` being invisible to launchd).
+
+### MY ERROR, corrected — I pre-cleared Tier 1 on a false probe
+Before running I probed GHCR with the gh token against
+`ghcr.io/wilddog64/shopping-cart-e2e-tests`, got HTTP 200 on the manifest, and told the user
+"repo scope is sufficient for your own packages, so Tier 1 can pull." **Wrong.** That package
+is **PUBLIC** — anonymous, credential-free token exchange also returns 200. Measured:
+
+| Package | anonymous | gh token |
+|---|---|---|
+| `shopping-cart-e2e-tests` | **200** | 200 |
+| `shopping-cart-basket` | 403 | **403** |
+| `shopping-cart-product-catalog` | 403 | **403** |
+
+The substrate needs the **private service images**, not the public test runner.
+`_shopping_cart_ghcr_pat_can_pull` is correct and its default
+`GHCR_PROBE_REPO=wilddog64/shopping-cart-basket` (private) is deliberate — trust it over an
+ad-hoc probe. Saved as `memory/reference_shopping_cart_e2e_tests_package_is_public.md`.
+Same trap family as the `GITHUB_TOKEN` green-push false positive.
+
+### Tier 2 — hard blocked, never started
+`e2e_verify_sandbox` hardcodes `kubectl --context ubuntu-k3s` (`scripts/plugins/e2e.sh:119`)
+and calls `acg_extend_playwright`. Only two contexts exist: `k3d-k3d-cluster` and
+`ubuntu-hostinger` — **there is no ACG sandbox up**. Standing rule: ACG login is a one-time
+MANUAL Pluralsight step needing a real TTY; Claude-run `credential-test` bails
+`ACG_SESSION_EXPIRED`. Not attempted.
+
+### What unblocks each (both user-side)
+- **Tier 1:** a GHCR PAT with `read:packages` → `pbpaste | bin/rotate-ghcr-pat`. **Open
+  question:** `bin/cluster-up` asserts gh's OAuth scopes "are fixed and exclude
+  read:packages", which would make the long-parked `gh auth refresh -h github.com -s
+  read:packages` futile. Unverified — check before spending time on it.
+- **Tier 2:** bring up the ACG sandbox (manual Pluralsight login, user, real TTY), then rerun.
+
+Also confirmed same root cause: hub `shopping-cart-apps` pods (basket/frontend/order/
+product-catalog) have been `ImagePullBackOff` for ~20h.
