@@ -1426,3 +1426,15 @@ zero coverage.
 
 Also outstanding from this pass: `Prometheus Vault credentials unreadable — skipping auth proxy`,
 another KV casualty of the same PVC loss.
+
+**Follow-up 2026-09-20 — the credential-restore tooling itself was the blocker.** The operator ran
+`make alertmanager-secret` and it aborted with `all three values are required (run in an interactive
+terminal)`: every value came from `read -r -p`, so with stdin not a TTY all three read empty. That
+left no usable recovery path at all, because `make restore-google-app-password` backs up only
+`gmail_app_pw` and therefore dies on its own `Vault missing gmail_from,sms_gateway` guard. Both
+targets now resolve each value from env (`ALERTMANAGER_GMAIL_FROM`, `ALERTMANAGER_SMS_GATEWAY`),
+then Keychain, then a prompt gated on `[ -t 0 ]`, and name each unresolved field individually.
+`alertmanager-secret` backs `gmail_from`/`sms_gateway` up to Keychain on success, so the next PVC
+loss is a single `make restore-google-app-password`. The Vault root token moved out of a `curl -H`
+argument into the environment, per the CLAUDE.md secret-hygiene rule. Verified: the guard now lists
+exactly the two genuinely missing fields and resolves the app password from Keychain silently.

@@ -130,10 +130,15 @@ federate `cluster: ubuntu-hostinger` keep their true origin.
 - [x] Hub Prometheus sets `cluster: hub` in `externalLabels`
 - [x] Templates proven to compile and render, not merely parse as YAML
 - [ ] `alertmanager-smtp-secret` recreated on the live hub and `sms-critical` present in
-      `/api/v2/status` — **blocked:** Vault's `secret/k3d-manager/alertmanager` was lost with the
-      Vault PVC, Keychain holds only `gmail_app_pw` (not `gmail_from`/`sms_gateway`), so
-      `make restore-google-app-password` fails its own guard. Needs interactive
-      `make alertmanager-secret` (operator, real TTY).
+      `/api/v2/status` — **blocked on the operator, no longer on tooling.** Vault's
+      `secret/k3d-manager/alertmanager` was lost with the Vault PVC and Keychain held only
+      `gmail_app_pw`, so `make restore-google-app-password` failed its own
+      `Vault missing gmail_from,sms_gateway` guard while `make alertmanager-secret` required a real
+      TTY for all three prompts. Both are fixed: the app password resolves from Keychain, and the
+      other two from `ALERTMANAGER_GMAIL_FROM` / `ALERTMANAGER_SMS_GATEWAY`, so the target now runs
+      non-interactively. The operator still supplies the from-address and gateway once, after which
+      they are backed up to Keychain and the whole secret rebuilds with
+      `make restore-google-app-password`.
 - [ ] One real SMS received and legible
 
 ## What NOT to Do

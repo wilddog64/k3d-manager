@@ -8,6 +8,20 @@
 
 ### Fixed
 
+- `make alertmanager-secret` could only ever run from a real terminal, and the one recovery path
+  that did not need a terminal could not succeed. All three values came from `read -r -p`, so
+  running the target anywhere without a TTY — a `!` shell, a script, an agent session — silently
+  read three empty strings and aborted with `all three values are required`. Meanwhile
+  `make restore-google-app-password` backs up only `gmail_app_pw` to Keychain, so after the Vault
+  PVC was lost it failed its own `Vault missing gmail_from,sms_gateway` guard: the two fields it
+  needed had no backup anywhere. Each value now resolves from env (`ALERTMANAGER_GMAIL_FROM`,
+  `ALERTMANAGER_SMS_GATEWAY`), then Keychain, then an interactive prompt only when stdin is a TTY,
+  and the error names each unresolved field and where to supply it instead of lumping all three
+  together. On success the target backs `gmail_from` and `sms_gateway` up to Keychain, and
+  `restore-google-app-password` reads all three from Keychain so a future PVC loss is a
+  single-command rebuild. The Vault root token now travels by environment variable rather than in a
+  `curl -H` argument visible in the process table, matching the sibling target.
+
 - The 45s apiserver `scrapeTimeout` never survived on the cluster. `kube-prometheus-stack-apiserver`
   is an ArgoCD-managed ServiceMonitor (`argocd.argoproj.io/tracking-id`) and the observability
   ApplicationSet runs `selfHeal: true`, so the out-of-band `kubectl patch` was reverted within

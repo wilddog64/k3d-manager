@@ -571,21 +571,39 @@ show-service-passwords:
 	echo "    dev users:      admin / $${_realm_admin:-N/A}  |  developer / $${_dev:-N/A}  |  operator / $${_op:-N/A}";\
 	echo ""
 
-## Store Alertmanager credentials in Vault (run once; requires Hub Vault + port-forward)
+## Store Alertmanager credentials in Vault (requires Hub Vault + port-forward)
+## Each value resolves from env, then Keychain, then an interactive prompt. Runs
+## non-interactively when ALERTMANAGER_GMAIL_FROM and ALERTMANAGER_SMS_GATEWAY are set.
 alertmanager-secret:
 	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
 	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	read -r -p "Gmail from address: " _gmail; \
-	read -r -s -p "Gmail app password: " _pw; echo; \
-	read -r -p "T-Mobile SMS gateway (10digits@tmomail.net): " _sms; \
-	if [ -z "$$_gmail" ] || [ -z "$$_pw" ] || [ -z "$$_sms" ]; then \
-	  echo "[alertmanager-secret] ERROR: all three values are required (run in an interactive terminal)" >&2; exit 1; \
+	[ -n "$$_tok" ] || { echo "[alertmanager-secret] ERROR: cannot read Hub Vault root token" >&2; exit 1; }; \
+	_gmail="$${ALERTMANAGER_GMAIL_FROM:-}"; \
+	[ -n "$$_gmail" ] || _gmail=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-from -w 2>/dev/null || true); \
+	_sms="$${ALERTMANAGER_SMS_GATEWAY:-}"; \
+	[ -n "$$_sms" ] || _sms=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-sms-gateway -w 2>/dev/null || true); \
+	_pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>/dev/null || true); \
+	if [ -t 0 ]; then \
+	  [ -n "$$_gmail" ] || read -r -p "Gmail from address: " _gmail; \
+	  [ -n "$$_pw" ] || { read -r -s -p "Gmail app password: " _pw; echo; }; \
+	  [ -n "$$_sms" ] || read -r -p "SMS gateway (10digits@tmomail.net): " _sms; \
 	fi; \
-	curl -sf -X POST \
-	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
-	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager" \
-	  -d "$$(GMAIL_FROM="$$_gmail" GMAIL_PW="$$_pw" SMS_GW="$$_sms" python3 -c 'import json,os; print(json.dumps({"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}))')" >/dev/null && \
-	echo "[alertmanager-secret] Credentials stored in Vault"
+	_missing=; \
+	[ -n "$$_gmail" ] || _missing="$$_missing gmail_from(env ALERTMANAGER_GMAIL_FROM)"; \
+	[ -n "$$_pw" ] || _missing="$$_missing gmail_app_pw(Keychain k3dm-alertmanager-gmail-app-password)"; \
+	[ -n "$$_sms" ] || _missing="$$_missing sms_gateway(env ALERTMANAGER_SMS_GATEWAY)"; \
+	if [ -n "$$_missing" ]; then \
+	  echo "[alertmanager-secret] ERROR: unresolved:$$_missing" >&2; \
+	  echo "[alertmanager-secret] set the named env vars, or run this target from a real terminal to be prompted" >&2; \
+	  exit 1; \
+	fi; \
+	VAULT_TOKEN="$$_tok" GMAIL_FROM="$$_gmail" GMAIL_PW="$$_pw" SMS_GW="$$_sms" python3 -c 'import json,os,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; p={"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}; u.urlopen(u.Request(a,data=json.dumps(p).encode(),headers=h,method="POST"))' || \
+	  { echo "[alertmanager-secret] ERROR: Vault write failed (is the Vault port-forward on 127.0.0.1:18200 up?)" >&2; exit 1; }; \
+	echo "[alertmanager-secret] Credentials stored in Vault"; \
+	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-gmail-from -w "$$_gmail" 2>/dev/null && \
+	  echo "[alertmanager-secret] gmail_from backed up to Keychain"; \
+	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-sms-gateway -w "$$_sms" 2>/dev/null && \
+	  echo "[alertmanager-secret] sms_gateway backed up to Keychain"
 
 ## Restore the Alertmanager Gmail App Password from Keychain into Vault, then rebuild the Alertmanager Secret
 restore-google-app-password:
@@ -594,7 +612,17 @@ restore-google-app-password:
 	[ -n "$$_tok" ] || { echo "[restore-google-app-password] ERROR: cannot read Hub Vault root token" >&2; exit 1; }; \
 	_pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>/dev/null); \
 	[ -n "$$_pw" ] || { echo "[restore-google-app-password] ERROR: k3dm-alertmanager-gmail-app-password not in Keychain (locked? run: security unlock-keychain)" >&2; exit 1; }; \
-	VAULT_TOKEN="$$_tok" GMAIL_PW="$$_pw" python3 -c 'import json,os,sys,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; d=json.load(u.urlopen(u.Request(a,headers=h)))["data"]["data"]; m=[k for k in ("gmail_from","sms_gateway") if not d.get(k)]; m and sys.exit("[restore-google-app-password] ERROR: Vault missing "+",".join(m)+" - run: make alertmanager-secret"); d["gmail_app_pw"]=os.environ["GMAIL_PW"]; u.urlopen(u.Request(a,data=json.dumps({"data":d}).encode(),headers=h,method="POST"))' && \
+	_gmail=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-from -w 2>/dev/null || true); \
+	_sms=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-sms-gateway -w 2>/dev/null || true); \
+	_missing=; \
+	[ -n "$$_gmail" ] || _missing="$$_missing k3dm-alertmanager-gmail-from"; \
+	[ -n "$$_sms" ] || _missing="$$_missing k3dm-alertmanager-sms-gateway"; \
+	if [ -n "$$_missing" ]; then \
+	  echo "[restore-google-app-password] ERROR: not in Keychain:$$_missing" >&2; \
+	  echo "[restore-google-app-password] run: make alertmanager-secret (it stores these for future restores)" >&2; \
+	  exit 1; \
+	fi; \
+	VAULT_TOKEN="$$_tok" GMAIL_PW="$$_pw" GMAIL_FROM="$$_gmail" SMS_GW="$$_sms" python3 -c 'import json,os,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; p={"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}; u.urlopen(u.Request(a,data=json.dumps(p).encode(),headers=h,method="POST"))' && \
 	echo "[restore-google-app-password] Vault updated — rebuilding Alertmanager Secret" && \
 	$(MAKE) observability
 
