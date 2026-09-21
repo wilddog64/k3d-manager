@@ -286,3 +286,89 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"NOT_READY"* ]]
 }
+
+@test "GHCR pull probe succeeds after token exchange and tags list" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    curl() {
+      if [[ "$*" == *"ghcr.io/token?"* ]]; then
+        printf "%s\n" "token-exchange"
+      else
+        printf "%s" "200"
+      fi
+    }
+    jq() { printf "%s\n" "bearer-token"; }
+    _shopping_cart_ghcr_pat_can_pull wilddog64 pat-value
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "GHCR pull probe rejects a 403 tags list" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    curl() {
+      if [[ "$*" == *"ghcr.io/token?"* ]]; then
+        printf "%s\n" "token-exchange"
+      else
+        printf "%s" "403"
+      fi
+    }
+    jq() { printf "%s\n" "bearer-token"; }
+    _shopping_cart_ghcr_pat_can_pull wilddog64 pat-value
+  '
+  [ "$status" -ne 0 ]
+}
+
+@test "GHCR pull probe rejects an empty token exchange" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    curl() { printf "%s\n" "empty-exchange"; }
+    jq() { :; }
+    _shopping_cart_ghcr_pat_can_pull wilddog64 pat-value
+  '
+  [ "$status" -ne 0 ]
+}
+
+@test "gh CLI PAT is not stored when the pull probe fails" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    vault_writes="$(mktemp)"
+    gh() {
+      case "$1" in
+        auth) printf "%s\n" "gh-token" ;;
+        api) return 0 ;;
+      esac
+    }
+    _shopping_cart_ghcr_pat_can_pull() {
+      return 1
+    }
+    _shopping_cart_store_ghcr_pat_in_vault() {
+      printf "%s\n" "write" >> "$vault_writes"
+    }
+    _github_user="wilddog64"
+    shopping_cart_load_ghcr_pat_from_gh || true
+    [[ ! -s "$vault_writes" ]]
+    rm -f "$vault_writes"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"read:packages"* ]]
+}
+
+@test "GHCR path does not pass Vault token or PAT in curl argv" {
+  run grep -nF ' -H "X-Vault-Token: ' scripts/plugins/shopping_cart.sh
+  [ "$status" -ne 0 ]
+  run grep -nF -- '{\"token\": \"${_ghcr_pat}' scripts/plugins/shopping_cart.sh
+  [ "$status" -ne 0 ]
+}
