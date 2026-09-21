@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Changed
+- `docs/architecture/webhook-server.md` roadmap replaced with measured per-phase status:
+  Phases 2–5 are **not started** (none of `server.py`, `routes.py`, `commands.py`,
+  `dispatch.py`, `jobs.py`, `diagnostics.py` exist), and the monolith has grown from 2,953
+  lines after Phase 1 to 4,008 today (+36%) — the plan is being outrun by the code it meant
+  to shrink.
+- `docs/guides/hermes.md` now enumerates all six Hermes Status panels (it described four),
+  names the dashboard source file and applier, and documents the `k3dm.k3.io` label trap.
 - Architecture docs realigned with the current webhook server: `docs/architecture/webhook-server.md`
   now records the real size (4,008 lines, not ~2,950), the `webhook/make_targets.py` module,
   corrected monolith line ranges for every area, the four `/k3dm` authorization gates, and the
@@ -31,6 +38,8 @@
   block moved to `memory-bank/archive/activeContext-2026-09-21.md`.
 
 ### Added
+
+- `docs/guides/grafana-dashboards.md` — a guide covering all seven shipped Grafana dashboards (ArgoCD/Image-Updater, CVE Auto-Patch, E2E Verification, Hermes Status, k3dm Deployment Metrics, Trivy Security, Checkout Load Test): panel-by-panel queries, the producer chain feeding each series (exporter / Pushgateway / promtail / trivy-operator), and a `No data`-by-cause triage table assembled from past incidents. Closes a "guide per major tech" gap — dashboard knowledge previously existed only scattered across ~25 plan/bug/issue docs, and `grafana-dashboard-hermes.yaml` was referenced by none of them.
 
 - Tier 2 `e2e_verify_sandbox` runs the Stripe Playwright flow in a self-contained ACG sandbox without hub registration, applies the proven sandbox substrate overrides at deploy time, and emits shared `tier: sandbox` / `project: stripe` summaries. Tier 2 is opt-in and periodic, never a blocking per-candidate gate.
 

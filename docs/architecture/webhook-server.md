@@ -1,7 +1,8 @@
 # Webhook Server Architecture
 
 **Component:** `bin/k3dm-webhook` + `scripts/lib/webhook/`
-**Status:** modularization Phase 1 landed (v1.13.0), extended by `make_targets` (v1.34.0); Phases 2–5 pending
+**Status:** modularization Phase 1 landed (v1.13.0), extended by `make_targets` (v1.34.0);
+**Phases 2–5 not started** — and the monolith has grown 36% since Phase 1 (see [Roadmap](#roadmap-remaining-phases))
 **Related specs:** [`docs/plans/v1.13.0-webhook-modularization.md`](../plans/v1.13.0-webhook-modularization.md) (umbrella),
 `v1.13.0-webhook-modularization-phase1.md` (config), `-render.md` (render), `-auth.md` (proc + auth),
 [`docs/plans/v1.34.0-slack-k3dm-make-command.md`](../plans/v1.34.0-slack-k3dm-make-command.md) (`/k3dm` make allowlist)
@@ -223,15 +224,45 @@ The authoritative target list lives in
 
 ## Roadmap (remaining phases)
 
-Phase 1 (config/auth/render/proc) is done, and `make_targets` was added to the package in
-v1.34.0 outside the original phase plan. The umbrella spec sequences the rest by risk:
+Status measured against the tree, not against the spec's intent:
 
-- **Phase 2** — command registry + dispatch split (`commands.py`, `dispatch.py`). Note that
-  `/k3dm` has already demonstrated the target shape: a declarative table plus a pure parser,
-  with the handler reduced to lock → spawn → notify.
-- **Phase 3** — jobs/state management split (`jobs.py`)
-- **Phase 4** — diagnostics/failure analysis split (`diagnostics.py`)
-- **Phase 5** — evaluate generic extraction candidates for `lib-foundation` (auth,
-  job-state primitives, subprocess wrappers) — only if another repo demonstrably needs them
+| Phase | Planned modules | Status | Evidence |
+|-------|-----------------|--------|----------|
+| **1** — thin entrypoint + config/auth/render split | `config.py`, `render.py`, `proc.py`, `auth.py` | **done** (v1.13.0, `28f38058`, 2026-07-05) | all four present |
+| *(unplanned)* `/k3dm` allowlist | `make_targets.py` | **done** (v1.34.0, `978ea60f`, 2026-09-17) | present; added outside the phase plan |
+| **2** — command registry + dispatch split | `commands.py`, `dispatch.py` | **not started** | neither file exists |
+| **3** — jobs/state management split | `jobs.py` | **not started** | file does not exist |
+| **4** — diagnostics/failure analysis split | `diagnostics.py` | **not started** | file does not exist |
+| **5** — evaluate `lib-foundation` extraction candidates | — | **not started** | gated on 2–4 |
+
+There is also no `server.py` or `routes.py`; the entrypoint is still both process host and
+router.
+
+### The measurement that matters
+
+Phase 1 moved ~190 lines out. The monolith has since taken on **five times that much**:
+
+| Point | `bin/k3dm-webhook` |
+|-------|--------------------|
+| before Phase 1 (`28f38058~1`) | 3,142 lines |
+| after Phase 1 (`28f38058`, 2026-07-05) | 2,953 lines |
+| today | **4,008 lines** |
+
+**+1,055 lines (+36%) since the refactor** — `/k3dm`, `/api/v1/cve-remediate`,
+`/api/v1/hostinger-status`, `/api/v1/cleanup-stale-sandbox`, `/api/v1/analyze`, the login
+smoke suite and the fix-mode thread handler all landed *in the entrypoint*. Phases 2–5 are
+not merely pending; the thing they were meant to shrink is growing faster than the plan is
+being executed. Any future statement that "modularization is on track" should be checked
+against this table first.
+
+### What the pattern actually is now
+
+`make_targets.py` is the tell. Two extractions have happened in practice, and both were
+**pure leaves** — data plus validation, no I/O, no server, no cluster — not the large
+behavioural splits phases 2–4 describe. `/k3dm` also demonstrates the target shape for
+Phase 2 in miniature: a declarative table plus a pure parser, with the handler reduced to
+lock → spawn → notify. If phases 2–4 are ever picked up, the cheap and proven move is to
+lift each area's *table and validation* into a leaf first and leave the handler behind,
+rather than attempting a whole-area move.
 
 No change to the external Slack/Worker contract is planned across any phase.
