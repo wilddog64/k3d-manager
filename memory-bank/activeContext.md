@@ -1390,3 +1390,51 @@ were **pure leaves**, not the behavioural splits phases 2–4 describe.
 Prior commit this window: `b5721781` (ASCII→Mermaid; found and fixed
 `acg-credentials-flow.md` block#1, which had never rendered — a semicolon in
 sequence-diagram message text terminates the statement).
+
+## 2026-09-21 — doc-link gate BUILT (5-month-old proposal), 13 broken links fixed
+
+`58f5c316` on `k3d-manager-v1.36.0`, pushed. Preceded by `f3b9be22` (e2e harness guide tiers).
+
+**Why now.** The harness-guide audit found three README entries for one doc, all linking to
+the bare file, so "Tier 2" landed on a page titled "(Tier 1)". Nothing could have caught it.
+`memory/feedback_issue_doc_links_precommit.md` had recorded this gap on **2026-04-06** and
+re-confirmed on 2026-09-17 that the checker had **never been built**.
+
+**Built:** `scripts/check-doc-links.py` (stdlib; the memory proposed a `.sh` — Python is more
+honest for markdown parsing) + `make check-doc-links`, wired into `.githooks/pre-commit` over
+**staged files only** so pre-existing debt cannot block unrelated commits. `K3DM_SKIP_DOC_LINKS=1`
+bypasses. Dropped the proposal's `.pre-commit-config.yaml` step — this repo uses
+`core.hooksPath=.githooks`, so that part was simply wrong. Tests:
+`scripts/tests/bin/test_check_doc_links.py`, **23 cases**, added to `make test-pytest`.
+
+**Three false-positive classes had to be handled** — each would have made the gate useless:
+1. **Inline code.** A DNS regex `` `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?` `` is syntactically
+   `[text](target)`. Code spans blanked before matching.
+2. **`path:line`.** This repo writes clickable `bin/k3dm-webhook:95`; suffix stripped.
+3. **Slug rules.** `github-slugger` does `.replace(/ /g, '-')` — **each** space its own hyphen,
+   so `/claude / /gemini / /codex Commands` → `claude--gemini--codex-commands`. **My first
+   implementation collapsed whitespace runs and reported three CORRECT links as broken.** Caught
+   by inspecting the target headings before "fixing" anything — the near-miss worth remembering.
+
+**Fixed 13 of 13.** Standing docs retargeted: `../howto/vault-pki-setup.md` →
+`../guides/security/04-vault-pki.md` (×2), dead `README.md#jenkins-authentication-modes` →
+`../guides/jenkins-authentication.md`, `../bin/get-ldap-password` → `../../bin/…`,
+`#create-slack-app` → `#1-create-slack-app`. In 4 historical `docs/issues/2026-05-*` and 1
+archived plan the dead links were **unlinked to inline code**, not repointed — repointing a
+record to somewhere it never pointed falsifies it. Same call as leaving historical ASCII
+diagrams alone. That also unlinked 3 neighbouring absolute `/Users/cliang/...` links that
+resolved on this machine only.
+
+Verified: `1725 file(s) OK`; 23 pytest pass; failure path exits 1 with `file:line`;
+`shellcheck .githooks/pre-commit` clean; and the hook fired on its own commit
+(`check-doc-links: 11 file(s) OK`).
+
+### Discovered, NOT fixed — needs the user's go
+**`bin/acg-up` / `bin/acg-down` were renamed `bin/cluster-up` / `bin/cluster-down` in v1.7.1
+(`0c9b2707`), and 219 files still say the old name.** No code references the old names, so
+nothing breaks at runtime — but standing docs (README's ACG table,
+`docs/architecture/cloudflare-slack-relay.md` "Step 10h"/"Step 14c", guides) instruct readers
+to run a script that does not exist. The link checker cannot see these: they are code spans,
+not links. Historical bugs/issues/retros should **keep** the old name. Scope for the sweep =
+standing docs only. Recorded in
+`docs/bugs/2026-09-21-doc-links-and-anchors-never-validated.md`.
