@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `memory-bank/techContext.md` and `memory-bank/systemPatterns.md` rewritten against the live tree.
+  Both dated from v1.24.0 (2026-08-11) and had drifted: techContext listed 15 BATS files against 117
+  and 1118 cases, two plugins against 26, and three cluster providers against nine; systemPatterns
+  had duplicate section numbers and two sections — agent role boundaries and the agent commit
+  protocol — that stated the opposite of current practice.
+- `memory-bank/activeContext.md` compressed 1783 → 1337 lines; the settled 2026-09-01→09-04 v1.28.0
+  block moved to `memory-bank/archive/activeContext-2026-09-21.md`.
+
 ### Added
 
 - Tier 2 `e2e_verify_sandbox` runs the Stripe Playwright flow in a self-contained ACG sandbox without hub registration, applies the proven sandbox substrate overrides at deploy time, and emits shared `tier: sandbox` / `project: stripe` summaries. Tier 2 is opt-in and periodic, never a blocking per-candidate gate.
