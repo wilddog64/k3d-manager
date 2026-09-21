@@ -1638,3 +1638,41 @@ left in place — branch deletion is not approved.
 
 Codex created branches in 4 repos on the first attempt; only product-catalog and infra will receive
 commits.
+
+## 2026-09-21 — promoter-key fix VERIFIED (2 SHAs on origin) + a pinning gap found
+
+Codex's second run is verified independently:
+
+| Repo | SHA | on origin | files | scope |
+|---|---|---|---|---|
+| shopping-cart-product-catalog | `2c8dd68f` | yes | `.github/workflows/ci.yml` | +1 line |
+| shopping-cart-infra | `94b16bc9` | yes | `.github/workflows/build-push-deploy.yml` | +10 lines |
+
+Both on `fix/pass-promoter-ssh-key`, no PRs, commit message and trailers exact.
+YAML parsed with `yaml.safe_load`: guard is step index **12**, promote step index **13** — guard
+first, guard is self-contained (`env`/`name`/`run`, `exit 1`), and the promote step still has its
+`git push` and key-file write. `required: false` left unchanged as specified.
+product-catalog's `publish` job now forwards all four secrets.
+
+Codex self-caught a real bug mid-run: its first patch put the guard **inside** the promotion step's
+`run:` block after `git commit`, which would have swallowed the consumer commands. It corrected to a
+separate step before reporting.
+
+### GAP — the guard will NOT fire for product-catalog yet
+
+`product-catalog/ci.yml` pins the reusable workflow:
+
+```
+uses: wilddog64/shopping-cart-infra/.github/workflows/build-push-deploy.yml@1b35d962d...
+```
+
+Verified `1b35d962d` does **not** contain the guard (`grep -c` = 0). So until that pin is bumped to
+a commit containing `94b16bc9`, product-catalog keeps calling the old workflow and an empty key still
+fails as `error in libcrypto`, not the actionable message.
+
+Change 1 (forwarding the secret) is unaffected — it lives in product-catalog's own file.
+
+Sequence for the guard to take effect: merge infra → bump the pin in product-catalog. Dependabot
+already tracks this pin (its PR titles read
+`github_actions in /. - Update ...build-push-deploy.yml-<sha>`), so it will bump on its own after
+the infra merge, or it can be re-pinned by hand.

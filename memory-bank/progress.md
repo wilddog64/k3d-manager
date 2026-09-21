@@ -583,3 +583,12 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `failed to push some refs` — push rejection, key was present. File if it recurs.
 - [ ] **Stray branches** `fix/pass-promoter-ssh-key` exist in payment and frontend from the first
   dispatch, with no commits. Deletion NOT approved — left in place.
+
+- [x] **Codex: forward `PROMOTER_SSH_KEY`** — VERIFIED. `2c8dd68f` (product-catalog) and `94b16bc9`
+  (infra), both on `origin/fix/pass-promoter-ssh-key`. YAML-parsed step order confirmed guard before
+  consumer; promote step intact. No PRs (awaiting user's go).
+- [ ] **Bump the infra pin in product-catalog** — `ci.yml` pins build-push-deploy.yml@`1b35d962d`,
+  which does NOT contain the new guard. Guard is inert for product-catalog until the pin moves.
+  Dependabot tracks this pin and should bump it after the infra merge.
+- [ ] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` — still the
+  blocker for promotion actually succeeding there.
