@@ -3,6 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** High — alerts are delivered but unactionable, and SMS delivery is currently dead.
+**Status:** RESOLVED 2026-09-21 — operator confirmed a legible `ServiceDown` SMS on the handset.
 
 ## Symptom
 
@@ -142,7 +143,23 @@ federate `cluster: ubuntu-hostinger` keep their true origin.
       terminate at the `null` route by design, feeding the CVE remediation pipeline instead.
       `alertmanager_notifications_total{integration="email"} 1` with
       `alertmanager_notifications_failed_total` 0 for every reason.
-- [ ] One real SMS received and legible
+- [x] One real SMS received and legible — confirmed by the operator 2026-09-21. Delivered body:
+
+      ```
+      [FIRING] ServiceDown on hub (1)
+      ServiceDown [critical] on hub No ready pods in namespace shopping-cart-app for > 5 mins ...
+      ```
+
+      Subject and body both arrived, and the Subject was *not* dropped by this gateway. The trailing
+      `...` is the gateway truncating at ~160 characters: the `where:` and `since:` lines were cut.
+      That is the anticipated failure mode and the reason identity comes first — `alertname`,
+      `severity`, `cluster` and the `description` all survived the cut, so the message is actionable
+      on its own. Compare the pre-fix body, which was `target disappeared from prometheus target
+      discovery` and named neither the alert, the component, nor the cluster.
+
+      Follow-on (not a defect in this fix): because the gateway truncates, `where:`/`since:` should be
+      treated as best-effort. The `namespace` is already in the `description` and the Subject, so no
+      identifying field depends solely on the truncated tail.
 
 ## What NOT to Do
 

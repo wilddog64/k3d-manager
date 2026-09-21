@@ -1463,3 +1463,13 @@ credential lookup could never recover and the target died on its own 10-attempt 
 `$(MAKE)` at `Makefile:502`; it was the only `$$(MAKE)` in the file against 9 correct uses. Verified
 with a standalone probe makefile rather than by running the target, which prints live credentials:
 `$(MAKE)` expands to the make binary path, `$$(MAKE)` expands to the stdout of a nested make.
+
+**CLOSED 2026-09-21 — the SMS alert legibility bug is fully resolved.** The operator received and
+confirmed a legible page: Subject `[FIRING] ServiceDown on hub (1)`, body
+`ServiceDown [critical] on hub / No ready pods in namespace shopping-cart-app for > 5 mins ...`. Both
+Subject and body arrived — this gateway does not drop the Subject — and the trailing `...` is
+truncation at ~160 chars that cut the `where:` and `since:` lines. That is the anticipated behaviour
+and the reason identity is emitted first: alertname, severity, cluster and the description all
+survived. `docs/bugs/2026-09-20-sms-alert-body-is-unidentifiable.md` has every DoD box checked and is
+marked RESOLVED. Treat the `where:`/`since:` tail as best-effort; no identifying field may depend on
+it (namespace is already carried in both the description and the Subject).
