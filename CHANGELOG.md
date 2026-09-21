@@ -8,6 +8,17 @@
 
 ### Fixed
 
+- The 45s apiserver `scrapeTimeout` never survived on the cluster. `kube-prometheus-stack-apiserver`
+  is an ArgoCD-managed ServiceMonitor (`argocd.argoproj.io/tracking-id`) and the observability
+  ApplicationSet runs `selfHeal: true`, so the out-of-band `kubectl patch` was reverted within
+  seconds while `_observability_ensure_apiserver_scrape_timeout` reported success against a value
+  that no longer existed — the live config stayed at `scrape_timeout: 10s` through two deploys.
+  Chart 67.9.0 exposes `kubeApiServer.serviceMonitor.interval` but no `scrapeTimeout`, so the patch
+  is the only lever; the ApplicationSet now declares `ignoreDifferences` for
+  `/spec/endpoints/0/scrapeTimeout` plus `RespectIgnoreDifferences=true` (without which
+  `ignoreDifferences` suppresses the diff but a sync still overwrites the field), and the function
+  reads the value back after patching and warns instead of claiming success.
+
 - Critical-alert SMS bodies could not identify what broke. The body was
   `{{ .Annotations.summary }}` alone, which discarded the alert name, severity, cluster,
   namespace, component labels and start time — and for `KubeAPIDown` and `KubeletDown` that

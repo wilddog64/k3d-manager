@@ -714,11 +714,21 @@ function _observability_ensure_apiserver_scrape_timeout() {
 
   local _patch
   _patch="[{\"op\":\"add\",\"path\":\"/spec/endpoints/0/scrapeTimeout\",\"value\":\"${_timeout_value}\"}]"
-  if _kubectl --context "${_ctx}" -n monitoring patch servicemonitor kube-prometheus-stack-apiserver \
+  if ! _kubectl --context "${_ctx}" -n monitoring patch servicemonitor kube-prometheus-stack-apiserver \
       --type=json -p "${_patch}" >/dev/null; then
+    _warn "[observability] failed to patch apiserver ServiceMonitor scrape timeout; continuing"
+    return 0
+  fi
+
+  local _observed=""
+  _observed=$(_kubectl --no-exit --context "${_ctx}" -n monitoring \
+    get servicemonitor kube-prometheus-stack-apiserver \
+    -o jsonpath='{.spec.endpoints[0].scrapeTimeout}' 2>/dev/null || true)
+  if [[ "${_observed}" == "${_timeout_value}" ]]; then
     _info "[observability] Apiserver ServiceMonitor scrape timeout set to ${_timeout_value}"
   else
-    _warn "[observability] failed to patch apiserver ServiceMonitor scrape timeout; continuing"
+    _warn "[observability] apiserver scrape timeout patch did not persist (observed '${_observed}')"
+    _warn "[observability] ArgoCD owns this ServiceMonitor; confirm RespectIgnoreDifferences is set on the observability ApplicationSet"
   fi
   return 0
 }
