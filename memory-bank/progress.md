@@ -600,3 +600,6 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
       a 2026-09-01 DeployKey ruleset bypass was a misdiagnosis. Broken since 08-12, not 08-26.
 - [ ] **Mint the product-catalog promoter pair** — deploy key + PROMOTER_SSH_KEY secret. Claude
       blocked by the classifier (Secret-Store Writes); user to run the handed-over command via `!`.
+- [x] **Hub GHCR 403 root-caused** — packages are private; no long-lived pull credential exists
+      anywhere (CI logs in with the ephemeral GITHUB_TOKEN). Probe verified correct; keychain not
+      locked. Fix is `gh auth refresh -h github.com -s read:packages`, not a new PAT.

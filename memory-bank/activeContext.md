@@ -1729,3 +1729,32 @@ to the calling repo, not to infra.
 
 BLOCKED: generating the pair and writing the secret was denied by the auto-mode classifier
 (Secret-Store Writes). Not worked around. One command handed to the user to run via `!`.
+
+### 2026-09-21 — hub GHCR 403: the credential path, corrected
+
+User asked whether the keychain was locked. Checked: it is **not** — `show-keychain-info` reports
+`no-timeout` and all four items (`github-packages-token`, `k3dm-hermes-gh-token`,
+`k3dm-hermes-audit-token`, `copilot-cli`) exist. That hypothesis is closed, but chasing it surfaced
+two corrections.
+
+**1. The pull probe is sound — I should not have let it be doubted.** Verified directly:
+`curl --netrc-file` does send `Authorization: Basic` preemptively to `ghcr.io/token`; a bogus
+credential returns 403 with no `.token`, so `_shopping_cart_ghcr_pat_can_pull` fails closed and is
+correct. Its verdict on all four keychain tokens stands.
+
+**2. "PACKAGES_TOKEN is working" was misleading.** The registry login in
+`build-push-deploy.yml` is `password: ${{ secrets.GITHUB_TOKEN }}` — the ephemeral per-run Actions
+token with automatic `packages: write`. So the green push proves nothing about any long-lived
+credential. `PACKAGES_TOKEN` is only a build arg (`GH_TOKEN=` for dependency fetches) and the
+frontend's deploy-PR token. **There is no working long-lived GHCR pull credential anywhere** — not in
+CI, not in the keychain.
+
+The packages are private: anonymous token exchange returns
+`401 UNAUTHORIZED authentication required`. A credential with `read:packages` is mandatory; one
+without it yields 403, which is exactly the hub's `ImagePullBackOff`.
+
+**Fix without minting anything:** the existing `gh` OAuth token (`gho_`, in the keyring) has scopes
+`admin:public_key, gist, read:org, repo` — no `read:packages`. `gh auth refresh -h github.com -s
+read:packages` adds it to the token we already have. Interactive, so the user runs it via `!`.
+Cheap scope check afterwards: `gh api "user/packages?package_type=container"` currently returns
+`403 You need at least read:packages scope to list packages`.
