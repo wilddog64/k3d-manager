@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Changed
+- Architecture docs realigned with the current webhook server: `docs/architecture/webhook-server.md`
+  now records the real size (4,008 lines, not ~2,950), the `webhook/make_targets.py` module,
+  corrected monolith line ranges for every area, the four `/k3dm` authorization gates, and the
+  pytest allowlist suite; `docs/architecture/cloudflare-slack-relay.md` gains the five routes
+  added since it was written (`/api/v1/make`, `-cve-remediate`, `-hostinger-status`,
+  `-cleanup-stale-sandbox`, `-analyze`), a min-role column, and the Worker `ALLOWED_COMMANDS` set.
 
 - Converted the remaining ASCII flow diagrams in the live docs to Mermaid: the webhook request
   flow and module dependency graph, the Pushgateway metrics path, the vCluster e2e harness, the

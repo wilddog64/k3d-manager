@@ -71,8 +71,17 @@ flowchart LR
 
 There are two inbound paths from Slack to the webhook:
 
-- **Slash commands** — user types `/acg-up` etc. in any channel; Slack sends a form POST to the Cloudflare Worker which verifies and forwards.
+- **Slash commands** — user types `/cluster-up` etc. in any channel; Slack sends a form POST to the Cloudflare Worker which verifies and forwards.
 - **Thread replies** — user types in an active job thread; Slack sends a `message` event via the Events API; the Worker forwards it to `/slack/events` on the webhook.
+
+The Worker's `ALLOWED_COMMANDS` set is the outer gate — anything else never reaches the
+tunnel:
+
+```js
+'/cluster-up' '/cluster-down' '/cluster-status' '/cluster-diagnose' '/cluster-refresh'
+'/cluster-resume' '/hostinger-status' '/cleanup-stale-sandbox' '/argocd-upgrade'
+'/hermes-auth' '/k3dm' '/ask' '/claude' '/gemini' '/codex'
+```
 
 ```mermaid
 sequenceDiagram
@@ -112,18 +121,46 @@ sequenceDiagram
 
 ### Routes handled by k3dm-webhook
 
-| Method | Path | Action |
-|--------|------|--------|
-| `POST` | `/api/v1/cluster` | `bin/acg-up` or `bin/acg-down` (action: up\|down\|kill) |
-| `POST` | `/api/v1/cluster-status` | cluster health check → Slack |
-| `POST` | `/api/v1/diagnostics` | read-only kubectl / ArgoCD diagnostics against approved contexts |
-| `POST` | `/api/v1/cluster-refresh` | `bin/acg-refresh` — restore tunnel + credentials |
-| `POST` | `/api/v1/cluster-resume` | `bin/acg-up` from last checkpoint |
-| `POST` | `/api/v1/ask` | AI agent question (claude / gemini / codex) → Slack |
-| `POST` | `/api/v1/argocd-upgrade` | ArgoCD label-patch workflow (`chart_version`, stage: `acg` \| `infra`) |
-| `POST` | `/slack/events` | Slack Events API — thread replies, URL verification |
-| `GET`  | `/api/v1/health` | JSON smoke-test report (used by `bin/acg-status`) — includes Pushgateway |
-| `GET`  | `/api/v1/status/<job_id>` | Poll job status + last 2 KB of output |
+Min-role comes from `_ACTION_POLICY` in `bin/k3dm-webhook` (or, for `/api/v1/make`, from the
+target's own `min_role`). A request below the floor is a 403 **and** an audit record.
+
+| Method | Path | Min role | Action |
+|--------|------|----------|--------|
+| `POST` | `/api/v1/cluster` | `admin` (up/down), `operator` (kill) | `bin/acg-up` or `bin/acg-down` |
+| `POST` | `/api/v1/cluster-status` | `reader` | cluster health check → Slack |
+| `POST` | `/api/v1/diagnostics` | `reader` | read-only kubectl / ArgoCD diagnostics against approved contexts |
+| `POST` | `/api/v1/hostinger-status` | `reader` | Hostinger edge + workload status → Slack |
+| `POST` | `/api/v1/make` | per target | **allowlisted `make` target** (`/k3dm`) — see below |
+| `POST` | `/api/v1/cluster-refresh` | `operator` | `bin/acg-refresh` — restore tunnel + credentials |
+| `POST` | `/api/v1/cve-remediate` | `operator` | trigger a CVE remediation scan (cooldown-guarded) |
+| `POST` | `/api/v1/analyze` | `operator` | Alertmanager payload → failure analysis → Slack |
+| `POST` | `/api/v1/cluster-resume` | `admin` | `bin/acg-up` from last checkpoint |
+| `POST` | `/api/v1/cleanup-stale-sandbox` | `admin` | reap a dead ACG sandbox (requires `confirm`) |
+| `POST` | `/api/v1/argocd-upgrade` | `admin` | ArgoCD label-patch workflow (`chart_version`, stage: `acg` \| `infra`) |
+| `POST` | `/api/v1/ask` | `reader` | AI agent question (claude / gemini / codex) → Slack |
+| `POST` | `/slack/events` | (Slack-signed) | Slack Events API — thread replies, URL verification |
+| `GET`  | `/api/v1/health` | — | JSON smoke-test report (used by `bin/acg-status`) — includes Pushgateway |
+| `GET`  | `/api/v1/make` | `reader` | target help for the caller's role |
+| `GET`  | `/api/v1/status/<job_id>` | — | Poll job status + last 2 KB of output |
+
+Any `/api/…` path that is not `/api/v1/…` is rejected 400 before auth-sensitive work, and
+every route is behind a per-bucket rate limiter (`429`).
+
+### `/k3dm` — the Makefile as the operator interface
+
+Rather than adding a route per operation, `/k3dm <target> [KEY=value …] [confirm]` runs one
+of the **17 allowlisted Makefile targets** declared in `scripts/lib/webhook/make_targets.py`.
+A new operator capability is now a Makefile target plus one table row — the route, the Slack
+surface, the role check and the help text are already there.
+
+The relay stamps `/k3dm` as `admin`; the webhook then **caps that at the caller's own**
+`K3DM_SLACK_ROLE_MAP` role (unmapped → `reader`) before applying the target's `min_role`.
+Arguments are regex-validated against `_ARG_PATTERNS` and passed positionally, never
+interpolated into a shell string. Destructive targets (`fix-delete-pod`, `fix-force-sync`,
+`e2e-runner-unlock`) additionally require `confirm`. One `/k3dm` job runs at a time (409).
+
+Target table and usage: [`docs/howto/slack-slash-commands.md`](../howto/slack-slash-commands.md#k3dm-targets).
+Gate design: [`docs/architecture/webhook-server.md`](webhook-server.md).
 
 ### Remote-operator metadata
 
