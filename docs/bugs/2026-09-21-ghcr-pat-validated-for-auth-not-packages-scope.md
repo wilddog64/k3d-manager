@@ -6,6 +6,17 @@
 validation all report green.
 **Status:** Open
 
+## Before You Start
+
+1. Read `memory-bank/activeContext.md` and `memory-bank/progress.md`.
+2. `git pull origin k3d-manager-v1.36.0` — work on that branch, never `main`.
+3. Read these files in full before editing:
+   - `scripts/plugins/shopping_cart.sh` — lines 240-357 hold all four PAT loaders
+   - `scripts/tests/plugins/shopping_cart.bats` — the test conventions you must match
+4. Branch (all work): `k3d-manager-v1.36.0` (this repo only — single-repo task).
+5. There is **no live cluster in scope**. Do not run `kubectl` against anything, do not attempt to
+   fix the credential itself, and do not touch Vault. This task is code + BATS only.
+
 ## Symptom
 
 All four `shopping-cart-apps` deployments have been in `ImagePullBackOff` for 11h on the hub,
@@ -107,38 +118,257 @@ and `--data-binary @-` on stdin, as `alertmanager-secret` now does.
 
 ## Fix
 
-**1 — Validate the scope, not just the token.** GitHub returns the granted scopes in a response
-header, so this costs nothing extra:
+Implement exactly the four changes below. Do not refactor anything else in this file.
+
+### Change 1 — add two shared helpers
+
+Insert both immediately **before** `function shopping_cart_load_ghcr_pat_from_env() {`.
+
+The authoritative check is a real GHCR token exchange plus a pull-scoped API call. `GET /user` is an
+authentication check; only this proves authorization. It works for classic **and** fine-grained PATs,
+which is why it, not header parsing, is the gate. Note the PAT travels via `--netrc-file` and the
+bearer token via `-H "@file"` — neither may appear in argv.
 
 ```bash
-_scopes=$(curl -s -D - -o /dev/null --netrc-file "${_netrc}" "https://api.github.com/user" \
-  | tr -d '\r' | awk -F': ' 'tolower($1)=="x-oauth-scopes"{print $2}')
+function _shopping_cart_ghcr_pat_can_pull() {
+  local _user="$1" _pat="$2"
+  local _probe_repo="${GHCR_PROBE_REPO:-wilddog64/shopping-cart-basket}"
+  local _netrc _hdr _token _http
+
+  if [[ -z "${_user}" || -z "${_pat}" ]]; then
+    return 1
+  fi
+
+  _netrc=$(mktemp) && chmod 0600 "${_netrc}"
+  printf 'machine ghcr.io login %s password %s\n' "${_user}" "${_pat}" > "${_netrc}"
+  _token=$(curl -s --netrc-file "${_netrc}" \
+    "https://ghcr.io/token?service=ghcr.io&scope=repository:${_probe_repo}:pull" \
+    | jq -r '.token // empty' 2>/dev/null || true)
+  rm -f "${_netrc}"
+
+  if [[ -z "${_token}" ]]; then
+    return 1
+  fi
+
+  _hdr=$(mktemp) && chmod 0600 "${_hdr}"
+  printf 'Authorization: Bearer %s\n' "${_token}" > "${_hdr}"
+  _http=$(curl -s -o /dev/null -w '%{http_code}' -H "@${_hdr}" \
+    "https://ghcr.io/v2/${_probe_repo}/tags/list" 2>/dev/null || true)
+  rm -f "${_hdr}"
+
+  [[ "${_http}" == "200" ]]
+}
 ```
 
-Require `read:packages` (or `write:packages`, which implies it). Note fine-grained PATs return an
-**empty** `X-OAuth-Scopes`, so an empty value must not be treated as failure — fall through to the
-authoritative check below rather than rejecting.
+The Vault write is duplicated verbatim in three places and each copy puts the token in argv. Replace
+all three with one helper that uses a header file and stdin:
 
-**2 — Prefer an end-to-end probe over header parsing.** The only check that cannot be wrong is a real
-token exchange plus manifest HEAD against GHCR:
+```bash
+function _shopping_cart_store_ghcr_pat_in_vault() {
+  local _pat="$1"
+  local _hdr _body
 
+  if [[ -z "${_vault_root_token:-}" || -z "${_pat}" ]]; then
+    return 1
+  fi
+
+  _hdr=$(mktemp) && chmod 0600 "${_hdr}"
+  printf 'X-Vault-Token: %s\n' "${_vault_root_token}" > "${_hdr}"
+  _body=$(mktemp) && chmod 0600 "${_body}"
+  jq -n --arg token "${_pat}" '{data: {token: $token}}' > "${_body}"
+
+  curl -s -X POST -H "@${_hdr}" --data-binary "@${_body}" \
+    "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
+
+  rm -f "${_hdr}" "${_body}"
+  return 0
+}
 ```
-GET https://ghcr.io/token?service=ghcr.io&scope=repository:<owner>/<repo>:pull   (Basic auth)
-HEAD https://ghcr.io/v2/<owner>/<repo>/manifests/<tag>                           (Bearer)
+
+`jq -n --arg` also removes a real injection bug: the old `-d "{\"data\": {\"token\": \"${_ghcr_pat}\"}}"`
+produces invalid JSON if the PAT contains a quote or backslash.
+
+### Change 2 — gate every loader on pull capability
+
+In `shopping_cart_load_ghcr_pat_from_env`, replace:
+
+```bash
+  if [[ "${_pat_http}" != "200" ]]; then
+    _info "[acg-up] GHCR_PAT env var is invalid (HTTP ${_pat_http}) — falling back to Vault"
+    _ghcr_pat=""
+    return 1
+  fi
+
+  _info "[acg-up] using validated GHCR_PAT from env for ghcr-pull-secret"
+  return 0
 ```
 
-A 200 on the HEAD is the definition of "this credential can pull". This works for both classic and
-fine-grained PATs and is the check the validation should have been doing all along.
+with:
 
-**3 — Never persist an unvalidated credential.** Move the Vault write in
-`shopping_cart_load_ghcr_pat_from_gh` to *after* the pull probe passes. A credential that cannot pull
-must never become the stored PAT, or the fallback chain can never escalate to the operator.
+```bash
+  if [[ "${_pat_http}" != "200" ]]; then
+    _info "[acg-up] GHCR_PAT env var is invalid (HTTP ${_pat_http}) — falling back to Vault"
+    _ghcr_pat=""
+    return 1
+  fi
 
-**4 — Make the failure legible.** On a scope failure the message must name the missing scope and the
-remedy, e.g. `GHCR PAT authenticates but lacks read:packages — pulls will 403; supply a PAT with
-read:packages`. `HTTP 200` followed 11h later by `403 Forbidden` in kubelet logs is not a diagnosis.
+  if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_ghcr_pat}"; then
+    _info "[acg-up] GHCR_PAT env var authenticates but cannot pull from ghcr.io — it is missing the read:packages scope; image pulls would 403. Falling back to Vault"
+    _ghcr_pat=""
+    return 1
+  fi
 
-**5 — Move the Vault token and PAT out of argv** per the secondary defect above.
+  _info "[acg-up] using validated GHCR_PAT from env for ghcr-pull-secret"
+  return 0
+```
+
+In `shopping_cart_load_ghcr_pat_from_vault`, replace:
+
+```bash
+  if [[ "${_pat_http}" != "200" ]]; then
+    _info "[acg-up] Vault PAT is expired (HTTP ${_pat_http}) — prompting for a new one"
+    _ghcr_pat=""
+    return 1
+  fi
+
+  _info "[acg-up] using PAT from Vault for ghcr-pull-secret"
+  return 0
+```
+
+with:
+
+```bash
+  if [[ "${_pat_http}" != "200" ]]; then
+    _info "[acg-up] Vault PAT is expired (HTTP ${_pat_http}) — prompting for a new one"
+    _ghcr_pat=""
+    return 1
+  fi
+
+  if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_ghcr_pat}"; then
+    _info "[acg-up] Vault PAT authenticates but cannot pull from ghcr.io — it is missing the read:packages scope; mint a PAT with read:packages and overwrite secret/github/pat"
+    _ghcr_pat=""
+    return 1
+  fi
+
+  _info "[acg-up] using PAT from Vault for ghcr-pull-secret"
+  return 0
+```
+
+Also replace the Vault read on the line beginning `_ghcr_pat=$(curl -s -H "X-Vault-Token: ...` with a
+header-file form so the token leaves argv:
+
+```bash
+  local _vault_hdr
+  _vault_hdr=$(mktemp) && chmod 0600 "${_vault_hdr}"
+  printf 'X-Vault-Token: %s\n' "${_vault_root_token}" > "${_vault_hdr}"
+  _ghcr_pat=$(curl -s -H "@${_vault_hdr}" \
+    "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" \
+    | jq -r '.data.data.token // empty' 2>/dev/null || true)
+  rm -f "${_vault_hdr}"
+```
+
+### Change 3 — never persist a credential that cannot pull
+
+This is the change that makes the bug recoverable. In `shopping_cart_load_ghcr_pat_from_gh`, replace:
+
+```bash
+  if ! GH_TOKEN="${_gh_token}" gh api user >/dev/null 2>&1; then
+    return 1
+  fi
+
+  _ghcr_pat="${_gh_token}"
+  _info "[acg-up] using gh CLI token for ghcr-pull-secret"
+  if [[ -n "${_vault_root_token:-}" ]]; then
+    curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
+      -d "{\"data\": {\"token\": \"${_ghcr_pat}\"}}" \
+      "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
+    _info "[acg-up] gh CLI token saved to Vault for future runs"
+  fi
+  return 0
+```
+
+with:
+
+```bash
+  if ! GH_TOKEN="${_gh_token}" gh api user >/dev/null 2>&1; then
+    return 1
+  fi
+
+  if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_gh_token}"; then
+    _info "[acg-up] gh CLI token cannot pull from ghcr.io — its OAuth scopes are fixed and exclude read:packages, so it is NOT being saved to Vault"
+    return 1
+  fi
+
+  _ghcr_pat="${_gh_token}"
+  _info "[acg-up] using gh CLI token for ghcr-pull-secret"
+  if _shopping_cart_store_ghcr_pat_in_vault "${_ghcr_pat}"; then
+    _info "[acg-up] gh CLI token saved to Vault for future runs"
+  fi
+  return 0
+```
+
+In `shopping_cart_prompt_ghcr_pat`, replace:
+
+```bash
+  if [[ -n "${_vault_root_token:-}" ]]; then
+    curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
+      -d "{\"data\": {\"token\": \"${_ghcr_pat}\"}}" \
+      "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
+    _info "[acg-up] new PAT saved to Vault"
+  fi
+  return 0
+```
+
+with:
+
+```bash
+  if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_ghcr_pat}"; then
+    _err "[acg-up] the pasted PAT cannot pull from ghcr.io — it is missing the read:packages scope; not saving it to Vault"
+    _ghcr_pat=""
+    return 1
+  fi
+
+  if _shopping_cart_store_ghcr_pat_in_vault "${_ghcr_pat}"; then
+    _info "[acg-up] new PAT saved to Vault"
+  fi
+  return 0
+```
+
+Note the prompt path previously stored the pasted value with **no validation at all** — not even
+`GET /user`. That is the third instance of persist-before-verify.
+
+### Change 4 — BATS coverage
+
+Add to `scripts/tests/plugins/shopping_cart.bats`, matching the existing source-and-stub style
+(source `scripts/lib/system.sh`, `scripts/lib/core.sh`, then the plugin, and stub `curl`/`jq`/`gh`
+as needed). Cover:
+
+1. `_shopping_cart_ghcr_pat_can_pull` returns 0 when the token exchange yields a token and
+   `tags/list` returns `200`.
+2. It returns non-zero when `tags/list` returns `403` — the missing-`read:packages` case.
+3. It returns non-zero when the token exchange yields an empty token.
+4. `shopping_cart_load_ghcr_pat_from_gh` does **not** call the Vault write when the pull probe fails,
+   and its message mentions `read:packages`. Assert the Vault write did not happen by having the
+   stub append to a temp file and asserting that file stays empty — this is the regression that
+   matters most.
+5. Neither the PAT nor the Vault token appears in any `curl` argv: assert the source contains no
+   `-H "X-Vault-Token: ` and no `-d "{\"data\"` on this path. Prefer a disappearance gate
+   (old pattern → 0 matches) over counting.
+
+Do not assert against whole source lines — assert on meaningful tokens only.
+
+## Rules
+
+- `set -euo pipefail` semantics are already established in this file; do not weaken them.
+- Double-quote every expansion. Run `shellcheck scripts/plugins/shopping_cart.sh` and finish with
+  **zero new warnings** versus the pre-change baseline. Capture the baseline first.
+- Run `bats scripts/tests/plugins/shopping_cart.bats` and paste the actual output. `bats` is bare on
+  PATH at `/opt/homebrew/bin/bats`.
+- Do NOT run the full `make test` — it takes ~15 minutes and is not required here.
+- No inline comments in the shell blocks.
+- LF line endings only.
+- Minimal patch: only `scripts/plugins/shopping_cart.sh` and
+  `scripts/tests/plugins/shopping_cart.bats` may change.
 
 ## Operator action required (cannot be automated)
 
@@ -149,14 +379,53 @@ is a routine operator step, not a blocker.
 
 ## Definition of Done
 
-- [ ] PAT validation requires package-pull capability, not just `GET /user` 200
-- [ ] Empty `X-OAuth-Scopes` (fine-grained PAT) is not treated as a failure
-- [ ] The gh CLI token is written to Vault only after it proves it can pull
-- [ ] Failure message names the missing scope and the remedy
-- [ ] Vault root token and PAT no longer appear in `curl` argv on this path
-- [ ] BATS covers: valid classic PAT, authenticating token without `read:packages`, fine-grained PAT
-      with empty scopes header, and the no-persist-on-failure path
-- [ ] Live: four `shopping-cart-apps` deployments Running and `ServiceDown` resolved
+- [ ] `_shopping_cart_ghcr_pat_can_pull` added and gating all four loaders
+- [ ] `_shopping_cart_store_ghcr_pat_in_vault` added and replacing all three duplicated Vault writes
+- [ ] No loader persists a credential that has not passed the pull probe
+- [ ] `shopping_cart_prompt_ghcr_pat` validates before storing (it previously did not validate at all)
+- [ ] Failure messages name `read:packages` and the remedy
+- [ ] Vault root token and PAT no longer appear in `curl` argv anywhere on this path
+- [ ] PAT is JSON-encoded with `jq -n --arg`, not string-interpolated into a JSON literal
+- [ ] `shellcheck scripts/plugins/shopping_cart.sh` — zero new warnings vs the captured baseline
+- [ ] `bats scripts/tests/plugins/shopping_cart.bats` green, output pasted
+- [ ] `memory-bank/activeContext.md` and `memory-bank/progress.md` updated with the commit SHA and
+      task status
+- [ ] Commit pushed to `origin/k3d-manager-v1.36.0` and `git rev-parse origin/k3d-manager-v1.36.0`
+      confirms it
+
+Deferred to the operator, explicitly **out of scope** for this task:
+
+- [ ] Live: a PAT with `read:packages` written to Vault, and the four `shopping-cart-apps`
+      deployments Running with `ServiceDown` resolved
+
+### Commit message (use verbatim)
+
+```
+fix(shopping-cart): validate the GHCR PAT can pull, not merely authenticate
+
+All three PAT loaders gated on GET https://api.github.com/user, which returns
+200 for any token that authenticates and never checks read:packages — the only
+scope GHCR enforces. A scope-less token therefore passed validation, and
+shopping_cart_load_ghcr_pat_from_gh persisted it to secret/github/pat, so the
+Vault loader later found it, probed /user, got 200, and never escalated to the
+operator prompt. The fallback chain converged on a permanently broken credential
+with ESO, ArgoCD and the validation all reporting green while every image pull
+403'd.
+
+Every loader now gates on a real GHCR token exchange plus a pull-scoped
+tags/list call, which is authoritative for both classic and fine-grained PATs.
+No loader persists a credential that has not passed that probe, so a bad
+credential can no longer become the stored PAT. shopping_cart_prompt_ghcr_pat
+previously stored the pasted value with no validation whatsoever.
+
+The three duplicated Vault writes collapse into one helper that passes the token
+by header file and the body on stdin, per the CLAUDE.md rule that Vault tokens
+must never appear in argv, and encodes the PAT with jq -n --arg instead of
+interpolating it into a JSON string literal.
+```
+
+Report back: the commit SHA, the `bats` output, the shellcheck before/after counts, and the
+memory-bank lines you updated.
 
 ## What NOT to Do
 
@@ -169,3 +438,12 @@ is a routine operator step, not a blocker.
 - Do NOT persist the gh CLI token to Vault before it has proven it can pull; that is what makes this
   bug unrecoverable without manual intervention.
 - Do NOT pass the Vault token or the PAT as `curl` arguments.
+- Do NOT create a PR.
+- Do NOT merge, and do NOT commit to `main` — work only on `k3d-manager-v1.36.0`.
+- Do NOT skip pre-commit hooks (`--no-verify`).
+- Do NOT force-push.
+- Do NOT modify any file outside `scripts/plugins/shopping_cart.sh`,
+  `scripts/tests/plugins/shopping_cart.bats` and the two memory-bank files.
+- Do NOT touch the live cluster, Vault, or the credential itself — code and tests only.
+- Do NOT edit `scripts/lib/foundation/` or `scripts/lib/acg/`; they are subtrees, fixed upstream.
+- Do NOT run the full `make test`.
