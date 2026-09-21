@@ -5,11 +5,16 @@ defaultRules:
     kubeApiserverHistogram: false
     kubeApiserverSlos: false
     configReloaders: false
+  disabled:
+    KubeAPIDown: true
+    KubeletDown: true
 
 prometheus:
   prometheusSpec:
     scrapeInterval: 60s
     evaluationInterval: 60s
+    externalLabels:
+      cluster: hub
     retention: 3d
     retentionSize: 8GB
     storageSpec:

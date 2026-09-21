@@ -8,6 +8,23 @@
 
 ### Fixed
 
+- Critical-alert SMS bodies could not identify what broke. The body was
+  `{{ .Annotations.summary }}` alone, which discarded the alert name, severity, cluster,
+  namespace, component labels and start time — and for `KubeAPIDown` and `KubeletDown` that
+  summary is the identical shared constant `"Target disappeared from Prometheus target
+  discovery."`, so the message could not name the failing component even in principle. The body
+  now leads with alertname, severity and cluster, prefers `description` over `summary`, appends the
+  locating labels and `StartsAt`, and iterates `.Alerts.Firing` so resolved entries cannot pad it.
+  The root route also gained an explicit `group_by` — with none set, Alertmanager groups every
+  alert into one group whose `GroupLabels` is empty, so the `[ALERT] {{ .GroupLabels.alertname }}`
+  Subject rendered as `[ALERT] ` regardless of whether the SMS gateway kept it. Hub Prometheus now
+  sets `externalLabels: {cluster: hub}`, matching the ACG values, so upstream rules are
+  cluster-attributable; and `KubeAPIDown`/`KubeletDown` are disabled via `defaultRules.disabled`
+  and re-shipped in `scripts/etc/prometheus/rules/kubernetes-control-plane.yaml` with summaries
+  that name their component and descriptions stating that a scrape slower than `scrape_timeout` is
+  indistinguishable from an absent target. Spec:
+  `docs/bugs/2026-09-20-sms-alert-body-is-unidentifiable.md`
+
 - Port-forward wrapper resolved its kubectl context once at process start and silently
   substituted a different cluster on miss, leaving the keycloak-browser-http daemon
   forwarding against the wrong cluster indefinitely; the context is now re-resolved every
