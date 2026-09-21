@@ -90,7 +90,7 @@ Run once per machine. Safe to re-run.
 - `gh` authenticated (`gh auth login`)
 - `node` / `npx` available (`brew install node`)
 - Cloudflare account at dash.cloudflare.com
-- Slack app created at api.slack.com/apps (see [Create Slack App](#create-slack-app))
+- Slack app created at api.slack.com/apps (see [Create Slack App](#1-create-slack-app))
 
 ### 1. Create Slack App
 

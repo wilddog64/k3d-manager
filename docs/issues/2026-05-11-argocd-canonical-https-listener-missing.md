@@ -34,6 +34,6 @@ Without a local `443` proxy/listener that forwards to Argo CD, Safari cannot rea
 
 ## Fixed by
 
-- [`bin/acg-up`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-up) now installs the browser TLS listener after the Argo CD `localhost:8080` port-forward is ready.
-- [`bin/acg-down`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-down) now removes the browser TLS listener on teardown.
-- [`scripts/plugins/argocd.sh`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/plugins/argocd.sh) now issues a Vault PKI certificate for the browser listener and renders a self-healing `socat` TLS wrapper for the canonical HTTPS listener.
+- `bin/acg-up` now installs the browser TLS listener after the Argo CD `localhost:8080` port-forward is ready.
+- `bin/acg-down` now removes the browser TLS listener on teardown.
+- `scripts/plugins/argocd.sh` now issues a Vault PKI certificate for the browser listener and renders a self-healing `socat` TLS wrapper for the canonical HTTPS listener.

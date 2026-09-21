@@ -24,6 +24,7 @@
   on purpose.
 
 ### Fixed
+- 13 broken doc links found by the new checker. Retargeted in standing docs: `vault-pki-setup.md` → `guides/security/04-vault-pki.md` (twice), a dead `README.md#jenkins-authentication-modes` → `guides/jenkins-authentication.md`, `../bin/get-ldap-password` → `../../bin/…`, and `#create-slack-app` → `#1-create-slack-app`. In four historical issue docs and one archived plan the dead links were unlinked to inline code rather than repointed, so the record still reads without a false promise of a working link.
 - README listed the vCluster E2E harness guide **three times**, twice labelled "(Tier 1)", and all
   three links pointed at the bare file — the Tier 2 entry led to the Tier 1 title. Root cause: the
   guide's own H1 still read `# vCluster E2E Harness (Tier 1)` after it gained a Tier 2 section, so
@@ -45,6 +46,7 @@
   block moved to `memory-bank/archive/activeContext-2026-09-21.md`.
 
 ### Added
+- `scripts/check-doc-links.py` + `make check-doc-links` — validates every relative link and heading anchor in the repo's Markdown (1,725 files), wired into `.githooks/pre-commit` over **staged files only** so pre-existing debt cannot block an unrelated commit (`K3DM_SKIP_DOC_LINKS=1` bypasses). Handles the three false-positive classes that would make such a gate useless: markdown-shaped regexes inside inline code, this repo's clickable `path:line` references, and `github-slugger`'s per-space hyphenation (`/claude / /gemini` → `claude--gemini`, doubled). Covered by `scripts/tests/bin/test_check_doc_links.py` (23 pytest cases, including a live-tree gate). Closes a gap open since 2026-04-06.
 
 - `docs/guides/grafana-dashboards.md` — a guide covering all seven shipped Grafana dashboards (ArgoCD/Image-Updater, CVE Auto-Patch, E2E Verification, Hermes Status, k3dm Deployment Metrics, Trivy Security, Checkout Load Test): panel-by-panel queries, the producer chain feeding each series (exporter / Pushgateway / promtail / trivy-operator), and a `No data`-by-cause triage table assembled from past incidents. Closes a "guide per major tech" gap — dashboard knowledge previously existed only scattered across ~25 plan/bug/issue docs, and `grafana-dashboard-hermes.yaml` was referenced by none of them.
 

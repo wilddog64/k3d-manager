@@ -352,7 +352,7 @@ See [LDAP Password Rotation](ldap-password-rotation.md) for details.
 ## See Also
 
 - [LDAP Password Rotation](ldap-password-rotation.md)
-- [Get LDAP Password Tool](../bin/get-ldap-password)
+- [Get LDAP Password Tool](../../bin/get-ldap-password)
 - [Example CSV File](../examples/ldap-users-example.csv)
 - [OpenLDAP Bootstrap Schema](../../scripts/etc/ldap/bootstrap-basic-schema.ldif)
 - [Active Directory Schema](../../scripts/etc/ldap/bootstrap-ad-schema.ldif)

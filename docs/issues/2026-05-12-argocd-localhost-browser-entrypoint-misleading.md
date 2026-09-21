@@ -36,8 +36,8 @@ That mismatch is confusing and leads users to open the wrong URL after SSO is en
 
 ## Fix
 
-- [`bin/acg-up`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-up) now labels the localhost port-forward as terminal-only and points browser login at the canonical host.
-- [`docs/howto/argocd.md`](/Users/cliang/src/gitrepo/personal/k3d-manager/docs/howto/argocd.md) now tells users not to use localhost as the browser SSO entrypoint.
+- `bin/acg-up` now labels the localhost port-forward as terminal-only and points browser login at the canonical host.
+- `docs/howto/argocd.md` now tells users not to use localhost as the browser SSO entrypoint.
 
 ## Follow-up
 

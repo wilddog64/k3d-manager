@@ -16,7 +16,7 @@ The browser state appears to keep reusing the old `localhost:8080` tab/session i
 
 ## Fix
 
-- [`bin/acg-up`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-up) now tries to drive Safari directly with `osascript` so the browser is actively navigated to `https://argocd.shopping-cart.local`.
+- `bin/acg-up` now tries to drive Safari directly with `osascript` so the browser is actively navigated to `https://argocd.shopping-cart.local`.
 - If Safari automation is unavailable, it falls back to the generic `open` handoff.
 
 ## Recommended follow-up

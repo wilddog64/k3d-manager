@@ -23,6 +23,24 @@ if [[ "${K3DM_SUBTREE_SYNC:-0}" != "1" ]]; then
    fi
 fi
 
+# Guard: broken relative links / heading anchors in staged Markdown
+# Staged files only — pre-existing debt elsewhere must not block an unrelated commit.
+# Bypass: K3DM_SKIP_DOC_LINKS=1
+if [[ "${K3DM_SKIP_DOC_LINKS:-0}" != "1" && -f "${SCRIPT_DIR}/check-doc-links.py" ]]; then
+   staged_md=()
+   while IFS= read -r _f; do
+      [[ -n "${_f}" && -f "${_f}" ]] && staged_md+=("${_f}")
+   done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.md')
+   if (( ${#staged_md[@]} > 0 )); then
+      if ! python3 "${SCRIPT_DIR}/check-doc-links.py" "${staged_md[@]}"; then
+         echo "Pre-commit hook: broken doc link(s) in staged Markdown — fix the path or anchor" >&2
+         echo "  full sweep: make check-doc-links" >&2
+         echo "  bypass:     K3DM_SKIP_DOC_LINKS=1 git commit ..." >&2
+         exit 1
+      fi
+   fi
+fi
+
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/system.sh"
 # IP allowlist — files with intentional CIDR literals (e.g. CloudFormation templates)
