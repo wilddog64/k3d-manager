@@ -1473,3 +1473,24 @@ and the reason identity is emitted first: alertname, severity, cluster and the d
 survived. `docs/bugs/2026-09-20-sms-alert-body-is-unidentifiable.md` has every DoD box checked and is
 marked RESOLVED. Treat the `where:`/`since:` tail as best-effort; no identifying field may depend on
 it (namespace is already carried in both the description and the Subject).
+
+**FILED 2026-09-21 — the `ServiceDown` page that the operator received is a true positive, and the
+root cause is a validation defect.** Deep-dived per the standing rule rather than treating the alert
+as known noise. All four `shopping-cart-apps` deployments have been `ImagePullBackOff` for 11h with
+`403 Forbidden` from ghcr.io. The plumbing is fine — `ghcr-pull-secret` exists and its ExternalSecret
+reports `SecretSynced True` — but all three PAT loaders in `scripts/plugins/shopping_cart.sh` validate
+with `GET https://api.github.com/user`, which proves only that the token *authenticates*, never that
+it has `read:packages`, the one scope GHCR checks. `gh auth status` shows the CLI token's scopes are
+`admin:public_key, gist, read:org, repo` — no `read:packages`. Worse,
+`shopping_cart_load_ghcr_pat_from_gh` *persists* that token to `secret/github/pat`, so the Vault
+loader then finds it, probes `/user`, gets 200 and never escalates to the prompt: the fallback chain
+converges on a permanently broken credential with every layer green. Spec:
+`docs/bugs/2026-09-21-ghcr-pat-validated-for-auth-not-packages-scope.md`, which also captures a
+secondary CLAUDE.md secret-hygiene violation (Vault token and PAT in `curl` argv at
+`shopping_cart.sh:272` and `:311-313`) and prescribes an end-to-end GHCR token-exchange + manifest
+HEAD probe as the only check that cannot be wrong. Operator action still required: mint a PAT with
+`read:packages` — the gh CLI token can never work, its scopes are fixed by the OAuth app.
+
+Note: I could not verify the stored PAT's scopes directly — reading `ghcr-pull-secret` and the
+ExternalSecret spec were both denied as credential materialization, correctly. The diagnosis rests on
+`gh auth status` (scopes only, no token) plus the code path, which is sufficient.
