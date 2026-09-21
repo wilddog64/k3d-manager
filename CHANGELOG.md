@@ -24,6 +24,13 @@
   on purpose.
 
 ### Fixed
+- README listed the vCluster E2E harness guide **three times**, twice labelled "(Tier 1)", and all
+  three links pointed at the bare file — the Tier 2 entry led to the Tier 1 title. Root cause: the
+  guide's own H1 still read `# vCluster E2E Harness (Tier 1)` after it gained a Tier 2 section, so
+  there was no Tier 2 anchor to link to. The guide is now titled for both tiers with a tier table
+  up top, Tier 1 has an explicit `## Tier 1: per-candidate vCluster gate` heading (its four former
+  H2 sections demoted under it) so the two tiers are parallel, and the README's How-To entries
+  deep-link to the right section. All four anchors verified against GitHub's slug rules.
 
 - `docs/howto/acg-credentials-flow.md` — the sequence diagram failed to render on GitHub. A
   semicolon in message text terminates a statement in Mermaid sequence diagrams; replaced with an

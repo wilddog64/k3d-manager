@@ -1,16 +1,16 @@
-# vCluster E2E Harness (Tier 1)
+# vCluster E2E Harness
 
-A learning-oriented guide to the **Tier 1 end-to-end verification harness** — how
-`e2e_verify_vcluster` stands up the shopping-cart stack in a throwaway
-[vCluster](https://www.vcluster.com/), runs the Playwright suite against it as an
-in-cluster Job, and reports a machine-readable pass/fail. Grounded in
+A learning-oriented guide to the **end-to-end verification harness** — both tiers of the
+two-tier model in `docs/plans/v1.25.0-e2e-verification-harness.md`. Grounded in
 `scripts/plugins/e2e.sh` and `scripts/etc/e2e/`.
 
-> **Scope.** This is Tier 1 of the two-tier model in
-> `docs/plans/v1.25.0-e2e-verification-harness.md`. Tier 1 is the **fast, cheap,
-> per-candidate** gate. Tier 2 (the ACG full-stack sandbox with real OIDC and the
-> live Stripe path) is a separate, periodic job. Tier 1 deliberately runs with
-> `OAUTH2_ENABLED=false` and no ESO/Vault/ArgoCD.
+| Tier | Function | Substrate | Cadence |
+|---|---|---|---|
+| [**Tier 1**](#tier-1-per-candidate-vcluster-gate) | `e2e_verify_vcluster` | throwaway vCluster, `OAUTH2_ENABLED=false`, no ESO/Vault/ArgoCD | **blocking, per-candidate** |
+| [**Tier 2**](#tier-2-acg-sandbox-stripe-verification) | `e2e_verify_sandbox` | ACG full-stack sandbox, real OIDC, live Stripe path | opt-in, periodic, never blocking |
+
+Most of this guide is Tier 1, because that is the gate a candidate image must pass. Tier 2
+has its own section near the end.
 
 ---
 
@@ -37,7 +37,9 @@ No manual vCluster CLI installation is supported.
 
 ---
 
-## The self-contained substrate bundle (`scripts/etc/e2e/`)
+## Tier 1: per-candidate vCluster gate
+
+### The self-contained substrate bundle (`scripts/etc/e2e/`)
 
 The existing `shopping_cart_reconcile_*` functions are hardcoded to the **live** app
 cluster — they assume ArgoCD, ESO, Vault, and a running Postgres. They are *not*
@@ -59,7 +61,7 @@ Vault / ESO / ArgoCD:
 **Contract, not convenience** — every value is derived from the authoritative
 `shopping-cart-e2e-tests/docker-compose.yml` and each service's `k8s/base`.
 
-### The port-decoupling detail worth knowing
+#### The port-decoupling detail worth knowing
 
 The e2e tests and the compose contract address product-catalog on **:8000**, but the
 published container image actually listens on **:8080** (`uvicorn --port 8080`). The
@@ -74,7 +76,7 @@ Service order            port 8080  ->  targetPort http (8080)
 So the test-facing DNS name/port (`product-catalog…svc:8000`) is stable regardless of
 the container's internal port.
 
-### Image pinning (A08)
+#### Image pinning (A08)
 
 All images are pinned — no `:latest`. The three service images default to their
 last-known-good immutable `sha-<gitsha>` tags (mirrored from each service's own
@@ -84,7 +86,7 @@ service-under-test image** with the candidate digest at deploy time.
 
 ---
 
-## The in-cluster Playwright Job model
+### The in-cluster Playwright Job model
 
 Rather than port-forwarding services to the host and running Playwright locally, the
 harness ships the tests **as a container image** and runs them **inside** the
@@ -124,7 +126,7 @@ from GHCR with the `ghcr-pull-secret` the harness provisions in the vCluster.
 
 ---
 
-## The gate-consumable contract
+### The gate-consumable contract
 
 Two outputs matter, and both are **exit-code-faithful**:
 
@@ -150,7 +152,7 @@ exporter and Grafana dashboard that turn these summaries into observability are 
 
 ---
 
-## Running it
+### Running it
 
 ```bash
 # Requires a host cluster context (VCLUSTER_HOST_CONTEXT or current kube-context).
