@@ -597,6 +597,12 @@ alertmanager-secret:
 	  echo "[alertmanager-secret] set the named env vars, or run this target from a real terminal to be prompted" >&2; \
 	  exit 1; \
 	fi; \
+	printf '%s' "$$_gmail" | grep -qE '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z][A-Za-z]+$$' || \
+	  { echo "[alertmanager-secret] ERROR: gmail_from is not an email address (placeholder text?)" >&2; exit 1; }; \
+	printf '%s' "$$_sms" | grep -qE '^[0-9]{10}@[A-Za-z0-9.-]+\.[A-Za-z][A-Za-z]+$$' || \
+	  { echo "[alertmanager-secret] ERROR: sms_gateway must be 10digits@gateway.domain (placeholder text?)" >&2; exit 1; }; \
+	printf '%s' "$$_pw" | grep -qE '^.{8,}$$' || \
+	  { echo "[alertmanager-secret] ERROR: gmail_app_pw is implausibly short" >&2; exit 1; }; \
 	VAULT_TOKEN="$$_tok" GMAIL_FROM="$$_gmail" GMAIL_PW="$$_pw" SMS_GW="$$_sms" python3 -c 'import json,os,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; p={"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}; u.urlopen(u.Request(a,data=json.dumps(p).encode(),headers=h,method="POST"))' || \
 	  { echo "[alertmanager-secret] ERROR: Vault write failed (is the Vault port-forward on 127.0.0.1:18200 up?)" >&2; exit 1; }; \
 	echo "[alertmanager-secret] Credentials stored in Vault"; \

@@ -19,7 +19,10 @@
   and the error names each unresolved field and where to supply it instead of lumping all three
   together. On success the target backs `gmail_from` and `sms_gateway` up to Keychain, and
   `restore-google-app-password` reads all three from Keychain so a future PVC loss is a
-  single-command rebuild. The Vault root token now travels by environment variable rather than in a
+  single-command rebuild. The target also validates shape before writing: it reported three success
+  lines when handed the literal placeholder text `...` from a copy-pasted command, storing garbage
+  in both Vault and Keychain, so `gmail_from` must now look like an email address and `sms_gateway`
+  like `10digits@gateway.domain`. The Vault root token now travels by environment variable rather than in a
   `curl -H` argument visible in the process table, matching the sibling target.
 
 - The 45s apiserver `scrapeTimeout` never survived on the cluster. `kube-prometheus-stack-apiserver`
