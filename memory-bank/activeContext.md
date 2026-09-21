@@ -1438,3 +1438,46 @@ to run a script that does not exist. The link checker cannot see these: they are
 not links. Historical bugs/issues/retros should **keep** the old name. Scope for the sweep =
 standing docs only. Recorded in
 `docs/bugs/2026-09-21-doc-links-and-anchors-never-validated.md`.
+
+## 2026-09-21 — acg-* → cluster-* rename applied to standing docs
+
+`cee21ef0`, pushed. Follows `58f5c316` (the doc-link gate that surfaced it).
+
+`bin/acg-up`/`-down`/`-refresh`/`-status`/`-sync-apps` → `bin/cluster-*`, and Slack `/acg-*`
+→ `/cluster-*`, happened in **v1.7.1** (`0c9b2707`; spec
+`docs/plans/v1.7.1-rename-acg-to-cluster-binaries.md`). Code was already clean — grep of
+`bin/k3dm-webhook`, `workers/slack-relay/index.js` and `Makefile` found **zero** old names —
+so nothing was broken at runtime, but standing docs told readers to run scripts that do not
+exist.
+
+**48 occurrences fixed** in README (live sections only), `docs/architecture/cloudflare-slack-relay.md`,
+`docs/howto/makefile.md`, `docs/howto/launchd-daemons.md`, `docs/guides/grafana-dashboards.md`,
+`memory-bank/projectbrief.md`, `memory-bank/systemPatterns.md`.
+
+**Deliberately left, each verified not assumed:**
+- **Release tables** (README `## Releases` from line ~310, `docs/releases.md`) + `docs/bugs/`,
+  `docs/issues/`, `docs/retro/`, `memory-bank/archive/`. `/acg-resume` really was the command
+  in v1.6.3 — renaming a release note falsifies what shipped. Boundary used: the `## Releases`
+  heading.
+- **Grafana panel titles** "Last acg-up Duration" / "Last acg-down Duration" — these are
+  *literal strings* in `k3dm-deployments-configmap.yaml`, so the guide quotes the dashboard as
+  deployed. Added a caveat naming the cost of changing them (edit ConfigMap + reapply
+  `make observability-acg`). **A doc that disagrees with a deployed UI string is worse than a
+  stale name.**
+- `acg-credential-test` / `acg-extend-test` — CURRENT names, and they live in
+  `scripts/lib/foundation/.../acg/bin/` (subtree, never edit). Also preserved `acg-watch`,
+  `acg-prometheus`, `acg-values`, `acg-plugin`, and the `acg-sandbox-stripe-verification`
+  anchor.
+- `acg-sync-apps-argocd-pf` state-file/log constant inside `bin/cluster-sync-apps` — kept on
+  purpose by the v1.7.1 spec. My `\bacg-sync-apps\b` regex *would* have matched it (hyphen is
+  a word boundary); confirmed it appears in no edited file.
+
+**Also fixed:** `cloudflare-slack-relay.md` quoted a 409 Slack message the webhook never
+emits (`use /acg-status to check progress`). Real text from `bin/k3dm-webhook:3755` is
+`cluster job already running: <job_id> (<action>)`. A stale *quote* is a separate defect from
+a stale *name* — the rename would have silently "modernised" a fabricated string.
+
+Caught before commit: inserting the panel-title caveat mid-table split a markdown table,
+orphaning three rows. Moved below the table.
+
+Verified: `check-doc-links` 1726 OK; mermaid 6 blocks 0 failed; 23 pytest pass.
