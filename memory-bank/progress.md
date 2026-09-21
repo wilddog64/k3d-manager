@@ -592,3 +592,6 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   Dependabot tracks this pin and should bump it after the infra merge.
 - [ ] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` — still the
   blocker for promotion actually succeeding there.
+- [x] **Promoter-key spec corrected twice** — deploy keys are per-repo, not shared; product-catalog
+      is missing the `sc-image-promoter` deploy key AND the `PROMOTER_SSH_KEY` secret. Pin bump
+      sequenced after the infra merge, not dispatched to Codex.

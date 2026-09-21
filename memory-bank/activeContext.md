@@ -1676,3 +1676,25 @@ Sequence for the guard to take effect: merge infra → bump the pin in product-c
 already tracks this pin (its PR titles read
 `github_actions in /. - Update ...build-push-deploy.yml-<sha>`), so it will bump on its own after
 the infra merge, or it can be re-pinned by hand.
+
+### 2026-09-21 — promoter-key gap is TWO missing things, not one (spec corrected again)
+
+Checked the deploy keys rather than trusting the earlier claim that basket/order/payment share one
+promoter key. They do **not** — three distinct `sc-image-promoter` fingerprints, one pair per repo.
+The promote step pushes to `git@github.com:${{ github.repository }}` — the **calling repo itself**,
+not the infra repo — so each app repo needs its own write deploy key plus its own private-half secret.
+
+`shopping-cart-product-catalog` is missing **both**: no `sc-image-promoter` deploy key and no
+`PROMOTER_SSH_KEY` secret. Adding only the secret would still fail, at `git push`, with a permission
+error rather than `error in libcrypto`.
+
+~~"add the secret reusing the key already in basket/order/payment"~~ — **RETRACTED, was wrong.**
+The fix is a fresh ed25519 pair for product-catalog only. Key material, so not a Codex task.
+
+Pin bump deliberately NOT dispatched: product-catalog pins `build-push-deploy.yml@1b35d962b`, and
+bumping it to the unmerged `94b16bc9` would point a consumer's main at a commit outside infra's
+default branch, with a second bump forced after the squash merge. Correct order is infra PR merge
+first, then bump to the merge SHA. Dependabot already tracks `github-actions` weekly in that repo.
+
+Blocked on the user, not on Codex: (1) PR creation in both repos, (2) the keygen + deploy key +
+secret for product-catalog.

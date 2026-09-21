@@ -227,12 +227,70 @@ Claude-Session: https://claude.ai/code/session_01B9RRyT5eU8S76oXYMrLZN8
 
 ## Operator action required (NOT Codex — needs key material)
 
+**Revised 2026-09-21 after checking the deploy keys — the first version of this section was wrong.**
+
 `shopping-cart-product-catalog` has **no** `PROMOTER_SSH_KEY` secret. Change 1 forwards a secret
 that does not yet exist there, so promotion will still fail — but with the explicit guard message
 instead of `error in libcrypto`.
 
-The operator must add the secret to that repo, using the same key already present in
-`shopping-cart-basket`, `shopping-cart-order` and `shopping-cart-payment`.
+### What the first version got wrong
+
+It said to reuse "the same key already present in basket, order and payment". There is no such
+shared key. Each repo has its **own** pair. The promote step pushes to the **calling repo itself**,
+not to the infra repo:
+
+```yaml
+git remote set-url origin "git@github.com:${{ github.repository }}.git"
+git push origin "HEAD:${{ github.ref_name }}"
+```
+
+so each app repo needs its own write-capable `sc-image-promoter` deploy key holding the public
+half, and its own `PROMOTER_SSH_KEY` secret holding the private half. Verified fingerprints — all
+three distinct:
+
+| Repo | `sc-image-promoter` deploy key | Fingerprint |
+|---|---|---|
+| shopping-cart-basket | yes (2026-08-09, write) | `SHA256:oEYsJuNeDySRiQsrkb6wWenKPTHwgHBO4X/y0cCqUA8` |
+| shopping-cart-order | yes (2026-08-09, write) | `SHA256:ptiaLsvS6aiD0Ldcwv01SXoBWuZKymNWTJA213CRMYs` |
+| shopping-cart-payment | yes (2026-08-09, write) | `SHA256:T+2IhZvq/r/RMxm0UC7j6JIxPoVlX098Qx9t79A7MbE` |
+| **shopping-cart-product-catalog** | **none** | — |
+
+So product-catalog is missing **two** things, not one: the deploy key *and* the secret. Adding only
+the secret would fail at `git push` with a permission error.
+
+`shopping-cart-frontend` correctly has neither — its inline publish job promotes via a deploy PR
+using `PACKAGES_TOKEN`, and never touches SSH.
+
+### The fix — a fresh pair for product-catalog only
+
+Generate a new `ed25519` pair, register the public half as a write-capable deploy key named
+`sc-image-promoter`, store the private half as the `PROMOTER_SSH_KEY` secret, then destroy the local
+copy. Never echo either half. Never reuse another repo's pair.
+
+This is the only step in this bug that touches key material, and it is the operator's or Claude's —
+**not Codex's**.
+
+## Follow-up — the guard is inert until the pin moves
+
+`shopping-cart-product-catalog/.github/workflows/ci.yml` line 134 pins the reusable workflow to a
+commit SHA:
+
+```
+uses: wilddog64/shopping-cart-infra/.github/workflows/build-push-deploy.yml@1b35d962b6e4c095348a09f7a41d79b755b6f6cd
+```
+
+That commit does **not** contain the guard, so Change 2 has no effect on product-catalog until the
+pin moves. Change 1 works regardless — it lives in product-catalog's own file.
+
+**Do not bump the pin to `94b16bc9` (the infra fix branch).** Pinning `main` of a consumer repo to
+an unmerged branch commit makes product-catalog depend on a commit that is not on infra's default
+branch, and a squash merge will produce a different SHA, forcing a second bump. Correct order:
+
+1. Merge the infra PR to `main`.
+2. Bump the pin in product-catalog to the **infra merge commit SHA**.
+
+`.github/dependabot.yml` in product-catalog already tracks `github-actions` weekly, so Dependabot
+will raise the bump on its own after the infra merge. A manual bump is only needed to move faster.
 
 ## What NOT to Do
 
