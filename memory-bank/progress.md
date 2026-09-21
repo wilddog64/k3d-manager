@@ -564,3 +564,13 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   machine can pull from `ghcr.io` (403 Forbidden). Needs a PAT with `read:packages`.
 - [ ] **`github-packages-token` cannot pull** — implies GitHub Actions image builds will 401.
   Independent of the hub outage; track separately.
+
+- [x] **Codex: fix `bin/rotate-ghcr-pat`** — VERIFIED and committed `edaa2e49`. Five BATS gates
+  mutation-tested against pre-fix source; one Codex-reported gate count (PAT argv `1→0`) was false
+  (`0→0`, vacuous) and was corrected before commit.
+- [ ] **Codex: forward `PROMOTER_SSH_KEY`** — spec `eb97355d`, dispatched 2026-09-21, branch
+  `fix/pass-promoter-ssh-key` in payment / product-catalog / frontend / infra. Awaiting 4 SHAs.
+- [ ] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` and
+  `shopping-cart-frontend` (both lack it entirely; reuse the key already in basket/order/payment).
+- [x] ~~`github-packages-token` implies Actions 401~~ — **RETRACTED, was wrong.** `PACKAGES_TOKEN`
+  works; the registry push succeeds. The break was `PROMOTER_SSH_KEY`, see above.

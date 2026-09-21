@@ -1577,3 +1577,36 @@ will 401 — a second, independent breakage worth tracking.
 
 Next: operator runs the per-token GHCR pull probe to confirm, then either pipes a
 working token into `bin/restore-hub-ghcr-pat` or mints a classic PAT with `read:packages`.
+
+## 2026-09-21 — rotate-ghcr-pat VERIFIED + image-promotion bug filed and dispatched
+
+`bin/rotate-ghcr-pat` fix verified and committed at `edaa2e49` (Codex implemented; Claude
+committed because Codex again could not write `.git/index.lock`). All five BATS gates
+mutation-tested `not ok` against the pre-fix source, file restored shasum-identical.
+`shellcheck` clean (only expected SC1091 info on sourced libs), `bats` 5/5.
+
+### CORRECTION — my earlier "PACKAGES_TOKEN is heading for 401s" claim was WRONG
+
+`PACKAGES_TOKEN` in GitHub Actions **works**. The registry push half of the pipeline is
+healthy: run `35117065512` built, pushed and cosign-attested
+`sha256:e9bcb925619b5344a958fc359091b651c61365ce7b8a65c354408ee2f7198b92` — the exact digest
+`product-catalog` on the hub is failing to pull. So the image exists in GHCR and CI can write it.
+
+The real CI breakage is `PROMOTER_SSH_KEY` arriving **empty**, so the git promotion step dies at
+`Load key ".../promoter_key": error in libcrypto`. Filed as
+`docs/bugs/2026-09-21-image-promotion-fails-promoter-ssh-key-not-passed-to-reusable-workflow.md`
+(`eb97355d`) and dispatched to Codex (session `01a0c401`, log
+`scratchpad/codex-promoter-run.log`), branch `fix/pass-promoter-ssh-key` in 4 repos.
+
+Cause: `build-push-deploy.yml` declares `PROMOTER_SSH_KEY: required: false`, and three of five
+callers omit it from their `secrets:` block — payment, product-catalog, frontend. Basket and
+order are correct. Payment is a pure code fix (secret exists); product-catalog and frontend also
+need the **operator** to create the repo secret.
+
+**Why this hid for weeks:** `publish` is gated on `github.ref == 'refs/heads/main' && event ==
+'push'`, so every PR and Dependabot run **skips** it, and a skipped job does not fail a run. The
+2026-09-21 product-catalog run reads `success` with `Build, Scan & Push = skipped`. Another
+instance of green ≠ working — check the job list, not the run conclusion.
+
+The hub `403 Forbidden` is a **separate, cluster-side** credential problem (the PAT in Vault /
+`ghcr-pull-secret`), not a CI problem. Still blocked on a PAT with `read:packages`.
