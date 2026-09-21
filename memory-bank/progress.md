@@ -44,6 +44,18 @@
   scrape-timeout patch landed earlier this release had nothing to patch on a fresh cluster, so the
   `KubeAPIDown` flap guard is **not** in place. Re-run once the ServiceMonitor exists.
 
+- [ ] **`cve-remediation-verify` CronJob fails every run: `secrets "cluster-ubuntu-hostinger" not
+  found`.** The new hub ArgoCD has no registration Secret for the live `ubuntu-hostinger` cluster,
+  so the CVE remediation verifier errors on every schedule. Re-register the hostinger cluster with
+  the rebuilt hub — do **not** hand-patch the cluster Secret
+  ([[reference_appset_generated_app_cleanup_ordering]] ordering applies). Until then this is a
+  recurring red that is *expected*, which is exactly the kind of thing that later gets dismissed as
+  noise — fix or pause it, do not learn to ignore it.
+
+- [x] **trivy `scan-vulnerabilityreport-8479d4f9` Error — investigated, benign.** One-off startup
+  race: the scan job ran at 23:56 while `trivy-service.trivy-system:4954` was still starting
+  (`connection refused` storing a blob). All 10 subsequent scan jobs show `Complete 1/1`. No action.
+
 - [ ] **Hermes ArgoCD token needs re-minting** — the hub ArgoCD is new, so
   `k3dm-hermes-argocd-token` is stale by construction.
 
