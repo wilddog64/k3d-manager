@@ -130,7 +130,10 @@ federate `cluster: ubuntu-hostinger` keep their true origin.
 - [x] Hub Prometheus sets `cluster: hub` in `externalLabels`
 - [x] Templates proven to compile and render, not merely parse as YAML
 - [ ] `alertmanager-smtp-secret` recreated on the live hub and `sms-critical` present in
-      `/api/v2/status`
+      `/api/v2/status` — **blocked:** Vault's `secret/k3d-manager/alertmanager` was lost with the
+      Vault PVC, Keychain holds only `gmail_app_pw` (not `gmail_from`/`sms_gateway`), so
+      `make restore-google-app-password` fails its own guard. Needs interactive
+      `make alertmanager-secret` (operator, real TTY).
 - [ ] One real SMS received and legible
 
 ## What NOT to Do

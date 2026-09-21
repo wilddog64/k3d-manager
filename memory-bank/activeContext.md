@@ -1381,3 +1381,48 @@ shell after `shopping_cart_seed_sandbox_vault_kv` returned. `_src_json` beside i
 (line 630). This was **Claude's spec omission**, not a Codex error — the spec's literal block did
 not declare it and Codex copied the block faithfully, as instructed. Fixed by adding `_stripe_sk=""`
 to the existing `local` on line 630.
+
+## 2026-09-20 — Alert legibility fixed, `deploy_observability` run, SMS still blocked on a lost Vault key
+
+Ran `deploy_observability --confirm` twice (operator-authorised). Three things are now verified
+live on the hub, not merely committed:
+
+| Change | Live evidence |
+|---|---|
+| apiserver `scrapeTimeout` 45s | `scrape_timeout: 45s` in `/api/v1/status/config`, persisted ≥2 min past an ArgoCD reconcile |
+| hub `externalLabels` | `external_labels: cluster: hub` |
+| legible control-plane rules | only `kubernetes-control-plane.legible` `KubeAPIDown`/`KubeletDown` exist; upstream duplicates gone |
+
+**The 45s timeout had never actually applied.** `kube-prometheus-stack-apiserver` carries
+`argocd.argoproj.io/tracking-id` and the observability ApplicationSet runs `selfHeal: true`, so the
+out-of-band `kubectl patch` was reverted within seconds while
+`_observability_ensure_apiserver_scrape_timeout` printed success against a value that no longer
+existed. Two deploys in a row reported "set to 45s" with the live config still at 10s. Chart 67.9.0
+exposes `kubeApiServer.serviceMonitor.interval` but no `scrapeTimeout`, so the patch is the only
+lever; fixed with `ignoreDifferences` on `/spec/endpoints/0/scrapeTimeout` **plus**
+`RespectIgnoreDifferences=true` — without the sync option, `ignoreDifferences` hides the diff but a
+sync still overwrites the field. The function now reads the value back and warns instead of
+trusting the patch exit code. See [[reference_argocd_selfheal_reverts_out_of_band_patch]].
+
+**Alert messages are now self-identifying.** Body leads with alertname, severity and cluster, then
+prefers `description` over `summary`, then the locating labels, then `StartsAt`; the root route
+gained an explicit `group_by` (with none set, Alertmanager groups everything into one group whose
+`GroupLabels` is empty, so the Subject rendered as a bare `[ALERT] `). Templates were proven by
+compiling and executing them in a standalone Go harness against real alert labels — `amtool
+check-config` validates only *file*-based templates and would not have caught an inline error
+before send time. See [[reference_alertmanager_inline_templates_no_sprig]]. Spec:
+`docs/bugs/2026-09-20-sms-alert-body-is-unidentifiable.md`.
+
+**SMS delivery is still dead, and it is a backup gap, not a config bug.**
+`alertmanager-smtp-secret` was lost in the rebuild; the Alertmanager CR still references it, so the
+operator fell back to a generated default whose root receiver is `"null"` — `sms-critical` and
+`smtp_smarthost` are absent from the running config. `deploy_observability` cannot rebuild it
+because Vault's `secret/k3d-manager/alertmanager` went with the Vault PVC. Keychain has
+`k3dm-alertmanager-gmail-app-password` but **not** `gmail_from` or `sms_gateway`, so
+`make restore-google-app-password` will fail its own `Vault missing gmail_from,sms_gateway` guard.
+Only `make alertmanager-secret` (interactive, needs a real TTY — operator's) can restore it. This is
+the same class of loss as `cosign-public-key`: fields outside the 14-key canonical allowlist have
+zero coverage.
+
+Also outstanding from this pass: `Prometheus Vault credentials unreadable — skipping auth proxy`,
+another KV casualty of the same PVC loss.
