@@ -1335,3 +1335,58 @@ afterwards. Not dispatched to Codex yet for that reason.
 
 Confirms the earlier decision to keep this separate from the PROMOTER_SSH_KEY bug was right: same
 failing step, different cause, key present.
+
+## 2026-09-21 — doc realignment: webhook architecture, /k3dm pattern, new Grafana guide
+
+Three commits, all on `k3d-manager-v1.36.0`, all pushed.
+
+**`3e5951ca` — architecture docs vs. the live webhook server.** Both
+`docs/architecture/webhook-server.md` and `-/cloudflare-slack-relay.md` still described
+v1.13.0. Measured corrections: `bin/k3dm-webhook` is **4,008** lines (doc said ~2,950);
+`scripts/lib/webhook/` has **5** modules (`make_targets.py` was absent from the table, as
+was `auth.py`'s Slack identity gate `_slack_user_is_allowlisted` / `_slack_user_role`);
+every line range in the "still in the monolith" table was stale. Five routes were
+undocumented: `/api/v1/make`, `-cve-remediate`, `-hostinger-status`,
+`-cleanup-stale-sandbox`, `-analyze`. The relay route table now carries a **min-role
+column** sourced from `_ACTION_POLICY`.
+
+Also documented the interface shift the user flagged: **the Makefile is now the operator
+surface**. `/k3dm` replaced "one route per operation" — a new capability is a Makefile
+target plus one row in `MAKE_TARGETS`. Four gates written down: target allowlist, per-target
+arg allowlist + `_ARG_PATTERNS` regex, role **capped twice** (relay stamps `admin`, then
+`_effective_make_role` caps at the caller's `K3DM_SLACK_ROLE_MAP` role, then the target's
+`min_role`), and `confirm` for the three destructive targets. Execution detail recorded:
+args are positional `$@`, never interpolated, and `__K3DM_MAKE_RC=` is how the real rc
+survives a merged-stream capture.
+
+**`dfef599e` — `docs/guides/grafana-dashboards.md` (new) + webhook phase status.**
+
+Grafana had **no guide at all** — a guide-per-major-tech violation. Seven dashboards ship
+from two directories to two different clusters; their knowledge existed only scattered
+across ~25 plan/bug/issue docs, and `grafana-dashboard-hermes.yaml` was referenced by none
+of them. The guide gives per-dashboard panels + queries, the producer chain, and a
+`No data`-by-cause triage table where every row is a real past incident.
+
+Findings surfaced while tracing producers:
+- **`k3dm.k3.io/hermes-status` is NOT a typo to fix.** The Hermes selector uses `k3.io`
+  where the e2e and CVE selectors use `k3dm.k3d.io`. `bin/k3dm-hermes:378` and
+  `vulnerability-inventory-exporter.yaml:281` agree, so it works; normalising one side
+  alone silently empties the dashboard and the exporter reports no error. Marked do-not-fix
+  in both guides.
+- **`checkout-loadtest-configmap.yaml` has no applier** — no plugin, Makefile target or
+  ApplicationSet references it. Its `No data` is the steady state, not a regression.
+- `docs/guides/hermes.md` described **four** Hermes panels; the dashboard has **six**
+  (*Degraded sensors*, *Unknown sensors* were missing). Fixed, with the panel/query table.
+
+**Webhook modularization phase status — the user asked where we are.** Answer: Phase 1
+only, and that is accurate, but the doc omitted the real story. None of `server.py`,
+`routes.py`, `commands.py`, `dispatch.py`, `jobs.py`, `diagnostics.py` exist — **phases 2–5
+not started**. Phase 1 moved ~190 lines out (3,142 → 2,953 at `28f38058`); today the file
+is **4,008**, **+36%** since. The plan is being outrun by the code it was meant to shrink;
+`webhook-server.md` now carries that measurement table and a per-phase status table with
+evidence. Noted that both real extractions (`config/render/proc/auth`, then `make_targets`)
+were **pure leaves**, not the behavioural splits phases 2–4 describe.
+
+Prior commit this window: `b5721781` (ASCII→Mermaid; found and fixed
+`acg-credentials-flow.md` block#1, which had never rendered — a semicolon in
+sequence-diagram message text terminates the statement).
