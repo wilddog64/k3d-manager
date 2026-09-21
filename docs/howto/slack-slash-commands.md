@@ -647,14 +647,33 @@ export K3DM_ASK_MAX_TURNS=15
 
 ### Guardrail summary
 
-```
-Internet request
-  └─ Cloudflare Worker: Slack HMAC-SHA256 signature check ──────── drop if invalid
-       └─ webhook Bearer token check ────────────────────────────── 401 if invalid
-            └─ _sanitize_question: length + injection patterns ───── reject if matched
-                 └─ structural separation: --system-prompt vs -p ─── injection can't override rules
-                      └─ repo scope: --add-dir + path guard + prompt ── block out-of-scope file access
-                           └─ bash sandbox (k3dm-ask-bash): deny-list ─ hard block destructive cmds
-                                └─ semaphore(2): max 2 concurrent asks ─ busy reply if cap hit
-                                     └─ timeout + --max-turns N ─────── hard kill if runaway (default 10, K3DM_ASK_MAX_TURNS)
+```mermaid
+flowchart TD
+    REQ["Internet request"]
+    SIG["Cloudflare Worker<br/>Slack HMAC-SHA256 signature check"]
+    TOK["webhook Bearer token check"]
+    SAN["_sanitize_question<br/>length + injection patterns"]
+    SEP["structural separation<br/>--system-prompt vs -p"]
+    SCOPE["repo scope<br/>--add-dir + path guard + prompt"]
+    SANDBOX["bash sandbox (k3dm-ask-bash)<br/>deny-list"]
+    SEM["semaphore(2)<br/>max 2 concurrent asks"]
+    TIMEOUT["timeout + --max-turns N<br/>default 10, K3DM_ASK_MAX_TURNS"]
+    OK(["request proceeds"])
+
+    REQ --> SIG
+    SIG -->|invalid| D1["drop"]
+    SIG --> TOK
+    TOK -->|invalid| D2["401"]
+    TOK --> SAN
+    SAN -->|pattern matched| D3["reject"]
+    SAN --> SEP
+    SEP -->|"injection cannot override rules"| SCOPE
+    SCOPE -->|out of scope| D4["block file access"]
+    SCOPE --> SANDBOX
+    SANDBOX -->|destructive cmd| D5["hard block"]
+    SANDBOX --> SEM
+    SEM -->|cap hit| D6["busy reply"]
+    SEM --> TIMEOUT
+    TIMEOUT -->|runaway| D7["hard kill"]
+    TIMEOUT --> OK
 ```

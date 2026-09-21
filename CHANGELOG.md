@@ -4,6 +4,18 @@
 
 ### Changed
 
+- Converted the remaining ASCII flow diagrams in the live docs to Mermaid: the webhook request
+  flow and module dependency graph, the Pushgateway metrics path, the vCluster e2e harness, the
+  `/ask` defense-in-depth chain, and the ESO secret flow and dual-cluster observability layout in
+  `systemPatterns.md`. File trees, the LDAP DIT, shipped plans and bug records were left as ASCII
+  on purpose.
+
+### Fixed
+
+- `docs/howto/acg-credentials-flow.md` — the sequence diagram failed to render on GitHub. A
+  semicolon in message text terminates a statement in Mermaid sequence diagrams; replaced with an
+  em dash. All 29 Mermaid blocks in the repo now parse.
+
 - `memory-bank/techContext.md` and `memory-bank/systemPatterns.md` rewritten against the live tree.
   Both dated from v1.24.0 (2026-08-11) and had drifted: techContext listed 15 BATS files against 117
   and 1118 cases, two plugins against 26, and three cluster providers against nine; systemPatterns

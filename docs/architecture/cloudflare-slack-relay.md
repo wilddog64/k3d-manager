@@ -183,14 +183,15 @@ already running. The Worker surfaces this to Slack as:
 After every `acg-up`, `acg-down`, or `acg-resume` job completes, `k3dm-webhook`
 pushes metrics to the Prometheus Pushgateway running in the cluster.
 
-```
-k3dm-webhook (Mac) ──POST──► localhost:9091 (LaunchAgent port-forward)
-                                     │
-                              Pushgateway pod (monitoring ns, ubuntu-k3s)
-                                     │
-                              Prometheus scrapes /metrics
-                                     │
-                              Grafana dashboard "k3dm Deployment Metrics"
+```mermaid
+flowchart TD
+    WH["k3dm-webhook (Mac)"]
+    PF["localhost:9091<br/>LaunchAgent port-forward"]
+    PG["Pushgateway pod<br/>monitoring ns, ubuntu-k3s"]
+    PROM["Prometheus<br/>scrapes /metrics"]
+    GRAF["Grafana dashboard<br/>&quot;k3dm Deployment Metrics&quot;"]
+
+    WH -->|POST| PF --> PG --> PROM --> GRAF
 ```
 
 ### Metrics pushed

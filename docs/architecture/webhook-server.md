@@ -55,10 +55,18 @@ from webhook.auth   import (...)
 
 ### Dependency direction
 
-```
-config  ◄── render
-   ▲
-   └────── auth ──► proc ◄── (bin/k3dm-webhook also imports proc directly)
+```mermaid
+flowchart LR
+    ENTRY["bin/k3dm-webhook<br/><i>entrypoint</i>"]
+    RENDER["render"]
+    AUTH["auth"]
+    CONFIG["config<br/><i>leaf</i>"]
+    PROC["proc<br/><i>leaf</i>"]
+
+    RENDER --> CONFIG
+    AUTH --> CONFIG
+    AUTH --> PROC
+    ENTRY -.->|"imports directly"| PROC
 ```
 
 `config` and `proc` are leaves (no intra-package imports), which is what makes them safe to
@@ -91,21 +99,26 @@ Slack command semantics, and cluster lifecycle — the seams are not stable enou
 
 ## Request flow (current)
 
-```
-Slack ──► Cloudflare Worker (k3dm-slack-relay)
-            │  verify signature, proxy
-            ▼
-    127.0.0.1:7443  _Handler.do_POST                 [bin/k3dm-webhook]
-            │
-            ├─ auth: _verify_slack_signature / _get_token   [webhook.auth]
-            ├─ route by path, validate body                 [monolith]
-            ├─ ack Slack within 3s, spawn background job     [_posix_spawn_job → webhook.proc]
-            │       └─ job dir under JOB_DIR                 [webhook.config._safe_job_dir]
-            ▼
-    command handler (_run_cluster_*, _run_analyze, …)        [monolith]
-            │  provider-aware subprocess (make up/down/…)
-            ▼
-    result ──► Slack via _post_slack_bot / _slack_post       [webhook.render]
+```mermaid
+flowchart TD
+    SLACK["Slack"]
+    CF["Cloudflare Worker<br/>k3dm-slack-relay<br/><i>verify signature, proxy</i>"]
+    HANDLER["127.0.0.1:7443 — _Handler.do_POST<br/><code>bin/k3dm-webhook</code>"]
+    AUTH["auth: _verify_slack_signature / _get_token<br/><code>webhook.auth</code>"]
+    ROUTE["route by path, validate body<br/><code>monolith</code>"]
+    ACK["ack Slack within 3s, spawn background job<br/><code>_posix_spawn_job → webhook.proc</code>"]
+    JOBDIR["job dir under JOB_DIR<br/><code>webhook.config._safe_job_dir</code>"]
+    CMD["command handler<br/>_run_cluster_*, _run_analyze, …<br/><code>monolith</code>"]
+    RESULT["result → Slack<br/>_post_slack_bot / _slack_post<br/><code>webhook.render</code>"]
+
+    SLACK --> CF --> HANDLER
+    HANDLER --> AUTH
+    HANDLER --> ROUTE
+    HANDLER --> ACK
+    ACK --> JOBDIR
+    HANDLER --> CMD
+    CMD -->|"provider-aware subprocess (make up/down/…)"| RESULT
+    RESULT --> SLACK
 ```
 
 Auth and Slack I/O sit at the package boundary; routing, job lifecycle, and command

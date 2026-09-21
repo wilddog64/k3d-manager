@@ -70,12 +70,15 @@ provider plugins — they are *not* secret backends, despite the earlier "planne
 
 ## 4) ESO Secret Flow
 
-```
-Vault (K8s auth enabled)
-  └─► ESO SecretStore (references Vault via K8s service account token)
-       └─► ExternalSecret (per service, maps Vault path → K8s secret key)
-            └─► Kubernetes Secret (auto-synced by ESO)
-                 └─► Service Pod (mounts secret as env or volume)
+```mermaid
+flowchart TD
+    V["Vault<br/>K8s auth enabled"]
+    SS["ESO SecretStore<br/>references Vault via K8s service account token"]
+    ES["ExternalSecret<br/>per service: Vault path → K8s secret key"]
+    KS["Kubernetes Secret<br/>auto-synced by ESO"]
+    POD["Service Pod<br/>mounts secret as env or volume"]
+
+    V --> SS --> ES --> KS --> POD
 ```
 
 Each service plugin creates its own ExternalSecret resources. Vault policies must grant each
@@ -260,22 +263,27 @@ Every handoff (Claude → Codex, Claude → Gemini, memory-bank reads) is a peri
 
 ## 18) Observability Architecture — Hub + ACG Dual-Cluster
 
-```
-Hub k3d (permanent, M4 OrbStack VM)
-├── monitoring/    kube-prometheus-stack
-│   ├── prometheus   scrapes Hub + federates ACG via host.internal:19090
-│   └── grafana      datasources: hub-prometheus (in-cluster) + acg-prometheus (host.internal:19090)
-└── trivy-system/  Trivy Operator  ← scans Hub workloads
+```mermaid
+flowchart LR
+    subgraph HUB["Hub k3d — permanent, M4 OrbStack VM"]
+        HPROM["monitoring/ prometheus<br/>scrapes Hub, federates ACG"]
+        HGRAF["monitoring/ grafana<br/>datasources: hub-prometheus + acg-prometheus"]
+        HTRIVY["trivy-system/ Trivy Operator<br/>scans Hub workloads"]
+        HTRIVY --> HPROM --> HGRAF
+    end
 
-ACG ubuntu-k3s (ephemeral, EC2)
-├── monitoring/    kube-prometheus-stack minimal (no Grafana, NodePort 30090)
-│   └── prometheus   scrapes ACG workloads + Trivy metrics
-└── trivy-system/  Trivy Operator  ← scans shopping cart images
+    subgraph ACG["ACG ubuntu-k3s — ephemeral, EC2"]
+        APROM["monitoring/ prometheus<br/>minimal, no Grafana, NodePort 30090"]
+        ATRIVY["trivy-system/ Trivy Operator<br/>scans shopping-cart images"]
+        ATRIVY --> APROM
+    end
 
-M4 host (managed by acg-up / acg-down)
-└── kubectl port-forward svc/prometheus-operated 19090:9090 -n monitoring \
-      --context ubuntu-k3s --address 0.0.0.0
-    PID → ~/.local/share/k3d-manager/run/acg-prom-pf.pid
+    subgraph HOST["M4 host — managed by acg-up / acg-down"]
+        PF["kubectl port-forward<br/>svc/prometheus-operated 19090:9090 -n monitoring<br/>--context ubuntu-k3s --address 0.0.0.0<br/>PID → ~/.local/share/k3d-manager/run/acg-prom-pf.pid"]
+    end
+
+    APROM --> PF
+    PF -->|"federated via host.internal:19090"| HPROM
 ```
 
 **Why:** the stack lives inside OrbStack's VM (zero extra macOS RSS); ACG Prometheus runs on EC2 with

@@ -90,24 +90,32 @@ Rather than port-forwarding services to the host and running Playwright locally,
 harness ships the tests **as a container image** and runs them **inside** the
 vCluster as a `Job`:
 
-```
-   build+publish                 vcluster_create
- e2e image (GHCR)  ─────►  ┌────────────────────────────┐
-                          │  vCluster (throwaway)        │
-  candidate digest ─────► │   substrate bundle (kustomize)│
-                          │   ├─ postgres / redis         │
-                          │   ├─ product-catalog/basket/order
-                          │   └─ seed Job                 │
-                          │   Playwright Job ─┐           │
-                          │     env → ClusterIP DNS:      │
-                          │       product-catalog:8000    │
-                          │       basket:8083 order:8080  │
-                          │     npx playwright test        │
-                          │       --project=api --project=flows
-                          └───────────┬───────────────────┘
-                                      │ logs + results.json
-                                      ▼
-                        exit code + JSON summary  → $E2E_REPORT_DIR/<run_id>.json
+```mermaid
+flowchart TD
+    IMG["e2e image (GHCR)<br/><i>build + publish</i>"]
+    DIGEST["candidate digest"]
+
+    subgraph VC["vCluster (throwaway) — vcluster_create"]
+        SUB["substrate bundle (kustomize)"]
+        DATA["postgres / redis"]
+        APPS["product-catalog / basket / order"]
+        SEED["seed Job"]
+        PW["Playwright Job<br/>npx playwright test<br/>--project=api --project=flows"]
+        DNS["env → ClusterIP DNS<br/>product-catalog:8000<br/>basket:8083 · order:8080"]
+
+        SUB --> DATA
+        SUB --> APPS
+        SUB --> SEED
+        SEED --> PW
+        DNS --> PW
+        APPS --> DNS
+    end
+
+    OUT["exit code + JSON summary<br/>$E2E_REPORT_DIR/&lt;run_id&gt;.json"]
+
+    IMG --> VC
+    DIGEST --> VC
+    PW -->|"logs + results.json"| OUT
 ```
 
 The Job talks to the services over **ClusterIP DNS** — no host port-forward. It uses
