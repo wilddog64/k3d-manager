@@ -1,5 +1,17 @@
 # Progress — k3d-manager
 
+## 2026-09-21 — rotate-ghcr-pat fix prepared; blocked before commit
+
+- [ ] `docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`:
+  exact Changes 1–4 implemented in `bin/rotate-ghcr-pat`; five static BATS gates added in
+  `scripts/tests/bin/rotate_ghcr_pat.bats`. Counts proved non-vacuous: hardcoded context 2→0;
+  pull probe 0→2; `--docker-password` 1→0; Vault-token argv 2→0;
+  `/user` validation 1→0; ESO branch 0→1. **Correction by Claude:** the PAT basic-auth argv gate
+  was reported 1→0 but measured 0→0 (vacuous, stray `\${` escapes); pattern fixed and re-verified. Pull probe line 59 is before `gh secret set` line 106.
+  `shellcheck -S warning` and `shellcheck -S error` clean; focused BATS 5/5. Commit/push pending:
+  `git commit` failed with `fatal: Unable to create .git/index.lock: Operation not permitted`,
+  so there is no SHA or origin verification yet.
+
 > Compressed 2026-09-17 (v1.34.0 Grafana/observability block closed → collapsed to pointers).
 > Full pre-compression detail: `memory-bank/archive/progress-2026-09-17.md`.
 > Settled work lives in `CHANGELOG.md`, `docs/releases.md`, `docs/retro/`, `docs/issues/`,

@@ -1,5 +1,20 @@
 # Active Context — k3d-manager
 
+## 2026-09-21 — rotate-ghcr-pat fix prepared; commit blocked by Git filesystem permissions
+
+Implemented the exact Changes 1–4 from `docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`
+in `bin/rotate-ghcr-pat` and added the five static-source gates in
+`scripts/tests/bin/rotate_ghcr_pat.bats`. Gate mutation counts were non-vacuous:
+hardcoded context 2→0; pull probe 0→2; `--docker-password` 1→0;
+Vault-token argv 2→0; `/user` auth validation 1→0; ESO branch 0→1. **Correction by Claude:**
+Codex reported the PAT basic-auth argv gate as 1→0; it was actually 0→0 (vacuous) because the
+pattern carried stray `\${` escapes the source never contained. Pattern corrected to the
+unescaped form, re-measured 1→0, and all five gates mutation-tested `not ok` against the
+pre-fix file before restore (shasum-verified byte-identical). Pull probe line 59 precedes
+the first `gh secret set` line 106. `shellcheck -S warning` and `shellcheck -S error` were clean;
+focused BATS was 5/5. The required commit could not be created because Git cannot create
+`.git/index.lock` (`Operation not permitted`); no commit SHA or push exists yet.
+
 ## 2026-09-20 — Port-forward wrapper fix implemented; Git commit blocked
 
 Implemented the requested allowlisted fix for `docs/bugs/2026-09-20-pf-wrapper-silent-wrong-context-and-address-blind-port-sweep.md` in the wrapper template, ArgoCD generator, `bin/cluster-up`, both focused BATS suites, and `CHANGELOG.md`. The wrapper now scopes both listener probes and the forward bind to `ADDRESS`, parameterizes `LOG_TAG`, re-resolves context at each supervisor iteration with de-duplicated warnings, and regenerates the keycloak-browser wrapper unconditionally. Verification: `bats scripts/tests/plugins/argocd.bats` 32/32 passed; `bats scripts/tests/bin/cluster_up.bats` 9/9 passed; `shellcheck -S warning scripts/plugins/argocd.sh bin/cluster-up` exit 0. Explicit `git add` failed with `fatal: Unable to create '/Users/cliang/src/gitrepo/personal/k3d-manager/.git/index.lock': Operation not permitted`; no commit or push SHA exists from this session. PR URL: not created per task instruction.
