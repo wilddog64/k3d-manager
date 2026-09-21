@@ -46,28 +46,63 @@
   launchd agent forwards 19091. Three ports for one service — needs a decision, then one source of
   truth. Not yet filed as a bug doc.
 
-- [ ] **`make status` still reports 2 errors — both need the operator, not code.**
+- [x] **Grafana Error 1033 diagnosed and fixed.** The operator hit
+  `Error 1033 — Cloudflare Tunnel error` on `grafana.3ai-talk.org`. Cause: teardown deleted
+  `com.k3d-manager.cloudflare-tunnel.plist` and nothing recreated it — `pgrep cloudflared` was
+  empty and no agent was loaded, while the origin it proxies (`127.0.0.1:3001`) was serving 200 the
+  whole time. Not a Grafana fault at all. Recreated the plist from the `bin/cluster-up:1742`
+  template and bootstrapped it; all public hosts came back
+  (grafana `/api/health` **200** `"database":"ok"`, argocd 200, prometheus/alertmanager 401 by
+  auth-proxy design, keycloak 302).
+
+- [ ] **GHCR pull is 403 — and `shopping_cart_resolve_ghcr_pat` poisoned the Vault cache.**
+  All four `shopping-cart-apps` pods are `ImagePullBackOff`:
+  `403 Forbidden` from `ghcr.io/v2/wilddog64/shopping-cart-frontend/blobs/...`. Root cause: the
+  function's fallback chain reached "use gh CLI token", and `gh auth status` reports scopes
+  `admin:public_key, gist, read:org, repo` — **no `read:packages`**. It then wrote that token to
+  `secret/github/pat` and logged `gh CLI token saved to Vault for future runs`, so every later run
+  will find it in Vault and reuse a token that cannot pull. Two defects worth filing:
+  1. The gh CLI branch is **not validated** before saving, unlike the Vault branch, which does
+     check (`Vault PAT is expired (HTTP ${_pat_http})`). Validate for `read:packages` first.
+  2. The Vault write is `|| true`, so `saved to Vault for future runs` prints even when the write
+     failed — observed directly: the first run printed it while `vault kv list secret` showed no
+     `github/` at all (the write had built `http://localhost:/v1/...` because `_vault_local_port`
+     was unset). A success message must not be unconditional.
+  Operator action: supply a PAT with `read:packages` — see
+  [[reference_packages_token_expiry_image_build]] — then overwrite `secret/github/pat`, force-sync
+  the `ghcr-pull-secret` ExternalSecret and restart the four deployments.
+
+- [ ] **`shopping-cart-data` StatefulSets never applied.** `ubuntu-k3s-data-layer` reports
+  `phase=Failed`, `namespaces "shopping-cart-payment" not found (retried 5 times)`. ConfigMaps and
+  Services synced; all StatefulSets are `OutOfSync` and absent, so the namespace has **zero** pods.
+  `ubuntu-k3s-shopping-cart-namespace` only creates `shopping-cart-apps`, so nothing creates
+  `shopping-cart-payment`. A failed sync also blocks self-heal
+  ([[reference_argocd_error_phase_blocks_selfheal]]) — operator sync after the namespace exists.
+
+- [ ] **`Frontend: HTTP 200` in `make status` is a FALSE GREEN for the hub.**
+  `~/.local/share/k3d-manager/bin/frontend-browser-http.sh` port-forwards
+  `--context "ubuntu-hostinger" svc/frontend`, so the check is served by the **hostinger** cluster,
+  not the rebuilt hub. The hub's own frontend is in `ImagePullBackOff`. Do not read that green as
+  hub health.
+
+- [ ] **`make status` still reports 1 error — needs the operator, not code.**
   ArgoCD, Frontend and Prometheus now pass; all nine local endpoints answer (grafana 3001, argocd
   8080, prometheus 19190 + 19091, alertmanager 9093 → 401 by auth-proxy design and 19093 raw,
   keycloak 8880, frontend 127.0.0.2, vault 18200). The two remaining:
-  1. **Grafana `530`** — needs the `com.k3d-manager.cloudflare-tunnel` launchd agent. Its plist was
-     deleted at teardown; `~/.cloudflared/config.yml` and the credentials survived and already map
-     `grafana.3ai-talk.org → 127.0.0.1:3001`. Creating/loading that agent was **blocked by the
-     Claude Code classifier** — operator action.
-  2. **Keycloak connection refused** — the probe is `http://keycloak.shopping-cart.local/health/live`
+  1. **Keycloak connection refused** — the probe is `http://keycloak.shopping-cart.local/health/live`
      on **port 80**, which needs the `keycloak-browser-http` LaunchDaemon. That is a privileged
      system-domain job; teardown itself logged `no sudo in headless context — skipping`. Keycloak is
      healthy on 8880, so this is purely the privileged listener.
-  3. Pushgateway's `!` warning is **pre-existing, not a regression** — `grep -i pushgateway`
+  2. Pushgateway's `!` warning is **pre-existing, not a regression** — `grep -i pushgateway`
      against `~/hub-rebuild-pods-before.txt` confirms it was not running before the rebuild either.
 
-- [ ] **Two platform-ops ExternalSecrets cannot sync** — `app-cluster-kubeconfig` and
-  `cosign-public-key`, both `SecretSyncedError: could not get secret data from provider`, which is
-  what makes ArgoCD `hub-platform-ops` **Degraded**. Neither key is among the 14 backed-up canonical
-  keys, so both were genuinely lost with the Vault PVC. `app-cluster-kubeconfig` is moot until an
-  app cluster is registered with the new hub; `cosign-public-key` belongs to the v1.27.0 image
-  signing work and needs a recovery path that is **not** `signing_init` (forbidden).
-  `monitoring/grafana-admin-credentials` **does** sync, so Grafana login is intact.
+- [ ] **`cosign-public-key` ExternalSecret cannot sync** — `SecretSyncedError: could not get secret
+  data from provider`, and it is what still makes ArgoCD `hub-platform-ops` **Degraded**. The key is
+  not among the 14 backed-up canonical keys, so it was genuinely lost with the Vault PVC. It belongs
+  to the v1.27.0 image signing work and needs a recovery path that is **not** `signing_init`
+  (forbidden). `app-cluster-kubeconfig` **now syncs** — `hub_recovery_reconcile` seeds
+  `platform-ops/app-cluster-hostinger` — as do `monitoring/grafana-admin-credentials` and all four
+  `identity` secrets.
 
 - [ ] **`observability/alertmanager` and `observability/prometheus` unseeded** — `make observability`
   warned `Alertmanager Vault secret not found — skipping SMS config`, `Failed to create Alertmanager
