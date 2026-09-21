@@ -35,6 +35,8 @@ if [[ "${_status_mode}" != full ]]; then
   fi
   exec "${SCRIPT_DIR}/cluster-status-summary" --mode "${_status_mode}"
 fi
+SCRIPT_DIR="${REPO_ROOT}/scripts"
+PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/observability.sh"

@@ -17,13 +17,49 @@
   `docs/bugs/2026-09-20-pf-supervisor-kills-healthy-forward-on-single-slow-probe.md`. 0 restarts
   post-fix vs ~1 per 45s before.
 
-- [ ] **Post-rebuild Vault KV is nearly empty — 12 of 14 canonical keys unseeded.**
-  `vault kv list secret` returns only `ldap/` and `observability/` (and `observability/` holds only
-  `grafana`). The hub-only rebuild sequence does **not** run `deploy_shopping_cart_data`, so
-  `redis/*`, `postgres/*`, `payment/*`, `rabbitmq/default`, `minio/credentials`, `keycloak/*` and
-  `github/pat` are absent. All 14 are in the Keychain backup, and the `f28a4539` seed fix will
-  restore the Stripe key from it, so this is recoverable — it just has not been done. Decide whether
-  to run `deploy_shopping_cart_data` (deploys the data tier + ~7 PVCs) or leave the hub lean.
+- [x] **Hub registered as the app cluster; the whole app tier came back.** The missing piece was
+  `hub_recovery_reconcile --confirm`, which self-registers the hub in-cluster as `ubuntu-k3s` with
+  the `k3d-manager/role: app-cluster` label. `data-git`, `services-git`, `eso` and
+  `grafana-dashboards-acg` all select on that label, so with no registration they generated
+  **zero** Applications — that, not a deploy failure, is why `shopping-cart-data`,
+  `shopping-cart-apps` and `shopping-cart-payment` were absent. Apps went 7 → 16 immediately.
+  `platform-helm` correctly still generates nothing (the in-cluster registration deliberately omits
+  `argocd-chart-version`, per `docs/bugs/2026-09-13-register-app-cluster-in-cluster-labels-trigger-platform-helm.md`).
+
+- [x] **Identity stack restored.** `shopping-cart-identity` is **not** appset-managed — it is
+  `exclude: true` in `services-git.yaml` and created directly by `bin/cluster-up:869`. The hub-only
+  sequence skipped it, so Keycloak/LDAP/postgres-keycloak were simply never requested. Applying that
+  manifest brought all of them up.
+
+- [x] **Vault seeded; the `f28a4539` seed fix proved itself in production.** The seeder logged
+  `Restoring payment/stripe api_key from Keychain backup` and the verification returns **REAL-OK** —
+  without that fix the rebuild would have written `sk_test_placeholder`. Note the seeder needs
+  `SEED_VAULT_ADDR`/`SEED_VAULT_TOKEN` when run standalone: it reads `${_vault_root_token}`, which
+  only the acg-up flow sets, and fails `unbound variable` otherwise. Vault KV now holds keycloak,
+  ldap, minio, observability, payment, platform-ops, postgres, rabbitmq, redis.
+
+- [ ] **Prometheus local-port drift: 19090 vs 19190.** `_acg_prom_local_port` computes
+  `19190 + offset`, and `k3s-aws` offset is **0**, so the app-cluster Prometheus forward is 19190 —
+  which is what `bin/k3dm-webhook:2233` probes. But `scripts/etc/cloudflared/config.yml` (and the
+  installed `~/.cloudflared/config.yml`) map `prometheus.3ai-talk.org` to **19090**. One of the two
+  is wrong; `prometheus.3ai-talk.org` cannot work while they disagree. Separately the hub's own
+  launchd agent forwards 19091. Three ports for one service — needs a decision, then one source of
+  truth. Not yet filed as a bug doc.
+
+- [ ] **`make status` still reports 2 errors — both need the operator, not code.**
+  ArgoCD, Frontend and Prometheus now pass; all nine local endpoints answer (grafana 3001, argocd
+  8080, prometheus 19190 + 19091, alertmanager 9093 → 401 by auth-proxy design and 19093 raw,
+  keycloak 8880, frontend 127.0.0.2, vault 18200). The two remaining:
+  1. **Grafana `530`** — needs the `com.k3d-manager.cloudflare-tunnel` launchd agent. Its plist was
+     deleted at teardown; `~/.cloudflared/config.yml` and the credentials survived and already map
+     `grafana.3ai-talk.org → 127.0.0.1:3001`. Creating/loading that agent was **blocked by the
+     Claude Code classifier** — operator action.
+  2. **Keycloak connection refused** — the probe is `http://keycloak.shopping-cart.local/health/live`
+     on **port 80**, which needs the `keycloak-browser-http` LaunchDaemon. That is a privileged
+     system-domain job; teardown itself logged `no sudo in headless context — skipping`. Keycloak is
+     healthy on 8880, so this is purely the privileged listener.
+  3. Pushgateway's `!` warning is **pre-existing, not a regression** — `grep -i pushgateway`
+     against `~/hub-rebuild-pods-before.txt` confirms it was not running before the rebuild either.
 
 - [ ] **Two platform-ops ExternalSecrets cannot sync** — `app-cluster-kubeconfig` and
   `cosign-public-key`, both `SecretSyncedError: could not get secret data from provider`, which is
