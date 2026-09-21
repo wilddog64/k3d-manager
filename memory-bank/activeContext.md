@@ -1512,3 +1512,20 @@ then trusted.
 Still operator-only and the thing that actually restores the pods: mint a PAT with `read:packages`,
 overwrite `secret/github/pat`, force-sync `ghcr-pull-secret`, restart the four deployments. The gh CLI
 token can never work — its OAuth scopes are fixed at `repo, read:org, gist, admin:public_key`.
+
+**2026-09-21 — the obvious restore tool cannot do the hub restore.** Before handing the operator
+`bin/rotate-ghcr-pat` (which the plugin's own error message recommends) I read it, and it is wrong
+for this in three ways: it hardcodes `--context ubuntu-k3s` in its propagation loop, so during a hub
+outage it prints three `✅ namespace:` lines while changing nothing on the hub; it validates with
+`GET /user` exactly like the defect just fixed, so it will accept a scope-less PAT and push it to
+seven repos plus Vault; and it puts the PAT and the Vault token in argv three times, including
+`kubectl create secret --docker-password`. The hardcoded context is a **recurrence** of
+`docs/bugs/2026-06-14-bugfix-ghcr-pull-secret-hardcoded-context.md` in a different file. Filed
+`docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`. Also note the
+hub's `ghcr-pull-secret` is ESO-managed, so a direct `kubectl create secret` there would be reverted
+on reconcile — the hub path must be *write Vault, force-sync the ExternalSecret*.
+
+Added `bin/restore-hub-ghcr-pat` for the hub: PAT from stdin only, verified against ghcr.io with a
+real token exchange before anything is stored, explicit `HUB_CONTEXT` default `k3d-k3d-cluster`,
+Vault write through the hardened helper, ESO force-sync, rollout restart of the four deployments.
+Refusal path verified live — a junk token is rejected with nothing written, exit 1.
