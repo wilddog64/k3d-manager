@@ -587,9 +587,18 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **Codex: forward `PROMOTER_SSH_KEY`** — VERIFIED. `2c8dd68f` (product-catalog) and `94b16bc9`
   (infra), both on `origin/fix/pass-promoter-ssh-key`. YAML-parsed step order confirmed guard before
   consumer; promote step intact. No PRs (awaiting user's go).
-- [ ] **Bump the infra pin in product-catalog** — `ci.yml` pins build-push-deploy.yml@`1b35d962d`,
-  which does NOT contain the new guard. Guard is inert for product-catalog until the pin moves.
-  Dependabot tracks this pin and should bump it after the infra merge.
+- [x] **Bump the infra pin in product-catalog** — MOVED, but NOT by our fix. Dependabot PR #54
+  merged 2026-09-21 23:41:44Z (`1f45062c`), pin `1b35d962b` -> `af4b053dc`. af4b053dc is infra
+  main at PR #98 (keycloak, 09-16); it predates the promoter guard `94b16bc9`, which is still
+  unmerged on `fix/pass-promoter-ssh-key`. So the pin moved to a SHA that has neither the guard
+  nor the rebase-fallback fix.
+- [ ] **product-catalog promotion is STILL BROKEN after the #54 merge** — main's `ci.yml:141-144`
+  forwards `PACKAGES_TOKEN`, `COSIGN_KEY`, `COSIGN_PASSWORD` and **not** `PROMOTER_SSH_KEY`. The
+  newly minted secret therefore never reaches the reusable workflow, which declares it
+  `required: false`, so the promote step still writes an empty key file and dies at
+  `Load key "~/.ssh/promoter_key": error in libcrypto`. `fix/pass-promoter-ssh-key` (`2c8dd68f`)
+  carries the forwarding and is `diverged` from main (1 ahead, 1 behind) with no PR. Merging a
+  Dependabot pin bump is not a substitute for merging the fix.
 - [x] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` — DONE
   2026-09-21 23:38Z by the user via `!`. See the minting row below.
 - [x] **Promoter-key spec corrected twice** — deploy keys are per-repo, not shared; product-catalog

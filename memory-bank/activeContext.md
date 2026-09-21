@@ -1555,3 +1555,40 @@ MANUAL Pluralsight step needing a real TTY; Claude-run `credential-test` bails
 
 Also confirmed same root cause: hub `shopping-cart-apps` pods (basket/frontend/order/
 product-catalog) have been `ImagePullBackOff` for ~20h.
+
+### 2026-09-21 — post-merge on product-catalog: the merged PR was Dependabot, not our fix
+
+User reported "only product-catalog has a PR open, and I merged it" and asked for `/post-merge`.
+Checked before running anything. The PR that merged at 23:41:44Z was **#54, a Dependabot pin
+bump** (`1f45062c`), moving `ci.yml`'s `build-push-deploy.yml` pin from `1b35d962b` to
+`af4b053dc`. It was not `fix/pass-promoter-ssh-key` — that branch never had a PR, because we were
+waiting on the user's go, and no PR was ever opened in infra either.
+
+Why this matters rather than being a harmless mix-up:
+
+| Thing | State on product-catalog `main` after #54 |
+|---|---|
+| `PROMOTER_SSH_KEY` secret | exists (minted 23:38Z) |
+| `sc-image-promoter` deploy key | exists, read-write |
+| `ci.yml` forwards `PROMOTER_SSH_KEY` to the reusable workflow | **NO** — only PACKAGES_TOKEN, COSIGN_KEY, COSIGN_PASSWORD |
+| pinned infra SHA contains the empty-key guard | **NO** — `af4b053dc` = infra main @ PR #98 (09-16), predates `94b16bc9` |
+| pinned infra SHA contains the rebase-fallback fix | **NO** — `git pull --rebase` fallback still present |
+
+The reusable workflow declares `PROMOTER_SSH_KEY: required: false`, so the missing forward is
+silent: the promote step writes an empty file and dies at
+`Load key "~/.ssh/promoter_key": error in libcrypto`. Minting the keypair removed the *second*
+blocker; the *first* one — the caller not passing the secret — is untouched.
+
+This is the [[reference_unenumerated_api_rollout_misses_repos]] pattern firing a second time on the
+same repo: a Dependabot pin bump moving a pin across a range that does not contain the fix, merging
+green because the promote step is `continue-on-error: true` with a separate fail-gate.
+
+Post-merge steps actually applicable to a Dependabot bump: main synced locally to `1f45062c`
+(fast-forward, 3 commits). No tag or release — CHANGELOG has only `[Unreleased]` and this was not a
+milestone branch, so the skip is legitimate, not a missed release. `main` is **not** branch-protected
+on this repo (`/protection` returns 404 "Branch not protected"), so there is no `enforce_admins` or
+review count to restore. Dependabot's branch was auto-deleted. No retro (not a milestone). No next
+feature branch created — `fix/pass-promoter-ssh-key` is still the live one.
+
+Left alone, pending the user's word: rebasing `fix/pass-promoter-ssh-key` onto the new main, and
+opening its PR.
