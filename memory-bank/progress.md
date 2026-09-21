@@ -544,3 +544,11 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [ ] **Operator, out of scope for Codex** — mint a PAT with `read:packages`, overwrite
   `secret/github/pat`, force-sync `ghcr-pull-secret`, restart the four deployments. The gh CLI token
   can never work: its scopes are fixed by the OAuth app (`repo, read:org, gist, admin:public_key`).
+
+- [ ] **Codex: fix `bin/rotate-ghcr-pat`** — hardcoded `ubuntu-k3s` context, auth-only PAT
+  validation, PAT+Vault token in argv. Spec `796ba237`. Dispatched 2026-09-21 via `codex exec`.
+  Awaiting SHA — verify before trusting.
+- [ ] **Hub GHCR `ImagePullBackOff`** — OPEN, blocked. No GitHub credential on the operator's
+  machine can pull from `ghcr.io` (403 Forbidden). Needs a PAT with `read:packages`.
+- [ ] **`github-packages-token` cannot pull** — implies GitHub Actions image builds will 401.
+  Independent of the hub outage; track separately.

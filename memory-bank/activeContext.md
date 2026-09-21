@@ -1529,3 +1529,36 @@ Added `bin/restore-hub-ghcr-pat` for the hub: PAT from stdin only, verified agai
 real token exchange before anything is stored, explicit `HUB_CONTEXT` default `k3d-k3d-cluster`,
 Vault write through the hardened helper, ESO force-sync, rollout restart of the four deployments.
 Refusal path verified live — a junk token is rejected with nothing written, exit 1.
+
+## 2026-09-21 — rotate-ghcr-pat defects assigned to Codex
+
+Spec made implementation-ready and pushed at `796ba237`:
+`docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`.
+Added `## Before You Start`, literal OLD/NEW blocks for 4 changes, the BATS gate list
+with an explicit non-vacuity requirement, `## Rules`, and the verbatim commit message.
+
+Dispatched to Codex via `codex exec` (session `01a0c3f9`), log at
+`scratchpad/codex-rotate-run.log`. Scope: `bin/rotate-ghcr-pat` +
+`scripts/tests/bin/rotate_ghcr_pat.bats` only. Awaiting SHA — verify before trusting.
+
+### Hub GHCR outage — still OPEN, blocked on a credential
+
+All four `shopping-cart-apps` deployments on the hub remain `ImagePullBackOff` (11h+).
+Kubelet reports `403 Forbidden` from `ghcr.io` — authenticated, not authorized.
+
+Every GitHub credential on the operator's machine was tested and none can pull:
+- `gh` CLI token — scopes `admin:public_key, gist, read:org, repo`. No `read:packages`.
+- Keychain `github-packages-token` — refused by `bin/restore-hub-ghcr-pat`'s pull probe.
+- `k3dm-hermes-gh-token`, `k3dm-hermes-audit-token` — no `X-OAuth-Scopes` header.
+
+The scope-header check is INCONCLUSIVE for fine-grained PATs (GitHub omits the header),
+so "no scopes header" does not distinguish expired from fine-grained. The authoritative
+test is the GHCR token exchange + `tags/list` pull, i.e. `_shopping_cart_ghcr_pat_can_pull`.
+That probe was validated against the real package: `wilddog64/shopping-cart-basket` is
+exactly what `basket-service` pulls, so the refusal is real and not a bad probe.
+
+`github-packages-token` failing also implies the GitHub Actions image-build pipeline
+will 401 — a second, independent breakage worth tracking.
+
+Next: operator runs the per-token GHCR pull probe to confirm, then either pipes a
+working token into `bin/restore-hub-ghcr-pat` or mints a classic PAT with `read:packages`.
