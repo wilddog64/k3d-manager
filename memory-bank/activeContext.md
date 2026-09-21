@@ -1438,3 +1438,16 @@ then Keychain, then a prompt gated on `[ -t 0 ]`, and name each unresolved field
 loss is a single `make restore-google-app-password`. The Vault root token moved out of a `curl -H`
 argument into the environment, per the CLAUDE.md secret-hygiene rule. Verified: the guard now lists
 exactly the two genuinely missing fields and resolves the app password from Keychain silently.
+
+**RESOLVED 2026-09-20 — SMS delivery restored end to end.** `alertmanager-smtp-secret` is rebuilt
+and the running Alertmanager config carries `sms-critical` and `smtp_smarthost`; the root receiver is
+no longer the generated `"null"` fallback and `group_by` is set. The operator supplied `gmail_from`
+and `sms_gateway` once via env, after which both are in Keychain — confirmed by re-running
+`make alertmanager-secret` with both env vars unset and no prompts. The secret now takes ~40s to be
+picked up by the operator after the Vault write, so an immediate `/api/v2/status` check reports
+`sms-critical` absent; poll rather than concluding failure. Routing verified against live alerts: of
+3 active criticals, only `ServiceDown` reaches `sms-critical`; both
+`TrivyCriticalVulnerabilityDetected` terminate at the `null` route ahead of it, which is the
+intended Trivy-noise design, not a routing bug. One email notification attempt, zero failures for
+every reason label. Still operator-confirmable only: whether the text physically arrived and reads
+well on the handset.
