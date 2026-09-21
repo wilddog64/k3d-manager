@@ -8,6 +8,17 @@
 
 ### Fixed
 
+- Port-forward wrapper resolved its kubectl context once at process start and silently
+  substituted a different cluster on miss, leaving the keycloak-browser-http daemon
+  forwarding against the wrong cluster indefinitely; the context is now re-resolved every
+  supervisor iteration and the substitution logs a WARNING naming both contexts.
+- Port-forward wrapper swept listeners by port alone, killing an unrelated healthy forward
+  bound to a different address on the same port; the sweep and the in-use probe are now
+  scoped to the address the wrapper itself binds.
+- `bin/cluster-up` only regenerated the keycloak-browser-http wrapper when its launchd plist
+  was missing, so template fixes never reached the deployed script; it is now regenerated
+  unconditionally.
+
 - `bin/cluster-status --full` (`make status-full`) no longer aborts on `PLUGINS_DIR: unbound variable`. It sources `scripts/plugins/observability.sh` directly rather than through the dispatcher, so it must supply the two layout variables `scripts/k3d-manager:64-65` exports; under `set -euo pipefail` the unbound expansion killed the script at source time, before a single check ran. Summary mode was unaffected because it `exec`s `cluster-status-summary` and never reaches the source — which is why this stayed hidden while `make status` kept working, even though a failing summary prints `Details: make status-full` and sent the operator straight at the broken command. `SCRIPT_DIR` is reassigned from `bin/` to `scripts/` (the plugin resolves `${SCRIPT_DIR}/etc/...` throughout its function bodies, so the `bin/` value would have been wrong even once bound) and placed after the summary early-exit, the only other consumer of the original value. Spec: `docs/bugs/2026-09-20-cluster-status-full-unbound-plugins-dir.md`
 
 - The monitoring port-forward supervisor no longer kills a healthy forward on one slow health probe. `_hostinger_write_monitoring_port_forward_wrapper` previously restarted the forward on a *single* failed `curl -fsS --max-time 3`, with no consecutive-failure tolerance, so one slow response or a transient 503 destroyed a working forward. Grafana's `/api/health` was measured at a ~0.2s median with a tail past 3s and occasional 503s while provisioned dashboards reload, which produced five restarts in two minutes on a fully healthy rebuilt hub; each restart drops the listener for ~2s, which is exactly what cloudflared reports upstream as a 502. The probe now requires `K3DM_PF_HEALTH_THRESHOLD` (default 3) consecutive failures and uses `K3DM_PF_HEALTH_TIMEOUT` (default 8s), resetting the counter on every success, so a genuinely broken SPDY stream is still caught in ~15s. This is the host-side port-forward instance of a disease family already documented for pods (`2026-08-27-keycloak-restart-loop-tight-probes.md`), nodes (`2026-08-28-node-health-watch-restart-loop-slow-node.md`) and Grafana's own liveness probe (`2026-07-06-grafana-repeatedly-killed-by-liveness-probe-under-argocd-image-updater-dashboard-load.md`). Spec: `docs/bugs/2026-09-20-pf-supervisor-kills-healthy-forward-on-single-slow-probe.md`

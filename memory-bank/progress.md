@@ -453,6 +453,14 @@
   Deployment) — confirm Keycloak federation binds openldap-0, not the stray, before v1.28.0 PR.
 # 2026-09-09 — Hermes Kine guard in progress
 
+## 2026-09-20 — Port-forward wrapper fix pending commit
+
+- [x] Implement address-scoped `lsof` probes and `--address="${ADDRESS}"` binds.
+- [x] Re-resolve kubectl context at the top of every supervisor iteration; log and de-duplicate wrong-context substitution warnings.
+- [x] Parameterize `LOG_TAG`; regenerate keycloak-browser wrapper unconditionally; add requested static BATS gates and changelog entries.
+- [x] Gates: `bats scripts/tests/plugins/argocd.bats` 32/32; `bats scripts/tests/bin/cluster_up.bats` 9/9; `shellcheck -S warning scripts/plugins/argocd.sh bin/cluster-up` exit 0.
+- [ ] Commit/push blocked by workspace Git permission: `fatal: Unable to create '/Users/cliang/src/gitrepo/personal/k3d-manager/.git/index.lock': Operation not permitted`. No commit SHA or PR URL exists yet; PR creation remains forbidden by the task.
+
 ## Shipped in v1.34.0 (detail in CHANGELOG `[Unreleased]` and the linked issues)
 
 - [x] **Hermes Status Grafana dashboard** (`60a04c19`, label fix `6a58f77f`, stat rendering `7fa75dd6`,

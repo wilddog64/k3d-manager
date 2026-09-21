@@ -1,5 +1,9 @@
 # Active Context — k3d-manager
 
+## 2026-09-20 — Port-forward wrapper fix implemented; Git commit blocked
+
+Implemented the requested allowlisted fix for `docs/bugs/2026-09-20-pf-wrapper-silent-wrong-context-and-address-blind-port-sweep.md` in the wrapper template, ArgoCD generator, `bin/cluster-up`, both focused BATS suites, and `CHANGELOG.md`. The wrapper now scopes both listener probes and the forward bind to `ADDRESS`, parameterizes `LOG_TAG`, re-resolves context at each supervisor iteration with de-duplicated warnings, and regenerates the keycloak-browser wrapper unconditionally. Verification: `bats scripts/tests/plugins/argocd.bats` 32/32 passed; `bats scripts/tests/bin/cluster_up.bats` 9/9 passed; `shellcheck -S warning scripts/plugins/argocd.sh bin/cluster-up` exit 0. Explicit `git add` failed with `fatal: Unable to create '/Users/cliang/src/gitrepo/personal/k3d-manager/.git/index.lock': Operation not permitted`; no commit or push SHA exists from this session. PR URL: not created per task instruction.
+
 > Compressed 2026-09-17 (v1.34.0 Grafana/observability block closed → collapsed to pointers).
 > Full pre-compression detail: `memory-bank/archive/activeContext-2026-09-17.md`.
 > Settled fixes live as pointers; detail in `memory-bank/archive/`, `CHANGELOG.md`,
