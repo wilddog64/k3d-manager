@@ -1284,6 +1284,16 @@ to the calling repo, not to infra.
 BLOCKED: generating the pair and writing the secret was denied by the auto-mode classifier
 (Secret-Store Writes). Not worked around. One command handed to the user to run via `!`.
 
+**RESOLVED 2026-09-21 23:38Z** — the user ran that command. Verified from the GitHub side, not from
+the reported output: `gh repo deploy-key list` shows `164022592  sc-image-promoter  read-write`
+created `2026-09-21T23:38:44Z`, and `gh secret list` shows `PROMOTER_SSH_KEY  2026-09-21T23:38:46Z`.
+The new fingerprint differs from `argocd-product-catalog-m2-air`, so the two keys are not conflated.
+Both `/tmp/pc_promoter` and `/tmp/pc_promoter.pub` are gone. Claude never read the private key.
+
+Onboarding steps 1 and 2 are closed. What remains for product-catalog promotion to actually succeed
+is the **infra merge plus the pin bump** — `ci.yml` still pins `build-push-deploy.yml@1b35d962d`,
+which predates the guard, so the forwarded secret is inert until that pin moves.
+
 ### 2026-09-21 — hub GHCR 403: the credential path, corrected
 
 User asked whether the keychain was locked. Checked: it is **not** — `show-keychain-info` reports

@@ -590,16 +590,21 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [ ] **Bump the infra pin in product-catalog** — `ci.yml` pins build-push-deploy.yml@`1b35d962d`,
   which does NOT contain the new guard. Guard is inert for product-catalog until the pin moves.
   Dependabot tracks this pin and should bump it after the infra merge.
-- [ ] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` — still the
-  blocker for promotion actually succeeding there.
+- [x] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` — DONE
+  2026-09-21 23:38Z by the user via `!`. See the minting row below.
 - [x] **Promoter-key spec corrected twice** — deploy keys are per-repo, not shared; product-catalog
       is missing the `sc-image-promoter` deploy key AND the `PROMOTER_SSH_KEY` secret. Pin bump
       sequenced after the infra merge, not dispatched to Codex.
 - [x] **Root-caused the product-catalog promotion failure** — never onboarded in the unenumerated
       2026-08-09 SSH-promoter rollout; Dependabot auto-merge imported the breaking change 2026-08-12;
       a 2026-09-01 DeployKey ruleset bypass was a misdiagnosis. Broken since 08-12, not 08-26.
-- [ ] **Mint the product-catalog promoter pair** — deploy key + PROMOTER_SSH_KEY secret. Claude
-      blocked by the classifier (Secret-Store Writes); user to run the handed-over command via `!`.
+- [x] **Mint the product-catalog promoter pair** — DONE 2026-09-21. User ran the handed-over
+      command via `!` (Claude was blocked by the Secret-Store Writes classifier). Verified
+      independently: deploy key `164022592` `sc-image-promoter` **read-write** created 23:38:44Z
+      (fingerprint `AAAA...DtH73fkqL5hO...`, distinct from the pre-existing
+      `argocd-product-catalog-m2-air` key), secret `PROMOTER_SSH_KEY` set 23:38:46Z, and both
+      `/tmp/pc_promoter*` files removed. Steps 1 and 2 of the onboarding are now closed; the
+      2026-09-01 DeployKey ruleset bypass was already in place.
 - [x] **Hub GHCR 403 root-caused** — packages are private; no long-lived pull credential exists
       anywhere (CI logs in with the ephemeral GITHUB_TOKEN). Probe verified correct; keychain not
       locked. Fix is `gh auth refresh -h github.com -s read:packages`, not a new PAT.
