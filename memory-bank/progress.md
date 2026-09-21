@@ -525,8 +525,19 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `shopping-cart-apps` deployments `ImagePullBackOff` 11h, `403 Forbidden` from ghcr.io. Root cause
   is a validation defect, not the plumbing — `ghcr-pull-secret` exists and ESO reports
   `SecretSynced True`. Spec filed `2c48a1a1`, made implementation-ready `cc4ee6bb`.
-- [ ] **Codex assigned** — `docs/bugs/2026-09-21-ghcr-pat-validated-for-auth-not-packages-scope.md`,
-  dispatched via `codex exec` on `k3d-manager-v1.36.0`, session `01a0c3e2-649a-7462-a8d8-1964a0435a62`.
+- [x] **Codex DONE, verified by Claude** — `cb428d09` on `origin/k3d-manager-v1.36.0`.
+  Spec `docs/bugs/2026-09-21-ghcr-pat-validated-for-auth-not-packages-scope.md`, session
+  `01a0c3e2-649a-7462-a8d8-1964a0435a62`. Codex could not commit (`.git/index.lock`: Operation not
+  permitted — the same wall as 2026-09-20), so Claude committed after independent verification: diff
+  scope exactly the two permitted files, bats 25/25, shellcheck 10 findings before and after.
+  Three corrections found during verification, all in the spec or the tests rather than the
+  implementation: (1) the spec told Codex to use `_err` in `shopping_cart_prompt_ghcr_pat`, but `_err`
+  **exits 1**, which aborted the run and left the following lines dead — Claude's spec error,
+  faithfully copied, now `_warn`; (2) the argv assertion grepped a pattern matching nothing in the
+  pre-fix source either, so it could never fail — replaced with a gate proven to discriminate 2 -> 0;
+  (3) the no-persist test asserted on `read:packages` while its own stub printed that string, so it
+  tested the stub, not the production message. The no-persist gate was mutation-tested: removing the
+  guard yields `not ok 24`.
   Gate all four PAT loaders on a real GHCR token-exchange + `tags/list` pull probe; never persist a
   credential that has not passed it; collapse the three duplicated Vault writes into one helper that
   keeps the token out of argv and encodes the PAT with `jq -n --arg`.

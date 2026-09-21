@@ -1494,3 +1494,21 @@ HEAD probe as the only check that cannot be wrong. Operator action still require
 Note: I could not verify the stored PAT's scopes directly — reading `ghcr-pull-secret` and the
 ExternalSecret spec were both denied as credential materialization, correctly. The diagnosis rests on
 `gh auth status` (scopes only, no token) plus the code path, which is sufficient.
+
+**DONE 2026-09-21 — the GHCR PAT scope-validation fix is on the branch (`cb428d09`).** Codex
+implemented the spec faithfully and could not commit (`.git/index.lock`: Operation not permitted, the
+same wall as 2026-09-20), so Claude verified and committed. Verification: diff scope exactly the two
+permitted files, `bats scripts/tests/plugins/shopping_cart.bats` 25/25, shellcheck 10 findings before
+and after. **Three defects surfaced during verification, none of them Codex's:** the spec instructed
+`_err` in `shopping_cart_prompt_ghcr_pat`, but `_err` exits 1 — it aborted the run and made the next
+two lines dead code, so the fall-through to `shopping_cart_resolve_ghcr_pat`'s remedy never happened;
+now `_warn`. The argv assertion used a `grep -F` pattern that matched nothing in the **pre-fix** source
+either, so it was a gate that could never fail — replaced with one proven to go 2 -> 0. And the
+no-persist test asserted on `read:packages` while its own stub printed that string to stderr, so it
+was testing the stub rather than the production message. Lesson worth keeping: a new test passing does
+not mean it can fail — the no-persist gate was mutation-tested (guard removed -> `not ok 24`) and only
+then trusted.
+
+Still operator-only and the thing that actually restores the pods: mint a PAT with `read:packages`,
+overwrite `secret/github/pat`, force-sync `ghcr-pull-secret`, restart the four deployments. The gh CLI
+token can never work — its OAuth scopes are fixed at `repo, read:org, gist, admin:public_key`.

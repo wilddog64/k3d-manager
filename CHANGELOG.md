@@ -8,6 +8,26 @@
 
 ### Fixed
 
+- The GHCR pull credential was validated for authentication but never for authorization, so the
+  system converged on a permanently broken PAT with every layer reporting green. All three loaders in
+  `scripts/plugins/shopping_cart.sh` gated on `GET https://api.github.com/user`, which returns 200 for
+  any token that authenticates and never checks `read:packages` — the only scope GHCR enforces. A
+  scope-less token passed validation, and `shopping_cart_load_ghcr_pat_from_gh` then *persisted* it to
+  `secret/github/pat`, so the Vault loader found it on the next run, probed `/user`, got 200, and never
+  escalated to the operator prompt. The fallback chain is built to escalate on a bad credential; this
+  defect made the bad one look good at every level. `ghcr-pull-secret` existed and its ExternalSecret
+  reported `SecretSynced True` throughout, which only ever meant "ESO copied what Vault holds" — four
+  `shopping-cart-apps` deployments sat in `ImagePullBackOff` for 11h with `403 Forbidden` until the
+  resulting `ServiceDown` critical paged the operator. Every loader now gates on a real GHCR token
+  exchange plus a pull-scoped `tags/list` call, which is authoritative for classic *and* fine-grained
+  PATs (the latter return an empty `X-OAuth-Scopes`, so header parsing would have rejected valid
+  credentials). No loader persists a credential that has not passed that probe, and
+  `shopping_cart_prompt_ghcr_pat` — which previously stored the pasted value with no validation
+  whatsoever — now validates first. The three duplicated Vault writes collapse into one helper that
+  passes the token by header file and the body on stdin per the secret-hygiene rule, and encodes the
+  PAT with `jq -n --arg` rather than interpolating it into a JSON literal, which also fixes invalid
+  JSON when a PAT contains a quote or backslash.
+
 - `make show-service-passwords` never restarted the Vault port-forward it announced it was
   restarting, and failed with `Error: invalid function name: '—'` instead. The recipe used
   `$$(MAKE)`, which expands to a literal `$(MAKE)` handed to the *shell*, so the shell performed
