@@ -603,3 +603,8 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **Hub GHCR 403 root-caused** — packages are private; no long-lived pull credential exists
       anywhere (CI logs in with the ephemeral GITHUB_TOKEN). Probe verified correct; keychain not
       locked. Fix is `gh auth refresh -h github.com -s read:packages`, not a new PAT.
+- [x] **basket promotion failure root-caused and filed** — concurrent `newTag:` bumps make the
+      `git pull --rebase` fallback a guaranteed conflict, not a flake. Spec:
+      `docs/bugs/2026-09-21-image-promotion-rebase-fallback-cannot-resolve-concurrent-newtag-conflict.md`
+- [ ] **Dispatch the refetch-loop fix to Codex** — BLOCKED until `fix/pass-promoter-ssh-key` merges
+      in shopping-cart-infra (same file).

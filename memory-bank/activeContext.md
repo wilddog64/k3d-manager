@@ -1758,3 +1758,26 @@ without it yields 403, which is exactly the hub's `ImagePullBackOff`.
 read:packages` adds it to the token we already have. Interactive, so the user runs it via `!`.
 Cheap scope check afterwards: `gh api "user/packages?package_type=container"` currently returns
 `403 You need at least read:packages scope to list packages`.
+
+### 2026-09-21 — basket promotion failure root-caused: the rebase fallback cannot ever work
+
+Filed `docs/bugs/2026-09-21-image-promotion-rebase-fallback-cannot-resolve-concurrent-newtag-conflict.md`.
+
+basket run `33507015429` (2026-09-01T12:19Z) was NOT a transient race. Two main pushes three minutes
+apart (12:16Z Dependabot pin bump, 12:19Z manual re-pin) each promoted; the second was rejected
+`fetch first`, and the fallback `git pull --rebase` hit
+`CONFLICT (content): Merge conflict in k8s/base/kustomization.yaml` because both commits rewrite the
+**same `newTag:` line**. Rebasing one such edit onto another is a guaranteed conflict — the retry is
+structurally incapable of recovering from the only scenario it exists for. The rebase halted, leaving a
+conflicted worktree, and the retry push ran against that.
+
+Fix specified: replace commit-then-rebase with a bounded fetch / `reset --hard origin/<ref>` / reapply
+`sed` / push loop, with the "already promoted" no-op check moved inside the loop so a concurrent run's
+identical result counts as success.
+
+**Sequencing:** must NOT start until `fix/pass-promoter-ssh-key` merges in shopping-cart-infra —
+`94b16bc9` touches the same file. Branch `fix/promote-refetch-instead-of-rebase` off the updated main
+afterwards. Not dispatched to Codex yet for that reason.
+
+Confirms the earlier decision to keep this separate from the PROMOTER_SSH_KEY bug was right: same
+failing step, different cause, key present.
