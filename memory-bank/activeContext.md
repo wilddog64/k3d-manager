@@ -1698,3 +1698,34 @@ first, then bump to the merge SHA. Dependabot already tracks `github-actions` we
 
 Blocked on the user, not on Codex: (1) PR creation in both repos, (2) the keygen + deploy key +
 secret for product-catalog.
+
+### 2026-09-21 — deep dive: product-catalog was never onboarded to the SSH promoter
+
+The user pushed back that this setup has been done many times and should not need redoing. Correct
+instinct, wrong conclusion about the cause: product-catalog was never onboarded, and a later pass did
+one third of the job, which is why it looks onboarded.
+
+infra PR #91 (2026-08-09T14:26Z) switched promotion from token push to SSH deploy key. Its rollout
+section says "Per repo: add write deploy key + PROMOTER_SSH_KEY secret; ruleset with DeployKey bypass;
+delete classic protection; repin" and **never enumerates the repos**. It covered order (14:27Z),
+payment (15:02Z) and basket (15:05Z) — deploy key and ruleset created within the same minute each —
+and skipped product-catalog.
+
+Breakage trigger, 2026-08-12: 01:53Z main push succeeded while still pinned to 4afa9dce (0 refs to
+PROMOTER_SSH_KEY); 01:54Z auto-merge enabled on Dependabot PR #47; 01:56:59Z squash-merged, moving the
+pin to 47769da (3 refs); 01:57Z main push FAILED. Four minutes. The Dependabot PR was green by
+construction — `publish` is main-push-gated, so it was skipped on the PR that broke it.
+
+2026-09-01 13:03Z: eight minutes after that day's failure, a main-protection ruleset with a
+DeployKey:always bypass was created on product-catalog. Step 3 of the rollout applied in isolation — a
+bypass for a key that does not exist. Misdiagnosis; 09-16 failed identically.
+
+Corrected in the spec: broken since **2026-08-12, six consecutive main pushes**, not 2026-08-26. The
+wrong date came from `gh run list --limit 3`.
+
+Still missing, steps 1 and 2 only: the write `sc-image-promoter` deploy key and the PROMOTER_SSH_KEY
+secret. Nothing to copy — the three sibling fingerprints are distinct because the promote step pushes
+to the calling repo, not to infra.
+
+BLOCKED: generating the pair and writing the secret was denied by the auto-mode classifier
+(Secret-Store Writes). Not worked around. One command handed to the user to run via `!`.

@@ -5,7 +5,8 @@
 `## Spec correction` for what the first version got wrong.
 **Branch (spec):** `k3d-manager-v1.36.0`
 **Severity:** High — `shopping-cart-product-catalog` has failed image promotion on **every** push to
-`main` since at least 2026-08-26. The image builds, pushes and is attested, but the infra repo never
+`main` since 2026-08-12 (six consecutive pushes). An earlier revision of this spec said 2026-08-26;
+that was wrong, and came from reading only the three most recent runs. The image builds, pushes and is attested, but the infra repo never
 receives the new digest.
 
 ## Evidence
@@ -60,6 +61,67 @@ Because it is `required: false`, a caller that omits it passes validation and th
 `PROMOTER_SSH_KEY` from its `secrets:` block. It is also the only one of the five repos with **no**
 `PROMOTER_SSH_KEY` repository secret at all.
 
+## What actually happened — an unenumerated rollout that never finished
+
+This is not a repo that was set up and then regressed. It was **never onboarded**, and the reason it
+looks onboarded is that a later pass did one third of the job.
+
+**2026-08-09T14:26Z — infra PR #91 changed the promotion mechanism.** Before it, promotion pushed
+with a token; after it, promotion pushes over SSH. The PR body states why: on personal repos neither
+`github-actions[bot]` nor a user-owned GitHub App can be a ruleset bypass actor (HTTP 422, org-only),
+but a per-repo **write deploy key** is accepted.
+
+That made three things prerequisites for **every** calling repo:
+
+1. a write deploy key named `sc-image-promoter`,
+2. a `PROMOTER_SSH_KEY` secret holding its private half,
+3. a ruleset with a `DeployKey` bypass.
+
+The PR body's rollout section reads, in full: *"Rollout (via API, no user setup) — Per repo: add write
+deploy key + PROMOTER_SSH_KEY secret; ruleset with DeployKey bypass; delete classic protection;
+repin."* **It never enumerates the repos.** Nothing in the PR, and nothing afterwards, asserted a
+count. That is the defect that let one repo fall out.
+
+Timestamps show the rollout ran immediately after the merge and covered three repos:
+
+| Repo | deploy key created | ruleset created | Onboarded |
+|---|---|---|---|
+| shopping-cart-order | 2026-08-09 14:27Z | 2026-08-09 14:27Z | ✅ |
+| shopping-cart-payment | 2026-08-09 15:02Z | 2026-08-09 15:02Z | ✅ |
+| shopping-cart-basket | 2026-08-09 15:05Z | 2026-08-09 15:05Z | ✅ |
+| **shopping-cart-product-catalog** | **never** | **2026-09-01 13:03Z** | ❌ |
+
+**2026-08-12 — Dependabot pulled product-catalog onto the new mechanism.** It was still pinned to
+`4afa9dce`, which has **zero** references to `PROMOTER_SSH_KEY`, so it kept promoting the old way and
+kept passing. Then:
+
+```
+01:53Z  main push                     => success      (still pinned to 4afa9dce)
+01:54Z  auto-merge enabled on PR #47
+01:57Z  PR #47 squash-merged          => pin moves 4afa9dce -> 47769da (3 refs to PROMOTER_SSH_KEY)
+01:57Z  main push                     => FAILURE      "Fail when image promotion did not complete"
+```
+
+Four minutes. A `chore(deps)` pin bump carried a breaking change across a required-secret boundary
+and auto-merged, because the only job that could have caught it — `publish` — is gated on
+`github.ref == 'refs/heads/main' && github.event_name == 'push'` and is therefore **skipped on the
+Dependabot PR itself**. The PR was green by construction. Every `main` push since has failed:
+08-12, 08-22, 08-25, 08-26, 09-01, 09-16.
+
+**2026-09-01 13:03Z — a follow-up pass misdiagnosed it.** That day's 12:55Z main push failed. Eight
+minutes later a `main-protection` ruleset with a `DeployKey:always` bypass was created on
+product-catalog (and order's was touched at 12:52Z). So step 3 of the rollout was applied — a bypass
+granting push rights to a deploy key **that does not exist**. The bypass is real, the key it exempts
+is not. The next main push (09-16) failed identically.
+
+So product-catalog is missing exactly steps 1 and 2. There is nothing to copy from a sibling: the
+three `sc-image-promoter` keys have distinct fingerprints, one pair per repo, because the promote step
+pushes to the **calling repo itself** (`git@github.com:${{ github.repository }}`), not to infra.
+
+**Lesson for the next API rollout:** a rollout that says "per repo" without listing the repos cannot
+be verified, and was not. Enumerate the repos, then assert the count afterwards — for this mechanism,
+`deploy keys == secrets == rulesets == callers`.
+
 ## Verified state of all five repos
 
 | Repo | Caller workflow | Calls reusable? | Forwards key? | Repo secret? | Last `main` pushes |
@@ -67,7 +129,7 @@ Because it is `required: false`, a caller that omits it passes validation and th
 | shopping-cart-basket | `go-ci.yml` | yes | yes | yes | 1 failure — **different cause**, see below |
 | shopping-cart-order | `ci.yml` | yes | yes | yes | success |
 | shopping-cart-payment | `ci.yaml` | yes | yes | yes | success |
-| **shopping-cart-product-catalog** | `ci.yml` | yes | **no** | **no** | **failure 3/3** |
+| **shopping-cart-product-catalog** | `ci.yml` | yes | **no** | **no** | **failure 6/6 since 08-12** |
 | shopping-cart-frontend | `ci.yml` | **no** — inline publish | n/a | n/a | success |
 
 `shopping-cart-frontend` does not use the reusable workflow. Its `publish` job is inline and promotes

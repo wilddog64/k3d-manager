@@ -595,3 +595,8 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **Promoter-key spec corrected twice** — deploy keys are per-repo, not shared; product-catalog
       is missing the `sc-image-promoter` deploy key AND the `PROMOTER_SSH_KEY` secret. Pin bump
       sequenced after the infra merge, not dispatched to Codex.
+- [x] **Root-caused the product-catalog promotion failure** — never onboarded in the unenumerated
+      2026-08-09 SSH-promoter rollout; Dependabot auto-merge imported the breaking change 2026-08-12;
+      a 2026-09-01 DeployKey ruleset bypass was a misdiagnosis. Broken since 08-12, not 08-26.
+- [ ] **Mint the product-catalog promoter pair** — deploy key + PROMOTER_SSH_KEY secret. Claude
+      blocked by the classifier (Secret-Store Writes); user to run the handed-over command via `!`.
