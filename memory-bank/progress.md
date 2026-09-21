@@ -574,3 +574,12 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `shopping-cart-frontend` (both lack it entirely; reuse the key already in basket/order/payment).
 - [x] ~~`github-packages-token` implies Actions 401~~ — **RETRACTED, was wrong.** `PACKAGES_TOKEN`
   works; the registry push succeeds. The break was `PROMOTER_SSH_KEY`, see above.
+
+- [ ] **Codex: forward `PROMOTER_SSH_KEY`** — RE-DISPATCHED with corrected scope, spec `6fa1ceab`.
+  Only `shopping-cart-product-catalog` + `shopping-cart-infra`. Awaiting 2 SHAs.
+- [ ] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` only
+  (it has none; reuse the key already in basket/order/payment).
+- [ ] **UNFILED follow-up:** basket run `33507015429` promotion failed with
+  `failed to push some refs` — push rejection, key was present. File if it recurs.
+- [ ] **Stray branches** `fix/pass-promoter-ssh-key` exist in payment and frontend from the first
+  dispatch, with no commits. Deletion NOT approved — left in place.

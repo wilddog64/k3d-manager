@@ -1610,3 +1610,31 @@ instance of green ≠ working — check the job list, not the run conclusion.
 
 The hub `403 Forbidden` is a **separate, cluster-side** credential problem (the PAT in Vault /
 `ghcr-pull-secret`), not a CI problem. Still blocked on a PAT with `read:packages`.
+
+## 2026-09-21 — promoter-key spec CORRECTED after Codex caught my mismatch
+
+Codex stopped without editing and reported that three of the four repos in my spec did not
+match the files on disk. It was right. The error was mine: my detection script globbed
+`*.yml` only and took the first match per repo.
+
+Corrected, verified scope — **`shopping-cart-product-catalog` is the only broken repo**:
+
+| Repo | Caller | Calls reusable? | Forwards key? | Repo secret? | Last main pushes |
+|---|---|---|---|---|---|
+| basket | `go-ci.yml` | yes | yes | yes | 1 failure, DIFFERENT cause |
+| order | `ci.yml` | yes | yes | yes | success |
+| payment | **`ci.yaml`** | yes | yes | yes | success |
+| **product-catalog** | `ci.yml` | yes | **no** | **no** | **failure 3/3 since 2026-08-26** |
+| frontend | `ci.yml` | **no** (inline publish) | n/a | n/a | success |
+
+- payment's caller is `ci.yaml` — **`.yaml`, not `.yml`** — and already forwards the key.
+- frontend never uses the reusable workflow; it promotes via a deploy PR with `PACKAGES_TOKEN`.
+- basket run `33507015429` failed promotion too, but its key was present (`***`) and the error was
+  `failed to push some refs` — a push rejection. Separate, unfiled, single occurrence. Do NOT fold in.
+
+Spec rewritten to product-catalog + infra only (`6fa1ceab`) and re-dispatched (session `01a0c406`,
+log `scratchpad/codex-promoter-run2.log`). Stray branches Codex created in payment and frontend are
+left in place — branch deletion is not approved.
+
+Codex created branches in 4 repos on the first attempt; only product-catalog and infra will receive
+commits.
