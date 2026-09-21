@@ -513,3 +513,23 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] Committed and pushed by Claude after independent verification (diff scope, 14/14 BATS,
   shellcheck parity against `git show HEAD:`). Codex could not commit: `.git/index.lock`
   Operation not permitted.
+
+## 2026-09-21 — GHCR PAT validated for auth, not for `read:packages`
+
+- [x] Fixed `Makefile:502` `$$(MAKE)` -> `$(MAKE)`: `show-service-passwords` announced a Vault
+  port-forward restart that never happened and failed with `Error: invalid function name: '—'`
+  (APFS case-insensitive `/usr/bin/MAKE` + `.DEFAULT_GOAL := help` + the help's em-dash). `b49c8164`.
+- [x] SMS legibility bug CLOSED — operator confirmed a legible `ServiceDown` page on the handset;
+  all DoD boxes checked. `fd59fb70`.
+- [x] Deep-dived the `ServiceDown` page per the standing rule: it is a **true positive**. Four
+  `shopping-cart-apps` deployments `ImagePullBackOff` 11h, `403 Forbidden` from ghcr.io. Root cause
+  is a validation defect, not the plumbing — `ghcr-pull-secret` exists and ESO reports
+  `SecretSynced True`. Spec filed `2c48a1a1`, made implementation-ready `cc4ee6bb`.
+- [ ] **Codex assigned** — `docs/bugs/2026-09-21-ghcr-pat-validated-for-auth-not-packages-scope.md`,
+  dispatched via `codex exec` on `k3d-manager-v1.36.0`, session `01a0c3e2-649a-7462-a8d8-1964a0435a62`.
+  Gate all four PAT loaders on a real GHCR token-exchange + `tags/list` pull probe; never persist a
+  credential that has not passed it; collapse the three duplicated Vault writes into one helper that
+  keeps the token out of argv and encodes the PAT with `jq -n --arg`.
+- [ ] **Operator, out of scope for Codex** — mint a PAT with `read:packages`, overwrite
+  `secret/github/pat`, force-sync `ghcr-pull-secret`, restart the four deployments. The gh CLI token
+  can never work: its scopes are fixed by the OAuth app (`repo, read:org, gist, admin:public_key`).
