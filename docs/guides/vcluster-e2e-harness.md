@@ -192,15 +192,80 @@ never a blocking per-candidate gate. Its summaries use `tier: sandbox` and
 
 ## Failure classification
 
-The operator vocabulary maps to the implementation's stable kind strings as follows:
+A failed run is not just a red light: each failing test is classified into a **kind** (what went
+wrong) and routed to a **service** (who owns it). Both live in one place —
+`scripts/lib/hermes/e2e_triage.py` — and are used by both the Bash summary writer
+(`_e2e_write_summary`) and Hermes' bug filer (`scripts/lib/hermes/e2e_bugs.py`). There was
+briefly a second, divergent copy inlined in `scripts/plugins/e2e.sh`; it is gone, and adding
+another is the thing to avoid.
 
-| Operator class | Implementation kind(s) |
-|---|---|
-| assertion | `assertion` |
-| contract drift | `contract-drift` |
-| infrastructure | `service-unreachable`, `timeout`, `harness` |
-| auth | `auth` |
-| cross-service | not a kind — a **routing** value of `service`, orthogonal to kind |
+### Kinds
+
+`classify()` returns the first match in a deliberate order, and that order is the policy:
+
+| Order | Kind | Matches on |
+|---|---|---|
+| 1 | `service-unreachable` | `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `connect ETIMEDOUT` |
+| 2 | `timeout` | Playwright `status == "timedOut"`, or `Timeout <n>ms exceeded` |
+| 3 | `auth` | `401`/`403`, `Unauthorized`, `Forbidden`, `invalid_grant`, `invalid_token`, expiry |
+| 4 | `contract-drift` | `Received: undefined`, `toHaveProperty`, type-shape mismatches |
+| 5 | `assertion` | anything else — the default |
+
+`harness` is a sixth kind, produced only when a run fails with **no** test-level failures at all
+(it died before or around Playwright); its target is the failing phase.
+
+Two narrowings are deliberate and are pinned by tests, so don't "simplify" them:
+
+- `auth` is checked **before** `contract-drift`, because a 401 body is often empty and would
+  otherwise read as a shape mismatch.
+- `auth` matches `\b(401|403)\b` only. A test asserting `toBe(404)` or a `500` is an
+  **assertion** failure, not an auth failure.
+
+### Routing, and the tier port split
+
+`service_for()` attributes a failure to one owning service; `repo_for()` maps that to the repo
+that must carry the fix, returning `None` when there is no single owner so the caller has to
+decide rather than defaulting silently.
+
+For a connection failure the port *is* the attribution — and the two tiers deliberately use
+**different ports for the same two services**:
+
+| Service | Tier 1 (vcluster) | Tier 2 (sandbox) | Repo |
+|---|---|---|---|
+| product-catalog | `8000` | `8082` | `shopping-cart-product-catalog` |
+| order | `8080` | `8081` | `shopping-cart-order` |
+| basket | `8083` | `8083` | `shopping-cart-basket` |
+| payment | `8084` | `8084` | `shopping-cart-payment` |
+| cross-service | — | — | `shopping-cart-e2e-tests` |
+
+The union has no collisions, so one map serves both tiers. This is worth knowing because a map
+covering only Tier 1 silently degrades Tier 2 attribution to `host-8081` / `host-8082` — a
+failure with no owning service and therefore no routable repo. An unrecognised port keeps its
+number as `host-<port>` rather than collapsing to `unknown`, so the value stays diagnosable.
+
+For everything else the target is the spec slug (`api/cart.spec.ts` → `api-cart`) and routing is
+by substring, with `cross-service` as the fallback when no single service owns the spec.
+
+### Redaction
+
+Failure text is **redacted before it is truncated**, not after — a token cut in half by a length
+cap would escape the pattern and survive. This matters because `failure_details` does not stay
+local: it is published to a hub `platform-ops` ConfigMap and surfaced in Grafana, and Playwright
+assertion output for an auth test routinely embeds the header that failed.
+
+Redacted: the JSON summary (`<run_id>.json`), the failures sidecar (`<run_id>.failures.json`),
+and the published event. **Not** redacted: the raw `<run_id>.log`, deliberately — it never
+leaves the machine and is what you actually debug from. The remote publisher
+(`scripts/plugins/e2e_remote.sh`) re-redacts on receipt rather than trusting the runner, since a
+runner may be on older code.
+
+### The corpus
+
+`scripts/tests/fixtures/e2e-corpus/corpus.jsonl` holds labelled failures that pin the classifier
+against regression — real samples back-labelled from machine-filed bug docs, plus synthetic
+entries for the cases real data does not yet cover. When you triage a new failure shape, add an
+entry. Read that directory's `README.md` before citing the corpus for anything else: it is a
+regression set, and it is far too small to validate a probabilistic or confidence-scored method.
 
 ---
 

@@ -245,6 +245,7 @@ docs/
 - **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth
 - **[ESO](docs/howto/eso.md)** — Deploy, connect a secret store, troubleshoot sync failures
 - **[Keycloak](docs/howto/keycloak.md)** — Deploy, smoke test, LDAP federation
+- **[Rotate a Service Credential](docs/howto/rotate-service-credentials.md)** — The three monthly rotators, triggering one on demand after an exposure, verifying with a negative control, and why Keycloak needs a different procedure
 
 **GitOps & CI/CD**
 - **[ArgoCD](docs/howto/argocd.md)** — Deploy, register app cluster, configure deploy keys
