@@ -1,8 +1,8 @@
 # How to rotate a service credential
 
-Three services rotate their admin credential automatically, monthly, on the 1st. This page
+Four services rotate their admin credential automatically, monthly, on the 1st. This page
 covers what exists, how to trigger a rotation **on demand** (after an exposure, say), how to
-verify it actually worked, and which service has no rotator yet.
+verify it actually worked.
 
 Until now this was documented only inside plan specs, which meant the safe procedure had to be
 reverse-engineered from YAML each time. That is what this page is for.
@@ -14,11 +14,11 @@ reverse-engineered from YAML each time. That is what this page is for.
 | Grafana | CronJob `grafana-credential-rotator` (ns `monitoring`) | `0 0 1 * *` | `secret/observability/grafana` |
 | ArgoCD | CronJob `argocd-credential-rotator` (ns `cicd`) | `0 0 1 * *` | `secret/argocd/admin` |
 | Prometheus | `observability_rotate_prometheus_basic_auth`, driven by a macOS LaunchAgent | day 1, 00:00 | `secret/k3d-manager/prometheus-basic-auth` |
-| **Keycloak** | **none — see [No rotator for Keycloak](#no-rotator-for-keycloak)** | — | `secret/keycloak/admin` |
+| Keycloak | CronJob `keycloak-credential-rotator` (ns `identity`) | `0 0 1 * *` | `secret/keycloak/admin` |
 
 ## The ordering invariant
 
-Every rotator writes **Vault first**, then propagates outward:
+Grafana and ArgoCD write **Vault first**, then propagate outward:
 
 1. Write the new password to Vault (the canonical source).
 2. Force the ExternalSecret to re-sync so the Kubernetes Secret matches.
@@ -35,6 +35,10 @@ the application while leaving Vault stale — so `make show-service-passwords` t
 password that no longer works, and the next ExternalSecret sync may overwrite the application
 back. Those standalone commands are forbidden for that reason; the CronJob is the sanctioned
 path precisely because it does step 4 *last* and rolls back on failure.
+
+Keycloak is the exception: its database is authoritative. Its rotator resets the master-realm
+admin password inside Keycloak first, then writes Vault, with a rollback trap installed before
+the reset so a later failure can restore the old Keycloak password.
 
 ## Trigger a rotation on demand
 
@@ -69,11 +73,19 @@ a plugin function rather than a CronJob:
 ./scripts/k3d-manager observability_rotate_prometheus_basic_auth
 ```
 
+For Keycloak, create a one-off Job in `identity`:
+
+```bash
+kubectl --context k3d-k3d-cluster create job "keycloak-rotate-manual-$(date +%Y%m%d-%H%M%S)" \
+  --from=cronjob/keycloak-credential-rotator -n identity
+```
+
 ### Expect it to take a few minutes, and expect no logs
 
-The job waits on `kubectl rollout status --timeout=5m` for the workload restart, so two to three
-minutes is normal. **Its logs are empty by design** — every step redirects to `/dev/null` so no
-credential can reach container logs. Track progress from cluster state instead:
+Grafana and ArgoCD jobs wait on `kubectl rollout status --timeout=5m` for the workload restart,
+so two to three minutes is normal. Keycloak changes its database directly and does not restart
+the workload. **Logs are empty by design** — every step redirects to `/dev/null` so no credential
+can reach container logs. Track progress from cluster state instead:
 
 ```bash
 kubectl --context k3d-k3d-cluster get job <job-name> -n monitoring \
@@ -113,23 +125,22 @@ kubectl --context k3d-k3d-cluster get externalsecret grafana-admin-credentials -
 The `force-sync` annotation is an epoch stamped by the job; it and `refreshTime` must fall
 inside the Job's `startTime`–`completionTime` window.
 
-## No rotator for Keycloak
+## Keycloak rotation details
 
-`secret/keycloak/admin` has **no** rotator, and it cannot be rotated the same way.
+Keycloak's `keycloak-secrets` Secret is a **bootstrap-only** input: it creates the admin user
+when Keycloak first starts. The live service admin is in the `master` realm, not the `home`
+realm, and the rotator changes it through the Keycloak Admin API before updating Vault.
 
-Keycloak's admin password reaches the pod through
-`scripts/etc/keycloak/externalsecret-admin.yaml.tmpl` → the chart's `auth.existingSecret` /
-`passwordSecretKey`. That is a **bootstrap-only** input: it creates the admin user on first
-start. Once the user exists in the database, changing the Secret and restarting does **not**
-change the live password — you get a Vault value that no longer opens the console, which is the
-exact split the ordering invariant exists to prevent.
+`secret/keycloak/admin` contains both `admin_password` and `db_password`. The job reads and
+writes both fields, changing only `admin_password`; `db_password` must not be rotated by this
+job because it is the Postgres credential and changing it requires rotating the database user.
 
-Rotating it requires three ordered steps: change the password inside Keycloak (`kcadm
-set-password` for the admin user), update `admin_password` in `secret/keycloak/admin`, then
-verify with a login probe as above.
+The Kubernetes Secret is not force-synced. It converges through its 15m `refreshInterval`; the
+ExternalSecret is ArgoCD-managed with `selfHeal`, so an out-of-band annotation would be reverted.
 
-Do **not** touch `db_password` in that same secret while doing so — it is the Postgres
-credential, not the console password, and rotating it requires rotating the database user too.
+Verify Keycloak with a master-realm token request using the new password and a negative control
+using a definitely wrong password. The good request must return a token; the bad request must
+fail. Keep both requests value-free in shell history and logs.
 
 Also distinct, and frequently confused: `secret/keycloak/admin` is the **service** admin, while
 `secret/keycloak/users/*` holds the **realm SSO** users (admin/developer/operator). The latter is

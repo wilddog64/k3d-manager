@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Keycloak monthly admin credential rotator, which preserves `db_password` and deliberately does not force-sync the ArgoCD-managed `keycloak-secrets` ExternalSecret.
+
 ## [1.36.0] - 2026-09-21
 
 ### Added
