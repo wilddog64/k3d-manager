@@ -748,3 +748,10 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   404 with no metadata; local cache intact. Repair = cache-recovery reseed (NOT
   `observability_rotate_prometheus_basic_auth`, which targets the ACG context). Awaiting go.
 - [ ] **`keycloak-realm-reconcile` awk exit 127** — still needs its own bug doc.
+- [x] **PR #130 CI GREEN** at `3d3e36a7` (run 35728186747: lint success, detect success). Copilot's
+  2 inline findings addressed, replied and both threads resolved: header tempfile `chmod 0600`
+  (fixed, `3d3e36a7`; `mktemp` is already 0600 so defence in depth) and the GHCR
+  `Authorization: ******` claim (FALSE POSITIVE — diff-rendering artefact; source uses
+  `printf 'Authorization: Bearer %s\n' "${_token}"`).
+  Outstanding merge gate: **Gemini live smoke test not run** — `enforce_admins` deliberately NOT
+  disabled, since the gate list is not fully satisfied.
