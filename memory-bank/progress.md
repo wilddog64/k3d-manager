@@ -722,3 +722,17 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **Grafana admin password ROTATED and verified** — job `grafana-rotate-manual-20260921-195152` via the existing CronJob; login 200 with the Vault/ESO credential, 401 with a wrong one. The exposed value is invalid.
 - [ ] **Keycloak admin rotation** — still outstanding; no rotator exists and the ESO secret is bootstrap-only, so Vault+restart alone will not change the live password. Needs a 3-step manual or a new `keycloak-credential-rotator` spec. Operator to choose.
 - [ ] **PR #130 CI RED** — 4 failures, all branch-introduced (`main` green): bare-`!` lint (2 no-op assertions from `6c744a23`), observability tests 3/8 (reseed conflates Vault-unreachable with entry-absent — real design bug against the Vault-is-canonical decision), alertmanager test 388 (stale message + stubs). Fix spec not yet written.
+
+- [x] **Keycloak admin credential rotated on the live hub** — 2026-09-22. Rotator manifest applied,
+  Vault role `keycloak-rotation` created, Job `keycloak-rotate-manual-20260922-043917`
+  `SuccessCriteriaMet`. Verified: `db_password=MATCH(preserved)`, `new_password=200`,
+  `wrong_password=401`, and the stale ESO copy of the old password now `401`. Exposed password
+  is dead.
+- [ ] **Fix `base64 --decode` in platform-ops rotators** — BusyBox in `alpine/k8s:1.31.4` only
+  accepts `-d`. keycloak lines 98/113 and argocd line 139 silently disable ALL Slack
+  notifications (including rollback-failure alerts); argocd line 117 has no `|| true` and looks
+  like it aborts the job outright. grafana already uses `-d`. Needs a bug doc + a test banning
+  `--decode` in `scripts/etc/argocd/platform-ops/`.
+- [ ] **`keycloak-realm-reconcile` fails with `awk: command not found`** — exit 127, 2026-09-21,
+  `quay.io/keycloak/keycloak:24.0`. Realm `shopping-cart` created but auth flows never
+  configured. Pre-existing, unrelated to the rotation. Needs a bug doc.

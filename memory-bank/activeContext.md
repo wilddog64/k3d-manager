@@ -1977,3 +1977,69 @@ wrong. `scripts/tests/lib/observability.bats:14` uses a *relative* `source
 scripts/plugins/observability.sh`, which resolves against the working directory — so running
 bats from the main repo against a worktree path silently sources the branch's plugin. To test
 another ref, the working directory must actually be that worktree.
+
+## Keycloak admin credential ROTATED — 2026-09-22 (live hub)
+
+The rotator from `46eb572b` was applied and run against the live k3d hub. It is done and
+verified; the leaked admin password is dead.
+
+Sequence actually executed (the CronJob did not exist in-cluster beforehand — `46eb572b` only
+added the source):
+
+1. Pre-flight probe pod (`envFrom: keycloak-secrets`) against `realms/master`:
+   `good=200 bad=401`. This proved Vault's `admin_password` was still valid for the master realm
+   *before* starting — the rotator's first step is a password grant with that value, so a drifted
+   password would have failed the job at step 1.
+2. `kubectl apply -f scripts/etc/argocd/platform-ops/keycloak-credential-rotator.yaml`
+   (ServiceAccount, ClusterRole, ClusterRoleBinding, CronJob).
+3. Vault policy + k8s auth role `keycloak-rotation` via
+   `_vault_configure_secret_writer_role secrets vault keycloak-credential-rotator identity secret keycloak/admin keycloak-rotation keycloak-rotation`.
+   **The dispatcher refuses underscore-prefixed functions** ("is private"), and there is no public
+   wrapper — `_keycloak_apply_credential_rotator` is only reachable from the full `deploy_keycloak`
+   path, which would have run a whole Helm upgrade. Sourced the libs in a scratch script instead.
+4. Job `keycloak-rotate-manual-20260922-043917` → `SuccessCriteriaMet succeeded=1`, 0 restarts.
+
+Verification pod (rotator SA, so it could read Vault, plus `envFrom: keycloak-secrets`):
+
+    vault_admin_password=present
+    vault_db_password=present
+    db_password=MATCH(preserved)
+    eso=stale(pre-refresh)
+    new_password=200
+    wrong_password=401
+    eso_secret_password=401
+
+`db_password=MATCH` compares Vault's value against the live `KC_DB_PASSWORD` in-shell — no base64
+echo, no value printed. **`eso_secret_password=401` is the proof the rotation was real:** that is
+the old password, still sitting in the not-yet-refreshed ExternalSecret, and it no longer works.
+`wrong_password=401` is the negative control showing auth is genuinely enforced.
+
+Keycloak and postgres-keycloak stayed 1/1 with 0 restarts throughout.
+
+### Defect found: `base64 --decode` is not valid in the rotator image
+
+The job's logs were NOT empty — they carried a BusyBox usage error. `docker.io/alpine/k8s:1.31.4`
+ships BusyBox base64, which supports only `-d`; `--decode` is rejected. Confirmed directly in the
+image: `printf aGk= | base64 -d` works, `--decode` prints usage and fails.
+
+Impact by rotator:
+
+- **keycloak** (lines 98 and 113) — both are `| base64 --decode || true`, so `slack_url` is always
+  empty and **no Slack notification is ever sent, including the rollback-failure alert.** That
+  alert is the one the spec called the worst-case signal; it is currently silent.
+- **argocd** (line 139) — same silent-Slack bug. Worse, **line 117 has no `|| true`**:
+  `old_bcrypt="$(kubectl ... | base64 --decode)"`. Under `set -eu` that aborts the job, so the
+  ArgoCD rotator looks likely to be broken outright. NOT yet verified by running it.
+- **grafana** (line 128) — correct, uses `base64 -d`. This is why the Grafana rotation succeeded.
+
+Grafana is the correct precedent; keycloak and argocd drifted to the GNU long option. Fix is a
+one-character change in three places, plus a test asserting no `--decode` in any platform-ops
+manifest. Not yet filed or fixed.
+
+### Unrelated open anomaly: `keycloak-realm-reconcile` failed 35h ago
+
+Two pods `Error` exit 127, started 2026-09-21T00:33Z — predating this rotation by ~28h, not caused
+by it. Logs show it logged in, created the `shopping-cart` realm shell, then died at
+`environment: line 104: awk: command not found` while creating the `browser-with-conditional-otp`
+flow. Image `quay.io/keycloak/keycloak:24.0` has no `awk`. **The realm was left partially
+configured** — created but without its auth flows. Needs its own bug doc.
