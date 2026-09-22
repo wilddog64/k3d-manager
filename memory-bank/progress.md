@@ -615,7 +615,19 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **RE-ENABLED enforce_admins on shopping-cart-infra after #99 merged** — bodyless POST
       completed 2026-09-22, verified `enabled=true`. The two PRs are now merged and post-merge
       housekeeping complete.
-- [ ] **product-catalog promotion — fix MERGED, not yet OBSERVED working.** PR #55 merged
+- [x] **product-catalog promotion VERIFIED WORKING 2026-09-22 00:13Z.** Merge run `35670460109`
+  on `b6ff80b7` promoted successfully. Evidence is the artifact, not the run conclusion:
+  commit `6b79fda` on `origin/main`, **authored by `sc-image-promoter`** (the deploy-key identity,
+  proving the key loaded and the push authenticated), setting
+  `newTag: sha-b6ff80b7dec18f9ed1b81c9f1d86e402ba01cdd2` in `k8s/base/kustomization.yaml`.
+  Step `Update image tag in k8s/base/kustomization.yaml` = success; gate
+  `Fail when image promotion did not complete` = skipped (its pass state).
+  Decisive corroboration: the previous change to that file was **2026-05-24 by a human** — the
+  promoter had never once written to this repo before today.
+  Note this run used pin `af4b053dc`, which predates the guard, so no
+  "Verify the promoter SSH key was provided" step appears. Expected; the guard arrives with the
+  pin bump onto the infra merge.
+  Superseded detail from when this was still open: PR #55 merged
   2026-09-22 00:05Z at `b6ff80b7`. main's `ci.yml` now forwards `PROMOTER_SSH_KEY` to the reusable
   workflow alongside `PACKAGES_TOKEN`, `COSIGN_KEY` and `COSIGN_PASSWORD`, so the promote step
   should no longer write an empty key file and die at

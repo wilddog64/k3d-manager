@@ -21,6 +21,12 @@ merged diff is not an executed code path. Verification requires reading the prom
 log and confirming `newTag:` in `k8s/base/kustomization.yaml` advanced — not the run conclusion,
 since the promote step runs under `continue-on-error: true`.
 
+**RESOLVED 00:13Z — promotion verified working.** Run `35670460109` promoted successfully.
+Commit `6b79fda` is on `origin/main` authored by `sc-image-promoter` (the deploy-key identity),
+setting `newTag: sha-b6ff80b7...`. Verified from the committed artifact and its author, not the
+run conclusion. The previous change to that file was 2026-05-24 by a human, so this is the first
+successful promoter write to this repo — broken since 2026-08-12, now closed.
+
 ## 2026-09-21 — rotate-ghcr-pat fix prepared; commit blocked by Git filesystem permissions
 
 Implemented the exact Changes 1–4 from `docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`
