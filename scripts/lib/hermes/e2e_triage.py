@@ -5,11 +5,65 @@ import re
 _UNREACHABLE = re.compile(r"ECONNREFUSED|ENOTFOUND|EAI_AGAIN|connect ETIMEDOUT")
 _TIMEOUT = re.compile(r"Timeout \d+ms exceeded")
 _CONTRACT = re.compile(r"Received: undefined|Cannot read properties of undefined|must have a length property|received value must be a number|toHaveProperty|Expected: \"number\".*Received: \"string\"", re.S)
-_PORT = re.compile(r":(8000|8083|8080|8084)(?:\D|$)")
+_AUTH = re.compile(
+    r"\b(401|403)\b|Unauthorized|Forbidden|invalid_grant|invalid_token|"
+    r"token (?:is )?expired|no bearer token|authentication failed",
+    re.I,
+)
+_PORT = re.compile(r":(8000|8080|8081|8082|8083|8084)(?:\D|$)")
+_ANY_PORT = re.compile(r":(\d+)(?:\D|$)")
 _BEARER = re.compile(r"Bearer\s+\S+")
 _JWT = re.compile(r"eyJ[\w-]+\.[\w-]+\.[\w-]+")
 _SECRET = re.compile(r"(?i)(password|secret|token|api[_-]?key)[\"'=:\s]+\S+")
-_PORTS = {"8000": "product-catalog", "8083": "basket", "8080": "order", "8084": "payment"}
+_PORTS = {
+    "8000": "product-catalog",
+    "8080": "order",
+    "8081": "order",
+    "8082": "product-catalog",
+    "8083": "basket",
+    "8084": "payment",
+}
+
+_SERVICE_PATTERNS = (
+    ("cross-service", re.compile(r"cross-service|cross_service")),
+    ("basket", re.compile(r"cart|basket")),
+    ("order", re.compile(r"order")),
+    ("payment", re.compile(r"payment|stripe")),
+    ("product-catalog", re.compile(r"product")),
+)
+
+_SERVICE_REPOS = {
+    "basket": "wilddog64/shopping-cart-basket",
+    "order": "wilddog64/shopping-cart-order",
+    "payment": "wilddog64/shopping-cart-payment",
+    "product-catalog": "wilddog64/shopping-cart-product-catalog",
+    "frontend": "wilddog64/shopping-cart-frontend",
+    "cross-service": "wilddog64/shopping-cart-e2e-tests",
+}
+
+
+def service_for(target):
+    """Attribute a classified target to one owning service.
+
+    `target` is either a service name already (from a port attribution) or a spec slug.
+    Returns "cross-service" when no single service owns it.
+    """
+    text = str(target or "").lower()
+    if text in _SERVICE_REPOS:
+        return text
+    for service, pattern in _SERVICE_PATTERNS:
+        if pattern.search(text):
+            return service
+    return "cross-service"
+
+
+def repo_for(service):
+    """Map an owning service to the repo that must carry the fix.
+
+    Returns None when there is no single owning repo, so callers must decide rather than
+    silently routing to a default.
+    """
+    return _SERVICE_REPOS.get(str(service or "").lower())
 
 
 def redact(value):
@@ -29,7 +83,7 @@ def spec_slug(failure):
 
 
 def _unreachable_target(text):
-    match = _PORT.search(text)
+    match = _PORT.search(text) or _ANY_PORT.search(text)
     return _PORTS.get(match.group(1), f"host-{match.group(1)}") if match else "host-unknown"
 
 
@@ -42,6 +96,8 @@ def classify(failure):
         return "service-unreachable", _unreachable_target(combined)
     if status == "timedOut" or _TIMEOUT.search(combined):
         return "timeout", spec_slug(failure)
+    if _AUTH.search(combined):
+        return "auth", spec_slug(failure)
     if _CONTRACT.search(combined):
         return "contract-drift", spec_slug(failure)
     return "assertion", spec_slug(failure)

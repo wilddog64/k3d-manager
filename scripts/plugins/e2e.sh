@@ -637,12 +637,16 @@ function _e2e_write_summary() {
   E2E_RC="$rc" \
   E2E_PHASE="$phase" \
   E2E_COMMIT="$commit" \
+  E2E_LIB_DIR="${SCRIPT_DIR}/lib" \
   E2E_LOG="$log_file" \
   E2E_RUNNER="${E2E_RUNNER:-local-m4}" \
   E2E_TIER="${E2E_TIER:-vcluster}" \
   E2E_PROJECT="${E2E_PROJECT:-api+flows}" \
   python3 - "$summary_file" "$failures_file" <<'PY'
 import json, os, re, sys
+
+sys.path.insert(0, os.environ["E2E_LIB_DIR"])
+from hermes.e2e_triage import classify, redact, service_for
 
 summary_path = sys.argv[1]
 failures_path = sys.argv[2]
@@ -699,9 +703,9 @@ try:
                         lines = [line.strip() for line in error.splitlines() if line.strip()]
                         failures.append({
                             "file": spec_file or "",
-                            "title": spec.get("title") or "",
+                            "title": redact(spec.get("title") or ""),
                             "status": last["status"],
-                            "error": " / ".join(lines[:3])[:300],
+                            "error": redact(" / ".join(lines[:3]))[:300],
                         })
                 walk_suites(suite.get("suites"), suite_file)
         walk_suites(data.get("suites"))
@@ -710,44 +714,14 @@ except Exception:
 
 groups = {}
 for failure in failures:
-    text = "%s %s" % (failure.get("title", ""), failure.get("error", ""))
-    spec = failure.get("file") or failure.get("title") or "unknown"
-    if re.search(r"ECONNREFUSED|ENOTFOUND|EAI_AGAIN|connect ETIMEDOUT", text, re.I):
-        kind = "service-unreachable"
-        targets = {"8000": "product-catalog", "8080": "order",
-                   "8081": "order", "8082": "product-catalog",
-                   "8083": "basket", "8084": "payment"}
-        match = re.search(r":(8000|8080|8081|8082|8083|8084)\b", text)
-        target = targets.get(match.group(1), "unknown") if match else "unknown"
-    elif re.search(r"timeout|timedOut|Timeout \d+ms exceeded", text, re.I):
-        kind, target = "timeout", spec
-    elif re.search(r"Received: undefined|Cannot read properties of undefined|must have a length property|received value must be a number|toHaveProperty", text, re.I):
-        kind, target = "contract-drift", spec
-    else:
-        kind, target = "assertion", spec
+    kind, target = classify(failure)
     groups[(kind, target)] = groups.get((kind, target), 0) + 1
 failure_groups = [
-    {"kind": kind, "target": target, "count": count}
+    {"kind": kind, "target": target, "count": count, "service": service_for(target)}
     for (kind, target), count in sorted(groups.items())
 ]
-for group in failure_groups:
-    target = group["target"]
-    group["service"] = (
-        "basket" if "cart" in target else
-        "order" if "order" in target else
-        "payment" if "payment" in target else
-        "product-catalog" if "product" in target else
-        "cross-service"
-    )
 for failure in failures:
-    file_name = failure.get("file", "")
-    failure["service"] = (
-        "basket" if "cart" in file_name else
-        "order" if "order" in file_name else
-        "payment" if "payment" in file_name else
-        "product-catalog" if "product" in file_name else
-        "cross-service"
-    )
+    failure["service"] = service_for(failure.get("file", ""))
 
 summary = {
     "run_id": run_id,

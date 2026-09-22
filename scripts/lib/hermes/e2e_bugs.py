@@ -12,6 +12,7 @@ _HINTS = {
     "service-unreachable": "the service is not in the Tier 1 substrate or never became ready; check `scripts/etc/e2e/kustomization.yaml` and the rollout wait list.",
     "contract-drift": "the response shape differs from the test's expectation; compare the substrate image pin with the `shopping-cart-e2e-tests` image and the service's API.",
     "timeout": "check substrate readiness and runner load (`make e2e-runner-health RUNNER=m2`).",
+    "auth": "the request was rejected by authn/authz, not by the service's business logic; check the Keycloak realm client, the token audience, and whether `secret/keycloak/clients` matches what the test requests.",
     "assertion": "a behaviour change; read the failing test.",
     "harness": "the run did not reach Playwright; read the dispatch transcript.",
 }

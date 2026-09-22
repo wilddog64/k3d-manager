@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- E2E failure classification now has one implementation (`hermes.e2e_triage`); the duplicate inline classifier in `scripts/plugins/e2e.sh` is gone.
 - `docs/architecture/webhook-server.md` roadmap replaced with measured per-phase status:
   Phases 2–5 are **not started** (none of `server.py`, `routes.py`, `commands.py`,
   `dispatch.py`, `jobs.py`, `diagnostics.py` exist), and the monolith has grown from 2,953
@@ -24,6 +25,8 @@
   on purpose.
 
 ### Fixed
+- Hermes misattributed Tier 2 E2E connection failures to `host-8081` / `host-8082` instead of `order` / `product-catalog`, because its port map covered only Tier 1.
+- E2E failure detail text was written to the run summary and published to the hub result event without redaction; a token appearing in a Playwright assertion diff could reach a cluster ConfigMap and a Grafana panel. The raw `<run_id>.log` stays unredacted by design (local-only, needed for debugging).
 - every credential `make show-service-passwords` prints now sits behind a `password:` label — the Keycloak block previously emitted four secrets on `user:`-prefixed lines, which defeats any consumer redacting on the `password:` convention; the three realm SSO users now say they are not provisioned on the hub instead of printing a bare `N/A`, and `bin/get-keycloak-password` no longer passes the Vault root token in a `kubectl exec` command string
 - a Vault rebuild no longer leaves `k3d-manager/prometheus-basic-auth` permanently unseeded — the auth-proxy refresh reseeds the canonical entry, recovering the existing password from the local cache rather than rotating it, and `show-service-passwords` falls back to `argocd-initial-admin-secret` for the ArgoCD display
 - `make show-service-passwords` probes Vault via `auth/token/lookup-self` instead of the optional `secret/argocd/admin` display mirror, so a missing mirror no longer blocks all four credentials
@@ -51,6 +54,7 @@
   block moved to `memory-bank/archive/activeContext-2026-09-21.md`.
 
 ### Added
+- `auth` failure class; `service_for` / `repo_for` routing table; a labelled triage corpus under `scripts/tests/fixtures/e2e-corpus/`.
 - `scripts/check-doc-links.py` + `make check-doc-links` — validates every relative link and heading anchor in the repo's Markdown (1,725 files), wired into `.githooks/pre-commit` over **staged files only** so pre-existing debt cannot block an unrelated commit (`K3DM_SKIP_DOC_LINKS=1` bypasses). Handles the three false-positive classes that would make such a gate useless: markdown-shaped regexes inside inline code, this repo's clickable `path:line` references, and `github-slugger`'s per-space hyphenation (`/claude / /gemini` → `claude--gemini`, doubled). Covered by `scripts/tests/bin/test_check_doc_links.py` (23 pytest cases, including a live-tree gate). Closes a gap open since 2026-04-06.
 
 - `docs/guides/grafana-dashboards.md` — a guide covering all seven shipped Grafana dashboards (ArgoCD/Image-Updater, CVE Auto-Patch, E2E Verification, Hermes Status, k3dm Deployment Metrics, Trivy Security, Checkout Load Test): panel-by-panel queries, the producer chain feeding each series (exporter / Pushgateway / promtail / trivy-operator), and a `No data`-by-cause triage table assembled from past incidents. Closes a "guide per major tech" gap — dashboard knowledge previously existed only scattered across ~25 plan/bug/issue docs, and `grafana-dashboard-hermes.yaml` was referenced by none of them.

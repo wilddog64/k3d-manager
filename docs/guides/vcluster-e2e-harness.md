@@ -190,6 +190,18 @@ harness; ACG TTL expiry provides cleanup. Tier 2 is best-effort and periodic,
 never a blocking per-candidate gate. Its summaries use `tier: sandbox` and
 `project: stripe` in the shared report directory.
 
+## Failure classification
+
+The operator vocabulary maps to the implementation's stable kind strings as follows:
+
+| Operator class | Implementation kind(s) |
+|---|---|
+| assertion | `assertion` |
+| contract drift | `contract-drift` |
+| infrastructure | `service-unreachable`, `timeout`, `harness` |
+| auth | `auth` |
+| cross-service | not a kind — a **routing** value of `service`, orthogonal to kind |
+
 ---
 
 ## Safety rules baked in

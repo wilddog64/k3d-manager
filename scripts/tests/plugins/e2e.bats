@@ -257,6 +257,60 @@ PY
   [[ "$output" == *"port attribution ok"* ]]
 }
 
+@test "failure groups carry routed services" {
+  local run_id="routed-services"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":0,"unexpected":2,"flaky":0,"skipped":0},"suites":[{"file":"api/cart.spec.ts","specs":[{"title":"cart contract","tests":[{"results":[{"status":"failed","error":"Received: undefined"}]}]}]},{"file":"api/orders.spec.ts","specs":[{"title":"order contract","tests":[{"results":[{"status":"failed","error":"Received: undefined"}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+services = {item["target"]: item["service"] for item in summary["failure_groups"]}
+assert services == {"api-cart": "basket", "api-orders": "order"}, services
+print("routed services ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"routed services ok"* ]]
+}
+
+@test "failure details are redacted in summary and failures file" {
+  local run_id="redacted-summary"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":0,"unexpected":1,"flaky":0,"skipped":0},"suites":[{"file":"api/payments.spec.ts","specs":[{"title":"auth Bearer sk_test_FAKEFAKEFAKE","tests":[{"results":[{"status":"failed","error":"Authorization: Bearer sk_test_FAKEFAKEFAKE"}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run grep -E '(<redacted>|sk_test_FAKEFAKEFAKE)' "$E2E_REPORT_DIR/${run_id}.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<redacted>"* ]]
+  [[ "$output" != *"sk_test_FAKEFAKEFAKE"* ]]
+  run grep -E '(<redacted>|sk_test_FAKEFAKEFAKE)' "$E2E_REPORT_DIR/${run_id}.failures.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<redacted>"* ]]
+  [[ "$output" != *"sk_test_FAKEFAKEFAKE"* ]]
+}
+
+@test "auth classification survives the bash summary path" {
+  local run_id="auth-summary"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":0,"unexpected":1,"flaky":0,"skipped":0},"suites":[{"file":"api/payments.spec.ts","specs":[{"title":"payment auth","tests":[{"results":[{"status":"failed","error":"expect(received).toBe(expected) / Expected: 200 / Received: 401"}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run grep -E '"kind": "auth"' "$E2E_REPORT_DIR/${run_id}.json"
+  [ "$status" -eq 0 ]
+  run grep -E '"target": "api-payments"' "$E2E_REPORT_DIR/${run_id}.json"
+  [ "$status" -eq 0 ]
+}
+
 @test "e2e.sh sources cleanly under set -euo pipefail" {
   run bash -c '
     set -euo pipefail
