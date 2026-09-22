@@ -87,6 +87,10 @@ so two to three minutes is normal. Keycloak changes its database directly and do
 the workload. **Logs are empty by design** — every step redirects to `/dev/null` so no credential
 can reach container logs. Track progress from cluster state instead:
 
+Successful rotator jobs have empty logs; any output at all is a defect worth reading. The image's
+`base64` is BusyBox and accepts only `-d`. A missing Slack notification does not mean the rotation
+failed, and a Slack notification does not prove that it succeeded — check the Job status.
+
 ```bash
 kubectl --context k3d-k3d-cluster get job <job-name> -n monitoring \
   -o custom-columns='STATUS:.status.conditions[0].type,SUCCEEDED:.status.succeeded,FAILED:.status.failed'

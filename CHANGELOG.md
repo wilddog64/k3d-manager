@@ -5,6 +5,10 @@
 ### Added
 - Keycloak monthly admin credential rotator, which preserves `db_password` and deliberately does not force-sync the ArgoCD-managed `keycloak-secrets` ExternalSecret.
 
+### Fixed
+- Prometheus reseeding now distinguishes unreachable Vault from an absent entry, and the reseed security assertions are effective rather than bare-`!` no-ops.
+- The Alertmanager secret test now uses the real unresolved-value error and hermetic stubs, while platform-ops rotators use BusyBox-compatible `base64 -d` so Slack notifications are not silently lost.
+
 ## [1.36.0] - 2026-09-21
 
 ### Added

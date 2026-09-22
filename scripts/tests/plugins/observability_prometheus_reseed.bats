@@ -8,6 +8,7 @@ setup() {
 
 stub_prometheus_reseed() {
   _observability_prometheus_auth_file() { printf '%s/auth.env\n' "${BATS_TEST_TMPDIR}"; }
+  _observability_vault_reachable() { return 0; }
   _kubectl() { printf 'test-vault-token\n'; }
   htpasswd() { printf 'admin:$2a$test-hash\n'; }
   _observability_prometheus_vault_payload() {
@@ -44,7 +45,8 @@ stub_prometheus_reseed() {
   run _observability_ensure_prometheus_login
   [ "${status}" -eq 0 ]
   grep -Fx 'recovered' "${calls}"
-  ! grep -F 'test-vault-token' "${calls}"
+  run grep -F 'test-vault-token' "${calls}"
+  [ "${status}" -ne 0 ]
 }
 
 @test "prometheus reseed: missing cache generates and writes a credential" {
@@ -81,7 +83,8 @@ stub_prometheus_reseed() {
   run _observability_ensure_prometheus_login
   [ "${status}" -eq 0 ]
   grep -Fx 'generated' "${calls}"
-  ! grep -Fx 'password' "${calls}"
+  run grep -Fx 'password' "${calls}"
+  [ "${status}" -ne 0 ]
 }
 
 @test "prometheus reseed: failed write remains a failure through refresh" {

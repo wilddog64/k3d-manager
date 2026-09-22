@@ -736,3 +736,7 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [ ] **`keycloak-realm-reconcile` fails with `awk: command not found`** — exit 127, 2026-09-21,
   `quay.io/keycloak/keycloak:24.0`. Realm `shopping-cart` created but auth flows never
   configured. Pre-existing, unrelated to the rotation. Needs a bug doc.
+# 2026-09-22 — Prometheus reseed and rotator CI fix
+
+- [x] Implemented M1–M5 and committed as `0309b298`; focused BATS suites, shellcheck, YAML parsing, doc links, and full `make test` (1,010/1,010) passed. `scripts/tests/lib/observability.bats` remained byte-identical.
+- [ ] Push `0309b298` to `origin/k3d-manager-v1.36.0` and record the remote SHA.
