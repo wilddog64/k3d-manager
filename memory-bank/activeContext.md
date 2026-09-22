@@ -1888,3 +1888,27 @@ usable entries: the 4 summaries with real Playwright stats predate the `failure_
 enough to pin a rule-based classifier against regression and nowhere near enough to validate a
 probabilistic or confidence-scored one — the corpus README must say so, so the number is not
 later cited as a calibration set.
+
+### Implementation landed — `0c57b110`
+
+Codex implemented M1-M6; it was blocked on `.git/index.lock` (the known sandbox restriction)
+and correctly refused to fabricate a SHA, so I committed and pushed on its behalf after
+verifying independently. Scope was exactly the spec's allowed file list.
+
+Gates I ran myself: `shellcheck -S error` RC=0; `pytest scripts/tests/hermes` 138 passed
+(via the pyenv shim — pytest is not on /opt/homebrew/bin/python3); `bats e2e.bats` 45 ok / 0
+not ok; `make check-doc-links` 1730 OK. Mutation check: reverting `_PORTS`/`_PORT` to the
+Tier-1-only map turned exactly the two Tier 2 corpus entries red
+(`host-8082 != product-catalog`), then restored and re-confirmed 138 passed. Pre-fix
+`scripts/plugins/e2e.sh` has zero `redact` occurrences and writes `title`/`error` raw, so the
+new BATS redaction assertion is genuinely red pre-fix. `sandbox-ports` (e2e.bats:240) was left
+unedited, as required — it is the cross-tier agreement check.
+
+Codex found a real defect in my spec and said so rather than diverging silently: M4.2 asked for
+an unknown-port corpus entry yielding `host-9999`, which the six-port `_PORT` regex can never
+match. It kept the mandated six-port map and added a generic `_ANY_PORT` fallback in
+`_unreachable_target`. That fallback only runs inside the `_UNREACHABLE` branch, so it cannot
+mislabel a non-connection failure. Accepted.
+
+Corpus: 24 entries, 11 real + 13 synthetic, all five kinds covered, no duplicate ids, no
+omitted samples.
