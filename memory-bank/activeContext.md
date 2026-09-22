@@ -2045,7 +2045,15 @@ fix repairs it on the next auth-proxy refresh rather than retroactively.
   - **Checkpoint is NOT blocking:** `step-10d5-ldap-passwords.done` exists only under the
     `k3s-aws` provider state dir, not for k3d - the hub seeder never ran here, so re-running it
     would actually execute rather than skip.
-  - **Reset staged but NOT run** (scratchpad `reseed-keycloak-users.sh`): mirrors Step 10d.5
+  - **RESOLVED — operator ran the reset; all three now display.** 9/9 steps green
+    (`vault put http=200` → `ldappasswd ok` → `ldapwhoami VERIFIED` per user). Verified without
+    printing values: all three resolve via `bin/get-keycloak-password`, and
+    `make show-service-passwords` shows a password on every realm row. These are **new**
+    passwords; the pre-reset plaintext is unrecoverable. Note `shellcheck` without `-S error`
+    exits non-zero on two info-level SC2016 hits and short-circuited the first run — the single
+    quotes are required so `$LDAP_ADMIN_PASSWORD`/`$1` expand in the pod rather than leaking into
+    the `kubectl exec` command string.
+  - **Reset script** (scratchpad `reseed-keycloak-users.sh`): mirrors Step 10d.5
     exactly (generate -> Vault KV put -> `ldappasswd` stdin -> `ldapwhoami` verify), prints no
     passwords, `chmod 600` header file. Preconditions verified live: openldap-0 present,
     `LDAP_ADMIN_PASSWORD` SET in the pod, Vault PF `http=200`, and `ldappasswd`/`ldapwhoami`/

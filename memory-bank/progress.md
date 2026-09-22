@@ -56,7 +56,22 @@
   `k3s-aws` state dir, not k3d — the seeder never ran on the hub, so it would execute, not skip.
 - [x] Gates: live render of the new text; BATS `makefile_show_service_passwords` 10/10 (case 9
   guards this block), `identity_tools` 5/5, `webhook_make_targets` 11/11.
-- [ ] **Reset staged, NOT run — needs the operator.** Scratchpad `reseed-keycloak-users.sh`
+- [x] **Reset RUN by the operator and verified — all three display.** `vault put: ok http=200`
+  → `ldappasswd: ok` → `ldapwhoami: VERIFIED` for admin, developer and operator (9/9 steps).
+  Claude then confirmed presence without printing values: all three resolve via
+  `bin/get-keycloak-password` (lengths 22/22/23, consistent with
+  `openssl rand -base64 18 | tr -d '=+/'`), and `make show-service-passwords` renders a password
+  on all three rows instead of the hint. **These are new passwords** — the pre-reset plaintext is
+  gone for good.
+  - **Lint friction worth remembering:** plain `shellcheck` exits non-zero on two *info*-level
+    SC2016 hits, which silently short-circuited the `&&` chain so the reset never ran on the
+    first attempt. The single quotes are correct and required — `$LDAP_ADMIN_PASSWORD` and `$1`
+    must expand **inside the pod**; double-quoting them would interpolate host values and bake
+    the LDAP admin password into the `kubectl exec` command string that reaches logs. Step 10d.5
+    uses the same idiom. Gate with `shellcheck -S error` for scripts using this pattern.
+  - **Claude error, corrected in place:** first attempt at silencing SC2016 used a backtick
+    `` `# comment` `` block, which spawns a subshell rather than commenting. Reverted immediately.
+- [x] **Reset script** (scratchpad `reseed-keycloak-users.sh`)
   mirrors Step 10d.5 (generate → Vault KV put → `ldappasswd` stdin → `ldapwhoami` verify),
   prints no passwords, `chmod 600` header file. Preconditions verified live: openldap-0 up,
   `LDAP_ADMIN_PASSWORD` SET, Vault PF 200, and `ldappasswd`/`ldapwhoami`/`mktemp`/`openssl` all
