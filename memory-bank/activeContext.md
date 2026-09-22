@@ -1,5 +1,38 @@
 # Active Context — k3d-manager
 
+## 2026-09-22 — v1.36.0 smoke and hub snapshot features
+
+Smoke feature committed as `6f1f7fd1` (`feat(smoke): add a unified make smoke target with tiered checks`).
+Hub snapshot feature committed as `d53ea1ba` (`feat(hub-snapshot): capture hub state to the M2 store with retention`).
+Both implementations are offline-only and leave Jenkins unwired, `make down`/`make up` unchanged,
+and the Prometheus admin API disabled. Focused suites, shellcheck, and `make test` passed (`1030/1030`).
+The Loki record required legacy recovery count assertions to move from seven to eight; compatibility
+test commit `5eb759eb` was pushed after the two feature commits.
+
+**Claude verification found two defects Codex's own green run did not surface** — fixed in
+`5dd53be8`, both mutation-verified:
+
+1. `K3DM_SNAPSHOT_DIR` defaulted to `~/k3dm-snapshots`. A tilde does not expand inside double
+   quotes, and the value is then single-quoted for the remote shell, so the M2 would receive
+   `mkdir -p '~/k3dm-snapshots'` and create a directory **literally named `~`** — snapshots
+   landing in `$HOME/~/k3dm-snapshots`. Confirmed by simulation before fixing. The BATS suite
+   could not catch it because the ssh stub never creates real paths; a guard asserting the
+   default contains no tilde was added (14th case).
+2. `hub_recovery_validate` still printed "seven logical claims" after the Loki record made it
+   eight. An operator reading "seven" after restoring eight would reasonably doubt Loki was
+   included. The message is now derived from the record count so it cannot drift again.
+
+Independently re-verified, not taken from the report: SHAs present on `origin`, local HEAD ==
+origin, `hub_recovery.sh` touched by exactly one insertion, node placement genuinely derived
+from the PV's `nodeAffinity` (fails closed on ambiguity), and the contract test really does
+iterate `_hub_recovery_records` and call `_hub_recovery_claim_tree` against the captured tree.
+Suites re-run by Claude: hub_recovery 27/27, hub_snapshot 14/14, smoke 7/7, shellcheck RC=0.
+
+**Known deviation, not blocking:** the free-space preflight runs *after* the full local capture
+rather than before it, so a full M2 wastes ~2.15G of local staging I/O instead of failing fast.
+Test 6 asserts only that no remote directory was created. Some local staging is inherent to
+pulling data out of containers; the `trap` cleans it up on both paths.
+
 ## 2026-09-22 — Grafana "no data" triaged; smoke + hub-snapshot specs assigned to Codex
 
 **Grafana is not broken.** Hub Prometheus has 31 active targets up and serves data; the

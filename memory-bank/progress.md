@@ -1,5 +1,21 @@
 # Progress — k3d-manager
 
+## 2026-09-22 — v1.36.0 smoke and hub snapshot features
+
+- [x] Unified `make smoke` target committed as `6f1f7fd1`; seven focused BATS cases pass, including
+  the tier skip/failure behavior and the `set -e` later-check regression guard.
+- [x] Hub snapshot capture, M2 transfer/checksum verification, retention, Loki recovery record,
+  docs, and 13 focused BATS cases committed as `d53ea1ba`; all focused cases and mutation checks pass.
+- [x] Full `make test` passed with `1030` `^ok` lines and no `not ok` lines. Feature commits and the
+  recovery compatibility test commit are pushed to `origin/k3d-manager-v1.36.0`; final SHA is
+  `5eb759eb4e9cb584cf17b7a67d6f937ecdd00010`.
+- [x] **Claude verification fixed two defects** (`5dd53be8`, both mutation-verified): the
+  `K3DM_SNAPSHOT_DIR` tilde default that would have created a directory literally named `~` on
+  the M2, and the stale "seven logical claims" message after Loki made it eight. Suites re-run
+  independently: hub_recovery 27/27, hub_snapshot 14/14, smoke 7/7, shellcheck RC=0.
+- [ ] **Deviation noted:** free-space preflight runs after the local capture, not before, so a
+  full M2 wastes ~2.15G of staging I/O rather than failing fast. Non-blocking.
+
 ## 2026-09-22 — Grafana triage + two specs assigned to Codex
 
 - [x] **Grafana "no data" root-caused — hub is healthy.** Prometheus 31 targets up and
