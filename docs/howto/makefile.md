@@ -22,6 +22,12 @@ make up URL=https://...      # provision with explicit sandbox URL
 | `make cleanup-stale-resources` | Both cleanup scripts | Run both guarded cleanup paths; the local sandbox path runs only for `CLUSTER_PROVIDER=k3s-aws` |
 | `make refresh` | `bin/cluster-refresh` | Creds expired or tunnel dropped — re-extracts credentials and restarts tunnel |
 | `make status` | `bin/cluster-status` | Read-only health check — Hub nodes, pods, tunnel, ArgoCD |
+| `make smoke` | `scripts/k3d-manager smoke_run` | Run the offline webhook check and the cluster health check when the configured context is reachable |
+
+`make smoke SMOKE_ONLY=offline` runs only the webhook check. Use
+`SMOKE_ONLY=cluster` to run only the cluster check. An unreachable cluster is
+reported as `SKIP`, while a failed check makes the target exit non-zero. Each
+check writes its output under `${TMPDIR:-/tmp}/k3dm-smoke/<UTC-run>/`.
 
 ---
 

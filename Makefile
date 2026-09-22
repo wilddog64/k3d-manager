@@ -773,6 +773,10 @@ test-all: test test-bin test-python
 e2e:
 	./scripts/k3d-manager e2e_verify_vcluster $(DIGEST)
 
+## Run the smoke gate (offline checks always; cluster checks when reachable). SMOKE_ONLY=offline|cluster optional.
+smoke:
+	./scripts/k3d-manager smoke_run $(SMOKE_ONLY)
+
 ## Run the Tier 1 e2e harness on a remote runner off the M4 laptop. RUNNER=m2 required, DIGEST=<image digest> optional. No local fallback.
 e2e-remote:
 	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-remote RUNNER=m2 [DIGEST=sha256:...]" >&2; exit 2; fi

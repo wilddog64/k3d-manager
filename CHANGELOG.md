@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- A unified `make smoke` target with offline and reachable-cluster tiers, per-check logs, and explicit PASS/FAIL/SKIP reporting.
 - Keycloak monthly admin credential rotator, which preserves `db_password` and deliberately does not force-sync the ArgoCD-managed `keycloak-secrets` ExternalSecret.
 
 ### Fixed
