@@ -265,6 +265,20 @@ function _observability_prometheus_auth_file() {
   printf '%s/.local/share/k3d-manager/prometheus-basic-auth.env\n' "${HOME}"
 }
 
+function _observability_seed_prometheus_vault_entry() {
+  local _vault_addr="http://127.0.0.1:18200" _vault_token _vault_hdr _payload _rc=0
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+  _payload=$(_observability_prometheus_vault_payload "${_PROM_BASIC_AUTH_PASSWORD}" "${_PROM_BASIC_AUTH_BCRYPT}")
+  curl -sf --header "@${_vault_hdr}" --header 'Content-Type: application/json' \
+    --request POST --data "${_payload}" \
+    "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null || _rc=1
+  rm -f "${_vault_hdr}"
+  return "${_rc}"
+}
+
 function _observability_ensure_prometheus_login() {
   local _auth_file _vault_token _vault_hdr _prom_creds
   _auth_file="$(_observability_prometheus_auth_file)"
@@ -283,8 +297,26 @@ function _observability_ensure_prometheus_login() {
   rm -f "${_vault_hdr}"
 
   if [[ -z "${_prom_creds}" ]]; then
-    _warn "[observability] Prometheus Vault credentials unreadable — skipping auth proxy"
-    return 1
+    _warn "[observability] Prometheus credentials absent from Vault — reseeding the canonical entry"
+    local _recovered_user="" _recovered_password=""
+    if [[ -r "${_auth_file}" ]]; then
+      _recovered_user=$(sed -n 's/^PROMETHEUS_BASIC_AUTH_USER=//p' "${_auth_file}" | head -1)
+      _recovered_password=$(sed -n 's/^PROMETHEUS_BASIC_AUTH_PASSWORD=//p' "${_auth_file}" | head -1)
+    fi
+    if [[ -n "${_recovered_password}" && "${_recovered_password}" != "password" ]]; then
+      _PROM_BASIC_AUTH_PASSWORD="${_recovered_password}"
+      _PROM_BASIC_AUTH_BCRYPT="$(printf '%s' "${_PROM_BASIC_AUTH_PASSWORD}" | htpasswd -niBC 12 admin | cut -d: -f2-)"
+      [[ -n "${_PROM_BASIC_AUTH_BCRYPT}" ]] || { _err "[observability] failed to rebcrypt the recovered Prometheus password"; return 1; }
+      _info "[observability] recovered the Prometheus password from the local cache; not rotating"
+    else
+      _observability_generate_prometheus_basic_auth || return 1
+      _warn "[observability] no recoverable Prometheus password — generated a new one; saved logins will stop working"
+    fi
+    if ! _observability_seed_prometheus_vault_entry; then
+      _err "[observability] could not reseed k3d-manager/prometheus-basic-auth in Vault"
+      return 1
+    fi
+    _prom_creds="${_recovered_user:-admin}|${_PROM_BASIC_AUTH_PASSWORD}"
   fi
 
   local _prom_user _prom_password
@@ -449,7 +481,10 @@ function _observability_install_prometheus_auth_proxy() {
 }
 
 function _observability_refresh_prometheus_auth_proxy() {
-  _observability_ensure_prometheus_login || return 0
+  if ! _observability_ensure_prometheus_login; then
+    _warn "[observability] Prometheus login unavailable; auth proxy not refreshed"
+    return 1
+  fi
   _observability_install_prometheus_auth_proxy
 }
 

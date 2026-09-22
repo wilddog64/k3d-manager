@@ -23,6 +23,19 @@ show_service_passwords_target() {
   [[ "${gate}" != *'check Vault token and port-forward'* ]]
 }
 
+@test "show-service-passwords: ArgoCD block references its authoritative k8s secret" {
+  target="$(awk '/^show-service-passwords:/,/^$/' "${MAKEFILE}")"
+  block="$(awk '/_argocd=/{ found=1 } found { print; if ($0 ~ /^\t?echo ""$/) exit }' <<<"${target}")"
+  [[ "${block}" == *"argocd-initial-admin-secret"* ]]
+}
+
+@test "show-service-passwords: Prometheus block keeps Vault as its only credential source" {
+  target="$(awk '/^show-service-passwords:/,/^$/' "${MAKEFILE}")"
+  block="$(awk '/_prom_creds=/{ found=1 } found { print; if ($0 ~ /^\t?echo ""$/) exit }' <<<"${target}")"
+  [[ "${block}" != *"prometheus-basic-auth.env"* ]]
+  [[ "${block}" != *"argocd-initial-admin-secret"* ]]
+}
+
 @test "show-service-passwords: credential blocks retain N/A degradation" {
   target="$(awk '/^show-service-passwords:/,/^$/' "${MAKEFILE}")"
   for service in ArgoCD Grafana Prometheus Alertmanager; do

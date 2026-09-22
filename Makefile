@@ -517,6 +517,8 @@ show-service-passwords:
 	  "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
 	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
 	rm -f "$$_vault_hdr"; \
+	[ -n "$$_argocd" ] || _argocd=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
 	echo "  ArgoCD      https://argocd.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_argocd:-N/A}";\

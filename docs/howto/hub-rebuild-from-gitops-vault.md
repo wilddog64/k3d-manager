@@ -67,6 +67,10 @@ The other eleven keys are safe: ten are guarded `reuse → copy-from-source → 
 infra passwords regeneration is harmless because the services are redeployed in the same run and
 ESO syncs the new values.
 
+### Credential paths after a Vault rebuild
+
+Credential paths are not all reseeded automatically after a Vault rebuild. `secret/argocd/admin` is repopulated by `hub_recovery_reconcile`, and `k3d-manager/prometheus-basic-auth` is repopulated by the Prometheus auth-proxy refresh. `~/.local/share/k3d-manager/prometheus-basic-auth.env` is a derived cache, not a source of truth.
+
 ## Procedure
 
 Run from `/Users/cliang/src/gitrepo/personal/k3d-manager`. Do not delete the `profile` or

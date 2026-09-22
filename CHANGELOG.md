@@ -24,6 +24,7 @@
   on purpose.
 
 ### Fixed
+- a Vault rebuild no longer leaves `k3d-manager/prometheus-basic-auth` permanently unseeded — the auth-proxy refresh reseeds the canonical entry, recovering the existing password from the local cache rather than rotating it, and `show-service-passwords` falls back to `argocd-initial-admin-secret` for the ArgoCD display
 - `make show-service-passwords` probes Vault via `auth/token/lookup-self` instead of the optional `secret/argocd/admin` display mirror, so a missing mirror no longer blocks all four credentials
 - Standing docs still told readers to run `bin/acg-up` / `acg-down` / `acg-refresh` / `acg-status` / `acg-sync-apps` and the `/acg-*` Slack commands, all renamed to `cluster-*` in **v1.7.1** (`0c9b2707`). 48 occurrences corrected across README, `docs/architecture/cloudflare-slack-relay.md`, `docs/howto/makefile.md`, `docs/howto/launchd-daemons.md`, `docs/guides/grafana-dashboards.md`, `memory-bank/projectbrief.md` and `memory-bank/systemPatterns.md`. Historical records (the README/`docs/releases.md` release tables, `docs/bugs/`, `docs/issues/`, `docs/retro/`, `memory-bank/archive/`) keep the old names — that is what shipped. The `acg-sync-apps-argocd-pf` state-file constant inside `bin/cluster-sync-apps` is deliberately unchanged, per `docs/plans/v1.7.1-rename-acg-to-cluster-binaries.md`.
 - `docs/architecture/cloudflare-slack-relay.md` quoted a 409 Slack message the webhook does not emit (`use /acg-status to check progress`); replaced with the real text from `bin/k3dm-webhook`.
