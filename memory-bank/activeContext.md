@@ -1746,3 +1746,47 @@ fabricating a SHA. I reviewed the diff, committed and pushed it myself: `e99960e
 **Noted, pre-existing, not introduced:** the promote step keeps `continue-on-error: true`, so the new
 `exit 1` does not fail the job on its own. A separate `Fail when image promotion did not complete`
 step (`if: steps.promote.outcome == 'failure'`) converts it, so exhaustion does surface as a red run.
+
+## 2026-09-21 - Vault rebuild root-caused; ArgoCD mirror repaired live
+
+With the liveness gate fixed, `show-service-passwords` ran and exposed two real Vault gaps.
+**KV *metadata* returns 404** for both `k3d-manager/prometheus-basic-auth` and `argocd/admin`,
+while `k3d-manager/alertmanager-basic-auth` returns 200 (created 2026-09-21T01:42:57Z). In KV v2 a
+data delete preserves metadata; only a destroy removes it, and nothing in this repo destroys. So
+those two paths were **never written to the current Vault instance** - the hub was rebuilt around
+2026-09-20T23:46Z (`argocd-secret.admin.passwordMtime` 23:51:56Z) and re-seeding was **partial**.
+
+Why it stayed invisible: `_observability_ensure_prometheus_login` (`observability.sh:268`) is
+Vault-read-only - on 404 it `_warn`s and returns 1, and its only caller does
+`_observability_ensure_prometheus_login || return 0`, discarding it. **This is the long-standing
+"Prometheus Vault credentials unreadable" backlog item, now root-caused.** The Prometheus login
+still works only because `bin/prometheus-auth-proxy` runs host-side on :19090 validating against
+`--credentials-file ~/.local/share/k3d-manager/prometheus-basic-auth.env`, a derived cache written
+from a *previous* Vault instance that survived on the host. The loop is self-consistent and green
+while the canonical store is empty - so a live 200 there proves the proxy accepts the file, **not**
+that Vault holds anything.
+
+Key design point for the fix: Prometheus and ArgoCD need **opposite** treatment. Vault is canonical
+for Prometheus per `docs/bugs/2026-06-09-prometheus-basic-auth-vault-managed.md`, so a display-time
+file fallback would reverse a deliberate decision - the repair belongs in the seeding path. ArgoCD's
+authoritative store is `cicd/argocd-initial-admin-secret` and Vault is only a display mirror, so a
+display fallback there is correct. Spec:
+`docs/bugs/2026-09-21-vault-rebuild-leaves-prometheus-and-argocd-credentials-unseeded.md` (`9d2bdb15`),
+dispatched to Codex.
+
+**Live repair done, ArgoCD only (user chose "ArgoCD only" over reseeding both).** Mirrored the
+existing password into `secret/argocd/admin` - additive write to an absent path, no credential
+rotated. Validated against ArgoCD's own `/api/v1/session` first: **HTTP 200**, which supersedes the
+earlier offline `passwordMtime` inference. Read-back 200, keys `['password','username']`, and the
+value **MATCHes** the k8s source. `make show-service-passwords` now resolves ArgoCD, Grafana and
+Alertmanager. **Prometheus is still N/A by design** - the user declined that reseed, and the Codex
+fix repairs it on the next auth-proxy refresh rather than retroactively.
+
+**Credential exposure to fix, both mine to own:**
+- The user pasted the live **Grafana** password into the session - rotate it.
+- I ran the target through a `password:`-based redaction filter; the **Keycloak admin** line uses a
+  different shape (`admin user:     admin / <password>`) and passed through unredacted into the
+  transcript - **rotate the Keycloak admin password.** That format inconsistency is worth fixing in
+  the target itself: it is the one credential that redaction-by-convention cannot catch.
+- The three Keycloak **dev users** (admin/developer/operator) also print `N/A` - a further gap not
+  covered by either spec. Unfiled.

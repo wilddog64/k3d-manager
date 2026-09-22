@@ -681,3 +681,16 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
       index < promote). Codex hit the `.git/index.lock` wall so I committed and pushed the diff.
       Spec: `docs/bugs/2026-09-21-image-promotion-rebase-fallback-cannot-resolve-concurrent-newtag-conflict.md`.
       **PR not opened** - awaiting the user's go.
+
+- [x] **Vault-rebuild credential gap root-caused and filed `9d2bdb15`** - KV metadata 404 proves
+      `k3d-manager/prometheus-basic-auth` and `argocd/admin` were never written to the current Vault
+      instance. Root-causes the standing "Prometheus Vault credentials unreadable" item. Spec:
+      `docs/bugs/2026-09-21-vault-rebuild-leaves-prometheus-and-argocd-credentials-unseeded.md`;
+      dispatched to Codex (M1 reseed, M2 stop discarding the failure, M3 ArgoCD display fallback, M4 doc).
+- [x] **`secret/argocd/admin` repaired live** - validated against ArgoCD `/api/v1/session` (200),
+      mirrored, read-back MATCHes the k8s source; the target now resolves ArgoCD.
+- [ ] **Rotate two exposed credentials** - Grafana (pasted by the user into the session) and Keycloak
+      admin (leaked past my redaction filter). Both need rotation.
+- [ ] **`show-service-passwords` Keycloak line defeats redaction** - prints `admin user: admin / <pw>`
+      instead of the `password: <pw>` convention every other service uses, so filtering by convention
+      misses it. Also the 3 Keycloak dev users print `N/A`. Unfiled.
