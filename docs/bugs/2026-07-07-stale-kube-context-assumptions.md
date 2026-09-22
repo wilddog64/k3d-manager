@@ -5,7 +5,7 @@
 
 ## Description
 
-The repo hardcodes the `ubuntu-k3s` kube context in multiple operational paths, including [bin/k3dm-webhook](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/k3dm-webhook:95), [scripts/lib/provider.sh](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/lib/provider.sh:94), and [bin/cluster-up](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/cluster-up:611).
+The repo hardcodes the `ubuntu-k3s` kube context in multiple operational paths, including [bin/k3dm-webhook:95](../../bin/k3dm-webhook), [scripts/lib/provider.sh:94](../../scripts/lib/provider.sh), and [bin/cluster-up:611](../../bin/cluster-up).
 
 **Consolidated into:** [App-cluster Vault portability design spec](./2026-07-07-app-cluster-vault-portability.md) — see there for verified findings, phased plan, and signed-off decisions.
 
