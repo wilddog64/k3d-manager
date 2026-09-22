@@ -1790,3 +1790,55 @@ fix repairs it on the next auth-proxy refresh rather than retroactively.
   the target itself: it is the one credential that redaction-by-convention cannot catch.
 - The three Keycloak **dev users** (admin/developer/operator) also print `N/A` - a further gap not
   covered by either spec. Unfiled.
+
+## 2026-09-21 - Keycloak credential display relabelled; Prometheus reseed verified
+
+- **Codex `bbr6gajol` verified and accepted** (`6c744a23`, on `origin/k3d-manager-v1.36.0`).
+  Prometheus reseed (M1-M4) + ArgoCD display fallback. My own gates: BATS 11/11; mutation
+  against pre-fix `Makefile` shows the ArgoCD-fallback test `not ok` (genuine), while the
+  Prometheus-absence test passes pre-fix by design and proves nothing. The deliberate
+  asymmetry held: the Prometheus display block still reads Vault only, with no file or k8s
+  fallback.
+- **Reverted one unsolicited Codex edit.** It left an uncommitted rewrite of an
+  intentionally-literal bcrypt string to `printf -v` to satisfy SC2016. That finding is
+  pre-existing since `fd281c85` (v1.24.0) and is *info* severity, while CI runs
+  `shellcheck -S error` - so the committed tree already passes the real gate. Codex's
+  reported `SHELLCHECK_RC=0` was only true with that edit applied.
+- **Filed `284d22ec`** - `docs/bugs/2026-09-21-show-service-passwords-keycloak-block-defeats-redaction.md`.
+  Three defects: (D1) the Keycloak block printed four secrets on `user:`-prefixed lines, so
+  any consumer redacting on the `password:` convention passed them through unredacted - this
+  is what leaked the live Keycloak admin password into a session transcript today; (D2) the
+  three realm SSO users always print `N/A`; (D3) `bin/get-keycloak-password` passed the Vault
+  root token in a `kubectl exec` command string, violating the CLAUDE.md secret-hygiene rule,
+  while `bin/vault-exec` already implements the safe stdin idiom.
+- **D2 root cause - a third victim of the same rebuild gap, but NOT the same path.**
+  `secret/keycloak/admin` (service admin: `admin_password`, `db_password`) exists and is one
+  of the 14 allowlisted hub seed keys. The realm SSO users live at
+  `secret/keycloak/users/<user>`, are written **only** by `bin/cluster-up:1031`, and are
+  **not** in the allowlist - so a hub rebuild never restores them. Live probe: data and
+  metadata both 404 for all three; `LIST secret/metadata/keycloak` returns
+  `["admin","clients"]`. The old message `run make up first` was wrong advice: `make up` does
+  not seed these. Changing the 14-key allowlist stays NOT approved, so the fix makes the
+  display honest rather than seeding anything.
+- **Codex `bqrx3e9l7` verified and accepted** (`41855a2d`, on origin). Every Keycloak secret
+  now sits behind a `password:` label; realm users report
+  `not provisioned on this cluster (seeded by bin/cluster-up, not by make up)`; the service
+  admin keeps a bare `N/A` because a blank there is a real fault. My own gates:
+  `shellcheck -S error` RC=0, BATS 15/15, mutation shows tests 7/8/9 `not ok` pre-fix and the
+  unchanged-block guard (test 10) passing pre-fix as expected. Codex used the inline stdin
+  idiom rather than `bin/vault-exec` because that wrapper parses only `-n|--namespace` and
+  cannot pin `--context` - verified, correct call.
+- **Jev / TypeSafe AI investigated - recommendation: do not integrate now.** A "System One"
+  model (constrained decoding, typed choice + probability, 70-500ms, $0.042/MTok in, output
+  free, 255-choice cap, text only, v0.01 early access). "Cannot hallucinate" means schema
+  conformance, not correctness; independent reviewers agree calibration is the specifically
+  unvalidated claim, and TypeSafe concedes its 0% figure is analytic (`our number is not
+  empirical`) with in-house evals. Three blockers here: (1) volume - e2e/Hermes findings run
+  ~13/month (1 May, 12 Aug, 13 Sep), far too few to calibrate a 0.90 threshold; (2)
+  `e2e.sh`/`e2e_remote.sh` (1963 lines) contain **zero** classification or routing logic, so a
+  judgment layer would precede the deterministic layer it is meant to sit on, and repo routing
+  is a lookup table, not a judgment; (3) data egress - failure payloads would go to a
+  third-party API, and today's Keycloak leak shows redaction-by-convention fails on one
+  nonconforming line. Proposed instead (NOT started, needs the user's go): a deterministic
+  verdict taxonomy + static service->repo routing table, and back-label the 28 existing
+  e2e/Hermes bug docs to produce the offline eval set.

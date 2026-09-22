@@ -694,3 +694,21 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [ ] **`show-service-passwords` Keycloak line defeats redaction** - prints `admin user: admin / <pw>`
       instead of the `password: <pw>` convention every other service uses, so filtering by convention
       misses it. Also the 3 Keycloak dev users print `N/A`. Unfiled.
+
+- [x] **Codex `bbr6gajol` verified** - `6c744a23` Prometheus reseed + ArgoCD display fallback;
+  BATS 11/11, mutation genuine, asymmetry held. One unsolicited SC2016 edit reverted.
+- [x] **Keycloak display defect filed and fixed** - spec `284d22ec`, fix `41855a2d`
+  (`origin/k3d-manager-v1.36.0`). Every credential now behind a `password:` label; Vault root
+  token out of the `kubectl exec` command string; hub context pinned in
+  `bin/get-keycloak-password`. BATS 15/15, mutation 7/8/9 red pre-fix.
+- [ ] **ROTATE two exposed credentials** - Grafana (pasted into the session) and Keycloak admin
+  (leaked past my redaction filter). Still outstanding.
+- [ ] **`secret/keycloak/users/*` unseeded on the hub** - expected state, now reported honestly.
+  Seeding it would require either running `bin/cluster-up`'s SSO step or adding the path to the
+  14-key allowlist; the latter is NOT approved. No action taken.
+- [ ] **Jev / TypeSafe AI - do not integrate now.** Recommendation is a deterministic e2e verdict
+  taxonomy + repo routing table + back-labelled corpus from the 28 existing e2e/Hermes bug docs,
+  which doubles as the offline eval set. Spec NOT written - needs the user's go.
+  (`docs/plans/` for v1.36.0 currently holds 1 of the 5-doc cap.)
+- [ ] **No PRs opened** for `ef3d4b8d`/`f9d956ae`/`6c744a23`/`41855a2d` (k3d-manager) or
+  `e99960e` (shopping-cart-infra). PR creation still needs the user's explicit go.
