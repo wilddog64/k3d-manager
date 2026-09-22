@@ -117,12 +117,17 @@ function _hub_recovery_replay_identity_hook() {
 
 function _hub_recovery_mirror_argocd_admin() {
   local hub_context="$1" root_token password payload_file argocd_url="${HUB_RECOVERY_ARGOCD_URL:-https://argocd.3ai-talk.org}" code
+  local __attempt
   root_token=$(_kubectl -- --context "$hub_context" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
   [[ -n "$root_token" ]] || { _err "[hub-recovery] Vault root token unavailable for ArgoCD admin mirror"; return 1; }
   if printf '%s\n' "$root_token" | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=password argocd/admin >/dev/null 2>&1'; then
     return 0
   fi
-  password=$(_kubectl -- --context "$hub_context" -n cicd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+  for __attempt in $(seq 1 10); do
+    password=$(_kubectl -- --context "$hub_context" -n cicd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+    [[ -n "$password" ]] && break
+    sleep "${HUB_RECOVERY_MIRROR_RETRY_DELAY:-6}"
+  done
   if [[ -z "$password" ]]; then
     _warn "[hub-recovery] argocd-initial-admin-secret unavailable; cannot mirror ArgoCD admin password into Vault"
     return 0

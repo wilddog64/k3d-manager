@@ -61,6 +61,7 @@ preferred browser path is the Cloudflare hostname:
 
 That hostname is backed by a local basic-auth proxy. The browser will prompt
 for a login. Use the credentials printed by `make show-service-passwords`.
+The `secret/argocd/admin` entry is an optional display mirror; its absence is not a Vault fault.
 
 If you need to debug the raw listener directly, the backend port-forward stays
 open on `http://localhost:19093`.

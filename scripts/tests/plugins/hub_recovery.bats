@@ -302,7 +302,15 @@ function _stub_argocd_admin_mirror_dependencies() {
   _kubectl() {
     case "$*" in
       *"get secret vault-root"*) printf '%s' "$MIRROR_ROOT_TOKEN_B64" ;;
-      *"get secret argocd-initial-admin-secret"*) printf '%s' "$MIRROR_PASSWORD_B64" ;;
+      *"get secret argocd-initial-admin-secret"*)
+        local secret_attempt
+        secret_attempt=$(grep -c '^get secret argocd-initial-admin-secret' "$MIRROR_CALLS" || true)
+        printf 'get secret argocd-initial-admin-secret\n' >> "$MIRROR_CALLS"
+        if [[ "${MIRROR_EMPTY_ATTEMPTS:-0}" -ge $((secret_attempt + 1)) ]]; then
+          return 0
+        fi
+        printf '%s' "$MIRROR_PASSWORD_B64"
+        ;;
       *"vault kv get"*) cat >/dev/null; printf 'kv get\n' >> "$MIRROR_CALLS"; return "$MIRROR_KV_GET_STATUS" ;;
       *"vault kv put"*)
         local stdin
@@ -358,12 +366,44 @@ function _stub_argocd_admin_mirror_dependencies() {
 @test "_hub_recovery_mirror_argocd_admin: skips an absent initial secret" {
   _stub_argocd_admin_mirror_dependencies
   MIRROR_PASSWORD_B64=""
+  HUB_RECOVERY_MIRROR_RETRY_DELAY=0
+  export HUB_RECOVERY_MIRROR_RETRY_DELAY
   run _hub_recovery_mirror_argocd_admin hub-context
   [ "$status" -eq 0 ]
   run grep -Fq curl "$MIRROR_CALLS"
   [ "$status" -ne 0 ]
   run grep -Fq 'kv put' "$MIRROR_CALLS"
   [ "$status" -ne 0 ]
+  run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+}
+
+@test "_hub_recovery_mirror_argocd_admin: retries until the initial secret appears" {
+  _stub_argocd_admin_mirror_dependencies
+  MIRROR_EMPTY_ATTEMPTS=2
+  HUB_RECOVERY_MIRROR_RETRY_DELAY=0
+  export MIRROR_EMPTY_ATTEMPTS HUB_RECOVERY_MIRROR_RETRY_DELAY
+  run _hub_recovery_mirror_argocd_admin hub-context
+  [ "$status" -eq 0 ]
+  grep -Fq 'kv put' "$MIRROR_CALLS"
+  [ "$(grep -c '^get secret argocd-initial-admin-secret' "$MIRROR_CALLS")" -eq 3 ]
+  run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+}
+
+@test "_hub_recovery_mirror_argocd_admin: exhausted secret retry stays non-fatal" {
+  _stub_argocd_admin_mirror_dependencies
+  MIRROR_EMPTY_ATTEMPTS=10
+  HUB_RECOVERY_MIRROR_RETRY_DELAY=0
+  export MIRROR_EMPTY_ATTEMPTS HUB_RECOVERY_MIRROR_RETRY_DELAY
+  run _hub_recovery_mirror_argocd_admin hub-context
+  [ "$status" -eq 0 ]
+  run grep -Fq curl "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  run grep -Fq 'kv put' "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  [ "$(grep -c '^get secret argocd-initial-admin-secret' "$MIRROR_CALLS")" -eq 10 ]
+  [ "$(grep -c '^warn$' "$MIRROR_CALLS")" -eq 1 ]
   run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
   [ "$status" -ne 0 ]
 }

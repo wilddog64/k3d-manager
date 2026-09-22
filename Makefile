@@ -497,15 +497,15 @@ show-service-passwords:
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
 	[ -n "$$_vault_tok" ] || { echo "[show-service-passwords] ERROR: cannot read secrets/vault-root (check k3d-k3d-cluster context)" >&2; exit 1; }; \
 	_vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	if ! curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" -o /dev/null 2>/dev/null; then \
+	if ! curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then \
 		echo "[show-service-passwords] Vault credential lookup unavailable; restarting its port-forward" >&2; \
 		$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
 		__vault_ready=0; \
 		for __vault_attempt in 1 2 3 4 5 6 7 8 9 10; do \
 			sleep 1; \
-			if curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
+			if curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
 		done; \
-		[ "$$__vault_ready" -eq 1 ] || { echo "[show-service-passwords] ERROR: Vault credential lookup still unavailable (check Vault token and port-forward)" >&2; exit 1; }; \
+		[ "$$__vault_ready" -eq 1 ] || { echo "[show-service-passwords] ERROR: Vault unreachable at 127.0.0.1:18200 with the secrets/vault-root token (port-forward restarted, still failing)" >&2; exit 1; }; \
 	fi
 	@echo ""
 	@echo "  === Service Credentials ==="
