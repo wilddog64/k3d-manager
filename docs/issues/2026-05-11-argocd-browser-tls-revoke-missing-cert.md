@@ -17,8 +17,8 @@ state                      revokedmake: *** [up] Error 1
 The Vault revoke helper was still issuing a revoke request even when the serial lookup already showed that the cert no longer existed under `pki/cert/`. That made the cleanup path too eager for a rebuild scenario where the prior cert had already been replaced or revoked by an earlier run.
 
 ## Fix
-- [`scripts/plugins/vault.sh`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/plugins/vault.sh) now treats a missing cert serial as a best-effort cleanup case and returns success without attempting the revoke write.
-- [`scripts/tests/plugins/vault.bats`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/tests/plugins/vault.bats) now covers the missing-cert path so the cleanup helper cannot abort bootstrap again.
+- [`scripts/plugins/vault.sh`](../../scripts/plugins/vault.sh) now treats a missing cert serial as a best-effort cleanup case and returns success without attempting the revoke write.
+- [`scripts/tests/plugins/vault.bats`](../../scripts/tests/plugins/vault.bats) now covers the missing-cert path so the cleanup helper cannot abort bootstrap again.
 
 ## Verification
 - `shellcheck -S warning scripts/plugins/vault.sh scripts/plugins/argocd.sh`

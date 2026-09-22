@@ -3,6 +3,7 @@
 Each broken-link case asserts the checker *fails*, and each false-positive case asserts it
 *passes* — a checker that never fires and a checker that always fires are equally useless.
 """
+import re
 import importlib.machinery
 import importlib.util
 from pathlib import Path
@@ -136,6 +137,28 @@ def test_directory_link_with_fragment_is_not_anchor_checked(tmp_path):
 
 
 # --- the live tree ---------------------------------------------------------------------
+
+def test_no_doc_links_target_an_absolute_path():
+    """An absolute link resolves on the author's machine and nowhere else.
+
+    `/Users/cliang/.../scripts/plugins/vault.sh` exists locally, so both `make check-doc-links`
+    and this module's broken-link gate pass on a Mac and fail on the Linux CI runner. Banning the
+    shape outright makes the failure reproducible locally.
+    """
+    offenders = []
+    for path in cdl.default_files():
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for lineno, line in enumerate(text.splitlines(), 1):
+            for match in re.finditer(r"\]\((/[^)\s]+)\)", line):
+                offenders.append(
+                    f"{path.relative_to(ROOT)}:{lineno} {match.group(1)}"
+                    " — absolute link target; use a repo-relative path"
+                )
+    assert offenders == [], "\n".join(offenders)
+
 
 def test_repo_docs_have_no_broken_links():
     """The gate itself: the committed tree must stay clean."""
