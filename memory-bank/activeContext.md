@@ -28,10 +28,67 @@ from the PV's `nodeAffinity` (fails closed on ambiguity), and the contract test 
 iterate `_hub_recovery_records` and call `_hub_recovery_claim_tree` against the captured tree.
 Suites re-run by Claude: hub_recovery 27/27, hub_snapshot 14/14, smoke 7/7, shellcheck RC=0.
 
-**Known deviation, not blocking:** the free-space preflight runs *after* the full local capture
-rather than before it, so a full M2 wastes ~2.15G of local staging I/O instead of failing fast.
-Test 6 asserts only that no remote directory was created. Some local staging is inherent to
-pulling data out of containers; the `trap` cleans it up on both paths.
+**Free-space preflight REMOVED** in `d1c8b5b3` at the operator's request. It ran *after* the
+full local capture, so it never delivered the "refuse before copying anything" behaviour the
+spec asked for — it only guarded the M2 transfer, which `rsync` already fails on when the
+destination is full. Removed rather than moved: it bought no safety the transfer did not
+already provide. The insufficient-space BATS case was replaced by its **inverse** — a
+successful capture must issue no remote `df`, so restoring the preflight fails the suite
+(mutation-verified). Requirement 3 and case 6 struck in place in the spec with the reason;
+numbering left intact. Suite stays at 14 cases.
+
+Residual gap, accepted knowingly: on a transfer failure the remote directory is now left
+un-marked rather than `.INCOMPLETE` (checksum failures still mark it). A two-line change
+would close it; deferred pending the operator's word.
+
+`make test` after the removal: **1031 ok / 0 not ok** — count reconciles exactly (one case
+out, one in). First run showed 4 reds in `e2e_remote.bats`, which is the documented
+**unpushed-HEAD** signature, not a regression: local HEAD was `d1c8b5b3` while origin was
+still `2ee4ad86`. After pushing, `e2e_remote` is 74/74. Process note: the run was launched as
+`make test > log 2>&1; echo "EXIT=$?"`, whose trailing `echo` always succeeds — the harness
+reported exit 0 for a run where `make` printed `*** [test] Error 1`. `make test; echo $?` is
+not a way to check an exit code.
+
+## 2026-09-22 — Webhook server decomposition specced and QUEUED for v1.37.0
+
+`docs/plans/v1.37.0-webhook-server-decomposition.md` (`1b67b2db`). **Queued, not for
+implementation during v1.36.0**, which is at the five-plan-doc cap; v1.37.0 now has 1.
+
+`bin/k3dm-webhook` is **4,009 lines / 180KB**, ~110 module-level functions, 19 routes. Measured
+concern clusters: cluster lifecycle 1233, smoke-SSO client 483, ask/agent invoker 450, Slack
+thread commands 362, failure analysis 153, authz/policy 149, metrics 100, redaction 50 (2980
+grouped). Two do not belong in an HTTP server at all — the smoke cluster is a
+browser-emulating SSO client subclassing `HTMLParser` and walking an OAuth code flow, and the
+agent cluster invokes an AI agent with a mutate-the-cluster "fix mode".
+
+**The defect is adjacency, not size.** `do_POST` spans 3515–3942 (428 lines); the role
+resolution for `/api/v1/make` is at line **3642** and the handler that spawns the job at
+**3880** — 238 lines apart in one method. Nothing is wrong with either block; no reviewer can
+hold both in view. This is the component the operator has named as their top security worry.
+
+Extraction is ordered by **value-if-stopped-early**, not by size: Phase 1 is `policy.py` + an
+explicit route table declaring `(path, min_role, handler)` on one line each, so the security
+payoff lands even if later phases never do. Then smoke.py (483, pinned by 14 pytest cases),
+agent.py (450 — `_fix_mode_enabled` gates cluster mutation and has **no test today**; one must
+be added with the move), lifecycle.py/status.py (1233). Recommended **against** a rewrite: the
+stalled `scripts/lib/webhook/` extraction (412 lines, 5 modules) proves incremental works.
+
+Measured baseline net that must stay green: **105 cases** — webhook.bats 64 (58 run, 6
+live-gated), webhook_hub_eso.bats 4, webhook_make_targets.py 11, webhook_redaction.py 6,
+webhook_request_hardening.py 6, test_smoke_logins.py 14.
+
+**Two findings worth carrying forward.** (1) The three `webhook_*.py` files are
+`unittest.TestCase`, not pytest, and run only because `make test-python-unit` loops
+`scripts/tests/bin/*.py` skipping `test_*`. I initially suspected they were orphaned and was
+wrong — but they are invisible to both `make test` and `make test-pytest`, so `make test`
+alone cannot catch a break in any of the 37 Python cases. Use `make test-all`. (2) All four
+Python suites load the entrypoint wholesale via `SourceFileLoader` and reach into private
+attributes (`wh._REDACT_VALUES`, `wh._redact_secrets`), so moving a function breaks them
+unless the test is repointed in the same commit. Permanent re-export shims are barred — they
+keep the file long and defeat the purpose.
+
+Also confirmed: `scripts/plugins/smoke.sh` (72 lines, v1.36.0) does **not** duplicate the
+webhook's 483-line smoke client today. Converging them is explicitly out of scope.
 
 ## 2026-09-22 — Grafana "no data" triaged; smoke + hub-snapshot specs assigned to Codex
 

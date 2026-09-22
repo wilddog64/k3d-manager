@@ -13,8 +13,20 @@
   `K3DM_SNAPSHOT_DIR` tilde default that would have created a directory literally named `~` on
   the M2, and the stale "seven logical claims" message after Loki made it eight. Suites re-run
   independently: hub_recovery 27/27, hub_snapshot 14/14, smoke 7/7, shellcheck RC=0.
-- [ ] **Deviation noted:** free-space preflight runs after the local capture, not before, so a
-  full M2 wastes ~2.15G of staging I/O rather than failing fast. Non-blocking.
+- [x] **Free-space preflight REMOVED at the operator's request** — `d1c8b5b3`, pushed. It ran
+  after the full local capture, so it never gave the "refuse before copying anything" behaviour
+  the spec asked for; it only guarded the M2 transfer, which `rsync` already fails on when the
+  destination is full. The insufficient-space BATS case was replaced by its inverse (a capture
+  must issue no remote `df`), mutation-verified by restoring the preflight. Suite stays at 14.
+  `make test` **1031/1031** after the removal — count reconciles exactly.
+  - The pre-commit `_agent_audit` blocked the first attempt ("@test blocks decreased"). That
+    guard is correct and was **not** bypassed with `--no-verify`; the replacement guard was
+    written instead, which is a stronger test than the one deleted.
+  - 4 reds in `e2e_remote.bats` on the first run were the documented **unpushed-HEAD**
+    signature, not a regression (local `d1c8b5b3` vs origin `2ee4ad86`). 74/74 after pushing.
+- [ ] **Residual gap, accepted knowingly:** on a *transfer* failure the remote directory is left
+  un-marked rather than `.INCOMPLETE` (checksum failures still mark it). Two-line fix available;
+  awaiting the operator's word.
 - [x] **`make test` 1031/1031, 0 `not ok`, against the live post-fix tree.** The first run showed
   1030 but predated Claude's two fixes — caught because the arithmetic was too clean
   (1010 + 7 + 13 = 1030, no room for the added 14th case). Re-run reconciles exactly at 1031.
@@ -22,6 +34,27 @@
 - [x] `docs/howto/makefile.md` corrected — it still documented the removed `~/k3dm-snapshots`
   default; now warns explicitly against a `~`-prefixed value. The `docs/issues/2026-09-11`
   mention of "seven logical claims" was deliberately left as historical record.
+
+## 2026-09-22 — Webhook decomposition specced, QUEUED for v1.37.0
+
+- [x] **Spec written and pushed** — `docs/plans/v1.37.0-webhook-server-decomposition.md`
+  (`1b67b2db`). **QUEUED — not for implementation in v1.36.0**, which is at the max-5 cap.
+  v1.37.0 now holds 1 plan doc.
+- [x] Measured the target before opining: `bin/k3dm-webhook` is 4,009 lines / 180KB, ~110
+  module-level functions, 19 routes, ~10 concerns (lifecycle 1233, smoke-SSO client 483,
+  agent invoker 450, Slack 362, analysis 153, authz 149, metrics 100, redaction 50).
+- [x] **Named the real defect as adjacency, not size** — `/api/v1/make` role resolution at
+  line 3642, job-spawning handler at 3880, 238 lines apart inside a 428-line `do_POST`.
+- [x] Recommended **against** a rewrite; four phases ordered by value-if-stopped-early with
+  the authz route-table first, so the security payoff lands even if the rest slips.
+- [x] Baseline net measured at **105 cases** across 6 suites and recorded in the spec.
+- [ ] **Follow-up worth acting on independently of the refactor:** `_fix_mode_enabled` gates
+  whether an AI agent may mutate the cluster and has **no test today**. Phase 3 adds one, but
+  it does not have to wait for the refactor.
+- [ ] **Gate hygiene finding:** the three `webhook_*.py` suites are `unittest`, run only via
+  `make test-python-unit`'s `scripts/tests/bin/*.py` loop, and are invisible to both
+  `make test` and `make test-pytest` — so `make test` cannot catch a break in any of the 37
+  Python cases. Use `make test-all`. (Initially suspected orphaned; that was wrong.)
 
 ## 2026-09-22 — Grafana triage + two specs assigned to Codex
 
