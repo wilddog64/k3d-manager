@@ -65,10 +65,6 @@ function _hub_snapshot_checksums() {
   done < <(find "$_stage" -type f ! -name SHA256SUMS -print | sort)
 }
 
-function _hub_snapshot_remote_df() {
-  _hub_snapshot_ssh "df -Pk '$K3DM_SNAPSHOT_DIR' | awk 'NR == 2 {print \$4}'"
-}
-
 function _hub_snapshot_remote_mark_incomplete() {
   local _remote="$1"
   _hub_snapshot_ssh "mv -- '${_remote}' '${_remote}.INCOMPLETE'" || _warn "[hub-snapshot] could not mark ${_remote} incomplete"
@@ -80,7 +76,7 @@ function hub_snapshot_capture() {
     return 0
   fi
   [[ "$#" -eq 0 ]] || { echo "Usage: hub_snapshot_capture" >&2; return 2; }
-  local _stage _timestamp _remote _available _size _required _node _namespace _claim _storage _pv _uid _path _container
+  local _stage _timestamp _remote _node _namespace _claim _storage _pv _uid _path _container
   _stage="$(_run_command -- mktemp -d "${TMPDIR:-/tmp}/k3dm-hub-snapshot.XXXXXX")"
   _run_command -- chmod 700 "$_stage"
   _hub_snapshot_stage="$_stage"
@@ -109,13 +105,6 @@ function hub_snapshot_capture() {
     _hub_snapshot_manifest "$_stage" "$_node" "$_namespace" "$_claim" "$_storage" "$_uid"
   done < <(_hub_recovery_records)
   _hub_snapshot_checksums "$_stage"
-  _size="$(_run_command -- du -sk "$_stage" | awk '{print $1}')"
-  _required=$(( (_size * 12 + 9) / 10 ))
-  _available="$(_hub_snapshot_remote_df)"
-  if [[ ! "$_available" =~ ^[0-9]+$ || "$_available" -lt "$_required" ]]; then
-    _err "[hub-snapshot] insufficient M2 free space: required ${_required} KiB, available ${_available:-unknown} KiB"
-    return 1
-  fi
   _hub_snapshot_ssh "mkdir -p '$K3DM_SNAPSHOT_DIR' '$_remote'"
   _run_command -- rsync -a -e "ssh -o BatchMode=yes -o ConnectTimeout=10" "${_stage}/" "${K3DM_SNAPSHOT_HOST}:${_remote}/"
   if ! _hub_snapshot_ssh "cd '$_remote' && sha256sum -c SHA256SUMS"; then

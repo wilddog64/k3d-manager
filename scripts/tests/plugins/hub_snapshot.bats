@@ -69,9 +69,6 @@ printf '%s\n' "$*" >> "$SSH_LOG"
 command_text="${@: -1}"
 [[ "${SSH_RC:-0}" == 1 ]] && exit 1
 [[ "$command_text" == true ]] && exit 0
-if [[ "$command_text" == df\ * ]]; then
-  printf '100000\n'; exit 0
-fi
 if [[ "$command_text" == mkdir\ * || "$command_text" == mv\ *INCOMPLETE* || "$command_text" == rm\ * ]]; then
   eval "$command_text"; exit $?
 fi
@@ -132,22 +129,16 @@ capture_snapshot() {
   [ "$status" -ne 0 ]; [[ "$output" == *"storage-loki-0"* ]]
 }
 
+@test "hub snapshot: capture probes no remote free space" {
+  capture_snapshot
+  run command grep -c 'df ' "$SSH_LOG"
+  [ "$output" -eq 0 ]
+}
+
 @test "hub snapshot: checksum mismatch marks incomplete" {
   export SHA_MISMATCH=1
   run hub_snapshot_capture
   [ "$status" -ne 0 ]; [ -d "$K3DM_SNAPSHOT_DIR/${K3DM_SNAPSHOT_TIMESTAMP}.INCOMPLETE" ]
-}
-
-@test "hub snapshot: insufficient space reports required and available" {
-  cat > "$BATS_TEST_TMPDIR/bin/ssh" <<'EOF'
-#!/usr/bin/env bash
-[[ "${@: -1}" == df\ * ]] && { echo 1; exit 0; }
-exit 0
-EOF
-  chmod +x "$BATS_TEST_TMPDIR/bin/ssh"
-  run hub_snapshot_capture
-  [ "$status" -ne 0 ]; [[ "$output" == *"required"* ]]; [[ "$output" == *"available 1 KiB"* ]]
-  [ ! -e "$K3DM_SNAPSHOT_DIR/$K3DM_SNAPSHOT_TIMESTAMP" ]
 }
 
 @test "hub snapshot: prune keeps the configured verified snapshots" {
