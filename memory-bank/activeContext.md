@@ -1,5 +1,57 @@
 # Active Context — k3d-manager
 
+## 2026-09-22 — ACG auto-login IS wired; the gap is an unpopulated Keychain item
+
+Spec queued: `docs/plans/v1.37.0-acg-autologin-enablement-for-tier2.md` (v1.37.0 now at 3 plan docs,
+cap is 5).
+
+**Correcting a misreading that persisted across several sessions.** Tier 2's P4 was recorded as
+"Operator's action (Keychain `k3dm-acg-pluralsight`, or one manual sign-in in `pw-profile`)", which
+was read as *ACG login is a manual step / the session gate is not wired*. Verified against the live
+tree — it is fully wired:
+
+```
+make -C scripts/lib/foundation credential-test
+  → scripts/lib/acg/bin/acg-credential-test:7-8   source cdp.sh; _browser_launch (unconditional)
+     → _browser_launch          cdp.sh:132 (Chrome already up) AND :163 (fresh launch)
+        → _cdp_ensure_acg_session   cdp.sh:166
+           → _secret_load_data k3dm-acg-pluralsight username|password   cdp.sh:184-185
+```
+
+The auto-login landed in v1.14.0 / lib-foundation v0.4.1 (`b7c849c`) and v0.4.2 (`96bea46`, which
+wired the gate into both `_browser_launch` paths) and was subtree-pulled. **It fires on every run.**
+
+**The real gap:** `security find-generic-password -s "k3dm-acg-pluralsight"` → **ABSENT** on this
+box. `cdp.sh:184-185` loads both keys with `2>/dev/null || true`, so the gate gets two empty strings
+and takes its `ACG_LOGIN_NO_CREDS` branch, which surfaces to a non-TTY caller as
+`ACG_SESSION_EXPIRED`. Not a code defect — an unpopulated secret plus a missing preflight that would
+have named it.
+
+**Second finding:** `e2e_verify_sandbox` (`scripts/plugins/e2e.sh:294`) sets
+`_E2E_ACTIVE_PHASE="preflight"` and then checks **nothing** — its first live action is
+`acg_extend_playwright "${_ACG_SANDBOX_URL:-}"` at :315. So a missing credential fails minutes later
+inside Playwright (`Buttons: ["Sign in"]`) and the summary blames `extending-sandbox`. Task 1 of the
+spec adds `_e2e_sandbox_preflight_auth`, which also refuses to run when
+`K3DM_ACG_SKIP_SESSION_CHECK=1` (`cdp.sh:167`) — that var bypasses the session gate and would let an
+acceptance run drive a signed-out browser.
+
+**Blocking question (Task 0), operator-only:** does the ACG account carry MFA?
+`docs/bugs/v1.14.0-bugfix-acg-pluralsight-autologin.md:394` — the login refuses MFA challenges **by
+design**, and the MFA/company account must never be stored in that Keychain item. Path A (no MFA) =
+populate the item once, P4 closes permanently, unattended for non-TTY callers. Path B (MFA) =
+auto-login is impossible by design, `pw-profile` holds the only session, P4 is never "closed" only
+"currently valid". Not answered yet.
+
+**Live state observed 2026-09-22:** CDP browser running; `pw-profile/Default/Cookies` written 09:45
+today, so a session may already be valid independent of the Keychain item. The stale sibling
+`profile` dir (cookies last written 2026-08-20, nearly empty) is the classic false lead — the CDP
+default moved `profile` → `pw-profile` so the browser stays version-locked to the pinned Playwright.
+Neither dir may be deleted.
+
+**Does NOT unblock Stripe 4/4.** P3 (`KeycloakRealmRoleConverter` absent from
+`shopping-cart-payment` `origin/main`) still causes the payment→Stripe 403; a PR there is not
+approved.
+
 ## 2026-09-22 — v1.36.0 smoke and hub snapshot features
 
 Smoke feature committed as `6f1f7fd1` (`feat(smoke): add a unified make smoke target with tiered checks`).

@@ -481,6 +481,16 @@
   not exist; unimplemented since v1.25.0. Precondition before the spec: the **ACG login live gate**
   (Keychain `k3dm-acg-pluralsight`, or one manual sign-in in `pw-profile`) — the false-green fix is
   vendored but has never passed live, and Tier 2's Stripe acceptance would sit on top of it.
+  **UPDATE 2026-09-22 — the "ACG login live gate" wording above is misleading and caused a
+  multi-session misreading.** `e2e_verify_sandbox` now EXISTS (`scripts/plugins/e2e.sh:294`), and the
+  headless auto-login is fully wired: `acg-credential-test:7-8` calls `_browser_launch`
+  unconditionally, which calls `_cdp_ensure_acg_session` on both paths (`cdp.sh:132,163`), which
+  reads `k3dm-acg-pluralsight` (`cdp.sh:184-185`). The gate fires on EVERY run. The only gap is that
+  the Keychain item is **ABSENT** on this box, so the gate gets empty creds and fast-fails
+  `ACG_LOGIN_NO_CREDS` → `ACG_SESSION_EXPIRED` to non-TTY callers. Spec queued:
+  `docs/plans/v1.37.0-acg-autologin-enablement-for-tier2.md`. Blocking operator question: does the
+  ACG account carry MFA (auto-login refuses MFA by design)? If no → populate the item once and P4
+  closes permanently; if yes → permanently manual via `pw-profile`.
   Then: Tier 2 spec → implementation → HTTP/2 protocol label + failure-rate panel. Still blocked
   meanwhile: Stripe live E2E at 2/4, and `docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`.
 
