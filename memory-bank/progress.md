@@ -662,3 +662,10 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
       `docs/bugs/2026-09-21-image-promotion-rebase-fallback-cannot-resolve-concurrent-newtag-conflict.md`
 - [ ] **Dispatch the refetch-loop fix to Codex** — BLOCKED until `fix/pass-promoter-ssh-key` merges
       in shopping-cart-infra (same file).
+- [ ] **`make show-service-passwords` hard-fails on a healthy Vault** — `Makefile:500` probes the
+  optional display mirror `secret/argocd/admin` (404) to decide Vault reachability, then exits 1
+  and blocks all four credentials. Live probe proved Vault healthy: `auth/token/lookup-self` 200,
+  `observability/grafana` **200**. Spec:
+  `docs/bugs/2026-09-21-show-service-passwords-liveness-probe-uses-optional-kv-path.md`.
+  M1 = swap probe to `auth/token/lookup-self`; M2 = retry the `argocd-initial-admin-secret` read
+  in `_hub_recovery_mirror_argocd_admin` (bootstrap race, ~6 min window observed); M3 = doc.

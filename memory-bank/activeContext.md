@@ -1698,3 +1698,20 @@ classifier (CI Bypass) and was not worked around; after the user explicitly aske
 succeeded, and `enabled` reads `false`. #99 still reports `MERGEABLE / BLOCKED` because the ruleset
 requires one approval — disabling enforce_admins grants the admin bypass, it does not rewrite that
 status. **Owed: re-enable with a bodyless POST after the merge.**
+
+## 2026-09-21 — `make show-service-passwords` root-caused (bug filed)
+
+`make show-service-passwords` exits 1 with "Vault credential lookup still unavailable (check
+Vault token and port-forward)" while **every layer the message blames is healthy**. Live probe
+of `127.0.0.1:18200`: `sys/health` 200, `auth/token/lookup-self` 200 (403 anonymous),
+`secret/data/observability/grafana` **200**, `secret/data/argocd/admin` **404**.
+
+Root cause: `Makefile:500` uses the optional display mirror `secret/argocd/admin` as its Vault
+liveness probe. That path's only producer, `_hub_recovery_mirror_argocd_admin`
+(`scripts/plugins/hub_recovery.sh:118-140`), `return 0`s on every failure branch — so its
+absence is a supported outcome, not a fault. The gate turns that cosmetic gap into a hard exit
+that blocks all four credentials, including Grafana's, which was readable the whole time.
+
+Spec: `docs/bugs/2026-09-21-show-service-passwords-liveness-probe-uses-optional-kv-path.md`.
+Fix is M1 probe swap to `auth/token/lookup-self` (+ M2 mirror bootstrap-race retry, M3 doc).
+Not yet assigned.
