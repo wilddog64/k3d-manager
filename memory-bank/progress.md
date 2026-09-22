@@ -1,5 +1,31 @@
 # Progress — k3d-manager
 
+## 2026-09-22 — Grafana triage + two specs assigned to Codex
+
+- [x] **Grafana "no data" root-caused — hub is healthy.** Prometheus 31 targets up and
+  serving; datasource correct and unauthenticated; 30 dashboard ConfigMaps provisioned;
+  no query errors in Grafana logs; `grafana.3ai-talk.org` returns 200. Empty panels are
+  three separate, expected causes: the last e2e run FAILED 15.6h ago and no successful run
+  has ever been recorded (`e2e_last_success_timestamp_seconds` never published); Hermes
+  sensor metrics are off because `K3DM_HERMES_STATUS_ENABLED` is deliberately unset; and
+  `trivy_*` / `hermes_incident_active` DO have data. No prefix mismatch.
+- [ ] **e2e failure-detail gap (NEW, real).** A failed run published no `e2e_failure_info`
+  or `e2e_failure_group_info`, and `e2e_run_info` carries a malformed `failure_ratio="/"`
+  (empty-over-empty). Belongs to `docs/plans/v1.36.0-e2e-deterministic-triage-and-corpus.md`.
+- [ ] **Tier 1 e2e blocked (verified).** `gh` token scopes lack `read:packages`
+  (`admin:public_key, gist, read:org, repo`), so the Playwright job cannot pull from GHCR.
+  Operator action: `gh auth refresh -h github.com -s read:packages`. Runner otherwise green.
+- [ ] **Tier 2 e2e blocked (verified).** No ACG context exists; manual TTY login required.
+- [x] **Specs written and pushed** as `b37acb91` on `k3d-manager-v1.36.0`:
+  `docs/plans/v1.36.0-make-smoke-target.md` and
+  `docs/plans/v1.36.0-hub-snapshot-capture-and-retention.md`.
+  This brings v1.36.0 to **5 plan docs — at the max-5 cap.** A 6th means splitting the release.
+- [ ] **Codex dispatched** (session `01a0c93c-45b4-7301-9ac7-661b66e21204`) to implement both,
+  two separate commits, fully offline/stubbed. Awaiting report; SHAs to be verified on
+  `origin/k3d-manager-v1.36.0` before trusting.
+- [ ] **Snapshot capture NOT wired into `make down`/`make up`** — deliberately out of scope
+  until capture is proven on a real hub.
+
 ## 2026-09-21 — rotate-ghcr-pat fix prepared; blocked before commit
 
 - [ ] `docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`:

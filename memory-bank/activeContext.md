@@ -1,5 +1,71 @@
 # Active Context — k3d-manager
 
+## 2026-09-22 — Grafana "no data" triaged; smoke + hub-snapshot specs assigned to Codex
+
+**Grafana is not broken.** Hub Prometheus has 31 active targets up and serves data; the
+`kube-prometheus-stack-grafana-datasource` ConfigMap points at
+`http://kube-prometheus-stack-prometheus.monitoring:9090/` unauthenticated (correct — hub
+Prometheus has no basic auth) and all 30 dashboard ConfigMaps provisioned cleanly. Grafana's
+own logs contain no datasource query errors. Grafana is reachable at `grafana.3ai-talk.org`
+(HTTP 200); its port-forward is `:3001`, not `:13000`.
+
+What is actually empty, and why — three independent causes, none of them a query fault:
+
+- **e2e dashboards.** `e2e_last_run_pass = 0` — the last run, 15.6h ago
+  (`run_id=1790025545-10464`, `tier=vcluster`, `runner=local-m4`), FAILED.
+  `e2e_last_success_timestamp_seconds` has **never** been published, so every
+  "last success" and trend panel is legitimately blank.
+- **e2e failure detail.** `e2e_failure_info` and `e2e_failure_group_info` are empty even
+  though the run failed, and `e2e_run_info` carries a malformed `failure_ratio="/"` —
+  an empty-over-empty division. A failed run produced no failure detail. This is the gap
+  `docs/plans/v1.36.0-e2e-deterministic-triage-and-corpus.md` covers.
+- **Hermes.** `hermes_sensor_status` and `hermes_last_poll_timestamp_seconds` empty because
+  `K3DM_HERMES_STATUS_ENABLED` is deliberately unset. By design.
+  `hermes_incident_active` and all `trivy_*` metrics DO have data.
+
+Metric names match the dashboards exactly — there is no `k3dm_` prefix mismatch.
+
+**Tier 1 and Tier 2 e2e remain unrunnable; both blockers verified, not assumed.**
+Tier 1: the `gh` token scopes are `admin:public_key, gist, read:org, repo` — no
+`read:packages`, so the in-cluster Playwright job cannot pull from GHCR. Runner health is
+otherwise green (`hub=ok`, `runner=m2jump`, `runner_status=available`). Operator must run
+`gh auth refresh -h github.com -s read:packages`. Tier 2: no ACG context exists at all
+(only `k3d-k3d-cluster` and `ubuntu-hostinger`); needs the manual TTY login.
+
+**Two specs written and pushed as `b37acb91`, dispatched to Codex (session
+`01a0c93c-45b4-7301-9ac7-661b66e21204`):**
+
+- `docs/plans/v1.36.0-make-smoke-target.md` — no `make smoke` exists today; three
+  `bin/smoke-test-*` scripts are invoked ad hoc. Tiered target: offline checks always,
+  cluster checks only when the context is reachable (unreachable = SKIP with a reason, not
+  FAIL). Deprecated `bin/smoke-test-jenkins` stays unwired.
+- `docs/plans/v1.36.0-hub-snapshot-capture-and-retention.md` — **the restore half already
+  exists** (`hub_recovery_plan/validate/targets/restore`, executed 2026-09-11). Only capture
+  is missing. Capture must emit the exact layout `hub_recovery_restore` already consumes
+  (`server-db/state.db`, `server-token`, `pv-pvc.yaml`, `node-*-storage/pvc-<uid>_<ns>_<claim>/`),
+  offload to M2, and prune.
+
+**Measured sizes (hub, 2026-09-22):** Prometheus 2.0G, keycloak-postgres 67M, Loki 46M,
+Vault 23M → **≈2.15G per snapshot**. M2 (`m2jump`/`m2-air.local`) has **382Gi** free vs the
+M4's 163Gi, so M2 is the store, as the operator proposed.
+
+**Retention ceiling — the governing constraint.** Hub Prometheus runs
+`--storage.tsdb.retention.time=3d --storage.tsdb.retention.size=8GB` and prunes
+out-of-retention blocks *at startup*. A snapshot older than 3 days therefore restores blocks
+Prometheus immediately deletes — the feature would silently do nothing. Snapshot retention
+defaults to 3 kept snapshots for that reason. Long-term history needs raised retention or
+remote-write, NOT snapshots. `enableAdminAPI` is `false` and stays false: capture happens
+during teardown, so a cold copy is consistent by construction.
+
+Two spec decisions worth remembering: node placement must be **derived from the live PV**,
+not read from `_hub_recovery_records` — `local-path` pins to whichever node the pod landed
+on, and Prometheus measured on `agent-1` today while the record says `agent-0`. And Vault KV
+needs no separate export: `secrets/data-vault-0` is the file backend and already contains it.
+
+Wiring capture into `make down`/`make up` is explicitly OUT of scope until capture is proven
+on a real hub — adding a 2.15G transfer to the destructive `down` path unreviewed is not
+acceptable.
+
 ## 2026-09-22 — Prometheus reseed and rotator CI fix
 
 Implemented and committed as `7d475a9fe1e8e5f051d035b4f917559341d8b127` (`fix(observability): distinguish unreachable Vault from an absent Prometheus entry`), then pushed to `origin/k3d-manager-v1.36.0`. Vault reachability now gates Prometheus reseeding; unreachable Vault skips without writing, while an absent entry still reseeds. The two reseed security assertions are effective, the Alertmanager test is hermetic and checks the real unresolved-value gate, and the Keycloak/ArgoCD rotators use BusyBox-compatible `base64 -d`. Added the platform-ops regression suite and rotation-guide note. Verification: shellcheck, all focused suites, doc links, and `make test` (1,010/1,010) passed; `scripts/tests/lib/observability.bats` is unchanged.
