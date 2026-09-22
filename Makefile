@@ -569,7 +569,7 @@ show-service-passwords:
 	_op=$$(./bin/get-keycloak-password operator -q 2>/dev/null || true); \
 	_kc_hint="N/A"; \
 	if [ -z "$$_realm_admin$$_dev$$_op" ]; then \
-	  _kc_hint="not provisioned on this cluster (seeded by bin/cluster-up, not by make up)"; \
+	  _kc_hint="no Vault record on this cluster (LDAP accounts exist; only bin/cluster-up Step 10d.5 stores the plaintext, and it cannot be recovered - reset to display)"; \
 	fi; \
 	echo "  Frontend    https://frontend.3ai-talk.org  (login via Keycloak SSO)";\
 	echo "  Keycloak    https://keycloak.3ai-talk.org";\
