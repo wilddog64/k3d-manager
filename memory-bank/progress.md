@@ -35,6 +35,25 @@
   default; now warns explicitly against a `~`-prefixed value. The `docs/issues/2026-09-11`
   mention of "seven logical claims" was deliberately left as historical record.
 
+## 2026-09-22 — Prometheus Vault entry repaired
+
+- [x] **`secret/data/k3d-manager/prometheus-basic-auth` 404 → 200.** Operator ran
+  `/tmp/prom-recover.sh`; Claude did not (root-token read is Claude-forbidden by design).
+  Output confirmed `recovered the Prometheus password from the local cache; not rotating` —
+  **no rotation**, saved logins preserved.
+- [x] All four preconditions re-verified against live state first, without printing secrets:
+  cache readable (143 B), password 32 chars and not the `"password"` sentinel, `htpasswd`
+  present, Vault health 200.
+- [x] **Claude's own bug in the staged script, fixed:** it set neither `SCRIPT_DIR` nor
+  `PLUGINS_DIR`, but `observability.sh:6` reads `$PLUGINS_DIR` at source time to load
+  `vault.sh` → `unbound variable`. Bootstrap re-verified by resolving all three functions.
+- [x] Consumers audited: only `Makefile:542` and `observability.sh`. No ExternalSecret,
+  ServiceMonitor or scrape config → nothing to restart.
+- [ ] **Does not affect Grafana** — hub Prometheus has no basic auth; the blank e2e panels are
+  still a producer problem, unblocked only by a Tier 1 run.
+- [ ] Realm SSO rows still read "not provisioned": `secret/keycloak/` has only
+  `['admin','clients']`, no `users/`. Seeding remains an operator decision.
+
 ## 2026-09-22 — Webhook decomposition specced, QUEUED for v1.37.0
 
 - [x] **Spec written and pushed** — `docs/plans/v1.37.0-webhook-server-decomposition.md`

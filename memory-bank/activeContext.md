@@ -49,6 +49,42 @@ still `2ee4ad86`. After pushing, `e2e_remote` is 74/74. Process note: the run wa
 reported exit 0 for a run where `make` printed `*** [test] Error 1`. `make test; echo $?` is
 not a way to check an exit code.
 
+## 2026-09-22 — Prometheus Vault entry REPAIRED (operator-run)
+
+`secret/data/k3d-manager/prometheus-basic-auth` was **404**; it is now **200**. The operator ran
+`/tmp/prom-recover.sh`; Claude did not execute it, because the script reads the Vault root token
+via `kubectl` into a curl header and that read is on Claude's do-not-touch list — structured so
+the token stays in the operator's shell.
+
+Output confirmed the intended branch: `recovered the Prometheus password from the local cache;
+not rotating`. **No rotation**, so existing saved Prometheus logins keep working.
+
+Preconditions re-verified live before the run (not carried over from the earlier session):
+cache at `~/.local/share/k3d-manager/prometheus-basic-auth.env` readable (143 bytes, user key
+present), cached password 32 chars and not the literal `"password"` (so the recovery branch
+rather than the generate branch), `htpasswd` present for the re-bcrypt, Vault health `http=200`.
+Secret values were never printed — length and a sentinel comparison only.
+
+**First run failed and the bug was Claude's:** `observability.sh:6` reads `$PLUGINS_DIR` at
+source time to pull in `vault.sh`, and the staged script set neither `SCRIPT_DIR` nor
+`PLUGINS_DIR` — it used a local `S="scripts"` nothing else knew about. Fixed by setting both
+absolutely; verified by sourcing the full chain in a throwaway shell and confirming
+`_observability_ensure_prometheus_login`, `_observability_seed_prometheus_vault_entry` and
+`_vault_exec` all resolve.
+
+**Consumers of this Vault path — nothing in-cluster:** `Makefile:542`
+(`show-service-passwords`) and `observability.sh`'s own ensure/seed/rotate logic. No
+ExternalSecret, no ServiceMonitor, no Prometheus scrape config. Nothing needed a restart.
+
+**This does NOT affect Grafana.** Hub Prometheus has no basic auth and the Grafana datasource is
+unauthenticated; this entry is a credential-store row for operator access and
+`show-service-passwords`. The blank e2e panels remain a producer problem — see
+`reference_e2e_dashboard_blank_means_empty_event_payload`.
+
+Still open, unchanged: realm SSO rows in `show-service-passwords` will still read "not
+provisioned on this cluster" because `secret/keycloak/` holds only `['admin','clients']` with no
+`users/` subtree. Seeding `secret/keycloak/users/*` remains an operator decision.
+
 ## 2026-09-22 — Webhook server decomposition specced and QUEUED for v1.37.0
 
 `docs/plans/v1.37.0-webhook-server-decomposition.md` (`1b67b2db`). **Queued, not for
