@@ -1716,3 +1716,33 @@ Spec: `docs/bugs/2026-09-21-show-service-passwords-liveness-probe-uses-optional-
 Fix `ef3d4b8d` swaps the probe to `auth/token/lookup-self`, retries the mirror bootstrap secret for
 up to 60 seconds, and documents that the mirror is optional. Focused BATS 31/31 and shellcheck
 passed; pushed to `origin/k3d-manager-v1.36.0`.
+
+**Independently verified (not taken from the Codex report).** `ef3d4b8d` + `f9d956ae` are on
+`origin/k3d-manager-v1.36.0`. Diff scope is exactly the six spec'd files. Re-ran the gates myself:
+`shellcheck -x scripts/plugins/hub_recovery.sh` rc 0; `bats` 31/31 green; and the mandatory mutation
+check against the pre-fix `Makefile` (`git show a7769892:Makefile`, never `git stash`) shows tests
+1-3 genuinely **red** and test 4 green — the N/A-degradation assertion correctly passes on both
+trees, since the credential blocks were never meant to change. Gate block now has zero occurrences
+of `secret/data/argocd/admin` and two of `auth/token/lookup-self`.
+
+## 2026-09-21 - image-promotion refetch fix pushed (`e99960e`, shopping-cart-infra)
+
+`fix/promote-refetch-instead-of-rebase` replaces the promote step's commit-then-`git pull --rebase`
+fallback with fetch -> `reset --hard origin/<ref>` -> reapply the `sed` -> commit -> push, bounded at
+5 attempts with `sleep $(( _attempt * 3 ))` backoff and an `::error::` exhaustion exit. Rebasing one
+`newTag:` edit onto another is a guaranteed content conflict, so the old fallback was structurally
+incapable of recovering - not flaky. The SSH/remote setup moved above the loop because `git fetch`
+now runs inside it.
+
+Gates verified by me on the working tree: YAML parses; `git pull --rebase` -> **0**;
+`git reset --hard` -> **1**; the `Verify the promoter SSH key was provided` guard -> **1** and still
+at a lower step index (12) than promote (13). One file changed.
+
+**Codex could not commit** - the same `.git/index.lock` `Operation not permitted` wall as the
+`bin/rotate-ghcr-pat` run. It left the edit in the working tree and said so plainly rather than
+fabricating a SHA. I reviewed the diff, committed and pushed it myself: `e99960e` on
+`origin/fix/promote-refetch-instead-of-rebase`. **No PR** - PR creation needs the user's go.
+
+**Noted, pre-existing, not introduced:** the promote step keeps `continue-on-error: true`, so the new
+`exit 1` does not fail the job on its own. A separate `Fail when image promotion did not complete`
+step (`if: steps.promote.outcome == 'failure'`) converts it, so exhaustion does surface as a red run.

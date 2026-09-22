@@ -674,3 +674,10 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `docs/bugs/2026-09-21-show-service-passwords-liveness-probe-uses-optional-kv-path.md`.
   M1 = swap probe to `auth/token/lookup-self`; M2 = retry the `argocd-initial-admin-secret` read
   in `_hub_recovery_mirror_argocd_admin` (bootstrap race, ~6 min window observed); M3 = doc. DONE.
+
+- [x] **image-promotion rebase fallback replaced `e99960e`** - `fix/promote-refetch-instead-of-rebase`
+      in shopping-cart-infra: fetch + `reset --hard` + reapply, 5 bounded attempts, no rebase.
+      Gates verified independently (`pull --rebase` 0, `reset --hard` 1, guard 1, YAML OK, guard step
+      index < promote). Codex hit the `.git/index.lock` wall so I committed and pushed the diff.
+      Spec: `docs/bugs/2026-09-21-image-promotion-rebase-fallback-cannot-resolve-concurrent-newtag-conflict.md`.
+      **PR not opened** - awaiting the user's go.
