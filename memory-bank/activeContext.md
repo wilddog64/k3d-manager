@@ -2,7 +2,7 @@
 
 ## 2026-09-22 — Prometheus reseed and rotator CI fix
 
-Implemented and committed as `0309b298` (`fix(observability): distinguish unreachable Vault from an absent Prometheus entry`). Vault reachability now gates Prometheus reseeding; unreachable Vault skips without writing, while an absent entry still reseeds. The two reseed security assertions are effective, the Alertmanager test is hermetic and checks the real unresolved-value gate, and the Keycloak/ArgoCD rotators use BusyBox-compatible `base64 -d`. Added the platform-ops regression suite and rotation-guide note. Verification: shellcheck, all focused suites, doc links, and `make test` (1,010/1,010) passed; `scripts/tests/lib/observability.bats` is unchanged. Push is pending.
+Implemented and committed as `7d475a9fe1e8e5f051d035b4f917559341d8b127` (`fix(observability): distinguish unreachable Vault from an absent Prometheus entry`), then pushed to `origin/k3d-manager-v1.36.0`. Vault reachability now gates Prometheus reseeding; unreachable Vault skips without writing, while an absent entry still reseeds. The two reseed security assertions are effective, the Alertmanager test is hermetic and checks the real unresolved-value gate, and the Keycloak/ArgoCD rotators use BusyBox-compatible `base64 -d`. Added the platform-ops regression suite and rotation-guide note. Verification: shellcheck, all focused suites, doc links, and `make test` (1,010/1,010) passed; `scripts/tests/lib/observability.bats` is unchanged.
 
 ## 2026-09-22 — Post-merge housekeeping for promoter PRs
 
