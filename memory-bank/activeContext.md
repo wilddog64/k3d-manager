@@ -1912,3 +1912,68 @@ mislabel a non-connection failure. Accepted.
 
 Corpus: 24 entries, 11 real + 13 synthetic, all five kinds covered, no duplicate ids, no
 omitted samples.
+
+## 2026-09-21 - Grafana admin password rotated (operator-approved); PR #130 open and RED
+
+**Grafana rotation DONE and verified.** Triggered the existing in-cluster rotator rather than
+running anything by hand: `kubectl create job --from=cronjob/grafana-credential-rotator -n
+monitoring` (job `grafana-rotate-manual-20260921-195152`). Prerequisites checked read-only
+first: CronJob present and unsuspended (had never run — `lastScheduleTime: <none>`),
+ExternalSecret `SecretSynced=True`, Grafana 1/1, `vault-0` ready, rotator SA present.
+
+Verified sequence from cluster state, not from the job's word: started 02:51:52Z → Vault write
+→ ESO `force-sync=1790045517` (02:51:57Z) → Grafana pod recreated 02:52:05Z → completed
+02:54:13Z, `SuccessCriteriaMet`, and the `trap restore EXIT` never fired. Login probe from
+inside the Grafana pod using its own mounted credential: **200**; same probe with a deliberately
+wrong password: **401**. The negative control matters — it proves the 200 is enforced auth and
+not a false green (the mistake I made earlier with the Prometheus probe). Grafana and Vault
+therefore agree, and the password the operator pasted into a session is now invalid.
+
+Note for future rotations: the rotator's own logs are empty by design (every step redirects to
+/dev/null), so progress must be read from cluster state. It does call
+`grafana cli admin reset-admin-password`, but with `--password-from-stdin` and only *after*
+Vault is updated and ESO re-synced — that is the sanctioned path. Running that CLI standalone
+remains forbidden because it desyncs Grafana from Vault.
+
+**Keycloak admin is NOT rotated and has no rotator.** Only `argocd-` and
+`grafana-credential-rotator` exist. Keycloak's admin password arrives via
+`scripts/etc/keycloak/externalsecret-admin.yaml.tmpl` → `auth.existingSecret` /
+`passwordSecretKey`, which is a **bootstrap-only** input: the admin user already exists in the
+database, so updating Vault and restarting will NOT change the live password. Rotation needs
+three ordered steps (change inside Keycloak via kcadm → update `secret/keycloak/admin`
+`admin_password` → verify). `db_password` in that same secret is the Postgres credential and
+must not be touched. Awaiting the operator's choice between a manual 3-step and specing a
+`keycloak-credential-rotator` to match the other two.
+
+### PR #130 is open and CI is RED — 4 failures, all introduced by this branch
+
+https://github.com/wilddog64/k3d-manager/pull/130 (`07bb4377`). `main` is fully green.
+
+1. `bats_negation_lint` test 57 — two bare `!` assertions in
+   `scripts/tests/plugins/observability_prometheus_reseed.bats:47,84`, from Codex's reseed run
+   (`6c744a23`). `!` suppresses `set -e`, so both assertions pass even when their grep matches:
+   they have never been capable of failing.
+2. `observability.bats` tests 3 and 8 — **a real design bug in my own reseed fix.**
+   `_observability_ensure_prometheus_login:290-296` collapses "Vault unreachable" and "entry
+   absent" into the same empty `_prom_creds`, so an unreachable Vault now fabricates a new
+   password, attempts a reseed, fails, and returns 1 — aborting `deploy_observability_acg`.
+   Test 8 exists to pin the opposite invariant (do not fabricate credentials when Vault is
+   unreadable), which is the "Vault is canonical" decision of
+   `docs/bugs/2026-06-09-prometheus-basic-auth-vault-managed.md`. curl distinguishes a 404 from
+   a connection failure; the code does not.
+3. `alertmanager_config_secret.bats` test 388 — asserts "all three values are required", a
+   message `ee32878f` replaced with "unresolved:". Its `kubectl` stub also returns empty, so the
+   target now exits at the root-token check before reaching the validation the test targets:
+   stubs need fixing, not just the string.
+
+**Verification lesson, the same shape twice.** For `6c744a23` I ran the two suites Codex named
+plus a mutation check and called it verified, but never ran the suites that already covered the
+function being changed (`scripts/tests/lib/observability.bats`) nor the repo-wide meta-lints
+(`scripts/tests/lib/bats_negation_lint.bats`). Changing a function means running every suite
+that touches it, not the suites the agent chose to mention.
+
+**Method error worth recording:** I first reported these as pre-existing on `main`. That was
+wrong. `scripts/tests/lib/observability.bats:14` uses a *relative* `source
+scripts/plugins/observability.sh`, which resolves against the working directory — so running
+bats from the main repo against a worktree path silently sources the branch's plugin. To test
+another ref, the working directory must actually be that worktree.
