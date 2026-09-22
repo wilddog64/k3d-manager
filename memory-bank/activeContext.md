@@ -1842,3 +1842,49 @@ fix repairs it on the next auth-proxy refresh rather than retroactively.
   nonconforming line. Proposed instead (NOT started, needs the user's go): a deterministic
   verdict taxonomy + static service->repo routing table, and back-label the 28 existing
   e2e/Hermes bug docs to produce the offline eval set.
+
+## 2026-09-21 - Deterministic E2E triage spec written and dispatched
+
+Spec: `docs/plans/v1.36.0-e2e-deterministic-triage-and-corpus.md` (`f670d731`). Dispatched to
+Codex (`scratchpad/handoff-e2e-triage.md`, session `01a0c6ab`). This is 2 of the 5-doc cap for
+v1.36.0. **No external model or service is involved** — deterministic Python and Bash only.
+
+Two findings the spec is built on, both verified against the live tree:
+
+- **Hermes misattributes every Tier 2 connection failure.** `scripts/lib/hermes/e2e_triage.py`
+  `_PORTS` covers only Tier 1 (8000 product-catalog, 8080 order, 8083 basket, 8084 payment).
+  Tier 2 uses **8081 order / 8082 product-catalog** (`_e2e_sandbox_job_manifest`,
+  `scripts/plugins/e2e.sh:141-250`), so a Tier 2 ECONNREFUSED classifies as
+  `("service-unreachable", "host-8081")` — no service attribution, no repo routing. Hermes is
+  the consumer that files bug docs, so Tier 2 failures file against `host-8081`. The union of
+  the two maps has no port collisions, so `e2e.sh`'s existing 6-entry map is the correct one and
+  Hermes is the incomplete copy. `scripts/tests/plugins/e2e.bats:240-258` (`sandbox-ports`)
+  already pins 8081/8082 and is correct — it must pass unchanged as the cross-tier check.
+
+- **`_e2e_write_summary` applies no redaction.** `failure_details` (<=200 entries, 300 chars of
+  raw Playwright error text each) is written to `~/.k3dm/e2e/<run>.json` and
+  `<run>.failures.json`, and published into a hub ConfigMap in `platform-ops` via
+  `_e2e_write_result_event`, then surfaced in Grafana. `e2e_remote.sh:583-591` validates shape
+  and length only. `hermes/e2e_triage.redact()` already exists and is applied on the Hermes side
+  (`sensors.py`, `e2e_bugs.py`, `status_triage.py`) — the `e2e.sh` writer path never adopted it.
+  Same failure class as the show-service-passwords Keycloak block: a redaction convention that
+  one code path does not follow.
+
+Correction to an earlier claim in this session: I had said `scripts/plugins/e2e.sh` contains
+zero classification or routing logic. That was wrong — there are **two** classifiers
+(`e2e.sh:711-760` inline heredoc, and `hermes/e2e_triage.py`) and they diverge on the port map,
+the timeout regex breadth, the contract regex, the unknown-port fallback, and redaction.
+
+Scope notes: no kind string is renamed (`service-unreachable`, `timeout`, `contract-drift`,
+`assertion`, `harness` are baked into the `e2e_bugs.py` hint table, `diff_groups` slugs, the
+`e2e_remote.sh` group schema, and the Grafana panels). The operator's vocabulary
+("infrastructure", "cross-service") is mapped in docs only. `cross-service` stays a **routing**
+value of `service`, not a kind. A new `auth` kind IS added — it was missing entirely.
+
+**Corpus size, stated honestly:** only 11 labelled samples exist (the `## Sample errors`
+bullets across the 5 machine-filed `2026-09-16-e2e-*` bug docs). `~/.k3dm/e2e/` yielded zero
+usable entries: the 4 summaries with real Playwright stats predate the `failure_details` feature
+(`978ea60f`, 2026-09-17) and the only post-feature run died at `deploying-substrate`. 11 is
+enough to pin a rule-based classifier against regression and nowhere near enough to validate a
+probabilistic or confidence-scored one — the corpus README must say so, so the number is not
+later cited as a calibration set.
