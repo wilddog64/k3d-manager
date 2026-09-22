@@ -2053,6 +2053,14 @@ fix repairs it on the next auth-proxy refresh rather than retroactively.
     exits non-zero on two info-level SC2016 hits and short-circuited the first run — the single
     quotes are required so `$LDAP_ADMIN_PASSWORD`/`$1` expand in the pod rather than leaking into
     the `kubectl exec` command string.
+  - **Durable fix QUEUED — `968ae5eb`, `docs/plans/v1.37.0-realm-sso-password-reseed.md`.**
+    Today's work was a repair plus an honest message, not a cure: the root cause recurs on every
+    `make up` hub rebuild. Spec adds `ldap_reseed_realm_users` (`ldap.sh`) +
+    `make reseed-realm-sso-users` and makes Step 10d.5 delegate to it. Present-record path
+    re-applies without rotating; absent-record path must distinguish "Vault unreachable" from
+    "record absent" or it rotates live passwords on a transient outage (the M1 defect already
+    filed against the Prometheus reseed — do not repeat). Operator asked for v1.34.0, which is
+    shipped and at the 5-doc cap; retargeted to v1.37.0 (now 2 docs).
   - **Reset script** (scratchpad `reseed-keycloak-users.sh`): mirrors Step 10d.5
     exactly (generate -> Vault KV put -> `ldappasswd` stdin -> `ldapwhoami` verify), prints no
     passwords, `chmod 600` header file. Preconditions verified live: openldap-0 present,

@@ -35,7 +35,37 @@
   default; now warns explicitly against a `~`-prefixed value. The `docs/issues/2026-09-11`
   mention of "seven logical claims" was deliberately left as historical record.
 
-## 2026-09-22 — Realm SSO password display: misleading hint fixed, reset staged
+## 2026-09-22 — Realm SSO reseed queued for v1.37.0
+
+- [x] **`968ae5eb` on origin — `docs/plans/v1.37.0-realm-sso-password-reseed.md`.** Specs
+  `ldap_reseed_realm_users` in `scripts/plugins/ldap.sh` + `make reseed-realm-sso-users`, and
+  requires `bin/cluster-up` Step 10d.5 to **delegate** to it rather than keep a second copy.
+  Core design: Vault record **present** → re-apply to LDAP, **no rotation**; **absent** →
+  generate + write + apply, rotation unavoidable. Mirrors the Prometheus
+  `recovered … not rotating` precedent.
+- [x] **Operator asked for v1.34.0 — impossible, retargeted.** `v1.34.0` is tagged/shipped AND
+  already at the 5-plan-doc cap, so a spec there could never be implemented. v1.35.0 shipped,
+  v1.36.0 at cap. v1.37.0 was the only milestone with room; now 2 docs.
+- [x] **Three traps recorded in the spec, each found by reading the tree, not assumed:**
+  - `ldap.sh:787 ldap_get_user_password` reads `secret/ldap/users/<u>` in ns **`vault`**, while
+    the realm users live at `secret/keycloak/users/<u>` in ns **`secrets`**
+    (`bin/get-keycloak-password:17,62`). Wiring the new target to the existing public function
+    would silently reseed nothing and look like "record absent". Test case 7 guards it.
+  - `_vault_kv_put/_exists/_get_field` exist **only** in `shopping_cart.sh:645,666,680` and need
+    `_vault_root_token`/`_vault_local_port` which `bin/cluster-up:381` sets. Cross-plugin calls
+    silently no-op under the lazy-loading dispatcher, so the new function must do its own Vault
+    access — precedent `bin/restore-hub-ghcr-pat:33,57`, `bin/rotate-ghcr-pat:32,46`.
+  - Do NOT copy `_ldap_sync_admin_password` (`:836`), which passes secrets via `env` on the exec
+    line; Step 10d.5's stdin idiom is correct and mandated.
+- [x] **Doc requirement pinned:** `docs/howto/rotate-service-credentials.md:151-155` already
+  documents this trap with no remedy; the spec's DoD requires that paragraph to name the new
+  target in the same release.
+- [x] **Explicitly out of scope, needs the operator's word:** adding `keycloak/users/*` to the
+  14-key hub seed allowlist (the other durable fix), and auto-reseeding on `make up` (would
+  silently rotate live passwords).
+- [x] Gates: `make check-doc-links` 1737 files OK; all cited line refs spot-checked live.
+
+## 2026-09-22 — Realm SSO password display: misleading hint fixed, reset done
 
 - [x] **`80970c04` on origin — `make show-service-passwords` stops lying.** The hint said
   `not provisioned on this cluster`, which reads as "these accounts do not exist". They do:
