@@ -2024,6 +2024,35 @@ fix repairs it on the next auth-proxy refresh rather than retroactively.
   unchanged-block guard (test 10) passing pre-fix as expected. Codex used the inline stdin
   idiom rather than `bin/vault-exec` because that wrapper parses only `-n|--namespace` and
   cannot pin `--context` - verified, correct call.
+- **Realm SSO hint corrected - `80970c04`, on origin.** 2026-09-22: the operator reported the
+  three realm users still showing `not provisioned on this cluster`. Diagnosis: the message is
+  **factually wrong**. `ldapsearch` on `ou=users,dc=home,dc=org` returns `uid=admin`,
+  `uid=developer`, `uid=operator` - all three exist with working passwords. Only the Vault copy
+  at `secret/keycloak/users/*` is absent, because `bin/cluster-up` Step 10d.5 (`:1018-1072`) is
+  the sole writer of that plaintext and this hub was rebuilt with `make up` while OpenLDAP's
+  local-path PV survived. **LDAP stores only hashes, so the plaintext is unrecoverable** - unlike
+  the Prometheus repair, there is no local plaintext cache to restore from. A reset is the only
+  route to a displayable password. Hint now reads `no Vault record on this cluster (LDAP accounts
+  exist; only bin/cluster-up Step 10d.5 stores the plaintext, and it cannot be recovered - reset
+  to display)`. Gates: `make show-service-passwords` rendered the new text live; BATS
+  `makefile_show_service_passwords` 10/10 (case 9 guards this block), `identity_tools` 5/5,
+  `webhook_make_targets` 11/11.
+  - **Ruled out, not assumed:** the `keycloak-credential-rotator` CronJob touches
+    `secret/keycloak/admin` only - it never writes `users/*`, which is why `LIST
+    secret/metadata/keycloak` returns `["admin","clients"]`. Its BusyBox `base64 --decode`
+    defect is already filed as M4 in
+    `docs/bugs/2026-09-22-ci-red-prometheus-reseed-and-rotator-base64.md`. Neither is the cause.
+  - **Checkpoint is NOT blocking:** `step-10d5-ldap-passwords.done` exists only under the
+    `k3s-aws` provider state dir, not for k3d - the hub seeder never ran here, so re-running it
+    would actually execute rather than skip.
+  - **Reset staged but NOT run** (scratchpad `reseed-keycloak-users.sh`): mirrors Step 10d.5
+    exactly (generate -> Vault KV put -> `ldappasswd` stdin -> `ldapwhoami` verify), prints no
+    passwords, `chmod 600` header file. Preconditions verified live: openldap-0 present,
+    `LDAP_ADMIN_PASSWORD` SET in the pod, Vault PF `http=200`, and `ldappasswd`/`ldapwhoami`/
+    `mktemp`/`openssl` all present in the pod (the BusyBox trap does not apply). `bash -n` and
+    `shellcheck` were **classifier-denied** (Secret-Store Writes), so the operator must lint and
+    run it via `!`. Seeding `secret/keycloak/users/*` remains gated on the operator's go because
+    it mutates live LDAP passwords.
 - **Jev / TypeSafe AI investigated - recommendation: do not integrate now.** A "System One"
   model (constrained decoding, typed choice + probability, 70-500ms, $0.042/MTok in, output
   free, 255-choice cap, text only, v0.01 early access). "Cannot hallucinate" means schema

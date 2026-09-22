@@ -35,6 +35,34 @@
   default; now warns explicitly against a `~`-prefixed value. The `docs/issues/2026-09-11`
   mention of "seven logical claims" was deliberately left as historical record.
 
+## 2026-09-22 — Realm SSO password display: misleading hint fixed, reset staged
+
+- [x] **`80970c04` on origin — `make show-service-passwords` stops lying.** The hint said
+  `not provisioned on this cluster`, which reads as "these accounts do not exist". They do:
+  `ldapsearch` on `ou=users,dc=home,dc=org` returns `uid=admin`, `uid=developer`, `uid=operator`,
+  all with working passwords. Only the Vault plaintext copy at `secret/keycloak/users/*` is
+  missing. New text names the real state and the real remedy.
+- [x] **Root cause:** `bin/cluster-up` Step 10d.5 (`:1018-1072`) is the sole writer of that
+  plaintext. This hub was rebuilt with `make up`, which does not run it, while OpenLDAP's
+  local-path PV survived — so the accounts persisted and the Vault records did not.
+- [x] **Plaintext is unrecoverable.** LDAP stores only hashes. Unlike the Prometheus repair
+  above, there is no local plaintext cache to restore from, so a **reset** is the only route to
+  a displayable password.
+- [x] **Ruled out with evidence, not dismissed:** `keycloak-credential-rotator` writes
+  `secret/keycloak/admin` only (hence `LIST secret/metadata/keycloak` = `["admin","clients"]`);
+  its BusyBox `base64 --decode` defect is already M4 in
+  `docs/bugs/2026-09-22-ci-red-prometheus-reseed-and-rotator-base64.md`. Neither caused this.
+- [x] **Checkpoint not implicated:** `step-10d5-ldap-passwords.done` exists only under the
+  `k3s-aws` state dir, not k3d — the seeder never ran on the hub, so it would execute, not skip.
+- [x] Gates: live render of the new text; BATS `makefile_show_service_passwords` 10/10 (case 9
+  guards this block), `identity_tools` 5/5, `webhook_make_targets` 11/11.
+- [ ] **Reset staged, NOT run — needs the operator.** Scratchpad `reseed-keycloak-users.sh`
+  mirrors Step 10d.5 (generate → Vault KV put → `ldappasswd` stdin → `ldapwhoami` verify),
+  prints no passwords, `chmod 600` header file. Preconditions verified live: openldap-0 up,
+  `LDAP_ADMIN_PASSWORD` SET, Vault PF 200, and `ldappasswd`/`ldapwhoami`/`mktemp`/`openssl` all
+  present in the pod. `bash -n` + `shellcheck` were **classifier-denied** (Secret-Store Writes),
+  so the operator lints and runs it via `!`. It mutates live LDAP passwords, so it stays gated.
+
 ## 2026-09-22 — Prometheus Vault entry repaired
 
 - [x] **`secret/data/k3d-manager/prometheus-basic-auth` 404 → 200.** Operator ran
