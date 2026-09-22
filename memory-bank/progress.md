@@ -592,13 +592,12 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   main at PR #98 (keycloak, 09-16); it predates the promoter guard `94b16bc9`, which is still
   unmerged on `fix/pass-promoter-ssh-key`. So the pin moved to a SHA that has neither the guard
   nor the rebase-fallback fix.
-- [x] **PRs OPENED for the promoter fix** — user's go 2026-09-21. product-catalog
-      [#55](https://github.com/wilddog64/shopping-cart-product-catalog/pull/55) (`5d5d59b7`, rebased
-      onto main `1f45062c` as `31fd3b3` + CHANGELOG) and infra
-      [#99](https://github.com/wilddog64/shopping-cart-infra/pull/99) (`9fafa459`). Both
-      `mergeable: true`, Copilot requested. Independent — product-catalog's pin `af4b053dc` does not
-      contain the infra guard, so either order works; the forwarding in #55 is what restores
-      promotion.
+- [x] **PRs MERGED for the promoter fix** — 2026-09-22 00:04-00:05Z. product-catalog
+      [#55](https://github.com/wilddog64/shopping-cart-product-catalog/pull/55) merged at
+      `b6ff80b7` and infra [#99](https://github.com/wilddog64/shopping-cart-infra/pull/99) merged at
+      `91432535`. Both fix the PROMOTER_SSH_KEY promotion failure: product-catalog's `ci.yml` now
+      forwards the key to the reusable workflow, and infra gained the guard step that detects an
+      empty key and fails loudly. Forwarding in #55 restores promotion for product-catalog.
 - [x] **Blast radius of the infra guard verified by enumeration** — all four callers read from
       `main`: basket `go-ci.yml`, order `ci.yml`, payment **`ci.yaml`** all forward
       `PROMOTER_SSH_KEY`; only product-catalog `ci.yml` does not. frontend does not call the
@@ -613,16 +612,14 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
       request. Verified `enabled = false`. #99 still displays `BLOCKED` (ruleset's 1 required
       approval); that is expected, the admin bypass path is what changes, not the status text.
       product-catalog needed none (ruleset repo, no such lever).
-- [ ] **RE-ENABLE enforce_admins on shopping-cart-infra after #99 merges** — bodyless POST:
-      `gh api repos/wilddog64/shopping-cart-infra/branches/main/protection/enforce_admins -X POST`
-      (`-f enabled=true` returns HTTP 422 `"enabled" is not a permitted key`).
-- [ ] **product-catalog promotion is STILL BROKEN on main until #55 merges** — main's `ci.yml:141-144`
-  forwards `PACKAGES_TOKEN`, `COSIGN_KEY`, `COSIGN_PASSWORD` and **not** `PROMOTER_SSH_KEY`. The
-  newly minted secret therefore never reaches the reusable workflow, which declares it
-  `required: false`, so the promote step still writes an empty key file and dies at
-  `Load key "~/.ssh/promoter_key": error in libcrypto`. `fix/pass-promoter-ssh-key` (`2c8dd68f`)
-  carries the forwarding and is `diverged` from main (1 ahead, 1 behind) with no PR. Merging a
-  Dependabot pin bump is not a substitute for merging the fix.
+- [x] **RE-ENABLED enforce_admins on shopping-cart-infra after #99 merged** — bodyless POST
+      completed 2026-09-22, verified `enabled=true`. The two PRs are now merged and post-merge
+      housekeeping complete.
+- [x] **product-catalog promotion FIXED by #55 merge** — PR #55 merged 2026-09-22 00:05Z at `b6ff80b7`.
+  main's `ci.yml` now forwards `PROMOTER_SSH_KEY` to the reusable workflow alongside `PACKAGES_TOKEN`,
+  `COSIGN_KEY`, and `COSIGN_PASSWORD`. The promotion step no longer writes an empty key file and
+  dies at `Load key "~/.ssh/promoter_key": error in libcrypto`. Promotion restore verified merged
+  on product-catalog main.
 - [x] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` — DONE
   2026-09-21 23:38Z by the user via `!`. See the minting row below.
 - [x] **Promoter-key spec corrected twice** — deploy keys are per-repo, not shared; product-catalog

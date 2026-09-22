@@ -1,5 +1,16 @@
 # Active Context — k3d-manager
 
+## 2026-09-22 — Post-merge housekeeping for promoter PRs
+
+Both `shopping-cart-product-catalog` PR #55 and `shopping-cart-infra` PR #99 merged successfully
+at 2026-09-22 00:04-00:05Z, merge commits `b6ff80b7` (product-catalog) and `91432535` (infra).
+Both fixed the PROMOTER_SSH_KEY promotion failure: product-catalog's `ci.yml` now forwards the key
+to the reusable workflow, and infra gained the guard step that detects an empty key and fails with
+an actionable error message. Main synced locally for both repos and merge commits verified present.
+`enforce_admins` on shopping-cart-infra was restored and verified enabled. CHANGELOG entries remain
+under `[Unreleased]` (correct for fix branches, not milestone releases). Release lists generated;
+no tags needed. No next branch or retrospective for fix merges. Memory-bank updated and committed.
+
 ## 2026-09-21 — rotate-ghcr-pat fix prepared; commit blocked by Git filesystem permissions
 
 Implemented the exact Changes 1–4 from `docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`
