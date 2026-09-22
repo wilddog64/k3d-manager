@@ -60,10 +60,24 @@
 - [x] **Doc requirement pinned:** `docs/howto/rotate-service-credentials.md:151-155` already
   documents this trap with no remedy; the spec's DoD requires that paragraph to name the new
   target in the same release.
-- [x] **Explicitly out of scope, needs the operator's word:** adding `keycloak/users/*` to the
-  14-key hub seed allowlist (the other durable fix), and auto-reseeding on `make up` (would
+- [x] **Hub seed set: APPROVED by the operator 2026-09-22 and added to the spec as requirement 4.**
+  Research found there is **no single allowlist**: the 14 keys are enumerated twice, with different
+  mechanisms — the `_keys` array at `scripts/plugins/vault.sh:1118-1125`
+  (`vault_seed_hub_into_context`, which is what writes the Keychain backup) and a hand-written
+  per-key `if _vault_kv_exists … else` chain in `shopping_cart.sh:696`
+  (`shopping_cart_seed_sandbox_vault_kv`, the seeder `bin/cluster-up:745` actually runs). Both must
+  change. The `vault.sh` side is load-bearing: `_seed_source_data` reads a canonical *source* Vault
+  which a hub rebuild has just destroyed, so only the Keychain fallback (`vault.sh:1135`) can
+  restore anything. Three literal paths, not a glob. `scripts/tests/plugins/vault_seed_hub.bats:58`
+  pins the exact key list and must go 14 → 17. New risk recorded: a Keychain-restored Vault record
+  whose LDAP hash no longer matches displays a password that does not work — worse than a blank —
+  so the reseed's present→re-apply branch is the required reconciler. Also noted `vault.sh:1170`
+  logs `all 13 canonical keys` against a 14-element array (message-only off-by-one, fix with the
+  count change).
+- [x] **Still out of scope, needs the operator's word:** auto-reseeding on `make up` (would
   silently rotate live passwords).
-- [x] Gates: `make check-doc-links` 1737 files OK; all cited line refs spot-checked live.
+- [x] Gates: `make check-doc-links` 1737 files OK then 1738 OK after the allowlist amendment; all
+  cited line refs spot-checked live.
 
 ## 2026-09-22 — Realm SSO password display: misleading hint fixed, reset done
 

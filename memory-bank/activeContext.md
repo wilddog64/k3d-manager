@@ -85,6 +85,29 @@ Still open, unchanged: realm SSO rows in `show-service-passwords` will still rea
 provisioned on this cluster" because `secret/keycloak/` holds only `['admin','clients']` with no
 `users/` subtree. Seeding `secret/keycloak/users/*` remains an operator decision.
 
+## 2026-09-22 — Realm SSO reseed spec: hub seed set APPROVED, added as requirement 4
+
+The operator approved adding `keycloak/users/*` to the hub seed set, so it moved out of
+"out of scope" and into `docs/plans/v1.37.0-realm-sso-password-reseed.md` as requirement 4.
+
+**There is no single allowlist to edit** — the 14 keys are enumerated twice:
+`scripts/plugins/vault.sh:1118-1125` (`_keys` array in `vault_seed_hub_into_context`, the side that
+writes the Keychain backup) and a hand-written per-key chain in `shopping_cart.sh:696`
+(`shopping_cart_seed_sandbox_vault_kv`, which `bin/cluster-up:745` runs). Changing only the latter
+yields a seeder reading a key the Keychain never held: `_seed_source_data` reads a canonical
+*source* Vault, and on a hub rebuild that is the Vault just destroyed, so the Keychain fallback at
+`vault.sh:1135` is the only live restore path. Enumerate three literal paths — Vault KV has no glob.
+`scripts/tests/plugins/vault_seed_hub.bats:58` pins the exact list and goes 14 to 17; the two howto
+docs that say "14" and call `keycloak/users/*` "expected to be absent" become wrong on landing.
+
+New risk written into the spec: these three are per-cluster random values, unlike the other 14
+static shared secrets. A Keychain-restored record whose LDAP hash no longer matches makes
+`make show-service-passwords` display a credential that fails to log in — worse than the blank it
+replaces. The reseed's *present then re-apply, no rotation* branch is the required reconciler, so a
+seeded record is never authoritative without an `ldapwhoami` check.
+
+Auto-reseeding on `make up` remains out of scope. `make check-doc-links` 1738 OK.
+
 ## 2026-09-22 — Webhook server decomposition specced and QUEUED for v1.37.0
 
 `docs/plans/v1.37.0-webhook-server-decomposition.md` (`1b67b2db`). **Queued, not for
