@@ -615,11 +615,18 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **RE-ENABLED enforce_admins on shopping-cart-infra after #99 merged** — bodyless POST
       completed 2026-09-22, verified `enabled=true`. The two PRs are now merged and post-merge
       housekeeping complete.
-- [x] **product-catalog promotion FIXED by #55 merge** — PR #55 merged 2026-09-22 00:05Z at `b6ff80b7`.
-  main's `ci.yml` now forwards `PROMOTER_SSH_KEY` to the reusable workflow alongside `PACKAGES_TOKEN`,
-  `COSIGN_KEY`, and `COSIGN_PASSWORD`. The promotion step no longer writes an empty key file and
-  dies at `Load key "~/.ssh/promoter_key": error in libcrypto`. Promotion restore verified merged
-  on product-catalog main.
+- [ ] **product-catalog promotion — fix MERGED, not yet OBSERVED working.** PR #55 merged
+  2026-09-22 00:05Z at `b6ff80b7`. main's `ci.yml` now forwards `PROMOTER_SSH_KEY` to the reusable
+  workflow alongside `PACKAGES_TOKEN`, `COSIGN_KEY` and `COSIGN_PASSWORD`, so the promote step
+  should no longer write an empty key file and die at
+  `Load key "~/.ssh/promoter_key": error in libcrypto`.
+  **This is a code-merged claim, NOT a promotion-verified claim — do not mark it done on the merge
+  alone.** The publish job is skipped on pull requests, so no PR could ever exercise promotion;
+  merge run `35670460109` is the first genuine test and was still `in_progress` when this was
+  written. Close this only after reading the promote step's own log and confirming `newTag:` in
+  `k8s/base/kustomization.yaml` actually advanced. A green run conclusion is NOT sufficient: the
+  promote step runs under `continue-on-error: true`, which is exactly how this stayed invisible
+  for six pushes.
 - [x] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` — DONE
   2026-09-21 23:38Z by the user via `!`. See the minting row below.
 - [x] **Promoter-key spec corrected twice** — deploy keys are per-repo, not shared; product-catalog

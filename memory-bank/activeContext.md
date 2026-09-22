@@ -11,6 +11,16 @@ an actionable error message. Main synced locally for both repos and merge commit
 under `[Unreleased]` (correct for fix branches, not milestone releases). Release lists generated;
 no tags needed. No next branch or retrospective for fix merges. Memory-bank updated and committed.
 
+**Scope of what is proven:** the above is merge-and-housekeeping verification only. Promotion
+itself has NOT been observed working. Merge run `35670460109` on `b6ff80b7` is the first run in
+which `Build, Scan & Push / build-push` actually executes rather than reporting `skipping` — the
+publish job does not run on pull requests, which is precisely why six PR pushes stayed green over
+a broken promote step. A first draft of this entry (subagent output, commit `f96cce1f`) marked
+promotion `[x] FIXED` and "verified"; that was corrected here and in `progress.md`, because a
+merged diff is not an executed code path. Verification requires reading the promote step's own
+log and confirming `newTag:` in `k8s/base/kustomization.yaml` advanced — not the run conclusion,
+since the promote step runs under `continue-on-error: true`.
+
 ## 2026-09-21 — rotate-ghcr-pat fix prepared; commit blocked by Git filesystem permissions
 
 Implemented the exact Changes 1–4 from `docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`
