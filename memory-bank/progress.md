@@ -174,9 +174,17 @@
 - [ ] **e2e failure-detail gap (NEW, real).** A failed run published no `e2e_failure_info`
   or `e2e_failure_group_info`, and `e2e_run_info` carries a malformed `failure_ratio="/"`
   (empty-over-empty). Belongs to `docs/plans/v1.36.0-e2e-deterministic-triage-and-corpus.md`.
-- [ ] **Tier 1 e2e blocked (verified).** `gh` token scopes lack `read:packages`
-  (`admin:public_key, gist, read:org, repo`), so the Playwright job cannot pull from GHCR.
-  Operator action: `gh auth refresh -h github.com -s read:packages`. Runner otherwise green.
+- [x] **Tier 1 e2e credential gate CLEARED 2026-09-22 (operator-run).** `gh auth refresh -h
+  github.com -s read:packages,workflow` completed on the second attempt; scopes are now
+  `admin:public_key, gist, read:org, read:packages, repo, workflow`. Verified three ways: live
+  `X-Oauth-Scopes` from the API, `gh api user/packages?package_type=container` returning a count
+  instead of 403, and the keychain item's `mdat` moving 2026-09-14 → 2026-09-22T23:26:00Z. Read
+  access confirmed against the **private** `shopping-cart-basket` package (`visibility: private`,
+  versions listable) — the public `shopping-cart-e2e-tests` would have answered anonymously and
+  proven nothing. **The first attempt silently no-opped**: the device flow was started but never
+  completed, leaving no error; the stale `mdat` is what proved no token had been written, and is
+  the check to use next time. This clears the credential gate only — the Tier 1 run itself has not
+  been executed yet.
 - [ ] **Tier 2 e2e blocked (verified).** No ACG context exists; manual TTY login required.
 - [x] **Specs written and pushed** as `b37acb91` on `k3d-manager-v1.36.0`:
   `docs/plans/v1.36.0-make-smoke-target.md` and

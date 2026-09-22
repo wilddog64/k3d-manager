@@ -85,6 +85,30 @@ Still open, unchanged: realm SSO rows in `show-service-passwords` will still rea
 provisioned on this cluster" because `secret/keycloak/` holds only `['admin','clients']` with no
 `users/` subtree. Seeding `secret/keycloak/users/*` remains an operator decision.
 
+## 2026-09-22 — Tier 1 e2e credential gate cleared (`read:packages` + `workflow`)
+
+Operator ran `gh auth refresh -h github.com -s read:packages,workflow` from their own terminal
+(the device flow needs a real TTY; my shell has none). Scopes are now
+`admin:public_key, gist, read:org, read:packages, repo, workflow`.
+
+Verified three ways rather than trusting the `✓ Authentication complete.` line: live
+`X-Oauth-Scopes` header from `gh api -i user`; `gh api user/packages?package_type=container`
+returning a count where it previously returned 403; and the keychain item's `mdat` moving from
+2026-09-14 to 2026-09-22T23:26:00Z. Read access confirmed against the **private**
+`shopping-cart-basket` package (`visibility: private`, versions listable) — probing the public
+`shopping-cart-e2e-tests` would have answered anonymously and proven nothing.
+
+**The first attempt silently no-opped.** The device flow was started but the browser half never
+completed, and the command left no error behind, so it was indistinguishable from success by output
+alone. The stale keychain `mdat` — eight days old at the time — is what proved no token had been
+written, and is the check that separates "a new token arrived without the scope" from "no new token
+arrived". `~/.config/gh/hosts.yml` mtime is only suggestive, since a keyring-stored token can be
+replaced without touching it. Recorded in
+`memory/reference_ghcr_pull_credential_gh_auth_refresh.md`.
+
+This clears the credential gate only. The Tier 1 run itself has not been executed. Tier 2 remains
+blocked on the manual ACG TTY login.
+
 ## 2026-09-22 — Realm SSO reseed spec: hub seed set APPROVED, added as requirement 4
 
 The operator approved adding `keycloak/users/*` to the hub seed set, so it moved out of
@@ -180,6 +204,11 @@ Tier 1: the `gh` token scopes are `admin:public_key, gist, read:org, repo` — n
 otherwise green (`hub=ok`, `runner=m2jump`, `runner_status=available`). Operator must run
 `gh auth refresh -h github.com -s read:packages`. Tier 2: no ACG context exists at all
 (only `k3d-k3d-cluster` and `ubuntu-hostinger`); needs the manual TTY login.
+
+**UPDATE 2026-09-22 — the Tier 1 credential half of the above is CLEARED.** Scopes are now
+`admin:public_key, gist, read:org, read:packages, repo, workflow`; private-package read confirmed
+against `shopping-cart-basket`. See the 2026-09-22 entry at the top of this file. Tier 2 is
+unchanged and still needs the manual TTY login.
 
 **Two specs written and pushed as `b37acb91`, dispatched to Codex (session
 `01a0c93c-45b4-7301-9ac7-661b66e21204`):**
