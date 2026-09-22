@@ -609,9 +609,13 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
       guard; fixing it exposed that the message embedded `${{ secrets.* }}`, which Actions
       substitutes in a run block (backslash is not an escape), so the guard's own instruction
       would have printed empty. Reworded, `6dc3c23`.
-- [ ] **OPERATOR: disable enforce_admins on shopping-cart-infra** — classifier denied it (CI
-      Bypass). `gh api repos/wilddog64/shopping-cart-infra/branches/main/protection/enforce_admins -X DELETE`
-      Re-enable after merge with a **bodyless POST**. product-catalog needs none (ruleset repo).
+- [x] **enforce_admins disabled on shopping-cart-infra** — 2026-09-21, on the user's explicit
+      request. Verified `enabled = false`. #99 still displays `BLOCKED` (ruleset's 1 required
+      approval); that is expected, the admin bypass path is what changes, not the status text.
+      product-catalog needed none (ruleset repo, no such lever).
+- [ ] **RE-ENABLE enforce_admins on shopping-cart-infra after #99 merges** — bodyless POST:
+      `gh api repos/wilddog64/shopping-cart-infra/branches/main/protection/enforce_admins -X POST`
+      (`-f enabled=true` returns HTTP 422 `"enabled" is not a permitted key`).
 - [ ] **product-catalog promotion is STILL BROKEN on main until #55 merges** — main's `ci.yml:141-144`
   forwards `PACKAGES_TOKEN`, `COSIGN_KEY`, `COSIGN_PASSWORD` and **not** `PROMOTER_SSH_KEY`. The
   newly minted secret therefore never reaches the reusable workflow, which declares it

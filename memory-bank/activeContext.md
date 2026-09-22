@@ -1665,3 +1665,9 @@ product-catalog needs no equivalent: its `main` has no classic protection (404) 
 **ruleset** (`deletion, non_fast_forward, pull_request, required_status_checks`), and ruleset repos
 expose no `enforce_admins` lever — see [[reference_classic_protection_404_on_ruleset_repos]]. #55
 already reports `CLEAN`.
+
+**enforce_admins on infra: DONE.** The first `-X DELETE` attempt was denied by the auto-mode
+classifier (CI Bypass) and was not worked around; after the user explicitly asked for the override it
+succeeded, and `enabled` reads `false`. #99 still reports `MERGEABLE / BLOCKED` because the ruleset
+requires one approval — disabling enforce_admins grants the admin bypass, it does not rewrite that
+status. **Owed: re-enable with a bodyless POST after the merge.**
