@@ -69,7 +69,7 @@ ESO syncs the new values.
 
 ### Credential paths after a Vault rebuild
 
-Credential paths are not all reseeded automatically after a Vault rebuild. `secret/argocd/admin` is repopulated by `hub_recovery_reconcile`, and `k3d-manager/prometheus-basic-auth` is repopulated by the Prometheus auth-proxy refresh. `~/.local/share/k3d-manager/prometheus-basic-auth.env` is a derived cache, not a source of truth.
+Credential paths are not all reseeded automatically after a Vault rebuild. `secret/argocd/admin` is repopulated by `hub_recovery_reconcile`, and `k3d-manager/prometheus-basic-auth` is repopulated by the Prometheus auth-proxy refresh. `~/.local/share/k3d-manager/prometheus-basic-auth.env` is a derived cache, not a source of truth. `secret/keycloak/users/*` holds the realm SSO users, is written only by `bin/cluster-up`, is **not** in the 14-key seed allowlist, and is therefore expected to be absent on a rebuilt hub — `make show-service-passwords` reports it as not provisioned rather than as a failure.
 
 ## Procedure
 

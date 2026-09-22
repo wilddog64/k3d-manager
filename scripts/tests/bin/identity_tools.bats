@@ -45,3 +45,18 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *'kubectl logs'* ]]
 }
+
+@test "get-keycloak-password does not pass VAULT_TOKEN in the exec command string" {
+  run grep -nE 'env[[:space:]]+VAULT_TOKEN=' bin/get-keycloak-password
+  [ "${status}" -ne 0 ]
+}
+
+@test "get-keycloak-password pins the hub context" {
+  run grep -nA2 'kubectl get secret -n "\${_VAULT_NS}" vault-root' bin/get-keycloak-password
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'--context "${_KC_CONTEXT}"'* ]]
+
+  run grep -nA3 'kubectl exec -i -n "\${_VAULT_NS}"' bin/get-keycloak-password
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'--context "${_KC_CONTEXT}"'* ]]
+}

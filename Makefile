@@ -567,10 +567,21 @@ show-service-passwords:
 	_realm_admin=$$(./bin/get-keycloak-password admin -q 2>/dev/null || true); \
 	_dev=$$(./bin/get-keycloak-password developer -q 2>/dev/null || true); \
 	_op=$$(./bin/get-keycloak-password operator -q 2>/dev/null || true); \
+	_kc_hint="N/A"; \
+	if [ -z "$$_realm_admin$$_dev$$_op" ]; then \
+	  _kc_hint="not provisioned on this cluster (seeded by bin/cluster-up, not by make up)"; \
+	fi; \
 	echo "  Frontend    https://frontend.3ai-talk.org  (login via Keycloak SSO)";\
 	echo "  Keycloak    https://keycloak.3ai-talk.org";\
-	echo "    admin user:     admin / $${_kc:-N/A}";\
-	echo "    dev users:      admin / $${_realm_admin:-N/A}  |  developer / $${_dev:-N/A}  |  operator / $${_op:-N/A}";\
+	echo "    user:     admin";\
+	echo "    password: $${_kc:-N/A}";\
+	echo "    realm SSO users (secret/keycloak/users/*):";\
+	echo "      user:     admin";\
+	echo "      password: $${_realm_admin:-$$_kc_hint}";\
+	echo "      user:     developer";\
+	echo "      password: $${_dev:-$$_kc_hint}";\
+	echo "      user:     operator";\
+	echo "      password: $${_op:-$$_kc_hint}";\
 	echo ""
 
 ## Store Alertmanager credentials in Vault (requires Hub Vault + port-forward)
