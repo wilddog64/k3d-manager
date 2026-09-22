@@ -777,6 +777,18 @@ e2e:
 smoke:
 	./scripts/k3d-manager smoke_run $(SMOKE_ONLY)
 
+## Capture a hub snapshot and offload it to the M2 store.
+snapshot:
+	./scripts/k3d-manager hub_snapshot_capture
+
+## List captured hub snapshots on the M2 store.
+snapshot-list:
+	./scripts/k3d-manager hub_snapshot_list
+
+## Prune old hub snapshots, keeping K3DM_SNAPSHOT_KEEP (default 3).
+snapshot-prune:
+	./scripts/k3d-manager hub_snapshot_prune
+
 ## Run the Tier 1 e2e harness on a remote runner off the M4 laptop. RUNNER=m2 required, DIGEST=<image digest> optional. No local fallback.
 e2e-remote:
 	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-remote RUNNER=m2 [DIGEST=sha256:...]" >&2; exit 2; fi

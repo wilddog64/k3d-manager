@@ -267,6 +267,7 @@ agent-0|identity|data-openldap-0|node-agent-0-storage
 agent-0|identity|ldap-config-pvc|node-agent-0-storage
 agent-2|trivy-system|data-trivy-server-0|node-agent-2-storage
 agent-0|monitoring|prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0|node-agent-0-storage
+agent-1|monitoring|storage-loki-0|node-agent-1-storage
 EOF
 }
 

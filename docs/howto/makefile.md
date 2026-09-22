@@ -29,6 +29,29 @@ make up URL=https://...      # provision with explicit sandbox URL
 reported as `SKIP`, while a failed check makes the target exit non-zero. Each
 check writes its output under `${TMPDIR:-/tmp}/k3dm-smoke/<UTC-run>/`.
 
+## Hub snapshots
+
+`make snapshot` captures the cold hub state and transfers it to
+`${K3DM_SNAPSHOT_HOST:-m2jump}:${K3DM_SNAPSHOT_DIR:-~/k3dm-snapshots}`.
+The capture includes the k3s server database and token, the PV/PVC metadata,
+Vault's file-backed data tree, Prometheus, Loki, Keycloak Postgres, OpenLDAP,
+and Trivy local-path trees. Use `make snapshot-list` to show each timestamp,
+size, and verification state. `make snapshot-prune` removes incomplete
+snapshots first and keeps the newest three verified snapshots by default; set
+`K3DM_SNAPSHOT_KEEP` to change that ceiling.
+
+Prometheus retains only three days (`--storage.tsdb.retention.time=3d`), so an
+older snapshot restores blocks that Prometheus immediately prunes on startup.
+Snapshots preserve history across a down/up cycle inside that window; they are
+not long-term history storage. Long-term retention requires a higher Prometheus
+retention setting or remote write.
+
+After a rebuild, generate the new target map and restore with:
+
+```bash
+./scripts/k3d-manager hub_recovery_restore <captured-directory> <targets.tsv> --confirm
+```
+
 ---
 
 ## ArgoCD
