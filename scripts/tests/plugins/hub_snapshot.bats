@@ -205,3 +205,13 @@ EOF
   run _hub_recovery_records
   [ "$status" -eq 0 ]; [[ "$output" == *"monitoring|storage-loki-0"* ]]
 }
+
+@test "hub snapshot: remote dir default survives single-quoting on the remote shell" {
+  run bash -c '
+    unset K3DM_SNAPSHOT_DIR
+    source "'"$PWD"'/scripts/plugins/hub_snapshot.sh" 2>/dev/null || true
+    printf "%s\n" "$K3DM_SNAPSHOT_DIR"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"~"* ]]
+}

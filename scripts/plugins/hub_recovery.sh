@@ -346,7 +346,9 @@ function hub_recovery_validate() {
   source_dir="$(_hub_recovery_source_dir "${1:-}")" || return 1
   _hub_recovery_validate_files "$source_dir" || return 1
   _hub_recovery_validate_claims "$source_dir" || return 1
-  echo "Hub recovery source validated: seven logical claims, one source tree each."
+  local _claim_count
+  _claim_count="$(_hub_recovery_records | grep -c '^[^[:space:]]')"
+  echo "Hub recovery source validated: ${_claim_count} logical claims, one source tree each."
 }
 
 function _hub_recovery_target_path() {

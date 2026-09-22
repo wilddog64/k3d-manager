@@ -40,7 +40,7 @@ YAML
 @test "hub_recovery_validate: accepts the complete eight-claim source map" {
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"seven logical claims"* ]]
+  [[ "$output" == *"8 logical claims"* ]]
 }
 
 @test "hub_recovery_plan: emits the dependency map by logical claim" {
