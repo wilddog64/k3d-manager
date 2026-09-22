@@ -650,8 +650,9 @@ function deploy_observability_acg() {
   _observability_ensure_alertmanager_login
   _observability_install_alertmanager_port_forward
   _observability_install_alertmanager_auth_proxy
-  (set +e; _observability_refresh_prometheus_auth_proxy) || true
-  return 0
+  if ! (set +e; _observability_refresh_prometheus_auth_proxy); then
+    _warn "[observability] Prometheus auth proxy refresh failed; continuing with the generated web config"
+  fi
 }
 
 function _deploy_pushgateway_acg() {
