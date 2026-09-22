@@ -1699,7 +1699,7 @@ succeeded, and `enabled` reads `false`. #99 still reports `MERGEABLE / BLOCKED` 
 requires one approval — disabling enforce_admins grants the admin bypass, it does not rewrite that
 status. **Owed: re-enable with a bodyless POST after the merge.**
 
-## 2026-09-21 — `make show-service-passwords` root-caused (bug filed)
+## 2026-09-21 — `make show-service-passwords` fixed and pushed (`ef3d4b8d`)
 
 `make show-service-passwords` exits 1 with "Vault credential lookup still unavailable (check
 Vault token and port-forward)" while **every layer the message blames is healthy**. Live probe
@@ -1713,5 +1713,6 @@ absence is a supported outcome, not a fault. The gate turns that cosmetic gap in
 that blocks all four credentials, including Grafana's, which was readable the whole time.
 
 Spec: `docs/bugs/2026-09-21-show-service-passwords-liveness-probe-uses-optional-kv-path.md`.
-Fix is M1 probe swap to `auth/token/lookup-self` (+ M2 mirror bootstrap-race retry, M3 doc).
-Not yet assigned.
+Fix `ef3d4b8d` swaps the probe to `auth/token/lookup-self`, retries the mirror bootstrap secret for
+up to 60 seconds, and documents that the mirror is optional. Focused BATS 31/31 and shellcheck
+passed; pushed to `origin/k3d-manager-v1.36.0`.
