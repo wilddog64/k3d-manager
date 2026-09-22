@@ -15,6 +15,13 @@
   independently: hub_recovery 27/27, hub_snapshot 14/14, smoke 7/7, shellcheck RC=0.
 - [ ] **Deviation noted:** free-space preflight runs after the local capture, not before, so a
   full M2 wastes ~2.15G of staging I/O rather than failing fast. Non-blocking.
+- [x] **`make test` 1031/1031, 0 `not ok`, against the live post-fix tree.** The first run showed
+  1030 but predated Claude's two fixes — caught because the arithmetic was too clean
+  (1010 + 7 + 13 = 1030, no room for the added 14th case). Re-run reconciles exactly at 1031.
+  Lesson reinforced: measure gates against the live tree, not a snapshot.
+- [x] `docs/howto/makefile.md` corrected — it still documented the removed `~/k3dm-snapshots`
+  default; now warns explicitly against a `~`-prefixed value. The `docs/issues/2026-09-11`
+  mention of "seven logical claims" was deliberately left as historical record.
 
 ## 2026-09-22 — Grafana triage + two specs assigned to Codex
 

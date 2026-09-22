@@ -32,7 +32,10 @@ check writes its output under `${TMPDIR:-/tmp}/k3dm-smoke/<UTC-run>/`.
 ## Hub snapshots
 
 `make snapshot` captures the cold hub state and transfers it to
-`${K3DM_SNAPSHOT_HOST:-m2jump}:${K3DM_SNAPSHOT_DIR:-~/k3dm-snapshots}`.
+`${K3DM_SNAPSHOT_HOST:-m2jump}:${K3DM_SNAPSHOT_DIR:-k3dm-snapshots}`, where a
+relative default resolves against the remote login home. Do not set
+`K3DM_SNAPSHOT_DIR` to a `~`-prefixed path: it is passed single-quoted to the
+remote shell, which would create a directory literally named `~`.
 The capture includes the k3s server database and token, the PV/PVC metadata,
 Vault's file-backed data tree, Prometheus, Loki, Keycloak Postgres, OpenLDAP,
 and Trivy local-path trees. Use `make snapshot-list` to show each timestamp,
