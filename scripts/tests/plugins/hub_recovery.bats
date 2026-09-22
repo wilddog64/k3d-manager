@@ -37,7 +37,7 @@ YAML
   done < <(_hub_recovery_records)
 }
 
-@test "hub_recovery_validate: accepts the complete seven-claim source map" {
+@test "hub_recovery_validate: accepts the complete eight-claim source map" {
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"seven logical claims"* ]]
@@ -46,7 +46,7 @@ YAML
 @test "hub_recovery_plan: emits the dependency map by logical claim" {
   run hub_recovery_plan "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 7 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 8 ]
   [[ "$output" == *"node=server-0 claim=secrets/data-vault-0"* ]]
   [[ "$output" == *"node=agent-1 claim=identity/postgres-keycloak-pvc"* ]]
 }
@@ -69,7 +69,7 @@ YAML
   mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-22222222-2222-2222-2222-222222222222_extra_unknown"
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"expected 7"* ]]
+  [[ "$output" == *"expected 8"* ]]
 }
 
 @test "hub_recovery_validate: ignores files below a mapped PVC root" {
@@ -81,7 +81,7 @@ YAML
 @test "hub_recovery_restore: plans all mapped claims by default" {
   run hub_recovery_restore "$RECOVERY_ROOT" "$TARGETS_FILE"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 7 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 8 ]
   [[ "$output" == *"Dry-run only"* ]]
 }
 
@@ -95,7 +95,7 @@ YAML
 @test "hub_recovery_targets: renders exactly one current PV target per claim" {
   run hub_recovery_targets
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^agent\|^server' )" -eq 7 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^agent\|^server' )" -eq 8 ]
   [[ "$output" == *"server-0|secrets|data-vault-0|k3d-k3d-cluster-server-0|${TARGET_ROOT}/pvc-"* ]]
 }
 
