@@ -2095,3 +2095,26 @@ run bare its context resolves to the **ACG app cluster** (`_observability_acg_co
 `ubuntu-k3s`), writing hub Vault first and then failing on the wrong context — turning a cosmetic
 N/A into a real lockout. The function is private, so reaching it needs a scratch sourcing script.
 **Awaiting the operator's go; nothing live has been run.**
+
+### 2026-09-22 — CI red twice more after the fix: latent pytest failures behind the BATS reds
+
+`make test` alone is **not** CI's gate. The `lint` job runs `make test` *and* `make test-pytest`
+as separate sequential steps, so the four BATS reds had been aborting the job before pytest ran.
+Greening BATS exposed a doc-links failure that had been latent, not introduced. `make test-all`
+(`test test-bin test-python`) is the real superset; `make test-pytest` cannot run locally because
+its `python3` is Homebrew 3.14.7 without pytest — run bare `pytest` on the same three paths.
+
+The failure was `test_check_doc_links::test_repo_docs_have_no_broken_links` on markdown links
+pointing at `/Users/cliang/src/gitrepo/personal/k3d-manager/...`. These resolve on this Mac and
+nowhere else, so `make check-doc-links` and the gate itself both pass locally — a Linux-only red
+invisible to every local check.
+
+First attempt fixed only the one file the assertion named (`5341d700`) and CI failed again: the
+assertion truncates its list (`['docs/issues...t exist', ...]`). Enumerating with the checker's own
+parser found **12 links across 5 files**, fixed together in `f3430476`, which also adds
+`test_no_doc_links_target_an_absolute_path` to ban the shape outright so the class is now
+locally detectable. Mutation-verified: reintroducing one absolute link fails the new guard while
+the original broken-link gate stays green.
+
+Commits: `937a5b3b` (docs/memory-bank), `5341d700` (partial, insufficient), `f3430476` (complete
++ guard). Local state at `f3430476`: BATS 1010/1010, pytest 176/176, check-doc-links 1733 OK.

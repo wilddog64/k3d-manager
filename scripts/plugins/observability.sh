@@ -275,7 +275,7 @@ function _observability_seed_prometheus_vault_entry() {
   local _vault_addr="http://127.0.0.1:18200" _vault_token _vault_hdr _payload _rc=0
   _vault_token=$(_kubectl get secret vault-root -n secrets \
     --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
-  _vault_hdr=$(mktemp)
+  _vault_hdr=$(mktemp) && chmod 0600 "${_vault_hdr}"
   printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
   _payload=$(_observability_prometheus_vault_payload "${_PROM_BASIC_AUTH_PASSWORD}" "${_PROM_BASIC_AUTH_BCRYPT}")
   curl -sf --header "@${_vault_hdr}" --header 'Content-Type: application/json' \
@@ -290,7 +290,7 @@ function _observability_ensure_prometheus_login() {
   _auth_file="$(_observability_prometheus_auth_file)"
   _vault_token=$(_kubectl get secret vault-root -n secrets \
     --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
-  _vault_hdr=$(mktemp)
+  _vault_hdr=$(mktemp) && chmod 0600 "${_vault_hdr}"
   printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
 
   if ! _prom_creds=$(curl -sf \
