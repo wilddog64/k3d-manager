@@ -85,11 +85,13 @@ kubectl --context k3d-k3d-cluster create job "keycloak-rotate-manual-$(date +%Y%
 Grafana and ArgoCD jobs wait on `kubectl rollout status --timeout=5m` for the workload restart,
 so two to three minutes is normal. Keycloak changes its database directly and does not restart
 the workload. **Logs are empty by design** — every step redirects to `/dev/null` so no credential
-can reach container logs. Track progress from cluster state instead:
+can reach container logs. The corollary is worth internalising: on a successful run there is
+nothing to read, so *any* log output is a defect. That is how the `base64 --decode` bug was found
+— the image's `base64` is BusyBox and accepts only `-d`, and the usage error it printed was the
+only sign that every Slack notification was being silently dropped.
 
-Successful rotator jobs have empty logs; any output at all is a defect worth reading. The image's
-`base64` is BusyBox and accepts only `-d`. A missing Slack notification does not mean the rotation
-failed, and a Slack notification does not prove that it succeeded — check the Job status.
+Do not use Slack as the signal either way: a missing notification does not mean the rotation
+failed, and a notification does not prove it succeeded. Track progress from cluster state instead:
 
 ```bash
 kubectl --context k3d-k3d-cluster get job <job-name> -n monitoring \

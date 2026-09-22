@@ -2047,3 +2047,51 @@ by it. Logs show it logged in, created the `shopping-cart` realm shell, then die
 `environment: line 104: awk: command not found` while creating the `browser-with-conditional-otp`
 flow. Image `quay.io/keycloak/keycloak:24.0` has no `awk`. **The realm was left partially
 configured** — created but without its auth flows. Needs its own bug doc.
+
+### 2026-09-22 — PR #130 CI reds fixed; rotator `base64` defect closed
+
+Spec `docs/bugs/2026-09-22-ci-red-prometheus-reseed-and-rotator-base64.md` (`6658faff`), handed to
+Codex, landed as `7d475a9f` + `0b9941c2`, refined by `1b7c6c93`. Full suite verified independently:
+**1010/1010, zero failures**, with tests 57, 174, 179 and 388 — the exact four CI numbers — all
+green. `scripts/tests/lib/observability.bats` diff confirmed empty: the guard tests were fixed
+around, not weakened.
+
+Root cause of the reds: `_observability_ensure_prometheus_login` collapsed "Vault unreachable" and
+"entry absent" into `_prom_creds=""` and reseeded on both, so a transient port-forward outage would
+rotate a credential nobody asked to rotate. Fixed with `_observability_vault_reachable()` probing
+`sys/health` — unreachable now warns and returns 0 without touching Vault or the auth file; absent
+still reseeds. The Vault header file is removed on all five exit paths, exactly once.
+
+`base64 --decode` → `base64 -d` at keycloak 98/113 and argocd 117/118/139 (**118 was missed in the
+first triage** — five sites, not four), plus `scripts/tests/plugins/platform_ops_rotators.bats`
+banning the long form repo-wide and asserting each rotator still decodes.
+
+**Correction worth keeping:** Codex ended `deploy_observability_acg` with
+`(set +e; _observability_refresh_prometheus_auth_proxy) || true; return 0`. The tolerance is
+correct — test 174's contract is that a failed Vault seed still yields a successful ACG deploy via
+the generated web config — but the failure was discarded silently. The `(set +e; ...)` subshell is
+**load-bearing**: the failure originates two frames down in `_observability_ensure_prometheus_login`
+and `set -e` kills the chain there, so a plain `if ! cmd` does NOT suppress it (verified
+empirically — replacing the subshell made test 174 fail again). `1b7c6c93` keeps the subshell, adds
+a `_warn`, and drops the redundant `return 0`.
+
+### Prometheus `show-service-passwords` N/A — diagnosed, repair NOT yet run
+
+Live hub, 2026-09-22: Vault PF **up** (`sys/health`=200) but
+`secret/k3d-manager/prometheus-basic-auth` returns **404 with no metadata at all**
+(`version=None`), so there is no soft-deleted version to restore — the path was
+metadata-deleted or never seeded. The local cache
+`~/.local/share/k3d-manager/prometheus-basic-auth.env` still holds a real 32-char password.
+
+`make show-service-passwords` reads Vault **inline in the Makefile recipe**, not through any plugin
+function, so the reseed fix does not change its output. Nothing is actually broken: per the
+2026-08-22 incident notes the hub Prometheus is unauthenticated at the edge, making this path a
+display-mirror plus local-auth-proxy credential (recorded, not re-verified).
+
+Correct repair is the **cache-recovery branch** of `_observability_ensure_prometheus_login`
+("recovered ... not rotating"), which restores Vault from the local cache without rotating.
+`observability_rotate_prometheus_basic_auth` is the WRONG tool: it generates a new password, and
+run bare its context resolves to the **ACG app cluster** (`_observability_acg_context` →
+`ubuntu-k3s`), writing hub Vault first and then failing on the wrong context — turning a cosmetic
+N/A into a real lockout. The function is private, so reaching it needs a scratch sourcing script.
+**Awaiting the operator's go; nothing live has been run.**

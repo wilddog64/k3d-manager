@@ -739,3 +739,12 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 # 2026-09-22 — Prometheus reseed and rotator CI fix
 
 - [x] Implemented M1–M5 and pushed as `7d475a9fe1e8e5f051d035b4f917559341d8b127` to `origin/k3d-manager-v1.36.0`; focused BATS suites, shellcheck, YAML parsing, doc links, and full `make test` (1,010/1,010) passed. `scripts/tests/lib/observability.bats` remained byte-identical.
+
+- [x] **PR #130 CI reds fixed** — spec `6658faff`, Codex `7d475a9f`+`0b9941c2`, refinement
+  `1b7c6c93`. Verified independently: `make test` 1010/1010, tests 57/174/179/388 green,
+  `observability.bats` untouched. Prometheus reseed now separates unreachable Vault from an absent
+  entry; `base64 --decode` → `-d` at five sites across the keycloak and argocd rotators.
+- [ ] **Prometheus Vault entry absent on the hub** — `secret/k3d-manager/prometheus-basic-auth`
+  404 with no metadata; local cache intact. Repair = cache-recovery reseed (NOT
+  `observability_rotate_prometheus_basic_auth`, which targets the ACG context). Awaiting go.
+- [ ] **`keycloak-realm-reconcile` awk exit 127** — still needs its own bug doc.

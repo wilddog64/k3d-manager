@@ -7,7 +7,8 @@
 
 ### Fixed
 - Prometheus reseeding now distinguishes unreachable Vault from an absent entry, and the reseed security assertions are effective rather than bare-`!` no-ops.
-- The Alertmanager secret test now uses the real unresolved-value error and hermetic stubs, while platform-ops rotators use BusyBox-compatible `base64 -d` so Slack notifications are not silently lost.
+- The Alertmanager secret test now asserts the error the recipe actually emits and stubs `security`, so it can no longer reach a live Vault.
+- Platform-ops rotators use BusyBox-compatible `base64 -d`; `--decode` silently emptied every Slack notification, including the Keycloak rollback-failure alert.
 
 ## [1.36.0] - 2026-09-21
 
