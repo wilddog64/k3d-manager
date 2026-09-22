@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-09-21
+
+### Added
+- `auth` failure class; `service_for` / `repo_for` routing table; a labelled triage corpus under `scripts/tests/fixtures/e2e-corpus/`.
+- `scripts/check-doc-links.py` + `make check-doc-links` — validates every relative link and heading anchor in the repo's Markdown (1,725 files), wired into `.githooks/pre-commit` over **staged files only** so pre-existing debt cannot block an unrelated commit (`K3DM_SKIP_DOC_LINKS=1` bypasses). Handles the three false-positive classes that would make such a gate useless: markdown-shaped regexes inside inline code, this repo's clickable `path:line` references, and `github-slugger`'s per-space hyphenation (`/claude / /gemini` → `claude--gemini`, doubled). Covered by `scripts/tests/bin/test_check_doc_links.py` (23 pytest cases, including a live-tree gate). Closes a gap open since 2026-04-06.
+
+- `docs/guides/grafana-dashboards.md` — a guide covering all seven shipped Grafana dashboards (ArgoCD/Image-Updater, CVE Auto-Patch, E2E Verification, Hermes Status, k3dm Deployment Metrics, Trivy Security, Checkout Load Test): panel-by-panel queries, the producer chain feeding each series (exporter / Pushgateway / promtail / trivy-operator), and a `No data`-by-cause triage table assembled from past incidents. Closes a "guide per major tech" gap — dashboard knowledge previously existed only scattered across ~25 plan/bug/issue docs, and `grafana-dashboard-hermes.yaml` was referenced by none of them.
+
+- Tier 2 `e2e_verify_sandbox` runs the Stripe Playwright flow in a self-contained ACG sandbox without hub registration, applies the proven sandbox substrate overrides at deploy time, and emits shared `tier: sandbox` / `project: stripe` summaries. Tier 2 is opt-in and periodic, never a blocking per-candidate gate.
+
 ### Changed
 - E2E failure classification now has one implementation (`hermes.e2e_triage`); the duplicate inline classifier in `scripts/plugins/e2e.sh` is gone.
 - `docs/architecture/webhook-server.md` roadmap replaced with measured per-phase status:
@@ -53,15 +63,6 @@
 - `memory-bank/activeContext.md` compressed 1783 → 1337 lines; the settled 2026-09-01→09-04 v1.28.0
   block moved to `memory-bank/archive/activeContext-2026-09-21.md`.
 
-### Added
-- `auth` failure class; `service_for` / `repo_for` routing table; a labelled triage corpus under `scripts/tests/fixtures/e2e-corpus/`.
-- `scripts/check-doc-links.py` + `make check-doc-links` — validates every relative link and heading anchor in the repo's Markdown (1,725 files), wired into `.githooks/pre-commit` over **staged files only** so pre-existing debt cannot block an unrelated commit (`K3DM_SKIP_DOC_LINKS=1` bypasses). Handles the three false-positive classes that would make such a gate useless: markdown-shaped regexes inside inline code, this repo's clickable `path:line` references, and `github-slugger`'s per-space hyphenation (`/claude / /gemini` → `claude--gemini`, doubled). Covered by `scripts/tests/bin/test_check_doc_links.py` (23 pytest cases, including a live-tree gate). Closes a gap open since 2026-04-06.
-
-- `docs/guides/grafana-dashboards.md` — a guide covering all seven shipped Grafana dashboards (ArgoCD/Image-Updater, CVE Auto-Patch, E2E Verification, Hermes Status, k3dm Deployment Metrics, Trivy Security, Checkout Load Test): panel-by-panel queries, the producer chain feeding each series (exporter / Pushgateway / promtail / trivy-operator), and a `No data`-by-cause triage table assembled from past incidents. Closes a "guide per major tech" gap — dashboard knowledge previously existed only scattered across ~25 plan/bug/issue docs, and `grafana-dashboard-hermes.yaml` was referenced by none of them.
-
-- Tier 2 `e2e_verify_sandbox` runs the Stripe Playwright flow in a self-contained ACG sandbox without hub registration, applies the proven sandbox substrate overrides at deploy time, and emits shared `tier: sandbox` / `project: stripe` summaries. Tier 2 is opt-in and periodic, never a blocking per-candidate gate.
-
-### Fixed
 
 - The GHCR pull credential was validated for authentication but never for authorization, so the
   system converged on a permanently broken PAT with every layer reporting green. All three loaders in
