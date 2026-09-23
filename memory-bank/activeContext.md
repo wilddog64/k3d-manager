@@ -1,5 +1,61 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — the hub syncs shopping-cart onto ITSELF via a self-referential app-cluster registration
+
+`v1.36.0` tagged (`8ea1469d`) and released; `enforce_admins` restored (`enabled=true`).
+
+**Root cause of the "data layer absence".** Secret `cicd/ubuntu-k3s-app-cluster` on the hub
+registers cluster `ubuntu-k3s` at `server=https://kubernetes.default.svc` — the hub itself — with
+`k3d-manager/role: app-cluster`, plus `managed: false` and `release: unknown` (values the normal
+release path does not write). Both AppSets select that label:
+
+| AppSet | Generator | `preserveResourcesOnDeletion` |
+|---|---|---|
+| `data-git` | `clusters` on `role: app-cluster` | unset → resources ARE pruned |
+| `services-git` | `git` (`services/*`, excl. `shopping-cart-identity`) × same `clusters` | **`true`** → resources SURVIVE |
+
+So the hub generates `ubuntu-k3s-data-layer` and `ubuntu-k3s-shopping-cart-*` against itself.
+
+**Why nothing deployed:** `ubuntu-k3s-data-layer` fails its sync *atomically* —
+`namespaces "shopping-cart-payment" not found (retried 5 times)`. `CreateNamespace=true` creates
+only the **destination** namespace (`shopping-cart-data`); the app's manifests span `secrets`,
+`shopping-cart-apps`, `shopping-cart-data`, `shopping-cart-payment`, and ArgoCD does not create
+non-destination namespaces. One missing namespace → all 7 StatefulSets never created → empty
+`shopping-cart-data` (Services only) → 3 pods CrashLooping on `postgresql-orders...: no such host`.
+
+**`ubuntu-k3s` is a role alias, NOT a place — this name has already misled a session.** It dates
+from the ACG sandbox era, and Tier 2 still self-registers the same name inside a sandbox's own
+ArgoCD (`scripts/plugins/e2e.sh:122-138`), which is correct *there*. The hub Secret is a different
+object in a different namespace. There is no `ubuntu-k3s` kubecontext locally — only
+`k3d-k3d-cluster` and `ubuntu-hostinger`.
+
+**Operator decision 2026-09-23: the hub should not run the shopping-cart data layer or payment at
+all.** Verified first that this is safe: Tier 1 (vCluster) and Tier 2 (ACG) each carry their own
+substrate under `scripts/etc/e2e/` (`postgres.yaml`, `payment.yaml`, `redis.yaml`, digest-pinned
+`kustomization.yaml`), independent of `shopping-cart-infra`'s `data-layer` path. So de-registering
+cannot break either tier. Spec: `docs/plans/v1.37.0-deregister-hub-app-cluster-shopping-cart.md`
+(`3504d565`). **Creating the missing namespace was withdrawn** — it would have entrenched the
+misconfiguration.
+
+**Load-bearing ordering:** delete the registration Secret BEFORE the generated Applications, or both
+AppSets regenerate them. And reapplying the AppSets before that deletion silently undoes it.
+
+**`services-git` git revision is frozen at `k3d-manager-v1.36.0`** — AppSets need reapplying for hub
+and ACG, then `argocd_check_values_branch`.
+
+**Separate, unrelated:** `shopping-cart-identity` is excluded from `services-git`, has no ownerRef,
+and fails because ArgoCD tries to `replace` a **bound** PVC — `postgres-keycloak-pvc ... spec is
+immutable`, blanking `volumeName` and `storageClassName`. Needs `ignoreDifferences` on those two
+fields + `RespectIgnoreDifferences=true`; almost certainly also why `keycloak-realm-reconcile` is
+`Failed 0/1`. Needs its own `docs/bugs/` spec.
+
+**Downgraded:** the stale `github/pat` in the Keychain seed backup is less severe than reported.
+`vault_seed_hub_into_context` (`scripts/plugins/vault.sh:1063`) reads the **source Vault first** and
+falls back to Keychain only when Vault is empty, then rewrites the Keychain backup from what it
+read. So the stale copy self-heals on the next seed run against a healthy hub Vault; the risk window
+is only "hub Vault lost AND seed runs". Minor: the key array has **14** entries but the success log
+says `all 13 canonical keys`.
+
 ## 2026-09-23 — v1.36.0 milestone: PR #130 merged, v1.37.0 branch created
 
 PR #130 (feat: v1.36.0 — Tier 2 e2e, deterministic triage, and the hub-rebuild repair list) merged to
