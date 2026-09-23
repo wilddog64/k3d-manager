@@ -60,6 +60,20 @@
 - [ ] **Tier 1 still unproven** — all three fixes (GHCR stdin `9d2a0ad0`, leak `7338a238`,
       the ensure_exists fix) are unexercised against the live runner. A dispatch is needed to confirm,
       and needs the operator's go.
+- [x] **Six stale kubeconfigs swept 2026-09-23** — operator-authorised; verified orphaned first
+      (`vclusters` ns absent, `vcluster list` empty, no docker proxies), deleted by exact name.
+      `~/.kube/vclusters/` on the m2 runner is now empty.
+- [ ] **Hostinger hub registration LOST AGAIN 2026-09-23** — regression of a doc marked DONE.
+      The 2026-09-20T23:49Z hub rebuild recreated only `ubuntu-k3s-app-cluster` (in-cluster);
+      `cluster-ubuntu-hostinger` is absent and 0 `ubuntu-hostinger-*` Applications exist. This
+      is why CVE Auto-Patch has no data: `cve-remediation-verify` fails every 15 min with
+      `secrets "cluster-ubuntu-hostinger" not found`, so no remediation event ConfigMap is
+      written and the exporter emits zero `cve_*` gauges. Recurrence appended to
+      `docs/bugs/2026-09-13-hostinger-app-cluster-registration-lost-orphaned-workloads.md`.
+      Needs the operator's go: no registration-only entry point exists, and
+      `make refresh CLUSTER_PROVIDER=k3s-hostinger` remains unsafe and unapproved. The real
+      fix is making registration survive a rebuild — otherwise recurrence #3 is scheduled.
+      Also: 3 consecutive CronJob failures raised no alert.
 - [ ] **Hermes still BOOTED OUT** — must stay down until both blockers are fixed, or it
       re-wedges the runner every 5 minutes. Restore:
       `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`

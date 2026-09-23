@@ -175,3 +175,73 @@ Run only after the code is merged to the branch and verified.
 - 12 `ubuntu-hostinger-*` apps plus `observability-acg` apps (`acg-kube-prometheus-stack`, `acg-trivy-operator`, `loki`) generated and adopted the existing hostinger workloads — all Synced/Healthy, no pod restarts. `loki` ran one sync that pruned `loki-canary`.
 - Hub istiod unchanged (HPA 2-3 replicas); `bin/smoke-test-cluster-health` 9 passed / 0 failed.
 - Deviation from spec: `_hostinger_register_cluster` also (re)configures the Vault app-cluster auth mount `kubernetes-ubuntu-hostinger` + `app-cluster-reader` policy + `eso-app-cluster` role. Idempotent and required by hostinger ESO, but the spec's "no Vault" claim was wrong — the BATS stub of `_hostinger_register_cluster` hid it.
+
+---
+
+## RECURRED 2026-09-23 — the 2026-09-20 hub rebuild dropped it again
+
+**Status of this doc reopened:** the 2026-09-13 fix (`14f26f3d`) re-registered hostinger and
+was verified. It did not make the registration *survive a hub rebuild*, and a rebuild has
+since happened. Live read-only checks on the hub, 2026-09-23:
+
+| Check | Result |
+|---|---|
+| `cicd` namespace created | `2026-09-20T23:49:25Z` |
+| `platform-ops` namespace created | `2026-09-20T23:53:17Z` |
+| `cicd/cluster-ubuntu-hostinger` | **absent** |
+| `cicd/ubuntu-k3s-app-cluster` | present, created `2026-09-21T00:26:24Z`, `server: https://kubernetes.default.svc`, `role: app-cluster` |
+| `ubuntu-hostinger-*` Applications | **0** |
+| `ubuntu-hostinger` reachable directly (`kubectl --context ubuntu-hostinger get nodes`) | Ready, `srv1754834`, v1.36.4+k3s1 |
+
+This is the same failure mode the original report attributes to the 2026-09-11 restore: the
+rebuild recreates only the in-cluster `ubuntu-k3s-app-cluster` registration and the hostinger
+one is never re-added. The workloads on hostinger are orphaned again.
+
+### What it broke this time — the CVE Auto-Patch dashboard
+
+The user-visible symptom was "CVE Auto-Patch has no data". Traced to the producer:
+
+```
+cve-remediation-verify  (*/15 * * * *)  ->  Failed, 3 consecutive runs
+pod log: Error from server (NotFound): secrets "cluster-ubuntu-hostinger" not found
+```
+
+`cve-remediation-verify.sh:4` and `app-cve-scan.sh:14` default
+`APP_CLUSTER_SECRET_NAME` to `cluster-ubuntu-hostinger`, and
+`app-cve-scan-cronjob.yaml` hardcodes it three more times — including a Role
+`resourceNames: ["cluster-ubuntu-hostinger"]` at line 147. With the Secret gone the job
+cannot reach the app cluster, so it never writes a
+`k3dm.k3d.io/cve-remediation-event=true` ConfigMap, so the exporter emits no `cve_*`
+gauges (confirmed: zero `cve_` series on the exporter's `/metrics`), so every remediation
+panel reads `No data`.
+
+So the empty dashboard is not a Grafana or exporter fault. It is this registration, two hops
+upstream.
+
+### Blast radius checked, and it is narrower than feared
+
+`reference_hub_app_cluster_registration_is_load_bearing_for_eso` warns that losing an
+app-cluster registration can nuke hub ESO. It has **not** happened here — the surviving
+`ubuntu-k3s-app-cluster` carries `role: app-cluster`, so the four selecting AppSets still
+match something. Only two things are unhealthy on the hub and both were already open:
+`shopping-cart-identity` OutOfSync (the `Replace=true` fix) and the `cosign-public-key`
+ExternalSecret. No other ExternalSecret is unready.
+
+Note the surviving registration points at `https://kubernetes.default.svc` — the hub's own
+API — while being labelled `role: app-cluster`. That is what keeps the AppSets satisfied,
+and it is also why the loss was silent.
+
+### Follow-on, not yet actioned (needs the operator's go)
+
+1. **Re-register hostinger.** Same problem as the original report: there is still no
+   registration-only entry point, and `make refresh CLUSTER_PROVIDER=k3s-hostinger` is
+   still the unsafe path (it moves the hub's istio and the public edge). That make target
+   remains on the not-approved list.
+2. **Make it survive a rebuild**, or the third recurrence is already scheduled. A fix that
+   restores state by hand but leaves the rebuild path unchanged is not a fix — this doc is
+   the evidence.
+3. **The hardcoded Secret name is enumerated in five places** across two shell scripts and
+   one manifest, one of them an RBAC `resourceNames`. Any rename must change all five in
+   one commit (`reference_unenumerated_api_rollout_misses_repos`).
+4. **Detection.** Three consecutive `cve-remediation-verify` failures produced no alert.
+   The gap that matters is not the dashboard being empty, it is that nothing said so.

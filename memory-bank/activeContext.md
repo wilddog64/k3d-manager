@@ -2950,3 +2950,53 @@ Hermes stays booted out until a live run confirms them.
 
 Out of scope: sweeping the six stale kubeconfigs on the m2 runner (live-host mutation,
 needs the operator's go; harmless now that the predicate no longer trusts them).
+
+### 2026-09-23 — six stale kubeconfigs swept; four blank Grafana dashboards diagnosed
+
+**Kubeconfigs (done).** Operator authorised the sweep. Verified orphaned first on the m2
+runner: `vclusters` namespace absent, `vcluster list` empty, no `vcluster_*` docker proxies.
+Deleted all six by exact name (no wildcard); `~/.kube/vclusters/` now empty. Two of the names
+were `e2e-1790154235-20` and `e2e-1790162339-22194` — the orphan used in the new BATS tests and
+the failed run from the transcript.
+
+**Four blank dashboards — three distinct causes, none of them Grafana.** All confirmed live,
+read-only. Note the exporter serves `/metrics` on **port 8080**, not 9109; probing 9109 returns
+nothing and looks exactly like "the exporter emits no metrics". I made that mistake and nearly
+filed a false defect.
+
+| Dashboard | Cause | Verdict |
+|---|---|---|
+| E2E Verification | producer works; the *runs* are empty | fixed by the three pending e2e fixes |
+| Hermes Status | no producer: agent booted out **and** `K3DM_HERMES_STATUS_ENABLED` unset by design | expected |
+| CVE Auto-Patch | `cluster-ubuntu-hostinger` registration lost again | **regression, see below** |
+| Checkout Load Test | dashboard now deployed, but zero producer | expected |
+
+E2E detail: 21 `e2e-result` ConfigMaps exist and the exporter emits `e2e_last_run_pass` (0 for
+both `m2` and `local-m4`) plus 21 `e2e_run_info` series. What is missing is
+`e2e_last_success_timestamp_seconds`, `e2e_failure_info` and `e2e_failure_group_info`, and
+duration is 0 — because every payload has `total: ""`, `failed: ""`, `failure_groups: []`. The
+runs abort before a single test executes. The dashboard is telling the truth. It populates only
+after a run actually reaches the test phase.
+
+Checkout Load Test detail: `checkout-loadtest-dashboard` **is** now present in `monitoring`, so
+the guide's "no applier" line is stale — but there is no k6 workload anywhere and Prometheus has
+`enableRemoteWriteReceiver` unset, so nothing can push. Still expected, for a second reason now.
+
+**CVE Auto-Patch is a real regression.** `cve-remediation-verify` has failed 3 consecutive runs
+with `secrets "cluster-ubuntu-hostinger" not found`. The hub was rebuilt 2026-09-20T23:49Z and
+recreated only `ubuntu-k3s-app-cluster` (in-cluster, `server: https://kubernetes.default.svc`,
+created 2026-09-21T00:26Z); zero `ubuntu-hostinger-*` Applications exist. This is the identical
+failure mode that `docs/bugs/2026-09-13-hostinger-app-cluster-registration-lost-orphaned-workloads.md`
+recorded for the 2026-09-11 restore — and that doc is marked **DONE**. The 2026-09-13 fix
+restored the state but never made it survive a rebuild, so it recurred. Recurrence appended to
+that doc rather than filed as a new one (dedup rule).
+
+Blast radius checked and narrower than the ESO warning implies: the surviving registration
+carries `role: app-cluster`, so the four selecting AppSets still match. Only the two
+already-open items are unhealthy (`shopping-cart-identity` OutOfSync, `cosign-public-key`
+ExternalSecret). No other ExternalSecret unready. Hostinger itself is reachable and Ready.
+
+Not actioned, needs the operator's go: re-registering hostinger (still no registration-only
+entry point; `make refresh CLUSTER_PROVIDER=k3s-hostinger` is still the unsafe path and still
+not approved), making registration survive a rebuild, and the fact that three consecutive
+CronJob failures raised no alert — the detection gap matters more than the blank panel.
