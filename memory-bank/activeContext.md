@@ -1,5 +1,36 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — v1.38.0 restructured: vector store as a platform component, Hermes as the consumer
+
+Operator direction: make the deployed vector store and Hermes retrieval the headline; CLI dedup
+becomes a by-product. Spec renamed to `docs/plans/v1.38.0-vector-store-and-hermes-prior-art.md`.
+
+**The driver is an agent-level defect, not a lint gap.** `scripts/lib/hermes/e2e_bugs.py:163` decides
+new-vs-recurrence with `bug_dir.glob(f"*-{group['slug']}.md")` — an unattended agent whose recall over
+its own 495-file corpus is an exact string match. A shifted slug makes Hermes file a duplicate bug
+doc and keep doing so every run; `created`/`reopened`/`ongoing` and the Slack outcome all inherit it.
+
+Five workstreams: WS1 pgvector as an ArgoCD-managed, ESO/Vault-credentialed, hub-scoped platform
+component in its own namespace (explicitly **not** behind the `role: app-cluster` selector); WS2 a
+stdlib indexer using a hosted embeddings API over `urllib` — `bin/k3dm-hermes` already imports
+`urllib.request`, so this matches the existing idiom and needs no ML wheels on Python 3.14.7; WS3 the
+shared retrieval library plus the advisory CLI; WS4 Hermes consumption; WS5 evaluation.
+
+**WS4 is strictly additive and that is load-bearing.** Hermes' filing decision stays on the exact
+glob this release; retrieval only appends a `## Possible prior art` section to newly filed docs. An
+unproven retriever allowed to suppress a filing turns a false positive into a silently unfiled
+defect — invisible failure. Gating needs its own spec, version, and measured precision floor.
+
+WS5 keeps a stdlib TF-IDF scorer as the **control** and measures recall@5 for both, per directory,
+against ≥25 hand-mined positive pairs and ≥25 hard negatives. If embeddings do not beat lexical, that
+is a finding to state, not skip — the deployed store would then rest on the platform-component
+argument alone, which is honest but must be said out loud.
+
+Noted in Risks: if scope grows, split WS1 (platform component) from WS2–WS5 (retrieval) rather than
+breaching the 5-plan-doc cap. `local-path` is `reclaimPolicy: Delete`, so the index is a rebuildable
+cache and the guide must say so.
+
+
 ## 2026-09-23 — semantic doc dedup specced for v1.38.0 (the one real agentic-tooling gap)
 
 Reviewed k3d-manager against a set of agentic-AI capability outcomes. Five of six are already
@@ -15,7 +46,8 @@ semantic search via the `code-review-graph` MCP; docs never got it. The concrete
 373 issue docs, 250 plans, 78 retros. Two filings of one defect with different vocabulary do not
 collide.
 
-`docs/plans/v1.38.0-semantic-doc-dedup.md` written. Deliberately **two-phase**, because the repo has
+`docs/plans/v1.38.0-vector-store-and-hermes-prior-art.md` (initially written as
+`v1.38.0-semantic-doc-dedup.md`, restructured on operator direction). Deliberately **two-phase**, because the repo has
 **zero third-party Python runtime dependencies** (`check-doc-links.py` is stdlib-only; no
 `requirements.txt` or `pyproject.toml` exists) on Python **3.14.7**, where torch-class wheels are not
 assured. Phase 1 is a stdlib TF-IDF cosine scorer plus a hand-mined labelled pair set and a
