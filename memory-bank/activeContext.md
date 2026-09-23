@@ -1,5 +1,11 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — v1.36.0 milestone: PR #130 merged, v1.37.0 branch created
+
+PR #130 (feat: v1.36.0 — Tier 2 e2e, deterministic triage, and the hub-rebuild repair list) merged to
+main as **945018ee** at 2026-09-23. enforce_admins re-enabled on main. **v1.36.0 remains UNTAGGED**
+pending the user's go; next branch is **k3d-manager-v1.37.0** (created from 945018ee).
+
 ## 2026-09-22 — hub apps 47h in ImagePullBackOff: stale `github/pat` in Vault, not the k8s Secret
 
 Found by running `make smoke` as the PR #130 live-smoke gate. `cluster-health` FAILED: 4/4 pods in

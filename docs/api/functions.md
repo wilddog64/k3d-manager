@@ -46,6 +46,9 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `hub_recovery_validate` | `scripts/plugins/hub_recovery.sh` | Read-only fail-closed validation of the captured Kine database/token/PV export and exactly one source tree for each of the seven approved durable claims. |
 | `hub_recovery_targets` | `scripts/plugins/hub_recovery.sh` | Read-only resolve of the current PV claim references, node affinity, and local-path targets into the exact target-map format accepted by recovery restore. |
 | `hub_recovery_restore` | `scripts/plugins/hub_recovery.sh` | Render, or with explicit `--confirm` copy, the validated source claims into an exact new-target map after stateful consumers have been stopped. Does not recreate a cluster or delete a volume. |
+| `hub_snapshot_capture` | `scripts/plugins/hub_snapshot.sh` | Capture hub state (PVCs + kine snapshot) locally and transfer to M2 remote storage via rsync; checksum-verified, with Loki recovery record written to Vault for unattended restore (v1.36.0+) |
+| `hub_snapshot_list` | `scripts/plugins/hub_snapshot.sh` | List remote hub snapshots on M2 storage; read-only (v1.36.0+) |
+| `hub_snapshot_restore` | `scripts/plugins/hub_snapshot.sh` | Restore a hub snapshot from M2 remote storage; uses the Vault-stored Loki recovery record from `hub_snapshot_capture` (v1.36.0+) |
 | `configure_vault_app_auth_for_context` | `scripts/plugins/vault.sh` | Provider-agnostic Kubernetes auth configuration for app cluster; resolves kubeconfig context to cluster name before CA/server lookup (v1.10.0+) |
 | `vault_install_unseal_watchdog` | `scripts/plugins/vault.sh` | Deploy in-cluster Vault auto-unseal watchdog CronJob (Tier 3 P2a); replays Shamir shard on `vault status` exit-code trigger |
 | `vault_deploy_hub_into_context` | `scripts/plugins/vault.sh` | Provision hub Vault inside an app cluster with least-privilege `app-cluster-reader` policy and kubernetes-auth ClusterSecretStore (v1.10.0+) |
@@ -61,6 +64,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `argocd_sync_webhook_token_secret` | `scripts/plugins/argocd.sh` | Read the `k3dm-webhook-token` value from macOS Keychain and create/update the `cicd/k3dm-webhook-token` Secret idempotently; called automatically from `deploy_argocd_platform_ops` so the webhook secret survives cluster rebuild; token is never passed via argv, only stdin under `_no_trace` (v1.18.0+) |
 | `deploy_argocd_platform_ops` | `scripts/plugins/argocd.sh` | Deploy the `platform-ops` namespace, RBAC, CVE-scan CronJob, and notification Secret for the ArgoCD CVE auto-patch pipeline; CronJob runs on the Hub cluster and patches cluster secrets directly (no webhook dependency); notification channels (SendGrid/PagerDuty/email) enable only when their env vars are set; invoked by `make platform-ops` (v1.18.0+) |
 | `deploy_istio_ambient` | `scripts/plugins/istio_ambient.sh` | Deploy Istio ambient mesh on the app cluster via ArgoCD ApplicationSet; applies ztunnel + istio-cni with substrate-aware CNI directory configuration (Cilium or k3s flannel) (v1.16.0+) |
+| `smoke_run` | `scripts/plugins/smoke.sh` | Run unified smoke health checks with tiered Tier-1/Tier-2 semantics; skip-tier gates prevent a lower tier's absence from failing the run; report passes/skipped/failures in JSON (v1.36.0+) |
 | `deploy_keycloak` | `scripts/plugins/keycloak.sh` | Deploy Keycloak identity provider |
 | `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
 | `deploy_ldap` | `scripts/plugins/ldap.sh` | Deploy OpenLDAP directory service |

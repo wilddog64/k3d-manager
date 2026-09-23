@@ -190,9 +190,8 @@
   `docs/plans/v1.36.0-make-smoke-target.md` and
   `docs/plans/v1.36.0-hub-snapshot-capture-and-retention.md`.
   This brings v1.36.0 to **5 plan docs — at the max-5 cap.** A 6th means splitting the release.
-- [ ] **Codex dispatched** (session `01a0c93c-45b4-7301-9ac7-661b66e21204`) to implement both,
-  two separate commits, fully offline/stubbed. Awaiting report; SHAs to be verified on
-  `origin/k3d-manager-v1.36.0` before trusting.
+- [x] **Codex dispatched** (session `01a0c93c-45b4-7301-9ac7-661b66e21204`) to implement both,
+  two separate commits, fully offline/stubbed. PR #130 merged to main 2026-09-23 as 945018ee.
 - [ ] **Snapshot capture NOT wired into `make down`/`make up`** — deliberately out of scope
   until capture is proven on a real hub.
 
@@ -927,7 +926,7 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **Deterministic e2e triage implemented** — `0c57b110`; verified independently (shellcheck RC=0, 138 pytest, 45/45 bats, mutation check genuine). Codex was blocked on `.git/index.lock`; Claude committed on its behalf.
 - [x] **Grafana admin password ROTATED and verified** — job `grafana-rotate-manual-20260921-195152` via the existing CronJob; login 200 with the Vault/ESO credential, 401 with a wrong one. The exposed value is invalid.
 - [ ] **Keycloak admin rotation** — still outstanding; no rotator exists and the ESO secret is bootstrap-only, so Vault+restart alone will not change the live password. Needs a 3-step manual or a new `keycloak-credential-rotator` spec. Operator to choose.
-- [ ] **PR #130 CI RED** — 4 failures, all branch-introduced (`main` green): bare-`!` lint (2 no-op assertions from `6c744a23`), observability tests 3/8 (reseed conflates Vault-unreachable with entry-absent — real design bug against the Vault-is-canonical decision), alertmanager test 388 (stale message + stubs). Fix spec not yet written.
+- [x] **PR #130 CI RED** — 4 failures, all branch-introduced (`main` green): bare-`!` lint (2 no-op assertions from `6c744a23`), observability tests 3/8 (reseed conflates Vault-unreachable with entry-absent — real design bug against the Vault-is-canonical decision), alertmanager test 388 (stale message + stubs). Fixed; PR merged 2026-09-23 as 945018ee.
 
 - [x] **Keycloak admin credential rotated on the live hub** — 2026-09-22. Rotator manifest applied,
   Vault role `keycloak-rotation` created, Job `keycloak-rotate-manual-20260922-043917`
@@ -950,9 +949,9 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `1b7c6c93`. Verified independently: `make test` 1010/1010, tests 57/174/179/388 green,
   `observability.bats` untouched. Prometheus reseed now separates unreachable Vault from an absent
   entry; `base64 --decode` → `-d` at five sites across the keycloak and argocd rotators.
-- [ ] **Prometheus Vault entry absent on the hub** — `secret/k3d-manager/prometheus-basic-auth`
+- [x] **Prometheus Vault entry absent on the hub** — `secret/k3d-manager/prometheus-basic-auth`
   404 with no metadata; local cache intact. Repair = cache-recovery reseed (NOT
-  `observability_rotate_prometheus_basic_auth`, which targets the ACG context). Awaiting go.
+  `observability_rotate_prometheus_basic_auth`, which targets the ACG context). Repaired by operator 2026-09-22.
 - [ ] **`keycloak-realm-reconcile` awk exit 127** — still needs its own bug doc.
 - [x] **PR #130 CI GREEN** at `3d3e36a7` (run 35728186747: lint success, detect success). Copilot's
   2 inline findings addressed, replied and both threads resolved: header tempfile `chmod 0600`
