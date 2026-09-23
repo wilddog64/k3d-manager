@@ -1,5 +1,58 @@
 # Active Context — k3d-manager
 
+## 2026-09-22 — hub apps 47h in ImagePullBackOff: stale `github/pat` in Vault, not the k8s Secret
+
+Found by running `make smoke` as the PR #130 live-smoke gate. `cluster-health` FAILED: 4/4 pods in
+`shopping-cart-apps` in `ImagePullBackOff` for **47h**, `403 Forbidden` on the GHCR manifest HEAD.
+
+**Root cause chain (verified, not inferred):**
+
+```
+ghcr-pull-secret  ←  ExternalSecret (refreshInterval 15m, creationPolicy Owner)
+                  ←  ClusterSecretStore vault-backend
+                  ←  Vault  secret/data/github/pat   property "token"
+```
+
+The pull secret holds a token minted **before** `read:packages` was granted (2026-09-22 23:26).
+Fixing the token was necessary but not sufficient — nothing propagated it to Vault.
+
+**The trap, and the thing to remember:** writing the k8s Secret directly is useless.
+`kubectl apply` of a fresh `.dockerconfigjson` succeeded and ESO reconciled it away within seconds —
+`managedFields` showed `externalsecrets.external-secrets.io/ghcr-pull-secret` and
+`kubectl-client-side-apply` at the *same* timestamp `2026-09-23T00:13:22Z`, and the secret carries
+`reconcile.external-secrets.io/managed: true` plus an `ExternalSecret` ownerReference. Verified by
+reading the value back as MATCH/MISMATCH against `gh auth token` — **MISMATCH**. This is the
+[[reference_argocd_selfheal_reverts_out_of_band_patch]] pattern with ESO as the reconciler: always
+read the value back.
+
+**Two misdiagnoses avoided along the way:**
+1. `403 Forbidden` reads exactly like a missing-scope credential, which is what
+   `reference_ghcr_pull_credential_gh_auth_refresh` says it means. Here the scope was already
+   correct. Proof: a direct token-exchange + manifest HEAD from the shell returned **200** for the
+   exact requested tag `sha-0d8ab3ba…`, and for `sha-b84a534d…` and `latest`. The credential works;
+   only the one the kubelet holds does not.
+2. The requested tag looked absent from the first page of
+   `user/packages/container/shopping-cart-basket/versions` (which is dominated by `.att`/`.sig`
+   attestation tags). It exists — pagination, not a missing image.
+
+**Fix is the operator's** (a Vault write needs the root token, which Claude does not read):
+`scratchpad/fix-ghcr-pat-in-vault.sh` — read-modify-writes `secret/github/pat` preserving sibling
+properties, force-syncs both ExternalSecrets, verifies MATCH, restarts the four deployments. Token
+and PAT never in argv; prints no secret material.
+
+**`github/pat` is one of the 14 canonical hub-seed keys** (`vault.sh:1118-1125`), so the Keychain
+seed backup also holds the stale token and would restore it on a hub rebuild. Re-backup after the
+Vault write.
+
+**Two more findings from the same smoke run:**
+- `shopping-cart-payment` namespace **does not exist** on the hub (only `-apps` and `-data`, both
+  47h old). So the smoke threshold `running >= 5` (`bin/smoke-test-cluster-health:86`, counting
+  apps + payment) is **unsatisfiable** — apps has 4 deployments. Its
+  "ghcr-pull-secret MISSING in shopping-cart-payment" and the ArgoCD `OutOfSync` for payment are
+  both downstream of the absent namespace, not separate defects.
+- `shopping_cart.sh:458` passes the GHCR PAT as `--docker-password=` on **argv**, same class as the
+  CLAUDE.md rule against secrets in script arguments. Needs its own bug doc; not fixed (scope).
+
 ## 2026-09-22 — ACG auto-login IS wired; the gap is an unpopulated Keychain item
 
 Spec queued: `docs/plans/v1.37.0-acg-autologin-enablement-for-tier2.md` (v1.37.0 now at 3 plan docs,
