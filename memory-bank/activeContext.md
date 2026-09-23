@@ -44,6 +44,27 @@ and PAT never in argv; prints no secret material.
 seed backup also holds the stale token and would restore it on a hub rebuild. Re-backup after the
 Vault write.
 
+**RESOLVED 2026-09-23 00:24 (operator ran the script).** `vault write secret/github/pat` → `http=200`,
+ESO force-sync → `ghcr-pull-secret vs gh token: MATCH`, four deployments restarted. **The 403 and the
+ImagePullBackOff are gone** — images now pull and `frontend` reached `1/1 Running`. The GHCR pull
+credential problem is closed.
+
+**What the fix exposed underneath (separate, pre-existing):** `basket-service`, `order-service` and
+`product-catalog` now `CrashLoopBackOff` on a **missing data layer**, not on images:
+
+```
+order-service: failed to connect to postgres — lookup
+postgresql-orders.shopping-cart-data.svc.cluster.local: no such host
+```
+
+`shopping-cart-data` holds the **Services** (`postgresql-orders`, `postgresql-products`,
+`postgresql-payment`, `minio`, all 2d old) but **zero StatefulSets and zero pods**, so the headless
+service has no endpoints and DNS does not resolve. Cause: ArgoCD app `ubuntu-k3s-data-layer` (in
+namespace **`cicd`**, not `argocd`) is **OutOfSync** and has never materialised the StatefulSets.
+`shopping-cart-identity` is also OutOfSync. This is the long-standing "shopping-cart-data
+StatefulSets" pending item — the data layer never returned after the hub rebuild 47h ago. Not caused
+by, and not fixed by, the credential work.
+
 **Two more findings from the same smoke run:**
 - `shopping-cart-payment` namespace **does not exist** on the hub (only `-apps` and `-data`, both
   47h old). So the smoke threshold `running >= 5` (`bin/smoke-test-cluster-health:86`, counting
