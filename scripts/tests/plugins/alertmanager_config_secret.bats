@@ -39,6 +39,39 @@ setup() {
   [ "${output}" = "sms-critical" ]
 }
 
+@test "Alertmanager routes KubeJobFailed to platform-warning" {
+  local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
+
+  run yq -r '.route.routes[2].matchers[0]' "${tmpl}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"KubeJobFailed"* ]]
+
+  run yq -r '.route.routes[2].receiver' "${tmpl}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "platform-warning" ]
+}
+
+@test "Alertmanager platform-warning has a non-empty recipient after envsubst" {
+  local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
+  local rendered="${BATS_TEST_TMPDIR}/alertmanager.yaml"
+
+  run env ALERTMANAGER_GMAIL_FROM=operator@example.com envsubst < "${tmpl}"
+  [ "${status}" -eq 0 ]
+  printf '%s\n' "${output}" > "${rendered}"
+
+  run yq -r '.receivers[] | select(.name == "platform-warning") | .email_configs[0].to' "${rendered}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "operator@example.com" ]
+}
+
+@test "Alertmanager keeps the critical route before platform-warning" {
+  local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
+
+  run yq -r '.route.routes[1].receiver + " " + .route.routes[2].receiver' "${tmpl}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "sms-critical platform-warning" ]
+}
+
 @test "make alertmanager-secret rejects empty input without calling Vault" {
   local stub_dir="${BATS_TEST_TMPDIR}/bin"
   mkdir -p "${stub_dir}"
