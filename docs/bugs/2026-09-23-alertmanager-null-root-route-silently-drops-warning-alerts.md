@@ -1,7 +1,9 @@
 # Alertmanager's `null` root route silently drops every warning-severity alert
 
 **Filed:** 2026-09-23
-**Status:** OPEN — spec only, assigned to Codex.
+**Status:** FIXED 2026-09-23 in `a7135966` — Changes 1-3 implemented, unit-verified and
+mutation-proven. **Not yet deployed**; the route tree in the live cluster is unchanged until
+the operator re-renders the Alertmanager secret (see "Verification after deploy" below).
 **Found while:** explaining why the CVE Auto-Patch Grafana dashboard is blank. The
 `cve-remediation-verify` CronJob had failed 15 consecutive times and nothing notified the
 operator.
@@ -180,6 +182,22 @@ kubectl exec -n monitoring alertmanager-kube-prometheus-stack-alertmanager-0 -c 
 
 and that a `KubeJobFailed` email arrives while `cve-remediation-verify` is still failing —
 which it will be until the hostinger registration is restored.
+
+### Implemented
+
+Changes 1, 2 and 3 landed as written in `a7135966`. The route tree is now:
+
+```
+route.receiver          null
+route.routes[0]         null              alertname = TrivyCriticalVulnerabilityDetected
+route.routes[1]         sms-critical      severity = critical
+route.routes[2]         platform-warning  alertname =~ "KubeJobFailed|..."
+```
+
+Verification: 7/7 in `alertmanager_config_secret.bats` (3 new guards), `make test` green,
+`make check-doc-links` OK. All three mutations reproduced independently — deleting the new
+route reds tests 3 and 5, blanking the `to:` reds test 4, swapping the two routes reds tests
+2, 3 and 5; the template was restored byte-identical after each.
 
 ## Not in this change
 
