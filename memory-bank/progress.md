@@ -1083,3 +1083,9 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `printf 'Authorization: Bearer %s\n' "${_token}"`).
   Outstanding merge gate: **Gemini live smoke test not run** — `enforce_admins` deliberately NOT
   disabled, since the gate list is not fully satisfied.
+- [ ] **Alertmanager root route is default-deny — all warning alerts discarded** (spec filed
+  2026-09-23, assigned to Codex). Root cause of the 15 silent `cve-remediation-verify`
+  failures. `route.receiver: 'null'` at `alertmanager.yaml.tmpl:9`; only `severity = critical`
+  or the 5-name allowlist escape it. Also silences this repo's own `E2EVerificationFailing`
+  and the `keycloak-realm-reconcile` awk-127 job. Spec:
+  `docs/bugs/2026-09-23-alertmanager-null-root-route-silently-drops-warning-alerts.md`.

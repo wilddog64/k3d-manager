@@ -3000,3 +3000,36 @@ Not actioned, needs the operator's go: re-registering hostinger (still no regist
 entry point; `make refresh CLUSTER_PROVIDER=k3s-hostinger` is still the unsafe path and still
 not approved), making registration survive a rebuild, and the fact that three consecutive
 CronJob failures raised no alert — the detection gap matters more than the blank panel.
+
+### 2026-09-23 — the detection gap root-caused: Alertmanager's root route is default-deny
+
+The `cve-remediation-verify` silence is **not** a missing rule or a missing metric. Measured on
+the live hub, every hop works except the last one:
+
+`kube_job_failed{namespace="platform-ops"} 1` → `KubeJobFailed` rule present in
+`kube-prometheus-stack-kubernetes-apps` → `ALERTS{...} alertstate="firing"` → active in
+Alertmanager, `silencedBy: []`, `inhibitedBy: []` → **matches no child route → root receiver
+`'null'` → discarded.**
+
+`scripts/etc/prometheus/alertmanager.yaml.tmpl:9` sets `route.receiver: 'null'`. The only exits
+are `severity = critical` (→ `sms-critical`) or the 5-name alertname allowlist in the
+`AlertmanagerConfig` CR (→ `cicd/k3dm-analyze/*` webhook). `KubeJobFailed` ships as
+`severity: warning` and is on neither, so **every kube-prometheus-stack default rule is
+undeliverable**. Currently firing and being dropped: `KubeJobFailed` ×3 (platform-ops and
+`identity/keycloak-realm-reconcile` — the awk-127 job already on the list),
+`E2EVerificationFailing` ×2 (this repo's own e2e alert has never been deliverable),
+`KubeHpaMaxedOut` ×2, `PrometheusDuplicateTimestamps` ×1, `Watchdog` ×1.
+
+`alertmanager_config_secret.bats:26` asserts an alert routes **to** `null` and nothing asserts
+any alert reaches a real receiver, so a template where every route ends at `'null'` passes.
+
+Spec filed: `docs/bugs/2026-09-23-alertmanager-null-root-route-silently-drops-warning-alerts.md`
+— a `platform-warning` receiver (email to `${ALERTMANAGER_GMAIL_FROM}`, already in both
+`envsubst` allowlists at `observability.sh:78` and `:634`, so no new variable), a third child
+route placed **after** `severity = critical` so criticals keep SMS, `docs/guides/alerting.md`
+(none exists), and a test that an alert reaches a non-`null` receiver. Assigned to Codex.
+
+Side findings, not actioned: `e2e_last_success_timestamp_seconds` has zero series, so
+`E2EVerificationStale` can never fire yet; `Watchdog` routing to `'null'` makes it a
+dead-man's switch that dies inside the cluster it watches; one 502 from
+`webhook.3ai-talk.org/api/v1/cve-remediate` at 2026-09-22T00:49Z, not retried since.
