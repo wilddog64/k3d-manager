@@ -1,5 +1,18 @@
 # Progress — k3d-manager
 
+## 2026-09-23 — Alertmanager warning-severity delivery fix
+
+- [x] **`a7135966` — warning alerts no longer fall through to the root `null` receiver.**
+      Added `platform-warning`, routed `KubeJobFailed`, `KubeJobNotCompleted`, E2E and
+      Prometheus self-health allowlisted alerts at route index 2 after SMS criticals, and
+      documented the default-deny/first-match behavior in `docs/guides/alerting.md`.
+- [x] Gates: focused Alertmanager BATS 7/7; `make test` 1061/1061; shellcheck clean;
+      `make check-doc-links` 1749 files OK; rendered template YAML valid.
+- [x] Mutation proof: deleting the route made tests 3 and 5 red; blanking `to:` made test 4
+      red; swapping the warning and critical routes made tests 2, 3 and 5 red. Each mutation
+      was restored byte-for-byte before the next.
+- [ ] **Push pending** — the initial pull was blocked by inability to write `.git/FETCH_HEAD`.
+
 ## 2026-09-23 — M2 GHCR credential root-caused (locked keychain), fix dispatched to Codex
 
 - [x] **Root cause found, prior triage retracted** — the M2's `gh` token is NOT invalid or

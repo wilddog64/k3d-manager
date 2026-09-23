@@ -1,5 +1,16 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — Alertmanager warning alerts now have an explicit delivery route
+
+Implemented and committed as `a7135966` on `k3d-manager-v1.37.0`. Added the
+`platform-warning` email receiver using `${ALERTMANAGER_GMAIL_FROM}`, appended the five-name
+warning allowlist at `.route.routes[2]` after `severity = critical`, added the Alerting guide
+and README/CHANGELOG entries, and added three BATS guards. Focused BATS is 7/7; `make test`
+is 1061/1061; `make check-doc-links` reports 1749 files OK; shellcheck is clean; YAML parses.
+Each required mutation turned its corresponding guard red and was restored byte-for-byte.
+The initial `git pull origin k3d-manager-v1.37.0` was blocked because the sandbox cannot write
+`.git/FETCH_HEAD`; no live cluster commands were run.
+
 ## 2026-09-23 — M2 GHCR blocker root-caused: locked keychain, not a bad token
 
 **Status: stdin token-forwarding fix IMPLEMENTED and VERIFIED.** Spec:
