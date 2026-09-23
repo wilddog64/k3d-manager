@@ -1,5 +1,33 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — semantic doc dedup specced for v1.38.0 (the one real agentic-tooling gap)
+
+Reviewed k3d-manager against a set of agentic-AI capability outcomes. Five of six are already
+covered — Hermes Phase 1 is the autonomous agent (memory-bank + 165 memory files + k3dm-mcp tools),
+the Claude/Codex/Gemini/Copilot split with its Haiku→Sonnet→Haiku quota routing is the multi-agent
+workflow, external API integration is saturated, and `scripts/tests/fixtures/e2e-corpus/corpus.jsonl`
++ `scripts/tests/hermes/test_e2e_corpus.py` is a genuine labelled eval set.
+
+**The gap is retrieval: zero embeddings or semantic search over documentation anywhere in the repo.**
+Verified by grep — the only matches are incidental prose and `scratch/pytest-venv`. Code has
+semantic search via the `code-review-graph` MCP; docs never got it. The concrete cost is the
+`CLAUDE.md` dedup gate, which is exact slug matching (`ls docs/bugs/*-<slug>.md`) over 495 bug docs,
+373 issue docs, 250 plans, 78 retros. Two filings of one defect with different vocabulary do not
+collide.
+
+`docs/plans/v1.38.0-semantic-doc-dedup.md` written. Deliberately **two-phase**, because the repo has
+**zero third-party Python runtime dependencies** (`check-doc-links.py` is stdlib-only; no
+`requirements.txt` or `pyproject.toml` exists) on Python **3.14.7**, where torch-class wheels are not
+assured. Phase 1 is a stdlib TF-IDF cosine scorer plus a hand-mined labelled pair set and a
+recall@5 floor; Phase 2 adds hosted-API embeddings **only if that measurement justifies it**, via
+`urllib` rather than local ML wheels. No vector database at either phase — brute-force cosine over
+~1,360 documents is microseconds, and a flat file is the correct index at this scale.
+
+Also noted for a future rule: today's near-miss argues that **a spec proposing a destructive action
+must carry a read-only precondition task capable of falsifying its own premise**. That is what
+caught the ESO cascade; review did not. Mechanically checkable across `docs/plans/`.
+
+
 ## 2026-09-23 — superseding plan: opt-in `k3d-manager/shopping-cart` label, ESO re-homing queued
 
 Operator direction: take the narrow fix now, re-home ESO as its own item.
