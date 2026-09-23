@@ -2863,3 +2863,51 @@ the original broken-link gate stays green.
 
 Commits: `937a5b3b` (docs/memory-bank), `5341d700` (partial, insufficient), `f3430476` (complete
 + guard). Local state at `f3430476`: BATS 1010/1010, pytest 176/176, check-doc-links 1733 OK.
+
+### 2026-09-23 — vCluster leak fixed; the filed root cause was wrong
+
+The leak doc claimed the teardown path "is not reached on this failure path" without naming a
+mechanism. Measured against `~/.k3dm/e2e/dispatch/m2-20260923T111856Z.log`, that framing is
+wrong: the EXIT trap (`e2e.sh:101`) **did** fire — the `Summary written (exit_code=1)` line can
+only come from it, because the failure at `deploying-substrate` means the inline summary was
+never reached.
+
+The trap killed itself. Its middle step, `_e2e_write_result_event`, ended with
+`if _kubectl create -f "$manifest_file" >/dev/null 2>&1`. `_kubectl` forwards to `_run_command`
+**without `--no-exit`**, and `_run_command` ends a failure with `_err` → `exit 1`. An `exit`
+inside an EXIT trap terminates the shell; an `if` condition does not contain it and `|| true`
+cannot catch it. `2>&1` into `/dev/null` swallowed the `ERROR:` line, which is why the leak was
+silent. On the m2 runner the hub is unreachable by construction, so this fired on **every**
+dispatch — teardown was unreachable there for every run, pass or fail.
+
+Fix (`scripts/plugins/e2e.sh`, `scripts/plugins/vcluster.sh`):
+1. `--no-exit` on the publish and prune `_kubectl` calls — both already had a `_warn` else
+   branch, so the hard exit was never intended.
+2. `_e2e_exit_trap` reordered to summary → **teardown** → result event. The step that frees the
+   shared `vclusters` namespace must not be starved by a later network step.
+3. `_vcluster_reconcile_namespace` clears an orphan before `vcluster create`, recovering from
+   leaks no trap can catch (SIGKILL, panic). It `_warn`s, because an orphan is always a bug and
+   a silent sweep would mask 1 and 2 regressing.
+
+**Why the existing test missed it:** `e2e.bats:403` was written for exactly this scenario and is
+green. It cannot fail — `setup()`'s `_run_command` stub only logs and returns, so a hard exit is
+unreachable under test. The guard was tested against a substitute that cannot exhibit the defect.
+
+My own first ordering test repeated that mistake: stubbing `_e2e_wait_job` fails *after* the
+inline summary, so the trap's publish branch never ran and the test passed under both orderings.
+Only failing at `_e2e_deploy_substrate` reproduces the production path. Caught by mutation
+testing, not by the test going green.
+
+Verified: shellcheck clean; 181 BATS pass / 0 fail across the five e2e+vcluster suites; three
+mutation proofs (reconcile call removed → 4 reds; `--no-exit` dropped → 2 reds; trap order
+reverted → 1 red), each restored byte-identical.
+
+**Unit-proven only — not yet exercised against the live runner.** Runner confirmed clear at fix
+time: no `vclusters` namespace, no helm release, hub free of `cluster-e2e-*` registrations.
+Six stale kubeconfigs remain in `~/.kube/vclusters/` on the runner (residue of teardowns that
+never ran); harmless, not cleaned, and they expose a follow-on — `_vcluster_ensure_exists`
+returns success purely because a kubeconfig file exists, without confirming the vCluster does.
+
+Still open, deliberately out of scope: leak-doc options 4 (health-check visibility, Hermes
+N-consecutive escalation) and 5 (write-through recurrence, wider sample capture, `None passed`
+rendering). Hermes stays booted out until a live run confirms the fix.

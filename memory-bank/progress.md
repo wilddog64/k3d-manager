@@ -38,9 +38,19 @@
       already treats as absent. Better than specced — one `PIPESTATUS` index, remote always
       gets EOF on stdin, and the pre-existing exit-code test now guards the index as well, so
       the trap has two guards. BATS 80/80. Amendment recorded at the top of the spec doc.
-- [ ] **Tier 1 still red** — this fix alone will not green it; the leaked vCluster must also
-      be cleared (`2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`,
-      options 1 and 3).
+- [x] **vCluster leak FIXED 2026-09-23** — and the filed root cause was wrong. The EXIT trap
+      did fire; it killed itself in `_e2e_write_result_event`, where `_kubectl create` without
+      `--no-exit` reaches `_run_command`'s `_err` → `exit 1`, terminating the shell before
+      teardown with the `ERROR:` line swallowed by `2>&1`. On the m2 runner the hub is
+      unreachable by construction, so teardown was unreachable there on *every* dispatch.
+      Three changes: `--no-exit` on publish+prune; trap reordered to summary → teardown →
+      result event; `_vcluster_reconcile_namespace` clears an orphan before create, for leaks
+      no trap can catch. `e2e.bats:403` was written for this scenario and could never fail —
+      its `_run_command` stub cannot exit. 181 BATS pass / 0 fail, shellcheck clean, three
+      mutation proofs. **Unit-proven only — not yet exercised live.**
+- [ ] **Tier 1 still unproven** — both blockers now have fixes (GHCR stdin `9d2a0ad0`, this
+      leak fix), neither exercised against the live runner. A dispatch is needed to confirm,
+      and needs the operator's go.
 - [ ] **Hermes still BOOTED OUT** — must stay down until both blockers are fixed, or it
       re-wedges the runner every 5 minutes. Restore:
       `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`

@@ -381,11 +381,20 @@ function _e2e_sandbox_exit_trap() {
 function _e2e_exit_trap() {
   local rc=$?
   set +e
+  local publish_run_id=""
   if [[ -n "${_E2E_RUN_ID:-}" ]] && [[ "${_E2E_SUMMARY_WRITTEN:-0}" -eq 0 ]]; then
     _e2e_write_summary "${_E2E_RUN_ID}" "${_E2E_CANDIDATE_DIGEST:-}" "$rc" "${_E2E_ACTIVE_PHASE:-unknown}" || true
-    _e2e_write_result_event "${_E2E_RUN_ID}" || true
+    publish_run_id="${_E2E_RUN_ID}"
   fi
+
+  # Teardown is deliberately ahead of the result event. It frees the vclusters namespace,
+  # which is shared by every run on this runner, so a later step that exits the shell must
+  # not be able to starve it. The summary is a local file write and safe to keep first; the
+  # result event talks to the hub and stays last, where its failure costs only a dashboard
+  # point. Teardown removes the per-run log and kubeconfig, never the summary JSON the
+  # publish reads, so the order is safe.
   _e2e_teardown "${_E2E_ACTIVE_NAME:-}" || true
+  [[ -n "$publish_run_id" ]] && { _e2e_write_result_event "$publish_run_id" || true; }
   trap - EXIT
   exit "$rc"
 }
@@ -827,7 +836,10 @@ PY
     return 0
   fi
 
-  if _kubectl create -f "$manifest_file" >/dev/null 2>&1; then
+  # --no-exit is load-bearing: without it _run_command ends a failure with _err, which is
+  # exit 1. This runs inside the EXIT trap, where an exit terminates the shell before
+  # teardown and takes the vCluster with it, and 2>&1 hides the ERROR line that would say so.
+  if _kubectl --no-exit create -f "$manifest_file" >/dev/null 2>&1; then
     _info "[e2e] Published result event to ${E2E_RESULT_EVENT_NAMESPACE} for run ${run_id}"
     _e2e_prune_result_events
   else
@@ -845,7 +857,7 @@ function _e2e_prune_result_events() {
   local runner="${E2E_RUNNER:-local-m4}"
   local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=${E2E_TIER},k3dm.k3d.io/e2e-runner=${runner}"
   local names
-  names="$(_kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
+  names="$(_kubectl --no-exit -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
     -l "$selector" --sort-by=.metadata.creationTimestamp \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
   [[ -z "$names" ]] && return 0
