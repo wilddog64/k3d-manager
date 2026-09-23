@@ -144,18 +144,38 @@ ERROR: [acg-up] GHCR_PAT not set and no valid PAT in Vault — set GHCR_PAT env 
    so this path can never succeed off-hub. This is the "design follow-up" named above and it
    was never actioned.
 
-2. **`gh` fallback — newly broken.** The August remediation was
-   `gh auth refresh -h github.com -s read:packages` on M2. That is now undone:
-
-   ```
-   X Failed to log in to github.com account wilddog64 (default)
-     - The token in default is invalid.
-   ```
-
-   `gh` is present (`/opt/homebrew/bin/gh`) but its stored token is invalid, so
-   `gh auth token` (`shopping_cart.sh:366`) returns empty and the fallback bails at
-   `shopping_cart.sh:367` before the `read:packages` pull check
+2. **`gh` fallback — unreachable over SSH, and NOT a bad login.**
+   `gh auth token` (`shopping_cart.sh:366`) returns empty on the runner, so the fallback
+   bails at `shopping_cart.sh:367` before the `read:packages` pull check
    (`_shopping_cart_ghcr_pat_can_pull`) is ever reached.
+
+   The cause is **not** an invalid or missing token. Measured on m2-air.local
+   (hostname confirmed; `ssh m2jump` → `m2-air.local`) with the absolute binary path:
+
+   ```
+   /opt/homebrew/bin/gh config get -h github.com oauth_token → length 0
+   /opt/homebrew/bin/gh auth token                           → length 0
+   /opt/homebrew/bin/gh auth status  → "The token in default is invalid."
+   security find-generic-password -s "gh:github.com"          → PRESENT
+   security show-keychain-info login.keychain-db  → User interaction is not allowed.
+   ~/.config/gh/hosts.yml                        → 0 occurrences of oauth_token
+   ```
+
+   The credential **exists and is valid** — the operator reads it successfully from m2's
+   own console with the same command. `gh` stores it in the macOS keyring, and a
+   non-interactive SSH session can neither unlock the login keychain nor prompt for it, so
+   the read fails **identically to a deleted token** — including `gh auth status` reporting
+   "invalid", which is what misled the August triage. This is the locked-login-keychain
+   class already recorded in this repo's references.
+
+   **Consequence: the August remediation is not merely undone, it was never viable.**
+   `gh auth refresh -s read:packages` on M2 cannot fix a dispatch that runs over SSH, no
+   matter how many times it is run. Do not re-issue it as a remediation step.
+
+   *Not a defect, recorded to close it off:* `gh` is absent from `command -v` on a BatchMode
+   shell (the binary is at `/opt/homebrew/bin/gh`), which invalidated some earlier manual
+   probes. The dispatch itself is unaffected — `E2E_M2_REMOTE_PATH`
+   (`e2e_remote.sh:31`) already prepends `/opt/homebrew/bin`.
 
 ### Correction to a note carried in the memory bank
 
@@ -177,32 +197,34 @@ the remote command or passed in argv. It has to travel over stdin or an `ssh` `S
 that is not echoed, consistent with the repo rule that tokens never appear in script
 arguments or logs.
 
-### Immediate unblock (requires the operator — interactive, real TTY)
+### Immediate unblock — RETRACTED, does not work
 
-On m2jump, from the operator's own terminal:
+This section previously said to run `gh auth login` / `gh auth refresh -s read:packages` on
+m2jump from a real TTY. **That was wrong and was tried on 2026-09-23 without effect.** It
+re-authenticates the keyring, which the dispatch's SSH session still cannot read. There is
+no operator-side unblock; the fix has to be in the dispatch.
 
-```bash
-gh auth login -h github.com                        # device flow, needs a real TTY
-gh auth refresh -h github.com -s read:packages     # restore the packages scope
-```
+### Durable fix — CHOSEN: option 2
 
-Then re-verify against a **private** package (the public `shopping-cart-e2e-tests` returns
-200 anonymously and proves nothing):
+Option 2 was selected on 2026-09-23 and specced in
+`docs/bugs/2026-09-23-e2e-dispatch-forward-ghcr-token-over-stdin.md` (assigned to Codex).
+The M4 already holds a token with `read:packages`, and
+`shopping_cart_load_ghcr_pat_from_env` is already first in the resolver chain — so the
+dispatch only has to set `GHCR_PAT`, streamed on stdin. Nothing is minted and nothing
+persists on the runner.
 
-```bash
-gh auth status
-./scripts/k3d-manager e2e_runner_health m2
-```
-
-### Durable fix — pick one, this is the third occurrence
+Options for the record, this being the third occurrence:
 
 1. Teach the Vault path to be host-aware instead of hardcoding the hub context, so the
    runner either skips it cleanly or reaches Vault over a real endpoint.
 2. Forward a short-lived, `read:packages`-scoped token over the dispatch **via stdin**
    (never argv, never the tee'd command string).
-3. Keep the runner's own `gh` authoritative, but add a preflight assertion so an invalid
-   runner token fails `e2e_runner_health` loudly instead of surfacing 40 minutes later as
-   a substrate failure.
+3. ~~Keep the runner's own `gh` authoritative~~ — **not viable.** A keyring-stored token is
+   unreadable from the SSH session the dispatch uses, so the runner's `gh` can never be the
+   source. A preflight assertion is still worth adding so the credential gap fails
+   `e2e_runner_health` loudly instead of surfacing 40 minutes later as a substrate failure —
+   but it is a detection improvement, not a fix.
 
-Option 3 is the smallest and would have caught this before the run started; option 1 or 2
-is still needed so the credential does not silently rot again.
+Option 2 is the fix. Option 1 remains open as cleanup (the hardcoded hub context in
+`shopping_cart.sh:321` is still wrong off-hub even once option 2 lands). Option 3's
+detection half is still unfiled.

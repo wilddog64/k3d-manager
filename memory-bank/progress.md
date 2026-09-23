@@ -1,5 +1,39 @@
 # Progress — k3d-manager
 
+## 2026-09-23 — M2 GHCR credential root-caused (locked keychain), fix dispatched to Codex
+
+- [x] **Root cause found, prior triage retracted** — the M2's `gh` token is NOT invalid or
+      missing. It is stored in the macOS keyring; a non-interactive SSH session cannot unlock
+      the login keychain nor prompt, so `gh auth token` returns empty and `gh auth status`
+      reports "invalid" — indistinguishable from a deleted token. Keychain item
+      `gh:github.com` is PRESENT; `show-keychain-info` → `User interaction is not allowed.`
+      Verified on m2-air.local with the absolute path `/opt/homebrew/bin/gh`.
+- [x] **August remediation retracted as never-viable** — `gh auth login` / `gh auth refresh
+      -s read:packages` on M2 cannot fix a dispatch that runs over SSH. Was run by the
+      operator on 2026-09-23 with no effect. Removed from the Gap 3 doc as a step.
+- [x] **Two of my own claims corrected** — (a) the earlier "not the locked-keychain trap"
+      call was based on a test that captured stderr into the variable; it IS the trap.
+      (b) `gh` missing from `command -v` on a BatchMode shell affected only my manual probes,
+      NOT the dispatch — `E2E_M2_REMOTE_PATH` (`e2e_remote.sh:31`) already prepends
+      `/opt/homebrew/bin`. Recorded so it is not re-filed as a defect.
+- [x] **`hosts.yml` must NOT be committed** — it is where `gh` writes the token in plaintext
+      when secure storage is off. It also holds no token on either host today, so committing
+      it would carry nothing and leak a credential the moment it did.
+- [x] **Fix specced and dispatched** —
+      `docs/bugs/2026-09-23-e2e-dispatch-forward-ghcr-token-over-stdin.md`. Forward the M4's
+      existing `read:packages` token to the runner over **stdin** (never argv, never the
+      tee'd command string). No change to `shopping_cart.sh` — its env path is already first
+      in the resolver chain. Includes a PIPESTATUS index trap: adding `printf` to the head of
+      the pipeline shifts `ssh` to index 1, and getting it wrong makes every dispatch report
+      exit 0.
+- [ ] **Codex implementing** — awaiting SHA on `origin/k3d-manager-v1.37.0`. Verify before trust.
+- [ ] **Tier 1 still red** — this fix alone will not green it; the leaked vCluster must also
+      be cleared (`2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`,
+      options 1 and 3).
+- [ ] **Hermes still BOOTED OUT** — must stay down until both blockers are fixed, or it
+      re-wedges the runner every 5 minutes. Restore:
+      `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`
+
 ## 2026-09-23 — shopping-cart made opt-in per app cluster (code done, reapply pending)
 
 - [x] **Narrow fix implemented** — `a89e9e93` on `k3d-manager-v1.37.0`. `data-git` + `services-git`

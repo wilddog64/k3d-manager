@@ -1,5 +1,46 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — M2 GHCR blocker root-caused: locked keychain, not a bad token
+
+**Current focus: Codex is implementing the stdin token-forwarding fix.** Spec:
+`docs/bugs/2026-09-23-e2e-dispatch-forward-ghcr-token-over-stdin.md`. Awaiting a SHA on
+`origin/k3d-manager-v1.37.0` — verify independently (SHA on origin, diff scope, BATS) before
+trusting the report.
+
+**The finding.** The operator challenged my host attribution ("I think you are running from
+m4"), which was worth making: `ssh m2jump` does resolve to `m2-air.local`, but the challenge
+exposed that my probes and their console read disagreed because of **session type**, not host.
+`gh` on M2 keeps its token in the macOS keyring. The operator's console session has an
+unlocked login keychain and reads it fine. A non-interactive SSH session cannot unlock it and
+cannot prompt, so `gh auth token` returns empty and `gh auth status` says "invalid" — the
+locked-login-keychain trap, which looks exactly like a deleted token. The credential was never
+broken.
+
+**Because `e2e_runner_dispatch` runs over SSH, re-logging in on M2 can never fix this.** The
+August remediation (`gh auth refresh -s read:packages` on M2) is retracted as never-viable,
+not merely regressed.
+
+**The fix.** The M4 already holds a token with `read:packages`. Forward it to the runner over
+stdin at dispatch time. `shopping_cart_load_ghcr_pat_from_env` is already first in
+`shopping_cart_resolve_ghcr_pat`'s chain, so `shopping_cart.sh` needs no change — the dispatch
+only has to set `GHCR_PAT`. Nothing minted, nothing persisted on the runner, and the token
+stays out of argv and out of the tee'd transcript.
+
+**Rejected:** committing `hosts.yml` (publishes a plaintext credential, and holds no token
+today anyway); plaintext `gh` storage on the runner (long-lived token at rest);
+`security unlock-keychain` in the dispatch (needs the login password non-interactively).
+
+**Two corrections to my own earlier reporting, recorded so they are not re-derived:**
+1. My "this is not the locked-keychain trap" claim came from a test that folded stderr into
+   the variable, so an error string read as a token. It is the trap.
+2. `gh` being absent from `command -v` on a BatchMode shell affected only my manual probes.
+   The dispatch is fine — `E2E_M2_REMOTE_PATH` (`e2e_remote.sh:31`) already prepends
+   `/opt/homebrew/bin`. Not a defect; do not file it.
+
+**Still blocking Tier 1 after this fix lands:** the leaked vCluster wedge
+(`2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`, fix options 1 and 3).
+**Hermes stays booted out** until both are fixed — every dispatch currently leaks a vCluster.
+
 ## 2026-09-23 — Tier 1 e2e: wedged for 2h by a leaked vCluster; Tier 2 still blocked
 
 **Operator asked for Tier 1 then Tier 2. Tier 1 ran twice and failed both times; Tier 2 never
