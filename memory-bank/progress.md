@@ -1,5 +1,31 @@
 # Progress — k3d-manager
 
+## 2026-09-23 — shopping-cart made opt-in per app cluster (code done, reapply pending)
+
+- [x] **Narrow fix implemented** — `a89e9e93` on `k3d-manager-v1.37.0`. `data-git` + `services-git`
+      require `k3d-manager/shopping-cart: "true"`; `register_app_cluster` emits it from
+      `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). `eso` and
+      `grafana-dashboards-acg` untouched. 5 new BATS assertions, each mutation-tested against the
+      pre-change tree; `argocd.bats` 42/42 and `argocd_app_cluster_generator.bats` 7/7 green;
+      shellcheck unchanged (1 pre-existing SC2317).
+- [x] **Docs, same release** — `docs/architecture/shopping-cart-deployment.md` §2 gains
+      "`ubuntu-k3s` is a role, not a place": the role label as a movable pointer, the designed
+      in-cluster registration mode, the four selecting AppSets and their `preserveResourcesOnDeletion`
+      split, the never-delete-the-registration warning, and that an empty `shopping-cart-data` on the
+      hub is expected. CHANGELOG `[Unreleased] → Changed`.
+- [x] **Withdrawn approach recorded** — `d6297a2c`, superseded by `c7a5956d`.
+- [ ] **PENDING OPERATOR GO — the change is inert until this runs.** Task 0 re-capture (read-only),
+      then reapply the ApplicationSets for hub **and** ACG, then `argocd_check_values_branch`.
+      Expect zero `ubuntu-k3s-data-layer` / `ubuntu-k3s-shopping-cart-*`; verify `ubuntu-k3s-eso`
+      and `ubuntu-k3s-grafana-dashboards` still Synced with 21 ESO CRDs and 22 ExternalSecrets.
+      `data-git` prunes and holds the resources finalizer — if StatefulSets or bound PVCs have
+      appeared in `shopping-cart-data`, stop.
+- [ ] **Then decide 3a vs 3b** — `preserveResourcesOnDeletion: true` leaves the `shopping-cart-apps`
+      Deployments running unmanaged. 3a deletes the `shopping-cart-apps` + `shopping-cart-data`
+      namespaces; 3b keeps them as an unmanaged demo. Never delete the `secrets` namespace.
+- [ ] **ESO re-homing** — queued in `docs/roadmap.md` Forward themes, unversioned, needs a scope doc
+      (the 21 CRDs must be adopted, not recreated).
+
 ## 2026-09-22 — v1.36.0 smoke and hub snapshot features
 
 - [x] Unified `make smoke` target committed as `6f1f7fd1`; seven focused BATS cases pass, including
