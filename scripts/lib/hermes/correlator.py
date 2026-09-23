@@ -17,13 +17,25 @@ class Correlator:
         contributors = sorted({sensor for cycle in history for sensor in cycle})
         active = len(contributors) >= 2
         was_active = state.get("incident_active", False)
+        notified = state.get("incident_sensors", [])
         if active and not was_active:
             state["incident_active"] = True
+            state["incident_sensors"] = contributors
             event = {"kind": "incident", "sensors": contributors,
                      "text": self._template(records, contributors, "incident")}
             return self._enrich(event, state, llm, today)
+        if active and was_active:
+            joined = [sensor for sensor in contributors if sensor not in notified]
+            if not joined:
+                return None
+            state["incident_sensors"] = sorted(set(notified) | set(contributors))
+            event = {"kind": "escalation", "sensors": contributors,
+                     "text": self._template(records, contributors,
+                                            f"escalation ({', '.join(joined)} joined)")}
+            return self._enrich(event, state, llm, today)
         if not active and was_active:
             state["incident_active"] = False
+            state["incident_sensors"] = []
             return {"kind": "resolved", "sensors": [], "text": "Hermes correlated incident resolved."}
         return None
 

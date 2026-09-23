@@ -17,6 +17,7 @@ setup() {
   export E2E_ROLLOUT_TIMEOUT=5
   export E2E_VCLUSTER_READY_INTERVAL=0
   export E2E_VCLUSTER_READY_REFRESH_INTERVAL=0
+  export E2E_STRIPE_SECRET_KEY=test-stripe-key
 
   _run_command() {
     while [[ $# -gt 0 ]]; do
@@ -47,6 +48,267 @@ setup() {
   run declare -f e2e_verify_vcluster
   [ "$status" -eq 0 ]
   [[ "$BATS_TEST_DESCRIPTION" != _* ]]
+}
+
+@test "e2e_verify_sandbox is a public function (no leading underscore)" {
+  run declare -f e2e_verify_sandbox
+  [ "$status" -eq 0 ]
+  [[ "$BATS_TEST_DESCRIPTION" != _* ]]
+}
+
+@test "sandbox verification never invokes register_app_cluster" {
+  local marker="$BATS_TEST_TMPDIR/register-app-cluster-called"
+  acg_extend_playwright() { :; }
+  shopping_cart_create_vault_bridge() { :; }
+  _e2e_sandbox_kc() { :; }
+  _e2e_sandbox_wait_job() { :; }
+  _e2e_sandbox_job_manifest() { :; }
+  _e2e_write_summary() { :; }
+  _e2e_write_result_event() { :; }
+  register_app_cluster() { : > "$marker"; return 1; }
+  local rc=0
+  ( e2e_verify_sandbox ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  [ ! -e "$marker" ]
+}
+
+@test "sandbox job manifest exports OAuth2 and Stripe mode before Job creation" {
+  run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'name: OAUTH2_ENABLED\n              value: "true"'* ]]
+  [[ "$output" == *$'name: STRIPE_E2E\n              value: "true"'* ]]
+  [[ "$output" == *"KEYCLOAK_URL"*"https://keycloak.3ai-talk.org/realms/shopping-cart"* ]]
+  [[ "$output" == *"stripe-checkout-orchestrator.spec.ts"* ]]
+}
+
+@test "sandbox Job uses the real Tier 2 Service hostnames" {
+  run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"http://basket-service.shopping-cart-apps.svc:8083"* ]]
+  [[ "$output" == *"http://order-service.shopping-cart-apps.svc:8081"* ]]
+  [[ "$output" == *"http://payment-service.shopping-cart-payment.svc:8084"* ]]
+  [[ "$output" != *"http://basket.shopping-cart-apps.svc:"* ]]
+  [[ "$output" != *"http://order.shopping-cart-apps.svc:"* ]]
+  [[ "$output" != *"http://payment.shopping-cart-payment.svc:"* ]]
+}
+
+@test "sandbox Job preserves all four service ports" {
+  run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"product-catalog.shopping-cart-apps.svc:8082"* ]]
+  [[ "$output" == *"basket-service.shopping-cart-apps.svc:8083"* ]]
+  [[ "$output" == *"order-service.shopping-cart-apps.svc:8081"* ]]
+  [[ "$output" == *"payment-service.shopping-cart-payment.svc:8084"* ]]
+}
+
+@test "sandbox Job command emits result markers and preserves Playwright status" {
+  run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"__E2E_RESULTS_BEGIN__"* ]]
+  [[ "$output" == *"__E2E_RESULTS_END__"* ]]
+  [[ "$output" == *'rc=$?'* ]]
+  [[ "$output" == *'exit $rc'* ]]
+}
+
+@test "sandbox summary parser extracts marked Playwright results" {
+  local run_id="sandbox-marked-summary"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":4,"unexpected":1,"flaky":0,"skipped":0,"duration":1250}}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+assert summary["passed"] == 4, summary
+assert summary["total"] == 5, summary
+assert summary["failed"] == 1, summary
+print("marked parser ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"marked parser ok"* ]]
+}
+
+@test "sandbox preflight creates both Secrets before completion" {
+  local calls="$BATS_TEST_TMPDIR/sandbox-preflight-calls"
+  : > "$calls"
+  _e2e_sandbox_kc() {
+    printf '%s\n' "$*" >> "$calls"
+    case "$*" in
+      *"create namespace"*) printf 'namespace-manifest\n' ;;
+      *"create secret docker-registry"*) printf 'ghcr-manifest\n' ;;
+      *"create secret generic stripe-e2e"*) cat >/dev/null; printf 'stripe-manifest\n' ;;
+      *"apply -f -"*) cat >/dev/null ;;
+    esac
+  }
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -eq 0 ]
+  run awk '/create secret docker-registry ghcr-pull-secret/{ghcr=NR} /create secret generic stripe-e2e/{stripe=NR} END{exit !(ghcr && stripe && ghcr < stripe)}' "$calls"
+  [ "$status" -eq 0 ]
+}
+
+@test "sandbox preflight is idempotent" {
+  _e2e_sandbox_kc() {
+    case "$*" in
+      *"create namespace"*|*"create secret docker-registry"*|*"create secret generic stripe-e2e"*)
+        [[ "$*" == *"--dry-run=client -o yaml"* ]] || return 1
+        ;;
+    esac
+    case "$*" in
+      *"create secret generic stripe-e2e"*) cat >/dev/null; printf 'stripe-manifest\n' ;;
+      *"apply -f -"*) cat >/dev/null ;;
+    esac
+  }
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -eq 0 ]
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -eq 0 ]
+}
+
+@test "sandbox preflight rejects a missing Stripe Keychain item" {
+  unset E2E_STRIPE_SECRET_KEY
+  security() { return 1; }
+  _warn() { printf '%s\n' "$*"; }
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"k3dm-stripe-sk-test is missing"* ]]
+}
+
+@test "sandbox preflight never places the Stripe key in kubectl argv" {
+  local calls="$BATS_TEST_TMPDIR/sandbox-secret-argv"
+  : > "$calls"
+  _e2e_sandbox_kc() {
+    printf '%s\n' "$*" >> "$calls"
+    case "$*" in
+      *"create secret generic stripe-e2e"*) cat >/dev/null; printf 'stripe-manifest\n' ;;
+      *"apply -f -"*) cat >/dev/null ;;
+    esac
+  }
+  run _e2e_sandbox_provision_secrets
+  [ "$status" -eq 0 ]
+  run grep -F -- "test-stripe-key" "$calls"
+  [ "$status" -ne 0 ]
+}
+
+@test "sandbox rendered overrides contain the three substrate changes" {
+  run _e2e_sandbox_render_overrides
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"name: order-service-config"*"BASKET_URL: http://basket-service.shopping-cart-apps:8083"* ]]
+  [[ "$output" == *"PAYMENT_URL: http://payment-service.shopping-cart-payment:8084"* ]]
+  [[ "$output" == *"payment.gateway.default: stripe"*"mock.gateway.enabled: \"false\""* ]]
+  [[ "$output" == *"oauth2.jwk-set-uri: https://keycloak.3ai-talk.org/realms/shopping-cart/protocol/openid-connect/certs"* ]]
+}
+
+@test "sandbox summary carries the sandbox tier and Stripe project" {
+  local run_id="sandbox-summary"
+  printf 'no Playwright results here\n' > "$E2E_REPORT_DIR/${run_id}.log"
+  export E2E_TIER=sandbox E2E_PROJECT=stripe
+  run _e2e_write_summary "$run_id" "" 0 "recording-result"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+assert summary["tier"] == "sandbox", summary
+assert summary["project"] == "stripe", summary
+assert summary["exit_code"] == 0, summary
+print("sandbox summary ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sandbox summary ok"* ]]
+}
+
+@test "Tier 1 summary defaults remain vcluster and api+flows" {
+  local run_id="tier1-summary"
+  unset E2E_TIER E2E_PROJECT
+  printf 'no Playwright results here\n' > "$E2E_REPORT_DIR/${run_id}.log"
+  run _e2e_write_summary "$run_id" "" 0 "recording-result"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+assert summary["tier"] == "vcluster", summary
+assert summary["project"] == "api+flows", summary
+print("Tier 1 summary unchanged")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Tier 1 summary unchanged"* ]]
+}
+
+@test "sandbox port attribution covers order 8081 and product-catalog 8082" {
+  local run_id="sandbox-ports"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":0,"unexpected":2,"flaky":0,"skipped":0},"suites":[{"file":"flows/stripe.spec.ts","specs":[{"title":"order :8081 ECONNREFUSED","tests":[{"results":[{"status":"failed","error":"connect ECONNREFUSED 10.0.0.1:8081"}]}]},{"title":"product :8082 ECONNREFUSED","tests":[{"results":[{"status":"failed","error":"connect ECONNREFUSED 10.0.0.2:8082"}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+groups = {(item["kind"], item["target"]) for item in summary["failure_groups"]}
+assert ("service-unreachable", "order") in groups, groups
+assert ("service-unreachable", "product-catalog") in groups, groups
+print("port attribution ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"port attribution ok"* ]]
+}
+
+@test "failure groups carry routed services" {
+  local run_id="routed-services"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":0,"unexpected":2,"flaky":0,"skipped":0},"suites":[{"file":"api/cart.spec.ts","specs":[{"title":"cart contract","tests":[{"results":[{"status":"failed","error":"Received: undefined"}]}]}]},{"file":"api/orders.spec.ts","specs":[{"title":"order contract","tests":[{"results":[{"status":"failed","error":"Received: undefined"}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run python3 - "$E2E_REPORT_DIR/${run_id}.json" <<'PY'
+import json, sys
+summary = json.load(open(sys.argv[1]))
+services = {item["target"]: item["service"] for item in summary["failure_groups"]}
+assert services == {"api-cart": "basket", "api-orders": "order"}, services
+print("routed services ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"routed services ok"* ]]
+}
+
+@test "failure details are redacted in summary and failures file" {
+  local run_id="redacted-summary"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":0,"unexpected":1,"flaky":0,"skipped":0},"suites":[{"file":"api/payments.spec.ts","specs":[{"title":"auth Bearer sk_test_FAKEFAKEFAKE","tests":[{"results":[{"status":"failed","error":"Authorization: Bearer sk_test_FAKEFAKEFAKE"}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run grep -E '(<redacted>|sk_test_FAKEFAKEFAKE)' "$E2E_REPORT_DIR/${run_id}.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<redacted>"* ]]
+  [[ "$output" != *"sk_test_FAKEFAKEFAKE"* ]]
+  run grep -E '(<redacted>|sk_test_FAKEFAKEFAKE)' "$E2E_REPORT_DIR/${run_id}.failures.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<redacted>"* ]]
+  [[ "$output" != *"sk_test_FAKEFAKEFAKE"* ]]
+}
+
+@test "auth classification survives the bash summary path" {
+  local run_id="auth-summary"
+  cat > "$E2E_REPORT_DIR/${run_id}.log" <<'EOF'
+__E2E_RESULTS_BEGIN__
+{"stats":{"expected":0,"unexpected":1,"flaky":0,"skipped":0},"suites":[{"file":"api/payments.spec.ts","specs":[{"title":"payment auth","tests":[{"results":[{"status":"failed","error":"expect(received).toBe(expected) / Expected: 200 / Received: 401"}]}]}]}]}
+__E2E_RESULTS_END__
+EOF
+  run _e2e_write_summary "$run_id" "" 1 "running-playwright"
+  [ "$status" -eq 0 ]
+  run grep -E '"kind": "auth"' "$E2E_REPORT_DIR/${run_id}.json"
+  [ "$status" -eq 0 ]
+  run grep -E '"target": "api-payments"' "$E2E_REPORT_DIR/${run_id}.json"
+  [ "$status" -eq 0 ]
 }
 
 @test "e2e.sh sources cleanly under set -euo pipefail" {

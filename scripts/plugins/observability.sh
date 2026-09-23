@@ -43,6 +43,7 @@ function deploy_observability() {
   _observability_apply_argocd_dashboard "${_hub_context}"
   _deploy_promtail_acg "${_hub_context}"
   _observability_ensure_argocd_servicemonitors "${_hub_context}"
+  _observability_ensure_apiserver_scrape_timeout "${_hub_context}"
 
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
@@ -264,12 +265,32 @@ function _observability_prometheus_auth_file() {
   printf '%s/.local/share/k3d-manager/prometheus-basic-auth.env\n' "${HOME}"
 }
 
+function _observability_vault_reachable() {
+  local _hdr="$1"
+  curl -sf --max-time 5 --header "@${_hdr}" \
+    "http://127.0.0.1:18200/v1/sys/health?standbyok=true&perfstandbyok=true" >/dev/null 2>&1
+}
+
+function _observability_seed_prometheus_vault_entry() {
+  local _vault_addr="http://127.0.0.1:18200" _vault_token _vault_hdr _payload _rc=0
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
+  _vault_hdr=$(mktemp) && chmod 0600 "${_vault_hdr}"
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+  _payload=$(_observability_prometheus_vault_payload "${_PROM_BASIC_AUTH_PASSWORD}" "${_PROM_BASIC_AUTH_BCRYPT}")
+  curl -sf --header "@${_vault_hdr}" --header 'Content-Type: application/json' \
+    --request POST --data "${_payload}" \
+    "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null || _rc=1
+  rm -f "${_vault_hdr}"
+  return "${_rc}"
+}
+
 function _observability_ensure_prometheus_login() {
   local _auth_file _vault_token _vault_hdr _prom_creds
   _auth_file="$(_observability_prometheus_auth_file)"
   _vault_token=$(_kubectl get secret vault-root -n secrets \
     --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 --decode)
-  _vault_hdr=$(mktemp)
+  _vault_hdr=$(mktemp) && chmod 0600 "${_vault_hdr}"
   printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
 
   if ! _prom_creds=$(curl -sf \
@@ -279,12 +300,44 @@ function _observability_ensure_prometheus_login() {
         print(d['user']+'|'+d['password'])" 2>/dev/null); then
     _prom_creds=""
   fi
-  rm -f "${_vault_hdr}"
 
   if [[ -z "${_prom_creds}" ]]; then
-    _warn "[observability] Prometheus Vault credentials unreadable — skipping auth proxy"
-    return 1
+    if ! _observability_vault_reachable "${_vault_hdr}"; then
+      _warn "[observability] Prometheus Vault credentials unreadable — Vault is unreachable; not reseeding"
+      rm -f "${_vault_hdr}"
+      return 0
+    fi
+    _warn "[observability] Prometheus credentials absent from Vault — reseeding the canonical entry"
+    local _recovered_user="" _recovered_password=""
+    if [[ -r "${_auth_file}" ]]; then
+      _recovered_user=$(sed -n 's/^PROMETHEUS_BASIC_AUTH_USER=//p' "${_auth_file}" | head -1)
+      _recovered_password=$(sed -n 's/^PROMETHEUS_BASIC_AUTH_PASSWORD=//p' "${_auth_file}" | head -1)
+    fi
+    if [[ -n "${_recovered_password}" && "${_recovered_password}" != "password" ]]; then
+      _PROM_BASIC_AUTH_PASSWORD="${_recovered_password}"
+      _PROM_BASIC_AUTH_BCRYPT="$(printf '%s' "${_PROM_BASIC_AUTH_PASSWORD}" | htpasswd -niBC 12 admin | cut -d: -f2-)"
+      if [[ -z "${_PROM_BASIC_AUTH_BCRYPT}" ]]; then
+        _err "[observability] failed to rebcrypt the recovered Prometheus password"
+        rm -f "${_vault_hdr}"
+        return 1
+      fi
+      _info "[observability] recovered the Prometheus password from the local cache; not rotating"
+    else
+      if ! _observability_generate_prometheus_basic_auth; then
+        rm -f "${_vault_hdr}"
+        return 1
+      fi
+      _warn "[observability] no recoverable Prometheus password — generated a new one; saved logins will stop working"
+    fi
+    if ! _observability_seed_prometheus_vault_entry; then
+      _err "[observability] could not reseed k3d-manager/prometheus-basic-auth in Vault"
+      rm -f "${_vault_hdr}"
+      return 1
+    fi
+    _prom_creds="${_recovered_user:-admin}|${_PROM_BASIC_AUTH_PASSWORD}"
   fi
+
+  rm -f "${_vault_hdr}"
 
   local _prom_user _prom_password
   _prom_user="${_prom_creds%%|*}"
@@ -448,7 +501,10 @@ function _observability_install_prometheus_auth_proxy() {
 }
 
 function _observability_refresh_prometheus_auth_proxy() {
-  _observability_ensure_prometheus_login || return 0
+  if ! _observability_ensure_prometheus_login; then
+    _warn "[observability] Prometheus login unavailable; auth proxy not refreshed"
+    return 1
+  fi
   _observability_install_prometheus_auth_proxy
 }
 
@@ -594,7 +650,9 @@ function deploy_observability_acg() {
   _observability_ensure_alertmanager_login
   _observability_install_alertmanager_port_forward
   _observability_install_alertmanager_auth_proxy
-  _observability_refresh_prometheus_auth_proxy
+  if ! (set +e; _observability_refresh_prometheus_auth_proxy); then
+    _warn "[observability] Prometheus auth proxy refresh failed; continuing with the generated web config"
+  fi
 }
 
 function _deploy_pushgateway_acg() {
@@ -685,6 +743,51 @@ function _observability_ensure_argocd_servicemonitors() {
   fi
   printf '%s\n' "${_rendered}" | _kubectl --context "${_ctx}" apply -f - >/dev/null \
     && _info "[observability] ArgoCD ServiceMonitors ensured on ${_ctx}"
+}
+
+function _observability_ensure_apiserver_scrape_timeout() {
+  local _ctx="${1:-k3d-k3d-cluster}"
+  local _timeout_value="${OBSERVABILITY_APISERVER_SCRAPE_TIMEOUT:-45s}"
+  local _waited=0 _timeout="${OBSERVABILITY_CRD_WAIT_SECONDS:-300}"
+  while ! _kubectl --no-exit --context "${_ctx}" get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; do
+    if (( _waited >= _timeout )); then
+      _warn "[observability] ServiceMonitor CRD not present after ${_timeout}s; apiserver scrape timeout NOT ensured"
+      return 0
+    fi
+    sleep 10
+    _waited=$((_waited + 10))
+  done
+
+  local _current_timeout
+  if ! _current_timeout=$(_kubectl --no-exit --context "${_ctx}" -n monitoring \
+      get servicemonitor kube-prometheus-stack-apiserver -o jsonpath='{.spec.endpoints[0].scrapeTimeout}' 2>/dev/null); then
+    _warn "[observability] ServiceMonitor monitoring/kube-prometheus-stack-apiserver not found; apiserver scrape timeout NOT ensured"
+    return 0
+  fi
+  if [[ "${_current_timeout}" == "${_timeout_value}" ]]; then
+    _info "[observability] Apiserver ServiceMonitor scrape timeout already ${_timeout_value}"
+    return 0
+  fi
+
+  local _patch
+  _patch="[{\"op\":\"add\",\"path\":\"/spec/endpoints/0/scrapeTimeout\",\"value\":\"${_timeout_value}\"}]"
+  if ! _kubectl --context "${_ctx}" -n monitoring patch servicemonitor kube-prometheus-stack-apiserver \
+      --type=json -p "${_patch}" >/dev/null; then
+    _warn "[observability] failed to patch apiserver ServiceMonitor scrape timeout; continuing"
+    return 0
+  fi
+
+  local _observed=""
+  _observed=$(_kubectl --no-exit --context "${_ctx}" -n monitoring \
+    get servicemonitor kube-prometheus-stack-apiserver \
+    -o jsonpath='{.spec.endpoints[0].scrapeTimeout}' 2>/dev/null || true)
+  if [[ "${_observed}" == "${_timeout_value}" ]]; then
+    _info "[observability] Apiserver ServiceMonitor scrape timeout set to ${_timeout_value}"
+  else
+    _warn "[observability] apiserver scrape timeout patch did not persist (observed '${_observed}')"
+    _warn "[observability] ArgoCD owns this ServiceMonitor; confirm RespectIgnoreDifferences is set on the observability ApplicationSet"
+  fi
+  return 0
 }
 
 function _observability_apply_trivy_dashboard() {

@@ -695,6 +695,6 @@ wsl --list --verbose
 
 ## Related Documentation
 
-- [Vault PKI Setup](../howto/vault-pki-setup.md)
+- [Vault PKI Setup](../guides/security/04-vault-pki.md)
 - [SSL Certificate Scripts](../../bin/setup-vault-ca)
 - [k3s Provider Configuration](../../scripts/lib/providers/k3s.sh)

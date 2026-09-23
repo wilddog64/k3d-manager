@@ -54,6 +54,18 @@ spec:
             releaseName: '{{if eq .name "hub-loki"}}loki{{else}}{{.name}}{{end}}'
             valueFiles:
               - '$values/{{.valuesFile}}'
+      # Chart 67.9.0 exposes kubeApiServer.serviceMonitor.interval but no
+      # scrapeTimeout, so the 45s apiserver timeout can only be applied as an
+      # out-of-band patch. Without this, selfHeal reverted that patch within
+      # seconds and _observability_ensure_apiserver_scrape_timeout reported
+      # success against a value that no longer existed.
+      ignoreDifferences:
+        - group: monitoring.coreos.com
+          kind: ServiceMonitor
+          name: kube-prometheus-stack-apiserver
+          namespace: monitoring
+          jsonPointers:
+            - /spec/endpoints/0/scrapeTimeout
       syncPolicy:
         automated:
           prune: true
@@ -61,3 +73,4 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
+          - RespectIgnoreDifferences=true

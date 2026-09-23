@@ -250,8 +250,8 @@ java -Djavax.net.ssl.trustStore=/path/to/custom-truststore \
 
 ## Related Documentation
 
-- [Jenkins Deployment](../../README.md#jenkins-authentication-modes)
-- [Vault PKI Setup](../../README.md#vault-pki-setup)
+- [Jenkins Authentication](../guides/jenkins-authentication.md)
+- [Vault PKI Setup](../guides/security/04-vault-pki.md)
 - [Java keytool Documentation](https://docs.oracle.com/en/java/javase/17/docs/specs/man/keytool.html)
 
 ## Automation Script

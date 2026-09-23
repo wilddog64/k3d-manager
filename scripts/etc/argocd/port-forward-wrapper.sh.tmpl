@@ -12,6 +12,8 @@ LOCAL_PORT=${LOCAL_PORT}
 REMOTE_PORT=${REMOTE_PORT}
 HEALTHZ_URL=${HEALTHZ_URL}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT}
+ADDRESS=${ADDRESS}
+LOG_TAG=${LOG_TAG}
 HEALTH_FAILURE_THRESHOLD=6
 RESTART_DELAY=2
 LOCK_DIR="${LOG_FILE}.lock"
@@ -22,17 +24,29 @@ fi
 
 _pf_pid=""
 _kubectl_context_arg=""
+_last_context_warning=""
 
-if [[ -n "${CONTEXT}" ]] && "${KUBECTL_BIN}" config get-contexts "${CONTEXT}" >/dev/null 2>&1; then
-   _kubectl_context_arg="--context ${CONTEXT}"
-else
-   _current_context="$("${KUBECTL_BIN}" config current-context 2>/dev/null || true)"
-   if [[ -n "${_current_context}" ]] && "${KUBECTL_BIN}" config get-contexts "${_current_context}" >/dev/null 2>&1; then
-      _kubectl_context_arg="--context ${_current_context}"
-   elif [[ -n "${CONTEXT}" ]]; then
-      printf '%s\n' "[argocd-pf] WARNING: kubectl context '${CONTEXT}' not found — falling back to kubeconfig default" >> "${LOG_FILE}"
+_resolve_kubectl_context() {
+   local _resolved="" _current_context="" _warning=""
+
+   if [[ -n "${CONTEXT}" ]] && "${KUBECTL_BIN}" config get-contexts "${CONTEXT}" >/dev/null 2>&1; then
+      _resolved="--context ${CONTEXT}"
+   else
+      _current_context="$("${KUBECTL_BIN}" config current-context 2>/dev/null || true)"
+      if [[ -n "${_current_context}" ]] && "${KUBECTL_BIN}" config get-contexts "${_current_context}" >/dev/null 2>&1; then
+         _resolved="--context ${_current_context}"
+         _warning="[${LOG_TAG}] WARNING: kubectl context '${CONTEXT}' not found — using current-context '${_current_context}' instead"
+      elif [[ -n "${CONTEXT}" ]]; then
+         _warning="[${LOG_TAG}] WARNING: kubectl context '${CONTEXT}' not found — falling back to kubeconfig default"
+      fi
    fi
-fi
+
+   if [[ -n "${_warning}" && "${_warning}" != "${_last_context_warning}" ]]; then
+      printf '%s\n' "${_warning}" >> "${LOG_FILE}"
+   fi
+   _last_context_warning="${_warning}"
+   _kubectl_context_arg="${_resolved}"
+}
 
 _cleanup() {
    case "${_pf_pid}" in
@@ -73,7 +87,7 @@ _acquire_lock
 
 _port_in_use() {
    if command -v lsof >/dev/null 2>&1; then
-      lsof -nP -iTCP:"${LOCAL_PORT}" -sTCP:LISTEN >/dev/null 2>&1
+      lsof -nP -iTCP@"${ADDRESS}":"${LOCAL_PORT}" -sTCP:LISTEN >/dev/null 2>&1
       return $?
    fi
 
@@ -90,14 +104,14 @@ _clear_stale_listeners() {
    if command -v lsof >/dev/null 2>&1; then
       while IFS= read -r _listener_pid; do
          [[ -n "${_listener_pid}" ]] && _listener_pids+=("${_listener_pid}")
-      done < <(lsof -nP -iTCP:"${LOCAL_PORT}" -sTCP:LISTEN -t 2>/dev/null | sort -u)
+      done < <(lsof -nP -iTCP@"${ADDRESS}":"${LOCAL_PORT}" -sTCP:LISTEN -t 2>/dev/null | sort -u)
    fi
 
    if ((${#_listener_pids[@]} == 0)); then
       return 0
    fi
 
-   printf '%s\n' "[argocd-pf] port ${LOCAL_PORT} still in use — clearing stale listener(s) before retry" >> "${LOG_FILE}"
+   printf '%s\n' "[${LOG_TAG}] ${ADDRESS}:${LOCAL_PORT} still in use — clearing stale listener(s) before retry" >> "${LOG_FILE}"
    kill "${_listener_pids[@]}" 2>/dev/null || true
    for (( _attempt=1; _attempt<=30; _attempt++ )); do
       if ! _port_in_use; then
@@ -108,13 +122,14 @@ _clear_stale_listeners() {
 }
 
 while true; do
+   _resolve_kubectl_context
    _clear_stale_listeners
-   printf '%s\n' "[argocd-pf] starting port-forward: ${SERVICE} -> localhost:${LOCAL_PORT}" >> "${LOG_FILE}"
+   printf '%s\n' "[${LOG_TAG}] starting port-forward: ${SERVICE} -> localhost:${LOCAL_PORT}" >> "${LOG_FILE}"
    if [[ -n "${_kubectl_context_arg}" ]]; then
       # shellcheck disable=SC2086
-      "${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward --address=127.0.0.1 "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
+      "${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward --address="${ADDRESS}" "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
    else
-      "${KUBECTL_BIN}" port-forward --address=127.0.0.1 "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
+      "${KUBECTL_BIN}" port-forward --address="${ADDRESS}" "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
    fi
    _pf_pid=$!
 
@@ -133,10 +148,10 @@ while true; do
    case "${_ready}" in
       0)
          if _pf_alive; then
-            printf '%s\n' "[argocd-pf] healthz did not become reachable — restarting" >> "${LOG_FILE}"
+            printf '%s\n' "[${LOG_TAG}] healthz did not become reachable — restarting" >> "${LOG_FILE}"
             kill "${_pf_pid}" 2>/dev/null || true
          else
-            printf '%s\n' "[argocd-pf] port-forward exited before healthz became reachable — restarting" >> "${LOG_FILE}"
+            printf '%s\n' "[${LOG_TAG}] port-forward exited before healthz became reachable — restarting" >> "${LOG_FILE}"
          fi
          wait "${_pf_pid}" 2>/dev/null || true
          _pf_pid=""
@@ -146,16 +161,16 @@ while true; do
          ;;
    esac
 
-   printf '%s\n' "[argocd-pf] healthz reachable — monitoring backend availability" >> "${LOG_FILE}"
+   printf '%s\n' "[${LOG_TAG}] healthz reachable — monitoring backend availability" >> "${LOG_FILE}"
    _health_failures=0
    while _pf_alive; do
       if "${CURL_BIN}" -sf --max-time 5 "${HEALTHZ_URL}" >/dev/null 2>&1; then
          _health_failures=0
       else
          _health_failures=$((_health_failures + 1))
-         printf '%s\n' "[argocd-pf] healthz check failed (${_health_failures}/${HEALTH_FAILURE_THRESHOLD})" >> "${LOG_FILE}"
+         printf '%s\n' "[${LOG_TAG}] healthz check failed (${_health_failures}/${HEALTH_FAILURE_THRESHOLD})" >> "${LOG_FILE}"
          if (( _health_failures >= HEALTH_FAILURE_THRESHOLD )); then
-            printf '%s\n' "[argocd-pf] healthz lost — restarting" >> "${LOG_FILE}"
+            printf '%s\n' "[${LOG_TAG}] healthz lost — restarting" >> "${LOG_FILE}"
             kill "${_pf_pid}" 2>/dev/null || true
             wait "${_pf_pid}" 2>/dev/null || true
             _pf_pid=""

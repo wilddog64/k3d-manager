@@ -248,6 +248,8 @@ function _argocd_write_port_forward_wrapper() {
    local remote_port="${9:-80}"
    local healthz_url="${10:-}"
    local kubeconfig_file="${11:-}"
+   local address="${12:-127.0.0.1}"
+   local log_tag="${13:-argocd-pf}"
 
    case "$kubectl_bin" in
       "") kubectl_bin="$(command -v kubectl 2>/dev/null || true)" ;;
@@ -278,7 +280,7 @@ function _argocd_write_port_forward_wrapper() {
       return 1
    fi
 
-   local q_kubectl_bin q_curl_bin q_log_file q_kubeconfig_file q_namespace q_context q_service q_local_port q_remote_port q_healthz_url q_startup_timeout
+   local q_kubectl_bin q_curl_bin q_log_file q_kubeconfig_file q_namespace q_context q_service q_local_port q_remote_port q_healthz_url q_startup_timeout q_address q_log_tag
    printf -v q_kubectl_bin '%q' "$kubectl_bin"
    printf -v q_curl_bin '%q' "$curl_bin"
    printf -v q_log_file '%q' "$log_file"
@@ -294,6 +296,8 @@ function _argocd_write_port_forward_wrapper() {
    printf -v q_remote_port '%q' "$remote_port"
    printf -v q_healthz_url '%q' "$healthz_url"
    printf -v q_startup_timeout '%q' "${ARGOCD_PORT_FORWARD_STARTUP_TIMEOUT:-30}"
+   printf -v q_address '%q' "$address"
+   printf -v q_log_tag '%q' "$log_tag"
 
    mkdir -p "$(dirname "$wrapper_path")"
    KUBECTL_BIN="$q_kubectl_bin" \
@@ -307,7 +311,9 @@ function _argocd_write_port_forward_wrapper() {
    REMOTE_PORT="$q_remote_port" \
    HEALTHZ_URL="$q_healthz_url" \
    STARTUP_TIMEOUT="$q_startup_timeout" \
-      envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
+   ADDRESS="$q_address" \
+   LOG_TAG="$q_log_tag" \
+      envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT $ADDRESS $LOG_TAG' \
          < "$template_path" > "$wrapper_path"
    chmod 700 "$wrapper_path"
 }

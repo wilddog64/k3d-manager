@@ -990,6 +990,16 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F -- '/api/health' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.sh"
   [ "$status" -eq 0 ]
+  run grep -F -- 'K3DM_PF_HEALTH_TIMEOUT:-8' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'K3DM_PF_HEALTH_THRESHOLD:-3' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -Eq -- '--max-time "\$\{_health_timeout\}"' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -Eq -- '_fails >= _health_threshold' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -c -- '--max-time 3' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.sh"
+  [ "$output" = "0" ]
   run grep -F -- 'com.k3d-manager.pushgateway-port-forward.sh' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   [ "$status" -eq 0 ]
   run grep -F -- 'svc/pushgateway' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.sh"

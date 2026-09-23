@@ -13,10 +13,12 @@ E2E_VCLUSTER_READY_INTERVAL="${E2E_VCLUSTER_READY_INTERVAL:-5}"
 E2E_VCLUSTER_READY_REFRESH_INTERVAL="${E2E_VCLUSTER_READY_REFRESH_INTERVAL:-30}"
 E2E_RESULT_EVENT_NAMESPACE="${E2E_RESULT_EVENT_NAMESPACE:-platform-ops}"
 E2E_RESULT_EVENT_KEEP="${E2E_RESULT_EVENT_KEEP:-20}"
+E2E_TIER="${E2E_TIER:-vcluster}"
+E2E_PROJECT="${E2E_PROJECT:-api+flows}"
 export E2E_IMAGE E2E_IMAGE_TAG E2E_NAMESPACE E2E_JOB_TIMEOUT E2E_REPORT_DIR
 export E2E_SERVICE_UNDER_TEST E2E_ROLLOUT_TIMEOUT E2E_VCLUSTER_READY_TIMEOUT
 export E2E_VCLUSTER_READY_INTERVAL E2E_VCLUSTER_READY_REFRESH_INTERVAL
-export E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP
+export E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP E2E_TIER E2E_PROJECT
 
 function _e2e_load_deps() {
   local plugin
@@ -112,6 +114,268 @@ function e2e_verify_vcluster() {
   _E2E_SUMMARY_WRITTEN=1
   _e2e_write_result_event "$run_id"
   return "$rc"
+}
+
+function _e2e_sandbox_kc() {
+  _run_command -- kubectl --context ubuntu-k3s "$@"
+}
+
+function _e2e_sandbox_argocd_cluster_manifest() {
+  cat <<'YAML'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ubuntu-k3s
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    k3d-manager/role: app-cluster
+type: Opaque
+stringData:
+  name: ubuntu-k3s
+  server: https://kubernetes.default.svc
+  config: '{"tlsClientConfig":{"insecure":true}}'
+YAML
+}
+
+function _e2e_sandbox_render_overrides() {
+  cat <<'YAML'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: shopping-cart-apps
+data:
+  BASKET_URL: http://basket-service.shopping-cart-apps:8083
+  PAYMENT_URL: http://payment-service.shopping-cart-payment:8084
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-config
+  namespace: shopping-cart-payment
+data:
+  payment.gateway.default: stripe
+  mock.gateway.enabled: "false"
+  oauth2.jwk-set-uri: https://keycloak.3ai-talk.org/realms/shopping-cart/protocol/openid-connect/certs
+YAML
+}
+
+function _e2e_sandbox_vault_store_manifest() {
+  cat <<'YAML'
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: vault-backend
+spec:
+  provider:
+    vault:
+      server: http://vault-bridge.secrets.svc.cluster.local:8201
+      path: secret
+      version: v2
+      auth:
+        tokenSecretRef:
+          name: vault-token
+          namespace: secrets
+          key: token
+YAML
+}
+
+function _e2e_sandbox_configure_vault_token_review() {
+  local token_file=""
+  token_file="$(mktemp -t e2e-sandbox-token.XXXXXX)"
+  _e2e_sandbox_kc -n secrets create token external-secrets > "$token_file"
+  _run_command -- env \
+    VAULT_ADDR="${HUB_VAULT_ADDR:-http://127.0.0.1:18200}" \
+    VAULT_TOKEN="${HUB_VAULT_TOKEN:-}" \
+    vault write "auth/kubernetes-ubuntu-k3s/config" \
+    disable_local_ca_jwt=true \
+    token_reviewer_jwt="@${token_file}" \
+    kubernetes_host="${E2E_SANDBOX_KUBERNETES_HOST:-https://kubernetes.default.svc:443}"
+  _run_command -- rm -f "$token_file"
+}
+
+function _e2e_sandbox_job_manifest() {
+  local job_name="${1:-}" image="${2:-}"
+  cat <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${job_name}
+  namespace: ${E2E_NAMESPACE}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: ${E2E_JOB_TIMEOUT}
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: e2e
+          image: ${image}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - 'npx playwright test --project=flows --no-deps tests/flows/stripe-checkout-orchestrator.spec.ts; rc=\$?; echo "__E2E_RESULTS_BEGIN__"; cat test-results/results.json 2>/dev/null || true; echo "__E2E_RESULTS_END__"; exit \$rc'
+          env:
+            - name: PRODUCT_CATALOG_URL
+              value: http://product-catalog.shopping-cart-apps.svc:8082
+            - name: BASKET_URL
+              value: http://basket-service.shopping-cart-apps.svc:8083
+            - name: ORDER_URL
+              value: http://order-service.shopping-cart-apps.svc:8081
+            - name: PAYMENT_URL
+              value: http://payment-service.shopping-cart-payment.svc:8084
+            - name: OAUTH2_ENABLED
+              value: "true"
+            - name: STRIPE_E2E
+              value: "true"
+            - name: KEYCLOAK_URL
+              value: https://keycloak.3ai-talk.org/realms/shopping-cart
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: stripe-e2e
+                  key: sk_test
+            - name: CI
+              value: "true"
+EOF
+}
+
+function _e2e_sandbox_wait_job() {
+  local job_name="${1:-}" deadline now succeeded failed
+  deadline=$(( $(date +%s) + E2E_JOB_TIMEOUT ))
+  while :; do
+    succeeded="$(_e2e_sandbox_kc -n "$E2E_NAMESPACE" get "job/${job_name}" -o jsonpath='{.status.succeeded}' 2>/dev/null || true)"
+    failed="$(_e2e_sandbox_kc -n "$E2E_NAMESPACE" get "job/${job_name}" -o jsonpath='{.status.failed}' 2>/dev/null || true)"
+    if [[ "${succeeded:-0}" -ge 1 ]] 2>/dev/null; then
+      return 0
+    fi
+    if [[ "${failed:-0}" -ge 1 ]] 2>/dev/null; then
+      return 1
+    fi
+    now=$(date +%s)
+    (( now < deadline )) || return 1
+    sleep 5
+  done
+}
+
+function _e2e_sandbox_provision_secrets() {
+  local _github_user="" _ghcr_pat="" stripe_secret_key=""
+  shopping_cart_resolve_ghcr_pat
+  stripe_secret_key="${E2E_STRIPE_SECRET_KEY:-}"
+  if [[ -z "$stripe_secret_key" ]]; then
+    stripe_secret_key="$(_no_trace security find-generic-password -s k3dm-stripe-sk-test -w 2>/dev/null || true)"
+  fi
+  if [[ -z "$stripe_secret_key" ]]; then
+    _warn "[e2e] Keychain item k3dm-stripe-sk-test is missing"
+    return 1
+  fi
+
+  _e2e_sandbox_kc create namespace "$E2E_NAMESPACE" \
+    --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
+  _e2e_sandbox_kc create secret docker-registry ghcr-pull-secret \
+    --docker-server=ghcr.io \
+    --docker-username="${_github_user}" \
+    --docker-password="${_ghcr_pat}" \
+    -n "$E2E_NAMESPACE" \
+    --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
+  _e2e_sandbox_kc -n "$E2E_NAMESPACE" patch serviceaccount default \
+    -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
+  printf '%s' "$stripe_secret_key" | _e2e_sandbox_kc create secret generic stripe-e2e \
+    --from-file=sk_test=/dev/stdin \
+    -n "$E2E_NAMESPACE" \
+    --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
+}
+
+function e2e_verify_sandbox() {
+  local run_id candidate_digest="${1:-}" job_name image manifest_file rc=1
+  local old_tier="${E2E_TIER}" old_project="${E2E_PROJECT}"
+  _e2e_load_deps
+  if ! declare -f acg_extend_playwright >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/acg.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${PLUGINS_DIR}/acg.sh"
+  fi
+  export E2E_TIER=sandbox E2E_PROJECT=stripe
+  run_id="$(date +%s)-${RANDOM}"
+  job_name="e2e-sandbox-run-${run_id}"
+  image="${E2E_IMAGE}:${E2E_IMAGE_TAG}"
+  _E2E_RUN_ID="$run_id"
+  _E2E_CANDIDATE_DIGEST="$candidate_digest"
+  _E2E_REPORT_DIR="$E2E_REPORT_DIR"
+  _E2E_ACTIVE_PHASE="preflight"
+  _E2E_SUMMARY_WRITTEN=0
+  mkdir -p "$E2E_REPORT_DIR"
+  trap '_e2e_sandbox_exit_trap' EXIT
+
+  _E2E_ACTIVE_PHASE="extending-sandbox"
+  acg_extend_playwright "${_ACG_SANDBOX_URL:-}"
+  _E2E_ACTIVE_PHASE="checking-nodes"
+  _e2e_sandbox_kc get nodes -o wide
+  _E2E_ACTIVE_PHASE="provisioning-secrets"
+  _e2e_sandbox_provision_secrets
+
+  _E2E_ACTIVE_PHASE="installing-argocd"
+  _run_command -- helm upgrade --install argocd argo/argo-cd --kube-context ubuntu-k3s \
+    -n argocd --create-namespace --set server.insecure=true --set server.service.type=ClusterIP
+  _e2e_sandbox_kc -n argocd apply -f - <<< "$(_e2e_sandbox_argocd_cluster_manifest)"
+  _e2e_sandbox_kc -n argocd wait --for=condition=available deployment/argocd-server --timeout=600s
+
+  _E2E_ACTIVE_PHASE="configuring-vault"
+  shopping_cart_create_vault_bridge
+  _e2e_sandbox_configure_vault_token_review
+  _e2e_sandbox_kc apply -f - <<< "$(_e2e_sandbox_vault_store_manifest)"
+  _e2e_sandbox_kc wait --for=condition=Ready clustersecretstore/vault-backend --timeout=300s
+
+  _E2E_ACTIVE_PHASE="applying-appsets"
+  local appset_file rendered_file
+  for appset_file in "${SCRIPT_DIR}/etc/argocd/applicationsets"/*.yaml; do
+    rendered_file="$(mktemp -t e2e-sandbox-appset.XXXXXX)"
+    ARGOCD_NAMESPACE=argocd APP_CLUSTER_NAME=ubuntu-k3s \
+      K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD)}" \
+      AMBIENT_CNI_CONF_DIR="${AMBIENT_CNI_CONF_DIR:-/opt/cni/bin}" \
+      AMBIENT_CNI_BIN_DIR="${AMBIENT_CNI_BIN_DIR:-/opt/cni/bin}" \
+      AMBIENT_ISTIO_VERSION="${AMBIENT_ISTIO_VERSION:-1.27.1}" \
+      envsubst < "$appset_file" > "$rendered_file"
+    _e2e_sandbox_kc apply -f "$rendered_file"
+    _run_command -- rm -f "$rendered_file"
+  done
+  _e2e_sandbox_kc apply -f - <<< "$(_e2e_sandbox_render_overrides)"
+  _e2e_sandbox_kc -n shopping-cart-apps rollout restart deployment/order-service
+  _e2e_sandbox_kc -n shopping-cart-payment rollout restart deployment/payment-service
+  _e2e_sandbox_kc -n shopping-cart-apps rollout status deployment/order-service --timeout="${E2E_ROLLOUT_TIMEOUT}s"
+  _e2e_sandbox_kc -n shopping-cart-payment rollout status deployment/payment-service --timeout="${E2E_ROLLOUT_TIMEOUT}s"
+
+  _E2E_ACTIVE_PHASE="running-playwright"
+  manifest_file="$(mktemp -t e2e-sandbox-job.XXXXXX)"
+  _e2e_sandbox_job_manifest "$job_name" "$image" > "$manifest_file"
+  _e2e_sandbox_kc apply -f "$manifest_file"
+  _run_command -- rm -f "$manifest_file"
+  rc=0
+  _e2e_sandbox_wait_job "$job_name" || rc=$?
+  _run_command -- mkdir -p "$E2E_REPORT_DIR"
+  _e2e_sandbox_kc -n "$E2E_NAMESPACE" logs "job/${job_name}" > "${E2E_REPORT_DIR}/${run_id}.log" 2>/dev/null || true
+  _E2E_ACTIVE_PHASE="recording-result"
+  _e2e_write_summary "$run_id" "$candidate_digest" "$rc" "${_E2E_ACTIVE_PHASE}"
+  _E2E_SUMMARY_WRITTEN=1
+  _e2e_write_result_event "$run_id"
+  E2E_TIER="$old_tier" E2E_PROJECT="$old_project" export E2E_TIER E2E_PROJECT
+  trap - EXIT
+  return "$rc"
+}
+
+function _e2e_sandbox_exit_trap() {
+  local rc=$?
+  set +e
+  if [[ -n "${_E2E_RUN_ID:-}" ]] && [[ "${_E2E_SUMMARY_WRITTEN:-0}" -eq 0 ]]; then
+    _e2e_write_summary "${_E2E_RUN_ID}" "${_E2E_CANDIDATE_DIGEST:-}" "$rc" "${_E2E_ACTIVE_PHASE:-unknown}" || true
+    _e2e_write_result_event "${_E2E_RUN_ID}" || true
+  fi
+  trap - EXIT
+  exit "$rc"
 }
 
 function _e2e_exit_trap() {
@@ -373,10 +637,16 @@ function _e2e_write_summary() {
   E2E_RC="$rc" \
   E2E_PHASE="$phase" \
   E2E_COMMIT="$commit" \
+  E2E_LIB_DIR="${SCRIPT_DIR}/lib" \
   E2E_LOG="$log_file" \
   E2E_RUNNER="${E2E_RUNNER:-local-m4}" \
+  E2E_TIER="${E2E_TIER:-vcluster}" \
+  E2E_PROJECT="${E2E_PROJECT:-api+flows}" \
   python3 - "$summary_file" "$failures_file" <<'PY'
 import json, os, re, sys
+
+sys.path.insert(0, os.environ["E2E_LIB_DIR"])
+from hermes.e2e_triage import classify, redact, service_for
 
 summary_path = sys.argv[1]
 failures_path = sys.argv[2]
@@ -388,6 +658,8 @@ phase = os.environ.get("E2E_PHASE", "unknown")
 commit = os.environ["E2E_COMMIT"]
 log_path = os.environ["E2E_LOG"]
 runner = os.environ.get("E2E_RUNNER") or "local-m4"
+tier = os.environ.get("E2E_TIER") or "vcluster"
+project = os.environ.get("E2E_PROJECT") or "api+flows"
 
 passed = total = failed = duration = None
 failures = []
@@ -431,9 +703,9 @@ try:
                         lines = [line.strip() for line in error.splitlines() if line.strip()]
                         failures.append({
                             "file": spec_file or "",
-                            "title": spec.get("title") or "",
+                            "title": redact(spec.get("title") or ""),
                             "status": last["status"],
-                            "error": " / ".join(lines[:3])[:300],
+                            "error": redact(" / ".join(lines[:3]))[:300],
                         })
                 walk_suites(suite.get("suites"), suite_file)
         walk_suites(data.get("suites"))
@@ -442,51 +714,22 @@ except Exception:
 
 groups = {}
 for failure in failures:
-    text = "%s %s" % (failure.get("title", ""), failure.get("error", ""))
-    spec = failure.get("file") or failure.get("title") or "unknown"
-    if re.search(r"ECONNREFUSED|ENOTFOUND|EAI_AGAIN|connect ETIMEDOUT", text, re.I):
-        kind = "service-unreachable"
-        targets = {"8000": "product-catalog", "8080": "order",
-                   "8083": "basket", "8084": "payment"}
-        match = re.search(r":(8000|8080|8083|8084)\b", text)
-        target = targets.get(match.group(1), "unknown") if match else "unknown"
-    elif re.search(r"timeout|timedOut|Timeout \d+ms exceeded", text, re.I):
-        kind, target = "timeout", spec
-    elif re.search(r"Received: undefined|Cannot read properties of undefined|must have a length property|received value must be a number|toHaveProperty", text, re.I):
-        kind, target = "contract-drift", spec
-    else:
-        kind, target = "assertion", spec
+    kind, target = classify(failure)
     groups[(kind, target)] = groups.get((kind, target), 0) + 1
 failure_groups = [
-    {"kind": kind, "target": target, "count": count}
+    {"kind": kind, "target": target, "count": count, "service": service_for(target)}
     for (kind, target), count in sorted(groups.items())
 ]
-for group in failure_groups:
-    target = group["target"]
-    group["service"] = (
-        "basket" if "cart" in target else
-        "order" if "order" in target else
-        "payment" if "payment" in target else
-        "product-catalog" if "product" in target else
-        "cross-service"
-    )
 for failure in failures:
-    file_name = failure.get("file", "")
-    failure["service"] = (
-        "basket" if "cart" in file_name else
-        "order" if "order" in file_name else
-        "payment" if "payment" in file_name else
-        "product-catalog" if "product" in file_name else
-        "cross-service"
-    )
+    failure["service"] = service_for(failure.get("file", ""))
 
 summary = {
     "run_id": run_id,
-    "tier": "vcluster",
+    "tier": tier,
     "runner": runner,
     "service": service,
     "candidate_digest": candidate,
-    "project": "api+flows",
+    "project": project,
     "passed": passed,
     "total": total,
     "failed": failed,
@@ -600,7 +843,7 @@ PY
 function _e2e_prune_result_events() {
   local svc="$E2E_SERVICE_UNDER_TEST"
   local runner="${E2E_RUNNER:-local-m4}"
-  local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=vcluster,k3dm.k3d.io/e2e-runner=${runner}"
+  local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=${E2E_TIER},k3dm.k3d.io/e2e-runner=${runner}"
   local names
   names="$(_kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
     -l "$selector" --sort-by=.metadata.creationTimestamp \

@@ -1,0 +1,369 @@
+# Image promotion fails in `shopping-cart-product-catalog`: `PROMOTER_SSH_KEY` is never passed to the reusable workflow
+
+**Filed:** 2026-09-21
+**Revised:** 2026-09-21 — scope corrected after Codex caught a spec/repository mismatch. See
+`## Spec correction` for what the first version got wrong.
+**Branch (spec):** `k3d-manager-v1.36.0`
+**Severity:** High — `shopping-cart-product-catalog` has failed image promotion on **every** push to
+`main` since 2026-08-12 (six consecutive pushes). An earlier revision of this spec said 2026-08-26;
+that was wrong, and came from reading only the three most recent runs. The image builds, pushes and is attested, but the infra repo never
+receives the new digest.
+
+## Evidence
+
+Every recent `main` push of `shopping-cart-product-catalog` fails the same way:
+
+```
+run 35117065512  2026-09-16T15:41 => failure   FAILED JOB: Build, Scan & Push / build-push
+run 33510350374  2026-09-01T12:55 => failure   FAILED JOB: Build, Scan & Push / build-push
+run 32914072637  2026-08-26T00:11 => failure   FAILED JOB: Build, Scan & Push / build-push
+```
+
+Failing step and cause (run `35117065512`):
+
+```
+FAILED STEP: Fail when image promotion did not complete
+
+PROMOTER_SSH_KEY:
+Load key "/home/runner/.ssh/promoter_key": error in libcrypto
+```
+
+The variable is **empty**. Note what succeeded first — the image was built, pushed and attested:
+
+```
+DIGEST: sha256:e9bcb925619b5344a958fc359091b651c61365ce7b8a65c354408ee2f7198b92
+cosign attest --yes --key env://COSIGN_KEY --type vuln ...
+```
+
+That digest is exactly what `product-catalog` on the hub is trying to pull, so the image exists in
+GHCR. **`PACKAGES_TOKEN` is working** — the registry half of this pipeline is healthy. Only the git
+promotion half is broken.
+
+## Root cause
+
+`shopping-cart-infra/.github/workflows/build-push-deploy.yml` declares the secret optional:
+
+```yaml
+      PROMOTER_SSH_KEY:
+        required: false
+```
+
+and consumes it around line 170:
+
+```yaml
+          printf '%s\n' "${PROMOTER_SSH_KEY}" > ~/.ssh/promoter_key
+```
+
+Because it is `required: false`, a caller that omits it passes validation and then fails deep inside
+`ssh` with `error in libcrypto` — a message naming neither the secret nor the caller.
+
+`shopping-cart-product-catalog/.github/workflows/ci.yml` calls the reusable workflow but omits
+`PROMOTER_SSH_KEY` from its `secrets:` block. It is also the only one of the five repos with **no**
+`PROMOTER_SSH_KEY` repository secret at all.
+
+## What actually happened — an unenumerated rollout that never finished
+
+This is not a repo that was set up and then regressed. It was **never onboarded**, and the reason it
+looks onboarded is that a later pass did one third of the job.
+
+**2026-08-09T14:26Z — infra PR #91 changed the promotion mechanism.** Before it, promotion pushed
+with a token; after it, promotion pushes over SSH. The PR body states why: on personal repos neither
+`github-actions[bot]` nor a user-owned GitHub App can be a ruleset bypass actor (HTTP 422, org-only),
+but a per-repo **write deploy key** is accepted.
+
+That made three things prerequisites for **every** calling repo:
+
+1. a write deploy key named `sc-image-promoter`,
+2. a `PROMOTER_SSH_KEY` secret holding its private half,
+3. a ruleset with a `DeployKey` bypass.
+
+The PR body's rollout section reads, in full: *"Rollout (via API, no user setup) — Per repo: add write
+deploy key + PROMOTER_SSH_KEY secret; ruleset with DeployKey bypass; delete classic protection;
+repin."* **It never enumerates the repos.** Nothing in the PR, and nothing afterwards, asserted a
+count. That is the defect that let one repo fall out.
+
+Timestamps show the rollout ran immediately after the merge and covered three repos:
+
+| Repo | deploy key created | ruleset created | Onboarded |
+|---|---|---|---|
+| shopping-cart-order | 2026-08-09 14:27Z | 2026-08-09 14:27Z | ✅ |
+| shopping-cart-payment | 2026-08-09 15:02Z | 2026-08-09 15:02Z | ✅ |
+| shopping-cart-basket | 2026-08-09 15:05Z | 2026-08-09 15:05Z | ✅ |
+| **shopping-cart-product-catalog** | **never** | **2026-09-01 13:03Z** | ❌ |
+
+**2026-08-12 — Dependabot pulled product-catalog onto the new mechanism.** It was still pinned to
+`4afa9dce`, which has **zero** references to `PROMOTER_SSH_KEY`, so it kept promoting the old way and
+kept passing. Then:
+
+```
+01:53Z  main push                     => success      (still pinned to 4afa9dce)
+01:54Z  auto-merge enabled on PR #47
+01:57Z  PR #47 squash-merged          => pin moves 4afa9dce -> 47769da (3 refs to PROMOTER_SSH_KEY)
+01:57Z  main push                     => FAILURE      "Fail when image promotion did not complete"
+```
+
+Four minutes. A `chore(deps)` pin bump carried a breaking change across a required-secret boundary
+and auto-merged, because the only job that could have caught it — `publish` — is gated on
+`github.ref == 'refs/heads/main' && github.event_name == 'push'` and is therefore **skipped on the
+Dependabot PR itself**. The PR was green by construction. Every `main` push since has failed:
+08-12, 08-22, 08-25, 08-26, 09-01, 09-16.
+
+**2026-09-01 13:03Z — a follow-up pass misdiagnosed it.** That day's 12:55Z main push failed. Eight
+minutes later a `main-protection` ruleset with a `DeployKey:always` bypass was created on
+product-catalog (and order's was touched at 12:52Z). So step 3 of the rollout was applied — a bypass
+granting push rights to a deploy key **that does not exist**. The bypass is real, the key it exempts
+is not. The next main push (09-16) failed identically.
+
+So product-catalog is missing exactly steps 1 and 2. There is nothing to copy from a sibling: the
+three `sc-image-promoter` keys have distinct fingerprints, one pair per repo, because the promote step
+pushes to the **calling repo itself** (`git@github.com:${{ github.repository }}`), not to infra.
+
+**Lesson for the next API rollout:** a rollout that says "per repo" without listing the repos cannot
+be verified, and was not. Enumerate the repos, then assert the count afterwards — for this mechanism,
+`deploy keys == secrets == rulesets == callers`.
+
+## Verified state of all five repos
+
+| Repo | Caller workflow | Calls reusable? | Forwards key? | Repo secret? | Last `main` pushes |
+|---|---|---|---|---|---|
+| shopping-cart-basket | `go-ci.yml` | yes | yes | yes | 1 failure — **different cause**, see below |
+| shopping-cart-order | `ci.yml` | yes | yes | yes | success |
+| shopping-cart-payment | `ci.yaml` | yes | yes | yes | success |
+| **shopping-cart-product-catalog** | `ci.yml` | yes | **no** | **no** | **failure 6/6 since 08-12** |
+| shopping-cart-frontend | `ci.yml` | **no** — inline publish | n/a | n/a | success |
+
+`shopping-cart-frontend` does not use the reusable workflow. Its `publish` job is inline and promotes
+via a deploy PR using `PACKAGES_TOKEN` as `GH_TOKEN`; it never references `PROMOTER_SSH_KEY`. It is
+out of scope.
+
+## Why CI looked green
+
+`publish` is gated on `if: github.ref == 'refs/heads/main' && github.event_name == 'push'`. Every
+Dependabot and feature-branch run **skips** it, and a skipped job does not fail a run. The most
+recent product-catalog run (2026-09-21) reads `success` with `Build, Scan & Push = skipped`. Only a
+push to `main` exercises the path. Read the job list, not the run conclusion.
+
+## Out of scope — separate follow-up, do NOT fix here
+
+`shopping-cart-basket` run `33507015429` (2026-09-01) also failed `Fail when image promotion did not
+complete`, but for an unrelated reason. Its key was present (`PROMOTER_SSH_KEY: ***`) and the failure
+was:
+
+```
+error: failed to push some refs to 'github.com:wilddog64/shopping-cart-basket.git'
+```
+
+That is a push rejection, not a missing credential. Single occurrence; order and payment succeed with
+the same shape. File separately if it recurs.
+
+## Spec correction
+
+The first version of this spec named four repos and three code changes. Three of those were wrong,
+and the error was Claude's, not Codex's — the detection script globbed `*.yml` only and took the
+first match per repo:
+
+- **payment** — tested `go-ci.yml`, which has no `publish` job. The real caller is `ci.yaml`
+  (`.yaml`, not `.yml`), which **already forwards the key**. Not broken.
+- **frontend** — does not call the reusable workflow at all. Not broken.
+- **basket** — already correct; its one failure has a different cause (above).
+
+Codex stopped and asked rather than editing files that did not match the spec. That was the right
+call and is why this revision exists.
+
+---
+
+## Before You Start
+
+**Spec repo:** k3d-manager — `git pull origin k3d-manager-v1.36.0`, read this file in full.
+**Work repos and branch (create from `origin/main` in each):** `fix/pass-promoter-ssh-key`
+
+- `~/src/gitrepo/personal/shopping-carts/shopping-cart-product-catalog`
+- `~/src/gitrepo/personal/shopping-carts/shopping-cart-infra`
+
+Only these two. Never work from `main`. Never push to `main`.
+
+You already created branches in `shopping-cart-payment` and `shopping-cart-frontend` during the
+first attempt. Leave them alone — do not commit to them, and do not delete them.
+
+Read before editing:
+- `shopping-cart-product-catalog/.github/workflows/ci.yml` — the `publish:` job
+- `shopping-cart-order/.github/workflows/ci.yml` — the `publish:` job. This is the **correct
+  reference shape**; read it, do not edit it.
+- `shopping-cart-infra/.github/workflows/build-push-deploy.yml` lines 20–40 and 160–190
+
+## Change 1 — forward the secret in product-catalog
+
+In `shopping-cart-product-catalog/.github/workflows/ci.yml`, in the `publish:` job:
+
+**OLD:**
+
+```yaml
+    secrets:
+      PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+      COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+```
+
+**NEW:**
+
+```yaml
+    secrets:
+      PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+      COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+      PROMOTER_SSH_KEY: ${{ secrets.PROMOTER_SSH_KEY }}
+```
+
+Add one line. Do not reorder or reformat the existing three.
+
+## Change 2 — fail fast with an actionable message in the reusable workflow
+
+In `shopping-cart-infra/.github/workflows/build-push-deploy.yml`, insert a guard step immediately
+**before** the step that consumes the key (the one containing
+`printf '%s\n' "${PROMOTER_SSH_KEY}" > ~/.ssh/promoter_key`, around line 165). Match the surrounding
+indentation exactly.
+
+```yaml
+      - name: Verify the promoter SSH key was provided
+        env:
+          PROMOTER_SSH_KEY: ${{ secrets.PROMOTER_SSH_KEY }}
+        run: |
+          if [ -z "${PROMOTER_SSH_KEY}" ]; then
+            echo "::error::PROMOTER_SSH_KEY is empty. The calling workflow did not forward it, or the repository has no such secret." >&2
+            echo "::error::Add 'PROMOTER_SSH_KEY: \${{ secrets.PROMOTER_SSH_KEY }}' to the secrets block of the job that calls build-push-deploy.yml, and confirm the secret exists in the calling repository." >&2
+            exit 1
+          fi
+```
+
+Leave `required: false` unchanged — flipping it to `required: true` fails at workflow-validation time
+with a less informative message, and this guard gives a better one.
+
+## Change 3 — do not touch the rest of the pipeline
+
+The build, push, cosign sign and attest steps are verified working. Do not modify them.
+
+## Rules
+
+- YAML only. Do not edit application code, Dockerfiles, or any other workflow.
+- Validate both changed files parse:
+  `python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" <file>` — paste both results.
+- Prove the product-catalog change is real, before/after:
+  - `git show origin/main:.github/workflows/ci.yml | grep -c 'PROMOTER_SSH_KEY'` → expect `0`
+  - `grep -c 'PROMOTER_SSH_KEY' .github/workflows/ci.yml` → expect `1`
+- Prove the guard precedes the consumer in `build-push-deploy.yml` — paste both line numbers and
+  show the guard's is smaller:
+  - `grep -n 'Verify the promoter SSH key was provided' .github/workflows/build-push-deploy.yml`
+  - `grep -n 'promoter_key' .github/workflows/build-push-deploy.yml`
+- LF line endings. Preserve indentation exactly — indentation is semantic in YAML.
+
+## Commit message (verbatim, both repos)
+
+```
+fix(ci): forward PROMOTER_SSH_KEY to the reusable build-push-deploy workflow
+
+shopping-cart-product-catalog failed image promotion on every push to main
+since 2026-08-26: the publish job never forwarded PROMOTER_SSH_KEY, so the
+reusable workflow wrote an empty key file and ssh failed with "error in
+libcrypto". The image itself built, pushed and was attested successfully, so
+the failure was confined to the git promotion step, and it was invisible on
+pull requests where the publish job is skipped.
+
+Forward the secret from the product-catalog caller, and add a guard in
+build-push-deploy.yml that fails immediately with a message naming the secret
+and the fix when it arrives empty.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01B9RRyT5eU8S76oXYMrLZN8
+```
+
+## Definition of Done
+
+- [ ] `PROMOTER_SSH_KEY` forwarded in `shopping-cart-product-catalog/.github/workflows/ci.yml`
+- [ ] Guard step added to `build-push-deploy.yml`, placed before the consuming step
+- [ ] Both files parse as valid YAML — output pasted
+- [ ] Before/after `grep -c` counts pasted (`0` → `1`)
+- [ ] Guard-before-consumer line numbers pasted
+- [ ] Committed on `fix/pass-promoter-ssh-key` in both repos with the message above
+- [ ] Pushed — `git rev-parse origin/fix/pass-promoter-ssh-key` matches local HEAD in both
+- [ ] Report one SHA per repo (2 total)
+
+## Operator action required (NOT Codex — needs key material)
+
+**Revised 2026-09-21 after checking the deploy keys — the first version of this section was wrong.**
+
+`shopping-cart-product-catalog` has **no** `PROMOTER_SSH_KEY` secret. Change 1 forwards a secret
+that does not yet exist there, so promotion will still fail — but with the explicit guard message
+instead of `error in libcrypto`.
+
+### What the first version got wrong
+
+It said to reuse "the same key already present in basket, order and payment". There is no such
+shared key. Each repo has its **own** pair. The promote step pushes to the **calling repo itself**,
+not to the infra repo:
+
+```yaml
+git remote set-url origin "git@github.com:${{ github.repository }}.git"
+git push origin "HEAD:${{ github.ref_name }}"
+```
+
+so each app repo needs its own write-capable `sc-image-promoter` deploy key holding the public
+half, and its own `PROMOTER_SSH_KEY` secret holding the private half. Verified fingerprints — all
+three distinct:
+
+| Repo | `sc-image-promoter` deploy key | Fingerprint |
+|---|---|---|
+| shopping-cart-basket | yes (2026-08-09, write) | `SHA256:oEYsJuNeDySRiQsrkb6wWenKPTHwgHBO4X/y0cCqUA8` |
+| shopping-cart-order | yes (2026-08-09, write) | `SHA256:ptiaLsvS6aiD0Ldcwv01SXoBWuZKymNWTJA213CRMYs` |
+| shopping-cart-payment | yes (2026-08-09, write) | `SHA256:T+2IhZvq/r/RMxm0UC7j6JIxPoVlX098Qx9t79A7MbE` |
+| **shopping-cart-product-catalog** | **none** | — |
+
+So product-catalog is missing **two** things, not one: the deploy key *and* the secret. Adding only
+the secret would fail at `git push` with a permission error.
+
+`shopping-cart-frontend` correctly has neither — its inline publish job promotes via a deploy PR
+using `PACKAGES_TOKEN`, and never touches SSH.
+
+### The fix — a fresh pair for product-catalog only
+
+Generate a new `ed25519` pair, register the public half as a write-capable deploy key named
+`sc-image-promoter`, store the private half as the `PROMOTER_SSH_KEY` secret, then destroy the local
+copy. Never echo either half. Never reuse another repo's pair.
+
+This is the only step in this bug that touches key material, and it is the operator's or Claude's —
+**not Codex's**.
+
+## Follow-up — the guard is inert until the pin moves
+
+`shopping-cart-product-catalog/.github/workflows/ci.yml` line 134 pins the reusable workflow to a
+commit SHA:
+
+```
+uses: wilddog64/shopping-cart-infra/.github/workflows/build-push-deploy.yml@1b35d962b6e4c095348a09f7a41d79b755b6f6cd
+```
+
+That commit does **not** contain the guard, so Change 2 has no effect on product-catalog until the
+pin moves. Change 1 works regardless — it lives in product-catalog's own file.
+
+**Do not bump the pin to `94b16bc9` (the infra fix branch).** Pinning `main` of a consumer repo to
+an unmerged branch commit makes product-catalog depend on a commit that is not on infra's default
+branch, and a squash merge will produce a different SHA, forcing a second bump. Correct order:
+
+1. Merge the infra PR to `main`.
+2. Bump the pin in product-catalog to the **infra merge commit SHA**.
+
+`.github/dependabot.yml` in product-catalog already tracks `github-actions` weekly, so Dependabot
+will raise the bump on its own after the infra merge. A manual bump is only needed to move faster.
+
+## What NOT to Do
+
+- Do NOT create a PR in any repo. Do NOT merge. Do NOT commit to `main`. Do NOT force-push.
+- Do NOT use `--no-verify`.
+- Do NOT change `required: false` to `required: true`.
+- Do NOT touch `shopping-cart-payment`, `shopping-cart-frontend`, `shopping-cart-basket` or
+  `shopping-cart-order` — all four are correct for this defect.
+- Do NOT delete the stray branches from the first attempt.
+- Do NOT attempt to fix the basket push-rejection failure. It is a separate, unfiled issue.
+- Do NOT touch the build, push, cosign sign or attest steps.
+- Do NOT create, read, print or guess the `PROMOTER_SSH_KEY` value.
+- Do NOT modify `PACKAGES_TOKEN` handling. It is not broken.
+- Do NOT re-run or trigger any GitHub Actions workflow.

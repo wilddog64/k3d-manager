@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# bin/restore-hub-ghcr-pat
+#
+# Restore the GHCR pull credential for the HUB cluster.
+#
+# Reads the PAT from stdin only — never from argv, never echoed, never written
+# to shell history. The PAT is verified to actually pull from ghcr.io before it
+# is stored, so a token that merely authenticates cannot become the stored
+# credential.
+#
+# Usage:
+#   pbpaste | bin/restore-hub-ghcr-pat
+#   bin/restore-hub-ghcr-pat < /path/to/pat
+#
+# Environment:
+#   HUB_CONTEXT        kube context for the hub (default: k3d-k3d-cluster)
+#   VAULT_LOCAL_PORT   local Vault port-forward port (default: 18200)
+#   GITHUB_USERNAME    GHCR username (default: wilddog64)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# shellcheck source=scripts/lib/system.sh
+source "${REPO_ROOT}/scripts/lib/system.sh"
+# shellcheck source=scripts/lib/core.sh
+source "${REPO_ROOT}/scripts/lib/core.sh"
+# shellcheck source=scripts/plugins/shopping_cart.sh
+source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
+
+HUB_CONTEXT="${HUB_CONTEXT:-k3d-k3d-cluster}"
+_vault_local_port="${VAULT_LOCAL_PORT:-18200}"
+_github_user="${GITHUB_USERNAME:-wilddog64}"
+
+NAMESPACES=(shopping-cart-apps shopping-cart-payment shopping-cart-data)
+DEPLOYMENTS=(basket-service frontend order-service product-catalog)
+
+if [[ -t 0 ]]; then
+  read -r -s -p "Paste a GitHub PAT with read:packages and press Enter: " _pat
+  echo ""
+else
+  read -r _pat
+fi
+
+if [[ -z "${_pat}" ]]; then
+  _err "no PAT supplied on stdin"
+fi
+
+_info "verifying the PAT can pull from ghcr.io"
+if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_pat}"; then
+  _pat=""
+  _err "that PAT cannot pull from ghcr.io — it is missing the read:packages scope. Nothing was written. Mint a classic PAT with read:packages at https://github.com/settings/tokens"
+fi
+_info "PAT verified — it can pull"
+
+_vault_root_token=$(kubectl get secret vault-root -n secrets --context "${HUB_CONTEXT}" \
+  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d || true)
+if [[ -z "${_vault_root_token}" ]]; then
+  _pat=""
+  _err "cannot read secrets/vault-root from ${HUB_CONTEXT}"
+fi
+
+if ! _shopping_cart_store_ghcr_pat_in_vault "${_pat}"; then
+  _pat=""
+  _err "failed to write the PAT to Vault (is the port-forward on 127.0.0.1:${_vault_local_port} up?)"
+fi
+_pat=""
+_info "PAT stored in Vault at secret/github/pat"
+
+_sync_ts="$(date +%s)"
+for ns in "${NAMESPACES[@]}"; do
+  if kubectl get externalsecret ghcr-pull-secret -n "${ns}" --context "${HUB_CONTEXT}" >/dev/null 2>&1; then
+    kubectl annotate externalsecret ghcr-pull-secret -n "${ns}" --context "${HUB_CONTEXT}" \
+      force-sync="${_sync_ts}" --overwrite >/dev/null \
+      && _info "ESO force-sync triggered for ${ns}/ghcr-pull-secret" \
+      || _warn "could not annotate ${ns}/ghcr-pull-secret"
+  else
+    _warn "no ExternalSecret ghcr-pull-secret in ${ns} — skipping"
+  fi
+done
+
+_info "waiting 10s for ESO to re-sync"
+sleep 10
+
+for dep in "${DEPLOYMENTS[@]}"; do
+  if kubectl get deployment "${dep}" -n shopping-cart-apps --context "${HUB_CONTEXT}" >/dev/null 2>&1; then
+    kubectl rollout restart deployment "${dep}" -n shopping-cart-apps --context "${HUB_CONTEXT}" >/dev/null \
+      && _info "restarted deployment ${dep}" \
+      || _warn "could not restart ${dep}"
+  else
+    _warn "no deployment ${dep} in shopping-cart-apps — skipping"
+  fi
+done
+
+echo ""
+_info "done — watch the pods come up with:"
+echo "  kubectl get pods -n shopping-cart-apps --context ${HUB_CONTEXT} -w"

@@ -1,5 +1,425 @@
 # Active Context — k3d-manager
 
+## 2026-09-22 — hub apps 47h in ImagePullBackOff: stale `github/pat` in Vault, not the k8s Secret
+
+Found by running `make smoke` as the PR #130 live-smoke gate. `cluster-health` FAILED: 4/4 pods in
+`shopping-cart-apps` in `ImagePullBackOff` for **47h**, `403 Forbidden` on the GHCR manifest HEAD.
+
+**Root cause chain (verified, not inferred):**
+
+```
+ghcr-pull-secret  ←  ExternalSecret (refreshInterval 15m, creationPolicy Owner)
+                  ←  ClusterSecretStore vault-backend
+                  ←  Vault  secret/data/github/pat   property "token"
+```
+
+The pull secret holds a token minted **before** `read:packages` was granted (2026-09-22 23:26).
+Fixing the token was necessary but not sufficient — nothing propagated it to Vault.
+
+**The trap, and the thing to remember:** writing the k8s Secret directly is useless.
+`kubectl apply` of a fresh `.dockerconfigjson` succeeded and ESO reconciled it away within seconds —
+`managedFields` showed `externalsecrets.external-secrets.io/ghcr-pull-secret` and
+`kubectl-client-side-apply` at the *same* timestamp `2026-09-23T00:13:22Z`, and the secret carries
+`reconcile.external-secrets.io/managed: true` plus an `ExternalSecret` ownerReference. Verified by
+reading the value back as MATCH/MISMATCH against `gh auth token` — **MISMATCH**. This is the
+[[reference_argocd_selfheal_reverts_out_of_band_patch]] pattern with ESO as the reconciler: always
+read the value back.
+
+**Two misdiagnoses avoided along the way:**
+1. `403 Forbidden` reads exactly like a missing-scope credential, which is what
+   `reference_ghcr_pull_credential_gh_auth_refresh` says it means. Here the scope was already
+   correct. Proof: a direct token-exchange + manifest HEAD from the shell returned **200** for the
+   exact requested tag `sha-0d8ab3ba…`, and for `sha-b84a534d…` and `latest`. The credential works;
+   only the one the kubelet holds does not.
+2. The requested tag looked absent from the first page of
+   `user/packages/container/shopping-cart-basket/versions` (which is dominated by `.att`/`.sig`
+   attestation tags). It exists — pagination, not a missing image.
+
+**Fix is the operator's** (a Vault write needs the root token, which Claude does not read):
+`scratchpad/fix-ghcr-pat-in-vault.sh` — read-modify-writes `secret/github/pat` preserving sibling
+properties, force-syncs both ExternalSecrets, verifies MATCH, restarts the four deployments. Token
+and PAT never in argv; prints no secret material.
+
+**`github/pat` is one of the 14 canonical hub-seed keys** (`vault.sh:1118-1125`), so the Keychain
+seed backup also holds the stale token and would restore it on a hub rebuild. Re-backup after the
+Vault write.
+
+**RESOLVED 2026-09-23 00:24 (operator ran the script).** `vault write secret/github/pat` → `http=200`,
+ESO force-sync → `ghcr-pull-secret vs gh token: MATCH`, four deployments restarted. **The 403 and the
+ImagePullBackOff are gone** — images now pull and `frontend` reached `1/1 Running`. The GHCR pull
+credential problem is closed.
+
+**What the fix exposed underneath (separate, pre-existing):** `basket-service`, `order-service` and
+`product-catalog` now `CrashLoopBackOff` on a **missing data layer**, not on images:
+
+```
+order-service: failed to connect to postgres — lookup
+postgresql-orders.shopping-cart-data.svc.cluster.local: no such host
+```
+
+`shopping-cart-data` holds the **Services** (`postgresql-orders`, `postgresql-products`,
+`postgresql-payment`, `minio`, all 2d old) but **zero StatefulSets and zero pods**, so the headless
+service has no endpoints and DNS does not resolve. Cause: ArgoCD app `ubuntu-k3s-data-layer` (in
+namespace **`cicd`**, not `argocd`) is **OutOfSync** and has never materialised the StatefulSets.
+`shopping-cart-identity` is also OutOfSync. This is the long-standing "shopping-cart-data
+StatefulSets" pending item — the data layer never returned after the hub rebuild 47h ago. Not caused
+by, and not fixed by, the credential work.
+
+**Two more findings from the same smoke run:**
+- `shopping-cart-payment` namespace **does not exist** on the hub (only `-apps` and `-data`, both
+  47h old). So the smoke threshold `running >= 5` (`bin/smoke-test-cluster-health:86`, counting
+  apps + payment) is **unsatisfiable** — apps has 4 deployments. Its
+  "ghcr-pull-secret MISSING in shopping-cart-payment" and the ArgoCD `OutOfSync` for payment are
+  both downstream of the absent namespace, not separate defects.
+- `shopping_cart.sh:458` passes the GHCR PAT as `--docker-password=` on **argv**, same class as the
+  CLAUDE.md rule against secrets in script arguments. Needs its own bug doc; not fixed (scope).
+
+## 2026-09-22 — ACG auto-login IS wired; the gap is an unpopulated Keychain item
+
+Spec queued: `docs/plans/v1.37.0-acg-autologin-enablement-for-tier2.md` (v1.37.0 now at 3 plan docs,
+cap is 5).
+
+**Correcting a misreading that persisted across several sessions.** Tier 2's P4 was recorded as
+"Operator's action (Keychain `k3dm-acg-pluralsight`, or one manual sign-in in `pw-profile`)", which
+was read as *ACG login is a manual step / the session gate is not wired*. Verified against the live
+tree — it is fully wired:
+
+```
+make -C scripts/lib/foundation credential-test
+  → scripts/lib/acg/bin/acg-credential-test:7-8   source cdp.sh; _browser_launch (unconditional)
+     → _browser_launch          cdp.sh:132 (Chrome already up) AND :163 (fresh launch)
+        → _cdp_ensure_acg_session   cdp.sh:166
+           → _secret_load_data k3dm-acg-pluralsight username|password   cdp.sh:184-185
+```
+
+The auto-login landed in v1.14.0 / lib-foundation v0.4.1 (`b7c849c`) and v0.4.2 (`96bea46`, which
+wired the gate into both `_browser_launch` paths) and was subtree-pulled. **It fires on every run.**
+
+**The real gap:** `security find-generic-password -s "k3dm-acg-pluralsight"` → **ABSENT** on this
+box. `cdp.sh:184-185` loads both keys with `2>/dev/null || true`, so the gate gets two empty strings
+and takes its `ACG_LOGIN_NO_CREDS` branch, which surfaces to a non-TTY caller as
+`ACG_SESSION_EXPIRED`. Not a code defect — an unpopulated secret plus a missing preflight that would
+have named it.
+
+**Second finding:** `e2e_verify_sandbox` (`scripts/plugins/e2e.sh:294`) sets
+`_E2E_ACTIVE_PHASE="preflight"` and then checks **nothing** — its first live action is
+`acg_extend_playwright "${_ACG_SANDBOX_URL:-}"` at :315. So a missing credential fails minutes later
+inside Playwright (`Buttons: ["Sign in"]`) and the summary blames `extending-sandbox`. Task 1 of the
+spec adds `_e2e_sandbox_preflight_auth`, which also refuses to run when
+`K3DM_ACG_SKIP_SESSION_CHECK=1` (`cdp.sh:167`) — that var bypasses the session gate and would let an
+acceptance run drive a signed-out browser.
+
+**Blocking question (Task 0), operator-only:** does the ACG account carry MFA?
+`docs/bugs/v1.14.0-bugfix-acg-pluralsight-autologin.md:394` — the login refuses MFA challenges **by
+design**, and the MFA/company account must never be stored in that Keychain item. Path A (no MFA) =
+populate the item once, P4 closes permanently, unattended for non-TTY callers. Path B (MFA) =
+auto-login is impossible by design, `pw-profile` holds the only session, P4 is never "closed" only
+"currently valid". Not answered yet.
+
+**Live state observed 2026-09-22:** CDP browser running; `pw-profile/Default/Cookies` written 09:45
+today, so a session may already be valid independent of the Keychain item. The stale sibling
+`profile` dir (cookies last written 2026-08-20, nearly empty) is the classic false lead — the CDP
+default moved `profile` → `pw-profile` so the browser stays version-locked to the pinned Playwright.
+Neither dir may be deleted.
+
+**Does NOT unblock Stripe 4/4.** P3 (`KeycloakRealmRoleConverter` absent from
+`shopping-cart-payment` `origin/main`) still causes the payment→Stripe 403; a PR there is not
+approved.
+
+## 2026-09-22 — v1.36.0 smoke and hub snapshot features
+
+Smoke feature committed as `6f1f7fd1` (`feat(smoke): add a unified make smoke target with tiered checks`).
+Hub snapshot feature committed as `d53ea1ba` (`feat(hub-snapshot): capture hub state to the M2 store with retention`).
+Both implementations are offline-only and leave Jenkins unwired, `make down`/`make up` unchanged,
+and the Prometheus admin API disabled. Focused suites, shellcheck, and `make test` passed (`1030/1030`).
+The Loki record required legacy recovery count assertions to move from seven to eight; compatibility
+test commit `5eb759eb` was pushed after the two feature commits.
+
+**Claude verification found two defects Codex's own green run did not surface** — fixed in
+`5dd53be8`, both mutation-verified:
+
+1. `K3DM_SNAPSHOT_DIR` defaulted to `~/k3dm-snapshots`. A tilde does not expand inside double
+   quotes, and the value is then single-quoted for the remote shell, so the M2 would receive
+   `mkdir -p '~/k3dm-snapshots'` and create a directory **literally named `~`** — snapshots
+   landing in `$HOME/~/k3dm-snapshots`. Confirmed by simulation before fixing. The BATS suite
+   could not catch it because the ssh stub never creates real paths; a guard asserting the
+   default contains no tilde was added (14th case).
+2. `hub_recovery_validate` still printed "seven logical claims" after the Loki record made it
+   eight. An operator reading "seven" after restoring eight would reasonably doubt Loki was
+   included. The message is now derived from the record count so it cannot drift again.
+
+Independently re-verified, not taken from the report: SHAs present on `origin`, local HEAD ==
+origin, `hub_recovery.sh` touched by exactly one insertion, node placement genuinely derived
+from the PV's `nodeAffinity` (fails closed on ambiguity), and the contract test really does
+iterate `_hub_recovery_records` and call `_hub_recovery_claim_tree` against the captured tree.
+Suites re-run by Claude: hub_recovery 27/27, hub_snapshot 14/14, smoke 7/7, shellcheck RC=0.
+
+**Free-space preflight REMOVED** in `d1c8b5b3` at the operator's request. It ran *after* the
+full local capture, so it never delivered the "refuse before copying anything" behaviour the
+spec asked for — it only guarded the M2 transfer, which `rsync` already fails on when the
+destination is full. Removed rather than moved: it bought no safety the transfer did not
+already provide. The insufficient-space BATS case was replaced by its **inverse** — a
+successful capture must issue no remote `df`, so restoring the preflight fails the suite
+(mutation-verified). Requirement 3 and case 6 struck in place in the spec with the reason;
+numbering left intact. Suite stays at 14 cases.
+
+Residual gap, accepted knowingly: on a transfer failure the remote directory is now left
+un-marked rather than `.INCOMPLETE` (checksum failures still mark it). A two-line change
+would close it; deferred pending the operator's word.
+
+`make test` after the removal: **1031 ok / 0 not ok** — count reconciles exactly (one case
+out, one in). First run showed 4 reds in `e2e_remote.bats`, which is the documented
+**unpushed-HEAD** signature, not a regression: local HEAD was `d1c8b5b3` while origin was
+still `2ee4ad86`. After pushing, `e2e_remote` is 74/74. Process note: the run was launched as
+`make test > log 2>&1; echo "EXIT=$?"`, whose trailing `echo` always succeeds — the harness
+reported exit 0 for a run where `make` printed `*** [test] Error 1`. `make test; echo $?` is
+not a way to check an exit code.
+
+## 2026-09-22 — Prometheus Vault entry REPAIRED (operator-run)
+
+`secret/data/k3d-manager/prometheus-basic-auth` was **404**; it is now **200**. The operator ran
+`/tmp/prom-recover.sh`; Claude did not execute it, because the script reads the Vault root token
+via `kubectl` into a curl header and that read is on Claude's do-not-touch list — structured so
+the token stays in the operator's shell.
+
+Output confirmed the intended branch: `recovered the Prometheus password from the local cache;
+not rotating`. **No rotation**, so existing saved Prometheus logins keep working.
+
+Preconditions re-verified live before the run (not carried over from the earlier session):
+cache at `~/.local/share/k3d-manager/prometheus-basic-auth.env` readable (143 bytes, user key
+present), cached password 32 chars and not the literal `"password"` (so the recovery branch
+rather than the generate branch), `htpasswd` present for the re-bcrypt, Vault health `http=200`.
+Secret values were never printed — length and a sentinel comparison only.
+
+**First run failed and the bug was Claude's:** `observability.sh:6` reads `$PLUGINS_DIR` at
+source time to pull in `vault.sh`, and the staged script set neither `SCRIPT_DIR` nor
+`PLUGINS_DIR` — it used a local `S="scripts"` nothing else knew about. Fixed by setting both
+absolutely; verified by sourcing the full chain in a throwaway shell and confirming
+`_observability_ensure_prometheus_login`, `_observability_seed_prometheus_vault_entry` and
+`_vault_exec` all resolve.
+
+**Consumers of this Vault path — nothing in-cluster:** `Makefile:542`
+(`show-service-passwords`) and `observability.sh`'s own ensure/seed/rotate logic. No
+ExternalSecret, no ServiceMonitor, no Prometheus scrape config. Nothing needed a restart.
+
+**This does NOT affect Grafana.** Hub Prometheus has no basic auth and the Grafana datasource is
+unauthenticated; this entry is a credential-store row for operator access and
+`show-service-passwords`. The blank e2e panels remain a producer problem — see
+`reference_e2e_dashboard_blank_means_empty_event_payload`.
+
+Still open, unchanged: realm SSO rows in `show-service-passwords` will still read "not
+provisioned on this cluster" because `secret/keycloak/` holds only `['admin','clients']` with no
+`users/` subtree. Seeding `secret/keycloak/users/*` remains an operator decision.
+
+## 2026-09-22 — Tier 1 e2e credential gate cleared (`read:packages` + `workflow`)
+
+Operator ran `gh auth refresh -h github.com -s read:packages,workflow` from their own terminal
+(the device flow needs a real TTY; my shell has none). Scopes are now
+`admin:public_key, gist, read:org, read:packages, repo, workflow`.
+
+Verified three ways rather than trusting the `✓ Authentication complete.` line: live
+`X-Oauth-Scopes` header from `gh api -i user`; `gh api user/packages?package_type=container`
+returning a count where it previously returned 403; and the keychain item's `mdat` moving from
+2026-09-14 to 2026-09-22T23:26:00Z. Read access confirmed against the **private**
+`shopping-cart-basket` package (`visibility: private`, versions listable) — probing the public
+`shopping-cart-e2e-tests` would have answered anonymously and proven nothing.
+
+**The first attempt silently no-opped.** The device flow was started but the browser half never
+completed, and the command left no error behind, so it was indistinguishable from success by output
+alone. The stale keychain `mdat` — eight days old at the time — is what proved no token had been
+written, and is the check that separates "a new token arrived without the scope" from "no new token
+arrived". `~/.config/gh/hosts.yml` mtime is only suggestive, since a keyring-stored token can be
+replaced without touching it. Recorded in
+`memory/reference_ghcr_pull_credential_gh_auth_refresh.md`.
+
+This clears the credential gate only. The Tier 1 run itself has not been executed. Tier 2 remains
+blocked on the manual ACG TTY login.
+
+## 2026-09-22 — Realm SSO reseed spec: hub seed set APPROVED, added as requirement 4
+
+The operator approved adding `keycloak/users/*` to the hub seed set, so it moved out of
+"out of scope" and into `docs/plans/v1.37.0-realm-sso-password-reseed.md` as requirement 4.
+
+**There is no single allowlist to edit** — the 14 keys are enumerated twice:
+`scripts/plugins/vault.sh:1118-1125` (`_keys` array in `vault_seed_hub_into_context`, the side that
+writes the Keychain backup) and a hand-written per-key chain in `shopping_cart.sh:696`
+(`shopping_cart_seed_sandbox_vault_kv`, which `bin/cluster-up:745` runs). Changing only the latter
+yields a seeder reading a key the Keychain never held: `_seed_source_data` reads a canonical
+*source* Vault, and on a hub rebuild that is the Vault just destroyed, so the Keychain fallback at
+`vault.sh:1135` is the only live restore path. Enumerate three literal paths — Vault KV has no glob.
+`scripts/tests/plugins/vault_seed_hub.bats:58` pins the exact list and goes 14 to 17; the two howto
+docs that say "14" and call `keycloak/users/*` "expected to be absent" become wrong on landing.
+
+New risk written into the spec: these three are per-cluster random values, unlike the other 14
+static shared secrets. A Keychain-restored record whose LDAP hash no longer matches makes
+`make show-service-passwords` display a credential that fails to log in — worse than the blank it
+replaces. The reseed's *present then re-apply, no rotation* branch is the required reconciler, so a
+seeded record is never authoritative without an `ldapwhoami` check.
+
+Auto-reseeding on `make up` remains out of scope. `make check-doc-links` 1738 OK.
+
+## 2026-09-22 — Webhook server decomposition specced and QUEUED for v1.37.0
+
+`docs/plans/v1.37.0-webhook-server-decomposition.md` (`1b67b2db`). **Queued, not for
+implementation during v1.36.0**, which is at the five-plan-doc cap; v1.37.0 now has 1.
+
+`bin/k3dm-webhook` is **4,009 lines / 180KB**, ~110 module-level functions, 19 routes. Measured
+concern clusters: cluster lifecycle 1233, smoke-SSO client 483, ask/agent invoker 450, Slack
+thread commands 362, failure analysis 153, authz/policy 149, metrics 100, redaction 50 (2980
+grouped). Two do not belong in an HTTP server at all — the smoke cluster is a
+browser-emulating SSO client subclassing `HTMLParser` and walking an OAuth code flow, and the
+agent cluster invokes an AI agent with a mutate-the-cluster "fix mode".
+
+**The defect is adjacency, not size.** `do_POST` spans 3515–3942 (428 lines); the role
+resolution for `/api/v1/make` is at line **3642** and the handler that spawns the job at
+**3880** — 238 lines apart in one method. Nothing is wrong with either block; no reviewer can
+hold both in view. This is the component the operator has named as their top security worry.
+
+Extraction is ordered by **value-if-stopped-early**, not by size: Phase 1 is `policy.py` + an
+explicit route table declaring `(path, min_role, handler)` on one line each, so the security
+payoff lands even if later phases never do. Then smoke.py (483, pinned by 14 pytest cases),
+agent.py (450 — `_fix_mode_enabled` gates cluster mutation and has **no test today**; one must
+be added with the move), lifecycle.py/status.py (1233). Recommended **against** a rewrite: the
+stalled `scripts/lib/webhook/` extraction (412 lines, 5 modules) proves incremental works.
+
+Measured baseline net that must stay green: **105 cases** — webhook.bats 64 (58 run, 6
+live-gated), webhook_hub_eso.bats 4, webhook_make_targets.py 11, webhook_redaction.py 6,
+webhook_request_hardening.py 6, test_smoke_logins.py 14.
+
+**Two findings worth carrying forward.** (1) The three `webhook_*.py` files are
+`unittest.TestCase`, not pytest, and run only because `make test-python-unit` loops
+`scripts/tests/bin/*.py` skipping `test_*`. I initially suspected they were orphaned and was
+wrong — but they are invisible to both `make test` and `make test-pytest`, so `make test`
+alone cannot catch a break in any of the 37 Python cases. Use `make test-all`. (2) All four
+Python suites load the entrypoint wholesale via `SourceFileLoader` and reach into private
+attributes (`wh._REDACT_VALUES`, `wh._redact_secrets`), so moving a function breaks them
+unless the test is repointed in the same commit. Permanent re-export shims are barred — they
+keep the file long and defeat the purpose.
+
+Also confirmed: `scripts/plugins/smoke.sh` (72 lines, v1.36.0) does **not** duplicate the
+webhook's 483-line smoke client today. Converging them is explicitly out of scope.
+
+## 2026-09-22 — Grafana "no data" triaged; smoke + hub-snapshot specs assigned to Codex
+
+**Grafana is not broken.** Hub Prometheus has 31 active targets up and serves data; the
+`kube-prometheus-stack-grafana-datasource` ConfigMap points at
+`http://kube-prometheus-stack-prometheus.monitoring:9090/` unauthenticated (correct — hub
+Prometheus has no basic auth) and all 30 dashboard ConfigMaps provisioned cleanly. Grafana's
+own logs contain no datasource query errors. Grafana is reachable at `grafana.3ai-talk.org`
+(HTTP 200); its port-forward is `:3001`, not `:13000`.
+
+What is actually empty, and why — three independent causes, none of them a query fault:
+
+- **e2e dashboards.** `e2e_last_run_pass = 0` — the last run, 15.6h ago
+  (`run_id=1790025545-10464`, `tier=vcluster`, `runner=local-m4`), FAILED.
+  `e2e_last_success_timestamp_seconds` has **never** been published, so every
+  "last success" and trend panel is legitimately blank.
+- **e2e failure detail.** `e2e_failure_info` and `e2e_failure_group_info` are empty even
+  though the run failed, and `e2e_run_info` carries a malformed `failure_ratio="/"` —
+  an empty-over-empty division. A failed run produced no failure detail. This is the gap
+  `docs/plans/v1.36.0-e2e-deterministic-triage-and-corpus.md` covers.
+- **Hermes.** `hermes_sensor_status` and `hermes_last_poll_timestamp_seconds` empty because
+  `K3DM_HERMES_STATUS_ENABLED` is deliberately unset. By design.
+  `hermes_incident_active` and all `trivy_*` metrics DO have data.
+
+Metric names match the dashboards exactly — there is no `k3dm_` prefix mismatch.
+
+**Tier 1 and Tier 2 e2e remain unrunnable; both blockers verified, not assumed.**
+Tier 1: the `gh` token scopes are `admin:public_key, gist, read:org, repo` — no
+`read:packages`, so the in-cluster Playwright job cannot pull from GHCR. Runner health is
+otherwise green (`hub=ok`, `runner=m2jump`, `runner_status=available`). Operator must run
+`gh auth refresh -h github.com -s read:packages`. Tier 2: no ACG context exists at all
+(only `k3d-k3d-cluster` and `ubuntu-hostinger`); needs the manual TTY login.
+
+**UPDATE 2026-09-22 — the Tier 1 credential half of the above is CLEARED.** Scopes are now
+`admin:public_key, gist, read:org, read:packages, repo, workflow`; private-package read confirmed
+against `shopping-cart-basket`. See the 2026-09-22 entry at the top of this file. Tier 2 is
+unchanged and still needs the manual TTY login.
+
+**Two specs written and pushed as `b37acb91`, dispatched to Codex (session
+`01a0c93c-45b4-7301-9ac7-661b66e21204`):**
+
+- `docs/plans/v1.36.0-make-smoke-target.md` — no `make smoke` exists today; three
+  `bin/smoke-test-*` scripts are invoked ad hoc. Tiered target: offline checks always,
+  cluster checks only when the context is reachable (unreachable = SKIP with a reason, not
+  FAIL). Deprecated `bin/smoke-test-jenkins` stays unwired.
+- `docs/plans/v1.36.0-hub-snapshot-capture-and-retention.md` — **the restore half already
+  exists** (`hub_recovery_plan/validate/targets/restore`, executed 2026-09-11). Only capture
+  is missing. Capture must emit the exact layout `hub_recovery_restore` already consumes
+  (`server-db/state.db`, `server-token`, `pv-pvc.yaml`, `node-*-storage/pvc-<uid>_<ns>_<claim>/`),
+  offload to M2, and prune.
+
+**Measured sizes (hub, 2026-09-22):** Prometheus 2.0G, keycloak-postgres 67M, Loki 46M,
+Vault 23M → **≈2.15G per snapshot**. M2 (`m2jump`/`m2-air.local`) has **382Gi** free vs the
+M4's 163Gi, so M2 is the store, as the operator proposed.
+
+**Retention ceiling — the governing constraint.** Hub Prometheus runs
+`--storage.tsdb.retention.time=3d --storage.tsdb.retention.size=8GB` and prunes
+out-of-retention blocks *at startup*. A snapshot older than 3 days therefore restores blocks
+Prometheus immediately deletes — the feature would silently do nothing. Snapshot retention
+defaults to 3 kept snapshots for that reason. Long-term history needs raised retention or
+remote-write, NOT snapshots. `enableAdminAPI` is `false` and stays false: capture happens
+during teardown, so a cold copy is consistent by construction.
+
+Two spec decisions worth remembering: node placement must be **derived from the live PV**,
+not read from `_hub_recovery_records` — `local-path` pins to whichever node the pod landed
+on, and Prometheus measured on `agent-1` today while the record says `agent-0`. And Vault KV
+needs no separate export: `secrets/data-vault-0` is the file backend and already contains it.
+
+Wiring capture into `make down`/`make up` is explicitly OUT of scope until capture is proven
+on a real hub — adding a 2.15G transfer to the destructive `down` path unreviewed is not
+acceptable.
+
+## 2026-09-22 — Prometheus reseed and rotator CI fix
+
+Implemented and committed as `7d475a9fe1e8e5f051d035b4f917559341d8b127` (`fix(observability): distinguish unreachable Vault from an absent Prometheus entry`), then pushed to `origin/k3d-manager-v1.36.0`. Vault reachability now gates Prometheus reseeding; unreachable Vault skips without writing, while an absent entry still reseeds. The two reseed security assertions are effective, the Alertmanager test is hermetic and checks the real unresolved-value gate, and the Keycloak/ArgoCD rotators use BusyBox-compatible `base64 -d`. Added the platform-ops regression suite and rotation-guide note. Verification: shellcheck, all focused suites, doc links, and `make test` (1,010/1,010) passed; `scripts/tests/lib/observability.bats` is unchanged.
+
+## 2026-09-22 — Post-merge housekeeping for promoter PRs
+
+Both `shopping-cart-product-catalog` PR #55 and `shopping-cart-infra` PR #99 merged successfully
+at 2026-09-22 00:04-00:05Z, merge commits `b6ff80b7` (product-catalog) and `91432535` (infra).
+Both fixed the PROMOTER_SSH_KEY promotion failure: product-catalog's `ci.yml` now forwards the key
+to the reusable workflow, and infra gained the guard step that detects an empty key and fails with
+an actionable error message. Main synced locally for both repos and merge commits verified present.
+`enforce_admins` on shopping-cart-infra was restored and verified enabled. CHANGELOG entries remain
+under `[Unreleased]` (correct for fix branches, not milestone releases). Release lists generated;
+no tags needed. No next branch or retrospective for fix merges. Memory-bank updated and committed.
+
+**Scope of what is proven:** the above is merge-and-housekeeping verification only. Promotion
+itself has NOT been observed working. Merge run `35670460109` on `b6ff80b7` is the first run in
+which `Build, Scan & Push / build-push` actually executes rather than reporting `skipping` — the
+publish job does not run on pull requests, which is precisely why six PR pushes stayed green over
+a broken promote step. A first draft of this entry (subagent output, commit `f96cce1f`) marked
+promotion `[x] FIXED` and "verified"; that was corrected here and in `progress.md`, because a
+merged diff is not an executed code path. Verification requires reading the promote step's own
+log and confirming `newTag:` in `k8s/base/kustomization.yaml` advanced — not the run conclusion,
+since the promote step runs under `continue-on-error: true`.
+
+**RESOLVED 00:13Z — promotion verified working.** Run `35670460109` promoted successfully.
+Commit `6b79fda` is on `origin/main` authored by `sc-image-promoter` (the deploy-key identity),
+setting `newTag: sha-b6ff80b7...`. Verified from the committed artifact and its author, not the
+run conclusion. The previous change to that file was 2026-05-24 by a human, so this is the first
+successful promoter write to this repo — broken since 2026-08-12, now closed.
+
+## 2026-09-21 — rotate-ghcr-pat fix prepared; commit blocked by Git filesystem permissions
+
+Implemented the exact Changes 1–4 from `docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`
+in `bin/rotate-ghcr-pat` and added the five static-source gates in
+`scripts/tests/bin/rotate_ghcr_pat.bats`. Gate mutation counts were non-vacuous:
+hardcoded context 2→0; pull probe 0→2; `--docker-password` 1→0;
+Vault-token argv 2→0; `/user` auth validation 1→0; ESO branch 0→1. **Correction by Claude:**
+Codex reported the PAT basic-auth argv gate as 1→0; it was actually 0→0 (vacuous) because the
+pattern carried stray `\${` escapes the source never contained. Pattern corrected to the
+unescaped form, re-measured 1→0, and all five gates mutation-tested `not ok` against the
+pre-fix file before restore (shasum-verified byte-identical). Pull probe line 59 precedes
+the first `gh secret set` line 106. `shellcheck -S warning` and `shellcheck -S error` were clean;
+focused BATS was 5/5. The required commit could not be created because Git cannot create
+`.git/index.lock` (`Operation not permitted`); no commit SHA or push exists yet.
+
+## 2026-09-20 — Port-forward wrapper fix implemented; Git commit blocked
+
+Implemented the requested allowlisted fix for `docs/bugs/2026-09-20-pf-wrapper-silent-wrong-context-and-address-blind-port-sweep.md` in the wrapper template, ArgoCD generator, `bin/cluster-up`, both focused BATS suites, and `CHANGELOG.md`. The wrapper now scopes both listener probes and the forward bind to `ADDRESS`, parameterizes `LOG_TAG`, re-resolves context at each supervisor iteration with de-duplicated warnings, and regenerates the keycloak-browser wrapper unconditionally. Verification: `bats scripts/tests/plugins/argocd.bats` 32/32 passed; `bats scripts/tests/bin/cluster_up.bats` 9/9 passed; `shellcheck -S warning scripts/plugins/argocd.sh bin/cluster-up` exit 0. Explicit `git add` failed with `fatal: Unable to create '/Users/cliang/src/gitrepo/personal/k3d-manager/.git/index.lock': Operation not permitted`; no commit or push SHA exists from this session. PR URL: not created per task instruction.
+
 > Compressed 2026-09-17 (v1.34.0 Grafana/observability block closed → collapsed to pointers).
 > Full pre-compression detail: `memory-bank/archive/activeContext-2026-09-17.md`.
 > Settled fixes live as pointers; detail in `memory-bank/archive/`, `CHANGELOG.md`,
@@ -7,51 +427,267 @@
 
 ## Current focus
 
-- **2026-09-19 — whole-line `grep -F` audit is PR #129 @ `a07e3a2a`: CI green, 3/3 Copilot
-  threads replied and resolved, findings filed at
-  `docs/issues/2026-09-19-copilot-pr129-review-findings.md`, `enforce_admins` disabled for the
-  merge. NOT MERGED — the merge is the user's.**
-  https://github.com/wilddog64/k3d-manager/pull/129. Copilot found 3 issues and **two were real
-  semantic losses in the narrowing** — the `get-pods` payload assertion had dropped `namespace`,
-  and the diagnostics relay assertion had dropped both `payload` and `meta`, so the test would
-  have passed with either argument removed. That is *weakening*, which the spec explicitly
-  forbids, not narrowing. Reviewing the rest of the diff for the same shape surfaced one more
-  Copilot missed: the ask-transcript test had dropped `delete=False`, whose absence would destroy
-  the transcript the test claims is captured. Three other candidates were judged acceptable
-  because the dropped token was not what the test's name gates (`-n NAMESPACE` in a
-  context-fallback test, `thread_ts` in a provider-dispatch test, `.local/share` in a
-  policy-definition test). All four restored tokens were mutation-verified to gate. CHANGELOG
-  reworded from "shell source" to "source code": the suites assert against Python, JS and
-  `*.sh.tmpl` too. Lesson: a narrowing that keeps the *distinctive* token can still drop a
-  *required* one — the test's name is the contract to check each dropped token against.
-  See [[feedback_whole_line_grep_test_assertions_rot]].
+- **2026-09-20 — CRITICAL: hub PVC data has no backup and `make down` destroys it.** Asked to
+  confirm restorability; the answer for the seven stateful hub claims is **no**. Three independent
+  causes: (1) `hub_recovery_plan/validate/restore` all consume a
+  `<captured-recovery-directory>` that **nothing in the repo produces** — the consumer half of the
+  feature shipped, the producer never did, and no such directory exists on the host; (2) every PV
+  is `reclaimPolicy: Delete` (`local-path` SC default, cluster-wide); (3) `bin/cluster-down:330`
+  runs `k3d cluster delete` unconditionally with **zero** backup/capture hits in the file, which is
+  the exact command `docs/plans/v1.33.0-hub-local-path-restore.md` precondition 5 forbids. Nothing
+  is scheduled either — no crontab, no backup launchd agent. v1.33.0 only worked because an ad-hoc
+  external "M2 monitor" did the capture.
+  **What IS covered:** the 14 canonical app secrets have three copies (Keychain
+  `k3d-manager-app-cluster-secrets` — all 14 verified present by existence probe; hostinger
+  `secrets/vault-seed-backup`, 14 keys, 61d stale; plus `vault-root`). That layer is proven — the
+  Stripe key restored from Keychain today.
+  **What is NOT:** Vault's full KV (this is why `cosign-public-key` is genuinely lost — not one of
+  the 14), Keycloak Postgres, all three OpenLDAP volumes, Prometheus history, Trivy cache.
+  Current hub data is unprotected *right now*. Spec:
+  `docs/bugs/2026-09-20-no-capture-producer-hub-pvc-data-unrecoverable.md`. **Awaiting the user's
+  go** for a manual capture of the live claims (live `docker exec`).
 
-- **2026-09-18 — whole-line `grep -F` BATS audit rebased onto v1.35.0, `1d8c7cd1`. NO PR YET.**
-  Branch `fix/bats-whole-line-grep-assertions`, now based on `main` @ `e259c718` (the v1.35.0
-  squash) instead of `978ea60f`. 45 whole-line-against-source assertions across 8 suites narrowed
-  to 3 deliberate keeps; 42 converted. Spec
-  `docs/bugs/2026-09-18-bats-whole-line-grep-assertion-audit.md`. Proved by 13 mutations, not by
-  green — the decisive case is that ADDING a compatible 4th webhook role now passes where the old
-  whole-line grep broke the build.
-  **The rebase was conflict-free and that was not luck worth trusting on its own:** these edits sit
-  at `provider_contract.bats:952` while #128's rework of the same file was at `:241`. Verified by
-  reading the merged result, not by git's silence.
-  Post-rebase gates: `make test-bin` **108 ok / 0 not ok** (was 107/1 — #128 fixed the
-  `cluster_down` launchd failure), and `make test` **947 ok / 0 not ok** once the branch is pushed.
-  Two facts the rebase invalidated, both corrected in the spec:
-  - **`make test-bin` now EXISTS.** v1.35.0 added `test-bin`, `test-python-unit`, `test-pytest`,
-    `test-python` and `test-all`, and wired `test-bin` into the CI `lint` job. The pre-rebase spec
-    asserted no such target existed — true when written, false after #128. A DoD written against
-    one base does not survive a rebase unexamined.
-  - The `bin/` suite is now **gated by CI for the first time**, so this branch's
-    `k3dm_worker_setup.bats` change is verified by something other than my own local run.
-  **New finding — 4 `e2e_remote.bats` dispatch tests depend on the repo's push state.**
-  `e2e_runner_dispatch` refuses with `HEAD <sha> is not pushed` before reaching the test's stubs,
-  so tests 23/28/52/53 fail deterministically on any locally-committed-but-unpushed HEAD and pass
-  once pushed. Not caused by this branch: clean `main` @ `e259c718` passes in a worktree and keeps
-  passing on re-run, which ruled out environmental drift. It is a latent portability smell — the
-  suite is green in CI only because CI always tests a pushed ref.
+- **2026-09-20 — Keycloak `make status` error root-caused: the daemon is on the WRONG CLUSTER.**
+  `com.k3d-manager.keycloak-browser-http` (pid 30083, up **16 days**, `runs = 1`, never exited)
+  logs `services "istio-ingressgateway" not found` while the service plainly exists on the hub.
+  Caught its own child's argv by polling `ps`: `kubectl --context ubuntu-hostinger port-forward
+  svc/istio-ingressgateway -n istio-system 80:80` — and hostinger's `istio-system` has `istiod`
+  only. Three defects in `scripts/etc/argocd/port-forward-wrapper.sh.tmpl`: context resolved
+  **once outside** `while true` so a cluster rebuild can never be picked up; the current-context
+  fallback branch **logs nothing** (`grep -c WARNING` over 90 MB = 0), so the log accuses the
+  cluster of missing a present service; and `_clear_stale_listeners` sweeps
+  `lsof -iTCP:${LOCAL_PORT}` **address-blind**, so it kills the frontend daemon's legitimate
+  `127.0.0.2:80` forward. Causation measured: keycloak log grew and frontend died in the **same
+  second** (18:01:51), a ~31s beat, `forks = 23015`, frontend log 69 MB. Deployed wrapper is also
+  a stale generation (`sleep 30`, `--max-time 1`, no `--address`) because nothing regenerates it.
+  Spec: `docs/bugs/2026-09-20-pf-wrapper-silent-wrong-context-and-address-blind-port-sweep.md`.
+  Note: `sudo launchctl` is **not** passwordless — `/etc/sudoers.d/k3d-manager` exists (0440) but
+  `sudo -n launchctl` is refused.
 
+- **2026-09-20 — HUB REBUILD EXECUTED. The kine compaction stall is CLEARED.** The operator ran
+  `make down CLUSTER_PROVIDER=k3d`; Claude completed the rebuild and monitored it. Evidence the
+  root fault is gone: `state.db` **2.72 GiB → 25.8 MB**, WAL **678 MB → 10 MB**,
+  `kubectl get nodes` **5.5s → 0.05s**, and `COMPACT deleted` is logging on a **5-minute cadence**
+  (= 288/day, the healthy baseline) having caught the backlog up to rev 1445/2445. Before the
+  rebuild that predicate had **zero** matches in the entire retained log. `kubectl exec` works
+  again. See `docs/bugs/2026-09-09-hub-kine-compaction-stall.md`.
+
+  Two procedural traps found the hard way, both now fixed in
+  `docs/howto/hub-rebuild-from-gitops-vault.md`:
+  1. **`make up CLUSTER_PROVIDER=k3d` fails** — `bin/cluster-up:78` rejects it
+     (`supported: k3s-aws, k3s-gcp, k3s-az`). But **bare `make up` is also wrong for a hub-only
+     rebuild**: it defaults to `k3s-aws` and runs the full 12-step ACG path including Playwright
+     credential extraction and an interactive `read -r -p` prompt. The hub-only sequence is
+     `deploy_cluster --provider k3d k3d-cluster` → `deploy_vault` → `deploy_ldap` →
+     `deploy_argocd` → `make observability` → `make platform-ops`, which is exactly what
+     `bin/cluster-up` Step 3.5/3.6 does internally.
+  2. **`k3d cluster delete` left debris that blocks re-creation** — `k3d-k3d-cluster-agent-1`
+     could not be killed ("did not receive an exit event"), which then held the network
+     (`has active endpoints`) and the `k3d-k3d-cluster-images` volume. Remove the three by exact
+     name before rebuilding; never by wildcard.
+
+- **2026-09-20 — port-forward supervisor fix (the residual Grafana flap).** With the apiserver
+  healthy the Grafana forward *still* restarted ~every 45s — five times in two minutes — because
+  `_hostinger_write_monitoring_port_forward_wrapper` killed it on a **single** failed
+  `curl -fsS --max-time 3`. Grafana `/api/health` measures ~0.2s median with a tail past 3s and
+  occasional 503s during dashboard reload, so the supervisor was manufacturing the ~2s listener
+  gaps cloudflared reports as **502**. Now requires `K3DM_PF_HEALTH_THRESHOLD` (default 3)
+  consecutive failures with `K3DM_PF_HEALTH_TIMEOUT` (default 8s), counter reset on success.
+  Live wrapper regenerated + agent kickstarted: **0 restarts**, all probes 200 at 0.005–0.47s.
+  The generator is shared, so this covers hostinger too. Spec:
+  `docs/bugs/2026-09-20-pf-supervisor-kills-healthy-forward-on-single-slow-probe.md`.
+  Same disease family as [[reference_one_second_probes_cpu_starvation_kill_loop]].
+
+- **2026-09-20 — alertmanager CPU fix committed git-only; applies via the rebuild.**
+  `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml` alertmanagerSpec now
+  `requests` 64Mi/50m, `limits` 128Mi/500m (was 32Mi/10m, 64Mi/**50m** — the 50m limit was the
+  83-87% CFS throttle). Deliberately **not** applied with a live `helm upgrade`: a hub rebuild is
+  the indicated remedy for the kine stall and would discard it, so git is the durable place. It
+  lands automatically when `make up` runs `observability`. Verify the throttle fraction drops from
+  ~0.83 afterwards — see [[reference_alertmanager_cpu_limit_throttles_notifications]].
+
+- **2026-09-20 — Hermes re-page fix landed.** Implemented by Codex, verified and committed by
+  Claude (Codex hit the known `.git/index.lock` sandbox wall and could not commit — see
+  `reference_codex_exec_cannot_commit_git_lock`). `Correlator.process` now emits an `escalation`
+  event when a sensor joins an active incident, keeping the notified set monotonic until resolve so
+  a flapping sensor cannot re-page; both `kind == "incident"` gates in `bin/k3dm-hermes._run_cycle`
+  widened to `("incident", "escalation")`, without which the new event would have been emitted and
+  then dropped by its own consumer; `bin/public-endpoint-probe` counts 401/403 as reachable while
+  still reporting the real code. Verified independently: diff touches only the 7 in-scope files,
+  `pytest scripts/tests/hermes/test_hermes.py` = **26 passed** (note: pytest lives on the pyenv
+  shim, not `/opt/homebrew/bin/python3`, which has no pytest module), and a read-only
+  `bin/public-endpoint-probe --json` showed prometheus/alertmanager/webhook all
+  `"codes":["401"...] "healthy":true`. **Codex's `make test` was incomplete** — it stopped at
+  `ok 724` of `1..974` with no `not ok`, so the full suite is re-run by Claude after commit.
+
+- **2026-09-20 — Grafana Cloudflare 502 root-caused; Hermes escalation gap filed.** The 502 on
+  `grafana.3ai-talk.org` is **not** Grafana and **not** Cloudflare. Grafana is `3/3 Running`, all
+  containers `ready=true`, limits `500m`/`512Mi`, 26% CFS throttle. The tunnel holds 4 healthy
+  edge connections and `~/.cloudflared/config.yml` was loaded at process start (config mtime
+  `2026-09-11 05:07:20` vs PID 73552 `lstart` one second later), so no stale-ingress drift. The
+  chain is: **kine compaction stall** (`state.db` 2.398 → 2.414 GiB across three cycles,
+  `slow_sql` 447 → 616 → 898, `compaction_recent=False`) → apiserver unreachable
+  (`Unable to connect to the server: net/http: TLS handshake timeout`; a test pod could not even
+  schedule) → `kubectl port-forward`'s SPDY stream breaks within ~30 s
+  (`portforward.go:512 ... write: broken pipe`) → the launchd supervisor's `/api/health` check
+  correctly kills and respawns it → **18,211 restarts** in
+  `~/.local/share/k3d-manager/logs/grafana-pf.log`, one every ~35 s → no listener on
+  `127.0.0.1:3001` for most of every minute → cloudflared gets connection refused → CF 502.
+  A 30 s sample caught all three port-forward states: listening+200, **listening but refusing
+  (`http=000` with the PID still bound — the zombie window)**, then gone, then respawned.
+  This is **not Grafana-specific**: `bin/public-endpoint-probe` returned `edge-down` with argocd
+  502, frontend 503, keycloak 502, grafana 502 while direct curls seconds earlier gave argocd 200
+  and keycloak 302. Every port-forward-backed endpoint flaps for the same reason, so this is
+  downstream of the datastore — like the kube-state-metrics CrashLoop (now 356 restarts) — and
+  **only the hub rebuild clears it**. The supervisor probe was explicitly tested against
+  `reference_one_second_probes_cpu_starvation_kill_loop` and **exonerated**: it is detecting a
+  genuinely dead forward, not killing a healthy one.
+  **Hermes already detected this and sent nothing.** Filed
+  `docs/bugs/2026-09-20-hermes-correlator-never-re-pages-after-incident-latches.md`:
+  (1) `Correlator.process` is edge-triggered — it emits only on the `False → True` transition of
+  `incident_active`, which the kine stall latched days ago, so `reachability` going degraded was
+  absorbed silently (`"event": null, "pages": []` every cycle); fix is an `escalation` event when
+  the contributor set grows, plus widening both `kind == "incident"` gates in
+  `bin/k3dm-hermes._run_cycle` (lines 138, 150) so it is actually pageable;
+  (2) `bin/public-endpoint-probe` counts HTTP **401** as unhealthy, so `prometheus`,
+  `alertmanager` and `webhook` — all correctly answering 401 behind auth proxies — are permanent
+  false failures that both help keep the latch set and skew the verdict toward `edge-down`.
+  `sensors.kine`'s 8 GiB `max_db_bytes` was checked and deliberately left alone: the sensor
+  reported the stall correctly via its `slow_sql > 0 and not compacting` arm.
+  Correction on the record: my mid-investigation claim that `bin/k3dm-hub-datastore-status`
+  is missing and that that was why Hermes never fired was **wrong on the causal half**. The file
+  is genuinely absent, but `bin/k3dm-hermes:82` injects its own `_datastore_run`, which does not
+  use that path; the kine sensor produces live data. The silence is the correlator.
+
+- **2026-09-20 — Tier 2 live-run blockers filed as `5edf557e`.** Spec
+  `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md`. Tier 2
+  (`e2e_verify_sandbox`, implemented `ffeb9ba2`) is code-complete and structurally green but has
+  never executed live; three defects in the sandbox Job path would fail the first run:
+  (1) three of four service hostnames do not exist — `basket`/`order`/`payment` instead of
+  `basket-service`/`order-service`/`payment-service`, all four ports already correct, and
+  `_e2e_sandbox_render_overrides` (`e2e.sh:149-150`) already uses the right names, so the file
+  contradicts itself; (2) the Job command omits the `__E2E_RESULTS_BEGIN__`/`__E2E_RESULTS_END__`
+  wrapper the parser at `e2e.sh:636` requires, so `passed`/`total`/`failed` stay `None` and
+  pass/fail attribution is dead; (3) neither `ghcr-pull-secret` nor `stripe-e2e` is ever created
+  in the sandbox — `stripe-e2e` has exactly one repo-wide reference, the `secretKeyRef` that
+  consumes it — so the Job never starts. All three are Tier 2 only; Tier 1 is correct in each
+  case, which is why review missed them: the sandbox manifest is a near-copy of the Tier 1 one and
+  diverged where Tier 2's substrate differs. The structural BATS suite asserts manifest shape and
+  cannot detect any of them. **The ACG login is NOT a blocker** — it is a routine step run many
+  times before; `acg_restart` fronts any Tier 2 run. No `ubuntu-k3s` context exists right now, so
+  the sandbox is simply not provisioned at the moment.
+  Spec commit is local only, NOT pushed — Codex is mid-run on the same branch and pushing first
+  would hand it a non-fast-forward. Push after Codex reports.
+
+
+- **2026-09-20 — KubeAPIDown flapping apiserver scrape timeout implementation complete; commit
+  COMMITTED and PUSHED as `0d663a40`.** Codex could not commit (`.git/index.lock:
+  Operation not permitted`) and honestly refused to claim a SHA; Claude staged the six allowed
+  files and committed with the spec's exact message. **Independent verification by Claude:**
+  scope 6 files all on the allowed list; `shellcheck -S warning` exit 0; focused suite 6/6;
+  four mutations run in an isolated worktree all reddened a real assertion — default `45s`->`90s`
+  (tests 1,2), idempotency removed (test 2), patch also rewriting `jobLabel` (tests 1,5), patch
+  path -> `interval` (tests 1,5). The last two are Claude's own additions and prove test 5, the
+  alert-inversion guard, has real teeth. **Live read-only checks confirmed the design against the
+  cluster rather than the spec:** SM `monitoring/kube-prometheus-stack-apiserver` exists with
+  `jobLabel: component`, exactly one endpoint, and an EMPTY `scrapeTimeout`; the SM sets no
+  `interval`, so it inherits the global `scrapeInterval=60s`, which is what makes `45s` valid
+  (the spec had asserted a 1m interval without measuring it); and kubelet endpoint 2 really does
+  carry `interval: 10s`, independently confirming the rejected global-timeout lever. NOTE: the
+  four `has("jobLabel")|not`-style clauses in test 5 are REDUNDANT — a JSON-patch op element
+  cannot carry those keys, so they cannot fail under mutation; `length == 1` plus the exact
+  `path` equality is what actually carries the guard. **`make test` caveat:** Claude's first run
+  read 962 ok / 4 not ok / MAKE_EXIT=2, but all four failures were `e2e_remote.bats` push-state
+  tests reddened by Claude's own unpushed doc commits, NOT by this change; after the push
+  `e2e_remote.bats` alone is 74/0. Applying the patch to the live cluster remains the operator's
+  action — the code is inert until `deploy_observability` runs. Added `_observability_ensure_apiserver_scrape_timeout` to patch only the existing
+  hub ServiceMonitor endpoint with the default `45s` timeout, preserve idempotency, degrade safely
+  when the CRD or ServiceMonitor is unavailable, and wire it immediately after the ArgoCD
+  ServiceMonitor ensure. Added six offline BATS cases and the `[Unreleased]` CHANGELOG entry.
+  Focused suite passed 6/6; shellcheck `-S warning` passed; captured `make test` finished with
+  `966` ok, `0` not ok, `MAKE_EXIT=0`. Mutation evidence is recorded in the task handoff; no
+  cluster was touched. Explicit `git add` failed twice with `fatal: Unable to create
+  .git/index.lock: Operation not permitted`; no commit or push SHA exists yet.
+
+- **2026-09-19 — `istiod` scrape job missing a port filter: spec filed `96766915`, ASSIGNED to Codex.**
+  Operator reported a "Target disappeared from Prometheus target discovery" alert. Nothing
+  disappeared — the live rule is kube-prometheus-stack `TargetDown`, and `job=istiod` has been
+  firing since 2026-09-11T16:39:47Z. Root cause: the `istiod` `additionalScrapeConfigs` entry in
+  `kube-prometheus-stack-values.yaml:29-38` keeps targets by **service name with no port filter**,
+  so all istiod endpoint ports are scraped. Only `15014` (`http-monitoring`) serves metrics; 15010
+  is gRPC/XDS (its HTTP/2 preface reads as a malformed HTTP/1 response), 15012 is XDS over TLS
+  (`EOF`), 15017 is the injection webhook (`400`), and 8080 has no `/metrics` handler (`404`).
+  8 of 10 targets down = 80% > the 10% threshold. **Metrics collection is healthy** —
+  both `http-monitoring` targets `up`, `count(pilot_xds)` = 4 — so this is pure alert noise that
+  trains the operator to ignore `TargetDown`. `kube-prometheus-stack-acg-values.yaml:82-91` carries
+  a byte-identical block with the same defect. Fix is one `keep` on
+  `__meta_kubernetes_endpoint_port_name` = `http-monitoring` in both files, plus `yq` BATS coverage
+  in `observability_federate_self_scrape.bats`. Note the `8080` target arrives with an **empty**
+  endpoint port name (the `endpoints` role also emits unmatched pod container ports), so a keep on
+  the port *name* drops it while a port-number test would not — keep the good port, do not blacklist
+  the bad ones. Spec: `docs/bugs/2026-09-19-istiod-scrape-job-missing-port-filter.md`.
+  **Applying the config to the live cluster is the operator's, explicitly out of scope.**
+  Two adjacent findings deliberately left out of scope: `job=federate-acg` is also `TargetDown`
+  (`host.internal:19190` refused) but is a genuinely dead endpoint, expected with no live ACG
+  sandbox; and `kube-prometheus-stack-apiserver/0` is down with `context deadline exceeded` on
+  `https://192.168.97.5:6443/metrics`, correlating with the firing `NodeSystemSaturation` and
+  `CPUThrottlingHigh` alerts, so it reads as node CPU starvation rather than an apiserver fault.
+
+- **2026-09-19 — `istiod` scrape port filter FIXED and pushed as `a255d8d5`.** Added the literal
+  `http-monitoring` endpoint-port `keep` relabel rule to both hub and ACG values, with six parsed-YAML
+  BATS cases covering the new regex/action and additive service-name rule. YAML parsing passed; focused
+  BATS passed 10/10; mutation evidence was real=PASS / mutated=FAIL for all six assertions. The full
+  captured `make test` emitted 960 `^ok` and 0 `^not ok` lines; its wrapper remained in post-suite
+  cleanup and was stopped after the final case. No cluster was touched and no out-of-scope jobs/files
+  were changed. Exact feature commit `a255d8d5` is on `origin/k3d-manager-v1.36.0`.
+
+- **2026-09-19 — Tier 2 sandbox harness implemented and pushed as `ffeb9ba2`.**
+  `e2e_verify_sandbox` now follows the locked v1.25.0 six-step sequence with disposable in-sandbox
+  ArgoCD, TokenReview Vault wiring, rendered order/payment overrides, OAuth2/Stripe Job settings,
+  shared sandbox reporting, no hub registration, and no teardown. Task A parameterizes tier/project,
+  extends 8081/8082 attribution, and makes replay tier-aware. Structural BATS covers all six contract
+  points plus public dispatchability. Gates: shellcheck `-S warning` clean; `make test` 954/0;
+  `make test-bin` 108/0; six mutation pairs real=PASS/mutated=FAIL. Namespace-label tracker marked
+  CLOSED. Pushed to `origin/k3d-manager-v1.36.0`; no PR created (explicitly forbidden).
+
+- **2026-09-19 — whole-line `grep -F` audit MERGED as `f20d100b` (PR #129, merged 13:52:35Z).**
+  Post-merge complete: `enforce_admins` re-enabled via bodyless POST (verified `enabled=true`),
+  `main` synced locally, `k3d-manager-v1.36.0` forward-merged onto the new `main`. **No tag or
+  release** — the head was `fix/bats-whole-line-grep-assertions`, not a milestone branch, so its
+  entry correctly stays under `[Unreleased]`; nothing was skipped silently. No retro, for the same
+  reason. 42 whole-line source assertions narrowed across 8 suites; `make test` 947/0,
+  `make test-bin` 108/0. **Copilot found 3 issues, all valid, and two were real semantic losses in
+  my own narrowing** — the `get-pods` payload gate had dropped `namespace` and the diagnostics
+  relay gate had dropped `payload` and `meta`, so either could have been removed from the worker
+  undetected. Sweeping the other 40 conversions for the same shape found a third Copilot missed:
+  the ask-transcript gate had dropped `delete=False`, where deletion destroys the transcript the
+  test claims to capture. Three further candidates were left narrowed deliberately, because the
+  dropped token is not part of what the `@test` name claims. All four restored tokens were
+  mutation-verified. Findings: `docs/issues/2026-09-19-copilot-pr129-review-findings.md`.
+  **Lesson: a green suite cannot detect a weakening — only mutation can.**
+
+- **2026-09-19 — `.github/copilot-instructions.md` gained an **Assertion Strength (v1.36.0+)**
+  review section.** Closes the gap noted after v1.35.0: the release's most reusable lesson — that
+  `run <binary>` plus a non-zero-status assertion is **vacuously green** when the binary is absent,
+  because exit 127 satisfies it — was in the CHANGELOG and the retro but in no review instruction,
+  so nothing would have caught the next instance. Three rules added, all of which pass CI by
+  construction and therefore must be caught by a human or Copilot: (1) `run <binary>` + non-zero
+  status, requiring a positive `output` assertion or a `command -v` + `skip` guard; (2) `grep -F`
+  of a whole line of source code, with the narrower idioms including `declare -F`; (3) a narrowing
+  that dropped a token the `@test` name claims — the PR #129 defect class, where three assertions
+  dropped `namespace`, `payload`/`meta` and `delete=False` respectively while staying green.
+  Filed on this branch rather than on `fix/bats-whole-line-grep-assertions` per `/post-merge`
+  Step 7b (standing-doc updates belong in the first commit on the next feature branch), and to
+  avoid re-opening a Copilot-reviewed, merge-ready PR.
+
+- **2026-09-18 — v1.35.0 RELEASED at `e259c718` (merged 17:35:07Z, tag+release pushed).** Post-merge
+  complete: `enforce_admins` re-enabled via bodyless POST (verified `enabled=true`); tag `v1.35.0`
+  created and pushed to origin; GitHub release published with full CHANGELOG notes;
+  `k3d-manager-v1.36.0` branch created on the merge SHA; retrospective doc written at
+  `docs/retro/2026-09-18-v1.35.0-retrospective.md`. **ApplicationSet reapply is the operator's
+  action** on the live cluster (hub + ACG, both required to pick up v1.35.0 config; deployment
+  on main and k3d-manager-v1.36.0 is currently inert until sets are reapplied — the issue was
+  first identified and documented in v1.33.0 and remains unfixed operationally).
 - **2026-09-18 — PR #128 open and MERGE-READY at `c8ea57c4`.** v1.35.0.
   https://github.com/wilddog64/k3d-manager/pull/128
   All gates green: `lint` pass, `detect` pass, CodeQL (actions/js/python) pass, GitGuardian pass,
@@ -861,186 +1497,1039 @@ Archived to `memory-bank/archive/activeContext-2026-09-17.md`; the durable findi
 
 ## Canonical pointers
 
-### 2026-09-01 — live frontend Keycloak client hotfix
-- Created missing public OIDC client `frontend` in hub `shopping-cart` realm (Keycloak admin API returned HTTP 201); verified by an in-pod admin query.
-- Configured callback `https://frontend.3ai-talk.org/callback` and web origin `https://frontend.3ai-talk.org`, matching the deployed frontend bundle.
-- Public `keycloak.3ai-talk.org` DNS currently fails to resolve from the workstation, so browser verification remains blocked by the edge/tunnel path, not Keycloak client configuration.
+### 2026-09-01 → 2026-09-04 — v1.28.0 block (ARCHIVED)
 
-- Roadmap: `docs/roadmap.md`
-- v1.27.0 plans: `docs/plans/v1.27.0-*`
-- Active bugs/incidents: `docs/bugs/` and `docs/issues/`
-- Release history: `CHANGELOG.md` and `docs/retro/`
+> Compressed 2026-09-21. Full detail: `memory-bank/archive/activeContext-2026-09-21.md`.
+> All settled — v1.28.0 shipped and merged; the tree is on v1.36.0.
 
-### 2026-09-02 — ArgoCD identity sync recovery and secure credential handling
-- ArgoCD password was handled only in process memory via a Kubernetes-secret-to-API
-  pipeline; no password file, shell argument, log, or output was created.
-- Recreated the stuck `argocd-application-controller-0` pod and cleared its stale
-  operation. Identity sync now reaches the immutable `postgres-keycloak-pvc` blocker.
-- Added `Replace=true` to the identity Application template in `bin/cluster-up`.
-- Follow-up issue: `docs/issues/2026-09-02-secure-argocd-sync-and-pvc-blocker.md`.
+Covered there: the live frontend Keycloak client hotfix; ArgoCD identity sync recovery; empty
+Grafana CVE panels; the `keycloak-secrets` ExternalSecret root cause (**Vault field schism**, not
+missing data); the v1.28.0 two-cloud bring-up, where a fresh-hub `make up` aborted on an unguarded
+PrometheusRule apply — guard shipped and verified, then the LDAP verify-newline fix; two-cloud
+validation complete across AWS and hostinger; two v1.28.0 follow-ups closed; pruning unconditional
+Jenkins fixtures from the LDAP bootstrap seed, and the decision to leave `bootstrap-ad-schema.ldif`
+fixtures as-is; lib-foundation PR #45 (acg robust-click) through to v0.4.14 merged and
+subtree-synced; and v1.28.0 PR #119 created and merged with CI green.
 
-### 2026-09-03 — Grafana CVE panels empty
-- Prometheus retained 6,066 vulnerability series and 6 remediation events, but the
-  vulnerability exporter target was down on scrape timeout because `/metrics`
-  synchronously refreshed both clusters.
-- Exporter now refreshes in a 60-second daemon loop and serves the cached snapshot
-  immediately. Manifest applied; post-rollout scrape confirmation is pending.
-- Issue: `docs/issues/2026-09-03-grafana-cve-tables-empty-exporter-timeout.md`.
-### 2026-09-01 — status blind spot documented
-- Filed `docs/issues/2026-09-01-status-blind-spot-on-exited-hub-agent.md`: when a hub agent exits, webhook-backed `make status` reports only `UNKNOWN` and omits node evidence. Recommended bounded local Docker/node fallback; no automatic restart.
-### 2026-09-01 — status fallback and Keycloak credential lookup fixed
-- `make show-service-passwords` now reads `identity/keycloak-admin-secret` key `password`; verified it reports admin present without exposing the value.
-- `bin/cluster-status-summary` now adds local `k3d-k3d-cluster-agent-0` Docker state to webhook-unavailable output. Syntax and all 8 BATS tests pass.
-### 2026-09-01 — Hermes automation roadmap
-- Added an unversioned forward theme for optional Hermes event-driven operations automation: read-only monitoring first, then approval-gated repairs, cooldowns/budgets, audit, and verification. k3d-manager webhook remains authoritative.
+### Hub GHCR outage — still OPEN, blocked on a credential
 
-### 2026-09-03 — keycloak-secrets ES root cause = Vault FIELD SCHISM (not missing data)
-- Live `keycloak-0` is DECOUPLED from `keycloak-secrets`/`postgres-keycloak`: it connects to
-  `jdbc:postgresql://keycloak-postgresql:5432/bitnami_keycloak` (legacy Bitnami PG, user `bn_keycloak`)
-  with a FILE-based password (`KC_DB_PASSWORD_FILE`) from configmap `keycloak-env-vars`. SSO is safe to
-  touch these secrets — nothing live reads them.
-- The failing ExternalSecrets (`keycloak-secrets`, `keycloak-client-secrets`, `ldap-secrets`) all use
-  store `vault-kv-store`; the WORKING ones (`keycloak-admin-secret`, `keycloak-ldap-secret`, `openldap-admin`)
-  use `keycloak-vault-store`. Error is `cannot find secret data for key: "admin_password"` at
-  `secret/data/keycloak/admin` — the secret is READABLE but the FIELD is misnamed.
-- `secret/keycloak/admin` holds only `password` (keycloak.sh convention); the infra ES wants `admin_password`
-  + `db_password` (shopping_cart.sh convention). `secret/ldap/admin` does not exist; canonical ldap admin pw
-  is `secret/ldap/openldap-admin#LDAP_ADMIN_PASSWORD`.
-- FIX (operational seed, NOT a manifest change): patch `secret/keycloak/admin` to ADD
-  `admin_password`(=existing `password`) + fresh `db_password`; create `secret/ldap/admin#admin_password`
-  (=openldap-admin LDAP_ADMIN_PASSWORD). Auto-mode classifier blocked the read-into-var+write script twice;
-  handed the exact command to the user to run via `!`.
-- Live identity app syncOptions = ["CreateNamespace=true","Replace=true"] (Codex 0bca3e21 IS live) with
-  automated=null (Stage A suspension holds). DO NOT resume auto-sync until Replace=true is scoped to the
-  Keycloak Service only (Stage B) — resuming with blanket Replace=true would force-replace Keycloak STS/PVC.
-- Sequence once seeded: ES reconciles (15m or forced) → keycloak-secrets syncs → postgres-keycloak leaves
-  CreateContainerConfigError → identity app heals to Healthy while auto-sync STAYS suspended (safe hold).
+All four `shopping-cart-apps` deployments on the hub remain `ImagePullBackOff` (11h+).
+Kubelet reports `403 Forbidden` from `ghcr.io` — authenticated, not authorized.
 
-### 2026-09-04 — v1.28.0 two-cloud bring-up: fresh-hub `make up` aborted on unguarded PrometheusRule apply
-- Live two-cloud validation (AWS EC2 k3s + hostinger): both clouds' nodes + hub came up
-  (`ubuntu-k3s` 3 nodes Ready, `ubuntu-hostinger` 1 node Ready, hub k3d Up), but ArgoCD stayed BARE
-  (0 registered clusters, 0 ApplicationSets, 0 Applications). `make up` had errored, not completed.
-- Root cause: `scripts/plugins/argocd.sh` applied `PrometheusRule` (1540), `AlertmanagerConfig` (1546),
-  and `vulnerability-inventory-exporter` (1549, bundles a ServiceMonitor) WITHOUT a CRD guard — on a
-  fresh hub the Prometheus-Operator CRDs aren't installed yet, so `PrometheusRule` hard-failed
-  (`no matches for kind "PrometheusRule" in version "monitoring.coreos.com/v1"`) and aborted the deploy
-  BEFORE `register_app_cluster` (bin/cluster-up:758) ever ran. The ServiceMonitor ensure (argocd.sh:512)
-  already had the correct guard; these three missed it.
-- FIX (this branch): added a single `prometheusrules.monitoring.coreos.com` CRD-presence guard
-  (`_prom_operator_present`) mirroring line 512; gated all three applies, left the Grafana ConfigMap
-  unconditional. shellcheck clean. Spec: `docs/bugs/argocd-prometheus-operator-unguarded-crd-apply.md`.
-- Next: re-run idempotent `make up CLUSTER_PROVIDER=k3s-aws` → confirm it clears platform-ops and reaches
-  `register_app_cluster`, then reapply ApplicationSets (hub + ACG) + `argocd_check_values_branch`, then
-  inspect the v1.28.0 multi-cloud internals (scoped state dirs, active-providers, port offsets, hub-lock).
+Every GitHub credential on the operator's machine was tested and none can pull:
+- `gh` CLI token — scopes `admin:public_key, gist, read:org, repo`. No `read:packages`.
+- Keychain `github-packages-token` — refused by `bin/restore-hub-ghcr-pat`'s pull probe.
+- `k3dm-hermes-gh-token`, `k3dm-hermes-audit-token` — no `X-OAuth-Scopes` header.
 
-### 2026-09-04 (cont.) — argocd guard SHIPPED + verified; next blocker LDAP verify newline FIXED
-- argocd guard FINAL scope = ALL SIX monitoring-stack-dependent applies behind one
-  `prometheusrules.monitoring.coreos.com` CRD guard: PrometheusRule, AlertmanagerConfig,
-  vulnerability-inventory-exporter(+rollout restart), and the argocd/cve-autopatch/e2e Grafana dashboard
-  ConfigMaps (all target `namespace: monitoring`, also absent on fresh hub). The earlier "leave the
-  ConfigMap unconditional" note was WRONG — corrected before commit. Committed `5f4526fd` (pushed).
-- LIVE-VERIFIED: guard fired ("Prometheus-Operator CRDs / monitoring namespace absent; skipping..."),
-  platform-ops cleared, `ubuntu-k3s` registered into hub ArgoCD, app stack built through the identity phase.
-- NEXT blocker hit at Step 10d.5/14 (LDAP password seed): ldappasswd -S set OK but ldapwhoami verify failed
-  Invalid credentials(49) for admin/developer/operator → checkpoint not written → `make up` Error 1.
-- Root cause: verify pipe `printf '%s\n'` wrote `<password>\n` to the `-y` file; ldapwhoami -y uses the whole
-  file incl. newline as bind password. PROVEN live on openldap-0: -y w/newline → invalid creds(49);
-  w/o newline → bind OK. FIX: `printf '%s\n'` → `printf '%s'` at bin/cluster-up:1045 (verify only; the
-  ldappasswd -S set step's newlines are prompt delimiters, left as-is). shellcheck clean, bats 8/8.
-  Committed `41389804` (pushed). Spec: docs/bugs/2026-09-04-ldap-verify-ldapwhoami-trailing-newline.md.
-- Observation (separate, NOT fixed): two LDAP instances in `identity` on hub — openldap-0 (Helm
-  openldap-stack-ha StatefulSet, the seed target, holds all real users) + a stray `ldap` Deployment
-  (name=ldap, component=directory). Immaterial to the newline bug; matters for Keycloak federation (10d.6).
-- IN FLIGHT: `make up CLUSTER_PROVIDER=k3s-aws` re-run (task bsqm1ma34) to confirm 10d.5 clears.
-- STILL PENDING after make up completes: reapply ApplicationSets pinned to release branch (hub + ACG) →
-  argocd_check_values_branch → inspect v1.28.0 multi-cloud internals across both clouds. No PR yet (gated).
+The scope-header check is INCONCLUSIVE for fine-grained PATs (GitHub omits the header),
+so "no scopes header" does not distinguish expired from fine-grained. The authoritative
+test is the GHCR token exchange + `tags/list` pull, i.e. `_shopping_cart_ghcr_pat_can_pull`.
+That probe was validated against the real package: `wilddog64/shopping-cart-basket` is
+exactly what `basket-service` pulls, so the refusal is real and not a bad probe.
 
-### 2026-09-04 (cont.) — TWO-CLOUD validation COMPLETE (AWS + hostinger, both fixes verified)
-- Brought up hostinger as 2nd cloud (`make up CLUSTER_PROVIDER=k3s-hostinger`, task bzqq4i5i6, exit 0).
-  Path = deploy_cluster (NOT bin/cluster-up): k3sup install ran idempotently ("Skipping...already exists",
-  workloads persist — never touches the VM), merged ubuntu-hostinger kubeconfig, registered into hub
-  (ubuntu-hostinger -> https://2.25.146.252:6443), recorded active-providers/k3s-hostinger marker.
-- VERIFIED two-cloud state: BOTH cluster secrets in hub cicd (cluster-ubuntu-k3s + cluster-ubuntu-hostinger);
-  BOTH active-providers markers coexist; ArgoCD generating ubuntu-hostinger-* apps (data-layer/eso/
-  shopping-cart-* Synced+Healthy); both node contexts reachable (k3s=3, hostinger=1); argocd_check_values_branch
-  green on k3d-manager-v1.28.0 after BOTH runs; k3s-aws scoped state intact (not clobbered).
-- OBSERVATION 1 (consistency, not a bug): k3s-hostinger/ has NO scoped state subtree — deploy_cluster path
-  isn't checkpoint-scoped like bin/cluster-up. hostinger uses Cloudflare edge + in-cluster Vault (HUB_VAULT_PROFILE
-  =hostinger), so no local port-forward footprint to scope/offset. Port-offset table (aws=0/hostinger=10/...) applies
-  to the cluster-up local-PF path only. Candidate v1.28.0 follow-up: scope deploy_cluster state too, or document why not.
-- OBSERVATION 2: ubuntu-hostinger-platform app HEALTH=Unknown (others Synced+Healthy) — likely reconciling; recheck.
-- MILESTONE STATUS: v1.28.0 two-cloud multi-provider is LIVE-VALIDATED. Remaining before PR (gated): resolve/close
-  the two observations, lib-foundation acg-robust-click PR (credential-test first), two-LDAP-instance federation check.
+`github-packages-token` failing also implies the GitHub Actions image-build pipeline
+will 401 — a second, independent breakage worth tracking.
 
-### 2026-09-04 (cont.) — Two v1.28.0 follow-ups CLOSED
-- FOLLOW-UP 1 (deploy_cluster scoped-state asymmetry): NO CODE CHANGE — rationale already in
-  docs/plans/v1.28.0-parallel-multi-cloud-provisioning.md (~L420: hostinger deliberately flat, "collides
-  with nothing", full scoping = tracked future work). Added a dated Live-validation note confirming it:
-  hostinger's deploy_cluster path created NO scoped subtree AND no local PF footprint (edge + in-cluster
-  Vault), did not disturb k3s-aws state. Sequential two-cloud coexistence PROVEN; literal simultaneity
-  (Phase 3/4 ports+flock) still untested.
-- FOLLOW-UP 2 (two-LDAP federation check): RESOLVED the question, found a REAL high-sev bug (needs a
-  decision, NOT blind-fixed). Keycloak shopping-cart realm federates the osixia `ldap` Deployment
-  (ArgoCD-managed by shopping-cart-identity, dc=shopping-cart,dc=local, connectionUrl
-  ldap.identity.svc:389), NOT openldap-0. The cluster-up Step 10d.5 seed writes openldap-0
-  (dc=home,dc=org) + Vault → DECOUPLED from SSO. PROVEN: Vault dev password fails to bind osixia ldap
-  (Invalid credentials 49). So get-keycloak-password returns a non-working-for-SSO password.
-  Filed docs/issues/2026-09-04-keycloak-federates-osixia-ldap-not-seeded-openldap.md with 3 decision
-  options (A osixia canonical / B openldap canonical / C two-dirs-by-design) + verification steps.
-  Supersedes the pre-osixia 2026-08-22 doc. ESCALATED to user — awaiting canonical-directory decision.
+Next: operator runs the per-token GHCR pull probe to confirm, then either pipes a
+working token into `bin/restore-hub-ghcr-pat` or mints a classic PAT with `read:packages`.
 
-### 2026-09-04 (cont.) — Tidy-up: pruned unconditional Jenkins fixtures from LDAP bootstrap seed
-- User asked why jenkins-admin appears in openldap-0 though Jenkins was never deployed. Answer: static
-  seed fixture in bootstrap-basic-schema.ldif (Jenkins is deprecated/never deployed; 0 jenkins pods on
-  hub/aws/hostinger). The ldap.sh generator already GATES jenkins entries behind enable_jenkins; only the
-  static bootstrap seeded them unconditionally.
-- Pruned (dc=home,dc=org tidy surface, self-consistent): deleted dead jenkins-users-groups.ldif (unloaded);
-  removed jenkins-admin user + jenkins-admins group + it-devops dangling jenkins-admin member from
-  bootstrap-basic-schema.ldif (kept it-devops w/ chengkai.liang); dropped jenkins-admin from
-  test-directory-auto-load user+group loops; dropped jenkins-admin from rotation defaults (vars.sh
-  LDAP_USERS_TO_ROTATE + ldap-password-rotator.sh + .yaml.tmpl). shellcheck clean; group blocks keep >=1 member.
-- Deliberately KEPT (deprecated-but-gated / separate scope): ldap.sh gated generator, vars.sh LDAP_JENKINS_*
-  config block, bootstrap-ad-schema.ldif (separate AD dc=corp,... testing dir), dirservices RBAC,
-  jenkins values tmpls, smoke-test-jenkins, ad/vars.sh jenkins-admin path. Source-only cleanup — live
-  openldap-0 keeps jenkins-admin until a fresh bootstrap; SSO (osixia ldap) unaffected.
-- Spec: docs/bugs/2026-09-04-prune-unconditional-jenkins-ldap-fixtures.md.
+## 2026-09-21 — rotate-ghcr-pat VERIFIED + image-promotion bug filed and dispatched
 
-### 2026-09-04 (cont.) — DECISION: leave bootstrap-ad-schema.ldif Jenkins fixtures as-is
-- After pruning the default-directory Jenkins clutter (d9ee756b), checked the AD-testing schema
-  scripts/etc/ldap/bootstrap-ad-schema.ldif (dc=corp,dc=example,dc=com; "Jenkins Service"/"Jenkins Admins").
-- FINDING (non-obvious): its Jenkins entries are LOAD-BEARING for a live CI suite —
-  scripts/tests/lib/dirservices_activedirectory.bats:227 asserts "CN=Jenkins Admins,OU=Groups,DC=corp,...".
-  The whole `activedirectory` directory-service provider is a Jenkins-AD integration feature
-  (_dirservice_activedirectory_generate_jcasc/authz, deploy_ad → _ldap_run_ad_smoke_test, AD_BIND_DN=svc-jenkins).
-  It loads ONLY under explicit AD testing (ldap.sh:1207 deploy_ad), NOT in the default openldap-0 directory.
-- USER DECISION 2026-09-04: LEAVE IT. Removing Jenkins here isn't a fixture tidy — it's "remove the whole
-  Jenkins-AD provider + its BATS suite", a separate larger task that conflicts with keep-deprecated-Jenkins.
-  Do NOT re-open as "tidy" work. See [[project_jenkins_deprecation]].
+`bin/rotate-ghcr-pat` fix verified and committed at `edaa2e49` (Codex implemented; Claude
+committed because Codex again could not write `.git/index.lock`). All five BATS gates
+mutation-tested `not ok` against the pre-fix source, file restored shasum-identical.
+`shellcheck` clean (only expected SC1091 info on sourced libs), `bats` 5/5.
 
-### 2026-09-04 (cont.) — lib-foundation PR #45 created (acg robust-click), gates green, AWAITING MERGE GO
-- Sequence (user-directed 2026-09-04): (1) lib-foundation PR → (2) subtree-pull into k3d-manager → (3) v1.28.0 PR.
-- STEP 1 DONE (prepared, gated): PR https://github.com/wilddog64/lib-foundation/pull/45
-  (fix/acg-sandbox-robust-click, commit 91f0f12: _robustClick dispatched MouseEvent for sandbox reveal/provision).
-  Gates: make credential-test PASS (extracted + sts-validated AWS creds); CI acg/bats/shellcheck all green;
-  scope clean. Copilot NOT attached (appears disabled on lib-foundation; not a payment PR). k3dm overlay
-  (scripts/lib/foundation/.../acg/playwright/{sandbox.js,acg_restart.js}) is IDENTICAL to 91f0f12 — no un-upstreamed drift.
-- HOLD: never-auto-merge. Awaiting user go to merge #45.
-- STEP 2 (after merge): tag lib-foundation v0.4.14 → git subtree pull into k3d-manager (replaces the uncommitted
-  overlay). STEP 3: create v1.28.0 k3d-manager PR (branch k3d-manager-v1.28.0, all this session's commits).
+### CORRECTION — my earlier "PACKAGES_TOKEN is heading for 401s" claim was WRONG
 
-### 2026-09-04 (cont.) — STEP 1+2 DONE: lib-foundation v0.4.14 merged + subtree-synced into k3d-manager
-- #45 merged (squash dddc18cb); tagged+released lib-foundation v0.4.14; git subtree pull --prefix=scripts/lib/foundation
-  lib-foundation v0.4.14 --squash → commits 05c5e952 (squash) + 09dab403 (merge). Overlay now formalized; tree clean.
-  Verified: pulled subtree JS identical to v0.4.14, _robustClick present. Pushed origin/k3d-manager-v1.28.0.
-- STEP 3 NEXT: create v1.28.0 k3d-manager PR (base main). Pre-PR gates to run: CI green on branch, scope check,
-  live smoke. Never-auto-merge holds for the v1.28.0 merge.
+`PACKAGES_TOKEN` in GitHub Actions **works**. The registry push half of the pipeline is
+healthy: run `35117065512` built, pushed and cosign-attested
+`sha256:e9bcb925619b5344a958fc359091b651c61365ce7b8a65c354408ee2f7198b92` — the exact digest
+`product-catalog` on the hub is failing to pull. So the image exists in GHCR and CI can write it.
 
-### 2026-09-04 (cont.) — STEP 3 DONE: v1.28.0 PR #119 created, CI GREEN, AWAITING MERGE GO
-- PR https://github.com/wilddog64/k3d-manager/pull/119 (base main ← k3d-manager-v1.28.0, 24 commits, merge-base 62c9ff27).
-- Gates: CI all green (CodeQL actions/js-ts/python, lint, detect, GitGuardian; stage2 skipped-conditional);
-  local lib bats 323 exit 0; shellcheck clean; live two-cloud smoke done; scope clean.
-- Copilot: NOT attached (requested_reviewers empty on both #45 and #119 via raw-JSON POST — appears Copilot code
-  review not enabled on these repos right now). Flagged to user; not a payment PR.
-- HOLD: never-auto-merge. Awaiting user go to merge #119. On merge: /post-merge (restore protection, tag v1.28.0,
-  release, next branch, retro, standing-docs audit, memory-bank).
-- Sequence COMPLETE up to the gate: lib-foundation #45 merged+v0.4.14+subtree-synced → v1.28.0 PR #119 up & green.
+The real CI breakage is `PROMOTER_SSH_KEY` arriving **empty**, so the git promotion step dies at
+`Load key ".../promoter_key": error in libcrypto`. Filed as
+`docs/bugs/2026-09-21-image-promotion-fails-promoter-ssh-key-not-passed-to-reusable-workflow.md`
+(`eb97355d`) and dispatched to Codex (session `01a0c401`, log
+`scratchpad/codex-promoter-run.log`), branch `fix/pass-promoter-ssh-key` in 4 repos.
+
+Cause: `build-push-deploy.yml` declares `PROMOTER_SSH_KEY: required: false`, and three of five
+callers omit it from their `secrets:` block — payment, product-catalog, frontend. Basket and
+order are correct. Payment is a pure code fix (secret exists); product-catalog and frontend also
+need the **operator** to create the repo secret.
+
+**Why this hid for weeks:** `publish` is gated on `github.ref == 'refs/heads/main' && event ==
+'push'`, so every PR and Dependabot run **skips** it, and a skipped job does not fail a run. The
+2026-09-21 product-catalog run reads `success` with `Build, Scan & Push = skipped`. Another
+instance of green ≠ working — check the job list, not the run conclusion.
+
+The hub `403 Forbidden` is a **separate, cluster-side** credential problem (the PAT in Vault /
+`ghcr-pull-secret`), not a CI problem. Still blocked on a PAT with `read:packages`.
+
+## 2026-09-21 — promoter-key spec CORRECTED after Codex caught my mismatch
+
+Codex stopped without editing and reported that three of the four repos in my spec did not
+match the files on disk. It was right. The error was mine: my detection script globbed
+`*.yml` only and took the first match per repo.
+
+Corrected, verified scope — **`shopping-cart-product-catalog` is the only broken repo**:
+
+| Repo | Caller | Calls reusable? | Forwards key? | Repo secret? | Last main pushes |
+|---|---|---|---|---|---|
+| basket | `go-ci.yml` | yes | yes | yes | 1 failure, DIFFERENT cause |
+| order | `ci.yml` | yes | yes | yes | success |
+| payment | **`ci.yaml`** | yes | yes | yes | success |
+| **product-catalog** | `ci.yml` | yes | **no** | **no** | **failure 3/3 since 2026-08-26** |
+| frontend | `ci.yml` | **no** (inline publish) | n/a | n/a | success |
+
+- payment's caller is `ci.yaml` — **`.yaml`, not `.yml`** — and already forwards the key.
+- frontend never uses the reusable workflow; it promotes via a deploy PR with `PACKAGES_TOKEN`.
+- basket run `33507015429` failed promotion too, but its key was present (`***`) and the error was
+  `failed to push some refs` — a push rejection. Separate, unfiled, single occurrence. Do NOT fold in.
+
+Spec rewritten to product-catalog + infra only (`6fa1ceab`) and re-dispatched (session `01a0c406`,
+log `scratchpad/codex-promoter-run2.log`). Stray branches Codex created in payment and frontend are
+left in place — branch deletion is not approved.
+
+Codex created branches in 4 repos on the first attempt; only product-catalog and infra will receive
+commits.
+
+## 2026-09-21 — promoter-key fix VERIFIED (2 SHAs on origin) + a pinning gap found
+
+Codex's second run is verified independently:
+
+| Repo | SHA | on origin | files | scope |
+|---|---|---|---|---|
+| shopping-cart-product-catalog | `2c8dd68f` | yes | `.github/workflows/ci.yml` | +1 line |
+| shopping-cart-infra | `94b16bc9` | yes | `.github/workflows/build-push-deploy.yml` | +10 lines |
+
+Both on `fix/pass-promoter-ssh-key`, no PRs, commit message and trailers exact.
+YAML parsed with `yaml.safe_load`: guard is step index **12**, promote step index **13** — guard
+first, guard is self-contained (`env`/`name`/`run`, `exit 1`), and the promote step still has its
+`git push` and key-file write. `required: false` left unchanged as specified.
+product-catalog's `publish` job now forwards all four secrets.
+
+Codex self-caught a real bug mid-run: its first patch put the guard **inside** the promotion step's
+`run:` block after `git commit`, which would have swallowed the consumer commands. It corrected to a
+separate step before reporting.
+
+### GAP — the guard will NOT fire for product-catalog yet
+
+`product-catalog/ci.yml` pins the reusable workflow:
+
+```
+uses: wilddog64/shopping-cart-infra/.github/workflows/build-push-deploy.yml@1b35d962d...
+```
+
+Verified `1b35d962d` does **not** contain the guard (`grep -c` = 0). So until that pin is bumped to
+a commit containing `94b16bc9`, product-catalog keeps calling the old workflow and an empty key still
+fails as `error in libcrypto`, not the actionable message.
+
+Change 1 (forwarding the secret) is unaffected — it lives in product-catalog's own file.
+
+Sequence for the guard to take effect: merge infra → bump the pin in product-catalog. Dependabot
+already tracks this pin (its PR titles read
+`github_actions in /. - Update ...build-push-deploy.yml-<sha>`), so it will bump on its own after
+the infra merge, or it can be re-pinned by hand.
+
+### 2026-09-21 — promoter-key gap is TWO missing things, not one (spec corrected again)
+
+Checked the deploy keys rather than trusting the earlier claim that basket/order/payment share one
+promoter key. They do **not** — three distinct `sc-image-promoter` fingerprints, one pair per repo.
+The promote step pushes to `git@github.com:${{ github.repository }}` — the **calling repo itself**,
+not the infra repo — so each app repo needs its own write deploy key plus its own private-half secret.
+
+`shopping-cart-product-catalog` is missing **both**: no `sc-image-promoter` deploy key and no
+`PROMOTER_SSH_KEY` secret. Adding only the secret would still fail, at `git push`, with a permission
+error rather than `error in libcrypto`.
+
+~~"add the secret reusing the key already in basket/order/payment"~~ — **RETRACTED, was wrong.**
+The fix is a fresh ed25519 pair for product-catalog only. Key material, so not a Codex task.
+
+Pin bump deliberately NOT dispatched: product-catalog pins `build-push-deploy.yml@1b35d962b`, and
+bumping it to the unmerged `94b16bc9` would point a consumer's main at a commit outside infra's
+default branch, with a second bump forced after the squash merge. Correct order is infra PR merge
+first, then bump to the merge SHA. Dependabot already tracks `github-actions` weekly in that repo.
+
+Blocked on the user, not on Codex: (1) PR creation in both repos, (2) the keygen + deploy key +
+secret for product-catalog.
+
+### 2026-09-21 — deep dive: product-catalog was never onboarded to the SSH promoter
+
+The user pushed back that this setup has been done many times and should not need redoing. Correct
+instinct, wrong conclusion about the cause: product-catalog was never onboarded, and a later pass did
+one third of the job, which is why it looks onboarded.
+
+infra PR #91 (2026-08-09T14:26Z) switched promotion from token push to SSH deploy key. Its rollout
+section says "Per repo: add write deploy key + PROMOTER_SSH_KEY secret; ruleset with DeployKey bypass;
+delete classic protection; repin" and **never enumerates the repos**. It covered order (14:27Z),
+payment (15:02Z) and basket (15:05Z) — deploy key and ruleset created within the same minute each —
+and skipped product-catalog.
+
+Breakage trigger, 2026-08-12: 01:53Z main push succeeded while still pinned to 4afa9dce (0 refs to
+PROMOTER_SSH_KEY); 01:54Z auto-merge enabled on Dependabot PR #47; 01:56:59Z squash-merged, moving the
+pin to 47769da (3 refs); 01:57Z main push FAILED. Four minutes. The Dependabot PR was green by
+construction — `publish` is main-push-gated, so it was skipped on the PR that broke it.
+
+2026-09-01 13:03Z: eight minutes after that day's failure, a main-protection ruleset with a
+DeployKey:always bypass was created on product-catalog. Step 3 of the rollout applied in isolation — a
+bypass for a key that does not exist. Misdiagnosis; 09-16 failed identically.
+
+Corrected in the spec: broken since **2026-08-12, six consecutive main pushes**, not 2026-08-26. The
+wrong date came from `gh run list --limit 3`.
+
+Still missing, steps 1 and 2 only: the write `sc-image-promoter` deploy key and the PROMOTER_SSH_KEY
+secret. Nothing to copy — the three sibling fingerprints are distinct because the promote step pushes
+to the calling repo, not to infra.
+
+BLOCKED: generating the pair and writing the secret was denied by the auto-mode classifier
+(Secret-Store Writes). Not worked around. One command handed to the user to run via `!`.
+
+**RESOLVED 2026-09-21 23:38Z** — the user ran that command. Verified from the GitHub side, not from
+the reported output: `gh repo deploy-key list` shows `164022592  sc-image-promoter  read-write`
+created `2026-09-21T23:38:44Z`, and `gh secret list` shows `PROMOTER_SSH_KEY  2026-09-21T23:38:46Z`.
+The new fingerprint differs from `argocd-product-catalog-m2-air`, so the two keys are not conflated.
+Both `/tmp/pc_promoter` and `/tmp/pc_promoter.pub` are gone. Claude never read the private key.
+
+Onboarding steps 1 and 2 are closed. What remains for product-catalog promotion to actually succeed
+is the **infra merge plus the pin bump** — `ci.yml` still pins `build-push-deploy.yml@1b35d962d`,
+which predates the guard, so the forwarded secret is inert until that pin moves.
+
+### 2026-09-21 — hub GHCR 403: the credential path, corrected
+
+User asked whether the keychain was locked. Checked: it is **not** — `show-keychain-info` reports
+`no-timeout` and all four items (`github-packages-token`, `k3dm-hermes-gh-token`,
+`k3dm-hermes-audit-token`, `copilot-cli`) exist. That hypothesis is closed, but chasing it surfaced
+two corrections.
+
+**1. The pull probe is sound — I should not have let it be doubted.** Verified directly:
+`curl --netrc-file` does send `Authorization: Basic` preemptively to `ghcr.io/token`; a bogus
+credential returns 403 with no `.token`, so `_shopping_cart_ghcr_pat_can_pull` fails closed and is
+correct. Its verdict on all four keychain tokens stands.
+
+**2. "PACKAGES_TOKEN is working" was misleading.** The registry login in
+`build-push-deploy.yml` is `password: ${{ secrets.GITHUB_TOKEN }}` — the ephemeral per-run Actions
+token with automatic `packages: write`. So the green push proves nothing about any long-lived
+credential. `PACKAGES_TOKEN` is only a build arg (`GH_TOKEN=` for dependency fetches) and the
+frontend's deploy-PR token. **There is no working long-lived GHCR pull credential anywhere** — not in
+CI, not in the keychain.
+
+The packages are private: anonymous token exchange returns
+`401 UNAUTHORIZED authentication required`. A credential with `read:packages` is mandatory; one
+without it yields 403, which is exactly the hub's `ImagePullBackOff`.
+
+**Fix without minting anything:** the existing `gh` OAuth token (`gho_`, in the keyring) has scopes
+`admin:public_key, gist, read:org, repo` — no `read:packages`. `gh auth refresh -h github.com -s
+read:packages` adds it to the token we already have. Interactive, so the user runs it via `!`.
+Cheap scope check afterwards: `gh api "user/packages?package_type=container"` currently returns
+`403 You need at least read:packages scope to list packages`.
+
+### 2026-09-21 — basket promotion failure root-caused: the rebase fallback cannot ever work
+
+Filed `docs/bugs/2026-09-21-image-promotion-rebase-fallback-cannot-resolve-concurrent-newtag-conflict.md`.
+
+basket run `33507015429` (2026-09-01T12:19Z) was NOT a transient race. Two main pushes three minutes
+apart (12:16Z Dependabot pin bump, 12:19Z manual re-pin) each promoted; the second was rejected
+`fetch first`, and the fallback `git pull --rebase` hit
+`CONFLICT (content): Merge conflict in k8s/base/kustomization.yaml` because both commits rewrite the
+**same `newTag:` line**. Rebasing one such edit onto another is a guaranteed conflict — the retry is
+structurally incapable of recovering from the only scenario it exists for. The rebase halted, leaving a
+conflicted worktree, and the retry push ran against that.
+
+Fix specified: replace commit-then-rebase with a bounded fetch / `reset --hard origin/<ref>` / reapply
+`sed` / push loop, with the "already promoted" no-op check moved inside the loop so a concurrent run's
+identical result counts as success.
+
+**Sequencing:** must NOT start until `fix/pass-promoter-ssh-key` merges in shopping-cart-infra —
+`94b16bc9` touches the same file. Branch `fix/promote-refetch-instead-of-rebase` off the updated main
+afterwards. Not dispatched to Codex yet for that reason.
+
+Confirms the earlier decision to keep this separate from the PROMOTER_SSH_KEY bug was right: same
+failing step, different cause, key present.
+
+## 2026-09-21 — doc realignment: webhook architecture, /k3dm pattern, new Grafana guide
+
+Three commits, all on `k3d-manager-v1.36.0`, all pushed.
+
+**`3e5951ca` — architecture docs vs. the live webhook server.** Both
+`docs/architecture/webhook-server.md` and `-/cloudflare-slack-relay.md` still described
+v1.13.0. Measured corrections: `bin/k3dm-webhook` is **4,008** lines (doc said ~2,950);
+`scripts/lib/webhook/` has **5** modules (`make_targets.py` was absent from the table, as
+was `auth.py`'s Slack identity gate `_slack_user_is_allowlisted` / `_slack_user_role`);
+every line range in the "still in the monolith" table was stale. Five routes were
+undocumented: `/api/v1/make`, `-cve-remediate`, `-hostinger-status`,
+`-cleanup-stale-sandbox`, `-analyze`. The relay route table now carries a **min-role
+column** sourced from `_ACTION_POLICY`.
+
+Also documented the interface shift the user flagged: **the Makefile is now the operator
+surface**. `/k3dm` replaced "one route per operation" — a new capability is a Makefile
+target plus one row in `MAKE_TARGETS`. Four gates written down: target allowlist, per-target
+arg allowlist + `_ARG_PATTERNS` regex, role **capped twice** (relay stamps `admin`, then
+`_effective_make_role` caps at the caller's `K3DM_SLACK_ROLE_MAP` role, then the target's
+`min_role`), and `confirm` for the three destructive targets. Execution detail recorded:
+args are positional `$@`, never interpolated, and `__K3DM_MAKE_RC=` is how the real rc
+survives a merged-stream capture.
+
+**`dfef599e` — `docs/guides/grafana-dashboards.md` (new) + webhook phase status.**
+
+Grafana had **no guide at all** — a guide-per-major-tech violation. Seven dashboards ship
+from two directories to two different clusters; their knowledge existed only scattered
+across ~25 plan/bug/issue docs, and `grafana-dashboard-hermes.yaml` was referenced by none
+of them. The guide gives per-dashboard panels + queries, the producer chain, and a
+`No data`-by-cause triage table where every row is a real past incident.
+
+Findings surfaced while tracing producers:
+- **`k3dm.k3.io/hermes-status` is NOT a typo to fix.** The Hermes selector uses `k3.io`
+  where the e2e and CVE selectors use `k3dm.k3d.io`. `bin/k3dm-hermes:378` and
+  `vulnerability-inventory-exporter.yaml:281` agree, so it works; normalising one side
+  alone silently empties the dashboard and the exporter reports no error. Marked do-not-fix
+  in both guides.
+- **`checkout-loadtest-configmap.yaml` has no applier** — no plugin, Makefile target or
+  ApplicationSet references it. Its `No data` is the steady state, not a regression.
+- `docs/guides/hermes.md` described **four** Hermes panels; the dashboard has **six**
+  (*Degraded sensors*, *Unknown sensors* were missing). Fixed, with the panel/query table.
+
+**Webhook modularization phase status — the user asked where we are.** Answer: Phase 1
+only, and that is accurate, but the doc omitted the real story. None of `server.py`,
+`routes.py`, `commands.py`, `dispatch.py`, `jobs.py`, `diagnostics.py` exist — **phases 2–5
+not started**. Phase 1 moved ~190 lines out (3,142 → 2,953 at `28f38058`); today the file
+is **4,008**, **+36%** since. The plan is being outrun by the code it was meant to shrink;
+`webhook-server.md` now carries that measurement table and a per-phase status table with
+evidence. Noted that both real extractions (`config/render/proc/auth`, then `make_targets`)
+were **pure leaves**, not the behavioural splits phases 2–4 describe.
+
+Prior commit this window: `b5721781` (ASCII→Mermaid; found and fixed
+`acg-credentials-flow.md` block#1, which had never rendered — a semicolon in
+sequence-diagram message text terminates the statement).
+
+## 2026-09-21 — doc-link gate BUILT (5-month-old proposal), 13 broken links fixed
+
+`58f5c316` on `k3d-manager-v1.36.0`, pushed. Preceded by `f3b9be22` (e2e harness guide tiers).
+
+**Why now.** The harness-guide audit found three README entries for one doc, all linking to
+the bare file, so "Tier 2" landed on a page titled "(Tier 1)". Nothing could have caught it.
+`memory/feedback_issue_doc_links_precommit.md` had recorded this gap on **2026-04-06** and
+re-confirmed on 2026-09-17 that the checker had **never been built**.
+
+**Built:** `scripts/check-doc-links.py` (stdlib; the memory proposed a `.sh` — Python is more
+honest for markdown parsing) + `make check-doc-links`, wired into `.githooks/pre-commit` over
+**staged files only** so pre-existing debt cannot block unrelated commits. `K3DM_SKIP_DOC_LINKS=1`
+bypasses. Dropped the proposal's `.pre-commit-config.yaml` step — this repo uses
+`core.hooksPath=.githooks`, so that part was simply wrong. Tests:
+`scripts/tests/bin/test_check_doc_links.py`, **23 cases**, added to `make test-pytest`.
+
+**Three false-positive classes had to be handled** — each would have made the gate useless:
+1. **Inline code.** A DNS regex `` `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?` `` is syntactically
+   `[text](target)`. Code spans blanked before matching.
+2. **`path:line`.** This repo writes clickable `bin/k3dm-webhook:95`; suffix stripped.
+3. **Slug rules.** `github-slugger` does `.replace(/ /g, '-')` — **each** space its own hyphen,
+   so `/claude / /gemini / /codex Commands` → `claude--gemini--codex-commands`. **My first
+   implementation collapsed whitespace runs and reported three CORRECT links as broken.** Caught
+   by inspecting the target headings before "fixing" anything — the near-miss worth remembering.
+
+**Fixed 13 of 13.** Standing docs retargeted: `../howto/vault-pki-setup.md` →
+`../guides/security/04-vault-pki.md` (×2), dead `README.md#jenkins-authentication-modes` →
+`../guides/jenkins-authentication.md`, `../bin/get-ldap-password` → `../../bin/…`,
+`#create-slack-app` → `#1-create-slack-app`. In 4 historical `docs/issues/2026-05-*` and 1
+archived plan the dead links were **unlinked to inline code**, not repointed — repointing a
+record to somewhere it never pointed falsifies it. Same call as leaving historical ASCII
+diagrams alone. That also unlinked 3 neighbouring absolute `/Users/cliang/...` links that
+resolved on this machine only.
+
+Verified: `1725 file(s) OK`; 23 pytest pass; failure path exits 1 with `file:line`;
+`shellcheck .githooks/pre-commit` clean; and the hook fired on its own commit
+(`check-doc-links: 11 file(s) OK`).
+
+### Discovered, NOT fixed — needs the user's go
+**`bin/acg-up` / `bin/acg-down` were renamed `bin/cluster-up` / `bin/cluster-down` in v1.7.1
+(`0c9b2707`), and 219 files still say the old name.** No code references the old names, so
+nothing breaks at runtime — but standing docs (README's ACG table,
+`docs/architecture/cloudflare-slack-relay.md` "Step 10h"/"Step 14c", guides) instruct readers
+to run a script that does not exist. The link checker cannot see these: they are code spans,
+not links. Historical bugs/issues/retros should **keep** the old name. Scope for the sweep =
+standing docs only. Recorded in
+`docs/bugs/2026-09-21-doc-links-and-anchors-never-validated.md`.
+
+## 2026-09-21 — acg-* → cluster-* rename applied to standing docs
+
+`cee21ef0`, pushed. Follows `58f5c316` (the doc-link gate that surfaced it).
+
+`bin/acg-up`/`-down`/`-refresh`/`-status`/`-sync-apps` → `bin/cluster-*`, and Slack `/acg-*`
+→ `/cluster-*`, happened in **v1.7.1** (`0c9b2707`; spec
+`docs/plans/v1.7.1-rename-acg-to-cluster-binaries.md`). Code was already clean — grep of
+`bin/k3dm-webhook`, `workers/slack-relay/index.js` and `Makefile` found **zero** old names —
+so nothing was broken at runtime, but standing docs told readers to run scripts that do not
+exist.
+
+**48 occurrences fixed** in README (live sections only), `docs/architecture/cloudflare-slack-relay.md`,
+`docs/howto/makefile.md`, `docs/howto/launchd-daemons.md`, `docs/guides/grafana-dashboards.md`,
+`memory-bank/projectbrief.md`, `memory-bank/systemPatterns.md`.
+
+**Deliberately left, each verified not assumed:**
+- **Release tables** (README `## Releases` from line ~310, `docs/releases.md`) + `docs/bugs/`,
+  `docs/issues/`, `docs/retro/`, `memory-bank/archive/`. `/acg-resume` really was the command
+  in v1.6.3 — renaming a release note falsifies what shipped. Boundary used: the `## Releases`
+  heading.
+- **Grafana panel titles** "Last acg-up Duration" / "Last acg-down Duration" — these are
+  *literal strings* in `k3dm-deployments-configmap.yaml`, so the guide quotes the dashboard as
+  deployed. Added a caveat naming the cost of changing them (edit ConfigMap + reapply
+  `make observability-acg`). **A doc that disagrees with a deployed UI string is worse than a
+  stale name.**
+- `acg-credential-test` / `acg-extend-test` — CURRENT names, and they live in
+  `scripts/lib/foundation/.../acg/bin/` (subtree, never edit). Also preserved `acg-watch`,
+  `acg-prometheus`, `acg-values`, `acg-plugin`, and the `acg-sandbox-stripe-verification`
+  anchor.
+- `acg-sync-apps-argocd-pf` state-file/log constant inside `bin/cluster-sync-apps` — kept on
+  purpose by the v1.7.1 spec. My `\bacg-sync-apps\b` regex *would* have matched it (hyphen is
+  a word boundary); confirmed it appears in no edited file.
+
+**Also fixed:** `cloudflare-slack-relay.md` quoted a 409 Slack message the webhook never
+emits (`use /acg-status to check progress`). Real text from `bin/k3dm-webhook:3755` is
+`cluster job already running: <job_id> (<action>)`. A stale *quote* is a separate defect from
+a stale *name* — the rename would have silently "modernised" a fabricated string.
+
+Caught before commit: inserting the panel-title caveat mid-table split a markdown table,
+orphaning three rows. Moved below the table.
+
+Verified: `check-doc-links` 1726 OK; mermaid 6 blocks 0 failed; 23 pytest pass.
+
+## 2026-09-21 — Tier 1 e2e RAN (first ever e2e data on Grafana); Tier 2 blocked
+
+**User asked for one Tier 1 + one Tier 2 run so Grafana has data.** Tier 1 ran; Tier 2 could
+not start.
+
+### Tier 1 — ran, failed at `deploying-substrate`, but DID publish
+`./scripts/k3d-manager e2e_verify_vcluster`, run `1790025545-10464`, host context
+`k3d-k3d-cluster`. vCluster `e2e-1790025545-10464` created in ns `vclusters`, API ready, then:
+
+```
+[acg-up] GHCR_PAT not in env — checking Vault...
+[acg-up] gh CLI token cannot pull from ghcr.io — ... excludes read:packages, NOT saved to Vault
+ERROR: [acg-up] GHCR_PAT not set and no valid PAT in Vault
+```
+
+`result: fail`, `exit_code: 1`, `phase: deploying-substrate`. The `EXIT` trap tore the vCluster
+down cleanly (deregistered from hub ArgoCD, namespace deleted) — no leak.
+
+**The observability chain is PROVEN END TO END**, which is the lasting win here:
+run → `platform-ops` ConfigMap `e2e-result-cxdm5`
+(`e2e-result=true,e2e-runner=local-m4,e2e-service=product-catalog,e2e-tier=vcluster`) →
+`vulnerability-inventory-exporter` → metrics. Read off the exporter's `:8080/metrics`:
+`e2e_last_run_pass{tier="vcluster",service="product-catalog",runner="local-m4"} 0`,
+plus `e2e_run_info`, `e2e_last_run_timestamp_seconds`, `e2e_last_run_duration_seconds`.
+**Before this run the hub had ZERO `e2e-result` ConfigMaps** — the E2E Verification dashboard
+now has its first series. Note this is a *local* run, so it does not clear the OPEN remote bug
+`docs/bugs/2026-09-15-e2e-remote-results-never-reach-grafana.md` (that is about
+`E2E_M2_PUBLISH_BACK_HOST` being invisible to launchd).
+
+### MY ERROR, corrected — I pre-cleared Tier 1 on a false probe
+Before running I probed GHCR with the gh token against
+`ghcr.io/wilddog64/shopping-cart-e2e-tests`, got HTTP 200 on the manifest, and told the user
+"repo scope is sufficient for your own packages, so Tier 1 can pull." **Wrong.** That package
+is **PUBLIC** — anonymous, credential-free token exchange also returns 200. Measured:
+
+| Package | anonymous | gh token |
+|---|---|---|
+| `shopping-cart-e2e-tests` | **200** | 200 |
+| `shopping-cart-basket` | 403 | **403** |
+| `shopping-cart-product-catalog` | 403 | **403** |
+
+The substrate needs the **private service images**, not the public test runner.
+`_shopping_cart_ghcr_pat_can_pull` is correct and its default
+`GHCR_PROBE_REPO=wilddog64/shopping-cart-basket` (private) is deliberate — trust it over an
+ad-hoc probe. Saved as `memory/reference_shopping_cart_e2e_tests_package_is_public.md`.
+Same trap family as the `GITHUB_TOKEN` green-push false positive.
+
+### Tier 2 — hard blocked, never started
+`e2e_verify_sandbox` hardcodes `kubectl --context ubuntu-k3s` (`scripts/plugins/e2e.sh:119`)
+and calls `acg_extend_playwright`. Only two contexts exist: `k3d-k3d-cluster` and
+`ubuntu-hostinger` — **there is no ACG sandbox up**. Standing rule: ACG login is a one-time
+MANUAL Pluralsight step needing a real TTY; Claude-run `credential-test` bails
+`ACG_SESSION_EXPIRED`. Not attempted.
+
+### What unblocks each (both user-side)
+- **Tier 1:** a GHCR PAT with `read:packages` → `pbpaste | bin/rotate-ghcr-pat`. **Open
+  question:** `bin/cluster-up` asserts gh's OAuth scopes "are fixed and exclude
+  read:packages", which would make the long-parked `gh auth refresh -h github.com -s
+  read:packages` futile. Unverified — check before spending time on it.
+- **Tier 2:** bring up the ACG sandbox (manual Pluralsight login, user, real TTY), then rerun.
+
+Also confirmed same root cause: hub `shopping-cart-apps` pods (basket/frontend/order/
+product-catalog) have been `ImagePullBackOff` for ~20h.
+
+### 2026-09-21 — post-merge on product-catalog: the merged PR was Dependabot, not our fix
+
+User reported "only product-catalog has a PR open, and I merged it" and asked for `/post-merge`.
+Checked before running anything. The PR that merged at 23:41:44Z was **#54, a Dependabot pin
+bump** (`1f45062c`), moving `ci.yml`'s `build-push-deploy.yml` pin from `1b35d962b` to
+`af4b053dc`. It was not `fix/pass-promoter-ssh-key` — that branch never had a PR, because we were
+waiting on the user's go, and no PR was ever opened in infra either.
+
+Why this matters rather than being a harmless mix-up:
+
+| Thing | State on product-catalog `main` after #54 |
+|---|---|
+| `PROMOTER_SSH_KEY` secret | exists (minted 23:38Z) |
+| `sc-image-promoter` deploy key | exists, read-write |
+| `ci.yml` forwards `PROMOTER_SSH_KEY` to the reusable workflow | **NO** — only PACKAGES_TOKEN, COSIGN_KEY, COSIGN_PASSWORD |
+| pinned infra SHA contains the empty-key guard | **NO** — `af4b053dc` = infra main @ PR #98 (09-16), predates `94b16bc9` |
+| pinned infra SHA contains the rebase-fallback fix | **NO** — `git pull --rebase` fallback still present |
+
+The reusable workflow declares `PROMOTER_SSH_KEY: required: false`, so the missing forward is
+silent: the promote step writes an empty file and dies at
+`Load key "~/.ssh/promoter_key": error in libcrypto`. Minting the keypair removed the *second*
+blocker; the *first* one — the caller not passing the secret — is untouched.
+
+This is the [[reference_unenumerated_api_rollout_misses_repos]] pattern firing a second time on the
+same repo: a Dependabot pin bump moving a pin across a range that does not contain the fix, merging
+green because the promote step is `continue-on-error: true` with a separate fail-gate.
+
+Post-merge steps actually applicable to a Dependabot bump: main synced locally to `1f45062c`
+(fast-forward, 3 commits). No tag or release — CHANGELOG has only `[Unreleased]` and this was not a
+milestone branch, so the skip is legitimate, not a missed release. `main` is **not** branch-protected
+on this repo (`/protection` returns 404 "Branch not protected"), so there is no `enforce_admins` or
+review count to restore. Dependabot's branch was auto-deleted. No retro (not a milestone). No next
+feature branch created — `fix/pass-promoter-ssh-key` is still the live one.
+
+Left alone, pending the user's word: rebasing `fix/pass-promoter-ssh-key` onto the new main, and
+opening its PR.
+
+### 2026-09-21 — promoter-fix PRs opened; the failure mode proved live on main first
+
+User gave the go. Before opening anything, the #54 merge's own main run
+(`35668727231`, head `1f45062c`) finished and proved the prediction rather than leaving it
+asserted. Build, push, cosign sign and both attestations succeeded; the promote step failed:
+
+```
+Load key "/home/runner/.ssh/promoter_key": error in libcrypto
+git@github.com: Permission denied (publickey).
+```
+
+twice — once on the initial `git push`, once on the `git pull --rebase` fallback retry. So the
+minted keypair changed nothing on `main`, exactly because `ci.yml` never forwards the secret. Worth
+recording: the keypair was necessary but not sufficient, and merging the Dependabot pin bump moved
+the pin *past* nothing useful.
+
+**Blast-radius enumeration before proposing the infra guard** (the guard hard-fails on an empty key,
+so "who breaks?" had to be answered by reading, not assumed):
+
+| Caller | Workflow file | Forwards `PROMOTER_SSH_KEY` |
+|---|---|---|
+| shopping-cart-basket | `go-ci.yml` | yes |
+| shopping-cart-order | `ci.yml` | yes |
+| shopping-cart-payment | **`ci.yaml`** | yes |
+| shopping-cart-product-catalog | `ci.yml` | **no** |
+| shopping-cart-frontend | — | does not call it |
+
+Payment's `.yaml` extension is itself the reason the 2026-08-09 rollout skipped a repo: a `*.yml`
+glob does not match it. Same family as
+[[reference_run_success_hides_skipped_publish_job]] and
+[[reference_unenumerated_api_rollout_misses_repos]].
+
+PRs: product-catalog [#55], infra [#99]. product-catalog's branch was rebased onto the new main
+(`31fd3b3`) and force-pushed with `--force-with-lease`; both got a CHANGELOG entry under
+`[Unreleased] / ### Fixed` carrying the **corrected** 2026-08-12 date, since the commit messages
+still say 2026-08-26. Both `mergeable: true`, state `blocked` (checks pending, not conflicted),
+Copilot requested on each. NOT merged — awaiting CI, Copilot, and the user's merge.
+
+Chose a guard over `required: true` deliberately: `required: true` hard-fails every caller at
+workflow-resolution time including any that legitimately does not promote, whereas the guard fires
+only on the path that needs the key and its message names the secret, the block to add and the repo
+to check.
+
+### 2026-09-21 — both promoter PRs green; a real defect found in the guard message
+
+PR gates. product-catalog **#55** `5d5d59b7`: all checks pass, Copilot "Approval recommended,
+Findings: None", 0 unresolved threads, `MERGEABLE / CLEAN`. infra **#99** `6dc3c23`: same Copilot
+verdict, all four checks pass, `MERGEABLE / BLOCKED` with `reviewDecision=REVIEW_REQUIRED`.
+
+`Build, Scan & Push` shows **skipping** on #55. That is expected and is the whole reason this bug
+survived six pushes: the publish job does not run on pull requests, so no PR can exercise promotion.
+The merge is the first real test.
+
+**Infra CI caught a genuine defect in Codex's commit, and fixing it surfaced a second one.**
+YAML Lint failed: `build-push-deploy.yml:162` was 211 chars against a `max: 200`. While splitting
+it I noticed the message embedded `\${{ secrets.PROMOTER_SSH_KEY }}` to show a caller what to add.
+Actions substitutes `${{ }}` in a `run` block before the shell sees it and a backslash is **not** an
+escape there, so that line would have rendered with an empty string where the syntax should be —
+the guard's own teaching message, broken, in the only code path that prints it. Not a secret leak
+(the guard only fires when the value is empty) but it defeats the purpose of the guard. Reworded to
+name the expression in prose and avoid the sequence entirely. Fix `6dc3c23`; verified by parsing the
+YAML and asserting the guard step still precedes the promote step (index 12 before 13).
+
+Lesson shape: a lint failure on a line-length rule is worth reading rather than mechanically
+wrapping — the wrap forced a look at content that no linter would have flagged.
+
+BLOCKED: `gh api .../branches/main/protection/enforce_admins -X DELETE` on **infra** was denied by
+the auto-mode classifier (CI Bypass). Not worked around. Handed to the user to run via `!`.
+product-catalog needs no equivalent: its `main` has no classic protection (404) but does carry a
+**ruleset** (`deletion, non_fast_forward, pull_request, required_status_checks`), and ruleset repos
+expose no `enforce_admins` lever — see [[reference_classic_protection_404_on_ruleset_repos]]. #55
+already reports `CLEAN`.
+
+**enforce_admins on infra: DONE.** The first `-X DELETE` attempt was denied by the auto-mode
+classifier (CI Bypass) and was not worked around; after the user explicitly asked for the override it
+succeeded, and `enabled` reads `false`. #99 still reports `MERGEABLE / BLOCKED` because the ruleset
+requires one approval — disabling enforce_admins grants the admin bypass, it does not rewrite that
+status. **Owed: re-enable with a bodyless POST after the merge.**
+
+## 2026-09-21 — `make show-service-passwords` fixed and pushed (`ef3d4b8d`)
+
+`make show-service-passwords` exits 1 with "Vault credential lookup still unavailable (check
+Vault token and port-forward)" while **every layer the message blames is healthy**. Live probe
+of `127.0.0.1:18200`: `sys/health` 200, `auth/token/lookup-self` 200 (403 anonymous),
+`secret/data/observability/grafana` **200**, `secret/data/argocd/admin` **404**.
+
+Root cause: `Makefile:500` uses the optional display mirror `secret/argocd/admin` as its Vault
+liveness probe. That path's only producer, `_hub_recovery_mirror_argocd_admin`
+(`scripts/plugins/hub_recovery.sh:118-140`), `return 0`s on every failure branch — so its
+absence is a supported outcome, not a fault. The gate turns that cosmetic gap into a hard exit
+that blocks all four credentials, including Grafana's, which was readable the whole time.
+
+Spec: `docs/bugs/2026-09-21-show-service-passwords-liveness-probe-uses-optional-kv-path.md`.
+Fix `ef3d4b8d` swaps the probe to `auth/token/lookup-self`, retries the mirror bootstrap secret for
+up to 60 seconds, and documents that the mirror is optional. Focused BATS 31/31 and shellcheck
+passed; pushed to `origin/k3d-manager-v1.36.0`.
+
+**Independently verified (not taken from the Codex report).** `ef3d4b8d` + `f9d956ae` are on
+`origin/k3d-manager-v1.36.0`. Diff scope is exactly the six spec'd files. Re-ran the gates myself:
+`shellcheck -x scripts/plugins/hub_recovery.sh` rc 0; `bats` 31/31 green; and the mandatory mutation
+check against the pre-fix `Makefile` (`git show a7769892:Makefile`, never `git stash`) shows tests
+1-3 genuinely **red** and test 4 green — the N/A-degradation assertion correctly passes on both
+trees, since the credential blocks were never meant to change. Gate block now has zero occurrences
+of `secret/data/argocd/admin` and two of `auth/token/lookup-self`.
+
+## 2026-09-21 - image-promotion refetch fix pushed (`e99960e`, shopping-cart-infra)
+
+`fix/promote-refetch-instead-of-rebase` replaces the promote step's commit-then-`git pull --rebase`
+fallback with fetch -> `reset --hard origin/<ref>` -> reapply the `sed` -> commit -> push, bounded at
+5 attempts with `sleep $(( _attempt * 3 ))` backoff and an `::error::` exhaustion exit. Rebasing one
+`newTag:` edit onto another is a guaranteed content conflict, so the old fallback was structurally
+incapable of recovering - not flaky. The SSH/remote setup moved above the loop because `git fetch`
+now runs inside it.
+
+Gates verified by me on the working tree: YAML parses; `git pull --rebase` -> **0**;
+`git reset --hard` -> **1**; the `Verify the promoter SSH key was provided` guard -> **1** and still
+at a lower step index (12) than promote (13). One file changed.
+
+**Codex could not commit** - the same `.git/index.lock` `Operation not permitted` wall as the
+`bin/rotate-ghcr-pat` run. It left the edit in the working tree and said so plainly rather than
+fabricating a SHA. I reviewed the diff, committed and pushed it myself: `e99960e` on
+`origin/fix/promote-refetch-instead-of-rebase`. **No PR** - PR creation needs the user's go.
+
+**Noted, pre-existing, not introduced:** the promote step keeps `continue-on-error: true`, so the new
+`exit 1` does not fail the job on its own. A separate `Fail when image promotion did not complete`
+step (`if: steps.promote.outcome == 'failure'`) converts it, so exhaustion does surface as a red run.
+
+## 2026-09-21 - Vault rebuild root-caused; ArgoCD mirror repaired live
+
+With the liveness gate fixed, `show-service-passwords` ran and exposed two real Vault gaps.
+**KV *metadata* returns 404** for both `k3d-manager/prometheus-basic-auth` and `argocd/admin`,
+while `k3d-manager/alertmanager-basic-auth` returns 200 (created 2026-09-21T01:42:57Z). In KV v2 a
+data delete preserves metadata; only a destroy removes it, and nothing in this repo destroys. So
+those two paths were **never written to the current Vault instance** - the hub was rebuilt around
+2026-09-20T23:46Z (`argocd-secret.admin.passwordMtime` 23:51:56Z) and re-seeding was **partial**.
+
+Why it stayed invisible: `_observability_ensure_prometheus_login` (`observability.sh:268`) is
+Vault-read-only - on 404 it `_warn`s and returns 1, and its only caller does
+`_observability_ensure_prometheus_login || return 0`, discarding it. **This is the long-standing
+"Prometheus Vault credentials unreadable" backlog item, now root-caused.** The Prometheus login
+still works only because `bin/prometheus-auth-proxy` runs host-side on :19090 validating against
+`--credentials-file ~/.local/share/k3d-manager/prometheus-basic-auth.env`, a derived cache written
+from a *previous* Vault instance that survived on the host. The loop is self-consistent and green
+while the canonical store is empty - so a live 200 there proves the proxy accepts the file, **not**
+that Vault holds anything.
+
+Key design point for the fix: Prometheus and ArgoCD need **opposite** treatment. Vault is canonical
+for Prometheus per `docs/bugs/2026-06-09-prometheus-basic-auth-vault-managed.md`, so a display-time
+file fallback would reverse a deliberate decision - the repair belongs in the seeding path. ArgoCD's
+authoritative store is `cicd/argocd-initial-admin-secret` and Vault is only a display mirror, so a
+display fallback there is correct. Spec:
+`docs/bugs/2026-09-21-vault-rebuild-leaves-prometheus-and-argocd-credentials-unseeded.md` (`9d2bdb15`),
+dispatched to Codex.
+
+**Live repair done, ArgoCD only (user chose "ArgoCD only" over reseeding both).** Mirrored the
+existing password into `secret/argocd/admin` - additive write to an absent path, no credential
+rotated. Validated against ArgoCD's own `/api/v1/session` first: **HTTP 200**, which supersedes the
+earlier offline `passwordMtime` inference. Read-back 200, keys `['password','username']`, and the
+value **MATCHes** the k8s source. `make show-service-passwords` now resolves ArgoCD, Grafana and
+Alertmanager. **Prometheus is still N/A by design** - the user declined that reseed, and the Codex
+fix repairs it on the next auth-proxy refresh rather than retroactively.
+
+**Credential exposure to fix, both mine to own:**
+- The user pasted the live **Grafana** password into the session - rotate it.
+- I ran the target through a `password:`-based redaction filter; the **Keycloak admin** line uses a
+  different shape (`admin user:     admin / <password>`) and passed through unredacted into the
+  transcript - **rotate the Keycloak admin password.** That format inconsistency is worth fixing in
+  the target itself: it is the one credential that redaction-by-convention cannot catch.
+- The three Keycloak **dev users** (admin/developer/operator) also print `N/A` - a further gap not
+  covered by either spec. Unfiled.
+
+## 2026-09-21 - Keycloak credential display relabelled; Prometheus reseed verified
+
+- **Codex `bbr6gajol` verified and accepted** (`6c744a23`, on `origin/k3d-manager-v1.36.0`).
+  Prometheus reseed (M1-M4) + ArgoCD display fallback. My own gates: BATS 11/11; mutation
+  against pre-fix `Makefile` shows the ArgoCD-fallback test `not ok` (genuine), while the
+  Prometheus-absence test passes pre-fix by design and proves nothing. The deliberate
+  asymmetry held: the Prometheus display block still reads Vault only, with no file or k8s
+  fallback.
+- **Reverted one unsolicited Codex edit.** It left an uncommitted rewrite of an
+  intentionally-literal bcrypt string to `printf -v` to satisfy SC2016. That finding is
+  pre-existing since `fd281c85` (v1.24.0) and is *info* severity, while CI runs
+  `shellcheck -S error` - so the committed tree already passes the real gate. Codex's
+  reported `SHELLCHECK_RC=0` was only true with that edit applied.
+- **Filed `284d22ec`** - `docs/bugs/2026-09-21-show-service-passwords-keycloak-block-defeats-redaction.md`.
+  Three defects: (D1) the Keycloak block printed four secrets on `user:`-prefixed lines, so
+  any consumer redacting on the `password:` convention passed them through unredacted - this
+  is what leaked the live Keycloak admin password into a session transcript today; (D2) the
+  three realm SSO users always print `N/A`; (D3) `bin/get-keycloak-password` passed the Vault
+  root token in a `kubectl exec` command string, violating the CLAUDE.md secret-hygiene rule,
+  while `bin/vault-exec` already implements the safe stdin idiom.
+- **D2 root cause - a third victim of the same rebuild gap, but NOT the same path.**
+  `secret/keycloak/admin` (service admin: `admin_password`, `db_password`) exists and is one
+  of the 14 allowlisted hub seed keys. The realm SSO users live at
+  `secret/keycloak/users/<user>`, are written **only** by `bin/cluster-up:1031`, and are
+  **not** in the allowlist - so a hub rebuild never restores them. Live probe: data and
+  metadata both 404 for all three; `LIST secret/metadata/keycloak` returns
+  `["admin","clients"]`. The old message `run make up first` was wrong advice: `make up` does
+  not seed these. Changing the 14-key allowlist stays NOT approved, so the fix makes the
+  display honest rather than seeding anything.
+- **Codex `bqrx3e9l7` verified and accepted** (`41855a2d`, on origin). Every Keycloak secret
+  now sits behind a `password:` label; realm users report
+  `not provisioned on this cluster (seeded by bin/cluster-up, not by make up)`; the service
+  admin keeps a bare `N/A` because a blank there is a real fault. My own gates:
+  `shellcheck -S error` RC=0, BATS 15/15, mutation shows tests 7/8/9 `not ok` pre-fix and the
+  unchanged-block guard (test 10) passing pre-fix as expected. Codex used the inline stdin
+  idiom rather than `bin/vault-exec` because that wrapper parses only `-n|--namespace` and
+  cannot pin `--context` - verified, correct call.
+- **Realm SSO hint corrected - `80970c04`, on origin.** 2026-09-22: the operator reported the
+  three realm users still showing `not provisioned on this cluster`. Diagnosis: the message is
+  **factually wrong**. `ldapsearch` on `ou=users,dc=home,dc=org` returns `uid=admin`,
+  `uid=developer`, `uid=operator` - all three exist with working passwords. Only the Vault copy
+  at `secret/keycloak/users/*` is absent, because `bin/cluster-up` Step 10d.5 (`:1018-1072`) is
+  the sole writer of that plaintext and this hub was rebuilt with `make up` while OpenLDAP's
+  local-path PV survived. **LDAP stores only hashes, so the plaintext is unrecoverable** - unlike
+  the Prometheus repair, there is no local plaintext cache to restore from. A reset is the only
+  route to a displayable password. Hint now reads `no Vault record on this cluster (LDAP accounts
+  exist; only bin/cluster-up Step 10d.5 stores the plaintext, and it cannot be recovered - reset
+  to display)`. Gates: `make show-service-passwords` rendered the new text live; BATS
+  `makefile_show_service_passwords` 10/10 (case 9 guards this block), `identity_tools` 5/5,
+  `webhook_make_targets` 11/11.
+  - **Ruled out, not assumed:** the `keycloak-credential-rotator` CronJob touches
+    `secret/keycloak/admin` only - it never writes `users/*`, which is why `LIST
+    secret/metadata/keycloak` returns `["admin","clients"]`. Its BusyBox `base64 --decode`
+    defect is already filed as M4 in
+    `docs/bugs/2026-09-22-ci-red-prometheus-reseed-and-rotator-base64.md`. Neither is the cause.
+  - **Checkpoint is NOT blocking:** `step-10d5-ldap-passwords.done` exists only under the
+    `k3s-aws` provider state dir, not for k3d - the hub seeder never ran here, so re-running it
+    would actually execute rather than skip.
+  - **RESOLVED — operator ran the reset; all three now display.** 9/9 steps green
+    (`vault put http=200` → `ldappasswd ok` → `ldapwhoami VERIFIED` per user). Verified without
+    printing values: all three resolve via `bin/get-keycloak-password`, and
+    `make show-service-passwords` shows a password on every realm row. These are **new**
+    passwords; the pre-reset plaintext is unrecoverable. Note `shellcheck` without `-S error`
+    exits non-zero on two info-level SC2016 hits and short-circuited the first run — the single
+    quotes are required so `$LDAP_ADMIN_PASSWORD`/`$1` expand in the pod rather than leaking into
+    the `kubectl exec` command string.
+  - **Durable fix QUEUED — `968ae5eb`, `docs/plans/v1.37.0-realm-sso-password-reseed.md`.**
+    Today's work was a repair plus an honest message, not a cure: the root cause recurs on every
+    `make up` hub rebuild. Spec adds `ldap_reseed_realm_users` (`ldap.sh`) +
+    `make reseed-realm-sso-users` and makes Step 10d.5 delegate to it. Present-record path
+    re-applies without rotating; absent-record path must distinguish "Vault unreachable" from
+    "record absent" or it rotates live passwords on a transient outage (the M1 defect already
+    filed against the Prometheus reseed — do not repeat). Operator asked for v1.34.0, which is
+    shipped and at the 5-doc cap; retargeted to v1.37.0 (now 2 docs).
+  - **Reset script** (scratchpad `reseed-keycloak-users.sh`): mirrors Step 10d.5
+    exactly (generate -> Vault KV put -> `ldappasswd` stdin -> `ldapwhoami` verify), prints no
+    passwords, `chmod 600` header file. Preconditions verified live: openldap-0 present,
+    `LDAP_ADMIN_PASSWORD` SET in the pod, Vault PF `http=200`, and `ldappasswd`/`ldapwhoami`/
+    `mktemp`/`openssl` all present in the pod (the BusyBox trap does not apply). `bash -n` and
+    `shellcheck` were **classifier-denied** (Secret-Store Writes), so the operator must lint and
+    run it via `!`. Seeding `secret/keycloak/users/*` remains gated on the operator's go because
+    it mutates live LDAP passwords.
+- **Jev / TypeSafe AI investigated - recommendation: do not integrate now.** A "System One"
+  model (constrained decoding, typed choice + probability, 70-500ms, $0.042/MTok in, output
+  free, 255-choice cap, text only, v0.01 early access). "Cannot hallucinate" means schema
+  conformance, not correctness; independent reviewers agree calibration is the specifically
+  unvalidated claim, and TypeSafe concedes its 0% figure is analytic (`our number is not
+  empirical`) with in-house evals. Three blockers here: (1) volume - e2e/Hermes findings run
+  ~13/month (1 May, 12 Aug, 13 Sep), far too few to calibrate a 0.90 threshold; (2)
+  `e2e.sh`/`e2e_remote.sh` (1963 lines) contain **zero** classification or routing logic, so a
+  judgment layer would precede the deterministic layer it is meant to sit on, and repo routing
+  is a lookup table, not a judgment; (3) data egress - failure payloads would go to a
+  third-party API, and today's Keycloak leak shows redaction-by-convention fails on one
+  nonconforming line. Proposed instead (NOT started, needs the user's go): a deterministic
+  verdict taxonomy + static service->repo routing table, and back-label the 28 existing
+  e2e/Hermes bug docs to produce the offline eval set.
+
+## 2026-09-21 - Deterministic E2E triage spec written and dispatched
+
+Spec: `docs/plans/v1.36.0-e2e-deterministic-triage-and-corpus.md` (`f670d731`). Dispatched to
+Codex (`scratchpad/handoff-e2e-triage.md`, session `01a0c6ab`). This is 2 of the 5-doc cap for
+v1.36.0. **No external model or service is involved** — deterministic Python and Bash only.
+
+Two findings the spec is built on, both verified against the live tree:
+
+- **Hermes misattributes every Tier 2 connection failure.** `scripts/lib/hermes/e2e_triage.py`
+  `_PORTS` covers only Tier 1 (8000 product-catalog, 8080 order, 8083 basket, 8084 payment).
+  Tier 2 uses **8081 order / 8082 product-catalog** (`_e2e_sandbox_job_manifest`,
+  `scripts/plugins/e2e.sh:141-250`), so a Tier 2 ECONNREFUSED classifies as
+  `("service-unreachable", "host-8081")` — no service attribution, no repo routing. Hermes is
+  the consumer that files bug docs, so Tier 2 failures file against `host-8081`. The union of
+  the two maps has no port collisions, so `e2e.sh`'s existing 6-entry map is the correct one and
+  Hermes is the incomplete copy. `scripts/tests/plugins/e2e.bats:240-258` (`sandbox-ports`)
+  already pins 8081/8082 and is correct — it must pass unchanged as the cross-tier check.
+
+- **`_e2e_write_summary` applies no redaction.** `failure_details` (<=200 entries, 300 chars of
+  raw Playwright error text each) is written to `~/.k3dm/e2e/<run>.json` and
+  `<run>.failures.json`, and published into a hub ConfigMap in `platform-ops` via
+  `_e2e_write_result_event`, then surfaced in Grafana. `e2e_remote.sh:583-591` validates shape
+  and length only. `hermes/e2e_triage.redact()` already exists and is applied on the Hermes side
+  (`sensors.py`, `e2e_bugs.py`, `status_triage.py`) — the `e2e.sh` writer path never adopted it.
+  Same failure class as the show-service-passwords Keycloak block: a redaction convention that
+  one code path does not follow.
+
+Correction to an earlier claim in this session: I had said `scripts/plugins/e2e.sh` contains
+zero classification or routing logic. That was wrong — there are **two** classifiers
+(`e2e.sh:711-760` inline heredoc, and `hermes/e2e_triage.py`) and they diverge on the port map,
+the timeout regex breadth, the contract regex, the unknown-port fallback, and redaction.
+
+Scope notes: no kind string is renamed (`service-unreachable`, `timeout`, `contract-drift`,
+`assertion`, `harness` are baked into the `e2e_bugs.py` hint table, `diff_groups` slugs, the
+`e2e_remote.sh` group schema, and the Grafana panels). The operator's vocabulary
+("infrastructure", "cross-service") is mapped in docs only. `cross-service` stays a **routing**
+value of `service`, not a kind. A new `auth` kind IS added — it was missing entirely.
+
+**Corpus size, stated honestly:** only 11 labelled samples exist (the `## Sample errors`
+bullets across the 5 machine-filed `2026-09-16-e2e-*` bug docs). `~/.k3dm/e2e/` yielded zero
+usable entries: the 4 summaries with real Playwright stats predate the `failure_details` feature
+(`978ea60f`, 2026-09-17) and the only post-feature run died at `deploying-substrate`. 11 is
+enough to pin a rule-based classifier against regression and nowhere near enough to validate a
+probabilistic or confidence-scored one — the corpus README must say so, so the number is not
+later cited as a calibration set.
+
+### Implementation landed — `0c57b110`
+
+Codex implemented M1-M6; it was blocked on `.git/index.lock` (the known sandbox restriction)
+and correctly refused to fabricate a SHA, so I committed and pushed on its behalf after
+verifying independently. Scope was exactly the spec's allowed file list.
+
+Gates I ran myself: `shellcheck -S error` RC=0; `pytest scripts/tests/hermes` 138 passed
+(via the pyenv shim — pytest is not on /opt/homebrew/bin/python3); `bats e2e.bats` 45 ok / 0
+not ok; `make check-doc-links` 1730 OK. Mutation check: reverting `_PORTS`/`_PORT` to the
+Tier-1-only map turned exactly the two Tier 2 corpus entries red
+(`host-8082 != product-catalog`), then restored and re-confirmed 138 passed. Pre-fix
+`scripts/plugins/e2e.sh` has zero `redact` occurrences and writes `title`/`error` raw, so the
+new BATS redaction assertion is genuinely red pre-fix. `sandbox-ports` (e2e.bats:240) was left
+unedited, as required — it is the cross-tier agreement check.
+
+Codex found a real defect in my spec and said so rather than diverging silently: M4.2 asked for
+an unknown-port corpus entry yielding `host-9999`, which the six-port `_PORT` regex can never
+match. It kept the mandated six-port map and added a generic `_ANY_PORT` fallback in
+`_unreachable_target`. That fallback only runs inside the `_UNREACHABLE` branch, so it cannot
+mislabel a non-connection failure. Accepted.
+
+Corpus: 24 entries, 11 real + 13 synthetic, all five kinds covered, no duplicate ids, no
+omitted samples.
+
+## 2026-09-21 - Grafana admin password rotated (operator-approved); PR #130 open and RED
+
+**Grafana rotation DONE and verified.** Triggered the existing in-cluster rotator rather than
+running anything by hand: `kubectl create job --from=cronjob/grafana-credential-rotator -n
+monitoring` (job `grafana-rotate-manual-20260921-195152`). Prerequisites checked read-only
+first: CronJob present and unsuspended (had never run — `lastScheduleTime: <none>`),
+ExternalSecret `SecretSynced=True`, Grafana 1/1, `vault-0` ready, rotator SA present.
+
+Verified sequence from cluster state, not from the job's word: started 02:51:52Z → Vault write
+→ ESO `force-sync=1790045517` (02:51:57Z) → Grafana pod recreated 02:52:05Z → completed
+02:54:13Z, `SuccessCriteriaMet`, and the `trap restore EXIT` never fired. Login probe from
+inside the Grafana pod using its own mounted credential: **200**; same probe with a deliberately
+wrong password: **401**. The negative control matters — it proves the 200 is enforced auth and
+not a false green (the mistake I made earlier with the Prometheus probe). Grafana and Vault
+therefore agree, and the password the operator pasted into a session is now invalid.
+
+Note for future rotations: the rotator's own logs are empty by design (every step redirects to
+/dev/null), so progress must be read from cluster state. It does call
+`grafana cli admin reset-admin-password`, but with `--password-from-stdin` and only *after*
+Vault is updated and ESO re-synced — that is the sanctioned path. Running that CLI standalone
+remains forbidden because it desyncs Grafana from Vault.
+
+**Keycloak admin is NOT rotated and has no rotator.** Only `argocd-` and
+`grafana-credential-rotator` exist. Keycloak's admin password arrives via
+`scripts/etc/keycloak/externalsecret-admin.yaml.tmpl` → `auth.existingSecret` /
+`passwordSecretKey`, which is a **bootstrap-only** input: the admin user already exists in the
+database, so updating Vault and restarting will NOT change the live password. Rotation needs
+three ordered steps (change inside Keycloak via kcadm → update `secret/keycloak/admin`
+`admin_password` → verify). `db_password` in that same secret is the Postgres credential and
+must not be touched. Awaiting the operator's choice between a manual 3-step and specing a
+`keycloak-credential-rotator` to match the other two.
+
+### PR #130 is open and CI is RED — 4 failures, all introduced by this branch
+
+https://github.com/wilddog64/k3d-manager/pull/130 (`07bb4377`). `main` is fully green.
+
+1. `bats_negation_lint` test 57 — two bare `!` assertions in
+   `scripts/tests/plugins/observability_prometheus_reseed.bats:47,84`, from Codex's reseed run
+   (`6c744a23`). `!` suppresses `set -e`, so both assertions pass even when their grep matches:
+   they have never been capable of failing.
+2. `observability.bats` tests 3 and 8 — **a real design bug in my own reseed fix.**
+   `_observability_ensure_prometheus_login:290-296` collapses "Vault unreachable" and "entry
+   absent" into the same empty `_prom_creds`, so an unreachable Vault now fabricates a new
+   password, attempts a reseed, fails, and returns 1 — aborting `deploy_observability_acg`.
+   Test 8 exists to pin the opposite invariant (do not fabricate credentials when Vault is
+   unreadable), which is the "Vault is canonical" decision of
+   `docs/bugs/2026-06-09-prometheus-basic-auth-vault-managed.md`. curl distinguishes a 404 from
+   a connection failure; the code does not.
+3. `alertmanager_config_secret.bats` test 388 — asserts "all three values are required", a
+   message `ee32878f` replaced with "unresolved:". Its `kubectl` stub also returns empty, so the
+   target now exits at the root-token check before reaching the validation the test targets:
+   stubs need fixing, not just the string.
+
+**Verification lesson, the same shape twice.** For `6c744a23` I ran the two suites Codex named
+plus a mutation check and called it verified, but never ran the suites that already covered the
+function being changed (`scripts/tests/lib/observability.bats`) nor the repo-wide meta-lints
+(`scripts/tests/lib/bats_negation_lint.bats`). Changing a function means running every suite
+that touches it, not the suites the agent chose to mention.
+
+**Method error worth recording:** I first reported these as pre-existing on `main`. That was
+wrong. `scripts/tests/lib/observability.bats:14` uses a *relative* `source
+scripts/plugins/observability.sh`, which resolves against the working directory — so running
+bats from the main repo against a worktree path silently sources the branch's plugin. To test
+another ref, the working directory must actually be that worktree.
+
+## Keycloak admin credential ROTATED — 2026-09-22 (live hub)
+
+The rotator from `46eb572b` was applied and run against the live k3d hub. It is done and
+verified; the leaked admin password is dead.
+
+Sequence actually executed (the CronJob did not exist in-cluster beforehand — `46eb572b` only
+added the source):
+
+1. Pre-flight probe pod (`envFrom: keycloak-secrets`) against `realms/master`:
+   `good=200 bad=401`. This proved Vault's `admin_password` was still valid for the master realm
+   *before* starting — the rotator's first step is a password grant with that value, so a drifted
+   password would have failed the job at step 1.
+2. `kubectl apply -f scripts/etc/argocd/platform-ops/keycloak-credential-rotator.yaml`
+   (ServiceAccount, ClusterRole, ClusterRoleBinding, CronJob).
+3. Vault policy + k8s auth role `keycloak-rotation` via
+   `_vault_configure_secret_writer_role secrets vault keycloak-credential-rotator identity secret keycloak/admin keycloak-rotation keycloak-rotation`.
+   **The dispatcher refuses underscore-prefixed functions** ("is private"), and there is no public
+   wrapper — `_keycloak_apply_credential_rotator` is only reachable from the full `deploy_keycloak`
+   path, which would have run a whole Helm upgrade. Sourced the libs in a scratch script instead.
+4. Job `keycloak-rotate-manual-20260922-043917` → `SuccessCriteriaMet succeeded=1`, 0 restarts.
+
+Verification pod (rotator SA, so it could read Vault, plus `envFrom: keycloak-secrets`):
+
+    vault_admin_password=present
+    vault_db_password=present
+    db_password=MATCH(preserved)
+    eso=stale(pre-refresh)
+    new_password=200
+    wrong_password=401
+    eso_secret_password=401
+
+`db_password=MATCH` compares Vault's value against the live `KC_DB_PASSWORD` in-shell — no base64
+echo, no value printed. **`eso_secret_password=401` is the proof the rotation was real:** that is
+the old password, still sitting in the not-yet-refreshed ExternalSecret, and it no longer works.
+`wrong_password=401` is the negative control showing auth is genuinely enforced.
+
+Keycloak and postgres-keycloak stayed 1/1 with 0 restarts throughout.
+
+### Defect found: `base64 --decode` is not valid in the rotator image
+
+The job's logs were NOT empty — they carried a BusyBox usage error. `docker.io/alpine/k8s:1.31.4`
+ships BusyBox base64, which supports only `-d`; `--decode` is rejected. Confirmed directly in the
+image: `printf aGk= | base64 -d` works, `--decode` prints usage and fails.
+
+Impact by rotator:
+
+- **keycloak** (lines 98 and 113) — both are `| base64 --decode || true`, so `slack_url` is always
+  empty and **no Slack notification is ever sent, including the rollback-failure alert.** That
+  alert is the one the spec called the worst-case signal; it is currently silent.
+- **argocd** (line 139) — same silent-Slack bug. Worse, **line 117 has no `|| true`**:
+  `old_bcrypt="$(kubectl ... | base64 --decode)"`. Under `set -eu` that aborts the job, so the
+  ArgoCD rotator looks likely to be broken outright. NOT yet verified by running it.
+- **grafana** (line 128) — correct, uses `base64 -d`. This is why the Grafana rotation succeeded.
+
+Grafana is the correct precedent; keycloak and argocd drifted to the GNU long option. Fix is a
+one-character change in three places, plus a test asserting no `--decode` in any platform-ops
+manifest. Not yet filed or fixed.
+
+### Unrelated open anomaly: `keycloak-realm-reconcile` failed 35h ago
+
+Two pods `Error` exit 127, started 2026-09-21T00:33Z — predating this rotation by ~28h, not caused
+by it. Logs show it logged in, created the `shopping-cart` realm shell, then died at
+`environment: line 104: awk: command not found` while creating the `browser-with-conditional-otp`
+flow. Image `quay.io/keycloak/keycloak:24.0` has no `awk`. **The realm was left partially
+configured** — created but without its auth flows. Needs its own bug doc.
+
+### 2026-09-22 — PR #130 CI reds fixed; rotator `base64` defect closed
+
+Spec `docs/bugs/2026-09-22-ci-red-prometheus-reseed-and-rotator-base64.md` (`6658faff`), handed to
+Codex, landed as `7d475a9f` + `0b9941c2`, refined by `1b7c6c93`. Full suite verified independently:
+**1010/1010, zero failures**, with tests 57, 174, 179 and 388 — the exact four CI numbers — all
+green. `scripts/tests/lib/observability.bats` diff confirmed empty: the guard tests were fixed
+around, not weakened.
+
+Root cause of the reds: `_observability_ensure_prometheus_login` collapsed "Vault unreachable" and
+"entry absent" into `_prom_creds=""` and reseeded on both, so a transient port-forward outage would
+rotate a credential nobody asked to rotate. Fixed with `_observability_vault_reachable()` probing
+`sys/health` — unreachable now warns and returns 0 without touching Vault or the auth file; absent
+still reseeds. The Vault header file is removed on all five exit paths, exactly once.
+
+`base64 --decode` → `base64 -d` at keycloak 98/113 and argocd 117/118/139 (**118 was missed in the
+first triage** — five sites, not four), plus `scripts/tests/plugins/platform_ops_rotators.bats`
+banning the long form repo-wide and asserting each rotator still decodes.
+
+**Correction worth keeping:** Codex ended `deploy_observability_acg` with
+`(set +e; _observability_refresh_prometheus_auth_proxy) || true; return 0`. The tolerance is
+correct — test 174's contract is that a failed Vault seed still yields a successful ACG deploy via
+the generated web config — but the failure was discarded silently. The `(set +e; ...)` subshell is
+**load-bearing**: the failure originates two frames down in `_observability_ensure_prometheus_login`
+and `set -e` kills the chain there, so a plain `if ! cmd` does NOT suppress it (verified
+empirically — replacing the subshell made test 174 fail again). `1b7c6c93` keeps the subshell, adds
+a `_warn`, and drops the redundant `return 0`.
+
+### Prometheus `show-service-passwords` N/A — diagnosed, repair NOT yet run
+
+Live hub, 2026-09-22: Vault PF **up** (`sys/health`=200) but
+`secret/k3d-manager/prometheus-basic-auth` returns **404 with no metadata at all**
+(`version=None`), so there is no soft-deleted version to restore — the path was
+metadata-deleted or never seeded. The local cache
+`~/.local/share/k3d-manager/prometheus-basic-auth.env` still holds a real 32-char password.
+
+`make show-service-passwords` reads Vault **inline in the Makefile recipe**, not through any plugin
+function, so the reseed fix does not change its output. Nothing is actually broken: per the
+2026-08-22 incident notes the hub Prometheus is unauthenticated at the edge, making this path a
+display-mirror plus local-auth-proxy credential (recorded, not re-verified).
+
+Correct repair is the **cache-recovery branch** of `_observability_ensure_prometheus_login`
+("recovered ... not rotating"), which restores Vault from the local cache without rotating.
+`observability_rotate_prometheus_basic_auth` is the WRONG tool: it generates a new password, and
+run bare its context resolves to the **ACG app cluster** (`_observability_acg_context` →
+`ubuntu-k3s`), writing hub Vault first and then failing on the wrong context — turning a cosmetic
+N/A into a real lockout. The function is private, so reaching it needs a scratch sourcing script.
+**Awaiting the operator's go; nothing live has been run.**
+
+### 2026-09-22 — CI red twice more after the fix: latent pytest failures behind the BATS reds
+
+`make test` alone is **not** CI's gate. The `lint` job runs `make test` *and* `make test-pytest`
+as separate sequential steps, so the four BATS reds had been aborting the job before pytest ran.
+Greening BATS exposed a doc-links failure that had been latent, not introduced. `make test-all`
+(`test test-bin test-python`) is the real superset; `make test-pytest` cannot run locally because
+its `python3` is Homebrew 3.14.7 without pytest — run bare `pytest` on the same three paths.
+
+The failure was `test_check_doc_links::test_repo_docs_have_no_broken_links` on markdown links
+pointing at `/Users/cliang/src/gitrepo/personal/k3d-manager/...`. These resolve on this Mac and
+nowhere else, so `make check-doc-links` and the gate itself both pass locally — a Linux-only red
+invisible to every local check.
+
+First attempt fixed only the one file the assertion named (`5341d700`) and CI failed again: the
+assertion truncates its list (`['docs/issues...t exist', ...]`). Enumerating with the checker's own
+parser found **12 links across 5 files**, fixed together in `f3430476`, which also adds
+`test_no_doc_links_target_an_absolute_path` to ban the shape outright so the class is now
+locally detectable. Mutation-verified: reintroducing one absolute link fails the new guard while
+the original broken-link gate stays green.
+
+Commits: `937a5b3b` (docs/memory-bank), `5341d700` (partial, insufficient), `f3430476` (complete
++ guard). Local state at `f3430476`: BATS 1010/1010, pytest 176/176, check-doc-links 1733 OK.

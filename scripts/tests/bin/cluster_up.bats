@@ -158,10 +158,15 @@ STUB
   run grep -nF '_argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}"' bin/cluster-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_write_port_forward_wrapper"* ]]
+  local wrapper_line="${output%%:*}"
 
   run grep -nF 'Step 10e/14 — Installing Istio ingress HTTP listener' bin/cluster-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"Istio ingress HTTP listener"* ]]
+  run grep -nF 'Istio ingress HTTP listener already healthy' bin/cluster-up
+  [ "$status" -eq 0 ]
+  local health_line="${output%%:*}"
+  [ "$wrapper_line" -lt "$health_line" ]
 
   run grep -nF 'Step 10f/14 — Wiring ArgoCD SSO' bin/cluster-up
   [ "$status" -eq 0 ]

@@ -24,5 +24,5 @@ That shape is inconsistent with the other PKI helpers in this repo, which derive
 
 ## Fixed by
 
-- [`scripts/plugins/argocd.sh`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/plugins/argocd.sh) now derives `allowed_domains=shopping-cart.local` for `argocd.shopping-cart.local` and keeps `allow_subdomains=true` for the browser TLS PKI role.
-- [`scripts/tests/plugins/argocd.bats`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/tests/plugins/argocd.bats) now asserts the derived parent-domain role shape.
+- [`scripts/plugins/argocd.sh`](../../scripts/plugins/argocd.sh) now derives `allowed_domains=shopping-cart.local` for `argocd.shopping-cart.local` and keeps `allow_subdomains=true` for the browser TLS PKI role.
+- [`scripts/tests/plugins/argocd.bats`](../../scripts/tests/plugins/argocd.bats) now asserts the derived parent-domain role shape.

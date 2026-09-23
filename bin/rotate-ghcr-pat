@@ -10,10 +10,26 @@
 #
 # Environment:
 #   SHOPPING_CART_ORG   GitHub org/user (default: wilddog64)
+#   HUB_CONTEXT         kube context for the hub (default: k3d-k3d-cluster)
+#   TARGET_CONTEXT      kube context to update (default: resolved app context)
+#   VAULT_LOCAL_PORT    local Vault port-forward port (default: 18200)
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# shellcheck source=scripts/lib/system.sh
+source "${REPO_ROOT}/scripts/lib/system.sh"
+# shellcheck source=scripts/lib/core.sh
+source "${REPO_ROOT}/scripts/lib/core.sh"
+# shellcheck source=scripts/plugins/shopping_cart.sh
+source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
+
 SHOPPING_CART_ORG="${SHOPPING_CART_ORG:-wilddog64}"
+HUB_CONTEXT="${HUB_CONTEXT:-k3d-k3d-cluster}"
+TARGET_CONTEXT="${TARGET_CONTEXT:-$(_shopping_cart_resolve_app_context)}"
+_vault_local_port="${VAULT_LOCAL_PORT:-18200}"
 
 REPOS=(
   shopping-cart-order
@@ -27,18 +43,23 @@ REPOS=(
 
 # Read token from stdin — works with both interactive prompt and pipe
 if [[ -t 0 ]]; then
-  # Try to read from Vault first
-  _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d 2>/dev/null || true)
-  if [[ -n "$_vault_root_token" ]]; then
-    TOKEN=$(curl -s -H "X-Vault-Token: ${_vault_root_token}" "http://localhost:18200/v1/secret/data/github/pat" | jq -r '.data.data.token // empty' 2>/dev/null || true)
+  _vault_root_token=$(kubectl get secret vault-root -n secrets --context "${HUB_CONTEXT}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
+  if [[ -n "${_vault_root_token}" ]]; then
+    _hdr=$(_seed_vault_header_file "${_vault_root_token}") || _hdr=""
+    if [[ -n "${_hdr}" ]]; then
+      TOKEN=$(curl -s --config "${_hdr}" \
+        "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" \
+        | jq -r '.data.data.token // empty' 2>/dev/null || true)
+      rm -f "${_hdr}"
+    fi
   fi
 
   if [[ -n "${TOKEN:-}" ]]; then
-    _pat_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${SHOPPING_CART_ORG}:${TOKEN}" "https://api.github.com/user" 2>/dev/null || true)
-    if [[ "$_pat_http" == "200" ]]; then
-      echo "Using PAT from Vault..."
+    if _shopping_cart_ghcr_pat_can_pull "${SHOPPING_CART_ORG}" "${TOKEN}"; then
+      _info "using PAT from Vault — verified it can pull from ghcr.io"
     else
-      echo "⚠️  Vault PAT is expired (HTTP ${_pat_http}) — please paste a new one" >&2
+      _warn "the PAT in Vault cannot pull from ghcr.io — please paste a new one"
       TOKEN=""
     fi
   fi
@@ -50,24 +71,29 @@ else
   read -r TOKEN
 fi
 
-if [[ -z "$TOKEN" ]]; then
-  echo "ERROR: No token provided — exiting" >&2
-  exit 1
+if [[ -z "${TOKEN:-}" ]]; then
+  _err "no token provided — exiting"
 fi
+
+if ! _shopping_cart_ghcr_pat_can_pull "${SHOPPING_CART_ORG}" "${TOKEN}"; then
+  TOKEN=""
+  _err "that PAT cannot pull from ghcr.io — it is missing the read:packages scope. Nothing was written or pushed. Mint a classic PAT with read:packages at https://github.com/settings/tokens"
+fi
+_info "PAT verified — it can pull from ghcr.io"
 
 if [[ -z "${_vault_root_token:-}" ]]; then
-  _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
+  _vault_root_token=$(kubectl get secret vault-root -n secrets --context "${HUB_CONTEXT}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
 fi
 
-if [[ -n "${TOKEN}" && -n "${_vault_root_token:-}" ]]; then
-  echo "Saving new token to Vault..."
-  if curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
-    -d "{\"data\": {\"token\": \"${TOKEN}\"}}" \
-    "http://localhost:18200/v1/secret/data/github/pat" >/dev/null; then
-    echo "  ✅ Token persisted to Vault"
+if [[ -n "${_vault_root_token:-}" ]]; then
+  if _shopping_cart_store_ghcr_pat_in_vault "${TOKEN}"; then
+    _info "token persisted to Vault at secret/github/pat"
   else
-    echo "  ⚠️ Failed to save token to Vault — you may need to re-paste after acg-down" >&2
+    _warn "failed to save token to Vault — you may need to re-paste after acg-down"
   fi
+else
+  _warn "no Vault root token available — skipping the Vault write"
 fi
 
 echo ""
@@ -86,10 +112,10 @@ for repo in "${REPOS[@]}"; do
   fi
 done
 
-# --- Cluster Update (Quick Fix) -------------------------------------------
+# --- Cluster Update --------------------------------------------------------
 
 echo ""
-echo "Propagating ghcr-pull-secret to ubuntu-k3s cluster..."
+_info "propagating ghcr-pull-secret to context ${TARGET_CONTEXT}"
 echo ""
 
 NAMESPACES=(
@@ -98,20 +124,42 @@ NAMESPACES=(
   shopping-cart-data
 )
 
+_auth=$(printf '%s:%s' "${SHOPPING_CART_ORG}" "${TOKEN}" | base64 | tr -d '\n')
+_dockercfg=$(printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${_auth}" | base64 | tr -d '\n')
+_auth=""
+_sync_ts="$(date +%s)"
+
 for ns in "${NAMESPACES[@]}"; do
-  if kubectl create secret docker-registry ghcr-pull-secret \
-    --docker-server=ghcr.io \
-    --docker-username="${SHOPPING_CART_ORG}" \
-    --docker-password="${TOKEN}" \
-    --context ubuntu-k3s \
-    -n "$ns" \
-    --dry-run=client -o yaml \
-    | kubectl apply --context ubuntu-k3s -f - >/dev/null 2>&1; then
-    echo "  ✅ namespace: ${ns}"
-  else
-    echo "  ❌ namespace: ${ns} — check kubectl connectivity and context" >&2
+  if kubectl get externalsecret ghcr-pull-secret -n "${ns}" --context "${TARGET_CONTEXT}" >/dev/null 2>&1; then
+    if kubectl annotate externalsecret ghcr-pull-secret -n "${ns}" --context "${TARGET_CONTEXT}" \
+      force-sync="${_sync_ts}" --overwrite >/dev/null 2>&1; then
+      _info "namespace ${ns}: ESO-managed — force-sync triggered"
+    else
+      _warn "namespace ${ns}: could not annotate the ExternalSecret"
+    fi
+    continue
   fi
+
+  _manifest=$(mktemp) && chmod 0600 "${_manifest}"
+  cat > "${_manifest}" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ghcr-pull-secret
+  namespace: ${ns}
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: ${_dockercfg}
+EOF
+  if kubectl apply --context "${TARGET_CONTEXT}" -f "${_manifest}" >/dev/null 2>&1; then
+    _info "namespace ${ns}: secret applied"
+  else
+    _warn "namespace ${ns}: apply failed — check kubectl connectivity and context"
+  fi
+  rm -f "${_manifest}"
 done
+
+_dockercfg=""
 
 unset TOKEN
 

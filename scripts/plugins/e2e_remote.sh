@@ -470,8 +470,12 @@ function _e2e_publish_build() {
   E2E_PUBLISH_OUT="$outfile" \
   E2E_EVENT_NS="$E2E_RESULT_EVENT_NAMESPACE" \
   E2E_PUBLISH_ALLOWLIST="$E2E_RUNNER_ALLOWLIST" \
+  E2E_REMOTE_LIB_DIR="${SCRIPT_DIR}/lib" \
   python3 <<'PY'
 import datetime, hashlib, json, os, re, sys
+
+sys.path.insert(0, os.environ["E2E_REMOTE_LIB_DIR"])
+from hermes.e2e_triage import redact
 
 def die(msg):
     sys.stderr.write("reject: %s\n" % msg)
@@ -589,6 +593,8 @@ for detail in details:
     if any(not isinstance(detail[key], str) or len(detail[key]) > 512
            for key in ("file", "title", "status", "error", "service")):
         die("failure_details entry contains an invalid string")
+    detail["title"] = redact(detail["title"])
+    detail["error"] = redact(detail["error"])
 
 created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 event = {

@@ -2,7 +2,182 @@
 
 ## [Unreleased]
 
+### Added
+- A unified `make smoke` target with offline and reachable-cluster tiers, per-check logs, and explicit PASS/FAIL/SKIP reporting.
+- Hub snapshot capture, M2 offload, verification, listing, and retention targets.
+- Keycloak monthly admin credential rotator, which preserves `db_password` and deliberately does not force-sync the ArgoCD-managed `keycloak-secrets` ExternalSecret.
+
 ### Fixed
+- Prometheus reseeding now distinguishes unreachable Vault from an absent entry, and the reseed security assertions are effective rather than bare-`!` no-ops.
+- The Alertmanager secret test now asserts the error the recipe actually emits and stubs `security`, so it can no longer reach a live Vault.
+- Platform-ops rotators use BusyBox-compatible `base64 -d`; `--decode` silently emptied every Slack notification, including the Keycloak rollback-failure alert.
+
+## [1.36.0] - 2026-09-21
+
+### Added
+- `docs/howto/rotate-service-credentials.md` — operator guide for the three monthly credential rotators (Grafana, ArgoCD, Prometheus): the Vault-first ordering invariant and why rotating by hand desyncs Vault from the service, how to trigger one on demand after an exposure, why the jobs emit no logs, how to verify with a login probe **and a negative control**, and why `secret/keycloak/admin` cannot be rotated the same way (its ExternalSecret is a bootstrap-only input, so Vault + restart leaves a value that no longer opens the console). Previously this procedure existed only inside plan specs and had to be reverse-engineered from YAML.
+- `docs/guides/vcluster-e2e-harness.md` gains a full **Failure classification** section: the five kinds and the deliberate ordering (`auth` before `contract-drift`; `404`/`500` stay assertions), the `service_for` / `repo_for` routing table, the Tier 1 vs Tier 2 port split that makes a Tier-1-only map silently degrade Tier 2 attribution, the redact-before-truncate rule and which artefacts are redacted, and how to extend the labelled corpus.
+- `auth` failure class; `service_for` / `repo_for` routing table; a labelled triage corpus under `scripts/tests/fixtures/e2e-corpus/`.
+- `scripts/check-doc-links.py` + `make check-doc-links` — validates every relative link and heading anchor in the repo's Markdown (1,725 files), wired into `.githooks/pre-commit` over **staged files only** so pre-existing debt cannot block an unrelated commit (`K3DM_SKIP_DOC_LINKS=1` bypasses). Handles the three false-positive classes that would make such a gate useless: markdown-shaped regexes inside inline code, this repo's clickable `path:line` references, and `github-slugger`'s per-space hyphenation (`/claude / /gemini` → `claude--gemini`, doubled). Covered by `scripts/tests/bin/test_check_doc_links.py` (23 pytest cases, including a live-tree gate). Closes a gap open since 2026-04-06.
+
+- `docs/guides/grafana-dashboards.md` — a guide covering all seven shipped Grafana dashboards (ArgoCD/Image-Updater, CVE Auto-Patch, E2E Verification, Hermes Status, k3dm Deployment Metrics, Trivy Security, Checkout Load Test): panel-by-panel queries, the producer chain feeding each series (exporter / Pushgateway / promtail / trivy-operator), and a `No data`-by-cause triage table assembled from past incidents. Closes a "guide per major tech" gap — dashboard knowledge previously existed only scattered across ~25 plan/bug/issue docs, and `grafana-dashboard-hermes.yaml` was referenced by none of them.
+
+- Tier 2 `e2e_verify_sandbox` runs the Stripe Playwright flow in a self-contained ACG sandbox without hub registration, applies the proven sandbox substrate overrides at deploy time, and emits shared `tier: sandbox` / `project: stripe` summaries. Tier 2 is opt-in and periodic, never a blocking per-candidate gate.
+
+### Changed
+- E2E failure classification now has one implementation (`hermes.e2e_triage`); the duplicate inline classifier in `scripts/plugins/e2e.sh` is gone.
+- `docs/architecture/webhook-server.md` roadmap replaced with measured per-phase status:
+  Phases 2–5 are **not started** (none of `server.py`, `routes.py`, `commands.py`,
+  `dispatch.py`, `jobs.py`, `diagnostics.py` exist), and the monolith has grown from 2,953
+  lines after Phase 1 to 4,008 today (+36%) — the plan is being outrun by the code it meant
+  to shrink.
+- `docs/guides/hermes.md` now enumerates all six Hermes Status panels (it described four),
+  names the dashboard source file and applier, and documents the `k3dm.k3.io` label trap.
+- Architecture docs realigned with the current webhook server: `docs/architecture/webhook-server.md`
+  now records the real size (4,008 lines, not ~2,950), the `webhook/make_targets.py` module,
+  corrected monolith line ranges for every area, the four `/k3dm` authorization gates, and the
+  pytest allowlist suite; `docs/architecture/cloudflare-slack-relay.md` gains the five routes
+  added since it was written (`/api/v1/make`, `-cve-remediate`, `-hostinger-status`,
+  `-cleanup-stale-sandbox`, `-analyze`), a min-role column, and the Worker `ALLOWED_COMMANDS` set.
+
+- Converted the remaining ASCII flow diagrams in the live docs to Mermaid: the webhook request
+  flow and module dependency graph, the Pushgateway metrics path, the vCluster e2e harness, the
+  `/ask` defense-in-depth chain, and the ESO secret flow and dual-cluster observability layout in
+  `systemPatterns.md`. File trees, the LDAP DIT, shipped plans and bug records were left as ASCII
+  on purpose.
+
+### Fixed
+- Hermes misattributed Tier 2 E2E connection failures to `host-8081` / `host-8082` instead of `order` / `product-catalog`, because its port map covered only Tier 1.
+- E2E failure detail text was written to the run summary and published to the hub result event without redaction; a token appearing in a Playwright assertion diff could reach a cluster ConfigMap and a Grafana panel. The raw `<run_id>.log` stays unredacted by design (local-only, needed for debugging).
+- every credential `make show-service-passwords` prints now sits behind a `password:` label — the Keycloak block previously emitted four secrets on `user:`-prefixed lines, which defeats any consumer redacting on the `password:` convention; the three realm SSO users now say they are not provisioned on the hub instead of printing a bare `N/A`, and `bin/get-keycloak-password` no longer passes the Vault root token in a `kubectl exec` command string
+- a Vault rebuild no longer leaves `k3d-manager/prometheus-basic-auth` permanently unseeded — the auth-proxy refresh reseeds the canonical entry, recovering the existing password from the local cache rather than rotating it, and `show-service-passwords` falls back to `argocd-initial-admin-secret` for the ArgoCD display
+- `make show-service-passwords` probes Vault via `auth/token/lookup-self` instead of the optional `secret/argocd/admin` display mirror, so a missing mirror no longer blocks all four credentials
+- Standing docs still told readers to run `bin/acg-up` / `acg-down` / `acg-refresh` / `acg-status` / `acg-sync-apps` and the `/acg-*` Slack commands, all renamed to `cluster-*` in **v1.7.1** (`0c9b2707`). 48 occurrences corrected across README, `docs/architecture/cloudflare-slack-relay.md`, `docs/howto/makefile.md`, `docs/howto/launchd-daemons.md`, `docs/guides/grafana-dashboards.md`, `memory-bank/projectbrief.md` and `memory-bank/systemPatterns.md`. Historical records (the README/`docs/releases.md` release tables, `docs/bugs/`, `docs/issues/`, `docs/retro/`, `memory-bank/archive/`) keep the old names — that is what shipped. The `acg-sync-apps-argocd-pf` state-file constant inside `bin/cluster-sync-apps` is deliberately unchanged, per `docs/plans/v1.7.1-rename-acg-to-cluster-binaries.md`.
+- `docs/architecture/cloudflare-slack-relay.md` quoted a 409 Slack message the webhook does not emit (`use /acg-status to check progress`); replaced with the real text from `bin/k3dm-webhook`.
+- 13 broken doc links found by the new checker. Retargeted in standing docs: `vault-pki-setup.md` → `guides/security/04-vault-pki.md` (twice), a dead `README.md#jenkins-authentication-modes` → `guides/jenkins-authentication.md`, `../bin/get-ldap-password` → `../../bin/…`, and `#create-slack-app` → `#1-create-slack-app`. In four historical issue docs and one archived plan the dead links were unlinked to inline code rather than repointed, so the record still reads without a false promise of a working link.
+- README listed the vCluster E2E harness guide **three times**, twice labelled "(Tier 1)", and all
+  three links pointed at the bare file — the Tier 2 entry led to the Tier 1 title. Root cause: the
+  guide's own H1 still read `# vCluster E2E Harness (Tier 1)` after it gained a Tier 2 section, so
+  there was no Tier 2 anchor to link to. The guide is now titled for both tiers with a tier table
+  up top, Tier 1 has an explicit `## Tier 1: per-candidate vCluster gate` heading (its four former
+  H2 sections demoted under it) so the two tiers are parallel, and the README's How-To entries
+  deep-link to the right section. All four anchors verified against GitHub's slug rules.
+
+- `docs/howto/acg-credentials-flow.md` — the sequence diagram failed to render on GitHub. A
+  semicolon in message text terminates a statement in Mermaid sequence diagrams; replaced with an
+  em dash. All 29 Mermaid blocks in the repo now parse.
+
+- `memory-bank/techContext.md` and `memory-bank/systemPatterns.md` rewritten against the live tree.
+  Both dated from v1.24.0 (2026-08-11) and had drifted: techContext listed 15 BATS files against 117
+  and 1118 cases, two plugins against 26, and three cluster providers against nine; systemPatterns
+  had duplicate section numbers and two sections — agent role boundaries and the agent commit
+  protocol — that stated the opposite of current practice.
+- `memory-bank/activeContext.md` compressed 1783 → 1337 lines; the settled 2026-09-01→09-04 v1.28.0
+  block moved to `memory-bank/archive/activeContext-2026-09-21.md`.
+
+
+- The GHCR pull credential was validated for authentication but never for authorization, so the
+  system converged on a permanently broken PAT with every layer reporting green. All three loaders in
+  `scripts/plugins/shopping_cart.sh` gated on `GET https://api.github.com/user`, which returns 200 for
+  any token that authenticates and never checks `read:packages` — the only scope GHCR enforces. A
+  scope-less token passed validation, and `shopping_cart_load_ghcr_pat_from_gh` then *persisted* it to
+  `secret/github/pat`, so the Vault loader found it on the next run, probed `/user`, got 200, and never
+  escalated to the operator prompt. The fallback chain is built to escalate on a bad credential; this
+  defect made the bad one look good at every level. `ghcr-pull-secret` existed and its ExternalSecret
+  reported `SecretSynced True` throughout, which only ever meant "ESO copied what Vault holds" — four
+  `shopping-cart-apps` deployments sat in `ImagePullBackOff` for 11h with `403 Forbidden` until the
+  resulting `ServiceDown` critical paged the operator. Every loader now gates on a real GHCR token
+  exchange plus a pull-scoped `tags/list` call, which is authoritative for classic *and* fine-grained
+  PATs (the latter return an empty `X-OAuth-Scopes`, so header parsing would have rejected valid
+  credentials). No loader persists a credential that has not passed that probe, and
+  `shopping_cart_prompt_ghcr_pat` — which previously stored the pasted value with no validation
+  whatsoever — now validates first. The three duplicated Vault writes collapse into one helper that
+  passes the token by header file and the body on stdin per the secret-hygiene rule, and encodes the
+  PAT with `jq -n --arg` rather than interpolating it into a JSON literal, which also fixes invalid
+  JSON when a PAT contains a quote or backslash.
+
+- `make show-service-passwords` never restarted the Vault port-forward it announced it was
+  restarting, and failed with `Error: invalid function name: '—'` instead. The recipe used
+  `$$(MAKE)`, which expands to a literal `$(MAKE)` handed to the *shell*, so the shell performed
+  command substitution instead of invoking the recursive make. On macOS APFS is case-insensitive, so
+  `MAKE` resolved to `/usr/bin/MAKE` and really ran `make`; with `.DEFAULT_GOAL := help` that printed
+  the help text, whose captured stdout was then word-split and executed as a command. The help's
+  first line contains a UTF-8 em-dash, so the dispatcher was invoked with `—` as a function name and
+  rejected it. The visible error was only the symptom: the real damage was that
+  `install-vault-port-forward` never ran, so the credential lookup could not recover and the target
+  died on its own retry guard. Now `$(MAKE)`, which make expands to the running make binary.
+
+- `make alertmanager-secret` could only ever run from a real terminal, and the one recovery path
+  that did not need a terminal could not succeed. All three values came from `read -r -p`, so
+  running the target anywhere without a TTY — a `!` shell, a script, an agent session — silently
+  read three empty strings and aborted with `all three values are required`. Meanwhile
+  `make restore-google-app-password` backs up only `gmail_app_pw` to Keychain, so after the Vault
+  PVC was lost it failed its own `Vault missing gmail_from,sms_gateway` guard: the two fields it
+  needed had no backup anywhere. Each value now resolves from env (`ALERTMANAGER_GMAIL_FROM`,
+  `ALERTMANAGER_SMS_GATEWAY`), then Keychain, then an interactive prompt only when stdin is a TTY,
+  and the error names each unresolved field and where to supply it instead of lumping all three
+  together. On success the target backs `gmail_from` and `sms_gateway` up to Keychain, and
+  `restore-google-app-password` reads all three from Keychain so a future PVC loss is a
+  single-command rebuild. The target also validates shape before writing: it reported three success
+  lines when handed the literal placeholder text `...` from a copy-pasted command, storing garbage
+  in both Vault and Keychain, so `gmail_from` must now look like an email address and `sms_gateway`
+  like `10digits@gateway.domain`. The Vault root token now travels by environment variable rather than in a
+  `curl -H` argument visible in the process table, matching the sibling target.
+
+- The 45s apiserver `scrapeTimeout` never survived on the cluster. `kube-prometheus-stack-apiserver`
+  is an ArgoCD-managed ServiceMonitor (`argocd.argoproj.io/tracking-id`) and the observability
+  ApplicationSet runs `selfHeal: true`, so the out-of-band `kubectl patch` was reverted within
+  seconds while `_observability_ensure_apiserver_scrape_timeout` reported success against a value
+  that no longer existed — the live config stayed at `scrape_timeout: 10s` through two deploys.
+  Chart 67.9.0 exposes `kubeApiServer.serviceMonitor.interval` but no `scrapeTimeout`, so the patch
+  is the only lever; the ApplicationSet now declares `ignoreDifferences` for
+  `/spec/endpoints/0/scrapeTimeout` plus `RespectIgnoreDifferences=true` (without which
+  `ignoreDifferences` suppresses the diff but a sync still overwrites the field), and the function
+  reads the value back after patching and warns instead of claiming success.
+
+- Critical-alert SMS bodies could not identify what broke. The body was
+  `{{ .Annotations.summary }}` alone, which discarded the alert name, severity, cluster,
+  namespace, component labels and start time — and for `KubeAPIDown` and `KubeletDown` that
+  summary is the identical shared constant `"Target disappeared from Prometheus target
+  discovery."`, so the message could not name the failing component even in principle. The body
+  now leads with alertname, severity and cluster, prefers `description` over `summary`, appends the
+  locating labels and `StartsAt`, and iterates `.Alerts.Firing` so resolved entries cannot pad it.
+  The root route also gained an explicit `group_by` — with none set, Alertmanager groups every
+  alert into one group whose `GroupLabels` is empty, so the `[ALERT] {{ .GroupLabels.alertname }}`
+  Subject rendered as `[ALERT] ` regardless of whether the SMS gateway kept it. Hub Prometheus now
+  sets `externalLabels: {cluster: hub}`, matching the ACG values, so upstream rules are
+  cluster-attributable; and `KubeAPIDown`/`KubeletDown` are disabled via `defaultRules.disabled`
+  and re-shipped in `scripts/etc/prometheus/rules/kubernetes-control-plane.yaml` with summaries
+  that name their component and descriptions stating that a scrape slower than `scrape_timeout` is
+  indistinguishable from an absent target. Spec:
+  `docs/bugs/2026-09-20-sms-alert-body-is-unidentifiable.md`
+
+- Port-forward wrapper resolved its kubectl context once at process start and silently
+  substituted a different cluster on miss, leaving the keycloak-browser-http daemon
+  forwarding against the wrong cluster indefinitely; the context is now re-resolved every
+  supervisor iteration and the substitution logs a WARNING naming both contexts.
+- Port-forward wrapper swept listeners by port alone, killing an unrelated healthy forward
+  bound to a different address on the same port; the sweep and the in-use probe are now
+  scoped to the address the wrapper itself binds.
+- `bin/cluster-up` only regenerated the keycloak-browser-http wrapper when its launchd plist
+  was missing, so template fixes never reached the deployed script; it is now regenerated
+  unconditionally.
+
+- `bin/cluster-status --full` (`make status-full`) no longer aborts on `PLUGINS_DIR: unbound variable`. It sources `scripts/plugins/observability.sh` directly rather than through the dispatcher, so it must supply the two layout variables `scripts/k3d-manager:64-65` exports; under `set -euo pipefail` the unbound expansion killed the script at source time, before a single check ran. Summary mode was unaffected because it `exec`s `cluster-status-summary` and never reaches the source — which is why this stayed hidden while `make status` kept working, even though a failing summary prints `Details: make status-full` and sent the operator straight at the broken command. `SCRIPT_DIR` is reassigned from `bin/` to `scripts/` (the plugin resolves `${SCRIPT_DIR}/etc/...` throughout its function bodies, so the `bin/` value would have been wrong even once bound) and placed after the summary early-exit, the only other consumer of the original value. Spec: `docs/bugs/2026-09-20-cluster-status-full-unbound-plugins-dir.md`
+
+- The monitoring port-forward supervisor no longer kills a healthy forward on one slow health probe. `_hostinger_write_monitoring_port_forward_wrapper` previously restarted the forward on a *single* failed `curl -fsS --max-time 3`, with no consecutive-failure tolerance, so one slow response or a transient 503 destroyed a working forward. Grafana's `/api/health` was measured at a ~0.2s median with a tail past 3s and occasional 503s while provisioned dashboards reload, which produced five restarts in two minutes on a fully healthy rebuilt hub; each restart drops the listener for ~2s, which is exactly what cloudflared reports upstream as a 502. The probe now requires `K3DM_PF_HEALTH_THRESHOLD` (default 3) consecutive failures and uses `K3DM_PF_HEALTH_TIMEOUT` (default 8s), resetting the counter on every success, so a genuinely broken SPDY stream is still caught in ~15s. This is the host-side port-forward instance of a disease family already documented for pods (`2026-08-27-keycloak-restart-loop-tight-probes.md`), nodes (`2026-08-28-node-health-watch-restart-loop-slow-node.md`) and Grafana's own liveness probe (`2026-07-06-grafana-repeatedly-killed-by-liveness-probe-under-argocd-image-updater-dashboard-load.md`). Spec: `docs/bugs/2026-09-20-pf-supervisor-kills-healthy-forward-on-single-slow-probe.md`
+
+- Vault seeding now preserves existing or canonical payment encryption, Stripe, and PayPal secrets, restoring the Stripe test key from the Keychain before using the placeholder fallback.
+
+- Alertmanager CPU limit raised from `50m` to `500m` (requests `10m` -> `50m`, memory `32Mi/64Mi` -> `64Mi/128Mi`). The `50m` limit left the container 83-87% CFS-throttled, so notification batches blew past Prometheus's 10s notifier timeout and `PrometheusErrorSendingAlertsToAnyAlertmanager` fired continuously.
+
+- Hermes now re-pages when a new sensor joins an active incident, and the public endpoint probe counts authenticated 401/403 responses as reachable while preserving the reported status code.
+
+- Tier 2 sandbox E2E Jobs now use the deployed Service names, emit the result markers consumed by the summary parser, and provision the GHCR and Stripe Secrets idempotently before execution. The Stripe test key is read from Keychain via stdin and missing credentials fail loudly.
+
+- Hub observability now patches the existing apiserver ServiceMonitor with a 45s endpoint scrape timeout, preventing slow 8.36 MB `/metrics` scrapes from making `KubeAPIDown` flap against the inherited 10s timeout.
+
+- `istiod` Prometheus scraping now keeps only the `http-monitoring` endpoint port in the hub and ACG values, preventing non-metrics ports from holding `TargetDown` open.
 
 - 42 BATS assertions across 8 suites no longer `grep -F` a whole line of source code. The affected suites assert against Bash (`scripts/plugins/*.sh`), Python (`bin/k3dm-webhook`, `scripts/lib/webhook/config.py`), JavaScript (`workers/slack-relay/index.js`) and rendered `*.sh.tmpl` wrappers, so this is not a shell-only pattern. A test that pins an entire statement fails when that statement is reformatted, reordered, or extended — it gates the *spelling* of an implementation rather than its behaviour, and its red tells you nothing about whether the requirement still holds. The audit classified all 355 `grep -F` sites in `scripts/tests/` into three populations and changed only the defective one: 198 sites match a short token against a **runtime artifact** (the correct idiom — the artifact is the output under test), 71 match a short token against source where the token *is* the contract (`kind: ClusterRole`, a flag name), and 45 pinned a whole line or long statement against source. Of those 45, three are deliberate keeps documented in the spec; the other 42 became one of three narrower forms — a `grep -E` over the semantically meaningful tokens, a per-element membership assertion for a collection literal, or a `declare -F` check against the loaded definition where the suite already sources the file. Every narrowing preserves each original semantic requirement; only the formatting dependency is dropped. Proven by mutation testing rather than by a green run: 13 targeted mutations were each confirmed to redden the narrowed gate, including the decisive **additive** case — adding a compatible fourth webhook role, which the old whole-line assertion rejected and the new membership assertion correctly accepts. Suite totals are unchanged at 947 passing (`make test`) and 108 passing (`make test-bin`), identical to `main`. Spec: `docs/bugs/2026-09-18-bats-whole-line-grep-assertion-audit.md`
 

@@ -5,11 +5,16 @@ defaultRules:
     kubeApiserverHistogram: false
     kubeApiserverSlos: false
     configReloaders: false
+  disabled:
+    KubeAPIDown: true
+    KubeletDown: true
 
 prometheus:
   prometheusSpec:
     scrapeInterval: 60s
     evaluationInterval: 60s
+    externalLabels:
+      cluster: hub
     retention: 3d
     retentionSize: 8GB
     storageSpec:
@@ -36,6 +41,9 @@ prometheus:
           - source_labels: [__meta_kubernetes_service_name]
             action: keep
             regex: istiod
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: http-monitoring
       - job_name: federate-acg
         scrape_interval: 60s
         honor_labels: true
@@ -86,11 +94,11 @@ alertmanager:
       type: None
     resources:
       requests:
-        memory: 32Mi
-        cpu: 10m
-      limits:
         memory: 64Mi
         cpu: 50m
+      limits:
+        memory: 128Mi
+        cpu: 500m
     useExistingSecret: true
     configSecret: alertmanager-smtp-secret
 

@@ -94,7 +94,7 @@ sequenceDiagram
         else Resume Sandbox visible
             UI-->>UI: click Resume Sandbox and wait 10s
         else no matching buttons
-            UI-->>UI: proceed anyway; credentials page may already be active
+            UI-->>UI: proceed anyway — credentials page may already be active
         end
     end
 

@@ -7,7 +7,7 @@
 # service but the service itself still returns 200 to a direct/stale-session
 # check (2026-09-02 502 incident; docs/architecture/hermes-phase1-monitoring-scope.md
 # §5). This probe samples each public hostname K times over a short window
-# and reports a host healthy only if >= M of K samples return 2xx/3xx.
+# and reports a host healthy only if >= M of K samples return 2xx/3xx/401/403.
 #
 # It also discriminates two different root causes with different fixes:
 #   - ALL hosts fail            -> edge-down       Cloudflare tunnel/edge issue
@@ -56,7 +56,7 @@ a short window and report per-host + overall reachability.
 Options:
   --samples K     Samples per host (default: 5)
   --interval S    Seconds to sleep between sample rounds (default: 2)
-  --min-ok M      Minimum ok samples (2xx/3xx) for a host to count healthy (default: 3)
+  --min-ok M      Minimum ok samples (2xx/3xx/401/403) for a host to count healthy (default: 3)
   --config PATH   Path to cloudflared ingress config (default: scripts/etc/cloudflared/config.yml)
   --json          Emit machine-readable JSON instead of human-readable text
   --help, -h      Show this help
@@ -138,7 +138,7 @@ for ((_pep_s = 1; _pep_s <= _pep_samples; _pep_s++)); do
     _pep_url="https://${_pep_host}/"
     _pep_code="$(curl -s --max-time 3 -o /dev/null -w '%{http_code}' -- "${_pep_url}" 2>/dev/null || echo 000)"
     case "${_pep_code}" in
-      2??|3??) _pep_host_ok[_pep_h_idx]=$((_pep_host_ok[_pep_h_idx] + 1)) ;;
+      2??|3??|401|403) _pep_host_ok[_pep_h_idx]=$((_pep_host_ok[_pep_h_idx] + 1)) ;;
     esac
     if [[ -z "${_pep_host_codes[_pep_h_idx]}" ]]; then
       _pep_host_codes[_pep_h_idx]="${_pep_code}"

@@ -135,7 +135,7 @@ def _run_cycle(state, status_runner=None):
         provider=os.environ.get("K3DM_HERMES_LLM_PROVIDER", "gemini"),
     )
     event = correlator.process(records, state)
-    if event and event["kind"] == "incident":
+    if event and event["kind"] in ("incident", "escalation"):
         state["incident_nonce"] = secrets.token_hex(8)
     if event and event["kind"] == "resolved":
         state["repairs_attempted_this_incident"] = []
@@ -147,7 +147,7 @@ def _run_cycle(state, status_runner=None):
     if automatic:
         event = event or {"kind": "incident", "sensors": ["kine"], "text": "Hermes Kine guard"}
         event["text"] += "\nAutomatic Kine guard: " + automatic["outcome"]
-    if event and event["kind"] == "incident" and proposals:
+    if event and event["kind"] in ("incident", "escalation") and proposals:
         lines = [f"Approve with: bin/k3dm-hermes approve {item['action_id']} ({item['command']})"
                  for item in proposals]
         event["text"] += "\nPending allowlisted repairs:\n" + "\n".join(lines)

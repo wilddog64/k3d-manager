@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest test-python test-all e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links test-python test-all e2e help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -497,15 +497,15 @@ show-service-passwords:
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
 	[ -n "$$_vault_tok" ] || { echo "[show-service-passwords] ERROR: cannot read secrets/vault-root (check k3d-k3d-cluster context)" >&2; exit 1; }; \
 	_vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	if ! curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" -o /dev/null 2>/dev/null; then \
+	if ! curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then \
 		echo "[show-service-passwords] Vault credential lookup unavailable; restarting its port-forward" >&2; \
-		$$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
+		$(MAKE) --no-print-directory install-vault-port-forward >/dev/null; \
 		__vault_ready=0; \
 		for __vault_attempt in 1 2 3 4 5 6 7 8 9 10; do \
 			sleep 1; \
-			if curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
+			if curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/auth/token/lookup-self" -o /dev/null 2>/dev/null; then __vault_ready=1; break; fi; \
 		done; \
-		[ "$$__vault_ready" -eq 1 ] || { echo "[show-service-passwords] ERROR: Vault credential lookup still unavailable (check Vault token and port-forward)" >&2; exit 1; }; \
+		[ "$$__vault_ready" -eq 1 ] || { echo "[show-service-passwords] ERROR: Vault unreachable at 127.0.0.1:18200 with the secrets/vault-root token (port-forward restarted, still failing)" >&2; exit 1; }; \
 	fi
 	@echo ""
 	@echo "  === Service Credentials ==="
@@ -517,6 +517,8 @@ show-service-passwords:
 	  "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
 	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
 	rm -f "$$_vault_hdr"; \
+	[ -n "$$_argocd" ] || _argocd=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
 	echo "  ArgoCD      https://argocd.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_argocd:-N/A}";\
@@ -565,27 +567,62 @@ show-service-passwords:
 	_realm_admin=$$(./bin/get-keycloak-password admin -q 2>/dev/null || true); \
 	_dev=$$(./bin/get-keycloak-password developer -q 2>/dev/null || true); \
 	_op=$$(./bin/get-keycloak-password operator -q 2>/dev/null || true); \
+	_kc_hint="N/A"; \
+	if [ -z "$$_realm_admin$$_dev$$_op" ]; then \
+	  _kc_hint="no Vault record on this cluster (LDAP accounts exist; only bin/cluster-up Step 10d.5 stores the plaintext, and it cannot be recovered - reset to display)"; \
+	fi; \
 	echo "  Frontend    https://frontend.3ai-talk.org  (login via Keycloak SSO)";\
 	echo "  Keycloak    https://keycloak.3ai-talk.org";\
-	echo "    admin user:     admin / $${_kc:-N/A}";\
-	echo "    dev users:      admin / $${_realm_admin:-N/A}  |  developer / $${_dev:-N/A}  |  operator / $${_op:-N/A}";\
+	echo "    user:     admin";\
+	echo "    password: $${_kc:-N/A}";\
+	echo "    realm SSO users (secret/keycloak/users/*):";\
+	echo "      user:     admin";\
+	echo "      password: $${_realm_admin:-$$_kc_hint}";\
+	echo "      user:     developer";\
+	echo "      password: $${_dev:-$$_kc_hint}";\
+	echo "      user:     operator";\
+	echo "      password: $${_op:-$$_kc_hint}";\
 	echo ""
 
-## Store Alertmanager credentials in Vault (run once; requires Hub Vault + port-forward)
+## Store Alertmanager credentials in Vault (requires Hub Vault + port-forward)
+## Each value resolves from env, then Keychain, then an interactive prompt. Runs
+## non-interactively when ALERTMANAGER_GMAIL_FROM and ALERTMANAGER_SMS_GATEWAY are set.
 alertmanager-secret:
 	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
 	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	read -r -p "Gmail from address: " _gmail; \
-	read -r -s -p "Gmail app password: " _pw; echo; \
-	read -r -p "T-Mobile SMS gateway (10digits@tmomail.net): " _sms; \
-	if [ -z "$$_gmail" ] || [ -z "$$_pw" ] || [ -z "$$_sms" ]; then \
-	  echo "[alertmanager-secret] ERROR: all three values are required (run in an interactive terminal)" >&2; exit 1; \
+	[ -n "$$_tok" ] || { echo "[alertmanager-secret] ERROR: cannot read Hub Vault root token" >&2; exit 1; }; \
+	_gmail="$${ALERTMANAGER_GMAIL_FROM:-}"; \
+	[ -n "$$_gmail" ] || _gmail=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-from -w 2>/dev/null || true); \
+	_sms="$${ALERTMANAGER_SMS_GATEWAY:-}"; \
+	[ -n "$$_sms" ] || _sms=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-sms-gateway -w 2>/dev/null || true); \
+	_pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>/dev/null || true); \
+	if [ -t 0 ]; then \
+	  [ -n "$$_gmail" ] || read -r -p "Gmail from address: " _gmail; \
+	  [ -n "$$_pw" ] || { read -r -s -p "Gmail app password: " _pw; echo; }; \
+	  [ -n "$$_sms" ] || read -r -p "SMS gateway (10digits@tmomail.net): " _sms; \
 	fi; \
-	curl -sf -X POST \
-	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
-	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager" \
-	  -d "$$(GMAIL_FROM="$$_gmail" GMAIL_PW="$$_pw" SMS_GW="$$_sms" python3 -c 'import json,os; print(json.dumps({"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}))')" >/dev/null && \
-	echo "[alertmanager-secret] Credentials stored in Vault"
+	_missing=; \
+	[ -n "$$_gmail" ] || _missing="$$_missing gmail_from(env ALERTMANAGER_GMAIL_FROM)"; \
+	[ -n "$$_pw" ] || _missing="$$_missing gmail_app_pw(Keychain k3dm-alertmanager-gmail-app-password)"; \
+	[ -n "$$_sms" ] || _missing="$$_missing sms_gateway(env ALERTMANAGER_SMS_GATEWAY)"; \
+	if [ -n "$$_missing" ]; then \
+	  echo "[alertmanager-secret] ERROR: unresolved:$$_missing" >&2; \
+	  echo "[alertmanager-secret] set the named env vars, or run this target from a real terminal to be prompted" >&2; \
+	  exit 1; \
+	fi; \
+	printf '%s' "$$_gmail" | grep -qE '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z][A-Za-z]+$$' || \
+	  { echo "[alertmanager-secret] ERROR: gmail_from is not an email address (placeholder text?)" >&2; exit 1; }; \
+	printf '%s' "$$_sms" | grep -qE '^[0-9]{10}@[A-Za-z0-9.-]+\.[A-Za-z][A-Za-z]+$$' || \
+	  { echo "[alertmanager-secret] ERROR: sms_gateway must be 10digits@gateway.domain (placeholder text?)" >&2; exit 1; }; \
+	printf '%s' "$$_pw" | grep -qE '^.{8,}$$' || \
+	  { echo "[alertmanager-secret] ERROR: gmail_app_pw is implausibly short" >&2; exit 1; }; \
+	VAULT_TOKEN="$$_tok" GMAIL_FROM="$$_gmail" GMAIL_PW="$$_pw" SMS_GW="$$_sms" python3 -c 'import json,os,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; p={"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}; u.urlopen(u.Request(a,data=json.dumps(p).encode(),headers=h,method="POST"))' || \
+	  { echo "[alertmanager-secret] ERROR: Vault write failed (is the Vault port-forward on 127.0.0.1:18200 up?)" >&2; exit 1; }; \
+	echo "[alertmanager-secret] Credentials stored in Vault"; \
+	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-gmail-from -w "$$_gmail" 2>/dev/null && \
+	  echo "[alertmanager-secret] gmail_from backed up to Keychain"; \
+	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-sms-gateway -w "$$_sms" 2>/dev/null && \
+	  echo "[alertmanager-secret] sms_gateway backed up to Keychain"
 
 ## Restore the Alertmanager Gmail App Password from Keychain into Vault, then rebuild the Alertmanager Secret
 restore-google-app-password:
@@ -594,7 +631,17 @@ restore-google-app-password:
 	[ -n "$$_tok" ] || { echo "[restore-google-app-password] ERROR: cannot read Hub Vault root token" >&2; exit 1; }; \
 	_pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>/dev/null); \
 	[ -n "$$_pw" ] || { echo "[restore-google-app-password] ERROR: k3dm-alertmanager-gmail-app-password not in Keychain (locked? run: security unlock-keychain)" >&2; exit 1; }; \
-	VAULT_TOKEN="$$_tok" GMAIL_PW="$$_pw" python3 -c 'import json,os,sys,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; d=json.load(u.urlopen(u.Request(a,headers=h)))["data"]["data"]; m=[k for k in ("gmail_from","sms_gateway") if not d.get(k)]; m and sys.exit("[restore-google-app-password] ERROR: Vault missing "+",".join(m)+" - run: make alertmanager-secret"); d["gmail_app_pw"]=os.environ["GMAIL_PW"]; u.urlopen(u.Request(a,data=json.dumps({"data":d}).encode(),headers=h,method="POST"))' && \
+	_gmail=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-from -w 2>/dev/null || true); \
+	_sms=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-sms-gateway -w 2>/dev/null || true); \
+	_missing=; \
+	[ -n "$$_gmail" ] || _missing="$$_missing k3dm-alertmanager-gmail-from"; \
+	[ -n "$$_sms" ] || _missing="$$_missing k3dm-alertmanager-sms-gateway"; \
+	if [ -n "$$_missing" ]; then \
+	  echo "[restore-google-app-password] ERROR: not in Keychain:$$_missing" >&2; \
+	  echo "[restore-google-app-password] run: make alertmanager-secret (it stores these for future restores)" >&2; \
+	  exit 1; \
+	fi; \
+	VAULT_TOKEN="$$_tok" GMAIL_PW="$$_pw" GMAIL_FROM="$$_gmail" SMS_GW="$$_sms" python3 -c 'import json,os,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; p={"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}; u.urlopen(u.Request(a,data=json.dumps(p).encode(),headers=h,method="POST"))' && \
 	echo "[restore-google-app-password] Vault updated — rebuilding Alertmanager Secret" && \
 	$(MAKE) observability
 
@@ -705,13 +752,16 @@ test-python-unit:
 	 if [ "$$found" -eq 0 ]; then echo "[make] no unittest suites found" >&2; exit 2; fi
 
 ## Run the pytest suites (scripts/tests/hermes + scripts/tests/bin/test_*.py)
+check-doc-links:
+	@python3 scripts/check-doc-links.py
+
 test-pytest:
 	@set -euo pipefail; \
 	 python3 -m pytest --version >/dev/null 2>&1 || { \
 	   echo "[make] pytest not installed for $$(python3 --version 2>&1)." >&2; \
 	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
 	   exit 2; }; \
-	 python3 -m pytest scripts/tests/hermes scripts/tests/bin/test_smoke_logins.py
+	 python3 -m pytest scripts/tests/hermes scripts/tests/bin/test_smoke_logins.py scripts/tests/bin/test_check_doc_links.py
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest
@@ -722,6 +772,22 @@ test-all: test test-bin test-python
 ## Run the Tier 1 e2e verification harness (throwaway vCluster + in-cluster Playwright Job). DIGEST=<candidate image digest> optional.
 e2e:
 	./scripts/k3d-manager e2e_verify_vcluster $(DIGEST)
+
+## Run the smoke gate (offline checks always; cluster checks when reachable). SMOKE_ONLY=offline|cluster optional.
+smoke:
+	./scripts/k3d-manager smoke_run $(SMOKE_ONLY)
+
+## Capture a hub snapshot and offload it to the M2 store.
+snapshot:
+	./scripts/k3d-manager hub_snapshot_capture
+
+## List captured hub snapshots on the M2 store.
+snapshot-list:
+	./scripts/k3d-manager hub_snapshot_list
+
+## Prune old hub snapshots, keeping K3DM_SNAPSHOT_KEEP (default 3).
+snapshot-prune:
+	./scripts/k3d-manager hub_snapshot_prune
 
 ## Run the Tier 1 e2e harness on a remote runner off the M4 laptop. RUNNER=m2 required, DIGEST=<image digest> optional. No local fallback.
 e2e-remote:

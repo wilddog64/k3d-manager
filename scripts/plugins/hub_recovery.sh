@@ -117,12 +117,17 @@ function _hub_recovery_replay_identity_hook() {
 
 function _hub_recovery_mirror_argocd_admin() {
   local hub_context="$1" root_token password payload_file argocd_url="${HUB_RECOVERY_ARGOCD_URL:-https://argocd.3ai-talk.org}" code
+  local __attempt
   root_token=$(_kubectl -- --context "$hub_context" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
   [[ -n "$root_token" ]] || { _err "[hub-recovery] Vault root token unavailable for ArgoCD admin mirror"; return 1; }
   if printf '%s\n' "$root_token" | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=password argocd/admin >/dev/null 2>&1'; then
     return 0
   fi
-  password=$(_kubectl -- --context "$hub_context" -n cicd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+  for __attempt in $(seq 1 10); do
+    password=$(_kubectl -- --context "$hub_context" -n cicd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+    [[ -n "$password" ]] && break
+    sleep "${HUB_RECOVERY_MIRROR_RETRY_DELAY:-6}"
+  done
   if [[ -z "$password" ]]; then
     _warn "[hub-recovery] argocd-initial-admin-secret unavailable; cannot mirror ArgoCD admin password into Vault"
     return 0
@@ -262,6 +267,7 @@ agent-0|identity|data-openldap-0|node-agent-0-storage
 agent-0|identity|ldap-config-pvc|node-agent-0-storage
 agent-2|trivy-system|data-trivy-server-0|node-agent-2-storage
 agent-0|monitoring|prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0|node-agent-0-storage
+agent-1|monitoring|storage-loki-0|node-agent-1-storage
 EOF
 }
 
@@ -340,7 +346,9 @@ function hub_recovery_validate() {
   source_dir="$(_hub_recovery_source_dir "${1:-}")" || return 1
   _hub_recovery_validate_files "$source_dir" || return 1
   _hub_recovery_validate_claims "$source_dir" || return 1
-  echo "Hub recovery source validated: seven logical claims, one source tree each."
+  local _claim_count
+  _claim_count="$(_hub_recovery_records | grep -c '^[^[:space:]]')"
+  echo "Hub recovery source validated: ${_claim_count} logical claims, one source tree each."
 }
 
 function _hub_recovery_target_path() {

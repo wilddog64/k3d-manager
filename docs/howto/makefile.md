@@ -14,14 +14,46 @@ make up URL=https://...      # provision with explicit sandbox URL
 
 | Target | Command | When to use |
 |---|---|---|
-| `make up` | `bin/acg-up` | Start from scratch — credentials → Hub cluster → ESO → ArgoCD → app cluster |
-| `make down` | `bin/acg-down --confirm` | Tear down app cluster, Hub cluster, and Vault port-forward; add `KEEP_LOCAL=1` to preserve the local Hub |
+| `make up` | `bin/cluster-up` | Start from scratch — credentials → Hub cluster → ESO → ArgoCD → app cluster |
+| `make down` | `bin/cluster-down --confirm` | Tear down app cluster, Hub cluster, and Vault port-forward; add `KEEP_LOCAL=1` to preserve the local Hub |
 | `make down CLEANUP_STALE=1` | `cleanup-stale-clusters` (+ AWS local cleanup) | Explicitly remove expired managed registrations and stale AWS sandbox state after teardown |
 | `make cleanup-stale-sandbox` | `bin/cleanup-stale-sandbox` | Preview stale AWS sandbox local state; add `CONFIRM=1` to remove it |
 | `make cleanup-stale-clusters` | `bin/cleanup-stale-clusters` | Preview expired managed ArgoCD registrations; add `CONFIRM=1` to remove them |
 | `make cleanup-stale-resources` | Both cleanup scripts | Run both guarded cleanup paths; the local sandbox path runs only for `CLUSTER_PROVIDER=k3s-aws` |
-| `make refresh` | `bin/acg-refresh` | Creds expired or tunnel dropped — re-extracts credentials and restarts tunnel |
-| `make status` | `bin/acg-status` | Read-only health check — Hub nodes, pods, tunnel, ArgoCD |
+| `make refresh` | `bin/cluster-refresh` | Creds expired or tunnel dropped — re-extracts credentials and restarts tunnel |
+| `make status` | `bin/cluster-status` | Read-only health check — Hub nodes, pods, tunnel, ArgoCD |
+| `make smoke` | `scripts/k3d-manager smoke_run` | Run the offline webhook check and the cluster health check when the configured context is reachable |
+
+`make smoke SMOKE_ONLY=offline` runs only the webhook check. Use
+`SMOKE_ONLY=cluster` to run only the cluster check. An unreachable cluster is
+reported as `SKIP`, while a failed check makes the target exit non-zero. Each
+check writes its output under `${TMPDIR:-/tmp}/k3dm-smoke/<UTC-run>/`.
+
+## Hub snapshots
+
+`make snapshot` captures the cold hub state and transfers it to
+`${K3DM_SNAPSHOT_HOST:-m2jump}:${K3DM_SNAPSHOT_DIR:-k3dm-snapshots}`, where a
+relative default resolves against the remote login home. Do not set
+`K3DM_SNAPSHOT_DIR` to a `~`-prefixed path: it is passed single-quoted to the
+remote shell, which would create a directory literally named `~`.
+The capture includes the k3s server database and token, the PV/PVC metadata,
+Vault's file-backed data tree, Prometheus, Loki, Keycloak Postgres, OpenLDAP,
+and Trivy local-path trees. Use `make snapshot-list` to show each timestamp,
+size, and verification state. `make snapshot-prune` removes incomplete
+snapshots first and keeps the newest three verified snapshots by default; set
+`K3DM_SNAPSHOT_KEEP` to change that ceiling.
+
+Prometheus retains only three days (`--storage.tsdb.retention.time=3d`), so an
+older snapshot restores blocks that Prometheus immediately prunes on startup.
+Snapshots preserve history across a down/up cycle inside that window; they are
+not long-term history storage. Long-term retention requires a higher Prometheus
+retention setting or remote write.
+
+After a rebuild, generate the new target map and restore with:
+
+```bash
+./scripts/k3d-manager hub_recovery_restore <captured-directory> <targets.tsv> --confirm
+```
 
 ---
 
@@ -32,7 +64,7 @@ make up URL=https://...      # provision with explicit sandbox URL
 | `make sync-apps` | Sync `rollout-demo-default` in ArgoCD and show remote pod status |
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
 
-`sync-apps` delegates to `bin/acg-sync-apps` which manages the argocd-server port-forward
+`sync-apps` delegates to `bin/cluster-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).
 
 Slack admin commands also support `cluster-up [provider] [dry-run]` and
@@ -95,8 +127,8 @@ make         # same as make help (DEFAULT_GOAL)
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `URL` | `https://app.pluralsight.com/cloud-playground/cloud-sandboxes` | Sandbox URL passed to `bin/acg-up` and `bin/acg-refresh` |
-| `GHCR_PAT` | `$(gh auth token)` | GitHub Container Registry token — used by `acg-up` to create the `ghcr-pull-secret` |
+| `URL` | `https://app.pluralsight.com/cloud-playground/cloud-sandboxes` | Sandbox URL passed to `bin/cluster-up` and `bin/cluster-refresh` |
+| `GHCR_PAT` | `$(gh auth token)` | GitHub Container Registry token — used by `cluster-up` to create the `ghcr-pull-secret` |
 | `KEEP_LOCAL` | `0` | Set to `1` to preserve the local Hub cluster when running `make down` |
 | `CLEANUP_STALE` | `0` | Set to `1` to run guarded stale-resource cleanup after `make down` |
 

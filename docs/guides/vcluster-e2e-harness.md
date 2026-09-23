@@ -1,16 +1,16 @@
-# vCluster E2E Harness (Tier 1)
+# vCluster E2E Harness
 
-A learning-oriented guide to the **Tier 1 end-to-end verification harness** — how
-`e2e_verify_vcluster` stands up the shopping-cart stack in a throwaway
-[vCluster](https://www.vcluster.com/), runs the Playwright suite against it as an
-in-cluster Job, and reports a machine-readable pass/fail. Grounded in
+A learning-oriented guide to the **end-to-end verification harness** — both tiers of the
+two-tier model in `docs/plans/v1.25.0-e2e-verification-harness.md`. Grounded in
 `scripts/plugins/e2e.sh` and `scripts/etc/e2e/`.
 
-> **Scope.** This is Tier 1 of the two-tier model in
-> `docs/plans/v1.25.0-e2e-verification-harness.md`. Tier 1 is the **fast, cheap,
-> per-candidate** gate. Tier 2 (the ACG full-stack sandbox with real OIDC and the
-> live Stripe path) is a separate, periodic job. Tier 1 deliberately runs with
-> `OAUTH2_ENABLED=false` and no ESO/Vault/ArgoCD.
+| Tier | Function | Substrate | Cadence |
+|---|---|---|---|
+| [**Tier 1**](#tier-1-per-candidate-vcluster-gate) | `e2e_verify_vcluster` | throwaway vCluster, `OAUTH2_ENABLED=false`, no ESO/Vault/ArgoCD | **blocking, per-candidate** |
+| [**Tier 2**](#tier-2-acg-sandbox-stripe-verification) | `e2e_verify_sandbox` | ACG full-stack sandbox, real OIDC, live Stripe path | opt-in, periodic, never blocking |
+
+Most of this guide is Tier 1, because that is the gate a candidate image must pass. Tier 2
+has its own section near the end.
 
 ---
 
@@ -37,7 +37,9 @@ No manual vCluster CLI installation is supported.
 
 ---
 
-## The self-contained substrate bundle (`scripts/etc/e2e/`)
+## Tier 1: per-candidate vCluster gate
+
+### The self-contained substrate bundle (`scripts/etc/e2e/`)
 
 The existing `shopping_cart_reconcile_*` functions are hardcoded to the **live** app
 cluster — they assume ArgoCD, ESO, Vault, and a running Postgres. They are *not*
@@ -59,7 +61,7 @@ Vault / ESO / ArgoCD:
 **Contract, not convenience** — every value is derived from the authoritative
 `shopping-cart-e2e-tests/docker-compose.yml` and each service's `k8s/base`.
 
-### The port-decoupling detail worth knowing
+#### The port-decoupling detail worth knowing
 
 The e2e tests and the compose contract address product-catalog on **:8000**, but the
 published container image actually listens on **:8080** (`uvicorn --port 8080`). The
@@ -74,7 +76,7 @@ Service order            port 8080  ->  targetPort http (8080)
 So the test-facing DNS name/port (`product-catalog…svc:8000`) is stable regardless of
 the container's internal port.
 
-### Image pinning (A08)
+#### Image pinning (A08)
 
 All images are pinned — no `:latest`. The three service images default to their
 last-known-good immutable `sha-<gitsha>` tags (mirrored from each service's own
@@ -84,30 +86,38 @@ service-under-test image** with the candidate digest at deploy time.
 
 ---
 
-## The in-cluster Playwright Job model
+### The in-cluster Playwright Job model
 
 Rather than port-forwarding services to the host and running Playwright locally, the
 harness ships the tests **as a container image** and runs them **inside** the
 vCluster as a `Job`:
 
-```
-   build+publish                 vcluster_create
- e2e image (GHCR)  ─────►  ┌────────────────────────────┐
-                          │  vCluster (throwaway)        │
-  candidate digest ─────► │   substrate bundle (kustomize)│
-                          │   ├─ postgres / redis         │
-                          │   ├─ product-catalog/basket/order
-                          │   └─ seed Job                 │
-                          │   Playwright Job ─┐           │
-                          │     env → ClusterIP DNS:      │
-                          │       product-catalog:8000    │
-                          │       basket:8083 order:8080  │
-                          │     npx playwright test        │
-                          │       --project=api --project=flows
-                          └───────────┬───────────────────┘
-                                      │ logs + results.json
-                                      ▼
-                        exit code + JSON summary  → $E2E_REPORT_DIR/<run_id>.json
+```mermaid
+flowchart TD
+    IMG["e2e image (GHCR)<br/><i>build + publish</i>"]
+    DIGEST["candidate digest"]
+
+    subgraph VC["vCluster (throwaway) — vcluster_create"]
+        SUB["substrate bundle (kustomize)"]
+        DATA["postgres / redis"]
+        APPS["product-catalog / basket / order"]
+        SEED["seed Job"]
+        PW["Playwright Job<br/>npx playwright test<br/>--project=api --project=flows"]
+        DNS["env → ClusterIP DNS<br/>product-catalog:8000<br/>basket:8083 · order:8080"]
+
+        SUB --> DATA
+        SUB --> APPS
+        SUB --> SEED
+        SEED --> PW
+        DNS --> PW
+        APPS --> DNS
+    end
+
+    OUT["exit code + JSON summary<br/>$E2E_REPORT_DIR/&lt;run_id&gt;.json"]
+
+    IMG --> VC
+    DIGEST --> VC
+    PW -->|"logs + results.json"| OUT
 ```
 
 The Job talks to the services over **ClusterIP DNS** — no host port-forward. It uses
@@ -116,7 +126,7 @@ from GHCR with the `ghcr-pull-secret` the harness provisions in the vCluster.
 
 ---
 
-## The gate-consumable contract
+### The gate-consumable contract
 
 Two outputs matter, and both are **exit-code-faithful**:
 
@@ -142,7 +152,7 @@ exporter and Grafana dashboard that turn these summaries into observability are 
 
 ---
 
-## Running it
+### Running it
 
 ```bash
 # Requires a host cluster context (VCLUSTER_HOST_CONTEXT or current kube-context).
@@ -162,6 +172,100 @@ image), `E2E_NAMESPACE`, `E2E_JOB_TIMEOUT`, `E2E_ROLLOUT_TIMEOUT`, `E2E_REPORT_D
 > published from the `shopping-cart-e2e-tests` repo (Part 1 of the Tier 1 spec:
 > `Dockerfile` + `publish-image.yml` + a `workflow_call` surface on `e2e-tests.yml`).
 > Pin `E2E_IMAGE_TAG` to a `sha-<gitsha>` tag for reproducible runs.
+
+## Tier 2: ACG sandbox Stripe verification
+
+`e2e_verify_sandbox` is the opt-in, periodic Tier 2 path for the Stripe checkout
+flow. It extends the ACG sandbox TTL, installs disposable ArgoCD inside the
+`ubuntu-k3s` sandbox, applies the four ApplicationSets plus the sandbox-only
+order/payment overrides, and runs the `flows` Playwright project with
+`OAUTH2_ENABLED=true` and `STRIPE_E2E=true`.
+
+```bash
+./scripts/k3d-manager e2e_verify_sandbox
+```
+
+The sandbox is never registered with hub ArgoCD and is not torn down by the
+harness; ACG TTL expiry provides cleanup. Tier 2 is best-effort and periodic,
+never a blocking per-candidate gate. Its summaries use `tier: sandbox` and
+`project: stripe` in the shared report directory.
+
+## Failure classification
+
+A failed run is not just a red light: each failing test is classified into a **kind** (what went
+wrong) and routed to a **service** (who owns it). Both live in one place —
+`scripts/lib/hermes/e2e_triage.py` — and are used by both the Bash summary writer
+(`_e2e_write_summary`) and Hermes' bug filer (`scripts/lib/hermes/e2e_bugs.py`). There was
+briefly a second, divergent copy inlined in `scripts/plugins/e2e.sh`; it is gone, and adding
+another is the thing to avoid.
+
+### Kinds
+
+`classify()` returns the first match in a deliberate order, and that order is the policy:
+
+| Order | Kind | Matches on |
+|---|---|---|
+| 1 | `service-unreachable` | `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `connect ETIMEDOUT` |
+| 2 | `timeout` | Playwright `status == "timedOut"`, or `Timeout <n>ms exceeded` |
+| 3 | `auth` | `401`/`403`, `Unauthorized`, `Forbidden`, `invalid_grant`, `invalid_token`, expiry |
+| 4 | `contract-drift` | `Received: undefined`, `toHaveProperty`, type-shape mismatches |
+| 5 | `assertion` | anything else — the default |
+
+`harness` is a sixth kind, produced only when a run fails with **no** test-level failures at all
+(it died before or around Playwright); its target is the failing phase.
+
+Two narrowings are deliberate and are pinned by tests, so don't "simplify" them:
+
+- `auth` is checked **before** `contract-drift`, because a 401 body is often empty and would
+  otherwise read as a shape mismatch.
+- `auth` matches `\b(401|403)\b` only. A test asserting `toBe(404)` or a `500` is an
+  **assertion** failure, not an auth failure.
+
+### Routing, and the tier port split
+
+`service_for()` attributes a failure to one owning service; `repo_for()` maps that to the repo
+that must carry the fix, returning `None` when there is no single owner so the caller has to
+decide rather than defaulting silently.
+
+For a connection failure the port *is* the attribution — and the two tiers deliberately use
+**different ports for the same two services**:
+
+| Service | Tier 1 (vcluster) | Tier 2 (sandbox) | Repo |
+|---|---|---|---|
+| product-catalog | `8000` | `8082` | `shopping-cart-product-catalog` |
+| order | `8080` | `8081` | `shopping-cart-order` |
+| basket | `8083` | `8083` | `shopping-cart-basket` |
+| payment | `8084` | `8084` | `shopping-cart-payment` |
+| cross-service | — | — | `shopping-cart-e2e-tests` |
+
+The union has no collisions, so one map serves both tiers. This is worth knowing because a map
+covering only Tier 1 silently degrades Tier 2 attribution to `host-8081` / `host-8082` — a
+failure with no owning service and therefore no routable repo. An unrecognised port keeps its
+number as `host-<port>` rather than collapsing to `unknown`, so the value stays diagnosable.
+
+For everything else the target is the spec slug (`api/cart.spec.ts` → `api-cart`) and routing is
+by substring, with `cross-service` as the fallback when no single service owns the spec.
+
+### Redaction
+
+Failure text is **redacted before it is truncated**, not after — a token cut in half by a length
+cap would escape the pattern and survive. This matters because `failure_details` does not stay
+local: it is published to a hub `platform-ops` ConfigMap and surfaced in Grafana, and Playwright
+assertion output for an auth test routinely embeds the header that failed.
+
+Redacted: the JSON summary (`<run_id>.json`), the failures sidecar (`<run_id>.failures.json`),
+and the published event. **Not** redacted: the raw `<run_id>.log`, deliberately — it never
+leaves the machine and is what you actually debug from. The remote publisher
+(`scripts/plugins/e2e_remote.sh`) re-redacts on receipt rather than trusting the runner, since a
+runner may be on older code.
+
+### The corpus
+
+`scripts/tests/fixtures/e2e-corpus/corpus.jsonl` holds labelled failures that pin the classifier
+against regression — real samples back-labelled from machine-filed bug docs, plus synthetic
+entries for the cases real data does not yet cover. When you triage a new failure shape, add an
+entry. Read that directory's `README.md` before citing the corpus for anything else: it is a
+regression set, and it is far too small to validate a probabilistic or confidence-scored method.
 
 ---
 

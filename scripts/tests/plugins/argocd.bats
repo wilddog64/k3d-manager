@@ -219,6 +219,10 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'RESTART_DELAY=2' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
+  run grep -F 'ADDRESS=${ADDRESS}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'LOG_TAG=${LOG_TAG}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
   run grep -Fq -- 'healthz check failed' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'KUBECONFIG_FILE=${KUBECONFIG_FILE}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
@@ -236,7 +240,41 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F '_kubectl_context_arg=""' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -Eq 'port-forward --address=127\.0\.0\.1 .*\$\{LOCAL_PORT\}:\$\{REMOTE_PORT\}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -Eq 'port-forward --address="\$\{ADDRESS\}" .*\$\{LOCAL_PORT\}:\$\{REMOTE_PORT\}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
+@test "port-forward wrapper scopes listener sweeps and refreshes context" {
+  local template="$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -F -c -- '-iTCP@"${ADDRESS}":"${LOCAL_PORT}"' "$template"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 2 ]
+  run bash -c 'grep -c -- '\''-iTCP:"${LOCAL_PORT}"'\'' "$1" || true' _ "$template"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 0 ]
+  run bash -c 'grep -cF '\''[argocd-pf]'\'' "$1" || true' _ "$template"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 0 ]
+  run grep -F '_resolve_kubectl_context()' "$template"
+  [ "$status" -eq 0 ]
+  run grep -nF 'while true; do' "$template"
+  [ "$status" -eq 0 ]
+  local loop_line="${output%%:*}"
+  run grep -nF '   _resolve_kubectl_context' "$template"
+  [ "$status" -eq 0 ]
+  local call_line="${output%%:*}"
+  [ "$call_line" -gt "$loop_line" ]
+  run grep -F 'using current-context' "$template"
+  [ "$status" -eq 0 ]
+  run grep -Eq 'local address=.*127\.0\.0\.1|local address=' scripts/plugins/argocd.sh
+  [ "$status" -eq 0 ]
+  run grep -F 'q_address' scripts/plugins/argocd.sh
+  [ "$status" -eq 0 ]
+  run grep -F 'q_log_tag' scripts/plugins/argocd.sh
+  [ "$status" -eq 0 ]
+  run grep -F 'ADDRESS="$q_address"' scripts/plugins/argocd.sh
+  [ "$status" -eq 0 ]
+  run grep -F 'LOG_TAG="$q_log_tag"' scripts/plugins/argocd.sh
   [ "$status" -eq 0 ]
 }
 

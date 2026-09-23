@@ -381,6 +381,31 @@ def test_correlator_fire_silence_dedupe_resolved_and_unknown():
     assert Correlator().process([sensor("eso", "unknown"), sensor("ci", "unknown")], {}) is None
 
 
+def test_correlator_re_pages_when_a_sensor_joins_an_active_incident():
+    corr, state = Correlator(correlation_window=1), {}
+    assert corr.process([sensor("kine", "degraded"), sensor("eso", "degraded")], state)["kind"] == "incident"
+    assert corr.process([sensor("kine", "degraded"), sensor("eso", "degraded")], state) is None
+    escalation = corr.process([sensor("kine", "degraded"), sensor("eso", "degraded"),
+                               sensor("reachability", "degraded")], state)
+    assert escalation["kind"] == "escalation"
+    assert "reachability" in escalation["text"]
+    assert corr.process([sensor("kine", "degraded"), sensor("eso", "degraded"),
+                         sensor("reachability", "degraded")], state) is None
+    assert corr.process([sensor("kine", "healthy"), sensor("eso", "healthy"),
+                         sensor("reachability", "healthy")], state)["kind"] == "resolved"
+    assert state["incident_sensors"] == []
+
+
+def test_correlator_does_not_re_page_a_flapping_sensor_within_one_incident():
+    corr, state = Correlator(correlation_window=1), {}
+    corr.process([sensor("kine", "degraded"), sensor("eso", "degraded")], state)
+    corr.process([sensor("kine", "degraded"), sensor("eso", "degraded"),
+                  sensor("reachability", "degraded")], state)
+    assert corr.process([sensor("kine", "degraded"), sensor("eso", "degraded")], state) is None
+    assert corr.process([sensor("kine", "degraded"), sensor("eso", "degraded"),
+                         sensor("reachability", "degraded")], state) is None
+
+
 def test_llm_budget_cap_and_deterministic_fallback():
     calls, state = [], {}
     corr = Correlator(correlation_window=1, daily_budget=1)

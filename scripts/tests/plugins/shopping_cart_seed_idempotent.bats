@@ -32,6 +32,18 @@ setup() {
           [[ "${TEST_SRC_MINIO_EXISTS:-0}" == "1" ]] || return 1
           printf '{"data":{"data":{"root-user":"src-minio-user","root-password":"src-minio-pass"}}}\n'
           ;;
+        payment/encryption)
+          [[ "${TEST_SRC_PAYMENT_ENCRYPTION_EXISTS:-0}" == "1" ]] || return 1
+          printf '{"data":{"data":{"key":"encryption-from-source"}}}\n'
+          ;;
+        payment/stripe)
+          [[ "${TEST_SRC_PAYMENT_STRIPE_EXISTS:-0}" == "1" ]] || return 1
+          printf '{"data":{"data":{"api_key":"stripe-from-source","webhook_secret":"webhook-from-source"}}}\n'
+          ;;
+        payment/paypal)
+          [[ "${TEST_SRC_PAYMENT_PAYPAL_EXISTS:-0}" == "1" ]] || return 1
+          printf '{"data":{"data":{"client_id":"paypal-from-source","client_secret":"paypal-secret-from-source"}}}\n'
+          ;;
         *) return 1 ;;
       esac
       return 0
@@ -62,6 +74,18 @@ setup() {
       minio/credentials)
         [[ "${TEST_MINIO_EXISTS:-1}" == "1" ]] || return 1
         printf '{"data":{"data":{"root-user":"minioadmin","root-password":"minio-pass"}}}\n'
+        ;;
+      payment/encryption)
+        [[ "${TEST_PAYMENT_ENCRYPTION_EXISTS:-0}" == "1" ]] || return 1
+        printf '{"data":{"data":{"key":"encryption-existing"}}}\n'
+        ;;
+      payment/stripe)
+        [[ "${TEST_PAYMENT_STRIPE_EXISTS:-0}" == "1" ]] || return 1
+        printf '{"data":{"data":{"api_key":"stripe-existing","webhook_secret":"webhook-existing"}}}\n'
+        ;;
+      payment/paypal)
+        [[ "${TEST_PAYMENT_PAYPAL_EXISTS:-0}" == "1" ]] || return 1
+        printf '{"data":{"data":{"client_id":"paypal-existing","client_secret":"paypal-secret-existing"}}}\n'
         ;;
       ldap/admin)
         printf '{"data":{"data":{"admin_password":"ldap-admin","readonly_password":"ldap-readonly"}}}\n'
@@ -96,6 +120,9 @@ setup() {
       case "$input" in
         *'"password":"cart-from-source"'*) printf '{"password":"cart-from-source"}\n' ;;
         *'"root-user":"src-minio-user"'*) printf '{"root-user":"src-minio-user","root-password":"src-minio-pass"}\n' ;;
+        *'"key":"encryption-from-source"'*) printf '{"key":"encryption-from-source"}\n' ;;
+        *'"api_key":"stripe-from-source"'*) printf '{"api_key":"stripe-from-source","webhook_secret":"webhook-from-source"}\n' ;;
+        *'"client_id":"paypal-from-source"'*) printf '{"client_id":"paypal-from-source","client_secret":"paypal-secret-from-source"}\n' ;;
       esac
       return 0
     fi
@@ -138,7 +165,11 @@ setup() {
     printf 'generated-secret\n'
   }
 
-  export -f curl jq openssl
+  security() {
+    return 1
+  }
+
+  export -f curl jq openssl security
 
   # shellcheck disable=SC1090
   source "${BATS_TEST_DIRNAME}/../../plugins/shopping_cart.sh"
@@ -218,6 +249,84 @@ setup() {
   [ "$status" -eq 0 ]
   grep -q 'http://source:8200/v1/secret/data/minio/credentials' "$CURL_LOG"
   grep -Eq 'src-minio-user.*minio/credentials$' "$CURL_LOG"
+}
+
+@test "reuses existing payment/encryption without PUT" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_PAYMENT_ENCRYPTION_EXISTS="1"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'POST .*payment/encryption$' "$CURL_LOG")" -eq 0 ]
+}
+
+@test "reuses existing payment/stripe without PUT" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_PAYMENT_STRIPE_EXISTS="1"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'POST .*payment/stripe$' "$CURL_LOG")" -eq 0 ]
+}
+
+@test "reuses existing payment/paypal without PUT" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_PAYMENT_PAYPAL_EXISTS="1"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'POST .*payment/paypal$' "$CURL_LOG")" -eq 0 ]
+}
+
+@test "copies payment/encryption from canonical source instead of writing the default" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_PAYMENT_ENCRYPTION_EXISTS="0"
+  export SEED_VAULT_SOURCE_ADDR="http://source:8200"
+  export TEST_SOURCE_ADDR="http://source:8200"
+  export TEST_SRC_PAYMENT_ENCRYPTION_EXISTS="1"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  grep -q 'http://source:8200/v1/secret/data/payment/encryption' "$CURL_LOG"
+  grep -Eq 'encryption-from-source.*payment/encryption$' "$CURL_LOG"
+  run grep -q 'dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg==' "$CURL_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "copies payment/stripe from canonical source instead of writing the placeholder" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_PAYMENT_STRIPE_EXISTS="0"
+  export SEED_VAULT_SOURCE_ADDR="http://source:8200"
+  export TEST_SOURCE_ADDR="http://source:8200"
+  export TEST_SRC_PAYMENT_STRIPE_EXISTS="1"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  grep -q 'http://source:8200/v1/secret/data/payment/stripe' "$CURL_LOG"
+  grep -Eq 'stripe-from-source.*payment/stripe$' "$CURL_LOG"
+  run grep -q 'sk_test_placeholder' "$CURL_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "copies payment/paypal from canonical source instead of writing the sandbox default" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_PAYMENT_PAYPAL_EXISTS="0"
+  export SEED_VAULT_SOURCE_ADDR="http://source:8200"
+  export TEST_SOURCE_ADDR="http://source:8200"
+  export TEST_SRC_PAYMENT_PAYPAL_EXISTS="1"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  grep -q 'http://source:8200/v1/secret/data/payment/paypal' "$CURL_LOG"
+  grep -Eq 'paypal-from-source.*payment/paypal$' "$CURL_LOG"
+  run grep -q 'paypal_sandbox_client_id' "$CURL_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "seed URL carries _vault_local_port set after the plugin was sourced (no empty-port freeze)" {

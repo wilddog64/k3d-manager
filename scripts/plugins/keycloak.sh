@@ -137,6 +137,8 @@ HELP
       _keycloak_ensure_admin_secret
    fi
 
+   _keycloak_apply_credential_rotator
+
    if (( enable_ldap )); then
       envsubst < "$KEYCLOAK_CONFIG_DIR/externalsecret-ldap.yaml.tmpl" | _kubectl apply -f - >/dev/null
       if ! _kubectl -n "$KEYCLOAK_NAMESPACE" wait --for=condition=Ready --timeout=60s externalsecret/"$KEYCLOAK_LDAP_SECRET_NAME" 2>/dev/null; then
@@ -173,6 +175,19 @@ HELP
    _info "[keycloak] UI available at: https://$KEYCLOAK_VIRTUALSERVICE_HOST"
    if (( enable_vault )); then
       _info "[keycloak] Admin password stored in secret '$KEYCLOAK_ADMIN_SECRET_NAME'"
+   fi
+}
+
+function _keycloak_apply_credential_rotator() {
+   local manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/keycloak-credential-rotator.yaml"
+   [[ -f "${manifest}" ]] || return 0
+   _kubectl apply -f "${manifest}" >/dev/null \
+     && _info "[keycloak] monthly credential rotator applied"
+   if declare -f _vault_configure_secret_writer_role >/dev/null 2>&1; then
+      _vault_configure_secret_writer_role "secrets" "vault" \
+        "keycloak-credential-rotator" "identity" "secret" "keycloak/admin" \
+        "keycloak-rotation" "keycloak-rotation" \
+        || _err "[keycloak] failed to configure Keycloak rotation Vault role"
    fi
 }
 

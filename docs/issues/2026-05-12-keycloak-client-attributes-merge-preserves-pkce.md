@@ -37,8 +37,8 @@ Keycloak’s client update path is preserving existing client attributes instead
 
 ## Fix
 
-- [`scripts/plugins/keycloak.sh`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/plugins/keycloak.sh) now removes the stale `pkce.code.challenge.method` row from the live Keycloak database during realm reconciliation.
-- [`bin/acg-up`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-up) now calls that cleanup after reconciling the `argocd` client.
+- `scripts/plugins/keycloak.sh` now removes the stale `pkce.code.challenge.method` row from the live Keycloak database during realm reconciliation.
+- `bin/acg-up` now calls that cleanup after reconciling the `argocd` client.
 
 ## Follow-up
 

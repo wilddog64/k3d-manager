@@ -3,6 +3,45 @@
 VALUES="${BATS_TEST_DIRNAME}/../../etc/helm/observability/kube-prometheus-stack-values.yaml"
 DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"
 
+@test "hub istiod keeps only http-monitoring" {
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "istiod") | .relabel_configs[] | select(.source_labels[0] == "__meta_kubernetes_endpoint_port_name") | .regex' "${VALUES}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "http-monitoring" ]
+}
+
+@test "hub istiod port rule action is keep" {
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "istiod") | .relabel_configs[] | select(.source_labels[0] == "__meta_kubernetes_endpoint_port_name") | .action' "${VALUES}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "keep" ]
+}
+
+@test "hub istiod service-name keep remains additive" {
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "istiod") | .relabel_configs[] | select(.source_labels[0] == "__meta_kubernetes_service_name") | [.action, .regex] | @tsv' "${VALUES}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = $'keep\tistiod' ]
+}
+
+@test "acg istiod keeps only http-monitoring" {
+  local values="${BATS_TEST_DIRNAME}/../../etc/helm/observability/kube-prometheus-stack-acg-values.yaml"
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "istiod") | .relabel_configs[] | select(.source_labels[0] == "__meta_kubernetes_endpoint_port_name") | .regex' "${values}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "http-monitoring" ]
+}
+
+@test "acg istiod port rule action is keep" {
+  local values="${BATS_TEST_DIRNAME}/../../etc/helm/observability/kube-prometheus-stack-acg-values.yaml"
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "istiod") | .relabel_configs[] | select(.source_labels[0] == "__meta_kubernetes_endpoint_port_name") | .action' "${values}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "keep" ]
+}
+
+@test "acg istiod service-name keep remains additive" {
+  local values="${BATS_TEST_DIRNAME}/../../etc/helm/observability/kube-prometheus-stack-acg-values.yaml"
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "istiod") | .relabel_configs[] | select(.source_labels[0] == "__meta_kubernetes_service_name") | [.action, .regex] | @tsv' "${values}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = $'keep\tistiod' ]
+}
+
 @test "federate-acg drops self-scraped samples" {
   run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .metric_relabel_configs[0].action' "${VALUES}"
   [ "${status}" -eq 0 ]

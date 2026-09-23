@@ -18,8 +18,8 @@ ERROR: failed to execute kubectl -n secrets exec -i vault-0 -c vault -- sh -lc v
 The browser TLS helper was attempting to upsert the PKI role before authenticating to Vault with the root token path that this repo already uses elsewhere. Without that login step, the in-pod `vault write` ran with insufficient privileges and Vault rejected the role write with `403 permission denied`.
 
 ## Fix
-- [`scripts/plugins/argocd.sh`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/plugins/argocd.sh) now calls `_vault_login "$ns" "$release"` before upserting the browser TLS PKI role.
-- [`scripts/tests/plugins/argocd.bats`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/tests/plugins/argocd.bats) now stubs `_vault_login` and verifies the browser TLS helper logs in before writing the role.
+- [`scripts/plugins/argocd.sh`](../../scripts/plugins/argocd.sh) now calls `_vault_login "$ns" "$release"` before upserting the browser TLS PKI role.
+- [`scripts/tests/plugins/argocd.bats`](../../scripts/tests/plugins/argocd.bats) now stubs `_vault_login` and verifies the browser TLS helper logs in before writing the role.
 
 ## Verification
 - `shellcheck -S warning scripts/plugins/argocd.sh`

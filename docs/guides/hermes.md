@@ -278,10 +278,36 @@ confirms the root cause and writes the fix specification.
 When the scheduled status sensor runs, Hermes publishes a redacted snapshot to
 the hub `platform-ops` namespace. The vulnerability exporter turns it into
 `hermes_sensor_status`, `hermes_status_check_info`, `hermes_incident_active`,
-and `hermes_last_poll_timestamp_seconds`. Open the Grafana **Hermes Status**
-dashboard to see current findings, incident state, poll age, and sensor history.
-The snapshot contains no tokens or raw local log lines. Set
-`K3DM_HERMES_PUBLISH_STATUS=0` only when deliberately disabling this publication.
+and `hermes_last_poll_timestamp_seconds`. The snapshot contains no tokens or raw
+local log lines. Set `K3DM_HERMES_PUBLISH_STATUS=0` only when deliberately
+disabling this publication.
+
+The Grafana **Hermes Status** dashboard (uid `hermes-status`,
+`scripts/etc/argocd/platform-ops/grafana-dashboard-hermes.yaml`, applied by
+`make platform-ops`) has six panels:
+
+| Panel | Query |
+|-------|-------|
+| Active incident | `sum(hermes_incident_active) or vector(0)` |
+| Minutes since last poll | `max((time() - hermes_last_poll_timestamp_seconds) / 60)` |
+| Degraded sensors | `count(hermes_sensor_status{status="degraded"}) or vector(0)` |
+| Unknown sensors | `count(hermes_sensor_status{status="unknown"}) or vector(0)` |
+| Current Hermes findings | `hermes_sensor_status` |
+| Sensor status history | `hermes_sensor_status` over time |
+
+**Read *Minutes since last poll* first** — sensor states are a snapshot, so a stale
+poll age invalidates every other panel on the dashboard.
+
+Two traps on the publication path:
+
+- The ConfigMap label is `k3dm.k3.io/hermes-status=true` — note `k3.io`, **not**
+  `k3dm.k3d.io` as used by the e2e and CVE-remediation selectors. `bin/k3dm-hermes`
+  and `vulnerability-inventory-exporter.yaml` agree, so it works; normalising the
+  domain in only one of the two silently empties the dashboard with no error.
+- The exporter reports nothing when the selector matches no ConfigMap, so "no
+  Hermes series" and "Hermes never published" look identical from Prometheus.
+
+Full dashboard map and `No data` triage: [`docs/guides/grafana-dashboards.md`](grafana-dashboards.md).
 
 ---
 

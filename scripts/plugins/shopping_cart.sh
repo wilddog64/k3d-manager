@@ -237,6 +237,55 @@ function shopping_cart_force_vault_secret_reconcile() {
   done < <(_shopping_cart_vault_externalsecrets)
 }
 
+function _shopping_cart_ghcr_pat_can_pull() {
+  local _user="$1" _pat="$2"
+  local _probe_repo="${GHCR_PROBE_REPO:-wilddog64/shopping-cart-basket}"
+  local _netrc _hdr _token _http
+
+  if [[ -z "${_user}" || -z "${_pat}" ]]; then
+    return 1
+  fi
+
+  _netrc=$(mktemp) && chmod 0600 "${_netrc}"
+  printf 'machine ghcr.io login %s password %s\n' "${_user}" "${_pat}" > "${_netrc}"
+  _token=$(curl -s --netrc-file "${_netrc}" \
+    "https://ghcr.io/token?service=ghcr.io&scope=repository:${_probe_repo}:pull" \
+    | jq -r '.token // empty' 2>/dev/null || true)
+  rm -f "${_netrc}"
+
+  if [[ -z "${_token}" ]]; then
+    return 1
+  fi
+
+  _hdr=$(mktemp) && chmod 0600 "${_hdr}"
+  printf 'Authorization: Bearer %s\n' "${_token}" > "${_hdr}"
+  _http=$(curl -s -o /dev/null -w '%{http_code}' -H "@${_hdr}" \
+    "https://ghcr.io/v2/${_probe_repo}/tags/list" 2>/dev/null || true)
+  rm -f "${_hdr}"
+
+  [[ "${_http}" == "200" ]]
+}
+
+function _shopping_cart_store_ghcr_pat_in_vault() {
+  local _pat="$1"
+  local _hdr _body
+
+  if [[ -z "${_vault_root_token:-}" || -z "${_pat}" ]]; then
+    return 1
+  fi
+
+  _hdr=$(mktemp) && chmod 0600 "${_hdr}"
+  printf 'X-Vault-Token: %s\n' "${_vault_root_token}" > "${_hdr}"
+  _body=$(mktemp) && chmod 0600 "${_body}"
+  jq -n --arg token "${_pat}" '{data: {token: $token}}' > "${_body}"
+
+  curl -s -X POST -H "@${_hdr}" --data-binary "@${_body}" \
+    "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
+
+  rm -f "${_hdr}" "${_body}"
+  return 0
+}
+
 function shopping_cart_load_ghcr_pat_from_env() {
   _ghcr_pat="${GHCR_PAT:-}"
   _github_user="${GITHUB_USERNAME:-wilddog64}"
@@ -258,6 +307,12 @@ function shopping_cart_load_ghcr_pat_from_env() {
     return 1
   fi
 
+  if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_ghcr_pat}"; then
+    _info "[acg-up] GHCR_PAT env var authenticates but cannot pull from ghcr.io — it is missing the read:packages scope; image pulls would 403. Falling back to Vault"
+    _ghcr_pat=""
+    return 1
+  fi
+
   _info "[acg-up] using validated GHCR_PAT from env for ghcr-pull-secret"
   return 0
 }
@@ -269,7 +324,13 @@ function shopping_cart_load_ghcr_pat_from_vault() {
     return 1
   fi
 
-  _ghcr_pat=$(curl -s -H "X-Vault-Token: ${_vault_root_token}" "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" | jq -r '.data.data.token // empty' 2>/dev/null || true)
+  local _vault_hdr
+  _vault_hdr=$(mktemp) && chmod 0600 "${_vault_hdr}"
+  printf 'X-Vault-Token: %s\n' "${_vault_root_token}" > "${_vault_hdr}"
+  _ghcr_pat=$(curl -s -H "@${_vault_hdr}" \
+    "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" \
+    | jq -r '.data.data.token // empty' 2>/dev/null || true)
+  rm -f "${_vault_hdr}"
   if [[ -z "${_ghcr_pat}" ]]; then
     return 1
   fi
@@ -283,6 +344,12 @@ function shopping_cart_load_ghcr_pat_from_vault() {
   rm -f "${_netrc}"
   if [[ "${_pat_http}" != "200" ]]; then
     _info "[acg-up] Vault PAT is expired (HTTP ${_pat_http}) — prompting for a new one"
+    _ghcr_pat=""
+    return 1
+  fi
+
+  if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_ghcr_pat}"; then
+    _info "[acg-up] Vault PAT authenticates but cannot pull from ghcr.io — it is missing the read:packages scope; mint a PAT with read:packages and overwrite secret/github/pat"
     _ghcr_pat=""
     return 1
   fi
@@ -305,12 +372,14 @@ function shopping_cart_load_ghcr_pat_from_gh() {
     return 1
   fi
 
+  if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_gh_token}"; then
+    _info "[acg-up] gh CLI token cannot pull from ghcr.io — its OAuth scopes are fixed and exclude read:packages, so it is NOT being saved to Vault"
+    return 1
+  fi
+
   _ghcr_pat="${_gh_token}"
   _info "[acg-up] using gh CLI token for ghcr-pull-secret"
-  if [[ -n "${_vault_root_token:-}" ]]; then
-    curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
-      -d "{\"data\": {\"token\": \"${_ghcr_pat}\"}}" \
-      "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
+  if _shopping_cart_store_ghcr_pat_in_vault "${_ghcr_pat}"; then
     _info "[acg-up] gh CLI token saved to Vault for future runs"
   fi
   return 0
@@ -327,10 +396,13 @@ function shopping_cart_prompt_ghcr_pat() {
     return 1
   fi
 
-  if [[ -n "${_vault_root_token:-}" ]]; then
-    curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
-      -d "{\"data\": {\"token\": \"${_ghcr_pat}\"}}" \
-      "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
+  if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_ghcr_pat}"; then
+    _warn "[acg-up] the pasted PAT cannot pull from ghcr.io — it is missing the read:packages scope; not saving it to Vault"
+    _ghcr_pat=""
+    return 1
+  fi
+
+  if _shopping_cart_store_ghcr_pat_in_vault "${_ghcr_pat}"; then
     _info "[acg-up] new PAT saved to Vault"
   fi
   return 0
@@ -627,7 +699,7 @@ function shopping_cart_seed_sandbox_vault_kv() {
   local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
   local _src_addr="${SEED_VAULT_SOURCE_ADDR:-${_seed_addr}}"
   local _src_token="${SEED_VAULT_SOURCE_TOKEN:-${_seed_token}}"
-  local _src_hdr="" _src_json=""
+  local _src_hdr="" _src_json="" _stripe_sk=""
   _src_hdr=$(_seed_vault_header_file "${_src_token}") || { _err "[acg-up] could not create temp header file"; return 1; }
   # Canonical source reader (Vault = source of truth). Returns the raw KV-v2 data object as JSON,
   # empty string if the key is absent in the source Vault.
@@ -713,9 +785,48 @@ function shopping_cart_seed_sandbox_vault_kv() {
       _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"               postgres/payment
     fi
   fi
-  _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
-  _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
-  _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
+  if _vault_kv_exists "payment/encryption"; then
+    _info "[acg-up] Reusing existing Vault secret payment/encryption"
+  else
+    _src_json=$(_seed_source_data "payment/encryption")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying payment/encryption from canonical source Vault"
+      _vault_kv_put "${_src_json}" payment/encryption
+    else
+      _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}' payment/encryption
+    fi
+  fi
+
+  if _vault_kv_exists "payment/stripe"; then
+    _info "[acg-up] Reusing existing Vault secret payment/stripe"
+  else
+    _src_json=$(_seed_source_data "payment/stripe")
+    if [[ -z "${_src_json}" ]]; then
+      _stripe_sk="$(_no_trace security find-generic-password -s k3dm-stripe-sk-test -w 2>/dev/null || true)"
+      if [[ -n "${_stripe_sk}" ]]; then
+        _info "[acg-up] Restoring payment/stripe api_key from Keychain backup"
+        _src_json=$(jq -cn --arg k "${_stripe_sk}" '{api_key:$k,webhook_secret:"whsec_placeholder"}')
+      fi
+    fi
+    if [[ -n "${_src_json}" ]]; then
+      _vault_kv_put "${_src_json}" payment/stripe
+    else
+      _warn "[acg-up] no Stripe key available — writing placeholder; Stripe calls will fail"
+      _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}' payment/stripe
+    fi
+  fi
+
+  if _vault_kv_exists "payment/paypal"; then
+    _info "[acg-up] Reusing existing Vault secret payment/paypal"
+  else
+    _src_json=$(_seed_source_data "payment/paypal")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying payment/paypal from canonical source Vault"
+      _vault_kv_put "${_src_json}" payment/paypal
+    else
+      _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
+    fi
+  fi
   if _vault_kv_exists "rabbitmq/default"; then
     _info "[acg-up] Reusing existing Vault secret rabbitmq/default"
     _rabbitmq_pass=$(_vault_kv_get_field "rabbitmq/default" "password")
