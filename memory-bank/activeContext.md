@@ -1,5 +1,48 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — Tier 1 e2e: wedged for 2h by a leaked vCluster; Tier 2 still blocked
+
+**Operator asked for Tier 1 then Tier 2. Tier 1 ran twice and failed both times; Tier 2 never
+started.** Neither failure was a shopping-cart regression.
+
+**Hermes is currently BOOTED OUT — `launchctl bootstrap gui/$(id -u)
+~/Library/LaunchAgents/com.k3d-manager.hermes.plist` to restore it.** Paused with the
+operator's approval so its 300s loop could not race the run. **Do not restore it until the
+GHCR credential is fixed** — every dispatch now leaks a vCluster, so an unattended Hermes
+re-wedges the runner within minutes.
+
+**Blocker 1 — leaked vCluster wedges everything.** A run at 09:04Z failed at
+`deploying-substrate` and left `e2e-1790154235-20` Running. vCluster 0.32.1 refuses a second
+vCluster in the shared `vclusters` namespace, so every later run died in ~15s. Hermes burned
+~17 dispatches between 03:19 and 04:14 local. Cleared both that orphan and the one my own
+rerun leaked. Filed:
+`docs/bugs/2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`.
+**Confirmed the leak reproduces** — the next run leaked too, so teardown-on-failure is
+required, not just cleanup.
+
+**Blocker 2 — the runner cannot get a GHCR PAT. NOT a new bug.** This is Gap 3 of
+`docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md` regressed; recorded
+there, not as a duplicate. The Vault path hardcodes `--context k3d-k3d-cluster`
+(`shopping_cart.sh:321`) and is dead off-hub by construction; the `gh` fallback now bails
+because **m2jump's gh token is invalid** (`shopping_cart.sh:366`). `e2e_remote.sh:430-438`
+forwards no `GHCR_PAT`, so the error message's own advice is unreachable.
+
+**Correcting a note in this file.** The 2026-09-22 "Tier 1 credential gate cleared
+(`read:packages`)" entry refers to the **M4's** gh token. The pull happens on **M2**, whose
+credential is independent and is the one that matters. That entry never cleared Tier 1.
+
+**Correcting my own claim.** I wrote that Hermes filed no bug doc. Wrong — it filed two
+(`c9d5da06`, `0c405871`) and pushed them; my local check predated the fetch. The real finding:
+`e2e_bugs.py:163` dedups by exact slug and is **write-once**, so failures 3–17 filed nothing
+and a 17× recurrence reads as a single event.
+
+**Tier 2 — verified blocked, not assumed.** Contexts are `k3d-k3d-cluster` and
+`ubuntu-hostinger` (no ACG); keychain item `k3dm-acg-pluralsight` is **ABSENT**. Needs a
+Pluralsight login at a real TTY — operator-only, Claude's shell has no TTY.
+
+Commits: `ea6d39ca` (rebased), `84798fc0`. Both on origin.
+
+
 ## 2026-09-23 — EXECUTED: the hub no longer runs shopping-cart; ESO survived
 
 `deploy_argocd_applicationsets --confirm` applied the new selectors; option **3a** taken.

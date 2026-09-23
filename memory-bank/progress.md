@@ -215,7 +215,22 @@
   completed, leaving no error; the stale `mdat` is what proved no token had been written, and is
   the check to use next time. This clears the credential gate only — the Tier 1 run itself has not
   been executed yet.
-- [ ] **Tier 2 e2e blocked (verified).** No ACG context exists; manual TTY login required.
+- [ ] **Tier 2 e2e blocked (re-verified 2026-09-23).** No ACG context (`k3d-k3d-cluster`,
+  `ubuntu-hostinger` only); keychain `k3dm-acg-pluralsight` **ABSENT**. Manual TTY login
+  required — operator-only.
+- [ ] **Tier 1 e2e RAN 2026-09-23 and FAILED twice — both blockers filed, neither a
+  shopping-cart regression.** (1) A leaked vCluster from a 09:04Z failure wedged the shared
+  `vclusters` namespace; ~17 Hermes dispatches failed identically over 2h. Cleared; leak
+  reproduces on every failure → `docs/bugs/2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`.
+  (2) The runner cannot obtain a GHCR PAT — Gap 3 of
+  `docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md` regressed
+  (m2jump's `gh` token invalid; Vault path hardcoded to the hub context). Commits `ea6d39ca`,
+  `84798fc0`.
+- [ ] **Hermes is BOOTED OUT — restore it.** `launchctl bootstrap gui/$(id -u)
+  ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`. Leave it down until the GHCR
+  credential is fixed, or it re-wedges the runner every 5 minutes.
+- [ ] **Correction: the 2026-09-22 credential clearance was the M4's `gh` token, not M2's.**
+  The GHCR pull happens on the runner, so that entry did not clear Tier 1.
 - [x] **Specs written and pushed** as `b37acb91` on `k3d-manager-v1.36.0`:
   `docs/plans/v1.36.0-make-smoke-target.md` and
   `docs/plans/v1.36.0-hub-snapshot-capture-and-retention.md`.
