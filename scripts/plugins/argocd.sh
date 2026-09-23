@@ -1322,7 +1322,7 @@ function _argocd_deploy_applicationsets() {
    _info "[argocd] Found ${#appset_files[@]} ApplicationSet file(s)"
 
    # Deploy each ApplicationSet
-   local deployed_count=0
+   local deployed_count=0 failed_count=0 _line
    for file in "${appset_files[@]}"; do
       local filename
       filename=$(basename "$file")
@@ -1337,6 +1337,7 @@ function _argocd_deploy_applicationsets() {
       done
       if [[ -n "${_unset}" ]]; then
          _err "[argocd] Refusing to apply ${filename}: unset variable(s):${_unset}"
+         failed_count=$((failed_count + 1))
          continue
       fi
       local -a _overrides=()
@@ -1349,14 +1350,25 @@ function _argocd_deploy_applicationsets() {
       if (( ${#_overrides[@]} > 0 )); then
          _info "[argocd] ${filename}: keeping live ${_overrides[*]}"
       fi
-      if env ${_overrides[@]+"${_overrides[@]}"} envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
-         ((deployed_count++))
+      local _apply_err _apply_rc=0
+      _apply_err="$(env ${_overrides[@]+"${_overrides[@]}"} envsubst "${_vars}" < "$file" \
+         | _kubectl apply -f - 2>&1 >/dev/null)" || _apply_rc=$?
+      if (( _apply_rc == 0 )); then
+         deployed_count=$((deployed_count + 1))
       else
+         failed_count=$((failed_count + 1))
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"
+         while IFS= read -r _line; do
+            [[ -n "${_line}" ]] && _warn "[argocd]   ${_line}"
+         done <<< "${_apply_err}"
       fi
    done
 
    _info "[argocd] Successfully deployed $deployed_count/${#appset_files[@]} ApplicationSet(s)"
+   if (( failed_count > 0 )); then
+      _err "[argocd] ${failed_count} of ${#appset_files[@]} ApplicationSet(s) did not apply"
+      return 1
+   fi
    return 0
 }
 

@@ -493,3 +493,36 @@ JSON
     ARGOCD_APP_CLUSTER_SHOPPING_CART=yes run register_app_cluster
   [ "$status" -eq 1 ]
 }
+
+@test "_argocd_deploy_applicationsets surfaces the kubectl error when an apply fails" {
+  ARGOCD_CONFIG_DIR="${BATS_TEST_TMPDIR}/argocd-fail"
+  mkdir -p "${ARGOCD_CONFIG_DIR}/applicationsets"
+  printf 'kind: ApplicationSet\nmetadata:\n  name: probe\n' \
+    > "${ARGOCD_CONFIG_DIR}/applicationsets/probe.yaml"
+  _argocd_set_active_app_cluster() { :; }
+  _argocd_appset_live_overrides() { :; }
+  _kubectl() {
+    printf 'error validating data: unknown field "spec.bogus"\n' >&2
+    return 1
+  }
+  export -f _argocd_set_active_app_cluster _argocd_appset_live_overrides _kubectl
+  ARGOCD_CONFIG_DIR="$ARGOCD_CONFIG_DIR" run _argocd_deploy_applicationsets
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Failed to deploy ApplicationSet: probe.yaml"* ]]
+  [[ "$output" == *"unknown field"* ]]
+  [[ "$output" == *"did not apply"* ]]
+}
+
+@test "_argocd_deploy_applicationsets returns success when every apply lands" {
+  ARGOCD_CONFIG_DIR="${BATS_TEST_TMPDIR}/argocd-ok"
+  mkdir -p "${ARGOCD_CONFIG_DIR}/applicationsets"
+  printf 'kind: ApplicationSet\nmetadata:\n  name: probe\n' \
+    > "${ARGOCD_CONFIG_DIR}/applicationsets/probe.yaml"
+  _argocd_set_active_app_cluster() { :; }
+  _argocd_appset_live_overrides() { :; }
+  _kubectl() { return 0; }
+  export -f _argocd_set_active_app_cluster _argocd_appset_live_overrides _kubectl
+  ARGOCD_CONFIG_DIR="$ARGOCD_CONFIG_DIR" run _argocd_deploy_applicationsets
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Successfully deployed 1/1"* ]]
+}
