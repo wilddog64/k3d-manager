@@ -36,3 +36,25 @@ setup() {
   run grep -F -- ".spec.volumeClaimTemplates[].kind" "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/data-git.yaml"
   [ "$status" -eq 0 ]
 }
+
+@test "argocd app cluster generator: data-git requires the shopping-cart opt-in label" {
+  run grep -F -- 'k3d-manager/shopping-cart: "true"' "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/data-git.yaml"
+  [ "$status" -eq 0 ]
+}
+
+@test "argocd app cluster generator: services-git requires the shopping-cart opt-in label" {
+  run grep -F -- 'k3d-manager/shopping-cart: "true"' "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/services-git.yaml"
+  [ "$status" -eq 0 ]
+}
+
+@test "argocd app cluster generator: eso and acg dashboards stay opt-in-free so the hub keeps them" {
+  local _appsets="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets"
+  run grep -F -- "k3d-manager/shopping-cart" "${_appsets}/eso.yaml"
+  [ "$status" -eq 1 ]
+  run grep -F -- "k3d-manager/shopping-cart" "${_appsets}/grafana-dashboards-acg.yaml"
+  [ "$status" -eq 1 ]
+  run grep -F -- "k3d-manager/role: app-cluster" "${_appsets}/eso.yaml"
+  [ "$status" -eq 0 ]
+  run grep -F -- "k3d-manager/role: app-cluster" "${_appsets}/grafana-dashboards-acg.yaml"
+  [ "$status" -eq 0 ]
+}

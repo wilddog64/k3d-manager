@@ -24,6 +24,7 @@ spec:
               selector:
                 matchLabels:
                   k3d-manager/role: app-cluster
+                  k3d-manager/shopping-cart: "true"
   goTemplate: true
   goTemplateOptions:
     - missingkey=error

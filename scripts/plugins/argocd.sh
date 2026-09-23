@@ -1408,6 +1408,9 @@ Config (override via env or scripts/etc/argocd/vars.sh):
   ARGOCD_APP_CLUSTER_INSECURE      Skip TLS      (default: true — dev only)
   ARGOCD_APP_CLUSTER_CA_DATA       CA bundle     (optional, base64; when set forces insecure=false)
   ARGOCD_APP_CLUSTER_TOKEN         Bearer token  (required unless SERVER=https://kubernetes.default.svc)
+  ARGOCD_APP_CLUSTER_SHOPPING_CART Run the shopping-cart stack on this cluster (default: false)
+                                   Only "true" opts the cluster into the data-git and services-git
+                                   ApplicationSets. The hub must stay false.
 HELP
     return 0
   fi
@@ -1445,6 +1448,11 @@ HELP
   local _release_label
   _release_label="$(printf '%s' "${_release}" | tr -cs 'A-Za-z0-9_.-' '-' | cut -c1-63)"
   _release_label="${_release_label:-unknown}"
+  local _shopping_cart="${ARGOCD_APP_CLUSTER_SHOPPING_CART:-false}"
+  if [[ "${_shopping_cart}" != "true" && "${_shopping_cart}" != "false" ]]; then
+    _err "[argocd] ARGOCD_APP_CLUSTER_SHOPPING_CART must be 'true' or 'false'"
+    return 1
+  fi
   local _managed="${ARGOCD_APP_CLUSTER_MANAGED:-false}"
   if [[ "${_managed}" == "true" ]] && {
     [[ -z "${ARGOCD_APP_CLUSTER_PROVIDER:-}" || -z "${ARGOCD_APP_CLUSTER_SANDBOX_ID:-}" ||
@@ -1473,6 +1481,7 @@ metadata:
     argocd.argoproj.io/secret-type: cluster
     argocd.argoproj.io/cluster-name: "${ARGOCD_APP_CLUSTER_NAME}"
 ${_platform_labels}    k3d-manager/managed: "${_managed}"
+    k3d-manager/shopping-cart: "${_shopping_cart}"
     k3d-manager/provider: "${ARGOCD_APP_CLUSTER_PROVIDER:-unknown}"
     k3d-manager/release: "${_release_label}"
   annotations:

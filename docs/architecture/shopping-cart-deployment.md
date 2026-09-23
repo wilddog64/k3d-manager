@@ -111,6 +111,9 @@ hub. Each uses a **matrix generator**: a git-directory or Helm generator crossed
 `clusters` generator selecting `k3d-manager/role: app-cluster`. That cross-product is why one
 set of manifests deploys to every registered app-cluster automatically.
 
+`data-git` and `services-git` additionally require `k3d-manager/shopping-cart: "true"` — see
+[`ubuntu-k3s` is a role, not a place](#ubuntu-k3s-is-a-role-not-a-place) below.
+
 | ApplicationSet | Source (repo / chart) | Target namespace | Deploys |
 |---|---|---|---|
 | `services-git` | **k3d-manager** `services/*` @ `${K3D_MANAGER_BRANCH}` | `shopping-cart-apps`, `shopping-cart-payment` | basket, order, payment, product-catalog, frontend, namespace |
@@ -130,6 +133,54 @@ set of manifests deploys to every registered app-cluster automatically.
 > when the set was last applied. Manifests committed on a newer branch are **inert** until the
 > ApplicationSets are re-applied for **both** the hub and ACG variants. Reapplying the sets is a
 > required release step — confirm with `argocd_check_values_branch`.
+
+### `ubuntu-k3s` is a role, not a place
+
+`k3d-manager/role: app-cluster` is a **pointer to whichever cluster is currently the active app
+cluster**, moved between cluster Secrets by `_argocd_set_active_app_cluster`
+(`scripts/plugins/argocd.sh`). The cluster it points at is conventionally named `ubuntu-k3s`, but
+that name is a role alias inherited from the ACG sandbox era — **not a host, and not a kubecontext**.
+Tier 2 e2e legitimately self-registers the same name inside a sandbox's own ArgoCD
+(`scripts/plugins/e2e.sh`), which is a different Secret in a different cluster.
+
+`register_app_cluster` has an explicit in-cluster branch: when
+`ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc` it emits `config: {}` and registers the
+hub **as its own app cluster**. This is a designed single-cluster mode, not a misconfiguration. Its
+consequence is that on a hub-only workstation every app-cluster ApplicationSet targets the hub.
+
+**Four** ApplicationSets select that label, and they differ in how they behave when they stop being
+generated:
+
+| ApplicationSet | `preserveResourcesOnDeletion` | On losing the cluster |
+|---|---|---|
+| `eso` | unset | **prunes** — takes the ESO Deployments *and its CRDs* with it |
+| `grafana-dashboards-acg` | unset | prunes its `monitoring` ConfigMaps |
+| `data-git` | unset | prunes; destroys `shopping-cart-data` PVCs if any exist |
+| `services-git` | `true` | leaves the workloads running, now unmanaged |
+
+> ⚠️ **Never remove the app-cluster registration Secret to stop a workload.** `eso` generates the
+> hub's entire External Secrets Operator install — 3 Deployments, 21 CRDs, 5 ClusterRoles — and
+> carries `resources-finalizer.argocd.argoproj.io`. Deleting the registration removes the
+> `externalsecrets` and `clustersecretstores` CRDs, which deletes every ExternalSecret CR in the
+> cluster and, through `ownerReferences`, the Secrets they produce: Grafana admin, Keycloak, LDAP,
+> `ghcr-pull-secret`, and all postgres / redis / rabbitmq / minio credentials.
+
+To control the shopping-cart stack specifically, use the opt-in label instead. `data-git` and
+`services-git` require **both** `role: app-cluster` and `k3d-manager/shopping-cart: "true"`;
+`eso` and `grafana-dashboards-acg` require only the role. Set it at registration time:
+
+```bash
+ARGOCD_APP_CLUSTER_SHOPPING_CART=true register_app_cluster
+```
+
+It defaults to `false` and only accepts `true` / `false`. **The hub is expected to be `false`** — it
+keeps ESO and the dashboards while the shopping-cart stack runs only where e2e puts it (Tier 1
+vCluster, Tier 2 ACG sandbox, each carrying its own substrate under `scripts/etc/e2e/`). An empty
+`shopping-cart-data` namespace on the hub is therefore **expected, not an incident**.
+
+Editing a live ApplicationSet selector with `kubectl patch` does not stick: ArgoCD selfHeal reverts
+it, and the release-time reapply overwrites it. `scripts/etc/argocd/applicationsets/` is the only
+durable write point.
 
 ---
 

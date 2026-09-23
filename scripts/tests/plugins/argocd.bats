@@ -449,3 +449,47 @@ JSON
   [[ "$output" == *"configs.cm.url=https://argo.example.invalid"* ]]
   [[ "$output" != *"configs.cm.url=https://argo.internal.invalid"* ]]
 }
+
+@test "register_app_cluster: shopping-cart label defaults to false" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/shopping-cart-default.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN ARGOCD_APP_CLUSTER_SHOPPING_CART
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -c -- 'k3d-manager/shopping-cart: "false"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+}
+
+@test "register_app_cluster: shopping-cart label opts in when explicitly true" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/shopping-cart-optin.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc \
+    ARGOCD_APP_CLUSTER_SHOPPING_CART=true run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -c -- 'k3d-manager/shopping-cart: "true"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+}
+
+@test "register_app_cluster: rejects a non-boolean shopping-cart value" {
+  _argocd_set_active_app_cluster() { :; }
+  export -f _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc \
+    ARGOCD_APP_CLUSTER_SHOPPING_CART=yes run register_app_cluster
+  [ "$status" -eq 1 ]
+}
