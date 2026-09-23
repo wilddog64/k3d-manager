@@ -26,7 +26,18 @@
       in the resolver chain. Includes a PIPESTATUS index trap: adding `printf` to the head of
       the pipeline shifts `ssh` to index 1, and getting it wrong makes every dispatch report
       exit 0.
-- [ ] **Codex implementing** — awaiting SHA on `origin/k3d-manager-v1.37.0`. Verify before trust.
+- [x] **Fix implemented and verified** — Codex wrote it; Claude committed/pushed after Codex
+      hit the known `.git/index.lock` write-wall. Verified independently: scope is the two
+      scoped files, shellcheck clean, BATS 79/79 (0 `not ok`), and Claude re-ran the PIPESTATUS
+      mutation test itself (index 0 → red, index 1 → green, restore byte-identical).
+      Unit-proven only — never yet exercised against the live runner.
+- [x] **Spec amended mid-implementation** — the two-branch shape tripped `_agent_audit`'s
+      if-count threshold on `e2e_runner_dispatch` (pre-commit rejected it; `--no-verify` is
+      forbidden). Collapsed to one unconditional path instead of extracting a helper: an
+      unresolved credential sends an empty line, which `shopping_cart_load_ghcr_pat_from_env`
+      already treats as absent. Better than specced — one `PIPESTATUS` index, remote always
+      gets EOF on stdin, and the pre-existing exit-code test now guards the index as well, so
+      the trap has two guards. BATS 80/80. Amendment recorded at the top of the spec doc.
 - [ ] **Tier 1 still red** — this fix alone will not green it; the leaked vCluster must also
       be cleared (`2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`,
       options 1 and 3).

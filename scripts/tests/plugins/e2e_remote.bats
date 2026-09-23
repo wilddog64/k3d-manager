@@ -211,6 +211,113 @@ _healthy_blob() {
   [ "$status" -eq 0 ]
 }
 
+@test "dispatch streams the GHCR token on stdin and not in the command string" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_GHCR_TOKEN_SOURCE=gh
+  local hex="0000000000000000000000000000000000000000000000000000000000000000"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.34.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
+  gh() { printf 'gho_TESTTOKEN\n'; }
+  SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"; STDIN_LOG="$BATS_TEST_TMPDIR/stdin.log"
+  ssh() { printf '%s\n' "$*" > "$SSH_LOG"; cat > "$STDIN_LOG"; return 0; }
+  run e2e_runner_dispatch "m2" "sha256:${hex}"
+  [ "$status" -eq 0 ]
+  run cat "$STDIN_LOG"
+  [ "$output" = "gho_TESTTOKEN" ]
+  run cat "$SSH_LOG"
+  [[ "$output" != *"gho_TESTTOKEN"* ]]
+  [[ "$output" == *"read -r GHCR_PAT"* ]]
+}
+
+@test "the dispatch transcript never contains the GHCR token" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_GHCR_TOKEN_SOURCE=gh
+  local hex="0000000000000000000000000000000000000000000000000000000000000000"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.34.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
+  gh() { printf 'gho_TESTTOKEN\n'; }
+  STDIN_LOG="$BATS_TEST_TMPDIR/stdin.log"
+  ssh() { cat > "$STDIN_LOG"; return 0; }
+  run e2e_runner_dispatch "m2" "sha256:${hex}"
+  [ "$status" -eq 0 ]
+  run bash -c 'grep -F -- "gho_TESTTOKEN" "$1"/dispatch/m2-*.log' "" "$E2E_REPORT_DIR"
+  [ "$status" -ne 0 ]
+}
+
+@test "dispatch returns the remote exit code when a token is streamed" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_GHCR_TOKEN_SOURCE=gh
+  local hex="0000000000000000000000000000000000000000000000000000000000000000"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.34.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
+  gh() { printf 'gho_TESTTOKEN\n'; }
+  ssh() { cat >/dev/null; return 7; }
+  run e2e_runner_dispatch "m2" "sha256:${hex}"
+  [ "$status" -eq 7 ]
+}
+
+@test "dispatch sends an empty credential when no token source is available" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_GHCR_TOKEN_SOURCE=none
+  local hex="0000000000000000000000000000000000000000000000000000000000000000"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.34.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
+  SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"; STDIN_LOG="$BATS_TEST_TMPDIR/stdin.log"
+  ssh() { printf '%s\n' "$*" > "$SSH_LOG"; cat > "$STDIN_LOG"; return 7; }
+  run e2e_runner_dispatch "m2" "sha256:${hex}"
+  [ "$status" -eq 7 ]
+  run cat "$STDIN_LOG"
+  [ -z "$output" ]
+  run cat "$SSH_LOG"
+  [[ "$output" == *"read -r GHCR_PAT"* ]]
+}
+
+@test "an empty forwarded credential is treated as absent by the env resolver" {
+  run bash -c '
+    _info(){ :; }; _warn(){ :; }
+    GHCR_PAT="" ; GITHUB_USERNAME=someone
+    source scripts/plugins/shopping_cart.sh 2>/dev/null || true
+    shopping_cart_load_ghcr_pat_from_env
+  '
+  [ "$status" -eq 1 ]
+}
+
+@test "the token resolver never prints the token value" {
+  export E2E_M2_GHCR_TOKEN_SOURCE=env
+  export GHCR_PAT=secret-value
+  run _e2e_remote_resolve_ghcr_token
+  [ "$status" -eq 0 ]
+  [ "$output" = "secret-value" ]
+  export E2E_M2_GHCR_TOKEN_SOURCE=none
+  run _e2e_remote_resolve_ghcr_token
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
 @test "dispatch refuses an unpushed SHA before SSH" {
   export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
   git() {
@@ -516,6 +623,7 @@ print("ok")' "$outf"
   [ "$status" -ne 0 ]
   # the M4 publish kubeconfig must only ever be used M4-side, never pushed to M2
   run grep -nE '_e2e_remote_ssh.*E2E_PUBLISH_KUBECONFIG' "$f"; [ "$status" -ne 0 ]
+  run grep -nE 'remote=.*GHCR_PAT=' "$f"; [ "$status" -ne 0 ]
 }
 
 # --- Failure behavior and operations (increment 6) -------------------------

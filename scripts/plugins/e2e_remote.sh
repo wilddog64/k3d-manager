@@ -29,6 +29,12 @@ E2E_M2_SSH_CONNECT_TIMEOUT="${E2E_M2_SSH_CONNECT_TIMEOUT:-8}"
 # neither is guaranteed on a BatchMode shell. Prepend both so remote commands
 # resolve their tools instead of failing with exit 127.
 E2E_M2_REMOTE_PATH="${E2E_M2_REMOTE_PATH:-/opt/homebrew/bin:/usr/local/bin}"
+# The dispatch forwards a read:packages credential to the runner because the M2's gh token
+# lives in the macOS keyring, which a non-interactive SSH session cannot unlock (it fails
+# exactly like a missing token). The value travels on stdin only — never in the remote
+# command string, which is tee'd to the dispatch transcript, and never in argv, which ps
+# exposes. Set to "none" to dispatch without a credential.
+E2E_M2_GHCR_TOKEN_SOURCE="${E2E_M2_GHCR_TOKEN_SOURCE:-gh}"
 E2E_M2_MIN_CPU_IDLE="${E2E_M2_MIN_CPU_IDLE:-35}"
 E2E_M2_MIN_MEM_FREE="${E2E_M2_MIN_MEM_FREE:-25}"
 E2E_M2_MIN_DISK_GB="${E2E_M2_MIN_DISK_GB:-40}"
@@ -94,6 +100,31 @@ function _e2e_remote_ssh() {
   mapfile -t opts < <(_e2e_remote_ssh_opts)
   local cmd="export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; $*"
   _run_command --soft --quiet -- ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$cmd"
+}
+
+# Resolve the credential the runner will use to pull from ghcr.io. Prints the token on
+# stdout and returns 0, or prints nothing and returns 1. Never logs the value.
+function _e2e_remote_resolve_ghcr_token() {
+  local tok=""
+  case "${E2E_M2_GHCR_TOKEN_SOURCE}" in
+    none)
+      return 1
+      ;;
+    env)
+      tok="${GHCR_PAT:-}"
+      ;;
+    gh)
+      command -v gh >/dev/null 2>&1 || return 1
+      tok="$(gh auth token 2>/dev/null || true)"
+      ;;
+    *)
+      _warn "[e2e-remote] unknown E2E_M2_GHCR_TOKEN_SOURCE '${E2E_M2_GHCR_TOKEN_SOURCE}' — dispatching without a GHCR credential"
+      return 1
+      ;;
+  esac
+  [[ -n "$tok" ]] || return 1
+  printf '%s' "$tok"
+  return 0
 }
 
 function _e2e_remote_load_conf() {
@@ -424,11 +455,20 @@ function e2e_runner_dispatch() {
   printf -v repo_url_q '%q' "$E2E_M2_REPO_URL"
   printf -v sha_q '%q' "$sha"
 
+  # The read is unconditional so the dispatch has one code path: an unresolved credential
+  # sends an empty line, which shopping_cart_load_ghcr_pat_from_env treats as absent and
+  # falls through to the runner's own chain. It also guarantees the remote sees EOF on stdin
+  # rather than inheriting the caller's.
+  local ghcr_token patenv
+  ghcr_token="$(_e2e_remote_resolve_ghcr_token || true)"
+  [[ -n "$ghcr_token" ]] || _info "[e2e-remote] no GHCR credential resolved (source=${E2E_M2_GHCR_TOKEN_SOURCE}) — the runner will fall back to its own credential chain"
+  patenv="IFS= read -r GHCR_PAT || true; export GHCR_PAT; "
+
   local -a opts
   mapfile -t opts < <(_e2e_remote_ssh_opts)
   local remote
   # shellcheck disable=SC2027
-  remote="export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; \
+  remote="${patenv}export PATH=\"${E2E_M2_REMOTE_PATH}:\$PATH\"; \
 export E2E_RUNNER=${runner} KUBECONFIG=${E2E_M2_KUBECONFIG} E2E_REPORT_DIR=${E2E_M2_REMOTE_REPORT_DIR}; \
 ${imageenv}${backenv}\
 [ -d "${E2E_M2_REPO}/.git" ] || git clone --quiet ${repo_url_q} "${E2E_M2_REPO}" || exit 1; \
@@ -438,8 +478,13 @@ git -C "${E2E_M2_REPO}" clean -fdq -e .k3dm || exit 1; \
 cd "${E2E_M2_REPO}" || exit 1; ./scripts/k3d-manager e2e_verify_vcluster ${digest}; rc=\$?; \
 ./scripts/k3d-manager e2e_runner_publish_back \$rc || true; exit \$rc"
 
-  ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$remote" 2>&1 | tee "$transcript"
-  local rc="${PIPESTATUS[0]}"
+  # printf is a builtin, so the token never reaches any process argv. It heads the pipeline,
+  # which puts ssh at PIPESTATUS[1] — index 0 would report printf's status and turn every
+  # remote failure into a silent pass.
+  printf '%s\n' "$ghcr_token" \
+    | ssh "${opts[@]}" -- "${E2E_M2_SSH_HOST}" "$remote" 2>&1 | tee "$transcript"
+  local rc="${PIPESTATUS[1]}"
+  ghcr_token=""
   _e2e_remote_copy_results "$transcript" "${opts[@]}"
   _info "[e2e-remote] dispatch exit ${rc}; transcript: ${transcript}"
   return "$rc"

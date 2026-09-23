@@ -2,10 +2,19 @@
 
 ## 2026-09-23 — M2 GHCR blocker root-caused: locked keychain, not a bad token
 
-**Current focus: Codex is implementing the stdin token-forwarding fix.** Spec:
-`docs/bugs/2026-09-23-e2e-dispatch-forward-ghcr-token-over-stdin.md`. Awaiting a SHA on
-`origin/k3d-manager-v1.37.0` — verify independently (SHA on origin, diff scope, BATS) before
-trusting the report.
+**Status: stdin token-forwarding fix IMPLEMENTED and VERIFIED.** Spec:
+`docs/bugs/2026-09-23-e2e-dispatch-forward-ghcr-token-over-stdin.md`. Codex wrote the source
+and tests but hit the known `.git/index.lock` `Operation not permitted` write-wall, so Claude
+committed and pushed on its behalf.
+
+Independently verified, not taken on report: diff scope is the two scoped files only;
+`shellcheck scripts/plugins/e2e_remote.sh` clean; `e2e_remote.bats` 79/79 with 0 `not ok`;
+and the PIPESTATUS guard mutation-tested by Claude directly — flipping the token branch to
+`PIPESTATUS[0]` makes test 27 fail (`status -eq 7` unmet), restoring `PIPESTATUS[1]` makes it
+pass, and the restored file is byte-identical to pre-mutation.
+
+**Not yet exercised against the live runner.** The fix is proven by unit test only; no
+dispatch has been run, because the vCluster leak still wedges the M2.
 
 **The finding.** The operator challenged my host attribution ("I think you are running from
 m4"), which was worth making: `ssh m2jump` does resolve to `m2-air.local`, but the challenge

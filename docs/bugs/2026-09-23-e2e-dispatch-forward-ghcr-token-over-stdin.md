@@ -2,7 +2,19 @@
 
 **Date:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
-**Status:** OPEN — assigned to Codex
+**Status:** IMPLEMENTED 2026-09-23 — unit-verified, not yet exercised live
+
+> **Amendment (2026-09-23, during implementation).** Changes 3 and 4 below were specced with
+> two branches (token / no-token). That put `e2e_runner_dispatch` over the `_agent_audit`
+> if-count threshold and the pre-commit hook rejected it. Rather than extract a helper (the
+> `lib-foundation` v0.3.7 precedent), the branches were **collapsed**: the credential read and
+> the stdin feed are now unconditional. An unresolved credential sends an empty line, which
+> `shopping_cart_load_ghcr_pat_from_env:293` already treats as absent and falls through to the
+> runner's own chain. This is strictly better than the specced shape — one code path, one
+> `PIPESTATUS` index, and the remote always sees EOF on stdin instead of inheriting the
+> caller's. It also means the **pre-existing** test `dispatch returns the remote exit code
+> unchanged` now guards the index too, so the trap has two independent guards rather than one.
+> The `if`/`else` blocks in Changes 3 and 4 below are superseded; everything else stands.
 **Affects:** `scripts/plugins/e2e_remote.sh`, `scripts/tests/plugins/e2e_remote.bats`
 **Fixes:** Gap 3 of `docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md`
 
