@@ -1,5 +1,51 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — ABORTED: deleting the hub app-cluster registration would destroy the hub's ESO
+
+Task 0 of `docs/plans/v1.37.0-deregister-hub-app-cluster-shopping-cart.md` was executed
+(read-only state capture). **It invalidated Task 1. Nothing was deleted.**
+
+The spec assumed two ApplicationSets select `k3d-manager/role: app-cluster`. There are **four**:
+
+| AppSet | Generates on the hub | `preserveResourcesOnDeletion` | Deletion finalizer |
+|---|---|---|---|
+| `eso` | `ubuntu-k3s-eso` — **the hub's entire External Secrets Operator** | unset (prunes) | present |
+| `grafana-dashboards-acg` | `ubuntu-k3s-grafana-dashboards` — 3 `monitoring` ConfigMaps | unset (prunes) | present |
+| `data-git` | `ubuntu-k3s-data-layer` | unset (prunes) | present |
+| `services-git` | `ubuntu-k3s-shopping-cart-*` (6) | `true` (preserves) | absent |
+
+`ubuntu-k3s-eso` owns 3 Deployments, 21 CRDs, 5 ClusterRoles, 2 ValidatingWebhookConfigurations
+and the ServiceAccounts in `secrets`. It carries `resources-finalizer.argocd.argoproj.io`, so
+deleting the registration Secret cascades: the `externalsecrets.external-secrets.io` and
+`clustersecretstores.external-secrets.io` CRDs are removed, taking **all 22 ExternalSecret CRs
+cluster-wide** and `ClusterSecretStore/vault-backend` with them. ESO sets `ownerReferences` on the
+Secrets it creates (verified on `monitoring/grafana-admin-credentials` and
+`identity/keycloak-secrets`), so garbage collection then deletes those Secrets too —
+`grafana-admin-credentials`, `keycloak-secrets`, `keycloak-client-secrets`, `ldap-secrets`,
+`openldap-admin`, `ghcr-pull-secret`, and every postgres / redis / rabbitmq / minio credential.
+The `ubuntu-k3s-grafana-dashboards` ConfigMaps (`checkout-loadtest-dashboard`,
+`k3dm-deployment-metrics`, `trivy-security-dashboard`) are **not** duplicated by
+`hub-grafana-dashboards`, which carries a different four.
+
+**So the registration is load-bearing, not merely bogus.** `ubuntu-k3s-app-cluster` is the only
+Secret carrying `role: app-cluster`, and the hub's ESO install depends on it. The operator decision
+("no shopping-cart on the hub") still stands, but it cannot be delivered by deleting the Secret.
+
+**Revised approach — a code change, no live deletion.** All four AppSets live in
+`scripts/etc/argocd/applicationsets/`. Narrow **only** `data-git` and `services-git` so they no
+longer match the hub, leaving `eso` and `grafana-dashboards-acg` matching as they do today. The
+registration Secret template is `scripts/etc/argocd/cluster-secret.yaml.tmpl`, which writes only
+`role: app-cluster` — the hub Secret's extra `provider` / `managed: false` / `release: unknown`
+labels come from elsewhere, so a new distinguishing label has to be added deliberately rather than
+relied upon. A live `kubectl` selector patch would be reverted by selfHeal and by the
+release-time AppSet reapply, so the templates are the only durable write point.
+
+Open question for the operator: the deeper misconfiguration is that the hub's ESO is installed by an
+*app-cluster* AppSet at all, instead of a hub-scoped Application like `hub-loki` /
+`hub-platform-ops`. Fixing that is a larger change than v1.37.0 should absorb.
+
+Secret backed up to `scratchpad/deregister/ubuntu-k3s-app-cluster.backup.yaml` (26 lines).
+
 ## 2026-09-23 — the hub syncs shopping-cart onto ITSELF via a self-referential app-cluster registration
 
 `v1.36.0` tagged (`8ea1469d`) and released; `enforce_admins` restored (`enabled=true`).
