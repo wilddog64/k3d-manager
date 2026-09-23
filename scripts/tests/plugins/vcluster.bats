@@ -121,6 +121,36 @@ STUB
   [ "${run_calls[0]}" = "$VCLUSTER_STUB list -n vclusters" ]
 }
 
+# A stale kubeconfig is all that is left of a teardown that never ran, and six of them
+# sit on the m2 runner. Accepting one as proof of existence made the predicate claim a
+# vCluster that is gone, so vcluster list has to be the source of truth.
+@test "vcluster_destroy: a stale kubeconfig is not proof the vCluster exists" {
+  _stub_run_command_executing
+  printf 'current-context: vc-ghost\n' > "${VCLUSTER_KUBECONFIG_DIR}/ghost.yaml"
+  export VCLUSTER_LIST_OUTPUT=$'NAME   NAMESPACE\nalpha   vclusters'
+  run vcluster_destroy ghost
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"vCluster 'ghost' not found"* ]]
+  run grep -F -- "$VCLUSTER_STUB delete ghost" "$RUN_LOG"
+  [ "$status" -ne 0 ]
+}
+
+# Regression guard, same class as the leak fixed in 7338a238: _e2e_teardown guards this
+# call with `|| _warn` and then does its own proxy, kubeconfig and log cleanup, none of
+# which an exit can be caught by. The absence path must return, not exit. Asserting a
+# non-zero status is not enough — an exit 1 satisfies that too — so the marker after the
+# call is what actually separates the two.
+@test "vcluster_destroy: a missing vCluster returns instead of exiting its caller" {
+  _stub_run_command_executing
+  export VCLUSTER_LIST_OUTPUT=$'NAME   NAMESPACE\nalpha   vclusters'
+  _caller() {
+    vcluster_destroy ghost || true
+    printf 'caller-survived\n'
+  }
+  run _caller
+  [[ "$output" == *"caller-survived"* ]]
+}
+
 @test "vcluster_list: uses the contract-returned CLI path" {
   run vcluster_list
   [ "$status" -eq 0 ]
@@ -131,6 +161,8 @@ STUB
 @test "vcluster_destroy: uses the contract-returned CLI path" {
   local kubeconfig="${VCLUSTER_KUBECONFIG_DIR}/demo.yaml"
   printf 'current-context: vc-demo\n' > "$kubeconfig"
+  _stub_run_command_executing
+  export VCLUSTER_LIST_OUTPUT=$'NAME   NAMESPACE\ndemo   vclusters'
   _vcluster_deregister_from_hub() { :; }
   run vcluster_destroy demo
   [ "$status" -eq 0 ]
@@ -255,7 +287,7 @@ _stub_run_command_executing() {
     done
     echo "$*" >> "$RUN_LOG"
     case "$1" in
-      helm) return 0 ;;
+      helm|docker) return 0 ;;
     esac
     if [[ "${2:-}" == "delete" && -n "${VCLUSTER_DELETE_FAILS:-}" ]]; then
       return 1

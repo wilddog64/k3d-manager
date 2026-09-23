@@ -2911,3 +2911,42 @@ returns success purely because a kubeconfig file exists, without confirming the 
 Still open, deliberately out of scope: leak-doc options 4 (health-check visibility, Hermes
 N-consecutive escalation) and 5 (write-through recurrence, wider sample capture, `None passed`
 rendering). Hermes stays booted out until a live run confirms the fix.
+
+### 2026-09-23 — second exit-in-teardown defect fixed (`_vcluster_ensure_exists`)
+
+The follow-on noted while tracing the leak turned out to be a live second instance of the
+same bug class as `7338a238`, not just a cosmetic lie in a predicate.
+
+`_vcluster_ensure_exists` returned success on the mere existence of a kubeconfig *file*,
+and when that shortcut did not fire it ended "not found" with `_err` — which is `exit 1`.
+Its only caller chain is `_e2e_teardown:405` → `vcluster_destroy:88`, guarded by
+`|| _warn`, which cannot catch an `exit`. So the exit skipped `e2e.sh:411-426` (proxy,
+stale-kubeconfig and per-run-log cleanup) and, inside the EXIT trap, killed the trap
+mid-way. The uncovered window is a run that fails **during** `vcluster create`: no
+kubeconfig written, nothing in `vcluster list`, teardown exits instead of cleaning up —
+exactly the phase `docs/bugs/2026-09-23-e2e-harness-creating-vcluster.md` records.
+
+Changes: (1) kubeconfig shortcut deleted, `vcluster list` is the sole source of truth;
+(2) both "not found" `_err`s became `_warn` + `return 1` (the empty-name guard stays
+`_err` — a call-site programming error, not a runtime state); (3) the existence check
+moved *after* the `DRY_RUN` early return, because with the shortcut gone a dry run started
+querying the host and broke its own "executes nothing" guarantee.
+
+Why nothing caught it: `vcluster.bats:131` passed **only** because of the shortcut — it
+touched a kubeconfig and left `VCLUSTER_LIST_OUTPUT` empty, so the real logic was never
+entered. And `vcluster.bats:113` asserts only `[ "$status" -ne 0 ]`, which `exit 1`
+satisfies as well as `return 1`, so it could not tell the defect from correct behaviour.
+The new guard asserts a statement *after* the call still runs — that is what separates the
+two. Third time this session that a passing test proved nothing; mutation testing is the
+only thing that has caught it each time.
+
+Verification: shellcheck clean; 183 BATS pass / 0 fail (vcluster 29, e2e 49, e2e_remote 80,
+e2e_observability 15, e2e_image_prune 10). Both new guards mutation-proven, one red each,
+`vcluster.sh` restored byte-identical via `cmp -s`.
+
+**Unit-proven only — not yet exercised against the live runner.** Three fixes now sit on
+`k3d-manager-v1.37.0` (`9d2a0ad0`, `7338a238`, this one) and none has been dispatched.
+Hermes stays booted out until a live run confirms them.
+
+Out of scope: sweeping the six stale kubeconfigs on the m2 runner (live-host mutation,
+needs the operator's go; harmless now that the predicate no longer trusts them).

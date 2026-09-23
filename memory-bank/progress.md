@@ -48,8 +48,17 @@
       no trap can catch. `e2e.bats:403` was written for this scenario and could never fail —
       its `_run_command` stub cannot exit. 181 BATS pass / 0 fail, shellcheck clean, three
       mutation proofs. **Unit-proven only — not yet exercised live.**
-- [ ] **Tier 1 still unproven** — both blockers now have fixes (GHCR stdin `9d2a0ad0`, this
-      leak fix), neither exercised against the live runner. A dispatch is needed to confirm,
+- [x] **Second exit-in-teardown defect FIXED 2026-09-23** — `_vcluster_ensure_exists` proved
+      existence from a kubeconfig *file* and otherwise `_err`ed, i.e. `exit 1`, out of a caller
+      chain (`_e2e_teardown:405` → `vcluster_destroy:88`) guarded only by `|| _warn`. Same class
+      as `7338a238`: the exit skipped `e2e.sh:411-426` and killed the trap mid-way. Fired when a
+      run fails *during* `vcluster create` — no kubeconfig, nothing listed. Fixes: shortcut
+      deleted (`vcluster list` is the truth), both `_err`s → `_warn` + `return 1`, check moved
+      after the `DRY_RUN` return. `vcluster.bats:131` passed only because of the shortcut;
+      `:113` asserted only non-zero, which `exit 1` also satisfies. 183 BATS pass / 0 fail,
+      shellcheck clean, both guards mutation-proven. **Unit-proven only — not exercised live.**
+- [ ] **Tier 1 still unproven** — all three fixes (GHCR stdin `9d2a0ad0`, leak `7338a238`,
+      the ensure_exists fix) are unexercised against the live runner. A dispatch is needed to confirm,
       and needs the operator's go.
 - [ ] **Hermes still BOOTED OUT** — must stay down until both blockers are fixed, or it
       re-wedges the runner every 5 minutes. Restore:
