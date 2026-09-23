@@ -14,7 +14,11 @@
       split, the never-delete-the-registration warning, and that an empty `shopping-cart-data` on the
       hub is expected. CHANGELOG `[Unreleased] → Changed`.
 - [x] **Withdrawn approach recorded** — `d6297a2c`, superseded by `c7a5956d`.
-- [ ] **PENDING OPERATOR GO — the change is inert until this runs.** Task 0 re-capture (read-only),
+- [x] **DONE 2026-09-23** — reapplied; 7 apps -> 0; ESO verified intact (23 CRDs, 3 deploys, 1 CSS).
+- [x] **3a executed** — `shopping-cart-apps` and `shopping-cart-data` namespaces deleted.
+- [x] **Bug docs filed** — identity `Replace=true` (new); argv PAT extended as Defect 4 on the
+      existing `rotate-ghcr-pat` doc rather than duplicated.
+- [ ] ~~PENDING OPERATOR GO~~ (superseded) Task 0 re-capture (read-only),
       then reapply the ApplicationSets for hub **and** ACG, then `argocd_check_values_branch`.
       Expect zero `ubuntu-k3s-data-layer` / `ubuntu-k3s-shopping-cart-*`; verify `ubuntu-k3s-eso`
       and `ubuntu-k3s-grafana-dashboards` still Synced with 21 ESO CRDs and 22 ExternalSecrets.

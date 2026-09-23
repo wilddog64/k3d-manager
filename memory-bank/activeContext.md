@@ -1,5 +1,36 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — EXECUTED: the hub no longer runs shopping-cart; ESO survived
+
+`deploy_argocd_applicationsets --confirm` applied the new selectors; option **3a** taken.
+
+**An empty or absent `shopping-cart-data` on the hub is now EXPECTED, not an incident.** Both
+`shopping-cart-data` and `shopping-cart-apps` were deleted. The hub deliberately does not run the
+shopping-cart data layer or payment stack; Tier 1 (vCluster) and Tier 2 (ACG) carry their own
+substrate under `scripts/etc/e2e/`.
+
+Measured: 7 shopping-cart Applications -> 0. `ubuntu-k3s-eso` and `ubuntu-k3s-grafana-dashboards`
+Synced/Healthy. ESO CRDs 23 -> 23, Deployments 3 -> 3, `ClusterSecretStore/vault-backend` intact.
+ExternalSecrets 22 -> 7, and every one of the 15 removed was shopping-cart-scoped; identity,
+monitoring and platform-ops entries all survived with their Secrets verified present, not just their
+CRs. Three CrashLoopBackOff pods gone. Every Application is now Synced/Healthy except
+`shopping-cart-identity`.
+
+`platform-ops/cosign-public-key` has no Secret, but `lastTransitionTime` == creation time
+(2026-09-20T23:53:17Z, `SecretSyncedError`) — never synced, pre-existing backlog item, **not**
+caused by this change.
+
+**Corrections worth carrying forward.** The spec's "expect 21 ESO CRDs" was wrong: the Application
+*lists* 21, the cluster has 23. Verifying against the Application rather than the cluster would have
+raised a false alarm. And the `shopping-cart-identity` root cause is **`Replace=true`**, not the
+missing `ignoreDifferences` this spec assumed — `Replace=true` replaces the whole object, so
+`ignoreDifferences` alone cannot fix it.
+
+Pre-delete state is in `scratchpad/deregister/` (registration Secret + `get all -o yaml` for both
+namespaces). The registration Secret `cicd/ubuntu-k3s-app-cluster` was deliberately **left in place**
+and still carries `role: app-cluster`.
+
+
 ## 2026-09-23 — v1.38.0 restructured: vector store as a platform component, Hermes as the consumer
 
 Operator direction: make the deployed vector store and Hermes retrieval the headline; CLI dedup

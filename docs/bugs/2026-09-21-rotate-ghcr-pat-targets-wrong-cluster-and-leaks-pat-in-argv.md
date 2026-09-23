@@ -4,7 +4,8 @@
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Medium — the tool an operator would reach for during a GHCR outage silently does not
 touch the affected cluster, and leaks credentials into the process table.
-**Status:** Assigned to Codex 2026-09-21
+**Status:** Assigned to Codex 2026-09-21. **Scope extended 2026-09-23** — see Defect 4; the fix
+must cover `scripts/plugins/shopping_cart.sh` as well as `bin/rotate-ghcr-pat`.
 
 ## Context
 
@@ -60,6 +61,30 @@ kubectl create secret docker-registry ... --docker-password="${TOKEN}" ...
 
 The `-d "{\"data\": {\"token\": \"${TOKEN}\"}}"` form also produces invalid JSON when the PAT
 contains a quote or backslash.
+
+## Defect 4 — the same argv leak in `scripts/plugins/shopping_cart.sh` (added 2026-09-23)
+
+Found while closing out the hub app-cluster work. `bin/rotate-ghcr-pat` is **not** the only site;
+the plugin's own minting path has the identical violation at
+`scripts/plugins/shopping_cart.sh:455-458`:
+
+```bash
+kubectl create secret docker-registry ghcr-pull-secret \
+  ...
+  --docker-username="${_github_user}" \
+  --docker-password="${_ghcr_pat}" \
+```
+
+The PAT is visible in the process table for the lifetime of the call, and `kubectl create secret`
+with `--docker-password` is exactly the pattern CLAUDE.md names. Recorded here rather than as a
+separate bug doc because it is the same defect class, with the same fix shape, and splitting it
+would leave two half-fixes: **Change 4 must cover this site too, or the leak survives the fix.**
+
+The correct form is the one `bin/restore-hub-ghcr-pat` already uses — assemble the
+`.dockerconfigjson` in-shell and pipe a manifest to `kubectl apply -f -` on stdin, so no credential
+reaches argv. Note also that on any ESO-managed namespace a direct `kubectl create secret` is
+reverted on the next reconcile, so this site has the Defect 1 problem as well: it writes something
+that does not persist.
 
 ## Interim mitigation already in place
 
