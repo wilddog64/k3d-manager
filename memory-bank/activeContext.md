@@ -2,7 +2,8 @@
 
 ## 2026-09-23 — Alertmanager warning alerts now have an explicit delivery route
 
-Implemented and committed as `a7135966` on `k3d-manager-v1.37.0`. Added the
+Implemented and committed as `a7135966` on `k3d-manager-v1.37.0`; status update pushed in
+`683a8ac7`. Added the
 `platform-warning` email receiver using `${ALERTMANAGER_GMAIL_FROM}`, appended the five-name
 warning allowlist at `.route.routes[2]` after `severity = critical`, added the Alerting guide
 and README/CHANGELOG entries, and added three BATS guards. Focused BATS is 7/7; `make test`

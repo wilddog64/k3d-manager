@@ -11,7 +11,9 @@
 - [x] Mutation proof: deleting the route made tests 3 and 5 red; blanking `to:` made test 4
       red; swapping the warning and critical routes made tests 2, 3 and 5 red. Each mutation
       was restored byte-for-byte before the next.
-- [ ] **Push pending** — the initial pull was blocked by inability to write `.git/FETCH_HEAD`.
+- [x] **Pushed** — implementation commit `a7135966` and status commit `683a8ac7` are on
+      `origin/k3d-manager-v1.37.0`; the initial pull was blocked by inability to write
+      `.git/FETCH_HEAD`.
 
 ## 2026-09-23 — M2 GHCR credential root-caused (locked keychain), fix dispatched to Codex
 
