@@ -119,3 +119,90 @@ publish the retained result. Configure/verify this before asserting the
 5. `gh auth refresh -h github.com -s read:packages` on M2 (until Gap 3 design fix).
 6. Configure publish-back OR plan to `make e2e-replay RUNNER=m2` (Gap 4).
 7. `make e2e-remote RUNNER=m2` (needs M2 CPU idle ≥ `E2E_M2_MIN_CPU_IDLE`, default 35%).
+
+---
+
+## Gap 3 REGRESSED — 2026-09-23 (reopened)
+
+Gap 3 is live again. `make e2e-remote RUNNER=m2` (run `1790162339-22194`) brought the
+vCluster up healthy, then failed at `deploying-substrate` with the same error this doc
+recorded in August:
+
+```
+INFO: [acg-up] GHCR_PAT not in env — checking Vault...
+error: context "k3d-k3d-cluster" does not exist
+ERROR: [acg-up] GHCR_PAT not set and no valid PAT in Vault — set GHCR_PAT env var
+       or run: pbpaste | bin/rotate-ghcr-pat
+```
+
+**Both credential paths are dead on the runner, for two different reasons:**
+
+1. **Vault path — dead by construction, unchanged since August.**
+   `scripts/plugins/shopping_cart.sh:321` hardcodes
+   `kubectl get secret vault-root -n secrets --context k3d-k3d-cluster` and reads Vault over
+   `localhost:${_vault_local_port}`. Both are M4-only. On m2jump the context does not exist,
+   so this path can never succeed off-hub. This is the "design follow-up" named above and it
+   was never actioned.
+
+2. **`gh` fallback — newly broken.** The August remediation was
+   `gh auth refresh -h github.com -s read:packages` on M2. That is now undone:
+
+   ```
+   X Failed to log in to github.com account wilddog64 (default)
+     - The token in default is invalid.
+   ```
+
+   `gh` is present (`/opt/homebrew/bin/gh`) but its stored token is invalid, so
+   `gh auth token` (`shopping_cart.sh:366`) returns empty and the fallback bails at
+   `shopping_cart.sh:367` before the `read:packages` pull check
+   (`_shopping_cart_ghcr_pat_can_pull`) is ever reached.
+
+### Correction to a note carried in the memory bank
+
+The 2026-09-22 entry "Tier 1 e2e credential gate cleared (`read:packages` + `workflow`)"
+refers to the **M4's** `gh` token. It says nothing about M2. The runner is where the
+GHCR pull actually happens, so that entry never cleared Tier 1 — the two hosts have
+independent `gh` credentials and only the runner's matters for the substrate.
+
+### Also relevant — `e2e_remote.sh` forwards no credential
+
+`e2e_runner_dispatch` (`scripts/plugins/e2e_remote.sh:430-438`) exports only
+`PATH`, `E2E_RUNNER`, `KUBECONFIG`, `E2E_REPORT_DIR`, optional `E2E_IMAGE_TAG` and the
+publish-back vars. There is no `GHCR_PAT`, so "set `GHCR_PAT` env var" — what the error
+message advises — is not reachable through the dispatch path as written.
+
+**Security constraint on any fix:** the dispatch command string is `tee`'d to
+`~/.k3dm/e2e/dispatch/<runner>-<ts>.log`. A PAT must therefore never be interpolated into
+the remote command or passed in argv. It has to travel over stdin or an `ssh` `SendEnv`
+that is not echoed, consistent with the repo rule that tokens never appear in script
+arguments or logs.
+
+### Immediate unblock (requires the operator — interactive, real TTY)
+
+On m2jump, from the operator's own terminal:
+
+```bash
+gh auth login -h github.com                        # device flow, needs a real TTY
+gh auth refresh -h github.com -s read:packages     # restore the packages scope
+```
+
+Then re-verify against a **private** package (the public `shopping-cart-e2e-tests` returns
+200 anonymously and proves nothing):
+
+```bash
+gh auth status
+./scripts/k3d-manager e2e_runner_health m2
+```
+
+### Durable fix — pick one, this is the third occurrence
+
+1. Teach the Vault path to be host-aware instead of hardcoding the hub context, so the
+   runner either skips it cleanly or reaches Vault over a real endpoint.
+2. Forward a short-lived, `read:packages`-scoped token over the dispatch **via stdin**
+   (never argv, never the tee'd command string).
+3. Keep the runner's own `gh` authoritative, but add a preflight assertion so an invalid
+   runner token fails `e2e_runner_health` loudly instead of surfacing 40 minutes later as
+   a substrate failure.
+
+Option 3 is the smallest and would have caught this before the run started; option 1 or 2
+is still needed so the credential does not silently rot again.
