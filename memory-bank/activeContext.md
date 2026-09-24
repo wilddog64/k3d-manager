@@ -8,6 +8,8 @@ delivery guard, read-only probe, Hermes sensor, tests and alert-delivery docs; `
 ApplicationSet values, adds the k3s generic-path refusal guard, tests and ambient guide. Both are
 on origin. No PR was created, and no live-cluster commands were run.
 
+The required pre-existing logging assertion was updated in follow-up `d2c6177fbadaf44729fcd09fc7c575c38c6f268` because the full suite still expected the intentionally removed `keeping live` wording. The corrected full suite is green.
+
 ## 2026-09-23 — Hostinger app-cluster registration: durability spec dispatched to Codex
 
 Filed `docs/bugs/2026-09-23-hostinger-registration-does-not-survive-a-hub-rebuild.md` and

@@ -11,6 +11,9 @@
       CNI dirs take precedence over live values, generic dirs are refused for k3s, and the
       override log no longer claims live provenance. Focused BATS: 8/8; mutations M1/M2/M3 each
       red and restored; doc links: 1757 files OK. Both commits pushed to origin; no PR created.
+- [x] **Follow-up test correction — `d2c6177fbadaf44729fcd09fc7c575c38c6f268`** — updated the
+      existing live-overrides assertion from `keeping live` to `resolved overrides`, as required
+      by commit 2's logging change. Corrected `make test`: 1083/1083; bare pytest: 184 passed.
 
 ## 2026-09-23 — Hostinger registration must survive a hub rebuild (spec filed)
 
