@@ -3119,4 +3119,9 @@ in the correct post-allowlist position. The 4-vs-5 gap against the hub is **expe
 extra route targets `cicd/k3dm-analyze/*`, AlertmanagerConfig CRs that are hub-only by design.
 `KubeDaemonSetRolloutStuck` — the istio-cni alert discarded for 17 days — is active and now routes.
 `smtp_smarthost = smtp.gmail.com:587` is set globally, so the blank per-receiver `smarthost` is fine.
-Delivery confirmation is pending the route's `group_wait: 10m`.
+Delivery confirmed after the route's `group_wait: 10m`: `notifications_total{integration="email"} 1`,
+`notifications_failed_total{integration="email",*} 0` across all five reasons, and
+`notification_latency_seconds_count{integration="email"} 1` — Alertmanager records that histogram only
+on a completed send, which is what makes this more than an attempt count. The notify log is silent
+because info level logs notification *errors*, not successes, so silence is consistent with success
+rather than evidence of it; the inbox is the last authority.
