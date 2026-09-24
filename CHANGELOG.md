@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Tier 2 ACG preflight now fails early on an empty sandbox URL or missing
+  `k3dm-acg-pluralsight` Keychain service, refuses
+  `K3DM_ACG_SKIP_SESSION_CHECK=1`, and documents the no-MFA auto-login setup.
 - Webhook Phase 1 policy extraction: `scripts/lib/webhook/policy.py`, explicit API route tables, and route-policy regression tests.
 - A unified `make smoke` target with offline and reachable-cluster tiers, per-check logs, and explicit PASS/FAIL/SKIP reporting.
 - Hub snapshot capture, M2 offload, verification, listing, and retention targets.

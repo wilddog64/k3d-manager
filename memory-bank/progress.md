@@ -1,5 +1,23 @@
 # Progress — k3d-manager
 
+## 2026-09-24 — Tier 2 ACG preflight (working tree complete; Git blocked)
+
+- [x] Task 0 recorded as Path A: the personal ACG account has no MFA.
+- [x] Added `_e2e_sandbox_preflight_auth` before `acg_extend_playwright`; it checks the
+      URL, existence-only `k3dm-acg-pluralsight` Keychain service, and refuses the skip
+      session-check override. Added offline transport-stubbed preflight tests.
+- [x] Extended `docs/guides/vcluster-e2e-harness.md` with the setup, MFA constraint,
+      marker triage, and debugging-override rules; added the Unreleased changelog entry.
+- [x] All six mutations turned their named guard tests red and were restored; the final
+      focused suite is 6/6 and existing `e2e.bats` is 49/49.
+- [x] `shellcheck -x scripts/plugins/e2e.sh` is clean with 0 warnings before and after;
+      `make check-doc-links` reports 1764 files OK; `make check-repo-root` passes.
+- [x] `make test-all` completed (`1..1111` primary BATS plan plus `1..132` additional
+      BATS) and reached the expected pytest dependency failure: Python 3.14.7 has no pytest,
+      so Make exited 2. No live ACG, browser, cluster, or CDP command ran.
+- [ ] Git staging was blocked by `.git/index.lock: Operation not permitted`; no commit SHA
+      or push exists. The requested files remain unstaged; operator must stage, commit, and push.
+
 ## 2026-09-24 — webhook Phase 1b authorization (staged; commit blocked)
 
 - [x] Implemented S1–S3: route floors are authoritative, dynamic requirements are marked,

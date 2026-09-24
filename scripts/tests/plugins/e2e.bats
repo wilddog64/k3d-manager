@@ -18,6 +18,8 @@ setup() {
   export E2E_VCLUSTER_READY_INTERVAL=0
   export E2E_VCLUSTER_READY_REFRESH_INTERVAL=0
   export E2E_STRIPE_SECRET_KEY=test-stripe-key
+  export _ACG_SANDBOX_URL=https://example.test/sandbox
+  security() { return 0; }
 
   _run_command() {
     while [[ $# -gt 0 ]]; do

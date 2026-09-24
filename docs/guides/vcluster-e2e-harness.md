@@ -190,6 +190,39 @@ harness; ACG TTL expiry provides cleanup. Tier 2 is best-effort and periodic,
 never a blocking per-candidate gate. Its summaries use `tier: sandbox` and
 `project: stripe` in the shared report directory.
 
+### Tier 2 ACG auto-login enablement
+
+The ACG session gate is already wired into the browser path. Tier 2 extends the
+sandbox through `acg_extend_playwright`, which launches or reuses the CDP browser,
+then `_cdp_ensure_acg_session` checks the Pluralsight session. When needed, that
+gate reads the `username` and `password` keys from the macOS Keychain service
+`k3dm-acg-pluralsight` and signs in before Playwright runs.
+
+Path A is the supported unattended setup: the item must contain the operator's
+personal ACG account, which must have no MFA. Never store the company/MFA account
+there; the login deliberately refuses MFA challenges and does not attempt to work
+around that control. Credentials must be supplied to the one-time Keychain setup
+through stdin or environment variables, never as command-line arguments. Do not
+print credential values.
+
+Start diagnostics with an existence-only check:
+
+```bash
+security find-generic-password -s k3dm-acg-pluralsight
+```
+
+Do not add `-w`: it reads the secret value, while this diagnostic only needs to
+know whether the service exists. An absent item is an error for Path A. Path B is
+the manual-session mode: a live `pw-profile` session may exist without the item,
+but it must be refreshed by a human when it expires.
+
+The session gate reports three distinct states: `ACG_SESSION_OK` means the browser
+is authenticated; `ACG_LOGIN_MFA_REQUIRED` means an MFA challenge was detected and
+deliberately refused; and `ACG_SESSION_EXPIRED` means the session is unauthenticated
+and unattended login is unavailable. `K3DM_ACG_SKIP_SESSION_CHECK=1` is a local
+debugging aid only and is never valid for a Tier 2 acceptance run; the Tier 2
+preflight refuses to run with it set.
+
 ## Failure classification
 
 A failed run is not just a red light: each failing test is classified into a **kind** (what went

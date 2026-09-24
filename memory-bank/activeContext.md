@@ -1,5 +1,17 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — Tier 2 ACG preflight
+
+Task 0 is resolved as **Path A**: the operator's personal ACG account has no MFA.
+Task 1/3 implementation is complete in the working tree on `k3d-manager-v1.37.0`; the
+preflight checks the sandbox URL, Keychain service existence without `-w`, and refuses
+`K3DM_ACG_SKIP_SESSION_CHECK=1`. The existing Tier 2 guide was extended. Focused preflight
+BATS is 6/6, existing E2E BATS is 49/49, shellcheck is clean before/after (0/0), and doc
+links pass (1764 files). `make test-all` completed its 1..1111 BATS plan plus 132 additional
+BATS cases and the Python unit suites, then exited 2 only because Homebrew Python 3.14.7 has
+no pytest. The foundation subtree and live ACG/browser paths remain untouched. Git staging is
+blocked by `.git/index.lock: Operation not permitted`; no commit SHA exists.
+
 ## 2026-09-24 — webhook Phase 1b implemented; commit blocked by sandbox
 
 Implemented the Phase 1b route-table authorization change in the five requested files:
