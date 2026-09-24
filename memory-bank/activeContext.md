@@ -1,5 +1,22 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — Hostinger app-cluster registration: durability spec dispatched to Codex
+
+Filed `docs/bugs/2026-09-23-hostinger-registration-does-not-survive-a-hub-rebuild.md` and
+dispatched it. Two hub rebuilds (2026-09-11, 2026-09-20) dropped `cicd/cluster-ubuntu-hostinger`
+because both rebuild paths — `bin/cluster-up:759` and `hub_recovery.sh:252` — register exactly one
+cluster and enumerate no others, and `bin/cluster-status:233` only checked
+`cluster-${APP_CONTEXT}`, so `make status` printed `Registered` while hostinger was orphaned. The
+spec adds `scripts/etc/argocd/app-clusters.tsv` as the single declaration,
+`argocd_reconcile_app_cluster_registrations` (additive-only, never aborts the rebuild, invokes the
+dispatcher as a child process so no provider file is sourced mid-rebuild), calls from both rebuild
+paths, and a `REGISTRATION GAP` line in `make status`. Three mutations are required.
+
+Correction worth keeping: the registration-only entry point already exists as
+`make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` (`14f26f3d`). The reopened 2026-09-13
+doc still claimed otherwise, and that stale line was repeated in session reporting. Item 1 is a
+single operator command, not development work.
+
 ## 2026-09-23 — Alertmanager warning alerts now have an explicit delivery route
 
 Implemented and committed as `a7135966` on `k3d-manager-v1.37.0`; status update pushed in

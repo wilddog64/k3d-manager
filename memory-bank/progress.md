@@ -1,5 +1,22 @@
 # Progress — k3d-manager
 
+## 2026-09-23 — Hostinger registration must survive a hub rebuild (spec filed)
+
+- [x] **Spec filed** — `docs/bugs/2026-09-23-hostinger-registration-does-not-survive-a-hub-rebuild.md`,
+      dispatched to Codex. Declares the app clusters in `scripts/etc/argocd/app-clusters.tsv`,
+      reconciles them additively from `bin/cluster-up` and `hub_recovery_reconcile` via the
+      existing `refresh_registration` entry point, and reports a `REGISTRATION GAP` in
+      `make status`.
+- [x] **Correction to the record:** the registration-only entry point already exists
+      (`make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`, `14f26f3d`). The reopened
+      2026-09-13 doc repeated "there is no registration-only entry point" after its own fix had
+      landed. Item 1 ("re-register hostinger") therefore needs no code — only the operator's run.
+- [ ] **Codex implementation** — pending.
+- [ ] **Operator: re-register hostinger** — `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`.
+      Live hub mutation; needs the user's go. Hostinger workloads are unmanaged until then.
+- [ ] **Durability unproven until a rebuild happens with the fix in place.** A reconcile that has
+      never run during an actual rebuild is a claim, not a verified fix. The bug doc stays open.
+
 ## 2026-09-23 — Alertmanager warning-severity delivery fix
 
 - [x] **`a7135966` — warning alerts no longer fall through to the root `null` receiver.**
