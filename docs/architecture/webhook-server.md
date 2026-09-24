@@ -2,7 +2,7 @@
 
 **Component:** `bin/k3dm-webhook` + `scripts/lib/webhook/`
 **Status:** modularization Phase 1 landed (v1.13.0), extended by `make_targets` (v1.34.0),
-and policy/route plus the SSO smoke-client extraction landed in v1.37.0; later phases remain not started (see [Roadmap](#roadmap-remaining-phases))
+and policy/route, SSO smoke-client, and agent extraction landed in v1.37.0; later phases remain not started (see [Roadmap](#roadmap-remaining-phases))
 **Related specs:** [`docs/plans/v1.13.0-webhook-modularization.md`](../plans/v1.13.0-webhook-modularization.md) (umbrella),
 `v1.13.0-webhook-modularization-phase1.md` (config), `-render.md` (render), `-auth.md` (proc + auth),
 [`docs/plans/v1.34.0-slack-k3dm-make-command.md`](../plans/v1.34.0-slack-k3dm-make-command.md) (`/k3dm` make allowlist)
@@ -46,6 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib
 from webhook.config       import (...)
 from webhook.render       import (...)
 from webhook.proc         import _spawn_capture_text
+from webhook.agent        import (_call_gemini, _run_cluster_ask, _sanitize_question)
 from webhook.auth         import (...)
 from webhook.make_targets import (MAKE_JOB_TIMEOUT_DEFAULT, MAKE_TARGETS,
                                   make_target_help, parse_make_request)
@@ -61,6 +62,7 @@ from webhook.policy       import (...)
 | `webhook/make_targets.py` | 73 | The `/k3dm` allowlist — `MAKE_TARGETS` (17 targets × min-role, required/optional args, per-target timeout, `confirm` flag), `_ARG_PATTERNS` regex whitelist, `parse_make_request()`, `make_target_help()` | — (leaf) |
 | `webhook/policy.py` | 159 | Request roles, static/dynamic action policy, thread-command roles, JSONL audit, and fixed-window rate limiting | `config`, `make_targets` |
 | `webhook/smoke.py` | 667 | Browser-emulating SSO smoke client: HTMLParser-based OAuth authorization-code checks, credentialed login probes, and service probes; it is not an HTTP health endpoint | `proc` (runtime callbacks from the entrypoint for shared redaction/provider helpers) |
+| `webhook/agent.py` | 506 | AI agent invocation, cluster-ask orchestration, the cluster-mutation gate, and the prompt-injection filter | `config`, `policy`, `proc`, `render` |
 
 `webhook/__init__.py` is empty — the package is a plain namespace.
 
@@ -76,6 +78,7 @@ flowchart LR
     MAKE["make_targets<br/><i>leaf</i>"]
     POLICY["policy<br/><i>authz + audit + rate limit</i>"]
     SMOKE["smoke<br/><i>SSO + service probes</i>"]
+    AGENT["agent<br/><i>ask + safety gates</i>"]
 
     RENDER --> CONFIG
     AUTH --> CONFIG
@@ -83,6 +86,10 @@ flowchart LR
     POLICY --> CONFIG
     POLICY --> MAKE
     SMOKE --> PROC
+    AGENT --> CONFIG
+    AGENT --> POLICY
+    AGENT --> PROC
+    AGENT --> RENDER
     ENTRY -.->|"imports directly"| PROC
     ENTRY -.->|"imports directly"| MAKE
 ```
@@ -91,6 +98,10 @@ flowchart LR
 makes them safe to import from BATS/pytest and from the smoke gate without booting the HTTP
 server. `make_targets` is deliberately a pure data + validation leaf: the allowlist is
 testable without a cluster, a Makefile, or a running server.
+
+`webhook.agent` owns the cluster-mutation gate (`_fix_mode_enabled`) and the prompt-injection
+filter (`_sanitize_question`). Both are covered by the direct-function tests in
+`scripts/tests/bin/webhook_agent.py`.
 
 ### API route table
 

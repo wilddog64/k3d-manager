@@ -1,5 +1,26 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — webhook Phase 3 agent extraction
+
+Phase 3 is implemented in the working tree on `k3d-manager-v1.37.0`: the seven agent
+functions and three regex gates now live in `scripts/lib/webhook/agent.py`; the entrypoint
+imports only `_call_gemini`, `_run_cluster_ask`, and `_sanitize_question`, which it still
+calls. Added direct real-function security tests in `scripts/tests/bin/webhook_agent.py`.
+The unknown-role matrix is intentionally pinned to the observed `True`/`True` behavior with
+the existing bug-doc pointer; no policy behavior was changed. The existing webhook BATS
+assertions for the moved code were repointed to the new module.
+
+Focused pytest: 7 passed; webhook BATS: 64/64; full pytest: 189 passed; doc links: 1764
+files OK; check-repo-root: 0; server import: `OK`; `_agent_audit`: 0; `bin/k3dm-webhook`
+measured 3409 -> 2957 lines. `make test-all` completed the `1..1112` and `1..132` BATS
+plans, with unittest suites 7 / 14 / 7 / 6 / 6 passing, then exited 2 only because Homebrew
+Python 3.14.7 has no pytest. The six required mutations each turned the named guard red and
+were restored. No live webhook, cluster, or AI CLI call was made.
+
+Commit and push are blocked by the sandbox's `.git/index.lock: Operation not permitted`
+wall. No lock removal, retry, `--no-verify`, force-push, or PR was attempted; the scoped
+changes are staged for the operator to commit and push.
+
 ## 2026-09-24 — Tier 2 ACG preflight
 
 Task 0 is resolved as **Path A**: the operator's personal ACG account has no MFA.

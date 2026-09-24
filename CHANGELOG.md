@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- `scripts/tests/bin/webhook_agent.py` covers the AI agent's cluster-mutation gate,
+  prompt-injection filter, filing/fix intent, and observation parsing.
 - Tier 2 ACG preflight now fails early on an empty sandbox URL or missing
   `k3dm-acg-pluralsight` Keychain service, refuses
   `K3DM_ACG_SKIP_SESSION_CHECK=1`, and documents the no-MFA auto-login setup.
@@ -13,6 +15,9 @@
 - `make app-cve-scan` triggers the app-cluster CVE scan CronJob, waits for its manually created Job, and exposes the additive operation to `/k3dm` for operator-role users with an enumerated `CRONJOB` choice.
 
 ### Changed
+- The AI agent invocation and `/ask` orchestration now live in `webhook.agent`, including
+  the role-gated cluster-mutation decision and prompt-injection filter; extraction preserves
+  the existing regexes, length cap, role floor, model handling, and Slack/job output paths.
 - The browser-emulating SSO and service smoke client now lives in `webhook.smoke`; the
   webhook entrypoint imports only the smoke checks it calls, with no change to their
   endpoints, retry behavior, or credential redaction paths.

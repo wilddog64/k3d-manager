@@ -573,10 +573,10 @@ PY
 }
 
 @test "webhook analysis defaults to agy CLI instead of gemini" {
-    run grep -F -- 'os.environ.get("K3DM_GEMINI_BIN", "agy")' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- 'os.environ.get("K3DM_GEMINI_BIN", "agy")' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'return "agy CLI not found — skipping AI analysis"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- 'return "agy CLI not found — skipping AI analysis"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
     [ "$status" -eq 0 ]
 }
 
@@ -966,12 +966,13 @@ assert _slack_user_role("Uunknown") == "reader"
 import importlib.machinery
 import os
 webhook = importlib.machinery.SourceFileLoader("k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]).load_module()
-assert webhook._fix_mode_enabled("restart the crashlooping pod", "reader") is False
-assert webhook._fix_mode_enabled("resync app foo", "reader") is False
-assert webhook._fix_mode_enabled("restart the crashlooping pod", "operator") is True
-assert webhook._fix_mode_enabled("force-sync argocd", "admin") is True
-assert webhook._fix_mode_enabled("why does the pod keep restarting", "reader") is False
-assert webhook._fix_mode_enabled("what pods are running", "operator") is False
+agent = importlib.machinery.SourceFileLoader("webhook_agent", os.path.join(os.path.dirname(os.environ["K3DM_WEBHOOK_PATH"]), "../scripts/lib/webhook/agent.py")).load_module()
+assert agent._fix_mode_enabled("restart the crashlooping pod", "reader") is False
+assert agent._fix_mode_enabled("resync app foo", "reader") is False
+assert agent._fix_mode_enabled("restart the crashlooping pod", "operator") is True
+assert agent._fix_mode_enabled("force-sync argocd", "admin") is True
+assert agent._fix_mode_enabled("why does the pod keep restarting", "reader") is False
+assert agent._fix_mode_enabled("what pods are running", "operator") is False
 '
     [ "$status" -eq 0 ]
 }

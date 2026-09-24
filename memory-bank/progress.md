@@ -1,5 +1,26 @@
 # Progress — k3d-manager
 
+## 2026-09-24 — webhook Phase 3 agent extraction (staged; Git blocked)
+
+- [x] Extracted `_call_gemini`, `_is_fix_request`, `_fix_mode_enabled`, `_is_filing_request`,
+      `_sanitize_question`, `_parse_gemini_observations`, `_run_cluster_ask`, plus
+      `_FIX_RE`, `_FILING_RE`, and `_INJECTION_RE` into `webhook/agent.py` with explicit
+      `__all__` and one-way imports toward config/policy/proc/render.
+- [x] Added `scripts/tests/bin/webhook_agent.py` with literal fix-mode matrix (including the
+      documented observed unknown-role values), individual injection alternatives, length and
+      control-character guards, intent matching, and structured/malformed observation cases.
+- [x] Updated the architecture map and CHANGELOG; repointed the two existing BATS checks that
+      inspected moved code. No Phase 4 lifecycle/status work was started.
+- [x] Mutation evidence: M1 reader bypass, M2 reader floor, M3 deleted `[INST]` alternative,
+      M4 returned injected text, M5 raised cap to 5000, and M6 removed control stripping all
+      produced red output; each was restored before the next mutation.
+- [x] Gates: focused pytest 7; webhook BATS 64/64; bare pytest 189; `make test-all` completed
+      BATS plans 1112 and 132 plus unittest counts 7/14/7/6/6, then expected EXIT=2 because
+      Homebrew Python 3.14.7 lacks pytest; doc links 1764; repo-root 0; import `OK`.
+- [ ] Commit/push and final SHA verification remain; Git returned
+      `fatal: Unable to create '.git/index.lock': Operation not permitted`. No retry,
+      lock removal, hook bypass, force-push, or PR was attempted. Changes are staged.
+
 ## 2026-09-24 — Tier 2 ACG preflight (working tree complete; Git blocked)
 
 - [x] Task 0 recorded as Path A: the personal ACG account has no MFA.
