@@ -3203,3 +3203,38 @@ probe-group health would catch this whole class. Not specced yet.
 **Open question for the operator:** there is no Makefile target to trigger `app-cve-scan`. The
 `/k3dm <target>` allowlist framework SHIPPED (`scripts/lib/webhook/make_targets.py`, 17 targets), so
 adding one would be a target plus one allowlist entry.
+
+## 2026-09-24 (later) — both gaps specced and dispatched
+
+The two open questions above are now answered in writing and handed to Codex.
+
+**`3af7b09f` — two specs pushed** on `k3d-manager-v1.37.0`:
+
+- `docs/plans/v1.37.0-app-cve-scan-make-target-and-k3dm.md` — `app_cve_scan_trigger` in
+  `observability.sh`, a `make app-cve-scan` target (`CRONJOB=`, `K3DM_CVE_SCAN_WAIT=`), and the
+  **18th** `/k3dm` allowlist entry at `min_role: operator`, `timeout: 900`, with `CRONJOB` as an
+  anchored two-value alternation because the value reaches `create job --from=cronjob/<value>`.
+  Deliberately **no** `confirm:` — a scan is additive. Records that the CronJob's
+  `.status.lastSuccessfulTime` stays empty after a manual run and documents it rather than adding an
+  `ownerReference`, which the history reaper would then delete.
+- `docs/plans/v1.38.0-hermes-app-health-delta-sensor.md` — a Hermes `app_health` sensor for the
+  general class, not a RabbitMQ check: **aggregate `/actuator/health` not UP while both probe groups
+  are UP**, which is by construction the set of failures no orchestration signal can ever report.
+  Reads through the API server's service proxy (`get --raw .../services/<svc>:<port>/proxy/...`) so
+  it needs no port-forward — the mechanism that silently broke Pushgateway metrics for 64 days.
+  Files bugs by extending `e2e_bugs.py`'s existing `run["source"]` dispatch with a third source,
+  reusing its dedup/reopen/worktree/rebase-retry wholesale. **Disabled by default** via
+  `K3DM_HERMES_APP_HEALTH_ENABLED`, mirroring `K3DM_HERMES_STATUS_ENABLED`.
+
+Why v1.38.0 for the second one: v1.37.0 already held four plan docs and the cap is five. Splitting
+was the rule, not a preference.
+
+**Two traps recorded in the specs so they are not re-derived:**
+- `group_slug` (`e2e_triage.py:106-109`) hardcodes an `e2e-` prefix, so the filed doc is
+  `*-e2e-health-probe-gap-*.md`. Leave it: `file_bugs` dedups by globbing `*-{slug}.md`, so changing
+  the prefix would orphan every open bug doc and file a duplicate of each.
+- `record()` truncates `evidence` to 200 chars, so the full delta list must travel in `data`.
+
+**Dispatched:** Codex is running the v1.37.0 CVE-scan task (`scratchpad/handoff-app-cve-scan-k3dm.md`,
+session `01a0d39d`). The v1.38.0 sensor task is written but **held** — it targets a different branch
+and the same working tree, so it goes after the first one lands and is verified.
