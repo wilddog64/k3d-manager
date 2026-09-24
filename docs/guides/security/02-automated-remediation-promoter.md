@@ -51,6 +51,11 @@ Trivy finding persists 15 min
 
 ## The safeguards
 
+The `services-git` ApplicationSet selects an app cluster only when it has both
+`k3d-manager/role=app-cluster` and `k3d-manager/shopping-cart=true`. Hostinger registration
+sets the shopping-cart label. A registration refresh that omits it silently un-generates every
+shopping-cart Application, so the CVE promoter cannot patch those Applications.
+
 An auto-remediation system that can deploy is dangerous if it's naïve. The guards
 are the interesting engineering:
 

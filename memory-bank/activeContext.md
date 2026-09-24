@@ -1,5 +1,15 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — Hostinger shopping-cart label and CVE promotion guard fixed
+
+Implemented in commit `FINAL_SHA` (final commit; pushed below): Hostinger registration now defaults
+`ARGOCD_APP_CLUSTER_SHOPPING_CART` to `true` while preserving explicit overrides; app-cve-scan
+records a failed promotion in `_rc` and continues when an ArgoCD Application is missing, without
+emitting a false remediation event. Focused BATS: 9/9; full `make test`: 1096/1096; pytest:
+184 passed; doc links: 1760 files OK; no live-cluster commands were run. The initial pull was
+blocked by the sandbox's `.git/FETCH_HEAD` restriction. User-owned untracked `scratchpad/` was
+left untouched.
+
 ## 2026-09-23 — Alert delivery and ambient CNI precedence fixes completed
 
 Implemented and pushed the two requested bug specs on `k3d-manager-v1.37.0` as separate commits:

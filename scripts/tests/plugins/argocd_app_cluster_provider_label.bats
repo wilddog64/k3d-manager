@@ -59,3 +59,33 @@ setup() {
   [[ "$output" == *"ARGOCD_APP_CLUSTER_PROVIDER unset"* ]]
   [[ "$output" == *"fall back to generic defaults"* ]]
 }
+
+@test "hostinger registration sets the shopping-cart label by default" {
+  unset ARGOCD_APP_CLUSTER_SHOPPING_CART
+  run _hostinger_register_cluster
+  [ "$status" -eq 0 ]
+  run grep -E 'k3d-manager/shopping-cart: "true"' "${BATS_TEST_TMPDIR}/rendered-secret.yaml"
+  [ "$status" -eq 0 ]
+}
+
+@test "an explicit shopping-cart override still wins" {
+  export ARGOCD_APP_CLUSTER_SHOPPING_CART="false"
+  run _hostinger_register_cluster
+  [ "$status" -eq 0 ]
+  run grep -E 'k3d-manager/shopping-cart: "false"' "${BATS_TEST_TMPDIR}/rendered-secret.yaml"
+  [ "$status" -eq 0 ]
+}
+
+@test "register_app_cluster keeps the false shopping-cart default" {
+  unset ARGOCD_APP_CLUSTER_SHOPPING_CART
+  ARGOCD_APP_CLUSTER_SECRET_NAME="cluster-test"
+  ARGOCD_APP_CLUSTER_NAME="test"
+  ARGOCD_APP_CLUSTER_SERVER="https://test.example:6443"
+  ARGOCD_APP_CLUSTER_TOKEN="token"
+  ARGOCD_APP_CLUSTER_INSECURE="true"
+  _kubectl() { cp "$rendered" "${BATS_TEST_TMPDIR}/rendered-secret.yaml"; }
+  run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -E 'k3d-manager/shopping-cart: "false"' "${BATS_TEST_TMPDIR}/rendered-secret.yaml"
+  [ "$status" -eq 0 ]
+}

@@ -1,5 +1,17 @@
 # Progress — k3d-manager
 
+## 2026-09-24 — Hostinger shopping-cart label and CVE promotion guard
+
+- [x] **`93ffe649`** — Hostinger registration sets the shopping-cart label by default with an
+      explicit override preserved; app-cve-scan skips a missing Application without aborting the
+      loop or emitting a remediation event. Added the required focused tests, CVE guide note and
+      changelog entry.
+- [x] Focused BATS **9/9**; mutation proofs M1–M4 each red and restored with `git diff --quiet`;
+      shellcheck exact counts unchanged from `HEAD~` (Hostinger 2→2, app-cve-scan 0→0);
+      `make test` **1096/1096**; bare pytest **184 passed**; `make check-doc-links` **1760 files OK**.
+- [x] Commit pushed and verified with `HEAD` equal to `origin/k3d-manager-v1.37.0`; no live-cluster
+      commands run.
+
 ## 2026-09-23 — Alert delivery and ambient CNI precedence specs
 
 - [x] **Commit 1 — `03b8755caad4b698c4ecdc9bfbd53b21cbf91e1`** — warning-severity alerts route
