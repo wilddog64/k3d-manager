@@ -3253,3 +3253,35 @@ was the rule, not a preference.
 **Dispatched:** Codex is running the v1.37.0 CVE-scan task (`scratchpad/handoff-app-cve-scan-k3dm.md`,
 session `01a0d39d`). The v1.38.0 sensor task is written but **held** — it targets a different branch
 and the same working tree, so it goes after the first one lands and is verified.
+
+### Task 1 landed — `fb6ceb88`; task 2 HELD by decision
+
+`make app-cve-scan` + the 18th `/k3dm` allowlist entry are on `origin/k3d-manager-v1.37.0`.
+Verified independently, not on Codex's report: local == origin, diff in scope (10 files, +201/-1,
+no refactors), trailers parsed, and all six mutations red with `RESTORE_COMPARE_RC=0` each time.
+Gates: focused BATS 6/6, `makefile_platform_ops` 2/2, focused pytest 14, whole pytest 189,
+`check-doc-links` 1762 OK, `make -n app-cve-scan` parses, shellcheck 1 → 1 (pre-existing SC2016).
+
+**The spec's guessed label selector was WRONG and the spec's own "verify it yourself" instruction
+caught it.** The real selector is `k3dm.k3d.io/cve-remediation-event=true`
+(`app-cve-scan.sh:427`), not the guessed `k3dm.k3.io/remediation=promotion_requested`. Note the
+domain: `k3dm.k3.io` is used **only** by the Hermes status label; every other selector in the repo,
+including this one, is `k3dm.k3d.io`. Never guess a selector — read it from the producer.
+
+Codex could not commit (`.git/index.lock: Operation not permitted` — the known `codex exec`
+sandbox wall), so it staged everything and Claude committed. Expected, not a failure.
+
+`make test` reported four `e2e_remote.bats` reds (688, 699, 723, 724). Those were the
+**unpushed-HEAD** artifact: `15e73d6b` was local-only at the time. Re-ran the suite after pushing —
+**80/80 green, zero reds.** Not a regression.
+
+**Decision (operator, 2026-09-24): task 2 is HELD until v1.37.0 merges.** The Hermes `app_health`
+sensor spec (`docs/plans/v1.38.0-hermes-app-health-delta-sensor.md`) and its handoff
+(`scratchpad/handoff-hermes-app-health-sensor.md`) are complete and ready. It targets
+`k3d-manager-v1.38.0`, which `/post-merge` step 5 cuts from the v1.37.0 merge SHA. Do not cut that
+branch early and do not move the work onto v1.37.0 — that would make v1.37.0 a 6-plan-doc release,
+the exact condition the max-5 cap exists to prevent.
+
+**Next operator action for the CVE target:** `make app-cve-scan` has never been run — it was
+deliberately excluded from the gates because it mutates the live hub. Its first live run is the
+operator's.
