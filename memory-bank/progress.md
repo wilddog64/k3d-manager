@@ -1532,3 +1532,24 @@ Gates: `make test` 1099/1099 (was 1096, +3 new bats); `pytest` 189 (was 184, +5 
 
 Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` will both flip
 `k3d-manager/shopping-cart` to `"true"` AND stop deleting the pushgateway port-forward agent.
+# 2026-09-24 — webhook Phase 4 lifecycle/status extraction (working tree; commit pending)
+
+- [x] Extracted exactly 7 measured lifecycle functions into `webhook/lifecycle.py` and exactly
+      4 measured reporting functions into `webhook/status.py`; no deferred failure-analysis,
+      metrics, redaction, or Slack-thread functions were moved.
+- [x] Added six lifecycle and four status unittest cases using SourceFileLoader; tests cover
+      direct argv/no shell, timeout, actor audit, provider fallback, concurrent refusal,
+      status formatting, malformed payloads, and redaction.
+- [x] Injected `_log`, `_notify_job`, `_push_metrics`, `_analyze_stall`, `_analyze_failure`,
+      `_redact_secrets`, process/job state, and provider probes; copied none of those functions.
+      Left the existing `agent.py` `_notify_job` duplication untouched.
+- [x] Updated architecture module map and Unreleased changelog; adapted only the existing
+      webhook BATS checks that inspected moved functions or patched their old globals.
+- [x] Gates: focused pytest 10; bare pytest 189; webhook BATS 64/64; hub ESO BATS 4/4;
+      `make test-all` completed plans 1112 and 132 with unittest counts 7/6/14/13/6/6/4,
+      then expected EXIT=2 because Homebrew Python 3.14.7 has no pytest; doc links 1765;
+      repo-root and server import passed; `_agent_audit` passed. M1–M6 each produced red
+      output and was restored.
+- [ ] Commit/push blocked by `.git/index.lock: Operation not permitted` after one commit attempt;
+      no retry, lock removal, hook bypass, force-push, or PR. All scoped changes remain staged;
+      no Phase 4 SHA exists.

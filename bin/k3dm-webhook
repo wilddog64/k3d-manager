@@ -58,6 +58,16 @@ from webhook.agent import (  # noqa: E402
     _run_cluster_ask,
     _sanitize_question,
 )
+from webhook.lifecycle import (  # noqa: E402
+    _run_make_target, _run_upgrade, _run_cluster,
+    _run_cluster_resume, _run_cluster_refresh, _run_hostinger_refresh,
+    configure_runtime as _configure_lifecycle_runtime,
+)
+from webhook.status import (  # noqa: E402
+    _run_cluster_status, _run_hostinger_status, _run_cluster_diagnostics,
+    configure_runtime as _configure_status_runtime,
+)
+import webhook.status as _status  # noqa: E402
 from webhook.smoke import (  # noqa: E402
     _smoke_test_services,
     configure_runtime as _configure_smoke_runtime,
@@ -261,7 +271,6 @@ _SEEN_EVENT_MAX = 2048
 # k8s API context for ESO checks — initialized at startup before NEF loads (see _init_k8s_ctx)
 _k3d_ssl_ctx = None
 _k3d_server = None
-_STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
 _SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (.+?/k3dm-acg-screenshot-\d+\.png)")
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
@@ -453,15 +462,6 @@ def _patch_label(cluster_name, version):
         raise RuntimeError(output.strip() or f"kubectl patch secret {cluster_name} failed with rc={rc}")
 
 
-def _run_cleanup(job_id, provider):
-    """Remove stale SSH tunnel and kubeconfig context after a failed cluster-up."""
-    _notify_job(job_id, f"🧹 *Cleanup triggered* ({provider}) — removing stale SSH tunnel and kubeconfig context")
-    try:
-        _spawn_capture_text(["pkill", "-f", "autossh"], timeout=10)
-        _spawn_capture_text(["kubectl", "config", "delete-context", "ubuntu-k3s"], timeout=20)
-        _notify_job(job_id, f"✅ *Cleanup complete* ({provider}) — stale connections removed")
-    except Exception as exc:
-        _notify_job(job_id, f"⚠️ *Cleanup error* ({provider}): {exc}")
 
 
 def _run_stale_sandbox_cleanup(job_id, confirm=False):
@@ -476,75 +476,8 @@ def _run_stale_sandbox_cleanup(job_id, confirm=False):
         _notify_job(job_id, f"🧹 *Stale sandbox cleanup*\n```{output.strip()}```")
 
 
-def _run_make_target(job_id, argv_tail, timeout, actor):
-    """Run one allowlisted /k3dm make target and post the tail of its output."""
-    label = " ".join(argv_tail)
-    try:
-        (JOB_DIR / job_id / "status").write_text("running")
-        _notify_job(job_id, f"🛠️ *make {label}* started by {actor}")
-        cmd = ["/bin/bash", "-c", 'make --no-print-directory "$@"; echo "__K3DM_MAKE_RC=$?"', "k3dm-make", *argv_tail]
-        output, timed_out = _posix_spawn_capture(cmd, timeout=timeout, cwd=REPO_ROOT)
-        lines = output.rstrip().splitlines()
-        rc_line = lines.pop() if lines and lines[-1].startswith("__K3DM_MAKE_RC=") else ""
-        tail = "\n".join(lines[-40:])[-3000:]
-        if timed_out:
-            status, icon, verdict = "failed", "⏱️", f"timed out after {timeout}s"
-        elif rc_line == "__K3DM_MAKE_RC=0":
-            status, icon, verdict = "success", "✅", "succeeded"
-        else:
-            status, icon, verdict = "failed", "❌", f"failed (rc {rc_line.partition('=')[2] or 'unknown'})"
-        (JOB_DIR / job_id / "status").write_text(status)
-        _notify_job(job_id, f"{icon} *make {label}* {verdict}\n```{tail or '(no output)'}```")
-    finally:
-        _MAKE_JOB_LOCK.release()
 
 
-def _run_upgrade(job_id, chart_version, stage):
-    job_dir = JOB_DIR / job_id
-    _out_file = job_dir / "output"
-
-    def _log(msg):
-        with open(_out_file, "a") as _f:
-            _f.write(msg + "\n")
-
-    def _finish(status):
-        (job_dir / "status").write_text(status)
-
-    try:
-        (job_dir / "status").write_text("running")
-        env_label = "dev" if stage == "acg" else "infra"
-
-        # Idempotency check
-        current = _current_label(env_label)
-        if current == chart_version:
-            _log(f"{stage}: already at {chart_version} — no-op")
-            _finish("success")
-            return
-
-        if stage == "acg":
-            _log("Running make up...")
-            pid = _posix_spawn_job(["make", "up"], _out_file, cwd=REPO_ROOT)
-            _, _status = os.waitpid(pid, 0)
-            _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
-            try:
-                os.killpg(pid, signal.SIGTERM)
-            except (ProcessLookupError, OSError):
-                pass
-            if _rc != 0:
-                raise RuntimeError(f"make up exited {_rc}")
-            _log("make up complete")
-
-        cluster_ref = _cluster_name(env_label)
-        if not cluster_ref:
-            raise RuntimeError(f"No cluster secret found for environment={env_label}")
-
-        _patch_label(cluster_ref, chart_version)
-        _log(f"Patched {cluster_ref}: argocd-chart-version={chart_version}")
-        _finish("success")
-
-    except Exception as exc:
-        _log(f"ERROR: {exc}")
-        _finish("failed")
 
 
 def _posix_spawn_job(cmd, output_path, cwd=None, env=None):
@@ -594,198 +527,11 @@ def _parse_cluster_args(command):
     return provider, dry_run
 
 
-def _run_cluster(job_id, action, provider="aws", dry_run=False):
-    job_dir = JOB_DIR / job_id
-    _out_file = job_dir / "output"
-    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az", "hostinger": "k3s-hostinger"}
-    _cluster_provider = _provider_map.get(provider, "k3s-aws")
-    _start = datetime.datetime.now(datetime.timezone.utc).timestamp()
-    _progress_timer = None
-    _last_line_count = 0
-    _stall_tick_count = 0
-    _stall_analyzed = False
-
-    def _log(msg):
-        with open(_out_file, "a") as _f:
-            _f.write(msg + "\n")
-
-    _notify_job(job_id, f"🚀 *cluster-{action}* ({provider}) started — job `{job_id}`")
-
-    def _post_progress():
-        nonlocal _progress_timer, _last_line_count, _stall_tick_count, _stall_analyzed
-        elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - _start) / 60)
-        tail = _read_job_tail(_out_file)
-        tail_text = "\n".join(tail) if tail else "—"
-        _notify_job(job_id, f"⏳ *cluster-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
-        try:
-            current_count = sum(1 for _ in open(_out_file))
-        except OSError:
-            current_count = 0
-        if current_count == _last_line_count:
-            _stall_tick_count += 1
-        else:
-            _stall_tick_count = 0
-            _stall_analyzed = False
-        _last_line_count = current_count
-        if _stall_tick_count >= _STALL_TICKS_THRESHOLD and not _stall_analyzed:
-            _stall_analyzed = True
-            try:
-                _all_lines = _out_file.read_text(errors="replace").splitlines()
-            except OSError:
-                _all_lines = []
-            analysis = _analyze_stall(_all_lines)
-            _notify_job(
-                job_id,
-                f"⚠️ *Stall detected* — no new output for {_stall_tick_count * 2}m "
-                f"(job `{job_id}`)\n*AI:* {analysis}\n"
-                f'To kill: POST `/api/v1/cluster` `{{"action":"kill","job_id":"{job_id}"}}`'
-            )
-        _progress_timer = threading.Timer(120, _post_progress)
-        _progress_timer.daemon = True
-        _progress_timer.start()
-
-    def _finish(status):
-        if _progress_timer:
-            _progress_timer.cancel()
-        with _running_procs_lock:
-            _running_procs.pop(job_id, None)
-        (job_dir / "status").write_text(status)
-        emoji = "✅" if status == "success" else "❌"
-        elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
-        elapsed = elapsed_secs // 60
-        _dry_tag = " — DRY_RUN preview" if dry_run else ""
-        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m{_dry_tag}"
-        _notify_job(job_id, summary)
-        if not dry_run:
-            _push_metrics(action, provider, status, elapsed_secs, job_id)
-
-    try:
-        if action == "up":
-            cmd = ["make", "up", f"CLUSTER_PROVIDER={_cluster_provider}"]
-        elif _cluster_provider == "k3s-hostinger":
-            cmd = ["make", "down", f"CLUSTER_PROVIDER={_cluster_provider}"]
-        else:
-            cmd = ["make", "down", "KEEP_LOCAL=1"]
-        _log(f"DRY_RUN: would {' '.join(cmd)}" if dry_run else f"Running {' '.join(cmd)}...")
-        _spawn_env = dict(os.environ)
-        if dry_run:
-            _spawn_env["DRY_RUN"] = "1"
-        _progress_timer = threading.Timer(120, _post_progress)
-        _progress_timer.daemon = True
-        _progress_timer.start()
-        pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT, env=_spawn_env)
-        with _running_procs_lock:
-            _running_procs[job_id] = pid
-        _, _status = os.waitpid(pid, 0)
-        _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
-        try:
-            os.killpg(pid, signal.SIGTERM)
-        except (ProcessLookupError, OSError):
-            pass
-        if _rc != 0:
-            raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
-        _log(f"{action} complete")
-        if action == "up" and not dry_run:
-            _record_acg_state(provider)
-            threading.Thread(
-                target=_run_post_provision_check,
-                args=(job_id, provider),
-                daemon=True
-            ).start()
-        _finish("success")
-    except Exception as exc:
-        tb = traceback.format_exc()
-        _log(f"ERROR: {exc}\n{tb}")
-        try:
-            _all_lines = _out_file.read_text(errors="replace").splitlines() if _out_file.exists() else []
-            analysis = _analyze_failure(_all_lines)
-            _notify_job(job_id, f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
-        except Exception as analysis_exc:
-            _log(f"WARN: failure analysis skipped: {analysis_exc}")
-        _finish("failed")
-        if action == "up":
-            threading.Thread(
-                target=_run_cleanup,
-                args=(job_id, provider),
-                daemon=True,
-            ).start()
 
 
 _MAX_JOB_AGE_SECS = 10800  # 3 hours — any older "running" job is stale
 
 
-def _run_cluster_resume(job_id, provider="aws"):
-    """Re-run make up with K3DM_RESUME=1 to skip completed checkpoints."""
-    job_dir = JOB_DIR / job_id
-    _out_file = job_dir / "output"
-    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az", "hostinger": "k3s-hostinger"}
-    _cluster_provider = _provider_map.get(provider, "k3s-aws")
-    _start = datetime.datetime.now(datetime.timezone.utc).timestamp()
-    _progress_timer = None
-
-    def _log(msg):
-        with open(_out_file, "a") as _f:
-            _f.write(msg + "\n")
-
-    _notify_job(job_id, f"🔄 *cluster-resume* ({provider}) started — job `{job_id}`")
-
-    def _post_progress():
-        nonlocal _progress_timer
-        elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - _start) / 60)
-        tail = _read_job_tail(_out_file)
-        tail_text = "\n".join(tail) if tail else "—"
-        _notify_job(job_id, f"⏳ *cluster-resume* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
-        _progress_timer = threading.Timer(120, _post_progress)
-        _progress_timer.daemon = True
-        _progress_timer.start()
-
-    def _finish(status):
-        if _progress_timer:
-            _progress_timer.cancel()
-        with _running_procs_lock:
-            _running_procs.pop(job_id, None)
-        (job_dir / "status").write_text(status)
-        emoji = "✅" if status == "success" else "❌"
-        elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
-        elapsed = elapsed_secs // 60
-        _notify_job(job_id, f"{emoji} *cluster-resume* ({provider}) — {status} in {elapsed}m")
-        _push_metrics("resume", provider, status, elapsed_secs, job_id)
-
-    try:
-        cmd = ["make", "up", f"CLUSTER_PROVIDER={_cluster_provider}", "K3DM_RESUME=1"]
-        _log(f"Running {' '.join(cmd)}...")
-        _progress_timer = threading.Timer(120, _post_progress)
-        _progress_timer.daemon = True
-        _progress_timer.start()
-        pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT)
-        with _running_procs_lock:
-            _running_procs[job_id] = pid
-        _, _status = os.waitpid(pid, 0)
-        _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
-        try:
-            os.killpg(pid, signal.SIGTERM)
-        except (ProcessLookupError, OSError):
-            pass
-        if _rc != 0:
-            raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
-        _log("resume complete")
-        _record_acg_state(provider)
-        threading.Thread(
-            target=_run_post_provision_check,
-            args=(job_id, provider),
-            daemon=True
-        ).start()
-        _finish("success")
-    except Exception as exc:
-        tb = traceback.format_exc()
-        _log(f"ERROR: {exc}\n{tb}")
-        try:
-            _all_lines = _out_file.read_text(errors="replace").splitlines() if _out_file.exists() else []
-            analysis = _analyze_failure(_all_lines)
-            _notify_job(job_id, f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
-        except Exception as analysis_exc:
-            _log(f"WARN: failure analysis skipped: {analysis_exc}")
-        _finish("failed")
 
 
 def _running_cluster_job():
@@ -1268,8 +1014,6 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
 
 _configure_smoke_runtime(_register_secret, _resolve_provider, _provider_context,
                          _posix_spawn_capture, _provider_supports_pushgateway)
-
-
 def _collect_cluster_state():
     """Collect live cluster state to enrich failure analysis. Returns a string or empty string.
     Uses posix_spawn (no fork) throughout — safe after macOS NEF is loaded."""
@@ -1830,513 +1574,38 @@ def _run_post_provision_check(job_id, provider):
         _notify_job(job_id, f"🔍 *{svc_name} smoke failure* — {analysis}")
 
 
-def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
-    """Check ACG cluster reachability + ArgoCD app health; post result to response_url or thread."""
-    job_dir = JOB_DIR / job_id
-    if thread_ts:
-        (job_dir / "thread_ts").write_text(thread_ts)
-    lines = []
-
-    def _log(msg):
-        lines.append(msg + "\n")
-
-    def _finish(status):
-        (job_dir / "status").write_text(status)
-        output = _redact_secrets("".join(lines))
-        if len(output) > 3400:
-            output = (output[:1600]
-                      + "\n… middle of report truncated …\n"
-                      + output[-1800:])
-        (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
-
-    def _pod_is_ready(line):
-        parts = line.split()
-        if len(parts) < 4:
-            return False
-        ready_str = parts[2]
-        status_str = parts[3]
-        if status_str in ("Completed", "Succeeded"):
-            return True
-        if "/" in ready_str:
-            try:
-                n, m = ready_str.split("/", 1)
-                return n == m and int(m) > 0 and status_str == "Running"
-            except ValueError:
-                return False
-        return False
-
-    try:
-        (job_dir / "status").write_text("running")
-        provider = _resolve_provider(provider)
-        app_context = _provider_context(provider)
-        acg_probe = _acg_stack_probe(provider)
-
-        active = _running_cluster_job()
-        if active:
-            active_id, active_action = active
-            active_dir = JOB_DIR / active_id
-            mtime = active_dir.stat().st_mtime
-            elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - mtime) / 60)
-            _log(f"⏳ *cluster-{active_action}* in progress (running {elapsed}m) — job `{active_id}`")
-            _finish("success")
-            return
-
-        # Hub cluster — posix_spawn avoids NEF atfork SIGSEGV
-        hub_out, hub_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "nodes", "--context", "k3d-k3d-cluster",
-             "--request-timeout=5s", "--no-headers"],
-            timeout=10,
-        )
-        if not hub_timeout and hub_out.strip() and not hub_out.lstrip().startswith("Error"):
-            hub_lines = [l for l in hub_out.strip().splitlines() if l]
-            hub_ready = sum(1 for l in hub_lines if "Ready" in l and "NotReady" not in l)
-            _log(f"🏠 *Hub cluster* — {hub_ready}/{len(hub_lines)} nodes ready")
-        else:
-            _log("🏠 *Hub cluster* — ❌ unreachable")
-
-        # SSH tunnel — Python socket, no subprocess
-        import socket as _socket
-        try:
-            with _socket.create_connection(("localhost", 6443), timeout=3):
-                tunnel_ok = True
-        except OSError:
-            tunnel_ok = False
-        _log(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
-        if acg_probe:
-            _log(acg_probe["status_line"])
-
-        # App cluster
-        nodes_out, nodes_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "nodes", "--context", app_context,
-             "--request-timeout=8s", "--no-headers"],
-            timeout=15,
-        )
-        acg_reachable = not nodes_timeout and nodes_out.strip() and not nodes_out.lstrip().startswith("Error")
-        if not acg_reachable:
-            _log(acg_probe["unreachable_line"] if acg_probe else f"\n❌ *{provider} cluster unreachable* — cluster may be rebuilding or unavailable.")
-        else:
-            node_lines = [l for l in nodes_out.strip().splitlines() if l]
-            ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
-            total_count = len(node_lines)
-
-            header = f"\n✅ *{provider} cluster* — {ready_count}/{total_count} nodes ready"
-            acg_state_out, _ = _posix_spawn_capture(
-                ["kubectl", "get", "configmap", "acg-state", "-n", "platform-ops",
-                 "--context", app_context, "--request-timeout=5s",
-                 "-o", "jsonpath={.data.provisioned-at} {.data.provider}"],
-                timeout=10,
-            )
-            if acg_state_out.strip() and not acg_state_out.lstrip().startswith("Error"):
-                parts = acg_state_out.strip().split()
-                try:
-                    age_min = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - int(parts[0])) / 60)
-                    provider = parts[1] if len(parts) > 1 else "aws"
-                    header += f" | {provider} | up {age_min}m"
-                except (ValueError, IndexError):
-                    pass
-            _log(header)
-            _log(f"```{nodes_out.strip()}```")
-
-            # App pods (all namespaces, standard output)
-            pods_out, pods_timeout = _posix_spawn_capture(
-                ["kubectl", "get", "pods", "-A", "--context", app_context,
-                 "--no-headers", "--request-timeout=10s"],
-                timeout=20,
-            )
-            if not pods_timeout and pods_out.strip():
-                all_pod_lines = [l for l in pods_out.strip().splitlines() if l]
-                skip_ns = {"kube-system", "kube-public", "kube-node-lease", "trivy-system"}
-                app_pods = [l for l in all_pod_lines if l.split()[0] not in skip_ns]
-                if app_pods:
-                    not_ready = [l for l in app_pods if not _pod_is_ready(l)]
-                    ready_count_pods = len(app_pods) - len(not_ready)
-                    _log(f"\n*Pods* — {ready_count_pods}/{len(app_pods)} ready")
-                    if not_ready:
-                        shown = not_ready[:10]
-                        snippet = "\n".join(
-                            f"{l.split()[0]}  {l.split()[1]}  {l.split()[2]}  {l.split()[3]}"
-                            for l in shown if len(l.split()) >= 4
-                        )
-                        _log(f"```{snippet}```")
-                        if len(not_ready) > 10:
-                            _log(f"_…and {len(not_ready) - 10} more not-ready pods_")
-                else:
-                    _log("\n*Pods* — no app pods deployed yet")
-            else:
-                _log("\n_Pod status unavailable_")
-
-        # ArgoCD apps
-        apps_out, apps_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "applications", "-n", "cicd",
-             "--context", "k3d-k3d-cluster",
-             "--no-headers",
-             "-o", "custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status"],
-            timeout=10,
-        )
-        if not apps_timeout and apps_out.strip() and not apps_out.lstrip().startswith("Error"):
-            acg_apps = [l for l in apps_out.strip().splitlines()
-                        if l.startswith("acg-") or "ubuntu-k3s" in l]
-            if acg_apps:
-                _log(f"\n*ACG ArgoCD apps:*")
-                if not acg_reachable:
-                    _log("_(cached — ACG cluster was unreachable)_")
-                _log(f"```{chr(10).join(acg_apps)}```")
-            all_apps = apps_out.strip().splitlines()
-            unhealthy = [l for l in all_apps
-                         if "Degraded" in l or "Missing" in l or "OutOfSync" in l]
-            if unhealthy:
-                _log("\n⚠️ *Unhealthy/OutOfSync apps:*")
-                _log(f"```{chr(10).join(unhealthy)}```")
-        else:
-            _log("\n_ArgoCD app status unavailable (Hub cluster unreachable)_")
-
-        # AWS credentials
-        aws_out, aws_timeout = _posix_spawn_capture(
-            ["aws", "sts", "get-caller-identity", "--query", "Arn", "--output", "text"],
-            timeout=10,
-        )
-        if not aws_timeout and aws_out.strip() and "arn:" in aws_out.lower():
-            _log(f"\n*AWS:* ✅ `{aws_out.strip()}`")
-        else:
-            _log("\n*AWS:* ❌ credentials invalid or expired — run `/cluster-refresh`")
-
-        # Service smoke test (1 retry — fast path for on-demand status)
-        smoke = _smoke_test_services(retries=1, provider=provider)
-        all_smoke_ok = all(ok is not False for _, ok, _ in smoke)
-        _log(f"\n*Service smoke test:*{'  all clear ✅' if all_smoke_ok else ''}")
-        for svc_name, ok, detail in smoke:
-            icon = "✅" if ok is True else ("⚪" if ok is None else "❌")
-            _log(f"  {icon} {svc_name}: {detail}")
-        if all_smoke_ok and not tunnel_ok:
-            _log("\nℹ️ _Hub/tunnel checks DOWN but service endpoints responding — port-forwards or Cloudflare tunnel still active. Run `/cluster-refresh` to restore kubectl access._")
-
-        failed_smoke = [(name, detail) for name, ok, detail in smoke if ok is False]
-        for svc_name, err_detail in failed_smoke[:3]:
-            diag_parts = [f"Service `{svc_name}` failed HTTP smoke test: {err_detail}"]
-            ns_map = {
-                "Frontend":              ("shopping-cart-apps", "app=frontend"),
-                "Product images":        ("shopping-cart-apps", "app.kubernetes.io/name=product-catalog"),
-                "Keycloak":              ("identity",            "app.kubernetes.io/name=keycloak"),
-                "Prometheus":            ("monitoring",          "app.kubernetes.io/name=prometheus"),
-                "Grafana":               ("monitoring",          "app.kubernetes.io/name=grafana"),
-                "Pushgateway":           ("monitoring",          "app.kubernetes.io/name=prometheus-pushgateway"),
-                "ArgoCD":                ("cicd",                "app.kubernetes.io/name=argocd-server"),
-                "ESO ClusterSecretStore":("secrets",             "app.kubernetes.io/name=external-secrets"),
-                "ESO ExternalSecrets":   ("secrets",             "app.kubernetes.io/name=external-secrets"),
-            }
-            ns, label_sel = ns_map.get(svc_name, ("shopping-cart-apps", ""))
-            if label_sel:
-                pod_state_out, pod_state_timeout = _posix_spawn_capture(
-                    ["kubectl", "get", "pods", "-n", ns, "-l", label_sel,
-                     "--context", app_context, "--no-headers", "--request-timeout=8s"],
-                    timeout=15,
-                )
-                if not pod_state_timeout and pod_state_out.strip():
-                    diag_parts.append(f"Pod state ({ns}):\n{pod_state_out.strip()[:800]}")
-            prompt = (
-                _ARCH_CONTEXT + "\n"
-                f"Service `{svc_name}` failed an HTTP smoke test. Error: {err_detail}\n\n"
-                "Diagnostics:\n" + "\n\n".join(diag_parts) + "\n\n"
-                "Is this a TRANSIENT issue (pod still starting, port-forward not ready, "
-                "ESO secret not yet synced — will resolve in a few minutes) or a REAL FAILURE "
-                "(crash loop, missing secret, misconfiguration — needs human action)?\n"
-                "Use the architecture context above to reason about upstream dependencies. "
-                "Reply with TRANSIENT or REAL FAILURE, then one sentence with the most likely "
-                "cause. Be brief."
-            )
-            analysis = _call_gemini(prompt)
-            _log(f"\n🔍 *{svc_name}:* {analysis}")
-
-        _finish("success")
-    except Exception as exc:
-        _log(f"ERROR: {exc}")
-        _finish("failed")
 
 
-def _run_cluster_refresh(job_id, response_url, thread_ts=None):
-    """Run bin/cluster-refresh --no-login-prompt; post result to response_url or thread."""
-    job_dir = JOB_DIR / job_id
-    if thread_ts:
-        (job_dir / "thread_ts").write_text(thread_ts)
-    lines = []
-
-    def _log(msg):
-        lines.append(msg + "\n")
-
-    def _finish(status):
-        (job_dir / "status").write_text(status)
-        report = _redact_secrets("".join(lines))
-        if len(report) > 3400:
-            report = (report[:1600]
-                      + "\n… middle of report truncated …\n"
-                      + report[-1800:])
-        output = report
-        (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
-
-    try:
-        _log("🔄 *ACG Refresh* — refreshing credentials + SSH tunnel…")
-        import shlex as _shlex_ref
-        repo_root = Path(__file__).resolve().parent.parent
-        refresh_bin = repo_root / "bin" / "cluster-refresh"
-        refresh_out, refresh_timeout = _posix_spawn_capture(
-            ["/bin/bash", "-c",
-             f"{_shlex_ref.quote(str(refresh_bin))} --no-login-prompt && echo __WEBHOOK_SUCCESS__"],
-            timeout=300,
-        )
-        if refresh_timeout:
-            _log("\n❌ *Refresh timed out* after 300s — run `bin/cluster-refresh` manually")
-            _finish("failed")
-            return
-        if "__WEBHOOK_SUCCESS__" in refresh_out:
-            acg_probe = _acg_stack_probe("k3s-aws")
-            _log(acg_probe["refresh_line"] if acg_probe else "\n✅ *Refresh complete* — credentials and access layer refreshed")
-        else:
-            tail_lines = [l for l in refresh_out.strip().splitlines()[-5:] if l]
-            _log("\n❌ *Refresh failed*")
-            if tail_lines:
-                _log("```\n{}\n```".format("\n".join(tail_lines)))
-        _finish("success")
-    except Exception as exc:
-        _log(f"ERROR: {exc}")
-        _finish("failed")
 
 
-def _format_status_summary_slack(payload, provider):
-    """Render the same per-service status checks shown by ``make status``."""
-    overall = str(payload.get("overall", "unknown"))
-    emoji = {"healthy": ":white_check_mark:", "warn": ":warning:",
-             "fail": ":x:", "unknown": ":grey_question:"}.get(overall, ":grey_question:")
-    counts = payload.get("counts", {}) or {}
-    header = f"{emoji} *Cluster status: {overall.upper()}* — `{provider}`"
-    if counts:
-        header += ("  ({} ok / {} warn / {} fail)".format(
-            counts.get("services_healthy", 0),
-            counts.get("services_warning", 0),
-            counts.get("services_failed", 0)))
-    out = [header]
-    checks = payload.get("checks", []) or []
-    if checks:
-        icons = {"healthy": ":white_check_mark:", "warning": ":warning:", "error": ":x:"}
-        for item in checks:
-            status = item.get("status", "warning")
-            out.append("{} {}: {}".format(
-                icons.get(status, ":warning:"),
-                item.get("service") or item.get("id") or "?",
-                str(item.get("message", ""))[:250],
-            ))
-    else:
-        for item in payload.get("errors", []):
-            out.append(":x: {}: {}".format(
-                item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
-        for item in payload.get("warnings", []):
-            out.append(":warning: {}: {}".format(
-                item.get("service") or item.get("id") or "?", str(item.get("message", ""))[:250]))
-    if overall == "unknown":
-        out.append("_status source unavailable — run `make restart-webhook` on the hub_")
-    return "\n".join(out)
 
 
-def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
-    """Run bin/cluster-status for k3s-hostinger (read-only); post result to response_url or thread."""
-    job_dir = JOB_DIR / job_id
-    if thread_ts:
-        (job_dir / "thread_ts").write_text(thread_ts)
-    lines = []
-
-    def _log(msg):
-        lines.append(msg + "\n")
-
-    def _finish(status):
-        (job_dir / "status").write_text(status)
-        report = _redact_secrets("".join(lines))
-        if len(report) > 3400:
-            report = (report[:1600]
-                      + "\n… middle of report truncated …\n"
-                      + report[-1800:])
-        output = report
-        (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
-
-    try:
-        (job_dir / "status").write_text("running")
-        # A node recovery invalidates several forwards at once. Use the normal
-        # bounded retry window here so `/cluster-status` does not report a
-        # false outage while launchd is rebuilding those forwards.
-        smoke = _smoke_test_services(provider="k3s-hostinger")
-        checks = []
-        for name, ok, detail in smoke:
-            status = "healthy" if ok is True else ("warning" if ok is None else "error")
-            checks.append({"id": name.lower().replace(" ", "_"), "service": name,
-                           "status": status, "message": detail})
-        errors = [item for item in checks if item["status"] == "error"]
-        warnings = [item for item in checks if item["status"] == "warning"]
-        payload = {
-            "overall": "fail" if errors else ("warn" if warnings else "healthy"),
-            "checks": checks,
-            "errors": errors,
-            "warnings": warnings,
-            "counts": {
-                "services_healthy": sum(item["status"] == "healthy" for item in checks),
-                "services_warning": len(warnings),
-                "services_failed": len(errors),
-            },
-        }
-        _log(_format_status_summary_slack(payload, "k3s-hostinger"))
-        _finish("success")
-    except Exception as exc:
-        _log(f"ERROR: {exc}")
-        _finish("failed")
 
 
-def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
-    """Run make refresh for k3s-hostinger (restore kubeconfig + ArgoCD); post result."""
-    job_dir = JOB_DIR / job_id
-    if thread_ts:
-        (job_dir / "thread_ts").write_text(thread_ts)
-    lines = []
-
-    def _log(msg):
-        lines.append(msg + "\n")
-
-    def _finish(status):
-        (job_dir / "status").write_text(status)
-        output = _redact_secrets("".join(lines))
-        (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
-
-    try:
-        (job_dir / "status").write_text("running")
-        import shlex as _shlex_hr
-        repo_root = Path(__file__).resolve().parent.parent
-        _log("🔄 *Hostinger refresh* — restoring kubeconfig + ArgoCD registration…")
-        refresh_out, refresh_timeout = _posix_spawn_capture(
-            ["/bin/bash", "-c",
-             f"cd {_shlex_hr.quote(str(repo_root))} && make refresh CLUSTER_PROVIDER=k3s-hostinger && echo __WEBHOOK_SUCCESS__"],
-            timeout=180,
-        )
-        if refresh_timeout:
-            _log("\n❌ *Hostinger refresh timed out* after 180s — run `make refresh CLUSTER_PROVIDER=k3s-hostinger` manually")
-            _finish("failed")
-            return
-        if "__WEBHOOK_SUCCESS__" in refresh_out:
-            _log("\n✅ *Hostinger refresh complete* — `ubuntu-hostinger` context restored")
-        else:
-            tail_lines = [l for l in refresh_out.strip().splitlines()[-8:] if l]
-            _log("\n❌ *Hostinger refresh failed*")
-            if tail_lines:
-                _log("```\n{}\n```".format("\n".join(tail_lines)))
-        _finish("success")
-    except Exception as exc:
-        _log(f"ERROR: {exc}")
-        _finish("failed")
 
 
-def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None):
-    """Run an explicit read-only diagnostic command and post the result."""
-    job_dir = JOB_DIR / job_id
-    if thread_ts:
-        (job_dir / "thread_ts").write_text(thread_ts)
-    lines = []
 
-    def _log(msg):
-        lines.append(msg + "\n")
 
-    def _finish(status):
-        (job_dir / "status").write_text(status)
-        output = _redact_secrets("".join(lines))
-        (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
-
-    try:
-        req = dict(request or {})
-        action = req["action"]
-        context = req["context"]
-        provider = req.get("provider", "hostinger")
-        namespace = req.get("namespace", "")
-        name = req.get("name", "")
-        tail_lines = req.get("tail_lines", 120)
-        cmd = []
-        title = ""
-
-        if action == "get-pods":
-            title = f"🔎 *Diagnostics* — pods in `{namespace}` on `{context}`"
-            cmd = [
-                "kubectl", "get", "pods", "-n", namespace,
-                "--context", context, "-o", "wide",
-                "--request-timeout=15s",
-            ]
-        elif action == "describe-pod":
-            title = f"🔎 *Diagnostics* — describe pod `{name}` in `{namespace}` on `{context}`"
-            cmd = [
-                "kubectl", "describe", "pod", name, "-n", namespace,
-                "--context", context, "--request-timeout=15s",
-            ]
-        elif action == "logs":
-            title = f"🔎 *Diagnostics* — logs for pod `{name}` in `{namespace}` on `{context}`"
-            cmd = [
-                "kubectl", "logs", f"pod/{name}", "-n", namespace,
-                "--context", context, f"--tail={tail_lines}",
-                "--request-timeout=15s",
-            ]
-            if req.get("container", ""):
-                cmd.extend(["-c", req["container"]])
-        elif action == "get-apps":
-            title = "🔎 *Diagnostics* — ArgoCD applications on `k3d-k3d-cluster`"
-            cmd = [
-                "kubectl", "get", "applications", "-n", "cicd",
-                "--context", "k3d-k3d-cluster", "--no-headers",
-                "-o", "custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status",
-                "--request-timeout=15s",
-            ]
-        elif action == "describe-app":
-            title = f"🔎 *Diagnostics* — describe ArgoCD app `{name}`"
-            cmd = [
-                "kubectl", "describe", "application", name, "-n", "cicd",
-                "--context", "k3d-k3d-cluster", "--request-timeout=15s",
-            ]
-        elif action == "get-appsets":
-            title = "🔎 *Diagnostics* — ArgoCD ApplicationSets on `k3d-k3d-cluster`"
-            cmd = [
-                "kubectl", "get", "applicationsets", "-n", "cicd",
-                "--context", "k3d-k3d-cluster", "-o", "wide",
-                "--request-timeout=15s",
-            ]
-
-        _log(title)
-        _log(f"_Target provider: `{provider}`_")
-        out, timed_out = _posix_spawn_capture(cmd, timeout=30)
-        if timed_out:
-            _log("\n❌ diagnostics command timed out after 30s")
-            _finish("failed")
-            return
-        if out.strip():
-            clipped = out.strip()
-            if len(clipped) > 3500:
-                clipped = clipped[-3500:]
-            _log(f"```{clipped}```")
-        else:
-            _log("_(no output returned)_")
-        _finish("success")
-    except Exception as exc:
-        _log(f"ERROR: {exc}")
-        _finish("failed")
+_configure_lifecycle_runtime(
+    None, _notify_job, _push_metrics, _analyze_stall, _analyze_failure,
+    _redact_secrets, _posix_spawn_job,
+    {
+        "current_label": _current_label,
+        "cluster_name": _cluster_name,
+        "patch_label": _patch_label,
+        "running_procs": _running_procs,
+        "running_procs_lock": _running_procs_lock,
+        "record_acg_state": _record_acg_state,
+        "run_post_provision_check": _run_post_provision_check,
+        "running_cluster_job": _running_cluster_job,
+        "make_job_lock": _MAKE_JOB_LOCK,
+    },
+)
+_configure_status_runtime(
+    None, _notify_job, _redact_secrets, _resolve_provider, _provider_context,
+    _acg_stack_probe, _running_cluster_job, _smoke_test_services,
+)
+_status._ARCH_CONTEXT = _ARCH_CONTEXT
 
 
 def _run_analyze(job_id, alert_payload, response_url=""):

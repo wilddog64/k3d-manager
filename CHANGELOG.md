@@ -15,6 +15,9 @@
 - `make app-cve-scan` triggers the app-cluster CVE scan CronJob, waits for its manually created Job, and exposes the additive operation to `/k3dm` for operator-role users with an enumerated `CRONJOB` choice.
 
 ### Changed
+- Webhook Phase 4 separates long-running cluster orchestration into `webhook.lifecycle` and
+  read-only reporting/formatting into `webhook.status`. Runtime dependencies owned by the
+  entrypoint are injected, and `/k3dm` validated argv reaches `make` without a shell.
 - The AI agent invocation and `/ask` orchestration now live in `webhook.agent`, including
   the role-gated cluster-mutation decision and prompt-injection filter; extraction preserves
   the existing regexes, length cap, role floor, model handling, and Slack/job output paths.

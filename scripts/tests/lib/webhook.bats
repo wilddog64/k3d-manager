@@ -309,7 +309,7 @@ setup() {
 }
 
 @test "webhook hostinger status handler accepts provider dispatch" {
-    run grep -Eq '^def _run_hostinger_status\(.*provider=None' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq '^def _run_hostinger_status\(.*provider=None' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/status.py"
     [ "$status" -eq 0 ]
 
     run grep -Eq '_run_hostinger_status if provider == "hostinger"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
@@ -372,6 +372,7 @@ import tempfile
 from pathlib import Path
 
 webhook = importlib.machinery.SourceFileLoader("k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]).load_module()
+life = webhook._run_cluster.__globals__
 assert webhook._parse_cluster_args("cluster-up --dry-run aws") == ("aws", True)
 assert webhook._parse_cluster_args("cluster-down hostinger dry") == ("hostinger", True)
 assert webhook._parse_cluster_args("cluster-up gcp") == ("gcp", False)
@@ -398,17 +399,22 @@ def exercise(dry_run):
     root = Path(tempfile.mkdtemp())
     job = "deadbeef"
     (root / job).mkdir()
-    webhook.JOB_DIR = root
-    webhook._notify_job = lambda *_args: None
-    webhook._push_metrics = lambda *args: metrics.append(args)
-    webhook._record_acg_state = lambda *args: records.append(args)
-    webhook._run_post_provision_check = lambda *args: posts.append(args)
+    life["JOB_DIR"] = root
+    life["_notify_job"] = lambda *_args: None
+    life["_push_metrics"] = lambda *args: metrics.append(args)
+    life["_record_acg_state"] = lambda *args: records.append(args)
+    life["_run_post_provision_check"] = lambda *args: posts.append(args)
     webhook.threading.Timer = Timer
     webhook.threading.Thread = Thread
-    webhook._posix_spawn_job = lambda _cmd, _out, **kwargs: (envs.append(kwargs["env"]) or 123)
+    life["_posix_spawn_job"] = lambda _cmd, _out, **kwargs: (envs.append(kwargs["env"]) or 123)
     webhook.os.waitpid = lambda *_args: (123, 0)
     webhook.os.killpg = lambda *_args: None
-    webhook.REPO_ROOT = root
+    life["REPO_ROOT"] = root
+    life["_helpers"].update({
+        "running_cluster_job": lambda: None,
+        "running_procs": {},
+        "running_procs_lock": webhook._running_procs_lock,
+    })
     webhook._run_cluster(job, "up", "aws", dry_run=dry_run)
     assert (root / job / "status").read_text() == "success"
 
@@ -424,11 +430,11 @@ PY
 }
 
 @test "hostinger status keeps report header and final health sections when long" {
-    run grep -F -- "middle of report truncated" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- "middle of report truncated" "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/status.py"
     [ "${status}" -eq 0 ]
-    run grep -F -- "report[:1600]" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- "report[:1600]" "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/status.py"
     [ "${status}" -eq 0 ]
-    run grep -F -- "report[-1800:]" "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- "report[-1800:]" "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/status.py"
     [ "${status}" -eq 0 ]
 }
 

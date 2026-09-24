@@ -3454,3 +3454,21 @@ grouping URL, not only a label, or CI silently overwrites a local red. `make tes
 recipes stay unchanged — publishing is an opt-in `make test-metrics`.
 
 Plan-doc counts: v1.36.0 **5**, v1.37.0 **5** (both at the cap), v1.38.0 **2**, v1.39.0 **2**.
+# 2026-09-24 — webhook Phase 4 lifecycle/status extraction (commit pending)
+
+Implemented the final scoped Phase 4 split on `k3d-manager-v1.37.0`: seven orchestration
+functions now live in `scripts/lib/webhook/lifecycle.py`, and four reporting/formatting
+functions live in `scripts/lib/webhook/status.py`. Both modules use explicit `__all__` and
+runtime injection for entrypoint-owned logging, notifications, metrics, analysis, redaction,
+and provider/job hooks. `/k3dm` passes validated argv directly to `make` with its timeout and
+repo working directory; no shell command string is constructed. Existing `agent.py`'s
+duplicate `_notify_job` was deliberately left alone.
+
+Verification: focused lifecycle/status pytest 10 passed; bare pytest 189 passed; webhook BATS
+64/64; webhook_hub_eso BATS 4/4; `make test-all` completed BATS plans `1..1112` and `1..132`,
+unittest suites `7 / 6 / 14 / 13 / 6 / 6 / 4`, then exited 2 at the expected missing pytest
+dependency under Homebrew Python 3.14.7. Mutation guards M1–M6 each went red and were restored.
+Doc links 1765 files OK, repo-root passed, server import printed `OK`, and `_agent_audit` passed.
+Entrypoint measured 2957 -> 2226 lines. Commit was attempted with the requested message but
+was blocked by `.git/index.lock: Operation not permitted`; no retry, lock removal, hook bypass,
+force-push, or PR was attempted. All scoped changes remain staged; no Phase 4 commit SHA exists.
