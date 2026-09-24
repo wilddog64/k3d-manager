@@ -234,8 +234,8 @@ _BOOTSTRAP='
     _OCI_INSTANCE_SHAPE='VM.Standard.A1.Flex'
     _OCI_OCPUS=2
     _OCI_MEMORY_GB=12
-    _OCI_SSH_KEY=\"\$(mktemp)\"
-    touch \"\${_OCI_SSH_KEY}.pub\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key\"
+    touch \"\${_OCI_SSH_KEY}\" \"\${_OCI_SSH_KEY}.pub\"
     _launch_count=0
     oci() {
       # list call — not running
