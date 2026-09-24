@@ -3359,3 +3359,49 @@ because that recipe's `python3` is Homebrew 3.14.7 with no pytest. Bare `pytest`
 **Webhook restarted** onto the refactored code: PID 43834 (was 37998), listening on 127.0.0.1:7443.
 Unauthenticated `/api/v1/health` and an unknown POST route both return 401 — auth is checked before
 routing, so no 404 route enumeration for unauthenticated callers. `/k3dm` remains live.
+
+### Phase 1b verified clean — `57ac113d`
+
+Independently verified, not taken from the agent's report.
+
+**Gates, measured on a run that COMPLETED:** `make test-all` -> `EXIT=2` (the expected
+`test-pytest` interpreter failure; `python3` is Homebrew 3.14.7 with no pytest), **1237 BATS ok / 0
+not ok** — identical to the pre-Phase-1b baseline, so zero regressions. Unittest suites
+`webhook_make_targets` 14, `webhook_policy` **7** (was 2), `webhook_redaction` 6,
+`webhook_request_hardening` 6, all OK. Bare `pytest` 189 passed. `webhook.bats` 64/64.
+
+**Two measurement traps hit on the way, both worth remembering:**
+
+1. The first run showed `1101 ok / 4 not ok`. All four reds were `e2e_remote.bats` and were the
+   documented **unpushed-HEAD** artifact — the v1.39.0 spec commit `5468f38c` was local-only. After
+   pushing, that suite is **80/80 green**. See [[reference_e2e_remote_reds_mean_unpushed_head]].
+2. `1101 ok` is NOT comparable to the 1237 baseline, because `make test` aborted on the BATS failure
+   and never reached `test-bin`/`test-python`. **A truncated run's case count looks like a smaller
+   suite, not a stopped one.** Only compare counts from a run that completed — otherwise the obvious
+   reading is that ~136 tests were deleted.
+
+**Codex's two caveats both checked out.** `bin/k3dm-webhook:3037` has `-> str | None`, so the file
+needs Python **3.10+**; it fails under `/usr/bin/python3` 3.9.6 and imports fine under Homebrew
+3.14.7, which is what the LaunchAgent runs. Pre-existing, untouched by the diff, in Phase 3
+territory (`_sanitize_question`). Its `make test-all` genuinely died on sandbox `/var/folders`
+mktemp permissions, so that gate was unmet and I ran it myself.
+
+Codex again could not commit (`.git/index.lock: Operation not permitted`) and correctly left
+everything staged rather than retrying or removing the lock — the handoff now tells it to do exactly
+that, and that instruction worked.
+
+**Open, not acted on:** three stray untracked files in the repo root — `.join-failures.38822`,
+`.join-failures.55968` (both containing `ubuntu-2`) and an empty `.pub`. Some suite writes to a
+RELATIVE path instead of a temp dir, leaking per-PID debris into the working tree. Cosmetic today,
+but one `git add -A` from being committed. Not traced yet.
+
+**v1.39.0 spec added — `5468f38c`:** `docs/plans/v1.39.0-test-suite-metrics-and-staleness.md`.
+Publishes `make test`/`make test-all` results to the app-cluster Pushgateway and Grafana. Built
+around four measured traps: the exit code is a lying metric here so `k3dm_test_cases_failed` is the
+health signal; Pushgateway retains the last value forever so the staleness rules are IN SCOPE (there
+is currently no staleness rule for any `k3dm_*` metric — the pre-existing `k3dm_deployment_*` gap is
+folded in); a failed push is indistinguishable from no run; and `origin` must be in the Pushgateway
+grouping URL, not only a label, or CI silently overwrites a local red. `make test`/`make test-all`
+recipes stay unchanged — publishing is an opt-in `make test-metrics`.
+
+Plan-doc counts: v1.36.0 **5**, v1.37.0 **5** (both at the cap), v1.38.0 **2**, v1.39.0 **2**.
