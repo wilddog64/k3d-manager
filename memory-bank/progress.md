@@ -1206,3 +1206,41 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   hold. Expected: `cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d`,
   `cniBinDir: /var/lib/rancher/k3s/data/cni`, and the new guard silent (provider is specific).
   Then roll `istio-cni-node` and confirm 1/1 plus `KubeDaemonSetRolloutStuck` clearing.
+
+- [x] **Grafana "No data" measured, 2026-09-24 — five dashboards, FOUR different causes.** All five
+  ConfigMaps live on the **hub** (`k3d-k3d-cluster`), which has **no Pushgateway**; hostinger has one.
+  The istio-cni work is unrelated to every one of these. Counts from hub Prometheus:
+  | metric | series |
+  |---|---|
+  | `trivy_vulnerability_inventory` | 7447 |
+  | `e2e_run_info` | 21 |
+  | `e2e_last_run_pass` | 2 (both = 0) |
+  | `e2e_last_run_timestamp_seconds` | 2 |
+  | `e2e_last_success_timestamp_seconds` | 0 |
+  | `e2e_failure_group_info` / `e2e_failure_info` | 0 |
+  | `cve_remediation_state` / `cve_remediation_event_info` | 0 |
+  | `hermes_sensor_status` | 0 (`hermes_incident_active` = 1) |
+  | `k3dm_deployment_*`, checkout/k6/loadtest | 0 (no such metric name exists) |
+
+  Source-ConfigMap counts in `platform-ops`: `k3dm.k3d.io/cve-remediation-event=true` → **0**,
+  `k3dm.k3d.io/e2e-result=true` → **21**, `k3dm.k3.io/hermes-status=true` → **0**.
+  1. **CVE auto Patch — partly alive.** Inventory panels have 7447 series and DO render. The
+     remediation panels are empty only because no remediation-event ConfigMap has ever been written.
+  2. **E2E Verification — the exporter is fine, the payloads are empty.** All 21 event payloads carry
+     `total:""`, `failed:""`, `duration_seconds:""`, `failure_groups:[]`, `failure_details:[]`, which
+     is why `e2e_run_info` carries the nonsense label `failure_ratio="/"` (empty/empty). This is the
+     already-documented "empty event payload = the run aborted before any test ran" mode. Both
+     runners report `e2e_last_run_pass=0`, so `e2e_last_success_timestamp_seconds` is never emitted —
+     "Last success age" is blank because **nothing has ever passed**, not because of plumbing.
+     Blocked on the three e2e fixes (`9d2a0ad0`, `7338a238`, `ad9909a8`) being exercised live.
+  3. **Hermes Status — blank by current design.** Zero `hermes-status` ConfigMaps because
+     `K3DM_HERMES_STATUS_ENABLED` must stay unset. Not a defect. Exporter selector correctly uses
+     `k3dm.k3.io` while e2e/cve use `k3dm.k3d.io` — the split is intentional, do not "fix" it.
+  4. **k3dm Deployment Metrics and Checkout Load Test — no producer at all.**
+     `k3dm_deployment_duration_seconds` appears in exactly one file in the repo, its own dashboard
+     ConfigMap. Nothing emits it, and no checkout/k6 metric name exists. These two are unwired
+     dashboards, not broken ones.
+
+  **Hypothesis I raised and then disproved:** I suspected the e2e dashboard queried a metric name the
+  exporter never emits. It does not — the exporter defines `e2e_last_success_timestamp_seconds` at
+  line 383 of `vulnerability-inventory-exporter.yaml`. Checked before reporting it.
