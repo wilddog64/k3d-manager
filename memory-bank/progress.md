@@ -1,5 +1,22 @@
 # Progress — k3d-manager
 
+## 2026-09-24 — unknown actor role authorization fix (commit pending)
+
+- [x] Added exported `_normalize_actor_role` in `webhook/policy.py`, switched exactly the
+      actor side of `_role_allows` and the audit role field, and did not change `_normalize_role`
+      or `strictest_role`.
+- [x] Updated the two fail-closed `_fix_mode_enabled` rows and added the six requested policy
+      tests, including the temporary patched `policy.AUDIT_DIR` audit isolation and enumerated
+      current-call-site role pairs.
+- [x] Updated the bug status/fix section, webhook role-model architecture note, and Unreleased
+      changelog. No out-of-scope files, live webhook, cluster, browser, or Phase 4 work touched.
+- [x] Gates: policy 13, agent 7, make-targets 14; webhook BATS 64/64; bare pytest 189;
+      doc links 1765 files; repo-root pass; server import `OK`; `_agent_audit` exit 0.
+- [x] `make test-all` completed plans `1..1112` and `1..132`; unittest counts `7 / 14 / 13 / 6 / 6`;
+      expected EXIT=2 at Homebrew Python 3.14.7 without pytest. M1–M5 all red and restored with
+      `git diff --quiet`.
+- [ ] Commit, push, and SHA verification remain.
+
 ## 2026-09-24 — webhook Phase 3 agent extraction (staged; Git blocked)
 
 - [x] Extracted `_call_gemini`, `_is_fix_request`, `_fix_mode_enabled`, `_is_filing_request`,

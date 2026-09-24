@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.37.0`
 **Filed:** 2026-09-24 by Claude, from a finding Codex surfaced and stopped on during webhook Phase 3
-**Status:** OPEN — root cause confirmed by trace; **not currently exploitable**; fix specced below, not applied
+**Status:** FIXED — unknown actor roles now fail closed; commit SHA recorded after commit
 **Component:** `scripts/lib/webhook/policy.py` (moved there by Phase 1, `b6c8a141`)
 
 ## The defect
@@ -73,7 +73,7 @@ In both cases the code was defensible line by line and wrong as a system. A new 
 raw string — from a job file, a queue payload, a future route — silently gets admin. Nothing fails,
 nothing logs, and the AI agent becomes write-capable.
 
-## Fix (proposed, NOT applied)
+## Fix
 
 Split the two meanings. Keep `_normalize_role` as the **requirement** normalizer (unknown → admin,
 fail-safe, relied on by `strictest_role`) and add a subject normalizer that fails closed:

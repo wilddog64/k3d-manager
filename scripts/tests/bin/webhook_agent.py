@@ -27,10 +27,9 @@ class WebhookAgentTests(unittest.TestCase):
             ("fix the pod", "admin", True),
             ("why is the pod unhealthy", "operator", False),
             ("why is the pod unhealthy", "admin", False),
-            # See docs/bugs/2026-09-24-normalize-role-defaults-unknown-actor-to-admin.md.
-            # These observed values should flip to False when that bug is fixed.
-            ("fix the pod", "", True),
-            ("fix the pod", "nonsense", True),
+            # Unknown actor roles fail closed.
+            ("fix the pod", "", False),
+            ("fix the pod", "nonsense", False),
         ]
         for question, role, expected in cases:
             with self.subTest(question=question, role=role):

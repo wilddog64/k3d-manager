@@ -1,5 +1,21 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — unknown actor role authorization fix (working tree; commit pending)
+
+Implemented the scoped policy fix from
+`docs/bugs/2026-09-24-normalize-role-defaults-unknown-actor-to-admin.md`: added and exported
+`_normalize_actor_role` with an unknown→reader default, used it only for the actual side of
+`_role_allows` and the audit role field, and left `_normalize_role` and `strictest_role`
+unchanged. Updated the two fix-mode rows, six direct policy guards, the architecture note,
+changelog, and bug status. No Phase 4 work or live webhook/cluster/browser operation ran.
+
+Focused pytest: policy 13 passed, agent 7 passed, make-targets 14 passed; webhook BATS 64/64;
+bare pytest 189 passed; `make check-doc-links` 1765 files OK; `make check-repo-root` passed;
+server import under `/opt/homebrew/bin/python3` printed `OK`; `_agent_audit` exit 0. `make
+test-all` completed BATS plans `1..1112` and `1..132`, unittest suites `7 / 14 / 13 / 6 / 6`,
+then exited 2 because Homebrew Python 3.14.7 has no pytest, as expected. M1–M5 each produced
+the required red guard output and was restored with `git diff --quiet`. Commit/push pending.
+
 ## 2026-09-24 — webhook Phase 3 agent extraction
 
 Phase 3 is implemented in the working tree on `k3d-manager-v1.37.0`: the seven agent

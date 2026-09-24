@@ -16,6 +16,7 @@ __all__ = [
     "_audit_remote_action",
     "_effective_make_role",
     "effective_policy",
+    "_normalize_actor_role",
     "_normalize_role",
     "_rate_limited",
     "_request_actor",
@@ -98,6 +99,12 @@ def _normalize_role(role):
     return role if role in _ROLE_LEVELS else _ROLE_DEFAULT
 
 
+def _normalize_actor_role(role):
+    """Normalize a caller's role. Unknown values fail closed to reader."""
+    role = (role or "").strip().lower()
+    return role if role in _ROLE_LEVELS else "reader"
+
+
 def _request_role(headers):
     raw = headers.get("X-K3DM-Role")
     if raw is None:
@@ -123,7 +130,7 @@ def _request_actor(headers):
 
 
 def _role_allows(actual_role, required_role):
-    return _ROLE_LEVELS[_normalize_role(actual_role)] >= _ROLE_LEVELS[_normalize_role(required_role)]
+    return _ROLE_LEVELS[_normalize_actor_role(actual_role)] >= _ROLE_LEVELS[_normalize_role(required_role)]
 
 
 def _action_policy(path, body):
@@ -163,7 +170,7 @@ def _audit_remote_action(path, action_name, actor, role, allowed, body=None, rea
             "path": path,
             "action": action_name,
             "actor": actor,
-            "role": _normalize_role(role),
+            "role": _normalize_actor_role(role),
             "allowed": bool(allowed),
             "reason": reason,
             "provider": (body or {}).get("provider", ""),

@@ -3,12 +3,16 @@
 import importlib.util
 import io
 import json
+import sys
+import tempfile
 from importlib.machinery import SourceFileLoader
 import unittest
 from unittest.mock import patch
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(_ROOT / "scripts" / "lib"))
+from webhook import policy
 _WEBHOOK = _ROOT / "bin" / "k3dm-webhook"
 _spec = importlib.util.spec_from_file_location(
     "k3dm_webhook", _WEBHOOK, loader=SourceFileLoader("k3dm_webhook", str(_WEBHOOK))
@@ -112,6 +116,42 @@ class WebhookPolicyTests(unittest.TestCase):
         self.assertEqual(wh.strictest_role("operator", None), "operator")
         self.assertEqual(wh.strictest_role(None, None), "admin")
         self.assertEqual(wh.strictest_role("nonsense"), "admin")
+
+    def test_normalize_actor_role_fails_closed(self):
+        for role in ("", "nonsense", None, "  "):
+            with self.subTest(role=role):
+                self.assertEqual(policy._normalize_actor_role(role), "reader")
+        self.assertEqual(policy._normalize_actor_role("ADMIN"), "admin")
+        self.assertEqual(policy._normalize_actor_role("  operator  "), "operator")
+
+    def test_role_allows_is_asymmetric(self):
+        self.assertFalse(policy._role_allows("nonsense", "operator"))
+        self.assertFalse(policy._role_allows("reader", "nonsense"))
+
+    def test_normalize_role_still_defaults_to_admin(self):
+        self.assertEqual(policy._normalize_role("nonsense"), "admin")
+
+    def test_strictest_role_is_unchanged(self):
+        self.assertEqual(policy.strictest_role(), "admin")
+        self.assertEqual(policy.strictest_role("reader", None), "reader")
+
+    def test_audit_records_the_actor_role_fail_closed(self):
+        with tempfile.TemporaryDirectory() as audit_dir, patch.object(policy, "AUDIT_DIR", Path(audit_dir)):
+            policy._audit_remote_action("/api/v1/ask", "ask", "actor", "nonsense", False)
+            line = (Path(audit_dir) / "remote-operator.jsonl").read_text(encoding="utf-8").strip()
+        self.assertEqual(json.loads(line)["role"], "reader")
+
+    def test_current_call_sites_are_unaffected(self):
+        expected = {
+            ("reader", "operator"): False,
+            ("operator", "operator"): True,
+            ("admin", "admin"): True,
+            ("reader", "reader"): True,
+            ("operator", "admin"): False,
+        }
+        for (actual, required), result in expected.items():
+            with self.subTest(actual=actual, required=required):
+                self.assertEqual(policy._role_allows(actual, required), result)
 
     def test_every_route_declares_a_floor_and_dynamic_routes_say_so(self):
         valid_roles = {"reader", "operator", "admin"}
