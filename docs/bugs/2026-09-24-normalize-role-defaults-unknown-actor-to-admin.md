@@ -93,6 +93,41 @@ Do **not** change `_normalize_role` itself, and do **not** make both sides fail 
 *requirement* resolving to `reader` would mean "anyone may do it", which reintroduces the fail-open
 authorization hole Phase 1b closed.
 
+### Second manifestation — the audit trail misreports the actor
+
+Found 2026-09-24 while enumerating call sites, and **not** in the original filing.
+`_audit_remote_action` (`policy.py:166`) writes:
+
+```python
+            "role": _normalize_role(role),
+```
+
+So an unknown or empty actor role is recorded in `remote-operator.jsonl` as **`"admin"`**. That is
+the actor semantics again, and here the consequence is worse in a different way: the audit log — the
+record you would reach for after an incident — would attribute the action to admin. Use
+`_normalize_actor_role` here too.
+
+### Complete call-site inventory (measured 2026-09-24)
+
+`_role_allows(actual_role, required_role)` — four production sites, all passing a **sanitized**
+actual role, which is why the fix is behaviour-neutral today:
+
+| Site | actual_role source | sanitized by |
+|---|---|---|
+| `bin/k3dm-webhook:859` (`_handle_thread_command`) | `slack_role` | `_slack_user_role` → reader |
+| `bin/k3dm-webhook:2593` (`do_POST` enforcement) | `request_role` | `_request_role` → reader |
+| `bin/k3dm-webhook:2829` (`make_target_help`) | `request_role` | `_request_role` → reader |
+| `scripts/lib/webhook/agent.py:131` (`_fix_mode_enabled`) | caller's `role` | both of the above |
+
+`_normalize_role` — three uses, and they must NOT all change:
+
+| Site | Semantics | Action |
+|---|---|---|
+| `policy.py:126` (`_role_allows`, actual side) | actor | **switch** to `_normalize_actor_role` |
+| `policy.py:126` (`_role_allows`, required side) | requirement | **keep** `_normalize_role` |
+| `policy.py:145` (`strictest_role`) | requirement | **keep** — Phase 1b depends on it |
+| `policy.py:166` (`_audit_remote_action`) | actor | **switch** to `_normalize_actor_role` |
+
 ### Blast radius to check before applying
 
 `_role_allows` is called from the route enforcement path, `_handle_thread_command`,
