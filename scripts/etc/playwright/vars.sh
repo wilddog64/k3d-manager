@@ -17,4 +17,10 @@ PLAYWRIGHT_CDP_PORT="9222"
 # Persistent Chrome profile used for CDP automation (shared with launchd job
 # com.k3d-manager.chrome-cdp). Path must match _ACG_CHROME_CDP_AUTH_DIR in
 # scripts/plugins/acg.sh.
-PLAYWRIGHT_AUTH_DIR="${HOME}/.local/share/k3d-manager/profile"
+#
+# This is pw-profile, NOT the sibling "profile" directory. "profile" is inert —
+# it last held a session on 2026-08-21 and is kept only because deleting either
+# directory is forbidden. The live session lives in pw-profile, which is what
+# scripts/lib/foundation/scripts/lib/acg/vars.sh and cdp.sh's fallback both use.
+# See scripts/lib/foundation/docs/bugs/2026-09-12-chrome-cdp-launchd-agent-wrong-browser-and-dead-profile.md
+PLAYWRIGHT_AUTH_DIR="${HOME}/.local/share/k3d-manager/pw-profile"
