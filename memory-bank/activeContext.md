@@ -3166,3 +3166,40 @@ The earlier one concluded no vector database at either phase (brute-force cosine
 microseconds). The later, operator-directed restructure deploys pgvector as a platform component. The
 later supersedes, but the earlier reasoning still holds — at this corpus size the store is justified
 as platform practice, not by retrieval performance. Say that out loud in the release notes.
+
+## 2026-09-24 — post-`refresh-registration` verification, CVE loop closed, payment root-caused
+
+**`make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` (operator-run) did both jobs.**
+`k3d-manager/shopping-cart` flipped `false` -> `"true"` on `cluster-ubuntu-hostinger`, and the
+Pushgateway LaunchAgent survived (pid 75822, `localhost:9091/-/healthy` 200) — `492b3cba` stopped
+the `rm -f`. Proof the label was load-bearing: all six `ubuntu-hostinger-shopping-cart-*`
+Applications were created at **13:03:31Z**, seconds after the flip, and four of the five services
+rolled fresh pods. `payment` lives in its own namespace `shopping-cart-payment` (its manifests set
+it explicitly, overriding the Application destination `shopping-cart-apps`) — it was never missing.
+
+**CVE auto-patch loop now works end to end — first success in the cronjob's history.**
+Manual trigger `app-cve-scan-manual-1790255689` **SUCCEEDED** (13:14:49 -> 13:18:48). It recorded
+**four** `promotion_requested` remediation events (frontend, order, payment, product-catalog;
+basket had no HIGH/CRITICAL). The CVE Remediation dashboard has data for the first time. Note the
+CronJob's own `.status.lastSuccessfulTime` stays `None` — a manually created job is not owned by
+the CronJob, so the scheduled 01:00 UTC run is still the one to watch.
+
+**`api/payments.spec.ts` health failure root-caused** — appended to
+`docs/bugs/2026-09-16-e2e-assertion-api-payments.md`. `application.yml:65` declares `rabbitmq:` at
+the **top level** instead of under `spring:`, so `RabbitAutoConfiguration` never binds it and
+defaults to `localhost:5672`. Measured: RabbitMQ reachable from the payment pod (`nc_exit=0`),
+`localhost:5672` refused (`nc_exit=1`), and `RabbitHealthIndicator` logs `Connection refused` at the
+exact second of each probe. The indicator is in neither the `liveness` nor `readiness` group, so
+Kubernetes and ArgoCD both report green while `/actuator/health` returns 503 — the same
+"signal disconnected, system fine" shape as the Pushgateway drift. Fix NOT applied: shopping-cart is
+spec-then-Codex, and the top-level `rabbitmq.vault.*` subtree is read by the custom
+`rabbitmq-client-java`, so this is a careful split, not a move. The other **eight** payments
+failures remain unexplained — do not close on the health fix alone.
+
+**Hermes gap identified.** No sensor probes an application's aggregate `/actuator/health`; `argocd`
+and `node_pressure` both read green here by design. A sensor comparing aggregate health against
+probe-group health would catch this whole class. Not specced yet.
+
+**Open question for the operator:** there is no Makefile target to trigger `app-cve-scan`. The
+`/k3dm <target>` allowlist framework SHIPPED (`scripts/lib/webhook/make_targets.py`, 17 targets), so
+adding one would be a target plus one allowlist entry.
