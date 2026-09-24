@@ -221,6 +221,7 @@ docs/
 
 ### Guides
 - **[Alerting](docs/guides/alerting.md)** — Alertmanager receivers, default-deny routing, warning allowlist, and notification triage
+- **[Alert delivery](docs/guides/alert-delivery.md)** — Generated route-tree checks, missing configSecret triage, and Hermes blackout detection
 - **[App-cluster registration](docs/guides/app-cluster-registration.md)** — Hub registration durability, reconciliation, and registration-gap triage
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
 - **[vCluster E2E Harness](docs/guides/vcluster-e2e-harness.md)** — Both tiers of the e2e verification harness: Tier 1 (`e2e_verify_vcluster`) stands up the shopping-cart stack in a throwaway vCluster, runs Playwright as an in-cluster Job and emits an exit-code-faithful pass/fail for the v1.26.0 promotion gate; Tier 2 (`e2e_verify_sandbox`) is the opt-in ACG sandbox Stripe flow

@@ -214,3 +214,28 @@ PY
   run grep -F -- 'grafana-dashboard-e2e.yaml' "${ARGOCD}"
   [ "${status}" -eq 0 ]
 }
+
+@test "Alertmanager has a non-null severity warning route" {
+  run python3 - "${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl" <<'PY'
+import sys, yaml
+route = yaml.safe_load(open(sys.argv[1]))["route"]
+warning = next(item for item in route["routes"] if any("severity = warning" in matcher for matcher in item["matchers"]))
+assert warning["receiver"] != "null"
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
+@test "Alertmanager warning catch-all follows the named allowlist" {
+  run python3 - "${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl" <<'PY'
+import sys, yaml
+routes = yaml.safe_load(open(sys.argv[1]))["route"]["routes"]
+allow = next(i for i, item in enumerate(routes) if any("alertname =~" in matcher for matcher in item["matchers"]))
+warning = next(i for i, item in enumerate(routes) if any("severity = warning" in matcher for matcher in item["matchers"]))
+assert warning > allow
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}

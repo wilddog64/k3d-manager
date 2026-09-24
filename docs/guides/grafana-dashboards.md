@@ -309,6 +309,7 @@ Work down this table before editing a query. Every row is a real past incident.
 | `30d` / `30m` `increase()` panel blank | dashboard time range narrower than the window | widen the time picker first |
 | Exporter-backed panels blank, inventory full | the ConfigMap producer never ran — different code path, same pod | `kubectl -n platform-ops get cm -l <selector>` |
 | Hermes panels blank | selector/publisher label drift (`k3dm.k3.io` vs `k3dm.k3d.io`), or publication disabled | compare `bin/k3dm-hermes` to the exporter; check *Minutes since last poll* |
+| Alertmanager delivers nothing on one cluster | the CR references a `configSecret` that does not exist | `kubectl -n monitoring get alertmanager -o jsonpath='{.items[0].spec.configSecret}'` then `get secret` on that name |
 | E2E detail panels blank, summary panels fine | result event carries aggregates only | inspect the newest `e2e-result` ConfigMap payload |
 | E2E entirely blank after a real remote run | `E2E_M2_PUBLISH_BACK_HOST` unset under launchd; result stuck `publication_pending` | count `k3dm.k3d.io/e2e-result` ConfigMaps on the hub |
 | k3dm Deployment panels blank | no Pushgateway (hub has none by design), or the `:9091` port-forward is down | `curl localhost:9091/metrics` |

@@ -253,6 +253,42 @@ def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024):
         return record("kine", "unknown", "hub datastore status source unavailable")
 
 
+def alert_delivery(run, state, threshold=1):
+    """Report clusters whose Alertmanager cannot deliver any alert at all.
+
+    Two independent blackout modes are checked, because either one alone silences
+    every rule: a referenced configSecret that does not exist (the Prometheus
+    Operator then generates route.receiver=null), and a live route tree whose root
+    receiver is a null sink with no child routes to escape through.
+    """
+    try:
+        code, output = run(["bin/k3dm-alert-delivery-status", "--json"], {})
+        payload = json.loads(output) if code == 0 and output else {}
+        clusters = payload.get("clusters")
+        if not payload.get("available") or not isinstance(clusters, list) or not clusters:
+            raise ValueError("invalid alert delivery probe")
+        blackout = []
+        for item in clusters:
+            if not isinstance(item, dict) or "context" not in item:
+                raise ValueError("invalid cluster entry")
+            name = item["context"]
+            if item.get("config_secret_missing"):
+                blackout.append(
+                    f"{name}: configSecret {item.get('config_secret', 'unset')} absent")
+            elif item.get("root_receiver_is_null") and not item.get("child_routes"):
+                blackout.append(f"{name}: root receiver is a null sink with no child routes")
+        data = {"clusters": len(clusters), "blackout": blackout}
+        if blackout:
+            status = ("degraded" if _debounced("alert_delivery", True, threshold, state)
+                      else "healthy")
+            return record("alert_delivery", status, "; ".join(blackout[:3]), data=data)
+        _debounced("alert_delivery", False, threshold, state)
+        return record("alert_delivery", "healthy",
+                      f"{len(clusters)} Alertmanager route tree(s) can deliver", data=data)
+    except Exception:
+        return record("alert_delivery", "unknown", "alert delivery probe unavailable")
+
+
 def _older_than(value, max_age_seconds, now):
     try:
         then = datetime.fromisoformat(value.replace("Z", "+00:00"))

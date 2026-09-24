@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+results_file="$(mktemp)"
+trap 'rm -f "${results_file}"' EXIT
+
+mapfile -t kube_contexts < <(kubectl config get-contexts -o name 2>/dev/null || true)
+context_available() {
+  local wanted="$1" context
+  for context in "${kube_contexts[@]}"; do
+    [[ "${context}" == "${wanted}" ]] && return 0
+  done
+  return 1
+}
+
+contexts=(k3d-k3d-cluster)
+while IFS=$'\t' read -r context _secret _provider; do
+  [[ -z "${context}" || "${context}" == \#* ]] && continue
+  contexts+=("${context}")
+done < "${ROOT}/scripts/etc/argocd/app-clusters.tsv"
+
+for context in "${contexts[@]}"; do
+  context_available "${context}" || continue
+  cr_json="$(kubectl --context "${context}" -n monitoring get alertmanager -o json 2>/dev/null)" || {
+    printf '%s\n' '{"available":false}'
+    exit 1
+  }
+  cr_name="$(printf '%s' "${cr_json}" | python3 -c 'import json,sys; items=json.load(sys.stdin).get("items", []); print(items[0].get("metadata", {}).get("name", "") if items else "")')"
+  if [[ -z "${cr_name}" ]]; then
+    printf '%s\n' "{}" >> "${results_file}"
+    continue
+  fi
+  config_secret="$(printf '%s' "${cr_json}" | python3 -c 'import json,sys; items=json.load(sys.stdin).get("items", []); print(items[0].get("spec", {}).get("configSecret", "") if items else "")')"
+  config_secret_missing=false
+  if [[ -n "${config_secret}" ]] && ! kubectl --context "${context}" -n monitoring get secret "${config_secret}" >/dev/null 2>&1; then
+    config_secret_missing=true
+  fi
+  root_receiver=null
+  root_receiver_is_null=false
+  child_routes=0
+  if ! ${config_secret_missing}; then
+    generated="alertmanager-${cr_name}-generated"
+    generated_json="$(kubectl --context "${context}" -n monitoring get secret "${generated}" -o json 2>/dev/null)" || {
+      printf '%s\n' '{"available":false}'
+      exit 1
+    }
+    route_shape="$(printf '%s' "${generated_json}" | python3 -c '
+import base64, json, sys
+import yaml
+secret = json.load(sys.stdin)
+raw = base64.b64decode(secret.get("data", {}).get("alertmanager.yaml", ""))
+config = yaml.safe_load(raw) or {}
+route = config.get("route") or {}
+receiver = route.get("receiver", "")
+receivers = {item.get("name"): item for item in config.get("receivers", [])}
+target = receivers.get(receiver) or {}
+has_delivery = any(key.endswith("_configs") and value for key, value in target.items())
+print(json.dumps({"root_receiver": receiver, "root_receiver_is_null": not has_delivery,
+                  "child_routes": len(route.get("routes") or [])}))
+')" || {
+      printf '%s\n' '{"available":false}'
+      exit 1
+    }
+    root_receiver="$(printf '%s' "${route_shape}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["root_receiver"])')"
+    root_receiver_is_null="$(printf '%s' "${route_shape}" | python3 -c 'import json,sys; print(str(json.load(sys.stdin)["root_receiver_is_null"]).lower())')"
+    child_routes="$(printf '%s' "${route_shape}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["child_routes"])')"
+  fi
+  python3 - "${context}" "${cr_name}" "${config_secret}" "${config_secret_missing}" \
+      "${root_receiver}" "${root_receiver_is_null}" "${child_routes}" >> "${results_file}" <<'PY'
+import json
+import sys
+context, alertmanager, config_secret, missing, receiver, receiver_null, children = sys.argv[1:]
+print(json.dumps({"context": context, "alertmanager": alertmanager,
+                  "config_secret": config_secret,
+                  "config_secret_missing": missing == "true",
+                  "root_receiver": receiver,
+                  "root_receiver_is_null": receiver_null == "true",
+                  "child_routes": int(children)}))
+PY
+done
+
+python3 - "${results_file}" <<'PY'
+import json
+import sys
+rows = []
+for line in open(sys.argv[1]):
+    item = json.loads(line)
+    if item:
+        rows.append(item)
+print(json.dumps({"available": True, "clusters": rows}))
+PY

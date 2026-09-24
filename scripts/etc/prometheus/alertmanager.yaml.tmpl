@@ -24,6 +24,12 @@ route:
       group_wait: 5m
       group_interval: 2h
       repeat_interval: 24h
+    - matchers:
+        - severity = warning
+      receiver: platform-warning
+      group_wait: 10m
+      group_interval: 6h
+      repeat_interval: 72h
 
 receivers:
   - name: 'null'

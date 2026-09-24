@@ -110,6 +110,7 @@ function deploy_observability() {
   _observability_install_alertmanager_port_forward
   _observability_install_alertmanager_auth_proxy
   _observability_refresh_prometheus_auth_proxy
+  _observability_assert_alertmanager_delivery "${_hub_context}"
 }
 
 function _observability_seed_grafana_if_absent() {
@@ -567,6 +568,30 @@ function _observability_ensure_namespace() {
     --dry-run=client -o yaml | _kubectl apply --context "${context}" -f - >/dev/null
 }
 
+function _observability_assert_alertmanager_delivery() {
+  local _context="$1"
+  local _cr _configured
+  _cr="$(_kubectl --no-exit get alertmanager -n monitoring --context "${_context}" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  if [[ -z "${_cr}" ]]; then
+    return 0
+  fi
+  _configured="$(_kubectl --no-exit get alertmanager "${_cr}" -n monitoring --context "${_context}" \
+    -o jsonpath='{.spec.configSecret}' 2>/dev/null || true)"
+  if [[ -z "${_configured}" ]]; then
+    return 0
+  fi
+  if _kubectl --no-exit get secret "${_configured}" -n monitoring --context "${_context}" \
+      >/dev/null 2>&1; then
+    _info "[observability] Alertmanager ${_cr} config secret ${_configured} present on ${_context}"
+    return 0
+  fi
+  _err "[observability] Alertmanager ${_cr} on ${_context} references configSecret ${_configured}, which does not exist"
+  _err "[observability] The Prometheus Operator falls back to route.receiver=null and DISCARDS EVERY ALERT"
+  _err "[observability] Seed the credentials first: make alertmanager-secret"
+  return 1
+}
+
 function deploy_observability_acg() {
   _info "[observability] Deploying ACG observability stack..."
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability-acg.yaml"
@@ -653,6 +678,7 @@ function deploy_observability_acg() {
   if ! (set +e; _observability_refresh_prometheus_auth_proxy); then
     _warn "[observability] Prometheus auth proxy refresh failed; continuing with the generated web config"
   fi
+  _observability_assert_alertmanager_delivery "${_app_context}"
 }
 
 function _deploy_pushgateway_acg() {
