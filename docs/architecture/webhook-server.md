@@ -93,10 +93,11 @@ testable without a cluster, a Makefile, or a running server.
 
 The API dispatcher declares each POST and GET route in `_POST_ROUTES` and `_GET_ROUTES`
 inside `bin/k3dm-webhook`. Every entry carries `handler`, `min_role`, and `action_name`.
-The static entries mirror `_ACTION_POLICY`; `/api/v1/cluster` and `/api/v1/make` keep
-their existing dynamic policy resolution in `webhook.policy` while declaring a reader
-baseline in the route table. `/slack/events` is deliberately outside these tables because
-it has its own signature-verification flow.
+`min_role` is the floor that applies when no dynamic policy resolves. The `dynamic` key
+marks routes whose requirement is resolved per request: `/api/v1/cluster` resolves by
+action and `/api/v1/make` resolves from the selected Make target. The effective requirement
+is the strictest of the table floor and that per-request policy. `/slack/events` is
+deliberately outside these tables because it has its own signature-verification flow.
 
 | Route | Minimum role |
 |---|---|

@@ -15,11 +15,13 @@ __all__ = [
     "_action_policy",
     "_audit_remote_action",
     "_effective_make_role",
+    "effective_policy",
     "_normalize_role",
     "_rate_limited",
     "_request_actor",
     "_request_role",
     "_role_allows",
+    "strictest_role",
     "_thread_command_min_role",
 ]
 
@@ -136,6 +138,21 @@ def _action_policy(path, body):
         spec = MAKE_TARGETS.get(target)
         return {"name": f"make:{target or 'help'}", "min_role": spec["min_role"] if spec else "reader"}
     return _ACTION_POLICY.get(path)
+
+
+def strictest_role(*roles):
+    """Return the highest-privilege requirement among the given roles; None values ignored."""
+    present = [_normalize_role(r) for r in roles if r]
+    return max(present, key=lambda r: _ROLE_LEVELS[r]) if present else _ROLE_DEFAULT
+
+
+def effective_policy(route, path, body):
+    """Resolve the one (action_name, min_role) pair a request must satisfy."""
+    dynamic = _action_policy(path, body)
+    if route is None:
+        return dynamic
+    min_role = strictest_role(route["min_role"], (dynamic or {}).get("min_role"))
+    return {"name": (dynamic or {}).get("name") or route["action_name"], "min_role": min_role}
 
 
 def _audit_remote_action(path, action_name, actor, role, allowed, body=None, reason=""):

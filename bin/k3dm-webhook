@@ -71,6 +71,7 @@ from webhook.policy import (  # noqa: E402
     _action_policy,
     _audit_remote_action,
     _effective_make_role,
+    effective_policy,
     _normalize_role,
     _rate_hits,
     _RATE_MAX_DEFAULT,
@@ -78,6 +79,7 @@ from webhook.policy import (  # noqa: E402
     _request_actor,
     _request_role,
     _role_allows,
+    strictest_role,
     _thread_command_min_role,
 )
 import webhook.policy as _policy  # noqa: E402
@@ -3383,17 +3385,20 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         _ask_semaphore.release()
 
 
+# min_role is the floor that applies when no dynamic policy resolves.
 _POST_ROUTES = {
     "/api/v1/argocd-upgrade": {"handler": "argocd_upgrade", "min_role": "admin", "action_name": "argocd-upgrade"},
     "/api/v1/cve-remediate": {"handler": "cve_remediate", "min_role": "operator", "action_name": "cve-remediate"},
-    "/api/v1/cluster": {"handler": "cluster", "min_role": "reader", "action_name": "cluster"},
+    "/api/v1/cluster": {"handler": "cluster", "min_role": "reader", "action_name": "cluster",
+                        "dynamic": "_action_policy resolves per action: up/down=admin, kill=operator"},
     "/api/v1/cluster-status": {"handler": "cluster_status", "min_role": "reader", "action_name": "cluster-status"},
     "/api/v1/diagnostics": {"handler": "diagnostics", "min_role": "reader", "action_name": "diagnostics"},
     "/api/v1/hostinger-status": {"handler": "hostinger_status", "min_role": "reader", "action_name": "hostinger-status"},
     "/api/v1/cluster-refresh": {"handler": "cluster_refresh", "min_role": "operator", "action_name": "cluster-refresh"},
     "/api/v1/cluster-resume": {"handler": "cluster_resume", "min_role": "admin", "action_name": "cluster-resume"},
     "/api/v1/cleanup-stale-sandbox": {"handler": "cleanup_stale_sandbox", "min_role": "admin", "action_name": "cleanup-stale-sandbox"},
-    "/api/v1/make": {"handler": "make", "min_role": "reader", "action_name": "make"},
+    "/api/v1/make": {"handler": "make", "min_role": "reader", "action_name": "make",
+                     "dynamic": "_action_policy resolves from MAKE_TARGETS[target]['min_role']"},
     "/api/v1/analyze": {"handler": "analyze", "min_role": "operator", "action_name": "analyze"},
     "/api/v1/ask": {"handler": "ask", "min_role": "reader", "action_name": "ask"},
 }
@@ -3548,40 +3553,34 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
         body["_source_command"] = _request_source_command(self.headers)
         route = _POST_ROUTES.get(self.path)
-        request_role = _request_role(self.headers)
-        if route is not None and route["handler"] == "make":
-            request_role = _effective_make_role(self.headers, body)
-        request_actor = _request_actor(self.headers)
-        action_policy = _action_policy(self.path, body)
-        # None is intentionally fail-open here for behavior compatibility. The
-        # route-table completeness test prevents a route from relying on it.
-        if action_policy:
-            if not _role_allows(request_role, action_policy["min_role"]):
-                _audit_remote_action(
-                    self.path,
-                    action_policy["name"],
-                    request_actor,
-                    request_role,
-                    False,
-                    body=body,
-                    reason=f"requires {action_policy['min_role']}",
-                )
-                self._json(403, {"error": f"forbidden: {action_policy['name']} requires role {action_policy['min_role']}"})
-                return
-            _audit_remote_action(
-                self.path,
-                action_policy["name"],
-                request_actor,
-                request_role,
-                True,
-                body=body,
-            )
-        # The route table declares every POST route's baseline min_role. Dynamic
-        # /cluster and /make policies remain authoritative to preserve the
-        # behavior of the action_policy None branch below.
         if route is None:
             self._json(404, {"error": "not found"})
             return
+        request_role = _request_role(self.headers)
+        if route["handler"] == "make":
+            request_role = _effective_make_role(self.headers, body)
+        request_actor = _request_actor(self.headers)
+        policy = effective_policy(route, self.path, body)
+        if not _role_allows(request_role, policy["min_role"]):
+            _audit_remote_action(
+                self.path,
+                policy["name"],
+                request_actor,
+                request_role,
+                False,
+                body=body,
+                reason=f"requires {policy['min_role']}",
+            )
+            self._json(403, {"error": f"forbidden: {policy['name']} requires role {policy['min_role']}"})
+            return
+        _audit_remote_action(
+            self.path,
+            policy["name"],
+            request_actor,
+            request_role,
+            True,
+            body=body,
+        )
         if route["handler"] == "argocd_upgrade":
             chart_version = body.get("chart_version", "")
             stage = body.get("stage", "")
