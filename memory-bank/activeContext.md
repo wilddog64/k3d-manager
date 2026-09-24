@@ -3304,3 +3304,43 @@ the exact condition the max-5 cap exists to prevent.
 **Next operator action for the CVE target:** `make app-cve-scan` has never been run — it was
 deliberately excluded from the gates because it mutates the live hub. Its first live run is the
 operator's.
+
+### Webhook Phase 1 landed — `b6c8a141`; stale status test fixed — `dd8422e7`
+
+Both on `origin/k3d-manager-v1.37.0`, local == origin verified.
+
+**Phase 1 is real but its acceptance criterion is NOT met.** Eleven authz functions moved to
+`scripts/lib/webhook/policy.py`, entrypoint 4010 -> 3929, `_POST_ROUTES`/`_GET_ROUTES` added, no
+moved name still defined in the entrypoint and no re-export shim (verified by grep, not by report).
+Behaviour-neutral and proven so: the 10 static + 3 dynamic `(path, min_role)` pairs are pinned as
+literals in `scripts/tests/bin/webhook_policy.py`. All four mutations went red as intended.
+
+BUT the tables' `min_role` is **declarative only** — enforcement still runs through
+`_action_policy`, so the table is not the check. The spec's criterion ("no route may reach a
+job-spawning call without passing through the table's min_role check") is unmet, and two entries are
+misleading: `/api/v1/cluster` declares `reader` while up/down need admin and kill needs operator,
+and `/api/v1/make` declares `reader` while its floor comes from `MAKE_TARGETS`. No regression — the
+dynamic resolution still governs. **Follow-up:** enforce the table min_role as an ADDITIONAL floor
+(behaviour-neutral today, since every table floor is <= its dynamic requirement) and correct those
+two entries. Not yet specced.
+
+The fail-open `if action_policy:` branch is preserved deliberately; a None policy still skips both
+the role check and the audit write. Nothing reaches privileged work through it today only because
+`/api/v1/cluster`'s handler re-validates. Separate decision, not yet taken.
+
+**`dd8422e7` fixes a red I let through.** `492b3cba` correctly changed
+`bin/cluster-status-summary`'s `optional={"pushgateway"}` to `optional=set()`, so a dead Pushgateway
+now counts as a failure — but it never updated `cluster_status_summary.bats`, whose fixture has TWO
+failing services against a hard-coded `services_failed == 1`. That suite had been red on the release
+branch since 05:08. Its "make test green" gate did not hold and I accepted the report without
+reading the summary line. Now asserts the failed-service SET by name and derives the count.
+Mutation-proven red, restored clean.
+
+**Full gate re-run 2026-09-24 08:4x:** `make test-all` -> `EXIT=2`, but **1237 BATS ok / 0 not ok**
+and all four unittest files OK (14/2/6/6); the only failure is `make: *** [test-pytest] Error 2`
+because that recipe's `python3` is Homebrew 3.14.7 with no pytest. Bare `pytest` -> **189 passed**.
+`make test-all` can never exit 0 on this box — read the per-suite counts, never the exit code.
+
+**Webhook restarted** onto the refactored code: PID 43834 (was 37998), listening on 127.0.0.1:7443.
+Unauthenticated `/api/v1/health` and an unknown POST route both return 401 — auth is checked before
+routing, so no 404 route enumeration for unauthenticated callers. `/k3dm` remains live.
