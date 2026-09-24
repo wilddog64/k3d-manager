@@ -2,7 +2,7 @@
 
 **Component:** `bin/k3dm-webhook` + `scripts/lib/webhook/`
 **Status:** modularization Phase 1 landed (v1.13.0), extended by `make_targets` (v1.34.0),
-and policy/route extraction landed in v1.37.0; later phases remain not started (see [Roadmap](#roadmap-remaining-phases))
+and policy/route plus the SSO smoke-client extraction landed in v1.37.0; later phases remain not started (see [Roadmap](#roadmap-remaining-phases))
 **Related specs:** [`docs/plans/v1.13.0-webhook-modularization.md`](../plans/v1.13.0-webhook-modularization.md) (umbrella),
 `v1.13.0-webhook-modularization-phase1.md` (config), `-render.md` (render), `-auth.md` (proc + auth),
 [`docs/plans/v1.34.0-slack-k3dm-make-command.md`](../plans/v1.34.0-slack-k3dm-make-command.md) (`/k3dm` make allowlist)
@@ -34,7 +34,7 @@ operator interface the webhook exposes, rather than each operation growing its o
 
 ---
 
-## Module layout after Phase 1
+## Module layout after Phase 2
 
 The refactor keeps `bin/k3dm-webhook` as the entrypoint and process host, and pulls
 **pure, low-risk helpers** into an importable package at `scripts/lib/webhook/`. The
@@ -60,6 +60,7 @@ from webhook.policy       import (...)
 | `webhook/auth.py`    | 103 | `_keychain_secret`, `_get_token` (bearer resolution), `_verify_slack_signature`, plus the Slack identity gate — `_slack_user_is_allowlisted`, `_slack_user_role` (reads `K3DM_SLACK_ROLE_MAP`); computes `SLACK_SIGNING_SECRET` at import | `config`, `proc` |
 | `webhook/make_targets.py` | 73 | The `/k3dm` allowlist — `MAKE_TARGETS` (17 targets × min-role, required/optional args, per-target timeout, `confirm` flag), `_ARG_PATTERNS` regex whitelist, `parse_make_request()`, `make_target_help()` | — (leaf) |
 | `webhook/policy.py` | 159 | Request roles, static/dynamic action policy, thread-command roles, JSONL audit, and fixed-window rate limiting | `config`, `make_targets` |
+| `webhook/smoke.py` | 667 | Browser-emulating SSO smoke client: HTMLParser-based OAuth authorization-code checks, credentialed login probes, and service probes; it is not an HTTP health endpoint | `proc` (runtime callbacks from the entrypoint for shared redaction/provider helpers) |
 
 `webhook/__init__.py` is empty — the package is a plain namespace.
 
@@ -74,12 +75,14 @@ flowchart LR
     PROC["proc<br/><i>leaf</i>"]
     MAKE["make_targets<br/><i>leaf</i>"]
     POLICY["policy<br/><i>authz + audit + rate limit</i>"]
+    SMOKE["smoke<br/><i>SSO + service probes</i>"]
 
     RENDER --> CONFIG
     AUTH --> CONFIG
     AUTH --> PROC
     POLICY --> CONFIG
     POLICY --> MAKE
+    SMOKE --> PROC
     ENTRY -.->|"imports directly"| PROC
     ENTRY -.->|"imports directly"| MAKE
 ```
@@ -120,9 +123,9 @@ deliberately outside these tables because it has its own signature-verification 
 
 ## What still lives in the monolith
 
-`bin/k3dm-webhook` is **4,008 lines** — it grew, not shrank, since Phase 1: `/k3dm`,
+`bin/k3dm-webhook` is **3,410 lines** after the Phase 2 smoke-client extraction; it still contains
 `/api/v1/cve-remediate`, `/api/v1/hostinger-status`, `/api/v1/cleanup-stale-sandbox`,
-`/api/v1/analyze`, the login smoke suite and the fix-mode thread handler all landed in the
+`/api/v1/analyze`, and the fix-mode thread handler in the
 monolith. Everything below is **not yet extracted** and maps to the phases still to come:
 
 | Area (functions) | Lines (approx) | Future home (planned) |
@@ -135,7 +138,7 @@ monolith. Everything below is **not yet extracted** and maps to the phases still
 | Cluster / make ops — `_run_cleanup`, `_run_stale_sandbox_cleanup`, `_run_make_target`, `_run_upgrade`, `_run_cluster`, `_run_cluster_resume` | 552–886 | `dispatch.py` |
 | Job runner — `_posix_spawn_job`, `_read_job_tail`, `_running_cluster_job`, `_find_job_by_thread_ts`, `_notify_job`, `_clear_stale_jobs` | 646–1696 | `jobs.py` |
 | Secret redaction — `_redact_skip_reason`, `_register_secret`, `_redact_secrets` | 1231–1280 | `render.py` |
-| Diagnostics / failure analysis — `_call_gemini`, `_analyze_stall`, `_collect_cluster_state`, `_analyze_failure`, `_smoke_*` login suite, `_smoke_test_services`, `_run_post_provision_check` | 1297–2520 | `diagnostics.py` |
+| Diagnostics / failure analysis — `_call_gemini`, `_analyze_stall`, `_collect_cluster_state`, `_analyze_failure`, `_run_post_provision_check` | 1297–2520 | `diagnostics.py` |
 | k8s / metrics — `_init_k8s_ctx`, `_push_metrics`, `_provider_supports_pushgateway` | 1566–1796 | `dispatch.py` / `diagnostics.py` |
 | Command handlers — `_run_cluster_status/refresh/diagnostics`, `_run_hostinger_*`, `_run_analyze`, fix/filing-mode gates, `_run_cluster_ask`, `_handle_thread_command` | 949–1209, 2521–3496 | `commands.py` |
 
