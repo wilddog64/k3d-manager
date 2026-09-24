@@ -1167,3 +1167,12 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `istio.io/dataplane-mode: ambient`, so redirection setup for new pods there is degraded.
   Next action, needs the user's go: reapply the `istio-ambient` ApplicationSet, confirm it writes
   the k3s dirs (the new guard should refuse the generic ones), then roll the DaemonSet.
+
+- [x] **v1.39.0 Slack corpus Q&A specced** — `docs/plans/v1.39.0-slack-corpus-qa.md`, filed on
+  operator direction so it is not lost between releases. Plan #1 of 5 for v1.39.0. **Hard-blocked on
+  v1.38.0 WS5 publishing a measured recall@5**; if neither scorer clears its floor the spec does not
+  ship. Dedup check found `v1.6.0-slack-ai-analysis.md`, which is a different shape (alert-triggered
+  push, not user-query pull) but establishes that `/api/v1/analyze` already calls the Claude API from
+  `k3dm-webhook` and posts to Slack — so v1.39.0 is a new handler on proven transport, not new
+  infrastructure. Real work is WS3 (authorisation + disclosure): `docs/bugs/` and `docs/issues/` were
+  written for operators with repo access, and a Slack channel may be wider.

@@ -3125,3 +3125,34 @@ Delivery confirmed after the route's `group_wait: 10m`: `notifications_total{int
 on a completed send, which is what makes this more than an attempt count. The notify log is silent
 because info level logs notification *errors*, not successes, so silence is consistent with success
 rather than evidence of it; the inbox is the last authority.
+
+## 2026-09-23 — v1.38.0 spec updated from the istio-cni incident
+
+Tonight's work produced real evidence for three claims the v1.38.0 spec had been asserting, so the
+spec now cites measurements instead of reasoning.
+
+1. **A five-document near-duplicate cluster the dedup gate provably misses.** One root symptom
+   (istio-cni CNI dirs wrong on a k3s substrate) is spread across five bug docs filed over 68 days
+   with five disjoint slugs; `ls docs/bugs/*-<slug>.md` returns exactly one match each — itself. Not
+   one pair collides. They are causally chained rather than strict duplicates, which is exactly the
+   near-duplicate case lexical matching misses. Two share the token `cni`, so the honest WS5 question
+   is not "does semantic beat nothing" but "does it beat grep" — the lexical control earns its place.
+2. **The gate also fires falsely.** The dedup check for the provider-label slug surfaced
+   `2026-06-08-thread-reply-triggers-unknown-command.md`, matched on the word `unknown`, about a
+   Slack command parser. Recorded as a **hard negative** pair. Both directions fail today.
+3. **WS5 must exercise the real component.** `test_alert_delivery.py` had 8 green cases while the
+   probe it consumes was inverted — it read `alertmanager.yaml` from a Secret whose only key is
+   `alertmanager.yaml.gz`, and reported a total blackout against a healthy 5-route cluster. The tests
+   stubbed `run`, so the probe never executed; they measured the half of the seam that could not
+   fail. WS5 now requires the real indexer and scorer over real files, one end-to-end subprocess case,
+   mutation-proved recall floors, and stubbing only the network call against a *recorded* response.
+
+Also added to WS4 as empirical support for additive-only: a component that is confidently wrong on
+its first live run is the normal case. The probe cried wolf, which is loud; a retriever wired to
+suppress filings fails silently and would not have been caught at all.
+
+NOTE for planning: the two v1.38.0 memory-bank entries disagree on whether a vector DB is warranted.
+The earlier one concluded no vector database at either phase (brute-force cosine over ~1,360 docs is
+microseconds). The later, operator-directed restructure deploys pgvector as a platform component. The
+later supersedes, but the earlier reasoning still holds — at this corpus size the store is justified
+as platform practice, not by retrieval performance. Say that out loud in the release notes.
