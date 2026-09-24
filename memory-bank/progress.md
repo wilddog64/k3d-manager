@@ -1156,5 +1156,14 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [ ] **Probe has no test of its own** — `test_alert_delivery.py` stubs `run`, so
   `bin/k3dm-alert-delivery-status` is never executed by any suite. That is how the gzip-key defect
   shipped green. A parse-level test over a fixture generated Secret would close it.
-- [ ] **istio-cni DaemonSet rollout — NOT started, last by the user's ordering.** Needs the
-  read-only precondition (are post-2026-09-17 pods enrolled in ztunnel?) and the user's go.
+- [ ] **istio-cni DaemonSet — precondition done, awaiting the user's go for the AppSet reapply.**
+  `istio-cni-node-vgr6m` is 0/1 since 2026-09-06, `install-cni` readiness 503, **160,074 probe
+  failures over 17d**, 0 restarts (no probe ever passed). The live `istio-ambient` AppSet still
+  holds the generic `cniConfDir: /etc/cni/net.d` / `cniBinDir: /opt/cni/bin`; the correct k3s values
+  are `/var/lib/rancher/k3s/agent/etc/cni/net.d` and `/var/lib/rancher/k3s/data/cni`
+  (`_istio_ambient_cni_dirs k3s-hostinger` confirms). **`02e3fa76` fixes the overwrite mechanism but
+  is inert until the AppSet is reapplied** — the stale generic dirs are still live. Ambient is in
+  real use, not cosmetic: `ztunnel-69cft` is 1/1 and namespace `shopping-cart-apps` carries
+  `istio.io/dataplane-mode: ambient`, so redirection setup for new pods there is degraded.
+  Next action, needs the user's go: reapply the `istio-ambient` ApplicationSet, confirm it writes
+  the k3s dirs (the new guard should refuse the generic ones), then roll the DaemonSet.
