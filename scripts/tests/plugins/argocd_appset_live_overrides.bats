@@ -82,7 +82,7 @@ _applied_for() {
 
   run _argocd_deploy_applicationsets
   [ "$status" -eq 0 ]
-  [[ "$output" == *"keeping live"* ]]
+  [[ "$output" == *"resolved overrides"* ]]
 
   local acg istio
   acg="$(_applied_for observability-acg)"
