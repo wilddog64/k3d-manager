@@ -2,7 +2,7 @@
 
 ## 2026-09-24 — Hostinger shopping-cart label and CVE promotion guard fixed
 
-Implemented in commit `FINAL_SHA` (final commit; pushed below): Hostinger registration now defaults
+Implemented in commit `f8a7e1189dadbd43c6c4ff9186a15e2dcbe7869c` (final commit; pushed): Hostinger registration now defaults
 `ARGOCD_APP_CLUSTER_SHOPPING_CART` to `true` while preserving explicit overrides; app-cve-scan
 records a failed promotion in `_rc` and continues when an ArgoCD Application is missing, without
 emitting a false remediation event. Focused BATS: 9/9; full `make test`: 1096/1096; pytest:

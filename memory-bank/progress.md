@@ -1330,3 +1330,55 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   - **Search lesson:** I first concluded "no producer exists" from
     `grep -r --include='*.yaml' --include='*.sh' --include='*.py'`. Wrong — `bin/k3dm-webhook` has **no
     extension**, so the filters skipped it. Never restrict by extension when hunting producers here.
+
+## 2026-09-24 — Pushgateway deployment metrics root-caused; Codex's shopping-cart label fix verified
+
+**Codex `f8a7e118` VERIFIED independently** (not taken on report): HEAD == origin/k3d-manager-v1.37.0;
+diff touches exactly the 8 spec'd files; both BATS suites re-run by Claude 9/9 green; shellcheck
+re-counted with `grep -cE '\^-*\^ SC'` — hostinger 2→2, app-cve-scan 0→0. Two mutations re-proved by
+Claude: deleting the `ARGOCD_APP_CLUSTER_SHOPPING_CART` line reds only test 4 (5 and 6 stay green,
+so the override path and the `register_app_cluster` default are correctly discriminated); reverting
+the promotion guard reds tests 7 and 8 while 9 stays green. Also checked the guard's `_rc=1` actually
+propagates — the promote call sits in a plain `for _svc in ${APP_SERVICES}` loop, not a pipeline
+subshell, and `_rc` is a script-level global consumed by `exit "${_rc}"`, so the run's failure is
+genuinely carried.
+
+**k3dm Deployment Metrics — root cause found, one line.** `_deploy_pushgateway_acg` installs the helm
+release as `prometheus-pushgateway` (`observability.sh:692`); `_hostinger_refresh_access_layer` probes
+for `svc pushgateway` (`k3s-hostinger.sh:661`). The probe always fails, so the `else` branch
+`rm -f`'s the port-forward LaunchAgent on **every** access-layer refresh. Nothing listens on
+localhost:9091, so every webhook push exhausts its 6 retries against a closed socket
+(`Errno 61 Connection refused`, live in `~/Library/Logs/k3dm-webhook.log`) and logs a non-fatal skip.
+The Pushgateway pod, its Prometheus target (`up=1`) and the retry logic were all healthy the whole
+time — only the laptop→cluster hop was missing, and our own code removed it. 64 days, zero series.
+
+`bin/cluster-up:1890` has always said `svc/prometheus-pushgateway` and is correct — the hostinger path
+drifted away from it. The reusable defect is the drift, not the typo, hence a cross-file
+agreement test in the spec.
+
+**Round-trip proved live, then cleaned up.** Regenerated the plist/wrapper by calling
+`_hostinger_write_monitoring_port_forward_plist` with the corrected name, bootstrapped the agent:
+`localhost:9091/-/healthy` → 200, a throwaway gauge POST → 200, the series queryable in hostinger
+Prometheus ~45s later, group then DELETEd (202). The corrected service name is the entire fix. The
+loaded agent is a manual stopgap and will be `rm -f`'d again by the next refresh until the fix lands.
+
+**Topology decided (was blocking):** the app-cluster Prometheus owns `k3dm_deployment_*`. Every panel
+targets datasource uid `P5A1115AEDF367D43`, defined in `kube-prometheus-stack-acg-values.yaml:26` —
+the ACG/app-cluster stack. The hub has no Pushgateway and is not supposed to. Do not add one; do not
+repoint the dashboard.
+
+**Second defect: `_provider_supports_pushgateway` is inverted** (`bin/k3dm-webhook:1794`). It returns
+False for `k3s-hostinger` — the only provider that provably has a Pushgateway — and True for the hub,
+which provably has none. It gates only the `make status` smoke surface, never `_push_metrics`, so it
+did not block the push; it blocked the *signal*. That is why a dead sink went unnoticed for 64 days.
+Combined with `bin/cluster-status-summary:61` treating `pushgateway` as `optional` (error→warning),
+the two produced total silence.
+
+Spec appended to `docs/bugs/2026-06-09-pushgateway-deployment-metrics-gap.md` per the dedup rule
+(S1 name fix + one-local binding, S2 predicate inversion, S3 status surface, 4 tests, M1-M4, 6 gates).
+Checkout Load Test is explicitly OUT of scope there — it already has
+`docs/bugs/2026-08-29-loadtest-slice-f-generator.md` and needs a live Keycloak password grant.
+Deferred follow-up: a metric-staleness alert.
+
+**Correction to the earlier note in this doc:** the LaunchAgent was described as "not loaded". It was
+worse — the plist did not exist at all, because our code deletes it every refresh.
