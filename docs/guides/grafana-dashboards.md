@@ -312,9 +312,12 @@ Work down this table before editing a query. Every row is a real past incident.
 | Alertmanager delivers nothing on one cluster | the CR references a `configSecret` that does not exist | `kubectl -n monitoring get alertmanager -o jsonpath='{.items[0].spec.configSecret}'` then `get secret` on that name |
 | E2E detail panels blank, summary panels fine | result event carries aggregates only | inspect the newest `e2e-result` ConfigMap payload |
 | E2E entirely blank after a real remote run | `E2E_M2_PUBLISH_BACK_HOST` unset under launchd; result stuck `publication_pending` | count `k3dm.k3d.io/e2e-result` ConfigMaps on the hub |
-| k3dm Deployment panels blank | no Pushgateway (hub has none by design), or the `:9091` port-forward is down | `curl localhost:9091/metrics` |
+| k3dm Deployment panels blank | `k3dm Deployment Metrics` is empty: the Pushgateway release must be installed on the app cluster, the local `:9091` port-forward agent must be loaded, and the `job="pushgateway"` target must be up | `curl -s -o /dev/null -w '%{http_code}' http://localhost:9091/-/healthy` |
 | Checkout Load Test blank except CPU | no producer — expected | nothing to fix |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
+
+The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub has no
+Pushgateway by design.
 
 ---
 

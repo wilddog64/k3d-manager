@@ -1382,3 +1382,40 @@ Deferred follow-up: a metric-staleness alert.
 
 **Correction to the earlier note in this doc:** the LaunchAgent was described as "not loaded". It was
 worse — the plist did not exist at all, because our code deletes it every refresh.
+
+## 2026-09-24 — Pushgateway service-name fix landed
+
+S1-S4 implemented. Codex wrote S1/S2/S3 and both new test suites, then **correctly refused to commit**
+because the required gate `scripts/tests/lib/provider_contract.bats` was red: it hardcodes the OLD
+service name at line 932 (stubbed `kubectl` case pattern) and line 1005 (`grep -F -- 'svc/pushgateway'`),
+while the spec's target list omitted the file. That was a spec defect on Claude's side, not a Codex
+failure — it stopped rather than guess or use `--no-verify`. S4 added to the spec to record it.
+
+**The reusable lesson.** `provider_contract.bats` asserted the broken name for 64 days, so it was a
+test that *locked in the defect* and would have blocked its own fix. A test that pins a literal it
+never independently justifies freezes whatever was true when it was written — the same shape as the
+standing rule against whole-line `grep -F` assertions. The new cross-file agreement test (test 3) is
+the intended replacement: it asserts the three producers AGREE, so it survives a legitimate rename and
+still catches drift. Confirmed the suite reassigns `HOME="${BATS_TEST_TMPDIR}"` on the enclosing test's
+first line (843), so it writes plists to a temp dir and does not touch the operator's real
+`~/Library/LaunchAgents`.
+
+**Claude error worth remembering:** restoring mutation M1 with `git checkout --` reverted to HEAD and
+silently discarded Codex's still-UNCOMMITTED S1 fix along with the mutation. Caught it when the next
+mutation's grep showed pre-fix lines; re-applied S1 and verified byte-identical restoration (blob
+`4b6a2dc7`). Switched to file snapshots for M2-M4. **`git checkout --` is only a safe mutation-restore
+when the work under test is already committed.**
+
+All four mutations independently re-proved by Claude, not taken on Codex's report:
+- M1 probe reverted → test 1 red, test 3 green.
+- M2 **only** the `svc/` argument reverted with the probe left correct → test 1 STILL red. This is the
+  one that mattered: it rules out a test that reads only the probe and would have passed a half-fix.
+- M3 helm release renamed → tests 2 and 3 red, test 1 green.
+- M4 predicate re-inverted → red on BOTH the `hub` and `k3s-hostinger` cases.
+
+Gates: `make test` 1099/1099 (was 1096, +3 new bats); `pytest` 189 (was 184, +5 parametrized cases);
+`provider_contract.bats` 57/57; shellcheck unchanged — `k3s-hostinger.sh` 2→2, `cluster-status-summary`
+0→0; `make check-doc-links` 1760 files OK.
+
+Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` will both flip
+`k3d-manager/shopping-cart` to `"true"` AND stop deleting the pushgateway port-forward agent.

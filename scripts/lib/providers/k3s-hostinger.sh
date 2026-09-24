@@ -589,6 +589,7 @@ function _hostinger_refresh_access_layer() {
   local _grafana_pf_log="${_ACG_STATE_DIR}/logs/grafana-pf.log"
   local _pushgateway_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   local _pushgateway_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
+  local _pushgateway_svc="prometheus-pushgateway"
   if [[ ! -f "${_argocd_pf_plist}" && -f "${_argocd_pf_wrapper}" ]]; then
     _info "[k3s-hostinger] ArgoCD port-forward plist missing — regenerating from wrapper..."
     mkdir -p "$(dirname "${_argocd_pf_log}")"
@@ -658,11 +659,11 @@ PLIST
     "k3d-k3d-cluster" \
     "3001" \
     "80"
-  if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n monitoring get svc pushgateway >/dev/null 2>&1; then
+  if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n monitoring get svc "${_pushgateway_svc}" >/dev/null 2>&1; then
     _hostinger_write_monitoring_port_forward_plist \
       "${_pushgateway_pf_plist}" \
       "${_pushgateway_pf_log}" \
-      "svc/pushgateway" \
+      "svc/${_pushgateway_svc}" \
       "${_HOSTINGER_KUBE_CONTEXT}" \
       "9091" \
       "9091"

@@ -11,6 +11,9 @@
 - The shopping-cart stack is now **opt-in per app cluster**. `data-git` and `services-git` require `k3d-manager/shopping-cart: "true"` in addition to `k3d-manager/role: app-cluster`, and `register_app_cluster` emits that label from `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). A hub registered as its own app cluster — the designed single-cluster mode — therefore keeps its External Secrets Operator install and ACG Grafana dashboards while no longer syncing the shopping-cart data layer or payment stack onto itself. The `eso` and `grafana-dashboards-acg` ApplicationSets are deliberately left selecting on the role label alone: `eso` generates the hub's entire ESO install (3 Deployments, 21 CRDs, 5 ClusterRoles) and carries the ArgoCD resources finalizer, so removing the registration Secret — the approach this replaces — would have deleted the `externalsecrets` and `clustersecretstores` CRDs, every ExternalSecret CR in the cluster, and the owner-referenced Secrets behind Grafana admin, Keycloak, LDAP, `ghcr-pull-secret` and all postgres / redis / rabbitmq / minio credentials. `docs/architecture/shopping-cart-deployment.md` gains a section on why `ubuntu-k3s` is a role alias rather than a place, the four ApplicationSets that select the role label, and how they differ in `preserveResourcesOnDeletion`.
 
 ### Fixed
+- Corrected the Hostinger Pushgateway service name and provider visibility checks so the local
+  port-forward survives access-layer refreshes and deployment metrics reach the app-cluster
+  Prometheus; failed Pushgateway status is now an error rather than optional.
 - Hostinger registration now sets `k3d-manager/shopping-cart: "true"` by default, preserving
   the shopping-cart Applications selected by `services-git`; `app-cve-scan` now skips a missing
   ArgoCD Application without aborting the scan or emitting a false remediation event.

@@ -198,6 +198,33 @@ appears where no Pushgateway is expected.
 
 Keep the change to that one set literal. Do not restructure the inline `python3` heredoc.
 
+## S4 — the existing contract test encodes the defect
+
+**Added 2026-09-24 after the first implementation attempt correctly refused to proceed.** The original
+target list for this spec omitted `scripts/tests/lib/provider_contract.bats` while requiring it stay
+green. That was contradictory: the suite hardcodes the **wrong** service name in two places, so S1
+cannot pass it unchanged.
+
+- line 932 — the stubbed `kubectl` matches the case pattern
+  `--context\ ubuntu-hostinger\ -n\ monitoring\ get\ svc\ pushgateway)`. After S1 the real probe no
+  longer matches, so the stub returns 1, so no plist is written.
+- line 1005 — `run grep -F -- 'svc/pushgateway'` on the generated wrapper. `svc/prometheus-pushgateway`
+  does not contain that substring, so the assertion fails.
+
+Change the service name in **both**, and nothing else in that file. Line 1003 refers to the wrapper
+*filename* (`com.k3d-manager.pushgateway-port-forward.sh`), which does not change — leave it.
+
+`HOME` is reassigned to `${BATS_TEST_TMPDIR}` on the first line of the enclosing test (line 843), so
+the suite writes plists into a temp dir and never touches the operator's real
+`~/Library/LaunchAgents`. Confirmed before editing; do not "fix" that.
+
+**The lesson, which is the reusable part.** This test asserted the broken name for 64 days and was
+therefore a test that *locked in the defect* and would have blocked its fix. A test that pins a
+literal it never independently justifies does not protect behaviour; it freezes whatever was there
+when it was written. That is the same failure shape as the standing rule against whole-line `grep -F`
+assertions. S1's cross-file agreement test (test 3) is the intended replacement: it asserts the three
+producers *agree*, so it stays correct when the name legitimately changes and still catches drift.
+
 ---
 
 ## Explicitly OUT of scope
@@ -263,8 +290,8 @@ One at a time. Reintroduce the defect, run the suite, **paste the red**, restore
 
 1. `bats scripts/tests/lib/hostinger_pushgateway_port_forward.bats` — green, with counts.
    BATS numbers tests per-invocation, not per-file, so **quote test NAMES, not numbers**.
-2. `bats scripts/tests/lib/provider_contract.bats` — still green. It is the one existing suite that
-   touches `_hostinger_refresh_access_layer`; S1 must not regress it.
+2. `bats scripts/tests/lib/provider_contract.bats` — green **after S4**. See S4: this suite asserts
+   the *old* name, so S1 cannot pass it unchanged.
 3. `shellcheck -x scripts/lib/providers/k3s-hostinger.sh` — **zero new** warnings vs `HEAD~`. Paste
    BOTH counts. Count with `grep -cE '\^-*\^ SC'`, **not** `grep -c 'SC[0-9]'` — the latter
    double-counts, because the "For more information" wiki URL line also contains the code.

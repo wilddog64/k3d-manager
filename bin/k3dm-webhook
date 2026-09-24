@@ -1791,7 +1791,9 @@ _SMOKE_USER_AGENT = "k3dm-smoketest/1"
 
 
 def _provider_supports_pushgateway(provider):
-    return provider != "k3s-hostinger"
+    """The Pushgateway is installed on app-cluster observability stacks only
+    (_deploy_pushgateway_acg). The hub has none by design."""
+    return provider != "hub"
 
 
 def _kubectl_absent(output):
