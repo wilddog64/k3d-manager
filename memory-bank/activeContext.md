@@ -3086,3 +3086,37 @@ Side findings, not actioned: `e2e_last_success_timestamp_seconds` has zero serie
 `E2EVerificationStale` can never fire yet; `Watchdog` routing to `'null'` makes it a
 dead-man's switch that dies inside the cluster it watches; one 502 from
 `webhook.3ai-talk.org/api/v1/cve-remediate` at 2026-09-22T00:49Z, not retried since.
+
+## 2026-09-23 — Alertmanager delivery blackout: FIXED and confirmed live
+
+Codex delivered both specs on `k3d-manager-v1.37.0`. Claude verified each independently.
+
+- `03b875c5` — commit 1: `severity = warning` → `platform-warning` route appended **after** the
+  `alertname =~` allowlist (order is load-bearing: Alertmanager takes the first match, so the
+  allowlist keeps its faster timing), plus `_observability_assert_alertmanager_delivery` on **both**
+  renderers. Guard returns 0 in every state except "CR names a configSecret and that Secret is
+  absent", so a transient Vault outage cannot fail a rebuild with a working config.
+  Verified: 8/8 pytest, BATS green, and the ordering assertion mutation-proved red.
+- `02e3fa76` — commit 2: `_argocd_appset_live_overrides` now prefers the substrate-derived CNI dirs
+  and keeps the live value only as a fallback, and refuses to write generic `/etc/cni/net.d` to a
+  k3s target. This is why three correct CNI fixes were overwritten on every AppSet reapply.
+  Verified: 13/13 BATS, shellcheck 2→2 (no new warnings), M1 mutation red on the asserted k3s dirs.
+  `d2c6177f` also updated `argocd_appset_live_overrides.bats` — outside the target list, but a
+  correct consequence of the `keeping live` → `resolved overrides` log change, not a weakened gate.
+- `114e5c82` — Claude's fix to Codex's probe. The generated Secret's **only** key is
+  `alertmanager.yaml.gz` (base64 **and** gzip). The probe read a plain `alertmanager.yaml`, so
+  `b64decode("")` → `yaml.safe_load` → `None` → it reported a **total blackout against the healthy
+  hub**, which has five working child routes. A missing key is now a hard error. The pytest suite
+  could not catch this because it stubs `run`, so the probe never executes — 8 green cases proved
+  the sensor's parsing, not the probe's. Also fixed the unparsed default of
+  `root_receiver_is_null=false`, which made a blacked-out cluster read as healthier than a working
+  one. The spec's S3a carried the same wrong key and was corrected.
+
+Live re-render (`deploy_observability_acg ubuntu-hostinger --confirm`): `alertmanager-smtp-secret`
+**created** on hostinger, and the new guard printed its success line on its first production run.
+hostinger went from **0 child routes to 4**, now including `platform-warning` on `severity = warning`
+in the correct post-allowlist position. The 4-vs-5 gap against the hub is **expected**: the hub's
+extra route targets `cicd/k3dm-analyze/*`, AlertmanagerConfig CRs that are hub-only by design.
+`KubeDaemonSetRolloutStuck` — the istio-cni alert discarded for 17 days — is active and now routes.
+`smtp_smarthost = smtp.gmail.com:587` is set globally, so the blank per-receiver `smarthost` is fine.
+Delivery confirmation is pending the route's `group_wait: 10m`.

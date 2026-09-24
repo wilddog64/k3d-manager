@@ -1142,3 +1142,18 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   or the 5-name allowlist escape it. Also silences this repo's own `E2EVerificationFailing`
   and the `keycloak-realm-reconcile` awk-127 job. Spec:
   `docs/bugs/2026-09-23-alertmanager-null-root-route-silently-drops-warning-alerts.md`.
+
+- [x] **Alertmanager delivery blackout — FIXED, confirmed on the live cluster.**
+  `03b875c5` warning route + deploy guard on both renderers; `02e3fa76` AppSet CNI-dir precedence
+  (substrate wins, live is fallback, generic dirs refused on k3s); `114e5c82` Claude's fix to the
+  probe's `alertmanager.yaml.gz` key + hard error on a missing key, which had it reporting the
+  healthy hub as a total blackout. All three verified independently (pytest, BATS, shellcheck,
+  four mutations red then restored). Live re-render seeded `alertmanager-smtp-secret` on
+  ubuntu-hostinger: **0 → 4 child routes**, `platform-warning` now reachable, and
+  `KubeDaemonSetRolloutStuck` routes for the first time in 17 days. Pending: mail-delivery
+  confirmation past the route's `group_wait: 10m` (`notifications_total` counts attempts only).
+- [ ] **Probe has no test of its own** — `test_alert_delivery.py` stubs `run`, so
+  `bin/k3dm-alert-delivery-status` is never executed by any suite. That is how the gzip-key defect
+  shipped green. A parse-level test over a fixture generated Secret would close it.
+- [ ] **istio-cni DaemonSet rollout — NOT started, last by the user's ordering.** Needs the
+  read-only precondition (are post-2026-09-17 pods enrolled in ztunnel?) and the user's go.
