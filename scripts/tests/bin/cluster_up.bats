@@ -24,6 +24,12 @@
   [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
 }
 
+@test "acg-up reconciles other app-cluster registrations after registering the hub" {
+  run bash -c "awk '/register_app_cluster/{print NR; found=1} found && /argocd_reconcile_app_cluster_registrations/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+}
+
 @test "acg-up does not capture the dry-run wrapper as its own base" {
   run grep -nF 'unset -f __k3dm_base_run_command' bin/cluster-up
   [ "$status" -ne 0 ]

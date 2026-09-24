@@ -766,6 +766,8 @@ kubectl rollout restart statefulset/argocd-application-controller \
 kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=300s
 _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
+_info "[acg-up] Reconciling other app-cluster registrations (additive)..."
+argocd_reconcile_app_cluster_registrations || true
 
 _info "[acg-up] Waiting for ArgoCD controller to reconnect to ubuntu-k3s (max 120s)..."
 _argocd_conn_deadline=$(( $(date +%s) + 120 ))

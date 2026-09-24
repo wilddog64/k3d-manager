@@ -1932,3 +1932,60 @@ for obj in doc.get("items", []):
         print("\t".join([action, kind, name, "-", instance]))
 ' "$1" "${2:-}"
 }
+
+function _argocd_app_cluster_inventory() {
+   local _table="${ARGOCD_APP_CLUSTER_TABLE:-${SCRIPT_DIR}/etc/argocd/app-clusters.tsv}"
+   if [[ ! -r "${_table}" ]]; then
+      _err "[argocd] app-cluster inventory not readable: ${_table}"
+      return 1
+   fi
+   grep -v '^[[:space:]]*#' "${_table}" | grep -v '^[[:space:]]*$'
+}
+
+function argocd_reconcile_app_cluster_registrations() {
+   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+      cat <<'HELP'
+Usage: argocd_reconcile_app_cluster_registrations
+
+Re-register any app cluster listed in scripts/etc/argocd/app-clusters.tsv that has a local
+kubeconfig context but no cluster Secret on the hub. Additive only; never aborts the caller.
+A cluster with no kubeconfig context is skipped, not an error.
+HELP
+      return 0
+   fi
+   if [[ "${K3DM_EXCLUSIVE_APP_CLUSTER:-false}" == "true" ]]; then
+      _err "[argocd] app-cluster reconcile is additive-only; K3DM_EXCLUSIVE_APP_CLUSTER=true would strip the app-cluster role from other registrations"
+      return 1
+   fi
+   local _ns="${ARGOCD_NAMESPACE:-cicd}"
+   local _dispatcher="${K3DM_DISPATCHER:-${SCRIPT_DIR}/k3d-manager}"
+   local -a _hub_kubectl=()
+   read -r -a _hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+   local _rows _context _secret _provider _restored=0 _gaps=0
+   _rows="$(_argocd_app_cluster_inventory)" || return 1
+   while IFS=$'\t' read -r _context _secret _provider; do
+      [[ -z "${_context}" ]] && continue
+      if ! kubectl config get-contexts "${_context}" >/dev/null 2>&1; then
+         _info "[argocd] ${_context}: no kubeconfig context on this host — skipping"
+         continue
+      fi
+      if "${_hub_kubectl[@]}" get secret "${_secret}" -n "${_ns}" >/dev/null 2>&1; then
+         _info "[argocd] ${_context}: already registered (${_ns}/${_secret})"
+         continue
+      fi
+      _warn "[argocd] ${_context}: hub registration ${_ns}/${_secret} is MISSING — re-registering additively"
+      if CLUSTER_PROVIDER="${_provider}" K3DM_EXCLUSIVE_APP_CLUSTER=false \
+            "${_dispatcher}" refresh_registration; then
+         _restored=$(( _restored + 1 ))
+         _info "[argocd] ${_context}: re-registered"
+      else
+         _gaps=$(( _gaps + 1 ))
+         _warn "[argocd] ${_context}: re-registration FAILED"
+      fi
+   done <<< "${_rows}"
+   _info "[argocd] app-cluster reconcile: ${_restored} restored, ${_gaps} still missing"
+   if (( _gaps > 0 )); then
+      printf '%s\n' "!! APP-CLUSTER REGISTRATION GAP: ${_gaps} cluster(s) not registered with the hub — rerun: make refresh-registration CLUSTER_PROVIDER=k3s-hostinger" >&2
+   fi
+   return 0
+}
