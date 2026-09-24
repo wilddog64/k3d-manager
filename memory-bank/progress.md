@@ -1581,3 +1581,17 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [ ] Commit/push blocked by `.git/index.lock: Operation not permitted` after one commit attempt;
       no retry, lock removal, hook bypass, force-push, or PR. All scoped changes remain staged;
       no Phase 4 SHA exists.
+
+## 2026-09-24 — lib-foundation v0.4.18 credential-test observability
+
+- [x] Spec `docs/plans/v0.4.18-credential-test-observability.md` (lib-foundation) — `d695f81`
+- [x] Implementation — **`1bcde41`** on `feat/v0.4.18-credential-test-observability`, local == origin.
+      Codex wrote it; `.git/index.lock: Operation not permitted` blocked its commit, so Claude
+      verified the tree and committed.
+- [x] Gates re-measured by Claude: jest 7 suites / **32** tests (baseline 28), disappearance gate
+      4 -> **0**, `node --check` clean x2, `make bats` **138/138 exit 0**.
+- [x] Codex-reported bats red (case 16, missing-aws-CLI) investigated, not dismissed: does not
+      reproduce on the host; the test skips on `aws` in `/usr/bin:/bin`, a sandbox-only difference.
+- [ ] Operator live `credential-test` run (TTY + CDP required; operator-only)
+- [ ] PR + merge + tag v0.4.18 — needs the user's go
+- [ ] Subtree pull into k3d-manager, then rewire the Tier 2 preflight to the real loader

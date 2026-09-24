@@ -3519,3 +3519,32 @@ Doc links 1765 files OK, repo-root passed, server import printed `OK`, and `_age
 Entrypoint measured 2957 -> 2226 lines. Commit was attempted with the requested message but
 was blocked by `.git/index.lock: Operation not permitted`; no retry, lock removal, hook bypass,
 force-push, or PR was attempted. All scoped changes remain staged; no Phase 4 commit SHA exists.
+
+# 2026-09-24 — lib-foundation v0.4.18 credential-test observability LANDED (1bcde41)
+
+Codex implemented the spec correctly but could not deliver it: `.git/index.lock: Operation not
+permitted`, its known sandbox limit. Claude verified the working tree independently and made the
+commit. `feat/v0.4.18-credential-test-observability` at **1bcde41**, local == origin.
+
+Scope as shipped (four files, exactly the spec's list): each `ACG_SESSION_OK` now carries
+`path=existing-session|auto-login|manual-login`; `_reportCredentialState` always writes
+`ACG_CREDENTIALS: username=<absent|empty|present> password=<...>` to stderr with no value or
+length; `K3DM_ACG_REQUIRE_CREDENTIALS=1` fails closed under its own `ACG_CREDENTIALS_REQUIRED`
+marker. Default behavior unchanged when unset.
+
+Gates re-measured by Claude, not taken from the report: jest **7 suites / 32 tests** (baseline
+28), disappearance gate `ACG_SESSION_OK\n'` **4 -> 0**, `node --check` clean on both JS files,
+`make bats` **138/138 exit 0, no skips**. Codex reported bats case 16 red ("acg credential test
+does not restart when aws CLI is missing"); it does NOT reproduce here — that test skips based on
+whether `aws` sits in `/usr/bin:/bin`, which differs inside its sandbox. Standalone `acg.bats`
+13/13.
+
+No Makefile change was needed: `scripts/lib/acg/cdp.sh:184-190` loads the credentials through the
+real `_secret_load_data k3dm-acg-pluralsight username|password` and execs node without `env -i`,
+so an exported `K3DM_ACG_REQUIRE_CREDENTIALS` reaches the script. The report is therefore a true
+read-back of the two Keychain accounts fixed in `53e96ba7`.
+
+Pending: operator runs the live `credential-test` gate (theirs alone — needs a TTY and the CDP
+browser; close the stray Pluralsight "Sign In" tab first), then PR + merge + tag v0.4.18 on the
+user's go, then a subtree pull into k3d-manager. Only after that can the Tier 2 preflight in
+`scripts/plugins/e2e.sh` swap its Keychain-existence check for the real loader.
