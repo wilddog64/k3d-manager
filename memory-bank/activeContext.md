@@ -1,5 +1,20 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — webhook Phase 1b implemented; commit blocked by sandbox
+
+Implemented the Phase 1b route-table authorization change in the five requested files:
+`strictest_role` defaults closed, `effective_policy` combines the table floor with dynamic
+policy, POST checks and audits exactly once, and `/cluster` plus `/make` carry `dynamic`
+descriptions without changing their reader floors. Focused pytest: **7 passed**; webhook BATS:
+**64/64**; bare pytest: **189 passed**; `make check-doc-links`: **1762 file(s) OK**;
+`_agent_audit`: **0**. M1–M6 all turned their named tests red and were restored with a clean
+unstaged diff after each mutation. `make test-all` was attempted; the first run hit the
+sandbox's restricted macOS `/var/folders` temp root, and the mandated import command hit the
+existing `/usr/bin/python3` 3.9.6 incompatibility with `str | None`. No live webhook or cluster
+operation ran. The exact implementation commit was blocked by `.git/index.lock: Operation not
+permitted`; changes remain staged. Untracked `.join-failures.*`, `.pub`, and operator-owned
+`scratchpad/` were left untouched.
+
 ## 2026-09-24 — webhook Phase 1 implementation blocked at git write
 
 Implemented Phase 1 in the working tree: moved the named authz/policy functions into

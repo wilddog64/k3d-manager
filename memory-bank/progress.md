@@ -1,5 +1,24 @@
 # Progress — k3d-manager
 
+## 2026-09-24 — webhook Phase 1b authorization (staged; commit blocked)
+
+- [x] Implemented S1–S3: route floors are authoritative, dynamic requirements are marked,
+      effective policy is the strictest floor/dynamic role, and every known POST request is
+      checked and audited exactly once. `/api/v1/cluster` remains reader-floor and its unknown
+      action still reaches the existing 400 handler response.
+- [x] Extended `scripts/tests/bin/webhook_policy.py` with literal effective-policy rows,
+      synthetic copied-table floor coverage, closed-default role coverage, dynamic metadata
+      coverage, and allowed/denied/None-dynamic audit cardinality coverage. No `if action_policy`
+      guard remains.
+- [x] Gates observed: focused pytest **7 passed**; `webhook.bats` **64/64**; bare pytest
+      **189 passed**; `make check-doc-links` **1762 file(s) OK**; `_agent_audit` **0**.
+- [x] M1–M6 each produced the expected red test and was restored with `git diff --quiet`.
+- [ ] Commit/push blocked by `.git/index.lock: Operation not permitted`; no SHA exists.
+      The staged implementation is ready for the operator/Claude to commit and push with the
+      exact requested message. The import gate used `/usr/bin/python3` 3.9.6 and failed before
+      module execution on existing `str | None` annotations; `make test-all` also encountered
+      the sandbox's restricted `/var/folders` temp root. No out-of-scope files were changed.
+
 ## 2026-09-24 — webhook Phase 1 extraction (working tree only; blocked)
 
 - [x] Added `scripts/lib/webhook/policy.py` with the exact requested policy functions and
