@@ -38,6 +38,18 @@
       `fatal: Unable to create '.git/index.lock': Operation not permitted`. No retry,
       lock removal, hook bypass, force-push, or PR was attempted. Changes are staged.
 
+## 2026-09-24 — upstream credential-test observability (dispatched)
+
+- [x] Spec written and pushed: lib-foundation `docs/plans/v0.4.18-credential-test-observability.md`
+      at `d695f81` on `feat/v0.4.18-credential-test-observability`.
+- [x] Dispatched to Codex (`codex exec`, workspace-write); log at
+      `scratchpad/codex-libfoundation-v0418.log`.
+- [ ] Verify Codex: SHA on origin, diff confined to the four listed files, jest > 28 tests, all three
+      mutations reddening their named tests, disappearance gate 4 -> 0.
+- [ ] lib-foundation PR + merge (operator's go required), then tag v0.4.18.
+- [ ] Subtree pull into k3d-manager; then consider wiring K3DM_ACG_REQUIRE_CREDENTIALS into the
+      Tier 2 preflight in place of the keychain-existence check.
+
 ## 2026-09-24 — ACG preflight account-name fix
 
 - [x] Preflight now checks the `username` and `password` accounts individually instead of

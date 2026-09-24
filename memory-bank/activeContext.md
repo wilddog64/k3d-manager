@@ -37,6 +37,28 @@ Commit and push are blocked by the sandbox's `.git/index.lock: Operation not per
 wall. No lock removal, retry, `--no-verify`, force-push, or PR was attempted; the scoped
 changes are staged for the operator to commit and push.
 
+## 2026-09-24 — upstream: credential-test observability dispatched to Codex
+
+`make credential-test` was treated as proof that ACG auto-login works, but it cannot be: the marker
+`ACG_SESSION_OK` is emitted from four places — existing session, headless auto-login, manual TTY
+login, and a fourth in `acg_pluralsight_login.js` — all identical. The existing-session branch
+short-circuits before credentials are ever read, which is exactly why the absent Keychain item read
+as "auto-login was never wired" for weeks.
+
+Specced upstream in lib-foundation (`d695f81`, branch `feat/v0.4.18-credential-test-observability`)
+because the target is the `scripts/lib/acg/` subtree and must never be edited here. Three changes:
+`path=` on all four markers; an always-emitted `ACG_CREDENTIALS: username=<state> password=<state>`
+on stderr using absent/empty/present only; and `K3DM_ACG_REQUIRE_CREDENTIALS=1` to fail an unusable
+store even when the session is live, under its own marker rather than `ACG_SESSION_EXPIRED`.
+
+Forcing a login while already authenticated was deliberately excluded — it invites the new-device
+MFA challenge the module refuses by design. Codex is forbidden from running any browser or
+`credential-test`; the operator owns the live gate. Baseline measured before dispatch: jest 7 suites
+/ 28 tests green, and the bare-marker disappearance gate finds exactly 4.
+
+Follow-on once merged upstream: subtree pull into k3d-manager, then the Tier 2 preflight can call the
+real loader instead of checking Keychain existence.
+
 ## 2026-09-24 — ACG preflight: service-only Keychain check was not predictive
 
 The Tier 2 preflight matched `security find-generic-password -s k3dm-acg-pluralsight` with
