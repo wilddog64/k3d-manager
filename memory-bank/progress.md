@@ -38,6 +38,22 @@
       `fatal: Unable to create '.git/index.lock': Operation not permitted`. No retry,
       lock removal, hook bypass, force-push, or PR was attempted. Changes are staged.
 
+## 2026-09-24 — ACG preflight account-name fix
+
+- [x] Preflight now checks the `username` and `password` accounts individually instead of
+      matching the Keychain service alone; the error reports `missing=<accounts>`. A credential
+      stored under `-a k3dm` no longer satisfies a gate that the loader would never read.
+- [x] Three new BATS cases (wrong account only, username-only, both accounts queried by name);
+      focused suite 10/10, mutation-verified — restoring the service-only form reds exactly
+      those three and leaves the no-`-w` and no-placeholder invariants green.
+- [x] `docs/guides/vcluster-e2e-harness.md` gains the account-name table, the reason this
+      service deviates from the repo-wide `-a k3dm` convention, the GUI-session requirement
+      behind `User interaction is not allowed`, and the silent empty-value trap for a bare `-w`
+      in a non-TTY shell. `make check-doc-links` 1765 OK; shellcheck clean.
+- [ ] Operator, at the Mac in Terminal.app: populate both accounts, then
+      `make -C scripts/lib/foundation credential-test` expecting `ACG_SESSION_OK`. All three
+      accounts measured absent on 2026-09-24; nothing to clean up first.
+
 ## 2026-09-24 — Tier 2 ACG preflight (working tree complete; Git blocked)
 
 - [x] Task 0 recorded as Path A: the personal ACG account has no MFA.

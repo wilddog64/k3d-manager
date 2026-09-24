@@ -51,6 +51,44 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "preflight fails when the service matches only a wrong account name" {
+  security() {
+    printf '%s\n' "$*" >> "$SECURITY_ARGS"
+    case "$*" in
+      *"-a username"*|*"-a password"*) return 1 ;;
+    esac
+    return 0
+  }
+  run _e2e_sandbox_preflight_auth
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing=username,password"* ]]
+  run test -e "$EXTEND_CALLED"
+  [ "$status" -ne 0 ]
+}
+
+@test "preflight fails when only the username account is present" {
+  security() {
+    printf '%s\n' "$*" >> "$SECURITY_ARGS"
+    case "$*" in
+      *"-a password"*) return 1 ;;
+    esac
+    return 0
+  }
+  run _e2e_sandbox_preflight_auth
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing=password"* ]]
+  [[ "$output" != *"missing=username"* ]]
+}
+
+@test "preflight queries both credential accounts by name" {
+  run _e2e_sandbox_preflight_auth
+  [ "$status" -eq 0 ]
+  run grep -F -- "-a username" "$SECURITY_ARGS"
+  [ "$status" -eq 0 ]
+  run grep -F -- "-a password" "$SECURITY_ARGS"
+  [ "$status" -eq 0 ]
+}
+
 @test "preflight refuses to run when K3DM_ACG_SKIP_SESSION_CHECK is set" {
   export K3DM_ACG_SKIP_SESSION_CHECK=1
   run _e2e_sandbox_preflight_auth

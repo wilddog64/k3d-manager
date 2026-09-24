@@ -205,14 +205,34 @@ around that control. Credentials must be supplied to the one-time Keychain setup
 through stdin or environment variables, never as command-line arguments. Do not
 print credential values.
 
-Start diagnostics with an existence-only check:
+The two values live under **one service with two accounts**, where the account name
+is the field name:
+
+| Service | Account (`-a`) | Value |
+|---|---|---|
+| `k3dm-acg-pluralsight` | `username` | the personal ACG account's email |
+| `k3dm-acg-pluralsight` | `password` | that account's password |
+
+This differs from every other Keychain item in the repo, which stores a single
+value under the account `k3dm` (`k3dm-webhook-token`, `k3dm-hermes-audit-token`,
+and the rest). Applying that house convention here produces an item that **nothing
+ever reads**: `_secret_load_data` (`scripts/lib/foundation/scripts/lib/system.sh:579`)
+resolves to `security find-generic-password -s <service> -a <key> -w`, so the
+account name is load-bearing. An entry under `-a k3dm` leaves auto-login reporting
+`ACG_SESSION_EXPIRED` with no indication that the credential is in the wrong place.
+
+Start diagnostics with an existence-only check, per account:
 
 ```bash
-security find-generic-password -s k3dm-acg-pluralsight
+security find-generic-password -s k3dm-acg-pluralsight -a username
+security find-generic-password -s k3dm-acg-pluralsight -a password
 ```
 
 Do not add `-w`: it reads the secret value, while this diagnostic only needs to
-know whether the service exists. An absent item is an error for Path A. Path B is
+know whether each account exists. Do not check the service alone — a match on
+`-s` with no `-a` is satisfied by an entry under any account name, including one
+the loader never reads, so it cannot tell you whether auto-login will work.
+An absent account is an error for Path A. Path B is
 the manual-session mode: a live `pw-profile` session may exist without the item,
 but it must be refreshed by a human when it expires.
 
@@ -222,6 +242,31 @@ deliberately refused; and `ACG_SESSION_EXPIRED` means the session is unauthentic
 and unattended login is unavailable. `K3DM_ACG_SKIP_SESSION_CHECK=1` is a local
 debugging aid only and is never valid for a Tier 2 acceptance run; the Tier 2
 preflight refuses to run with it set.
+
+#### One-time population must happen in a GUI-session terminal
+
+Write the two accounts from **Terminal.app on the Mac itself**, one command each,
+with no value after `-w` so the tool prompts and the credential never enters argv
+or shell history. `-U` updates in place, which makes the same command the rotation
+procedure.
+
+Two environment traps make this fail in ways that do not look like failure:
+
+- **`User interaction is not allowed`** — the writing process is not attached to
+  the Mac's login session, so it cannot reach the security agent to authorize the
+  write, even when the keychain is unlocked. An SSH session and a non-TTY shell
+  (`!` in Claude Code, `codex exec`, a launchd job) all hit this. Run
+  `security unlock-keychain` interactively in that session first, or do the write
+  at the machine. Recorded previously for `k3dm-webhook-token` in
+  `docs/issues/2026-09-16-status-webhook-health-timeout.md`. Do not work around it
+  with a plaintext token file.
+- **A bare `-w` in a non-TTY shell silently stores an empty value and exits 0.**
+  It reads EOF instead of a prompt, so the item exists, the existence checks above
+  pass, and `_cdp_ensure_acg_session` loads an empty string. The session check then
+  takes its no-credentials branch (`acg_session_check.js:19,62,66` test for
+  truthiness) and reports `ACG_SESSION_EXPIRED`, which is indistinguishable from an
+  absent item. If auto-login fails while both accounts exist, re-enter both values
+  from a real terminal before investigating anything else.
 
 ## Failure classification
 

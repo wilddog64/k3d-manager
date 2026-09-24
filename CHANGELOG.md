@@ -5,8 +5,8 @@
 ### Added
 - `scripts/tests/bin/webhook_agent.py` covers the AI agent's cluster-mutation gate,
   prompt-injection filter, filing/fix intent, and observation parsing.
-- Tier 2 ACG preflight now fails early on an empty sandbox URL or missing
-  `k3dm-acg-pluralsight` Keychain service, refuses
+- Tier 2 ACG preflight now fails early on an empty sandbox URL or a missing
+  `k3dm-acg-pluralsight` credential account, refuses
   `K3DM_ACG_SKIP_SESSION_CHECK=1`, and documents the no-MFA auto-login setup.
 - Webhook Phase 1 policy extraction: `scripts/lib/webhook/policy.py`, explicit API route tables, and route-policy regression tests.
 - A unified `make smoke` target with offline and reachable-cluster tiers, per-check logs, and explicit PASS/FAIL/SKIP reporting.
@@ -28,6 +28,11 @@
 - The shopping-cart stack is now **opt-in per app cluster**. `data-git` and `services-git` require `k3d-manager/shopping-cart: "true"` in addition to `k3d-manager/role: app-cluster`, and `register_app_cluster` emits that label from `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). A hub registered as its own app cluster — the designed single-cluster mode — therefore keeps its External Secrets Operator install and ACG Grafana dashboards while no longer syncing the shopping-cart data layer or payment stack onto itself. The `eso` and `grafana-dashboards-acg` ApplicationSets are deliberately left selecting on the role label alone: `eso` generates the hub's entire ESO install (3 Deployments, 21 CRDs, 5 ClusterRoles) and carries the ArgoCD resources finalizer, so removing the registration Secret — the approach this replaces — would have deleted the `externalsecrets` and `clustersecretstores` CRDs, every ExternalSecret CR in the cluster, and the owner-referenced Secrets behind Grafana admin, Keycloak, LDAP, `ghcr-pull-secret` and all postgres / redis / rabbitmq / minio credentials. `docs/architecture/shopping-cart-deployment.md` gains a section on why `ubuntu-k3s` is a role alias rather than a place, the four ApplicationSets that select the role label, and how they differ in `preserveResourcesOnDeletion`.
 
 ### Fixed
+- The Tier 2 ACG preflight now checks the `username` and `password` accounts individually
+  instead of matching the Keychain service alone, so a credential stored under an account name
+  the loader never reads no longer satisfies the gate; the error names which accounts are
+  missing. The e2e harness guide documents the account-name convention this service deviates
+  from, and the two environment traps that make population fail silently.
 - Webhook authorization now normalizes unknown actor roles to `reader` while preserving the
   requirement-side `admin` default, preventing unknown callers from satisfying role checks or
   being misreported as administrators in the audit trail.

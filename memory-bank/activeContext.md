@@ -37,6 +37,31 @@ Commit and push are blocked by the sandbox's `.git/index.lock: Operation not per
 wall. No lock removal, retry, `--no-verify`, force-push, or PR was attempted; the scoped
 changes are staged for the operator to commit and push.
 
+## 2026-09-24 — ACG preflight: service-only Keychain check was not predictive
+
+The Tier 2 preflight matched `security find-generic-password -s k3dm-acg-pluralsight` with
+no `-a`, so **any** account under that service satisfied the gate. `_secret_load_data`
+(`scripts/lib/foundation/scripts/lib/system.sh:579`) resolves to `-s <service> -a <key> -w`,
+so the loader only ever reads the accounts `username` and `password`; an entry under `-a k3dm`
+— the convention every other item in the repo uses — is never read. The gate would have gone
+green and Tier 2 would have failed later at the session check instead of failing fast.
+
+Found while the operator hit `User interaction is not allowed` populating the item. Claude had
+handed them `-a k3dm`, which was wrong; the account name is the field name here. Fixed: the
+preflight loops both accounts and names which are missing. 10/10 focused BATS, mutation-verified
+(reverting to the service-only form reds exactly the three new cases), shellcheck clean, doc
+links 1765 OK. The no-`-w` invariant is deliberately preserved — an empty-value check would
+require the guard to handle secret material, and `acg_session_check.js:19,62,66` already treat
+an empty credential as absent.
+
+Two environment traps are now documented in `docs/guides/vcluster-e2e-harness.md`: the
+GUI-session requirement behind `User interaction is not allowed` (prior art:
+`docs/issues/2026-09-16-status-webhook-health-timeout.md`), and that a bare `-w` in a non-TTY
+shell **silently stores an empty value and exits 0**, which is indistinguishable from an absent
+item downstream. Keychain state measured 2026-09-24: all three accounts absent — the operator's
+earlier attempts never landed, so there is nothing to clean up. Population remains blocked
+until they are at the Mac in Terminal.app.
+
 ## 2026-09-24 — Tier 2 ACG preflight
 
 Task 0 is resolved as **Path A**: the operator's personal ACG account has no MFA.

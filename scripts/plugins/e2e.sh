@@ -292,16 +292,20 @@ function _e2e_sandbox_provision_secrets() {
 }
 
 function _e2e_sandbox_preflight_auth() {
-  local service="k3dm-acg-pluralsight" keychain_present=0 profile_dir
+  local service="k3dm-acg-pluralsight" keychain_present=1 profile_dir
+  local account missing=""
   profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
 
   if [[ -z "${_ACG_SANDBOX_URL:-}" ]]; then
     _err "[e2e] _ACG_SANDBOX_URL is empty; set the ACG sandbox URL before Tier 2"
     return 1
   fi
-  if security find-generic-password -s "$service" >/dev/null 2>&1; then
-    keychain_present=1
-  fi
+  for account in username password; do
+    if ! security find-generic-password -s "$service" -a "$account" >/dev/null 2>&1; then
+      keychain_present=0
+      missing="${missing:+${missing},}${account}"
+    fi
+  done
   if [[ "${K3DM_ACG_SKIP_SESSION_CHECK:-0}" == "1" ]]; then
     _err "[e2e] Tier 2 refuses to run with K3DM_ACG_SKIP_SESSION_CHECK=1; unset the local debugging aid"
     return 1
@@ -310,7 +314,7 @@ function _e2e_sandbox_preflight_auth() {
     _info "[e2e] ACG preflight: service=${service} keychain_present=true path=Path A"
     return 0
   fi
-  _err "[e2e] ACG preflight: service=${service} keychain_present=false path=Path A; add the personal no-MFA account via the ACG auto-login enablement guide (profile_dir=${profile_dir} exists but proves nothing about session validity); markers: ACG_SESSION_OK=authenticated, ACG_LOGIN_MFA_REQUIRED=MFA refused, ACG_SESSION_EXPIRED=not authenticated"
+  _err "[e2e] ACG preflight: service=${service} keychain_present=false missing=${missing} path=Path A; the loader reads the accounts username and password under this service, so an entry stored under any other account name is never read; add the personal no-MFA account via the ACG auto-login enablement guide (profile_dir=${profile_dir} exists but proves nothing about session validity); markers: ACG_SESSION_OK=authenticated, ACG_LOGIN_MFA_REQUIRED=MFA refused, ACG_SESSION_EXPIRED=not authenticated"
   return 1
 }
 
