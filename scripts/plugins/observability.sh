@@ -1152,6 +1152,65 @@ function trivy_scan_report() {
   fi
 }
 
+function app_cve_scan_trigger() {
+  local _namespace="${K3DM_PLATFORM_OPS_NAMESPACE:-platform-ops}"
+  local _cronjob="${1:-app-cve-scan}"
+  local _wait="${K3DM_CVE_SCAN_WAIT:-600}"
+  local _job
+
+  case "${_cronjob}" in
+    app-cve-scan|argocd-cve-scan) ;;
+    *) _err "[observability] unsupported CVE scan cronjob: ${_cronjob}"; return 1 ;;
+  esac
+
+  if ! _kubectl -n "${_namespace}" get "cronjob/${_cronjob}" >/dev/null 2>&1; then
+    _err "[observability] cronjob/${_cronjob} not found in ${_namespace} on the hub"
+    return 1
+  fi
+
+  _job="${_cronjob}-manual-$(date -u +%s)"
+  _info "[observability] triggering ${_cronjob} as job/${_job}"
+  if ! _kubectl -n "${_namespace}" create job "${_job}" --from="cronjob/${_cronjob}"; then
+    _err "[observability] could not create job/${_job}"
+    return 1
+  fi
+
+  _info "[observability] waiting up to ${_wait}s for job/${_job}"
+  if _kubectl -n "${_namespace}" wait "job/${_job}" \
+       --for=condition=complete --timeout="${_wait}s" >/dev/null 2>&1; then
+    _info "[observability] job/${_job} completed"
+    _app_cve_scan_report "${_namespace}" "${_job}"
+    return 0
+  fi
+
+  _err "[observability] job/${_job} did not complete within ${_wait}s"
+  _app_cve_scan_report "${_namespace}" "${_job}"
+  return 1
+}
+
+function _app_cve_scan_report() {
+  local _namespace="${1:-platform-ops}"
+  local _job="${2:-}"
+  local _events
+
+  _kubectl -n "${_namespace}" get "job/${_job}" \
+    -o 'custom-columns=JOB:.metadata.name,SUCCEEDED:.status.succeeded,FAILED:.status.failed' \
+    --no-headers 2>/dev/null || true
+
+  _events="$(_kubectl -n "${_namespace}" get configmap \
+    -l 'k3dm.k3d.io/cve-remediation-event=true' \
+    --sort-by=.metadata.creationTimestamp \
+    -o 'custom-columns=EVENT:.metadata.name,AT:.metadata.creationTimestamp' \
+    --no-headers 2>/dev/null | tail -n 10 || true)"
+
+  if [[ -n "${_events}" ]]; then
+    _info "[observability] most recent promotion requests:"
+    printf '%s\n' "${_events}"
+  else
+    _info "[observability]   (no promotion_requested events found)"
+  fi
+}
+
 function _trivy_prom_query() {
   local _context="${1:-k3d-k3d-cluster}"
   local _query="${2:-}"

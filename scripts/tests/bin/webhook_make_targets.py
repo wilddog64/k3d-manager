@@ -89,6 +89,28 @@ class MakeTargetTests(unittest.TestCase):
         self.assertNotIn("fix-sync", reader_help)
         self.assertIn("fix-force-sync APP=… confirm", wh.make_target_help("admin", wh._role_allows))
 
+    def test_app_cve_scan_requires_operator(self):
+        self.assertEqual(wh.MAKE_TARGETS["app-cve-scan"]["min_role"], "operator")
+        self.assertNotIn("app-cve-scan", wh.make_target_help("reader", wh._role_allows))
+        self.assertIn("app-cve-scan", wh.make_target_help("operator", wh._role_allows))
+
+    def test_app_cve_scan_cronjob_value_is_enumerated(self):
+        self.assertEqual(
+            wh.parse_make_request("app-cve-scan", {"CRONJOB": "app-cve-scan"}, None),
+            (["app-cve-scan", "CRONJOB=app-cve-scan"], None),
+        )
+        for value in ("app-cve-scan; rm -rf /", "../../etc/passwd", "app-cve-scan\n", "APP-CVE-SCAN", ""):
+            with self.subTest(value=value):
+                argv, error = wh.parse_make_request("app-cve-scan", {"CRONJOB": value}, None)
+                self.assertIsNone(argv)
+                self.assertIsNotNone(error)
+
+    def test_app_cve_scan_needs_no_confirm(self):
+        self.assertEqual(
+            wh.parse_make_request("app-cve-scan", {}, None),
+            (["app-cve-scan"], None),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

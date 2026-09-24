@@ -1,5 +1,22 @@
 # Progress — k3d-manager
 
+## 2026-09-24 — app-CVE scan trigger target
+
+- [x] Implemented the exact v1.37.0 S1–S3 trigger, Makefile target, operator-role `/k3dm`
+      allowlist entry, enumerated `CRONJOB` validation, appended pytest cases, and new
+      transport-stubbed BATS suite.
+- [x] Added the existing CVE guide's out-of-band trigger section, v1.34 allowlist row, and
+      Unreleased changelog entry. Verified the payload's actual selector is
+      `k3dm.k3d.io/cve-remediation-event=true` (spec guess did not match); no payload logic
+      or schedule was changed.
+- [x] Focused BATS **6/6** and **2/2**; focused pytest **14 passed**; whole pytest **189
+      passed**; `make check-doc-links` **1762 files OK**; `make -n app-cve-scan` parsed.
+- [x] M1–M6 each turned the required named test red and restored byte-for-byte.
+- [ ] `make test` completed **1105 tests** but exited 1 on unrelated pre-existing
+      `e2e_remote.bats` tests 688, 699, 723, and 724; left untouched per scope. No live
+      cluster commands were run. Commit/push is blocked by `.git/index.lock: Operation not
+      permitted`; no commit SHA exists yet.
+
 ## 2026-09-24 — Hostinger shopping-cart label and CVE promotion guard
 
 - [x] **`93ffe649`** — Hostinger registration sets the shopping-cart label by default with an

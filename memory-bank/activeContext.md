@@ -1,5 +1,20 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — app-CVE scan trigger target
+
+Implemented S1–S3 of `docs/plans/v1.37.0-app-cve-scan-make-target-and-k3dm.md`: the
+operator-only `make app-cve-scan` trigger, enumerated `CRONJOB` Slack argument, focused
+tests, and required guide/design/changelog documentation. The remediation ConfigMap selector
+was measured in `scripts/etc/argocd/platform-ops/app-cve-scan.sh` as
+`k3dm.k3d.io/cve-remediation-event=true`, which differs from the spec's guessed
+`k3dm.k3.io/remediation=promotion_requested`; the payload file was left untouched. Focused
+BATS: 6/6 and 2/2; focused pytest: 14 passed; whole pytest: 189 passed; doc links: 1762
+files OK. All six mutations turned their named tests red and were restored. `make test`
+completed 1105 tests but retained five unrelated pre-existing `e2e_remote.bats` failures
+(688, 699, 723, 724; 724 is the chained failure; exact output is in the session log); no
+live-cluster commands were run. Commit/push is blocked by `.git/index.lock: Operation not
+permitted`; no commit SHA exists yet.
+
 ## 2026-09-24 — Hostinger shopping-cart label and CVE promotion guard fixed
 
 Implemented in commit `f8a7e1189dadbd43c6c4ff9186a15e2dcbe7869c` (final commit; pushed): Hostinger registration now defaults

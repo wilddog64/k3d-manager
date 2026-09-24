@@ -125,6 +125,26 @@ are the interesting engineering:
 
 (Reference: `reference_hostinger_maxsurge_rollout_deadlock`.)
 
+## Triggering a scan out of band
+
+Run the app-cluster CVE scan immediately instead of waiting for its schedule:
+
+```bash
+make app-cve-scan
+CRONJOB=app-cve-scan make app-cve-scan
+CRONJOB=argocd-cve-scan make app-cve-scan
+K3DM_CVE_SCAN_WAIT=900 make app-cve-scan
+```
+
+The same operation is available from Slack as `/k3dm app-cve-scan`. `CRONJOB=` selects
+the CronJob (`app-cve-scan` or `argocd-cve-scan`), and `K3DM_CVE_SCAN_WAIT` controls
+how long the trigger waits for the manually created Job to complete.
+
+A manually triggered Job leaves the CronJob's `.status.lastSuccessfulTime` empty. This
+is expected: `--from=cronjob/...` creates no owner reference to the CronJob. Check Jobs
+in `platform-ops` for the manual run; do not read the empty CronJob field as evidence
+that the scan has never worked.
+
 ## Live checks you can name
 
 ```bash
