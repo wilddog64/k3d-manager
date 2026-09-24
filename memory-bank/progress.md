@@ -1244,3 +1244,28 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   **Hypothesis I raised and then disproved:** I suspected the e2e dashboard queried a metric name the
   exporter never emits. It does not — the exporter defines `e2e_last_success_timestamp_seconds` at
   line 383 of `vulnerability-inventory-exporter.yaml`. Checked before reporting it.
+
+- [x] **istio-cni-node on ubuntu-hostinger is 1/1 — RESOLVED 2026-09-24 after 17 days at 0/1.**
+  Ran `APP_CLUSTER_NAME=ubuntu-hostinger ./scripts/k3d-manager deploy_istio_ambient --confirm`.
+  Derived correctly: `INFO: [istio_ambient] CNI dirs for provider 'k3s-hostinger':
+  /var/lib/rancher/k3s/agent/etc/cni/net.d /var/lib/rancher/k3s/data/cni`. Live AppSet now carries
+  those values. ArgoCD rolled the DaemonSet **by itself** (helm values changed) — `istio-cni-node-rls4b`
+  came up 1/1 in 55s, app `Synced/Healthy`. The new pod's own log closes the loop:
+  `CNI config file "" preempted by "/host/etc/cni/net.d/10-flannel.conflist"` →
+  `created CNI config ...` → `initial installation complete, start watching for re-installation`.
+  `KubeDaemonSetRolloutStuck` is gone; hostinger now has **0 real alerts firing** (only `Watchdog`,
+  which is the always-on deadman's switch and therefore a positive signal for the delivery path
+  repaired earlier tonight). Five-link chain closed end to end.
+
+- [x] **TRAP: `--dry-run` cannot preview any substrate-derived value.** `scripts/lib/system_overrides.sh`
+  replaces `_run_command` so that in dry-run mode **every** invocation is short-circuited to a printed
+  preview — including read-only `kubectl get`. Any function that derives config by querying the
+  cluster therefore captures the literal string `[dry-run] kubectl ...` instead of real output, the
+  comparison fails, and the derivation silently falls back to its default.
+  Concretely: `deploy_istio_ambient --dry-run` printed `CNI dirs for provider 'unknown':
+  /etc/cni/net.d /opt/cni/bin` on a cluster whose provider label was correctly `k3s-hostinger`, and
+  the real `--confirm` run then derived `k3s-hostinger` correctly. **I briefly read the dry-run as a
+  fourth recurrence of the CNI bug and was wrong** — the dry-run manufactured the `unknown`. Verified
+  by re-running `_istio_ambient_target_provider` under a passthrough `_kubectl`, which returned
+  `k3s-hostinger`. Rule: never trust a dry-run's *derived* values, only its *intent*; to preview one,
+  pass the value explicitly (`AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR`) or resolve it separately.
