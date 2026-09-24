@@ -1,5 +1,17 @@
 # Progress — k3d-manager
 
+## 2026-09-23 — Alert delivery and ambient CNI precedence specs
+
+- [x] **Commit 1 — `03b8755caad4b698c4ecdc9bfbd53b21cbf91e1`** — warning-severity alerts route
+      through `platform-warning`, both observability renderers reject a missing referenced
+      Alertmanager config Secret, and Hermes gains the read-only `alert_delivery` sensor/probe.
+      Focused pytest: 8/8; focused BATS: 22/22; mutations M1/M2/M3 each red and restored;
+      doc links: 1756 files OK.
+- [x] **Commit 2 — `02e3fa769e002ba5757e5eb267ab02e1c7f192ad`** — provider-derived Istio ambient
+      CNI dirs take precedence over live values, generic dirs are refused for k3s, and the
+      override log no longer claims live provenance. Focused BATS: 8/8; mutations M1/M2/M3 each
+      red and restored; doc links: 1757 files OK. Both commits pushed to origin; no PR created.
+
 ## 2026-09-23 — Hostinger registration must survive a hub rebuild (spec filed)
 
 - [x] **Spec filed** — `docs/bugs/2026-09-23-hostinger-registration-does-not-survive-a-hub-rebuild.md`,

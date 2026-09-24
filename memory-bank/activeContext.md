@@ -1,5 +1,13 @@
 # Active Context — k3d-manager
 
+## 2026-09-23 — Alert delivery and ambient CNI precedence fixes completed
+
+Implemented and pushed the two requested bug specs on `k3d-manager-v1.37.0` as separate commits:
+`03b8755caad4b698c4ecdc9bfbd53b21cbf91e1` adds the warning catch-all, missing-configSecret
+delivery guard, read-only probe, Hermes sensor, tests and alert-delivery docs; `02e3fa769e002ba5757e5eb267ab02e1c7f192ad` makes target-substrate CNI dirs win over stale live
+ApplicationSet values, adds the k3s generic-path refusal guard, tests and ambient guide. Both are
+on origin. No PR was created, and no live-cluster commands were run.
+
 ## 2026-09-23 — Hostinger app-cluster registration: durability spec dispatched to Codex
 
 Filed `docs/bugs/2026-09-23-hostinger-registration-does-not-survive-a-hub-rebuild.md` and
