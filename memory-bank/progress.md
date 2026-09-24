@@ -11,7 +11,9 @@
       (`make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`, `14f26f3d`). The reopened
       2026-09-13 doc repeated "there is no registration-only entry point" after its own fix had
       landed. Item 1 ("re-register hostinger") therefore needs no code — only the operator's run.
-- [ ] **Codex implementation** — pending.
+- [x] **Codex implementation — `1238f994`** — pushed to `origin/k3d-manager-v1.37.0`. S1–S4,
+      focused tests, guide, README/CHANGELOG updates, and mutation proofs complete; focused
+      suites 47/47 and `make test` 1068/1068 green.
 - [ ] **Operator: re-register hostinger** — `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`.
       Live hub mutation; needs the user's go. Hostinger workloads are unmanaged until then.
 - [ ] **Durability unproven until a rebuild happens with the fix in place.** A reconcile that has

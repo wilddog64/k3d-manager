@@ -17,6 +17,20 @@ Correction worth keeping: the registration-only entry point already exists as
 doc still claimed otherwise, and that stale line was repeated in session reporting. Item 1 is a
 single operator command, not development work.
 
+## 2026-09-23 — Hostinger app-cluster registration durability implemented
+
+Implemented and pushed as `1238f994` on `k3d-manager-v1.37.0`. Added the single-row remote app-
+cluster inventory, additive reconcile function, calls from both hub rebuild paths, and direct TSV
+registration-gap reporting in `cluster-status`, plus focused BATS coverage and the operator guide.
+The implementation invokes `refresh_registration` as a child dispatcher process and returns zero
+when a remote re-registration fails, leaving the warning banner and status line as the signal.
+
+Verification: focused suites 47/47; `make test` 1068/1068; shellcheck warning counts matched
+`HEAD~` exactly (`argocd.sh` 1, `hub_recovery.sh` 0, `cluster-up` 18, `cluster-status` 0);
+`make check-doc-links` 1751 files OK. M1, M2, and M3 each turned the required test red and
+were restored. The initial pull was blocked by the sandbox's `.git/FETCH_HEAD` restriction; no
+live cluster commands were run.
+
 ## 2026-09-23 — Alertmanager warning alerts now have an explicit delivery route
 
 Implemented and committed as `a7135966` on `k3d-manager-v1.37.0`; status update pushed in
