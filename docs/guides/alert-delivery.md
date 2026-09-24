@@ -13,8 +13,15 @@ The renderer also refuses success when an Alertmanager CR names a missing `confi
 ## Confirm delivery
 
 1. Check the CR's `spec.configSecret`, then verify that Secret exists in `monitoring`.
-2. Inspect the generated Secret's decoded `alertmanager.yaml` and confirm it has child routes and
-   a receiver with an `email_configs` or other delivery configuration.
+2. Inspect the generated Secret's config and confirm it has child routes and a receiver with an
+   `email_configs` or other delivery configuration. The only key is `alertmanager.yaml.gz`, which is
+   base64 **and** gzipped — there is no plain `alertmanager.yaml` key, so a reader that asks for one
+   silently gets an empty config that looks like a total blackout:
+
+   ```bash
+   kubectl -n monitoring get secret alertmanager-<name>-generated \
+     -o jsonpath='{.data.alertmanager\.yaml\.gz}' | base64 -d | gunzip
+   ```
 3. Confirm the alert is firing in Prometheus, then check Alertmanager's notification logs. The
    `notifications_total` metric counts attempts, not successful receipt.
 4. Run `bin/k3dm-alert-delivery-status --json` for the read-only route-tree shape across the hub

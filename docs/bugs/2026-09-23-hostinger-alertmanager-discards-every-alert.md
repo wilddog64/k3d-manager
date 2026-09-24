@@ -261,8 +261,14 @@ Contract, and the sensor depends on every key:
   context absent from the local kubeconfig (a laptop without the VPS context must not fail).
 - `config_secret_missing` — the CR names a `configSecret` and `kubectl get secret` on it fails.
 - `root_receiver` / `child_routes` — parsed from the **generated** Secret
-  (`alertmanager-<cr-name>-generated`, key `alertmanager.yaml`, base64), because that is what
-  Alertmanager actually loads. Parse it in Python via `python3 -c`, not with `grep`.
+  (`alertmanager-<cr-name>-generated`, key `alertmanager.yaml.gz`, base64-then-gzip), because that
+  is what Alertmanager actually loads. Parse it in Python via `python3 -c`, not with `grep`:
+  `gzip.decompress(base64.b64decode(data["alertmanager.yaml.gz"]))`. The Prometheus Operator emits
+  **only** the gzipped key — there is no plain `alertmanager.yaml` key in the generated Secret.
+- A missing `alertmanager.yaml.gz` key is a **hard error** (`{"available": false}`, exit 1), never a
+  parsed result. Defaulting the read to `""` makes `yaml.safe_load` return `None`, which collapses
+  to `root_receiver_is_null: true, child_routes: 0` — the probe would report a total blackout on a
+  perfectly healthy cluster. An inverted verdict on the alerting path is worse than no probe.
 - `"null"` detection is on the receiver **name** resolving to a receiver with no
   `email_configs`, `webhook_configs` or any other `*_configs` key — not on the literal string
   `null`, so a receiver renamed to `blackhole` is still caught.

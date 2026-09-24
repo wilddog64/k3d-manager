@@ -14,7 +14,7 @@ context_available() {
   return 1
 }
 
-contexts=(k3d-k3d-cluster)
+contexts=("${K3DM_HUB_CONTEXT:-k3d-k3d-cluster}")
 while IFS=$'\t' read -r context _secret _provider; do
   [[ -z "${context}" || "${context}" == \#* ]] && continue
   contexts+=("${context}")
@@ -37,7 +37,7 @@ for context in "${contexts[@]}"; do
     config_secret_missing=true
   fi
   root_receiver=null
-  root_receiver_is_null=false
+  root_receiver_is_null=true
   child_routes=0
   if ! ${config_secret_missing}; then
     generated="alertmanager-${cr_name}-generated"
@@ -46,11 +46,16 @@ for context in "${contexts[@]}"; do
       exit 1
     }
     route_shape="$(printf '%s' "${generated_json}" | python3 -c '
-import base64, json, sys
+import base64, gzip, json, sys
 import yaml
 secret = json.load(sys.stdin)
-raw = base64.b64decode(secret.get("data", {}).get("alertmanager.yaml", ""))
-config = yaml.safe_load(raw) or {}
+data = secret.get("data", {})
+if "alertmanager.yaml.gz" not in data:
+    sys.exit("generated secret has no alertmanager.yaml.gz key")
+raw = gzip.decompress(base64.b64decode(data["alertmanager.yaml.gz"]))
+config = yaml.safe_load(raw)
+if not isinstance(config, dict):
+    sys.exit("generated alertmanager config did not parse as a mapping")
 route = config.get("route") or {}
 receiver = route.get("receiver", "")
 receivers = {item.get("name"): item for item in config.get("receivers", [])}
