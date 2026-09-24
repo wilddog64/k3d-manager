@@ -100,6 +100,27 @@ capture_overrides() {
   [[ "${warnings}" == *"k3s-hostinger"* ]]
 }
 
+@test "generic live dirs are refused for a k3d target" {
+  live_with_dirs
+  set_provider k3d /etc/cni/net.d /opt/cni/bin
+  configure_live_stub
+  capture_overrides
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *"AMBIENT_CNI_"* ]]
+  [[ "${warnings}" == *"k3d"* ]]
+}
+
+@test "an unknown provider warns that generic dirs are being written" {
+  live_with_dirs
+  set_provider unknown /etc/cni/net.d /opt/cni/bin
+  configure_live_stub
+  capture_overrides
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"AMBIENT_CNI_CONF_DIR=/etc/cni/net.d"* ]]
+  [[ "${output}" == *"AMBIENT_CNI_BIN_DIR=/opt/cni/bin"* ]]
+  [[ "${warnings}" == *"writing GENERIC CNI dirs"* ]]
+}
+
 @test "live APP_CLUSTER_NAME override remains unchanged" {
   live_with_dirs
   set_provider k3s /k3s/conf /k3s/bin

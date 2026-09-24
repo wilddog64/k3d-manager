@@ -11,3 +11,14 @@ the repository values, then confirm the generated `istio-cni` DaemonSet mounts t
 The generic defaults remain `/etc/cni/net.d` and `/opt/cni/bin` for Cilium-backed targets; bare
 k3s flannel uses the `/var/lib/rancher/k3s/agent/etc/cni/net.d` and
 `/var/lib/rancher/k3s/data/cni` pair exported by its provider path.
+
+## Provider label and CNI directories
+
+The ambient CNI directories are derived from the target's
+`k3d-manager/provider` label. The only substrate-specific provider values are `k3d` and
+`k3s-hostinger`; bare `k3s` resolves to the generic pair. A cluster registered without a
+provider silently gets generic CNI directories. Check the label with:
+
+```bash
+kubectl -n cicd get secret cluster-<name> -o jsonpath='{.metadata.labels.k3d-manager/provider}'
+```

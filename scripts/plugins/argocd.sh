@@ -1247,6 +1247,18 @@ EOF
    fi
 }
 
+function _argocd_warn_generic_cni_dirs() {
+   local name="$1" conf="$2" provider="$3"
+   if [[ "${conf}" != "/etc/cni/net.d" ]]; then
+      return 0
+   fi
+   if [[ -n "${provider}" && "${provider}" != unknown ]]; then
+      return 0
+   fi
+   _warn "[argocd] ${name}: provider is '${provider:-<empty>}' — writing GENERIC CNI dirs, which are wrong for any k3s or k3d substrate"
+   _warn "[argocd] ${name}: re-register the target so its k3d-manager/provider label is set"
+}
+
 function _argocd_appset_live_overrides() {
    local file="$1" name live value conf bin provider dirs
    name="$(sed -n 's/^  name: //p' "$file" | head -1)"
@@ -1277,11 +1289,14 @@ function _argocd_appset_live_overrides() {
          conf="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniConfDir:[[:space:]]*//p' | head -1)"
          bin="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniBinDir:[[:space:]]*//p' | head -1)"
       fi
-      if [[ -n "${conf:-}" && "${conf}" == "/etc/cni/net.d" && "${provider:-}" == k3s* ]]; then
+      if [[ -n "${conf:-}" && "${conf}" == "/etc/cni/net.d" ]] \
+         && declare -f _istio_ambient_cni_provider_is_specific >/dev/null 2>&1 \
+         && _istio_ambient_cni_provider_is_specific "${provider:-}"; then
          _warn "[argocd] ${name}: refusing generic CNI dirs for provider ${provider}"
          conf=""
          bin=""
       fi
+      _argocd_warn_generic_cni_dirs "${name}" "${conf:-}" "${provider:-}"
       if [[ -n "${conf:-}" && -n "${bin:-}" ]]; then
          printf 'AMBIENT_CNI_CONF_DIR=%s\nAMBIENT_CNI_BIN_DIR=%s\n' "${conf}" "${bin}"
       fi
@@ -1475,6 +1490,11 @@ HELP
   }; then
     _err "[argocd] managed registrations require provider, sandbox-id, expires-at, and release metadata"
     return 1
+  fi
+
+  if [[ -z "${ARGOCD_APP_CLUSTER_PROVIDER:-}" ]]; then
+    _warn "[argocd] ARGOCD_APP_CLUSTER_PROVIDER unset — registering ${ARGOCD_APP_CLUSTER_NAME:-<unnamed>} with provider 'unknown'"
+    _warn "[argocd] Substrate-derived config (ambient CNI dirs) will fall back to generic defaults for this cluster"
   fi
 
   local _wasx=0
