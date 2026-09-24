@@ -1269,3 +1269,52 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   by re-running `_istio_ambient_target_provider` under a passthrough `_kubectl`, which returned
   `k3s-hostinger`. Rule: never trust a dry-run's *derived* values, only its *intent*; to preview one,
   pass the value explicitly (`AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR`) or resolve it separately.
+
+- [x] **Live e2e run on m2 — the three e2e fixes are CONFIRMED working (2026-09-24).**
+  `make e2e-remote RUNNER=m2` with HEAD == origin (`8699752b`). Dispatch exited 1 because **tests**
+  failed, not the harness. The published payload is **populated for the first time**:
+  `total: 102, failed: 9, duration_seconds: 11.814`, one `failure_groups` entry
+  (`kind=assertion, service=payment, target=api-payments`) and nine `failure_details`. Every prior
+  run had `total:""`, `failed:""`, `failure_groups:[]` — that was the defect, and it is fixed.
+  - Prometheus went `e2e_failure_group_info` 0 → **1** and `e2e_failure_info` 0 → **9**. The E2E
+    dashboard's Failure groups / Failure details / Top failing specs / Failure trend / Failure causes
+    panels now have data. Exporter cadence is 60s refresh + 1m scrape, so allow ~2min.
+  - `e2e_run_info` stayed at 21, not 22: the publisher prunes the oldest result when it adds one, and
+    the ConfigMap count is still exactly 21. Consistent, not an anomaly.
+  - The nine failures are a **real application fault**, not harness noise: `payment` health returns
+    `DOWN`, then `SyntaxError: Unexpected end of JSON input` because the service returns an empty
+    body. In `api/payments.spec.ts`.
+  - `WARN: [e2e] could not publish result event (hub platform-ops unreachable?)` during the run is
+    **non-fatal and expected** — the hub is not reachable from m2. The publish-back path recovered it:
+    `INFO: [e2e-publish] applied result for run ... (result=fail)`. Do not chase that WARN.
+
+- [x] **ROOT CAUSE: CVE auto-patch has never produced a remediation event — specced, dispatched.**
+  `docs/bugs/2026-09-24-hostinger-registration-resets-shopping-cart-label.md`.
+  `cronjob/app-cve-scan` `.status.lastSuccessfulTime` is **empty** — it has never succeeded. A manual
+  run failed in 6m32s, exit 1, on `applications.argoproj.io "ubuntu-hostinger-shopping-cart-frontend"
+  not found`. Chain: `register_app_cluster:1481` defaults `ARGOCD_APP_CLUSTER_SHOPPING_CART` to
+  **false** → `_hostinger_register_cluster` never sets it (`grep -c` = **0**) → live `services-git`
+  AppSet selects on `k3d-manager/shopping-cart: "true"` AND `role: app-cluster`, so it matches **zero**
+  clusters and generates none of the `ubuntu-hostinger-shopping-cart-*` Applications (it still reports
+  "All applications have been generated successfully" — generating nothing counts as success) →
+  `app-cve-scan.sh:526` patches that Application unguarded under `set -eu` → aborts → and
+  `_emit_remediation_event` is on line **529**, so no event is ever written.
+  - **This is the SAME defect shape as the provider label fixed in `834149ea`, in the SAME env block,
+    one line away.** Two instances of "the hostinger register path omits a var that silently defaults
+    to a value breaking a downstream AppSet selector" — worth treating as a class, not a one-off.
+  - **It regressed.** `2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` records a run
+    that promoted four services including `frontend`, so the label was `true` and a refresh flipped it.
+  - **Not cosmetic:** reaching `_promote` means the scan found a real HIGH/CRITICAL worth promoting on
+    `shopping-cart-frontend`. Auto-patch has been silently not remediating.
+
+- [x] **`2026-06-09-pushgateway-deployment-metrics-gap.md` updated — its proposed fix already shipped.**
+  The bounded retry + `/-/healthy` precheck exist at `bin/k3dm-webhook:1717-1741`. Measured cause is
+  different and total, not intermittent: the launchd agent
+  `com.k3d-manager.pushgateway-port-forward` is **not loaded** and `localhost:9091/-/healthy` returns
+  **000**, so every push retries against a closed socket. hostinger's Pushgateway is up and scraped
+  (`pushgateway_build_info` present) but holds **zero** `k3dm_*` series; the hub has no Pushgateway pod
+  at all. Remaining defects recorded in the doc: absent-vs-slow sink, no operator surface for silent
+  failure, `_provider_supports_pushgateway` disagreeing with `_push_metrics`, and unstated topology.
+  - **Search lesson:** I first concluded "no producer exists" from
+    `grep -r --include='*.yaml' --include='*.sh' --include='*.py'`. Wrong — `bin/k3dm-webhook` has **no
+    extension**, so the filters skipped it. Never restrict by extension when hunting producers here.
