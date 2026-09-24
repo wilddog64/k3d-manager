@@ -1176,3 +1176,33 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `k3dm-webhook` and posts to Slack — so v1.39.0 is a new handler on proven transport, not new
   infrastructure. Real work is WS3 (authorisation + disclosure): `docs/bugs/` and `docs/issues/` were
   written for operators with repo access, and a Slack channel may be wider.
+
+- [x] **Provider label verified `k3s-hostinger` on the live hub (2026-09-24)** — operator ran
+  `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`; `cluster-ubuntu-hostinger` now carries
+  `k3d-manager/provider: k3s-hostinger` (was `unknown`). `834149ea` is confirmed effective against
+  the live cluster, so the last link in the istio-cni chain is closed and the AppSet reapply
+  precondition now holds.
+  - **Root cause confirmed from the container's own logs, not inferred.** `install-cni` has logged
+    since 2026-09-06T16:36:54Z: `Istio CNI is configured as chained plugin, but cannot find existing
+    CNI network config: no networks found in /host/etc/cni/net.d` and `Waiting for CNI network config
+    file to be written in /host/etc/cni/net.d...`. The host `/etc/cni/net.d` is **empty**; k3s keeps
+    its conflist under `/var/lib/rancher/k3s/agent/etc/cni/net.d`. Istio is chain-waiting on a
+    directory nothing will ever populate — that is the permanent 503, now 163,101 failures over 17d.
+  - The ambient data path is **working**: the same container enrols pods and writes iptables
+    (`sending pod add to ztunnel`, `shopping-cart-apps`). Only the chained-plugin install is stuck,
+    so the DaemonSet is unready while ambient still functions. Readiness is the accurate signal here,
+    not a false alarm.
+  - `/var/lib/rancher/k3s/data/cni` exists and holds the k3s plugins (bandwidth, bridge, cni,
+    firewall, flannel); `/opt/cni/bin` already holds the stray `istio-cni` binary installed to the
+    wrong place.
+  - **Probe caveat, recorded so it is not repeated:** an initial check via the
+    `prometheus-node-exporter` pod reported the k3s conf dir MISSING. That was WRONG. node-exporter
+    runs as `nobody`, and `[ -d ]` returned false because an ancestor was untraversable — `ls`
+    printed `Permission denied`, which proves the ancestor EXISTS. Never read a negative existence
+    result from an unprivileged container; an EACCES on the path is not absence. The istio-cni pod
+    is distroless (no `sh`), so container logs were the authority instead.
+
+- [ ] **AWAITING THE USER'S GO — reapply the `istio-ambient` ApplicationSet.** All preconditions now
+  hold. Expected: `cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d`,
+  `cniBinDir: /var/lib/rancher/k3s/data/cni`, and the new guard silent (provider is specific).
+  Then roll `istio-cni-node` and confirm 1/1 plus `KubeDaemonSetRolloutStuck` clearing.
