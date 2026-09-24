@@ -1260,24 +1260,27 @@ function _argocd_appset_live_overrides() {
    fi
 
    if grep -q '\${AMBIENT_CNI_CONF_DIR}' "$file"; then
-      if [[ -n "${live}" ]]; then
+      if ! declare -f _istio_ambient_cni_dirs >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/istio_ambient.sh" ]]; then
+         # shellcheck disable=SC1090,SC1091
+         source "${PLUGINS_DIR}/istio_ambient.sh"
+      fi
+      if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
+         provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${APP_CLUSTER_NAME:-ubuntu-k3s}")}"
+         if [[ -n "${provider}" ]]; then
+            dirs="$(_istio_ambient_cni_dirs "${provider}")"
+            conf="${dirs%% *}"
+            bin="${dirs##* }"
+         fi
+      fi
+      if [[ -z "${conf:-}" || -z "${bin:-}" ]] && [[ -n "${live}" ]]; then
          value="$(printf '%s' "${live}" | jq -r '[.spec.generators[]?.list.elements[]? | select(.name == "istio-cni") | .values][0] // ""')"
          conf="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniConfDir:[[:space:]]*//p' | head -1)"
          bin="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniBinDir:[[:space:]]*//p' | head -1)"
       fi
-      if [[ -z "${conf:-}" || -z "${bin:-}" ]]; then
-         if ! declare -f _istio_ambient_cni_dirs >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/istio_ambient.sh" ]]; then
-            # shellcheck disable=SC1090,SC1091
-            source "${PLUGINS_DIR}/istio_ambient.sh"
-         fi
-         if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
-            provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${APP_CLUSTER_NAME:-ubuntu-k3s}")}"
-            if [[ -n "${provider}" ]]; then
-               dirs="$(_istio_ambient_cni_dirs "${provider}")"
-               conf="${dirs%% *}"
-               bin="${dirs##* }"
-            fi
-         fi
+      if [[ -n "${conf:-}" && "${conf}" == "/etc/cni/net.d" && "${provider:-}" == k3s* ]]; then
+         _warn "[argocd] ${name}: refusing generic CNI dirs for provider ${provider}"
+         conf=""
+         bin=""
       fi
       if [[ -n "${conf:-}" && -n "${bin:-}" ]]; then
          printf 'AMBIENT_CNI_CONF_DIR=%s\nAMBIENT_CNI_BIN_DIR=%s\n' "${conf}" "${bin}"
@@ -1348,7 +1351,7 @@ function _argocd_deploy_applicationsets() {
          done < <(_argocd_appset_live_overrides "$file")
       fi
       if (( ${#_overrides[@]} > 0 )); then
-         _info "[argocd] ${filename}: keeping live ${_overrides[*]}"
+         _info "[argocd] ${filename}: resolved overrides ${_overrides[*]}"
       fi
       local _apply_err _apply_rc=0
       _apply_err="$(env ${_overrides[@]+"${_overrides[@]}"} envsubst "${_vars}" < "$file" \
