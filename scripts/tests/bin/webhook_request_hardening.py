@@ -18,6 +18,7 @@ _spec = importlib.util.spec_from_file_location(
 )
 wh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(wh)
+from webhook import policy
 
 
 class ContentLengthTests(unittest.TestCase):
@@ -36,12 +37,12 @@ class ContentLengthTests(unittest.TestCase):
 
 class RateLimitTests(unittest.TestCase):
     def setUp(self):
-        wh._rate_hits.clear()
+        policy._rate_hits.clear()
 
     def test_fixed_window_enforced(self):
-        for _ in range(wh._RATE_MAX_DEFAULT):
-            self.assertFalse(wh._rate_limited("api"))
-        self.assertTrue(wh._rate_limited("api"))
+        for _ in range(policy._RATE_MAX_DEFAULT):
+            self.assertFalse(policy._rate_limited("api"))
+        self.assertTrue(policy._rate_limited("api"))
 
     def test_unauthenticated_get_does_not_consume_bucket(self):
         h = wh._Handler.__new__(wh._Handler)
@@ -50,11 +51,11 @@ class RateLimitTests(unittest.TestCase):
         h._auth = lambda: False
         h.path = "/api/v1/health"
         h.headers = {}
-        for _ in range(wh._RATE_MAX_DEFAULT * 3):
+        for _ in range(policy._RATE_MAX_DEFAULT * 3):
             responses.clear()
             h.do_GET()
             self.assertEqual(responses[0][0], 401)
-        self.assertEqual(wh._rate_hits.get("api", (0, 0))[1], 0)
+        self.assertEqual(policy._rate_hits.get("api", (0, 0))[1], 0)
 
 
 if __name__ == "__main__":

@@ -3,12 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- Webhook Phase 1 policy extraction: `scripts/lib/webhook/policy.py`, explicit API route tables, and route-policy regression tests.
 - A unified `make smoke` target with offline and reachable-cluster tiers, per-check logs, and explicit PASS/FAIL/SKIP reporting.
 - Hub snapshot capture, M2 offload, verification, listing, and retention targets.
 - Keycloak monthly admin credential rotator, which preserves `db_password` and deliberately does not force-sync the ArgoCD-managed `keycloak-secrets` ExternalSecret.
 - `make app-cve-scan` triggers the app-cluster CVE scan CronJob, waits for its manually created Job, and exposes the additive operation to `/k3dm` for operator-role users with an enumerated `CRONJOB` choice.
 
 ### Changed
+- Webhook authorization and request policy now live in `webhook.policy`; API routes declare their handler and minimum role in one table. Existing dynamic policy resolutions remain unchanged.
 - The shopping-cart stack is now **opt-in per app cluster**. `data-git` and `services-git` require `k3d-manager/shopping-cart: "true"` in addition to `k3d-manager/role: app-cluster`, and `register_app_cluster` emits that label from `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). A hub registered as its own app cluster — the designed single-cluster mode — therefore keeps its External Secrets Operator install and ACG Grafana dashboards while no longer syncing the shopping-cart data layer or payment stack onto itself. The `eso` and `grafana-dashboards-acg` ApplicationSets are deliberately left selecting on the role label alone: `eso` generates the hub's entire ESO install (3 Deployments, 21 CRDs, 5 ClusterRoles) and carries the ArgoCD resources finalizer, so removing the registration Secret — the approach this replaces — would have deleted the `externalsecrets` and `clustersecretstores` CRDs, every ExternalSecret CR in the cluster, and the owner-referenced Secrets behind Grafana admin, Keycloak, LDAP, `ghcr-pull-secret` and all postgres / redis / rabbitmq / minio credentials. `docs/architecture/shopping-cart-deployment.md` gains a section on why `ubuntu-k3s` is a role alias rather than a place, the four ApplicationSets that select the role label, and how they differ in `preserveResourcesOnDeletion`.
 
 ### Fixed

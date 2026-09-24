@@ -1,5 +1,24 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — webhook Phase 1 implementation blocked at git write
+
+Implemented Phase 1 in the working tree: moved the named authz/policy functions into
+`scripts/lib/webhook/policy.py`, added explicit `_POST_ROUTES`/`_GET_ROUTES` metadata,
+repointed tests that imported moved names, and added route completeness/effective-policy
+equality tests. The fail-open `if action_policy:` branch remains unchanged and is documented.
+The four required mutations all turned their named tests red and were restored cleanly.
+
+Measured: `bin/k3dm-webhook` 4010 lines before, 3929 after; bare pytest 189 passed;
+focused BATS 64/64; Python collections 14/6/6/14 plus 2 new policy cases. `make test-all`
+was rerun and reached 1105 dispatcher cases, but the pre-existing `cluster_status_summary.bats`
+JSON case failed because its fixture supplies two failed services while it asserts one; the
+system `python3` also lacks pytest (pyenv-shimmed `make test-python` passed 184). `make
+check-doc-links` passed with 1762 files. No server, cluster, or live webhook operation ran.
+
+No commit SHA exists: the sandbox rejects `.git/index.lock`, `.git/COMMIT_EDITMSG`, and Git
+temporary tree objects with `Operation not permitted`; push is therefore blocked. User-owned
+untracked `scratchpad/` was left untouched.
+
 ## 2026-09-24 — app-CVE scan trigger target
 
 Implemented S1–S3 of `docs/plans/v1.37.0-app-cve-scan-make-target-and-k3dm.md`: the

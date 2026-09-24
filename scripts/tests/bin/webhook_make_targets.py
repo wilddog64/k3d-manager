@@ -12,6 +12,7 @@ _spec = importlib.util.spec_from_file_location(
 )
 wh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(wh)
+from webhook import policy
 
 
 class MakeTargetTests(unittest.TestCase):
@@ -67,16 +68,16 @@ class MakeTargetTests(unittest.TestCase):
 
     def test_effective_make_role_caps_relay_role(self):
         self.assertEqual(wh._effective_make_role({}, {}), "admin")
-        old = wh._slack_user_role
-        self.addCleanup(setattr, wh, "_slack_user_role", old)
-        wh._slack_user_role = lambda _user_id: "reader"
-        self.assertEqual(wh._effective_make_role({"X-K3DM-Role": "admin"}, {"slack_user_id": "unknown"}), "reader")
-        wh._slack_user_role = lambda _user_id: "operator"
-        self.assertEqual(wh._effective_make_role({"X-K3DM-Role": "admin"}, {}), "operator")
-        wh._slack_user_role = lambda _user_id: "admin"
-        self.assertEqual(wh._effective_make_role({"X-K3DM-Role": "reader"}, {}), "reader")
-        wh._slack_user_role = lambda _user_id: "bogus"
-        self.assertEqual(wh._effective_make_role({"X-K3DM-Role": "admin"}, {}), "reader")
+        old = policy._slack_user_role
+        self.addCleanup(setattr, policy, "_slack_user_role", old)
+        policy._slack_user_role = lambda _user_id: "reader"
+        self.assertEqual(policy._effective_make_role({"X-K3DM-Role": "admin"}, {"slack_user_id": "unknown"}), "reader")
+        policy._slack_user_role = lambda _user_id: "operator"
+        self.assertEqual(policy._effective_make_role({"X-K3DM-Role": "admin"}, {}), "operator")
+        policy._slack_user_role = lambda _user_id: "admin"
+        self.assertEqual(policy._effective_make_role({"X-K3DM-Role": "reader"}, {}), "reader")
+        policy._slack_user_role = lambda _user_id: "bogus"
+        self.assertEqual(policy._effective_make_role({"X-K3DM-Role": "admin"}, {}), "reader")
 
     def test_make_action_policy(self):
         self.assertEqual(wh._action_policy("/api/v1/make", {"target": "fix-delete-pod"})["min_role"], "admin")

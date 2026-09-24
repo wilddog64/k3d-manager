@@ -1,5 +1,26 @@
 # Progress — k3d-manager
 
+## 2026-09-24 — webhook Phase 1 extraction (working tree only; blocked)
+
+- [x] Added `scripts/lib/webhook/policy.py` with the exact requested policy functions and
+      explicit `__all__`; no policy import-time authentication/keychain side effect.
+- [x] Replaced path comparisons in API POST/GET dispatch with explicit route metadata and
+      documented the route table in `docs/architecture/webhook-server.md`; `/slack/events`
+      signature verification was left untouched.
+- [x] Added completeness and literal before/after authorization-equality tests; baseline
+      test imports were repointed for moved names. Four required mutations each went red and
+      were restored with `git diff --quiet`.
+- [x] Verification: entrypoint 4010 -> 3929 lines; bare pytest **189 passed**; focused BATS
+      **64/64**; Python collections **14, 6, 6, 14, 2**; `make check-doc-links` **1762 files OK**;
+      pyenv-shimmed `make test-python` **184 passed**.
+- [ ] `make test-all` is not green because an unrelated existing `cluster_status_summary.bats`
+      JSON assertion expects one failed service while its fixture returns two; the system
+      `python3` used by Make also has no pytest unless PATH is shimmed. No out-of-scope test
+      fix was made. No issue doc was created because the dispatch explicitly forbids modifying
+      files outside its target list.
+- [ ] Commit/push blocked by sandbox Git write restrictions (`.git/index.lock`,
+      `.git/COMMIT_EDITMSG`, and temporary tree objects: `Operation not permitted`); no SHA.
+
 ## 2026-09-24 — app-CVE scan trigger target
 
 - [x] Implemented the exact v1.37.0 S1–S3 trigger, Makefile target, operator-role `/k3dm`

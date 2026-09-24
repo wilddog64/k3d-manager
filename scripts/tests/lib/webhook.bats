@@ -535,7 +535,7 @@ PY
 
 @test "webhook remote operator access defines policy and audit log" {
     local _levels
-    _levels="$(grep -m1 -E '_ROLE_LEVELS\s*=' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook")"
+    _levels="$(grep -m1 -E '_ROLE_LEVELS\s*=' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/policy.py")"
     local _pair
     for _pair in '"reader": 1' '"operator": 2' '"admin": 3'; do
       if [[ "${_levels}" != *"${_pair}"* ]]; then
@@ -550,7 +550,7 @@ PY
     run grep -Eq '"/api/v1/cluster-refresh":.*"min_role": "operator"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -Eq 'f"cluster-\{action\}".*"min_role": "admin"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -Eq 'f"cluster-\{action\}".*"min_role": "admin"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/policy.py"
     [ "$status" -eq 0 ]
 }
 

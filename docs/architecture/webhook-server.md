@@ -1,8 +1,8 @@
 # Webhook Server Architecture
 
 **Component:** `bin/k3dm-webhook` + `scripts/lib/webhook/`
-**Status:** modularization Phase 1 landed (v1.13.0), extended by `make_targets` (v1.34.0);
-**Phases 2–5 not started** — and the monolith has grown 36% since Phase 1 (see [Roadmap](#roadmap-remaining-phases))
+**Status:** modularization Phase 1 landed (v1.13.0), extended by `make_targets` (v1.34.0),
+and policy/route extraction landed in v1.37.0; later phases remain not started (see [Roadmap](#roadmap-remaining-phases))
 **Related specs:** [`docs/plans/v1.13.0-webhook-modularization.md`](../plans/v1.13.0-webhook-modularization.md) (umbrella),
 `v1.13.0-webhook-modularization-phase1.md` (config), `-render.md` (render), `-auth.md` (proc + auth),
 [`docs/plans/v1.34.0-slack-k3dm-make-command.md`](../plans/v1.34.0-slack-k3dm-make-command.md) (`/k3dm` make allowlist)
@@ -49,6 +49,7 @@ from webhook.proc         import _spawn_capture_text
 from webhook.auth         import (...)
 from webhook.make_targets import (MAKE_JOB_TIMEOUT_DEFAULT, MAKE_TARGETS,
                                   make_target_help, parse_make_request)
+from webhook.policy       import (...)
 ```
 
 | Module | Lines | Responsibility | Depends on |
@@ -58,6 +59,7 @@ from webhook.make_targets import (MAKE_JOB_TIMEOUT_DEFAULT, MAKE_TARGETS,
 | `webhook/proc.py`    | 78  | `_spawn_capture_text` — the fork-safe `os.posix_spawn` capture primitive (avoids macOS NEF atfork SIGSEGV) | — (leaf) |
 | `webhook/auth.py`    | 103 | `_keychain_secret`, `_get_token` (bearer resolution), `_verify_slack_signature`, plus the Slack identity gate — `_slack_user_is_allowlisted`, `_slack_user_role` (reads `K3DM_SLACK_ROLE_MAP`); computes `SLACK_SIGNING_SECRET` at import | `config`, `proc` |
 | `webhook/make_targets.py` | 73 | The `/k3dm` allowlist — `MAKE_TARGETS` (17 targets × min-role, required/optional args, per-target timeout, `confirm` flag), `_ARG_PATTERNS` regex whitelist, `parse_make_request()`, `make_target_help()` | — (leaf) |
+| `webhook/policy.py` | 159 | Request roles, static/dynamic action policy, thread-command roles, JSONL audit, and fixed-window rate limiting | `config`, `make_targets` |
 
 `webhook/__init__.py` is empty — the package is a plain namespace.
 
@@ -71,10 +73,13 @@ flowchart LR
     CONFIG["config<br/><i>leaf</i>"]
     PROC["proc<br/><i>leaf</i>"]
     MAKE["make_targets<br/><i>leaf</i>"]
+    POLICY["policy<br/><i>authz + audit + rate limit</i>"]
 
     RENDER --> CONFIG
     AUTH --> CONFIG
     AUTH --> PROC
+    POLICY --> CONFIG
+    POLICY --> MAKE
     ENTRY -.->|"imports directly"| PROC
     ENTRY -.->|"imports directly"| MAKE
 ```
@@ -83,6 +88,32 @@ flowchart LR
 makes them safe to import from BATS/pytest and from the smoke gate without booting the HTTP
 server. `make_targets` is deliberately a pure data + validation leaf: the allowlist is
 testable without a cluster, a Makefile, or a running server.
+
+### API route table
+
+The API dispatcher declares each POST and GET route in `_POST_ROUTES` and `_GET_ROUTES`
+inside `bin/k3dm-webhook`. Every entry carries `handler`, `min_role`, and `action_name`.
+The static entries mirror `_ACTION_POLICY`; `/api/v1/cluster` and `/api/v1/make` keep
+their existing dynamic policy resolution in `webhook.policy` while declaring a reader
+baseline in the route table. `/slack/events` is deliberately outside these tables because
+it has its own signature-verification flow.
+
+| Route | Minimum role |
+|---|---|
+| `/api/v1/argocd-upgrade` | admin |
+| `/api/v1/cve-remediate` | operator |
+| `/api/v1/cluster` | reader baseline; kill/operator, up/down/admin dynamically |
+| `/api/v1/cluster-status` | reader |
+| `/api/v1/diagnostics` | reader |
+| `/api/v1/hostinger-status` | reader |
+| `/api/v1/cluster-refresh` | operator |
+| `/api/v1/cluster-resume` | admin |
+| `/api/v1/cleanup-stale-sandbox` | admin |
+| `/api/v1/make` | reader baseline; target role dynamically |
+| `/api/v1/analyze` | operator |
+| `/api/v1/ask` | reader |
+| `/api/v1/health` (GET) | reader |
+| `/api/v1/status/…` (GET) | reader |
 
 ---
 
@@ -97,7 +128,7 @@ monolith. Everything below is **not yet extracted** and maps to the phases still
 |------------------|----------------|-----------------------|
 | HTTP routing — `_Handler.do_POST` / `do_GET`, `__main__` server bootstrap | 3497–4008 | `server.py`, `routes.py` |
 | Provider resolution — `_normalize_provider`, `_resolve_provider`, `_provider_context`, `_acg_stack_probe` | 70–232 | `dispatch.py` |
-| RBAC / audit / rate limit — `_rate_limited`, `_ROLE_LEVELS`, `_ACTION_POLICY`, `_normalize_role`, `_request_role/actor`, `_effective_make_role`, `_thread_command_min_role`, `_role_allows`, `_action_policy`, `_audit_remote_action` | 233–400 | `commands.py` / `dispatch.py` |
+| Remaining server concerns — request validation, handlers, job lifecycle, diagnostics, metrics and redaction | 401–3496 | later phases |
 | Request validation — `_validate_namespace/resource_name/diagnostics_request`, `_resolve_diagnostics_context` | 401–520 | `routes.py` |
 | CVE cooldown + scan jobs — `_cve_cooldown_*`, `_active_cve_scan_job`, `_create_cve_scan_job` | 423–479 | `diagnostics.py` |
 | Cluster / make ops — `_run_cleanup`, `_run_stale_sandbox_cleanup`, `_run_make_target`, `_run_upgrade`, `_run_cluster`, `_run_cluster_resume` | 552–886 | `dispatch.py` |

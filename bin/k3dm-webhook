@@ -65,6 +65,24 @@ from webhook.make_targets import (  # noqa: E402
     make_target_help,
     parse_make_request,
 )
+from webhook.policy import (  # noqa: E402
+    _ACTION_POLICY,
+    _THREAD_COMMAND_MIN_ROLE,
+    _action_policy,
+    _audit_remote_action,
+    _effective_make_role,
+    _normalize_role,
+    _rate_hits,
+    _RATE_MAX_DEFAULT,
+    _rate_limited,
+    _request_actor,
+    _request_role,
+    _role_allows,
+    _thread_command_min_role,
+)
+import webhook.policy as _policy  # noqa: E402
+
+_policy._slack_user_role = _slack_user_role
 
 
 def _normalize_provider(provider):
@@ -230,25 +248,6 @@ _SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (.+?/k3dm-acg-screenshot
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
 _ask_semaphore = threading.Semaphore(2)
-_ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}
-_ROLE_DEFAULT = "admin"
-
-_RATE_WINDOW_SECS = 60
-_RATE_MAX_DEFAULT = int(os.environ.get("K3DM_RATE_MAX_PER_MIN", "60"))
-_rate_lock = threading.Lock()
-_rate_hits: dict = {}
-
-
-def _rate_limited(bucket):
-    """Fixed-window per-bucket limiter. Returns True if the caller is over budget."""
-    now = time.time()
-    with _rate_lock:
-        window_start, count = _rate_hits.get(bucket, (now, 0))
-        if now - window_start >= _RATE_WINDOW_SECS:
-            window_start, count = now, 0
-        count += 1
-        _rate_hits[bucket] = (window_start, count)
-        return count > _RATE_MAX_DEFAULT
 _DIAGNOSTIC_CONTEXTS = {
     "k3d-k3d-cluster",
     "ubuntu-hostinger",
@@ -268,80 +267,7 @@ _DIAGNOSTIC_NAMESPACES = {
 _RESOURCE_NAME_RE = re.compile(r"^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$")
 _CVE_COOLDOWN_DIR = Path.home() / ".k3dm" / "cooldowns" / "cve-remediate"
 _CVE_COOLDOWN_SECS = 24 * 60 * 60
-_ACTION_POLICY = {
-    "/api/v1/argocd-upgrade": {"name": "argocd-upgrade", "min_role": "admin"},
-    "/api/v1/cve-remediate": {"name": "cve-remediate", "min_role": "operator"},
-    "/api/v1/cluster-status": {"name": "cluster-status", "min_role": "reader"},
-    "/api/v1/diagnostics": {"name": "diagnostics", "min_role": "reader"},
-    "/api/v1/hostinger-status": {"name": "hostinger-status", "min_role": "reader"},
-    "/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"},
-    "/api/v1/cluster-resume": {"name": "cluster-resume", "min_role": "admin"},
-    "/api/v1/cleanup-stale-sandbox": {"name": "cleanup-stale-sandbox", "min_role": "admin"},
-    "/api/v1/analyze": {"name": "analyze", "min_role": "operator"},
-    "/api/v1/ask": {"name": "ask", "min_role": "reader"},
-}
-
-# Minimum role for commands reachable from the Slack thread surface. Anything not
-# listed defaults to reader-tier (informational). Aliases normalized before lookup.
-_THREAD_COMMAND_MIN_ROLE = {
-    "kill": "operator",
-    "diagnosis": "reader",
-    "status": "reader",
-    "logs": "reader",
-    "ask": "reader",
-    "claude": "reader",
-    "gemini": "reader",
-    "codex": "reader",
-    "cluster-status": "reader",
-    "hostinger-status": "reader",
-    "cluster-refresh": "operator",
-    "refresh": "operator",
-    "cluster-resume": "admin",
-    "resume": "admin",
-    "cluster-down": "admin",
-    "down": "admin",
-    "cluster-up": "admin",
-    "up": "admin",
-    "cleanup-stale-sandbox": "admin",
-}
-
-
-def _thread_command_min_role(command):
-    """Return the min role required for a Slack thread command (default reader)."""
-    cmd = command.strip().lstrip("/").lower().split()[0] if command.strip() else ""
-    return _THREAD_COMMAND_MIN_ROLE.get(cmd, "reader")
-
-
-def _normalize_role(role):
-    role = (role or "").strip().lower()
-    return role if role in _ROLE_LEVELS else _ROLE_DEFAULT
-
-
-def _request_role(headers):
-    raw = headers.get("X-K3DM-Role")
-    if raw is None:
-        return _ROLE_DEFAULT  # direct token = admin credential
-    raw = raw.strip().lower()
-    return raw if raw in _ROLE_LEVELS else "reader"  # present-but-invalid → fail closed
-
-
 _MAKE_JOB_LOCK = threading.Lock()
-
-
-def _effective_make_role(headers, body):
-    """Cap a relayed /k3dm role at the caller's mapped Slack role (unknown → reader)."""
-    header_role = _request_role(headers)
-    if headers.get("X-K3DM-Role") is None:
-        return header_role
-    user_role = _slack_user_role(str(body.get("slack_user_id", "")))
-    if user_role not in _ROLE_LEVELS:
-        user_role = "reader"
-    return header_role if _ROLE_LEVELS[header_role] <= _ROLE_LEVELS[user_role] else user_role
-
-
-def _request_actor(headers):
-    actor = (headers.get("X-K3DM-Actor", "") or "").strip()
-    return actor or "direct-token"
 
 
 def _request_source_command(headers):
@@ -357,45 +283,6 @@ def _content_length(headers):
     except (TypeError, ValueError):
         return None
     return length if length >= 0 else None
-
-
-def _role_allows(actual_role, required_role):
-    return _ROLE_LEVELS[_normalize_role(actual_role)] >= _ROLE_LEVELS[_normalize_role(required_role)]
-
-
-def _action_policy(path, body):
-    if path == "/api/v1/cluster":
-        action = body.get("action", "")
-        if action == "kill":
-            return {"name": "cluster-kill", "min_role": "operator"}
-        if action in ("up", "down"):
-            return {"name": f"cluster-{action}", "min_role": "admin"}
-    if path == "/api/v1/make":
-        target = str(body.get("target", "")).strip()
-        spec = MAKE_TARGETS.get(target)
-        return {"name": f"make:{target or 'help'}", "min_role": spec["min_role"] if spec else "reader"}
-    return _ACTION_POLICY.get(path)
-
-
-def _audit_remote_action(path, action_name, actor, role, allowed, body=None, reason=""):
-    try:
-        AUDIT_DIR.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "ts": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-            "path": path,
-            "action": action_name,
-            "actor": actor,
-            "role": _normalize_role(role),
-            "allowed": bool(allowed),
-            "reason": reason,
-            "provider": (body or {}).get("provider", ""),
-            "request_action": (body or {}).get("action", ""),
-            "source_command": (body or {}).get("_source_command", ""),
-        }
-        with open(AUDIT_DIR / "remote-operator.jsonl", "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    except OSError:
-        pass
 
 
 def _resolve_diagnostics_context(provider="", context=""):
@@ -3496,6 +3383,26 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         _ask_semaphore.release()
 
 
+_POST_ROUTES = {
+    "/api/v1/argocd-upgrade": {"handler": "argocd_upgrade", "min_role": "admin", "action_name": "argocd-upgrade"},
+    "/api/v1/cve-remediate": {"handler": "cve_remediate", "min_role": "operator", "action_name": "cve-remediate"},
+    "/api/v1/cluster": {"handler": "cluster", "min_role": "reader", "action_name": "cluster"},
+    "/api/v1/cluster-status": {"handler": "cluster_status", "min_role": "reader", "action_name": "cluster-status"},
+    "/api/v1/diagnostics": {"handler": "diagnostics", "min_role": "reader", "action_name": "diagnostics"},
+    "/api/v1/hostinger-status": {"handler": "hostinger_status", "min_role": "reader", "action_name": "hostinger-status"},
+    "/api/v1/cluster-refresh": {"handler": "cluster_refresh", "min_role": "operator", "action_name": "cluster-refresh"},
+    "/api/v1/cluster-resume": {"handler": "cluster_resume", "min_role": "admin", "action_name": "cluster-resume"},
+    "/api/v1/cleanup-stale-sandbox": {"handler": "cleanup_stale_sandbox", "min_role": "admin", "action_name": "cleanup-stale-sandbox"},
+    "/api/v1/make": {"handler": "make", "min_role": "reader", "action_name": "make"},
+    "/api/v1/analyze": {"handler": "analyze", "min_role": "operator", "action_name": "analyze"},
+    "/api/v1/ask": {"handler": "ask", "min_role": "reader", "action_name": "ask"},
+}
+_GET_ROUTES = {
+    "/api/v1/health": {"handler": "health", "min_role": "reader", "action_name": "health"},
+    "/api/v1/status/": {"handler": "status", "min_role": "reader", "action_name": "status"},
+}
+
+
 class _Handler(http.server.BaseHTTPRequestHandler):
     def _auth(self):
         token = _register_secret(_get_token())
@@ -3640,11 +3547,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(400, {"error": "body must be a JSON object"})
             return
         body["_source_command"] = _request_source_command(self.headers)
+        route = _POST_ROUTES.get(self.path)
         request_role = _request_role(self.headers)
-        if self.path == "/api/v1/make":
+        if route is not None and route["handler"] == "make":
             request_role = _effective_make_role(self.headers, body)
         request_actor = _request_actor(self.headers)
         action_policy = _action_policy(self.path, body)
+        # None is intentionally fail-open here for behavior compatibility. The
+        # route-table completeness test prevents a route from relying on it.
         if action_policy:
             if not _role_allows(request_role, action_policy["min_role"]):
                 _audit_remote_action(
@@ -3666,7 +3576,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 True,
                 body=body,
             )
-        if self.path == "/api/v1/argocd-upgrade":
+        # The route table declares every POST route's baseline min_role. Dynamic
+        # /cluster and /make policies remain authoritative to preserve the
+        # behavior of the action_policy None branch below.
+        if route is None:
+            self._json(404, {"error": "not found"})
+            return
+        if route["handler"] == "argocd_upgrade":
             chart_version = body.get("chart_version", "")
             stage = body.get("stage", "")
             if not chart_version or stage not in ("acg", "infra"):
@@ -3683,7 +3599,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/cve-remediate":
+        if route["handler"] == "cve_remediate":
             alerts = body.get("alerts", [])
             if not isinstance(alerts, list):
                 self._json(400, {"error": "alerts[] required"})
@@ -3728,7 +3644,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             })
             return
 
-        if self.path == "/api/v1/cluster":
+        if route["handler"] == "cluster":
             action = body.get("action", "")
             if action == "kill":
                 job_id = body.get("job_id", "")
@@ -3774,7 +3690,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/cluster-status":
+        if route["handler"] == "cluster_status":
             provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
@@ -3790,7 +3706,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/diagnostics":
+        if route["handler"] == "diagnostics":
             validation_error = _validate_diagnostics_request(body)
             if validation_error:
                 self._json(400, {"error": validation_error})
@@ -3809,7 +3725,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/hostinger-status":
+        if route["handler"] == "hostinger_status":
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
             job_id = str(uuid.uuid4())[:8]
@@ -3824,7 +3740,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/cluster-refresh":
+        if route["handler"] == "cluster_refresh":
             provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
@@ -3840,7 +3756,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/cluster-resume":
+        if route["handler"] == "cluster_resume":
             running = _running_cluster_job()
             if running:
                 self._json(409, {"error": f"cluster job already running: {running[0]} ({running[1]})"})
@@ -3863,7 +3779,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/cleanup-stale-sandbox":
+        if route["handler"] == "cleanup_stale_sandbox":
             confirm = bool(body.get("confirm", False))
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
@@ -3879,7 +3795,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/make":
+        if route["handler"] == "make":
             target = str(body.get("target", "")).strip()
             if target in ("", "help"):
                 self._json(200, {"text": f"*/k3dm targets for role {request_role}*\n{make_target_help(request_role, _role_allows)}"})
@@ -3905,7 +3821,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/analyze":
+        if route["handler"] == "analyze":
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
@@ -3918,7 +3834,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        if self.path == "/api/v1/ask":
+        if route["handler"] == "ask":
             question = body.get("question", "").strip()
             if not question:
                 self._json(400, {"error": "question required"})
@@ -3952,6 +3868,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if self.path.startswith("/api/") and not self.path.startswith("/api/v1/"):
             self._json(400, {"error": "invalid api path"})
             return
+        get_route = _GET_ROUTES.get(self.path)
+        if get_route is None and self.path.startswith("/api/v1/status/"):
+            get_route = _GET_ROUTES["/api/v1/status/"]
         if self.path == "/api/v1/health":
             services = _smoke_test_services()
             result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]
@@ -3968,7 +3887,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(200, {"services": result,
                              "all_ok": all(r["ok"] is not False for r in result)})
             return
-        if not self.path.startswith("/api/v1/status/"):
+        if get_route is None:
             self._json(404, {"error": "not found"})
             return
 
