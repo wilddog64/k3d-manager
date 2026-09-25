@@ -61,6 +61,12 @@ Regression test added (13 total), mutation-checked: the pre-fix module has no `F
 Standing lesson: this is the **third** distinct occurrence of the same root cause in one feature.
 Both ends now name refs explicitly, and the how-to says not to "simplify" it back.
 
+Follow-up the same day: the cloud session asked for a `.claude/settings.json` permission grant to
+run the helper. `.claude/` was in `.gitignore`, so committing that file would have been accepted and
+tracked **nothing** — git cannot re-include a file whose parent directory is excluded. Changed the
+pattern to `.claude/*` plus `!.claude/settings.json`, verified with `check-ignore` that the 103KB
+`settings.local.json` and `projects/`/`worktrees/` stay ignored.
+
 ## 2026-09-25 — Cloud bridge bootstrapped and proven end to end (Claude)
 
 The operator gave the go, so `origin/cloud-requests` now exists and the bridge is live.

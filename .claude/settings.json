@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 bin/k3dm-cloud-request:*)",
+      "Bash(bin/k3dm-cloud-request:*)"
+    ]
+  }
+}

@@ -8,6 +8,12 @@
   webhook with the reader credential, and commits a response plus replay ledger entry.
   `bin/k3dm-cloud-request` files and optionally waits for those requests without exposing a
   credential or building a command from branch content.
+- A committed `.claude/settings.json` granting a cloud session permission to run
+  `bin/k3dm-cloud-request` (and the `python3`-prefixed form), so it can exercise the bridge without
+  a per-session approval prompt. `.gitignore` now excludes `.claude/*` with a `!.claude/settings.json`
+  negation instead of `.claude/`, because git cannot re-include a file under an excluded directory —
+  the previous pattern would have accepted the commit request and tracked nothing.
+  `.claude/settings.local.json`, `projects/` and `worktrees/` stay ignored.
 - `make init-cloud-requests`, `make install-cloud-bridge` and `make uninstall-cloud-bridge`.
   The first seeds `origin/cloud-requests` as an **orphan** commit via git plumbing, so it never
   touches the worktree, moves `HEAD`, or runs a pre-commit hook, and the branch carries no repo

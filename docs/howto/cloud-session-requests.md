@@ -133,6 +133,14 @@ are polling `health` with a short `--timeout`, raise it rather than assuming the
 It needs no credential and no environment variables beyond the git access the session already
 has. That is the practical payoff of the pull design.
 
+A cloud session still needs permission to *run* it. `.claude/settings.json` is committed and
+allows exactly `bin/k3dm-cloud-request` and `python3 bin/k3dm-cloud-request`, nothing else. That
+grant is safe to keep narrow because the helper's `argparse` `choices` already bound it to the four
+actions, and the bridge revalidates every request independently — the allowlist, not the caller's
+permissions, is the security boundary. Note that `.gitignore` excludes `.claude/*` rather than
+`.claude/`, because git cannot re-include a file whose parent directory is excluded; keep it that
+way or the settings file silently stops being tracked.
+
 `--wait` works in a shallow or single-branch checkout, which is what a cloud session usually
 gets. It refreshes with an explicit `+refs/heads/cloud-requests:refs/remotes/origin/cloud-requests`
 refspec and reads the response from that ref. Do not "simplify" it to
