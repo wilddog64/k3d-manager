@@ -988,6 +988,11 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
             (os.POSIX_SPAWN_OPEN, 1, tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
             (os.POSIX_SPAWN_DUP2, 1, 2),
         ]
+        # codeql[py/command-line-injection,py/path-injection] -- spawn_exe is never
+        # request-derived: callers pass "aws", "/bin/bash", or a Path resolved from
+        # __file__, and the cwd branch pins it to /bin/bash. Request-derived argv values
+        # are shlex.quote'd and validated by anchored fullmatch patterns. See
+        # docs/issues/2026-09-24-codeql-pr131-spawn-injection-false-positives.md
         child_pid = os.posix_spawn(spawn_exe, spawn_cmd, _env, file_actions=file_actions, setsid=True)
         deadline = _time.monotonic() + timeout
         while True:
