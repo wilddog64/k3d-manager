@@ -21,6 +21,25 @@ setup() {
   export _ACG_SANDBOX_URL=https://example.test/sandbox
   security() { return 0; }
 
+  # _e2e_sandbox_preflight_auth gates on _secret_load_data, which runs security
+  # inside bash -c -- a fresh shell where the function stub above is invisible.
+  # A fake executable on PATH is the only stub that loader can see. Without it
+  # this suite reads the operator's real keychain on macOS and finds no security
+  # binary at all on Linux CI.
+  FAKE_BIN="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$FAKE_BIN"
+  cat > "$FAKE_BIN/security" <<'FAKE'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  [ "$arg" = "-w" ] && { printf '%s\n' "e2e-fake-secret"; exit 0; }
+done
+exit 0
+FAKE
+  chmod +x "$FAKE_BIN/security"
+  PATH="$FAKE_BIN:$PATH"
+  export PATH
+  _is_mac() { return 0; }
+
   _run_command() {
     while [[ $# -gt 0 ]]; do
       case "$1" in
