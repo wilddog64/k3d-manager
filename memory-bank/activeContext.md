@@ -1,5 +1,42 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — S3 gate was unreachable for the health query form (Claude follow-up)
+
+Verified `8b706882` independently: SHA on origin, 4-file scope, bare pytest and
+`bats scripts/tests/lib/webhook.bats` 64/64 re-run by Claude, including test 62 — the
+`_request_role({}) == "admin"` contract that `token_role=None` had to preserve.
+
+One gap found. The new gate is guarded by `get_route is not None`, and `get_route` resolves by
+exact dict lookup plus a `/api/v1/status/` prefix. `/api/v1/health?...` matches neither, so
+`get_route` stayed `None`, the gate was skipped, and the `startswith("/api/v1/health?")` branch
+served the request anyway — one of the two health branches ungated, which is the exact defect S3
+exists to close. No privilege was reachable today (health's `min_role` is already `reader`), but it
+reinstated the unenforced coincidence: raise health's `min_role` and the query form bypasses it.
+
+Fixed by resolving the health route for the query form before the gate, plus
+`test_get_role_gate_covers_health_query_string_form`. Mutation-checked: without the guard the test
+fails, and the pre-patch response was `200`, confirming the bypass was real rather than theoretical.
+
+Also corrected `docs/howto/cloud-session-requests.md`, which claimed reader-token rotation needs
+`make restart-webhook`. It does not — `_auth()` reads the Keychain per request. The doc now also
+names the service/account, the no-TTY empty-write trap, and why `bin/k3dm-webhook-setup` must not
+be reused (it puts the value in argv and pushes it to a GitHub secret).
+
+## 2026-09-25 — webhook credential-bound roles COMPLETE (`8b706882`)
+
+Implemented only v1.38.0 spec sections S1, S2, S3, and S6 on `k3d-manager-v1.38.0`.
+`auth.py` now resolves admin/reader bearer credentials, `policy.py` treats the credential role as
+the ceiling, POST and make-target authorization receive that ceiling, and `do_GET` enforces route
+`min_role` before the existing health branches. Added the eight requested policy tests, including a
+copied above-reader GET route. No `bin/` files were created; P1/P2/P4/P5/S7 and workflow/docs
+changes were not implemented.
+
+Remote commit: `8b706882` on `origin/k3d-manager-v1.38.0`.
+Gates: bare pytest 36 passed plus 121 subtests; `bats scripts/tests/lib/webhook.bats` 64/64;
+AST parse passed; staged `_agent_audit` passed. Shellcheck was not run because all touched files
+are Python. Mutation check against the original policy produced the two required failures for S6
+items 3 and 4, then the edited policy was restored and its working hash differed from HEAD.
+
 ## 2026-09-25 — cloud-session access: PULL chosen; a live privilege-escalation gap found
 
 Spec `docs/plans/v1.38.0-cloud-session-endpoint-access.md` (#4 of 5 for v1.38.0). Operator decided

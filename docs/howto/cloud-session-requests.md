@@ -159,8 +159,19 @@ adding the reader token is that revisit.
 ### Creating and rotating the reader token
 
 Generate it on the machine, write it straight to the Keychain, and never let it reach a shell
-argument, a log, or a file in the repo. Rotation is: write the new value, then
-`make restart-webhook`. Nothing else holds a copy — the bridge reads the Keychain each tick.
+argument, a log, or a file in the repo. It lives in the login Keychain as service
+`k3dm-webhook-token-reader`, account `k3dm` — the same store and account as the admin token.
+Write it from a real terminal: a `security add-generic-password -w` with no TTY stores an
+*empty* value at exit 0, which would create a credential matching the empty string.
+
+Rotation needs no restart. `_auth()` calls `_get_token()` and `_get_reader_token()` on every
+request, so the Keychain is read per authentication and a new value takes effect immediately —
+`bin/k3dm-webhook-setup --rotate` says as much for the admin token ("daemon picks up new token
+on next request"). Nothing else holds a copy; the bridge reads the Keychain each tick.
+
+Do **not** reuse `bin/k3dm-webhook-setup` for this token. It passes the value as a `-w` argv
+argument, and it pushes the result to a GitHub Actions secret — neither is acceptable for a
+credential whose whole purpose is that it never leaves this machine.
 
 ### Revoking cloud access
 

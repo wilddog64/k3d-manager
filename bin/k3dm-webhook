@@ -2176,6 +2176,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         get_route = _GET_ROUTES.get(self.path)
         if get_route is None and self.path.startswith("/api/v1/status/"):
             get_route = _GET_ROUTES["/api/v1/status/"]
+        if get_route is None and self.path.startswith("/api/v1/health?"):
+            get_route = _GET_ROUTES["/api/v1/health"]
         role = _request_role(self.headers, getattr(self, "_token_role", None))
         if get_route is not None and not _role_allows(role, get_route["min_role"]):
             self._json(403, {"error": "forbidden"})

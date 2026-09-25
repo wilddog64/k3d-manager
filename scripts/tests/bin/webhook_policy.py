@@ -91,6 +91,34 @@ class WebhookPolicyTests(unittest.TestCase):
             request._token_role = None
             wh._Handler.do_GET(request)
         self.assertEqual(request.responses[0][0], 200)
+
+    def test_get_role_gate_covers_health_query_string_form(self):
+        routes = dict(wh._GET_ROUTES)
+        routes["/api/v1/health"] = {
+            "handler": "health", "min_role": "operator", "action_name": "health"
+        }
+
+        class Request:
+            path = "/api/v1/health?quick=1"
+            headers = {}
+            _token_role = "reader"
+
+            def __init__(self):
+                self.responses = []
+
+            def _auth(self):
+                return True
+
+            def _json(self, code, response):
+                self.responses.append((code, response))
+
+        request = Request()
+        with patch.object(wh, "_GET_ROUTES", routes), \
+                patch.object(wh, "_rate_limited", return_value=False), \
+                patch.object(wh, "_smoke_test_services", return_value=[]):
+            wh._Handler.do_GET(request)
+        self.assertEqual(request.responses, [(403, {"error": "forbidden"})])
+
     def test_route_table_every_entry_declares_valid_min_role(self):
         valid_roles = {"reader", "operator", "admin"}
         routes = {**wh._POST_ROUTES, **wh._GET_ROUTES}

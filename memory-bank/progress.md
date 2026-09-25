@@ -1,5 +1,33 @@
 # Progress — k3d-manager
 
+## 2026-09-25 — S3 gate hole closed for the health query form (Claude)
+
+- [x] Independently verified `8b706882`: on origin, 4-file scope, pytest + `webhook.bats` 64/64
+      re-run by Claude. Codex's report checked out.
+- [x] Found and fixed a real gap: the gate's `get_route is not None` guard left
+      `/api/v1/health?...` ungated, because `get_route` resolves by exact lookup plus a
+      `/api/v1/status/` prefix only. Resolved the health route for the query form before the gate.
+- [x] Added `test_get_role_gate_covers_health_query_string_form`; mutation-checked — fails without
+      the guard, and the pre-patch response was `200`.
+- [x] Corrected the reader-token rotation claim in `docs/howto/cloud-session-requests.md`: no
+      restart is needed, `_auth()` reads the Keychain per request.
+- [ ] Reader token not yet created — operator's step (login Keychain, `k3dm-webhook-token-reader`
+      / `k3dm`, from a real TTY). Nothing reads it until `make restart-webhook`.
+- [ ] Part 2 (P2 bridge + P5) not dispatched.
+
+## 2026-09-25 — webhook credential-bound roles COMPLETE (`8b706882`)
+
+- [x] Implemented only S1/S2/S3/S6 from `docs/plans/v1.38.0-cloud-session-endpoint-access.md`:
+      reader token resolver without `TOKEN_FILE` fallback; credential role ceiling; POST/make
+      threading; GET route gate before health early returns; eight S6 tests.
+- [x] Mutation check against the original `policy.py`: S6 items 3 and 4 both failed with the
+      expected one-argument `TypeError`; edited policy was restored afterward.
+- [x] Gates: bare pytest `36 passed`; `bats scripts/tests/lib/webhook.bats` `64/64`; AST parse;
+      staged `_agent_audit` all passed. Shellcheck not run because all touched files are Python.
+- [x] Commit `8b706882` pushed to `origin/k3d-manager-v1.38.0`.
+- [x] Scope held to the four code/test files; no bridge, request helper, launchd plist, workflow,
+      or new docs were added. Memory-bank status update is the required follow-up.
+
 ## 2026-09-25 — deploy_app_cluster_confirm live-mutation test fix COMPLETE
 
 - [x] Applied A1/A2/A3 only to `scripts/tests/core/deploy_app_cluster_confirm.bats`:
