@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""File and optionally wait for a read-only cloud-session request."""
+
+import argparse
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+from webhook.proc import _spawn_capture_text
+
+
+ACTION_ARGS = {"health": set(), "cluster-status": set(), "hostinger-status": set(),
+               "job-status": {"job_id"}}
+JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
+
+
+def _git(args, cwd=ROOT, env=None, timeout=60):
+    rc, output, timed_out = _spawn_capture_text(["git", *args], cwd=cwd, env=env, timeout=timeout)
+    if timed_out or rc != 0:
+        raise RuntimeError(output.strip() or "git command failed")
+    return output
+
+
+def _parse_args(argv):
+    parser = argparse.ArgumentParser(usage="k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS]")
+    parser.add_argument("action", choices=sorted(ACTION_ARGS))
+    parser.add_argument("--arg", action="append", default=[])
+    parser.add_argument("--wait", action="store_true")
+    parser.add_argument("--timeout", type=float, default=300)
+    parsed = parser.parse_args(argv)
+    args = {}
+    for item in parsed.arg:
+        if "=" not in item:
+            parser.error("--arg requires key=value")
+        key, value = item.split("=", 1)
+        if key not in ACTION_ARGS[parsed.action] or key in args:
+            parser.error("unknown or repeated argument")
+        if key == "job_id" and not JOB_ID_RE.fullmatch(value):
+            parser.error("invalid job_id")
+        args[key] = value
+    if set(args) != ACTION_ARGS[parsed.action]:
+        parser.error("missing required argument")
+    if parsed.timeout < 0:
+        parser.error("timeout must be non-negative")
+    return parsed, args
+
+
+def _commit_request(request_id, payload):
+    remote_ref = _git(["ls-remote", "origin", "refs/heads/cloud-requests"]).split()
+    parent = remote_ref[0] if remote_ref else "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    with tempfile.NamedTemporaryFile(dir=ROOT, prefix="cloud-index.", delete=False) as handle:
+        index_path = handle.name
+    request_file = Path(index_path + ".request")
+    request_file.write_text(json.dumps(payload, sort_keys=True) + "\n")
+    env = os.environ.copy()
+    env["GIT_INDEX_FILE"] = index_path
+    try:
+        if remote_ref:
+            _git(["read-tree", parent], env=env)
+        else:
+            _git(["read-tree", "--empty"], env=env)
+        blob = _git(["hash-object", "-w", str(request_file)], env=env).strip()
+        _git(["update-index", "--add", "--cacheinfo", f"100644,{blob},requests/{request_id}.json"], env=env)
+        tree = _git(["write-tree"], env=env).strip()
+        commit_args = ["commit-tree", tree]
+        if remote_ref:
+            commit_args += ["-p", parent]
+        commit_args += ["-m", "cloud request"]
+        commit = _git(commit_args, env=env, timeout=30).strip()
+        ref_args = ["update-ref", "refs/heads/cloud-requests", commit]
+        if remote_ref:
+            ref_args.append(parent)
+        _git(ref_args, env=env)
+        push = ["push", "--force-with-lease=refs/heads/cloud-requests:" + parent,
+                "origin", f"{commit}:refs/heads/cloud-requests"]
+        _git(push, timeout=120)
+    finally:
+        for path in (Path(index_path), request_file):
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+
+def main(argv=None):
+    parsed, args = _parse_args(argv)
+    now = datetime.now(timezone.utc)
+    request_id = now.strftime("%Y%m%dT%H%M%SZ") + "-" + parsed.action
+    payload = {"schema": 1, "action": parsed.action, "args": args,
+               "requested_by": "claude-cloud", "requested_at": now.isoformat().replace("+00:00", "Z"),
+               "expires_at": (now + timedelta(minutes=30)).isoformat().replace("+00:00", "Z")}
+    try:
+        _commit_request(request_id, payload)
+    except (OSError, RuntimeError, ValueError) as error:
+        print(str(error), file=sys.stderr)
+        return 4
+    print(request_id)
+    if not parsed.wait:
+        return 0
+    deadline = time.monotonic() + parsed.timeout
+    while time.monotonic() <= deadline:
+        try:
+            raw = _git(["show", f"origin/cloud-requests:responses/{request_id}.json"])
+            response = json.loads(raw)
+        except (RuntimeError, json.JSONDecodeError):
+            response = None
+        if response is not None:
+            print(json.dumps(response, sort_keys=True))
+            return {"ok": 0, "rejected": 3, "error": 4}.get(response.get("status"), 4)
+        time.sleep(30)
+        try:
+            _git(["fetch", "origin", "cloud-requests"], timeout=120)
+        except RuntimeError:
+            return 4
+    return 5
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except (argparse.ArgumentError, ValueError):
+        raise SystemExit(2)

@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""Poll the cloud-requests branch and execute its read-only requests."""
+
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+
+from webhook.auth import _get_reader_token
+from webhook.proc import _spawn_capture_text
+
+
+MAX_REQUEST_BYTES = 8 * 1024
+MAX_PER_TICK = 10
+REQUEST_TTL_SECONDS = 30 * 60
+HTTP_TIMEOUT = min(float(os.environ.get("K3DM_CLOUD_BRIDGE_HTTP_TIMEOUT", "300")), REQUEST_TTL_SECONDS)
+ID_RE = re.compile(r"[0-9]{8}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,63}")
+JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
+REQUIRED_FIELDS = {"schema", "action", "args", "requested_by", "requested_at", "expires_at"}
+ACTION_ALLOWLIST = {
+    "health": ("GET", "/api/v1/health", {}),
+    "cluster-status": ("POST", "/api/v1/cluster-status", {}),
+    "hostinger-status": ("POST", "/api/v1/hostinger-status", {}),
+    "job-status": ("GET", "/api/v1/status/{job_id}", {"job_id": JOB_ID_RE}),
+}
+
+
+def _now():
+    return datetime.now(timezone.utc)
+
+
+def _parse_timestamp(value):
+    if not isinstance(value, str):
+        raise ValueError("timestamp must be a string")
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def validate_request(raw, now=None):
+    """Return (request, reason), with validation in the contract's order."""
+    if not isinstance(raw, dict):
+        return None, "request is not a JSON object"
+    if set(raw) != REQUIRED_FIELDS:
+        return None, "request fields are not exactly the required six"
+    if raw["schema"] != 1:
+        return None, "unsupported schema"
+    action = raw["action"]
+    if action not in ACTION_ALLOWLIST:
+        return None, "unknown action"
+    args = raw["args"]
+    if not isinstance(args, dict):
+        return None, "args is not an object"
+    _, _, allowed = ACTION_ALLOWLIST[action]
+    if set(args) - set(allowed):
+        return None, "unexpected argument"
+    if set(allowed) - set(args):
+        return None, "missing argument"
+    for key, value in args.items():
+        if not isinstance(value, str) or not allowed[key].fullmatch(value):
+            return None, f"invalid {key}"
+    try:
+        expires_at = _parse_timestamp(raw["expires_at"])
+    except (TypeError, ValueError, OverflowError):
+        return None, "invalid expires_at"
+    if expires_at <= (now or _now()):
+        return None, "request expired"
+    return raw, None
+
+
+def validate_request_bytes(data, now=None):
+    """Validate the bounded blob before JSON decoding it."""
+    if len(data) >= MAX_REQUEST_BYTES:
+        return None, "request exceeds size cap"
+    try:
+        raw = json.loads(data)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None, "request is not valid JSON"
+    return validate_request(raw, now=now)
+
+
+def prepare_request(request_id, raw, processed, now=None):
+    """Consume an id before validation; return (request, rejection response)."""
+    if request_id in processed:
+        return None, None
+    processed.add(request_id)
+    request, reason = validate_request(raw, now=now)
+    if reason:
+        action = raw.get("action", "") if isinstance(raw, dict) else ""
+        return None, _response(request_id, action, "rejected", 0, reason=reason)
+    return request, None
+
+
+def _response(request_id, action, status, http_status, body=None, reason=None):
+    result = {
+        "schema": 1,
+        "id": request_id,
+        "action": action,
+        "status": status,
+        "http_status": http_status,
+        "completed_at": _now().isoformat().replace("+00:00", "Z"),
+    }
+    if status == "rejected":
+        result["reason"] = reason or "request rejected"
+    else:
+        result["body"] = body
+    return result
+
+
+def _git(repo, args, env=None, timeout=30):
+    rc, output, timed_out = _spawn_capture_text(["git", *args], cwd=repo, env=env, timeout=timeout)
+    if timed_out or rc != 0:
+        raise RuntimeError(output.strip() or "git command failed")
+    return output
+
+
+def _remote_url(root):
+    return _git(root, ["config", "--get", "remote.origin.url"]).strip()
+
+
+def _ensure_bare_repo(repo, root):
+    if repo.exists():
+        return
+    repo.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _git(repo.parent, ["clone", "--bare", _remote_url(root), str(repo)], timeout=120)
+
+
+def _fetch(repo):
+    _git(repo, ["fetch", "origin", "cloud-requests"], timeout=120)
+    return _git(repo, ["rev-parse", "FETCH_HEAD"]).strip()
+
+
+def _processed(repo, ref):
+    try:
+        return set(_git(repo, ["show", f"{ref}:ledger/processed.txt"]).splitlines())
+    except RuntimeError:
+        return set()
+
+
+def _request_ids(repo, ref):
+    names = _git(repo, ["ls-tree", "-r", "--name-only", ref, "requests/"]).splitlines()
+    return [name.removeprefix("requests/").removesuffix(".json") for name in names
+            if name.startswith("requests/") and name.endswith(".json")
+            and ID_RE.fullmatch(name.removeprefix("requests/").removesuffix(".json"))]
+
+
+def _read_request(repo, ref, request_id):
+    size = int(_git(repo, ["cat-file", "-s", f"{ref}:requests/{request_id}.json"]).strip())
+    if size >= MAX_REQUEST_BYTES:
+        return None, "request exceeds size cap"
+    try:
+        raw = _git(repo, ["show", f"{ref}:requests/{request_id}.json"]).encode()
+    except RuntimeError:
+        return None, "request is not readable"
+    return validate_request_bytes(raw)
+
+
+def _call_webhook(request):
+    action = request["action"]
+    method, path_template, _ = ACTION_ALLOWLIST[action]
+    path = path_template.format(**request["args"])
+    headers = {"Authorization": f"Bearer {_get_reader_token()}"}
+    data = b"" if method == "GET" else b"{}"
+    http_request = urllib.request.Request(
+        f"http://127.0.0.1:7443{path}", data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(http_request, timeout=HTTP_TIMEOUT) as response:
+            payload = response.read()
+            try:
+                body = json.loads(payload)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                body = payload.decode(errors="replace")
+            return _response("", action, "ok", response.status, body=body)
+    except urllib.error.HTTPError as error:
+        try:
+            body = json.loads(error.read())
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            body = {"error": "webhook HTTP error"}
+        return _response("", action, "error", error.code, body=body)
+    except (OSError, TimeoutError, ValueError):
+        return _response("", action, "error", 0, body={"error": "webhook request failed"})
+
+
+def _write_commit(repo, parent, request_id, response):
+    response_bytes = (json.dumps(response, sort_keys=True) + "\n").encode()
+    try:
+        ledger = _git(repo, ["show", f"{parent}:ledger/processed.txt"])
+    except RuntimeError:
+        ledger = ""
+    ledger_bytes = (ledger + request_id + "\n").encode()
+    with tempfile.NamedTemporaryFile(dir=repo, prefix="index.", delete=False) as handle:
+        index_path = handle.name
+    env = os.environ.copy()
+    env["GIT_INDEX_FILE"] = index_path
+    try:
+        _git(repo, ["read-tree", parent], env=env)
+        response_file = Path(index_path + ".response")
+        ledger_file = Path(index_path + ".ledger")
+        response_file.write_bytes(response_bytes)
+        ledger_file.write_bytes(ledger_bytes)
+        response_hash = _git(repo, ["hash-object", "-w", str(response_file)], env=env).strip()
+        ledger_hash = _git(repo, ["hash-object", "-w", str(ledger_file)], env=env).strip()
+        _git(repo, ["update-index", "--add", "--cacheinfo", f"100644,{response_hash},responses/{request_id}.json"], env=env)
+        _git(repo, ["update-index", "--add", "--cacheinfo", f"100644,{ledger_hash},ledger/processed.txt"], env=env)
+        tree = _git(repo, ["write-tree"], env=env).strip()
+        commit = _git(repo, ["commit-tree", tree, "-p", parent, "-m", "cloud response"], env=env,
+                      timeout=30).strip()
+        _git(repo, ["update-ref", "refs/heads/cloud-requests", commit, parent], env=env)
+        _git(repo, ["push", "--force-with-lease=refs/heads/cloud-requests:" + parent,
+                    "origin", f"{commit}:refs/heads/cloud-requests"], timeout=120)
+    finally:
+        for path in (Path(index_path), Path(index_path + ".response"), Path(index_path + ".ledger")):
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+
+def process_tick(repo, root):
+    ref = _fetch(repo)
+    processed = _processed(repo, ref)
+    processed_this_tick = 0
+    for request_id in _request_ids(repo, ref):
+        if request_id in processed:
+            continue
+        raw, read_error = _read_request(repo, ref, request_id)
+        if read_error:
+            response = _response(request_id, "", "rejected", 0, reason=read_error)
+        else:
+            request, response = prepare_request(request_id, raw, processed)
+            if response is None:
+                response = _call_webhook(request)
+                response["id"] = request_id
+        processed.add(request_id)
+        _write_commit(repo, ref, request_id, response)
+        ref = _fetch(repo)
+        processed.add(request_id)
+        processed_this_tick += 1
+        if processed_this_tick >= MAX_PER_TICK:
+            break
+
+
+def main():
+    root = Path(os.environ.get("K3DM_REPO_ROOT", ROOT))
+    repo = Path(os.environ.get("K3DM_CLOUD_BRIDGE_REPO",
+                              str(Path.home() / ".k3d-manager" / "cloud-bridge" / "repo.git")))
+    _ensure_bare_repo(repo, root)
+    while True:
+        try:
+            process_tick(repo, root)
+        except (RuntimeError, OSError, ValueError) as error:
+            print(f"[cloud-bridge] {error}", file=sys.stderr, flush=True)
+        time.sleep(60)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.k3d-manager.cloud-bridge</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/python3</string>
+    <string>{{CLOUD_BRIDGE_BIN}}</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>K3DM_REPO_ROOT</key>
+    <string>{{K3DM_REPO_ROOT}}</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>60</integer>
+  <key>StandardOutPath</key>
+  <string>{{CLOUD_BRIDGE_LOG}}</string>
+  <key>StandardErrorPath</key>
+  <string>{{CLOUD_BRIDGE_LOG}}</string>
+</dict>
+</plist>

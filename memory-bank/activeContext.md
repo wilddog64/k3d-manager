@@ -1,5 +1,59 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — P2/P5 cloud session bridge implemented
+
+Implemented Part 2 of `v1.38.0-cloud-session-endpoint-access.md` on
+`k3d-manager-v1.38.0`: `bin/k3dm-cloud-bridge` is a 60-second bare-clone poller using the
+reader credential and plain loopback HTTP, with fixed four-action validation, replay ledger,
+bounded processing, and Git plumbing commits; `bin/k3dm-cloud-request` files and optionally polls
+requests using the fixed CLI contract. Added the launchd template, nine pure validator tests, the
+three Copilot invariants, and the Unreleased Added entry. The README how-to link was already
+present and was not changed; the contract/spec were not changed.
+
+P4 verification counted exactly two workflow files across both `.yml` and `.yaml`: `ci.yml` is
+pull-request-only for `main`, and `deploy-worker.yml` is push-scoped to `main` plus
+`workers/slack-relay/**`; neither includes `cloud-requests`.
+
+Verification before commit: `pytest scripts/tests/bin/cloud_bridge.py` 9 passed;
+`pytest scripts/tests/bin/webhook_policy.py` 22 passed; both Python files AST-parsed; the
+placeholder-substituted plist passed `plutil -lint`; `make check-doc-links` reported 1782 files;
+`_agent_audit` passed. The forbidden-string and plain-loopback grep gates were empty. Commit and
+push are blocked in this managed workspace: Git cannot create `.git/index.lock` or insert staged
+objects (`Operation not permitted`), including when given an alternate index under `/private/tmp`.
+
+## 2026-09-25 — Part 2 cloud bridge verified, with one structural fix (Claude)
+
+Codex delivered P2/P5 but could not commit (the usual `.git` write denial), leaving all 8 files
+staged. **Claude then committed them by accident** under a memory-bank message — `git add
+memory-bank/progress.md && git commit` sweeps the whole index. Unpushed, so `git reset --mixed
+f6d60b00` recovered it with the worktree intact. Second occurrence of that exact failure; the
+memory rule now names the mechanism and prescribes `git diff --cached --stat`.
+
+Verified: no forbidden patterns (no `git checkout`/`switch`, no `--no-verify`, no `--insecure`/
+`verify=False`, no `https://`/`SSLContext`, no `shell=True`/`eval`), no token printing, no
+`TOKEN_FILE` fallback, AST parses, plist lints, doc links OK, pytest 63 + 121 subtests, bats 64/64.
+Validator is genuinely tight: exactly six fields, exact arg-key match, size cap applied *before*
+JSON decode, id consumed before validation so an expired request cannot be retried.
+
+**One structural weakness fixed.** The per-value check was `if key == "job_id"`, correct only
+because `job_id` is currently the sole parameter — declaring a second would have sent its value
+into the request path with **no validation at all**. The allowlist now binds each parameter to a
+compiled pattern, so a parameter cannot be declared without one. Two tests added, both
+mutation-checked. This is the third instance this session of the same class: correctness that holds
+only by coincidence of the current table (dead `min_role`, the ungated `health?` form, this).
+
+Also corrected in my own handoff before dispatch: it told Codex the webhook was HTTPS with a
+self-signed cert. It is a bare `ThreadingHTTPServer` on loopback with no `wrap_socket`
+(`bin/k3dm-webhook:2238`), and `bin/k3dm-hermes:123` calls it as `http://`. And a claim I made that
+is *not* quite right: `_spawn_capture_text` does NOT keep argv a literal list when `cwd` is set —
+it builds `/bin/bash -c "cd … && …"`. It is `shlex.quote`d and the only request-derived value
+reaching git is the `ID_RE`-validated `request_id`, so it is safe, but the safety rests on quoting
+plus validation, not on the absence of a shell.
+
+Moved the three new Copilot rules out of `## Architecture` into `## Review Focus` where review
+rules belong, and expanded them to six covering the role ceiling, `min_role` actually being read,
+untrusted branch bytes, the allowlist as boundary, workflow scoping, and token placement.
+
 ## 2026-09-25 — S3 gate was unreachable for the health query form (Claude follow-up)
 
 Verified `8b706882` independently: SHA on origin, 4-file scope, bare pytest and

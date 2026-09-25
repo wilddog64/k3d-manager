@@ -48,6 +48,14 @@ Use the rules below to shape all code suggestions and PR reviews.
 - Use `--` to separate options from arguments where arguments may contain hyphens.
 - Variables expanded via `envsubst` in `*.yaml.tmpl` files must not contain shell metacharacters.
 
+### Cloud-session request path (v1.38.0+)
+- A request header may only ever **narrow** a role. The credential sets the maximum — `_request_role` takes the credential's role as a ceiling. Any code that lets a header raise a role is a privilege-escalation bug.
+- Every route's `min_role` must actually be **read** on the path that serves the request. `do_GET` carried `min_role` metadata for two releases without ever comparing it, and the gate that fixed it initially missed `/api/v1/health?...` because the route resolved to `None` for the query form. A gate that is correct only for the paths that happen to exist today is not a gate.
+- The `cloud-requests` branch is **untrusted input**. Its bytes may come from a compromised cloud session and must never reach argv, a shell string, `eval`, or an AI prompt.
+- The action allowlist in `bin/k3dm-cloud-bridge` is the security boundary. Each action hard-codes its HTTP method and binds every parameter to a compiled anchored pattern, so a parameter cannot be declared without validation. Never derive the method from the request file; never add an `operator`/`admin` action, nor `ask`/`analyze`.
+- Any new push-triggered workflow must be branch-scoped and must never include `cloud-requests` in its trigger set.
+- Neither webhook token may be placed in a cloud environment, a third-party secret store, or the repo. The reader token reads env then Keychain only — a `TOKEN_FILE` fallback would collapse the two roles into one shared secret.
+
 ### Privilege Escalation
 - Bare `sudo` calls in production code are a bug — all privilege escalation must go through `_run_command`.
 - `_run_command --prefer-sudo` for operations that may succeed without sudo.

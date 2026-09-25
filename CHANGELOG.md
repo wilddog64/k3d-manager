@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+- A two-token read-only cloud session path: `bin/k3dm-cloud-bridge` polls the untrusted
+  `cloud-requests` branch from a bare clone, validates four fixed actions, calls the local
+  webhook with the reader credential, and commits a response plus replay ledger entry.
+  `bin/k3dm-cloud-request` files and optionally waits for those requests without exposing a
+  credential or building a command from branch content.
+
 ### Fixed
 - `GET /api/v1/health` answers again instead of dropping the connection. The v1.37.0 webhook
   decomposition (`925c43e7`) moved `_smoke_test_services` into `scripts/lib/webhook/smoke.py`

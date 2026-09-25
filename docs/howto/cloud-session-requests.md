@@ -119,6 +119,13 @@ bin/k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECOND
 - exit 0 = response received with `status: ok`; 3 = `rejected`; 4 = `error`; 5 = timed out with
   no response; 2 = bad usage (unknown action, malformed `--arg`)
 
+Two limits worth knowing before you wonder why nothing happened. The bridge rejects any request
+file of 8 KiB or more without parsing it, and it processes at most 10 requests per 60-second tick —
+file twenty and the rest wait for the next tick. Separately, `health` runs the full smoke sweep,
+including the browser login probes, so it is the slowest of the four actions by a wide margin and
+can legitimately take minutes; `job-status` and the two `-status` actions return promptly. If you
+are polling `health` with a short `--timeout`, raise it rather than assuming the bridge is stuck.
+
 It needs no credential and no environment variables beyond the git access the session already
 has. That is the practical payoff of the pull design.
 

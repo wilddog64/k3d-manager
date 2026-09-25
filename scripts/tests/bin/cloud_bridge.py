@@ -1,0 +1,119 @@
+"""Pure validation tests for the cloud bridge."""
+
+import importlib.machinery
+import importlib.util
+import json
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+
+ROOT = Path(__file__).resolve().parents[3]
+LOADER = importlib.machinery.SourceFileLoader("cloud_bridge", str(ROOT / "bin" / "k3dm-cloud-bridge"))
+SPEC = importlib.util.spec_from_loader("cloud_bridge", LOADER)
+bridge = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(bridge)
+
+
+NOW = datetime(2026, 9, 25, 20, 14, 3, tzinfo=timezone.utc)
+
+
+def request(action="cluster-status", args=None, expires=None):
+    return {
+        "schema": 1,
+        "action": action,
+        "args": {} if args is None else args,
+        "requested_by": "claude-cloud",
+        "requested_at": "2026-09-25T20:14:03Z",
+        "expires_at": (expires or NOW + timedelta(minutes=30)).isoformat().replace("+00:00", "Z"),
+    }
+
+
+@pytest.mark.parametrize("action", ["ask", "analyze", "nope"])
+def test_unknown_action_is_rejected(action):
+    value, reason = bridge.validate_request(request(action), now=NOW)
+    assert value is None
+    assert reason == "unknown action"
+
+
+def test_schema_is_pinned():
+    value, reason = bridge.validate_request({**request(), "schema": 2}, now=NOW)
+    assert value is None
+    assert reason == "unsupported schema"
+
+
+def test_job_id_metacharacter_is_rejected():
+    value, reason = bridge.validate_request(
+        request("job-status", {"job_id": "a" * 8 + ";echo pwned"}), now=NOW)
+    assert value is None
+    assert reason == "invalid job_id"
+
+
+def test_extra_argument_is_rejected():
+    value, reason = bridge.validate_request(
+        request("cluster-status", {"unexpected": "value"}), now=NOW)
+    assert value is None
+    assert reason == "unexpected argument"
+
+
+def test_expired_request_is_rejected_and_response_consumes_id():
+    processed = set()
+    value, response = bridge.prepare_request(
+        "expired-id", request(expires=NOW - timedelta(seconds=1)), processed, now=NOW)
+    assert value is None
+    assert "expired-id" in processed
+    assert response["id"] == "expired-id"
+    assert response["status"] == "rejected"
+    assert response["reason"] == "request expired"
+
+
+def test_replayed_id_is_skipped():
+    processed = {"replayed-id"}
+    value, response = bridge.prepare_request("replayed-id", request(), processed, now=NOW)
+    assert value is None
+    assert response is None
+
+
+def test_oversized_file_is_rejected():
+    assert len(json.dumps(request()).encode()) < bridge.MAX_REQUEST_BYTES
+    assert bridge.MAX_REQUEST_BYTES == 8 * 1024
+    value, reason = bridge.validate_request_bytes(b"{" + b"x" * bridge.MAX_REQUEST_BYTES, now=NOW)
+    assert value is None
+    assert reason == "request exceeds size cap"
+
+
+def test_every_allowlisted_parameter_declares_its_own_pattern():
+    import re
+    """The allowlist binds each parameter to a compiled pattern, so declaring a
+    parameter without one is impossible. The first implementation validated on
+    `key == "job_id"`, which was correct only because job_id was the sole
+    parameter — adding a second would have sent its value into the request path
+    with no validation at all."""
+    for action, (method, path_template, params) in bridge.ACTION_ALLOWLIST.items():
+        assert method in ("GET", "POST"), action
+        assert isinstance(params, dict), f"{action}: params must map name -> pattern"
+        for name, pattern in params.items():
+            assert hasattr(pattern, "fullmatch"), f"{action}.{name} has no compiled pattern"
+        placeholders = set(re.findall(r"\{([a-z_]+)\}", path_template))
+        assert placeholders == set(params), f"{action}: path placeholders and params disagree"
+
+
+def test_a_second_parameter_is_validated_not_just_job_id(monkeypatch):
+    """Proves the value check is pattern-driven rather than keyed on the literal
+    name job_id: a synthetic action with a different parameter still rejects a
+    value that does not match its pattern."""
+    import re
+    allowlist = dict(bridge.ACTION_ALLOWLIST)
+    allowlist["synthetic"] = ("GET", "/api/v1/synthetic/{cluster}", {"cluster": re.compile(r"[a-z]{1,10}")})
+    monkeypatch.setattr(bridge, "ACTION_ALLOWLIST", allowlist)
+
+    bad = request(action="synthetic", args={"cluster": "a; rm -rf /"})
+    result, reason = bridge.validate_request(bad, now=NOW)
+    assert result is None
+    assert reason == "invalid cluster"
+
+    good = request(action="synthetic", args={"cluster": "hub"})
+    result, reason = bridge.validate_request(good, now=NOW)
+    assert reason is None
+    assert result is not None

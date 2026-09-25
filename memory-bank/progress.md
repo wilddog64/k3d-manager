@@ -1,5 +1,23 @@
 # Progress — k3d-manager
 
+## 2026-09-25 — v1.38.0 Part 2 P2/P5 cloud bridge
+
+- [x] Implemented only the requested Part 2 files: bare-clone bridge, cloud request helper,
+      launchd template, pure Python bridge tests, CHANGELOG, and three Copilot invariants.
+- [x] Bridge validation order is file-size cap (8 KiB), JSON object, `schema == 1`, fixed action
+      allowlist, exact args and anchored `job_id`, then future `expires_at`; rejected and expired
+      ids are consumed, replayed ids are skipped, and processing is capped at 10 per tick.
+- [x] Bridge uses `webhook.proc._spawn_capture_text` for literal Git argv, plumbing commits with a
+      throwaway index, `--force-with-lease`, and plain `http://127.0.0.1:7443` reader requests.
+      No checkout/switch, hook bypass, TLS-disable flag, shell string, kubectl, or non-Git child
+      process was added.
+- [x] P4 is configuration-inert: exactly 2 workflow files were counted across `.yml` and `.yaml`,
+      with no push trigger for `cloud-requests`.
+- [x] Gates: bridge pytest 9 passed; existing webhook policy pytest 22 passed; both AST parses,
+      substituted-template `plutil -lint`, `make check-doc-links` (1782 files), `_agent_audit`,
+      and diff checks passed. Commit/push are blocked by the managed workspace refusing Git lock
+      and object writes (`Operation not permitted`); no hook bypass or history mutation was used.
+
 ## 2026-09-25 — `/api/v1/health` has been 500ing since v1.37.0 (found during v1.38.0 verify)
 
 - [x] Root-caused an authenticated `GET /api/v1/health` returning `http=000`: the daemon raised
@@ -16,8 +34,14 @@
       Filed `docs/bugs/2026-09-25-smoke-test-services-missing-return-breaks-health.md`.
 - [x] Not caused by the v1.38.0 role work. `reader cluster-status: 202` was the control — auth,
       the credential ceiling and the POST path were all correct while health was dead.
+- [x] Live confirmation after `f6d60b00` + restart: `reader health: 200`. One result closes three
+      things — health answers again, the reader credential authenticates, and the S3 GET gate lets
+      a reader through a `reader`-rated route rather than over-blocking it.
 - [ ] Follow-up, not in this fix: no gate asserts `/api/v1/health` returns 200 and parses its
       `services` array. That is why a dead endpoint merged. Belongs with the webhook smoke gate.
+- [ ] Bears on the pending v1.37.0 tag: the broken endpoint is ON the v1.37.0 tree and the fix is
+      only on `k3d-manager-v1.38.0`. Tagging v1.37.0 as-is tags a webhook whose `/api/v1/health`
+      and post-provision check both raise. Operator's call.
 
 ## 2026-09-25 — S3 gate hole closed for the health query form (Claude)
 
