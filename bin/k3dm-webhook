@@ -5,7 +5,6 @@ import collections
 import datetime
 import base64
 import hashlib
-import hmac
 import http.server
 import json
 import os
@@ -77,6 +76,8 @@ from webhook.smoke import (  # noqa: E402
 # Its app-cluster readiness default remains localhost:19190/-/ready.
 from webhook.auth import (  # noqa: E402
     _get_token,
+    _get_reader_token,
+    _resolve_token_role,
     _verify_slack_signature,
     _slack_user_is_allowlisted,
     _slack_user_role,
@@ -1713,13 +1714,14 @@ _GET_ROUTES = {
 
 class _Handler(http.server.BaseHTTPRequestHandler):
     def _auth(self):
-        token = _register_secret(_get_token())
-        if not token:
+        authorization = self.headers.get("Authorization", "")
+        prefix = "Bearer "
+        if not authorization.startswith(prefix):
             return False
-        return hmac.compare_digest(
-            self.headers.get("Authorization", ""),
-            f"Bearer {token}"
-        )
+        self._token_role = _resolve_token_role(authorization[len(prefix):])
+        _register_secret(_get_token())
+        _register_secret(_get_reader_token())
+        return self._token_role is not None
 
     def _json(self, code, body):
         data = json.dumps(body, separators=(",", ":")).encode()
@@ -1859,9 +1861,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if route is None:
             self._json(404, {"error": "not found"})
             return
-        request_role = _request_role(self.headers)
+        token_role = getattr(self, "_token_role", None)
+        request_role = _request_role(self.headers, token_role)
         if route["handler"] == "make":
-            request_role = _effective_make_role(self.headers, body)
+            request_role = _effective_make_role(self.headers, body, token_role)
         request_actor = _request_actor(self.headers)
         policy = effective_policy(route, self.path, body)
         if not _role_allows(request_role, policy["min_role"]):
@@ -2173,6 +2176,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         get_route = _GET_ROUTES.get(self.path)
         if get_route is None and self.path.startswith("/api/v1/status/"):
             get_route = _GET_ROUTES["/api/v1/status/"]
+        role = _request_role(self.headers, getattr(self, "_token_role", None))
+        if get_route is not None and not _role_allows(role, get_route["min_role"]):
+            self._json(403, {"error": "forbidden"})
+            return
         if self.path == "/api/v1/health":
             services = _smoke_test_services()
             result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]

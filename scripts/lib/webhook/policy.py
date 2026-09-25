@@ -105,17 +105,21 @@ def _normalize_actor_role(role):
     return role if role in _ROLE_LEVELS else "reader"
 
 
-def _request_role(headers):
+def _request_role(headers, token_role=None):
     raw = headers.get("X-K3DM-Role")
     if raw is None:
-        return _ROLE_DEFAULT  # direct token = admin credential
-    raw = raw.strip().lower()
-    return raw if raw in _ROLE_LEVELS else "reader"  # present-but-invalid → fail closed
+        role = token_role or _ROLE_DEFAULT
+    else:
+        raw = raw.strip().lower()
+        role = raw if raw in _ROLE_LEVELS else "reader"  # present-but-invalid → fail closed
+    if token_role is not None and _ROLE_LEVELS[role] > _ROLE_LEVELS[token_role]:
+        return token_role
+    return role
 
 
-def _effective_make_role(headers, body):
+def _effective_make_role(headers, body, token_role=None):
     """Cap a relayed /k3dm role at the caller's mapped Slack role (unknown → reader)."""
-    header_role = _request_role(headers)
+    header_role = _request_role(headers, token_role)
     if headers.get("X-K3DM-Role") is None:
         return header_role
     user_role = _slack_user_role(str(body.get("slack_user_id", "")))
