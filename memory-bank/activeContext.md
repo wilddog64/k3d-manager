@@ -1,5 +1,51 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — cloud-session access: PULL chosen; a live privilege-escalation gap found
+
+Spec `docs/plans/v1.38.0-cloud-session-endpoint-access.md` (#4 of 5 for v1.38.0). Operator decided
+**pull**, not exposing the endpoint. The push path (cloudflared ingress + Cloudflare Access
+application + service token + cloud env vars) is recorded in the spec as not-chosen, to be revisited
+only if a session needs live state at sub-60s latency.
+
+**The finding that outranks the feature.** A webhook bearer-token holder is `admin` today, and the
+role is self-asserted by the caller. `scripts/lib/webhook/policy.py:108`:
+
+```python
+def _request_role(headers):
+    raw = headers.get("X-K3DM-Role")
+    if raw is None:
+        return _ROLE_DEFAULT  # direct token = admin credential
+```
+
+`_ROLE_DEFAULT = "admin"` (line 30). `bin/k3dm-webhook:1713` `_auth()` compares the bearer and
+returns a bool — no identity travels forward, so nothing binds a role to a credential. Omitting
+`X-K3DM-Role` (or sending `admin`) reaches `cluster-up`, `cluster-down`, `cluster-resume`,
+`cleanup-stale-sandbox`, `argocd-upgrade`. `_normalize_actor_role`'s fail-closed-to-reader does NOT
+cover it: it normalizes an already-resolved string, and the direct-token path never routes through a
+resolver that could return an unknown value. `_effective_make_role` also short-circuits when the
+header is absent.
+
+This exists **independently of any cloud access** — it is not introduced by this work, and it is why
+I had to retract the earlier claim that a cloud token could simply be "registered as reader". That
+is not configuration; S1/S2 of the spec is the code change. Fix shape: a second reader-scoped token
+(`k3dm-webhook-token-reader`, env `K3DM_WEBHOOK_TOKEN_READER`, no `TOKEN_FILE` fallback) plus
+`_request_role(headers, token_role)` treating the credential's role as a **ceiling the header can
+only narrow**. `token_role=None` keeps today's behavior byte-identical.
+
+**Invariant for copilot-instructions.md:** a request header may only ever narrow a role; the
+credential sets the maximum. Any code letting a header raise a role is a privilege-escalation bug.
+
+Pull design: branch `cloud-requests` (never merged) carrying `requests/`, `responses/`,
+`ledger/processed.txt`; new `bin/k3dm-cloud-bridge` on a 60s launchd tick reads blobs from the
+**fetched ref** (never `git checkout` — it runs unattended against the operator's tree), validates
+in a fixed order, and calls `127.0.0.1:7443` with the reader token. Allowlist is reader-only:
+`health`, `cluster-status`, `hostinger-status`, `job-status`. `/api/v1/ask` and `/api/v1/analyze`
+are excluded despite being `min_role: reader` — they invoke an AI and the request file is authored
+from GitHub content, which is the injection source `_INJECTION_RE` exists for.
+
+Nothing implemented. Not approved: bootstrapping the `cloud-bridge` launchd agent, creating the
+`cloud-requests` branch.
+
 ## 2026-09-25 — deploy_app_cluster_confirm test isolated from live infrastructure (`1cbdab25`)
 
 Fixed `scripts/tests/core/deploy_app_cluster_confirm.bats` per Part A of the bug spec:
