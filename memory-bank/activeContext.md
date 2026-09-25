@@ -1,5 +1,34 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — ACG app tier blocked by a duplicate cluster name (owner decision needed)
+
+`make up CLUSTER_PROVIDER=k3s-aws` failed at Step 10b/14 a third time. The label fix
+`ffe954a1` landed correctly (`cluster-ubuntu-k3s` now `provider: k3s-aws`,
+`shopping-cart: "true"`) but `ubuntu-k3s-data-layer` is still NotFound.
+
+Cause: two cluster Secrets claim the name `ubuntu-k3s` — `cluster-ubuntu-k3s`
+(`https://host.k3d.internal:6443`) and `ubuntu-k3s-app-cluster`
+(`https://kubernetes.default.svc`, the hub registering itself, from
+`hub_recovery.sh:252`, v1.33.0 `4b6ce874`). ArgoCD resolves `destination.name` globally, so
+every name-keyed ApplicationSet is rejected with `ErrorOccurred` while
+`ParametersGenerated` stays True: `data-git`, `services-git` (all 6 services) and
+`grafana-dashboards-acg`. Sets addressing by `server` (`eso`, `platform-helm`) are fine.
+`ubuntu-k3s-grafana-dashboards` was already `Unknown/Unknown` from this — it predates the
+label fix.
+
+Also found: the hub's ESO is **orphaned**. Both registrations generate the single
+`ubuntu-k3s-eso` Application; the ACG one won, so its destination moved to
+`host.k3d.internal` and the hub's 4d-old `external-secrets` deployments are managed by
+nothing while still carrying the `ubuntu-k3s-eso` tracking id.
+
+Filed `docs/bugs/2026-09-24-hub-self-registration-duplicate-cluster-name-blocks-name-keyed-appsets.md`
+with three remedies (delete the Secret / rename it to a distinct cluster name / switch the
+three sets to `server:`). All mutate a live registration Secret that four AppSets select on —
+**blocked on the owner's decision**; option 2 is the only one that also re-adopts the hub's
+ESO and is the only one carrying the preserveResourcesOnDeletion rename trap.
+
+Tier 2 `make e2e-sandbox` stays blocked: Steps 10c-14 (Keycloak + LDAP identity) never ran.
+
 ## 2026-09-24 — ACG registration labels: the third instance of the same defect
 
 `make up` cleared Step 4c after the listener fix, then failed at **Step 10b/14**: the data-layer
