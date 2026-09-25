@@ -5,6 +5,10 @@
 ## [1.37.0] - 2026-09-24
 
 ### Added
+- `make acg-restart` wraps `acg_restart`, the recovery path for an already-expired ACG sandbox
+  (delete, recreate via Playwright/CDP, re-extract credentials). It was the only ACG recovery
+  function without a make target, which is the one you reach for under pressure. Accepts
+  `URL=` and `PROVIDER=`; needs `make chrome-cdp` and a real TTY for the first login.
 - `scripts/tests/bin/webhook_agent.py` covers the AI agent's cluster-mutation gate,
   prompt-injection filter, filing/fix intent, and observation parsing.
 - Tier 2 ACG preflight now fails early on an empty sandbox URL or a missing

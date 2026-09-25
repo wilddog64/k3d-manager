@@ -73,6 +73,36 @@ The browser helper opens the sandbox page and clicks the extend button automatic
 
 Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (useful for CI or troubleshooting Playwright issues).
 
+### 4a. Recover an Expired Sandbox
+
+Once a sandbox has expired there is nothing left to extend — it has to be replaced. `make acg-restart`
+does the whole recovery in one call:
+
+```bash
+make acg-restart
+```
+
+That deletes the expired sandbox, starts a fresh one through the Playwright/CDP browser helper,
+re-runs `acg_get_credentials`, and verifies the result — so `~/.aws/credentials` is refreshed by the
+time it returns.
+
+Override the defaults when you need a specific sandbox or cloud:
+
+```bash
+make acg-restart URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<sandbox-id>" PROVIDER=aws
+```
+
+`URL` defaults to the sandbox list page and `PROVIDER` defaults to `aws` (`gcp` and `azure` are also accepted).
+
+**Prerequisites:**
+
+- The Chrome CDP helper must be available — run `make chrome-cdp` first if the launchd agent is not loaded.
+- The first Pluralsight login of a session is manual, so this needs a **real TTY**. It cannot be run
+  from a non-interactive agent or CI shell.
+
+A fresh sandbox gets a new public IP, so the `ubuntu-k3s` context still points at the old address.
+Follow the restart with `make argocd-registration` to re-register the app cluster with ArgoCD.
+
 ### 5. Teardown
 
 ```bash

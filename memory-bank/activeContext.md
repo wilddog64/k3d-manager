@@ -1,5 +1,23 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — `make acg-restart` added
+
+`acg_restart` was the only ACG recovery function without a make target (`creds`, `chrome-cdp`,
+`chrome-cdp-stop`, `provision` all had one), so the path you reach for when a sandbox has expired
+was the one you had to spell out by hand. Added `acg-restart` to the Makefile (+ `.PHONY`, + `make
+help`), passing `URL=` (defaults to the sandbox list page, already defined at `Makefile:14`) and
+`PROVIDER=` (defaults to `aws` inside the function). Empty overrides are safe — `acg_restart` uses
+`${1:-default}`/`${2:-aws}`, and `:-` catches the empty string, not just unset.
+
+Documented in `docs/howto/acg.md` (new "4a. Recover an Expired Sandbox", between extend and
+teardown) and `docs/howto/makefile.md` (Credential Extraction table + prose). `make
+check-doc-links`: 1770 files OK. No BATS case — there is no existing test coverage for Makefile
+targets to extend.
+
+Still blocked: the sandbox at `34.218.59.16:6443` is down (`/readyz` times out, rc=124), and
+`com.k3d-manager.chrome-cdp` is **not** in `launchctl list`, so `make acg-restart` needs
+`make chrome-cdp` first. Both are operator-TTY work.
+
 ## 2026-09-25 — Cloudflare tunnel outage (restored) + the ACG sandbox is gone
 
 Operator reported Cloudflare **1033** on `grafana.3ai-talk.org`. Cause: the third `make up`
