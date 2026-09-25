@@ -53,7 +53,8 @@ def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
     monkeypatch.setenv("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")
     calls = []
     runner = lambda *_: calls.append(True) or (0, status_payload("healthy"))
-    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci"):
+    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci",
+                 "alert_delivery"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
     state = {}
@@ -95,7 +96,8 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: True)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
-    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci"):
+    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci",
+                 "alert_delivery"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
     calls = []
