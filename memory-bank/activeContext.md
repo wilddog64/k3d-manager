@@ -1,5 +1,38 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — MinIO repoint DONE and verified on origin (`e9d545d`), unmerged
+
+`shopping-cart-infra` branch `fix/minio-bitnamilegacy-registry`, commit `e9d545d`, confirmed on
+origin via `gh api` (local HEAD == `origin/fix/...`). **No PR opened** — `gh pr list` empty.
+
+Codex's **first** dispatch was blocked by the known sandbox limit: `git fetch` failed with
+`cannot open '.git/FETCH_HEAD': Operation not permitted`. It stopped before editing anything rather
+than working around it, which was correct. Workaround applied: Claude created the branch from
+`origin/main` and did the commit/push; Codex was re-dispatched with **all git writes removed from
+its scope**, doing edits plus seven read-only gates. Worth reusing — see
+[[reference_codex_exec_cannot_commit_git_lock]].
+
+Independently verified, not taken on trust: YAML parses; `grep -rn 'quay.io/minio' data-layer/`
+prints NONE; `console-address` gone; all three images on bitnamilegacy; `mountPath`
+`/bitnami/minio/data`; `fsGroup`/`runAsUser` both 1001; `secret.yaml`, `service.yaml` and
+`image-upload-configmap.yaml` all UNCHANGED; scope on origin is exactly 5 files. Diff read in full
+— matches the spec with no creep. Note `git diff --stat` did **not** list the new bug doc because
+it was untracked; `git status --short` was needed to see it.
+
+**Not yet proven at runtime.** Nothing has pulled the Bitnami image on a cluster. Residual risks to
+watch on the next `make up`:
+
+- Bitnami's `run.sh` reads `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` — present, but it also enforces
+  minimum lengths; if the seeded credential is short the container will refuse to start.
+- The existing sandbox PVC was created under UID 1000. It is empty (MinIO never started), so the
+  UID move to 1001 is safe *here*; on any cluster where MinIO did run, pre-existing files owned by
+  1000 would not be writable by 1001 and the volume would need chown or recreation.
+- `bitnamilegacy` is a sunset repo. Follow-up (owner's call): mirror both pinned images into
+  `ghcr.io/wilddog64/`, which *is* possible since bitnamilegacy is public, so a third upstream gate
+  cannot break provisioning. Needs a GHCR push credential.
+
+Merge is the owner's call; PR gates have not been run.
+
 ## 2026-09-25 — tunnel cleanup fixed; MinIO registry spec dispatched to Codex
 
 **Cloudflare tunnel (fixed, `e1811e67`).** `_acg_up_cleanup` in `bin/cluster-up` ran an
