@@ -1,5 +1,47 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — tunnel cleanup fixed; MinIO registry spec dispatched to Codex
+
+**Cloudflare tunnel (fixed, `e1811e67`).** `_acg_up_cleanup` in `bin/cluster-up` ran an
+unconditional `launchctl bootout` of `com.k3d-manager.cloudflare-tunnel` on any non-zero exit, but
+`cluster-up` does not install or bootstrap that tunnel until ~line 1809 — far past Step 10b, where
+all three observed failures happened. It was destroying a permanent service it had never created:
+the plist lives in `~/Library/LaunchAgents` with `RunAtLoad` + `KeepAlive=true` and serves the hub's
+public ingress independently of any sandbox. Now gated on `_ACG_TUNNEL_PLIST_CREATED`, set only
+where the run installs the plist and none existed before, so "clean up what you created" survives.
+Four BATS cases; mutation-proven (restoring the unconditional bootout fails three of four).
+`bin/cluster-refresh` was checked and is fine — its bootout is half of a bootout+bootstrap restart.
+Resolution appended to `docs/issues/2026-09-25-cloudflare-tunnel-killed-by-make-up-cleanup-no-alert.md`.
+
+**MinIO: my earlier GHCR-mirror recommendation was wrong and is withdrawn.** Mirroring requires
+pulling the source, and there are no credentials for it. Probed every alternative:
+`ghcr.io/minio/minio` 403, `docker.io/minio/minio` does not exist, quay gated at the repository
+level (`latest` and a 2022 tag both 401). The only public source carrying the *same* upstream
+releases is Bitnami's sunset repo:
+
+| replacement (200 anonymously) | replaces | same release |
+|---|---|---|
+| `docker.io/bitnamilegacy/minio:2024.11.7-debian-12-r1` | `quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z` | yes |
+| `docker.io/bitnamilegacy/minio-client:2024.11.5-debian-12-r1` | `quay.io/minio/mc:RELEASE.2024-11-05T11-29-45Z` | yes |
+
+It is a **port, not a tag swap** — verified from the image configs: `User` 1000 -> 1001, an
+entrypoint that runs its own `run.sh` (so the existing `args: [server, /data, --console-address,
+":9001"]` must be deleted or the container fails), data dir `/data` -> `/bitnami/minio/data`, and
+`mc` at `/opt/bitnami/minio-client/bin/mc` not `/usr/bin/mc`. `secret.yaml` needs no change: it
+already exposes `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`, exactly what Bitnami reads.
+
+Spec at `docs/bugs/2026-09-25-minio-quay-registry-gated.md` (`071acd24`), dispatched via
+`codex exec` into `shopping-cart-infra` on branch `fix/minio-bitnamilegacy-registry` from
+`origin/main`. Codex session `01a0d93a-484a-71f0-b523-cf42e823ae55`, log at
+`scratchpad/codex-minio.log`. **Unverified — do not trust the completion report.** On return:
+confirm the SHA is on `origin/fix/minio-bitnamilegacy-registry`, the diff touches only the three
+YAMLs plus CHANGELOG and the bug doc, `grep -rn 'quay.io/minio' data-layer/` prints NONE, and no PR
+was opened.
+
+Follow-up once green, owner's call: `bitnamilegacy` is itself sunset, so mirror both pinned images
+into `ghcr.io/wilddog64/` — which *is* possible since bitnamilegacy is public — needs a GHCR push
+credential.
+
 ## 2026-09-25 — data-layer sync wait now fails fast on a blocked image pull
 
 Implements the second finding from the quay/MinIO failure below. `bin/cluster-up` gained two
