@@ -344,3 +344,42 @@ Claude-Session: https://claude.ai/code/session_01B9RRyT5eU8S76oXYMrLZN8
 - `docs/bugs/2026-09-23-hostinger-alertmanager-discards-every-alert.md` — why 17 days passed with
   nobody told
 - `memory/reference_argocd_selfheal_reverts_out_of_band_patch.md`
+
+---
+
+## Live evidence, 2026-09-25 — a fourth observation, still unfixed
+
+Found incidentally while root-causing the public frontend 404 (unrelated cause; see
+`2026-09-25-frontend-public-url-routes-to-wrong-cluster.md`). The DaemonSet on `ubuntu-hostinger`
+still carries the generic default:
+
+```
+$ kubectl --context ubuntu-hostinger get ds -n istio-system istio-cni-node \
+    -o jsonpath='{range .spec.template.spec.volumes[*]}{.name} -> {.hostPath.path}{"\n"}{end}'
+cni-net-dir -> /etc/cni/net.d
+```
+
+k3s writes its CNI config to `/var/lib/rancher/k3s/agent/etc/cni/net.d`, so the agent waits on a
+directory that will never be populated:
+
+```
+info cni-agent configuration requires updates, (re)writing CNI config file at "": no networks found in /host/etc/cni/net.d
+warn cni-agent Istio CNI is configured as chained plugin, but cannot find existing CNI network config: no networks found in /host/etc/cni/net.d
+info cni-agent Waiting for CNI network config file to be written in /host/etc/cni/net.d...
+```
+
+The pod has been `0/1 Running` for 8h with **3281 consecutive readiness failures and zero restarts**
+(`/readyz` 503). Zero restarts is why this never escalated: the container stays up and simply never
+reports ready.
+
+**Why it still looks fine.** `ztunnel` is healthy and holds all four workloads
+(`received hello from ztunnel version=V1`, followed by a snapshot naming `basket-service`,
+`frontend`, `product-catalog` and `order-service`), so traffic between the running pods works. The
+exposure is on **new** pods: with the CNI agent not ready, ambient enrollment on pod creation is not
+reliable, so this would surface as an apparently random connectivity or mTLS fault after some future
+rollout, far from its cause.
+
+This is the symptom this spec exists to stop recurring, observed again after the third fix. It is
+evidence that the live-override mechanism is still the blocker — **not** a reason to re-derive the
+paths a fourth time. Do not hand-patch the DaemonSet: it is ArgoCD-managed and self-heal reverts
+out-of-band patches.
