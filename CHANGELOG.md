@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.37.0] - 2026-09-24
+
 ### Added
 - `scripts/tests/bin/webhook_agent.py` covers the AI agent's cluster-mutation gate,
   prompt-injection filter, filing/fix intent, and observation parsing.
@@ -13,8 +15,10 @@
 - Hub snapshot capture, M2 offload, verification, listing, and retention targets.
 - Keycloak monthly admin credential rotator, which preserves `db_password` and deliberately does not force-sync the ArgoCD-managed `keycloak-secrets` ExternalSecret.
 - `make app-cve-scan` triggers the app-cluster CVE scan CronJob, waits for its manually created Job, and exposes the additive operation to `/k3dm` for operator-role users with an enumerated `CRONJOB` choice.
+- `scripts/check-repo-root-debris.sh` + `make check-repo-root`, wired into `.githooks/pre-commit` over **staged files only** so pre-existing strays cannot block an unrelated commit. Mutation-proven: staging `.join-failures.999` fires the gate.
 
 ### Changed
+- `scripts/lib/foundation/` vendors lib-foundation **v0.4.18** (`023f76e5..2f244ee4`, 8 files). The vendored tree hash equals upstream `main`, which is the proof the subtree pull is faithful. Carries the ACG session-check observability: `ACG_SESSION_OK path=` reporting, credential-store health without value exposure, and the `K3DM_ACG_REQUIRE_CREDENTIALS=1` fail-closed gate.
 - Webhook Phase 4 separates long-running cluster orchestration into `webhook.lifecycle` and
   read-only reporting/formatting into `webhook.status`. Runtime dependencies owned by the
   entrypoint are injected, and `/k3dm` validated argv reaches `make` without a shell.
@@ -28,6 +32,34 @@
 - The shopping-cart stack is now **opt-in per app cluster**. `data-git` and `services-git` require `k3d-manager/shopping-cart: "true"` in addition to `k3d-manager/role: app-cluster`, and `register_app_cluster` emits that label from `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). A hub registered as its own app cluster — the designed single-cluster mode — therefore keeps its External Secrets Operator install and ACG Grafana dashboards while no longer syncing the shopping-cart data layer or payment stack onto itself. The `eso` and `grafana-dashboards-acg` ApplicationSets are deliberately left selecting on the role label alone: `eso` generates the hub's entire ESO install (3 Deployments, 21 CRDs, 5 ClusterRoles) and carries the ArgoCD resources finalizer, so removing the registration Secret — the approach this replaces — would have deleted the `externalsecrets` and `clustersecretstores` CRDs, every ExternalSecret CR in the cluster, and the owner-referenced Secrets behind Grafana admin, Keycloak, LDAP, `ghcr-pull-secret` and all postgres / redis / rabbitmq / minio credentials. `docs/architecture/shopping-cart-deployment.md` gains a section on why `ubuntu-k3s` is a role alias rather than a place, the four ApplicationSets that select the role label, and how they differ in `preserveResourcesOnDeletion`.
 
 ### Fixed
+- The Tier 2 ACG preflight now gates on **credential readability, not Keychain existence**. An
+  existence check (`security find-generic-password` without `-w`) succeeds in two states that
+  break unattended login: a **locked login keychain** (the value read fails with `User
+  interaction is not allowed`) and a **value stored empty** (a bare `-w` write with stdin not a
+  TTY reads EOF and silently stores an empty value at exit 0). The preflight now calls
+  `_secret_load_data` — the same loader `_cdp_ensure_acg_session` uses — and discards the value
+  to `/dev/null`, so readability is the claim under test and the secret never enters a shell
+  variable. It also exports `K3DM_ACG_REQUIRE_CREDENTIALS=1` to arm the upstream fail-closed
+  gate, and only after the sandbox-URL and `K3DM_ACG_SKIP_SESSION_CHECK` guards pass, so a
+  refusal reads no credential at all. The no-`-w` form is retained in the guide for operator
+  diagnostics, where *not* reading the secret is the point. 14 BATS cases, mutation-gated
+  against the previous implementation; the proof requires a fake `security` **executable on
+  `PATH`**, because a shell-function stub is invisible to a loader that runs `security` inside
+  `bash -c`.
+- `scripts/etc/playwright/vars.sh` pointed `PLAYWRIGHT_AUTH_DIR` at the sibling `profile`
+  directory while the live CDP Chrome, `cdp.sh`'s fallback and the lib-foundation copy all use
+  `pw-profile` (measured: `pw-profile` 711M written minutes earlier, `profile` 600M last touched
+  2026-08-21). Because `_cdp_profile_in_use` is evaluated against `PLAYWRIGHT_AUTH_DIR`, the
+  drift would report the profile free while Chrome held a live session, and a launch could
+  replace a signed-in browser with one on the dead profile — recoverable only by a human signing
+  in. Latent rather than active (nothing in-repo sourced the file), now aligned with upstream.
+- `$(mktemp)` returns an empty string when `TMPDIR` is unwritable and nothing checked it, so
+  every derived path lost its directory and resolved against the CWD — the repo root during a
+  test run, where three files appeared while the suite reported `1237 ok / 0 not ok`.
+  `_k3sup_join_agents_parallel` now refuses an empty kubeconfig instead of deriving a relative
+  path, and the OCI stub builds its SSH key under `BATS_TEST_TMPDIR`. Reproduced before fixing,
+  because the tests pass either way. The six `_vault_hdr=$(mktemp)` sites are the same unchecked
+  call and are deliberately left for their own spec.
 - The Tier 2 ACG preflight now checks the `username` and `password` accounts individually
   instead of matching the Keychain service alone, so a credential stored under an account name
   the loader never reads no longer satisfies the gate; the error names which accounts are

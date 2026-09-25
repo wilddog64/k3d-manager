@@ -266,6 +266,7 @@ The session gate reports these states:
 |---|---|
 | `ACG_SESSION_OK path=existing-session` | already authenticated; no login attempted |
 | `ACG_SESSION_OK path=auto-login` | signed in unattended during this run |
+| `ACG_SESSION_OK path=manual-login` | a human signed in interactively during this run; only reachable when `K3DM_NONINTERACTIVE` is unset **and** stdout is a TTY, so it cannot occur in CI or an unattended Tier 2 run |
 | `ACG_CREDENTIALS: username=… password=…` | credential-store health (`present`/`empty`/`absent`), never the values |
 | `ACG_CREDENTIALS_REQUIRED` | store unusable while `K3DM_ACG_REQUIRE_CREDENTIALS=1` — the fail-closed gate |
 | `ACG_LOGIN_FIELDS_MISSING` | the sign-in form did not yield both fields |
@@ -274,7 +275,9 @@ The session gate reports these states:
 
 The `path=` suffix on `ACG_SESSION_OK` is what distinguishes "auto-login works" from
 "a human happened to be signed in already" — before it existed, both printed the same
-marker, and headless auto-login was broken for months without the gate noticing.
+marker, and headless auto-login was broken for months without the gate noticing. Those three
+are the complete set of `path=` values; a Tier 2 gate that must prove *unattended* login should
+accept `auto-login` alone and treat an unrecognized value as a failure.
 `K3DM_ACG_SKIP_SESSION_CHECK=1` is a local debugging aid only and is never valid for a
 Tier 2 acceptance run; the Tier 2 preflight refuses to run with it set.
 
