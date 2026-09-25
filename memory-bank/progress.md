@@ -11,8 +11,18 @@
       the guard, and the pre-patch response was `200`.
 - [x] Corrected the reader-token rotation claim in `docs/howto/cloud-session-requests.md`: no
       restart is needed, `_auth()` reads the Keychain per request.
-- [ ] Reader token not yet created — operator's step (login Keychain, `k3dm-webhook-token-reader`
-      / `k3dm`, from a real TTY). Nothing reads it until `make restart-webhook`.
+- [x] Reader token created by the operator in the login Keychain (`k3dm-webhook-token-reader` /
+      `k3dm`), verified non-empty by length only — 65 bytes, i.e. 64 hex plus newline. Claude never
+      read the value.
+- [x] `make restart-webhook` run by Claude; daemon back as pid 90449 on `127.0.0.1:7443` (plain
+      HTTP on loopback, unchanged by this work). Negative auth cases all 401: no header, bogus
+      bearer, non-Bearer scheme, and rejected before the api-path guard.
+- [ ] Positive-path live check (admin 200 / reader 200 on health, reader 200 on POST
+      `cluster-status`) is the operator's — it needs the token values, which Claude does not read.
+- [ ] No live escalation test offered on purpose: every above-reader POST route
+      (`argocd-upgrade`, `cluster-refresh`, `cve-remediate`, `analyze`) mutates or is expensive, so
+      a probe that found the gate broken would execute the action. That case is covered by the
+      synthetic-route unit tests instead, both mutation-checked.
 - [ ] Part 2 (P2 bridge + P5) not dispatched.
 
 ## 2026-09-25 — webhook credential-bound roles COMPLETE (`8b706882`)
