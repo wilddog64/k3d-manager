@@ -2,9 +2,14 @@
 
 const SIGNIN_URL = 'https://app.pluralsight.com/id/signin';
 const SANDBOX_URL = 'https://app.pluralsight.com/hands-on/playground/cloud-sandboxes';
-const EMAIL_SELECTOR = 'input[type="email"], input[name="username"], input[name="email"]';
+// Pluralsight's identity form uses PascalCase attributes (name="Username", id="Username") on a
+// type="text" input. CSS attribute VALUES are case-sensitive, so a lowercase [name="username"]
+// arm matches nothing -- measured live: the old selector returned count=0 while the form was
+// fully rendered and visible. Keep the " i" flag on every name/id arm.
+const EMAIL_SELECTOR = 'input[type="email"], input[name="username" i], input[name="email" i], input[id="username" i]';
 const PASSWORD_SELECTOR = 'input[type="password"]';
 const SUBMIT_SELECTOR = 'button[type="submit"], button:has-text("Sign in"), input[type="submit"]';
+const FIELD_TIMEOUT_MS = 15000;
 const LOGGED_IN_SELECTORS = [
   '[data-testid="user-menu"]',
   '[aria-label="User menu"]',
@@ -24,6 +29,20 @@ const MFA_SELECTORS = [
   'text=/two-?factor/i',
   'text=/enter the code/i',
 ];
+
+// The Pluralsight identity SPA drops Playwright's synthetic click (force:true skips
+// actionability but still issues the click the SPA ignores, and does not waive the
+// viewport requirement). Drive submit with a dispatched DOM MouseEvent instead.
+// evaluate() would otherwise fall back to Playwright's 30s default budget while the rest of
+// this module waits on FIELD_TIMEOUT_MS. Wait explicitly so a never-rendered submit button
+// fails on this module's own budget.
+async function _robustClick(locator, timeoutMs = FIELD_TIMEOUT_MS) {
+  await locator.waitFor({ state: 'visible', timeout: timeoutMs });
+  await locator.evaluate(el => {
+    el.scrollIntoView({ block: 'center', inline: 'center' });
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+  });
+}
 
 async function anyVisible(page, selectors, timeoutMs) {
   const checks = selectors.map((selector) =>
@@ -76,13 +95,14 @@ async function pageLooksLoggedIn(page, options) {
 
 async function fillIfVisible(page, selector, value, timeoutMs) {
   const field = page.locator(selector).first();
-  if (await field.isVisible({ timeout: timeoutMs }).catch(() => false)) {
-    await field.click();
-    await field.fill('');
-    await field.fill(value);
-    return true;
+  try {
+    await field.waitFor({ state: 'visible', timeout: timeoutMs });
+  } catch {
+    return false;
   }
-  return false;
+  await field.fill('');
+  await field.fill(value);
+  return true;
 }
 
 async function loginWithPage(page, username, password) {
@@ -96,10 +116,15 @@ async function loginWithPage(page, username, password) {
     return { ok: true, reason: 'already_logged_in' };
   }
 
-  await fillIfVisible(page, EMAIL_SELECTOR, username, 5000);
-  await fillIfVisible(page, PASSWORD_SELECTOR, password, 5000);
+  const emailFilled = await fillIfVisible(page, EMAIL_SELECTOR, username, FIELD_TIMEOUT_MS);
+  const passwordFilled = await fillIfVisible(page, PASSWORD_SELECTOR, password, FIELD_TIMEOUT_MS);
 
-  await page.locator(SUBMIT_SELECTOR).first().click();
+  if (!emailFilled || !passwordFilled) {
+    console.error(`ACG_LOGIN_FIELDS_MISSING: email=${emailFilled ? 'filled' : 'missing'} password=${passwordFilled ? 'filled' : 'missing'}`);
+    return { ok: false, reason: 'login_form_unavailable' };
+  }
+
+  await _robustClick(page.locator(SUBMIT_SELECTOR).first());
   await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(2000);
 
@@ -121,6 +146,7 @@ module.exports = {
   EMAIL_SELECTOR,
   LOGGED_IN_SELECTORS,
   MFA_SELECTORS,
+  _robustClick,
   PASSWORD_SELECTOR,
   SANDBOX_URL,
   SIGNED_OUT_SELECTORS,

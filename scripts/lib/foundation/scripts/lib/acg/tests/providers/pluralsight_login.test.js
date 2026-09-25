@@ -2,6 +2,9 @@ const {
   loginWithPage,
   pageLooksLoggedIn,
   SANDBOX_URL,
+  EMAIL_SELECTOR,
+  PASSWORD_SELECTOR,
+  SUBMIT_SELECTOR,
   SIGNED_OUT_SELECTORS,
   urlLooksSignedOut,
 } = require('../../playwright/lib/pluralsight_login');
@@ -9,13 +12,19 @@ const {
 function makeLocator(visible) {
   return {
     click: jest.fn().mockResolvedValue(undefined),
+    evaluate: jest.fn().mockResolvedValue(undefined),
     fill: jest.fn().mockResolvedValue(undefined),
     first: jest.fn().mockReturnThis(),
     isVisible: jest.fn().mockResolvedValue(visible),
+    waitFor: jest.fn(async () => {
+      if (!visible) {
+        throw new Error('not visible');
+      }
+    }),
   };
 }
 
-function makePage({ mfaVisible = false, loggedInVisible = false } = {}) {
+function makePage({ mfaVisible = false, loggedInVisible = false, passwordVisible = true } = {}) {
   let currentUrl = 'https://app.pluralsight.com/id/signin';
   const locators = new Map();
 
@@ -28,7 +37,8 @@ function makePage({ mfaVisible = false, loggedInVisible = false } = {}) {
         const isLoggedInSelector = selector.includes('psPrismMonogram');
         const isSignedOutSelector = SIGNED_OUT_SELECTORS.includes(selector);
         const isMfaSelector = selector.includes('one-time-code') || selector.includes('verification code') || selector.includes('two-?factor') || selector.includes('enter the code');
-        locators.set(selector, makeLocator(isMfaSelector ? mfaVisible : isLoggedInSelector ? loggedInVisible : isSignedOutSelector ? false : true));
+        const isPasswordSelector = selector === PASSWORD_SELECTOR;
+        locators.set(selector, makeLocator(isMfaSelector ? mfaVisible : isLoggedInSelector ? loggedInVisible : isSignedOutSelector ? false : isPasswordSelector ? passwordVisible : true));
       }
       return locators.get(selector);
     }),
@@ -47,6 +57,57 @@ describe('pluralsight login helper', () => {
     expect(result).toEqual({ ok: false, reason: 'mfa_required' });
     expect(page.goto).toHaveBeenNthCalledWith(1, 'https://app.pluralsight.com/id/signin', expect.any(Object));
     expect(page.goto).toHaveBeenCalledTimes(1);
+  });
+
+  test('fillIfVisible no longer clicks the fields', async () => {
+    const page = makePage({ loggedInVisible: true });
+
+    await loginWithPage(page, 'user@example.com', 'secret');
+
+    expect(page.locator(EMAIL_SELECTOR).click).not.toHaveBeenCalled();
+    expect(page.locator(PASSWORD_SELECTOR).click).not.toHaveBeenCalled();
+    expect(page.locator(EMAIL_SELECTOR).fill).toHaveBeenCalled();
+    expect(page.locator(PASSWORD_SELECTOR).fill).toHaveBeenCalled();
+  });
+
+  test('a field that never becomes visible returns login_form_unavailable', async () => {
+    const page = makePage({ passwordVisible: false });
+
+    await expect(loginWithPage(page, 'user@example.com', 'secret')).resolves.toEqual({
+      ok: false,
+      reason: 'login_form_unavailable',
+    });
+    expect(page.locator(SUBMIT_SELECTOR).evaluate).not.toHaveBeenCalled();
+  });
+
+  test('submit is dispatched, not clicked', async () => {
+    const page = makePage({ loggedInVisible: true });
+
+    await loginWithPage(page, 'user@example.com', 'secret');
+
+    expect(page.locator(SUBMIT_SELECTOR).evaluate).toHaveBeenCalled();
+    expect(page.locator(SUBMIT_SELECTOR).click).not.toHaveBeenCalled();
+  });
+
+  test('the submit wait carries an explicit timeout, not Playwright default', async () => {
+    const page = makePage({ loggedInVisible: true });
+
+    await loginWithPage(page, 'user@example.com', 'secret');
+
+    expect(page.locator(SUBMIT_SELECTOR).waitFor).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'visible', timeout: expect.any(Number) }),
+    );
+  });
+
+  test('the missing-field log line leaks no credential', async () => {
+    const page = makePage({ passwordVisible: false });
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await loginWithPage(page, 'user@example.com', 'secret');
+
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('ACG_LOGIN_FIELDS_MISSING'));
+    expect(error.mock.calls[0][0]).not.toContain('secret');
+    error.mockRestore();
   });
 });
 
@@ -71,6 +132,32 @@ function makeSlowRenderPage({ loggedInVisibleFromAttempt = 1 } = {}) {
     waitForTimeout: jest.fn().mockResolvedValue(undefined),
   };
 }
+
+describe('EMAIL_SELECTOR case sensitivity', () => {
+  // Pluralsight serves name="Username" (PascalCase) on a type="text" input. CSS attribute
+  // values are case-sensitive, so the old lowercase arms matched nothing and the email field
+  // was silently reported missing while the form was fully visible. jest has no DOM here
+  // (the suite is offline, no jsdom), so this guards the selector's shape; the behavioral
+  // proof is the live Playwright probe recorded in the bug doc: count 0 -> 1.
+  test('no bare case-sensitive name arm survives', () => {
+    expect(EMAIL_SELECTOR).not.toMatch(/\[name="username"\]/);
+    expect(EMAIL_SELECTOR).not.toMatch(/\[name="email"\]/);
+  });
+
+  test('username and email arms are case-insensitive', () => {
+    expect(EMAIL_SELECTOR).toMatch(/\[name="username" i\]/);
+    expect(EMAIL_SELECTOR).toMatch(/\[name="email" i\]/);
+  });
+
+  test('every name and id arm carries the case-insensitivity flag', () => {
+    const arms = EMAIL_SELECTOR.split(',').map((arm) => arm.trim());
+    const attrArms = arms.filter((arm) => /\[(name|id)=/.test(arm));
+    expect(attrArms.length).toBeGreaterThan(0);
+    for (const arm of attrArms) {
+      expect(arm).toMatch(/ i\]$/);
+    }
+  });
+});
 
 describe('pageLooksLoggedIn render-race hardening', () => {
   test('single attempt misses a slow-rendering logged-in page (reproduces the false negative)', async () => {

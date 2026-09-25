@@ -31,7 +31,7 @@ async function _main() {
     const result = await loginWithPage(page, USERNAME, PASSWORD);
 
     if (result.ok) {
-      process.stdout.write('ACG_SESSION_OK\n');
+      process.stdout.write('ACG_SESSION_OK path=auto-login\n');
       return;
     }
 
