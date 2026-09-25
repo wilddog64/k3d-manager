@@ -47,3 +47,17 @@ setup() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"jq is required"* ]]
 }
+
+@test "ssm_wait timeout returns 1 so callers can fall back" {
+  run bash -c '
+    export SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/plugins/ssm.sh
+    aws() { echo "ConnectionLost"; }
+    sleep() { return 0; }
+    ssm_wait i-test || echo "REACHED_CALLER rc=$?"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"did not become Online after 300s"* ]]
+  [[ "$output" == *"REACHED_CALLER rc=1"* ]]
+}

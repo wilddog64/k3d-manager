@@ -1,5 +1,52 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — SSM->SSH fallback was dead code: `_err` exits, so every fallback branch was unreachable
+
+Follow-up to the SSM backoff root cause below. The provider already intends to degrade to SSH —
+`scripts/lib/providers/k3s-aws.sh:127` says "fall back to SSH; provisioning fails only if both
+transports fail" — and there are three correctly written fallback sites:
+
+| site | intent |
+|---|---|
+| `k3s-aws.sh:138` | `wait_ssm_registered` fails -> `falling back to SSH tunnel` |
+| `k3s-aws.sh:156` | `SSM bootstrap failed — falling back to SSH provisioning` |
+| `k3s-aws.sh:161` | retry `deploy_app_cluster` with `K3S_AWS_SSM_ENABLED=false` |
+
+**None could ever run.** `_err` (`scripts/lib/system.sh:1731`) is fatal:
+
+```bash
+function _err() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+```
+
+Both registration waits ended in `_err`, so the process exited at the timeout; the `return 1` on
+the following line and every caller's fallback were unreachable. The failed `acg-recover` log
+proves it — line 65 `Provisioning app cluster via SSM (SSH fallback armed)`, line 67
+`ERROR: [ssm] Instance i-04f4f6420ae76148c did not become Online after 300s`, line 68
+`WARN: [acg-up] failed (exit 1)`. No fallback WARN in between.
+
+**The BATS suite was green over the bug.** `scripts/tests/lib/k3s_aws_provider.bats:333` stubbed
+`_provider_k3s_aws_wait_ssm_registered() { return 1; }` — a stub that *returns* where the real
+function *exits*. The test asserted the fallback message and passed, because the stub behaved the
+way the code was meant to rather than the way it did. That test could not fail.
+
+Fix: `_err` -> `_warn` in `ssm_wait` (`scripts/plugins/ssm.sh:72`) and
+`_provider_k3s_aws_wait_ssm_registered` (`scripts/lib/providers/k3s-aws.sh:88`). Three new tests
+drive the **real** functions (stubbing only `aws`/`_run_command`/`sleep`) and were mutation-proven:
+all three fail against the pre-fix source, all pass after. 26/26 green across both suites,
+shellcheck clean. Documented in `docs/howto/acg.md` under a new "SSM vs SSH transport" section.
+
+Two notes for later:
+
+- A repo-wide sweep found ~200 other `_err` followed by an unreachable `return` across
+  `scripts/plugins/` and `scripts/lib/`. Almost all are genuinely fatal so the dead `return` is
+  harmless idiom — but any future "degrade instead of abort" path must use `_warn`, not `_err`,
+  or it will be dead on arrival. Not fixed: out of scope, would be a mass refactor.
+- The SSM path is unreachable in the default profile anyway: `k3s-aws.sh:104` forces
+  `K3S_AWS_SSM_ENABLED=false` whenever `HUB_VAULT_USE_BRIDGE=1` (the default), because the Vault
+  bridge needs a reverse tunnel. That is why this survived so long, and why today's `make up`
+  bypassed SSM entirely. Still unfixed: the two-pass `EnableSsm=false` -> `true` deploy. The
+  fallback is the safety net, not the fix.
+
 ## 2026-09-25 — SSM timeout root-caused: 28m50s agent credential backoff vs a 150s/300s wait
 
 `ssm_wait` cannot succeed on a first-time ACG provision. The cause is a two-pass stack deploy

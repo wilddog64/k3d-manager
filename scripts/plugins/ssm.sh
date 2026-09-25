@@ -69,7 +69,7 @@ function ssm_wait() {
     [[ "${status}" == "Online" ]] && break
     (( attempts++ ))
     if (( attempts >= 60 )); then
-      _err "[ssm] Instance ${instance_id} did not become Online after 300s"
+      _warn "[ssm] Instance ${instance_id} did not become Online after 300s"
       return 1
     fi
     sleep 5

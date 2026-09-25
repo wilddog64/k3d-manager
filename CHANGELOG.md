@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Fixed
+- The `k3s-aws` SSM-to-SSH fallback is no longer dead code. `ssm_wait` and
+  `_provider_k3s_aws_wait_ssm_registered` ended their registration timeouts with `_err`, which
+  calls `exit 1` — so the process died at the timeout and the `return 1` on the next line, plus
+  every caller's SSH fallback branch, was unreachable. All three fallback sites in
+  `scripts/lib/providers/k3s-aws.sh` were written correctly and none of them could ever run; a
+  first-time ACG provision aborted at `[ssm] Instance <id> did not become Online after 300s`
+  right after logging `SSH fallback armed`. Both waits now `_warn` and return, so an SSM
+  registration timeout costs a detour instead of the whole run. The existing BATS coverage was
+  green over the bug because it stubbed `_provider_k3s_aws_wait_ssm_registered` with a function
+  that *returns* 1 where the real one *exits*; the new tests drive the real functions and were
+  mutation-proven to fail against the pre-fix source. Documented in `docs/howto/acg.md`,
+  including the underlying 28m50s `amazon-ssm-agent` credential backoff that makes both waits
+  unreachable on a first provision, and why raising the timeouts is the wrong fix.
+
 ## [1.37.0] - 2026-09-24
 
 ### Added

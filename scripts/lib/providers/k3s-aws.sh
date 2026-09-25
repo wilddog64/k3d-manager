@@ -85,7 +85,7 @@ _provider_k3s_aws_wait_ssm_registered() {
       --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null)" == "Online" ]]; do
     attempts=$(( attempts + 1 ))
     if (( attempts >= 30 )); then
-      _err "[k3s-aws] SSM agent did not register ${instance_id} within 150s"
+      _warn "[k3s-aws] SSM agent did not register ${instance_id} within 150s"
       return 1
     fi
     sleep 5
