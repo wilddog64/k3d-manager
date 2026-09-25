@@ -15,7 +15,7 @@
 - [x] `make test-all` completed plans `1..1112` and `1..132`; unittest counts `7 / 14 / 13 / 6 / 6`;
       expected EXIT=2 at Homebrew Python 3.14.7 without pytest. M1–M5 all red and restored with
       `git diff --quiet`.
-- [ ] Commit, push, and SHA verification remain.
+- [x] **PR #131 merged to main at 925c43e7** (2026-09-25 18:14:11Z); retrospective written and committed on v1.38.0.
 
 ## 2026-09-24 — webhook Phase 3 agent extraction (staged; Git blocked)
 

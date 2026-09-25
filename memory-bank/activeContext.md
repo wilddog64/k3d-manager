@@ -4644,3 +4644,20 @@ STILL PENDING, user's call only: (1) the scope decision — one PR covering obse
 (Claude's recommendation) vs. splitting the login fix onto its own `fix/` branch; (2) the PR itself
 plus merge + tag v0.4.18; then (3) subtree pull into k3d-manager and rewire the Tier 2 preflight in
 `scripts/plugins/e2e.sh` from Keychain-existence to the real loader. No PR created.
+
+# 2026-09-25 — v1.37.0 merged
+
+PR #131 (`k3d-manager-v1.37.0` → `main`) merged at **925c43e7675651b9de007346612f2941d47c605a** on 2026-09-25 18:14:11Z. 
+
+**Branch protection:** `enforce_admins` restored to `true` immediately post-merge.
+
+**Next branch created:** `k3d-manager-v1.38.0` at the merge commit; retrospective written and committed at **7e5333b0** (verified on origin).
+
+**Retrospective contents:** v1.37.0 delivered the webhook monolith split (five modules: policy, smoke, agent, lifecycle, status) with authorization hardened (unknown actor → reader, POST enforces floors + policy, every request audited once). Copilot caught two gate defects in this release's own tests (disappearance guard via `rg` was vacuously green; Alertmanager tests had hard PyYAML dependency) — both fixed. Four CodeQL alerts (23/24/26/27, spawn injection) dismissed as false positives with reasoning; alert 25 resolved by renaming `config_secret` → `config_ref`. Live smoke gate reported two failures on healthy cluster — both traced to stale gate defaults, not v1.37.0 regressions. Four findings filed as specs and deferred to v1.38.0.
+
+**Merge regression surface:** verified — no new failures introduced vs. pre-merge tree.
+
+**Git tag and GitHub release:** **still MISSING** and awaiting the owner's explicit approval. CHANGELOG heading, `docs/releases.md` row and README row already exist on `main`; the downstream step (tag + release) is a hard gate requiring the user's go, not something an agent owns. No tag or release was created.
+
+**v1.38.0 plan-doc count:** starts at 3 (max 5): `v1.38.0-hermes-app-health-delta-sensor.md`, `v1.38.0-vector-store-and-hermes-prior-art.md`, and `v1.38.0-slack-smoke-target.md`. Two slots remain.
+
