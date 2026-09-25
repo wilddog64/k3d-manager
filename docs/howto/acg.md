@@ -195,3 +195,42 @@ The agent log on the node is `/var/log/amazon/ssm/amazon-ssm-agent.log`. Ignore 
 `AccessDeniedException: Systems Manager's instance management role is not configured for account`
 — that is Default Host Management Configuration failing and is irrelevant. The real line above it
 is `EC2RoleRequestError: no EC2 instance role found`.
+
+## Data-layer sync that never converges
+
+`cluster-up` Step 10b waits for the `<cluster>-data-layer` ArgoCD Application to reach `Synced`
+(300s, then one force-sync and a further 180s). A sync wait cannot succeed while a pod in
+`shopping-cart-data` is stuck pulling its image, so the run now checks for that directly and
+aborts with the reason instead of polling until the deadline:
+
+```
+WARN: [acg-up] data-layer is blocked on an image pull, not on a slow sync:
+WARN: [acg-up]   pod/minio-0 minio ImagePullBackOff: Back-off pulling image "..." 401 UNAUTHORIZED
+WARN: [acg-up] An ArgoCD sync cannot clear an image pull failure — aborting instead of waiting out the timeout.
+```
+
+The check fires on `ImagePullBackOff`, `ErrImagePull`, `InvalidImageName`, `ErrInvalidImageName`
+and `RegistryUnavailable`, in init containers as well as regular ones, and only after the same
+verdict on three consecutive polls so a pull still in progress is not mistaken for a failure.
+`ContainerCreating`, `CreateContainerConfigError` and `CrashLoopBackOff` are deliberately **not**
+fatal — those can still clear on their own (for example once ESO populates a Secret).
+
+When it fires, the image reference is wrong or unreachable, and the fix is in
+`shopping-cart-infra` under `data-layer/` — not in this repo.
+
+### Telling a gated registry from a missing tag
+
+Request `latest` with an anonymous bearer token. If that is also `401`, the **repository** is gated
+and no tag will pull; if only your pinned tag fails, the tag is gone. Always confirm egress with a
+known-public control image from the same registry first:
+
+```bash
+T=$(curl -s "https://quay.io/v2/auth?service=quay.io&scope=repository:minio/minio:pull" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+curl -s -o /dev/null -w '%{http_code}\n' -I -H "Authorization: Bearer $T" \
+  https://quay.io/v2/minio/minio/manifests/latest
+```
+
+As of 2026-09-25 both `quay.io/minio/minio` and `quay.io/minio/mc` answer `401` for every tag,
+including `latest`, while `quay.io/prometheus/busybox:latest` returns `200` — so MinIO's images
+are no longer anonymously pullable and need a mirror or a pull secret.

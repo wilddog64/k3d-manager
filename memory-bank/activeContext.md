@@ -1,5 +1,40 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — data-layer sync wait now fails fast on a blocked image pull
+
+Implements the second finding from the quay/MinIO failure below. `bin/cluster-up` gained two
+helpers before `login_prompt=0`:
+
+- `_acg_image_pull_blocked <ns> <ctx>` — prints one `pod/<name> <container> <reason>: <message>`
+  line per container waiting on `ImagePullBackOff`, `ErrImagePull`, `InvalidImageName`,
+  `ErrInvalidImageName` or `RegistryUnavailable`, init containers included; rc 0 when any found.
+- `_acg_data_layer_abort_on_image_pull` — three-strike gate (20s of grace) so an in-progress pull
+  is not mistaken for a permanent failure, then WARNs the detail and returns 0 to abort.
+
+Wired into **both** data-layer sync waits (pre- and post-force-sync). `CreateContainerConfigError`
+and `CrashLoopBackOff` are deliberately NOT fatal — they can clear once ESO populates a Secret.
+
+Verified against the live broken sandbox, not just stubs: poll 1 and 2 logged `not settled (n/3)`,
+poll 3 aborted naming `pod/minio-0 minio ImagePullBackOff`. Controls (`kube-system`, a
+nonexistent namespace) correctly returned not-blocked. Six new BATS tests in
+`scripts/tests/bin/cluster_up.bats`, 18/18 green, `bash -n` and shellcheck clean.
+Mutation-proven twice: dropping `ImagePullBackOff` from the reason list fails tests 13 and 16;
+removing either loop call-site fails test 18.
+
+**Two bugs found in my own helper while testing it live** — both worth remembering:
+
+1. `print(f"... {cs.get(\"name\", \"?\")} ...")` is a `SyntaxError` even on Python 3.13
+   (PEP 701 allows nested quotes but not backslash escapes inside an f-string expression). With
+   `2>/dev/null` on the python and `|| return 1` after it, this produced a **silent false
+   negative** — the probe reported "not blocked" against a cluster that was visibly blocked, which
+   is exactly the failure mode the helper exists to prevent. Fixed by binding the name to a local
+   first; python stderr is no longer suppressed, only kubectl's.
+2. A column-0 `}` inside embedded python (the closing brace of a multi-line `set` literal) breaks
+   any `sed -n '/^function f/,/^}$/p'` extraction, which is how the BATS tests source these
+   helpers out of a non-sourceable script. Flattened the literal to a parenthesised tuple.
+
+Committed on `k3d-manager-v1.37.0`.
+
 ## 2026-09-25 — `make up` failed at data-layer: quay.io/minio is no longer anonymously pullable
 
 `make up CLUSTER_PROVIDER=k3s-aws` got all the way to the data-layer wait and then failed

@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Fixed
+- `cluster-up` Step 10b fails fast when the data layer is blocked on an image pull instead of
+  polling out the full 300s + force-sync + 180s window. A `quay.io/minio/minio` 401 surfaced as
+  eight minutes of `data-layer not yet Synced — waiting...` followed by a force-sync that could
+  not possibly help, because the ArgoCD operation was still `Running`, `waiting for healthy state
+  of apps/StatefulSet/minio`. Both sync waits now call `_acg_data_layer_abort_on_image_pull`,
+  which reports the offending pod, container, reason and message. Fires on `ImagePullBackOff`,
+  `ErrImagePull`, `InvalidImageName`, `ErrInvalidImageName` and `RegistryUnavailable`, in init
+  containers too, and only after three consecutive polls so an in-progress pull is not mistaken
+  for a failure; `ContainerCreating`, `CreateContainerConfigError` and `CrashLoopBackOff` stay
+  non-fatal since they can still clear on their own.
 - The `k3s-aws` SSM-to-SSH fallback is no longer dead code. `ssm_wait` and
   `_provider_k3s_aws_wait_ssm_registered` ended their registration timeouts with `_err`, which
   calls `exit 1` — so the process died at the timeout and the `return 1` on the next line, plus

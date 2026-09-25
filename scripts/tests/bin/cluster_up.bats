@@ -264,3 +264,90 @@ STUB
   [ "$status" -eq 0 ]
   [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
 }
+
+_load_image_pull_helpers() {
+  sed -n '/^function _acg_image_pull_blocked()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/a.sh"
+  sed -n '/^function _acg_data_layer_abort_on_image_pull()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/b.sh"
+  source scripts/lib/system.sh
+  source "${BATS_TEST_TMPDIR}/a.sh"
+  source "${BATS_TEST_TMPDIR}/b.sh"
+}
+
+_pods_json_imagepullbackoff() {
+  cat <<'JSON'
+{"items":[{"metadata":{"name":"minio-0"},"status":{"containerStatuses":[
+ {"name":"minio","state":{"waiting":{"reason":"ImagePullBackOff","message":"Back-off pulling image \"quay.io/minio/minio:X\": 401 UNAUTHORIZED"}}}]}},
+ {"metadata":{"name":"redis-cart-0"},"status":{"containerStatuses":[{"name":"redis","state":{"running":{}}}]}}]}
+JSON
+}
+
+@test "acg-up image-pull probe reports a blocked container with pod, container and reason" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers _pods_json_imagepullbackoff)"'
+    _load_image_pull_helpers
+    kubectl() { _pods_json_imagepullbackoff; }
+    _acg_image_pull_blocked shopping-cart-data ubuntu-k3s
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pod/minio-0 minio ImagePullBackOff"* ]]
+  [[ "$output" == *"401 UNAUTHORIZED"* ]]
+  [[ "$output" != *"redis-cart-0"* ]]
+}
+
+@test "acg-up image-pull probe stays quiet when every container is running" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers)"'
+    _load_image_pull_helpers
+    kubectl() { echo "{\"items\":[{\"metadata\":{\"name\":\"redis-cart-0\"},\"status\":{\"containerStatuses\":[{\"name\":\"redis\",\"state\":{\"running\":{}}}]}}]}"; }
+    _acg_image_pull_blocked shopping-cart-data ubuntu-k3s
+  '
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "acg-up image-pull probe ignores a non-fatal waiting reason" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers)"'
+    _load_image_pull_helpers
+    kubectl() { echo "{\"items\":[{\"metadata\":{\"name\":\"minio-0\"},\"status\":{\"containerStatuses\":[{\"name\":\"minio\",\"state\":{\"waiting\":{\"reason\":\"ContainerCreating\"}}}]}}]}"; }
+    _acg_image_pull_blocked shopping-cart-data ubuntu-k3s
+  '
+  [ "$status" -ne 0 ]
+}
+
+@test "acg-up data-layer abort waits three polls before giving up" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers _pods_json_imagepullbackoff)"'
+    _load_image_pull_helpers
+    kubectl() { _pods_json_imagepullbackoff; }
+    for i in 1 2 3; do
+      if _acg_data_layer_abort_on_image_pull; then echo "ABORT_AT=$i"; break; fi
+    done
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"not settled (1/3)"* ]]
+  [[ "$output" == *"not settled (2/3)"* ]]
+  [[ "$output" == *"blocked on an image pull, not on a slow sync"* ]]
+  [[ "$output" == *"ABORT_AT=3"* ]]
+}
+
+@test "acg-up data-layer abort resets its strike count when the pull recovers" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers _pods_json_imagepullbackoff)"'
+    _load_image_pull_helpers
+    kubectl() { _pods_json_imagepullbackoff; }
+    _acg_data_layer_abort_on_image_pull || true
+    _acg_data_layer_abort_on_image_pull || true
+    kubectl() { echo "{\"items\":[]}"; }
+    _acg_data_layer_abort_on_image_pull || true
+    echo "strikes=${_DL_IMAGE_STRIKES}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"strikes=0"* ]]
+}
+
+@test "acg-up checks for a blocked image pull inside both data-layer sync waits" {
+  run grep -c '_acg_data_layer_abort_on_image_pull' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 3 ]
+}
