@@ -1,5 +1,24 @@
 # Progress — k3d-manager
 
+## 2026-09-25 — `/api/v1/health` has been 500ing since v1.37.0 (found during v1.38.0 verify)
+
+- [x] Root-caused an authenticated `GET /api/v1/health` returning `http=000`: the daemon raised
+      `TypeError: 'NoneType' object is not iterable` at `do_GET:2187`. `_smoke_test_services`
+      returns `results` only inside its `if quick:` branch and falls off the end otherwise, so the
+      default non-quick path returns `None`.
+- [x] Introduced by `925c43e7` (v1.37.0 webhook decomposition, PR #131): the function ended with
+      `return results` at `bin/k3dm-webhook:2377` under `945018ee`, and the move into
+      `scripts/lib/webhook/smoke.py` dropped it. smoke.py has exactly one commit, so no later edit.
+- [x] Two callers affected: both `/api/v1/health` branches, and the post-provision Slack check at
+      `bin/k3dm-webhook:1482`. `?quick=1` kept working, which is why a release shipped over it.
+- [x] Fixed with the one-line return, plus
+      `test_smoke_test_services_returns_results_on_the_non_quick_path`. Mutation-checked.
+      Filed `docs/bugs/2026-09-25-smoke-test-services-missing-return-breaks-health.md`.
+- [x] Not caused by the v1.38.0 role work. `reader cluster-status: 202` was the control — auth,
+      the credential ceiling and the POST path were all correct while health was dead.
+- [ ] Follow-up, not in this fix: no gate asserts `/api/v1/health` returns 200 and parses its
+      `services` array. That is why a dead endpoint merged. Belongs with the webhook smoke gate.
+
 ## 2026-09-25 — S3 gate hole closed for the health query form (Claude)
 
 - [x] Independently verified `8b706882`: on origin, 4-file scope, pytest + `webhook.bats` 64/64

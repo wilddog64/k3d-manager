@@ -665,3 +665,5 @@ def _smoke_test_services(retries=None, provider=None, quick=False):
         results.append(("Data layer", _dl_ok, _dl_detail))
 
     results.extend(_smoke_test_logins(provider, app_context))
+
+    return results

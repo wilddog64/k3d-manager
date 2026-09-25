@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Fixed
+- `GET /api/v1/health` answers again instead of dropping the connection. The v1.37.0 webhook
+  decomposition (`925c43e7`) moved `_smoke_test_services` into `scripts/lib/webhook/smoke.py`
+  and dropped its closing `return results`, so the default non-quick path returned `None` and
+  every caller that iterated it raised `TypeError: 'NoneType' object is not iterable`. Both
+  `/api/v1/health` branches and the post-provision Slack check were affected; `?quick=1` returns
+  inside the early-exit branch and kept working, which is how a release shipped over it. Adds a
+  regression test that exercises the non-quick path, which no test previously did.
 - `cluster-up`'s failure cleanup no longer tears down the Cloudflare tunnel it did not start.
   `_acg_up_cleanup` ran an unconditional `launchctl bootout` of
   `com.k3d-manager.cloudflare-tunnel` on any non-zero exit, but `cluster-up` does not install or
