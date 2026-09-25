@@ -199,3 +199,63 @@ FAKE
   run grep -F -- 'make e2e-sandbox' Makefile
   [ "$status" -eq 0 ]
 }
+
+_stub_kubectl() {
+  kubectl() {
+    if [[ "$1" == "config" ]]; then
+      printf '%s\n' ${KUBECTL_CONTEXTS:-}
+      return 0
+    fi
+    if [[ "$*" == *"--raw=/readyz"* ]]; then
+      return "${KUBECTL_READYZ_RC:-0}"
+    fi
+    return 0
+  }
+}
+
+@test "cluster preflight fails when the sandbox kubecontext is absent" {
+  _stub_kubectl
+  KUBECTL_CONTEXTS="k3d-k3d-cluster ubuntu-hostinger"
+  run _e2e_sandbox_preflight_cluster
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"ubuntu-k3s"* ]]
+  [[ "$output" == *"is absent"* ]]
+  [[ "$output" == *"make up"* ]]
+}
+
+@test "cluster preflight does not match a context by prefix" {
+  _stub_kubectl
+  KUBECTL_CONTEXTS="ubuntu-k3s-old"
+  run _e2e_sandbox_preflight_cluster
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"is absent"* ]]
+}
+
+@test "cluster preflight fails when the context exists but the API server is dead" {
+  _stub_kubectl
+  KUBECTL_CONTEXTS="ubuntu-k3s"
+  KUBECTL_READYZ_RC=1
+  run _e2e_sandbox_preflight_cluster
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"readyz"* ]]
+  [[ "$output" == *"4h"* ]]
+}
+
+@test "cluster preflight passes when the context exists and answers readyz" {
+  _stub_kubectl
+  KUBECTL_CONTEXTS="ubuntu-k3s"
+  KUBECTL_READYZ_RC=0
+  run _e2e_sandbox_preflight_cluster
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"readyz=ok"* ]]
+}
+
+@test "cluster preflight runs before the sandbox extension burns a browser step" {
+  run grep -n -A4 -- '_e2e_sandbox_preflight_auth$' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"_e2e_sandbox_preflight_cluster"* ]]
+  local cluster_line extend_line
+  cluster_line="$(grep -n -- '_e2e_sandbox_preflight_cluster$' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh" | tail -1 | cut -d: -f1)"
+  extend_line="$(grep -n -- 'acg_extend_playwright "\${_ACG_SANDBOX_URL' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh" | cut -d: -f1)"
+  [ "$cluster_line" -lt "$extend_line" ]
+}

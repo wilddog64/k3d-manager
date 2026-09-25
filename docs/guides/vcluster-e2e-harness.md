@@ -190,6 +190,14 @@ make e2e-sandbox                          # DIGEST=sha256:... optional
 terminal: the preflight's one-time interactive ACG login needs a real TTY, so it
 cannot run unattended.
 
+**Prerequisite: a live `ubuntu-k3s` kubecontext.** Tier 2 does not provision the
+sandbox cluster — it deploys *into* one. Bring the cluster up with the `k3s-aws`
+provider first (`make up`) and confirm `kubectl --context ubuntu-k3s get nodes`.
+The preflight checks this before anything else and fails with the reason, because
+an ACG sandbox expires after 4h and takes its node addresses with it: a context
+left over from an earlier sandbox is still in your kubeconfig but points at a dead
+endpoint. If the sandbox itself is gone, `acg_restart` is the recovery path.
+
 The sandbox is never registered with hub ArgoCD and is not torn down by the
 harness; ACG TTL expiry provides cleanup. Tier 2 is best-effort and periodic,
 never a blocking per-candidate gate. Its summaries use `tier: sandbox` and

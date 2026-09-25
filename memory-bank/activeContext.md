@@ -1,5 +1,33 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — Tier 2 preflight gates on the sandbox kubecontext
+
+First `make e2e-sandbox` run died three phases in on a bare kubectl
+`context was not found for specified context: ubuntu-k3s`, **after** the ACG browser
+extension step had already run. Tier 2 deploys *into* a cluster; it never provisioned one, and
+nothing checked that the cluster existed.
+
+Root cause is environmental, not a harness bug: `kubectl config get-contexts` holds only
+`k3d-k3d-cluster` and `ubuntu-hostinger`. The one local sandbox kubeconfig,
+`~/.kube/k3s-ubuntu.yaml` (Sep 4), was never merged as a context and its endpoint is dead —
+probed it, `context deadline exceeded`. An ACG sandbox lasts 4h, so a 3-week-old sandbox
+kubeconfig cannot be live. Unblocking Tier 2 needs `make up` on the k3s-aws default, which is
+the operator's to run.
+
+What was fixed in code: `_e2e_sandbox_preflight_cluster` now runs immediately after the
+credential preflight and before the browser step, and distinguishes the two states — context
+absent from the kubeconfig (never provisioned) vs context present but `/readyz` silent (left
+over from an expired sandbox). Verified against the real kubeconfig: it fires with the absent
+message and rc=1.
+
+Lesson repeated a **third** time this release: `e2e.bats`'s "never invokes
+register_app_cluster" test stubs private helpers from a by-name list, so the new preflight ran
+real `kubectl` against the operator's clusters and the test went red. Fixed durably this time
+rather than by adding one more name — `setup()` now installs a bare `kubectl` stub for the
+whole suite, so any future code path that shells out to kubectl is offline by default. The
+suite's one intentionally-real kubectl call uses `env kubectl`, which bypasses a shell function
+and is therefore unaffected.
+
 ## 2026-09-24 — Tier 2 gets a make target and a Slack surface
 
 Tier 1 has had `make e2e` since v1.26.0; Tier 2 (`e2e_verify_sandbox`) had no make entry point

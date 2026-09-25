@@ -15,6 +15,13 @@
   Tier 2 the same make entry point Tier 1 has had via `make e2e`. `DIGEST=` is optional and
   passes through as the candidate digest; the target must be run from a real terminal because
   the preflight's one-time interactive ACG login needs a TTY.
+- Tier 2 preflight now gates on the **sandbox kubecontext**, not just credentials. `ubuntu-k3s`
+  must exist and answer `/readyz` before the harness touches the browser. Previously a missing
+  or expired context surfaced three phases in as a bare `context was not found for specified
+  context: ubuntu-k3s` from kubectl, after the ACG extension step had already run. The two
+  states are now distinguished: absent from the kubeconfig (never provisioned) vs present but
+  unreachable (left over from an expired sandbox — ACG sandboxes last 4h and take their node
+  addresses with them).
 - `e2e-sandbox` is also reachable from Slack `/k3dm` as an `operator` target with an optional
   `DIGEST` and a 3600s timeout, matching `e2e-remote`. Unattended, it can only use an already
   valid ACG session and otherwise fails closed with `ACG_SESSION_EXPIRED`.

@@ -120,6 +120,20 @@ function _e2e_sandbox_kc() {
   _run_command -- kubectl --context ubuntu-k3s "$@"
 }
 
+function _e2e_sandbox_preflight_cluster() {
+  local ctx="ubuntu-k3s" timeout="${E2E_SANDBOX_PROBE_TIMEOUT:-15}"
+
+  if ! kubectl config get-contexts -o name 2>/dev/null | grep -qx -- "$ctx"; then
+    _err "[e2e] sandbox preflight: kubecontext ${ctx} is absent, so every later phase would fail on 'context was not found'; the sandbox k3s cluster is not provisioned in this kubeconfig — bring it up with the k3s-aws provider (make up) and confirm with 'kubectl --context ${ctx} get nodes' before rerunning Tier 2"
+    return 1
+  fi
+  if ! kubectl --context "$ctx" get --raw=/readyz --request-timeout="${timeout}s" >/dev/null 2>&1; then
+    _err "[e2e] sandbox preflight: kubecontext ${ctx} exists but its API server did not answer /readyz within ${timeout}s; an ACG sandbox expires after 4h and takes its node addresses with it, so a context left over from an earlier sandbox points at a dead endpoint — reprovision with the k3s-aws provider (acg_restart first if the sandbox itself is gone), then rerun Tier 2"
+    return 1
+  fi
+  _info "[e2e] sandbox preflight: context=${ctx} readyz=ok"
+}
+
 function _e2e_sandbox_argocd_cluster_manifest() {
   cat <<'YAML'
 apiVersion: v1
@@ -342,6 +356,8 @@ function e2e_verify_sandbox() {
   trap '_e2e_sandbox_exit_trap' EXIT
 
   _e2e_sandbox_preflight_auth
+  _E2E_ACTIVE_PHASE="preflight-cluster"
+  _e2e_sandbox_preflight_cluster
   _E2E_ACTIVE_PHASE="extending-sandbox"
   acg_extend_playwright "${_ACG_SANDBOX_URL:-}"
   _E2E_ACTIVE_PHASE="checking-nodes"

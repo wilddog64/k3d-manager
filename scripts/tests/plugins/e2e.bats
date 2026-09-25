@@ -58,6 +58,15 @@ FAKE
     return "$rc"
   }
 
+  # Never let a bare kubectl in a path under test reach the operator's real clusters.
+  kubectl() {
+    if [[ "$1" == "config" ]]; then
+      printf '%s\n' "${KUBECTL_CONTEXTS:-ubuntu-k3s}"
+      return 0
+    fi
+    return "${KUBECTL_RC:-0}"
+  }
+
   # Stub sibling-plugin dependencies so _e2e_load_deps does not source the real files.
   vcluster_create() { echo "vcluster_create $*" >> "$VC_LOG"; }
   vcluster_destroy() { echo "vcluster_destroy $*" >> "$VC_LOG"; }
