@@ -1599,9 +1599,15 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] Bug filed: `docs/bugs/2026-09-24-acg-pluralsight-login-click-preconditions.md` — **`b48ad1c4`**,
       local == origin. 4 defects in `playwright/lib/pluralsight_login.js`; root cause explicitly
       NOT reproduced (a CDP probe disproved the "never stable" hypothesis).
-- [ ] Login fix — dispatched to `codex exec` (background). Scope: `pluralsight_login.js`, its jest
-      suite, `CHANGE.md`. Mutation check mandatory. VERIFY on return: SHA on origin, `--stat`
-      scope, jest count > 32, both mutation runs, bats 138.
+- [x] Login fix — **`8a74258`** (3 files) + **`a33727c0`** (bug-doc gate table), local == origin.
+      Codex wrote it; `.git/index.lock: Operation not permitted` blocked its commit AGAIN (2nd time
+      on this branch) and left 3 gates unrun. It correctly stopped rather than working around the
+      lock. Claude reviewed the diff and ran the outstanding gates.
+- [x] Gates measured by Claude: `node --check` clean x2; jest 7 suites / **36** tests (from 32);
+      `npm run check` clean; `make bats` **138 ok / 0 not ok / 0 skips**.
+- [x] **Mutation check PASSED exactly** — pre-fix source swapped in by file copy (not `git stash`,
+      which is what failed for Codex): **4 failed / 32 passed**. The 4 new tests are all real
+      guards; the 32-test baseline undisturbed.
 - [ ] Operator re-runs `credential-test` — the ONLY gate that can confirm the login fix.
       Cannot be delegated; until it passes the fix is plausible, not confirmed.
 - [ ] PR + merge + tag v0.4.18 — needs the user's go

@@ -3591,3 +3591,40 @@ sandbox-provisioning path that cannot be tested without a live sandbox.
 
 Verify on return per the standing rule: SHA on origin, `--stat` scope, jest count risen above 32,
 both mutation-check runs, bats 138.
+
+# 2026-09-24 — login fix landed (8a74258); the mutation gate is what made it trustworthy
+
+Codex wrote the change correctly but hit `.git/index.lock: Operation not permitted` again — its
+known sandbox limit, now seen twice on this branch. It stopped and reported instead of working
+around the lock, which is the required behavior, but that left **three gates unrun**: the mutation
+check, `npm run check`, and `make bats`. Claude reviewed the diff and ran all three.
+
+Landed: **`8a74258`** (fix, 3 files: `pluralsight_login.js`, its jest suite, `CHANGE.md`) and
+**`a33727c0`** (bug-doc verification table). Local == origin. Source diff matches the spec's F1-F4
+exactly; no scope creep, no files outside the three.
+
+Gates measured by Claude, not taken from the report: `node --check` clean x2; jest **7 suites / 36
+tests** (up from 32); `npm run check` clean; `make bats` **138 ok, 0 not ok, 0 skips**. The
+"missing aws CLI" case did NOT go red here, consistent with the earlier finding that its skip
+depends on `aws` being in `/usr/bin:/bin`.
+
+**The mutation check is the gate that mattered and it passed exactly:** swapping the pre-fix source
+back in (by FILE COPY — `git stash` is what failed for Codex, from the module dir with a
+repo-relative path) produced **4 failed / 32 passed**. Precisely the four new tests go red and all
+32 pre-existing ones stay green, so each new test is a real guard and none of the baseline was
+disturbed. Given that this bug's whole shape was "a guard that looks present but isn't", tests that
+passed either way would have repeated the defect rather than fixed it.
+
+Still NOT confirmed: the fix itself. Jest green means the code matches the spec, not that
+auto-login works. Root cause was never reproduced (the CDP probe disproved the "never stable"
+hypothesis), so this is precondition reduction plus documented precedent. **Only the operator's
+`credential-test` re-run can confirm it** — it needs a TTY and their credentials, so no agent and
+not Claude can run it. Recorded in the bug doc as plausible, not confirmed.
+
+Open decision for the user: this fix now sits on the same branch as the approved "Reporting +
+require-credentials gate" scope, so the v0.4.18 PR is wider than what was signed off. Claude's
+recommendation is one PR (same subsystem, nothing merged yet); the alternative is splitting the
+login fix onto its own `fix/` branch before the PR. Awaiting the user's call — no PR created.
+
+Minor residue, deliberately not churned on a verified tree: `_robustClick` is exported but no test
+imports it directly. Folded into the `_robustClick` dedup follow-up.
