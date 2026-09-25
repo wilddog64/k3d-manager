@@ -1,5 +1,43 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — CodeQL alert 25 resolved by renaming, not dismissing (`1d31d9e7`)
+
+The last red check on PR #131. `py/clear-text-logging-sensitive-data` (high) at
+`bin/k3dm-hermes:451` — a `print(json.dumps(...))` **the PR never touched**. `git diff
+origin/main...HEAD -- bin/k3dm-hermes` confirms it: the PR added a new taint *source* that
+reaches an existing *sink*.
+
+The source is the new `alert_delivery` sensor's dict key `config_secret`. CodeQL classifies
+any `secret`-shaped **identifier** as sensitive data — no value flow is involved. Path:
+
+```
+sensors.py  item.get('config_secret')  ->  blackout  ->  data  ->  record()
+            ->  records  ->  print(json.dumps({"records": records, ...}))   # :451
+```
+
+The value is the *name* of the Secret in the Alertmanager CR's `spec.configSecret`;
+`bin/k3dm-alert-delivery-status:36` only does `kubectl get secret "$name" >/dev/null` — an
+existence check. Contents are never read. Live probe confirms:
+`"config_ref": "alertmanager-smtp-secret"`.
+
+**Owner chose rename over a fifth dismissal.** `config_secret` -> `config_ref`,
+`config_secret_missing` -> `config_ref_missing`. Rationale worth keeping: a name-based
+heuristic re-fires on *every* future `*_secret` field that carries a reference, so removing the
+trigger word removes the class where a suppression hides one instance — and the field was
+misleading anyway. Blast radius was only three files with zero consumers on `main`, because the
+field ships in this same PR. The operator-facing message still reads `configSecret <name>
+absent` (string *contents* are not a CodeQL source, only identifiers are), and the reasoning is
+now in the `alert_delivery` docstring so nobody tidies the name back.
+
+**Checked the two adjacent taint paths into the same `print` at the same time**, so clearing one
+did not leave a real one: `approvals` filters relay items through three anchored regexes and
+keeps only `action_id`/`outcome` (a token cannot match `^r[0-9]+-[0-9a-f]{8}$`); `pages` is built
+from `alert.get('number')` only. Both clean.
+
+Generalisable: **CodeQL's Python sensitive-data rules key on identifiers, not values.** A field
+holding a *reference* to a secret must not be named like the secret, or it silently converts any
+downstream log line into a high-severity alert.
+
 ## 2026-09-25 — Copilot PR #131: two v1.37.0 gates could not fail
 
 Both findings accepted, neither a false positive, and both inside the milestone's *own* new
