@@ -1822,3 +1822,14 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       to Pushgateway, so no rule can fire and no SMS can be sent. Delivery is fine
       (`severity = critical` → `sms-critical`). Second silent failure from this same gap; the
       blackbox-probe + `CloudflareTunnelDown` follow-up is now load-bearing.
+- [x] **Root-cause the Frontend 404** — `docs/bugs/2026-09-25-frontend-public-url-routes-to-wrong-cluster.md`.
+      Tunnel → `:8000` → OrbStack → **hub** Istio, which has no `frontend` route and no frontend
+      workload; the healthy pod is on hostinger with no Ingress and no NodePort. Fix is an
+      architecture choice and needs the operator.
+- [x] **Spec the public-endpoint blackbox probes** — `docs/plans/v1.38.0-public-endpoint-blackbox-probes.md`
+      (5th plan doc; v1.38.0 is now at the max-5 cap). Two modules, explicit `User-Agent`,
+      `PublicEndpointDown` / `CloudflareTunnelDown` / `PublicEndpointProbeAbsent`.
+- [x] **Keycloak `awk` fix dispatched and verified** — `e0815211` on
+      `origin/fix/keycloak-reconcile-awk-free` (`shopping-cart-infra`). `awk` 11 → 0, YAML parses,
+      shellcheck clean both sides, 13/13 helper-vs-awk equivalences with 2 negative controls.
+      PR is the owner's call.

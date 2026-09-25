@@ -1,5 +1,46 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — Frontend 404 root-caused; blackbox spec filed; Keycloak awk fix verified
+
+**`frontend.3ai-talk.org` 404 — the tunnel points at the wrong cluster.** The tunnel and its config
+are healthy. `~/.cloudflared/config.yml` maps the host to `127.0.0.1:8000`, which OrbStack publishes
+into the **k3d hub** cluster's Istio ingress — `curl -D -` on `:8000` answers `server: istio-envoy`,
+404, content-length 0. The hub's gateway has VirtualServices for only `grafana` and `prometheus`, and
+`shopping-cart-apps` on the hub is **empty**. The healthy frontend is on hostinger, where it is
+ClusterIP-only with no Ingress and no NodePort, unlike `order-service` and `product-catalog` which
+both have NodePorts. `grafana`/`prometheus` work through the same `:8000` precisely because the hub
+does have their routes; `argocd`/`keycloak` work because they are port-forwards on `:8080`/`:8880`.
+Second, independent fault: `com.k3d-manager.frontend-port-forward` targets context `ubuntu-k3s` (ACG,
+not hostinger) on port 3000, which no tunnel rule references, and answers `000` on both `127.0.0.1`
+and `[::1]` despite launchd reporting it up with last exit status 1. Filed
+`docs/bugs/2026-09-25-frontend-public-url-routes-to-wrong-cluster.md`. The fix is an architecture
+choice (NodePort on hostinger vs a hub VirtualService proxying to it) and is **not** decided.
+
+**Why no SMS.** Delivery was never the problem — `severity = critical` already routes to
+`sms-critical`. Nothing produces a signal: `make status` writes no metrics (no Pushgateway writer
+anywhere in `scripts/` or `bin/`), there is **no blackbox exporter anywhere in the repo**, and
+`ServiceDown` keys on `kube_pod_status_ready == 0`, which is correctly silent when the pod is healthy
+and only the public path is broken. Spec filed:
+`docs/plans/v1.38.0-public-endpoint-blackbox-probes.md` — two probe modules (a 302 from Keycloak and
+a 401 from the auth-gated hosts are *healthy*, so a single naive `valid_status_codes` would be
+wrong), an explicit `User-Agent` because Cloudflare 1010-blocks a default one, and three rules:
+`PublicEndpointDown`, `CloudflareTunnelDown`, and `PublicEndpointProbeAbsent` so a dead probe is not
+mistaken for silence. **This is the 5th v1.38.0 plan doc — the release is at the max-5 cap.**
+
+**Keycloak `awk` fix (Codex, verified).** `e0815211` on
+`origin/fix/keycloak-reconcile-awk-free` in `shopping-cart-infra`, parented on `origin/main`, exactly
+3 files. Verified independently rather than trusted: `awk` 11 → 0, YAML parses, `bash -n` passes, and
+shellcheck is clean on both sides. Two process notes — (1) Codex pushed correctly but left the local
+repo with the branch ref still at `origin/main` and the changes uncommitted, so a local
+`git rev-parse origin/<branch>` looked like a fabricated SHA until the ref was fetched; it was real.
+Synced with `git reset --mixed FETCH_HEAD` (content was byte-identical, so nothing could be lost).
+(2) **My spec's shellcheck gate was vacuous** — it extracted `command[3]`, which is the literal `-c`,
+so both before and after "counts" were one `SC2215` on a 1-line file. Codex reported that honestly.
+The script is `command[4]`; re-run properly it is clean. Behavioural equivalence was then proven
+directly: 13 comparisons of each new bash helper against its `awk` oracle on realistic quoted-CSV
+input all matched, with 2 negative controls failing as required to show the harness can detect a
+difference.
+
 ## 2026-09-25 — Cloud bridge bootstrapped and proven end to end (Claude)
 
 The operator gave the go, so `origin/cloud-requests` now exists and the bridge is live.
