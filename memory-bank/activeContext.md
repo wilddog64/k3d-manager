@@ -7,8 +7,12 @@ Spec `docs/plans/v1.38.0-cloud-session-endpoint-access.md` (#4 of 5 for v1.38.0)
 application + service token + cloud env vars) is recorded in the spec as not-chosen, to be revisited
 only if a session needs live state at sub-60s latency.
 
-**The finding that outranks the feature.** A webhook bearer-token holder is `admin` today, and the
-role is self-asserted by the caller. `scripts/lib/webhook/policy.py:108`:
+**Audit finding F4, promoted — not a new discovery.** The 2026-09-07 audit
+(`docs/issues/2026-09-07-webhook-server-security-audit.md` F4) already recorded that
+`X-K3DM-Role` is client-asserted, rated LOW *because of* the single-admin-token invariant, with
+"revisit if role-scoped tokens are added." Adding a reader token is exactly that condition, so
+F4 becomes blocking: its own text says "a low-tier token could send `X-K3DM-Role: admin` and
+escalate." A bearer-token holder is `admin` today and the role is self-asserted by the caller. `scripts/lib/webhook/policy.py:108`:
 
 ```python
 def _request_role(headers):
@@ -26,7 +30,7 @@ resolver that could return an unknown value. `_effective_make_role` also short-c
 header is absent.
 
 This exists **independently of any cloud access** — it is not introduced by this work, and it is why
-I had to retract the earlier claim that a cloud token could simply be "registered as reader". That
+the earlier claim had to be retracted that a cloud token could simply be "registered as reader". That
 is not configuration; S1/S2 of the spec is the code change. Fix shape: a second reader-scoped token
 (`k3dm-webhook-token-reader`, env `K3DM_WEBHOOK_TOKEN_READER`, no `TOKEN_FILE` fallback) plus
 `_request_role(headers, token_role)` treating the credential's role as a **ceiling the header can
