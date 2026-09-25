@@ -26,6 +26,13 @@ bin/k3dm-cloud-request cluster-status          # files the request, prints the i
 bin/k3dm-cloud-request --wait cluster-status   # files it, then polls until the response lands
 ```
 
+First check that you actually have the helper: `ls bin/k3dm-cloud-request`. Until the bridge
+lands on `main`, it exists only on the release branch that introduced it, so a session started
+from `main` has no helper, no bridge and no `.claude/settings.json` — and the missing permission
+grant is the symptom you will notice first, which makes it read as a permissions problem when it
+is a missing file. If the helper is absent, start a session against the branch carrying it rather
+than trying to patch permissions.
+
 If nothing comes back within a few minutes, the bridge is not running. That is an operator
 problem, not something to work around. Say so and move on.
 

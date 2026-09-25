@@ -67,6 +67,17 @@ tracked **nothing** — git cannot re-include a file whose parent directory is e
 pattern to `.claude/*` plus `!.claude/settings.json`, verified with `check-ignore` that the 103KB
 `settings.local.json` and `projects/`/`worktrees/` stay ignored.
 
+That grant still did not unblock the cloud session, and the reason is worth keeping: its checkout
+had no `bin/k3dm-cloud-request` at all. `git ls-tree` on `v1.36.0`, `v1.37.0` and `origin/main`
+returns nothing for the helper, the bridge or the how-to — the whole feature was added in
+`dc53987c`, which lives only on `k3d-manager-v1.38.0`, while `origin/main` is still `925c43e7`
+(v1.37.0). The missing settings file is the symptom an agent notices first, so the failure reads as
+a permissions problem when it is a missing file. The how-to now opens the short version with an
+`ls bin/k3dm-cloud-request` check and says to start the session against the branch carrying the
+bridge rather than patch permissions. No `claude/*` branch exists on origin, so a cloud session's
+branch is container-local; and it loads permission rules at clone time, so a mid-session checkout
+would not pick the grant up either.
+
 ## 2026-09-25 — Cloud bridge bootstrapped and proven end to end (Claude)
 
 The operator gave the go, so `origin/cloud-requests` now exists and the bridge is live.
