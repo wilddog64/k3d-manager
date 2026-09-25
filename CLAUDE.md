@@ -15,6 +15,13 @@ Uses a dispatcher pattern with lazy plugin loading.
 - **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
 - **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
 - **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes.
+- **No network path out of a cloud session** — if you are running in a Claude cloud
+  environment with only the GitHub connection, you cannot reach the k3dm webhook, the cluster,
+  or any host. Do not search for a token, do not attempt a tunnel, and do not ask the operator to
+  place a credential in your environment — that is refused by policy. To read cluster state, file
+  a request on the `cloud-requests` branch: see **`docs/howto/cloud-session-requests.md`**. Four
+  read-only actions are available; everything else must be run by the operator.
+
 - **Reapply the ApplicationSets on every release** — ApplicationSets template their `$values` source at `${K3D_MANAGER_BRANCH}`, which freezes to whatever branch was checked out when the set was last applied. Config committed to a newer branch is **inert** until the sets are reapplied: it is in git, CI is green, and no cluster reads it. This silently persisted for two releases (hub `trivy-operator` still on `k3d-manager-v1.16.0` as of 2026-07-24). Decision 2026-07-24: the values ref keeps tracking the **release branch**, not `main` — which makes this a required release step, not an optional one. Reapply for **both** the hub and ACG variants, then confirm with `argocd_check_values_branch`.
 
 ## Environment Constraints

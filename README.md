@@ -262,6 +262,7 @@ docs/
 - **[Gemini Browser Automation](docs/howto/gemini.md)** — First-run setup, ACG extend, Copilot agent trigger
 - **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
 - **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/claude` / `/gemini` / `/codex`, `/cluster-up` / `/cluster-down` / `/cluster-status` / `/cluster-refresh` / `/cluster-resume`, and `/argocd-upgrade`
+- **[Cloud Session Requests](docs/howto/cloud-session-requests.md)** — How an agent with only repo access asks the local webhook for read-only cluster state via the `cloud-requests` branch, the action allowlist, and the two-token (admin / reader) model
 
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
 
