@@ -1617,8 +1617,12 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] D5 gates: jest **39** (from 36); mutation check **3 failed / 36 passed** vs old selector;
       `npm run check` clean; `make bats` **138/0/0**; live probe 0 -> 1. Captcha ruled out
       (`ShowCaptcha="False"`, 0 reCAPTCHA iframes) so unattended login is feasible.
-- [ ] Operator re-runs `credential-test` a 3rd time — expect `ACG_SESSION_OK path=auto-login`.
-      Still the ONLY gate that can confirm auto-login actually works end to end.
+- [x] **Operator re-ran `credential-test` — CONFIRMED.** `ACG_SESSION_OK path=auto-login` from a
+      signed-out start, then Open Sandbox -> Start Sandbox -> 4 inputs extracted -> credentials
+      written to `~/.aws/credentials` -> `sts:GetCallerIdentity OK`. **First successful headless
+      Pluralsight login in this subsystem's history.** Bug doc marked RESOLVED &
+      OPERATOR-CONFIRMED at **`38c64ade`**; both gate tables flipped to confirmed.
+- [x] The live `credential-test` gate required before any lib-foundation PR has PASSED.
 - [ ] PR + merge + tag v0.4.18 — needs the user's go
 - [ ] Subtree pull into k3d-manager, then rewire the Tier 2 preflight to the real loader
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —

@@ -3675,3 +3675,49 @@ the login fix onto its own `fix/` branch. No PR created.
 
 NEXT: operator re-runs `make credential-test` a third time. Expect `ACG_SESSION_OK path=auto-login`.
 If it fails again the diagnostic will name the new stage — that is now the working pattern.
+
+# 2026-09-24 — CONFIRMED: headless auto-login works for the first time ever (38c64ade)
+
+The operator's third `credential-test` run closed the loop:
+
+    ACG_CREDENTIALS: username=present password=present
+    INFO: Session not authenticated — attempting headless Pluralsight login...
+    ACG_SESSION_OK path=auto-login
+    ... Open Sandbox -> Start Sandbox -> Found 4 copyable inputs
+    INFO: AWS credentials written to ~/.aws/credentials [default]
+    INFO: AWS credentials validated (sts:GetCallerIdentity OK)
+
+**`path=auto-login` from a signed-out start is the first successful headless Pluralsight login in
+this subsystem's history**, and the full chain behind it completed: sandbox start, credential
+extraction, live STS validation. All five defects fixed and **CONFIRMED, not merely plausible**.
+
+The `path=` suffix is what makes this legible — a bare `ACG_SESSION_OK` would be
+indistinguishable from `path=existing-session`, which never touches the credential store. The
+v0.4.18 observability work paid for itself three times over in one day: it exposed the failure,
+then named the stage, then proved the fix.
+
+Bug doc `docs/bugs/2026-09-24-acg-pluralsight-login-click-preconditions.md` marked
+RESOLVED & OPERATOR-CONFIRMED; both verification tables flipped to confirmed. Commit **38c64ade**,
+local == origin.
+
+**Three successive wrong diagnoses, each only reachable after the previous layer was removed
+— the reusable lesson:**
+| Symptom | Natural reading | Actual state |
+| `ACG_SESSION_EXPIRED` | session expired, sign in again | auto-login had NEVER worked |
+| `locator.click` 30s timeout | form animates, never stable | DISPROVEN by probe; click was unnecessary |
+| generic `login_failed` | wrong password | email field never matched at all |
+
+D1-D4 did not repair login; they exposed D5. The fix that mattered was naming the failing stage.
+Rule: when a symptom is generic, instrument the stages before theorizing about any one of them; a
+`count=0` locator on a rendered visible form is a wrong selector, never a slow page. Saved as
+memory `reference_css_attribute_values_are_case_sensitive.md`.
+
+Branch `feat/v0.4.18-credential-test-observability` state: `1bcde41` (observability), `b48ad1c4`
+(bug doc), `8a74258` (D1-D4), `a33727c0` (gate table), `7801ff4` (D5 selector), `38c64ade`
+(confirmation). Local == origin. **The live credential-test gate required before a lib-foundation
+PR has now PASSED.**
+
+STILL PENDING, user's call only: (1) the scope decision — one PR covering observability + login fix
+(Claude's recommendation) vs. splitting the login fix onto its own `fix/` branch; (2) the PR itself
+plus merge + tag v0.4.18; then (3) subtree pull into k3d-manager and rewire the Tier 2 preflight in
+`scripts/plugins/e2e.sh` from Keychain-existence to the real loader. No PR created.
