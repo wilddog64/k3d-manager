@@ -449,3 +449,80 @@ JSON
   [[ "$output" == *"configs.cm.url=https://argo.example.invalid"* ]]
   [[ "$output" != *"configs.cm.url=https://argo.internal.invalid"* ]]
 }
+
+@test "register_app_cluster: shopping-cart label defaults to false" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/shopping-cart-default.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN ARGOCD_APP_CLUSTER_SHOPPING_CART
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -c -- 'k3d-manager/shopping-cart: "false"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+}
+
+@test "register_app_cluster: shopping-cart label opts in when explicitly true" {
+  RENDERED_FILE="${BATS_TEST_TMPDIR}/shopping-cart-optin.yaml"
+  _kubectl() {
+    if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      cp "$3" "$RENDERED_FILE"
+    fi
+  }
+  _argocd_set_active_app_cluster() { :; }
+  export RENDERED_FILE
+  export -f _kubectl _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc \
+    ARGOCD_APP_CLUSTER_SHOPPING_CART=true run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -c -- 'k3d-manager/shopping-cart: "true"' "$RENDERED_FILE"
+  [ "$output" = "1" ]
+}
+
+@test "register_app_cluster: rejects a non-boolean shopping-cart value" {
+  _argocd_set_active_app_cluster() { :; }
+  export -f _argocd_set_active_app_cluster
+  unset ARGOCD_APP_CLUSTER_TOKEN
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc \
+    ARGOCD_APP_CLUSTER_SHOPPING_CART=yes run register_app_cluster
+  [ "$status" -eq 1 ]
+}
+
+@test "_argocd_deploy_applicationsets surfaces the kubectl error when an apply fails" {
+  ARGOCD_CONFIG_DIR="${BATS_TEST_TMPDIR}/argocd-fail"
+  mkdir -p "${ARGOCD_CONFIG_DIR}/applicationsets"
+  printf 'kind: ApplicationSet\nmetadata:\n  name: probe\n' \
+    > "${ARGOCD_CONFIG_DIR}/applicationsets/probe.yaml"
+  _argocd_set_active_app_cluster() { :; }
+  _argocd_appset_live_overrides() { :; }
+  _kubectl() {
+    printf 'error validating data: unknown field "spec.bogus"\n' >&2
+    return 1
+  }
+  export -f _argocd_set_active_app_cluster _argocd_appset_live_overrides _kubectl
+  ARGOCD_CONFIG_DIR="$ARGOCD_CONFIG_DIR" run _argocd_deploy_applicationsets
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Failed to deploy ApplicationSet: probe.yaml"* ]]
+  [[ "$output" == *"unknown field"* ]]
+  [[ "$output" == *"did not apply"* ]]
+}
+
+@test "_argocd_deploy_applicationsets returns success when every apply lands" {
+  ARGOCD_CONFIG_DIR="${BATS_TEST_TMPDIR}/argocd-ok"
+  mkdir -p "${ARGOCD_CONFIG_DIR}/applicationsets"
+  printf 'kind: ApplicationSet\nmetadata:\n  name: probe\n' \
+    > "${ARGOCD_CONFIG_DIR}/applicationsets/probe.yaml"
+  _argocd_set_active_app_cluster() { :; }
+  _argocd_appset_live_overrides() { :; }
+  _kubectl() { return 0; }
+  export -f _argocd_set_active_app_cluster _argocd_appset_live_overrides _kubectl
+  ARGOCD_CONFIG_DIR="$ARGOCD_CONFIG_DIR" run _argocd_deploy_applicationsets
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Successfully deployed 1/1"* ]]
+}

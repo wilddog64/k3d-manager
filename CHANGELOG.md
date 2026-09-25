@@ -2,12 +2,165 @@
 
 ## [Unreleased]
 
+### Fixed
+- `cluster-up`'s failure cleanup no longer tears down the Cloudflare tunnel it did not start.
+  `_acg_up_cleanup` ran an unconditional `launchctl bootout` of
+  `com.k3d-manager.cloudflare-tunnel` on any non-zero exit, but `cluster-up` does not install or
+  bootstrap that tunnel until ~line 1809 — far past Step 10b, where all three observed failures
+  happened. Each one took all 7 public hostnames down (`edge-down`, every host 530) until the
+  agent was manually re-bootstrapped; the plist lives in `~/Library/LaunchAgents` with
+  `KeepAlive=true`, survives reboots, and serves the hub's public ingress independently of any ACG
+  sandbox. The bootout is now gated on `_ACG_TUNNEL_PLIST_CREATED`, set only where the run
+  installs the plist and none existed beforehand, so "clean up what you created" still holds.
+- `cluster-up` Step 10b fails fast when the data layer is blocked on an image pull instead of
+  polling out the full 300s + force-sync + 180s window. A `quay.io/minio/minio` 401 surfaced as
+  eight minutes of `data-layer not yet Synced — waiting...` followed by a force-sync that could
+  not possibly help, because the ArgoCD operation was still `Running`, `waiting for healthy state
+  of apps/StatefulSet/minio`. Both sync waits now call `_acg_data_layer_abort_on_image_pull`,
+  which reports the offending pod, container, reason and message. Fires on `ImagePullBackOff`,
+  `ErrImagePull`, `InvalidImageName`, `ErrInvalidImageName` and `RegistryUnavailable`, in init
+  containers too, and only after three consecutive polls so an in-progress pull is not mistaken
+  for a failure; `ContainerCreating`, `CreateContainerConfigError` and `CrashLoopBackOff` stay
+  non-fatal since they can still clear on their own.
+- The `k3s-aws` SSM-to-SSH fallback is no longer dead code. `ssm_wait` and
+  `_provider_k3s_aws_wait_ssm_registered` ended their registration timeouts with `_err`, which
+  calls `exit 1` — so the process died at the timeout and the `return 1` on the next line, plus
+  every caller's SSH fallback branch, was unreachable. All three fallback sites in
+  `scripts/lib/providers/k3s-aws.sh` were written correctly and none of them could ever run; a
+  first-time ACG provision aborted at `[ssm] Instance <id> did not become Online after 300s`
+  right after logging `SSH fallback armed`. Both waits now `_warn` and return, so an SSM
+  registration timeout costs a detour instead of the whole run. The existing BATS coverage was
+  green over the bug because it stubbed `_provider_k3s_aws_wait_ssm_registered` with a function
+  that *returns* 1 where the real one *exits*; the new tests drive the real functions and were
+  mutation-proven to fail against the pre-fix source. Documented in `docs/howto/acg.md`,
+  including the underlying 28m50s `amazon-ssm-agent` credential backoff that makes both waits
+  unreachable on a first provision, and why raising the timeouts is the wrong fix.
+
+## [1.37.0] - 2026-09-24
+
 ### Added
+- `make acg-recover` chains the whole sandbox recovery: `chrome-cdp`, `acg-restart`, then a
+  recursive `make up` with `K3DM_RESUME=` forced empty so an exported `K3DM_RESUME=1` cannot make
+  `cluster-up` reuse checkpoints from the dead sandbox and skip provisioning.
+- `make acg-restart` wraps `acg_restart`, the recovery path for an already-expired ACG sandbox
+  (delete, recreate via Playwright/CDP, re-extract credentials). It was the only ACG recovery
+  function without a make target, which is the one you reach for under pressure. Accepts
+  `URL=` and `PROVIDER=`; needs `make chrome-cdp` and a real TTY for the first login.
+- `scripts/tests/bin/webhook_agent.py` covers the AI agent's cluster-mutation gate,
+  prompt-injection filter, filing/fix intent, and observation parsing.
+- Tier 2 ACG preflight now fails early on an empty sandbox URL or a missing
+  `k3dm-acg-pluralsight` credential account, refuses
+  `K3DM_ACG_SKIP_SESSION_CHECK=1`, and documents the no-MFA auto-login setup.
+- Webhook Phase 1 policy extraction: `scripts/lib/webhook/policy.py`, explicit API route tables, and route-policy regression tests.
+- `make e2e-sandbox` invokes the Tier 2 ACG/Stripe harness (`e2e_verify_sandbox`), giving
+  Tier 2 the same make entry point Tier 1 has had via `make e2e`. `DIGEST=` is optional and
+  passes through as the candidate digest; the target must be run from a real terminal because
+  the preflight's one-time interactive ACG login needs a TTY.
+- Tier 2 preflight now gates on the **sandbox kubecontext**, not just credentials. `ubuntu-k3s`
+  must exist and answer `/readyz` before the harness touches the browser. Previously a missing
+  or expired context surfaced three phases in as a bare `context was not found for specified
+  context: ubuntu-k3s` from kubectl, after the ACG extension step had already run. The two
+  states are now distinguished: absent from the kubeconfig (never provisioned) vs present but
+  unreachable (left over from an expired sandbox — ACG sandboxes last 4h and take their node
+  addresses with them).
+- `e2e-sandbox` is also reachable from Slack `/k3dm` as an `operator` target with an optional
+  `DIGEST` and a 3600s timeout, matching `e2e-remote`. Unattended, it can only use an already
+  valid ACG session and otherwise fails closed with `ACG_SESSION_EXPIRED`.
 - A unified `make smoke` target with offline and reachable-cluster tiers, per-check logs, and explicit PASS/FAIL/SKIP reporting.
 - Hub snapshot capture, M2 offload, verification, listing, and retention targets.
 - Keycloak monthly admin credential rotator, which preserves `db_password` and deliberately does not force-sync the ArgoCD-managed `keycloak-secrets` ExternalSecret.
+- `make app-cve-scan` triggers the app-cluster CVE scan CronJob, waits for its manually created Job, and exposes the additive operation to `/k3dm` for operator-role users with an enumerated `CRONJOB` choice.
+- `scripts/check-repo-root-debris.sh` + `make check-repo-root`, wired into `.githooks/pre-commit` over **staged files only** so pre-existing strays cannot block an unrelated commit. Mutation-proven: staging `.join-failures.999` fires the gate.
+
+### Changed
+- `scripts/lib/foundation/` vendors lib-foundation **v0.4.18** (`023f76e5..2f244ee4`, 8 files). The vendored tree hash equals upstream `main`, which is the proof the subtree pull is faithful. Carries the ACG session-check observability: `ACG_SESSION_OK path=` reporting, credential-store health without value exposure, and the `K3DM_ACG_REQUIRE_CREDENTIALS=1` fail-closed gate.
+- Webhook Phase 4 separates long-running cluster orchestration into `webhook.lifecycle` and
+  read-only reporting/formatting into `webhook.status`. Runtime dependencies owned by the
+  entrypoint are injected, and `/k3dm` validated argv reaches `make` without a shell.
+- The AI agent invocation and `/ask` orchestration now live in `webhook.agent`, including
+  the role-gated cluster-mutation decision and prompt-injection filter; extraction preserves
+  the existing regexes, length cap, role floor, model handling, and Slack/job output paths.
+- The browser-emulating SSO and service smoke client now lives in `webhook.smoke`; the
+  webhook entrypoint imports only the smoke checks it calls, with no change to their
+  endpoints, retry behavior, or credential redaction paths.
+- Webhook authorization and request policy now live in `webhook.policy`; API routes declare their handler and minimum role in one table. Existing dynamic policy resolutions remain unchanged.
+- The shopping-cart stack is now **opt-in per app cluster**. `data-git` and `services-git` require `k3d-manager/shopping-cart: "true"` in addition to `k3d-manager/role: app-cluster`, and `register_app_cluster` emits that label from `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). A hub registered as its own app cluster — the designed single-cluster mode — therefore keeps its External Secrets Operator install and ACG Grafana dashboards while no longer syncing the shopping-cart data layer or payment stack onto itself. The `eso` and `grafana-dashboards-acg` ApplicationSets are deliberately left selecting on the role label alone: `eso` generates the hub's entire ESO install (3 Deployments, 21 CRDs, 5 ClusterRoles) and carries the ArgoCD resources finalizer, so removing the registration Secret — the approach this replaces — would have deleted the `externalsecrets` and `clustersecretstores` CRDs, every ExternalSecret CR in the cluster, and the owner-referenced Secrets behind Grafana admin, Keycloak, LDAP, `ghcr-pull-secret` and all postgres / redis / rabbitmq / minio credentials. `docs/architecture/shopping-cart-deployment.md` gains a section on why `ubuntu-k3s` is a role alias rather than a place, the four ApplicationSets that select the role label, and how they differ in `preserveResourcesOnDeletion`.
 
 ### Fixed
+- `hub_recovery_reconcile` now registers the hub under its own cluster name (`k3d-cluster`, overridable via `HUB_RECOVERY_HUB_CLUSTER_NAME`) instead of `ubuntu-k3s`. Two cluster Secrets claiming the same name made every `destination.name`-keyed ApplicationSet unresolvable, so `data-git`, `services-git` (all six services) and `grafana-dashboards-acg` reported `ErrorOccurred` while `ParametersGenerated` stayed True — the ACG application tier could never be generated, and the hub's own ESO Application was silently retargeted to the ACG cluster
+- `bin/cluster-up` now passes `ARGOCD_APP_CLUSTER_PROVIDER` and
+  `ARGOCD_APP_CLUSTER_SHOPPING_CART=true` when registering the ACG app cluster. It previously
+  passed only the token, so `register_app_cluster` applied its defaults and the sandbox was
+  registered with `provider: unknown` and `shopping-cart: "false"`. The `data-git` and
+  `services-git` ApplicationSets select on `shopping-cart: "true"`, so no
+  `ubuntu-k3s-data-layer` Application was ever generated and Step 10b/14 waited ~8 minutes for
+  an Application that could not exist, failing the provision and taking the Keycloak + LDAP
+  identity stack and ACG observability with it. Third instance of this defect on the same two
+  labels — the previous two were fixed only on the hostinger caller.
+- `bin/cluster-up` now restarts the ArgoCD browser HTTPS listener when its **wrapper** changes,
+  not only when the plist does. The plist names the wrapper path but never its contents, so it
+  stays byte-identical across any wrapper rewrite and the `diff -q` short-circuit skipped the
+  `launchctl bootout`/`bootstrap` pair that makes a rewrite take effect. After the v1.35.0 TLS
+  path unification (`e259c718`) moved the cert dir to the provider-scoped path, a listener
+  daemon that had been running since Sep 4 kept resolving the legacy flat dir — now empty — and
+  socat failed with `SSL_CTX_use_certificate_file(): No such file or directory` against certs
+  that existed. Step 4c/12 then aborted the whole provision, so the identity stack, data layer,
+  app-cluster registration and ACG observability never deployed. The wrapper is now hashed
+  either side of the rewrite and a content change forces the reinstall.
+- The Tier 2 ACG preflight now gates on **credential readability, not Keychain existence**. An
+  existence check (`security find-generic-password` without `-w`) succeeds in two states that
+  break unattended login: a **locked login keychain** (the value read fails with `User
+  interaction is not allowed`) and a **value stored empty** (a bare `-w` write with stdin not a
+  TTY reads EOF and silently stores an empty value at exit 0). The preflight now calls
+  `_secret_load_data` — the same loader `_cdp_ensure_acg_session` uses — and discards the value
+  to `/dev/null`, so readability is the claim under test and the secret never enters a shell
+  variable. It also exports `K3DM_ACG_REQUIRE_CREDENTIALS=1` to arm the upstream fail-closed
+  gate, and only after the sandbox-URL and `K3DM_ACG_SKIP_SESSION_CHECK` guards pass, so a
+  refusal reads no credential at all. The no-`-w` form is retained in the guide for operator
+  diagnostics, where *not* reading the secret is the point. 14 BATS cases, mutation-gated
+  against the previous implementation; the proof requires a fake `security` **executable on
+  `PATH`**, because a shell-function stub is invisible to a loader that runs `security` inside
+  `bash -c`.
+- `scripts/etc/playwright/vars.sh` pointed `PLAYWRIGHT_AUTH_DIR` at the sibling `profile`
+  directory while the live CDP Chrome, `cdp.sh`'s fallback and the lib-foundation copy all use
+  `pw-profile` (measured: `pw-profile` 711M written minutes earlier, `profile` 600M last touched
+  2026-08-21). Because `_cdp_profile_in_use` is evaluated against `PLAYWRIGHT_AUTH_DIR`, the
+  drift would report the profile free while Chrome held a live session, and a launch could
+  replace a signed-in browser with one on the dead profile — recoverable only by a human signing
+  in. Latent rather than active (nothing in-repo sourced the file), now aligned with upstream.
+- `$(mktemp)` returns an empty string when `TMPDIR` is unwritable and nothing checked it, so
+  every derived path lost its directory and resolved against the CWD — the repo root during a
+  test run, where three files appeared while the suite reported `1237 ok / 0 not ok`.
+  `_k3sup_join_agents_parallel` now refuses an empty kubeconfig instead of deriving a relative
+  path, and the OCI stub builds its SSH key under `BATS_TEST_TMPDIR`. Reproduced before fixing,
+  because the tests pass either way. The six `_vault_hdr=$(mktemp)` sites are the same unchecked
+  call and are deliberately left for their own spec.
+- The Tier 2 ACG preflight now checks the `username` and `password` accounts individually
+  instead of matching the Keychain service alone, so a credential stored under an account name
+  the loader never reads no longer satisfies the gate; the error names which accounts are
+  missing. The e2e harness guide documents the account-name convention this service deviates
+  from, and the two environment traps that make population fail silently.
+- Webhook authorization now normalizes unknown actor roles to `reader` while preserving the
+  requirement-side `admin` default, preventing unknown callers from satisfying role checks or
+  being misreported as administrators in the audit trail.
+- Webhook POST authorization now enforces each route table's `min_role` floor and audits
+  every request exactly once, including requests with no dynamic policy; the effective
+  requirement is the strictest of the route floor and the per-request policy.
+- Corrected the Hostinger Pushgateway service name and provider visibility checks so the local
+  port-forward survives access-layer refreshes and deployment metrics reach the app-cluster
+  Prometheus; failed Pushgateway status is now an error rather than optional.
+- Hostinger registration now sets `k3d-manager/shopping-cart: "true"` by default, preserving
+  the shopping-cart Applications selected by `services-git`; `app-cve-scan` now skips a missing
+  ArgoCD Application without aborting the scan or emitting a false remediation event.
+- Hostinger app-cluster registration now sets the `k3s-hostinger` provider label, and ambient CNI
+  resolution warns on unknown providers while refusing generic directories for all specific
+  substrates.
+- `deploy_argocd_applicationsets` now derives Istio ambient CNI directories from the target substrate before consulting live ApplicationSet values, and refuses generic CNI paths for k3s targets.
+- Warning alerts now route to `platform-warning` by default, observability deploys fail when an Alertmanager CR references a missing config Secret, and Hermes monitors the read-only delivery path.
+- A hub rebuild no longer drops the `ubuntu-hostinger` app-cluster registration — `bin/cluster-up` and `hub_recovery_reconcile` reconcile every cluster declared in `scripts/etc/argocd/app-clusters.tsv`, and `make status` reports a `REGISTRATION GAP` when one is missing
+- Warning-severity `KubeJobFailed`, `KubeJobNotCompleted`, E2E, and Prometheus self-health alerts now reach the `platform-warning` email receiver instead of being silently dropped by Alertmanager's default-deny root route; the route follows `severity = critical` so SMS delivery is unchanged.
+- `deploy_argocd_applicationsets` no longer hides why an ApplicationSet failed to apply. The apply piped both streams to `/dev/null`, so a rejected manifest produced one context-free warning line inside an otherwise reassuring `Successfully deployed N/N` summary, and the function returned success regardless of how many files failed. It now captures kubectl's stderr and echoes it, counts failures, and returns non-zero when any set did not apply. `((deployed_count++))` was also replaced with an arithmetic assignment — as a post-increment from zero it evaluates to 0 and returns exit status 1, which would abort the loop under `set -e`.
+
 - Prometheus reseeding now distinguishes unreachable Vault from an absent entry, and the reseed security assertions are effective rather than bare-`!` no-ops.
 - The Alertmanager secret test now asserts the error the recipe actually emits and stubs `security`, so it can no longer reach a live Vault.
 - Platform-ops rotators use BusyBox-compatible `base64 -d`; `--decode` silently emptied every Slack notification, including the Keycloak rollback-failure alert.

@@ -237,6 +237,21 @@ if kubectl get secret "cluster-${APP_CONTEXT}" -n "${ARGOCD_NAMESPACE}" \
 else
   echo "NOT registered: secret cluster-${APP_CONTEXT} missing"
 fi
+_app_cluster_table="${REPO_ROOT}/scripts/etc/argocd/app-clusters.tsv"
+if [[ -r "${_app_cluster_table}" ]]; then
+  while IFS=$'\t' read -r _ac_context _ac_secret _ac_provider; do
+    [[ -z "${_ac_context}" || "${_ac_context}" == \#* ]] && continue
+    if kubectl get secret "${_ac_secret}" -n "${ARGOCD_NAMESPACE}" \
+         --context "${INFRA_CONTEXT}" >/dev/null 2>&1; then
+      echo "Registered: ${_ac_context} (secret ${_ac_secret})"
+    elif kubectl config get-contexts "${_ac_context}" >/dev/null 2>&1; then
+      echo "REGISTRATION GAP: ${_ac_context} has a kubeconfig context but no hub secret ${_ac_secret}"
+      echo "                  its workloads are unmanaged — run: make refresh-registration CLUSTER_PROVIDER=${_ac_provider}"
+    else
+      echo "Not present: ${_ac_context} (no kubeconfig context on this host)"
+    fi
+  done < "${_app_cluster_table}"
+fi
 
 echo ""
 echo "=== ArgoCD Apps ==="

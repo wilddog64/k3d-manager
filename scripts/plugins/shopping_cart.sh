@@ -1226,6 +1226,10 @@ function _k3sup_join_agent_worker() {
 
 function _k3sup_join_agents_parallel() {
   local hosts_csv="$1" server_ip="$2" local_kubeconfig="$3"
+  if [[ -z "${local_kubeconfig}" ]]; then
+    _err "[shopping-cart] _k3sup_join_agents_parallel requires a kubeconfig path"
+    return 1
+  fi
   local failure_file="${local_kubeconfig}.join-failures.$$"
   local -a _join_pids=() _agent_hosts
   local _agent_host _join_pid _join_rc=0

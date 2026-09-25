@@ -84,12 +84,28 @@ context, calls `register_app_cluster`, and restarts the ArgoCD application contr
 | `make creds` | Extract AWS/GCP credentials only — no cluster changes |
 | `make chrome-cdp` | Install macOS Chrome CDP launchd agent (persistent CDP session on boot) |
 | `make chrome-cdp-stop` | Uninstall the launchd agent |
+| `make acg-restart` | Recover an expired ACG sandbox: delete it, recreate it, re-extract credentials |
+| `make acg-recover` | End-to-end recovery: `chrome-cdp` + `acg-restart` + a clean `make up` |
 
 `make creds` calls `acg_get_credentials` directly — useful for refreshing short-lived
 credentials without touching the cluster.
 
 `make chrome-cdp` installs a `launchd` plist so Chrome starts with CDP flags on login,
 enabling headless credential automation without a manual browser launch.
+
+`make acg-restart` wraps `acg_restart` — the recovery path for a sandbox that has already expired
+(`acg_extend` only works while one is still alive). It deletes the dead sandbox, provisions a
+replacement via Playwright/CDP, then re-extracts and checks the credentials. Accepts
+`URL=<sandbox-url>` (default: the sandbox list page) and `PROVIDER=aws|gcp|azure` (default: `aws`).
+Needs `make chrome-cdp` in place and a real TTY for the first Pluralsight login. See
+[ACG sandbox how-to](acg.md) for the full lifecycle.
+
+`make acg-recover` is the one-shot form: `chrome-cdp` and `acg-restart` as prerequisites, then a
+recursive `make up`. Because a replaced sandbox has no EC2 instance and no k3s, `make up` is what
+provisions the cluster (Step 2) and re-registers it with ArgoCD (Step 10) — `make
+argocd-registration` alone would have nothing to register. The recursive call passes `K3DM_RESUME=`
+so an exported `K3DM_RESUME=1` cannot make `cluster-up` reuse checkpoints from the dead sandbox and
+skip provisioning.
 
 ---
 

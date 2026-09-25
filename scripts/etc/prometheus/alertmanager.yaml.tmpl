@@ -18,6 +18,18 @@ route:
     - matchers:
         - severity = critical
       receiver: sms-critical
+    - matchers:
+        - alertname =~ "KubeJobFailed|KubeJobNotCompleted|E2EVerificationFailing|E2EVerificationStale|PrometheusDuplicateTimestamps"
+      receiver: platform-warning
+      group_wait: 5m
+      group_interval: 2h
+      repeat_interval: 24h
+    - matchers:
+        - severity = warning
+      receiver: platform-warning
+      group_wait: 10m
+      group_interval: 6h
+      repeat_interval: 72h
 
 receivers:
   - name: 'null'
@@ -31,6 +43,18 @@ receivers:
           {{ range .Alerts.Firing }}{{ .Labels.alertname }}{{ if .Labels.severity }} [{{ .Labels.severity }}]{{ end }} on {{ if .Labels.cluster }}{{ .Labels.cluster }}{{ else }}unknown-cluster{{ end }}
           {{ if .Annotations.description }}{{ .Annotations.description }}{{ else if .Annotations.summary }}{{ .Annotations.summary }}{{ else }}(rule carries no description){{ end }}
           where:{{ if .Labels.namespace }} ns={{ .Labels.namespace }}{{ end }}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.node }} node={{ .Labels.node }}{{ end }}{{ if .Labels.instance }} instance={{ .Labels.instance }}{{ end }}{{ if .Labels.job }} job={{ .Labels.job }}{{ end }}
+          since: {{ .StartsAt.UTC.Format "2006-01-02 15:04 UTC" }}
+          {{ end }}
+  - name: platform-warning
+    email_configs:
+      - to: '${ALERTMANAGER_GMAIL_FROM}'
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }} on {{ if .GroupLabels.cluster }}{{ .GroupLabels.cluster }}{{ else }}unknown-cluster{{ end }} ({{ .Alerts.Firing | len }})'
+        text: |-
+          {{ range .Alerts.Firing }}{{ .Labels.alertname }}{{ if .Labels.severity }} [{{ .Labels.severity }}]{{ end }} on {{ if .Labels.cluster }}{{ .Labels.cluster }}{{ else }}unknown-cluster{{ end }}
+          {{ if .Annotations.description }}{{ .Annotations.description }}{{ else if .Annotations.summary }}{{ .Annotations.summary }}{{ else }}(rule carries no description){{ end }}
+          where:{{ if .Labels.namespace }} ns={{ .Labels.namespace }}{{ end }}{{ if .Labels.job_name }} job_name={{ .Labels.job_name }}{{ end }}{{ if .Labels.pod }} pod={{ .Labels.pod }}{{ end }}{{ if .Labels.instance }} instance={{ .Labels.instance }}{{ end }}
           since: {{ .StartsAt.UTC.Format "2006-01-02 15:04 UTC" }}
           {{ end }}
 

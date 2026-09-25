@@ -120,6 +120,20 @@ function _e2e_sandbox_kc() {
   _run_command -- kubectl --context ubuntu-k3s "$@"
 }
 
+function _e2e_sandbox_preflight_cluster() {
+  local ctx="ubuntu-k3s" timeout="${E2E_SANDBOX_PROBE_TIMEOUT:-15}"
+
+  if ! kubectl config get-contexts -o name 2>/dev/null | grep -qx -- "$ctx"; then
+    _err "[e2e] sandbox preflight: kubecontext ${ctx} is absent, so every later phase would fail on 'context was not found'; the sandbox k3s cluster is not provisioned in this kubeconfig — bring it up with the k3s-aws provider (make up) and confirm with 'kubectl --context ${ctx} get nodes' before rerunning Tier 2"
+    return 1
+  fi
+  if ! kubectl --context "$ctx" get --raw=/readyz --request-timeout="${timeout}s" >/dev/null 2>&1; then
+    _err "[e2e] sandbox preflight: kubecontext ${ctx} exists but its API server did not answer /readyz within ${timeout}s; an ACG sandbox expires after 4h and takes its node addresses with it, so a context left over from an earlier sandbox points at a dead endpoint — reprovision with the k3s-aws provider (acg_restart first if the sandbox itself is gone), then rerun Tier 2"
+    return 1
+  fi
+  _info "[e2e] sandbox preflight: context=${ctx} readyz=ok"
+}
+
 function _e2e_sandbox_argocd_cluster_manifest() {
   cat <<'YAML'
 apiVersion: v1
@@ -291,6 +305,36 @@ function _e2e_sandbox_provision_secrets() {
     --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
 }
 
+function _e2e_sandbox_preflight_auth() {
+  local service="k3dm-acg-pluralsight" credentials_loadable=1 profile_dir
+  local account unreadable=""
+  profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
+
+  if [[ -z "${_ACG_SANDBOX_URL:-}" ]]; then
+    _err "[e2e] _ACG_SANDBOX_URL is empty; set the ACG sandbox URL before Tier 2"
+    return 1
+  fi
+  if [[ "${K3DM_ACG_SKIP_SESSION_CHECK:-0}" == "1" ]]; then
+    _err "[e2e] Tier 2 refuses to run with K3DM_ACG_SKIP_SESSION_CHECK=1; unset the local debugging aid"
+    return 1
+  fi
+  for account in username password; do
+    if ! _secret_load_data "$service" "$account" >/dev/null 2>&1; then
+      credentials_loadable=0
+      unreadable="${unreadable:+${unreadable},}${account}"
+    fi
+  done
+
+  export K3DM_ACG_REQUIRE_CREDENTIALS=1
+
+  if (( credentials_loadable )); then
+    _info "[e2e] ACG preflight: service=${service} credentials_loadable=true K3DM_ACG_REQUIRE_CREDENTIALS=1"
+    return 0
+  fi
+  _err "[e2e] ACG preflight: service=${service} credentials_loadable=false unreadable=${unreadable}; this is the same loader the session check uses, so a value it cannot read is a value unattended login will never see — the entry is absent, the login keychain is locked (security reports 'User interaction is not allowed' on reads), or the value was stored empty; add the personal no-MFA account under the accounts username and password via the ACG auto-login enablement guide (profile_dir=${profile_dir} exists but proves nothing about session validity); markers: ACG_SESSION_OK=authenticated, ACG_LOGIN_MFA_REQUIRED=MFA refused, ACG_SESSION_EXPIRED=not authenticated, ACG_CREDENTIALS_REQUIRED=fail-closed credential gate"
+  return 1
+}
+
 function e2e_verify_sandbox() {
   local run_id candidate_digest="${1:-}" job_name image manifest_file rc=1
   local old_tier="${E2E_TIER}" old_project="${E2E_PROJECT}"
@@ -311,6 +355,9 @@ function e2e_verify_sandbox() {
   mkdir -p "$E2E_REPORT_DIR"
   trap '_e2e_sandbox_exit_trap' EXIT
 
+  _e2e_sandbox_preflight_auth
+  _E2E_ACTIVE_PHASE="preflight-cluster"
+  _e2e_sandbox_preflight_cluster
   _E2E_ACTIVE_PHASE="extending-sandbox"
   acg_extend_playwright "${_ACG_SANDBOX_URL:-}"
   _E2E_ACTIVE_PHASE="checking-nodes"
@@ -381,11 +428,20 @@ function _e2e_sandbox_exit_trap() {
 function _e2e_exit_trap() {
   local rc=$?
   set +e
+  local publish_run_id=""
   if [[ -n "${_E2E_RUN_ID:-}" ]] && [[ "${_E2E_SUMMARY_WRITTEN:-0}" -eq 0 ]]; then
     _e2e_write_summary "${_E2E_RUN_ID}" "${_E2E_CANDIDATE_DIGEST:-}" "$rc" "${_E2E_ACTIVE_PHASE:-unknown}" || true
-    _e2e_write_result_event "${_E2E_RUN_ID}" || true
+    publish_run_id="${_E2E_RUN_ID}"
   fi
+
+  # Teardown is deliberately ahead of the result event. It frees the vclusters namespace,
+  # which is shared by every run on this runner, so a later step that exits the shell must
+  # not be able to starve it. The summary is a local file write and safe to keep first; the
+  # result event talks to the hub and stays last, where its failure costs only a dashboard
+  # point. Teardown removes the per-run log and kubeconfig, never the summary JSON the
+  # publish reads, so the order is safe.
   _e2e_teardown "${_E2E_ACTIVE_NAME:-}" || true
+  [[ -n "$publish_run_id" ]] && { _e2e_write_result_event "$publish_run_id" || true; }
   trap - EXIT
   exit "$rc"
 }
@@ -827,7 +883,10 @@ PY
     return 0
   fi
 
-  if _kubectl create -f "$manifest_file" >/dev/null 2>&1; then
+  # --no-exit is load-bearing: without it _run_command ends a failure with _err, which is
+  # exit 1. This runs inside the EXIT trap, where an exit terminates the shell before
+  # teardown and takes the vCluster with it, and 2>&1 hides the ERROR line that would say so.
+  if _kubectl --no-exit create -f "$manifest_file" >/dev/null 2>&1; then
     _info "[e2e] Published result event to ${E2E_RESULT_EVENT_NAMESPACE} for run ${run_id}"
     _e2e_prune_result_events
   else
@@ -845,7 +904,7 @@ function _e2e_prune_result_events() {
   local runner="${E2E_RUNNER:-local-m4}"
   local selector="k3dm.k3d.io/e2e-result=true,k3dm.k3d.io/e2e-service=${svc},k3dm.k3d.io/e2e-tier=${E2E_TIER},k3dm.k3d.io/e2e-runner=${runner}"
   local names
-  names="$(_kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
+  names="$(_kubectl --no-exit -n "$E2E_RESULT_EVENT_NAMESPACE" get configmaps \
     -l "$selector" --sort-by=.metadata.creationTimestamp \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
   [[ -z "$names" ]] && return 0

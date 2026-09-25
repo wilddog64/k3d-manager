@@ -19,7 +19,7 @@ from hermes.correlator import Correlator
 from hermes.records import timestamp
 from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
-                            _keychain_secret, argocd, ci, eso, kine, kine_log_signals,
+                            _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
                             node_pressure, reachability, stale_acg_registration,
                             status_checks, token_expiry_advisory)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
@@ -103,6 +103,13 @@ def _datastore_run(_command, _additions):
         return 1, json.dumps({"available": False})
 
 
+def _alert_delivery_run(command, _additions):
+    """Read Alertmanager delivery shape from the read-only probe."""
+    result = subprocess.run([str(ROOT / command[0]), *command[1:]],
+                            capture_output=True, text=True, timeout=60, check=False)
+    return result.returncode, result.stdout
+
+
 def _run_cycle(state, status_runner=None):
     """Sample the Phase 1 sensors and propose, but never execute, repairs."""
     webhook = _keychain_secret(WEBHOOK_SERVICE)
@@ -125,6 +132,7 @@ def _run_cycle(state, status_runner=None):
         reachability(_probe_run, state),
         node_pressure(webhook_fetch, state, token=webhook),
         kine(_datastore_run, state),
+        alert_delivery(_alert_delivery_run, state),
         ci(github_fetch, state, token=github),
     ]
     if status_runner is not None:

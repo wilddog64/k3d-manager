@@ -59,6 +59,13 @@ function _istio_ambient_cni_dirs() {
   esac
 }
 
+function _istio_ambient_cni_provider_is_specific() {
+  case "${1:-}" in
+    k3d|k3s-hostinger) return 0 ;;
+    *)                 return 1 ;;
+  esac
+}
+
 function _istio_ambient_target_provider() {
   local context="$1" namespace="$2" cluster_name="$3" secret name
   while IFS= read -r secret; do

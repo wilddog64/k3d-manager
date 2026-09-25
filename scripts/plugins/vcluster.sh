@@ -45,11 +45,37 @@ function vcluster_create() {
     return 0
   fi
 
+  _vcluster_reconcile_namespace "$name"
   _run_command -- "$_VCLUSTER_BIN" create "$name" -n "$VCLUSTER_NAMESPACE" \
     --chart-version "$VCLUSTER_VERSION" --connect=false -f "$values_file"
   _vcluster_wait_ready "$name"
   _vcluster_export_kubeconfig "$name"
   _info "vCluster '$name' created; run ./scripts/k3d-manager vcluster_use $name to switch context"
+}
+
+# vcluster create refuses a second virtual cluster in a namespace that already holds one,
+# and VCLUSTER_NAMESPACE is shared by every run on a runner. One orphan therefore wedges
+# every later run permanently, and each blocked run fails too early to clean up after
+# itself. Clearing it here recovers from leaks no EXIT trap can catch, such as a SIGKILLed
+# run. The _warn is deliberate: an orphan is always a bug, so a silent sweep would mask a
+# teardown regression instead of surfacing it.
+function _vcluster_reconcile_namespace() {
+  local keep="${1:-}"
+  local list_output="" line="" cluster_name=""
+  list_output="$(_run_command --no-exit --quiet -- "$_VCLUSTER_BIN" list -n "$VCLUSTER_NAMESPACE" 2>/dev/null || true)"
+
+  while IFS= read -r line; do
+    [[ -z "$line" || "$line" == NAME* ]] && continue
+    read -r cluster_name _ <<< "$line"
+    [[ -z "$cluster_name" || "$cluster_name" == "$keep" ]] && continue
+    _warn "vCluster '${cluster_name}' is an orphan in namespace '${VCLUSTER_NAMESPACE}' (its run never tore down); deleting it before creating '${keep}'"
+    if ! _run_command --no-exit -- "$_VCLUSTER_BIN" delete "$cluster_name" -n "$VCLUSTER_NAMESPACE" --wait; then
+      _warn "vcluster delete '${cluster_name}' failed; falling back to helm uninstall"
+      _run_command --no-exit -- helm -n "$VCLUSTER_NAMESPACE" uninstall "$cluster_name" --wait || true
+    fi
+  done <<< "$list_output"
+
+  return 0
 }
 
 function vcluster_destroy() {
@@ -59,7 +85,6 @@ function vcluster_destroy() {
   fi
 
   _vcluster_check_prerequisites
-  _vcluster_ensure_exists "$name"
   local kubeconfig_path
   kubeconfig_path="$(_vcluster_kubeconfig_path "$name")"
 
@@ -69,6 +94,10 @@ function vcluster_destroy() {
     printf 'DRY_RUN: deregister %s from hub ArgoCD (cluster-%s + %s-preflight-* appsets/apps)\n' "$name" "$name" "$name"
     return 0
   fi
+
+  # After the dry-run return: the existence check queries the host, and a dry run must
+  # execute nothing and must not depend on the vCluster being there to print its plan.
+  _vcluster_ensure_exists "$name" || return 1
 
   _vcluster_deregister_from_hub "$name"
   if ! _run_command --no-exit -- "$_VCLUSTER_BIN" delete "$name" -n "$VCLUSTER_NAMESPACE" --wait; then
@@ -266,16 +295,17 @@ function _vcluster_ensure_exists() {
   if [[ -z "$name" ]]; then
     _err "vCluster name required"
   fi
-  local kubeconfig
-  kubeconfig="$(
-    _vcluster_kubeconfig_path "$name"
-  )"
-  if [[ -f "$kubeconfig" ]]; then
-    return 0
-  fi
+  # A kubeconfig file is not a virtual cluster. Teardowns that never ran leave stale
+  # kubeconfigs behind, so accepting one as proof made this predicate report a vCluster
+  # that no longer exists. vcluster list is the only source of truth.
+  #
+  # Absence returns non-zero instead of _err, because _err is exit 1 and the caller
+  # chain cannot catch that: _e2e_teardown guards vcluster_destroy with `|| _warn`, and
+  # the exit skipped the proxy, kubeconfig and log cleanup that follows it.
   local list_output=""
   if ! list_output="$(_run_command --no-exit --quiet -- "$_VCLUSTER_BIN" list -n "$VCLUSTER_NAMESPACE")"; then
-    _err "vCluster '$name' not found in namespace '$VCLUSTER_NAMESPACE'"
+    _warn "vCluster '$name' not found in namespace '$VCLUSTER_NAMESPACE'"
+    return 1
   fi
   local found=0 line cluster_name
   while IFS= read -r line; do
@@ -287,7 +317,8 @@ function _vcluster_ensure_exists() {
     fi
   done <<< "$list_output"
   if [[ $found -eq 0 ]]; then
-    _err "vCluster '$name' not found in namespace '$VCLUSTER_NAMESPACE'"
+    _warn "vCluster '$name' not found in namespace '$VCLUSTER_NAMESPACE'"
+    return 1
   fi
 }
 

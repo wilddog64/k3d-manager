@@ -929,7 +929,7 @@ EOF
 
   kubectl() {
     case "$*" in
-      --context\ ubuntu-hostinger\ -n\ monitoring\ get\ svc\ pushgateway)
+      --context\ ubuntu-hostinger\ -n\ monitoring\ get\ svc\ prometheus-pushgateway)
         return 0
         ;;
       *)
@@ -1002,7 +1002,7 @@ EOF
   [ "$output" = "0" ]
   run grep -F -- 'com.k3d-manager.pushgateway-port-forward.sh' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   [ "$status" -eq 0 ]
-  run grep -F -- 'svc/pushgateway' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.sh"
+  run grep -F -- 'svc/prometheus-pushgateway' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.sh"
   [ "$status" -eq 0 ]
   run grep -F -- "$(command -v kubectl)" "${HOME}/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
   [ "$status" -eq 0 ]

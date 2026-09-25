@@ -9,6 +9,7 @@ _ARG_PATTERNS = {
     "NS": re.compile(r"[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?"),
     "DIGEST": re.compile(r"sha256:[0-9a-f]{64}"),
     "FIX_CONTEXT": re.compile(r"ubuntu-k3s|ubuntu-hostinger|k3d-k3d-cluster"),
+    "CRONJOB": re.compile(r"app-cve-scan|argocd-cve-scan"),
 }
 
 MAKE_TARGETS = {
@@ -19,8 +20,10 @@ MAKE_TARGETS = {
     "vuln-scan": {"min_role": "reader", "summary": "VulnerabilityReport summary"},
     "e2e-runner-health": {"min_role": "reader", "optional": ("RUNNER",), "summary": "hub vs remote-runner health"},
     "e2e-remote": {"min_role": "operator", "required": ("RUNNER",), "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e on a remote runner"},
+    "e2e-sandbox": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 2 e2e on the live ACG sandbox"},
     "e2e-replay": {"min_role": "operator", "required": ("RUNNER",), "timeout": 900, "summary": "replay retained runner results"},
     "sync-apps": {"min_role": "operator", "timeout": 600, "summary": "sync data-layer apps"},
+    "app-cve-scan": {"min_role": "operator", "timeout": 900, "optional": ("CRONJOB",), "summary": "trigger the app-cluster CVE scan now"},
     "monitoring-pause": {"min_role": "operator", "timeout": 600, "summary": "scale hub observability to zero"},
     "monitoring-resume": {"min_role": "operator", "timeout": 600, "summary": "restore paused hub observability"},
     "fix-restart": {"min_role": "operator", "required": ("APP", "NS"), "optional": ("FIX_CONTEXT",), "summary": "rollout restart a deployment"},

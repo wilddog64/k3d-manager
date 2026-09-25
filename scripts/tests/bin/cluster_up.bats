@@ -24,6 +24,12 @@
   [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
 }
 
+@test "acg-up reconciles other app-cluster registrations after registering the hub" {
+  run bash -c "awk '/register_app_cluster/{print NR; found=1} found && /argocd_reconcile_app_cluster_registrations/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+}
+
 @test "acg-up does not capture the dry-run wrapper as its own base" {
   run grep -nF 'unset -f __k3dm_base_run_command' bin/cluster-up
   [ "$status" -ne 0 ]
@@ -231,4 +237,169 @@ STUB
 
   run grep -nF -- '-w "${_ldap_user_pass}"' bin/cluster-up
   [ "$status" -ne 0 ]
+}
+
+@test "acg-up restarts the argocd browser listener when only the wrapper changed" {
+  run grep -nF 'if [[ -f "${_argocd_browser_plist}" ]] && [[ "${_argocd_browser_wrapper_changed}" -eq 0 ]] && diff -q' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run grep -cF '_argocd_browser_wrapper_changed=1' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+
+  run bash -c "awk '/_argocd_browser_wrapper_before=\"\"/{print NR} /_argocd_write_browser_https_wrapper \"/{print NR} /_argocd_browser_wrapper_changed=0/{print NR}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+  [ "$(printf '%s\n' "$output" | sed -n '2p')" -lt "$(printf '%s\n' "$output" | sed -n '3p')" ]
+}
+
+@test "acg-up registers the app cluster with a real provider and the shopping-cart label" {
+  run grep -nF 'ARGOCD_APP_CLUSTER_PROVIDER="${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'ARGOCD_APP_CLUSTER_SHOPPING_CART="${ARGOCD_APP_CLUSTER_SHOPPING_CART:-true}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run bash -c "awk '/ARGOCD_APP_CLUSTER_SHOPPING_CART=/{print NR; found=1} found && /^  register_app_cluster\$/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+}
+
+_load_image_pull_helpers() {
+  sed -n '/^function _acg_image_pull_blocked()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/a.sh"
+  sed -n '/^function _acg_data_layer_abort_on_image_pull()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/b.sh"
+  source scripts/lib/system.sh
+  source "${BATS_TEST_TMPDIR}/a.sh"
+  source "${BATS_TEST_TMPDIR}/b.sh"
+}
+
+_pods_json_imagepullbackoff() {
+  cat <<'JSON'
+{"items":[{"metadata":{"name":"minio-0"},"status":{"containerStatuses":[
+ {"name":"minio","state":{"waiting":{"reason":"ImagePullBackOff","message":"Back-off pulling image \"quay.io/minio/minio:X\": 401 UNAUTHORIZED"}}}]}},
+ {"metadata":{"name":"redis-cart-0"},"status":{"containerStatuses":[{"name":"redis","state":{"running":{}}}]}}]}
+JSON
+}
+
+@test "acg-up image-pull probe reports a blocked container with pod, container and reason" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers _pods_json_imagepullbackoff)"'
+    _load_image_pull_helpers
+    kubectl() { _pods_json_imagepullbackoff; }
+    _acg_image_pull_blocked shopping-cart-data ubuntu-k3s
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pod/minio-0 minio ImagePullBackOff"* ]]
+  [[ "$output" == *"401 UNAUTHORIZED"* ]]
+  [[ "$output" != *"redis-cart-0"* ]]
+}
+
+@test "acg-up image-pull probe stays quiet when every container is running" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers)"'
+    _load_image_pull_helpers
+    kubectl() { echo "{\"items\":[{\"metadata\":{\"name\":\"redis-cart-0\"},\"status\":{\"containerStatuses\":[{\"name\":\"redis\",\"state\":{\"running\":{}}}]}}]}"; }
+    _acg_image_pull_blocked shopping-cart-data ubuntu-k3s
+  '
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "acg-up image-pull probe ignores a non-fatal waiting reason" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers)"'
+    _load_image_pull_helpers
+    kubectl() { echo "{\"items\":[{\"metadata\":{\"name\":\"minio-0\"},\"status\":{\"containerStatuses\":[{\"name\":\"minio\",\"state\":{\"waiting\":{\"reason\":\"ContainerCreating\"}}}]}}]}"; }
+    _acg_image_pull_blocked shopping-cart-data ubuntu-k3s
+  '
+  [ "$status" -ne 0 ]
+}
+
+@test "acg-up data-layer abort waits three polls before giving up" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers _pods_json_imagepullbackoff)"'
+    _load_image_pull_helpers
+    kubectl() { _pods_json_imagepullbackoff; }
+    for i in 1 2 3; do
+      if _acg_data_layer_abort_on_image_pull; then echo "ABORT_AT=$i"; break; fi
+    done
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"not settled (1/3)"* ]]
+  [[ "$output" == *"not settled (2/3)"* ]]
+  [[ "$output" == *"blocked on an image pull, not on a slow sync"* ]]
+  [[ "$output" == *"ABORT_AT=3"* ]]
+}
+
+@test "acg-up data-layer abort resets its strike count when the pull recovers" {
+  run bash -c '
+    '"$(declare -f _load_image_pull_helpers _pods_json_imagepullbackoff)"'
+    _load_image_pull_helpers
+    kubectl() { _pods_json_imagepullbackoff; }
+    _acg_data_layer_abort_on_image_pull || true
+    _acg_data_layer_abort_on_image_pull || true
+    kubectl() { echo "{\"items\":[]}"; }
+    _acg_data_layer_abort_on_image_pull || true
+    echo "strikes=${_DL_IMAGE_STRIKES}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"strikes=0"* ]]
+}
+
+@test "acg-up checks for a blocked image pull inside both data-layer sync waits" {
+  run grep -c '_acg_data_layer_abort_on_image_pull' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 3 ]
+}
+
+_load_acg_up_cleanup() {
+  sed -n '/^function _acg_up_cleanup()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/c.sh"
+  source scripts/lib/system.sh
+  source "${BATS_TEST_TMPDIR}/c.sh"
+}
+
+@test "acg-up failure cleanup leaves a pre-existing cloudflare tunnel running" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    _load_acg_up_cleanup
+    launchctl() { echo "LAUNCHCTL_CALLED $*"; }
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"LAUNCHCTL_CALLED"* ]]
+  [[ "$output" == *"leaving the cloudflare tunnel up"* ]]
+}
+
+@test "acg-up failure cleanup removes only a tunnel it created itself" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    _load_acg_up_cleanup
+    launchctl() { echo "LAUNCHCTL_CALLED $1"; }
+    _ACG_TUNNEL_PLIST_CREATED=1
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"LAUNCHCTL_CALLED bootout"* ]]
+  [[ "$output" == *"removing the cloudflare tunnel this run created"* ]]
+}
+
+@test "acg-up marks the tunnel plist as created only when none existed" {
+  run grep -c '_ACG_TUNNEL_PLIST_CREATED=1' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+  run bash -c "awk '/_ACG_TUNNEL_PLIST_CREATED=1/{print NR}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  run bash -c "awk '/install -m 644 .\{_named_tunnel_plist_tmp\}/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+}
+
+@test "acg-up failure cleanup never boots out the tunnel unconditionally" {
+  run bash -c "sed -n '/^function _acg_up_cleanup()/,/^}\$/p' bin/cluster-up | grep -c 'launchctl bootout'"
+  [ "$output" -eq 1 ]
+  run bash -c "sed -n '/^function _acg_up_cleanup()/,/^}\$/p' bin/cluster-up | grep -n '_ACG_TUNNEL_PLIST_CREATED'"
+  [ "$status" -eq 0 ]
 }

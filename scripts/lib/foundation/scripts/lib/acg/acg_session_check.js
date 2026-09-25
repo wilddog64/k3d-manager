@@ -15,6 +15,23 @@ const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
 const POLL_INTERVAL_MS = 5000;
 const LOGIN_TIMEOUT_MS = 300000;
 
+function _credentialState(value) {
+  if (value === undefined || value === null) {
+    return 'absent';
+  }
+  if (value === '') {
+    return 'empty';
+  }
+  return 'present';
+}
+
+function _reportCredentialState() {
+  const user = _credentialState(process.env.ACG_USERNAME);
+  const pass = _credentialState(process.env.ACG_PASSWORD);
+  console.error(`ACG_CREDENTIALS: username=${user} password=${pass}`);
+  return user === 'present' && pass === 'present';
+}
+
 async function _autoLogin(browser) {
   if (!process.env.ACG_USERNAME || !process.env.ACG_PASSWORD) {
     return false;
@@ -36,6 +53,14 @@ async function _autoLogin(browser) {
 async function _main() {
   const browser = await chromium.connectOverCDP(CDP_URL);
   try {
+    const credentialsUsable = _reportCredentialState();
+    if (process.env.K3DM_ACG_REQUIRE_CREDENTIALS === '1' && !credentialsUsable) {
+      const usernameState = _credentialState(process.env.ACG_USERNAME);
+      const passwordState = _credentialState(process.env.ACG_PASSWORD);
+      console.error(`ACG_CREDENTIALS_REQUIRED: credential store is not usable (username=${usernameState} password=${passwordState}) and K3DM_ACG_REQUIRE_CREDENTIALS=1`);
+      throw new Error('ACG_CREDENTIALS_REQUIRED');
+    }
+
     const contexts = browser.contexts();
     if (contexts.length === 0) {
       throw new Error('No browser context found via CDP');
@@ -55,7 +80,7 @@ async function _main() {
       await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
     }
     if (await pageLooksLoggedIn(page, { attempts: 4 })) {
-      process.stdout.write('ACG_SESSION_OK\n');
+      process.stdout.write('ACG_SESSION_OK path=existing-session\n');
       return;
     }
 
@@ -70,7 +95,7 @@ async function _main() {
         return false;
       });
       if (loginOk && await pageLooksLoggedIn(page, { attempts: 3 })) {
-        process.stdout.write('ACG_SESSION_OK\n');
+        process.stdout.write('ACG_SESSION_OK path=auto-login\n');
         return;
       }
       console.error('INFO: headless auto-login did not succeed.');
@@ -92,7 +117,7 @@ async function _main() {
     const deadline = Date.now() + LOGIN_TIMEOUT_MS;
     while (Date.now() < deadline) {
       if (!page.url().includes('/signin') && await pageLooksLoggedIn(page)) {
-        process.stdout.write('ACG_SESSION_OK\n');
+        process.stdout.write('ACG_SESSION_OK path=manual-login\n');
         return;
       }
       await page.waitForTimeout(POLL_INTERVAL_MS);
@@ -115,5 +140,7 @@ module.exports = {
   LOGIN_TIMEOUT_MS,
   POLL_INTERVAL_MS,
   _autoLogin,
+  _credentialState,
   _main,
+  _reportCredentialState,
 };

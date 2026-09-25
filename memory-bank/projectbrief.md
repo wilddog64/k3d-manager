@@ -52,8 +52,10 @@ and two functions — nothing else changes.
 ### Plugin System
 
 Feature modules live in `scripts/plugins/` and are **lazy-loaded** — sourced only when
-a matching function is invoked. Plugins are independent: Vault, ESO, Jenkins, ArgoCD,
-Istio, LDAP, Shopping Cart, Antigravity, and AWS credential management each live in their own file.
+a matching function is invoked. Plugins are independent: ACG, ArgoCD, AWS, Azure, Cert-Manager,
+Copilot, E2E (Tier 1 & Tier 2), ESO, GCP, Gemini, Hub Recovery, Hub Snapshot, Istio Ambient,
+Jenkins, Keycloak, LDAP, Loadtest, Observability, Shopping Cart, Signing, SMB-CSI, Smoke,
+SSM, Tunnel, Vault, and vCluster each live in their own file.
 
 Public functions have no underscore prefix and are first-class CLI commands:
 ```

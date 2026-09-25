@@ -2,6 +2,7 @@ import importlib.machinery
 import importlib.util
 import io
 import json
+import sys
 from email.message import Message
 from pathlib import Path
 from urllib.error import HTTPError
@@ -10,7 +11,8 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[3]
-SOURCE = ROOT / "bin" / "k3dm-webhook"
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+SOURCE = ROOT / "scripts" / "lib" / "webhook" / "smoke.py"
 SPEC = importlib.util.spec_from_loader("k3dm_webhook_smoke_test", importlib.machinery.SourceFileLoader("k3dm_webhook_smoke_test", str(SOURCE)))
 WEBHOOK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(WEBHOOK)

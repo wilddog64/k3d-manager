@@ -28,6 +28,22 @@ setup() {
   [ "$output" = "/etc/cni/net.d /opt/cni/bin" ]
 }
 
+@test "_istio_ambient_cni_provider_is_specific accepts k3d and k3s-hostinger" {
+  run _istio_ambient_cni_provider_is_specific k3d
+  [ "$status" -eq 0 ]
+  run _istio_ambient_cni_provider_is_specific k3s-hostinger
+  [ "$status" -eq 0 ]
+}
+
+@test "_istio_ambient_cni_provider_is_specific rejects unknown, empty and bare k3s" {
+  run _istio_ambient_cni_provider_is_specific unknown
+  [ "$status" -ne 0 ]
+  run _istio_ambient_cni_provider_is_specific ""
+  [ "$status" -ne 0 ]
+  run _istio_ambient_cni_provider_is_specific k3s
+  [ "$status" -ne 0 ]
+}
+
 @test "deploy_istio_ambient skips provider lookup when CNI dirs are preset" {
   local marker="${BATS_TEST_TMPDIR}/target-provider-called"
   _istio_ambient_target_provider() { : > "${marker}"; }

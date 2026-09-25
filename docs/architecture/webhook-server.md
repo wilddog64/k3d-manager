@@ -1,8 +1,9 @@
 # Webhook Server Architecture
 
 **Component:** `bin/k3dm-webhook` + `scripts/lib/webhook/`
-**Status:** modularization Phase 1 landed (v1.13.0), extended by `make_targets` (v1.34.0);
-**Phases 2–5 not started** — and the monolith has grown 36% since Phase 1 (see [Roadmap](#roadmap-remaining-phases))
+**Status:** modularization Phase 1 landed (v1.13.0), extended by `make_targets` (v1.34.0),
+and policy/route, SSO smoke-client, agent, lifecycle, and status extraction landed in v1.37.0;
+failure-analysis, metrics, redaction, and Slack-thread concerns remain in the entrypoint.
 **Related specs:** [`docs/plans/v1.13.0-webhook-modularization.md`](../plans/v1.13.0-webhook-modularization.md) (umbrella),
 `v1.13.0-webhook-modularization-phase1.md` (config), `-render.md` (render), `-auth.md` (proc + auth),
 [`docs/plans/v1.34.0-slack-k3dm-make-command.md`](../plans/v1.34.0-slack-k3dm-make-command.md) (`/k3dm` make allowlist)
@@ -34,7 +35,7 @@ operator interface the webhook exposes, rather than each operation growing its o
 
 ---
 
-## Module layout after Phase 1
+## Module layout after Phase 4
 
 The refactor keeps `bin/k3dm-webhook` as the entrypoint and process host, and pulls
 **pure, low-risk helpers** into an importable package at `scripts/lib/webhook/`. The
@@ -46,9 +47,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib
 from webhook.config       import (...)
 from webhook.render       import (...)
 from webhook.proc         import _spawn_capture_text
+from webhook.agent        import (_call_gemini, _run_cluster_ask, _sanitize_question)
+from webhook.lifecycle    import (_run_cluster, _run_cluster_resume, _run_upgrade, _run_cleanup,
+                                  _run_make_target, _run_cluster_refresh, _run_hostinger_refresh)
+from webhook.status       import (_run_cluster_status, _run_hostinger_status,
+                                  _run_cluster_diagnostics)
 from webhook.auth         import (...)
 from webhook.make_targets import (MAKE_JOB_TIMEOUT_DEFAULT, MAKE_TARGETS,
                                   make_target_help, parse_make_request)
+from webhook.policy       import (...)
 ```
 
 | Module | Lines | Responsibility | Depends on |
@@ -58,6 +65,11 @@ from webhook.make_targets import (MAKE_JOB_TIMEOUT_DEFAULT, MAKE_TARGETS,
 | `webhook/proc.py`    | 78  | `_spawn_capture_text` — the fork-safe `os.posix_spawn` capture primitive (avoids macOS NEF atfork SIGSEGV) | — (leaf) |
 | `webhook/auth.py`    | 103 | `_keychain_secret`, `_get_token` (bearer resolution), `_verify_slack_signature`, plus the Slack identity gate — `_slack_user_is_allowlisted`, `_slack_user_role` (reads `K3DM_SLACK_ROLE_MAP`); computes `SLACK_SIGNING_SECRET` at import | `config`, `proc` |
 | `webhook/make_targets.py` | 73 | The `/k3dm` allowlist — `MAKE_TARGETS` (17 targets × min-role, required/optional args, per-target timeout, `confirm` flag), `_ARG_PATTERNS` regex whitelist, `parse_make_request()`, `make_target_help()` | — (leaf) |
+| `webhook/policy.py` | 159 | Request roles, static/dynamic action policy, thread-command roles, JSONL audit, and fixed-window rate limiting | `config`, `make_targets` |
+| `webhook/smoke.py` | 667 | Browser-emulating SSO smoke client: HTMLParser-based OAuth authorization-code checks, credentialed login probes, and service probes; it is not an HTTP health endpoint | `proc` (runtime callbacks from the entrypoint for shared redaction/provider helpers) |
+| `webhook/agent.py` | 506 | AI agent invocation, cluster-ask orchestration, the cluster-mutation gate, and the prompt-injection filter | `config`, `policy`, `proc`, `render` |
+| `webhook/lifecycle.py` | 434 | Long-running cluster orchestration: cleanup, Make execution, upgrades, cluster up/down/resume, and provider refresh jobs | `config`, `proc`, `render` (entrypoint-owned runtime hooks are injected) |
+| `webhook/status.py` | 453 | Read-only cluster/status/diagnostics jobs and Slack status formatting | `config`, `proc`, `render`, `agent` (entrypoint-owned probes and redaction are injected) |
 
 `webhook/__init__.py` is empty — the package is a plain namespace.
 
@@ -71,10 +83,29 @@ flowchart LR
     CONFIG["config<br/><i>leaf</i>"]
     PROC["proc<br/><i>leaf</i>"]
     MAKE["make_targets<br/><i>leaf</i>"]
+    POLICY["policy<br/><i>authz + audit + rate limit</i>"]
+    SMOKE["smoke<br/><i>SSO + service probes</i>"]
+    AGENT["agent<br/><i>ask + safety gates</i>"]
+    LIFE["lifecycle<br/><i>orchestration</i>"]
+    STATUS["status<br/><i>reporting</i>"]
 
     RENDER --> CONFIG
     AUTH --> CONFIG
     AUTH --> PROC
+    POLICY --> CONFIG
+    POLICY --> MAKE
+    SMOKE --> PROC
+    AGENT --> CONFIG
+    AGENT --> POLICY
+    AGENT --> PROC
+    AGENT --> RENDER
+    LIFE --> CONFIG
+    LIFE --> PROC
+    LIFE --> RENDER
+    STATUS --> CONFIG
+    STATUS --> PROC
+    STATUS --> RENDER
+    STATUS --> AGENT
     ENTRY -.->|"imports directly"| PROC
     ENTRY -.->|"imports directly"| MAKE
 ```
@@ -84,28 +115,68 @@ makes them safe to import from BATS/pytest and from the smoke gate without booti
 server. `make_targets` is deliberately a pure data + validation leaf: the allowlist is
 testable without a cluster, a Makefile, or a running server.
 
+`webhook.agent` owns the cluster-mutation gate (`_fix_mode_enabled`) and the prompt-injection
+filter (`_sanitize_question`). Both are covered by the direct-function tests in
+`scripts/tests/bin/webhook_agent.py`.
+
+`webhook.lifecycle` owns slow, mutating orchestration while `webhook.status` owns read-only
+collection and formatting. The entrypoint injects `_log`, `_notify_job`, `_push_metrics`,
+`_analyze_stall`, `_analyze_failure`, `_redact_secrets`, process/job state, and provider probes
+through each module's `configure_runtime(...)`; the modules do not import the entrypoint. The
+remaining entrypoint concerns are the future Phase 5 work: failure analysis, metrics, secret
+registration/redaction, Slack thread commands, HTTP routing, and server bootstrap.
+
+### API route table
+
+The API dispatcher declares each POST and GET route in `_POST_ROUTES` and `_GET_ROUTES`
+inside `bin/k3dm-webhook`. Every entry carries `handler`, `min_role`, and `action_name`.
+`min_role` is the floor that applies when no dynamic policy resolves. The `dynamic` key
+marks routes whose requirement is resolved per request: `/api/v1/cluster` resolves by
+action and `/api/v1/make` resolves from the selected Make target. The effective requirement
+is the strictest of the table floor and that per-request policy. Requirements default to the
+most restrictive role (`admin`) when unknown, while actors default to the least-privileged
+role (`reader`) when unknown; these opposite defaults keep missing requirements fail-safe and
+unrecognised callers fail-closed. `/slack/events` is deliberately outside these tables because
+it has its own signature-verification flow.
+
+| Route | Minimum role |
+|---|---|
+| `/api/v1/argocd-upgrade` | admin |
+| `/api/v1/cve-remediate` | operator |
+| `/api/v1/cluster` | reader baseline; kill/operator, up/down/admin dynamically |
+| `/api/v1/cluster-status` | reader |
+| `/api/v1/diagnostics` | reader |
+| `/api/v1/hostinger-status` | reader |
+| `/api/v1/cluster-refresh` | operator |
+| `/api/v1/cluster-resume` | admin |
+| `/api/v1/cleanup-stale-sandbox` | admin |
+| `/api/v1/make` | reader baseline; target role dynamically |
+| `/api/v1/analyze` | operator |
+| `/api/v1/ask` | reader |
+| `/api/v1/health` (GET) | reader |
+| `/api/v1/status/…` (GET) | reader |
+
 ---
 
 ## What still lives in the monolith
 
-`bin/k3dm-webhook` is **4,008 lines** — it grew, not shrank, since Phase 1: `/k3dm`,
-`/api/v1/cve-remediate`, `/api/v1/hostinger-status`, `/api/v1/cleanup-stale-sandbox`,
-`/api/v1/analyze`, the login smoke suite and the fix-mode thread handler all landed in the
-monolith. Everything below is **not yet extracted** and maps to the phases still to come:
+`bin/k3dm-webhook` is **2,196 lines** after the Phase 4 lifecycle/status extraction. It still
+contains the HTTP server, provider probes, deferred failure analysis, metrics, redaction, and
+Slack-thread command handling. Everything below is **not yet extracted**:
 
 | Area (functions) | Lines (approx) | Future home (planned) |
 |------------------|----------------|-----------------------|
 | HTTP routing — `_Handler.do_POST` / `do_GET`, `__main__` server bootstrap | 3497–4008 | `server.py`, `routes.py` |
 | Provider resolution — `_normalize_provider`, `_resolve_provider`, `_provider_context`, `_acg_stack_probe` | 70–232 | `dispatch.py` |
-| RBAC / audit / rate limit — `_rate_limited`, `_ROLE_LEVELS`, `_ACTION_POLICY`, `_normalize_role`, `_request_role/actor`, `_effective_make_role`, `_thread_command_min_role`, `_role_allows`, `_action_policy`, `_audit_remote_action` | 233–400 | `commands.py` / `dispatch.py` |
+| Remaining server concerns — request validation, handlers, job lifecycle, diagnostics, metrics and redaction | 401–3496 | later phases |
 | Request validation — `_validate_namespace/resource_name/diagnostics_request`, `_resolve_diagnostics_context` | 401–520 | `routes.py` |
 | CVE cooldown + scan jobs — `_cve_cooldown_*`, `_active_cve_scan_job`, `_create_cve_scan_job` | 423–479 | `diagnostics.py` |
-| Cluster / make ops — `_run_cleanup`, `_run_stale_sandbox_cleanup`, `_run_make_target`, `_run_upgrade`, `_run_cluster`, `_run_cluster_resume` | 552–886 | `dispatch.py` |
+| Remaining cluster helper — `_run_stale_sandbox_cleanup` | entrypoint | later lifecycle follow-up |
 | Job runner — `_posix_spawn_job`, `_read_job_tail`, `_running_cluster_job`, `_find_job_by_thread_ts`, `_notify_job`, `_clear_stale_jobs` | 646–1696 | `jobs.py` |
 | Secret redaction — `_redact_skip_reason`, `_register_secret`, `_redact_secrets` | 1231–1280 | `render.py` |
-| Diagnostics / failure analysis — `_call_gemini`, `_analyze_stall`, `_collect_cluster_state`, `_analyze_failure`, `_smoke_*` login suite, `_smoke_test_services`, `_run_post_provision_check` | 1297–2520 | `diagnostics.py` |
+| Diagnostics / failure analysis — `_analyze_stall`, `_collect_cluster_state`, `_analyze_failure`, `_run_post_provision_check` | entrypoint | future Phase 5 |
 | k8s / metrics — `_init_k8s_ctx`, `_push_metrics`, `_provider_supports_pushgateway` | 1566–1796 | `dispatch.py` / `diagnostics.py` |
-| Command handlers — `_run_cluster_status/refresh/diagnostics`, `_run_hostinger_*`, `_run_analyze`, fix/filing-mode gates, `_run_cluster_ask`, `_handle_thread_command` | 949–1209, 2521–3496 | `commands.py` |
+| Command handlers — `_run_analyze`, fix/filing-mode gates, `_run_cluster_ask`, `_handle_thread_command` | entrypoint | future Phase 5 |
 
 **Deliberately not extracted yet** (per the umbrella spec's "Why not `lib-foundation` yet"):
 these paths are tightly bound to the repo's provider model, shopping-cart diagnostics,
@@ -182,12 +253,11 @@ Four independent gates, all of which must pass before `make` is reached:
 4. **`confirm` for destructive targets** — `fix-delete-pod`, `fix-force-sync` and
    `e2e-runner-unlock` require an explicit `confirm` token.
 
-Execution detail worth knowing: arguments are passed as **positional `$@` parameters**, not
-interpolated into a command string —
+Execution detail worth knowing: validated arguments are passed as an **argv list**, never
+interpolated into a shell command string —
 
 ```python
-cmd = ["/bin/bash", "-c", 'make --no-print-directory "$@"; echo "__K3DM_MAKE_RC=$?"',
-       "k3dm-make", *argv_tail]
+cmd = ["make", "--no-print-directory", *argv_tail]
 ```
 
 The trailing `__K3DM_MAKE_RC=` sentinel is how the real exit code survives being captured

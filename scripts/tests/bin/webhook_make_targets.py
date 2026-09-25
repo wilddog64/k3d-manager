@@ -12,6 +12,7 @@ _spec = importlib.util.spec_from_file_location(
 )
 wh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(wh)
+from webhook import policy
 
 
 class MakeTargetTests(unittest.TestCase):
@@ -67,16 +68,16 @@ class MakeTargetTests(unittest.TestCase):
 
     def test_effective_make_role_caps_relay_role(self):
         self.assertEqual(wh._effective_make_role({}, {}), "admin")
-        old = wh._slack_user_role
-        self.addCleanup(setattr, wh, "_slack_user_role", old)
-        wh._slack_user_role = lambda _user_id: "reader"
-        self.assertEqual(wh._effective_make_role({"X-K3DM-Role": "admin"}, {"slack_user_id": "unknown"}), "reader")
-        wh._slack_user_role = lambda _user_id: "operator"
-        self.assertEqual(wh._effective_make_role({"X-K3DM-Role": "admin"}, {}), "operator")
-        wh._slack_user_role = lambda _user_id: "admin"
-        self.assertEqual(wh._effective_make_role({"X-K3DM-Role": "reader"}, {}), "reader")
-        wh._slack_user_role = lambda _user_id: "bogus"
-        self.assertEqual(wh._effective_make_role({"X-K3DM-Role": "admin"}, {}), "reader")
+        old = policy._slack_user_role
+        self.addCleanup(setattr, policy, "_slack_user_role", old)
+        policy._slack_user_role = lambda _user_id: "reader"
+        self.assertEqual(policy._effective_make_role({"X-K3DM-Role": "admin"}, {"slack_user_id": "unknown"}), "reader")
+        policy._slack_user_role = lambda _user_id: "operator"
+        self.assertEqual(policy._effective_make_role({"X-K3DM-Role": "admin"}, {}), "operator")
+        policy._slack_user_role = lambda _user_id: "admin"
+        self.assertEqual(policy._effective_make_role({"X-K3DM-Role": "reader"}, {}), "reader")
+        policy._slack_user_role = lambda _user_id: "bogus"
+        self.assertEqual(policy._effective_make_role({"X-K3DM-Role": "admin"}, {}), "reader")
 
     def test_make_action_policy(self):
         self.assertEqual(wh._action_policy("/api/v1/make", {"target": "fix-delete-pod"})["min_role"], "admin")
@@ -88,6 +89,49 @@ class MakeTargetTests(unittest.TestCase):
         self.assertIn("fix-list", reader_help)
         self.assertNotIn("fix-sync", reader_help)
         self.assertIn("fix-force-sync APP=… confirm", wh.make_target_help("admin", wh._role_allows))
+
+    def test_app_cve_scan_requires_operator(self):
+        self.assertEqual(wh.MAKE_TARGETS["app-cve-scan"]["min_role"], "operator")
+        self.assertNotIn("app-cve-scan", wh.make_target_help("reader", wh._role_allows))
+        self.assertIn("app-cve-scan", wh.make_target_help("operator", wh._role_allows))
+
+    def test_app_cve_scan_cronjob_value_is_enumerated(self):
+        self.assertEqual(
+            wh.parse_make_request("app-cve-scan", {"CRONJOB": "app-cve-scan"}, None),
+            (["app-cve-scan", "CRONJOB=app-cve-scan"], None),
+        )
+        for value in ("app-cve-scan; rm -rf /", "../../etc/passwd", "app-cve-scan\n", "APP-CVE-SCAN", ""):
+            with self.subTest(value=value):
+                argv, error = wh.parse_make_request("app-cve-scan", {"CRONJOB": value}, None)
+                self.assertIsNone(argv)
+                self.assertIsNotNone(error)
+
+    def test_e2e_sandbox_requires_operator_and_takes_only_digest(self):
+        self.assertEqual(wh.MAKE_TARGETS["e2e-sandbox"]["min_role"], "operator")
+        self.assertNotIn("e2e-sandbox", wh.make_target_help("reader", wh._role_allows))
+        self.assertIn("e2e-sandbox", wh.make_target_help("operator", wh._role_allows))
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox", {}, None),
+            (["e2e-sandbox"], None),
+        )
+        digest = "sha256:" + "a" * 64
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox", {"DIGEST": digest}, None),
+            (["e2e-sandbox", f"DIGEST={digest}"], None),
+        )
+        _, error = wh.parse_make_request("e2e-sandbox", {"RUNNER": "m2"}, None)
+        self.assertIn("does not accept RUNNER", error)
+        for value in ("sha256:" + "a" * 63, "sha256:" + "A" * 64, f"{digest}; rm -rf /", ""):
+            with self.subTest(value=value):
+                argv, error = wh.parse_make_request("e2e-sandbox", {"DIGEST": value}, None)
+                self.assertIsNone(argv)
+                self.assertIn("invalid value for DIGEST", error)
+
+    def test_app_cve_scan_needs_no_confirm(self):
+        self.assertEqual(
+            wh.parse_make_request("app-cve-scan", {}, None),
+            (["app-cve-scan"], None),
+        )
 
 
 if __name__ == "__main__":

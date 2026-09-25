@@ -1247,6 +1247,18 @@ EOF
    fi
 }
 
+function _argocd_warn_generic_cni_dirs() {
+   local name="$1" conf="$2" provider="$3"
+   if [[ "${conf}" != "/etc/cni/net.d" ]]; then
+      return 0
+   fi
+   if [[ -n "${provider}" && "${provider}" != unknown ]]; then
+      return 0
+   fi
+   _warn "[argocd] ${name}: provider is '${provider:-<empty>}' — writing GENERIC CNI dirs, which are wrong for any k3s or k3d substrate"
+   _warn "[argocd] ${name}: re-register the target so its k3d-manager/provider label is set"
+}
+
 function _argocd_appset_live_overrides() {
    local file="$1" name live value conf bin provider dirs
    name="$(sed -n 's/^  name: //p' "$file" | head -1)"
@@ -1260,25 +1272,31 @@ function _argocd_appset_live_overrides() {
    fi
 
    if grep -q '\${AMBIENT_CNI_CONF_DIR}' "$file"; then
-      if [[ -n "${live}" ]]; then
+      if ! declare -f _istio_ambient_cni_dirs >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/istio_ambient.sh" ]]; then
+         # shellcheck disable=SC1090,SC1091
+         source "${PLUGINS_DIR}/istio_ambient.sh"
+      fi
+      if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
+         provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${APP_CLUSTER_NAME:-ubuntu-k3s}")}"
+         if [[ -n "${provider}" ]]; then
+            dirs="$(_istio_ambient_cni_dirs "${provider}")"
+            conf="${dirs%% *}"
+            bin="${dirs##* }"
+         fi
+      fi
+      if [[ -z "${conf:-}" || -z "${bin:-}" ]] && [[ -n "${live}" ]]; then
          value="$(printf '%s' "${live}" | jq -r '[.spec.generators[]?.list.elements[]? | select(.name == "istio-cni") | .values][0] // ""')"
          conf="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniConfDir:[[:space:]]*//p' | head -1)"
          bin="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniBinDir:[[:space:]]*//p' | head -1)"
       fi
-      if [[ -z "${conf:-}" || -z "${bin:-}" ]]; then
-         if ! declare -f _istio_ambient_cni_dirs >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/istio_ambient.sh" ]]; then
-            # shellcheck disable=SC1090,SC1091
-            source "${PLUGINS_DIR}/istio_ambient.sh"
-         fi
-         if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
-            provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${APP_CLUSTER_NAME:-ubuntu-k3s}")}"
-            if [[ -n "${provider}" ]]; then
-               dirs="$(_istio_ambient_cni_dirs "${provider}")"
-               conf="${dirs%% *}"
-               bin="${dirs##* }"
-            fi
-         fi
+      if [[ -n "${conf:-}" && "${conf}" == "/etc/cni/net.d" ]] \
+         && declare -f _istio_ambient_cni_provider_is_specific >/dev/null 2>&1 \
+         && _istio_ambient_cni_provider_is_specific "${provider:-}"; then
+         _warn "[argocd] ${name}: refusing generic CNI dirs for provider ${provider}"
+         conf=""
+         bin=""
       fi
+      _argocd_warn_generic_cni_dirs "${name}" "${conf:-}" "${provider:-}"
       if [[ -n "${conf:-}" && -n "${bin:-}" ]]; then
          printf 'AMBIENT_CNI_CONF_DIR=%s\nAMBIENT_CNI_BIN_DIR=%s\n' "${conf}" "${bin}"
       fi
@@ -1322,7 +1340,7 @@ function _argocd_deploy_applicationsets() {
    _info "[argocd] Found ${#appset_files[@]} ApplicationSet file(s)"
 
    # Deploy each ApplicationSet
-   local deployed_count=0
+   local deployed_count=0 failed_count=0 _line
    for file in "${appset_files[@]}"; do
       local filename
       filename=$(basename "$file")
@@ -1337,6 +1355,7 @@ function _argocd_deploy_applicationsets() {
       done
       if [[ -n "${_unset}" ]]; then
          _err "[argocd] Refusing to apply ${filename}: unset variable(s):${_unset}"
+         failed_count=$((failed_count + 1))
          continue
       fi
       local -a _overrides=()
@@ -1347,16 +1366,27 @@ function _argocd_deploy_applicationsets() {
          done < <(_argocd_appset_live_overrides "$file")
       fi
       if (( ${#_overrides[@]} > 0 )); then
-         _info "[argocd] ${filename}: keeping live ${_overrides[*]}"
+         _info "[argocd] ${filename}: resolved overrides ${_overrides[*]}"
       fi
-      if env ${_overrides[@]+"${_overrides[@]}"} envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
-         ((deployed_count++))
+      local _apply_err _apply_rc=0
+      _apply_err="$(env ${_overrides[@]+"${_overrides[@]}"} envsubst "${_vars}" < "$file" \
+         | _kubectl apply -f - 2>&1 >/dev/null)" || _apply_rc=$?
+      if (( _apply_rc == 0 )); then
+         deployed_count=$((deployed_count + 1))
       else
+         failed_count=$((failed_count + 1))
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"
+         while IFS= read -r _line; do
+            [[ -n "${_line}" ]] && _warn "[argocd]   ${_line}"
+         done <<< "${_apply_err}"
       fi
    done
 
    _info "[argocd] Successfully deployed $deployed_count/${#appset_files[@]} ApplicationSet(s)"
+   if (( failed_count > 0 )); then
+      _err "[argocd] ${failed_count} of ${#appset_files[@]} ApplicationSet(s) did not apply"
+      return 1
+   fi
    return 0
 }
 
@@ -1408,6 +1438,9 @@ Config (override via env or scripts/etc/argocd/vars.sh):
   ARGOCD_APP_CLUSTER_INSECURE      Skip TLS      (default: true — dev only)
   ARGOCD_APP_CLUSTER_CA_DATA       CA bundle     (optional, base64; when set forces insecure=false)
   ARGOCD_APP_CLUSTER_TOKEN         Bearer token  (required unless SERVER=https://kubernetes.default.svc)
+  ARGOCD_APP_CLUSTER_SHOPPING_CART Run the shopping-cart stack on this cluster (default: false)
+                                   Only "true" opts the cluster into the data-git and services-git
+                                   ApplicationSets. The hub must stay false.
 HELP
     return 0
   fi
@@ -1445,6 +1478,11 @@ HELP
   local _release_label
   _release_label="$(printf '%s' "${_release}" | tr -cs 'A-Za-z0-9_.-' '-' | cut -c1-63)"
   _release_label="${_release_label:-unknown}"
+  local _shopping_cart="${ARGOCD_APP_CLUSTER_SHOPPING_CART:-false}"
+  if [[ "${_shopping_cart}" != "true" && "${_shopping_cart}" != "false" ]]; then
+    _err "[argocd] ARGOCD_APP_CLUSTER_SHOPPING_CART must be 'true' or 'false'"
+    return 1
+  fi
   local _managed="${ARGOCD_APP_CLUSTER_MANAGED:-false}"
   if [[ "${_managed}" == "true" ]] && {
     [[ -z "${ARGOCD_APP_CLUSTER_PROVIDER:-}" || -z "${ARGOCD_APP_CLUSTER_SANDBOX_ID:-}" ||
@@ -1452,6 +1490,11 @@ HELP
   }; then
     _err "[argocd] managed registrations require provider, sandbox-id, expires-at, and release metadata"
     return 1
+  fi
+
+  if [[ -z "${ARGOCD_APP_CLUSTER_PROVIDER:-}" ]]; then
+    _warn "[argocd] ARGOCD_APP_CLUSTER_PROVIDER unset — registering ${ARGOCD_APP_CLUSTER_NAME:-<unnamed>} with provider 'unknown'"
+    _warn "[argocd] Substrate-derived config (ambient CNI dirs) will fall back to generic defaults for this cluster"
   fi
 
   local _wasx=0
@@ -1473,6 +1516,7 @@ metadata:
     argocd.argoproj.io/secret-type: cluster
     argocd.argoproj.io/cluster-name: "${ARGOCD_APP_CLUSTER_NAME}"
 ${_platform_labels}    k3d-manager/managed: "${_managed}"
+    k3d-manager/shopping-cart: "${_shopping_cart}"
     k3d-manager/provider: "${ARGOCD_APP_CLUSTER_PROVIDER:-unknown}"
     k3d-manager/release: "${_release_label}"
   annotations:
@@ -1910,4 +1954,61 @@ for obj in doc.get("items", []):
         action = "orphan" if kind == "serviceaccount" else "review"
         print("\t".join([action, kind, name, "-", instance]))
 ' "$1" "${2:-}"
+}
+
+function _argocd_app_cluster_inventory() {
+   local _table="${ARGOCD_APP_CLUSTER_TABLE:-${SCRIPT_DIR}/etc/argocd/app-clusters.tsv}"
+   if [[ ! -r "${_table}" ]]; then
+      _err "[argocd] app-cluster inventory not readable: ${_table}"
+      return 1
+   fi
+   grep -v '^[[:space:]]*#' "${_table}" | grep -v '^[[:space:]]*$'
+}
+
+function argocd_reconcile_app_cluster_registrations() {
+   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+      cat <<'HELP'
+Usage: argocd_reconcile_app_cluster_registrations
+
+Re-register any app cluster listed in scripts/etc/argocd/app-clusters.tsv that has a local
+kubeconfig context but no cluster Secret on the hub. Additive only; never aborts the caller.
+A cluster with no kubeconfig context is skipped, not an error.
+HELP
+      return 0
+   fi
+   if [[ "${K3DM_EXCLUSIVE_APP_CLUSTER:-false}" == "true" ]]; then
+      _err "[argocd] app-cluster reconcile is additive-only; K3DM_EXCLUSIVE_APP_CLUSTER=true would strip the app-cluster role from other registrations"
+      return 1
+   fi
+   local _ns="${ARGOCD_NAMESPACE:-cicd}"
+   local _dispatcher="${K3DM_DISPATCHER:-${SCRIPT_DIR}/k3d-manager}"
+   local -a _hub_kubectl=()
+   read -r -a _hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+   local _rows _context _secret _provider _restored=0 _gaps=0
+   _rows="$(_argocd_app_cluster_inventory)" || return 1
+   while IFS=$'\t' read -r _context _secret _provider; do
+      [[ -z "${_context}" ]] && continue
+      if ! kubectl config get-contexts "${_context}" >/dev/null 2>&1; then
+         _info "[argocd] ${_context}: no kubeconfig context on this host — skipping"
+         continue
+      fi
+      if "${_hub_kubectl[@]}" get secret "${_secret}" -n "${_ns}" >/dev/null 2>&1; then
+         _info "[argocd] ${_context}: already registered (${_ns}/${_secret})"
+         continue
+      fi
+      _warn "[argocd] ${_context}: hub registration ${_ns}/${_secret} is MISSING — re-registering additively"
+      if CLUSTER_PROVIDER="${_provider}" K3DM_EXCLUSIVE_APP_CLUSTER=false \
+            "${_dispatcher}" refresh_registration; then
+         _restored=$(( _restored + 1 ))
+         _info "[argocd] ${_context}: re-registered"
+      else
+         _gaps=$(( _gaps + 1 ))
+         _warn "[argocd] ${_context}: re-registration FAILED"
+      fi
+   done <<< "${_rows}"
+   _info "[argocd] app-cluster reconcile: ${_restored} restored, ${_gaps} still missing"
+   if (( _gaps > 0 )); then
+      printf '%s\n' "!! APP-CLUSTER REGISTRATION GAP: ${_gaps} cluster(s) not registered with the hub — rerun: make refresh-registration CLUSTER_PROVIDER=k3s-hostinger" >&2
+   fi
+   return 0
 }

@@ -18,6 +18,27 @@ setup() {
   export E2E_VCLUSTER_READY_INTERVAL=0
   export E2E_VCLUSTER_READY_REFRESH_INTERVAL=0
   export E2E_STRIPE_SECRET_KEY=test-stripe-key
+  export _ACG_SANDBOX_URL=https://example.test/sandbox
+  security() { return 0; }
+
+  # _e2e_sandbox_preflight_auth gates on _secret_load_data, which runs security
+  # inside bash -c -- a fresh shell where the function stub above is invisible.
+  # A fake executable on PATH is the only stub that loader can see. Without it
+  # this suite reads the operator's real keychain on macOS and finds no security
+  # binary at all on Linux CI.
+  FAKE_BIN="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$FAKE_BIN"
+  cat > "$FAKE_BIN/security" <<'FAKE'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  [ "$arg" = "-w" ] && { printf '%s\n' "e2e-fake-secret"; exit 0; }
+done
+exit 0
+FAKE
+  chmod +x "$FAKE_BIN/security"
+  PATH="$FAKE_BIN:$PATH"
+  export PATH
+  _is_mac() { return 0; }
 
   _run_command() {
     while [[ $# -gt 0 ]]; do
@@ -35,6 +56,15 @@ setup() {
       RUN_EXIT_CODES=("${RUN_EXIT_CODES[@]:1}")
     fi
     return "$rc"
+  }
+
+  # Never let a bare kubectl in a path under test reach the operator's real clusters.
+  kubectl() {
+    if [[ "$1" == "config" ]]; then
+      printf '%s\n' "${KUBECTL_CONTEXTS:-ubuntu-k3s}"
+      return 0
+    fi
+    return "${KUBECTL_RC:-0}"
   }
 
   # Stub sibling-plugin dependencies so _e2e_load_deps does not source the real files.
@@ -582,6 +612,7 @@ print("ok")' "$E2E_REPORT_DIR/${run_id}.json"
 JSON
   local capture="$BATS_TEST_TMPDIR/event-manifest.json"
   _kubectl() {
+    while [[ "$1" == --* ]]; do shift; done
     if [[ "$1" == "create" && "$2" == "-f" ]]; then cp "$3" "$capture"; return 0; fi
     return 0
   }
@@ -618,6 +649,7 @@ PY
 JSON
   local capture="$BATS_TEST_TMPDIR/m2-manifest.json"
   _kubectl() {
+    while [[ "$1" == --* ]]; do shift; done
     if [[ "$1" == "create" && "$2" == "-f" ]]; then cp "$3" "$capture"; return 0; fi
     return 0
   }
@@ -644,6 +676,7 @@ PY
 JSON
   local capture="$BATS_TEST_TMPDIR/fail-manifest.json"
   _kubectl() {
+    while [[ "$1" == --* ]]; do shift; done
     if [[ "$1" == "create" && "$2" == "-f" ]]; then cp "$3" "$capture"; return 0; fi
     return 0
   }
@@ -669,5 +702,53 @@ PY
     skip "shellcheck not installed"
   fi
   run shellcheck -S warning -x "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh"
+  [ "$status" -eq 0 ]
+}
+
+@test "result event publish passes --no-exit so a hub failure cannot exit the shell" {
+  mkdir -p "$E2E_REPORT_DIR"
+  cat > "$E2E_REPORT_DIR/flagrun.json" <<'JSON'
+{"run_id":"flagrun","tier":"vcluster","service":"product-catalog","passed":1,"total":1,"failed":0,"exit_code":0,"result":"pass"}
+JSON
+  local seen="$BATS_TEST_TMPDIR/kubectl-flags"
+  _kubectl() { printf '%s\n' "$*" > "$seen"; return 0; }
+  run _e2e_write_result_event "flagrun"
+  [ "$status" -eq 0 ]
+  run grep -F -- "--no-exit" "$seen"
+  [ "$status" -eq 0 ]
+}
+
+@test "result event prune passes --no-exit so a hub failure cannot exit the shell" {
+  local seen="$BATS_TEST_TMPDIR/prune-flags"
+  _kubectl() { printf '%s\n' "$*" >> "$seen"; return 0; }
+  run _e2e_prune_result_events
+  [ "$status" -eq 0 ]
+  run grep -F -- "--no-exit" "$seen"
+  [ "$status" -eq 0 ]
+}
+
+# Regression guard for the vCluster leak: the publish step talks to the hub, which is
+# unreachable from the m2 runner, and _run_command ends an unguarded failure with exit 1.
+# An exit there used to kill the EXIT trap before teardown, stranding the vCluster and
+# wedging every later run. Teardown must therefore come first. The stub exits rather than
+# returning non-zero because `|| true` cannot catch an exit — which is exactly why the
+# original defect was invisible.
+@test "exit trap tears down the vCluster even when the result event publish exits the shell" {
+  _e2e_deploy_substrate() { exit 1; }
+  _e2e_write_result_event() { exit 9; }
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  run grep -F -- "vcluster_destroy e2e-" "$VC_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "exit trap writes the summary before the teardown that precedes the publish" {
+  _e2e_deploy_substrate() { exit 1; }
+  _e2e_write_result_event() { exit 9; }
+  local rc=0
+  ( e2e_verify_vcluster ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  run bash -c 'ls "$1"/*.json' _ "$E2E_REPORT_DIR"
   [ "$status" -eq 0 ]
 }

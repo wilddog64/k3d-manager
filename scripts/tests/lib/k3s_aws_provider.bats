@@ -355,3 +355,37 @@
   [ "$status" -ne 0 ]
   [[ "$output" == *"falling back to SSH tunnel"* ]]
 }
+
+@test "k3s-aws SSM registration timeout returns instead of exiting the shell" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _run_command() { echo "ConnectionLost"; }
+    sleep() { return 0; }
+    _provider_k3s_aws_wait_ssm_registered i-test || echo "REACHED_CALLER rc=$?"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"did not register i-test within 150s"* ]]
+  [[ "$output" == *"REACHED_CALLER rc=1"* ]]
+}
+
+@test "k3s-aws falls back to SSH when the real SSM registration wait times out" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ssm_get_instance_id() { echo i-test; }
+    _run_command() { echo "ConnectionLost"; }
+    sleep() { return 0; }
+    tunnel_start() { echo "[stub] tunnel_start"; return 0; }
+    K3S_AWS_SSM_ENABLED=true _provider_k3s_aws_start_tunnel
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"falling back to SSH tunnel"* ]]
+  [[ "$output" == *"[stub] tunnel_start"* ]]
+}

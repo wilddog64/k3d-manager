@@ -119,3 +119,112 @@ publish the retained result. Configure/verify this before asserting the
 5. `gh auth refresh -h github.com -s read:packages` on M2 (until Gap 3 design fix).
 6. Configure publish-back OR plan to `make e2e-replay RUNNER=m2` (Gap 4).
 7. `make e2e-remote RUNNER=m2` (needs M2 CPU idle ≥ `E2E_M2_MIN_CPU_IDLE`, default 35%).
+
+---
+
+## Gap 3 REGRESSED — 2026-09-23 (reopened)
+
+Gap 3 is live again. `make e2e-remote RUNNER=m2` (run `1790162339-22194`) brought the
+vCluster up healthy, then failed at `deploying-substrate` with the same error this doc
+recorded in August:
+
+```
+INFO: [acg-up] GHCR_PAT not in env — checking Vault...
+error: context "k3d-k3d-cluster" does not exist
+ERROR: [acg-up] GHCR_PAT not set and no valid PAT in Vault — set GHCR_PAT env var
+       or run: pbpaste | bin/rotate-ghcr-pat
+```
+
+**Both credential paths are dead on the runner, for two different reasons:**
+
+1. **Vault path — dead by construction, unchanged since August.**
+   `scripts/plugins/shopping_cart.sh:321` hardcodes
+   `kubectl get secret vault-root -n secrets --context k3d-k3d-cluster` and reads Vault over
+   `localhost:${_vault_local_port}`. Both are M4-only. On m2jump the context does not exist,
+   so this path can never succeed off-hub. This is the "design follow-up" named above and it
+   was never actioned.
+
+2. **`gh` fallback — unreachable over SSH, and NOT a bad login.**
+   `gh auth token` (`shopping_cart.sh:366`) returns empty on the runner, so the fallback
+   bails at `shopping_cart.sh:367` before the `read:packages` pull check
+   (`_shopping_cart_ghcr_pat_can_pull`) is ever reached.
+
+   The cause is **not** an invalid or missing token. Measured on m2-air.local
+   (hostname confirmed; `ssh m2jump` → `m2-air.local`) with the absolute binary path:
+
+   ```
+   /opt/homebrew/bin/gh config get -h github.com oauth_token → length 0
+   /opt/homebrew/bin/gh auth token                           → length 0
+   /opt/homebrew/bin/gh auth status  → "The token in default is invalid."
+   security find-generic-password -s "gh:github.com"          → PRESENT
+   security show-keychain-info login.keychain-db  → User interaction is not allowed.
+   ~/.config/gh/hosts.yml                        → 0 occurrences of oauth_token
+   ```
+
+   The credential **exists and is valid** — the operator reads it successfully from m2's
+   own console with the same command. `gh` stores it in the macOS keyring, and a
+   non-interactive SSH session can neither unlock the login keychain nor prompt for it, so
+   the read fails **identically to a deleted token** — including `gh auth status` reporting
+   "invalid", which is what misled the August triage. This is the locked-login-keychain
+   class already recorded in this repo's references.
+
+   **Consequence: the August remediation is not merely undone, it was never viable.**
+   `gh auth refresh -s read:packages` on M2 cannot fix a dispatch that runs over SSH, no
+   matter how many times it is run. Do not re-issue it as a remediation step.
+
+   *Not a defect, recorded to close it off:* `gh` is absent from `command -v` on a BatchMode
+   shell (the binary is at `/opt/homebrew/bin/gh`), which invalidated some earlier manual
+   probes. The dispatch itself is unaffected — `E2E_M2_REMOTE_PATH`
+   (`e2e_remote.sh:31`) already prepends `/opt/homebrew/bin`.
+
+### Correction to a note carried in the memory bank
+
+The 2026-09-22 entry "Tier 1 e2e credential gate cleared (`read:packages` + `workflow`)"
+refers to the **M4's** `gh` token. It says nothing about M2. The runner is where the
+GHCR pull actually happens, so that entry never cleared Tier 1 — the two hosts have
+independent `gh` credentials and only the runner's matters for the substrate.
+
+### Also relevant — `e2e_remote.sh` forwards no credential
+
+`e2e_runner_dispatch` (`scripts/plugins/e2e_remote.sh:430-438`) exports only
+`PATH`, `E2E_RUNNER`, `KUBECONFIG`, `E2E_REPORT_DIR`, optional `E2E_IMAGE_TAG` and the
+publish-back vars. There is no `GHCR_PAT`, so "set `GHCR_PAT` env var" — what the error
+message advises — is not reachable through the dispatch path as written.
+
+**Security constraint on any fix:** the dispatch command string is `tee`'d to
+`~/.k3dm/e2e/dispatch/<runner>-<ts>.log`. A PAT must therefore never be interpolated into
+the remote command or passed in argv. It has to travel over stdin or an `ssh` `SendEnv`
+that is not echoed, consistent with the repo rule that tokens never appear in script
+arguments or logs.
+
+### Immediate unblock — RETRACTED, does not work
+
+This section previously said to run `gh auth login` / `gh auth refresh -s read:packages` on
+m2jump from a real TTY. **That was wrong and was tried on 2026-09-23 without effect.** It
+re-authenticates the keyring, which the dispatch's SSH session still cannot read. There is
+no operator-side unblock; the fix has to be in the dispatch.
+
+### Durable fix — CHOSEN: option 2
+
+Option 2 was selected on 2026-09-23 and specced in
+`docs/bugs/2026-09-23-e2e-dispatch-forward-ghcr-token-over-stdin.md` (assigned to Codex).
+The M4 already holds a token with `read:packages`, and
+`shopping_cart_load_ghcr_pat_from_env` is already first in the resolver chain — so the
+dispatch only has to set `GHCR_PAT`, streamed on stdin. Nothing is minted and nothing
+persists on the runner.
+
+Options for the record, this being the third occurrence:
+
+1. Teach the Vault path to be host-aware instead of hardcoding the hub context, so the
+   runner either skips it cleanly or reaches Vault over a real endpoint.
+2. Forward a short-lived, `read:packages`-scoped token over the dispatch **via stdin**
+   (never argv, never the tee'd command string).
+3. ~~Keep the runner's own `gh` authoritative~~ — **not viable.** A keyring-stored token is
+   unreadable from the SSH session the dispatch uses, so the runner's `gh` can never be the
+   source. A preflight assertion is still worth adding so the credential gap fails
+   `e2e_runner_health` loudly instead of surfacing 40 minutes later as a substrate failure —
+   but it is a detection improvement, not a fix.
+
+Option 2 is the fix. Option 1 remains open as cleanup (the hardcoded hub context in
+`shopping_cart.sh:321` is still wrong off-hub even once option 2 lands). Option 3's
+detection half is still unfiled.

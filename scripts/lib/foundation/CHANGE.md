@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+## [v0.4.18] — 2026-09-24
+
 ### Changed
+- `scripts/lib/acg/acg_session_check.js`: report the authentication path in each
+  `ACG_SESSION_OK` marker, report credential-store health without exposing values, and support
+  `K3DM_ACG_REQUIRE_CREDENTIALS=1` for fail-closed credential validation. The default behavior
+  remains unchanged; see `docs/plans/v0.4.18-credential-test-observability.md`.
 - `scripts/lib/acg/package.json`, `scripts/lib/acg/package-lock.json`: rename the package
   identity `lib-acg` → `lib-foundation-acg`. The name was inherited verbatim by the v0.4.0
   absorption tree-copy and still claimed the standalone `wilddog64/lib-acg` repo, archived
@@ -22,6 +28,7 @@
   `docs/bugs/2026-09-12-acg-npm-audit-brace-expansion-js-yaml.md`.
 
 ### Fixed
+- `scripts/lib/acg/playwright/lib/pluralsight_login.js`: headless Pluralsight auto-login previously hung on `locator.click()` preconditions, then silently skipped the email field because `EMAIL_SELECTOR` used case-sensitive lowercase attribute arms against Pluralsight's PascalCase `name="Username"` input; see `docs/bugs/2026-09-24-acg-pluralsight-login-click-preconditions.md`. The submit dispatch waits on this module's own `FIELD_TIMEOUT_MS` rather than Playwright's 30s default.
 - `scripts/lib/acg/acg.sh`: `_acg_chrome_cdp_write_plist` no longer returns 1 silently when
   `_acg_resolve_cdp_browser_bin` fails (node or playwright missing) — the resolver failure now
   falls through to the existing "Playwright-managed Chromium not found" error.

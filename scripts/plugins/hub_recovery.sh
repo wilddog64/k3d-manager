@@ -240,7 +240,7 @@ function hub_recovery_reconcile() {
   local confirm=0 hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}" app_context="${HUB_RECOVERY_APP_CONTEXT:-ubuntu-hostinger}"
   if [[ "${1:-}" == "--confirm" ]]; then confirm=1
   elif [[ -n "${1:-}" ]]; then _err "[hub-recovery] only --confirm is accepted"; return 1; fi
-  local -a steps=("k3d serverlb upstreams" "Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins")
+  local -a steps=("k3d serverlb upstreams" "Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
   local index
   if (( ! confirm )); then
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
@@ -249,7 +249,8 @@ function hub_recovery_reconcile() {
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1
   _hub_recovery_ensure_eso_apps_role || return 1
-  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc ARGOCD_APP_CLUSTER_NAME=ubuntu-k3s ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster ARGOCD_APP_CLUSTER_PROVIDER=k3d ARGOCD_NAMESPACE=cicd register_app_cluster || return 1
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc ARGOCD_APP_CLUSTER_NAME="${HUB_RECOVERY_HUB_CLUSTER_NAME:-k3d-cluster}" ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster ARGOCD_APP_CLUSTER_PROVIDER=k3d ARGOCD_NAMESPACE=cicd register_app_cluster || return 1
+  argocd_reconcile_app_cluster_registrations || true
   _hub_recovery_seed_app_cluster_reader "$hub_context" "$app_context" || return 1
   _hub_recovery_scale_openldap "$hub_context" || return 1
   _hub_recovery_replay_identity_hook "$hub_context" || return 1

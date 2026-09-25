@@ -36,7 +36,7 @@ teardown() { rm -rf "${TMP_DIR}"; }
   [ "${status}" -eq 1 ]
   [[ "${output}" == *'"http_code"'* ]]
   [[ "${output}" != *$'\033['* ]]
-  python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["overall"] == "fail"; assert d["counts"]["services_failed"] == 1' "${output}"
+  python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["overall"] == "fail"; failed={e["service"] for e in d["errors"]}; assert failed == {"shopping-cart-order","Pushgateway"}, failed; assert d["counts"]["services_failed"] == len(failed), d["counts"]' "${output}"
 }
 
 @test "unknown service returns usage error" {

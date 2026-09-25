@@ -41,6 +41,17 @@ if [[ "${K3DM_SKIP_DOC_LINKS:-0}" != "1" && -f "${SCRIPT_DIR}/check-doc-links.py
    fi
 fi
 
+# Guard: test/job debris at the repo root, written by a path derived from an empty
+# variable (usually an unchecked "$(mktemp)"). Staged files only.
+# Bypass: K3DM_SKIP_ROOT_DEBRIS=1
+if [[ "${K3DM_SKIP_ROOT_DEBRIS:-0}" != "1" && -x "${SCRIPT_DIR}/check-repo-root-debris.sh" ]]; then
+   if ! "${SCRIPT_DIR}/check-repo-root-debris.sh"; then
+      echo "Pre-commit hook: repo-root debris staged — fix the producer, not the symptom" >&2
+      echo "  bypass: K3DM_SKIP_ROOT_DEBRIS=1 git commit ..." >&2
+      exit 1
+   fi
+fi
+
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/system.sh"
 # IP allowlist — files with intentional CIDR literals (e.g. CloudFormation templates)

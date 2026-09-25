@@ -5,6 +5,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-e2e.y
 HERMES_DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-hermes.yaml"
 RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+AM_TMPL="${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl"
 
 @test "exporter declares the e2e reader and label selector" {
   run grep -F -- 'refresh_e2e_events' "${EXPORTER}"
@@ -213,4 +214,19 @@ PY
 @test "argocd platform-ops deploy applies the e2e dashboard" {
   run grep -F -- 'grafana-dashboard-e2e.yaml' "${ARGOCD}"
   [ "${status}" -eq 0 ]
+}
+
+@test "Alertmanager has a non-null severity warning route" {
+  run yq -r '.route.routes[] | select(.matchers[] == "severity = warning") | .receiver' "${AM_TMPL}"
+  [ "${status}" -eq 0 ]
+  [ -n "${output}" ]
+  [ "${output}" != "null" ]
+}
+
+@test "Alertmanager warning catch-all follows the named allowlist" {
+  allow="$(yq -r '.route.routes | to_entries | map(select(.value.matchers[] | contains("alertname =~"))) | .[0].key' "${AM_TMPL}")"
+  warning="$(yq -r '.route.routes | to_entries | map(select(.value.matchers[] | contains("severity = warning"))) | .[0].key' "${AM_TMPL}")"
+  [[ "${allow}" =~ ^[0-9]+$ ]]
+  [[ "${warning}" =~ ^[0-9]+$ ]]
+  [ "${warning}" -gt "${allow}" ]
 }

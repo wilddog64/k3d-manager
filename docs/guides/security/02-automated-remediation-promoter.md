@@ -51,6 +51,11 @@ Trivy finding persists 15 min
 
 ## The safeguards
 
+The `services-git` ApplicationSet selects an app cluster only when it has both
+`k3d-manager/role=app-cluster` and `k3d-manager/shopping-cart=true`. Hostinger registration
+sets the shopping-cart label. A registration refresh that omits it silently un-generates every
+shopping-cart Application, so the CVE promoter cannot patch those Applications.
+
 An auto-remediation system that can deploy is dangerous if it's naïve. The guards
 are the interesting engineering:
 
@@ -119,6 +124,26 @@ are the interesting engineering:
 > security-tool costume."
 
 (Reference: `reference_hostinger_maxsurge_rollout_deadlock`.)
+
+## Triggering a scan out of band
+
+Run the app-cluster CVE scan immediately instead of waiting for its schedule:
+
+```bash
+make app-cve-scan
+CRONJOB=app-cve-scan make app-cve-scan
+CRONJOB=argocd-cve-scan make app-cve-scan
+K3DM_CVE_SCAN_WAIT=900 make app-cve-scan
+```
+
+The same operation is available from Slack as `/k3dm app-cve-scan`. `CRONJOB=` selects
+the CronJob (`app-cve-scan` or `argocd-cve-scan`), and `K3DM_CVE_SCAN_WAIT` controls
+how long the trigger waits for the manually created Job to complete.
+
+A manually triggered Job leaves the CronJob's `.status.lastSuccessfulTime` empty. This
+is expected: `--from=cronjob/...` creates no owner reference to the CronJob. Check Jobs
+in `platform-ops` for the manual run; do not read the empty CronJob field as evidence
+that the scan has never worked.
 
 ## Live checks you can name
 

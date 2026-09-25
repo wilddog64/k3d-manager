@@ -87,4 +87,4 @@ patches:
       name: order-service
 images:
   - name: ghcr.io/wilddog64/shopping-cart-order
-    digest: sha256:839423bca45945bbee4e5c4420dcf14801ed7558a035329439703e97d1db57b4
+    digest: sha256:6412b131c1934fdc49b64524b600c062cd24d878ea08bb5b46793d9a710104bf

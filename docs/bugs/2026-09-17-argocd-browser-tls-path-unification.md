@@ -1,7 +1,8 @@
 # Unify the ArgoCD browser TLS dir on the provider-scoped path
 
 **Filed:** 2026-09-17
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED — landed in `e259c718` (v1.35.0)
+**Follow-up filed:** `2026-09-24-argocd-browser-listener-not-restarted-on-wrapper-change.md` — the path move left the long-running listener bound to the legacy flat dir
 **Branch:** `k3d-manager-v1.35.0`
 **Follow-up to:** `2026-09-17-cluster-down-argocd-browser-tls-key-not-removed.md` (`4184d23e`)
 

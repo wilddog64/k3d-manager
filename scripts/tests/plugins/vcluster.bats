@@ -44,9 +44,8 @@ STUB
 @test "vcluster_create: uses foundation-managed CLI path" {
   run vcluster_create demo
   [ "$status" -eq 0 ]
-  local -a run_calls
-  read_lines "$RUN_LOG" run_calls
-  [ "${run_calls[0]}" = "$VCLUSTER_STUB create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${SCRIPT_DIR}/etc/vcluster/values.yaml" ]
+  run grep -F -- "$VCLUSTER_STUB create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${SCRIPT_DIR}/etc/vcluster/values.yaml" "$RUN_LOG"
+  [ "$status" -eq 0 ]
 }
 
 @test "_vcluster_check_prerequisites: stores the contract path" {
@@ -79,9 +78,8 @@ STUB
   printf 'controlPlane:\n  service:\n    spec:\n      type: NodePort\n' > "$override_values"
   VCLUSTER_VALUES_FILE="$override_values" run vcluster_create demo
   [ "$status" -eq 0 ]
-  local -a run_calls
-  read_lines "$RUN_LOG" run_calls
-  [ "${run_calls[0]}" = "$VCLUSTER_STUB create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${override_values}" ]
+  run grep -F -- "$VCLUSTER_STUB create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${override_values}" "$RUN_LOG"
+  [ "$status" -eq 0 ]
 }
 
 @test "vcluster_create: fails without active host context" {
@@ -123,6 +121,36 @@ STUB
   [ "${run_calls[0]}" = "$VCLUSTER_STUB list -n vclusters" ]
 }
 
+# A stale kubeconfig is all that is left of a teardown that never ran, and six of them
+# sit on the m2 runner. Accepting one as proof of existence made the predicate claim a
+# vCluster that is gone, so vcluster list has to be the source of truth.
+@test "vcluster_destroy: a stale kubeconfig is not proof the vCluster exists" {
+  _stub_run_command_executing
+  printf 'current-context: vc-ghost\n' > "${VCLUSTER_KUBECONFIG_DIR}/ghost.yaml"
+  export VCLUSTER_LIST_OUTPUT=$'NAME   NAMESPACE\nalpha   vclusters'
+  run vcluster_destroy ghost
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"vCluster 'ghost' not found"* ]]
+  run grep -F -- "$VCLUSTER_STUB delete ghost" "$RUN_LOG"
+  [ "$status" -ne 0 ]
+}
+
+# Regression guard, same class as the leak fixed in 7338a238: _e2e_teardown guards this
+# call with `|| _warn` and then does its own proxy, kubeconfig and log cleanup, none of
+# which an exit can be caught by. The absence path must return, not exit. Asserting a
+# non-zero status is not enough — an exit 1 satisfies that too — so the marker after the
+# call is what actually separates the two.
+@test "vcluster_destroy: a missing vCluster returns instead of exiting its caller" {
+  _stub_run_command_executing
+  export VCLUSTER_LIST_OUTPUT=$'NAME   NAMESPACE\nalpha   vclusters'
+  _caller() {
+    vcluster_destroy ghost || true
+    printf 'caller-survived\n'
+  }
+  run _caller
+  [[ "$output" == *"caller-survived"* ]]
+}
+
 @test "vcluster_list: uses the contract-returned CLI path" {
   run vcluster_list
   [ "$status" -eq 0 ]
@@ -133,6 +161,8 @@ STUB
 @test "vcluster_destroy: uses the contract-returned CLI path" {
   local kubeconfig="${VCLUSTER_KUBECONFIG_DIR}/demo.yaml"
   printf 'current-context: vc-demo\n' > "$kubeconfig"
+  _stub_run_command_executing
+  export VCLUSTER_LIST_OUTPUT=$'NAME   NAMESPACE\ndemo   vclusters'
   _vcluster_deregister_from_hub() { :; }
   run vcluster_destroy demo
   [ "$status" -eq 0 ]
@@ -239,4 +269,102 @@ STUB
   [[ "$output" == *"--context k3d-k3d-cluster -n cicd patch application/green1-preflight-data-layer --type=merge -p {\"metadata\":{\"finalizers\":null}}"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster -n cicd delete application/green1-preflight-data-layer --ignore-not-found"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster -n cicd delete secret cluster-green1 --ignore-not-found"* ]]
+}
+
+# The shared _run_command stub logs its arguments without executing them, so a function that
+# parses a command's stdout cannot be exercised through it. These orphan-reconcile tests
+# install a stub that actually runs the vcluster stub binary, and intercepts helm (which is
+# not installed in the harness) so the fallback path is still observable.
+_stub_run_command_executing() {
+  _run_command() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --probe) shift 2 ;;
+        --*) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$RUN_LOG"
+    case "$1" in
+      helm|docker) return 0 ;;
+    esac
+    if [[ "${2:-}" == "delete" && -n "${VCLUSTER_DELETE_FAILS:-}" ]]; then
+      return 1
+    fi
+    "$@"
+  }
+}
+
+_seed_orphan_listing() {
+  export VCLUSTER_LIST_OUTPUT="NAME                  NAMESPACE   STATUS    AGE
+${1} vclusters   Running   131m"
+}
+
+@test "vcluster_create deletes an orphan occupying the shared namespace" {
+  _stub_run_command_executing
+  _seed_orphan_listing e2e-1790154235-20
+  run vcluster_create e2e-new-run
+  [ "$status" -eq 0 ]
+  run grep -F -- "$VCLUSTER_STUB delete e2e-1790154235-20 -n vclusters --wait" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "vcluster_create deletes the orphan before creating the new vCluster" {
+  _stub_run_command_executing
+  _seed_orphan_listing e2e-1790154235-20
+  run vcluster_create e2e-new-run
+  [ "$status" -eq 0 ]
+  local delete_line create_line
+  delete_line="$(grep -nF -- "delete e2e-1790154235-20" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  create_line="$(grep -nF -- "create e2e-new-run" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  [ -n "$delete_line" ]
+  [ -n "$create_line" ]
+  [ "$delete_line" -lt "$create_line" ]
+}
+
+@test "vcluster_create warns when it clears an orphan so a teardown regression stays visible" {
+  _stub_run_command_executing
+  _seed_orphan_listing e2e-1790154235-20
+  run vcluster_create e2e-new-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"orphan"* ]]
+  [[ "$output" == *"e2e-1790154235-20"* ]]
+}
+
+@test "vcluster_create does not delete a vCluster matching the name being created" {
+  _stub_run_command_executing
+  _seed_orphan_listing e2e-new-run
+  run vcluster_create e2e-new-run
+  [ "$status" -eq 0 ]
+  run grep -F -- "delete e2e-new-run" "$RUN_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "vcluster_create issues no delete when the namespace holds no vCluster" {
+  _stub_run_command_executing
+  export VCLUSTER_LIST_OUTPUT=""
+  run vcluster_create demo
+  [ "$status" -eq 0 ]
+  run grep -F -- "$VCLUSTER_STUB delete" "$RUN_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "vcluster_create dry-run clears no orphan" {
+  _stub_run_command_executing
+  _seed_orphan_listing e2e-1790154235-20
+  DRY_RUN=1 run vcluster_create e2e-new-run
+  [ "$status" -eq 0 ]
+  run grep -F -- "delete e2e-1790154235-20" "$RUN_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "orphan cleanup falls back to helm uninstall when vcluster delete fails" {
+  _stub_run_command_executing
+  _seed_orphan_listing e2e-orphan
+  export VCLUSTER_DELETE_FAILS=1
+  run vcluster_create e2e-new-run
+  [ "$status" -eq 0 ]
+  run grep -F -- "helm -n vclusters uninstall e2e-orphan --wait" "$RUN_LOG"
+  [ "$status" -eq 0 ]
 }

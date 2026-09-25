@@ -125,7 +125,12 @@ function _acg_up_cleanup() {
       rm -f "${_f}"
     fi
   done
-  launchctl bootout "gui/$(id -u)" "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" 2>/dev/null || true
+  if [[ "${_ACG_TUNNEL_PLIST_CREATED:-0}" == "1" ]]; then
+    _warn "[acg-up] removing the cloudflare tunnel this run created"
+    launchctl bootout "gui/$(id -u)" "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" 2>/dev/null || true
+  else
+    _info "[acg-up] leaving the cloudflare tunnel up — it is the hub's public ingress and predates this run"
+  fi
 }
 trap _acg_up_cleanup EXIT
 
@@ -167,6 +172,61 @@ function _acg_repair_hub_host_alias() {
   else
     _warn "[acg-up] CoreDNS restart failed — ArgoCD may not reach ubuntu-k3s"
   fi
+}
+
+# Report pods in a namespace whose containers are stuck on an unrecoverable image
+# problem. Waiting on an ArgoCD sync cannot clear these, so the caller should fail
+# fast instead of polling. Prints one "pod/<name> <container> <reason>: <message>"
+# line per blocked container; returns 0 when at least one was found.
+function _acg_image_pull_blocked() {
+  local _ns="$1" _ctx="$2" _out
+  _out=$(kubectl get pods -n "${_ns}" --context "${_ctx}" -o json 2>/dev/null \
+    | python3 -c '
+import json, sys
+FATAL = ("ImagePullBackOff", "ErrImagePull", "InvalidImageName",
+         "ErrInvalidImageName", "RegistryUnavailable")
+try:
+    doc = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for pod in doc.get("items", []):
+    name = pod.get("metadata", {}).get("name", "?")
+    status = pod.get("status", {})
+    for key in ("initContainerStatuses", "containerStatuses"):
+        for cs in status.get(key) or []:
+            waiting = (cs.get("state") or {}).get("waiting") or {}
+            reason = waiting.get("reason", "")
+            if reason in FATAL:
+                msg = " ".join((waiting.get("message") or "").split())[:300]
+                cname = cs.get("name", "?")
+                print(f"pod/{name} {cname} {reason}: {msg}")
+') || return 1
+  [[ -n "${_out}" ]] || return 1
+  printf '%s\n' "${_out}"
+  return 0
+}
+
+# Fail fast when the data layer is blocked on an image pull rather than on a slow
+# sync. Requires the same verdict on three consecutive polls so a pull still in
+# progress is not mistaken for a permanent failure.
+function _acg_data_layer_abort_on_image_pull() {
+  local _blocked _line
+  if ! _blocked=$(_acg_image_pull_blocked "shopping-cart-data" "ubuntu-k3s"); then
+    _DL_IMAGE_STRIKES=0
+    return 1
+  fi
+  _DL_IMAGE_STRIKES=$(( ${_DL_IMAGE_STRIKES:-0} + 1 ))
+  if (( _DL_IMAGE_STRIKES < 3 )); then
+    _info "[acg-up] data-layer image pull not settled (${_DL_IMAGE_STRIKES}/3) — rechecking"
+    return 1
+  fi
+  _warn "[acg-up] data-layer is blocked on an image pull, not on a slow sync:"
+  while IFS= read -r _line; do
+    [[ -n "${_line}" ]] && _warn "[acg-up]   ${_line}"
+  done <<< "${_blocked}"
+  _warn "[acg-up] An ArgoCD sync cannot clear an image pull failure — aborting instead of waiting out the timeout."
+  _warn "[acg-up] Check the tag exists and the registry allows anonymous pulls; a 401 on every tag including 'latest' means the repository is gated, not the tag."
+  return 0
 }
 
 login_prompt=0
@@ -592,7 +652,16 @@ if _is_mac; then
         _info "[acg-up] Vault CA cert already trusted in System Keychain — skipping"
       fi
     fi
+    _argocd_browser_wrapper_before=""
+    if [[ -f "${_argocd_browser_wrapper}" ]]; then
+      _argocd_browser_wrapper_before="$(shasum -a 256 "${_argocd_browser_wrapper}" | awk '{print $1}')"
+    fi
     _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
+    _argocd_browser_wrapper_changed=0
+    if [[ "$(shasum -a 256 "${_argocd_browser_wrapper}" | awk '{print $1}')" != "${_argocd_browser_wrapper_before}" ]]; then
+      _argocd_browser_wrapper_changed=1
+      _info "[acg-up] ArgoCD browser HTTPS wrapper changed — forcing a listener restart so the new paths take effect"
+    fi
     cat > "${_argocd_browser_plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -617,7 +686,7 @@ if _is_mac; then
 </plist>
 PLIST
     _argocd_browser_install_skipped=0
-    if [[ -f "${_argocd_browser_plist}" ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
+    if [[ -f "${_argocd_browser_plist}" ]] && [[ "${_argocd_browser_wrapper_changed}" -eq 0 ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_argocd_browser_plist_tmp}"
       _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
     elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
@@ -756,6 +825,8 @@ kubectl label namespace cicd istio-injection=enabled --overwrite --context k3d-k
 kubectl config use-context k3d-k3d-cluster >/dev/null
 _acg_repair_hub_host_alias
 ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
+  ARGOCD_APP_CLUSTER_PROVIDER="${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}" \
+  ARGOCD_APP_CLUSTER_SHOPPING_CART="${ARGOCD_APP_CLUSTER_SHOPPING_CART:-true}" \
   register_app_cluster
 if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then
   configure_vault_app_auth_for_context "${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}" || true
@@ -766,6 +837,8 @@ kubectl rollout restart statefulset/argocd-application-controller \
 kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=300s
 _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
+_info "[acg-up] Reconciling other app-cluster registrations (additive)..."
+argocd_reconcile_app_cluster_registrations || true
 
 _info "[acg-up] Waiting for ArgoCD controller to reconnect to ubuntu-k3s (max 120s)..."
 _argocd_conn_deadline=$(( $(date +%s) + 120 ))
@@ -839,10 +912,16 @@ else
             _err "[acg-up] data-layer ArgoCD Application did not reach Synced after force-sync + 180s retry — check: kubectl get application ${_dl_app_name} -n cicd --context k3d-k3d-cluster"
             exit 1
           fi
+          if _acg_data_layer_abort_on_image_pull; then
+            _err "[acg-up] data-layer cannot sync while an image pull is failing — fix the image reference in shopping-cart-infra (data-layer/minio/) and rerun"
+          fi
           _info "[acg-up] data-layer not yet Synced after force-sync — waiting..."
           sleep 10
         done
         break
+      fi
+      if _acg_data_layer_abort_on_image_pull; then
+        _err "[acg-up] data-layer cannot sync while an image pull is failing — fix the image reference in shopping-cart-infra (data-layer/minio/) and rerun"
       fi
       _info "[acg-up] data-layer not yet Synced — waiting..."
       sleep 10
@@ -1784,6 +1863,7 @@ PLIST
       fi
       : > "${_tunnel_launchctl_log}"
       mkdir -p "${HOME}/Library/LaunchAgents"
+      [[ -f "${_named_tunnel_plist}" ]] || _ACG_TUNNEL_PLIST_CREATED=1
       if ! install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
           >"${_tunnel_launchctl_log}" 2>&1; then
         _warn "[acg-up] failed to install tunnel plist — skipping"

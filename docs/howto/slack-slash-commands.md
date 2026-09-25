@@ -335,6 +335,7 @@ bin/k3dm-webhook-setup --uninstall
 | `vuln-scan` | reader | | | | 300 |
 | `e2e-runner-health` | reader | | `RUNNER` | | 300 |
 | `e2e-remote` | operator | `RUNNER` | `DIGEST` | | 3600 |
+| `e2e-sandbox` | operator | | `DIGEST` | | 3600 |
 | `e2e-replay` | operator | `RUNNER` | | | 900 |
 | `sync-apps` | operator | | | | 600 |
 | `monitoring-pause` | operator | | | | 600 |
@@ -348,6 +349,12 @@ bin/k3dm-webhook-setup --uninstall
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
+
+`e2e-sandbox` runs unattended, so it can only use an **already valid** ACG session: its
+preflight refuses `K3DM_ACG_SKIP_SESSION_CHECK=1` and the interactive login path needs a
+TTY, which Slack jobs do not have. If the stored session has expired the job fails closed
+with `ACG_SESSION_EXPIRED` — sign in once from a real terminal (or run `make e2e-sandbox`
+there) and retry.
 
 ### `/cluster-diagnose` usage
 

@@ -1,5 +1,352 @@
 # Progress — k3d-manager
 
+## 2026-09-24 — unknown actor role authorization fix (commit pending)
+
+- [x] Added exported `_normalize_actor_role` in `webhook/policy.py`, switched exactly the
+      actor side of `_role_allows` and the audit role field, and did not change `_normalize_role`
+      or `strictest_role`.
+- [x] Updated the two fail-closed `_fix_mode_enabled` rows and added the six requested policy
+      tests, including the temporary patched `policy.AUDIT_DIR` audit isolation and enumerated
+      current-call-site role pairs.
+- [x] Updated the bug status/fix section, webhook role-model architecture note, and Unreleased
+      changelog. No out-of-scope files, live webhook, cluster, browser, or Phase 4 work touched.
+- [x] Gates: policy 13, agent 7, make-targets 14; webhook BATS 64/64; bare pytest 189;
+      doc links 1765 files; repo-root pass; server import `OK`; `_agent_audit` exit 0.
+- [x] `make test-all` completed plans `1..1112` and `1..132`; unittest counts `7 / 14 / 13 / 6 / 6`;
+      expected EXIT=2 at Homebrew Python 3.14.7 without pytest. M1–M5 all red and restored with
+      `git diff --quiet`.
+- [ ] Commit, push, and SHA verification remain.
+
+## 2026-09-24 — webhook Phase 3 agent extraction (staged; Git blocked)
+
+- [x] Extracted `_call_gemini`, `_is_fix_request`, `_fix_mode_enabled`, `_is_filing_request`,
+      `_sanitize_question`, `_parse_gemini_observations`, `_run_cluster_ask`, plus
+      `_FIX_RE`, `_FILING_RE`, and `_INJECTION_RE` into `webhook/agent.py` with explicit
+      `__all__` and one-way imports toward config/policy/proc/render.
+- [x] Added `scripts/tests/bin/webhook_agent.py` with literal fix-mode matrix (including the
+      documented observed unknown-role values), individual injection alternatives, length and
+      control-character guards, intent matching, and structured/malformed observation cases.
+- [x] Updated the architecture map and CHANGELOG; repointed the two existing BATS checks that
+      inspected moved code. No Phase 4 lifecycle/status work was started.
+- [x] Mutation evidence: M1 reader bypass, M2 reader floor, M3 deleted `[INST]` alternative,
+      M4 returned injected text, M5 raised cap to 5000, and M6 removed control stripping all
+      produced red output; each was restored before the next mutation.
+- [x] Gates: focused pytest 7; webhook BATS 64/64; bare pytest 189; `make test-all` completed
+      BATS plans 1112 and 132 plus unittest counts 7/14/7/6/6, then expected EXIT=2 because
+      Homebrew Python 3.14.7 lacks pytest; doc links 1764; repo-root 0; import `OK`.
+- [ ] Commit/push and final SHA verification remain; Git returned
+      `fatal: Unable to create '.git/index.lock': Operation not permitted`. No retry,
+      lock removal, hook bypass, force-push, or PR was attempted. Changes are staged.
+
+## 2026-09-24 — upstream credential-test observability (dispatched)
+
+- [x] Spec written and pushed: lib-foundation `docs/plans/v0.4.18-credential-test-observability.md`
+      at `d695f81` on `feat/v0.4.18-credential-test-observability`.
+- [x] Dispatched to Codex (`codex exec`, workspace-write); log at
+      `scratchpad/codex-libfoundation-v0418.log`.
+- [ ] Verify Codex: SHA on origin, diff confined to the four listed files, jest > 28 tests, all three
+      mutations reddening their named tests, disappearance gate 4 -> 0.
+- [x] **lib-foundation PR #55 opened** — `https://github.com/wilddog64/lib-foundation/pull/55`,
+      head `8986227`, `mergeable_state: clean`, CI green per-job, 5/5 Copilot threads resolved.
+      `CHANGE.md` promoted to `[v0.4.18] — 2026-09-24` in `15bf3b7`.
+- [x] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release. Merged to main at
+      `2f244ee4`; tag pushed; release at https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18.
+- [x] Subtree pull lib-foundation v0.4.18 (prefix `scripts/lib/foundation`, NOT scripts/lib/acg) —
+      `7d786cd0`, vendored tree hash == upstream main tree `8b2f7956`. Tier 2 preflight rewired in
+      `a4d6ef53`: `_secret_load_data` instead of a keychain existence check (which passes on a
+      locked keychain and on an empty stored value), plus `export K3DM_ACG_REQUIRE_CREDENTIALS=1`
+      so the session check fails closed. 14 BATS, mutation-gated (5 fail on the old code).
+      Guide updated in the same commit.
+- [x] Open a PR for lib-foundation `docs/v0.4.18-retrospective` — **PR #56**, CI 3/3 green.
+      Copilot found three real gaps (verified against `acg_session_check.js`, not taken on faith):
+      the marker table omitted `path=manual-login` (emitted at line 120), `docs/api/acg.md` had the
+      same omission, and the retro cited `path=pluralsight_login` — a value emitted nowhere. Fixed
+      in `78eacbe2`, all three threads replied to and resolved. `CHANGE.md` entry added in
+      `1077361`. The same omission was mirrored in k3d-manager's harness guide and fixed in
+      `4376a6ec`.
+- [x] Open the v1.37.0 PR — **PR #131** (`4376a6ec`), Copilot requested, CI running at handoff.
+- [x] Add `make e2e-sandbox` (Tier 2 `e2e_verify_sandbox`, `DIGEST=` optional) so Tier 2 has the
+      same make entry point Tier 1 has, and expose `e2e-sandbox` on Slack `/k3dm` as an
+      `operator` target (optional `DIGEST`, 3600s, no `confirm` — symmetric with `e2e-remote`).
+      Docs: harness guide, Slack howto (incl. the unattended `ACG_SESSION_EXPIRED` caveat),
+      CHANGELOG. Tests: Makefile-wiring BATS assertion + allowlist regression, both
+      mutation-proven.
+- [x] Fix both PR #131 CI reds — BATS `9a649af3` (fake `security` executable on PATH; the shell
+  function stub was invisible inside `bash -c`, so macOS read the real keychain and Linux CI
+  found no binary) and pytest `444aea0c` (`alert_delivery` missing from **both** sensor-stub
+  sites, so the real sensor shelled out to live `kubectl`). Both were green locally for
+  environment-specific reasons. Mutation-gated; 189 pytest passed offline.
+- [x] Analyse + document CodeQL alerts 23/24/26/27 — `d482fc47`, false positives
+  (`docs/issues/2026-09-24-codeql-pr131-spawn-injection-false-positives.md`) with in-code
+  markers at both sinks.
+- [ ] **Operator action:** dismiss CodeQL alerts 23/24/26/27 via `gh api` — the classifier
+  denied it as a CI bypass; must be run from the operator's terminal. Blocks the #131 CodeQL
+  gate; `enforce_admins` untouched until then.
+
+## 2026-09-24 — ACG preflight account-name fix
+
+- [x] Preflight now checks the `username` and `password` accounts individually instead of
+      matching the Keychain service alone; the error reports `missing=<accounts>`. A credential
+      stored under `-a k3dm` no longer satisfies a gate that the loader would never read.
+- [x] Three new BATS cases (wrong account only, username-only, both accounts queried by name);
+      focused suite 10/10, mutation-verified — restoring the service-only form reds exactly
+      those three and leaves the no-`-w` and no-placeholder invariants green.
+- [x] `docs/guides/vcluster-e2e-harness.md` gains the account-name table, the reason this
+      service deviates from the repo-wide `-a k3dm` convention, the GUI-session requirement
+      behind `User interaction is not allowed`, and the silent empty-value trap for a bare `-w`
+      in a non-TTY shell. `make check-doc-links` 1765 OK; shellcheck clean.
+- [ ] Operator, at the Mac in Terminal.app: populate both accounts, then
+      `make -C scripts/lib/foundation credential-test` expecting `ACG_SESSION_OK`. All three
+      accounts measured absent on 2026-09-24; nothing to clean up first.
+
+## 2026-09-24 — Tier 2 ACG preflight (working tree complete; Git blocked)
+
+- [x] Task 0 recorded as Path A: the personal ACG account has no MFA.
+- [x] Added `_e2e_sandbox_preflight_auth` before `acg_extend_playwright`; it checks the
+      URL, existence-only `k3dm-acg-pluralsight` Keychain service, and refuses the skip
+      session-check override. Added offline transport-stubbed preflight tests.
+- [x] Extended `docs/guides/vcluster-e2e-harness.md` with the setup, MFA constraint,
+      marker triage, and debugging-override rules; added the Unreleased changelog entry.
+- [x] All six mutations turned their named guard tests red and were restored; the final
+      focused suite is 6/6 and existing `e2e.bats` is 49/49.
+- [x] `shellcheck -x scripts/plugins/e2e.sh` is clean with 0 warnings before and after;
+      `make check-doc-links` reports 1764 files OK; `make check-repo-root` passes.
+- [x] `make test-all` completed (`1..1111` primary BATS plan plus `1..132` additional
+      BATS) and reached the expected pytest dependency failure: Python 3.14.7 has no pytest,
+      so Make exited 2. No live ACG, browser, cluster, or CDP command ran.
+- [ ] Git staging was blocked by `.git/index.lock: Operation not permitted`; no commit SHA
+      or push exists. The requested files remain unstaged; operator must stage, commit, and push.
+
+## 2026-09-24 — webhook Phase 1b authorization (staged; commit blocked)
+
+- [x] Implemented S1–S3: route floors are authoritative, dynamic requirements are marked,
+      effective policy is the strictest floor/dynamic role, and every known POST request is
+      checked and audited exactly once. `/api/v1/cluster` remains reader-floor and its unknown
+      action still reaches the existing 400 handler response.
+- [x] Extended `scripts/tests/bin/webhook_policy.py` with literal effective-policy rows,
+      synthetic copied-table floor coverage, closed-default role coverage, dynamic metadata
+      coverage, and allowed/denied/None-dynamic audit cardinality coverage. No `if action_policy`
+      guard remains.
+- [x] Gates observed: focused pytest **7 passed**; `webhook.bats` **64/64**; bare pytest
+      **189 passed**; `make check-doc-links` **1762 file(s) OK**; `_agent_audit` **0**.
+- [x] M1–M6 each produced the expected red test and was restored with `git diff --quiet`.
+- [ ] Commit/push blocked by `.git/index.lock: Operation not permitted`; no SHA exists.
+      The staged implementation is ready for the operator/Claude to commit and push with the
+      exact requested message. The import gate used `/usr/bin/python3` 3.9.6 and failed before
+      module execution on existing `str | None` annotations; `make test-all` also encountered
+      the sandbox's restricted `/var/folders` temp root. No out-of-scope files were changed.
+
+## 2026-09-24 — webhook Phase 1 extraction (working tree only; blocked)
+
+- [x] Added `scripts/lib/webhook/policy.py` with the exact requested policy functions and
+      explicit `__all__`; no policy import-time authentication/keychain side effect.
+- [x] Replaced path comparisons in API POST/GET dispatch with explicit route metadata and
+      documented the route table in `docs/architecture/webhook-server.md`; `/slack/events`
+      signature verification was left untouched.
+- [x] Added completeness and literal before/after authorization-equality tests; baseline
+      test imports were repointed for moved names. Four required mutations each went red and
+      were restored with `git diff --quiet`.
+- [x] Verification: entrypoint 4010 -> 3929 lines; bare pytest **189 passed**; focused BATS
+      **64/64**; Python collections **14, 6, 6, 14, 2**; `make check-doc-links` **1762 files OK**;
+      pyenv-shimmed `make test-python` **184 passed**.
+- [ ] `make test-all` is not green because an unrelated existing `cluster_status_summary.bats`
+      JSON assertion expects one failed service while its fixture returns two; the system
+      `python3` used by Make also has no pytest unless PATH is shimmed. No out-of-scope test
+      fix was made. No issue doc was created because the dispatch explicitly forbids modifying
+      files outside its target list.
+- [ ] Commit/push blocked by sandbox Git write restrictions (`.git/index.lock`,
+      `.git/COMMIT_EDITMSG`, and temporary tree objects: `Operation not permitted`); no SHA.
+
+## 2026-09-24 — app-CVE scan trigger target
+
+- [x] Implemented the exact v1.37.0 S1–S3 trigger, Makefile target, operator-role `/k3dm`
+      allowlist entry, enumerated `CRONJOB` validation, appended pytest cases, and new
+      transport-stubbed BATS suite.
+- [x] Added the existing CVE guide's out-of-band trigger section, v1.34 allowlist row, and
+      Unreleased changelog entry. Verified the payload's actual selector is
+      `k3dm.k3d.io/cve-remediation-event=true` (spec guess did not match); no payload logic
+      or schedule was changed.
+- [x] Focused BATS **6/6** and **2/2**; focused pytest **14 passed**; whole pytest **189
+      passed**; `make check-doc-links` **1762 files OK**; `make -n app-cve-scan` parsed.
+- [x] M1–M6 each turned the required named test red and restored byte-for-byte.
+- [ ] `make test` completed **1105 tests** but exited 1 on unrelated pre-existing
+      `e2e_remote.bats` tests 688, 699, 723, and 724; left untouched per scope. No live
+      cluster commands were run. Commit/push is blocked by `.git/index.lock: Operation not
+      permitted`; no commit SHA exists yet.
+
+## 2026-09-24 — Hostinger shopping-cart label and CVE promotion guard
+
+- [x] **`93ffe649`** — Hostinger registration sets the shopping-cart label by default with an
+      explicit override preserved; app-cve-scan skips a missing Application without aborting the
+      loop or emitting a remediation event. Added the required focused tests, CVE guide note and
+      changelog entry.
+- [x] Focused BATS **9/9**; mutation proofs M1–M4 each red and restored with `git diff --quiet`;
+      shellcheck exact counts unchanged from `HEAD~` (Hostinger 2→2, app-cve-scan 0→0);
+      `make test` **1096/1096**; bare pytest **184 passed**; `make check-doc-links` **1760 files OK**.
+- [x] Commit pushed and verified with `HEAD` equal to `origin/k3d-manager-v1.37.0`; no live-cluster
+      commands run.
+
+## 2026-09-23 — Alert delivery and ambient CNI precedence specs
+
+- [x] **Commit 1 — `03b8755caad4b698c4ecdc9bfbd53b21cbf91e1`** — warning-severity alerts route
+      through `platform-warning`, both observability renderers reject a missing referenced
+      Alertmanager config Secret, and Hermes gains the read-only `alert_delivery` sensor/probe.
+      Focused pytest: 8/8; focused BATS: 22/22; mutations M1/M2/M3 each red and restored;
+      doc links: 1756 files OK.
+- [x] **Commit 2 — `02e3fa769e002ba5757e5eb267ab02e1c7f192ad`** — provider-derived Istio ambient
+      CNI dirs take precedence over live values, generic dirs are refused for k3s, and the
+      override log no longer claims live provenance. Focused BATS: 8/8; mutations M1/M2/M3 each
+      red and restored; doc links: 1757 files OK. Both commits pushed to origin; no PR created.
+- [x] **Follow-up test correction — `d2c6177fbadaf44729fcd09fc7c575c38c6f268`** — updated the
+      existing live-overrides assertion from `keeping live` to `resolved overrides`, as required
+      by commit 2's logging change. Corrected `make test`: 1083/1083; bare pytest: 184 passed.
+
+## 2026-09-23 — Hostinger registration must survive a hub rebuild (spec filed)
+
+- [x] **Spec filed** — `docs/bugs/2026-09-23-hostinger-registration-does-not-survive-a-hub-rebuild.md`,
+      dispatched to Codex. Declares the app clusters in `scripts/etc/argocd/app-clusters.tsv`,
+      reconciles them additively from `bin/cluster-up` and `hub_recovery_reconcile` via the
+      existing `refresh_registration` entry point, and reports a `REGISTRATION GAP` in
+      `make status`.
+- [x] **Correction to the record:** the registration-only entry point already exists
+      (`make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`, `14f26f3d`). The reopened
+      2026-09-13 doc repeated "there is no registration-only entry point" after its own fix had
+      landed. Item 1 ("re-register hostinger") therefore needs no code — only the operator's run.
+- [x] **Codex implementation — `1238f994`** — pushed to `origin/k3d-manager-v1.37.0`. S1–S4,
+      focused tests, guide, README/CHANGELOG updates, and mutation proofs complete; focused
+      suites 47/47 and `make test` 1068/1068 green.
+- [ ] **Operator: re-register hostinger** — `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`.
+      Live hub mutation; needs the user's go. Hostinger workloads are unmanaged until then.
+- [ ] **Durability unproven until a rebuild happens with the fix in place.** A reconcile that has
+      never run during an actual rebuild is a claim, not a verified fix. The bug doc stays open.
+
+## 2026-09-23 — Alertmanager warning-severity delivery fix
+
+- [x] **`a7135966` — warning alerts no longer fall through to the root `null` receiver.**
+      Added `platform-warning`, routed `KubeJobFailed`, `KubeJobNotCompleted`, E2E and
+      Prometheus self-health allowlisted alerts at route index 2 after SMS criticals, and
+      documented the default-deny/first-match behavior in `docs/guides/alerting.md`.
+- [x] Gates: focused Alertmanager BATS 7/7; `make test` 1061/1061; shellcheck clean;
+      `make check-doc-links` 1749 files OK; rendered template YAML valid.
+- [x] Mutation proof: deleting the route made tests 3 and 5 red; blanking `to:` made test 4
+      red; swapping the warning and critical routes made tests 2, 3 and 5 red. Each mutation
+      was restored byte-for-byte before the next.
+- [x] **Pushed** — implementation commit `a7135966` and status commit `683a8ac7` are on
+      `origin/k3d-manager-v1.37.0`; the initial pull was blocked by inability to write
+      `.git/FETCH_HEAD`.
+- [ ] **NOT YET DEPLOYED** — the live Alertmanager still runs the old two-route tree and is
+      still discarding `KubeJobFailed`. Needs the operator to re-render the Alertmanager
+      secret, then confirm `platform-warning` appears in the route tree and that a
+      `KubeJobFailed` email actually arrives. Delivery is unproven until then.
+
+## 2026-09-23 — M2 GHCR credential root-caused (locked keychain), fix dispatched to Codex
+
+- [x] **Root cause found, prior triage retracted** — the M2's `gh` token is NOT invalid or
+      missing. It is stored in the macOS keyring; a non-interactive SSH session cannot unlock
+      the login keychain nor prompt, so `gh auth token` returns empty and `gh auth status`
+      reports "invalid" — indistinguishable from a deleted token. Keychain item
+      `gh:github.com` is PRESENT; `show-keychain-info` → `User interaction is not allowed.`
+      Verified on m2-air.local with the absolute path `/opt/homebrew/bin/gh`.
+- [x] **August remediation retracted as never-viable** — `gh auth login` / `gh auth refresh
+      -s read:packages` on M2 cannot fix a dispatch that runs over SSH. Was run by the
+      operator on 2026-09-23 with no effect. Removed from the Gap 3 doc as a step.
+- [x] **Two of my own claims corrected** — (a) the earlier "not the locked-keychain trap"
+      call was based on a test that captured stderr into the variable; it IS the trap.
+      (b) `gh` missing from `command -v` on a BatchMode shell affected only my manual probes,
+      NOT the dispatch — `E2E_M2_REMOTE_PATH` (`e2e_remote.sh:31`) already prepends
+      `/opt/homebrew/bin`. Recorded so it is not re-filed as a defect.
+- [x] **`hosts.yml` must NOT be committed** — it is where `gh` writes the token in plaintext
+      when secure storage is off. It also holds no token on either host today, so committing
+      it would carry nothing and leak a credential the moment it did.
+- [x] **Fix specced and dispatched** —
+      `docs/bugs/2026-09-23-e2e-dispatch-forward-ghcr-token-over-stdin.md`. Forward the M4's
+      existing `read:packages` token to the runner over **stdin** (never argv, never the
+      tee'd command string). No change to `shopping_cart.sh` — its env path is already first
+      in the resolver chain. Includes a PIPESTATUS index trap: adding `printf` to the head of
+      the pipeline shifts `ssh` to index 1, and getting it wrong makes every dispatch report
+      exit 0.
+- [x] **Fix implemented and verified** — Codex wrote it; Claude committed/pushed after Codex
+      hit the known `.git/index.lock` write-wall. Verified independently: scope is the two
+      scoped files, shellcheck clean, BATS 79/79 (0 `not ok`), and Claude re-ran the PIPESTATUS
+      mutation test itself (index 0 → red, index 1 → green, restore byte-identical).
+      Unit-proven only — never yet exercised against the live runner.
+- [x] **Spec amended mid-implementation** — the two-branch shape tripped `_agent_audit`'s
+      if-count threshold on `e2e_runner_dispatch` (pre-commit rejected it; `--no-verify` is
+      forbidden). Collapsed to one unconditional path instead of extracting a helper: an
+      unresolved credential sends an empty line, which `shopping_cart_load_ghcr_pat_from_env`
+      already treats as absent. Better than specced — one `PIPESTATUS` index, remote always
+      gets EOF on stdin, and the pre-existing exit-code test now guards the index as well, so
+      the trap has two guards. BATS 80/80. Amendment recorded at the top of the spec doc.
+- [x] **vCluster leak FIXED 2026-09-23** — and the filed root cause was wrong. The EXIT trap
+      did fire; it killed itself in `_e2e_write_result_event`, where `_kubectl create` without
+      `--no-exit` reaches `_run_command`'s `_err` → `exit 1`, terminating the shell before
+      teardown with the `ERROR:` line swallowed by `2>&1`. On the m2 runner the hub is
+      unreachable by construction, so teardown was unreachable there on *every* dispatch.
+      Three changes: `--no-exit` on publish+prune; trap reordered to summary → teardown →
+      result event; `_vcluster_reconcile_namespace` clears an orphan before create, for leaks
+      no trap can catch. `e2e.bats:403` was written for this scenario and could never fail —
+      its `_run_command` stub cannot exit. 181 BATS pass / 0 fail, shellcheck clean, three
+      mutation proofs. **Unit-proven only — not yet exercised live.**
+- [x] **Second exit-in-teardown defect FIXED 2026-09-23** — `_vcluster_ensure_exists` proved
+      existence from a kubeconfig *file* and otherwise `_err`ed, i.e. `exit 1`, out of a caller
+      chain (`_e2e_teardown:405` → `vcluster_destroy:88`) guarded only by `|| _warn`. Same class
+      as `7338a238`: the exit skipped `e2e.sh:411-426` and killed the trap mid-way. Fired when a
+      run fails *during* `vcluster create` — no kubeconfig, nothing listed. Fixes: shortcut
+      deleted (`vcluster list` is the truth), both `_err`s → `_warn` + `return 1`, check moved
+      after the `DRY_RUN` return. `vcluster.bats:131` passed only because of the shortcut;
+      `:113` asserted only non-zero, which `exit 1` also satisfies. 183 BATS pass / 0 fail,
+      shellcheck clean, both guards mutation-proven. **Unit-proven only — not exercised live.**
+- [ ] **Tier 1 still unproven** — all three fixes (GHCR stdin `9d2a0ad0`, leak `7338a238`,
+      the ensure_exists fix) are unexercised against the live runner. A dispatch is needed to confirm,
+      and needs the operator's go.
+- [x] **Six stale kubeconfigs swept 2026-09-23** — operator-authorised; verified orphaned first
+      (`vclusters` ns absent, `vcluster list` empty, no docker proxies), deleted by exact name.
+      `~/.kube/vclusters/` on the m2 runner is now empty.
+- [ ] **Hostinger hub registration LOST AGAIN 2026-09-23** — regression of a doc marked DONE.
+      The 2026-09-20T23:49Z hub rebuild recreated only `ubuntu-k3s-app-cluster` (in-cluster);
+      `cluster-ubuntu-hostinger` is absent and 0 `ubuntu-hostinger-*` Applications exist. This
+      is why CVE Auto-Patch has no data: `cve-remediation-verify` fails every 15 min with
+      `secrets "cluster-ubuntu-hostinger" not found`, so no remediation event ConfigMap is
+      written and the exporter emits zero `cve_*` gauges. Recurrence appended to
+      `docs/bugs/2026-09-13-hostinger-app-cluster-registration-lost-orphaned-workloads.md`.
+      Needs the operator's go: no registration-only entry point exists, and
+      `make refresh CLUSTER_PROVIDER=k3s-hostinger` remains unsafe and unapproved. The real
+      fix is making registration survive a rebuild — otherwise recurrence #3 is scheduled.
+      Also: 3 consecutive CronJob failures raised no alert.
+- [ ] **Hermes still BOOTED OUT** — must stay down until both blockers are fixed, or it
+      re-wedges the runner every 5 minutes. Restore:
+      `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`
+
+## 2026-09-23 — shopping-cart made opt-in per app cluster (code done, reapply pending)
+
+- [x] **Narrow fix implemented** — `a89e9e93` on `k3d-manager-v1.37.0`. `data-git` + `services-git`
+      require `k3d-manager/shopping-cart: "true"`; `register_app_cluster` emits it from
+      `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). `eso` and
+      `grafana-dashboards-acg` untouched. 5 new BATS assertions, each mutation-tested against the
+      pre-change tree; `argocd.bats` 42/42 and `argocd_app_cluster_generator.bats` 7/7 green;
+      shellcheck unchanged (1 pre-existing SC2317).
+- [x] **Docs, same release** — `docs/architecture/shopping-cart-deployment.md` §2 gains
+      "`ubuntu-k3s` is a role, not a place": the role label as a movable pointer, the designed
+      in-cluster registration mode, the four selecting AppSets and their `preserveResourcesOnDeletion`
+      split, the never-delete-the-registration warning, and that an empty `shopping-cart-data` on the
+      hub is expected. CHANGELOG `[Unreleased] → Changed`.
+- [x] **Withdrawn approach recorded** — `d6297a2c`, superseded by `c7a5956d`.
+- [x] **DONE 2026-09-23** — reapplied; 7 apps -> 0; ESO verified intact (23 CRDs, 3 deploys, 1 CSS).
+- [x] **3a executed** — `shopping-cart-apps` and `shopping-cart-data` namespaces deleted.
+- [x] **Bug docs filed** — identity `Replace=true` (new); argv PAT extended as Defect 4 on the
+      existing `rotate-ghcr-pat` doc rather than duplicated.
+- [ ] ~~PENDING OPERATOR GO~~ (superseded) Task 0 re-capture (read-only),
+      then reapply the ApplicationSets for hub **and** ACG, then `argocd_check_values_branch`.
+      Expect zero `ubuntu-k3s-data-layer` / `ubuntu-k3s-shopping-cart-*`; verify `ubuntu-k3s-eso`
+      and `ubuntu-k3s-grafana-dashboards` still Synced with 21 ESO CRDs and 22 ExternalSecrets.
+      `data-git` prunes and holds the resources finalizer — if StatefulSets or bound PVCs have
+      appeared in `shopping-cart-data`, stop.
+- [ ] **Then decide 3a vs 3b** — `preserveResourcesOnDeletion: true` leaves the `shopping-cart-apps`
+      Deployments running unmanaged. 3a deletes the `shopping-cart-apps` + `shopping-cart-data`
+      namespaces; 3b keeps them as an unmanaged demo. Never delete the `secrets` namespace.
+- [ ] **ESO re-homing** — queued in `docs/roadmap.md` Forward themes, unversioned, needs a scope doc
+      (the 21 CRDs must be adopted, not recreated).
+
 ## 2026-09-22 — v1.36.0 smoke and hub snapshot features
 
 - [x] Unified `make smoke` target committed as `6f1f7fd1`; seven focused BATS cases pass, including
@@ -185,14 +532,28 @@
   completed, leaving no error; the stale `mdat` is what proved no token had been written, and is
   the check to use next time. This clears the credential gate only — the Tier 1 run itself has not
   been executed yet.
-- [ ] **Tier 2 e2e blocked (verified).** No ACG context exists; manual TTY login required.
+- [ ] **Tier 2 e2e blocked (re-verified 2026-09-23).** No ACG context (`k3d-k3d-cluster`,
+  `ubuntu-hostinger` only); keychain `k3dm-acg-pluralsight` **ABSENT**. Manual TTY login
+  required — operator-only.
+- [ ] **Tier 1 e2e RAN 2026-09-23 and FAILED twice — both blockers filed, neither a
+  shopping-cart regression.** (1) A leaked vCluster from a 09:04Z failure wedged the shared
+  `vclusters` namespace; ~17 Hermes dispatches failed identically over 2h. Cleared; leak
+  reproduces on every failure → `docs/bugs/2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`.
+  (2) The runner cannot obtain a GHCR PAT — Gap 3 of
+  `docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md` regressed
+  (m2jump's `gh` token invalid; Vault path hardcoded to the hub context). Commits `ea6d39ca`,
+  `84798fc0`.
+- [ ] **Hermes is BOOTED OUT — restore it.** `launchctl bootstrap gui/$(id -u)
+  ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`. Leave it down until the GHCR
+  credential is fixed, or it re-wedges the runner every 5 minutes.
+- [ ] **Correction: the 2026-09-22 credential clearance was the M4's `gh` token, not M2's.**
+  The GHCR pull happens on the runner, so that entry did not clear Tier 1.
 - [x] **Specs written and pushed** as `b37acb91` on `k3d-manager-v1.36.0`:
   `docs/plans/v1.36.0-make-smoke-target.md` and
   `docs/plans/v1.36.0-hub-snapshot-capture-and-retention.md`.
   This brings v1.36.0 to **5 plan docs — at the max-5 cap.** A 6th means splitting the release.
-- [ ] **Codex dispatched** (session `01a0c93c-45b4-7301-9ac7-661b66e21204`) to implement both,
-  two separate commits, fully offline/stubbed. Awaiting report; SHAs to be verified on
-  `origin/k3d-manager-v1.36.0` before trusting.
+- [x] **Codex dispatched** (session `01a0c93c-45b4-7301-9ac7-661b66e21204`) to implement both,
+  two separate commits, fully offline/stubbed. PR #130 merged to main 2026-09-23 as 945018ee.
 - [ ] **Snapshot capture NOT wired into `make down`/`make up`** — deliberately out of scope
   until capture is proven on a real hub.
 
@@ -927,7 +1288,7 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **Deterministic e2e triage implemented** — `0c57b110`; verified independently (shellcheck RC=0, 138 pytest, 45/45 bats, mutation check genuine). Codex was blocked on `.git/index.lock`; Claude committed on its behalf.
 - [x] **Grafana admin password ROTATED and verified** — job `grafana-rotate-manual-20260921-195152` via the existing CronJob; login 200 with the Vault/ESO credential, 401 with a wrong one. The exposed value is invalid.
 - [ ] **Keycloak admin rotation** — still outstanding; no rotator exists and the ESO secret is bootstrap-only, so Vault+restart alone will not change the live password. Needs a 3-step manual or a new `keycloak-credential-rotator` spec. Operator to choose.
-- [ ] **PR #130 CI RED** — 4 failures, all branch-introduced (`main` green): bare-`!` lint (2 no-op assertions from `6c744a23`), observability tests 3/8 (reseed conflates Vault-unreachable with entry-absent — real design bug against the Vault-is-canonical decision), alertmanager test 388 (stale message + stubs). Fix spec not yet written.
+- [x] **PR #130 CI RED** — 4 failures, all branch-introduced (`main` green): bare-`!` lint (2 no-op assertions from `6c744a23`), observability tests 3/8 (reseed conflates Vault-unreachable with entry-absent — real design bug against the Vault-is-canonical decision), alertmanager test 388 (stale message + stubs). Fixed; PR merged 2026-09-23 as 945018ee.
 
 - [x] **Keycloak admin credential rotated on the live hub** — 2026-09-22. Rotator manifest applied,
   Vault role `keycloak-rotation` created, Job `keycloak-rotate-manual-20260922-043917`
@@ -950,9 +1311,9 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `1b7c6c93`. Verified independently: `make test` 1010/1010, tests 57/174/179/388 green,
   `observability.bats` untouched. Prometheus reseed now separates unreachable Vault from an absent
   entry; `base64 --decode` → `-d` at five sites across the keycloak and argocd rotators.
-- [ ] **Prometheus Vault entry absent on the hub** — `secret/k3d-manager/prometheus-basic-auth`
+- [x] **Prometheus Vault entry absent on the hub** — `secret/k3d-manager/prometheus-basic-auth`
   404 with no metadata; local cache intact. Repair = cache-recovery reseed (NOT
-  `observability_rotate_prometheus_basic_auth`, which targets the ACG context). Awaiting go.
+  `observability_rotate_prometheus_basic_auth`, which targets the ACG context). Repaired by operator 2026-09-22.
 - [ ] **`keycloak-realm-reconcile` awk exit 127** — still needs its own bug doc.
 - [x] **PR #130 CI GREEN** at `3d3e36a7` (run 35728186747: lint success, detect success). Copilot's
   2 inline findings addressed, replied and both threads resolved: header tempfile `chmod 0600`
@@ -961,3 +1322,381 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   `printf 'Authorization: Bearer %s\n' "${_token}"`).
   Outstanding merge gate: **Gemini live smoke test not run** — `enforce_admins` deliberately NOT
   disabled, since the gate list is not fully satisfied.
+- [ ] **Alertmanager root route is default-deny — all warning alerts discarded** (spec filed
+  2026-09-23, assigned to Codex). Root cause of the 15 silent `cve-remediation-verify`
+  failures. `route.receiver: 'null'` at `alertmanager.yaml.tmpl:9`; only `severity = critical`
+  or the 5-name allowlist escape it. Also silences this repo's own `E2EVerificationFailing`
+  and the `keycloak-realm-reconcile` awk-127 job. Spec:
+  `docs/bugs/2026-09-23-alertmanager-null-root-route-silently-drops-warning-alerts.md`.
+
+- [x] **Alertmanager delivery blackout — FIXED, confirmed on the live cluster.**
+  `03b875c5` warning route + deploy guard on both renderers; `02e3fa76` AppSet CNI-dir precedence
+  (substrate wins, live is fallback, generic dirs refused on k3s); `114e5c82` Claude's fix to the
+  probe's `alertmanager.yaml.gz` key + hard error on a missing key, which had it reporting the
+  healthy hub as a total blackout. All three verified independently (pytest, BATS, shellcheck,
+  four mutations red then restored). Live re-render seeded `alertmanager-smtp-secret` on
+  ubuntu-hostinger: **0 → 4 child routes**, `platform-warning` now reachable, and
+  `KubeDaemonSetRolloutStuck` routes for the first time in 17 days. Mail delivery confirmed:
+  1 email attempt, 0 failures across all five reasons, and 1 latency-histogram observation (recorded
+  only on a completed send). First alert out of that cluster after a 17-day blackout.
+- [ ] **Probe has no test of its own** — `test_alert_delivery.py` stubs `run`, so
+  `bin/k3dm-alert-delivery-status` is never executed by any suite. That is how the gzip-key defect
+  shipped green. A parse-level test over a fixture generated Secret would close it.
+- [ ] **istio-cni DaemonSet — precondition done, awaiting the user's go for the AppSet reapply.**
+  `istio-cni-node-vgr6m` is 0/1 since 2026-09-06, `install-cni` readiness 503, **160,074 probe
+  failures over 17d**, 0 restarts (no probe ever passed). The live `istio-ambient` AppSet still
+  holds the generic `cniConfDir: /etc/cni/net.d` / `cniBinDir: /opt/cni/bin`; the correct k3s values
+  are `/var/lib/rancher/k3s/agent/etc/cni/net.d` and `/var/lib/rancher/k3s/data/cni`
+  (`_istio_ambient_cni_dirs k3s-hostinger` confirms). **`02e3fa76` fixes the overwrite mechanism but
+  is inert until the AppSet is reapplied** — the stale generic dirs are still live. Ambient is in
+  real use, not cosmetic: `ztunnel-69cft` is 1/1 and namespace `shopping-cart-apps` carries
+  `istio.io/dataplane-mode: ambient`, so redirection setup for new pods there is degraded.
+  Next action, needs the user's go: reapply the `istio-ambient` ApplicationSet, confirm it writes
+  the k3s dirs (the new guard should refuse the generic ones), then roll the DaemonSet.
+
+- [x] **v1.39.0 Slack corpus Q&A specced** — `docs/plans/v1.39.0-slack-corpus-qa.md`, filed on
+  operator direction so it is not lost between releases. Plan #1 of 5 for v1.39.0. **Hard-blocked on
+  v1.38.0 WS5 publishing a measured recall@5**; if neither scorer clears its floor the spec does not
+  ship. Dedup check found `v1.6.0-slack-ai-analysis.md`, which is a different shape (alert-triggered
+  push, not user-query pull) but establishes that `/api/v1/analyze` already calls the Claude API from
+  `k3dm-webhook` and posts to Slack — so v1.39.0 is a new handler on proven transport, not new
+  infrastructure. Real work is WS3 (authorisation + disclosure): `docs/bugs/` and `docs/issues/` were
+  written for operators with repo access, and a Slack channel may be wider.
+
+- [x] **Provider label verified `k3s-hostinger` on the live hub (2026-09-24)** — operator ran
+  `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`; `cluster-ubuntu-hostinger` now carries
+  `k3d-manager/provider: k3s-hostinger` (was `unknown`). `834149ea` is confirmed effective against
+  the live cluster, so the last link in the istio-cni chain is closed and the AppSet reapply
+  precondition now holds.
+  - **Root cause confirmed from the container's own logs, not inferred.** `install-cni` has logged
+    since 2026-09-06T16:36:54Z: `Istio CNI is configured as chained plugin, but cannot find existing
+    CNI network config: no networks found in /host/etc/cni/net.d` and `Waiting for CNI network config
+    file to be written in /host/etc/cni/net.d...`. The host `/etc/cni/net.d` is **empty**; k3s keeps
+    its conflist under `/var/lib/rancher/k3s/agent/etc/cni/net.d`. Istio is chain-waiting on a
+    directory nothing will ever populate — that is the permanent 503, now 163,101 failures over 17d.
+  - The ambient data path is **working**: the same container enrols pods and writes iptables
+    (`sending pod add to ztunnel`, `shopping-cart-apps`). Only the chained-plugin install is stuck,
+    so the DaemonSet is unready while ambient still functions. Readiness is the accurate signal here,
+    not a false alarm.
+  - `/var/lib/rancher/k3s/data/cni` exists and holds the k3s plugins (bandwidth, bridge, cni,
+    firewall, flannel); `/opt/cni/bin` already holds the stray `istio-cni` binary installed to the
+    wrong place.
+  - **Probe caveat, recorded so it is not repeated:** an initial check via the
+    `prometheus-node-exporter` pod reported the k3s conf dir MISSING. That was WRONG. node-exporter
+    runs as `nobody`, and `[ -d ]` returned false because an ancestor was untraversable — `ls`
+    printed `Permission denied`, which proves the ancestor EXISTS. Never read a negative existence
+    result from an unprivileged container; an EACCES on the path is not absence. The istio-cni pod
+    is distroless (no `sh`), so container logs were the authority instead.
+
+- [ ] **AWAITING THE USER'S GO — reapply the `istio-ambient` ApplicationSet.** All preconditions now
+  hold. Expected: `cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d`,
+  `cniBinDir: /var/lib/rancher/k3s/data/cni`, and the new guard silent (provider is specific).
+  Then roll `istio-cni-node` and confirm 1/1 plus `KubeDaemonSetRolloutStuck` clearing.
+
+- [x] **Grafana "No data" measured, 2026-09-24 — five dashboards, FOUR different causes.** All five
+  ConfigMaps live on the **hub** (`k3d-k3d-cluster`), which has **no Pushgateway**; hostinger has one.
+  The istio-cni work is unrelated to every one of these. Counts from hub Prometheus:
+  | metric | series |
+  |---|---|
+  | `trivy_vulnerability_inventory` | 7447 |
+  | `e2e_run_info` | 21 |
+  | `e2e_last_run_pass` | 2 (both = 0) |
+  | `e2e_last_run_timestamp_seconds` | 2 |
+  | `e2e_last_success_timestamp_seconds` | 0 |
+  | `e2e_failure_group_info` / `e2e_failure_info` | 0 |
+  | `cve_remediation_state` / `cve_remediation_event_info` | 0 |
+  | `hermes_sensor_status` | 0 (`hermes_incident_active` = 1) |
+  | `k3dm_deployment_*`, checkout/k6/loadtest | 0 (no such metric name exists) |
+
+  Source-ConfigMap counts in `platform-ops`: `k3dm.k3d.io/cve-remediation-event=true` → **0**,
+  `k3dm.k3d.io/e2e-result=true` → **21**, `k3dm.k3.io/hermes-status=true` → **0**.
+  1. **CVE auto Patch — partly alive.** Inventory panels have 7447 series and DO render. The
+     remediation panels are empty only because no remediation-event ConfigMap has ever been written.
+  2. **E2E Verification — the exporter is fine, the payloads are empty.** All 21 event payloads carry
+     `total:""`, `failed:""`, `duration_seconds:""`, `failure_groups:[]`, `failure_details:[]`, which
+     is why `e2e_run_info` carries the nonsense label `failure_ratio="/"` (empty/empty). This is the
+     already-documented "empty event payload = the run aborted before any test ran" mode. Both
+     runners report `e2e_last_run_pass=0`, so `e2e_last_success_timestamp_seconds` is never emitted —
+     "Last success age" is blank because **nothing has ever passed**, not because of plumbing.
+     Blocked on the three e2e fixes (`9d2a0ad0`, `7338a238`, `ad9909a8`) being exercised live.
+  3. **Hermes Status — blank by current design.** Zero `hermes-status` ConfigMaps because
+     `K3DM_HERMES_STATUS_ENABLED` must stay unset. Not a defect. Exporter selector correctly uses
+     `k3dm.k3.io` while e2e/cve use `k3dm.k3d.io` — the split is intentional, do not "fix" it.
+  4. **k3dm Deployment Metrics and Checkout Load Test — no producer at all.**
+     `k3dm_deployment_duration_seconds` appears in exactly one file in the repo, its own dashboard
+     ConfigMap. Nothing emits it, and no checkout/k6 metric name exists. These two are unwired
+     dashboards, not broken ones.
+
+  **Hypothesis I raised and then disproved:** I suspected the e2e dashboard queried a metric name the
+  exporter never emits. It does not — the exporter defines `e2e_last_success_timestamp_seconds` at
+  line 383 of `vulnerability-inventory-exporter.yaml`. Checked before reporting it.
+
+- [x] **istio-cni-node on ubuntu-hostinger is 1/1 — RESOLVED 2026-09-24 after 17 days at 0/1.**
+  Ran `APP_CLUSTER_NAME=ubuntu-hostinger ./scripts/k3d-manager deploy_istio_ambient --confirm`.
+  Derived correctly: `INFO: [istio_ambient] CNI dirs for provider 'k3s-hostinger':
+  /var/lib/rancher/k3s/agent/etc/cni/net.d /var/lib/rancher/k3s/data/cni`. Live AppSet now carries
+  those values. ArgoCD rolled the DaemonSet **by itself** (helm values changed) — `istio-cni-node-rls4b`
+  came up 1/1 in 55s, app `Synced/Healthy`. The new pod's own log closes the loop:
+  `CNI config file "" preempted by "/host/etc/cni/net.d/10-flannel.conflist"` →
+  `created CNI config ...` → `initial installation complete, start watching for re-installation`.
+  `KubeDaemonSetRolloutStuck` is gone; hostinger now has **0 real alerts firing** (only `Watchdog`,
+  which is the always-on deadman's switch and therefore a positive signal for the delivery path
+  repaired earlier tonight). Five-link chain closed end to end.
+
+- [x] **TRAP: `--dry-run` cannot preview any substrate-derived value.** `scripts/lib/system_overrides.sh`
+  replaces `_run_command` so that in dry-run mode **every** invocation is short-circuited to a printed
+  preview — including read-only `kubectl get`. Any function that derives config by querying the
+  cluster therefore captures the literal string `[dry-run] kubectl ...` instead of real output, the
+  comparison fails, and the derivation silently falls back to its default.
+  Concretely: `deploy_istio_ambient --dry-run` printed `CNI dirs for provider 'unknown':
+  /etc/cni/net.d /opt/cni/bin` on a cluster whose provider label was correctly `k3s-hostinger`, and
+  the real `--confirm` run then derived `k3s-hostinger` correctly. **I briefly read the dry-run as a
+  fourth recurrence of the CNI bug and was wrong** — the dry-run manufactured the `unknown`. Verified
+  by re-running `_istio_ambient_target_provider` under a passthrough `_kubectl`, which returned
+  `k3s-hostinger`. Rule: never trust a dry-run's *derived* values, only its *intent*; to preview one,
+  pass the value explicitly (`AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR`) or resolve it separately.
+
+- [x] **Live e2e run on m2 — the three e2e fixes are CONFIRMED working (2026-09-24).**
+  `make e2e-remote RUNNER=m2` with HEAD == origin (`8699752b`). Dispatch exited 1 because **tests**
+  failed, not the harness. The published payload is **populated for the first time**:
+  `total: 102, failed: 9, duration_seconds: 11.814`, one `failure_groups` entry
+  (`kind=assertion, service=payment, target=api-payments`) and nine `failure_details`. Every prior
+  run had `total:""`, `failed:""`, `failure_groups:[]` — that was the defect, and it is fixed.
+  - Prometheus went `e2e_failure_group_info` 0 → **1** and `e2e_failure_info` 0 → **9**. The E2E
+    dashboard's Failure groups / Failure details / Top failing specs / Failure trend / Failure causes
+    panels now have data. Exporter cadence is 60s refresh + 1m scrape, so allow ~2min.
+  - `e2e_run_info` stayed at 21, not 22: the publisher prunes the oldest result when it adds one, and
+    the ConfigMap count is still exactly 21. Consistent, not an anomaly.
+  - The nine failures are a **real application fault**, not harness noise: `payment` health returns
+    `DOWN`, then `SyntaxError: Unexpected end of JSON input` because the service returns an empty
+    body. In `api/payments.spec.ts`.
+  - `WARN: [e2e] could not publish result event (hub platform-ops unreachable?)` during the run is
+    **non-fatal and expected** — the hub is not reachable from m2. The publish-back path recovered it:
+    `INFO: [e2e-publish] applied result for run ... (result=fail)`. Do not chase that WARN.
+
+- [x] **ROOT CAUSE: CVE auto-patch has never produced a remediation event — specced, dispatched.**
+  `docs/bugs/2026-09-24-hostinger-registration-resets-shopping-cart-label.md`.
+  `cronjob/app-cve-scan` `.status.lastSuccessfulTime` is **empty** — it has never succeeded. A manual
+  run failed in 6m32s, exit 1, on `applications.argoproj.io "ubuntu-hostinger-shopping-cart-frontend"
+  not found`. Chain: `register_app_cluster:1481` defaults `ARGOCD_APP_CLUSTER_SHOPPING_CART` to
+  **false** → `_hostinger_register_cluster` never sets it (`grep -c` = **0**) → live `services-git`
+  AppSet selects on `k3d-manager/shopping-cart: "true"` AND `role: app-cluster`, so it matches **zero**
+  clusters and generates none of the `ubuntu-hostinger-shopping-cart-*` Applications (it still reports
+  "All applications have been generated successfully" — generating nothing counts as success) →
+  `app-cve-scan.sh:526` patches that Application unguarded under `set -eu` → aborts → and
+  `_emit_remediation_event` is on line **529**, so no event is ever written.
+  - **This is the SAME defect shape as the provider label fixed in `834149ea`, in the SAME env block,
+    one line away.** Two instances of "the hostinger register path omits a var that silently defaults
+    to a value breaking a downstream AppSet selector" — worth treating as a class, not a one-off.
+  - **It regressed.** `2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md` records a run
+    that promoted four services including `frontend`, so the label was `true` and a refresh flipped it.
+  - **Not cosmetic:** reaching `_promote` means the scan found a real HIGH/CRITICAL worth promoting on
+    `shopping-cart-frontend`. Auto-patch has been silently not remediating.
+
+- [x] **`2026-06-09-pushgateway-deployment-metrics-gap.md` updated — its proposed fix already shipped.**
+  The bounded retry + `/-/healthy` precheck exist at `bin/k3dm-webhook:1717-1741`. Measured cause is
+  different and total, not intermittent: the launchd agent
+  `com.k3d-manager.pushgateway-port-forward` is **not loaded** and `localhost:9091/-/healthy` returns
+  **000**, so every push retries against a closed socket. hostinger's Pushgateway is up and scraped
+  (`pushgateway_build_info` present) but holds **zero** `k3dm_*` series; the hub has no Pushgateway pod
+  at all. Remaining defects recorded in the doc: absent-vs-slow sink, no operator surface for silent
+  failure, `_provider_supports_pushgateway` disagreeing with `_push_metrics`, and unstated topology.
+  - **Search lesson:** I first concluded "no producer exists" from
+    `grep -r --include='*.yaml' --include='*.sh' --include='*.py'`. Wrong — `bin/k3dm-webhook` has **no
+    extension**, so the filters skipped it. Never restrict by extension when hunting producers here.
+
+## 2026-09-24 — Pushgateway deployment metrics root-caused; Codex's shopping-cart label fix verified
+
+**Codex `f8a7e118` VERIFIED independently** (not taken on report): HEAD == origin/k3d-manager-v1.37.0;
+diff touches exactly the 8 spec'd files; both BATS suites re-run by Claude 9/9 green; shellcheck
+re-counted with `grep -cE '\^-*\^ SC'` — hostinger 2→2, app-cve-scan 0→0. Two mutations re-proved by
+Claude: deleting the `ARGOCD_APP_CLUSTER_SHOPPING_CART` line reds only test 4 (5 and 6 stay green,
+so the override path and the `register_app_cluster` default are correctly discriminated); reverting
+the promotion guard reds tests 7 and 8 while 9 stays green. Also checked the guard's `_rc=1` actually
+propagates — the promote call sits in a plain `for _svc in ${APP_SERVICES}` loop, not a pipeline
+subshell, and `_rc` is a script-level global consumed by `exit "${_rc}"`, so the run's failure is
+genuinely carried.
+
+**k3dm Deployment Metrics — root cause found, one line.** `_deploy_pushgateway_acg` installs the helm
+release as `prometheus-pushgateway` (`observability.sh:692`); `_hostinger_refresh_access_layer` probes
+for `svc pushgateway` (`k3s-hostinger.sh:661`). The probe always fails, so the `else` branch
+`rm -f`'s the port-forward LaunchAgent on **every** access-layer refresh. Nothing listens on
+localhost:9091, so every webhook push exhausts its 6 retries against a closed socket
+(`Errno 61 Connection refused`, live in `~/Library/Logs/k3dm-webhook.log`) and logs a non-fatal skip.
+The Pushgateway pod, its Prometheus target (`up=1`) and the retry logic were all healthy the whole
+time — only the laptop→cluster hop was missing, and our own code removed it. 64 days, zero series.
+
+`bin/cluster-up:1890` has always said `svc/prometheus-pushgateway` and is correct — the hostinger path
+drifted away from it. The reusable defect is the drift, not the typo, hence a cross-file
+agreement test in the spec.
+
+**Round-trip proved live, then cleaned up.** Regenerated the plist/wrapper by calling
+`_hostinger_write_monitoring_port_forward_plist` with the corrected name, bootstrapped the agent:
+`localhost:9091/-/healthy` → 200, a throwaway gauge POST → 200, the series queryable in hostinger
+Prometheus ~45s later, group then DELETEd (202). The corrected service name is the entire fix. The
+loaded agent is a manual stopgap and will be `rm -f`'d again by the next refresh until the fix lands.
+
+**Topology decided (was blocking):** the app-cluster Prometheus owns `k3dm_deployment_*`. Every panel
+targets datasource uid `P5A1115AEDF367D43`, defined in `kube-prometheus-stack-acg-values.yaml:26` —
+the ACG/app-cluster stack. The hub has no Pushgateway and is not supposed to. Do not add one; do not
+repoint the dashboard.
+
+**Second defect: `_provider_supports_pushgateway` is inverted** (`bin/k3dm-webhook:1794`). It returns
+False for `k3s-hostinger` — the only provider that provably has a Pushgateway — and True for the hub,
+which provably has none. It gates only the `make status` smoke surface, never `_push_metrics`, so it
+did not block the push; it blocked the *signal*. That is why a dead sink went unnoticed for 64 days.
+Combined with `bin/cluster-status-summary:61` treating `pushgateway` as `optional` (error→warning),
+the two produced total silence.
+
+Spec appended to `docs/bugs/2026-06-09-pushgateway-deployment-metrics-gap.md` per the dedup rule
+(S1 name fix + one-local binding, S2 predicate inversion, S3 status surface, 4 tests, M1-M4, 6 gates).
+Checkout Load Test is explicitly OUT of scope there — it already has
+`docs/bugs/2026-08-29-loadtest-slice-f-generator.md` and needs a live Keycloak password grant.
+Deferred follow-up: a metric-staleness alert.
+
+**Correction to the earlier note in this doc:** the LaunchAgent was described as "not loaded". It was
+worse — the plist did not exist at all, because our code deletes it every refresh.
+
+## 2026-09-24 — Pushgateway service-name fix landed
+
+S1-S4 implemented. Codex wrote S1/S2/S3 and both new test suites, then **correctly refused to commit**
+because the required gate `scripts/tests/lib/provider_contract.bats` was red: it hardcodes the OLD
+service name at line 932 (stubbed `kubectl` case pattern) and line 1005 (`grep -F -- 'svc/pushgateway'`),
+while the spec's target list omitted the file. That was a spec defect on Claude's side, not a Codex
+failure — it stopped rather than guess or use `--no-verify`. S4 added to the spec to record it.
+
+**The reusable lesson.** `provider_contract.bats` asserted the broken name for 64 days, so it was a
+test that *locked in the defect* and would have blocked its own fix. A test that pins a literal it
+never independently justifies freezes whatever was true when it was written — the same shape as the
+standing rule against whole-line `grep -F` assertions. The new cross-file agreement test (test 3) is
+the intended replacement: it asserts the three producers AGREE, so it survives a legitimate rename and
+still catches drift. Confirmed the suite reassigns `HOME="${BATS_TEST_TMPDIR}"` on the enclosing test's
+first line (843), so it writes plists to a temp dir and does not touch the operator's real
+`~/Library/LaunchAgents`.
+
+**Claude error worth remembering:** restoring mutation M1 with `git checkout --` reverted to HEAD and
+silently discarded Codex's still-UNCOMMITTED S1 fix along with the mutation. Caught it when the next
+mutation's grep showed pre-fix lines; re-applied S1 and verified byte-identical restoration (blob
+`4b6a2dc7`). Switched to file snapshots for M2-M4. **`git checkout --` is only a safe mutation-restore
+when the work under test is already committed.**
+
+All four mutations independently re-proved by Claude, not taken on Codex's report:
+- M1 probe reverted → test 1 red, test 3 green.
+- M2 **only** the `svc/` argument reverted with the probe left correct → test 1 STILL red. This is the
+  one that mattered: it rules out a test that reads only the probe and would have passed a half-fix.
+- M3 helm release renamed → tests 2 and 3 red, test 1 green.
+- M4 predicate re-inverted → red on BOTH the `hub` and `k3s-hostinger` cases.
+
+Gates: `make test` 1099/1099 (was 1096, +3 new bats); `pytest` 189 (was 184, +5 parametrized cases);
+`provider_contract.bats` 57/57; shellcheck unchanged — `k3s-hostinger.sh` 2→2, `cluster-status-summary`
+0→0; `make check-doc-links` 1760 files OK.
+
+Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger` will both flip
+`k3d-manager/shopping-cart` to `"true"` AND stop deleting the pushgateway port-forward agent.
+# 2026-09-24 — webhook Phase 4 lifecycle/status extraction (working tree; commit pending)
+
+- [x] Extracted exactly 7 measured lifecycle functions into `webhook/lifecycle.py` and exactly
+      4 measured reporting functions into `webhook/status.py`; no deferred failure-analysis,
+      metrics, redaction, or Slack-thread functions were moved.
+- [x] Added six lifecycle and four status unittest cases using SourceFileLoader; tests cover
+      direct argv/no shell, timeout, actor audit, provider fallback, concurrent refusal,
+      status formatting, malformed payloads, and redaction.
+- [x] Injected `_log`, `_notify_job`, `_push_metrics`, `_analyze_stall`, `_analyze_failure`,
+      `_redact_secrets`, process/job state, and provider probes; copied none of those functions.
+      Left the existing `agent.py` `_notify_job` duplication untouched.
+- [x] Updated architecture module map and Unreleased changelog; adapted only the existing
+      webhook BATS checks that inspected moved functions or patched their old globals.
+- [x] Gates: focused pytest 10; bare pytest 189; webhook BATS 64/64; hub ESO BATS 4/4;
+      `make test-all` completed plans 1112 and 132 with unittest counts 7/6/14/13/6/6/4,
+      then expected EXIT=2 because Homebrew Python 3.14.7 has no pytest; doc links 1765;
+      repo-root and server import passed; `_agent_audit` passed. M1–M6 each produced red
+      output and was restored.
+- [ ] Commit/push blocked by `.git/index.lock: Operation not permitted` after one commit attempt;
+      no retry, lock removal, hook bypass, force-push, or PR. All scoped changes remain staged;
+      no Phase 4 SHA exists.
+
+## 2026-09-24 — lib-foundation v0.4.18 credential-test observability
+
+- [x] Spec `docs/plans/v0.4.18-credential-test-observability.md` (lib-foundation) — `d695f81`
+- [x] Implementation — **`1bcde41`** on `feat/v0.4.18-credential-test-observability`, local == origin.
+      Codex wrote it; `.git/index.lock: Operation not permitted` blocked its commit, so Claude
+      verified the tree and committed.
+- [x] Gates re-measured by Claude: jest 7 suites / **32** tests (baseline 28), disappearance gate
+      4 -> **0**, `node --check` clean x2, `make bats` **138/138 exit 0**.
+- [x] Codex-reported bats red (case 16, missing-aws-CLI) investigated, not dismissed: does not
+      reproduce on the host; the test skips on `aws` in `/usr/bin:/bin`, a sandbox-only difference.
+- [x] Operator live `credential-test` run (TTY + CDP required; operator-only) — RAN 2026-09-24.
+      Credentials confirmed `username=present password=present`; reached `path=auto-login`;
+      auto-login FAILED on `locator.click` timeout. The instrumentation's first real catch: the
+      old bare `ACG_SESSION_EXPIRED` had been hiding a login path that has never worked.
+- [x] Bug filed: `docs/bugs/2026-09-24-acg-pluralsight-login-click-preconditions.md` — **`b48ad1c4`**,
+      local == origin. 4 defects in `playwright/lib/pluralsight_login.js`; root cause explicitly
+      NOT reproduced (a CDP probe disproved the "never stable" hypothesis).
+- [x] Login fix — **`8a74258`** (3 files) + **`a33727c0`** (bug-doc gate table), local == origin.
+      Codex wrote it; `.git/index.lock: Operation not permitted` blocked its commit AGAIN (2nd time
+      on this branch) and left 3 gates unrun. It correctly stopped rather than working around the
+      lock. Claude reviewed the diff and ran the outstanding gates.
+- [x] Gates measured by Claude: `node --check` clean x2; jest 7 suites / **36** tests (from 32);
+      `npm run check` clean; `make bats` **138 ok / 0 not ok / 0 skips**.
+- [x] **Mutation check PASSED exactly** — pre-fix source swapped in by file copy (not `git stash`,
+      which is what failed for Codex): **4 failed / 32 passed**. The 4 new tests are all real
+      guards; the 32-test baseline undisturbed.
+- [x] Operator re-ran `credential-test` — **the click hang is GONE**. New diagnostic fired:
+      `ACG_LOGIN_FIELDS_MISSING: email=missing password=filled`.
+- [x] **D5 root cause REPRODUCED and fixed — `7801ff4`**, local == origin. The email field is
+      `type="text" name="Username" id="Username"`; CSS attribute VALUES are case-sensitive, so
+      every arm of the old `EMAIL_SELECTOR` missed. Measured via Playwright's own engine on the
+      live form: **OLD count=0, NEW count=1**. Fixing D1-D4 did not fix login, it revealed this.
+- [x] D5 gates: jest **39** (from 36); mutation check **3 failed / 36 passed** vs old selector;
+      `npm run check` clean; `make bats` **138/0/0**; live probe 0 -> 1. Captcha ruled out
+      (`ShowCaptcha="False"`, 0 reCAPTCHA iframes) so unattended login is feasible.
+- [x] **Operator re-ran `credential-test` — CONFIRMED.** `ACG_SESSION_OK path=auto-login` from a
+      signed-out start, then Open Sandbox -> Start Sandbox -> 4 inputs extracted -> credentials
+      written to `~/.aws/credentials` -> `sts:GetCallerIdentity OK`. **First successful headless
+      Pluralsight login in this subsystem's history.** Bug doc marked RESOLVED &
+      OPERATOR-CONFIRMED at **`38c64ade`**; both gate tables flipped to confirmed.
+- [x] The live `credential-test` gate required before any lib-foundation PR has PASSED.
+- [x] **PR #55 opened and merge-ready** — one PR covering observability + the login fix.
+      Gates measured here: `npm run check` clean; jest 7 suites / **40** tests; `make bats`
+      `1..138` all ok; CI green on `8986227` verified per-job. Copilot: 4 findings / 5 comments,
+      2 real and fixed in `8986227` (unbounded `_robustClick` timeout; duplicated `Outcome`
+      section in the bug doc), 3 false positives on `process.env` isolation that already exists
+      via `beforeEach`/`afterAll`. All 5 threads replied to and resolved.
+      No `enforce_admins` lever — lib-foundation `main` is ruleset-protected with no
+      required-approvals gate.
+- [x] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release. Merged to main at
+      `2f244ee4`; tag pushed; release at https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18.
+- [x] Subtree pull lib-foundation v0.4.18 (prefix `scripts/lib/foundation`, NOT scripts/lib/acg) —
+      `7d786cd0`, vendored tree hash == upstream main tree `8b2f7956`. Tier 2 preflight rewired in
+      `a4d6ef53`: `_secret_load_data` instead of a keychain existence check (which passes on a
+      locked keychain and on an empty stored value), plus `export K3DM_ACG_REQUIRE_CREDENTIALS=1`
+      so the session check fails closed. 14 BATS, mutation-gated (5 fail on the old code).
+      Guide updated in the same commit.
+- [x] Open a PR for lib-foundation `docs/v0.4.18-retrospective` — **PR #56**, CI 3/3 green.
+      Copilot found three real gaps (verified against `acg_session_check.js`, not taken on faith):
+      the marker table omitted `path=manual-login` (emitted at line 120), `docs/api/acg.md` had the
+      same omission, and the retro cited `path=pluralsight_login` — a value emitted nowhere. Fixed
+      in `78eacbe2`, all three threads replied to and resolved. `CHANGE.md` entry added in
+      `1077361`. The same omission was mirrored in k3d-manager's harness guide and fixed in
+      `4376a6ec`.
+- [x] Open the v1.37.0 PR — **PR #131** (`4376a6ec`), Copilot requested, CI running at handoff.
+- [x] Add `make e2e-sandbox` (Tier 2 `e2e_verify_sandbox`, `DIGEST=` optional) so Tier 2 has the
+      same make entry point Tier 1 has, and expose `e2e-sandbox` on Slack `/k3dm` as an
+      `operator` target (optional `DIGEST`, 3600s, no `confirm` — symmetric with `e2e-remote`).
+      Docs: harness guide, Slack howto (incl. the unattended `ACG_SESSION_EXPIRED` caveat),
+      CHANGELOG. Tests: Makefile-wiring BATS assertion + allowlist regression, both
+      mutation-proven.
+- [x] Fix both PR #131 CI reds — BATS `9a649af3` (fake `security` executable on PATH; the shell
+  function stub was invisible inside `bash -c`, so macOS read the real keychain and Linux CI
+  found no binary) and pytest `444aea0c` (`alert_delivery` missing from **both** sensor-stub
+  sites, so the real sensor shelled out to live `kubectl`). Both were green locally for
+  environment-specific reasons. Mutation-gated; 189 pytest passed offline.
+- [x] Analyse + document CodeQL alerts 23/24/26/27 — `d482fc47`, false positives
+  (`docs/issues/2026-09-24-codeql-pr131-spawn-injection-false-positives.md`) with in-code
+  markers at both sinks.
+- [ ] **Operator action:** dismiss CodeQL alerts 23/24/26/27 via `gh api` — the classifier
+  denied it as a CI bypass; must be run from the operator's terminal. Blocks the #131 CodeQL
+  gate; `enforce_admins` untouched until then.
+- [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
+      `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
+      live sandbox path and needs a sandbox to verify.

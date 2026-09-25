@@ -35,6 +35,12 @@ def _spawn_capture_text(cmd, cwd=None, env=None, timeout=15):
         exe = cmd[0]
         if not os.path.isabs(exe):
             exe = _shutil.which(exe) or exe
+        # codeql[py/command-line-injection,py/path-injection] -- exe is never
+        # request-derived: every caller passes a literal cmd[0] ("make", "aws") or an
+        # absolute path, and the cwd branch above pins it to /bin/bash. Request-derived
+        # argv values are constrained by anchored metacharacter-free fullmatch patterns in
+        # parse_make_request and shlex.quote'd. See
+        # docs/issues/2026-09-24-codeql-pr131-spawn-injection-false-positives.md
         child_pid = os.posix_spawn(exe, cmd, _env, file_actions=_file_actions, setsid=True)
         deadline = time.time() + timeout
         status = None

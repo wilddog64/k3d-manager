@@ -58,7 +58,7 @@ PY
 fi
 _parsed="$(python3 - "${_tmp}" "${_service}" <<'PY'
 import json,re,sys
-d=json.load(open(sys.argv[1])); w=sys.argv[2].lower(); a={"shopping-cart-order":"order","shopping-cart-payment":"payment","shopping-cart-basket":"basket","shopping-cart-frontend":"frontend","shopping-cart-product-catalog":"product-catalog"}; optional={"pushgateway"}; rows=[]
+d=json.load(open(sys.argv[1])); w=sys.argv[2].lower(); a={"shopping-cart-order":"order","shopping-cart-payment":"payment","shopping-cart-basket":"basket","shopping-cart-frontend":"frontend","shopping-cart-product-catalog":"product-catalog"}; optional=set(); rows=[]
 for x in d.get("services",[]):
  n=str(x.get("name","")); l=n.lower()
  if w and not (l==w or l==a.get(w,w) or a.get(w,w) in l): continue
