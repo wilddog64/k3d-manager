@@ -16,8 +16,9 @@ setup() {
 }
 
 @test "no producer refers to the bare pushgateway service name" {
-  run bash -c "! rg -n --pcre2 'get svc pushgateway|svc/pushgateway(?![[:alnum:]_-])|helm upgrade --install pushgateway(?![[:alnum:]_-])' '${hostinger}' '${cluster_up}' '${observability}'"
-  [ "${status}" -eq 0 ]
+  run grep -nE 'get svc pushgateway([^[:alnum:]_-]|$)|svc/pushgateway([^[:alnum:]_-]|$)|helm upgrade --install pushgateway([^[:alnum:]_-]|$)' "${hostinger}" "${cluster_up}" "${observability}"
+  [ "${status}" -eq 1 ]
+  [ -z "${output}" ]
 }
 
 @test "all three sites agree on the pushgateway service name" {

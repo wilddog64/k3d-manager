@@ -5,6 +5,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-e2e.y
 HERMES_DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-hermes.yaml"
 RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+AM_TMPL="${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl"
 
 @test "exporter declares the e2e reader and label selector" {
   run grep -F -- 'refresh_e2e_events' "${EXPORTER}"
@@ -216,26 +217,16 @@ PY
 }
 
 @test "Alertmanager has a non-null severity warning route" {
-  run python3 - "${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl" <<'PY'
-import sys, yaml
-route = yaml.safe_load(open(sys.argv[1]))["route"]
-warning = next(item for item in route["routes"] if any("severity = warning" in matcher for matcher in item["matchers"]))
-assert warning["receiver"] != "null"
-print("ok")
-PY
+  run yq -r '.route.routes[] | select(.matchers[] == "severity = warning") | .receiver' "${AM_TMPL}"
   [ "${status}" -eq 0 ]
-  [[ "${output}" == *"ok"* ]]
+  [ -n "${output}" ]
+  [ "${output}" != "null" ]
 }
 
 @test "Alertmanager warning catch-all follows the named allowlist" {
-  run python3 - "${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl" <<'PY'
-import sys, yaml
-routes = yaml.safe_load(open(sys.argv[1]))["route"]["routes"]
-allow = next(i for i, item in enumerate(routes) if any("alertname =~" in matcher for matcher in item["matchers"]))
-warning = next(i for i, item in enumerate(routes) if any("severity = warning" in matcher for matcher in item["matchers"]))
-assert warning > allow
-print("ok")
-PY
-  [ "${status}" -eq 0 ]
-  [[ "${output}" == *"ok"* ]]
+  allow="$(yq -r '.route.routes | to_entries | map(select(.value.matchers[] | contains("alertname =~"))) | .[0].key' "${AM_TMPL}")"
+  warning="$(yq -r '.route.routes | to_entries | map(select(.value.matchers[] | contains("severity = warning"))) | .[0].key' "${AM_TMPL}")"
+  [[ "${allow}" =~ ^[0-9]+$ ]]
+  [[ "${warning}" =~ ^[0-9]+$ ]]
+  [ "${warning}" -gt "${allow}" ]
 }
