@@ -106,6 +106,27 @@ class MakeTargetTests(unittest.TestCase):
                 self.assertIsNone(argv)
                 self.assertIsNotNone(error)
 
+    def test_e2e_sandbox_requires_operator_and_takes_only_digest(self):
+        self.assertEqual(wh.MAKE_TARGETS["e2e-sandbox"]["min_role"], "operator")
+        self.assertNotIn("e2e-sandbox", wh.make_target_help("reader", wh._role_allows))
+        self.assertIn("e2e-sandbox", wh.make_target_help("operator", wh._role_allows))
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox", {}, None),
+            (["e2e-sandbox"], None),
+        )
+        digest = "sha256:" + "a" * 64
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox", {"DIGEST": digest}, None),
+            (["e2e-sandbox", f"DIGEST={digest}"], None),
+        )
+        _, error = wh.parse_make_request("e2e-sandbox", {"RUNNER": "m2"}, None)
+        self.assertIn("does not accept RUNNER", error)
+        for value in ("sha256:" + "a" * 63, "sha256:" + "A" * 64, f"{digest}; rm -rf /", ""):
+            with self.subTest(value=value):
+                argv, error = wh.parse_make_request("e2e-sandbox", {"DIGEST": value}, None)
+                self.assertIsNone(argv)
+                self.assertIn("invalid value for DIGEST", error)
+
     def test_app_cve_scan_needs_no_confirm(self):
         self.assertEqual(
             wh.parse_make_request("app-cve-scan", {}, None),

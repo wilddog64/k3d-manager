@@ -192,3 +192,10 @@ FAKE
   [ "$status" -eq 0 ]
   [ -e "$EXTEND_CALLED" ]
 }
+
+@test "make e2e-sandbox wires to the sandbox dispatcher and passes DIGEST through" {
+  run grep -F -- 'e2e_verify_sandbox $(DIGEST)' Makefile
+  [ "$status" -eq 0 ]
+  run grep -F -- 'make e2e-sandbox' Makefile
+  [ "$status" -eq 0 ]
+}

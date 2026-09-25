@@ -11,6 +11,13 @@
   `k3dm-acg-pluralsight` credential account, refuses
   `K3DM_ACG_SKIP_SESSION_CHECK=1`, and documents the no-MFA auto-login setup.
 - Webhook Phase 1 policy extraction: `scripts/lib/webhook/policy.py`, explicit API route tables, and route-policy regression tests.
+- `make e2e-sandbox` invokes the Tier 2 ACG/Stripe harness (`e2e_verify_sandbox`), giving
+  Tier 2 the same make entry point Tier 1 has had via `make e2e`. `DIGEST=` is optional and
+  passes through as the candidate digest; the target must be run from a real terminal because
+  the preflight's one-time interactive ACG login needs a TTY.
+- `e2e-sandbox` is also reachable from Slack `/k3dm` as an `operator` target with an optional
+  `DIGEST` and a 3600s timeout, matching `e2e-remote`. Unattended, it can only use an already
+  valid ACG session and otherwise fails closed with `ACG_SESSION_EXPIRED`.
 - A unified `make smoke` target with offline and reachable-cluster tiers, per-check logs, and explicit PASS/FAIL/SKIP reporting.
 - Hub snapshot capture, M2 offload, verification, listing, and retention targets.
 - Keycloak monthly admin credential rotator, which preserves `db_password` and deliberately does not force-sync the ArgoCD-managed `keycloak-secrets` ExternalSecret.

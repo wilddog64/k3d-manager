@@ -182,8 +182,13 @@ order/payment overrides, and runs the `flows` Playwright project with
 `OAUTH2_ENABLED=true` and `STRIPE_E2E=true`.
 
 ```bash
-./scripts/k3d-manager e2e_verify_sandbox
+make e2e-sandbox                          # DIGEST=sha256:... optional
+./scripts/k3d-manager e2e_verify_sandbox  # equivalent, direct dispatch
 ```
+
+`make e2e-sandbox` is the Tier 2 counterpart to `make e2e`. Run it from your own
+terminal: the preflight's one-time interactive ACG login needs a real TTY, so it
+cannot run unattended.
 
 The sandbox is never registered with hub ArgoCD and is not torn down by the
 harness; ACG TTL expiry provides cleanup. Tier 2 is best-effort and periodic,

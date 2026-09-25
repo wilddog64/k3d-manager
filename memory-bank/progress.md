@@ -65,6 +65,12 @@
       `1077361`. The same omission was mirrored in k3d-manager's harness guide and fixed in
       `4376a6ec`.
 - [x] Open the v1.37.0 PR — **PR #131** (`4376a6ec`), Copilot requested, CI running at handoff.
+- [x] Add `make e2e-sandbox` (Tier 2 `e2e_verify_sandbox`, `DIGEST=` optional) so Tier 2 has the
+      same make entry point Tier 1 has, and expose `e2e-sandbox` on Slack `/k3dm` as an
+      `operator` target (optional `DIGEST`, 3600s, no `confirm` — symmetric with `e2e-remote`).
+      Docs: harness guide, Slack howto (incl. the unattended `ACG_SESSION_EXPIRED` caveat),
+      CHANGELOG. Tests: Makefile-wiring BATS assertion + allowlist regression, both
+      mutation-proven.
 - [x] Fix both PR #131 CI reds — BATS `9a649af3` (fake `security` executable on PATH; the shell
   function stub was invisible inside `bash -c`, so macOS read the real keychain and Linux CI
   found no binary) and pytest `444aea0c` (`alert_delivery` missing from **both** sensor-stub
@@ -1674,6 +1680,12 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       `1077361`. The same omission was mirrored in k3d-manager's harness guide and fixed in
       `4376a6ec`.
 - [x] Open the v1.37.0 PR — **PR #131** (`4376a6ec`), Copilot requested, CI running at handoff.
+- [x] Add `make e2e-sandbox` (Tier 2 `e2e_verify_sandbox`, `DIGEST=` optional) so Tier 2 has the
+      same make entry point Tier 1 has, and expose `e2e-sandbox` on Slack `/k3dm` as an
+      `operator` target (optional `DIGEST`, 3600s, no `confirm` — symmetric with `e2e-remote`).
+      Docs: harness guide, Slack howto (incl. the unattended `ACG_SESSION_EXPIRED` caveat),
+      CHANGELOG. Tests: Makefile-wiring BATS assertion + allowlist regression, both
+      mutation-proven.
 - [x] Fix both PR #131 CI reds — BATS `9a649af3` (fake `security` executable on PATH; the shell
   function stub was invisible inside `bash -c`, so macOS read the real keychain and Linux CI
   found no binary) and pytest `444aea0c` (`alert_delivery` missing from **both** sensor-stub

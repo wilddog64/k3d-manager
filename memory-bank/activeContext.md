@@ -1,5 +1,28 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — Tier 2 gets a make target and a Slack surface
+
+Tier 1 has had `make e2e` since v1.26.0; Tier 2 (`e2e_verify_sandbox`) had no make entry point
+at all and was dispatcher-only, which is why the PR #131 test-plan box reads as an ad-hoc
+operator step. Added `make e2e-sandbox` (`DIGEST=` optional, passed through as the candidate
+digest) next to `make e2e`, plus `.PHONY` and a `make help` line.
+
+Also added `e2e-sandbox` to the Slack `/k3dm` allowlist as an `operator` target with an
+optional `DIGEST` and a 3600s timeout — symmetric with `e2e-remote`. It deliberately does NOT
+carry `confirm`, for the same reason `e2e-remote` does not.
+
+Operational caveat worth remembering: a Slack-triggered Tier 2 run is unattended, so it can
+only use an **already valid** ACG session. The preflight refuses
+`K3DM_ACG_SKIP_SESSION_CHECK=1` and the interactive login needs a TTY, so a stale session
+fails closed with `ACG_SESSION_EXPIRED` rather than hanging. Documented in
+`docs/howto/slack-slash-commands.md`.
+
+Gates: `make e2e-sandbox` dry-run (with and without `DIGEST`), `make help`,
+`e2e_sandbox_preflight.bats` 15/15, `make test-python-unit` 7/7 suites OK,
+`make check-doc-links` 1766 files OK. Both new assertions were mutation-proven — the allowlist
+test raises `KeyError` with the `MAKE_TARGETS` row removed, and both Makefile greps are absent
+from `HEAD:Makefile`.
+
 ## 2026-09-24 — PR #131 CI repair: two environment-dependent green tests
 
 Both CI reds on #131 were tests that passed locally **because of the operator's environment**,
