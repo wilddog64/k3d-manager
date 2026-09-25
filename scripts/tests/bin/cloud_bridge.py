@@ -117,3 +117,23 @@ def test_a_second_parameter_is_validated_not_just_job_id(monkeypatch):
     result, reason = bridge.validate_request(good, now=NOW)
     assert reason is None
     assert result is not None
+
+
+def test_fetch_updates_the_local_branch_ref_not_only_fetch_head(monkeypatch):
+    """git fetch origin cloud-requests writes FETCH_HEAD only — a bare branch name
+    makes git ignore the configured refspec, so refs/heads/cloud-requests went
+    stale and _write_commit's update-ref failed its old-value check on every
+    tick. The refspec must name the local ref explicitly."""
+    calls = []
+
+    def fake_spawn(argv, cwd=None, env=None, timeout=15):
+        calls.append(argv)
+        return 0, "deadbeef\n", False
+
+    monkeypatch.setattr(bridge, "_spawn_capture_text", fake_spawn)
+    bridge._fetch(Path("/nonexistent"))
+
+    fetch_argv = [argv for argv in calls if "fetch" in argv][0]
+    refspec = fetch_argv[-1]
+    assert ":" in refspec, f"fetch refspec {refspec!r} does not write a local ref"
+    assert refspec.split(":")[1] == "refs/heads/cloud-requests"

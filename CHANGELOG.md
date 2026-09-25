@@ -8,8 +8,30 @@
   webhook with the reader credential, and commits a response plus replay ledger entry.
   `bin/k3dm-cloud-request` files and optionally waits for those requests without exposing a
   credential or building a command from branch content.
+- `make init-cloud-requests`, `make install-cloud-bridge` and `make uninstall-cloud-bridge`.
+  The first seeds `origin/cloud-requests` as an **orphan** commit via git plumbing, so it never
+  touches the worktree, moves `HEAD`, or runs a pre-commit hook, and the branch carries no repo
+  code for a compromised cloud session to modify. The installer refuses to bootstrap until the
+  reader token is in the Keychain and the remote branch exists, because the bridge's
+  `--force-with-lease` requires the remote ref to be present.
 
 ### Fixed
+- The cloud request path could not complete a single round trip: both ends assumed a local
+  `refs/heads/cloud-requests` that nothing maintains. `git fetch origin cloud-requests` with a
+  bare branch name makes git **ignore the configured refspec and write only `FETCH_HEAD`**, so in
+  the bridge's bare clone the branch ref stayed at the seed commit while `parent` advanced, and
+  `update-ref <new> <old>` failed its old-value check on every tick — logging
+  `is at <seed> but expected <parent>` and never calling the webhook. `bin/k3dm-cloud-request`
+  failed the mirror image in a fresh clone, where the local ref does not exist at all
+  (`unable to resolve reference`), which is exactly the state the documented cloud-side
+  `git fetch origin cloud-requests` leaves. The bridge now fetches an explicit
+  `+refs/heads/cloud-requests:refs/heads/cloud-requests`, and the helper drops its pointless local
+  `update-ref` — the push already carries an explicit lease. The helper's no-remote-branch case
+  also leased against the empty *tree* SHA, which no remote ref can ever equal; it now leases
+  against the empty string, which git defines as "must not exist".
+- Bridge LaunchAgent template: `KeepAlive` replaces `StartInterval 60`. `main()` is a long-running
+  daemon with its own 60s loop, so the interval was the one-shot idiom applied to a persistent
+  job — it worked, but recovery from a crash waited out the interval instead of being immediate.
 - `GET /api/v1/health` answers again instead of dropping the connection. The v1.37.0 webhook
   decomposition (`925c43e7`) moved `_smoke_test_services` into `scripts/lib/webhook/smoke.py`
   and dropped its closing `return results`, so the default non-quick path returned `None` and

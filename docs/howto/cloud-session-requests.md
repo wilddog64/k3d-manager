@@ -89,6 +89,10 @@ expires is rejected, and its id is still consumed.
 
 Commit and push to `cloud-requests` only. Never open a PR from it and never merge it.
 
+The branch is an **orphan** — it shares no history with `main` or any release branch and holds
+only these three paths, never repo code. `git fetch origin cloud-requests` is enough; you do not
+need a local branch of that name, and the helper does not create one.
+
 ## Reading the response
 
 ```json
@@ -180,12 +184,34 @@ Do **not** reuse `bin/k3dm-webhook-setup` for this token. It passes the value as
 argument, and it pushes the result to a GitHub Actions secret — neither is acceptable for a
 credential whose whole purpose is that it never leaves this machine.
 
+### Bootstrapping the bridge
+
+Three make targets, in this order. `init-cloud-requests` is idempotent and creates the branch as
+an orphan commit with git plumbing, so it never touches your worktree or `HEAD` and runs no
+pre-commit hooks:
+
+```bash
+make init-cloud-requests     # seeds origin/cloud-requests (skips if it already exists)
+make install-cloud-bridge    # renders the plist and bootstraps the LaunchAgent
+```
+
+`install-cloud-bridge` refuses to run until the reader token is in the Keychain and
+`origin/cloud-requests` exists, because the bridge's `--force-with-lease` needs the remote ref to
+be there already. It must be a `gui/` agent, not a `system/` daemon: the reader token lives in
+your login Keychain, which a system daemon cannot read.
+
+A healthy tick logs **nothing** — `process_tick` is silent on success and only writes
+`[cloud-bridge] <error>`. Watch `~/Library/Logs/k3dm-cloud-bridge.log`. Because the clone and every
+fetch go over SSH to `git@github.com`, a failure with a locked Keychain or an unavailable SSH
+agent shows up as a git error, not as a webhook 401.
+
 ### Revoking cloud access
 
 One step. Bootout the bridge's launchd agent:
 
 ```bash
-launchctl bootout gui/$(id -u)/com.k3d-manager.cloud-bridge
+make uninstall-cloud-bridge
+# equivalently: launchctl bootout gui/$(id -u)/com.k3d-manager.cloud-bridge
 ```
 
 Requests already on the branch become inert — nothing reads them. The branch can stay; nothing

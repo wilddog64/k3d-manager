@@ -1805,3 +1805,20 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
       `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
       live sandbox path and needs a sandbox to verify.
+- [x] **Bootstrap the cloud bridge** — `origin/cloud-requests` seeded as an orphan (`67dc3468`,
+      parents `[]`, only `ledger/processed.txt`) and `com.k3d-manager.cloud-bridge` bootstrapped as
+      a `gui/` LaunchAgent. Added `make init-cloud-requests` / `install-cloud-bridge` /
+      `uninstall-cloud-bridge`. Fixed two blocking bugs with one root cause — `git fetch origin
+      <branch>` with a bare branch name ignores the configured refspec and writes only
+      `FETCH_HEAD`, so nothing maintained `refs/heads/cloud-requests`: the bridge's `update-ref`
+      old-value check failed every tick (before the webhook call, so nothing half-executed) and the
+      helper died with `unable to resolve reference` in any fresh clone, i.e. the documented
+      cloud-side flow. Plist switched from `StartInterval` to `KeepAlive`. Proven on the live path:
+      `cluster-status` → 202, `job-status` → 200 with output, helper exit 0.
+- [ ] **Unalerted public-path failure:** `make status CLUSTER_PROVIDER=k3s-hostinger` reports
+      Frontend 404 while all four `shopping-cart-apps` pods are Running 1/1, so `ServiceDown`
+      (`kube_pod_status_ready ... == 0`) is correctly silent. Nothing probes the public hostnames —
+      there is **no blackbox exporter anywhere in the repo** and nothing writes smoke/status results
+      to Pushgateway, so no rule can fire and no SMS can be sent. Delivery is fine
+      (`severity = critical` → `sms-critical`). Second silent failure from this same gap; the
+      blackbox-probe + `CloudflareTunnelDown` follow-up is now load-bearing.

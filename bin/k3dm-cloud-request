@@ -74,11 +74,8 @@ def _commit_request(request_id, payload):
             commit_args += ["-p", parent]
         commit_args += ["-m", "cloud request"]
         commit = _git(commit_args, env=env, timeout=30).strip()
-        ref_args = ["update-ref", "refs/heads/cloud-requests", commit]
-        if remote_ref:
-            ref_args.append(parent)
-        _git(ref_args, env=env)
-        push = ["push", "--force-with-lease=refs/heads/cloud-requests:" + parent,
+        lease = parent if remote_ref else ""
+        push = ["push", "--force-with-lease=refs/heads/cloud-requests:" + lease,
                 "origin", f"{commit}:refs/heads/cloud-requests"]
         _git(push, timeout=120)
     finally:

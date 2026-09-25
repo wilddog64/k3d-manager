@@ -1,5 +1,52 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — Cloud bridge bootstrapped and proven end to end (Claude)
+
+The operator gave the go, so `origin/cloud-requests` now exists and the bridge is live.
+
+Three new make targets: `init-cloud-requests` (seeds the branch as an **orphan** commit through
+git plumbing — `hash-object`/`update-index` on a throwaway `GIT_INDEX_FILE`/`write-tree`/
+`commit-tree` — so it never touches the worktree, moves `HEAD`, or triggers a pre-commit hook; it
+is idempotent and skips when the remote ref exists), `install-cloud-bridge` (renders the plist,
+`plutil -lint`s it, and bootstraps the `gui/` agent; refuses unless the reader Keychain item and
+the remote branch are both present), and `uninstall-cloud-bridge` (the documented revocation
+lever).
+
+The branch is an orphan on purpose: it carries only `ledger/processed.txt`, shares no history with
+any release branch, and holds no repo code that a compromised cloud session could modify into
+something executable. Seeded at `67dc3468`, parents `[]`.
+
+Two blocking bugs, both the same root cause — **`git fetch origin cloud-requests` with a bare
+branch name makes git ignore the configured refspec and write only `FETCH_HEAD`**, so nothing
+maintains `refs/heads/cloud-requests`:
+- bridge: in the bare clone the branch ref stayed at the seed while `parent` came from
+  `FETCH_HEAD`, so `_write_commit`'s `update-ref <new> <old>` failed its old-value check every
+  tick (`is at 67dc3468 but expected 0188d59b`, four identical log lines). It failed *before* the
+  push, so the webhook was never called and no ledger entry was written — the request was retried
+  intact, not half-executed. Fixed by fetching an explicit
+  `+refs/heads/cloud-requests:refs/heads/cloud-requests`.
+- `bin/k3dm-cloud-request`: `update-ref refs/heads/cloud-requests <commit> <remote parent>` in a
+  clone with no such local ref → `unable to resolve reference`. That is exactly the state the
+  how-to's own `git fetch origin cloud-requests` leaves a cloud session in, so the documented
+  flow could never have worked. The local `update-ref` was pointless (the push carries an explicit
+  lease) and is gone. Its no-remote-branch case also leased against the empty *tree* SHA, which no
+  ref can equal; now the empty string, which git defines as "must not exist".
+
+Plist template: `KeepAlive` replaces `StartInterval 60` — `main()` is a persistent daemon with its
+own 60s loop, so the one-shot idiom delayed crash recovery by up to a minute.
+
+End-to-end proof on the live path, not a mock: `cluster-status` → `http_status 202`,
+`body.job_id 4c645143`, ledger appended, response committed and pushed; then
+`job-status --arg job_id=4c645143` → `http_status 200` with the full status text and secrets
+`***REDACTED***`, helper exit 0. Branch is now `67dc3468` (seed) → `0188d59b` (request) →
+`f52041d8` (response). Agent `runs = 1`, `never exited`, log empty. The bare clone over SSH from a
+`gui/` agent worked, which answers the open SSH-agent question.
+
+Gates: `pytest` cloud_bridge + webhook_policy + webhook_make_targets + test_smoke_logins → 64
+passed, 121 subtests; `bats scripts/tests/lib/webhook.bats` → 64 ok; AST parse both bins;
+forbidden-pattern grep empty; `make check-doc-links` 1782 OK. The new refspec test was
+mutation-checked against the pre-fix source (`assert ':' in 'cloud-requests'` failed).
+
 ## 2026-09-25 — P2/P5 cloud session bridge implemented
 
 Implemented Part 2 of `v1.38.0-cloud-session-endpoint-access.md` on

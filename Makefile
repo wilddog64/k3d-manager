@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links check-repo-root test-python test-all e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links check-repo-root test-python test-all e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -413,6 +413,47 @@ uninstall-alertmanager-auth-proxy:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
 	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
 	@echo "Alertmanager auth proxy removed"
+
+## Seed the orphan cloud-requests data branch (idempotent; safe to re-run)
+init-cloud-requests:
+	@set -euo pipefail; \
+	if [ -n "$$(git ls-remote --heads origin cloud-requests)" ]; then \
+	  echo "[init-cloud-requests] origin/cloud-requests already exists — nothing to do"; \
+	  exit 0; \
+	fi; \
+	_empty=$$(git hash-object -w -t blob /dev/null); \
+	_idx=$$(mktemp -u "$${TMPDIR:-/tmp}/cloud-requests-index.XXXXXX"); \
+	trap 'rm -f "$$_idx"' EXIT; \
+	GIT_INDEX_FILE="$$_idx" git update-index --add --cacheinfo "100644,$$_empty,ledger/processed.txt"; \
+	_tree=$$(GIT_INDEX_FILE="$$_idx" git write-tree); \
+	_commit=$$(git commit-tree "$$_tree" -m "chore: seed the cloud-requests data branch"); \
+	git push origin "$$_commit:refs/heads/cloud-requests"; \
+	echo "[init-cloud-requests] origin/cloud-requests seeded at $$_commit (orphan, ledger/processed.txt only)"
+
+## Install the cloud-session request bridge LaunchAgent (reads origin/cloud-requests every 60s)
+install-cloud-bridge:
+	@set -euo pipefail; \
+	security find-generic-password -s k3dm-webhook-token-reader -a k3dm >/dev/null 2>&1 || \
+	  { echo "[install-cloud-bridge] ERROR: Keychain item k3dm-webhook-token-reader (account k3dm) not found — create it from a real terminal first; see docs/howto/cloud-session-requests.md" >&2; exit 1; }; \
+	[ -n "$$(git ls-remote --heads origin cloud-requests)" ] || \
+	  { echo "[install-cloud-bridge] ERROR: origin/cloud-requests does not exist — run: make init-cloud-requests" >&2; exit 1; }
+	sed \
+	  -e "s|{{CLOUD_BRIDGE_BIN}}|$(CURDIR)/bin/k3dm-cloud-bridge|g" \
+	  -e "s|{{K3DM_REPO_ROOT}}|$(CURDIR)|g" \
+	  -e "s|{{CLOUD_BRIDGE_LOG}}|$(HOME)/Library/Logs/k3dm-cloud-bridge.log|g" \
+	  scripts/etc/launchd/com.k3d-manager.cloud-bridge.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	plutil -lint "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	@echo "Cloud bridge installed — polling origin/cloud-requests every 60s; log: $(HOME)/Library/Logs/k3dm-cloud-bridge.log"
+
+## Revoke cloud-session access — stop and remove the bridge LaunchAgent
+uninstall-cloud-bridge:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	@echo "Cloud bridge removed — requests already on origin/cloud-requests are now inert"
 
 ## Inject SLACK_BOT_TOKEN (Keychain k3d-manager-slack-bot-token-bot) and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
 update-webhook-slack:

@@ -25,6 +25,7 @@ REQUEST_TTL_SECONDS = 30 * 60
 HTTP_TIMEOUT = min(float(os.environ.get("K3DM_CLOUD_BRIDGE_HTTP_TIMEOUT", "300")), REQUEST_TTL_SECONDS)
 ID_RE = re.compile(r"[0-9]{8}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,63}")
 JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
+FETCH_REFSPEC = "+refs/heads/cloud-requests:refs/heads/cloud-requests"
 REQUIRED_FIELDS = {"schema", "action", "args", "requested_by", "requested_at", "expires_at"}
 ACTION_ALLOWLIST = {
     "health": ("GET", "/api/v1/health", {}),
@@ -136,7 +137,7 @@ def _ensure_bare_repo(repo, root):
 
 
 def _fetch(repo):
-    _git(repo, ["fetch", "origin", "cloud-requests"], timeout=120)
+    _git(repo, ["fetch", "origin", FETCH_REFSPEC], timeout=120)
     return _git(repo, ["rev-parse", "FETCH_HEAD"]).strip()
 
 
