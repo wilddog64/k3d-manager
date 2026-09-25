@@ -133,6 +133,13 @@ are polling `health` with a short `--timeout`, raise it rather than assuming the
 It needs no credential and no environment variables beyond the git access the session already
 has. That is the practical payoff of the pull design.
 
+`--wait` works in a shallow or single-branch checkout, which is what a cloud session usually
+gets. It refreshes with an explicit `+refs/heads/cloud-requests:refs/remotes/origin/cloud-requests`
+refspec and reads the response from that ref. Do not "simplify" it to
+`git fetch origin cloud-requests`: a bare branch name writes only `FETCH_HEAD`, and in a clone
+whose refspec covers just the default branch, `origin/cloud-requests` is then never created, so
+the poll never sees a response that is sitting on the branch.
+
 ## Why it is built this way
 
 The alternative was to expose the webhook publicly behind Cloudflare Access with a service token

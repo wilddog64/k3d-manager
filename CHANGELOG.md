@@ -29,6 +29,17 @@
   `update-ref` — the push already carries an explicit lease. The helper's no-remote-branch case
   also leased against the empty *tree* SHA, which no remote ref can ever equal; it now leases
   against the empty string, which git defines as "must not exist".
+- `bin/k3dm-cloud-request --wait` could never observe a response from a shallow or single-branch
+  clone — the shape a cloud session actually runs in, and the only environment the helper exists
+  for. The poll read `origin/cloud-requests:responses/<id>.json` but refreshed with
+  `git fetch origin cloud-requests`, a bare branch name that writes only `FETCH_HEAD`. A clone
+  made with `--depth 1 --branch main` has `remote.origin.fetch` covering just `main`, so nothing
+  ever creates `refs/remotes/origin/cloud-requests` and every poll raised
+  `invalid object name`, exiting 5 after the full timeout with the response sitting on the branch.
+  A full clone hid this, because `git clone` writes every remote-tracking ref up front. The poll
+  now fetches an explicit `+refs/heads/cloud-requests:refs/remotes/origin/cloud-requests` and
+  reads the response from that same ref. This was the third distinct instance of the bare-branch
+  fetch defect in this feature; both ends now name their refs explicitly.
 - Bridge LaunchAgent template: `KeepAlive` replaces `StartInterval 60`. `main()` is a long-running
   daemon with its own 60s loop, so the interval was the one-shot idiom applied to a persistent
   job — it worked, but recovery from a crash waited out the interval instead of being immediate.

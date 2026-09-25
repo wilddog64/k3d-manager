@@ -15,6 +15,12 @@ SPEC = importlib.util.spec_from_loader("cloud_bridge", LOADER)
 bridge = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bridge)
 
+REQUEST_LOADER = importlib.machinery.SourceFileLoader(
+    "cloud_request", str(ROOT / "bin" / "k3dm-cloud-request"))
+REQUEST_SPEC = importlib.util.spec_from_loader("cloud_request", REQUEST_LOADER)
+helper = importlib.util.module_from_spec(REQUEST_SPEC)
+REQUEST_SPEC.loader.exec_module(helper)
+
 
 NOW = datetime(2026, 9, 25, 20, 14, 3, tzinfo=timezone.utc)
 
@@ -137,3 +143,16 @@ def test_fetch_updates_the_local_branch_ref_not_only_fetch_head(monkeypatch):
     refspec = fetch_argv[-1]
     assert ":" in refspec, f"fetch refspec {refspec!r} does not write a local ref"
     assert refspec.split(":")[1] == "refs/heads/cloud-requests"
+
+
+def test_request_helper_fetches_the_ref_it_reads_the_response_from():
+    """The --wait poll read `git show origin/cloud-requests:responses/<id>.json` but
+    refreshed with `git fetch origin cloud-requests` — a bare branch name, which
+    writes only FETCH_HEAD. A single-branch or shallow clone, which is what a cloud
+    session gets, has no refspec covering the branch, so origin/cloud-requests is
+    never created and --wait always exited 5 even with the response on the branch.
+    Confirmed against a real `git clone --depth 1 --branch main`."""
+    assert ":" in helper.FETCH_REFSPEC, "fetch refspec writes no local ref"
+    source, destination = helper.FETCH_REFSPEC.lstrip("+").split(":")
+    assert source == "refs/heads/cloud-requests"
+    assert destination == helper.RESPONSE_REF

@@ -41,6 +41,26 @@ directly: 13 comparisons of each new bash helper against its `awk` oracle on rea
 input all matched, with 2 negative controls failing as required to show the harness can detect a
 difference.
 
+## 2026-09-25 — Third instance of the bare-branch fetch defect, in the poll path (Claude)
+
+The operator asked whether a **cloud** Claude session could test the bridge. Checking instead of
+answering found the answer was no. `bin/k3dm-cloud-request --wait` read
+`origin/cloud-requests:responses/<id>.json` but refreshed with `git fetch origin cloud-requests` —
+a bare branch name, writing only `FETCH_HEAD`. Reproduced against a real
+`git clone --depth 1 --branch main`: `remote.origin.fetch` is
+`+refs/heads/main:refs/remotes/origin/main`, so `refs/remotes/origin/cloud-requests` is **never
+created**, every poll raises `invalid object name`, and `--wait` exits 5 after the full timeout
+with the response sitting on the branch. A full clone hides it entirely, because `git clone` writes
+every remote-tracking ref up front — which is why two live round trips from this laptop passed.
+
+That is the shape a cloud session runs in, i.e. the only environment the helper exists for. The
+poll now fetches an explicit `+refs/heads/cloud-requests:refs/remotes/origin/cloud-requests` and
+reads from that ref; proven on the same shallow clone, which then returned `status: ok http: 200`.
+Regression test added (13 total), mutation-checked: the pre-fix module has no `FETCH_REFSPEC`.
+
+Standing lesson: this is the **third** distinct occurrence of the same root cause in one feature.
+Both ends now name refs explicitly, and the how-to says not to "simplify" it back.
+
 ## 2026-09-25 — Cloud bridge bootstrapped and proven end to end (Claude)
 
 The operator gave the go, so `origin/cloud-requests` now exists and the bridge is live.

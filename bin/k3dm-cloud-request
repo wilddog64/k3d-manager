@@ -19,6 +19,8 @@ from webhook.proc import _spawn_capture_text
 ACTION_ARGS = {"health": set(), "cluster-status": set(), "hostinger-status": set(),
                "job-status": {"job_id"}}
 JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
+RESPONSE_REF = "refs/remotes/origin/cloud-requests"
+FETCH_REFSPEC = f"+refs/heads/cloud-requests:{RESPONSE_REF}"
 
 
 def _git(args, cwd=ROOT, env=None, timeout=60):
@@ -104,7 +106,7 @@ def main(argv=None):
     deadline = time.monotonic() + parsed.timeout
     while time.monotonic() <= deadline:
         try:
-            raw = _git(["show", f"origin/cloud-requests:responses/{request_id}.json"])
+            raw = _git(["show", f"{RESPONSE_REF}:responses/{request_id}.json"])
             response = json.loads(raw)
         except (RuntimeError, json.JSONDecodeError):
             response = None
@@ -113,7 +115,7 @@ def main(argv=None):
             return {"ok": 0, "rejected": 3, "error": 4}.get(response.get("status"), 4)
         time.sleep(30)
         try:
-            _git(["fetch", "origin", "cloud-requests"], timeout=120)
+            _git(["fetch", "origin", FETCH_REFSPEC], timeout=120)
         except RuntimeError:
             return 4
     return 5

@@ -1815,6 +1815,14 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       helper died with `unable to resolve reference` in any fresh clone, i.e. the documented
       cloud-side flow. Plist switched from `StartInterval` to `KeepAlive`. Proven on the live path:
       `cluster-status` → 202, `job-status` → 200 with output, helper exit 0.
+- [x] **Cloud bridge testable from a cloud session** — `--wait` was broken in exactly the clone
+      shape a cloud session gets. Third instance of the bare-branch fetch defect: the poll read
+      `origin/cloud-requests:responses/<id>.json` while refreshing with `git fetch origin
+      cloud-requests`, so in a `--depth 1 --branch main` clone `refs/remotes/origin/cloud-requests`
+      never existed and every poll exited 5 with the response on the branch. Two live round trips
+      from the laptop passed because a full clone writes all tracking refs at clone time. Fixed to
+      an explicit `+refs/heads/cloud-requests:refs/remotes/origin/cloud-requests`, verified on a
+      real shallow clone, regression test mutation-checked, how-to warns against reverting it.
 - [ ] **Unalerted public-path failure:** `make status CLUSTER_PROVIDER=k3s-hostinger` reports
       Frontend 404 while all four `shopping-cart-apps` pods are Running 1/1, so `ServiceDown`
       (`kube_pod_status_ready ... == 0`) is correctly silent. Nothing probes the public hostnames —
