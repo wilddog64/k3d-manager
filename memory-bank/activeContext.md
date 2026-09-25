@@ -1,5 +1,47 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — Tier 2 preflight rewired to the real credential loader (v1.37.0)
+
+Subtree pull of lib-foundation v0.4.18 landed in `7d786cd0` (squash `c027fe07`), range
+`023f76e5..2f244ee4`. **The subtree prefix is `scripts/lib/foundation`, not `scripts/lib/acg`** —
+the acg module is nested at `scripts/lib/foundation/scripts/lib/acg`. Verified by tree hash:
+`git rev-parse HEAD:scripts/lib/foundation` == `git rev-parse origin/main^{tree}` upstream ==
+`8b2f7956f7d9e4baf68f2c883c60b08191f56c0f`.
+
+`_e2e_sandbox_preflight_auth` (`scripts/plugins/e2e.sh:294`) rewired in `a4d6ef53`. It called
+`security find-generic-password` with no `-w` — an existence check that **succeeds when the login
+keychain is locked and when the value was stored empty**, the two states that actually break
+unattended login. It now calls `_secret_load_data` (the same loader `_cdp_ensure_acg_session`
+uses), discards the value to `/dev/null`, and on success exports
+`K3DM_ACG_REQUIRE_CREDENTIALS=1` so the session check fails closed rather than coasting on a
+human's leftover browser session. The `K3DM_ACG_SKIP_SESSION_CHECK` guard moved above the reads,
+so a refused run touches the keychain zero times.
+
+BATS `scripts/tests/plugins/e2e_sandbox_preflight.bats`: 14 tests, mutation-gated — against the
+previous implementation exactly 5 fail (locked keychain, empty value, locked-with-profile-dir, and
+the two export assertions) and the 9 pre-existing-behavior tests stay green. The suite installs a
+fake `security` executable on `PATH`; a shell-function stub is invisible to `_secret_load_data`
+because it runs `security` inside `bash -c`.
+
+Gates: `shellcheck -x` clean. `make test` plan `1..1119`, 1115 ok / 4 not ok / 10 skipped / no
+index gaps. **The 4 reds were all in `e2e_remote.bats` and were caused by unpushed local
+commits** — `e2e_runner_dispatch` verifies the SHA is on origin before reaching the stubbed
+preflight. Re-ran that suite after pushing: 80/80 green. Not a regression.
+
+Docs updated in the same commit: `docs/guides/vcluster-e2e-harness.md` gained the
+existence-vs-readability table, the fail-closed gate and the full marker list.
+
+**Doc gap found in the shipped release:** v0.4.18 documented neither
+`K3DM_ACG_REQUIRE_CREDENTIALS`, the `ACG_SESSION_OK path=` suffix, nor the `ACG_CREDENTIALS*`
+markers in lib-foundation `README.md` / `docs/api/acg.md`. Fixed upstream in `452d149` on
+`docs/v0.4.18-retrospective` — after the tag and release were already cut, so it lands as a
+follow-up. The release gate let it through.
+
+Still open: the `_robustClick` dedup across `sandbox.js` / `acg_restart.js` (needs a live sandbox —
+`sandbox.js` swallows errors with `.catch(() => {})` and `acg_restart.js` does not). The
+lib-foundation `docs/v0.4.18-retrospective` branch carries two unmerged commits (`d968af5` retro,
+`452d149` docs) with no PR yet.
+
 ## 2026-09-24 — upstream: lib-foundation v0.4.18 merged, tagged, released
 
 PR #55 merged to main (`2f244ee4`); tag v0.4.18 pushed; GitHub release created at

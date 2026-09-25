@@ -51,8 +51,14 @@
       `CHANGE.md` promoted to `[v0.4.18] — 2026-09-24` in `15bf3b7`.
 - [x] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release. Merged to main at
       `2f244ee4`; tag pushed; release at https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18.
-- [ ] Subtree pull lib-foundation v0.4.18 into scripts/lib/acg/, then rewire the Tier 2 preflight
-      in scripts/plugins/e2e.sh to the real loader / K3DM_ACG_REQUIRE_CREDENTIALS.
+- [x] Subtree pull lib-foundation v0.4.18 (prefix `scripts/lib/foundation`, NOT scripts/lib/acg) —
+      `7d786cd0`, vendored tree hash == upstream main tree `8b2f7956`. Tier 2 preflight rewired in
+      `a4d6ef53`: `_secret_load_data` instead of a keychain existence check (which passes on a
+      locked keychain and on an empty stored value), plus `export K3DM_ACG_REQUIRE_CREDENTIALS=1`
+      so the session check fails closed. 14 BATS, mutation-gated (5 fail on the old code).
+      Guide updated in the same commit.
+- [ ] Open a PR for lib-foundation `docs/v0.4.18-retrospective` (`d968af5` retro + `452d149` docs
+      for K3DM_ACG_REQUIRE_CREDENTIALS / ACG_SESSION_OK path= — undocumented in the shipped v0.4.18)
 
 ## 2026-09-24 — ACG preflight account-name fix
 
@@ -1637,8 +1643,14 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       required-approvals gate.
 - [x] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release. Merged to main at
       `2f244ee4`; tag pushed; release at https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18.
-- [ ] Subtree pull lib-foundation v0.4.18 into scripts/lib/acg/, then rewire the Tier 2 preflight
-      to the real loader / K3DM_ACG_REQUIRE_CREDENTIALS.
+- [x] Subtree pull lib-foundation v0.4.18 (prefix `scripts/lib/foundation`, NOT scripts/lib/acg) —
+      `7d786cd0`, vendored tree hash == upstream main tree `8b2f7956`. Tier 2 preflight rewired in
+      `a4d6ef53`: `_secret_load_data` instead of a keychain existence check (which passes on a
+      locked keychain and on an empty stored value), plus `export K3DM_ACG_REQUIRE_CREDENTIALS=1`
+      so the session check fails closed. 14 BATS, mutation-gated (5 fail on the old code).
+      Guide updated in the same commit.
+- [ ] Open a PR for lib-foundation `docs/v0.4.18-retrospective` (`d968af5` retro + `452d149` docs
+      for K3DM_ACG_REQUIRE_CREDENTIALS / ACG_SESSION_OK path= — undocumented in the shipped v0.4.18)
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
       `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
       live sandbox path and needs a sandbox to verify.
