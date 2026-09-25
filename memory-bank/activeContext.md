@@ -1,5 +1,24 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — `make acg-recover` added (and a correction)
+
+Chained the recovery into one target: `acg-recover: chrome-cdp acg-restart` + a recursive
+`$(MAKE) K3DM_RESUME= --no-print-directory up`. Prerequisite ordering carries the sequence, matching
+the existing `provision: ssm` precedent, which also keeps `make -n` safe to inspect.
+
+**Correction to the previous entry:** the sequence I first gave (chrome-cdp → acg-restart →
+argocd-registration) was wrong in its last step. `acg_restart` replaces the *Pluralsight sandbox
+account* and its AWS credentials only — it does not provision EC2 or install k3s. At that point there
+is no cluster to register. `bin/cluster-up` does both: Step 2 provisions, Step 10 registers with
+ArgoCD. So the third step is `make up`, and `docs/howto/acg.md` now says so explicitly.
+
+`K3DM_RESUME=` is forced empty deliberately: `cluster-up:201` clears `${_ACG_CHECKPOINT_DIR}` only
+when `K3DM_RESUME != 1`, so an exported `K3DM_RESUME=1` would let a recovery skip "Step 2 —
+Provisioning 3-node cluster" against a sandbox where nothing exists. Verified with a scratchpad probe
+makefile (per [[reference_double_dollar_make_runs_help_and_emdash]], `make -n` executes `$(MAKE)`
+lines, so a probe is the safe way to check): `$(MAKE)` expands to the real binary, the override wins
+over an exported `K3DM_RESUME=1`, and `-n` propagates into the nested make.
+
 ## 2026-09-25 — `make acg-restart` added
 
 `acg_restart` was the only ACG recovery function without a make target (`creds`, `chrome-cdp`,

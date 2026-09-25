@@ -100,8 +100,34 @@ make acg-restart URL="https://app.pluralsight.com/cloud-playground/cloud-sandbox
 - The first Pluralsight login of a session is manual, so this needs a **real TTY**. It cannot be run
   from a non-interactive agent or CI shell.
 
-A fresh sandbox gets a new public IP, so the `ubuntu-k3s` context still points at the old address.
-Follow the restart with `make argocd-registration` to re-register the app cluster with ArgoCD.
+`acg_restart` replaces the **Pluralsight sandbox account** and its AWS credentials. It does not
+provision the EC2 instance or install k3s — that is `make up` (Step 2), which also re-registers the
+app cluster with ArgoCD (Step 10). So the full recovery is three commands:
+
+```bash
+make chrome-cdp     # regenerates and loads the CDP launchd agent
+make acg-restart    # new sandbox + fresh credentials
+make up             # provision EC2, install k3s, register with ArgoCD, deploy the stack
+```
+
+`make argocd-registration` is *not* the step to reach for here — there is no cluster to register
+until `make up` has run. It is for re-registering an existing cluster whose IP changed.
+
+### 4b. One-Shot Recovery
+
+`make acg-recover` chains all three:
+
+```bash
+make acg-recover
+```
+
+It runs `chrome-cdp`, then `acg-restart`, then `make up` — and forces `K3DM_RESUME=` empty for that
+final step. That matters: `cluster-up` clears its lifecycle checkpoints only when `K3DM_RESUME` is
+not `1`, so with `K3DM_RESUME=1` exported in your shell a recovery would happily skip "Step 2 —
+Provisioning 3-node cluster" against a sandbox where nothing exists yet. The override neutralises an
+exported value, so `acg-recover` always provisions from scratch.
+
+`URL=` and `PROVIDER=` pass through to `acg-restart` as above.
 
 ### 5. Teardown
 

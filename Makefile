@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links check-repo-root test-python test-all e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links check-repo-root test-python test-all e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -187,6 +187,10 @@ chrome-cdp-stop:
 ## Recover an expired ACG sandbox: delete it, start a fresh one, re-extract credentials (URL=<sandbox-url> PROVIDER=aws|gcp|azure; needs a TTY on first login)
 acg-restart:
 	scripts/k3d-manager acg_restart "$(URL)" "$(PROVIDER)"
+
+## End-to-end ACG recovery: Chrome CDP agent, fresh sandbox + credentials, then a full clean `make up` (URL=/PROVIDER= as for acg-restart; needs a TTY)
+acg-recover: chrome-cdp acg-restart
+	@$(MAKE) K3DM_RESUME= --no-print-directory up
 
 ## Re-register ubuntu-k3s app cluster with ArgoCD (after sandbox recreation or IP change)
 argocd-registration:
@@ -855,6 +859,7 @@ help:
 	@echo "    make chrome-cdp    Install Chrome CDP launchd agent (automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
 	@echo "    make acg-restart   Recover an expired sandbox: delete, recreate, re-extract creds (needs a TTY)"
+	@echo "    make acg-recover   Full recovery: chrome-cdp + acg-restart + a clean make up (needs a TTY)"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
 	@echo "    make cleanup-stale-sandbox  Preview/remove stale AWS sandbox local state (CONFIRM=1 to remove)"
 	@echo "    make cleanup-stale-clusters Preview/remove expired managed ArgoCD registrations (CONFIRM=1 to remove)"

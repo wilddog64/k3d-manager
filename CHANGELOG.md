@@ -5,6 +5,9 @@
 ## [1.37.0] - 2026-09-24
 
 ### Added
+- `make acg-recover` chains the whole sandbox recovery: `chrome-cdp`, `acg-restart`, then a
+  recursive `make up` with `K3DM_RESUME=` forced empty so an exported `K3DM_RESUME=1` cannot make
+  `cluster-up` reuse checkpoints from the dead sandbox and skip provisioning.
 - `make acg-restart` wraps `acg_restart`, the recovery path for an already-expired ACG sandbox
   (delete, recreate via Playwright/CDP, re-extract credentials). It was the only ACG recovery
   function without a make target, which is the one you reach for under pressure. Accepts
