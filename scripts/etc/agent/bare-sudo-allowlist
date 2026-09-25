@@ -1,3 +1,0 @@
-# Files allowed to contain literal sudo invocations (reviewed + justified).
-# Keep in sync with lib-foundation upstream.
-scripts/lib/system.sh

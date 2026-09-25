@@ -62,18 +62,8 @@ _agent_audit() {
    fi
 
    local status=0
-   local diff_bats=""
-   local -a audit_bats_files=()
-   local bats_file=""
-   while IFS= read -r bats_file; do
-      [[ -z "$bats_file" ]] && continue
-      [[ "$bats_file" == scripts/lib/acg/* ]] && continue
-      audit_bats_files+=("$bats_file")
-   done < <(git diff --cached --name-only -- '*.bats' 2>/dev/null || true)
-
-   if (( ${#audit_bats_files[@]} > 0 )); then
-      diff_bats="$(git diff --cached -- "${audit_bats_files[@]}" 2>/dev/null || true)"
-   fi
+   local diff_bats
+   diff_bats="$(git diff --cached -- '*.bats' 2>/dev/null || true)"
    if [[ -n "$diff_bats" ]]; then
       if grep -q '^-[[:space:]]*assert_' <<<"$diff_bats"; then
          _warn "Agent audit: assertions removed from BATS files"
@@ -227,7 +217,7 @@ _agent_lint() {
    fi
 
    local staged_files
-   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null || true)"
+   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' '*.js' '*.md' 2>/dev/null || true)"
    if [[ -z "$staged_files" ]]; then
       return 0
    fi
@@ -239,7 +229,7 @@ _agent_lint() {
    fi
 
    local prompt
-   prompt="Review the following staged shell files for architectural violations.\n\nRules:\n$(cat "$rules_file")\n\nFiles:\n$staged_files"
+   prompt="Review the following staged files for architectural violations.\n\nRules:\n$(cat "$rules_file")\n\nFiles:\n$staged_files"
 
    "$ai_func" -p "$prompt"
 }
