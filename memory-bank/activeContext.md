@@ -1,5 +1,43 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — Cloudflare tunnel outage (restored) + the ACG sandbox is gone
+
+Operator reported Cloudflare **1033** on `grafana.3ai-talk.org`. Cause: the third `make up`
+failure at 02:44:58Z ran `cleaning up local processes...` and unloaded the
+`com.k3d-manager.cloudflare-tunnel` LaunchAgent — the single ingress for all **7** public
+hostnames, not just Grafana. Plist present and still *enabled*, just not bootstrapped, so
+nothing retried it. Restored 12:16:51Z with `launchctl bootstrap gui/$(id -u)`; all 7 probes
+now match their loopback status codes.
+
+Also down for those 9.5h: both Alertmanager webhook receivers post to
+`https://webhook.3ai-talk.org` (`k3dm-analyze`, `k3dm-cve-remediate`), so CVE auto-remediation
+was dead — `notifications_failed_total{webhook,serverError}=95/142`, frozen at 95 on restore,
+next remediation job 5s later.
+
+**No alert fired because nothing watches the tunnel** — no blackbox exporter, no rule
+referencing a public hostname/`probe_*`/tunnel. The text path itself is healthy
+(`sms-critical` = email_configs, 19 sent / 0 failed). Note the root route receiver is `null`,
+so a future rule needs an explicit route or it is silently dropped.
+
+Filed `docs/issues/2026-09-25-cloudflare-tunnel-killed-by-make-up-cleanup-no-alert.md` with
+three follow-ups, none started: add the probe + `CloudflareTunnelDown` rule; stop `cluster-up`
+cleanup from unloading the public tunnel; fix the unhandled `RuntimeError` in
+`bin/k3dm-webhook` `_create_cve_scan_job` on an already-existing job (raises out of `do_POST`
+→ 500 → counted as serverError).
+
+**The ACG sandbox is unreachable** — the `ubuntu-k3s` context points at `34.218.59.16:6443`
+and now times out (it answered ~30m earlier). `make up` cannot be resumed and Tier 2
+`make e2e-sandbox` stays blocked until the sandbox is restarted (needs the operator's TTY).
+
+### Duplicate cluster name — FIXED and verified live
+`ac3ebb82` renamed the hub self-registration to `k3d-cluster`
+(`HUB_RECOVERY_HUB_CLUSTER_NAME` override); the live Secret `ubuntu-k3s-app-cluster` was
+patched to match (backup: scratchpad `ubuntu-k3s-app-cluster.before.yaml`). All four AppSets
+now report "All applications have been generated successfully"; the 8 previously-impossible
+Applications exist (`ubuntu-k3s-data-layer`, the 6 services, `ubuntu-k3s-grafana-dashboards`),
+and the hub's orphaned ESO is re-adopted by `k3d-cluster-eso`. The ACG-side apps are
+`OutOfSync/Missing` only because the sandbox is unreachable.
+
 ## 2026-09-24 — ACG app tier blocked by a duplicate cluster name (owner decision needed)
 
 `make up CLUSTER_PROVIDER=k3s-aws` failed at Step 10b/14 a third time. The label fix
