@@ -14,9 +14,18 @@
 | 23 | `py/path-injection` | high | `scripts/lib/webhook/proc.py:38` |
 | 24 | `py/path-injection` | high | `bin/k3dm-webhook:991` |
 
-Both locations are the `os.posix_spawn(...)` call in a capture helper. Alert 25
-(`py/clear-text-logging-sensitive-data`, `bin/k3dm-hermes:451`) is **not** in this set — it is
-main's pre-existing alert 22 at a shifted line, and is left open like its predecessor.
+Both locations are the `os.posix_spawn(...)` call in a capture helper.
+
+Alert 25 (`py/clear-text-logging-sensitive-data`, high, `bin/k3dm-hermes:451`) is a separate
+finding analysed in its own section below.
+
+### Correction
+
+An earlier reading of this PR recorded alert 25 as main's pre-existing alert 22 at a shifted
+line. **That was wrong.** Main's alert 22 is at `bin/k3dm-hermes:469`,
+`print(json.dumps(report, sort_keys=True))` in the `preflight` dispatch — a different sink
+carrying different data. Alert 25 is genuinely new to this PR. The mistake came from matching
+on rule id and file rather than on the sink.
 
 ## Why these are not exploitable
 
@@ -73,6 +82,40 @@ Any of the following would turn these back into true positives — re-open the a
   or that is not anchored with `fullmatch`;
 - a new caller of `_spawn_capture_text` / `_posix_spawn_capture` that bypasses
   `parse_make_request` for argv it builds from a request body.
+
+## Alert 25 — `py/clear-text-logging-sensitive-data` at `bin/k3dm-hermes:451`
+
+> This expression logs sensitive data (secret) as clear text.
+
+The sink is `print(json.dumps({"records": records, ...}))`. **Main carries the identical sink**
+at `bin/k3dm-hermes:443` and it is not flagged there, so this alert is new to v1.37.0 — it
+appeared because of what now flows *into* `records`, not because the print changed.
+
+The new contributor is the `alert_delivery` sensor added by `03b875c5`:
+
+```python
+f"{name}: configSecret {item.get('config_secret', 'unset')} absent"   # sensors.py:277
+```
+
+`config_secret` is the **name** of a Kubernetes Secret, read from `.spec.configSecret` of the
+Alertmanager CR (`bin/k3dm-alert-delivery-status:34`). The probe uses it only to test that the
+Secret exists:
+
+```bash
+kubectl --context "${context}" -n monitoring get secret "${config_secret}" >/dev/null 2>&1
+```
+
+Output is discarded; the Secret's contents are never read, and nothing derived from them enters
+the payload. CodeQL's clear-text-logging heuristic classifies the source as a secret from the
+*identifier name* `config_secret`, not from any value flow.
+
+A Secret's name is not sensitive — it appears in every manifest that references it and in
+ordinary `kubectl get` output. So this is a false positive, but note it is a **name-based
+heuristic** false positive, a different class from the four injection alerts above, and one that
+will re-fire on any future field named `*_secret` that carries a reference rather than a value.
+
+**This alert alone fails the PR's CodeQL check** — the check reports "1 new alert including
+1 high severity" after the four injection alerts were dismissed.
 
 ## Process note
 

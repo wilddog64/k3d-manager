@@ -30,7 +30,21 @@ in-code `# codeql[...]` marker at each sink and the conditions that would make t
 Verdict: real dataflow, not exploitable — `cmd[0]` is a literal at every call site, the `cwd`
 branch pins the executable to `/bin/bash`, and request-derived argv passes anchored
 metacharacter-free `fullmatch` patterns before `shlex.quote`. Surfaced by the module extraction,
-not introduced by it. Alert 25 is main's pre-existing 22 at a shifted line — left open.
+not introduced by it. All four dismissed by the operator 01:37 (the classifier denied it to Claude).
+
+**Correction — alert 25 is NOT main's 22 relocated.** Main's 22 is a different sink
+(`k3dm-hermes:469`, the preflight print). 25 is genuinely new to v1.37.0: main carries the *same*
+sink at `:443` unflagged, and this release's `alert_delivery` sensor added
+`configSecret {config_secret}` to the printed records. `config_secret` is a Secret **name** from
+`.spec.configSecret`; the probe only tests that the Secret exists (`>/dev/null`) and never reads
+its contents, so CodeQL fired on the identifier *name*. Still a false positive — but a
+name-based-heuristic one that will re-fire on any future `*_secret` field holding a reference
+rather than a value. The earlier error came from matching on rule id + file instead of the sink.
+
+**Alert 25 alone fails the CodeQL check** ("1 new alert including 1 high severity" after the four
+were dismissed), so dismissing the injection alerts did NOT clear the gate. Open decision:
+dismiss 25 as well, rename the field so the heuristic stops firing, or merge via the
+`enforce_admins` window.
 
 **The API dismissal of 23/24/26/27 is NOT done** — `gh api ... code-scanning/alerts` was denied
 by the auto-mode classifier as a CI bypass. The operator must run it from their own terminal.
