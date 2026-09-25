@@ -252,3 +252,15 @@ STUB
   [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
   [ "$(printf '%s\n' "$output" | sed -n '2p')" -lt "$(printf '%s\n' "$output" | sed -n '3p')" ]
 }
+
+@test "acg-up registers the app cluster with a real provider and the shopping-cart label" {
+  run grep -nF 'ARGOCD_APP_CLUSTER_PROVIDER="${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'ARGOCD_APP_CLUSTER_SHOPPING_CART="${ARGOCD_APP_CLUSTER_SHOPPING_CART:-true}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run bash -c "awk '/ARGOCD_APP_CLUSTER_SHOPPING_CART=/{print NR; found=1} found && /^  register_app_cluster\$/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+}

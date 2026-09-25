@@ -46,6 +46,15 @@
 - The shopping-cart stack is now **opt-in per app cluster**. `data-git` and `services-git` require `k3d-manager/shopping-cart: "true"` in addition to `k3d-manager/role: app-cluster`, and `register_app_cluster` emits that label from `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). A hub registered as its own app cluster — the designed single-cluster mode — therefore keeps its External Secrets Operator install and ACG Grafana dashboards while no longer syncing the shopping-cart data layer or payment stack onto itself. The `eso` and `grafana-dashboards-acg` ApplicationSets are deliberately left selecting on the role label alone: `eso` generates the hub's entire ESO install (3 Deployments, 21 CRDs, 5 ClusterRoles) and carries the ArgoCD resources finalizer, so removing the registration Secret — the approach this replaces — would have deleted the `externalsecrets` and `clustersecretstores` CRDs, every ExternalSecret CR in the cluster, and the owner-referenced Secrets behind Grafana admin, Keycloak, LDAP, `ghcr-pull-secret` and all postgres / redis / rabbitmq / minio credentials. `docs/architecture/shopping-cart-deployment.md` gains a section on why `ubuntu-k3s` is a role alias rather than a place, the four ApplicationSets that select the role label, and how they differ in `preserveResourcesOnDeletion`.
 
 ### Fixed
+- `bin/cluster-up` now passes `ARGOCD_APP_CLUSTER_PROVIDER` and
+  `ARGOCD_APP_CLUSTER_SHOPPING_CART=true` when registering the ACG app cluster. It previously
+  passed only the token, so `register_app_cluster` applied its defaults and the sandbox was
+  registered with `provider: unknown` and `shopping-cart: "false"`. The `data-git` and
+  `services-git` ApplicationSets select on `shopping-cart: "true"`, so no
+  `ubuntu-k3s-data-layer` Application was ever generated and Step 10b/14 waited ~8 minutes for
+  an Application that could not exist, failing the provision and taking the Keycloak + LDAP
+  identity stack and ACG observability with it. Third instance of this defect on the same two
+  labels — the previous two were fixed only on the hostinger caller.
 - `bin/cluster-up` now restarts the ArgoCD browser HTTPS listener when its **wrapper** changes,
   not only when the plist does. The plist names the wrapper path but never its contents, so it
   stays byte-identical across any wrapper rewrite and the `diff -q` short-circuit skipped the

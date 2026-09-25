@@ -765,6 +765,8 @@ kubectl label namespace cicd istio-injection=enabled --overwrite --context k3d-k
 kubectl config use-context k3d-k3d-cluster >/dev/null
 _acg_repair_hub_host_alias
 ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
+  ARGOCD_APP_CLUSTER_PROVIDER="${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}" \
+  ARGOCD_APP_CLUSTER_SHOPPING_CART="${ARGOCD_APP_CLUSTER_SHOPPING_CART:-true}" \
   register_app_cluster
 if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then
   configure_vault_app_auth_for_context "${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}" || true

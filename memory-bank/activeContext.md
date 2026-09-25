@@ -1,5 +1,32 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — ACG registration labels: the third instance of the same defect
+
+`make up` cleared Step 4c after the listener fix, then failed at **Step 10b/14**: the data-layer
+ArgoCD Application never Synced because it **was never generated**. `ubuntu-k3s-data-layer` does
+not exist on the hub; `ubuntu-hostinger-data-layer` is Synced/Healthy beside it.
+
+Cause: `bin/cluster-up:767` passed only `ARGOCD_APP_CLUSTER_TOKEN` to `register_app_cluster`, so
+the defaults applied — `provider: unknown`, `shopping-cart: "false"`. `data-git` and
+`services-git` select `shopping-cart: "true"`, so ubuntu-k3s was excluded and an ~8-minute wait
+loop polled for an Application that could not appear. Steps 10c–14 (Keycloak + LDAP identity,
+ClusterSecretStore, ACG observability) never ran.
+
+**This is the same two labels as `2026-09-23-hostinger-registration-never-sets-provider-label.md`
+and `2026-09-24-hostinger-registration-resets-shopping-cart-label.md`** — both fixed on the
+hostinger caller only. `register_app_cluster` has two callers and its defaults are wrong for
+both. Fixed by passing both labels (provider from the already-normalized `_cluster_provider`).
+Gated in `cluster_up.bats` (12/12, mutation-proven). Filed
+`docs/bugs/2026-09-24-cluster-up-registration-omits-provider-and-shopping-cart-labels.md`.
+
+Three open items recorded there, none touched: (1) **two** cluster secrets exist for ubuntu-k3s —
+`cluster-ubuntu-k3s` (provider `unknown`) and `ubuntu-k3s-app-cluster` (provider `k3d`) — and
+`_istio_ambient_target_provider` returns whichever it hits first, so ambient CNI dirs depend on
+iteration order and `k3d` would win with k3d-shaped paths on an AWS cluster; deleting a cluster
+secret is load-bearing for ESO and four AppSets, so it needs the operator's call. (2) the Step 10b
+error prints an empty `--context `. (3) the wait loop cannot tell "not yet Synced" from "will
+never exist".
+
 ## 2026-09-24 — sandbox provisioned; cluster-up's listener guard fixed
 
 `make up CLUSTER_PROVIDER=k3s-aws` brought the ACG sandbox up: CloudFormation stack created,
