@@ -1592,6 +1592,20 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       4 -> **0**, `node --check` clean x2, `make bats` **138/138 exit 0**.
 - [x] Codex-reported bats red (case 16, missing-aws-CLI) investigated, not dismissed: does not
       reproduce on the host; the test skips on `aws` in `/usr/bin:/bin`, a sandbox-only difference.
-- [ ] Operator live `credential-test` run (TTY + CDP required; operator-only)
+- [x] Operator live `credential-test` run (TTY + CDP required; operator-only) — RAN 2026-09-24.
+      Credentials confirmed `username=present password=present`; reached `path=auto-login`;
+      auto-login FAILED on `locator.click` timeout. The instrumentation's first real catch: the
+      old bare `ACG_SESSION_EXPIRED` had been hiding a login path that has never worked.
+- [x] Bug filed: `docs/bugs/2026-09-24-acg-pluralsight-login-click-preconditions.md` — **`b48ad1c4`**,
+      local == origin. 4 defects in `playwright/lib/pluralsight_login.js`; root cause explicitly
+      NOT reproduced (a CDP probe disproved the "never stable" hypothesis).
+- [ ] Login fix — dispatched to `codex exec` (background). Scope: `pluralsight_login.js`, its jest
+      suite, `CHANGE.md`. Mutation check mandatory. VERIFY on return: SHA on origin, `--stat`
+      scope, jest count > 32, both mutation runs, bats 138.
+- [ ] Operator re-runs `credential-test` — the ONLY gate that can confirm the login fix.
+      Cannot be delegated; until it passes the fix is plausible, not confirmed.
 - [ ] PR + merge + tag v0.4.18 — needs the user's go
 - [ ] Subtree pull into k3d-manager, then rewire the Tier 2 preflight to the real loader
+- [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
+      `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
+      live sandbox path and needs a sandbox to verify.

@@ -3548,3 +3548,46 @@ Pending: operator runs the live `credential-test` gate (theirs alone — needs a
 browser; close the stray Pluralsight "Sign In" tab first), then PR + merge + tag v0.4.18 on the
 user's go, then a subtree pull into k3d-manager. Only after that can the Tier 2 preflight in
 `scripts/plugins/e2e.sh` swap its Keychain-existence check for the real loader.
+
+# 2026-09-24 — the v0.4.18 instrumentation paid off on its first live run: headless auto-login has NEVER worked
+
+The operator ran `make credential-test` twice (with and without `K3DM_ACG_REQUIRE_CREDENTIALS=1`).
+Both runs behaved identically, which also confirms the new gate does not false-positive when
+credentials are present. Output, in order: `ACG_CREDENTIALS: username=present password=present`
+(the `53e96ba7` Keychain fix is confirmed through the real loader), then the session was NOT
+authenticated, so execution reached `path=auto-login` — the branch we had assumed was unreachable
+on demand — and then `auto-login error: locator.click: Timeout 30000ms exceeded` on
+`input[type="password"]`, `waiting for element to be visible, enabled and stable`.
+
+**Under the old code this printed a bare `ACG_SESSION_EXPIRED` and the only reasonable reading was
+"session expired, sign in again." The truth is headless auto-login has never succeeded.** That is
+exactly the class of false-green the observability work was built to break.
+
+Bug filed upstream (cap-exempt, dedup cleared — no colliding slug among the 19 existing files):
+`lib-foundation/docs/bugs/2026-09-24-acg-pluralsight-login-click-preconditions.md` at **b48ad1c4**,
+local == origin. Four defects in `playwright/lib/pluralsight_login.js`: (D1) `fillIfVisible` clicks
+a text input before filling it, adding the *stable* + in-viewport preconditions that `fill()` does
+not require — that click is the statement that timed out; (D2) `isVisible({timeout})` never waits,
+so the 5000 is inert and a still-rendering field is silently "absent"; (D3) both call sites discard
+the return value, so the form submits blind and surfaces only a generic `login_failed`; (D4) the
+submit click ignores the `_robustClick` dispatch precedent — this is the ONE file in the subsystem
+that never received it, after the same defect recurred 3x from narrow per-file fixes.
+
+**Honest limit recorded in the doc: the root cause is NOT reproduced.** A read-only CDP probe found
+the field visible, enabled, editable, stable (identical bounding boxes), `pointer-events: auto`,
+`animation: none`, `elementFromPoint` returning the input itself — which DISPROVES the "the form
+animates so it is never stable" hypothesis. The fix is precondition reduction plus documented
+precedent, not a confirmed root cause. Claude cannot verify it: doing so means driving a real login
+with the operator's credentials. **Only the operator's `credential-test` re-run is the gate.**
+
+Dispatched to `codex exec` (background, workspace-write + network, launched with `-C` from
+lib-foundation, `NPM_CONFIG_CACHE` pre-set for the known `~/.npm` denial). Clean startup confirmed.
+Scope: 3 files only (`pluralsight_login.js`, its existing jest suite, `CHANGE.md`). The handoff
+makes the mutation check mandatory — each new test must be shown RED against pre-fix source — and
+forbids PR/merge/main/force-push/`--no-verify`/`git add -A`. Unifying the two existing
+`_robustClick` copies is explicitly OUT of scope: `sandbox.js` swallows errors with
+`.catch(() => {})` and `acg_restart.js` does not, so collapsing them would silently change the live
+sandbox-provisioning path that cannot be tested without a live sandbox.
+
+Verify on return per the standing rule: SHA on origin, `--stat` scope, jest count risen above 32,
+both mutation-check runs, bats 138.
