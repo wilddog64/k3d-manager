@@ -57,8 +57,14 @@
       locked keychain and on an empty stored value), plus `export K3DM_ACG_REQUIRE_CREDENTIALS=1`
       so the session check fails closed. 14 BATS, mutation-gated (5 fail on the old code).
       Guide updated in the same commit.
-- [ ] Open a PR for lib-foundation `docs/v0.4.18-retrospective` (`d968af5` retro + `452d149` docs
-      for K3DM_ACG_REQUIRE_CREDENTIALS / ACG_SESSION_OK path= — undocumented in the shipped v0.4.18)
+- [x] Open a PR for lib-foundation `docs/v0.4.18-retrospective` — **PR #56**, CI 3/3 green.
+      Copilot found three real gaps (verified against `acg_session_check.js`, not taken on faith):
+      the marker table omitted `path=manual-login` (emitted at line 120), `docs/api/acg.md` had the
+      same omission, and the retro cited `path=pluralsight_login` — a value emitted nowhere. Fixed
+      in `78eacbe2`, all three threads replied to and resolved. `CHANGE.md` entry added in
+      `1077361`. The same omission was mirrored in k3d-manager's harness guide and fixed in
+      `4376a6ec`.
+- [x] Open the v1.37.0 PR — **PR #131** (`4376a6ec`), Copilot requested, CI running at handoff.
 
 ## 2026-09-24 — ACG preflight account-name fix
 
@@ -1649,8 +1655,14 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       locked keychain and on an empty stored value), plus `export K3DM_ACG_REQUIRE_CREDENTIALS=1`
       so the session check fails closed. 14 BATS, mutation-gated (5 fail on the old code).
       Guide updated in the same commit.
-- [ ] Open a PR for lib-foundation `docs/v0.4.18-retrospective` (`d968af5` retro + `452d149` docs
-      for K3DM_ACG_REQUIRE_CREDENTIALS / ACG_SESSION_OK path= — undocumented in the shipped v0.4.18)
+- [x] Open a PR for lib-foundation `docs/v0.4.18-retrospective` — **PR #56**, CI 3/3 green.
+      Copilot found three real gaps (verified against `acg_session_check.js`, not taken on faith):
+      the marker table omitted `path=manual-login` (emitted at line 120), `docs/api/acg.md` had the
+      same omission, and the retro cited `path=pluralsight_login` — a value emitted nowhere. Fixed
+      in `78eacbe2`, all three threads replied to and resolved. `CHANGE.md` entry added in
+      `1077361`. The same omission was mirrored in k3d-manager's harness guide and fixed in
+      `4376a6ec`.
+- [x] Open the v1.37.0 PR — **PR #131** (`4376a6ec`), Copilot requested, CI running at handoff.
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
       `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
       live sandbox path and needs a sandbox to verify.

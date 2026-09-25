@@ -1,5 +1,43 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — v1.37.0 PR #131 opened; lib-foundation PR #56 opened
+
+**k3d-manager PR #131** (`k3d-manager-v1.37.0` → `main`, head `4376a6ec`, 90 commits). Copilot
+requested; CI was still running at handoff, so the PR gates are **not** complete and
+`enforce_admins` has **not** been touched.
+
+Release doc prep landed in `4376a6ec` after the pre-flight found four gaps — worth recording
+because each was a silent omission, not a judgement call:
+
+- CHANGELOG carried only `[Unreleased]` on a *milestone* branch. Four landed changes were
+  unrecorded: the Tier 2 readability rewire, the v0.4.18 subtree pull, the `PLAYWRIGHT_AUTH_DIR`
+  drift and the empty-`mktemp` derived-path fix with its `check-repo-root` gate. Added, then
+  promoted to `## [1.37.0] - 2026-09-24` with `[Unreleased]` kept empty above it.
+- README releases table and `docs/releases.md` had no v1.37.0 row; v1.34.0 demoted into the
+  `<details>` block to hold the table at three.
+- `docs/api/functions.md` was missing **both** public functions this release adds —
+  `app_cve_scan_trigger` and `argocd_reconcile_app_cluster_registrations`.
+- The harness guide's ACG marker table listed two `path=` values. `acg_session_check.js` emits
+  **three**: `manual-login` at line 120, reachable when `K3DM_NONINTERACTIVE` is unset and stdout
+  is a TTY. A reader treating the table as exhaustive would misread a real marker.
+
+**lib-foundation PR #56** (`docs/v0.4.18-retrospective` → `main`), CI 3/3 green, three Copilot
+threads fixed and resolved. Copilot found the *same* `manual-login` omission upstream, plus a
+fabricated `path=pluralsight_login` in the retro — a value emitted nowhere, which a consumer
+keying off it would never match. Verified against the source before accepting each finding
+(`path=` is emitted only at lines 83, 98, 120). Fixes in `78eacbe2`; `CHANGE.md` entry `1077361`.
+
+Note for anyone writing a `path=`-matching gate: **accept `auto-login` alone** when the claim is
+that *unattended* login works. `manual-login` means a human signed in during the run, and
+`existing-session` means none was attempted — either would make a broken auto-login look green,
+which is the exact failure the `path=` suffix was added to expose.
+
+lib-foundation `main` is **ruleset-protected** (`deletion`, `non_fast_forward`,
+`copilot_code_review`) — `branches/main/protection` 404s by design, there is no `enforce_admins`
+lever and no required-approvals gate, so `/create-pr` step 7 does not apply to PR #56. It applies
+to PR #131 and is still pending CI.
+
+
 ## 2026-09-24 — Tier 2 preflight rewired to the real credential loader (v1.37.0)
 
 Subtree pull of lib-foundation v0.4.18 landed in `7d786cd0` (squash `c027fe07`), range
