@@ -1608,8 +1608,17 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] **Mutation check PASSED exactly** — pre-fix source swapped in by file copy (not `git stash`,
       which is what failed for Codex): **4 failed / 32 passed**. The 4 new tests are all real
       guards; the 32-test baseline undisturbed.
-- [ ] Operator re-runs `credential-test` — the ONLY gate that can confirm the login fix.
-      Cannot be delegated; until it passes the fix is plausible, not confirmed.
+- [x] Operator re-ran `credential-test` — **the click hang is GONE**. New diagnostic fired:
+      `ACG_LOGIN_FIELDS_MISSING: email=missing password=filled`.
+- [x] **D5 root cause REPRODUCED and fixed — `7801ff4`**, local == origin. The email field is
+      `type="text" name="Username" id="Username"`; CSS attribute VALUES are case-sensitive, so
+      every arm of the old `EMAIL_SELECTOR` missed. Measured via Playwright's own engine on the
+      live form: **OLD count=0, NEW count=1**. Fixing D1-D4 did not fix login, it revealed this.
+- [x] D5 gates: jest **39** (from 36); mutation check **3 failed / 36 passed** vs old selector;
+      `npm run check` clean; `make bats` **138/0/0**; live probe 0 -> 1. Captcha ruled out
+      (`ShowCaptcha="False"`, 0 reCAPTCHA iframes) so unattended login is feasible.
+- [ ] Operator re-runs `credential-test` a 3rd time — expect `ACG_SESSION_OK path=auto-login`.
+      Still the ONLY gate that can confirm auto-login actually works end to end.
 - [ ] PR + merge + tag v0.4.18 — needs the user's go
 - [ ] Subtree pull into k3d-manager, then rewire the Tier 2 preflight to the real loader
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —

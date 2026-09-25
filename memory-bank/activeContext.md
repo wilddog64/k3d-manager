@@ -3628,3 +3628,50 @@ login fix onto its own `fix/` branch before the PR. Awaiting the user's call —
 
 Minor residue, deliberately not churned on a verified tree: `_robustClick` is exported but no test
 imports it directly. Folded into the `_robustClick` dedup follow-up.
+
+# 2026-09-24 — D5: the REAL root cause, reproduced. EMAIL_SELECTOR never matched (7801ff4)
+
+The operator re-ran `credential-test` after the D1-D4 fix. **The 30s click hang is gone**, and the
+new D3 diagnostic immediately earned its keep:
+
+    ACG_CREDENTIALS: username=present password=present
+    ACG_LOGIN_FIELDS_MISSING: email=missing password=filled
+
+Password filled, email never matched. A read-only CDP probe of the live signin form:
+email field is **`type="text" name="Username" id="Username"`** — PascalCase, an ASP.NET identity
+form. Every arm of `input[type="email"], input[name="username"], input[name="email"]` misses:
+wrong type; no `email` field; and `[name="username"]` fails because **CSS attribute VALUES are
+case-sensitive even though attribute NAMES are not.** That is the trap.
+
+Measured through **Playwright's own** selector engine (checked separately from native
+`querySelectorAll`, since Playwright implements its own CSS parser) on the live page:
+**OLD count=0, NEW count=1 firstVisible=true.** `count=0` against a fully rendered visible form is
+the bug reproduced end to end. Unlike D1-D4 this is a genuine root cause, not precondition
+reduction.
+
+Also probed because it would have flipped the verdict: **`ShowCaptcha` is `"False"` with zero
+reCAPTCHA iframes** — no captcha armed, so unattended login is actually feasible.
+
+**Key lesson for the record: fixing D1-D4 did not fix login — it REVEALED what was broken.** D2's
+non-waiting `isVisible()` returned false for the unmatched email locator and D3 discarded it, so
+the form submitted with only a password and died as a generic `login_failed`. The selector bug sat
+behind the precondition bugs. The observability work has now converted two successive false
+diagnoses ("session expired", then "login failed") into the actual defect.
+
+Fix `7801ff4`, local == origin: EMAIL_SELECTOR gains the ` i` flag on every name/id arm plus an
+`[id="username" i]` arm. Gates measured by Claude: jest **39** (from 36); mutation check **3 failed
+/ 36 passed** against the old selector; `npm run check` clean; `make bats` **138 ok / 0 not ok / 0
+skips**; live probe 0 -> 1.
+
+Honest coverage limit, recorded in the bug doc: jest here has **no DOM** (offline suite, no
+`jest-environment-jsdom`), so the 3 new tests assert the selector's SHAPE as disappearance gates,
+not CSS matching. Installing jsdom for one test is disproportionate for an offline suite. The
+behavioral proof is the live probe, which cannot run in CI because it needs the operator's CDP
+browser.
+
+Branch now carries three commits beyond the approved v0.4.18 scope (8a74258, a33727c0, 7801ff4).
+The scope decision is still open and still the user's: one PR (Claude's recommendation) vs. split
+the login fix onto its own `fix/` branch. No PR created.
+
+NEXT: operator re-runs `make credential-test` a third time. Expect `ACG_SESSION_OK path=auto-login`.
+If it fails again the diagnostic will name the new stage — that is now the working pattern.
