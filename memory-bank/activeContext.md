@@ -1,5 +1,95 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — SSM timeout root-caused: 28m50s agent credential backoff vs a 150s/300s wait
+
+`ssm_wait` cannot succeed on a first-time ACG provision. The cause is a two-pass stack deploy
+racing the SSM agent's credential-retry backoff, and it is deterministic, not flaky.
+
+CloudFormation event timeline (stack `k3d-manager-cluster`):
+
+| time (UTC) | event |
+|---|---|
+| 12:55:05 | stack CREATE_IN_PROGRESS — `EnableSsm` still **false** |
+| 12:55:29-31 | all three instances launch with `IamInstanceProfile: AWS::NoValue` |
+| 12:55:48 | ssm-agent starts, finds no EC2 role in IMDS (404), falls back to Default Host Management -> `AccessDeniedException: Systems Manager's instance management role is not configured for account` |
+| 12:55:48 | `[CredentialRefresher] Sleeping for **28m50s** before retrying retrieve credentials` |
+| 12:55:51 | stack CREATE_COMPLETE |
+| 12:56:19 | stack UPDATE_IN_PROGRESS — `_provider_k3s_aws_enable_ssm_stack` flips `EnableSsm=true` |
+| 12:56:43 | SSMInstanceRole CREATE_COMPLETE |
+| 12:58:56 | SSMInstanceProfile CREATE_COMPLETE |
+| 12:58:57-12:59:00 | instances UPDATE_COMPLETE — profile attached to **running** nodes |
+| ~12:59-13:04 | `ssm_wait` polls 300s -> `did not become Online` -> `make up` exits 1 |
+| 13:24:38 | `EC2RoleProvider Successfully connected with instance profile role credentials` — backoff expired, agent recovered unaided |
+| 13:34 | all three `PingStatus: Online`, agent v3.3.4793.0 |
+
+The profile landed at 12:58:57, **26 minutes before the agent would next look at IMDS.**
+Everything else was correct and was ruled out: IGW route + `0.0.0.0/0` egress + public IPs, the
+official Canonical jammy AMI with the snap agent enabled, `AmazonSSMManagedInstanceCore` attached
+to `k3d-manager-cluster-ssm-role`, a valid `ec2.amazonaws.com` trust policy, IMDSv1 optional,
+`NRestarts=0`. The agent was never broken — it was asleep.
+
+`scripts/lib/providers/k3s-aws.sh:47` calls this attachment "with no interruption". That is the
+false premise: no interruption is exactly why the agent keeps sleeping. Both waits are unreachable —
+`_provider_k3s_aws_wait_ssm_registered` allows 150s, `ssm_wait` 300s, the agent needs ~1730s.
+
+**A longer timeout is the wrong fix.** Either restart the agent over SSH right after the update
+attaches the profile (`sudo systemctl restart snap.amazon-ssm-agent.amazon-ssm-agent.service`,
+which resets the backoff and registers in seconds), or create the stack with `EnableSsm=true` in
+the first pass so the profile exists at launch and the first credential fetch succeeds. The
+second-run-passes behaviour is explained too: `_provider_k3s_aws_enable_ssm_stack` early-returns
+when `EnableSsm` is already `true`, by which time the backoff has long expired.
+
+Cluster left running (server 44.250.167.86, agents 16.146.71.239 / 44.247.114.156), SSM now Online,
+so `make up` can be resumed rather than reprovisioned.
+
+## 2026-09-25 — Hermes bootstrap path confirmed, plus template drift
+
+`com.k3d-manager.hermes` is installed on disk but absent from both `launchctl list` and
+`launchctl print-disabled` — enabled-but-never-bootstrapped, the identical failure mode as
+`com.k3d-manager.cloudflare-tunnel`. The supported installer is **`bin/k3dm-hermes-setup`**
+(delegates to `_install_hermes_agent` in the lib-foundation subtree; `--uninstall` to reverse).
+Preflight is green: all four required Keychain credentials present (`k3dm-webhook-token`,
+`k3dm-hermes-argocd-token`, `k3dm-hermes-gh-token`, `k3dm-slack-webhook`), both binaries
+executable, `/opt/homebrew/bin/python3` resolves.
+
+**Drift to decide before running it:** the installed plist sets
+`K3DM_HERMES_AUTO_KINE_GUARD=1`, and `scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl`
+does **not**. Re-rendering from the template therefore silently disables the one auto-executing
+repair (`repairs.auto_remediate_kine`). Bootstrapping the existing plist as-is
+(`launchctl bootstrap gui/<uid> ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`) preserves it.
+Either the template should carry the var or the guard was never meant to be on — owner's call.
+
+## 2026-09-25 — acg-recover failed at SSM; tunnel killed again; CDP tab leak diagnosed
+
+`make acg-recover` ran clean through chrome-cdp, acg-restart (CDP reused the logged-in session, no
+manual login) and creds, provisioned the CloudFormation stack (server 44.250.167.86, agents
+16.146.71.239 / 44.247.114.156), then **failed exit 2**: `[ssm] Instance i-04f4f6420ae76148c did not
+become Online after 300s`.
+
+**The failure cleanup killed the Cloudflare tunnel a second time** — same `cleaning up local
+processes...` path as 02:44:58Z, ~3h after I restored it. Grafana was 530. Restored again
+(`launchctl bootstrap`, pid 28226); grafana + argocd back to 200. This makes incident follow-up #2
+(stop `cluster-up` cleanup unloading the public tunnel) a **reproduced** bug, not a hypothesis.
+
+**CDP tab leak root cause — not a Playwright leak.**
+`com.k3d-manager.chrome-cdp.plist` has `KeepAlive=true`. A relaunch into a profile/port another
+Chrome already holds exits 0 immediately, so launchd respawns it, and each respawn opens one tab in
+the live instance. Count grew 38 → 55 → 74 while observed. I closed 55 blank `chrome://newtab/`
+targets over `/json/close`; they were replaced within minutes. **Closing tabs cannot win against the
+producer** — the repair has to target the respawn loop. The plist's own comment already warns about
+the port-reclaim hazard in `_cdp_stop_chrome_cdp_agent`.
+
+**Correction to the 2026-09-25 outage entry:** "nothing watches the tunnel" was wrong at the Hermes
+layer. `scripts/lib/hermes/sensors.py:107 reachability()` already shells out to
+`bin/public-endpoint-probe --json` and has an explicit `edge-down` verdict. The reason it never
+fired: `~/Library/LaunchAgents/com.k3d-manager.hermes.plist` exists (Sep 9) but is **not in
+`launchctl list`** and not in `print-disabled` — the same enabled-but-not-bootstrapped failure as the
+tunnel agent it would have reported on. The Prometheus half of that entry stands: still no blackbox
+exporter and no PrometheusRule.
+
+Hermes has no CDP/launchd sensor, and `repairs.propose()` proposes only — `auto_remediate_kine` is
+the single auto-executing repair and is gated on `K3DM_HERMES_AUTO_KINE_GUARD=1`.
+
 ## 2026-09-25 — `make acg-recover` added (and a correction)
 
 Chained the recovery into one target: `acg-recover: chrome-cdp acg-restart` + a recursive
