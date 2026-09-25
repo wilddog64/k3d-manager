@@ -1,5 +1,60 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — `make up` failed at data-layer: quay.io/minio is no longer anonymously pullable
+
+`make up CLUSTER_PROVIDER=k3s-aws` got all the way to the data-layer wait and then failed
+(exit 2) with `data-layer ArgoCD Application did not reach Synced after force-sync + 180s retry`.
+The SSM path was never touched this run (autoselect chose SSH, stack reused), so this is unrelated
+to the SSM work.
+
+**Real cause: `minio-0` is in `ImagePullBackOff`.** 6 of 7 StatefulSets in
+`shopping-cart-data` are healthy (`postgresql-orders/payment/products`, `rabbitmq`, `redis-cart`,
+`redis-orders-cache`); only `minio` is stuck:
+
+```
+Failed to pull image "quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z":
+  unexpected status from HEAD request to
+  https://quay.io/v2/minio/minio/manifests/RELEASE.2024-11-07T00-52-20Z: 401 UNAUTHORIZED
+```
+
+The ArgoCD operation was still `phase: Running`, `waiting for healthy state of
+apps/StatefulSet/minio` — so the wait loop timing out is a symptom; it was never going to converge.
+
+**This is not a bad tag and not our network.** Anonymous pulls of the whole repo are gated now:
+
+| probe | result |
+|---|---|
+| `quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z` (anon token) | 401 |
+| `quay.io/minio/minio:latest` (anon token) | 401 |
+| `quay.io/minio/mc:latest` (anon token) | 401 |
+| `quay.io/prometheus/busybox:latest` (control, anon token) | **200** |
+| `quay.io/api/v1/repository/minio/minio` | 401 `Requires authentication` |
+| Docker Hub `minio/minio` | `object not found` — never published there |
+
+The control proves quay.io and egress are fine. `minio/minio` AND `minio/mc` both require auth as
+of now; the May 2026 bug doc `2026-05-23-minio-mc-image-tag-not-found.md` explicitly recorded that
+`minio/minio:RELEASE.2024-11-07T00-52-20Z` "does exist and pulls successfully" at the time, so the
+gate is new. The hub never cached it (`no minio on hub`), which is why a fresh sandbox is the first
+place this surfaced.
+
+**Fix belongs in `shopping-cart-infra`, not here** — `data-layer/minio/statefulset.yaml:35` plus
+`bucket-init-job.yaml:28` and `image-upload-job.yaml:28` (both `quay.io/minio/mc`, equally gated,
+not yet reached). Per repo discipline that is spec + Codex on a feature branch, and needs the
+owner's go. Options, not yet decided: mirror both images into GHCR under `wilddog64/`, add a pull
+secret for a MinIO account, or move off MinIO for the sandbox data layer.
+
+**Third Cloudflare tunnel kill.** The failure-cleanup path unloaded
+`com.k3d-manager.cloudflare-tunnel` again — `bin/public-endpoint-probe --json` returned
+`edge-down`, all 7 hosts 530. Restored with `launchctl bootstrap gui/$(id -u)`; re-probe shows
+6/7 healthy (`frontend` 404 is expected, the app never deployed). Incident follow-up #2 is now
+**reproduced three times** and should stop being a follow-up.
+
+**Second finding, already known and now costly:** the data-layer wait loop cannot distinguish
+"not yet Synced" from "will never sync". A plain `ImagePullBackOff` on one pod was reported as
+8 minutes of `data-layer not yet Synced — waiting...` followed by a force-sync retry that could
+not possibly help. The loop should surface non-Ready pod reasons (`ImagePullBackOff`,
+`CreateContainerConfigError`, `CrashLoopBackOff`) and fail fast on them.
+
 ## 2026-09-25 — SSM->SSH fallback was dead code: `_err` exits, so every fallback branch was unreachable
 
 Follow-up to the SSM backoff root cause below. The provider already intends to degrade to SSH —
