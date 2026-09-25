@@ -84,23 +84,59 @@ variable is effectively ignored on the already-Ready path.
 
 ### A. Test (required)
 
-Make test 3 assert what its name claims without depending on, or touching, live
-infrastructure. Stub the reachability probe so the not-ready branch is taken
-deterministically — add a `kubectl` stub to `STUB_DIR` alongside the existing `k3sup` stub,
-printing no `Ready` line:
+**Scope: `scripts/tests/core/deploy_app_cluster_confirm.bats` only.** No production file changes.
+
+The real leak is the kubeconfig path, not `KUBECONFIG`. `deploy_app_cluster` builds its own:
+
+```bash
+  local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
+```
+
+and probes with `KUBECONFIG="${local_kubeconfig}" kubectl get nodes`. The test's
+`KUBECONFIG=/dev/null` is therefore ignored, and the probe reads the operator's real
+`~/.kube/k3s-ubuntu.yaml`. Three changes, in this order:
+
+**A1 — add the hard-fail network stubs first.** These are the safety belt: with them in place no
+subsequent step can contact a host even if A2 is wrong. Add to `setup()` after the `k3sup` stub:
+
+```bash
+  printf '#!/usr/bin/env bash\necho "stub: ssh must not be called" >&2\nexit 97\n' > "${STUB_DIR}/ssh"
+  printf '#!/usr/bin/env bash\necho "stub: scp must not be called" >&2\nexit 97\n' > "${STUB_DIR}/scp"
+  chmod +x "${STUB_DIR}/ssh" "${STUB_DIR}/scp"
+```
+
+**A2 — make the reachability probe deterministic.** Add a `kubectl` stub that emits no `Ready`
+line, and point the kubeconfig at a path under `STUB_DIR` so nothing reads the operator's file:
 
 ```bash
   printf '#!/usr/bin/env bash\nexit 0\n' > "${STUB_DIR}/kubectl"
   chmod +x "${STUB_DIR}/kubectl"
 ```
 
-`KUBECONFIG=/dev/null` is already set but is not sufficient — `deploy_app_cluster` builds
-its own `local_kubeconfig` path. Also stub `ssh` and `scp` as hard failures so that any
-future path change that reaches them fails the test loudly instead of contacting a host.
+and add to the `run env` list in test 3:
 
-Mutation-check the new stubs against pre-fix behavior: with the `kubectl` stub in place the
-test must fail if the `SSH key not found` guard is removed (see
-`reference_new_test_passing_does_not_mean_it_can_fail`).
+```bash
+    UBUNTU_K3S_LOCAL_KUBECONFIG="${STUB_DIR}/absent-kubeconfig.yaml" \
+```
+
+Both are needed: the env var alone still invokes the operator's real `kubectl`, and the stub alone
+still reads the real kubeconfig path if a future change drops the probe's `KUBECONFIG` override.
+
+**A3 — assert no contact was made.** Add to test 3, after the existing assertions:
+
+```bash
+  [[ "$output" != *"Merging ubuntu-k3s context"* ]]
+  [[ "$output" != *"Installing socat"* ]]
+  [[ "$output" != *"stub: ssh must not be called"* ]]
+```
+
+Keep the three existing assertions on lines 41-43 unchanged — they are the Finding 2b contract.
+
+**Mutation check (required).** With A1-A3 applied, temporarily delete the
+`[[ -f "${ssh_key}" ]]` guard block from `scripts/plugins/shopping_cart.sh` and confirm test 3
+**fails**. Then restore it with `git checkout -- scripts/plugins/shopping_cart.sh` and confirm
+`git diff --quiet scripts/plugins/shopping_cart.sh`. A test that passes both with and without the
+guard is not testing the guard (see the `new_test_passing_does_not_mean_it_can_fail` rule).
 
 ### B. Production (owner's call — not covered by A)
 
@@ -134,3 +170,64 @@ If B is deferred, the test fix in A still stands on its own and must not be dela
 Auditing the rest of `scripts/tests/` for the same class of reachability-dependent live
 mutation. That sweep is worth doing — this file was found by a failure, not by a search, so
 others may exist — but it belongs in its own spec.
+
+---
+
+## Before You Start
+
+- Repo: `/Users/cliang/src/gitrepo/personal/k3d-manager`
+- Branch: `k3d-manager-v1.38.0` — `git pull origin k3d-manager-v1.38.0` first. Never `main`.
+- Read `memory-bank/activeContext.md` (top section, dated 2026-09-25) for the failure context.
+- Read these files in full before editing:
+  - `scripts/tests/core/deploy_app_cluster_confirm.bats` (44 lines)
+  - `scripts/plugins/shopping_cart.sh` lines 1330-1420 (read only — Part B is NOT approved)
+  - `scripts/tests/test_helpers.bash`
+- **A live ACG `k3s-aws` cluster is currently reachable at `44.250.167.86`.** That is what makes
+  this test destructive. Apply step A1 (the `ssh`/`scp` hard-fail stubs) **before running the
+  suite even once.** Do not run `bats` on this file before A1 is in place.
+
+## Definition of Done
+
+- [ ] A1, A2, A3 applied to `scripts/tests/core/deploy_app_cluster_confirm.bats`.
+- [ ] `bats scripts/tests/core/deploy_app_cluster_confirm.bats` — 3/3 pass. Paste the output.
+- [ ] Mutation check performed and reported: test 3 fails with the guard removed, and
+      `git diff --quiet scripts/plugins/shopping_cart.sh` is clean afterwards. Paste both results.
+- [ ] Output of the passing run contains none of `Merging ubuntu-k3s context`, `Installing socat`,
+      `Permanently added`, `vault-bridge active`. Paste the grep result proving it.
+- [ ] `shellcheck` clean on the changed file with zero new warnings.
+- [ ] Exactly one file changed. `git show --stat` must list only the `.bats` file.
+- [ ] Commit message, verbatim:
+
+```
+fix(tests): stop deploy_app_cluster_confirm test 3 provisioning live infra
+
+Test 3 stubbed only k3sup, so with a k3s cluster reachable deploy_app_cluster
+took its live path: it merged the ubuntu-k3s context into ~/.kube/config and
+installed socat plus a vault-bridge systemd unit on the EC2 server, returning 0
+instead of the asserted 1. Stub the reachability probe (kubectl plus a
+STUB_DIR-scoped UBUNTU_K3S_LOCAL_KUBECONFIG), hard-fail ssh/scp so no future
+path change can contact a host, and assert the absence of the provisioning
+output. Test-only; the SSH-key guard placement in shopping_cart.sh is unchanged.
+
+See docs/bugs/2026-09-25-deploy-app-cluster-confirm-bats-mutates-live-cluster.md
+```
+
+- [ ] `git push origin k3d-manager-v1.38.0` — do NOT report done until the push succeeds.
+- [ ] Verify with `git rev-parse origin/k3d-manager-v1.38.0` and report that SHA.
+- [ ] Update `memory-bank/activeContext.md` and `memory-bank/progress.md` with the SHA and status,
+      and paste the lines you changed.
+
+## What NOT to Do
+
+- Do NOT touch `scripts/plugins/shopping_cart.sh`. **Part B is unapproved** — moving the SSH-key
+  guard changes behavior on the already-Ready path and is the owner's decision. Read it, do not
+  edit it. The only permitted interaction is the temporary mutation check, which must be reverted.
+- Do NOT run `bats` on this file before the `ssh`/`scp` stubs exist.
+- Do NOT run `scripts/k3d-manager deploy_app_cluster` by hand, with or without `--confirm`.
+- Do NOT run `make up`, `make deploy-worker`, `kubectl`, `ssh`, `helm` or `docker` against any
+  live cluster or host. No live-cluster mutation of any kind.
+- Do NOT modify `~/.kube/config` or any file outside the repo.
+- Do NOT create a PR, merge, commit to `main`, force-push, or use `--no-verify`.
+- Do NOT edit `scripts/lib/foundation/` or `scripts/lib/acg/` (subtrees).
+- Do NOT `git add -A`. Stage the one file by path.
+- Do NOT touch any other file in `scripts/tests/` — the broader sweep is a separate spec.
