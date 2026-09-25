@@ -12,6 +12,11 @@ setup() {
   STUB_DIR="$(mktemp -d)"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${STUB_DIR}/k3sup"
   chmod +x "${STUB_DIR}/k3sup"
+  printf '#!/usr/bin/env bash\necho "stub: ssh must not be called" >&2\nexit 97\n' > "${STUB_DIR}/ssh"
+  printf '#!/usr/bin/env bash\necho "stub: scp must not be called" >&2\nexit 97\n' > "${STUB_DIR}/scp"
+  chmod +x "${STUB_DIR}/ssh" "${STUB_DIR}/scp"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${STUB_DIR}/kubectl"
+  chmod +x "${STUB_DIR}/kubectl"
 }
 
 teardown() {
@@ -35,10 +40,14 @@ teardown() {
   run env \
     K3S_AWS_SSM_ENABLED=false \
     UBUNTU_K3S_SSH_KEY=/nonexistent/k3d-manager-key.pem \
+    UBUNTU_K3S_LOCAL_KUBECONFIG="${STUB_DIR}/absent-kubeconfig.yaml" \
     KUBECONFIG=/dev/null \
     PATH="${STUB_DIR}:${PATH}" \
     "$MANAGER" deploy_app_cluster --confirm
   [ "$status" -eq 1 ]
   [[ "$output" != *"requires --confirm"* ]]
   [[ "$output" == *"SSH key not found"* ]]
+  [[ "$output" != *"Merging ubuntu-k3s context"* ]]
+  [[ "$output" != *"Installing socat"* ]]
+  [[ "$output" != *"stub: ssh must not be called"* ]]
 }
