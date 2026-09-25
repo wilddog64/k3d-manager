@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Fixed
+- `cluster-up`'s failure cleanup no longer tears down the Cloudflare tunnel it did not start.
+  `_acg_up_cleanup` ran an unconditional `launchctl bootout` of
+  `com.k3d-manager.cloudflare-tunnel` on any non-zero exit, but `cluster-up` does not install or
+  bootstrap that tunnel until ~line 1809 — far past Step 10b, where all three observed failures
+  happened. Each one took all 7 public hostnames down (`edge-down`, every host 530) until the
+  agent was manually re-bootstrapped; the plist lives in `~/Library/LaunchAgents` with
+  `KeepAlive=true`, survives reboots, and serves the hub's public ingress independently of any ACG
+  sandbox. The bootout is now gated on `_ACG_TUNNEL_PLIST_CREATED`, set only where the run
+  installs the plist and none existed beforehand, so "clean up what you created" still holds.
 - `cluster-up` Step 10b fails fast when the data layer is blocked on an image pull instead of
   polling out the full 300s + force-sync + 180s window. A `quay.io/minio/minio` 401 surfaced as
   eight minutes of `data-layer not yet Synced — waiting...` followed by a force-sync that could

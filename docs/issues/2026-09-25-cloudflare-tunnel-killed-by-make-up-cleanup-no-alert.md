@@ -102,3 +102,40 @@ A LaunchAgent that is *enabled* but *not bootstrapped* is indistinguishable from
 rather than "job down". Check membership in `launchctl list`, not the disabled map. More broadly:
 the tunnel had no monitor because it is infrastructure *for* monitoring — the path that would
 report its death runs through it.
+
+---
+
+## Resolution — 2026-09-25
+
+**Reproduced three times** (2026-09-24 once, 2026-09-25 twice). Each occurrence was a `cluster-up`
+failure at **Step 10b**, and each took all 7 public hostnames down (`bin/public-endpoint-probe`
+verdict `edge-down`, every host `530`) until the agent was manually re-bootstrapped.
+
+**Root cause.** `_acg_up_cleanup` (`bin/cluster-up`) ran an *unconditional*
+`launchctl bootout` of `com.k3d-manager.cloudflare-tunnel` on any non-zero exit. But `cluster-up`
+does not install or bootstrap that tunnel until roughly line 1809 — far past Step 10b at line 811.
+So on every one of these failures the cleanup tore down a long-lived service **the run had never
+started**, and which it had no business owning: the plist lives in `~/Library/LaunchAgents` with
+`RunAtLoad` and `KeepAlive=true`, survives reboots, and serves the hub's public ingress
+independently of any ACG sandbox.
+
+**Fix.** The bootout is now gated on `_ACG_TUNNEL_PLIST_CREATED`, set only where the run installs
+the plist and no plist existed beforehand. A failure that never reached the tunnel step now logs:
+
+```
+INFO: [acg-up] leaving the cloudflare tunnel up — it is the hub's public ingress and predates this run
+```
+
+"Clean up what you created" is preserved: a run that genuinely created the agent from scratch still
+removes it on failure.
+
+**Coverage.** Four BATS cases in `scripts/tests/bin/cluster_up.bats` — pre-existing tunnel is left
+alone, a self-created one is removed, the marker is set exactly once, and the cleanup body no
+longer boots out unconditionally. Mutation-proven: restoring the unconditional bootout fails three
+of the four.
+
+**Not fixed by this change.** There is still no alert on the outage — no blackbox probe over the 7
+public hostnames and no `CloudflareTunnelDown` rule, and the Alertmanager root receiver is `null`,
+so a future outage is still silent. Hermes `reachability()` (`scripts/lib/hermes/sensors.py:107`)
+already has an `edge-down` verdict and would have caught all three, but its LaunchAgent
+(`com.k3d-manager.hermes`) is installed and never bootstrapped. Those two remain open.

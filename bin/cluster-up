@@ -125,7 +125,12 @@ function _acg_up_cleanup() {
       rm -f "${_f}"
     fi
   done
-  launchctl bootout "gui/$(id -u)" "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" 2>/dev/null || true
+  if [[ "${_ACG_TUNNEL_PLIST_CREATED:-0}" == "1" ]]; then
+    _warn "[acg-up] removing the cloudflare tunnel this run created"
+    launchctl bootout "gui/$(id -u)" "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" 2>/dev/null || true
+  else
+    _info "[acg-up] leaving the cloudflare tunnel up — it is the hub's public ingress and predates this run"
+  fi
 }
 trap _acg_up_cleanup EXIT
 
@@ -1858,6 +1863,7 @@ PLIST
       fi
       : > "${_tunnel_launchctl_log}"
       mkdir -p "${HOME}/Library/LaunchAgents"
+      [[ -f "${_named_tunnel_plist}" ]] || _ACG_TUNNEL_PLIST_CREATED=1
       if ! install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
           >"${_tunnel_launchctl_log}" 2>&1; then
         _warn "[acg-up] failed to install tunnel plist — skipping"

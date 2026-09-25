@@ -351,3 +351,55 @@ JSON
   [ "$status" -eq 0 ]
   [ "$output" -eq 3 ]
 }
+
+_load_acg_up_cleanup() {
+  sed -n '/^function _acg_up_cleanup()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/c.sh"
+  source scripts/lib/system.sh
+  source "${BATS_TEST_TMPDIR}/c.sh"
+}
+
+@test "acg-up failure cleanup leaves a pre-existing cloudflare tunnel running" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    _load_acg_up_cleanup
+    launchctl() { echo "LAUNCHCTL_CALLED $*"; }
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"LAUNCHCTL_CALLED"* ]]
+  [[ "$output" == *"leaving the cloudflare tunnel up"* ]]
+}
+
+@test "acg-up failure cleanup removes only a tunnel it created itself" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    _load_acg_up_cleanup
+    launchctl() { echo "LAUNCHCTL_CALLED $1"; }
+    _ACG_TUNNEL_PLIST_CREATED=1
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"LAUNCHCTL_CALLED bootout"* ]]
+  [[ "$output" == *"removing the cloudflare tunnel this run created"* ]]
+}
+
+@test "acg-up marks the tunnel plist as created only when none existed" {
+  run grep -c '_ACG_TUNNEL_PLIST_CREATED=1' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+  run bash -c "awk '/_ACG_TUNNEL_PLIST_CREATED=1/{print NR}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  run bash -c "awk '/install -m 644 .\{_named_tunnel_plist_tmp\}/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+}
+
+@test "acg-up failure cleanup never boots out the tunnel unconditionally" {
+  run bash -c "sed -n '/^function _acg_up_cleanup()/,/^}\$/p' bin/cluster-up | grep -c 'launchctl bootout'"
+  [ "$output" -eq 1 ]
+  run bash -c "sed -n '/^function _acg_up_cleanup()/,/^}\$/p' bin/cluster-up | grep -n '_ACG_TUNNEL_PLIST_CREATED'"
+  [ "$status" -eq 0 ]
+}
