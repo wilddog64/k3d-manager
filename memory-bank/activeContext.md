@@ -1,5 +1,38 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — upstream: lib-foundation v0.4.18 PR #55 opened, merge-ready
+
+`https://github.com/wilddog64/lib-foundation/pull/55` — one PR covering both the approved
+credential-test observability scope and the headless Pluralsight auto-login fix it exposed.
+Head `8986227`, `mergeable_state: clean`.
+
+Pre-PR: promoted `CHANGE.md` `[Unreleased]` to `[v0.4.18] — 2026-09-24` in `15bf3b7`, matching
+the v0.4.17 convention (empty `[Unreleased]` kept above the version heading).
+
+Gates, all measured here and not taken from any agent: `npm run check` clean; jest 7 suites /
+**40** tests; `make bats` plan `1..138` with 138 ok, 0 not ok, 0 skips, no index gaps; CI green
+per-job (`shellcheck`, `bats`, `acg (node)`) on head SHA `8986227`, verified from the job list
+rather than the run conclusion.
+
+Copilot posted 4 distinct findings across 5 comments, all replied to and all 5 threads resolved
+(0 unresolved). Two were real and fixed in `8986227`: `_robustClick` inherited Playwright's 30s
+default instead of the module's `FIELD_TIMEOUT_MS`, and the bug doc repeated its whole `Outcome`
+section (lines 457-500 were a byte-exact duplicate of 381-424, confirmed with `diff`). The three
+env-leakage findings on `acg_session_check.test.js` are **false positives** — that describe block
+already reassigns `process.env` from a snapshot in `beforeEach` and restores the original object
+in `afterAll`. Copilot's own note says it ran at Lite effort and could not complete its agentic
+suite. The timeout fix was mutation-gated: reverting the wait left exactly the new test red
+(1 failed / 39 passed).
+
+No `enforce_admins` step applies — lib-foundation `main` is ruleset-protected (`deletion`,
+`non_fast_forward`, `copilot_code_review`) with no required-approvals gate, so classic
+protection returns 404 by design and there is no admin lever to disable.
+
+**Awaiting the operator's merge.** Not done and deliberately not started: merge, the `v0.4.18`
+tag, the GitHub release, the subtree pull into k3d-manager, and rewiring the Tier 2 preflight in
+`scripts/plugins/e2e.sh` from Keychain-existence to the real loader /
+`K3DM_ACG_REQUIRE_CREDENTIALS`.
+
 ## 2026-09-24 — unknown actor role authorization fix (working tree; commit pending)
 
 Implemented the scoped policy fix from

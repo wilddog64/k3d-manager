@@ -46,7 +46,10 @@
       `scratchpad/codex-libfoundation-v0418.log`.
 - [ ] Verify Codex: SHA on origin, diff confined to the four listed files, jest > 28 tests, all three
       mutations reddening their named tests, disappearance gate 4 -> 0.
-- [ ] lib-foundation PR + merge (operator's go required), then tag v0.4.18.
+- [x] **lib-foundation PR #55 opened** — `https://github.com/wilddog64/lib-foundation/pull/55`,
+      head `8986227`, `mergeable_state: clean`, CI green per-job, 5/5 Copilot threads resolved.
+      `CHANGE.md` promoted to `[v0.4.18] — 2026-09-24` in `15bf3b7`.
+- [ ] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release.
 - [ ] Subtree pull into k3d-manager; then consider wiring K3DM_ACG_REQUIRE_CREDENTIALS into the
       Tier 2 preflight in place of the keychain-existence check.
 
@@ -1623,7 +1626,15 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       Pluralsight login in this subsystem's history.** Bug doc marked RESOLVED &
       OPERATOR-CONFIRMED at **`38c64ade`**; both gate tables flipped to confirmed.
 - [x] The live `credential-test` gate required before any lib-foundation PR has PASSED.
-- [ ] PR + merge + tag v0.4.18 — needs the user's go
+- [x] **PR #55 opened and merge-ready** — one PR covering observability + the login fix.
+      Gates measured here: `npm run check` clean; jest 7 suites / **40** tests; `make bats`
+      `1..138` all ok; CI green on `8986227` verified per-job. Copilot: 4 findings / 5 comments,
+      2 real and fixed in `8986227` (unbounded `_robustClick` timeout; duplicated `Outcome`
+      section in the bug doc), 3 false positives on `process.env` isolation that already exists
+      via `beforeEach`/`afterAll`. All 5 threads replied to and resolved.
+      No `enforce_admins` lever — lib-foundation `main` is ruleset-protected with no
+      required-approvals gate.
+- [ ] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release
 - [ ] Subtree pull into k3d-manager, then rewire the Tier 2 preflight to the real loader
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
       `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
