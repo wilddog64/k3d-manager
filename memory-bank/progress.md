@@ -16,6 +16,16 @@
       expected EXIT=2 at Homebrew Python 3.14.7 without pytest. M1–M5 all red and restored with
       `git diff --quiet`.
 - [x] **PR #131 merged to main at 925c43e7** (2026-09-25 18:14:11Z); retrospective written and committed on v1.38.0.
+- [x] `make test` on v1.38.0: **1128 ok / 1 not ok of 1129**, exit 2. The red is
+      `deploy_app_cluster_confirm.bats` test 3 — **not a v1.37.0 regression** (guard `1bbe54393`
+      2026-08-21, test `62c9ff27` v1.27.0); it fails only because the ACG `k3s-aws` sandbox is
+      reachable, and it **provisioned live infrastructure** (kubeconfig merge + socat/vault-bridge
+      on `44.250.167.86`) three times. Spec `6da697a6`:
+      `docs/bugs/2026-09-25-deploy-app-cluster-confirm-bats-mutates-live-cluster.md`.
+- [ ] Implement the BATS fix (Part A — stub the reachability probe, hard-fail `ssh`/`scp`).
+      **Part B (move the SSH-key guard in `shopping_cart.sh`) needs the owner's go** — it changes
+      behavior on the already-Ready path.
+- [ ] Sweep the rest of `scripts/tests/` for reachability-dependent live mutation (own spec).
 
 ## 2026-09-24 — webhook Phase 3 agent extraction (staged; Git blocked)
 

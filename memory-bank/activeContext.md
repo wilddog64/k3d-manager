@@ -1,5 +1,42 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — `make test` 1128/1129: the one red provisions live EC2 (`6da697a6`)
+
+`make test` on `k3d-manager-v1.38.0` ran to completion: **1128 ok / 1 not ok of 1129**, exit 2.
+The single failure is `not ok 3 deploy_app_cluster --confirm reaches the confirmed path
+(Finding 2b)` at `scripts/tests/core/deploy_app_cluster_confirm.bats` line 41 — deterministic,
+reproduced standalone, not a flake.
+
+**The failure is the lesser finding.** The test stubs only `k3sup`, so with the ACG `k3s-aws`
+sandbox reachable `deploy_app_cluster` takes its live path: it merged the `ubuntu-k3s` context
+into `~/.kube/config` and installed socat + a vault-bridge systemd unit on EC2 server
+`44.250.167.86`, then returned **0** instead of the asserted 1. That ran three times today —
+the operator's `make test` plus two diagnosis reproductions — before the behavior was
+understood. Mutations were idempotent (the context pre-existed), by luck not design.
+`~/.kube/config` mtime `Sep 25 11:46:45 2026`.
+
+Root cause `scripts/plugins/shopping_cart.sh:1375-1400`: the `[[ -f "${ssh_key}" ]]` guard is
+nested **inside** `if (( _server_ready == 0 ))`, but the function SSHes after that block
+regardless. A guard inside an early-exit branch is not a guard. The nonexistent
+`-i /nonexistent/k3d-manager-key.pem` did not stop it either — `ssh` falls back to
+ssh-agent/default identities and only warns `Identity file ... not accessible`, so a bogus key
+path cannot be used to force an SSH failure in a test.
+
+**Not a v1.37.0 regression.** `git blame` → `1bbe54393` (2026-08-21) for both the `_server_ready`
+probe and the guard; the test file last changed in `62c9ff27` (v1.27.0). It is green in CI only
+because no cluster answers there. CLAUDE.md declares `scripts/tests/` "pure logic only — no
+cluster mocks" — this file violates that and writes to a remote host.
+
+Spec filed: `docs/bugs/2026-09-25-deploy-app-cluster-confirm-bats-mutates-live-cluster.md`
+(dedup clean — the four similar `*confirm*` docs are all about the dispatcher stripping
+`--confirm`). Part A (stub the reachability probe, plus `ssh`/`scp` hard-fail stubs) is required
+and self-contained. **Part B — relocating the key guard in `shopping_cart.sh` — is unapproved:**
+it changes behavior on the already-Ready path, so it waits on the owner. Neither part is
+implemented.
+
+Not yet swept: the rest of `scripts/tests/` for the same class of reachability-dependent live
+mutation. This file was found by a failure, not by a search.
+
 ## 2026-09-25 — CodeQL alert 25 resolved by renaming, not dismissing (`1d31d9e7`)
 
 The last red check on PR #131. `py/clear-text-logging-sensitive-data` (high) at
