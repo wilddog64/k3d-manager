@@ -285,6 +285,66 @@ Two notes for later:
   bypassed SSM entirely. Still unfixed: the two-pass `EnableSsm=false` -> `true` deploy. The
   fallback is the safety net, not the fix.
 
+## 2026-09-25 — v1.37.0 live smoke gate: 2 FAIL, both stale local defaults, no PR regression
+
+`make smoke` (the canonical pre-PR live smoke gate; Claude runs it, never Gemini) reported
+`0 passed, 2 failed`. Both were traced to stale assumptions in the gate itself, not to anything
+this release changed.
+
+**cluster-health** — `bin/smoke-test-cluster-health:27` defaults
+`APP_CONTEXT="${APP_CONTEXT:-${INFRA_CONTEXT}}"` with the comment *"the hub is its own app
+cluster"*. That premise is exactly what v1.37.0 deregistered. The hub's `shopping-cart-*`
+namespaces are now empty by design, so the gate asserted 5 pods on `k3d-k3d-cluster` and found 0
+while ArgoCD correctly reported all five apps `Synced`. Re-run pinned to the real app cluster:
+
+    APP_CONTEXT=ubuntu-k3s bin/smoke-test-cluster-health   ->   9 passed, 0 failed
+
+**webhook** — `GET /api/v1/health` with no query string calls `_smoke_test_services()` with no
+arguments: the full sweep (endpoints x `_SMOKE_RETRIES=3` x 8s timeout + `_SMOKE_RETRY_SLEEP=10`,
+then serial Vault/ESO/Kubernetes/login stages). `bin/smoke-test-webhook` caps it at
+`--max-time 90`, so on a box where the `.local` endpoints are unreachable it cannot finish.
+The code's own comment concedes the sweep "can legitimately take longer than a CLI status probe
+should wait". **Identical on `origin/main`** (`_smoke_test_services()` bare, `quick` already
+present) and `bin/smoke-test-webhook` is untouched since v1.16.0 (`4c5d3556`) -- so this is
+pre-existing, NOT a decomposition regression. The bounded variant proves the module split:
+
+    GET /api/v1/health?quick=1              ->  HTTP 200 in 0.43s
+    GET /api/v1/health?quick=1&provider=...  ->  HTTP 200 in 0.26s
+
+All 10 `scripts/lib/webhook/*.py` modules import cleanly; `bin/k3dm-webhook` compiles.
+The `000000` in the failure line is a gate bug of its own: curl's `-w '%{http_code}'` prints
+`000` and the `|| echo "000"` appends a second, masking the real error.
+
+**The running webhook is pre-decomposition code.** PID 43834 started Thu Sep 24 08:52:55; every
+decomposed module was written after it (agent 12:37, policy 13:52, status 14:59, lifecycle 15:21,
+proc 18:32, make_targets 19:20). `make restart-webhook` is needed to exercise the split at
+runtime -- a live host mutation, so it waits for the owner.
+
+**PR runtime surface verified.** The Alertmanager warning-route fix is live and byte-identical to
+the template on BOTH clusters -- route `[3] severity = warning -> platform-warning` sits after
+`[2]` the named allowlist, which is the ordering the BATS gate asserts. The new
+`bin/k3dm-alert-delivery-status` reads the operator-**generated** secret
+(`alertmanager.yaml.gz`), so its `child_routes: 5` on the hub vs 4 in the user-supplied secret is
+correct -- the generated config is a superset. Root receiver is still `null` on both clusters
+(the known `CloudflareTunnelDown` -> `sms-critical` follow-up), but warning alerts are now
+delivered via route [3] rather than silently dropped.
+
+**Four findings the gate surfaced that are NOT v1.37.0 regressions:**
+
+| finding | evidence |
+|---|---|
+| Prometheus probe unreachable by design | `smoke.py:525` probes app-cluster `localhost:19190`; no launchd agent forwards it. The hub agent forwards `19091:9090` per `com.k3d-manager.prometheus-port-forward.plist.tmpl:13`, and `19091/-/ready` returns 200. Main's own comment documents the two-port scheme, so this is a missing app-cluster PF, not a typo. `loadtest.sh:123` shares the 19190 assumption. |
+| Keycloak probe targets a path that does not exist | probes `http://keycloak.shopping-cart.local/health/live` -> `127.0.0.1:80` (`/etc/hosts:13`); nothing listens on :80. Keycloak actually runs in namespace **`identity`** on the hub, not `keycloak`. |
+| `keycloak-realm-reconcile` failing for 4 days | two pods in `Error` in `identity`; log ends `environment: line 104: awk: command not found`. The realm partial-import never completes. |
+| MinIO still pulling the auth-gated quay image | `minio-0` `ImagePullBackOff` on `quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z`. The bitnamilegacy repoint is not in effect on `ubuntu-k3s`; the pending runtime proof is still unmet. |
+
+**Gate/Slack gap (owner asked to close it next release):** `make smoke` exists
+(`Makefile:797` -> `smoke_run`, `SMOKE_ONLY=offline|cluster`) but is **absent from
+`MAKE_TARGETS`** in `scripts/lib/webhook/make_targets.py`, so there is no `/k3dm smoke`. Proposed
+for v1.38.0: add `"smoke": {"min_role": "reader", "optional": ("SMOKE_ONLY",), "timeout": 900}`
+plus a `SMOKE_ONLY` pattern `offline|cluster`, and fix the two stale gate defaults above so the
+Slack surface cannot report a red that is really a local-default artifact.
+
 ## 2026-09-25 — SSM timeout root-caused: 28m50s agent credential backoff vs a 150s/300s wait
 
 `ssm_wait` cannot succeed on a first-time ACG provision. The cause is a two-pass stack deploy
