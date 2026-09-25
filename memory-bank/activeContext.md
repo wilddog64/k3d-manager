@@ -345,6 +345,102 @@ for v1.38.0: add `"smoke": {"min_role": "reader", "optional": ("SMOKE_ONLY",), "
 plus a `SMOKE_ONLY` pattern `offline|cluster`, and fix the two stale gate defaults above so the
 Slack surface cannot report a red that is really a local-default artifact.
 
+## 2026-09-25 — four smoke findings filed as specs; implementation held for v1.38.0
+
+Owner decision: commit the specs on `k3d-manager-v1.37.0` rather than hold them in scratchpad, so
+they reach the v1.38.0 branch through the merge instead of needing a manual move. Only the **specs**
+are on this branch — every fix they describe is v1.38.0 work and none of it is implemented here, so
+the docs commit cannot affect v1.37.0's behaviour.
+
+| spec | path |
+|---|---|
+| smoke cluster-health app context | `docs/bugs/2026-09-25-smoke-cluster-health-app-context-decoupled-from-app-prefix.md` |
+| smoke webhook gate sweep + probes | `docs/bugs/2026-09-25-smoke-webhook-gate-unbounded-sweep-and-unreachable-probes.md` |
+| Grafana ServiceMonitor label | `docs/bugs/2026-09-25-grafana-servicemonitor-missing-release-label.md` |
+| Keycloak reconcile `awk` (work repo: shopping-cart-infra) | `docs/bugs/2026-09-25-keycloak-realm-reconcile-awk-missing-in-image.md` |
+| `/k3dm smoke` exposure | `docs/plans/v1.38.0-slack-smoke-target.md` — 3 of max 5 for v1.38.0 |
+
+`scratchpad/` and the stray 0-byte `.pub` are now in `.gitignore`. `scratchpad/` holds ~40 MB of
+agent logs and had been untracked-but-ignorable only by luck; one `git add .` would have committed
+all of it.
+
+**v1.38.0 plan-doc count is 3, not 1** — `docs/plans/v1.38.0-hermes-app-health-delta-sensor.md` and
+`docs/plans/v1.38.0-vector-store-and-hermes-prior-art.md` already exist. Two slots left before the
+cap forces a split.
+
+### Correction to the 2026-09-25 smoke entry above
+
+That entry said the cluster-health failure came from v1.37.0 "deregistering" the hub as its own app
+cluster. **That was wrong.** The hub is still registered as an app cluster — it was *renamed*. Live:
+
+| Secret | `name` | `server` | provider |
+|---|---|---|---|
+| `ubuntu-k3s-app-cluster` | `k3d-cluster` | `https://kubernetes.default.svc` | `k3d` (the hub) |
+| `cluster-ubuntu-k3s` | `ubuntu-k3s` | `https://host.k3d.internal:6443` | `k3s-aws` |
+| `cluster-ubuntu-hostinger` | `ubuntu-hostinger` | `https://2.25.146.252:6443` | `k3s-hostinger` |
+
+The name `ubuntu-k3s` was re-pointed from the hub to the AWS cluster. All six
+`ubuntu-k3s-shopping-cart-*` apps carry `destination.name: ubuntu-k3s`, so their pods live on the
+remote AWS cluster while the gate's `APP_CONTEXT` defaults to the hub. The gate reads apps on one
+cluster and pods on another — the exact defect
+`docs/bugs/2026-09-13-smoke-test-cluster-health-pods-checked-on-wrong-cluster.md` closed, reintroduced
+by a registration rename with **no code change**. Third iteration of a rotting hardcoded context
+default, so the fix derives `APP_CONTEXT` from the checked Application's `destination.name`.
+
+### Grafana ServiceMonitor — confirmed, not inferred
+
+`kube-prometheus-stack-grafana` (hub) and `acg-kube-prometheus-stack-grafana` (hostinger) are the only
+ServiceMonitors of eight on each cluster missing `release`, which
+`serviceMonitorSelector: matchLabels: {release: …}` requires. Consequence measured on the hub
+Prometheus: `up{job=~".*grafana.*"}` returns **0 series**, and **0 of 1740** metric names start with
+`grafana_`. Grafana has never been scraped on either cluster. Cause: `grafana` is an upstream
+*subchart*, so it renders its own ServiceMonitor from `grafana.serviceMonitor.labels` and does not
+inherit the parent chart's `release` label; neither values file sets it.
+
+### Keycloak realm-reconcile — 4d16h failure root-caused
+
+`keycloak-realm-reconcile` in ns `identity` is `Failed 0/1`, two pods `Error`, `backoffLimit: 1`
+exhausted. Log: `environment: line 104: awk: command not found`. The Job runs
+`quay.io/keycloak/keycloak:24.0` (ubi9-micro), which has `bash`/`grep`/`sed`/`head`/`mktemp` but **no
+`awk`** — the `grep -q` on the preceding line succeeds, which makes the failure look selective. The
+embedded script needs `awk` in 11 places. The image cannot change (`kcadm.sh` only exists there), so
+the fix rewrites the four CSV helpers plus seven inline pipelines in pure bash. `shopping-cart-identity`
+is `OutOfSync` on the hub purely because this PostSync hook never completes.
+
+Equivalence of the bash replacements was verified locally against the original `awk` for
+`csv_value`, `csv_all_values`, `csv_match_count`, `csv_row_count`, `level0_rows`,
+`csv_unexpected_top_names` and `urlencode_path`: **8/8 match**, with a deliberate negative control
+correctly mismatching (so the comparison can fail).
+
+### Probe targets measured
+
+| target | result |
+|---|---|
+| `localhost:19090/-/ready` (hub) | `401` (basic-auth) |
+| `localhost:19091/-/ready` (hub) | `200` |
+| `localhost:19190/-/ready` (k3s-aws app cluster) | **unreachable** |
+| `localhost:19200/-/ready` (hostinger app cluster) | **unreachable** |
+| `keycloak.shopping-cart.local/realms/master` (non-hostinger branch) | **`000`** |
+| `keycloak.3ai-talk.org/realms/master` (hostinger branch) | `200` |
+
+No agent forwards the app-cluster Prometheus port, so the "Operator follow-up" item in
+`docs/bugs/2026-09-14-prometheus-port-19090-hub-acg-collision.md` (`confirm lsof -iTCP:19190`) has
+never been satisfied and `smoke.py:525` has failed since `31e69c56`. `keycloak.shopping-cart.local`
+resolves to `127.0.0.1` via `/etc/hosts` with **nothing listening on :80**, and the hub has **no
+Ingress resources at all** — Keycloak is reachable only via the `identity/keycloak` ClusterIP or
+`identity/keycloak-nodeport` (:30080, also unforwarded). Each unreachable target burns
+`3 x (8s timeout + 10s sleep)`, which is what pushes the sweep past the gate's own 90s cap.
+
+### `/k3dm smoke`
+
+`make smoke` exists (`Makefile:797`, `SMOKE_ONLY=offline|cluster`); `smoke` is absent from
+`MAKE_TARGETS`, so only the Slack half is missing. Spec adds `{"min_role": "operator",
+"optional": ("SMOKE_ONLY",), "timeout": 900}` plus a `SMOKE_ONLY` pattern. **Deliberately ordered
+after both gate fixes** — exposing it first would post two false reds to Slack on every run.
+`operator` rather than `reader` because the cluster half exercises live Vault/Keycloak/ArgoCD
+credentials; a `reader`-level `SMOKE_ONLY=offline` would need per-argument role checks that
+`parse_make_request` does not support.
+
 ## 2026-09-25 — SSM timeout root-caused: 28m50s agent credential backoff vs a 150s/300s wait
 
 `ssm_wait` cannot succeed on a first-time ACG provision. The cause is a two-pass stack deploy

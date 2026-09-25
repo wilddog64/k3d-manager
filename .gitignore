@@ -17,3 +17,7 @@ gemini-config/
 
 # Added by ggshield
 .cache_ggshield
+
+# Session scratch: multi-MB agent logs and draft specs. Never track.
+scratchpad/
+.pub
