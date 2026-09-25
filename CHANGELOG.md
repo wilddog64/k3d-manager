@@ -46,6 +46,16 @@
 - The shopping-cart stack is now **opt-in per app cluster**. `data-git` and `services-git` require `k3d-manager/shopping-cart: "true"` in addition to `k3d-manager/role: app-cluster`, and `register_app_cluster` emits that label from `ARGOCD_APP_CLUSTER_SHOPPING_CART` (default `false`, boolean-validated). A hub registered as its own app cluster — the designed single-cluster mode — therefore keeps its External Secrets Operator install and ACG Grafana dashboards while no longer syncing the shopping-cart data layer or payment stack onto itself. The `eso` and `grafana-dashboards-acg` ApplicationSets are deliberately left selecting on the role label alone: `eso` generates the hub's entire ESO install (3 Deployments, 21 CRDs, 5 ClusterRoles) and carries the ArgoCD resources finalizer, so removing the registration Secret — the approach this replaces — would have deleted the `externalsecrets` and `clustersecretstores` CRDs, every ExternalSecret CR in the cluster, and the owner-referenced Secrets behind Grafana admin, Keycloak, LDAP, `ghcr-pull-secret` and all postgres / redis / rabbitmq / minio credentials. `docs/architecture/shopping-cart-deployment.md` gains a section on why `ubuntu-k3s` is a role alias rather than a place, the four ApplicationSets that select the role label, and how they differ in `preserveResourcesOnDeletion`.
 
 ### Fixed
+- `bin/cluster-up` now restarts the ArgoCD browser HTTPS listener when its **wrapper** changes,
+  not only when the plist does. The plist names the wrapper path but never its contents, so it
+  stays byte-identical across any wrapper rewrite and the `diff -q` short-circuit skipped the
+  `launchctl bootout`/`bootstrap` pair that makes a rewrite take effect. After the v1.35.0 TLS
+  path unification (`e259c718`) moved the cert dir to the provider-scoped path, a listener
+  daemon that had been running since Sep 4 kept resolving the legacy flat dir — now empty — and
+  socat failed with `SSL_CTX_use_certificate_file(): No such file or directory` against certs
+  that existed. Step 4c/12 then aborted the whole provision, so the identity stack, data layer,
+  app-cluster registration and ACG observability never deployed. The wrapper is now hashed
+  either side of the rewrite and a content change forces the reinstall.
 - The Tier 2 ACG preflight now gates on **credential readability, not Keychain existence**. An
   existence check (`security find-generic-password` without `-w`) succeeds in two states that
   break unattended login: a **locked login keychain** (the value read fails with `User

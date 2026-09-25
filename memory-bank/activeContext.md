@@ -1,5 +1,35 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — sandbox provisioned; cluster-up's listener guard fixed
+
+`make up CLUSTER_PROVIDER=k3s-aws` brought the ACG sandbox up: CloudFormation stack created,
+3 nodes `Ready` on v1.32.0+k3s1, `ubuntu-k3s` merged into `~/.kube/config`, `/readyz` = `ok`.
+The Tier 2 kubecontext preflight added earlier today now passes.
+
+The first attempt failed at **Step 4c/12** and so never ran Steps 5–14 (argocd-manager SA,
+app-cluster registration, data layer, Keycloak + LDAP, ClusterSecretStore, ACG observability).
+Cause was **not** the cluster: the ArgoCD browser HTTPS listener daemon had been running since
+**Sep 4** (pid 29808, 20d elapsed) with the pre-`e259c718` wrapper text in memory, still naming
+the legacy flat TLS dir (now empty). The run rewrote the wrapper with the provider-scoped path,
+but the plist-unchanged `diff -q` short-circuit skipped the bootout/bootstrap, so the rewrite
+never took effect and socat reported `No such file or directory` for certs that existed.
+
+Operator ran `sudo launchctl kickstart -k system/com.k3d-manager.argocd-browser-https`
+(not NOPASSWD in `/etc/sudoers.d/k3d-manager`, and needs a TTY). pid 29808 → 59280, healthz 200.
+The resumed run cleared 4c and continued through Step 10b/14.
+
+Fix in `bin/cluster-up`: hash the wrapper either side of the rewrite, and require
+`_argocd_browser_wrapper_changed -eq 0` in the plist-unchanged guard. Gated by
+`scripts/tests/bin/cluster_up.bats` (11/11; new test mutation-proven against
+`HEAD:bin/cluster-up`). Filed
+`docs/bugs/2026-09-24-argocd-browser-listener-not-restarted-on-wrapper-change.md`; corrected the
+stale `OPEN — assigned to Codex` status on `2026-09-17-argocd-browser-tls-path-unification.md`,
+which in fact landed in `e259c718` (v1.35.0).
+
+Two WARNs from the resumed run still to deep-dive: `ARGOCD_APP_CLUSTER_PROVIDER unset —
+registering ubuntu-k3s with provider 'unknown'` (substrate/ambient-CNI defaults fall back) and
+`Could not detect host IP from host.docker.internal — CoreDNS host alias repair skipped`.
+
 ## 2026-09-24 — Tier 2 preflight gates on the sandbox kubecontext
 
 First `make e2e-sandbox` run died three phases in on a bare kubectl

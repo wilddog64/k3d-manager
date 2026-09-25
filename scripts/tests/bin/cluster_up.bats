@@ -238,3 +238,17 @@ STUB
   run grep -nF -- '-w "${_ldap_user_pass}"' bin/cluster-up
   [ "$status" -ne 0 ]
 }
+
+@test "acg-up restarts the argocd browser listener when only the wrapper changed" {
+  run grep -nF 'if [[ -f "${_argocd_browser_plist}" ]] && [[ "${_argocd_browser_wrapper_changed}" -eq 0 ]] && diff -q' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run grep -cF '_argocd_browser_wrapper_changed=1' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+
+  run bash -c "awk '/_argocd_browser_wrapper_before=\"\"/{print NR} /_argocd_write_browser_https_wrapper \"/{print NR} /_argocd_browser_wrapper_changed=0/{print NR}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+  [ "$(printf '%s\n' "$output" | sed -n '2p')" -lt "$(printf '%s\n' "$output" | sed -n '3p')" ]
+}

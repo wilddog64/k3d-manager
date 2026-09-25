@@ -592,7 +592,16 @@ if _is_mac; then
         _info "[acg-up] Vault CA cert already trusted in System Keychain — skipping"
       fi
     fi
+    _argocd_browser_wrapper_before=""
+    if [[ -f "${_argocd_browser_wrapper}" ]]; then
+      _argocd_browser_wrapper_before="$(shasum -a 256 "${_argocd_browser_wrapper}" | awk '{print $1}')"
+    fi
     _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
+    _argocd_browser_wrapper_changed=0
+    if [[ "$(shasum -a 256 "${_argocd_browser_wrapper}" | awk '{print $1}')" != "${_argocd_browser_wrapper_before}" ]]; then
+      _argocd_browser_wrapper_changed=1
+      _info "[acg-up] ArgoCD browser HTTPS wrapper changed — forcing a listener restart so the new paths take effect"
+    fi
     cat > "${_argocd_browser_plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -617,7 +626,7 @@ if _is_mac; then
 </plist>
 PLIST
     _argocd_browser_install_skipped=0
-    if [[ -f "${_argocd_browser_plist}" ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
+    if [[ -f "${_argocd_browser_plist}" ]] && [[ "${_argocd_browser_wrapper_changed}" -eq 0 ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_argocd_browser_plist_tmp}"
       _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
     elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
