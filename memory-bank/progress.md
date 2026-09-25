@@ -65,6 +65,17 @@
       `1077361`. The same omission was mirrored in k3d-manager's harness guide and fixed in
       `4376a6ec`.
 - [x] Open the v1.37.0 PR — **PR #131** (`4376a6ec`), Copilot requested, CI running at handoff.
+- [x] Fix both PR #131 CI reds — BATS `9a649af3` (fake `security` executable on PATH; the shell
+  function stub was invisible inside `bash -c`, so macOS read the real keychain and Linux CI
+  found no binary) and pytest `444aea0c` (`alert_delivery` missing from **both** sensor-stub
+  sites, so the real sensor shelled out to live `kubectl`). Both were green locally for
+  environment-specific reasons. Mutation-gated; 189 pytest passed offline.
+- [x] Analyse + document CodeQL alerts 23/24/26/27 — `d482fc47`, false positives
+  (`docs/issues/2026-09-24-codeql-pr131-spawn-injection-false-positives.md`) with in-code
+  markers at both sinks.
+- [ ] **Operator action:** dismiss CodeQL alerts 23/24/26/27 via `gh api` — the classifier
+  denied it as a CI bypass; must be run from the operator's terminal. Blocks the #131 CodeQL
+  gate; `enforce_admins` untouched until then.
 
 ## 2026-09-24 — ACG preflight account-name fix
 
@@ -1663,6 +1674,17 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       `1077361`. The same omission was mirrored in k3d-manager's harness guide and fixed in
       `4376a6ec`.
 - [x] Open the v1.37.0 PR — **PR #131** (`4376a6ec`), Copilot requested, CI running at handoff.
+- [x] Fix both PR #131 CI reds — BATS `9a649af3` (fake `security` executable on PATH; the shell
+  function stub was invisible inside `bash -c`, so macOS read the real keychain and Linux CI
+  found no binary) and pytest `444aea0c` (`alert_delivery` missing from **both** sensor-stub
+  sites, so the real sensor shelled out to live `kubectl`). Both were green locally for
+  environment-specific reasons. Mutation-gated; 189 pytest passed offline.
+- [x] Analyse + document CodeQL alerts 23/24/26/27 — `d482fc47`, false positives
+  (`docs/issues/2026-09-24-codeql-pr131-spawn-injection-false-positives.md`) with in-code
+  markers at both sinks.
+- [ ] **Operator action:** dismiss CodeQL alerts 23/24/26/27 via `gh api` — the classifier
+  denied it as a CI bypass; must be run from the operator's terminal. Blocks the #131 CodeQL
+  gate; `enforce_admins` untouched until then.
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
       `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
       live sandbox path and needs a sandbox to verify.

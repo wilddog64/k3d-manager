@@ -1,5 +1,42 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — PR #131 CI repair: two environment-dependent green tests
+
+Both CI reds on #131 were tests that passed locally **because of the operator's environment**,
+not because the code was correct. Same failure class, twice in one release:
+
+1. `lint` / BATS — `scripts/tests/plugins/e2e.bats` stubbed `security` as a shell *function*,
+   invisible to `_secret_load_data` because that loader runs `security` inside `bash -c`. On
+   macOS the test therefore read the **real** `k3dm-acg-pluralsight` credential; on Linux CI
+   there is no `security` binary, so the preflight refused. Fixed in `9a649af3` with a fake
+   `security` executable on PATH plus a pinned `_is_mac`. Mutation-gated.
+2. `lint` / pytest — `scripts/tests/hermes/test_hermes.py` stubs sensors from an explicit
+   tuple, and v1.37.0's `03b875c5` added `alert_delivery` to `_run_cycle` without extending
+   it (**two** stub sites, lines 56 and 98). The real sensor ran and shelled out to
+   `bin/k3dm-alert-delivery-status --json` with a 60s timeout — live `kubectl` on every local
+   `make test-pytest`. Locally the probe succeeded → green; on CI it raised → `unknown` → seven
+   40-minute polls tripped the 30+ min unknown page → `pages == []` failed. Fixed in
+   `444aea0c`. Reproduced pre-fix with `env PATH="/usr/bin:/bin"` (0.30s vs 17.82s — the
+   timing gap is the tell), 189 passed post-fix.
+
+**Standing lesson:** a stub list enumerated by name silently leaks every sensor added later.
+A third sensor will escape the same way — worth a gate that derives the list from
+`_run_cycle` rather than restating it.
+
+**CodEQL alerts 23/24/26/27** (`py/path-injection` + `py/command-line-injection`, 2 critical,
+at `proc.py:38` and `bin/k3dm-webhook:991`) analysed and documented in
+`docs/issues/2026-09-24-codeql-pr131-spawn-injection-false-positives.md` (`d482fc47`), with an
+in-code `# codeql[...]` marker at each sink and the conditions that would make them real again.
+Verdict: real dataflow, not exploitable — `cmd[0]` is a literal at every call site, the `cwd`
+branch pins the executable to `/bin/bash`, and request-derived argv passes anchored
+metacharacter-free `fullmatch` patterns before `shlex.quote`. Surfaced by the module extraction,
+not introduced by it. Alert 25 is main's pre-existing 22 at a shifted line — left open.
+
+**The API dismissal of 23/24/26/27 is NOT done** — `gh api ... code-scanning/alerts` was denied
+by the auto-mode classifier as a CI bypass. The operator must run it from their own terminal.
+GitHub does not honour the in-code `codeql[...]` comments as dismissals, so the alerts stand
+until that runs. `enforce_admins` still untouched.
+
 ## 2026-09-24 — v1.37.0 PR #131 opened; lib-foundation PR #56 opened
 
 **k3d-manager PR #131** (`k3d-manager-v1.37.0` → `main`, head `4376a6ec`, 90 commits). Copilot
