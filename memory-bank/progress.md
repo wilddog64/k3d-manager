@@ -49,9 +49,10 @@
 - [x] **lib-foundation PR #55 opened** — `https://github.com/wilddog64/lib-foundation/pull/55`,
       head `8986227`, `mergeable_state: clean`, CI green per-job, 5/5 Copilot threads resolved.
       `CHANGE.md` promoted to `[v0.4.18] — 2026-09-24` in `15bf3b7`.
-- [ ] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release.
-- [ ] Subtree pull into k3d-manager; then consider wiring K3DM_ACG_REQUIRE_CREDENTIALS into the
-      Tier 2 preflight in place of the keychain-existence check.
+- [x] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release. Merged to main at
+      `2f244ee4`; tag pushed; release at https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18.
+- [ ] Subtree pull lib-foundation v0.4.18 into scripts/lib/acg/, then rewire the Tier 2 preflight
+      in scripts/plugins/e2e.sh to the real loader / K3DM_ACG_REQUIRE_CREDENTIALS.
 
 ## 2026-09-24 — ACG preflight account-name fix
 
@@ -1634,8 +1635,10 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       via `beforeEach`/`afterAll`. All 5 threads replied to and resolved.
       No `enforce_admins` lever — lib-foundation `main` is ruleset-protected with no
       required-approvals gate.
-- [ ] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release
-- [ ] Subtree pull into k3d-manager, then rewire the Tier 2 preflight to the real loader
+- [x] Merge PR #55 (operator's), then tag v0.4.18 + GitHub release. Merged to main at
+      `2f244ee4`; tag pushed; release at https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18.
+- [ ] Subtree pull lib-foundation v0.4.18 into scripts/lib/acg/, then rewire the Tier 2 preflight
+      to the real loader / K3DM_ACG_REQUIRE_CREDENTIALS.
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
       `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
       live sandbox path and needs a sandbox to verify.

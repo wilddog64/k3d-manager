@@ -1,5 +1,21 @@
 # Active Context — k3d-manager
 
+## 2026-09-24 — upstream: lib-foundation v0.4.18 merged, tagged, released
+
+PR #55 merged to main (`2f244ee4`); tag v0.4.18 pushed; GitHub release created at
+`https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18`. Retrospective
+committed to `docs/v0.4.18-retrospective` branch at `d968af5` and pushed.
+
+No `enforce_admins` step applied — lib-foundation `main` is ruleset-protected (`deletion`,
+`non_fast_forward`, `copilot_code_review`) with no required-approvals gate; classic
+protection endpoint returns 404 by design and there is no admin lever to restore.
+
+**Still pending:** subtree pull of lib-foundation v0.4.18 into `scripts/lib/acg/`,
+then rewiring the Tier 2 preflight in `scripts/plugins/e2e.sh` from Keychain-existence
+check to the real loader / `K3DM_ACG_REQUIRE_CREDENTIALS`. Also deferred: `_robustClick`
+dedup across `sandbox.js` and `acg_restart.js` (needs live sandbox to verify the
+`catch()` behavior difference does not break the provisioning path).
+
 ## 2026-09-24 — upstream: lib-foundation v0.4.18 PR #55 opened, merge-ready
 
 `https://github.com/wilddog64/lib-foundation/pull/55` — one PR covering both the approved
