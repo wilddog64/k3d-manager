@@ -260,6 +260,12 @@ def alert_delivery(run, state, threshold=1):
     every rule: a referenced configSecret that does not exist (the Prometheus
     Operator then generates route.receiver=null), and a live route tree whose root
     receiver is a null sink with no child routes to escape through.
+
+    ``config_ref`` carries the *name* of the Secret named by the Alertmanager CR's
+    ``spec.configSecret``, never its contents -- the probe only checks that the object
+    exists. The field is deliberately not called ``config_secret``: CodeQL's
+    ``py/clear-text-logging-sensitive-data`` classifies any ``secret``-shaped name as
+    sensitive, and this record is printed as JSON by ``bin/k3dm-hermes``.
     """
     try:
         code, output = run(["bin/k3dm-alert-delivery-status", "--json"], {})
@@ -272,9 +278,9 @@ def alert_delivery(run, state, threshold=1):
             if not isinstance(item, dict) or "context" not in item:
                 raise ValueError("invalid cluster entry")
             name = item["context"]
-            if item.get("config_secret_missing"):
+            if item.get("config_ref_missing"):
                 blackout.append(
-                    f"{name}: configSecret {item.get('config_secret', 'unset')} absent")
+                    f"{name}: configSecret {item.get('config_ref', 'unset')} absent")
             elif item.get("root_receiver_is_null") and not item.get("child_routes"):
                 blackout.append(f"{name}: root receiver is a null sink with no child routes")
         data = {"clusters": len(clusters), "blackout": blackout}

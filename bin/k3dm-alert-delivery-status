@@ -31,15 +31,15 @@ for context in "${contexts[@]}"; do
     printf '%s\n' "{}" >> "${results_file}"
     continue
   fi
-  config_secret="$(printf '%s' "${cr_json}" | python3 -c 'import json,sys; items=json.load(sys.stdin).get("items", []); print(items[0].get("spec", {}).get("configSecret", "") if items else "")')"
-  config_secret_missing=false
-  if [[ -n "${config_secret}" ]] && ! kubectl --context "${context}" -n monitoring get secret "${config_secret}" >/dev/null 2>&1; then
-    config_secret_missing=true
+  config_ref="$(printf '%s' "${cr_json}" | python3 -c 'import json,sys; items=json.load(sys.stdin).get("items", []); print(items[0].get("spec", {}).get("configSecret", "") if items else "")')"
+  config_ref_missing=false
+  if [[ -n "${config_ref}" ]] && ! kubectl --context "${context}" -n monitoring get secret "${config_ref}" >/dev/null 2>&1; then
+    config_ref_missing=true
   fi
   root_receiver=null
   root_receiver_is_null=true
   child_routes=0
-  if ! ${config_secret_missing}; then
+  if ! ${config_ref_missing}; then
     generated="alertmanager-${cr_name}-generated"
     generated_json="$(kubectl --context "${context}" -n monitoring get secret "${generated}" -o json 2>/dev/null)" || {
       printf '%s\n' '{"available":false}'
@@ -71,14 +71,14 @@ print(json.dumps({"root_receiver": receiver, "root_receiver_is_null": not has_de
     root_receiver_is_null="$(printf '%s' "${route_shape}" | python3 -c 'import json,sys; print(str(json.load(sys.stdin)["root_receiver_is_null"]).lower())')"
     child_routes="$(printf '%s' "${route_shape}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["child_routes"])')"
   fi
-  python3 - "${context}" "${cr_name}" "${config_secret}" "${config_secret_missing}" \
+  python3 - "${context}" "${cr_name}" "${config_ref}" "${config_ref_missing}" \
       "${root_receiver}" "${root_receiver_is_null}" "${child_routes}" >> "${results_file}" <<'PY'
 import json
 import sys
-context, alertmanager, config_secret, missing, receiver, receiver_null, children = sys.argv[1:]
+context, alertmanager, config_ref, missing, receiver, receiver_null, children = sys.argv[1:]
 print(json.dumps({"context": context, "alertmanager": alertmanager,
-                  "config_secret": config_secret,
-                  "config_secret_missing": missing == "true",
+                  "config_ref": config_ref,
+                  "config_ref_missing": missing == "true",
                   "root_receiver": receiver,
                   "root_receiver_is_null": receiver_null == "true",
                   "child_routes": int(children)}))

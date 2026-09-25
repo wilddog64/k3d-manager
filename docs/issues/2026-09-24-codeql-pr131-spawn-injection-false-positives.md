@@ -117,6 +117,49 @@ will re-fire on any future field named `*_secret` that carries a reference rathe
 **This alert alone fails the PR's CodeQL check** — the check reports "1 new alert including
 1 high severity" after the four injection alerts were dismissed.
 
+### Resolution — 2026-09-25: renamed, not dismissed
+
+Owner's decision: **rename the field** rather than carry a fifth dismissal.
+
+The rename is the honest fix independently of CodeQL. The value is a resource *name*, so
+`config_secret` was already misleading — a reader would reasonably expect it to hold a
+credential. Two other considerations settled it:
+
+- **The blast radius is three files and zero external consumers.** The JSON field is introduced
+  by this PR, so nothing on `main` reads it: `bin/k3dm-alert-delivery-status` (emitter),
+  `scripts/lib/hermes/sensors.py` (consumer), `scripts/tests/hermes/test_alert_delivery.py`.
+  (`scripts/tests/plugins/alertmanager_config_secret.bats` matches on the Helm values key
+  `configSecret` and is unrelated.)
+- **A dismissal would have to be re-argued.** A name-based heuristic re-fires on every future
+  `*_secret` field carrying a reference; removing the trigger word removes the class, whereas a
+  suppression only hides this instance.
+
+| was | now |
+|---|---|
+| `config_secret` | `config_ref` |
+| `config_secret_missing` | `config_ref_missing` |
+
+The human-readable message still reads `configSecret <name> absent`, because that string names
+the Alertmanager CR field an operator has to go look at. String *contents* are not a CodeQL
+source — the heuristic keys on the identifier, which is why renaming the dict key is sufficient.
+
+`scripts/lib/hermes/sensors.py` now carries the reasoning in the `alert_delivery` docstring, so
+the next person does not "tidy" the name back.
+
+Verified before push: the live read-only probe emits `"config_ref": "alertmanager-smtp-secret"`
+for both contexts (confirming the value really is an object name), `shellcheck` clean, and the
+full Hermes suite green at 146 passed.
+
+Two taint paths into the same `print` were checked at the same time, so that clearing one did
+not leave a real one behind — both are clean:
+
+- `approvals` — the drain token reaches only an `Authorization: Bearer` header; returned items
+  are filtered through three anchored regexes (`^r[0-9]+-[0-9a-f]{8}$`, `^[0-9a-f]{16}$`,
+  `^[A-Z0-9]{2,32}$`) and only `action_id` and `outcome` survive into the payload. A token could
+  not satisfy those patterns even if the relay echoed one back.
+- `pages` — `_open_severe` builds its strings from `alert.get('number')` alone, so the output is
+  a literal template plus integers.
+
 ## Process note
 
 The four alerts carry an in-code `# codeql[...]` marker at each sink pointing at this document,

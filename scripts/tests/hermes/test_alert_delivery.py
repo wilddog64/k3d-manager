@@ -14,8 +14,8 @@ def run_payload(payload, code=0):
 def cluster(**overrides):
     value = {
         "context": "k3d-k3d-cluster",
-        "config_secret": "alertmanager-smtp-secret",
-        "config_secret_missing": False,
+        "config_ref": "alertmanager-smtp-secret",
+        "config_ref_missing": False,
         "root_receiver_is_null": False,
         "child_routes": 4,
     }
@@ -29,8 +29,8 @@ def test_healthy_cluster_names_count():
     assert "1 Alertmanager" in result["evidence"]
 
 
-def test_missing_config_secret_degrades_on_second_cycle():
-    payload = {"available": True, "clusters": [cluster(config_secret_missing=True)]}
+def test_missing_config_ref_degrades_on_second_cycle():
+    payload = {"available": True, "clusters": [cluster(config_ref_missing=True)]}
     state = {}
     alert_delivery(run_payload(payload), state)
     result = alert_delivery(run_payload(payload), state)
@@ -41,7 +41,7 @@ def test_missing_config_secret_degrades_on_second_cycle():
 
 def test_first_blackout_cycle_is_debounced():
     state = {}
-    result = alert_delivery(run_payload({"available": True, "clusters": [cluster(config_secret_missing=True)]}), state)
+    result = alert_delivery(run_payload({"available": True, "clusters": [cluster(config_ref_missing=True)]}), state)
     assert result["status"] == "healthy"
     assert state["debounce"]["alert_delivery"] == 1
 
@@ -72,7 +72,7 @@ def test_invalid_cluster_entries_are_unknown():
 
 def test_healthy_cycle_resets_blackout_debounce():
     state = {}
-    bad = {"available": True, "clusters": [cluster(config_secret_missing=True)]}
+    bad = {"available": True, "clusters": [cluster(config_ref_missing=True)]}
     alert_delivery(run_payload(bad), state)
     good = alert_delivery(run_payload({"available": True, "clusters": [cluster()]}), state)
     assert good["status"] == "healthy"
