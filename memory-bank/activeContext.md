@@ -4645,7 +4645,7 @@ STILL PENDING, user's call only: (1) the scope decision — one PR covering obse
 plus merge + tag v0.4.18; then (3) subtree pull into k3d-manager and rewire the Tier 2 preflight in
 `scripts/plugins/e2e.sh` from Keychain-existence to the real loader. No PR created.
 
-# 2026-09-25 — v1.37.0 merged
+## 2026-09-25 — v1.37.0 merged
 
 PR #131 (`k3d-manager-v1.37.0` → `main`) merged at **925c43e7675651b9de007346612f2941d47c605a** on 2026-09-25 18:14:11Z. 
 
@@ -4655,9 +4655,37 @@ PR #131 (`k3d-manager-v1.37.0` → `main`) merged at **925c43e7675651b9de0073466
 
 **Retrospective contents:** v1.37.0 delivered the webhook monolith split (five modules: policy, smoke, agent, lifecycle, status) with authorization hardened (unknown actor → reader, POST enforces floors + policy, every request audited once). Copilot caught two gate defects in this release's own tests (disappearance guard via `rg` was vacuously green; Alertmanager tests had hard PyYAML dependency) — both fixed. Four CodeQL alerts (23/24/26/27, spawn injection) dismissed as false positives with reasoning; alert 25 resolved by renaming `config_secret` → `config_ref`. Live smoke gate reported two failures on healthy cluster — both traced to stale gate defaults, not v1.37.0 regressions. Four findings filed as specs and deferred to v1.38.0.
 
-**Merge regression surface:** verified — no new failures introduced vs. pre-merge tree.
-
 **Git tag and GitHub release:** **still MISSING** and awaiting the owner's explicit approval. CHANGELOG heading, `docs/releases.md` row and README row already exist on `main`; the downstream step (tag + release) is a hard gate requiring the user's go, not something an agent owns. No tag or release was created.
 
 **v1.38.0 plan-doc count:** starts at 3 (max 5): `v1.38.0-hermes-app-health-delta-sensor.md`, `v1.38.0-vector-store-and-hermes-prior-art.md`, and `v1.38.0-slack-smoke-target.md`. Two slots remain.
+
+
+### Standing-doc audit closed (commit `4ef90a3a`)
+
+`docs/api/functions.md` was current. The other two were not:
+
+- `memory-bank/projectbrief.md` counted the two E2E tiers as one plugin and omitted `hello.sh`,
+  leaving its inventory two files short of `scripts/plugins/`. Jenkins now carries the deprecated
+  marker CLAUDE.md already applies.
+- `.github/copilot-instructions.md` had **no entry for `scripts/lib/webhook/`** — the module set
+  v1.37.0 shipped. Copilot reviews against that file, so the modules holding the authorization
+  logic were the least-covered code in the repo. Added the three authorization invariants (unknown
+  actor role normalizes to `reader`; `min_role` is a strict floor and the effective requirement is
+  the stricter of floor and policy; audit exactly once) plus the literal-`cmd[0]` /
+  anchored-`fullmatch` invariant the four dismissed CodeQL `posix_spawn` alerts rest on — loosening
+  it turns those dismissals into real findings. Eleven plugins had no bullet and are now listed
+  with their public functions.
+
+Note `scripts/lib/webhook/` is **eleven** files / 2,662 lines, not the five the retro names; the
+five are the extracted feature modules, the rest are `config`/`make_targets`/`proc`/`render`/`auth`.
+
+### Webhook restarted onto post-decomposition code
+
+`make restart-webhook` run by the operator at 11:32 PDT. PID 86204 listening on 127.0.0.1:7443;
+the prior instance exited on SIGTERM, which is what `launchctl kickstart -k` does. The agent runs
+`bin/k3dm-webhook` straight out of this working tree, so the restart also picked up the
+`k3d-manager-v1.38.0` checkout.
+
+**No regression testing was run against the merge** — `make test` was not executed in this session,
+so treat the post-merge tree as untested rather than verified.
 
