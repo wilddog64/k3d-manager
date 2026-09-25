@@ -1,5 +1,19 @@
 # Progress — k3d-manager
 
+## 2026-09-25 — deploy_app_cluster_confirm live-mutation test fix COMPLETE
+
+- [x] Applied A1/A2/A3 only to `scripts/tests/core/deploy_app_cluster_confirm.bats`:
+      hard-fail `ssh`/`scp`, stub reachability `kubectl`, isolate the kubeconfig under
+      `STUB_DIR`, and assert no provisioning output.
+- [x] Focused BATS: 3/3. Mutation check: removing the SSH-key guard made test 3 fail;
+      `git diff --quiet scripts/plugins/shopping_cart.sh` returned 0 after restoration.
+- [x] Passing output had no `Merging ubuntu-k3s context`, `Installing socat`,
+      `Permanently added`, or `vault-bridge active`; shellcheck passed with the existing
+      dynamic-source SC1091 excluded. Claude re-verified BATS 3/3, the one-file scope, the
+      origin tip, and that `shopping_cart.sh` is blob-identical to `925c43e7`.
+- [x] Commit `1cbdab25bbe894d8658a82d22d5438f945f0e86d` pushed to
+      `origin/k3d-manager-v1.38.0`; no production file or PR changed.
+
 ## 2026-09-24 — unknown actor role authorization fix (commit pending)
 
 - [x] Added exported `_normalize_actor_role` in `webhook/policy.py`, switched exactly the

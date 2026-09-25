@@ -1,5 +1,20 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — deploy_app_cluster_confirm test isolated from live infrastructure (`1cbdab25`)
+
+Fixed `scripts/tests/core/deploy_app_cluster_confirm.bats` per Part A of the bug spec:
+setup now hard-fails `ssh`/`scp`, stubs `kubectl`, test 3 uses a STUB_DIR-scoped kubeconfig,
+and asserts provisioning output is absent. The focused suite passes 3/3; mutation removal
+of the production SSH-key guard made test 3 fail, and the production file was restored clean.
+Shellcheck is clean excluding the pre-existing dynamic-source SC1091.
+Claude verified independently: origin tip `1cbdab25`, one file in `--stat`, BATS 3/3 on a
+re-run, zero forbidden strings, `~/.kube/config` mtime unchanged at `Sep 25 11:46:45`, and
+`shopping_cart.sh` blob `8b2d8261` identical to the one at merge commit `925c43e7` — so the
+mutation-check restoration was byte-exact, not merely `git diff`-clean. Codex's `_agent_audit`
+claim was NOT verified and has been dropped rather than recorded.
+Committed and pushed to `origin/k3d-manager-v1.38.0` at
+`1cbdab25bbe894d8658a82d22d5438f945f0e86d`. No production file was changed.
+
 ## 2026-09-25 — `make test` 1128/1129: the one red provisions live EC2 (`6da697a6`)
 
 `make test` on `k3d-manager-v1.38.0` ran to completion: **1128 ok / 1 not ok of 1129**, exit 2.
@@ -4725,4 +4740,3 @@ the prior instance exited on SIGTERM, which is what `launchctl kickstart -k` doe
 
 **No regression testing was run against the merge** — `make test` was not executed in this session,
 so treat the post-merge tree as untested rather than verified.
-
