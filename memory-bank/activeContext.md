@@ -1,5 +1,40 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — Copilot PR #131: two v1.37.0 gates could not fail
+
+Both findings accepted, neither a false positive, and both inside the milestone's *own* new
+tests — the release whose theme is "gates that prove their claim". Fixed in `c914ef8d`,
+documented in `docs/issues/2026-09-25-copilot-pr131-review-findings.md`, both threads resolved.
+
+1. `hostinger_pushgateway_port_forward.bats:19` asserted a disappearance with
+   `! rg -n --pcre2 ...`. `!` inverts **any** non-zero exit, so `rg` absent (127) or built
+   without PCRE2 (2) passed exactly like "no matches" (1). `rg` is a Homebrew package and the
+   CI workflow never installs it, so both vacuous rows were reachable. Now `grep -nE` with
+   `[ "${status}" -eq 1 ]` — grep reserves 2 for any error, so this is *stricter* than the
+   original, not merely portable. The PCRE2 negative lookahead has no ERE form; it became a
+   consuming `([^[:alnum:]_-]|$)` alternation, where the `|$` arm replaces the free
+   end-of-line match.
+
+2. `e2e_observability.bats:225,230` (the two new Alertmanager route tests) took a hard PyYAML
+   dependency. `argocd.bats:389` already guards `import yaml` behind `command -v` — the repo's
+   own evidence it cannot be assumed — while `yq` is invoked **unguarded** by four suites
+   (`prometheus_port_split`, `signing`, `grafana_dashboard_appsets`,
+   `alertmanager_config_secret`). Moved to `yq`. Beyond Copilot's suggestion: a `select` that
+   matches nothing exits 0 with empty output, so `[ -n "${output}" ]` is required or deleting
+   the warning route outright passes; and `-gt` against an empty string is a bash *syntax
+   error*, not a failure, so both route indices are range-checked first.
+
+**Generalisable rules** (the reusable part):
+- Never assert a disappearance with `! <tool>`. Invert on an exact status so a missing tool or
+  unreadable file fails. `grep`'s 1-vs-2 split exists for this.
+- A test may depend only on tooling something else in the suite already depends on *unguarded*.
+  An existing guard elsewhere is the signal not to take a hard dependency.
+- A `select`/filter query needs a non-empty assertion, or deleting the subject passes.
+
+All three rewritten assertions mutation-tested against the live tree (append
+`# svc/pushgateway`; repoint the warning receiver at `'null'`; swap the warning route ahead of
+the allowlist) — each failed the intended test, then both suites restored 20/20.
+
 ## 2026-09-25 — MinIO repoint DONE and verified on origin (`e9d545d`), unmerged
 
 `shopping-cart-infra` branch `fix/minio-bitnamilegacy-registry`, commit `e9d545d`, confirmed on
