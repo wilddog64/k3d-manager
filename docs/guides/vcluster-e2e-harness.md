@@ -228,7 +228,7 @@ security find-generic-password -s k3dm-acg-pluralsight -a username
 security find-generic-password -s k3dm-acg-pluralsight -a password
 ```
 
-Do not add `-w`: it reads the secret value, while this diagnostic only needs to
+Do not add `-w` by hand: it reads the secret value, while this diagnostic only needs to
 know whether each account exists. Do not check the service alone — a match on
 `-s` with no `-a` is satisfied by an entry under any account name, including one
 the loader never reads, so it cannot tell you whether auto-login will work.
@@ -236,12 +236,47 @@ An absent account is an error for Path A. Path B is
 the manual-session mode: a live `pw-profile` session may exist without the item,
 but it must be refreshed by a human when it expires.
 
-The session gate reports three distinct states: `ACG_SESSION_OK` means the browser
-is authenticated; `ACG_LOGIN_MFA_REQUIRED` means an MFA challenge was detected and
-deliberately refused; and `ACG_SESSION_EXPIRED` means the session is unauthenticated
-and unattended login is unavailable. `K3DM_ACG_SKIP_SESSION_CHECK=1` is a local
-debugging aid only and is never valid for a Tier 2 acceptance run; the Tier 2
-preflight refuses to run with it set.
+**Existence is weaker than readability, and the preflight tests the stronger claim.**
+`_e2e_sandbox_preflight_auth` calls `_secret_load_data` — the same loader
+`_cdp_ensure_acg_session` uses — and discards the value to `/dev/null`, so a value the
+preflight cannot read is a value unattended login will never see. This catches two
+states an existence-only check reports as healthy:
+
+| State | `find-generic-password` (no `-w`) | `_secret_load_data` |
+|---|---|---|
+| entry absent | fails | fails |
+| **login keychain locked** | **succeeds** | fails (`User interaction is not allowed`) |
+| **value stored empty** | **succeeds** | fails (empty is rc 1) |
+| value readable | succeeds | succeeds |
+
+The empty-value row is not hypothetical: `security -w` with no TTY stores an empty
+value at rc 0, so a population attempt from a non-GUI session produces an item that
+exists, reads back as nothing, and passes an existence check.
+
+On success the preflight exports `K3DM_ACG_REQUIRE_CREDENTIALS=1`, which makes the
+downstream session check fail closed: `acg_session_check.js` refuses to fall back to a
+pre-existing browser session when the credential store is unusable, rather than
+silently passing on a human's leftover login. The preflight arms this only after the
+`_ACG_SANDBOX_URL` and `K3DM_ACG_SKIP_SESSION_CHECK` guards pass, and it reads no
+credential at all when it refuses on those.
+
+The session gate reports these states:
+
+| Marker | Meaning |
+|---|---|
+| `ACG_SESSION_OK path=existing-session` | already authenticated; no login attempted |
+| `ACG_SESSION_OK path=auto-login` | signed in unattended during this run |
+| `ACG_CREDENTIALS: username=… password=…` | credential-store health (`present`/`empty`/`absent`), never the values |
+| `ACG_CREDENTIALS_REQUIRED` | store unusable while `K3DM_ACG_REQUIRE_CREDENTIALS=1` — the fail-closed gate |
+| `ACG_LOGIN_FIELDS_MISSING` | the sign-in form did not yield both fields |
+| `ACG_LOGIN_MFA_REQUIRED` | MFA challenge detected and deliberately refused |
+| `ACG_SESSION_EXPIRED` | unauthenticated and unattended login unavailable |
+
+The `path=` suffix on `ACG_SESSION_OK` is what distinguishes "auto-login works" from
+"a human happened to be signed in already" — before it existed, both printed the same
+marker, and headless auto-login was broken for months without the gate noticing.
+`K3DM_ACG_SKIP_SESSION_CHECK=1` is a local debugging aid only and is never valid for a
+Tier 2 acceptance run; the Tier 2 preflight refuses to run with it set.
 
 #### One-time population must happen in a GUI-session terminal
 

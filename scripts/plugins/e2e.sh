@@ -292,29 +292,32 @@ function _e2e_sandbox_provision_secrets() {
 }
 
 function _e2e_sandbox_preflight_auth() {
-  local service="k3dm-acg-pluralsight" keychain_present=1 profile_dir
-  local account missing=""
+  local service="k3dm-acg-pluralsight" credentials_loadable=1 profile_dir
+  local account unreadable=""
   profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
 
   if [[ -z "${_ACG_SANDBOX_URL:-}" ]]; then
     _err "[e2e] _ACG_SANDBOX_URL is empty; set the ACG sandbox URL before Tier 2"
     return 1
   fi
-  for account in username password; do
-    if ! security find-generic-password -s "$service" -a "$account" >/dev/null 2>&1; then
-      keychain_present=0
-      missing="${missing:+${missing},}${account}"
-    fi
-  done
   if [[ "${K3DM_ACG_SKIP_SESSION_CHECK:-0}" == "1" ]]; then
     _err "[e2e] Tier 2 refuses to run with K3DM_ACG_SKIP_SESSION_CHECK=1; unset the local debugging aid"
     return 1
   fi
-  if (( keychain_present )); then
-    _info "[e2e] ACG preflight: service=${service} keychain_present=true path=Path A"
+  for account in username password; do
+    if ! _secret_load_data "$service" "$account" >/dev/null 2>&1; then
+      credentials_loadable=0
+      unreadable="${unreadable:+${unreadable},}${account}"
+    fi
+  done
+
+  export K3DM_ACG_REQUIRE_CREDENTIALS=1
+
+  if (( credentials_loadable )); then
+    _info "[e2e] ACG preflight: service=${service} credentials_loadable=true K3DM_ACG_REQUIRE_CREDENTIALS=1"
     return 0
   fi
-  _err "[e2e] ACG preflight: service=${service} keychain_present=false missing=${missing} path=Path A; the loader reads the accounts username and password under this service, so an entry stored under any other account name is never read; add the personal no-MFA account via the ACG auto-login enablement guide (profile_dir=${profile_dir} exists but proves nothing about session validity); markers: ACG_SESSION_OK=authenticated, ACG_LOGIN_MFA_REQUIRED=MFA refused, ACG_SESSION_EXPIRED=not authenticated"
+  _err "[e2e] ACG preflight: service=${service} credentials_loadable=false unreadable=${unreadable}; this is the same loader the session check uses, so a value it cannot read is a value unattended login will never see — the entry is absent, the login keychain is locked (security reports 'User interaction is not allowed' on reads), or the value was stored empty; add the personal no-MFA account under the accounts username and password via the ACG auto-login enablement guide (profile_dir=${profile_dir} exists but proves nothing about session validity); markers: ACG_SESSION_OK=authenticated, ACG_LOGIN_MFA_REQUIRED=MFA refused, ACG_SESSION_EXPIRED=not authenticated, ACG_CREDENTIALS_REQUIRED=fail-closed credential gate"
   return 1
 }
 
