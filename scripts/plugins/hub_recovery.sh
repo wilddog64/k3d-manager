@@ -249,7 +249,7 @@ function hub_recovery_reconcile() {
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1
   _hub_recovery_ensure_eso_apps_role || return 1
-  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc ARGOCD_APP_CLUSTER_NAME=ubuntu-k3s ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster ARGOCD_APP_CLUSTER_PROVIDER=k3d ARGOCD_NAMESPACE=cicd register_app_cluster || return 1
+  ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc ARGOCD_APP_CLUSTER_NAME="${HUB_RECOVERY_HUB_CLUSTER_NAME:-k3d-cluster}" ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster ARGOCD_APP_CLUSTER_PROVIDER=k3d ARGOCD_NAMESPACE=cicd register_app_cluster || return 1
   argocd_reconcile_app_cluster_registrations || true
   _hub_recovery_seed_app_cluster_reader "$hub_context" "$app_context" || return 1
   _hub_recovery_scale_openldap "$hub_context" || return 1

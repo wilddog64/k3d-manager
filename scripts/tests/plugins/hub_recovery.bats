@@ -444,3 +444,28 @@ function _stub_argocd_admin_mirror_dependencies() {
   run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
   [ "$status" -ne 0 ]
 }
+
+@test "hub_recovery_reconcile: hub self-registration uses its own cluster name, not ubuntu-k3s" {
+  local seen="${BATS_TEST_TMPDIR}/hub-reg-name"
+  : >"$seen"
+  _hub_recovery_ensure_serverlb_upstreams() { :; }
+  _hub_recovery_sync_vault_root_token() { :; }
+  _hub_recovery_ensure_eso_apps_role() { :; }
+  register_app_cluster() { printf '%s\n' "${ARGOCD_APP_CLUSTER_NAME}" >>"$seen"; }
+  argocd_reconcile_app_cluster_registrations() { :; }
+  _hub_recovery_seed_app_cluster_reader() { :; }
+  _hub_recovery_scale_openldap() { :; }
+  _hub_recovery_replay_identity_hook() { :; }
+  keycloak_seed_smoke_user() { :; }
+  _hub_recovery_mirror_argocd_admin() { :; }
+  _hub_recovery_install_cloudflared_config() { :; }
+  export -f _hub_recovery_ensure_serverlb_upstreams _hub_recovery_sync_vault_root_token
+  export -f _hub_recovery_ensure_eso_apps_role register_app_cluster argocd_reconcile_app_cluster_registrations
+  export -f _hub_recovery_seed_app_cluster_reader _hub_recovery_scale_openldap _hub_recovery_replay_identity_hook
+  export -f keycloak_seed_smoke_user _hub_recovery_mirror_argocd_admin _hub_recovery_install_cloudflared_config
+  run hub_recovery_reconcile --confirm
+  [ "$status" -eq 0 ]
+  [ "$(<"$seen")" = k3d-cluster ]
+  run grep -Fqx ubuntu-k3s "$seen"
+  [ "$status" -ne 0 ]
+}
