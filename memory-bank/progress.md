@@ -14,20 +14,53 @@
 
 ## 2026-09-26 — v1.38.0 MERGED, tagged and released; v1.39.0 branch cut
 
+- [x] **SCOPE REVISED 2026-09-26 (operator approved): the vector-store spec is SPLIT, and
+  `slack-corpus-qa` moves to v1.40.0.** Supersedes the earlier same-day decision that carried three
+  specs onto v1.39.0. The original six-workstream spec named this split in its own Risks section and
+  we took it.
+  **v1.39.0 (4 plan docs, under the cap):** `test-suite-metrics-and-staleness`,
+  `public-endpoint-blackbox-probes`, `slack-smoke-target`,
+  `vector-store-platform-and-retrieval` (WS1 deploy + WS2 indexer + WS3 library).
+  **v1.40.0 (3, pre-staged):** `hermes-app-health-delta-sensor`,
+  `hermes-prior-art-and-retrieval-eval` (WS4 + WS5), `slack-corpus-qa`.
+  Effect: `slack-corpus-qa` now sits in the **same** release as the WS5 recall@5 that gates it,
+  instead of one release behind. That was the flaw in the earlier decision — carrying the vector
+  store forward kept the dependency on the branch but not the measurement.
+- [ ] **BLOCKS WS2 — the embeddings provider is undecided and no credential exists.**
+  `k3dm-openai-api-key`, `k3dm-embeddings-api-key` and `k3dm-anthropic-api-key` are all absent
+  (existence check only, no value read). **`gemini-cli-api-key` does exist** and Gemini embeddings
+  are free-tier, making it the candidate needing no new credential — but it was provisioned for the
+  Gemini CLI and **repurposing it needs the operator's explicit go**. WS1 does not depend on this;
+  WS2 cannot start without it.
+- [ ] **WS1 needs the operator's go** — it deploys pgvector to the hub. Prerequisites verified
+  2026-09-26: ESO on the hub is healthy (6 of 7 ExternalSecrets `SecretSynced/True`; the one
+  failure is the pre-existing `cosign-public-key` in `platform-ops`), and the hub-scoped Application
+  pattern to copy already exists (`hub-loki`, `hub-platform-ops`). WS1 must **not** use the
+  `role: app-cluster` selector.
+- [x] **Corpus measured for WS5's effort estimate: 1,703 tracked docs**, not the 868 the original
+  spec assumed — 737 `docs/bugs/`, 451 `docs/issues/`, 435 `docs/plans/`, 80 `docs/retro/`. WS5 wants
+  >=25 positive and >=25 hard-negative hand-mined pairs; 10 positives and 1 hard negative are already
+  seeded, so ~15 and ~24 remain. This is the bulk of the retrieval work and is why it is its own
+  release. `scripts/tests/fixtures/doc-dedup/` does not exist yet; `e2e-corpus/corpus.jsonl` is the
+  schema precedent.
+- [x] **v1.39.0 ships the retriever UNMEASURED — accepted, and must be stated.** No recall@5 number
+  exists until v1.40.0's WS5 runs. The guide, CHANGELOG and retro must say the quality is unmeasured
+  rather than implying it was evaluated; v1.40.0's WS6 goes back and replaces that caveat with the
+  measured numbers.
 - [x] **SCOPE DECISION for v1.39.0 — settled 2026-09-26, operator approved.** v1.39.0 now holds
   exactly **5** plan docs, at the cap:
   1. `v1.39.0-test-suite-metrics-and-staleness.md` (its own, ready to implement)
-  2. `v1.39.0-slack-corpus-qa.md` (its own, blocked — see below)
+  2. `v1.40.0-slack-corpus-qa.md` (its own, blocked — see below)
   3. `v1.39.0-public-endpoint-blackbox-probes.md` (carried)
   4. `v1.39.0-slack-smoke-target.md` (carried)
-  5. `v1.39.0-vector-store-and-hermes-prior-art.md` (carried)
+  5. `v1.39.0-vector-store-platform-and-retrieval.md` (carried)
   **Deferred to v1.40.0:** `v1.40.0-hermes-app-health-delta-sensor.md`.
   Files renamed per the `62c9ff27` precedent (carried specs take the new version prefix), headers
   updated, all inbound references fixed.
 - [x] **Why the vector store was kept and the sensor deferred — corrects an earlier
   recommendation.** My first recommendation was to push the vector-store prior art to v1.40.0 as
   "research". That was wrong: its **WS5 measured recall@5 is the hard blocker** on
-  `v1.39.0-slack-corpus-qa.md`, which was already on the branch. Deferring it would have left
+  `v1.40.0-slack-corpus-qa.md`, which was already on the branch. Deferring it would have left
   v1.39.0 carrying a spec that could not be started. The `app_health` sensor is the only one of the
   four carried candidates with nothing on this branch depending on it, so it is the only one that
   can leave without stranding something. **Rule: before deferring a spec, check what on the target
@@ -1620,7 +1653,7 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   Next action, needs the user's go: reapply the `istio-ambient` ApplicationSet, confirm it writes
   the k3s dirs (the new guard should refuse the generic ones), then roll the DaemonSet.
 
-- [x] **v1.39.0 Slack corpus Q&A specced** — `docs/plans/v1.39.0-slack-corpus-qa.md`, filed on
+- [x] **v1.39.0 Slack corpus Q&A specced** — `docs/plans/v1.40.0-slack-corpus-qa.md`, filed on
   operator direction so it is not lost between releases. Plan #1 of 5 for v1.39.0. **Hard-blocked on
   v1.38.0 WS5 publishing a measured recall@5**; if neither scorer clears its floor the spec does not
   ship. Dedup check found `v1.6.0-slack-ai-analysis.md`, which is a different shape (alert-triggered

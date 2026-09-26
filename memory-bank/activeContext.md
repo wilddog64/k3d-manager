@@ -986,7 +986,7 @@ agent logs and had been untracked-but-ignorable only by luck; one `git add .` wo
 all of it.
 
 **v1.38.0 plan-doc count is 3, not 1** — `docs/plans/v1.40.0-hermes-app-health-delta-sensor.md` and
-`docs/plans/v1.39.0-vector-store-and-hermes-prior-art.md` already exist. Two slots left before the
+`docs/plans/v1.39.0-vector-store-platform-and-retrieval.md` already exist. Two slots left before the
 cap forces a split.
 
 ### Correction to the 2026-09-25 smoke entry above
@@ -1879,7 +1879,7 @@ and still carries `role: app-cluster`.
 ## 2026-09-23 — v1.38.0 restructured: vector store as a platform component, Hermes as the consumer
 
 Operator direction: make the deployed vector store and Hermes retrieval the headline; CLI dedup
-becomes a by-product. Spec renamed to `docs/plans/v1.39.0-vector-store-and-hermes-prior-art.md`.
+becomes a by-product. Spec renamed to `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md`.
 
 **The driver is an agent-level defect, not a lint gap.** `scripts/lib/hermes/e2e_bugs.py:163` decides
 new-vs-recurrence with `bug_dir.glob(f"*-{group['slug']}.md")` — an unattended agent whose recall over
@@ -1922,7 +1922,7 @@ semantic search via the `code-review-graph` MCP; docs never got it. The concrete
 373 issue docs, 250 plans, 78 retros. Two filings of one defect with different vocabulary do not
 collide.
 
-`docs/plans/v1.39.0-vector-store-and-hermes-prior-art.md` (initially written as
+`docs/plans/v1.39.0-vector-store-platform-and-retrieval.md` (initially written as
 `v1.38.0-semantic-doc-dedup.md`, restructured on operator direction). Deliberately **two-phase**, because the repo has
 **zero third-party Python runtime dependencies** (`check-doc-links.py` is stdlib-only; no
 `requirements.txt` or `pyproject.toml` exists) on Python **3.14.7**, where torch-class wheels are not
@@ -5278,7 +5278,7 @@ PR #131 (`k3d-manager-v1.37.0` → `main`) merged at **925c43e7675651b9de0073466
 
 **Git tag and GitHub release:** **still MISSING** and awaiting the owner's explicit approval. CHANGELOG heading, `docs/releases.md` row and README row already exist on `main`; the downstream step (tag + release) is a hard gate requiring the user's go, not something an agent owns. No tag or release was created.
 
-**v1.38.0 plan-doc count:** starts at 3 (max 5): `v1.40.0-hermes-app-health-delta-sensor.md`, `v1.39.0-vector-store-and-hermes-prior-art.md`, and `v1.39.0-slack-smoke-target.md`. Two slots remain.
+**v1.38.0 plan-doc count:** starts at 3 (max 5): `v1.40.0-hermes-app-health-delta-sensor.md`, `v1.39.0-vector-store-platform-and-retrieval.md`, and `v1.39.0-slack-smoke-target.md`. Two slots remain.
 
 
 ### Standing-doc audit closed (commit `4ef90a3a`)
