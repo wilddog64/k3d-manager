@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Fixed
+- ArgoCD bootstrap now seeds the vectordb Postgres credential inside the Vault pod when the
+  path is absent, so a hand-written credential is reproducible after a hub rebuild. The seed is
+  idempotent and skips an existing entry rather than rotating it, because the initialised
+  database would reject a newly published password.
 - The ArgoCD values-branch gate no longer reports a clean result it did not verify. The drift
   detector had used one empty-stdout channel for no drift, unparseable input, and zero references,
   while the caller discarded its exit status; it now distinguishes those outcomes, fails closed on

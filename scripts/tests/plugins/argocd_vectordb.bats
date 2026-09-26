@@ -92,3 +92,62 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   [ "$status" -eq 0 ]
   [[ "$output" == *"key: vectordb/postgres"* ]]
 }
+
+@test "vectordb Vault seed function is defined" {
+  run rg -n '^function _argocd_seed_vectordb_postgres\(\)' "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+}
+
+@test "bootstrap seeds vectordb before deploying the AppProject" {
+  local _argocd="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  local _seed_line _project_line
+
+  _seed_line=$(rg -nF '_argocd_seed_vectordb_postgres || _warn' "${_argocd}" | cut -d: -f1)
+  _project_line=$(rg -n '^[[:space:]]*_argocd_deploy_appproject$' "${_argocd}" | tail -1 | cut -d: -f1)
+  [ -n "${_seed_line}" ]
+  [ -n "${_project_line}" ]
+  [ "${_seed_line}" -lt "${_project_line}" ]
+}
+
+@test "vectordb Vault seed checks for an existing secret before putting" {
+  local _argocd="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  local _body _get_line _put_line
+
+  _body=$(awk '/^function _argocd_seed_vectordb_postgres\(\)/ { in_function=1 } in_function { print } in_function && /^}/ { exit }' "${_argocd}")
+  _get_line=$(printf '%s\n' "${_body}" | rg -n 'vault kv get -mount=secret "\$secret_path"' | cut -d: -f1)
+  _put_line=$(printf '%s\n' "${_body}" | rg -n 'vault kv put -mount=secret vectordb/postgres' | cut -d: -f1)
+  [ -n "${_get_line}" ]
+  [ -n "${_put_line}" ]
+  [ "${_get_line}" -lt "${_put_line}" ]
+}
+
+@test "vectordb Vault seed sends generated credentials on stdin, not argv" {
+  local _argocd="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  local _body _argv_count
+
+  _body=$(awk '/^function _argocd_seed_vectordb_postgres\(\)/ { in_function=1 } in_function { print } in_function && /^}/ { exit }' "${_argocd}")
+  run rg -nF "vault kv put -mount=secret vectordb/postgres -'" <<< "${_body}"
+  [ "$status" -eq 0 ]
+  _argv_count=$(printf '%s\n' "${_body}" | rg -c 'vault kv put[^\n]*(password=|password[^[:space:]]*=)' || true)
+  _argv_count=${_argv_count:-0}
+  [ "${_argv_count}" = "0" ]
+}
+
+@test "vectordb Vault seed generates the value from urandom inside remote sh" {
+  local _argocd="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  local _body
+
+  _body=$(awk '/^function _argocd_seed_vectordb_postgres\(\)/ { in_function=1 } in_function { print } in_function && /^}/ { exit }' "${_argocd}")
+  run rg -n "sh -c 'P=.*tr -dc.*< /dev/urandom" <<< "${_body}"
+  [ "$status" -eq 0 ]
+}
+
+@test "vectordb Vault seed pins the secret KV mount on get and put" {
+  local _argocd="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  local _get_count _put_count
+
+  _get_count=$(awk '/^function _argocd_seed_vectordb_postgres\(\)/ { in_function=1 } in_function && /vault kv get -mount=secret/ { count++ } in_function && /^function / && !/^function _argocd_seed_vectordb_postgres/ { exit } END { print count + 0 }' "${_argocd}")
+  _put_count=$(awk '/^function _argocd_seed_vectordb_postgres\(\)/ { in_function=1 } in_function && /vault kv put -mount=secret/ { count++ } in_function && /^function / && !/^function _argocd_seed_vectordb_postgres/ { exit } END { print count + 0 }' "${_argocd}")
+  [ "${_get_count}" = "1" ]
+  [ "${_put_count}" = "1" ]
+}

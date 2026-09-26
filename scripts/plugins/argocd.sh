@@ -619,6 +619,33 @@ function _argocd_seed_vault_admin_secret() {
    _info "[argocd] ArgoCD admin password seeded. Retrieve via Kubernetes secret after ESO sync"
 }
 
+function _argocd_seed_vectordb_postgres() {
+   local ns="${VAULT_NS_DEFAULT:-vault}"
+   local release="${VAULT_RELEASE_DEFAULT:-vault}"
+   local pod="${release}-0"
+   local secret_path="vectordb/postgres"
+
+   if _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+         vault kv get -mount=secret "$secret_path" >/dev/null 2>&1; then
+      _info "[argocd] Vault secret secret/${secret_path} already present, not rotating"
+      return 0
+   fi
+
+   _info "[argocd] Seeding vectordb Postgres credentials in Vault"
+   _vault_login "$ns" "$release"
+
+   local rc=0
+   _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+      sh -c 'P=$(LC_ALL=C tr -dc "A-Za-z0-9" < /dev/urandom | head -c 32); printf "{\"username\":\"postgres\",\"password\":\"%s\"}" "$P" | vault kv put -mount=secret vectordb/postgres -' || rc=$?
+
+   if (( rc != 0 )); then
+      _err "[argocd] Failed to seed secret/${secret_path} in Vault (exit ${rc})"
+      return "$rc"
+   fi
+
+   _info "[argocd] vectordb Postgres credentials seeded"
+}
+
 function _argocd_setup_vault_policies() {
    local ns="${VAULT_NS_DEFAULT:-vault}"
    local release="${VAULT_RELEASE_DEFAULT:-vault}"
@@ -1062,6 +1089,10 @@ EOF
    # Deploy the platform-ops CVE/observability tier (namespace, CronJobs, dashboards).
    # Deployed here so it survives a hub rebuild instead of needing a manual one-shot.
    deploy_argocd_platform_ops || _warn "[argocd] platform-ops deploy reported a problem — CVE scan/dashboards may be incomplete"
+
+   # Seed the vectordb Postgres credential before the ApplicationSets create its
+   # ExternalSecret, so a rebuilt hub does not need a manual Vault write.
+   _argocd_seed_vectordb_postgres || _warn "[argocd] vectordb credential seeding reported a problem — the vectordb ExternalSecret may stay SecretSyncedError"
 
    # Deploy AppProject
    if (( ! skip_appproject )); then

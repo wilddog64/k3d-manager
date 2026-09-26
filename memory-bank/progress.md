@@ -2113,3 +2113,12 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       `origin/fix/keycloak-reconcile-awk-free` (`shopping-cart-infra`). `awk` 11 → 0, YAML parses,
       shellcheck clean both sides, 13/13 helper-vs-awk equivalences with 2 negative controls.
       PR is the owner's call.
+# 2026-09-26 — vectordb Vault credential seed authored
+
+- [x] Added the idempotent in-pod Vault seed and bootstrap call before the AppProject.
+- [x] Added six focused BATS gates and `docs/guides/vector-store.md`; no credential value was
+  handled or recorded.
+- [x] `bats scripts/tests/plugins/argocd_vectordb.bats`: 16/16 passed after restoration.
+- [x] Mutation-proof red lines captured for gates 11–16; all mutations restored.
+- [ ] Commit and push blocked: `git add` could not create `.git/index.lock` (`Operation not
+  permitted`) under the sandbox; no PR created.

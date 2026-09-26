@@ -5430,3 +5430,12 @@ the prior instance exited on SIGTERM, which is what `launchctl kickstart -k` doe
 
 **No regression testing was run against the merge** — `make test` was not executed in this session,
 so treat the post-merge tree as untested rather than verified.
+# 2026-09-26 — vectordb Vault credential seed authored
+
+Implemented the WS1 addendum in the allowed files: `_argocd_seed_vectordb_postgres` generates
+the credential inside the Vault pod, skips an existing KV entry, and is called before the
+AppProject deployment. Added six source-level BATS gates and the scoped vector-store guide.
+Focused BATS is 16/16. Mutation proof produced red gates 11, 12, 13, 14, 15, and 16 and all
+mutations were restored. Shellcheck remains at the existing single SC2317 informational warning.
+Commit and push are blocked by the sandbox refusing `.git/index.lock` creation with
+`Operation not permitted`; no PR was created.
