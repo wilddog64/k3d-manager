@@ -41,6 +41,18 @@ directly: 13 comparisons of each new bash helper against its `awk` oracle on rea
 input all matched, with 2 negative controls failing as required to show the harness can detect a
 difference.
 
+## 2026-09-26 — PR #100 merged, hub SSO fix is on main (Claude)
+
+`shopping-cart-infra` PR #100 merged as `64c11783` — the awk-free Keycloak reconcile hook plus the
+four `return 0` lines that Copilot's false positive led to. `enforce_admins` was disabled for the
+merge and has been **restored** (bodyless POST, read back `{"enabled": true}`). Local `main` synced.
+No tag: the CHANGELOG still has only `[Unreleased]`, and the release version is the operator's call —
+last tag is `v0.5.0` (2026-05-19), so roughly four months of work is unreleased.
+
+Still owed on this: the ArgoCD sync that makes the fix take effect, then confirm
+`keycloak-realm-reconcile` reaches `Completed` and re-run the cluster smoke for frontend and ArgoCD
+SSO. That is a live mutation and waits for the go.
+
 ## 2026-09-26 — Hub SSO outage root-caused to the awk-free fix that was never PR'd (Claude)
 
 A cloud session ran the bridge's `cluster-status` and reported 13 ok / 3 warn / 5 fail. Three of
