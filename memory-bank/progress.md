@@ -1,5 +1,38 @@
 # Progress — k3d-manager
 
+## 2026-09-25 — v1.38.0 PR #132 open, all gates green, enforce_admins off
+
+- [x] **PR #132 created** — `feat: read-only cloud-session access to the local webhook`,
+  base `main`, head `k3d-manager-v1.38.0`. 40 commits, 34 files.
+  https://github.com/wilddog64/k3d-manager/pull/132
+- [x] **CHANGELOG promoted** — `[Unreleased]` -> `## [1.38.0] - 2026-09-25`, `[Unreleased]`
+  left in place and empty above it. Release rows added to README (3-row main table, v1.35.0
+  moved into `<details>`) and `docs/releases.md`. `59079150`, row reworded to the house
+  title-and-theme form in `78216bd7`.
+- [x] **Copilot: 3 findings, all valid, all fixed** — `2339e99d`. Threads all resolved.
+  See `docs/issues/2026-09-25-copilot-pr132-review-findings.md`.
+  - `mktemp -u` raced on the `init-cloud-requests` git index path. **Copilot's suggested fix
+    was wrong** — git rejects a zero-byte index (`index file smaller than expected`), so
+    dropping `-u` would have failed the target at rc 128. Fixed with a private `mktemp -d`.
+  - BRE `\|` alternation in the day-old vacuous-run guard -> `grep -Eq` with an escaped ERE,
+    re-mutation-tested red/green after the change.
+  - The loopback webhook addressed as `https://` in **three** places, not the one flagged.
+- [x] **Gates** — CI run 36209718366 on `2339e99d`: lint success, detect success, stage2
+  **skipped** (label-gated on `ci:cluster-tests`, by design — not a hidden gap).
+  `make test` 1129 ok / 0 not ok; `test-pytest` 215 passed; `test-python-unit` rc 0;
+  `check-doc-links` 1785 OK. Live smoke: health 200, reader `cluster-status` 202, Slack
+  `/k3dm test-pytest` round trip green.
+- [x] **`enforce_admins` disabled** on `wilddog64/k3d-manager` `main`, verified
+  `enabled=false`. `mergeable_state` reads `blocked` only because
+  `required_approving_review_count=1` and Copilot reviewed as COMMENTED, not APPROVED —
+  admin bypass is the intended path. **MUST be re-enabled with a bodyless POST after merge,
+  or restored in the same turn if the merge is deferred.**
+- [ ] **Merge PR #132** — the operator's call. Never auto-merge.
+- [ ] **Release-scope decision** — four v1.38.0 specs ship as specs only (public-endpoint
+  blackbox probes, hermes app-health delta sensor, slack smoke target, vector-store prior
+  art). Carrying all four to v1.39.0 puts that branch at **6 plan docs, one over the max-5
+  cap**, so they must be split across v1.39.0/v1.40.0 or dropped. Decide at `/post-merge`.
+
 ## 2026-09-26 — v1.38.0 P6 reader-tier make targets through the cloud bridge
 
 - [x] **P7 — offline test suites as reader targets** — `test-pytest` + `test-python-unit` in

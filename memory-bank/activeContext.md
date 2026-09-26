@@ -1,5 +1,33 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — PR #132 is open and mergeable by admin bypass (Claude)
+
+`/create-pr` ran to completion. Pre-flight 0-2, 7 and 8 were run in the main session because
+they can end in "ask the user"; 3-6 went to a Haiku subagent, which returned before CI
+finished and had its CHANGELOG promotion, release rows and PR body verified independently
+rather than trusted.
+
+**Two things worth carrying forward from this run.**
+
+*An automated reviewer can be right about the defect and wrong about the fix.* Copilot's
+`mktemp -u` finding was a genuine symlink race, and its proposed remedy — create the file by
+dropping `-u` — would have made `make init-cloud-requests` die at rc 128, because git refuses a
+zero-byte index. That was caught only by actually running the suggestion in a scratch repo
+before applying it. **Do not apply a review suggestion without executing it**, especially in a
+target that runs once on a fresh setup where nobody is watching.
+
+*A flagged occurrence is a sample, not a count.* Copilot flagged one `https://127.0.0.1:7443`;
+grepping the class found three, two of them in the spec. One of those was wrong for a second,
+different reason: a cloudflared ingress `service:` addresses the local origin, and Cloudflare
+terminates TLS at its edge, so it would have been `http://` even had the push path been built.
+
+**stage2 is skipped, and that is by design** — `ci.yml:145-152` gates it on the
+`ci:cluster-tests` label. Asking for the job list rather than the run conclusion is what made
+that visible; it is not a hidden gap, but the cluster tier genuinely did not run on this PR.
+
+**`enforce_admins` is OFF on `main` right now.** If the merge is deferred rather than done, it
+must be restored in the same turn with a **bodyless** POST — `-f enabled=true` returns HTTP 422.
+
 ## 2026-09-25 — the hostinger smoke FAIL, deep-dived (Claude)
 
 `make test` on `k3d-manager-v1.38.0`: **1129 ok, 0 not ok, exit 0**. The last v1.38.0 gate.
