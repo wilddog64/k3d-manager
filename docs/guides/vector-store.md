@@ -92,13 +92,26 @@ exported deliberately, or the operator runs the command.
 ## Health verification
 
 ```bash
-kubectl --context k3d-k3d-cluster -n vectordb get pod,externalsecret
-make index-docs DRY_RUN=1     # proves the psql path without touching the API
+bin/k3dm-vectordb-status --offline
+bin/k3dm-vectordb-status --json
 ```
 
-`DRY_RUN=1` is the cheapest end-to-end check of the store path: it creates the schema if absent,
-reads every indexed hash, and reports drift, with no credential and no network call. A row count of
-zero means the index was never built or the volume was lost — re-run `make index-docs`.
+`k3dm-vectordb-status` is the read-only source of truth for Hermes and the Pushgateway publisher.
+It reports the store reachability and row count, the `vectordb-postgres` ExternalSecret condition,
+the `vectordb-0` Ready condition, the tracked corpus size and the newest `indexed_at` timestamp.
+The `--offline` mode skips every cluster and database call and is safe for a local contract check.
+
+Hermes samples the same facts on every tick. The `vectordb` sensor checks the ExternalSecret first,
+then the pod, store reachability and index age; unreadable fields are `unknown`, never healthy or
+degraded. The metrics publisher runs after a successful `make index-docs` and on each Hermes tick.
+It publishes rows, corpus size, drift, reachability, ExternalSecret sync and the last index timestamp
+to Pushgateway. The Grafana dashboard labels these values **last published** because Pushgateway
+retains gauges after a publisher stops.
+
+The alert watches only the last index timestamp: no publication for an hour, or an index older than
+seven days, is stale. A stale index can still return plausible results from `make find-similar-docs`;
+check the sensor evidence and re-run `make index-docs` after confirming the store is reachable. See
+[`docs/howto/find-prior-art.md`](../howto/find-prior-art.md) for the retrieval workflow.
 
 The `vectordb-postgres` ExternalSecret is the component's historical failure point: a missing Vault
 prefix surfaces as `SecretSyncedError` and a `CreateContainerConfigError` pod, and the ESO condition

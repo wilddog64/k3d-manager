@@ -14,6 +14,10 @@
   as well as `$values` sources while explicitly excluding and counting sources that track `HEAD`.
 
 ### Added
+- Hermes now watches vectordb health and publishes index freshness. Nothing previously watched this
+  rebuildable component, and the ExternalSecret condition that can prevent its pod from starting is
+  not scrapeable today; the read-only probe, Pushgateway gauges, stale-index alerts and Grafana
+  dashboard expose that failure chain and the quieter stale-index defect.
 - Similarity search over the docs corpus, closing a gap the exact-slug dedup check could not: the
   glob only matches a slug someone already guessed correctly, so the same ESO defect was refiled
   under a name it could not match. `make index-docs` embeds the tracked `docs/bugs`, `docs/issues`,

@@ -15,6 +15,7 @@ Exit status is 0 on success, 1 when the credential or the store is unavailable, 
 error. The store is a rebuildable cache: losing it costs one re-index, not data.
 """
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -134,6 +135,8 @@ def main(argv=None):
         f"index-docs: {len(docs)} docs, {len(rows)} embedded, "
         f"{counts.get('pruned', '0')} pruned, {counts.get('indexed', '?')} in store"
     )
+    subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
+                   cwd=ROOT, capture_output=True, text=True, timeout=120, check=False)
     return 0
 
 

@@ -21,7 +21,7 @@ from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
                             node_pressure, reachability, stale_acg_registration,
-                            status_checks, token_expiry_advisory)
+                            status_checks, token_expiry_advisory, vectordb)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
 from hermes.slack import post_interactive, post_summary
@@ -103,6 +103,13 @@ def _datastore_run(_command, _additions):
         return 1, json.dumps({"available": False})
 
 
+def _vectordb_run(command, _additions):
+    """Execute the read-only vectordb probe and return (rc, stdout)."""
+    result = subprocess.run([str(ROOT / command[0]), *command[1:]],
+                            capture_output=True, text=True, timeout=120, check=False)
+    return result.returncode, result.stdout
+
+
 def _alert_delivery_run(command, _additions):
     """Read Alertmanager delivery shape from the read-only probe."""
     result = subprocess.run([str(ROOT / command[0]), *command[1:]],
@@ -132,6 +139,7 @@ def _run_cycle(state, status_runner=None):
         reachability(_probe_run, state),
         node_pressure(webhook_fetch, state, token=webhook),
         kine(_datastore_run, state),
+        vectordb(_vectordb_run, state),
         alert_delivery(_alert_delivery_run, state),
         ci(github_fetch, state, token=github),
     ]
@@ -436,7 +444,10 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
     if digest:
         post_summary(relay, digest)
     # Unknown status belongs to the webhook detector, including SMS escalation.
-    texts = pager.health_events([item for item in records if item["sensor"] != "status_checks"], state)
+    texts = pager.health_events(
+        [item for item in records
+         if item["sensor"] != "status_checks" and
+         not (item["sensor"] == "vectordb" and item["status"] == "unknown")], state)
     texts += pager.security_events(audit_get, _keychain_secret, state, timestamp()[:13],
                                    AUDIT_SERVICE, REPOSITORY)
     texts += pager.job_events(state, None)
@@ -446,6 +457,8 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
             (status_record.get("status") == "degraded" or state.get("status_groups"))):
         _status_notification(state, status_record, relay)
     _publish_status(records, state)
+    subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
+                   capture_output=True, text=True, timeout=120, check=False)
     _schedule_e2e(state)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event, "approvals": approvals,

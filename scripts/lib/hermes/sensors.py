@@ -4,6 +4,7 @@ import base64
 import binascii
 import json
 import subprocess
+import time
 from datetime import datetime, timezone
 
 from hermes.records import record
@@ -251,6 +252,44 @@ def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024):
                       data=data)
     except Exception:
         return record("kine", "unknown", "hub datastore status source unavailable")
+
+
+def vectordb(run, state, threshold=2, max_index_age_seconds=7 * 86400, now=None):
+    """Report vector-store health from a read-only, injected probe."""
+    try:
+        code, output = run(["bin/k3dm-vectordb-status", "--json"], {})
+        payload = json.loads(output) if code == 0 and output else {}
+        required = ("available", "external_secret_synced", "pod_ready", "rows",
+                    "corpus_docs", "last_indexed_epoch")
+        if not all(name in payload for name in required):
+            raise ValueError("invalid vectordb probe")
+        data = {name: payload[name] for name in required}
+        if any(payload[name] is None for name in required):
+            return record("vectordb", "unknown", "vectordb status source unavailable", data=data)
+        if payload["external_secret_synced"] is False:
+            status = "degraded" if _debounced("vectordb", True, threshold, state) else "healthy"
+            return record("vectordb", status,
+                          "ExternalSecret vectordb-postgres not synced — the pod cannot start until it is",
+                          data=data)
+        if payload["pod_ready"] is False:
+            status = "degraded" if _debounced("vectordb", True, threshold, state) else "healthy"
+            return record("vectordb", status, "pod vectordb-0 is not ready", data=data)
+        if payload["available"] is False:
+            status = "degraded" if _debounced("vectordb", True, threshold, state) else "healthy"
+            return record("vectordb", status, "vector store did not answer", data=data)
+        now = time.time() if now is None else now
+        age_seconds = max(0, now - float(payload["last_indexed_epoch"]))
+        age_days = age_seconds / 86400
+        if age_seconds > max_index_age_seconds:
+            status = "degraded" if _debounced("vectordb", True, threshold, state) else "healthy"
+            return record("vectordb", status,
+                          f"index is {age_days:.1f}d old, rows={payload['rows']}", data=data)
+        _debounced("vectordb", False, threshold, state)
+        return record("vectordb", "healthy",
+                      f"rows={payload['rows']}, corpus={payload['corpus_docs']}, indexed {age_days:.1f}d ago",
+                      data=data)
+    except Exception:
+        return record("vectordb", "unknown", "vectordb status source unavailable")
 
 
 def alert_delivery(run, state, threshold=1):
