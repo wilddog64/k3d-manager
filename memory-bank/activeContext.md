@@ -22,8 +22,16 @@ provisioned live EC2 until `1cbdab25`. Exposing them is the operator's call.
 Gates: `make test-pytest` 215 passed; `make test-python-unit` rc=0; the exposure drift guard
 mutation-tested red by removing `make-test-pytest` from the bridge, then green.
 
-Still pending and NOT done: `make restart-webhook`, which is what actually makes these two
-targets live. Until it runs, the listener serves the old allowlist.
+Operator ran `make restart-webhook` at 18:09 on 2026-09-25. Fresh PID 54949 bound to
+127.0.0.1:7443; `make_targets.py` mtime 18:03:09 predates the restart, so the new allowlist is
+loaded. Unauthenticated GET `/api/v1/health` and POST `/api/v1/make` both return 401, so the
+listener and the role gate are live on both routes.
+
+NOT yet verified, and honestly so: that `/api/v1/health` now returns 200 rather than the
+earlier 000, and that `make-test-pytest` is reachable end to end. Both need an authenticated
+request, and reading a webhook token from the Keychain is denied to Claude. The 401 short-circuits
+before the handler, so it does not exercise the `f6d60b00` `_smoke_test_services` fix at all.
+The operator can close this with one authenticated probe.
 
 ## 2026-09-26 — P6 reader-tier make targets through the cloud bridge
 
