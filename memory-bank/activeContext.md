@@ -1,5 +1,36 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — the hostinger smoke FAIL, deep-dived (Claude)
+
+`make test` on `k3d-manager-v1.38.0`: **1129 ok, 0 not ok, exit 0**. The last v1.38.0 gate.
+
+The 17:04 Slack cluster-status FAIL (13 ok / 3 warn / 5 fail) was traced, not dismissed:
+
+- **Frontend SSO + ArgoCD SSO "credentials rejected"** — root cause found. The hub's
+  `keycloak-realm-reconcile` Job has been **Failed for 5 days**, 0/1 completions, two Error
+  pods. Its log ends:
+  `Creating browser-with-conditional-otp flow... / environment: line 104: awk: command not found`
+  That is exactly the ubi9-micro no-`awk` bug fixed by shopping-cart-infra PR #100 (`64c11783`).
+  The fix is on `main`; the cluster still runs the old manifest because the hub ArgoCD app
+  **`shopping-cart-identity` is `OutOfSync`**. Syncing it is the pending post-merge verification.
+  Realm users were never seeded, which is why both SSO logins are rejected.
+- **Frontend 404 + Product images 404** — the known undecided frontend routing fix.
+- **Hub ESO 1/7 not synced: cosign-public-key** — known, Vault path still unchecked.
+- **Prometheus 401 warn** — expected; the authenticated `Prometheus login` line is 200.
+- **k3dm-smoke-user credentials unavailable** (2 warns) — known; the Frontend API smoke is
+  skipped and proves nothing.
+
+Also observed: `istio-cni-ubuntu-hostinger` is `Progressing` — a **fifth** live observation of
+the stale istio-cni dirs bug. `ubuntu-k3s-data-layer` is OutOfSync/Progressing because the
+ubuntu-k3s context points at the dead ACG sandbox (44.250.167.86, i/o timeout). That stale
+context should be deleted to fail fast.
+
+**Navigation note for future sessions: ArgoCD runs in the `cicd` namespace, not `argocd`.**
+There is no `argocd` namespace on either cluster. `kubectl -n argocd get applications` returns
+"No resources found in argocd namespace" rather than an error, which reads exactly like
+"ArgoCD has no apps" and nearly produced a false finding this session. The hub (k3d) owns all
+Applications, including every `ubuntu-hostinger-*` one; hostinger's own `cicd` has zero.
+
 ## 2026-09-25 — P7: the offline test suites are reader targets (Claude)
 
 `test-pytest` and `test-python-unit` are now `min_role: reader` in `MAKE_TARGETS` (the Slack
