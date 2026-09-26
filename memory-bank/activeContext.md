@@ -27,11 +27,18 @@ Operator ran `make restart-webhook` at 18:09 on 2026-09-25. Fresh PID 54949 boun
 loaded. Unauthenticated GET `/api/v1/health` and POST `/api/v1/make` both return 401, so the
 listener and the role gate are live on both routes.
 
-NOT yet verified, and honestly so: that `/api/v1/health` now returns 200 rather than the
-earlier 000, and that `make-test-pytest` is reachable end to end. Both need an authenticated
-request, and reading a webhook token from the Keychain is denied to Claude. The 401 short-circuits
-before the handler, so it does not exercise the `f6d60b00` `_smoke_test_services` fix at all.
-The operator can close this with one authenticated probe.
+Operator closed both open questions with authenticated probes at 18:12:
+
+- `GET /api/v1/health` returns **200**. This is the first time the handler has actually run
+  since `f6d60b00`; the earlier `000` dropped-connection regression from the missing
+  `return _smoke_test_services` is confirmed dead.
+- `POST /api/v1/make {"target":"help"}` with the reader credential lists eight reader targets,
+  including `test-pytest` and `test-python-unit`. The Slack `/k3dm` path for P7 is live.
+
+Still unexercised: an actual `test-pytest` run through Slack or the bridge. The `$HOME`-based
+pytest fallback was proven under a simulated webhook PATH with `env -i`, not under launchd's
+real environment, so the first real invocation is still the thing that proves the interpreter
+resolves. Worth one `/k3dm test-pytest` from Slack.
 
 ## 2026-09-26 — P6 reader-tier make targets through the cloud bridge
 
