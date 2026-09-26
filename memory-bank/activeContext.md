@@ -1,3 +1,58 @@
+# 2026-09-26 — WS2/WS3/WS6 landed; vectordb monitoring specced
+
+- [x] `a13b42f7` similarity search: `scripts/lib/hermes/prior_art.py`, `scripts/index-docs.py`,
+      `scripts/find-similar-docs.py`, `make index-docs` / `make find-similar-docs Q=`, Slack
+      entries, cloud-bridge action, docs. Pushed; origin/k3d-manager-v1.39.0 = `2dc3fef7`.
+- [x] `2dc3fef7` `docs/plans/v1.39.0-vectordb-health-monitoring.md`. v1.39.0 is now at the
+      max-5 plan cap.
+- [x] 247 pytest green; 7 mutations proved red on their own gate; Q-pattern mutation → 12 reds.
+
+DECISION (operator, 2026-09-26) — embeddings provider is Gemini `text-embedding-004`,
+`vector(768)`, reusing `gemini-cli-api-key`. Resolution order is env
+`K3DM_EMBEDDINGS_API_KEY`, then keychain `k3dm-embeddings-api-key`, then `gemini-cli-api-key`,
+so dropping a dedicated key into the second item later takes over with no code change.
+
+BLOCKER — **the live first index has NOT run, and Claude cannot run it.** A keychain value read
+from this shell returns **rc 36 with empty stderr**; the standing rule already records that
+Claude's keychain value reads are denied. Every embedding call needs that value, so both
+`make index-docs` and `make find-similar-docs` degrade to "retrieval unavailable" (rc 0) in an
+agent session. The operator runs `make index-docs` once (18 batched API calls for 1,704 docs),
+or exports `K3DM_EMBEDDINGS_API_KEY` deliberately for an agent session. This reverses the
+earlier "you run it" plan for an environmental reason, not a choice.
+
+VERIFIED LIVE (read-only + schema create) — in-pod `psql -U "$POSTGRES_USER"` over the local
+socket authenticates with **no password**, so the credential never leaves the pod and never
+reaches argv, a log or shell history. `make index-docs DRY_RUN=1` created the schema and
+reported 1,704 docs / 0 pruned. Store had only `plpgsql` and zero tables before this.
+
+CORPUS — 1,704 tracked docs, not the ~1,360 the spec estimated. Embedded text is ~3% of a
+typical file (8,029 → 257 chars on the ESO bug doc).
+
+FINDING — **ESO has no ServiceMonitor and no metrics Service on the hub.** `kubectl get
+servicemonitor -A` lists eleven, none for external-secrets. So `externalsecret_status_condition`
+is not scraped and the ExternalSecret sync condition — the exact link that broke in WS1 — cannot
+be alerted on by any PromQL today. This is why the monitoring spec cannot just reuse existing
+metrics. Hub Prometheus `:19090` is **401** to an agent, so kube-state-metrics series names in
+that spec are UNVERIFIED and carry an operator-run gate.
+
+FINDING — the cloud-bridge suite's `KNOWN_UNEXPOSED` was an empty frozenset, so adding any
+reader-tier target forces an explicit expose-or-except decision. `find-similar-docs` was
+exposed (read-only; the webhook validates `Q` independently), keeping that set empty.
+
+SPEC CONFLICT — `docs/plans/v1.40.0-hermes-prior-art-and-retrieval-eval.md` names
+`bin/find-similar-docs`; v1.39.0 WS3 names `scripts/find-similar-docs.py`, which is what shipped.
+That spec needs a one-line path correction before WS5 is dispatched.
+
+SCOPE — v1.40.0 will hold **6** plan docs once v1.39.0 merges (3 here: app-health-delta-sensor,
+prior-art-and-retrieval-eval, slack-corpus-qa; 3 on branch k3d-manager-v1.40.0: the cloud-bridge
+artifacts / e2e-dispatch / test-targets specs). Over the max-5 cap — needs a split decision.
+
+- [ ] Operator: run `make index-docs` once, then Claude verifies row count read-only.
+- [ ] Implement the vectordb monitoring spec (H1-H4).
+- [ ] v1.39.0 release close-out is untouched: no `## [1.39.0]` CHANGELOG heading, no
+      releases-table row, no retro, no PR. Three other v1.39.0 specs remain unimplemented
+      (blackbox probes, slack smoke target, test-suite metrics).
+
 # 2026-09-26 — cloud-request diagnostic artifacts spec written (v1.40.0)
 
 `docs/plans/v1.40.0-cloud-request-artifacts.md` — publish `artifacts/<request-id>/{summary.json,junit.xml}`
