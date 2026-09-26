@@ -1,3 +1,13 @@
+# vectordb seed — 2026-09-26 verified
+
+- [x] `10dcd995` seeds `vectordb/postgres` in `deploy_argocd_bootstrap`; pushed to origin.
+- [x] Independently verified: scope 6 files, bats 16/16, shellcheck baseline, no credential
+      value anywhere in diff, tests, docs or commit messages.
+- [x] All six gates mutation-proved individually; 12/14/15 uniquely red for their own mutation.
+- [x] ApplicationSets reapplied 13/13; all Applications on k3d-manager-v1.39.0.
+- [ ] `hub-vectordb` ExternalSecret still OutOfSync on CRD defaults despite ServerSideDiff
+      being live — needs a hard refresh so the controller re-diffs under SSA. Operator's call.
+
 # vectordb — 2026-09-26 final: running, one cosmetic OutOfSync left
 
 - [x] Operator overwrote Vault policy `eso-ldap-directory` (5 prefixes, token+policy on stdin).

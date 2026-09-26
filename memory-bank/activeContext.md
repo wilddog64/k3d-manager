@@ -1,3 +1,39 @@
+# 2026-09-26 — vectordb seed verified independently; ApplicationSets reapplied
+
+Codex `10dcd995` + `869accfd` on `origin/k3d-manager-v1.39.0`. Verified by Claude on a
+quiescent tree, NOT taken from the report: scope is exactly the six spec'd files (133
+insertions), bats 16/16, shellcheck at the 7-line/SC2317 baseline, and a credential sweep
+found zero 20+ char literals in added lines — every `password` occurrence is a field name,
+a doc sentence, or the in-pod generator.
+
+All six new gates were mutation-proved one at a time with a byte-equality restore between
+each. Gates 12 (call site), 14 (argv), 15 (urandom) each go red uniquely for their own
+mutation; none was incapable of failing.
+
+**Process failure worth remembering: I verified a tree while Codex was still writing it.**
+The background task reported "completed, exit code 0" but `codex exec` (PID 45118) was
+still alive and editing. My sed mutation tests raced its edits, so results were incoherent
+— gate 14 red under a mutation that could not affect it, a regex returning rc=1 standing
+alone while bats called it green, and three different versions of gate 14 across three
+reads. I also asserted a defect ("Codex added the comment but not the call") from a
+truncated diff render; grep showed the call was present all along. Rule: confirm the writer
+has exited (`pgrep -x codex`, check the PID) before verifying, and grep the file before
+claiming a missing line.
+
+ApplicationSets reapplied by the operator: 13/13 (was 12 — `vectordb.yaml` is now in the
+set), all Applications on `k3d-manager-v1.39.0`. The three stale v1.37.0 pins
+(`acg-kube-prometheus-stack`, `acg-trivy-operator`, `loki`) are cleared.
+
+`hub-vectordb` still `OutOfSync / Healthy` with only the ExternalSecret out of sync, even
+though `ServerSideDiff=true` is now present on the live Application (confirmed by reading
+the annotation back). The residual diff is pure CRD defaulting — `conversionStrategy`,
+`decodingStrategy`, `metadataPolicy`, `deletionPolicy: Retain`, `template.engineVersion: v2`,
+`mergePolicy: Replace`, `metadata: {}` — none of which is in git. ServerSideDiff should
+absorb exactly this, so the annotation alone was necessary but not sufficient: the
+controller still needs to re-diff under SSA and take field ownership. A hard refresh is
+the next step and is the operator's to run. My earlier "missing annotation" diagnosis was
+therefore incomplete, not wrong.
+
 # 2026-09-26 — vectordb is UP; policy overwrite proven safe by diff
 
 The ESO grant is live and `vectordb` runs. Sequence: operator overwrote the Vault policy
