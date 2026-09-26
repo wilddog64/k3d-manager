@@ -1,3 +1,21 @@
+# vectordb — 2026-09-26 later: Vault path written, ESO still denied
+
+- [x] Operator wrote `secret/vectordb/postgres` (version 1, 13:03Z). Password generated inside
+      the vault pod; never in argv, host or history. Claude never saw it.
+- [x] Root-caused the remaining failure: ESO gets `403 permission denied`, not a missing path.
+      `vectordb` was absent from `LDAP_VAULT_POLICY_PREFIX`. Fixed in `04fafc55` + gate 10.
+      Recurrence appended to `docs/bugs/v1.4.5-bugfix-eso-ldap-policy-missing-keycloak.md`.
+- [ ] Operator: apply the Vault policy so the grant is live. `vars.sh` alone changes nothing.
+      Blocked on an operator-run `vault policy read eso-ldap-directory` first — Claude cannot
+      read it (needs the root token) and so cannot confirm an overwrite would not revoke a
+      prefix that was merged in out of band.
+- [ ] Operator: reapply the ApplicationSets for the `ServerSideDiff` annotation (`d44ef5cd`).
+- [ ] Then Claude verifies read-only: `vectordb-postgres` `SecretSynced/True`, `pod/vectordb-0`
+      Running, `hub-vectordb` `Synced/Healthy`.
+
+LESSON — `could not get secret data from provider` on an ExternalSecret is ambiguous between an
+absent path and a denied one. Read the ESO controller log for the HTTP code before diagnosing.
+
 # WS1 vectordb — live status 2026-09-26
 
 - [x] `platform` AppProject applied via `deploy_argocd_bootstrap --skip-applicationsets`

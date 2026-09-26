@@ -1,3 +1,41 @@
+# 2026-09-26 — vectordb blocker was the ESO Vault policy, not the missing path
+
+The Vault path `secret/vectordb/postgres` is now written (operator, version 1, 13:03Z,
+`username: postgres`, password generated inside the vault pod so it never reached the host,
+argv or shell history). The pod did NOT come up, and the reason was already true before the
+write: the ESO role is denied that path.
+
+Proven from the ESO controller log:
+`Code: 403 ... permission denied` on `GET /v1/secret/data/vectordb/postgres`, repeating every
+~7 minutes, including before the write.
+
+`LDAP_VAULT_POLICY_PREFIX` (`scripts/etc/ldap/vars.sh:79`) listed
+`ldap,keycloak,observability,platform-ops` — no `vectordb`. `VAULT_ESO_APPS_PREFIXES`
+(`vault.sh:2130`) does not cover it either. Fixed in `04fafc55` by adding `vectordb`, with a
+mutation-checked gate tying the grant to the manifest. Third occurrence of the class first filed
+for keycloak in v1.4.5; recorded on that doc.
+
+CORRECTION recorded against my own earlier report: the `SecretSyncedError` was reported as "the
+Vault path does not exist yet" and the write as the single remaining blocker. Both wrong. The
+ExternalSecret condition message `could not get secret data from provider` is identical for an
+absent path and a denied one, and it is the only thing `kubectl get externalsecret` shows.
+
+LESSON — when a secret will not sync, read the ESO controller log, never the ExternalSecret
+condition: `kubectl -n secrets logs deploy/external-secrets --tail=300 | grep <name>`.
+403 = policy prefix missing (this bug). 404 = path genuinely absent. The condition cannot
+distinguish them.
+
+STILL OPEN — the live grant is unchanged. `vars.sh` is inert until
+`_vault_configure_secret_reader_role` runs again (via `deploy_ldap`, `ldap.sh:1136`), the same
+inertness as the ApplicationSet values pin. Claude cannot verify the live policy's current
+contents, because that needs the Vault root token, which Claude does not read — so whether the
+policy can be safely overwritten has to be decided from an operator-run
+`vault policy read eso-ldap-directory`. Generated the exact 5-prefix HCL the repo's builder
+would emit, in the session scratchpad, for that comparison.
+
+Also open, unchanged: the `ServerSideDiff` annotation (`d44ef5cd`) needs an ApplicationSet
+reapply before it reaches the live Application.
+
 # 2026-09-26 — WS1 live: vectordb deployed, one blocker left (Vault path)
 
 `deploy_argocd_bootstrap --skip-applicationsets` (operator-run) applied the updated `platform`
