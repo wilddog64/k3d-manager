@@ -235,3 +235,18 @@ def test_make_body_and_empty_post_body():
     assert bridge._request_body(make_request) == (
         b'{"args": {"NS": "identity"}, "target": "fix-status"}')
     assert bridge._request_body(request("cluster-status")) == b"{}"
+
+
+def test_test_suite_actions_take_no_arguments():
+    for action in ("make-test-pytest", "make-test-python-unit"):
+        value, reason = bridge.validate_request(
+            request(action, {"NS": "identity"}), now=NOW)
+        assert value is None
+        assert reason == "unexpected argument"
+
+
+def test_test_suite_actions_post_their_target():
+    assert bridge._request_body(request("make-test-pytest")) == (
+        b'{"args": {}, "target": "test-pytest"}')
+    assert bridge._request_body(request("make-test-python-unit")) == (
+        b'{"args": {}, "target": "test-python-unit"}')

@@ -47,7 +47,7 @@ problem, not something to work around. Say so and move on.
 
 ## What you can ask for
 
-Ten actions. This list is a security boundary, not a convenience default — anything not on it
+Twelve actions. This list is a security boundary, not a convenience default — anything not on it
 is rejected by the bridge without being executed.
 
 | action | args | what you get back |
@@ -62,6 +62,8 @@ is rejected by the bridge without being executed.
 | `make-observability-status` | none | monitoring/trivy-system pods, both clusters |
 | `make-vuln-scan` | none | VulnerabilityReport summary |
 | `make-e2e-runner-health` | none | hub vs remote-runner health |
+| `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`) |
+| `make-test-python-unit` | none | the offline stdlib-unittest suites |
 
 `job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected.
 

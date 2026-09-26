@@ -39,6 +39,8 @@ ACTION_ALLOWLIST = {
     "make-observability-status": ("POST", "/api/v1/make", {}, "observability-status"),
     "make-vuln-scan": ("POST", "/api/v1/make", {}, "vuln-scan"),
     "make-e2e-runner-health": ("POST", "/api/v1/make", {}, "e2e-runner-health"),
+    "make-test-pytest": ("POST", "/api/v1/make", {}, "test-pytest"),
+    "make-test-python-unit": ("POST", "/api/v1/make", {}, "test-python-unit"),
 }
 
 

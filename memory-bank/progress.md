@@ -2,6 +2,16 @@
 
 ## 2026-09-26 — v1.38.0 P6 reader-tier make targets through the cloud bridge
 
+- [x] **P7 — offline test suites as reader targets** — `test-pytest` + `test-python-unit` in
+  `MAKE_TARGETS` (Slack) and the bridge `ACTION_ALLOWLIST` (cloud). Fixed the webhook-PATH
+  interpreter gap that would have made `test-pytest` exit 2 on every remote invocation.
+  `make test` / `make test-bin` left unexposed pending the `scripts/tests/` live-mutation sweep.
+  Gates: 215 pytest passed; drift guard mutation-tested. **`make restart-webhook` still pending.**
+- [x] **Bug: two pytest suites ran nowhere in CI** — `cloud_bridge.py` (20 tests, incl. the P6
+  drift guards) passed vacuously under `make test-python-unit` and was absent from
+  `make test-pytest`. Renamed to `test_cloud_bridge.py`, `test-pytest` now globs `test_*.py`,
+  and `test-python-unit` gained a vacuous-run guard. `a7d513f3`.
+  See `docs/bugs/2026-09-25-pytest-suites-unreachable-from-make.md`.
 - [x] Added exactly six literal bridge actions: `make-fix-list`, `make-fix-status`,
       `make-status-public`, `make-observability-status`, `make-vuln-scan`, and
       `make-e2e-runner-health`; no optional arguments or operator/admin targets were exposed.

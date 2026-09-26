@@ -820,11 +820,21 @@ check-repo-root:
 
 test-pytest:
 	@set -euo pipefail; \
-	 python3 -m pytest --version >/dev/null 2>&1 || { \
-	   echo "[make] pytest not installed for $$(python3 --version 2>&1)." >&2; \
+	 if [ -n "$${PYTEST:-}" ]; then set -- $$PYTEST; \
+	 elif command -v pytest >/dev/null 2>&1; then set -- pytest; \
+	 elif python3 -m pytest --version >/dev/null 2>&1; then set -- python3 -m pytest; \
+	 elif [ -x "$$HOME/.pyenv/shims/python3" ] \
+	      && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
+	   set -- "$$HOME/.pyenv/shims/python3" -m pytest; \
+	 else \
+	   echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
+	   echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
+	   echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
 	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
-	   exit 2; }; \
-	 python3 -m pytest scripts/tests/hermes scripts/tests/bin/test_*.py
+	   exit 2; \
+	 fi; \
+	 echo "[make] $$* (pytest suites)"; \
+	 "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest

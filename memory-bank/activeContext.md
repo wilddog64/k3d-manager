@@ -1,5 +1,30 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — P7: the offline test suites are reader targets (Claude)
+
+`test-pytest` and `test-python-unit` are now `min_role: reader` in `MAKE_TARGETS` (the Slack
+`/k3dm` allowlist) and exposed through the cloud bridge as `make-test-pytest` and
+`make-test-python-unit`. Both take no arguments, so nothing untrusted reaches argv.
+
+Found and fixed first, because it would have shipped broken: the webhook LaunchAgent's PATH is
+`/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`, and under that PATH there is no `pytest`
+binary and `python3 -m pytest` fails — pytest lives only in `~/.pyenv/shims`. `make test-pytest`
+would have exited 2 on every Slack and bridge invocation while passing locally and in CI.
+`test-pytest` now resolves an interpreter in order (`$PYTEST`, `pytest` on PATH,
+`python3 -m pytest`, `$HOME/.pyenv/shims/python3 -m pytest`), verified under the exact webhook
+PATH with `env -i`. The service PATH was deliberately NOT changed — pyenv-shims-first would
+reorder `python3` for every other make target the webhook runs.
+
+`make test` and `make test-bin` are deliberately NOT exposed: both run BATS, the
+`scripts/tests/` live-mutation sweep is unfinished, and `deploy_app_cluster_confirm.bats` test 3
+provisioned live EC2 until `1cbdab25`. Exposing them is the operator's call.
+
+Gates: `make test-pytest` 215 passed; `make test-python-unit` rc=0; the exposure drift guard
+mutation-tested red by removing `make-test-pytest` from the bridge, then green.
+
+Still pending and NOT done: `make restart-webhook`, which is what actually makes these two
+targets live. Until it runs, the listener serves the old allowlist.
+
 ## 2026-09-26 — P6 reader-tier make targets through the cloud bridge
 
 Implemented only P6 on `k3d-manager-v1.38.0`: the bridge now exposes six flat `make-*` actions

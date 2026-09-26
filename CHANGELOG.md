@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- The offline test suites are now reader-tier targets: `test-pytest` and `test-python-unit`
+  are reachable from the Slack `/k3dm` command and, as `make-test-pytest` and
+  `make-test-python-unit`, from the cloud bridge. Both take no arguments. `make test` and
+  `make test-bin` stay unexposed until the `scripts/tests/` live-mutation sweep is complete.
 - The cloud bridge now exposes the six reader-tier `make` targets as separate fixed actions:
   `fix-list`, `fix-status`, `status-public`, `observability-status`, `vuln-scan` and
   `e2e-runner-health`, with no optional arguments in phase 1.
