@@ -2120,5 +2120,4 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
   handled or recorded.
 - [x] `bats scripts/tests/plugins/argocd_vectordb.bats`: 16/16 passed after restoration.
 - [x] Mutation-proof red lines captured for gates 11–16; all mutations restored.
-- [ ] Commit and push blocked: `git add` could not create `.git/index.lock` (`Operation not
-  permitted`) under the sandbox; no PR created.
+- [x] Implementation commit `10dcd995` is pushed to `origin/k3d-manager-v1.39.0`; no PR created.
