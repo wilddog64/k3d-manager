@@ -10,6 +10,12 @@ _ARG_PATTERNS = {
     "DIGEST": re.compile(r"sha256:[0-9a-f]{64}"),
     "FIX_CONTEXT": re.compile(r"ubuntu-k3s|ubuntu-hostinger|k3d-k3d-cluster"),
     "CRONJOB": re.compile(r"app-cve-scan|argocd-cve-scan"),
+    # Q reaches a Makefile recipe, where $(Q) expands unquoted into a shell command
+    # line. Every shell metacharacter is excluded so the recipe's "$(Q)" cannot be
+    # broken out of: no quote, backslash, dollar, backtick, semicolon, pipe,
+    # ampersand, redirect, parenthesis, newline or "#".
+    "Q": re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}"),
+    "K": re.compile(r"[1-9]|[1-4][0-9]|50"),
 }
 
 MAKE_TARGETS = {
@@ -21,6 +27,8 @@ MAKE_TARGETS = {
     "e2e-runner-health": {"min_role": "reader", "optional": ("RUNNER",), "summary": "hub vs remote-runner health"},
     "test-pytest": {"min_role": "reader", "timeout": 600, "summary": "offline pytest suites"},
     "test-python-unit": {"min_role": "reader", "summary": "offline unittest suites"},
+    "find-similar-docs": {"min_role": "reader", "required": ("Q",), "optional": ("K",), "timeout": 120, "summary": "search docs/ for prior art by similarity"},
+    "index-docs": {"min_role": "operator", "timeout": 1800, "summary": "re-embed changed docs into the vector store"},
     "e2e-remote": {"min_role": "operator", "required": ("RUNNER",), "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e on a remote runner"},
     "e2e-sandbox": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 2 e2e on the live ACG sandbox"},
     "e2e-replay": {"min_role": "operator", "required": ("RUNNER",), "timeout": 900, "summary": "replay retained runner results"},

@@ -14,6 +14,28 @@
   as well as `$values` sources while explicitly excluding and counting sources that track `HEAD`.
 
 ### Added
+- Similarity search over the docs corpus, closing a gap the exact-slug dedup check could not: the
+  glob only matches a slug someone already guessed correctly, so the same ESO defect was refiled
+  under a name it could not match. `make index-docs` embeds the tracked `docs/bugs`, `docs/issues`,
+  `docs/plans` and `docs/retro` trees (1,704 documents) into the pgvector store, and
+  `make find-similar-docs Q="..."` ranks prior art against a query. Both are reachable from Slack
+  (`find-similar-docs` at reader tier, `index-docs` at operator tier) and `find-similar-docs` is
+  also a cloud-bridge action, so a cloud session can check prior art before filing.
+
+  Only each document's title, leading prose paragraph and `##` headings are embedded — about 3% of a
+  typical file, since the bodies are shell transcripts that dominate the token count and carry
+  almost no topical signal. Rows are keyed by a hash of exactly that embedded text, so a re-run with
+  no doc changes makes zero embedding calls and an edit confined to a transcript re-embeds nothing.
+  Retrieval is advisory everywhere: a missing credential, an unreachable store or an empty index
+  reports on stderr and exits 0, because the dedup check must never become a new way for filing to
+  fail. Retrieval quality is UNMEASURED until the v1.40.0 eval.
+
+  No Postgres driver is introduced: SQL is piped to `psql` inside the pod with the argument vector
+  carrying a literal `$POSTGRES_USER` for the pod's own shell to expand, so the database password
+  never reaches argv, a log or this host's history. The embeddings key is read from
+  `K3DM_EMBEDDINGS_API_KEY` or the keychain at call time and sent only as a request header, so there
+  is no sensitive CLI flag to register. The Slack `Q` argument excludes every shell metacharacter
+  because it reaches a Makefile recipe where `$(Q)` expands into a command line.
 - A hub platform component deploys single-instance pgvector Postgres into the `vectordb` namespace
   as a rebuildable cache on local-path storage, not a system of record; its index is not durable and
   losing it costs one re-index. The retriever's quality is UNMEASURED until the v1.40.0 eval runs.

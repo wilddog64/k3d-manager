@@ -47,7 +47,7 @@ problem, not something to work around. Say so and move on.
 
 ## What you can ask for
 
-Twelve actions. This list is a security boundary, not a convenience default — anything not on it
+Thirteen actions. This list is a security boundary, not a convenience default — anything not on it
 is rejected by the bridge without being executed.
 
 | action | args | what you get back |
@@ -64,6 +64,7 @@ is rejected by the bridge without being executed.
 | `make-e2e-runner-health` | none | hub vs remote-runner health |
 | `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`) |
 | `make-test-python-unit` | none | the offline stdlib-unittest suites |
+| `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
 
 `job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected.
 

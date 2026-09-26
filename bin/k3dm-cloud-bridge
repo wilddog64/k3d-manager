@@ -26,6 +26,9 @@ HTTP_TIMEOUT = min(float(os.environ.get("K3DM_CLOUD_BRIDGE_HTTP_TIMEOUT", "300")
 ID_RE = re.compile(r"[0-9]{8}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,63}")
 JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
 NS_RE = re.compile(r"[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?")
+# Prose search text. Kept byte-identical to webhook _ARG_PATTERNS["Q"]: every shell
+# metacharacter is excluded because the value reaches a Makefile recipe.
+Q_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}")
 FETCH_REFSPEC = "+refs/heads/cloud-requests:refs/heads/cloud-requests"
 REQUIRED_FIELDS = {"schema", "action", "args", "requested_by", "requested_at", "expires_at"}
 ACTION_ALLOWLIST = {
@@ -41,6 +44,7 @@ ACTION_ALLOWLIST = {
     "make-e2e-runner-health": ("POST", "/api/v1/make", {}, "e2e-runner-health"),
     "make-test-pytest": ("POST", "/api/v1/make", {}, "test-pytest"),
     "make-test-python-unit": ("POST", "/api/v1/make", {}, "test-python-unit"),
+    "make-find-similar-docs": ("POST", "/api/v1/make", {"Q": Q_RE}, "find-similar-docs"),
 }
 
 

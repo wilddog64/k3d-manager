@@ -16,6 +16,46 @@ from webhook import policy
 
 
 class MakeTargetTests(unittest.TestCase):
+    def test_find_similar_docs_is_reader_tier(self):
+        self.assertEqual(wh.MAKE_TARGETS["find-similar-docs"]["min_role"], "reader")
+
+    def test_index_docs_is_operator_tier(self):
+        """Indexing writes to the store and spends API quota, so it is not reader-tier."""
+        self.assertEqual(wh.MAKE_TARGETS["index-docs"]["min_role"], "operator")
+
+    def test_find_similar_docs_accepts_a_prose_query(self):
+        argv, error = wh.parse_make_request(
+            "find-similar-docs", {"Q": "eso 403 on a vault path"}, False)
+        self.assertIsNone(error)
+        self.assertEqual(argv, ["find-similar-docs", "Q=eso 403 on a vault path"])
+
+    def test_find_similar_docs_requires_a_query(self):
+        _, error = wh.parse_make_request("find-similar-docs", {}, False)
+        self.assertIn("requires Q", error)
+
+    def test_query_rejects_every_shell_metacharacter(self):
+        """Q reaches a Makefile recipe, where $(Q) expands into a shell command line."""
+        for bad in ('a"; id', "a`id`", "a$(id)", "a;id", "a|id", "a&&id",
+                    "a>f", "a<f", "a#c", "a\\b", "a\nb", "a'q"):
+            with self.subTest(value=bad):
+                _, error = wh.parse_make_request("find-similar-docs", {"Q": bad}, False)
+                self.assertIsNotNone(error, f"{bad!r} was accepted")
+
+    def test_query_length_is_bounded(self):
+        _, error = wh.parse_make_request("find-similar-docs", {"Q": "a" * 500}, False)
+        self.assertIsNotNone(error)
+
+    def test_result_count_must_be_a_small_integer(self):
+        for bad in ("0", "51", "999", "5x", "-1"):
+            with self.subTest(value=bad):
+                _, error = wh.parse_make_request(
+                    "find-similar-docs", {"Q": "vault", "K": bad}, False)
+                self.assertIsNotNone(error, f"K={bad!r} was accepted")
+
+    def test_index_docs_takes_no_arguments(self):
+        _, error = wh.parse_make_request("index-docs", {"Q": "x"}, False)
+        self.assertIn("does not accept", error)
+
     def test_parse_valid_target(self):
         self.assertEqual(
             wh.parse_make_request("fix-sync", {"APP": "frontend"}, False),
