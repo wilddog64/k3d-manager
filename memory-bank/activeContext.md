@@ -251,7 +251,7 @@ choice (NodePort on hostinger vs a hub VirtualService proxying to it) and is **n
 anywhere in `scripts/` or `bin/`), there is **no blackbox exporter anywhere in the repo**, and
 `ServiceDown` keys on `kube_pod_status_ready == 0`, which is correctly silent when the pod is healthy
 and only the public path is broken. Spec filed:
-`docs/plans/v1.38.0-public-endpoint-blackbox-probes.md` — two probe modules (a 302 from Keycloak and
+`docs/plans/v1.39.0-public-endpoint-blackbox-probes.md` — two probe modules (a 302 from Keycloak and
 a 401 from the auth-gated hosts are *healthy*, so a single naive `valid_status_codes` would be
 wrong), an explicit `User-Agent` because Cloudflare 1010-blocks a default one, and three rules:
 `PublicEndpointDown`, `CloudflareTunnelDown`, and `PublicEndpointProbeAbsent` so a dead probe is not
@@ -970,14 +970,14 @@ the docs commit cannot affect v1.37.0's behaviour.
 | smoke webhook gate sweep + probes | `docs/bugs/2026-09-25-smoke-webhook-gate-unbounded-sweep-and-unreachable-probes.md` |
 | Grafana ServiceMonitor label | `docs/bugs/2026-09-25-grafana-servicemonitor-missing-release-label.md` |
 | Keycloak reconcile `awk` (work repo: shopping-cart-infra) | `docs/bugs/2026-09-25-keycloak-realm-reconcile-awk-missing-in-image.md` |
-| `/k3dm smoke` exposure | `docs/plans/v1.38.0-slack-smoke-target.md` — 3 of max 5 for v1.38.0 |
+| `/k3dm smoke` exposure | `docs/plans/v1.39.0-slack-smoke-target.md` — 3 of max 5 for v1.38.0 |
 
 `scratchpad/` and the stray 0-byte `.pub` are now in `.gitignore`. `scratchpad/` holds ~40 MB of
 agent logs and had been untracked-but-ignorable only by luck; one `git add .` would have committed
 all of it.
 
-**v1.38.0 plan-doc count is 3, not 1** — `docs/plans/v1.38.0-hermes-app-health-delta-sensor.md` and
-`docs/plans/v1.38.0-vector-store-and-hermes-prior-art.md` already exist. Two slots left before the
+**v1.38.0 plan-doc count is 3, not 1** — `docs/plans/v1.40.0-hermes-app-health-delta-sensor.md` and
+`docs/plans/v1.39.0-vector-store-and-hermes-prior-art.md` already exist. Two slots left before the
 cap forces a split.
 
 ### Correction to the 2026-09-25 smoke entry above
@@ -1870,7 +1870,7 @@ and still carries `role: app-cluster`.
 ## 2026-09-23 — v1.38.0 restructured: vector store as a platform component, Hermes as the consumer
 
 Operator direction: make the deployed vector store and Hermes retrieval the headline; CLI dedup
-becomes a by-product. Spec renamed to `docs/plans/v1.38.0-vector-store-and-hermes-prior-art.md`.
+becomes a by-product. Spec renamed to `docs/plans/v1.39.0-vector-store-and-hermes-prior-art.md`.
 
 **The driver is an agent-level defect, not a lint gap.** `scripts/lib/hermes/e2e_bugs.py:163` decides
 new-vs-recurrence with `bug_dir.glob(f"*-{group['slug']}.md")` — an unattended agent whose recall over
@@ -1913,7 +1913,7 @@ semantic search via the `code-review-graph` MCP; docs never got it. The concrete
 373 issue docs, 250 plans, 78 retros. Two filings of one defect with different vocabulary do not
 collide.
 
-`docs/plans/v1.38.0-vector-store-and-hermes-prior-art.md` (initially written as
+`docs/plans/v1.39.0-vector-store-and-hermes-prior-art.md` (initially written as
 `v1.38.0-semantic-doc-dedup.md`, restructured on operator direction). Deliberately **two-phase**, because the repo has
 **zero third-party Python runtime dependencies** (`check-doc-links.py` is stdlib-only; no
 `requirements.txt` or `pyproject.toml` exists) on Python **3.14.7**, where torch-class wheels are not
@@ -4897,7 +4897,7 @@ The two open questions above are now answered in writing and handed to Codex.
   Deliberately **no** `confirm:` — a scan is additive. Records that the CronJob's
   `.status.lastSuccessfulTime` stays empty after a manual run and documents it rather than adding an
   `ownerReference`, which the history reaper would then delete.
-- `docs/plans/v1.38.0-hermes-app-health-delta-sensor.md` — a Hermes `app_health` sensor for the
+- `docs/plans/v1.40.0-hermes-app-health-delta-sensor.md` — a Hermes `app_health` sensor for the
   general class, not a RabbitMQ check: **aggregate `/actuator/health` not UP while both probe groups
   are UP**, which is by construction the set of failures no orchestration signal can ever report.
   Reads through the API server's service proxy (`get --raw .../services/<svc>:<port>/proxy/...`) so
@@ -4941,7 +4941,7 @@ sandbox wall), so it staged everything and Claude committed. Expected, not a fai
 **80/80 green, zero reds.** Not a regression.
 
 **Decision (operator, 2026-09-24): task 2 is HELD until v1.37.0 merges.** The Hermes `app_health`
-sensor spec (`docs/plans/v1.38.0-hermes-app-health-delta-sensor.md`) and its handoff
+sensor spec (`docs/plans/v1.40.0-hermes-app-health-delta-sensor.md`) and its handoff
 (`scratchpad/handoff-hermes-app-health-sensor.md`) are complete and ready. It targets
 `k3d-manager-v1.38.0`, which `/post-merge` step 5 cuts from the v1.37.0 merge SHA. Do not cut that
 branch early and do not move the work onto v1.37.0 — that would make v1.37.0 a 6-plan-doc release,
@@ -5269,7 +5269,7 @@ PR #131 (`k3d-manager-v1.37.0` → `main`) merged at **925c43e7675651b9de0073466
 
 **Git tag and GitHub release:** **still MISSING** and awaiting the owner's explicit approval. CHANGELOG heading, `docs/releases.md` row and README row already exist on `main`; the downstream step (tag + release) is a hard gate requiring the user's go, not something an agent owns. No tag or release was created.
 
-**v1.38.0 plan-doc count:** starts at 3 (max 5): `v1.38.0-hermes-app-health-delta-sensor.md`, `v1.38.0-vector-store-and-hermes-prior-art.md`, and `v1.38.0-slack-smoke-target.md`. Two slots remain.
+**v1.38.0 plan-doc count:** starts at 3 (max 5): `v1.40.0-hermes-app-health-delta-sensor.md`, `v1.39.0-vector-store-and-hermes-prior-art.md`, and `v1.39.0-slack-smoke-target.md`. Two slots remain.
 
 
 ### Standing-doc audit closed (commit `4ef90a3a`)

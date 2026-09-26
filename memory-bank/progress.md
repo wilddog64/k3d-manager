@@ -2,6 +2,24 @@
 
 ## 2026-09-26 — v1.38.0 MERGED, tagged and released; v1.39.0 branch cut
 
+- [x] **SCOPE DECISION for v1.39.0 — settled 2026-09-26, operator approved.** v1.39.0 now holds
+  exactly **5** plan docs, at the cap:
+  1. `v1.39.0-test-suite-metrics-and-staleness.md` (its own, ready to implement)
+  2. `v1.39.0-slack-corpus-qa.md` (its own, blocked — see below)
+  3. `v1.39.0-public-endpoint-blackbox-probes.md` (carried)
+  4. `v1.39.0-slack-smoke-target.md` (carried)
+  5. `v1.39.0-vector-store-and-hermes-prior-art.md` (carried)
+  **Deferred to v1.40.0:** `v1.40.0-hermes-app-health-delta-sensor.md`.
+  Files renamed per the `62c9ff27` precedent (carried specs take the new version prefix), headers
+  updated, all inbound references fixed.
+- [x] **Why the vector store was kept and the sensor deferred — corrects an earlier
+  recommendation.** My first recommendation was to push the vector-store prior art to v1.40.0 as
+  "research". That was wrong: its **WS5 measured recall@5 is the hard blocker** on
+  `v1.39.0-slack-corpus-qa.md`, which was already on the branch. Deferring it would have left
+  v1.39.0 carrying a spec that could not be started. The `app_health` sensor is the only one of the
+  four carried candidates with nothing on this branch depending on it, so it is the only one that
+  can leave without stranding something. **Rule: before deferring a spec, check what on the target
+  branch depends on it — a spec can be low-priority and still be load-bearing.**
 - [x] **Release step DONE: ApplicationSets reapplied for v1.39.0** (operator ran it; 2026-09-26).
   12/12 sets deployed on the hub `k3d-k3d-cluster` ns `cicd`, both ACG variants included
   (`grafana-dashboards-acg`, `observability-acg`). All **24** k3d-manager sources moved off
@@ -1965,7 +1983,7 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       Tunnel → `:8000` → OrbStack → **hub** Istio, which has no `frontend` route and no frontend
       workload; the healthy pod is on hostinger with no Ingress and no NodePort. Fix is an
       architecture choice and needs the operator.
-- [x] **Spec the public-endpoint blackbox probes** — `docs/plans/v1.38.0-public-endpoint-blackbox-probes.md`
+- [x] **Spec the public-endpoint blackbox probes** — `docs/plans/v1.39.0-public-endpoint-blackbox-probes.md`
       (5th plan doc; v1.38.0 is now at the max-5 cap). Two modules, explicit `User-Agent`,
       `PublicEndpointDown` / `CloudflareTunnelDown` / `PublicEndpointProbeAbsent`.
 - [x] **Keycloak `awk` fix dispatched and verified** — `e0815211` on
