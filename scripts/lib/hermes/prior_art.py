@@ -6,14 +6,16 @@ instead of through a driver. That choice also keeps the database password where 
 generated: the argument vector carries a literal ``$POSTGRES_USER`` which the pod's own
 shell expands, so no credential ever appears in argv, a log line, or this host's history.
 
-The embeddings key is read from the environment or the login keychain at call time and is
-never accepted as a command-line flag, so there is no sensitive flag to register in
-``_args_have_sensitive_flag``.
+The embeddings key is read at call time from the environment, then the login keychain, then
+the hub Vault, and is never accepted as a command-line flag, so there is no sensitive flag to
+register in ``_args_have_sensitive_flag``. On the Vault path the root token is delivered to the
+pod on stdin, so neither credential ever appears in an argv.
 
 Retrieval is advisory everywhere it is used. Every failure path raises
 ``RetrievalUnavailable`` (or a subclass) so a caller can degrade to its previous behaviour
 with one ``except``; nothing here is allowed to crash a Hermes run.
 """
+import base64
 import hashlib
 import json
 import os
@@ -38,6 +40,20 @@ PRIMARY_KEYCHAIN_ITEM = "k3dm-embeddings-api-key"
 # The dedicated item first, so dropping a key into it later takes over from the shared
 # Gemini CLI credential with no code change.
 KEYCHAIN_ITEMS = (PRIMARY_KEYCHAIN_ITEM, "gemini-cli-api-key")
+
+# Vault holds a second copy of the embeddings key, for the case the keychain cannot serve
+# one: a locked login keychain, an item whose ACL trusts only the tool that created it, or a
+# launchd context with no session to unlock. The two stores are independent failure domains
+# because the Vault root token comes from a Kubernetes Secret read with kubectl, not from the
+# keychain, so this fallback has no bootstrapping circularity.
+VAULT_CONTEXT = os.environ.get("K3DM_VAULT_CONTEXT", "k3d-k3d-cluster")
+VAULT_NAMESPACE = os.environ.get("K3DM_VAULT_NAMESPACE", "secrets")
+VAULT_POD = os.environ.get("K3DM_VAULT_POD", "vault-0")
+VAULT_ROOT_SECRET = "vault-root"
+VAULT_MOUNT = "secret"
+VAULT_SECRET_PATH = os.environ.get("K3DM_EMBEDDINGS_VAULT_PATH", "embeddings/gemini")
+VAULT_SECRET_FIELD = "api_key"
+_VAULT_PATH_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._/-]{0,127}\Z")
 
 KUBE_CONTEXT = os.environ.get("K3DM_VECTORDB_CONTEXT", "k3d-k3d-cluster")
 NAMESPACE = os.environ.get("K3DM_VECTORDB_NAMESPACE", "vectordb")
@@ -82,6 +98,102 @@ _RULE_LINE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})$")
 LEAD_MAX_CHARS = 600
 
 
+def _exec_detail(proc):
+    """Return the most specific line of a ``kubectl exec`` failure.
+
+    ``kubectl exec`` appends its own ``command terminated with exit code N`` to the pod's stderr,
+    which is the last line and says nothing. Taking the last line therefore hid the real error —
+    Vault's ``No value found at secret/data/...`` became ``exit code 2``. Dropping kubectl's own
+    lines first leaves the pod's message, which is what an operator needs.
+    """
+    lines = [
+        line.strip()
+        for line in ((proc.stderr or "") + "\n" + (proc.stdout or "")).splitlines()
+        if line.strip() and not line.startswith("command terminated with exit code")
+    ]
+    return lines[-1] if lines else f"rc {proc.returncode}"
+
+
+def _vault_root_token():
+    """Return the hub Vault root token, read from the ``vault-root`` Kubernetes Secret.
+
+    The token is base64-decoded in this process rather than by piping through ``base64`` in a
+    shell, so the cleartext value never becomes a shell word and cannot reach history or a
+    process listing.
+    """
+    argv = [
+        "kubectl", "--context", VAULT_CONTEXT, "-n", VAULT_NAMESPACE,
+        "get", "secret", VAULT_ROOT_SECRET,
+        "-o", "jsonpath={.data.root_token}",
+    ]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        raise EmbeddingsUnavailable("kubectl timed out reading the Vault root token") from None
+    except OSError as exc:
+        raise EmbeddingsUnavailable(f"cannot run kubectl: {exc}") from None
+    if proc.returncode != 0:
+        detail = (proc.stderr or "").strip().splitlines()
+        raise EmbeddingsUnavailable(
+            f"cannot read {VAULT_ROOT_SECRET}: " + (detail[-1] if detail else f"rc {proc.returncode}")
+        )
+    encoded = proc.stdout.strip()
+    if not encoded:
+        raise EmbeddingsUnavailable(f"{VAULT_ROOT_SECRET} has no root_token field")
+    try:
+        return base64.b64decode(encoded).decode("utf-8").strip()
+    except (ValueError, UnicodeDecodeError):
+        raise EmbeddingsUnavailable(f"{VAULT_ROOT_SECRET} root_token is not valid base64") from None
+
+
+def vault_argv():
+    """Return the argv that reads the embeddings key inside the Vault pod.
+
+    The token is delivered on stdin and read by the pod's own shell, so it never appears in
+    this argv, in a Kubernetes audit record of the exec command, or in a log line. The secret
+    path is passed as a positional argument rather than interpolated into the ``sh -c`` string,
+    so an operator-supplied path cannot become shell syntax.
+    """
+    script = (
+        "read -r VAULT_TOKEN; export VAULT_TOKEN; "
+        f'exec vault kv get -mount={VAULT_MOUNT} -field={VAULT_SECRET_FIELD} "$1"'
+    )
+    return [
+        "kubectl", "--context", VAULT_CONTEXT, "-n", VAULT_NAMESPACE,
+        "exec", "-i", VAULT_POD, "--",
+        "sh", "-c", script, "sh", VAULT_SECRET_PATH,
+    ]
+
+
+def vault_api_key():
+    """Return the embeddings key stored at ``secret/embeddings/gemini`` in the hub Vault.
+
+    Raises ``EmbeddingsUnavailable`` with the reason on every failure path, so a caller can
+    report why this source was rejected alongside the others.
+    """
+    if not _VAULT_PATH_RE.match(VAULT_SECRET_PATH):
+        raise EmbeddingsUnavailable(
+            f"refusing Vault path {VAULT_SECRET_PATH!r}: not a plain KV path"
+        )
+    token = _vault_root_token()
+    try:
+        proc = subprocess.run(
+            vault_argv(), input=token + "\n", capture_output=True, text=True, timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        raise EmbeddingsUnavailable("Vault read timed out") from None
+    except OSError as exc:
+        raise EmbeddingsUnavailable(f"cannot run kubectl: {exc}") from None
+    if proc.returncode != 0:
+        raise EmbeddingsUnavailable(f"secret/{VAULT_SECRET_PATH}: {_exec_detail(proc)}")
+    value = proc.stdout.strip()
+    if not value:
+        raise EmbeddingsUnavailable(
+            f"secret/{VAULT_SECRET_PATH} has no {VAULT_SECRET_FIELD} value"
+        )
+    return value
+
+
 def api_key():
     """Return the embeddings key from the environment, else the keychain.
 
@@ -93,6 +205,11 @@ def api_key():
     common one here is rc 36 (``errSecInteractionNotAllowed``, -25308 truncated to a byte): the
     item exists and the keychain is unlocked, but the process cannot present the authorization
     prompt, so no value is returned.
+
+    The hub Vault is tried last rather than first because it is the slowest and least available
+    source — it needs a reachable cluster — while the keychain answers locally. It is tried at
+    all because it survives the failures the keychain does not: a locked keychain, a
+    single-binary ACL, or a launchd context with no login session.
     """
     value = os.environ.get(KEY_ENV, "").strip()
     if value:
@@ -121,6 +238,10 @@ def api_key():
             f"{item}: rc {found.returncode}{hint}"
             + (f" — {detail[-1]}" if detail else "")
         )
+    try:
+        return vault_api_key()
+    except EmbeddingsUnavailable as exc:
+        reasons.append(f"hub Vault: {exc}")
     raise EmbeddingsUnavailable("no embeddings credential. " + "; ".join(reasons))
 
 
@@ -285,10 +406,7 @@ def run_sql(sql, timeout=600):
     except OSError as exc:
         raise StoreUnavailable(f"cannot run kubectl: {exc}") from None
     if proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout or "").strip().splitlines()
-        raise StoreUnavailable(
-            "vector store error: " + (detail[-1] if detail else f"rc {proc.returncode}")
-        )
+        raise StoreUnavailable(f"vector store error: {_exec_detail(proc)}")
     return proc.stdout
 
 

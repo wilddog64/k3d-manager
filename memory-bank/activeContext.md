@@ -1,3 +1,51 @@
+# 2026-09-26 — embeddings credential gains a Vault source; indexer commits per batch
+
+- [x] Vault fallback in `scripts/lib/hermes/prior_art.py`: `_vault_root_token`, `vault_argv`,
+      `vault_api_key`, wired as source 4 in `api_key()` after env and the two keychain items.
+      Path `secret/embeddings/gemini` field `api_key`; overrides `K3DM_EMBEDDINGS_VAULT_PATH`,
+      `K3DM_VAULT_CONTEXT`, `K3DM_VAULT_NAMESPACE`, `K3DM_VAULT_POD`.
+- [x] `scripts/index-docs.py` split into `_upsert_script(rows)` (one transaction per batch) and
+      `_prune_script(present)` (separate final transaction). Progress reads `committed N/M`.
+- [x] 9 tests in `scripts/tests/bin/test_prior_art.py` (`TestVaultFallback`), 9 new in
+      `scripts/tests/bin/test_index_docs.py`. 4 mutations each produced a targeted failure.
+- [x] `docs/guides/vector-store.md` — resolution order, the rc 36 diagnosis, the prompted write
+      command, resumability. Addendum 3 in
+      `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md` (v1.39.0 is at the 5-doc cap).
+
+ROOT CAUSE of the operator's `no embeddings credential` — NOT a locked keychain. Value reads in
+the same non-TTY shell: `-a k3dm -s k3dm-webhook-token` rc 0, `-a k3dm -s k3dm-hermes-gh-token`
+rc 0, `-s k3dm-stripe-sk-test` rc 0, `-s gemini-cli-api-key` **rc 36**. The Gemini CLI created
+its item with an ACL trusting only its own binary. rc 36 = `errSecInteractionNotAllowed` (-25308
+truncated to a byte): item present, keychain unlocked, no authorization prompt possible.
+
+WHY VAULT IS NOT CIRCULAR — the Vault token comes from the `vault-root` Kubernetes Secret read
+with kubectl (`bin/get-ldap-password:121`, `bin/get-keycloak-password:46`, `bin/cluster-up:512`),
+never from the keychain. Independent failure domains. Vault is LAST because it needs a reachable
+hub; the keychain answers locally. Do not reorder.
+
+SECRET HYGIENE — the root token is base64-decoded in-process and delivered to the pod on stdin
+(`read -r VAULT_TOKEN`), so it is never a shell word and never in the exec command string. The
+secret path is validated and passed as a positional arg (`sh -c '... "$1"' sh "$path"`), never
+interpolated. `TestVaultFallback` asserts the argv shape so a later "simplify" cannot undo it.
+
+INDEXER DEFECT FIXED — it embedded all 1,704 docs into memory then wrote once, so a late failure
+discarded every call already paid for, and a mid-run `rows: 0` was indistinguishable from a dead
+run. That is why the operator's run could not be diagnosed.
+
+- [x] THIRD DEFECT, found by one live read-only call: `kubectl exec` appends
+      `command terminated with exit code N` as the LAST stderr line, so `detail[-1]` reported the
+      trailer and hid Vault's `No value found at secret/data/embeddings/gemini`. Same bug was in
+      `run_sql`, hiding every psql error. `_exec_detail` drops kubectl's lines first;
+      `TestExecFailureDetail` pins it (4 mutations caught). Stubbed unit tests could NOT find this.
+
+- [ ] Operator: `security add-generic-password -a k3dm -s k3dm-embeddings-api-key -w` — the
+      immediate unblock for the indexer, Hermes and the webhook.
+- [ ] Operator: write the Vault copy (prompted command in the guide). No agent touches the value.
+- [ ] Operator: re-run `make index-docs`; then Claude verifies `rows` > 0, `last_indexed_epoch`
+      set, the sensor flipping off `index never built`, and one real ranked similarity result.
+- [ ] Pre-existing, NOT fixed here: `Makefile:814` help comment "Run the pytest suites" sits above
+      `check-doc-links`, so `make help` mislabels that target.
+
 # 2026-09-26 — vectordb monitoring H1-H5 landed via Codex, one defect fixed on review
 
 - [x] Codex `2554da26` implemented H1-H5: `bin/k3dm-vectordb-status` (probe, `--offline` mode),

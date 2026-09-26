@@ -36,36 +36,49 @@ from hermes.prior_art import (  # noqa: E402
 )
 
 
-def _upsert_script(rows, present_paths):
-    """Build one psql script that upserts ``rows`` and prunes to ``present_paths``."""
-    parts = ["BEGIN;"]
-    if rows:
+def _upsert_script(rows):
+    """Build one psql script that upserts ``rows`` in its own transaction.
+
+    One batch per transaction, deliberately. Embedding 1,700 documents and writing once at the
+    end meant a failure on the last batch discarded every batch already paid for; committing
+    per batch makes a re-run resume, because ``fetch_hashes`` then sees what landed.
+    """
+    parts = [
+        "BEGIN;",
+        "CREATE TEMP TABLE staging (path text, title text, content_hash text, "
+        "embedding vector) ON COMMIT DROP;",
+        "COPY staging (path, title, content_hash, embedding) FROM STDIN;",
+    ]
+    for path, title, digest, vector in rows:
         parts.append(
-            "CREATE TEMP TABLE staging (path text, title text, content_hash text, "
-            "embedding vector) ON COMMIT DROP;"
-        )
-        parts.append("COPY staging (path, title, content_hash, embedding) FROM STDIN;")
-        for path, title, digest, vector in rows:
-            parts.append(
-                "\t".join(
-                    (
-                        copy_escape(path),
-                        copy_escape(title),
-                        copy_escape(digest),
-                        vector_literal(vector),
-                    )
+            "\t".join(
+                (
+                    copy_escape(path),
+                    copy_escape(title),
+                    copy_escape(digest),
+                    vector_literal(vector),
                 )
             )
-        parts.append("\\.")
-        parts.append(
-            f"INSERT INTO {TABLE} (path, title, content_hash, embedding) "
-            "SELECT path, title, content_hash, embedding FROM staging "
-            "ON CONFLICT (path) DO UPDATE SET title = EXCLUDED.title, "
-            "content_hash = EXCLUDED.content_hash, embedding = EXCLUDED.embedding, "
-            "indexed_at = now();"
         )
-    parts.append("CREATE TEMP TABLE present (path text) ON COMMIT DROP;")
-    parts.append("COPY present (path) FROM STDIN;")
+    parts.append("\\.")
+    parts.append(
+        f"INSERT INTO {TABLE} (path, title, content_hash, embedding) "
+        "SELECT path, title, content_hash, embedding FROM staging "
+        "ON CONFLICT (path) DO UPDATE SET title = EXCLUDED.title, "
+        "content_hash = EXCLUDED.content_hash, embedding = EXCLUDED.embedding, "
+        "indexed_at = now();"
+    )
+    parts.append("COMMIT;")
+    return "\n".join(parts) + "\n"
+
+
+def _prune_script(present_paths):
+    """Build one psql script that deletes rows for docs no longer in the corpus."""
+    parts = [
+        "BEGIN;",
+        "CREATE TEMP TABLE present (path text) ON COMMIT DROP;",
+        "COPY present (path) FROM STDIN;",
+    ]
     for path in present_paths:
         parts.append(copy_escape(path))
     parts.append("\\.")
@@ -111,28 +124,44 @@ def main(argv=None):
     if args.limit > 0:
         changed = changed[: args.limit]
 
-    rows = []
+    written = 0
     try:
         for start in range(0, len(changed), EMBED_BATCH):
             batch = changed[start:start + EMBED_BATCH]
             vectors = embed_batch([doc[2] for doc in batch], task_type="RETRIEVAL_DOCUMENT")
-            for (path, title, _text, digest), vector in zip(batch, vectors):
-                rows.append((path, title, digest, vector))
+            rows = [
+                (path, title, digest, vector)
+                for (path, title, _text, digest), vector in zip(batch, vectors)
+            ]
+            run_sql(_upsert_script(rows))
+            written += len(rows)
             if not args.quiet:
-                print(f"index-docs: embedded {len(rows)}/{len(changed)}", file=sys.stderr)
-        present = [doc[0] for doc in docs]
-        if args.limit > 0 and stale:
-            present = sorted(set(present) | set(existing))
-        summary = run_sql(_upsert_script(rows, present))
+                print(f"index-docs: committed {written}/{len(changed)}", file=sys.stderr)
     except RetrievalUnavailable as exc:
         print(f"index-docs: unavailable — {exc}", file=sys.stderr)
+        print(
+            f"index-docs: {written} of {len(changed)} documents were committed before the "
+            "failure; re-running resumes from there",
+            file=sys.stderr,
+        )
+        return 1
+
+    present = [doc[0] for doc in docs]
+    if args.limit > 0 and stale:
+        present = sorted(set(present) | set(existing))
+    try:
+        summary = run_sql(_prune_script(present))
+    except RetrievalUnavailable as exc:
+        print(f"index-docs: unavailable — {exc}", file=sys.stderr)
+        print(f"index-docs: {written} documents were committed; only the prune failed",
+              file=sys.stderr)
         return 1
 
     counts = dict(
         line.split("=", 1) for line in summary.split() if "=" in line
     )
     print(
-        f"index-docs: {len(docs)} docs, {len(rows)} embedded, "
+        f"index-docs: {len(docs)} docs, {written} embedded, "
         f"{counts.get('pruned', '0')} pruned, {counts.get('indexed', '?')} in store"
     )
     subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],

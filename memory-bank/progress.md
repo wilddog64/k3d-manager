@@ -1,3 +1,15 @@
+# embeddings credential + indexer resumability — 2026-09-26 complete
+
+- [x] Vault added as credential source 4 (`secret/embeddings/gemini`, field `api_key`) in
+      `scripts/lib/hermes/prior_art.py`; tried after env and both keychain items.
+- [x] `scripts/index-docs.py` commits one transaction per 100-doc batch; prune split out.
+- [x] 18 new tests (`TestVaultFallback` + `scripts/tests/bin/test_index_docs.py`); 50 pass in the
+      two files. 4 mutations produced targeted failures and were restored.
+- [x] Docs: `docs/guides/vector-store.md` + Addendum 3 in
+      `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md`. CHANGELOG updated.
+- [ ] Operator: add the k3dm-owned keychain item, write the Vault copy, re-run `make index-docs`.
+- [ ] Then Claude verifies read-only: row count, sensor status, one ranked similarity result.
+
 # vectordb health monitoring — 2026-09-26 complete
 
 - [x] Commit `2554da26d2dcf940c09168d6e93b417e39eb8976` pushed to

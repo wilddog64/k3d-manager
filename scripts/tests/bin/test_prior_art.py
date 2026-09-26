@@ -150,6 +150,7 @@ class TestFailureModes:
     def test_missing_credential_raises_embeddings_unavailable(self, monkeypatch):
         monkeypatch.setenv(pa.KEY_ENV, "")
         monkeypatch.setattr(pa, "KEYCHAIN_ITEMS", ())
+        monkeypatch.setattr(pa, "vault_api_key", _vault_raises("no cluster"))
         with pytest.raises(pa.EmbeddingsUnavailable):
             pa.api_key()
 
@@ -244,3 +245,178 @@ def _stub_urlopen(monkeypatch, payload):
             return json.dumps(payload).encode()
 
     monkeypatch.setattr(pa.urllib.request, "urlopen", lambda *_a, **_k: _Resp())
+
+
+def _vault_raises(message):
+    def _raise():
+        raise pa.EmbeddingsUnavailable(message)
+
+    return _raise
+
+
+class TestVaultFallback:
+    """The third credential source: one copy in the hub Vault.
+
+    These tests exist because the Vault path handles two secrets at once — the root token and
+    the API key — and the whole point of its shape is that neither reaches an argv. An
+    assertion on the argv is the only thing that keeps a later "simplify" from piping the token
+    through a shell.
+    """
+
+    def test_the_root_token_is_not_in_the_exec_argv(self):
+        argv = pa.vault_argv()
+        assert "VAULT_TOKEN" not in " ".join(argv[:-3])
+        assert "read -r VAULT_TOKEN" in argv[-3]
+
+    def test_the_secret_path_is_a_positional_argument_not_interpolated(self):
+        argv = pa.vault_argv()
+        assert argv[-1] == pa.VAULT_SECRET_PATH
+        assert pa.VAULT_SECRET_PATH not in argv[-3]
+        assert '"$1"' in argv[-3]
+
+    def test_the_exec_reads_the_token_from_stdin(self, monkeypatch):
+        captured = {}
+
+        class Proc:
+            returncode = 0
+            stdout = "the-key\n"
+            stderr = ""
+
+        monkeypatch.setattr(pa, "_vault_root_token", lambda: "root-token-test-value")
+        monkeypatch.setattr(
+            pa.subprocess, "run",
+            lambda argv, **kw: captured.update(argv=argv, input=kw.get("input")) or Proc(),
+        )
+        assert pa.vault_api_key() == "the-key"
+        assert captured["input"] == "root-token-test-value\n"
+        assert "root-token-test-value" not in " ".join(captured["argv"])
+
+    def test_a_path_with_shell_syntax_is_refused_before_any_call(self, monkeypatch):
+        def explode(*_a, **_k):
+            raise AssertionError("must not run kubectl for a rejected path")
+
+        monkeypatch.setattr(pa.subprocess, "run", explode)
+        monkeypatch.setattr(pa, "VAULT_SECRET_PATH", "embeddings/gemini; rm -rf /")
+        with pytest.raises(pa.EmbeddingsUnavailable, match="not a plain KV path"):
+            pa.vault_api_key()
+
+    def test_an_empty_field_is_not_returned_as_a_credential(self, monkeypatch):
+        class Proc:
+            returncode = 0
+            stdout = "\n"
+            stderr = ""
+
+        monkeypatch.setattr(pa, "_vault_root_token", lambda: "root-token-test-value")
+        monkeypatch.setattr(pa.subprocess, "run", lambda *_a, **_k: Proc())
+        with pytest.raises(pa.EmbeddingsUnavailable, match="has no api_key value"):
+            pa.vault_api_key()
+
+    def test_the_root_token_is_decoded_in_process(self, monkeypatch):
+        class Proc:
+            returncode = 0
+            stdout = "cm9vdC10b2tlbi10ZXN0LXZhbHVl"
+            stderr = ""
+
+        captured = {}
+        monkeypatch.setattr(
+            pa.subprocess, "run",
+            lambda argv, **kw: captured.update(argv=argv) or Proc(),
+        )
+        assert pa._vault_root_token() == "root-token-test-value"
+        assert "base64" not in " ".join(captured["argv"])
+
+    def test_vault_is_tried_only_after_env_and_keychain(self, monkeypatch):
+        order = []
+        monkeypatch.setenv(pa.KEY_ENV, "")
+        monkeypatch.setattr(pa, "KEYCHAIN_ITEMS", ("k3dm-embeddings-api-key",))
+
+        class Missing:
+            returncode = 44
+            stdout = ""
+            stderr = "not found"
+
+        def keychain(*_a, **_k):
+            order.append("keychain")
+            return Missing()
+
+        def vault():
+            order.append("vault")
+            return "vault-supplied-value"
+
+        monkeypatch.setattr(pa.subprocess, "run", keychain)
+        monkeypatch.setattr(pa, "vault_api_key", vault)
+        assert pa.api_key() == "vault-supplied-value"
+        assert order == ["keychain", "vault"]
+
+    def test_the_env_var_short_circuits_every_other_source(self, monkeypatch):
+        def explode(*_a, **_k):
+            raise AssertionError("must not consult the keychain or Vault")
+
+        monkeypatch.setenv(pa.KEY_ENV, "env-supplied-value")
+        monkeypatch.setattr(pa.subprocess, "run", explode)
+        monkeypatch.setattr(pa, "vault_api_key", explode)
+        assert pa.api_key() == "env-supplied-value"
+
+    def test_the_failure_message_names_all_three_sources(self, monkeypatch):
+        monkeypatch.setenv(pa.KEY_ENV, "")
+        monkeypatch.setattr(pa, "KEYCHAIN_ITEMS", ("k3dm-embeddings-api-key",))
+
+        class Denied:
+            returncode = 36
+            stdout = ""
+            stderr = ""
+
+        monkeypatch.setattr(pa.subprocess, "run", lambda *_a, **_k: Denied())
+        monkeypatch.setattr(pa, "vault_api_key", _vault_raises("cluster unreachable"))
+        with pytest.raises(pa.EmbeddingsUnavailable) as caught:
+            pa.api_key()
+        message = str(caught.value)
+        assert pa.KEY_ENV in message
+        assert "errSecInteractionNotAllowed" in message
+        assert "hub Vault: cluster unreachable" in message
+
+
+class TestExecFailureDetail:
+    """``kubectl exec`` appends its own last line, so the last line is never the real error.
+
+    This was a live defect, not a hypothetical: a Vault read of an unwritten path reported
+    ``command terminated with exit code 2`` and hid ``No value found at secret/data/...``.
+    """
+
+    class _Proc:
+        def __init__(self, stderr="", stdout="", returncode=1):
+            self.stderr = stderr
+            self.stdout = stdout
+            self.returncode = returncode
+
+    def test_kubectls_own_trailer_is_not_the_reported_reason(self):
+        proc = self._Proc(
+            stderr="No value found at secret/data/embeddings/gemini\n"
+                   "command terminated with exit code 2\n",
+            returncode=2,
+        )
+        assert pa._exec_detail(proc) == "No value found at secret/data/embeddings/gemini"
+
+    def test_the_most_specific_pod_line_wins_when_several_are_emitted(self):
+        proc = self._Proc(
+            stderr="psql:<stdin>:3: ERROR:  relation does not exist\n"
+                   "psql:<stdin>:4: ERROR:  current transaction is aborted\n"
+                   "command terminated with exit code 1\n",
+        )
+        assert "transaction is aborted" in pa._exec_detail(proc)
+
+    def test_a_silent_failure_falls_back_to_the_exit_code(self):
+        assert pa._exec_detail(self._Proc(returncode=7)) == "rc 7"
+
+    def test_a_trailer_only_failure_still_reports_something_useful(self):
+        proc = self._Proc(stderr="command terminated with exit code 2\n", returncode=2)
+        assert pa._exec_detail(proc) == "rc 2"
+
+    def test_the_store_error_reports_the_pod_message(self, monkeypatch):
+        proc = self._Proc(
+            stderr="psql:<stdin>:1: ERROR:  syntax error\n"
+                   "command terminated with exit code 1\n",
+        )
+        monkeypatch.setattr(pa.subprocess, "run", lambda *_a, **_k: proc)
+        with pytest.raises(pa.StoreUnavailable, match="syntax error"):
+            pa.run_sql("SELECT 1;")

@@ -55,6 +55,16 @@ of exactly that embedded text, so:
 
 A full cold index of 1,704 documents is 18 batched calls to the Gemini embeddings API.
 
+**A partial run is not wasted.** Each batch of 100 is committed in its own transaction, so an
+interruption on batch 17 keeps the 1,600 documents already embedded; re-running resumes from there,
+because the hash comparison then sees what landed. The first implementation embedded the whole
+corpus into memory and wrote once at the end, which meant a late failure discarded every call
+already paid for. Two consequences worth knowing:
+
+- progress on stderr reads `committed N/M`, and that count is durable — it is not a buffer;
+- pruning removed documents is a separate final transaction, so a failed run prunes nothing and
+  leaves the store a superset of the corpus rather than a truncated one.
+
 ## How the store is reached, and why there is no Postgres driver
 
 This repo carries no third-party Python runtime dependencies, so there is no `psycopg2`. SQL is
@@ -79,15 +89,81 @@ Resolution order, at call time:
 1. `K3DM_EMBEDDINGS_API_KEY` in the environment
 2. keychain item `k3dm-embeddings-api-key` (the dedicated item)
 3. keychain item `gemini-cli-api-key` (shared with the Gemini CLI)
+4. `secret/embeddings/gemini` field `api_key` in the hub Vault
 
 The key is placed only in an `x-goog-api-key` request header. It is never passed as a command-line
 flag, which is why there is no new entry in `_args_have_sensitive_flag` — there is no sensitive flag
 to register. Dropping a dedicated key into item 2 takes over from the shared CLI credential with no
 code change.
 
+Vault is last because it is the slowest and least available source — it needs a reachable hub —
+while the keychain answers locally. It is there because it survives the failures the keychain does
+not: a locked login keychain, an item whose ACL trusts only the tool that created it, and a launchd
+context with no login session to unlock anything. The two stores are **independent failure
+domains**: the Vault root token comes from the `vault-root` Kubernetes Secret read with kubectl, not
+from the keychain, so the fallback has no bootstrapping circularity.
+
+### Why item 3 denies a read, and what to do about it
+
+`gemini-cli-api-key` was created by the Gemini CLI with an ACL trusting only its own binary, so a
+value read from any other process returns **rc 36** (`errSecInteractionNotAllowed`, -25308 truncated
+to a byte): the item exists, the keychain is unlocked, and the process cannot present the
+authorization prompt. This is not a locked keychain — every k3dm-owned item reads at rc 0 from the
+same non-TTY shell. The fix is one k3dm-owned item, which is why item 2 is checked first:
+
+```bash
+security add-generic-password -a k3dm -s k3dm-embeddings-api-key -w
+```
+
+The `-w` with no value prompts, so the key never reaches shell history.
+
+### Writing the Vault copy
+
+The operator writes this value; no agent creates, reads or echoes it. The key is prompted, so it
+stays out of history, out of argv and out of a process listing:
+
+```zsh
+read -rs 'GEMINI_KEY?Gemini API key: '; echo
+ROOT_TOKEN=$(kubectl --context k3d-k3d-cluster -n secrets get secret vault-root -o jsonpath='{.data.root_token}' | base64 --decode)
+{ printf '%s\n' "$ROOT_TOKEN"; GEMINI_KEY="$GEMINI_KEY" jq -n '{api_key: env.GEMINI_KEY}'; } | kubectl --context k3d-k3d-cluster -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put -mount=secret embeddings/gemini -'
+unset GEMINI_KEY ROOT_TOKEN
+```
+
+Three details are load-bearing. In zsh `read -p` reads from a *coprocess*, so the prompt form is
+`read -rs 'VAR?prompt'`. `jq -n '{api_key: env.GEMINI_KEY}'` passes the value through the
+environment rather than argv, so it never appears in `ps` output, and it JSON-escapes it. The root
+token goes to the pod on stdin and is read by the pod's own shell, so it stays out of the
+`kubectl exec` command string that lands in logs and audit records.
+
+Confirm it landed without printing it:
+
+```zsh
+kubectl --context k3d-k3d-cluster -n secrets get secret vault-root -o jsonpath='{.data.root_token}' | base64 --decode | kubectl --context k3d-k3d-cluster -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=api_key embeddings/gemini | wc -c'
+```
+
+That prints a character count. Expect 40 for a standard `AIza…` key (39 characters plus a newline).
+
+Overrides, for a non-default hub: `K3DM_VAULT_CONTEXT`, `K3DM_VAULT_NAMESPACE`, `K3DM_VAULT_POD`,
+`K3DM_EMBEDDINGS_VAULT_PATH`. The path is validated against a plain-KV-path pattern and passed to
+the pod as a positional argument, never interpolated into the `sh -c` string, so an override cannot
+become shell syntax.
+
 **A Claude session cannot read either keychain item** — a value read returns rc 36 with no stderr.
 Indexing and querying from an agent session therefore require `K3DM_EMBEDDINGS_API_KEY` to be
-exported deliberately, or the operator runs the command.
+exported deliberately, the Vault copy to be present, or the operator runs the command.
+
+### Diagnosing "no embeddings credential"
+
+The failure names every source and why it was rejected, because the same message once covered an
+absent item, a denied read and an empty value — three different fixes. Read the per-source reason
+rather than assuming: `rc 44` is item not found, `rc 36` is the ACL denial above, and
+`No value found at secret/data/embeddings/gemini` means the Vault copy has not been written yet,
+while `permission denied` means the token was rejected.
+
+The Vault and store errors report the **pod's** message, not kubectl's. `kubectl exec` appends its
+own `command terminated with exit code N` as the last line of stderr, so reading the last line
+reports the exit code and hides the real error — which it did, until `_exec_detail` began dropping
+kubectl's trailer first.
 
 ## Health verification
 
