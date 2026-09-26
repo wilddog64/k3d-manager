@@ -2,7 +2,86 @@
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-09-25
+
+### Added
+- The offline test suites are now reader-tier targets: `test-pytest` and `test-python-unit`
+  are reachable from the Slack `/k3dm` command and, as `make-test-pytest` and
+  `make-test-python-unit`, from the cloud bridge. Both take no arguments. `make test` and
+  `make test-bin` stay unexposed until the `scripts/tests/` live-mutation sweep is complete.
+- The cloud bridge now exposes the six reader-tier `make` targets as separate fixed actions:
+  `fix-list`, `fix-status`, `status-public`, `observability-status`, `vuln-scan` and
+  `e2e-runner-health`, with no optional arguments in phase 1.
+- A two-token read-only cloud session path: `bin/k3dm-cloud-bridge` polls the untrusted
+  `cloud-requests` branch from a bare clone, validates four fixed actions, calls the local
+  webhook with the reader credential, and commits a response plus replay ledger entry.
+  `bin/k3dm-cloud-request` files and optionally waits for those requests without exposing a
+  credential or building a command from branch content.
+- A committed `.claude/settings.json` granting a cloud session permission to run
+  `bin/k3dm-cloud-request` (and the `python3`-prefixed form), so it can exercise the bridge without
+  a per-session approval prompt. `.gitignore` now excludes `.claude/*` with a `!.claude/settings.json`
+  negation instead of `.claude/`, because git cannot re-include a file under an excluded directory —
+  the previous pattern would have accepted the commit request and tracked nothing.
+  `.claude/settings.local.json`, `projects/` and `worktrees/` stay ignored.
+- `make init-cloud-requests`, `make install-cloud-bridge` and `make uninstall-cloud-bridge`.
+  The first seeds `origin/cloud-requests` as an **orphan** commit via git plumbing, so it never
+  touches the worktree, moves `HEAD`, or runs a pre-commit hook, and the branch carries no repo
+  code for a compromised cloud session to modify. The installer refuses to bootstrap until the
+  reader token is in the Keychain and the remote branch exists, because the bridge's
+  `--force-with-lease` requires the remote ref to be present.
+
 ### Fixed
+- `make init-cloud-requests` no longer names its throwaway git index with `mktemp -u`, which
+  prints a path without reserving it and left a symlink-attack window in a world-writable
+  directory. The obvious remedy does not work: git rejects a pre-created zero-byte index with
+  `index file smaller than expected`, so dropping `-u` would have made the target fail at rc 128
+  on the one run it ever gets. It now reserves a private `mktemp -d` directory (`drwx------`) and
+  places the index inside it, so the path is unguessable and the file still does not exist when
+  git opens it.
+- The `test-python-unit` vacuous-run guard used `grep` basic-regex alternation (`\|`), a GNU
+  extension that is not POSIX and that this repo relies on across both BSD and GNU grep — a guard
+  whose entire purpose is to fail closed was itself non-portable. Now `grep -Eq` with an escaped
+  ERE, re-mutation-tested so it still goes red on a bare-`test_` file with no main hook.
+- The webhook is addressed as `http://127.0.0.1:7443` rather than `https://` in the how-to and in
+  two places in the cloud-session spec. The listener is a bare `ThreadingHTTPServer` on loopback
+  with no `wrap_socket` and no certificate, so the `https://` form sent readers looking for TLS
+  errors that cannot occur. The spec's not-chosen cloudflared ingress rule was wrong for a second
+  reason: an ingress `service:` addresses the local origin, and Cloudflare terminates TLS at its
+  edge.
+- The cloud request path could not complete a single round trip: both ends assumed a local
+  `refs/heads/cloud-requests` that nothing maintains. `git fetch origin cloud-requests` with a
+  bare branch name makes git **ignore the configured refspec and write only `FETCH_HEAD`**, so in
+  the bridge's bare clone the branch ref stayed at the seed commit while `parent` advanced, and
+  `update-ref <new> <old>` failed its old-value check on every tick — logging
+  `is at <seed> but expected <parent>` and never calling the webhook. `bin/k3dm-cloud-request`
+  failed the mirror image in a fresh clone, where the local ref does not exist at all
+  (`unable to resolve reference`), which is exactly the state the documented cloud-side
+  `git fetch origin cloud-requests` leaves. The bridge now fetches an explicit
+  `+refs/heads/cloud-requests:refs/heads/cloud-requests`, and the helper drops its pointless local
+  `update-ref` — the push already carries an explicit lease. The helper's no-remote-branch case
+  also leased against the empty *tree* SHA, which no remote ref can ever equal; it now leases
+  against the empty string, which git defines as "must not exist".
+- `bin/k3dm-cloud-request --wait` could never observe a response from a shallow or single-branch
+  clone — the shape a cloud session actually runs in, and the only environment the helper exists
+  for. The poll read `origin/cloud-requests:responses/<id>.json` but refreshed with
+  `git fetch origin cloud-requests`, a bare branch name that writes only `FETCH_HEAD`. A clone
+  made with `--depth 1 --branch main` has `remote.origin.fetch` covering just `main`, so nothing
+  ever creates `refs/remotes/origin/cloud-requests` and every poll raised
+  `invalid object name`, exiting 5 after the full timeout with the response sitting on the branch.
+  A full clone hid this, because `git clone` writes every remote-tracking ref up front. The poll
+  now fetches an explicit `+refs/heads/cloud-requests:refs/remotes/origin/cloud-requests` and
+  reads the response from that same ref. This was the third distinct instance of the bare-branch
+  fetch defect in this feature; both ends now name their refs explicitly.
+- Bridge LaunchAgent template: `KeepAlive` replaces `StartInterval 60`. `main()` is a long-running
+  daemon with its own 60s loop, so the interval was the one-shot idiom applied to a persistent
+  job — it worked, but recovery from a crash waited out the interval instead of being immediate.
+- `GET /api/v1/health` answers again instead of dropping the connection. The v1.37.0 webhook
+  decomposition (`925c43e7`) moved `_smoke_test_services` into `scripts/lib/webhook/smoke.py`
+  and dropped its closing `return results`, so the default non-quick path returned `None` and
+  every caller that iterated it raised `TypeError: 'NoneType' object is not iterable`. Both
+  `/api/v1/health` branches and the post-provision Slack check were affected; `?quick=1` returns
+  inside the early-exit branch and kept working, which is how a release shipped over it. Adds a
+  regression test that exercises the non-quick path, which no test previously did.
 - `cluster-up`'s failure cleanup no longer tears down the Cloudflare tunnel it did not start.
   `_acg_up_cleanup` ran an unconditional `launchctl bootout` of
   `com.k3d-manager.cloudflare-tunnel` on any non-zero exit, but `cluster-up` does not install or

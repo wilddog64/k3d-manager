@@ -169,3 +169,30 @@ def test_redirect_uri_error_wins_before_and_after_post():
     page = "<html>Invalid parameter: redirect_uri</html>"
     assert WEBHOOK._smoke_code_flow_error(400, page, posted=False) == "client redirect_uri rejected"
     assert WEBHOOK._smoke_code_flow_error(400, page) == "client redirect_uri rejected"
+
+
+def test_smoke_test_services_returns_results_on_the_non_quick_path(monkeypatch):
+    """The v1.37.0 decomposition dropped the closing `return results`, so the default
+    quick=False path returned None and every caller that iterated it raised
+    TypeError: 'NoneType' object is not iterable — /api/v1/health and the
+    post-provision check both 500'd. quick=True kept working, which hid it."""
+    monkeypatch.setattr(WEBHOOK, "_resolve_provider", lambda p=None: "k3d")
+    monkeypatch.setattr(WEBHOOK, "_provider_context", lambda p=None: "k3d-hub")
+    monkeypatch.setattr(WEBHOOK, "_provider_supports_pushgateway", lambda p: False)
+    monkeypatch.setattr(WEBHOOK, "_monitoring_paused", lambda: False)
+    monkeypatch.setattr(WEBHOOK, "_posix_spawn_capture", lambda *a, **k: ("", False))
+    monkeypatch.setattr(WEBHOOK, "_smoke_test_logins", lambda *a, **k: [])
+
+    def fake_urlopen(*args, **kwargs):
+        raise OSError("no network in tests")
+
+    monkeypatch.setattr(WEBHOOK.urllib.request, "urlopen", fake_urlopen)
+
+    result = WEBHOOK._smoke_test_services(retries=1)
+    assert result is not None, "non-quick path returned None — the closing return is missing"
+    assert isinstance(result, list)
+    for name, ok, detail in result:
+        assert isinstance(name, str)
+
+    quick = WEBHOOK._smoke_test_services(retries=1, quick=True)
+    assert isinstance(quick, list)

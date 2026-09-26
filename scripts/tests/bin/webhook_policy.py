@@ -13,6 +13,8 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_ROOT / "scripts" / "lib"))
 from webhook import policy
+import webhook.auth as auth
+from webhook.auth import _resolve_token_role
 _WEBHOOK = _ROOT / "bin" / "k3dm-webhook"
 _spec = importlib.util.spec_from_file_location(
     "k3dm_webhook", _WEBHOOK, loader=SourceFileLoader("k3dm_webhook", str(_WEBHOOK))
@@ -22,6 +24,101 @@ _spec.loader.exec_module(wh)
 
 
 class WebhookPolicyTests(unittest.TestCase):
+    def test_resolve_token_role(self):
+        with patch.object(auth, "_get_token", return_value="admin-tok"), \
+                patch.object(auth, "_get_reader_token", return_value="reader-tok"):
+            self.assertEqual(_resolve_token_role("admin-tok"), "admin")
+            self.assertEqual(_resolve_token_role("reader-tok"), "reader")
+            self.assertIsNone(_resolve_token_role("unknown-tok"))
+            self.assertIsNone(_resolve_token_role(""))
+
+    def test_resolve_token_role_prefers_admin_when_tokens_match(self):
+        with patch.object(auth, "_get_token", return_value="same-tok"), \
+                patch.object(auth, "_get_reader_token", return_value="same-tok"):
+            self.assertEqual(_resolve_token_role("same-tok"), "admin")
+
+    def test_reader_token_role_is_ceiling_without_header(self):
+        self.assertEqual(wh._request_role({}, "reader"), "reader")
+
+    def test_reader_token_role_caps_admin_header(self):
+        self.assertEqual(wh._request_role({"X-K3DM-Role": "admin"}, "reader"), "reader")
+
+    def test_admin_token_role_still_allows_header_narrowing(self):
+        self.assertEqual(wh._request_role({"X-K3DM-Role": "reader"}, "admin"), "reader")
+
+    def test_request_role_default_behavior_is_unchanged(self):
+        cases = [({}, "admin"), ({"X-K3DM-Role": "admin"}, "admin"),
+                 ({"X-K3DM-Role": "reader"}, "reader"),
+                 ({"X-K3DM-Role": "bogus"}, "reader")]
+        for headers, expected in cases:
+            with self.subTest(headers=headers):
+                self.assertEqual(wh._request_role(headers), expected)
+
+    def test_reader_token_cannot_reach_operator_make_target(self):
+        self.assertEqual(wh._effective_make_role({}, {"target": "fix-sync"}, "reader"), "reader")
+
+    def test_get_role_gate_uses_copied_route_table(self):
+        routes = dict(wh._GET_ROUTES)
+        routes["/api/v1/above-reader"] = {
+            "handler": "synthetic", "min_role": "operator", "action_name": "synthetic"
+        }
+
+        class Request:
+            path = "/api/v1/above-reader"
+            headers = {}
+            _token_role = "reader"
+
+            def __init__(self):
+                self.responses = []
+
+            def _auth(self):
+                return True
+
+            def _json(self, code, response):
+                self.responses.append((code, response))
+
+        request = Request()
+        with patch.object(wh, "_GET_ROUTES", routes), \
+                patch.object(wh, "_rate_limited", return_value=False):
+            wh._Handler.do_GET(request)
+        self.assertEqual(request.responses, [(403, {"error": "forbidden"})])
+
+        request = Request()
+        request.path = "/api/v1/health"
+        with patch.object(wh, "_GET_ROUTES", routes), \
+                patch.object(wh, "_rate_limited", return_value=False), \
+                patch.object(wh, "_smoke_test_services", return_value=[]):
+            request._token_role = None
+            wh._Handler.do_GET(request)
+        self.assertEqual(request.responses[0][0], 200)
+
+    def test_get_role_gate_covers_health_query_string_form(self):
+        routes = dict(wh._GET_ROUTES)
+        routes["/api/v1/health"] = {
+            "handler": "health", "min_role": "operator", "action_name": "health"
+        }
+
+        class Request:
+            path = "/api/v1/health?quick=1"
+            headers = {}
+            _token_role = "reader"
+
+            def __init__(self):
+                self.responses = []
+
+            def _auth(self):
+                return True
+
+            def _json(self, code, response):
+                self.responses.append((code, response))
+
+        request = Request()
+        with patch.object(wh, "_GET_ROUTES", routes), \
+                patch.object(wh, "_rate_limited", return_value=False), \
+                patch.object(wh, "_smoke_test_services", return_value=[]):
+            wh._Handler.do_GET(request)
+        self.assertEqual(request.responses, [(403, {"error": "forbidden"})])
+
     def test_route_table_every_entry_declares_valid_min_role(self):
         valid_roles = {"reader", "operator", "admin"}
         routes = {**wh._POST_ROUTES, **wh._GET_ROUTES}

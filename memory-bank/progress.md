@@ -1,5 +1,157 @@
 # Progress — k3d-manager
 
+## 2026-09-25 — v1.38.0 PR #132 open, all gates green, enforce_admins off
+
+- [x] **PR #132 created** — `feat: read-only cloud-session access to the local webhook`,
+  base `main`, head `k3d-manager-v1.38.0`. 40 commits, 34 files.
+  https://github.com/wilddog64/k3d-manager/pull/132
+- [x] **CHANGELOG promoted** — `[Unreleased]` -> `## [1.38.0] - 2026-09-25`, `[Unreleased]`
+  left in place and empty above it. Release rows added to README (3-row main table, v1.35.0
+  moved into `<details>`) and `docs/releases.md`. `59079150`, row reworded to the house
+  title-and-theme form in `78216bd7`.
+- [x] **Copilot: 3 findings, all valid, all fixed** — `2339e99d`. Threads all resolved.
+  See `docs/issues/2026-09-25-copilot-pr132-review-findings.md`.
+  - `mktemp -u` raced on the `init-cloud-requests` git index path. **Copilot's suggested fix
+    was wrong** — git rejects a zero-byte index (`index file smaller than expected`), so
+    dropping `-u` would have failed the target at rc 128. Fixed with a private `mktemp -d`.
+  - BRE `\|` alternation in the day-old vacuous-run guard -> `grep -Eq` with an escaped ERE,
+    re-mutation-tested red/green after the change.
+  - The loopback webhook addressed as `https://` in **three** places, not the one flagged.
+- [x] **Gates** — CI run 36209718366 on `2339e99d`: lint success, detect success, stage2
+  **skipped** (label-gated on `ci:cluster-tests`, by design — not a hidden gap).
+  `make test` 1129 ok / 0 not ok; `test-pytest` 215 passed; `test-python-unit` rc 0;
+  `check-doc-links` 1785 OK. Live smoke: health 200, reader `cluster-status` 202, Slack
+  `/k3dm test-pytest` round trip green.
+- [x] **`enforce_admins` disabled** on `wilddog64/k3d-manager` `main`, verified
+  `enabled=false`. `mergeable_state` reads `blocked` only because
+  `required_approving_review_count=1` and Copilot reviewed as COMMENTED, not APPROVED —
+  admin bypass is the intended path. **MUST be re-enabled with a bodyless POST after merge,
+  or restored in the same turn if the merge is deferred.**
+- [ ] **Merge PR #132** — the operator's call. Never auto-merge.
+- [ ] **Release-scope decision** — four v1.38.0 specs ship as specs only (public-endpoint
+  blackbox probes, hermes app-health delta sensor, slack smoke target, vector-store prior
+  art). Carrying all four to v1.39.0 puts that branch at **6 plan docs, one over the max-5
+  cap**, so they must be split across v1.39.0/v1.40.0 or dropped. Decide at `/post-merge`.
+
+## 2026-09-26 — v1.38.0 P6 reader-tier make targets through the cloud bridge
+
+- [x] **P7 — offline test suites as reader targets** — `test-pytest` + `test-python-unit` in
+  `MAKE_TARGETS` (Slack) and the bridge `ACTION_ALLOWLIST` (cloud). Fixed the webhook-PATH
+  interpreter gap that would have made `test-pytest` exit 2 on every remote invocation.
+  `make test` / `make test-bin` left unexposed pending the `scripts/tests/` live-mutation sweep.
+  Gates: 215 pytest passed; drift guard mutation-tested. **`make restart-webhook` still pending.**
+- [x] **Bug: two pytest suites ran nowhere in CI** — `cloud_bridge.py` (20 tests, incl. the P6
+  drift guards) passed vacuously under `make test-python-unit` and was absent from
+  `make test-pytest`. Renamed to `test_cloud_bridge.py`, `test-pytest` now globs `test_*.py`,
+  and `test-python-unit` gained a vacuous-run guard. `a7d513f3`.
+  See `docs/bugs/2026-09-25-pytest-suites-unreachable-from-make.md`.
+- [x] Added exactly six literal bridge actions: `make-fix-list`, `make-fix-status`,
+      `make-status-public`, `make-observability-status`, `make-vuln-scan`, and
+      `make-e2e-runner-health`; no optional arguments or operator/admin targets were exposed.
+- [x] Added four drift guards against `webhook.make_targets`, with `KNOWN_UNEXPOSED = frozenset()`
+      explicitly defined for the current complete reader-tier exposure.
+- [x] Added mutation-checked validation tests for unexpected args, missing `NS`, shell metacharacters,
+      uppercase `NS`, unknown `make-sync-apps`, and exact make/cluster body bytes.
+- [x] Gates: `pytest scripts/tests/bin/cloud_bridge.py` 23 passed; `pytest scripts/tests/bin/webhook_policy.py`
+      22 passed; bridge AST parse passed; `make check-doc-links` reported 1784 files OK; forbidden
+      pattern and operator-target-name greps were empty. Commit: `2db1a172` (amended once to record
+      the final SHA; the final amended SHA is reported below).
+
+## 2026-09-25 — v1.38.0 Part 2 P2/P5 cloud bridge
+
+- [x] Implemented only the requested Part 2 files: bare-clone bridge, cloud request helper,
+      launchd template, pure Python bridge tests, CHANGELOG, and three Copilot invariants.
+- [x] Bridge validation order is file-size cap (8 KiB), JSON object, `schema == 1`, fixed action
+      allowlist, exact args and anchored `job_id`, then future `expires_at`; rejected and expired
+      ids are consumed, replayed ids are skipped, and processing is capped at 10 per tick.
+- [x] Bridge uses `webhook.proc._spawn_capture_text` for literal Git argv, plumbing commits with a
+      throwaway index, `--force-with-lease`, and plain `http://127.0.0.1:7443` reader requests.
+      No checkout/switch, hook bypass, TLS-disable flag, shell string, kubectl, or non-Git child
+      process was added.
+- [x] P4 is configuration-inert: exactly 2 workflow files were counted across `.yml` and `.yaml`,
+      with no push trigger for `cloud-requests`.
+- [x] Gates: bridge pytest 9 passed; existing webhook policy pytest 22 passed; both AST parses,
+      substituted-template `plutil -lint`, `make check-doc-links` (1782 files), `_agent_audit`,
+      and diff checks passed. Commit/push are blocked by the managed workspace refusing Git lock
+      and object writes (`Operation not permitted`); no hook bypass or history mutation was used.
+
+## 2026-09-25 — `/api/v1/health` has been 500ing since v1.37.0 (found during v1.38.0 verify)
+
+- [x] Root-caused an authenticated `GET /api/v1/health` returning `http=000`: the daemon raised
+      `TypeError: 'NoneType' object is not iterable` at `do_GET:2187`. `_smoke_test_services`
+      returns `results` only inside its `if quick:` branch and falls off the end otherwise, so the
+      default non-quick path returns `None`.
+- [x] Introduced by `925c43e7` (v1.37.0 webhook decomposition, PR #131): the function ended with
+      `return results` at `bin/k3dm-webhook:2377` under `945018ee`, and the move into
+      `scripts/lib/webhook/smoke.py` dropped it. smoke.py has exactly one commit, so no later edit.
+- [x] Two callers affected: both `/api/v1/health` branches, and the post-provision Slack check at
+      `bin/k3dm-webhook:1482`. `?quick=1` kept working, which is why a release shipped over it.
+- [x] Fixed with the one-line return, plus
+      `test_smoke_test_services_returns_results_on_the_non_quick_path`. Mutation-checked.
+      Filed `docs/bugs/2026-09-25-smoke-test-services-missing-return-breaks-health.md`.
+- [x] Not caused by the v1.38.0 role work. `reader cluster-status: 202` was the control — auth,
+      the credential ceiling and the POST path were all correct while health was dead.
+- [x] Live confirmation after `f6d60b00` + restart: `reader health: 200`. One result closes three
+      things — health answers again, the reader credential authenticates, and the S3 GET gate lets
+      a reader through a `reader`-rated route rather than over-blocking it.
+- [ ] Follow-up, not in this fix: no gate asserts `/api/v1/health` returns 200 and parses its
+      `services` array. That is why a dead endpoint merged. Belongs with the webhook smoke gate.
+- [ ] Bears on the pending v1.37.0 tag: the broken endpoint is ON the v1.37.0 tree and the fix is
+      only on `k3d-manager-v1.38.0`. Tagging v1.37.0 as-is tags a webhook whose `/api/v1/health`
+      and post-provision check both raise. Operator's call.
+
+## 2026-09-25 — S3 gate hole closed for the health query form (Claude)
+
+- [x] Independently verified `8b706882`: on origin, 4-file scope, pytest + `webhook.bats` 64/64
+      re-run by Claude. Codex's report checked out.
+- [x] Found and fixed a real gap: the gate's `get_route is not None` guard left
+      `/api/v1/health?...` ungated, because `get_route` resolves by exact lookup plus a
+      `/api/v1/status/` prefix only. Resolved the health route for the query form before the gate.
+- [x] Added `test_get_role_gate_covers_health_query_string_form`; mutation-checked — fails without
+      the guard, and the pre-patch response was `200`.
+- [x] Corrected the reader-token rotation claim in `docs/howto/cloud-session-requests.md`: no
+      restart is needed, `_auth()` reads the Keychain per request.
+- [x] Reader token created by the operator in the login Keychain (`k3dm-webhook-token-reader` /
+      `k3dm`), verified non-empty by length only — 65 bytes, i.e. 64 hex plus newline. Claude never
+      read the value.
+- [x] `make restart-webhook` run by Claude; daemon back as pid 90449 on `127.0.0.1:7443` (plain
+      HTTP on loopback, unchanged by this work). Negative auth cases all 401: no header, bogus
+      bearer, non-Bearer scheme, and rejected before the api-path guard.
+- [ ] Positive-path live check (admin 200 / reader 200 on health, reader 200 on POST
+      `cluster-status`) is the operator's — it needs the token values, which Claude does not read.
+- [ ] No live escalation test offered on purpose: every above-reader POST route
+      (`argocd-upgrade`, `cluster-refresh`, `cve-remediate`, `analyze`) mutates or is expensive, so
+      a probe that found the gate broken would execute the action. That case is covered by the
+      synthetic-route unit tests instead, both mutation-checked.
+- [ ] Part 2 (P2 bridge + P5) not dispatched.
+
+## 2026-09-25 — webhook credential-bound roles COMPLETE (`8b706882`)
+
+- [x] Implemented only S1/S2/S3/S6 from `docs/plans/v1.38.0-cloud-session-endpoint-access.md`:
+      reader token resolver without `TOKEN_FILE` fallback; credential role ceiling; POST/make
+      threading; GET route gate before health early returns; eight S6 tests.
+- [x] Mutation check against the original `policy.py`: S6 items 3 and 4 both failed with the
+      expected one-argument `TypeError`; edited policy was restored afterward.
+- [x] Gates: bare pytest `36 passed`; `bats scripts/tests/lib/webhook.bats` `64/64`; AST parse;
+      staged `_agent_audit` all passed. Shellcheck not run because all touched files are Python.
+- [x] Commit `8b706882` pushed to `origin/k3d-manager-v1.38.0`.
+- [x] Scope held to the four code/test files; no bridge, request helper, launchd plist, workflow,
+      or new docs were added. Memory-bank status update is the required follow-up.
+
+## 2026-09-25 — deploy_app_cluster_confirm live-mutation test fix COMPLETE
+
+- [x] Applied A1/A2/A3 only to `scripts/tests/core/deploy_app_cluster_confirm.bats`:
+      hard-fail `ssh`/`scp`, stub reachability `kubectl`, isolate the kubeconfig under
+      `STUB_DIR`, and assert no provisioning output.
+- [x] Focused BATS: 3/3. Mutation check: removing the SSH-key guard made test 3 fail;
+      `git diff --quiet scripts/plugins/shopping_cart.sh` returned 0 after restoration.
+- [x] Passing output had no `Merging ubuntu-k3s context`, `Installing socat`,
+      `Permanently added`, or `vault-bridge active`; shellcheck passed with the existing
+      dynamic-source SC1091 excluded. Claude re-verified BATS 3/3, the one-file scope, the
+      origin tip, and that `shopping_cart.sh` is blob-identical to `925c43e7`.
+- [x] Commit `1cbdab25bbe894d8658a82d22d5438f945f0e86d` pushed to
+      `origin/k3d-manager-v1.38.0`; no production file or PR changed.
+
 ## 2026-09-24 — unknown actor role authorization fix (commit pending)
 
 - [x] Added exported `_normalize_actor_role` in `webhook/policy.py`, switched exactly the
@@ -15,7 +167,17 @@
 - [x] `make test-all` completed plans `1..1112` and `1..132`; unittest counts `7 / 14 / 13 / 6 / 6`;
       expected EXIT=2 at Homebrew Python 3.14.7 without pytest. M1–M5 all red and restored with
       `git diff --quiet`.
-- [ ] Commit, push, and SHA verification remain.
+- [x] **PR #131 merged to main at 925c43e7** (2026-09-25 18:14:11Z); retrospective written and committed on v1.38.0.
+- [x] `make test` on v1.38.0: **1128 ok / 1 not ok of 1129**, exit 2. The red is
+      `deploy_app_cluster_confirm.bats` test 3 — **not a v1.37.0 regression** (guard `1bbe54393`
+      2026-08-21, test `62c9ff27` v1.27.0); it fails only because the ACG `k3s-aws` sandbox is
+      reachable, and it **provisioned live infrastructure** (kubeconfig merge + socat/vault-bridge
+      on `44.250.167.86`) three times. Spec `6da697a6`:
+      `docs/bugs/2026-09-25-deploy-app-cluster-confirm-bats-mutates-live-cluster.md`.
+- [ ] Implement the BATS fix (Part A — stub the reachability probe, hard-fail `ssh`/`scp`).
+      **Part B (move the SSH-key guard in `shopping_cart.sh`) needs the owner's go** — it changes
+      behavior on the already-Ready path.
+- [ ] Sweep the rest of `scripts/tests/` for reachability-dependent live mutation (own spec).
 
 ## 2026-09-24 — webhook Phase 3 agent extraction (staged; Git blocked)
 
@@ -1700,3 +1862,39 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
       `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
       live sandbox path and needs a sandbox to verify.
+- [x] **Bootstrap the cloud bridge** — `origin/cloud-requests` seeded as an orphan (`67dc3468`,
+      parents `[]`, only `ledger/processed.txt`) and `com.k3d-manager.cloud-bridge` bootstrapped as
+      a `gui/` LaunchAgent. Added `make init-cloud-requests` / `install-cloud-bridge` /
+      `uninstall-cloud-bridge`. Fixed two blocking bugs with one root cause — `git fetch origin
+      <branch>` with a bare branch name ignores the configured refspec and writes only
+      `FETCH_HEAD`, so nothing maintained `refs/heads/cloud-requests`: the bridge's `update-ref`
+      old-value check failed every tick (before the webhook call, so nothing half-executed) and the
+      helper died with `unable to resolve reference` in any fresh clone, i.e. the documented
+      cloud-side flow. Plist switched from `StartInterval` to `KeepAlive`. Proven on the live path:
+      `cluster-status` → 202, `job-status` → 200 with output, helper exit 0.
+- [x] **Cloud bridge testable from a cloud session** — `--wait` was broken in exactly the clone
+      shape a cloud session gets. Third instance of the bare-branch fetch defect: the poll read
+      `origin/cloud-requests:responses/<id>.json` while refreshing with `git fetch origin
+      cloud-requests`, so in a `--depth 1 --branch main` clone `refs/remotes/origin/cloud-requests`
+      never existed and every poll exited 5 with the response on the branch. Two live round trips
+      from the laptop passed because a full clone writes all tracking refs at clone time. Fixed to
+      an explicit `+refs/heads/cloud-requests:refs/remotes/origin/cloud-requests`, verified on a
+      real shallow clone, regression test mutation-checked, how-to warns against reverting it.
+- [ ] **Unalerted public-path failure:** `make status CLUSTER_PROVIDER=k3s-hostinger` reports
+      Frontend 404 while all four `shopping-cart-apps` pods are Running 1/1, so `ServiceDown`
+      (`kube_pod_status_ready ... == 0`) is correctly silent. Nothing probes the public hostnames —
+      there is **no blackbox exporter anywhere in the repo** and nothing writes smoke/status results
+      to Pushgateway, so no rule can fire and no SMS can be sent. Delivery is fine
+      (`severity = critical` → `sms-critical`). Second silent failure from this same gap; the
+      blackbox-probe + `CloudflareTunnelDown` follow-up is now load-bearing.
+- [x] **Root-cause the Frontend 404** — `docs/bugs/2026-09-25-frontend-public-url-routes-to-wrong-cluster.md`.
+      Tunnel → `:8000` → OrbStack → **hub** Istio, which has no `frontend` route and no frontend
+      workload; the healthy pod is on hostinger with no Ingress and no NodePort. Fix is an
+      architecture choice and needs the operator.
+- [x] **Spec the public-endpoint blackbox probes** — `docs/plans/v1.38.0-public-endpoint-blackbox-probes.md`
+      (5th plan doc; v1.38.0 is now at the max-5 cap). Two modules, explicit `User-Agent`,
+      `PublicEndpointDown` / `CloudflareTunnelDown` / `PublicEndpointProbeAbsent`.
+- [x] **Keycloak `awk` fix dispatched and verified** — `e0815211` on
+      `origin/fix/keycloak-reconcile-awk-free` (`shopping-cart-infra`). `awk` 11 → 0, YAML parses,
+      shellcheck clean both sides, 13/13 helper-vs-awk equivalences with 2 negative controls.
+      PR is the owner's call.

@@ -52,10 +52,15 @@ and two functions — nothing else changes.
 ### Plugin System
 
 Feature modules live in `scripts/plugins/` and are **lazy-loaded** — sourced only when
-a matching function is invoked. Plugins are independent: ACG, ArgoCD, AWS, Azure, Cert-Manager,
-Copilot, E2E (Tier 1 & Tier 2), ESO, GCP, Gemini, Hub Recovery, Hub Snapshot, Istio Ambient,
-Jenkins, Keycloak, LDAP, Loadtest, Observability, Shopping Cart, Signing, SMB-CSI, Smoke,
-SSM, Tunnel, Vault, and vCluster each live in their own file.
+a matching function is invoked. Plugins are independent — each of the 28 lives in its own file:
+ACG, ArgoCD, AWS, Azure, Cert-Manager, Copilot, E2E Tier 1 (`e2e.sh`), E2E Tier 2
+(`e2e_remote.sh`), ESO, GCP, Gemini, Hello, Hub Recovery, Hub Snapshot, Istio Ambient, Jenkins
+(**deprecated** — disabled by default, not deployed; code retained but unsupported), Keycloak,
+LDAP, Loadtest, Observability, Shopping Cart, Signing, SMB-CSI, Smoke, SSM, Tunnel, Vault,
+vCluster.
+
+The two E2E tiers are separate plugins, not one: `e2e.sh` drives the local vCluster tier and
+`e2e_remote.sh` the ACG/Stripe acceptance tier, and `smoke.sh` is a third file that probes both.
 
 Public functions have no underscore prefix and are first-class CLI commands:
 ```

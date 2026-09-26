@@ -1,5 +1,506 @@
 # Active Context — k3d-manager
 
+## 2026-09-25 — PR #132 is open and mergeable by admin bypass (Claude)
+
+`/create-pr` ran to completion. Pre-flight 0-2, 7 and 8 were run in the main session because
+they can end in "ask the user"; 3-6 went to a Haiku subagent, which returned before CI
+finished and had its CHANGELOG promotion, release rows and PR body verified independently
+rather than trusted.
+
+**Two things worth carrying forward from this run.**
+
+*An automated reviewer can be right about the defect and wrong about the fix.* Copilot's
+`mktemp -u` finding was a genuine symlink race, and its proposed remedy — create the file by
+dropping `-u` — would have made `make init-cloud-requests` die at rc 128, because git refuses a
+zero-byte index. That was caught only by actually running the suggestion in a scratch repo
+before applying it. **Do not apply a review suggestion without executing it**, especially in a
+target that runs once on a fresh setup where nobody is watching.
+
+*A flagged occurrence is a sample, not a count.* Copilot flagged one `https://127.0.0.1:7443`;
+grepping the class found three, two of them in the spec. One of those was wrong for a second,
+different reason: a cloudflared ingress `service:` addresses the local origin, and Cloudflare
+terminates TLS at its edge, so it would have been `http://` even had the push path been built.
+
+**stage2 is skipped, and that is by design** — `ci.yml:145-152` gates it on the
+`ci:cluster-tests` label. Asking for the job list rather than the run conclusion is what made
+that visible; it is not a hidden gap, but the cluster tier genuinely did not run on this PR.
+
+**`enforce_admins` is OFF on `main` right now.** If the merge is deferred rather than done, it
+must be restored in the same turn with a **bodyless** POST — `-f enabled=true` returns HTTP 422.
+
+## 2026-09-25 — the hostinger smoke FAIL, deep-dived (Claude)
+
+`make test` on `k3d-manager-v1.38.0`: **1129 ok, 0 not ok, exit 0**. The last v1.38.0 gate.
+
+The 17:04 Slack cluster-status FAIL (13 ok / 3 warn / 5 fail) was traced, not dismissed:
+
+- **Frontend SSO + ArgoCD SSO "credentials rejected"** — root cause found. The hub's
+  `keycloak-realm-reconcile` Job has been **Failed for 5 days**, 0/1 completions, two Error
+  pods. Its log ends:
+  `Creating browser-with-conditional-otp flow... / environment: line 104: awk: command not found`
+  That is exactly the ubi9-micro no-`awk` bug fixed by shopping-cart-infra PR #100 (`64c11783`).
+  The fix is on `main`; the cluster still runs the old manifest because the hub ArgoCD app
+  **`shopping-cart-identity` is `OutOfSync`**. Syncing it is the pending post-merge verification.
+  Realm users were never seeded, which is why both SSO logins are rejected.
+- **Frontend 404 + Product images 404** — the known undecided frontend routing fix.
+- **Hub ESO 1/7 not synced: cosign-public-key** — known, Vault path still unchecked.
+- **Prometheus 401 warn** — expected; the authenticated `Prometheus login` line is 200.
+- **k3dm-smoke-user credentials unavailable** (2 warns) — known; the Frontend API smoke is
+  skipped and proves nothing.
+
+Also observed: `istio-cni-ubuntu-hostinger` is `Progressing` — a **fifth** live observation of
+the stale istio-cni dirs bug. `ubuntu-k3s-data-layer` is OutOfSync/Progressing because the
+ubuntu-k3s context points at the dead ACG sandbox (44.250.167.86, i/o timeout). That stale
+context should be deleted to fail fast.
+
+**Navigation note for future sessions: ArgoCD runs in the `cicd` namespace, not `argocd`.**
+There is no `argocd` namespace on either cluster. `kubectl -n argocd get applications` returns
+"No resources found in argocd namespace" rather than an error, which reads exactly like
+"ArgoCD has no apps" and nearly produced a false finding this session. The hub (k3d) owns all
+Applications, including every `ubuntu-hostinger-*` one; hostinger's own `cicd` has zero.
+
+## 2026-09-25 — P7: the offline test suites are reader targets (Claude)
+
+`test-pytest` and `test-python-unit` are now `min_role: reader` in `MAKE_TARGETS` (the Slack
+`/k3dm` allowlist) and exposed through the cloud bridge as `make-test-pytest` and
+`make-test-python-unit`. Both take no arguments, so nothing untrusted reaches argv.
+
+Found and fixed first, because it would have shipped broken: the webhook LaunchAgent's PATH is
+`/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`, and under that PATH there is no `pytest`
+binary and `python3 -m pytest` fails — pytest lives only in `~/.pyenv/shims`. `make test-pytest`
+would have exited 2 on every Slack and bridge invocation while passing locally and in CI.
+`test-pytest` now resolves an interpreter in order (`$PYTEST`, `pytest` on PATH,
+`python3 -m pytest`, `$HOME/.pyenv/shims/python3 -m pytest`), verified under the exact webhook
+PATH with `env -i`. The service PATH was deliberately NOT changed — pyenv-shims-first would
+reorder `python3` for every other make target the webhook runs.
+
+`make test` and `make test-bin` are deliberately NOT exposed: both run BATS, the
+`scripts/tests/` live-mutation sweep is unfinished, and `deploy_app_cluster_confirm.bats` test 3
+provisioned live EC2 until `1cbdab25`. Exposing them is the operator's call.
+
+Gates: `make test-pytest` 215 passed; `make test-python-unit` rc=0; the exposure drift guard
+mutation-tested red by removing `make-test-pytest` from the bridge, then green.
+
+Operator ran `make restart-webhook` at 18:09 on 2026-09-25. Fresh PID 54949 bound to
+127.0.0.1:7443; `make_targets.py` mtime 18:03:09 predates the restart, so the new allowlist is
+loaded. Unauthenticated GET `/api/v1/health` and POST `/api/v1/make` both return 401, so the
+listener and the role gate are live on both routes.
+
+Operator closed both open questions with authenticated probes at 18:12:
+
+- `GET /api/v1/health` returns **200**. This is the first time the handler has actually run
+  since `f6d60b00`; the earlier `000` dropped-connection regression from the missing
+  `return _smoke_test_services` is confirmed dead.
+- `POST /api/v1/make {"target":"help"}` with the reader credential lists eight reader targets,
+  including `test-pytest` and `test-python-unit`. The Slack `/k3dm` path for P7 is live.
+
+**P7 verified end to end from Slack.** `/k3dm test-pytest` returned "make test-pytest
+succeeded", 215 passed in 32.22s, and its first output line is
+`[make] /Users/cliang/.pyenv/shims/python3 -m pytest (pytest suites)`.
+
+That line is the whole point: under launchd's real environment the **fourth** fallback branch
+fired. `$PYTEST` was unset, no `pytest` binary was on PATH, `python3 -m pytest` failed, and
+`$HOME/.pyenv/shims/python3` resolved. Without that fallback the target would have exited 2 on
+every Slack and bridge invocation while passing locally and in CI. The `env -i` simulation
+predicted this correctly, but the Slack run is the actual proof.
+
+The Slack output also lists `scripts/tests/bin/test_cloud_bridge.py` among the collected
+suites, which is the direct confirmation that the vacuous-run bug (`a7d513f3`) is closed: that
+file executed nowhere at all before today.
+
+## 2026-09-26 — P6 reader-tier make targets through the cloud bridge
+
+Implemented only P6 on `k3d-manager-v1.38.0`: the bridge now exposes six flat `make-*` actions
+for the reader-tier targets, with `make-fix-status` accepting only the required `NS` argument.
+The validator's logic is unchanged except for the four-tuple unpack, and make bodies are built as
+the existing `/api/v1/make` contract expects. Added four drift guards and the six required logic
+checks, including the exact body bytes; no network or live webhook was used. Docs and CHANGELOG
+were updated. Gates: bridge pytest 23 passed, webhook policy pytest 22 passed, AST parse passed,
+and `make check-doc-links` reported 1784 files OK. Mutation checks were red for each removed
+validator guard and restored. Commit: `2db1a172` (amended once to record the final SHA).
+
+## 2026-09-25 — Frontend 404 root-caused; blackbox spec filed; Keycloak awk fix verified
+
+**`frontend.3ai-talk.org` 404 — the tunnel points at the wrong cluster.** The tunnel and its config
+are healthy. `~/.cloudflared/config.yml` maps the host to `127.0.0.1:8000`, which OrbStack publishes
+into the **k3d hub** cluster's Istio ingress — `curl -D -` on `:8000` answers `server: istio-envoy`,
+404, content-length 0. The hub's gateway has VirtualServices for only `grafana` and `prometheus`, and
+`shopping-cart-apps` on the hub is **empty**. The healthy frontend is on hostinger, where it is
+ClusterIP-only with no Ingress and no NodePort, unlike `order-service` and `product-catalog` which
+both have NodePorts. `grafana`/`prometheus` work through the same `:8000` precisely because the hub
+does have their routes; `argocd`/`keycloak` work because they are port-forwards on `:8080`/`:8880`.
+Second, independent fault: `com.k3d-manager.frontend-port-forward` targets context `ubuntu-k3s` (ACG,
+not hostinger) on port 3000, which no tunnel rule references, and answers `000` on both `127.0.0.1`
+and `[::1]` despite launchd reporting it up with last exit status 1. Filed
+`docs/bugs/2026-09-25-frontend-public-url-routes-to-wrong-cluster.md`. The fix is an architecture
+choice (NodePort on hostinger vs a hub VirtualService proxying to it) and is **not** decided.
+
+**Why no SMS.** Delivery was never the problem — `severity = critical` already routes to
+`sms-critical`. Nothing produces a signal: `make status` writes no metrics (no Pushgateway writer
+anywhere in `scripts/` or `bin/`), there is **no blackbox exporter anywhere in the repo**, and
+`ServiceDown` keys on `kube_pod_status_ready == 0`, which is correctly silent when the pod is healthy
+and only the public path is broken. Spec filed:
+`docs/plans/v1.38.0-public-endpoint-blackbox-probes.md` — two probe modules (a 302 from Keycloak and
+a 401 from the auth-gated hosts are *healthy*, so a single naive `valid_status_codes` would be
+wrong), an explicit `User-Agent` because Cloudflare 1010-blocks a default one, and three rules:
+`PublicEndpointDown`, `CloudflareTunnelDown`, and `PublicEndpointProbeAbsent` so a dead probe is not
+mistaken for silence. **This is the 5th v1.38.0 plan doc — the release is at the max-5 cap.**
+
+**Keycloak `awk` fix (Codex, verified).** `e0815211` on
+`origin/fix/keycloak-reconcile-awk-free` in `shopping-cart-infra`, parented on `origin/main`, exactly
+3 files. Verified independently rather than trusted: `awk` 11 → 0, YAML parses, `bash -n` passes, and
+shellcheck is clean on both sides. Two process notes — (1) Codex pushed correctly but left the local
+repo with the branch ref still at `origin/main` and the changes uncommitted, so a local
+`git rev-parse origin/<branch>` looked like a fabricated SHA until the ref was fetched; it was real.
+Synced with `git reset --mixed FETCH_HEAD` (content was byte-identical, so nothing could be lost).
+(2) **My spec's shellcheck gate was vacuous** — it extracted `command[3]`, which is the literal `-c`,
+so both before and after "counts" were one `SC2215` on a 1-line file. Codex reported that honestly.
+The script is `command[4]`; re-run properly it is clean. Behavioural equivalence was then proven
+directly: 13 comparisons of each new bash helper against its `awk` oracle on realistic quoted-CSV
+input all matched, with 2 negative controls failing as required to show the harness can detect a
+difference.
+
+## 2026-09-26 — PR #100 merged, hub SSO fix is on main (Claude)
+
+`shopping-cart-infra` PR #100 merged as `64c11783` — the awk-free Keycloak reconcile hook plus the
+four `return 0` lines that Copilot's false positive led to. `enforce_admins` was disabled for the
+merge and has been **restored** (bodyless POST, read back `{"enabled": true}`). Local `main` synced.
+No tag: the CHANGELOG still has only `[Unreleased]`, and the release version is the operator's call —
+last tag is `v0.5.0` (2026-05-19), so roughly four months of work is unreleased.
+
+Still owed on this: the ArgoCD sync that makes the fix take effect, then confirm
+`keycloak-realm-reconcile` reaches `Completed` and re-run the cluster smoke for frontend and ArgoCD
+SSO. That is a live mutation and waits for the go.
+
+## 2026-09-26 — Hub SSO outage root-caused to the awk-free fix that was never PR'd (Claude)
+
+A cloud session ran the bridge's `cluster-status` and reported 13 ok / 3 warn / 5 fail. Three of
+the five failures — frontend SSO rejecting all three Vault `keycloak/users`, ArgoCD SSO rejected —
+trace to one cause. `keycloak-realm-reconcile` has two pods in `Error` for 4d23h on the **k3d hub**
+(not hostinger; there is no Keycloak and no `identity` namespace on hostinger at all, which is why
+a hostinger-scoped smoke report shows hub SSO failures). The log ends:
+
+    Realm shopping-cart exists; applying partial import
+    browser-with-conditional-otp flow already exists; reconciling it
+    environment: line 104: awk: command not found
+
+The fix has existed since 2026-09-25 as `shopping-cart-infra` `e081521` on
+`fix/keycloak-reconcile-awk-free`, pushed to origin, with **no PR ever opened**. Worse, the
+browser-flow repair that fixes this exact SSO symptom is already **on main** — the hook crashes
+before reaching it, so a merged fix has never once executed. The outage is an unmerged PR, not
+missing work.
+
+Pre-PR gates run 2026-09-26, all green: `bash -n` clean on the extracted container script;
+`shellcheck -s bash` clean; no residual `awk`/`jq`/`python3`; external binaries reduced to
+`cat grep head printf sed`, all present in ubi9-micro; interpreter confirmed `/bin/bash -euo
+pipefail -c` so the bashisms in the rewrite are safe. Behaviour equivalence vs the replaced awk
+proven 10/10 on representative `kcadm --format csv` input including the real flow display names.
+Non-ASCII diverges in the rewrite's favour: old awk aborted `towc: multibyte conversion failure`
+and returned empty, new bash percent-encodes correctly under `LC_ALL=C`.
+
+Two gates cannot run pre-merge and the PR body says so: CI is `pull_request`-only in that repo, and
+the live smoke is impossible because this is an ArgoCD `PostSync` hook that runs only on sync. PR
+body drafted, **not created** — awaiting the owner's go. No manual Job cleanup will be needed:
+`hook-delete-policy: BeforeHookCreation` removes the failed pods on the next sync, which closes the
+older "operator may need to delete the Failed keycloak-realm-reconcile Job" follow-up.
+
+Still open from the same report and NOT part of this: `cosign-public-key` ExternalSecret in
+`platform-ops` is `SecretSyncedError` / `could not get secret data from provider` (Vault path, hub,
+unrelated); frontend + product-image 404s (the open architecture call); `k3dm-smoke-user`
+credentials unavailable so the Frontend API smoke is **skipped** — excluded from the 13/3/5 tally
+and therefore proving nothing.
+
+## 2026-09-25 — Third instance of the bare-branch fetch defect, in the poll path (Claude)
+
+The operator asked whether a **cloud** Claude session could test the bridge. Checking instead of
+answering found the answer was no. `bin/k3dm-cloud-request --wait` read
+`origin/cloud-requests:responses/<id>.json` but refreshed with `git fetch origin cloud-requests` —
+a bare branch name, writing only `FETCH_HEAD`. Reproduced against a real
+`git clone --depth 1 --branch main`: `remote.origin.fetch` is
+`+refs/heads/main:refs/remotes/origin/main`, so `refs/remotes/origin/cloud-requests` is **never
+created**, every poll raises `invalid object name`, and `--wait` exits 5 after the full timeout
+with the response sitting on the branch. A full clone hides it entirely, because `git clone` writes
+every remote-tracking ref up front — which is why two live round trips from this laptop passed.
+
+That is the shape a cloud session runs in, i.e. the only environment the helper exists for. The
+poll now fetches an explicit `+refs/heads/cloud-requests:refs/remotes/origin/cloud-requests` and
+reads from that ref; proven on the same shallow clone, which then returned `status: ok http: 200`.
+Regression test added (13 total), mutation-checked: the pre-fix module has no `FETCH_REFSPEC`.
+
+Standing lesson: this is the **third** distinct occurrence of the same root cause in one feature.
+Both ends now name refs explicitly, and the how-to says not to "simplify" it back.
+
+Follow-up the same day: the cloud session asked for a `.claude/settings.json` permission grant to
+run the helper. `.claude/` was in `.gitignore`, so committing that file would have been accepted and
+tracked **nothing** — git cannot re-include a file whose parent directory is excluded. Changed the
+pattern to `.claude/*` plus `!.claude/settings.json`, verified with `check-ignore` that the 103KB
+`settings.local.json` and `projects/`/`worktrees/` stay ignored.
+
+That grant still did not unblock the cloud session, and the reason is worth keeping: its checkout
+had no `bin/k3dm-cloud-request` at all. `git ls-tree` on `v1.36.0`, `v1.37.0` and `origin/main`
+returns nothing for the helper, the bridge or the how-to — the whole feature was added in
+`dc53987c`, which lives only on `k3d-manager-v1.38.0`, while `origin/main` is still `925c43e7`
+(v1.37.0). The missing settings file is the symptom an agent notices first, so the failure reads as
+a permissions problem when it is a missing file. The how-to now opens the short version with an
+`ls bin/k3dm-cloud-request` check and says to start the session against the branch carrying the
+bridge rather than patch permissions. No `claude/*` branch exists on origin, so a cloud session's
+branch is container-local; and it loads permission rules at clone time, so a mid-session checkout
+would not pick the grant up either.
+
+**Closed 2026-09-26 — the cloud half is proven.** With the session on `k3d-manager-v1.38.0` and
+**auto mode off**, a real cloud session filed two requests that completed end to end:
+`20260926T000251Z-cluster-status` (http 202, job `eb0df4ec`) and `20260926T000330Z-job-status`
+(http 200, `running`). Verified from this laptop rather than taken on report: the request commits
+`45e4365c`/`7885e7b2` are authored `Claude <noreply@anthropic.com>`, distinct from the `t <t@t>`
+author on my own earlier test `c03e45f9`, so they did not originate here. Branch tip `7885e7b2`.
+
+The blocker was never the allowlist. With auto mode on, a safety classifier refuses the helper as a
+"Containment Escape", and a `settings.json` `allow` rule cannot override a classifier — independent
+layers, so no repo change would have cleared it. Auto mode off degrades it to an approval prompt the
+operator accepts. My prediction that a classifier would refuse outright rather than prompt was
+wrong, and the correction matters: the feature is operator-overridable, not structurally undeliverable
+inside a cloud sandbox. Recorded in the how-to's short version.
+
+## 2026-09-25 — Cloud bridge bootstrapped and proven end to end (Claude)
+
+The operator gave the go, so `origin/cloud-requests` now exists and the bridge is live.
+
+Three new make targets: `init-cloud-requests` (seeds the branch as an **orphan** commit through
+git plumbing — `hash-object`/`update-index` on a throwaway `GIT_INDEX_FILE`/`write-tree`/
+`commit-tree` — so it never touches the worktree, moves `HEAD`, or triggers a pre-commit hook; it
+is idempotent and skips when the remote ref exists), `install-cloud-bridge` (renders the plist,
+`plutil -lint`s it, and bootstraps the `gui/` agent; refuses unless the reader Keychain item and
+the remote branch are both present), and `uninstall-cloud-bridge` (the documented revocation
+lever).
+
+The branch is an orphan on purpose: it carries only `ledger/processed.txt`, shares no history with
+any release branch, and holds no repo code that a compromised cloud session could modify into
+something executable. Seeded at `67dc3468`, parents `[]`.
+
+Two blocking bugs, both the same root cause — **`git fetch origin cloud-requests` with a bare
+branch name makes git ignore the configured refspec and write only `FETCH_HEAD`**, so nothing
+maintains `refs/heads/cloud-requests`:
+- bridge: in the bare clone the branch ref stayed at the seed while `parent` came from
+  `FETCH_HEAD`, so `_write_commit`'s `update-ref <new> <old>` failed its old-value check every
+  tick (`is at 67dc3468 but expected 0188d59b`, four identical log lines). It failed *before* the
+  push, so the webhook was never called and no ledger entry was written — the request was retried
+  intact, not half-executed. Fixed by fetching an explicit
+  `+refs/heads/cloud-requests:refs/heads/cloud-requests`.
+- `bin/k3dm-cloud-request`: `update-ref refs/heads/cloud-requests <commit> <remote parent>` in a
+  clone with no such local ref → `unable to resolve reference`. That is exactly the state the
+  how-to's own `git fetch origin cloud-requests` leaves a cloud session in, so the documented
+  flow could never have worked. The local `update-ref` was pointless (the push carries an explicit
+  lease) and is gone. Its no-remote-branch case also leased against the empty *tree* SHA, which no
+  ref can equal; now the empty string, which git defines as "must not exist".
+
+Plist template: `KeepAlive` replaces `StartInterval 60` — `main()` is a persistent daemon with its
+own 60s loop, so the one-shot idiom delayed crash recovery by up to a minute.
+
+End-to-end proof on the live path, not a mock: `cluster-status` → `http_status 202`,
+`body.job_id 4c645143`, ledger appended, response committed and pushed; then
+`job-status --arg job_id=4c645143` → `http_status 200` with the full status text and secrets
+`***REDACTED***`, helper exit 0. Branch is now `67dc3468` (seed) → `0188d59b` (request) →
+`f52041d8` (response). Agent `runs = 1`, `never exited`, log empty. The bare clone over SSH from a
+`gui/` agent worked, which answers the open SSH-agent question.
+
+Gates: `pytest` cloud_bridge + webhook_policy + webhook_make_targets + test_smoke_logins → 64
+passed, 121 subtests; `bats scripts/tests/lib/webhook.bats` → 64 ok; AST parse both bins;
+forbidden-pattern grep empty; `make check-doc-links` 1782 OK. The new refspec test was
+mutation-checked against the pre-fix source (`assert ':' in 'cloud-requests'` failed).
+
+## 2026-09-25 — P2/P5 cloud session bridge implemented
+
+Implemented Part 2 of `v1.38.0-cloud-session-endpoint-access.md` on
+`k3d-manager-v1.38.0`: `bin/k3dm-cloud-bridge` is a 60-second bare-clone poller using the
+reader credential and plain loopback HTTP, with fixed four-action validation, replay ledger,
+bounded processing, and Git plumbing commits; `bin/k3dm-cloud-request` files and optionally polls
+requests using the fixed CLI contract. Added the launchd template, nine pure validator tests, the
+three Copilot invariants, and the Unreleased Added entry. The README how-to link was already
+present and was not changed; the contract/spec were not changed.
+
+P4 verification counted exactly two workflow files across both `.yml` and `.yaml`: `ci.yml` is
+pull-request-only for `main`, and `deploy-worker.yml` is push-scoped to `main` plus
+`workers/slack-relay/**`; neither includes `cloud-requests`.
+
+Verification before commit: `pytest scripts/tests/bin/cloud_bridge.py` 9 passed;
+`pytest scripts/tests/bin/webhook_policy.py` 22 passed; both Python files AST-parsed; the
+placeholder-substituted plist passed `plutil -lint`; `make check-doc-links` reported 1782 files;
+`_agent_audit` passed. The forbidden-string and plain-loopback grep gates were empty. Commit and
+push are blocked in this managed workspace: Git cannot create `.git/index.lock` or insert staged
+objects (`Operation not permitted`), including when given an alternate index under `/private/tmp`.
+
+## 2026-09-25 — Part 2 cloud bridge verified, with one structural fix (Claude)
+
+Codex delivered P2/P5 but could not commit (the usual `.git` write denial), leaving all 8 files
+staged. **Claude then committed them by accident** under a memory-bank message — `git add
+memory-bank/progress.md && git commit` sweeps the whole index. Unpushed, so `git reset --mixed
+f6d60b00` recovered it with the worktree intact. Second occurrence of that exact failure; the
+memory rule now names the mechanism and prescribes `git diff --cached --stat`.
+
+Verified: no forbidden patterns (no `git checkout`/`switch`, no `--no-verify`, no `--insecure`/
+`verify=False`, no `https://`/`SSLContext`, no `shell=True`/`eval`), no token printing, no
+`TOKEN_FILE` fallback, AST parses, plist lints, doc links OK, pytest 63 + 121 subtests, bats 64/64.
+Validator is genuinely tight: exactly six fields, exact arg-key match, size cap applied *before*
+JSON decode, id consumed before validation so an expired request cannot be retried.
+
+**One structural weakness fixed.** The per-value check was `if key == "job_id"`, correct only
+because `job_id` is currently the sole parameter — declaring a second would have sent its value
+into the request path with **no validation at all**. The allowlist now binds each parameter to a
+compiled pattern, so a parameter cannot be declared without one. Two tests added, both
+mutation-checked. This is the third instance this session of the same class: correctness that holds
+only by coincidence of the current table (dead `min_role`, the ungated `health?` form, this).
+
+Also corrected in my own handoff before dispatch: it told Codex the webhook was HTTPS with a
+self-signed cert. It is a bare `ThreadingHTTPServer` on loopback with no `wrap_socket`
+(`bin/k3dm-webhook:2238`), and `bin/k3dm-hermes:123` calls it as `http://`. And a claim I made that
+is *not* quite right: `_spawn_capture_text` does NOT keep argv a literal list when `cwd` is set —
+it builds `/bin/bash -c "cd … && …"`. It is `shlex.quote`d and the only request-derived value
+reaching git is the `ID_RE`-validated `request_id`, so it is safe, but the safety rests on quoting
+plus validation, not on the absence of a shell.
+
+Moved the three new Copilot rules out of `## Architecture` into `## Review Focus` where review
+rules belong, and expanded them to six covering the role ceiling, `min_role` actually being read,
+untrusted branch bytes, the allowlist as boundary, workflow scoping, and token placement.
+
+## 2026-09-25 — S3 gate was unreachable for the health query form (Claude follow-up)
+
+Verified `8b706882` independently: SHA on origin, 4-file scope, bare pytest and
+`bats scripts/tests/lib/webhook.bats` 64/64 re-run by Claude, including test 62 — the
+`_request_role({}) == "admin"` contract that `token_role=None` had to preserve.
+
+One gap found. The new gate is guarded by `get_route is not None`, and `get_route` resolves by
+exact dict lookup plus a `/api/v1/status/` prefix. `/api/v1/health?...` matches neither, so
+`get_route` stayed `None`, the gate was skipped, and the `startswith("/api/v1/health?")` branch
+served the request anyway — one of the two health branches ungated, which is the exact defect S3
+exists to close. No privilege was reachable today (health's `min_role` is already `reader`), but it
+reinstated the unenforced coincidence: raise health's `min_role` and the query form bypasses it.
+
+Fixed by resolving the health route for the query form before the gate, plus
+`test_get_role_gate_covers_health_query_string_form`. Mutation-checked: without the guard the test
+fails, and the pre-patch response was `200`, confirming the bypass was real rather than theoretical.
+
+Also corrected `docs/howto/cloud-session-requests.md`, which claimed reader-token rotation needs
+`make restart-webhook`. It does not — `_auth()` reads the Keychain per request. The doc now also
+names the service/account, the no-TTY empty-write trap, and why `bin/k3dm-webhook-setup` must not
+be reused (it puts the value in argv and pushes it to a GitHub secret).
+
+## 2026-09-25 — webhook credential-bound roles COMPLETE (`8b706882`)
+
+Implemented only v1.38.0 spec sections S1, S2, S3, and S6 on `k3d-manager-v1.38.0`.
+`auth.py` now resolves admin/reader bearer credentials, `policy.py` treats the credential role as
+the ceiling, POST and make-target authorization receive that ceiling, and `do_GET` enforces route
+`min_role` before the existing health branches. Added the eight requested policy tests, including a
+copied above-reader GET route. No `bin/` files were created; P1/P2/P4/P5/S7 and workflow/docs
+changes were not implemented.
+
+Remote commit: `8b706882` on `origin/k3d-manager-v1.38.0`.
+Gates: bare pytest 36 passed plus 121 subtests; `bats scripts/tests/lib/webhook.bats` 64/64;
+AST parse passed; staged `_agent_audit` passed. Shellcheck was not run because all touched files
+are Python. Mutation check against the original policy produced the two required failures for S6
+items 3 and 4, then the edited policy was restored and its working hash differed from HEAD.
+
+## 2026-09-25 — cloud-session access: PULL chosen; a live privilege-escalation gap found
+
+Spec `docs/plans/v1.38.0-cloud-session-endpoint-access.md` (#4 of 5 for v1.38.0). Operator decided
+**pull**, not exposing the endpoint. The push path (cloudflared ingress + Cloudflare Access
+application + service token + cloud env vars) is recorded in the spec as not-chosen, to be revisited
+only if a session needs live state at sub-60s latency.
+
+**Audit finding F4, promoted — not a new discovery.** The 2026-09-07 audit
+(`docs/issues/2026-09-07-webhook-server-security-audit.md` F4) already recorded that
+`X-K3DM-Role` is client-asserted, rated LOW *because of* the single-admin-token invariant, with
+"revisit if role-scoped tokens are added." Adding a reader token is exactly that condition, so
+F4 becomes blocking: its own text says "a low-tier token could send `X-K3DM-Role: admin` and
+escalate." A bearer-token holder is `admin` today and the role is self-asserted by the caller. `scripts/lib/webhook/policy.py:108`:
+
+```python
+def _request_role(headers):
+    raw = headers.get("X-K3DM-Role")
+    if raw is None:
+        return _ROLE_DEFAULT  # direct token = admin credential
+```
+
+`_ROLE_DEFAULT = "admin"` (line 30). `bin/k3dm-webhook:1713` `_auth()` compares the bearer and
+returns a bool — no identity travels forward, so nothing binds a role to a credential. Omitting
+`X-K3DM-Role` (or sending `admin`) reaches `cluster-up`, `cluster-down`, `cluster-resume`,
+`cleanup-stale-sandbox`, `argocd-upgrade`. `_normalize_actor_role`'s fail-closed-to-reader does NOT
+cover it: it normalizes an already-resolved string, and the direct-token path never routes through a
+resolver that could return an unknown value. `_effective_make_role` also short-circuits when the
+header is absent.
+
+This exists **independently of any cloud access** — it is not introduced by this work, and it is why
+the earlier claim had to be retracted that a cloud token could simply be "registered as reader". That
+is not configuration; S1/S2 of the spec is the code change. Fix shape: a second reader-scoped token
+(`k3dm-webhook-token-reader`, env `K3DM_WEBHOOK_TOKEN_READER`, no `TOKEN_FILE` fallback) plus
+`_request_role(headers, token_role)` treating the credential's role as a **ceiling the header can
+only narrow**. `token_role=None` keeps today's behavior byte-identical.
+
+**Invariant for copilot-instructions.md:** a request header may only ever narrow a role; the
+credential sets the maximum. Any code letting a header raise a role is a privilege-escalation bug.
+
+Pull design: branch `cloud-requests` (never merged) carrying `requests/`, `responses/`,
+`ledger/processed.txt`; new `bin/k3dm-cloud-bridge` on a 60s launchd tick reads blobs from the
+**fetched ref** (never `git checkout` — it runs unattended against the operator's tree), validates
+in a fixed order, and calls `127.0.0.1:7443` with the reader token. Allowlist is reader-only:
+`health`, `cluster-status`, `hostinger-status`, `job-status`. `/api/v1/ask` and `/api/v1/analyze`
+are excluded despite being `min_role: reader` — they invoke an AI and the request file is authored
+from GitHub content, which is the injection source `_INJECTION_RE` exists for.
+
+Nothing implemented. Not approved: bootstrapping the `cloud-bridge` launchd agent, creating the
+`cloud-requests` branch.
+
+## 2026-09-25 — deploy_app_cluster_confirm test isolated from live infrastructure (`1cbdab25`)
+
+Fixed `scripts/tests/core/deploy_app_cluster_confirm.bats` per Part A of the bug spec:
+setup now hard-fails `ssh`/`scp`, stubs `kubectl`, test 3 uses a STUB_DIR-scoped kubeconfig,
+and asserts provisioning output is absent. The focused suite passes 3/3; mutation removal
+of the production SSH-key guard made test 3 fail, and the production file was restored clean.
+Shellcheck is clean excluding the pre-existing dynamic-source SC1091.
+Claude verified independently: origin tip `1cbdab25`, one file in `--stat`, BATS 3/3 on a
+re-run, zero forbidden strings, `~/.kube/config` mtime unchanged at `Sep 25 11:46:45`, and
+`shopping_cart.sh` blob `8b2d8261` identical to the one at merge commit `925c43e7` — so the
+mutation-check restoration was byte-exact, not merely `git diff`-clean. Codex's `_agent_audit`
+claim was NOT verified and has been dropped rather than recorded.
+Committed and pushed to `origin/k3d-manager-v1.38.0` at
+`1cbdab25bbe894d8658a82d22d5438f945f0e86d`. No production file was changed.
+
+## 2026-09-25 — `make test` 1128/1129: the one red provisions live EC2 (`6da697a6`)
+
+`make test` on `k3d-manager-v1.38.0` ran to completion: **1128 ok / 1 not ok of 1129**, exit 2.
+The single failure is `not ok 3 deploy_app_cluster --confirm reaches the confirmed path
+(Finding 2b)` at `scripts/tests/core/deploy_app_cluster_confirm.bats` line 41 — deterministic,
+reproduced standalone, not a flake.
+
+**The failure is the lesser finding.** The test stubs only `k3sup`, so with the ACG `k3s-aws`
+sandbox reachable `deploy_app_cluster` takes its live path: it merged the `ubuntu-k3s` context
+into `~/.kube/config` and installed socat + a vault-bridge systemd unit on EC2 server
+`44.250.167.86`, then returned **0** instead of the asserted 1. That ran three times today —
+the operator's `make test` plus two diagnosis reproductions — before the behavior was
+understood. Mutations were idempotent (the context pre-existed), by luck not design.
+`~/.kube/config` mtime `Sep 25 11:46:45 2026`.
+
+Root cause `scripts/plugins/shopping_cart.sh:1375-1400`: the `[[ -f "${ssh_key}" ]]` guard is
+nested **inside** `if (( _server_ready == 0 ))`, but the function SSHes after that block
+regardless. A guard inside an early-exit branch is not a guard. The nonexistent
+`-i /nonexistent/k3d-manager-key.pem` did not stop it either — `ssh` falls back to
+ssh-agent/default identities and only warns `Identity file ... not accessible`, so a bogus key
+path cannot be used to force an SSH failure in a test.
+
+**Not a v1.37.0 regression.** `git blame` → `1bbe54393` (2026-08-21) for both the `_server_ready`
+probe and the guard; the test file last changed in `62c9ff27` (v1.27.0). It is green in CI only
+because no cluster answers there. CLAUDE.md declares `scripts/tests/` "pure logic only — no
+cluster mocks" — this file violates that and writes to a remote host.
+
+Spec filed: `docs/bugs/2026-09-25-deploy-app-cluster-confirm-bats-mutates-live-cluster.md`
+(dedup clean — the four similar `*confirm*` docs are all about the dispatcher stripping
+`--confirm`). Part A (stub the reachability probe, plus `ssh`/`scp` hard-fail stubs) is required
+and self-contained. **Part B — relocating the key guard in `shopping_cart.sh` — is unapproved:**
+it changes behavior on the already-Ready path, so it waits on the owner. Neither part is
+implemented.
+
+Not yet swept: the rest of `scripts/tests/` for the same class of reachability-dependent live
+mutation. This file was found by a failure, not by a search.
+
 ## 2026-09-25 — CodeQL alert 25 resolved by renaming, not dismissing (`1d31d9e7`)
 
 The last red check on PR #131. `py/clear-text-logging-sensitive-data` (high) at
@@ -4644,3 +5145,47 @@ STILL PENDING, user's call only: (1) the scope decision — one PR covering obse
 (Claude's recommendation) vs. splitting the login fix onto its own `fix/` branch; (2) the PR itself
 plus merge + tag v0.4.18; then (3) subtree pull into k3d-manager and rewire the Tier 2 preflight in
 `scripts/plugins/e2e.sh` from Keychain-existence to the real loader. No PR created.
+
+## 2026-09-25 — v1.37.0 merged
+
+PR #131 (`k3d-manager-v1.37.0` → `main`) merged at **925c43e7675651b9de007346612f2941d47c605a** on 2026-09-25 18:14:11Z. 
+
+**Branch protection:** `enforce_admins` restored to `true` immediately post-merge.
+
+**Next branch created:** `k3d-manager-v1.38.0` at the merge commit; retrospective written and committed at **7e5333b0** (verified on origin).
+
+**Retrospective contents:** v1.37.0 delivered the webhook monolith split (five modules: policy, smoke, agent, lifecycle, status) with authorization hardened (unknown actor → reader, POST enforces floors + policy, every request audited once). Copilot caught two gate defects in this release's own tests (disappearance guard via `rg` was vacuously green; Alertmanager tests had hard PyYAML dependency) — both fixed. Four CodeQL alerts (23/24/26/27, spawn injection) dismissed as false positives with reasoning; alert 25 resolved by renaming `config_secret` → `config_ref`. Live smoke gate reported two failures on healthy cluster — both traced to stale gate defaults, not v1.37.0 regressions. Four findings filed as specs and deferred to v1.38.0.
+
+**Git tag and GitHub release:** **still MISSING** and awaiting the owner's explicit approval. CHANGELOG heading, `docs/releases.md` row and README row already exist on `main`; the downstream step (tag + release) is a hard gate requiring the user's go, not something an agent owns. No tag or release was created.
+
+**v1.38.0 plan-doc count:** starts at 3 (max 5): `v1.38.0-hermes-app-health-delta-sensor.md`, `v1.38.0-vector-store-and-hermes-prior-art.md`, and `v1.38.0-slack-smoke-target.md`. Two slots remain.
+
+
+### Standing-doc audit closed (commit `4ef90a3a`)
+
+`docs/api/functions.md` was current. The other two were not:
+
+- `memory-bank/projectbrief.md` counted the two E2E tiers as one plugin and omitted `hello.sh`,
+  leaving its inventory two files short of `scripts/plugins/`. Jenkins now carries the deprecated
+  marker CLAUDE.md already applies.
+- `.github/copilot-instructions.md` had **no entry for `scripts/lib/webhook/`** — the module set
+  v1.37.0 shipped. Copilot reviews against that file, so the modules holding the authorization
+  logic were the least-covered code in the repo. Added the three authorization invariants (unknown
+  actor role normalizes to `reader`; `min_role` is a strict floor and the effective requirement is
+  the stricter of floor and policy; audit exactly once) plus the literal-`cmd[0]` /
+  anchored-`fullmatch` invariant the four dismissed CodeQL `posix_spawn` alerts rest on — loosening
+  it turns those dismissals into real findings. Eleven plugins had no bullet and are now listed
+  with their public functions.
+
+Note `scripts/lib/webhook/` is **eleven** files / 2,662 lines, not the five the retro names; the
+five are the extracted feature modules, the rest are `config`/`make_targets`/`proc`/`render`/`auth`.
+
+### Webhook restarted onto post-decomposition code
+
+`make restart-webhook` run by the operator at 11:32 PDT. PID 86204 listening on 127.0.0.1:7443;
+the prior instance exited on SIGTERM, which is what `launchctl kickstart -k` does. The agent runs
+`bin/k3dm-webhook` straight out of this working tree, so the restart also picked up the
+`k3d-manager-v1.38.0` checkout.
+
+**No regression testing was run against the merge** — `make test` was not executed in this session,
+so treat the post-merge tree as untested rather than verified.

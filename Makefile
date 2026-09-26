@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links check-repo-root test-python test-all e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links check-repo-root test-python test-all e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -414,6 +414,48 @@ uninstall-alertmanager-auth-proxy:
 	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
 	@echo "Alertmanager auth proxy removed"
 
+## Seed the orphan cloud-requests data branch (idempotent; safe to re-run)
+init-cloud-requests:
+	@set -euo pipefail; \
+	if [ -n "$$(git ls-remote --heads origin cloud-requests)" ]; then \
+	  echo "[init-cloud-requests] origin/cloud-requests already exists — nothing to do"; \
+	  exit 0; \
+	fi; \
+	_empty=$$(git hash-object -w -t blob /dev/null); \
+	_idxdir=$$(mktemp -d "$${TMPDIR:-/tmp}/cloud-requests-index.XXXXXX"); \
+	trap 'rm -rf "$$_idxdir"' EXIT; \
+	_idx="$$_idxdir/index"; \
+	GIT_INDEX_FILE="$$_idx" git update-index --add --cacheinfo "100644,$$_empty,ledger/processed.txt"; \
+	_tree=$$(GIT_INDEX_FILE="$$_idx" git write-tree); \
+	_commit=$$(git commit-tree "$$_tree" -m "chore: seed the cloud-requests data branch"); \
+	git push origin "$$_commit:refs/heads/cloud-requests"; \
+	echo "[init-cloud-requests] origin/cloud-requests seeded at $$_commit (orphan, ledger/processed.txt only)"
+
+## Install the cloud-session request bridge LaunchAgent (reads origin/cloud-requests every 60s)
+install-cloud-bridge:
+	@set -euo pipefail; \
+	security find-generic-password -s k3dm-webhook-token-reader -a k3dm >/dev/null 2>&1 || \
+	  { echo "[install-cloud-bridge] ERROR: Keychain item k3dm-webhook-token-reader (account k3dm) not found — create it from a real terminal first; see docs/howto/cloud-session-requests.md" >&2; exit 1; }; \
+	[ -n "$$(git ls-remote --heads origin cloud-requests)" ] || \
+	  { echo "[install-cloud-bridge] ERROR: origin/cloud-requests does not exist — run: make init-cloud-requests" >&2; exit 1; }
+	sed \
+	  -e "s|{{CLOUD_BRIDGE_BIN}}|$(CURDIR)/bin/k3dm-cloud-bridge|g" \
+	  -e "s|{{K3DM_REPO_ROOT}}|$(CURDIR)|g" \
+	  -e "s|{{CLOUD_BRIDGE_LOG}}|$(HOME)/Library/Logs/k3dm-cloud-bridge.log|g" \
+	  scripts/etc/launchd/com.k3d-manager.cloud-bridge.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	plutil -lint "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	@echo "Cloud bridge installed — polling origin/cloud-requests every 60s; log: $(HOME)/Library/Logs/k3dm-cloud-bridge.log"
+
+## Revoke cloud-session access — stop and remove the bridge LaunchAgent
+uninstall-cloud-bridge:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	@echo "Cloud bridge removed — requests already on origin/cloud-requests are now inert"
+
 ## Inject SLACK_BOT_TOKEN (Keychain k3d-manager-slack-bot-token-bot) and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
 update-webhook-slack:
 	@_tok="$${SLACK_BOT_TOKEN:-$$(security find-generic-password -s k3d-manager-slack-bot-token-bot -w 2>/dev/null)}"; \
@@ -758,6 +800,12 @@ test-python-unit:
 	 for f in scripts/tests/bin/*.py; do \
 	   case "$$(basename "$$f")" in test_*) continue;; esac; \
 	   found=1; \
+	   if grep -q '^def test_' "$$f" && ! grep -Eq 'unittest\.main\(\)|pytest\.main\(' "$$f"; then \
+	     echo "[make] $$f defines bare test functions but has no main hook —" >&2; \
+	     echo "[make] running it as a script executes nothing. Rename it to test_*.py" >&2; \
+	     echo "[make] so make test-pytest collects it." >&2; \
+	     exit 2; \
+	   fi; \
 	   echo "[make] python3 $$f"; \
 	   python3 "$$f"; \
 	 done; \
@@ -773,11 +821,21 @@ check-repo-root:
 
 test-pytest:
 	@set -euo pipefail; \
-	 python3 -m pytest --version >/dev/null 2>&1 || { \
-	   echo "[make] pytest not installed for $$(python3 --version 2>&1)." >&2; \
+	 if [ -n "$${PYTEST:-}" ]; then set -- $$PYTEST; \
+	 elif command -v pytest >/dev/null 2>&1; then set -- pytest; \
+	 elif python3 -m pytest --version >/dev/null 2>&1; then set -- python3 -m pytest; \
+	 elif [ -x "$$HOME/.pyenv/shims/python3" ] \
+	      && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
+	   set -- "$$HOME/.pyenv/shims/python3" -m pytest; \
+	 else \
+	   echo "[make] no pytest found. Tried \$$PYTEST, pytest on PATH, python3 -m pytest," >&2; \
+	   echo "[make] and \$$HOME/.pyenv/shims/python3 -m pytest. This target runs from the" >&2; \
+	   echo "[make] webhook too, whose PATH excludes the pyenv shims." >&2; \
 	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
-	   exit 2; }; \
-	 python3 -m pytest scripts/tests/hermes scripts/tests/bin/test_smoke_logins.py scripts/tests/bin/test_check_doc_links.py
+	   exit 2; \
+	 fi; \
+	 echo "[make] $$* (pytest suites)"; \
+	 "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest

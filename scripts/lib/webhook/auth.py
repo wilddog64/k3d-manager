@@ -53,6 +53,26 @@ def _get_token():
     return None
 
 
+def _get_reader_token():
+    token = os.environ.get("K3DM_WEBHOOK_TOKEN_READER")
+    if token:
+        return token
+    return _keychain_secret("k3dm-webhook-token-reader") or None
+
+
+def _resolve_token_role(presented):
+    """Return the role bound to the presented bearer, or None if unknown."""
+    if not presented:
+        return None
+    admin_token = _get_token()
+    if admin_token and hmac.compare_digest(presented, admin_token):
+        return "admin"
+    reader_token = _get_reader_token()
+    if reader_token and hmac.compare_digest(presented, reader_token):
+        return "reader"
+    return None
+
+
 def _verify_slack_signature(raw_body, timestamp, signature):
     """Return True if the Slack request signature is valid."""
     if not SLACK_SIGNING_SECRET:
