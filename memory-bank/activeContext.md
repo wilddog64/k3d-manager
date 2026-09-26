@@ -1,3 +1,29 @@
+# 2026-09-26 — cloud-request diagnostic artifacts spec written (v1.40.0)
+
+`docs/plans/v1.40.0-cloud-request-artifacts.md` — publish `artifacts/<request-id>/{summary.json,junit.xml}`
+to the `cloud-requests` branch beside the existing `responses/<id>.json`, so a cloud session sees the
+failing assertion instead of the webhook's last-2000-bytes tail of `${K3DM_JOB_DIR}/<job_id>/output`.
+
+Deliberately phased: structured artifacts only in v1.40.0. Raw `output.log` is deferred to its own
+later spec behind a tested redaction filter reusing the `_args_have_sensitive_flag` vocabulary — a
+`cloud-requests` commit is permanent and repo-readable, and raw test output routinely echoes
+environment, cluster endpoints and bearer tokens. M5 gate 6 asserts `output.log` is absent so the
+later work cannot arrive without its filter. Retention: keep-window prune, `K3DM_CLOUD_ARTIFACT_KEEP`
+default 50, in the same detached-index commit the bridge already makes.
+
+Spec adds no `ACTION_ALLOWLIST` entry — it deepens detail on the existing twelve actions, it does not
+widen what a cloud session may invoke.
+
+**NOT COMMITTED.** The file is on disk on `k3d-manager-v1.39.0` but left uncommitted on purpose: a
+v1.40.0 spec riding in the v1.39.0 PR diff would fail `/create-pr` pre-flight 7 (every changed file
+named by the release's spec). It belongs in the first commit on `k3d-manager-v1.40.0`, which
+`/post-merge` Step 5 creates from the merge SHA.
+
+Also found, filed as M7 of that spec: `CLAUDE.md`'s **No network path out of a cloud session** rule
+still says "Four read-only actions are available". `bin/k3dm-cloud-bridge:31` has carried **twelve**
+since the reader-tier make targets landed, and `docs/howto/cloud-session-requests.md` already says
+twelve. CLAUDE.md is the stale one.
+
 # 2026-09-26 — vectordb seed verified independently; ApplicationSets reapplied
 
 Codex `10dcd995` + `869accfd` on `origin/k3d-manager-v1.39.0`. Verified by Claude on a
