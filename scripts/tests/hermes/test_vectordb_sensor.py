@@ -102,3 +102,32 @@ def test_sensor_never_raises_for_every_health_payload():
              payload(rows=None)]
     for value in cases:
         assert vectordb(runner(value), {}, threshold=0, now=1_000_000.0)["sensor"] == "vectordb"
+
+
+def test_never_indexed_is_degraded_not_unknown():
+    """rows=0 with no timestamp is a readable state, not an unreadable source.
+
+    The probe answered every other field, so reporting "source unavailable" would hide the
+    exact condition this sensor exists to surface: an index that was never built.
+    """
+    result = vectordb(runner(payload(rows=0, last_indexed_epoch=None)), {}, threshold=0)
+    assert result["status"] == "degraded"
+    assert "never built" in result["evidence"]
+    assert "source unavailable" not in result["evidence"]
+
+
+def test_never_indexed_evidence_names_the_remedy():
+    result = vectordb(runner(payload(rows=0, last_indexed_epoch=None)), {}, threshold=0)
+    assert "make index-docs" in result["evidence"]
+
+
+def test_rows_without_a_timestamp_is_unknown():
+    """Rows present but no max(indexed_at) is genuinely anomalous, so it stays unknown."""
+    result = vectordb(runner(payload(rows=5, last_indexed_epoch=None)), {}, threshold=0)
+    assert result["status"] == "unknown"
+
+
+def test_a_null_readable_field_is_still_unknown():
+    for field in ("available", "external_secret_synced", "pod_ready", "rows", "corpus_docs"):
+        result = vectordb(runner(payload(**{field: None})), {}, threshold=0)
+        assert result["status"] == "unknown", field

@@ -264,7 +264,8 @@ def vectordb(run, state, threshold=2, max_index_age_seconds=7 * 86400, now=None)
         if not all(name in payload for name in required):
             raise ValueError("invalid vectordb probe")
         data = {name: payload[name] for name in required}
-        if any(payload[name] is None for name in required):
+        readable = ("available", "external_secret_synced", "pod_ready", "rows", "corpus_docs")
+        if any(payload[name] is None for name in readable):
             return record("vectordb", "unknown", "vectordb status source unavailable", data=data)
         if payload["external_secret_synced"] is False:
             status = "degraded" if _debounced("vectordb", True, threshold, state) else "healthy"
@@ -277,6 +278,17 @@ def vectordb(run, state, threshold=2, max_index_age_seconds=7 * 86400, now=None)
         if payload["available"] is False:
             status = "degraded" if _debounced("vectordb", True, threshold, state) else "healthy"
             return record("vectordb", status, "vector store did not answer", data=data)
+        if payload["last_indexed_epoch"] is None:
+            # A readable "never indexed" state, not an unreadable source: the probe answered
+            # every other field. Zero rows and no timestamp means the index was never built or
+            # the volume was lost, which is exactly what this sensor exists to surface.
+            if payload["rows"] == 0:
+                status = "degraded" if _debounced("vectordb", True, threshold, state) else "healthy"
+                return record("vectordb", status,
+                              f"index never built — corpus={payload['corpus_docs']}, rows=0; "
+                              "run make index-docs", data=data)
+            return record("vectordb", "unknown",
+                          "vectordb reports rows with no index timestamp", data=data)
         now = time.time() if now is None else now
         age_seconds = max(0, now - float(payload["last_indexed_epoch"]))
         age_days = age_seconds / 86400
