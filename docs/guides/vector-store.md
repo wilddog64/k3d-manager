@@ -173,7 +173,14 @@ keychain item, which is why they all read rc 0 here, so it is consistent with th
 keychain rather than a new exposure class. The alternative — a single-binary ACL plus a copy for
 everything else — trades that for two values to rotate and no way to tell which one is stale.
 
-Fill item 2 only on a host that has no `gemini-cli-api-key` at all:
+Fill item 2 on a host that has no `gemini-cli-api-key` at all — **or when the CLI's item cannot be
+made to serve**. On this host two `-U` writes into `gemini-cli-api-key` both stored nothing and the
+second reset its access back to rc 36, so item 2 became the working slot. That is not a second copy:
+the CLI's item is empty, so exactly one slot holds a value and the preference order simply shifts.
+Reading the CLI's item into the env var cannot bootstrap this — `K3DM_EMBEDDINGS_API_KEY="$(security
+find-generic-password -s gemini-cli-api-key -w)"` substitutes the empty value and reports
+`$K3DM_EMBEDDINGS_API_KEY is unset or empty`, which looks like a third failure and is the first one
+restated.
 
 ```bash
 security add-generic-password -a k3dm -s k3dm-embeddings-api-key -w
