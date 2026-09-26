@@ -1,3 +1,12 @@
+# 2026-09-26 — ArgoCD values-branch gate fix dispatched to Codex
+
+Implemented M1–M4 from `docs/bugs/2026-09-26-check-values-branch-false-clean-under-dry-run.md` on
+`k3d-manager-v1.39.0`: detector outcomes are distinct and fail closed, dry-run confirmation is
+skipped, and the gate checks all k3d-manager manifest references while excluding/counting `HEAD`.
+Focused BATS is green at 11/11; `argocd.bats` and final shellcheck are pending the final gate run.
+Mutation checks for all six new tests were red when their covered change was reverted and were
+restored. Commit SHA: `b1f90fce`; no PR created.
+
 # Active Context — k3d-manager
 
 ## 2026-09-26 — ApplicationSets reapplied, values pin now v1.39.0 (Claude + operator)

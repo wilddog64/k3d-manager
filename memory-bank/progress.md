@@ -1,3 +1,15 @@
+# 2026-09-26 — ArgoCD values-branch gate fix implemented
+
+- [x] M1–M4 implemented exactly from the bug spec on `k3d-manager-v1.39.0`.
+- [x] Added six pure-logic BATS tests; focused suite passes 11/11. Each new test was
+      mutation-checked individually; the covered change was reverted, the suite went red, and the
+      change was restored. No cluster or network command was run.
+- [x] Pre/post shellcheck output is identical: one pre-existing informational SC2317 at
+      `scripts/plugins/argocd.sh:12`; no new warnings.
+- [x] Final gates passed: `argocd_values_branch_drift.bats` 11/11, `argocd.bats` 37/37,
+      shellcheck unchanged from the pre-change run, and `_agent_audit` passed. Implementation
+      commit: `b1f90fce`; push is the remaining handoff step.
+
 # Progress — k3d-manager
 
 ## 2026-09-26 — v1.38.0 MERGED, tagged and released; v1.39.0 branch cut

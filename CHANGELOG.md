@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- The ArgoCD values-branch gate no longer reports a clean result it did not verify. The drift
+  detector had used one empty-stdout channel for no drift, unparseable input, and zero references,
+  while the caller discarded its exit status; it now distinguishes those outcomes, fails closed on
+  parse or vacuous-query failures, skips confirmation during dry runs, and checks manifest sources
+  as well as `$values` sources while explicitly excluding and counting sources that track `HEAD`.
+
 ## [1.38.0] - 2026-09-25
 
 ### Added
