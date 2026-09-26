@@ -66,10 +66,19 @@ Operator closed both open questions with authenticated probes at 18:12:
 - `POST /api/v1/make {"target":"help"}` with the reader credential lists eight reader targets,
   including `test-pytest` and `test-python-unit`. The Slack `/k3dm` path for P7 is live.
 
-Still unexercised: an actual `test-pytest` run through Slack or the bridge. The `$HOME`-based
-pytest fallback was proven under a simulated webhook PATH with `env -i`, not under launchd's
-real environment, so the first real invocation is still the thing that proves the interpreter
-resolves. Worth one `/k3dm test-pytest` from Slack.
+**P7 verified end to end from Slack.** `/k3dm test-pytest` returned "make test-pytest
+succeeded", 215 passed in 32.22s, and its first output line is
+`[make] /Users/cliang/.pyenv/shims/python3 -m pytest (pytest suites)`.
+
+That line is the whole point: under launchd's real environment the **fourth** fallback branch
+fired. `$PYTEST` was unset, no `pytest` binary was on PATH, `python3 -m pytest` failed, and
+`$HOME/.pyenv/shims/python3` resolved. Without that fallback the target would have exited 2 on
+every Slack and bridge invocation while passing locally and in CI. The `env -i` simulation
+predicted this correctly, but the Slack run is the actual proof.
+
+The Slack output also lists `scripts/tests/bin/test_cloud_bridge.py` among the collected
+suites, which is the direct confirmation that the vacuous-run bug (`a7d513f3`) is closed: that
+file executed nowhere at all before today.
 
 ## 2026-09-26 — P6 reader-tier make targets through the cloud bridge
 
