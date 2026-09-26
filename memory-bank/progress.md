@@ -2,6 +2,24 @@
 
 ## 2026-09-26 — v1.38.0 MERGED, tagged and released; v1.39.0 branch cut
 
+- [ ] **Release step BLOCKED: reapply the ApplicationSets** — `deploy_argocd_applicationsets
+  --confirm` was denied by the auto-mode classifier (`Protected-Scope IaC Apply`). Not worked
+  around. **Operator must run it via `!`.** Baseline measured first: 24 k3d-manager sources on
+  the hub are pinned at `k3d-manager-v1.37.0` (6 of them `ref: values`), so v1.38.0 config is
+  inert in-cluster right now. Correct pin is `k3d-manager-v1.39.0` (the current release branch,
+  cut from the v1.38.0 merge commit, so it contains all v1.38.0 config). Dry run covered all
+  12 sets including both ACG variants (`grafana-dashboards-acg`, `observability-acg`).
+- [ ] **BLOCKED: sync `shopping-cart-identity`** — could not even reach the read stage; a
+  read-only `kubectl get application` was denied by the classifier with no explanation. No
+  live cluster access this session. Operator to run via `!`.
+- [x] **BUG FOUND: `argocd_check_values_branch` reports a false clean under `--dry-run`** —
+  printed "All Applications reference values branch k3d-manager-v1.39.0" while none did.
+  `_argocd_values_branch_drift` exits 3 on unparseable input with empty stdout, and the caller
+  decides on stdout alone, so "could not tell" is indistinguishable from "no drift". The
+  absent `checked N values references` stderr line is the tell. Also: the gate checks only the
+  6 `ref: values` sources, not the other 18 that drift on the same boundary.
+  `docs/bugs/2026-09-26-check-values-branch-false-clean-under-dry-run.md`. OPEN, unfixed.
+
 - [x] **PR #132 created** — `feat: read-only cloud-session access to the local webhook`,
   base `main`, head `k3d-manager-v1.38.0`. 40 commits, 34 files.
   https://github.com/wilddog64/k3d-manager/pull/132

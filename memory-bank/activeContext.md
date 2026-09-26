@@ -1,5 +1,28 @@
 # Active Context — k3d-manager
 
+## 2026-09-26 — both live release items blocked by the classifier (Claude)
+
+The operator gave the go for the ApplicationSet reapply and the `shopping-cart-identity` sync.
+**Neither could be done: the auto-mode classifier denied both, and per standing rule denials
+are not worked around.** `deploy_argocd_applicationsets --confirm` was refused as
+`Protected-Scope IaC Apply`; a *read-only* `kubectl get application` was then refused with no
+explanation, so there is no live cluster access in this session at all. Both need the operator
+running them via `!`.
+
+**v1.38.0 config is inert in-cluster as of now.** 24 k3d-manager sources on the hub are pinned
+at `k3d-manager-v1.37.0`. The pin to use is `k3d-manager-v1.39.0` — the current release branch,
+cut from the v1.38.0 merge commit, so it already contains every v1.38.0 change; pinning to
+`v1.38.0` would freeze the sets to a branch that stops receiving commits and would need redoing
+at once.
+
+**The release step's own gate cannot be trusted under `--dry-run`.** It reported "All
+Applications reference values branch k3d-manager-v1.39.0" while none did — an unparseable-input
+exit is indistinguishable from no-drift because only stdout is consulted. Filed in
+`docs/bugs/2026-09-26-check-values-branch-false-clean-under-dry-run.md`. It was caught only
+because the live pins had been measured *before* the dry run, so the claim contradicted a
+number already in hand. **Measure the baseline before running a release step**, or a false
+clean reads as a successful no-op.
+
 ## 2026-09-26 — v1.38.0 shipped; protection restored; v1.39.0 open (Claude)
 
 `/post-merge` ran in the main session rather than the Haiku subagent the skill prescribes:
