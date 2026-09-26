@@ -375,6 +375,30 @@ class TestVaultFallback:
         assert "errSecInteractionNotAllowed" in message
         assert "hub Vault: cluster unreachable" in message
 
+    def test_the_rc36_hint_names_the_fix_not_a_second_item(self, monkeypatch):
+        """rc 36 is an access-control problem on one item, not a missing second item.
+
+        The remedy is widening that item's partition list. Telling the operator to create a
+        duplicate k3dm-owned item instead puts the same key in two places on one machine,
+        which doubles rotation and survives nothing extra, so the hint must not suggest it.
+        """
+        monkeypatch.setenv(pa.KEY_ENV, "")
+        monkeypatch.setattr(pa, "KEYCHAIN_ITEMS", ("gemini-cli-api-key",))
+
+        class Denied:
+            returncode = 36
+            stdout = ""
+            stderr = ""
+
+        monkeypatch.setattr(pa.subprocess, "run", lambda *_a, **_k: Denied())
+        monkeypatch.setattr(pa, "vault_api_key", _vault_raises("cluster unreachable"))
+        with pytest.raises(pa.EmbeddingsUnavailable) as caught:
+            pa.api_key()
+        message = str(caught.value)
+        assert "set-generic-password-partition-list" in message
+        assert "gemini-cli-api-key" in message
+        assert "add-generic-password" not in message
+
 
 class TestExecFailureDetail:
     """``kubectl exec`` appends its own last line, so the last line is never the real error.

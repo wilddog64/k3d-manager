@@ -138,7 +138,10 @@ Zero entries is the default, not an anomaly.
   (existence check only, no value read). **`gemini-cli-api-key` does exist** and Gemini embeddings
   are free-tier, making it the candidate needing no new credential — but it was provisioned for the
   Gemini CLI and **repurposing it needs the operator's explicit go**. WS1 does not depend on this;
-  WS2 cannot start without it.
+  WS2 cannot start without it. RESOLVED 2026-09-26: the operator approved reusing
+  `gemini-cli-api-key`, and ruled that it stays the single keychain copy — the remaining absent items
+  stay absent rather than being filled with duplicates. See the one-slot decision in
+  `activeContext.md`.
 - [ ] **WS1 needs the operator's go** — it deploys pgvector to the hub. Prerequisites verified
   2026-09-26: ESO on the hub is healthy (6 of 7 ExternalSecrets `SecretSynced/True`; the one
   failure is the pre-existing `cosign-public-key` in `platform-ops`), and the hub-scoped Application

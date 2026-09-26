@@ -32,6 +32,20 @@
   goes to the Vault pod on stdin, and the secret path is passed as a positional argument rather than
   interpolated into the `sh -c` string.
 
+### Changed
+- The embeddings credential resolution order is documented as a preference order rather than a set of
+  copies, and `rc 36` now names the fix that does not duplicate anything. The guide previously told
+  the operator to create a dedicated `k3dm-embeddings-api-key` holding a copy of the key the Gemini
+  CLI item already held — two items in one keychain on one machine, sharing a lock state and a
+  failure domain, so the copy doubled what rotation had to touch and survived nothing the original
+  would not. `errSecInteractionNotAllowed` is an access-control problem on a single item, and the
+  remedy is widening that item's partition list (`security
+  set-generic-password-partition-list -S apple-tool:,apple:`), or its trusted-application ACL through
+  Keychain Access when the partition list is not the restriction. Exactly one keychain slot holds a
+  value; `k3dm-embeddings-api-key` stays empty except on a host with no Gemini CLI. The hub Vault
+  copy is unaffected — it is a different failure domain (locked keychain, launchd with no session,
+  another host), which is the distinction that makes it worth having and a second keychain item not.
+
 ### Fixed (continued)
 - Vault and vector-store failures now report the pod's own error instead of kubectl's exit-code
   trailer. `kubectl exec` appends `command terminated with exit code N` as the last line of stderr,

@@ -87,14 +87,19 @@ Override the target with `K3DM_VECTORDB_CONTEXT`, `K3DM_VECTORDB_NAMESPACE` or
 Resolution order, at call time:
 
 1. `K3DM_EMBEDDINGS_API_KEY` in the environment
-2. keychain item `k3dm-embeddings-api-key` (the dedicated item)
+2. keychain item `k3dm-embeddings-api-key` (k3dm-owned; normally empty — see below)
 3. keychain item `gemini-cli-api-key` (shared with the Gemini CLI)
 4. `secret/embeddings/gemini` field `api_key` in the hub Vault
 
 The key is placed only in an `x-goog-api-key` request header. It is never passed as a command-line
 flag, which is why there is no new entry in `_args_have_sensitive_flag` — there is no sensitive flag
-to register. Dropping a dedicated key into item 2 takes over from the shared CLI credential with no
-code change.
+to register.
+
+**Exactly one keychain slot should hold a value.** This is a preference order, not a set of copies to
+keep in sync. Items 2 and 3 live in the same keychain on the same machine with the same lock state,
+so putting the key in both doubles what rotation has to touch and survives nothing that one item
+would not. On this host the key is in item 3, the Gemini CLI's own item, and item 2 stays empty — it
+exists as an override for a host with no Gemini CLI installed.
 
 Vault is last because it is the slowest and least available source — it needs a reachable hub —
 while the keychain answers locally. It is there because it survives the failures the keychain does
@@ -105,19 +110,57 @@ from the keychain, so the fallback has no bootstrapping circularity.
 
 ### Why item 3 denies a read, and what to do about it
 
-`gemini-cli-api-key` was created by the Gemini CLI with an ACL trusting only its own binary, so a
-value read from any other process returns **rc 36** (`errSecInteractionNotAllowed`, -25308 truncated
-to a byte): the item exists, the keychain is unlocked, and the process cannot present the
-authorization prompt. This is not a locked keychain — every k3dm-owned item reads at rc 0 from the
-same non-TTY shell. The fix is one k3dm-owned item, which is why item 2 is checked first:
+`gemini-cli-api-key` was created by the Gemini CLI with an access control trusting only its own
+binary, so a value read from any other process returns **rc 36** (`errSecInteractionNotAllowed`,
+-25308 truncated to a byte): the item exists, the keychain is unlocked, and the process cannot
+present the authorization dialog. This is not a locked keychain — every k3dm-owned item reads at rc 0
+from the same non-TTY shell.
+
+**Widen that item's access; do not copy the key into a second item.** Run this in a GUI Terminal
+session, where the keychain can prompt:
+
+```bash
+security set-generic-password-partition-list \
+  -S apple-tool:,apple: -s gemini-cli-api-key -a default-api-key
+```
+
+Omit `-k` and it prompts for the login keychain password instead of taking it on argv. This is the
+documented remedy for `errSecInteractionNotAllowed` in non-interactive contexts: it tells the
+keychain that Apple-signed tools such as `/usr/bin/security` may read the item without a dialog.
+
+If rc 36 persists, the restriction is the trusted-application ACL rather than the partition list, and
+that is GUI-only: **Keychain Access → `gemini-cli-api-key` → Get Info → Access Control**, then either
+add `/usr/bin/security` to the trusted list or select *Allow all applications*.
+
+Verify without printing the value — a Gemini API key is 39 characters, so expect `40`:
+
+```bash
+security find-generic-password -s gemini-cli-api-key -w | wc -c
+```
+
+The tradeoff is real and worth stating: widening the access means any process running as this user
+can read the key through `security` without a prompt. That is already true of every k3dm-owned
+keychain item, which is why they all read rc 0 here, so it is consistent with the rest of the
+keychain rather than a new exposure class. The alternative — a single-binary ACL plus a copy for
+everything else — trades that for two values to rotate and no way to tell which one is stale.
+
+Fill item 2 only on a host that has no `gemini-cli-api-key` at all:
 
 ```bash
 security add-generic-password -a k3dm -s k3dm-embeddings-api-key -w
 ```
 
-The `-w` with no value prompts, so the key never reaches shell history.
+`-w` with no value prompts, so the key never reaches shell history. It needs a TTY: with no TTY it
+stores an **empty value and exits 0**, which then reports `read succeeded but the value is empty`.
 
 ### Writing the Vault copy
+
+The Vault copy is the one deliberate second copy, and it is not a contradiction of the
+one-slot-only rule above. A second *keychain* item shares the machine, the keychain and the lock
+state of the first, so it duplicates without surviving anything. Vault is a different failure
+domain: it answers when the login keychain is locked, when the caller is a launchd job with no
+session to unlock anything, and from a host that is not this laptop. Two copies total — one
+keychain item, one Vault path — and nothing else.
 
 The operator writes this value; no agent creates, reads or echoes it. The key is prompted, so it
 stays out of history, out of argv and out of a process listing:

@@ -38,8 +38,11 @@ run. That is why the operator's run could not be diagnosed.
       `run_sql`, hiding every psql error. `_exec_detail` drops kubectl's lines first;
       `TestExecFailureDetail` pins it (4 mutations caught). Stubbed unit tests could NOT find this.
 
-- [ ] Operator: `security add-generic-password -a k3dm -s k3dm-embeddings-api-key -w` — the
-      immediate unblock for the indexer, Hermes and the webhook.
+- [ ] Operator: `security set-generic-password-partition-list -S apple-tool:,apple:
+      -s gemini-cli-api-key -a default-api-key` — widens the EXISTING item so the indexer, Hermes
+      and the webhook can read it. If rc 36 persists it is the trusted-app ACL, not the partition
+      list: Keychain Access → Get Info → Access Control (GUI only). Do **not** create a second
+      keychain item — see the decision note below.
 - [ ] Operator: write the Vault copy (prompted command in the guide). No agent touches the value.
 - [ ] Operator: re-run `make index-docs`; then Claude verifies `rows` > 0, `last_indexed_epoch`
       set, the sensor flipping off `index never built`, and one real ranked similarity result.
@@ -114,7 +117,25 @@ dashboard ConfigMap. Wrong: Grafana discovers dashboards by `grafana_dashboard: 
 DECISION (operator, 2026-09-26) — embeddings provider is Gemini `text-embedding-004`,
 `vector(768)`, reusing `gemini-cli-api-key`. Resolution order is env
 `K3DM_EMBEDDINGS_API_KEY`, then keychain `k3dm-embeddings-api-key`, then `gemini-cli-api-key`,
-so dropping a dedicated key into the second item later takes over with no code change.
+then the hub Vault.
+
+DECISION (operator, 2026-09-26) — **the resolution order is a preference order, not a set of copies
+to keep in sync. Exactly ONE keychain slot holds a value.** Claude first proposed a dedicated
+`k3dm-embeddings-api-key` holding a copy; the operator rejected it — *"why can't we reuse that item
+instead we have to create another same one? this make it spread and hard to maintain"* — and was
+right, including against the standing rule not to duplicate credentials across keychain items. Two
+items in one keychain share the machine and the lock state, so a copy doubles rotation and survives
+nothing. rc 36 is an ACCESS-CONTROL problem on one item; the fix widens that item's partition list.
+`k3dm-embeddings-api-key` stays EMPTY except on a host with no Gemini CLI installed.
+
+The Vault copy is the one deliberate second copy and does not contradict this: it is a different
+failure domain (locked keychain, launchd with no session, another host). Two copies total — one
+keychain item, one Vault path.
+
+LESSON — both design defects in this change were caught by the operator, not by a test, and both had
+the same shape: a plausible mechanism no test could reject, because tests assert that a structure
+behaves, never whether it should exist. `TestVaultFallback` now pins the rc 36 hint against
+regressing to the duplicate-item advice (mutation-verified).
 
 BLOCKER — **the live first index has NOT run, and Claude cannot run it.** A keychain value read
 from this shell returns **rc 36 with empty stderr**; the standing rule already records that

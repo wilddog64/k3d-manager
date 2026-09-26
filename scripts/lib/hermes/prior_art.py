@@ -37,8 +37,11 @@ API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
 KEY_ENV = "K3DM_EMBEDDINGS_API_KEY"
 PRIMARY_KEYCHAIN_ITEM = "k3dm-embeddings-api-key"
-# The dedicated item first, so dropping a key into it later takes over from the shared
-# Gemini CLI credential with no code change.
+# Exactly one of these should ever hold a value. This is a preference order, not a set of
+# copies to keep in sync: a second keychain item shares the machine and the lock state of the
+# first, so it adds rotation drift and survives nothing extra. The normal arrangement is the
+# key in the Gemini CLI's own item with its access widened, and the k3dm-owned name left empty
+# as an override for a host that has no Gemini CLI.
 KEYCHAIN_ITEMS = (PRIMARY_KEYCHAIN_ITEM, "gemini-cli-api-key")
 
 # Vault holds a second copy of the embeddings key, for the case the keychain cannot serve
@@ -232,8 +235,10 @@ def api_key():
         detail = (found.stderr or "").strip().splitlines()
         hint = ""
         if found.returncode == 36:
-            hint = " (errSecInteractionNotAllowed — cannot show the authorization prompt; "
-            hint += "run it from a GUI Terminal session, or export the key)"
+            hint = " (errSecInteractionNotAllowed — the item exists but its access control "
+            hint += "will not serve this process; widen it with "
+            hint += "'security set-generic-password-partition-list -S apple-tool:,apple: "
+            hint += f"-s {item}', or export ${KEY_ENV})"
         reasons.append(
             f"{item}: rc {found.returncode}{hint}"
             + (f" — {detail[-1]}" if detail else "")
