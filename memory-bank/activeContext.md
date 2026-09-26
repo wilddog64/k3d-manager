@@ -1,3 +1,51 @@
+# 2026-09-26 — vectordb monitoring H1-H5 landed via Codex, one defect fixed on review
+
+- [x] Codex `2554da26` implemented H1-H5: `bin/k3dm-vectordb-status` (probe, `--offline` mode),
+      `bin/k3dm-vectordb-metrics` (Pushgateway), `sensors.vectordb`, registration in
+      `bin/k3dm-hermes`, `scripts/etc/prometheus/rules/vectordb.yaml`,
+      `scripts/etc/grafana/dashboards/k3dm-vectordb-configmap.yaml`, tests, guide, CHANGELOG.
+- [x] Codex `79bf0178` memory-bank. Claude `a1eddaab` the fix below. origin = `a1eddaab`.
+- [x] INDEPENDENTLY VERIFIED, not taken on report: SHA on origin, scope 12 files all spec-named,
+      no subtree touched, commit message exact, 266 pytest green re-run by Claude, all four
+      grep/offline gates re-run, and two of Codex's claimed mutations re-proved (ExternalSecret
+      ordering; null-readable-field). Codex asserted "mutation proofs all produced targeted
+      failures" WITHOUT pasting per-mutation output as the spec demanded — the claim held up on
+      spot-check, but it was unevidenced.
+
+DEFECT FOUND ON REVIEW — **my spec was wrong, and Codex implemented it faithfully.** The spec said
+every `null` probe field means the source is unreadable. Against the live cluster that made the
+sensor report `unknown` / "status source unavailable" while the probe had read every field
+successfully: store up, ExternalSecret synced, pod ready, `rows=0`, `last_indexed_epoch=null`.
+That is the readable "never indexed" state and the most informative condition this release
+produces. Fixed in `a1eddaab`: null means unreadable only for `available`,
+`external_secret_synced`, `pod_ready`, `rows`, `corpus_docs`; no timestamp with 0 rows →
+`degraded` "index never built — run make index-docs"; no timestamp with rows > 0 → `unknown`.
+Both branches mutation-proved. Spec records the correction.
+
+LESSON — a spec rule phrased as an absolute ("every null means X") is where a faithful
+implementer encodes the author's error. The live probe output was what exposed it; no unit test
+would have, because the tests asserted the spec.
+
+LIVE STATE (read-only) — probe returns `available:true, external_secret_synced:true,
+pod_ready:true, rows:0, corpus_docs:1705, last_indexed_epoch:null`. Sensor now correctly reports
+`degraded — index never built`. Corpus is 1705 (the monitoring spec added one doc).
+
+ALSO CORRECTED PRE-DISPATCH — the first spec draft told Codex to put a `release` label on the
+dashboard ConfigMap. Wrong: Grafana discovers dashboards by `grafana_dashboard: "1"`; the
+`release` trap applies to ServiceMonitors. A gate now asserts `grep -c release` outputs 0.
+
+- [ ] Operator: run `make index-docs` once. Claude cannot — keychain value reads return rc 36.
+      After that the sensor should flip to healthy and `last_index_timestamp_seconds` starts
+      publishing.
+- [ ] Operator/Claude DoD still open: confirm kube-state-metrics series in the live TSDB
+      (`:19090` is 401 to an agent), confirm the dashboard is LOADED in Grafana not just applied,
+      `promtool check rules`, reapply ApplicationSets + `argocd_check_values_branch`.
+- [ ] v1.40.0 will hold 6 plan docs once v1.39.0 merges — over the max-5 cap, needs a split.
+- [ ] `v1.40.0-hermes-prior-art-and-retrieval-eval.md` names `bin/find-similar-docs`; what
+      shipped is `scripts/find-similar-docs.py`. One-line correction before WS5 dispatch.
+- [ ] v1.39.0 close-out untouched: no `## [1.39.0]` heading, no releases row, no retro, no PR.
+      Three specs still unimplemented: blackbox probes, slack smoke target, test-suite metrics.
+
 # 2026-09-26 — vectordb health monitoring implemented
 
 - [x] `2554da26d2dcf940c09168d6e93b417e39eb8976` implements H1-H5 and the pytest suite for
