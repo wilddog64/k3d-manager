@@ -1,3 +1,11 @@
+# 2026-09-26 — vectordb health monitoring implemented
+
+- [x] `2554da26d2dcf940c09168d6e93b417e39eb8976` implements H1-H5 and the pytest suite for
+      vectordb health: read-only JSON probe, Hermes sensor/tick, Pushgateway metrics, alerts,
+      dashboard, guide and changelog. Pushed to `origin/k3d-manager-v1.39.0`; no PR by instruction.
+- [x] Gates: py_compile rc 0, bare pytest 262 passed, offline probe rc 0, Prometheus reachable
+      grep absent from expr lines, dashboard release count 0, doc links green, both new bins executable.
+
 # 2026-09-26 — WS2/WS3/WS6 landed; vectordb monitoring specced
 
 - [x] `a13b42f7` similarity search: `scripts/lib/hermes/prior_art.py`, `scripts/index-docs.py`,
