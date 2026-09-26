@@ -2,16 +2,42 @@
 
 ## 2026-09-26 — v1.38.0 MERGED, tagged and released; v1.39.0 branch cut
 
-- [ ] **Release step BLOCKED: reapply the ApplicationSets** — `deploy_argocd_applicationsets
-  --confirm` was denied by the auto-mode classifier (`Protected-Scope IaC Apply`). Not worked
-  around. **Operator must run it via `!`.** Baseline measured first: 24 k3d-manager sources on
-  the hub are pinned at `k3d-manager-v1.37.0` (6 of them `ref: values`), so v1.38.0 config is
-  inert in-cluster right now. Correct pin is `k3d-manager-v1.39.0` (the current release branch,
-  cut from the v1.38.0 merge commit, so it contains all v1.38.0 config). Dry run covered all
-  12 sets including both ACG variants (`grafana-dashboards-acg`, `observability-acg`).
-- [ ] **BLOCKED: sync `shopping-cart-identity`** — could not even reach the read stage; a
-  read-only `kubectl get application` was denied by the classifier with no explanation. No
-  live cluster access this session. Operator to run via `!`.
+- [x] **Release step DONE: ApplicationSets reapplied for v1.39.0** (operator ran it; 2026-09-26).
+  12/12 sets deployed on the hub `k3d-k3d-cluster` ns `cicd`, both ACG variants included
+  (`grafana-dashboards-acg`, `observability-acg`). All **24** k3d-manager sources moved off
+  `k3d-manager-v1.37.0` to `k3d-manager-v1.39.0` — the 6 with `ref: values` and the 18 with no
+  `ref` that the gate never inspects. 2 remain at `HEAD` (rollout demo, intended). v1.38.0 config
+  is now live in-cluster. `argocd_check_values_branch k3d-manager-v1.39.0` confirms clean **and
+  printed `checked 6 values references`**, so the confirmation is trustworthy.
+- [x] **LESSON: the release step inherits the current kube context.** The first attempt applied
+  against the stale `ubuntu-k3s` context (dead ACG sandbox, 44.250.167.86) and failed all 12 sets
+  at kubectl openapi validation — before any write, so nothing was mutated — at ~90s per set.
+  `deploy_argocd_applicationsets` takes no context flag. **Check `kubectl config current-context`
+  before any release step that does not take an explicit context.**
+- [x] **LESSON: a partial stale split right after a reapply is reconcile lag.** The check run
+  seconds after the apply still showed 3 of 6 stale (`acg-kube-prometheus-stack`,
+  `acg-trivy-operator`, `loki`); a re-check moments later was fully clean. The sets update
+  synchronously, the child Applications regenerate on the controller's own loop. Re-check before
+  escalating.
+- [x] **LESSON: the `!` relay executed nothing.** Three `!` invocations produced zero side
+  effects — a `>` redirect target was never created, which proves the command never ran rather
+  than ran-and-failed (zsh creates the target before the first line executes). Operator ran the
+  commands directly instead.
+- [ ] **NOT DONE and NOT to be retried as a sync: `shopping-cart-identity`** — deterministic
+  failure, not drift. `Replace=true` in its syncOptions makes ArgoCD `kubectl replace` the bound
+  `postgres-keycloak-pvc`, whose spec is immutable except `resources.requests`; the manifest
+  omits `volumeName`/`storageClassName` so the replacement blanks them and the API server rejects
+  it. Retry limit 5 exhausted, `phase: Failed`, which also blocks self-heal. Holds back 3
+  ExternalSecrets and prevents `Job/keycloak-realm-reconcile` from being created at all.
+  Already filed: `docs/bugs/2026-09-23-argocd-identity-replace-true-cannot-update-bound-pvc.md`
+  (dedup check caught it; no second file). **Appended update disproves that doc's open question**
+  — the realm-reconcile failure is independent, caused by `awk: command not found` in the
+  `ubi9-micro` image. **Two fixes needed; the PVC one must land first** or the awk fix cannot be
+  observed. Needs the operator's go on which fix option (per-resource `Replace=false` annotation
+  in `shopping-cart-infra` is the filed preference).
+- [ ] **Delete the stale `ubuntu-k3s` kube context** — now escalated from a ~90s-per-query
+  annoyance to having burned a release step. `kubectl config delete-context ubuntu-k3s`. Operator's
+  call (config mutation).
 - [x] **BUG FOUND: `argocd_check_values_branch` reports a false clean under `--dry-run`** —
   printed "All Applications reference values branch k3d-manager-v1.39.0" while none did.
   `_argocd_values_branch_drift` exits 3 on unparseable input with empty stdout, and the caller

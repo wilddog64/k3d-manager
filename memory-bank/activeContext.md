@@ -1,6 +1,58 @@
 # Active Context — k3d-manager
 
-## 2026-09-26 — both live release items blocked by the classifier (Claude)
+## 2026-09-26 — ApplicationSets reapplied, values pin now v1.39.0 (Claude + operator)
+
+**The required per-release ApplicationSet reapply is DONE.** The operator ran it directly after
+the `!` relay proved to be executing nothing (three invocations, zero side effects — a `>`
+redirect target was never even created, which is how we knew the command was not running rather
+than failing).
+
+**First attempt applied to the dead ACG sandbox.** `deploy_argocd_applicationsets` takes no
+context flag and inherits whatever `kubectl` points at; the current context was the stale
+`ubuntu-k3s`, i.e. the expired sandbox at 44.250.167.86. Every set failed at kubectl's *openapi
+validation* step (before any write, so nothing was mutated) at ~90s per set. Aborted, switched
+to `k3d-k3d-cluster`, re-ran clean. **Lesson: check `kubectl config current-context` before any
+release step that does not take an explicit context.** The stale `ubuntu-k3s` context is still
+present and is now overdue for deletion — it has cost ~90s per query for weeks and has now cost
+a release step.
+
+Result on the hub (`k3d-k3d-cluster`, ns `cicd`): **12/12 ApplicationSets deployed**, both ACG
+variants included (`grafana-dashboards-acg`, `observability-acg`). All **24** k3d-manager sources
+moved off `k3d-manager-v1.37.0` to `k3d-manager-v1.39.0` — the 6 with `ref: values` and the 18
+with no `ref`, which the gate never inspects but which are templated from the same
+`${K3D_MANAGER_BRANCH}`. The 2 remaining at `HEAD` are the rollout demo and are intended.
+`istio-ambient` resolved the k3s CNI dirs correctly (`/var/lib/rancher/k3s/...`), so the open
+`_argocd_appset_live_overrides` istio-cni bug did **not** fire — no sixth observation.
+
+**The values-branch gate confirmed clean, and this one is trustworthy** — it printed
+`checked 6 values references`. Note the first check, run seconds after the apply, still showed 3
+of 6 stale (`acg-kube-prometheus-stack`, `acg-trivy-operator`, `loki`): the sets are updated
+synchronously but the child Applications are regenerated on the controller's own loop. **A
+partial split immediately after a reapply is reconcile lag, not failure** — re-check before
+escalating.
+
+Correction to the record: an earlier note in this file claimed the pre-denial dump showed 26
+Applications and that no `identity` app existed. Both wrong — `apps.json` had **38**, including
+`shopping-cart-identity`. The miscount was mine; nothing changed in-cluster.
+
+## 2026-09-26 — identity sync NOT attempted: deterministic failure, already filed (Claude)
+
+The second authorized item (sync `shopping-cart-identity`) was **deliberately not run.** It fails
+deterministically and a sync is not the remedy. `syncOptions: ["CreateNamespace=true",
+"Replace=true"]` makes ArgoCD `kubectl replace` the bound `postgres-keycloak-pvc`, whose spec is
+immutable except `resources.requests`; the git manifest legitimately omits `volumeName` and
+`storageClassName`, so the replacement blanks them and the API server rejects it. Retry limit 5,
+exhausted, `operationState.phase: Failed` — which also blocks self-heal. Held back with it: 3
+ExternalSecrets `OutOfSync` and `Job/keycloak-realm-reconcile` never created.
+
+Already filed as `docs/bugs/2026-09-23-argocd-identity-replace-true-cannot-update-bound-pvc.md`
+(the dedup check caught it — no second file created). Appended a 2026-09-26 update that
+**disproves that doc's own open question**: the `keycloak-realm-reconcile` failure is *not*
+caused by the sync failure. Its pods die on `awk: command not found` — the `ubi9-micro` image has
+no `awk`. **Two independent fixes are required**, and the PVC one must land first or the awk fix
+cannot be observed, because the Job is currently never created at all.
+
+## 2026-09-26 — both live release items blocked by the classifier (Claude) — SUPERSEDED, see above
 
 The operator gave the go for the ApplicationSet reapply and the `shopping-cart-identity` sync.
 **Neither could be done: the auto-mode classifier denied both, and per standing rule denials

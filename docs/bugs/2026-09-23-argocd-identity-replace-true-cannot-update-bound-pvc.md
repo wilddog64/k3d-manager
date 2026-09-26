@@ -101,3 +101,38 @@ Found while executing `docs/plans/v1.37.0-deregister-hub-app-cluster-shopping-ca
 deliberately left `shopping-cart-identity` untouched. Unrelated to the hub app-cluster work: the
 identity Application predates it, targets `https://kubernetes.default.svc` directly, and survived
 the shopping-cart de-scoping unchanged.
+
+## Update 2026-09-26 — still open, and the realm-reconcile link is disproven
+
+Re-confirmed during the v1.39.0 ApplicationSet reapply. Unchanged after 5 days:
+
+- `sync: OutOfSync`, `health: Healthy`, `operationState.phase: Failed`, finished
+  `2026-09-26T00:39:58Z`, same `retried 5 times`.
+- The PVC is still `Bound` to `pvc-e32941a3-014a-4149-b102-6d478871be37` on `local-path`,
+  created `2026-09-21T00:29:53Z` — so the replacement payload still blanks the same two fields.
+- Held back with it: `ExternalSecret/keycloak-client-secrets`, `ExternalSecret/keycloak-secrets`,
+  `ExternalSecret/ldap-secrets` (all `OutOfSync`), and `Job/keycloak-realm-reconcile` (status
+  `None` — never created).
+
+**A plain sync does not clear this and should not be attempted as a remedy.** The failure is
+deterministic: the API server rejects the replacement every time, the retry limit is 5, and a
+`Failed` operation phase blocks self-heal
+(`reference_argocd_selfheal_reverts_out_of_band_patch` / `argocd_error_phase_blocks_selfheal`).
+Syncing again only reproduces the same 8-minute failure.
+
+**Correction to the Verification section above.** That section asks whether the `Failed 0/1`
+`keycloak-realm-reconcile` Job was caused by this sync failure, flagging the link as inferred.
+It was not. The two pod logs end:
+
+```
+Creating browser-with-conditional-otp flow...
+environment: line 104: awk: command not found
+```
+
+The Keycloak image is `ubi9-micro`, which ships bash, grep and sed but **no `awk`, `jq` or
+`python3`** (`reference_keycloak_image_has_no_awk`). That is an independent defect in the
+reconcile script, and it is the actual root cause of the two red SSO lines. Fixing the
+`Replace=true` PVC problem will let the Job be *created*; it will then fail again on the missing
+`awk` until the script parses CSV in bash instead. **Two fixes are required, not one** — and
+because this one blocks the Job from existing at all, it must land first or the awk fix cannot be
+observed.
