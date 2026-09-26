@@ -87,24 +87,41 @@ def api_key():
 
     The value is returned to the caller and placed only in a request header. It is never
     logged, echoed, or passed as an argument to another process.
+
+    A failure reports *why* each source was rejected, because "no credential" reads the same
+    for an absent item, a denied read and an empty value, and those need different fixes. The
+    common one here is rc 36 (``errSecInteractionNotAllowed``, -25308 truncated to a byte): the
+    item exists and the keychain is unlocked, but the process cannot present the authorization
+    prompt, so no value is returned.
     """
     value = os.environ.get(KEY_ENV, "").strip()
     if value:
         return value
+    reasons = [f"${KEY_ENV} is unset or empty"]
     for item in KEYCHAIN_ITEMS:
         try:
             found = subprocess.run(
                 ["security", "find-generic-password", "-s", item, "-w"],
                 capture_output=True, text=True, timeout=30,
             )
-        except (OSError, subprocess.SubprocessError):
+        except (OSError, subprocess.SubprocessError) as exc:
+            reasons.append(f"{item}: cannot run security ({type(exc).__name__})")
             continue
         if found.returncode == 0 and found.stdout.strip():
             return found.stdout.strip()
-    raise EmbeddingsUnavailable(
-        f"no embeddings credential: set ${KEY_ENV} or add keychain item "
-        f"{PRIMARY_KEYCHAIN_ITEM!r}"
-    )
+        if found.returncode == 0:
+            reasons.append(f"{item}: read succeeded but the value is empty")
+            continue
+        detail = (found.stderr or "").strip().splitlines()
+        hint = ""
+        if found.returncode == 36:
+            hint = " (errSecInteractionNotAllowed — cannot show the authorization prompt; "
+            hint += "run it from a GUI Terminal session, or export the key)"
+        reasons.append(
+            f"{item}: rc {found.returncode}{hint}"
+            + (f" — {detail[-1]}" if detail else "")
+        )
+    raise EmbeddingsUnavailable("no embeddings credential. " + "; ".join(reasons))
 
 
 def doc_embed_text(path, raw):
