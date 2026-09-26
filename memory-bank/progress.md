@@ -1,3 +1,16 @@
+# 2026-09-26 — WS1 pgvector hub platform component implemented
+
+- [x] Added `scripts/etc/argocd/applicationsets/vectordb.yaml` with a hub list generator,
+  literal `${K3D_MANAGER_BRANCH}`, `vectordb` destination, and `CreateNamespace=true`.
+- [x] Added plain manifests for a single-instance `pgvector/pgvector:pg17` StatefulSet, Service,
+  one 10Gi PVC using the default StorageClass, and ESO credentials from `vault-backend` at
+  `vectordb/postgres`; no Role, RoleBinding, ClusterRole, fallback Secret, or credential value.
+- [x] Added six pure-logic BATS tests. Each mutation check went red for its targeted broken
+  condition and was restored. Focused suite passes 6/6; PyYAML parses all five YAML files;
+  `make check-doc-links` reports 1789 files OK; shellcheck and `_agent_audit` are clean.
+- [x] CHANGELOG describes the rebuildable cache, non-durable index, and UNMEASURED quality until
+  the v1.40.0 eval. Commit: `5cf1700d`; PR not created by instruction; push remains pending.
+
 # 2026-09-26 — ArgoCD values-branch gate fix implemented
 
 - [x] M1–M4 implemented exactly from the bug spec on `k3d-manager-v1.39.0`.

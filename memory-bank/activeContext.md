@@ -1,3 +1,15 @@
+# 2026-09-26 — WS1 pgvector hub platform component implemented
+
+Implemented WS1 from `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md` on
+`k3d-manager-v1.39.0` in commit `5cf1700d` (PR not created by instruction). Added a hub-scoped
+plain-manifest ApplicationSet and single-instance pgvector StatefulSet, Service, local-path-default
+PVC, and ESO ExternalSecret in namespace `vectordb`. The image is pinned to `pg17`; credentials are
+secretKeyRef-only from `vault-backend` / `vectordb/postgres`; no RBAC objects or credential values
+were added. No cluster, Vault, Helm, kubectl, or deployment command was run. Focused BATS is 6/6,
+PyYAML parses all five YAML files, `make check-doc-links` is green, shellcheck and `_agent_audit`
+are clean. Mutation checks for all six tests went red on the intended broken assertion and were
+restored. Push remains the final handoff step.
+
 # 2026-09-26 — ArgoCD values-branch gate fix dispatched to Codex
 
 Implemented M1–M4 from `docs/bugs/2026-09-26-check-values-branch-false-clean-under-dry-run.md` on

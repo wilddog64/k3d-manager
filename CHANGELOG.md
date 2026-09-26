@@ -9,6 +9,11 @@
   parse or vacuous-query failures, skips confirmation during dry runs, and checks manifest sources
   as well as `$values` sources while explicitly excluding and counting sources that track `HEAD`.
 
+### Added
+- A hub platform component deploys single-instance pgvector Postgres into the `vectordb` namespace
+  as a rebuildable cache on local-path storage, not a system of record; its index is not durable and
+  losing it costs one re-index. The retriever's quality is UNMEASURED until the v1.40.0 eval runs.
+
 ## [1.38.0] - 2026-09-25
 
 ### Added
