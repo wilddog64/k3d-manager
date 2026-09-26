@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-09-25
+
 ### Added
 - The offline test suites are now reader-tier targets: `test-pytest` and `test-python-unit`
   are reachable from the Slack `/k3dm` command and, as `make-test-pytest` and
