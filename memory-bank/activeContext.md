@@ -1,5 +1,41 @@
 # Active Context — k3d-manager
 
+## 2026-09-26 — v1.38.0 shipped; protection restored; v1.39.0 open (Claude)
+
+`/post-merge` ran in the main session rather than the Haiku subagent the skill prescribes:
+two of its steps are not mechanical — publishing a tag and a GitHub release is outward-facing,
+and the release-scope split is the operator's decision — and `enforce_admins` follows the
+`/create-pr` precedent of Claude running protection changes directly.
+
+**PR #132 merged `6f0fb4af`. `enforce_admins` is back ON, verified `enabled=true`.** The
+bodyless POST is the only form that works; `-f enabled=true` returns HTTP 422. Tag `v1.38.0`
+and the GitHub release are published and the release is marked latest.
+
+Full protection on `main` now: `required_approving_review_count=1`, `enforce_admins=true`,
+`required_status_checks.checks=[]`. **CI is not a merge gate on this repo** — worth remembering
+before treating a green run as something that had to pass.
+
+**A commit pushed after the PR went merge-ready missed the squash.** `875f97da` (queueing the
+cloud-bridge architecture doc) is not in `main`; it is on `k3d-manager-v1.39.0` as `ed697ef3`
+via cherry-pick. Once a PR is merge-ready the merge can land at any moment, so a further push
+to that branch is a push into a closing window — put it on the next branch instead.
+
+**Standing-doc audit found one real gap.** `.github/copilot-instructions.md` was already
+current: all four v1.38.0 rules (header-may-only-narrow, cloud-requests-is-untrusted, the
+allowlist-is-the-boundary, branch-scoped-workflows) landed inside the release. But
+`memory-bank/projectbrief.md` still described scope as if no remote read surface existed, three
+releases after the Slack `/k3dm` command and now the bridge — added. `docs/api/functions.md`
+needs nothing: it documents plugin shell functions and v1.38.0 added Python bins only.
+
+**Branch cleanup was not run.** It is due every 5 releases and v1.35.0 was the last multiple,
+so v1.40.0 is next.
+
+**Open for the operator: the v1.39.0 scope split.** v1.38.0 has 5 plan docs, exactly at the
+cap, and four of them shipped as specs only — public-endpoint blackbox probes, the Hermes
+app-health delta sensor, the Slack smoke target, and the vector-store prior art. v1.39.0
+already has 2 of its own (`slack-corpus-qa`, `test-suite-metrics-and-staleness`), so carrying
+all four forward makes 6. The cap exists to force the split, not to be rounded up.
+
 ## 2026-09-25 — PR #132 is open and mergeable by admin bypass (Claude)
 
 `/create-pr` ran to completion. Pre-flight 0-2, 7 and 8 were run in the main session because

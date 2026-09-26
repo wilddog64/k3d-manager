@@ -1,6 +1,6 @@
 # Progress — k3d-manager
 
-## 2026-09-25 — v1.38.0 PR #132 open, all gates green, enforce_admins off
+## 2026-09-26 — v1.38.0 MERGED, tagged and released; v1.39.0 branch cut
 
 - [x] **PR #132 created** — `feat: read-only cloud-session access to the local webhook`,
   base `main`, head `k3d-manager-v1.38.0`. 40 commits, 34 files.
@@ -27,8 +27,29 @@
   `required_approving_review_count=1` and Copilot reviewed as COMMENTED, not APPROVED —
   admin bypass is the intended path. **MUST be re-enabled with a bodyless POST after merge,
   or restored in the same turn if the merge is deferred.**
-- [ ] **Merge PR #132** — the operator's call. Never auto-merge.
-- [ ] **Release-scope decision** — four v1.38.0 specs ship as specs only (public-endpoint
+- [x] **PR #132 merged** — squash merge `6f0fb4af`, merged 2026-09-26T02:08:13Z by the
+  operator. `mergeStateStatus` now UNKNOWN (post-merge), state MERGED.
+- [x] **v1.38.0 tagged and released** — annotated tag `v1.38.0` on `6f0fb4af`, pushed over
+  SSH (no token-in-remote dance needed). GitHub release published and marked latest:
+  https://github.com/wilddog64/k3d-manager/releases/tag/v1.38.0
+- [x] **`enforce_admins` restored** on `main` with a bodyless POST, verified `enabled=true`.
+  Protection now reads `required_approving_review_count=1`, `enforce_admins=true`,
+  `required_status_checks.checks=[]` — CI is still **not** a merge gate on this repo.
+- [x] **`k3d-manager-v1.39.0` cut** from `6f0fb4af` and pushed, upstream verified as
+  `origin/k3d-manager-v1.39.0` (not `main` — the mistrack guard).
+- [x] **Retro written** — `docs/retro/2026-09-26-v1.38.0-retrospective.md`.
+- [x] **Standing docs audited** — `.github/copilot-instructions.md` already current (all four
+  v1.38.0 rules landed in the release). `memory-bank/projectbrief.md` was stale: its In-scope
+  list had no entry for the read-only remote/cloud-session surface; added. `docs/api/functions.md`
+  needs nothing — it documents plugin shell functions, and v1.38.0 added Python bins only.
+- [ ] **Branch cleanup NOT run** — due every 5 releases; v1.35.0 was the last multiple, so
+  v1.40.0 is next. Run early only if the operator asks.
+- [ ] **`875f97da` missed the squash** — the memory-bank commit queueing the cloud-bridge
+  architecture doc was pushed after the merge window and is **not in `main`**. Cherry-picked
+  onto `k3d-manager-v1.39.0` as `ed697ef3`. Lesson: a push to a branch whose PR is already
+  merge-ready is a push into a closing window.
+- [ ] **Release-scope decision — NOW DUE, blocks v1.39.0 planning** — four v1.38.0 specs
+  shipped as specs only (public-endpoint
   blackbox probes, hermes app-health delta sensor, slack smoke target, vector-store prior
   art). Carrying all four to v1.39.0 puts that branch at **6 plan docs, one over the max-5
   cap**, so they must be split across v1.39.0/v1.40.0 or dropped. Decide at `/post-merge`.

@@ -91,6 +91,10 @@ directory integration plugin, mirroring the same pattern as cluster providers.
 - ACG sandbox lifecycle: provision, credential extraction via Playwright/Chrome CDP, TTL extension, teardown.
 - SSH tunnel (autossh + launchd) with forward (k3s API) and reverse (Vault) port forwarding.
 - ArgoCD GitOps hub on infra cluster managing shopping-cart apps on app cluster.
+- Read-only remote and cloud-session access (v1.38.0+): a Slack `/k3dm` command surface and a
+  pull-model cloud bridge (`bin/k3dm-cloud-bridge`) that serves a fixed reader-tier action
+  allowlist from an untrusted git branch. No credential is ever placed in a cloud environment
+  and no cluster endpoint is exposed; operator-tier and admin-tier actions stay off both paths.
 
 **Out of scope:**
 - Production cluster management.
