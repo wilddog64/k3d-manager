@@ -79,3 +79,16 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   run grep -c 'ignoreDifferences' "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/vectordb.yaml"
   [ "$output" = "0" ]
 }
+
+@test "the ESO Vault policy grants the prefix the vectordb ExternalSecret reads" {
+  local _vars="${BATS_TEST_DIRNAME}/../../etc/ldap/vars.sh"
+  local _es="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb/externalsecret.yaml"
+
+  run awk -F'"' '/^export LDAP_VAULT_POLICY_PREFIX=/ { print $2 }' "${_vars}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"vectordb"* ]]
+
+  run awk '/remoteRef:/,0' "${_es}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"key: vectordb/postgres"* ]]
+}
