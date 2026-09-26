@@ -31,6 +31,23 @@
   `--force-with-lease` requires the remote ref to be present.
 
 ### Fixed
+- `make init-cloud-requests` no longer names its throwaway git index with `mktemp -u`, which
+  prints a path without reserving it and left a symlink-attack window in a world-writable
+  directory. The obvious remedy does not work: git rejects a pre-created zero-byte index with
+  `index file smaller than expected`, so dropping `-u` would have made the target fail at rc 128
+  on the one run it ever gets. It now reserves a private `mktemp -d` directory (`drwx------`) and
+  places the index inside it, so the path is unguessable and the file still does not exist when
+  git opens it.
+- The `test-python-unit` vacuous-run guard used `grep` basic-regex alternation (`\|`), a GNU
+  extension that is not POSIX and that this repo relies on across both BSD and GNU grep — a guard
+  whose entire purpose is to fail closed was itself non-portable. Now `grep -Eq` with an escaped
+  ERE, re-mutation-tested so it still goes red on a bare-`test_` file with no main hook.
+- The webhook is addressed as `http://127.0.0.1:7443` rather than `https://` in the how-to and in
+  two places in the cloud-session spec. The listener is a bare `ThreadingHTTPServer` on loopback
+  with no `wrap_socket` and no certificate, so the `https://` form sent readers looking for TLS
+  errors that cannot occur. The spec's not-chosen cloudflared ingress rule was wrong for a second
+  reason: an ingress `service:` addresses the local origin, and Cloudflare terminates TLS at its
+  edge.
 - The cloud request path could not complete a single round trip: both ends assumed a local
   `refs/heads/cloud-requests` that nothing maintains. `git fetch origin cloud-requests` with a
   bare branch name makes git **ignore the configured refspec and write only `FETCH_HEAD`**, so in

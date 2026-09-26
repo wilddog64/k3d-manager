@@ -422,8 +422,9 @@ init-cloud-requests:
 	  exit 0; \
 	fi; \
 	_empty=$$(git hash-object -w -t blob /dev/null); \
-	_idx=$$(mktemp -u "$${TMPDIR:-/tmp}/cloud-requests-index.XXXXXX"); \
-	trap 'rm -f "$$_idx"' EXIT; \
+	_idxdir=$$(mktemp -d "$${TMPDIR:-/tmp}/cloud-requests-index.XXXXXX"); \
+	trap 'rm -rf "$$_idxdir"' EXIT; \
+	_idx="$$_idxdir/index"; \
 	GIT_INDEX_FILE="$$_idx" git update-index --add --cacheinfo "100644,$$_empty,ledger/processed.txt"; \
 	_tree=$$(GIT_INDEX_FILE="$$_idx" git write-tree); \
 	_commit=$$(git commit-tree "$$_tree" -m "chore: seed the cloud-requests data branch"); \
@@ -799,7 +800,7 @@ test-python-unit:
 	 for f in scripts/tests/bin/*.py; do \
 	   case "$$(basename "$$f")" in test_*) continue;; esac; \
 	   found=1; \
-	   if grep -q '^def test_' "$$f" && ! grep -q 'unittest.main()\|pytest.main(' "$$f"; then \
+	   if grep -q '^def test_' "$$f" && ! grep -Eq 'unittest\.main\(\)|pytest\.main\(' "$$f"; then \
 	     echo "[make] $$f defines bare test functions but has no main hook —" >&2; \
 	     echo "[make] running it as a script executes nothing. Rename it to test_*.py" >&2; \
 	     echo "[make] so make test-pytest collects it." >&2; \

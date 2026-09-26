@@ -11,7 +11,7 @@ what `bin/k3dm-cloud-request` and `bin/k3dm-cloud-bridge` are built to match.
 
 ## The short version, for a cloud session
 
-You cannot reach the webhook. It listens on `https://127.0.0.1:7443` on a machine that has no
+You cannot reach the webhook. It listens on `http://127.0.0.1:7443` on a machine that has no
 inbound route, and you have no credential for it. Do not look for one, do not try to open a
 tunnel, and do not ask the operator to paste a token into your environment — that request is
 refused by policy, not by accident.
