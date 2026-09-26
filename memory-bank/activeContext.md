@@ -78,6 +78,20 @@ bridge rather than patch permissions. No `claude/*` branch exists on origin, so 
 branch is container-local; and it loads permission rules at clone time, so a mid-session checkout
 would not pick the grant up either.
 
+**Closed 2026-09-26 — the cloud half is proven.** With the session on `k3d-manager-v1.38.0` and
+**auto mode off**, a real cloud session filed two requests that completed end to end:
+`20260926T000251Z-cluster-status` (http 202, job `eb0df4ec`) and `20260926T000330Z-job-status`
+(http 200, `running`). Verified from this laptop rather than taken on report: the request commits
+`45e4365c`/`7885e7b2` are authored `Claude <noreply@anthropic.com>`, distinct from the `t <t@t>`
+author on my own earlier test `c03e45f9`, so they did not originate here. Branch tip `7885e7b2`.
+
+The blocker was never the allowlist. With auto mode on, a safety classifier refuses the helper as a
+"Containment Escape", and a `settings.json` `allow` rule cannot override a classifier — independent
+layers, so no repo change would have cleared it. Auto mode off degrades it to an approval prompt the
+operator accepts. My prediction that a classifier would refuse outright rather than prompt was
+wrong, and the correction matters: the feature is operator-overridable, not structurally undeliverable
+inside a cloud sandbox. Recorded in the how-to's short version.
+
 ## 2026-09-25 — Cloud bridge bootstrapped and proven end to end (Claude)
 
 The operator gave the go, so `origin/cloud-requests` now exists and the bridge is live.

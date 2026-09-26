@@ -33,6 +33,15 @@ grant is the symptom you will notice first, which makes it read as a permissions
 is a missing file. If the helper is absent, start a session against the branch carrying it rather
 than trying to patch permissions.
 
+Second, the session must not be in **auto mode**. With auto mode on, a safety classifier refuses
+the helper as a "Containment Escape" — using a git branch as a channel to make something happen on
+a machine outside the sandbox, which is a fair description of the mechanism. An `allow` rule cannot
+override a classifier; the two are independent layers, so no repo change clears this. Turning auto
+mode off degrades the refusal into an ordinary approval prompt the operator can accept. Proven
+2026-09-26: a cloud session filed `20260926T000251Z-cluster-status` (http 202) and
+`20260926T000330Z-job-status` (http 200) this way. Do not look for another route onto the branch
+when the classifier fires — that is dodging the check, not fixing it. Ask the operator.
+
 If nothing comes back within a few minutes, the bridge is not running. That is an operator
 problem, not something to work around. Say so and move on.
 
