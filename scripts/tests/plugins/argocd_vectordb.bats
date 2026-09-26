@@ -53,3 +53,9 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   run rg -n 'key:[[:space:]]*vectordb/postgres' "${MANIFEST_DIR}/externalsecret.yaml"
   [ "${status}" -eq 0 ]
 }
+
+@test "vectordb destination is permitted by the platform AppProject" {
+  run rg -n -A1 'namespace: vectordb' "${BATS_TEST_DIRNAME}/../../etc/argocd/projects/platform.yaml.tmpl"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"server: https://kubernetes.default.svc"* ]]
+}
