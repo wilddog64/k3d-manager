@@ -4,6 +4,19 @@
 
 ### Fixed
 
+- **Prior-art embeddings: a 429 no longer abandons the whole index.** The first live run after the
+  `embedContent` port failed on its very first request with `embeddings API returned HTTP 429`,
+  committing 0 of 1,705 documents. Rate limiting is not an outage: one request per document against a
+  *per-minute* quota makes a 429 an expected step in a healthy run, and the old policy — three
+  attempts with a 2s/4s backoff — gave up six seconds in and discarded the run. `_embed_one` now
+  retries six times and honours the delay the server names. That delay arrives in a `RetryInfo`
+  detail in the response body (`"retryDelay": "31s"`), not in a `Retry-After` header, so a
+  header-only reader misses it entirely and falls back to guessing; both are read, header first.
+  `embed_batch` also spaces requests by `EMBED_MIN_INTERVAL` (default `0.6s`, overridable with
+  `K3DM_EMBEDDINGS_MIN_INTERVAL`) so the loop stays under the free tier's 100 requests/minute
+  instead of sprinting into the limit — a cold index is now roughly half an hour. Both new tests
+  were proved red against the pre-fix source; the retry test showed the old code sleeping its
+  guessed `2.0s` in place of the server's `31s`.
 - **Prior-art embeddings: ported off the withdrawn `batchEmbedContents` endpoint.** `make index-docs`
   failed every run with `embeddings API returned HTTP 404`, which reads like a credential problem and
   is not one — `api_key()` raises before any HTTP call when nothing resolves, so a 404 proves the key

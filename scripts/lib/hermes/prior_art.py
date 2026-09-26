@@ -33,6 +33,11 @@ CORPUS_GLOBS = ("docs/bugs/*.md", "docs/issues/*.md", "docs/plans/*.md", "docs/r
 EMBED_MODEL = "gemini-embedding-2"
 EMBED_DIM = 768
 EMBED_BATCH = 100
+# One request per text against a per-minute quota, so the loop has to pace itself. The free
+# tier serves 100 requests/minute for the embedding models; 0.6s between requests sits just
+# under that. Raise the interval down on a paid tier, where the ceiling is far higher.
+EMBED_MIN_INTERVAL = float(os.environ.get("K3DM_EMBEDDINGS_MIN_INTERVAL", "0.6"))
+EMBED_MAX_BACKOFF = 64.0
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
 KEY_ENV = "K3DM_EMBEDDINGS_API_KEY"
@@ -350,8 +355,38 @@ def _embed_request(text, task_type, key):
     )
 
 
+_RETRY_DELAY = re.compile(r'"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"')
+
+
+def _server_retry_delay(exc):
+    """Return the delay the server asked for, in seconds, or ``None``.
+
+    A 429 from this API carries its wait in a ``RetryInfo`` detail in the response body
+    (``"retryDelay": "31s"``) rather than in a ``Retry-After`` header, so the header alone
+    misses it and the backoff guesses. Both are read; the header wins when present.
+    """
+    header = exc.headers.get("Retry-After") if exc.headers else None
+    if header:
+        try:
+            return float(header)
+        except ValueError:
+            pass
+    try:
+        body = exc.read().decode("utf-8", "replace")
+    except Exception:
+        return None
+    found = _RETRY_DELAY.search(body)
+    return float(found.group(1)) if found else None
+
+
 def _embed_one(text, task_type, key, attempts):
-    """One text, one request, with backoff on the retryable statuses."""
+    """One text, one request, with backoff on the retryable statuses.
+
+    A cold index is one request per document against a per-minute quota, so a 429 is an
+    expected step in a normal run, not a failure: the first attempt of a 1705-document run
+    hit one and the old three-tries-in-six-seconds policy abandoned the whole index. Waiting
+    the delay the server names is what gets the run through.
+    """
     delay = 2.0
     for attempt in range(1, attempts + 1):
         try:
@@ -361,23 +396,27 @@ def _embed_one(text, task_type, key, attempts):
             last = f"HTTP {exc.code}"
             if exc.code not in (429, 500, 502, 503, 504) or attempt == attempts:
                 raise EmbeddingsUnavailable(f"embeddings API returned {last}") from None
+            asked = _server_retry_delay(exc)
+            wait = asked if asked is not None else delay
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             last = type(exc).__name__
             if attempt == attempts:
                 raise EmbeddingsUnavailable(f"embeddings API unreachable ({last})") from None
-        time.sleep(delay)
-        delay *= 2
+            wait = delay
+        time.sleep(wait)
+        delay = min(delay * 2, EMBED_MAX_BACKOFF)
     raise EmbeddingsUnavailable(f"embeddings API gave up after {attempts} attempts")
 
 
-def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=3):
+def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=6):
     """Embed up to ``EMBED_BATCH`` texts. Returns one vector per input, in order.
 
     The current embedding models expose ``embedContent`` only: ``batchEmbedContents`` was
     withdrawn along with ``text-embedding-004`` and now answers 404, so each text costs one
     request. ``EMBED_BATCH`` therefore bounds the caller's commit chunk, not an API call.
     ``outputDimensionality`` is explicit because ``gemini-embedding-2`` defaults wider than
-    the ``vector(EMBED_DIM)`` column this index is built on.
+    the ``vector(EMBED_DIM)`` column this index is built on. Requests are spaced by
+    ``EMBED_MIN_INTERVAL`` because the quota they spend is per minute.
     """
     if not texts:
         return []
@@ -385,7 +424,9 @@ def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=3):
         raise ValueError(f"batch of {len(texts)} exceeds {EMBED_BATCH}")
     key = api_key()
     vectors = []
-    for text in texts:
+    for index, text in enumerate(texts):
+        if index and EMBED_MIN_INTERVAL > 0:
+            time.sleep(EMBED_MIN_INTERVAL)
         data = _embed_one(text, task_type, key, attempts)
         vectors.append((data.get("embedding") or {}).get("values") or [])
     for vector in vectors:

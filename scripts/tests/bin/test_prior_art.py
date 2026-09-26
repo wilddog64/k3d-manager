@@ -235,9 +235,63 @@ class TestFailureModes:
             return _Resp({"embedding": {"values": [index] * pa.EMBED_DIM}})
 
         monkeypatch.setattr(pa.urllib.request, "urlopen", capture)
+        monkeypatch.setattr(pa.time, "sleep", lambda *_a: None)
         vectors = pa.embed_batch(["alpha", "beta", "gamma"])
         assert seen == ["alpha", "beta", "gamma"]
         assert [vector[0] for vector in vectors] == [1.0, 2.0, 3.0]
+
+    def test_a_429_is_retried_for_the_delay_the_server_asks_for(self, monkeypatch):
+        monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
+        slept = []
+        monkeypatch.setattr(pa.time, "sleep", lambda seconds: slept.append(seconds))
+        attempts = []
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+
+            def read(self):
+                return json.dumps({"embedding": {"values": [0.5] * pa.EMBED_DIM}}).encode()
+
+        def throttle_once(_request, **_k):
+            attempts.append(1)
+            if len(attempts) == 1:
+                body = json.dumps(
+                    {"error": {"details": [{"@type": "RetryInfo", "retryDelay": "31s"}]}}
+                ).encode()
+                raise urllib.error.HTTPError(
+                    "https://example.invalid", 429, "Too Many Requests",
+                    {"Content-Type": "application/json"}, io.BytesIO(body),
+                )
+            return _Resp()
+
+        monkeypatch.setattr(pa.urllib.request, "urlopen", throttle_once)
+        vectors = pa.embed_batch(["one"])
+        assert len(vectors) == 1
+        assert 31.0 in slept
+
+    def test_requests_are_paced_between_texts(self, monkeypatch):
+        monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
+        slept = []
+        monkeypatch.setattr(pa.time, "sleep", lambda seconds: slept.append(seconds))
+        monkeypatch.setattr(pa, "EMBED_MIN_INTERVAL", 0.6)
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+
+            def read(self):
+                return json.dumps({"embedding": {"values": [0.5] * pa.EMBED_DIM}}).encode()
+
+        monkeypatch.setattr(pa.urllib.request, "urlopen", lambda *_a, **_k: _Resp())
+        pa.embed_batch(["alpha", "beta", "gamma"])
+        assert slept == [0.6, 0.6]
 
 
 class TestSearchSql:

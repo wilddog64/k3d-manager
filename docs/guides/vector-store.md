@@ -60,6 +60,15 @@ text. There is no batch endpoint to use: `batchEmbedContents` was withdrawn alon
 (`api_key()` raises before any HTTP call when no credential resolves, so reaching a 404 at all proves
 the key authenticated). `EMBED_BATCH = 100` therefore sizes the commit chunk below, not an API call.
 
+Because that quota is **per minute**, the loop paces itself: `EMBED_MIN_INTERVAL` (default `0.6s`,
+overridable with `K3DM_EMBEDDINGS_MIN_INTERVAL`) sits just under the free tier's 100 requests/minute,
+which puts a cold index at roughly half an hour. A **429 is an ordinary step in a healthy run**, not a
+failure — the first attempt of the first live run hit one, and the original policy of three tries over
+six seconds abandoned all 1,705 documents. `_embed_one` now retries six times and waits the delay the
+server names: this API puts it in a `RetryInfo` detail in the response body (`"retryDelay": "31s"`),
+not in a `Retry-After` header, so reading the header alone misses it and the backoff falls back to
+guessing. Set `K3DM_EMBEDDINGS_MIN_INTERVAL` lower on a paid tier, where the ceiling is far higher.
+
 `outputDimensionality: 768` is sent explicitly. `gemini-embedding-2` defaults wider than the
 `embedding vector(768)` column, so omitting it fails the dimension guard rather than corrupting the
 table — but it fails after paying for every call in the batch.
