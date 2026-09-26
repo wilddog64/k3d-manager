@@ -3,6 +3,27 @@
 ## [Unreleased]
 
 ### Fixed
+
+- **Prior-art embeddings: ported off the withdrawn `batchEmbedContents` endpoint.** `make index-docs`
+  failed every run with `embeddings API returned HTTP 404`, which reads like a credential problem and
+  is not one — `api_key()` raises before any HTTP call when nothing resolves, so a 404 proves the key
+  authenticated. The cause was the endpoint, not the credential: `text-embedding-004` has been
+  withdrawn, and the current embedding models (`gemini-embedding-2`, `gemini-embedding-2-preview`)
+  expose `embedContent`, `countTokens` and `asyncBatchEmbedContent` only. `batchEmbedContents` is gone,
+  so changing the model name alone would have reproduced the identical 404. `_embed_request` now
+  targets `:embedContent` with a single `content`, and `embed_batch` loops per text while keeping its
+  backoff, ordering and dimension guards; `EMBED_BATCH` now sizes the commit chunk rather than an API
+  call, so a full cold index is 1,704 requests instead of 18. `outputDimensionality: 768` is sent
+  explicitly because `gemini-embedding-2` defaults wider than the `embedding vector(768)` column. Two
+  tests pin the request shape — endpoint and dimensionality — so this cannot silently regress to a
+  retired endpoint, and both were proved red against the pre-fix source.
+- **`docs/guides/vector-store.md`: the two meanings of a zero-length keychain read.** `wc -c` printing
+  `0` is a missing item (rc 44, with a stderr line) or a genuinely empty stored value (rc 0, silent),
+  and the widening remedy above only fixes the first. The non-TTY `-w` trap is also documented for
+  `-U`, not just for creation: an update without a TTY exits 0 having stored nothing, advancing `mdat`
+  while leaving the value empty.
+
+### Fixed
 - `make index-docs` now commits each batch of 100 documents in its own transaction instead of
   embedding the whole corpus into memory and writing once at the end. A failure on the last batch
   used to discard every embedding call already paid for, and a mid-run store read showed `rows: 0`

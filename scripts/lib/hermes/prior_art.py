@@ -30,7 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 CORPUS_GLOBS = ("docs/bugs/*.md", "docs/issues/*.md", "docs/plans/*.md", "docs/retro/*.md")
 
-EMBED_MODEL = "text-embedding-004"
+EMBED_MODEL = "gemini-embedding-2"
 EMBED_DIM = 768
 EMBED_BATCH = 100
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
@@ -335,39 +335,28 @@ def iter_corpus(repo_root=None):
     return docs
 
 
-def _embed_request(texts, task_type, key):
+def _embed_request(text, task_type, key):
     payload = {
-        "requests": [
-            {
-                "model": f"models/{EMBED_MODEL}",
-                "content": {"parts": [{"text": text}]},
-                "taskType": task_type,
-            }
-            for text in texts
-        ]
+        "model": f"models/{EMBED_MODEL}",
+        "content": {"parts": [{"text": text}]},
+        "taskType": task_type,
+        "outputDimensionality": EMBED_DIM,
     }
     return urllib.request.Request(
-        f"{API_ROOT}/models/{EMBED_MODEL}:batchEmbedContents",
+        f"{API_ROOT}/models/{EMBED_MODEL}:embedContent",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json", "x-goog-api-key": key},
         method="POST",
     )
 
 
-def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=3):
-    """Embed up to ``EMBED_BATCH`` texts. Returns one vector per input, in order."""
-    if not texts:
-        return []
-    if len(texts) > EMBED_BATCH:
-        raise ValueError(f"batch of {len(texts)} exceeds {EMBED_BATCH}")
-    key = api_key()
+def _embed_one(text, task_type, key, attempts):
+    """One text, one request, with backoff on the retryable statuses."""
     delay = 2.0
-    last = None
     for attempt in range(1, attempts + 1):
         try:
-            with urllib.request.urlopen(_embed_request(texts, task_type, key), timeout=120) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            break
+            with urllib.request.urlopen(_embed_request(text, task_type, key), timeout=120) as resp:
+                return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             last = f"HTTP {exc.code}"
             if exc.code not in (429, 500, 502, 503, 504) or attempt == attempts:
@@ -378,11 +367,27 @@ def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=3):
                 raise EmbeddingsUnavailable(f"embeddings API unreachable ({last})") from None
         time.sleep(delay)
         delay *= 2
-    vectors = [item.get("values") or [] for item in data.get("embeddings", [])]
-    if len(vectors) != len(texts):
-        raise EmbeddingsUnavailable(
-            f"embeddings API returned {len(vectors)} vectors for {len(texts)} inputs"
-        )
+    raise EmbeddingsUnavailable(f"embeddings API gave up after {attempts} attempts")
+
+
+def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=3):
+    """Embed up to ``EMBED_BATCH`` texts. Returns one vector per input, in order.
+
+    The current embedding models expose ``embedContent`` only: ``batchEmbedContents`` was
+    withdrawn along with ``text-embedding-004`` and now answers 404, so each text costs one
+    request. ``EMBED_BATCH`` therefore bounds the caller's commit chunk, not an API call.
+    ``outputDimensionality`` is explicit because ``gemini-embedding-2`` defaults wider than
+    the ``vector(EMBED_DIM)`` column this index is built on.
+    """
+    if not texts:
+        return []
+    if len(texts) > EMBED_BATCH:
+        raise ValueError(f"batch of {len(texts)} exceeds {EMBED_BATCH}")
+    key = api_key()
+    vectors = []
+    for text in texts:
+        data = _embed_one(text, task_type, key, attempts)
+        vectors.append((data.get("embedding") or {}).get("values") or [])
     for vector in vectors:
         if len(vector) != EMBED_DIM:
             raise EmbeddingsUnavailable(

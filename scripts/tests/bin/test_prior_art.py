@@ -167,15 +167,15 @@ class TestFailureModes:
 
     def test_wrong_dimension_is_rejected(self, monkeypatch):
         monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
-        _stub_urlopen(monkeypatch, {"embeddings": [{"values": [0.0] * 5}]})
+        _stub_urlopen(monkeypatch, {"embedding": {"values": [0.0] * 5}})
         with pytest.raises(pa.EmbeddingsUnavailable, match="dimension 5"):
             pa.embed_batch(["one"])
 
-    def test_vector_count_mismatch_is_rejected(self, monkeypatch):
+    def test_a_response_without_an_embedding_is_rejected(self, monkeypatch):
         monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
-        _stub_urlopen(monkeypatch, {"embeddings": [{"values": [0.0] * pa.EMBED_DIM}]})
-        with pytest.raises(pa.EmbeddingsUnavailable, match="1 vectors for 2 inputs"):
-            pa.embed_batch(["one", "two"])
+        _stub_urlopen(monkeypatch, {})
+        with pytest.raises(pa.EmbeddingsUnavailable, match="dimension 0"):
+            pa.embed_batch(["one"])
 
     def test_oversized_batch_is_refused_before_the_call(self, monkeypatch):
         def explode(*_a, **_k):
@@ -200,9 +200,44 @@ class TestFailureModes:
 
     def test_the_key_is_sent_as_a_header_not_a_query_parameter(self, monkeypatch):
         monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
-        request = pa._embed_request(["one"], "RETRIEVAL_DOCUMENT", "unused-test-value")
+        request = pa._embed_request("one", "RETRIEVAL_DOCUMENT", "unused-test-value")
         assert "unused-test-value" not in request.full_url
         assert request.get_header("X-goog-api-key") == "unused-test-value"
+
+    def test_the_request_targets_embedcontent_and_pins_the_column_width(self):
+        request = pa._embed_request("one", "RETRIEVAL_DOCUMENT", "unused-test-value")
+        assert request.full_url.endswith(":embedContent")
+        assert "batchEmbedContents" not in request.full_url
+        payload = json.loads(request.data.decode("utf-8"))
+        assert payload["outputDimensionality"] == pa.EMBED_DIM
+        assert payload["content"]["parts"] == [{"text": "one"}]
+
+    def test_every_text_gets_its_own_request_and_order_is_preserved(self, monkeypatch):
+        monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
+        seen = []
+
+        class _Resp:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+
+            def read(self):
+                return json.dumps(self._payload).encode()
+
+        def capture(request, **_k):
+            seen.append(json.loads(request.data.decode("utf-8"))["content"]["parts"][0]["text"])
+            index = float(len(seen))
+            return _Resp({"embedding": {"values": [index] * pa.EMBED_DIM}})
+
+        monkeypatch.setattr(pa.urllib.request, "urlopen", capture)
+        vectors = pa.embed_batch(["alpha", "beta", "gamma"])
+        assert seen == ["alpha", "beta", "gamma"]
+        assert [vector[0] for vector in vectors] == [1.0, 2.0, 3.0]
 
 
 class TestSearchSql:

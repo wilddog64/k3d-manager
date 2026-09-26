@@ -53,7 +53,16 @@ of exactly that embedded text, so:
 - an edit confined to a transcript body correctly re-embeds nothing, because it cannot change the
   vector.
 
-A full cold index of 1,704 documents is 18 batched calls to the Gemini embeddings API.
+A full cold index of 1,704 documents is 1,704 calls to the Gemini embeddings API — one per
+document. The model is `gemini-embedding-2` and the endpoint is `embedContent`, which takes a single
+text. There is no batch endpoint to use: `batchEmbedContents` was withdrawn along with
+`text-embedding-004` and now answers **HTTP 404**, which reads as a credential problem and is not one
+(`api_key()` raises before any HTTP call when no credential resolves, so reaching a 404 at all proves
+the key authenticated). `EMBED_BATCH = 100` therefore sizes the commit chunk below, not an API call.
+
+`outputDimensionality: 768` is sent explicitly. `gemini-embedding-2` defaults wider than the
+`embedding vector(768)` column, so omitting it fails the dimension guard rather than corrupting the
+table — but it fails after paying for every call in the batch.
 
 **A partial run is not wasted.** Each batch of 100 is committed in its own transaction, so an
 interruption on batch 17 keeps the 1,600 documents already embedded; re-running resumes from there,
@@ -137,6 +146,26 @@ Verify without printing the value — a Gemini API key is 39 characters, so expe
 ```bash
 security find-generic-password -s gemini-cli-api-key -w | wc -c
 ```
+
+**`0` has two meanings and only stderr separates them.** `0` with
+`SecKeychainSearchCopyNext: The specified item could not be found` on stderr is rc 44, a missing
+item. `0` with **no** stderr line is rc 0 and a genuinely empty stored value — the item exists, the
+widening worked, and there is nothing in it. That second case is what a successful
+`set-generic-password-partition-list` followed by a `0` actually means: do not re-run the widening,
+fill the item.
+
+**The non-TTY `-w` trap applies to updates, not just to creation.** `security add-generic-password -U
+... -w` run without a TTY also exits 0 having stored nothing, so a second attempt leaves `mdat`
+advanced to now with the value still empty — `security find-generic-password -s <item>` (no `-w`)
+shows the timestamp moved while `wc -c` still says `0`. That pair distinguishes "the command did
+nothing" from "the command stored nothing", which have different fixes. Write in a GUI Terminal and
+confirm you are prompted **twice**: `password data for new item:` then `retype password for new
+item:`. One prompt, or none, means the value did not land. `-U` can also reset the item's access, so
+re-run the partition-list command after an update and re-check with `wc -c`.
+
+The env var is the unblock that needs none of this: `prior_art.py` checks
+`$K3DM_EMBEDDINGS_API_KEY` first, so exporting it in the shell that runs `make index-docs` bypasses
+the keychain entirely for that session.
 
 The tradeoff is real and worth stating: widening the access means any process running as this user
 can read the key through `security` without a prompt. That is already true of every k3dm-owned

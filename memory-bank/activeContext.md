@@ -114,8 +114,10 @@ dashboard ConfigMap. Wrong: Grafana discovers dashboards by `grafana_dashboard: 
       max-5 plan cap.
 - [x] 247 pytest green; 7 mutations proved red on their own gate; Q-pattern mutation → 12 reds.
 
-DECISION (operator, 2026-09-26) — embeddings provider is Gemini `text-embedding-004`,
-`vector(768)`, reusing `gemini-cli-api-key`. Resolution order is env
+DECISION (operator, 2026-09-26) — embeddings provider is Gemini `gemini-embedding-2` via
+`embedContent`, `vector(768)` with `outputDimensionality: 768` sent explicitly, reusing
+`gemini-cli-api-key`. (Originally specified as `text-embedding-004` with `batchEmbedContents`; both
+were withdrawn and the endpoint now answers 404 — corrected 2026-09-26 after the first live run.) Resolution order is env
 `K3DM_EMBEDDINGS_API_KEY`, then keychain `k3dm-embeddings-api-key`, then `gemini-cli-api-key`,
 then the hub Vault.
 
