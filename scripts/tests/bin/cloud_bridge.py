@@ -15,6 +15,8 @@ SPEC = importlib.util.spec_from_loader("cloud_bridge", LOADER)
 bridge = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bridge)
 
+from webhook import make_targets
+
 REQUEST_LOADER = importlib.machinery.SourceFileLoader(
     "cloud_request", str(ROOT / "bin" / "k3dm-cloud-request"))
 REQUEST_SPEC = importlib.util.spec_from_loader("cloud_request", REQUEST_LOADER)
@@ -96,13 +98,14 @@ def test_every_allowlisted_parameter_declares_its_own_pattern():
     `key == "job_id"`, which was correct only because job_id was the sole
     parameter — adding a second would have sent its value into the request path
     with no validation at all."""
-    for action, (method, path_template, params) in bridge.ACTION_ALLOWLIST.items():
+    for action, (method, path_template, params, _) in bridge.ACTION_ALLOWLIST.items():
         assert method in ("GET", "POST"), action
         assert isinstance(params, dict), f"{action}: params must map name -> pattern"
         for name, pattern in params.items():
             assert hasattr(pattern, "fullmatch"), f"{action}.{name} has no compiled pattern"
         placeholders = set(re.findall(r"\{([a-z_]+)\}", path_template))
-        assert placeholders == set(params), f"{action}: path placeholders and params disagree"
+        expected = set() if action.startswith("make-") else set(params)
+        assert placeholders == expected, f"{action}: path placeholders and params disagree"
 
 
 def test_a_second_parameter_is_validated_not_just_job_id(monkeypatch):
@@ -111,7 +114,7 @@ def test_a_second_parameter_is_validated_not_just_job_id(monkeypatch):
     value that does not match its pattern."""
     import re
     allowlist = dict(bridge.ACTION_ALLOWLIST)
-    allowlist["synthetic"] = ("GET", "/api/v1/synthetic/{cluster}", {"cluster": re.compile(r"[a-z]{1,10}")})
+    allowlist["synthetic"] = ("GET", "/api/v1/synthetic/{cluster}", {"cluster": re.compile(r"[a-z]{1,10}")}, None)
     monkeypatch.setattr(bridge, "ACTION_ALLOWLIST", allowlist)
 
     bad = request(action="synthetic", args={"cluster": "a; rm -rf /"})
@@ -156,3 +159,79 @@ def test_request_helper_fetches_the_ref_it_reads_the_response_from():
     source, destination = helper.FETCH_REFSPEC.lstrip("+").split(":")
     assert source == "refs/heads/cloud-requests"
     assert destination == helper.RESPONSE_REF
+
+
+KNOWN_UNEXPOSED = frozenset()
+
+
+def test_make_action_argument_patterns_match_webhook_patterns():
+    for action, (_, _, args, target) in bridge.ACTION_ALLOWLIST.items():
+        if not action.startswith("make-"):
+            continue
+        for key, pattern in args.items():
+            assert pattern.pattern == make_targets._ARG_PATTERNS[key].pattern
+
+
+def test_make_actions_are_reader_targets():
+    for action, (_, _, _, target) in bridge.ACTION_ALLOWLIST.items():
+        if not action.startswith("make-"):
+            continue
+        assert target in make_targets.MAKE_TARGETS
+        assert make_targets.MAKE_TARGETS[target]["min_role"] == "reader"
+
+
+def test_make_action_args_match_required_args_only():
+    for action, (_, _, args, target) in bridge.ACTION_ALLOWLIST.items():
+        if not action.startswith("make-"):
+            continue
+        required = make_targets.MAKE_TARGETS[target].get("required", ())
+        assert set(args) == set(required)
+
+
+def test_all_reader_targets_are_exposed_or_explicitly_unexposed():
+    exposed = {
+        target for action, (_, _, _, target) in bridge.ACTION_ALLOWLIST.items()
+        if action.startswith("make-")
+    }
+    reader_targets = {
+        target for target, spec in make_targets.MAKE_TARGETS.items()
+        if spec["min_role"] == "reader"
+    }
+    assert reader_targets == exposed | KNOWN_UNEXPOSED
+
+
+def test_make_vuln_scan_rejects_arguments():
+    value, reason = bridge.validate_request(
+        request("make-vuln-scan", {"NS": "identity"}), now=NOW)
+    assert value is None
+    assert reason == "unexpected argument"
+
+
+def test_make_fix_status_requires_ns():
+    value, reason = bridge.validate_request(request("make-fix-status"), now=NOW)
+    assert value is None
+    assert reason == "missing argument"
+
+
+@pytest.mark.parametrize("namespace, reason", [
+    ("identity; rm -rf /", "invalid NS"),
+    ("Identity", "invalid NS"),
+])
+def test_make_fix_status_rejects_invalid_ns(namespace, reason):
+    value, actual_reason = bridge.validate_request(
+        request("make-fix-status", {"NS": namespace}), now=NOW)
+    assert value is None
+    assert actual_reason == reason
+
+
+def test_operator_make_action_is_unknown():
+    value, reason = bridge.validate_request(request("make-sync-apps"), now=NOW)
+    assert value is None
+    assert reason == "unknown action"
+
+
+def test_make_body_and_empty_post_body():
+    make_request = request("make-fix-status", {"NS": "identity"})
+    assert bridge._request_body(make_request) == (
+        b'{"args": {"NS": "identity"}, "target": "fix-status"}')
+    assert bridge._request_body(request("cluster-status")) == b"{}"

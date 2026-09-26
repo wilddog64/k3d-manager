@@ -47,7 +47,7 @@ problem, not something to work around. Say so and move on.
 
 ## What you can ask for
 
-Four actions. This list is a security boundary, not a convenience default — anything not on it
+Ten actions. This list is a security boundary, not a convenience default — anything not on it
 is rejected by the bridge without being executed.
 
 | action | args | what you get back |
@@ -56,6 +56,12 @@ is rejected by the bridge without being executed.
 | `cluster-status` | none | the hub/app cluster status summary |
 | `hostinger-status` | none | the hostinger cluster status |
 | `job-status` | `job_id` | status and the last 2000 bytes of output for one webhook job |
+| `make-fix-list` | none | the list of fix targets |
+| `make-fix-status` | `NS` | node + pod status for a namespace |
+| `make-status-public` | none | probe results for the public Cloudflare hostnames |
+| `make-observability-status` | none | monitoring/trivy-system pods, both clusters |
+| `make-vuln-scan` | none | VulnerabilityReport summary |
+| `make-e2e-runner-health` | none | hub vs remote-runner health |
 
 `job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected.
 
@@ -68,11 +74,11 @@ another AI's prompt chains two injection surfaces together, which is exactly wha
 own `_INJECTION_RE` filter exists to prevent. Adding either one back requires its own spec and
 the operator's decision.
 
-Every mutating action — `cluster-up`, `cluster-down`, `cluster-resume`, `cluster-refresh`,
-`argocd-upgrade`, `cve-remediate`, `cleanup-stale-sandbox`, any `make` target — is unreachable
-through this channel by three independent mechanisms: it is not in the table above, the bridge
-presents a reader credential that the webhook will not accept for it, and the branch's content
-never becomes a command. If you need one of those, ask the operator to run it.
+The six reader-tier `make` targets above are reachable through mechanism 1. Every operator and
+admin target remains refused through this channel: the bridge presents a reader credential that
+the webhook will not accept for it, and the branch's content never becomes a command. Concrete
+examples still refused are `sync-apps`, `fix-restart`, `fix-sync`, `e2e-remote` and
+`app-cve-scan`. If you need one of those, ask the operator to run it.
 
 ## Filing a request by hand
 

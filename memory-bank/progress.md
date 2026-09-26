@@ -1,5 +1,19 @@
 # Progress — k3d-manager
 
+## 2026-09-26 — v1.38.0 P6 reader-tier make targets through the cloud bridge
+
+- [x] Added exactly six literal bridge actions: `make-fix-list`, `make-fix-status`,
+      `make-status-public`, `make-observability-status`, `make-vuln-scan`, and
+      `make-e2e-runner-health`; no optional arguments or operator/admin targets were exposed.
+- [x] Added four drift guards against `webhook.make_targets`, with `KNOWN_UNEXPOSED = frozenset()`
+      explicitly defined for the current complete reader-tier exposure.
+- [x] Added mutation-checked validation tests for unexpected args, missing `NS`, shell metacharacters,
+      uppercase `NS`, unknown `make-sync-apps`, and exact make/cluster body bytes.
+- [x] Gates: `pytest scripts/tests/bin/cloud_bridge.py` 23 passed; `pytest scripts/tests/bin/webhook_policy.py`
+      22 passed; bridge AST parse passed; `make check-doc-links` reported 1784 files OK; forbidden
+      pattern and operator-target-name greps were empty. Commit: `2db1a172` (amended once to record
+      the final SHA; the final amended SHA is reported below).
+
 ## 2026-09-25 — v1.38.0 Part 2 P2/P5 cloud bridge
 
 - [x] Implemented only the requested Part 2 files: bare-clone bridge, cloud request helper,

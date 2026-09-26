@@ -1,5 +1,16 @@
 # Active Context — k3d-manager
 
+## 2026-09-26 — P6 reader-tier make targets through the cloud bridge
+
+Implemented only P6 on `k3d-manager-v1.38.0`: the bridge now exposes six flat `make-*` actions
+for the reader-tier targets, with `make-fix-status` accepting only the required `NS` argument.
+The validator's logic is unchanged except for the four-tuple unpack, and make bodies are built as
+the existing `/api/v1/make` contract expects. Added four drift guards and the six required logic
+checks, including the exact body bytes; no network or live webhook was used. Docs and CHANGELOG
+were updated. Gates: bridge pytest 23 passed, webhook policy pytest 22 passed, AST parse passed,
+and `make check-doc-links` reported 1784 files OK. Mutation checks were red for each removed
+validator guard and restored. Commit: `2db1a172` (amended once to record the final SHA).
+
 ## 2026-09-25 — Frontend 404 root-caused; blackbox spec filed; Keycloak awk fix verified
 
 **`frontend.3ai-talk.org` 404 — the tunnel points at the wrong cluster.** The tunnel and its config

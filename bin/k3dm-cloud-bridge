@@ -25,13 +25,20 @@ REQUEST_TTL_SECONDS = 30 * 60
 HTTP_TIMEOUT = min(float(os.environ.get("K3DM_CLOUD_BRIDGE_HTTP_TIMEOUT", "300")), REQUEST_TTL_SECONDS)
 ID_RE = re.compile(r"[0-9]{8}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,63}")
 JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
+NS_RE = re.compile(r"[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?")
 FETCH_REFSPEC = "+refs/heads/cloud-requests:refs/heads/cloud-requests"
 REQUIRED_FIELDS = {"schema", "action", "args", "requested_by", "requested_at", "expires_at"}
 ACTION_ALLOWLIST = {
-    "health": ("GET", "/api/v1/health", {}),
-    "cluster-status": ("POST", "/api/v1/cluster-status", {}),
-    "hostinger-status": ("POST", "/api/v1/hostinger-status", {}),
-    "job-status": ("GET", "/api/v1/status/{job_id}", {"job_id": JOB_ID_RE}),
+    "health": ("GET", "/api/v1/health", {}, None),
+    "cluster-status": ("POST", "/api/v1/cluster-status", {}, None),
+    "hostinger-status": ("POST", "/api/v1/hostinger-status", {}, None),
+    "job-status": ("GET", "/api/v1/status/{job_id}", {"job_id": JOB_ID_RE}, None),
+    "make-fix-list": ("POST", "/api/v1/make", {}, "fix-list"),
+    "make-fix-status": ("POST", "/api/v1/make", {"NS": NS_RE}, "fix-status"),
+    "make-status-public": ("POST", "/api/v1/make", {}, "status-public"),
+    "make-observability-status": ("POST", "/api/v1/make", {}, "observability-status"),
+    "make-vuln-scan": ("POST", "/api/v1/make", {}, "vuln-scan"),
+    "make-e2e-runner-health": ("POST", "/api/v1/make", {}, "e2e-runner-health"),
 }
 
 
@@ -62,7 +69,7 @@ def validate_request(raw, now=None):
     args = raw["args"]
     if not isinstance(args, dict):
         return None, "args is not an object"
-    _, _, allowed = ACTION_ALLOWLIST[action]
+    _, _, allowed, _ = ACTION_ALLOWLIST[action]
     if set(args) - set(allowed):
         return None, "unexpected argument"
     if set(allowed) - set(args):
@@ -166,12 +173,23 @@ def _read_request(repo, ref, request_id):
     return validate_request_bytes(raw)
 
 
+def _request_body(request):
+    action = request["action"]
+    method, _, _, make_target = ACTION_ALLOWLIST[action]
+    if method == "GET":
+        return b""
+    if make_target is None:
+        return b"{}"
+    return json.dumps(
+        {"target": make_target, "args": request["args"]}, sort_keys=True).encode()
+
+
 def _call_webhook(request):
     action = request["action"]
-    method, path_template, _ = ACTION_ALLOWLIST[action]
+    method, path_template, _, _ = ACTION_ALLOWLIST[action]
     path = path_template.format(**request["args"])
     headers = {"Authorization": f"Bearer {_get_reader_token()}"}
-    data = b"" if method == "GET" else b"{}"
+    data = _request_body(request)
     http_request = urllib.request.Request(
         f"http://127.0.0.1:7443{path}", data=data, headers=headers, method=method)
     try:

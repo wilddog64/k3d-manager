@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- The cloud bridge now exposes the six reader-tier `make` targets as separate fixed actions:
+  `fix-list`, `fix-status`, `status-public`, `observability-status`, `vuln-scan` and
+  `e2e-runner-health`, with no optional arguments in phase 1.
 - A two-token read-only cloud session path: `bin/k3dm-cloud-bridge` polls the untrusted
   `cloud-requests` branch from a bare clone, validates four fixed actions, calls the local
   webhook with the reader credential, and commits a response plus replay ledger entry.
