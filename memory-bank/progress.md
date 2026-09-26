@@ -1,3 +1,34 @@
+# WS1 vectordb — live status 2026-09-26
+
+- [x] `platform` AppProject applied via `deploy_argocd_bootstrap --skip-applicationsets`
+      (operator-run; the applicationsets deploy path does NOT apply AppProjects).
+      Destinations 42 -> 43, `vectordb` permitted.
+- [x] `hub-vectordb` synced; StatefulSet, Service, PVC (Bound 10Gi local-path) and
+      ExternalSecret all created in namespace `vectordb`.
+- [x] Perpetual `OutOfSync` on the ExternalSecret root-caused and fixed in `d44ef5cd` —
+      missing `argocd.argoproj.io/compare-options: ServerSideDiff=true` on the Application
+      template. Two gates added to `argocd_vectordb.bats` (9/9 green); the annotation gate is
+      mutation-checked. Recurrence appended to the existing 2026-09-13 platform-ops bug doc.
+- [x] Reverted `afed4ec9` (declared `target.template.engineVersion`) — the experiment refuted
+      the hypothesis; the app picked the commit up and stayed OutOfSync.
+- [ ] BLOCKED — operator: write Vault `vectordb/postgres` with `username` and `password`.
+      `vectordb-postgres` is `SecretSyncedError` and `pod/vectordb-0` is
+      `CreateContainerConfigError` until it exists. Claude must not create, read, print or log
+      that value.
+- [ ] Operator: reapply the ApplicationSets so the `ServerSideDiff` annotation reaches the live
+      Application. The git fix is inert until then.
+- [ ] Then Claude verifies read-only: `hub-vectordb` `Synced/Healthy` and `vectordb-postgres`
+      `SecretSynced/True`.
+- [ ] Latent: `observability.yaml` and `data-git.yaml` lack the same annotation. No symptom today
+      (their ExternalSecrets are on `ubuntu-hostinger`); any ESO resource added to them will drift.
+
+LESSON — search `docs/bugs/` for the symptom before diagnosing. This failure was already filed
+and fixed for `platform-ops` on 2026-09-13 with the annotation named as the fix; re-deriving it
+cost several live-diff rounds and one refuted experiment.
+
+LESSON — `kubectl get -o json` hides `managedFields` unless `--show-managed-fields` is passed.
+Zero entries is the default, not an anomaly.
+
 # 2026-09-26 — WS1 pgvector hub platform component implemented
 
 - [x] Added `scripts/etc/argocd/applicationsets/vectordb.yaml` with a hub list generator,

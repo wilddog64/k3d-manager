@@ -1,3 +1,40 @@
+# 2026-09-26 — WS1 live: vectordb deployed, one blocker left (Vault path)
+
+`deploy_argocd_bootstrap --skip-applicationsets` (operator-run) applied the updated `platform`
+AppProject: destinations 42 -> 43, `vectordb` permitted. The `InvalidSpecError` on `hub-vectordb`
+was a cached condition and cleared on its own after ~85s, at 22:56:05 — it was not a second
+failure. The app then auto-synced and every manifest landed: StatefulSet `vectordb` (0/1),
+Service `vectordb` (ClusterIP 5432), PVC `vectordb-data` (Bound, 10Gi, `local-path`),
+ExternalSecret `vectordb-postgres`.
+
+Two states remain, and only the first is a blocker:
+
+1. `pod/vectordb-0` is `CreateContainerConfigError` and `vectordb-postgres` is
+   `SecretSyncedError` ("could not get secret data from provider"). This is the expected
+   state: the Vault path `vectordb/postgres` does not exist yet. Writing it (`username`,
+   `password`) is the operator's step — Claude must not create, generate, echo or log that
+   value.
+2. `hub-vectordb` was perpetually `OutOfSync` on the ExternalSecret alone. Root-caused and
+   fixed in `d44ef5cd`: the Application template was missing
+   `argocd.argoproj.io/compare-options: ServerSideDiff=true`. Recurrence of the bug already
+   filed 2026-09-13 for `platform-ops`; recorded on that existing doc, not a new one.
+   **The fix is inert until the ApplicationSets are reapplied** — the live ApplicationSet still
+   carries the old template.
+
+LESSON — check `docs/bugs/` for the symptom before diagnosing it. This exact failure was
+already filed and fixed for `platform-ops` on 2026-09-13, with the annotation named as the fix.
+Several rounds of live diffing, field-ownership comparison and one refuted experiment
+(`afed4ec9`, reverted) went into re-deriving it. The dedup check that the docs conventions
+require before *filing* would have found it just as well when run before *investigating*.
+
+LESSON — `kubectl get -o json` strips `managedFields` by default (kubectl >= 1.21). An empty
+`managedFields` is not an anomaly; it needs `--show-managed-fields`.
+
+LESSON — latent exposure: `observability.yaml` and `data-git.yaml` also lack the annotation.
+Neither shows the symptom today because their ExternalSecrets are on `ubuntu-hostinger`, but any
+ESO resource added to them will drift identically. Three sets have now needed this annotation
+one at a time; making it part of the ApplicationSet template convention is the durable fix.
+
 # 2026-09-26 — WS1 pgvector hub platform component implemented
 
 Implemented WS1 from `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md` on
