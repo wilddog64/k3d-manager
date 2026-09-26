@@ -41,6 +41,44 @@ directly: 13 comparisons of each new bash helper against its `awk` oracle on rea
 input all matched, with 2 negative controls failing as required to show the harness can detect a
 difference.
 
+## 2026-09-26 — Hub SSO outage root-caused to the awk-free fix that was never PR'd (Claude)
+
+A cloud session ran the bridge's `cluster-status` and reported 13 ok / 3 warn / 5 fail. Three of
+the five failures — frontend SSO rejecting all three Vault `keycloak/users`, ArgoCD SSO rejected —
+trace to one cause. `keycloak-realm-reconcile` has two pods in `Error` for 4d23h on the **k3d hub**
+(not hostinger; there is no Keycloak and no `identity` namespace on hostinger at all, which is why
+a hostinger-scoped smoke report shows hub SSO failures). The log ends:
+
+    Realm shopping-cart exists; applying partial import
+    browser-with-conditional-otp flow already exists; reconciling it
+    environment: line 104: awk: command not found
+
+The fix has existed since 2026-09-25 as `shopping-cart-infra` `e081521` on
+`fix/keycloak-reconcile-awk-free`, pushed to origin, with **no PR ever opened**. Worse, the
+browser-flow repair that fixes this exact SSO symptom is already **on main** — the hook crashes
+before reaching it, so a merged fix has never once executed. The outage is an unmerged PR, not
+missing work.
+
+Pre-PR gates run 2026-09-26, all green: `bash -n` clean on the extracted container script;
+`shellcheck -s bash` clean; no residual `awk`/`jq`/`python3`; external binaries reduced to
+`cat grep head printf sed`, all present in ubi9-micro; interpreter confirmed `/bin/bash -euo
+pipefail -c` so the bashisms in the rewrite are safe. Behaviour equivalence vs the replaced awk
+proven 10/10 on representative `kcadm --format csv` input including the real flow display names.
+Non-ASCII diverges in the rewrite's favour: old awk aborted `towc: multibyte conversion failure`
+and returned empty, new bash percent-encodes correctly under `LC_ALL=C`.
+
+Two gates cannot run pre-merge and the PR body says so: CI is `pull_request`-only in that repo, and
+the live smoke is impossible because this is an ArgoCD `PostSync` hook that runs only on sync. PR
+body drafted, **not created** — awaiting the owner's go. No manual Job cleanup will be needed:
+`hook-delete-policy: BeforeHookCreation` removes the failed pods on the next sync, which closes the
+older "operator may need to delete the Failed keycloak-realm-reconcile Job" follow-up.
+
+Still open from the same report and NOT part of this: `cosign-public-key` ExternalSecret in
+`platform-ops` is `SecretSyncedError` / `could not get secret data from provider` (Vault path, hub,
+unrelated); frontend + product-image 404s (the open architecture call); `k3dm-smoke-user`
+credentials unavailable so the Frontend API smoke is **skipped** — excluded from the 13/3/5 tally
+and therefore proving nothing.
+
 ## 2026-09-25 — Third instance of the bare-branch fetch defect, in the poll path (Claude)
 
 The operator asked whether a **cloud** Claude session could test the bridge. Checking instead of
