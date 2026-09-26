@@ -1,3 +1,58 @@
+# 2026-09-26 — cloud-bridge capability specs written (v1.40.0 branch created)
+
+`k3d-manager-v1.40.0` created from v1.39.0 HEAD; three specs committed and pushed. Supersedes the
+"NOT COMMITTED" note in the entry below — the artifacts spec is committed as `63c7c2af`.
+
+| SHA | spec | needs a new credential? |
+|---|---|---|
+| `63c7c2af` | `v1.40.0-cloud-request-artifacts.md` | no |
+| `60b2ddda` | `v1.40.0-cloud-bridge-e2e-dispatch.md` | yes — scoped `cloud-runner` token |
+| `081b47f8` | `v1.40.0-cloud-bridge-test-targets.md` | no — reader tier |
+
+Operator's boundary, stated 2026-09-26: **create, destroy, or anything that can destroy a service
+or cluster** is the line — not "anything that runs a command". The `test*` family is inside it.
+
+Verified facts behind the split (read from code, not assumed):
+- `_resolve_token_role` (`scripts/lib/webhook/auth.py:63`) knows exactly **two** tokens, admin and
+  reader. There is no operator credential. So an operator-tier target through the bridge means
+  handing it **admin**, which would make a branch-driven channel authoritative for
+  `fix-delete-pod`, `fix-force-sync`, `cluster-resume`, `cleanup-stale-sandbox`, `argocd-upgrade`.
+  Hence the scoped third token for `e2e-remote`, designed as an explicit capability set and
+  deliberately **not** a rank in `_ROLE_LEVELS` — ranking it would transitively grant everything
+  below it.
+- All six `test*` targets are offline, so they fit `min_role: reader` and need no new credential.
+  `test-pytest` and `test-python-unit` are already reader-tier and already reachable — the
+  governing precedent. Only four additions are needed.
+- `make e2e-test` **does not exist**; the family is `e2e`, `e2e-sandbox`, `e2e-remote`,
+  `e2e-replay`, `e2e-runner-health`. `make test` / `test-bin` are absent from `MAKE_TARGETS`
+  entirely, so exposing them widens the webhook surface, not just the bridge allowlist.
+- Bridge `HTTP_TIMEOUT` = `min(env or 300, REQUEST_TTL_SECONDS=1800)`, but `e2e-remote` declares
+  `timeout: 3600`. Synchronous await is impossible and must not be reconfigured — dispatch
+  returns a job id and the session polls `job-status`. This is why the artifacts spec is a
+  prerequisite for the other two rather than a sibling.
+- `e2e-runner-unlock` exists as an **admin** target to clear a stale runner lock, so the remote
+  runner is a locked singleton and concurrent dispatch is an already-observed failure mode. The
+  spec refuses on a held lock and never clears it.
+
+Correction to my own earlier recommendation: I advised withholding `make test` on value grounds
+and was wrong. The host is macOS/BSD and a cloud sandbox is Linux; BSD-vs-GNU divergence in `sed`,
+`stat`, `grep`, `cat` is a recurring defect class here, so host BATS exercises a platform the
+sandbox cannot. That is information only the host can produce.
+
+Open risk carried into M1 of the test-targets spec: "the BATS suites are offline" is repo
+convention plus an **unfinished sweep**, not evidence. Six files under `scripts/tests/` contain
+mutation verbs (`e2e_remote.bats`, `vcluster.bats`, `run-cert-rotation-test.sh`,
+`hostinger_pushgateway_port_forward.bats`, `provider_contract.bats`, `webhook.bats`); spot-checks
+show stub infrastructure in each and one hit is inside a comment, so the convention appears to
+hold. The failure mode to rule out is a suite that stubs `kubectl` only when a cluster is
+*unreachable* and exercises the real binary when one is reachable — green in CI, green locally,
+mutating on the operator's host. Finishing the sweep is blocking, with a disappearance gate to
+keep it true.
+
+Also filed as M7/M6: `CLAUDE.md`'s **No network path out of a cloud session** rule still says
+"Four read-only actions are available". `bin/k3dm-cloud-bridge:31` has carried twelve since the
+reader-tier make targets landed; `docs/howto/cloud-session-requests.md` already says twelve.
+
 # 2026-09-26 — cloud-request diagnostic artifacts spec written (v1.40.0)
 
 `docs/plans/v1.40.0-cloud-request-artifacts.md` — publish `artifacts/<request-id>/{summary.json,junit.xml}`
