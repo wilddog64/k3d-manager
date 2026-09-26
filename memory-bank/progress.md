@@ -32,6 +32,15 @@
   blackbox probes, hermes app-health delta sensor, slack smoke target, vector-store prior
   art). Carrying all four to v1.39.0 puts that branch at **6 plan docs, one over the max-5
   cap**, so they must be split across v1.39.0/v1.40.0 or dropped. Decide at `/post-merge`.
+- [ ] **Cloud-bridge architecture doc — queued for v1.39.0** (operator, 2026-09-25). There is
+  no `docs/architecture/` page for the bridge: v1.38.0 shipped
+  `docs/howto/cloud-session-requests.md`, which is a usage contract (schema, actions, exit
+  codes), not a design view. Missing: the request/response topology across the trust boundary,
+  the two-token model and why a header may only narrow a role, the bare-clone + git-plumbing
+  choice, the validator's ordered reject chain, and the deliberately unbuilt push path.
+  **Not a plan doc** — `docs/architecture/` is outside the max-5 cap, so this does not
+  compete with the four carried v1.38.0 specs. House style is Mermaid (9 of 11 existing
+  architecture docs), plus a README `## Documentation` link.
 
 ## 2026-09-26 — v1.38.0 P6 reader-tier make targets through the cloud bridge
 
