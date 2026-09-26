@@ -273,6 +273,44 @@ class TestFailureModes:
         assert len(vectors) == 1
         assert 31.0 in slept
 
+    def test_an_exhausted_quota_names_the_quota_in_the_error(self, monkeypatch):
+        """The message a human reads must say which limit was hit.
+
+        A per-minute throttle and a spent per-day allowance both surface as 429. The
+        distinction decides whether the run should be retried now or resumed after a reset,
+        and it lives only in the response body -- which the exhausted path did not read.
+        """
+        monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
+        monkeypatch.setattr(pa.time, "sleep", lambda *_a: None)
+        body = json.dumps(
+            {
+                "error": {
+                    "code": 429,
+                    "details": [
+                        {
+                            "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                            "violations": [
+                                {"quotaId": "EmbedContentRequestsPerDayPerProjectPerModel-FreeTier"}
+                            ],
+                        }
+                    ],
+                }
+            }
+        ).encode()
+
+        def always_throttled(_request, **_k):
+            raise urllib.error.HTTPError(
+                "https://example.invalid", 429, "Too Many Requests",
+                {"Content-Type": "application/json"}, io.BytesIO(body),
+            )
+
+        monkeypatch.setattr(pa.urllib.request, "urlopen", always_throttled)
+        with pytest.raises(pa.EmbeddingsUnavailable) as caught:
+            pa.embed_batch(["one"], attempts=2)
+        message = str(caught.value)
+        assert "429" in message
+        assert "EmbedContentRequestsPerDayPerProjectPerModel-FreeTier" in message
+
     def test_requests_are_paced_between_texts(self, monkeypatch):
         monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
         slept = []

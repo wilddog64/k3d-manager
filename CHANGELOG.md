@@ -4,6 +4,18 @@
 
 ### Fixed
 
+- **Prior-art embeddings: a 429 now says which quota it hit.** The second live run committed 900 of
+  1,705 documents across nine clean batches, then failed with `embeddings API returned HTTP 429` —
+  a message that cannot distinguish a per-minute throttle, which clears in seconds, from a spent
+  per-day allowance, which cannot clear until the quota resets. The difference decides whether to
+  re-run immediately or resume tomorrow, and it had to be inferred from batch timings instead of
+  read off the error. The detail was in the response body all along: the body was parsed only for
+  `retryDelay`, and only on the paths that go on to retry, so the one message a human actually sees
+  — the exhausted-attempts path — was raised *before* the body was ever read. `_server_retry_delay`
+  is now `_error_detail`, which reads the body once (it can only be read once) and returns both the
+  delay and the `QuotaFailure` violation's `quotaId`, which is appended to the error as
+  `HTTP 429 (quota ...)`.
+
 - **Prior-art embeddings: a 429 no longer abandons the whole index.** The first live run after the
   `embedContent` port failed on its very first request with `embeddings API returned HTTP 429`,
   committing 0 of 1,705 documents. Rate limiting is not an outage: one request per document against a

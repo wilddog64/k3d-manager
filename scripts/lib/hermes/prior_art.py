@@ -356,27 +356,41 @@ def _embed_request(text, task_type, key):
 
 
 _RETRY_DELAY = re.compile(r'"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"')
+_QUOTA_ID = re.compile(r'"quotaId"\s*:\s*"([^"]+)"')
+_QUOTA_METRIC = re.compile(r'"quotaMetric"\s*:\s*"([^"]+)"')
 
 
-def _server_retry_delay(exc):
-    """Return the delay the server asked for, in seconds, or ``None``.
+def _error_detail(exc):
+    """Read an ``HTTPError`` body once and return ``(retry_delay, quota)``.
 
-    A 429 from this API carries its wait in a ``RetryInfo`` detail in the response body
-    (``"retryDelay": "31s"``) rather than in a ``Retry-After`` header, so the header alone
-    misses it and the backoff guesses. Both are read; the header wins when present.
+    The body is the only place this API says anything useful about a 429, and it can be read
+    exactly once, so both facts are pulled out together:
+
+    * the delay, from a ``RetryInfo`` detail (``"retryDelay": "31s"``) rather than a
+      ``Retry-After`` header — reading the header alone misses it and the backoff guesses.
+      The header still wins when it is present.
+    * the quota, from a ``QuotaFailure`` violation. Without it a per-minute throttle and an
+      exhausted per-day allowance produce the same bare ``HTTP 429``, which is not enough to
+      tell "retry in a moment" from "this cannot finish until the quota resets" — a
+      distinction that had to be inferred from batch timings the first time it mattered.
     """
+    delay = None
     header = exc.headers.get("Retry-After") if exc.headers else None
     if header:
         try:
-            return float(header)
+            delay = float(header)
         except ValueError:
-            pass
+            delay = None
     try:
         body = exc.read().decode("utf-8", "replace")
     except Exception:
-        return None
-    found = _RETRY_DELAY.search(body)
-    return float(found.group(1)) if found else None
+        return delay, None
+    if delay is None:
+        found = _RETRY_DELAY.search(body)
+        if found:
+            delay = float(found.group(1))
+    quota = _QUOTA_ID.search(body) or _QUOTA_METRIC.search(body)
+    return delay, (quota.group(1) if quota else None)
 
 
 def _embed_one(text, task_type, key, attempts):
@@ -393,10 +407,12 @@ def _embed_one(text, task_type, key, attempts):
             with urllib.request.urlopen(_embed_request(text, task_type, key), timeout=120) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
+            asked, quota = _error_detail(exc)
             last = f"HTTP {exc.code}"
+            if quota:
+                last = f"{last} (quota {quota})"
             if exc.code not in (429, 500, 502, 503, 504) or attempt == attempts:
                 raise EmbeddingsUnavailable(f"embeddings API returned {last}") from None
-            asked = _server_retry_delay(exc)
             wait = asked if asked is not None else delay
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             last = type(exc).__name__
