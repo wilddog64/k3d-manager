@@ -799,6 +799,12 @@ test-python-unit:
 	 for f in scripts/tests/bin/*.py; do \
 	   case "$$(basename "$$f")" in test_*) continue;; esac; \
 	   found=1; \
+	   if grep -q '^def test_' "$$f" && ! grep -q 'unittest.main()\|pytest.main(' "$$f"; then \
+	     echo "[make] $$f defines bare test functions but has no main hook —" >&2; \
+	     echo "[make] running it as a script executes nothing. Rename it to test_*.py" >&2; \
+	     echo "[make] so make test-pytest collects it." >&2; \
+	     exit 2; \
+	   fi; \
 	   echo "[make] python3 $$f"; \
 	   python3 "$$f"; \
 	 done; \
@@ -818,7 +824,7 @@ test-pytest:
 	   echo "[make] pytest not installed for $$(python3 --version 2>&1)." >&2; \
 	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
 	   exit 2; }; \
-	 python3 -m pytest scripts/tests/hermes scripts/tests/bin/test_smoke_logins.py scripts/tests/bin/test_check_doc_links.py
+	 python3 -m pytest scripts/tests/hermes scripts/tests/bin/test_*.py
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest
