@@ -121,6 +121,16 @@ were withdrawn and the endpoint now answers 404 — corrected 2026-09-26 after t
 `K3DM_EMBEDDINGS_API_KEY`, then keychain `k3dm-embeddings-api-key`, then `gemini-cli-api-key`,
 then the hub Vault.
 
+FINDING (2026-09-26, live) — the embeddings credential is resolved and working. `gemini-cli-api-key`
+(`acct=default-api-key`, the only item under that service) is **empty**: two `-U -w` writes advanced
+`mdat` and stored nothing, because they ran through Claude's `!` prefix, which has no TTY — `security
+-w` without a TTY never prompts and stores empty at rc 0. The partition-list widening did take, so the
+item now reads rc 0/empty rather than rc 36. The key currently reaches the process only as env
+`K3DM_EMBEDDINGS_API_KEY`, exported in the operator's own terminal via `read -rs`; that is enough to
+index but not to serve `make find-similar-docs` later, so a durable slot (keychain item written from a
+real TTY, or the operator-written Vault copy) is still outstanding. `5f8590b6` fixes the run that this
+unblocked: the first live attempt died on a 429 at request 1 of 1705.
+
 DECISION (operator, 2026-09-26) — **the resolution order is a preference order, not a set of copies
 to keep in sync. Exactly ONE keychain slot holds a value.** Claude first proposed a dedicated
 `k3dm-embeddings-api-key` holding a copy; the operator rejected it — *"why can't we reuse that item
