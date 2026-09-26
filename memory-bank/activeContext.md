@@ -1,3 +1,37 @@
+# 2026-09-26 — vectordb is UP; policy overwrite proven safe by diff
+
+The ESO grant is live and `vectordb` runs. Sequence: operator overwrote the Vault policy
+`eso-ldap-directory` with the 5-prefix HCL the repo's builder emits; the ExternalSecret flipped
+`SecretSyncedError` -> `SecretSynced` at 06:27:04 (~6 min, one ESO retry cycle); kubelet then
+created the container and `vectordb-0` reached `Running 1/1`; StatefulSet 1/1.
+
+No role rewrite was needed — the role already carries `eso-ldap-directory` in `token_policies`
+by name, and Vault evaluates the policy body per request. So a policy overwrite takes effect on
+the next ESO attempt with no restart and no force-sync annotation (which self-heal would revert).
+
+HOW THE OVERWRITE WAS DE-RISKED, and the general method. Claude cannot read a live Vault policy
+(that needs the root token), so it could not rule out that an overwrite would revoke a prefix
+merged in out of band — a real risk, since a role rewrite dropping a grant is already a filed
+bug. Resolution was not to guess and not to reach for the additive path by default: the operator
+ran `vault policy read eso-ldap-directory`, and the output was diffed against the generated HCL.
+`diff` returned empty on the first 16 lines, proving the change strictly additive (4 new
+`vectordb` lines, nothing else touched). Only then was the overwrite recommended. The additive
+`eso-vectordb` policy stays the fallback for when that diff is NOT clean — it cannot revoke, but
+it leaves a second policy `deploy_ldap` does not know about.
+
+REMAINING, and it is the committed-but-inert trap again: `hub-vectordb` is `OutOfSync / Healthy`.
+PVC, Service and StatefulSet are all Synced; only the ExternalSecret is OutOfSync, because the
+live Application carries no `argocd.argoproj.io/compare-options` annotation. `d44ef5cd` added it
+to the ApplicationSet template, but the sets have not been reapplied, so nothing in the cluster
+reads it. Same class as the `vars.sh` inertness above and the values-branch pin.
+
+CORRECTION — the ArgoCD namespace on this hub is `cicd`, not `argocd` (`ARGOCD_NAMESPACE:-cicd`,
+`argocd.sh:1270`). An earlier read reported "No resources found in argocd namespace" for all
+three contexts; that namespace does not exist, so the output proved nothing. `kubectl` prints
+"No resources found in X namespace" for a missing namespace on a plural/multi-resource get and
+only errors with NotFound on a named get — so the empty reading looked like a valid answer.
+Never read an empty kubectl listing as evidence without confirming the namespace exists.
+
 # 2026-09-26 — vectordb blocker was the ESO Vault policy, not the missing path
 
 The Vault path `secret/vectordb/postgres` is now written (operator, version 1, 13:03Z,

@@ -1,3 +1,19 @@
+# vectordb — 2026-09-26 final: running, one cosmetic OutOfSync left
+
+- [x] Operator overwrote Vault policy `eso-ldap-directory` (5 prefixes, token+policy on stdin).
+- [x] Overwrite proven safe first: live policy diffed byte-identical against the generated HCL,
+      so the change was strictly additive and could not revoke a prefix merged in out of band.
+- [x] `vectordb-postgres` ExternalSecret `SecretSynced/True` at 06:27:04; both keys present.
+- [x] `pod/vectordb-0` `Running 1/1`; `statefulset/vectordb` 1/1.
+- [ ] Operator: reapply the ApplicationSets so `d44ef5cd`'s `ServerSideDiff=true` reaches the
+      live Application. Until then `hub-vectordb` stays `OutOfSync / Healthy` on the
+      ExternalSecret alone — the workload is fine, the diff is spurious.
+- [ ] Offered, not approved: seed `vectordb/postgres` in the automated Vault path
+      (`_vault_kv_exists` -> generate -> `_vault_kv_put`) so the credential survives a hub rebuild.
+
+NOTE — the ArgoCD namespace here is `cicd`, not `argocd`. Queries against `argocd` return an
+empty listing that reads like a valid negative answer.
+
 # vectordb — 2026-09-26 later: Vault path written, ESO still denied
 
 - [x] Operator wrote `secret/vectordb/postgres` (version 1, 13:03Z). Password generated inside
