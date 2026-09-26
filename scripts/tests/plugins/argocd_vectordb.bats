@@ -59,3 +59,23 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"server: https://kubernetes.default.svc"* ]]
 }
+
+@test "vectordb Application template enables server-side diff" {
+  run awk '
+    /^  template:/ { in_template = 1; next }
+    in_template && /^    metadata:/ { in_metadata = 1; next }
+    in_metadata && /^    spec:/ { exit }
+    in_metadata { print }
+  ' "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/vectordb.yaml"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"argocd.argoproj.io/compare-options"* ]]
+  [[ "$output" == *"ServerSideDiff=true"* ]]
+}
+
+@test "vectordb ApplicationSet retains server-side apply and masks no differences" {
+  run grep -F 'ServerSideApply=true' "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/vectordb.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -c 'ignoreDifferences' "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/vectordb.yaml"
+  [ "$output" = "0" ]
+}

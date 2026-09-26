@@ -15,6 +15,8 @@ spec:
   template:
     metadata:
       name: '{{.name}}-vectordb'
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
       labels:
         app-type: platform
     spec:
