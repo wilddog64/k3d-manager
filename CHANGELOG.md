@@ -92,6 +92,25 @@
 
 ### Fixed
 
+- **`make test` no longer writes fabricated deployment metrics into the live Pushgateway.**
+  `scripts/tests/lib/webhook.bats` was careful about isolation — port, token, `HOME`, `PATH`
+  (stubbing `make` and `kubectl`), `K3DM_JOB_DIR` and `K3DM_RUN_DIR` — but never set
+  `K3DM_PUSHGATEWAY_URL`, which `scripts/lib/webhook/config.py` defaults to
+  `http://localhost:9091`, the live ACG Pushgateway forward on a dev host. Every suite run
+  therefore pushed three `k3dm_deployment_*` groups (`up-gcp`, `up-aws`, `down-aws`) from its
+  own `/api/v1/cluster` cases, each reporting a zero-second duration because the harness stubs
+  `make` to `exit 0`. The damage was not the three stray rows: `DeploymentMetricsStale` was
+  watching the test suite's last run rather than any deployment, so it was structurally
+  incapable of firing while the suite ran regularly — the same vacuous-signal class as the
+  misplaced `k3dm-tests` rules fixed above, with the producer wrong instead of absent. The
+  harness now exports an empty `K3DM_PUSHGATEWAY_URL`, taking the existing
+  `if not PUSHGATEWAY_URL: return` early exit in `_push_metrics()`, and asserts it in-suite.
+- **The k3dm Deployment Metrics panels aggregate `job_id` away.** `_push_metrics()` stamps
+  `k3dm_deployment_duration_seconds` and `k3dm_deployment_success` with the job's own `job_id`,
+  so the stat panels drew one tile per deployment in the dashboard window rather than one per
+  `(action, provider)` — fifteen identically-labelled `aws (failed) 0 s` tiles, and a time
+  series legend repeating `up/aws (failed)` once per job. All five queries now wrap in
+  `max by (...)` over the meaningful labels, and a new BATS suite keeps them that way.
 - **The webhook smoke gate requests the bounded `?quick=1` health variant** instead of the
   unbounded full sweep it could never complete inside its own 90s cap. The gate asked for every
   stage serially behind three retries with a ten-second sleep between them, so a single slow

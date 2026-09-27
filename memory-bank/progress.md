@@ -31,13 +31,20 @@
       `inactive` is now a measurement rather than the original "matches nothing" silence.
 - [ ] Duration metrics (DEFECT 2) still undecided: fix in v1.39.0 or file for v1.40.0.
 - [ ] My `:19190` forward propping up `federate-acg` is still undisclosed to a durable fix.
-- [ ] **NEW DEFECT 5 — `make test` contaminates the live deployment telemetry.** Found while
-      deep-diving the three `status="failed"` `k3dm_deployment_last_timestamp_seconds` series.
-      They are not deployments. `scripts/tests/lib/webhook.bats` isolates the port, token, HOME,
-      PATH (stub `make`/`kubectl`), `K3DM_JOB_DIR` and `K3DM_RUN_DIR` — but **not**
-      `K3DM_PUSHGATEWAY_URL`, which `scripts/lib/webhook/config.py:33` defaults to
-      `http://localhost:9091`. So the test webhook's `_push_metrics` writes into the real
-      Pushgateway. Needs a fix + a BATS guard; see activeContext for the full evidence chain.
+- [x] **DEFECT 5 FIXED — `make test` contaminated the live deployment telemetry.**
+      `scripts/tests/lib/webhook.bats` `setup_file` now exports an empty `K3DM_PUSHGATEWAY_URL`,
+      taking the `if not PUSHGATEWAY_URL: return` early exit in `_push_metrics()`, with an
+      in-suite guard test plus `scripts/tests/plugins/observability_deployment_dashboard.bats`.
+      Proven live: a full 65-case `webhook.bats` run left all three Pushgateway timestamps
+      unchanged. Both guards were mutation-tested against pre-fix content and fail there.
+      **Operator action outstanding** — the three fabricated groups are still in the Pushgateway;
+      the DELETE was denied to Claude by the auto-mode classifier. Run via `!`:
+      `for g in up-gcp up-aws down-aws; do curl -X DELETE http://localhost:9091/metrics/job/k3dm-webhook/instance/$g; done`
+- [x] **Deployment dashboard crowding fixed** — every `k3dm_deployment_*` panel now aggregates
+      `job_id` away with `max by (...)`. `_push_metrics()` stamps `duration_seconds` and
+      `success` with the job's own `job_id`, so the stat panels drew one tile per deployment in
+      the window (fifteen identical `aws (failed) 0 s` tiles) instead of one per
+      `(action, provider)`. Needs `make observability-acg` to reach the cluster.
 
 # embeddings credential + indexer resumability — 2026-09-26 complete
 

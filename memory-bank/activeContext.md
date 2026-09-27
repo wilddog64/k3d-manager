@@ -1,3 +1,59 @@
+# 2026-09-27 — DEFECT 5 fixed: the test suite no longer writes live deployment metrics
+
+**The fix.** `scripts/tests/lib/webhook.bats` `setup_file` now exports an empty
+`K3DM_PUSHGATEWAY_URL` alongside the existing `K3DM_JOB_DIR` / `K3DM_RUN_DIR` isolation, with a
+comment explaining why. An empty value takes the `if not PUSHGATEWAY_URL: return` early exit
+already present at the top of `_push_metrics()` (`bin/k3dm-webhook:1294`), so nothing in the
+producer changed — this is purely a harness omission being closed. `scripts/lib/webhook/config.py:33`
+keeps its `http://localhost:9091` default, which is correct for the real webhook.
+
+**Guards.** Two, deliberately in different places so neither alone is load-bearing:
+- an in-suite case in `webhook.bats` asserting `K3DM_PUSHGATEWAY_URL` is *set and empty*
+  (`${VAR+set}` plus `-z`), which distinguishes "harness neutralized it" from "nobody set it";
+- `scripts/tests/plugins/observability_deployment_dashboard.bats`, which asserts the export exists
+  in the harness source and that all five dashboard queries stay aggregated.
+
+Both were mutation-tested against reconstructed pre-fix content in the scratchpad and fail there,
+so they are not vacuous.
+
+**Live proof the leak is closed.** A full `bats scripts/tests/lib/webhook.bats` run — 65/65 ok,
+including all three `/api/v1/cluster` cases that used to push — left the three Pushgateway
+timestamps at `1790515707` / `1790515714` / `1790515715`, unchanged from ~2.4h earlier. Before the
+fix those three would have been rewritten to the run's own clock.
+
+**Second defect, same dashboard: `job_id` cardinality.** The operator's screenshot showed fifteen
+identically-labelled `aws (failed) 0 s` tiles and a legend repeating `up/aws (failed)` eight times.
+Cause: `_push_metrics()` stamps `k3dm_deployment_duration_seconds` and `k3dm_deployment_success`
+with the job's own `job_id`, so querying either bare returns one series *per deployment in the
+dashboard window*, and a stat panel draws a tile per series. `k3dm_deployment_last_timestamp_seconds`
+carries no `job_id`, which is exactly why that one panel showed a readable three tiles while its
+neighbours did not — a useful tell for diagnosing this class. All five queries in
+`k3dm-deployments-configmap.yaml` now wrap in `max by (...)` over the meaningful labels only.
+This is independent of DEFECT 5: it would have crowded the dashboard just as badly with real
+deployments, only more slowly.
+
+**Docs.** `docs/guides/grafana-dashboards.md` §k3dm Deployment Metrics: the panel table quotes the
+aggregated queries, a note explains why `job_id` must stay aggregated, and a second note records
+that a zero-duration deployment series is test exhaust with the DELETE command to remove it.
+CHANGELOG has both fixes under 1.39.0 `### Fixed`.
+
+**Outstanding operator action.** The three fabricated groups (`up-gcp`, `up-aws`, `down-aws`) are
+still in the Pushgateway and will render as three red `FAILED` tiles forever, since Pushgateway
+retains the last value indefinitely. Claude's DELETE was refused by the auto-mode classifier
+(`Modify Shared Resources`); not retried. Run via `!`:
+
+```
+for g in up-gcp up-aws down-aws; do curl -sS -o /dev/null -w "$g %{http_code}\n" -X DELETE http://localhost:9091/metrics/job/k3dm-webhook/instance/$g; done
+```
+
+Expect `202` from each. The dashboard change also needs `make observability-acg` to reach the
+cluster — the ConfigMap edit is inert until then.
+
+**Still unrecovered (informational).** Why the stubbed jobs reported `failed` when the harness stubs
+`make` to `exit 0`. The `mktemp -d` job dirs holding the traceback are deleted at teardown. It never
+changed the conclusion — a zero-second job is not a deployment either way — and reproducing it is now
+safe, since a rerun no longer contaminates anything.
+
 # 2026-09-27 — DEFECT 4 live-verified; DEFECT 5 found (test telemetry leaks into the live Pushgateway)
 
 The operator ran both previously-blocked commands. `deploy_argocd_applicationsets --confirm`
