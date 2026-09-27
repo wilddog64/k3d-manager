@@ -1,18 +1,13 @@
 # v1.39.0 k3dm-tests alerts moved to the ACG stack — 2026-09-27
 
-- [ ] **Blackbox probes inert: doubled image registry + unsubstituted `${CF_DOMAIN}`** — spec
-      `docs/bugs/2026-09-27-blackbox-probe-registry-and-cf-domain-unsubstituted.md` filed.
-      Both defects from this release's own `ba2a01e1`, never merged to `main`. (1) chart 11.3.1
-      concatenates `image.registry` with `image.repository`, so the fully-qualified repository in
-      `blackbox-exporter-values.yaml` rendered `quay.io/quay.io/prometheus/blackbox-exporter` —
-      live pod in `ImagePullBackOff` 137m, 593 backoffs. (2) `public-endpoint-probes.yaml` carries
-      seven `${CF_DOMAIN}` placeholders; `CF_DOMAIN` is assigned nowhere in the repo and
-      `observability.sh:92-96` applied the rules directory raw, so `kubectl` accepted the literal
-      string and the failure would surface as `probe_success 0` blamed on DNS. (3) zero test
-      coverage, which is why both shipped in one commit. Fix per operator's call: `CF_DOMAIN` into
-      a new `scripts/etc/vars.sh`, per-file `envsubst '$CF_DOMAIN'` in the apply path, plus a BATS
-      defect-class guard asserting every placeholder in the rules directory is in the allowlist.
-      Dispatched to Codex.
+- [x] **Blackbox probes inert: doubled image registry + unsubstituted `${CF_DOMAIN}`** — fixed in
+      `cc4d634b0d7a0d2f7e1ac1ad097afad2fd7d40c9`, pushed to `origin/k3d-manager-v1.39.0`.
+      M1–M6 implemented exactly from `docs/bugs/2026-09-27-blackbox-probe-registry-and-cf-domain-unsubstituted.md`:
+      de-qualified exporter repository, shared `CF_DOMAIN` vars, sourced vars, per-file explicit
+      `envsubst '$CF_DOMAIN'` with loud apply failure, five source-backed BATS tests, and the
+      documentation update. Focused suite: 5/5. Recursive plugin suite: 787/787. Each M5 test
+      went red against its corresponding reverted hunk in an isolated scratch copy and passed
+      after restoration. No kubectl, helm, docker, or make deploy/up target was run.
 
 - [ ] **`/k3dm help` omits the cluster lifecycle commands** — spec
       `docs/bugs/2026-09-27-k3dm-help-omits-cluster-lifecycle-commands.md` filed and committed

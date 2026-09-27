@@ -15,6 +15,17 @@ defects in this release's own `ba2a01e1`, all blocking every operator-owned gate
 Operator chose `scripts/etc/vars.sh` as `CF_DOMAIN`'s home over renaming the manifest to
 `.yaml.tmpl`.
 
+# 2026-09-27 — blackbox probe registry and CF_DOMAIN defects fixed
+
+Implemented M1–M6 from `docs/bugs/2026-09-27-blackbox-probe-registry-and-cf-domain-unsubstituted.md`
+in commit `cc4d634b0d7a0d2f7e1ac1ad097afad2fd7d40c9`, pushed to
+`origin/k3d-manager-v1.39.0`. The exporter repository is chart-compatible, `CF_DOMAIN` is sourced
+from `scripts/etc/vars.sh` with an environment override, and Prometheus rule files render through
+the explicit `envsubst '$CF_DOMAIN'` allowlist with failed applies returning 1. Added five
+source-backed BATS tests, each mutation-checked red against its reverted hunk. Gates: focused
+suite 5/5; recursive plugin suite 787/787; shellcheck has only the pre-existing informational
+SC2016 at `observability.sh:880`.
+
 This is the second instance of one defect class in a single day: **a placeholder is only as good as
 the renderer that substitutes it.** The morning's was `{{HOME}}` in the cloud-bridge launchd
 template, caught before shipping; this one was already committed, and
