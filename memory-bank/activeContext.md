@@ -32,6 +32,15 @@ embeddings credential — operator action), so pass 2 fell back to the glob as d
 files. NOT YET VERIFIED: Codex's SHA, the four new tests and the scope of its diff all still need
 independent confirmation before this is called done.
 
+# 2026-09-27 — `/k3dm help` now lists cluster lifecycle commands
+
+- [x] Implemented the scoped help-only fix in `scripts/lib/webhook/make_targets.py`,
+  `scripts/tests/bin/webhook_make_targets.py`, and `docs/howto/slack-slash-commands.md`.
+- [x] Focused pytest: `33 passed, 78 subtests passed`; `make test-python-unit`: all seven
+  unittest suites passed.
+- [x] Implementation commit `f3cdc25a3a0393e4198e472f6530b82114a93895` pushed to
+  `origin/k3d-manager-v1.39.0`; no PR created.
+
 # 2026-09-27 — DEFECT 5 fixed: the test suite no longer writes live deployment metrics
 
 **The fix.** `scripts/tests/lib/webhook.bats` `setup_file` now exports an empty

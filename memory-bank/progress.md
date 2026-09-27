@@ -2238,6 +2238,16 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       `origin/fix/keycloak-reconcile-awk-free` (`shopping-cart-infra`). `awk` 11 → 0, YAML parses,
       shellcheck clean both sides, 13/13 helper-vs-awk equivalences with 2 negative controls.
       PR is the owner's call.
+# v1.39.0 `/k3dm help` cluster lifecycle commands — DONE 2026-09-27
+
+- [x] Added role-filtered `/cluster-*` and `/hostinger-status` discoverability to `/k3dm help`
+  without adding Makefile targets or changing routing.
+- [x] Added the four specified regression tests and the short Slack slash-command documentation
+  note. Focused pytest: `33 passed, 78 subtests passed`; `make test-python-unit`: all seven suites
+  passed.
+- [x] Commit `f3cdc25a3a0393e4198e472f6530b82114a93895` pushed to
+  `origin/k3d-manager-v1.39.0`; no PR created.
+
 # 2026-09-26 — vectordb Vault credential seed authored
 
 - [x] Added the idempotent in-pod Vault seed and bootstrap call before the AppProject.
