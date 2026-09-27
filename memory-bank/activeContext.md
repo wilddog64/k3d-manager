@@ -1,3 +1,31 @@
+# 2026-09-27 — test targets documented in docs/howto/makefile.md (`8312512d`)
+
+Closed the first of the two gaps recorded from the v1.39.0 Step 7b audit: the
+file claims to document all `make` targets and documented none of the six test
+targets. Added a `Test Suites` section (+39) before `Test Metrics`.
+
+Facts established while writing it, worth keeping:
+
+- `make test` reaches only `scripts/tests/{lib,core,plugins,etc}` at
+  `-maxdepth 1` (`scripts/k3d-manager:439`). `scripts/tests/bin` is covered by
+  `make test-bin`.
+- **Three BATS files at the `scripts/tests/` root are in no make target and no
+  CI job:** `observability_keep_list.bats`, `observability_resume_layer.bats`,
+  `test_install_sudoers.bats`. They sit outside every `search_dirs` entry and
+  outside `bats scripts/tests/bin`. Same shape as
+  `workers/slack-relay/test/relay.test.mjs`. Reported, not fixed — adding a
+  search dir changes what CI runs.
+- CI runs `make test`, `test-bin`, `test-python-unit` and `test-pytest` as four
+  separate steps (`.github/workflows/ci.yml:81-95`), never `make test-all`.
+- `make test-pytest` resolves `$PYTEST` → `pytest` on PATH → `python3 -m pytest`
+  → `~/.pyenv/shims/python3 -m pytest`; `pytest` is on PATH here
+  (`~/.pyenv/shims/pytest`), so the old "test-all always exits 2 locally" note
+  no longer describes the current target.
+- Exit 2 from `test-bin`, `test-python-unit` or `test-pytest` means missing
+  tooling, not a failed assertion.
+
+Still open from the same audit: `bin/k3dm-vectordb-metrics` is undocumented.
+
 # 2026-09-27 — v1.39.0 merged, tagged and released; enforce_admins restored
 
 PR #133 merged to `main` as squash commit `3a254484`. `/post-merge` is complete:

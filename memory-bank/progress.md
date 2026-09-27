@@ -1,3 +1,11 @@
+# v1.40.0 in progress — 2026-09-27
+
+- [x] `docs/howto/makefile.md` documents the six test targets — `8312512d`
+      (Test Suites section, +39; `check-doc-links: 1 file(s) OK`)
+- [ ] `bin/k3dm-vectordb-metrics` still undocumented (v1.39.0 Step 7b leftover)
+- [ ] three root-level `scripts/tests/*.bats` files run in no make target and
+      no CI job — reported, fix not approved
+
 # v1.39.0 shipped — 2026-09-27
 
 - [x] **PR #133 merged** to `main` as squash commit `3a254484c04d0ff6d9a42de72eeae1ab3b12c473`.
