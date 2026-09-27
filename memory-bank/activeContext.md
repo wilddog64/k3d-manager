@@ -144,6 +144,39 @@ The Vault copy is the one deliberate second copy and does not contradict this: i
 failure domain (locked keychain, launchd with no session, another host). Two copies total — one
 keychain item, one Vault path.
 
+FINDING (2026-09-27, second live run) — the run committed **900 of 1705** documents across nine clean
+batches (one 100-doc batch per ~93s, no retry-visible pause in the poll trace), then failed with
+`embeddings API returned HTTP 429` that survived all six retries. A per-minute bucket cannot survive
+six retries: the server-named wait was 31s and the fallback chain is 2+4+8+16+32 = 62s, so something
+still refusing after a minute-plus of waiting is a **standing** limit. Leading hypothesis is
+requests-per-day (commonly 1,000 on the free tier) — 900 committed plus the first run's request plus
+probes lands almost exactly there. If that holds it is arithmetic, not a defect: 1,705 documents
+against a ~1,000/day ceiling means a cold index **cannot** complete in one day on the free tier, and
+the resume path already handles it (`last_indexed_epoch` is now `1790451199.664996`, was `null`; a
+re-run resumes at document 901). What would be wrong is the wording — "unavailable" is not
+"paused until the quota resets" — and the `docs/guides/vector-store.md` "roughly half an hour"
+estimate, which describes a run that never spans days. Do **not** lower `EMBED_MIN_INTERVAL` or add
+retries to push through a daily cap: that spends tomorrow's quota on retries and makes the failure
+less legible.
+
+- [x] `1b3c7f47` `fix(prior-art): name the quota in a 429 instead of just the status` —
+      `_server_retry_delay` became `_error_detail`, which reads the `HTTPError` body **once**
+      (`exc.read()` is single-use) and returns both the `retryDelay` and the `QuotaFailure`
+      violation's `quotaId`, appended to the message as `HTTP 429 (quota ...)`. The real defect was
+      ordering: the body was parsed only on the paths that go on to retry, so the exhausted-attempts
+      path — the one message a human actually reads — raised *before* the body was ever read, making
+      a per-minute throttle and a spent per-day allowance indistinguishable. `_error_detail` is now
+      called before the raise check. 52 pytest pass; the new test mutation-proved red against `HEAD`
+      with `assert '...RequestsPerDay...' in 'embeddings API returned HTTP 429'` — verbatim the line
+      the live run produced. Pushed: `origin/k3d-manager-v1.39.0` = `1b3c7f47`.
+- [ ] Determine which quota it was. Two routes, both needing the key present in the shell:
+      the scratchpad probe, or simply re-running `make index-docs` — with `1b3c7f47` in place the
+      re-run is the better of the two, since it either resumes past 900 or names the quota itself.
+      The operator's `python3 .../quota-probe.py` via `!` printed
+      `K3DM_EMBEDDINGS_API_KEY is unset in this shell` — the `!` prefix runs in Claude's shell, which
+      never saw the operator's `export`. This is the durable-credential gap demonstrated, not
+      predicted.
+
 LESSON — both design defects in this change were caught by the operator, not by a test, and both had
 the same shape: a plausible mechanism no test could reject, because tests assert that a structure
 behaves, never whether it should exist. `TestVaultFallback` now pins the rc 36 hint against

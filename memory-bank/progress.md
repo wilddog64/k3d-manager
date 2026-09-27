@@ -9,6 +9,14 @@
       `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md`. CHANGELOG updated.
 - [ ] Operator: add the k3dm-owned keychain item, write the Vault copy, re-run `make index-docs`.
 - [ ] Then Claude verifies read-only: row count, sensor status, one ranked similarity result.
+- [x] `5f8590b6` paces the embed loop (`EMBED_MIN_INTERVAL`, default 0.6s) and waits the delay a 429
+      names; `1b3c7f47` makes the 429 say **which** quota it hit — `_error_detail` reads the error
+      body once and appends `(quota <quotaId>)`, and is now called before the exhausted-attempts
+      raise, which previously produced the only message a human sees and the only one with no detail.
+- [ ] Second live run: 900/1705 committed, then a 429 surviving six retries — a standing limit, most
+      likely per-day, not the per-minute throttle the first run hit. Re-running resumes at 901. If it
+      is a daily cap, a free-tier cold index cannot finish in one day and the guide's half-hour
+      estimate plus the word "unavailable" both need correcting.
 
 # vectordb health monitoring — 2026-09-26 complete
 
