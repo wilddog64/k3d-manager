@@ -18,6 +18,13 @@
   **verifies against the live endpoint before reporting success**, so a green result means the sensor
   will work rather than merely that an item exists.
 
+  Both API calls send an explicit `User-Agent`. `urllib` otherwise announces itself as
+  `Python-urllib/<ver>`, which Cloudflare rejects with **HTTP 403 and `error code: 1010`** before the
+  request ever reaches ArgoCD. The first live run failed exactly this way, and a 403 on a session call
+  reads as a rejected password or a missing `accounts.hermes=apiKey` — sending the operator after two
+  causes that were both fine. The target's own error hint now names the 1010 case first, and a BATS
+  guard fails if the header is ever dropped.
+
   Motivating incident: the `argocd` sensor had been reporting "credential rejected" since the
   2026-09-20 ArgoCD rebuild. The error was `token signature is invalid` — neither an expiry nor a
   revocation. Every token and CLI session is signed with `server.secretkey` from `argocd-secret`, and

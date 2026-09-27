@@ -1,3 +1,38 @@
+# 2026-09-27 — argocd-hermes-token: the first live run hit Cloudflare 1010
+
+`make argocd-hermes-token` failed on the operator's first real-terminal run with
+`urllib.error.HTTPError: HTTP 403: Forbidden` out of the session call. Not an ArgoCD
+authz failure: the body is `error code: 1010`, Cloudflare's bot block, rejecting
+`urllib`'s default `Python-urllib/3.13` User-Agent before the request reaches ArgoCD.
+
+Proved credential-free against `/api/v1/version`:
+
+| User-Agent | Result |
+|---|---|
+| default `Python-urllib/3.13` | `403` + `error code: 1010` |
+| `Mozilla/5.0` | `200` `{"Version":"v3.5.3"}` |
+| `k3d-manager/argocd-hermes-token` | `200` |
+| `curl/8.7.1` | `200` |
+
+A descriptive project UA suffices — no browser impersonation needed.
+
+**Why this was worth a doc change, not just a one-line fix.** A 403 on
+`/api/v1/session` is indistinguishable from a rejected admin password or a missing
+`accounts.hermes=apiKey`, and both are plausible right after the rebuild that killed
+the token in the first place. The target's own error hint pointed at exactly those two
+innocent causes. It now names the 1010 case first.
+
+Fix: `User-Agent` on both snippets (mint + verify), the reordered error hint, BATS test
+9 asserting at least two UA headers (mutation-proven: removing them turns it red, tree
+restored `cmp`-identical and green, 9/9), a troubleshooting block in
+`docs/guides/hermes.md`, and a CHANGELOG paragraph. The standing memory
+`reference_cloudflare_1010_ua_block` was **corrected** — it claimed this "bites only
+ad-hoc verification", and it framed the trigger as a *missing* UA when a *blocked* UA
+is enough.
+
+Still pending: the operator re-runs `make argocd-hermes-token`. The TTY gate means no
+agent can do it.
+
 # 2026-09-27 — `make argocd-hermes-token` (`80fb51c2`)
 
 The ArgoCD token re-mint is now one command instead of a five-step manual

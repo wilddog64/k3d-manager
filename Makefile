@@ -718,9 +718,11 @@ argocd-hermes-token:
 	  echo "[argocd-hermes-token]        that argocd-initial-admin-secret still exists in $$_ns." >&2; \
 	  exit 1; \
 	}; \
-	_tok=$$(ARGOCD_HOST="$$_host" ARGOCD_ADMIN_PW="$$_pw" python3 -c 'import json,os,urllib.request as u; h=os.environ["ARGOCD_HOST"]; j={"Content-Type":"application/json"}; s=json.loads(u.urlopen(u.Request("https://%s/api/v1/session" % h, data=json.dumps({"username":"admin","password":os.environ["ARGOCD_ADMIN_PW"]}).encode(), headers=j, method="POST"), timeout=30).read())["token"]; k=dict(j); k["Authorization"]="Bearer "+s; print(json.loads(u.urlopen(u.Request("https://%s/api/v1/account/hermes/token" % h, data=json.dumps({"expiresIn":"0"}).encode(), headers=k, method="POST"), timeout=30).read())["token"])') || { \
+	_tok=$$(ARGOCD_HOST="$$_host" ARGOCD_ADMIN_PW="$$_pw" python3 -c 'import json,os,urllib.request as u; UA="k3d-manager/argocd-hermes-token"; h=os.environ["ARGOCD_HOST"]; j={"Content-Type":"application/json","User-Agent":UA}; s=json.loads(u.urlopen(u.Request("https://%s/api/v1/session" % h, data=json.dumps({"username":"admin","password":os.environ["ARGOCD_ADMIN_PW"]}).encode(), headers=j, method="POST"), timeout=30).read())["token"]; k=dict(j); k["Authorization"]="Bearer "+s; print(json.loads(u.urlopen(u.Request("https://%s/api/v1/account/hermes/token" % h, data=json.dumps({"expiresIn":"0"}).encode(), headers=k, method="POST"), timeout=30).read())["token"])') || { \
 	  echo "[argocd-hermes-token] ERROR: could not mint a token on $$_host." >&2; \
-	  echo "[argocd-hermes-token]        Check that accounts.hermes=apiKey is set in argocd-cm and" >&2; \
+	  echo "[argocd-hermes-token]        A 403 with \"error code: 1010\" is Cloudflare blocking the" >&2; \
+	  echo "[argocd-hermes-token]        User-Agent, not an ArgoCD authz failure." >&2; \
+	  echo "[argocd-hermes-token]        Otherwise check that accounts.hermes=apiKey is set in argocd-cm and" >&2; \
 	  echo "[argocd-hermes-token]        that the admin password is the current one (a rebuild resets it)." >&2; \
 	  exit 1; \
 	}; \
@@ -735,7 +737,7 @@ argocd-hermes-token:
 	  exit 1; \
 	}; \
 	echo "[argocd-hermes-token] stored in Keychain (k3dm-hermes-argocd-token)"; \
-	ARGOCD_HOST="$$_host" ARGOCD_TOKEN="$$_stored" python3 -c 'import json,os,urllib.request as u; d=json.loads(u.urlopen(u.Request("https://%s/api/v1/applications" % os.environ["ARGOCD_HOST"], headers={"Authorization":"Bearer "+os.environ["ARGOCD_TOKEN"]}), timeout=30).read()); print("[argocd-hermes-token] verified: %d applications visible to hermes" % len(d.get("items") or []))' || { \
+	ARGOCD_HOST="$$_host" ARGOCD_TOKEN="$$_stored" python3 -c 'import json,os,urllib.request as u; d=json.loads(u.urlopen(u.Request("https://%s/api/v1/applications" % os.environ["ARGOCD_HOST"], headers={"Authorization":"Bearer "+os.environ["ARGOCD_TOKEN"],"User-Agent":"k3d-manager/argocd-hermes-token"}), timeout=30).read()); print("[argocd-hermes-token] verified: %d applications visible to hermes" % len(d.get("items") or []))' || { \
 	  echo "[argocd-hermes-token] ERROR: the stored token was rejected by $$_host." >&2; \
 	  echo "[argocd-hermes-token]        Check the hermes RBAC line in argocd-rbac-cm grants applications/get." >&2; \
 	  exit 1; \

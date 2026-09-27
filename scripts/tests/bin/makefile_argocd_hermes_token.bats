@@ -70,3 +70,18 @@ setup() {
   [[ "${RECIPE}" == *"/api/v1/applications"* ]]
   [[ "${RECIPE}" == *"applications visible to hermes"* ]]
 }
+
+@test "both API calls set an explicit User-Agent" {
+  case "${RECIPE}" in
+    *'User-Agent'*) ;;
+    *)
+      printf 'The recipe sends no User-Agent header.\n' >&2
+      printf 'urllib defaults to "Python-urllib/<ver>", which Cloudflare rejects with\n' >&2
+      printf 'HTTP 403 "error code: 1010" before the request reaches ArgoCD — a failure\n' >&2
+      printf 'that reads as an authz problem and sends the operator after the wrong cause.\n' >&2
+      return 1 ;;
+  esac
+
+  _ua_count="$(printf '%s' "${RECIPE}" | command grep -c 'User-Agent' || true)"
+  [ "${_ua_count}" -ge 2 ]
+}

@@ -200,6 +200,18 @@ To confirm the read-only posture: `argocd account can-i get applications '*/*'` 
 make argocd-hermes-token
 ```
 
+> **A 403 is probably Cloudflare, not ArgoCD.** `argocd.3ai-talk.org` sits behind Cloudflare, which
+> blocks `urllib`'s default `Python-urllib/<ver>` User-Agent with `HTTP 403` and a body of
+> `error code: 1010`. On the session call that looks identical to a rejected admin password or a
+> missing `accounts.hermes=apiKey`. Confirm which you have by reading the body:
+>
+> ```bash
+> python3 -c 'import urllib.request as u; print(u.urlopen(u.Request("https://argocd.3ai-talk.org/api/version", headers={"User-Agent":"k3d-manager/diag"})).read())'
+> ```
+>
+> A 200 here means the endpoint and the block are both understood — the target sets its own
+> User-Agent, so a remaining 403 is a genuine ArgoCD authz failure.
+
 Run this from a real terminal. The target mints a fresh token for the `hermes` account, stores it in
 the Keychain, proves it against `/api/v1/applications`, and restarts the Hermes agent. It never
 prints the token.
