@@ -101,6 +101,34 @@ class TestPerBatchCommit:
         assert "2 of 4 documents were committed" in stderr
         assert "re-running resumes" in stderr
 
+    def test_a_spent_daily_quota_says_paused_not_unavailable(self, monkeypatch, capsys):
+        """A daily cap is arithmetic, not a fault: the wording must not read as breakage."""
+        monkeypatch.setattr(ix, "EMBED_BATCH", 2)
+        docs = [_doc(n) for n in ("one", "two", "three", "four")]
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: docs)
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: {})
+        monkeypatch.setattr(ix, "run_sql", lambda sql: "indexed=2")
+
+        calls = []
+
+        def spent(texts, task_type=None):
+            calls.append(texts)
+            if len(calls) == 2:
+                raise pa.RetrievalUnavailable(
+                    "embeddings API returned HTTP 429 "
+                    "(quota EmbedContentRequestsPerDayPerProjectPerModel-FreeTier)")
+            return _vectors(len(texts))
+
+        monkeypatch.setattr(ix, "embed_batch", spent)
+
+        assert ix.main([]) == 1
+        stderr = capsys.readouterr().err
+        assert "index-docs: paused" in stderr
+        assert "unavailable" not in stderr
+        assert "daily embeddings quota is spent" in stderr
+        assert "2 of 4 documents were committed" in stderr
+
     def test_a_failed_embed_call_commits_nothing_for_that_batch(self, monkeypatch):
         monkeypatch.setattr(ix, "EMBED_BATCH", 2)
         docs = [_doc(n) for n in ("one", "two")]

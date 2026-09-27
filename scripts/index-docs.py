@@ -138,12 +138,22 @@ def main(argv=None):
             if not args.quiet:
                 print(f"index-docs: committed {written}/{len(changed)}", file=sys.stderr)
     except RetrievalUnavailable as exc:
-        print(f"index-docs: unavailable — {exc}", file=sys.stderr)
-        print(
-            f"index-docs: {written} of {len(changed)} documents were committed before the "
-            "failure; re-running resumes from there",
-            file=sys.stderr,
-        )
+        detail = str(exc)
+        if "perday" in detail.lower():
+            print(f"index-docs: paused — {detail}", file=sys.stderr)
+            print(
+                f"index-docs: {written} of {len(changed)} documents were committed; the daily "
+                "embeddings quota is spent. Neither the store nor the credential is broken — "
+                "re-run after the quota resets and it resumes from there",
+                file=sys.stderr,
+            )
+        else:
+            print(f"index-docs: unavailable — {detail}", file=sys.stderr)
+            print(
+                f"index-docs: {written} of {len(changed)} documents were committed before the "
+                "failure; re-running resumes from there",
+                file=sys.stderr,
+            )
         return 1
 
     present = [doc[0] for doc in docs]

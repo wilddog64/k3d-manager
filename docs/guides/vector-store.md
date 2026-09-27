@@ -41,8 +41,8 @@ make index-docs LIMIT=5       # embed at most 5 changed docs
 ```
 
 The corpus is `docs/bugs`, `docs/issues`, `docs/plans` and `docs/retro`, enumerated with
-`git ls-files` — untracked scratch files are never indexed. As of 2026-09-26 that is **1,704**
-documents.
+`git ls-files` — untracked scratch files are never indexed. As of 2026-09-27 that is **1,705**
+documents, all of them in the store.
 
 Only the `#` title, the leading prose paragraph and the `##` headings are embedded. The bodies are
 largely shell transcripts, which dominate the token count while carrying almost no topical signal;
@@ -53,16 +53,33 @@ of exactly that embedded text, so:
 - an edit confined to a transcript body correctly re-embeds nothing, because it cannot change the
   vector.
 
-A full cold index of 1,704 documents is 1,704 calls to the Gemini embeddings API — one per
+A full cold index of 1,705 documents is 1,705 calls to the Gemini embeddings API — one per
 document. The model is `gemini-embedding-2` and the endpoint is `embedContent`, which takes a single
 text. There is no batch endpoint to use: `batchEmbedContents` was withdrawn along with
 `text-embedding-004` and now answers **HTTP 404**, which reads as a credential problem and is not one
 (`api_key()` raises before any HTTP call when no credential resolves, so reaching a 404 at all proves
 the key authenticated). `EMBED_BATCH = 100` therefore sizes the commit chunk below, not an API call.
 
-Because that quota is **per minute**, the loop paces itself: `EMBED_MIN_INTERVAL` (default `0.6s`,
-overridable with `K3DM_EMBEDDINGS_MIN_INTERVAL`) sits just under the free tier's 100 requests/minute,
-which puts a cold index at roughly half an hour. A **429 is an ordinary step in a healthy run**, not a
+**There are two quotas, and only one of them can be paced around.** The loop paces the per-minute
+one: `EMBED_MIN_INTERVAL` (default `0.6s`, overridable with `K3DM_EMBEDDINGS_MIN_INTERVAL`) sits just
+under the free tier's 100 requests/minute, which costs about 90 seconds per 100-document batch. The
+second is a **requests-per-day** allowance — roughly 1,000 on the free tier — and no pacing defeats
+it, because it does not refill until the day rolls over.
+
+That makes a **cold** index of 1,705 documents impossible to finish in one day on the free tier: it
+is about 1,705 calls against a ~1,000/day ceiling. The real cold start (2026-09-26/27) took two days
+— 900 documents, a 429 that survived every retry, then the remaining 805 the next morning with no
+429 at all. Each day's run is only ~15 minutes of wall clock; the daily allowance is the constraint,
+not the pacing. Plan a cold start as *two sittings* rather than one half-hour run. A **warm**
+re-index is unaffected — it embeds only what changed, so it is normally zero calls.
+
+Telling the two apart is what `_error_detail` is for: a spent daily allowance now prints
+`index-docs: paused — ... (quota EmbedContentRequestsPerDayPerProjectPerModel-FreeTier)`, not
+`unavailable`, because the store and the credential are both fine and the only correct action is to
+re-run after the reset. Do **not** lower `EMBED_MIN_INTERVAL` or add retries to push through a daily
+cap: that spends the next day's allowance on retries and makes the failure less legible.
+
+A **429 from the per-minute bucket is an ordinary step in a healthy run**, not a
 failure — the first attempt of the first live run hit one, and the original policy of three tries over
 six seconds abandoned all 1,705 documents. `_embed_one` now retries six times and waits the delay the
 server names: this API puts it in a `RetryInfo` detail in the response body (`"retryDelay": "31s"`),
@@ -284,7 +301,7 @@ HTTP status before diagnosing.
 
 ## Why a vector store at this scale
 
-1,704 documents is small enough to grep and too large to read. The failure this addresses is not
+1,705 documents is small enough to grep and too large to read. The failure this addresses is not
 search latency; it is that the exact-slug dedup check only matches a slug someone already guessed
 correctly. A bug filed as `eso-403-vault-path` does not match an existing
 `eso-ldap-policy-missing-keycloak`, so the same defect gets refiled under a new name — which has

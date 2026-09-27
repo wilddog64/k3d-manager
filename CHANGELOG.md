@@ -2,8 +2,83 @@
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-09-27
+
+### Added
+
+- The embeddings credential has a fourth source: `secret/embeddings/gemini` in the hub Vault, tried
+  after the environment and the two keychain items. The keychain cannot always serve a value —
+  `gemini-cli-api-key` was created by the Gemini CLI with an ACL trusting only its own binary, so any
+  other process gets rc 36 (`errSecInteractionNotAllowed`) even with the keychain unlocked, and a
+  launchd context has no session to unlock anything. Vault covers those cases without circularity,
+  because its root token comes from the `vault-root` Kubernetes Secret read with kubectl rather than
+  from the keychain. It is tried last on availability grounds: it needs a reachable hub, while the
+  keychain answers locally. Neither the root token nor the API key ever reaches an argv — the token
+  goes to the Vault pod on stdin, and the secret path is passed as a positional argument rather than
+  interpolated into the `sh -c` string.
+- Hermes now watches vectordb health and publishes index freshness. Nothing previously watched this
+  rebuildable component, and the ExternalSecret condition that can prevent its pod from starting is
+  not scrapeable today; the read-only probe, Pushgateway gauges, stale-index alerts and Grafana
+  dashboard expose that failure chain and the quieter stale-index defect.
+- Similarity search over the docs corpus, closing a gap the exact-slug dedup check could not: the
+  glob only matches a slug someone already guessed correctly, so the same ESO defect was refiled
+  under a name it could not match. `make index-docs` embeds the tracked `docs/bugs`, `docs/issues`,
+  `docs/plans` and `docs/retro` trees (1,705 documents) into the pgvector store, and
+  `make find-similar-docs Q="..."` ranks prior art against a query. Both are reachable from Slack
+  (`find-similar-docs` at reader tier, `index-docs` at operator tier) and `find-similar-docs` is
+  also a cloud-bridge action, so a cloud session can check prior art before filing.
+
+  Only each document's title, leading prose paragraph and `##` headings are embedded — about 3% of a
+  typical file, since the bodies are shell transcripts that dominate the token count and carry
+  almost no topical signal. Rows are keyed by a hash of exactly that embedded text, so a re-run with
+  no doc changes makes zero embedding calls and an edit confined to a transcript re-embeds nothing.
+  Retrieval is advisory everywhere: a missing credential, an unreachable store or an empty index
+  reports on stderr and exits 0, because the dedup check must never become a new way for filing to
+  fail. Retrieval quality is UNMEASURED until the v1.40.0 eval.
+
+  No Postgres driver is introduced: SQL is piped to `psql` inside the pod with the argument vector
+  carrying a literal `$POSTGRES_USER` for the pod's own shell to expand, so the database password
+  never reaches argv, a log or this host's history. The embeddings key is read from
+  `K3DM_EMBEDDINGS_API_KEY` or the keychain at call time and sent only as a request header, so there
+  is no sensitive CLI flag to register. The Slack `Q` argument excludes every shell metacharacter
+  because it reaches a Makefile recipe where `$(Q)` expands into a command line.
+- A hub platform component deploys single-instance pgvector Postgres into the `vectordb` namespace
+  as a rebuildable cache on local-path storage, not a system of record; its index is not durable and
+  losing it costs one re-index. The retriever's quality is UNMEASURED until the v1.40.0 eval runs.
+
+### Changed
+
+- The embeddings credential resolution order is documented as a preference order rather than a set of
+  copies, and `rc 36` now names the fix that does not duplicate anything. The guide previously told
+  the operator to create a dedicated `k3dm-embeddings-api-key` holding a copy of the key the Gemini
+  CLI item already held — two items in one keychain on one machine, sharing a lock state and a
+  failure domain, so the copy doubled what rotation had to touch and survived nothing the original
+  would not. `errSecInteractionNotAllowed` is an access-control problem on a single item, and the
+  remedy is widening that item's partition list (`security
+  set-generic-password-partition-list -S apple-tool:,apple:`), or its trusted-application ACL through
+  Keychain Access when the partition list is not the restriction. Exactly one keychain slot holds a
+  value; `k3dm-embeddings-api-key` stays empty except on a host with no Gemini CLI. The hub Vault
+  copy is unaffected — it is a different failure domain (locked keychain, launchd with no session,
+  another host), which is the distinction that makes it worth having and a second keychain item not.
+
 ### Fixed
 
+- **`make index-docs`: a spent daily quota now reports `paused`, not `unavailable`.** The cold index
+  is ~1,705 calls against a free-tier ceiling of roughly 1,000 requests/day, so a run that stops
+  partway through is the expected outcome, not a fault — but it printed `index-docs: unavailable`,
+  the same word used when the store is unreachable or no credential resolves. That reads as
+  breakage and invites exactly the wrong response: lowering `EMBED_MIN_INTERVAL` or adding retries,
+  which spends the next day's allowance on retries and makes the stop less legible. The mid-run
+  handler now recognises a per-day `quotaId` and says the daily quota is spent and that a re-run
+  after the reset resumes from there. The test was proved red against the pre-fix source, which
+  emitted the old `unavailable` line verbatim.
+- **`docs/guides/vector-store.md` described a run that cannot happen.** It called the quota
+  "per minute" and put a cold index at "roughly half an hour", which is true only of the per-minute
+  bucket the pacing already handles. The real cold start took two days — 900 documents, a 429 that
+  survived 62s of backoff, then the remaining 805 the next morning with no 429 at all, which is a
+  per-day allowance resetting at the day boundary and not a throttle. The guide now documents both
+  quotas, that only one can be paced around, and that a free-tier cold start is two sittings. The
+  corpus count is also corrected to 1,705 throughout, matching `git ls-files`.
 - **Prior-art embeddings: a 429 now says which quota it hit.** The second live run committed 900 of
   1,705 documents across nine clean batches, then failed with `embeddings API returned HTTP 429` —
   a message that cannot distinguish a per-minute throttle, which clears in seconds, from a spent
@@ -26,7 +101,8 @@
   header-only reader misses it entirely and falls back to guessing; both are read, header first.
   `embed_batch` also spaces requests by `EMBED_MIN_INTERVAL` (default `0.6s`, overridable with
   `K3DM_EMBEDDINGS_MIN_INTERVAL`) so the loop stays under the free tier's 100 requests/minute
-  instead of sprinting into the limit — a cold index is now roughly half an hour. Both new tests
+  instead of sprinting into the limit, which costs about 90 seconds per 100-document batch. Both
+  new tests
   were proved red against the pre-fix source; the retry test showed the old code sleeping its
   guessed `2.0s` in place of the server's `31s`.
 - **Prior-art embeddings: ported off the withdrawn `batchEmbedContents` endpoint.** `make index-docs`
@@ -38,7 +114,7 @@
   so changing the model name alone would have reproduced the identical 404. `_embed_request` now
   targets `:embedContent` with a single `content`, and `embed_batch` loops per text while keeping its
   backoff, ordering and dimension guards; `EMBED_BATCH` now sizes the commit chunk rather than an API
-  call, so a full cold index is 1,704 requests instead of 18. `outputDimensionality: 768` is sent
+  call, so a full cold index is 1,705 requests instead of 18. `outputDimensionality: 768` is sent
   explicitly because `gemini-embedding-2` defaults wider than the `embedding vector(768)` column. Two
   tests pin the request shape — endpoint and dimensionality — so this cannot silently regress to a
   retired endpoint, and both were proved red against the pre-fix source.
@@ -47,8 +123,6 @@
   and the widening remedy above only fixes the first. The non-TTY `-w` trap is also documented for
   `-U`, not just for creation: an update without a TTY exits 0 having stored nothing, advancing `mdat`
   while leaving the value empty.
-
-### Fixed
 - `make index-docs` now commits each batch of 100 documents in its own transaction instead of
   embedding the whole corpus into memory and writing once at the end. A failure on the last batch
   used to discard every embedding call already paid for, and a mid-run store read showed `rows: 0`
@@ -65,70 +139,11 @@
   while the caller discarded its exit status; it now distinguishes those outcomes, fails closed on
   parse or vacuous-query failures, skips confirmation during dry runs, and checks manifest sources
   as well as `$values` sources while explicitly excluding and counting sources that track `HEAD`.
-
-### Added
-- The embeddings credential has a fourth source: `secret/embeddings/gemini` in the hub Vault, tried
-  after the environment and the two keychain items. The keychain cannot always serve a value —
-  `gemini-cli-api-key` was created by the Gemini CLI with an ACL trusting only its own binary, so any
-  other process gets rc 36 (`errSecInteractionNotAllowed`) even with the keychain unlocked, and a
-  launchd context has no session to unlock anything. Vault covers those cases without circularity,
-  because its root token comes from the `vault-root` Kubernetes Secret read with kubectl rather than
-  from the keychain. It is tried last on availability grounds: it needs a reachable hub, while the
-  keychain answers locally. Neither the root token nor the API key ever reaches an argv — the token
-  goes to the Vault pod on stdin, and the secret path is passed as a positional argument rather than
-  interpolated into the `sh -c` string.
-
-### Changed
-- The embeddings credential resolution order is documented as a preference order rather than a set of
-  copies, and `rc 36` now names the fix that does not duplicate anything. The guide previously told
-  the operator to create a dedicated `k3dm-embeddings-api-key` holding a copy of the key the Gemini
-  CLI item already held — two items in one keychain on one machine, sharing a lock state and a
-  failure domain, so the copy doubled what rotation had to touch and survived nothing the original
-  would not. `errSecInteractionNotAllowed` is an access-control problem on a single item, and the
-  remedy is widening that item's partition list (`security
-  set-generic-password-partition-list -S apple-tool:,apple:`), or its trusted-application ACL through
-  Keychain Access when the partition list is not the restriction. Exactly one keychain slot holds a
-  value; `k3dm-embeddings-api-key` stays empty except on a host with no Gemini CLI. The hub Vault
-  copy is unaffected — it is a different failure domain (locked keychain, launchd with no session,
-  another host), which is the distinction that makes it worth having and a second keychain item not.
-
-### Fixed (continued)
 - Vault and vector-store failures now report the pod's own error instead of kubectl's exit-code
   trailer. `kubectl exec` appends `command terminated with exit code N` as the last line of stderr,
   so reading the last line reported the exit code and discarded the message: a read of an unwritten
   Vault path said `exit code 2` rather than `No value found at secret/data/embeddings/gemini`. The
   same defect applied to every `psql` error surfaced through the store.
-
-### Added (continued)
-- Hermes now watches vectordb health and publishes index freshness. Nothing previously watched this
-  rebuildable component, and the ExternalSecret condition that can prevent its pod from starting is
-  not scrapeable today; the read-only probe, Pushgateway gauges, stale-index alerts and Grafana
-  dashboard expose that failure chain and the quieter stale-index defect.
-- Similarity search over the docs corpus, closing a gap the exact-slug dedup check could not: the
-  glob only matches a slug someone already guessed correctly, so the same ESO defect was refiled
-  under a name it could not match. `make index-docs` embeds the tracked `docs/bugs`, `docs/issues`,
-  `docs/plans` and `docs/retro` trees (1,704 documents) into the pgvector store, and
-  `make find-similar-docs Q="..."` ranks prior art against a query. Both are reachable from Slack
-  (`find-similar-docs` at reader tier, `index-docs` at operator tier) and `find-similar-docs` is
-  also a cloud-bridge action, so a cloud session can check prior art before filing.
-
-  Only each document's title, leading prose paragraph and `##` headings are embedded — about 3% of a
-  typical file, since the bodies are shell transcripts that dominate the token count and carry
-  almost no topical signal. Rows are keyed by a hash of exactly that embedded text, so a re-run with
-  no doc changes makes zero embedding calls and an edit confined to a transcript re-embeds nothing.
-  Retrieval is advisory everywhere: a missing credential, an unreachable store or an empty index
-  reports on stderr and exits 0, because the dedup check must never become a new way for filing to
-  fail. Retrieval quality is UNMEASURED until the v1.40.0 eval.
-
-  No Postgres driver is introduced: SQL is piped to `psql` inside the pod with the argument vector
-  carrying a literal `$POSTGRES_USER` for the pod's own shell to expand, so the database password
-  never reaches argv, a log or this host's history. The embeddings key is read from
-  `K3DM_EMBEDDINGS_API_KEY` or the keychain at call time and sent only as a request header, so there
-  is no sensitive CLI flag to register. The Slack `Q` argument excludes every shell metacharacter
-  because it reaches a Makefile recipe where `$(Q)` expands into a command line.
-- A hub platform component deploys single-instance pgvector Postgres into the `vectordb` namespace
-  as a rebuildable cache on local-path storage, not a system of record; its index is not durable and
-  losing it costs one re-index. The retriever's quality is UNMEASURED until the v1.40.0 eval runs.
 
 ## [1.38.0] - 2026-09-25
 
