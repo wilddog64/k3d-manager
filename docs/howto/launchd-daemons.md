@@ -136,15 +136,37 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 launchd does not read the operator's shell profile; the plist's `EnvironmentVariables` `PATH` is
 the complete `PATH` for every child process.
 
-`~/.local/bin` is deliberately **not** in the webhook plist's `PATH`, and it holds `k3d`,
-`istioctl`, `k3d-manager`, `agy` and `secret-cli`.
+`~/.local/bin` holds `k3d`, `istioctl`, `k3d-manager`, `agy` and `secret-cli`. It is now the
+first entry in the webhook plist's `PATH`, set in
+`scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl` — fix the **template**, never only the
+generated file, or the next `k3dm-webhook-setup` reinstalls the defect.
 
-Any `bin/` script that may be invoked by a LaunchAgent must therefore normalize `PATH` itself.
-The scripts that currently do are `bin/cluster-up`, `bin/cluster-down`,
-`bin/k3dm-node-health-watch` and `bin/k3dm-vault-failover`.
+Three sibling templates still omit it: `cloud-bridge`, `hermes` and
+`prometheus-credential-rotator`. Anything they start that lives in `~/.local/bin` is unreachable.
+
+Defence in depth: any `bin/` script a LaunchAgent may invoke should also normalize `PATH` itself,
+so it stays correct under a plist nobody has fixed yet. The scripts that do are `bin/cluster-up`,
+`bin/cluster-down`, `bin/k3dm-node-health-watch` and `bin/k3dm-vault-failover`.
 
 A command that works in a terminal and fails under launchd is this bug, not a logic bug — check
 `PATH` first.
+
+### Applying a plist change requires bootout, not restart
+
+`make restart-webhook` runs `launchctl kickstart -k`. That restarts the *process* but reuses
+launchd's cached service definition, so a changed `EnvironmentVariables` block is **not** picked
+up: the restart succeeds, exits 0, and changes nothing. Use bootout/bootstrap instead, and verify
+by reading the value back rather than trusting the exit code:
+
+```bash
+launchctl bootout "gui/$(id -u)/com.k3d-manager.webhook"
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.k3d-manager.webhook.plist
+launchctl print "gui/$(id -u)/com.k3d-manager.webhook" | grep -E '^[[:space:]]+PATH =>'
+```
+
+`bootout` drops any in-flight job, so check `~/.local/share/k3d-manager/webhook-jobs/*/status`
+first. Filter that `launchctl print` output to the key you care about — the unfiltered
+environment block contains Slack credentials.
 
 ## Common Operations
 

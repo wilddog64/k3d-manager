@@ -1,3 +1,41 @@
+# 2026-09-27 — launchd PATH fix taken live on the host
+
+The repo half (`eff44a3f`) was already live for Slack-driven runs: the webhook LaunchAgent execs
+`/Users/cliang/src/gitrepo/personal/k3d-manager/bin/k3dm-webhook` out of this very checkout, which
+sits on `k3d-manager-v1.39.0`, so `make up` picked up the fixed `bin/cluster-up` with no deploy.
+What was still broken was everything else launchd starts through that plist's `PATH`.
+
+Two changes, on the operator's explicit go:
+
+- `scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl` — `PATH` now begins
+  `{{HOME}}/.local/bin:`. Without this the next `k3dm-webhook-setup` / `make install-launchd`
+  would have reinstalled the defect over any host-side edit. The template was the real root of the
+  bug, not the generated file.
+- The live `~/Library/LaunchAgents/com.k3d-manager.webhook.plist` — `EnvironmentVariables:PATH`
+  set with a targeted `PlistBuddy Set` (never a whole-block rewrite: that dict holds Slack
+  credentials). All five env keys and all seven top-level keys verified intact afterwards;
+  `plutil -lint` OK. Backup kept in the session scratchpad.
+
+**Operational finding — `make restart-webhook` cannot apply a plist change.** The target runs
+`launchctl kickstart -k`, which restarts the *process* but reuses launchd's cached service
+definition. After it, `launchctl print` still reported the OLD `PATH` while the plist on disk had
+the new one — a restart that looks successful and changes nothing. `launchctl bootout` +
+`bootstrap` was required; only then did `launchctl print` show
+`PATH => /Users/cliang/.local/bin:/opt/homebrew/bin:...`. The Makefile only reaches
+bootout/bootstrap in its *fallback*, when kickstart fails. Left unchanged (blast radius: every
+caller, and bootout drops in-flight jobs) — reported to the operator.
+
+Webhook confirmed healthy after bootstrap: pid up, last exit 0, listening on 127.0.0.1:7443. No
+job was in flight when it was restarted (checked every status file under
+`~/.local/share/k3d-manager/webhook-jobs` first; newest was the failed `c7faf86b`).
+
+Same defect class still present in three sibling templates and their loaded plists —
+`cloud-bridge`, `hermes`, `prometheus-credential-rotator` all lack `~/.local/bin`. Not touched:
+out of scope for this fix and each needs its own agent restarted. Operator's call.
+
+Lesson: a launchd env change needs bootout/bootstrap, not kickstart; and verify it by reading the
+value back out of `launchctl print`, not by trusting the restart's exit code.
+
 # 2026-09-27 — launchd PATH fix verified independently; one specced test was a tautology
 
 Codex implemented `docs/bugs/2026-09-27-launchd-path-omits-local-bin.md` as `f8d5ced7`

@@ -99,6 +99,17 @@
   `PATH`. Both entry-point scripts now normalize `PATH` themselves, so the fix travels with the
   code and is not dependent on changing the host-specific plist.
 
+- **The webhook LaunchAgent template no longer omits `~/.local/bin` from `PATH`.** Normalizing
+  `PATH` inside `cluster-up` and `cluster-down` fixes those two entry points, but every other
+  binary launchd starts through that plist — `istioctl`, `k3d-manager`, `agy`, `secret-cli` — was
+  still unreachable. `scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl` now leads its `PATH`
+  with `{{HOME}}/.local/bin`. The fix belongs in the template rather than the generated plist
+  because `k3dm-webhook-setup` regenerates the latter, which would silently reinstall the defect
+  over any host-side edit. `docs/howto/launchd-daemons.md` also records that applying such a change
+  needs `launchctl bootout` + `bootstrap`: `make restart-webhook` uses `kickstart -k`, which reuses
+  launchd's cached service definition and so restarts the process without picking up a new
+  environment — a restart that exits 0 and changes nothing.
+
 - **`/cluster-up` and `/cluster-down` no longer act on a cluster the operator did not name.**
   `resolveProvider` returned a per-command default for any text it did not recognize, which made two
   defects out of one function. The defaults were asymmetric — bare `/cluster-up` meant `hostinger`,

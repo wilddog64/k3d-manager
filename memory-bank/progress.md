@@ -2353,6 +2353,15 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 # 2026-09-27 — launchd PATH omission fixed
 
 - [x] M1–M5 implemented exactly from `docs/bugs/2026-09-27-launchd-path-omits-local-bin.md`.
+- [x] **Fix taken live on the host (operator go, 2026-09-27)** — webhook plist template `PATH` now
+      leads with `{{HOME}}/.local/bin` so `make install-launchd` cannot reinstall the defect, and the
+      loaded plist was updated with a targeted `PlistBuddy Set`. Verified by reading `PATH` back out
+      of `launchctl print`, not by the restart's exit code.
+- [x] **`make restart-webhook` does NOT apply plist changes** — `launchctl kickstart -k` reuses the
+      cached service definition; the loaded `PATH` stayed stale through a "successful" restart.
+      `bootout` + `bootstrap` was required. Makefile left unchanged; reported to the operator.
+- [ ] **Three sibling templates still carry the same PATH defect** — `cloud-bridge`, `hermes`,
+      `prometheus-credential-rotator` lack `~/.local/bin`. Out of scope for this fix; operator's call.
 - [x] Implementation commit `f8d5ced74467bd703f19cca60bda37b7360dfcf3` pushed to
 - [x] **Claude verified the launchd PATH fix independently** — SHA on origin via `gh api` (local `.git` was unwritable in Codex's sandbox), six-file diff scope, no subtree or `system.sh` changes, BATS 39/39 re-run by Claude, shellcheck histogram identical pre/post.
 - [x] **Fixed a tautological test Claude had specced** (`393f6570`) — the idempotence case asserted on an inline copy of the guard instead of `bin/cluster-up`, so it passed against unfixed source; now extracts and sources the real block and fails pre-fix.
