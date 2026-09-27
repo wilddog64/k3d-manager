@@ -323,8 +323,13 @@ than because the store is unhealthy. Run it by hand to distinguish the two:
 K3DM_PUSHGATEWAY_URL=http://localhost:9091 bin/k3dm-vectordb-metrics
 ```
 
-The alert watches only the last index timestamp: no publication for an hour, or an index older than
-seven days, is stale. A stale index can still return plausible results from `make find-similar-docs`;
+Two alerts watch this. `VectorDBMetricsStale` fires when the index timestamp has never been
+published **or** when `push_time_seconds{job="k3dm-vectordb"}` is over an hour old;
+`VectorDBIndexStale` fires when the index itself is older than seven days. The push-age term is
+load-bearing: **Pushgateway retains gauges after a publisher stops**, so `absent()` alone can never
+go true once one publish has happened, and a dead publisher is indistinguishable from a healthy one
+on the panels. To tell "stale" from "never ran", read `time() - push_time_seconds{job="k3dm-vectordb"}`
+rather than the panel values. A stale index can still return plausible results from `make find-similar-docs`;
 check the sensor evidence and re-run `make index-docs` after confirming the store is reachable. See
 [`docs/howto/find-prior-art.md`](../howto/find-prior-art.md) for the retrieval workflow.
 

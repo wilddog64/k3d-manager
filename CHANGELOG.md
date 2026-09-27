@@ -17,6 +17,21 @@
 
 ### Fixed
 
+- **`VectorDBMetricsStale` could never fire.** The alert was
+  `absent(k3dm_vectordb_last_index_timestamp_seconds)` with `for: 1h`, intended to catch "no
+  VectorDB metrics published for an hour". But Pushgateway **retains gauges after a publisher
+  stops**, so once a single publish had happened the series never disappeared again and `absent()`
+  could not go true — the one condition the alert existed to detect was the one condition it was
+  structurally incapable of detecting. The dashboard meanwhile keeps rendering the retained values,
+  so a dead publisher looks exactly like a healthy one. Confirmed live: with the last push 3.9 hours
+  old and no producer scheduled, the old expression returned an empty result while the new one
+  fired. The expression now also compares `push_time_seconds{job="k3dm-vectordb"}` against `time()`
+  with a one-hour threshold, keeping the `absent()` branch for the never-published case, and `for`
+  drops to `15m` so the hour is not counted twice. `scripts/tests/plugins/vectordb_rules.bats`
+  asserts the push-age term is present and fails with an explanation if the expression is ever
+  reduced to `absent()` alone.
+
+
 - **Three BATS suites ran in no `make` target and no CI job.**
   `observability_keep_list.bats`, `observability_resume_layer.bats` and
   `test_install_sudoers.bats` sat at the `scripts/tests/` root. The dispatcher
