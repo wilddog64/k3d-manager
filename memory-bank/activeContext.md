@@ -44,8 +44,13 @@ run. That is why the operator's run could not be diagnosed.
       list: Keychain Access → Get Info → Access Control (GUI only). Do **not** create a second
       keychain item — see the decision note below.
 - [ ] Operator: write the Vault copy (prompted command in the guide). No agent touches the value.
-- [ ] Operator: re-run `make index-docs`; then Claude verifies `rows` > 0, `last_indexed_epoch`
-      set, the sensor flipping off `index never built`, and one real ranked similarity result.
+- [x] Operator re-ran `make index-docs` (2026-09-27); Claude verified read-only: `rows=1705`,
+      `corpus_docs=1705`, `last_indexed_epoch=1790509292.947991`, and the sensor now
+      `healthy` — `rows=1705, corpus=1705, indexed 0.0d ago`. The `index never built` branch is
+      off. **One ranked similarity result is still NOT verified** — `make find-similar-docs`
+      embeds the query, so it needs the same credential; from Claude's shell it still prints
+      `retrieval unavailable — no embeddings credential` and exits 0. The retrieval path has
+      therefore never once returned a ranked result, and cannot until the durable slot exists.
 - [ ] Pre-existing, NOT fixed here: `Makefile:814` help comment "Run the pytest suites" sits above
       `check-doc-links`, so `make help` mislabels that target.
 
@@ -169,13 +174,22 @@ less legible.
       called before the raise check. 52 pytest pass; the new test mutation-proved red against `HEAD`
       with `assert '...RequestsPerDay...' in 'embeddings API returned HTTP 429'` — verbatim the line
       the live run produced. Pushed: `origin/k3d-manager-v1.39.0` = `1b3c7f47`.
-- [ ] Determine which quota it was. Two routes, both needing the key present in the shell:
-      the scratchpad probe, or simply re-running `make index-docs` — with `1b3c7f47` in place the
-      re-run is the better of the two, since it either resumes past 900 or names the quota itself.
-      The operator's `python3 .../quota-probe.py` via `!` printed
-      `K3DM_EMBEDDINGS_API_KEY is unset in this shell` — the `!` prefix runs in Claude's shell, which
-      never saw the operator's `export`. This is the durable-credential gap demonstrated, not
-      predicted.
+- [x] Which quota it was: **requests-per-day, confirmed by the day boundary — no probe needed**.
+      The 429 that survived six retries was on 2026-09-26; the server-named wait was 31s and the
+      fallback chain sums to 62s, so a limit still refusing after a minute-plus of waiting is
+      standing, not refilling. On 2026-09-27 the same key served the remaining 805 documents in
+      nine clean batches with no 429 at all. A limit that refuses a minute of backoff one day and
+      is freely available the next is a per-day allowance that reset at midnight. This retires the
+      per-minute hypothesis for good, and the arithmetic held: 805 fits under a ~1,000/day ceiling.
+      The resume path is also proven end to end — Claude's own credential-failed run printed
+      `0 of 805 documents were committed`, i.e. it read `last_indexed_epoch`, skipped the 900
+      already stored and scoped the run to the remainder.
+      Corollary standing: a **cold** 1,705-document index cannot complete in one day on the free
+      tier, so `docs/guides/vector-store.md`'s "roughly half an hour" and the word "unavailable"
+      in the failure message are both wrong for a cold start that spans days.
+      Note the earlier `!`-prefix probe printing `K3DM_EMBEDDINGS_API_KEY is unset in this shell`:
+      the `!` prefix runs in *Claude's* shell, which never saw the operator's `export`. That is the
+      durable-credential gap demonstrated, and it is the same gap that still blocks retrieval.
 
 LESSON — both design defects in this change were caught by the operator, not by a test, and both had
 the same shape: a plausible mechanism no test could reject, because tests assert that a structure

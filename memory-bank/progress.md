@@ -7,16 +7,23 @@
       two files. 4 mutations produced targeted failures and were restored.
 - [x] Docs: `docs/guides/vector-store.md` + Addendum 3 in
       `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md`. CHANGELOG updated.
-- [ ] Operator: add the k3dm-owned keychain item, write the Vault copy, re-run `make index-docs`.
-- [ ] Then Claude verifies read-only: row count, sensor status, one ranked similarity result.
+- [x] `make index-docs` completed 2026-09-27: `rows=1705`, `last_indexed_epoch` set, sensor
+      `healthy`. Two of three verifications pass; the ranked similarity result does NOT, because
+      `make find-similar-docs` embeds its query and no credential reaches a non-operator shell.
+- [ ] Operator: the durable slot is still open — write the Vault copy at `secret/embeddings/gemini`
+      (still `No value found`) or fix the `gemini-cli-api-key` trusted-app ACL in Keychain Access.
+      Until then `make find-similar-docs` and dedup Pass 2 are inert for every agent. No agent
+      creates, reads, echoes or commits the value.
 - [x] `5f8590b6` paces the embed loop (`EMBED_MIN_INTERVAL`, default 0.6s) and waits the delay a 429
       names; `1b3c7f47` makes the 429 say **which** quota it hit — `_error_detail` reads the error
       body once and appends `(quota <quotaId>)`, and is now called before the exhausted-attempts
       raise, which previously produced the only message a human sees and the only one with no detail.
-- [ ] Second live run: 900/1705 committed, then a 429 surviving six retries — a standing limit, most
-      likely per-day, not the per-minute throttle the first run hit. Re-running resumes at 901. If it
-      is a daily cap, a free-tier cold index cannot finish in one day and the guide's half-hour
-      estimate plus the word "unavailable" both need correcting.
+- [x] The 429 was a **per-day** cap, confirmed by the day boundary: it survived 62s of backoff on
+      2026-09-26 and the same key served 805 documents with zero 429s on 2026-09-27. Third run
+      resumed at 901 and finished 1705/1705. Do not lower `EMBED_MIN_INTERVAL` or add retries for
+      a daily cap — that spends tomorrow's quota and hides the failure.
+- [ ] Doc follow-up: a free-tier **cold** index spans days, so `docs/guides/vector-store.md`'s
+      "roughly half an hour" and the word "unavailable" in the index-docs message are both wrong.
 
 # vectordb health monitoring — 2026-09-26 complete
 
