@@ -23,19 +23,27 @@
   [ "${status}" -ne 0 ]
 }
 
-@test "every rules placeholder is in the envsubst allowlist" {
+@test "every rules placeholder is in the rules envsubst allowlist" {
   rules="${BATS_TEST_DIRNAME}/../../etc/prometheus/rules"
   plugin="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
-  run bash -c '
-    set -e
-    placeholders=$(grep -rhoE '\''\$\{[A-Za-z_][A-Za-z0-9_]*\}'\'' "$1" | sort -u)
-    while IFS= read -r placeholder; do
-      name=${placeholder#\${}
-      name=${name%\}}
-      grep -F -- "\$${name}" "$2" >/dev/null
-    done <<< "${placeholders}"
-  ' _ "${rules}" "${plugin}"
-  [ "${status}" -eq 0 ]
+
+  local _allow_line _allowlist
+  _allow_line="$(command grep -F -- '< "${_rule_file}"' "${plugin}" | command grep -F -- 'envsubst')"
+  [ -n "${_allow_line}" ]
+  _allowlist="${_allow_line#*envsubst \'}"
+  _allowlist="${_allowlist%%\'*}"
+  [ -n "${_allowlist}" ]
+
+  local _placeholder _name
+  while IFS= read -r _placeholder; do
+    [ -n "${_placeholder}" ] || continue
+    _name="${_placeholder#\$\{}"
+    _name="${_name%\}}"
+    if [[ " ${_allowlist} " != *" \$${_name} "* ]]; then
+      echo "placeholder \${${_name}} under ${rules}/ is absent from the rules envsubst allowlist (${_allowlist})"
+      return 1
+    fi
+  done < <(command grep -rhoE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' "${rules}" | sort -u)
 }
 
 @test "every Probe target is CF_DOMAIN-suffixed" {
