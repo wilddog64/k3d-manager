@@ -307,3 +307,17 @@ STUB
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" ]
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log" ]
 }
+
+@test "cluster-down puts ~/.local/bin on PATH before the hub teardown" {
+  run bash -c "awk '/^set -euo pipefail/{print NR; found=1} found && /HOME\}\/\.local\/bin/{print NR; exit}' bin/cluster-down"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 2 ]
+}
+
+@test "cluster-down fails loudly when k3d is missing instead of skipping the hub" {
+  run bash -c "awk '/Tearing down local Hub cluster/{found=1} found && /_command_exist k3d/{print NR; exit}' bin/cluster-down"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+  run grep -nF 'cannot tear down the local Hub cluster' bin/cluster-down
+  [ "$status" -eq 0 ]
+}

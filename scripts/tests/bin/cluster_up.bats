@@ -403,3 +403,22 @@ _load_acg_up_cleanup() {
   run bash -c "sed -n '/^function _acg_up_cleanup()/,/^}\$/p' bin/cluster-up | grep -n '_ACG_TUNNEL_PLIST_CREATED'"
   [ "$status" -eq 0 ]
 }
+
+@test "acg-up puts ~/.local/bin on PATH before anything reads it" {
+  run bash -c "awk '/^set -euo pipefail/{print NR; found=1} found && /HOME\}\/\.local\/bin/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 2 ]
+  run bash -c "awk '/HOME\}\/\.local\/bin:\\\$\{PATH\}/{print NR; found=1} found && /_command_exist k3d/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+}
+
+@test "acg-up does not prepend ~/.local/bin twice" {
+  run bash -c "PATH=\"\${HOME}/.local/bin:/usr/bin:/bin\" bash -c '
+    if [[ \":\${PATH}:\" != *\":\${HOME}/.local/bin:\"* ]]; then
+      export PATH=\"\${HOME}/.local/bin:\${PATH}\"
+    fi
+    printf %s \"\${PATH}\"'"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | tr ':' '\n' | grep -c "\.local/bin")" -eq 1 ]
+}

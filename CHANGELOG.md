@@ -92,6 +92,13 @@
 
 ### Fixed
 
+- **Launchd-driven cluster lifecycle runs now find k3d.** `cluster-up` previously failed loudly at
+  the Hub preflight when launchd supplied its minimal `PATH`, while `cluster-down` silently skipped
+  the Hub teardown and reported that no cluster existed. The root cause was launchd not reading the
+  operator's shell profile, leaving `~/.local/bin` — where `k3d` lives — out of the child process
+  `PATH`. Both entry-point scripts now normalize `PATH` themselves, so the fix travels with the
+  code and is not dependent on changing the host-specific plist.
+
 - **`/cluster-up` and `/cluster-down` no longer act on a cluster the operator did not name.**
   `resolveProvider` returned a per-command default for any text it did not recognize, which made two
   defects out of one function. The defaults were asymmetric — bare `/cluster-up` meant `hostinger`,

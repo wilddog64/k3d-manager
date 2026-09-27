@@ -131,6 +131,21 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 
 ---
 
+## PATH under launchd
+
+launchd does not read the operator's shell profile; the plist's `EnvironmentVariables` `PATH` is
+the complete `PATH` for every child process.
+
+`~/.local/bin` is deliberately **not** in the webhook plist's `PATH`, and it holds `k3d`,
+`istioctl`, `k3d-manager`, `agy` and `secret-cli`.
+
+Any `bin/` script that may be invoked by a LaunchAgent must therefore normalize `PATH` itself.
+The scripts that currently do are `bin/cluster-up`, `bin/cluster-down`,
+`bin/k3dm-node-health-watch` and `bin/k3dm-vault-failover`.
+
+A command that works in a terminal and fails under launchd is this bug, not a logic bug — check
+`PATH` first.
+
 ## Common Operations
 
 ```bash

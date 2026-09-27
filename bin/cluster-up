@@ -17,6 +17,14 @@
 
 set -euo pipefail
 
+# launchd starts this script with the plist's minimal PATH, which omits
+# ~/.local/bin where k3d and istioctl live. Without this, every Slack-driven
+# run dies at the Step 3.5 hub preflight while the same command succeeds from a
+# terminal.
+if [[ ":${PATH}:" != *":${HOME}/.local/bin:"* ]]; then
+  export PATH="${HOME}/.local/bin:${PATH}"
+fi
+
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
