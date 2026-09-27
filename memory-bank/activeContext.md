@@ -1,3 +1,25 @@
+# 2026-09-27 — enforce_admins is OFF on main; PR #133 awaiting the operator's merge
+
+`/create-pr` step 7 is done. The DELETE on
+`repos/wilddog64/k3d-manager/branches/main/protection/enforce_admins` was **denied to Claude by
+the auto-mode classifier**, so per the standing rule it was not worked around, not retried, and
+not routed through a subagent — it was surfaced and the **operator ran it via the `!` prefix**.
+Confirmed after the fact: `enabled: false`.
+
+`mergeable_state` is still `blocked` with `mergeable: true`. That is expected and not a new
+problem: the required-review count is untouched, and `enforce_admins: false` is what lets the
+owner merge past it. Do not read `blocked` as the DELETE having failed — read `enabled`.
+
+**Open obligation:** `main` is admin-bypassable until this is closed. Restore with the
+**bodyless** POST (`-f enabled=true` returns HTTP 422):
+
+    gh api repos/wilddog64/k3d-manager/branches/main/protection/enforce_admins -X POST
+
+On a merge, `/post-merge` Step 2 does it. If the merge is **deferred**, nothing is scheduled to
+close the window — restore it in the same sitting.
+
+Claude will not merge PR #133: creation was requested, merge was not.
+
 # 2026-09-27 — PR #133 is green; the rename provably cleared the CodeQL alert
 
 All `/create-pr` gates pass for PR #133 at `fc834487`. CI read **per job**, not by run
