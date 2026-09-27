@@ -66,6 +66,15 @@
   case-count drop and staleness. `origin` is part of the grouping URL rather than a body label,
   since a body label would let a green CI push silently overwrite a red local one.
 
+  The rules live in `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` under
+  `release: acg-kube-prometheus-stack`, deliberately apart from every other rule file in this
+  repo, which is hub-side. Only the app cluster has a Pushgateway and only its Prometheus scrapes
+  it; the hub's `federate-acg` job selects
+  `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}` and so pulls back none of the
+  `k3dm_test_*` series. A rule for these metrics on the hub stack matches nothing and can never
+  fire, which is not distinguishable from a healthy suite. `DeploymentMetricsStale` moved out of
+  the hub rule for the same reason — it had been inert since it was written.
+
 ### Changed
 
 - The embeddings credential resolution order is documented as a preference order rather than a set of

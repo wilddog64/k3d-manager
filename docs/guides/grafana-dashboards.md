@@ -279,6 +279,20 @@ exit code, drive health.
 | Total cases | `k3dm_test_cases_total` |
 | Exit code | `k3dm_test_exit_code` (informational only) |
 
+**Suite duration is not wired yet.** `k3dm_test_run_duration_seconds` is pushed as a literal
+`0`, and the per-suite regex in `bin/k3dm-test-metrics` looks for a `# duration:` marker that
+no harness emits — so only the unittest files report real values and the `bats` and `pytest`
+bars stay flat at zero. A flat duration panel here is the known gap, not a broken push.
+
+**Where the alerts live.** The five `k3dm-tests.alerts` rules are in
+`scripts/etc/prometheus/rules-acg/k3dm-tests.yaml`, labelled
+`release: acg-kube-prometheus-stack`, and are applied to the app cluster by
+`make observability-acg`. They deliberately do **not** sit with the other rule files under
+`scripts/etc/prometheus/rules/`, which are hub-side: the hub has no Pushgateway, its
+`federate-acg` job selects only `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}`,
+and so the hub TSDB holds zero `k3dm_test_*` series. A rule on the hub for these metrics can
+never fire. `DeploymentMetricsStale` moved for the same reason.
+
 ### Trivy Security (`trivy-security`) — ACG only
 
 Native `trivy-operator` metrics, no exporter in the path.

@@ -1,3 +1,25 @@
+# v1.39.0 k3dm-tests alerts moved to the ACG stack — 2026-09-27
+
+- [x] NEW `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` — five rules,
+      `release: acg-kube-prometheus-stack`, `namespace: monitoring`. Verified live that this is the
+      ACG `ruleSelector` (`{"matchLabels":{"release":"acg-kube-prometheus-stack"}}`) and that its
+      `ruleNamespaceSelector` is `{}`.
+- [x] `k3dm-tests.alerts` removed from the hub `prometheusrule.yaml`; 3 groups / 9 rules remain.
+- [x] NEW `scripts/tests/plugins/observability_k3dm_tests_rules.bats` — 5 cases green; these alerts
+      had no test coverage at all before. Case 2 mutation-proved red against `git show HEAD:`.
+- [x] `docs/guides/grafana-dashboards.md` + `CHANGELOG.md` record the hub/ACG split and the reason.
+- [x] `make check-doc-links` 1794 OK; `bats -r scripts/tests/plugins/` exit 0, 779 tests, 0 not ok.
+- [ ] **BLOCKED (classifier, operator must run):** wire the apply into
+      `_deploy_pushgateway_acg` in `scripts/plugins/observability.sh`. Until this lands nothing
+      applies the new rule file. Exact patch handed to the operator.
+- [ ] **BLOCKED (classifier, operator must run):**
+      `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` — the per-release reapply.
+      `--dry-run` clean, 13/13 sets.
+- [ ] After both: confirm the rule group appears in the ACG Prometheus
+      `/api/v1/rules` (it returned no `k3dm-tests` group before this work).
+- [ ] Duration metrics (DEFECT 2) still undecided: fix in v1.39.0 or file for v1.40.0.
+- [ ] My `:19190` forward propping up `federate-acg` is still undisclosed to a durable fix.
+
 # embeddings credential + indexer resumability — 2026-09-26 complete
 
 - [x] Vault added as credential source 4 (`secret/embeddings/gemini`, field `api_key`) in

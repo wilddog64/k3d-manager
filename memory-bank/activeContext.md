@@ -1,3 +1,67 @@
+# 2026-09-27 — DEFECT 4: the k3dm-tests alerts were on a Prometheus that has none of the data
+
+Found while assembling the ApplicationSet-reapply instructions. The five `k3dm-tests.alerts` rules
+landed in `scripts/etc/argocd/platform-ops/prometheusrule.yaml`, whose metadata is
+`namespace: cicd` / `release: kube-prometheus-stack` — the HUB stack. `deploy_argocd_platform_ops`
+applies with a bare `_kubectl apply` and no `--context`, so it targets whatever context is current
+(`k3d-k3d-cluster`).
+
+Evidence, all first-hand:
+
+| Check | Result |
+|---|---|
+| hub TSDB `k3dm_test_cases_total` | 0 series |
+| hub TSDB `k3dm_deployment_last_timestamp_seconds` | 0 series |
+| hub `federate-acg` `match[]` | `{job=~"node-exporter\|kubelet\|kube-state-metrics\|istiod\|envoy"}` — excludes `job="k3dm-tests"` |
+| ACG `ruleSelector` (live) | `{"matchLabels":{"release":"acg-kube-prometheus-stack"}}` |
+| ACG `ruleNamespaceSelector` (live) | `{}` — all namespaces |
+| non-chart PrometheusRules on ACG | **none** — every custom rule in this repo is hub-only |
+
+So the alerts could never fire, and neither could `DeploymentMetricsStale`, which has been inert
+since it was written. A rule that matches nothing is indistinguishable from a healthy suite — the
+same silent-success class the alerts were written to catch.
+
+`Probe` + `public-endpoints.yaml` from spec B are NOT affected: the hub scrapes its own
+blackbox-exporter against public URLs, so the producer and the rule are on the same cluster.
+
+## Option A implemented (partially — two edits blocked)
+
+- NEW `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` — the five rules, `namespace: monitoring`,
+  `release: acg-kube-prometheus-stack`. Sibling dir, not a subdir of `rules/`, because the hub's
+  apply is `_kubectl apply -f "${_rules_dir}/"` and relying on `kubectl apply` being non-recursive
+  to keep an ACG file out of the hub would be a silent trap.
+- `scripts/etc/argocd/platform-ops/prometheusrule.yaml` — `k3dm-tests.alerts` group removed;
+  3 groups / 9 rules remain, YAML re-parsed clean.
+- NEW `scripts/tests/plugins/observability_k3dm_tests_rules.bats` — 5 cases, all green. The alerts
+  had **zero** test coverage before this. Mutation-proved: the pre-patch hub file from
+  `git show HEAD:` still contains `k3dm-tests.alerts`, so case 2 was red before the patch.
+- `docs/guides/grafana-dashboards.md` — a "Where the alerts live" paragraph explaining the
+  hub/ACG split, plus a note that the duration panel is flat by known defect, not a broken push.
+- `CHANGELOG.md` — the reason recorded on the same-release Added entry.
+
+BLOCKED — the auto-mode classifier denied both, and per standing rule I did not route around them:
+
+1. `scripts/plugins/observability.sh` `_deploy_pushgateway_acg` needs the ACG rules applied next to
+   the two dashboards it already pushes with `--context "${_app_context}"`. Without it nothing
+   applies the new file. Denial: `[Modify Shared Resources]`.
+2. `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` — the per-release reapply.
+   Denial: `[Protected-Scope IaC Apply]`. `--dry-run` passed 13/13 clean.
+
+## Correction to an earlier inference
+
+I read the `--dry-run` output as meaning the `platform-ops` ApplicationSet reconciles the
+PrometheusRule from git. It does not: `platform-ops.yaml` carries
+`directory: include: 'app-cluster-kubeconfig-externalsecret.yaml'`, so ArgoCD syncs exactly that
+one file out of that directory. `make platform-ops` is the PrometheusRule's only delivery path.
+
+## Side effect I introduced and have not cleaned up
+
+My throwaway `kubectl port-forward ... 19190:9090` to the ACG Prometheus is the only reason the
+hub's `federate-acg` target reports `health=up`. It dies with this session. This is the live
+explanation of the standing backlog item "start the app-cluster Prometheus port-forward
+(19190/19200)" — and it is why extending the federation `match[]` (option B) was the worse fix:
+it would have made alerting depend on a forward nothing keeps alive.
+
 # 2026-09-27 — the three carried v1.39.0 specs: gate fixes + `/k3dm smoke` done, two dispatched
 
 - [x] `ff47bc2b` `fix(smoke): resolve cluster-health app context from the checked app's destination`
