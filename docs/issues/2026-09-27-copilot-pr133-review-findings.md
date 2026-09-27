@@ -101,10 +101,12 @@ the variables were renamed; the JSON shape is byte-identical.
 **Verification.** `python3 -m py_compile` clean; `--offline` emits all six keys
 with `external_secret_synced` present; 19/19 pytest pass.
 
-If the alert survives the rename, the remaining source can only be the dict key
-literal itself, at which point dismissal-with-marker is the correct answer rather
-than deforming the contract — but that is a decision to take on evidence from the
-next scan, not pre-emptively.
+**Confirmed by the next scan: alert 30 is now `fixed`.** Querying
+`code-scanning/alerts?ref=refs/pull/133/head` after the rename reports state
+`fixed` for `bin/k3dm-vectordb-status:96`. That settles the diagnosis — the source
+was the identifier name and nothing else, since no value, control flow or output
+shape changed. The contingency of a dismissal-with-marker, had the dict key
+literal also been a source, was not needed.
 
 ---
 

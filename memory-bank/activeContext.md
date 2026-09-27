@@ -1,3 +1,29 @@
+# 2026-09-27 — PR #133 is green; the rename provably cleared the CodeQL alert
+
+All `/create-pr` gates pass for PR #133 at `fc834487`. CI read **per job**, not by run
+conclusion: `lint` success, `detect` success, `stage2` **skipped**. The skip is by design and
+was verified rather than assumed — `stage2` requires the opt-in PR label `ci:cluster-tests`
+on top of `skip_cluster == 'false'`, and #133 carries no labels, so the cluster suite on the
+self-hosted macOS runner never enters the standard gate. `lint` (the full offline BATS +
+Python suite) is the real gate. Zero unresolved review threads; all three replied to with
+fix SHAs.
+
+**The CodeQL rename is confirmed, not assumed.** Alert 30 now reports state **`fixed`** on
+`refs/pull/133/head`. That is the clean proof the source was the identifier *name* alone:
+no value, control flow or output shape changed between the two scans — only
+`EXTERNAL_SECRET`/`external_secret`/`external_secret_synced` →
+`EXTERNAL_BINDING`/`binding`/`binding_synced`. The published
+`"external_secret_synced"` output key stayed put and the alert still cleared, so the
+contract never had to be deformed and no dismissal was needed. This is the concrete
+precedent for "rename beats dismissing" on a name-matched alert.
+
+Also worth keeping: I briefly misread an empty `requested_reviewers` as a failed Copilot
+tag. **A completed review clears the request** — Copilot had already reviewed. An empty
+reviewer array on a reviewed PR means the opposite of what it looks like.
+
+Left as backlog, deliberately not fixed here: the nine pre-existing `apply … >/dev/null
+&& _info` sites in `observability.sh`, and the `deploy_observability` if-count allowlist
+entry, which is a deferral of a refactor rather than a fix.
 # 2026-09-27 — Copilot caught the defect this release advertises fixing
 
 Copilot's review of PR #133 raised two findings; one is the most useful review catch of
