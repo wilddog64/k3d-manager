@@ -1,3 +1,35 @@
+# 2026-09-27 — the `eso` sensor's `unknown` is four stacked defects, diagnosed
+
+`eso` has reported `unknown  ESO status source unavailable` every cycle. Reproduced
+deterministically with no credential and no mutation:
+
+```bash
+PYTHONPATH=scripts/lib python3 -c "
+from webhook import smoke
+print(smoke._eso_health_results('ubuntu-k3s'))
+print(smoke._eso_health_results('k3d-k3d-cluster', 'Hub '))"
+```
+
+| # | Defect | Evidence |
+|---|---|---|
+| D1 | `_kubectl_absent()` reads a kubeconfig error as resource absence | kubectl prints `Error in configuration: context was not found for specified context: ubuntu-k3s`; lowercased that contains **`not found`**, an absence signature → `(name, None, "not installed …")` |
+| D2 | `_posix_spawn_capture()` discards the exit code | `_spawn_capture_text` returns `(rc, output, timed_out)`; the shim drops `rc` one line later, so a config error (rc=1) is indistinguishable from a real `No resources found` (rc=0) |
+| D3 | the sensor never reads the `Hub ESO *` rows | `sensors.py` exact-matches the unprefixed pair only; the hub rows carry `Hub ESO ExternalSecrets ok=False '1/8 not synced: cosign-public-key'` — **a real finding, computed every cycle and discarded** |
+| D4 | the hub-ESO bats suite tests dead code | `bin/k3dm-webhook` imports `_smoke_test_services` from `webhook.smoke` but *also* defines its own unreachable `_kubectl_absent`/`_eso_health_results`; `webhook_hub_eso.bats` asserts against those duplicates, so it stayed green while the live path had no coverage |
+
+Contributing: `~/.local/share/k3d-manager/active-provider` is absent → `_resolve_provider("")`
+defaults to `k3s-aws` → `_provider_context` returns `ubuntu-k3s`, but the kubeconfig holds only
+`k3d-k3d-cluster` and `ubuntu-hostinger`. `_provider_context` also `.get(…, "ubuntu-k3s")`s, so
+there is no default path to a context that exists here. Left out of the fix deliberately —
+changing the default provider affects every webhook consumer and is the operator's call.
+
+Also note D3 contradicts the tri-state contract from
+`docs/bugs/2026-07-17-status-health-absent-vs-fail.md`: `ok is None` is documented as neutral and
+passing for every gate, yet the sensor alone lets one neutral row poison the whole verdict.
+
+Spec: `docs/bugs/2026-09-27-hermes-eso-sensor-unknown-kubeconfig-error-as-absence.md` — assigned
+to Codex on `k3d-manager-v1.40.0`. Six files, S1–S7, both new guards mutation-gated.
+
 # 2026-09-27 — argocd-hermes-token: the first live run hit Cloudflare 1010
 
 `make argocd-hermes-token` failed on the operator's first real-terminal run with
