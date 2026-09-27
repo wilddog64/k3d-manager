@@ -91,10 +91,19 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
 
 - **`docs/bugs/`** — unplanned bug fix specs filed by agents or Claude during a session.
 - **`docs/issues/`** — Copilot PR findings and post-incident notes.
-- **Dedup before filing** — before writing to either directory, check for an existing file with the same slug:
-  - Shell: `ls docs/bugs/*-<slug>.md 2>/dev/null` or `ls docs/issues/*-<slug>.md 2>/dev/null`
-  - Python: `list(Path("docs/bugs").glob(f"*-{slug}.md"))`
-  - If any match exists, use the existing path — do NOT create a second file.
+- **Dedup before filing — two passes.** The exact-slug glob only matches a slug someone already
+  guessed correctly; this repo has refiled the same ESO defect under a name the glob could not
+  match. Run both:
+  - **Pass 1 — exact slug (authoritative).** Shell: `ls docs/bugs/*-<slug>.md 2>/dev/null` or
+    `ls docs/issues/*-<slug>.md 2>/dev/null`; Python:
+    `list(Path("docs/bugs").glob(f"*-{slug}.md"))`. If any match exists, use the existing path —
+    do NOT create a second file.
+  - **Pass 2 — similarity (advisory).** `make find-similar-docs Q="<the symptom in prose>"`. A high
+    score means **read that file before filing**, not *do not file*: a recurrence is worth
+    recording, and often belongs as a `Recurrence` section appended to the existing doc rather than
+    as a new file. The command always exits 0 — a store that is down or an unset credential must
+    never block filing. Scores are UNMEASURED until the v1.40.0 retrieval eval lands.
+    See `docs/howto/find-prior-art.md`.
 
 ---
 

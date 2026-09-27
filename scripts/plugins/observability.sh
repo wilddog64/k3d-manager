@@ -9,6 +9,12 @@ if [[ -r "$VAULT_PLUGIN" ]]; then
    source "$VAULT_PLUGIN"
 fi
 
+_OBSERVABILITY_ETC_VARS="${SCRIPT_DIR}/etc/vars.sh"
+if [[ -r "${_OBSERVABILITY_ETC_VARS}" ]]; then
+   # shellcheck disable=SC1090
+   source "${_OBSERVABILITY_ETC_VARS}"
+fi
+
 function deploy_observability() {
   _info "[observability] Deploying Hub observability stack..."
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability.yaml"
@@ -91,8 +97,21 @@ function deploy_observability() {
 
   local _rules_dir="${SCRIPT_DIR}/etc/prometheus/rules"
   if [[ -d "${_rules_dir}" ]]; then
-    _kubectl apply -f "${_rules_dir}/" >/dev/null \
-      && _info "[observability] PrometheusRules applied from ${_rules_dir}/"
+    : "${CF_DOMAIN:=3ai-talk.org}"
+    export CF_DOMAIN
+    local _rule_file
+    local _rules_applied=0
+    for _rule_file in "${_rules_dir}"/*.yaml; do
+      [[ -f "${_rule_file}" ]] || continue
+      # shellcheck disable=SC2016
+      if envsubst '$CF_DOMAIN' < "${_rule_file}" | _kubectl apply -f - >/dev/null; then
+        _rules_applied=$((_rules_applied + 1))
+      else
+        _err "[observability] Failed to apply PrometheusRule ${_rule_file}"
+        return 1
+      fi
+    done
+    _info "[observability] ${_rules_applied} PrometheusRule file(s) applied from ${_rules_dir}/"
   fi
 
   if ( _kubectl get application shopping-cart-rules -n cicd >/dev/null 2>&1 ); then
@@ -708,7 +727,23 @@ function _deploy_pushgateway_acg() {
     _kubectl apply --context "${_app_context}" -f "${_dashboard_cm}" >/dev/null \
       && _info "[observability] k3dm deployment metrics dashboard applied"
   fi
+  local _tests_dashboard_cm="${SCRIPT_DIR}/etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  if [[ -f "${_tests_dashboard_cm}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_tests_dashboard_cm}" >/dev/null \
+      && _info "[observability] k3dm tests dashboard applied"
+  fi
+  local _acg_rules_failed=0
+  local _acg_rules_dir="${SCRIPT_DIR}/etc/prometheus/rules-acg"
+  if [[ -d "${_acg_rules_dir}" ]]; then
+    if _kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/" >/dev/null; then
+      _info "[observability] app-cluster PrometheusRules applied from ${_acg_rules_dir}/"
+    else
+      _err "[observability] Failed to apply app-cluster PrometheusRules from ${_acg_rules_dir}/"
+      _acg_rules_failed=1
+    fi
+  fi
   _observability_apply_trivy_dashboard "${_app_context}"
+  return "${_acg_rules_failed}"
 }
 
 function _deploy_promtail_acg() {

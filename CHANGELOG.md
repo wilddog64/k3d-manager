@@ -2,7 +2,254 @@
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-09-27
+
+### Added
+
+- Hub blackbox-exporter probes for all seven Cloudflare public hostnames, with separate UI and
+  authenticated modules, explicit User-Agent headers, and critical alerts for endpoint failure,
+  full tunnel failure, and probe silence. See `docs/howto/public-endpoint-alerts.md`.
+- The embeddings credential has a fourth source: `secret/embeddings/gemini` in the hub Vault, tried
+  after the environment and the two keychain items. The keychain cannot always serve a value —
+  `gemini-cli-api-key` was created by the Gemini CLI with an ACL trusting only its own binary, so any
+  other process gets rc 36 (`errSecInteractionNotAllowed`) even with the keychain unlocked, and a
+  launchd context has no session to unlock anything. Vault covers those cases without circularity,
+  because its root token comes from the `vault-root` Kubernetes Secret read with kubectl rather than
+  from the keychain. It is tried last on availability grounds: it needs a reachable hub, while the
+  keychain answers locally. Neither the root token nor the API key ever reaches an argv — the token
+  goes to the Vault pod on stdin, and the secret path is passed as a positional argument rather than
+  interpolated into the `sh -c` string.
+- Hermes now watches vectordb health and publishes index freshness. Nothing previously watched this
+  rebuildable component, and the ExternalSecret condition that can prevent its pod from starting is
+  not scrapeable today; the read-only probe, Pushgateway gauges, stale-index alerts and Grafana
+  dashboard expose that failure chain and the quieter stale-index defect.
+- Similarity search over the docs corpus, closing a gap the exact-slug dedup check could not: the
+  glob only matches a slug someone already guessed correctly, so the same ESO defect was refiled
+  under a name it could not match. `make index-docs` embeds the tracked `docs/bugs`, `docs/issues`,
+  `docs/plans` and `docs/retro` trees (1,705 documents) into the pgvector store, and
+  `make find-similar-docs Q="..."` ranks prior art against a query. Both are reachable from Slack
+  (`find-similar-docs` at reader tier, `index-docs` at operator tier) and `find-similar-docs` is
+  also a cloud-bridge action, so a cloud session can check prior art before filing.
+
+  Only each document's title, leading prose paragraph and `##` headings are embedded — about 3% of a
+  typical file, since the bodies are shell transcripts that dominate the token count and carry
+  almost no topical signal. Rows are keyed by a hash of exactly that embedded text, so a re-run with
+  no doc changes makes zero embedding calls and an edit confined to a transcript re-embeds nothing.
+  Retrieval is advisory everywhere: a missing credential, an unreachable store or an empty index
+  reports on stderr and exits 0, because the dedup check must never become a new way for filing to
+  fail. Retrieval quality is UNMEASURED until the v1.40.0 eval.
+
+  No Postgres driver is introduced: SQL is piped to `psql` inside the pod with the argument vector
+  carrying a literal `$POSTGRES_USER` for the pod's own shell to expand, so the database password
+  never reaches argv, a log or this host's history. The embeddings key is read from
+  `K3DM_EMBEDDINGS_API_KEY` or the keychain at call time and sent only as a request header, so there
+  is no sensitive CLI flag to register. The Slack `Q` argument excludes every shell metacharacter
+  because it reaches a Makefile recipe where `$(Q)` expands into a command line.
+- A hub platform component deploys single-instance pgvector Postgres into the `vectordb` namespace
+  as a rebuildable cache on local-path storage, not a system of record; its index is not durable and
+  losing it costs one re-index. The retriever's quality is UNMEASURED until the v1.40.0 eval runs.
+
+- **`/k3dm smoke` runs the smoke gate from Slack** (`operator` role, optional
+  `SMOKE_ONLY=offline|cluster`, 900s timeout). `make smoke` already existed; only the Slack
+  surface was missing. It is `operator` rather than `reader` because the cluster half reads Vault
+  secrets and performs real logins, and the timeout is raised from the 300s default because the
+  Vault, ESO and login stages run serially behind three retries.
+
+- **Offline test-suite metrics and staleness alerting.** `bin/k3dm-test-metrics` parses a
+  captured `make test` or `make test-all` log and pushes bounded metrics to Pushgateway via the
+  opt-in `make test-metrics` target, which leaves the `test` and `test-all` recipes untouched.
+  `k3dm_test_cases_failed` is the health signal, not the exit code: the same green suite exits 2
+  or 0 here depending on whether `test-pytest` finds a real `pytest`, so an exit-code-driven
+  panel would report a healthy run as broken. Because Pushgateway retains the last value
+  indefinitely, a stopped push is indistinguishable from a passing one — so the `k3dm-tests`
+  dashboard leads with a freshness panel and five new rules cover failures, a vacuous suite, a
+  case-count drop and staleness. `origin` is part of the grouping URL rather than a body label,
+  since a body label would let a green CI push silently overwrite a red local one.
+
+  The rules live in `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` under
+  `release: acg-kube-prometheus-stack`, deliberately apart from every other rule file in this
+  repo, which is hub-side. Only the app cluster has a Pushgateway and only its Prometheus scrapes
+  it; the hub's `federate-acg` job selects
+  `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}` and so pulls back none of the
+  `k3dm_test_*` series. A rule for these metrics on the hub stack matches nothing and can never
+  fire, which is not distinguishable from a healthy suite. `DeploymentMetricsStale` moved out of
+  the hub rule for the same reason — it had been inert since it was written.
+
+### Changed
+
+- The embeddings credential resolution order is documented as a preference order rather than a set of
+  copies, and `rc 36` now names the fix that does not duplicate anything. The guide previously told
+  the operator to create a dedicated `k3dm-embeddings-api-key` holding a copy of the key the Gemini
+  CLI item already held — two items in one keychain on one machine, sharing a lock state and a
+  failure domain, so the copy doubled what rotation had to touch and survived nothing the original
+  would not. `errSecInteractionNotAllowed` is an access-control problem on a single item, and the
+  remedy is widening that item's partition list (`security
+  set-generic-password-partition-list -S apple-tool:,apple:`), or its trusted-application ACL through
+  Keychain Access when the partition list is not the restriction. Exactly one keychain slot holds a
+  value; `k3dm-embeddings-api-key` stays empty except on a host with no Gemini CLI. The hub Vault
+  copy is unaffected — it is a different failure domain (locked keychain, launchd with no session,
+  another host), which is the distinction that makes it worth having and a second keychain item not.
+
 ### Fixed
+
+- **Launchd-driven cluster lifecycle runs now find k3d.** `cluster-up` previously failed loudly at
+  the Hub preflight when launchd supplied its minimal `PATH`, while `cluster-down` silently skipped
+  the Hub teardown and reported that no cluster existed. The root cause was launchd not reading the
+  operator's shell profile, leaving `~/.local/bin` — where `k3d` lives — out of the child process
+  `PATH`. Both entry-point scripts now normalize `PATH` themselves, so the fix travels with the
+  code and is not dependent on changing the host-specific plist.
+
+- **The webhook LaunchAgent template no longer omits `~/.local/bin` from `PATH`.** Normalizing
+  `PATH` inside `cluster-up` and `cluster-down` fixes those two entry points, but every other
+  binary launchd starts through that plist — `istioctl`, `k3d-manager`, `agy`, `secret-cli` — was
+  still unreachable. `scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl` now leads its `PATH`
+  with `{{HOME}}/.local/bin`. The fix belongs in the template rather than the generated plist
+  because `k3dm-webhook-setup` regenerates the latter, which would silently reinstall the defect
+  over any host-side edit. `docs/howto/launchd-daemons.md` also records that applying such a change
+  needs `launchctl bootout` + `bootstrap`: `make restart-webhook` uses `kickstart -k`, which reuses
+  launchd's cached service definition and so restarts the process without picking up a new
+  environment — a restart that exits 0 and changes nothing.
+- **The same `PATH` defect is fixed in the `cloud-bridge` and `prometheus-credential-rotator`
+  LaunchAgent templates, and worked around for `hermes`.** `install-cloud-bridge` was also missing
+  the `s|{{HOME}}|$(HOME)|g` substitution its template now needs — without it the placeholder would
+  have been written into the plist verbatim, which is worse than the original omission, so the
+  Makefile target and the template had to change together. `hermes` cannot be fixed the same way:
+  its plist is rendered by `_install_hermes_agent` in the lib-foundation subtree, which substitutes
+  only `{{HERMES_BIN}}`, `{{K3DM_REPO_ROOT}}` and `{{HERMES_LOG}}`, and that subtree is edited
+  upstream rather than here. `bin/k3dm-hermes` therefore prepends `~/.local/bin` to its own
+  `PATH` at import time — the same defence-in-depth pattern `bin/cluster-up` uses. New suite
+  `scripts/tests/bin/launchd_plist_path.bats` asserts the template `PATH` strings, the Makefile
+  substitution and the Hermes normalization, closing the untested surface that let the original
+  defect ship.
+
+- **`/cluster-up` and `/cluster-down` no longer act on a cluster the operator did not name.**
+  `resolveProvider` returned a per-command default for any text it did not recognize, which made two
+  defects out of one function. The defaults were asymmetric — bare `/cluster-up` meant `hostinger`,
+  the permanent app cluster, while bare `/cluster-down` meant `aws`, the sandbox — so the two
+  commands with no argument acted on different clusters. Worse, the fallback applied to *unrecognized*
+  tokens and not just empty ones, so `/cluster-down hostigner` silently tore down `aws` and
+  `/cluster-up awz` silently provisioned `hostinger`, each acknowledged with a confidently worded
+  reply naming the cluster the operator had not asked for. A typo was enough to retarget a
+  destructive command. Both commands now resolve through `resolveProviderStrict`, which requires an
+  exact provider or alias and replies with usage instead of relaying; the read-only commands keep
+  their defaults, where a wrong guess costs nothing. Covered by four cases in
+  `workers/slack-relay/test/relay.test.mjs`, two of which fail against the pre-fix source.
+- **`/k3dm help` now lists the cluster lifecycle commands.** `/k3dm help` enumerates all 24 make
+  targets and is the only self-describing command surface in Slack, but the seven `/cluster-*`
+  commands are separate slash commands routed to `/api/v1/cluster` and appeared in no in-Slack
+  listing at all. An operator reading the help output could not discover the commands that record a
+  deployment, because `_run_cluster` — not the Makefile — is what carries the running-job guard, the
+  stall timer and the Pushgateway push. They are listed for discoverability only and remain
+  unrunnable as make targets, which `test_cluster_commands_are_not_make_targets` pins.
+  See `docs/bugs/2026-09-27-k3dm-help-omits-cluster-lifecycle-commands.md`.
+- **`make test` no longer writes fabricated deployment metrics into the live Pushgateway.**
+  `scripts/tests/lib/webhook.bats` was careful about isolation — port, token, `HOME`, `PATH`
+  (stubbing `make` and `kubectl`), `K3DM_JOB_DIR` and `K3DM_RUN_DIR` — but never set
+  `K3DM_PUSHGATEWAY_URL`, which `scripts/lib/webhook/config.py` defaults to
+  `http://localhost:9091`, the live ACG Pushgateway forward on a dev host. Every suite run
+  therefore pushed three `k3dm_deployment_*` groups (`up-gcp`, `up-aws`, `down-aws`) from its
+  own `/api/v1/cluster` cases, each reporting a zero-second duration because the harness stubs
+  `make` to `exit 0`. The damage was not the three stray rows: `DeploymentMetricsStale` was
+  watching the test suite's last run rather than any deployment, so it was structurally
+  incapable of firing while the suite ran regularly — the same vacuous-signal class as the
+  misplaced `k3dm-tests` rules fixed above, with the producer wrong instead of absent. The
+  harness now exports an empty `K3DM_PUSHGATEWAY_URL`, taking the existing
+  `if not PUSHGATEWAY_URL: return` early exit in `_push_metrics()`, and asserts it in-suite.
+- **The k3dm Deployment Metrics panels aggregate `job_id` away.** `_push_metrics()` stamps
+  `k3dm_deployment_duration_seconds` and `k3dm_deployment_success` with the job's own `job_id`,
+  so the stat panels drew one tile per deployment in the dashboard window rather than one per
+  `(action, provider)` — fifteen identically-labelled `aws (failed) 0 s` tiles, and a time
+  series legend repeating `up/aws (failed)` once per job. All five queries now wrap in
+  `max by (...)` over the meaningful labels, and a new BATS suite keeps them that way.
+- **The webhook smoke gate requests the bounded `?quick=1` health variant** instead of the
+  unbounded full sweep it could never complete inside its own 90s cap. The gate asked for every
+  stage serially behind three retries with a ten-second sleep between them, so a single slow
+  endpoint guaranteed a timeout the gate then reported as a service failure. It now also reports
+  curl's exit code: `-w '%{http_code}'` already prints `000` on a transport failure, and the
+  `|| echo "000"` fallback appended a second one, so the operator saw `HTTP 000000` — a code that
+  does not exist — in place of `curl exit 28 (timeout)`. A probe that cannot connect at all is
+  additionally named as a missing host-side forward rather than reported like a service outage,
+  which is what made the two endpoints with no port-forward on this host read as real reds.
+
+- **`bin/smoke-test-cluster-health` resolves the app-cluster context from the checked ArgoCD
+  Application's `destination.name`** instead of a hardcoded default, so a cluster-registration
+  rename can no longer make it check apps on one cluster and pods on another. `make smoke` reported
+  `0 passed, 2 failed` on a healthy cluster with no code change behind it: the hub's app-cluster
+  registration had been renamed to `k3d-cluster` and the name `ubuntu-k3s` re-pointed at the
+  separate AWS cluster, so the six `ubuntu-k3s-shopping-cart-*` apps deploy there while
+  `APP_CONTEXT` still defaulted to the hub. `ARGOCD_APP_PREFIX` and `APP_CONTEXT` were two
+  independent guesses at one fact; the prefix already names the cluster, so the context is now
+  derived from the Application itself and the two cannot disagree. This is the third rot of the same
+  hardcoded default — the hardcoding was the bug, not the value. An explicit `APP_CONTEXT` still
+  wins, and a destination that is not a local kubectl context falls back to `INFRA_CONTEXT`.
+
+- **`make index-docs`: a spent daily quota now reports `paused`, not `unavailable`.** The cold index
+  is ~1,705 calls against a free-tier ceiling of roughly 1,000 requests/day, so a run that stops
+  partway through is the expected outcome, not a fault — but it printed `index-docs: unavailable`,
+  the same word used when the store is unreachable or no credential resolves. That reads as
+  breakage and invites exactly the wrong response: lowering `EMBED_MIN_INTERVAL` or adding retries,
+  which spends the next day's allowance on retries and makes the stop less legible. The mid-run
+  handler now recognises a per-day `quotaId` and says the daily quota is spent and that a re-run
+  after the reset resumes from there. The test was proved red against the pre-fix source, which
+  emitted the old `unavailable` line verbatim.
+- **`docs/guides/vector-store.md` described a run that cannot happen.** It called the quota
+  "per minute" and put a cold index at "roughly half an hour", which is true only of the per-minute
+  bucket the pacing already handles. The real cold start took two days — 900 documents, a 429 that
+  survived 62s of backoff, then the remaining 805 the next morning with no 429 at all, which is a
+  per-day allowance resetting at the day boundary and not a throttle. The guide now documents both
+  quotas, that only one can be paced around, and that a free-tier cold start is two sittings. The
+  corpus count is also corrected to 1,705 throughout, matching `git ls-files`.
+- **Prior-art embeddings: a 429 now says which quota it hit.** The second live run committed 900 of
+  1,705 documents across nine clean batches, then failed with `embeddings API returned HTTP 429` —
+  a message that cannot distinguish a per-minute throttle, which clears in seconds, from a spent
+  per-day allowance, which cannot clear until the quota resets. The difference decides whether to
+  re-run immediately or resume tomorrow, and it had to be inferred from batch timings instead of
+  read off the error. The detail was in the response body all along: the body was parsed only for
+  `retryDelay`, and only on the paths that go on to retry, so the one message a human actually sees
+  — the exhausted-attempts path — was raised *before* the body was ever read. `_server_retry_delay`
+  is now `_error_detail`, which reads the body once (it can only be read once) and returns both the
+  delay and the `QuotaFailure` violation's `quotaId`, which is appended to the error as
+  `HTTP 429 (quota ...)`.
+
+- **Prior-art embeddings: a 429 no longer abandons the whole index.** The first live run after the
+  `embedContent` port failed on its very first request with `embeddings API returned HTTP 429`,
+  committing 0 of 1,705 documents. Rate limiting is not an outage: one request per document against a
+  *per-minute* quota makes a 429 an expected step in a healthy run, and the old policy — three
+  attempts with a 2s/4s backoff — gave up six seconds in and discarded the run. `_embed_one` now
+  retries six times and honours the delay the server names. That delay arrives in a `RetryInfo`
+  detail in the response body (`"retryDelay": "31s"`), not in a `Retry-After` header, so a
+  header-only reader misses it entirely and falls back to guessing; both are read, header first.
+  `embed_batch` also spaces requests by `EMBED_MIN_INTERVAL` (default `0.6s`, overridable with
+  `K3DM_EMBEDDINGS_MIN_INTERVAL`) so the loop stays under the free tier's 100 requests/minute
+  instead of sprinting into the limit, which costs about 90 seconds per 100-document batch. Both
+  new tests
+  were proved red against the pre-fix source; the retry test showed the old code sleeping its
+  guessed `2.0s` in place of the server's `31s`.
+- **Prior-art embeddings: ported off the withdrawn `batchEmbedContents` endpoint.** `make index-docs`
+  failed every run with `embeddings API returned HTTP 404`, which reads like a credential problem and
+  is not one — `api_key()` raises before any HTTP call when nothing resolves, so a 404 proves the key
+  authenticated. The cause was the endpoint, not the credential: `text-embedding-004` has been
+  withdrawn, and the current embedding models (`gemini-embedding-2`, `gemini-embedding-2-preview`)
+  expose `embedContent`, `countTokens` and `asyncBatchEmbedContent` only. `batchEmbedContents` is gone,
+  so changing the model name alone would have reproduced the identical 404. `_embed_request` now
+  targets `:embedContent` with a single `content`, and `embed_batch` loops per text while keeping its
+  backoff, ordering and dimension guards; `EMBED_BATCH` now sizes the commit chunk rather than an API
+  call, so a full cold index is 1,705 requests instead of 18. `outputDimensionality: 768` is sent
+  explicitly because `gemini-embedding-2` defaults wider than the `embedding vector(768)` column. Two
+  tests pin the request shape — endpoint and dimensionality — so this cannot silently regress to a
+  retired endpoint, and both were proved red against the pre-fix source.
+- **`docs/guides/vector-store.md`: the two meanings of a zero-length keychain read.** `wc -c` printing
+  `0` is a missing item (rc 44, with a stderr line) or a genuinely empty stored value (rc 0, silent),
+  and the widening remedy above only fixes the first. The non-TTY `-w` trap is also documented for
+  `-U`, not just for creation: an update without a TTY exits 0 having stored nothing, advancing `mdat`
+  while leaving the value empty.
+- `make index-docs` now commits each batch of 100 documents in its own transaction instead of
+  embedding the whole corpus into memory and writing once at the end. A failure on the last batch
+  used to discard every embedding call already paid for, and a mid-run store read showed `rows: 0`
+  whether the run was healthy or dead — indistinguishable, which is how a failed run went
+  undiagnosed. A re-run now resumes, because the content-hash comparison sees what landed. Pruning
+  removed documents is a separate final transaction, so a failed run prunes nothing and leaves the
+  store a superset of the corpus rather than a truncated one.
 - ArgoCD bootstrap now seeds the vectordb Postgres credential inside the Vault pod when the
   path is absent, so a hand-written credential is reproducible after a hub rebuild. The seed is
   idempotent and skips an existing entry rather than rotating it, because the initialised
@@ -12,11 +259,11 @@
   while the caller discarded its exit status; it now distinguishes those outcomes, fails closed on
   parse or vacuous-query failures, skips confirmation during dry runs, and checks manifest sources
   as well as `$values` sources while explicitly excluding and counting sources that track `HEAD`.
-
-### Added
-- A hub platform component deploys single-instance pgvector Postgres into the `vectordb` namespace
-  as a rebuildable cache on local-path storage, not a system of record; its index is not durable and
-  losing it costs one re-index. The retriever's quality is UNMEASURED until the v1.40.0 eval runs.
+- Vault and vector-store failures now report the pod's own error instead of kubectl's exit-code
+  trailer. `kubectl exec` appends `command terminated with exit code N` as the last line of stderr,
+  so reading the last line reported the exit code and discarded the message: a read of an unwritten
+  Vault path said `exit code 2` rather than `No value found at secret/data/embeddings/gemini`. The
+  same defect applied to every `psql` error surfaced through the store.
 
 ## [1.38.0] - 2026-09-25
 

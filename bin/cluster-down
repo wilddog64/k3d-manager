@@ -15,6 +15,13 @@
 
 set -euo pipefail
 
+# launchd starts this script with the plist's minimal PATH, which omits
+# ~/.local/bin where k3d and istioctl live. Without this, the hub teardown below
+# silently no-ops and reports that no hub cluster exists.
+if [[ ":${PATH}:" != *":${HOME}/.local/bin:"* ]]; then
+  export PATH="${HOME}/.local/bin:${PATH}"
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
@@ -323,6 +330,10 @@ fi
 
 if [[ "${_keep_hub}" -eq 0 ]]; then
   _info "[acg-down] Tearing down local Hub cluster (${_HUB_CLUSTER})..."
+  if ! _command_exist k3d; then
+    _err "[acg-down] k3d binary not found in PATH — cannot tear down the local Hub cluster. Check PATH includes ~/.local/bin."
+    exit 1
+  fi
   if k3d cluster list 2>/dev/null | grep -q "^${_HUB_CLUSTER}[[:space:]]"; then
     if _dry_run_active; then
       _info "DRY_RUN: would delete local Hub cluster ${_HUB_CLUSTER}"

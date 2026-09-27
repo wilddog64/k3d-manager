@@ -4,28 +4,28 @@ APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/vectordb.yaml"
 MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
 
 @test "vectordb ApplicationSet is hub-scoped without an app-cluster selector" {
-  run rg -n 'k3d-manager/role:[[:space:]]*app-cluster|role:[[:space:]]*app-cluster' "${APPSET}"
+  run grep -nE 'k3d-manager/role:[[:space:]]*app-cluster|role:[[:space:]]*app-cluster' "${APPSET}"
   [ "${status}" -eq 1 ]
-  run rg -n 'name:[[:space:]]*hub|namespace:[[:space:]]*vectordb' "${APPSET}"
+  run grep -nE 'name:[[:space:]]*hub|namespace:[[:space:]]*vectordb' "${APPSET}"
   [ "${status}" -eq 0 ]
 }
 
 @test "vectordb uses the pinned pgvector pg17 image and not latest" {
-  run rg -n 'image:[[:space:]]*pgvector/pgvector:pg17([[:space:]]*)$' "${MANIFEST_DIR}"
+  run grep -rnE 'image:[[:space:]]*pgvector/pgvector:pg17([[:space:]]*)$' "${MANIFEST_DIR}"
   [ "${status}" -eq 0 ]
-  run rg -n 'image:[^#]*:latest([[:space:]]*)$' "${MANIFEST_DIR}"
+  run grep -rnE 'image:[^#]*:latest([[:space:]]*)$' "${MANIFEST_DIR}"
   [ "${status}" -eq 1 ]
 }
 
 @test "vectordb defines no Role, RoleBinding, or ClusterRole" {
-  run rg -n '^[[:space:]]*kind:[[:space:]]*(Role|RoleBinding|ClusterRole)[[:space:]]*$' "${MANIFEST_DIR}"
+  run grep -rnE '^[[:space:]]*kind:[[:space:]]*(Role|RoleBinding|ClusterRole)[[:space:]]*$' "${MANIFEST_DIR}"
   [ "${status}" -eq 1 ]
 }
 
 @test "vectordb destination and manifests use namespace vectordb, never default" {
-  run rg -n 'namespace:[[:space:]]*vectordb' "${APPSET}" "${MANIFEST_DIR}"
+  run grep -rnE 'namespace:[[:space:]]*vectordb' "${APPSET}" "${MANIFEST_DIR}"
   [ "${status}" -eq 0 ]
-  run rg -n 'namespace:[[:space:]]*default' "${APPSET}" "${MANIFEST_DIR}"
+  run grep -rnE 'namespace:[[:space:]]*default' "${APPSET}" "${MANIFEST_DIR}"
   [ "${status}" -eq 1 ]
 }
 
@@ -41,21 +41,21 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
     END { if (in_credential && (has_ref == 0 || has_value == 1)) exit 1 }
   ' "${MANIFEST_DIR}/statefulset.yaml"
   [ "${status}" -eq 0 ]
-  run rg -n 'POSTGRES_HOST_AUTH_METHOD:[[:space:]]*trust' "${MANIFEST_DIR}"
+  run grep -rnE 'POSTGRES_HOST_AUTH_METHOD:[[:space:]]*trust' "${MANIFEST_DIR}"
   [ "${status}" -eq 1 ]
 }
 
 @test "vectordb ExternalSecret uses vault-backend and vectordb/postgres" {
-  run rg -n -A2 'secretStoreRef:' "${MANIFEST_DIR}/externalsecret.yaml"
+  run grep -nE -A2 'secretStoreRef:' "${MANIFEST_DIR}/externalsecret.yaml"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"name: vault-backend"* ]]
   [[ "${output}" == *"kind: ClusterSecretStore"* ]]
-  run rg -n 'key:[[:space:]]*vectordb/postgres' "${MANIFEST_DIR}/externalsecret.yaml"
+  run grep -nE 'key:[[:space:]]*vectordb/postgres' "${MANIFEST_DIR}/externalsecret.yaml"
   [ "${status}" -eq 0 ]
 }
 
 @test "vectordb destination is permitted by the platform AppProject" {
-  run rg -n -A1 'namespace: vectordb' "${BATS_TEST_DIRNAME}/../../etc/argocd/projects/platform.yaml.tmpl"
+  run grep -nE -A1 'namespace: vectordb' "${BATS_TEST_DIRNAME}/../../etc/argocd/projects/platform.yaml.tmpl"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"server: https://kubernetes.default.svc"* ]]
 }
@@ -94,7 +94,7 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
 }
 
 @test "vectordb Vault seed function is defined" {
-  run rg -n '^function _argocd_seed_vectordb_postgres\(\)' "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  run grep -nE '^function _argocd_seed_vectordb_postgres\(\)' "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   [ "$status" -eq 0 ]
 }
 
@@ -102,8 +102,8 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   local _argocd="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   local _seed_line _project_line
 
-  _seed_line=$(rg -nF '_argocd_seed_vectordb_postgres || _warn' "${_argocd}" | cut -d: -f1)
-  _project_line=$(rg -n '^[[:space:]]*_argocd_deploy_appproject$' "${_argocd}" | tail -1 | cut -d: -f1)
+  _seed_line=$(grep -nF '_argocd_seed_vectordb_postgres || _warn' "${_argocd}" | cut -d: -f1)
+  _project_line=$(grep -nE '^[[:space:]]*_argocd_deploy_appproject$' "${_argocd}" | tail -1 | cut -d: -f1)
   [ -n "${_seed_line}" ]
   [ -n "${_project_line}" ]
   [ "${_seed_line}" -lt "${_project_line}" ]
@@ -114,8 +114,8 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   local _body _get_line _put_line
 
   _body=$(awk '/^function _argocd_seed_vectordb_postgres\(\)/ { in_function=1 } in_function { print } in_function && /^}/ { exit }' "${_argocd}")
-  _get_line=$(printf '%s\n' "${_body}" | rg -n 'vault kv get -mount=secret "\$secret_path"' | cut -d: -f1)
-  _put_line=$(printf '%s\n' "${_body}" | rg -n 'vault kv put -mount=secret vectordb/postgres' | cut -d: -f1)
+  _get_line=$(printf '%s\n' "${_body}" | grep -nE 'vault kv get -mount=secret "\$secret_path"' | cut -d: -f1)
+  _put_line=$(printf '%s\n' "${_body}" | grep -nE 'vault kv put -mount=secret vectordb/postgres' | cut -d: -f1)
   [ -n "${_get_line}" ]
   [ -n "${_put_line}" ]
   [ "${_get_line}" -lt "${_put_line}" ]
@@ -126,9 +126,9 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   local _body _argv_count
 
   _body=$(awk '/^function _argocd_seed_vectordb_postgres\(\)/ { in_function=1 } in_function { print } in_function && /^}/ { exit }' "${_argocd}")
-  run rg -nF "vault kv put -mount=secret vectordb/postgres -'" <<< "${_body}"
+  run grep -nF "vault kv put -mount=secret vectordb/postgres -'" <<< "${_body}"
   [ "$status" -eq 0 ]
-  _argv_count=$(printf '%s\n' "${_body}" | rg -c 'vault kv put[^\n]*(password=|password[^[:space:]]*=)' || true)
+  _argv_count=$(printf '%s\n' "${_body}" | grep -cE 'vault kv put.*(password=|password[^[:space:]]*=)' || true)
   _argv_count=${_argv_count:-0}
   [ "${_argv_count}" = "0" ]
 }
@@ -138,7 +138,7 @@ MANIFEST_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/vectordb"
   local _body
 
   _body=$(awk '/^function _argocd_seed_vectordb_postgres\(\)/ { in_function=1 } in_function { print } in_function && /^}/ { exit }' "${_argocd}")
-  run rg -n "sh -c 'P=.*tr -dc.*< /dev/urandom" <<< "${_body}"
+  run grep -nE "sh -c 'P=.*tr -dc.*< /dev/urandom" <<< "${_body}"
   [ "$status" -eq 0 ]
 }
 

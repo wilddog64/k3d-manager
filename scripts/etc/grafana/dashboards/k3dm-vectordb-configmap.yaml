@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k3dm-vectordb
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  k3dm-vectordb.json: |
+    {
+      "title": "k3dm VectorDB Health",
+      "uid": "k3dm-vectordb",
+      "tags": ["k3dm"],
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-30d", "to": "now" },
+      "panels": [
+        { "id": 1, "type": "timeseries", "title": "Rows vs corpus docs (last published)", "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }, "targets": [{ "expr": "k3dm_vectordb_rows", "legendFormat": "rows (last published)" }, { "expr": "k3dm_vectordb_corpus_docs", "legendFormat": "corpus docs (last published)" }] },
+        { "id": 2, "type": "timeseries", "title": "Drift docs (last published)", "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }, "targets": [{ "expr": "k3dm_vectordb_drift_docs", "legendFormat": "drift docs (last published)" }] },
+        { "id": 3, "type": "timeseries", "title": "Index age (last published)", "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }, "targets": [{ "expr": "time() - k3dm_vectordb_last_index_timestamp_seconds", "legendFormat": "age seconds (last published)" }] },
+        { "id": 4, "type": "stat", "title": "Reachability and ExternalSecret sync (last published)", "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }, "targets": [{ "expr": "k3dm_vectordb_reachable", "legendFormat": "reachable (last published)" }, { "expr": "k3dm_vectordb_external_secret_synced", "legendFormat": "ExternalSecret synced (last published)" }] }
+      ]
+    }

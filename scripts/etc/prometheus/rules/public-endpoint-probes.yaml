@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: public-endpoints-ui
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  jobName: blackbox-public-ui
+  interval: 60s
+  scrapeTimeout: 10s
+  module: http_public_ui
+  prober:
+    url: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc:9115
+    scheme: http
+    path: /probe
+  targets:
+    staticConfig:
+      static:
+        - https://argocd.${CF_DOMAIN}/
+        - https://frontend.${CF_DOMAIN}/
+        - https://keycloak.${CF_DOMAIN}/
+        - https://grafana.${CF_DOMAIN}/
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: public-endpoints-authenticated
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  jobName: blackbox-authenticated
+  interval: 60s
+  scrapeTimeout: 10s
+  module: http_authenticated
+  prober:
+    url: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc:9115
+    scheme: http
+    path: /probe
+  targets:
+    staticConfig:
+      static:
+        - https://prometheus.${CF_DOMAIN}/
+        - https://alertmanager.${CF_DOMAIN}/
+        - https://webhook.${CF_DOMAIN}/

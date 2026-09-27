@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links check-repo-root test-python test-all e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -442,6 +442,7 @@ install-cloud-bridge:
 	  -e "s|{{CLOUD_BRIDGE_BIN}}|$(CURDIR)/bin/k3dm-cloud-bridge|g" \
 	  -e "s|{{K3DM_REPO_ROOT}}|$(CURDIR)|g" \
 	  -e "s|{{CLOUD_BRIDGE_LOG}}|$(HOME)/Library/Logs/k3dm-cloud-bridge.log|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.cloud-bridge.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
 	plutil -lint "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
@@ -815,6 +816,14 @@ test-python-unit:
 check-doc-links:
 	@python3 scripts/check-doc-links.py
 
+## Embed the docs corpus into the pgvector store; only changed docs are re-embedded
+index-docs:
+	@python3 scripts/index-docs.py $(if $(DRY_RUN),--dry-run,) $(if $(LIMIT),--limit $(LIMIT),)
+
+## Find prior art in docs/ by similarity: make find-similar-docs Q="..." [K=5]
+find-similar-docs:
+	@python3 scripts/find-similar-docs.py $(if $(K),--k $(K),) -- "$(Q)"
+
 ## Fail if test/job debris (empty-mktemp derived paths) is staged at the repo root
 check-repo-root:
 	@./scripts/check-repo-root-debris.sh
@@ -842,6 +851,15 @@ test-python: test-python-unit test-pytest
 
 ## Run every offline suite: BATS (dispatcher) + BATS bin + Python
 test-all: test test-bin test-python
+
+## Run the offline suite, capture the log, and publish results to Pushgateway
+test-metrics:
+	@set -o pipefail; \
+	_log="$${TMPDIR:-/tmp}/k3dm-test-all-$$(date -u +%s).log"; \
+	$(MAKE) test-all >"$${_log}" 2>&1; _rc=$$?; \
+	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}"; \
+	echo "[test-metrics] log: $${_log}"; \
+	exit 0
 
 ## Run the Tier 1 e2e verification harness (throwaway vCluster + in-cluster Playwright Job). DIGEST=<candidate image digest> optional.
 e2e:
@@ -900,6 +918,8 @@ help:
 	@echo "    make status-json   Emit concise status as JSON"
 	@echo "    make status-public Sustained multi-sample public-endpoint probe (JSON=1 for machine output)"
 	@echo "    make test          Run all BATS test suites"
+	@echo "    make index-docs    Embed docs/ into the vector store (DRY_RUN=1, LIMIT=n)"
+	@echo "    make find-similar-docs Q=\"...\" [K=5]  Find prior art by similarity (advisory)"
 	@echo "    make test-all      Run every offline suite (BATS dispatcher + bin BATS + Python)"
 	@echo "    make test-bin      Run the BATS suites under scripts/tests/bin"
 	@echo "    make test-python   Run every Python suite (unittest + pytest)"

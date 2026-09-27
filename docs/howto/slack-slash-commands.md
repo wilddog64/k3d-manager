@@ -65,7 +65,7 @@ remote-operator role. The webhook enforces that role before it queues work.
 | Role | Allowed commands |
 |------|------------------|
 | `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
-| `operator` | `/cluster-refresh` plus everything in `reader` |
+| `operator` | `/cluster-refresh`, `/k3dm smoke` plus everything in `reader` |
 | `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade`, `/cleanup-stale-sandbox` plus everything in `operator` |
 
 `/k3dm <target>` runs an allowlisted Makefile target (`scripts/lib/webhook/make_targets.py`). The relay stamps it `admin`; the webhook caps that at the caller's `K3DM_SLACK_ROLE_MAP` role (unmapped users are `reader`), then applies the target's own minimum role. Destructive targets also require the `confirm` token.
@@ -78,6 +78,9 @@ The relay forwards these metadata headers to the webhook:
 
 Direct Bearer-token calls that do not provide a role header currently default
 to `admin` for backward compatibility with existing local automation.
+
+`/k3dm help` also prints the cluster lifecycle commands. Their roles are authoritative in
+`COMMAND_ROLES` in `workers/slack-relay/index.js`.
 
 ---
 
@@ -114,14 +117,14 @@ Run once per machine. Safe to re-run.
         "command": "/cluster-up",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Start the lab sandbox cluster",
-        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
+        "usage_hint": "<aws|gcp|az|hostinger>  e.g. hostinger",
         "should_escape": false
       },
       {
         "command": "/cluster-down",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Stop the lab sandbox cluster",
-        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
+        "usage_hint": "<aws|gcp|az|hostinger>  e.g. hostinger",
         "should_escape": false
       },
       {
@@ -310,8 +313,8 @@ bin/k3dm-webhook-setup --uninstall
 
 | Command | Action | Example | Notes |
 |---------|--------|---------|-------|
-| `/cluster-up [aws\|gcp\|az\|hostinger]` | Provision cluster | `/cluster-up hostinger` | Hostinger is the permanent app cluster; others are lab sandboxes |
-| `/cluster-down [aws\|gcp\|az\|hostinger]` | Tear down cluster | `/cluster-down hostinger` | Hostinger tears down the permanent app cluster |
+| `/cluster-up <aws\|gcp\|az\|hostinger>` | Provision cluster | `/cluster-up hostinger` | Cluster is **required** — there is no default. Hostinger is the permanent app cluster; others are lab sandboxes |
+| `/cluster-down <aws\|gcp\|az\|hostinger>` | Tear down cluster | `/cluster-down hostinger` | Cluster is **required** — there is no default. An unrecognized name is rejected, never resolved to a fallback |
 | `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | `/cluster-status hostinger` | kubectl nodes + ArgoCD app status + smoke test |
 | `/cluster-diagnose [hostinger\|aws\|gcp\|az\|hub] ...` | Run read-only diagnostics | `/cluster-diagnose hostinger pods shopping-cart-apps` | `pods`, `describe-pod`, `logs`, `apps`, `app`, `appsets` only |
 | `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | `/cluster-refresh hostinger` | Re-establishes SSH tunnel, refreshes kubeconfig |
@@ -338,6 +341,7 @@ bin/k3dm-webhook-setup --uninstall
 | `e2e-sandbox` | operator | | `DIGEST` | | 3600 |
 | `e2e-replay` | operator | `RUNNER` | | | 900 |
 | `sync-apps` | operator | | | | 600 |
+| `smoke` | operator | | `SMOKE_ONLY` | | 900 |
 | `monitoring-pause` | operator | | | | 600 |
 | `monitoring-resume` | operator | | | | 600 |
 | `fix-restart` | operator | `APP`, `NS` | `FIX_CONTEXT` | | 300 |
@@ -349,6 +353,18 @@ bin/k3dm-webhook-setup --uninstall
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
+
+`smoke` runs the same gate as `make smoke`: the offline sweep always, and the cluster sweep
+when the cluster is reachable. `SMOKE_ONLY` narrows it to one half — `SMOKE_ONLY=offline` skips
+everything that needs a cluster, `SMOKE_ONLY=cluster` skips the offline suites. It is `operator`
+rather than `reader` because the cluster half reads Vault secrets and performs real Keycloak,
+ArgoCD and frontend logins, and its 900s timeout replaces the 300s default because the Vault, ESO
+and login stages run serially with retries.
+
+Examples:
+
+- `/k3dm smoke`
+- `/k3dm smoke SMOKE_ONLY=offline`
 
 `e2e-sandbox` runs unattended, so it can only use an **already valid** ACG session: its
 preflight refuses `K3DM_ACG_SKIP_SESSION_CHECK=1` and the interactive login path needs a

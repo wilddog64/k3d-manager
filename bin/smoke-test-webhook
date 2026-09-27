@@ -77,14 +77,19 @@ fi
 echo "[PASS] server booted and is accepting connections"
 
 # --- hit /api/v1/health on the running server ---
-health_path="/api/v1/health"
+health_path="/api/v1/health?quick=1"
 if [[ -n "${CLUSTER_PROVIDER:-}" ]]; then
-  health_path="/api/v1/health?provider=${CLUSTER_PROVIDER}"
+  health_path="/api/v1/health?quick=1&provider=${CLUSTER_PROVIDER}"
 fi
 
+curl_rc=0
 http_code="$(curl -s -o "${HEALTH_JSON}" -w '%{http_code}' \
   -H "Authorization: Bearer ${TOKEN}" \
-  --max-time 90 "${URL}${health_path}" 2>/dev/null || echo "000")"
+  --max-time 90 "${URL}${health_path}" 2>/dev/null)" || curl_rc=$?
+if [[ "${curl_rc}" -ne 0 ]]; then
+  echo "[FAIL] GET ${health_path} — curl exit ${curl_rc} (28 = timeout)" >&2
+  exit 1
+fi
 
 if [[ "${http_code}" != "200" ]]; then
   echo "[FAIL] GET ${health_path} returned HTTP ${http_code} (expected 200)" >&2

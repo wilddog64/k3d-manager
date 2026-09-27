@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vectordb-health
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: vectordb.health
+      interval: 60s
+      rules:
+        - alert: VectorDBMetricsStale
+          expr: absent(k3dm_vectordb_last_index_timestamp_seconds)
+          for: 1h
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "VectorDB metrics are absent"
+            description: "No VectorDB index timestamp has been published to Pushgateway for one hour."
+        - alert: VectorDBIndexStale
+          expr: time() - k3dm_vectordb_last_index_timestamp_seconds > 7 * 86400
+          for: 15m
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "VectorDB index is stale"
+            description: "The VectorDB index has not been refreshed for more than seven days."
