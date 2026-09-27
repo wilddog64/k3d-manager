@@ -9,9 +9,11 @@
       had no test coverage at all before. Case 2 mutation-proved red against `git show HEAD:`.
 - [x] `docs/guides/grafana-dashboards.md` + `CHANGELOG.md` record the hub/ACG split and the reason.
 - [x] `make check-doc-links` 1794 OK; `bats -r scripts/tests/plugins/` exit 0, 779 tests, 0 not ok.
-- [ ] **BLOCKED (classifier, operator must run):** wire the apply into
-      `_deploy_pushgateway_acg` in `scripts/plugins/observability.sh`. Until this lands nothing
-      applies the new rule file. Exact patch handed to the operator.
+- [x] Wiring landed — `_deploy_pushgateway_acg` in `scripts/plugins/observability.sh` now applies
+      `etc/prometheus/rules-acg/` with `--context "${_app_context}"`, beside the two dashboard
+      applies and the Pushgateway that produces the metrics. `make observability-acg` →
+      `deploy_observability_acg --confirm` → `_deploy_pushgateway_acg` is the confirmed chain.
+      A 6th BATS case asserts the wiring and is mutation-proved red against `git show HEAD:`.
 - [ ] **BLOCKED (classifier, operator must run):**
       `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` — the per-release reapply.
       `--dry-run` clean, 13/13 sets.

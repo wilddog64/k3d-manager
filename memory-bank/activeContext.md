@@ -1,3 +1,34 @@
+# 2026-09-27 — DEFECT 4 wiring completed
+
+The one blocked piece of option A has landed. `_deploy_pushgateway_acg` in
+`scripts/plugins/observability.sh` now applies `etc/prometheus/rules-acg/` to the app cluster with
+an explicit `--context "${_app_context}"`, directly after the two k3dm dashboard applies and before
+`_observability_apply_trivy_dashboard`. That function is where the Pushgateway — the producer of
+every `k3dm_test_*` series — is installed, so the rules that alert on its data now ship beside it.
+
+The `--context` is the whole point of the fix: the hub-side apply at `observability.sh:92` uses a
+bare `_kubectl apply -f "${_rules_dir}/"`, which is how the rules ended up on a Prometheus that
+holds none of the data in the first place.
+
+Delivery chain confirmed end to end: `make observability-acg` → `./scripts/k3d-manager
+deploy_observability_acg --confirm` → `_deploy_pushgateway_acg` (called at
+`observability.sh:673`) → the new block. The claim already written into
+`docs/guides/grafana-dashboards.md` — "applied to the app cluster by `make observability-acg`" — is
+therefore accurate as of this commit and needed no correction.
+
+Verification: `shellcheck scripts/plugins/observability.sh` reports only the pre-existing SC2016
+info on the literal bcrypt hash at line 861, which is present at HEAD too and must stay
+single-quoted. A 6th BATS case was added to
+`scripts/tests/plugins/observability_k3dm_tests_rules.bats` asserting both the `rules-acg` path and
+the `--context "${_app_context}"` form; 6/6 green, and the new case is mutation-proved red against
+`git show HEAD:scripts/plugins/observability.sh` (zero `rules-acg` references pre-patch). No file
+mode change — the diff is 5 insertions, nothing else.
+
+Still operator-owned: `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` (the
+per-release reapply, `--dry-run` clean at 13/13), then `make observability-acg`, then confirm the
+`k3dm-tests.alerts` group appears in the ACG Prometheus `/api/v1/rules` — it returned no such group
+before this work.
+
 # 2026-09-27 — DEFECT 4: the k3dm-tests alerts were on a Prometheus that has none of the data
 
 Found while assembling the ApplicationSet-reapply instructions. The five `k3dm-tests.alerts` rules

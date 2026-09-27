@@ -45,3 +45,11 @@ PY
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"OK 5"* ]]
 }
+
+@test "the ACG rules dir is applied to the app cluster by the observability plugin" {
+  local _plugin="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
+  run grep -F -- 'etc/prometheus/rules-acg' "${_plugin}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '_kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/"' "${_plugin}"
+  [ "${status}" -eq 0 ]
+}

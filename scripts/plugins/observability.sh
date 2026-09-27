@@ -713,6 +713,11 @@ function _deploy_pushgateway_acg() {
     _kubectl apply --context "${_app_context}" -f "${_tests_dashboard_cm}" >/dev/null \
       && _info "[observability] k3dm tests dashboard applied"
   fi
+  local _acg_rules_dir="${SCRIPT_DIR}/etc/prometheus/rules-acg"
+  if [[ -d "${_acg_rules_dir}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/" >/dev/null \
+      && _info "[observability] app-cluster PrometheusRules applied from ${_acg_rules_dir}/"
+  fi
   _observability_apply_trivy_dashboard "${_app_context}"
 }
 
