@@ -26,6 +26,19 @@ source-backed BATS tests, each mutation-checked red against its reverted hunk. G
 suite 5/5; recursive plugin suite 787/787; shellcheck has only the pre-existing informational
 SC2016 at `observability.sh:880`.
 
+**Codex's class guard did not guard the class, and the focused suite was green either way.** Its
+test 4 grepped each rules placeholder against the whole of `observability.sh`, so a rules file
+introducing `${ARGOCD_NAMESPACE}` passed on the strength of the *ApplicationSet's* envsubst
+allowlist at line 27 — a call that never renders the rules directory. Proved by adding such a file:
+accepted before, rejected after. The allowlist is now read out of the envsubst invocation whose
+input is `"${_rule_file}"`, and the guard fails in both directions (unlisted placeholder appears;
+allowlist drifts off a placeholder already present). Fixed in `09fce5a4`.
+
+The lesson generalises past this test: Codex's mutation evidence was real but only covered the
+hunks it was told to revert, which proves a test notices *that* change — not that the test means
+what the spec said. A guard's semantics have to be attacked with the case it was written to catch,
+not with the diff it was written alongside.
+
 This is the second instance of one defect class in a single day: **a placeholder is only as good as
 the renderer that substitutes it.** The morning's was `{{HOME}}` in the cloud-bridge launchd
 template, caught before shipping; this one was already committed, and
