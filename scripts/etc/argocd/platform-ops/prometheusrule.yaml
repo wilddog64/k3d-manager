@@ -150,7 +150,7 @@ spec:
             summary: "{{ $value }} offline test case(s) failing for target {{ $labels.target }}"
             description: "The last recorded run of {{ $labels.target }} had failing cases. This is the health signal; the exit code is not."
         - alert: OfflineSuiteVacuous
-          expr: k3dm_test_suite_cases < 1
+          expr: k3dm_test_suite_cases{result="ok"} < 1
           for: 30m
           labels:
             group: k3dm-tests

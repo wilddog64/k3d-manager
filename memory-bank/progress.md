@@ -2217,3 +2217,51 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [ ] OPERATOR-OWNED, deliberately not done: the first live `make test-metrics` push, and
       confirming the `k3dm-tests` dashboard loads in the ACG Grafana. No live Pushgateway, cluster
       or host action was taken by any agent.
+# v1.39.0 public endpoint blackbox probes — 2026-09-27, pushed `ba2a01e1`
+
+- [x] Offline half implemented in one commit `ba2a01e1679423d3fbf7978cb4a248addbe57085` and
+  pushed to `origin/k3d-manager-v1.39.0`; no PR created.
+- [x] Added pinned `prometheus-blackbox-exporter` chart `11.3.1` with image tag `v0.27.0`, both
+  required modules with explicit `User-Agent`, `public-endpoint-probes.yaml` with two
+  `release: kube-prometheus-stack` Probe resources and `${CF_DOMAIN}` targets, and
+  `public-endpoints.yaml` with all three spec rules.
+- [x] Added the P4 operator guide, Grafana triage row, and v1.39.0 CHANGELOG entry. Static gates:
+  yq parse and non-empty expressions pass; each new manifest has `grep -c '3ai-talk' = 0`;
+  focused observability BATS `1..28` all pass; `_agent_audit` passes; `make check-doc-links` says
+  `1793 file(s) OK`. `promtool` was unavailable, so YAML parsing and expression non-empty checks
+  are the documented fallback.
+- [!] Curated test-all was `1..1151` with 42 unrelated webhook failures (312–353); the focused
+  observability subset passed. Untouched observability shellcheck has pre-existing SC2016 line 856.
+- [ ] **Live verification pending operator action:** deploy the chart/Probe resources via ArgoCD;
+  query `count(probe_success)` and all seven `probe_http_status_code` series; prove the frontend
+  404 yields `probe_success 0`; reapply hub and ACG ApplicationSets; run
+  `argocd_check_values_branch`. The local remote-tracking ref could not be updated by the sandbox,
+  but `git ls-remote` reports the pushed SHA above.
+
+# v1.39.0 test-suite metrics — live push CONFIRMED 2026-09-27
+
+- [x] First real `make test-metrics` run: green, 1692 cases, 0 failed, push accepted by the
+      live Pushgateway at `:9091`. The T4 `origin`-in-URL grouping produced
+      `instance="test-all-local"` as designed.
+- [x] `OfflineSuiteVacuous` false-positive fixed — scoped to `{result="ok"}`. It would have
+      paged on a fully green run because every `result="not_ok"` series is 0 when healthy.
+- [ ] **Duration metrics are dead** — `k3dm_test_run_duration_seconds` is a hardcoded 0 and
+      `bats`/`pytest` suite durations are 0 (the parser expects a `# duration:` marker that no
+      harness emits). Needs Makefile timing + `--duration` + a pytest `in <n>s` parse. DECISION
+      PENDING: fix in v1.39.0 or file as a bug doc for v1.40.0.
+- [ ] Operator-owned: apply the `k3dm-tests` dashboard (`make observability-acg`) and confirm it
+      loads in the ACG Grafana. The ConfigMap is still absent on both clusters, so the metrics
+      that just landed have nothing reading them yet.
+
+# v1.39.0 blackbox probes — Codex landed ba2a01e1 2026-09-27
+
+- [x] `ba2a01e1` verified on `origin/k3d-manager-v1.39.0` by my own fetch. 7 files, 151
+      insertions, all named by the spec, no scope creep. Trailer correct.
+- [x] Three alerts present with non-empty exprs: `PublicEndpointDown`, `CloudflareTunnelDown`,
+      `PublicEndpointProbeAbsent`. Chart pinned `11.3.1`, image `v0.27.0`, no `latest`.
+      `check-doc-links`: 1793 OK.
+- [x] Codex's "42 pre-existing webhook failures" claim DISPROVEN — 27 reds, all sandbox
+      Keychain-token artifacts; the same tree is 1304/0 in a real shell.
+- [ ] Operator-owned live DoD: ArgoCD deploy, seven `probe_success` series, seven status codes,
+      prove the frontend returns `probe_success 0` / 404, ApplicationSet reapply,
+      `argocd_check_values_branch`.
