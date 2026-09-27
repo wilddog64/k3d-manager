@@ -63,6 +63,16 @@
 
 ### Fixed
 
+- **The webhook smoke gate requests the bounded `?quick=1` health variant** instead of the
+  unbounded full sweep it could never complete inside its own 90s cap. The gate asked for every
+  stage serially behind three retries with a ten-second sleep between them, so a single slow
+  endpoint guaranteed a timeout the gate then reported as a service failure. It now also reports
+  curl's exit code: `-w '%{http_code}'` already prints `000` on a transport failure, and the
+  `|| echo "000"` fallback appended a second one, so the operator saw `HTTP 000000` — a code that
+  does not exist — in place of `curl exit 28 (timeout)`. A probe that cannot connect at all is
+  additionally named as a missing host-side forward rather than reported like a service outage,
+  which is what made the two endpoints with no port-forward on this host read as real reds.
+
 - **`bin/smoke-test-cluster-health` resolves the app-cluster context from the checked ArgoCD
   Application's `destination.name`** instead of a hardcoded default, so a cluster-registration
   rename can no longer make it check apps on one cluster and pods on another. `make smoke` reported
