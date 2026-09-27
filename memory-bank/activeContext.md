@@ -1,3 +1,39 @@
+# 2026-09-27 — the `eso` sensor's `unknown` is FIXED and verified live
+
+Codex implemented S1-S7; the `.git` write denial in its sandbox meant Claude committed. Verified
+independently, not from the report: diff limited to the 7 spec files, `py_compile` clean, 71 BATS
+(6 skipped) + 167 pytest green, all 3 grep gates at their expected values, and **both guards
+mutation-tested** — neutering `_kubectl_config_error` fails `not ok 4`, restoring the old
+poison-on-`None` sensor logic fails 2 pytest tests.
+
+Live reproduction now yields the real finding instead of `unknown`:
+
+| cycle | status | evidence |
+|---|---|---|
+| 1-2 | `healthy` | `1/8 not synced: cosign-public-key` |
+| 3+ | `degraded` | `1/8 not synced: cosign-public-key` |
+
+The app rows now read `cluster unreachable (kube context 'ubuntu-k3s' unusable)` with `ok=None`
+(neutral, skipped) rather than the false `not installed`.
+
+**Two findings of my own while verifying:**
+
+- **My original reproduction stub was wrong and the bug hid it.** `fetch` must return the parsed
+  dict; mine returned `(status, body)`, so `_webhook_services` raised `ValueError` and the
+  `except Exception` branch returned `unknown` — the same verdict the real defect produced. A
+  broken harness agreeing with a real bug is indistinguishable from a working one. The guide's
+  documented snippet uses the correct form.
+- **`_debounced` needs threshold+1 cycles**, not threshold — `counts[sensor] > threshold`. So
+  `degraded` lands on cycle 3 with `threshold=2`. Pre-existing and shared by every sensor; not
+  touched here, but it means every Hermes "debounce 2" is really 3.
+
+Also fixed a markdown defect in Codex's doc edit: the new troubleshooting `###` section was
+inserted between list items 2 and 3, breaking the numbered sensor list. Moved below item 5.
+
+Still open and operator-owned: `platform-ops/cosign-public-key` (the actual unsynced secret), and
+the two out-of-scope defects in the spec — `_provider_context`'s `ubuntu-k3s` default when no
+`active-provider` file exists, and threading rc through `_posix_spawn_capture`.
+
 # 2026-09-27 — the `eso` sensor's `unknown` is four stacked defects, diagnosed
 
 `eso` has reported `unknown  ESO status source unavailable` every cycle. Reproduced

@@ -1378,67 +1378,6 @@ ESO sync failure is the most common root cause of "pod Running but app broken" s
 """
 
 
-def _kubectl_absent(output):
-    """True when combined kubectl output indicates a missing resource."""
-    if not output or not output.strip():
-        return False
-    _low = output.lower()
-    return any(sig in _low for sig in (
-        "notfound", "not found", "no resources found",
-        "doesn't have a resource type", "could not find the requested resource",
-    ))
-
-
-def _eso_health_results(context, label_prefix=""):
-    """ClusterSecretStore + ExternalSecret health on one kube context."""
-    results = []
-    css_name = f"{label_prefix}ESO ClusterSecretStore"
-    es_name = f"{label_prefix}ESO ExternalSecrets"
-    try:
-        _css_out, _css_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "clustersecretstore", "vault-backend",
-             "--context", context, "-o", "json"], timeout=8)
-        if _css_timeout:
-            raise RuntimeError("kubectl clustersecretstore timed out")
-        if _kubectl_absent(_css_out):
-            results.append((css_name, None,
-                            f"not installed (no ClusterSecretStore on {context})"))
-        else:
-            _data = json.loads(_css_out)
-            _conds = _data.get("status", {}).get("conditions", [])
-            _ready = next((c for c in _conds if c.get("type") == "Ready"), None)
-            _val = f"Ready={_ready.get('status', 'Unknown')}" if _ready else "no conditions"
-            results.append((css_name, _val == "Ready=True", _val))
-    except Exception as _exc:
-        results.append((css_name, False, str(_exc)[:200]))
-    try:
-        _es_out, _es_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "externalsecret", "-A", "--context", context, "-o", "json"],
-            timeout=10)
-        if _es_timeout:
-            raise RuntimeError("kubectl externalsecret timed out")
-        if _kubectl_absent(_es_out):
-            results.append((es_name, None,
-                            f"not installed (no ExternalSecret CRD on {context})"))
-            _es_data = None
-        else:
-            _es_data = json.loads(_es_out)
-        if _es_data is not None:
-            _items = _es_data.get("items", [])
-            _not_ready = [it["metadata"]["name"] for it in _items if not any(
-                c.get("type") == "Ready" and c.get("status") == "True"
-                for c in it.get("status", {}).get("conditions", []))]
-            _total = len(_items)
-            if _not_ready:
-                results.append((es_name, False,
-                                f"{len(_not_ready)}/{_total} not synced: {', '.join(_not_ready[:3])}"))
-            else:
-                results.append((es_name, True, f"{_total}/{_total} synced"))
-    except Exception as _exc:
-        results.append((es_name, False, str(_exc)[:200]))
-    return results
-
-
 def _run_post_provision_check(job_id, provider):
     """90s after cluster-up: check tunnel + apps; AI-triage each degraded app to Slack."""
     import time

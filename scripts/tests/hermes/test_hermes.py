@@ -205,8 +205,36 @@ def test_eso_healthy_degraded_unknown_and_debounce():
     assert [eso(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
     unknown = health([{"name": "ESO ClusterSecretStore", "ok": None, "detail": "absent"},
                       {"name": "ESO ExternalSecrets", "ok": True, "detail": "ok"}])
-    assert eso(webhook(unknown), {}, token="x")["status"] == "unknown"
+    # Intentional tri-state contract inversion from docs/bugs/2026-09-27-hermes-eso-sensor-unknown-kubeconfig-error-as-absence.md.
+    assert eso(webhook(unknown), {}, token="x")["status"] == "healthy"
     assert eso(webhook(good), {}, token="")["status"] == "unknown"
+
+
+def test_eso_grades_hub_rows_and_ignores_unreachable_app_cluster():
+    payload = health([
+        {"name": "ESO ClusterSecretStore", "ok": None,
+         "detail": "cluster unreachable (kube context 'ubuntu-k3s' unusable)"},
+        {"name": "ESO ExternalSecrets", "ok": None,
+         "detail": "cluster unreachable (kube context 'ubuntu-k3s' unusable)"},
+        {"name": "Hub ESO ClusterSecretStore", "ok": True, "detail": "Ready=True"},
+        {"name": "Hub ESO ExternalSecrets", "ok": False,
+         "detail": "1/8 not synced: cosign-public-key"},
+    ])
+    state = {}
+    statuses = [eso(webhook(payload), state, token="x")["status"] for _ in range(3)]
+    assert statuses == ["healthy", "healthy", "degraded"]
+    final = eso(webhook(payload), state, token="x")
+    assert_normalized(final, "eso")
+    assert final["status"] == "degraded"
+    assert "cosign-public-key" in final["evidence"]
+
+
+def test_eso_stays_unknown_when_all_rows_are_neutral():
+    payload = health([
+        {"name": "ESO ClusterSecretStore", "ok": None, "detail": "absent"},
+        {"name": "Hub ESO ExternalSecrets", "ok": None, "detail": "absent"},
+    ])
+    assert eso(webhook(payload), {}, token="x")["status"] == "unknown"
 
 
 def test_argocd_healthy_degraded_unknown_and_debounce():

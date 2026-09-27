@@ -1,6 +1,6 @@
 # v1.40.0 in progress — 2026-09-27
 
-- [ ] **fix the `eso` sensor `unknown`** — four stacked defects diagnosed 2026-09-27 (kubeconfig error read as absence; exit code discarded; `Hub ESO *` rows never graded; the bats suite tests dead duplicates). Spec `docs/bugs/2026-09-27-hermes-eso-sensor-unknown-kubeconfig-error-as-absence.md`, assigned to Codex.
+- [x] **fix the `eso` sensor `unknown`** — four stacked defects diagnosed 2026-09-27 (kubeconfig error read as absence; exit code discarded; `Hub ESO *` rows never graded; the bats suite tests dead duplicates). Spec `docs/bugs/2026-09-27-hermes-eso-sensor-unknown-kubeconfig-error-as-absence.md`, assigned to Codex. — FIXED, verified live (degraded on cycle 3, `cosign-public-key`); mutation-tested both guards
 - [x] vectordb dashboard investigated — **not blank.** All six gauges publish to
       Pushgateway, Prometheus scrapes them (target up), all six panel queries
       return values, dashboard uid `k3dm-vectordb` provisioned, ConfigMap present

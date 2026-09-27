@@ -57,6 +57,10 @@
 
 ### Fixed
 
+- **Hermes `eso` could remain permanently `unknown`.** A kubeconfig error whose text contained
+  `not found` was classified as resource absence, making every app-cluster ESO row neutral, while
+  the `Hub ESO *` rows the sensor never read carried a real unsynced-ExternalSecret finding.
+
 - **`VectorDBMetricsStale` could never fire.** The alert was
   `absent(k3dm_vectordb_last_index_timestamp_seconds)` with `for: 1h`, intended to catch "no
   VectorDB metrics published for an hour". But Pushgateway **retains gauges after a publisher

@@ -52,17 +52,19 @@ def eso(fetch, state, provider="", token=None, threshold=2):
         return _unavailable("eso", WEBHOOK_SERVICE)
     try:
         services = _webhook_services(fetch, token, provider)["services"]
-        entries = [item for item in services if item.get("name") in
-                   ("ESO ClusterSecretStore", "ESO ExternalSecrets")]
-        if len(entries) != 2 or any(item.get("ok") is None for item in entries):
+        entries = [item for item in services
+                   if isinstance(item.get("name"), str)
+                   and item["name"].endswith(("ESO ClusterSecretStore", "ESO ExternalSecrets"))]
+        graded = [item for item in entries if item.get("ok") is not None]
+        if not graded:
             return record("eso", "unknown", "ESO status source unavailable")
-        failed = [item for item in entries if item.get("ok") is False]
+        failed = [item for item in graded if item.get("ok") is False]
         if failed:
             detail = "; ".join(item.get("detail", item["name"]) for item in failed)
             status = "degraded" if _debounced("eso", True, threshold, state) else "healthy"
             return record("eso", status, detail)
         _debounced("eso", False, threshold, state)
-        return record("eso", "healthy", "; ".join(item.get("detail", item["name"]) for item in entries))
+        return record("eso", "healthy", "; ".join(item.get("detail", item["name"]) for item in graded))
     except Exception:
         return record("eso", "unknown", "ESO status source unavailable")
 

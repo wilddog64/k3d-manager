@@ -86,11 +86,38 @@ K3DM_SMOKE_FE_REDIRECT = os.environ.get(
 _SMOKE_USER_AGENT = "k3dm-smoketest/1"
 
 
+_KUBECTL_CONFIG_ERROR_SIGNATURES = (
+    "error in configuration",
+    "context was not found",
+    "no configuration has been provided",
+    "error loading config file",
+    "unable to read client-cert",
+    "unable to read client-key",
+    "the connection to the server",
+)
+
+
+def _kubectl_config_error(output):
+    """True when kubectl never reached a cluster (bad or missing context, unreadable
+    kubeconfig, unreachable API server) as opposed to reporting on a resource.
+
+    Absence is a claim about a cluster that WAS queried. A kubeconfig error means the
+    resource's existence is unknown, so it must not be reported as 'not installed' —
+    note that 'context was not found for specified context: X' contains the substring
+    'not found' and would otherwise match _kubectl_absent()."""
+    if not output or not output.strip():
+        return False
+    _low = output.lower()
+    return any(sig in _low for sig in _KUBECTL_CONFIG_ERROR_SIGNATURES)
+
+
 def _kubectl_absent(output):
     """True when combined kubectl stdout+stderr indicates the resource, CRD, or
     namespace does not exist (as opposed to existing-but-unhealthy). Relies on
     _posix_spawn_capture merging stderr into the returned text."""
     if not output or not output.strip():
+        return False
+    if _kubectl_config_error(output):
         return False
     _low = output.lower()
     return any(sig in _low for sig in (
@@ -451,7 +478,10 @@ def _eso_health_results(context, label_prefix=""):
         )
         if _css_timeout:
             raise RuntimeError("kubectl clustersecretstore timed out")
-        if _kubectl_absent(_css_out):
+        if _kubectl_config_error(_css_out):
+            results.append((css_name, None,
+                            f"cluster unreachable (kube context '{context}' unusable)"))
+        elif _kubectl_absent(_css_out):
             results.append((css_name, None,
                             f"not installed (no ClusterSecretStore on {context})"))
         else:
@@ -471,7 +501,11 @@ def _eso_health_results(context, label_prefix=""):
         )
         if _es_timeout:
             raise RuntimeError("kubectl externalsecret timed out")
-        if _kubectl_absent(_es_out):
+        if _kubectl_config_error(_es_out):
+            results.append((es_name, None,
+                            f"cluster unreachable (kube context '{context}' unusable)"))
+            _es_data = None
+        elif _kubectl_absent(_es_out):
             results.append((es_name, None,
                             f"not installed (no ExternalSecret CRD on {context})"))
             _es_data = None

@@ -128,9 +128,10 @@ Sensor status is a three-value enum defined in
 Each sensor emits one normalized record per cycle and debounces on a sustained signal (a single
 flap does not trip it). All are read-only.
 
-1. **`eso`** — ExternalSecrets health, from the webhook `services[]` entries `ESO ClusterSecretStore`
-   and `ESO ExternalSecrets`. Not-synced sustained beyond the debounce → `degraded`; source missing
-   → `unknown`.
+1. **`eso`** — ExternalSecrets health, from every webhook `services[]` row whose name ends in
+   `ESO ClusterSecretStore` or `ESO ExternalSecrets`, including the `Hub `-prefixed pair. Neutral
+   (`ok: null`) rows are skipped rather than treated as `unknown`; not-synced sustained beyond the
+   debounce → `degraded`, and `unknown` means no ESO row could be graded at all.
 2. **`argocd`** — per-`Application` `Degraded` / `OutOfSync`, from `argocd app list -o json --grpc-web`
    using the read-only `hermes` API token (get-only). The webhook JSON does not expose per-app state,
    which is the one reason Hermes holds an ArgoCD token at all.
@@ -141,6 +142,23 @@ flap does not trip it). All are read-only.
    (the `Data layer` entry plus aggregate service health), never a direct node probe.
 5. **`ci`** — GitHub Actions / required-check health via the GitHub read API (failed, timed-out,
    cancelled, or stuck in-progress runs).
+
+### `eso` says `unknown` — check the kube context before the credential.
+
+An `unknown` ESO result means no ESO row could be graded. Reproduce the webhook payload without
+using a credential or touching a cluster:
+
+```bash
+PYTHONPATH=scripts/lib python3 - <<'PY'
+from webhook import smoke
+from hermes.sensors import eso
+res = smoke._eso_health_results("ubuntu-k3s")
+for name, ok, detail in res:
+    print(f"  {name!r}: ok={ok!r} detail={detail!r}")
+payload = {"services": [{"name": n, "ok": ok, "detail": d} for n, ok, d in res]}
+print("sensor:", eso(lambda *a, **k: payload, {}, token="x")["status"])
+PY
+```
 
 ---
 
