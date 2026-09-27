@@ -1,3 +1,65 @@
+# 2026-09-27 — the vectordb dashboard is NOT blank; the stale premise corrected
+
+Investigated read-only before bootstrapping Hermes. **The premise behind the
+pending "vectordb dashboard is blank because `bin/k3dm-vectordb-metrics` has
+never run" item was stale — it has run, and the whole path works.**
+
+| Link in the chain | State |
+|---|---|
+| `bin/k3dm-vectordb-status --json` | rc 0: `available` true, `rows` 1705, `corpus_docs` 1713, `pod_ready` true, `external_secret_synced` true |
+| Pushgateway `localhost:9091` | `/-/healthy` 200; job `k3dm-vectordb` present with all **six** gauges |
+| Prometheus scrape | target `prometheus-pushgateway.monitoring:9091` **up** |
+| All six dashboard panel queries | every one returns a value (no label selectors in any of them) |
+| Grafana | dashboard provisioned, uid `k3dm-vectordb`, id 27, "k3dm VectorDB Health" |
+| ConfigMap `k3dm-vectordb` (monitoring) | present in **both** `k3d-k3d-cluster` and `ubuntu-hostinger`, label `grafana_dashboard: "1"` |
+| Firing alerts | only `Watchdog` (expected). No vectordb alert |
+
+**The real defect, and it is not blankness — it is staleness that cannot be
+detected.** `time() - push_time_seconds{job="k3dm-vectordb"}` was **14005s
+(~3.9h)** and the index itself 9.7h old. Nothing will refresh either: the only
+recurring producer is the Hermes tick, and `make index-docs` is manual. Yet
+`VectorDBMetricsStale` is `absent(k3dm_vectordb_last_index_timestamp_seconds)`
+`for: 1h` — and **Pushgateway retains gauges after a publisher stops**, so once
+a single publish has happened (it has) `absent()` can never be true again and
+that alert can never fire. `VectorDBIndexStale` only trips past **7 days**. So
+the dashboard will keep showing confident, healthy, arbitrarily old numbers with
+nothing complaining. Same defect class as the `DeploymentMetricsStale`
+"cannot fire on no deployment has ever run" item. Not fixed — needs the user's
+call.
+
+**Also corrected — a false negative I produced myself.** `kubectl get configmap
+-n monitoring | grep -i vectordb` reported the ConfigMap absent. It was not: the
+current kube context is the stale `ubuntu-k3s`, which does not exist, so every
+`kubectl` call errored and the grep read the error text as an empty listing.
+This is exactly the trap in `reference_kubectl_empty_listing_missing_namespace`.
+**Deleting the stale `ubuntu-k3s` context is now load-bearing, not cosmetic** —
+it silently turns every unqualified `kubectl` read into a plausible-looking
+negative.
+
+## Hermes bootstrap — feasible, NOT performed
+
+`com.k3d-manager.hermes.plist` exists (Sep 9) but the agent is **not loaded**.
+All four required Keychain items are present (`k3dm-webhook-token`,
+`k3dm-hermes-argocd-token`, `k3dm-hermes-gh-token`, `k3dm-slack-webhook`), plus
+the optional `k3dm-hermes-audit-token`; only the two optional SMS items are
+missing. So `bin/k3dm-hermes-setup` would succeed.
+
+Held back because the vectordb publish is the **last** statement of a full
+Hermes cycle (`bin/k3dm-hermes:464`), so loading the agent for a dashboard
+refresh also switches on, every 300s with `RunAtLoad`:
+
+- **`K3DM_HERMES_AUTO_KINE_GUARD=1`** in the plist env — auto-action on the hub
+  Kine circuit breaker. Per `reference_kine_compaction_dies_silently` a restart
+  does not fix compaction and induces a bootstrap crash loop.
+- Slack summary delivery and the pager (outward-facing; a sent page is not
+  reversible).
+- Scheduled e2e dispatch (`wed,sat@02:00`).
+- The monthly security audit.
+
+Awaiting the user's choice: full bootstrap, a freshness-only bootstrap
+(`K3DM_HERMES_AUTO_KINE_GUARD=0`, `K3DM_HERMES_E2E_ENABLED=0`), or just a
+periodic `bin/k3dm-vectordb-metrics`.
+
 # 2026-09-27 — `bin/k3dm-vectordb-metrics` documented (`28e3f744`)
 
 Closes the second and last of the two v1.39.0 Step 7b leftovers. The

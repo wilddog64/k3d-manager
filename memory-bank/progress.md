@@ -1,5 +1,22 @@
 # v1.40.0 in progress — 2026-09-27
 
+- [x] vectordb dashboard investigated — **not blank.** All six gauges publish to
+      Pushgateway, Prometheus scrapes them (target up), all six panel queries
+      return values, dashboard uid `k3dm-vectordb` provisioned, ConfigMap present
+      in both clusters. The stale "blank because the producer never ran" item is
+      withdrawn.
+- [ ] **`VectorDBMetricsStale` can never fire.** `absent(...)` cannot go true
+      because Pushgateway retains gauges after a publisher stops; last publish was
+      ~3.9h old with nothing scheduled to refresh it. Needs a
+      `push_time_seconds` age expression instead. Not approved.
+- [ ] Hermes bootstrap feasible (all four Keychain creds present, agent not
+      loaded) but NOT performed — the plist carries
+      `K3DM_HERMES_AUTO_KINE_GUARD=1`, Slack/SMS paging and scheduled e2e.
+      Awaiting the user's choice of scope.
+- [ ] delete the stale `ubuntu-k3s` kube context — now load-bearing: it is the
+      current context and does not exist, so unqualified `kubectl` reads error and
+      read as empty listings.
+
 - [x] `docs/howto/makefile.md` documents the six test targets — `8312512d`
       (Test Suites section, +39; `check-doc-links: 1 file(s) OK`)
 - [x] `bin/k3dm-vectordb-metrics` documented in `docs/guides/vector-store.md` —
