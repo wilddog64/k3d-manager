@@ -1,3 +1,28 @@
+# v1.39.0 shipped — 2026-09-27
+
+- [x] **PR #133 merged** to `main` as squash commit `3a254484c04d0ff6d9a42de72eeae1ab3b12c473`.
+- [x] `enforce_admins` restored on `main` via the bodyless POST; read back `enabled: true`.
+      `required_approving_review_count` was never lowered this release (still `1`).
+- [x] Tag `v1.39.0` created on the merge commit and pushed; GitHub release `v1.39.0` published
+      as `latest` with the CHANGELOG section as notes.
+- [x] `main` synced locally (fast-forward, clean).
+- [x] `origin/main` merged into `k3d-manager-v1.40.0` as `8758dcf0` — six conflicts, all
+      resolved and verified: three files were strict subsets of main's and took `--theirs`,
+      `argocd_vectordb.bats` took main's `rg`-free version (suite re-run 16/16 on the merged
+      tree), and both memory-bank files were union-merged and proved supersets of both sides.
+- [x] Retro `docs/retro/2026-09-27-v1.39.0-retrospective.md` shipped with the PR.
+- [x] Step 7b standing-doc audit — four gaps found and fixed in `65e015ec`:
+      `docs/howto/makefile.md` (all three new targets were missing), `README.md`
+      (`public-endpoint-alerts.md` link), `memory-bank/projectbrief.md` (no vectordb/pgvector
+      mention anywhere), `.github/copilot-instructions.md` (Architecture bullets + a v1.39.0
+      review section). `docs/api/functions.md` needed no change — no new public shell functions.
+- [ ] `docs/howto/makefile.md` still documents no `test`/`test-pytest`/`test-bin`/`test-all`
+      target — pre-existing, not a v1.39.0 regression. Worth a pass in v1.40.0.
+- [ ] `bin/k3dm-vectordb-metrics` is undocumented. Its sibling `bin/k3dm-vectordb-status` is
+      covered in `docs/guides/vector-store.md`.
+- [ ] Branch cleanup not run — v1.39.0 is not a 5-release boundary and the user did not ask.
+      Branch deletion needs the user's explicit go.
+
 # v1.39.0 k3dm-tests alerts moved to the ACG stack — 2026-09-27
 
 - [x] **Blackbox probes inert: doubled image registry + unsubstituted `${CF_DOMAIN}`** — fixed in

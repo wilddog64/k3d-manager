@@ -1,3 +1,54 @@
+# 2026-09-27 — v1.39.0 merged, tagged and released; enforce_admins restored
+
+PR #133 merged to `main` as squash commit `3a254484`. `/post-merge` is complete:
+
+| Step | Result |
+|---|---|
+| 2 — branch protection | `enforce_admins` **restored** (bodyless POST → `enabled: true`). `required_approving_review_count` was never lowered — still `1`. |
+| 3 — main synced | `main` at `3a254484`, fast-forward, worktree clean |
+| 4 — release | tag `v1.39.0` → `3a254484`, pushed; GitHub release `v1.39.0` published as `latest` from the CHANGELOG section |
+| 5 — next branch | `k3d-manager-v1.40.0` already existed with three commits; `origin/main` merged into it as `8758dcf0` |
+| 6 — retro | `docs/retro/2026-09-27-v1.39.0-retrospective.md` was committed on the release branch, so it merged with the PR |
+| 7b — standing docs | four real gaps found and fixed (below) |
+
+**The merge into `k3d-manager-v1.40.0` had six conflicts, and five of them were the same
+thing:** the branch was cut *before* the CHANGELOG promotion and before WS6 finished, so its
+copies of `CHANGELOG.md`, `docs/guides/vector-store.md` and
+`docs/plans/v1.39.0-vector-store-platform-and-retrieval.md` were strict **subsets** of main's —
+verified line-for-line with `comm`, zero unique lines — and `docs/guides/vector-store.md` was
+still the 23-line stub ending in `## Still to be written (WS6)` against main's finished 310
+lines. Those took `--theirs`. `scripts/tests/plugins/argocd_vectordb.bats` was an add/add
+conflict whose only difference was the 19 `rg` → POSIX `grep` conversions from `16bb217f`; took
+main's, then re-ran the suite on the merged tree: **16/16, zero `run rg`**.
+
+The two memory-bank files were resolved with `git merge-file --union`, then **proved** to be
+strict supersets of both sides (`diff` shows zero deletions against either). Do not hand-resolve
+these two by picking a side — each side holds entries the other never saw.
+
+**Step 7b found four genuine staleness gaps, all fixed in `65e015ec`:**
+
+- `docs/howto/makefile.md` claims to document *all* `make` targets and was missing **all three**
+  v1.39.0 additions. Added `## Docs & Prior Art` (`index-docs`, `find-similar-docs`, with the
+  advisory/exit-0 contract, the ~3% embedding scope and the two-sitting cold index) and
+  `## Test Metrics` (`test-metrics`, and why it always exits 0).
+- `README.md` was missing the `docs/howto/public-endpoint-alerts.md` link; added under
+  **Networking**.
+- `memory-bank/projectbrief.md` had no mention of `vectordb`, pgvector or embeddings at all.
+  Added a v1.39.0 Scope bullet and two Component Origin Story entries (pgvector store, blackbox
+  exporter). Scope's provider list and Out-of-scope section were checked and are current.
+- `.github/copilot-instructions.md` had nothing on this release's patterns. Added three
+  Architecture bullets (vector store, public endpoint probes, test-suite metrics) and a
+  `### Vector store, embeddings, and probes (v1.39.0+)` review section.
+
+**Still noted, not fixed:** `docs/howto/makefile.md` documents no `test*` target at all beyond
+the new `test-metrics` — `test`, `test-pytest`, `test-bin`, `test-all` are absent, which predates
+this release. `bin/k3dm-vectordb-metrics` is undocumented (its sibling
+`bin/k3dm-vectordb-status` is covered in the vector-store guide). Neither is a v1.39.0
+regression.
+
+`docs/api/functions.md` needed no change: v1.39.0 added **no** new public shell functions — the
+release's new surface is three `bin/` scripts and three `make` targets.
+
 # 2026-09-26 — cloud-bridge capability specs written (v1.40.0 branch created)
 
 `k3d-manager-v1.40.0` created from v1.39.0 HEAD; three specs committed and pushed. Supersedes the
