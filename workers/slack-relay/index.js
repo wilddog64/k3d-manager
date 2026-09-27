@@ -30,6 +30,16 @@ function resolveProvider(text, dflt) {
   return ALL_PROVIDERS.has(p) ? p : dflt
 }
 
+function resolveProviderStrict(text) {
+  const t = (text || '').trim().toLowerCase()
+  if (!t) return { error: 'no cluster named' }
+  const p = PROVIDER_ALIASES[t] || t
+  if (!ALL_PROVIDERS.has(p)) return { error: `unknown cluster \`${t}\`` }
+  return { provider: p }
+}
+
+const CLUSTER_ARG_USAGE = '`hostinger` is the permanent app cluster; `aws`, `gcp` and `az` are ephemeral lab sandboxes.'
+
 function parseClusterDiagnose(text) {
   const parts = (text || '').trim().split(/\s+/).filter(Boolean)
   let target = 'hostinger'
@@ -304,7 +314,8 @@ async function handle(req, event) {
   }
 
   if (command === '/cluster-up') {
-    const provider = resolveProvider(text, 'hostinger')
+    const { provider, error } = resolveProviderStrict(text)
+    if (error) return jsonReply(`⚠️ ${error} — usage: \`${command} <aws|gcp|az|hostinger>\`. ${CLUSTER_ARG_USAGE}`, threadTs, true)
     const payload = { action: 'up', provider, response_url: responseUrl }
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
@@ -318,7 +329,8 @@ async function handle(req, event) {
   }
 
   if (command === '/cluster-down') {
-    const provider = resolveProvider(text, 'aws')
+    const { provider, error } = resolveProviderStrict(text)
+    if (error) return jsonReply(`⚠️ ${error} — usage: \`${command} <aws|gcp|az|hostinger>\`. ${CLUSTER_ARG_USAGE}`, threadTs, true)
     const payload = { action: 'down', provider, response_url: responseUrl }
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)

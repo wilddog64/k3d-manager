@@ -92,6 +92,26 @@
 
 ### Fixed
 
+- **`/cluster-up` and `/cluster-down` no longer act on a cluster the operator did not name.**
+  `resolveProvider` returned a per-command default for any text it did not recognize, which made two
+  defects out of one function. The defaults were asymmetric — bare `/cluster-up` meant `hostinger`,
+  the permanent app cluster, while bare `/cluster-down` meant `aws`, the sandbox — so the two
+  commands with no argument acted on different clusters. Worse, the fallback applied to *unrecognized*
+  tokens and not just empty ones, so `/cluster-down hostigner` silently tore down `aws` and
+  `/cluster-up awz` silently provisioned `hostinger`, each acknowledged with a confidently worded
+  reply naming the cluster the operator had not asked for. A typo was enough to retarget a
+  destructive command. Both commands now resolve through `resolveProviderStrict`, which requires an
+  exact provider or alias and replies with usage instead of relaying; the read-only commands keep
+  their defaults, where a wrong guess costs nothing. Covered by four cases in
+  `workers/slack-relay/test/relay.test.mjs`, two of which fail against the pre-fix source.
+- **`/k3dm help` now lists the cluster lifecycle commands.** `/k3dm help` enumerates all 24 make
+  targets and is the only self-describing command surface in Slack, but the seven `/cluster-*`
+  commands are separate slash commands routed to `/api/v1/cluster` and appeared in no in-Slack
+  listing at all. An operator reading the help output could not discover the commands that record a
+  deployment, because `_run_cluster` — not the Makefile — is what carries the running-job guard, the
+  stall timer and the Pushgateway push. They are listed for discoverability only and remain
+  unrunnable as make targets, which `test_cluster_commands_are_not_make_targets` pins.
+  See `docs/bugs/2026-09-27-k3dm-help-omits-cluster-lifecycle-commands.md`.
 - **`make test` no longer writes fabricated deployment metrics into the live Pushgateway.**
   `scripts/tests/lib/webhook.bats` was careful about isolation — port, token, `HOME`, `PATH`
   (stubbing `make` and `kubectl`), `K3DM_JOB_DIR` and `K3DM_RUN_DIR` — but never set

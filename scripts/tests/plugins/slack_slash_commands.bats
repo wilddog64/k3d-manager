@@ -50,10 +50,14 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
 }
 
 @test "slack commands doc gives a concrete example for each command" {
-  run grep -F -- '| `/cluster-up [aws\|gcp\|az\|hostinger]` | Provision cluster | `/cluster-up hostinger` |' "${DOC}"
+  run grep -F -- '`/cluster-up <aws\|gcp\|az\|hostinger>`' "${DOC}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '`/cluster-up hostinger`' "${DOC}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- '| `/cluster-down [aws\|gcp\|az\|hostinger]` | Tear down cluster | `/cluster-down hostinger` |' "${DOC}"
+  run grep -F -- '`/cluster-down <aws\|gcp\|az\|hostinger>`' "${DOC}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '`/cluster-down hostinger`' "${DOC}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '| `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | `/cluster-status hostinger` |' "${DOC}"

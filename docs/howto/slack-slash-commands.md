@@ -117,14 +117,14 @@ Run once per machine. Safe to re-run.
         "command": "/cluster-up",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Start the lab sandbox cluster",
-        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
+        "usage_hint": "<aws|gcp|az|hostinger>  e.g. hostinger",
         "should_escape": false
       },
       {
         "command": "/cluster-down",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Stop the lab sandbox cluster",
-        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
+        "usage_hint": "<aws|gcp|az|hostinger>  e.g. hostinger",
         "should_escape": false
       },
       {
@@ -313,8 +313,8 @@ bin/k3dm-webhook-setup --uninstall
 
 | Command | Action | Example | Notes |
 |---------|--------|---------|-------|
-| `/cluster-up [aws\|gcp\|az\|hostinger]` | Provision cluster | `/cluster-up hostinger` | Hostinger is the permanent app cluster; others are lab sandboxes |
-| `/cluster-down [aws\|gcp\|az\|hostinger]` | Tear down cluster | `/cluster-down hostinger` | Hostinger tears down the permanent app cluster |
+| `/cluster-up <aws\|gcp\|az\|hostinger>` | Provision cluster | `/cluster-up hostinger` | Cluster is **required** — there is no default. Hostinger is the permanent app cluster; others are lab sandboxes |
+| `/cluster-down <aws\|gcp\|az\|hostinger>` | Tear down cluster | `/cluster-down hostinger` | Cluster is **required** — there is no default. An unrecognized name is rejected, never resolved to a fallback |
 | `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | `/cluster-status hostinger` | kubectl nodes + ArgoCD app status + smoke test |
 | `/cluster-diagnose [hostinger\|aws\|gcp\|az\|hub] ...` | Run read-only diagnostics | `/cluster-diagnose hostinger pods shopping-cart-apps` | `pods`, `describe-pod`, `logs`, `apps`, `app`, `appsets` only |
 | `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | `/cluster-refresh hostinger` | Re-establishes SSH tunnel, refreshes kubeconfig |
