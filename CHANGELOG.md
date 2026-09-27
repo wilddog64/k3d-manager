@@ -63,6 +63,18 @@
 
 ### Fixed
 
+- **`bin/smoke-test-cluster-health` resolves the app-cluster context from the checked ArgoCD
+  Application's `destination.name`** instead of a hardcoded default, so a cluster-registration
+  rename can no longer make it check apps on one cluster and pods on another. `make smoke` reported
+  `0 passed, 2 failed` on a healthy cluster with no code change behind it: the hub's app-cluster
+  registration had been renamed to `k3d-cluster` and the name `ubuntu-k3s` re-pointed at the
+  separate AWS cluster, so the six `ubuntu-k3s-shopping-cart-*` apps deploy there while
+  `APP_CONTEXT` still defaulted to the hub. `ARGOCD_APP_PREFIX` and `APP_CONTEXT` were two
+  independent guesses at one fact; the prefix already names the cluster, so the context is now
+  derived from the Application itself and the two cannot disagree. This is the third rot of the same
+  hardcoded default — the hardcoding was the bug, not the value. An explicit `APP_CONTEXT` still
+  wins, and a destination that is not a local kubectl context falls back to `INFRA_CONTEXT`.
+
 - **`make index-docs`: a spent daily quota now reports `paused`, not `unavailable`.** The cold index
   is ~1,705 calls against a free-tier ceiling of roughly 1,000 requests/day, so a run that stops
   partway through is the expected outcome, not a fault — but it printed `index-docs: unavailable`,
