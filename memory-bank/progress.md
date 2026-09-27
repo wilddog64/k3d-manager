@@ -2354,6 +2354,8 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 
 - [x] M1–M5 implemented exactly from `docs/bugs/2026-09-27-launchd-path-omits-local-bin.md`.
 - [x] Implementation commit `f8d5ced74467bd703f19cca60bda37b7360dfcf3` pushed to
+- [x] **Claude verified the launchd PATH fix independently** — SHA on origin via `gh api` (local `.git` was unwritable in Codex's sandbox), six-file diff scope, no subtree or `system.sh` changes, BATS 39/39 re-run by Claude, shellcheck histogram identical pre/post.
+- [x] **Fixed a tautological test Claude had specced** (`393f6570`) — the idempotence case asserted on an inline copy of the guard instead of `bin/cluster-up`, so it passed against unfixed source; now extracts and sources the real block and fails pre-fix.
       `origin/k3d-manager-v1.39.0`; no PR created per instruction (PR URL: not applicable).
 - [x] Focused BATS: 39/39; shellcheck: no new warnings; `_agent_audit`: passed.
 - [!] Mutation proof against pre-fix HEAD copies: tests 1, 3 and 4 fail; test 2 passes because its

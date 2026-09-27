@@ -1,3 +1,30 @@
+# 2026-09-27 — launchd PATH fix verified independently; one specced test was a tautology
+
+Codex implemented `docs/bugs/2026-09-27-launchd-path-omits-local-bin.md` as `f8d5ced7`
+(+ memory-bank `b1f8a5f4`). Verified by Claude rather than trusted: SHA confirmed on origin via
+`git ls-remote` and `gh api` (the local tree was behind because Codex's sandbox could not write
+`.git/refs`, so "pushed" had to be checked against GitHub, not `git log`); diff is exactly the six
+permitted files, insertions only; `scripts/lib/foundation/`, `scripts/lib/acg/` and
+`scripts/lib/system.sh` all show an empty diff. Gates re-run by Claude, not read from the report:
+`bats scripts/tests/bin/cluster_up.bats scripts/tests/bin/cluster_down.bats` 39/39 at exit 0, and
+shellcheck emits the identical code histogram pre- and post-fix (31 SC1091 / 8 SC2015 / 6 SC2016 /
+2 SC2029), so zero new warnings.
+
+**Codex was right to push back on the spec, and the spec was wrong.** The mutation gate produced
+3 of 4 new tests failing against pre-fix source; the fourth — the idempotence test — passed both
+ways. Cause is a defect in the test *as Claude specced it*: it reimplemented the PATH guard inline
+in the test body and asserted on its own copy, so it never opened `bin/cluster-up` and could not
+distinguish fixed from unfixed source. Rewritten in `393f6570` to extract the block from
+`bin/cluster-up` with awk and source it, covering both the already-present and absent PATH cases;
+it now fails against pre-fix source (proven in a scratch copy) and the suite stays 39/39.
+**Lesson: a test whose subject is a copy of the code is not a test of the code** — the mutation
+check is what caught it, which is exactly why that gate is not optional.
+
+**Still not deployed.** This fixes the repo, not the running host: the webhook's plist `PATH` is
+unchanged by design, and the fix only takes effect for runs that invoke the committed
+`bin/cluster-up`. `make deploy-worker` and the Slack manifest re-import remain operator actions and
+are unrelated to this commit.
+
 # 2026-09-27 — `/cluster-up` job c7faf86b failed on the webhook's PATH (hub k3d preflight)
 
 **The cluster came up; the run still failed.** Slack job `c7faf86b` (`/cluster-up aws`) provisioned
