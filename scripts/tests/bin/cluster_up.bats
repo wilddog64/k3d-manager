@@ -413,12 +413,19 @@ _load_acg_up_cleanup() {
   [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
 }
 
-@test "acg-up does not prepend ~/.local/bin twice" {
-  run bash -c "PATH=\"\${HOME}/.local/bin:/usr/bin:/bin\" bash -c '
-    if [[ \":\${PATH}:\" != *\":\${HOME}/.local/bin:\"* ]]; then
-      export PATH=\"\${HOME}/.local/bin:\${PATH}\"
-    fi
-    printf %s \"\${PATH}\"'"
+@test "acg-up guards the PATH prepend so it cannot duplicate an existing entry" {
+  local block="${BATS_TEST_TMPDIR}/path-block.sh"
+  awk '/^# launchd starts this script/{found=1} found{print} found && /^fi$/{exit}' \
+    bin/cluster-up > "${block}"
+  run grep -c 'local/bin' "${block}"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | tr ':' '\n' | grep -c "\.local/bin")" -eq 1 ]
+  [ "$output" -ge 2 ]
+
+  run bash -c "PATH=\"\${HOME}/.local/bin:/usr/bin:/bin\" bash -c 'source \"${block}\"; printf %s \"\${PATH}\"'"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | tr ':' '\n' | grep -c 'local/bin')" -eq 1 ]
+
+  run bash -c "PATH=\"/usr/bin:/bin\" bash -c 'source \"${block}\"; printf %s \"\${PATH}\"'"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | tr ':' '\n' | grep -c 'local/bin')" -eq 1 ]
 }
