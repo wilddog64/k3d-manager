@@ -1,3 +1,43 @@
+# 2026-09-27 — the three untargeted BATS suites moved into globbed directories (`1cf46580`)
+
+Closed the gap reported while documenting the test targets. Discovery in this
+repo is **by directory glob, not by file pattern**: the dispatcher globs
+`scripts/tests/{lib,core,plugins,etc}` at `-maxdepth 1`
+(`scripts/k3d-manager:439`) and `make test-bin` globs `scripts/tests/bin`, so
+the `scripts/tests/` root is outside every search path. All 16 tests passed when
+run by hand and had never run in `make test`, `make test-all` or CI.
+
+| Was | Now |
+|---|---|
+| `scripts/tests/observability_keep_list.bats` | `scripts/tests/plugins/observability_keep_list.bats` |
+| `scripts/tests/observability_resume_layer.bats` | `scripts/tests/plugins/observability_resume_layer.bats` |
+| `scripts/tests/test_install_sudoers.bats` | `scripts/tests/bin/install_sudoers.bats` |
+
+All three moved with `git mv`; each needed a one-line `BATS_TEST_DIRNAME` depth
+correction (`../plugins/` → `../../plugins/`, `../..` → `../../..`). The sudoers
+suite also dropped its `test_` prefix to match its 26 siblings in `bin/`, where
+`test_*.py` already means "pytest collects this".
+
+`scripts/tests/core/suite_discovery.bats` is the recurrence guard: it fails and
+names the file if any `.bats` suite sits outside a globbed directory, including
+one nested a level too deep. A convention cannot detect this defect class — the
+failure mode is silence, not a red build — so it is a test, not a doc rule. The
+discovery boundary is also now written into the `Test Suites` section of
+`docs/howto/makefile.md` (+9).
+
+Verified by discovery, not just by running the files: the dispatcher resolves
+both plugin suites by name (5/5 each), `bats scripts/tests/core` is 10/10
+including the guard, `bats scripts/tests/bin` is **167/167 at rc 0** with
+`install_sudoers` in the glob (was 161), and `find` reports zero `.bats` files
+outside the five globbed directories or below `-mindepth 3`. Both the path edit
+and the guard were mutation-tested: a wrong depth gives `not ok` +
+`No such file or directory`, and the guard goes red and names the path for both
+orphan shapes (tests root, and one directory too deep).
+
+**`workers/slack-relay/test/relay.test.mjs` is now the only known remaining
+instance of the same defect class** — in no make target and no CI job. Reported,
+no decision yet.
+
 # 2026-09-27 — test targets documented in docs/howto/makefile.md (`8312512d`)
 
 Closed the first of the two gaps recorded from the v1.39.0 Step 7b audit: the
@@ -9,12 +49,11 @@ Facts established while writing it, worth keeping:
 - `make test` reaches only `scripts/tests/{lib,core,plugins,etc}` at
   `-maxdepth 1` (`scripts/k3d-manager:439`). `scripts/tests/bin` is covered by
   `make test-bin`.
-- **Three BATS files at the `scripts/tests/` root are in no make target and no
+- **Three BATS files at the `scripts/tests/` root were in no make target and no
   CI job:** `observability_keep_list.bats`, `observability_resume_layer.bats`,
-  `test_install_sudoers.bats`. They sit outside every `search_dirs` entry and
-  outside `bats scripts/tests/bin`. Same shape as
-  `workers/slack-relay/test/relay.test.mjs`. Reported, not fixed — adding a
-  search dir changes what CI runs.
+  `test_install_sudoers.bats`. They sat outside every `search_dirs` entry and
+  outside `bats scripts/tests/bin`. **Fixed in `1cf46580` — see the section
+  above.**
 - CI runs `make test`, `test-bin`, `test-python-unit` and `test-pytest` as four
   separate steps (`.github/workflows/ci.yml:81-95`), never `make test-all`.
 - `make test-pytest` resolves `$PYTEST` → `pytest` on PATH → `python3 -m pytest`
