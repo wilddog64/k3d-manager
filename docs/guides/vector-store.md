@@ -289,6 +289,40 @@ It publishes rows, corpus size, drift, reachability, ExternalSecret sync and the
 to Pushgateway. The Grafana dashboard labels these values **last published** because Pushgateway
 retains gauges after a publisher stops.
 
+### The metrics publisher
+
+`bin/k3dm-vectordb-metrics` is the publisher named above. It takes no arguments and no flags: it
+runs `bin/k3dm-vectordb-status --json`, converts the payload to a Prometheus text block and POSTs it
+to `<pushgateway>/metrics/job/k3dm-vectordb`. `K3DM_PUSHGATEWAY_URL` overrides the target
+(default `http://localhost:9091`).
+
+| Metric | Source field |
+|---|---|
+| `k3dm_vectordb_rows` | `rows` — indexed chunks in the store |
+| `k3dm_vectordb_corpus_docs` | `corpus_docs` — documents the tracked corpus contains |
+| `k3dm_vectordb_drift_docs` | `corpus_docs - rows`, emitted only when both are present |
+| `k3dm_vectordb_last_index_timestamp_seconds` | `last_indexed_epoch` — what the staleness alert reads |
+| `k3dm_vectordb_reachable` | `available`, as 0/1 |
+| `k3dm_vectordb_external_secret_synced` | `external_secret_synced`, as 0/1 |
+
+**A metric whose field is absent is omitted, not zeroed** — so a panel reading "No data" means the
+status probe could not determine that fact, which is different from a fact it determined to be zero.
+
+**Every failure path is deliberately non-fatal.** A `k3dm-vectordb-status` non-zero exit or
+unparseable output yields an empty payload and an empty publish; a Pushgateway that fails its
+`/-/healthy` check is retried three times, two seconds apart, and then skipped with
+`vectordb metrics push skipped (non-fatal)` on stderr. The script exits 0 regardless, because it is
+called from `make index-docs` and from the Hermes tick and must never fail either.
+
+That also means a **silent** publisher is the expected symptom of a broken one. It has only two call
+sites — `scripts/index-docs.py` after a successful index, and `bin/k3dm-hermes` on each tick — so if
+neither has run, nothing has ever published and the Grafana panels are blank for that reason rather
+than because the store is unhealthy. Run it by hand to distinguish the two:
+
+```bash
+K3DM_PUSHGATEWAY_URL=http://localhost:9091 bin/k3dm-vectordb-metrics
+```
+
 The alert watches only the last index timestamp: no publication for an hour, or an index older than
 seven days, is stale. A stale index can still return plausible results from `make find-similar-docs`;
 check the sensor evidence and re-run `make index-docs` after confirming the store is reachable. See

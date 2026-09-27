@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`bin/k3dm-vectordb-metrics` is documented** in the Health verification section of
+  `docs/guides/vector-store.md`. The guide described "the metrics publisher" without ever naming the
+  script, so nothing told a reader how to invoke it, what it emits, or how it fails. The new
+  subsection names it, tables the six gauges against the `k3dm-vectordb-status` fields they come
+  from, records `K3DM_PUSHGATEWAY_URL`, and states the two properties that make its failures hard to
+  read: an absent status field is **omitted rather than zeroed**, so "No data" on a panel means
+  undetermined and not zero; and every failure path is deliberately non-fatal and exits 0, because
+  both call sites (`make index-docs` and the Hermes tick) must not fail. A silent publisher is
+  therefore the expected symptom of a broken one, and blank Grafana panels most often mean it has
+  never run rather than that the store is unhealthy.
+
 ### Fixed
 
 - **Three BATS suites ran in no `make` target and no CI job.**
