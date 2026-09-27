@@ -1,3 +1,76 @@
+# 2026-09-27 — Hermes bootstrapped; VectorDBMetricsStale fixed (`fa89fc6b`)
+
+## Hermes is loaded and publishing
+
+`bin/k3dm-hermes-setup` run at the user's direction. `com.k3d-manager.hermes` is
+loaded, `StartInterval` 300s, `RunAtLoad` true, `last exit code = 0`. Verified it
+publishes **on its own**, not just by hand: a `push_time_seconds` marker taken
+after a manual publish advanced by ~392s at the end of cycle 2 with no
+intervention, gauges refreshed from the stale `corpus_docs` 1708 to the live
+1713, and Prometheus then reported the publish 136s old.
+
+**The installer silently dropped a plist key.** The hand-maintained plist had
+`K3DM_HERMES_AUTO_KINE_GUARD=1`; `_install_hermes_agent` regenerates the plist
+from the lib-foundation template, which does not set that key, so **the auto Kine
+guard is now OFF**. Everything else survived (`K3DM_HERMES_JITTER`,
+`K3DM_REPO_ROOT`, `PATH`, ProgramArguments, StartInterval, RunAtLoad). This is
+the concrete form of the known "Hermes plist drift" backlog item: a reinstall is
+not idempotent with respect to hand-added env keys. Restoring it is the user's
+call — the safer posture happens to be the current one.
+
+**A cycle takes ~60-90s and `runs` increments before the log is written**, so a
+quiet log right after a tick is normal, not a hang. Read
+`launchctl print gui/<uid>/com.k3d-manager.hermes` for `runs`/`state` instead —
+and always with a targeted key filter, never unfiltered (it dumps the whole
+environment block).
+
+**The vectordb publish is unobservable from the Hermes log.** The call site is
+`subprocess.run([... k3dm-vectordb-metrics], capture_output=True, text=True,
+timeout=120, check=False)` (`bin/k3dm-hermes:464`): stdout and stderr are
+captured and the result object is discarded, so the publisher's own
+`push skipped (non-fatal)` message can never reach the log. To tell whether a
+cycle published, compare `push_time_seconds{job="k3dm-vectordb"}` before and
+after — **read it from Pushgateway directly**, because Prometheus scrape lag can
+make a fresh push look stale for up to a scrape interval. (I briefly misread
+cycle 1 as a failed publish for exactly that reason; it is not established that
+it failed.)
+
+## `VectorDBMetricsStale` fixed — `fa89fc6b`
+
+`absent(k3dm_vectordb_last_index_timestamp_seconds)` `for: 1h` could never fire,
+because Pushgateway retains gauges after a publisher stops. Now:
+
+```
+absent(k3dm_vectordb_last_index_timestamp_seconds)
+  or (time() - max by (job) (push_time_seconds{job="k3dm-vectordb"}) > 3600)
+```
+
+with `for: 15m` so the hour is not counted twice. **Proven in both directions
+against live Prometheus:** with the publisher 3.9h stale the new expression
+returned `14339` and the old one returned empty; with Hermes publishing, the new
+expression is correctly quiet. `scripts/tests/plugins/vectordb_rules.bats` (6
+tests) asserts the push-age term and explains the Pushgateway-retention reason on
+failure; mutation-tested by restoring the old expression (tests 3 and 5 go red).
+`docs/guides/vector-store.md` updated.
+
+The rule is ArgoCD-managed, so it reaches the cluster on the next sync — not
+hand-applied.
+
+## Sensor anomalies observed on the first cycles — all need decisions
+
+- **`argocd` sensor `unknown`: "credential rejected; re-mint
+  `k3dm-hermes-argocd-token`".** The Keychain item exists but the token is no
+  longer accepted. Hermes has no ArgoCD visibility until it is re-minted
+  (`argocd account generate-token --account hermes`) — operator-only.
+- **`eso` sensor `unknown`** — "ESO status source unavailable".
+- **`reachability` `degraded`** — `single-service 1/7 hosts failing`,
+  `frontend.3ai-talk.org`. Consistent with the known unapproved frontend 404 fix.
+- **`node_pressure` `degraded`** — webhook failures: Keycloak, Hub ESO
+  ExternalSecrets, Frontend SSO login.
+- **`kine` healthy but `stale_acg_registration: true`.**
+
+Not investigated further this turn; none is caused by the bootstrap.
+
 # 2026-09-27 — the vectordb dashboard is NOT blank; the stale premise corrected
 
 Investigated read-only before bootstrapping Hermes. **The premise behind the

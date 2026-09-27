@@ -5,14 +5,22 @@
       return values, dashboard uid `k3dm-vectordb` provisioned, ConfigMap present
       in both clusters. The stale "blank because the producer never ran" item is
       withdrawn.
-- [ ] **`VectorDBMetricsStale` can never fire.** `absent(...)` cannot go true
-      because Pushgateway retains gauges after a publisher stops; last publish was
-      ~3.9h old with nothing scheduled to refresh it. Needs a
-      `push_time_seconds` age expression instead. Not approved.
-- [ ] Hermes bootstrap feasible (all four Keychain creds present, agent not
-      loaded) but NOT performed — the plist carries
-      `K3DM_HERMES_AUTO_KINE_GUARD=1`, Slack/SMS paging and scheduled e2e.
-      Awaiting the user's choice of scope.
+- [x] **`VectorDBMetricsStale` fixed** — `fa89fc6b`. Now also compares
+      `push_time_seconds{job="k3dm-vectordb"}` against `time()` (>1h), `for: 15m`;
+      proven in both directions against live Prometheus. New
+      `scripts/tests/plugins/vectordb_rules.bats` (6/6), mutation-tested. Guide
+      updated. Reaches the cluster on the next ArgoCD sync.
+- [x] **Hermes bootstrapped** — `com.k3d-manager.hermes` loaded, 300s interval,
+      last exit code 0; verified it publishes unattended (push_time advanced
+      ~392s at cycle 2, gauges 1708 → 1713, Prometheus then 136s old).
+- [ ] **the installer dropped `K3DM_HERMES_AUTO_KINE_GUARD=1` from the plist** —
+      `_install_hermes_agent` regenerates from a template that omits it, so the
+      auto Kine guard is now OFF. Restore or leave? User's call.
+- [ ] **re-mint `k3dm-hermes-argocd-token`** — the ArgoCD sensor reports
+      "credential rejected"; Hermes has no ArgoCD visibility. Operator-only.
+- [ ] Hermes sensors reporting: `eso` unknown, `reachability` degraded
+      (`frontend.3ai-talk.org`), `node_pressure` degraded (Keycloak, Hub ESO,
+      Frontend SSO), `kine` healthy with `stale_acg_registration: true`.
 - [ ] delete the stale `ubuntu-k3s` kube context — now load-bearing: it is the
       current context and does not exist, so unqualified `kubectl` reads error and
       read as empty listings.
