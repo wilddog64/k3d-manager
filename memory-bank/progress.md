@@ -6,7 +6,26 @@
       `CLUSTER_COMMANDS` + a role-filtered section in `make_target_help`, four new tests in
       `scripts/tests/bin/webhook_make_targets.py`, a note in `docs/howto/slack-slash-commands.md`.
       The routing split stays — `/api/v1/make` has no job guard, no stall timer and no metrics push.
-      AWAITING VERIFICATION: SHA on origin, test output, diff scope.
+      VERIFIED 2026-09-27: Codex commits `f3cdc25a` (fix) + `86c18cf5` (memory), both on
+      `origin/k3d-manager-v1.39.0`. Diff is exactly the three permitted files, insertions only;
+      `workers/slack-relay/index.js`, `scripts/lib/webhook/lifecycle.py` and `bin/k3dm-webhook` show
+      an empty diff. All four specified tests present; suite re-run by Claude: 33 tests, OK.
+
+- [x] **`/cluster-up` and `/cluster-down` defaulted to a cluster the operator never named** —
+      fixed `229db281`, pushed. `resolveProvider`'s fallback applied to unrecognized tokens, not
+      only empty ones, so `/cluster-down hostigner` tore down `aws` and `/cluster-up awz`
+      provisioned `hostinger`. Both now use `resolveProviderStrict`. Gates: `node --test
+      workers/slack-relay/test/` 21/21, mutation-tested against pre-fix source (2 guard cases fail,
+      2 regression cases pass), slash-command BATS 11/11.
+      NOT DEPLOYED — needs `make deploy-worker` (operator) plus a Slack manifest re-import.
+
+- [ ] **Slack job `c7faf86b` (`/cluster-up aws`) failed at Step 3.5/12** — the k3s-aws cluster
+      provisioned fine (3 nodes Ready); `bin/cluster-up:402` then failed `_command_exist k3d`
+      because `com.k3d-manager.webhook.plist` sets `PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`
+      and `k3d` lives in `~/.local/bin`. Slack-driven `make up` always fails here; the same command
+      run by hand succeeds. Fix NOT approved, NOT started: plist PATH (host config) or absolute
+      `k3d` resolution in `bin/cluster-up` (durable). Metrics were pushed: `success 0`,
+      `duration 644`, `status="failed"` — the deployment dashboard now has real data.
 
 - [x] NEW `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` — five rules,
       `release: acg-kube-prometheus-stack`, `namespace: monitoring`. Verified live that this is the

@@ -1,3 +1,60 @@
+# 2026-09-27 — `/cluster-up` job c7faf86b failed on the webhook's PATH (hub k3d preflight)
+
+**The cluster came up; the run still failed.** Slack job `c7faf86b` (`/cluster-up aws`) provisioned
+k3s-aws end to end — CloudFormation stack created, 3 nodes Ready, labeled, sandbox watcher started
+(PID 23026, ~234 min TTL remaining at launch). It then died at Step 3.5/12 with
+`[acg-up] k3d binary not found in PATH — cannot manage Hub cluster` (`bin/cluster-up:402-405`),
+`make up CLUSTER_PROVIDER=k3s-aws exited 2`, duration 644s.
+
+**Root cause — the webhook's launchd PATH, not the cluster.** `com.k3d-manager.webhook.plist` sets
+`PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`. `k3d` is installed at
+`~/.local/bin/k3d` (root-owned, 2025-09-14), which is on the operator's interactive PATH but not
+launchd's. So every Slack-driven `make up` reaching the hub preflight fails, while the same command
+run by hand from a terminal succeeds — the failure is invisible from the shell. `_command_exist k3d`
+is the gate; the error message already names `~/.local/bin`, so the check knows where to look.
+Two candidate fixes, NOT approved and NOT started: add `~/.local/bin` to the plist `PATH` (host
+config, operator action), or resolve `k3d` absolutely in `bin/cluster-up` so it does not depend on
+the caller's PATH. The second is the durable one — the plist is per-host state that drifts.
+
+**This did answer the dashboard question.** `_finish()` pushes metrics regardless of status, so the
+Pushgateway now holds real series: `k3dm_deployment_success{action="up",provider="aws"} 0`,
+`k3dm_deployment_duration_seconds ... 644`, `job_id="c7faf86b"`, `status="failed"`. The deployment
+dashboard is no longer blank — it is showing a genuine failure.
+
+**Incidental, operator's call:** reading the webhook plist to find the PATH also displayed
+`SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` in terminal output. Local only, never sent anywhere,
+but they were rendered. Rotation is the operator's decision.
+
+# 2026-09-27 — `/cluster-up` and `/cluster-down` no longer default to a cluster (fixed, `229db281`)
+
+**Two defects in one function.** `resolveProvider` (`workers/slack-relay/index.js`) returned a
+per-command default for any text it did not recognize. The defaults were asymmetric — bare
+`/cluster-up` → `hostinger` (the permanent app cluster), bare `/cluster-down` → `aws` (the sandbox)
+— so the two commands with no argument acted on different clusters. Worse, the fallback applied to
+*unrecognized* tokens and not only empty ones: `/cluster-down hostigner` silently tore down `aws`
+and `/cluster-up awz` silently provisioned `hostinger`, each acknowledged by a confidently worded
+reply naming the cluster the operator had not asked for. A typo was enough to retarget a
+destructive command.
+
+**Fix.** Both commands resolve through a new `resolveProviderStrict`, which requires an exact
+provider or alias and replies with usage instead of relaying. Read-only commands (`/cluster-status`,
+`/cluster-diagnose`) keep their defaults, where a wrong guess costs nothing. `/cluster-refresh` was
+left alone — out of scope for what was asked.
+
+**Gates.** `node --test workers/slack-relay/test/` 21/21. Mutation-tested against `HEAD`'s pre-fix
+`index.js` in a scratch copy: the two guard cases fail, the two regression cases pass.
+`bats scripts/tests/plugins/slack_slash_commands.bats scripts/tests/plugins/slack_relay_ack.bats`
+11/11 after updating the doc rows and their paired assertions (the two whole-line greps were
+narrowed to meaningful tokens while being touched).
+
+**NOT deployed — the change is inert.** It needs `make deploy-worker`, which is the operator's to
+run and part of the Cloudflare path that has no standing approval. The Slack app manifest
+`usage_hint` was updated in the doc to `<aws|gcp|az|hostinger>`, which also needs a manifest
+re-import in Slack before the hint changes for users.
+
+**Also worth noting:** `workers/slack-relay/test/relay.test.mjs` is wired into no make target and no
+CI job. Nothing runs it automatically; it passes only because it was run by hand.
+
 # 2026-09-27 — `/k3dm help` omits the cluster lifecycle commands (spec filed, dispatched to Codex)
 
 **Found while answering "what deployment do I have to run?"** The `k3dm_deployment_*` metrics are
