@@ -30,6 +30,11 @@
       note `make show-service-passwords` prefers the **Vault** copy at
       `secret/data/argocd/admin`, which may predate the rebuild, so it can print a
       password that no longer works. The k8s Secret is authoritative.
+      **`make argocd-hermes-token` added (`80fb51c2`)** — mints via the ArgoCD API
+      (secrets by env, never argv), writes the Keychain item with `-U`, reads it
+      back, proves it against `/api/v1/applications`, restarts Hermes, never
+      prints the token. Refuses without a TTY. 8 BATS tests, mutation-tested.
+      **The operator still has to run it** — it cannot run unattended by design.
 - [x] **the other Hermes sensor reports deep-dived** — all four traced to root
       cause, read-only. Real ESO health is fine on both clusters (hub CSS
       Ready=True 7/8 synced; hostinger Ready=True 20/20).

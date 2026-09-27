@@ -1,3 +1,45 @@
+# 2026-09-27 — `make argocd-hermes-token` (`80fb51c2`)
+
+The ArgoCD token re-mint is now one command instead of a five-step manual
+procedure in which every step had a trap. `make argocd-hermes-token` mints
+through the ArgoCD API, stores the token, proves it, and restarts Hermes.
+
+**Why it exists:** the `argocd` sensor's "credential rejected" was
+`token signature is invalid` — not an expiry. `argocd-secret` was created
+`2026-09-20T23:50:23Z` at `resourceVersion: 2144` and never updated since, and
+`argocd-server` started the same second, so the rebuild regenerated
+`server.secretkey` and invalidated **every** credential minted before it,
+including the operator's own CLI session. A token recorded as "no expiry" is
+really bounded by the signing key's lifetime, so re-minting every ArgoCD token
+belongs in the post-rebuild checklist.
+
+**Design decisions worth keeping:**
+
+- **Secrets by environment, never argv.** Both API calls receive the admin
+  password and the token through env vars into `python3 -c`, following the
+  `alertmanager-secret` precedent. Nothing reaches `ps` or shell history.
+- **Refuses without a TTY.** Minting a credential must not run unattended, and a
+  Keychain write with no terminal stores an **empty value at rc 0** — a silent
+  failure that reads as success. Verified by running the target from this
+  session's shell: it exits 1 before touching the cluster, the password or the
+  Keychain. This is also why Claude cannot run it.
+- **`-U` in place, never delete-and-recreate.** A recreated item gets a default
+  ACL, which can make a non-interactive launchd read prompt for authorization;
+  Hermes would then fail silently.
+- **Reads the value back and calls the endpoint before reporting success**, so
+  green means the sensor will work, not that an item exists.
+- **Prefers `argocd-initial-admin-secret` over `make show-service-passwords`**,
+  which reads the Vault copy at `secret/data/argocd/admin` first — after a
+  rebuild that copy can predate the install and hand over a dead password.
+
+**Verification:** shell syntax of the expanded recipe OK (`sh -n`); both embedded
+python snippets parse and fail at the network layer, not the code layer, against
+an unroutable host; `make help` renders; 8/8 BATS, mutation-tested three ways
+(drop the TTY guard, swap `-U` for delete+add, echo the token — each turns the
+intended test red, and the restored tree is byte-identical and green);
+`make test-bin` 175/175; `suite_discovery.bats` green, so the new suite is
+genuinely collected; `check-doc-links` 1801 files OK.
+
 # 2026-09-27 — Hermes sensor anomalies traced to root cause
 
 All four anomalies from the first post-bootstrap cycles were deep-dived read-only.
