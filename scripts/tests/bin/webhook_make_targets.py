@@ -13,6 +13,9 @@ _spec = importlib.util.spec_from_file_location(
 wh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(wh)
 from webhook import policy
+from webhook.make_targets import CLUSTER_COMMANDS
+
+wh.CLUSTER_COMMANDS = CLUSTER_COMMANDS
 
 
 class MakeTargetTests(unittest.TestCase):
@@ -129,6 +132,40 @@ class MakeTargetTests(unittest.TestCase):
         self.assertIn("fix-list", reader_help)
         self.assertNotIn("fix-sync", reader_help)
         self.assertIn("fix-force-sync APP=… confirm", wh.make_target_help("admin", wh._role_allows))
+
+    def test_help_lists_cluster_lifecycle_commands(self):
+        """/k3dm help is the only self-describing surface in Slack; the cluster
+        commands are not make targets and appeared in no listing at all."""
+        admin_help = wh.make_target_help("admin", wh._role_allows)
+        self.assertIn("/cluster-up", admin_help)
+        self.assertIn("/cluster-down", admin_help)
+        self.assertIn("Cluster lifecycle", admin_help)
+
+    def test_cluster_commands_are_role_filtered(self):
+        reader_help = wh.make_target_help("reader", wh._role_allows)
+        self.assertIn("/cluster-status", reader_help)
+        self.assertNotIn("/cluster-up", reader_help)
+        self.assertNotIn("/cluster-refresh", reader_help)
+        self.assertIn("/cluster-refresh", wh.make_target_help("operator", wh._role_allows))
+
+    def test_cluster_commands_are_not_make_targets(self):
+        """Listing them in help must not make them runnable through /api/v1/make --
+        that path has no running-job guard, no stall timer and no metrics push."""
+        for _name, _role, _summary in wh.CLUSTER_COMMANDS:
+            _target = _name.split()[0].lstrip("/")
+            self.assertNotIn(_target, wh.MAKE_TARGETS)
+            _argv, _error = wh.parse_make_request(_target, {}, False)
+            self.assertIsNone(_argv)
+            self.assertIn("unknown target", _error)
+
+    def test_cluster_command_roles_match_the_relay(self):
+        """COMMAND_ROLES in workers/slack-relay/index.js is authoritative. A role
+        that drifts here advertises a command the relay will refuse."""
+        _relay = Path(__file__).resolve().parents[3] / "workers" / "slack-relay" / "index.js"
+        _text = _relay.read_text()
+        for _name, _role, _summary in wh.CLUSTER_COMMANDS:
+            _cmd = _name.split()[0]
+            self.assertRegex(_text, re.escape(f"'{_cmd}': '{_role}'"))
 
     def test_app_cve_scan_requires_operator(self):
         self.assertEqual(wh.MAKE_TARGETS["app-cve-scan"]["min_role"], "operator")

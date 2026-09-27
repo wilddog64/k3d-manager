@@ -46,6 +46,23 @@ MAKE_TARGETS = {
     "fix-force-sync": {"min_role": "admin", "confirm": True, "required": ("APP",), "summary": "ArgoCD force sync"},
 }
 
+# The cluster lifecycle commands are NOT make targets. They are separate slash
+# commands the relay routes to /api/v1/cluster, which reaches _run_cluster --
+# the only path that carries the running-job guard, the stall timer and the
+# Pushgateway metrics push. They are listed here for discoverability only:
+# /k3dm help is the sole self-describing surface in Slack, and an operator who
+# cannot see these commands cannot find the one that records a deployment.
+# Roles mirror COMMAND_ROLES in workers/slack-relay/index.js -- keep in sync.
+CLUSTER_COMMANDS = (
+    ("/cluster-status [provider]", "reader", "cluster + access-layer status"),
+    ("/cluster-diagnose [provider|hub] <verb>", "reader", "pods, logs, apps, appsets"),
+    ("/hostinger-status", "reader", "permanent app-cluster status"),
+    ("/cluster-refresh [provider]", "operator", "refresh the access layer"),
+    ("/cluster-up [provider]", "admin", "bring a cluster up (records deployment metrics)"),
+    ("/cluster-down [provider]", "admin", "tear a cluster down (records deployment metrics)"),
+    ("/cluster-resume [provider]", "admin", "resume a partially provisioned cluster"),
+)
+
 
 def parse_make_request(target, args, confirm):
     """Validate a /k3dm request. Return (argv_tail, None) or (None, error_text)."""
@@ -85,4 +102,13 @@ def make_target_help(role, role_allows):
         if spec.get("confirm"):
             parts.append("confirm")
         lines.append(f"• `{' '.join(parts)}` — {spec['summary']} ({spec['min_role']})")
+    cluster_lines = [
+        f"• `{name}` — {summary} ({min_role})"
+        for name, min_role, summary in CLUSTER_COMMANDS
+        if role_allows(role, min_role)
+    ]
+    if cluster_lines:
+        lines.append("")
+        lines.append("*Cluster lifecycle* — separate slash commands, not `/k3dm` targets:")
+        lines.extend(cluster_lines)
     return "\n".join(lines)

@@ -79,6 +79,9 @@ The relay forwards these metadata headers to the webhook:
 Direct Bearer-token calls that do not provide a role header currently default
 to `admin` for backward compatibility with existing local automation.
 
+`/k3dm help` also prints the cluster lifecycle commands. Their roles are authoritative in
+`COMMAND_ROLES` in `workers/slack-relay/index.js`.
+
 ---
 
 ## One-time Bootstrap
