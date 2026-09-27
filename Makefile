@@ -442,6 +442,7 @@ install-cloud-bridge:
 	  -e "s|{{CLOUD_BRIDGE_BIN}}|$(CURDIR)/bin/k3dm-cloud-bridge|g" \
 	  -e "s|{{K3DM_REPO_ROOT}}|$(CURDIR)|g" \
 	  -e "s|{{CLOUD_BRIDGE_LOG}}|$(HOME)/Library/Logs/k3dm-cloud-bridge.log|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.cloud-bridge.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
 	plutil -lint "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"

@@ -1,3 +1,51 @@
+# 2026-09-27 — sibling launchd PATH defect fixed (cloud-bridge, rotator, hermes)
+
+Operator authorized fixing the three sibling templates flagged in the previous entry.
+
+**cloud-bridge** — template `PATH` now leads with `{{HOME}}/.local/bin`. The template alone was
+not enough: `install-cloud-bridge` (Makefile) substituted `{{CLOUD_BRIDGE_BIN}}`,
+`{{K3DM_REPO_ROOT}}` and `{{CLOUD_BRIDGE_LOG}}` but **not** `{{HOME}}`, so the placeholder would
+have been written into the plist literally and broken `PATH` outright — a worse failure than the
+omission being fixed. Added `-e "s|{{HOME}}|$(HOME)|g"`. Dry-rendered to the scratchpad and
+`plutil -lint`ed before touching the live agent, then applied with `make install-cloud-bridge`
+(that target already does bootout/bootstrap, not kickstart). Live: pid 95253, state running,
+`PATH => /Users/cliang/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`.
+
+**prometheus-credential-rotator** — template already substituted `{{HOME}}` (it had
+`{{HOME}}/bin`, which is a different directory from `~/.local/bin`; the earlier sweep was right to
+call it missing). `.local/bin` prepended ahead of `{{HOME}}/bin`. Live plist updated with a
+targeted `PlistBuddy Set` and bootout/bootstrap; both env keys and all seven top-level keys intact,
+`plutil -lint` OK. State `not running` is correct — it is `StartCalendarInterval`-driven.
+
+**hermes — could not be fixed in the template, and the reason matters.** Its plist is rendered by
+`_install_hermes_agent` in `scripts/lib/foundation/scripts/lib/system.sh`, which does literal bash
+substitution of only `{{HERMES_BIN}}`, `{{K3DM_REPO_ROOT}}` and `{{HERMES_LOG}}`. There is no
+`{{HOME}}` hook, launchd does not expand `$HOME` inside a plist string, and lib-foundation is
+edited upstream-first — never in the subtree. Putting `{{HOME}}/.local/bin` in that template would
+write the placeholder verbatim. Instead `bin/k3dm-hermes` now prepends `~/.local/bin` to its own
+`os.environ["PATH"]` right after the `sys.path` setup, which is the documented defence-in-depth
+pattern (`bin/cluster-up` et al.). The Hermes agent is **not currently loaded**, so nothing needed
+restarting; the change takes effect whenever it is bootstrapped. An upstream lib-foundation change
+adding `{{HOME}}` substitution remains the cleaner long-term fix.
+
+**Regression test now exists.** `scripts/tests/bin/launchd_plist_path.bats` (4 tests) asserts the
+three templates lead with `{{HOME}}/.local/bin`, that they keep the homebrew and system entries,
+that the Makefile carries the `{{HOME}}` substitution, and that `bin/k3dm-hermes` normalizes
+`PATH`. Mutation-tested: reverting the cloud-bridge template turns test 1 red, so it can fail.
+Creating this file was denied by the classifier in the previous segment; it succeeded once the
+operator re-confirmed auto-mode approval.
+
+Green: the new suite 4/4, `scripts/tests/lib/observability.bats` 18/18,
+`test_cloud_bridge.py` + `test_hermes.py` 51 passed.
+
+Also confirmed the operator's own `make restart-webhook` run afterwards did **not** revert the
+webhook fix — `kickstart -k` reuses the cached definition, and the cached definition is now the
+bootstrapped fixed one. PATH still correct at pid 80329.
+
+Lesson: a template placeholder is only as good as the renderer that substitutes it. Check the
+renderer before adding one — an unsubstituted `{{HOME}}` in a `PATH` is a harder failure than the
+missing entry it was meant to fix.
+
 # 2026-09-27 — launchd PATH fix taken live on the host
 
 The repo half (`eff44a3f`) was already live for Slack-driven runs: the webhook LaunchAgent execs

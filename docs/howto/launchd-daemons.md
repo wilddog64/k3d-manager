@@ -141,12 +141,28 @@ first entry in the webhook plist's `PATH`, set in
 `scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl` — fix the **template**, never only the
 generated file, or the next `k3dm-webhook-setup` reinstalls the defect.
 
-Three sibling templates still omit it: `cloud-bridge`, `hermes` and
-`prometheus-credential-rotator`. Anything they start that lives in `~/.local/bin` is unreachable.
+`cloud-bridge` and `prometheus-credential-rotator` now lead with it too. Both are rendered by
+code in this repo, so `{{HOME}}` resolves: `prometheus-credential-rotator` already substituted it
+in `_observability_install_prometheus_rotator`, and `install-cloud-bridge` gained the
+`s|{{HOME}}|$(HOME)|g` expression it was missing — without that the placeholder would have landed
+in the plist verbatim and broken `PATH` outright.
+
+**`hermes` is the exception, and not by oversight.** Its plist is rendered by
+`_install_hermes_agent` in the lib-foundation subtree, which substitutes only `{{HERMES_BIN}}`,
+`{{K3DM_REPO_ROOT}}` and `{{HERMES_LOG}}`. There is no `{{HOME}}` expansion to hook, launchd does
+not expand `$HOME` inside a plist string, and `scripts/lib/foundation/` must never be edited here —
+that change belongs upstream in lib-foundation. So `bin/k3dm-hermes` prepends `~/.local/bin` to its
+own `os.environ["PATH"]` at import time instead. Fixing the template without the upstream change
+would write a literal `{{HOME}}/.local/bin` into the plist.
 
 Defence in depth: any `bin/` script a LaunchAgent may invoke should also normalize `PATH` itself,
 so it stays correct under a plist nobody has fixed yet. The scripts that do are `bin/cluster-up`,
-`bin/cluster-down`, `bin/k3dm-node-health-watch` and `bin/k3dm-vault-failover`.
+`bin/cluster-down`, `bin/k3dm-node-health-watch`, `bin/k3dm-vault-failover` and `bin/k3dm-hermes`.
+
+`scripts/tests/bin/launchd_plist_path.bats` asserts all of this: the three templates lead with
+`{{HOME}}/.local/bin`, keep the homebrew and system entries, the Makefile substitutes `{{HOME}}`,
+and `bin/k3dm-hermes` normalizes `PATH`. That suite exists because the original defect survived
+precisely because no test read those strings.
 
 A command that works in a terminal and fails under launchd is this bug, not a logic bug — check
 `PATH` first.

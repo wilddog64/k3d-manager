@@ -109,6 +109,18 @@
   needs `launchctl bootout` + `bootstrap`: `make restart-webhook` uses `kickstart -k`, which reuses
   launchd's cached service definition and so restarts the process without picking up a new
   environment — a restart that exits 0 and changes nothing.
+- **The same `PATH` defect is fixed in the `cloud-bridge` and `prometheus-credential-rotator`
+  LaunchAgent templates, and worked around for `hermes`.** `install-cloud-bridge` was also missing
+  the `s|{{HOME}}|$(HOME)|g` substitution its template now needs — without it the placeholder would
+  have been written into the plist verbatim, which is worse than the original omission, so the
+  Makefile target and the template had to change together. `hermes` cannot be fixed the same way:
+  its plist is rendered by `_install_hermes_agent` in the lib-foundation subtree, which substitutes
+  only `{{HERMES_BIN}}`, `{{K3DM_REPO_ROOT}}` and `{{HERMES_LOG}}`, and that subtree is edited
+  upstream rather than here. `bin/k3dm-hermes` therefore prepends `~/.local/bin` to its own
+  `PATH` at import time — the same defence-in-depth pattern `bin/cluster-up` uses. New suite
+  `scripts/tests/bin/launchd_plist_path.bats` asserts the template `PATH` strings, the Makefile
+  substitution and the Hermes normalization, closing the untested surface that let the original
+  defect ship.
 
 - **`/cluster-up` and `/cluster-down` no longer act on a cluster the operator did not name.**
   `resolveProvider` returned a per-command default for any text it did not recognize, which made two

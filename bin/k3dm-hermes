@@ -15,6 +15,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
+_LOCAL_BIN = str(Path.home() / ".local" / "bin")
+if _LOCAL_BIN not in os.environ.get("PATH", "").split(os.pathsep):
+    os.environ["PATH"] = os.pathsep.join([_LOCAL_BIN, os.environ.get("PATH", "")]).rstrip(os.pathsep)
+
 from hermes.correlator import Correlator
 from hermes.records import timestamp
 from hermes import repairs

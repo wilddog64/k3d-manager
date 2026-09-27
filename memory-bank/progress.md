@@ -2360,8 +2360,20 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] **`make restart-webhook` does NOT apply plist changes** — `launchctl kickstart -k` reuses the
       cached service definition; the loaded `PATH` stayed stale through a "successful" restart.
       `bootout` + `bootstrap` was required. Makefile left unchanged; reported to the operator.
-- [ ] **Three sibling templates still carry the same PATH defect** — `cloud-bridge`, `hermes`,
-      `prometheus-credential-rotator` lack `~/.local/bin`. Out of scope for this fix; operator's call.
+- [x] **Sibling templates fixed** — `cloud-bridge` and `prometheus-credential-rotator` templates now
+      lead `PATH` with `{{HOME}}/.local/bin`; `install-cloud-bridge` gained the missing
+      `s|{{HOME}}|$(HOME)|g` substitution without which the placeholder would have landed in the
+      plist verbatim. Both live plists reloaded with bootout/bootstrap and read back.
+- [x] **`hermes` handled differently, on purpose** — its plist is rendered by `_install_hermes_agent`
+      in the lib-foundation subtree, which substitutes no `{{HOME}}`, and that subtree is edited
+      upstream only. `bin/k3dm-hermes` normalizes its own `PATH` instead. Agent is not loaded, so
+      nothing needed restarting.
+- [ ] **Upstream lib-foundation change: add `{{HOME}}` substitution to `_install_hermes_agent`** so
+      the hermes template can carry the fix like its siblings. Not started; needs the lib-foundation
+      repo and its own PR.
+- [x] **Regression test exists now** — `scripts/tests/bin/launchd_plist_path.bats`, 4 tests,
+      mutation-verified (reverting the cloud-bridge template turns test 1 red). The earlier
+      classifier denial that blocked this file is cleared.
 - [x] Implementation commit `f8d5ced74467bd703f19cca60bda37b7360dfcf3` pushed to
 - [x] **Claude verified the launchd PATH fix independently** — SHA on origin via `gh api` (local `.git` was unwritable in Codex's sandbox), six-file diff scope, no subtree or `system.sh` changes, BATS 39/39 re-run by Claude, shellcheck histogram identical pre/post.
 - [x] **Fixed a tautological test Claude had specced** (`393f6570`) — the idempotence case asserted on an inline copy of the guard instead of `bin/cluster-up`, so it passed against unfixed source; now extracts and sources the real block and fails pre-fix.
