@@ -1,3 +1,39 @@
+# 2026-09-27 — the three carried v1.39.0 specs: gate fixes + `/k3dm smoke` done, two dispatched
+
+- [x] `ff47bc2b` `fix(smoke): resolve cluster-health app context from the checked app's destination`
+      — `bin/smoke-test-cluster-health` derives `APP_CONTEXT` from the checked ArgoCD Application's
+      `destination.name` (falling back to `INFRA_CONTEXT`); the hardcoded default was the bug, and
+      this is its third rot. 11/11 BATS, mutation-proved red then restored.
+- [x] `70417db0` `fix(smoke): webhook gate uses the bounded health variant and reports curl failures`
+      — `?quick=1` replaces the unbounded sweep the gate could never finish inside its own 90s cap;
+      `|| echo "000"` removed so a transport failure reads `curl exit 28` instead of `HTTP 000000`;
+      `_smoke_unreachable_detail` names a missing host-side forward instead of reporting it like a
+      service outage. New `scripts/tests/bin/smoke_test_webhook.bats`, 4 cases, all four red against
+      pre-fix source then restored identical.
+- [x] `92590ae9` `feat(webhook): expose the smoke gate as /k3dm smoke` — `SMOKE_ONLY` pattern,
+      `MAKE_TARGETS["smoke"]` at `operator`/900s/no-confirm, 6 test methods (29 pytest passed), the
+      `re.compile(r".*")` mutation reddened all six anchoring subcases. `docs/howto/slack-slash-commands.md`
+      role table, target table row and a usage section. No Makefile edit; `smoke_run offline` rc 0.
+
+ORDERING — spec A was blocked by its own gate ("both must land before `/k3dm smoke` is enabled"),
+and neither prerequisite had ever been implemented (`bin/smoke-test-cluster-health` last touched in
+v1.33.0, `bin/smoke-test-webhook` in v1.16.0). Exposing it first would have put two guaranteed false
+reds into Slack on every invocation. The two `docs/bugs/` fixes were implemented first; `docs/bugs/`
+is exempt from the max-5 plan-doc cap.
+
+CHANGELOG PLACEMENT — all three entries went under `## [1.39.0]`, not `[Unreleased]`, deviating from
+the specs' DoD. v1.39.0 was promoted to a version heading earlier and is unmerged and untagged, so
+`[Unreleased]` would have stranded the entries outside the release they belong to. The `/create-pr`
+"entries written after the milestone merge belong to the next version" rule does not apply — there
+has been no merge.
+
+OPERATOR FOLLOW-UP — `make restart-webhook` before `/k3dm smoke` will work: `MAKE_TARGETS` is read
+by the running webhook process, which predates the v1.37.0 module split.
+
+DISPATCHED TO CODEX — `docs/plans/v1.39.0-test-suite-metrics-and-staleness.md` and
+`docs/plans/v1.39.0-public-endpoint-blackbox-probes.md` (offline half only; the live TSDB checks and
+the ApplicationSet reapply stay operator-owned).
+
 # 2026-09-26 — embeddings credential gains a Vault source; indexer commits per batch
 
 - [x] Vault fallback in `scripts/lib/hermes/prior_art.py`: `_vault_root_token`, `vault_argv`,

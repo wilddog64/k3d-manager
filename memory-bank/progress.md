@@ -183,6 +183,17 @@ Zero entries is the default, not an anomaly.
   exists until v1.40.0's WS5 runs. The guide, CHANGELOG and retro must say the quality is unmeasured
   rather than implying it was evaluated; v1.40.0's WS6 goes back and replaces that caveat with the
   measured numbers.
+- [x] **v1.39.0's three unimplemented specs — operator instruction 2026-09-27: implement, do not
+  defer.** I had recommended deferring all three to v1.40.0; the operator overrode that. Two of the
+  three are done on `k3d-manager-v1.39.0`, plus the two prerequisite gate fixes spec A was blocked on:
+  - [x] `ff47bc2b` cluster-health app context resolved from `destination.name` (`docs/bugs/2026-09-25-smoke-cluster-health-app-context-decoupled-from-app-prefix.md`)
+  - [x] `70417db0` webhook gate uses `?quick=1` and reports `curl exit 28`, not `000000` (`docs/bugs/2026-09-25-smoke-webhook-gate-unbounded-sweep-and-unreachable-probes.md`)
+  - [x] `92590ae9` `/k3dm smoke` at `operator`/900s (`docs/plans/v1.39.0-slack-smoke-target.md`)
+  - [ ] `docs/plans/v1.39.0-test-suite-metrics-and-staleness.md` — **dispatched to Codex**
+  - [ ] `docs/plans/v1.39.0-public-endpoint-blackbox-probes.md` — **dispatched to Codex, offline half
+        only**; the live TSDB verification and the ApplicationSet reapply stay operator-owned.
+  Operator follow-up: `make restart-webhook` before `/k3dm smoke` resolves.
+
 - [x] **SCOPE DECISION for v1.39.0 — settled 2026-09-26, operator approved.** v1.39.0 now holds
   exactly **5** plan docs, at the cap:
   1. `v1.39.0-test-suite-metrics-and-staleness.md` (its own, ready to implement)
