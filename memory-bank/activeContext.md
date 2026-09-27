@@ -64,6 +64,28 @@ run. That is why the operator's run could not be diagnosed.
       CLAUDE.md's "a high score means read that file before filing" is the correct framing and why
       the scores stay UNMEASURED until the eval lands. Do not add a score threshold on this
       evidence: a cutoff anywhere in that band would have discarded the correct document.
+- [x] `203893cc` v1.39.0 close-out artifacts complete: CHANGELOG version heading, releases.md and
+      README rows, retro, and the README guides link the release had shipped without.
+- [ ] **v1.39.0 PR not created.** Remaining gates: reapply the ApplicationSets (hub + ACG) then
+      `argocd_check_values_branch` — config on this branch is inert in-cluster until that runs, and
+      it is a required release step; `promtool check rules scripts/etc/prometheus/rules/vectordb.yaml`;
+      confirm kube-state-metrics series in the live TSDB and that the vectordb dashboard is LOADED in
+      Grafana, not merely applied. Three apps were last seen still on `k3d-manager-v1.37.0`:
+      `acg-kube-prometheus-stack`, `acg-trivy-operator`, `loki`.
+- [ ] Three v1.39.0 specs remain unimplemented: `v1.39.0-public-endpoint-blackbox-probes.md`,
+      `v1.39.0-slack-smoke-target.md`, `v1.39.0-test-suite-metrics-and-staleness.md`. Either
+      implement or explicitly defer them to v1.40.0 before the PR, since the release scope check
+      compares the diff against the specs.
+- [ ] KEYCHAIN ACL, 2026-09-27: the operator's interactive `-w` read of `gemini-cli-api-key` now
+      returns 40 bytes and the item's `mdat` moved to `11:56:27Z`, but Claude's non-TTY shell still
+      gets **rc 36** on a retry at `11:59:29Z` — three minutes after the write, so not a timing
+      artifact. The ACL still requires *interaction*, which a non-interactive process can never
+      supply; the remedy is Keychain Access → Get Info → Access Control, either "Allow all
+      applications" or unchecking "Confirm before allowing access" (a trusted-app list still fails
+      non-interactively while that flag is set). Both items are the same object — a metadata-only
+      read with and without `-a default-api-key` returned identical `cdat`/`mdat`, so there is no
+      second competing entry. Every consumer that matters (launchd Hermes, the webhook, agent
+      shells) is non-interactive, so the **Vault copy remains the durable fix**.
 - [ ] Pre-existing, NOT fixed here: `Makefile:814` help comment "Run the pytest suites" sits above
       `check-doc-links`, so `make help` mislabels that target.
 

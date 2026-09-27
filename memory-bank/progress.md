@@ -26,8 +26,15 @@
       2026-09-26 and the same key served 805 documents with zero 429s on 2026-09-27. Third run
       resumed at 901 and finished 1705/1705. Do not lower `EMBED_MIN_INTERVAL` or add retries for
       a daily cap — that spends tomorrow's quota and hides the failure.
-- [ ] Doc follow-up: a free-tier **cold** index spans days, so `docs/guides/vector-store.md`'s
-      "roughly half an hour" and the word "unavailable" in the index-docs message are both wrong.
+- [x] `203893cc` doc follow-up done: the guide now documents both quotas and a two-sitting cold
+      start, a spent daily quota reports `paused` not `unavailable` (test proved red against the old
+      wording), and the corpus count is 1,705 throughout.
+- [x] `203893cc` v1.39.0 close-out: CHANGELOG promoted to `## [1.39.0] - 2026-09-27` with the
+      duplicate Fixed/Added/Changed headings consolidated (13 entries preserved, verified by
+      set-diff), `docs/releases.md` + README rows added with v1.36.0 rotated into the collapsible
+      block, retro at `docs/retro/2026-09-27-v1.39.0-retrospective.md`, and the vector-store guide
+      linked from the README guides list.
+- [ ] v1.39.0 PR is NOT created — gates unmet. See `activeContext.md` for which.
 
 # vectordb health monitoring — 2026-09-26 complete
 
