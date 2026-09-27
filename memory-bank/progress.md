@@ -2350,3 +2350,12 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [ ] Operator-owned live DoD: ArgoCD deploy, seven `probe_success` series, seven status codes,
       prove the frontend returns `probe_success 0` / 404, ApplicationSet reapply,
       `argocd_check_values_branch`.
+# 2026-09-27 — launchd PATH omission fixed
+
+- [x] M1–M5 implemented exactly from `docs/bugs/2026-09-27-launchd-path-omits-local-bin.md`.
+- [x] Implementation commit `f8d5ced74467bd703f19cca60bda37b7360dfcf3` pushed to
+      `origin/k3d-manager-v1.39.0`; no PR created per instruction (PR URL: not applicable).
+- [x] Focused BATS: 39/39; shellcheck: no new warnings; `_agent_audit`: passed.
+- [!] Mutation proof against pre-fix HEAD copies: tests 1, 3 and 4 fail; test 2 passes because its
+      literal body is self-contained and does not inspect either script, so it cannot fail against
+      the unfixed source without altering the required test block.

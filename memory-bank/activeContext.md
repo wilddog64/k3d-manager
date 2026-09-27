@@ -6252,3 +6252,15 @@ request — fails. Sandbox-shaped, not a regression.
 
 Lesson: an agent calling its own reds "pre-existing" is a claim about a baseline it never
 measured. Verify against a clean run before accepting it.
+# 2026-09-27 — launchd PATH normalization fixed (`f8d5ced74467bd703f19cca60bda37b7360dfcf3`)
+
+M1–M5 from `docs/bugs/2026-09-27-launchd-path-omits-local-bin.md` are implemented on
+`k3d-manager-v1.39.0`: `bin/cluster-up` and `bin/cluster-down` normalize `PATH`, cluster-down
+fails loudly when `k3d` is unavailable, four literal BATS tests were added, and the launchd guide
+and CHANGELOG were updated. The implementation commit was pushed to
+`origin/k3d-manager-v1.39.0`; no PR was created per instruction (PR URL: not applicable).
+
+Gates: focused BATS 39/39; shellcheck reports only existing informational warnings; agent audit
+passed. Mutation proof against HEAD copies: three source-sensitive tests fail; the literal
+“does not prepend ~/.local/bin twice” test passes against both versions because it does not read the
+source, so it cannot provide mutation evidence without changing the specified test block.
