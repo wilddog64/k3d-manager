@@ -18,6 +18,18 @@
       auto Kine guard is now OFF. Restore or leave? User's call.
 - [ ] **re-mint `k3dm-hermes-argocd-token`** — the ArgoCD sensor reports
       "credential rejected"; Hermes has no ArgoCD visibility. Operator-only.
+      **Root cause found 2026-09-27:** the error is `token signature is invalid`,
+      not an expiry. `argocd-secret` was created `2026-09-20T23:50:23Z` at
+      `resourceVersion: 2144` and never updated since; `argocd-server` started the
+      same second. The 2026-09-20 ArgoCD rebuild regenerated `server.secretkey`,
+      so **every API token minted before that date is permanently invalid** — the
+      key that signed it no longer exists. The operator's own CLI session was
+      rejected the same way. Re-minting is the only fix; retrying cannot work.
+      `argocd-initial-admin-secret` still exists (created 23:51:56Z, 93s later),
+      so the admin password is probably still the post-rebuild initial one — and
+      note `make show-service-passwords` prefers the **Vault** copy at
+      `secret/data/argocd/admin`, which may predate the rebuild, so it can print a
+      password that no longer works. The k8s Secret is authoritative.
 - [x] **the other Hermes sensor reports deep-dived** — all four traced to root
       cause, read-only. Real ESO health is fine on both clusters (hub CSS
       Ready=True 7/8 synced; hostinger Ready=True 20/20).
