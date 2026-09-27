@@ -156,6 +156,45 @@ the store rather than truncating it. See
 
 ---
 
+## Test Suites
+
+| Target | Command | When to use |
+|---|---|---|
+| `make test` | `scripts/k3d-manager test all` | The dispatcher BATS suites — `scripts/tests/lib`, `core`, `plugins` and `etc`, one level deep each. Takes **~15 minutes**; a quiet terminal is not a hang |
+| `make test-bin` | `bats scripts/tests/bin` | The BATS suites for `bin/` scripts and `Makefile` behaviour, which `make test` does **not** reach |
+| `make test-python-unit` | `python3 scripts/tests/bin/<suite>.py` | The stdlib-`unittest` suites — every `scripts/tests/bin/*.py` whose name is not `test_*.py` |
+| `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
+| `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
+| `make test-all` | `test` + `test-bin` + `test-python` | Everything that runs offline, in one call — what `make test-metrics` wraps |
+
+`make test` alone is **not the CI gate.** CI runs `make test`, `make test-bin`,
+`make test-python-unit` and `make test-pytest` as four separate steps, so a
+branch that is green under `make test` can still be red on a Python suite.
+
+**The two Python targets split on filename, and the split is enforced.**
+`test-python-unit` runs each file as a script, so a file that defines bare
+`def test_` functions with no `unittest.main()` or `pytest.main()` hook would
+execute nothing and still exit 0. Rather than pass silently, the target fails
+with exit 2 and tells you to rename the file to `test_*.py` so
+`make test-pytest` collects it. It also exits 2 when it finds no suites at all —
+an empty glob is a broken checkout, not a pass.
+
+**`make test-pytest` resolves an interpreter in four steps** and exits 2 with
+the list if none works: `$PYTEST` (word-split, so
+`PYTEST="python3 -m pytest"` works), `pytest` on `PATH`, `python3 -m pytest`,
+then `~/.pyenv/shims/python3 -m pytest`. The last fallback exists because this
+target also runs from the webhook, whose `PATH` excludes the pyenv shims. Exit 2
+from this target means *no pytest was found*, never *a test failed*.
+
+Missing `bats` is the same shape — `make test-bin` exits 2 with
+`brew install bats-core` rather than reporting a pass.
+
+**Read per-suite counts, not just the exit code.** A non-zero status from any of
+these can mean the tooling was absent (exit 2) or that assertions failed, and
+the two want opposite responses.
+
+---
+
 ## Test Metrics
 
 | Target | Command | When to use |
