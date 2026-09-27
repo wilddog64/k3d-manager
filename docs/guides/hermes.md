@@ -194,6 +194,57 @@ To confirm the read-only posture: `argocd account can-i get applications '*/*'` 
 `argocd account can-i sync applications '*/*'` → no; the GitHub PAT succeeds on a read call and is
 403/404 on any write.
 
+### Re-minting the ArgoCD token
+
+```bash
+make argocd-hermes-token
+```
+
+Run this from a real terminal. The target mints a fresh token for the `hermes` account, stores it in
+the Keychain, proves it against `/api/v1/applications`, and restarts the Hermes agent. It never
+prints the token.
+
+**An ArgoCD rebuild invalidates the token even though it has no expiry.** Every API token and CLI
+session is signed with `server.secretkey` from the `argocd-secret` Secret, and a rebuild regenerates
+that key — so each previously issued credential becomes permanently unusable at once. The symptom is
+
+```
+rpc error: code = Unauthenticated desc = invalid session: token signature is invalid
+```
+
+which is neither an expiry nor a revocation: retrying, unlocking the Keychain, and re-checking the
+account's RBAC all explain nothing, and the `argocd` sensor reports `unknown` with
+"credential rejected". Date the cutoff from metadata alone, without reading any secret value — a
+recent `creationTimestamp` on `argocd-secret` with a **low `resourceVersion`** means the Secret was
+created with the datastore and never rotated since, so any credential older than it is dead:
+
+```bash
+kubectl -n cicd get secret argocd-secret --context k3d-k3d-cluster \
+  -o jsonpath='{.metadata.creationTimestamp} {.metadata.resourceVersion}{"\n"}'
+```
+
+Re-minting every ArgoCD token therefore belongs in the post-rebuild checklist.
+
+Three behaviours of the target are deliberate:
+
+- **It refuses to run without a TTY.** Minting a credential must not happen unattended, and a
+  Keychain write with no terminal can store an empty value at exit code 0 — a silent failure that
+  reads as success.
+- **It updates the Keychain item in place (`-U`) rather than deleting and recreating it.** A
+  recreated item gets a default ACL, which can make a non-interactive launchd read prompt for
+  authorization; Hermes would then fail silently.
+- **It reads the stored value back and calls the endpoint before reporting success**, so a green
+  result means the sensor will work, not merely that an item exists.
+
+The admin password resolves from `ARGOCD_ADMIN_PASSWORD`, else the `argocd-initial-admin-secret`
+Secret in `cicd`. Prefer that Secret over `make show-service-passwords`, which reads the Vault copy
+at `secret/data/argocd/admin` first — after a rebuild the Vault copy can predate the new install and
+hand you a password that no longer works. Override the endpoint with `ARGOCD_HOST`.
+
+Old tokens signed by a retired key remain listed on the account. `argocd account get --account
+hermes` shows the token IDs and `argocd account delete-token --account hermes <id>` clears the
+unusable ones.
+
 ---
 
 ## Install and uninstall

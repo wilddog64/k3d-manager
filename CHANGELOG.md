@@ -4,6 +4,33 @@
 
 ### Added
 
+- **`make argocd-hermes-token`** re-mints the Hermes ArgoCD API token and stores it in the Keychain,
+  replacing a five-command manual procedure whose every step had a trap. The target mints through the
+  ArgoCD API (session and account-token calls, secrets passed by environment so nothing lands in
+  `argv` or shell history), writes the item with `-U`, reads the value back, proves it against
+  `/api/v1/applications`, and restarts the Hermes agent. It never prints the token.
+
+  Three guards encode failures already paid for. It **refuses to run without a TTY**, because minting
+  a credential must not happen unattended and because a Keychain write with no terminal stores an
+  empty value at exit code 0 — a silent failure that reads as success. It **updates the item in place
+  rather than deleting and recreating it**, because a recreated item gets a default ACL that can make
+  a non-interactive launchd read prompt for authorization, after which Hermes fails silently. And it
+  **verifies against the live endpoint before reporting success**, so a green result means the sensor
+  will work rather than merely that an item exists.
+
+  Motivating incident: the `argocd` sensor had been reporting "credential rejected" since the
+  2026-09-20 ArgoCD rebuild. The error was `token signature is invalid` — neither an expiry nor a
+  revocation. Every token and CLI session is signed with `server.secretkey` from `argocd-secret`, and
+  the rebuild regenerated that key, invalidating every previously issued credential at once. A token
+  documented as having "no expiry" is really bounded by the lifetime of the signing key, so
+  re-minting now belongs in the post-rebuild checklist. `docs/guides/hermes.md` gains a
+  **Re-minting the ArgoCD token** section covering the target, the signature-invalid signature, and
+  how to date the cutoff from `argocd-secret` metadata without reading any secret value.
+
+  Covered by `scripts/tests/bin/makefile_argocd_hermes_token.bats` (8 tests), mutation-tested by
+  removing the TTY guard, swapping `-U` for delete-and-recreate, and echoing the token — each turns
+  the intended test red.
+
 - **`bin/k3dm-vectordb-metrics` is documented** in the Health verification section of
   `docs/guides/vector-store.md`. The guide described "the metrics publisher" without ever naming the
   script, so nothing told a reader how to invoke it, what it emits, or how it fails. The new

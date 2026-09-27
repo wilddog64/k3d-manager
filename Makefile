@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -696,6 +696,57 @@ restore-google-app-password:
 	echo "[restore-google-app-password] Vault updated — rebuilding Alertmanager Secret" && \
 	$(MAKE) observability
 
+## Re-mint the Hermes ArgoCD API token and store it in the Keychain (k3dm-hermes-argocd-token).
+## Required after ANY ArgoCD rebuild: a rebuild regenerates server.secretkey, which permanently
+## invalidates every token minted before it — the CLI reports "token signature is invalid", which
+## is neither an expiry nor a revocation, and retrying can never succeed.
+## The admin password resolves from ARGOCD_ADMIN_PASSWORD, else the argocd-initial-admin-secret
+## Secret. Override the endpoint with ARGOCD_HOST. Never prints the token.
+argocd-hermes-token:
+	@[ -t 0 ] || { \
+	  echo "[argocd-hermes-token] ERROR: refusing to run without a terminal." >&2; \
+	  echo "[argocd-hermes-token] This target mints a credential; it must not run unattended." >&2; \
+	  exit 1; \
+	}; \
+	_host="$${ARGOCD_HOST:-argocd.3ai-talk.org}"; \
+	_ns="$${ARGOCD_NAMESPACE:-cicd}"; \
+	_pw="$${ARGOCD_ADMIN_PASSWORD:-}"; \
+	[ -n "$$_pw" ] || _pw=$$(kubectl get secret argocd-initial-admin-secret -n "$$_ns" \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 -d); \
+	[ -n "$$_pw" ] || { \
+	  echo "[argocd-hermes-token] ERROR: no admin password. Set ARGOCD_ADMIN_PASSWORD, or check" >&2; \
+	  echo "[argocd-hermes-token]        that argocd-initial-admin-secret still exists in $$_ns." >&2; \
+	  exit 1; \
+	}; \
+	_tok=$$(ARGOCD_HOST="$$_host" ARGOCD_ADMIN_PW="$$_pw" python3 -c 'import json,os,urllib.request as u; h=os.environ["ARGOCD_HOST"]; j={"Content-Type":"application/json"}; s=json.loads(u.urlopen(u.Request("https://%s/api/v1/session" % h, data=json.dumps({"username":"admin","password":os.environ["ARGOCD_ADMIN_PW"]}).encode(), headers=j, method="POST"), timeout=30).read())["token"]; k=dict(j); k["Authorization"]="Bearer "+s; print(json.loads(u.urlopen(u.Request("https://%s/api/v1/account/hermes/token" % h, data=json.dumps({"expiresIn":"0"}).encode(), headers=k, method="POST"), timeout=30).read())["token"])') || { \
+	  echo "[argocd-hermes-token] ERROR: could not mint a token on $$_host." >&2; \
+	  echo "[argocd-hermes-token]        Check that accounts.hermes=apiKey is set in argocd-cm and" >&2; \
+	  echo "[argocd-hermes-token]        that the admin password is the current one (a rebuild resets it)." >&2; \
+	  exit 1; \
+	}; \
+	[ -n "$$_tok" ] || { echo "[argocd-hermes-token] ERROR: minted an empty token; refusing to store it" >&2; exit 1; }; \
+	security add-generic-password -U -a k3dm -s k3dm-hermes-argocd-token -w "$$_tok" || { \
+	  echo "[argocd-hermes-token] ERROR: Keychain write failed (locked? run: security unlock-keychain)" >&2; \
+	  exit 1; \
+	}; \
+	_stored=$$(security find-generic-password -a k3dm -s k3dm-hermes-argocd-token -w 2>/dev/null); \
+	[ -n "$$_stored" ] || { \
+	  echo "[argocd-hermes-token] ERROR: the stored item reads back empty — the write did not take." >&2; \
+	  exit 1; \
+	}; \
+	echo "[argocd-hermes-token] stored in Keychain (k3dm-hermes-argocd-token)"; \
+	ARGOCD_HOST="$$_host" ARGOCD_TOKEN="$$_stored" python3 -c 'import json,os,urllib.request as u; d=json.loads(u.urlopen(u.Request("https://%s/api/v1/applications" % os.environ["ARGOCD_HOST"], headers={"Authorization":"Bearer "+os.environ["ARGOCD_TOKEN"]}), timeout=30).read()); print("[argocd-hermes-token] verified: %d applications visible to hermes" % len(d.get("items") or []))' || { \
+	  echo "[argocd-hermes-token] ERROR: the stored token was rejected by $$_host." >&2; \
+	  echo "[argocd-hermes-token]        Check the hermes RBAC line in argocd-rbac-cm grants applications/get." >&2; \
+	  exit 1; \
+	}; \
+	if launchctl print "gui/$$(id -u)/com.k3d-manager.hermes" >/dev/null 2>&1; then \
+	  launchctl kickstart -k "gui/$$(id -u)/com.k3d-manager.hermes" >/dev/null 2>&1 && \
+	    echo "[argocd-hermes-token] Hermes restarted — the argocd sensor picks it up on the next cycle"; \
+	else \
+	  echo "[argocd-hermes-token] NOTE: the Hermes agent is not loaded; nothing to restart"; \
+	fi
+
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:
 	./scripts/k3d-manager deploy_observability --confirm
@@ -966,6 +1017,7 @@ help:
 	@echo "    make install-alertmanager-auth-proxy   Install Alertmanager auth proxy LaunchAgent"
 	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
+	@echo "    make argocd-hermes-token        Re-mint the Hermes ArgoCD token into Keychain (needs a TTY; required after an ArgoCD rebuild)"
 	@echo ""
 	@echo "  Examples:"
 	@echo "    make up                                          # k3s-aws (default)"
