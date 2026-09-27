@@ -14,13 +14,30 @@
       applies and the Pushgateway that produces the metrics. `make observability-acg` →
       `deploy_observability_acg --confirm` → `_deploy_pushgateway_acg` is the confirmed chain.
       A 6th BATS case asserts the wiring and is mutation-proved red against `git show HEAD:`.
-- [ ] **BLOCKED (classifier, operator must run):**
-      `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` — the per-release reapply.
-      `--dry-run` clean, 13/13 sets.
-- [ ] After both: confirm the rule group appears in the ACG Prometheus
-      `/api/v1/rules` (it returned no `k3dm-tests` group before this work).
+- [x] Operator ran `deploy_argocd_applicationsets --confirm` (13/13) and `make observability-acg`
+      (2026-09-27). The reapply's automatic `argocd_check_values_branch` reported 26 k3d-manager
+      references checked (2 tracking HEAD, ignored) and all Applications on
+      `k3d-manager-v1.39.0` — the `acg-kube-prometheus-stack` / `acg-trivy-operator` / `loki`
+      pins to v1.37.0 are cleared. `make observability-acg` printed the new
+      `app-cluster PrometheusRules applied from .../rules-acg/` line, proving the wiring live.
+- [x] **DEFECT 4 CLOSED and live-verified.** `PrometheusRule/k3dm-tests` exists in `monitoring`
+      on `ubuntu-hostinger` with `release: acg-kube-prometheus-stack`; the ACG Prometheus loaded
+      `k3dm-tests.alerts` (25 groups total) from
+      `monitoring-k3dm-tests-80fbbf35-bb46-4577-9d61-84dc2e208b83.yaml`; all five alerts
+      `state=inactive health=ok`. `inactive` was NOT accepted as proof — every one of the five
+      expressions was queried and all are backed by real series: `k3dm_test_cases_failed` 0,
+      `k3dm_test_cases_total` 1692 (vs the 1500 floor, 192 headroom), nine `k3dm_test_suite_cases`
+      series (min 4, `webhook_status.py`), last success 2.0h old vs the 7d threshold. So
+      `inactive` is now a measurement rather than the original "matches nothing" silence.
 - [ ] Duration metrics (DEFECT 2) still undecided: fix in v1.39.0 or file for v1.40.0.
 - [ ] My `:19190` forward propping up `federate-acg` is still undisclosed to a durable fix.
+- [ ] **NEW DEFECT 5 — `make test` contaminates the live deployment telemetry.** Found while
+      deep-diving the three `status="failed"` `k3dm_deployment_last_timestamp_seconds` series.
+      They are not deployments. `scripts/tests/lib/webhook.bats` isolates the port, token, HOME,
+      PATH (stub `make`/`kubectl`), `K3DM_JOB_DIR` and `K3DM_RUN_DIR` — but **not**
+      `K3DM_PUSHGATEWAY_URL`, which `scripts/lib/webhook/config.py:33` defaults to
+      `http://localhost:9091`. So the test webhook's `_push_metrics` writes into the real
+      Pushgateway. Needs a fix + a BATS guard; see activeContext for the full evidence chain.
 
 # embeddings credential + indexer resumability — 2026-09-26 complete
 

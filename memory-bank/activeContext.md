@@ -1,3 +1,66 @@
+# 2026-09-27 — DEFECT 4 live-verified; DEFECT 5 found (test telemetry leaks into the live Pushgateway)
+
+The operator ran both previously-blocked commands. `deploy_argocd_applicationsets --confirm`
+deployed 13/13 and its automatic `argocd_check_values_branch` reported 26 k3d-manager references
+checked (2 tracking HEAD, ignored) and every Application on `k3d-manager-v1.39.0`, clearing the
+`acg-kube-prometheus-stack` / `acg-trivy-operator` / `loki` pins to v1.37.0. `make observability-acg`
+then printed `[observability] app-cluster PrometheusRules applied from .../scripts/etc/prometheus/rules-acg/`
+between the tests dashboard and the Trivy dashboard — the `6ea1bc5f` wiring proven live.
+
+DEFECT 4 is closed. `PrometheusRule/k3dm-tests` is in `monitoring` on `ubuntu-hostinger` with
+`release: acg-kube-prometheus-stack`; the ACG Prometheus has 25 rule groups including
+`k3dm-tests.alerts`, loaded from
+`/etc/prometheus/rules/prometheus-acg-kube-prometheus-stack-prometheus-rulefiles-0/monitoring-k3dm-tests-80fbbf35-bb46-4577-9d61-84dc2e208b83.yaml`,
+all five alerts `state=inactive health=ok`.
+
+`inactive` was deliberately not accepted as proof — it is the exact appearance the original defect
+wore on the hub, where the same five rules evaluated against zero series. All five expressions were
+queried: `k3dm_test_cases_failed` = 0; `k3dm_test_cases_total` = 1692 against the 1500 floor
+(192 headroom); nine `k3dm_test_suite_cases{result="ok"}` series, smallest 4 (`webhook_status.py`),
+summing to the 1692 (1304 bats + 308 pytest + 80 webhook unittest); `k3dm_test_last_success_timestamp_seconds`
+2.0h old against a 7d threshold. So `inactive` now means measured-and-healthy.
+
+## DEFECT 5 — `make test` writes fake deployment metrics into the live Pushgateway
+
+The three `k3dm_deployment_last_timestamp_seconds` series all carried `status="failed"`
+(`up-aws`, `down-aws`, `up-gcp`). Deep dive per the standing rule; they are **not deployments**:
+
+- All three pushed inside an 8-second window (06:28:27–06:28:35 PDT), and
+  `k3dm_deployment_duration_seconds` is **0** for all three. A real `make up` cannot do either.
+- Their `job_id`s (`0b1cc2a6`, `254d6fb8`, `4523f6eb`) do not exist in the live job dir
+  `~/.local/share/k3d-manager/webhook-jobs`, whose newest entry is 06:01.
+- The three `(action, provider)` pairs are exactly the three `/api/v1/cluster` POSTs in
+  `scripts/tests/lib/webhook.bats` that reach the queue path: `{"action":"up","provider":"gcp"}`
+  → `up-gcp`; `{"action":"up","provider":"unknown"}` (defaults to aws) → `up-aws`;
+  `{"action":"down"}` (defaults to aws) → `down-aws`.
+- `setup_file` isolates port, token, `SLACK_SIGNING_SECRET`, `HOME`, `PATH` (stub `make` and
+  `kubectl`), `K3DM_JOB_DIR` and `K3DM_RUN_DIR` — the job-dir isolation was added precisely so
+  test jobs could not clobber the live `:7443` instance. It never touches
+  `K3DM_PUSHGATEWAY_URL`, and `scripts/lib/webhook/config.py:33` defaults `PUSHGATEWAY_URL` to
+  `http://localhost:9091`, which on this host is the forward to the real ACG Pushgateway.
+  `_finish()` in `scripts/lib/webhook/lifecycle.py:217` calls `_push_metrics` for every non-dry-run
+  job, so each test cluster job pushes.
+
+Consequence: `k3dm_deployment_success`, `k3dm_deployment_duration_seconds` and
+`k3dm_deployment_last_timestamp_seconds` are test artifacts, not deployment signal.
+`DeploymentMetricsStale` is therefore watching the test suite's last run, and it will never fire
+while `make test` runs regularly — a permanently-green alert on a metric nobody is producing, which
+is the same class of vacuous-signal defect as DEFECT 4. The dashboard's "Last Deployment Time"
+panel is wrong for the same reason.
+
+Note also there are **no** `provider=hostinger` or k3d series at all, so even absent the
+contamination the alert covers only the cloud paths.
+
+Fix shape (not yet implemented, needs the user's go): export `K3DM_PUSHGATEWAY_URL` to an
+unreachable sink in `setup_file`, plus a BATS case asserting the harness sets it — the same
+isolation pattern already applied to `K3DM_JOB_DIR`. The three stale groups should also be deleted
+from the Pushgateway once the leak is closed, or the fake series persist indefinitely.
+
+Open sub-question: why the stubbed jobs report `failed` at all, given `make` is stubbed to
+`exit 0`. The temp job dirs holding the `output` traceback are deleted at teardown, so it is not
+recoverable after the fact; it does not change the conclusion, since a 0-second job is not a
+deployment either way.
+
 # 2026-09-27 — DEFECT 4 wiring completed
 
 The one blocked piece of option A has landed. `_deploy_pushgateway_acg` in
