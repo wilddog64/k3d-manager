@@ -49,8 +49,21 @@ run. That is why the operator's run could not be diagnosed.
       `healthy` — `rows=1705, corpus=1705, indexed 0.0d ago`. The `index never built` branch is
       off. **One ranked similarity result is still NOT verified** — `make find-similar-docs`
       embeds the query, so it needs the same credential; from Claude's shell it still prints
-      `retrieval unavailable — no embeddings credential` and exits 0. The retrieval path has
-      therefore never once returned a ranked result, and cannot until the durable slot exists.
+      `retrieval unavailable — no embeddings credential` and exits 0.
+- [x] **First ranked similarity result, 2026-09-27** — the operator ran
+      `make find-similar-docs Q="argocd application stuck out of sync with no real diff" K=5`
+      in the shell holding the export. Five hits, all ArgoCD OutOfSync docs. Two findings for
+      the v1.40.0 retrieval eval, which this makes the first real datapoint for:
+      **(a) recall good, ranking weak.** The query was near-verbatim the symptom whose canonical
+      cause is a missing `ServerSideDiff=true`; the doc carrying that answer
+      (`docs/bugs/2026-09-13-hub-platform-ops-externalsecret-perpetual-outofsync.md`) came back
+      **4th at 0.764**, under three *expected-drift* docs describing a different cause. The right
+      answer is retrieved but not ranked first, so the eval's job is ranking quality, not recall.
+      **(b) the score band is compressed** — 0.785 to 0.764, a spread of 0.021 across five hits of
+      materially different relevance. Rank order is therefore not a verdict, which is why
+      CLAUDE.md's "a high score means read that file before filing" is the correct framing and why
+      the scores stay UNMEASURED until the eval lands. Do not add a score threshold on this
+      evidence: a cutoff anywhere in that band would have discarded the correct document.
 - [ ] Pre-existing, NOT fixed here: `Makefile:814` help comment "Run the pytest suites" sits above
       `check-doc-links`, so `make help` mislabels that target.
 

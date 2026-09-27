@@ -8,8 +8,12 @@
 - [x] Docs: `docs/guides/vector-store.md` + Addendum 3 in
       `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md`. CHANGELOG updated.
 - [x] `make index-docs` completed 2026-09-27: `rows=1705`, `last_indexed_epoch` set, sensor
-      `healthy`. Two of three verifications pass; the ranked similarity result does NOT, because
-      `make find-similar-docs` embeds its query and no credential reaches a non-operator shell.
+      `healthy`. All three verifications now pass: the operator ran the first ranked query from the
+      shell holding the export and it returned five relevant hits. Retrieval works end to end.
+- [ ] v1.40.0 retrieval eval — first datapoint in hand, and it points at **ranking, not recall**:
+      the correct doc for an `ArgoCD OutOfSync with no real diff` query ranked 4th of 5, and the
+      whole band spanned 0.785-0.764 (0.021). Do not add a score threshold on this evidence; any
+      cutoff in that band drops the right answer. Details in `activeContext.md`.
 - [ ] Operator: the durable slot is still open — write the Vault copy at `secret/embeddings/gemini`
       (still `No value found`) or fix the `gemini-cli-api-key` trusted-app ACL in Keychain Access.
       Until then `make find-similar-docs` and dedup Pass 2 are inert for every agent. No agent
