@@ -1,5 +1,5 @@
 image:
-  repository: quay.io/prometheus/blackbox-exporter
+  repository: prometheus/blackbox-exporter
   tag: v0.27.0
   pullPolicy: IfNotPresent
 
