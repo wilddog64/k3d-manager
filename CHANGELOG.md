@@ -52,6 +52,17 @@
   secrets and performs real logins, and the timeout is raised from the 300s default because the
   Vault, ESO and login stages run serially behind three retries.
 
+- **Offline test-suite metrics and staleness alerting.** `bin/k3dm-test-metrics` parses a
+  captured `make test` or `make test-all` log and pushes bounded metrics to Pushgateway via the
+  opt-in `make test-metrics` target, which leaves the `test` and `test-all` recipes untouched.
+  `k3dm_test_cases_failed` is the health signal, not the exit code: the same green suite exits 2
+  or 0 here depending on whether `test-pytest` finds a real `pytest`, so an exit-code-driven
+  panel would report a healthy run as broken. Because Pushgateway retains the last value
+  indefinitely, a stopped push is indistinguishable from a passing one — so the `k3dm-tests`
+  dashboard leads with a freshness panel and five new rules cover failures, a vacuous suite, a
+  case-count drop and staleness. `origin` is part of the grouping URL rather than a body label,
+  since a body label would let a green CI push silently overwrite a red local one.
+
 ### Changed
 
 - The embeddings credential resolution order is documented as a preference order rather than a set of

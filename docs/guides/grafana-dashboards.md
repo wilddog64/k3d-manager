@@ -26,8 +26,9 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
 | Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
+| k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `make observability-acg` | **ACG** |
 
-All seven are `ConfigMap`s in the `monitoring` namespace carrying
+All eight are `ConfigMap`s in the `monitoring` namespace carrying
 `labels: {grafana_dashboard: "1"}`, which the kube-prometheus-stack Grafana sidecar
 discovers and imports. A dashboard that does not appear at all is usually a sidecar /
 namespace / label problem; a dashboard that appears but is blank is a producer problem.
@@ -258,6 +259,25 @@ independently: the webhook LaunchAgent, the Pushgateway port-forward LaunchAgent
 dashboard being empty on the hub is by design, not a regression. See
 `docs/architecture/cloudflare-slack-relay.md` §3 for the full metrics path.
 
+### k3dm Tests (`k3dm-tests`) — ACG only
+
+These metrics come from a laptop-side push and therefore exist only after someone runs
+`make test-metrics`. Pushgateway retains the last value indefinitely, so read the **Suite
+freshness** panel first. The exit-code panel is informational only: `make test-all` here exits 2 when `test-pytest`
+falls back to a `python3` without pytest and 0 when a real `pytest` is on PATH, so the same
+healthy suite reports either value depending on the shell it ran in. Failed cases, never the
+exit code, drive health.
+
+| Panel | Query |
+|---|---|
+| Suite freshness | `time() - k3dm_test_last_timestamp_seconds` |
+| Last passing run | `time() - k3dm_test_last_success_timestamp_seconds` |
+| Failed cases | `k3dm_test_cases_failed` |
+| Cases by suite | `k3dm_test_suite_cases{result="not_ok"} > 0` |
+| Suite duration over time | `k3dm_test_suite_duration_seconds` |
+| Total cases | `k3dm_test_cases_total` |
+| Exit code | `k3dm_test_exit_code` (informational only) |
+
 ### Trivy Security (`trivy-security`) — ACG only
 
 Native `trivy-operator` metrics, no exporter in the path.
@@ -314,6 +334,7 @@ Work down this table before editing a query. Every row is a real past incident.
 | E2E entirely blank after a real remote run | `E2E_M2_PUBLISH_BACK_HOST` unset under launchd; result stuck `publication_pending` | count `k3dm.k3d.io/e2e-result` ConfigMaps on the hub |
 | k3dm Deployment panels blank | `k3dm Deployment Metrics` is empty: the Pushgateway release must be installed on the app cluster, the local `:9091` port-forward agent must be loaded, and the `job="pushgateway"` target must be up | `curl -s -o /dev/null -w '%{http_code}' http://localhost:9091/-/healthy` |
 | Checkout Load Test blank except CPU | no producer — expected | nothing to fix |
+| k3dm Tests panels blank | nobody has run `make test-metrics` yet — these metrics are a laptop-side push, not a scrape, so there is no producer until someone runs it | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
 
 The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub has no

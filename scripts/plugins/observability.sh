@@ -708,6 +708,11 @@ function _deploy_pushgateway_acg() {
     _kubectl apply --context "${_app_context}" -f "${_dashboard_cm}" >/dev/null \
       && _info "[observability] k3dm deployment metrics dashboard applied"
   fi
+  local _tests_dashboard_cm="${SCRIPT_DIR}/etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  if [[ -f "${_tests_dashboard_cm}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_tests_dashboard_cm}" >/dev/null \
+      && _info "[observability] k3dm tests dashboard applied"
+  fi
   _observability_apply_trivy_dashboard "${_app_context}"
 }
 

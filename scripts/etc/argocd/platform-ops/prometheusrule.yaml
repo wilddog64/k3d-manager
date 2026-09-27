@@ -138,3 +138,50 @@ spec:
           annotations:
             summary: "no passing e2e for {{ $labels.service }}/{{ $labels.tier }} (runner {{ $labels.runner }}) in >3d"
             description: "No passing e2e run for {{ $labels.service }} on the {{ $labels.tier }} substrate (runner {{ $labels.runner }}) in over 3 days; the verification signal is stale."
+    - name: k3dm-tests.alerts
+      rules:
+        - alert: OfflineSuiteFailing
+          expr: k3dm_test_cases_failed > 0
+          for: 30m
+          labels:
+            group: k3dm-tests
+            severity: warning
+          annotations:
+            summary: "{{ $value }} offline test case(s) failing for target {{ $labels.target }}"
+            description: "The last recorded run of {{ $labels.target }} had failing cases. This is the health signal; the exit code is not."
+        - alert: OfflineSuiteVacuous
+          expr: k3dm_test_suite_cases < 1
+          for: 30m
+          labels:
+            group: k3dm-tests
+            severity: warning
+          annotations:
+            summary: "suite {{ $labels.suite }} recorded 0 cases — it executed nothing"
+            description: "A suite that runs no cases reports no failures, so OfflineSuiteFailing cannot see it. cloud_bridge.py passed this way for a full release because it was a pytest-style file that no make target collected. A suite present in the run with zero cases is a wiring bug, not a pass."
+        - alert: OfflineSuiteCaseCountDropped
+          expr: k3dm_test_cases_total < 1500
+          for: 30m
+          labels:
+            group: k3dm-tests
+            severity: warning
+          annotations:
+            summary: "offline suite total is {{ $value }}, below the expected floor"
+            description: "A floor catches whole suites silently dropping out of collection, which a failure count cannot. Raise the floor as the suite grows; as of 2026-09-25 the real totals are 1129 dispatcher BATS + 215 pytest + the test-bin BATS suites."
+        - alert: OfflineSuiteStale
+          expr: time() - k3dm_test_last_success_timestamp_seconds > 604800
+          for: 1h
+          labels:
+            group: k3dm-tests
+            severity: warning
+          annotations:
+            summary: "no passing offline suite for {{ $labels.target }} in >7d"
+            description: "Pushgateway retains the last pushed value indefinitely, so a stale success is indistinguishable from a current one. No zero-failure run has been recorded for over 7 days."
+        - alert: DeploymentMetricsStale
+          expr: time() - k3dm_deployment_last_timestamp_seconds > 1209600
+          for: 1h
+          labels:
+            group: k3dm-tests
+            severity: warning
+          annotations:
+            summary: "no k3dm deployment metric pushed for {{ $labels.action }}/{{ $labels.provider }} in >14d"
+            description: "The k3dm Deployment Metrics dashboard held zero series for 64 days because the Pushgateway port-forward was removed on every access-layer refresh. This alert makes that class of silence visible."
