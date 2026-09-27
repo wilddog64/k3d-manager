@@ -46,8 +46,36 @@ Both fixes are one-character-class errors in a JSON literal that surfaced as HTT
 codes pointing somewhere else entirely. BATS test 10 rejects a quoted `expiresIn`
 (mutation-proven; 10/10 green, tree `cmp`-identical after restore).
 
-Still pending: the operator re-runs `make argocd-hermes-token`. The TTY gate means no
-agent can do it.
+**VERIFIED 2026-09-27 23:15:45Z — the argocd sensor is live again.** The operator's third
+run succeeded: `stored in Keychain` / `verified: 40 applications visible to hermes` /
+`Hermes restarted`. Independent confirmation, not the target's own report:
+
+| Check | Result |
+|---|---|
+| Applications in `cicd` (kubectl) | **40** — matches the target's count exactly |
+| `accounts.hermes` in `argocd-cm` | `apiKey` (so that error hint was never the cause) |
+| Keychain item | PRESENT (existence only; the value is never read) |
+| Hermes agent | `running`, pid 20720, `last exit code = 0`, restarted 23:14:56Z |
+| First post-restart cycle | `argocd` = **degraded** with real app evidence, no longer `unknown` |
+
+`argocd` at 23:15:45Z: `platform/shopping-cart-identity Healthy/OutOfSync,
+shopping-cart/ubuntu-k3s-data-layer Healthy/Unknown last-op=Failed`. Both are known
+open items (the keycloak `awk` PostSync hook; the stale `ubuntu-k3s` registration), so
+`degraded` here is the sensor working, not a new fault. No page was raised.
+
+**A stale log line nearly read as a failure.** The last cycle before the restart still
+said `credential rejected; re-mint k3dm-hermes-argocd-token`, sampled 23:10:38Z — four
+minutes *before* the agent came back at 23:14:56Z. Reading the log without comparing
+timestamps against the restart would have said the mint failed. Always date the cycle
+against the process start.
+
+**What only the post-restart cycle could prove:** that Hermes can *read* the item from
+the Keychain under launchd. The mint reaching the API proves the token is valid; it says
+nothing about the ACL. This is the failure `-U` exists to prevent, and it is now
+confirmed clear.
+
+`eso` remains `unknown` — the separate, already-tracked false negative
+(`_kubectl_absent()` treating a kubeconfig error as resource absence).
 
 # 2026-09-27 — `make argocd-hermes-token` (`80fb51c2`)
 

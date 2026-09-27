@@ -18,7 +18,16 @@
       auto Kine guard is now OFF. Restore or leave? User's call.
 - [x] **`make argocd-hermes-token` HTTP 400 fix** — `expiresIn` sent as string `"0"`; swagger types it `integer/int64`, so grpc-gateway rejected the body pre-ArgoCD. Integer now; BATS test 10 guards it. `swagger.json` is unauthenticated — the diagnosis lever
 - [x] **`make argocd-hermes-token` Cloudflare 1010 fix** — first live run 403'd on `urllib`'s default UA, not on ArgoCD authz; UA set on both API calls, error hint reordered, BATS test 9 added (mutation-proven), `docs/guides/hermes.md` troubleshooting block
-- [ ] **re-mint `k3dm-hermes-argocd-token`** — the ArgoCD sensor reports
+- [x] **re-mint `k3dm-hermes-argocd-token`** — **DONE and VERIFIED 2026-09-27** via
+      `make argocd-hermes-token`. Independent confirmation: 40 Applications reported by
+      the target matched `kubectl get applications -n cicd`; the first post-restart cycle
+      (23:15:45Z) shows `argocd` **degraded with real app evidence** instead of `unknown`,
+      which also proves Hermes can read the item from the Keychain under launchd — the
+      ACL failure `-U` exists to prevent. Beware: the last pre-restart cycle still logged
+      `credential rejected` (23:10:38Z, before the 23:14:56Z restart), which reads as a
+      failed mint if you don't date it against the process start.
+      Original diagnosis below, retained for the root cause:
+      The ArgoCD sensor reported
       "credential rejected"; Hermes has no ArgoCD visibility. Operator-only.
       **Root cause found 2026-09-27:** the error is `token signature is invalid`,
       not an expiry. `argocd-secret` was created `2026-09-20T23:50:23Z` at
