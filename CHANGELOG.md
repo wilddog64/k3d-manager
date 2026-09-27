@@ -25,6 +25,12 @@
   causes that were both fine. The target's own error hint now names the 1010 case first, and a BATS
   guard fails if the header is ever dropped.
 
+  `expiresIn` is sent as a JSON **integer**. The ArgoCD swagger types it `integer/int64`, so the
+  quoted `"0"` the target first used failed to unmarshal and grpc-gateway answered **HTTP 400**
+  before any ArgoCD logic ran — a second failure that again looked like an account or permission
+  problem. `https://<argocd-host>/swagger.json` is served unauthenticated and settles these shape
+  questions directly; a BATS guard rejects a quoted value.
+
   Motivating incident: the `argocd` sensor had been reporting "credential rejected" since the
   2026-09-20 ArgoCD rebuild. The error was `token signature is invalid` — neither an expiry nor a
   revocation. Every token and CLI session is signed with `server.secretkey` from `argocd-secret`, and

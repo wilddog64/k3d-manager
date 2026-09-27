@@ -85,3 +85,15 @@ setup() {
   _ua_count="$(printf '%s' "${RECIPE}" | command grep -c 'User-Agent' || true)"
   [ "${_ua_count}" -ge 2 ]
 }
+
+@test "expiresIn is sent as a JSON integer, not a string" {
+  case "${RECIPE}" in
+    *'"expiresIn":"'*)
+      printf 'expiresIn is quoted, making it a JSON string.\n' >&2
+      printf 'The ArgoCD swagger types it as integer/int64, so a quoted value fails to\n' >&2
+      printf 'unmarshal and the API returns HTTP 400 before any ArgoCD logic runs.\n' >&2
+      return 1 ;;
+  esac
+
+  [[ "${RECIPE}" == *'"expiresIn":0'* ]]
+}

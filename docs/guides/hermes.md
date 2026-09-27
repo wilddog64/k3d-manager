@@ -212,6 +212,14 @@ make argocd-hermes-token
 > A 200 here means the endpoint and the block are both understood — the target sets its own
 > User-Agent, so a remaining 403 is a genuine ArgoCD authz failure.
 
+> **A 400 is a request-shape problem, not a permission problem.** The token endpoint types
+> `expiresIn` as `integer/int64`; a quoted `"0"` is rejected by grpc-gateway before ArgoCD sees it.
+> The API's own schema is served unauthenticated and is the authority on any field's type:
+>
+> ```bash
+> python3 -c 'import json,urllib.request as u; s=json.loads(u.urlopen(u.Request("https://argocd.3ai-talk.org/swagger.json", headers={"User-Agent":"k3d-manager/diag"})).read()); print(json.dumps(s["definitions"]["accountCreateTokenRequest"], indent=1))'
+> ```
+
 Run this from a real terminal. The target mints a fresh token for the `hermes` account, stores it in
 the Keychain, proves it against `/api/v1/applications`, and restarts the Hermes agent. It never
 prints the token.

@@ -30,6 +30,22 @@ restored `cmp`-identical and green, 9/9), a troubleshooting block in
 ad-hoc verification", and it framed the trigger as a *missing* UA when a *blocked* UA
 is enough.
 
+**Second failure, same shape of mistake.** With the UA fixed the run reached ArgoCD and
+returned **HTTP 400** from `/api/v1/account/hermes/token` — the session login had
+succeeded (the traceback's caret moved to the second `urlopen`). Cause: `expiresIn` was
+sent as the string `"0"`, but the swagger types it `integer/int64`, so grpc-gateway
+rejected the body before any ArgoCD logic ran. Again the target's error hint pointed at
+innocent causes (`accounts.hermes=apiKey`, stale admin password).
+
+**The lever that settled it: `https://<argocd-host>/swagger.json` is served
+unauthenticated.** No credential, no cluster access, no guessing — it gave the field type
+and confirmed the account name belongs in the path, not the body. Use it for any ArgoCD
+API shape question.
+
+Both fixes are one-character-class errors in a JSON literal that surfaced as HTTP status
+codes pointing somewhere else entirely. BATS test 10 rejects a quoted `expiresIn`
+(mutation-proven; 10/10 green, tree `cmp`-identical after restore).
+
 Still pending: the operator re-runs `make argocd-hermes-token`. The TTY gate means no
 agent can do it.
 
