@@ -1,3 +1,39 @@
+# 2026-09-27 — v1.39.0 pre-PR live smoke: OrbStack wedged, then the fix verified live
+
+`/create-pr` pre-flight 0–7 all passed; gate 8 (live smoke) initially could not run at all.
+The hub presented a **half-alive** failure worth naming, because each half alone reads as a
+different problem: port 52888 **accepted TCP** while the TLS handshake timed out, `docker ps`
+hung past 120s producing no output, and yet both OrbStack processes were alive and
+`~/.orbstack/run/docker.sock` existed. `orb status` returned `Running` instantly. So the VM was
+up enough to answer a connect and not up enough to serve the API — the engine was wedged, not
+the VM, and no single one of those signals says so.
+
+Recovery was `orbctl stop` then `orbctl start` (with the operator's explicit go — a host
+mutation). Note `orb restart` is **not** the lever: it takes a Linux machine argument and exits 0
+after printing usage, so it looks like it worked and does nothing. `orbctl reset` is adjacent in
+the help output and deletes all Docker data — never reach for it here. The cluster came back
+4/4 nodes Ready at **6d19h** age: a restart, not a rebuild, nothing lost.
+
+**Defect 1 is confirmed live.** The exporter runs `quay.io/prometheus/blackbox-exporter:v0.27.0`
+— correctly single-qualified — and the pod is `1/1 Running` where it had been `0/1
+ImagePullBackOff` for 137m.
+
+**Defects 2 and 3 are verified as far as a non-mutating check can reach.** Rendering all five
+files in `scripts/etc/prometheus/rules/` through the fix's own `envsubst '$CF_DOMAIN'` pipeline
+yields **zero** unsubstituted placeholders and seven correct hostnames; `kubectl apply
+--dry-run=server` accepts all five against the live CRD schemas at rc=0. The actual apply is the
+operator's resync — the two new rules and both Probes report `created`, the two pre-existing ones
+`unchanged`. There is **no** literal `CF_DOMAIN` in any of the 27 live rules, so the old raw-apply
+path left no polluted resource behind to clean up.
+
+**A truncating `head` produced a wrong conclusion mid-check, and the dry-run caught it.** Listing
+`prometheusrules` through `head -20` cut an alphabetically sorted list off before
+`kubernetes-control-plane-legible` and `shopping-cart-apps`, so I first read the rules directory as
+never applied to this cluster. It had been; only the files this release *adds* are absent. The
+`unchanged` vs `created` split in the server dry-run is what exposed it. A `head` on a sorted
+listing is a silent sampling decision — when the question is "is X present", grep for X instead of
+paging the list.
+
 # 2026-09-27 — v1.39.0 PR-readiness audit found the blackbox probes inert
 
 Answering "anything else left before create pr": the process gates are clean (no open PRs, branch
