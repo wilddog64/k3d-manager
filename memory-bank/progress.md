@@ -18,6 +18,30 @@
       auto Kine guard is now OFF. Restore or leave? User's call.
 - [ ] **re-mint `k3dm-hermes-argocd-token`** — the ArgoCD sensor reports
       "credential rejected"; Hermes has no ArgoCD visibility. Operator-only.
+- [x] **the other Hermes sensor reports deep-dived** — all four traced to root
+      cause, read-only. Real ESO health is fine on both clusters (hub CSS
+      Ready=True 7/8 synced; hostinger Ready=True 20/20).
+- [ ] **`eso` sensor reports unknown on a false negative** — the webhook defaults
+      the provider to `k3s-aws`, whose context `ubuntu-k3s` is not registered, and
+      `_kubectl_absent()` classifies kubectl's `context was not found` error as
+      resource absence. Two fixes available: delete the stale context (necessary,
+      not sufficient) and stop `_kubectl_absent()` treating a kubeconfig error as
+      absence (the real fix). Not started.
+- [ ] **`eso` sensor never evaluates the hub** — it exact-matches only the
+      unprefixed names, so the `Hub ESO *` entries the webhook emits are invisible
+      to it. Hub ESO failures surface only incidentally via `node_pressure`.
+- [ ] **`keycloak-realm-reconcile` Job Failed for 6d21h** — `awk: command not
+      found`; `quay.io/keycloak/keycloak:24.0` has no awk and the inline script
+      uses it ~9 times. ArgoCD PostSync hook of `shopping-cart-identity`, so the
+      manifest lives in **shopping-cart-infra** — spec + Codex. Likely the common
+      cause of both remaining `node_pressure` failures (Keycloak, Frontend SSO
+      login). Nothing alerted on it for six days.
+- [ ] **hub `platform-ops/cosign-public-key` ExternalSecret still not synced** —
+      1 of 8; this is the "Hub ESO ExternalSecrets" failure `node_pressure`
+      reports. Pre-existing backlog item, now confirmed as the live cause.
+- [x] **`reachability` confirmed unchanged** — verdict `single-service`; frontend
+      0/5 with a `1/1 Running` pod returning 404 (routing, the known unapproved
+      fix), all six other hosts 5/5.
 - [ ] Hermes sensors reporting: `eso` unknown, `reachability` degraded
       (`frontend.3ai-talk.org`), `node_pressure` degraded (Keycloak, Hub ESO,
       Frontend SSO), `kine` healthy with `stale_acg_registration: true`.

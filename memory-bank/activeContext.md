@@ -1,3 +1,104 @@
+# 2026-09-27 — Hermes sensor anomalies traced to root cause
+
+All four anomalies from the first post-bootstrap cycles were deep-dived read-only.
+Three resolve to known items; one is a defect nobody had reported.
+
+## `eso` unknown is a false negative caused by the stale `ubuntu-k3s` context
+
+Real ESO health is **fine on both real clusters** — read directly, per context:
+
+| Context | ClusterSecretStore `vault-backend` | ExternalSecrets |
+|---|---|---|
+| `k3d-k3d-cluster` (hub) | `Ready=True` | 7/8 synced — the 1 not-ready is `platform-ops/cosign-public-key` |
+| `ubuntu-hostinger` | `Ready=True` | 20/20 synced |
+
+The sensor says "unknown" because of a five-step misclassification, each step
+verified first-hand:
+
+1. Hermes calls the webhook with `provider=""` (`K3DM_HERMES_PROVIDER` is unset,
+   and the regenerated plist does not define it).
+2. `bin/k3dm-webhook:_resolve_provider("")` finds no `CLUSTER_PROVIDER`, and
+   `~/.local/share/k3d-manager/active-provider` **does not exist**, so it falls
+   through to its hardcoded default `"k3s-aws"`.
+3. `_provider_context("k3s-aws")` maps to **`ubuntu-k3s`** — a context that is
+   not registered in the kubeconfig (only `k3d-k3d-cluster` and
+   `ubuntu-hostinger` are).
+4. kubectl therefore emits `Error in configuration: context was not found for
+   specified context: ubuntu-k3s`, whose lowercase form contains the substring
+   **`not found`** — one of `_kubectl_absent()`'s absence signatures. Confirmed
+   by evaluating the real error text against the real signature tuple.
+5. So `scripts/lib/webhook/smoke.py:_eso_health_results` reports
+   `ok=None, "not installed"`, and `eso` maps any `ok is None` to
+   `"ESO status source unavailable"` → **unknown**.
+
+**`_kubectl_absent()` cannot distinguish "the resource is absent" from "your
+kube context does not exist".** This is the third instance this session of the
+same class — a configuration error read as a valid empty answer. The immediate
+remedy is deleting the stale `ubuntu-k3s` context; the durable fix is for
+`_kubectl_absent()` to stop treating a kubeconfig error as resource absence.
+Note the interaction: deleting the context alone does **not** fix it, because
+step 3 would still name `ubuntu-k3s`; the provider default is the real seam.
+
+## The `eso` sensor is structurally blind to the hub
+
+`eso` exact-matches only `("ESO ClusterSecretStore", "ESO ExternalSecrets")`.
+When the app context differs from the hub, `smoke.py:655` also emits
+**`Hub ESO ClusterSecretStore`** and **`Hub ESO ExternalSecrets`** — which that
+tuple never matches. So the sensor whose entire job is ESO health never
+evaluates the hub's ESO. The hub's real failure surfaced only incidentally,
+through `node_pressure`, which counts *any* two failing services regardless of
+name. Same failure mode as the hardcoded-context-gate rot: a producer-side name
+change silently empties a consumer's selector.
+
+## `kine` stale ACG registration — confirmed, and it is the same `ubuntu-k3s`
+
+`cicd` holds three cluster registration Secrets on the hub. The offender:
+
+    cluster-ubuntu-k3s  name=ubuntu-k3s  server=https://host.k3d.internal:6443
+
+`host.k3d.internal` is exactly the marker `stale_acg_registration()` looks for.
+It carries `k3d-manager/role: app-cluster`, so the four AppSets that select that
+label still generate applications for a cluster that no longer exists. Deleting
+it is a live mutation with a known ordering trap (registration Secret first) —
+**not done, user's call.**
+
+## `reachability` — unchanged, not widened
+
+`bin/public-endpoint-probe --json`: verdict `single-service`; `frontend` 0/5,
+and `argocd`, `keycloak`, `prometheus`, `alertmanager`, `grafana`, `webhook` all
+5/5. `frontend.3ai-talk.org` returns **404** while its pod is `1/1 Running` for
+3d9h — so this is routing, not a dead workload, consistent with the known
+(unapproved) frontend 404 fix. No new failure.
+
+## NEW DEFECT — `keycloak-realm-reconcile` has been failing for 6d21h
+
+`kubectl -n identity get job`: `keycloak-realm-reconcile` **Failed 0/1, age
+6d21h**, two pods in `Error`. The log ends:
+
+    Realm shopping-cart exists; applying partial import
+    browser-with-conditional-otp flow already exists; reconciling it
+    environment: line 104: awk: command not found
+
+This is the **known Keycloak-image trap recurring** — `quay.io/keycloak/keycloak:24.0`
+is ubi9-micro-based and ships bash/grep/sed but **no `awk`**. The Job's inline
+script uses `awk` in roughly nine places (`csv_value`, `csv_match_count`,
+`level0_rows`, `urlencode_path`, and five inline filters), and it dies at the
+first one inside `reconcile_browser_flow` — *after* `grep` has already
+succeeded, which is precisely why it reads like a logic bug rather than a
+missing binary.
+
+Consequence: `browser-with-conditional-otp` is never finished being reconciled
+and `browserFlow` is never activated, which is the most likely common cause of
+**both** remaining `node_pressure` failures (`Keycloak` and `Frontend SSO
+login`). The Job is an ArgoCD **PostSync hook** of the `shopping-cart-identity`
+app (tracking-id `shopping-cart-identity:batch/Job:identity/keycloak-realm-reconcile`),
+so the manifest lives in **shopping-cart-infra**, not here — spec + Codex, feature
+branch. Not started, not approved.
+
+**Nothing alerted on this for six days.** A failed ArgoCD PostSync hook Job is
+not covered by any current rule — the same detection gap class as the
+`absent()` defect just fixed.
+
 # 2026-09-27 — Hermes bootstrapped; VectorDBMetricsStale fixed (`fa89fc6b`)
 
 ## Hermes is loaded and publishing
