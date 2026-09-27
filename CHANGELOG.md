@@ -46,6 +46,12 @@
   as a rebuildable cache on local-path storage, not a system of record; its index is not durable and
   losing it costs one re-index. The retriever's quality is UNMEASURED until the v1.40.0 eval runs.
 
+- **`/k3dm smoke` runs the smoke gate from Slack** (`operator` role, optional
+  `SMOKE_ONLY=offline|cluster`, 900s timeout). `make smoke` already existed; only the Slack
+  surface was missing. It is `operator` rather than `reader` because the cluster half reads Vault
+  secrets and performs real logins, and the timeout is raised from the 300s default because the
+  Vault, ESO and login stages run serially behind three retries.
+
 ### Changed
 
 - The embeddings credential resolution order is documented as a preference order rather than a set of

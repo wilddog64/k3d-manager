@@ -167,6 +167,40 @@ class MakeTargetTests(unittest.TestCase):
                 self.assertIsNone(argv)
                 self.assertIn("invalid value for DIGEST", error)
 
+    def test_smoke_is_operator_tier_and_hidden_from_readers(self):
+        """The cluster half performs real Vault reads and live logins."""
+        self.assertEqual(wh.MAKE_TARGETS["smoke"]["min_role"], "operator")
+        self.assertNotIn("smoke", wh.make_target_help("reader", wh._role_allows))
+        self.assertIn("smoke", wh.make_target_help("operator", wh._role_allows))
+
+    def test_smoke_runs_without_arguments(self):
+        self.assertEqual(wh.parse_make_request("smoke", {}, None), (["smoke"], None))
+
+    def test_smoke_accepts_only_the_two_sweep_halves(self):
+        for value in ("offline", "cluster"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    wh.parse_make_request("smoke", {"SMOKE_ONLY": value}, None),
+                    (["smoke", f"SMOKE_ONLY={value}"], None),
+                )
+
+    def test_smoke_only_is_anchored_against_partial_matches(self):
+        """fullmatch is what rejects these — a search would accept every one."""
+        for value in ("both", "offline; rm -rf /", "offline cluster", "offlin", "OFFLINE", ""):
+            with self.subTest(value=value):
+                argv, error = wh.parse_make_request("smoke", {"SMOKE_ONLY": value}, None)
+                self.assertIsNone(argv)
+                self.assertIn("invalid value for SMOKE_ONLY", error)
+
+    def test_smoke_rejects_arguments_it_does_not_declare(self):
+        _, error = wh.parse_make_request("smoke", {"APP": "x"}, None)
+        self.assertIn("does not accept APP", error)
+
+    def test_smoke_timeout_exceeds_the_serial_retry_budget(self):
+        """The default 300s cannot cover a sweep where one stage retries."""
+        self.assertEqual(wh.MAKE_TARGETS["smoke"]["timeout"], 900)
+        self.assertNotIn("confirm", wh.MAKE_TARGETS["smoke"])
+
     def test_app_cve_scan_needs_no_confirm(self):
         self.assertEqual(
             wh.parse_make_request("app-cve-scan", {}, None),

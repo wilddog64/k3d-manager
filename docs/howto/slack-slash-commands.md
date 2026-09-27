@@ -65,7 +65,7 @@ remote-operator role. The webhook enforces that role before it queues work.
 | Role | Allowed commands |
 |------|------------------|
 | `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
-| `operator` | `/cluster-refresh` plus everything in `reader` |
+| `operator` | `/cluster-refresh`, `/k3dm smoke` plus everything in `reader` |
 | `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade`, `/cleanup-stale-sandbox` plus everything in `operator` |
 
 `/k3dm <target>` runs an allowlisted Makefile target (`scripts/lib/webhook/make_targets.py`). The relay stamps it `admin`; the webhook caps that at the caller's `K3DM_SLACK_ROLE_MAP` role (unmapped users are `reader`), then applies the target's own minimum role. Destructive targets also require the `confirm` token.
@@ -338,6 +338,7 @@ bin/k3dm-webhook-setup --uninstall
 | `e2e-sandbox` | operator | | `DIGEST` | | 3600 |
 | `e2e-replay` | operator | `RUNNER` | | | 900 |
 | `sync-apps` | operator | | | | 600 |
+| `smoke` | operator | | `SMOKE_ONLY` | | 900 |
 | `monitoring-pause` | operator | | | | 600 |
 | `monitoring-resume` | operator | | | | 600 |
 | `fix-restart` | operator | `APP`, `NS` | `FIX_CONTEXT` | | 300 |
@@ -349,6 +350,18 @@ bin/k3dm-webhook-setup --uninstall
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
+
+`smoke` runs the same gate as `make smoke`: the offline sweep always, and the cluster sweep
+when the cluster is reachable. `SMOKE_ONLY` narrows it to one half — `SMOKE_ONLY=offline` skips
+everything that needs a cluster, `SMOKE_ONLY=cluster` skips the offline suites. It is `operator`
+rather than `reader` because the cluster half reads Vault secrets and performs real Keycloak,
+ArgoCD and frontend logins, and its 900s timeout replaces the 300s default because the Vault, ESO
+and login stages run serially with retries.
+
+Examples:
+
+- `/k3dm smoke`
+- `/k3dm smoke SMOKE_ONLY=offline`
 
 `e2e-sandbox` runs unattended, so it can only use an **already valid** ACG session: its
 preflight refuses `K3DM_ACG_SKIP_SESSION_CHECK=1` and the interactive login path needs a
