@@ -6,6 +6,9 @@
 
 ### Added
 
+- Hub blackbox-exporter probes for all seven Cloudflare public hostnames, with separate UI and
+  authenticated modules, explicit User-Agent headers, and critical alerts for endpoint failure,
+  full tunnel failure, and probe silence. See `docs/howto/public-endpoint-alerts.md`.
 - The embeddings credential has a fourth source: `secret/embeddings/gemini` in the hub Vault, tried
   after the environment and the two keychain items. The keychain cannot always serve a value —
   `gemini-cli-api-key` was created by the Gemini CLI with an ACL trusting only its own binary, so any

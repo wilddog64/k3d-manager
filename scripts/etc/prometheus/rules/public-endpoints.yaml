@@ -1,0 +1,39 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: public-endpoints
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: public.endpoints
+      interval: 60s
+      rules:
+        - alert: PublicEndpointDown
+          expr: probe_success{job=~".*blackbox.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            cluster: hub
+          annotations:
+            summary: "Public endpoint {{ $labels.instance }} is failing its probe"
+            description: "{{ $labels.instance }} has failed the blackbox probe for 5 minutes. Last status code: {{ with printf `probe_http_status_code{instance=%q}` $labels.instance | query }}{{ . | first | value }}{{ end }}."
+        - alert: CloudflareTunnelDown
+          expr: sum(probe_success{job=~".*blackbox.*"}) == 0
+          for: 3m
+          labels:
+            severity: critical
+            cluster: hub
+          annotations:
+            summary: "Every public hostname is failing — tunnel or edge is down"
+            description: "All blackbox probes are failing simultaneously, which points at the cloudflared tunnel or the Cloudflare edge rather than any one service."
+        - alert: PublicEndpointProbeAbsent
+          expr: absent(probe_success{job=~".*blackbox.*"})
+          for: 15m
+          labels:
+            severity: critical
+            cluster: hub
+          annotations:
+            summary: "The public endpoint probes have stopped reporting"
+            description: "No probe_success series for 15 minutes. The exporter, the Probe resource, or the scrape is broken — public availability is currently unmonitored."

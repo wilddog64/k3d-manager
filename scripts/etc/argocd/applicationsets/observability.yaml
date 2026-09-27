@@ -16,6 +16,12 @@ spec:
             repoURL: https://prometheus-community.github.io/helm-charts
             targetRevision: 67.9.0
             valuesFile: scripts/etc/helm/observability/kube-prometheus-stack-values.yaml
+          - name: blackbox-exporter
+            namespace: monitoring
+            chart: prometheus-blackbox-exporter
+            repoURL: https://prometheus-community.github.io/helm-charts
+            targetRevision: 11.3.1
+            valuesFile: scripts/etc/helm/observability/blackbox-exporter-values.yaml
           - name: hub-loki
             namespace: monitoring
             chart: loki

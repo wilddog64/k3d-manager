@@ -27,6 +27,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
 | Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
 | k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `make observability-acg` | **ACG** |
+| Public endpoint probes | `probe_*` | Prometheus blackbox-exporter | Hub observability ApplicationSet + `Probe` resources | hub |
 
 All eight are `ConfigMap`s in the `monitoring` namespace carrying
 `labels: {grafana_dashboard: "1"}`, which the kube-prometheus-stack Grafana sidecar
@@ -323,6 +324,7 @@ Work down this table before editing a query. Every row is a real past incident.
 | Dashboard missing entirely | sidecar didn't import it; wrong namespace or missing `grafana_dashboard: "1"` | `kubectl -n monitoring get cm -l grafana_dashboard=1` |
 | `Dashboard not found` in a healthy Grafana | public route points at the **app-cluster** instance | confirm which Grafana the hostname resolves to |
 | *All* panels blank, JSON loads fine | dashboard applied to the wrong cluster | does the cluster even have `argocd_*` / `trivy_*`? |
+| `probe_*` panels blank | blackbox-exporter or its `Probe` resources are not deployed/scraped | check the hub blackbox-exporter release and the `release`-labeled `Probe` resources |
 | All `argocd_*` panels blank after a rebuild | Helm release predates the ServiceMonitor CRD; chart skipped them | `kubectl -n cicd get servicemonitor`; fix = `helm upgrade`, same values |
 | Loki / LogQL panels blank after a rebuild | promtail DaemonSet absent | `kubectl get ds -A \| grep promtail` |
 | LogQL panel shows a wall of `kubernetes_*` labels | `\| json` with no line filter | add the `\|= "…"` filter before `\| json` |
