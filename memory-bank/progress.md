@@ -2,7 +2,10 @@
 
 - [x] `docs/howto/makefile.md` documents the six test targets — `8312512d`
       (Test Suites section, +39; `check-doc-links: 1 file(s) OK`)
-- [ ] `bin/k3dm-vectordb-metrics` still undocumented (v1.39.0 Step 7b leftover)
+- [x] `bin/k3dm-vectordb-metrics` documented in `docs/guides/vector-store.md` —
+      `28e3f744` (six gauges tabled to their status fields, `K3DM_PUSHGATEWAY_URL`,
+      omitted-vs-zero and the non-fatal exit-0 contract). Both v1.39.0 Step 7b
+      leftovers now closed.
 - [x] the three root-level `scripts/tests/*.bats` files now live in globbed
       directories — `1cf46580` (two into `plugins/`, `test_install_sudoers.bats`
       into `bin/install_sudoers.bats`; `BATS_TEST_DIRNAME` depths corrected;

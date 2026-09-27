@@ -1,3 +1,29 @@
+# 2026-09-27 — `bin/k3dm-vectordb-metrics` documented (`28e3f744`)
+
+Closes the second and last of the two v1.39.0 Step 7b leftovers. The
+Health verification section of `docs/guides/vector-store.md` already described
+"the metrics publisher" — it never named the script, so nothing told a reader
+how to invoke it, what it emits or how it fails. New `### The metrics publisher`
+subsection (+34): no arguments, `K3DM_PUSHGATEWAY_URL` (default
+`http://localhost:9091`), POSTs to `/metrics/job/k3dm-vectordb`, and a table of
+the six gauges against the `k3dm-vectordb-status --json` fields they derive
+from.
+
+Two properties worth keeping, both of which make its failures hard to read:
+
+- **An absent status field is omitted, not zeroed.** A Grafana panel showing
+  "No data" means the probe could not determine that fact — not that the fact
+  is zero.
+- **Every failure path is deliberately non-fatal and exits 0** (empty payload on
+  a bad status exit or unparseable JSON; three retries two seconds apart on an
+  unhealthy Pushgateway, then `push skipped (non-fatal)` on stderr), because
+  both call sites — `scripts/index-docs.py` after a successful index and
+  `bin/k3dm-hermes` on each tick — must not fail. So a **silent** publisher is
+  the expected symptom of a broken one, and blank vectordb panels most often
+  mean it has never run rather than that the store is unhealthy.
+
+Both v1.39.0 Step 7b leftovers are now closed.
+
 # 2026-09-27 — the three untargeted BATS suites moved into globbed directories (`1cf46580`)
 
 Closed the gap reported while documenting the test targets. Discovery in this
