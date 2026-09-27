@@ -14,7 +14,7 @@ from hermes.prior_art import (  # noqa: E402
     KUBE_CONTEXT, NAMESPACE, TABLE, RetrievalUnavailable, iter_corpus, run_sql,
 )
 
-EXTERNAL_SECRET = "vectordb-postgres"
+EXTERNAL_BINDING = "vectordb-postgres"
 POD = "vectordb-0"
 
 
@@ -47,9 +47,9 @@ def _kubectl_json(kind, name):
 
 
 def _cluster_facts():
-    external_secret = _kubectl_json("externalsecret", EXTERNAL_SECRET)
+    binding = _kubectl_json("externalsecret", EXTERNAL_BINDING)
     pod = _kubectl_json("pod", POD)
-    return (_condition_status(external_secret, "Ready") if external_secret is not None else None,
+    return (_condition_status(binding, "Ready") if binding is not None else None,
             _condition_status(pod, "Ready") if pod is not None else None)
 
 
@@ -72,14 +72,14 @@ def _corpus_docs():
 def status(offline=False):
     corpus_docs = _corpus_docs()
     if offline:
-        external_secret_synced, pod_ready = None, None
+        binding_synced, pod_ready = None, None
         available, rows, last_indexed_epoch = False, None, None
     else:
-        external_secret_synced, pod_ready = _cluster_facts()
+        binding_synced, pod_ready = _cluster_facts()
         available, rows, last_indexed_epoch = _store_facts()
     return {
         "available": available,
-        "external_secret_synced": external_secret_synced,
+        "external_secret_synced": binding_synced,
         "pod_ready": pod_ready,
         "rows": rows,
         "corpus_docs": corpus_docs,

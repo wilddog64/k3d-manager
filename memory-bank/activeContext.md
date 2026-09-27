@@ -1,3 +1,55 @@
+# 2026-09-27 — PR #133 opened; CI red on `rg`, and the agent report said green
+
+PR [#133](https://github.com/wilddog64/k3d-manager/pull/133) is open for v1.39.0,
+`mergeable_state=blocked`. Two things needed fixing, and one of them was hidden by a
+subagent report.
+
+**The Phase 1 report was wrong twice, and verification is what caught it.** It stated
+"all 1165 BATS tests passed, zero `not ok`" and blamed `exit code 2` on BW01 warnings; the
+log holds **12 `not ok`**. It also reported the Copilot tag as SUCCESS while
+`requested_reviewers` and `reviewRequests` were both **empty**. The check that exposed the
+first was `gh run view <id> --log-failed | command grep -c 'not ok'` — a count from the log,
+not a re-read of the summary. BW01 text is verbose and lands directly above `Error 1`, so
+the warnings read as the cause and the failures as absent. A green claim is only
+substantiated by a zero `not ok` count.
+
+**`rg` is not installed on `ubuntu-latest`, and no test that runs in CI may call it.**
+`scripts/tests/plugins/argocd_vectordb.bats` asserted with `run rg …` in 19 places; all
+exited **127**, failing 12 of 16 tests. It passed locally only because this host has
+ripgrep installed — note `bats` runs bash and never sees the interactive `grep`→`rg` alias,
+so the alias was never the mechanism; the tests named `rg` outright. **This is a
+recurrence**: the PR #131 findings record the same root cause inverted — a `! rg` guard
+returning 0 when `rg` was absent, i.e. a gate that *vacuously passed* — fixed then by
+moving to `grep -nE`. Six days later a new file reintroduced `rg`.
+
+Converted all 19 to POSIX `grep`. Two conversions are not mechanical: `rg` recurses into a
+directory implicitly so a directory argument needs `grep -rnE`, and `[^\n]*` must become
+`.*` because `grep` is line-based. 16/16 now pass, and the purely-negative guard
+("defines no Role, RoleBinding, or ClusterRole") was **mutation-tested** — a `kind: Role`
+append turns it red, file restored byte-identical by `cmp`. That guard mattered to attack
+specifically: a converted *absence* assertion returns 1 both when the thing is absent and
+when `grep -r` failed to read the directory at all. The positive `-rnE` assertions on the
+same directory are the control that separates those.
+
+**CodeQL alert 30 (`py/clear-text-logging-sensitive-data`, high) is a false positive, fixed
+by rename.** At `bin/k3dm-vectordb-status:96` the only output line is flagged. The message
+classifies it `(secret)` — selected **by identifier name**, not by value: `EXTERNAL_SECRET`,
+the local `external_secret`, and `external_secret_synced` all carry a `_condition_status()`
+result, which is `True`/`False`/`None`. An `ExternalSecret` CR names where a value comes
+from and never holds it, and the probe reads only `.status.conditions[].status`. Renamed the
+three identifiers to `EXTERNAL_BINDING` / `binding` / `binding_synced`.
+
+**The output key `"external_secret_synced"` was deliberately left alone.** It is a published
+contract — `scripts/lib/hermes/sensors.py:262-270`, `bin/k3dm-vectordb-metrics`, the
+`k3dm_vectordb_external_secret_synced` gauge, six assertions in
+`test_vectordb_sensor.py`. Renaming a live dashboard contract to quiet a static analyser
+reporting on a boolean is the wrong trade. Only variables changed; `--offline` output is
+byte-identical and 19/19 pytest pass. If the alert survives the rename the only remaining
+source is the dict key literal, and *then* dismissal-with-marker is right — decided on the
+next scan's evidence, not pre-emptively.
+
+Findings written up in `docs/issues/2026-09-27-copilot-pr133-review-findings.md`; README
+Issue Logs row added (PR #128 aged out of the 5).
 # 2026-09-27 — v1.39.0 pre-PR live smoke: OrbStack wedged, then the fix verified live
 
 `/create-pr` pre-flight 0–7 all passed; gate 8 (live smoke) initially could not run at all.
