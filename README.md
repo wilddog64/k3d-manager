@@ -288,6 +288,7 @@ docs/
 
 **Networking**
 - **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
+- **[Public Endpoint Alerts](docs/howto/public-endpoint-alerts.md)** — Blackbox probes for the seven Cloudflare public hostnames, the UI vs authenticated module split, and the endpoint-failure / full-tunnel-failure / probe-silence alerts
 
 **LDAP / Directory**
 - **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** — Import users from a CSV into OpenLDAP

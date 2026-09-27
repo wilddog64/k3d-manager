@@ -26,6 +26,9 @@ Use the rules below to shape all code suggestions and PR reviews.
 - **OCI Storage plugin**: `scripts/lib/providers/k3s-oci-storage.sh` — `oci_backup` (etcd snapshot → OCI object storage), `oci_restore` (restore from OCI object storage → etcd). Auto-backup runs after `k3s-oci` deploy. Snapshot names validated against `^k3s-etcd-[0-9]{8}-[0-9]{6}\.db$` pattern.
 - **Copilot plugin**: `scripts/plugins/copilot.sh` — `copilot_triage_pod <ns> <pod>` (collects kubectl describe + logs → Copilot diagnosis), `copilot_draft_spec '<desc>'` (collects git context → scaffolds a `docs/bugs/` spec). Both require `K3DM_ENABLE_AI=1`. Route through `_ai_agent_review` in `scripts/lib/system.sh` and keep `_copilot_review` as the backend implementation.
 - **Observability plugin**: `scripts/plugins/observability.sh` — `deploy_observability` (Hub kube-prometheus-stack + Trivy via ArgoCD), `deploy_observability_acg` (ACG minimal Prometheus + Trivy via ArgoCD), `observability_status`, `trivy_scan_report`, `_observability_seed_grafana_if_absent` (idempotent Grafana KV seed, self-heal on rebuild, v1.29.0+). Hub Grafana federates ACG Prometheus via `host.internal:19090`; `bin/acg-up` Step 14 starts the port-forward (`acg-prom-pf.pid`); `bin/acg-down` kills it. ApplicationSets: `scripts/etc/argocd/applicationsets/observability.yaml` (Hub) and `observability-acg.yaml` (ACG). Helm values under `scripts/etc/helm/observability/`.
+- **Vector store (v1.39.0+)**: a single-instance pgvector Postgres in the `vectordb` namespace, deployed by `scripts/etc/argocd/applicationsets/vectordb.yaml` over `scripts/etc/argocd/vectordb/` (StatefulSet, Service, PVC on local-path, ExternalSecret). Producers and consumers are stdlib-only Python: `scripts/index-docs.py` (`make index-docs`) embeds the tracked `docs/bugs`, `docs/issues`, `docs/plans` and `docs/retro` trees, `scripts/find-similar-docs.py` (`make find-similar-docs`) ranks prior art, and `scripts/lib/hermes/prior_art.py` is the Hermes-side reader. There is **no Postgres driver** — `psql` is reached inside the pod. `bin/k3dm-vectordb-status` reports health and `bin/k3dm-vectordb-metrics` publishes index freshness. Alerts: `scripts/etc/prometheus/rules/vectordb.yaml`. Guide: `docs/guides/vector-store.md`.
+- **Public endpoint probes (v1.39.0+)**: a hub blackbox exporter (`scripts/etc/helm/observability/blackbox-exporter-values.yaml`) probes the seven Cloudflare public hostnames every 60s with separate UI and authenticated modules and explicit User-Agent headers (Cloudflare 1010-blocks a default UA). Probe targets take the hostname suffix from `${CF_DOMAIN}` in `scripts/etc/vars.sh` rather than hard-coding it. Rules: `scripts/etc/prometheus/rules/public-endpoint{s,-probes}.yaml`. How-to: `docs/howto/public-endpoint-alerts.md`.
+- **Test-suite metrics (v1.39.0+)**: `bin/k3dm-test-metrics` parses a `make test-all` log and pushes `k3dm_test_*` series to the Pushgateway for the `k3dm Tests` dashboard; `make test-metrics` always exits 0 because the suite's real status travels in `k3dm_test_exit_code`, not the target's exit code.
 - **Hermes Phase-1 plugin** (v1.29.0+): `bin/k3dm-hermes` — off-hub, laptop-side read-only monitoring agent. Five stdlib-only sensors (ESO sync via webhook, ArgoCD per-app health via get-only `hermes` account, public-endpoint reachability, node/data-layer via webhook, GitHub Actions CI read-only API). Deterministic multi-signal correlator (≥2 degraded in-window, anti-flap debounce), budgeted LLM (non-Claude default, 10/day cap, deterministic fallback). Installed via lib-foundation **v0.4.15** `_install_hermes_agent`/`_uninstall_hermes_agent` (off-hub launchd agent, bounded `StartInterval`, jitter). Read-only access model: webhook bearer token (reused), ArgoCD `hermes` get-only account in `scripts/etc/argocd/values.yaml.tmpl`, user-minted GitHub fine-grained read-only PAT. No mutation path, no direct kube-apiserver credential, no kubeconfig. Guide: `docs/guides/hermes.md`. Agent entry: `bin/k3dm-hermes` (no-arg poll cycle) plus `preflight` (v1.31.0+, scope-check tool), `list` / `approve <action-id>` (v1.30.0+, Phase 2 repairs) subcommands; configuration is env-var driven (no config-file flag). Install: `bin/k3dm-hermes-setup`, uninstall: `bin/k3dm-hermes-setup --uninstall`.
 - **Image signing plugin**: `scripts/plugins/signing.sh` — `signing_init` (seed/rotate cosign keypair into Vault + ESO + Keychain backup), `signing_status` (verify key presence), `signing_rotate_key` (regenerate keypair), `deploy_image_signing` (install Kyverno + verifyImages policy). Three-latch CVE-loop: BUILD signs and attests, PROMOTE verifies attestation, ADMIT (Kyverno) enforces signature + attestation. Shipped inert by default; staged Audit→Enforce (v1.27.0+).
 - **Istio Ambient plugin**: `scripts/plugins/istio_ambient.sh` — `deploy_istio_ambient` (v1.16.0+). Applies the istio-ambient ApplicationSet to deploy Istio in ambient mode (ztunnel + istio-cni, zero sidecar containers, HBONE/mTLS). Substrate-aware: resolves CNI conf/bin directories to Cilium defaults (`/etc/cni/net.d`, `/opt/cni/bin`) or k3s flannel paths via `AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR` environment variables.
@@ -125,6 +128,44 @@ A green test proves nothing about a test that asserts nothing. These three patte
 - **Flag `run <binary>` followed by a non-zero-status assertion.** `run rg …` + `[ "$status" -ne 0 ]` is satisfied by exit **127** — command not found. If the binary is absent from the runner, the case is not merely red, it is **vacuously green**: it passes for the wrong reason and would keep passing if the behaviour under test disappeared. Two such cases shipped in `argocd_reclaim_release_ownership.bats` and `argocd_appset_live_overrides.bats` and survived until v1.35.0 lit up the dark suites. Require either a positive assertion about `output`, or an explicit guard that the binary exists (`command -v <bin>` + `skip`). Only `grep`, `awk`, `sed`, `python3` and the repo's own scripts may be assumed present.
 - **Flag `grep -F` of a whole line of source code.** Pinning an entire statement gates its *formatting*, not its behaviour: the test breaks when the line is reformatted, reordered or extended, while telling you nothing about whether the requirement still holds. Assert the tokens that carry the meaning — `grep -E` over the stable parts, a per-element membership loop for a collection literal, or `declare -F <name>` where the suite already sources the file under test (strictly stronger than matching a `function …()` signature, because it proves the function actually loaded). This applies to Python, JavaScript and `*.sh.tmpl` targets too, not just shell.
 - **Flag a narrowed assertion that dropped a token the test's name claims.** When a whole-line assertion is replaced by a narrower one, the replacement must still assert every *requirement* the original did — narrowing, never weakening. Matching a distinctive substring is how you locate the statement; it is not how you decide what to assert about it. The check is the `@test` name: a token that name claims must survive, a token it does not claim may go. Three regressions of this kind reached review in PR #129 — a payload gate that dropped `namespace`, a relay gate that dropped `payload` and `meta`, and an ask-transcript gate that dropped `delete=False` (with `delete=True` the transcript the test "captures" is destroyed on close). All three still matched a distinctive token and all three stayed green. Ask for mutation evidence: the assertion must fail against a copy of the source with that token removed.
+
+---
+
+### Vector store, embeddings, and probes (v1.39.0+)
+
+- **No credential value may be created, echoed, logged or committed on this path.** The embeddings
+  API key reaches the process only via `K3DM_EMBEDDINGS_API_KEY`, a keychain read performed by the
+  code itself, or the in-pod Vault read, and it must appear only in an `x-goog-api-key` request
+  header. The `vectordb/postgres` password is generated at runtime **inside the Vault pod** and sent
+  on stdin — never argv, never a `kubectl exec` command string, never a literal in a template or a
+  test. Flag any change that widens either path, including one that adds a fourth copy of a
+  credential rather than a fourth *source* consulted in a documented order.
+- **Retrieval is advisory and must stay advisory.** `make index-docs` and `make find-similar-docs`
+  exit 0 on a missing credential, an unreachable store or an empty index, because they sit in the
+  path that files a bug. Any change that lets either fail a caller is a regression, not a
+  hardening.
+- **The store is a rebuildable cache, not a system of record.** Flag anything that implies
+  durability guarantees for it — a `reclaimPolicy: Retain`, a backup obligation, a restore
+  procedure. Losing the index costs one re-index, and saying otherwise creates an operational
+  duty that does not exist.
+- **A message that cannot distinguish two causes with opposite remedies is the defect.** This
+  release fixed the same shape four times. A bare `HTTP 429` cannot say whether a per-minute
+  throttle (clears in seconds) or a spent per-day allowance (cannot clear until the day rolls
+  over) is in force, and the answer is in the response **body** (`RetryInfo`, `quotaId`), not the
+  `Retry-After` header — so a header-only reader silently falls back to guessing. Flag an error
+  path that raises a message before parsing the detail it needs, and flag a retry policy that
+  treats a per-request rate limit as an outage and discards completed work.
+- **Never report `kubectl exec`'s exit-code trailer in place of the pod's own error.** `command
+  terminated with exit code N` is appended as the **last** line of stderr, so reading the last
+  line discards the real message — a read of an unwritten Vault path said `exit code 2` instead of
+  `No value found at secret/data/embeddings/gemini`.
+- **`envsubst` must be given an explicit variable list.** `envsubst '$CF_DOMAIN'` substitutes only
+  that variable; a bare `envsubst` clobbers every other `${...}` in the manifest, including ones a
+  controller is meant to resolve. Probe and rules manifests must also **fail loudly** on a failed
+  `apply` — `apply … >/dev/null && _info` reports success it never verified.
+- **Image references must not be double-qualified.** A registry prefix in both the chart's
+  `repository` and its `registry` value yields an unpullable name that no template test catches;
+  assert the rendered reference, not the value in isolation.
 
 ---
 

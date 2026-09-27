@@ -130,6 +130,49 @@ It installs the SSM plugin first via `make ssm` then provisions the full CloudFo
 
 ---
 
+## Docs & Prior Art
+
+| Target | Command | When to use |
+|---|---|---|
+| `make index-docs` | `python3 scripts/index-docs.py` | Embed the tracked `docs/bugs`, `docs/issues`, `docs/plans` and `docs/retro` trees into the pgvector store. Add `DRY_RUN=1` to report what would be embedded without calling the API, or `LIMIT=<n>` to cap the document count |
+| `make find-similar-docs` | `python3 scripts/find-similar-docs.py` | Dedup pass 2 before filing a bug or issue — `Q="<the symptom in prose>"` is required, `K=<n>` sets how many results to rank (default 5) |
+
+Both targets are **advisory and always exit 0**. A missing credential, an
+unreachable store or an empty index reports on stderr and succeeds, because a
+dedup aid must never become a new way for filing a bug to fail. A high
+similarity score means *read that file before filing*, not *do not file*.
+
+Only each document's title, leading paragraph and `##` headings are embedded —
+roughly 3% of a typical file — and rows are keyed by a content hash of exactly
+that text, so re-running with no doc changes makes zero API calls. Retrieval
+quality is UNMEASURED until the v1.40.0 eval lands.
+
+A cold index on the free Gemini tier spans **two sittings**, not one: the
+per-day allowance is spent before the corpus finishes. A partial run is durable
+— each batch of 100 commits in its own transaction — so a resumed run adds to
+the store rather than truncating it. See
+[Vector Store](../guides/vector-store.md) and
+[Find Prior Art](find-prior-art.md).
+
+---
+
+## Test Metrics
+
+| Target | Command | When to use |
+|---|---|---|
+| `make test-metrics` | `make test-all` → `bin/k3dm-test-metrics` | Run the full offline suite and publish its result to the Pushgateway for the `k3dm Tests` Grafana dashboard |
+
+The target **always exits 0** — it is a reporter, not a gate. The suite's real
+exit code travels in the `k3dm_test_exit_code` metric rather than the target's
+status, so a scheduled run cannot fail a caller that only wanted the numbers.
+Use `make test` or `make test-pytest` directly when you want a non-zero exit on
+failure.
+
+The raw log path is echoed on the last line; the log itself is kept under
+`${TMPDIR:-/tmp}/k3dm-test-all-<epoch>.log`.
+
+---
+
 ## Help
 
 ```bash

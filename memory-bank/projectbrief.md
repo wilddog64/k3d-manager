@@ -95,6 +95,11 @@ directory integration plugin, mirroring the same pattern as cluster providers.
   pull-model cloud bridge (`bin/k3dm-cloud-bridge`) that serves a fixed reader-tier action
   allowlist from an untrusted git branch. No credential is ever placed in a cloud environment
   and no cluster endpoint is exposed; operator-tier and admin-tier actions stay off both paths.
+- Prior-art retrieval over the docs corpus (v1.39.0+): a single-instance pgvector Postgres in the
+  `vectordb` namespace backs `make index-docs` and `make find-similar-docs`. It is an explicitly
+  **rebuildable cache, not a system of record** — losing it costs one re-index — and every path is
+  advisory, exiting 0 on a missing credential, an unreachable store or an empty index, because a
+  dedup aid must never become a new way for filing a bug to fail.
 
 **Out of scope:**
 - Production cluster management.
@@ -116,6 +121,11 @@ Each component exists because of a real gap, reasoned through sequentially — n
 - **CloudFormation** → replace sequential single-node EC2 with parallel 3-node stack; eliminates t3.medium resource exhaustion
 - **ArgoCD** → GitOps hub on infra cluster; manages shopping-cart app deployments on EC2 k3s
 - **Reverse tunnel** → Vault runs on Mac infra cluster; EC2 app pods need `localhost:8200`; reverse SSH tunnel bridges the gap without exposing Vault publicly
+- **pgvector store** → the exact-slug dedup check only ever matched a slug someone had already
+  guessed correctly, and this repo refiled the same ESO defect under a name the glob could not
+  match; similarity search over `docs/` gives the check a memory
+- **Blackbox exporter** → the seven Cloudflare public hostnames had no external liveness signal;
+  in-cluster health says nothing about whether the tunnel actually serves them
 
 The `SECRET_BACKEND` abstraction exists because backends were *actually swapped* during development.
 
