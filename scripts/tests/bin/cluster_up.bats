@@ -403,3 +403,29 @@ _load_acg_up_cleanup() {
   run bash -c "sed -n '/^function _acg_up_cleanup()/,/^}\$/p' bin/cluster-up | grep -n '_ACG_TUNNEL_PLIST_CREATED'"
   [ "$status" -eq 0 ]
 }
+
+@test "acg-up puts ~/.local/bin on PATH before anything reads it" {
+  run bash -c "awk '/^set -euo pipefail/{print NR; found=1} found && /HOME\}\/\.local\/bin/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 2 ]
+  run bash -c "awk '/HOME\}\/\.local\/bin:\\\$\{PATH\}/{print NR; found=1} found && /_command_exist k3d/{print NR; exit}' bin/cluster-up"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+}
+
+@test "acg-up guards the PATH prepend so it cannot duplicate an existing entry" {
+  local block="${BATS_TEST_TMPDIR}/path-block.sh"
+  awk '/^# launchd starts this script/{found=1} found{print} found && /^fi$/{exit}' \
+    bin/cluster-up > "${block}"
+  run grep -c 'local/bin' "${block}"
+  [ "$status" -eq 0 ]
+  [ "$output" -ge 2 ]
+
+  run bash -c "PATH=\"\${HOME}/.local/bin:/usr/bin:/bin\" bash -c 'source \"${block}\"; printf %s \"\${PATH}\"'"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | tr ':' '\n' | grep -c 'local/bin')" -eq 1 ]
+
+  run bash -c "PATH=\"/usr/bin:/bin\" bash -c 'source \"${block}\"; printf %s \"\${PATH}\"'"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | tr ':' '\n' | grep -c 'local/bin')" -eq 1 ]
+}

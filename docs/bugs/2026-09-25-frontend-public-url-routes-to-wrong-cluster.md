@@ -127,7 +127,7 @@ problem is that **nothing produces a signal for this failure**:
 
 This is the second silent failure from this gap — the first was the `_acg_up_cleanup` tunnel
 bootout that took all 7 hostnames down. The fix is specified in
-`docs/plans/v1.38.0-public-endpoint-blackbox-probes.md`.
+`docs/plans/v1.39.0-public-endpoint-blackbox-probes.md`.
 
 ## Fix — not yet decided, needs the operator
 

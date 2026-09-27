@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vectordb-data
+  namespace: vectordb
+  labels:
+    app.kubernetes.io/name: vectordb
+    app.kubernetes.io/part-of: k3d-manager-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

@@ -165,6 +165,50 @@ test('GET /slack/events returns 404', async () => {
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
 })
 
+test('cluster-up and cluster-down refuse to default to a cluster', async () => {
+  for (const command of ['/cluster-up', '/cluster-down']) {
+    const worker = loadWorker()
+    const body = `command=${encodeURIComponent(command)}&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp`
+    const response = await worker.dispatch(signed('/slack/commands', body))
+    assert.match(await response.text(), /no cluster named/)
+    assert.equal(worker.fetches.length, 0)
+  }
+})
+
+test('an unrecognized cluster name never silently retargets the command', async () => {
+  for (const [command, typo] of [['/cluster-down', 'hostigner'], ['/cluster-up', 'awz']]) {
+    const worker = loadWorker()
+    const body = `command=${encodeURIComponent(command)}&text=${typo}&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp`
+    const response = await worker.dispatch(signed('/slack/commands', body))
+    assert.match(await response.text(), /unknown cluster/)
+    assert.equal(worker.fetches.length, 0)
+  }
+})
+
+test('an explicit cluster still reaches /api/v1/cluster for both actions', async () => {
+  for (const [command, text, action, provider] of [
+    ['/cluster-up', 'hostinger', 'up', 'hostinger'],
+    ['/cluster-down', 'azure', 'down', 'az'],
+  ]) {
+    const worker = loadWorker()
+    const body = `command=${encodeURIComponent(command)}&text=${text}&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp`
+    await worker.dispatch(signed('/slack/commands', body))
+    const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster')
+    assert.ok(call, `${command} ${text} did not relay`)
+    assert.equal(JSON.parse(call.init.body).action, action)
+    assert.equal(JSON.parse(call.init.body).provider, provider)
+  }
+})
+
+test('read-only cluster commands keep their default provider', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcluster-status&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await worker.dispatch(signed('/slack/commands', body))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster-status')
+  assert.ok(call)
+  assert.equal(JSON.parse(call.init.body).provider, 'hostinger')
+})
+
 test('/k3dm relays target, args, confirm and user id to /api/v1/make', async () => {
   const worker = loadWorker()
   const body = 'command=/k3dm&text=' + encodeURIComponent('fix-delete-pod APP=frontend NS=shopping-cart-apps confirm') +

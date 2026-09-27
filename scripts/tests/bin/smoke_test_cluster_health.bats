@@ -16,7 +16,14 @@ fi
 
 case " $* " in
   *" get application "*)
-    printf 'Synced\n'
+    if [[ " $* " == *"destination.name"* ]]; then
+      printf '%s' "${STUB_APP_DEST:-}"
+    else
+      printf 'Synced\n'
+    fi
+    ;;
+  *" config get-contexts "*)
+    printf '%s' "${STUB_CONTEXTS:-}"
     ;;
   *" get pods "*)
     if [[ " $* " == *" shopping-cart-apps "* ]]; then
@@ -31,6 +38,7 @@ EOF
   export PATH="${BATS_TEST_TMPDIR}:${PATH}"
   export KUBECTL_CALL_LOG
   unset APP_CONTEXT INFRA_CONTEXT ARGOCD_APP_PREFIX KUBECTL_STUB_MODE
+  unset STUB_APP_DEST STUB_CONTEXTS
 }
 
 @test "all healthy" {
@@ -98,4 +106,72 @@ EOF
   [ "${status}" -eq 0 ]
   run grep -F -- 'get application shopping-cart-basket' "${KUBECTL_CALL_LOG}"
   [ "${status}" -eq 0 ]
+}
+
+@test "app context is resolved from the checked application's destination" {
+  export STUB_APP_DEST="ubuntu-k3s"
+  export STUB_CONTEXTS="k3d-k3d-cluster
+ubuntu-k3s
+ubuntu-hostinger"
+
+  run "${SMOKE_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=ubuntu-k3s get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=ubuntu-k3s get secret ghcr-pull-secret' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=k3d-k3d-cluster .*get application' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "a destination that is not a local context falls back to the infra context" {
+  export STUB_APP_DEST="remote-only"
+  export STUB_CONTEXTS="k3d-k3d-cluster
+ubuntu-k3s"
+
+  run "${SMOKE_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=k3d-k3d-cluster get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=remote-only get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "an empty destination falls back to the infra context" {
+  export STUB_APP_DEST=""
+  export STUB_CONTEXTS="k3d-k3d-cluster"
+
+  run "${SMOKE_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=k3d-k3d-cluster get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "explicit APP_CONTEXT wins over a resolvable destination" {
+  export APP_CONTEXT=remote-y
+  export STUB_APP_DEST="ubuntu-k3s"
+  export STUB_CONTEXTS="k3d-k3d-cluster
+ubuntu-k3s"
+
+  run "${SMOKE_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=remote-y get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -E -- '--context=ubuntu-k3s get pods' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -ne 0 ]
+  run grep -F -- 'destination.name' "${KUBECTL_CALL_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "the chosen contexts are reported before the checks run" {
+  run "${SMOKE_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Infra context: k3d-k3d-cluster"* ]]
+  [[ "${output}" == *"app context: k3d-k3d-cluster"* ]]
+  [[ "${output}" == *"ubuntu-k3s-shopping-cart-*"* ]]
 }

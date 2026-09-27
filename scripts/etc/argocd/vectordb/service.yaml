@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vectordb
+  namespace: vectordb
+  labels:
+    app.kubernetes.io/name: vectordb
+    app.kubernetes.io/part-of: k3d-manager-platform
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: vectordb
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

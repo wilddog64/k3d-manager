@@ -619,6 +619,33 @@ function _argocd_seed_vault_admin_secret() {
    _info "[argocd] ArgoCD admin password seeded. Retrieve via Kubernetes secret after ESO sync"
 }
 
+function _argocd_seed_vectordb_postgres() {
+   local ns="${VAULT_NS_DEFAULT:-vault}"
+   local release="${VAULT_RELEASE_DEFAULT:-vault}"
+   local pod="${release}-0"
+   local secret_path="vectordb/postgres"
+
+   if _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+         vault kv get -mount=secret "$secret_path" >/dev/null 2>&1; then
+      _info "[argocd] Vault secret secret/${secret_path} already present, not rotating"
+      return 0
+   fi
+
+   _info "[argocd] Seeding vectordb Postgres credentials in Vault"
+   _vault_login "$ns" "$release"
+
+   local rc=0
+   _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+      sh -c 'P=$(LC_ALL=C tr -dc "A-Za-z0-9" < /dev/urandom | head -c 32); printf "{\"username\":\"postgres\",\"password\":\"%s\"}" "$P" | vault kv put -mount=secret vectordb/postgres -' || rc=$?
+
+   if (( rc != 0 )); then
+      _err "[argocd] Failed to seed secret/${secret_path} in Vault (exit ${rc})"
+      return "$rc"
+   fi
+
+   _info "[argocd] vectordb Postgres credentials seeded"
+}
+
 function _argocd_setup_vault_policies() {
    local ns="${VAULT_NS_DEFAULT:-vault}"
    local release="${VAULT_RELEASE_DEFAULT:-vault}"
@@ -1063,6 +1090,10 @@ EOF
    # Deployed here so it survives a hub rebuild instead of needing a manual one-shot.
    deploy_argocd_platform_ops || _warn "[argocd] platform-ops deploy reported a problem — CVE scan/dashboards may be incomplete"
 
+   # Seed the vectordb Postgres credential before the ApplicationSets create its
+   # ExternalSecret, so a rebuilt hub does not need a manual Vault write.
+   _argocd_seed_vectordb_postgres || _warn "[argocd] vectordb credential seeding reported a problem — the vectordb ExternalSecret may stay SecretSyncedError"
+
    # Deploy AppProject
    if (( ! skip_appproject )); then
       _argocd_deploy_appproject
@@ -1242,8 +1273,12 @@ EOF
    _argocd_deploy_applicationsets || return 1
 
    if (( verify )) && declare -f argocd_check_values_branch >/dev/null 2>&1; then
-      _info "[argocd] Confirming values-branch pin (${K3D_MANAGER_BRANCH})"
-      argocd_check_values_branch "${K3D_MANAGER_BRANCH}"
+      if _dry_run_active; then
+         _info "[argocd] DRY_RUN: skipping the values-branch confirmation — nothing was applied, so there is nothing to confirm"
+      else
+         _info "[argocd] Confirming values-branch pin (${K3D_MANAGER_BRANCH})"
+         argocd_check_values_branch "${K3D_MANAGER_BRANCH}"
+      fi
    fi
 }
 
@@ -1764,7 +1799,21 @@ function argocd_check_values_branch() {
    fi
 
    _info "[argocd] Expected values branch: ${_expected}"
-   _drift="$(printf '%s' "${_apps}" | _argocd_values_branch_drift "${_expected}")"
+
+   local _rc=0
+   _drift="$(printf '%s' "${_apps}" | _argocd_values_branch_drift "${_expected}")" || _rc=$?
+
+   case "${_rc}" in
+      0) ;;
+      4)
+         _warn "[argocd] Values-branch gate inspected 0 references — treating as a failure, not a clean result"
+         return 2
+         ;;
+      *)
+         _warn "[argocd] Could not evaluate values-branch drift (exit ${_rc})"
+         return 2
+         ;;
+   esac
 
    if [[ -z "${_drift}" ]]; then
       _info "[argocd] All Applications reference values branch ${_expected}"
@@ -1791,23 +1840,30 @@ repo = sys.argv[2]
 try:
     doc = json.load(sys.stdin)
 except ValueError:
+    print("[argocd] values-branch input is not JSON", file=sys.stderr)
     sys.exit(3)
 
 checked = 0
+tracking_head = 0
 for app in doc.get("items", []):
     spec = app.get("spec", {})
     sources = spec.get("sources") or ([spec["source"]] if "source" in spec else [])
     for src in sources:
-        if src.get("ref") != "values":
-            continue
         if repo not in src.get("repoURL", ""):
+            continue
+        if src.get("targetRevision", "") == "HEAD":
+            tracking_head += 1
             continue
         checked += 1
         revision = src.get("targetRevision", "")
         if revision != expected:
             print("  {} {}".format(app.get("metadata", {}).get("name", "?"), revision))
 
-print("[argocd] checked {} values references".format(checked), file=sys.stderr)
+print("[argocd] checked {} k3d-manager references ({} tracking HEAD, ignored)".format(
+    checked, tracking_head), file=sys.stderr)
+if checked == 0:
+    print("[argocd] no values references found — the query or the filter is wrong", file=sys.stderr)
+    sys.exit(4)
 ' "${_expected}" "${_repo}"
 }
 

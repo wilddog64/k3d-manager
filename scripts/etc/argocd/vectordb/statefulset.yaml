@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vectordb
+  namespace: vectordb
+  labels:
+    app.kubernetes.io/name: vectordb
+    app.kubernetes.io/part-of: k3d-manager-platform
+spec:
+  serviceName: vectordb
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vectordb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vectordb
+        app.kubernetes.io/part-of: k3d-manager-platform
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: vectordb-postgres
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vectordb-postgres
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: vectordb-data

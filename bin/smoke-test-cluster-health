@@ -12,7 +12,9 @@
 #
 # Environment:
 #   INFRA_CONTEXT      kubectl context for infra cluster (default: k3d-k3d-cluster)
-#   APP_CONTEXT        kubectl context for app cluster   (default: $INFRA_CONTEXT — the hub is its own app cluster)
+#   APP_CONTEXT        kubectl context for app cluster (default: resolved from
+#                      ${ARGOCD_APP_PREFIX}shopping-cart-basket's destination.name,
+#                      falling back to $INFRA_CONTEXT)
 #   ARGOCD_NAMESPACE   namespace ArgoCD runs in          (default: cicd)
 #   ARGOCD_APP_PREFIX  prefix of the per-cluster ArgoCD apps (default: ubuntu-k3s-)
 
@@ -24,9 +26,20 @@ REPO_ROOT="$(cd "${SMOKE_SCRIPT_DIR}/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
-APP_CONTEXT="${APP_CONTEXT:-${INFRA_CONTEXT}}"
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
 ARGOCD_APP_PREFIX="${ARGOCD_APP_PREFIX-ubuntu-k3s-}"
+
+if [[ -z "${APP_CONTEXT:-}" ]]; then
+  _resolved_dest="$(_kubectl --no-exit --quiet -- --context="${INFRA_CONTEXT}" \
+    -n "${ARGOCD_NAMESPACE}" get application "${ARGOCD_APP_PREFIX}shopping-cart-basket" \
+    -o jsonpath='{.spec.destination.name}' 2>/dev/null || true)"
+  if [[ -n "${_resolved_dest}" ]] && kubectl config get-contexts -o name 2>/dev/null \
+       | grep -qxF -- "${_resolved_dest}"; then
+    APP_CONTEXT="${_resolved_dest}"
+  else
+    APP_CONTEXT="${INFRA_CONTEXT}"
+  fi
+fi
 SHOPPING_CART_APP_NS="shopping-cart-apps"
 SHOPPING_CART_PAYMENT_NS="shopping-cart-payment"
 
@@ -39,6 +52,7 @@ _fail() { echo "[FAIL] $*" >&2; (( FAIL++ )) || true; }
 echo "=== Cluster Health Smoke Test ==="
 echo "  infra: ${INFRA_CONTEXT}"
 echo "  app:   ${APP_CONTEXT}"
+echo "Infra context: ${INFRA_CONTEXT}; app context: ${APP_CONTEXT} (apps: ${ARGOCD_APP_PREFIX}shopping-cart-*)"
 echo ""
 
 # --- 1. ghcr-pull-secret in all 3 namespaces (app cluster) ---

@@ -13,9 +13,52 @@ _spec = importlib.util.spec_from_file_location(
 wh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(wh)
 from webhook import policy
+from webhook.make_targets import CLUSTER_COMMANDS
+
+wh.CLUSTER_COMMANDS = CLUSTER_COMMANDS
 
 
 class MakeTargetTests(unittest.TestCase):
+    def test_find_similar_docs_is_reader_tier(self):
+        self.assertEqual(wh.MAKE_TARGETS["find-similar-docs"]["min_role"], "reader")
+
+    def test_index_docs_is_operator_tier(self):
+        """Indexing writes to the store and spends API quota, so it is not reader-tier."""
+        self.assertEqual(wh.MAKE_TARGETS["index-docs"]["min_role"], "operator")
+
+    def test_find_similar_docs_accepts_a_prose_query(self):
+        argv, error = wh.parse_make_request(
+            "find-similar-docs", {"Q": "eso 403 on a vault path"}, False)
+        self.assertIsNone(error)
+        self.assertEqual(argv, ["find-similar-docs", "Q=eso 403 on a vault path"])
+
+    def test_find_similar_docs_requires_a_query(self):
+        _, error = wh.parse_make_request("find-similar-docs", {}, False)
+        self.assertIn("requires Q", error)
+
+    def test_query_rejects_every_shell_metacharacter(self):
+        """Q reaches a Makefile recipe, where $(Q) expands into a shell command line."""
+        for bad in ('a"; id', "a`id`", "a$(id)", "a;id", "a|id", "a&&id",
+                    "a>f", "a<f", "a#c", "a\\b", "a\nb", "a'q"):
+            with self.subTest(value=bad):
+                _, error = wh.parse_make_request("find-similar-docs", {"Q": bad}, False)
+                self.assertIsNotNone(error, f"{bad!r} was accepted")
+
+    def test_query_length_is_bounded(self):
+        _, error = wh.parse_make_request("find-similar-docs", {"Q": "a" * 500}, False)
+        self.assertIsNotNone(error)
+
+    def test_result_count_must_be_a_small_integer(self):
+        for bad in ("0", "51", "999", "5x", "-1"):
+            with self.subTest(value=bad):
+                _, error = wh.parse_make_request(
+                    "find-similar-docs", {"Q": "vault", "K": bad}, False)
+                self.assertIsNotNone(error, f"K={bad!r} was accepted")
+
+    def test_index_docs_takes_no_arguments(self):
+        _, error = wh.parse_make_request("index-docs", {"Q": "x"}, False)
+        self.assertIn("does not accept", error)
+
     def test_parse_valid_target(self):
         self.assertEqual(
             wh.parse_make_request("fix-sync", {"APP": "frontend"}, False),
@@ -90,6 +133,40 @@ class MakeTargetTests(unittest.TestCase):
         self.assertNotIn("fix-sync", reader_help)
         self.assertIn("fix-force-sync APP=… confirm", wh.make_target_help("admin", wh._role_allows))
 
+    def test_help_lists_cluster_lifecycle_commands(self):
+        """/k3dm help is the only self-describing surface in Slack; the cluster
+        commands are not make targets and appeared in no listing at all."""
+        admin_help = wh.make_target_help("admin", wh._role_allows)
+        self.assertIn("/cluster-up", admin_help)
+        self.assertIn("/cluster-down", admin_help)
+        self.assertIn("Cluster lifecycle", admin_help)
+
+    def test_cluster_commands_are_role_filtered(self):
+        reader_help = wh.make_target_help("reader", wh._role_allows)
+        self.assertIn("/cluster-status", reader_help)
+        self.assertNotIn("/cluster-up", reader_help)
+        self.assertNotIn("/cluster-refresh", reader_help)
+        self.assertIn("/cluster-refresh", wh.make_target_help("operator", wh._role_allows))
+
+    def test_cluster_commands_are_not_make_targets(self):
+        """Listing them in help must not make them runnable through /api/v1/make --
+        that path has no running-job guard, no stall timer and no metrics push."""
+        for _name, _role, _summary in wh.CLUSTER_COMMANDS:
+            _target = _name.split()[0].lstrip("/")
+            self.assertNotIn(_target, wh.MAKE_TARGETS)
+            _argv, _error = wh.parse_make_request(_target, {}, False)
+            self.assertIsNone(_argv)
+            self.assertIn("unknown target", _error)
+
+    def test_cluster_command_roles_match_the_relay(self):
+        """COMMAND_ROLES in workers/slack-relay/index.js is authoritative. A role
+        that drifts here advertises a command the relay will refuse."""
+        _relay = Path(__file__).resolve().parents[3] / "workers" / "slack-relay" / "index.js"
+        _text = _relay.read_text()
+        for _name, _role, _summary in wh.CLUSTER_COMMANDS:
+            _cmd = _name.split()[0]
+            self.assertRegex(_text, re.escape(f"'{_cmd}': '{_role}'"))
+
     def test_app_cve_scan_requires_operator(self):
         self.assertEqual(wh.MAKE_TARGETS["app-cve-scan"]["min_role"], "operator")
         self.assertNotIn("app-cve-scan", wh.make_target_help("reader", wh._role_allows))
@@ -126,6 +203,40 @@ class MakeTargetTests(unittest.TestCase):
                 argv, error = wh.parse_make_request("e2e-sandbox", {"DIGEST": value}, None)
                 self.assertIsNone(argv)
                 self.assertIn("invalid value for DIGEST", error)
+
+    def test_smoke_is_operator_tier_and_hidden_from_readers(self):
+        """The cluster half performs real Vault reads and live logins."""
+        self.assertEqual(wh.MAKE_TARGETS["smoke"]["min_role"], "operator")
+        self.assertNotIn("smoke", wh.make_target_help("reader", wh._role_allows))
+        self.assertIn("smoke", wh.make_target_help("operator", wh._role_allows))
+
+    def test_smoke_runs_without_arguments(self):
+        self.assertEqual(wh.parse_make_request("smoke", {}, None), (["smoke"], None))
+
+    def test_smoke_accepts_only_the_two_sweep_halves(self):
+        for value in ("offline", "cluster"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    wh.parse_make_request("smoke", {"SMOKE_ONLY": value}, None),
+                    (["smoke", f"SMOKE_ONLY={value}"], None),
+                )
+
+    def test_smoke_only_is_anchored_against_partial_matches(self):
+        """fullmatch is what rejects these — a search would accept every one."""
+        for value in ("both", "offline; rm -rf /", "offline cluster", "offlin", "OFFLINE", ""):
+            with self.subTest(value=value):
+                argv, error = wh.parse_make_request("smoke", {"SMOKE_ONLY": value}, None)
+                self.assertIsNone(argv)
+                self.assertIn("invalid value for SMOKE_ONLY", error)
+
+    def test_smoke_rejects_arguments_it_does_not_declare(self):
+        _, error = wh.parse_make_request("smoke", {"APP": "x"}, None)
+        self.assertIn("does not accept APP", error)
+
+    def test_smoke_timeout_exceeds_the_serial_retry_budget(self):
+        """The default 300s cannot cover a sweep where one stage retries."""
+        self.assertEqual(wh.MAKE_TARGETS["smoke"]["timeout"], 900)
+        self.assertNotIn("confirm", wh.MAKE_TARGETS["smoke"])
 
     def test_app_cve_scan_needs_no_confirm(self):
         self.assertEqual(

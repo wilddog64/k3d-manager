@@ -498,6 +498,27 @@ def _eso_health_results(context, label_prefix=""):
     return results
 
 
+_SMOKE_UNREACHABLE_HINTS = (
+    ("localhost:19190", "app-cluster Prometheus port-forward not running"),
+    ("localhost:19200", "app-cluster Prometheus port-forward not running (hostinger offset)"),
+    ("keycloak.shopping-cart.local", "no host listener for identity/keycloak"),
+)
+
+
+def _smoke_unreachable_detail(url, exc):
+    """Name the missing forward when a probe cannot connect at all.
+
+    A refused connection and a non-2xx reply are different findings: the second
+    means the service answered, the first means nothing is listening. Reporting
+    only the URL made the two read alike, which is why the two probes that have
+    no host-side forward on this box looked like service outages.
+    """
+    for marker, hint in _SMOKE_UNREACHABLE_HINTS:
+        if marker in url:
+            return f"no listener on {marker} ({hint})"
+    return str(exc)
+
+
 def _smoke_test_services(retries=None, provider=None, quick=False):
     """HTTP smoke test for each service. Returns list of (name, ok, detail) tuples."""
     import ssl
@@ -554,6 +575,8 @@ def _smoke_test_services(retries=None, provider=None, quick=False):
                 if name == "Prometheus" and exc.code == 401:
                     return name, None, "HTTP 401 (authentication required)"
                 last_err = str(exc)
+            except (urllib.error.URLError, OSError) as exc:
+                last_err = _smoke_unreachable_detail(url, exc)
             except Exception as exc:
                 last_err = str(exc)
             if attempt < _retries - 1:

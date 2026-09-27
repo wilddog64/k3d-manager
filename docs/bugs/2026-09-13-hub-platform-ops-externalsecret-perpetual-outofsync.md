@@ -82,3 +82,65 @@ The ApplicationSet must be reapplied on the hub, per the CLAUDE.md "reapply the 
 - Do NOT create a PR, commit to `main`, or use `--no-verify`
 - Do NOT edit `scripts/lib/foundation/`, `scripts/lib/acg/`, `scripts/lib/system.sh`, or any file outside the targets
 - Do NOT apply anything to a live cluster (no `kubectl apply`, no `argocd` CLI)
+
+---
+
+## Recurrence 2026-09-26 — `hub-vectordb`, same cause, new ApplicationSet
+
+The v1.39.0 WS1 vector-store ApplicationSet (`scripts/etc/argocd/applicationsets/vectordb.yaml`)
+reproduced this exactly: `hub-vectordb` sat `OutOfSync` with `ExternalSecret vectordb/vectordb-postgres`
+as its only OutOfSync resource, while every sync operation reported `Succeeded` /
+`serverside-applied`. The other three resources (PVC, Service, StatefulSet) were `Synced`.
+
+Confirmed the same fingerprint:
+
+- A server-side dry-run apply as field manager `argocd-controller` produced **no diff** against
+  live — `NO DIFF live vs predicted`. Git and live agree.
+- Field ownership was byte-identical to the Synced `platform-ops/app-cluster-kubeconfig`:
+  `argocd-controller` (Apply) owning `spec.{data,refreshInterval,secretStoreRef,target}`,
+  `external-secrets` (Update) owning the finalizer and `spec.target.template.metadata`.
+- The controller log showed the self-heal loop this bug describes: apply succeeds, the next
+  comparison is OutOfSync again, `SelfHealAttemptsCount: 5`, then
+  `Skipping auto-sync: already attempted sync ... (retrying in 2m41s)`.
+
+The discriminator is the Application template annotation this doc's fix added, and nothing else:
+
+| ApplicationSet | `compare-options` on the live Application | sync |
+|---|---|---|
+| `platform-ops` | `ServerSideDiff=true` | `Synced` |
+| `vectordb` (before fix) | `None` | `OutOfSync` |
+
+### Hypotheses tested and refuted
+
+Recording these so the next recurrence goes straight to the annotation:
+
+- **CRD-defaulted fields are the drift** — refuted. The Synced `platform-ops` ExternalSecret
+  carries the identical defaults (`deletionPolicy`, `mergePolicy`, `template.metadata`,
+  `conversionStrategy`, `decodingStrategy`, `metadataPolicy`).
+- **`SecretSyncedError` causes OutOfSync** — refuted. The three `identity` ExternalSecrets are
+  `SecretSynced` and still OutOfSync (that app is blocked by the separate `Replace=true` bound-PVC
+  bug, so its sync op never completes).
+- **A missing `kubectl.kubernetes.io/last-applied-configuration` annotation** — refuted. No
+  ExternalSecret on the hub has one, including the Synced `platform-ops` object.
+- **An undeclared `target.template.engineVersion`** — refuted by experiment. Declaring it
+  explicitly (`afed4ec9`) changed nothing; `hub-vectordb` picked the commit up and stayed
+  OutOfSync. Reverted in the fix commit.
+- **A poisoned comparison cache from the `InvalidSpecError` period** — not the cause;
+  `status.sync.comparedTo` matched `spec.source` exactly and the revision was current.
+
+### Fix applied
+
+`scripts/etc/argocd/applicationsets/vectordb.yaml` gained the same annotation on its Application
+template, plus two gates in `scripts/tests/plugins/argocd_vectordb.bats` (server-side diff
+enabled; SSA retained and `ignoreDifferences` absent, so the gate cannot be satisfied by dropping
+SSA or by masking fields). The first gate was mutation-checked: removing the annotation turns
+test 8 red.
+
+### Latent gap — not fixed here
+
+`observability.yaml` and `data-git.yaml` also lack the annotation. Neither currently shows the
+symptom (their ExternalSecrets live on `ubuntu-hostinger` and report `Synced`), so this is a
+latent exposure rather than an active bug — but any ESO resource added to those sets will drift
+the same way. The durable fix is to make the annotation part of the ApplicationSet template
+convention rather than adding it per set after each recurrence; this is now the third set to need
+it (`istio-ambient`, `platform-ops`, `vectordb`).

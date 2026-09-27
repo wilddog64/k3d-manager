@@ -72,6 +72,15 @@ EOF
     K3DM_JOB_DIR="$(mktemp -d)"
     K3DM_RUN_DIR="$(mktemp -d)"
 
+    # Disable the Pushgateway push for the same reason. config.py defaults
+    # K3DM_PUSHGATEWAY_URL to http://localhost:9091 -- the live ACG Pushgateway
+    # forward on a dev host -- so every queued /cluster job here pushed a fake
+    # k3dm_deployment_* series that the ACG Prometheus then scraped. That left
+    # DeploymentMetricsStale watching the test suite instead of a deployment,
+    # so it could never fire while `make test` ran regularly. An empty value
+    # takes the `if not PUSHGATEWAY_URL: return` early exit in _push_metrics.
+    export K3DM_PUSHGATEWAY_URL=""
+
     REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
     python3 "${REPO_ROOT}/bin/k3dm-webhook" &
     export _BATS_WEBHOOK_PID=$!
@@ -133,6 +142,11 @@ setup() {
 }
 
 # ── Unit / black-box HTTP tests ────────────────────────────────────────────────
+
+@test "the harness neutralizes the Pushgateway so tests cannot write live metrics" {
+    [ -n "${K3DM_PUSHGATEWAY_URL+set}" ]
+    [ -z "${K3DM_PUSHGATEWAY_URL}" ]
+}
 
 @test "POST with wrong token returns 401" {
     run curl -s -o /dev/null -w "%{http_code}" -X POST \

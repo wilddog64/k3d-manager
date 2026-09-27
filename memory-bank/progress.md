@@ -1,6 +1,344 @@
+# v1.39.0 k3dm-tests alerts moved to the ACG stack — 2026-09-27
+
+- [x] **Blackbox probes inert: doubled image registry + unsubstituted `${CF_DOMAIN}`** — fixed in
+      `cc4d634b0d7a0d2f7e1ac1ad097afad2fd7d40c9`, pushed to `origin/k3d-manager-v1.39.0`.
+      M1–M6 implemented exactly from `docs/bugs/2026-09-27-blackbox-probe-registry-and-cf-domain-unsubstituted.md`:
+      de-qualified exporter repository, shared `CF_DOMAIN` vars, sourced vars, per-file explicit
+      `envsubst '$CF_DOMAIN'` with loud apply failure, five source-backed BATS tests, and the
+      documentation update. Focused suite: 5/5. Recursive plugin suite: 787/787. Each M5 test
+      went red against its corresponding reverted hunk in an isolated scratch copy and passed
+      after restoration. No kubectl, helm, docker, or make deploy/up target was run.
+
+- [ ] **`/k3dm help` omits the cluster lifecycle commands** — spec
+      `docs/bugs/2026-09-27-k3dm-help-omits-cluster-lifecycle-commands.md` filed and committed
+      `788deeb2`, pushed. Dispatched to Codex (session `01a0e3a3`). Help text only:
+      `CLUSTER_COMMANDS` + a role-filtered section in `make_target_help`, four new tests in
+      `scripts/tests/bin/webhook_make_targets.py`, a note in `docs/howto/slack-slash-commands.md`.
+      The routing split stays — `/api/v1/make` has no job guard, no stall timer and no metrics push.
+      VERIFIED 2026-09-27: Codex commits `f3cdc25a` (fix) + `86c18cf5` (memory), both on
+      `origin/k3d-manager-v1.39.0`. Diff is exactly the three permitted files, insertions only;
+      `workers/slack-relay/index.js`, `scripts/lib/webhook/lifecycle.py` and `bin/k3dm-webhook` show
+      an empty diff. All four specified tests present; suite re-run by Claude: 33 tests, OK.
+
+- [x] **`/cluster-up` and `/cluster-down` defaulted to a cluster the operator never named** —
+      fixed `229db281`, pushed. `resolveProvider`'s fallback applied to unrecognized tokens, not
+      only empty ones, so `/cluster-down hostigner` tore down `aws` and `/cluster-up awz`
+      provisioned `hostinger`. Both now use `resolveProviderStrict`. Gates: `node --test
+      workers/slack-relay/test/` 21/21, mutation-tested against pre-fix source (2 guard cases fail,
+      2 regression cases pass), slash-command BATS 11/11.
+      NOT DEPLOYED — needs `make deploy-worker` (operator) plus a Slack manifest re-import.
+
+- [ ] **Slack job `c7faf86b` (`/cluster-up aws`) failed at Step 3.5/12** — the k3s-aws cluster
+      provisioned fine (3 nodes Ready); `bin/cluster-up:402` then failed `_command_exist k3d`
+      because `com.k3d-manager.webhook.plist` sets `PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`
+      and `k3d` lives in `~/.local/bin`. Slack-driven `make up` always fails here; the same command
+      run by hand succeeds. Fix NOT approved, NOT started: plist PATH (host config) or absolute
+      `k3d` resolution in `bin/cluster-up` (durable). Metrics were pushed: `success 0`,
+      `duration 644`, `status="failed"` — the deployment dashboard now has real data.
+
+- [x] NEW `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` — five rules,
+      `release: acg-kube-prometheus-stack`, `namespace: monitoring`. Verified live that this is the
+      ACG `ruleSelector` (`{"matchLabels":{"release":"acg-kube-prometheus-stack"}}`) and that its
+      `ruleNamespaceSelector` is `{}`.
+- [x] `k3dm-tests.alerts` removed from the hub `prometheusrule.yaml`; 3 groups / 9 rules remain.
+- [x] NEW `scripts/tests/plugins/observability_k3dm_tests_rules.bats` — 5 cases green; these alerts
+      had no test coverage at all before. Case 2 mutation-proved red against `git show HEAD:`.
+- [x] `docs/guides/grafana-dashboards.md` + `CHANGELOG.md` record the hub/ACG split and the reason.
+- [x] `make check-doc-links` 1794 OK; `bats -r scripts/tests/plugins/` exit 0, 779 tests, 0 not ok.
+- [x] Wiring landed — `_deploy_pushgateway_acg` in `scripts/plugins/observability.sh` now applies
+      `etc/prometheus/rules-acg/` with `--context "${_app_context}"`, beside the two dashboard
+      applies and the Pushgateway that produces the metrics. `make observability-acg` →
+      `deploy_observability_acg --confirm` → `_deploy_pushgateway_acg` is the confirmed chain.
+      A 6th BATS case asserts the wiring and is mutation-proved red against `git show HEAD:`.
+- [x] Operator ran `deploy_argocd_applicationsets --confirm` (13/13) and `make observability-acg`
+      (2026-09-27). The reapply's automatic `argocd_check_values_branch` reported 26 k3d-manager
+      references checked (2 tracking HEAD, ignored) and all Applications on
+      `k3d-manager-v1.39.0` — the `acg-kube-prometheus-stack` / `acg-trivy-operator` / `loki`
+      pins to v1.37.0 are cleared. `make observability-acg` printed the new
+      `app-cluster PrometheusRules applied from .../rules-acg/` line, proving the wiring live.
+- [x] **DEFECT 4 CLOSED and live-verified.** `PrometheusRule/k3dm-tests` exists in `monitoring`
+      on `ubuntu-hostinger` with `release: acg-kube-prometheus-stack`; the ACG Prometheus loaded
+      `k3dm-tests.alerts` (25 groups total) from
+      `monitoring-k3dm-tests-80fbbf35-bb46-4577-9d61-84dc2e208b83.yaml`; all five alerts
+      `state=inactive health=ok`. `inactive` was NOT accepted as proof — every one of the five
+      expressions was queried and all are backed by real series: `k3dm_test_cases_failed` 0,
+      `k3dm_test_cases_total` 1692 (vs the 1500 floor, 192 headroom), nine `k3dm_test_suite_cases`
+      series (min 4, `webhook_status.py`), last success 2.0h old vs the 7d threshold. So
+      `inactive` is now a measurement rather than the original "matches nothing" silence.
+- [ ] Duration metrics (DEFECT 2) still undecided: fix in v1.39.0 or file for v1.40.0.
+- [ ] My `:19190` forward propping up `federate-acg` is still undisclosed to a durable fix.
+- [x] **DEFECT 5 FIXED — `make test` contaminated the live deployment telemetry.**
+      `scripts/tests/lib/webhook.bats` `setup_file` now exports an empty `K3DM_PUSHGATEWAY_URL`,
+      taking the `if not PUSHGATEWAY_URL: return` early exit in `_push_metrics()`, with an
+      in-suite guard test plus `scripts/tests/plugins/observability_deployment_dashboard.bats`.
+      Proven live: a full 65-case `webhook.bats` run left all three Pushgateway timestamps
+      unchanged. Both guards were mutation-tested against pre-fix content and fail there.
+      **Operator action outstanding** — the three fabricated groups are still in the Pushgateway;
+      the DELETE was denied to Claude by the auto-mode classifier. Run via `!`:
+      `for g in up-gcp up-aws down-aws; do curl -X DELETE http://localhost:9091/metrics/job/k3dm-webhook/instance/$g; done`
+- [x] **Deployment dashboard crowding fixed** — every `k3dm_deployment_*` panel now aggregates
+      `job_id` away with `max by (...)`. `_push_metrics()` stamps `duration_seconds` and
+      `success` with the job's own `job_id`, so the stat panels drew one tile per deployment in
+      the window (fifteen identical `aws (failed) 0 s` tiles) instead of one per
+      `(action, provider)`. Needs `make observability-acg` to reach the cluster.
+
+# embeddings credential + indexer resumability — 2026-09-26 complete
+
+- [x] Vault added as credential source 4 (`secret/embeddings/gemini`, field `api_key`) in
+      `scripts/lib/hermes/prior_art.py`; tried after env and both keychain items.
+- [x] `scripts/index-docs.py` commits one transaction per 100-doc batch; prune split out.
+- [x] 18 new tests (`TestVaultFallback` + `scripts/tests/bin/test_index_docs.py`); 50 pass in the
+      two files. 4 mutations produced targeted failures and were restored.
+- [x] Docs: `docs/guides/vector-store.md` + Addendum 3 in
+      `docs/plans/v1.39.0-vector-store-platform-and-retrieval.md`. CHANGELOG updated.
+- [x] `make index-docs` completed 2026-09-27: `rows=1705`, `last_indexed_epoch` set, sensor
+      `healthy`. All three verifications now pass: the operator ran the first ranked query from the
+      shell holding the export and it returned five relevant hits. Retrieval works end to end.
+- [ ] v1.40.0 retrieval eval — first datapoint in hand, and it points at **ranking, not recall**:
+      the correct doc for an `ArgoCD OutOfSync with no real diff` query ranked 4th of 5, and the
+      whole band spanned 0.785-0.764 (0.021). Do not add a score threshold on this evidence; any
+      cutoff in that band drops the right answer. Details in `activeContext.md`.
+- [ ] Operator: the durable slot is still open — write the Vault copy at `secret/embeddings/gemini`
+      (still `No value found`) or fix the `gemini-cli-api-key` trusted-app ACL in Keychain Access.
+      Until then `make find-similar-docs` and dedup Pass 2 are inert for every agent. No agent
+      creates, reads, echoes or commits the value.
+- [x] `5f8590b6` paces the embed loop (`EMBED_MIN_INTERVAL`, default 0.6s) and waits the delay a 429
+      names; `1b3c7f47` makes the 429 say **which** quota it hit — `_error_detail` reads the error
+      body once and appends `(quota <quotaId>)`, and is now called before the exhausted-attempts
+      raise, which previously produced the only message a human sees and the only one with no detail.
+- [x] The 429 was a **per-day** cap, confirmed by the day boundary: it survived 62s of backoff on
+      2026-09-26 and the same key served 805 documents with zero 429s on 2026-09-27. Third run
+      resumed at 901 and finished 1705/1705. Do not lower `EMBED_MIN_INTERVAL` or add retries for
+      a daily cap — that spends tomorrow's quota and hides the failure.
+- [x] `203893cc` doc follow-up done: the guide now documents both quotas and a two-sitting cold
+      start, a spent daily quota reports `paused` not `unavailable` (test proved red against the old
+      wording), and the corpus count is 1,705 throughout.
+- [x] `203893cc` v1.39.0 close-out: CHANGELOG promoted to `## [1.39.0] - 2026-09-27` with the
+      duplicate Fixed/Added/Changed headings consolidated (13 entries preserved, verified by
+      set-diff), `docs/releases.md` + README rows added with v1.36.0 rotated into the collapsible
+      block, retro at `docs/retro/2026-09-27-v1.39.0-retrospective.md`, and the vector-store guide
+      linked from the README guides list.
+- [ ] v1.39.0 PR is NOT created — gates unmet. See `activeContext.md` for which.
+
+# vectordb health monitoring — 2026-09-26 complete
+
+- [x] Commit `2554da26d2dcf940c09168d6e93b417e39eb8976` pushed to
+      `origin/k3d-manager-v1.39.0`; no PR created by instruction.
+- [x] H1-H5 and Tests implemented; py_compile, bare pytest (262 passed), offline probe,
+      Prometheus/dashboard gates, mutation proofs, doc links and executable-bit gates passed.
+
+# vectordb seed — 2026-09-26 verified
+
+- [x] `10dcd995` seeds `vectordb/postgres` in `deploy_argocd_bootstrap`; pushed to origin.
+- [x] Independently verified: scope 6 files, bats 16/16, shellcheck baseline, no credential
+      value anywhere in diff, tests, docs or commit messages.
+- [x] All six gates mutation-proved individually; 12/14/15 uniquely red for their own mutation.
+- [x] ApplicationSets reapplied 13/13; all Applications on k3d-manager-v1.39.0.
+- [ ] `hub-vectordb` ExternalSecret still OutOfSync on CRD defaults despite ServerSideDiff
+      being live — needs a hard refresh so the controller re-diffs under SSA. Operator's call.
+
+# vectordb — 2026-09-26 final: running, one cosmetic OutOfSync left
+
+- [x] Operator overwrote Vault policy `eso-ldap-directory` (5 prefixes, token+policy on stdin).
+- [x] Overwrite proven safe first: live policy diffed byte-identical against the generated HCL,
+      so the change was strictly additive and could not revoke a prefix merged in out of band.
+- [x] `vectordb-postgres` ExternalSecret `SecretSynced/True` at 06:27:04; both keys present.
+- [x] `pod/vectordb-0` `Running 1/1`; `statefulset/vectordb` 1/1.
+- [ ] Operator: reapply the ApplicationSets so `d44ef5cd`'s `ServerSideDiff=true` reaches the
+      live Application. Until then `hub-vectordb` stays `OutOfSync / Healthy` on the
+      ExternalSecret alone — the workload is fine, the diff is spurious.
+- [ ] Offered, not approved: seed `vectordb/postgres` in the automated Vault path
+      (`_vault_kv_exists` -> generate -> `_vault_kv_put`) so the credential survives a hub rebuild.
+
+NOTE — the ArgoCD namespace here is `cicd`, not `argocd`. Queries against `argocd` return an
+empty listing that reads like a valid negative answer.
+
+# vectordb — 2026-09-26 later: Vault path written, ESO still denied
+
+- [x] Operator wrote `secret/vectordb/postgres` (version 1, 13:03Z). Password generated inside
+      the vault pod; never in argv, host or history. Claude never saw it.
+- [x] Root-caused the remaining failure: ESO gets `403 permission denied`, not a missing path.
+      `vectordb` was absent from `LDAP_VAULT_POLICY_PREFIX`. Fixed in `04fafc55` + gate 10.
+      Recurrence appended to `docs/bugs/v1.4.5-bugfix-eso-ldap-policy-missing-keycloak.md`.
+- [ ] Operator: apply the Vault policy so the grant is live. `vars.sh` alone changes nothing.
+      Blocked on an operator-run `vault policy read eso-ldap-directory` first — Claude cannot
+      read it (needs the root token) and so cannot confirm an overwrite would not revoke a
+      prefix that was merged in out of band.
+- [ ] Operator: reapply the ApplicationSets for the `ServerSideDiff` annotation (`d44ef5cd`).
+- [ ] Then Claude verifies read-only: `vectordb-postgres` `SecretSynced/True`, `pod/vectordb-0`
+      Running, `hub-vectordb` `Synced/Healthy`.
+
+LESSON — `could not get secret data from provider` on an ExternalSecret is ambiguous between an
+absent path and a denied one. Read the ESO controller log for the HTTP code before diagnosing.
+
+# WS1 vectordb — live status 2026-09-26
+
+- [x] `platform` AppProject applied via `deploy_argocd_bootstrap --skip-applicationsets`
+      (operator-run; the applicationsets deploy path does NOT apply AppProjects).
+      Destinations 42 -> 43, `vectordb` permitted.
+- [x] `hub-vectordb` synced; StatefulSet, Service, PVC (Bound 10Gi local-path) and
+      ExternalSecret all created in namespace `vectordb`.
+- [x] Perpetual `OutOfSync` on the ExternalSecret root-caused and fixed in `d44ef5cd` —
+      missing `argocd.argoproj.io/compare-options: ServerSideDiff=true` on the Application
+      template. Two gates added to `argocd_vectordb.bats` (9/9 green); the annotation gate is
+      mutation-checked. Recurrence appended to the existing 2026-09-13 platform-ops bug doc.
+- [x] Reverted `afed4ec9` (declared `target.template.engineVersion`) — the experiment refuted
+      the hypothesis; the app picked the commit up and stayed OutOfSync.
+- [ ] BLOCKED — operator: write Vault `vectordb/postgres` with `username` and `password`.
+      `vectordb-postgres` is `SecretSyncedError` and `pod/vectordb-0` is
+      `CreateContainerConfigError` until it exists. Claude must not create, read, print or log
+      that value.
+- [ ] Operator: reapply the ApplicationSets so the `ServerSideDiff` annotation reaches the live
+      Application. The git fix is inert until then.
+- [ ] Then Claude verifies read-only: `hub-vectordb` `Synced/Healthy` and `vectordb-postgres`
+      `SecretSynced/True`.
+- [ ] Latent: `observability.yaml` and `data-git.yaml` lack the same annotation. No symptom today
+      (their ExternalSecrets are on `ubuntu-hostinger`); any ESO resource added to them will drift.
+
+LESSON — search `docs/bugs/` for the symptom before diagnosing. This failure was already filed
+and fixed for `platform-ops` on 2026-09-13 with the annotation named as the fix; re-deriving it
+cost several live-diff rounds and one refuted experiment.
+
+LESSON — `kubectl get -o json` hides `managedFields` unless `--show-managed-fields` is passed.
+Zero entries is the default, not an anomaly.
+
+# 2026-09-26 — WS1 pgvector hub platform component implemented
+
+- [x] Added `scripts/etc/argocd/applicationsets/vectordb.yaml` with a hub list generator,
+  literal `${K3D_MANAGER_BRANCH}`, `vectordb` destination, and `CreateNamespace=true`.
+- [x] Added plain manifests for a single-instance `pgvector/pgvector:pg17` StatefulSet, Service,
+  one 10Gi PVC using the default StorageClass, and ESO credentials from `vault-backend` at
+  `vectordb/postgres`; no Role, RoleBinding, ClusterRole, fallback Secret, or credential value.
+- [x] Added six pure-logic BATS tests. Each mutation check went red for its targeted broken
+  condition and was restored. Focused suite passes 6/6; PyYAML parses all five YAML files;
+  `make check-doc-links` reports 1789 files OK; shellcheck and `_agent_audit` are clean.
+- [x] CHANGELOG describes the rebuildable cache, non-durable index, and UNMEASURED quality until
+  the v1.40.0 eval. Commit: `5cf1700d`; PR not created by instruction; push remains pending.
+
+# 2026-09-26 — ArgoCD values-branch gate fix implemented
+
+- [x] M1–M4 implemented exactly from the bug spec on `k3d-manager-v1.39.0`.
+- [x] Added six pure-logic BATS tests; focused suite passes 11/11. Each new test was
+      mutation-checked individually; the covered change was reverted, the suite went red, and the
+      change was restored. No cluster or network command was run.
+- [x] Pre/post shellcheck output is identical: one pre-existing informational SC2317 at
+      `scripts/plugins/argocd.sh:12`; no new warnings.
+- [x] Final gates passed: `argocd_values_branch_drift.bats` 11/11, `argocd.bats` 37/37,
+      shellcheck unchanged from the pre-change run, and `_agent_audit` passed. Implementation
+      commit: `b1f90fce`; push is the remaining handoff step.
+
 # Progress — k3d-manager
 
-## 2026-09-25 — v1.38.0 PR #132 open, all gates green, enforce_admins off
+## 2026-09-26 — v1.38.0 MERGED, tagged and released; v1.39.0 branch cut
+
+- [x] **SCOPE REVISED 2026-09-26 (operator approved): the vector-store spec is SPLIT, and
+  `slack-corpus-qa` moves to v1.40.0.** Supersedes the earlier same-day decision that carried three
+  specs onto v1.39.0. The original six-workstream spec named this split in its own Risks section and
+  we took it.
+  **v1.39.0 (4 plan docs, under the cap):** `test-suite-metrics-and-staleness`,
+  `public-endpoint-blackbox-probes`, `slack-smoke-target`,
+  `vector-store-platform-and-retrieval` (WS1 deploy + WS2 indexer + WS3 library).
+  **v1.40.0 (3, pre-staged):** `hermes-app-health-delta-sensor`,
+  `hermes-prior-art-and-retrieval-eval` (WS4 + WS5), `slack-corpus-qa`.
+  Effect: `slack-corpus-qa` now sits in the **same** release as the WS5 recall@5 that gates it,
+  instead of one release behind. That was the flaw in the earlier decision — carrying the vector
+  store forward kept the dependency on the branch but not the measurement.
+- [ ] **BLOCKS WS2 — the embeddings provider is undecided and no credential exists.**
+  `k3dm-openai-api-key`, `k3dm-embeddings-api-key` and `k3dm-anthropic-api-key` are all absent
+  (existence check only, no value read). **`gemini-cli-api-key` does exist** and Gemini embeddings
+  are free-tier, making it the candidate needing no new credential — but it was provisioned for the
+  Gemini CLI and **repurposing it needs the operator's explicit go**. WS1 does not depend on this;
+  WS2 cannot start without it. RESOLVED 2026-09-26: the operator approved reusing
+  `gemini-cli-api-key`, and ruled that it stays the single keychain copy — the remaining absent items
+  stay absent rather than being filled with duplicates. See the one-slot decision in
+  `activeContext.md`.
+- [ ] **WS1 needs the operator's go** — it deploys pgvector to the hub. Prerequisites verified
+  2026-09-26: ESO on the hub is healthy (6 of 7 ExternalSecrets `SecretSynced/True`; the one
+  failure is the pre-existing `cosign-public-key` in `platform-ops`), and the hub-scoped Application
+  pattern to copy already exists (`hub-loki`, `hub-platform-ops`). WS1 must **not** use the
+  `role: app-cluster` selector.
+- [x] **Corpus measured for WS5's effort estimate: 1,703 tracked docs**, not the 868 the original
+  spec assumed — 737 `docs/bugs/`, 451 `docs/issues/`, 435 `docs/plans/`, 80 `docs/retro/`. WS5 wants
+  >=25 positive and >=25 hard-negative hand-mined pairs; 10 positives and 1 hard negative are already
+  seeded, so ~15 and ~24 remain. This is the bulk of the retrieval work and is why it is its own
+  release. `scripts/tests/fixtures/doc-dedup/` does not exist yet; `e2e-corpus/corpus.jsonl` is the
+  schema precedent.
+- [x] **v1.39.0 ships the retriever UNMEASURED — accepted, and must be stated.** No recall@5 number
+  exists until v1.40.0's WS5 runs. The guide, CHANGELOG and retro must say the quality is unmeasured
+  rather than implying it was evaluated; v1.40.0's WS6 goes back and replaces that caveat with the
+  measured numbers.
+- [x] **v1.39.0's three unimplemented specs — operator instruction 2026-09-27: implement, do not
+  defer.** I had recommended deferring all three to v1.40.0; the operator overrode that. Two of the
+  three are done on `k3d-manager-v1.39.0`, plus the two prerequisite gate fixes spec A was blocked on:
+  - [x] `ff47bc2b` cluster-health app context resolved from `destination.name` (`docs/bugs/2026-09-25-smoke-cluster-health-app-context-decoupled-from-app-prefix.md`)
+  - [x] `70417db0` webhook gate uses `?quick=1` and reports `curl exit 28`, not `000000` (`docs/bugs/2026-09-25-smoke-webhook-gate-unbounded-sweep-and-unreachable-probes.md`)
+  - [x] `92590ae9` `/k3dm smoke` at `operator`/900s (`docs/plans/v1.39.0-slack-smoke-target.md`)
+  - [ ] `docs/plans/v1.39.0-test-suite-metrics-and-staleness.md` — **dispatched to Codex**
+  - [ ] `docs/plans/v1.39.0-public-endpoint-blackbox-probes.md` — **dispatched to Codex, offline half
+        only**; the live TSDB verification and the ApplicationSet reapply stay operator-owned.
+  Operator follow-up: `make restart-webhook` before `/k3dm smoke` resolves.
+
+- [x] **SCOPE DECISION for v1.39.0 — settled 2026-09-26, operator approved.** v1.39.0 now holds
+  exactly **5** plan docs, at the cap:
+  1. `v1.39.0-test-suite-metrics-and-staleness.md` (its own, ready to implement)
+  2. `v1.40.0-slack-corpus-qa.md` (its own, blocked — see below)
+  3. `v1.39.0-public-endpoint-blackbox-probes.md` (carried)
+  4. `v1.39.0-slack-smoke-target.md` (carried)
+  5. `v1.39.0-vector-store-platform-and-retrieval.md` (carried)
+  **Deferred to v1.40.0:** `v1.40.0-hermes-app-health-delta-sensor.md`.
+  Files renamed per the `62c9ff27` precedent (carried specs take the new version prefix), headers
+  updated, all inbound references fixed.
+- [x] **Why the vector store was kept and the sensor deferred — corrects an earlier
+  recommendation.** My first recommendation was to push the vector-store prior art to v1.40.0 as
+  "research". That was wrong: its **WS5 measured recall@5 is the hard blocker** on
+  `v1.40.0-slack-corpus-qa.md`, which was already on the branch. Deferring it would have left
+  v1.39.0 carrying a spec that could not be started. The `app_health` sensor is the only one of the
+  four carried candidates with nothing on this branch depending on it, so it is the only one that
+  can leave without stranding something. **Rule: before deferring a spec, check what on the target
+  branch depends on it — a spec can be low-priority and still be load-bearing.**
+- [x] **Release step DONE: ApplicationSets reapplied for v1.39.0** (operator ran it; 2026-09-26).
+  12/12 sets deployed on the hub `k3d-k3d-cluster` ns `cicd`, both ACG variants included
+  (`grafana-dashboards-acg`, `observability-acg`). All **24** k3d-manager sources moved off
+  `k3d-manager-v1.37.0` to `k3d-manager-v1.39.0` — the 6 with `ref: values` and the 18 with no
+  `ref` that the gate never inspects. 2 remain at `HEAD` (rollout demo, intended). v1.38.0 config
+  is now live in-cluster. `argocd_check_values_branch k3d-manager-v1.39.0` confirms clean **and
+  printed `checked 6 values references`**, so the confirmation is trustworthy.
+- [x] **LESSON: the release step inherits the current kube context.** The first attempt applied
+  against the stale `ubuntu-k3s` context (dead ACG sandbox, 44.250.167.86) and failed all 12 sets
+  at kubectl openapi validation — before any write, so nothing was mutated — at ~90s per set.
+  `deploy_argocd_applicationsets` takes no context flag. **Check `kubectl config current-context`
+  before any release step that does not take an explicit context.**
+- [x] **LESSON: a partial stale split right after a reapply is reconcile lag.** The check run
+  seconds after the apply still showed 3 of 6 stale (`acg-kube-prometheus-stack`,
+  `acg-trivy-operator`, `loki`); a re-check moments later was fully clean. The sets update
+  synchronously, the child Applications regenerate on the controller's own loop. Re-check before
+  escalating.
+- [x] **LESSON: the `!` relay executed nothing.** Three `!` invocations produced zero side
+  effects — a `>` redirect target was never created, which proves the command never ran rather
+  than ran-and-failed (zsh creates the target before the first line executes). Operator ran the
+  commands directly instead.
+- [ ] **NOT DONE and NOT to be retried as a sync: `shopping-cart-identity`** — deterministic
+  failure, not drift. `Replace=true` in its syncOptions makes ArgoCD `kubectl replace` the bound
+  `postgres-keycloak-pvc`, whose spec is immutable except `resources.requests`; the manifest
+  omits `volumeName`/`storageClassName` so the replacement blanks them and the API server rejects
+  it. Retry limit 5 exhausted, `phase: Failed`, which also blocks self-heal. Holds back 3
+  ExternalSecrets and prevents `Job/keycloak-realm-reconcile` from being created at all.
+  Already filed: `docs/bugs/2026-09-23-argocd-identity-replace-true-cannot-update-bound-pvc.md`
+  (dedup check caught it; no second file). **Appended update disproves that doc's open question**
+  — the realm-reconcile failure is independent, caused by `awk: command not found` in the
+  `ubi9-micro` image. **Two fixes needed; the PVC one must land first** or the awk fix cannot be
+  observed. Needs the operator's go on which fix option (per-resource `Replace=false` annotation
+  in `shopping-cart-infra` is the filed preference).
+- [ ] **Delete the stale `ubuntu-k3s` kube context** — now escalated from a ~90s-per-query
+  annoyance to having burned a release step. `kubectl config delete-context ubuntu-k3s`. Operator's
+  call (config mutation).
+- [x] **BUG FOUND: `argocd_check_values_branch` reports a false clean under `--dry-run`** —
+  printed "All Applications reference values branch k3d-manager-v1.39.0" while none did.
+  `_argocd_values_branch_drift` exits 3 on unparseable input with empty stdout, and the caller
+  decides on stdout alone, so "could not tell" is indistinguishable from "no drift". The
+  absent `checked N values references` stderr line is the tell. Also: the gate checks only the
+  6 `ref: values` sources, not the other 18 that drift on the same boundary.
+  `docs/bugs/2026-09-26-check-values-branch-false-clean-under-dry-run.md`. OPEN, unfixed.
 
 - [x] **PR #132 created** — `feat: read-only cloud-session access to the local webhook`,
   base `main`, head `k3d-manager-v1.38.0`. 40 commits, 34 files.
@@ -27,11 +365,41 @@
   `required_approving_review_count=1` and Copilot reviewed as COMMENTED, not APPROVED —
   admin bypass is the intended path. **MUST be re-enabled with a bodyless POST after merge,
   or restored in the same turn if the merge is deferred.**
-- [ ] **Merge PR #132** — the operator's call. Never auto-merge.
-- [ ] **Release-scope decision** — four v1.38.0 specs ship as specs only (public-endpoint
+- [x] **PR #132 merged** — squash merge `6f0fb4af`, merged 2026-09-26T02:08:13Z by the
+  operator. `mergeStateStatus` now UNKNOWN (post-merge), state MERGED.
+- [x] **v1.38.0 tagged and released** — annotated tag `v1.38.0` on `6f0fb4af`, pushed over
+  SSH (no token-in-remote dance needed). GitHub release published and marked latest:
+  https://github.com/wilddog64/k3d-manager/releases/tag/v1.38.0
+- [x] **`enforce_admins` restored** on `main` with a bodyless POST, verified `enabled=true`.
+  Protection now reads `required_approving_review_count=1`, `enforce_admins=true`,
+  `required_status_checks.checks=[]` — CI is still **not** a merge gate on this repo.
+- [x] **`k3d-manager-v1.39.0` cut** from `6f0fb4af` and pushed, upstream verified as
+  `origin/k3d-manager-v1.39.0` (not `main` — the mistrack guard).
+- [x] **Retro written** — `docs/retro/2026-09-26-v1.38.0-retrospective.md`.
+- [x] **Standing docs audited** — `.github/copilot-instructions.md` already current (all four
+  v1.38.0 rules landed in the release). `memory-bank/projectbrief.md` was stale: its In-scope
+  list had no entry for the read-only remote/cloud-session surface; added. `docs/api/functions.md`
+  needs nothing — it documents plugin shell functions, and v1.38.0 added Python bins only.
+- [ ] **Branch cleanup NOT run** — due every 5 releases; v1.35.0 was the last multiple, so
+  v1.40.0 is next. Run early only if the operator asks.
+- [ ] **`875f97da` missed the squash** — the memory-bank commit queueing the cloud-bridge
+  architecture doc was pushed after the merge window and is **not in `main`**. Cherry-picked
+  onto `k3d-manager-v1.39.0` as `ed697ef3`. Lesson: a push to a branch whose PR is already
+  merge-ready is a push into a closing window.
+- [ ] **Release-scope decision — NOW DUE, blocks v1.39.0 planning** — four v1.38.0 specs
+  shipped as specs only (public-endpoint
   blackbox probes, hermes app-health delta sensor, slack smoke target, vector-store prior
   art). Carrying all four to v1.39.0 puts that branch at **6 plan docs, one over the max-5
   cap**, so they must be split across v1.39.0/v1.40.0 or dropped. Decide at `/post-merge`.
+- [ ] **Cloud-bridge architecture doc — queued for v1.39.0** (operator, 2026-09-25). There is
+  no `docs/architecture/` page for the bridge: v1.38.0 shipped
+  `docs/howto/cloud-session-requests.md`, which is a usage contract (schema, actions, exit
+  codes), not a design view. Missing: the request/response topology across the trust boundary,
+  the two-token model and why a header may only narrow a role, the bare-clone + git-plumbing
+  choice, the validator's ordered reject chain, and the deliberately unbuilt push path.
+  **Not a plan doc** — `docs/architecture/` is outside the max-5 cap, so this does not
+  compete with the four carried v1.38.0 specs. House style is Mermaid (9 of 11 existing
+  architecture docs), plus a README `## Documentation` link.
 
 ## 2026-09-26 — v1.38.0 P6 reader-tier make targets through the cloud bridge
 
@@ -1516,7 +1884,7 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
   Next action, needs the user's go: reapply the `istio-ambient` ApplicationSet, confirm it writes
   the k3s dirs (the new guard should refuse the generic ones), then roll the DaemonSet.
 
-- [x] **v1.39.0 Slack corpus Q&A specced** — `docs/plans/v1.39.0-slack-corpus-qa.md`, filed on
+- [x] **v1.39.0 Slack corpus Q&A specced** — `docs/plans/v1.40.0-slack-corpus-qa.md`, filed on
   operator direction so it is not lost between releases. Plan #1 of 5 for v1.39.0. **Hard-blocked on
   v1.38.0 WS5 publishing a measured recall@5**; if neither scorer clears its floor the spec does not
   ship. Dedup check found `v1.6.0-slack-ai-analysis.md`, which is a different shape (alert-triggered
@@ -1891,10 +2259,135 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
       Tunnel → `:8000` → OrbStack → **hub** Istio, which has no `frontend` route and no frontend
       workload; the healthy pod is on hostinger with no Ingress and no NodePort. Fix is an
       architecture choice and needs the operator.
-- [x] **Spec the public-endpoint blackbox probes** — `docs/plans/v1.38.0-public-endpoint-blackbox-probes.md`
+- [x] **Spec the public-endpoint blackbox probes** — `docs/plans/v1.39.0-public-endpoint-blackbox-probes.md`
       (5th plan doc; v1.38.0 is now at the max-5 cap). Two modules, explicit `User-Agent`,
       `PublicEndpointDown` / `CloudflareTunnelDown` / `PublicEndpointProbeAbsent`.
 - [x] **Keycloak `awk` fix dispatched and verified** — `e0815211` on
       `origin/fix/keycloak-reconcile-awk-free` (`shopping-cart-infra`). `awk` 11 → 0, YAML parses,
       shellcheck clean both sides, 13/13 helper-vs-awk equivalences with 2 negative controls.
       PR is the owner's call.
+# v1.39.0 `/k3dm help` cluster lifecycle commands — DONE 2026-09-27
+
+- [x] Added role-filtered `/cluster-*` and `/hostinger-status` discoverability to `/k3dm help`
+  without adding Makefile targets or changing routing.
+- [x] Added the four specified regression tests and the short Slack slash-command documentation
+  note. Focused pytest: `33 passed, 78 subtests passed`; `make test-python-unit`: all seven suites
+  passed.
+- [x] Commit `f3cdc25a3a0393e4198e472f6530b82114a93895` pushed to
+  `origin/k3d-manager-v1.39.0`; no PR created.
+
+# 2026-09-26 — vectordb Vault credential seed authored
+
+- [x] Added the idempotent in-pod Vault seed and bootstrap call before the AppProject.
+- [x] Added six focused BATS gates and `docs/guides/vector-store.md`; no credential value was
+  handled or recorded.
+- [x] `bats scripts/tests/plugins/argocd_vectordb.bats`: 16/16 passed after restoration.
+- [x] Mutation-proof red lines captured for gates 11–16; all mutations restored.
+- [x] Implementation commit `10dcd995` is pushed to `origin/k3d-manager-v1.39.0`; no PR created.
+# v1.39.0 test-suite metrics — 2026-09-27 implementation status
+
+- [x] Worktree implementation complete within the spec files: offline log parser/pusher and tests,
+      opt-in `test-metrics` target, dashboard, apply hook, staleness rules, and guide.
+- [x] Verification: focused pytest `11 passed`; bare pytest `307 passed`; `make test-all` observed
+      `EXIT=0`, with `1304 BATS ok / 0 not ok`, unittest `7/6/29/22/6/6/4`, and pytest `307 passed`.
+      Shellcheck clean, YAML/JSON checks clean, and `make check-doc-links` reported `1793 file(s) OK`.
+- [x] Seven mutations M1-M7 each went red and were restored; focused suite returned `11 passed`.
+- [ ] No commit/push SHA: the environment denies writes to `.git` (`FETCH_HEAD` and `index.lock`).
+      Resume by retrying the required pull, commit (including the observed marker fact), push, and
+      remote SHA verification from a checkout with writable Git metadata.
+
+# v1.39.0 test-suite metrics — DONE 2026-09-27, commit `205405c0`
+
+- [x] Spec `docs/plans/v1.39.0-test-suite-metrics-and-staleness.md` implemented: `bin/k3dm-test-metrics`,
+      focused pytest suite + fixture, opt-in `make test-metrics`, `k3dm-tests` dashboard, ACG apply
+      hook, five Prometheus rules, guide update. `make test` and `make test-all` recipes unchanged.
+- [x] Codex wrote the worktree changes but could NOT commit — sandbox denied `.git` writes. Claude
+      verified, fixed two gaps, and committed `205405c0`. Codex's own "blocked, no SHA" entries
+      above are accurate for its run and are left as written.
+- [x] Claude-added coverage: the real flat-TAP BATS path, which Codex's invented `# file:` fixture
+      marker left untested. Mutation-proved red, then restored identical.
+- [x] Claude-fixed spec misses: the guide's triage-table row, and the false "exit code reads 2"
+      claim (the real capture exits 0 with a pyenv pytest on PATH).
+- [ ] OPERATOR-OWNED, deliberately not done: the first live `make test-metrics` push, and
+      confirming the `k3dm-tests` dashboard loads in the ACG Grafana. No live Pushgateway, cluster
+      or host action was taken by any agent.
+# v1.39.0 public endpoint blackbox probes — 2026-09-27, pushed `ba2a01e1`
+
+- [x] Offline half implemented in one commit `ba2a01e1679423d3fbf7978cb4a248addbe57085` and
+  pushed to `origin/k3d-manager-v1.39.0`; no PR created.
+- [x] Added pinned `prometheus-blackbox-exporter` chart `11.3.1` with image tag `v0.27.0`, both
+  required modules with explicit `User-Agent`, `public-endpoint-probes.yaml` with two
+  `release: kube-prometheus-stack` Probe resources and `${CF_DOMAIN}` targets, and
+  `public-endpoints.yaml` with all three spec rules.
+- [x] Added the P4 operator guide, Grafana triage row, and v1.39.0 CHANGELOG entry. Static gates:
+  yq parse and non-empty expressions pass; each new manifest has `grep -c '3ai-talk' = 0`;
+  focused observability BATS `1..28` all pass; `_agent_audit` passes; `make check-doc-links` says
+  `1793 file(s) OK`. `promtool` was unavailable, so YAML parsing and expression non-empty checks
+  are the documented fallback.
+- [!] Curated test-all was `1..1151` with 42 unrelated webhook failures (312–353); the focused
+  observability subset passed. Untouched observability shellcheck has pre-existing SC2016 line 856.
+- [ ] **Live verification pending operator action:** deploy the chart/Probe resources via ArgoCD;
+  query `count(probe_success)` and all seven `probe_http_status_code` series; prove the frontend
+  404 yields `probe_success 0`; reapply hub and ACG ApplicationSets; run
+  `argocd_check_values_branch`. The local remote-tracking ref could not be updated by the sandbox,
+  but `git ls-remote` reports the pushed SHA above.
+
+# v1.39.0 test-suite metrics — live push CONFIRMED 2026-09-27
+
+- [x] First real `make test-metrics` run: green, 1692 cases, 0 failed, push accepted by the
+      live Pushgateway at `:9091`. The T4 `origin`-in-URL grouping produced
+      `instance="test-all-local"` as designed.
+- [x] `OfflineSuiteVacuous` false-positive fixed — scoped to `{result="ok"}`. It would have
+      paged on a fully green run because every `result="not_ok"` series is 0 when healthy.
+- [ ] **Duration metrics are dead** — `k3dm_test_run_duration_seconds` is a hardcoded 0 and
+      `bats`/`pytest` suite durations are 0 (the parser expects a `# duration:` marker that no
+      harness emits). Needs Makefile timing + `--duration` + a pytest `in <n>s` parse. DECISION
+      PENDING: fix in v1.39.0 or file as a bug doc for v1.40.0.
+- [ ] Operator-owned: apply the `k3dm-tests` dashboard (`make observability-acg`) and confirm it
+      loads in the ACG Grafana. The ConfigMap is still absent on both clusters, so the metrics
+      that just landed have nothing reading them yet.
+
+# v1.39.0 blackbox probes — Codex landed ba2a01e1 2026-09-27
+
+- [x] `ba2a01e1` verified on `origin/k3d-manager-v1.39.0` by my own fetch. 7 files, 151
+      insertions, all named by the spec, no scope creep. Trailer correct.
+- [x] Three alerts present with non-empty exprs: `PublicEndpointDown`, `CloudflareTunnelDown`,
+      `PublicEndpointProbeAbsent`. Chart pinned `11.3.1`, image `v0.27.0`, no `latest`.
+      `check-doc-links`: 1793 OK.
+- [x] Codex's "42 pre-existing webhook failures" claim DISPROVEN — 27 reds, all sandbox
+      Keychain-token artifacts; the same tree is 1304/0 in a real shell.
+- [ ] Operator-owned live DoD: ArgoCD deploy, seven `probe_success` series, seven status codes,
+      prove the frontend returns `probe_success 0` / 404, ApplicationSet reapply,
+      `argocd_check_values_branch`.
+# 2026-09-27 — launchd PATH omission fixed
+
+- [x] M1–M5 implemented exactly from `docs/bugs/2026-09-27-launchd-path-omits-local-bin.md`.
+- [x] **Fix taken live on the host (operator go, 2026-09-27)** — webhook plist template `PATH` now
+      leads with `{{HOME}}/.local/bin` so `make install-launchd` cannot reinstall the defect, and the
+      loaded plist was updated with a targeted `PlistBuddy Set`. Verified by reading `PATH` back out
+      of `launchctl print`, not by the restart's exit code.
+- [x] **`make restart-webhook` does NOT apply plist changes** — `launchctl kickstart -k` reuses the
+      cached service definition; the loaded `PATH` stayed stale through a "successful" restart.
+      `bootout` + `bootstrap` was required. Makefile left unchanged; reported to the operator.
+- [x] **Sibling templates fixed** — `cloud-bridge` and `prometheus-credential-rotator` templates now
+      lead `PATH` with `{{HOME}}/.local/bin`; `install-cloud-bridge` gained the missing
+      `s|{{HOME}}|$(HOME)|g` substitution without which the placeholder would have landed in the
+      plist verbatim. Both live plists reloaded with bootout/bootstrap and read back.
+- [x] **`hermes` handled differently, on purpose** — its plist is rendered by `_install_hermes_agent`
+      in the lib-foundation subtree, which substitutes no `{{HOME}}`, and that subtree is edited
+      upstream only. `bin/k3dm-hermes` normalizes its own `PATH` instead. Agent is not loaded, so
+      nothing needed restarting.
+- [ ] **Upstream lib-foundation change: add `{{HOME}}` substitution to `_install_hermes_agent`** so
+      the hermes template can carry the fix like its siblings. Not started; needs the lib-foundation
+      repo and its own PR.
+- [x] **Regression test exists now** — `scripts/tests/bin/launchd_plist_path.bats`, 4 tests,
+      mutation-verified (reverting the cloud-bridge template turns test 1 red). The earlier
+      classifier denial that blocked this file is cleared.
+- [x] Implementation commit `f8d5ced74467bd703f19cca60bda37b7360dfcf3` pushed to
+- [x] **Claude verified the launchd PATH fix independently** — SHA on origin via `gh api` (local `.git` was unwritable in Codex's sandbox), six-file diff scope, no subtree or `system.sh` changes, BATS 39/39 re-run by Claude, shellcheck histogram identical pre/post.
+- [x] **Fixed a tautological test Claude had specced** (`393f6570`) — the idempotence case asserted on an inline copy of the guard instead of `bin/cluster-up`, so it passed against unfixed source; now extracts and sources the real block and fails pre-fix.
+      `origin/k3d-manager-v1.39.0`; no PR created per instruction (PR URL: not applicable).
+- [x] Focused BATS: 39/39; shellcheck: no new warnings; `_agent_audit`: passed.
+- [!] Mutation proof against pre-fix HEAD copies: tests 1, 3 and 4 fail; test 2 passes because its
+      literal body is self-contained and does not inspect either script, so it cannot fail against
+      the unfixed source without altering the required test block.

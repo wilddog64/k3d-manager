@@ -1,0 +1,14 @@
+# file: scripts/tests/lib/webhook.bats
+1..2
+ok 1 webhook accepts request
+ok 2 webhook rejects bad request
+# file: scripts/tests/lib/policy.bats
+1..2
+ok 1 policy allows safe action
+not ok 2 policy rejects unsafe action
+[make] python3 scripts/tests/bin/webhook_policy.py
+Ran 14 tests in 0.42s
+FAILED (failures=2)
+[make] pytest scripts/tests/hermes scripts/tests/bin/test_*.py
+============================= test session starts =============================
+189 passed, 2 failed in 4.00s
