@@ -1,3 +1,37 @@
+# 2026-09-27 — `/k3dm help` omits the cluster lifecycle commands (spec filed, dispatched to Codex)
+
+**Found while answering "what deployment do I have to run?"** The `k3dm_deployment_*` metrics are
+pushed only by `_run_cluster`'s `_finish()` (`scripts/lib/webhook/lifecycle.py:217`), which is
+reached by the `/cluster-up` and `/cluster-down` slash commands via `/api/v1/cluster`. A hand-run
+`make up CLUSTER_PROVIDER=k3s-aws` produces nothing — `make` is what the webhook shells out to, and
+the timing plus the push live in the Python wrapper around it.
+
+**The discoverability gap.** `/k3dm help` enumerates all 24 allowlisted make targets
+(`make_target_help`, `scripts/lib/webhook/make_targets.py:78-90`) and is the only self-describing
+command surface in Slack. The six `/cluster-*` commands are separate slash commands in the relay
+allowlist (`workers/slack-relay/index.js:1`) and appear in no in-Slack listing at all. This session
+inferred `/k3dm cluster-up aws` from the only surface that describes itself; the relay rejected it
+because `aws` is not a `KEY=value` pair (`index.js:88-90`).
+
+**The split is correct and must be preserved.** `/api/v1/make` has no running-job guard
+(`lifecycle.py:151-155`), no stall timer (`:171-201`) and no metrics push. Folding the cluster
+commands into `MAKE_TARGETS` would silently drop all three, so the spec is help-text only.
+
+**Also recorded:** the relay's provider defaults are asymmetric — bare `/cluster-up` defaults to
+`hostinger` (the permanent cluster, `index.js:307`) while bare `/cluster-down` defaults to `aws`
+(the sandbox, `:320`). Deliberate per the reply text, but it means the two commands with no
+argument act on different clusters. Always pass the provider explicitly. Not in this spec's scope.
+
+**Spec:** `docs/bugs/2026-09-27-k3dm-help-omits-cluster-lifecycle-commands.md`, committed
+`788deeb2`, pushed to `origin/k3d-manager-v1.39.0`. Dedup: both passes run; the two 2026-07-01
+manifest-drift docs cover the *doc* drifting from the relay, not the *runtime help output*, so this
+is a new file rather than a recurrence section. `make find-similar-docs` is still unavailable (no
+embeddings credential — operator action), so pass 2 fell back to the glob as designed.
+
+**Dispatched to Codex** (session `01a0e3a3`) — help text only, three files plus the two memory-bank
+files. NOT YET VERIFIED: Codex's SHA, the four new tests and the scope of its diff all still need
+independent confirmation before this is called done.
+
 # 2026-09-27 — DEFECT 5 fixed: the test suite no longer writes live deployment metrics
 
 **The fix.** `scripts/tests/lib/webhook.bats` `setup_file` now exports an empty

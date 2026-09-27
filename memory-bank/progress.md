@@ -1,5 +1,13 @@
 # v1.39.0 k3dm-tests alerts moved to the ACG stack — 2026-09-27
 
+- [ ] **`/k3dm help` omits the cluster lifecycle commands** — spec
+      `docs/bugs/2026-09-27-k3dm-help-omits-cluster-lifecycle-commands.md` filed and committed
+      `788deeb2`, pushed. Dispatched to Codex (session `01a0e3a3`). Help text only:
+      `CLUSTER_COMMANDS` + a role-filtered section in `make_target_help`, four new tests in
+      `scripts/tests/bin/webhook_make_targets.py`, a note in `docs/howto/slack-slash-commands.md`.
+      The routing split stays — `/api/v1/make` has no job guard, no stall timer and no metrics push.
+      AWAITING VERIFICATION: SHA on origin, test output, diff scope.
+
 - [x] NEW `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` — five rules,
       `release: acg-kube-prometheus-stack`, `namespace: monitoring`. Verified live that this is the
       ACG `ruleSelector` (`{"matchLabels":{"release":"acg-kube-prometheus-stack"}}`) and that its
