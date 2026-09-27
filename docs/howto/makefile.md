@@ -167,6 +167,15 @@ the store rather than truncating it. See
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
 | `make test-all` | `test` + `test-bin` + `test-python` | Everything that runs offline, in one call — what `make test-metrics` wraps |
 
+**A new BATS suite must live in one of those directories or nothing runs it.**
+Discovery is by directory glob, not by file pattern: the dispatcher globs
+`scripts/tests/{lib,core,plugins,etc}` at `-maxdepth 1`, and `make test-bin`
+globs `scripts/tests/bin`. A `.bats` file at the `scripts/tests/` root, or
+nested a level deeper inside one of those directories, is collected by nothing
+and reported by nothing — it passes when run by hand and never runs again.
+Three suites sat at the root this way until v1.40.0. Put plugin tests in
+`plugins/`, `bin/` and `Makefile` tests in `bin/`.
+
 `make test` alone is **not the CI gate.** CI runs `make test`, `make test-bin`,
 `make test-python-unit` and `make test-pytest` as four separate steps, so a
 branch that is green under `make test` can still be red on a Python suite.

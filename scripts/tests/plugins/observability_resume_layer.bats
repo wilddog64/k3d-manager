@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 
 setup() {
-  source "${BATS_TEST_DIRNAME}/../plugins/observability.sh"
+  source "${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 }
 
 @test "layer normalizer: 1 stays 1" {

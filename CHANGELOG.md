@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Three BATS suites ran in no `make` target and no CI job.**
+  `observability_keep_list.bats`, `observability_resume_layer.bats` and
+  `test_install_sudoers.bats` sat at the `scripts/tests/` root. The dispatcher
+  discovers suites under `scripts/tests/{lib,core,plugins,etc}` at
+  `-maxdepth 1`, and `make test-bin` globs `scripts/tests/bin`, so the repo root
+  is outside every search path: the 16 tests passed on demand and were never
+  run by `make test`, `make test-all` or CI. Moved the two observability suites
+  into `scripts/tests/plugins/` and the sudoers suite into `scripts/tests/bin/`
+  (renamed `install_sudoers.bats` to match its 26 siblings), and fixed the
+  `BATS_TEST_DIRNAME` relative paths for the new depth. A suite in a directory
+  nobody globs is indistinguishable from a suite that does not exist — the
+  failure mode is silence, not a red build.
+  `scripts/tests/core/suite_discovery.bats` now fails, naming the file, if any
+  `.bats` suite sits outside a globbed directory — including one nested a level
+  too deep — so the next one cannot go unnoticed.
+
 ## [1.39.0] - 2026-09-27
 
 ### Added
