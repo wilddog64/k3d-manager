@@ -1,3 +1,32 @@
+# 2026-09-27 — Copilot caught the defect this release advertises fixing
+
+Copilot's review of PR #133 raised two findings; one is the most useful review catch of
+the release. Correction to my earlier read: I inferred the Copilot tag had failed because
+`requested_reviewers` was empty. It had not — **a completed review clears the request**, and
+Copilot had already submitted at 19:02. The empty array meant the opposite of what I took it
+for.
+
+**Copilot found a new instance of the swallowed-apply defect, in this branch's own code.**
+`scripts/plugins/observability.sh` gained an ACG PrometheusRules apply in `22e9c53d` written
+as `_kubectl apply … >/dev/null && _info …` — the `&&` gates only the log line, so a failed
+apply is indistinguishable from a successful one. That is precisely the defect the PR body
+advertises fixing for the hub rules path. Confirmed in scope rather than assumed:
+`git show main:scripts/plugins/observability.sh` has no `_acg_rules_dir` at all.
+
+The same `apply … && _info` shape occurs **9 more times** in that file (dashboards, promtail,
+ArgoCD dashboard). All are pre-existing on `main`, so they stay — fixing them here would be
+an unsolicited refactor of code this release does not touch. Backlog item.
+
+Fixed with a failure flag rather than a bare `return 1` at the failure site: an early return
+would skip `_observability_apply_trivy_dashboard`, converting a reporting bug into silent
+loss of unrelated work. There is no `set -e` above this function and its caller ignores the
+status, so the `_err` line is what is actually observable today and the return value is for
+the record. New guard asserts the contract (block has `_err`, lacks `&& _info`, function
+returns the flag) and is **mutation-tested** against the pre-fix source; restored
+byte-identical by `cmp`. 6/6 in the probes suite, shellcheck clean on HEAD and main.
+
+Copilot's second finding was the `rg` dependency — the same defect CI had already failed on,
+reached from the portability angle instead. Two independent routes to one cause.
 # 2026-09-27 — PR #133 opened; CI red on `rg`, and the agent report said green
 
 PR [#133](https://github.com/wilddog64/k3d-manager/pull/133) is open for v1.39.0,

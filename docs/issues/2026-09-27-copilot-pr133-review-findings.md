@@ -4,8 +4,12 @@
 **Date:** 2026-09-27
 **Reviewers:** GitHub Advanced Security (CodeQL), CI
 
-Two findings: one real CI red that the run summary misreported, and one CodeQL
-false positive resolved by rename rather than dismissal.
+Three findings: one real CI red that the run summary misreported, one CodeQL
+false positive resolved by rename rather than dismissal, and one genuine defect
+Copilot caught that this PR had itself introduced.
+
+Copilot independently flagged the `rg` dependency of finding 1, from the
+portability angle rather than the CI-failure angle.
 
 ---
 
@@ -101,6 +105,111 @@ If the alert survives the rename, the remaining source can only be the dict key
 literal itself, at which point dismissal-with-marker is the correct answer rather
 than deforming the contract — but that is a decision to take on evidence from the
 next scan, not pre-emptively.
+
+---
+
+## Finding 3 — the ACG rules apply swallowed failures, the defect this PR fixes elsewhere
+
+**Where:** `scripts/plugins/observability.sh:735-738` (as reviewed), inside `_deploy_pushgateway_acg`
+**Raised by:** Copilot
+
+> This apply path swallows failures: if applying the ACG PrometheusRules directory
+> fails, the function still continues and reports success (the `&& _info` only gates
+> the log line). That recreates the "failed apply looked like success" defect that
+> this PR fixes for the hub rules path.
+
+This is correct and it is the most valuable finding of the three, because the PR
+body advertises exactly this fix for the hub path while the branch introduced a
+**new** instance of it for the app cluster:
+
+```bash
+_kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/" >/dev/null   && _info "[observability] app-cluster PrometheusRules applied from ${_acg_rules_dir}/"
+```
+
+`&&` gates only the log line, so a failed apply is indistinguishable from a
+successful one: no error, no non-zero status, just a missing success message that
+nobody is watching for.
+
+**It is in scope, and that was checked rather than assumed.** `git show
+main:scripts/plugins/observability.sh` has no `_acg_rules_dir` at all — the block
+arrived on this branch in `22e9c53d`. The same `apply … >/dev/null && _info` shape
+occurs 9 more times in this file (dashboards, promtail, the ArgoCD dashboard), but
+all of those are pre-existing on `main`; fixing them here would be an unsolicited
+refactor of code this release does not touch. Filed as backlog instead.
+
+### Fix
+
+```bash
+local _acg_rules_failed=0
+local _acg_rules_dir="${SCRIPT_DIR}/etc/prometheus/rules-acg"
+if [[ -d "${_acg_rules_dir}" ]]; then
+  if _kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/" >/dev/null; then
+    _info "[observability] app-cluster PrometheusRules applied from ${_acg_rules_dir}/"
+  else
+    _err "[observability] Failed to apply app-cluster PrometheusRules from ${_acg_rules_dir}/"
+    _acg_rules_failed=1
+  fi
+fi
+_observability_apply_trivy_dashboard "${_app_context}"
+return "${_acg_rules_failed}"
+```
+
+**Why a flag rather than a bare `return 1` at the failure site.** An early return
+would skip `_observability_apply_trivy_dashboard`, which has nothing to do with
+the rules apply — turning a reporting bug into a silent loss of unrelated work.
+The flag makes the failure loud *and* the exit status honest while leaving the
+sequence intact. Note this function has no `set -e` above it and its caller at
+line 692 ignores the status, so the non-zero return is for the record and for
+future callers; the `_err` line is what a human or a log scrape actually sees
+today. There is deliberately no behaviour change to the pushgateway install above
+it, which warns and returns 0 on purpose ("deployment metrics disabled").
+
+**Verification.** New guard, `the ACG PrometheusRules apply cannot report success
+on failure`, asserts the contract rather than a source line: the block contains
+`_err`, does **not** contain `&& _info`, and the function returns the flag. It is
+**mutation-tested** — reverting `observability.sh` to the pre-fix source turns it
+red, and the file was restored byte-identical by `cmp`. 6/6 in
+`observability_public_endpoint_probes.bats`; shellcheck `-S warning` clean on both
+`HEAD` and `main`.
+
+---
+
+## Incidental — `deploy_observability` tripped the if-count audit
+
+Committing the finding-3 fix was blocked by the `_agent_audit` pre-commit hook:
+
+```
+WARN: Agent audit: scripts/plugins/observability.sh exceeds if-count threshold in: deploy_observability:9
+```
+
+**This is not caused by the fix.** The threshold is 8
+(`AGENT_AUDIT_MAX_IF`). Counting `if` statements per function across three
+revisions: `main` has no offender, `HEAD` before this commit already reports
+`deploy_observability: 9`, and the staged tree with the fix still reports 9 — the
+count is unchanged. The function crossed the threshold earlier on this branch, in
+`cc4d634b`, which added the per-file `if envsubst … then` loop to the hub rules
+apply. The fix itself added an `if/else` to a *different* function
+(`_deploy_pushgateway_acg`), which is well under the limit.
+
+The hook only audits `.sh` files that are **staged**, which is why it surfaced
+now: the first commit on this PR staged BATS, Python and Markdown, so
+`observability.sh` was never presented to it.
+
+Resolved with the mechanism the repo provides for exactly this — an entry in
+`scripts/etc/agent/if-count-allowlist`, whose own header reads "Temporary
+allowlist for functions pending refactors … See docs/issues entries for each
+item" and which already carries eight such entries:
+
+```
+scripts/plugins/observability.sh:deploy_observability
+```
+
+**This is a deferral, not a fix, and it loosens a repo-wide quality gate by one
+function.** The honest alternative is decomposing `deploy_observability`, which is
+an unsolicited refactor of code already reviewed in this release and does not
+belong in a review-response commit. Flagged for the operator: if the preference is
+to refactor rather than allowlist, that is a follow-up, and this entry should be
+removed when it lands.
 
 ---
 

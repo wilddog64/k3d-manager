@@ -54,3 +54,16 @@
   [ "${status}" -eq 0 ]
   [ "$(printf '%s\n' "${output}" | wc -l | tr -d ' ')" -eq 7 ]
 }
+
+@test "the ACG PrometheusRules apply cannot report success on failure" {
+  plugin="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
+
+  local _block
+  _block=$(awk '/_acg_rules_dir="/ { found=1 } found { print } found && /^  fi$/ { exit }' "${plugin}")
+  [ -n "${_block}" ]
+  [[ "${_block}" == *"_err "* ]]
+  [[ "${_block}" != *"&& _info"* ]]
+
+  run grep -F -- 'return "${_acg_rules_failed}"' "${plugin}"
+  [ "${status}" -eq 0 ]
+}
