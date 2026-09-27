@@ -5810,3 +5810,54 @@ AppProject deployment. Added six source-level BATS gates and the scoped vector-s
 Focused BATS is 16/16. Mutation proof produced red gates 11, 12, 13, 14, 15, and 16 and all
 mutations were restored. Shellcheck remains at the existing single SC2317 informational warning.
 Implementation commit `10dcd995` is pushed to `origin/k3d-manager-v1.39.0`; no PR was created.
+# 2026-09-27 — v1.39.0 test-suite metrics implementation blocked on read-only Git metadata
+
+- [x] Implemented the spec worktree changes: `bin/k3dm-test-metrics`, focused pytest suite and
+      fixture, `make test-metrics`, ACG Grafana dashboard/apply hook, five Prometheus rules,
+      and the dashboard guide. No live Pushgateway, cluster, or host action was run.
+- [x] Gates observed: focused pytest 11 passed; bare pytest 307 passed; `make test-all` observed
+      `EXIT=0` in this shell (the pyenv `pytest` command was found, so the expected Homebrew
+      no-pytest `EXIT=2` path was not reproduced), 1304 BATS ok / 0 not ok, unittest 7/6/29/22/6/6/4,
+      pytest 307 passed; shellcheck clean; YAML/JSON validation clean; doc links 1793 files OK.
+- [x] M1-M7 each produced a focused pytest failure and restored to 11 passed. The genuine `make
+      test` capture contained the verbatim plan line `1..1151` and no `.bats` or `[make] bats`
+      suite marker; the parser uses a `bats` aggregate fallback for that real combined output.
+- [ ] Commit/push blocked by environment permissions: `git pull` could not write `.git/FETCH_HEAD`,
+      and `git add` could not create `.git/index.lock` (`Operation not permitted`). No commit SHA
+      or remote update exists for this implementation; memory update is status-only pending a
+      writable Git checkout.
+
+# 2026-09-27 — test-suite metrics landed as `205405c0` (Claude finished Codex's blocked commit)
+
+Codex implemented the spec in the worktree but could not commit: its sandbox denied `.git`
+writes (`FETCH_HEAD`, `index.lock` — `Operation not permitted`), the known
+`reference_codex_exec_cannot_commit_git_lock` failure. Claude verified the worktree, fixed two
+gaps and committed as `205405c0`.
+
+VERIFIED INDEPENDENTLY, not taken from the report: focused pytest 12 passed (11 from Codex plus
+one Claude added); bare `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` 307 passed;
+`make test-python-unit` all seven files OK (7/6/29/22/6/6/4); `make check-doc-links` 1793 files OK;
+`py_compile` rc 0; rule YAML parses with 14 alerts and no empty `expr`; dashboard JSON parses,
+uid `k3dm-tests`, 7 panels, `grafana_dashboard: "1"`. The five added alerts are exactly the
+spec's, including the spec'd `DeploymentMetricsStale`, whose metric name matches its producer at
+`bin/k3dm-webhook:1303`.
+
+THE MARKER FACT, CONFIRMED AGAINST THE REAL LOG. The genuine `make test-all` capture
+(`/tmp/k3dm-test-all-20260927.log`, 90KB) has ZERO `# file:` markers — real BATS output is one
+flat TAP stream opening `1..1151`. Codex's fixture invents a `# file: scripts/tests/lib/*.bats`
+marker, so its two attribution tests exercised a code path that never occurs in production, and
+nothing covered a red in the flat stream that actually ships. Claude ran the parser against the
+real log directly (1304/0, total 1691, suites `bats`+7 unittest files+`pytest`) and added
+`test_real_combined_bats_output_aggregates_and_counts_its_red`, mutation-proved by renaming the
+aggregate suite `bats` → `bats-all`: exactly that one test went red, then restored identical.
+
+SHELLCHECK WAS A VACUOUS GATE. `bin/k3dm-test-metrics` is Python carrying
+`# shellcheck disable=SC1071`, so `shellcheck -x` passes without reading it. `py_compile` is the
+real gate; do not treat the spec's shellcheck line as coverage for this file.
+
+TWO SPEC MISSES CLAUDE FIXED. (1) The spec required a `k3dm Tests` row in the guide's
+"Triage: `No data` by cause" table; Codex added a section but not the row. (2) The guide asserted
+the exit-code panel "reads 2 on a healthy `test-all` here", which the real run contradicts — it
+exits 0 when a real `pytest` is on PATH. Both corrected in `205405c0`.
+
+CHANGELOG went under `## [1.39.0]`, consistent with the other three entries this release.

@@ -2190,3 +2190,30 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] `bats scripts/tests/plugins/argocd_vectordb.bats`: 16/16 passed after restoration.
 - [x] Mutation-proof red lines captured for gates 11–16; all mutations restored.
 - [x] Implementation commit `10dcd995` is pushed to `origin/k3d-manager-v1.39.0`; no PR created.
+# v1.39.0 test-suite metrics — 2026-09-27 implementation status
+
+- [x] Worktree implementation complete within the spec files: offline log parser/pusher and tests,
+      opt-in `test-metrics` target, dashboard, apply hook, staleness rules, and guide.
+- [x] Verification: focused pytest `11 passed`; bare pytest `307 passed`; `make test-all` observed
+      `EXIT=0`, with `1304 BATS ok / 0 not ok`, unittest `7/6/29/22/6/6/4`, and pytest `307 passed`.
+      Shellcheck clean, YAML/JSON checks clean, and `make check-doc-links` reported `1793 file(s) OK`.
+- [x] Seven mutations M1-M7 each went red and were restored; focused suite returned `11 passed`.
+- [ ] No commit/push SHA: the environment denies writes to `.git` (`FETCH_HEAD` and `index.lock`).
+      Resume by retrying the required pull, commit (including the observed marker fact), push, and
+      remote SHA verification from a checkout with writable Git metadata.
+
+# v1.39.0 test-suite metrics — DONE 2026-09-27, commit `205405c0`
+
+- [x] Spec `docs/plans/v1.39.0-test-suite-metrics-and-staleness.md` implemented: `bin/k3dm-test-metrics`,
+      focused pytest suite + fixture, opt-in `make test-metrics`, `k3dm-tests` dashboard, ACG apply
+      hook, five Prometheus rules, guide update. `make test` and `make test-all` recipes unchanged.
+- [x] Codex wrote the worktree changes but could NOT commit — sandbox denied `.git` writes. Claude
+      verified, fixed two gaps, and committed `205405c0`. Codex's own "blocked, no SHA" entries
+      above are accurate for its run and are left as written.
+- [x] Claude-added coverage: the real flat-TAP BATS path, which Codex's invented `# file:` fixture
+      marker left untested. Mutation-proved red, then restored identical.
+- [x] Claude-fixed spec misses: the guide's triage-table row, and the false "exit code reads 2"
+      claim (the real capture exits 0 with a pyenv pytest on PATH).
+- [ ] OPERATOR-OWNED, deliberately not done: the first live `make test-metrics` push, and
+      confirming the `k3dm-tests` dashboard loads in the ACG Grafana. No live Pushgateway, cluster
+      or host action was taken by any agent.
