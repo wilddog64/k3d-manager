@@ -1,3 +1,25 @@
+# 2026-09-27 — v1.39.0 PR-readiness audit found the blackbox probes inert
+
+Answering "anything else left before create pr": the process gates are clean (no open PRs, branch
+in sync at `25e8e77c`, CHANGELOG promoted to `## [1.39.0] - 2026-09-27` with `[Unreleased]`
+preserved and empty, both release tables carrying the row, promtool green on both rule files after
+extracting `.spec` with `yq` and running it from `prom/prometheus:v3.1.0` — `promtool check rules`
+cannot read a PrometheusRule CR directly). CI is not a pre-PR gate in this repo at all: `ci.yml`
+triggers on `pull_request` only, so an empty `gh run list` before the PR is expected rather than
+the dirty-PR failure `/create-pr` warns about.
+
+Chasing an incidental `ImagePullBackOff` — per the deep-dive-every-anomaly rule — found three
+defects in this release's own `ba2a01e1`, all blocking every operator-owned gate in
+`docs/plans/v1.39.0-public-endpoint-blackbox-probes.md`. Spec:
+`docs/bugs/2026-09-27-blackbox-probe-registry-and-cf-domain-unsubstituted.md`, dispatched to Codex.
+Operator chose `scripts/etc/vars.sh` as `CF_DOMAIN`'s home over renaming the manifest to
+`.yaml.tmpl`.
+
+This is the second instance of one defect class in a single day: **a placeholder is only as good as
+the renderer that substitutes it.** The morning's was `{{HOME}}` in the cloud-bridge launchd
+template, caught before shipping; this one was already committed, and
+`docs/howto/public-endpoint-alerts.md` had documented the substitution as if it happened.
+
 # 2026-09-27 — sibling launchd PATH defect fixed (cloud-bridge, rotator, hermes)
 
 Operator authorized fixing the three sibling templates flagged in the previous entry.

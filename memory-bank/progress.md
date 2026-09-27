@@ -1,5 +1,19 @@
 # v1.39.0 k3dm-tests alerts moved to the ACG stack — 2026-09-27
 
+- [ ] **Blackbox probes inert: doubled image registry + unsubstituted `${CF_DOMAIN}`** — spec
+      `docs/bugs/2026-09-27-blackbox-probe-registry-and-cf-domain-unsubstituted.md` filed.
+      Both defects from this release's own `ba2a01e1`, never merged to `main`. (1) chart 11.3.1
+      concatenates `image.registry` with `image.repository`, so the fully-qualified repository in
+      `blackbox-exporter-values.yaml` rendered `quay.io/quay.io/prometheus/blackbox-exporter` —
+      live pod in `ImagePullBackOff` 137m, 593 backoffs. (2) `public-endpoint-probes.yaml` carries
+      seven `${CF_DOMAIN}` placeholders; `CF_DOMAIN` is assigned nowhere in the repo and
+      `observability.sh:92-96` applied the rules directory raw, so `kubectl` accepted the literal
+      string and the failure would surface as `probe_success 0` blamed on DNS. (3) zero test
+      coverage, which is why both shipped in one commit. Fix per operator's call: `CF_DOMAIN` into
+      a new `scripts/etc/vars.sh`, per-file `envsubst '$CF_DOMAIN'` in the apply path, plus a BATS
+      defect-class guard asserting every placeholder in the rules directory is in the allowlist.
+      Dispatched to Codex.
+
 - [ ] **`/k3dm help` omits the cluster lifecycle commands** — spec
       `docs/bugs/2026-09-27-k3dm-help-omits-cluster-lifecycle-commands.md` filed and committed
       `788deeb2`, pushed. Dispatched to Codex (session `01a0e3a3`). Help text only:
