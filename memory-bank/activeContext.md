@@ -33,8 +33,7 @@ Implemented the Codex brief for `docs/bugs/2026-09-28-diagnostics-logs-output-un
 Added shared `scripts/lib/webhook/redact.py` and applied it after registry redaction in diagnostics
 output, covering Slack and job artifacts. Added the required shape and false-positive tests plus
 the stubbed diagnostics path test. Compilation, registry regression, grep, and `make test-pytest`
-(334 passed) are green; all three mutations went red and were restored to green. Commit SHA is
-recorded after the single requested commit.
+(334 passed) are green; all three mutations went red and were restored to green. Commit `7208c043`.
 
 # 2026-09-28 — cloud-request helper fix implemented
 

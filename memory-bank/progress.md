@@ -12,7 +12,7 @@
 - [x] Fixed unregistered credential-shaped values leaking through diagnostics logs. Added shared
   `scripts/lib/webhook/redact.py`, the diagnostics integration, focused tests, and the Unreleased
   changelog entry. `make test-pytest` passed 334 tests; the three required mutations were proven
-  red and restored to green. Commit SHA is recorded after the single requested commit.
+  red and restored to green. Commit `7208c043`.
 
 # 2026-09-28 — cloud-request helper fix implemented
 
