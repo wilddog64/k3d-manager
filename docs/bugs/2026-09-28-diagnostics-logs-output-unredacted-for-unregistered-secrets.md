@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-28 by Claude (cloud session), at the operator's request while adding
 `/cluster-diagnose` to the cloud bridge (`v1.40.0-cloud-bridge-test-targets.md` M4b)
-**Status:** FIXED — commit `7208c043`
+**Status:** FIXED in `7208c043`; follow-up gaps open (see Verification)
 **Severity:** Medium — no known live leak; a real exposure path to Slack today, and a
 permanent one to git once the bridge exposes it.
 **Component:** `scripts/lib/webhook/status.py` (`_run_cluster_diagnostics`, `action == "logs"`),
@@ -141,3 +141,53 @@ false-positive cases are tested as hard as the positive ones.
 - `describe-pod` — the sibling doc; different leak shape.
 - Whether diagnostics should be posted to Slack at all.
 - `_register_secret` coverage (the 2026-09-17 doc).
+
+## Verification (2026-09-28, Claude cloud session)
+
+`7208c043` passes every gate in the brief: compile OK, `make test-pytest` 334 passed,
+`webhook_redaction.py` OK, grep count `2`, diff limited to the listed files. The three brief
+mutations each go red. Authored as `t <t@t>`, like the previous Codex commit.
+
+Gaps found, each reproduced against `scrub_credentials` directly:
+
+| Input | Output | Why |
+|---|---|---|
+| `{"password":"hunter2"}` | unchanged | a quote sits between the key and `:`; JSON logs (zap, structlog) leak |
+| `{"access_token": "abc"}` | unchanged | same |
+| `token: Bearer abc123` | `token: ***REDACTED*** abc123` | key/value rule eats `Bearer` first, so the Bearer rule never sees the token |
+| `redis://:pw@redis:6379` | unchanged | userinfo rule needs a non-empty user |
+| `Authorization: Basic dXNl...` | unchanged | no Basic rule |
+| `password = "two words"` | `password = ***REDACTED*** words"` | quoted value cut at the first space |
+
+Surviving mutations (tests stay green):
+- Drop `_redact_secrets(` from `_finish`: 20/20 and 334/334 green. Test 3 stubs
+  `_redact_secrets` to identity and test 4 uses a local lambda, so no test proves the registry
+  path still runs in diagnostics.
+- Drop `\b` from `_VAULT_RE`: green. No test guards `items.<long id>`.
+
+### Codex brief (follow-up)
+
+Same branch, same files: `scripts/lib/webhook/redact.py`, `scripts/tests/bin/test_redact.py`,
+`CHANGELOG.md`, `memory-bank/*`, this doc. Do not touch `status.py` beyond what test 4 needs
+(nothing expected).
+
+- Key/value rule allows an optional closing quote after the key (`"password":"x"`) and redacts a
+  whole quoted value (`"..."` or `'...'`), else `\S+` as now.
+- Run the Bearer rule before the key/value rule, or make the key/value value skip a leading
+  `Bearer `, so `token: Bearer x` redacts `x`.
+- Userinfo user may be empty (`[^/\s:@]*`).
+- Add `Basic <base64>` (keep the `Basic ` prefix).
+- Tests: one case per row in the table above; a guard that `items.abcdefghijklmnopqrstuvwxyz0123`
+  is unchanged; rewrite test 4 to call `_run_cluster_diagnostics` with a real registry-style
+  `_redact_secrets` (via `status.configure_runtime` or monkeypatch to a function that replaces a
+  registered value) and assert the registered value is gone from `output`.
+- Mutations to show red: drop `_redact_secrets(` from `_finish`; drop `\b` from `_VAULT_RE`;
+  revert the JSON quote handling.
+- Commit message: `fix(diagnostics): scrub JSON, quoted and Basic credentials in diagnostics output`.
+
+### Live check
+
+Not possible from the cloud bridge yet: it has no diagnostics action (M4b holds `diagnose-logs`
+on this bug), and `job-status` for make jobs returns empty output
+(`2026-09-28-make-jobs-never-write-output-file.md`), so a bridged `make-test-pytest` (job
+`ece42f1c`, status success) cannot show which tests ran on the M4.
