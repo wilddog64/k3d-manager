@@ -8,6 +8,62 @@
 Two independent defects in the same file. Both make the helper fail for a cloud session, which is
 the helper's only audience.
 
+## Codex brief
+
+**Goal:** a fresh cloud clone can file every bridge action through `bin/k3dm-cloud-request`, with no
+manual `git fetch` first, and the helper's action list can never drift from the bridge's again.
+
+**Runs where:** Codex web is fine. Pure code and offline tests; nothing needs the M4, a cluster, the
+webhook, or the real `cloud-requests` branch. Test 1 uses a local bare repo in `tmp_path`, never
+`origin` on GitHub.
+
+**Decision already made (shape 1):** create `scripts/lib/webhook/cloud_actions.py` holding
+`JOB_ID_RE`, `NS_RE`, `Q_RE` and `ACTION_ALLOWLIST`, moved verbatim from `bin/k3dm-cloud-bridge`.
+It imports only `re` (`scripts/lib/webhook/__init__.py` is empty, so importing it pulls in no
+`webhook.auth`). The bridge imports those four names from it so `bridge.ACTION_ALLOWLIST` and the
+regexes still resolve for existing tests. The helper derives its argparse `choices` and per-action
+arg names from `ACTION_ALLOWLIST` and validates each value with that action's regex; delete
+`ACTION_ARGS` and the helper's own `JOB_ID_RE`.
+
+**Files to touch (only these):**
+- `scripts/lib/webhook/cloud_actions.py` (new)
+- `bin/k3dm-cloud-bridge` (import the table instead of defining it)
+- `bin/k3dm-cloud-request` (fetch in `_commit_request`; table-driven args)
+- `scripts/tests/bin/test_cloud_bridge.py` (tests 1 to 3 below)
+- `docs/howto/cloud-session-requests.md`, `CLAUDE.md` (the "Docs" section below)
+- `CHANGELOG.md` (one `### Fixed` bullet under `## [Unreleased]`)
+- `memory-bank/activeContext.md`, `memory-bank/progress.md` (SHA and status)
+- this bug doc (set **Status** to FIXED with the SHA)
+
+**Defect 1 detail:** in `_commit_request`, first `_git(["fetch", "origin", FETCH_REFSPEC], timeout=120)`,
+then resolve the parent with `git rev-parse --verify --quiet refs/remotes/origin/cloud-requests`.
+The fetch of a missing remote branch fails, so treat "remote has no `cloud-requests`" (check with
+the existing `ls-remote` call, done before the fetch) as the empty-tree path, exactly as today.
+Keep `--force-with-lease` against that parent.
+
+**Gates (paste the output of each):**
+- `python3 -m py_compile bin/k3dm-cloud-request bin/k3dm-cloud-bridge scripts/lib/webhook/cloud_actions.py`
+- `make test-pytest` green (summary pasted). Invoke via make, not bare pytest.
+- `command grep -c 'ACTION_ARGS' bin/k3dm-cloud-request` → `0`
+- `command grep -c '^ACTION_ALLOWLIST = ' bin/k3dm-cloud-bridge` → `0`
+- `python3 -c "import sys; sys.path.insert(0,'scripts/lib'); import webhook.cloud_actions; print('webhook.auth' in sys.modules)"` → `False`
+- The three mutations in "Mutations" below, each shown red, then the tree restored and green again.
+- `git diff --stat` lists only the files above.
+
+**Do not change:**
+- The bridge's validation logic, its `FETCH_REFSPEC`, or any regex's pattern text (the existing
+  `test_make_action_argument_patterns_match_webhook_patterns` pins them to `make_targets`).
+- The helper's exit codes (2 bad args, 3 rejected, 4 error, 5 timeout) or the request JSON schema.
+- `.claude/settings.json`, `scripts/lib/foundation/`, `scripts/lib/acg/`.
+- Do not add the four actions from `v1.40.0-cloud-bridge-test-targets.md` M4. That spec adds them
+  to the bridge table later, and after this fix the helper picks them up for free.
+- Do not run `kubectl`, the bridge's poll loop, `make install-cloud-bridge`, or `make down`, and do
+  not push to the real `cloud-requests` branch.
+
+**Commit and hand back:** one commit on `k3d-manager-v1.40.0`, message
+`fix(cloud-request): fetch before filing and derive actions from the bridge allowlist`.
+No PR, no merge, no force-push, no `--no-verify`.
+
 ## Defect 1 — the helper commits on top of a parent it never fetched
 
 `_commit_request` reads the remote tip with `git ls-remote origin refs/heads/cloud-requests` and then

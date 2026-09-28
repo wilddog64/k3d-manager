@@ -1,3 +1,11 @@
+# 2026-09-28 — cloud-request helper bug handed to Codex
+
+The Hermes ESO sensor bug (first in the v1.40.0 bug list) was already FIXED in `8381656`; its doc
+still said OPEN and now says FIXED. Handed off the next one instead:
+`docs/bugs/2026-09-28-cloud-request-helper-no-fetch-and-four-action-allowlist.md` now has a
+**Codex brief** (shape 1 chosen: shared `scripts/lib/webhook/cloud_actions.py` table). Codex web
+can do it; no M4 or cluster needed.
+
 # 2026-09-28 — v1.40.0 back to 5 plans; e2e-dispatch deferred to v1.41.0
 
 Earlier count of "3 plans" was wrong — three more v1.40.0 plans were already on `main`

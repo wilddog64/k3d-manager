@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-27
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED in `8381656` (2026-09-27)
 **Files:** `scripts/lib/webhook/smoke.py`, `scripts/lib/hermes/sensors.py`,
 `scripts/tests/lib/webhook_hub_eso.bats`, `scripts/tests/hermes/test_hermes.py`,
 `docs/guides/hermes.md`, `CHANGELOG.md`
