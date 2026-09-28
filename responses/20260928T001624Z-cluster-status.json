@@ -1,0 +1,1 @@
+{"action": "cluster-status", "body": {"job_id": "d4d6c8be", "status": "queued"}, "completed_at": "2026-09-28T00:16:39.836478Z", "http_status": 202, "id": "20260928T001624Z-cluster-status", "schema": 1, "status": "ok"}
