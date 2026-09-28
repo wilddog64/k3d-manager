@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `cluster-down` now removes the per-provider active marker through the provider-state helper
+  instead of hardcoding the legacy scalar marker path. The old teardown cleared the resolver's
+  tie-break while leaking the per-provider set entry, leaving a torn-down provider registered
+  indefinitely and sending provider-scoped probes at a kube context that no longer existed.
+
 ### Added
 
 - **`make argocd-hermes-token`** re-mints the Hermes ArgoCD API token and stores it in the Keychain,

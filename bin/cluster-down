@@ -124,7 +124,8 @@ case "${_cluster_provider}" in
     ;;
 esac
 
-_dry_guard "remove active-provider marker" rm -f "${HOME}/.local/share/k3d-manager/active-provider"
+_dry_guard "clear active-provider markers for ${_cluster_provider}" \
+  _acg_unrecord_provider "${_cluster_provider}"
 
 _info "[acg-down] Stopping Vault port-forward..."
 _vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
