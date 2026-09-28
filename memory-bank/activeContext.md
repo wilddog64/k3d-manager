@@ -5,7 +5,7 @@ The helper now fetches before resolving the `cloud-requests` parent and derives 
 validation from shared `scripts/lib/webhook/cloud_actions.py`; the bridge imports the same table.
 Added the three specified tests, updated the how-to, `CLAUDE.md`, changelog, and bug status. Gates:
 py_compile, structural grep/import checks, and `make test-pytest` (314 passed); all three required
-mutations went red and were restored to green. Commit SHA is recorded after the single requested commit.
+mutations went red and were restored to green. Commit: `66f642aa`.
 
 # 2026-09-28 — cloud-request helper bug handed to Codex
 
