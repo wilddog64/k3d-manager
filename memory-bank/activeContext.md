@@ -1,3 +1,10 @@
+# 2026-09-28 — v1.41.0 spec: webhook log levels and retention
+
+CK asked for log levels and a disk retention policy. v1.40.0 is full (5 plans), so it is
+`docs/plans/v1.41.0-webhook-log-levels-and-retention.md` (v1.41.0 now has 2 plans). M1 levels via
+`K3DM_LOG_LEVEL`; M2 full make output to local `make.log` (not `output`, which the bridge
+publishes); M3 retention in `bin/k3dm-cleanup` (job folders 14d/500, launchd logs 10 MiB x5).
+
 # 2026-09-28 — make jobs never write `output` (bug filed)
 
 Live cloud-request test showed `job-status` returns `"output": ""` for every `/api/v1/make` job:
