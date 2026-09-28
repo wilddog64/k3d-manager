@@ -19,8 +19,8 @@ Uses a dispatcher pattern with lazy plugin loading.
   environment with only the GitHub connection, you cannot reach the k3dm webhook, the cluster,
   or any host. Do not search for a token, do not attempt a tunnel, and do not ask the operator to
   place a credential in your environment — that is refused by policy. To read cluster state, file
-  a request on the `cloud-requests` branch: see **`docs/howto/cloud-session-requests.md`**. Four
-  read-only actions listed in the cloud-session how-to are available; everything else must be run
+  a request on the `cloud-requests` branch: see **`docs/howto/cloud-session-requests.md`**. The
+  read-only actions listed in that how-to's table are available; everything else must be run
   by the operator.
 
 - **Reapply the ApplicationSets on every release** — ApplicationSets template their `$values` source at `${K3D_MANAGER_BRANCH}`, which freezes to whatever branch was checked out when the set was last applied. Config committed to a newer branch is **inert** until the sets are reapplied: it is in git, CI is green, and no cluster reads it. This silently persisted for two releases (hub `trivy-operator` still on `k3d-manager-v1.16.0` as of 2026-07-24). Decision 2026-07-24: the values ref keeps tracking the **release branch**, not `main` — which makes this a required release step, not an optional one. Reapply for **both** the hub and ACG variants, then confirm with `argocd_check_values_branch`.

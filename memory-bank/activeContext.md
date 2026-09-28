@@ -1,3 +1,32 @@
+# 2026-09-28 — diagnostics logs redaction bug handed to Codex
+
+Next Codex handoff after the cloud-request helper: the diagnostics logs bug, chosen over the
+latent role-ranking bug because the describe-pod bug, the artifacts spec M2 and the v1.41.0
+logging M4 all need its scrubber. Brief fixes the module as `scripts/lib/webhook/redact.py`
+(`scrub_credentials`, marker `***REDACTED***`); the artifacts spec now imports it instead of
+defining its own filter.
+
+# 2026-09-28 — logging spec gains M4: failed-job notes for the vector store
+
+CK agreed raw logs stay out of pgvector; added M4 to `v1.41.0-webhook-log-levels-and-retention.md`.
+The webhook writes a redacted `failure.md` per failed job; `make harvest-job-failures` copies it
+to `docs/job-failures/` (dedup by signature); that dir joins `CORPUS_GLOBS`. Blocked on the
+v1.40.0 artifacts spec's redaction filter.
+
+# 2026-09-28 — v1.41.0 spec: webhook log levels and retention
+
+CK asked for log levels and a disk retention policy. v1.40.0 is full (5 plans), so it is
+`docs/plans/v1.41.0-webhook-log-levels-and-retention.md` (v1.41.0 now has 2 plans). M1 levels via
+`K3DM_LOG_LEVEL`; M2 full make output to local `make.log` (not `output`, which the bridge
+publishes); M3 retention in `bin/k3dm-cleanup` (job folders 14d/500, launchd logs 10 MiB x5).
+
+# 2026-09-28 — make jobs never write `output` (bug filed)
+
+Live cloud-request test showed `job-status` returns `"output": ""` for every `/api/v1/make` job:
+`_run_make_target` posts the tail to Slack but never writes `JOB_DIR/<id>/output`. Filed
+`docs/bugs/2026-09-28-make-jobs-never-write-output-file.md`. It contradicts the artifacts spec's
+premise; hold the fix until that spec's redaction filter decision.
+
 # 2026-09-28 — cloud-request helper fix implemented
 
 Implemented the Codex brief for `docs/bugs/2026-09-28-cloud-request-helper-no-fetch-and-four-action-allowlist.md`.
@@ -5,7 +34,8 @@ The helper now fetches before resolving the `cloud-requests` parent and derives 
 validation from shared `scripts/lib/webhook/cloud_actions.py`; the bridge imports the same table.
 Added the three specified tests, updated the how-to, `CLAUDE.md`, changelog, and bug status. Gates:
 py_compile, structural grep/import checks, and `make test-pytest` (314 passed); all three required
-mutations went red and were restored to green. Commit: `66f642aa`.
+mutations went red and were restored to green. Commit `66f642aa`; verified by Claude 2026-09-28
+(tests, mutations, and a real fresh-clone file against a local bare remote).
 
 # 2026-09-28 — cloud-request helper bug handed to Codex
 
