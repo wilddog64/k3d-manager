@@ -14,6 +14,71 @@ separately as a v1.35.0 item". No such item exists in `docs/` or `memory-bank/` 
 2026-09-28). This doc is that item, for the `logs` verb.
 **Sibling:** `2026-09-28-diagnostics-describe-pod-prints-literal-env-values.md`
 
+## Codex brief
+
+**Goal:** diagnostics output (Slack and `job-status`) never carries a credential-shaped value,
+whether or not the webhook registered it. One shared scrubber module that the describe-pod
+sibling, the artifacts spec's M2 filter and the v1.41.0 logging spec's M4 all import.
+
+**Runs where:** Codex web is fine. Pure code and offline tests with a stubbed `kubectl`; nothing
+needs the M4, a cluster, Slack, or the webhook process.
+
+**Decisions already made:**
+- New module `scripts/lib/webhook/redact.py`, stdlib `re` only, exposing
+  `scrub_credentials(text) -> str`. The marker is `***REDACTED***`, the one `_redact_secrets`
+  already uses, so every redaction reads the same.
+- Call it in exactly one place: `_finish` inside `_run_cluster_diagnostics`
+  (`scripts/lib/webhook/status.py:372`), as
+  `output = scrub_credentials(_redact_secrets("".join(lines)))`. That covers every diagnostics
+  action (logs, describe-pod, describe-app, ...) for both the Slack post and the `output` file.
+- Key/value rule: match only when the **key ends in** the sensitive word, so `DB_PASSWORD=`,
+  `client_secret:` and `api-key=` are caught but `token_count=42` and `secretName: app-tls` are
+  not. A starting point:
+  `(?i)\b([\w.-]*(?:password|passwd|secret|token|api[_-]?key|credential)s?)(\s*[:=]\s*)(\S+)`,
+  replacing group 3.
+- Vault tokens need a word boundary: `\b(?:hvs|s)\.[A-Za-z0-9]{24,}`, so `items.<long id>`
+  does not match.
+- `_args_have_sensitive_flag` (`scripts/lib/system.sh:196`) names `password`, `token` and
+  `username`. `username` is not a secret and stays out. Add a test asserting `password` and
+  `token` are both in the module's key vocabulary, so the two cannot drift.
+
+**Files to touch (only these):**
+- `scripts/lib/webhook/redact.py` (new)
+- `scripts/lib/webhook/status.py` (import and the one call in `_finish`)
+- `scripts/tests/bin/test_redact.py` (new; tests 1 to 4 below, plus the vocabulary test and
+  the extra guard `secretName: app-tls` unchanged)
+- `CHANGELOG.md` (one `### Fixed` bullet under `## [Unreleased]`)
+- `memory-bank/activeContext.md`, `memory-bank/progress.md` (SHA and status)
+- this bug doc (set **Status** to FIXED with the SHA)
+
+**Test 3 detail:** monkeypatch `status.JOB_DIR` to `tmp_path`, `status._spawn_capture_text` to
+return `(0, "<synthetic log with Bearer token>", False)`, and `status._slack_post` /
+`status._notify_job` to capture their text. Call `_run_cluster_diagnostics` with
+`{"action": "logs", "context": "k3d-k3d-cluster", "namespace": "identity", "name": "keycloak-0"}`
+and a `response_url`, then assert neither `tmp_path/<job>/output` nor the captured payload
+contains the token.
+
+**Gates (paste the output of each):**
+- `python3 -m py_compile scripts/lib/webhook/redact.py scripts/lib/webhook/status.py`
+- `make test-pytest` green (summary pasted).
+- `python3 scripts/tests/bin/webhook_redaction.py` green (the registry path still works).
+- `command grep -c 'scrub_credentials' scripts/lib/webhook/status.py` → `2` (import + call)
+- The three mutations below, each shown red, then the tree restored and green again.
+- `git diff --stat` lists only the files above.
+
+**Do not change:**
+- `_redact_secrets`, `_register_secret` or `_REDACT_VALUES` in `bin/k3dm-webhook`.
+- `_args_have_sensitive_flag` or anything in `scripts/lib/system.sh`, `scripts/lib/foundation/`
+  or `scripts/lib/acg/`.
+- The describe-pod env-block masking. That is the sibling doc's job and it will import this
+  module.
+- `bin/k3dm-cloud-bridge`. The artifacts spec wires the scrubber in there.
+- Do not run `kubectl`, restart the webhook, post to Slack, or run `make down`.
+
+**Commit and hand back:** one commit on `k3d-manager-v1.40.0`, message
+`fix(diagnostics): scrub credential-shaped values from diagnostics output`.
+No PR, no merge, no force-push, no `--no-verify`.
+
 ## The defect
 
 `logs` runs `kubectl logs pod/<name> -n <ns> --context <ctx> --tail=<n>` and writes the result

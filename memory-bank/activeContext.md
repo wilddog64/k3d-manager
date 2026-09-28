@@ -1,3 +1,11 @@
+# 2026-09-28 — diagnostics logs redaction bug handed to Codex
+
+Next Codex handoff after the cloud-request helper: the diagnostics logs bug, chosen over the
+latent role-ranking bug because the describe-pod bug, the artifacts spec M2 and the v1.41.0
+logging M4 all need its scrubber. Brief fixes the module as `scripts/lib/webhook/redact.py`
+(`scrub_credentials`, marker `***REDACTED***`); the artifacts spec now imports it instead of
+defining its own filter.
+
 # 2026-09-28 — logging spec gains M4: failed-job notes for the vector store
 
 CK agreed raw logs stay out of pgvector; added M4 to `v1.41.0-webhook-log-levels-and-retention.md`.
