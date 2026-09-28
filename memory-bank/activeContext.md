@@ -1,3 +1,55 @@
+# 2026-09-28 — v1.40.0 back to 5 plans; e2e-dispatch deferred to v1.41.0
+
+Earlier count of "3 plans" was wrong — three more v1.40.0 plans were already on `main`
+(`hermes-app-health-delta-sensor`, `hermes-prior-art-and-retrieval-eval`, `slack-corpus-qa`), making
+six. Operator approved moving `cloud-bridge-e2e-dispatch` to `docs/plans/v1.41.0-cloud-bridge-e2e-dispatch.md`
+(it is blocked on the artifacts spec and the token-role bug anyway). **Count plans with
+`ls docs/plans/v1.40.0-*`, not a diff against main.** Also renamed slack-corpus-qa's new command
+`/ask` → `/ask-docs`: `/ask` already exists in the relay (cluster-aware AI, `/api/v1/ask`).
+
+# 2026-09-28 — `/cluster-diagnose` added to the test-targets spec
+
+CK approved exposing read-only cluster diagnostics to cloud sessions. `v1.40.0-cloud-bridge-test-targets.md`
+M4b adds six `diagnose-*` bridge actions over the existing reader route `POST /api/v1/diagnostics`
+(no new route/role/token). `diagnose-logs`/`describe-pod` wait on the artifacts spec's redaction
+filter, because their output is committed to `cloud-requests` permanently.
+Filed as bugs the same day (they also leak to Slack today):
+`docs/bugs/2026-09-28-diagnostics-logs-output-unredacted-for-unregistered-secrets.md`,
+`docs/bugs/2026-09-28-diagnostics-describe-pod-prints-literal-env-values.md`. The 2026-09-17
+audit said the fetch-scoped redaction limit was "tracked separately" — it never was; these are it.
+
+# 2026-09-28 — operator: throwaway vClusters OK; the line is cluster lifecycle
+
+CK decided a cloud session may run `make e2e` (vCluster Tier 1): creating and deleting vClusters
+is fine, including the orphan-delete that can kill a concurrent run (accepted, no lock this
+release). The hard line is bringing a cluster up or down — `make up`/`down`,
+`cleanup-stale-sandbox`, `/cluster-up|down|resume` — never reachable from the bridge.
+`v1.40.0-cloud-bridge-e2e-dispatch.md` now covers `e2e-remote` **and** `e2e` under the
+cloud-runner token. `e2e-sandbox` stays excluded (ACG 4h session).
+
+# 2026-09-28 — v1.40.0 specs corrected after a review against the code
+
+A cloud session reviewed the three v1.40.0 plans against the branch and fixed spec defects
+(no code changed):
+
+- **artifacts:** make/status jobs are async (202 + job id), so artifacts are written on the
+  `job-status` response that first sees a terminal state, keyed by that request id. No
+  `exit_code` (the webhook records only the status word). No target produced `junit.xml`, so M2
+  now adds `K3DM_JUNIT_XML` to `test-pytest` + the webhook job env, and a redaction filter —
+  junit carries assertion values, so it is not inherently safe. Response keeps
+  `status` ok/rejected/error and `http_status`. Action count is thirteen, not twelve.
+- **test-targets:** M4 also adds the actions to the helper's `ACTION_ARGS`; M5's TTL/timeout
+  reasoning corrected (dispatch returns 202, neither limit bounds job runtime).
+- **e2e-dispatch:** dropped the gate/docs/NOT-list items that contradicted test-targets on
+  `make test`/`test-bin`. Lock handling now relies on the dispatcher's atomic `mkdir` acquire
+  (no bridge-side check-then-dispatch, which would race); M4 makes the refusal print the lock
+  `meta` owner. The lock spans the run, so it is the single-flight control.
+
+Filed as bugs (2026-09-28): `docs/bugs/2026-09-28-role-code-assumes-every-token-role-is-ranked.md`
+and `docs/bugs/2026-09-28-cloud-request-helper-no-fetch-and-four-action-allowlist.md`. Was: `policy.py` role handling would KeyError / normalize to admin
+for a new `cloud-runner` role (a requirement e2e-dispatch M2 should state), and the helper bugs
+(`bin/k3dm-cloud-request` needs the branch fetched first; exposes 4 of 13 actions).
+
 # 2026-09-27 — `cluster-down` now unrecords the provider set entry
 
 Implemented item 1 of `docs/bugs/2026-06-24-hostinger-provider-switch-stale-active-provider.md`.
