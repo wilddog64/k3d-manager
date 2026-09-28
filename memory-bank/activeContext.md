@@ -1,3 +1,37 @@
+# 2026-09-27 — root cause upstream of the `eso` fix: `cluster-down` leaks the provider set entry
+
+Traced why the ESO probe was aimed at `ubuntu-k3s`, a context absent from the kubeconfig for
+three weeks. It is not a missing default — it is a teardown bug.
+
+`bin/cluster-down:127` hardcodes `rm -f ~/.local/share/k3d-manager/active-provider`. It never
+calls `_acg_unrecord_provider` and never touches `active-providers/`. So teardown **clears the
+scalar tie-break and leaks the set entry** — the inverse of what `_resolve_provider` needs.
+
+Live state: `active-providers/` holds `k3s-aws` (dated Sep 4 14:04) and `k3s-hostinger`; the
+scalar `active-provider` is absent. An ACG sandbox lives 4h, so the `k3s-aws` entry had outlived
+its cluster by 23 days. Two set entries defeat the single-live shortcut, so the resolver needs
+the scalar, which teardown had deleted.
+
+**The two layers disagree on the fallback default** — `provider.sh:266` returns `k3s-hostinger`,
+`bin/k3dm-webhook:149` returns `k3s-aws` → `ubuntu-k3s`. Same absent-marker state, different
+cluster depending on which layer asks. That is a second defect, not a symptom of the first.
+
+Recorded as a `Recurrence` section on the existing
+`docs/bugs/2026-06-24-hostinger-provider-switch-stale-active-provider.md` (same defect class,
+same file, three months earlier — that fix is what introduced the set). Not a new file, per the
+dedup rule.
+
+**Not implemented — operator decision.** The narrow fix is one line: have `cluster-down` call
+`_acg_unrecord_provider`, which already does the correct thing and is already tested.
+
+New rule: when replacing a state *file* with a state *directory*, grep for the **literal path**,
+not just the variable name. `bin/cluster-down` mentioned neither `_ACG_ACTIVE_PROVIDER_FILE` nor
+`_ACG_ACTIVE_PROVIDERS_DIR`, so every variable-name search missed it for three months.
+
+Also from the operator's `make status` run: `Prometheus: HTTP 401` is **by design** — an explicit
+special case at `scripts/lib/webhook/smoke.py:604-610` returning neutral, because the endpoint is
+auth-gated. The only real failure in that output is the known `frontend.3ai-talk.org` 404.
+
 # 2026-09-27 — `eso` confirmed live: escalation fired at 23:50
 
 Hermes log (`~/Library/Logs/k3dm-hermes.log`) shows the transition:
