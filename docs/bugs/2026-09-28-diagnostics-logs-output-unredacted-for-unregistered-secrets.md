@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-28 by Claude (cloud session), at the operator's request while adding
 `/cluster-diagnose` to the cloud bridge (`v1.40.0-cloud-bridge-test-targets.md` M4b)
-**Status:** FIXED
+**Status:** FIXED — follow-up commit `89214fc0`
 **Severity:** Medium — no known live leak; a real exposure path to Slack today, and a
 permanent one to git once the bridge exposes it.
 **Component:** `scripts/lib/webhook/status.py` (`_run_cluster_diagnostics`, `action == "logs"`),

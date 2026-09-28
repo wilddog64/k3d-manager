@@ -4,7 +4,7 @@ Implemented the follow-up brief for `docs/bugs/2026-09-28-diagnostics-logs-outpu
 The shared scrubber now handles JSON and quoted values, nested `Bearer` values, empty-user
 connection strings, and `Basic` authorization, with guards for Vault word boundaries and the
 registry redaction path. Focused tests: 27 passed; `make test-pytest`: 341 passed. All three
-follow-up mutations went red and were restored to green. Commit SHA is recorded after commit.
+follow-up mutations went red and were restored to green. Commit `89214fc0`.
 
 # 2026-09-28 — diagnostics logs redaction bug handed to Codex
 

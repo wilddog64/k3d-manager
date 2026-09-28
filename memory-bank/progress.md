@@ -3,7 +3,7 @@
 - [x] Closed the follow-up scrubber gaps: JSON/quoted values, nested Bearer values, empty-user
   URLs, Basic auth, Vault boundary guard, and a real registry-path integration test. Focused
   tests 27/27 and `make test-pytest` 341/341; all three mutations were red and restored green.
-  Commit SHA is recorded after commit.
+  Commit `89214fc0`.
 
 # 2026-09-27 — v1.40.0 cluster-down recurrence fix complete
 
