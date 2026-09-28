@@ -1,3 +1,25 @@
+# 2026-09-27 — `eso` confirmed live: escalation fired at 23:50
+
+Hermes log (`~/Library/Logs/k3dm-hermes.log`) shows the transition:
+`unknown` (23:22, 23:29) → `healthy` (23:36, 23:43) → **`degraded` (23:50, 23:57)**, evidence
+`1/8 not synced: cosign-public-key`. The correlator emitted a real escalation event at 23:50:
+`Hermes escalation (eso joined): argocd + ci + eso + node_pressure + reachability`. First time ESO
+has counted as a correlated signal.
+
+**The verdict fix did NOT need the webhook restart, contrary to what I told the operator.** Hermes
+is `StartInterval 300` with no `KeepAlive` — a fresh process each cycle — so it re-imported the new
+`sensors.py` from the working tree at 23:36, *before* the commit and before `make restart-webhook`.
+The webhook had already been serving the `Hub ESO *` rows since the 2026-09-14 fix, so the D3 fix
+alone flipped the verdict. What the restart changed is the resident webhook's `smoke.py`: app-cluster
+rows now read `cluster unreachable (kube context 'ubuntu-k3s' unusable)` instead of the false
+`not installed`. **Rule: a `StartInterval` launchd agent picks up library edits with no restart —
+only resident (`KeepAlive`) processes need one. Check the plist before claiming a restart is needed.**
+
+Two live observations not yet chased: `kine` reports `stale_acg_registration: true`, and
+`~/.local/share/k3d-manager/` holds a directory `active-providers` (plural) while
+`webhook/config.py` looks for the file `active-provider` (singular) — likely the real origin of the
+`k3s-aws`/`ubuntu-k3s` default fallback in the spec's out-of-scope section.
+
 # 2026-09-27 — the `eso` sensor's `unknown` is FIXED and verified live
 
 Codex implemented S1-S7; the `.git` write denial in its sandbox meant Claude committed. Verified
