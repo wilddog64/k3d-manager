@@ -11,6 +11,8 @@
 - Diagnostics output now scrubs credential-shaped values, including unregistered bearer tokens,
   JWTs, URL passwords, sensitive key/value pairs, Vault, Stripe and GitHub tokens before writing
   job output or posting it to Slack.
+- Diagnostics redaction now also handles JSON and quoted values, `Basic` authorization, empty-user
+  connection strings, and `Bearer` values nested inside sensitive key/value fields.
 - `bin/k3dm-cloud-request` now fetches `cloud-requests` before filing on its tip, so a fresh clone
   no longer fails while reading an object it has not downloaded, and derives its action choices and
   argument validation from the bridge's shared allowlist so all thirteen permitted actions remain

@@ -1,3 +1,11 @@
+# 2026-09-28 — diagnostics redaction follow-up implemented
+
+Implemented the follow-up brief for `docs/bugs/2026-09-28-diagnostics-logs-output-unredacted-for-unregistered-secrets.md`.
+The shared scrubber now handles JSON and quoted values, nested `Bearer` values, empty-user
+connection strings, and `Basic` authorization, with guards for Vault word boundaries and the
+registry redaction path. Focused tests: 27 passed; `make test-pytest`: 341 passed. All three
+follow-up mutations went red and were restored to green. Commit SHA is recorded after commit.
+
 # 2026-09-28 — diagnostics logs redaction bug handed to Codex
 
 Next Codex handoff after the cloud-request helper: the diagnostics logs bug, chosen over the
