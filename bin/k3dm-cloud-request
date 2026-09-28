@@ -4,7 +4,6 @@
 import argparse
 import json
 import os
-import re
 import sys
 import tempfile
 import time
@@ -14,11 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 from webhook.proc import _spawn_capture_text
+from webhook.cloud_actions import ACTION_ALLOWLIST
 
 
-ACTION_ARGS = {"health": set(), "cluster-status": set(), "hostinger-status": set(),
-               "job-status": {"job_id"}}
-JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
 RESPONSE_REF = "refs/remotes/origin/cloud-requests"
 FETCH_REFSPEC = f"+refs/heads/cloud-requests:{RESPONSE_REF}"
 
@@ -32,7 +29,7 @@ def _git(args, cwd=ROOT, env=None, timeout=60):
 
 def _parse_args(argv):
     parser = argparse.ArgumentParser(usage="k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS]")
-    parser.add_argument("action", choices=sorted(ACTION_ARGS))
+    parser.add_argument("action", choices=sorted(ACTION_ALLOWLIST))
     parser.add_argument("--arg", action="append", default=[])
     parser.add_argument("--wait", action="store_true")
     parser.add_argument("--timeout", type=float, default=300)
@@ -42,12 +39,13 @@ def _parse_args(argv):
         if "=" not in item:
             parser.error("--arg requires key=value")
         key, value = item.split("=", 1)
-        if key not in ACTION_ARGS[parsed.action] or key in args:
+        allowed = ACTION_ALLOWLIST[parsed.action][2]
+        if key not in allowed or key in args:
             parser.error("unknown or repeated argument")
-        if key == "job_id" and not JOB_ID_RE.fullmatch(value):
-            parser.error("invalid job_id")
+        if not allowed[key].fullmatch(value):
+            parser.error(f"invalid {key}")
         args[key] = value
-    if set(args) != ACTION_ARGS[parsed.action]:
+    if set(args) != set(ACTION_ALLOWLIST[parsed.action][2]):
         parser.error("missing required argument")
     if parsed.timeout < 0:
         parser.error("timeout must be non-negative")
@@ -56,7 +54,11 @@ def _parse_args(argv):
 
 def _commit_request(request_id, payload):
     remote_ref = _git(["ls-remote", "origin", "refs/heads/cloud-requests"]).split()
-    parent = remote_ref[0] if remote_ref else "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    if remote_ref:
+        _git(["fetch", "origin", FETCH_REFSPEC], timeout=120)
+        parent = _git(["rev-parse", "--verify", "--quiet", RESPONSE_REF]).strip()
+    else:
+        parent = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
     with tempfile.NamedTemporaryFile(dir=ROOT, prefix="cloud-index.", delete=False) as handle:
         index_path = handle.name
     request_file = Path(index_path + ".request")

@@ -1,3 +1,12 @@
+# 2026-09-28 — cloud-request helper fix implemented
+
+Implemented the Codex brief for `docs/bugs/2026-09-28-cloud-request-helper-no-fetch-and-four-action-allowlist.md`.
+The helper now fetches before resolving the `cloud-requests` parent and derives actions and argument
+validation from shared `scripts/lib/webhook/cloud_actions.py`; the bridge imports the same table.
+Added the three specified tests, updated the how-to, `CLAUDE.md`, changelog, and bug status. Gates:
+py_compile, structural grep/import checks, and `make test-pytest` (314 passed); all three required
+mutations went red and were restored to green. Commit SHA is recorded after the single requested commit.
+
 # 2026-09-28 — cloud-request helper bug handed to Codex
 
 The Hermes ESO sensor bug (first in the v1.40.0 bug list) was already FIXED in `8381656`; its doc

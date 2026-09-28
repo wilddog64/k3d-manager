@@ -7,6 +7,13 @@
   `origin/k3d-manager-v1.40.0`; mutation-tested both directions. Provider active set: 26/26;
   provider contract: 57/57; shellcheck before/after unchanged with existing informational output.
 
+# 2026-09-28 — cloud-request helper fix implemented
+
+- [x] Fixed the fresh-clone fetch failure and four-action helper allowlist drift per the Codex brief.
+  Shared action definitions live in `scripts/lib/webhook/cloud_actions.py`; the helper validates
+  all action arguments from that table. Required tests and mutations passed; `make test-pytest`
+  passed 314 tests. Commit SHA is recorded after the single requested commit.
+
 # v1.40.0 in progress — 2026-09-27
 
 - [x] **fix the `eso` sensor `unknown`** — four stacked defects diagnosed 2026-09-27 (kubeconfig error read as absence; exit code discarded; `Hub ESO *` rows never graded; the bats suite tests dead duplicates). Spec `docs/bugs/2026-09-27-hermes-eso-sensor-unknown-kubeconfig-error-as-absence.md`, assigned to Codex. — FIXED, verified live (degraded on cycle 3, `cosign-public-key`); mutation-tested both guards

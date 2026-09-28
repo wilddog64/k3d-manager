@@ -161,6 +161,54 @@ def test_request_helper_fetches_the_ref_it_reads_the_response_from():
     assert destination == helper.RESPONSE_REF
 
 
+def test_request_helper_fetches_an_unfetched_remote_tip_before_committing(monkeypatch):
+    parent = "a" * 40
+    calls = []
+    fetched = False
+
+    def fake_git(args, cwd=helper.ROOT, env=None, timeout=60):
+        nonlocal fetched
+        calls.append(args)
+        if args[:2] == ["ls-remote", "origin"]:
+            return f"{parent}\trefs/heads/cloud-requests\n"
+        if args[:2] == ["fetch", "origin"]:
+            fetched = True
+            return ""
+        if args[:3] == ["rev-parse", "--verify", "--quiet"]:
+            assert fetched
+            return f"{parent}\n"
+        if args[0] == "hash-object":
+            return "b" * 40 + "\n"
+        if args[0] == "write-tree":
+            return "c" * 40 + "\n"
+        if args[0] == "commit-tree":
+            return "d" * 40 + "\n"
+        return ""
+
+    monkeypatch.setattr(helper, "_git", fake_git)
+    helper._commit_request("20260925T201403Z-cluster-status", request())
+
+    assert calls.index(["fetch", "origin", helper.FETCH_REFSPEC]) < calls.index(
+        ["rev-parse", "--verify", "--quiet", helper.RESPONSE_REF])
+    assert ["read-tree", parent] in calls
+
+
+def test_request_helper_actions_and_arguments_match_bridge():
+    assert set(helper.ACTION_ALLOWLIST) == set(bridge.ACTION_ALLOWLIST)
+    for action in bridge.ACTION_ALLOWLIST:
+        assert set(helper.ACTION_ALLOWLIST[action][2]) == set(bridge.ACTION_ALLOWLIST[action][2])
+
+
+@pytest.mark.parametrize("action, argument", [
+    ("make-fix-status", "NS=bad;ns"),
+    ("make-find-similar-docs", "Q=$(x)"),
+])
+def test_request_helper_rejects_invalid_action_arguments_without_filing(action, argument):
+    with pytest.raises(SystemExit) as error:
+        helper._parse_args([action, "--arg", argument])
+    assert error.value.code == 2
+
+
 KNOWN_UNEXPOSED = frozenset()
 
 

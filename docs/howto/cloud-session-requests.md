@@ -21,7 +21,6 @@ on the operator's machine reads the branch every 60 seconds, calls the webhook w
 credential you never see, and commits the response back.
 
 ```bash
-git fetch origin cloud-requests
 bin/k3dm-cloud-request cluster-status          # files the request, prints the id
 bin/k3dm-cloud-request --wait cluster-status   # files it, then polls until the response lands
 ```
@@ -115,8 +114,8 @@ expires is rejected, and its id is still consumed.
 Commit and push to `cloud-requests` only. Never open a PR from it and never merge it.
 
 The branch is an **orphan** — it shares no history with `main` or any release branch and holds
-only these three paths, never repo code. `git fetch origin cloud-requests` is enough; you do not
-need a local branch of that name, and the helper does not create one.
+only these three paths, never repo code. The helper fetches it as needed; you do not need a local
+branch of that name, and the helper does not create one.
 
 ## Reading the response
 
@@ -151,18 +150,19 @@ bin/k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECOND
 Two limits worth knowing before you wonder why nothing happened. The bridge rejects any request
 file of 8 KiB or more without parsing it, and it processes at most 10 requests per 60-second tick —
 file twenty and the rest wait for the next tick. Separately, `health` runs the full smoke sweep,
-including the browser login probes, so it is the slowest of the four actions by a wide margin and
+  including the browser login probes, so it is the slowest action by a wide margin and
 can legitimately take minutes; `job-status` and the two `-status` actions return promptly. If you
 are polling `health` with a short `--timeout`, raise it rather than assuming the bridge is stuck.
 
 It needs no credential and no environment variables beyond the git access the session already
-has. That is the practical payoff of the pull design.
+has. That is the practical payoff of the pull design. The accepted actions and their arguments
+are the thirteen listed in the table above; the helper derives its choices and validation from the
+same shared table as the bridge.
 
 A cloud session still needs permission to *run* it. `.claude/settings.json` is committed and
-allows exactly `bin/k3dm-cloud-request` and `python3 bin/k3dm-cloud-request`, nothing else. That
-grant is safe to keep narrow because the helper's `argparse` `choices` already bound it to the four
-actions, and the bridge revalidates every request independently — the allowlist, not the caller's
-permissions, is the security boundary. Note that `.gitignore` excludes `.claude/*` rather than
+allows exactly `bin/k3dm-cloud-request` and `python3 bin/k3dm-cloud-request`, nothing else. The
+bridge revalidates every request independently — the allowlist, not the caller's permissions, is
+the security boundary. Note that `.gitignore` excludes `.claude/*` rather than
 `.claude/`, because git cannot re-include a file whose parent directory is excluded; keep it that
 way or the settings file silently stops being tracked.
 
