@@ -1,3 +1,10 @@
+# 2026-09-28 — logging spec gains M4: failed-job notes for the vector store
+
+CK agreed raw logs stay out of pgvector; added M4 to `v1.41.0-webhook-log-levels-and-retention.md`.
+The webhook writes a redacted `failure.md` per failed job; `make harvest-job-failures` copies it
+to `docs/job-failures/` (dedup by signature); that dir joins `CORPUS_GLOBS`. Blocked on the
+v1.40.0 artifacts spec's redaction filter.
+
 # 2026-09-28 — v1.41.0 spec: webhook log levels and retention
 
 CK asked for log levels and a disk retention policy. v1.40.0 is full (5 plans), so it is
