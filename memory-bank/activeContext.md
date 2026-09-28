@@ -1,3 +1,10 @@
+# 2026-09-28 — make jobs never write `output` (bug filed)
+
+Live cloud-request test showed `job-status` returns `"output": ""` for every `/api/v1/make` job:
+`_run_make_target` posts the tail to Slack but never writes `JOB_DIR/<id>/output`. Filed
+`docs/bugs/2026-09-28-make-jobs-never-write-output-file.md`. It contradicts the artifacts spec's
+premise; hold the fix until that spec's redaction filter decision.
+
 # 2026-09-28 — cloud-request helper fix implemented
 
 Implemented the Codex brief for `docs/bugs/2026-09-28-cloud-request-helper-no-fetch-and-four-action-allowlist.md`.
