@@ -1,3 +1,25 @@
+# 2026-09-27 — `cluster-down` now unrecords the provider set entry
+
+Implemented item 1 of `docs/bugs/2026-06-24-hostinger-provider-switch-stale-active-provider.md`.
+`bin/cluster-down` now calls `_acg_unrecord_provider "${_cluster_provider}"`; added the two-test
+structural gate and the Unreleased changelog entry. Commit `396afff89fb7830f4e12530967ada804c2106da2`
+was pushed to `origin/k3d-manager-v1.40.0`. Gates: shellcheck before/after unchanged (existing
+informational diagnostics only); `cluster_down_provider_marker.bats` 2/2,
+`provider_active_set.bats` 26/26, and `provider_contract.bats` 57/57. Mutation run failed both
+new tests with M1 reverted, then passed both after restoration. No teardown command was run.
+
+**Claude tightened test 2 afterwards.** As Codex wrote it, the second test made two independent
+assertions — `_acg_unrecord_provider` present, and `"${_cluster_provider}"` present anywhere. The
+latter is **vacuous**: `case "${_cluster_provider}" in` at line 60 satisfies it regardless of the
+fix. It still failed under the full mutation, but only via its first assertion, so it did not
+actually verify the call's *argument*. Rewritten as a single co-location grep requiring exactly one
+`_acg_unrecord_provider "${_cluster_provider}"`. Proven by a second, narrower mutation that keeps
+the call but swaps the argument to `"${CLUSTER_PROVIDER:-k3s-aws}"`: the original test passed it,
+the tightened one fails it.
+
+General rule: two separate `grep` presence assertions do not prove co-location. When the defect is
+"called with the wrong argument", assert the call and its argument as one pattern.
+
 # 2026-09-27 — root cause upstream of the `eso` fix: `cluster-down` leaks the provider set entry
 
 Traced why the ESO probe was aimed at `ubuntu-k3s`, a context absent from the kubeconfig for

@@ -1,3 +1,12 @@
+# 2026-09-27 — v1.40.0 cluster-down recurrence fix complete
+
+- [x] Item 1 from `docs/bugs/2026-06-24-hostinger-provider-switch-stale-active-provider.md`:
+  `bin/cluster-down` calls `_acg_unrecord_provider "${_cluster_provider}"` instead of removing
+  the legacy scalar directly. Added `scripts/tests/lib/cluster_down_provider_marker.bats` (2/2)
+  and the Unreleased Fixed entry. Commit `396afff89fb7830f4e12530967ada804c2106da2` pushed to
+  `origin/k3d-manager-v1.40.0`; mutation-tested both directions. Provider active set: 26/26;
+  provider contract: 57/57; shellcheck before/after unchanged with existing informational output.
+
 # v1.40.0 in progress — 2026-09-27
 
 - [x] **fix the `eso` sensor `unknown`** — four stacked defects diagnosed 2026-09-27 (kubeconfig error read as absence; exit code discarded; `Hub ESO *` rows never graded; the bats suite tests dead duplicates). Spec `docs/bugs/2026-09-27-hermes-eso-sensor-unknown-kubeconfig-error-as-absence.md`, assigned to Codex. — FIXED, verified live (degraded on cycle 3, `cosign-public-key`); mutation-tested both guards

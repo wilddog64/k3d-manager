@@ -12,8 +12,7 @@ setup() {
 }
 
 @test "cluster-down unrecords the current provider" {
-  run grep -F '_acg_unrecord_provider' "${REPO_ROOT}/bin/cluster-down"
+  run grep -c '_acg_unrecord_provider "\${_cluster_provider}"' "${REPO_ROOT}/bin/cluster-down"
   [[ "${status}" -eq 0 ]]
-  run grep -F '"${_cluster_provider}"' "${REPO_ROOT}/bin/cluster-down"
-  [[ "${status}" -eq 0 ]]
+  [[ "${output}" == "1" ]]
 }
