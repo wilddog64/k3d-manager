@@ -1,7 +1,7 @@
 # Bug: the role code assumes every token role is in `_ROLE_LEVELS` — a third, unranked role would crash auth
 
 **Branch:** `k3d-manager-v1.40.0`
-**Filed:** 2026-09-28 by Claude (cloud session), from a review of `v1.40.0-cloud-bridge-e2e-dispatch.md`
+**Filed:** 2026-09-28 by Claude (cloud session), from a review of `v1.41.0-cloud-bridge-e2e-dispatch.md`
 **Status:** OPEN — latent. Unreachable today; becomes reachable the moment that spec's M1 lands.
 **Component:** `scripts/lib/webhook/policy.py`, `scripts/lib/webhook/auth.py`, `bin/k3dm-webhook`
 **Related:** `2026-09-24-normalize-role-defaults-unknown-actor-to-admin.md` (FIXED). Same family —
@@ -25,7 +25,7 @@ consumer of its result indexes `_ROLE_LEVELS` directly, with no membership check
     return header_role if _ROLE_LEVELS[header_role] <= _ROLE_LEVELS[user_role] else user_role  # KeyError
 ```
 
-`v1.40.0-cloud-bridge-e2e-dispatch.md` M1-M2 add a third token that resolves to `"cloud-runner"`,
+`v1.41.0-cloud-bridge-e2e-dispatch.md` M1-M2 add a third token that resolves to `"cloud-runner"`,
 and M2 requires that `cloud-runner` is **not** added to `_ROLE_LEVELS` (so it cannot transitively
 grant every lower target). Those two requirements together hit the lines above:
 
@@ -82,7 +82,7 @@ Handle a capability role before any rank comparison, in one place:
 Do not add `cloud-runner` to `_ROLE_LEVELS`, and do not change `_normalize_role`
 (`strictest_role` depends on unknown-requirement → admin).
 
-This fix can land as the first milestone of `v1.40.0-cloud-bridge-e2e-dispatch.md` (its M2 should
+This fix can land as the first milestone of `v1.41.0-cloud-bridge-e2e-dispatch.md` (its M2 should
 point here) rather than as a separate change; it is a precondition, not a follow-up.
 
 ## Tests
