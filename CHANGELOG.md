@@ -8,6 +8,9 @@
   instead of hardcoding the legacy scalar marker path. The old teardown cleared the resolver's
   tie-break while leaking the per-provider set entry, leaving a torn-down provider registered
   indefinitely and sending provider-scoped probes at a kube context that no longer existed.
+- Diagnostics output now scrubs credential-shaped values, including unregistered bearer tokens,
+  JWTs, URL passwords, sensitive key/value pairs, Vault, Stripe and GitHub tokens before writing
+  job output or posting it to Slack.
 - `bin/k3dm-cloud-request` now fetches `cloud-requests` before filing on its tip, so a fresh clone
   no longer fails while reading an object it has not downloaded, and derives its action choices and
   argument validation from the bridge's shared allowlist so all thirteen permitted actions remain

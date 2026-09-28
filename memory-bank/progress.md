@@ -7,6 +7,13 @@
   `origin/k3d-manager-v1.40.0`; mutation-tested both directions. Provider active set: 26/26;
   provider contract: 57/57; shellcheck before/after unchanged with existing informational output.
 
+# 2026-09-28 — diagnostics logs redaction fix implemented
+
+- [x] Fixed unregistered credential-shaped values leaking through diagnostics logs. Added shared
+  `scripts/lib/webhook/redact.py`, the diagnostics integration, focused tests, and the Unreleased
+  changelog entry. `make test-pytest` passed 334 tests; the three required mutations were proven
+  red and restored to green. Commit SHA is recorded after the single requested commit.
+
 # 2026-09-28 — cloud-request helper fix implemented
 
 - [x] Fixed the fresh-clone fetch failure and four-action helper allowlist drift per the Codex brief.

@@ -27,6 +27,15 @@ Live cloud-request test showed `job-status` returns `"output": ""` for every `/a
 `docs/bugs/2026-09-28-make-jobs-never-write-output-file.md`. It contradicts the artifacts spec's
 premise; hold the fix until that spec's redaction filter decision.
 
+# 2026-09-28 — diagnostics logs redaction fix implemented
+
+Implemented the Codex brief for `docs/bugs/2026-09-28-diagnostics-logs-output-unredacted-for-unregistered-secrets.md`.
+Added shared `scripts/lib/webhook/redact.py` and applied it after registry redaction in diagnostics
+output, covering Slack and job artifacts. Added the required shape and false-positive tests plus
+the stubbed diagnostics path test. Compilation, registry regression, grep, and `make test-pytest`
+(334 passed) are green; all three mutations went red and were restored to green. Commit SHA is
+recorded after the single requested commit.
+
 # 2026-09-28 — cloud-request helper fix implemented
 
 Implemented the Codex brief for `docs/bugs/2026-09-28-cloud-request-helper-no-fetch-and-four-action-allowlist.md`.

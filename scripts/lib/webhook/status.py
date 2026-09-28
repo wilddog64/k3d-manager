@@ -8,6 +8,7 @@ from webhook.config import JOB_DIR
 from webhook.proc import _spawn_capture_text
 from webhook.render import _slack_post
 from webhook.agent import _call_gemini
+from webhook.redact import scrub_credentials
 
 __all__ = [
     "_run_cluster_status", "_format_status_summary_slack",
@@ -371,7 +372,7 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = _redact_secrets("".join(lines))
+        output = scrub_credentials(_redact_secrets("".join(lines)))
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
