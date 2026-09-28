@@ -114,3 +114,123 @@ the old location does not fail loudly — it degrades into stale state that read
 answer. When replacing a state file with a state directory, grep for the **literal path**, not just
 the variable name: `bin/cluster-down` referenced neither `_ACG_ACTIVE_PROVIDER_FILE` nor
 `_ACG_ACTIVE_PROVIDERS_DIR`, so every variable-name search missed it.
+
+---
+
+## Implementation Spec — Recurrence fix (2026-09-27)
+
+Scope is **item 1 only** from the Recurrence section above: make teardown go through the tested
+helper. Items 2 and 3 (reconciling the two `_resolve_provider` defaults, kubeconfig-based
+self-heal) are explicitly **out of scope** — do not touch them.
+
+### Before You Start
+
+- Branch: `k3d-manager-v1.40.0` — `git pull origin k3d-manager-v1.40.0` first.
+- Read `memory-bank/activeContext.md` (the top dated section describes this defect).
+- Read, in full, before editing anything:
+  - `bin/cluster-down` (lines 25–40 for the sourcing and `_cluster_provider`; line 127 is the target)
+  - `scripts/lib/provider.sh` lines 104–126 (`_acg_record_provider`, `_acg_unrecord_provider`)
+  - `scripts/tests/lib/provider_active_set.bats` (the helper is already fully covered there — do
+    NOT add duplicate coverage for `_acg_unrecord_provider` itself)
+
+### M1 — `bin/cluster-down`: call the helper instead of hardcoding the legacy path
+
+`scripts/lib/provider.sh` is already sourced at line 30, and `_cluster_provider` is already set at
+line 39, so the helper is in scope at line 127 with no new sourcing.
+
+Replace this exact line:
+
+```bash
+_dry_guard "remove active-provider marker" rm -f "${HOME}/.local/share/k3d-manager/active-provider"
+```
+
+with:
+
+```bash
+_dry_guard "clear active-provider markers for ${_cluster_provider}" \
+  _acg_unrecord_provider "${_cluster_provider}"
+```
+
+Notes, so you do not "improve" this:
+
+- `_dry_guard` runs `"$@"` in the current shell, so a shell function is a valid target — same as the
+  existing `_dry_guard ... sh -c` usages elsewhere in the file.
+- `_acg_unrecord_provider` normalizes its argument itself, so pass `_cluster_provider` raw. Do not
+  call `_acg_normalize_provider` at the call site.
+- It removes the set entry unconditionally and clears the legacy scalar **only when the scalar names
+  the provider being torn down**. That asymmetry is deliberate and already tested — do not change
+  `provider.sh`.
+- It returns 0 always, so it is safe under `set -euo pipefail`.
+
+### M2 — new test: `scripts/tests/lib/cluster_down_provider_marker.bats`
+
+`bin/cluster-down` executes teardown at source time under `set -euo pipefail`, so it cannot be
+sourced in a test. This gate is therefore **structural, and the spec says so rather than dressing it
+up as behavioural**: the behaviour it protects is already covered in `provider_active_set.bats`;
+what rotted for three months was the *call site*, and a call-site gate is what was missing.
+
+Write a two-test file following the existing `setup()` style in `provider_active_set.bats`
+(`REPO_ROOT` derived from `BATS_TEST_FILENAME`):
+
+1. A **disappearance gate** — `bin/cluster-down` must no longer contain the literal legacy path
+   `share/k3d-manager/active-provider` followed by nothing else. Assert on the meaningful token,
+   not a whole source line: grep the file for `active-provider"` preceded by `rm -f` and require
+   zero matches. Remember `command grep -c` exits 1 on zero matches, so use `run` and assert on
+   `status`/`output` rather than letting a nonzero exit fail the test.
+2. A **presence gate** — `bin/cluster-down` must call `_acg_unrecord_provider` with
+   `"${_cluster_provider}"`. Assert both tokens, not the full line.
+
+Do NOT use a whole-line `grep -F` assertion in either test — that pattern rots on any reformat.
+
+### M3 — CHANGELOG
+
+Add under the existing `## [Unreleased]` heading (line 3), in a `### Fixed` subsection (create it if
+absent). Write prose explaining the defect class, not a shortlog line: teardown hardcoded the legacy
+scalar marker path, so it cleared the resolver's tie-break while leaking the per-provider set entry,
+leaving a torn-down provider registered indefinitely and sending provider-scoped probes at a kube
+context that no longer existed.
+
+### Rules
+
+- `shellcheck bin/cluster-down` must pass with **zero new warnings** versus before your change.
+  Paste the before/after output.
+- Run and paste the output of:
+  - `bats scripts/tests/lib/cluster_down_provider_marker.bats`
+  - `bats scripts/tests/lib/provider_active_set.bats`
+  - `bats scripts/tests/lib/provider_contract.bats`
+- **Mutation-test M2 before reporting done.** Revert the M1 line to the old hardcoded `rm -f`,
+  re-run the new BATS file, and confirm **both** tests fail. Restore M1 and confirm they pass
+  again. Paste both runs. A gate that cannot fail is not a gate.
+- Do not reformat, re-indent or refactor anything else in `bin/cluster-down`.
+- Minimal patch. No unsolicited refactors. LF endings. No inline comments in the shell change.
+
+### Definition of Done
+
+- [ ] `bin/cluster-down` line 127 replaced exactly as in M1
+- [ ] `scripts/tests/lib/cluster_down_provider_marker.bats` added, 2 tests, both passing
+- [ ] Mutation test performed and both directions pasted
+- [ ] CHANGELOG `[Unreleased]` → `### Fixed` entry added
+- [ ] shellcheck before/after pasted, zero new warnings
+- [ ] All three BATS files pasted green
+- [ ] Commit message, verbatim:
+      `fix(cluster-down): unrecord the provider set entry instead of the legacy scalar`
+- [ ] Pushed to `origin/k3d-manager-v1.40.0`; report the SHA and confirm
+      `git rev-parse origin/k3d-manager-v1.40.0` matches
+- [ ] `memory-bank/activeContext.md` and `memory-bank/progress.md` updated with the SHA and status;
+      paste the lines you wrote
+
+### What NOT to Do
+
+- Do NOT create a PR.
+- Do NOT merge, and do NOT commit to `main` — work only on `k3d-manager-v1.40.0`.
+- Do NOT force-push.
+- Do NOT use `--no-verify`; the pre-commit `check-doc-links` hook must run.
+- Do NOT modify `scripts/lib/provider.sh` — the helper is already correct and tested.
+- Do NOT touch `bin/k3dm-webhook`, `scripts/lib/webhook/config.py`, `Makefile` or
+  `bin/cluster-status-summary`. The two disagreeing `_resolve_provider` defaults are a separate,
+  unapproved change.
+- Do NOT add a kubeconfig-based self-heal or a startup reconcile.
+- Do NOT run `bin/cluster-down`, `make down`, or any live teardown. This change is verified by
+  BATS and shellcheck only.
+- Do NOT edit `scripts/lib/foundation/` or `scripts/lib/acg/` (subtrees).
+- Do NOT modify files outside the four named above.
