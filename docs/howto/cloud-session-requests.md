@@ -150,7 +150,7 @@ bin/k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECOND
 Two limits worth knowing before you wonder why nothing happened. The bridge rejects any request
 file of 8 KiB or more without parsing it, and it processes at most 10 requests per 60-second tick —
 file twenty and the rest wait for the next tick. Separately, `health` runs the full smoke sweep,
-  including the browser login probes, so it is the slowest action by a wide margin and
+including the browser login probes, so it is the slowest action by a wide margin and
 can legitimately take minutes; `job-status` and the two `-status` actions return promptly. If you
 are polling `health` with a short `--timeout`, raise it rather than assuming the bridge is stuck.
 

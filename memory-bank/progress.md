@@ -12,7 +12,7 @@
 - [x] Fixed the fresh-clone fetch failure and four-action helper allowlist drift per the Codex brief.
   Shared action definitions live in `scripts/lib/webhook/cloud_actions.py`; the helper validates
   all action arguments from that table. Required tests and mutations passed; `make test-pytest`
-  passed 314 tests. Commit SHA is recorded after the single requested commit.
+  passed 314 tests. Commit `66f642a`; verified by Claude 2026-09-28 (tests, mutations, and a real fresh-clone file against a local bare remote).
 
 # v1.40.0 in progress — 2026-09-27
 

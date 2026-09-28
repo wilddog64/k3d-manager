@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-28 by Claude (cloud session), found while verifying the bridge end to end
-**Status:** FIXED
+**Status:** FIXED in `66f642a` (2026-09-28), verified by Claude
 **Component:** `bin/k3dm-cloud-request` (the cloud-side helper). The bridge itself is not at fault.
 
 Two independent defects in the same file. Both make the helper fail for a cloud session, which is
