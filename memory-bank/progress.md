@@ -1,3 +1,7 @@
+# 2026-09-29 — retrieval-eval spec status corrected
+
+- [x] `v1.40.0-hermes-prior-art-and-retrieval-eval.md`: blocker removed (v1.39.0 shipped WS1-WS3).
+
 # 2026-09-29 — cloud-session fixes landed on k3d-manager-v1.40.0
 
 - [x] Fast-forwarded `k3d-manager-v1.40.0` to `a1ea1ab` (3 bug fixes + doc status sweep).

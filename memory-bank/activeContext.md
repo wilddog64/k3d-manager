@@ -1,3 +1,9 @@
+# 2026-09-29 — prior-art/retrieval-eval spec unblocked
+
+Operator noticed the v1.40.0 `hermes-prior-art-and-retrieval-eval` spec still read "hard-blocked on
+v1.39.0 shipping WS1-WS3". v1.39.0 shipped 2026-09-27 with the store, indexer and search, so the
+status now reads ready to implement. `slack-corpus-qa` stays blocked on this spec's WS5 recall@5.
+
 # 2026-09-29 — cloud-session fixes fast-forwarded into v1.40.0
 
 Operator asked for the `claude/inspiring-bohr-37ojhk` work on the release branch.
