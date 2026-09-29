@@ -1,3 +1,16 @@
+# 2026-09-29 — empty dashboards + email-not-SMS triage (cloud session, bridge used)
+
+Bridge `health` (live): **Pushgateway `localhost:9091` connection refused**; `ubuntu-k3s` context
+unusable. VectorDB dashboard (deployed to app-cluster Grafana by `grafana-dashboards-acg`) is fed by
+`bin/k3dm-vectordb-metrics` → `localhost:9091`, a forward that points at whichever app cluster last
+ran `cluster-up`/hostinger refresh — here an expired ACG sandbox. Checkout load-test: expected empty
+(no producer, `enableRemoteWriteReceiver` unset; `docs/issues/2026-09-17-checkout-loadtest-dashboard-no-data.md`).
+Hermes Status (hub): fed by the `platform-ops` `hermes-status` ConfigMap → exporter; publisher
+(`bin/k3dm-hermes` `_publish_status`) and exporter both swallow errors, so the break is unseen;
+needs operator checks. Email vs SMS: only `severity=critical` routes to the SMS gateway, warnings
+go to Gmail. `make-observability-status` job `d2b79461` failed with empty output (webhook not yet
+restarted onto `b66ca92`). No bug docs filed yet.
+
 # 2026-09-29 — /cluster-diagnose <provider> lists all pods (cloud session)
 
 Operator asked for `/cluster-diagnose <provider>` to cover every namespace. Chose pod listing
