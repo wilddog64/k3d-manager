@@ -1,0 +1,1 @@
+{"action": "job-status", "body": {"job_id": "d2b79461", "output": "", "status": "failed"}, "completed_at": "2026-09-29T17:16:43.328150Z", "http_status": 200, "id": "20260929T171548Z-job-status", "schema": 1, "status": "ok"}
