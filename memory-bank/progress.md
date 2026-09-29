@@ -1,3 +1,10 @@
+# 2026-09-29 — /cluster-diagnose all-namespaces overview
+
+- [x] Relay + webhook + runner + docs. Relay node tests 23/23, `test_diagnostics_all_pods.py` 12/12,
+  `webhook.bats` 65/65, `slack_slash_commands.bats` 8/8, `make test-pytest` 387/387; relay and
+  webhook mutations red. Commit `64d87163`.
+- [ ] Operator: `make deploy-worker` (or merge to main) so Slack sees the new form.
+
 # 2026-09-29 — e2e payment root cause documented
 
 - [x] Root-caused the 8 JSON failures + vcluster health failure; recorded in the api-payments bug doc.

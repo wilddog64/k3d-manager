@@ -1,3 +1,12 @@
+# 2026-09-29 — /cluster-diagnose <provider> lists all pods (cloud session)
+
+Operator asked for `/cluster-diagnose <provider>` to cover every namespace. Chose pod listing
+(`get-pods-all`, `kubectl get pods --all-namespaces -o wide`) over widening describe/logs; added
+`shopping-cart-payment` and `shopping-cart-data` to `_DIAGNOSTIC_NAMESPACES`. Commit `64d87163`.
+**The relay Worker only redeploys on a push to `main` (or `make deploy-worker`)**, so Slack will
+not accept the no-verb form until then; the webhook side takes effect on its next restart.
+Not yet in the cloud bridge: `v1.40.0-cloud-bridge-test-targets.md` M4b could add `diagnose-pods-all`.
+
 # 2026-09-29 — e2e payment failures root-caused (source only)
 
 Run `1790248982-25275` (m2, vcluster): 9 `api/payments.spec.ts` failures. Updated
