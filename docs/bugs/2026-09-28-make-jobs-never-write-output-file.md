@@ -2,7 +2,10 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-28 by Claude (cloud session), found while live-testing the cloud request helper
-**Status:** OPEN
+**Status:** FIXED 2026-09-29 by Claude (cloud session). The redaction hold is resolved: the output
+goes through `_redact_secrets` then `scrub_credentials` (the shared scrubber the artifacts spec's M2
+now imports), the same filters diagnostics output uses. Tests: `scripts/tests/bin/test_make_job_output.py`;
+removing the write, dropping the scrubber, and writing after `status` each went red.
 **Files:** `scripts/lib/webhook/lifecycle.py`, `scripts/tests/bin/` (a new test)
 
 ## Problem

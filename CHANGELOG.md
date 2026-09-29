@@ -17,6 +17,9 @@
   (`*PASSWORD*`, `*SECRET*`, `*TOKEN*`, `*API_KEY*`, `*CREDENTIAL*`, `*DSN*`, `*_URL`) inside
   `kubectl describe` `Environment:` blocks, keeping the names and the `<set to the key ...>`
   references, before the shared credential scrubber runs over the whole output.
+- `/api/v1/make` jobs now write their full output to the job's `output` file, through the
+  registered-secret redaction and the shared credential scrubber, before the terminal status is
+  written. `job-status` previously returned `""` for every make job.
 - Diagnostics output now scrubs credential-shaped values, including unregistered bearer tokens,
   JWTs, URL passwords, sensitive key/value pairs, Vault, Stripe and GitHub tokens before writing
   job output or posting it to Slack.

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from webhook.config import JOB_DIR, REPO_ROOT
 from webhook.proc import _spawn_capture_text
+from webhook.redact import scrub_credentials
 from webhook.render import _slack_post
 
 __all__ = [
@@ -95,6 +96,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
             status, icon, verdict = "success", "✅", "succeeded"
         else:
             status, icon, verdict = "failed", "❌", f"failed (rc {rc})"
+        (JOB_DIR / job_id / "output").write_text(scrub_credentials(_redact_secrets(output)))
         (JOB_DIR / job_id / "status").write_text(status)
         _notify_job(job_id, f"{icon} *make {label}* {verdict}\n```{tail or '(no output)'}```")
     finally:
