@@ -156,3 +156,10 @@ The fix prevents the next loss; it does not restore today's lost grants. After t
 - Do NOT modify files outside the three listed targets. Do NOT edit `scripts/lib/foundation/`, `scripts/lib/acg/`, `scripts/lib/system.sh`, `scripts/plugins/signing.sh`, or memory-bank.
 - Do NOT remove or reorder the policies each writer already sets.
 - Do NOT use `grep -F` on source lines in BATS.
+
+## Recurrence 2026-09-29 — key lost too, not only the grant
+
+After the 2026-09-20 hub rebuild, both the Vault key and the `cosign-verify` grant were missing.
+The operator restored both with `signing_restore` (Keychain backup) on 2026-09-29. The key loss is a
+separate root cause (no bring-up seeder): see `2026-09-29-hub-rebuild-loses-cosign-signing-key.md`,
+which also adds `make signing-restore`.

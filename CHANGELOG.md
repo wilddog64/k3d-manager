@@ -4,6 +4,9 @@
 
 ### Added
 
+- `make signing-restore [CONTEXT=…]` restores the cosign signing key (from the Keychain backup, only
+  if Vault lacks it) and the ESO `cosign-verify` grant on one cluster, then resyncs
+  `cosign-public-key`. It pins the cluster through a temporary kubeconfig and never generates a key.
 - `/cluster-diagnose <provider>` with no verb lists every pod in every namespace on that cluster
   (`kubectl get pods --all-namespaces -o wide`, webhook action `get-pods-all`). The provider is
   required; bare `/cluster-diagnose` still prints usage. It reads pod names and status only.

@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -700,6 +700,32 @@ restore-google-app-password:
 	VAULT_TOKEN="$$_tok" GMAIL_PW="$$_pw" GMAIL_FROM="$$_gmail" SMS_GW="$$_sms" python3 -c 'import json,os,urllib.request as u; a="http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager"; h={"X-Vault-Token":os.environ["VAULT_TOKEN"],"Content-Type":"application/json"}; p={"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}; u.urlopen(u.Request(a,data=json.dumps(p).encode(),headers=h,method="POST"))' && \
 	echo "[restore-google-app-password] Vault updated — rebuilding Alertmanager Secret" && \
 	$(MAKE) observability
+
+## Restore cosign signing material and the ESO read grant on one cluster, then resync its
+## cosign-public-key ExternalSecret. Idempotent: restores the key from the Keychain backup only if
+## Vault lacks it, and adds the cosign-verify grant only if the ESO role lacks it. Never generates
+## a key (that is signing_init, which forces re-signing every image). CONTEXT pins the cluster via
+## a temporary kubeconfig; the global current-context is not changed.
+## Hub: make signing-restore   Hostinger: make signing-restore CONTEXT=ubuntu-hostinger
+##   SIGNING_ES_NAMESPACE=kyverno SIGNING_ESO_ROLE=eso-app-cluster
+##   SIGNING_ESO_AUTH_MOUNT=kubernetes-ubuntu-hostinger
+signing-restore:
+	@_ctx="$(or $(CONTEXT),$(INFRA_CONTEXT))"; _ns="$${SIGNING_ES_NAMESPACE:-platform-ops}"; \
+	_kc="$$(mktemp)"; [ -n "$$_kc" ] && [ -f "$$_kc" ] || { echo "[signing-restore] ERROR: mktemp failed" >&2; exit 1; }; \
+	trap 'rm -f "$$_kc"' EXIT; \
+	kubectl config view --minify --flatten --context "$$_ctx" > "$$_kc" 2>/dev/null && [ -s "$$_kc" ] || { \
+	  echo "[signing-restore] ERROR: kube context '$$_ctx' not found" >&2; exit 1; }; \
+	echo "[signing-restore] restoring on $$_ctx (ExternalSecret namespace $$_ns)"; \
+	KUBECONFIG="$$_kc" ./scripts/k3d-manager signing_restore || { \
+	  echo "[signing-restore] ERROR: signing_restore failed on $$_ctx" >&2; exit 1; }; \
+	if kubectl --context "$$_ctx" -n "$$_ns" get externalsecret cosign-public-key >/dev/null 2>&1; then \
+	  kubectl --context "$$_ctx" -n "$$_ns" annotate externalsecret cosign-public-key \
+	    force-sync="$$(date +%s)" --overwrite >/dev/null && \
+	  kubectl --context "$$_ctx" -n "$$_ns" wait externalsecret cosign-public-key \
+	    --for=condition=Ready --timeout=60s; \
+	else \
+	  echo "[signing-restore] no cosign-public-key ExternalSecret in $$_ns on $$_ctx; nothing to resync"; \
+	fi
 
 ## Re-mint the Hermes ArgoCD API token and store it in the Keychain (k3dm-hermes-argocd-token).
 ## Required after ANY ArgoCD rebuild: a rebuild regenerates server.secretkey, which permanently
