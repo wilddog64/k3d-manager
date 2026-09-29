@@ -148,3 +148,11 @@ context and a port nothing references is a trap for the next person, whichever r
 - Do NOT change `~/.cloudflared/config.yml` and restart the tunnel casually. It currently serves 7
   public hostnames; a bad edit takes all of them down, which has already happened once.
 - Do NOT assume the frontend pod is broken. It is healthy and has been for 32h.
+
+## Recurrence 2026-09-29 — still live
+
+Hermes `reachability` has reported `single-service 1/7 hosts failing` with
+`failed_hosts: ["frontend.3ai-talk.org"]` on every poll from at least 20:32Z to 22:48Z (operator's
+Hermes log), and the webhook smoke list added `Frontend` and `Product images` failures from 22:40Z.
+The fix above is still waiting on the operator's decision. Hermes also double-counts this outage
+under `node_pressure`; see `2026-09-29-hermes-node-pressure-sensor-measures-service-failures.md`.

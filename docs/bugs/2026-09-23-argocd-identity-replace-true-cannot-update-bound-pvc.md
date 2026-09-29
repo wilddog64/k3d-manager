@@ -136,3 +136,8 @@ reconcile script, and it is the actual root cause of the two red SSO lines. Fixi
 `awk` until the script parses CSV in bash instead. **Two fixes are required, not one** — and
 because this one blocks the Job from existing at all, it must land first or the awk fix cannot be
 observed.
+
+## Recurrence 2026-09-29 — still live
+
+Hermes `argocd` sensor, every poll on 2026-09-29: `shopping-cart/shopping-cart-identity
+Healthy/OutOfSync`. Unchanged since this doc was filed; still unassigned.
