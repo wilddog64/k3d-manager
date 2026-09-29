@@ -81,17 +81,20 @@ function _hub_recovery_ensure_eso_apps_role() {
 }
 
 function _hub_recovery_restore_signing() {
-  local hub_context="$1" kubeconfig
-  kubeconfig=$(mktemp -t hub-recovery-signing.XXXXXX)
-  trap 'trap - RETURN; rm -f "'"${kubeconfig}'"' 2>/dev/null || true' RETURN
+  local hub_context="$1" kubeconfig=""
+  kubeconfig=$(mktemp -t hub-recovery-signing.XXXXXX) || kubeconfig=""
+  if [[ -z "$kubeconfig" || ! -f "$kubeconfig" ]]; then
+    _warn "[hub-recovery] could not create a temporary kubeconfig for cosign signing restore; continuing"
+    return 0
+  fi
   if ! _kubectl -- --context "$hub_context" config view --minify --flatten > "$kubeconfig" 2>/dev/null || [[ ! -s "$kubeconfig" ]]; then
+    rm -f "$kubeconfig"
     _warn "[hub-recovery] could not pin kubeconfig for cosign signing restore; continuing"
     return 0
   fi
   if ! KUBECONFIG="$kubeconfig" signing_restore; then
     _warn "[hub-recovery] cosign signing restore failed; continuing recovery"
   fi
-  trap - RETURN
   rm -f "$kubeconfig"
 }
 

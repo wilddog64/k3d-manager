@@ -226,6 +226,43 @@ YAML
   [[ "$output" == *"cosign signing restore failed"* ]]
 }
 
+@test "_hub_recovery_restore_signing: pins the hub context and removes the temp kubeconfig" {
+  local seen="${BATS_TEST_TMPDIR}/seen" tmp="${BATS_TEST_TMPDIR}/t"
+  mkdir -p "$tmp"
+  _kubectl() { printf 'apiVersion: v1\ncurrent-context: %s\n' "$3"; }
+  signing_restore() { cat "$KUBECONFIG" >"$seen"; }
+  _warn() { echo "WARN $*"; }
+  TMPDIR="$tmp" run _hub_recovery_restore_signing k3d-k3d-cluster
+  [ "$status" -eq 0 ]
+  grep -q 'current-context: k3d-k3d-cluster' "$seen"
+  [ -z "$(ls -A "$tmp")" ]
+}
+
+@test "_hub_recovery_restore_signing: a pin failure warns, skips the restore and leaves no temp file" {
+  local tmp="${BATS_TEST_TMPDIR}/t" called="${BATS_TEST_TMPDIR}/called"
+  mkdir -p "$tmp"
+  _kubectl() { return 1; }
+  signing_restore() { echo called >"$called"; }
+  _warn() { echo "WARN $*"; }
+  TMPDIR="$tmp" run _hub_recovery_restore_signing k3d-k3d-cluster
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"could not pin kubeconfig"* ]]
+  [[ "$output" != *"unexpected EOF"* ]]
+  [ ! -e "$called" ]
+  [ -z "$(ls -A "$tmp")" ]
+}
+
+@test "hub_recovery_reconcile: the dry list names the cosign step" {
+  run hub_recovery_reconcile
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"4. Cosign signing key"* ]]
+}
+
+@test "hub_recovery never generates or rotates a signing key" {
+  run grep -nE 'signing_(init|rotate_key)' "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
+  [ "$status" -ne 0 ]
+}
+
 @test "_hub_recovery_render_serverlb_values: servers on 6443, servers then agents on 80/443" {
   local input expected
   input=$'agent k3d-c-agent-1\nloadbalancer k3d-c-serverlb\nserver k3d-c-server-0\nagent k3d-c-agent-0'
