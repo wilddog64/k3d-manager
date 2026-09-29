@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Remove one explicitly named stale ArgoCD cluster registration and its generated
+# Applications. The default is a read-only preview; --confirm is required.
+
+cluster=""
+confirm=0
+for arg in "$@"; do
+  case "${arg}" in
+    --cluster=*) cluster="${arg#*=}" ;;
+    --cluster) printf '%s\n' 'ERROR: --cluster requires --cluster=<name>' >&2; exit 2 ;;
+    --confirm) confirm=1 ;;
+    --dry-run) confirm=0 ;;
+    -h|--help)
+      printf '%s\n' 'Usage: cleanup-stale-registration --cluster=<name> [--dry-run|--confirm]'
+      printf '%s\n' '  Remove one explicitly named ArgoCD cluster registration; dry-run is the default.'
+      exit 0
+      ;;
+    *) printf 'ERROR: unknown option: %s\n' "${arg}" >&2; exit 2 ;;
+  esac
+done
+
+if [[ -z "${cluster}" || ! "${cluster}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  printf '%s\n' 'ERROR: --cluster must be a non-empty Kubernetes-safe name' >&2
+  exit 2
+fi
+
+hub_context="${ARGOCD_HUB_CONTEXT:-k3d-k3d-cluster}"
+argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+kubectl_cmd=(kubectl --context "${hub_context}")
+
+secret_json="$("${kubectl_cmd[@]}" -n "${argocd_ns}" get secrets \
+  -l "argocd.argoproj.io/secret-type=cluster,argocd.argoproj.io/cluster-name=${cluster}" -o json)"
+mapfile -t registrations < <(printf '%s' "${secret_json}" | jq -r '.items[] |
+  [.metadata.name, (.data.server // "")] | @tsv')
+
+if (( ${#registrations[@]} == 0 )); then
+  printf 'No ArgoCD cluster registration found for %s\n' "${cluster}"
+  exit 0
+fi
+if (( ${#registrations[@]} > 1 )); then
+  printf 'ERROR: multiple ArgoCD registrations found for %s; refusing to guess\n' "${cluster}" >&2
+  exit 1
+fi
+
+IFS=$'\t' read -r secret server_b64 <<< "${registrations[0]}"
+server=""
+if [[ -n "${server_b64}" ]]; then
+  server="$(printf '%s' "${server_b64}" | base64 --decode 2>/dev/null || true)"
+fi
+
+applications_json="$("${kubectl_cmd[@]}" -n "${argocd_ns}" get applications -o json)"
+mapfile -t applications < <(printf '%s' "${applications_json}" | jq -r \
+  --arg cluster "${cluster}" --arg server "${server}" '
+  .items[] |
+  select((.spec.destination.name // "") == $cluster or
+    (.metadata.labels["k3d-manager/cluster"] // "") == $cluster or
+    ($server != "" and (.spec.destination.server // "") == $server)) |
+  .metadata.name')
+
+printf 'Stale ArgoCD registration cleanup (context=%s namespace=%s)\n' "${hub_context}" "${argocd_ns}"
+printf '  cluster: %s\n  secret: %s\n' "${cluster}" "${secret}"
+if (( ${#applications[@]} == 0 )); then
+  printf '%s\n' '  applications: none'
+else
+  printf '%s\n' '  applications:'
+  printf '    %s\n' "${applications[@]}"
+fi
+
+if (( confirm == 0 )); then
+  printf '%s\n' 'DRY_RUN: no changes made (rerun with CONFIRM=1)'
+  exit 0
+fi
+
+# Delete the Secret first so ApplicationSets cannot regenerate the Applications.
+"${kubectl_cmd[@]}" -n "${argocd_ns}" delete secret "${secret}" --ignore-not-found >/dev/null
+for app in "${applications[@]}"; do
+  [[ -n "${app}" ]] || continue
+  "${kubectl_cmd[@]}" -n "${argocd_ns}" patch "application/${app}" --type=merge \
+    -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
+  "${kubectl_cmd[@]}" -n "${argocd_ns}" delete "application/${app}" --wait=false --ignore-not-found >/dev/null 2>&1 || true
+done
+printf 'Removed registration %s and %d matching Applications\n' "${secret}" "${#applications[@]}"
