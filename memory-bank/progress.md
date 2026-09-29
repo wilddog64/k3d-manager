@@ -1,3 +1,10 @@
+# 2026-09-29 — describe-pod env masking implemented
+
+- [x] `docs/bugs/2026-09-28-diagnostics-describe-pod-prints-literal-env-values.md`: env-block
+  masking + existing scrubber. `scripts/tests/bin/test_describe_pod_env_masking.py` 5/5;
+  `make test-pytest` 372/372; `make test-python-unit` 7/7 OK; four mutations red and restored.
+  Commit `6c95ea8` on `claude/inspiring-bohr-37ojhk`.
+
 # 2026-09-29 — unranked token-role fix implemented
 
 - [x] `docs/bugs/2026-09-28-role-code-assumes-every-token-role-is-ranked.md`: capability roles

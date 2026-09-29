@@ -1,3 +1,9 @@
+# 2026-09-29 — describe-pod env masking implemented (cloud session)
+
+Fixed `docs/bugs/2026-09-28-diagnostics-describe-pod-prints-literal-env-values.md`: new
+`mask_env_values` in `redact.py`, applied to `describe-pod` before clipping. Unblocks M4b's
+`diagnose-describe-pod` in `v1.40.0-cloud-bridge-test-targets.md`. Commit `6c95ea8`.
+
 # 2026-09-29 — unranked token-role fix implemented (cloud session)
 
 Fixed `docs/bugs/2026-09-28-role-code-assumes-every-token-role-is-ranked.md` on
