@@ -1,3 +1,8 @@
+# 2026-09-29 — cosign restore
+
+- [x] Hub cosign key + grant restored live (operator). `make signing-restore` added (`6ea6cd9b`).
+- [ ] Operator: approve Fix 1 (bring-up restore) and/or Fix 2 (Hermes R7).
+
 # 2026-09-29 — Hermes status publish fixed
 
 - [x] Label-as-string bug fixed (`e4ea49e0`); `test_publish_status.py` 9/9, pytest 396/396, 2 mutations red.

@@ -1,3 +1,12 @@
+# 2026-09-29 — cosign key restored; make signing-restore added
+
+Operator ran `signing_restore` on the hub: Vault `secret/cosign/signing` was EMPTY (restored from
+Keychain) and the `cosign-verify` grant was gone; ExternalSecret now `SecretSynced True`. Added
+`make signing-restore` (`6ea6cd9b`, BATS 8/8, `scripts/tests/bin` 188/188, 3 mutations red). Filed
+`docs/bugs/2026-09-29-hub-rebuild-loses-cosign-signing-key.md`: no bring-up path calls
+`signing_restore` (known since the 09-05 issue). Proposed Fix 1 (bring-up calls it) and Fix 2
+(Hermes R7, approval-gated). Awaiting operator choice.
+
 # 2026-09-29 — five degraded Hermes sensors triaged
 
 - reachability (frontend.3ai-talk.org): known, `2026-09-25-frontend-public-url-routes-to-wrong-cluster.md`
