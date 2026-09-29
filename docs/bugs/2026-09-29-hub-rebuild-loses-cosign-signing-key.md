@@ -2,11 +2,72 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from Hermes `eso` degraded on the hub
-**Status:** OPEN — `make signing-restore` landed as the one-command remedy; prevention and the
-Hermes repair below are not implemented
+**Status:** OPEN — assigned to Codex 2026-09-29 (brief below: Fix 1 + Fix 2). `make signing-restore`
+already landed in `19d74587`.
 **Related:** `docs/issues/2026-09-05-vault-kv-and-eso-policy-loss-grafana-cosign.md` (first
 occurrence and root cause), `docs/bugs/2026-09-13-vault-eso-role-rewrite-drops-cosign-verify.md`
 (the grant-only variant, fixed in `b3bc737c`)
+
+## Codex brief
+
+**Goal:** a hub rebuild or recovery restores the cosign key and ESO grant without a human, and
+Hermes proposes `make signing-restore` whenever the hub's `cosign-public-key` stops syncing.
+
+**Runs where:** Codex web is fine. Code and offline tests only; nothing needs the M4, a cluster,
+Vault, or the Keychain. Stub every `signing_restore`, `kubectl` and `make` call.
+
+**Decisions already made (operator, 2026-09-29):** do both fixes. Prevention calls the existing
+`signing_restore` (never `signing_init`, never `signing_rotate_key`). R7 is approval-gated like
+R1–R4; do not add it to any auto-execution path.
+
+**Files to touch (only these):**
+- `scripts/plugins/hub_recovery.sh`: source `$PLUGINS_DIR/signing.sh` the same way as the other
+  plugins at the top of the file. In `hub_recovery_reconcile`, add step `"Cosign signing key"` to
+  `steps` right after `"ESO policy"`. After `_hub_recovery_ensure_eso_apps_role`, call
+  `_hub_recovery_restore_signing "$hub_context"`: a new function that runs `signing_restore` with the
+  hub context pinned (same temporary-kubeconfig pattern as `make signing-restore`). A failure
+  **warns and continues** (`_warn`, return 0): an absent Keychain backup must not block recovery.
+- `bin/cluster-up`: in the `_hub_newly_created -eq 1` branch of Step 3.6, after `deploy_argocd`, add
+  `_dry_guard "restore cosign signing" "${REPO_ROOT}/scripts/k3d-manager" signing_restore || _warn …`
+  (warn and continue, as above). Do not touch the `elif` branch.
+- `scripts/lib/hermes/repairs.py`: add `r7` to `REPAIRS` using the table in "Fix 2" above;
+  `_r7_precondition` = `eso` degraded, its evidence contains `cosign-public-key`, and the same held on
+  the previous cycle (use `_sustained` over `history`, as R3 does); `_r7_command` returns
+  `(["make", "signing-restore"], {})` with `cwd: ROOT`. Add `"r7": ("eso",)` to `_evidence`.
+- `docs/architecture/hermes-phase2-repair-scope.md`: add the R7 row to the §3 allowlist table.
+- Tests: `scripts/tests/plugins/hub_recovery.bats`, `scripts/tests/bin/cluster_up.bats`,
+  `scripts/tests/hermes/test_repairs.py` (see "Tests" below).
+- `CHANGELOG.md` (one `### Fixed` bullet, one `### Added` bullet), `memory-bank/activeContext.md`,
+  `memory-bank/progress.md`, and this doc (Status → FIXED with the SHA).
+
+**Tests (all offline):**
+1. `hub_recovery_reconcile --confirm` with stubs calls `signing_restore` exactly once, after the ESO
+   policy step, with the hub context pinned.
+2. `signing_restore` failing → reconcile still returns 0 and logs a warning.
+3. The dry list (`hub_recovery_reconcile` without `--confirm`) shows `Cosign signing key`.
+4. `cluster_up.bats`: a newly created hub calls `signing_restore` after `deploy_argocd`; an existing
+   hub does not.
+5. No path in `hub_recovery.sh` or `bin/cluster-up` mentions `signing_init` or `signing_rotate_key`.
+6. `test_repairs.py`: R7 proposed only when `eso` is degraded with `cosign-public-key` for 2 cycles;
+   not for one cycle; not for other ESO evidence (`1/8 not synced: grafana-admin`); command is exactly
+   `make signing-restore`; `reversible` is `True`.
+
+**Mutations (paste each red run, then the restored green run):**
+- Remove the `signing_restore` call from `hub_recovery_reconcile` → test 1 red.
+- Make the restore failure fatal → test 2 red.
+- Drop the `cosign-public-key` evidence check from `_r7_precondition` → test 6 red.
+
+**Gates (paste output):** `shellcheck -S warning scripts/plugins/hub_recovery.sh bin/cluster-up`
+unchanged from before; `bats scripts/tests/plugins/hub_recovery.bats scripts/tests/bin/cluster_up.bats`;
+`make test-pytest`; `git diff --stat` lists only the files above.
+
+**Do not change:** `scripts/plugins/signing.sh`, the `signing-restore` make target,
+`scripts/lib/foundation/`, `scripts/lib/acg/`, R1–R6, or `approve()`. Do not run any command
+against a live cluster, Vault or the Keychain.
+
+**Commit and hand back:** one commit on `k3d-manager-v1.40.0`, message
+`fix(signing): restore the cosign key on hub bring-up and propose it as Hermes R7`.
+No PR, no merge, no force-push, no `--no-verify`.
 
 ## Evidence (2026-09-29)
 

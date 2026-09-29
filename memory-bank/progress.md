@@ -1,3 +1,9 @@
+# 2026-09-29 — Codex handoff: cosign prevention + Hermes R7
+
+- [x] Brief written (hub-rebuild-loses-cosign-signing-key.md).
+- [ ] Codex implements; Claude verifies SHA, tests and mutations independently.
+- [ ] Operator: Prometheus log for the duplicate-timestamp scrape pool.
+
 # 2026-09-29 — cosign restore
 
 - [x] Hub cosign key + grant restored live (operator). `make signing-restore` added (`6ea6cd9b`).

@@ -224,3 +224,9 @@ probe groups on this tier. Decide which; do not disable the indicator (rejected 
   parsing, so the next failure names its status instead of `Unexpected end of JSON input`.
 - Also noted: the substrate pins payment `sha-a672ee42…`; the payment repo's latest image commit is
   `87819d4` (`sha-cced3440…`). Not a cause of these failures.
+
+## Alert 2026-09-29
+
+The operator received `[FIRING] E2EVerificationFailing on hub (3)` (severity `warning`, so email, not
+SMS). The rule is `e2e_last_run_pass == 0` for 10 minutes, so it is working as designed: it reports
+the failures root-caused above. It clears once the path and auth fixes land and a run passes.

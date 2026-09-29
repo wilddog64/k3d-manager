@@ -1,3 +1,13 @@
+# 2026-09-29 — cosign Fix 1 + Fix 2 handed to Codex; two warning alerts triaged
+
+Codex brief added to `docs/bugs/2026-09-29-hub-rebuild-loses-cosign-signing-key.md`: hub_recovery and
+new-hub cluster-up call `signing_restore` (warn, never fatal, never signing_init); Hermes R7 proposes
+`make signing-restore` (approval-gated). Alert emails: `E2EVerificationFailing` = the known payment e2e
+failures (working as designed, noted on the api-payments bug). `PrometheusDuplicateTimestamps` (hub):
+source not identifiable from the repo — federation was fixed 09-13 and now targets the dead ACG port
+19190; Hermes exporter series are unique per sensor/check. Awaiting the Prometheus log line naming the
+scrape pool. Both are `severity: warning` → Gmail by design, not SMS.
+
 # 2026-09-29 — cosign key restored; make signing-restore added
 
 Operator ran `signing_restore` on the hub: Vault `secret/cosign/signing` was EMPTY (restored from
