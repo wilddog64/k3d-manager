@@ -437,6 +437,7 @@ if [[ "${_hub_newly_created}" -eq 1 ]]; then
   _dry_guard "deploy Vault" "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --confirm
   _dry_guard "deploy LDAP" "${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm
   _dry_guard "deploy ArgoCD" "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd --confirm
+  _dry_guard "restore cosign signing" "${REPO_ROOT}/scripts/k3d-manager" signing_restore || _warn "[acg-up] cosign signing restore failed; continuing"
   _info "[acg-up] Hub cluster bootstrapped."
 elif ! _argocd_bootstrap_is_ready; then
   _info "[acg-up] Step 3.6/12 — Refreshing ArgoCD bootstrap resources on existing Hub cluster..."

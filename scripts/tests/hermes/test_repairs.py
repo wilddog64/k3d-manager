@@ -98,6 +98,21 @@ def test_r6_is_never_auto_executed_by_the_kine_guard():
     assert "r6" not in current.get("repairs_attempted_this_incident", [])
 
 
+def test_r7_requires_cosign_evidence_for_two_cycles():
+    records = [record("eso", "degraded", "1/8 not synced: cosign-public-key")]
+    proposals = repairs.propose(records, state([["eso"], ["eso"]]))
+    proposal = next(item for item in proposals if item["key"] == "r7")
+    assert proposal["command"] == "make signing-restore"
+    assert repairs.REPAIRS["r7"]["reversible"] is True
+
+
+def test_r7_does_not_fire_for_one_cycle_or_other_eso_evidence():
+    records = [record("eso", "degraded", "1/8 not synced: cosign-public-key")]
+    assert not any(item["key"] == "r7" for item in repairs.propose(records, state([["eso"]])))
+    other = [record("eso", "degraded", "1/8 not synced: grafana-admin")]
+    assert not any(item["key"] == "r7" for item in repairs.propose(other, state([["eso"], ["eso"]])))
+
+
 def test_r5_auto_guard_is_opt_in_and_runs_once():
     current, calls = state(), []
     assert repairs.auto_remediate_kine(r5_records(), current, lambda *args: calls.append(args), False) is None

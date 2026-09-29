@@ -2,8 +2,8 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from Hermes `eso` degraded on the hub
-**Status:** OPEN — assigned to Codex 2026-09-29 (brief below: Fix 1 + Fix 2). `make signing-restore`
-already landed in `19d74587`.
+**Status:** FIXED — Fix 1 + Fix 2 implemented on 2026-09-29. `make signing-restore` already landed
+in `19d74587`; implementation commit is recorded below.
 **Related:** `docs/issues/2026-09-05-vault-kv-and-eso-policy-loss-grafana-cosign.md` (first
 occurrence and root cause), `docs/bugs/2026-09-13-vault-eso-role-rewrite-drops-cosign-verify.md`
 (the grant-only variant, fixed in `b3bc737c`)
@@ -136,3 +136,10 @@ is false for other ESO failures and for a single cycle; the built command is exa
 `make signing-restore`; `approve()` runs it and nothing else.
 
 Fix 1 removes the common trigger, and R7 covers the rest (for example, a grant rewrite).
+
+## Resolution
+
+The bring-up and recovery paths restore signing material after Vault/ESO setup, while warning and
+continuing if the restore cannot run. Hermes R7 is proposal-only until the existing approval flow
+executes the exact `make signing-restore` command. Implementation commit: this commit (SHA in the
+handoff below).

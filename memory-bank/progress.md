@@ -1,3 +1,10 @@
+# 2026-09-29 — Codex implementation: cosign prevention + Hermes R7
+
+- [x] Implemented the exact brief: hub recovery/new-hub restore hooks, approval-gated R7, allowlist
+  row, changelog, tests, and bug resolution. Focused BATS 57/57; Hermes repairs 24/24; all three
+  mutations went red and were restored green. The single commit SHA is recorded in the completion
+  handoff.
+
 # 2026-09-29 — Codex handoff: cosign prevention + Hermes R7
 
 - [x] Brief written (hub-rebuild-loses-cosign-signing-key.md).

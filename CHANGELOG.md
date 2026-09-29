@@ -4,6 +4,7 @@
 
 ### Added
 
+- Hermes R7 proposes the approval-gated `make signing-restore` repair only when the Hub `cosign-public-key` ExternalSecret has been degraded for two cycles.
 - `make signing-restore [CONTEXT=…]` restores the cosign signing key (from the Keychain backup, only
   if Vault lacks it) and the ESO `cosign-verify` grant on one cluster, then resyncs
   `cosign-public-key`. It pins the cluster through a temporary kubeconfig and never generates a key.
@@ -15,6 +16,7 @@
 
 ### Fixed
 
+- Hub recovery and newly created Hub bring-up now restore existing cosign signing material after Vault/ESO setup; a missing Keychain backup warns and continues without generating or rotating a key.
 - Hermes status publishing works: the `hermes-status` ConfigMap label was spliced into the YAML as
   `key=value`, which made `metadata.labels` a string and failed every apply since v1.34.0, so the
   Hermes Status dashboard never had data. The manifest is now built as JSON with a real label map.

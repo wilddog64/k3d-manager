@@ -141,6 +141,17 @@ def _r6_command(_records):
     return (["docker", "restart", HUB_K3S_CONTAINER], {})
 
 
+def _r7_precondition(records, history, _state):
+    eso = _rec(records, "eso") or {}
+    return (_status(records, "eso") == "degraded" and
+            "cosign-public-key" in eso.get("evidence", "").lower() and
+            _sustained(history, lambda cycle: "eso" in cycle, 2))
+
+
+def _r7_command(_records):
+    return (["make", "signing-restore"], {})
+
+
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
@@ -171,6 +182,10 @@ REPAIRS = {
            "precondition": _r6_precondition, "build_command": _r6_command, "cwd": None,
            "blast_radius": "hub control plane restarts; brief apiserver outage", "reversible": False,
            "needs_scope": "local docker socket"},
+    "r7": {"key": "r7", "name": "Restore cosign signing key and ESO grant",
+           "precondition": _r7_precondition, "build_command": _r7_command, "cwd": ROOT,
+           "blast_radius": "Vault secret/cosign/signing, cosign-verify policy, ESO role grant, one ExternalSecret resync",
+           "reversible": True, "needs_scope": "macOS Keychain (k3d-manager-signing), local hub kubeconfig"},
 }
 
 
@@ -182,7 +197,7 @@ def _update_r1_debounce(records, state):
 def _evidence(records, key):
     relevant = {"r1": ("eso", "node_pressure"), "r2": ("reachability", "node_pressure"),
                 "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
-                "r6": ("kine",)}[key]
+                "r6": ("kine",), "r7": ("eso",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
 

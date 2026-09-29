@@ -25,6 +25,11 @@ if [[ -r "$KEYCLOAK_PLUGIN" ]]; then
   # shellcheck disable=SC1090
   source "$KEYCLOAK_PLUGIN"
 fi
+SIGNING_PLUGIN="$PLUGINS_DIR/signing.sh"
+if [[ -r "$SIGNING_PLUGIN" ]]; then
+  # shellcheck disable=SC1090
+  source "$SIGNING_PLUGIN"
+fi
 
 function _hub_recovery_render_cloudflared_config() {
   local provider="$1" in_file="$2" table="$3"
@@ -73,6 +78,21 @@ function _hub_recovery_ensure_eso_apps_role() {
   if ! printf '%s' "$role_json" | jq -e '.data.token_policies | index("eso-apps")' >/dev/null 2>&1; then
     _vault_configure_secret_reader_role secrets vault "$LDAP_ESO_SERVICE_ACCOUNT" "$LDAP_NAMESPACE" "$LDAP_VAULT_KV_MOUNT" "$LDAP_VAULT_POLICY_PREFIX" "$LDAP_ESO_ROLE" || return 1
   fi
+}
+
+function _hub_recovery_restore_signing() {
+  local hub_context="$1" kubeconfig
+  kubeconfig=$(mktemp -t hub-recovery-signing.XXXXXX)
+  trap 'trap - RETURN; rm -f "'"${kubeconfig}'"' 2>/dev/null || true' RETURN
+  if ! _kubectl -- --context "$hub_context" config view --minify --flatten > "$kubeconfig" 2>/dev/null || [[ ! -s "$kubeconfig" ]]; then
+    _warn "[hub-recovery] could not pin kubeconfig for cosign signing restore; continuing"
+    return 0
+  fi
+  if ! KUBECONFIG="$kubeconfig" signing_restore; then
+    _warn "[hub-recovery] cosign signing restore failed; continuing recovery"
+  fi
+  trap - RETURN
+  rm -f "$kubeconfig"
 }
 
 function _hub_recovery_seed_app_cluster_reader() {
@@ -240,7 +260,7 @@ function hub_recovery_reconcile() {
   local confirm=0 hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}" app_context="${HUB_RECOVERY_APP_CONTEXT:-ubuntu-hostinger}"
   if [[ "${1:-}" == "--confirm" ]]; then confirm=1
   elif [[ -n "${1:-}" ]]; then _err "[hub-recovery] only --confirm is accepted"; return 1; fi
-  local -a steps=("k3d serverlb upstreams" "Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
+  local -a steps=("k3d serverlb upstreams" "Vault root token ↔ Keychain" "ESO policy" "Cosign signing key" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
   local index
   if (( ! confirm )); then
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
@@ -249,6 +269,7 @@ function hub_recovery_reconcile() {
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1
   _hub_recovery_ensure_eso_apps_role || return 1
+  _hub_recovery_restore_signing "$hub_context"
   ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc ARGOCD_APP_CLUSTER_NAME="${HUB_RECOVERY_HUB_CLUSTER_NAME:-k3d-cluster}" ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster ARGOCD_APP_CLUSTER_PROVIDER=k3d ARGOCD_NAMESPACE=cicd register_app_cluster || return 1
   argocd_reconcile_app_cluster_registrations || true
   _hub_recovery_seed_app_cluster_reader "$hub_context" "$app_context" || return 1

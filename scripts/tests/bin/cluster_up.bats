@@ -193,6 +193,25 @@ STUB
   [[ "$output" == *'_import_status=$(curl -sS -o /dev/null -w "%{http_code}"'* ]]
 }
 
+@test "acg-up restores cosign signing only for a newly created Hub" {
+  run grep -nF '_dry_guard "restore cosign signing"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  local restore_line="${output%%:*}"
+  run grep -nF 'elif ! _argocd_bootstrap_is_ready' bin/cluster-up
+  [ "$status" -eq 0 ]
+  local existing_line="${output%%:*}"
+  [ "$restore_line" -lt "$existing_line" ]
+  run grep -nF '_dry_guard "deploy ArgoCD"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  local argocd_line="${output%%:*}"
+  [ "$argocd_line" -lt "$restore_line" ]
+}
+
+@test "acg-up never references signing_init or signing_rotate_key" {
+  run grep -nE 'signing_(init|rotate_key)' bin/cluster-up
+  [ "$status" -ne 0 ]
+}
+
 @test "acg-up preserves existing Vault identity secrets on rebuild" {
   run grep -nF '_vault_kv_exists "keycloak/admin"' scripts/plugins/shopping_cart.sh
   [ "$status" -eq 0 ]

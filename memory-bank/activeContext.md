@@ -1,3 +1,12 @@
+# 2026-09-29 — cosign Fix 1 + Fix 2 implemented; awaiting commit SHA
+
+Codex implemented the exact brief in `docs/bugs/2026-09-29-hub-rebuild-loses-cosign-signing-key.md`:
+hub recovery and newly created-hub bring-up call `signing_restore` after Vault/ESO setup, warning
+and continuing on failure; Hermes R7 proposes `make signing-restore` only for two-cycle
+`cosign-public-key` ESO degradation and remains approval-gated. Offline gates are green: focused
+BATS 57/57 and Hermes repairs 24/24; three required mutations each went red and were restored
+green. The single commit SHA is recorded in the completion handoff.
+
 # 2026-09-29 — cosign Fix 1 + Fix 2 handed to Codex; two warning alerts triaged
 
 Codex brief added to `docs/bugs/2026-09-29-hub-rebuild-loses-cosign-signing-key.md`: hub_recovery and
