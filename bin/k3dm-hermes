@@ -32,6 +32,7 @@ from hermes.slack import post_interactive, post_summary
 from hermes import pager
 from hermes import e2e_schedule, e2e_triage, e2e_bugs
 from hermes import status_triage
+from webhook.redact import scrub_credentials
 
 
 def _load_state(path):
@@ -396,24 +397,34 @@ def _publish_status(records, state):
     namespace = os.environ.get("K3DM_HERMES_STATUS_NAMESPACE", "platform-ops")
     name = os.environ.get("K3DM_HERMES_STATUS_CONFIGMAP", "hermes-status")
     labels = "k3dm.k3.io/hermes-status=true"
+
+    def _failed(step, detail):
+        detail = scrub_credentials(" ".join(str(detail).split()))[:400]
+        print(f"[k3dm-hermes] status publish failed at {step} "
+              f"(context={context} namespace={namespace} bytes={len(value)}): {detail}",
+              file=sys.stderr, flush=True)
+        return False
+
     try:
         create = subprocess.run(
             ["kubectl", "--context", context, "-n", namespace, "create", "configmap", name,
              "--from-literal=status.json=" + value, "--dry-run=client", "-o", "yaml"],
             capture_output=True, text=True, timeout=30, check=False)
         if create.returncode != 0:
-            return False
+            return _failed("create", create.stderr or f"rc={create.returncode}")
         manifest = create.stdout.replace("metadata:\n", "metadata:\n  labels:\n    " + labels + "\n", 1)
         applied = subprocess.run(["kubectl", "--context", context, "-n", namespace, "apply", "-f", "-"],
                                  input=manifest, capture_output=True, text=True, timeout=30, check=False)
         if applied.returncode != 0:
-            return False
+            return _failed("apply", applied.stderr or f"rc={applied.returncode}")
         labeled = subprocess.run(["kubectl", "--context", context, "-n", namespace, "label",
                                   "configmap", name, labels, "--overwrite"],
                                  capture_output=True, text=True, timeout=30, check=False)
-        return labeled.returncode == 0
-    except (OSError, subprocess.TimeoutExpired):
-        return False
+        if labeled.returncode != 0:
+            return _failed("label", labeled.stderr or f"rc={labeled.returncode}")
+        return True
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return _failed("exec", f"{type(exc).__name__}: {exc}")
 
 
 def _poll(state, state_path, now=None, status_runner=_status_run):

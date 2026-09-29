@@ -12,6 +12,10 @@
 
 ### Fixed
 
+- Hermes now logs why its status ConfigMap publish failed — the failing `kubectl` step
+  (`create`, `apply`, `label` or `exec`), the context, namespace and payload size, and the
+  scrubbed, bounded stderr — instead of returning `False` silently. The Hermes Status dashboard
+  had been empty with no error anywhere.
 - `cluster-down` now removes the per-provider active marker through the provider-state helper
   instead of hardcoding the legacy scalar marker path. The old teardown cleared the resolver's
   tie-break while leaking the per-provider set entry, leaving a torn-down provider registered
