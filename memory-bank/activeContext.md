@@ -1,3 +1,12 @@
+# 2026-09-29 — Hermes status publish: silent failure made visible
+
+Operator steps 1-6 done (pull, webhook restart, worker deploy after Keychain unlock, hostinger
+refresh, Hermes running). Step 7: no `hermes-status` ConfigMap in `platform-ops` — Hermes runs but
+never publishes. Filed `docs/bugs/2026-09-29-hermes-status-publish-fails-silently.md`; commit `349eab0c`
+makes `_publish_status` log the failing step + stderr. Awaiting the operator's
+`grep 'status publish failed' ~/Library/Logs/k3dm-hermes.log`. Also noted: the GitHub
+deploy-worker workflow has failed every run since 09-13 (`CLOUDFLARE_API_TOKEN` repo secret empty).
+
 # 2026-09-29 — empty dashboards + email-not-SMS triage (cloud session, bridge used)
 
 Bridge `health` (live): **Pushgateway `localhost:9091` connection refused**; `ubuntu-k3s` context

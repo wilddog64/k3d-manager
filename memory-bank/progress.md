@@ -1,3 +1,9 @@
+# 2026-09-29 — Hermes status publish diagnostics
+
+- [x] `_publish_status` logs failures; `test_publish_status.py` 7/7; pytest 394/394; 3 mutations red. `349eab0c`.
+- [ ] Operator: read the new log line; then fix the named cause.
+- [ ] Operator: `bin/k3dm-worker-setup` to repopulate the empty `CLOUDFLARE_API_TOKEN` GitHub secret.
+
 # 2026-09-29 — /cluster-diagnose all-namespaces overview
 
 - [x] Relay + webhook + runner + docs. Relay node tests 23/23, `test_diagnostics_all_pods.py` 12/12,
