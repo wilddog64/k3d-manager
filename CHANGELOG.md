@@ -12,6 +12,9 @@
 
 ### Fixed
 
+- Hermes status publishing works: the `hermes-status` ConfigMap label was spliced into the YAML as
+  `key=value`, which made `metadata.labels` a string and failed every apply since v1.34.0, so the
+  Hermes Status dashboard never had data. The manifest is now built as JSON with a real label map.
 - Hermes now logs why its status ConfigMap publish failed — the failing `kubectl` step
   (`create`, `apply`, `label` or `exec`), the context, namespace and payload size, and the
   scrubbed, bounded stderr — instead of returning `False` silently. The Hermes Status dashboard

@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from the operator's report that the Hermes Status
 dashboard is empty
-**Status:** OPEN — diagnostic logging landed; root cause pending the next Hermes poll on the M4
+**Status:** FIXED 2026-09-29 — root cause found with the new logging; fix pending operator confirmation
 **Files:** `bin/k3dm-hermes` (`_publish_status`), `scripts/tests/hermes/test_publish_status.py`,
 `scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml`
 
@@ -61,3 +61,27 @@ Operator: after pulling, wait one poll (≤ 5 min), then
 `grep 'status publish failed' ~/Library/Logs/k3dm-hermes.log | tail -3`. The fix follows from that
 line. Out of scope until then: the exporter's `except Exception: pass`, which should count read
 failures in a metric rather than swallow them.
+
+## Root cause (2026-09-29, from the new log line)
+
+The operator ran `_publish_status` once under the launchd environment:
+
+```
+[k3dm-hermes] status publish failed at apply (context=k3d-k3d-cluster namespace=platform-ops bytes=111):
+error: unable to decode "STDIN": json: cannot unmarshal string into Go struct field
+ObjectMeta.metadata.labels of type map[string]string
+```
+
+The label was spliced into the dry-run YAML as `k3dm.k3.io/hermes-status=true` (the `kubectl label`
+`key=value` form), so `metadata.labels` parsed as a **string**, not a map, and the API server
+rejected every apply. This has been true since the feature shipped in `978ea60f` (2026-09-17): the
+Hermes Status dashboard has never had data. Both kubeconfigs resolved `k3d-k3d-cluster` to the same
+server (`https://127.0.0.1:52888`), and the candidate causes listed above were all ruled out.
+
+## Fix
+
+`create --dry-run=client -o json`, set `metadata.labels[key] = value` on the parsed object, apply the
+JSON. No string surgery on YAML. Tests: `test_applied_manifest_labels_are_a_map` (stdlib `json`, so it
+cannot be skipped the way a PyYAML-based check was on this runner) and
+`test_label_step_keeps_kubectl_key_equals_value`. Mutations: the original string-label shape and
+dropping the label each went red.

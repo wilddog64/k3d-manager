@@ -408,11 +408,17 @@ def _publish_status(records, state):
     try:
         create = subprocess.run(
             ["kubectl", "--context", context, "-n", namespace, "create", "configmap", name,
-             "--from-literal=status.json=" + value, "--dry-run=client", "-o", "yaml"],
+             "--from-literal=status.json=" + value, "--dry-run=client", "-o", "json"],
             capture_output=True, text=True, timeout=30, check=False)
         if create.returncode != 0:
             return _failed("create", create.stderr or f"rc={create.returncode}")
-        manifest = create.stdout.replace("metadata:\n", "metadata:\n  labels:\n    " + labels + "\n", 1)
+        label_key, _, label_value = labels.partition("=")
+        try:
+            obj = json.loads(create.stdout)
+        except ValueError as exc:
+            return _failed("create", f"unparseable kubectl output: {exc}")
+        obj.setdefault("metadata", {}).setdefault("labels", {})[label_key] = label_value
+        manifest = json.dumps(obj)
         applied = subprocess.run(["kubectl", "--context", context, "-n", namespace, "apply", "-f", "-"],
                                  input=manifest, capture_output=True, text=True, timeout=30, check=False)
         if applied.returncode != 0:

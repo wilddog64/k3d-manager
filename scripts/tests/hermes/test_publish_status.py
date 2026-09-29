@@ -1,6 +1,7 @@
 """Hermes status publication reports why it failed instead of failing silently."""
 
 import importlib.machinery
+import json
 import importlib.util
 import subprocess
 from pathlib import Path
@@ -17,16 +18,19 @@ loader.exec_module(hermes)
 RECORDS = [{"sensor": "eso", "status": "healthy"}]
 
 
-def _runner(fail_at=None, stderr="", exc=None):
+def _runner(fail_at=None, stderr="", exc=None, inputs=None):
     steps = []
 
-    def run(cmd, **_kwargs):
+    def run(cmd, **kwargs):
         step = "create" if "create" in cmd else "apply" if "apply" in cmd else "label"
         steps.append(step)
+        if inputs is not None and "input" in kwargs:
+            inputs[step] = kwargs["input"]
         if exc is not None:
             raise exc
         rc = 1 if step == fail_at else 0
-        out = "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: hermes-status\n" if step == "create" else ""
+        out = ('{"apiVersion": "v1", "kind": "ConfigMap", "data": {"status.json": "{}"}, '
+               '"metadata": {"name": "hermes-status", "namespace": "platform-ops"}}') if step == "create" else ""
         return SimpleNamespace(returncode=rc, stdout=out, stderr=stderr if rc else "")
     return steps, run
 
@@ -73,3 +77,20 @@ def test_disabled_or_empty_records_skip_quietly(monkeypatch, capsys):
     monkeypatch.setenv("K3DM_HERMES_PUBLISH_STATUS", "0")
     assert hermes._publish_status(RECORDS, {}) is False
     assert capsys.readouterr().err == ""
+
+
+def test_applied_manifest_labels_are_a_map(monkeypatch):
+    inputs = {}
+    _steps, run = _runner(inputs=inputs)
+    monkeypatch.setattr(hermes.subprocess, "run", run)
+    assert hermes._publish_status(RECORDS, {}) is True
+    labels = json.loads(inputs["apply"])["metadata"]["labels"]
+    assert labels == {"k3dm.k3.io/hermes-status": "true"}
+
+
+def test_label_step_keeps_kubectl_key_equals_value(monkeypatch):
+    calls = []
+    _steps, run = _runner()
+    monkeypatch.setattr(hermes.subprocess, "run", lambda cmd, **kw: (calls.append(cmd), run(cmd, **kw))[1])
+    hermes._publish_status(RECORDS, {})
+    assert "k3dm.k3.io/hermes-status=true" in calls[-1]
