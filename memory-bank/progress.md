@@ -3,7 +3,12 @@
 - [x] Implemented the exact brief: hub recovery/new-hub restore hooks, approval-gated R7, allowlist
   row, changelog, tests, and bug resolution. Focused BATS 57/57; Hermes repairs 24/24; all three
   mutations went red and were restored green. The single commit SHA is recorded in the completion
-  handoff.
+handoff.
+
+# 2026-09-29 — host-network IP drift
+
+- [x] Live: node-exporter pods recycled; drift check empty.
+- [ ] Codex: implement the brief in hostnetwork-pods-keep-stale-ip-after-node-restart.md.
 
 # 2026-09-29 — Codex handoff: cosign prevention + Hermes R7
 

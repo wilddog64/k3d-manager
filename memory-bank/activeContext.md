@@ -7,6 +7,15 @@ and continuing on failure; Hermes R7 proposes `make signing-restore` only for tw
 BATS 57/57 and Hermes repairs 24/24; three required mutations each went red and were restored
 green. The single commit SHA is recorded in the completion handoff.
 
+# 2026-09-29 — PrometheusDuplicateTimestamps root-caused: host-network IP drift
+
+The duplicate was KSM `kube_endpoint_address` for node-exporter: after a node restart ~2d4h earlier,
+3 of 4 hostNetwork node-exporter pods kept stale IPs (agent-2 unscraped, per-node data mislabeled).
+The operator recycled the pods live; a cluster-wide drift check came back empty. This is 09-13
+Defect 4 again. Filed `2026-09-29-hostnetwork-pods-keep-stale-ip-after-node-restart.md` with a Codex
+brief: `bin/k3dm-hostnet-drift`, calls from hub recovery and node-health-watch, a Hermes
+`hostnet_drift` sensor, and approval-gated R8.
+
 # 2026-09-29 — cosign Fix 1 + Fix 2 handed to Codex; two warning alerts triaged
 
 Codex brief added to `docs/bugs/2026-09-29-hub-rebuild-loses-cosign-signing-key.md`: hub_recovery and
