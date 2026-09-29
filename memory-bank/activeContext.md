@@ -1,3 +1,10 @@
+# 2026-09-29 — five stale bug docs marked FIXED (cloud session)
+
+Verified against code and marked FIXED with the landing commit: pytest-suites-unreachable,
+k3dm-help lifecycle commands, launchd PATH, cluster-status --full PLUGINS_DIR, bats
+host-tool/sibling-repo deps. Commit `b0aca7b`. Branch `claude/inspiring-bohr-37ojhk` carries these plus
+the three fixes above; not yet merged into `k3d-manager-v1.40.0`.
+
 # 2026-09-29 — make jobs now write scrubbed output (cloud session)
 
 Fixed `docs/bugs/2026-09-28-make-jobs-never-write-output-file.md`. `job-status` for make jobs now

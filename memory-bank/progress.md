@@ -1,3 +1,7 @@
+# 2026-09-29 — stale bug-doc statuses corrected
+
+- [x] Five bug docs whose fixes had already landed now read FIXED with commit SHAs. Commit `b0aca7b`.
+
 # 2026-09-29 — make-job output file fix implemented
 
 - [x] `docs/bugs/2026-09-28-make-jobs-never-write-output-file.md`: output written via
