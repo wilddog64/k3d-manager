@@ -216,7 +216,7 @@ probe groups on this tier. Decide which; do not disable the indicator (rejected 
   implementations. Do not add an unversioned alias in the service.
 - Auth, choose one:
   a. an e2e-only Spring profile in `shopping-cart-payment` that permits the API when
-     `OAUTH2_ENABLED=false` (other services in the substrate already honor that variable), or
+     `OAUTH2_ENABLED=false`, or
   b. the e2e client mints a real token from a substrate Keycloak and sends
      `Authorization: Bearer` with a `PAYMENT_USER` role.
   (a) is cheaper; (b) tests the real security path.
