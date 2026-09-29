@@ -18,6 +18,7 @@ __all__ = [
     "effective_policy",
     "_normalize_actor_role",
     "_normalize_role",
+    "_policy_allows",
     "_rate_limited",
     "_request_actor",
     "_request_role",
@@ -28,6 +29,9 @@ __all__ = [
 
 _ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}
 _ROLE_DEFAULT = "admin"
+# Capability roles are deliberately unranked: each is allowed exactly the policy names in its set,
+# never a tier, so one cannot transitively grant every lower-ranked target.
+_ROLE_CAPABILITIES: dict = {}
 
 _RATE_WINDOW_SECS = 60
 _RATE_MAX_DEFAULT = int(os.environ.get("K3DM_RATE_MAX_PER_MIN", "60"))
@@ -106,9 +110,11 @@ def _normalize_actor_role(role):
 
 
 def _request_role(headers, token_role=None):
+    if token_role is not None and token_role not in _ROLE_LEVELS:
+        return token_role
     raw = headers.get("X-K3DM-Role")
     if raw is None:
-        role = token_role or _ROLE_DEFAULT
+        role = _ROLE_DEFAULT if token_role is None else token_role
     else:
         raw = raw.strip().lower()
         role = raw if raw in _ROLE_LEVELS else "reader"  # present-but-invalid → fail closed
@@ -120,7 +126,7 @@ def _request_role(headers, token_role=None):
 def _effective_make_role(headers, body, token_role=None):
     """Cap a relayed /k3dm role at the caller's mapped Slack role (unknown → reader)."""
     header_role = _request_role(headers, token_role)
-    if headers.get("X-K3DM-Role") is None:
+    if header_role not in _ROLE_LEVELS or headers.get("X-K3DM-Role") is None:
         return header_role
     user_role = _slack_user_role(str(body.get("slack_user_id", "")))
     if user_role not in _ROLE_LEVELS:
@@ -134,7 +140,18 @@ def _request_actor(headers):
 
 
 def _role_allows(actual_role, required_role):
+    if actual_role in _ROLE_CAPABILITIES:
+        return False
     return _ROLE_LEVELS[_normalize_actor_role(actual_role)] >= _ROLE_LEVELS[_normalize_role(required_role)]
+
+
+def _policy_allows(role, policy):
+    """Authorize a request role against an effective policy; unranked roles need a capability set."""
+    if role in _ROLE_CAPABILITIES:
+        return policy["name"] in _ROLE_CAPABILITIES[role]
+    if role not in _ROLE_LEVELS:
+        return False
+    return _role_allows(role, policy["min_role"])
 
 
 def _action_policy(path, body):

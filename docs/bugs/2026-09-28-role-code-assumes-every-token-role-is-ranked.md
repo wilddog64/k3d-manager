@@ -2,7 +2,9 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-28 by Claude (cloud session), from a review of `v1.41.0-cloud-bridge-e2e-dispatch.md`
-**Status:** OPEN — latent. Unreachable today; becomes reachable the moment that spec's M1 lands.
+**Status:** FIXED (mechanism) 2026-09-29 by Claude (cloud session) — `_ROLE_CAPABILITIES` is empty;
+`v1.41.0-cloud-bridge-e2e-dispatch.md` M1 adds `cloud-runner` and its `CLOUD_RUNNER_TARGETS` set there.
+Tests: `scripts/tests/bin/test_role_capabilities.py`; all three mutations below went red.
 **Component:** `scripts/lib/webhook/policy.py`, `scripts/lib/webhook/auth.py`, `bin/k3dm-webhook`
 **Related:** `2026-09-24-normalize-role-defaults-unknown-actor-to-admin.md` (FIXED). Same family —
 role handling that is correct only because every value happens to be one of three strings — but a

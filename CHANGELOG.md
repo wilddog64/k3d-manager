@@ -8,6 +8,11 @@
   instead of hardcoding the legacy scalar marker path. The old teardown cleared the resolver's
   tie-break while leaking the per-provider set entry, leaving a torn-down provider registered
   indefinitely and sending provider-scoped probes at a kube context that no longer existed.
+- Webhook authorization no longer assumes every token role is ranked. A token role outside
+  `_ROLE_LEVELS` is returned unchanged by `_request_role` (an `X-K3DM-Role` header cannot widen or
+  narrow it), is allowed only the policy names in its `_ROLE_CAPABILITIES` set, and is refused when
+  it has none. Previously such a role raised `KeyError` inside authorization. The thread-command
+  refusal now names the fail-closed role (`reader`) instead of `admin`.
 - Diagnostics output now scrubs credential-shaped values, including unregistered bearer tokens,
   JWTs, URL passwords, sensitive key/value pairs, Vault, Stripe and GitHub tokens before writing
   job output or posting it to Slack.

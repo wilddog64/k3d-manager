@@ -95,7 +95,9 @@ from webhook.policy import (  # noqa: E402
     _audit_remote_action,
     _effective_make_role,
     effective_policy,
+    _normalize_actor_role,
     _normalize_role,
+    _policy_allows,
     _rate_hits,
     _RATE_MAX_DEFAULT,
     _rate_limited,
@@ -608,7 +610,7 @@ def _handle_thread_command(job_id, command, role="admin"):
             "/slack/events", f"thread-{cmd or 'unknown'}", "slack", role, False,
             reason=f"requires {required}",
         )
-        _notify_job(job_id, f"⛔ `{cmd or command.strip()}` requires role *{required}* — you have *{_normalize_role(role)}*.")
+        _notify_job(job_id, f"⛔ `{cmd or command.strip()}` requires role *{required}* — you have *{_normalize_actor_role(role)}*.")
         return
     if cmd in {"gemini", "claude", "codex"}:
         _alias_parts = command.strip().lstrip("/").split(None, 1)
@@ -1806,7 +1808,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             request_role = _effective_make_role(self.headers, body, token_role)
         request_actor = _request_actor(self.headers)
         policy = effective_policy(route, self.path, body)
-        if not _role_allows(request_role, policy["min_role"]):
+        if not _policy_allows(request_role, policy):
             _audit_remote_action(
                 self.path,
                 policy["name"],
