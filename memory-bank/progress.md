@@ -1,3 +1,10 @@
+# 2026-09-29 — make-job output file fix implemented
+
+- [x] `docs/bugs/2026-09-28-make-jobs-never-write-output-file.md`: output written via
+  `_redact_secrets` + `scrub_credentials` before `status`. `test_make_job_output.py` 3/3;
+  `make test-pytest` 375/375; `make test-python-unit` 7/7 OK; three mutations red.
+  Commit `b66ca92` on `claude/inspiring-bohr-37ojhk`.
+
 # 2026-09-29 — describe-pod env masking implemented
 
 - [x] `docs/bugs/2026-09-28-diagnostics-describe-pod-prints-literal-env-values.md`: env-block

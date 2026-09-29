@@ -1,3 +1,9 @@
+# 2026-09-29 — make jobs now write scrubbed output (cloud session)
+
+Fixed `docs/bugs/2026-09-28-make-jobs-never-write-output-file.md`. `job-status` for make jobs now
+returns real output; the artifacts spec's premise ("full output already exists on the host") now
+holds for make jobs. Commit `b66ca92`.
+
 # 2026-09-29 — describe-pod env masking implemented (cloud session)
 
 Fixed `docs/bugs/2026-09-28-diagnostics-describe-pod-prints-literal-env-values.md`: new
