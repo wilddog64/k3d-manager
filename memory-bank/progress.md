@@ -1,3 +1,8 @@
+# 2026-09-29 — Codex verification + next handoff
+
+- [x] Verified `2dfa00ef` (cosign bring-up restore + R7); defect fixed in `c5b6def2`.
+- [ ] Codex: hostnet-drift brief. Claude verifies on return.
+
 # 2026-09-29 — Codex implementation: cosign prevention + Hermes R7
 
 - [x] Implemented the exact brief: hub recovery/new-hub restore hooks, approval-gated R7, allowlist

@@ -2,8 +2,8 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from Hermes `eso` degraded on the hub
-**Status:** FIXED — Fix 1 + Fix 2 implemented on 2026-09-29. `make signing-restore` already landed
-in `19d74587`; implementation commit is recorded below.
+**Status:** FIXED — Codex `2dfa00ef`, verified by Claude 2026-09-29 with one defect fixed in `c5b6def2`.
+`make signing-restore` landed in `19d74587`. Live check pending the next hub rebuild or recovery.
 **Related:** `docs/issues/2026-09-05-vault-kv-and-eso-policy-loss-grafana-cosign.md` (first
 occurrence and root cause), `docs/bugs/2026-09-13-vault-eso-role-rewrite-drops-cosign-verify.md`
 (the grant-only variant, fixed in `b3bc737c`)
@@ -143,3 +143,21 @@ The bring-up and recovery paths restore signing material after Vault/ESO setup, 
 continuing if the restore cannot run. Hermes R7 is proposal-only until the existing approval flow
 executes the exact `make signing-restore` command. Implementation commit: this commit (SHA in the
 handoff below).
+
+## Verification (Claude, 2026-09-29)
+
+Verified independently rather than from the report. `2dfa00ef` is on `origin/k3d-manager-v1.40.0` and
+touches only the 11 files the brief allows. The merge `d8f91c1c` brings in only docs and memory-bank
+files. Results: `hub_recovery.bats` + `cluster_up.bats` 57/57, `test_repairs.py` 24/24,
+`make test-pytest` 398/398, shellcheck clean. The brief's three mutations (remove the call, make the
+failure fatal, drop the evidence check) each went red.
+
+**Defect found and fixed in `c5b6def2`:** `_hub_recovery_restore_signing` set
+`trap '… rm -f "'"${kubeconfig}'"' 2>/dev/null || true' RETURN`. The nested quoting leaves an
+unterminated `"`, so on the early-return path (kubeconfig pin failure) bash printed
+`unexpected EOF while looking for matching '"'` and the cleanup never ran. shellcheck cannot see
+inside the trap string, and no test exercised that path. The fix removes the file explicitly on both
+paths. Added the tests the brief asked for and Codex omitted: kubeconfig pinning (brief test 1), no
+temp file on either path, the dry-list name `Cosign signing key` (brief test 3), and no
+`signing_init`/`signing_rotate_key` in `hub_recovery.sh` (brief test 5). Mutations: Codex's original
+function, dropping the pin, and skipping the success-path cleanup each went red. `hub_recovery.bats` 35/35.

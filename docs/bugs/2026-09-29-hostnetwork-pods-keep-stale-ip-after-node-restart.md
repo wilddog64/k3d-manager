@@ -90,6 +90,10 @@ DaemonSet-owner check → test 2 red; make a drift-fix failure fatal in recovery
 **Gates (paste output):** `shellcheck -S warning bin/k3dm-hostnet-drift bin/k3dm-node-health-watch scripts/plugins/hub_recovery.sh`;
 the new and touched BATS suites; `make test-pytest`; `git diff --stat` lists only the files above.
 
+**Lessons from the previous brief (2026-09-29 review of `2dfa00ef`):** do not use `trap … RETURN`
+with nested quoting; clean up temp files explicitly on every return path. Every early-return path
+needs its own test. Cover each numbered test above; say explicitly if you skip one.
+
 **Do not change:** R1–R7, `approve()`, `scripts/lib/foundation/`, `scripts/lib/acg/`. No live cluster commands.
 
 **Commit and hand back:** one commit on `k3d-manager-v1.40.0`, message

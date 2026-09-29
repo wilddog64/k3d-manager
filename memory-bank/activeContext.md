@@ -1,3 +1,12 @@
+# 2026-09-29 — Codex `2dfa00ef` verified; one defect fixed; hostnet-drift handed to Codex
+
+Codex's cosign Fix 1 + R7 met its brief gates (57/57 BATS, 24/24 repairs, 398/398 pytest, 3 mutations
+red, scope = 11 allowed files, merge `d8f91c1c` docs-only). Found a broken `trap … RETURN` in
+`_hub_recovery_restore_signing` (unterminated quote; the early-return path errored and skipped cleanup)
+and three brief tests Codex skipped. Fixed and tested in `c5b6def2` (hub_recovery.bats 35/35, 3 mutations red).
+Handed off `2026-09-29-hostnetwork-pods-keep-stale-ip-after-node-restart.md` to Codex, with the lessons
+added to its brief.
+
 # 2026-09-29 — cosign Fix 1 + Fix 2 implemented; awaiting commit SHA
 
 Codex implemented the exact brief in `docs/bugs/2026-09-29-hub-rebuild-loses-cosign-signing-key.md`:
