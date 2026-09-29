@@ -8,7 +8,7 @@ from webhook.config import JOB_DIR
 from webhook.proc import _spawn_capture_text
 from webhook.render import _slack_post
 from webhook.agent import _call_gemini
-from webhook.redact import scrub_credentials
+from webhook.redact import mask_env_values, scrub_credentials
 
 __all__ = [
     "_run_cluster_status", "_format_status_summary_slack",
@@ -441,6 +441,8 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
             _write_log("\n❌ diagnostics command timed out after 30s")
             _finish("failed")
             return
+        if action == "describe-pod":
+            out = mask_env_values(out)
         if out.strip():
             clipped = out.strip()
             if len(clipped) > 3500:

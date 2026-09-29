@@ -3,7 +3,12 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-28 by Claude (cloud session), at the operator's request while adding
 `/cluster-diagnose` to the cloud bridge (`v1.40.0-cloud-bridge-test-targets.md` M4b)
-**Status:** OPEN
+**Status:** FIXED 2026-09-29 by Claude (cloud session) — `mask_env_values` in
+`scripts/lib/webhook/redact.py`, called for `describe-pod` only; the whole-output scrubber already ran.
+Tests: `scripts/tests/bin/test_describe_pod_env_masking.py`. Test 1 checks the masker directly, because
+the shape scrubber alone already hides the three original fixture values and an end-to-end test 1
+could not go red; `SENTRY_DSN` (userinfo without a colon) and `WEBHOOK_URL` (secret in the path)
+are the cases only layer 1 catches. All three mutations below, plus unwiring the call, went red.
 **Severity:** Medium — no known live leak; reachable in Slack today, permanent in git once the
 bridge exposes it.
 **Component:** `scripts/lib/webhook/status.py` (`_run_cluster_diagnostics`,
