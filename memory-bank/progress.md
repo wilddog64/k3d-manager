@@ -1,3 +1,8 @@
+# 2026-09-29 — e2e payment root cause documented
+
+- [x] Root-caused the 8 JSON failures + vcluster health failure; recorded in the api-payments bug doc.
+- [ ] Operator: choose auth option (e2e profile vs real token) before a Codex spec for the two repos.
+
 # 2026-09-29 — retrieval-eval spec status corrected
 
 - [x] `v1.40.0-hermes-prior-art-and-retrieval-eval.md`: blocker removed (v1.39.0 shipped WS1-WS3).

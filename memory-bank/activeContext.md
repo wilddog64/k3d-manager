@@ -1,3 +1,12 @@
+# 2026-09-29 — e2e payment failures root-caused (source only)
+
+Run `1790248982-25275` (m2, vcluster): 9 `api/payments.spec.ts` failures. Updated
+`docs/bugs/2026-09-16-e2e-assertion-api-payments.md`: client calls `/api/payments` but service maps
+`/api/v1/payments`; service security has no `OAUTH2_ENABLED` switch so unauthenticated calls get an
+empty 401 → `Unexpected end of JSON input`; substrate has no RabbitMQ so health stays DOWN. Fixes live
+in `shopping-cart-e2e-tests` and `shopping-cart-payment` — awaiting operator decision on auth option.
+Marked `2026-09-15-e2e-substrate-missing-payment.md` FIXED (`978ea60f`).
+
 # 2026-09-29 — prior-art/retrieval-eval spec unblocked
 
 Operator noticed the v1.40.0 `hermes-prior-art-and-retrieval-eval` spec still read "hard-blocked on

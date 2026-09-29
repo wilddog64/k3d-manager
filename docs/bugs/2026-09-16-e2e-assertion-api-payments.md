@@ -173,3 +173,54 @@ application's aggregate `/actuator/health`, and the two that come closest both r
 here by design: `argocd` sees `Healthy`, `node_pressure` sees `1/1 Running`. A sensor that
 compares aggregate health against probe-group health would have caught this class on the day
 it shipped.
+
+---
+
+## Update 2026-09-29 — the eight `Unexpected end of JSON input` failures explained
+
+**Verified by:** Claude (cloud session), from source only: `shopping-cart-payment@87819d4`,
+`shopping-cart-e2e-tests@7601aa1`, and `scripts/etc/e2e/`. No live cluster access. Recurred on
+run `1790248982-25275` (runner `m2`, tier `vcluster`) with the same 9 failures.
+
+**Answer to "whether the vcluster tier even had a payment substrate":** yes.
+`scripts/etc/e2e/payment.yaml` deploys it and the Job sets `PAYMENT_URL=http://payment.<ns>.svc:8084`.
+This run has no `ECONNREFUSED`, so the service is reached.
+
+### Why every non-health request gets an empty body — two independent defects
+
+Each alone is enough to fail all eight tests; both must be fixed.
+
+1. **Path mismatch.** `tests/helpers/api-client.ts` `PaymentClient` calls `/api/payments`,
+   `/api/payments/<id>`, `/api/payments?orderId=`, `/api/payments/<id>/refund`. The service maps
+   `@RequestMapping("/api/v1/payments")` (`PaymentController.java:21`; the Go rewrite's
+   `go/internal/payment/handler.go:21-26` uses `/api/v1/payments` too). No handler exists at
+   `/api/payments`.
+2. **Auth cannot be switched off.** `SecurityConfig.java` permits only `/actuator/**` and requires
+   an authenticated JWT for everything else; controller methods also require a `PAYMENT_*` role via
+   `@PreAuthorize`. Nothing in `src/main` reads `OAUTH2_ENABLED`, so the substrate's
+   `OAUTH2_ENABLED=false` is inert. The client sends only `X-User-ID` and `X-Correlation-ID` — no
+   bearer. Spring Security rejects before routing with **401 and an empty body**, and
+   `responseData()` calls `response.json()` unconditionally, which throws
+   `SyntaxError: Unexpected end of JSON input`. That is why the sample error hides the status code.
+
+### Health failure on the vcluster tier
+
+Independent of the `spring.rabbitmq` key-path defect above, the e2e substrate deploys **no RabbitMQ
+at all**, so even after that fix `RabbitHealthIndicator` reports `DOWN` there and
+`/actuator/health` stays 503. The substrate needs a broker, or the health test must assert the
+probe groups on this tier. Decide which; do not disable the indicator (rejected above).
+
+### Fix options (operator decision; shopping-cart is spec-then-Codex)
+
+- Paths: change `PaymentClient` to `/api/v1/payments` (test repo), matching both service
+  implementations. Do not add an unversioned alias in the service.
+- Auth, choose one:
+  a. an e2e-only Spring profile in `shopping-cart-payment` that permits the API when
+     `OAUTH2_ENABLED=false` (other services in the substrate already honor that variable), or
+  b. the e2e client mints a real token from a substrate Keycloak and sends
+     `Authorization: Bearer` with a `PAYMENT_USER` role.
+  (a) is cheaper; (b) tests the real security path.
+- Test harness: make `responseData()` assert `response.ok()` and include status + body text before
+  parsing, so the next failure names its status instead of `Unexpected end of JSON input`.
+- Also noted: the substrate pins payment `sha-a672ee42…`; the payment repo's latest image commit is
+  `87819d4` (`sha-cced3440…`). Not a cause of these failures.
