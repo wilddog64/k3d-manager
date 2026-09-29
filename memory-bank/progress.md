@@ -1,3 +1,8 @@
+# 2026-09-29 — host-network IP drift
+
+- [x] Live: node-exporter pods recycled; drift check empty.
+- [ ] Codex: implement the brief in hostnetwork-pods-keep-stale-ip-after-node-restart.md.
+
 # 2026-09-29 — Codex handoff: cosign prevention + Hermes R7
 
 - [x] Brief written (hub-rebuild-loses-cosign-signing-key.md).
