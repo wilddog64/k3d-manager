@@ -1,3 +1,11 @@
+# 2026-09-29 — unranked token-role fix implemented
+
+- [x] `docs/bugs/2026-09-28-role-code-assumes-every-token-role-is-ranked.md`: capability roles
+  bypass rank comparison and are allowed only their policy-name set. Added
+  `scripts/tests/bin/test_role_capabilities.py` (26/26); `make test-pytest` 367/367;
+  `make test-python-unit` 7/7 suites OK; all three mutations red and restored green.
+  Commit `adb451c` on `claude/inspiring-bohr-37ojhk`.
+
 # 2026-09-28 — diagnostics redaction follow-up implemented
 
 - [x] Closed the follow-up scrubber gaps: JSON/quoted values, nested Bearer values, empty-user

@@ -1,3 +1,10 @@
+# 2026-09-29 — unranked token-role fix implemented (cloud session)
+
+Fixed `docs/bugs/2026-09-28-role-code-assumes-every-token-role-is-ranked.md` on
+`claude/inspiring-bohr-37ojhk` (branched from `k3d-manager-v1.40.0`). New `_ROLE_CAPABILITIES`
+(empty) + `_policy_allows` in `policy.py`; `do_POST` enforces through it. v1.41.0 e2e-dispatch M1
+only has to add `cloud-runner` and its target set. Commit `adb451c`.
+
 # 2026-09-28 — diagnostics redaction follow-up implemented
 
 Implemented the follow-up brief for `docs/bugs/2026-09-28-diagnostics-logs-output-unredacted-for-unregistered-secrets.md`.
