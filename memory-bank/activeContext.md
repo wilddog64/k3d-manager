@@ -1,3 +1,10 @@
+# 2026-09-29 — Hermes status publish root-caused and fixed
+
+The new logging named it: `apply` rejected `metadata.labels` as a string — the label was spliced in
+`key=value` form since `978ea60f`, so the Hermes Status dashboard never had data. Same cluster from
+both kubeconfigs (`127.0.0.1:52888`), so no env issue. Fix `e4ea49e0`: JSON manifest with a real label map.
+Pending: operator pulls; next poll (≤5 min) should create `platform-ops/hermes-status`.
+
 # 2026-09-29 — Hermes status publish: silent failure made visible
 
 Operator steps 1-6 done (pull, webhook restart, worker deploy after Keychain unlock, hostinger
