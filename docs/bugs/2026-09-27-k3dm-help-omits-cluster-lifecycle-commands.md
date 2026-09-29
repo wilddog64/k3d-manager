@@ -3,6 +3,7 @@
 **Filed:** 2026-09-27
 **Source:** Claude session — operator could not find the command that produces deployment metrics
 **Branch:** `k3d-manager-v1.39.0`
+**Status:** FIXED in `3a25448` (#133) — the lifecycle slash commands are listed in `scripts/lib/webhook/make_targets.py` help. Status line added 2026-09-29 by Claude (cloud session) after checking the code on `k3d-manager-v1.40.0`.
 
 ## Description
 

@@ -3,6 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Medium — `make status-full` is 100% broken, and `make status` tells the operator to
+**Status:** FIXED in `945018e` (#130) — `bin/cluster-status` sets `PLUGINS_DIR` before sourcing `observability.sh`. Status line added 2026-09-29 by Claude (cloud session) after checking the code on `k3d-manager-v1.40.0`.
 run it.
 
 ## Symptom

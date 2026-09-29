@@ -1,7 +1,7 @@
 # Two BATS suites depend on the author's workstation, not the repo
 
 **Filed:** 2026-09-18
-**Status:** OPEN
+**Status:** FIXED — `rg` removed from `argocd_reclaim_release_ownership.bats` in `e259c71`; `keycloak.bats` skips with a named message when the sibling realm fixture is absent (`e259c71`). Residual nit: the fixture path still counts `../` from `BATS_TEST_DIRNAME` instead of resolving from the repo root. Status line added 2026-09-29 by Claude (cloud session) after checking the code on `k3d-manager-v1.40.0`.
 **Branch:** `k3d-manager-v1.35.0`
 **Component:** `scripts/tests/plugins/argocd_reclaim_release_ownership.bats`,
 `scripts/tests/plugins/keycloak.bats`

@@ -3,6 +3,7 @@
 **Filed:** 2026-09-25
 **Branch:** k3d-manager-v1.38.0
 **Severity:** gate hole — a green CI proved less than it claimed
+**Status:** FIXED in `6f0fb4a` (#132) — `cloud_bridge.py` renamed to `test_cloud_bridge.py`; `make test-pytest` collects `scripts/tests/bin/test_*.py`. Status line added 2026-09-29 by Claude (cloud session) after checking the code on `k3d-manager-v1.40.0`.
 
 ## Symptom
 
