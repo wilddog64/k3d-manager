@@ -7404,3 +7404,10 @@ Gates: focused BATS 39/39; shellcheck reports only existing informational warnin
 passed. Mutation proof against HEAD copies: three source-sensitive tests fail; the literal
 “does not prepend ~/.local/bin twice” test passes against both versions because it does not read the
 source, so it cannot provide mutation evidence without changing the specified test block.
+# 2026-09-29 — stale unmanaged ArgoCD registration cleanup fixed
+
+Filed and fixed `docs/bugs/2026-09-29-stale-unmanaged-argocd-registration.md`.
+Added `make cleanup-stale-registration CLUSTER=<name> [CONFIRM=1]` and its exact-name,
+dry-run-by-default cleanup helper. Commit `39193aae` is pushed to
+`origin/k3d-manager-v1.40.0`; live cleanup removed the stale `cluster-ubuntu-k3s`
+registration and all 10 generated Unknown Applications before this fix was added.

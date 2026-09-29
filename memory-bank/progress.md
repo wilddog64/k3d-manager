@@ -2542,3 +2542,11 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [!] Mutation proof against pre-fix HEAD copies: tests 1, 3 and 4 fail; test 2 passes because its
       literal body is self-contained and does not inspect either script, so it cannot fail against
       the unfixed source without altering the required test block.
+# 2026-09-29 — stale unmanaged ArgoCD registration cleanup fixed
+
+- [x] Added `make cleanup-stale-registration CLUSTER=<name> [CONFIRM=1]` for exact,
+  explicitly confirmed removal of one stale ArgoCD cluster registration. The helper
+  deletes the registration Secret first, then removes only matching Applications with
+  non-blocking deletion. Bug filed at `docs/bugs/2026-09-29-stale-unmanaged-argocd-registration.md`.
+  Targeted cleanup tests: 5/5; `bash -n`, ShellCheck, `_agent_checkpoint`, `_agent_lint`,
+  and `_agent_audit` passed. Commit `39193aae` pushed to `origin/k3d-manager-v1.40.0`.
