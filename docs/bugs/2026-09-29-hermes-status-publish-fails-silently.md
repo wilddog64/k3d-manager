@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from the operator's report that the Hermes Status
 dashboard is empty
-**Status:** FIXED 2026-09-29 — root cause found with the new logging; fix pending operator confirmation
+**Status:** FIXED and verified live 2026-09-29 — `1f495ab0`; operator saw `published: True` and `platform-ops/hermes-status` created on the hub
 **Files:** `bin/k3dm-hermes` (`_publish_status`), `scripts/tests/hermes/test_publish_status.py`,
 `scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml`
 

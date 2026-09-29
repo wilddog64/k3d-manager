@@ -1,3 +1,12 @@
+# 2026-09-29 — Hermes status publish verified live
+
+Operator on the M4 after pulling `1f495ab0`: `_publish_status` → `published: True`;
+`kubectl -n platform-ops get cm hermes-status` → present. Hermes Status dashboard should populate.
+Hermes' own node_pressure evidence dropped `Pushgateway` from its webhook-failure list after the
+hostinger refresh, so the VectorDB push path is back. Still open from the same polls:
+`frontend.3ai-talk.org` unreachable, `cosign-public-key` ExternalSecret not synced,
+`shopping-cart-identity` OutOfSync.
+
 # 2026-09-29 — Hermes status publish root-caused and fixed
 
 The new logging named it: `apply` rejected `metadata.labels` as a string — the label was spliced in

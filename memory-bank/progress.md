@@ -1,7 +1,7 @@
 # 2026-09-29 — Hermes status publish fixed
 
 - [x] Label-as-string bug fixed (`e4ea49e0`); `test_publish_status.py` 9/9, pytest 396/396, 2 mutations red.
-- [ ] Operator: pull, then confirm `kubectl -n platform-ops get cm hermes-status` and the dashboard.
+- [x] Operator confirmed live: `published: True`, `hermes-status` ConfigMap present.
 
 # 2026-09-29 — Hermes status publish diagnostics
 
