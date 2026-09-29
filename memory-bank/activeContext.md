@@ -1,3 +1,10 @@
+# 2026-09-29 — cloud-session fixes fast-forwarded into v1.40.0
+
+Operator asked for the `claude/inspiring-bohr-37ojhk` work on the release branch.
+`k3d-manager-v1.40.0` fast-forwarded `0071444..a1ea1ab` (no merge commit): the unranked token-role
+fix `adb451c`, describe-pod env masking `6c95ea8`, make-job output `b66ca92`, and the five stale
+bug-doc statuses `b0aca7b`. No CI runs on a branch push; the release PR's CI will be the first gate.
+
 # 2026-09-29 — five stale bug docs marked FIXED (cloud session)
 
 Verified against code and marked FIXED with the landing commit: pytest-suites-unreachable,

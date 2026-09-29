@@ -1,3 +1,8 @@
+# 2026-09-29 — cloud-session fixes landed on k3d-manager-v1.40.0
+
+- [x] Fast-forwarded `k3d-manager-v1.40.0` to `a1ea1ab` (3 bug fixes + doc status sweep).
+  Local gates: `make test-pytest` 375/375, `make test-python-unit` 7/7. CI not yet run (PR-only).
+
 # 2026-09-29 — stale bug-doc statuses corrected
 
 - [x] Five bug docs whose fixes had already landed now read FIXED with commit SHAs. Commit `b0aca7b`.
