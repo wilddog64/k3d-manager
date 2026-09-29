@@ -49,8 +49,11 @@ function parseClusterDiagnose(text) {
     index = 1
   }
   const verb = parts[index] || ''
+  if (!verb && index === 1) {
+    return { payload: { provider: target, action: 'get-pods-all' } }
+  }
   if (!verb) {
-    return { error: 'Usage: /cluster-diagnose [hostinger|aws|gcp|az|hub] <pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets>' }
+    return { error: 'Usage: /cluster-diagnose <hostinger|aws|gcp|az|hub> (all pods) | /cluster-diagnose [hostinger|aws|gcp|az|hub] <pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets>' }
   }
   if (verb === 'pods') {
     const namespace = parts[index + 1] || ''

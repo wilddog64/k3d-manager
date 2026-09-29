@@ -291,6 +291,8 @@ _DIAGNOSTIC_NAMESPACES = {
     "platform-ops",
     "secrets",
     "shopping-cart-apps",
+    "shopping-cart-data",
+    "shopping-cart-payment",
     "trivy-system",
 }
 _RESOURCE_NAME_RE = re.compile(r"^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$")
@@ -395,7 +397,7 @@ def _create_cve_scan_job():
 
 def _validate_diagnostics_request(body):
     action = (body.get("action", "") or "").strip()
-    allowed_actions = {"get-pods", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}
+    allowed_actions = {"get-pods", "get-pods-all", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}
     if action not in allowed_actions:
         return "unsupported diagnostics action"
     context = _resolve_diagnostics_context(body.get("provider", ""), body.get("context", ""))
@@ -408,6 +410,9 @@ def _validate_diagnostics_request(body):
     body["provider"] = provider
     if action in {"get-apps", "describe-app", "get-appsets"} and context != "k3d-k3d-cluster":
         return "ArgoCD diagnostics must target the hub context"
+    if action == "get-pods-all":
+        body.pop("namespace", None)
+        return None
     if action == "get-pods":
         if not _validate_namespace(body.get("namespace", "")):
             return "namespace must be one of the approved repo-owned namespaces"

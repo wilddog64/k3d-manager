@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `/cluster-diagnose <provider>` with no verb lists every pod in every namespace on that cluster
+  (`kubectl get pods --all-namespaces -o wide`, webhook action `get-pods-all`). The provider is
+  required; bare `/cluster-diagnose` still prints usage. It reads pod names and status only.
+- The diagnostics namespace allowlist now includes `shopping-cart-payment` and
+  `shopping-cart-data`, so `pods`, `describe-pod` and `logs` work there.
+
 ### Fixed
 
 - `cluster-down` now removes the per-provider active marker through the provider-state helper

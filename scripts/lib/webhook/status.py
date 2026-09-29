@@ -397,6 +397,13 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
                 "--context", context, "-o", "wide",
                 "--request-timeout=15s",
             ]
+        elif action == "get-pods-all":
+            title = f"🔎 *Diagnostics* — pods in all namespaces on `{context}`"
+            cmd = [
+                "kubectl", "get", "pods", "--all-namespaces",
+                "--context", context, "-o", "wide",
+                "--request-timeout=15s",
+            ]
         elif action == "describe-pod":
             title = f"🔎 *Diagnostics* — describe pod `{name}` in `{namespace}` on `{context}`"
             cmd = [

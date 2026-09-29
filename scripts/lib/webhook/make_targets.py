@@ -55,7 +55,7 @@ MAKE_TARGETS = {
 # Roles mirror COMMAND_ROLES in workers/slack-relay/index.js -- keep in sync.
 CLUSTER_COMMANDS = (
     ("/cluster-status [provider]", "reader", "cluster + access-layer status"),
-    ("/cluster-diagnose [provider|hub] <verb>", "reader", "pods, logs, apps, appsets"),
+    ("/cluster-diagnose [provider|hub] [verb]", "reader", "no verb: pods in all namespaces; pods, logs, apps, appsets"),
     ("/hostinger-status", "reader", "permanent app-cluster status"),
     ("/cluster-refresh [provider]", "operator", "refresh the access layer"),
     ("/cluster-up [provider]", "admin", "bring a cluster up (records deployment metrics)"),

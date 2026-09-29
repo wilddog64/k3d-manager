@@ -376,6 +376,9 @@ there) and retry.
 
 Examples:
 
+- `/cluster-diagnose aws` — no verb: every pod in every namespace on that cluster
+  (`kubectl get pods --all-namespaces -o wide`). The provider is required for this form;
+  `/cluster-diagnose` alone prints usage. Long output is clipped to its last 3500 characters.
 - `/cluster-diagnose hostinger pods shopping-cart-apps`
 - `/cluster-diagnose hostinger describe-pod shopping-cart-apps frontend-abc123`
 - `/cluster-diagnose hostinger logs shopping-cart-apps frontend-abc123`
@@ -383,8 +386,11 @@ Examples:
 - `/cluster-diagnose hub app shopping-cart-apps`
 - `/cluster-diagnose hub appsets`
 
-This path is deliberately read-only and the webhook rejects any namespace or
-context outside the repo-owned allowlist.
+This path is deliberately read-only. `pods <namespace>`, `describe-pod` and `logs` reject any
+namespace outside the repo-owned allowlist (`cicd`, `identity`, `monitoring`, `platform-ops`,
+`secrets`, `shopping-cart-apps`, `shopping-cart-data`, `shopping-cart-payment`, `trivy-system`).
+The no-verb overview lists pod names and status in every namespace but never reads env, logs or
+secrets. Every form rejects a context outside the approved set.
 
 ### Service smoke test
 
