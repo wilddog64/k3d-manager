@@ -1,3 +1,17 @@
+# 2026-09-29 — five degraded Hermes sensors triaged
+
+- reachability (frontend.3ai-talk.org): known, `2026-09-25-frontend-public-url-routes-to-wrong-cluster.md`
+  (fix awaits operator decision) — recurrence noted.
+- argocd (shopping-cart-identity OutOfSync): known, `2026-09-23-argocd-identity-replace-true-cannot-update-bound-pvc.md`
+  (unassigned) — recurrence noted.
+- eso (cosign-public-key): likely 4th loss of the `cosign-verify` Vault grant after the 09-20 hub
+  rebuild (`2026-09-13-vault-eso-role-rewrite-drops-cosign-verify.md`, live restore was left to the
+  operator) — needs the ExternalSecret condition message to confirm.
+- node_pressure: NEW `2026-09-29-hermes-node-pressure-sensor-measures-service-failures.md` — it is a
+  two-service-failure aggregate, double-counts, and blocks R2.
+- ci: stale — latest repo run is the 09-27 Deploy Worker failure; cause (empty GH secret) fixed.
+Bridge poller stopped answering ~23:11Z (request `20260929T231124Z-health` unanswered). Commit `1866187e`.
+
 # 2026-09-29 — Hermes status publish verified live
 
 Operator on the M4 after pulling `1f495ab0`: `_publish_status` → `published: True`;
