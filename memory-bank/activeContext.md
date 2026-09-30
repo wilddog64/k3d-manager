@@ -1,3 +1,10 @@
+# 2026-09-30 — keycloak reconcile: real root cause is a missing flowId (not timing)
+
+#103's wait read the flow on attempt 1, then the first sub-flow PUT still 404'd. Live tests: the hook's body (authenticationFlow:true,
+no flowId) gives 404 with or without --no-merge; the same body with flowId is OK; requirement-only is OK. The hook computes forms_flow_id
+and conditional_otp_flow_id but never sends them. The flow is already in the target state; logins are fine. Brief 2 is in the bug doc
+(add flowId to 2 updates; behavioural BATS with the live CSV). Hook-only changes need a manual sync.
+
 # 2026-09-30 — Codex `b11f1a2` (keycloak flow wait) verified; shopping-cart-infra #103 open
 
 Clean: 2 files, based on main, wait on both branches, set -e intact, 3/3 BATS, mutation red, shellcheck/kubeconform/yamllint(CI config) OK.

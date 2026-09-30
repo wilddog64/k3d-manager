@@ -27,7 +27,8 @@
 - [x] Codex `50bd3591` hub Pushgateway + dashboard move, verified by Claude (`b46d5e06`).
 - [x] Codex `b11f1a2` keycloak flow wait, verified by Claude; shopping-cart-infra PR #103 open.
 - [x] shopping-cart-infra #103 merged as `98da0c5` (identical to the verified b11f1a2; CI green; Copilot found nothing).
-- [ ] Live: identity syncs to 98da0c5, the hook passes and logs 'readable after N attempt(s)', KubeJobFailed resolves; this also closes the 09-15 browser-flow live check.
+- [x] Live 2026-09-30: 98da0c5 synced; wait passed on attempt 1; the hook still 404s. Root cause corrected: missing flowId.
+- [ ] Codex brief 2 (shopping-cart-infra): send flowId on the 2 sub-flow updates; then one manual sync; KubeJobFailed resolves.
 - [x] Hub vectordb metrics live 2026-09-30 (ApplicationSets reapplied, forward 19094 healthy, rows=1732 pushed; the stray copy was pruned by ArgoCD).
 - [x] `make validate-manifests` + `_ensure_kubeconform` (self-installing kubeconform); SC2317 false positive suppressed.
 - [ ] Operator: let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.

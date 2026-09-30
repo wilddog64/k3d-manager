@@ -1,8 +1,8 @@
-# Bug: the Keycloak reconcile hook 404s on its own browser flow right after the partial import
+# Bug: the Keycloak reconcile hook's sub-flow updates omit `flowId`, so Keycloak rejects them with 404
 
 **Branch:** `k3d-manager-v1.40.0` (tracking); **work repo:** `shopping-cart-infra`
 **Filed:** 2026-09-30 by Claude (cloud session), from `KubeJobFailed` (hub, `identity`)
-**Status:** MERGED 2026-09-30 as shopping-cart-infra `98da0c5` ([#103](https://github.com/wilddog64/shopping-cart-infra/pull/103)); tree identical to the verified `b11f1a2`; CI green on the PR and on main. Live check pending (hook passes, `KubeJobFailed` resolves).
+**Status:** OPEN — root cause corrected 2026-09-30 after live tests; second Codex brief below. #103 (`98da0c5`) is merged and harmless but did not fix it.
 **Target files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats` (amended 2026-09-30 at plan review: the stub harness is kept as a test, not thrown away)
 **Severity:** Medium. The flow itself and logins are fine; every `shopping-cart-identity` sync
 fails its PostSync hook, and `KubeJobFailed` stays firing.
@@ -103,3 +103,79 @@ Open a PR to `main` per shopping-cart-infra's rules; do not merge.
   renders; kubeconform is valid; yamllint is clean under CI's config (the default config's 83
   line-length/indent errors also exist on `main`, and CI relaxes those rules).
 - Nit, not blocking: the timeout message says "404" for any kcadm failure.
+
+## Correction (2026-09-30, live): the cause is a missing `flowId`, not import timing
+
+After #103 merged, a manual sync ran the new hook at `98da0c5`. It logged
+`browser flow readable after 1 attempt(s)` and then failed with the same 404. The flow was readable
+immediately, so **the cache/timing theory is refuted**. The wait stays as a harmless guard.
+
+No log line appears between the wait and the error, so every check passed and the hook reached its
+first write. That write is `kcadm.sh update "authentication/flows/${browser_flow}/executions" -b '{"id":…,"requirement":"ALTERNATIVE","authenticationFlow":true,"displayName":…}'`.
+Live tests in the Keycloak pod, all setting values the flow already has:
+
+| Body sent to `PUT …/flows/browser-with-conditional-otp/executions` | Result |
+|---|---|
+| hook's body: `id`, `requirement`, `authenticationFlow: true`, `displayName` (merge) | **404** |
+| same, `--no-merge` | **404** |
+| same plus `"flowId":"1b41e828-…"` | **OK** |
+| `id` and `requirement` only | **OK** |
+
+The ID was correct (`837de7dc-…`, identical to its CSV row). For an execution flagged
+`authenticationFlow: true`, Keycloak's update handler also resolves the sub-flow from the body's
+`flowId`. When it is absent, the handler throws `NotFoundException("Illegal execution")` and marks the
+transaction rollback-only. kcadm prints that as "Resource not found for url". The hook already computes
+`forms_flow_id` (CSV column 5) and `conditional_otp_flow_id` (forms CSV column 6) and never sends them.
+
+This code arrived in #98 (2026-09-15) and never ran live until 2026-09-30: `awk` (#100) and the PVC
+sync block (#101) stopped the hook earlier. The live flow is already in the target state: forms
+`ALTERNATIVE`, Username Password `REQUIRED`, Conditional OTP `CONDITIONAL`, role condition and OTP
+Form `REQUIRED`. So logins work, and the hook fails on no-op writes.
+
+## Codex brief 2 (shopping-cart-infra)
+
+**Goal:** the PostSync hook completes. Both sub-flow updates send the `flowId` Keycloak requires.
+
+**Branch:** `fix/keycloak-reconcile-subflow-flowid` from `origin/main`.
+**Files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and
+`scripts/tests/bin/keycloak-reconcile.bats`. Nothing else.
+
+**Change:**
+1. In the forms-subflow update (`kcadm.sh update "authentication/flows/${browser_flow}/executions"`),
+   add `\"flowId\":\"${forms_flow_id}\"` to the `-b` JSON.
+2. In the conditional-OTP update (`kcadm.sh update "authentication/flows/${forms_flow_alias}/executions"`),
+   add `\"flowId\":\"${conditional_otp_flow_id}\"`.
+3. No other edits: no re-indentation, and keep the #103 wait. Both IDs are already validated
+   non-empty before use.
+
+**Tests (BATS, against the script rendered by `kubectl kustomize`, like the existing cases):**
+1. **Static:** every `kcadm.sh update "authentication/flows/…/executions"` whose `-b` body contains
+   `authenticationFlow` also contains `flowId`.
+2. **Behavioural, with realistic fixtures.** Extract the CSV helpers, `level0_rows`, `urlencode_path` and
+   `reconcile_browser_flow` (add `# BEGIN/# END` markers like #103 did). Run them against a stub
+   `kcadm.sh` that:
+   - returns, for `get …/flows/browser-with-conditional-otp/executions`, the live CSV captured on
+     2026-09-30 (copy it verbatim; the table above lists the rows, and it is in this doc's
+     history);
+   - returns matching CSVs for the forms and conditional-OTP sub-flow GETs;
+   - logs every `update` body, and **exits 1 with `Resource not found for url`** for an
+     `update …/executions` whose body has `"authenticationFlow":true` but no `"flowId"`, exactly as
+     Keycloak does.
+
+   The function returns 0, and the logged bodies carry `flowId` values `1b41e828-6706-41b9-8a3a-50b2013e7e1d`
+   (forms) and `f01f2d25-00eb-4840-94d4-92a24cb78d68` (conditional OTP).
+3. **Mutation:** drop `flowId` from either update → test 2 fails with the 404 message; test 1 fails too.
+
+**Gates:** bats (all cases), `bash -n` + `shellcheck -S warning` on the rendered script, yamllint (CI
+config), kubeconform, `kustomize build identity/keycloak`.
+
+**Hand back:** one commit, `fix(identity): send flowId on sub-flow execution updates so Keycloak accepts them`,
+and a PR to `main`; do not merge.
+
+**Live verification (operator):** after the merge, trigger one sync; ArgoCD will not re-run a hook-only change on its own:
+`kubectl --context k3d-k3d-cluster -n cicd patch application shopping-cart-identity --type merge -p '{"operation":{"initiatedBy":{"username":"operator"},"sync":{}}}'`.
+Expect: the phase `Succeeded`, no `keycloak-realm-reconcile` Job left, and `KubeJobFailed` resolved.
+This also closes the live check in `2026-09-15-keycloak-browser-flow-regression-blocks-all-sso.md`.
+
+**Process gap noted:** hook-only changes never auto-sync. The Application stays `Synced`, because
+ArgoCD excludes hooks from the diff, so each hook fix needs one manual sync to take effect.
