@@ -1,3 +1,10 @@
+# 2026-09-30 — Slack `/k3dm find-similar-docs` accepted only one-word queries; fixed
+
+The relay's `parseK3dm` split on whitespace and required every token to be KEY=value, so any sentence
+was a usage error. `Q` is now free text up to the next KEY=value or `confirm`. The webhook's character
+check is unchanged. Relay tests 31/31; 3 mutations red. Doc:
+`docs/bugs/2026-09-30-slack-k3dm-query-limited-to-one-word.md`. Needs `make deploy-worker` (operator).
+
 # 2026-09-30 — retrieval baseline: 5 paraphrase queries + 1 negative control (operator ran, Claude scored)
 
 Queries avoided every title word (for example "object storage" instead of MinIO, "mac scheduler" instead of
