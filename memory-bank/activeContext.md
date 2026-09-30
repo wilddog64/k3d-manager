@@ -1,3 +1,12 @@
+# 2026-09-30 — KubeJobFailed on hostinger = MinIO image gated on quay.io
+
+The failing Job is Trivy's `scan-vulnerabilityreport-5fb89fd85c` (container `minio`): quay.io returns
+UNAUTHORIZED for `quay.io/minio/minio`, a known issue (`2026-09-25-minio-quay-registry-gated.md`). The
+fix branch in shopping-cart-infra (`e9d545dc`) was never merged, is 2 behind main, and changes the UID
+1000→1001 on a local-path PVC holding live data. Added a Codex completion brief (keep UID 1000, or
+chown initContainer; PR only). Also: shopping-cart-infra `00d0d8a` (#101) fixed the identity
+`Replace=true` bug; that doc now says so, with live confirmation pending.
+
 # 2026-09-30 — Alertmanager delivery dashboard (bug, not spec)
 
 Operator chose option (a) and asked bug vs spec: filed as a bug

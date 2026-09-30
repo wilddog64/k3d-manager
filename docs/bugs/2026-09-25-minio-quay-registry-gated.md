@@ -233,3 +233,46 @@ Do not change the `uploader` container — `python:3.12-slim` is unaffected.
 durable fix is to mirror both pinned images into `ghcr.io/wilddog64/` — which *is* possible because
 bitnamilegacy is public — so a second upstream gate cannot break provisioning again. That needs a
 GHCR push credential and is the owner's call.
+
+---
+
+## Recurrence and completion brief (2026-09-30, Claude)
+
+**Still live.** `shopping-cart-infra` `main` (`00d0d8a`) still pins `quay.io/minio/minio` and
+`quay.io/minio/mc`. The fix branch `fix/minio-bitnamilegacy-registry` (`e9d545dc`) was never merged and
+is 2 commits behind `main`. Hostinger keeps running MinIO from the node's image cache, but Trivy must
+pull the image to scan it, so `trivy-system/scan-vulnerabilityreport-5fb89fd85c` (container `minio`)
+fails every hour with `GET https://quay.io/v2/minio/minio/manifests/RELEASE.2024-11-07T00-52-20Z:
+UNAUTHORIZED`. That is the `KubeJobFailed on ubuntu-hostinger` email the operator receives, which fires
+and then resolves as the failed Job is cleaned up.
+
+### Codex brief — finish and land the port, safely for a cluster that already has data
+
+**Repo:** `shopping-cart-infra`. **Branch:** `fix/minio-bitnamilegacy-registry`. Merge `origin/main`
+into it; do not rebase or force-push.
+
+**The existing branch is written for a fresh cluster. Fix this before it can land:** it changes
+`runAsUser`/`fsGroup` from 1000 to 1001 and the data mount to `/bitnami/minio/data`. Hostinger has an
+existing MinIO PVC (product images) written as UID 1000 on **local-path** storage, and local-path does
+not apply `fsGroup` ownership changes. As written, MinIO could lose access to its own data.
+Pick one and say which:
+- **(preferred)** keep `runAsUser: 1000` / `fsGroup: 1000`. Bitnami images are built to run as an
+  arbitrary non-root UID; confirm from the image's docs or entrypoint that `/opt/bitnami/minio` and the
+  data dir work as 1000. If they don't, use the next option.
+- an `initContainer` (pinned busybox, runs as root, only `chown -R 1001:1001` on the data mount, and
+  only when the top-level owner is not already 1001), so the data carries over.
+
+The mount path change is safe (same PVC, new path), but confirm Bitnami's data dir is exactly
+`/bitnami/minio/data` and that existing buckets appear there unchanged.
+
+**Tests / proof (paste output):**
+- `kubectl kustomize` (or the repo's render target) of `data-layer/` renders cleanly;
+- no `quay.io/minio` reference remains: `git grep -n 'quay.io/minio' -- data-layer` → nothing;
+- the chosen ownership approach, with the evidence for it (image docs or entrypoint lines).
+
+**Do not:** log in to quay.io or add a pull secret; touch `secret.yaml`, `service.yaml`,
+`image-upload-configmap.yaml`; merge to `main` yourself. Open a PR and stop.
+
+**Operator acceptance after merge (live, hostinger):** `minio-0` Running; the storefront still shows
+product images; `kubectl -n trivy-system get vulnerabilityreports | grep minio` shows a report; no new
+`KubeJobFailed` email for `scan-vulnerabilityreport-*` within 2 h.

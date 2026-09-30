@@ -1,3 +1,8 @@
+# 2026-09-30 — hostinger KubeJobFailed root-caused
+
+- [ ] Codex (shopping-cart-infra): finish the MinIO bitnamilegacy port safely for existing data; PR only.
+- [ ] Operator: confirm shopping-cart-identity is Synced now that #101 is on main.
+
 # 2026-09-30 — Alertmanager delivery dashboard
 
 - [x] Dashboard + tests + bug doc (`1e063919`).
