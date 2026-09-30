@@ -1,3 +1,8 @@
+# 2026-09-30 — Alertmanager delivery dashboard
+
+- [x] Dashboard + tests + bug doc (`1e063919`).
+- [ ] Operator: confirm in Grafana after the next platform-ops sync.
+
 # 2026-09-30 — Codex verification #3
 
 - [x] Verified `d37b4347`; blind-webhook defect fixed in `4a2bf022`.

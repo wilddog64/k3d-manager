@@ -1,3 +1,11 @@
+# 2026-09-30 — Alertmanager delivery dashboard (bug, not spec)
+
+Operator chose option (a) and asked bug vs spec: filed as a bug
+(`2026-09-30-alertmanager-overview-shows-unused-integrations.md`); v1.40.0 is at its 5-plan cap anyway.
+Chart 67.9.0 gates the Alertmanager overview only by `defaultDashboardsEnabled` (all-or-nothing), so it
+stays; added `grafana-dashboard-alertmanager-delivery.yaml` (hub, `1e063919`), listing only integrations with
+sends in 30 d, plus severity routing. BATS 5/5, 2 mutations red. Live check pending the next sync.
+
 # 2026-09-30 — Codex `d37b4347` verified; blind-webhook regression fixed
 
 node_pressure (b) + data_layer passed its brief gates (72/72, 4 mutations red, 14 allowed files,

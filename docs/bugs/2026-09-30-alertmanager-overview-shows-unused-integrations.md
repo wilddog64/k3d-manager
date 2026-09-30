@@ -2,8 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's screenshot
-**Status:** FIXED 2026-09-30 by Claude — `k3dm Alertmanager Delivery` dashboard added (commit in
-the changelog entry). The chart's dashboard remains; see "Why it stays".
+**Status:** FIXED 2026-09-30 by Claude — `k3dm Alertmanager Delivery` dashboard added in `1e063919`. The chart's dashboard remains; see "Why it stays".
 
 ## Evidence
 
