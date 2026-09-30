@@ -276,3 +276,33 @@ The mount path change is safe (same PVC, new path), but confirm Bitnami's data d
 **Operator acceptance after merge (live, hostinger):** `minio-0` Running; the storefront still shows
 product images; `kubectl -n trivy-system get vulnerabilityreports | grep minio` shows a report; no new
 `KubeJobFailed` email for `scan-vulnerabilityreport-*` within 2 h.
+
+## Verification of `shopping-cart-infra` `e8c0b8d9` (Claude, 2026-09-30) — changes requested
+
+Verified independently. Branch tip `e8c0b8d9`; `origin/main` merged in `40fd1df` (merge commit, no
+rebase or force-push). Scope: `data-layer/minio/{statefulset,bucket-init-job,image-upload-job}.yaml`,
+`CHANGELOG.md`, the bug doc. The repo's CI gates at CI's pinned versions, run by Claude: yamllint clean;
+kubeconform 1.34.0 `-strict` 6 valid / 0 invalid; every `kustomize build` overlay passes;
+`git grep quay.io/minio -- data-layer` returns nothing. Bitnami `mc` path and `MC_CONFIG_DIR=/tmp/.mc`
+are correct.
+
+Codex chose the brief's second option (keep Bitnami's UID 1001, re-own the existing data with a root
+`initContainer`). **Two changes are needed before merge:**
+
+1. **The ownership fix can fail partway and then never retry.** The init container drops every
+   capability except `CHOWN`. Without `DAC_READ_SEARCH`, root cannot enter a directory that denies
+   "others", so `chown -R` stops there and exits 1: the pod shows `Init:Error`. On retry, the top-level
+   directory is already 1001 (chown touched it first), so `stat -c '%u' … != 1001` skips the fix, and
+   MinIO starts with part of its data still owned by 1000. Reproduced with `setpriv` and the same
+   capability set (exit 1; a `0700` dir left owned by 1000). Fix, verified the same way (repairs the
+   partial state; the second run is a no-op):
+   ```yaml
+   command: ["sh", "-c", "if [ -n \"$(find /bitnami/minio/data ! -user 1001 | head -n 1)\" ]; then chown -R 1001:1001 /bitnami/minio/data; fi"]
+   capabilities: { drop: [ALL], add: [CHOWN, DAC_READ_SEARCH] }
+   ```
+2. **No recorded rationale.** The brief asked which ownership option was chosen and why UID 1000 was not
+   kept, with evidence. The commit body is empty, and the branch's bug doc still describes the original
+   fresh-cluster change with no mention of the init container. Add a short section: the decision, the
+   evidence (Bitnami entrypoint or docs on arbitrary UIDs), and the ownership migration.
+
+Then the operator's post-merge checks in the brief apply unchanged.

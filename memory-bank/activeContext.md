@@ -1,3 +1,11 @@
+# 2026-09-30 — shopping-cart-infra `e8c0b8d9` (MinIO port) verified: changes requested
+
+CI gates pass (yamllint, kubeconform, kustomize, no quay refs); Bitnami mc paths are right. Two defects:
+the root chown initContainer has only CAP_CHOWN, so `chown -R` fails on a 0700 dir, and the top-level-owner
+check then skips the fix on retry, leaving data owned by 1000 (reproduced with setpriv). Fix: add
+DAC_READ_SEARCH, and check with `find ! -user 1001`. Also no written rationale for choosing UID 1001 over
+1000. Recorded in `2026-09-25-minio-quay-registry-gated.md`; back to Codex.
+
 # 2026-09-30 — KubeJobFailed on hostinger = MinIO image gated on quay.io
 
 The failing Job is Trivy's `scan-vulnerabilityreport-5fb89fd85c` (container `minio`): quay.io returns
