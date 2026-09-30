@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
 from hermes.correlator import Correlator
 from hermes.sensors import (argocd, ci, eso, github_token_expiry, kine, kine_log_signals,
-                            node_pressure, reachability, stale_acg_registration,
+                            hostnet_drift, node_pressure, reachability, stale_acg_registration,
                             status_checks, token_expiry_advisory)
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -53,7 +53,7 @@ def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
     monkeypatch.setenv("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")
     calls = []
     runner = lambda *_: calls.append(True) or (0, status_payload("healthy"))
-    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci",
+    for name in ("eso", "argocd", "reachability", "node_pressure", "hostnet_drift", "kine", "ci",
                  "alert_delivery"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
@@ -96,7 +96,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: True)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
-    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci",
+    for name in ("eso", "argocd", "reachability", "node_pressure", "hostnet_drift", "kine", "ci",
                  "alert_delivery"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
@@ -310,6 +310,18 @@ def test_node_pressure_healthy_degraded_unknown_and_debounce():
     assert [node_pressure(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
     assert node_pressure(webhook(health([{"name": "Data layer", "ok": None}])), {}, token="x")["status"] == "unknown"
     assert node_pressure(webhook(good), {}, token="")["status"] == "unknown"
+
+
+def test_hostnet_drift_healthy_degraded_after_two_cycles_and_unknown_on_failure():
+    payload = json.dumps({"drifted": [{"namespace": "monitoring", "pod": "node-exporter",
+                                        "owner_kind": "DaemonSet"}]})
+    state = {}
+    runner = lambda *_: (0, payload)
+    assert hostnet_drift(runner, state)["status"] == "healthy"
+    degraded = hostnet_drift(runner, state)
+    assert degraded["status"] == "degraded"
+    assert "monitoring/node-exporter" in degraded["evidence"]
+    assert hostnet_drift(lambda *_: (1, ""), {})["status"] == "unknown"
 
 
 def test_kine_log_signals_ignores_compact_rev_key_in_slow_sql():

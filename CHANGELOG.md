@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- Hub recovery and node-health-watch now detect host-network pods stranded on stale node IPs and recycle only DaemonSet-owned pods after recovery; other owners are logged and skipped.
 - Hub recovery and newly created Hub bring-up now restore existing cosign signing material after Vault/ESO setup; a missing Keychain backup warns and continues without generating or rotating a key.
 - Hermes status publishing works: the `hermes-status` ConfigMap label was spliced into the YAML as
   `key=value`, which made `metadata.labels` a string and failed every apply since v1.34.0, so the
@@ -52,6 +53,7 @@
 
 ### Added
 
+- Hermes now reports host-network IP drift and proposes the approval-gated R8 repair `bin/k3dm-hostnet-drift --fix` when a drifted pod is DaemonSet-owned.
 - **`make argocd-hermes-token`** re-mints the Hermes ArgoCD API token and stores it in the Keychain,
   replacing a five-command manual procedure whose every step had a trap. The target mints through the
   ArgoCD API (session and account-token calls, secrets passed by environment so nothing lands in

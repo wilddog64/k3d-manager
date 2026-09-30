@@ -19,6 +19,7 @@ healthz_timeout="${K3DM_NODE_RECOVERY_HEALTHZ_TIMEOUT:-15s}"
 enabled="${K3DM_NODE_RECOVERY_ENABLED:-0}"
 log_file="${K3DM_NODE_RECOVERY_LOG:-${HOME}/.local/share/k3d-manager/logs/node-health-watch.log}"
 state_file="${K3DM_NODE_RECOVERY_STATE:-${HOME}/.local/share/k3d-manager/node-health-watch.state}"
+drift_script="${K3DM_HOSTNET_DRIFT_BIN:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/k3dm-hostnet-drift}"
 
 mkdir -p "$(dirname "$log_file")" "$(dirname "$state_file")"
 
@@ -57,7 +58,13 @@ _recover() {
   _log "${recovery_command}ing ${node} after ${threshold} consecutive kubelet-proxy failures"
   "${DOCKER_BIN:-docker}" "$recovery_command" "$node" >>"$log_file" 2>&1 || { _log "${recovery_command} failed"; return 1; }
   for _ in {1..20}; do
-    _ready && _healthy && { _log "${node} recovered"; return 0; }
+    if _ready && _healthy; then
+      _log "${node} recovered"
+      if ! "$drift_script" --context "$context" --fix >>"$log_file" 2>&1; then
+        _log "host-network IP drift reconciliation failed after ${node} recovery"
+      fi
+      return 0
+    fi
     sleep 5
   done
   _log "${node} did not recover within 100s"

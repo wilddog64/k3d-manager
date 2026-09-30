@@ -152,6 +152,17 @@ def _r7_command(_records):
     return (["make", "signing-restore"], {})
 
 
+def _r8_precondition(records, _history, _state):
+    drift = _rec(records, "hostnet_drift") or {}
+    return (_status(records, "hostnet_drift") == "degraded" and
+            any(item.get("owner_kind") == "DaemonSet"
+                for item in drift.get("data", {}).get("drifted", [])))
+
+
+def _r8_command(_records):
+    return (["bin/k3dm-hostnet-drift", "--fix"], {})
+
+
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
@@ -186,6 +197,10 @@ REPAIRS = {
            "precondition": _r7_precondition, "build_command": _r7_command, "cwd": ROOT,
            "blast_radius": "Vault secret/cosign/signing, cosign-verify policy, ESO role grant, one ExternalSecret resync",
            "reversible": True, "needs_scope": "macOS Keychain (k3d-manager-signing), local hub kubeconfig"},
+    "r8": {"key": "r8", "name": "Recycle drifted host-network DaemonSet pods",
+           "precondition": _r8_precondition, "build_command": _r8_command, "cwd": ROOT,
+           "blast_radius": "DaemonSet pods on stale node IPs are recreated", "reversible": True,
+           "needs_scope": "local hub kubeconfig"},
 }
 
 
@@ -197,7 +212,7 @@ def _update_r1_debounce(records, state):
 def _evidence(records, key):
     relevant = {"r1": ("eso", "node_pressure"), "r2": ("reachability", "node_pressure"),
                 "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
-                "r6": ("kine",), "r7": ("eso",)}[key]
+                "r6": ("kine",), "r7": ("eso",), "r8": ("hostnet_drift",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
 

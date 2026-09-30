@@ -1,3 +1,9 @@
+# 2026-09-29 — hostnet-drift implementation complete; awaiting commit SHA
+
+- [x] Implemented all seven numbered tests from the host-network drift brief: focused BATS 46/46,
+  Hermes 55/55, full `make test-pytest` 401/401; shellcheck clean; all three mutations went red
+  and were restored green. No numbered test was skipped. Commit SHA is in the completion handoff.
+
 # 2026-09-29 — Codex verification + next handoff
 
 - [x] Verified `2dfa00ef` (cosign bring-up restore + R7); defect fixed in `c5b6def2`.

@@ -98,6 +98,23 @@ def test_r6_is_never_auto_executed_by_the_kine_guard():
     assert "r6" not in current.get("repairs_attempted_this_incident", [])
 
 
+def test_r8_requires_a_daemonset_owned_drift_and_builds_exact_command():
+    drift = {"drifted": [{"namespace": "monitoring", "pod": "node-exporter",
+                           "owner_kind": "DaemonSet"}]}
+    records = [record("hostnet_drift", "degraded", "1 host-network pods on stale IPs", drift)]
+    proposal = repairs.propose(records, state())[0]
+    assert proposal["key"] == "r8"
+    assert proposal["command"] == "bin/k3dm-hostnet-drift --fix"
+    assert repairs.REPAIRS["r8"]["reversible"] is True
+
+
+def test_r8_ignores_drift_without_daemonset_owner():
+    drift = {"drifted": [{"namespace": "monitoring", "pod": "deployment-pod",
+                           "owner_kind": "Deployment"}]}
+    records = [record("hostnet_drift", "degraded", "1 host-network pods on stale IPs", drift)]
+    assert repairs.propose(records, state()) == []
+
+
 def test_r7_requires_cosign_evidence_for_two_cycles():
     records = [record("eso", "degraded", "1/8 not synced: cosign-public-key")]
     proposals = repairs.propose(records, state([["eso"], ["eso"]]))

@@ -255,6 +255,13 @@ function _hub_recovery_ensure_serverlb_upstreams() {
   return 1
 }
 
+function _hub_recovery_reconcile_hostnet_drift() {
+  local hub_context="$1" drift_script="${HOSTNET_DRIFT_BIN:-${SCRIPT_DIR}/../bin/k3dm-hostnet-drift}"
+  if ! "$drift_script" --context "$hub_context" --fix; then
+    _warn "[hub-recovery] host-network IP drift reconciliation failed; continuing recovery"
+  fi
+}
+
 function hub_recovery_reconcile() {
   if [[ "${1:-}" == "--help" ]]; then
     echo "Usage: hub_recovery_reconcile [--confirm]"
@@ -263,13 +270,14 @@ function hub_recovery_reconcile() {
   local confirm=0 hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}" app_context="${HUB_RECOVERY_APP_CONTEXT:-ubuntu-hostinger}"
   if [[ "${1:-}" == "--confirm" ]]; then confirm=1
   elif [[ -n "${1:-}" ]]; then _err "[hub-recovery] only --confirm is accepted"; return 1; fi
-  local -a steps=("k3d serverlb upstreams" "Vault root token ↔ Keychain" "ESO policy" "Cosign signing key" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
+  local -a steps=("k3d serverlb upstreams" "Host-network IP drift" "Vault root token ↔ Keychain" "ESO policy" "Cosign signing key" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
   local index
   if (( ! confirm )); then
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
     return 0
   fi
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
+  _hub_recovery_reconcile_hostnet_drift "$hub_context"
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1
   _hub_recovery_ensure_eso_apps_role || return 1
   _hub_recovery_restore_signing "$hub_context"

@@ -1,3 +1,13 @@
+# 2026-09-29 — hostnet-drift implementation complete; awaiting commit SHA
+
+Implemented the exact host-network drift brief: `bin/k3dm-hostnet-drift` reports node/pod IP drift
+from one nodes JSON read and one pods JSON read, fixes only DaemonSet-owned pods, and is invoked
+after hub recovery serverlb repair and after node-health-watch restart recovery. Hermes now samples
+`hostnet_drift`, exports it to the node scope, and proposes approval-gated R8. All seven numbered
+tests are covered; focused BATS 46/46, Hermes 55/55, full pytest 401/401, shellcheck clean, and
+three mutations went red then restored green. No live cluster commands were run. Commit SHA is in
+the completion handoff.
+
 # 2026-09-29 — Codex `2dfa00ef` verified; one defect fixed; hostnet-drift handed to Codex
 
 Codex's cosign Fix 1 + R7 met its brief gates (57/57 BATS, 24/24 repairs, 398/398 pytest, 3 mutations

@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from a `PrometheusDuplicateTimestamps` alert on the hub
-**Status:** OPEN — assigned to Codex 2026-09-29 (brief below). Recovered live by the operator.
+**Status:** FIXED — implemented 2026-09-29; commit SHA recorded in the completion handoff. Recovered live by the operator.
 **Related:** `docs/bugs/2026-09-13-hub-orbstack-restart-serverlb-empty-config.md` Defect 4 (first
 occurrence, `istio-cni-node`, fixed by hand, never given a durable fix)
 

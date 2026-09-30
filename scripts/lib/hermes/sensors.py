@@ -256,6 +256,28 @@ def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024):
         return record("kine", "unknown", "hub datastore status source unavailable")
 
 
+def hostnet_drift(run, state, threshold=2):
+    """Report host-network pods whose recorded IP differs from the node IP."""
+    try:
+        code, output = run(["bin/k3dm-hostnet-drift", "--json"], {})
+        payload = json.loads(output) if code == 0 and output else {}
+        drifted = payload.get("drifted")
+        if not isinstance(drifted, list):
+            raise ValueError("invalid host-network drift probe")
+        data = {"drifted": drifted}
+        if drifted:
+            status = ("degraded" if _debounced("hostnet_drift", True, max(0, threshold - 1), state)
+                      else "healthy")
+            names = ", ".join(f"{item.get('namespace', 'default')}/{item.get('pod', '?')}"
+                              for item in drifted[:3])
+            return record("hostnet_drift", status,
+                          f"{len(drifted)} host-network pods on stale IPs: {names}", data=data)
+        _debounced("hostnet_drift", False, threshold, state)
+        return record("hostnet_drift", "healthy", "no host-network pods on stale IPs", data=data)
+    except Exception:
+        return record("hostnet_drift", "unknown", "host-network drift source unavailable")
+
+
 def vectordb(run, state, threshold=2, max_index_age_seconds=7 * 86400, now=None):
     """Report vector-store health from a read-only, injected probe."""
     try:

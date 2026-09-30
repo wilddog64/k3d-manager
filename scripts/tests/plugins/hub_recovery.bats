@@ -4,6 +4,10 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
   source "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
+  HOSTNET_DRIFT_BIN="$BATS_TEST_TMPDIR/hostnet-drift-default"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$HOSTNET_DRIFT_BIN"
+  chmod +x "$HOSTNET_DRIFT_BIN"
+  export HOSTNET_DRIFT_BIN
   RECOVERY_ROOT="${BATS_TEST_TMPDIR}/recovery"
   mkdir -p "$RECOVERY_ROOT/server-db"
   : > "$RECOVERY_ROOT/server-db/state.db"
@@ -149,6 +153,37 @@ YAML
   [ ! -s "$calls" ]
 }
 
+@test "hub_recovery_reconcile: hostnet drift runs after serverlb and failure is non-fatal" {
+  local calls="${BATS_TEST_TMPDIR}/hostnet-reconcile-calls"
+  local drift="${BATS_TEST_TMPDIR}/hostnet-drift"
+  : >"$calls"
+  cat >"$drift" <<'STUB'
+#!/usr/bin/env bash
+printf 'drift %s\n' "$*" >>"$HOSTNET_CALLS"
+exit 1
+STUB
+  chmod +x "$drift"
+  export HOSTNET_DRIFT_BIN="$drift" HOSTNET_CALLS="$calls"
+  _hub_recovery_ensure_serverlb_upstreams() { echo serverlb >>"$calls"; }
+  _hub_recovery_sync_vault_root_token() { :; }
+  _hub_recovery_ensure_eso_apps_role() { :; }
+  _hub_recovery_restore_signing() { :; }
+  register_app_cluster() { :; }
+  argocd_reconcile_app_cluster_registrations() { :; }
+  _hub_recovery_seed_app_cluster_reader() { :; }
+  _hub_recovery_scale_openldap() { :; }
+  _hub_recovery_replay_identity_hook() { :; }
+  keycloak_seed_smoke_user() { :; }
+  _hub_recovery_mirror_argocd_admin() { :; }
+  _hub_recovery_install_cloudflared_config() { echo continued >>"$calls"; }
+  _warn() { echo warn >>"$calls"; }
+  run hub_recovery_reconcile --confirm
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$calls")" = serverlb ]
+  grep -q '^drift --context k3d-k3d-cluster --fix$' "$calls"
+  grep -q '^continued$' "$calls"
+}
+
 @test "hub_recovery_reconcile: confirm invokes app-cluster registration reconcile" {
   local calls="${BATS_TEST_TMPDIR}/reconcile-confirm-calls"
   : >"$calls"
@@ -255,7 +290,7 @@ YAML
 @test "hub_recovery_reconcile: the dry list names the cosign step" {
   run hub_recovery_reconcile
   [ "$status" -eq 0 ]
-  [[ "$output" == *"4. Cosign signing key"* ]]
+  [[ "$output" == *"5. Cosign signing key"* ]]
 }
 
 @test "hub_recovery never generates or rotates a signing key" {
