@@ -4,6 +4,10 @@
 
 ### Added
 
+- Grafana dashboard **k3dm Alertmanager Delivery** (hub, `k3dm-alertmanager-delivery`): delivery rate,
+  failures and latency only for integrations that have actually sent in the last 30 days, plus firing
+  alerts by severity with the SMS/email routing spelled out. The chart's Alertmanager / Overview draws a
+  panel for every integration Alertmanager supports and cannot be disabled on its own in chart 67.9.0.
 - Hermes now reports a separate `data_layer` sensor for the webhook Data layer check.
 - Hermes R7 proposes the approval-gated `make signing-restore` repair only when the Hub `cosign-public-key` ExternalSecret has been degraded for two cycles.
 - `make signing-restore [CONTEXT=…]` restores the cosign signing key (from the Keychain backup, only
