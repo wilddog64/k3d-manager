@@ -1,3 +1,8 @@
+# 2026-09-30 — vector store freshness
+
+- [ ] Codex: automatic re-indexing + ingestion dashboard (brief in 2026-09-30-vectordb-index-never-refreshes-automatically.md).
+- [ ] Operator (now): `git pull && make index-docs` to catch up the 23 missing docs.
+
 # 2026-09-30 — MinIO registry bug closed
 
 - [x] Live: minio Running on bitnamilegacy, data intact, Trivy reports present, protection restored.

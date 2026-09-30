@@ -1,3 +1,12 @@
+# 2026-09-30 — vector store never re-indexes on its own; Codex brief filed
+
+Answer to the operator: no automatic ingestion. The last run was about 2026-09-27; 23 docs since are
+unsearchable. Filed `2026-09-30-vectordb-index-never-refreshes-automatically.md`: index from
+`origin/<branch>` via git objects, Hermes re-indexes each poll only when the corpus fingerprint changes
+(~5 min latency, zero cost when idle), `--limit 100` backlog draining, quota-pause handling,
+`VectorDBIndexDrift` (2h) and `VectorDBIndexFailing` (30m) alerts. Per the operator, ingestion runs are
+pushed as `k3dm-vectordb-index` gauges and charted in a new "Ingestion" row on the VectorDB Health dashboard.
+
 # 2026-09-30 — MinIO registry bug CLOSED (verified live)
 
 Trivy VulnerabilityReports for minio exist in shopping-cart-data after the merge, so the hourly scan
