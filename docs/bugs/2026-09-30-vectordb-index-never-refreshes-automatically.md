@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's question "are new docs injected
 into the vector DB?"
-**Status:** OPEN — assigned to Codex 2026-09-30 (brief below)
+**Status:** FIXED — implementation committed (brief below)
 **Severity:** Medium. Prior-art dedup (`make find-similar-docs`, which CLAUDE.md requires before
 filing) silently misses recent docs, and the v1.40.0 retrieval eval would measure a stale index.
 

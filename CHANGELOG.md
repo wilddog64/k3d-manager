@@ -4,6 +4,9 @@
 
 ### Added
 
+- Hermes now re-indexes changed documentation from the tracked Git ref every poll, with quota-aware
+  backlog draining, VectorDB ingestion metrics, dashboard panels and failure/drift alerts.
+
 - Grafana dashboard **k3dm Alertmanager Delivery** (hub, `k3dm-alertmanager-delivery`): delivery rate,
   failures and latency only for integrations that have actually sent in the last 30 days, plus firing
   alerts by severity with the SMS/email routing spelled out. The chart's Alertmanager / Overview draws a

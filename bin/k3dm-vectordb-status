@@ -5,6 +5,7 @@ import argparse
 import json
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -64,7 +65,7 @@ def _store_facts():
 
 def _corpus_docs():
     try:
-        return len(iter_corpus(ROOT))
+        return len(iter_corpus(ROOT, os.environ.get("K3DM_INDEX_REF") or None))
     except (RetrievalUnavailable, OSError, subprocess.SubprocessError):
         return 0
 

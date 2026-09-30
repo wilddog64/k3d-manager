@@ -274,6 +274,19 @@ kubectl's trailer first.
 
 ## Health verification
 
+### Freshness and automatic indexing
+
+Hermes checks the checkout's upstream ref every poll (about five minutes), fetching that ref without
+pulling, checking out, merging or changing the working tree. It fingerprints corpus paths and blob
+IDs, so an unchanged corpus performs no embedding work. Changed documents are indexed in batches of
+100; a larger backlog drains over later polls. `K3DM_INDEX_REF` can pin a different tracked ref.
+
+The automatic path is advisory: a failed credential, store or fetch is logged and the monitoring poll
+continues. A daily embeddings quota response pauses until the next 00:00 UTC rather than retrying.
+The `k3dm-vectordb-index` Pushgateway job publishes the last result, backlog, duration, embedded and
+pruned counts, and quota pause time. `VectorDBIndexDrift` fires after two hours of backlog drift and
+`VectorDBIndexFailing` after thirty minutes of failed runs.
+
 ```bash
 bin/k3dm-vectordb-status --offline
 bin/k3dm-vectordb-status --json

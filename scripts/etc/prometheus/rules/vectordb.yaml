@@ -32,6 +32,26 @@ spec:
           labels:
             severity: warning
             cluster: hub
-          annotations:
+            annotations:
             summary: "VectorDB index is stale"
             description: "The VectorDB index has not been refreshed for more than seven days."
+        - alert: VectorDBIndexDrift
+          expr: k3dm_vectordb_drift_docs != 0
+          for: 2h
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "VectorDB index has corpus drift"
+            description: >-
+              Documents differ from the indexed corpus. Check the Hermes log and run
+              make index-docs DRY_RUN=1.
+        - alert: VectorDBIndexFailing
+          expr: k3dm_vectordb_index_last_result{result="failed"} == 1
+          for: 30m
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "VectorDB automatic indexing is failing"
+            description: "Hermes could not complete the latest tracked-ref indexing run."

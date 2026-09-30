@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 RULES="${BATS_TEST_DIRNAME}/../../etc/prometheus/rules/vectordb.yaml"
+DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-configmap.yaml"
 
 @test "vectordb rules target the hub prometheus stack" {
   run grep -F -- 'release: kube-prometheus-stack' "${RULES}"
@@ -9,10 +10,17 @@ RULES="${BATS_TEST_DIRNAME}/../../etc/prometheus/rules/vectordb.yaml"
 
 @test "both vectordb alerts are present" {
   local _alert
-  for _alert in VectorDBMetricsStale VectorDBIndexStale; do
+  for _alert in VectorDBMetricsStale VectorDBIndexStale VectorDBIndexDrift VectorDBIndexFailing; do
     run grep -F -- "alert: ${_alert}" "${RULES}"
     [ "${status}" -eq 0 ]
   done
+}
+
+@test "automatic indexing alerts use the requested windows" {
+  run grep -A4 -F -- 'alert: VectorDBIndexDrift' "${RULES}"
+  [[ "${output}" == *"for: 2h"* ]]
+  run grep -A4 -F -- 'alert: VectorDBIndexFailing' "${RULES}"
+  [[ "${output}" == *"for: 30m"* ]]
 }
 
 @test "VectorDBMetricsStale watches push age, not absence alone" {
@@ -56,5 +64,21 @@ for group in document["spec"]["groups"]:
 
 @test "VectorDBIndexStale keeps the seven-day index threshold" {
   run grep -F -- '7 * 86400' "${RULES}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "dashboard has six ingestion panels using emitted metrics" {
+  run python3 -c '
+import json, re, sys
+text = open(sys.argv[1]).read()
+payload = text.split("k3dm-vectordb.json: |", 1)[1]
+dashboard = json.loads(payload)
+row = next(panel for panel in dashboard["panels"] if panel.get("title") == "Ingestion")
+assert len(row["panels"]) == 6
+queries = " ".join(target["expr"] for panel in row["panels"] for target in panel["targets"])
+metrics = open("bin/k3dm-hermes").read()
+for name in re.findall(r"k3dm_vectordb_[a-z_]+", queries):
+    assert name in metrics or name == "k3dm_vectordb_drift_docs"
+' "${DASHBOARD}"
   [ "${status}" -eq 0 ]
 }
