@@ -1,3 +1,8 @@
+# 2026-09-30 — Codex verification #2 + handoff #3
+
+- [x] Verified `72b402ea` (hostnet drift); argv-size defect fixed in `07c61ff9`.
+- [ ] Codex: node_pressure → data_layer brief. Claude verifies on return.
+
 # 2026-09-29 — hostnet-drift implementation complete; awaiting commit SHA
 
 - [x] Implemented all seven numbered tests from the host-network drift brief: focused BATS 46/46,

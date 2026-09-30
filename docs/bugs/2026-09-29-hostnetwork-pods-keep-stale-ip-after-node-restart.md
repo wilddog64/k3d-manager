@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from a `PrometheusDuplicateTimestamps` alert on the hub
-**Status:** FIXED — implemented 2026-09-29; commit SHA recorded in the completion handoff. Recovered live by the operator.
+**Status:** FIXED — Codex `72b402ea`, verified by Claude 2026-09-30 with one defect fixed in `07c61ff9`. Recovered live by the operator; the automatic path is unexercised live until the next node restart.
 **Related:** `docs/bugs/2026-09-13-hub-orbstack-restart-serverlb-empty-config.md` Defect 4 (first
 occurrence, `istio-cni-node`, fixed by hand, never given a durable fix)
 
@@ -99,3 +99,23 @@ needs its own test. Cover each numbered test above; say explicitly if you skip o
 **Commit and hand back:** one commit on `k3d-manager-v1.40.0`, message
 `fix(hub): detect and recycle host-network pods stranded on stale node IPs`.
 No PR, no merge, no force-push, no `--no-verify`.
+
+## Verification (Claude, 2026-09-30)
+
+Verified independently rather than from the report. `72b402ea` is on `origin/k3d-manager-v1.40.0` and
+touches only the brief's files plus their tests. Results: `hostnet_drift.bats` + `node_health_watch.bats`
++ `hub_recovery.bats` 46/46; Hermes `test_repairs.py` + `test_hermes.py` 55/55; `make test-pytest`
+401/401; shellcheck clean. The brief's three mutations (skip the IP comparison, drop the DaemonSet-owner
+check, make the recovery step fatal) each went red. Design points checked: the node-health-watch hook runs
+only inside `_recover` after a real `docker restart`; `max(0, threshold - 1)` in the sensor makes "degraded
+after 2 cycles" literal under `_debounced`'s `count > threshold` rule; `_probe_run` runs from the repo root
+with a 60 s timeout.
+
+**Defect found and fixed in `07c61ff9`:** the script passed the whole `kubectl get pods -A -o json` output to
+`jq --argjson`. A real hub's pod list is hundreds of KB to several MB (`managedFields`), over the
+per-argument limit (128 KiB on Linux; about 1 MiB total on macOS). Reproduced with a 950 KB list:
+`jq: Argument list too long`, exit 126. The sensor would have stayed `unknown`, and the node-health-watch
+hook, hub recovery and R8 would never have acted. Codex's fixtures were a few hundred bytes, so no test
+could see it. Fix: both documents go through temp files (`--slurpfile nodes`, and the pods file as jq's
+input), removed by a single-quoted `EXIT` trap. Added a regression test with a pod list over 256 KiB;
+Codex's original script fails it, and the fixed one passes (4/4).

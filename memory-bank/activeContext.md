@@ -1,3 +1,12 @@
+# 2026-09-30 — Codex `72b402ea` verified; one defect fixed; node_pressure handed to Codex
+
+Host-network drift work passed every brief gate (46/46 BATS, 55/55 Hermes, 401/401 pytest, 3 mutations red,
+scope OK). Found that `k3dm-hostnet-drift` passed the full pod JSON as a jq argument, which fails on any
+real hub ("Argument list too long", reproduced at 950 KB). Fixed in `07c61ff9` by streaming through files, with
+a >256 KiB regression test. Handed off `2026-09-29-hermes-node-pressure-sensor-measures-service-failures.md`
+as option (a), a rename to `data_layer` narrowed to the Data layer check. That was Claude's recommendation;
+the operator said "hand off" without choosing, so (b) is still open if they object.
+
 # 2026-09-29 — hostnet-drift implementation complete; awaiting commit SHA
 
 Implemented the exact host-network drift brief: `bin/k3dm-hostnet-drift` reports node/pod IP drift
