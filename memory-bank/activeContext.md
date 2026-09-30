@@ -1,3 +1,24 @@
+# 2026-09-30 — retrieval baseline: 5 paraphrase queries + 1 negative control (operator ran, Claude scored)
+
+Queries avoided every title word (for example "object storage" instead of MinIO, "mac scheduler" instead of
+launchd). Result: 5/5 in the top 5; ranks 1,1,1,1,2.
+
+| Expected doc | Rank | Score | Margin over the next doc |
+|---|---|---|---|
+| hermes-status-publish-fails-silently | 1 | 0.726 | +0.001 |
+| diagnostics-logs-output-unredacted | 1 | 0.722 | 0.000 (tie) |
+| minio-quay-registry-gated | 1 | 0.757 | +0.023 |
+| launchd-path-omits-local-bin | 1 | 0.720 | +0.023 |
+| hostnetwork-pods-keep-stale-ip | 2 | 0.701 | tied with #1 |
+
+Negative control ("best recipe for sourdough bread"): 0.568–0.550. Scores fall into three bands:
+noise 0.55–0.57, related prior art 0.67–0.73, the expected doc 0.70–0.76. A cutoff near 0.65 would
+separate "nothing related" from "related", but no cutoff separates the right doc from its neighbours.
+The neighbours were genuinely related (other launchd PATH bugs, other registry-auth bugs), which is
+what dedup wants. Recall is good; top-1 precision rests on margins of 0.000–0.023. This confirms the
+09-27 finding: the weakness is ranking, not recall. Still no threshold. This is 6 data points, not an eval.
+Archive docs are indexed (one appeared under `docs/bugs/archive/`).
+
 # 2026-09-30 — vector store caught up (operator)
 
 `make index-docs` read the key from Vault and committed 32/32: 1727 docs, 32 embedded, 0 pruned, 1727 in
