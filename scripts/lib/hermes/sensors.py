@@ -128,9 +128,6 @@ def _values_branch_expected(run, expected=None):
 def values_branch(run, argocd_run, state, token=None, expected=None, threshold=3,
                   server="argocd.3ai-talk.org"):
     """Check k3d-manager Application sources against the checked-out release branch."""
-    token = token if token is not None else _keychain_secret(ARGOCD_SERVICE)
-    if not token:
-        return _unavailable("values_branch", ARGOCD_SERVICE)
     branch, error = _values_branch_expected(run, expected)
     if error:
         return record("values_branch", "unknown", error)
@@ -138,6 +135,9 @@ def values_branch(run, argocd_run, state, token=None, expected=None, threshold=3
         return record("values_branch", "healthy",
                       f"skipped: checkout on {branch}, not a release branch",
                       data={"expected": branch, "skipped": True})
+    token = token if token is not None else _keychain_secret(ARGOCD_SERVICE)
+    if not token:
+        return _unavailable("values_branch", ARGOCD_SERVICE)
     try:
         code, output = argocd_run(["argocd", "app", "list", "-o", "json", "--grpc-web"],
                                   {"ARGOCD_AUTH_TOKEN": token, "ARGOCD_SERVER": server})

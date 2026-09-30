@@ -3,7 +3,8 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's "I don't see any" (the
 *k3dm Alertmanager Delivery* dashboard)
-**Status:** FIXED — committed; SHA reported in the completion handoff (brief below; amended 2026-09-30 after plan review: the non-release checkout is healthy/skipped, not unknown)
+**Status:** FIXED — Codex `a92f1f1d`, verified by Claude 2026-09-30 with one ordering defect and two test
+defects fixed in the follow-up commit. Unexercised live until the next release-branch switch.
 **Classification:** Bugfix in `docs/bugs/` (v1.40.0 already has five plan docs).
 **Severity:** Medium. Nothing fails; config merged and green in CI never reaches a cluster.
 **Related:** `2026-07-24-make-status-values-branch-drift-wiring.md` (the same check in `make status`,
@@ -114,3 +115,30 @@ ApplicationSet templates, R1–R8, `approve()`, `scripts/lib/foundation/`. No li
 **Commit and hand back:** one commit on `k3d-manager-v1.40.0`, message
 `fix(hermes): detect ApplicationSets left on an old release branch and propose the reapply as R9`.
 No PR, no merge, no force-push, no `--no-verify`.
+
+## Verification (Claude, 2026-09-30)
+
+Verified independently rather than from the report. `a92f1f1d` touches only the brief's 12 files; the
+exporter change is one line with no other re-indent. `make test-pytest` 430/430 as committed. The
+fixture is realistic (45 Applications, over 200 KB, mixed `source`/`sources`, other-repo charts, two
+`HEAD` sources). All six brief mutations went red. `approve()` re-checks the precondition against
+current records, and `_repair_runner` merges R9's env over `os.environ`, so `PATH` and `KUBECONFIG`
+survive the pinned `K3D_MANAGER_BRANCH`.
+
+**Fixed in the follow-up commit:**
+
+1. **The token was checked before the branch.** With no ArgoCD token, a feature-branch checkout
+   reported `unknown` ("credential unavailable") and would page after six polls, instead of being
+   skipped with no ArgoCD dependency as the brief says. The branch is now resolved and skipped first.
+   New test: a non-release checkout with no token is healthy/skipped. Codex's ordering fails it.
+2. **The pager assertion could not fail.** `pager.health_events([item], {})` used a fresh state dict
+   every iteration, so the six-poll streak never built. Mutation 5 went red only through the adjacent
+   status assert. The loop now shares one pager state for `SENSOR_UNKNOWN_CYCLES + 1` polls, with a
+   positive control (an unknown streak does page). Feeding `unknown` to the pager inside the loop now
+   fails on the sixth poll.
+3. **One test read the real Keychain.** The no-token case called `values_branch` without a token,
+   so `_keychain_secret` queried the host. On the M4, where `k3dm-hermes-argocd-token` exists, it
+   would find the token and fail `make test-pytest`. `_keychain_secret` is now stubbed in both
+   no-token tests.
+
+`make test-pytest` 431/431.

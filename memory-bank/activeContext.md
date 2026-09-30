@@ -1,3 +1,9 @@
+# 2026-09-30 — Codex `a92f1f1d` (values_branch + R9) verified; 3 defects fixed
+
+Scope was clean, the fixture realistic, and all 6 mutations red. Fixed: (1) token checked before the branch, so a feature
+checkout without a token would page; (2) the pager assertion used a fresh state each poll and could not fail;
+(3) a no-token test read the real Keychain and would fail on the M4. 431/431. Live on the next release-branch switch.
+
 # 2026-09-30 — values_branch sensor and R9 implemented
 
 Implemented the release-branch ApplicationSet drift sensor with non-release checkout skip semantics,

@@ -101,11 +101,23 @@ def test_values_branch_nonrelease_is_skipped_and_never_pages(monkeypatch):
     def argo(*args):
         calls.append(args)
         return 0, "[]"
-    for _ in range(6):
+    pager_state = {}
+    for _ in range(pager.SENSOR_UNKNOWN_CYCLES + 1):
         item = values_branch(lambda *_: (0, "main"), argo, state, token="x")
         assert item["status"] == "healthy" and item["data"]["skipped"] is True
-        assert pager.health_events([item], {}) == []
+        assert pager.health_events([item], pager_state) == []
     assert calls == []
+    unknown_state, pages = {}, []
+    for _ in range(pager.SENSOR_UNKNOWN_CYCLES):
+        pages += pager.health_events([dict(item, status="unknown")], unknown_state)
+    assert any("values_branch check unknown" in text for text in pages), "control: unknown must page"
+
+
+def test_values_branch_nonrelease_skips_even_without_a_token(monkeypatch):
+    from hermes import sensors as sensor_module
+    monkeypatch.setattr(sensor_module, "_keychain_secret", lambda *_: "")
+    item = values_branch(lambda *_: (0, "claude/foo"), lambda *_: (0, "[]"), {})
+    assert item["status"] == "healthy" and item["data"]["skipped"] is True
 
 
 def test_values_branch_zero_refs_and_real_failures_are_unknown():
@@ -130,7 +142,10 @@ def test_values_branch_resolution_order_and_argocd_failures(monkeypatch):
     rejected = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
                              lambda *_: (1, "Unauthenticated"), {}, token="x")
     assert "re-mint" in rejected["evidence"]
-    assert values_branch(lambda *_: (0, "main"), lambda *_: (0, "[]"), {})["status"] == "unknown"
+    from hermes import sensors as sensor_module
+    monkeypatch.setattr(sensor_module, "_keychain_secret", lambda *_: "")
+    missing = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), lambda *_: (0, "[]"), {})
+    assert missing["status"] == "unknown" and "credential unavailable" in missing["evidence"]
 
 
 def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
