@@ -1,3 +1,11 @@
+# 2026-09-30 — KubeJobFailed (identity): reconcile hook 404s on its flow right after the partial import
+
+Deterministic: the 8 PM run, a manual re-sync and all 5 ArgoCD retries failed. The flow exists (top-level, custom) and GET
+executions works 8/8 later, with one Keycloak replica. Theory: the partial import OVERWRITE invalidates the realm cache, so alias
+lookup misses for a window. This is the first live run of reconcile_browser_flow (awk #100 and PVC #101 blocked it before).
+Filed `2026-09-30-keycloak-reconcile-flow-lookup-404-after-partial-import.md` with a shopping-cart-infra Codex brief:
+wait (poll up to 60s) for executions before reconciling, logging the attempt count. The hub vectordb dashboard is confirmed working.
+
 # 2026-09-30 — vectordb metrics live on the hub
 
 The forward on 19094 is healthy; `bin/k3dm-vectordb-metrics` pushed `k3dm_vectordb_rows 1732` to the hub Pushgateway. The stray

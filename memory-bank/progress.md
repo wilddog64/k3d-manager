@@ -25,6 +25,7 @@
 - [x] VectorDB dashboard shows data on the hostinger Grafana; Ingestion stat panels use instant queries.
 - [x] Decided 2026-09-30: vectordb metrics and dashboard move to the hub.
 - [x] Codex `50bd3591` hub Pushgateway + dashboard move, verified by Claude (`b46d5e06`).
+- [ ] Codex (shopping-cart-infra): keycloak reconcile waits for the flow after the partial import (brief in 2026-09-30-keycloak-reconcile-flow-lookup-404-after-partial-import.md).
 - [x] Hub vectordb metrics live 2026-09-30 (ApplicationSets reapplied, forward 19094 healthy, rows=1732 pushed; the stray copy was pruned by ArgoCD).
 - [x] `make validate-manifests` + `_ensure_kubeconform` (self-installing kubeconform); SC2317 false positive suppressed.
 - [ ] Operator: let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.
