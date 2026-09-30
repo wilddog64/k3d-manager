@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's "why this still has no data?"
-**Status:** FIXED — Codex `50bd3591`, verified by Claude 2026-09-30 (one missing test added, no code defects).
+**Status:** FIXED and live 2026-09-30 — Codex `50bd3591`, verified by Claude (one missing test added, no code defects).
 Live after the operator steps below.
 reported in the completion handoff below.
 **Severity:** Medium. The dashboard in the Grafana the operator uses is blank, and the vectordb alerts

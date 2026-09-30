@@ -1,3 +1,8 @@
+# 2026-09-30 — vectordb metrics live on the hub
+
+The forward on 19094 is healthy; `bin/k3dm-vectordb-metrics` pushed `k3dm_vectordb_rows 1732` to the hub Pushgateway. The stray
+hub `k3dm-vectordb` ConfigMap was already pruned by ArgoCD. The hub Grafana *k3dm VectorDB Health* should now show data.
+
 # 2026-09-30 — hub Pushgateway live
 
 `hub-pushgateway` needed a second ApplicationSet reapply: the generator list lives in the applied object.
