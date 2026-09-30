@@ -142,3 +142,13 @@ survive the pinned `K3D_MANAGER_BRANCH`.
    no-token tests.
 
 `make test-pytest` 431/431.
+
+## Follow-up gap (found live 2026-09-30, not in this fix)
+
+`values_branch` detects Applications reading an **old branch**. It does not detect an ApplicationSet
+whose **own definition** changed in git. The generator list is part of the applied object, so a new
+element (here `hub-pushgateway`, added in `50bd3591`) produces no Application until the sets are
+reapplied, and nothing reports it. `kube-prometheus-stack` had already synced its new values from
+git, while `hub-pushgateway` stayed "not found" until `deploy_argocd_applicationsets --confirm`. A
+candidate check: render each `scripts/etc/argocd/applicationsets/*.yaml` with the same envsubst and
+compare `spec` against the live object. That is a v1.41.0 item, not widened into this fix.

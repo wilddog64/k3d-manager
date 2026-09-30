@@ -1,3 +1,10 @@
+# 2026-09-30 — hub Pushgateway live
+
+`hub-pushgateway` needed a second ApplicationSet reapply: the generator list lives in the applied object.
+It is now Synced/Healthy, with `service/prometheus-pushgateway` and `configmap/grafana-dashboard-vectordb` on the hub.
+Remaining operator steps: `make install-hub-pushgateway-port-forward`, and the stray `k3dm-vectordb` owner check and delete.
+Gap noted in the values_branch doc: ApplicationSet spec drift is undetected (v1.41.0 candidate).
+
 # 2026-09-30 — v1.41.0 spec: agent rigor for Python
 
 `docs/plans/v1.41.0-python-agent-rigor.md` (the 3rd v1.41.0 plan). M1 (lib-foundation): `_agent_audit` learns Python,
