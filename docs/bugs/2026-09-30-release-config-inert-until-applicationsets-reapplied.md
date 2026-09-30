@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's "I don't see any" (the
 *k3dm Alertmanager Delivery* dashboard)
-**Status:** OPEN — assigned to Codex 2026-09-30 (brief below)
+**Status:** OPEN — assigned to Codex 2026-09-30 (brief below; amended 2026-09-30 after plan review: the non-release checkout is healthy/skipped, not unknown)
 **Classification:** Bugfix in `docs/bugs/` (v1.40.0 already has five plan docs).
 **Severity:** Medium. Nothing fails; config merged and green in CI never reaches a cluster.
 **Related:** `2026-07-24-make-status-values-branch-drift-wiring.md` (the same check in `make status`,
@@ -45,8 +45,11 @@ flow. Reconcile lag right after a reapply never alerts.
   expected=None, threshold=3, server="argocd.3ai-talk.org")`.
   - **Expected branch:** `expected`, else env `K3DM_RELEASE_BRANCH`, else
     `run(["git", "rev-parse", "--abbrev-ref", "HEAD"], {})` (Hermes runs from the M4 checkout). It must
-    fully match `k3d-manager-v\d+\.\d+\.\d+`. Otherwise `unknown` with evidence
-    `checkout is not on a release branch (<branch>)`: a feature branch is not a release.
+    fully match `k3d-manager-v\d+\.\d+\.\d+`. Otherwise **`healthy`** with evidence
+    `skipped: checkout on <branch>, not a release branch` and `data.skipped = True`, and no ArgoCD call.
+    It must not be `unknown`: the pager pages any sensor unknown for 6 cycles
+    (`pager.SENSOR_UNKNOWN_CYCLES`), and a feature-branch checkout is a normal state, not an outage.
+    A git failure is still `unknown`.
   - **Apps:** the same call and credential as `argocd` (`argocd app list -o json --grpc-web` through
     `argocd_run`, `ARGOCD_SERVICE` token). No token → `_unavailable("values_branch", ARGOCD_SERVICE)`;
     `Unauthenticated` → `unknown` with the same re-mint hint as `argocd`.
@@ -85,16 +88,17 @@ helm-chart sources from other repos, and two `HEAD` sources):**
 2. Two apps on `k3d-manager-v1.39.0` → healthy on cycles 1–2, degraded on cycle 3; evidence names both
    as `app@rev`; `data.stale` lists them. They clear before cycle 3 → never degraded (lag case).
 3. Expected-branch resolution: explicit arg beats `K3DM_RELEASE_BRANCH`, which beats the checkout;
-   a checkout on `main` or `claude/foo` → `unknown` "not on a release branch"; git failure → `unknown`.
+   a checkout on `main` or `claude/foo` → `healthy` with `skipped:` evidence, `data.skipped` true, and
+   **no** ArgoCD call; git failure → `unknown`. Six polls on `main` fire no page (run the pager over them).
 4. Zero k3d-manager sources (only HEAD and other repos) → `unknown`, not healthy.
 5. No token → unavailable; `Unauthenticated` → unknown with the re-mint hint; invalid JSON → unknown.
 6. R9 proposed only when `values_branch` is degraded with stale apps; not when healthy, unknown, or
    degraded with an empty `stale`. Command and env exactly as specified; `reversible` is `False`.
 7. `approve()` for R9 runs that command with `K3D_MANAGER_BRANCH` set and nothing else (stubbed).
 
-**Mutations (paste each red run, then green):** count `HEAD` sources as stale → test 1 red; drop the
+**Mutations (paste each red run, then green; six in total):** count `HEAD` sources as stale → test 1 red; drop the
 debounce → test 2 red; return healthy on zero references → test 4 red; accept any branch name as
-expected → test 3 red; omit `K3D_MANAGER_BRANCH` from R9's env → test 6 red.
+expected → test 3 red; return `unknown` for a non-release checkout → test 3 red (the page fires); omit `K3D_MANAGER_BRANCH` from R9's env → test 6 red.
 
 **Gates (paste output):** `make test-pytest`; `python3 scripts/check-doc-links.py`; `git diff --stat`
 lists only the files above.
