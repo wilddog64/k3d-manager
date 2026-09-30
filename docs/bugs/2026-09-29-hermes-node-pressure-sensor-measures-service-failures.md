@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from the operator's Hermes Status dashboard
-**Status:** FIXED — option (b) implemented 2026-09-30; commit SHA recorded in the completion handoff.
+**Status:** FIXED — Codex `d37b4347`, verified by Claude 2026-09-30 with one defect fixed in `4a2bf022`.
 **Severity:** Medium — misleading on the dashboard, double-counts other sensors, and blocks self-repair R2
 **Component:** `scripts/lib/hermes/sensors.py` (`node_pressure`), `scripts/lib/hermes/repairs.py`
 
@@ -150,3 +150,22 @@ to the sensor that owns it.
 
 - Restore the two-service rule → test 1 red.
 - Make R2 depend on the old aggregate → test 4 red.
+
+## Verification (Claude, 2026-09-30)
+
+Verified independently rather than from the report. `d37b4347` touches exactly the 14 files the brief
+allows. Node fixtures carry 2,500 `status.images` entries (about 110 KB), as the brief asked. Hermes
+`test_hermes.py` + `test_pager.py` + `test_repairs.py` 72/72; the brief's four mutations (two-service
+rule, ignoring Disk/PID pressure, any-unreadable → unknown, `node_pressure` left in `WEBHOOK_SENSORS`)
+each went red.
+
+**Defect found and fixed in `4a2bf022`:** the brief says `data_layer` is `unknown` on an all-`None` payload,
+but the code kept only `if not services`. Reproduced: with every check `ok: None` ("cluster unreachable"),
+`eso` went `unknown` but `data_layer` reported **healthy** with the "cluster unreachable" detail, so
+`_unknown_webhook` was false. A blind webhook, which paged and proposed R1 under the old
+`node_pressure`, would have paged nothing. No numbered test covered the case. Fix: `data_layer` is
+`unknown … source unavailable` when every check is ungraded, unless the Data layer entry itself says
+"not deployed", because that answer proves the webhook can query the cluster. An ungraded Data layer
+entry for any other reason is `unknown` ("data layer ungraded: …"), not healthy. Tests added in
+`test_repairs.py`; Codex's original code fails both, and dropping the all-`None` rule fails one.
+Hermes suites 74/74; `make test-pytest` 408/408.

@@ -1,3 +1,11 @@
+# 2026-09-30 — Codex `d37b4347` verified; blind-webhook regression fixed
+
+node_pressure (b) + data_layer passed its brief gates (72/72, 4 mutations red, 14 allowed files,
+~110 KB node fixtures). Found that data_layer reported healthy on an all-None webhook payload, which
+silently disabled the webhook-down page and R1 for a blind webhook. Fixed in `4a2bf022` (74/74,
+pytest 408/408). Operator also flagged that the chart's "Alertmanager / Overview" dashboard shows every
+integration (only email + webhook are used); fix pending their choice.
+
 # 2026-09-30 — node_pressure option (b) implemented; awaiting commit SHA
 
 Implemented the exact option (b) brief: `node_pressure` reads Ready and pressure conditions from

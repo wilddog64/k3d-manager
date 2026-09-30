@@ -1,3 +1,8 @@
+# 2026-09-30 — Codex verification #3
+
+- [x] Verified `d37b4347`; blind-webhook defect fixed in `4a2bf022`.
+- [ ] Operator: choose a fix for the Alertmanager Overview integration panels.
+
 # 2026-09-30 — node_pressure option (b) implementation complete; awaiting commit SHA
 
 - [x] Implemented the option (b) brief: real node conditions plus separate `data_layer`, pager/R1/R2
