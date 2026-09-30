@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0` (tracking); **work repo:** `shopping-cart-infra`
 **Filed:** 2026-09-30 by Claude (cloud session), from `KubeJobFailed` (hub, `identity`)
-**Status:** OPEN — root cause corrected 2026-09-30 after live tests; second Codex brief below. #103 (`98da0c5`) is merged and harmless but did not fix it.
+**Status:** FIX READY — Codex `4057069` ([wilddog64/shopping-cart-infra#104](https://github.com/wilddog64/shopping-cart-infra/pull/104)), verified by Claude 2026-09-30. Awaiting merge, one manual sync and a live check. #103 (`98da0c5`) stays as a harmless guard.
 **Target files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats` (amended 2026-09-30 at plan review: the stub harness is kept as a test, not thrown away)
 **Severity:** Medium. The flow itself and logins are fine; every `shopping-cart-identity` sync
 fails its PostSync hook, and `KubeJobFailed` stays firing.
@@ -197,3 +197,18 @@ The sub-flow GETs use other `--fields` lists (`id,displayName,providerId,require
 for the forms flow; `id,providerId` and `id,providerId,authenticationConfig` for conditional OTP). Build their
 stub outputs from the same rows in those column orders, with provider IDs `auth-username-password-form`,
 `conditional-user-configured`, `auth-otp-form` and `conditional-user-role`.
+
+## Verification of brief 2 (Claude, 2026-09-30)
+
+`4057069` is based on current `main` and touches only the two allowed files. The hook change is the two
+`flowId` additions plus `# BEGIN/# END` markers.
+- **Rendered bodies:** both `-b` bodies are split across two lines with a backslash inside double
+  quotes. Evaluated in bash, both are valid JSON with `flowId` (checked by parsing them). The
+  continuation leaves indentation whitespace inside the JSON, which is legal.
+- **Strict mode:** the Job still runs `bash -euo pipefail -c`, and the probe runs under the same mode.
+- **Tests:** BATS 5/5. The behavioural test runs the real `reconcile_browser_flow` and every helper
+  against the captured CSV, takes the config-update branch as production does, and fails on any
+  unhandled call. Dropping either `flowId` fails both the static and the behavioural test; restored,
+  5/5 again.
+- **Gates:** `bash -n` and shellcheck clean; yamllint (CI config) and kubeconform clean. PR CI:
+  YAML Lint, Kubeconform, Kustomize Build and GitGuardian pass; the Copilot review was still running.

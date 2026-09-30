@@ -1,3 +1,7 @@
+# 2026-09-30 — Codex `4057069` (keycloak flowId) verified; shopping-cart-infra #104 open
+
+Both rendered bodies parse as JSON with flowId; BATS 5/5; each flowId mutation fails the static and behavioural tests; set -e intact; CI green.
+
 # 2026-09-30 — keycloak reconcile: real root cause is a missing flowId (not timing)
 
 #103's wait read the flow on attempt 1, then the first sub-flow PUT still 404'd. Live tests: the hook's body (authenticationFlow:true,
