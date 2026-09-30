@@ -340,13 +340,13 @@ def _ref_entries(root, ref):
 def _batch_contents(root, entries):
     process = subprocess.Popen(
         ["git", "cat-file", "--batch"], cwd=str(root), stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
     )
     try:
-        process.stdin.write(b"".join((oid.encode("ascii") + b"\n") for _path, oid in entries))
-        process.stdin.close()
         contents = {}
-        for path, _oid in entries:
+        for path, oid in entries:
+            process.stdin.write(oid.encode("ascii") + b"\n")
+            process.stdin.flush()
             header = process.stdout.readline()
             if not header:
                 raise StoreUnavailable("git cat-file --batch returned no header")
@@ -357,6 +357,7 @@ def _batch_contents(root, entries):
             raw = process.stdout.read(size)
             process.stdout.read(1)
             contents[path] = raw.decode("utf-8", "replace")
+        process.stdin.close()
         if process.wait(timeout=120) != 0:
             raise StoreUnavailable("git cat-file --batch failed")
         return contents

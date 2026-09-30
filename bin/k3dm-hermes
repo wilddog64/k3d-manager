@@ -490,6 +490,7 @@ def _refresh_index(state, now=None):
     }
     try:
         ref, branch = _index_ref()
+        state["index_ref"] = ref
         fetched = subprocess.run(["git", "fetch", "--quiet", "origin", branch], cwd=ROOT,
                                  capture_output=True, text=True, timeout=60, check=False)
         if fetched.returncode != 0:
@@ -517,7 +518,7 @@ def _refresh_index(state, now=None):
         metrics["embedded"] = int(embedded.group(1)) if embedded else 0
         metrics["pruned"] = int(pruned.group(1)) if pruned else 0
         metrics["backlog"] = int(remaining.group(1)) if remaining else 0
-        if "paused" in output.lower():
+        if "index-docs: paused" in output:
             tomorrow = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             metrics["paused_until"] = (tomorrow + timedelta(days=1)).timestamp()
             metrics["result"] = "paused"
@@ -541,9 +542,10 @@ def _refresh_index(state, now=None):
         _push_index_metrics(metrics)
 
 
-def _publish_health_metrics():
+def _publish_health_metrics(ref=None):
+    env = {**os.environ, "K3DM_INDEX_REF": ref} if ref else None
     subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
-                   capture_output=True, text=True, timeout=120, check=False)
+                   env=env, capture_output=True, text=True, timeout=120, check=False)
 
 
 def _poll(state, state_path, now=None, status_runner=_status_run):
@@ -592,7 +594,7 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
             (status_record.get("status") == "degraded" or state.get("status_groups"))):
         _status_notification(state, status_record, relay)
     _publish_status(records, state)
-    _publish_health_metrics()
+    _publish_health_metrics(state.get("index_ref"))
     _schedule_e2e(state)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event, "approvals": approvals,

@@ -6,7 +6,8 @@
 
 # 2026-09-30 — vector store freshness
 
-- [ ] Codex: automatic re-indexing + ingestion dashboard (brief in 2026-09-30-vectordb-index-never-refreshes-automatically.md).
+- [x] Codex `29b7f55c` automatic re-indexing, verified by Claude with 4 defects fixed (deadlock, drift ref, pause match, rules YAML).
+- [ ] Operator: pull on the M4 (Hermes runs from the checkout), let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.
 - [x] Operator: Vault copy written 2026-09-30 (`secret/embeddings/gemini` v1; verify prints 39).
 - [x] Operator: `make index-docs` 2026-09-30, 32/32 committed, 1727 in store (key read from Vault).
 - [x] Slack `/k3dm find-similar-docs` multi-word `Q` fixed in the relay parser.

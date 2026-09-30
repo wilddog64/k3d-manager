@@ -24,6 +24,10 @@
 
 ### Fixed
 
+- Automatic re-indexing no longer hangs on a real-sized corpus (`git cat-file --batch` was fed every
+  object ID before any output was read), drift is counted at the indexed ref rather than the working
+  tree, and the `VectorDBIndexStale` rule's annotations are restored, which had invalidated the whole
+  vectordb PrometheusRule.
 - `/k3dm find-similar-docs Q=…` from Slack accepts a sentence: after `Q=`, words run to the next
   `KEY=value` or `confirm` (`/k3dm find-similar-docs Q=mac scheduler cannot find tools K=10`). The
   relay rejected every query longer than one word. Character validation is unchanged in the webhook.

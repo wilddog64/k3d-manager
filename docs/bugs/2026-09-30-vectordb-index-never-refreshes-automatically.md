@@ -3,7 +3,8 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's question "are new docs injected
 into the vector DB?"
-**Status:** FIXED — implementation committed (brief below)
+**Status:** FIXED — Codex `29b7f55c`, verified by Claude 2026-09-30 with four defects fixed in the
+follow-up commit (see Verification). Unexercised live until Hermes restarts on the new code.
 **Severity:** Medium. Prior-art dedup (`make find-similar-docs`, which CLAUDE.md requires before
 filing) silently misses recent docs, and the v1.40.0 retrieval eval would measure a stale index.
 
@@ -171,3 +172,46 @@ Two notes for the implementation:
 That forward points at whichever app cluster was last brought up. On 2026-09-29 it pointed at an
 expired ACG sandbox and every panel was empty until a hostinger refresh re-pointed it. The ingestion
 panels share that dependency; the hub-vs-app-cluster placement of hub-owned metrics is a separate issue.
+
+## Verification (Claude, 2026-09-30)
+
+Verified independently rather than from the report. `29b7f55c` touches only files the brief allows;
+`make test-pytest` 415/415 and `vectordb_rules.bats` 8/8 as committed. The brief's mutations (read the
+working tree with a ref, always re-index, store the fingerprint on failure, push under
+`k3dm-vectordb`) each went red. Brief test 1 (parity on at least 500 docs), test 4's pause case,
+test 5, and test 7's push-failure case were not written. The fixtures held four docs.
+
+**Four defects found and fixed:**
+
+1. **`iter_corpus(ref=…)` deadlocks on the real corpus.** `_batch_contents` wrote every object ID
+   to `git cat-file --batch` before reading any output. Once the IDs pass the pipe buffer (64 KiB,
+   about 1,600 docs at 41 bytes each), both processes block writing: us on stdin, git on stdout. On
+   this repo (1,728 docs), `iter_corpus(".", "HEAD")` never returned (killed at 60 s). In Hermes,
+   every changed-corpus poll would have held `index-docs` for its full 900 s timeout and indexed
+   nothing, and the metrics step would have hung too. Fix: one request, one read, same single
+   process. Real corpus: 0.43 s, identical to the working-tree read. Regression test: a 2,000-doc
+   repo with `archive/` subtrees and non-corpus files, run under a 60 s watchdog. Codex's function
+   fails it.
+2. **Drift counted from the wrong tree.** Hermes' per-poll `k3dm-vectordb-metrics` ran without
+   `K3DM_INDEX_REF`, so `corpus_docs` came from the M4's working tree while the store followed
+   `origin`. The M4 is often behind (it was 3 commits behind on 2026-09-30), so `VectorDBIndexDrift`
+   would fire on a correct index. Fix: `_refresh_index` records the ref and the health step passes it.
+3. **Any output containing "paused" was a quota pause.** `"paused" in output.lower()` also matches
+   a failure that names a path such as `…-monitoring-paused.md`, which would silence indexing until
+   midnight UTC. Fix: match the indexer's own `index-docs: paused` prefix.
+4. **The existing `VectorDBIndexStale` rule was broken, and so was the whole PrometheusRule.** Its
+   `annotations:` was re-indented under `labels:`, giving a label `annotations: null`. kubeconform
+   against the PrometheusRule CRD schema rejects it (`labels/annotations … expected string, but got
+   null`), so none of the four vectordb alerts would load. The brief said to keep that rule as it is.
+   Also, the Ingestion row nested its six panels inside an expanded row with no `gridPos`, and the
+   brief's colours, thresholds and date format were missing. Fixed: panels flattened below the row
+   with layout; result colours (success/noop green, paused orange, failed red); age amber > 1 h and
+   red > 6 h; paused-until as a date, with 0 shown as "not paused".
+
+Tests added: realistic-size parity; pause until next UTC midnight and no run before it; a failure
+naming a "paused" path stays `failed`; backlog > 0 leaves the fingerprint unset; Hermes never
+issues pull/checkout/switch/reset/merge/rebase; a push failure keeps the outcome; health metrics get
+the indexed ref; every rule has string labels and its own annotations; the expanded row nests
+nothing. Mutations: Codex's `_batch_contents`, the loose "paused" match, dropping the ref from
+health metrics, storing the fingerprint with a backlog, Codex's rules file and Codex's dashboard
+each went red. `make test-pytest` 423/423; `vectordb_rules.bats` 9/9.

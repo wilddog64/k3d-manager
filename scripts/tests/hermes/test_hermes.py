@@ -3,6 +3,7 @@ import importlib.machinery
 import importlib.util
 import json
 import sys
+import time
 from types import SimpleNamespace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -97,7 +98,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: True)
     monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
-    monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda: None)
+    monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
                  "alert_delivery"):
@@ -204,6 +205,113 @@ def test_refresh_index_failure_does_not_store_fingerprint_or_break_poll(monkeypa
     k3dm_hermes._refresh_index(state, now=1000)
     assert "index_fingerprint" not in state
     assert pushed[-1]["result"] == "failed"
+
+
+def _index_runner(commands, index_result):
+    def run(command, **kwargs):
+        commands.append((command, kwargs))
+        if command[1:4] == ["fetch", "--quiet", "origin"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return index_result
+    return run
+
+
+def _stub_refresh(monkeypatch, commands, index_result, pushed):
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "new")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", pushed.append)
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", _index_runner(commands, index_result))
+
+
+def _index_calls(commands):
+    return [command for command, _kw in commands if "index-docs.py" in command[0]]
+
+
+def test_refresh_index_paused_waits_for_next_utc_midnight(monkeypatch):
+    commands, pushed = [], []
+    paused = SimpleNamespace(returncode=1, stdout="",
+                             stderr="index-docs: paused — daily quota (quota EmbedPerDay)\n")
+    _stub_refresh(monkeypatch, commands, paused, pushed)
+    state = {}
+    k3dm_hermes._refresh_index(state)
+    until = state["index_paused_until"]
+    midnight = datetime.fromtimestamp(until, timezone.utc)
+    assert (midnight.hour, midnight.minute, midnight.second) == (0, 0, 0)
+    assert 0 < until - time.time() <= 86400
+    assert pushed[-1]["result"] == "paused" and "index_fingerprint" not in state
+    k3dm_hermes._refresh_index(state, now=until - 60)
+    assert len(_index_calls(commands)) == 1
+    assert pushed[-1]["result"] == "paused"
+
+
+def test_refresh_index_failure_naming_a_paused_doc_is_not_a_pause(monkeypatch):
+    commands, pushed = [], []
+    failed = SimpleNamespace(returncode=1, stdout="",
+                             stderr="index-docs: unavailable — cannot read docs/bugs/monitoring-paused.md\n")
+    _stub_refresh(monkeypatch, commands, failed, pushed)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert pushed[-1]["result"] == "failed"
+    assert not state.get("index_paused_until")
+
+
+def test_refresh_index_backlog_keeps_fingerprint_unset(monkeypatch):
+    commands, pushed = [], []
+    partial = SimpleNamespace(returncode=0, stderr="",
+                              stdout="index-docs: 900 docs, 100 embedded, 0 pruned, 800 in store, 250 remaining\n")
+    _stub_refresh(monkeypatch, commands, partial, pushed)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert "index_fingerprint" not in state
+    assert pushed[-1]["result"] == "success" and pushed[-1]["backlog"] == 250
+
+
+def test_refresh_index_never_changes_the_checkout(monkeypatch):
+    commands, pushed = [], []
+    ok = SimpleNamespace(returncode=0, stderr="",
+                         stdout="index-docs: 4 docs, 1 embedded, 0 pruned, 4 in store, 0 remaining\n")
+    _stub_refresh(monkeypatch, commands, ok, pushed)
+    k3dm_hermes._refresh_index({}, now=1000)
+    git = [command for command, _kw in commands if command[0] == "git"]
+    assert git and all(command[1] not in ("pull", "checkout", "switch", "reset", "merge", "rebase")
+                       for command in git)
+
+
+def test_refresh_index_push_failure_keeps_outcome(monkeypatch):
+    commands = []
+    ok = SimpleNamespace(returncode=0, stderr="",
+                         stdout="index-docs: 4 docs, 1 embedded, 0 pruned, 4 in store, 0 remaining\n")
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "new")
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", _index_runner(commands, ok))
+
+    def refused(*_args, **_kw):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen", refused)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_fingerprint"] == "new" and state["index_last_success"] == 1000
+
+
+def test_health_metrics_count_the_corpus_at_the_indexed_ref(monkeypatch):
+    commands = []
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run",
+                        lambda command, **kw: commands.append((command, kw)) or SimpleNamespace(returncode=0))
+    k3dm_hermes._publish_health_metrics("origin/k3d-manager-v1.40.0")
+    assert commands[-1][1]["env"]["K3DM_INDEX_REF"] == "origin/k3d-manager-v1.40.0"
+    k3dm_hermes._publish_health_metrics(None)
+    assert commands[-1][1]["env"] is None
+
+
+def test_refresh_index_records_the_ref_for_health_metrics(monkeypatch):
+    commands, pushed = [], []
+    ok = SimpleNamespace(returncode=0, stderr="",
+                         stdout="index-docs: 4 docs, 0 embedded, 0 pruned, 4 in store, 0 remaining\n")
+    _stub_refresh(monkeypatch, commands, ok, pushed)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_ref"] == "origin/main"
 
 
 def test_index_metrics_use_separate_job_and_one_current_result(monkeypatch):

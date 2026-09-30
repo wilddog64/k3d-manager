@@ -73,12 +73,30 @@ import json, re, sys
 text = open(sys.argv[1]).read()
 payload = text.split("k3dm-vectordb.json: |", 1)[1]
 dashboard = json.loads(payload)
-row = next(panel for panel in dashboard["panels"] if panel.get("title") == "Ingestion")
-assert len(row["panels"]) == 6
-queries = " ".join(target["expr"] for panel in row["panels"] for target in panel["targets"])
+panels = dashboard["panels"]
+row = next(panel for panel in panels if panel.get("title") == "Ingestion")
+assert row.get("collapsed") is False and row.get("panels") == [], "an expanded row must not nest its panels"
+below = [p for p in panels if p is not row and p["gridPos"]["y"] > row["gridPos"]["y"]]
+assert len(below) == 6, len(below)
+assert all(p.get("gridPos") for p in panels)
+queries = " ".join(target["expr"] for panel in below for target in panel["targets"])
 metrics = open("bin/k3dm-hermes").read()
 for name in re.findall(r"k3dm_vectordb_[a-z_]+", queries):
-    assert name in metrics or name == "k3dm_vectordb_drift_docs"
+    assert name in metrics or name == "k3dm_vectordb_drift_docs", name
 ' "${DASHBOARD}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "every rule keeps string labels and its own annotations" {
+  run python3 -c '
+import sys, yaml
+document = yaml.safe_load(open(sys.argv[1]))
+for group in document["spec"]["groups"]:
+    for rule in group["rules"]:
+        labels = rule.get("labels", {})
+        assert all(isinstance(v, str) for v in labels.values()), (rule["alert"], labels)
+        assert "annotations" not in labels, rule["alert"]
+        assert rule.get("annotations", {}).get("summary"), rule["alert"]
+' "${RULES}"
   [ "${status}" -eq 0 ]
 }

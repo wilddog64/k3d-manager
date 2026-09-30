@@ -32,7 +32,7 @@ spec:
           labels:
             severity: warning
             cluster: hub
-            annotations:
+          annotations:
             summary: "VectorDB index is stale"
             description: "The VectorDB index has not been refreshed for more than seven days."
         - alert: VectorDBIndexDrift

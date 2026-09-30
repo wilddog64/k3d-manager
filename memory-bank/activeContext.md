@@ -1,3 +1,13 @@
+# 2026-09-30 — Codex `29b7f55c` (vectordb auto-index) verified; 4 defects fixed
+
+Scope was clean and the committed tests were green (415 pytest, 8 bats), but: (1) `iter_corpus(ref)` deadlocks
+past about 1,600 docs, and the real repo has 1,728, so Hermes would have hit its 900 s timeout every poll;
+(2) the drift metric counted the working tree, not the indexed ref, a false alert whenever the M4 is behind;
+(3) any output containing "paused" counted as a quota pause; (4) `VectorDBIndexStale` annotations were moved
+under labels, so the CRD schema rejects the whole PrometheusRule. The dashboard row also nested panels with
+no layout. All fixed with tests and mutations; 423 pytest, 9 bats. Details in the bug doc's Verification.
+Live: Hermes starts fresh each launchd interval from the M4 checkout, so it runs the new code after the operator pulls. ArgoCD syncs the rules and dashboard.
+
 # 2026-09-30 — Slack prior-art search works end to end
 
 `/k3dm find-similar-docs Q=mac scheduler cannot find tools` ran under launchd and returned
