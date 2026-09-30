@@ -340,5 +340,5 @@ the operator confirms `enforce_admins` is back to `true`, then runs the four pos
 `VulnerabilityReport` for minio, and 2 h without a `KubeJobFailed` email.
 
 **Branch protection after the bypass (Codex report, 2026-09-30):** `enforce_admins: true`, required
-approvals 1, dismiss stale reviews true, code-owner reviews false. Not independently readable from
-Claude's session; the operator confirms with `gh api repos/wilddog64/shopping-cart-infra/branches/main/protection`.
+approvals 1, dismiss stale reviews true, code-owner reviews false. **Confirmed by the operator** with
+`gh api repos/wilddog64/shopping-cart-infra/branches/main/protection`: `enforce_admins: true`, approvals 1.
