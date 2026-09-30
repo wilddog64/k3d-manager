@@ -76,3 +76,23 @@ JSON
   [ "$status" -eq 0 ]
   [ ! -s "$DELETE_CALLS" ]
 }
+
+@test "hostnet drift: a pod list larger than the per-argument limit is still read" {
+  python3 - "$PODS_FILE" <<'PY'
+import json, sys
+items = [{"metadata": {"namespace": "monitoring", "name": "node-exporter-agent-0",
+                       "ownerReferences": [{"kind": "DaemonSet"}]},
+          "spec": {"hostNetwork": True, "nodeName": "agent-0"},
+          "status": {"phase": "Running", "podIP": ".3"}}]
+for i in range(200):
+    items.append({"metadata": {"namespace": "apps", "name": f"app-{i}",
+                               "managedFields": [{"fieldsV1": {"f:spec": "x" * 2048}}]},
+                  "spec": {"nodeName": "agent-1"}, "status": {"phase": "Running", "podIP": "10.42.0.1"}})
+json.dump({"items": items}, open(sys.argv[1], "w"))
+PY
+  [ "$(wc -c <"$PODS_FILE")" -gt 262144 ]
+  run bin/k3dm-hostnet-drift --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"pod":"node-exporter-agent-0"'* ]]
+  [[ "$output" != *"Argument list too long"* ]]
+}

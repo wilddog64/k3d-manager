@@ -26,13 +26,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-nodes_json="$(kubectl --context "$context" get nodes -o json)"
-pods_json="$(kubectl --context "$context" get pods -A -o json)"
-drifted_json="$(jq -c --argjson nodes "$nodes_json" --argjson pods "$pods_json" '
+nodes_file="$(mktemp)"
+pods_file="$(mktemp)"
+trap 'rm -f "$nodes_file" "$pods_file"' EXIT
+[[ -n "$nodes_file" && -n "$pods_file" ]] || { printf '%s\n' 'ERROR: mktemp failed' >&2; exit 1; }
+kubectl --context "$context" get nodes -o json > "$nodes_file"
+kubectl --context "$context" get pods -A -o json > "$pods_file"
+drifted_json="$(jq -c --slurpfile nodes "$nodes_file" '
   def node_ip($name):
-    ($nodes.items[] | select(.metadata.name == $name) |
+    ($nodes[0].items[] | select(.metadata.name == $name) |
       (.status.addresses // [])[] | select(.type == "InternalIP") | .address);
-  [ $pods.items[]
+  [ .items[]
     | select(.spec.hostNetwork == true and .status.phase == "Running")
     | . as $pod
     | ($pod.spec.nodeName // "") as $node
@@ -45,10 +49,10 @@ drifted_json="$(jq -c --argjson nodes "$nodes_json" --argjson pods "$pods_json" 
        pod_ip: $pod_ip,
        node_ip: $node_ip,
        owner_kind: ($pod.metadata.ownerReferences[0].kind // "")} ]
-' <<< '{}')"
+' "$pods_file")"
 
 if [[ "$mode" == "json" ]]; then
-  jq -c --argjson drifted "$drifted_json" '{drifted: $drifted}' <<< '{}'
+  jq -c '{drifted: .}' <<< "$drifted_json"
   exit 0
 fi
 
