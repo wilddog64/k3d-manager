@@ -1,3 +1,13 @@
+# 2026-09-30 — index-docs catch-up blocked: no durable embeddings credential
+
+Operator's `make index-docs` failed: 0 of 32 committed. The env var is unset, `k3dm-embeddings-api-key` is
+rc 44, `gemini-cli-api-key` is rc 36, and Vault `secret/embeddings/gemini` has no value. This is not a
+regression: the durable slot has been open since 2026-09-26, and the 09-27 index ran on a one-shot env
+export. The Vault copy is also a prerequisite for the Hermes auto-index fix, because launchd has no
+session to read a terminal export. Added a Prerequisite section to the bug doc: a missing credential
+records last_result=failed (not paused), and the Vault copy is lost on a hub rebuild with nothing to
+restore it from.
+
 # 2026-09-30 — vector store never re-indexes on its own; Codex brief filed
 
 Answer to the operator: no automatic ingestion. The last run was about 2026-09-27; 23 docs since are

@@ -142,6 +142,30 @@ No PR, no merge, no force-push, no `--no-verify`.
 git pull && make index-docs DRY_RUN=1 && make index-docs
 ```
 
+## Prerequisite: a credential that launchd can read (operator, 2026-09-30)
+
+The catch-up run failed with `no embeddings credential` (0 of 32 committed): env unset,
+`k3dm-embeddings-api-key` rc 44, `gemini-cli-api-key` rc 36, Vault `No value found at
+secret/data/embeddings/gemini`. This is not a regression. The 2026-09-27 index ran on a one-shot
+`K3DM_EMBEDDINGS_API_KEY` export, and the durable slot has been open since 2026-09-26
+(`memory-bank/progress.md`, "the durable slot is still open").
+
+It blocks this fix too. Hermes runs under launchd with no login session, so an env export in a
+terminal never reaches it, and a keychain item only works if its ACL serves `/usr/bin/security`
+without a dialog. **The Vault copy is the source Hermes can rely on.** Write it with the prompted
+command in `docs/guides/vector-store.md`, "Writing the Vault copy", then run the catch-up.
+
+Two notes for the implementation:
+
+- A missing credential makes `index-docs` print `unavailable` and exit non-zero. `_refresh_index`
+  records it as `last_result{result="failed"}` and logs the first line of the error, so
+  `VectorDBIndexFailing` fires within 30 minutes instead of drift growing silently. It is not
+  `paused`: waiting for 00:00 UTC does not fix it.
+- The Vault copy lives in the hub's Vault, so it is lost on a hub rebuild, as the cosign key was
+  (`2026-09-29-hub-rebuild-loses-cosign-signing-key.md`). Unlike cosign there is no Keychain backup
+  for bring-up to restore from, so after a rebuild the operator re-runs the Vault write. The
+  `VectorDBIndexFailing` alert is how that surfaces.
+
 **Where the dashboard lives:** *k3dm VectorDB Health* is deployed to the **app-cluster** Grafana by
 `grafana-dashboards-acg`, and its data arrives through the M4's `localhost:9091` Pushgateway forward.
 That forward points at whichever app cluster was last brought up. On 2026-09-29 it pointed at an

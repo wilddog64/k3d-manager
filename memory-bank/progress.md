@@ -1,7 +1,8 @@
 # 2026-09-30 — vector store freshness
 
 - [ ] Codex: automatic re-indexing + ingestion dashboard (brief in 2026-09-30-vectordb-index-never-refreshes-automatically.md).
-- [ ] Operator (now): `git pull && make index-docs` to catch up the 23 missing docs.
+- [ ] Operator (now): write the Vault copy (guide, "Writing the Vault copy"), then `make index-docs`
+      (32 pending). The first attempt on 2026-09-30 failed: no embeddings credential.
 
 # 2026-09-30 — MinIO registry bug closed
 
