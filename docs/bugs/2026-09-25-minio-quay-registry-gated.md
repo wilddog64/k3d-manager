@@ -338,3 +338,7 @@ the operator confirms `enforce_admins` is back to `true`, then runs the four pos
 `product-images` bucket and its objects (`bag.jpg`, `cable.jpg`, `charger.jpg`, …) are present under
 `/bitnami/minio/data`, and `find /bitnami/minio/data ! -user 1001` returns nothing. Remaining: a Trivy
 `VulnerabilityReport` for minio, and 2 h without a `KubeJobFailed` email.
+
+**Branch protection after the bypass (Codex report, 2026-09-30):** `enforce_admins: true`, required
+approvals 1, dismiss stale reviews true, code-owner reviews false. Not independently readable from
+Claude's session; the operator confirms with `gh api repos/wilddog64/shopping-cart-infra/branches/main/protection`.
