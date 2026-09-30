@@ -1,3 +1,12 @@
+# 2026-09-30 — VectorDB dashboard: data is on hostinger; the hub has a stray copy
+
+The operator saw "No data" on every panel in the **hub** Grafana. Metrics reach the hostinger Pushgateway and
+Prometheus (`k3dm_vectordb_rows` = 1730). `k3dm-vectordb` ConfigMaps exist on both clusters (3d20h). The hub copy
+queries the hub Prometheus, which never sees them. The hostinger Grafana (port-forward svc/acg-kube-prometheus-stack-grafana,
+then an SSH -L tunnel because the operator works over SSH) shows full data. Fixed the Last run result stat, which
+showed every result ever current: the stat panels now use instant queries. Open design question (awaiting
+the operator): move vectordb metrics and dashboard to the hub (recommended) vs keep them on the app cluster and remove the hub copy.
+
 # 2026-09-30 — automatic doc ingestion confirmed live
 
 Hermes indexed `10e95119` (committed 11:42:50 UTC) at 11:45:17 UTC with no manual step: fingerprint

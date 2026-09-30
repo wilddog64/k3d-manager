@@ -79,6 +79,8 @@ assert row.get("collapsed") is False and row.get("panels") == [], "an expanded r
 below = [p for p in panels if p is not row and p["gridPos"]["y"] > row["gridPos"]["y"]]
 assert len(below) == 6, len(below)
 assert all(p.get("gridPos") for p in panels)
+for stat in (p for p in below if p["type"] == "stat"):
+    assert all(target.get("instant") is True for target in stat["targets"]), stat["title"]
 queries = " ".join(target["expr"] for panel in below for target in panel["targets"])
 metrics = open("bin/k3dm-hermes").read()
 for name in re.findall(r"k3dm_vectordb_[a-z_]+", queries):
