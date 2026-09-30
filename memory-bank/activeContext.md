@@ -1,3 +1,13 @@
+# 2026-09-30 — ApplicationSets reapplied on v1.40.0; Hermes values_branch sensor + R9 briefed
+
+Operator ran `deploy_argocd_applicationsets --confirm`: 13/13 sets, 19 references on v1.40.0. `loki` and
+`acg-trivy-operator` lagged on the first check and were clean a minute later. The Alertmanager Delivery
+ConfigMap is on the hub. To stop this recurring, filed
+`docs/bugs/2026-09-30-release-config-inert-until-applicationsets-reapplied.md` (a bug doc, because v1.40.0
+already has 5 plan docs). It briefs a `values_branch` sensor (expected branch = the M4 checkout's release
+branch, debounced 3 cycles, unknown on zero references) and an approval-gated R9 `deploy_argocd_applicationsets
+--confirm` with `K3D_MANAGER_BRANCH` pinned. Moving to a fixed ref such as `k3dm-live` is deferred to v1.41.0 design.
+
 # 2026-09-30 — k3dm Alertmanager Delivery dashboard not visible: ApplicationSets not reapplied for v1.40.0
 
 The dashboard exists only on `k3d-manager-v1.40.0`. `grafana-dashboards-hub` syncs
