@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0` (tracking); **work repo:** `shopping-cart-infra`
 **Filed:** 2026-09-30 by Claude (cloud session), from `KubeJobFailed` (hub, `identity`)
 **Status:** OPEN — assigned to Codex 2026-09-30 (brief below)
-**Target file:** `identity/keycloak/keycloak-reconcile-hook-job.yaml`, and nothing else
+**Target files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats` (amended 2026-09-30 at plan review: the stub harness is kept as a test, not thrown away)
 **Severity:** Medium. The flow itself and logins are fine; every `shopping-cart-identity` sync
 fails its PostSync hook, and `KubeJobFailed` stays firing.
 **Related:** `2026-09-15-keycloak-browser-flow-regression-blocks-all-sso.md` (added
@@ -50,7 +50,7 @@ needed, which confirms or refutes the theory on the first live run.
 **Runs where:** Codex web; branch `fix/keycloak-reconcile-wait-for-flow` from `origin/main`. Offline
 checks only.
 
-**Change (one file, `identity/keycloak/keycloak-reconcile-hook-job.yaml`):**
+**Change (`identity/keycloak/keycloak-reconcile-hook-job.yaml`; tests in `scripts/tests/bin/keycloak-reconcile.bats`):**
 1. Add `wait_for_flow_executions()`. It calls `kcadm.sh get "authentication/flows/${browser_flow}/executions" -r "${KC_REALM}"`,
    with output to `/dev/null`, every 2 s until it succeeds, for up to `KEYCLOAK_FLOW_READY_TIMEOUT_SECONDS`
    (default 60). On success it prints `browser flow readable after N attempt(s)`. On timeout it prints
@@ -67,7 +67,8 @@ checks only.
 - `kustomize build identity/keycloak` renders.
 - Extract the embedded script (`yq` or a Python YAML load of the container `args`) and run
   `bash -n` plus `shellcheck -S warning` on it.
-- A stub harness: put a fake `kcadm.sh` on `PATH` (or override the path variable in a copy of the
+- A stub harness, **added as `@test` cases to the existing `scripts/tests/bin/keycloak-reconcile.bats`**
+  (extract the script from `kubectl kustomize identity/keycloak`, as the existing test renders it): put a fake `kcadm.sh` on `PATH` (or override the path variable in a copy of the
   script) that 404s the first 3 executions GETs and then succeeds. The script prints
   `readable after 4 attempt(s)` and proceeds. A stub that always 404s exits non-zero within the
   timeout (use `KEYCLOAK_FLOW_READY_TIMEOUT_SECONDS=6`).
