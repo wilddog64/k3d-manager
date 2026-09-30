@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0` (tracking); **work repo:** `shopping-cart-infra`
 **Filed:** 2026-09-30 by Claude (cloud session), from `KubeJobFailed` (hub, `identity`)
-**Status:** OPEN — assigned to Codex 2026-09-30 (brief below)
+**Status:** FIX READY — Codex `b11f1a2` ([wilddog64/shopping-cart-infra#103](https://github.com/wilddog64/shopping-cart-infra/pull/103)), verified by Claude 2026-09-30. Awaiting merge and live check.
 **Target files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats` (amended 2026-09-30 at plan review: the stub harness is kept as a test, not thrown away)
 **Severity:** Medium. The flow itself and logins are fine; every `shopping-cart-identity` sync
 fails its PostSync hook, and `KubeJobFailed` stays firing.
@@ -89,3 +89,17 @@ Open a PR to `main` per shopping-cart-infra's rules; do not merge.
    `browser flow readable after N attempt(s)`. N > 1 confirms the cache theory; N = 1 means the
    window is narrower than one call, and the wait still makes the hook safe.
 3. This also closes the outstanding live verification in `2026-09-15-keycloak-browser-flow-regression-blocks-all-sso.md`.
+
+## Verification (Claude, 2026-09-30)
+
+`b11f1a2` is based on current `main` and touches only the two allowed files, with additions only.
+- **Wait placement:** on both branches; the Job still runs `bash -euo pipefail -c`, so a timed-out
+  wait stops the hook rather than reconciling blind. `activeDeadlineSeconds: 900` and the service
+  wait are unchanged.
+- **Tests:** the `keycloak-reconcile.bats` suite passes 3/3 against the script rendered through
+  kustomize (404 ×3 then ok → "readable after 4 attempt(s)"; always 404 → the error within the
+  6 s timeout). The mutation that removes the wait from the existing-flow branch fails all 3.
+- **Gates:** the rendered script passes `bash -n` and `shellcheck -S warning`; `kustomize build`
+  renders; kubeconform is valid; yamllint is clean under CI's config (the default config's 83
+  line-length/indent errors also exist on `main`, and CI relaxes those rules).
+- Nit, not blocking: the timeout message says "404" for any kcadm failure.

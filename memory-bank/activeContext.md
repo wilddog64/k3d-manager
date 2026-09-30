@@ -1,3 +1,7 @@
+# 2026-09-30 — Codex `b11f1a2` (keycloak flow wait) verified; shopping-cart-infra #103 open
+
+Clean: 2 files, based on main, wait on both branches, set -e intact, 3/3 BATS, mutation red, shellcheck/kubeconform/yamllint(CI config) OK.
+
 # 2026-09-30 — KubeJobFailed (identity): reconcile hook 404s on its flow right after the partial import
 
 Deterministic: the 8 PM run, a manual re-sync and all 5 ArgoCD retries failed. The flow exists (top-level, custom) and GET
