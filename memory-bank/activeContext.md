@@ -1,3 +1,11 @@
+# 2026-09-30 — k3dm Alertmanager Delivery dashboard not visible: ApplicationSets not reapplied for v1.40.0
+
+The dashboard exists only on `k3d-manager-v1.40.0`. `grafana-dashboards-hub` syncs
+`scripts/etc/argocd/platform-ops/grafana-dashboard-*.yaml` at `targetRevision: ${K3D_MANAGER_BRANCH}`,
+frozen at the last apply, so it is inert (the CLAUDE.md reapply rule). The same applies to the vectordb
+rules and Ingestion row. Operator: `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` from the
+v1.40.0 checkout (it runs `argocd_check_values_branch`), then the ACG variant.
+
 # 2026-09-30 — Codex `29b7f55c` (vectordb auto-index) verified; 4 defects fixed
 
 Scope was clean and the committed tests were green (415 pytest, 8 bats), but: (1) `iter_corpus(ref)` deadlocks

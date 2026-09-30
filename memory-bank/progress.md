@@ -7,6 +7,7 @@
 # 2026-09-30 — vector store freshness
 
 - [x] Codex `29b7f55c` automatic re-indexing, verified by Claude with 4 defects fixed (deadlock, drift ref, pause match, rules YAML).
+- [ ] Operator: reapply ApplicationSets on v1.40.0 (the Alertmanager Delivery dashboard and vectordb rules/row are inert until then).
 - [ ] Operator: pull on the M4 (Hermes runs from the checkout), let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.
 - [x] Operator: Vault copy written 2026-09-30 (`secret/embeddings/gemini` v1; verify prints 39).
 - [x] Operator: `make index-docs` 2026-09-30, 32/32 committed, 1727 in store (key read from Vault).
