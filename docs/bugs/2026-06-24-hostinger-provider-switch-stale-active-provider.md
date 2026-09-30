@@ -1,5 +1,7 @@
 # Bug: `make status` can resolve the wrong provider after switching between ACG and Hostinger
 
+**Status:** FIXED — 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
+
 **Date:** 2026-06-24  
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`  
 **Files:** `scripts/lib/provider.sh`, `scripts/lib/providers/k3s-hostinger.sh`, `scripts/tests/lib/provider_contract.bats`

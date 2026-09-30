@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by k3dm-hermes
-**Status:** OPEN — Hermes rule-based triage; unverified
+**Status:** CLOSED — not a bug (Claude, 2026-09-30). The run never reached Playwright: `e2e-remote` refused to dispatch because runner `m2` was below its CPU idle floor (`status=capacity_cpu`, 31.92% idle < 35%). That is the capacity gate working as designed. Reopen only if m2 is refused for capacity repeatedly.
 **Run:** `unknown`, runner `m2`, tier `vcluster`, 0 passed / 1 failed / 1 total
 **Runner commit:** `unknown`
 
