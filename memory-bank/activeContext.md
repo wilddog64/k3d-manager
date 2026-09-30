@@ -1,3 +1,9 @@
+# 2026-09-30 — automatic doc ingestion confirmed live
+
+Hermes indexed `10e95119` (committed 11:42:50 UTC) at 11:45:17 UTC with no manual step: fingerprint
+8f0403d4… → cabd4b99…, backlog 0. An earlier run at 11:37 UTC followed Codex's `a92f1f1d`. `git fetch` works
+under launchd, and the embeddings key comes from Vault. Latency is about one poll (≤ 5.5 min).
+
 # 2026-09-30 — Codex `a92f1f1d` (values_branch + R9) verified; 3 defects fixed
 
 Scope was clean, the fixture realistic, and all 6 mutations red. Fixed: (1) token checked before the branch, so a feature
