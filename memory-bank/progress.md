@@ -2,7 +2,7 @@
 
 - [ ] Codex: automatic re-indexing + ingestion dashboard (brief in 2026-09-30-vectordb-index-never-refreshes-automatically.md).
 - [x] Operator: Vault copy written 2026-09-30 (`secret/embeddings/gemini` v1; verify prints 39).
-- [ ] Operator (now): `make index-docs DRY_RUN=1 && make index-docs` (32 pending).
+- [x] Operator: `make index-docs` 2026-09-30, 32/32 committed, 1727 in store (key read from Vault).
 
 # 2026-09-30 — MinIO registry bug closed
 

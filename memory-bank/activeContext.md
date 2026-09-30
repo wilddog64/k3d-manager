@@ -1,3 +1,8 @@
+# 2026-09-30 — vector store caught up (operator)
+
+`make index-docs` read the key from Vault and committed 32/32: 1727 docs, 32 embedded, 0 pruned, 1727 in
+store. Drift is 0 until the next doc lands. Automatic refresh is still Codex's brief.
+
 # 2026-09-30 — embeddings Vault copy written (operator)
 
 `secret/embeddings/gemini` version 1, created 2026-09-30T03:02:08Z. The verify command printed 39, which
