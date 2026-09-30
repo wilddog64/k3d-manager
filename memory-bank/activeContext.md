@@ -1,3 +1,7 @@
+# 2026-09-30 — Codex `b87bd8d` (keycloak brief 3) verified; shopping-cart-infra #105 open
+
+3 calls moved to parent-flow updates; 5 bodies valid JSON; the stub reproduces the live failure on the pre-fix hook; 6/6 BATS; each revert red; CI green.
+
 # 2026-09-30 — keycloak hook: #104 worked; next failure is PUT authentication/executions/{id} (unsupported in KC 24)
 
 Live: that PUT gives 404; GET on the same path is OK; the parent-flow PUT with {id, requirement} is OK. 3 calls use the bad form. Brief 3 is

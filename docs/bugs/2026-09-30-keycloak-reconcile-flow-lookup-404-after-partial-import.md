@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0` (tracking); **work repo:** `shopping-cart-infra`
 **Filed:** 2026-09-30 by Claude (cloud session), from `KubeJobFailed` (hub, `identity`)
-**Status:** OPEN — #104 (`930a82d`) fixed the sub-flow `flowId` 404 (confirmed live); the hook now fails at the next write. Brief 3 below. #103 and #104 stay.
+**Status:** FIX READY — Codex `b87bd8d` ([wilddog64/shopping-cart-infra#105](https://github.com/wilddog64/shopping-cart-infra/pull/105)), verified by Claude 2026-09-30. Awaiting merge, then a hard refresh and one sync. #103 and #104 stay.
 **Target files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats` (amended 2026-09-30 at plan review: the stub harness is kept as a test, not thrown away)
 **Severity:** Medium. The flow itself and logins are fine; every `shopping-cart-identity` sync
 fails its PostSync hook, and `KubeJobFailed` stays firing.
@@ -278,3 +278,20 @@ the phase is `Succeeded`, and no `keycloak-realm-reconcile` Job is left.
 
 **Lesson recorded:** a stub that accepts every write only tests the caller's arithmetic. Model each
 endpoint the code writes to as the real server behaves, including what it rejects.
+
+## Verification of brief 3 (Claude, 2026-09-30)
+
+`b87bd8d` is based on `930a82d` (main) and touches only the two allowed files. The hook diff is exactly
+the three calls, now `update "authentication/flows/${PARENT}/executions" -b '{"id":…,"requirement":"REQUIRED"}'`
+with the right parents, each on one line.
+- **Rendered bodies:** all 5 update bodies in the hook parse as JSON (2 sub-flow bodies with
+  `flowId`, 3 requirement-only).
+- **Stub fidelity:** the stub rejects `update authentication/executions/…` like Keycloak 24. Running
+  the pre-fix hook (`930a82d`) against it fails at
+  `update authentication/executions/47df1e22-2f22-478f-bddc-32a9871a346f -s requirement=REQUIRED` with
+  `Resource not found for url`, the exact live failure.
+- **Tests:** BATS 6/6. The behavioural test asserts the exact URL-encoded parent paths and all three
+  IDs. Reverting each call separately fails both new tests; restored, 6/6 again.
+- **Gates:** `bash -n` and shellcheck clean on the rendered script; yamllint (CI config) and
+  kubeconform clean. PR CI: YAML Lint, Kubeconform, Kustomize Build and GitGuardian pass; the Copilot
+  review was still running.
