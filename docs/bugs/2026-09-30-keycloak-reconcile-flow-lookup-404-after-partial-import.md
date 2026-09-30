@@ -154,9 +154,8 @@ Form `REQUIRED`. So logins work, and the hook fails on no-op writes.
 2. **Behavioural, with realistic fixtures.** Extract the CSV helpers, `level0_rows`, `urlencode_path` and
    `reconcile_browser_flow` (add `# BEGIN/# END` markers like #103 did). Run them against a stub
    `kcadm.sh` that:
-   - returns, for `get …/flows/browser-with-conditional-otp/executions`, the live CSV captured on
-     2026-09-30 (copy it verbatim; the table above lists the rows, and it is in this doc's
-     history);
+   - returns, for `get …/flows/browser-with-conditional-otp/executions`, the live CSV below, captured on
+     2026-09-30 (fields `id,displayName,requirement,authenticationFlow,flowId,level`);
    - returns matching CSVs for the forms and conditional-OTP sub-flow GETs;
    - logs every `update` body, and **exits 1 with `Resource not found for url`** for an
      `update …/executions` whose body has `"authenticationFlow":true` but no `"flowId"`, exactly as
@@ -179,3 +178,22 @@ This also closes the live check in `2026-09-15-keycloak-browser-flow-regression-
 
 **Process gap noted:** hook-only changes never auto-sync. The Application stays `Synced`, because
 ArgoCD excludes hooks from the diff, so each hook fix needs one manual sync to take effect.
+
+### Fixture: live CSV, 2026-09-30 (`--fields id,displayName,requirement,authenticationFlow,flowId,level --format csv`)
+
+```
+"72f9df5f-9326-41de-9c75-dfc9f64161e9","Cookie","ALTERNATIVE",,,0
+"b7a5af7e-2b1d-4e9c-9210-5a964d0f6ee4","Kerberos","DISABLED",,,0
+"4132b009-6492-4bf2-8fc9-c23d5c326419","Identity Provider Redirector","ALTERNATIVE",,,0
+"837de7dc-c162-4e6e-875a-206856e6a152","browser-with-conditional-otp forms","ALTERNATIVE",true,"1b41e828-6706-41b9-8a3a-50b2013e7e1d",0
+"47df1e22-2f22-478f-bddc-32a9871a346f","Username Password Form","REQUIRED",,,1
+"f3e14e86-26d4-4a7f-9bbb-0a6ab26514e4","browser-with-conditional-otp Browser - Conditional OTP","CONDITIONAL",true,"f01f2d25-00eb-4840-94d4-92a24cb78d68",1
+"c93c67dd-14ae-4d7c-afde-4da9082a4300","Condition - user configured","REQUIRED",,,2
+"ac0bb8fe-bc30-4f32-8b95-423f33a9e44a","OTP Form","REQUIRED",,,2
+"2ed55ec6-0fe7-4298-a396-a07f8ad33993","Condition - user role","REQUIRED",,,2
+```
+
+The sub-flow GETs use other `--fields` lists (`id,displayName,providerId,requirement,authenticationFlow,flowId`
+for the forms flow; `id,providerId` and `id,providerId,authenticationConfig` for conditional OTP). Build their
+stub outputs from the same rows in those column orders, with provider IDs `auth-username-password-form`,
+`conditional-user-configured`, `auth-otp-form` and `conditional-user-role`.
