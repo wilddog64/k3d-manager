@@ -306,3 +306,22 @@ Codex chose the brief's second option (keep Bitnami's UID 1001, re-own the exist
    evidence (Bitnami entrypoint or docs on arbitrary UIDs), and the ownership migration.
 
 Then the operator's post-merge checks in the brief apply unchanged.
+
+## Re-verification of `shopping-cart-infra` `36ea68e9` (Claude, 2026-09-30) — ready to merge
+
+`36ea68e9` makes exactly the two requested changes, and nothing else (`statefulset.yaml`, the bug doc):
+the init container checks the whole tree with `find /bitnami/minio/data ! -user 1001 | head -n 1`, and
+adds `DAC_READ_SEARCH` beside `CHOWN` (still `drop: [ALL]`). The bug doc now records the decision and
+evidence: Bitnami requires writability by UID 1001 at `/bitnami/minio/data`; local-path ignores `fsGroup`.
+
+Proof, run by Claude: the **committed** script extracted from the manifest, run under **busybox 1.36.1**
+(`sh`, `find`, `head`, `chown`; the image is `busybox:1.36`) as root with exactly `CHOWN` +
+`DAC_READ_SEARCH`, on UID-1000 data containing a `0700` directory:
+- fresh data → exit 0, 0 files not owned by 1001;
+- the partial state that broke `e8c0b8d9` (top level already 1001) → exit 0, 0 remaining;
+- already migrated → exit 0, no-op;
+- control, the old `CHOWN`-only set → `Permission denied`, exit 1, 1 remaining.
+
+CI gates at CI's pinned versions: yamllint clean; kubeconform 6 valid / 0 invalid; every kustomize
+overlay builds; no `quay.io/minio` references. **Ready to merge.** After merge, run the operator checks
+in the completion brief above.

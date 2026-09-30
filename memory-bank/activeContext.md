@@ -1,3 +1,10 @@
+# 2026-09-30 — shopping-cart-infra `36ea68e9` (MinIO port) re-verified: ready to merge
+
+Both requested changes landed. Committed init script run under busybox 1.36.1 with CHOWN+DAC_READ_SEARCH:
+fresh, partial and no-op cases all pass; the CHOWN-only control still fails. CI gates green. Operator
+merges the PR, then checks: minio-0 Running, product images visible, a Trivy report for minio, no
+KubeJobFailed for 2 h.
+
 # 2026-09-30 — shopping-cart-infra `e8c0b8d9` (MinIO port) verified: changes requested
 
 CI gates pass (yamllint, kubeconform, kustomize, no quay refs); Bitnami mc paths are right. Two defects:

@@ -1,3 +1,8 @@
+# 2026-09-30 — MinIO port ready
+
+- [x] `36ea68e9` verified (busybox capability test + CI gates).
+- [ ] Operator: merge the shopping-cart-infra PR; run the post-merge checks.
+
 # 2026-09-30 — hostinger KubeJobFailed root-caused
 
 - [ ] Codex (shopping-cart-infra): finish the MinIO bitnamilegacy port safely for existing data; PR only.
