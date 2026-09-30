@@ -2713,3 +2713,10 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
   non-blocking deletion. Bug filed at `docs/bugs/2026-09-29-stale-unmanaged-argocd-registration.md`.
   Targeted cleanup tests: 5/5; `bash -n`, ShellCheck, `_agent_checkpoint`, `_agent_lint`,
   and `_agent_audit` passed. Commit `39193aae` pushed to `origin/k3d-manager-v1.40.0`.
+# 2026-09-30 — VectorDB hub metrics implementation
+
+- [x] Added hub Pushgateway chart application and static Prometheus scrape.
+- [x] Routed VectorDB publishers to `K3DM_VECTORDB_PUSHGATEWAY_URL` (default localhost:19094).
+- [x] Moved the dashboard to the hub platform-ops set with byte-identical JSON and corrected labels.
+- [x] Added offline tests, ran mutation red/green checks and repository gates; commit SHA is in the
+  completion handoff.

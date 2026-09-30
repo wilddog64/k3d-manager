@@ -469,7 +469,7 @@ def _push_index_metrics(metrics):
         lines.append(f'k3dm_vectordb_index_last_result{{result="{result}"}} '
                      f"{int(metrics['result'] == result)}")
     body = ("\n".join(lines) + "\n").encode()
-    base = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091").rstrip("/")
+    base = os.environ.get("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
     url = f"{base}/metrics/job/k3dm-vectordb-index"
     try:
         request = urllib.request.Request(url, data=body, method="POST",

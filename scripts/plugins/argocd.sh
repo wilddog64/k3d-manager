@@ -1767,6 +1767,9 @@ EOF
 
       _info "[argocd] Deploying Alertmanager delivery Grafana dashboard..."
       _kubectl apply -f "${_dir}/grafana-dashboard-alertmanager-delivery.yaml"
+
+      _info "[argocd] Deploying VectorDB Grafana dashboard..."
+      _kubectl apply -f "${_dir}/grafana-dashboard-vectordb.yaml"
    else
       _info "[argocd] Prometheus-Operator CRDs / monitoring namespace absent; skipping PrometheusRule, AlertmanagerConfig, inventory-exporter, and Grafana dashboards (monitoring stack not yet installed)"
    fi

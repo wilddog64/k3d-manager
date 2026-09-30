@@ -308,8 +308,9 @@ retains gauges after a publisher stops.
 
 `bin/k3dm-vectordb-metrics` is the publisher named above. It takes no arguments and no flags: it
 runs `bin/k3dm-vectordb-status --json`, converts the payload to a Prometheus text block and POSTs it
-to `<pushgateway>/metrics/job/k3dm-vectordb`. `K3DM_PUSHGATEWAY_URL` overrides the target
-(default `http://localhost:9091`).
+to `<pushgateway>/metrics/job/k3dm-vectordb`. `K3DM_VECTORDB_PUSHGATEWAY_URL` overrides the hub
+target (default `http://localhost:19094`); the generic `K3DM_PUSHGATEWAY_URL` remains reserved for
+app-cluster jobs.
 
 | Metric | Source field |
 |---|---|
@@ -335,8 +336,21 @@ neither has run, nothing has ever published and the Grafana panels are blank for
 than because the store is unhealthy. Run it by hand to distinguish the two:
 
 ```bash
-K3DM_PUSHGATEWAY_URL=http://localhost:9091 bin/k3dm-vectordb-metrics
+K3DM_VECTORDB_PUSHGATEWAY_URL=http://localhost:19094 bin/k3dm-vectordb-metrics
 ```
+
+### Hub metrics and dashboard
+
+VectorDB metrics belong to the hub because the store, its alerts and the Grafana dashboard all run
+there. The hub has a dedicated `prometheus-pushgateway` installed by ArgoCD and a static Prometheus
+scrape job that preserves the publisher's `job="k3dm-vectordb"` labels. On the M4, install the
+port-forward with `make install-hub-pushgateway-port-forward`; it maps hub Pushgateway port 9091 to
+localhost port 19094. Hermes and the standalone publisher use that endpoint by default, while the
+webhook, test metrics and smoke checks continue using the app-cluster `localhost:9091` path.
+
+The VectorDB dashboard is applied in the hub's platform-ops set as
+`grafana-dashboard-vectordb`. After the first sync, verify the hub endpoint with
+`curl -s localhost:19094/-/healthy` and allow one Hermes poll for fresh panels.
 
 Two alerts watch this. `VectorDBMetricsStale` fires when the index timestamp has never been
 published **or** when `push_time_seconds{job="k3dm-vectordb"}` is over an hour old;

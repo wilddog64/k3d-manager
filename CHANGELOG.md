@@ -4,6 +4,9 @@
 
 ### Added
 
+- VectorDB metrics now publish to a dedicated hub Pushgateway on port 19094, with the dashboard
+  moved to the hub platform-ops set; app-cluster Pushgateway jobs are unchanged.
+
 - Hermes now detects Applications left on an older k3d-manager release branch and proposes the
   approval-gated R9 ApplicationSet reapply with the expected branch pinned.
 

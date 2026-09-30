@@ -60,6 +60,11 @@ prometheus:
           - source_labels: [cluster]
             regex: acg
             action: drop
+      - job_name: pushgateway
+        honor_labels: true
+        static_configs:
+          - targets:
+              - 'prometheus-pushgateway.monitoring:9091'
 
 grafana:
   admin:

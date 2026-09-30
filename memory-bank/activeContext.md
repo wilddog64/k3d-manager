@@ -7799,3 +7799,9 @@ Added `make cleanup-stale-registration CLUSTER=<name> [CONFIRM=1]` and its exact
 dry-run-by-default cleanup helper. Commit `39193aae` is pushed to
 `origin/k3d-manager-v1.40.0`; live cleanup removed the stale `cluster-ubuntu-k3s`
 registration and all 10 generated Unknown Applications before this fix was added.
+# 2026-09-30 — VectorDB metrics moved to the hub
+
+Implemented the scoped VectorDB hub Pushgateway, Prometheus scrape, M4 port-forward template and
+dedicated publisher endpoint. Moved the dashboard to the hub platform-ops ConfigMap with the same
+dashboard JSON and corrected metadata. Offline tests and mutation results are recorded in the task
+handoff; the branch commit is pushed upstream.

@@ -435,6 +435,28 @@ def test_index_metrics_use_separate_job_and_one_current_result(monkeypatch):
     assert "/metrics/job/k3dm-vectordb\n" not in body
 
 
+def test_index_metrics_use_dedicated_hub_endpoint_and_ignore_old_override(monkeypatch):
+    requests = []
+
+    class Response:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda request, **_kw: requests.append(request) or Response())
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://old.invalid:9091")
+    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0,
+                                     "pruned": 0, "backlog": 0, "duration": 0.1,
+                                     "paused_until": 0, "result": "success"})
+    assert requests[0].full_url.startswith("http://localhost:19094/metrics/job/k3dm-vectordb-index")
+    requests.clear()
+    monkeypatch.setenv("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://hub.invalid:1234")
+    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0,
+                                     "pruned": 0, "backlog": 0, "duration": 0.1,
+                                     "paused_until": 0, "result": "success"})
+    assert requests[0].full_url.startswith("http://hub.invalid:1234/metrics/job/k3dm-vectordb-index")
+
+
 def test_status_reminder_waits_for_local_midnight(monkeypatch):
     from datetime import timedelta
     class LocalClock:

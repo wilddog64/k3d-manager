@@ -2,7 +2,8 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's "why this still has no data?"
-**Status:** OPEN — assigned to Codex 2026-09-30 (brief below)
+**Status:** FIXED — implementation and offline gates completed on `k3d-manager-v1.40.0`; commit SHA is
+reported in the completion handoff below.
 **Severity:** Medium. The dashboard in the Grafana the operator uses is blank, and the vectordb alerts
 evaluate on a Prometheus that never receives the metrics.
 **Related:** `2026-09-30-vectordb-index-never-refreshes-automatically.md` (it noted the hub-vs-app-cluster

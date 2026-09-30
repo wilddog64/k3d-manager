@@ -1,10 +1,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: k3dm-vectordb
+  name: grafana-dashboard-vectordb
   namespace: monitoring
   labels:
     grafana_dashboard: "1"
+    release: kube-prometheus-stack
 data:
   k3dm-vectordb.json: |
     {

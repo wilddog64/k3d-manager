@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 
 RULES="${BATS_TEST_DIRNAME}/../../etc/prometheus/rules/vectordb.yaml"
-DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-configmap.yaml"
+DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-vectordb.yaml"
+OLD_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-configmap.yaml"
 
 @test "vectordb rules target the hub prometheus stack" {
   run grep -F -- 'release: kube-prometheus-stack' "${RULES}"
@@ -87,6 +88,10 @@ for name in re.findall(r"k3dm_vectordb_[a-z_]+", queries):
     assert name in metrics or name == "k3dm_vectordb_drift_docs", name
 ' "${DASHBOARD}"
   [ "${status}" -eq 0 ]
+}
+
+@test "vectordb dashboard is no longer in the app-cluster dashboard folder" {
+  [ ! -e "${OLD_DASHBOARD}" ]
 }
 
 @test "every rule keeps string labels and its own annotations" {

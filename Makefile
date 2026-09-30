@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -384,6 +384,21 @@ uninstall-prometheus-port-forward:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.prometheus-port-forward" 2>/dev/null || true
 	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
 	@echo "Prometheus port-forward agent removed"
+
+install-hub-pushgateway-port-forward:
+	sed \
+	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.hub-pushgateway-port-forward.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-pushgateway-port-forward" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
+	@echo "Hub Pushgateway port-forward agent installed — port 19094 will stay open while the hub is reachable"
+
+uninstall-hub-pushgateway-port-forward:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-pushgateway-port-forward" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
+	@echo "Hub Pushgateway port-forward agent removed"
 
 install-alertmanager-port-forward:
 	sed \
@@ -1049,6 +1064,7 @@ help:
 	@echo "    make restore-google-app-password   Restore Gmail App Password from Keychain → Vault → Alertmanager"
 	@echo "    make install-alertmanager-auth-proxy   Install Alertmanager auth proxy LaunchAgent"
 	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
+	@echo "    make install-hub-pushgateway-port-forward Install hub Pushgateway port-forward LaunchAgent"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
 	@echo "    make argocd-hermes-token        Re-mint the Hermes ArgoCD token into Keychain (needs a TTY; required after an ArgoCD rebuild)"
 	@echo ""
