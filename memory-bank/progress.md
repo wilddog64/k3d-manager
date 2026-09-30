@@ -19,7 +19,9 @@
 - [x] Automatic ingestion live 2026-09-30: `10e95119` indexed 2.5 min after commit, backlog 0.
 - [x] VectorDB dashboard shows data on the hostinger Grafana; Ingestion stat panels use instant queries.
 - [x] Decided 2026-09-30: vectordb metrics and dashboard move to the hub.
-- [ ] Codex: hub Pushgateway + dashboard move (brief in 2026-09-30-vectordb-metrics-published-to-the-wrong-cluster.md).
+- [x] Codex `50bd3591` hub Pushgateway + dashboard move, verified by Claude (`b46d5e06`).
+- [ ] Operator: sync, `make install-hub-pushgateway-port-forward`, delete the stray hub `k3dm-vectordb` after an owner check.
+- [x] `make validate-manifests` + `_ensure_kubeconform` (self-installing kubeconform); SC2317 false positive suppressed.
 - [ ] Operator: let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.
 - [x] Operator: Vault copy written 2026-09-30 (`secret/embeddings/gemini` v1; verify prints 39).
 - [x] Operator: `make index-docs` 2026-09-30, 32/32 committed, 1727 in store (key read from Vault).

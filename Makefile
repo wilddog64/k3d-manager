@@ -19,7 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -915,6 +915,17 @@ test-python-unit:
 check-doc-links:
 	@python3 scripts/check-doc-links.py
 
+## Validate Kubernetes manifests, CRDs included, with kubeconform (installed if missing; needs network):
+## make validate-manifests [FILES="path/a.yaml path/b.yaml"]
+KUBECONFORM_CRD_CATALOG := https://raw.githubusercontent.com/datreeio/CRDs-catalog/d373c2da9702bc9509a004db83e57263fe3bdfc1/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+VALIDATE_MANIFESTS_DEFAULT := scripts/etc/argocd/platform-ops/*.yaml scripts/etc/prometheus/rules/*.yaml scripts/etc/grafana/dashboards/*.yaml scripts/etc/argocd/applicationsets/*.yaml
+validate-manifests:
+	@set -euo pipefail; \
+	 SCRIPT_DIR="$(CURDIR)/scripts" bash -c 'source "$$SCRIPT_DIR/lib/system.sh"; _ensure_kubeconform'; \
+	 PATH="$(HOME)/.local/bin:$$PATH" kubeconform -strict -summary \
+	   -schema-location default -schema-location '$(KUBECONFORM_CRD_CATALOG)' \
+	   $(or $(FILES),$(VALIDATE_MANIFESTS_DEFAULT))
+
 ## Embed the docs corpus into the pgvector store; only changed docs are re-embedded
 index-docs:
 	@python3 scripts/index-docs.py $(if $(DRY_RUN),--dry-run,) $(if $(LIMIT),--limit $(LIMIT),)
@@ -1065,6 +1076,7 @@ help:
 	@echo "    make install-alertmanager-auth-proxy   Install Alertmanager auth proxy LaunchAgent"
 	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
 	@echo "    make install-hub-pushgateway-port-forward Install hub Pushgateway port-forward LaunchAgent"
+	@echo "    make validate-manifests         Validate manifests and CRDs with kubeconform (installs it if missing)"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
 	@echo "    make argocd-hermes-token        Re-mint the Hermes ArgoCD token into Keychain (needs a TTY; required after an ArgoCD rebuild)"
 	@echo ""

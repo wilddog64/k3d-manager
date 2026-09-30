@@ -4,6 +4,11 @@
 
 ### Added
 
+- `make validate-manifests [FILES=…]` validates manifests, custom resources included, with kubeconform
+  against the Datree CRD catalog pinned to a commit. It installs kubeconform when it is missing: Homebrew
+  first, else the pinned v0.7.0 release into `~/.local/bin`, verified by SHA-256 (`_ensure_kubeconform`).
+  The default set (platform-ops, Prometheus rules, dashboards, ApplicationSets) validates 72/72, and it
+  rejects the PrometheusRule that `29b7f55c` broke.
 - VectorDB metrics now publish to a dedicated hub Pushgateway on port 19094, with the dashboard
   moved to the hub platform-ops set; app-cluster Pushgateway jobs are unchanged.
 
@@ -30,6 +35,8 @@
 
 ### Fixed
 
+- `scripts/plugins/argocd.sh`: suppress shellcheck's SC2317 false positive on the sourced-or-executed
+  `return 1 2>/dev/null || exit 1` idiom, the only SC2317 finding outside the foundation subtree.
 - Automatic re-indexing no longer hangs on a real-sized corpus (`git cat-file --batch` was fed every
   object ID before any output was read), drift is counted at the indexed ref rather than the working
   tree, and the `VectorDBIndexStale` rule's annotations are restored, which had invalidated the whole

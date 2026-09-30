@@ -1,3 +1,11 @@
+# 2026-09-30 — Codex `50bd3591` verified; kubeconform self-installs; SC2317 resolved
+
+`50bd3591` (vectordb metrics on the hub) is clean: unique scrape jobs, identical dashboard JSON, no federation leak,
+5/5 mutations red. Added the missing test 6 (`b46d5e06`). Operator steps are in the bug doc (sync, `make
+install-hub-pushgateway-port-forward`, check and delete the stray hub `k3dm-vectordb`). New `make validate-manifests`
+plus `_ensure_kubeconform` (brew, else a pinned v0.7.0 release with SHA-256), so Codex can run the kubeconform gate.
+SC2317 at argocd.sh:12 was a false positive on the sourced-or-executed idiom (info level; CI runs -S error); now suppressed with its reason.
+
 # 2026-09-30 — option 1 chosen: vectordb metrics to the hub; Codex brief filed
 
 `docs/bugs/2026-09-30-vectordb-metrics-published-to-the-wrong-cluster.md`. Plan: a hub Pushgateway (ArgoCD

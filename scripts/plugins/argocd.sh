@@ -9,6 +9,7 @@
 PROVIDER_LIB="$SCRIPT_DIR/lib/provider.sh"
 if [[ ! -r "$PROVIDER_LIB" ]]; then
    printf '[argocd] required provider helpers not readable: %s\n' "$PROVIDER_LIB" >&2
+   # shellcheck disable=SC2317  # exit is reached when this file is executed rather than sourced
    return 1 2>/dev/null || exit 1
 fi
 # shellcheck disable=SC1090
