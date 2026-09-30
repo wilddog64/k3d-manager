@@ -2,74 +2,93 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from the operator's Hermes Status dashboard
-**Status:** OPEN — assigned to Codex 2026-09-30 (brief below, option (a))
+**Status:** OPEN — assigned to Codex 2026-09-30 (brief below, **option (b)**, operator's choice)
 **Severity:** Medium — misleading on the dashboard, double-counts other sensors, and blocks self-repair R2
 **Component:** `scripts/lib/hermes/sensors.py` (`node_pressure`), `scripts/lib/hermes/repairs.py`
 
 ## Codex brief
 
-**Goal:** the sensor that today reads "node_pressure" reports only what no other sensor covers, the
-webhook's `Data layer` check, under an honest name, and R2 is no longer blocked by failures that
-belong to other sensors.
+**Goal:** `node_pressure` measures real node health, read straight from the clusters. A new
+`data_layer` sensor takes over the webhook's `Data layer` check. Service failures that belong to
+other sensors no longer degrade either one, so R2 is no longer blocked by them.
 
-**Runs where:** Codex web is fine. Pure Python and docs; all tests are offline.
+**Runs where:** Codex web is fine. Pure Python and docs; all tests are offline with a stubbed runner.
 
-**Decision:** option (a), recommended by Claude and handed off by the operator on 2026-09-30. Rename
-`node_pressure` → `data_layer` and narrow it. Do **not** implement option (b) (real node conditions).
+**Decision:** option (b), chosen by the operator on 2026-09-30. Keep the name `node_pressure`, make it
+real, and add `data_layer`. Because `node_pressure` stops reading the webhook, the webhook-down signal
+(the pager's `WEBHOOK_SENSORS` and `repairs._unknown_webhook`) moves to `eso` + `data_layer`.
 
 **Files to touch (only these):**
-- `scripts/lib/hermes/sensors.py`: rename `node_pressure` → `data_layer`. Keep the signature minus
-  `service_threshold`. Keep the `unknown` paths exactly ("source unavailable" wording, and
-  `_unavailable` when there's no token). Degrade (debounced, `threshold=2` as today) **only** when
-  the `Data layer` service is `ok is False`, with evidence `data layer: <its detail>`. Other failing
-  services no longer affect it. If there's no `Data layer` entry at all → `unknown`
-  ("data layer check absent from webhook payload"). `Data layer` with `ok is None` (the webhook
-  reports "not deployed (namespace shopping-cart-data absent …)", `smoke.py:698`) → `healthy` with that
-  detail as evidence: an app cluster with no data layer is not a fault, and today's code treats it the
-  same way.
-- `bin/k3dm-hermes`: import and registration.
-- `scripts/lib/hermes/pager.py`: `WEBHOOK_SENSORS = ("eso", "data_layer")`.
-- `scripts/lib/hermes/repairs.py`: `_unknown_webhook` and `_r2_precondition` use `data_layer`;
-  `_evidence` r1 → `("eso", "data_layer")`, r2 → `("reachability", "data_layer")`.
-- `scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml`: `target_scopes` key
-  `"data_layer": "shopping-cart-data"` in place of `"node_pressure": "node"`.
-- `docs/guides/hermes.md` (§ sensor 4 and the paging table) and `docs/guides/grafana-dashboards.md:237`:
-  rename, and describe what it now measures.
-- Tests: `scripts/tests/hermes/test_hermes.py`, `test_pager.py`, `test_repairs.py` (update existing
-  `node_pressure` references plus the new tests below).
-- `CHANGELOG.md` (one `### Changed` bullet naming the rename, since dashboards and alerts show the sensor
-  name), `memory-bank/activeContext.md`, `memory-bank/progress.md`, this doc (Status → FIXED with SHA).
+- `scripts/lib/hermes/sensors.py`:
+  - **`node_pressure(run, state, contexts=None, threshold=2)`**: for each context in `contexts`
+    (default: env `K3DM_HERMES_NODE_CONTEXTS`, comma-separated, else `k3d-k3d-cluster,ubuntu-hostinger`)
+    run `["kubectl", "--context", ctx, "get", "nodes", "-o", "json", "--request-timeout=10s"]` through the
+    injected runner (as `kine` does). Parse the JSON from stdout; never pass it as an argument anywhere.
+    A node is a problem when `Ready` is not `True`, or when `MemoryPressure`, `DiskPressure` or
+    `PIDPressure` is `True`. Status:
+    - **degraded** (debounced with `_debounced("node_pressure", …, threshold, state)`, today's semantics)
+      when any readable context has a problem node. Evidence: `"<ctx>/<node> <Condition>"`, first 3,
+      `; `-joined.
+    - **healthy** when every readable context is clean. If some contexts were unreadable, still healthy,
+      but append `"; unreadable: <ctx,…>"` to the evidence.
+    - **unknown** ("node status source unavailable") only when **no** context was readable.
+    - `data = {"problems": [{"context","node","condition"}...], "unreadable": [ctx...]}`.
+  - **`data_layer(fetch, state, provider="", token=None, threshold=2)`**: new. It takes over today's
+    webhook-payload logic, narrowed. `_unavailable("data_layer", WEBHOOK_SERVICE)` without a token;
+    `unknown` "data layer status source unavailable" on fetch failure or an all-`None` payload.
+    Degrade (debounced) **only** when the `Data layer` entry has `ok is False`, with evidence
+    `data layer: <detail>`. `ok is None` ("not deployed (namespace shopping-cart-data absent …)",
+    `smoke.py:698`) → `healthy` with that detail. No `Data layer` entry → `unknown` ("data layer check
+    absent from webhook payload"). Other failing services never affect it.
+- `bin/k3dm-hermes`: `node_pressure(_probe_run, state)`, `data_layer(webhook_fetch, state, token=webhook)`,
+  and the imports.
+- `scripts/lib/hermes/pager.py`: `WEBHOOK_SENSORS = ("eso", "data_layer")`. `node_pressure` then falls
+  under the generic "unknown 30+ min" page. That is intended: Hermes that cannot read any node for
+  30 minutes should page.
+- `scripts/lib/hermes/repairs.py`: `_unknown_webhook` uses `eso` + `data_layer`. `_r2_precondition`
+  requires `node_pressure == "healthy"` **and** `data_layer != "degraded"`. `_evidence`: r1 →
+  `("eso", "data_layer")`, r2 → `("reachability", "node_pressure", "data_layer")`.
+- `scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml`: `target_scopes` keeps
+  `"node_pressure": "node"` and adds `"data_layer": "shopping-cart-data"`.
+- `docs/guides/hermes.md` (sensor list and the paging table) and `docs/guides/grafana-dashboards.md:237`:
+  describe both sensors; the webhook-down signature is now `eso` + `data_layer`.
+- Tests: `scripts/tests/hermes/test_hermes.py`, `test_pager.py`, `test_repairs.py`.
+- `CHANGELOG.md` (`### Changed`: node_pressure now reads node conditions; `### Added`: data_layer),
+  `memory-bank/activeContext.md`, `memory-bank/progress.md`, this doc (Status → FIXED with SHA).
 
-**Tests (offline):**
-1. Webhook payload with `Frontend` and `Hub ESO ExternalSecrets` failing and `Data layer` ok →
-   `data_layer` healthy, even after 3 cycles.
-2. `Data layer` failing → healthy on cycles 1–2, degraded on cycle 3 (today's `threshold=2`
-   semantics; say so in the test name). Evidence starts `data layer:`.
-3. Webhook unreachable → `unknown` with "source unavailable", and `repairs._unknown_webhook` is still
-   true when `eso` is also unknown (R1 path unchanged).
-4. No `Data layer` entry → `unknown`; `Data layer` with `ok: None` ("not deployed") → `healthy`.
-5. R2: one failing port-forward host, `Data layer` ok, **and an unrelated ESO failure** in the
-   webhook list → R2 proposed. (This is the case the bug is about.)
-6. `pager` webhook-down still needs both `eso` and `data_layer` unknown for 2 cycles.
-7. `git grep -n node_pressure -- scripts bin` returns nothing (docs/plans and dated bug docs are history
-   and stay as they are).
+**Tests (offline; build node fixtures from real `kubectl get nodes -o json` shape, including a large
+`status.images` list, over 100 KB per context, not only minimal dicts):**
+1. Webhook list with `Frontend` and `Hub ESO ExternalSecrets` failing, `Data layer` ok, nodes clean →
+   `node_pressure` and `data_layer` both healthy, even after 3 cycles.
+2. One node `DiskPressure=True` → `node_pressure` healthy on cycles 1–2, degraded on cycle 3; evidence
+   `k3d-k3d-cluster/<node> DiskPressure`. One node `Ready=False` → evidence names `NotReady`.
+3. The hub readable and `ubuntu-hostinger` unreadable (runner rc≠0) → healthy, with
+   `unreadable: ubuntu-hostinger` in evidence and `data.unreadable`. Both unreadable → unknown.
+4. `data_layer`: `Data layer` `ok False` → degraded after debounce; `ok None` → healthy; entry absent →
+   unknown; fetch error → unknown "source unavailable".
+5. R2: one failing port-forward host, nodes clean, `Data layer` ok, **and an unrelated ESO failure**
+   → R2 proposed. With `node_pressure` degraded → not proposed.
+6. Webhook down (fetch fails): `eso` and `data_layer` unknown → `_unknown_webhook` true and the pager's
+   2-cycle webhook-down page still fires. `node_pressure` stays healthy in that case (it doesn't use
+   the webhook), and that must not suppress the page.
+7. Pager: `node_pressure` unknown for `SENSOR_UNKNOWN_CYCLES` → the generic unknown page fires.
 
-**Mutations (paste each red run, then green):** restore the "two or more failed services" rule → test 1
-red; make R2 read the old aggregate (any failure → not healthy) → test 5 red; drop the absent-entry check
-→ test 4 red.
+**Mutations (paste each red run, then green):** restore the "two or more failed services" rule in
+either sensor → test 1 red; ignore `PIDPressure`/`DiskPressure` → test 2 red; return unknown when *any*
+context is unreadable → test 3 red; leave `node_pressure` in `WEBHOOK_SENSORS` → test 6 or 7 red.
 
 **Gates (paste output):** `make test-pytest`; `python3 scripts/check-doc-links.py`; `git diff --stat`
 lists only the files above.
 
-**Lessons from earlier reviews (2026-09-29/30):** test with realistic inputs, not only minimal
-fixtures; cover every numbered test above, or say explicitly which one you skipped and why.
+**Lessons from earlier reviews (2026-09-29/30):** test with realistic input sizes, not only minimal
+fixtures; never pass cluster JSON as a command-line argument; cover every numbered test above, or say
+explicitly which one you skipped and why.
 
-**Do not change:** R3–R8, `approve()`, the correlator, `docs/plans/*`, dated bug docs, `scripts/lib/foundation/`.
-Persisted Hermes state keyed by the old name (`debounce.node_pressure`) is simply abandoned; do not
-write a migration.
+**Do not change:** R1's command, R3–R8, `approve()`, the correlator, `hostnet_drift`, `docs/plans/*`,
+dated bug docs, `scripts/lib/foundation/`. Persisted debounce state is not migrated.
 
 **Commit and hand back:** one commit on `k3d-manager-v1.40.0`, message
-`fix(hermes): rename node_pressure to data_layer and stop it double-counting other sensors`.
+`fix(hermes): make node_pressure read node conditions and split out a data_layer sensor`.
 No PR, no merge, no force-push, no `--no-verify`.
 
 ## Evidence (2026-09-29, first day the dashboard had data)
@@ -104,7 +123,7 @@ fails **or any two services fail** (`service_threshold=2`). So:
 `node_pressure`'s *unknown* state as "the webhook is unreachable". That use is legitimate and must
 be kept.
 
-## Fix — proposed, needs the operator's choice
+## Fix — options (operator chose (b) on 2026-09-30)
 
 - **(a) Rename and narrow, preferred.** Rename to `data_layer` and degrade only on the `Data layer`
   check, which is its one signal not covered elsewhere. Keep its `unknown` path, so

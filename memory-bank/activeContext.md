@@ -1,3 +1,10 @@
+# 2026-09-30 — node_pressure handoff switched to option (b)
+
+Operator chose (b): `node_pressure` reads node conditions (Ready, Memory/Disk/PID pressure) via kubectl
+for `k3d-k3d-cluster,ubuntu-hostinger`; new `data_layer` sensor owns the webhook Data layer check. The
+webhook-down signal (pager `WEBHOOK_SENSORS`, `_unknown_webhook`) moves to `eso` + `data_layer`; R2 needs
+`node_pressure` healthy and `data_layer` not degraded. Brief rewritten.
+
 # 2026-09-30 — Codex `72b402ea` verified; one defect fixed; node_pressure handed to Codex
 
 Host-network drift work passed every brief gate (46/46 BATS, 55/55 Hermes, 401/401 pytest, 3 mutations red,
