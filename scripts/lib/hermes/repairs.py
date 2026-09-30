@@ -49,11 +49,11 @@ def _sustained(history, predicate, cycles):
 
 def _unknown_webhook(records):
     eso = _rec(records, "eso")
-    node = _rec(records, "node_pressure")
+    data = _rec(records, "data_layer")
     return (_status(records, "eso") == "unknown" and
-            _status(records, "node_pressure") == "unknown" and
+            _status(records, "data_layer") == "unknown" and
             "source unavailable" in (eso or {}).get("evidence", "").lower() and
-            "source unavailable" in (node or {}).get("evidence", "").lower())
+            "source unavailable" in (data or {}).get("evidence", "").lower())
 
 
 def _r1_precondition(records, _history, state):
@@ -71,7 +71,8 @@ def _r2_precondition(records, _history, _state):
     reachability = _rec(records, "reachability") or {}
     return (_status(records, "reachability") == "degraded" and
             reachability.get("data", {}).get("verdict") == "single-service" and
-            _status(records, "node_pressure") == "healthy" and bool(_r2_label(records)))
+            _status(records, "node_pressure") == "healthy" and
+            _status(records, "data_layer") != "degraded" and bool(_r2_label(records)))
 
 
 def _r3_precondition(records, history, _state):
@@ -210,7 +211,7 @@ def _update_r1_debounce(records, state):
 
 
 def _evidence(records, key):
-    relevant = {"r1": ("eso", "node_pressure"), "r2": ("reachability", "node_pressure"),
+    relevant = {"r1": ("eso", "data_layer"), "r2": ("reachability", "node_pressure", "data_layer"),
                 "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
                 "r6": ("kine",), "r7": ("eso",), "r8": ("hostnet_drift",)}[key]
     return "; ".join(item.get("evidence", "") for item in records

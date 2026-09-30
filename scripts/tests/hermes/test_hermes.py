@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
 from hermes.correlator import Correlator
-from hermes.sensors import (argocd, ci, eso, github_token_expiry, kine, kine_log_signals,
+from hermes.sensors import (argocd, ci, data_layer, eso, github_token_expiry, kine, kine_log_signals,
                             hostnet_drift, node_pressure, reachability, stale_acg_registration,
                             status_checks, token_expiry_advisory)
 
@@ -53,7 +53,7 @@ def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
     monkeypatch.setenv("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")
     calls = []
     runner = lambda *_: calls.append(True) or (0, status_payload("healthy"))
-    for name in ("eso", "argocd", "reachability", "node_pressure", "hostnet_drift", "kine", "ci",
+    for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
                  "alert_delivery"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
@@ -96,7 +96,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: True)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
-    for name in ("eso", "argocd", "reachability", "node_pressure", "hostnet_drift", "kine", "ci",
+    for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
                  "alert_delivery"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
@@ -185,6 +185,21 @@ def health(entries):
 
 def webhook(payload):
     return lambda _url, _headers: payload
+
+
+def nodes_payload(ready="True", pressure=None):
+    conditions = [{"type": "Ready", "status": ready},
+                  {"type": "MemoryPressure", "status": "False"},
+                  {"type": "DiskPressure", "status": "False"},
+                  {"type": "PIDPressure", "status": "False"}]
+    if pressure:
+        for item in conditions:
+            if item["type"] == pressure:
+                item["status"] = "True"
+    node = {"metadata": {"name": "node-0"}, "status": {
+        "conditions": conditions,
+        "images": [{"names": [f"registry.example/image-{idx}:v1"]} for idx in range(2500)]}}
+    return json.dumps({"items": [node]})
 
 
 def assert_normalized(item, sensor):
@@ -299,17 +314,46 @@ def test_reachability_healthy_degraded_unknown_and_debounce():
     assert reachability(lambda *_: (3, "{}"), {})["status"] == "unknown"
 
 
-def test_node_pressure_healthy_degraded_unknown_and_debounce():
-    good = health([{"name": "Data layer", "ok": True, "detail": "4/4 ready"}])
-    bad = health([{"name": "Data layer", "ok": False, "detail": "1 not ready"},
-                  {"name": "ArgoCD", "ok": False, "detail": "HTTP 502"}])
-    healthy = node_pressure(webhook(good), {}, token="x")
-    assert_normalized(healthy, "node_pressure")
-    assert healthy["status"] == "healthy"
+def test_node_pressure_and_data_layer_ignore_unrelated_webhook_failures():
+    runner = lambda _command, _env: (0, nodes_payload())
+    service_payload = health([{"name": "Frontend", "ok": False, "detail": "down"},
+                              {"name": "Hub ESO ExternalSecrets", "ok": False, "detail": "unsynced"},
+                              {"name": "Data layer", "ok": True, "detail": "4/4 ready"}])
+    node_state, data_state = {}, {}
+    assert [node_pressure(runner, node_state)["status"] for _ in range(3)] == ["healthy"] * 3
+    assert [data_layer(webhook(service_payload), data_state, token="x")["status"] for _ in range(3)] == ["healthy"] * 3
+
+
+def test_node_pressure_detects_pressure_and_not_ready_with_realistic_payloads():
+    pressure_runner = lambda _command, _env: (0, nodes_payload(pressure="DiskPressure"))
     state = {}
-    assert [node_pressure(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
-    assert node_pressure(webhook(health([{"name": "Data layer", "ok": None}])), {}, token="x")["status"] == "unknown"
-    assert node_pressure(webhook(good), {}, token="")["status"] == "unknown"
+    assert [node_pressure(pressure_runner, state)["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
+    assert "k3d-k3d-cluster/node-0 DiskPressure" in node_pressure(
+        pressure_runner, {}, contexts=["k3d-k3d-cluster"])["evidence"]
+    not_ready = node_pressure(lambda _command, _env: (0, nodes_payload(ready="False")), {},
+                              contexts=["k3d-k3d-cluster"])
+    assert "NotReady" in not_ready["evidence"]
+
+
+def test_node_pressure_unreadable_contexts_are_partial_or_unknown():
+    payload = nodes_payload()
+    def runner(command, _env):
+        return (0, payload) if command[2] == "k3d-k3d-cluster" else (1, "")
+    partial = node_pressure(runner, {}, contexts=["k3d-k3d-cluster", "ubuntu-hostinger"])
+    assert partial["status"] == "healthy"
+    assert partial["data"]["unreadable"] == ["ubuntu-hostinger"]
+    unknown = node_pressure(lambda _command, _env: (1, ""), {},
+                           contexts=["k3d-k3d-cluster", "ubuntu-hostinger"])
+    assert unknown["status"] == "unknown"
+
+
+def test_data_layer_narrow_tri_state_and_failure_contracts():
+    bad = health([{"name": "Data layer", "ok": False, "detail": "1 not ready"}])
+    state = {}
+    assert [data_layer(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
+    assert data_layer(webhook(health([{"name": "Data layer", "ok": None, "detail": "not deployed"}])), {}, token="x")["status"] == "healthy"
+    assert data_layer(webhook(health([{"name": "Frontend", "ok": True}])), {}, token="x")["status"] == "unknown"
+    assert data_layer(lambda *_: (_ for _ in ()).throw(TimeoutError()), {}, token="x")["status"] == "unknown"
 
 
 def test_hostnet_drift_healthy_degraded_after_two_cycles_and_unknown_on_failure():

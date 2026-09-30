@@ -123,7 +123,7 @@ Sensor status is a three-value enum defined in
 
 ---
 
-## The five sensors
+## The sensors
 
 Each sensor emits one normalized record per cycle and debounces on a sustained signal (a single
 flap does not trip it). All are read-only.
@@ -138,9 +138,13 @@ flap does not trip it). All are read-only.
 3. **`reachability`** — wraps the already-shipped [`bin/public-endpoint-probe --json`](../../bin/public-endpoint-probe)
    (v1.28.0), which discriminates edge-down from single-service failures. Probe "source unavailable"
    exit → `unknown`.
-4. **`node_pressure`** — node / control-plane / data-layer pressure, again via the **webhook** payload
-   (the `Data layer` entry plus aggregate service health), never a direct node probe.
-5. **`ci`** — GitHub Actions / required-check health via the GitHub read API (failed, timed-out,
+4. **`node_pressure`** — reads `Ready`, `MemoryPressure`, `DiskPressure` and `PIDPressure` directly
+   from the hub and app-cluster nodes with read-only `kubectl`; unreadable contexts are reported
+   separately and do not make a readable, clean context degraded.
+5. **`data_layer`** — the webhook's `Data layer` check only; unrelated service failures do not affect
+   it. A sustained `ok: false` degrades it, `ok: null` means not deployed and is healthy, and a
+   missing entry or unavailable webhook is unknown.
+6. **`ci`** — GitHub Actions / required-check health via the GitHub read API (failed, timed-out,
    cancelled, or stuck in-progress runs).
 
 ### `eso` says `unknown` — check the kube context before the credential.
@@ -408,7 +412,7 @@ Slack and Alertmanager cannot: Alertmanager runs inside the cluster, and Hermes 
 
 | Event | Fires when | Recovery text |
 |-------|------------|---------------|
-| Webhook down | `eso` and `node_pressure` both `unknown` for 2 consecutive polls (~10 min) | yes |
+| Webhook down | `eso` and `data_layer` both `unknown` for 2 consecutive polls (~10 min) | yes |
 | Sensor stuck unknown | any other sensor `unknown` for 6 consecutive polls (~30 min); the text carries its evidence, e.g. `argocd ... credential rejected` | yes |
 | Poll job failing | the Hermes poll raises on 2 consecutive runs | yes |
 | Security | once per UTC hour, any **new** open critical/high CodeQL or Dependabot alert (read with `k3dm-hermes-audit-token`) | no |

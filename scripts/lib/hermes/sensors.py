@@ -3,6 +3,7 @@
 import base64
 import binascii
 import json
+import os
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -167,26 +168,75 @@ def status_checks(run, state, threshold=2):
         return record("status_checks", "unknown", "cluster status source unavailable")
 
 
-def node_pressure(fetch, state, provider="", token=None, threshold=2, service_threshold=2):
+def _node_contexts(contexts):
+    if contexts is not None:
+        return [item for item in contexts if item]
+    configured = os.environ.get("K3DM_HERMES_NODE_CONTEXTS", "")
+    values = configured.split(",") if configured else ["k3d-k3d-cluster", "ubuntu-hostinger"]
+    return [item.strip() for item in values if item.strip()]
+
+
+def node_pressure(run, state, contexts=None, threshold=2):
+    """Report node Ready and pressure conditions from each configured cluster."""
+    problems = []
+    unreadable = []
+    for context in _node_contexts(contexts):
+        try:
+            code, output = run(["kubectl", "--context", context, "get", "nodes", "-o", "json",
+                                "--request-timeout=10s"], {})
+            payload = json.loads(output) if code == 0 and output else {}
+            nodes = payload.get("items")
+            if not isinstance(nodes, list):
+                raise ValueError("invalid node payload")
+        except Exception:
+            unreadable.append(context)
+            continue
+        for node in nodes:
+            name = node.get("metadata", {}).get("name", "unknown")
+            conditions = {item.get("type"): item.get("status")
+                          for item in node.get("status", {}).get("conditions", [])
+                          if isinstance(item, dict)}
+            if conditions.get("Ready") != "True":
+                problems.append({"context": context, "node": name, "condition": "NotReady"})
+            for pressure in ("MemoryPressure", "DiskPressure", "PIDPressure"):
+                if conditions.get(pressure) == "True":
+                    problems.append({"context": context, "node": name, "condition": pressure})
+    data = {"problems": problems, "unreadable": unreadable}
+    if not problems and len(unreadable) == len(_node_contexts(contexts)):
+        return record("node_pressure", "unknown", "node status source unavailable", data=data)
+    if problems:
+        status = "degraded" if _debounced("node_pressure", True, threshold, state) else "healthy"
+        evidence = "; ".join(f"{item['context']}/{item['node']} {item['condition']}"
+                             for item in problems[:3])
+    else:
+        _debounced("node_pressure", False, threshold, state)
+        evidence = "all readable nodes healthy"
+        if unreadable:
+            evidence += "; unreadable: " + ", ".join(unreadable)
+        status = "healthy"
+    return record("node_pressure", status, evidence, data=data)
+
+
+def data_layer(fetch, state, provider="", token=None, threshold=2):
+    """Report only the webhook's Data layer check."""
     token = token if token is not None else _keychain_secret(WEBHOOK_SERVICE)
     if not token:
-        return _unavailable("node_pressure", WEBHOOK_SERVICE)
+        return _unavailable("data_layer", WEBHOOK_SERVICE)
     try:
-        payload = _webhook_services(fetch, token, provider)
-        services = payload["services"]
-        if not services or all(item.get("ok") is None for item in services):
-            return record("node_pressure", "unknown", "node status source unavailable")
-        failed = [item for item in services if item.get("ok") is False]
-        data_layer = next((item for item in services if item.get("name") == "Data layer"), None)
-        raw = bool(data_layer and data_layer.get("ok") is False) or len(failed) >= service_threshold
-        if raw:
-            detail = ", ".join(item.get("name", "unknown") for item in failed[:3])
-            status = "degraded" if _debounced("node_pressure", True, threshold, state) else "healthy"
-            return record("node_pressure", status, f"webhook failures: {detail}")
-        _debounced("node_pressure", False, threshold, state)
-        return record("node_pressure", "healthy", "webhook data layer and services healthy")
+        services = _webhook_services(fetch, token, provider)["services"]
+        if not services:
+            return record("data_layer", "unknown", "data layer status source unavailable")
+        check = next((item for item in services if item.get("name") == "Data layer"), None)
+        if check is None:
+            return record("data_layer", "unknown", "data layer check absent from webhook payload")
+        detail = check.get("detail", "Data layer")
+        if check.get("ok") is False:
+            status = "degraded" if _debounced("data_layer", True, threshold, state) else "healthy"
+            return record("data_layer", status, f"data layer: {detail}")
+        _debounced("data_layer", False, threshold, state)
+        return record("data_layer", "healthy", detail)
     except Exception:
-        return record("node_pressure", "unknown", "node status source unavailable")
+        return record("data_layer", "unknown", "data layer status source unavailable")
 
 
 def stale_acg_registration(items, marker="host.k3d.internal"):

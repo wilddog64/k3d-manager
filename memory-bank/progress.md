@@ -1,3 +1,9 @@
+# 2026-09-30 — node_pressure option (b) implementation complete; awaiting commit SHA
+
+- [x] Implemented the option (b) brief: real node conditions plus separate `data_layer`, pager/R1/R2
+  migration, exporter/docs, and tests. Focused Hermes tests 72/72; four mutations red/restored green;
+  no numbered test skipped. Full pytest result and commit SHA are in the completion handoff.
+
 # 2026-09-30 — Codex verification #2 + handoff #3
 
 - [x] Verified `72b402ea` (hostnet drift); argv-size defect fixed in `07c61ff9`.

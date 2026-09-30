@@ -1,3 +1,12 @@
+# 2026-09-30 — node_pressure option (b) implemented; awaiting commit SHA
+
+Implemented the exact option (b) brief: `node_pressure` reads Ready and pressure conditions from
+the hub and app contexts with realistic large JSON fixtures; `data_layer` owns only the webhook
+Data layer check; pager, R1/R2, exporter, docs, and Hermes wiring are updated. All seven numbered
+tests are covered; focused Hermes tests 72/72, `make test-pytest` result is recorded below, and all
+four mutations went red then restored green. No live cluster commands were run. Commit SHA is in
+the completion handoff.
+
 # 2026-09-30 — node_pressure handoff switched to option (b)
 
 Operator chose (b): `node_pressure` reads node conditions (Ready, Memory/Disk/PID pressure) via kubectl

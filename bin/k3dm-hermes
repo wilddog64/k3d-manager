@@ -24,7 +24,7 @@ from hermes.records import timestamp
 from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
-                            hostnet_drift, node_pressure, reachability, stale_acg_registration,
+                            data_layer, hostnet_drift, node_pressure, reachability, stale_acg_registration,
                             status_checks, token_expiry_advisory, vectordb)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
@@ -142,7 +142,8 @@ def _run_cycle(state, status_runner=None):
         eso(webhook_fetch, state, token=webhook),
         argocd(_argocd_run, state, token=argo_token),
         reachability(_probe_run, state),
-        node_pressure(webhook_fetch, state, token=webhook),
+        node_pressure(_probe_run, state),
+        data_layer(webhook_fetch, state, token=webhook),
         hostnet_drift(_probe_run, state),
         kine(_datastore_run, state),
         vectordb(_vectordb_run, state),

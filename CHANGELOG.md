@@ -4,6 +4,7 @@
 
 ### Added
 
+- Hermes now reports a separate `data_layer` sensor for the webhook Data layer check.
 - Hermes R7 proposes the approval-gated `make signing-restore` repair only when the Hub `cosign-public-key` ExternalSecret has been degraded for two cycles.
 - `make signing-restore [CONTEXT=…]` restores the cosign signing key (from the Keychain backup, only
   if Vault lacks it) and the ESO `cosign-verify` grant on one cluster, then resyncs
@@ -16,6 +17,7 @@
 
 ### Fixed
 
+- `node_pressure` now reads node Ready and pressure conditions directly from configured clusters instead of aggregating webhook service failures; R2 no longer double-counts unrelated ESO or service failures.
 - Hub recovery and node-health-watch now detect host-network pods stranded on stale node IPs and recycle only DaemonSet-owned pods after recovery; other owners are logged and skipped.
 - Hub recovery and newly created Hub bring-up now restore existing cosign signing material after Vault/ESO setup; a missing Keychain backup warns and continues without generating or rotating a key.
 - Hermes status publishing works: the `hermes-status` ConfigMap label was spliced into the YAML as

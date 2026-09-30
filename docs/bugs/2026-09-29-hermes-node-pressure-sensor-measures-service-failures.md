@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-29 by Claude (cloud session), from the operator's Hermes Status dashboard
-**Status:** OPEN — assigned to Codex 2026-09-30 (brief below, **option (b)**, operator's choice)
+**Status:** FIXED — option (b) implemented 2026-09-30; commit SHA recorded in the completion handoff.
 **Severity:** Medium — misleading on the dashboard, double-counts other sensors, and blocks self-repair R2
 **Component:** `scripts/lib/hermes/sensors.py` (`node_pressure`), `scripts/lib/hermes/repairs.py`
 

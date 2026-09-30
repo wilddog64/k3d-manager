@@ -18,7 +18,8 @@ def state(history=None):
 def r2_records(verdict="single-service"):
     return [record("reachability", "degraded", data={"verdict": verdict,
                    "failed_hosts": ["prometheus.3ai-talk.org"]}),
-            record("node_pressure", "healthy", "healthy")]
+            record("node_pressure", "healthy", "healthy"),
+            record("data_layer", "healthy", "ok")]
 
 
 def r4_records(conclusion="timed_out"):
@@ -37,7 +38,7 @@ def test_single_degraded_sensor_proposes_nothing():
 
 
 def test_r1_fires_only_when_both_webhook_sensors_unknown_sustained():
-    inputs = [record("eso", "unknown"), record("node_pressure", "unknown")]
+    inputs = [record("eso", "unknown"), record("data_layer", "unknown")]
     current = state()
     assert repairs.propose(inputs, current) == []
     assert [item["key"] for item in repairs.propose(inputs, current)] == ["r1"]
@@ -48,6 +49,14 @@ def test_r2_fires_on_single_service_with_healthy_substrate():
     assert proposals[0]["key"] == "r2"
     assert proposals[0]["command"] == "launchctl kickstart -k com.k3d-manager.prometheus-port-forward"
     assert repairs.propose(r2_records("edge-down"), state()) == []
+
+
+def test_r2_ignores_unrelated_eso_failure_but_not_node_pressure():
+    records = r2_records() + [record("eso", "degraded", "cosign-public-key")]
+    assert repairs.propose(records, state())[0]["key"] == "r2"
+    blocked = [item if item["sensor"] != "node_pressure" else record("node_pressure", "degraded", "DiskPressure")
+               for item in records]
+    assert repairs.propose(blocked, state()) == []
 
 
 def test_r3_fires_on_edge_down_sustained():
