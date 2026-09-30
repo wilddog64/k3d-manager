@@ -1,3 +1,12 @@
+# 2026-09-30 — v1.41.0 spec: agent rigor for Python
+
+`docs/plans/v1.41.0-python-agent-rigor.md` (the 3rd v1.41.0 plan). M1 (lib-foundation): `_agent_audit` learns Python,
+with shebang detection, a test-shrink guard, py_compile of the staged blob, and dangerous calls (shell=True, eval/exec,
+"sudo", sensitive flags); it also reconciles the drifted local `scripts/lib/agent_rigor.sh`, which the hook runs.
+M2: a hermetic conftest guard (blocks real security/kubectl/network; temp-dir stubs allowed). M3: `ruff --select F`
+in CI with a lifecycle.py F821 ignore. M4: `make validate-manifests` in CI. Baseline: 74 Python files (9 extensionless),
+417 tests, 47 pyflakes findings (19 false-positive F821), zero shell=True/eval/sudo.
+
 # 2026-09-30 — Codex `50bd3591` verified; kubeconform self-installs; SC2317 resolved
 
 `50bd3591` (vectordb metrics on the hub) is clean: unique scrape jobs, identical dashboard JSON, no federation leak,

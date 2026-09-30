@@ -1,3 +1,8 @@
+# 2026-09-30 — v1.41.0 planning
+
+- [x] Spec `docs/plans/v1.41.0-python-agent-rigor.md` written (3 of 5 v1.41.0 plans).
+- [ ] Codex briefs A (lib-foundation M1) and B (k3d-manager M1 adoption + M2–M4) once v1.41.0 opens.
+
 # 2026-09-30 — values_branch sensor and R9
 
 - [x] Implemented the amended values_branch/R9 brief, including realistic ArgoCD fixture coverage,
