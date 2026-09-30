@@ -332,3 +332,9 @@ https://github.com/wilddog64/shopping-cart-infra/pull/102 (head `36ea68e9`) on 2
 **Merged 2026-09-30 02:25Z** as `shopping-cart-infra` `f909906` (#102, squash, admin bypass run by
 Codex). Claude checked that `main`'s tree is identical to the verified head `36ea68e9`. Open items:
 the operator confirms `enforce_admins` is back to `true`, then runs the four post-merge checks on hostinger.
+
+**Live on hostinger (operator, 2026-09-30):** `minio-0` 1/1 Running, 0 restarts, image
+`docker.io/bitnamilegacy/minio:2024.11.7-debian-12-r1`. The ownership migration completed: the
+`product-images` bucket and its objects (`bag.jpg`, `cable.jpg`, `charger.jpg`, …) are present under
+`/bitnami/minio/data`, and `find /bitnami/minio/data ! -user 1001` returns nothing. Remaining: a Trivy
+`VulnerabilityReport` for minio, and 2 h without a `KubeJobFailed` email.

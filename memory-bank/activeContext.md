@@ -1,3 +1,8 @@
+# 2026-09-30 — MinIO port live on hostinger; data intact
+
+minio-0 Running on bitnamilegacy, 0 restarts; bucket + images present; no files left un-owned by 1001.
+Waiting on the Trivy report for minio and the 2 h KubeJobFailed-free window.
+
 # 2026-09-30 — shopping-cart-infra #102 merged (`f909906`)
 
 Squash-merged via a one-time admin bypass (Codex). Claude verified that `main`'s tree equals the reviewed
