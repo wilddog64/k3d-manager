@@ -44,3 +44,12 @@ PY
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"targetRevision: 2.14.0"* ]]
 }
+
+@test "only the two vectordb publishers left the app-cluster Pushgateway" {
+  cd "${ROOT}/.."
+  run bash -c "git grep -l 'localhost:9091' -- bin scripts/lib | sort"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "$(printf '%s\n' bin/cluster-up bin/k3dm-test-metrics scripts/lib/webhook/config.py scripts/lib/webhook/smoke.py)" ]
+  run git grep -n 'localhost:9091' -- bin/k3dm-hermes bin/k3dm-vectordb-metrics
+  [ "${status}" -ne 0 ]
+}

@@ -2,7 +2,8 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's "why this still has no data?"
-**Status:** FIXED — implementation and offline gates completed on `k3d-manager-v1.40.0`; commit SHA is
+**Status:** FIXED — Codex `50bd3591`, verified by Claude 2026-09-30 (one missing test added, no code defects).
+Live after the operator steps below.
 reported in the completion handoff below.
 **Severity:** Medium. The dashboard in the Grafana the operator uses is blank, and the vectordb alerts
 evaluate on a Prometheus that never receives the metrics.
@@ -128,3 +129,29 @@ No PR, no merge, no force-push, no `--no-verify`.
    `kubectl --context k3d-k3d-cluster -n monitoring get configmap k3dm-vectordb -o jsonpath='{.metadata.annotations}{"\n"}{.metadata.labels}{"\n"}'`.
    If no ArgoCD Application tracks it, delete it: it has the same dashboard `uid` as the new one.
 4. After one Hermes poll, the hub *k3dm VectorDB Health* shows data.
+5. Optional: clear the stale vectordb series from the app-cluster Pushgateway, which keeps pushed
+   gauges forever: `curl -X DELETE localhost:9091/metrics/job/k3dm-vectordb` and
+   `curl -X DELETE localhost:9091/metrics/job/k3dm-vectordb-index`. Nothing reads them any more.
+
+## Verification (Claude, 2026-09-30)
+
+Verified independently rather than from the report. `50bd3591` touches only the brief's files, and the
+dashboard is a rename.
+- **Hub Prometheus values:** only the scrape job is added (`diff` shows five `+` lines, nothing else
+  moved), and the job names stay unique (`istiod`, `federate-acg`, `pushgateway`). A duplicate
+  `job_name` would have broken the whole hub Prometheus config.
+- **Dashboard:** its JSON is identical to the pre-move file (parsed comparison). The ConfigMap is
+  renamed to `grafana-dashboard-vectordb`, so it cannot collide with the stray hub `k3dm-vectordb`.
+- **No leak back from the app cluster:** the hub's `federate-acg` job only matches
+  `node-exporter|kubelet|kube-state-metrics|istiod|envoy`, so the stale app-cluster vectordb series
+  cannot reach the hub.
+- **Gates:** `make test-pytest` 433/433; BATS green; shellcheck clean; the new dashboard is valid
+  under kubeconform. Codex reported kubeconform as not installed; it now installs itself (below).
+- **Mutations:** all five of the brief's went red (both publishers defaulting to 9091, routing via
+  `K3DM_PUSHGATEWAY_URL`, dropping `honor_labels`, forwarding `9091:9091`, keeping the old dashboard).
+
+**Added:** brief test 6 had no automated test. `hub_pushgateway.bats` now asserts that the
+`localhost:9091` users in `bin/` and `scripts/lib/` are exactly `bin/cluster-up`,
+`bin/k3dm-test-metrics`, `scripts/lib/webhook/config.py` and `scripts/lib/webhook/smoke.py`, and that
+neither vectordb publisher mentions it. Reverting Hermes to 9091 fails it. Also fixed a missing blank
+line around `_pushgateway_url()` in `bin/k3dm-vectordb-metrics`, and added operator step 5.

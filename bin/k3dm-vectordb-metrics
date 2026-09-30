@@ -10,10 +10,12 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-def _pushgateway_url():
-    return os.environ.get("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
+
+
+def _pushgateway_url():
+    return os.environ.get("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
 
 
 def _status():
