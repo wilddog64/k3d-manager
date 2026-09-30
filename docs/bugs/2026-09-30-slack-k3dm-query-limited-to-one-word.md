@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's question "is this command available
 on Slack?"
-**Status:** FIXED in the commit that adds this doc (Claude). Live after `make deploy-worker`.
+**Status:** FIXED in `2e0f4bc2` (Claude) and verified live 2026-09-30: after `make deploy-worker`, `/k3dm find-similar-docs Q=mac scheduler cannot find tools` returned the launchd PATH bug at #1.
 **Severity:** Medium. Semantic search needs a sentence; one word reduces it to keyword lookup.
 
 ## Evidence
