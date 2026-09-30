@@ -4,7 +4,8 @@
 - [x] Operator: Vault copy written 2026-09-30 (`secret/embeddings/gemini` v1; verify prints 39).
 - [x] Operator: `make index-docs` 2026-09-30, 32/32 committed, 1727 in store (key read from Vault).
 - [x] Slack `/k3dm find-similar-docs` multi-word `Q` fixed in the relay parser.
-- [ ] Operator: `make deploy-worker`, then `/k3dm find-similar-docs Q=mac scheduler cannot find tools`.
+- [x] Operator deployed the relay 2026-09-30 (from a worktree); a multi-word `Q` is now accepted in Slack.
+- [ ] Confirm the job result posts ranked docs (it runs under launchd, so the key comes from Vault).
 - [x] Retrieval baseline 2026-09-30: 5/5 paraphrase queries in the top 5 (4 at rank 1), noise floor 0.55–0.57; see activeContext.
 
 # 2026-09-30 — MinIO registry bug closed
