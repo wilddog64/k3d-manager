@@ -1,3 +1,10 @@
+# 2026-09-30 — opened shopping-cart-infra PR #102 (MinIO port)
+
+Codex pushed `fix/minio-bitnamilegacy-registry` (`36ea68e9`, verified) but never opened the PR. Claude
+attached shopping-cart-infra with push access and opened
+https://github.com/wilddog64/shopping-cart-infra/pull/102. The operator reviews and merges, then runs the
+post-merge checks listed in the PR.
+
 # 2026-09-30 — shopping-cart-infra `36ea68e9` (MinIO port) re-verified: ready to merge
 
 Both requested changes landed. Committed init script run under busybox 1.36.1 with CHOWN+DAC_READ_SEARCH:

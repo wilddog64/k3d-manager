@@ -325,3 +325,6 @@ Proof, run by Claude: the **committed** script extracted from the manifest, run 
 CI gates at CI's pinned versions: yamllint clean; kubeconform 6 valid / 0 invalid; every kustomize
 overlay builds; no `quay.io/minio` references. **Ready to merge.** After merge, run the operator checks
 in the completion brief above.
+
+**PR:** Codex pushed the branch but did not open a PR. Claude opened
+https://github.com/wilddog64/shopping-cart-infra/pull/102 (head `36ea68e9`) on 2026-09-30 for the operator to review and merge.
