@@ -4,6 +4,45 @@ Implemented the tracked-ref Hermes refresh, bounded backlog draining, quota paus
 `k3dm-vectordb-index` gauges, alerts and dashboard ingestion row. Focused tests and the rules/dashboard
 contract pass; final commit SHA is reported in the completion handoff.
 
+# 2026-09-30 — Slack `/k3dm find-similar-docs` accepted only one-word queries; fixed
+
+The relay's `parseK3dm` split on whitespace and required every token to be KEY=value, so any sentence
+was a usage error. `Q` is now free text up to the next KEY=value or `confirm`. The webhook's character
+check is unchanged. Relay tests 31/31; 3 mutations red. Doc:
+`docs/bugs/2026-09-30-slack-k3dm-query-limited-to-one-word.md`. Needs `make deploy-worker` (operator).
+
+# 2026-09-30 — retrieval baseline: 5 paraphrase queries + 1 negative control (operator ran, Claude scored)
+
+Queries avoided every title word (for example "object storage" instead of MinIO, "mac scheduler" instead of
+launchd). Result: 5/5 in the top 5; ranks 1,1,1,1,2.
+
+| Expected doc | Rank | Score | Margin over the next doc |
+|---|---|---|---|
+| hermes-status-publish-fails-silently | 1 | 0.726 | +0.001 |
+| diagnostics-logs-output-unredacted | 1 | 0.722 | 0.000 (tie) |
+| minio-quay-registry-gated | 1 | 0.757 | +0.023 |
+| launchd-path-omits-local-bin | 1 | 0.720 | +0.023 |
+| hostnetwork-pods-keep-stale-ip | 2 | 0.701 | tied with #1 |
+
+Negative control ("best recipe for sourdough bread"): 0.568–0.550. Scores fall into three bands:
+noise 0.55–0.57, related prior art 0.67–0.73, the expected doc 0.70–0.76. A cutoff near 0.65 would
+separate "nothing related" from "related", but no cutoff separates the right doc from its neighbours.
+The neighbours were genuinely related (other launchd PATH bugs, other registry-auth bugs), which is
+what dedup wants. Recall is good; top-1 precision rests on margins of 0.000–0.023. This confirms the
+09-27 finding: the weakness is ranking, not recall. Still no threshold. This is 6 data points, not an eval.
+Archive docs are indexed (one appeared under `docs/bugs/archive/`).
+
+# 2026-09-30 — vector store caught up (operator)
+
+`make index-docs` read the key from Vault and committed 32/32: 1727 docs, 32 embedded, 0 pruned, 1727 in
+store. Drift is 0 until the next doc lands. Automatic refresh is still Codex's brief.
+
+# 2026-09-30 — embeddings Vault copy written (operator)
+
+`secret/embeddings/gemini` version 1, created 2026-09-30T03:02:08Z. The verify command printed 39, which
+is correct: `vault kv get -field` adds no newline when piped. The guide said 40; corrected. The durable
+slot is now filled. Next: `make index-docs` to catch up the 32 pending docs.
+
 # 2026-09-30 — index-docs catch-up blocked: no durable embeddings credential
 
 Operator's `make index-docs` failed: 0 of 32 committed. The env var is unset, `k3dm-embeddings-api-key` is

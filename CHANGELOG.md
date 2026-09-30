@@ -24,6 +24,9 @@
 
 ### Fixed
 
+- `/k3dm find-similar-docs Q=…` from Slack accepts a sentence: after `Q=`, words run to the next
+  `KEY=value` or `confirm` (`/k3dm find-similar-docs Q=mac scheduler cannot find tools K=10`). The
+  relay rejected every query longer than one word. Character validation is unchanged in the webhook.
 - `node_pressure` now reads node Ready and pressure conditions directly from configured clusters instead of aggregating webhook service failures; R2 no longer double-counts unrelated ESO or service failures.
 - Hub recovery and node-health-watch now detect host-network pods stranded on stale node IPs and recycle only DaemonSet-owned pods after recovery; other owners are logged and skipped.
 - Hub recovery and newly created Hub bring-up now restore existing cosign signing material after Vault/ESO setup; a missing Keychain backup warns and continues without generating or rotating a key.

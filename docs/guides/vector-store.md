@@ -246,7 +246,9 @@ Confirm it landed without printing it:
 kubectl --context k3d-k3d-cluster -n secrets get secret vault-root -o jsonpath='{.data.root_token}' | base64 --decode | kubectl --context k3d-k3d-cluster -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=api_key embeddings/gemini | wc -c'
 ```
 
-That prints a character count. Expect 40 for a standard `AIza…` key (39 characters plus a newline).
+That prints a character count. Expect 39 for a standard `AIza…` key: `vault kv get -field` writes the
+raw value with no trailing newline when its output is piped (confirmed live 2026-09-30). The keychain
+check above prints 40 because `security -w` does add one.
 
 Overrides, for a non-default hub: `K3DM_VAULT_CONTEXT`, `K3DM_VAULT_NAMESPACE`, `K3DM_VAULT_POD`,
 `K3DM_EMBEDDINGS_VAULT_PATH`. The path is validated against a plain-KV-path pattern and passed to

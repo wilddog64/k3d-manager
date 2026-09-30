@@ -47,7 +47,9 @@ make find-similar-docs Q="kine compaction stopped" K=10   # more results
 scripts/find-similar-docs.py --json "grafana panel is blank"  # machine-readable
 ```
 
-From Slack, the same search is `/k3dm find-similar-docs Q=...` (reader role). `Q` is restricted to
+From Slack, the same search is `/k3dm find-similar-docs Q=<a sentence> [K=n]` (reader role), with
+no quotes: `Q` runs to the next `KEY=value` or `confirm`, for example
+`/k3dm find-similar-docs Q=mac scheduler cannot find tools K=10`. `Q` is restricted to
 letters, digits, spaces and `._,:/?!-`: the value reaches a Makefile recipe where `$(Q)` expands
 into a shell command line, so every shell metacharacter is rejected rather than escaped.
 

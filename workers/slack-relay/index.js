@@ -90,6 +90,7 @@ function parseClusterDiagnose(text) {
 }
 
 const K3DM_USAGE = 'Usage: /k3dm <target> [KEY=value …] [confirm] — `/k3dm help` lists targets for your role'
+const K3DM_FREE_TEXT_KEYS = new Set(['Q'])
 
 function parseK3dm(text) {
   const parts = (text || '').trim().split(/\s+/).filter(Boolean)
@@ -97,11 +98,17 @@ function parseK3dm(text) {
   if (!/^[a-z][a-z0-9-]{0,40}$/.test(target)) return { error: K3DM_USAGE }
   const args = {}
   let confirm = false
+  let freeKey = null
   for (const part of parts) {
-    if (part.toLowerCase() === 'confirm') { confirm = true; continue }
+    if (part.toLowerCase() === 'confirm') { confirm = true; freeKey = null; continue }
     const m = /^([A-Z][A-Z_]{0,31})=(\S{1,256})$/.exec(part)
-    if (!m) return { error: K3DM_USAGE }
-    args[m[1]] = m[2]
+    if (m) {
+      args[m[1]] = m[2]
+      freeKey = K3DM_FREE_TEXT_KEYS.has(m[1]) ? m[1] : null
+      continue
+    }
+    if (!freeKey || args[freeKey].length + 1 + part.length > 256) return { error: K3DM_USAGE }
+    args[freeKey] += ' ' + part
   }
   return { payload: { target, args, confirm } }
 }
