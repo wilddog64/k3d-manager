@@ -328,3 +328,7 @@ in the completion brief above.
 
 **PR:** Codex pushed the branch but did not open a PR. Claude opened
 https://github.com/wilddog64/shopping-cart-infra/pull/102 (head `36ea68e9`) on 2026-09-30 for the operator to review and merge.
+
+**Merged 2026-09-30 02:25Z** as `shopping-cart-infra` `f909906` (#102, squash, admin bypass run by
+Codex). Claude checked that `main`'s tree is identical to the verified head `36ea68e9`. Open items:
+the operator confirms `enforce_admins` is back to `true`, then runs the four post-merge checks on hostinger.

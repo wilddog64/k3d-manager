@@ -1,3 +1,9 @@
+# 2026-09-30 — shopping-cart-infra #102 merged (`f909906`)
+
+Squash-merged via a one-time admin bypass (Codex). Claude verified that `main`'s tree equals the reviewed
+`36ea68e9`. Pending: operator confirms `enforce_admins` is `true` again, then the hostinger checks
+(minio-0 Running, product images, a Trivy report for minio, no KubeJobFailed for 2 h).
+
 # 2026-09-30 — opened shopping-cart-infra PR #102 (MinIO port)
 
 Codex pushed `fix/minio-bitnamilegacy-registry` (`36ea68e9`, verified) but never opened the PR. Claude

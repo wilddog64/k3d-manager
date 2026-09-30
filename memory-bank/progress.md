@@ -1,3 +1,8 @@
+# 2026-09-30 — MinIO port merged
+
+- [x] #102 merged as `f909906`; tree identical to the reviewed head.
+- [ ] Operator: `enforce_admins` back to true; hostinger post-merge checks.
+
 # 2026-09-30 — MinIO port ready
 
 - [x] `36ea68e9` verified (busybox capability test + CI gates).
