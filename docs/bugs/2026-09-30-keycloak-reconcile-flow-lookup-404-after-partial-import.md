@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0` (tracking); **work repo:** `shopping-cart-infra`
 **Filed:** 2026-09-30 by Claude (cloud session), from `KubeJobFailed` (hub, `identity`)
-**Status:** FIX READY — Codex `b11f1a2` ([wilddog64/shopping-cart-infra#103](https://github.com/wilddog64/shopping-cart-infra/pull/103)), verified by Claude 2026-09-30. Awaiting merge and live check.
+**Status:** MERGED 2026-09-30 as shopping-cart-infra `98da0c5` ([#103](https://github.com/wilddog64/shopping-cart-infra/pull/103)); tree identical to the verified `b11f1a2`; CI green on the PR and on main. Live check pending (hook passes, `KubeJobFailed` resolves).
 **Target files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats` (amended 2026-09-30 at plan review: the stub harness is kept as a test, not thrown away)
 **Severity:** Medium. The flow itself and logins are fine; every `shopping-cart-identity` sync
 fails its PostSync hook, and `KubeJobFailed` stays firing.
