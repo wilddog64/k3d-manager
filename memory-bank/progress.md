@@ -1,3 +1,8 @@
+# 2026-09-30 — MinIO registry bug closed
+
+- [x] Live: minio Running on bitnamilegacy, data intact, Trivy reports present, protection restored.
+- [ ] Follow-up (owner): replace the sunset bitnamilegacy MinIO image (12 CRITICAL / 80 HIGH).
+
 # 2026-09-30 — MinIO port merged
 
 - [x] #102 merged as `f909906`; tree identical to the reviewed head.

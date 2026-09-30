@@ -1,3 +1,9 @@
+# 2026-09-30 — MinIO registry bug CLOSED (verified live)
+
+Trivy VulnerabilityReports for minio exist in shopping-cart-data after the merge, so the hourly scan
+failure (KubeJobFailed on hostinger) is gone. Follow-up: bitnamilegacy/minio shows 12 CRITICAL / 80 HIGH
+(the same release as before, in a sunset repo); a move to a maintained build is the owner's call.
+
 # 2026-09-30 — MinIO port live on hostinger; data intact
 
 minio-0 Running on bitnamilegacy, 0 restarts; bucket + images present; no files left un-owned by 1001.

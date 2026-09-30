@@ -4,6 +4,7 @@
 **Work repo:** `shopping-cart-infra` (NOT k3d-manager)
 **Branch (work repo):** `fix/minio-bitnamilegacy-registry` — create from `origin/main`
 **Severity:** blocks `make up CLUSTER_PROVIDER=k3s-aws` at Step 10b on every fresh cluster
+**Status:** FIXED and verified live 2026-09-30 — `shopping-cart-infra` `f909906` (#102). Follow-up: CVEs in the sunset image, see the end of this doc.
 
 ## Symptom
 
@@ -342,3 +343,16 @@ the operator confirms `enforce_admins` is back to `true`, then runs the four pos
 **Branch protection after the bypass (Codex report, 2026-09-30):** `enforce_admins: true`, required
 approvals 1, dismiss stale reviews true, code-owner reviews false. **Confirmed by the operator** with
 `gh api repos/wilddog64/shopping-cart-infra/branches/main/protection`: `enforce_admins: true`, approvals 1.
+
+## Closed 2026-09-30 — fixed and verified live
+
+Trivy now scans MinIO successfully on hostinger: `shopping-cart-data/statefulset-minio-minio`
+(`bitnamilegacy/minio:2024.11.7-debian-12-r1`) and `statefulset-minio-fix-data-ownership`
+(`busybox:1.36`, 0 findings), both created after the 02:25Z merge. The hourly failing scan Job, the
+source of the `KubeJobFailed on ubuntu-hostinger` emails, is gone.
+
+**Follow-up (security debt, not a regression):** the scan reports **12 CRITICAL / 80 HIGH** findings in
+`bitnamilegacy/minio:2024.11.7-debian-12-r1`. That is the same MinIO release as before, in a sunset
+repository that gets no patches; the findings were invisible only because the scan had been failing.
+The durable fix is still the one in "Follow-up" above: move to a maintained MinIO build (or mirror a
+patched one into `ghcr.io/wilddog64/`). Owner's call; file it as its own bug when scheduled.
