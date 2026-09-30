@@ -31,7 +31,7 @@
 - [x] Codex `4057069` flowId fix verified by Claude; shopping-cart-infra PR #104 open, CI green.
 - [x] #104 merged as 930a82d; flowId fix confirmed live; the hook now fails at PUT authentication/executions/{id}.
 - [x] Codex `b87bd8d` brief 3 verified by Claude; shopping-cart-infra PR #105 open, CI green.
-- [ ] Operator: merge #105, hard refresh + sync; expect Succeeded, no Job, KubeJobFailed resolved.
+- [x] Keycloak reconcile hook FIXED live 2026-09-30 at e41f2ad (#105): Succeeded, no Job. Closes the 09-15 browser-flow live check. Watch for the KubeJobFailed RESOLVED email.
 - [x] Hub vectordb metrics live 2026-09-30 (ApplicationSets reapplied, forward 19094 healthy, rows=1732 pushed; the stray copy was pruned by ArgoCD).
 - [x] `make validate-manifests` + `_ensure_kubeconform` (self-installing kubeconform); SC2317 false positive suppressed.
 - [ ] Operator: let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.

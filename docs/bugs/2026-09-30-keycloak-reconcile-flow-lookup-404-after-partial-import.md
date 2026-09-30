@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0` (tracking); **work repo:** `shopping-cart-infra`
 **Filed:** 2026-09-30 by Claude (cloud session), from `KubeJobFailed` (hub, `identity`)
-**Status:** FIX READY — Codex `b87bd8d` ([wilddog64/shopping-cart-infra#105](https://github.com/wilddog64/shopping-cart-infra/pull/105)), verified by Claude 2026-09-30. Awaiting merge, then a hard refresh and one sync. #103 and #104 stay.
+**Status:** FIXED and verified live 2026-09-30 — shopping-cart-infra #103 (`98da0c5`), #104 (`930a82d`) and #105 (`e41f2ad`). The hook synced at `e41f2ad`: phase `Succeeded`, and no reconcile Job left (HookSucceeded deleted it).
 **Target files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats` (amended 2026-09-30 at plan review: the stub harness is kept as a test, not thrown away)
 **Severity:** Medium. The flow itself and logins are fine; every `shopping-cart-identity` sync
 fails its PostSync hook, and `KubeJobFailed` stays firing.
@@ -295,3 +295,18 @@ with the right parents, each on one line.
 - **Gates:** `bash -n` and shellcheck clean on the rendered script; yamllint (CI config) and
   kubeconform clean. PR CI: YAML Lint, Kubeconform, Kustomize Build and GitGuardian pass; the Copilot
   review was still running.
+
+## Live result (2026-09-30)
+
+After #105 merged as `e41f2ad`: a hard refresh, then a sync. `syncResult.revisions` = `e41f2ad…` (both
+sources), phase **Succeeded**, and `kubectl -n identity get jobs` → "No resources found". The hook ran to
+completion, and `HookSucceeded` deleted the Job. That means `reconcile_browser_flow`, the realm
+`browserFlow` activation and the LDAP section all ran live for the first time since #98.
+
+Three fixes were needed, each exposed only by the previous one:
+1. #103: a readiness wait. Harmless; it turned out not to be the cause.
+2. #104: `flowId` on the two sub-flow updates.
+3. #105: requirement updates go through the parent flow.
+
+The recurring lesson: test stubs must model the server's rejections. #104's stub accepted every write,
+so it could not see the third failure.

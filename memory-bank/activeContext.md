@@ -1,3 +1,8 @@
+# 2026-09-30 — Keycloak reconcile hook fixed live
+
+#105 merged as e41f2ad; after a hard refresh and sync: Succeeded, no Job left. The reconcile + LDAP section ran fully for the first time since #98.
+Chain: #103 (wait, harmless), #104 (flowId), #105 (parent-flow requirement updates). The 09-15 live check is closed.
+
 # 2026-09-30 — Codex `b87bd8d` (keycloak brief 3) verified; shopping-cart-infra #105 open
 
 3 calls moved to parent-flow updates; 5 bodies valid JSON; the stub reproduces the live failure on the pre-fix hook; 6/6 BATS; each revert red; CI green.
