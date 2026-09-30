@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 from hermes.correlator import Correlator
 from hermes.sensors import (argocd, ci, data_layer, eso, github_token_expiry, kine, kine_log_signals,
                             hostnet_drift, node_pressure, reachability, stale_acg_registration,
-                            status_checks, token_expiry_advisory)
+                            status_checks, token_expiry_advisory, values_branch)
 
 ROOT = Path(__file__).resolve().parents[3]
 loader = importlib.machinery.SourceFileLoader("k3dm_hermes_status", str(ROOT / "bin" / "k3dm-hermes"))
@@ -49,6 +49,90 @@ def test_status_checks_handles_invalid_empty_and_timeout_output_as_unknown():
     assert status_checks(lambda *_: (_ for _ in ()).throw(TimeoutError()), {})["status"] == "unknown"
 
 
+def _values_apps(revision="k3d-manager-v1.40.0", stale=0):
+    apps = []
+    for number in range(45):
+        source = {"repoURL": "https://github.com/wilddog64/k3d-manager",
+                  "targetRevision": "k3d-manager-v1.39.0" if number < stale else revision}
+        if number in (2, 4):
+            source["targetRevision"] = "HEAD"
+        if number == 2:
+            spec = {"sources": [source, {"repoURL": "https://charts.example.invalid/helm", "targetRevision": "HEAD"}]}
+        elif number == 3:
+            spec = {"source": {"repoURL": "https://charts.example.invalid/helm", "targetRevision": "1.2.3"}}
+        else:
+            spec = {"source": source} if number % 2 else {"sources": [source]}
+        apps.append({"metadata": {"name": f"app-{number}"}, "spec": spec,
+                     "status": {"health": {"status": "Healthy"}, "sync": {"status": "Synced"},
+                                "operationState": {"phase": "Succeeded"}, "padding": "x" * 6000}})
+    return apps
+
+
+def test_values_branch_realistic_fixture_ignores_head_and_other_repos():
+    apps = _values_apps()
+    output = json.dumps(apps)
+    assert len(output) > 200_000
+    calls = []
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                           lambda argv, _env: calls.append(argv) or (0, output), {}, token="x")
+    assert result["status"] == "healthy"
+    assert result["data"]["checked"] == 42
+    assert result["data"]["tracking_head"] == 2
+    assert calls == [["argocd", "app", "list", "-o", "json", "--grpc-web"]]
+
+
+def test_values_branch_debounces_lag_then_stale_and_clears():
+    output = json.dumps(_values_apps(stale=2))
+    current = {}
+    run = lambda *_: (0, output)
+    assert [values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), run, current, token="x")["status"]
+            for _ in range(2)] == ["healthy", "healthy"]
+    third = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), run, current, token="x")
+    assert third["status"] == "degraded" and "app-0@k3d-manager-v1.39.0" in third["evidence"]
+    clean = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                          lambda *_: (0, json.dumps(_values_apps())), current, token="x")
+    assert clean["status"] == "healthy"
+
+
+def test_values_branch_nonrelease_is_skipped_and_never_pages(monkeypatch):
+    from hermes import pager
+    calls = []
+    state = {}
+    def argo(*args):
+        calls.append(args)
+        return 0, "[]"
+    for _ in range(6):
+        item = values_branch(lambda *_: (0, "main"), argo, state, token="x")
+        assert item["status"] == "healthy" and item["data"]["skipped"] is True
+        assert pager.health_events([item], {}) == []
+    assert calls == []
+
+
+def test_values_branch_zero_refs_and_real_failures_are_unknown():
+    no_refs = json.dumps([{"metadata": {"name": "head"}, "spec": {"source": {
+        "repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "HEAD"}}}])
+    item = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                         lambda *_: (0, no_refs), {}, token="x")
+    assert item["status"] == "unknown" and "no k3d-manager" in item["evidence"]
+    failed = values_branch(lambda *_: (1, "git failure"), lambda *_: (0, "[]"), {}, token="x")
+    assert failed["status"] == "unknown"
+
+
+def test_values_branch_resolution_order_and_argocd_failures(monkeypatch):
+    monkeypatch.setenv("K3DM_RELEASE_BRANCH", "k3d-manager-v1.39.0")
+    assert k3dm_hermes is not None
+    from hermes.sensors import _values_branch_expected
+    assert _values_branch_expected(lambda *_: (0, "main"), "k3d-manager-v1.40.0")[0] == "k3d-manager-v1.40.0"
+    assert _values_branch_expected(lambda *_: (0, "main"))[0] == "k3d-manager-v1.39.0"
+    bad_json = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                             lambda *_: (0, "not json"), {}, token="x")
+    assert bad_json["status"] == "unknown"
+    rejected = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                             lambda *_: (1, "Unauthenticated"), {}, token="x")
+    assert "re-mint" in rejected["evidence"]
+    assert values_branch(lambda *_: (0, "main"), lambda *_: (0, "[]"), {})["status"] == "unknown"
+
+
 def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
     monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "1")
     monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_: "")
@@ -59,6 +143,7 @@ def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
                  "alert_delivery"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
+    monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     state = {}
     assert k3dm_hermes._status_due(state, 1_000)
     records, _event = k3dm_hermes._run_cycle(state, runner)
@@ -100,6 +185,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
+    monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
                  "alert_delivery"):
         monkeypatch.setattr(k3dm_hermes, name,

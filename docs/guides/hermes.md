@@ -49,6 +49,7 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 | R3 | Refresh Hostinger edge access | all public hosts fail for two cycles | `scripts/k3d-manager refresh_access_layer` (the public wrapper for `_hostinger_refresh_access_layer`; never `make refresh`) |
 | R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using the `k3dm-hermes-gh-token` PAT in `GH_TOKEN` |
 | R5 | Quarantine stale ACG reconciliation | sustained Kine pressure, `state.db` >= 8 GiB, and the known stale `host.k3d.internal` registration | pause hub ArgoCD application-controller (opt-in automatic circuit breaker only) |
+| R9 | Reapply ApplicationSets on the release branch | `values_branch` degraded with stale references | `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` with `K3D_MANAGER_BRANCH` pinned |
 
 ## Slack approvals (opt-in)
 

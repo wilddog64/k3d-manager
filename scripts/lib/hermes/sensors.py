@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import time
+import re
 from datetime import datetime, timezone
 
 from hermes.records import record
@@ -15,6 +16,7 @@ WEBHOOK_SERVICE = "k3dm-webhook-token"
 ARGOCD_SERVICE = "k3dm-hermes-argocd-token"
 GITHUB_SERVICE = "k3dm-hermes-gh-token"
 TERMINAL_OPERATION_FAILURES = ("Error", "Failed")
+RELEASE_BRANCH = re.compile(r"\Ak3d-manager-v\d+\.\d+\.\d+\Z")
 
 
 def _keychain_secret(service):
@@ -106,6 +108,79 @@ def argocd(run, state, token=None, threshold=3, server="argocd.3ai-talk.org"):
         return record("argocd", "healthy", f"{len(apps)} applications healthy")
     except Exception:
         return record("argocd", "unknown", "ArgoCD status source unavailable")
+
+
+def _values_branch_expected(run, expected=None):
+    if expected:
+        return expected, None
+    configured = os.environ.get("K3DM_RELEASE_BRANCH", "").strip()
+    if configured:
+        return configured, None
+    try:
+        code, output = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], {})
+        if code != 0 or not output.strip():
+            return None, "checkout branch could not be determined"
+        return output.strip(), None
+    except Exception:
+        return None, "checkout branch could not be determined"
+
+
+def values_branch(run, argocd_run, state, token=None, expected=None, threshold=3,
+                  server="argocd.3ai-talk.org"):
+    """Check k3d-manager Application sources against the checked-out release branch."""
+    token = token if token is not None else _keychain_secret(ARGOCD_SERVICE)
+    if not token:
+        return _unavailable("values_branch", ARGOCD_SERVICE)
+    branch, error = _values_branch_expected(run, expected)
+    if error:
+        return record("values_branch", "unknown", error)
+    if not RELEASE_BRANCH.fullmatch(branch):
+        return record("values_branch", "healthy",
+                      f"skipped: checkout on {branch}, not a release branch",
+                      data={"expected": branch, "skipped": True})
+    try:
+        code, output = argocd_run(["argocd", "app", "list", "-o", "json", "--grpc-web"],
+                                  {"ARGOCD_AUTH_TOKEN": token, "ARGOCD_SERVER": server})
+        if code != 0:
+            if "Unauthenticated" in (output or ""):
+                return record("values_branch", "unknown",
+                              f"ArgoCD status source unavailable: credential rejected; re-mint {ARGOCD_SERVICE}")
+            return record("values_branch", "unknown", "ArgoCD status source unavailable")
+        apps = json.loads(output) if output else None
+        if not isinstance(apps, list):
+            raise ValueError("invalid ArgoCD response")
+        stale = []
+        checked = 0
+        tracking_head = 0
+        for app in apps:
+            spec = app.get("spec", {}) if isinstance(app, dict) else {}
+            sources = spec.get("sources") or ([spec["source"]] if "source" in spec else [])
+            for source in sources:
+                if not isinstance(source, dict) or "github.com/wilddog64/k3d-manager" not in source.get("repoURL", ""):
+                    continue
+                revision = source.get("targetRevision", "")
+                if revision == "HEAD":
+                    tracking_head += 1
+                    continue
+                checked += 1
+                if revision != branch:
+                    name = app.get("name") or app.get("metadata", {}).get("name", "unnamed")
+                    stale.append({"app": name, "revision": revision})
+        data = {"expected": branch, "stale": stale, "checked": checked,
+                "tracking_head": tracking_head}
+        if checked == 0:
+            return record("values_branch", "unknown", "no k3d-manager references found", data=data)
+        if stale:
+            status = "degraded" if _debounced("values_branch", True, max(1, threshold - 1), state) else "healthy"
+            names = ", ".join(f"{item['app']}@{item['revision']}" for item in stale[:3])
+            if len(stale) > 3:
+                names += f" (+{len(stale) - 3} more)"
+            return record("values_branch", status,
+                          f"{len(stale)} apps not on {branch}: {names}", data=data)
+        _debounced("values_branch", False, threshold, state)
+        return record("values_branch", "healthy", f"{checked} references on {branch}", data=data)
+    except Exception:
+        return record("values_branch", "unknown", "ArgoCD status source unavailable")
 
 
 def reachability(run, state, threshold=2):

@@ -3,7 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's "I don't see any" (the
 *k3dm Alertmanager Delivery* dashboard)
-**Status:** OPEN — assigned to Codex 2026-09-30 (brief below; amended 2026-09-30 after plan review: the non-release checkout is healthy/skipped, not unknown)
+**Status:** FIXED — committed; SHA reported in the completion handoff (brief below; amended 2026-09-30 after plan review: the non-release checkout is healthy/skipped, not unknown)
 **Classification:** Bugfix in `docs/bugs/` (v1.40.0 already has five plan docs).
 **Severity:** Medium. Nothing fails; config merged and green in CI never reaches a cluster.
 **Related:** `2026-07-24-make-status-values-branch-drift-wiring.md` (the same check in `make status`,

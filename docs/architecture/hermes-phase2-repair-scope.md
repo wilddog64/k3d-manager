@@ -71,6 +71,7 @@ repo and in the operator's runbook memory.
 | R4 | **Re-run a transient-failed required CI check** | a required check failed with a transient/infra signature (not a test/compile failure) on a run Hermes can read | `gh run rerun <run-id> --failed` (read-scoped today; needs `actions:write` — see §6) | one GitHub Actions run re-execution | yes — re-run only |
 | R7 | **Restore cosign signing key and ESO grant** | `eso` degraded with `cosign-public-key` evidence sustained for ≥2 cycles | `make signing-restore` (hub) | Vault signing secret, cosign-verify policy, one ESO role grant, one ExternalSecret resync | yes — additive; never generates or rotates a key |
 | R8 | **Recycle drifted host-network DaemonSet pods** | `hostnet_drift` degraded and at least one drifted pod is DaemonSet-owned | `bin/k3dm-hostnet-drift --fix` | DaemonSet pods on stale node IPs are recreated | yes |
+| R9 | **Reapply ApplicationSets on the release branch** | `values_branch` degraded with stale references | `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` with `K3D_MANAGER_BRANCH` pinned | every k3d-manager-sourced Application re-targets and syncs | no |
 
 **Cloudflared split-brain (two connectors) is deliberately NOT R3.** Its fix is
 `bootout` of a *stray* launchd agent (`reference_cloudflared_split_brain`) — an action

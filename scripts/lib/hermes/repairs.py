@@ -6,6 +6,7 @@ durable audit, auto-verification) is NOT implemented and needs its own scope doc
 """
 
 import hashlib
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -164,6 +165,20 @@ def _r8_command(_records):
     return (["bin/k3dm-hostnet-drift", "--fix"], {})
 
 
+def _r9_precondition(records, _history, _state):
+    item = _rec(records, "values_branch") or {}
+    expected = item.get("data", {}).get("expected", "")
+    return (_status(records, "values_branch") == "degraded" and
+            bool(item.get("data", {}).get("stale")) and
+            re.fullmatch(r"k3d-manager-v\d+\.\d+\.\d+", expected) is not None)
+
+
+def _r9_command(records):
+    expected = (_rec(records, "values_branch") or {}).get("data", {}).get("expected", "")
+    return (["./scripts/k3d-manager", "deploy_argocd_applicationsets", "--confirm"],
+            {"K3D_MANAGER_BRANCH": expected})
+
+
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
@@ -202,6 +217,10 @@ REPAIRS = {
            "precondition": _r8_precondition, "build_command": _r8_command, "cwd": ROOT,
            "blast_radius": "DaemonSet pods on stale node IPs are recreated", "reversible": True,
            "needs_scope": "local hub kubeconfig"},
+    "r9": {"key": "r9", "name": "Reapply ApplicationSets on the release branch",
+           "precondition": _r9_precondition, "build_command": _r9_command, "cwd": ROOT,
+           "blast_radius": "every k3d-manager-sourced Application on the hub and app cluster re-targets the release branch and syncs",
+           "reversible": False, "needs_scope": "local hub kubeconfig"},
 }
 
 
@@ -213,7 +232,8 @@ def _update_r1_debounce(records, state):
 def _evidence(records, key):
     relevant = {"r1": ("eso", "data_layer"), "r2": ("reachability", "node_pressure", "data_layer"),
                 "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
-                "r6": ("kine",), "r7": ("eso",), "r8": ("hostnet_drift",)}[key]
+                "r6": ("kine",), "r7": ("eso",), "r8": ("hostnet_drift",),
+                "r9": ("values_branch",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
 

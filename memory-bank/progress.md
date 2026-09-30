@@ -1,3 +1,9 @@
+# 2026-09-30 — values_branch sensor and R9
+
+- [x] Implemented the amended values_branch/R9 brief, including realistic ArgoCD fixture coverage,
+  six mutation cases, exporter scope, docs and approval-pinned command. Final commit SHA is recorded
+  in the completion handoff.
+
 # 2026-09-30 — vector store auto-index implementation
 
 - [x] Implemented tracked-ref corpus reads, fingerprinting, Hermes refresh, quota pause, ingestion

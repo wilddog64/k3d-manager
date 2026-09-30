@@ -4,6 +4,9 @@
 
 ### Added
 
+- Hermes now detects Applications left on an older k3d-manager release branch and proposes the
+  approval-gated R9 ApplicationSet reapply with the expected branch pinned.
+
 - Hermes now re-indexes changed documentation from the tracked Git ref every poll, with quota-aware
   backlog draining, VectorDB ingestion metrics, dashboard panels and failure/drift alerts.
 

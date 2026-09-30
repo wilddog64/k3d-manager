@@ -1,3 +1,9 @@
+# 2026-09-30 — values_branch sensor and R9 implemented
+
+Implemented the release-branch ApplicationSet drift sensor with non-release checkout skip semantics,
+three-cycle debounce, zero-reference unknown handling, and approval-gated R9 with a pinned branch.
+Final commit SHA is recorded in the completion handoff.
+
 # 2026-09-30 — ApplicationSets reapplied on v1.40.0; Hermes values_branch sensor + R9 briefed
 
 Operator ran `deploy_argocd_applicationsets --confirm`: 13/13 sets, 19 references on v1.40.0. `loki` and
