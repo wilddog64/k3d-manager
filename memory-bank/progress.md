@@ -1,8 +1,8 @@
 # 2026-09-30 — vector store freshness
 
 - [ ] Codex: automatic re-indexing + ingestion dashboard (brief in 2026-09-30-vectordb-index-never-refreshes-automatically.md).
-- [ ] Operator (now): write the Vault copy (guide, "Writing the Vault copy"), then `make index-docs`
-      (32 pending). The first attempt on 2026-09-30 failed: no embeddings credential.
+- [x] Operator: Vault copy written 2026-09-30 (`secret/embeddings/gemini` v1; verify prints 39).
+- [ ] Operator (now): `make index-docs DRY_RUN=1 && make index-docs` (32 pending).
 
 # 2026-09-30 — MinIO registry bug closed
 
@@ -387,7 +387,7 @@ handoff.
       the correct doc for an `ArgoCD OutOfSync with no real diff` query ranked 4th of 5, and the
       whole band spanned 0.785-0.764 (0.021). Do not add a score threshold on this evidence; any
       cutoff in that band drops the right answer. Details in `activeContext.md`.
-- [ ] Operator: the durable slot is still open — write the Vault copy at `secret/embeddings/gemini`
+- [x] (closed 2026-09-30: Vault copy written) Operator: the durable slot is still open — write the Vault copy at `secret/embeddings/gemini`
       (still `No value found`) or fix the `gemini-cli-api-key` trusted-app ACL in Keychain Access.
       Until then `make find-similar-docs` and dedup Pass 2 are inert for every agent. No agent
       creates, reads, echoes or commits the value.

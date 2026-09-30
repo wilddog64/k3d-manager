@@ -1,3 +1,9 @@
+# 2026-09-30 — embeddings Vault copy written (operator)
+
+`secret/embeddings/gemini` version 1, created 2026-09-30T03:02:08Z. The verify command printed 39, which
+is correct: `vault kv get -field` adds no newline when piped. The guide said 40; corrected. The durable
+slot is now filled. Next: `make index-docs` to catch up the 32 pending docs.
+
 # 2026-09-30 — index-docs catch-up blocked: no durable embeddings credential
 
 Operator's `make index-docs` failed: 0 of 32 committed. The env var is unset, `k3dm-embeddings-api-key` is
