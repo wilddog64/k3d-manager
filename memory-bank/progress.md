@@ -5,7 +5,7 @@
 - [x] Operator: `make index-docs` 2026-09-30, 32/32 committed, 1727 in store (key read from Vault).
 - [x] Slack `/k3dm find-similar-docs` multi-word `Q` fixed in the relay parser.
 - [x] Operator deployed the relay 2026-09-30 (from a worktree); a multi-word `Q` is now accepted in Slack.
-- [ ] Confirm the job result posts ranked docs (it runs under launchd, so the key comes from Vault).
+- [x] Slack end-to-end 2026-09-30: `Q=mac scheduler cannot find tools` → launchd-path-omits-local-bin at #1 (0.643), key read unattended.
 - [x] Retrieval baseline 2026-09-30: 5/5 paraphrase queries in the top 5 (4 at rank 1), noise floor 0.55–0.57; see activeContext.
 
 # 2026-09-30 — MinIO registry bug closed

@@ -1,3 +1,10 @@
+# 2026-09-30 — Slack prior-art search works end to end
+
+`/k3dm find-similar-docs Q=mac scheduler cannot find tools` ran under launchd and returned
+launchd-path-omits-local-bin at #1. Retrieval datapoint: the 5-word query scored 0.643 (margin +0.011);
+the full-sentence version scored 0.720 (margin +0.023), and the runners-up were less related. Short
+queries sit closer to the 0.55–0.57 noise floor, so the guidance is to describe the symptom in a full sentence.
+
 # 2026-09-30 — Slack `/k3dm find-similar-docs` accepted only one-word queries; fixed
 
 The relay's `parseK3dm` split on whitespace and required every token to be KEY=value, so any sentence
