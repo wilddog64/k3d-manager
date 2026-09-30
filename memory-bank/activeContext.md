@@ -1,3 +1,11 @@
+# 2026-09-30 — option 1 chosen: vectordb metrics to the hub; Codex brief filed
+
+`docs/bugs/2026-09-30-vectordb-metrics-published-to-the-wrong-cluster.md`. Plan: a hub Pushgateway (ArgoCD
+`observability` set, chart 2.14.0, `fullnameOverride: prometheus-pushgateway`), a hub scrape job with
+honor_labels, an M4 port-forward on 19094 (`make install-hub-pushgateway-port-forward`), and
+`K3DM_VECTORDB_PUSHGATEWAY_URL` defaulting to it. The dashboard moves to platform-ops (hub). `K3DM_PUSHGATEWAY_URL`
+users are untouched. Also found: the vectordb rules already evaluate on the hub, so they have never seen the metrics.
+
 # 2026-09-30 — VectorDB dashboard: data is on hostinger; the hub has a stray copy
 
 The operator saw "No data" on every panel in the **hub** Grafana. Metrics reach the hostinger Pushgateway and
