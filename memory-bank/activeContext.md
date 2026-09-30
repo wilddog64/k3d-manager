@@ -1,3 +1,9 @@
+# 2026-09-30 — vector store auto-index implemented
+
+Implemented the tracked-ref Hermes refresh, bounded backlog draining, quota pause, separate
+`k3dm-vectordb-index` gauges, alerts and dashboard ingestion row. Focused tests and the rules/dashboard
+contract pass; final commit SHA is reported in the completion handoff.
+
 # 2026-09-30 — index-docs catch-up blocked: no durable embeddings credential
 
 Operator's `make index-docs` failed: 0 of 32 committed. The env var is unset, `k3dm-embeddings-api-key` is

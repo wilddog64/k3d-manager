@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +33,7 @@ from hermes import pager
 from hermes import e2e_schedule, e2e_triage, e2e_bugs
 from hermes import status_triage
 from webhook.redact import scrub_credentials
+from hermes.prior_art import corpus_fingerprint
 
 
 def _load_state(path):
@@ -435,8 +436,119 @@ def _publish_status(records, state):
         return _failed("exec", f"{type(exc).__name__}: {exc}")
 
 
+_INDEX_RESULTS = ("success", "noop", "paused", "failed")
+
+
+def _index_ref():
+    configured = os.environ.get("K3DM_INDEX_REF", "").strip()
+    if configured:
+        return configured, configured.removeprefix("origin/")
+    result = subprocess.run(["git", "rev-parse", "--abbrev-ref", "@{upstream}"],
+                            cwd=ROOT, capture_output=True, text=True, timeout=60, check=False)
+    if result.returncode != 0:
+        raise RuntimeError("cannot determine the checkout upstream")
+    upstream = result.stdout.strip()
+    if "/" not in upstream:
+        raise RuntimeError(f"unexpected upstream {upstream!r}")
+    return upstream, upstream.split("/", 1)[1]
+
+
+def _push_index_metrics(metrics):
+    """Publish the indexer's gauges separately from the health probe."""
+    lines = [
+        f"k3dm_vectordb_index_last_run_timestamp_seconds {metrics['last_run']}",
+        f"k3dm_vectordb_index_last_success_timestamp_seconds {metrics['last_success']}",
+        f"k3dm_vectordb_index_embedded_last {metrics['embedded']}",
+        f"k3dm_vectordb_index_pruned_last {metrics['pruned']}",
+        f"k3dm_vectordb_index_backlog_docs {metrics['backlog']}",
+        f"k3dm_vectordb_index_duration_seconds {metrics['duration']}",
+        f"k3dm_vectordb_index_paused_until_timestamp_seconds {metrics['paused_until']}",
+    ]
+    for result in _INDEX_RESULTS:
+        lines.append(f'k3dm_vectordb_index_last_result{{result="{result}"}} '
+                     f"{int(metrics['result'] == result)}")
+    body = ("\n".join(lines) + "\n").encode()
+    base = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091").rstrip("/")
+    url = f"{base}/metrics/job/k3dm-vectordb-index"
+    try:
+        request = urllib.request.Request(url, data=body, method="POST",
+                                         headers={"Content-Type": "text/plain; charset=utf-8"})
+        urllib.request.urlopen(request, timeout=5).close()
+    except Exception as exc:
+        print(f"vectordb index metrics push skipped (non-fatal): {exc}", file=sys.stderr)
+
+
+def _refresh_index(state, now=None):
+    """Fetch the tracked ref and index changed corpus docs without touching the checkout."""
+    now = time.time() if now is None else now
+    started = time.monotonic()
+    metrics = {
+        "last_run": now, "last_success": state.get("index_last_success", 0),
+        "embedded": 0, "pruned": 0, "backlog": state.get("index_backlog_docs", 0),
+        "duration": 0, "paused_until": state.get("index_paused_until", 0),
+        "result": "failed",
+    }
+    try:
+        ref, branch = _index_ref()
+        fetched = subprocess.run(["git", "fetch", "--quiet", "origin", branch], cwd=ROOT,
+                                 capture_output=True, text=True, timeout=60, check=False)
+        if fetched.returncode != 0:
+            raise RuntimeError(f"git fetch failed: {(fetched.stderr or '').strip()}")
+        paused_until = float(state.get("index_paused_until", 0) or 0)
+        if paused_until and now < paused_until:
+            metrics["result"] = "paused"
+            metrics["paused_until"] = paused_until
+            return
+        fingerprint = corpus_fingerprint(ROOT, ref)
+        if fingerprint == state.get("index_fingerprint"):
+            metrics["result"] = "noop"
+            metrics["backlog"] = 0
+            return
+        env = {**os.environ, "K3DM_INDEX_REF": ref}
+        result = subprocess.run(
+            [str(ROOT / "scripts" / "index-docs.py"), "--ref", ref, "--limit", "100", "--quiet"],
+            cwd=ROOT, env=env, capture_output=True, text=True, timeout=900, check=False,
+        )
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        import re
+        embedded = re.search(r"(\d+) embedded", output)
+        pruned = re.search(r"(\d+) pruned", output)
+        remaining = re.search(r"(\d+) remaining", output)
+        metrics["embedded"] = int(embedded.group(1)) if embedded else 0
+        metrics["pruned"] = int(pruned.group(1)) if pruned else 0
+        metrics["backlog"] = int(remaining.group(1)) if remaining else 0
+        if "paused" in output.lower():
+            tomorrow = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            metrics["paused_until"] = (tomorrow + timedelta(days=1)).timestamp()
+            metrics["result"] = "paused"
+        elif result.returncode == 0:
+            metrics["result"] = "success"
+            metrics["last_success"] = now
+            if metrics["backlog"] == 0:
+                state["index_fingerprint"] = fingerprint
+            state["index_last_success"] = now
+            state["index_paused_until"] = 0
+        else:
+            metrics["result"] = "failed"
+            print(f"vectordb index failed: {output.strip().splitlines()[-1] if output.strip() else 'unknown error'}",
+                  file=sys.stderr)
+        state["index_backlog_docs"] = metrics["backlog"]
+        state["index_paused_until"] = metrics["paused_until"]
+    except Exception as exc:
+        print(f"vectordb index refresh skipped: {exc}", file=sys.stderr)
+    finally:
+        metrics["duration"] = time.monotonic() - started
+        _push_index_metrics(metrics)
+
+
+def _publish_health_metrics():
+    subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
+                   capture_output=True, text=True, timeout=120, check=False)
+
+
 def _poll(state, state_path, now=None, status_runner=_status_run):
     now = time.time() if now is None else now
+    _refresh_index(state, now)
     due = _status_due(state, now)
     records, event = _run_cycle(state, status_runner if due else None)
     if due:
@@ -480,8 +592,7 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
             (status_record.get("status") == "degraded" or state.get("status_groups"))):
         _status_notification(state, status_record, relay)
     _publish_status(records, state)
-    subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
-                   capture_output=True, text=True, timeout=120, check=False)
+    _publish_health_metrics()
     _schedule_e2e(state)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event, "approvals": approvals,

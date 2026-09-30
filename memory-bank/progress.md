@@ -1,3 +1,9 @@
+# 2026-09-30 — vector store auto-index implementation
+
+- [x] Implemented tracked-ref corpus reads, fingerprinting, Hermes refresh, quota pause, ingestion
+  gauges, alerts, dashboard row and offline tests. Final commit SHA is reported in the completion handoff.
+- [ ] Operator: write the durable Vault embeddings credential before live ingestion can succeed.
+
 # 2026-09-30 — vector store freshness
 
 - [ ] Codex: automatic re-indexing + ingestion dashboard (brief in 2026-09-30-vectordb-index-never-refreshes-automatically.md).
