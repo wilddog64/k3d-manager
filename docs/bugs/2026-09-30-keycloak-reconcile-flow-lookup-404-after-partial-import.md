@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0` (tracking); **work repo:** `shopping-cart-infra`
 **Filed:** 2026-09-30 by Claude (cloud session), from `KubeJobFailed` (hub, `identity`)
-**Status:** FIX READY — Codex `4057069` ([wilddog64/shopping-cart-infra#104](https://github.com/wilddog64/shopping-cart-infra/pull/104)), verified by Claude 2026-09-30. Awaiting merge, one manual sync and a live check. #103 (`98da0c5`) stays as a harmless guard.
+**Status:** OPEN — #104 (`930a82d`) fixed the sub-flow `flowId` 404 (confirmed live); the hook now fails at the next write. Brief 3 below. #103 and #104 stay.
 **Target files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats` (amended 2026-09-30 at plan review: the stub harness is kept as a test, not thrown away)
 **Severity:** Medium. The flow itself and logins are fine; every `shopping-cart-identity` sync
 fails its PostSync hook, and `KubeJobFailed` stays firing.
@@ -212,3 +212,69 @@ stub outputs from the same rows in those column orders, with provider IDs `auth-
   5/5 again.
 - **Gates:** `bash -n` and shellcheck clean; yamllint (CI config) and kubeconform clean. PR CI:
   YAML Lint, Kubeconform, Kustomize Build and GitGuardian pass; the Copilot review was still running.
+
+## Third failure (2026-09-30, live, after #104 as `930a82d`)
+
+A sync at `930a82d` passed the forms sub-flow update (so `flowId` fixed that call), then failed on:
+```
+Resource not found for url: …/admin/realms/shopping-cart/authentication/executions/47df1e22-2f22-478f-bddc-32a9871a346f
+```
+That is `kcadm.sh update "authentication/executions/${username_password_id}" -s requirement=REQUIRED`.
+Live tests in the Keycloak pod, all setting values the flow already has:
+
+| Call | Result |
+|---|---|
+| `update authentication/executions/{id} -s requirement=REQUIRED` (the hook's form) | **404** |
+| `get authentication/executions/{id}` | OK |
+| `update "authentication/flows/browser-with-conditional-otp%20forms/executions" -b '{"id":…,"requirement":"REQUIRED"}'` | **OK** |
+
+Keycloak 24 serves `GET /authentication/executions/{id}` but has no update on that path. An
+execution's requirement is changed through its **parent flow's** `…/flows/{alias}/executions` PUT. The
+hook uses the unsupported form three times. The #104 stub accepted every `update`, so the tests could
+not catch it; brief 3 makes the stub model Keycloak 24 here.
+
+## Codex brief 3 (shopping-cart-infra)
+
+**Branch:** `fix/keycloak-reconcile-requirement-via-parent-flow` from `origin/main` (now at `930a82d`).
+**Files:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` and `scripts/tests/bin/keycloak-reconcile.bats`.
+
+**Change:** replace each `kcadm.sh update "authentication/executions/${X}" -r "${KC_REALM}" -s requirement=R`
+with `kcadm.sh update "authentication/flows/${PARENT}/executions" -r "${KC_REALM}" -b "{\"id\":\"${X}\",\"requirement\":\"R\"}"`:
+
+| `X` | `R` | `PARENT` (already defined and URL-encoded at that point) |
+|---|---|---|
+| `username_password_id` | `REQUIRED` | `forms_flow_alias` |
+| `role_condition_id` | `REQUIRED` | `conditional_otp_flow_alias` |
+| `otp_form_id` | `REQUIRED` | `conditional_otp_flow_alias` |
+
+Keep the body on one line (no backslash-newline continuation inside the JSON string). Change nothing
+else, and keep #103 and #104's changes.
+
+**Tests (extend the #104 harness):**
+1. **Static:** the rendered script contains no `kcadm.sh update "authentication/executions/`
+   (`delete` and `create …/config` on that path stay; they are supported).
+2. **Stub fidelity:** the stub `kcadm.sh` exits 1 with `Resource not found for url` for any
+   `update authentication/executions/…`, as Keycloak 24 does. It keeps the #104 rule for sub-flow
+   updates without `flowId`, and it logs every `update` call's path and body.
+3. **Behavioural:** `reconcile_browser_flow` returns 0 against the captured CSV. The logged updates
+   include the three parent-flow calls with the right `PARENT` (URL-encoded, containing `%20`) and IDs
+   `47df1e22-2f22-478f-bddc-32a9871a346f`, `2ed55ec6-0fe7-4298-a396-a07f8ad33993` and
+   `ac0bb8fe-bc30-4f32-8b95-423f33a9e44a`.
+4. **Mutation:** revert any one of the three calls to the old form → tests 1 and 3 fail. Also, the
+   #104 test run against the new stub, with the old code, fails at the Username Password update (the
+   exact live failure).
+
+**Gates:** BATS all green, `bash -n` + shellcheck on the rendered script, yamllint (CI config),
+kubeconform, `kustomize build`. **Hand back:** one commit,
+`fix(identity): set execution requirements through the parent flow, which Keycloak 24 supports`, and a PR; do not merge.
+
+**After merge (operator):** a hard refresh, then one sync; the hook change alone does not trigger a sync:
+```
+kubectl --context k3d-k3d-cluster -n cicd annotate application shopping-cart-identity argocd.argoproj.io/refresh=hard --overwrite
+kubectl --context k3d-k3d-cluster -n cicd patch application shopping-cart-identity --type merge -p '{"operation":{"initiatedBy":{"username":"operator"},"sync":{}}}'
+```
+Then confirm the synced revision (`.status.operationState.syncResult.revisions`) is the merge commit,
+the phase is `Succeeded`, and no `keycloak-realm-reconcile` Job is left.
+
+**Lesson recorded:** a stub that accepts every write only tests the caller's arithmetic. Model each
+endpoint the code writes to as the real server behaves, including what it rejects.

@@ -29,7 +29,8 @@
 - [x] shopping-cart-infra #103 merged as `98da0c5` (identical to the verified b11f1a2; CI green; Copilot found nothing).
 - [x] Live 2026-09-30: 98da0c5 synced; wait passed on attempt 1; the hook still 404s. Root cause corrected: missing flowId.
 - [x] Codex `4057069` flowId fix verified by Claude; shopping-cart-infra PR #104 open, CI green.
-- [ ] Operator: merge #104, run one manual sync (patch), expect Succeeded + no Job + KubeJobFailed resolved.
+- [x] #104 merged as 930a82d; flowId fix confirmed live; the hook now fails at PUT authentication/executions/{id}.
+- [ ] Codex brief 3: set requirements via the parent flow (3 calls); then hard refresh + sync.
 - [x] Hub vectordb metrics live 2026-09-30 (ApplicationSets reapplied, forward 19094 healthy, rows=1732 pushed; the stray copy was pruned by ArgoCD).
 - [x] `make validate-manifests` + `_ensure_kubeconform` (self-installing kubeconform); SC2317 false positive suppressed.
 - [ ] Operator: let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.

@@ -1,3 +1,9 @@
+# 2026-09-30 — keycloak hook: #104 worked; next failure is PUT authentication/executions/{id} (unsupported in KC 24)
+
+Live: that PUT gives 404; GET on the same path is OK; the parent-flow PUT with {id, requirement} is OK. 3 calls use the bad form. Brief 3 is
+in the bug doc (move them to the parent flow; the stub now rejects the bad form like KC 24). Remaining later writes (config update, realm
+browserFlow, guarded LDAP creates) use supported endpoints.
+
 # 2026-09-30 — Codex `4057069` (keycloak flowId) verified; shopping-cart-infra #104 open
 
 Both rendered bodies parse as JSON with flowId; BATS 5/5; each flowId mutation fails the static and behavioural tests; set -e intact; CI green.
