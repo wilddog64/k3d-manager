@@ -227,12 +227,17 @@ def data_layer(fetch, state, provider="", token=None, threshold=2):
         if not services:
             return record("data_layer", "unknown", "data layer status source unavailable")
         check = next((item for item in services if item.get("name") == "Data layer"), None)
+        detail = (check or {}).get("detail", "Data layer")
+        not_deployed = check is not None and check.get("ok") is None and str(detail).startswith("not deployed")
+        if not not_deployed and all(item.get("ok") is None for item in services):
+            return record("data_layer", "unknown", "data layer status source unavailable")
         if check is None:
             return record("data_layer", "unknown", "data layer check absent from webhook payload")
-        detail = check.get("detail", "Data layer")
         if check.get("ok") is False:
             status = "degraded" if _debounced("data_layer", True, threshold, state) else "healthy"
             return record("data_layer", status, f"data layer: {detail}")
+        if check.get("ok") is None and not not_deployed:
+            return record("data_layer", "unknown", f"data layer ungraded: {detail}")
         _debounced("data_layer", False, threshold, state)
         return record("data_layer", "healthy", detail)
     except Exception:

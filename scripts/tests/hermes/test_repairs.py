@@ -260,3 +260,31 @@ def test_r4_command_uses_keychain_pat(monkeypatch):
     _argv, env = repairs._r4_command(r4_records())
 
     assert env == {"GH_TOKEN": "pat-token"}
+
+
+def test_blind_webhook_all_none_still_reads_as_webhook_down():
+    from hermes.sensors import data_layer, eso
+    unreachable = "cluster unreachable (kube context 'ubuntu-hostinger' unusable)"
+    payload = {"services": [{"name": name, "ok": None, "detail": unreachable}
+                            for name in ("Frontend", "ESO ExternalSecrets", "Hub ESO ExternalSecrets", "Data layer")]}
+    fetch = lambda _url, _headers: payload
+    current = {}
+    records = [eso(fetch, current, token="x"), data_layer(fetch, current, token="x")]
+    assert records[1]["status"] == "unknown"
+    assert "source unavailable" in records[1]["evidence"]
+    assert repairs._unknown_webhook(records)
+
+
+def test_data_layer_none_is_healthy_only_when_not_deployed():
+    from hermes.sensors import data_layer
+
+    def fetch_with(detail):
+        payload = {"services": [{"name": "Frontend", "ok": True, "detail": "HTTP 200"},
+                                {"name": "Data layer", "ok": None, "detail": detail}]}
+        return lambda _url, _headers: payload
+
+    absent = "not deployed (namespace shopping-cart-data absent on ubuntu-hostinger)"
+    assert data_layer(fetch_with(absent), {}, token="x")["status"] == "healthy"
+    ungraded = data_layer(fetch_with("cluster unreachable (kube context unusable)"), {}, token="x")
+    assert ungraded["status"] == "unknown"
+    assert "source unavailable" not in ungraded["evidence"]
