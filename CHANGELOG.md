@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Hermes Grafana findings now expose failed hostnames and clickable CI run links, while status
+  history explains the 0/1/2 encoding and carries evidence in its legend.
+
 ### Added
 
 - `make validate-manifests [FILES=…]` validates manifests, custom resources included, with kubeconform

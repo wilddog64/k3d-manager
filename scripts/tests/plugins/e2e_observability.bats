@@ -25,6 +25,19 @@ AM_TMPL="${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl"
   [ "${status}" -eq 0 ]
 }
 
+@test "Hermes dashboard exposes failure evidence and status meanings" {
+  for field in 'failed_hosts' 'ci_run_url' 'Failed hosts' 'CI run' 'Open GitHub Actions run'; do
+    run grep -F -- "${field}" "${HERMES_DASH}"
+    [ "${status}" -eq 0 ]
+  done
+  run grep -F -- '0 = healthy, 1 = degraded, 2 = unknown' "${HERMES_DASH}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '{{sensor}} ({{status}}): {{evidence}}' "${HERMES_DASH}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- 'run_url' "${EXPORTER}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "exporter emits all five e2e_* gauges" {
   for metric in e2e_run_info e2e_last_run_pass e2e_last_run_timestamp_seconds \
                 e2e_last_run_duration_seconds e2e_last_success_timestamp_seconds; do

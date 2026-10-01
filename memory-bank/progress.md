@@ -2768,3 +2768,12 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] Moved the dashboard to the hub platform-ops set with byte-identical JSON and corrected labels.
 - [x] Added offline tests, ran mutation red/green checks and repository gates; commit SHA is in the
   completion handoff.
+
+# 2026-09-30 — Hermes dashboard evidence and status history
+
+- [x] Added failed-host labels and CI run URLs to the Hermes exporter and findings table.
+- [x] Added status enum/evidence guidance to the history panel.
+- [x] Added regression coverage for dashboard fields, sensor evidence, and CI run metadata.
+- [x] Mutation checks failed as expected when the history explanation or CI field was removed, then
+  passed after restoration. Full pytest: 442 passed; manifest validation: 10 valid; doc links: 1825
+  files OK. Final commit SHA is recorded in the bug docs after commit.

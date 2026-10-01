@@ -615,12 +615,13 @@ def test_argocd_evidence_names_apps_from_cr_shape_and_truncates():
 
 def test_reachability_healthy_degraded_unknown_and_debounce():
     good = json.dumps({"verdict": "ok", "hosts": []})
-    bad = json.dumps({"verdict": "edge-down", "hosts": [{"healthy": False}]})
+    bad = json.dumps({"verdict": "edge-down", "hosts": [{"host": "grafana.3ai-talk.org", "healthy": False}]})
     healthy = reachability(lambda *_: (0, good), {})
     assert_normalized(healthy, "reachability")
     assert healthy["status"] == "healthy"
     state = {}
     assert [reachability(lambda *_: (2, bad), state)["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
+    assert "grafana.3ai-talk.org" in reachability(lambda *_: (2, bad), {})["evidence"]
     assert reachability(lambda *_: (3, "{}"), {})["status"] == "unknown"
 
 
@@ -747,7 +748,8 @@ def test_ci_healthy_degraded_unknown_and_debounce():
     def source(conclusion="success", status="completed"):
         def fetch(url, _headers):
             if "actions/runs" in url:
-                return {"workflow_runs": [{"head_sha": "abc", "id": 123}]}
+                return {"workflow_runs": [{"head_sha": "abc", "id": 123,
+                                            "html_url": "https://github.com/wilddog64/k3d-manager/actions/runs/123"}]}
             return {"check_runs": [{"name": "test", "conclusion": conclusion, "status": status,
                                     "started_at": "2026-09-05T00:00:00Z"}]}
         return fetch
@@ -755,7 +757,9 @@ def test_ci_healthy_degraded_unknown_and_debounce():
     assert_normalized(healthy, "ci")
     assert healthy["status"] == "healthy"
     state = {}
-    assert [ci(source("failure"), state, token="x", now=now)["status"] for _ in range(2)] == ["healthy", "degraded"]
+    failed = [ci(source("failure"), state, token="x", now=now) for _ in range(2)]
+    assert [item["status"] for item in failed] == ["healthy", "degraded"]
+    assert failed[-1]["data"]["run_url"].endswith("/actions/runs/123")
     assert ci(lambda *_: (_ for _ in ()).throw(RuntimeError()), {}, token="x", now=now)["status"] == "unknown"
     assert ci(source(), {}, token="", now=now)["status"] == "unknown"
     stuck_now = datetime(2026, 9, 5, 2, tzinfo=timezone.utc)

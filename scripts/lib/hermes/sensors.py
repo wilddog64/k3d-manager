@@ -198,7 +198,10 @@ def reachability(run, state, threshold=2):
         failed_hosts = [host.get("host") or host.get("name") or host.get("url")
                         for host in hosts if not host.get("healthy")]
         status = "degraded" if _debounced("reachability", True, threshold, state) else "healthy"
-        return record("reachability", status, f"{verdict} {failed}/{len(hosts)} hosts failing",
+        evidence = f"{verdict} {failed}/{len(hosts)} hosts failing"
+        if failed_hosts:
+            evidence += ": " + ", ".join(str(host) for host in failed_hosts[:5])
+        return record("reachability", status, evidence,
                       data={"verdict": verdict,
                             "failed_hosts": [host for host in failed_hosts if host]})
     except Exception:
@@ -530,14 +533,16 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
             for check in checks.get("check_runs", []):
                 if check.get("conclusion") in ("failure", "timed_out", "cancelled"):
                     bad.append(f"{repo_name} {check.get('name', 'check')} {check.get('conclusion')}")
-                    if check.get("conclusion") in ("timed_out", "cancelled") and not ci_data:
+                    if not ci_data:
                         ci_data = {"repo": repo_name, "run_id": latest["id"],
+                                   "run_url": latest.get("html_url", ""),
                                    "conclusion": check["conclusion"]}
                 elif check.get("status") == "in_progress" and _older_than(
                         check.get("started_at"), max_age_seconds, now):
                     bad.append(f"{repo_name} {check.get('name', 'check')} stuck")
                     if not ci_data:
                         ci_data = {"repo": repo_name, "run_id": latest["id"],
+                                   "run_url": latest.get("html_url", ""),
                                    "conclusion": "stuck"}
         if bad:
             status = "degraded" if _debounced("ci", True, threshold, state) else "healthy"

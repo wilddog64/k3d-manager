@@ -7923,3 +7923,12 @@ Implemented the scoped VectorDB hub Pushgateway, Prometheus scrape, M4 port-forw
 dedicated publisher endpoint. Moved the dashboard to the hub platform-ops ConfigMap with the same
 dashboard JSON and corrected metadata. Offline tests and mutation results are recorded in the task
 handoff; the branch commit is pushed upstream.
+
+# 2026-09-30 — Hermes Grafana dashboard findings made actionable
+
+Implemented the two dashboard bugs `hermes-dashboard-findings-have-no-drilldown` and
+`hermes-status-history-hides-unknown-cause`. The findings table now exposes failed hostnames and
+clickable GitHub Actions run links; status history explains healthy/degraded/unknown numeric values
+and includes evidence in the legend. The exporter carries the optional labels without changing
+sensor status semantics. Focused and full pytest, dashboard BATS, manifest validation, YAML parse,
+diff-check, and doc-link gates passed. Final commit SHA is recorded in the bug docs after commit.
