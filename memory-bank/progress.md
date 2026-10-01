@@ -19,7 +19,8 @@
 # 2026-10-01 — bug backlog triage
 
 - [x] Codex batch verified 2026-10-01: 8a7cdec9 (agy), 2f8c3ec8 (R2), 8fa82259 (mktemp); plus the R2 gui/<uid> service-target fix.
-- [ ] Operator: `agy --model gemini-3.8-flash-medium --prompt 'Reply with exactly: PONG'` on the M4.
+- [x] agy model probe OK (PONG) 2026-10-01.
+- [ ] Operator: git pull + `make restart-webhook` so the running webhook loads the new agent.py.
 - [x] 27 OPEN docs triaged: 14 fixed, 7 stale-closed, 6 open (R2 label, agy exit status, mktemp, appset overrides dormant, payments a/b, hub self-registration).
 
 # 2026-09-30 — v1.41.0 planning

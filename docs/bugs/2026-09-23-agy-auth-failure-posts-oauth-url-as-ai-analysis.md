@@ -514,5 +514,5 @@ test-pytest` collects it.
 mutations went red: dropping the exit status fails `test_nonzero_exit_is_failure_even_with_answer_like_output`,
 dropping the not-logged-in rows fails `test_no_oauth_url_escapes`, and ignoring the pin fails
 `test_pinned_candidate_disables_fallback`. `make test-pytest` 442/442.
-**Operator step still open:** probe the model once on the M4:
+**Operator probe done 2026-10-01:** `gemini-3.8-flash-medium` answered `PONG`. Command used:
 `agy --model gemini-3.8-flash-medium --prompt 'Reply with exactly: PONG'`.
