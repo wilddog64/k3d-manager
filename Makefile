@@ -19,6 +19,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 ARGOCD_SERVER ?= localhost:8080
+ARGOCD_SCHEME ?= http
 
 .PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
@@ -865,7 +866,8 @@ fix-sync: ## APP is required
 	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
 		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not read ArgoCD admin password Secret from $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
 		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		_login_error=$$(printf '%s\n' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --skip-test-tls --insecure 2>&1) || { _keep_log=1; echo "$$_login_error" >&2; echo "ArgoCD CLI login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
+		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
+		export ARGOCD_AUTH_TOKEN="$$_session_token"; \
 	fi; \
 	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 
@@ -884,7 +886,8 @@ fix-force-sync: ## APP is required
 	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
 		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not read ArgoCD admin password Secret from $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
 		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		_login_error=$$(printf '%s\n' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --skip-test-tls --insecure 2>&1) || { _keep_log=1; echo "$$_login_error" >&2; echo "ArgoCD CLI login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
+		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
+		export ARGOCD_AUTH_TOKEN="$$_session_token"; \
 	fi; \
 	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 

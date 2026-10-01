@@ -15,6 +15,8 @@
   authentication errors without exposing the password.
 - `fix-sync` now captures both stdout and stderr from ArgoCD login failures so the root cause is
   visible instead of returning only a generic make error.
+- The sync fallback uses the ArgoCD session API and `ARGOCD_AUTH_TOKEN`, avoiding the unsupported
+  CLI `--stdin` flag and keeping the admin password out of argv.
 
 ### Added
 

@@ -76,3 +76,17 @@ The login diagnostic was still hidden because stdout was redirected before captu
 captures both stdout and stderr from `argocd login` before reporting the failure.
 
 Follow-up commit: `75952f57`.
+
+## CLI-version compatibility follow-up
+
+The installed CLI rejected the repository's historical `--stdin` flag:
+
+```text
+Error: unknown flag: --stdin
+```
+
+The fallback now authenticates through ArgoCD's `/api/v1/session` endpoint, reads the password
+from stdin without putting it in argv, and exports only the resulting `ARGOCD_AUTH_TOKEN` for the
+sync command.
+
+Follow-up commit: pending.

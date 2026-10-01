@@ -2821,3 +2821,8 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] Captured both stdout and stderr from ArgoCD login failures, preserving the password boundary
   while exposing the actual error. Focused BATS passed; final SHA is recorded in the bug doc after
   commit: `75952f57`.
+
+# 2026-09-30 — fix-sync CLI-version compatibility
+
+- [x] Replaced unsupported `argocd login --stdin` with password-stdin API authentication and
+  `ARGOCD_AUTH_TOKEN`. Focused BATS passed; final SHA is recorded in the bug doc after commit.
