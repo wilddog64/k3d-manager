@@ -7947,4 +7947,4 @@ Final commit SHA: `bc301f83`.
 Filed and fixed `docs/bugs/2026-09-30-make-fix-sync-cannot-connect-argocd.md`. The Make repair
 targets now bootstrap a short-lived local ArgoCD port-forward when needed, wait for health, use
 gRPC-web, clean up the child process, and accept `ARGOCD_SERVER` overrides. Focused BATS and a
-mutation check passed; final commit SHA is recorded in the bug doc after commit.
+mutation check passed; final commit SHA: `ffe501fa`.

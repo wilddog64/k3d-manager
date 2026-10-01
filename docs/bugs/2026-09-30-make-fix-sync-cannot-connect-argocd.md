@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30
-**Status:** FIXED (pending final commit SHA)
+**Status:** FIXED (`ffe501fa`)
 **Severity:** medium — the documented repair target fails with an opaque EOF when the local
 ArgoCD port-forward is not already running.
 
