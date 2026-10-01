@@ -8,9 +8,9 @@
   history explains the 0/1/2 encoding and carries evidence in its legend.
 - Grafana ServiceMonitors now carry the release labels selected by Prometheus, restoring metrics
   for the overview dashboard in both the hub and ACG observability stacks.
-- `make fix-sync` and `make fix-force-sync` now bootstrap the local ArgoCD port-forward when needed,
-  validate/re-mint stale CLI authentication from the cluster Secret, use plaintext gRPC-web, and
-  clean up the temporary tunnel; failed tunnel/login diagnostics now remain visible.
+- `make fix-sync` and `make fix-force-sync` now share `bin/argocd-app-sync`, probe ArgoCD sessions
+  server-side, re-mint stale authentication when needed, use plaintext gRPC-web, and clean up the
+  temporary tunnel; failed tunnel/login diagnostics now remain visible.
 - The sync login path now matches the repository's working ArgoCD login flags and reports CLI
   authentication errors without exposing the password.
 - `fix-sync` now captures both stdout and stderr from ArgoCD login failures so the root cause is
@@ -24,8 +24,11 @@
 - Added a source-controlled `Grafana Overview — Readable` dashboard with readable HTTP-status and
   latency legends for both app-cluster and hub Grafana while preserving the existing metrics and
   dashboard variables.
-- The k3dm-tests dashboard now presents the latest result by runner, with readable PASS, FAIL, and
-  EXPECTED ENVIRONMENT exit-code mappings instead of raw metric-internal table columns.
+- The k3dm-tests dashboard now presents the make exit code as informational data, with the Failed
+  cases panel remaining the pass/fail health signal.
+
+- Hermes CI sensor data now preserves the first timed-out, cancelled, or stuck check for R4 reruns
+  while retaining run URLs for pure failures.
 
 ### Added
 

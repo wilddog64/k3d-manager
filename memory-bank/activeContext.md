@@ -8056,3 +8056,10 @@ agent that independently runs the offline k3dm-test suite and Tier 1 E2E daily, 
 separate result/triage channels, records real durations, and pauses for human approval before
 mutating repairs or filing work. The detailed scope is
 `docs/plans/v1.42.0-daily-offline-and-e2e-verification.md`.
+# 2026-10-01 — v1.40.0 review fixes complete
+
+Codex implemented the four review findings on `k3d-manager-v1.40.0`. Commits: `b5227418` (Hermes
+R4-eligible conclusion), `393a0aae` (informational k3dm-tests exit-code panel), and `236219f6`
+(shared ArgoCD sync helper with server-side session validation). The docs commit records the fixed
+spec, changelog, and memory-bank update. Focused BATS: 23/23; Hermes pytest: 51 passed; shellcheck
+clean; all three mutations were red and restored green.

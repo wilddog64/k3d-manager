@@ -2883,3 +2883,11 @@ in the bug doc after commit: `3664bea7`.
 - [x] Added the candidate v1.42.0 “k3d-manager Dot” milestone to `docs/roadmap.md`, linking
   the independent daily offline/E2E verification scope.
 - [ ] Implementation is not started; this remains a roadmap/specification item.
+# 2026-10-01 — v1.40.0 review fixes complete
+
+- [x] Four review findings fixed in commits `b5227418`, `393a0aae`, and `236219f6`; docs commit
+  records the spec as FIXED and updates CHANGELOG/memory-bank.
+- [x] Gates: `shellcheck bin/argocd-app-sync`; focused BATS 23/23; Hermes pytest 51 passed; and
+  `make check-doc-links` passed.
+- [x] Mutation checks: Hermes rerunnable ordering, Grafana verdict mapping, and stale ArgoCD
+  session probe each failed their named regression test and were restored green.
