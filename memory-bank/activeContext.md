@@ -9,6 +9,12 @@ with no prompt. Documented in docs/guides/ai-analysis-fallback.md.
 All clean against their specs, with mutations red. Found and fixed: R2 used `launchctl kickstart -k <bare label>`, which launchctl rejects,
 so R2 never worked. It now uses gui/<uid>/<label>. Operator: probe `agy --model gemini-3.8-flash-medium` once on the M4.
 
+# 2026-09-30 — Hermes data_layer unknown-cause bug filed
+
+Filed `2026-09-30-hermes-data-layer-unknown-has-no-cause.md`: the history panel shows
+`data_layer (unknown) 2` but does not retain/display whether the webhook source was unavailable,
+the check was absent, or the payload was ungradeable.
+
 # 2026-09-30 — Hermes dashboard observability bugs filed
 
 Filed `2026-09-30-hermes-dashboard-findings-have-no-drilldown.md` for summary findings that omit

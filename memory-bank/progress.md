@@ -1,3 +1,7 @@
+# 2026-09-30 — Hermes data_layer unknown-cause bug filed
+
+- [ ] Preserve and display a bounded, redacted cause for historical `data_layer` unknown states.
+
 # 2026-09-30 — Hermes dashboard bugs filed
 
 - [ ] Add drill-down evidence/links to the current findings table.
