@@ -9,6 +9,12 @@ with no prompt. Documented in docs/guides/ai-analysis-fallback.md.
 All clean against their specs, with mutations red. Found and fixed: R2 used `launchctl kickstart -k <bare label>`, which launchctl rejects,
 so R2 never worked. It now uses gui/<uid>/<label>. Operator: probe `agy --model gemini-3.8-flash-medium` once on the M4.
 
+# 2026-09-30 — Hermes dashboard observability bugs filed
+
+Filed `2026-09-30-hermes-dashboard-findings-have-no-drilldown.md` for summary findings that omit
+failed hostnames and CI run links, and `2026-09-30-hermes-status-history-hides-unknown-cause.md`
+for the numeric `0/1/2` history values that hide unknown-sensor evidence. No runtime changes made.
+
 # 2026-10-01 — Codex batch bug 3 fixed (`ecb46449`)
 
 Empty `mktemp` paths are prevented in the shopping-cart tests: the join helper rejects an empty

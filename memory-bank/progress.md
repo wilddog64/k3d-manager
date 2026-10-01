@@ -1,3 +1,8 @@
+# 2026-09-30 — Hermes dashboard bugs filed
+
+- [ ] Add drill-down evidence/links to the current findings table.
+- [ ] Explain numeric status history and expose evidence for unknown/degraded transitions.
+
 # 2026-10-01 — Codex batch bug 3 complete (`ecb46449`)
 
 - [x] Empty mktemp paths: F1 guard, F2 BATS_TEST_TMPDIR sweep, F3 root-debris checker wired to
