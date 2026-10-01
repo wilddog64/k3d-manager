@@ -25,6 +25,5 @@ data:
       "time": {"from": "now-6h", "to": "now"},
       "timezone": "utc",
       "title": "Grafana Overview — Readable",
-      "uid": "k3dm-grafana-overview",
       "version": 1
     }

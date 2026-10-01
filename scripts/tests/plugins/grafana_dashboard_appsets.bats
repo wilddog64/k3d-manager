@@ -56,7 +56,6 @@ HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboa
   run yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | jq empty
-  [[ "$output" == *'"uid": "k3dm-grafana-overview"'* ]]
   [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
@@ -69,7 +68,6 @@ HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboa
   run yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | jq empty
-  [[ "$output" == *'"uid": "k3dm-grafana-overview"'* ]]
   [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]

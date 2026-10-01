@@ -8011,8 +8011,8 @@ the labels safely.
 # 2026-10-01 — Grafana Overview readable replacement
 
 Added `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` with the existing
-queries, plus readable HTTP-status and latency legends. It uses a unique UID/title because the
-Helm-owned Overview dashboard cannot be overridden safely by duplicate UID. The final implementation
-SHA is recorded in the bug doc after commit. Final SHA: `e6543d1f`.
+queries, plus readable HTTP-status and latency legends. It uses a unique title and lets the sidecar
+assign the UID because the Helm-owned Overview dashboard cannot be overridden safely by duplicate
+UID. The final implementation SHA is recorded in the bug doc after commit. Final SHA: `e6543d1f`.
 The same dashboard is now sourced for both the app-cluster and hub ApplicationSets; final SHA is
 recorded in the bug doc after commit. Final SHA: `e6543d1f`.
