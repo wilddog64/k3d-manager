@@ -50,3 +50,5 @@ rpc error: code = Unauthenticated desc = invalid session: token signature is inv
 The targets now validate the current CLI session and re-login with the `admin` password from
 `argocd-initial-admin-secret` when the cached token is invalid. The password is passed on stdin and
 never printed.
+
+Follow-up commit: `a7fb7798`.

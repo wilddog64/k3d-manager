@@ -7961,5 +7961,4 @@ focused regression test and a mutation check removing `--plaintext` were run; fi
 The local ArgoCD transport fix exposed stale cached CLI tokens after an ArgoCD server-secret
 rotation. `fix-sync` and `fix-force-sync` now validate the CLI session and re-login from
 `argocd-initial-admin-secret` over stdin when the token signature is invalid. The focused test and
-the mutation removing login transport flags were red/green verified; final SHA is recorded in the
-bug doc after commit.
+the mutation removing login transport flags were red/green verified; final SHA: `a7fb7798`.

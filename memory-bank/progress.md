@@ -2802,4 +2802,4 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 
 - [x] Added automatic ArgoCD session validation and password-stdin login for stale tokens.
 - [x] Regression passed; removing the login plaintext flag made it fail, then restoration passed.
-  Final SHA is recorded in the bug doc after commit.
+  Final SHA: `a7fb7798`.
