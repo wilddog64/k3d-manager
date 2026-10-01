@@ -7940,4 +7940,4 @@ Prometheus selectors require a release label, but the Grafana subchart ServiceMo
 carry one, so `grafana_build_info` and request metrics were never scraped. Added matching
 `grafana.serviceMonitor.labels.release` values for hub and ACG, with a regression test and Helm
 render verification. Mutation of the label failed the test as expected; restoration passed.
-Final commit SHA is recorded in the bug doc after commit.
+Final commit SHA: `bc301f83`.

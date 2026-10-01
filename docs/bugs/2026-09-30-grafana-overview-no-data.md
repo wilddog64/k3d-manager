@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30
-**Status:** FIXED (pending final commit SHA)
+**Status:** FIXED (`bc301f83`)
 **Severity:** medium — the Grafana overview loads, but its dashboards, build info, RPS and
 request-latency panels are empty.
 
