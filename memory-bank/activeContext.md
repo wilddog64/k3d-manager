@@ -6,6 +6,10 @@ masked by the CI-sensor `ci_data` change; (2) the exit-code panel paints make's 
 "EXPECTED ENVIRONMENT"; (3) `fix-sync` trusts a stale local context; (4) the sync recipe is duplicated,
 so move it to `bin/argocd-app-sync`. Items 5–10 stay deferred.
 
+**Update:** FIXED and Claude-verified (`b5227418`, `393a0aae`, `236219f6`, docs `6aaef4dc`). Gates and
+mutations were reproduced independently. Mutating `sensors.py` while keeping the same byte size can leave a stale `.pyc`.
+Clear `scripts/lib/hermes/__pycache__/sensors.*.pyc` before trusting a rerun after a restore.
+
 # 2026-10-01 — agy keychain prompt fixed
 
 Every agy run prompted for the login password. Both `Antigravity Safe Storage` items trusted only com.google.antigravity (the desktop app);

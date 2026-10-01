@@ -1,7 +1,9 @@
 # 2026-10-01 — v1.40.0 review fix spec (Codex)
 
 - [x] Spec filed: `docs/bugs/2026-10-01-v1.40.0-review-fixes-ci-rerun-exit-code-argocd-session.md`.
-- [ ] Codex implements three fix commits; Claude verifies diff, gates, and mutations, then commits.
+- [x] Codex implemented `b5227418`, `393a0aae`, `236219f6`, docs `6aaef4dc`. Claude verified them independently:
+  the SHAs are on origin, the diff stays within spec scope, shellcheck is clean, BATS passed 23/23, pytest passed 51, and doc links passed.
+  All three mutations went red. The faithful `get-context` exit-only probe fails `stale session mints a token`.
 - [ ] Deferred review items 5–10: Vault root token, latency unit, duplicated overview dashboard,
   label cardinality, and release-label test location.
 
