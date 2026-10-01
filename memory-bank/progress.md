@@ -2836,4 +2836,4 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 
 - [x] Corrected the embedded Python newline escape in both sync targets and added a regression
   assertion. The faulty escape mutation failed the focused suite; restoration passed. Final SHA is
-  recorded in the bug doc after commit.
+  recorded in the bug doc: `db351961`.

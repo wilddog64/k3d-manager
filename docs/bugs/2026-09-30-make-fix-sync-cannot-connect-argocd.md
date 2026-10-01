@@ -105,4 +105,4 @@ The direct session API test authenticated successfully while the Make target ret
 The embedded Python used `rstrip("\\n")`, which strips the literal backslash and `n` characters
 instead of a newline. It now uses `rstrip("\n")` so the password reaches ArgoCD unchanged.
 
-Follow-up implementation commit is recorded after commit.
+Follow-up implementation commit: `db351961`.

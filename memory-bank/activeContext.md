@@ -7999,4 +7999,4 @@ then the Kubernetes Secret. Focused regression is green; final SHA: `122129bb`.
 The direct session API test authenticated successfully while the Make target returned HTTP 401.
 The embedded Python used `rstrip("\\n")`, stripping literal backslash/`n` characters from some
 passwords. Both sync targets now use `rstrip("\n")`; the focused regression is green. The final
-implementation SHA is recorded in the bug doc after commit.
+implementation SHA: `db351961`.
