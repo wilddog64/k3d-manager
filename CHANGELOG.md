@@ -35,6 +35,10 @@
 
 ### Fixed
 
+- Empty `mktemp` results can no longer make the shopping-cart tests write into the repository root:
+  the join helper rejects an empty kubeconfig, BATS fixtures use `BATS_TEST_TMPDIR`, and
+  `make check-doc-links` rejects root debris.
+
 - Hermes R2 now kickstarts the Prometheus auth proxy that serves the cloudflared ingress port,
   rather than the backend port-forward behind it.
 

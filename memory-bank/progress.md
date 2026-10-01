@@ -1,4 +1,10 @@
-# 2026-10-01 — Codex batch bug 2 complete (`b5a70e7a`)
+# 2026-10-01 — Codex batch bug 3 complete (`ecb46449`)
+
+- [x] Empty mktemp paths: F1 guard, F2 BATS_TEST_TMPDIR sweep, F3 root-debris checker wired to
+  check-doc-links; TMPDIR pre-fix reproduction showed `.join-failures.*`; mutation red; full pytest 442/442.
+- [x] Three-commit batch complete; all three SHAs are recorded in the bug docs and memory-bank.
+
+# 2026-10-01 — Codex batch bug 2 complete (`2f8c3ec8`)
 
 - [x] Hermes R2 ingress mapping: auth proxy label, corrected topology comment, mapping-derived test,
   old-label mutation red; full pytest 442/442.

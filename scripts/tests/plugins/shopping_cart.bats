@@ -32,7 +32,8 @@
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    calls="$(mktemp)"
+    calls="${BATS_TEST_TMPDIR}/prune-keep-calls"
+    : > "$calls"
     kubectl() {
       if [[ "$1 $2 $3" == "config view -o" ]]; then
         printf "%s\\n" default
@@ -56,7 +57,8 @@
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    calls="$(mktemp)"
+    calls="${BATS_TEST_TMPDIR}/prune-delete-calls"
+    : > "$calls"
     kubectl() {
       if [[ "$1 $2 $3" == "config view -o" ]]; then
         printf "%s\\n" ubuntu-hostinger
@@ -154,7 +156,8 @@
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
     source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh
-    _state="$(mktemp)"
+    _state="${BATS_TEST_TMPDIR}/bootstrap-state"
+    : > "$_state"
     _command_exist() {
       case "$1" in
         k3sup) [[ -s "$_state" ]] ;;
@@ -172,7 +175,8 @@
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
     source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh
-    _state="$(mktemp)"
+    _state="${BATS_TEST_TMPDIR}/ensure-state"
+    : > "$_state"
     _command_exist() {
       case "$1" in
         k3sup) [[ -s "$_state" ]] ;;
@@ -195,13 +199,14 @@
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    log="$(mktemp)"
+    log="${BATS_TEST_TMPDIR}/parallel-join-log"
+    : > "$log"
     _k3s_agent_is_ready() { return 1; }
     _k3s_agent_address() { printf "%s\n" "$1"; }
     _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
     _k3sup_join_agent() { printf "join %s\n" "$1" >> "$log"; }
     _k3s_wait_agent_ready() { printf "ready %s\n" "$2" >> "$log"; }
-    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3,ubuntu-4 server "$(mktemp)"
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3,ubuntu-4 server "${BATS_TEST_TMPDIR}/parallel-kubeconfig"
     cat "$log"
   '
   [ "$status" -eq 0 ]
@@ -220,7 +225,7 @@
     _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
     _k3sup_join_agent() { [[ "$1" != ubuntu-2 ]]; }
     _k3s_wait_agent_ready() { return 0; }
-    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3 server "$(mktemp)"
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3 server "${BATS_TEST_TMPDIR}/failure-kubeconfig"
   '
   [ "$status" -ne 0 ]
   [[ "$output" == *"ubuntu-2"* ]]
@@ -232,12 +237,13 @@
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    log="$(mktemp)"
+    log="${BATS_TEST_TMPDIR}/idempotent-join-log"
+    : > "$log"
     _k3s_agent_is_ready() { return 0; }
     _k3s_agent_address() { printf "%s\n" "$1"; }
     _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
     _k3sup_join_agent() { printf "unexpected join\n" >> "$log"; return 1; }
-    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2 server "$(mktemp)"
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2 server "${BATS_TEST_TMPDIR}/idempotent-kubeconfig"
     [ ! -s "$log" ]
   '
   [ "$status" -eq 0 ]
@@ -344,7 +350,8 @@ EOF
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    vault_writes="$(mktemp)"
+    vault_writes="${BATS_TEST_TMPDIR}/vault-writes"
+    : > "$vault_writes"
     gh() {
       case "$1" in
         auth) printf "%s\n" "gh-token" ;;

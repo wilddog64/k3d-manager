@@ -1,4 +1,12 @@
-# 2026-10-01 — Codex batch bug 2 fixed (`b5a70e7a`)
+# 2026-10-01 — Codex batch bug 3 fixed (`ecb46449`)
+
+Empty `mktemp` paths are prevented in the shopping-cart tests: the join helper rejects an empty
+kubeconfig, fixtures use `BATS_TEST_TMPDIR`, and the repo-root checker is wired into
+`make check-doc-links`. The `.join-failures.999` mutation failed the gate; both BATS suites,
+shellcheck, doc links, and full pytest 442/442 pass. A pre-existing ignored `.pub` was moved
+recoverably to `/private/tmp/k3d-manager-existing-pub` rather than deleted.
+
+# 2026-10-01 — Codex batch bug 2 fixed (`2f8c3ec8`)
 
 Hermes R2 now maps prometheus.3ai-talk.org to the auth proxy listening on cloudflared ingress :19090,
 not the backend port-forward on :19091. The two proposal assertions and a mapping-derived guard pass;

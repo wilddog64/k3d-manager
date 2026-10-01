@@ -914,6 +914,7 @@ test-python-unit:
 ## Run the pytest suites (scripts/tests/hermes + scripts/tests/bin/test_*.py)
 check-doc-links:
 	@python3 scripts/check-doc-links.py
+	@./scripts/check-repo-root-debris.sh
 
 ## Validate Kubernetes manifests, CRDs included, with kubeconform (installed if missing; needs network):
 ## make validate-manifests [FILES="path/a.yaml path/b.yaml"]
