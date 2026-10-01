@@ -102,6 +102,18 @@ originally-queued **v1.28.0 platform zero-downtime rollouts** was deferred (hard
 v1.28.0 tag instead shipped parallel multi-cloud provisioning + the public-endpoint probe. The next
 milestone will be chosen from Forward themes below once it gets a scope doc.
 
+### Candidate milestone — v1.42.0: k3d-manager Dot
+
+Turn Hermes into a focused, always-on project agent that keeps operational work moving while
+preserving human control. The first slice is deliberately narrow: once per day, launch the
+offline `k3dm-test` suite and Tier 1 vCluster E2E independently; retain separate result,
+freshness, and triage channels; investigate failures; and pause for approval before any repair
+or bug-writing mutation. The two runs must never depend on each other or mask each other's
+status. Accurate duration and resumable run state are part of the foundation.
+
+Scope: [`v1.42.0-daily-offline-and-e2e-verification.md`](plans/v1.42.0-daily-offline-and-e2e-verification.md).
+Tier 2 ACG/Stripe remains opt-in and is not made an unattended daily job.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a

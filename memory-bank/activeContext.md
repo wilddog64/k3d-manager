@@ -8041,3 +8041,10 @@ launches the offline `k3dm-test` suite and Tier 1 vCluster E2E independently. Th
 separate result channels and Hermes triage keys, records child timing, repairs the currently
 dead offline duration metrics, and excludes the unattended Tier 2 ACG/Stripe sandbox. Awaiting
 implementation and review.
+# 2026-10-01 — k3d-manager Dot roadmap
+
+Added a candidate v1.42.0 milestone to `docs/roadmap.md`: an always-on, project-specific Hermes
+agent that independently runs the offline k3dm-test suite and Tier 1 E2E daily, preserves
+separate result/triage channels, records real durations, and pauses for human approval before
+mutating repairs or filing work. The detailed scope is
+`docs/plans/v1.42.0-daily-offline-and-e2e-verification.md`.

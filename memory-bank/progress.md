@@ -2871,3 +2871,8 @@ in the bug doc after commit: `3664bea7`.
   channels/triage, stale-data semantics, timing metrics, mutations, and offline acceptance
   gates in `docs/plans/v1.42.0-daily-offline-and-e2e-verification.md`.
 - [ ] Implementation not started; Tier 2 ACG/Stripe remains opt-in and outside this plan.
+# 2026-10-01 — k3d-manager Dot roadmap
+
+- [x] Added the candidate v1.42.0 “k3d-manager Dot” milestone to `docs/roadmap.md`, linking
+  the independent daily offline/E2E verification scope.
+- [ ] Implementation is not started; this remains a roadmap/specification item.
