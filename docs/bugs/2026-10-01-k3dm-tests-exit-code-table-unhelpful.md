@@ -19,3 +19,11 @@ metric-internal columns, renames the useful fields to `Runner`, `Job`, and `Resu
 known values to `PASS`, `EXPECTED ENVIRONMENT` (exit code 2), and `FAIL`.
 
 Implementation commit: `e3db399e`.
+
+## Regression
+
+The review-fix regression is tracked in
+`docs/bugs/2026-10-01-v1.40.0-review-fixes-ci-rerun-exit-code-argocd-session.md`.
+The `e3db399e` verdict mapping was reverted to an informational panel: the make exit code is
+shown without PASS/FAIL/EXPECTED ENVIRONMENT verdicts, while the Failed cases panel remains the
+health signal.

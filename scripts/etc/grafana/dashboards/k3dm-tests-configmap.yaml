@@ -75,20 +75,16 @@ data:
         {
           "id": 7,
           "type": "table",
-          "title": "Latest test result",
-          "description": "Latest recorded result for each runner. PASS is exit code 0; EXPECTED ENVIRONMENT is exit code 2 when test-pytest cannot run because pytest is unavailable; any other non-zero code is a failure.",
+          "title": "Make exit code (informational)",
+          "description": "The make test-all exit code is informational. make returns 2 for any failed recipe, including the expected missing-pytest case. Pass/fail is shown in the Failed cases panel.",
           "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
-          "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": {
-            "0": { "text": "PASS", "color": "green" },
-            "1": { "text": "FAIL", "color": "red" },
-            "2": { "text": "EXPECTED ENVIRONMENT", "color": "yellow" }
-          } }] }, "overrides": [] },
-          "targets": [{ "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "last_over_time(k3dm_test_exit_code[7d])", "format": "table", "instant": true }],
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "k3dm_test_exit_code", "format": "table", "instant": true }],
           "transformations": [
             { "id": "labelsToFields", "options": {} },
             { "id": "organize", "options": {
-              "excludeByName": { "Time": true, "__name__": true },
-              "renameByName": { "Value": "Result", "instance": "Runner", "job": "Job" }
+              "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true },
+              "renameByName": { "target": "Target", "Value": "Exit code" }
             } }
           ]
         }

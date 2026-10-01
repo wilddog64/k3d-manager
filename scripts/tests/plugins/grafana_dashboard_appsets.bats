@@ -73,13 +73,18 @@ HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboa
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
 }
 
-@test "k3dm tests dashboard presents a readable latest result" {
+@test "k3dm tests dashboard keeps the make exit code informational" {
   local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
   run yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}"
   [ "$status" -eq 0 ]
-  printf '%s\n' "$output" | jq empty
-  [[ "$output" == *'"title": "Latest test result"'* ]]
-  [[ "$output" == *'last_over_time(k3dm_test_exit_code[7d])'* ]]
-  [[ "$output" == *'"Value": "Result"'* ]]
-  [[ "$output" == *'"2": { "text": "EXPECTED ENVIRONMENT"'* ]]
+  local dashboard_json="$output"
+  local panel
+  panel=$(printf '%s\n' "$dashboard_json" | jq -c '.panels[] | select(.id == 7)')
+  [ -n "$panel" ]
+  [ "$(jq -r '.title' <<<"$panel")" = "Make exit code (informational)" ]
+  [ "$(jq '[.fieldConfig.defaults.mappings[]? | tostring | test("PASS|EXPECTED ENVIRONMENT")] | any' <<<"$panel")" = "false" ]
+  [ "$(jq -r '.targets[0].expr' <<<"$panel")" = "k3dm_test_exit_code" ]
+  ! jq -e '.targets[0].expr | contains("last_over_time")' <<<"$panel" >/dev/null
+  jq -e '.description | contains("Failed cases")' <<<"$panel" >/dev/null
+  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failed cases" and (.targets[0].expr == "k3dm_test_cases_failed"))' >/dev/null
 }
