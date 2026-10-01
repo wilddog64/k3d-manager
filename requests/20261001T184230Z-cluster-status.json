@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "action": "cluster-status",
+  "args": {},
+  "requested_by": "codex-cloud",
+  "requested_at": "2026-10-01T18:42:30.052Z",
+  "expires_at": "2026-10-01T19:12:30.052Z"
+}
