@@ -2843,3 +2843,8 @@ recorded in the bug doc: `db351961`.
 - [x] Filed the bug with screenshot evidence and confirmed the built-in Overview JSON is absent
   from the available source checkouts.
 - [ ] Add and deploy a source-controlled replacement/override after confirming dashboard ownership.
+
+# 2026-10-01 — Grafana Overview readable replacement
+
+- [x] Added and tested the source-controlled replacement dashboard; final SHA is recorded in the
+  bug doc after commit.

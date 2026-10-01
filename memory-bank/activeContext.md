@@ -8007,3 +8007,9 @@ Filed `docs/bugs/2026-10-01-grafana-overview-raw-series-labels.md`. The screensh
 built-in Overview dashboard; its JSON is not source-controlled in k3d-manager or the adjacent
 shopping-cart-infra checkout. A source-controlled replacement would be required before changing
 the labels safely.
+
+# 2026-10-01 — Grafana Overview readable replacement
+
+Added `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` with the existing
+Overview UID and queries, plus readable HTTP-status and latency legends. The dashboard regression
+suite is green; final SHA is recorded in the bug doc after commit.

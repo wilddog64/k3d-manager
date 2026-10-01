@@ -4,6 +4,7 @@ ACG="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-ac
 HUB="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-hub.yaml"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-autopatch.yaml"
+OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/grafana-overview-readable-configmap.yaml"
 
 @test "acg dashboard appset targets app-cluster role" {
   run yq -r '.spec.generators[0].clusters.selector.matchLabels["k3d-manager/role"]' "${ACG}"
@@ -48,4 +49,16 @@ DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-
 
   run grep -F -- '"legendFormat": "{{exported_service}} ({{state}})"' "${DASHBOARD}"
   [ "$status" -eq 0 ]
+}
+
+@test "Grafana Overview uses readable request labels" {
+  run yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq empty
+  [[ "$output" == *'"uid": "6be0s85Mk"'* ]]
+  [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
+  [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
+  [[ "$output" == *'"legendFormat": "p50 — median"'* ]]
+  [[ "$output" == *'"legendFormat": "Average — arithmetic mean"'* ]]
+  [[ "$output" == *'Status -1 means the request did not produce a normal HTTP response'* ]]
 }
