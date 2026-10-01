@@ -36,3 +36,5 @@ rpc error: code = Unknown desc = Post "https://localhost:8080/application.Applic
 
 The repository's working login path uses `--plaintext` for this local port-forward. The sync
 targets now pass that flag as well.
+
+Follow-up commit: `14dab218`.

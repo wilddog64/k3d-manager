@@ -7953,5 +7953,5 @@ mutation check passed; final commit SHA: `ffe501fa`.
 
 The first connection fix established the tunnel but ArgoCD then returned an HTTPS EOF. Added
 `--plaintext` to both Make sync targets, matching the repository's local ArgoCD login path. The
-focused regression test and a mutation check removing `--plaintext` were run; final follow-up SHA
-is recorded in the bug doc after commit.
+focused regression test and a mutation check removing `--plaintext` were run; final follow-up SHA:
+`14dab218`.
