@@ -58,3 +58,5 @@ Follow-up commit: `a7fb7798`.
 When the target still exited with status 1, its cleanup path removed the port-forward log and its
 login branch suppressed the useful error. The target now identifies Secret-read and login failures
 and preserves the temporary port-forward log when the operation fails.
+
+Follow-up commit: `36653c96`.

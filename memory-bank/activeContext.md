@@ -7967,4 +7967,4 @@ the mutation removing login transport flags were red/green verified; final SHA: 
 
 The sync target's failure path was still opaque: it removed the port-forward log and suppressed
 login errors. Added explicit tunnel/Secret/login diagnostics and preserve-on-failure log cleanup.
-The full fix-target BATS suite is green; final SHA is recorded in the bug doc after commit.
+The full fix-target BATS suite is green; final SHA: `36653c96`.
