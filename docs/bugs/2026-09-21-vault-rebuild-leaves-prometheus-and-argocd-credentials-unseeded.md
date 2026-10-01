@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-21
 **Branch:** `k3d-manager-v1.36.0`
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — `_observability_ensure_prometheus_login` reseeds Vault (recovering from the local cache first); ArgoCD display falls back to `argocd-initial-admin-secret`.
 **Targets:** `scripts/plugins/observability.sh`, `Makefile` (`show-service-passwords`)
 **Follows:** `docs/bugs/2026-09-21-show-service-passwords-liveness-probe-uses-optional-kv-path.md` (`ef3d4b8d`)
 

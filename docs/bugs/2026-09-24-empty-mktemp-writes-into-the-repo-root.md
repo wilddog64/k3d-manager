@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.37.0`
 **Filed:** 2026-09-24 by Claude
-**Status:** OPEN — root cause confirmed by measurement; fix specced below, not applied
+**Status:** STILL OPEN (triage by Claude, 2026-10-01): F1–F3 not applied; `scripts/tests/lib/k3s_oci_provider.bats` still has 10 bare `$(mktemp)` uses. Test hygiene, low risk.
 
 ## Symptom
 

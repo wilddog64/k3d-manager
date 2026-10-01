@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-16 by k3dm-hermes
-**Status:** OPEN — Hermes rule-based triage; unverified
+**Status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Awaiting the operator's choice: (a) a test-only profile or (b) a real Keycloak token.
 **Run:** `1789549631-2079`, runner `m2`, tier `vcluster`, 24 passed / 33 failed / 102 total
 **Runner commit:** `ec4874fe62cab1ba120729dc5d48454f7d50dcc7`
 

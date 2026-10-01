@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — `bin/prometheus-auth-proxy` and its LaunchAgent sit on the ingress port 19090 in front of the raw port-forward on 19091 (v1.34.0, #127).
 **Severity:** high — a public, unauthenticated read of every metric series, target list, and scrape config on the hub.
 **Files:** `bin/prometheus-auth-proxy` (new), `scripts/etc/launchd/com.k3d-manager.prometheus-auth-proxy.plist.tmpl` (new), `scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl`, `scripts/plugins/observability.sh`, `scripts/tests/lib/observability.bats`, `CHANGELOG.md`
 **Related:** `docs/bugs/v1.6.1-bugfix-prometheus-acg-web-config-arg.md` (why the operator path was abandoned)

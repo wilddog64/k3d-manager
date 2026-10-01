@@ -1,7 +1,7 @@
 # CI's hand-maintained BATS list has drifted from `make test` — 54 suite files are dark
 
 **Filed:** 2026-09-17
-**Status:** OPEN — assigned to Codex
+**Status:** FIXED (triage by Claude, 2026-10-01) — `.github/workflows/ci.yml` runs `make test` / `make test-bin` / `make test-python-unit` instead of a hand-written list.
 **Branch:** `k3d-manager-v1.35.0`
 **Severity:** process / coverage. No production defect in this spec, but it is the reason
 two real defects reached the branch unseen (see Evidence).

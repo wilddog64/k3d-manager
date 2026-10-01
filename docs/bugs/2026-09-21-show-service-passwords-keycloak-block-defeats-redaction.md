@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-21
 **Branch:** `k3d-manager-v1.36.0`
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — the Keycloak block in `make show-service-passwords` prints labelled `password:` lines.
 **Targets:** `Makefile` (`show-service-passwords`), `bin/get-keycloak-password`
 **Follows:** `docs/bugs/2026-09-21-vault-rebuild-leaves-prometheus-and-argocd-credentials-unseeded.md` (`6c744a23`)
 **Related:** `docs/bugs/2026-05-11-keycloak-admin-password-reseed-on-rebuild.md`,

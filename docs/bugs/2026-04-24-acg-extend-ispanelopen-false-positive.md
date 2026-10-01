@@ -1,7 +1,7 @@
 # Bug: `acg_extend.js` — `isPanelOpen` false positive skips "Open Sandbox" click
 
 **Date:** 2026-04-24
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — `scripts/playwright/acg_extend.js:176-178` now derives `isPanelOpen` from the click result instead of the card text.
 **Severity:** CRITICAL (Blocker — extend always fails on listing page)
 **Branch:** `k3d-manager-v1.1.0`
 

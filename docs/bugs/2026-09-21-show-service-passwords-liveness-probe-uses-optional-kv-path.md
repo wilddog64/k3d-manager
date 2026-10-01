@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-21
 **Branch:** `k3d-manager-v1.36.0`
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — the Vault readiness probe uses `auth/token/lookup-self`.
 **Target:** `Makefile` (`show-service-passwords`, line 496)
 
 ---

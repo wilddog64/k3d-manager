@@ -1,3 +1,7 @@
+# 2026-10-01 — bug backlog triage
+
+- [x] 27 OPEN docs triaged: 14 fixed, 7 stale-closed, 6 open (R2 label, agy exit status, mktemp, appset overrides dormant, payments a/b, hub self-registration).
+
 # 2026-09-30 — v1.41.0 planning
 
 - [x] Spec `docs/plans/v1.41.0-python-agent-rigor.md` written (3 of 5 v1.41.0 plans).

@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Alert:** `PrometheusErrorSendingAlertsToAnyAlertmanager` — "Prometheus encounters more than 3% errors sending alert to any alertmanager"
 **Cluster:** hub (`k3d-cluster`)
-**Status:** OPEN — root cause identified, fix not applied
+**Status:** FIXED (triage by Claude, 2026-10-01) — hub Alertmanager CPU limit is now 500m (was 50m) in `kube-prometheus-stack-values.yaml`.
 
 ## Symptom
 

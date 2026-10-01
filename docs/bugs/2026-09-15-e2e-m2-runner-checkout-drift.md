@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — `scripts/plugins/e2e_remote.sh` dispatches the M4's exact SHA and force-checks it out on the M2 (`:413`, `:476`).
 **Files:** `scripts/plugins/e2e_remote.sh`, `scripts/tests/plugins/e2e_remote.bats`, `CHANGELOG.md`
 
 ## Evidence (2026-09-15, read-only)

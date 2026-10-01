@@ -2,7 +2,7 @@
 
 **Cluster:** hub `k3d-k3d-cluster` (ArgoCD ns `cicd`), app `acg-trivy-operator`
 **Observed:** 2026-08-23
-**Status:** OPEN — durable git fix is correct and in place; ArgoCD will not apply it.
+**Status:** CLOSED as stale (triage by Claude, 2026-10-01) — a one-off ArgoCD render-cache incident on v1.27.0, not seen since; ApplicationSets were reapplied and hard-refreshed on 2026-09-30. Reopen if it recurs.
 
 ## Symptom
 

@@ -1,3 +1,10 @@
+# 2026-10-01 — bug backlog triage: 27 OPEN → 6 open
+
+Checked each OPEN doc against the current code and live evidence. 14 FIXED (code cited in each status line), 7 CLOSED as stale
+(4 Hermes contract-drift and 2 harness triage docs from single runs; the 08-23 ArgoCD render incident). Still open: R2 wrong agent
+after the Prometheus port split; agy exit status discarded; empty mktemp (test hygiene); appset live-overrides (dormant); payment
+e2e 503 (awaiting decision a/b); hub self-registration duplicate (awaiting the owner's decision).
+
 # 2026-09-30 — Keycloak reconcile hook fixed live
 
 #105 merged as e41f2ad; after a hard refresh and sync: Succeeded, no Job left. The reconcile + LDAP section ran fully for the first time since #98.

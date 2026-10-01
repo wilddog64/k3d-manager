@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — restricted result publication plus `publication_pending` retention and `make e2e-replay` (`scripts/plugins/e2e_remote.sh:493+`).
 **Files:** `scripts/plugins/e2e.sh`, `scripts/plugins/e2e_remote.sh`, `scripts/tests/plugins/e2e.bats`, `scripts/tests/plugins/e2e_remote.bats`, `CHANGELOG.md`
 **Blocks:** `docs/plans/v1.34.0-hermes-scheduled-e2e.md` (Hermes reads the files B3 creates)
 

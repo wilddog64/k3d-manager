@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
-**Status:** OPEN — spec only, assigned to Codex.
+**Status:** FIXED (triage by Claude, 2026-10-01) — `scripts/etc/argocd/app-clusters.tsv`, `_argocd_app_cluster_inventory` and `argocd_app_cluster_reconcile.bats` shipped in v1.37.0 (#131).
 **Predecessor:** `docs/bugs/2026-09-13-hostinger-app-cluster-registration-lost-orphaned-workloads.md`
 (fixed `14f26f3d`, **RECURRED 2026-09-23**). That doc restored the registration and gave us a
 safe way to restore it again. This one makes the restore automatic and the gap visible.

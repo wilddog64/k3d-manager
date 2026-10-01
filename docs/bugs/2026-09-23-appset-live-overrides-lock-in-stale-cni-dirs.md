@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
-**Status:** OPEN
+**Status:** OPEN, DORMANT (triage by Claude, 2026-10-01): the structural fix is not applied, but the 2026-09-30 reapply resolved the correct k3s CNI dirs for hostinger, so nothing is broken live today.
 **Severity:** high — the same defect has been "fixed" three times and re-broken three times, because the fix cannot reach the cluster
 
 ---
