@@ -2847,4 +2847,5 @@ recorded in the bug doc: `db351961`.
 # 2026-10-01 — Grafana Overview readable dashboard
 
 - [x] Added and tested the source-controlled readable dashboard with a unique UID/title; final SHA
-  is recorded in the bug doc after commit.
+is recorded in the bug doc after commit.
+Final implementation SHA: `487b0a43`.

@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-10-01
-**Status:** FIXED (`62940976`)
+**Status:** FIXED (`487b0a43`)
 **Severity:** low — the dashboard is functional, but its legends and panel descriptions make the
 HTTP status and latency series difficult to interpret.
 
@@ -42,4 +42,4 @@ It uses the unique title `Grafana Overview — Readable` and UID `k3dm-grafana-o
 Helm-owned Overview dashboard cannot be safely overridden by a second ConfigMap with the same UID.
 The dashboard sidecar imports it from the existing ArgoCD-managed dashboards directory.
 
-Implementation commit: `62940976`.
+Implementation commits: `62940976`, `487b0a43`.
