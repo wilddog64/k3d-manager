@@ -6,6 +6,7 @@ durable audit, auto-verification) is NOT implemented and needs its own scope doc
 """
 
 import hashlib
+import os
 import re
 from pathlib import Path
 import shlex
@@ -103,7 +104,8 @@ def _r1_command(_records):
 
 
 def _r2_command(records):
-    return ["launchctl", "kickstart", "-k", _r2_label(records)], {}
+    # kickstart takes a service target (gui/<uid>/<label>); a bare label is rejected.
+    return ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{_r2_label(records)}"], {}
 
 
 def _r3_command(_records):

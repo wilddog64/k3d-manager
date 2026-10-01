@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -47,7 +48,7 @@ def test_r1_fires_only_when_both_webhook_sensors_unknown_sustained():
 def test_r2_fires_on_single_service_with_healthy_substrate():
     proposals = repairs.propose(r2_records(), state())
     assert proposals[0]["key"] == "r2"
-    assert proposals[0]["command"] == "launchctl kickstart -k com.k3d-manager.prometheus-auth-proxy"
+    assert proposals[0]["command"] == f"launchctl kickstart -k gui/{os.getuid()}/com.k3d-manager.prometheus-auth-proxy"
     assert repairs.propose(r2_records("edge-down"), state()) == []
 
 
@@ -59,7 +60,7 @@ def test_r2_command_uses_the_ingress_label_mapping():
         proposal = repairs.propose(r2_records(), state())[0]
     finally:
         repairs.PORT_FORWARD_LABELS[host] = original
-    assert proposal["command"] == "launchctl kickstart -k com.test.ingress-agent"
+    assert proposal["command"] == f"launchctl kickstart -k gui/{os.getuid()}/com.test.ingress-agent"
 
 
 def test_r2_ignores_unrelated_eso_failure_but_not_node_pressure():
@@ -217,7 +218,7 @@ def test_approve_runs_lever_and_records_audit():
 
     outcome = repairs.approve(proposal["action_id"], current, r2_records(), runner)
     assert outcome["outcome"] == "executed"
-    assert calls == [(["launchctl", "kickstart", "-k", "com.k3d-manager.prometheus-auth-proxy"], {}, None)]
+    assert calls == [(["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/com.k3d-manager.prometheus-auth-proxy"], {}, None)]
     assert current["repair_audit"][0]["action_id"] == proposal["action_id"]
     assert current["repairs_attempted_this_incident"] == ["r2"]
 

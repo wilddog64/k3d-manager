@@ -1,3 +1,8 @@
+# 2026-10-01 — Codex batch verified (8a7cdec9 agy fallback, 2f8c3ec8 R2 label, 8fa82259 mktemp)
+
+All clean against their specs, with mutations red. Found and fixed: R2 used `launchctl kickstart -k <bare label>`, which launchctl rejects,
+so R2 never worked. It now uses gui/<uid>/<label>. Operator: probe `agy --model gemini-3.8-flash-medium` once on the M4.
+
 # 2026-10-01 — Codex batch bug 3 fixed (`ecb46449`)
 
 Empty `mktemp` paths are prevented in the shopping-cart tests: the join helper rejects an empty

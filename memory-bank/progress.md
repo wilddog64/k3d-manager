@@ -18,7 +18,8 @@
 
 # 2026-10-01 — bug backlog triage
 
-- [ ] Codex batch (k3d-manager-v1.40.0, 3 commits): agy exit status + S0 model (re-anchored to agent.py), R2 label, empty mktemp F1–F3.
+- [x] Codex batch verified 2026-10-01: 8a7cdec9 (agy), 2f8c3ec8 (R2), 8fa82259 (mktemp); plus the R2 gui/<uid> service-target fix.
+- [ ] Operator: `agy --model gemini-3.8-flash-medium --prompt 'Reply with exactly: PONG'` on the M4.
 - [x] 27 OPEN docs triaged: 14 fixed, 7 stale-closed, 6 open (R2 label, agy exit status, mktemp, appset overrides dormant, payments a/b, hub self-registration).
 
 # 2026-09-30 — v1.41.0 planning

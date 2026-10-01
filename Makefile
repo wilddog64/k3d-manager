@@ -935,7 +935,7 @@ index-docs:
 find-similar-docs:
 	@python3 scripts/find-similar-docs.py $(if $(K),--k $(K),) -- "$(Q)"
 
-## Fail if test/job debris (empty-mktemp derived paths) is staged at the repo root
+## Fail if test/job debris (empty-mktemp derived paths) exists at the repo root
 check-repo-root:
 	@./scripts/check-repo-root-debris.sh
 
