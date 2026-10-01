@@ -55,7 +55,8 @@ OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/grafana-overview-rea
   run yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | jq empty
-  [[ "$output" == *'"uid": "6be0s85Mk"'* ]]
+  [[ "$output" == *'"uid": "k3dm-grafana-overview"'* ]]
+  [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
   [[ "$output" == *'"legendFormat": "p50 — median"'* ]]

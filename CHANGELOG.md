@@ -21,8 +21,8 @@
   the Kubernetes Secret, avoiding stale initial-admin credentials after rebuilds.
 - Fixed the embedded session-login Python newline escape so passwords are passed unchanged to
   ArgoCD.
-- Added a source-controlled Grafana Overview replacement with readable HTTP-status and latency
-  legends while preserving the existing metrics and dashboard variables.
+- Added a source-controlled `Grafana Overview — Readable` dashboard with readable HTTP-status and
+  latency legends while preserving the existing metrics and dashboard variables.
 
 ### Added
 

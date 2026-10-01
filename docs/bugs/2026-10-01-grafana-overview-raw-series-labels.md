@@ -36,8 +36,10 @@ Grafana UI.
 ## Resolution
 
 Added `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml`. It keeps the
-existing dashboard UID, PromQL, datasource variable, job/instance filters, and panel layout, while
-adding explanatory panel descriptions and readable HTTP-status, percentile, median, and average
-legends. The dashboard sidecar can import it from the existing ArgoCD-managed dashboards directory.
+existing PromQL, datasource variable, job/instance filters, and panel layout, while adding
+explanatory panel descriptions and readable HTTP-status, percentile, median, and average legends.
+It uses the unique title `Grafana Overview — Readable` and UID `k3dm-grafana-overview`, because the
+Helm-owned Overview dashboard cannot be safely overridden by a second ConfigMap with the same UID.
+The dashboard sidecar imports it from the existing ArgoCD-managed dashboards directory.
 
 Implementation commit: `62940976`.

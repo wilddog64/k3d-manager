@@ -2844,7 +2844,7 @@ recorded in the bug doc: `db351961`.
   from the available source checkouts.
 - [x] Add and deploy a source-controlled replacement/override after confirming dashboard ownership.
 
-# 2026-10-01 — Grafana Overview readable replacement
+# 2026-10-01 — Grafana Overview readable dashboard
 
-- [x] Added and tested the source-controlled replacement dashboard; final SHA is recorded in the
-  bug doc: `62940976`.
+- [x] Added and tested the source-controlled readable dashboard with a unique UID/title; final SHA
+  is recorded in the bug doc after commit.
