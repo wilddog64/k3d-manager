@@ -73,6 +73,14 @@ is about 1,705 calls against a ~1,000/day ceiling. The real cold start (2026-09-
 not the pacing. Plan a cold start as *two sittings* rather than one half-hour run. A **warm**
 re-index is unaffected — it embeds only what changed, so it is normally zero calls.
 
+## Offline retrieval-quality control
+
+The v1.40.0 offline evaluation uses a stdlib TF-IDF cosine scorer over the same `doc_embed_text`
+strings that the indexer embeds. On the mined 25-positive-pair control, recall@5 was 0.800 for
+`docs/bugs/`, 0.800 for `docs/issues/`, 1.000 for `docs/plans/`, and 1.000 for `docs/retro/`.
+These are lexical control numbers; the embedding scorer remains gated for a live pgvector/Gemini
+run and is not represented by synthetic or sandbox measurements.
+
 Telling the two apart is what `_error_detail` is for: a spent daily allowance now prints
 `index-docs: paused — ... (quota EmbedContentRequestsPerDayPerProjectPerModel-FreeTier)`, not
 `unavailable`, because the store and the credential are both fine and the only correct action is to
