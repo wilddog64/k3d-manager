@@ -2814,4 +2814,4 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 
 - [x] Matched the working ArgoCD login flags and newline-fed stdin; login errors are now surfaced.
 - [x] Regression passed; removing `--skip-test-tls` made it fail, then restoration passed. Final
-  SHA is recorded in the bug doc after commit.
+  SHA: `e853c849`.

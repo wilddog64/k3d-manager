@@ -67,3 +67,5 @@ The first automatic-login implementation still failed without exposing the CLI d
 did not match the repository's known-good login path, which supplies `--skip-test-tls` and a
 newline-terminated password. The target now matches that path and reports the login command's
 error output without printing the password.
+
+Follow-up commit: `e853c849`.
