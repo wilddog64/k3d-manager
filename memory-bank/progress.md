@@ -1,6 +1,7 @@
 # 2026-10-01 — v1.40.0 spec handoff
 
 - [x] Specs corrected against the live tree and handed to Codex (app-health first, then retrieval eval).
+- [x] Dispatched via `codex exec` into worktree `../k3d-manager-codex-v1.40.0` (branch `codex-v1.40.0-hermes`).
 - [ ] Codex: app-health sensor commit — verify SHA on origin, 11 cases, 8 mutations, gate 7 default-off.
 - [ ] Codex: retrieval eval (test commit + feat commit) — verify pairs exist on disk, mutations red.
 - [ ] Claude: live `K3DM_RETRIEVAL_EVAL_LIVE=1` run, `search-response.json`, retro + vector-store.md numbers.

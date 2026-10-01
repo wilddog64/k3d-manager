@@ -7,7 +7,11 @@ retrieval named a non-existent `bin/find-similar-docs` (real: `scripts/find-simi
 asked for a Makefile edit `test-pytest` already globs, and required live embedding numbers Codex cannot reach. The eval
 was split: Codex does offline TF-IDF + pairs + a `K3DM_RETRIEVAL_EVAL_LIVE=1` case; Claude runs the live case, records
 `search-response.json`, and writes the retro and guide numbers. Claude implements `cloud-bridge-test-targets` and
-`cloud-request-artifacts` next. `slack-corpus-qa` stays blocked on the live recall@5.
+`cloud-request-artifacts` next.
+**Dispatched 2026-10-01** via `codex exec` (session 01a0f9cc) into worktree `../k3d-manager-codex-v1.40.0`,
+local branch `codex-v1.40.0-hermes` (from 12dbcdf5): Codex commits locally, no push, no memory-bank edits;
+Claude verifies, cherry-picks onto `k3d-manager-v1.40.0`, pushes, then removes the worktree. Claude does
+`cloud-request-artifacts` before `cloud-bridge-test-targets` (the latter needs its filter + junit readback). `slack-corpus-qa` stays blocked on the live recall@5.
 
 # 2026-10-01 — v1.40.0 review fix spec filed; assigned to Codex
 
