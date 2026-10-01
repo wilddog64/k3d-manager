@@ -24,7 +24,8 @@ from hermes.records import timestamp
 from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
-                            data_layer, hostnet_drift, node_pressure, reachability, stale_acg_registration,
+                            app_health, data_layer, hostnet_drift, node_pressure, reachability,
+                            stale_acg_registration,
                             status_checks, token_expiry_advisory, values_branch, vectordb)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
@@ -32,6 +33,7 @@ from hermes.slack import post_interactive, post_summary
 from hermes import pager
 from hermes import e2e_schedule, e2e_triage, e2e_bugs
 from hermes import status_triage
+from hermes import app_health_triage
 from webhook.redact import scrub_credentials
 from hermes.prior_art import corpus_fingerprint
 
@@ -83,6 +85,28 @@ def _status_run(command, _additions):
     result = subprocess.run(command, capture_output=True, text=True, cwd=ROOT,
                             timeout=120, check=False)
     return result.returncode, result.stdout
+
+
+def _app_health_run(command, _additions):
+    """Read app-cluster actuator endpoints through the API server, read-only."""
+    env = os.environ.copy()
+    kubeconfig = os.environ.get("K3DM_HERMES_APP_KUBECONFIG")
+    if kubeconfig:
+        env["KUBECONFIG"] = kubeconfig
+    result = subprocess.run(command, capture_output=True, text=True, env=env,
+                            timeout=30, check=False)
+    return result.returncode, result.stdout
+
+
+def _app_health_targets():
+    if os.environ.get("K3DM_HERMES_APP_HEALTH_ENABLED") != "1":
+        return []
+    path = Path(os.environ.get("K3DM_HERMES_APP_HEALTH_TARGETS",
+                               str(ROOT / "scripts/etc/hermes/app-health-targets.json")))
+    try:
+        return json.loads(path.read_text()).get("targets", [])
+    except (OSError, ValueError):
+        return []
 
 
 def _datastore_run(_command, _additions):
@@ -151,6 +175,8 @@ def _run_cycle(state, status_runner=None):
         vectordb(_vectordb_run, state),
         alert_delivery(_alert_delivery_run, state),
         ci(github_fetch, state, token=github),
+        app_health(_app_health_run, state, targets=_app_health_targets(),
+                   context=os.environ.get("K3DM_HERMES_APP_CONTEXT", "")),
     ]
     if status_runner is not None:
         records.append(status_checks(status_runner, state))
@@ -390,6 +416,16 @@ def _status_notification(state, record, relay):
                               for group in groups]
 
 
+def _file_app_health_bugs(records, slot):
+    health = next((item for item in records if item.get("sensor") == "app_health"), None)
+    if not health or health.get("status") != "degraded":
+        return None
+    groups = app_health_triage.triage((health.get("data") or {}).get("down_components"))
+    if not groups:
+        return None
+    return e2e_bugs.file_bugs(ROOT, groups, {"source": "app-health", "run_id": slot}, slot)
+
+
 def _publish_status(records, state):
     """Publish a redacted status snapshot for the cluster Hermes dashboard."""
     if not records or os.environ.get("K3DM_HERMES_PUBLISH_STATUS", "1") != "1":
@@ -582,10 +618,12 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
     if digest:
         post_summary(relay, digest)
     # Unknown status belongs to the webhook detector, including SMS escalation.
+    app_health_default_off = os.environ.get("K3DM_HERMES_APP_HEALTH_ENABLED") != "1"
     texts = pager.health_events(
         [item for item in records
          if item["sensor"] != "status_checks" and
-         not (item["sensor"] == "vectordb" and item["status"] == "unknown")], state)
+         not (item["sensor"] == "vectordb" and item["status"] == "unknown") and
+         not (app_health_default_off and item["sensor"] == "app_health")], state)
     texts += pager.security_events(audit_get, _keychain_secret, state, timestamp()[:13],
                                    AUDIT_SERVICE, REPOSITORY)
     texts += pager.job_events(state, None)
@@ -594,6 +632,12 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
     if (status_record and status_record.get("status") != "unknown" and
             (status_record.get("status") == "degraded" or state.get("status_groups"))):
         _status_notification(state, status_record, relay)
+    app_health_filed = _file_app_health_bugs(records, timestamp())
+    if app_health_filed and app_health_filed.get("groups"):
+        post_summary(relay, e2e_triage.redact(
+            "Hermes app-health triage: " + ", ".join(
+                f"[{item['status']}] {item['target']}" for item in app_health_filed["groups"]
+            ) + "; " + app_health_filed.get("push", "")))
     _publish_status(records, state)
     _publish_health_metrics(state.get("index_ref"))
     _schedule_e2e(state)

@@ -90,7 +90,44 @@ human investigation; existing repair proposals still require approval.
 '''
 
 
+def _app_health_doc(group, run, branch, date):
+    return f'''# Bug: app health gap — {redact(group["target"])}
+
+**Branch:** `{branch}`
+**Filed:** {date} by k3dm-hermes
+**Status:** OPEN — Hermes app-health sensor; unverified
+**Source:** `app_health` sensor (API-server service proxy)
+**Sample:** `{redact(run.get("run_id", "unknown"))}`
+
+## What was measured
+
+The aggregate `/actuator/health` endpoint is **not** `UP`, while both `/actuator/health/liveness`
+and `/actuator/health/readiness` are `UP`.
+
+## Why this cannot alert any other way
+
+Kubernetes polls only the two probe groups, so the pod stays Ready, stays in its Service, and
+ArgoCD reports Healthy. No existing sensor, alert rule or probe observes this state. A component
+is broken and every orchestration-level signal is green by construction.
+
+## Failing component(s) ({group.get("count", 0)})
+{_lines(group)}
+
+## Sample
+{chr(10).join(f"- {redact(sample)}" for sample in group.get("samples", [])[:3]) or "- No sample was available"}
+
+## Next step
+Identify which health indicator is DOWN and whether the underlying dependency is genuinely broken
+or merely misconfigured. Precedent: `docs/bugs/2026-09-16-e2e-assertion-api-payments.md`, where a
+`rabbitmq:` block at column 0 instead of nested under `spring:` made Spring target
+`localhost:5672`. Disabling the indicator is **not** a fix — it converts an honest red into a
+false green.
+'''
+
+
 def _doc(group, run, branch, date):
+    if run.get("source") == "app-health":
+        return _app_health_doc(group, run, branch, date)
     if run.get("source") == "status":
         return _status_doc(group, run, branch, date)
     summary = run.get("summary", {})
@@ -118,7 +155,8 @@ A human (or Claude) verifies the root cause, then writes the fix spec here befor
 
 def _reopen(path, group, run, date):
     text = path.read_text()
-    source = "cluster status sample" if run.get("source") == "status" else "e2e run"
+    source = ("cluster status sample" if run.get("source") == "status"
+              else "app health sample" if run.get("source") == "app-health" else "e2e run")
     unit = "check(s)" if run.get("source") == "status" else "test(s)"
     text = re.sub(r"^\*\*Status:\*\*.*$", f"**Status:** REOPENED {date} — recurred in Hermes {source} {redact(run.get('run_id', 'unknown'))}", text, flags=re.M)
     samples = "\n".join(f"- {redact(value)}" for value in group.get("samples", [])[:3])
@@ -130,7 +168,7 @@ def _commit_push(worktree, paths, slot, run, branch):
     add = _run(["git", "-C", str(worktree), "add", "--", *map(str, paths)])
     if add.returncode != 0:
         return f"commit blocked by pre-commit: {_first_line(add.stderr)}"
-    source = "status" if run.get("source") == "status" else "e2e"
+    source = run.get("source") if run.get("source") in ("status", "app-health") else "e2e"
     commit = _run(["git", "-C", str(worktree), "commit", "-m", f"docs(bugs): Hermes {source} triage {slot} (run {redact(run.get('run_id', 'unknown'))})", "-m", "Filed-By: k3dm-hermes"])
     if commit.returncode != 0:
         return f"commit blocked by pre-commit: {_first_line(commit.stderr or commit.stdout)}"

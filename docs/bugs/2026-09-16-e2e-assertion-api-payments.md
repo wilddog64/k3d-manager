@@ -174,6 +174,8 @@ here by design: `argocd` sees `Healthy`, `node_pressure` sees `1/1 Running`. A s
 compares aggregate health against probe-group health would have caught this class on the day
 it shipped.
 
+Implemented by `docs/plans/v1.40.0-hermes-app-health-delta-sensor.md` (commit pending verification).
+
 ---
 
 ## Update 2026-09-29 — the eight `Unexpected end of JSON input` failures explained

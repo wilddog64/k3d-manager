@@ -147,6 +147,23 @@ flap does not trip it). All are read-only.
    missing entry or unavailable webhook is unknown.
 6. **`ci`** — GitHub Actions / required-check health via the GitHub read API (failed, timed-out,
    cancelled, or stuck in-progress runs).
+7. **`app_health`** — compares each configured service's aggregate `/actuator/health` with its
+   liveness and readiness groups through the API-server service proxy. It reports a delta only
+   when the aggregate is not `UP` while both groups are `UP`; this is the application failure
+   Kubernetes and ArgoCD cannot see because they poll only the probe groups. It is disabled by
+   default and files debounced deltas into `docs/bugs/` through the same path as e2e and status
+   triage.
+
+### App-health aggregate/probe deltas
+
+Enable the sensor only after a read-only dry run confirms the app-cluster context, API-server
+service proxy path, and actuator port. Set `K3DM_HERMES_APP_HEALTH_ENABLED=1` and provide
+`K3DM_HERMES_APP_CONTEXT`; set `K3DM_HERMES_APP_KUBECONFIG` when the app cluster needs a
+dedicated kubeconfig. The target table is
+[`scripts/etc/hermes/app-health-targets.json`](../../scripts/etc/hermes/app-health-targets.json).
+Adding a service is a one-line target-table edit, but the operator must confirm that service's
+port from its own Deployment first. The sensor is disabled by default, uses no port-forward, and
+files only a debounced delta through the existing e2e-bugs path.
 
 ### `eso` says `unknown` — check the kube context before the credential.
 
@@ -339,6 +356,9 @@ align to a hard boundary.
 | `K3DM_HERMES_SMS_DAILY_BUDGET` | `10` | Max SMS pages per UTC day |
 | `K3DM_HERMES_E2E_ENABLED` | (enabled) | Set to `0` to disable scheduled E2E dispatch |
 | `K3DM_HERMES_E2E_SCHEDULE` | `wed,sat@02:00` | Strict local-time E2E schedule |
+| `K3DM_HERMES_APP_HEALTH_ENABLED` | (disabled) | Set to `1` to enable aggregate/probe health-delta sampling |
+| `K3DM_HERMES_APP_CONTEXT` | (unset) | Kubernetes context for the app-cluster service proxy |
+| `K3DM_HERMES_APP_KUBECONFIG` | (unset) | Optional kubeconfig path used by app-health kubectl calls |
 
 ---
 

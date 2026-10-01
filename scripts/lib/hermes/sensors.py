@@ -246,6 +246,74 @@ def status_checks(run, state, threshold=2):
         return record("status_checks", "unknown", "cluster status source unavailable")
 
 
+APP_HEALTH_PROBE_GROUPS = ("liveness", "readiness")
+
+
+def _health_payload(run, context, namespace, service, port, path):
+    """Read one actuator endpoint through the API server's service proxy."""
+    proxy = f"/api/v1/namespaces/{namespace}/services/{service}:{port}/proxy{path}"
+    code, output = run(["kubectl", "--context", context, "get", "--raw", proxy], {})
+    if code != 0 or not output:
+        return None
+    payload = json.loads(output)
+    return payload if isinstance(payload, dict) else None
+
+
+def _health_delta(run, context, target):
+    """Return (delta_detail, down_components) for one service; delta_detail is '' when none."""
+    namespace = target["namespace"]
+    service = target["service"]
+    port = target["port"]
+    aggregate = _health_payload(run, context, namespace, service, port, "/actuator/health")
+    if aggregate is None or not aggregate.get("status"):
+        raise ValueError(f"{service}: aggregate health unavailable")
+    if aggregate["status"] == "UP":
+        return "", []
+    groups = {}
+    for group in APP_HEALTH_PROBE_GROUPS:
+        payload = _health_payload(run, context, namespace, service, port,
+                                  f"/actuator/health/{group}")
+        if payload is None or not payload.get("status"):
+            raise ValueError(f"{service}: {group} group unavailable")
+        groups[group] = payload["status"]
+    if any(value != "UP" for value in groups.values()):
+        return "", []
+    components = aggregate.get("components") or {}
+    down = sorted(name for name, body in components.items()
+                  if isinstance(body, dict) and body.get("status") not in (None, "UP"))
+    return f"{service} aggregate {aggregate['status']} while both probe groups UP", down
+
+
+def app_health(run, state, targets=None, context="", threshold=2):
+    """Flag services whose aggregate health disagrees with the probe groups k8s polls."""
+    if not targets:
+        return record("app_health", "unknown", "no app health targets configured")
+    if not context:
+        return record("app_health", "unknown", "no app cluster context configured")
+    deltas, down = [], {}
+    try:
+        for target in targets:
+            detail, components = _health_delta(run, context, target)
+            if detail:
+                deltas.append(detail)
+                down[target["service"]] = components
+    except Exception:
+        return record("app_health", "unknown", "app health source unavailable")
+    if not deltas:
+        _debounced("app_health", False, threshold, state)
+        return record("app_health", "healthy",
+                      f"{len(targets)} service(s) agree with their probe groups "
+                      "(a group-visible outage is covered by the argocd sensor, not this one)")
+    status = "degraded" if _debounced("app_health", True, threshold, state) else "healthy"
+    detail = "; ".join(deltas[:3])
+    if len(deltas) > 3:
+        detail = f"{detail} (+{len(deltas) - 3} more)"
+    return record("app_health", status, redact(detail),
+                  data={"deltas": [redact(item) for item in deltas],
+                        "down_components": {key: [redact(name) for name in value]
+                                            for key, value in down.items()}})
+
+
 def _node_contexts(contexts):
     if contexts is not None:
         return [item for item in contexts if item]

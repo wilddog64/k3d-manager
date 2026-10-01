@@ -44,6 +44,9 @@
 
 ### Added
 
+- Hermes now measures application aggregate health against liveness/readiness probe groups through
+  the API-server service proxy, filing debounced deltas as app-health bug triage while disabled by default.
+
 - `make validate-manifests [FILES=…]` validates manifests, custom resources included, with kubeconform
   against the Datree CRD catalog pinned to a commit. It installs kubeconform when it is missing: Homebrew
   first, else the pinned v0.7.0 release into `~/.local/bin`, verified by SHA-256 (`_ensure_kubeconform`).
