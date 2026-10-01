@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-10-01
-**Status:** FIXED (`pending commit`)
+**Status:** FIXED (`e3db399e`)
 **Severity:** low — the panel shows `Time`, `__name__`, `instance`, and `job` without making the
 actual test result understandable.
 
@@ -18,4 +18,4 @@ The panel now queries `last_over_time(k3dm_test_exit_code[7d])` as an instant ta
 metric-internal columns, renames the useful fields to `Runner`, `Job`, and `Result`, and maps the
 known values to `PASS`, `EXPECTED ENVIRONMENT` (exit code 2), and `FAIL`.
 
-Implementation commit is recorded after commit.
+Implementation commit: `e3db399e`.

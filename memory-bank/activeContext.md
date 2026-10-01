@@ -8021,4 +8021,4 @@ recorded in the bug doc after commit. Final SHA: `3664bea7`.
 
 Changed the raw exit-code table to an instant latest-result table with Runner, Job, and Result
 columns plus PASS/FAIL/EXPECTED ENVIRONMENT mappings. The dashboard regression suite is green;
-final SHA is recorded in the bug doc after commit.
+final SHA: `e3db399e`.
