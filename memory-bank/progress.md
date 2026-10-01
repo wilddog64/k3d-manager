@@ -2791,3 +2791,9 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
   and use gRPC-web, with cleanup and a configurable server override.
 - [x] Added regression coverage; removing `--grpc-web` made the test fail, then restoration passed.
   Final commit SHA: `ffe501fa`.
+
+# 2026-09-30 — fix-sync plaintext follow-up
+
+- [x] Added `--plaintext` to `fix-sync` and `fix-force-sync` for the local ArgoCD port-forward.
+- [x] Focused regression passed; removing `--plaintext` made it fail, then restoration passed.
+  Follow-up SHA is recorded in the bug doc after commit.

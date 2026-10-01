@@ -862,7 +862,7 @@ fix-sync: ## APP is required
 		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
 		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { echo "ArgoCD did not become reachable at $(ARGOCD_SERVER); see $$_pf_log" >&2; exit 1; }; \
 	fi; \
-	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --insecure
+	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 
 ## ArgoCD force sync — discards local state (APP=<argocd-app-name>; ARGOCD_SERVER=host:port)
 fix-force-sync: ## APP is required
@@ -876,7 +876,7 @@ fix-force-sync: ## APP is required
 		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
 		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { echo "ArgoCD did not become reachable at $(ARGOCD_SERVER); see $$_pf_log" >&2; exit 1; }; \
 	fi; \
-	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --insecure
+	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 
 ## Force ESO ClusterSecretStore reconcile (annotates vault-backend to trigger re-sync)
 fix-eso-refresh: ## No arguments needed

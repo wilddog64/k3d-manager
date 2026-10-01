@@ -25,3 +25,14 @@ path uses the port-forward with gRPC-web.
 The targets now create a short-lived `k3d-k3d-cluster` port-forward when the default local
 endpoint is unavailable, wait for `/healthz`, use `--grpc-web`, and clean up the process and log.
 `ARGOCD_SERVER=host:port` remains available for an already reachable non-local endpoint.
+
+## Follow-up evidence
+
+After the first fix established the tunnel, ArgoCD returned:
+
+```text
+rpc error: code = Unknown desc = Post "https://localhost:8080/application.ApplicationService/Get": EOF
+```
+
+The repository's working login path uses `--plaintext` for this local port-forward. The sync
+targets now pass that flag as well.

@@ -36,7 +36,7 @@ setup() {
   run make -n fix-sync APP=acg-kube-prometheus-stack
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"kubectl --context \"k3d-k3d-cluster\" -n \"cicd\" port-forward svc/argocd-server 8080:443"* ]]
-  [[ "${output}" == *"--server 'localhost:8080' --grpc-web --insecure"* ]]
+  [[ "${output}" == *"--server 'localhost:8080' --grpc-web --plaintext --insecure"* ]]
 }
 
 @test "ask sandbox allows make fix-list in fix mode" {

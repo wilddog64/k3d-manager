@@ -7948,3 +7948,10 @@ Filed and fixed `docs/bugs/2026-09-30-make-fix-sync-cannot-connect-argocd.md`. T
 targets now bootstrap a short-lived local ArgoCD port-forward when needed, wait for health, use
 gRPC-web, clean up the child process, and accept `ARGOCD_SERVER` overrides. Focused BATS and a
 mutation check passed; final commit SHA: `ffe501fa`.
+
+# 2026-09-30 — fix-sync plaintext follow-up
+
+The first connection fix established the tunnel but ArgoCD then returned an HTTPS EOF. Added
+`--plaintext` to both Make sync targets, matching the repository's local ArgoCD login path. The
+focused regression test and a mutation check removing `--plaintext` were run; final follow-up SHA
+is recorded in the bug doc after commit.
