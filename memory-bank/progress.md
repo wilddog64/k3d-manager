@@ -2836,4 +2836,10 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 
 - [x] Corrected the embedded Python newline escape in both sync targets and added a regression
   assertion. The faulty escape mutation failed the focused suite; restoration passed. Final SHA is
-  recorded in the bug doc: `db351961`.
+recorded in the bug doc: `db351961`.
+
+# 2026-10-01 — Grafana Overview raw labels
+
+- [x] Filed the bug with screenshot evidence and confirmed the built-in Overview JSON is absent
+  from the available source checkouts.
+- [ ] Add and deploy a source-controlled replacement/override after confirming dashboard ownership.

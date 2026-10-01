@@ -8000,3 +8000,10 @@ The direct session API test authenticated successfully while the Make target ret
 The embedded Python used `rstrip("\\n")`, stripping literal backslash/`n` characters from some
 passwords. Both sync targets now use `rstrip("\n")`; the focused regression is green. The final
 implementation SHA: `db351961`.
+
+# 2026-10-01 — Grafana Overview raw labels
+
+Filed `docs/bugs/2026-10-01-grafana-overview-raw-series-labels.md`. The screenshot is Grafana's
+built-in Overview dashboard; its JSON is not source-controlled in k3d-manager or the adjacent
+shopping-cart-infra checkout. A source-controlled replacement would be required before changing
+the labels safely.
