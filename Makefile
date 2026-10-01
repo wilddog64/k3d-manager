@@ -865,7 +865,7 @@ fix-sync: ## APP is required
 	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
 		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not read ArgoCD admin password Secret from $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
 		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		printf '%s' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --insecure >/dev/null || { _keep_log=1; echo "ArgoCD CLI login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
+		_login_error=$$(printf '%s\n' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --skip-test-tls --insecure 2>&1 >/dev/null) || { _keep_log=1; echo "$$_login_error" >&2; echo "ArgoCD CLI login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
 	fi; \
 	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 
@@ -884,7 +884,7 @@ fix-force-sync: ## APP is required
 	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
 		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not read ArgoCD admin password Secret from $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
 		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		printf '%s' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --insecure >/dev/null || { _keep_log=1; echo "ArgoCD CLI login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
+		_login_error=$$(printf '%s\n' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --skip-test-tls --insecure 2>&1 >/dev/null) || { _keep_log=1; echo "$$_login_error" >&2; echo "ArgoCD CLI login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
 	fi; \
 	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 

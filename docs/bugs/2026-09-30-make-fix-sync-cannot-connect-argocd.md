@@ -60,3 +60,10 @@ login branch suppressed the useful error. The target now identifies Secret-read 
 and preserves the temporary port-forward log when the operation fails.
 
 Follow-up commit: `36653c96`.
+
+## Login compatibility follow-up
+
+The first automatic-login implementation still failed without exposing the CLI diagnostic. It also
+did not match the repository's known-good login path, which supplies `--skip-test-tls` and a
+newline-terminated password. The target now matches that path and reports the login command's
+error output without printing the password.

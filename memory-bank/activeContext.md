@@ -7968,3 +7968,10 @@ the mutation removing login transport flags were red/green verified; final SHA: 
 The sync target's failure path was still opaque: it removed the port-forward log and suppressed
 login errors. Added explicit tunnel/Secret/login diagnostics and preserve-on-failure log cleanup.
 The full fix-target BATS suite is green; final SHA: `36653c96`.
+
+# 2026-09-30 — fix-sync login compatibility
+
+Automatic ArgoCD login now matches the known-good path with `--skip-test-tls` and a newline-fed
+password, while capturing CLI diagnostics without exposing credentials. Focused regression and a
+mutation removing the compatibility flag were red/green verified; final SHA is recorded in the bug
+doc after commit.
