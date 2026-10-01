@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-10-01
-**Status:** FIXED (`487b0a43`)
+**Status:** FIXED (`e6543d1f`)
 **Severity:** low — the dashboard is functional, but its legends and panel descriptions make the
 HTTP status and latency series difficult to interpret.
 
@@ -45,4 +45,4 @@ The dashboard sidecar imports it from the existing ArgoCD-managed dashboards dir
 The same dashboard is also present in `scripts/etc/argocd/platform-ops/` for the hub ApplicationSet;
 the app-cluster and hub dashboards must be synchronized separately.
 
-Implementation commits: `62940976`, `487b0a43`.
+Implementation commits: `62940976`, `487b0a43`, `e6543d1f`.

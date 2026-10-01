@@ -2847,7 +2847,6 @@ recorded in the bug doc: `db351961`.
 # 2026-10-01 — Grafana Overview readable dashboard
 
 - [x] Added and tested the source-controlled readable dashboard with a unique UID/title; final SHA
-is recorded in the bug doc after commit.
+is recorded in the bug doc after commit. Final SHA: `e6543d1f`.
 The hub platform-ops manifest and regression assertion are included as well; final SHA is recorded
-in the bug doc after commit.
-Final implementation SHA: `487b0a43`.
+in the bug doc after commit: `e6543d1f`.
