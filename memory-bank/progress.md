@@ -1,3 +1,13 @@
+# 2026-10-01 — v1.40.0 spec handoff
+
+- [x] Specs corrected against the live tree and handed to Codex (app-health first, then retrieval eval).
+- [ ] Codex: app-health sensor commit — verify SHA on origin, 11 cases, 8 mutations, gate 7 default-off.
+- [ ] Codex: retrieval eval (test commit + feat commit) — verify pairs exist on disk, mutations red.
+- [ ] Claude: live `K3DM_RETRIEVAL_EVAL_LIVE=1` run, `search-response.json`, retro + vector-store.md numbers.
+- [ ] Claude: `v1.40.0-cloud-bridge-test-targets.md`.
+- [ ] Claude: `v1.40.0-cloud-request-artifacts.md`.
+- [ ] `v1.40.0-slack-corpus-qa.md` — blocked on the live recall@5.
+
 # 2026-10-01 — v1.40.0 review fix spec (Codex)
 
 - [x] Spec filed: `docs/bugs/2026-10-01-v1.40.0-review-fixes-ci-rerun-exit-code-argocd-session.md`.

@@ -1,3 +1,14 @@
+# 2026-10-01 — two v1.40.0 specs handed to Codex; Claude takes the cloud-bridge pair
+
+Remaining v1.40.0 specs: 5 of 5 unimplemented. Handed off to Codex, run in order on `k3d-manager-v1.40.0`:
+(1) `v1.40.0-hermes-app-health-delta-sensor.md` (one commit), then (2) `v1.40.0-hermes-prior-art-and-retrieval-eval.md`
+(two commits). Before handoff Claude fixed the specs: app-health pushed to v1.38.0 and said the branch "does not exist";
+retrieval named a non-existent `bin/find-similar-docs` (real: `scripts/find-similar-docs.py` + `hermes.prior_art.search`),
+asked for a Makefile edit `test-pytest` already globs, and required live embedding numbers Codex cannot reach. The eval
+was split: Codex does offline TF-IDF + pairs + a `K3DM_RETRIEVAL_EVAL_LIVE=1` case; Claude runs the live case, records
+`search-response.json`, and writes the retro and guide numbers. Claude implements `cloud-bridge-test-targets` and
+`cloud-request-artifacts` next. `slack-corpus-qa` stays blocked on the live recall@5.
+
 # 2026-10-01 — v1.40.0 review fix spec filed; assigned to Codex
 
 Claude reviewed the v1.40.0 bug-fix commits (3d0c5478..691713c5). Items 1–4 are in
