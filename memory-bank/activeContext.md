@@ -7931,4 +7931,4 @@ Implemented the two dashboard bugs `hermes-dashboard-findings-have-no-drilldown`
 clickable GitHub Actions run links; status history explains healthy/degraded/unknown numeric values
 and includes evidence in the legend. The exporter carries the optional labels without changing
 sensor status semantics. Focused and full pytest, dashboard BATS, manifest validation, YAML parse,
-diff-check, and doc-link gates passed. Final commit SHA is recorded in the bug docs after commit.
+diff-check, and doc-link gates passed. Final commit SHA: `3d0c5478`.

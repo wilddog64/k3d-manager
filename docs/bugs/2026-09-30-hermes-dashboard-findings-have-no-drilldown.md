@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30
-**Status:** FIXED (pending final commit SHA)
+**Status:** FIXED (`3d0c5478`)
 **Severity:** medium — the dashboard reports degraded sensors but does not expose the hostname,
 CI run, or actionable evidence needed to diagnose them.
 

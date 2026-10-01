@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30
-**Status:** FIXED (pending final commit SHA)
+**Status:** FIXED (`3d0c5478`)
 **Severity:** low/medium — the history panel is technically correct but easy to misread during an
 incident, especially when a sensor changes to `unknown`.
 
