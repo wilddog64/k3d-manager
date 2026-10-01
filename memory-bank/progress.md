@@ -1,3 +1,9 @@
+# 2026-10-01 — Codex batch bug 1 complete (`f6008374`)
+
+- [x] Webhook AI fallback: agent.py S0–S2, eight offline tests, stale webhook BATS assertions,
+  guide/README/CHANGELOG updates; M1–M3 red/restored green; full pytest 441/441.
+- [ ] Batch bugs 2 and 3 remain.
+
 # 2026-10-01 — bug backlog triage
 
 - [ ] Codex batch (k3d-manager-v1.40.0, 3 commits): agy exit status + S0 model (re-anchored to agent.py), R2 label, empty mktemp F1–F3.

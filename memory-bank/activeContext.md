@@ -1,3 +1,10 @@
+# 2026-10-01 — Codex batch bug 1 fixed (`f6008374`)
+
+Webhook AI analysis now defaults agy to `gemini-3.8-flash-medium`, classifies unavailable candidates,
+uses child exit status, falls back to gemini-cli safely, and never returns raw OAuth/error output.
+The eight offline fallback tests, webhook BATS suite, doc-link check, and full pytest gate pass; M1–M3
+were each red and restored green. `bin/k3dm-webhook` call sites remain unchanged.
+
 # 2026-10-01 — bug backlog triage: 27 OPEN → 6 open
 
 Checked each OPEN doc against the current code and live evidence. 14 FIXED (code cited in each status line), 7 CLOSED as stale

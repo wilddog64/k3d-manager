@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
-**Status:** STILL OPEN (triage by Claude, 2026-10-01): `_call_gemini` (`scripts/lib/webhook/agent.py`) still discards the child's exit status (`done_pid, _ = os.waitpid(...)`).
+**Status:** FIXED (`f6008374`): `_call_gemini` now classifies unavailable candidates, uses child exit status, and never returns raw failure output.
 **Severity:** medium — all 7 webhook AI-analysis consumers return a CLI error string in place of
 analysis. `/ask gemini` posted a live Google OAuth URL into Slack while agy was unauthenticated,
 and posts a model-drift error now that it is.

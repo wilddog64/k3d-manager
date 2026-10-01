@@ -221,6 +221,7 @@ docs/
 
 ### Guides
 - **[Alerting](docs/guides/alerting.md)** — Alertmanager receivers, default-deny routing, warning allowlist, and notification triage
+- **[Webhook AI analysis fallback](docs/guides/ai-analysis-fallback.md)** — Candidate ordering, failure classification, and safe sentinel output
 - **[Alert delivery](docs/guides/alert-delivery.md)** — Generated route-tree checks, missing configSecret triage, and Hermes blackout detection
 - **[App-cluster registration](docs/guides/app-cluster-registration.md)** — Hub registration durability, reconciliation, and registration-gap triage
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing

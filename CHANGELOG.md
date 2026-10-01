@@ -35,6 +35,9 @@
 
 ### Fixed
 
+- Webhook AI analysis now falls back between agy and gemini-cli, classifies unavailable
+  candidates, and never posts raw authentication or model errors (including OAuth URLs) as analysis.
+
 - `scripts/plugins/argocd.sh`: suppress shellcheck's SC2317 false positive on the sourced-or-executed
   `return 1 2>/dev/null || exit 1` idiom, the only SC2317 finding outside the foundation subtree.
 - Automatic re-indexing no longer hangs on a real-sized corpus (`git cat-file --batch` was fed every
