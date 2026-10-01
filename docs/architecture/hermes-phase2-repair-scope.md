@@ -31,6 +31,12 @@ Phase 2 shortens mean-time-to-recovery for exactly those failures by letting Her
 does **not** expand what Hermes may touch beyond a fixed list, and it does **not** let
 Hermes decide on its own to act.
 
+Retrieval sits earlier in the sensor → correlate → propose chain as advisory context in newly
+filed Hermes bug documents. A `## Possible prior art` list may help a human review the finding,
+but it does not influence the exact-slug filing decision, correlation, repair proposal, or repair
+execution. If the vector store or embeddings credential is unavailable, the section is omitted
+and the existing filing behavior continues unchanged.
+
 ## 2 — The single governing principle (inherited from Phase 1 §7)
 
 **Health-degraded ≠ safe-to-repair.** The Phase 1 scope records the cautionary tale:

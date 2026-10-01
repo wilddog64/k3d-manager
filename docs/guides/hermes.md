@@ -165,6 +165,14 @@ Adding a service is a one-line target-table edit, but the operator must confirm 
 port from its own Deployment first. The sensor is disabled by default, uses no port-forward, and
 files only a debounced delta through the existing e2e-bugs path.
 
+### Possible prior art
+
+New Hermes bug documents may include a `## Possible prior art` section containing up to three
+retrieved documents and their scores. This is advisory context for the human reviewer only. An
+unavailable vector store or embeddings credential omits the section without failing the run, and
+Hermes still decides new versus recurring strictly from the exact-slug glob; the prior-art list
+does not gate, suppress, or redirect filing.
+
 ### `eso` says `unknown` — check the kube context before the credential.
 
 An `unknown` ESO result means no ESO row could be graded. Reproduce the webhook payload without

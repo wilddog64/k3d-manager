@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from hermes.e2e_triage import redact
+from hermes.prior_art import RetrievalUnavailable, search
 
 _BRANCH = re.compile(r"^k3d-manager-v\d+\.\d+\.\d+$")
 _HINTS = {
@@ -68,6 +69,24 @@ def _lines(group):
     return "\n".join(lines) or "- No individual test title was available"
 
 
+def _possible_prior_art(group):
+    query = " ".join([
+        str(group.get("kind", "")), str(group.get("target", "")),
+        *[str(item.get("title", "")) for item in group.get("titles", [])[:10]],
+        *[str(item) for item in group.get("samples", [])[:3]],
+    ]).strip()
+    try:
+        results = search(query, k=3)
+    except RetrievalUnavailable:
+        return ""
+    if not results:
+        return ""
+    lines = ["## Possible prior art", ""]
+    lines.extend(f"- `{redact(path)}` — {score:.3f} — {redact(title)}"
+                 for score, path, title in results[:3])
+    return "\n".join(lines) + "\n"
+
+
 def _status_doc(group, run, branch, date):
     return f'''# Bug: cluster status {redact(group["kind"])} — {redact(group["target"])}
 
@@ -87,7 +106,7 @@ def _status_doc(group, run, branch, date):
 ## Next step
 Verify the failing check and its underlying service. SSO and credential failures require
 human investigation; existing repair proposals still require approval.
-'''
+''' + _possible_prior_art(group)
 
 
 def _app_health_doc(group, run, branch, date):
@@ -122,7 +141,7 @@ or merely misconfigured. Precedent: `docs/bugs/2026-09-16-e2e-assertion-api-paym
 `rabbitmq:` block at column 0 instead of nested under `spring:` made Spring target
 `localhost:5672`. Disabling the indicator is **not** a fix — it converts an honest red into a
 false green.
-'''
+''' + _possible_prior_art(group)
 
 
 def _doc(group, run, branch, date):
@@ -150,7 +169,7 @@ def _doc(group, run, branch, date):
 
 ## Next step
 A human (or Claude) verifies the root cause, then writes the fix spec here before any code change.
-'''
+''' + _possible_prior_art(group)
 
 
 def _reopen(path, group, run, date):
