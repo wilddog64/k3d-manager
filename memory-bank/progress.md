@@ -2850,3 +2850,8 @@ recorded in the bug doc: `db351961`.
 is recorded in the bug doc after commit. Final SHA: `3664bea7`.
 The hub platform-ops manifest and regression assertion are included as well; final SHA is recorded
 in the bug doc after commit: `3664bea7`.
+
+# 2026-10-01 — k3dm-tests exit result panel
+
+- [x] Replaced the raw exit-code table with a latest-result view and regression coverage; final SHA
+  is recorded in the bug doc after commit.

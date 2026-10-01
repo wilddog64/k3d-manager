@@ -75,10 +75,22 @@ data:
         {
           "id": 7,
           "type": "table",
-          "title": "Exit code",
-          "description": "Informational only, not pass/fail. Exit code 2 is expected for test-all on this box because test-pytest's python3 has no pytest.",
+          "title": "Latest test result",
+          "description": "Latest recorded result for each runner. PASS is exit code 0; EXPECTED ENVIRONMENT is exit code 2 when test-pytest cannot run because pytest is unavailable; any other non-zero code is a failure.",
           "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
-          "targets": [{ "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "k3dm_test_exit_code", "format": "table" }]
+          "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": {
+            "0": { "text": "PASS", "color": "green" },
+            "1": { "text": "FAIL", "color": "red" },
+            "2": { "text": "EXPECTED ENVIRONMENT", "color": "yellow" }
+          } }] }, "overrides": [] },
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "last_over_time(k3dm_test_exit_code[7d])", "format": "table", "instant": true }],
+          "transformations": [
+            { "id": "labelsToFields", "options": {} },
+            { "id": "organize", "options": {
+              "excludeByName": { "Time": true, "__name__": true },
+              "renameByName": { "Value": "Result", "instance": "Runner", "job": "Job" }
+            } }
+          ]
         }
       ]
     }

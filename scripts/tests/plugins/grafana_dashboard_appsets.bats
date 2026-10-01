@@ -72,3 +72,14 @@ HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboa
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
 }
+
+@test "k3dm tests dashboard presents a readable latest result" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  run yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq empty
+  [[ "$output" == *'"title": "Latest test result"'* ]]
+  [[ "$output" == *'last_over_time(k3dm_test_exit_code[7d])'* ]]
+  [[ "$output" == *'"Value": "Result"'* ]]
+  [[ "$output" == *'"2": { "text": "EXPECTED ENVIRONMENT"'* ]]
+}

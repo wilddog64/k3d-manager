@@ -8016,3 +8016,9 @@ assign the UID because the Helm-owned Overview dashboard cannot be overridden sa
 UID. The final implementation SHA is recorded in the bug doc after commit. Final SHA: `3664bea7`.
 The same dashboard is now sourced for both the app-cluster and hub ApplicationSets; final SHA is
 recorded in the bug doc after commit. Final SHA: `3664bea7`.
+
+# 2026-10-01 — k3dm-tests exit result panel
+
+Changed the raw exit-code table to an instant latest-result table with Runner, Job, and Result
+columns plus PASS/FAIL/EXPECTED ENVIRONMENT mappings. The dashboard regression suite is green;
+final SHA is recorded in the bug doc after commit.

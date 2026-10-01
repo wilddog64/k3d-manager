@@ -24,6 +24,8 @@
 - Added a source-controlled `Grafana Overview — Readable` dashboard with readable HTTP-status and
   latency legends for both app-cluster and hub Grafana while preserving the existing metrics and
   dashboard variables.
+- The k3dm-tests dashboard now presents the latest result by runner, with readable PASS, FAIL, and
+  EXPECTED ENVIRONMENT exit-code mappings instead of raw metric-internal table columns.
 
 ### Added
 
