@@ -2865,3 +2865,9 @@ in the bug doc after commit: `3664bea7`.
 
 - [x] Specified branch resolution, terminal/Slack/JSON output, offline tests, and scope for
   link-enriched similarity results. Implementation remains pending.
+# 2026-10-01 — v1.42.0 daily verification plan
+
+- [x] Specified independent daily offline `k3dm-test` and Tier 1 E2E runs, separate result
+  channels/triage, stale-data semantics, timing metrics, mutations, and offline acceptance
+  gates in `docs/plans/v1.42.0-daily-offline-and-e2e-verification.md`.
+- [ ] Implementation not started; Tier 2 ACG/Stripe remains opt-in and outside this plan.

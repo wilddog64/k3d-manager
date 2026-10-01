@@ -8034,3 +8034,10 @@ and dashboard empty-state behavior. No implementation changes were made.
 Added `docs/plans/v1.41.0-find-similar-docs-links.md`. The proposal adds branch-pinned GitHub URLs
 to human and JSON retrieval results without changing search, Slack parsing, or advisory fallback
 behavior. No implementation changes were made.
+# 2026-10-01 — v1.42.0 daily offline + E2E verification spec
+
+Wrote `docs/plans/v1.42.0-daily-offline-and-e2e-verification.md` for a daily trigger that
+launches the offline `k3dm-test` suite and Tier 1 vCluster E2E independently. The plan keeps
+separate result channels and Hermes triage keys, records child timing, repairs the currently
+dead offline duration metrics, and excludes the unattended Tier 2 ACG/Stripe sandbox. Awaiting
+implementation and review.
