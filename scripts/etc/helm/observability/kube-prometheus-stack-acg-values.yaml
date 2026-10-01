@@ -16,6 +16,9 @@ defaultRules:
 
 grafana:
   enabled: true
+  serviceMonitor:
+    labels:
+      release: acg-kube-prometheus-stack
   sidecar:
     dashboards:
       provider:

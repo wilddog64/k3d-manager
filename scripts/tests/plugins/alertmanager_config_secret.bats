@@ -23,6 +23,18 @@ setup() {
   done
 }
 
+@test "Grafana ServiceMonitors carry the release label Prometheus selects" {
+  local values expected
+  for values in \
+    "${ETC_DIR}/helm/observability/kube-prometheus-stack-values.yaml" \
+    "${ETC_DIR}/helm/observability/kube-prometheus-stack-acg-values.yaml"; do
+    expected="$(basename "${values}" | sed 's/-values.yaml//' | sed 's/^kube-prometheus-stack$/kube-prometheus-stack/' | sed 's/^kube-prometheus-stack-acg$/acg-kube-prometheus-stack/')"
+    run yq -r '.grafana.serviceMonitor.labels.release' "${values}"
+    [ "${status}" -eq 0 ]
+    [ "${output}" = "${expected}" ]
+  done
+}
+
 @test "Alertmanager routes Trivy critical CVE alerts to null before SMS" {
   local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
 

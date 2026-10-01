@@ -67,6 +67,9 @@ prometheus:
               - 'prometheus-pushgateway.monitoring:9091'
 
 grafana:
+  serviceMonitor:
+    labels:
+      release: kube-prometheus-stack
   admin:
     existingSecret: grafana-admin-credentials
     userKey: admin-user

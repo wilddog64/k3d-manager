@@ -7932,3 +7932,12 @@ clickable GitHub Actions run links; status history explains healthy/degraded/unk
 and includes evidence in the legend. The exporter carries the optional labels without changing
 sensor status semantics. Focused and full pytest, dashboard BATS, manifest validation, YAML parse,
 diff-check, and doc-link gates passed. Final commit SHA: `3d0c5478`.
+
+# 2026-09-30 — Grafana overview metrics restored at source
+
+Filed and fixed `docs/bugs/2026-09-30-grafana-overview-no-data.md`. The kube-prometheus-stack
+Prometheus selectors require a release label, but the Grafana subchart ServiceMonitors did not
+carry one, so `grafana_build_info` and request metrics were never scraped. Added matching
+`grafana.serviceMonitor.labels.release` values for hub and ACG, with a regression test and Helm
+render verification. Mutation of the label failed the test as expected; restoration passed.
+Final commit SHA is recorded in the bug doc after commit.

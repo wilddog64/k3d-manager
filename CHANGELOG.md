@@ -6,6 +6,8 @@
 
 - Hermes Grafana findings now expose failed hostnames and clickable CI run links, while status
   history explains the 0/1/2 encoding and carries evidence in its legend.
+- Grafana ServiceMonitors now carry the release labels selected by Prometheus, restoring metrics
+  for the overview dashboard in both the hub and ACG observability stacks.
 
 ### Added
 
