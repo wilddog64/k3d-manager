@@ -2820,4 +2820,4 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 
 - [x] Captured both stdout and stderr from ArgoCD login failures, preserving the password boundary
   while exposing the actual error. Focused BATS passed; final SHA is recorded in the bug doc after
-  commit.
+  commit: `75952f57`.

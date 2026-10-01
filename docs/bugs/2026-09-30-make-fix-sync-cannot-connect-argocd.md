@@ -74,3 +74,5 @@ Follow-up commit: `e853c849`.
 
 The login diagnostic was still hidden because stdout was redirected before capture. The target now
 captures both stdout and stderr from `argocd login` before reporting the failure.
+
+Follow-up commit: `75952f57`.

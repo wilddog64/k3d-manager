@@ -7980,4 +7980,4 @@ doc after commit: `e853c849`.
 
 The login error remained generic because stdout was redirected before capture. The target now
 captures both stdout and stderr from `argocd login`; focused BATS remains green. Final SHA is
-recorded in the bug doc after commit.
+recorded in the bug doc after commit: `75952f57`.
