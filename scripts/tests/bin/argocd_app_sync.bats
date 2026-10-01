@@ -80,7 +80,8 @@ run_sync() {
 @test "valid session does not mint a token" {
   run env PROBE_OUTPUT='{"loggedIn": true}' "${REPO_ROOT}/bin/argocd-app-sync" demo
   [ "${status}" -eq 0 ]
-  ! grep -q '/api/v1/session' "${BATS_TEST_TMPDIR}/calls.log"
+  run grep -q '/api/v1/session' "${BATS_TEST_TMPDIR}/calls.log"
+  [ "$status" -ne 0 ]
 }
 
 @test "force and timeout reach app sync" {
@@ -94,7 +95,8 @@ run_sync() {
   [ "${status}" -eq 0 ]
   [[ "${output}" != *s3cr3t-fixture-pw* ]]
   [[ "${output}" != *fake-token* ]]
-  ! grep -qE 's3cr3t-fixture-pw|fake-token' "${BATS_TEST_TMPDIR}/calls.log"
+  run grep -qE 's3cr3t-fixture-pw|fake-token' "${BATS_TEST_TMPDIR}/calls.log"
+  [ "$status" -ne 0 ]
 }
 
 @test "port-forward lifecycle cleans its process and temporary files" {
@@ -108,12 +110,14 @@ run_sync() {
 @test "environment password takes precedence over kubectl secrets" {
   run_sync demo
   [ "${status}" -eq 0 ]
-  ! grep -q kubectl "${BATS_TEST_TMPDIR}/calls.log"
+  run grep -q kubectl "${BATS_TEST_TMPDIR}/calls.log"
+  [ "$status" -ne 0 ]
 }
 
 @test "missing app prints usage and makes no ArgoCD call" {
   run "${REPO_ROOT}/bin/argocd-app-sync"
   [ "${status}" -ne 0 ]
   [[ "${output}" == *"Usage: bin/argocd-app-sync"* ]]
-  ! grep -q argocd "${BATS_TEST_TMPDIR}/calls.log"
+  run grep -q argocd "${BATS_TEST_TMPDIR}/calls.log"
+  [ "$status" -ne 0 ]
 }

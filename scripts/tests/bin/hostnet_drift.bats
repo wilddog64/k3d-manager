@@ -63,9 +63,10 @@ JSON
   run bin/k3dm-hostnet-drift --fix
   [ "$status" -eq 0 ]
   [ "$(wc -l <"$DELETE_CALLS" | tr -d ' ')" -eq 3 ]
-  ! grep -q 'deployment-pod\|bare-pod' "$DELETE_CALLS"
   [[ "$output" == *"skipping monitoring/deployment-pod"* ]]
   [[ "$output" == *"skipping monitoring/bare-pod"* ]]
+  run grep -q 'deployment-pod\|bare-pod' "$DELETE_CALLS"
+  [ "$status" -ne 0 ]
 }
 
 @test "hostnet drift: no drift makes no delete calls" {

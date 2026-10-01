@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
-**Status:** FIXED `81048cea` (Codex; Claude verified + committed, incl. S5 signing.sh env://COSIGN_KEY)
+**Status:** FIXED `81048cea`; recurred and re-fixed 2026-10-01 (see Recurrence) (Codex; Claude verified + committed, incl. S5 signing.sh env://COSIGN_KEY)
 **Files:** the 14 `.bats` files listed below, `scripts/plugins/signing.sh` (S5), `scripts/tests/lib/bats_negation_lint.bats` (new), `CHANGELOG.md`
 
 ## Problem
@@ -177,3 +177,26 @@ Under `## [Unreleased]` → `### Fixed`, as the last bullet:
 - Do NOT touch `scripts/lib/foundation/` (including its own tests), `scripts/lib/acg/`, or memory-bank.
 - Do NOT convert `!` used inside `if ! …`, `while ! …` or `[[ ! … ]]`; only whole-line `! cmd` statements.
 - Do NOT `grep -F` whole source lines in new assertions.
+
+## Recurrence — 2026-10-01 (`k3d-manager-v1.40.0`)
+
+Seven new bare `! cmd` assertions landed on the v1.40.0 branch, and `bats_negation_lint.bats` went red
+in `make test`. Nothing caught it at push time: `ci.yml` runs on pull requests and on pushes to
+`main`, never on pushes to a release branch, so the lint only fires at PR time. Found by Claude while
+running `make test` behind a PATH tripwire for `v1.40.0-cloud-bridge-test-targets.md` M1.
+
+| file | lines |
+|---|---|
+| `scripts/tests/bin/argocd_app_sync.bats` | 4 (`/api/v1/session`, credential fixture, `kubectl`, `argocd`) |
+| `scripts/tests/bin/hostnet_drift.bats` | 1 (Deployment / bare pod never deleted) |
+| `scripts/tests/lib/ensure_kubeconform.bats` | 1 |
+| `scripts/tests/plugins/grafana_dashboard_appsets.bats` | 1 |
+
+**Fix:** each becomes `run <cmd>` + `[ "$status" -ne 0 ]`. In `hostnet_drift.bats` the new `run` had to
+move below the two `$output` assertions, which read the output of `bin/k3dm-hostnet-drift --fix`; a
+`run` before them overwrites `$output`. Lint plus the four suites: 28/28. Mutation: appending
+`kubectl` to the call log turns `argocd_app_sync.bats` test 7 red. Under the bare `!` it stayed
+green.
+
+**Lesson:** the lint is the right control, but it only runs where `make test` runs. Run `make test`
+before handing a release branch to PR, not only the suites a change touched.

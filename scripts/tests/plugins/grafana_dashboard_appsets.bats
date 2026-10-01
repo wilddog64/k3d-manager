@@ -84,7 +84,8 @@ HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboa
   [ "$(jq -r '.title' <<<"$panel")" = "Make exit code (informational)" ]
   [ "$(jq '[.fieldConfig.defaults.mappings[]? | tostring | test("PASS|EXPECTED ENVIRONMENT")] | any' <<<"$panel")" = "false" ]
   [ "$(jq -r '.targets[0].expr' <<<"$panel")" = "k3dm_test_exit_code" ]
-  ! jq -e '.targets[0].expr | contains("last_over_time")' <<<"$panel" >/dev/null
+  run jq -e '.targets[0].expr | contains("last_over_time")' <<<"$panel"
+  [ "$status" -ne 0 ]
   jq -e '.description | contains("Failed cases")' <<<"$panel" >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failed cases" and (.targets[0].expr == "k3dm_test_cases_failed"))' >/dev/null
 }

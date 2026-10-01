@@ -68,7 +68,8 @@ _stub_release_download() {
   run _ensure_kubeconform
   [ "$status" -eq 0 ]
   grep -q 'brew install kubeconform' "$RUN_LOG"
-  ! grep -q 'release used' "$RUN_LOG"
+  run grep -q 'release used' "$RUN_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "installs the pinned release into ~/.local/bin when the checksum matches" {

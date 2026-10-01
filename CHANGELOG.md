@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Seven bare `! cmd` BATS assertions added this release could never fail under `set -e`; they now
+  use `run` + a status check, and `bats_negation_lint.bats` is green again.
+
 ### Added
 
 - Cloud-request diagnostic artifacts: the first `job-status` response that sees a job finish
