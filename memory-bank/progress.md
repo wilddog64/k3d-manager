@@ -1,4 +1,10 @@
-# 2026-10-01 — Codex batch bug 1 complete (`f6008374`)
+# 2026-10-01 — Codex batch bug 2 complete (`b5a70e7a`)
+
+- [x] Hermes R2 ingress mapping: auth proxy label, corrected topology comment, mapping-derived test,
+  old-label mutation red; full pytest 442/442.
+- [ ] Batch bug 3 remains.
+
+# 2026-10-01 — Codex batch bug 1 complete (`8a7cdec9`)
 
 - [x] Webhook AI fallback: agent.py S0–S2, eight offline tests, stale webhook BATS assertions,
   guide/README/CHANGELOG updates; M1–M3 red/restored green; full pytest 441/441.

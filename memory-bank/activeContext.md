@@ -1,4 +1,10 @@
-# 2026-10-01 — Codex batch bug 1 fixed (`f6008374`)
+# 2026-10-01 — Codex batch bug 2 fixed (`b5a70e7a`)
+
+Hermes R2 now maps prometheus.3ai-talk.org to the auth proxy listening on cloudflared ingress :19090,
+not the backend port-forward on :19091. The two proposal assertions and a mapping-derived guard pass;
+the old mapping made both assertions red. Full pytest passes 442/442.
+
+# 2026-10-01 — Codex batch bug 1 fixed (`8a7cdec9`)
 
 Webhook AI analysis now defaults agy to `gemini-3.8-flash-medium`, classifies unavailable candidates,
 uses child exit status, falls back to gemini-cli safely, and never returns raw OAuth/error output.

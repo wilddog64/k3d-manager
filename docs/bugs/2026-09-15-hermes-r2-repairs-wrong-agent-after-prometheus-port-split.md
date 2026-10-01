@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** STILL OPEN (triage by Claude, 2026-10-01): `PORT_FORWARD_LABELS` in `scripts/lib/hermes/repairs.py` still maps prometheus to the port-forward, and the comment still describes 19090:9090. A dead auth proxy would get the wrong repair.
+**Status:** FIXED (`b5a70e7a`): `PORT_FORWARD_LABELS` now maps the public Prometheus host to the auth proxy listening on cloudflared's ingress port.
 **Severity:** medium — a self-repair that cannot repair the failure it fires on, and its own
 stated grounding is now false.
 **Fix lands in:** `scripts/lib/hermes/repairs.py`, `scripts/tests/hermes/test_repairs.py`

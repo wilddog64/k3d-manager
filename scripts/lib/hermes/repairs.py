@@ -17,16 +17,15 @@ from hermes.sensors import GITHUB_SERVICE, _keychain_secret
 ROOT = Path(__file__).resolve().parents[3]
 WEBHOOK_LABEL = "com.k3d-manager.webhook"
 HUB_K3S_CONTAINER = "k3d-k3d-cluster-server-0"
-# Public host -> the launchd port-forward label that actually serves it. Grounded
-# in scripts/etc/cloudflared/config.yml (ingress local port) matched against the
-# installed com.k3d-manager.*-port-forward.plist listen ports: only
-# prometheus.3ai-talk.org (ingress :19090) maps cleanly to the prometheus PF
-# (19090:9090). The other public hosts are served by different mechanisms
-# (argocd via port-forward-wrapper.sh, keycloak/grafana/frontend by their own
-# services) and alertmanager's ingress (:9093) does not match its PF listen port
-# (:19093) -- none has a known launchd PF label, so R2 is not proposable for them.
+# Public host -> the launchd label listening on cloudflared's ingress port.
+# prometheus.3ai-talk.org enters at :19090 on the auth proxy
+# (com.k3d-manager.prometheus-auth-proxy); that proxy forwards to the backend
+# port-forward on :19091. The other public hosts are served by different
+# mechanisms (argocd via port-forward-wrapper.sh, keycloak/grafana/frontend by
+# their own services), and alertmanager's ingress (:9093) does not match its
+# PF listen port (:19093), so R2 is not proposable for them.
 PORT_FORWARD_LABELS = {
-    "prometheus.3ai-talk.org": "com.k3d-manager.prometheus-port-forward",
+    "prometheus.3ai-talk.org": "com.k3d-manager.prometheus-auth-proxy",
 }
 
 

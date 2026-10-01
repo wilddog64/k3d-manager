@@ -35,6 +35,9 @@
 
 ### Fixed
 
+- Hermes R2 now kickstarts the Prometheus auth proxy that serves the cloudflared ingress port,
+  rather than the backend port-forward behind it.
+
 - Webhook AI analysis now falls back between agy and gemini-cli, classifies unavailable
   candidates, and never posts raw authentication or model errors (including OAuth URLs) as analysis.
 
