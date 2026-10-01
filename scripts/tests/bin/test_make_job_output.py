@@ -64,3 +64,15 @@ def test_make_job_output_is_scrubbed(job, monkeypatch):
     written = (job / "output").read_text()
     assert "make-synthetic-token" not in written
     assert "hunter2-synthetic" not in written
+
+
+def test_make_job_exports_its_junit_report_path(job, monkeypatch):
+    seen = {}
+
+    def fake_spawn(*_a, **kwargs):
+        seen["env"] = kwargs.get("env") or {}
+        return 0, "", False
+
+    monkeypatch.setattr(lifecycle, "_spawn_capture_text", fake_spawn)
+    lifecycle._run_make_target(job.name, ["test-pytest"], 60, "cloud-bridge")
+    assert seen["env"]["K3DM_JUNIT_XML"] == str(job / "junit.xml")

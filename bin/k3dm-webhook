@@ -2062,6 +2062,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
+            (JOB_DIR / job_id / "target").write_text(target)
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
             threading.Thread(

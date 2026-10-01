@@ -135,6 +135,37 @@ branch of that name, and the helper does not create one.
 `body` is absent — the request was never executed. There is **no retry**: an id is consumed
 whether it succeeded, was rejected, or expired. To ask again, file a new request with a new id.
 
+### Diagnostic artifacts on a finished job
+
+Every `make-*` action is asynchronous: its response carries `body.job_id` and `body.status:
+"queued"`, and the job runs after the response is written. Poll it with `job-status`
+(`--arg job_id=<id>`). The **first** `job-status` response that sees the job finish (`success`
+or `failed`) also carries an `artifacts` array, committed in the same commit as the response:
+
+```
+artifacts/<job-status request id>/summary.json   always — request_id, job_id, job_status,
+                                                 http_status, finished_at, target (make jobs)
+artifacts/<job-status request id>/junit.xml      when the job produced one (make-test-pytest)
+```
+
+- `artifacts` is optional. A `job-status` that sees `queued` or `running` omits it, as does every
+  other action. Response-level `status` is still only `ok`, `rejected` or `error` — the job's own
+  outcome is `summary.json`'s `job_status`.
+- A later `job-status` for the same job lists the existing paths again; nothing is rewritten.
+- `summary.json` has no `exit_code`: the webhook records only the status word.
+- `junit.xml` comes from pytest's `--junitxml` with `-o junit_logging=no` (no captured
+  stdout/stderr). It still carries assertion messages, which can print compared values, so the
+  bridge passes it through the same credential scrubber as job output
+  (`scripts/lib/webhook/redact.py`) before committing; matches become `***REDACTED***`. Reports
+  over 512 KiB are skipped.
+- **Raw job output is deliberately not published.** The full log is the highest-leak artifact
+  there is, and a `cloud-requests` commit is permanent and readable by anyone with repo read
+  access. `output.log` waits for its own spec and a gated redaction filter; until then the last
+  2000 bytes in `body.output` are all you get.
+
+Read an artifact with `git show refs/remotes/origin/cloud-requests:<path>` after the helper's
+fetch.
+
 ## The helper
 
 ```
@@ -264,6 +295,10 @@ delete the remote branch and recreate it empty with the three directories. Nothi
 history, and the ledger only needs to contain ids that could still be replayed — but if you
 truncate the ledger, any surviving `requests/` entry becomes eligible again, so clear `requests/`
 in the same operation.
+
+Artifact trees are pruned on write: when the bridge commits new artifacts it keeps the newest
+`K3DM_CLOUD_ARTIFACT_KEEP` trees (default 50, ordered by request id) and drops the rest in the
+same commit — no history rewrite.
 
 ### Bridge placement
 

@@ -87,7 +87,8 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
         (JOB_DIR / job_id / "status").write_text("running")
         _notify_job(job_id, f"🛠️ *make {label}* started by {actor}")
         cmd = ["make", "--no-print-directory", *argv_tail]
-        rc, output, timed_out = _spawn_capture_text(cmd, timeout=timeout, cwd=REPO_ROOT)
+        env = {**os.environ, "K3DM_JUNIT_XML": str(JOB_DIR / job_id / "junit.xml")}
+        rc, output, timed_out = _spawn_capture_text(cmd, timeout=timeout, cwd=REPO_ROOT, env=env)
         lines = output.rstrip().splitlines()
         tail = "\n".join(lines[-40:])[-3000:]
         if timed_out:

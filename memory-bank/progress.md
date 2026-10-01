@@ -6,7 +6,8 @@
 - [ ] Codex: retrieval eval (test commit + feat commit) — verify pairs exist on disk, mutations red.
 - [ ] Claude: live `K3DM_RETRIEVAL_EVAL_LIVE=1` run, `search-response.json`, retro + vector-store.md numbers.
 - [ ] Claude: `v1.40.0-cloud-bridge-test-targets.md`.
-- [ ] Claude: `v1.40.0-cloud-request-artifacts.md`.
+- [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
+- [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
 - [ ] `v1.40.0-slack-corpus-qa.md` — blocked on the live recall@5.
 
 # 2026-10-01 — v1.40.0 review fix spec (Codex)

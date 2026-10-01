@@ -1,3 +1,12 @@
+# 2026-10-01 — cloud-request artifacts implemented (Claude)
+
+`v1.40.0-cloud-request-artifacts.md` done: first terminal `job-status` response carries `artifacts`
+(`summary.json` + scrubbed `junit.xml`), same commit, pruned to `K3DM_CLOUD_ARTIFACT_KEEP`. Gates:
+`test_cloud_artifacts.py` 10/10 against real bare git repos; 6 mutations red, restored byte-equal; make
+test-pytest 454 passed with `K3DM_JUNIT_XML` set (62 KB report, no captured output); 7 unittest suites OK.
+Gotcha: `update-index --force-remove` in a bare repo needs `GIT_WORK_TREE` (an empty temp dir works).
+Operator: restart the bridge and the webhook to pick it up. Next: `cloud-bridge-test-targets`.
+
 # 2026-10-01 — two v1.40.0 specs handed to Codex; Claude takes the cloud-bridge pair
 
 Remaining v1.40.0 specs: 5 of 5 unimplemented. Handed off to Codex, run in order on `k3d-manager-v1.40.0`:

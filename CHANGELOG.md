@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- Cloud-request diagnostic artifacts: the first `job-status` response that sees a job finish
+  carries an `artifacts` array — `summary.json` plus a credential-scrubbed `junit.xml` for
+  `make-test-pytest` — committed with the response and pruned to `K3DM_CLOUD_ARTIFACT_KEEP` (50).
+  Raw job output is still not published. See `docs/howto/cloud-session-requests.md`.
+
 ### Fixed
 
 - Hermes Grafana findings now expose failed hostnames and clickable CI run links, while status

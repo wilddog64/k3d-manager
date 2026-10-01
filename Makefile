@@ -956,6 +956,7 @@ test-pytest:
 	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
 	   exit 2; \
 	 fi; \
+	 if [ -n "$${K3DM_JUNIT_XML:-}" ]; then set -- "$$@" --junitxml "$$K3DM_JUNIT_XML" -o junit_logging=no; fi; \
 	 echo "[make] $$* (pytest suites)"; \
 	 "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
 
