@@ -1,3 +1,11 @@
+# 2026-10-01 — v1.40.0 review fix spec filed; assigned to Codex
+
+Claude reviewed the v1.40.0 bug-fix commits (3d0c5478..691713c5). Items 1–4 are in
+`docs/bugs/2026-10-01-v1.40.0-review-fixes-ci-rerun-exit-code-argocd-session.md`: (1) R4 rerun
+masked by the CI-sensor `ci_data` change; (2) the exit-code panel paints make's exit 2 as
+"EXPECTED ENVIRONMENT"; (3) `fix-sync` trusts a stale local context; (4) the sync recipe is duplicated,
+so move it to `bin/argocd-app-sync`. Items 5–10 stay deferred.
+
 # 2026-10-01 — agy keychain prompt fixed
 
 Every agy run prompted for the login password. Both `Antigravity Safe Storage` items trusted only com.google.antigravity (the desktop app);

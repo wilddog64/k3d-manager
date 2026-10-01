@@ -1,3 +1,10 @@
+# 2026-10-01 — v1.40.0 review fix spec (Codex)
+
+- [x] Spec filed: `docs/bugs/2026-10-01-v1.40.0-review-fixes-ci-rerun-exit-code-argocd-session.md`.
+- [ ] Codex implements three fix commits; Claude verifies diff, gates, and mutations, then commits.
+- [ ] Deferred review items 5–10: Vault root token, latency unit, duplicated overview dashboard,
+  label cardinality, and release-label test location.
+
 # 2026-09-30 — Hermes data_layer unknown-cause bug filed
 
 - [ ] Preserve and display a bounded, redacted cause for historical `data_layer` unknown states.
