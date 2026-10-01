@@ -864,7 +864,11 @@ fix-sync: ## APP is required
 		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { _keep_log=1; echo "ArgoCD did not become reachable at $(ARGOCD_SERVER)" >&2; exit 1; }; \
 	fi; \
 	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
-		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not read ArgoCD admin password Secret from $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
+		_pw="$${ARGOCD_ADMIN_PASSWORD:-}"; _vault_hdr="$${TMPDIR:-/tmp}/k3d-manager-fix-sync-vault.$$$$.hdr"; \
+		if [ -z "$$_pw" ]; then _vault_token=$$(kubectl --context "$(INFRA_CONTEXT)" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
+			if [ -n "$$_vault_token" ]; then printf 'X-Vault-Token: %s\n' "$$_vault_token" >"$$_vault_hdr"; _pw=$$(curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password", ""))' 2>/dev/null || true); rm -f "$$_vault_hdr"; fi; \
+		fi; \
+		[ -n "$$_pw" ] || _pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not resolve ArgoCD admin password from ARGOCD_ADMIN_PASSWORD, Vault, or $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
 		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
 		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
 		export ARGOCD_AUTH_TOKEN="$$_session_token"; \
@@ -884,7 +888,11 @@ fix-force-sync: ## APP is required
 		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { _keep_log=1; echo "ArgoCD did not become reachable at $(ARGOCD_SERVER)" >&2; exit 1; }; \
 	fi; \
 	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
-		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not read ArgoCD admin password Secret from $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
+		_pw="$${ARGOCD_ADMIN_PASSWORD:-}"; _vault_hdr="$${TMPDIR:-/tmp}/k3d-manager-fix-sync-vault.$$$$.hdr"; \
+		if [ -z "$$_pw" ]; then _vault_token=$$(kubectl --context "$(INFRA_CONTEXT)" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
+			if [ -n "$$_vault_token" ]; then printf 'X-Vault-Token: %s\n' "$$_vault_token" >"$$_vault_hdr"; _pw=$$(curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password", ""))' 2>/dev/null || true); rm -f "$$_vault_hdr"; fi; \
+		fi; \
+		[ -n "$$_pw" ] || _pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not resolve ArgoCD admin password from ARGOCD_ADMIN_PASSWORD, Vault, or $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
 		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
 		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
 		export ARGOCD_AUTH_TOKEN="$$_session_token"; \

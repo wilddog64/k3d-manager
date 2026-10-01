@@ -7987,3 +7987,10 @@ recorded in the bug doc after commit: `75952f57`.
 The installed ArgoCD CLI rejected the historical `--stdin` login flag. Replaced that fallback with
 the ArgoCD `/api/v1/session` API, reading the password from stdin and exporting only the returned
 token. Focused regression is green; final SHA: `4335a601`.
+
+# 2026-10-01 — fix-sync Vault-first ArgoCD credentials
+
+The session API returned 401 because the Kubernetes initial-admin Secret was stale. `fix-sync` and
+`fix-force-sync` now resolve the password from `ARGOCD_ADMIN_PASSWORD`, Vault `secret/argocd/admin`,
+then the Kubernetes Secret. Focused regression is green; final SHA is recorded in the bug doc after
+commit.

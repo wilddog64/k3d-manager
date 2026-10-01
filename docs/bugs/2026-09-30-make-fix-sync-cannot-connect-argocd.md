@@ -90,3 +90,9 @@ from stdin without putting it in argv, and exports only the resulting `ARGOCD_AU
 sync command.
 
 Follow-up commit: `4335a601`.
+
+## Credential-source follow-up
+
+The session API then returned HTTP 401 because the Kubernetes initial-admin Secret was stale. The
+target now resolves credentials in this order: `ARGOCD_ADMIN_PASSWORD`, Vault
+`secret/argocd/admin`, then the Kubernetes initial-admin Secret.

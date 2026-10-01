@@ -17,6 +17,8 @@
   visible instead of returning only a generic make error.
 - The sync fallback uses the ArgoCD session API and `ARGOCD_AUTH_TOKEN`, avoiding the unsupported
   CLI `--stdin` flag and keeping the admin password out of argv.
+- The sync fallback resolves the ArgoCD admin password from `ARGOCD_ADMIN_PASSWORD`, Vault, then
+  the Kubernetes Secret, avoiding stale initial-admin credentials after rebuilds.
 
 ### Added
 
