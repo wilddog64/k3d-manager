@@ -2830,4 +2830,4 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 # 2026-10-01 — fix-sync Vault-first ArgoCD credentials
 
 - [x] Added explicit override, Vault-first lookup, and Kubernetes fallback for ArgoCD admin
-  credentials. Focused BATS passed; final SHA is recorded in the bug doc after commit.
+  credentials. Focused BATS passed; final SHA: `122129bb`.

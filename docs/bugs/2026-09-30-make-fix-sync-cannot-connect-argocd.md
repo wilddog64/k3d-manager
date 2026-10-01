@@ -96,3 +96,5 @@ Follow-up commit: `4335a601`.
 The session API then returned HTTP 401 because the Kubernetes initial-admin Secret was stale. The
 target now resolves credentials in this order: `ARGOCD_ADMIN_PASSWORD`, Vault
 `secret/argocd/admin`, then the Kubernetes initial-admin Secret.
+
+Follow-up commit: `122129bb`.

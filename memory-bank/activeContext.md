@@ -7992,5 +7992,4 @@ token. Focused regression is green; final SHA: `4335a601`.
 
 The session API returned 401 because the Kubernetes initial-admin Secret was stale. `fix-sync` and
 `fix-force-sync` now resolve the password from `ARGOCD_ADMIN_PASSWORD`, Vault `secret/argocd/admin`,
-then the Kubernetes Secret. Focused regression is green; final SHA is recorded in the bug doc after
-commit.
+then the Kubernetes Secret. Focused regression is green; final SHA: `122129bb`.
