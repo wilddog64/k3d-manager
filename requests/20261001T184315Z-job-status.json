@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "action": "job-status",
+  "args": {
+    "job_id": "32cffb15"
+  },
+  "requested_by": "codex-cloud",
+  "requested_at": "2026-10-01T18:43:15.430Z",
+  "expires_at": "2026-10-01T19:13:15.430Z"
+}
