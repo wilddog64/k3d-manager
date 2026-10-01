@@ -13,6 +13,8 @@
   clean up the temporary tunnel; failed tunnel/login diagnostics now remain visible.
 - The sync login path now matches the repository's working ArgoCD login flags and reports CLI
   authentication errors without exposing the password.
+- `fix-sync` now captures both stdout and stderr from ArgoCD login failures so the root cause is
+  visible instead of returning only a generic make error.
 
 ### Added
 

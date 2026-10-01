@@ -7975,3 +7975,9 @@ Automatic ArgoCD login now matches the known-good path with `--skip-test-tls` an
 password, while capturing CLI diagnostics without exposing credentials. Focused regression and a
 mutation removing the compatibility flag were red/green verified; final SHA is recorded in the bug
 doc after commit: `e853c849`.
+
+# 2026-09-30 — fix-sync login diagnostic capture
+
+The login error remained generic because stdout was redirected before capture. The target now
+captures both stdout and stderr from `argocd login`; focused BATS remains green. Final SHA is
+recorded in the bug doc after commit.

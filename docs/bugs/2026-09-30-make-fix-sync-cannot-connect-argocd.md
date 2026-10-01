@@ -69,3 +69,8 @@ newline-terminated password. The target now matches that path and reports the lo
 error output without printing the password.
 
 Follow-up commit: `e853c849`.
+
+## Output-capture follow-up
+
+The login diagnostic was still hidden because stdout was redirected before capture. The target now
+captures both stdout and stderr from `argocd login` before reporting the failure.
