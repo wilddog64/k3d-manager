@@ -1,3 +1,9 @@
+# 2026-10-01 — agy keychain prompt fixed
+
+Every agy run prompted for the login password. Both `Antigravity Safe Storage` items trusted only com.google.antigravity (the desktop app);
+the CLI is Identifier=cli, team EQHXZ8M8AV. The operator added ~/.local/bin/agy to both items' Access Control; a launchctl submit test printed PONG
+with no prompt. Documented in docs/guides/ai-analysis-fallback.md.
+
 # 2026-10-01 — Codex batch verified (8a7cdec9 agy fallback, 2f8c3ec8 R2 label, 8fa82259 mktemp)
 
 All clean against their specs, with mutations red. Found and fixed: R2 used `launchctl kickstart -k <bare label>`, which launchctl rejects,
