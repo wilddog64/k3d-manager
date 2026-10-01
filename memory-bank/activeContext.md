@@ -7962,3 +7962,9 @@ The local ArgoCD transport fix exposed stale cached CLI tokens after an ArgoCD s
 rotation. `fix-sync` and `fix-force-sync` now validate the CLI session and re-login from
 `argocd-initial-admin-secret` over stdin when the token signature is invalid. The focused test and
 the mutation removing login transport flags were red/green verified; final SHA: `a7fb7798`.
+
+# 2026-09-30 — fix-sync failure diagnostics
+
+The sync target's failure path was still opaque: it removed the port-forward log and suppressed
+login errors. Added explicit tunnel/Secret/login diagnostics and preserve-on-failure log cleanup.
+The full fix-target BATS suite is green; final SHA is recorded in the bug doc after commit.

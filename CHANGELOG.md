@@ -10,7 +10,7 @@
   for the overview dashboard in both the hub and ACG observability stacks.
 - `make fix-sync` and `make fix-force-sync` now bootstrap the local ArgoCD port-forward when needed,
   validate/re-mint stale CLI authentication from the cluster Secret, use plaintext gRPC-web, and
-  clean up the temporary tunnel.
+  clean up the temporary tunnel; failed tunnel/login diagnostics now remain visible.
 
 ### Added
 

@@ -854,18 +854,18 @@ fix-delete-pod: ## APP and NS are required
 fix-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-sync APP=<argocd-app-name>"; exit 1; }
 	@set -euo pipefail; \
-	_pf_pid=''; _pf_log="$${TMPDIR:-/tmp}/k3d-manager-fix-sync.$$$$.log"; \
-	_cleanup() { if [ -n "$$_pf_pid" ]; then kill "$$_pf_pid" 2>/dev/null || true; wait "$$_pf_pid" 2>/dev/null || true; fi; rm -f "$$_pf_log"; }; \
+	_pf_pid=''; _keep_log=0; _pf_log="$${TMPDIR:-/tmp}/k3d-manager-fix-sync.$$$$.log"; \
+	_cleanup() { if [ -n "$$_pf_pid" ]; then kill "$$_pf_pid" 2>/dev/null || true; wait "$$_pf_pid" 2>/dev/null || true; fi; if [ "$$_keep_log" -eq 0 ]; then rm -f "$$_pf_log"; else echo "ArgoCD port-forward log: $$_pf_log" >&2; fi; }; \
 	trap _cleanup EXIT; \
 	if [ "$(ARGOCD_SERVER)" = "localhost:8080" ] && ! curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null; then \
 		kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" port-forward svc/argocd-server 8080:443 >"$$_pf_log" 2>&1 & _pf_pid=$$!; \
 		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
-		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { echo "ArgoCD did not become reachable at $(ARGOCD_SERVER); see $$_pf_log" >&2; exit 1; }; \
+		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { _keep_log=1; echo "ArgoCD did not become reachable at $(ARGOCD_SERVER)" >&2; exit 1; }; \
 	fi; \
 	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
-		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode); \
-		[ -n "$$_pw" ] || { echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		printf '%s' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --insecure >/dev/null; \
+		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not read ArgoCD admin password Secret from $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
+		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
+		printf '%s' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --insecure >/dev/null || { _keep_log=1; echo "ArgoCD CLI login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
 	fi; \
 	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 
@@ -873,18 +873,18 @@ fix-sync: ## APP is required
 fix-force-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-force-sync APP=<argocd-app-name>"; exit 1; }
 	@set -euo pipefail; \
-	_pf_pid=''; _pf_log="$${TMPDIR:-/tmp}/k3d-manager-fix-sync.$$$$.log"; \
-	_cleanup() { if [ -n "$$_pf_pid" ]; then kill "$$_pf_pid" 2>/dev/null || true; wait "$$_pf_pid" 2>/dev/null || true; fi; rm -f "$$_pf_log"; }; \
+	_pf_pid=''; _keep_log=0; _pf_log="$${TMPDIR:-/tmp}/k3d-manager-fix-sync.$$$$.log"; \
+	_cleanup() { if [ -n "$$_pf_pid" ]; then kill "$$_pf_pid" 2>/dev/null || true; wait "$$_pf_pid" 2>/dev/null || true; fi; if [ "$$_keep_log" -eq 0 ]; then rm -f "$$_pf_log"; else echo "ArgoCD port-forward log: $$_pf_log" >&2; fi; }; \
 	trap _cleanup EXIT; \
 	if [ "$(ARGOCD_SERVER)" = "localhost:8080" ] && ! curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null; then \
 		kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" port-forward svc/argocd-server 8080:443 >"$$_pf_log" 2>&1 & _pf_pid=$$!; \
 		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
-		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { echo "ArgoCD did not become reachable at $(ARGOCD_SERVER); see $$_pf_log" >&2; exit 1; }; \
+		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { _keep_log=1; echo "ArgoCD did not become reachable at $(ARGOCD_SERVER)" >&2; exit 1; }; \
 	fi; \
 	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
-		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode); \
-		[ -n "$$_pw" ] || { echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		printf '%s' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --insecure >/dev/null; \
+		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not read ArgoCD admin password Secret from $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
+		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
+		printf '%s' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --insecure >/dev/null || { _keep_log=1; echo "ArgoCD CLI login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
 	fi; \
 	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 

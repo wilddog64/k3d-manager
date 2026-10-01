@@ -52,3 +52,9 @@ The targets now validate the current CLI session and re-login with the `admin` p
 never printed.
 
 Follow-up commit: `a7fb7798`.
+
+## Diagnostics follow-up
+
+When the target still exited with status 1, its cleanup path removed the port-forward log and its
+login branch suppressed the useful error. The target now identifies Secret-read and login failures
+and preserves the temporary port-forward log when the operation fails.
