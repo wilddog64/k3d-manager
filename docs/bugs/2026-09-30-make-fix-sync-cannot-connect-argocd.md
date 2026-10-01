@@ -38,3 +38,15 @@ The repository's working login path uses `--plaintext` for this local port-forwa
 targets now pass that flag as well.
 
 Follow-up commit: `14dab218`.
+
+## Authentication follow-up
+
+After the transport fix, a stale CLI session failed with:
+
+```text
+rpc error: code = Unauthenticated desc = invalid session: token signature is invalid: signature is invalid
+```
+
+The targets now validate the current CLI session and re-login with the `admin` password from
+`argocd-initial-admin-secret` when the cached token is invalid. The password is passed on stdin and
+never printed.

@@ -2797,3 +2797,9 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] Added `--plaintext` to `fix-sync` and `fix-force-sync` for the local ArgoCD port-forward.
 - [x] Focused regression passed; removing `--plaintext` made it fail, then restoration passed.
   Follow-up SHA: `14dab218`.
+
+# 2026-09-30 — fix-sync stale-token recovery
+
+- [x] Added automatic ArgoCD session validation and password-stdin login for stale tokens.
+- [x] Regression passed; removing the login plaintext flag made it fail, then restoration passed.
+  Final SHA is recorded in the bug doc after commit.

@@ -36,6 +36,9 @@ setup() {
   run make -n fix-sync APP=acg-kube-prometheus-stack
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"kubectl --context \"k3d-k3d-cluster\" -n \"cicd\" port-forward svc/argocd-server 8080:443"* ]]
+  [[ "${output}" == *"argocd account get-context --server 'localhost:8080' --grpc-web --plaintext --insecure"* ]]
+  [[ "${output}" == *"get secret argocd-initial-admin-secret"* ]]
+  [[ "${output}" == *"argocd login 'localhost:8080' --username admin --stdin --grpc-web --plaintext --insecure"* ]]
   [[ "${output}" == *"--server 'localhost:8080' --grpc-web --plaintext --insecure"* ]]
 }
 

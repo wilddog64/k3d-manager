@@ -7955,3 +7955,11 @@ The first connection fix established the tunnel but ArgoCD then returned an HTTP
 `--plaintext` to both Make sync targets, matching the repository's local ArgoCD login path. The
 focused regression test and a mutation check removing `--plaintext` were run; final follow-up SHA:
 `14dab218`.
+
+# 2026-09-30 — fix-sync stale-token recovery
+
+The local ArgoCD transport fix exposed stale cached CLI tokens after an ArgoCD server-secret
+rotation. `fix-sync` and `fix-force-sync` now validate the CLI session and re-login from
+`argocd-initial-admin-secret` over stdin when the token signature is invalid. The focused test and
+the mutation removing login transport flags were red/green verified; final SHA is recorded in the
+bug doc after commit.

@@ -862,6 +862,11 @@ fix-sync: ## APP is required
 		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
 		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { echo "ArgoCD did not become reachable at $(ARGOCD_SERVER); see $$_pf_log" >&2; exit 1; }; \
 	fi; \
+	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
+		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode); \
+		[ -n "$$_pw" ] || { echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
+		printf '%s' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --insecure >/dev/null; \
+	fi; \
 	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 
 ## ArgoCD force sync — discards local state (APP=<argocd-app-name>; ARGOCD_SERVER=host:port)
@@ -875,6 +880,11 @@ fix-force-sync: ## APP is required
 		kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" port-forward svc/argocd-server 8080:443 >"$$_pf_log" 2>&1 & _pf_pid=$$!; \
 		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
 		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { echo "ArgoCD did not become reachable at $(ARGOCD_SERVER); see $$_pf_log" >&2; exit 1; }; \
+	fi; \
+	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
+		_pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode); \
+		[ -n "$$_pw" ] || { echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
+		printf '%s' "$$_pw" | argocd login '$(ARGOCD_SERVER)' --username admin --stdin --grpc-web --plaintext --insecure >/dev/null; \
 	fi; \
 	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
 

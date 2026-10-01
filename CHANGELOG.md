@@ -9,7 +9,8 @@
 - Grafana ServiceMonitors now carry the release labels selected by Prometheus, restoring metrics
   for the overview dashboard in both the hub and ACG observability stacks.
 - `make fix-sync` and `make fix-force-sync` now bootstrap the local ArgoCD port-forward when needed,
-  use gRPC-web, and clean up the temporary tunnel.
+  validate/re-mint stale CLI authentication from the cluster Secret, use plaintext gRPC-web, and
+  clean up the temporary tunnel.
 
 ### Added
 
