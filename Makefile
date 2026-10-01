@@ -854,50 +854,12 @@ fix-delete-pod: ## APP and NS are required
 ## ArgoCD app sync with 120s timeout (APP=<argocd-app-name>; ARGOCD_SERVER=host:port)
 fix-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-sync APP=<argocd-app-name>"; exit 1; }
-	@set -euo pipefail; \
-	_pf_pid=''; _keep_log=0; _pf_log="$${TMPDIR:-/tmp}/k3d-manager-fix-sync.$$$$.log"; \
-	_cleanup() { if [ -n "$$_pf_pid" ]; then kill "$$_pf_pid" 2>/dev/null || true; wait "$$_pf_pid" 2>/dev/null || true; fi; if [ "$$_keep_log" -eq 0 ]; then rm -f "$$_pf_log"; else echo "ArgoCD port-forward log: $$_pf_log" >&2; fi; }; \
-	trap _cleanup EXIT; \
-	if [ "$(ARGOCD_SERVER)" = "localhost:8080" ] && ! curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null; then \
-		kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" port-forward svc/argocd-server 8080:443 >"$$_pf_log" 2>&1 & _pf_pid=$$!; \
-		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
-		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { _keep_log=1; echo "ArgoCD did not become reachable at $(ARGOCD_SERVER)" >&2; exit 1; }; \
-	fi; \
-	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
-		_pw="$${ARGOCD_ADMIN_PASSWORD:-}"; _vault_hdr="$${TMPDIR:-/tmp}/k3d-manager-fix-sync-vault.$$$$.hdr"; \
-		if [ -z "$$_pw" ]; then _vault_token=$$(kubectl --context "$(INFRA_CONTEXT)" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
-			if [ -n "$$_vault_token" ]; then printf 'X-Vault-Token: %s\n' "$$_vault_token" >"$$_vault_hdr"; _pw=$$(curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password", ""))' 2>/dev/null || true); rm -f "$$_vault_hdr"; fi; \
-		fi; \
-		[ -n "$$_pw" ] || _pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not resolve ArgoCD admin password from ARGOCD_ADMIN_PASSWORD, Vault, or $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
-		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
-		export ARGOCD_AUTH_TOKEN="$$_session_token"; \
-	fi; \
-	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
+	@ARGOCD_SERVER='$(ARGOCD_SERVER)' ARGOCD_SCHEME='$(ARGOCD_SCHEME)' INFRA_CONTEXT='$(INFRA_CONTEXT)' ARGOCD_NS='$(ARGOCD_NS)' ./bin/argocd-app-sync '$(APP)' --timeout 120
 
 ## ArgoCD force sync — discards local state (APP=<argocd-app-name>; ARGOCD_SERVER=host:port)
 fix-force-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-force-sync APP=<argocd-app-name>"; exit 1; }
-	@set -euo pipefail; \
-	_pf_pid=''; _keep_log=0; _pf_log="$${TMPDIR:-/tmp}/k3d-manager-fix-sync.$$$$.log"; \
-	_cleanup() { if [ -n "$$_pf_pid" ]; then kill "$$_pf_pid" 2>/dev/null || true; wait "$$_pf_pid" 2>/dev/null || true; fi; if [ "$$_keep_log" -eq 0 ]; then rm -f "$$_pf_log"; else echo "ArgoCD port-forward log: $$_pf_log" >&2; fi; }; \
-	trap _cleanup EXIT; \
-	if [ "$(ARGOCD_SERVER)" = "localhost:8080" ] && ! curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null; then \
-		kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" port-forward svc/argocd-server 8080:443 >"$$_pf_log" 2>&1 & _pf_pid=$$!; \
-		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
-		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { _keep_log=1; echo "ArgoCD did not become reachable at $(ARGOCD_SERVER)" >&2; exit 1; }; \
-	fi; \
-	if ! argocd account get-context --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure >/dev/null 2>&1; then \
-		_pw="$${ARGOCD_ADMIN_PASSWORD:-}"; _vault_hdr="$${TMPDIR:-/tmp}/k3d-manager-fix-sync-vault.$$$$.hdr"; \
-		if [ -z "$$_pw" ]; then _vault_token=$$(kubectl --context "$(INFRA_CONTEXT)" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
-			if [ -n "$$_vault_token" ]; then printf 'X-Vault-Token: %s\n' "$$_vault_token" >"$$_vault_hdr"; _pw=$$(curl -sf -H "@$$_vault_hdr" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password", ""))' 2>/dev/null || true); rm -f "$$_vault_hdr"; fi; \
-		fi; \
-		[ -n "$$_pw" ] || _pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not resolve ArgoCD admin password from ARGOCD_ADMIN_PASSWORD, Vault, or $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
-		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
-		export ARGOCD_AUTH_TOKEN="$$_session_token"; \
-	fi; \
-	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
+	@ARGOCD_SERVER='$(ARGOCD_SERVER)' ARGOCD_SCHEME='$(ARGOCD_SCHEME)' INFRA_CONTEXT='$(INFRA_CONTEXT)' ARGOCD_NS='$(ARGOCD_NS)' ./bin/argocd-app-sync '$(APP)' --force --timeout 180
 
 ## Force ESO ClusterSecretStore reconcile (annotates vault-backend to trigger re-sync)
 fix-eso-refresh: ## No arguments needed
