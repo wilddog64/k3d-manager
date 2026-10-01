@@ -22,7 +22,8 @@
 - Fixed the embedded session-login Python newline escape so passwords are passed unchanged to
   ArgoCD.
 - Added a source-controlled `Grafana Overview — Readable` dashboard with readable HTTP-status and
-  latency legends while preserving the existing metrics and dashboard variables.
+  latency legends for both app-cluster and hub Grafana while preserving the existing metrics and
+  dashboard variables.
 
 ### Added
 

@@ -5,6 +5,7 @@ HUB="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-hu
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-autopatch.yaml"
 OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/grafana-overview-readable-configmap.yaml"
+HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml"
 
 @test "acg dashboard appset targets app-cluster role" {
   run yq -r '.spec.generators[0].clusters.selector.matchLabels["k3d-manager/role"]' "${ACG}"
@@ -62,4 +63,14 @@ OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/grafana-overview-rea
   [[ "$output" == *'"legendFormat": "p50 — median"'* ]]
   [[ "$output" == *'"legendFormat": "Average — arithmetic mean"'* ]]
   [[ "$output" == *'Status -1 means the request did not produce a normal HTTP response'* ]]
+}
+
+@test "hub Grafana Overview uses the same readable dashboard contract" {
+  run yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq empty
+  [[ "$output" == *'"uid": "k3dm-grafana-overview"'* ]]
+  [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
+  [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
+  [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
 }

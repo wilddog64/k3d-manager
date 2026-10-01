@@ -42,4 +42,7 @@ It uses the unique title `Grafana Overview — Readable` and UID `k3dm-grafana-o
 Helm-owned Overview dashboard cannot be safely overridden by a second ConfigMap with the same UID.
 The dashboard sidecar imports it from the existing ArgoCD-managed dashboards directory.
 
+The same dashboard is also present in `scripts/etc/argocd/platform-ops/` for the hub ApplicationSet;
+the app-cluster and hub dashboards must be synchronized separately.
+
 Implementation commits: `62940976`, `487b0a43`.

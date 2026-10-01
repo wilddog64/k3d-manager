@@ -2848,4 +2848,6 @@ recorded in the bug doc: `db351961`.
 
 - [x] Added and tested the source-controlled readable dashboard with a unique UID/title; final SHA
 is recorded in the bug doc after commit.
+The hub platform-ops manifest and regression assertion are included as well; final SHA is recorded
+in the bug doc after commit.
 Final implementation SHA: `487b0a43`.

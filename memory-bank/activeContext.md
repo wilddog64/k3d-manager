@@ -8014,4 +8014,6 @@ Added `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` 
 queries, plus readable HTTP-status and latency legends. It uses a unique UID/title because the
 Helm-owned Overview dashboard cannot be overridden safely by duplicate UID. The final implementation
 SHA is recorded in the bug doc after commit.
+The same dashboard is now sourced for both the app-cluster and hub ApplicationSets; final SHA is
+recorded in the bug doc after commit.
 Final implementation SHA: `487b0a43`.
