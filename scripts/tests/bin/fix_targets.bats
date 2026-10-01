@@ -32,6 +32,13 @@ setup() {
   [[ "${output}" == *"kubectl get pods -n 'shopping-cart-apps' --context 'k3d-k3d-cluster'"* ]]
 }
 
+@test "make fix-sync bootstraps the local ArgoCD port-forward and uses grpc-web" {
+  run make -n fix-sync APP=acg-kube-prometheus-stack
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"kubectl --context \"k3d-k3d-cluster\" -n \"cicd\" port-forward svc/argocd-server 8080:443"* ]]
+  [[ "${output}" == *"--server 'localhost:8080' --grpc-web --insecure"* ]]
+}
+
 @test "ask sandbox allows make fix-list in fix mode" {
   run env K3DM_FIX_MODE=1 bin/k3dm-ask-bash -lc 'make fix-list'
   [ "${status}" -eq 0 ]

@@ -18,6 +18,7 @@ CLEANUP_STALE ?= 0
 BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
+ARGOCD_SERVER ?= localhost:8080
 
 .PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
@@ -849,15 +850,33 @@ fix-delete-pod: ## APP and NS are required
 	@test -n "$(NS)"  || { echo "Usage: make fix-delete-pod APP=<label> NS=<namespace>"; exit 1; }
 	kubectl delete pod -l 'app=$(APP)' -n '$(NS)' --context '$(FIX_CONTEXT)' --grace-period=0
 
-## ArgoCD app sync with 120s timeout (APP=<argocd-app-name>)
+## ArgoCD app sync with 120s timeout (APP=<argocd-app-name>; ARGOCD_SERVER=host:port)
 fix-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-sync APP=<argocd-app-name>"; exit 1; }
-	argocd app sync '$(APP)' --timeout 120 --server localhost:8080 --insecure
+	@set -euo pipefail; \
+	_pf_pid=''; _pf_log="$${TMPDIR:-/tmp}/k3d-manager-fix-sync.$$$$.log"; \
+	_cleanup() { if [ -n "$$_pf_pid" ]; then kill "$$_pf_pid" 2>/dev/null || true; wait "$$_pf_pid" 2>/dev/null || true; fi; rm -f "$$_pf_log"; }; \
+	trap _cleanup EXIT; \
+	if [ "$(ARGOCD_SERVER)" = "localhost:8080" ] && ! curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null; then \
+		kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" port-forward svc/argocd-server 8080:443 >"$$_pf_log" 2>&1 & _pf_pid=$$!; \
+		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
+		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { echo "ArgoCD did not become reachable at $(ARGOCD_SERVER); see $$_pf_log" >&2; exit 1; }; \
+	fi; \
+	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --insecure
 
-## ArgoCD force sync — discards local state (APP=<argocd-app-name>)
+## ArgoCD force sync — discards local state (APP=<argocd-app-name>; ARGOCD_SERVER=host:port)
 fix-force-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-force-sync APP=<argocd-app-name>"; exit 1; }
-	argocd app sync '$(APP)' --force --timeout 180 --server localhost:8080 --insecure
+	@set -euo pipefail; \
+	_pf_pid=''; _pf_log="$${TMPDIR:-/tmp}/k3d-manager-fix-sync.$$$$.log"; \
+	_cleanup() { if [ -n "$$_pf_pid" ]; then kill "$$_pf_pid" 2>/dev/null || true; wait "$$_pf_pid" 2>/dev/null || true; fi; rm -f "$$_pf_log"; }; \
+	trap _cleanup EXIT; \
+	if [ "$(ARGOCD_SERVER)" = "localhost:8080" ] && ! curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null; then \
+		kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" port-forward svc/argocd-server 8080:443 >"$$_pf_log" 2>&1 & _pf_pid=$$!; \
+		for _attempt in $$(seq 1 30); do curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null && break; sleep 1; done; \
+		curl -sf --max-time 1 "http://$(ARGOCD_SERVER)/healthz" >/dev/null || { echo "ArgoCD did not become reachable at $(ARGOCD_SERVER); see $$_pf_log" >&2; exit 1; }; \
+	fi; \
+	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --insecure
 
 ## Force ESO ClusterSecretStore reconcile (annotates vault-backend to trigger re-sync)
 fix-eso-refresh: ## No arguments needed

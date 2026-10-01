@@ -7941,3 +7941,10 @@ carry one, so `grafana_build_info` and request metrics were never scraped. Added
 `grafana.serviceMonitor.labels.release` values for hub and ACG, with a regression test and Helm
 render verification. Mutation of the label failed the test as expected; restoration passed.
 Final commit SHA: `bc301f83`.
+
+# 2026-09-30 — fix-sync now manages its ArgoCD connection
+
+Filed and fixed `docs/bugs/2026-09-30-make-fix-sync-cannot-connect-argocd.md`. The Make repair
+targets now bootstrap a short-lived local ArgoCD port-forward when needed, wait for health, use
+gRPC-web, clean up the child process, and accept `ARGOCD_SERVER` overrides. Focused BATS and a
+mutation check passed; final commit SHA is recorded in the bug doc after commit.

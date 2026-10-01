@@ -2784,3 +2784,10 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [x] Added a regression test and confirmed the rendered Helm ServiceMonitors contain the labels.
 - [x] Mutation made the regression test fail; restoring the label made it pass. Final commit SHA is
   recorded in the bug doc: `bc301f83`.
+
+# 2026-09-30 — fix-sync ArgoCD connection
+
+- [x] Fixed `fix-sync` and `fix-force-sync` to self-manage the default local ArgoCD port-forward
+  and use gRPC-web, with cleanup and a configurable server override.
+- [x] Added regression coverage; removing `--grpc-web` made the test fail, then restoration passed.
+  Final commit SHA is recorded in the bug doc after commit.
