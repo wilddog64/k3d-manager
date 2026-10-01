@@ -519,7 +519,8 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
     now = now or datetime.now(timezone.utc)
     try:
         bad = []
-        ci_data = {}
+        first_bad = {}
+        rerunnable = {}
         for repo_name in repos:
             run = fetch(f"/repos/{repo_name}/actions/runs", {"Authorization": f"token {token}"})
             runs = run.get("workflow_runs", []) if isinstance(run, dict) else []
@@ -531,19 +532,24 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
             if not isinstance(checks, dict):
                 raise ValueError("invalid checks")
             for check in checks.get("check_runs", []):
+                conclusion = None
                 if check.get("conclusion") in ("failure", "timed_out", "cancelled"):
-                    bad.append(f"{repo_name} {check.get('name', 'check')} {check.get('conclusion')}")
-                    if not ci_data:
-                        ci_data = {"repo": repo_name, "run_id": latest["id"],
-                                   "run_url": latest.get("html_url", ""),
-                                   "conclusion": check["conclusion"]}
+                    conclusion = check["conclusion"]
+                    bad.append(f"{repo_name} {check.get('name', 'check')} {conclusion}")
                 elif check.get("status") == "in_progress" and _older_than(
                         check.get("started_at"), max_age_seconds, now):
+                    conclusion = "stuck"
                     bad.append(f"{repo_name} {check.get('name', 'check')} stuck")
-                    if not ci_data:
-                        ci_data = {"repo": repo_name, "run_id": latest["id"],
-                                   "run_url": latest.get("html_url", ""),
-                                   "conclusion": "stuck"}
+                if conclusion is None:
+                    continue
+                candidate = {"repo": repo_name, "run_id": latest["id"],
+                             "run_url": latest.get("html_url", ""),
+                             "conclusion": conclusion}
+                if not first_bad:
+                    first_bad = candidate
+                if not rerunnable and conclusion in ("timed_out", "cancelled", "stuck"):
+                    rerunnable = candidate
+        ci_data = rerunnable or first_bad
         if bad:
             status = "degraded" if _debounced("ci", True, threshold, state) else "healthy"
             return record("ci", status, ", ".join(bad[:3]), data=ci_data)

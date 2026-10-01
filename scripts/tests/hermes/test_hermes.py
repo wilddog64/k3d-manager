@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
 from hermes.correlator import Correlator
+from hermes import repairs
 from hermes.sensors import (argocd, ci, data_layer, eso, github_token_expiry, kine, kine_log_signals,
                             hostnet_drift, node_pressure, reachability, stale_acg_registration,
                             status_checks, token_expiry_advisory, values_branch)
@@ -745,13 +746,14 @@ def test_kine_degraded_only_for_stalled_compaction_or_size_and_never_writes():
 
 def test_ci_healthy_degraded_unknown_and_debounce():
     now = datetime(2026, 9, 5, tzinfo=timezone.utc)
-    def source(conclusion="success", status="completed"):
+    def source(conclusion="success", status="completed", checks=None):
         def fetch(url, _headers):
             if "actions/runs" in url:
                 return {"workflow_runs": [{"head_sha": "abc", "id": 123,
                                             "html_url": "https://github.com/wilddog64/k3d-manager/actions/runs/123"}]}
-            return {"check_runs": [{"name": "test", "conclusion": conclusion, "status": status,
-                                    "started_at": "2026-09-05T00:00:00Z"}]}
+            return {"check_runs": checks if checks is not None else
+                    [{"name": "test", "conclusion": conclusion, "status": status,
+                      "started_at": "2026-09-05T00:00:00Z"}]}
         return fetch
     healthy = ci(source(), {}, token="x", now=now)
     assert_normalized(healthy, "ci")
@@ -764,6 +766,40 @@ def test_ci_healthy_degraded_unknown_and_debounce():
     assert ci(source(), {}, token="", now=now)["status"] == "unknown"
     stuck_now = datetime(2026, 9, 5, 2, tzinfo=timezone.utc)
     assert ci(source("success", "in_progress"), {"debounce": {"ci": 1}}, token="x", now=stuck_now)["status"] == "degraded"
+
+
+def test_ci_prefers_rerunnable_conclusion_after_failure():
+    now = datetime(2026, 9, 5, 2, tzinfo=timezone.utc)
+    def source(checks):
+        return lambda url, _headers: (
+            {"workflow_runs": [{"head_sha": "abc", "id": 123,
+                                 "html_url": "https://example.test/run/123"}]}
+            if "actions/runs" in url else {"check_runs": checks})
+
+    cancelled = [{"name": "failed", "conclusion": "failure", "status": "completed"},
+                 {"name": "cancelled", "conclusion": "cancelled", "status": "completed"}]
+    record = ci(source(cancelled), {"debounce": {"ci": 1}}, token="x", now=now)
+    assert record["data"]["conclusion"] == "cancelled"
+    assert record["data"]["run_url"]
+    assert repairs._r4_precondition([record], [], {}) is True
+
+    stuck = [{"name": "failed", "conclusion": "failure", "status": "completed"},
+             {"name": "stuck", "conclusion": None, "status": "in_progress",
+              "started_at": "2026-09-05T00:00:00Z"}]
+    record = ci(source(stuck), {"debounce": {"ci": 1}}, token="x", now=now)
+    assert record["data"]["conclusion"] == "stuck"
+    assert repairs._r4_precondition([record], [], {}) is True
+
+    record = ci(source([{"name": "failed", "conclusion": "failure", "status": "completed"}]),
+                {"debounce": {"ci": 1}}, token="x", now=now)
+    assert record["data"]["conclusion"] == "failure"
+    assert record["data"]["run_url"]
+    assert repairs._r4_precondition([record], [], {}) is False
+
+    record = ci(source([{ "name": "cancelled", "conclusion": "cancelled", "status": "completed"},
+                        {"name": "failed", "conclusion": "failure", "status": "completed"}]),
+                {"debounce": {"ci": 1}}, token="x", now=now)
+    assert record["data"]["conclusion"] == "cancelled"
 
 
 def sensor(name, status):
