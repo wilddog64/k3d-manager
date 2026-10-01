@@ -2831,3 +2831,9 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 
 - [x] Added explicit override, Vault-first lookup, and Kubernetes fallback for ArgoCD admin
   credentials. Focused BATS passed; final SHA: `122129bb`.
+
+# 2026-10-01 — fix-sync password newline handling
+
+- [x] Corrected the embedded Python newline escape in both sync targets and added a regression
+  assertion. The faulty escape mutation failed the focused suite; restoration passed. Final SHA is
+  recorded in the bug doc after commit.

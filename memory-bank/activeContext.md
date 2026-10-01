@@ -7993,3 +7993,10 @@ token. Focused regression is green; final SHA: `4335a601`.
 The session API returned 401 because the Kubernetes initial-admin Secret was stale. `fix-sync` and
 `fix-force-sync` now resolve the password from `ARGOCD_ADMIN_PASSWORD`, Vault `secret/argocd/admin`,
 then the Kubernetes Secret. Focused regression is green; final SHA: `122129bb`.
+
+# 2026-10-01 — fix-sync password newline handling
+
+The direct session API test authenticated successfully while the Make target returned HTTP 401.
+The embedded Python used `rstrip("\\n")`, stripping literal backslash/`n` characters from some
+passwords. Both sync targets now use `rstrip("\n")`; the focused regression is green. The final
+implementation SHA is recorded in the bug doc after commit.

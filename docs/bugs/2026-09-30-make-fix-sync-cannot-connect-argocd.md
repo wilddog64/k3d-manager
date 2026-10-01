@@ -98,3 +98,11 @@ target now resolves credentials in this order: `ARGOCD_ADMIN_PASSWORD`, Vault
 `secret/argocd/admin`, then the Kubernetes initial-admin Secret.
 
 Follow-up commit: `122129bb`.
+
+## Password-input follow-up
+
+The direct session API test authenticated successfully while the Make target returned HTTP 401.
+The embedded Python used `rstrip("\\n")`, which strips the literal backslash and `n` characters
+instead of a newline. It now uses `rstrip("\n")` so the password reaches ArgoCD unchanged.
+
+Follow-up implementation commit is recorded after commit.

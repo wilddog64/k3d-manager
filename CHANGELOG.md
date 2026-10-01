@@ -19,6 +19,8 @@
   CLI `--stdin` flag and keeping the admin password out of argv.
 - The sync fallback resolves the ArgoCD admin password from `ARGOCD_ADMIN_PASSWORD`, Vault, then
   the Kubernetes Secret, avoiding stale initial-admin credentials after rebuilds.
+- Fixed the embedded session-login Python newline escape so passwords are passed unchanged to
+  ArgoCD.
 
 ### Added
 

@@ -870,7 +870,7 @@ fix-sync: ## APP is required
 		fi; \
 		[ -n "$$_pw" ] || _pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not resolve ArgoCD admin password from ARGOCD_ADMIN_PASSWORD, Vault, or $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
 		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
+		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
 		export ARGOCD_AUTH_TOKEN="$$_session_token"; \
 	fi; \
 	argocd app sync '$(APP)' --timeout 120 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure
@@ -894,7 +894,7 @@ fix-force-sync: ## APP is required
 		fi; \
 		[ -n "$$_pw" ] || _pw=$$(kubectl --context "$(INFRA_CONTEXT)" -n "$(ARGOCD_NS)" get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode) || { _keep_log=1; echo "Could not resolve ArgoCD admin password from ARGOCD_ADMIN_PASSWORD, Vault, or $(INFRA_CONTEXT)/$(ARGOCD_NS)" >&2; exit 1; }; \
 		[ -n "$$_pw" ] || { _keep_log=1; echo "ArgoCD admin password Secret is empty or missing" >&2; exit 1; }; \
-		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
+		_session_token=$$(printf '%s\n' "$$_pw" | python3 -c 'import json,sys,urllib.request as u; p=sys.stdin.read().rstrip("\n"); req=u.Request("$(ARGOCD_SCHEME)://$(ARGOCD_SERVER)/api/v1/session", data=json.dumps({"username":"admin","password":p}).encode(), headers={"Content-Type":"application/json"}, method="POST"); print(json.load(u.urlopen(req, timeout=30))["token"])') || { _keep_log=1; echo "ArgoCD API login failed for $(ARGOCD_SERVER)" >&2; exit 1; }; \
 		export ARGOCD_AUTH_TOKEN="$$_session_token"; \
 	fi; \
 	argocd app sync '$(APP)' --force --timeout 180 --server '$(ARGOCD_SERVER)' --grpc-web --plaintext --insecure

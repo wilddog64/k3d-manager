@@ -39,6 +39,7 @@ setup() {
   [[ "${output}" == *"argocd account get-context --server 'localhost:8080' --grpc-web --plaintext --insecure"* ]]
   [[ "${output}" == *"get secret argocd-initial-admin-secret"* ]]
   [[ "${output}" == *"/api/v1/session"* ]]
+  [[ "${output}" == *'sys.stdin.read().rstrip("\n")'* ]]
   [[ "${output}" == *"export ARGOCD_AUTH_TOKEN"* ]]
   [[ "${output}" == *"secret/data/argocd/admin"* ]]
   [[ "${output}" == *'${ARGOCD_ADMIN_PASSWORD:-}'* ]]
