@@ -7986,4 +7986,4 @@ recorded in the bug doc after commit: `75952f57`.
 
 The installed ArgoCD CLI rejected the historical `--stdin` login flag. Replaced that fallback with
 the ArgoCD `/api/v1/session` API, reading the password from stdin and exporting only the returned
-token. Focused regression is green; final SHA is recorded in the bug doc after commit.
+token. Focused regression is green; final SHA: `4335a601`.

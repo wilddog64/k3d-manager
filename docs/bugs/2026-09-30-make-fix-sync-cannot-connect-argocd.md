@@ -89,4 +89,4 @@ The fallback now authenticates through ArgoCD's `/api/v1/session` endpoint, read
 from stdin without putting it in argv, and exports only the resulting `ARGOCD_AUTH_TOKEN` for the
 sync command.
 
-Follow-up commit: pending.
+Follow-up commit: `4335a601`.
