@@ -8028,3 +8028,9 @@ final SHA: `e3db399e`.
 Added `docs/plans/v1.41.1-loadtest-credentials-and-preflight.md`. The proposal defines Vault-backed
 credential sourcing, a no-load preflight, Prometheus remote-write validation, explicit confirmation,
 and dashboard empty-state behavior. No implementation changes were made.
+
+# 2026-10-01 — v1.41.0 find-similar-docs links spec
+
+Added `docs/plans/v1.41.0-find-similar-docs-links.md`. The proposal adds branch-pinned GitHub URLs
+to human and JSON retrieval results without changing search, Slack parsing, or advisory fallback
+behavior. No implementation changes were made.

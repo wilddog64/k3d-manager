@@ -2860,3 +2860,8 @@ in the bug doc after commit: `3664bea7`.
 
 - [x] Specified the safe credential, preflight, remote-write, dashboard, testing, and scope
   requirements for v1.41.1. Implementation remains pending.
+
+# 2026-10-01 — v1.41.0 find-similar-docs links spec
+
+- [x] Specified branch resolution, terminal/Slack/JSON output, offline tests, and scope for
+  link-enriched similarity results. Implementation remains pending.
