@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-10-01
-**Status:** FIXED (`pending commit`)
+**Status:** FIXED (`62940976`)
 **Severity:** low — the dashboard is functional, but its legends and panel descriptions make the
 HTTP status and latency series difficult to interpret.
 
@@ -40,4 +40,4 @@ existing dashboard UID, PromQL, datasource variable, job/instance filters, and p
 adding explanatory panel descriptions and readable HTTP-status, percentile, median, and average
 legends. The dashboard sidecar can import it from the existing ArgoCD-managed dashboards directory.
 
-Implementation commit is recorded after commit.
+Implementation commit: `62940976`.

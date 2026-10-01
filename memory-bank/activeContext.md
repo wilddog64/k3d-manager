@@ -8012,4 +8012,4 @@ the labels safely.
 
 Added `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` with the existing
 Overview UID and queries, plus readable HTTP-status and latency legends. The dashboard regression
-suite is green; final SHA is recorded in the bug doc after commit.
+suite is green; final SHA: `62940976`.
