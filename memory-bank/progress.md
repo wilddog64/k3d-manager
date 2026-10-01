@@ -2855,3 +2855,8 @@ in the bug doc after commit: `3664bea7`.
 
 - [x] Replaced the raw exit-code table with a latest-result view and regression coverage; final SHA
   is recorded in the bug doc: `e3db399e`.
+
+# 2026-10-01 — v1.41.1 load-test credential/preflight spec
+
+- [x] Specified the safe credential, preflight, remote-write, dashboard, testing, and scope
+  requirements for v1.41.1. Implementation remains pending.

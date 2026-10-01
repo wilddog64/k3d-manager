@@ -8022,3 +8022,9 @@ recorded in the bug doc after commit. Final SHA: `3664bea7`.
 Changed the raw exit-code table to an instant latest-result table with Runner, Job, and Result
 columns plus PASS/FAIL/EXPECTED ENVIRONMENT mappings. The dashboard regression suite is green;
 final SHA: `e3db399e`.
+
+# 2026-10-01 — v1.41.1 load-test credential/preflight spec
+
+Added `docs/plans/v1.41.1-loadtest-credentials-and-preflight.md`. The proposal defines Vault-backed
+credential sourcing, a no-load preflight, Prometheus remote-write validation, explicit confirmation,
+and dashboard empty-state behavior. No implementation changes were made.
