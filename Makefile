@@ -886,14 +886,14 @@ file-bug: ## FILE_TITLE and FILE_BODY required — write docs/bugs/<date>-<slug>
 
 ## Run all BATS test suites
 test:
-	./scripts/k3d-manager test all
+	scripts/tests/tripwire.sh ./scripts/k3d-manager test all
 
 ## Run the BATS suites under scripts/tests/bin (not covered by `make test`)
 test-bin:
 	@set -euo pipefail; \
 	 command -v bats >/dev/null 2>&1 || { \
 	   echo "[make] bats not found — install with: brew install bats-core" >&2; exit 2; }; \
-	 bats scripts/tests/bin
+	 scripts/tests/tripwire.sh bats scripts/tests/bin
 
 ## Run the stdlib-unittest Python suites (scripts/tests/bin/*.py, excluding test_*.py)
 test-python-unit:
@@ -909,7 +909,7 @@ test-python-unit:
 	     exit 2; \
 	   fi; \
 	   echo "[make] python3 $$f"; \
-	   python3 "$$f"; \
+	   scripts/tests/tripwire.sh python3 "$$f"; \
 	 done; \
 	 if [ "$$found" -eq 0 ]; then echo "[make] no unittest suites found" >&2; exit 2; fi
 
@@ -958,7 +958,7 @@ test-pytest:
 	 fi; \
 	 if [ -n "$${K3DM_JUNIT_XML:-}" ]; then set -- "$$@" --junitxml "$$K3DM_JUNIT_XML" -o junit_logging=no; fi; \
 	 echo "[make] $$* (pytest suites)"; \
-	 "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
+	 scripts/tests/tripwire.sh "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest

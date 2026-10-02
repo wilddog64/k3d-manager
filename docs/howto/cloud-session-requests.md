@@ -46,7 +46,7 @@ problem, not something to work around. Say so and move on.
 
 ## What you can ask for
 
-Thirteen actions. This list is a security boundary, not a convenience default — anything not on it
+The actions below, and only these (`ACTION_ALLOWLIST` in `scripts/lib/webhook/cloud_actions.py`). This list is a security boundary, not a convenience default — anything not on it
 is rejected by the bridge without being executed.
 
 | action | args | what you get back |
@@ -61,11 +61,62 @@ is rejected by the bridge without being executed.
 | `make-observability-status` | none | monitoring/trivy-system pods, both clusters |
 | `make-vuln-scan` | none | VulnerabilityReport summary |
 | `make-e2e-runner-health` | none | hub vs remote-runner health |
-| `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`) |
+| `make-test` | none | the BATS dispatcher suites (`./scripts/k3d-manager test all`), ~15 min |
+| `make-test-bin` | none | the BATS suites under `scripts/tests/bin`, ~1 min |
+| `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`), ~1.5 min; publishes `junit.xml` |
 | `make-test-python-unit` | none | the offline stdlib-unittest suites |
+| `make-test-python` | none | both Python groups above |
+| `make-test-all` | none | every offline suite (BATS + Python), ~20 min |
 | `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
 
 `job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected.
+
+**The test targets run on macOS, which is why they are worth asking for.** The host has BSD
+`sed`, `stat`, `grep` and `date`; your sandbox is Linux. A suite that is green in your sandbox can
+be red on the machine the tool ships on, and only the host can tell you. Each test target runs
+behind `scripts/tests/tripwire.sh`, so it cannot reach a real cluster, cloud API or keychain even
+on the operator's machine — see `docs/issues/2026-10-01-offline-test-sweep-tripwire.md`. Only one
+`/k3dm` make job runs at a time; a `make-test-all` occupies that slot for about 20 minutes, and a
+second make request is answered `409` until it finishes.
+
+**Every `make-*` and `diagnose-*` action is asynchronous.** The response carries `body.job_id`
+and `body.status: "queued"` within seconds, whatever the job's runtime. Poll it:
+
+```bash
+bin/k3dm-cloud-request --wait make-test-pytest            # -> body.job_id, e.g. 1a2b3c4d
+bin/k3dm-cloud-request --wait job-status --arg job_id=1a2b3c4d
+```
+
+Repeat `job-status` until `body.status` is `success` or `failed`. That first terminal
+`job-status` also carries the diagnostic `artifacts` described below.
+
+### Read-only cluster diagnostics
+
+The same verbs as Slack's `/cluster-diagnose`, each a `kubectl get`/`describe`/`logs` run by the
+webhook at reader tier. The webhook `action` is fixed per bridge action server-side; a request
+cannot choose it, and an `action` key in `args` is rejected as an unexpected argument.
+
+| action | args | what you get back (via `job-status`) |
+|---|---|---|
+| `diagnose-pods` | `provider`, `namespace` | pods in one namespace |
+| `diagnose-describe-pod` | `provider`, `namespace`, `name` | `kubectl describe pod`, sensitive env values masked |
+| `diagnose-logs` | `provider`, `namespace`, `name` | the last 120 log lines of the pod's default container |
+| `diagnose-apps` | none | hub ArgoCD Applications |
+| `diagnose-app` | `name` | one hub Application, described |
+| `diagnose-appsets` | none | hub ApplicationSets |
+
+- `provider` is one of `hostinger`, `aws`, `gcp`, `az`, `hub` (`azure` is not accepted here).
+- `namespace` must be in the webhook's `_DIAGNOSTIC_NAMESPACES` allowlist in `bin/k3dm-webhook`;
+  the bridge checks only that it is a DNS label, and the webhook is the authority.
+- `name` must be a Kubernetes-safe resource name.
+- Output is scrubbed twice before it reaches this branch: by the webhook when the job writes it,
+  and again by the bridge before it commits any `job-status` response. An application that logs
+  a credential in a shape nobody registered can still slip through both; treat logs as sensitive.
+
+**The boundary, in the operator's terms:** offline test targets and read-only diagnostics, yes.
+Creating, destroying or changing a cluster, a service, a pod or a cloud resource — never. That
+is why there is no `make-cluster-*`, `make-e2e*`, `fix-delete-pod`, `fix-force-sync` or
+`argocd-upgrade` action, and `test_no_lifecycle_or_mutating_target_is_reachable` keeps it so.
 
 ### What you cannot ask for, and why
 
@@ -76,7 +127,7 @@ another AI's prompt chains two injection surfaces together, which is exactly wha
 own `_INJECTION_RE` filter exists to prevent. Adding either one back requires its own spec and
 the operator's decision.
 
-The six reader-tier `make` targets above are reachable through mechanism 1. Every operator and
+The reader-tier `make` targets in the table above are reachable through mechanism 1. Every operator and
 admin target remains refused through this channel: the bridge presents a reader credential that
 the webhook will not accept for it, and the branch's content never becomes a command. Concrete
 examples still refused are `sync-apps`, `fix-restart`, `fix-sync`, `e2e-remote` and

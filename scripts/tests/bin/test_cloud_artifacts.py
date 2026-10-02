@@ -226,3 +226,20 @@ def test_non_job_status_action_never_publishes_artifacts(repos, job_dir, monkeyp
     _tick(repos, monkeypatch, "success")
 
     assert "artifacts" not in _response(repos, request_id)
+
+
+def test_job_status_output_is_scrubbed_before_it_is_committed(repos, job_dir, monkeypatch):
+    def fake_webhook(request):
+        return bridge._response("", request["action"], "ok", 200, body={
+            "job_id": JOB_ID, "status": "running",
+            "output": f"2026-10-01 payment-0 Authorization: {SYNTHETIC_BEARER}\n"})
+
+    (job_dir / "status").write_text("running")
+    request_id = _request_id(30)
+    _file_request(repos, request_id, _request())
+    monkeypatch.setattr(bridge, "_call_webhook", fake_webhook)
+    bridge.process_tick(repos["repo"], ROOT)
+
+    committed = _git(repos["origin"], "show", f"cloud-requests:responses/{request_id}.json")
+    assert "synthetic0token0value" not in committed
+    assert "***REDACTED***" in committed

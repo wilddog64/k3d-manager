@@ -9,6 +9,11 @@
 
 ### Added
 
+- Cloud bridge: `make-test`, `make-test-bin`, `make-test-python`, `make-test-all` and six read-only
+  `diagnose-*` actions (pods, describe-pod, logs, apps, app, appsets) at reader tier. The `test*`
+  targets now run behind `scripts/tests/tripwire.sh`, which blocks real cluster, cloud and keychain
+  tools and fails the run on any non-read call; see
+  `docs/issues/2026-10-01-offline-test-sweep-tripwire.md`.
 - Cloud-request diagnostic artifacts: the first `job-status` response that sees a job finish
   carries an `artifacts` array — `summary.json` plus a credential-scrubbed `junit.xml` for
   `make-test-pytest` — committed with the response and pruned to `K3DM_CLOUD_ARTIFACT_KEEP` (50).

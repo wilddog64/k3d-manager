@@ -94,7 +94,7 @@ class MakeTargetTests(unittest.TestCase):
         )
 
     def test_denylist_is_not_allowlisted(self):
-        for target in "e2e test show-service-passwords alertmanager-secret backup restore rotate-webhook-token creds cloudflared-backup restart-webhook install-sudoers provision up down refresh".split():
+        for target in "e2e show-service-passwords alertmanager-secret backup restore rotate-webhook-token creds cloudflared-backup restart-webhook install-sudoers provision up down refresh".split():
             with self.subTest(target=target):
                 self.assertNotIn(target, wh.MAKE_TARGETS)
 

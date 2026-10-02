@@ -6,7 +6,7 @@
 - [x] Codex retrieval eval `0ded5a83` + prior art `428960fe`; Claude fixes `e35fcba9` (6 defects).
 - [ ] Claude/operator: live `K3DM_RETRIEVAL_EVAL_LIVE=1` run -> embedding row in vector-store.md + retro.
 - [x] Bare-negation recurrence fixed `4c0dd7ac`.
-- [ ] Claude: `v1.40.0-cloud-bridge-test-targets.md`.
+- [x] Claude: `v1.40.0-cloud-bridge-test-targets.md` (2026-10-01) — tripwire, 4 test + 6 diagnose actions.
 - [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
 - [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
 - [ ] `v1.40.0-slack-corpus-qa.md` — blocked on the live recall@5.

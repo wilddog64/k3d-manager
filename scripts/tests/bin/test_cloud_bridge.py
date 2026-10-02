@@ -104,7 +104,7 @@ def test_every_allowlisted_parameter_declares_its_own_pattern():
         for name, pattern in params.items():
             assert hasattr(pattern, "fullmatch"), f"{action}.{name} has no compiled pattern"
         placeholders = set(re.findall(r"\{([a-z_]+)\}", path_template))
-        expected = set() if action.startswith("make-") else set(params)
+        expected = set() if action.startswith(("make-", "diagnose-")) else set(params)
         assert placeholders == expected, f"{action}: path placeholders and params disagree"
 
 
@@ -285,8 +285,43 @@ def test_make_body_and_empty_post_body():
     assert bridge._request_body(request("cluster-status")) == b"{}"
 
 
+TEST_SUITE_ACTIONS = {
+    "make-test": ("test", 1200),
+    "make-test-bin": ("test-bin", 300),
+    "make-test-pytest": ("test-pytest", 600),
+    "make-test-python-unit": ("test-python-unit", None),
+    "make-test-python": ("test-python", 900),
+    "make-test-all": ("test-all", 1800),
+}
+NEVER_EXPOSED = {
+    "up", "down", "cluster", "cluster-up", "cluster-down", "fix-delete-pod", "fix-force-sync",
+    "e2e", "e2e-sandbox", "e2e-remote", "e2e-replay", "e2e-runner-unlock", "cleanup-stale-sandbox",
+    "argocd-upgrade", "index-docs", "sync-apps",
+}
+
+
+@pytest.mark.parametrize("action", sorted(TEST_SUITE_ACTIONS))
+def test_test_suite_action_resolves_to_its_reader_target_with_a_declared_timeout(action):
+    target, timeout = TEST_SUITE_ACTIONS[action]
+    method, path, params, fixed = bridge.ACTION_ALLOWLIST[action]
+    assert (method, path, params, fixed) == ("POST", "/api/v1/make", {}, target)
+    spec = make_targets.MAKE_TARGETS[target]
+    assert spec["min_role"] == "reader"
+    if timeout is not None:
+        assert spec["timeout"] == timeout
+
+
+def test_no_lifecycle_or_mutating_target_is_reachable():
+    exposed = {fixed for _m, _p, _a, fixed in bridge.ACTION_ALLOWLIST.values() if isinstance(fixed, str)}
+    assert not exposed & NEVER_EXPOSED
+    assert not {name.removeprefix("make-") for name in bridge.ACTION_ALLOWLIST} & NEVER_EXPOSED
+    for _m, _p, _a, fixed in bridge.ACTION_ALLOWLIST.values():
+        if isinstance(fixed, str):
+            assert make_targets.MAKE_TARGETS[fixed]["min_role"] == "reader", fixed
+
+
 def test_test_suite_actions_take_no_arguments():
-    for action in ("make-test-pytest", "make-test-python-unit"):
+    for action in TEST_SUITE_ACTIONS:
         value, reason = bridge.validate_request(
             request(action, {"NS": "identity"}), now=NOW)
         assert value is None
@@ -298,3 +333,57 @@ def test_test_suite_actions_post_their_target():
         b'{"args": {}, "target": "test-pytest"}')
     assert bridge._request_body(request("make-test-python-unit")) == (
         b'{"args": {}, "target": "test-python-unit"}')
+
+
+DIAGNOSE_ACTIONS = {
+    "diagnose-pods": ("get-pods", {"provider": "hostinger", "namespace": "identity"}),
+    "diagnose-describe-pod": ("describe-pod", {"provider": "hub", "namespace": "identity", "name": "keycloak-0"}),
+    "diagnose-logs": ("logs", {"provider": "aws", "namespace": "shopping-cart-payment", "name": "payment-0"}),
+    "diagnose-apps": ("get-apps", {}),
+    "diagnose-app": ("describe-app", {"name": "shopping-cart-payment"}),
+    "diagnose-appsets": ("get-appsets", {}),
+}
+
+
+@pytest.mark.parametrize("action", sorted(DIAGNOSE_ACTIONS))
+def test_diagnose_action_sends_exactly_its_fixed_webhook_action(action):
+    webhook_action, args = DIAGNOSE_ACTIONS[action]
+    value, reason = bridge.validate_request(request(action, args), now=NOW)
+    assert reason is None
+    body = json.loads(bridge._request_body(value))
+    assert body["action"] == webhook_action
+    assert {key: body[key] for key in args} == args
+    assert bridge.ACTION_ALLOWLIST[action][1] == "/api/v1/diagnostics"
+
+
+@pytest.mark.parametrize("action", sorted(DIAGNOSE_ACTIONS))
+def test_diagnose_request_cannot_choose_the_webhook_action(action):
+    _webhook_action, args = DIAGNOSE_ACTIONS[action]
+    value, reason = bridge.validate_request(request(action, {**args, "action": "get-pods-all"}), now=NOW)
+    assert value is None
+    assert reason == "unexpected argument"
+
+
+@pytest.mark.parametrize("args, reason", [
+    ({"provider": "azure", "namespace": "identity"}, "invalid provider"),
+    ({"provider": "hub; id", "namespace": "identity"}, "invalid provider"),
+    ({"provider": "hub", "namespace": "Identity"}, "invalid namespace"),
+    ({"provider": "hub", "namespace": "identity", "name": "-bad"}, "invalid name"),
+])
+def test_diagnose_arguments_are_pattern_checked(args, reason):
+    action = "diagnose-describe-pod" if "name" in args else "diagnose-pods"
+    value, actual = bridge.validate_request(request(action, args), now=NOW)
+    assert value is None
+    assert actual == reason
+
+
+@pytest.mark.parametrize("action", sorted(DIAGNOSE_ACTIONS))
+def test_diagnose_bodies_pass_the_webhooks_own_validator(action):
+    from importlib.machinery import SourceFileLoader
+    loader = SourceFileLoader("k3dm_webhook_bridge", str(ROOT / "bin" / "k3dm-webhook"))
+    spec = importlib.util.spec_from_loader("k3dm_webhook_bridge", loader)
+    webhook = importlib.util.module_from_spec(spec)
+    loader.exec_module(webhook)
+    _webhook_action, args = DIAGNOSE_ACTIONS[action]
+    value, _reason = bridge.validate_request(request(action, args), now=NOW)
+    assert webhook._validate_diagnostics_request(json.loads(bridge._request_body(value))) is None

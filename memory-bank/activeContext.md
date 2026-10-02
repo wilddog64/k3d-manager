@@ -1,3 +1,15 @@
+# 2026-10-01 — cloud-bridge test targets + diagnose actions implemented (Claude)
+
+`v1.40.0-cloud-bridge-test-targets.md` done. Bridge actions added: make-test, -test-bin, -test-python, -test-all
+(reader, timeouts 1200/300/900/1800) and six `diagnose-*` (fixed webhook action server-side). All `test*` recipes run
+behind `scripts/tests/tripwire.sh`: 31 cluster/cloud/credential/AI tools shimmed; non-read calls fail the run.
+The sweep found and fixed: a real `k3d cluster delete` in provider_contract teardown; Hermes tests hitting the live
+vectordb (`exec psql`); 7 tests reading the Vault root token + embeddings key via unstubbed `search()`.
+Residual: webhook/auth.py reads the keychain at import (blocked by the tripwire, not removed).
+`test` removed from the `webhook_make_targets.py` denylist per the spec decision; also exposes the targets to Slack `/k3dm`.
+**User feedback 2026-10-01: dispatch implementation to Codex by default; Claude verifies/integrates.**
+Remaining in v1.40.0: live retrieval eval run; `slack-corpus-qa` (blocked on it); operator restarts (bridge, webhook).
+
 # 2026-10-01 — Codex Hermes batch integrated + verified; eval defects fixed (Claude)
 
 Codex (codex exec, worktree) produced 3 commits; Claude verified and cherry-picked them: `7319f07c` app_health

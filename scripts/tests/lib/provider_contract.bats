@@ -15,11 +15,6 @@ setup() {
   export SCRIPT_DIR
 }
 
-teardown_file() {
-  # Clean up any potential leftover test clusters
-  k3d cluster delete "k3d-test-orbstack-exists" 2>/dev/null || true
-}
-
 # --- K3D Provider Contract ---
 
 @test "_acg_normalize_provider normalizes short aliases" {

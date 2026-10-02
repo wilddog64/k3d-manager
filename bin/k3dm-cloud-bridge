@@ -168,13 +168,15 @@ def _read_request(repo, ref, request_id):
 
 def _request_body(request):
     action = request["action"]
-    method, _, _, make_target = ACTION_ALLOWLIST[action]
+    method, _, _, fixed = ACTION_ALLOWLIST[action]
     if method == "GET":
         return b""
-    if make_target is None:
+    if fixed is None:
         return b"{}"
+    if isinstance(fixed, dict):
+        return json.dumps({**request["args"], **fixed}, sort_keys=True).encode()
     return json.dumps(
-        {"target": make_target, "args": request["args"]}, sort_keys=True).encode()
+        {"target": fixed, "args": request["args"]}, sort_keys=True).encode()
 
 
 def _call_webhook(request):
@@ -343,6 +345,9 @@ def process_tick(repo, root):
             if response is None:
                 response = _call_webhook(request)
                 response["id"] = request_id
+                body = response.get("body")
+                if request["action"] == "job-status" and isinstance(body, dict) and "output" in body:
+                    body["output"] = scrub_credentials(body["output"])
                 artifacts, paths = job_artifacts(repo, ref, request_id, request, response)
                 if paths:
                     response["artifacts"] = paths
