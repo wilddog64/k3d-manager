@@ -1,3 +1,14 @@
+# 2026-10-01 — open-bug batch dispatched to Codex
+
+Branch `codex-v1.40.0-bugs`, worktree `../k3d-manager-codex-bugs` (from 86ef9c93). Three bugs:
+(1) NEW `2026-10-01-restart-webhook-leaves-cloud-bridge-on-stale-code` — restart-webhook also restarts
+the bridge; (2) `2026-09-30-hermes-data-layer-unknown-has-no-cause` — distinct evidence per unknown
+cause (dashboard legend already shows evidence); (3) `2026-08-15-cluster-up-failure-orphans-cloudformation-stack`
+— options 2+3 (ownership marker + loud warning), NO teardown. Claude verifies, then cherry-picks.
+Closed as already fixed in code (stale status): ghcr PAT scope, appset CNI dirs (925c43e7), pf-supervisor.
+Not Codex-able (need operator decision or live access): payments 503 e2e, hub self-registration
+duplicate name, openldap CVE options, SSM agent registration.
+
 # 2026-10-01 — README architecture diagram redrawn
 
 The README mermaid diagram predated the webhook, Hermes, cloud bridge, Slack relay, pgvector and
