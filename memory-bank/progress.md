@@ -2,9 +2,10 @@
 
 - [x] Specs corrected against the live tree and handed to Codex (app-health first, then retrieval eval).
 - [x] Dispatched via `codex exec` into worktree `../k3d-manager-codex-v1.40.0` (branch `codex-v1.40.0-hermes`).
-- [ ] Codex: app-health sensor commit — verify SHA on origin, 11 cases, 8 mutations, gate 7 default-off.
-- [ ] Codex: retrieval eval (test commit + feat commit) — verify pairs exist on disk, mutations red.
-- [ ] Claude: live `K3DM_RETRIEVAL_EVAL_LIVE=1` run, `search-response.json`, retro + vector-store.md numbers.
+- [x] Codex app-health sensor: `7319f07c`, Claude-verified (11/11, spot mutations red, default-off).
+- [x] Codex retrieval eval `0ded5a83` + prior art `428960fe`; Claude fixes `e35fcba9` (6 defects).
+- [ ] Claude/operator: live `K3DM_RETRIEVAL_EVAL_LIVE=1` run -> embedding row in vector-store.md + retro.
+- [x] Bare-negation recurrence fixed `4c0dd7ac`.
 - [ ] Claude: `v1.40.0-cloud-bridge-test-targets.md`.
 - [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
 - [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.

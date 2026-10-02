@@ -1,3 +1,20 @@
+# 2026-10-01 — Codex Hermes batch integrated + verified; eval defects fixed (Claude)
+
+Codex (codex exec, worktree) produced 3 commits; Claude verified and cherry-picked them: `7319f07c` app_health
+(11/11, mutations red, default-off proven; Codex also suppresses paging for the inert unknown record), `0ded5a83`
+retrieval eval, `428960fe` prior art in new Hermes bug docs. Claude fixes in `e35fcba9`: hard negatives were never
+scored (now intrusion@5); the live case asserted >=0.0, printed nothing and did not exclude the query doc; 2 mislabelled
+pairs relabelled positive; floors 0.20 -> one miss below measured; 7 Hermes tests read the embeddings key + Vault
+root token via unstubbed search() (hermes conftest now stubs it); prior-art catch widened. TF-IDF recall@5:
+bugs 12/16, issues 5/6, plans 5/5, retro 5/5. Worktree + temp branch removed.
+Open: live `K3DM_RETRIEVAL_EVAL_LIVE=1` run (Claude/operator) -> record embedding row in vector-store.md + retro.
+Risk noted, not fixed: search() retries embeddings up to 6x with backoff, so a 429 can stall a Hermes poll for minutes.
+
+# 2026-10-01 — bare-negation recurrence fixed (`4c0dd7ac`)
+
+`make test` was red on the branch: 7 bare `! cmd` BATS assertions added this release; CI never runs on release-branch
+pushes. Recurrence appended to `docs/bugs/2026-09-14-bats-bare-negation-assertions-never-fail.md`.
+
 # 2026-10-01 — cloud-request artifacts implemented (Claude)
 
 `v1.40.0-cloud-request-artifacts.md` done: first terminal `job-status` response carries `artifacts`
