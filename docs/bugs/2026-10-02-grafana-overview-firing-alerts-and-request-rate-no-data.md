@@ -186,3 +186,53 @@ by construction. Every real alert is a Prometheus rule routed through Alertmanag
   sentence to match.
 - No cluster, network or git commits. Leave changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
 - Update this section's Status to FIXED (pending sync).
+
+## Follow-up (2026-10-02): Firing Alerts has a count but no breakdown
+
+**Status:** OPEN
+
+The Firing Alerts stat read `55` with no way to see what the 55 are without opening Alertmanager. On 2026-10-02, 48
+of them were `TrivyCriticalVulnerabilityDetected` (image CVE findings) and seven were known defects awaiting
+rollout. The operator asked for a table that classifies them.
+
+### Fix (new panel `id` 12, both copies, kept identical)
+
+Add one `table` panel after panel `id` 4 (Request Latency) in the `panels` array of both
+`scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` and
+`scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml`. Follow each file's existing JSON
+formatting. Change nothing else in either file.
+
+- `id`: `12`; `type`: `table`; `title`: `Firing Alerts by Category`; `datasource`: `{"uid": "$datasource"}`
+- `gridPos`: `{"h": 9, "w": 24, "x": 0, "y": 13}`
+- `description`: `Prometheus alerts currently firing, grouped by a category derived from the alert name (Watchdog and InfoInhibitor excluded). Image vulnerabilities = Trivy CVE findings, mostly in upstream images; E2E verification = failing e2e gate; Capacity & throttling = CPU, HPA, memory, quota and volume alerts; Jobs = failed Jobs/CronJobs; Workloads = pod, deployment, statefulset, daemonset and container alerts; Monitoring stack = Prometheus, Alertmanager, Grafana and target-down alerts; Other = no category matched. Cluster hub means the alert carries no cluster label. Open Alertmanager for each alert's annotations.`
+- `targets`: one target, `refId` `A`, `format` `table`, `instant` `true`, `expr` exactly (validated live on the
+  hub 2026-10-02):
+
+```
+sort_desc(count by (category, alertname, severity, cluster) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(ALERTS{alertstate="firing", alertname!~"Watchdog|InfoInhibitor"}, "cluster", "hub", "cluster", ""), "category", "Other", "alertname", ".*"), "category", "Workloads", "alertname", "KubePod.*|KubeDeployment.*|KubeStatefulSet.*|KubeDaemonSet.*|KubeContainer.*"), "category", "Capacity & throttling", "alertname", "CPUThrottling.*|KubeHpa.*|KubeCPU.*|KubeMemory.*|KubeQuota.*|KubePersistentVolume.*"), "category", "Jobs", "alertname", "KubeJob.*|KubeCronJob.*"), "category", "Monitoring stack", "alertname", "Prometheus.*|Alertmanager.*|Grafana.*|TargetDown|.*Down"), "category", "E2E verification", "alertname", "E2E.*"), "category", "Image vulnerabilities", "alertname", "Trivy.*")))
+```
+
+- `transformations`: `[{"id": "organize", "options": {"excludeByName": {"Time": true}, "indexByName": {"category": 0, "alertname": 1, "severity": 2, "cluster": 3, "Value": 4}, "renameByName": {"category": "Category", "alertname": "Alert", "severity": "Severity", "cluster": "Cluster", "Value": "Count"}}}]`
+- `options`: `{"showHeader": true, "sortBy": [{"displayName": "Count", "desc": true}]}`
+- `fieldConfig`: `{"defaults": {"custom": {"cellOptions": {"type": "auto"}}, "mappings": [], "noValue": "No alerts firing"}, "overrides": [{"matcher": {"id": "byName", "options": "Severity"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "mappings", "value": [{"type": "value", "options": {"critical": {"color": "red", "index": 0}, "warning": {"color": "orange", "index": 1}, "info": {"color": "blue", "index": 2}}}]}]}, {"matcher": {"id": "byName", "options": "Count"}, "properties": [{"id": "custom.width", "value": 80}]}]}`
+
+No per-alert "status" column (such as "fixed, pending rollout"): that is temporal and would rot in a static
+dashboard. The category is derived from the alert name and stays true.
+
+### Tests (`scripts/tests/plugins/grafana_dashboard_appsets.bats`)
+
+1. Extend `_assert_query_contract`: select panel `id == 12`; `type == "table"`; the expr contains
+   `ALERTS{alertstate="firing"`, `Watchdog|InfoInhibitor`, `count by (category, alertname, severity, cluster)`,
+   `"Image vulnerabilities", "alertname", "Trivy.*"` and `"cluster", "hub", "cluster", ""`; `targets[0].format ==
+   "table"` and `instant == true`; the `organize` transformation renames `Value` to `Count`.
+2. Extend the byte-identity test so panels `id` 6, 2 **and 12** are identical across the two copies.
+3. Mutations in the snapshot style (`cp` restore + `cmp`), each red: remove the `Trivy.*` category
+   `label_replace`; change panel 12's `format` to `time_series`.
+4. Gridpos sanity: no two panels in either copy overlap (rectangles from `gridPos`).
+
+### Rules
+
+- `bats scripts/tests/plugins/grafana_dashboard_appsets.bats` green; `yq` parses both files; embedded JSON passes `jq -e .`.
+- If `docs/guides/grafana-dashboards.md` lists the Overview's panels, add one line for this panel.
+- No cluster, network or git commits. Leave changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
+- Update this section's Status to FIXED (pending sync).
