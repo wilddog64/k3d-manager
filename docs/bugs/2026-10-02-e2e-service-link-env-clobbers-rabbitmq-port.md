@@ -1,6 +1,6 @@
 # Bug: the `rabbitmq` Service's link env var crash-loops product-catalog in the e2e substrate
 
-**Status:** FIXED (pending commit)
+**Status:** FIXED (c7fa36e4)
 **Branch:** `k3d-manager-v1.40.0`
 **Files:** `scripts/etc/e2e/{postgres,redis,rabbitmq,product-catalog,basket,order,keycloak,payment,seed-job}.yaml`
 **Tests:** `scripts/tests/plugins/e2e.bats`
