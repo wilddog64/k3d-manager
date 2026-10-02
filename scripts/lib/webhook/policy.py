@@ -67,6 +67,7 @@ _ACTION_POLICY = {
     "/api/v1/cleanup-stale-sandbox": {"name": "cleanup-stale-sandbox", "min_role": "admin"},
     "/api/v1/analyze": {"name": "analyze", "min_role": "operator"},
     "/api/v1/ask": {"name": "ask", "min_role": "reader"},
+    "/api/v1/ask-docs": {"name": "ask-docs", "min_role": "reader"},
 }
 
 _THREAD_COMMAND_MIN_ROLE = {
