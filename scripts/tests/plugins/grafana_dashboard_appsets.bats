@@ -231,6 +231,14 @@ _assert_no_panel_overlap() {
   done
 }
 
+@test "Grafana Health dashboard has a fixed uid and k3dm tags" {
+  local dashboard
+  for dashboard in "${OVERVIEW}" "${HUB_OVERVIEW}"; do
+    run bash -c "yq -r '.data[\"grafana-overview-readable.json\"]' '$dashboard' | jq -e '.uid == \"k3dm-grafana-health\" and (.tags | index(\"k3d-manager\")) != null'"
+    [ "$status" -eq 0 ]
+  done
+}
+
 @test "Grafana Overview Build Info panels use the positive table contract" {
   _assert_build_info_contract "${OVERVIEW}"
   _assert_build_info_contract "${HUB_OVERVIEW}"
