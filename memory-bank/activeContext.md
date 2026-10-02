@@ -1,3 +1,16 @@
+# 2026-10-01 — `/ask-docs` verified and on the release branch
+
+Codex finished slack-corpus-qa; Claude verified, then fixed two gaps before committing `971c109d`
+(pushed, origin matches): (1) the question skipped `_sanitize_question` — `/ask` runs it — so
+injection patterns / >500 chars reached the model prompt; now rejected before retrieval, no model
+call; (2) the "end-to-end" test used a hardcoded doc and asserted the PLACEHOLDER wording; it now
+retrieves over the real corpus with the TF-IDF control and asserts structure. Mutations red, each
+cmp-restored: sanitize, floor, allowlist, zero-model-call, IP redaction, sources. Webhook import
+checked under the LaunchAgent interpreter. Cherry-picked to `k3d-manager-v1.40.0` as `cccf9748`.
+Full `make test` + pytest on the release head running. Next: operator live tests (list given to
+the user), floor calibration, release steps (retro eval table, reapply ApplicationSets hub+ACG,
+`argocd_check_values_branch`), then remove both Codex worktrees.
+
 # 2026-10-01 — slack-corpus-qa (`/ask-docs`) dispatched to Codex
 
 Worktree `../k3d-manager-codex-askdocs`, branch `codex-v1.40.0-slack-corpus-qa` from `k3d-manager-v1.40.0`.

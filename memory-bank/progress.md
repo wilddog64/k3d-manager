@@ -10,9 +10,9 @@
 - [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
 - [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
 - [x] README architecture diagram redrawn for v1.40.0 (Claude, docs only).
-- [ ] `v1.40.0-slack-corpus-qa` (`/ask-docs`) dispatched to Codex 2026-10-01 — branch `codex-v1.40.0-slack-corpus-qa`, worktree `../k3d-manager-codex-askdocs`.
+- [x] `v1.40.0-slack-corpus-qa` (`/ask-docs`) — IMPLEMENTED (Codex), verified + fixed by Claude 2026-10-01: `971c109d` on `codex-v1.40.0-slack-corpus-qa`, cherry-picked as `cccf9748` on `k3d-manager-v1.40.0` (tree-equal). Claude added `_sanitize_question` + real-corpus TF-IDF e2e test; 6 mutations red, cmp-restored.
+- [ ] `/ask-docs` operator steps: `wrangler deploy` relay, Slack manifest `/ask-docs`, `make restart-webhook`, live smoke; then Claude calibrates `K3DM_ASK_DOCS_MIN_SCORE` and replaces the PLACEHOLDER fixture.
 - [x] Codex bug batch: bridge restart `52efebde`, data_layer cause `baedfdc5`, CFN orphan warning `82ba559b` on `k3d-manager-v1.40.0` (2026-10-01; make test 1223/1223, pytest 523). R1 regression + stale-marker false warning caught and fixed by Claude.
-- [ ] `v1.40.0-slack-corpus-qa.md` — UNBLOCKED 2026-10-01 (live recall@5 measured); dispatch to Codex.
 
 # 2026-10-01 — v1.40.0 review fix spec (Codex)
 
