@@ -1,7 +1,7 @@
 # Bug: Go payment service drops `gatewayTransactionId` from the payment response
 
 **Filed:** 2026-10-02
-**Status:** OPEN — spec ready, not dispatched
+**Status:** OPEN — dispatched to Codex 2026-10-02 (branch created from origin/main `d281a3a`)
 **Repo:** `wilddog64/shopping-cart-payment` (work branch: `fix/payment-response-gateway-transaction-id` from `origin/main`)
 **Spec branch:** `k3d-manager-v1.41.0`
 **Found by:** live Tier 1 `make e2e` run `1790970000-22917` (image `shopping-cart-e2e-tests:sha-35098aca…`, commit `4a94eb0a`): 56 passed, 1 failed, 45 did not run
