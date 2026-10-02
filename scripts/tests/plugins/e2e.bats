@@ -855,6 +855,20 @@ PY
   [ "$status" -eq 0 ]
 }
 
+@test "substrate Keycloak e2e-user has a complete Keycloak 24 user profile" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  run python3 - "${BATS_TEST_DIRNAME}/../../etc/e2e/keycloak.yaml" <<'PY'
+import json, re, sys
+text = open(sys.argv[1]).read()
+block = re.search(r"shopping-cart-realm\.json: \|\n((?:    .*\n|\n)+)", text).group(1)
+realm = json.loads("\n".join(l[4:] for l in block.splitlines()))
+user = next(u for u in realm["users"] if u["username"] == "e2e-user")
+missing = [k for k in ("email", "firstName", "lastName") if not user.get(k)]
+assert not missing, missing
+PY
+  [ "$status" -eq 0 ]
+}
+
 # Regression guard for the vCluster leak: the publish step talks to the hub, which is
 # unreachable from the m2 runner, and _run_command ends an unguarded failure with exit 1.
 # An exit there used to kill the EXIT trap before teardown, stranding the vCluster and
