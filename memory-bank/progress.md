@@ -4,7 +4,10 @@
 - [x] Removed `.claude/worktrees/k3d-manager` + branch `worktree-k3d-manager` (operator go; May lock-dir edit superseded by the Sept wrapper rewrite; c5949cf4 is on main).
 - [x] Codex: CHANGELOG promoted to [1.40.0] + retro `82ec57a0` (Claude-verified: on origin, headings order, every in-repo SHA/path resolves; 755ad2d is e2e-tests repo). Audit gap: validate-manifests undocumented + stale UNMEASURED in CLAUDE.md/makefile.md → fixed `e6185b92` (Codex, Claude-verified: on origin, 3 files, doc-links 1872 OK, stale grep empty).
 - [x] e2e-tests publish run 37044992425 GREEN: sha-755ad2d… and latest both = sha256:78044624… (old latest 59abbc19). [ ] operator reruns `make e2e E2E_IMAGE_TAG=sha-755ad2d7efeb96dcb6d3701077264fc6b9374db3` (live smoke gate).
-- [ ] Scope check, PR (prepare and stop for operator go).
+- [x] Live e2e run 1790965743-22494 (operator refreshed gh read:packages; GHCR via gh CLI token; substrate all up; teardown clean): 48 passed / 8 failed / 102 — all 8 api/payments now fail at Keycloak token 400 Missing form parameter: grant_type (global extraHTTPHeaders Content-Type: application/json overrides form:). Spec docs/bugs/2026-10-02-e2e-keycloak-token-request-sent-as-json.md → Codex in e2e-tests branch fix/keycloak-token-form-content-type. Operator: do NOT gate v1.40.0 on it.
+- [ ] Next release: Vault GHCR PAT lookup returns silently on empty/unreachable — should say which.
+- [x] Scope check done (283 files, all v1.40.0 specs/bugs + future plans).
+- [ ] v1.40.0 PR body drafted — operator go before gh pr create.
 
 # 2026-10-01 — v1.40.0 spec handoff
 
