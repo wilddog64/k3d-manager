@@ -1,7 +1,7 @@
 # Bug: Go payment service drops `gatewayTransactionId` from the payment response
 
 **Filed:** 2026-10-02
-**Status:** FIXED `4a2503d` (Codex wrote; sandbox blocked git, Claude verified + committed: gofmt/vet clean, go test all ok, unmapped-field mutation red). PR wilddog64/shopping-cart-payment#79 OPEN (Copilot requested); live e2e pending merge + image + substrate pin bump
+**Status:** FIXED `4a2503d` (Codex wrote; sandbox blocked git, Claude verified + committed: gofmt/vet clean, go test all ok, unmapped-field mutation red). PR wilddog64/shopping-cart-payment#79 MERGED 2026-10-02 (`ea86c42`; Copilot no findings); live e2e pending main image sha-ea86c42 + substrate pin bump
 **Repo:** `wilddog64/shopping-cart-payment` (work branch: `fix/payment-response-gateway-transaction-id` from `origin/main`)
 **Spec branch:** `k3d-manager-v1.41.0`
 **Found by:** live Tier 1 `make e2e` run `1790970000-22917` (image `shopping-cart-e2e-tests:sha-35098aca…`, commit `4a94eb0a`): 56 passed, 1 failed, 45 did not run
