@@ -1,6 +1,6 @@
 # Bug: the Overview "Dashboards" stat has a title that does not say what it counts
 
-**Status:** OPEN
+**Status:** FIXED (2ac52522)
 **Branch:** `k3d-manager-v1.40.0`
 **Files:** `scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml`,
 `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (keep both copies of panel 8 identical)

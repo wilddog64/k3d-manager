@@ -196,6 +196,16 @@ _assert_no_panel_overlap() {
   [[ "$output" == *'Status -1 means the request did not produce a normal HTTP response'* ]]
 }
 
+@test "Grafana Overview dashboard count names what it counts" {
+  local dashboard
+  for dashboard in "${OVERVIEW}" "${HUB_OVERVIEW}"; do
+    run grep -F -- '"title": "Grafana Dashboards Loaded"' "$dashboard"
+    [ "$status" -eq 0 ]
+    run grep -F -- '"title": "Dashboards"' "$dashboard"
+    [ "$status" -ne 0 ]
+  done
+}
+
 @test "hub Grafana Overview uses the same readable dashboard contract" {
   run yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"
   [ "$status" -eq 0 ]

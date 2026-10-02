@@ -26,13 +26,13 @@ data:
         },
         {
           "datasource": {"uid": "$datasource"},
-          "description": "Total dashboards currently known to this Grafana instance.",
+          "description": "How many dashboards this Grafana instance has loaded: the provisioned ConfigMaps plus any saved in the UI. Inventory only, not a health signal. A drop after a sync means a dashboard ConfigMap stopped loading.",
           "fieldConfig": {"defaults": {"mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 80}]}}, "overrides": []},
           "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
           "id": 8,
           "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}, "textMode": "auto"},
-          "targets": [{"expr": "sum(grafana_stat_totals_dashboard{job=~\"$job\", instance=~\"$instance\"})", "legendFormat": "Dashboards", "refId": "A"}],
-          "title": "Dashboards",
+          "targets": [{"expr": "sum(grafana_stat_totals_dashboard{job=~\"$job\", instance=~\"$instance\"})", "legendFormat": "Dashboards loaded", "refId": "A"}],
+          "title": "Grafana Dashboards Loaded",
           "type": "stat"
         },
         {
