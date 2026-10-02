@@ -10,6 +10,9 @@
 - `ask-docs` typed as a reply in a Slack thread now answers in that thread instead of being
   silently dropped.
 
+- Cloudflared backup and restore no longer expose tunnel credentials, `cert.pem`, or the Vault
+  root token in process arguments; Keychain restores decode legacy hex items and create mode-600 files.
+
 - Hub recovery now selects the public frontend Cloudflare origin from the app cluster's
   frontend deployment, with an explicit override and a safe Hostinger fallback.
 

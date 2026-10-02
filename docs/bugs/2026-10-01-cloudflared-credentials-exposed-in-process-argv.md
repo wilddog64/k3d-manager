@@ -6,7 +6,7 @@
 command runs. The values are the Cloudflare tunnel credentials JSON, `cert.pem` (account-level
 tunnel management), and the Vault root token. This violates CLAUDE.md Secret Hygiene: "Vault
 tokens must never appear in script arguments".
-**Status:** OPEN
+**Status:** FIXED
 **Related:** `2026-10-01-no-standalone-cloudflared-config-render-or-drift-check.md` (queued after
 this one; it touches the same Makefile region)
 
@@ -122,3 +122,11 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 
 Run `make cloudflared-backup` once to rewrite both Keychain items in the base64 format. The
 operator runs it; agents do not.
+
+## Resolution
+
+`cloudflared-backup` now writes base64-encoded Keychain values through `security -i`, verifies
+each write by decoding it and comparing the source file, and sends Vault headers and JSON through
+file descriptors/stdin. `cluster-up` uses the shared decoder for both restore paths, accepts new
+base64 and legacy hex Keychain items, and restores both files with mode `0600`. Offline BATS
+coverage verifies argv hygiene, decoding, restore modes, and the required mutations.

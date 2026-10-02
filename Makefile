@@ -591,17 +591,18 @@ gh-secret-sync-relay:
 
 ## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
 cloudflared-backup:
-	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	@set -euo pipefail; \
+	source "$(CURDIR)/scripts/lib/cloudflared_keychain.sh"; \
+	_creds_file="$$HOME/.cloudflared/bb7ece59-8680-4310-9437-232f862e2773.json"; \
+	_cert_file="$$HOME/.cloudflared/cert.pem"; \
+	_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
 	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	_creds=$$(cat "$$HOME/.cloudflared/bb7ece59-8680-4310-9437-232f862e2773.json"); \
-	_cert=$$(cat "$$HOME/.cloudflared/cert.pem"); \
-	security add-generic-password -a cloudflared -s k3d-manager-cloudflared-credentials -w "$$_creds" -U && \
-	security add-generic-password -a cloudflared -s k3d-manager-cloudflared-cert -w "$$_cert" -U && \
-	echo "[cloudflared-backup] Keychain updated" && \
-	curl -sf -X POST \
-	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
-	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
-	  -d "$$(CREDS="$$_creds" CERT="$$_cert" python3 -c 'import json,os; print(json.dumps({"data":{"credentials_json":os.environ["CREDS"],"cert_pem":os.environ["CERT"],"tunnel_id":"bb7ece59-8680-4310-9437-232f862e2773","tunnel_name":"k3d-manager"}}))')" >/dev/null && \
+	_cloudflared_keychain_write_file k3d-manager-cloudflared-credentials "$$_creds_file"; \
+	_cloudflared_keychain_write_file k3d-manager-cloudflared-cert "$$_cert_file"; \
+	echo "[cloudflared-backup] Keychain updated"; \
+	CREDS="$$(<"$$_creds_file")" CERT="$$(<"$$_cert_file")" python3 -c 'import json,os; print(json.dumps({"data":{"credentials_json":os.environ["CREDS"],"cert_pem":os.environ["CERT"],"tunnel_id":"bb7ece59-8680-4310-9437-232f862e2773","tunnel_name":"k3d-manager"}}))' | \
+	curl -sf -X POST -H @<(printf 'X-Vault-Token: %s\n' "$$_tok") -H "Content-Type: application/json" \
+	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" --data-binary @- >/dev/null; \
 	echo "[cloudflared-backup] Vault updated"
 
 ## Backup k3s etcd snapshot + kubeconfig to OCI object storage (k3s-oci only)
