@@ -44,6 +44,10 @@ when the classifier fires — that is dodging the check, not fixing it. Ask the 
 If nothing comes back within a few minutes, the bridge is not running. That is an operator
 problem, not something to work around. Say so and move on.
 
+After pulling changes, `make restart-webhook` restarts both the webhook and the cloud bridge.
+To restart only the bridge, run `make restart-cloud-bridge`; if it has not been installed, that
+target reports the skip and exits successfully.
+
 ## What you can ask for
 
 The actions below, and only these (`ACTION_ALLOWLIST` in `scripts/lib/webhook/cloud_actions.py`). This list is a security boundary, not a convenience default — anything not on it
