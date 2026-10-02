@@ -1,3 +1,7 @@
+# 2026-10-01 — Hub readable Overview ConfigMap had two owners
+
+`fd2323ff` on `k3d-manager-v1.40.0` (Codex, verified by Claude). `grafana-dashboards-acg` now excludes `grafana-overview-readable-configmap.yaml` only when `.server` is `https://kubernetes.default.svc`, so `hub-grafana-dashboards` is the sole writer on the hub. Hostinger keeps the app copy. 17/17 BATS, with a derived collision guard and mutations. OPERATOR, pending: check the CM tracking-id names `hub-grafana-dashboards`, reapply the ACG dashboard appset, then confirm `k3d-cluster-grafana-dashboards` is Synced.
+
 # 2026-10-01 — Grafana Overview Build Info fix on the release branch
 
 `2d3ea40e` on `k3d-manager-v1.40.0` (Codex, verified by Claude). The Build Info table in both the hub and app copies now shows only Version, Edition, Job and Instance, using a positive allowlist. A BATS drift guard keeps the two panels equal. 13/13 BATS. Operator: confirm on the hub after the ArgoCD sync.
