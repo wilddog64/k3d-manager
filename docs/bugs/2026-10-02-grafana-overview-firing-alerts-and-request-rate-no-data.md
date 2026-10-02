@@ -189,7 +189,7 @@ by construction. Every real alert is a Prometheus rule routed through Alertmanag
 
 ## Follow-up (2026-10-02): Firing Alerts has a count but no breakdown
 
-**Status:** OPEN
+**Status:** FIXED (pending sync)
 
 The Firing Alerts stat read `55` with no way to see what the 55 are without opening Alertmanager. On 2026-10-02, 48
 of them were `TrivyCriticalVulnerabilityDetected` (image CVE findings) and seven were known defects awaiting

@@ -74,6 +74,27 @@ _assert_query_contract() {
   jq -e '(.targets[0].expr | contains("rate(")) and (.targets[0].expr | contains("[$__rate_interval]")) and (.targets[0].expr | contains("irate(") | not) and (.targets[0].expr | contains("[1m]") | not) and (.targets[0] | has("interval") | not) and (.description | contains("kubelet /api/health")) and (.description | contains("Status -1"))' <<<"$request" >/dev/null || return 1
 }
 
+_assert_category_contract() {
+  local dashboard_file="$1"
+  local dashboard_json category
+  dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
+  category="$(jq -c '.panels[] | select(.id == 12)' <<<"$dashboard_json")" || return 1
+  jq -e '(.type == "table") and (.targets[0].expr | contains("ALERTS{alertstate=\"firing\"")) and (.targets[0].expr | contains("Watchdog|InfoInhibitor")) and (.targets[0].expr | contains("count by (category, alertname, severity, cluster)")) and (.targets[0].expr | contains("Image vulnerabilities")) and (.targets[0].expr | contains("Trivy.*")) and (.targets[0].expr | contains("\"cluster\", \"hub\", \"cluster\", \"\"")) and (.targets[0].format == "table") and (.targets[0].instant == true) and ([.transformations[] | select(.id == "organize") | .options.renameByName.Value] | index("Count") != null)' <<<"$category" >/dev/null || return 1
+}
+
+_assert_no_panel_overlap() {
+  local dashboard_file="$1"
+  yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file" | jq -e '
+    def overlaps($a; $b):
+      ($a.x < ($b.x + $b.w)) and (($a.x + $a.w) > $b.x) and
+      ($a.y < ($b.y + $b.h)) and (($a.y + $a.h) > $b.y);
+    .panels as $panels |
+    [range(0; ($panels | length)) as $i |
+     range(($i + 1); ($panels | length)) as $j |
+     select(overlaps($panels[$i].gridPos; $panels[$j].gridPos))] |
+    length == 0' >/dev/null
+}
+
 @test "acg dashboard appset targets app-cluster role" {
   run yq -r '.spec.generators[0].clusters.selector.matchLabels["k3d-manager/role"]' "${ACG}"
   [ "$status" -eq 0 ]
@@ -202,7 +223,42 @@ _assert_query_contract() {
 }
 
 @test "Grafana Overview Firing Alerts and Request Rate panels stay byte-identical" {
-  [ "$(jq -S '[.panels[] | select(.id == 6 or .id == 2)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))" = "$(jq -S '[.panels[] | select(.id == 6 or .id == 2)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))" ]
+  [ "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))" = "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))" ]
+}
+
+@test "Grafana Overview Firing Alerts by Category panels satisfy the table contract" {
+  _assert_category_contract "${OVERVIEW}"
+  _assert_category_contract "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview panels do not overlap" {
+  _assert_no_panel_overlap "${OVERVIEW}"
+  _assert_no_panel_overlap "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview category mutation rejects a missing Trivy category" {
+  local snapshot="${BATS_TEST_TMPDIR}/app-overview-category.yaml"
+  cp "${OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 12) | .targets[0].expr) |= sub("Trivy\\.\\*"; "Cve.*") | tojson))' "$snapshot"
+  run _assert_category_contract "$snapshot"
+  printf 'mutation (a) missing Trivy category: status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+  cp "${OVERVIEW}" "$snapshot"
+  cmp -s "${OVERVIEW}" "$snapshot"
+  printf 'mutation (a) restore: cmp=identical\n'
+}
+
+@test "Grafana Overview category mutation rejects a time-series format" {
+  local snapshot="${HUB_OVERVIEW}"
+  local mutation="${BATS_TEST_TMPDIR}/hub-overview-category.yaml"
+  cp "$snapshot" "$mutation"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 12) | .targets[0].format) = "time_series" | tojson))' "$mutation"
+  run _assert_category_contract "$mutation"
+  printf 'mutation (b) time_series format: status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+  cp "$snapshot" "$mutation"
+  cmp -s "$snapshot" "$mutation"
+  printf 'mutation (b) restore: cmp=identical\n'
 }
 
 @test "Grafana Overview query mutation rejects a fixed one-minute window" {
