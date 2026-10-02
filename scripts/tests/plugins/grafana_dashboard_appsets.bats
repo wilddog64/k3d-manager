@@ -54,11 +54,21 @@ _assert_build_info_contract() {
   [ "$(jq -r '.targets[0].format' <<<"$panel")" = "table" ] || return 1
   [ "$(jq -r '.targets[0].instant' <<<"$panel")" = "true" ] || return 1
   [ "$(jq -r '.targets[0] | has("legendFormat")' <<<"$panel")" = "false" ] || return 1
-  [ "$(jq -c '.transformations[0].options.include.names' <<<"$panel")" = '["version","edition","job","instance"]' ] || return 1
+  [ "$(jq -c '.transformations[0].options.include.names' <<<"$panel")" = '["version","edition","pod"]' ] || return 1
   [ "$(jq -r '[.transformations[].id] | join(",")' <<<"$panel")" = "filterFieldsByName,organize" ] || return 1
-  [ "$(jq -r '[.transformations[] | select(.id == "organize") | .options.indexByName | to_entries | sort_by(.value) | .[].key] | join(",")' <<<"$panel")" = "version,edition,job,instance" ] || return 1
-  [ "$(jq -r '[.transformations[] | select(.id == "organize") | .options.renameByName | to_entries | sort_by(.key) | .[] | (.key + "=" + .value)] | join(",")' <<<"$panel")" = "edition=Edition,instance=Instance,job=Job,version=Version" ] || return 1
+  [ "$(jq -r '[.transformations[] | select(.id == "organize") | .options.indexByName | to_entries | sort_by(.value) | .[].key] | join(",")' <<<"$panel")" = "version,edition,pod" ] || return 1
+  [ "$(jq -r '[.transformations[] | select(.id == "organize") | .options.renameByName | to_entries | sort_by(.key) | .[] | (.key + "=" + .value)] | join(",")' <<<"$panel")" = "edition=Edition,pod=Pod,version=Version" ] || return 1
   [ "$(jq -e 'any(.transformations[]; .id == "labelsToFields") | not' <<<"$panel")" = "true" ] || return 1
+}
+
+_assert_query_contract() {
+  local dashboard_file="$1"
+  local dashboard_json firing request
+  dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
+  firing="$(jq -c '.panels[] | select(.id == 6)' <<<"$dashboard_json")" || return 1
+  request="$(jq -c '.panels[] | select(.id == 2)' <<<"$dashboard_json")" || return 1
+  jq -e '(.targets[0].expr | contains("grafana_alerting_alerts")) and (.targets[0].expr | contains("or vector(0)")) and (.targets[0].expr | contains("grafana_alerting_result_total") | not) and (.fieldConfig.defaults.noValue == "0")' <<<"$firing" >/dev/null || return 1
+  jq -e '(.targets[0].expr | contains("rate(")) and (.targets[0].expr | contains("[$__rate_interval]")) and (.targets[0].expr | contains("irate(") | not) and (.targets[0].expr | contains("[1m]") | not) and (.targets[0] | has("interval") | not)' <<<"$request" >/dev/null || return 1
 }
 
 @test "acg dashboard appset targets app-cluster role" {
@@ -181,6 +191,35 @@ _assert_build_info_contract() {
   app_panel="$(_build_info_panel "${OVERVIEW}")"
   hub_panel="$(_build_info_panel "${HUB_OVERVIEW}")"
   [ "$(jq -S . <<<"$app_panel")" = "$(jq -S . <<<"$hub_panel")" ]
+}
+
+@test "Grafana Overview query panels use live metrics and rate interval" {
+  _assert_query_contract "${OVERVIEW}"
+  _assert_query_contract "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview Firing Alerts and Request Rate panels stay byte-identical" {
+  [ "$(jq -S '[.panels[] | select(.id == 6 or .id == 2)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))" = "$(jq -S '[.panels[] | select(.id == 6 or .id == 2)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))" ]
+}
+
+@test "Grafana Overview query mutation rejects a fixed one-minute window" {
+  local snapshot="${BATS_TEST_TMPDIR}/hub-overview-rate.yaml"
+  cp "${HUB_OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 2) | .targets[0].expr) = "sum by (status_code) (rate(grafana_http_request_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[1m]))" | tojson))' "$snapshot"
+  run _assert_query_contract "$snapshot"
+  [ "$status" -ne 0 ]
+  cp "${HUB_OVERVIEW}" "$snapshot"
+  cmp -s "${HUB_OVERVIEW}" "$snapshot"
+}
+
+@test "Grafana Overview query mutation rejects the removed alert metric" {
+  local snapshot="${BATS_TEST_TMPDIR}/app-overview-alert.yaml"
+  cp "${OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 6) | .targets[0].expr) = "grafana_alerting_result_total{job=~\"$job\", instance=~\"$instance\", state=\"alerting\"}" | tojson))' "$snapshot"
+  run _assert_query_contract "$snapshot"
+  [ "$status" -ne 0 ]
+  cp "${OVERVIEW}" "$snapshot"
+  cmp -s "${OVERVIEW}" "$snapshot"
 }
 
 @test "Grafana Overview Build Info mutation guards reject a missing include" {

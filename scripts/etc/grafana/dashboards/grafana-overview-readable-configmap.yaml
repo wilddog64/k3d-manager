@@ -20,7 +20,7 @@ data:
           "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
           "id": 6,
           "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}, "textMode": "auto"},
-          "targets": [{"expr": "grafana_alerting_result_total{job=~\"$job\", instance=~\"$instance\", state=\"alerting\"}", "instant": true, "legendFormat": "Firing alerts", "refId": "A"}],
+          "targets": [{"expr": "sum(grafana_alerting_alerts{job=~\"$job\", instance=~\"$instance\", state=\"alerting\"}) or vector(0)", "instant": true, "legendFormat": "Firing alerts", "refId": "A"}],
           "title": "Firing Alerts",
           "type": "stat"
         },
@@ -37,14 +37,14 @@ data:
         },
         {
           "datasource": {"uid": "$datasource"},
-          "description": "Grafana build and runtime labels for the selected job and instance.",
+          "description": "Grafana build and runtime labels for the selected pod name.",
           "fieldConfig": {"defaults": {"custom": {"cellOptions": {"type": "auto"}}, "mappings": []}, "overrides": []},
           "gridPos": {"h": 5, "w": 12, "x": 12, "y": 0},
           "id": 10,
           "options": {"showHeader": true},
           "targets": [{"expr": "grafana_build_info{job=~\"$job\", instance=~\"$instance\"}", "format": "table", "instant": true, "refId": "A"}],
           "title": "Build Info",
-          "transformations": [{"id": "filterFieldsByName", "options": {"include": {"names": ["version", "edition", "job", "instance"]}}}, {"id": "organize", "options": {"indexByName": {"version": 0, "edition": 1, "job": 2, "instance": 3}, "renameByName": {"version": "Version", "edition": "Edition", "job": "Job", "instance": "Instance"}}}],
+          "transformations": [{"id": "filterFieldsByName", "options": {"include": {"names": ["version", "edition", "pod"]}}}, {"id": "organize", "options": {"indexByName": {"version": 0, "edition": 1, "pod": 2}, "renameByName": {"version": "Version", "edition": "Edition", "pod": "Pod"}}}],
           "type": "table"
         },
         {
@@ -54,7 +54,7 @@ data:
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
           "id": 2,
           "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "none"}},
-          "targets": [{"expr": "sum by (status_code) (irate(grafana_http_request_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[1m]))", "interval": "1m", "legendFormat": "HTTP {{status_code}}", "refId": "A"}],
+          "targets": [{"expr": "sum by (status_code) (rate(grafana_http_request_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))", "legendFormat": "HTTP {{status_code}}", "refId": "A"}],
           "title": "Request Rate by HTTP Status",
           "type": "timeseries"
         },

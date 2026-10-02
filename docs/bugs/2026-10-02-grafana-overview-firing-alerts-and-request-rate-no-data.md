@@ -3,7 +3,7 @@
 **Filed:** 2026-10-02
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** low. Two of the five Overview panels are empty, and the table answers "which Grafana" with a pod IP.
-**Status:** OPEN
+**Status:** FIXED (pending sync)
 **Related:** `docs/bugs/2026-09-30-grafana-overview-no-data.md` (that fixed the scrape: the ServiceMonitor `release`
 label; these are query defects), `docs/bugs/2026-10-01-grafana-overview-raw-series-labels.md` (the readable copy and
 the Build Info contract this changes).
@@ -66,6 +66,10 @@ Files:
 - `yq` parses both files, and the embedded JSON passes `jq -e .`.
 - No cluster, network or git commits. Leave the changes uncommitted. Do not touch `CHANGELOG.md`.
 - Update this doc: Status FIXED (pending sync), plus a short Resolution section.
+
+## Resolution
+
+Both readable dashboard copies now use the available Grafana alert metric with a zero fallback, the adaptive rate interval, and Version/Edition/Pod Build Info columns. Tests enforce the query contract, panel identity, and regression mutations.
 
 ## Rollout
 

@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- Grafana Overview — Readable: Firing Alerts now reads `grafana_alerting_alerts` (the old
+  `grafana_alerting_result_total` does not exist in Grafana 11) and shows 0 instead of No data; Request Rate by
+  HTTP Status uses `rate(…[$__rate_interval])` instead of an empty `irate(…[1m])`; Build Info shows the pod name
+  instead of a truncated job and pod IP ([bug](docs/bugs/2026-10-02-grafana-overview-firing-alerts-and-request-rate-no-data.md))
 - `/ask-docs` sources are now GitHub links at the webhook's checked-out branch (override with
   `K3DM_ASK_DOCS_LINK_REF`), in both answers and `--sources` mode; the 3000-char reply budget counts the full
   links so none is cut ([bug](docs/bugs/2026-10-02-ask-docs-sources-not-linked.md))
