@@ -393,14 +393,24 @@ embeds, and it runs offline in `make test-pytest`. Measured 2026-10-01:
 |---|---|---|---|---|---|
 | TF-IDF control | recall@5 | 0.750 (12/16) | 0.833 (5/6) | 1.000 (5/5) | 1.000 (5/5) |
 | TF-IDF control | intrusion@5 | 0.071 (1/14) | 0.500 (2/4) | 1.000 (4/4) | 0.250 (1/4) |
-| embeddings | both | **not yet measured** — needs the live run below | | | |
+| embeddings | recall@5 | 0.875 (14/16) | 0.833 (5/6) | 1.000 (5/5) | 1.000 (5/5) |
+| embeddings | intrusion@5 | 0.286 (4/14) | 0.500 (2/4) | 0.750 (3/4) | 0.500 (2/4) |
 
 Plans score 4/4 on intrusion because sibling specs share a template; lexical overlap there says
-"same shape", not "same defect". The embedding scorer runs only against the live store:
+"same shape", not "same defect".
+
+**Finding (live run, 2026-10-01, `gemini-embedding-2` over the hub store):** embeddings beat the
+lexical control on recall only for bugs (two more duplicates found of 16) and tie elsewhere. They
+are also noisier: three more hard negatives reach the bugs top 5, and one more for retros. The
+sample is small (27 positives, 26 negatives), so treat a one-pair difference as noise. This fits
+how retrieval is used today: an advisory "possible prior art" list that a person reads, never a
+filter that suppresses filing. It argues against letting either scorer gate filing without a
+larger labelled set. The embedding scorer runs only against the live store:
 
 ```bash
 K3DM_RETRIEVAL_EVAL_LIVE=1 pytest -s scripts/tests/bin/test_find_similar_docs.py -k live
 ```
 
-Until that run is recorded here, embedding quality is **unmeasured**: treat
-`find-similar-docs` output as advisory, and do not read a high score as "do not file".
+With `K3DM_RETRIEVAL_EVAL_LIVE=1` the live case enforces its own floors, one miss below the
+2026-10-01 measurement. Either way, treat `find-similar-docs` output as advisory and do not read a
+high score as "do not file".

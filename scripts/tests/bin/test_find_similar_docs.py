@@ -22,6 +22,8 @@ TOKEN = re.compile(r"[a-z0-9]+")
 # Measured 2026-10-01 on 27 positives: bugs 12/16, issues 5/6, plans 5/5, retro 5/5. Each floor
 # allows one more miss than measured, so the gate fails on a real regression, not on noise.
 RECALL_FLOOR = {"bugs": 0.60, "issues": 0.60, "plans": 0.80, "retro": 0.80}
+# Live embeddings, measured 2026-10-01: bugs 14/16, issues 5/6, plans 5/5, retro 5/5.
+LIVE_RECALL_FLOOR = {"bugs": 0.81, "issues": 0.66, "plans": 0.80, "retro": 0.80}
 
 
 def _pairs():
@@ -160,7 +162,7 @@ def test_cli_unavailable_is_distinguishable_from_zero_results(tmp_path):
 @pytest.mark.skipif(os.environ.get("K3DM_RETRIEVAL_EVAL_LIVE") != "1",
                     reason="live pgvector/Gemini retrieval eval is operator-gated")
 def test_live_embedding_recall_at_5_per_directory(capsys):
-    """Run by the operator or Claude with K3DM_RETRIEVAL_EVAL_LIVE=1; reports, does not gate yet.
+    """Run by the operator or Claude with K3DM_RETRIEVAL_EVAL_LIVE=1; gated by LIVE_RECALL_FLOOR.
 
     The query document is indexed too, so it is fetched with k=6 and removed — the same exclusion
     the TF-IDF control applies. Without it the embedding scorer spends a top-5 slot on itself.
@@ -178,3 +180,5 @@ def test_live_embedding_recall_at_5_per_directory(capsys):
     print(f"embedding recall@5: {json.dumps(recall, sort_keys=True)}")
     print(f"embedding hard-negative intrusion@5: {json.dumps(intrusion, sort_keys=True)}")
     assert returned and all(count == 5 for count in returned), "search returned fewer than 5 results"
+    for directory, floor in LIVE_RECALL_FLOOR.items():
+        assert recall[directory] >= floor, recall

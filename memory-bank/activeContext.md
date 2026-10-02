@@ -1,3 +1,11 @@
+# 2026-10-01 — live retrieval eval recorded; slack-corpus-qa unblocked
+
+Operator ran `K3DM_RETRIEVAL_EVAL_LIVE=1` (64s, pass). Embeddings recall@5 bugs .875 / issues .833 / plans 1 / retro 1
+vs TF-IDF .75/.833/1/1; intrusion@5 embeddings .286/.5/.75/.5 vs TF-IDF .071/.5/1/.25. Finding: modest recall gain on
+bugs only, noisier; fine for advisory prior art, argues against gating filing. Recorded in `docs/guides/vector-store.md`;
+live floors set (LIVE_RECALL_FLOOR). Copy the table into the v1.40.0 retro at release. `slack-corpus-qa` is unblocked;
+per user feedback it goes to Codex.
+
 # 2026-10-01 — cloud-bridge test targets + diagnose actions implemented (Claude, `0c697005`)
 
 `v1.40.0-cloud-bridge-test-targets.md` done. Bridge actions added: make-test, -test-bin, -test-python, -test-all

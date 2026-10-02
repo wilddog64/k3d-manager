@@ -4,12 +4,12 @@
 - [x] Dispatched via `codex exec` into worktree `../k3d-manager-codex-v1.40.0` (branch `codex-v1.40.0-hermes`).
 - [x] Codex app-health sensor: `7319f07c`, Claude-verified (11/11, spot mutations red, default-off).
 - [x] Codex retrieval eval `0ded5a83` + prior art `428960fe`; Claude fixes `e35fcba9` (6 defects).
-- [ ] Claude/operator: live `K3DM_RETRIEVAL_EVAL_LIVE=1` run -> embedding row in vector-store.md + retro.
+- [x] Live retrieval eval run 2026-10-01; numbers in vector-store.md + live floors. [ ] copy into v1.40.0 retro at release.
 - [x] Bare-negation recurrence fixed `4c0dd7ac`.
 - [x] Claude: `v1.40.0-cloud-bridge-test-targets.md` (2026-10-01) — tripwire, 4 test + 6 diagnose actions.
 - [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
 - [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
-- [ ] `v1.40.0-slack-corpus-qa.md` — blocked on the live recall@5.
+- [ ] `v1.40.0-slack-corpus-qa.md` — UNBLOCKED 2026-10-01 (live recall@5 measured); dispatch to Codex.
 
 # 2026-10-01 — v1.40.0 review fix spec (Codex)
 
