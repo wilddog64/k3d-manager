@@ -1,7 +1,7 @@
 # Bug: payment image carries 3 CRITICAL Tomcat CVEs that the latest Spring Boot BOM does not fix
 
 **Filed:** 2026-10-02
-**Status:** OPEN, spec ready for Codex
+**Status:** FIXED payment `90e3052` on `fix/payment-cve-bom-overrides` (Codex; Claude-verified: pom.xml only, effective-pom re-run shows all 5 fixed versions, branch CI 37068823246 green, 139 unit + 139 integration tests = main); PR pending merge, then Rollout
 **Repo (work):** `wilddog64/shopping-cart-payment` (`~/src/gitrepo/personal/shopping-carts/shopping-cart-payment`)
 **Branch (work repo):** `fix/payment-cve-bom-overrides`, from `origin/main`
 **Spec branch:** `k3d-manager-v1.41.0`
