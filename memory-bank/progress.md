@@ -10,7 +10,7 @@
 - [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
 - [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
 - [x] README architecture diagram redrawn for v1.40.0 (Claude, docs only).
-- [ ] Codex bug batch `codex-v1.40.0-bugs`: bridge restart, data_layer cause, CFN orphan warning — dispatched 2026-10-01. Bug 1 `65a221fe` + Bug 2 `ff599a3a` verified (R1 regression fixed by Claude); Bug 3 re-dispatched.
+- [x] Codex bug batch: bridge restart `52efebde`, data_layer cause `baedfdc5`, CFN orphan warning `82ba559b` on `k3d-manager-v1.40.0` (2026-10-01; make test 1223/1223, pytest 523). R1 regression + stale-marker false warning caught and fixed by Claude.
 - [ ] `v1.40.0-slack-corpus-qa.md` — UNBLOCKED 2026-10-01 (live recall@5 measured); dispatch to Codex.
 
 # 2026-10-01 — v1.40.0 review fix spec (Codex)

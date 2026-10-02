@@ -1,6 +1,6 @@
 # Bug: cluster-up failure leaves the CloudFormation cluster stack orphaned and billable
 
-**Status:** FIXED (Codex, 2026-10-01)
+**Status:** FIXED (Codex, 2026-10-01, `82ba559b` on `k3d-manager-v1.40.0`)
 **Discovered:** 2026-08-15
 **Branch:** `k3d-manager-v1.25.0`
 **Files:** `bin/cluster-up` (`_acg_up_cleanup`), `scripts/lib/providers/k3s-aws.sh`

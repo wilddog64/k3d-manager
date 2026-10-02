@@ -13,7 +13,12 @@ Run 1 result: Bug 1 committed `65a221fe` (verified: 4/4, recipe-read test, stub 
 Bug 2 finished uncommitted; Claude verification found a REAL regression: R1 (`repairs._unknown_webhook`)
 keys on "source unavailable" in data_layer evidence — new strings would have disabled R1 (Codex ran only
 test_hermes.py). Fixed by keeping the substring + R1 test; mutations red; committed `ff599a3a` (229 hermes).
-Bug 3 re-dispatched alone with `--add-dir <main>/.git` (log scratchpad codex-bug3.log). Nothing pushed yet.
+Bug 3 re-dispatched with `--add-dir <main>/.git` — still could not commit (worktree index lock). Claude verified:
+54/54 BATS, 4 own mutations each red on exactly their test, found + fixed a stale-marker false warning (marker
+now cleared at run start), committed `bab29f87`. Full gate on pushed branch: make test 1223/1223 (tripwire: reads
+only), pytest 523 passed/1 skipped. DONE — cherry-picked onto `k3d-manager-v1.40.0`: `52efebde` (bridge restart),
+`baedfdc5` (data_layer evidence), `82ba559b` (CFN orphan warning); tree equal to the bug branch except memory-bank.
+Operator follow-up: `make restart-webhook` (now also restarts the bridge).
 
 # 2026-10-01 — README architecture diagram redrawn
 

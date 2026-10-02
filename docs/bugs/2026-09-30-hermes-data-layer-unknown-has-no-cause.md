@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30
-**Status:** FIXED (Codex, 2026-10-01)
+**Status:** FIXED (Codex, 2026-10-01, `baedfdc5` on `k3d-manager-v1.40.0`)
 **Severity:** medium — an unknown data-layer result is fail-closed, but the operator cannot tell
 whether the webhook was unavailable, the check was absent, or the payload was ungradeable.
 
