@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
-**Status:** OPEN, DORMANT (triage by Claude, 2026-10-01): the structural fix is not applied, but the 2026-09-30 reapply resolved the correct k3s CNI dirs for hostinger, so nothing is broken live today.
+**Status:** FIXED in v1.37.0 (`925c43e7`, rechecked by Claude 2026-10-01) — `_argocd_appset_live_overrides` now prefers the substrate-derived dirs, falls back to the live value, and refuses generic dirs for a k3s target; covered by `argocd_appset_cni_dir_precedence.bats` and `argocd_appset_live_overrides.bats`. The earlier 2026-10-01 "not applied" triage was wrong.
 **Severity:** high — the same defect has been "fixed" three times and re-broken three times, because the fix cannot reach the cluster
 
 ---
