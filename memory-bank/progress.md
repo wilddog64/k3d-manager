@@ -1,3 +1,11 @@
+# 2026-10-02 — v1.40.0 release close-out (gh auth churn deferred to next release, operator call)
+
+- [x] Removed clean Codex worktrees `../k3d-manager-codex-askdocs`, `../k3d-manager-codex-bugs` (commits already cherry-picked; branches kept).
+- [x] Removed `.claude/worktrees/k3d-manager` + branch `worktree-k3d-manager` (operator go; May lock-dir edit superseded by the Sept wrapper rewrite; c5949cf4 is on main).
+- [x] Codex: CHANGELOG promoted to [1.40.0] + retro `82ec57a0` (Claude-verified: on origin, headings order, every in-repo SHA/path resolves; 755ad2d is e2e-tests repo). Audit gap: validate-manifests undocumented + stale UNMEASURED in CLAUDE.md/makefile.md → fixed `e6185b92` (Codex, Claude-verified: on origin, 3 files, doc-links 1872 OK, stale grep empty).
+- [x] e2e-tests publish run 37044992425 GREEN: sha-755ad2d… and latest both = sha256:78044624… (old latest 59abbc19). [ ] operator reruns `make e2e E2E_IMAGE_TAG=sha-755ad2d7efeb96dcb6d3701077264fc6b9374db3` (live smoke gate).
+- [ ] Scope check, PR (prepare and stop for operator go).
+
 # 2026-10-01 — v1.40.0 spec handoff
 
 - [x] vcluster.bats orphan seed still a table (stale since 5706eb21) — FIXED `bd88be39` (Codex edit, Claude commit — Codex hit .git lock): 30/30 + reconcile 4/4, `.Name`→`.name` mutation reds the 4 orphan tests, restored.
