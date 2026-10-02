@@ -2933,3 +2933,4 @@ in the bug doc after commit: `3664bea7`.
 - 2026-10-02: payment #78 CI green on `a3c0c24` (139 tests); Copilot thread resolved. Both PRs ready for operator merge.
 - 2026-10-02: payment #78 MERGED (`412bc78`), e2e-tests #9 MERGED (`755ad2d`); e2e-tests enforce_admins re-enabled. Awaiting payment main build 37031252652 image publish → substrate pin bump.
 - 2026-10-02: Overview "Firing Alerts by Category" table spec `617ac4c8` (operator request; classifies the 55 firing alerts) dispatched to Codex.
+- 2026-10-02: Firing Alerts by Category table landed `bf32ce99` (Codex, verified: 28/28 bats, panel 12 identical in both copies, shipped expr live-checked). Live on next ArgoCD sync.
