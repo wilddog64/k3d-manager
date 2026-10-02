@@ -71,7 +71,7 @@ _assert_query_contract() {
   firing="$(jq -c '.panels[] | select(.id == 6)' <<<"$dashboard_json")" || return 1
   request="$(jq -c '.panels[] | select(.id == 2)' <<<"$dashboard_json")" || return 1
   jq -e '(.targets[0].expr | contains("grafana_alerting_alerts")) and (.targets[0].expr | contains("or vector(0)")) and (.targets[0].expr | contains("grafana_alerting_result_total") | not) and (.fieldConfig.defaults.noValue == "0")' <<<"$firing" >/dev/null || return 1
-  jq -e '(.targets[0].expr | contains("rate(")) and (.targets[0].expr | contains("[$__rate_interval]")) and (.targets[0].expr | contains("irate(") | not) and (.targets[0].expr | contains("[1m]") | not) and (.targets[0] | has("interval") | not)' <<<"$request" >/dev/null || return 1
+  jq -e '(.targets[0].expr | contains("rate(")) and (.targets[0].expr | contains("[$__rate_interval]")) and (.targets[0].expr | contains("irate(") | not) and (.targets[0].expr | contains("[1m]") | not) and (.targets[0] | has("interval") | not) and (.description | contains("kubelet /api/health")) and (.description | contains("Status -1"))' <<<"$request" >/dev/null || return 1
 }
 
 @test "acg dashboard appset targets app-cluster role" {
@@ -223,6 +223,16 @@ _assert_query_contract() {
   [ "$status" -ne 0 ]
   cp "${OVERVIEW}" "$snapshot"
   cmp -s "${OVERVIEW}" "$snapshot"
+}
+
+@test "Grafana Overview query mutation rejects the old Request Rate description" {
+  local snapshot="${BATS_TEST_TMPDIR}/hub-overview-description.yaml"
+  cp "${HUB_OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 2) | .description) = "Request rate grouped by HTTP status code. Status -1 means the request did not produce a normal HTTP response, usually because instrumentation recorded an internal failure before a response was available." | tojson))' "$snapshot"
+  run _assert_query_contract "$snapshot"
+  [ "$status" -ne 0 ]
+  cp "${HUB_OVERVIEW}" "$snapshot"
+  cmp -s "${HUB_OVERVIEW}" "$snapshot"
 }
 
 @test "Grafana Overview Build Info mutation guards reject a missing include" {

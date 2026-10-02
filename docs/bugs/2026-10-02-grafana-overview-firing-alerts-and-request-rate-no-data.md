@@ -124,7 +124,7 @@ hits and alternates between neighbouring counts. The 12:00–13:30 bursts are re
 
 ## Follow-up (2026-10-02): Request Rate description names the health-probe baseline
 
-**Status:** OPEN
+**Status:** FIXED (pending sync)
 
 The operator read the steady HTTP 200 line as unexplained load. It is kubelet `/api/health` probes (see the note above).
 

@@ -49,7 +49,7 @@ data:
         },
         {
           "datasource": {"uid": "$datasource"},
-          "description": "Request rate grouped by HTTP status code. Status -1 means the request did not produce a normal HTTP response, usually because instrumentation recorded an internal failure before a response was available.",
+          "description": "Request rate grouped by HTTP status code. The steady ~0.4 req/s HTTP 200 baseline is kubelet /api/health liveness and readiness probes; bursts above it are real traffic (browser sessions, dashboard provisioning reloads). Status -1 means the request did not produce a normal HTTP response, usually because instrumentation recorded an internal failure before a response was available.",
           "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "showPoints": "never"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 80}]}, "unit": "reqps"}, "overrides": []},
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
           "id": 2,
