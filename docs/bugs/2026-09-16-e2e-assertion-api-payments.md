@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-16 by k3dm-hermes
-**Status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Operator chose (b), a real Keycloak token (2026-10-02); option (b) IMPLEMENTED on feature branches (payment `d2f2d55`, e2e-tests `df6b9c1`, k3d-manager substrate), pending PRs, image pins and a live Tier 1 run. Health test still open.
+**Status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Operator chose (b), a real Keycloak token (2026-10-02); option (b) IMPLEMENTED on feature branches (payment `d2f2d55`, e2e-tests `df6b9c1`, k3d-manager substrate), pending PRs, image pins and a live Tier 1 run. Health fix (substrate broker + `spring.rabbitmq`) IMPLEMENTED: payment `9778e21` + k3d-manager substrate.
 **Run:** `1789549631-2079`, runner `m2`, tier `vcluster`, 24 passed / 33 failed / 102 total
 **Runner commit:** `ec4874fe62cab1ba120729dc5d48454f7d50dcc7`
 
@@ -458,3 +458,17 @@ Same as option (b): the payment PR merges → bump the substrate payment pin →
 `api/payments.spec.ts` tests pass. If `/actuator/health` is still `DOWN`, read its `components` in the payment pod (no
 auth needed for `/actuator/**`) before changing anything: another indicator (for example the client's
 `VaultHealthIndicator`) may be next in line.
+
+### Resolution — broker and key path (2026-10-02)
+
+- **Payment** (`fix/payment-jwt-keycloak-roles`, `9778e21`): `spring.rabbitmq.*` added inside the existing
+  `spring:` key (one top-level `spring:`, checked with `yq`); the library's top-level `rabbitmq:` block is
+  unchanged. New `RabbitPropertiesBindingTest`. Java is gated by branch CI.
+- **k3d-manager substrate**: new `scripts/etc/e2e/rabbitmq.yaml` (`rabbitmq:3.12-alpine`, user `e2e`,
+  password from `e2e-datastore-credentials`/`rabbitmq-password`, readiness `rabbitmq-diagnostics -q ping`);
+  payment gets `RABBITMQ_*` env, password via `secretKeyRef`; the rollout waits for `rabbitmq` before payment.
+- Gates: `e2e.bats` + `e2e_image_prune.bats` 66/66, shellcheck clean. Claude's mutations (literal password in
+  payment env, broker dropped from the kustomization, `rabbitmq-password` dropped from the Secret) each went red;
+  restores `cmp`-proved.
+- Still needed for a green Tier 1: merge both payment fixes and the e2e-tests fix, bump the substrate payment pin,
+  then a live `e2e_verify_vcluster` run.

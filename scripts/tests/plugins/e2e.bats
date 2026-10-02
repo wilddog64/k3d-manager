@@ -414,6 +414,34 @@ EOF
   [ "$status" -eq 0 ]
 }
 
+@test "datastore secret includes the RabbitMQ password" {
+  export E2E_RABBITMQ_PASSWORD="rabbitmq-key-not-echoed"
+  run _e2e_provision_datastore_secret "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"$E2E_RABBITMQ_PASSWORD"* ]]
+  run awk '/rabbitmq-password=rabbitmq-key-not-echoed/ { found=1 } END { exit (found ? 0 : 1) }' "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "substrate waits for RabbitMQ before payment" {
+  run _e2e_deploy_substrate "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  local rabbitmq_line payment_line
+  rabbitmq_line="$(grep -nF -- "rollout status deployment/rabbitmq" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  payment_line="$(grep -nF -- "rollout status deployment/payment" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  [ "$rabbitmq_line" -lt "$payment_line" ]
+}
+
+@test "payment RabbitMQ password is secret-backed and substrate renders the broker" {
+  command -v kubectl >/dev/null 2>&1 || skip "kubectl not installed"
+  run env kubectl kustomize "${BATS_TEST_DIRNAME}/../../etc/e2e"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"image: rabbitmq:3.12-alpine"* ]]
+  [[ "$output" == *"name: rabbitmq"* ]]
+  [[ "$output" == *"name: RABBITMQ_PASSWORD"*"key: rabbitmq-password"* ]]
+  [[ "$output" != *$'        - name: RABBITMQ_PASSWORD\n          value:'* ]]
+}
+
 @test "substrate provisions Keycloak before apply and waits before payment" {
   run _e2e_deploy_substrate "$BATS_TEST_TMPDIR/kubeconfig"
   [ "$status" -eq 0 ]

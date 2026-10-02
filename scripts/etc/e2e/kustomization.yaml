@@ -15,6 +15,7 @@ labels:
 resources:
 - postgres.yaml
 - redis.yaml
+- rabbitmq.yaml
 - product-catalog.yaml
 - basket.yaml
 - order.yaml

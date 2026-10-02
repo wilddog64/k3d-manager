@@ -530,7 +530,7 @@ function _e2e_deploy_substrate() {
   fi
 
   local rollout
-  for rollout in postgres redis product-catalog basket order keycloak payment; do
+  for rollout in postgres redis rabbitmq product-catalog basket order keycloak payment; do
     _info "[e2e] Waiting for rollout: ${rollout}"
     _e2e_kc "$kubeconfig" -n "$E2E_NAMESPACE" rollout status \
       "deployment/${rollout}" --timeout="${E2E_ROLLOUT_TIMEOUT}s"
@@ -563,13 +563,15 @@ function _e2e_provision_pull_secret() {
 }
 
 function _e2e_provision_datastore_secret() {
-  local kubeconfig="${1:-}" postgres_password redis_password payment_encryption_key
+  local kubeconfig="${1:-}" postgres_password redis_password rabbitmq_password payment_encryption_key
   postgres_password="${E2E_POSTGRES_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
   redis_password="${E2E_REDIS_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  rabbitmq_password="${E2E_RABBITMQ_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
   payment_encryption_key="${E2E_PAYMENT_ENCRYPTION_KEY:-$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')}"
   _e2e_kc "$kubeconfig" create secret generic e2e-datastore-credentials \
     --from-literal=postgres-password="${postgres_password}" \
     --from-literal=redis-password="${redis_password}" \
+    --from-literal=rabbitmq-password="${rabbitmq_password}" \
     --from-literal=payment-encryption-key="${payment_encryption_key}" \
     -n "$E2E_NAMESPACE" --dry-run=client -o yaml | _e2e_kc "$kubeconfig" apply -f -
 }

@@ -53,6 +53,17 @@ spec:
               key: postgres-password
         - name: DB_SSLMODE
           value: disable
+        - name: RABBITMQ_HOST
+          value: rabbitmq
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USERNAME
+          value: e2e
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: e2e-datastore-credentials
+              key: rabbitmq-password
         - name: SPRING_CLOUD_VAULT_ENABLED
           value: "false"
         - name: OAUTH2_ENABLED
