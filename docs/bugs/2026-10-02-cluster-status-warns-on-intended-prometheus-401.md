@@ -8,7 +8,7 @@
 - The same check would report a **green** Prometheus if the auth proxy were bypassed and the public
   endpoint answered 200 again — the exact regression fixed on 2026-09-15.
 
-**Status:** OPEN
+**Status:** FIXED
 **Related:** `docs/issues/2026-09-15-prometheus-public-endpoint-unauthenticated.md` (added
 `bin/prometheus-auth-proxy` on 19090 in front of the port-forward on 19091)
 
@@ -88,3 +88,12 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 
 Run `make restart-webhook`, then `/cluster-status`. Prometheus should read `✓ Prometheus: HTTP 401
 (auth enforced)` and the overall status should be OK.
+
+## Resolution
+
+`smoke.py` now declares the expected authentication behavior on each endpoint. The public
+hostinger Prometheus probe treats both response and `HTTPError` 401 as a passing, auth-enforced
+result, reports a 200 as an auth-proxy bypass, and leaves other failures on the existing retry
+path. Local Prometheus remains 200-only, and the monitoring-paused downgrade is unchanged.
+Added offline pytest coverage for both 401 forms, the bypass and failure cases, provider-specific
+behavior, and the paused-monitoring 502.

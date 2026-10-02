@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- `/cluster-status` on k3s-hostinger now passes the public Prometheus endpoint on an
+  unauthenticated 401 (`auth enforced`) instead of warning on every healthy run, and fails on a 200
+  (`auth proxy bypassed`). The local `localhost:19190` probe still expects 200.
+  ([bug](docs/bugs/2026-10-02-cluster-status-warns-on-intended-prometheus-401.md))
 - `/ask-docs` answers questions about recent items: recency words switch to a 50-doc pool sorted
   newest first, and excerpts and `--sources` show each doc's date.
 

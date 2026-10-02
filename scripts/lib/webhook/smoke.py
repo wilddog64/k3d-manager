@@ -580,17 +580,19 @@ def _smoke_test_services(retries=None, provider=None, quick=False):
         prometheus_ready_url = "http://localhost:19190/-/ready"
 
     smoke_endpoints = [
-        ("ArgoCD", argocd_health_url, [200]),
-        ("Frontend", frontend_url, [200]),
-        ("Keycloak", keycloak_url, [200]),
-        ("Prometheus", prometheus_ready_url, [200]),
-        ("Grafana", "https://grafana.3ai-talk.org/api/health", [200]),
+        ("ArgoCD", argocd_health_url, [200], False),
+        ("Frontend", frontend_url, [200], False),
+        ("Keycloak", keycloak_url, [200], False),
+        ("Prometheus", prometheus_ready_url,
+         [401] if provider == "k3s-hostinger" else [200],
+         provider == "k3s-hostinger"),
+        ("Grafana", "https://grafana.3ai-talk.org/api/health", [200], False),
     ]
     if _provider_supports_pushgateway(provider):
-        smoke_endpoints.append(("Pushgateway", "http://localhost:9091/-/healthy", [200]))
+        smoke_endpoints.append(("Pushgateway", "http://localhost:9091/-/healthy", [200], False))
 
     def _probe_endpoint(endpoint):
-        name, url, ok_codes = endpoint
+        name, url, ok_codes, expected_auth = endpoint
         last_err = ""
         passed = False
         for attempt in range(_retries):
@@ -600,14 +602,16 @@ def _smoke_test_services(retries=None, provider=None, quick=False):
                     code = resp.status
                     if code in ok_codes:
                         passed = True
-                        last_err = f"HTTP {code}"
+                        last_err = "HTTP 401 (auth enforced)" if expected_auth else f"HTTP {code}"
                         break
-                    if name == "Prometheus" and code == 401:
-                        return name, None, "HTTP 401 (authentication required)"
+                    if expected_auth and code == 200:
+                        return name, False, "HTTP 200 without credentials — auth proxy bypassed"
                     last_err = f"HTTP {code}"
             except urllib.error.HTTPError as exc:
-                if name == "Prometheus" and exc.code == 401:
-                    return name, None, "HTTP 401 (authentication required)"
+                if expected_auth and exc.code == 401:
+                    return name, True, "HTTP 401 (auth enforced)"
+                if expected_auth and exc.code == 200:
+                    return name, False, "HTTP 200 without credentials — auth proxy bypassed"
                 last_err = str(exc)
             except (urllib.error.URLError, OSError) as exc:
                 last_err = _smoke_unreachable_detail(url, exc)
