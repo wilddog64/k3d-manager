@@ -104,3 +104,18 @@ stop and report the failing test or compile error; do not swap in other versions
 2. Hostinger digest re-pinned to `sha256:b722319e…`.
 3. e2e `newTag` bumped to `sha-2d9ec91…` (it also carries #79; the Java `gatewayTransactionId` fix is PR #80, still open).
 4. Pending: the hostinger VulnerabilityReport will show 1 CRITICAL (netty) until the netty override lands, so the Trivy alert will not clear yet.
+
+### The git re-pin is shadowed by the CVE promoter's live override
+
+After `eba1c0a8` synced, hostinger still ran `sha256:50253e83…`. `kubectl kustomize services/shopping-cart-payment`
+renders the new digest, but the Application `ubuntu-hostinger-shopping-cart-payment` carries
+`spec.source.kustomize.images: [ghcr.io/wilddog64/shopping-cart-payment=…:sha-cced344…@sha256:50253e83…]`.
+The `kubectl-patch` manager wrote it on 2026-09-24 (`_promote_image` in `scripts/etc/argocd/platform-ops/app-cve-scan.sh`).
+`services-git` lists `.spec.source.kustomize.images` in `ignoreApplicationDifferences`, so the AppSet never clears it.
+The promoter will not replace it either, because `sha-2d9ec91` still has the netty CRITICAL.
+A hard refresh does not help, and ArgoCD reports Synced/Healthy throughout.
+
+Operator step (Claude's patch was denied): set the override to the new image, in the promoter's own format:
+`kubectl -n cicd patch applications.argoproj.io ubuntu-hostinger-shopping-cart-payment --type merge -p '{"spec":{"source":{"kustomize":{"images":["ghcr.io/wilddog64/shopping-cart-payment=ghcr.io/wilddog64/shopping-cart-payment:sha-2d9ec91cd1dbcb7ed122a4e521fbe4d81675c700@sha256:b722319ec749aa0756b1c87306a2c2372d0950d6159b4dbf4713bc956e3eead3"]}}}}'`
+
+Design gap, to be filed separately: any manual git digest re-pin is silent and inert while a promoter override exists.
