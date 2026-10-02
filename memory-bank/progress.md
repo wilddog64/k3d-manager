@@ -2936,3 +2936,4 @@ in the bug doc after commit: `3664bea7`.
 - 2026-10-02: Firing Alerts by Category table landed `bf32ce99` (Codex, verified: 28/28 bats, panel 12 identical in both copies, shipped expr live-checked). Live on next ArgoCD sync.
 - 2026-10-02: payment image sha-412bc78 published (run 37031252652, build-push success); substrate pin bumped `7c9caff7` (Codex, verified 56/56 e2e bats). Next: operator live Tier 1.
 - 2026-10-02: live Tier 1 run 1790958044-29337 failed before tests: no GHCR pull PAT in env or Vault (gh token lacks read:packages). vcluster reconcile table-parsing bug filed `a8f52a5c`, dispatched to Codex.
+- 2026-10-02: vcluster reconcile JSON fix landed `5706eb21` (Codex, verified 4/4 bats, shellcheck clean). Operator re-running `make e2e` from their terminal.
