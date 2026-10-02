@@ -5,7 +5,7 @@
 **Severity:** low. `/ask-docs` now opens a thread (fix `61d6d3fb`). A follow-up typed in that
 thread as `ask-docs <question>` gets no reply at all. The same follow-up as `ask <question>`
 answers in the thread, so the two commands behave differently.
-**Status:** OPEN
+**Status:** FIXED
 **Related:** `2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`
 
 ## Observed (operator, 2026-10-01; webhook log)
@@ -96,3 +96,11 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 ## Operator step after the fix
 
 Run `make restart-webhook`. The relay is unchanged: thread replies come in via `/slack/events`.
+
+## Resolution
+
+`ask-docs` is now accepted as both a standalone and thread command. Thread follow-ups create a
+retrieval sub-job with the parent thread timestamp, preserve `--sources`/`-s`, sanitize the
+question, and invoke `_run_ask_docs` without a channel ID so the answer is posted back into the
+existing thread. Thread lookup skips `ask-docs` sub-jobs, the help text includes the command, and
+the command retains the default `reader` role floor.

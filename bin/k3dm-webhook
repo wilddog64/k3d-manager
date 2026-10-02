@@ -585,7 +585,7 @@ def _find_job_by_thread_ts(thread_ts):
     for ts_file in JOB_DIR.glob("*/thread_ts"):
         try:
             action_file = ts_file.parent / "action"
-            if action_file.exists() and action_file.read_text().strip() == "ask":
+            if action_file.exists() and action_file.read_text().strip() in {"ask", "ask-docs"}:
                 continue
             if ts_file.read_text().strip() == thread_ts:
                 return ts_file.parent.name
@@ -595,7 +595,7 @@ def _find_job_by_thread_ts(thread_ts):
 
 
 _THREAD_COMMANDS = {
-    "kill", "diagnosis", "status", "logs", "ask",
+    "kill", "diagnosis", "status", "logs", "ask", "ask-docs",
     "cluster-up", "cluster-down", "cluster-refresh", "cluster-resume",
     "cleanup-stale-sandbox",
     "cluster-status", "hostinger-status", "gemini", "claude", "codex",
@@ -603,7 +603,7 @@ _THREAD_COMMANDS = {
 _STANDALONE_CMDS = {
     "cluster-up", "cluster-down", "cluster-resume",
     "cluster-status", "hostinger-status", "cluster-refresh", "refresh",
-    "ask", "claude", "gemini", "codex",
+    "ask", "ask-docs", "claude", "gemini", "codex",
     "cleanup-stale-sandbox",
 }
 
@@ -861,10 +861,37 @@ def _handle_thread_command(job_id, command, role="admin"):
         ).start()
         _notify_job(job_id, f"🤖 Asking *{agent}*…")
 
+    elif cmd == "ask-docs":
+        parts = command.strip().split()
+        question = " ".join(parts[1:]).strip()
+        if not question or question in {"--sources", "-s"}:
+            _notify_job(job_id, "Usage: `ask-docs [--sources] <question>`")
+            return
+        question = _sanitize_question(question)
+        if not question:
+            _notify_job(job_id, "❌ Question rejected — too long or contains disallowed patterns.")
+            return
+        thread_ts_file = JOB_DIR / job_id / "thread_ts"
+        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        (new_job_dir / "action").write_text("ask-docs")
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        threading.Thread(
+            target=_run_ask_docs,
+            args=(new_job_id, question, "", thread_ts),
+            kwargs={"channel_id": ""},
+            daemon=True,
+        ).start()
+        _notify_job(job_id, "📚 Searching docs…")
+
     else:
         _notify_job(
             job_id,
-            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`, `cleanup-stale-sandbox [confirm]` (admin)",
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `ask-docs`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`, `cleanup-stale-sandbox [confirm]` (admin)",
         )
 
 
