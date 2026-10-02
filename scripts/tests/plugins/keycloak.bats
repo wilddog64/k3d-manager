@@ -134,3 +134,135 @@ setup() {
 @test "test_keycloak function exists" {
   declare -F test_keycloak >/dev/null
 }
+
+setup_smoke_stubs() {
+  export SMOKE_VAULT_PASSWORD="${1:-}"
+  export SMOKE_LEGACY_PASSWORD="${2:-}"
+  export SMOKE_OWNER_JSON="${3:-}"
+  [[ -n "$SMOKE_OWNER_JSON" ]] || export SMOKE_OWNER_JSON='{}'
+  export SMOKE_VAULT_PUT_RC="${4:-0}"
+  export SMOKE_KUBECTL_LOG="$BATS_TEST_TMPDIR/smoke-kubectl.log"
+  : > "$SMOKE_KUBECTL_LOG"
+
+  _kubectl() {
+    local args="$*" input=""
+    if [[ "$args" == *"exec -i vault-0"* ]]; then
+      input=$(cat)
+    fi
+    printf 'ARGV\t%s\n' "${args//$'\n'/ }" >> "$SMOKE_KUBECTL_LOG"
+    printf 'STDIN\t%s\n' "${input//$'\n'/ }" >> "$SMOKE_KUBECTL_LOG"
+    case "$args" in
+      *"get secret vault-root"*)
+        printf 'cm9vdC10b2tlbg=='
+        return 0
+        ;;
+      *"exec -i vault-0"*"vault kv get"*)
+        printf '%s' "$SMOKE_VAULT_PASSWORD"
+        [[ -n "$SMOKE_VAULT_PASSWORD" ]]
+        return $?
+        ;;
+      *"exec -i vault-0"*"vault kv put"*)
+        printf 'PUT_INPUT\t%s\n' "$input" >> "$SMOKE_KUBECTL_LOG"
+        return "$SMOKE_VAULT_PUT_RC"
+        ;;
+      *"get secret k3dm-smoke-user"*"jsonpath"*)
+        [[ -n "$SMOKE_LEGACY_PASSWORD" ]] || return 1
+        printf '%s' "$SMOKE_LEGACY_PASSWORD" | base64
+        return 0
+        ;;
+      *"get secret k3dm-smoke-user"*"-o json"*)
+        printf '%s' "$SMOKE_OWNER_JSON"
+        return 0
+        ;;
+      *"get secret openldap-admin"*)
+        printf 'bGRhcC1wYXNz'
+        return 0
+        ;;
+      *"delete secret k3dm-smoke-user"*)
+        return 0
+        ;;
+    esac
+    return 0
+  }
+  _curl() { return 0; }
+  _keycloak_smoke_admin_token() { printf 'admin-token'; }
+  _keycloak_smoke_ensure_client() { return 0; }
+  _keycloak_smoke_ensure_user() { printf 'user-uuid'; }
+  _keycloak_smoke_set_password() { printf '%s' "$5" > "$BATS_TEST_TMPDIR/selected-password"; return 0; }
+  _keycloak_smoke_ensure_realm() { return 0; }
+  _keycloak_smoke_ensure_ldap_component() { return 0; }
+  _keycloak_smoke_ensure_ldap_user() { printf '%s' "$8" > "$BATS_TEST_TMPDIR/selected-password"; return 0; }
+  openssl() { printf 'generated-password'; }
+  export -f _kubectl _curl _keycloak_smoke_admin_token _keycloak_smoke_ensure_client
+  export -f _keycloak_smoke_ensure_user _keycloak_smoke_set_password openssl
+  export -f _keycloak_smoke_ensure_realm _keycloak_smoke_ensure_ldap_component
+  export -f _keycloak_smoke_ensure_ldap_user
+}
+
+@test "smoke seed prefers Vault password and does not run openssl" {
+  setup_smoke_stubs vault-password
+  run keycloak_seed_smoke_user
+  [ "$status" -eq 0 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/selected-password")" = "vault-password" ]
+  ! grep -q 'generated-password' "$SMOKE_KUBECTL_LOG" || false
+  ! grep -q 'ARGV.*vault-password' "$SMOKE_KUBECTL_LOG" || false
+}
+
+@test "smoke seed reuses legacy password and writes all Vault fields" {
+  setup_smoke_stubs '' legacy-password
+  run keycloak_seed_smoke_user
+  [ "$status" -eq 0 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/selected-password")" = "legacy-password" ]
+  grep -q '"password": "legacy-password"' "$SMOKE_KUBECTL_LOG"
+  grep -q 'vault kv get -mount=secret -field=password keycloak/smoke-user' "$SMOKE_KUBECTL_LOG"
+  grep -q '"username": "k3dm-smoke"' "$SMOKE_KUBECTL_LOG"
+  grep -q '"realm": "shopping-cart"' "$SMOKE_KUBECTL_LOG"
+  grep -q '"client": "k3dm-smoke"' "$SMOKE_KUBECTL_LOG"
+}
+
+@test "smoke seed generates a password when Vault and legacy Secret are empty" {
+  setup_smoke_stubs
+  run keycloak_seed_smoke_user
+  [ "$status" -eq 0 ]
+  grep -q '"password": "generated-password"' "$SMOKE_KUBECTL_LOG"
+}
+
+@test "smoke seed and provision never create the smoke Secret" {
+  setup_smoke_stubs
+  run keycloak_seed_smoke_user
+  [ "$status" -eq 0 ]
+  run keycloak_provision_shopping_cart_realm
+  [ "$status" -eq 0 ]
+  ! grep -q 'create secret generic k3dm-smoke-user' "$SMOKE_KUBECTL_LOG" || false
+}
+
+@test "smoke Vault hygiene keeps token and password out of kubectl argv" {
+  setup_smoke_stubs secret-password
+  run keycloak_seed_smoke_user
+  [ "$status" -eq 0 ]
+  ! grep -q 'ARGV.*root-token' "$SMOKE_KUBECTL_LOG" || false
+  ! grep -q 'ARGV.*secret-password' "$SMOKE_KUBECTL_LOG" || false
+  grep -q 'STDIN.*root-token' "$SMOKE_KUBECTL_LOG"
+  grep -q '"password": "secret-password"' "$SMOKE_KUBECTL_LOG"
+}
+
+@test "smoke Vault write failure warns and returns zero" {
+  setup_smoke_stubs '' '' '{}' 1
+  run keycloak_seed_smoke_user
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"secret/keycloak/smoke-user"* ]]
+}
+
+@test "smoke cleanup deletes an unowned legacy Secret" {
+  setup_smoke_stubs '' '' '{}'
+  run _keycloak_smoke_remove_unowned_secret identity k3dm-smoke-user
+  [ "$status" -eq 0 ]
+  grep -q 'delete secret k3dm-smoke-user' "$SMOKE_KUBECTL_LOG"
+}
+
+@test "smoke cleanup preserves an ESO-owned Secret" {
+  setup_smoke_stubs '' '' '{"metadata":{"ownerReferences":[{"kind":"ExternalSecret"}]}}'
+  run _keycloak_smoke_remove_unowned_secret identity k3dm-smoke-user
+  [ "$status" -eq 0 ]
+  ! grep -q 'delete secret k3dm-smoke-user' "$SMOKE_KUBECTL_LOG" || false
+}

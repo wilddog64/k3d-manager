@@ -9,7 +9,7 @@
 ! Frontend API (smoke token): k3dm-smoke-user via identity/k3dm-smoke-user Secret: token unavailable
 ```
 
-**Status:** OPEN
+**Status:** FIXED (pending deploy)
 **Related:**
 - `docs/bugs/2026-09-13-hub-recovery-manual-fixes-not-declarative.md` (Defect 6): it added the seed to
   `hub_recovery_reconcile`, which covers a restore but not a plain rebuild.
@@ -30,6 +30,19 @@ credential is an ExternalSecret over Vault and comes back on its own.
 Vault path: KV v2 mount `secret`, key **`keycloak/smoke-user`**, fields `username`, `password`, `realm`,
 `client`. The `eso-ldap-directory` role used by `identity/vault-kv-store` already reads
 `secret/data/keycloak/*` (`LDAP_VAULT_POLICY_PREFIX` includes `keycloak`), so **no Vault policy change**.
+
+## Resolution
+
+Claude's verification fixes: the payload password moved from `jq --arg` argv to `$ENV`. In the smoke tests, mid-test `! grep` assertions
+were silent no-ops under bats `set -e`; they now end with `|| false`. The stub's argv log flattens newlines. A
+whole-line source grep was dropped. The argv-leak and Secret-create mutations are now red.
+
+The smoke seed and realm-provision functions now use Vault `secret/keycloak/smoke-user` as the
+source of truth, migrating a legacy password when necessary and generating one only when both
+Vault and the old Secret are empty. They no longer create the Kubernetes Secret; an unowned legacy
+Secret is removed after a successful Vault write, while ESO-owned Secrets are preserved. The
+shopping-cart identity kustomization now declares the ESO ExternalSecret that recreates
+`identity/k3dm-smoke-user` from Vault after a rebuild.
 
 ### A. k3d-manager — `scripts/plugins/keycloak.sh` (+ `scripts/tests/plugins/keycloak.bats`)
 
@@ -98,7 +111,12 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 ## Rollout (operator, after merge)
 
 1. Claude opens the shopping-cart-infra PR. ArgoCD tracks `main`, so the ExternalSecret appears only after merge.
-2. `KEYCLOAK_BASE_URL=https://keycloak.3ai-talk.org ./scripts/k3d-manager keycloak_seed_smoke_user` on the hub context. This writes Vault, then ESO creates the Secret within 15m. Annotate `force-sync` to make it immediate.
+2. **Rotate while migrating.** On 2026-10-02 the operator ran the *old* seed, which recreated a hand-made Secret.
+   Claude then leaked that password into a session transcript, through a failing `kubectl -o go-template` on the
+   Secret. So delete it first, and the seed generates a fresh password instead of migrating the exposed one:
+   `kubectl --context k3d-k3d-cluster -n identity delete secret k3dm-smoke-user`, then
+   `KEYCLOAK_BASE_URL=https://keycloak.3ai-talk.org ./scripts/k3d-manager keycloak_seed_smoke_user`.
+   Vault is written, and ESO creates the Secret within 15m; annotate `force-sync` to make it immediate.
 3. `/cluster-status` → 21 ok / 0 warn, and `ESO ExternalSecrets` on the hub counts the new one.
 
 **Out of scope:** the Keycloak *user* itself. It lives in the Keycloak DB. If a future rebuild loses it, the

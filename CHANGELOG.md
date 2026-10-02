@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- The `k3dm-smoke-user` login credentials now live in Vault (`secret/keycloak/smoke-user`) and are recreated
+  by an ExternalSecret in shopping-cart-infra, so a hub rebuild no longer leaves `/cluster-status` with two
+  smoke-token warnings. The seed reuses the Vault password, then a legacy Secret, before generating one, and passes
+  the token and password over stdin only.
+  ([bug](docs/bugs/2026-10-02-smoke-user-secret-lost-on-hub-rebuild.md))
 - `/cluster-status` on k3s-hostinger now passes the public Prometheus endpoint on an
   unauthenticated 401 (`auth enforced`) instead of warning on every healthy run, and fails on a 200
   (`auth proxy bypassed`). The local `localhost:19190` probe still expects 200.
