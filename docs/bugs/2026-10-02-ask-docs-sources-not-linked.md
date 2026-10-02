@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** low. The reader has to copy a path such as `docs/bugs/2026-10-01-….md` and find it by hand
 before they can check what the answer is based on.
-**Status:** FIXED (pending deploy)
+**Status:** FIXED (deployed 2026-10-02)
 **Related:** `docs/bugs/2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`, which added
 `--sources` mode.
 

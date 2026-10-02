@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** low. Each `/cluster-status` drops a report of about 21 lines into the channel, so two runs
 bury everything else. A follow-up has no thread to go in.
-**Status:** FIXED (pending deploy)
+**Status:** FIXED (deployed 2026-10-02; threading confirmed in Slack)
 **Related:** `docs/bugs/2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`. `/ask` and
 `/ask-docs` got threaded delivery there. This doc applies the same pattern to `/cluster-status`.
 
