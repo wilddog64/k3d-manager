@@ -2941,3 +2941,4 @@ in the bug doc after commit: `3664bea7`.
 - 2026-10-02: live Tier 1 run 1790958044-29337 failed before tests: no GHCR pull PAT in env or Vault (gh token lacks read:packages). vcluster reconcile table-parsing bug filed `a8f52a5c`, dispatched to Codex.
 - 2026-10-02: vcluster reconcile JSON fix landed `5706eb21` (Codex, verified 4/4 bats, shellcheck clean). Operator re-running `make e2e` from their terminal.
 - 2026-10-02: e2e run 1790961003-14944 FAILED pre-test: product-catalog crash-loop on service-link `RABBITMQ_PORT=tcp://…` (regression from `034d9513`), found via new substrate diagnostics. Spec `af17b25c` dispatched to Codex.
+- 2026-10-02: service-link fix landed `c7fa36e4` (Codex, Claude-verified 60/60 bats, mutation red). Operator to re-run `make e2e`.
