@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-16 by k3dm-hermes
-**Status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Awaiting the operator's choice: (a) a test-only profile or (b) a real Keycloak token.
+**Status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Operator chose (b), a real Keycloak token (2026-10-02); fix spec below, dispatched to Codex.
 **Run:** `1789549631-2079`, runner `m2`, tier `vcluster`, 24 passed / 33 failed / 102 total
 **Runner commit:** `ec4874fe62cab1ba120729dc5d48454f7d50dcc7`
 
@@ -232,3 +232,140 @@ probe groups on this tier. Decide which; do not disable the indicator (rejected 
 The operator received `[FIRING] E2EVerificationFailing on hub (3)` (severity `warning`, so email, not
 SMS). The rule is `e2e_last_run_pass == 0` for 10 minutes, so it is working as designed: it reports
 the failures root-caused above. It clears once the path and auth fixes land and a run passes.
+
+---
+
+## Fix spec — option (b), real Keycloak token (operator decision 2026-10-02)
+
+**Status after this spec:** the eight API failures (paths + auth). The health test
+(`should return healthy status`) is **out of scope** here: it still needs the `spring.rabbitmq` key-path fix plus a
+broker-or-probe-group decision (see 2026-09-29 above), so `E2EVerificationFailing` does not clear on this fix alone.
+
+### New finding — the payment service cannot authorize any real token (likely production too)
+
+`SecurityConfig.java` uses `.oauth2ResourceServer(oauth2 -> oauth2.jwt())` with **no**
+`JwtAuthenticationConverter`. Spring's default maps only the `scope` claim to `SCOPE_*` authorities, so every
+`@PreAuthorize("hasAnyRole('PAYMENT_USER', …)")` is false for a Keycloak token, which carries roles in
+`realm_access.roles`. Every authenticated payment call returns **403**. `PaymentControllerTest` never saw it:
+`@WithMockUser(roles = "PAYMENT_USER")` injects `ROLE_PAYMENT_USER` directly and skips JWT conversion.
+`shopping-cart-order` already has the converter (`OAuth2SecurityConfig.KeycloakGrantedAuthoritiesConverter`).
+Option (a) would have hidden this; (b) exposes it.
+
+### Repos and branches (already created from `origin/main`; do not switch)
+
+| Repo | Branch |
+|---|---|
+| `shopping-carts/shopping-cart-payment` | `fix/payment-jwt-keycloak-roles` |
+| `shopping-carts/shopping-cart-e2e-tests` | `fix/payment-client-v1-bearer` |
+| `k3d-manager` | `k3d-manager-v1.40.0` |
+
+### A. `shopping-cart-payment` — map Keycloak roles
+
+1. New `src/main/java/com/shoppingcart/payment/config/KeycloakGrantedAuthoritiesConverter.java`
+   (public class, `Converter<Jwt, Collection<GrantedAuthority>>`). Port the order service's realm-role and
+   resource-role extraction: `realm_access.roles` plus every `resource_access.<client>.roles`, each mapped to
+   `ROLE_` + `toUpperCase()` with `-` replaced by `_`. **Do not** port the `groups` extraction: a group name must
+   not grant a role. A missing or malformed claim yields no authority, never an exception.
+2. `SecurityConfig.java`: add a `JwtAuthenticationConverter` bean using that converter, and change
+   `.oauth2ResourceServer(oauth2 -> oauth2.jwt())` to
+   `.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))`.
+   Change nothing else in the chain (`permitAll` on `/actuator/**`, CSRF, session, `httpBasic`).
+3. Tests, new `src/test/java/com/shoppingcart/payment/config/KeycloakGrantedAuthoritiesConverterTest.java`:
+   - `realm_access.roles = [PAYMENT_USER, payment-write]` → `ROLE_PAYMENT_USER`, `ROLE_PAYMENT_WRITE`;
+   - `resource_access.payment-service.roles = [PAYMENT_READ]` → `ROLE_PAYMENT_READ`;
+   - no `realm_access` / no `resource_access` → empty, no exception;
+   - `groups = [/PAYMENT_ADMIN]` alone → empty (groups do not grant roles).
+4. One `PaymentControllerTest` case that goes **through** the converter: `@Import(SecurityConfig.class)` if needed,
+   and `SecurityMockMvcRequestPostProcessors.jwt().jwt(j -> j.claim("realm_access", Map.of("roles", List.of("PAYMENT_USER")))).authorities(new KeycloakGrantedAuthoritiesConverter())`
+   on `GET /api/v1/payments/{id}` → not 403. And the same with `roles = [GUEST]` → 403.
+5. Gate: `./mvnw -o -q test` (offline; `~/.m2` is populated). If offline resolution fails, say so and stop; do not
+   enable network.
+
+### B. `shopping-cart-e2e-tests` — v1 paths, a real bearer, honest failures
+
+1. `tests/helpers/auth.ts`: split the token fetch out of the `OAUTH2_ENABLED` gate:
+   - new exported `mintToken(request): Promise<string>` that does the password grant and caches, as today, but
+     **throws** `Error("Keycloak token request failed: <status> <body text>")` on a non-2xx response or a missing
+     `access_token`;
+   - `getAuthToken` keeps its current contract (returns `null` when disabled or on failure) by calling `mintToken`
+     inside its existing `try`.
+2. `tests/helpers/api-client.ts` `PaymentClient`:
+   - paths → `/api/v1/payments`, `/api/v1/payments/${paymentId}`, `/api/v1/payments/order/${orderId}`,
+     `/api/v1/payments/customer/${customerId}`, `/api/v1/payments/${paymentId}/refund`;
+   - `getHeaders()` becomes `async` and always sends `Authorization: Bearer ${await mintToken(this.request)}` plus
+     the existing `X-Correlation-ID`. The service has no unauthenticated mode, so there is no flag. Keep `X-User-ID`.
+   - `getPaymentByOrderId`: 404 → `null`; otherwise one `Payment` (the endpoint returns an object, not a list).
+   - `checkHealth` unchanged.
+3. `responseData()`: if `!response.ok()`, throw
+   `Error(\`HTTP ${response.status()} ${response.url()}: ${(await response.text()).slice(0, 500)}\`)` before parsing.
+   The `getPaymentByOrderId` 404 is checked before calling it. **Do not** change any other client's call sites;
+   if a currently-passing spec relied on parsing a non-2xx body, list it in the report instead of working around it.
+4. Gate: `npx tsc --noEmit` clean. Do not run Playwright (no substrate).
+
+### C. `k3d-manager` — substrate Keycloak and Job wiring
+
+1. New `scripts/etc/e2e/keycloak.yaml`: ConfigMap `e2e-keycloak-realm` (key `shopping-cart-realm.json`), Deployment
+   `keycloak` and Service `keycloak` (port 8080), labels as the other substrate files.
+   - Image `quay.io/keycloak/keycloak:24.0` (the tag the repo already uses). Args `start-dev --import-realm`, realm
+     mounted at `/opt/keycloak/data/import`.
+   - Env: `KC_HOSTNAME_URL=http://keycloak:8080` (fixes the token `iss` regardless of caller), `KC_HEALTH_ENABLED=true`,
+     `E2E_KC_CLIENT_SECRET` and `E2E_KC_USER_PASSWORD` from Secret `e2e-keycloak-credentials` (keys
+     `client-secret`, `user-password`). No admin user.
+   - Readiness `/health/ready` on 8080; requests `cpu 100m / memory 512Mi`, limits `1000m / 1Gi`.
+   - Realm JSON: realm `shopping-cart`, `enabled: true`; realm roles `PAYMENT_USER`, `PAYMENT_WRITE`; confidential
+     client `e2e-tests` with `directAccessGrantsEnabled: true`, `standardFlowEnabled: false`,
+     `secret: "${E2E_KC_CLIENT_SECRET}"`; user `e2e-user` (enabled, `emailVerified: true`, realm roles
+     `PAYMENT_USER`, `PAYMENT_WRITE`, credential type `password`, `value: "${E2E_KC_USER_PASSWORD}"`,
+     `temporary: false`). Keycloak's import resolves `${ENV}` placeholders; no literal secret goes in git.
+2. `scripts/etc/e2e/kustomization.yaml`: add `keycloak.yaml` to `resources` before `payment.yaml`.
+3. `scripts/etc/e2e/payment.yaml` env: add `OAUTH2_ISSUER_URI=http://keycloak:8080/realms/shopping-cart` and
+   `OAUTH2_JWK_SET_URI=http://keycloak:8080/realms/shopping-cart/protocol/openid-connect/certs`. Leave the rest.
+4. `scripts/plugins/e2e.sh`:
+   - new `_e2e_provision_keycloak_secret <kubeconfig>`, modelled on `_e2e_provision_datastore_secret`: values from
+     `E2E_KC_CLIENT_SECRET` / `E2E_KC_USER_PASSWORD` or `od -An -N24 -tx1 /dev/urandom | tr -d ' \n'`, created
+     with `--dry-run=client -o yaml | apply`; nothing echoed.
+   - `_e2e_deploy_substrate`: call it right after `_e2e_provision_pull_secret`, and add `keycloak` to the rollout
+     loop **before** `payment`.
+   - `_e2e_job_manifest` (vcluster tier only; leave `_e2e_sandbox_job_manifest` alone) env:
+     `KEYCLOAK_URL=http://keycloak:8080`, `KEYCLOAK_REALM=shopping-cart`, `KEYCLOAK_CLIENT_ID=e2e-tests`,
+     `TEST_USERNAME=e2e-user`, and `KEYCLOAK_CLIENT_SECRET` / `TEST_PASSWORD` via `secretKeyRef` on
+     `e2e-keycloak-credentials`. Keep `OAUTH2_ENABLED=false` (the orchestrator flow must stay skipped on this tier).
+5. Tests in `scripts/tests/plugins/e2e.bats` (stubbed, no cluster):
+   - `_e2e_job_manifest` output has the five Keycloak env names, `secretKeyRef` for the two secrets, and no literal
+     password value;
+   - `_e2e_deploy_substrate` creates `e2e-keycloak-credentials` before `apply -k` and waits for `keycloak` before
+     `payment` (order from the stub's call log);
+   - with `E2E_KC_USER_PASSWORD=s3cr3t-sentinel`, the sentinel never appears in any recorded `_e2e_kc` **argv** line
+     except as the `--from-literal` value of the `create secret` call;
+   - `kubectl kustomize scripts/etc/e2e` (or `kustomize build`) renders, contains `kind: Deployment` `keycloak`, and
+     the realm JSON parses with `jq` after extraction.
+   - Mutations, `cp`-restored and `cmp`-proved: drop `keycloak` from the rollout loop → red; inline a literal
+     `value:` for `TEST_PASSWORD` → red.
+6. Gates: `bats scripts/tests/plugins/e2e.bats scripts/tests/plugins/e2e_image_prune.bats` green; `shellcheck
+   scripts/plugins/e2e.sh` no new warnings. `e2e_prune_images` must still list the Keycloak image (it is a plain
+   `image:`); add it to the image-prune test if that test enumerates substrate images.
+
+### Rules (all three repos)
+
+- No cluster, network, or git commits; leave every change uncommitted. Claude verifies and commits.
+- Do not touch `CHANGELOG.md` or any memory-bank.
+- Report: files changed per repo, each gate's output, each mutation's result.
+
+### Rollout (operator, in order)
+
+1. Payment PR merges → CI builds `sha-<new>`; bump the `shopping-cart-payment` `newTag` in
+   `scripts/etc/e2e/kustomization.yaml` to it (Claude does this commit).
+2. e2e-tests PR merges → its image is published; bump `E2E_IMAGE_TAG` if it is pinned.
+3. Run `e2e_verify_vcluster`. Expected: the eight payment API tests pass; `should return healthy status` still
+   fails (out of scope above). Live-verify that the token's `iss` is `http://keycloak:8080/realms/shopping-cart`
+   (realm import resolved the placeholders if the password grant succeeds at all).
+4. Production check (read-only, operator): with a real user token, `GET /api/v1/payments/customer/<id>` on the
+   payment service returned 403 before the payment image rollout and does not after.
+
+### Lead, unverified — the sandbox-tier `stripe` failure
+
+`_e2e_sandbox_job_manifest` sets `KEYCLOAK_URL=https://keycloak.3ai-talk.org/realms/shopping-cart`, but
+`auth.ts` appends `/realms/<realm>/…` itself, so the token URL has the realm twice, and the Job sets no
+`KEYCLOAK_CLIENT_*` / `TEST_*`, so the defaults (`e2e-tests` / `e2e-user`) are used against the production realm.
+`getAuthToken` then returns `null` and the orchestrator falls back to `X-User-ID`. Not fixed here; triage
+separately.
