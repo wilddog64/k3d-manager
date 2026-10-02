@@ -1,5 +1,7 @@
 # Vector store credentials
 
+Architecture diagrams: [docs/architecture/vector-store.md](../architecture/vector-store.md).
+
 ArgoCD bootstrap seeds the Vault KV v2 path `secret/vectordb/postgres` with the `username` and
 `password` fields needed by the vectordb Postgres component. The seed is idempotent: if the entry
 already exists, bootstrap does not rotate it. Rotation would publish a credential that an already

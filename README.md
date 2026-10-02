@@ -251,6 +251,8 @@ docs/
 - **[OpenLDAP Directory Service](docs/architecture/openldap-directory-service.md)** — Symas `jp-gouin/openldap-stack-ha` topology, credential model, and consumer wiring after the v1.22.0 `bitnamilegacy` migration
 - **[CVE Detection and Remediation Pipeline](docs/architecture/cve-remediation-pipeline.md)** — Trivy alert → webhook → immutable-image promotion/rebuild, plus Dependabot escalation
 - **[Trivy Operator Observability](docs/architecture/trivy-operator-observability.md)** — Trivy Operator reconcile-error logs, scan-job failure alerts, and metrics scraping
+- **[Cloud Bridge](docs/architecture/cloud-bridge.md)** — Pull-model bridge that lets a cloud agent read cluster state: components, request sequence, and trust boundaries
+- **[Vector Store](docs/architecture/vector-store.md)** — pgvector prior-art index: components, index-run sequence, credential resolution, failure modes
 
 ### How-To
 

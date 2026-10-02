@@ -1,5 +1,7 @@
 # Cloud Session Requests — asking the local k3dm webhook for read-only state
 
+Architecture and trust boundaries: [docs/architecture/cloud-bridge.md](../architecture/cloud-bridge.md).
+
 **Audience:** a Claude cloud session (or any agent) that has this repo through a GitHub
 connection but no network path to the operator's machine. Also the operator, for the
 two-token model and revocation.

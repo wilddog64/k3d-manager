@@ -1,6 +1,6 @@
 # Docs gap: no architecture page or diagram for the vector store or the cloud bridge
 
-**Status:** OPEN
+**Status:** FIXED (this commit)
 **Branch:** `k3d-manager-v1.40.0`
 **Type:** documentation defect (filed under `docs/bugs/` — v1.40.0 is at the 5-plan cap, and this
 is missing release-DoD documentation for v1.38.0 and v1.39.0, not new scope)
