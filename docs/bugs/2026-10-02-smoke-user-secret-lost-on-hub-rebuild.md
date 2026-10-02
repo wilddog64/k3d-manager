@@ -9,7 +9,7 @@
 ! Frontend API (smoke token): k3dm-smoke-user via identity/k3dm-smoke-user Secret: token unavailable
 ```
 
-**Status:** FIXED (pending deploy)
+**Status:** FIXED (deployed 2026-10-02; `/cluster-status` 21 ok / 0 warn)
 **Related:**
 - `docs/bugs/2026-09-13-hub-recovery-manual-fixes-not-declarative.md` (Defect 6): it added the seed to
   `hub_recovery_reconcile`, which covers a restore but not a plain rebuild.
