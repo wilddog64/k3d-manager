@@ -38,7 +38,7 @@ data:
         {
           "datasource": {"uid": "$datasource"},
           "description": "Grafana build and runtime labels for the selected pod name.",
-          "fieldConfig": {"defaults": {"custom": {"cellOptions": {"type": "auto"}}, "mappings": []}, "overrides": []},
+          "fieldConfig": {"defaults": {"custom": {"cellOptions": {"type": "auto"}}, "mappings": []}, "overrides": [{"matcher": {"id": "byName", "options": "Version"}, "properties": [{"id": "custom.width", "value": 90}]}, {"matcher": {"id": "byName", "options": "Edition"}, "properties": [{"id": "custom.width", "value": 90}]}]},
           "gridPos": {"h": 5, "w": 12, "x": 12, "y": 0},
           "id": 10,
           "options": {"showHeader": true},

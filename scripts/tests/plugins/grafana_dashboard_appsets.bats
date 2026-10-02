@@ -59,6 +59,9 @@ _assert_build_info_contract() {
   [ "$(jq -r '[.transformations[] | select(.id == "organize") | .options.indexByName | to_entries | sort_by(.value) | .[].key] | join(",")' <<<"$panel")" = "version,edition,pod" ] || return 1
   [ "$(jq -r '[.transformations[] | select(.id == "organize") | .options.renameByName | to_entries | sort_by(.key) | .[] | (.key + "=" + .value)] | join(",")' <<<"$panel")" = "edition=Edition,pod=Pod,version=Version" ] || return 1
   [ "$(jq -e 'any(.transformations[]; .id == "labelsToFields") | not' <<<"$panel")" = "true" ] || return 1
+  [ "$(jq -c '[.fieldConfig.overrides[] | select(.matcher.id == "byName" and .matcher.options == "Version") | .properties[] | select(.id == "custom.width") | .value]' <<<"$panel")" = '[90]' ] || return 1
+  [ "$(jq -c '[.fieldConfig.overrides[] | select(.matcher.id == "byName" and .matcher.options == "Edition") | .properties[] | select(.id == "custom.width") | .value]' <<<"$panel")" = '[90]' ] || return 1
+  jq -e 'all(.fieldConfig.overrides[]?; (.matcher.id == "byName" and .matcher.options == "Pod") | not)' <<<"$panel" >/dev/null || return 1
 }
 
 _assert_query_contract() {
@@ -240,6 +243,17 @@ _assert_query_contract() {
   [ "$status" -ne 0 ]
   cp "${OVERVIEW}" "$snapshot"
   cmp -s "${OVERVIEW}" "$snapshot"
+}
+
+@test "Grafana Overview Build Info mutation guards reject missing width overrides" {
+  local snapshot="${BATS_TEST_TMPDIR}/hub-overview-widths.yaml"
+  cp "${HUB_OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | del(.panels[] | select(.id == 10) | .fieldConfig.overrides) | tojson))' "$snapshot"
+  run _assert_build_info_contract "$snapshot"
+  printf 'mutation missing width overrides: status=%s output=%s snapshot=%s\n' "$status" "$output" "$snapshot"
+  [ "$status" -ne 0 ]
+  cp "${HUB_OVERVIEW}" "$snapshot"
+  cmp -s "${HUB_OVERVIEW}" "$snapshot"
 }
 
 @test "k3dm tests dashboard keeps the make exit code informational" {

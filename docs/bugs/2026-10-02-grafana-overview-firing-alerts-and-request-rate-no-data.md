@@ -82,7 +82,7 @@ The hub copy syncs from the release branch through the platform-ops app. The app
 
 ## Follow-up (2026-10-02): Build Info Pod column truncated
 
-**Status:** OPEN
+**Status:** FIXED (pending sync)
 
 After the sync, Firing Alerts reads `0` and Request Rate shows series. Build Info shows
 `11.4.0 | oss | kube-prometheus-stack-graf…`: the three columns share the panel width equally, and the pod name
