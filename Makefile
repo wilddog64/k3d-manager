@@ -1056,13 +1056,21 @@ test-metrics:
 	echo "[test-metrics] log: $${_log}"; \
 	exit 0
 
+define _e2e_recorded
+mkdir -p "$(HOME)/.k3dm/e2e"; \
+_log="$(HOME)/.k3dm/e2e/make-$(1)-$$(date -u +%Y%m%dT%H%M%SZ).log"; \
+echo "[$(1)] recording full output to $${_log}"; \
+umask 077; \
+if [ "$$(uname -s)" = Darwin ]; then script -q "$${_log}" $(2); else script -q -e -c "$(2)" "$${_log}"; fi
+endef
+
 ## Run the Tier 1 e2e verification harness (throwaway vCluster + in-cluster Playwright Job). DIGEST=<candidate image digest> optional.
 e2e:
-	./scripts/k3d-manager e2e_verify_vcluster $(DIGEST)
+	@$(call _e2e_recorded,e2e,./scripts/k3d-manager e2e_verify_vcluster $(DIGEST))
 
 ## Run the Tier 2 e2e verification harness (live ACG sandbox + Stripe project). DIGEST=<candidate image digest> optional. Needs a real TTY for the one-time interactive login.
 e2e-sandbox:
-	./scripts/k3d-manager e2e_verify_sandbox $(DIGEST)
+	@$(call _e2e_recorded,e2e-sandbox,./scripts/k3d-manager e2e_verify_sandbox $(DIGEST))
 
 ## Run the smoke gate (offline checks always; cluster checks when reachable). SMOKE_ONLY=offline|cluster optional.
 smoke:

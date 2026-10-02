@@ -6,7 +6,7 @@
 output (vCluster creation, credential resolution, substrate deploy). The harness saves only the Playwright Job log
 (`~/.k3dm/e2e/<run-id>.log`), and only once the run reaches the Job. Run `1790958044-29337` (2026-10-02) failed
 on a missing GHCR PAT before that point, so the summary JSON was the only record.
-**Status:** OPEN
+**Status:** FIXED (pending)
 
 ## Fix (`Makefile`, targets `e2e` and `e2e-sandbox` only)
 
@@ -73,3 +73,8 @@ Mutation, `cp`-restored and `cmp`-proved: replace the macro body's `script -q "$
   `~/.k3dm/e2e/make-e2e-<UTC timestamp>.log` file.
 - No cluster, network or git commits. Leave changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
 - Update this doc: Status FIXED, plus a short Resolution section.
+
+## Resolution
+
+The `e2e` and `e2e-sandbox` targets now record the complete pseudo-terminal output in a mode-600
+timestamped log under `~/.k3dm/e2e/`, preserving interactive prompts and the harness exit status.

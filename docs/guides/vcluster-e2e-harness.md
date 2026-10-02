@@ -188,7 +188,8 @@ make e2e-sandbox                          # DIGEST=sha256:... optional
 
 `make e2e-sandbox` is the Tier 2 counterpart to `make e2e`. Run it from your own
 terminal: the preflight's one-time interactive ACG login needs a real TTY, so it
-cannot run unattended.
+cannot run unattended; the full output is recorded at
+`~/.k3dm/e2e/make-e2e-<UTC timestamp>.log` (or `make-e2e-sandbox-<UTC timestamp>.log`).
 
 **Prerequisite: a live `ubuntu-k3s` kubecontext.** Tier 2 does not provision the
 sandbox cluster — it deploys *into* one. Bring the cluster up with the `k3s-aws`
