@@ -1,6 +1,6 @@
 # 2026-10-01 — /ask + /ask-docs threaded answers, /ask-docs --sources
 
-> **2026-10-01 Slack incident RESOLVED** (both GH relay secrets re-set, run 36959382431 green; `make gh-secret` landed `c4a23890`). Frontend 404: tunnel pointed at hub — live config fixed, hub-recovery fix `9cb1207b`. ask-docs thread `aee1a258` + recency `c0b7bc88` landed (webhook restarted 20:50). argv fix `29c2d506` landed (operator backup DONE 2026-10-01). cloudflared-config landed; live config matches repo render. Prometheus-401 fix `d6cc4d7b` verified live. Smoke-user Vault+ESO fix landed; NOW: infra PR #106 open (merge needs go), then operator delete+reseed (rotates leaked smoke password). `/cluster-status` threading: spec `e85e7544` (docs/bugs/2026-10-02-cluster-status-report-not-threaded.md) landed (Codex, verified); needs `make deploy-worker` + `make restart-webhook`. ask-docs links spec `b54b19af` dispatched to Codex. AppSet reapply (13/13) + argocd_check_values_branch DONE 2026-10-02 by operator; `k3d-cluster-grafana-dashboards` OutOfSync cleared (`fd2323ff` exclude now live), all hub apps Synced+Healthy. NEXT: release steps (retro eval table, worktree cleanup).
+> **2026-10-01 Slack incident RESOLVED** (both GH relay secrets re-set, run 36959382431 green; `make gh-secret` landed `c4a23890`). Frontend 404: tunnel pointed at hub — live config fixed, hub-recovery fix `9cb1207b`. ask-docs thread `aee1a258` + recency `c0b7bc88` landed (webhook restarted 20:50). argv fix `29c2d506` landed (operator backup DONE 2026-10-01). cloudflared-config landed; live config matches repo render. Prometheus-401 fix `d6cc4d7b` verified live. Smoke-user Vault+ESO fix landed; NOW: infra PR #106 open (merge needs go), then operator delete+reseed (rotates leaked smoke password). `/cluster-status` threading: spec `e85e7544` (docs/bugs/2026-10-02-cluster-status-report-not-threaded.md) landed `609df49f`; relay deployed 2026-10-02 (version 10ebc8a6, needed keychain unlock in a GUI terminal); `make restart-webhook` pending until ask-docs links land. ask-docs links spec `b54b19af` dispatched to Codex. AppSet reapply (13/13) + argocd_check_values_branch DONE 2026-10-02 by operator; `k3d-cluster-grafana-dashboards` OutOfSync cleared (`fd2323ff` exclude now live), all hub apps Synced+Healthy. NEXT: release steps (retro eval table, worktree cleanup).
 
 `61d6d3fb` on `k3d-manager-v1.40.0` (Codex, verified by Claude; Claude added Slack escaping of the header). In `SLACK_CHANNEL_ID` with a bot token, the job posts a redacted header and replies in its thread; anywhere else, or if a bot post fails, it uses response_url as before. `--sources`/`-s` returns scored matches with no model call. pytest 542 passed / 1 skipped, relay 33/33. OPERATOR, pending: `make restart-webhook`, redeploy the relay from the release branch, make sure the bot is in the channel.
 
@@ -1638,7 +1638,7 @@ the dirty-PR failure `/create-pr` warns about.
 Chasing an incidental `ImagePullBackOff` — per the deep-dive-every-anomaly rule — found three
 defects in this release's own `ba2a01e1`, all blocking every operator-owned gate in
 `docs/plans/v1.39.0-public-endpoint-blackbox-probes.md`. Spec:
-`docs/bugs/2026-09-27-blackbox-probe-registry-and-cf-domain-unsubstituted.md`, landed (Codex, verified); needs `make deploy-worker` + `make restart-webhook`. ask-docs links spec `b54b19af` dispatched to Codex.
+`docs/bugs/2026-09-27-blackbox-probe-registry-and-cf-domain-unsubstituted.md`, dispatched to Codex.
 Operator chose `scripts/etc/vars.sh` as `CF_DOMAIN`'s home over renaming the manifest to
 `.yaml.tmpl`.
 
@@ -6821,7 +6821,7 @@ file fallback would reverse a deliberate decision - the repair belongs in the se
 authoritative store is `cicd/argocd-initial-admin-secret` and Vault is only a display mirror, so a
 display fallback there is correct. Spec:
 `docs/bugs/2026-09-21-vault-rebuild-leaves-prometheus-and-argocd-credentials-unseeded.md` (`9d2bdb15`),
-landed (Codex, verified); needs `make deploy-worker` + `make restart-webhook`. ask-docs links spec `b54b19af` dispatched to Codex.
+dispatched to Codex.
 
 **Live repair done, ArgoCD only (user chose "ArgoCD only" over reseeding both).** Mirrored the
 existing password into `secret/argocd/admin` - additive write to an absent path, no credential
