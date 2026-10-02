@@ -7,7 +7,7 @@ call; (2) the "end-to-end" test used a hardcoded doc and asserted the PLACEHOLDE
 retrieves over the real corpus with the TF-IDF control and asserts structure. Mutations red, each
 cmp-restored: sanitize, floor, allowlist, zero-model-call, IP redaction, sources. Webhook import
 checked under the LaunchAgent interpreter. Cherry-picked to `k3d-manager-v1.40.0` as `cccf9748`.
-Full `make test` + pytest on the release head running. Next: operator live tests (list given to
+Gates on release head `af3fce1c`: `make test` 1227/1227 (rc 0), pytest 535 passed + 1 skipped. Next: operator live tests (list given to
 the user), floor calibration, release steps (retro eval table, reapply ApplicationSets hub+ACG,
 `argocd_check_values_branch`), then remove both Codex worktrees.
 
