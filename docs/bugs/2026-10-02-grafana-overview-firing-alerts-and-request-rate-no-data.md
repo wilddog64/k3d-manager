@@ -79,3 +79,45 @@ The hub copy syncs from the release branch through the platform-ops app. The app
 - Firing Alerts reads `0`;
 - Request Rate shows `HTTP 200` and the other status series;
 - Build Info shows the version, the edition and the pod name.
+
+## Follow-up (2026-10-02): Build Info Pod column truncated
+
+**Status:** OPEN
+
+After the sync, Firing Alerts reads `0` and Request Rate shows series. Build Info shows
+`11.4.0 | oss | kube-prometheus-stack-graf…`: the three columns share the panel width equally, and the pod name
+(`kube-prometheus-stack-grafana-64756ff7c7-lvbz4`, 46 characters) does not fit a third of a `w: 12` panel.
+
+### Fix (panel `id` 10, both copies, kept identical)
+
+Set `fieldConfig.overrides` (empty today) to fix the two short columns' widths, so Pod takes the rest:
+
+```json
+"overrides": [
+  {"matcher": {"id": "byName", "options": "Version"}, "properties": [{"id": "custom.width", "value": 90}]},
+  {"matcher": {"id": "byName", "options": "Edition"}, "properties": [{"id": "custom.width", "value": 90}]}
+]
+```
+
+The matcher names are the **renamed** column names. Change nothing else.
+
+### Tests (`scripts/tests/plugins/grafana_dashboard_appsets.bats`)
+
+1. Extend `_assert_build_info_contract`: the overrides set `custom.width` 90 for `Version` and for `Edition`, and
+   there is no width override for `Pod`.
+2. The existing Build Info byte-identity test covers both copies; keep it green.
+3. One mutation in the existing snapshot style: delete the overrides (`yq -i`) → the contract is red.
+
+### Rules
+
+- `bats scripts/tests/plugins/grafana_dashboard_appsets.bats` is green; `yq` parses both files and the
+  embedded JSON passes `jq -e .`.
+- No cluster, network or git commits. Leave the changes uncommitted. Do not touch `CHANGELOG.md`.
+- Update this section's Status to FIXED (pending sync).
+
+### Note: the HTTP 200 baseline
+
+Measured on the hub 2026-10-02: the steady ~0.4 req/s is `/api/health` (kubelet probes, 240 per 10 min). The
+small ripple is sampling: probe hits land in a 30s-scraped counter, so each `rate` window holds a whole number of
+hits and alternates between neighbouring counts. The 12:00–13:30 bursts are real traffic: dashboard-sidecar
+`/api/admin/provisioning/dashboards/reload` calls during the ArgoCD syncs, plus browser sessions.
