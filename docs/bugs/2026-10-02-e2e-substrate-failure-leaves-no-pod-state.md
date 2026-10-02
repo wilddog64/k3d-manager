@@ -1,6 +1,6 @@
 # Bug: a substrate rollout failure tears down the vCluster with no pod state saved
 
-**Status:** OPEN
+**Status:** FIXED (pending)
 **Branch:** `k3d-manager-v1.40.0`
 **File:** `scripts/plugins/e2e.sh`
 **Tests:** `scripts/tests/plugins/e2e.bats`

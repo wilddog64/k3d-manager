@@ -512,6 +512,36 @@ EOF
   [ "$status" -eq 0 ]
 }
 
+@test "substrate diagnostics capture pods, events and per-deployment logs" {
+  run _e2e_dump_substrate_diagnostics e2e-x run-1
+  [ "$status" -eq 0 ]
+  diagnostics="${BATS_TEST_TMPDIR}/report/run-1.substrate.txt"
+  [ -f "$diagnostics" ]
+  mode=$(stat -c %a "$diagnostics" 2>/dev/null || stat -f %Lp "$diagnostics")
+  [ "$mode" = 600 ]
+  run grep -F -- "get pods" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F -- "--field-selector type=Warning" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F -- "logs deployment/product-catalog" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "substrate diagnostics no-op without a vCluster name" {
+  run _e2e_dump_substrate_diagnostics "" run-1
+  [ "$status" -eq 0 ]
+  run grep -F -- "get pods" "$RUN_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "exit trap dumps diagnostics before teardown" {
+  trap_body="$(declare -f _e2e_exit_trap)"
+  dump_line=$(printf '%s\n' "$trap_body" | grep -nF '_e2e_dump_substrate_diagnostics' | head -1 | cut -d: -f1)
+  teardown_line=$(printf '%s\n' "$trap_body" | grep -nF '_e2e_teardown' | head -1 | cut -d: -f1)
+  [ "$dump_line" -lt "$teardown_line" ]
+  [[ "$trap_body" == *'deploying-substrate'* ]]
+}
+
 @test "teardown removes orphaned kubeconfig and transient log when destroy is incomplete" {
   local name="e2e-orphaned"
   local kubeconfig="$BATS_TEST_TMPDIR/${name}.kubeconfig"

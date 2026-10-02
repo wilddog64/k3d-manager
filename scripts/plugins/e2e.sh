@@ -425,6 +425,32 @@ function _e2e_sandbox_exit_trap() {
   exit "$rc"
 }
 
+function _e2e_dump_substrate_diagnostics() {
+  local name="${1:-}" run_id="${2:-unknown}"
+  [[ -z "$name" ]] && return 0
+  local kubeconfig out deploy
+  kubeconfig="$(_vcluster_kubeconfig_path "$name")"
+  out="${_E2E_REPORT_DIR:-$E2E_REPORT_DIR}/${run_id}.substrate.txt"
+  (
+    umask 077
+    {
+      echo "### pods"
+      KUBECONFIG="$kubeconfig" _run_command --no-exit -- kubectl -n "$E2E_NAMESPACE" \
+        --request-timeout=10s get pods -o wide
+      echo "### warning events"
+      KUBECONFIG="$kubeconfig" _run_command --no-exit -- kubectl -n "$E2E_NAMESPACE" \
+        --request-timeout=10s get events --field-selector type=Warning --sort-by=.lastTimestamp
+      for deploy in postgres redis rabbitmq product-catalog basket order keycloak payment; do
+        echo "### logs deployment/${deploy}"
+        KUBECONFIG="$kubeconfig" _run_command --no-exit -- kubectl -n "$E2E_NAMESPACE" \
+          --request-timeout=10s logs "deployment/${deploy}" --all-containers --tail=40
+      done
+    } > "$out" 2>&1
+  )
+  _warn "[e2e] substrate deploy failed; pods, warning events and logs saved to ${out}"
+  awk '/^### warning events/{p=1;next} /^### /{p=0} p' "$out" | tail -n 15 >&2 || true
+}
+
 function _e2e_exit_trap() {
   local rc=$?
   set +e
@@ -440,6 +466,9 @@ function _e2e_exit_trap() {
   # result event talks to the hub and stays last, where its failure costs only a dashboard
   # point. Teardown removes the per-run log and kubeconfig, never the summary JSON the
   # publish reads, so the order is safe.
+  if (( rc != 0 )) && [[ "${_E2E_ACTIVE_PHASE:-}" == "deploying-substrate" ]]; then
+    _e2e_dump_substrate_diagnostics "${_E2E_ACTIVE_NAME:-}" "${_E2E_RUN_ID:-unknown}" || true
+  fi
   _e2e_teardown "${_E2E_ACTIVE_NAME:-}" || true
   [[ -n "$publish_run_id" ]] && { _e2e_write_result_event "$publish_run_id" || true; }
   trap - EXIT
