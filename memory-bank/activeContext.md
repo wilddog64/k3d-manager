@@ -1,5 +1,7 @@
 # 2026-10-01 — /ask + /ask-docs threaded answers, /ask-docs --sources
 
+> **2026-10-01 SLACK DOWN (Claude-caused):** `deploy-worker.yml` run 36958122506 pushed stale GH `SLACK_SIGNING_SECRET` (2026-06-23) to the relay. Operator must `gh secret set SLACK_SIGNING_SECRET` (first attempt was typo `SLACK_SIGING_SECRET` — delete it), then Claude reruns the workflow. `make gh-secret` tooling dispatched to Codex.
+
 `61d6d3fb` on `k3d-manager-v1.40.0` (Codex, verified by Claude; Claude added Slack escaping of the header). In `SLACK_CHANNEL_ID` with a bot token, the job posts a redacted header and replies in its thread; anywhere else, or if a bot post fails, it uses response_url as before. `--sources`/`-s` returns scored matches with no model call. pytest 542 passed / 1 skipped, relay 33/33. OPERATOR, pending: `make restart-webhook`, redeploy the relay from the release branch, make sure the bot is in the channel.
 
 # 2026-10-01 — Hub readable Overview ConfigMap had two owners
