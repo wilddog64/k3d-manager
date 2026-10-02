@@ -31,6 +31,8 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
 # shellcheck source=scripts/lib/cloudflared_keychain.sh
 source "${REPO_ROOT}/scripts/lib/cloudflared_keychain.sh"
+# shellcheck source=scripts/lib/cloudflared_render.sh
+source "${REPO_ROOT}/scripts/lib/cloudflared_render.sh"
 if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
   export DRY_RUN=1
 fi

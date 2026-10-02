@@ -30,25 +30,8 @@ if [[ -r "$SIGNING_PLUGIN" ]]; then
   # shellcheck disable=SC1090
   source "$SIGNING_PLUGIN"
 fi
-
-function _hub_recovery_render_cloudflared_config() {
-  local provider="$1" in_file="$2" table="$3"
-  awk -v provider="$provider" -v table="$table" '
-    BEGIN {
-      while ((getline line < table) > 0) {
-        if (line ~ /^#/ || line == "") continue
-        split(line, f, "\\t")
-        if (f[2] == provider) origin[f[1]] = f[3]
-      }
-    }
-    /^[[:space:]]*-[[:space:]]*hostname:/ { host = $NF; print; next }
-    /^[[:space:]]*service:/ {
-      if (host != "" && (host in origin)) sub(/service:.*/, "service: " origin[host])
-      host = ""; print; next
-    }
-    { print }
-  ' "$in_file"
-}
+# shellcheck source=scripts/lib/cloudflared_render.sh
+source "$SCRIPT_DIR/lib/cloudflared_render.sh"
 
 function _hub_recovery_frontend_origin_provider() {
   local hub_context="$1" app_context="$2"

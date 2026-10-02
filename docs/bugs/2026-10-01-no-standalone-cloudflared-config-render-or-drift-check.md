@@ -5,7 +5,7 @@
 **Severity:** low. The live `~/.cloudflared/config.yml` drifted to the hub origin and the public
 frontend returned 404 for weeks. Nothing reported the drift, and the only way to regenerate the
 file was a full `bin/cluster-up` or `hub_recovery_reconcile`.
-**Status:** OPEN
+**Status:** FIXED
 **Related:** `2026-10-01-hub-recovery-points-public-frontend-at-hub.md`
 
 ## Background
@@ -86,3 +86,10 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
   the new bats file, B's files if done, the guide, `CHANGELOG.md`, and this doc (Resolution
   section, Status FIXED).
 - No live cluster calls, no kickstart, and never read the tunnel credentials JSON or `cert.pem`.
+
+## Resolution
+
+Added `make cloudflared-config` with a `k3s-hostinger` default, provider validation, read-only
+drift reporting, opt-in backup and installation, and an explicit launchd kickstart hint. The
+shared renderer is sourced by both hub recovery and `bin/cluster-up`; the existing renderer body
+is unchanged. Added offline BATS coverage, operator documentation, and a changelog entry.

@@ -48,6 +48,8 @@
 
 ### Added
 
+- `make cloudflared-config` renders, checks, and optionally installs the repo-managed tunnel config with provider-aware drift detection.
+
 - Added `make gh-secret` and `make gh-secret-sync-relay` to safely manage the allowlisted
   GitHub Actions secrets used by the Slack relay workflow.
 

@@ -23,7 +23,7 @@ ARGOCD_SCHEME ?= http
 GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -605,6 +605,33 @@ cloudflared-backup:
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" --data-binary @- >/dev/null; \
 	echo "[cloudflared-backup] Vault updated"
 
+## Render, check, or install the repo-managed Cloudflare tunnel config (APPLY=1 installs)
+cloudflared-config:
+	@set -euo pipefail; \
+	_cf_provider="$${CF_PROVIDER:-k3s-hostinger}"; \
+	_cf_config="$${CF_CONFIG:-$(HOME)/.cloudflared/config.yml}"; \
+	_cf_source="$(CURDIR)/scripts/etc/cloudflared/config.yml"; \
+	_cf_table="$(CURDIR)/scripts/etc/cloudflared/origins.tsv"; \
+	_cf_rendered=$$(mktemp "$${TMPDIR:-/tmp}/k3d-manager-cloudflared.XXXXXX"); \
+	trap 'rm -f -- "$$_cf_rendered"' EXIT; \
+	if ! awk -F '\t' -v provider="$$_cf_provider" 'NR > 1 && $$2 == provider { found=1 } END { exit found ? 0 : 1 }' "$$_cf_table"; then \
+		echo "ERROR: unknown CF_PROVIDER: $$_cf_provider" >&2; exit 2; \
+	fi; \
+	source "$(CURDIR)/scripts/lib/cloudflared_render.sh"; \
+	_hub_recovery_render_cloudflared_config "$$_cf_provider" "$$_cf_source" "$$_cf_table" > "$$_cf_rendered"; \
+	if [[ -f "$$_cf_config" ]] && cmp -s "$$_cf_rendered" "$$_cf_config"; then \
+		echo "cloudflared config up to date ($$_cf_provider)"; exit 0; \
+	fi; \
+	if [[ -f "$$_cf_config" ]]; then diff -u "$$_cf_config" "$$_cf_rendered" || true; else diff -u /dev/null "$$_cf_rendered" || true; fi; \
+	if [[ "$${APPLY:-0}" != "1" ]]; then \
+		echo "drift: rerun with APPLY=1 to install" >&2; exit 1; \
+	fi; \
+	mkdir -p "$$(dirname "$$_cf_config")"; \
+	if [[ -f "$$_cf_config" ]]; then cp "$$_cf_config" "$${_cf_config}.bak.$$(date -u +%Y%m%dT%H%M%SZ)"; fi; \
+	cp "$$_cf_rendered" "$$_cf_config"; \
+	echo "installed cloudflared config ($$_cf_provider)"; \
+	echo "hint: launchctl kickstart -k \"gui/$$(id -u)/com.k3d-manager.cloudflare-tunnel\""
+
 ## Backup k3s etcd snapshot + kubeconfig to OCI object storage (k3s-oci only)
 backup:
 	@case "$(CLUSTER_PROVIDER)" in \
@@ -1138,6 +1165,7 @@ help:
 	@echo "    make install-hub-pushgateway-port-forward Install hub Pushgateway port-forward LaunchAgent"
 	@echo "    make validate-manifests         Validate manifests and CRDs with kubeconform (installs it if missing)"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
+	@echo "    make cloudflared-config         Check or install the repo-managed Cloudflare tunnel config"
 	@echo "    make argocd-hermes-token        Re-mint the Hermes ArgoCD token into Keychain (needs a TTY; required after an ArgoCD rebuild)"
 	@echo ""
 	@echo "  Examples:"
