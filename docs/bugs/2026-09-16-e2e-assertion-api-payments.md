@@ -383,3 +383,78 @@ Implemented by Codex, verified by Claude:
 - k3d-manager: substrate `keycloak.yaml`, payment issuer/JWK env, `_e2e_provision_keycloak_secret`, Job env via
   `secretKeyRef`. `e2e.bats` + `e2e_image_prune.bats` 63/63; mutations (no keycloak rollout wait, literal
   `TEST_PASSWORD`, no secret provisioning) red.
+
+---
+
+## Fix spec — health on Tier 1: a substrate RabbitMQ broker + the `spring.rabbitmq` key path (operator decision 2026-10-02)
+
+The operator chose a real broker over relaxing the health test to the probe groups. Both defects from the 2026-09-24
+and 2026-09-29 updates must be fixed, because each alone keeps `/actuator/health` at 503.
+
+**Confirmed before fixing (2026-10-02):** `rabbitmq-client` (`com.shoppingcart:rabbitmq-client`) registers its own
+`RabbitMQClientAutoConfiguration`, `ConnectionManager` and `RabbitMQHealthIndicator`, and binds the top-level
+`rabbitmq.*` block. Spring Boot's stock `RabbitHealthIndicator` uses the separate auto-configured factory, which binds
+`spring.rabbitmq.*`. So the key-path defect is health-only, not a messaging outage, and the top-level block must stay.
+
+### A. `shopping-cart-payment`, same branch `fix/payment-jwt-keycloak-roles`
+
+1. `src/main/resources/application.yml`: add a `rabbitmq:` child **inside the existing top-level `spring:` mapping**
+   (do not create a second `spring:` key; YAML would silently keep only one):
+   ```yaml
+     rabbitmq:
+       host: ${RABBITMQ_HOST:rabbitmq.shopping-cart-data.svc.cluster.local}
+       port: ${RABBITMQ_PORT:5672}
+       virtual-host: ${RABBITMQ_VHOST:/}
+       username: ${RABBITMQ_USERNAME:guest}
+       password: ${RABBITMQ_PASSWORD:guest}
+   ```
+   Leave the top-level `rabbitmq:` block (including `vault:`) unchanged. Do **not** add
+   `management.health.rabbit.enabled=false` (rejected 2026-09-24: a false green).
+2. Test, new `src/test/java/com/shoppingcart/payment/config/RabbitPropertiesBindingTest.java`: load
+   `application.yml` with `YamlPropertySourceLoader` and assert `spring.rabbitmq.host`, `.port`, `.virtual-host`,
+   `.username`, `.password` exist with the env placeholders above, and that top-level `rabbitmq.host` and
+   `rabbitmq.vault.enabled` still exist. Mutation: delete the `spring.rabbitmq` block → red.
+3. Gate: the branch CI (`ci.yaml` runs on `fix/**`). The local build cannot resolve the private `rabbitmq-client`
+   package; do not try to fix that.
+
+### B. `k3d-manager` — the broker
+
+1. New `scripts/etc/e2e/rabbitmq.yaml`: Deployment and Service `rabbitmq` (port 5672, name `amqp`), labels as the
+   other substrate files, `app.kubernetes.io/component: datastore`.
+   - Image `rabbitmq:3.12-alpine`: the same 3.12 line as production (`shopping-cart-infra` pins
+     `rabbitmq:3.12-management-alpine`); the management plugin is not needed here.
+   - Env `RABBITMQ_DEFAULT_USER=e2e`; `RABBITMQ_DEFAULT_PASS` via `secretKeyRef` on `e2e-datastore-credentials`, key
+     `rabbitmq-password`.
+   - Readiness: exec `rabbitmq-diagnostics -q ping`, `initialDelaySeconds 10`, `periodSeconds 5`,
+     `timeoutSeconds 5`, `failureThreshold 24`. Requests `100m / 256Mi`, limits `500m / 512Mi`.
+2. `scripts/etc/e2e/kustomization.yaml`: add `rabbitmq.yaml` to `resources` after `redis.yaml`.
+3. `scripts/etc/e2e/payment.yaml` env: `RABBITMQ_HOST=rabbitmq`, `RABBITMQ_PORT=5672`, `RABBITMQ_USERNAME=e2e`,
+   `RABBITMQ_PASSWORD` via `secretKeyRef` (`e2e-datastore-credentials` / `rabbitmq-password`). Keep
+   `RABBITMQ_VAULT_ENABLED=false`.
+4. `scripts/plugins/e2e.sh`:
+   - `_e2e_provision_datastore_secret`: add `rabbitmq-password` from `E2E_RABBITMQ_PASSWORD` or the same `od`
+     generator.
+   - `_e2e_deploy_substrate`: rollout loop becomes `postgres redis rabbitmq product-catalog basket order keycloak
+     payment`.
+5. Tests (`scripts/tests/plugins/e2e.bats`, `e2e_image_prune.bats`; stubbed):
+   - the datastore secret call carries a `rabbitmq-password` literal and no other new key;
+   - `rabbitmq` is waited for before `payment`;
+   - `kubectl kustomize scripts/etc/e2e` renders a `rabbitmq` Deployment, and payment's `RABBITMQ_PASSWORD` is a
+     `secretKeyRef`, never a literal `value`;
+   - `e2e_prune_images` lists `rabbitmq:3.12-alpine`.
+   - Mutations, `cp`-restored and `cmp`-proved: drop `rabbitmq` from the rollout loop → red; drop the
+     `rabbitmq-password` literal → red.
+6. Gates: `bats scripts/tests/plugins/e2e.bats scripts/tests/plugins/e2e_image_prune.bats` green;
+   `shellcheck scripts/plugins/e2e.sh` clean.
+
+### Rules
+
+- No cluster, network, or git commits; leave every change uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
+- Do not modify files outside those named above.
+
+### Rollout
+
+Same as option (b): the payment PR merges → bump the substrate payment pin → `e2e_verify_vcluster`. Expected: all nine
+`api/payments.spec.ts` tests pass. If `/actuator/health` is still `DOWN`, read its `components` in the payment pod (no
+auth needed for `/actuator/**`) before changing anything: another indicator (for example the client's
+`VaultHealthIndicator`) may be next in line.
