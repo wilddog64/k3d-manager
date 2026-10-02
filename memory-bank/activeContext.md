@@ -1,4 +1,4 @@
-# 2026-10-01 — cloud-bridge test targets + diagnose actions implemented (Claude)
+# 2026-10-01 — cloud-bridge test targets + diagnose actions implemented (Claude, `0c697005`)
 
 `v1.40.0-cloud-bridge-test-targets.md` done. Bridge actions added: make-test, -test-bin, -test-python, -test-all
 (reader, timeouts 1200/300/900/1800) and six `diagnose-*` (fixed webhook action server-side). All `test*` recipes run
@@ -27,7 +27,7 @@ Risk noted, not fixed: search() retries embeddings up to 6x with backoff, so a 4
 `make test` was red on the branch: 7 bare `! cmd` BATS assertions added this release; CI never runs on release-branch
 pushes. Recurrence appended to `docs/bugs/2026-09-14-bats-bare-negation-assertions-never-fail.md`.
 
-# 2026-10-01 — cloud-request artifacts implemented (Claude)
+# 2026-10-01 — cloud-request artifacts implemented (Claude, `5d915bea`)
 
 `v1.40.0-cloud-request-artifacts.md` done: first terminal `job-status` response carries `artifacts`
 (`summary.json` + scrubbed `junit.xml`), same commit, pruned to `K3DM_CLOUD_ARTIFACT_KEEP`. Gates:
