@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** low. Two alerts that can never clear (firing since 2026-09-27T18:46Z, the hub rebuild) teach the
 operator to ignore `KubeHpaMaxedOut`, and they keep the Overview's Firing Alerts panel red.
-**Status:** OPEN
+**Status:** FIXED (pending rollout)
 
 ## Evidence (hub `k3d-k3d-cluster`, 2026-10-02)
 
@@ -61,6 +61,10 @@ Mutations, each red, then `cp`-restored and `cmp`-proved: (a) put an `hpaSpec` b
 - `bats scripts/tests/lib/istio_operator_template.bats` is green; the rendered YAML parses with `yq`.
 - No cluster, network or git commits. Leave the changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
 - Update this doc: Status FIXED (pending rollout), plus a short Resolution section.
+
+## Resolution
+
+The single-node hub now runs `istiod` and `istio-ingressgateway` with one replica and no HPA. Istio autoscaling is disabled for both components, preventing the permanently maxed-out HPA alerts while preserving the existing resources, service type, and profile.
 
 ## Rollout (operator)
 
