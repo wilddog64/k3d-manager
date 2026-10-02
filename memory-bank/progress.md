@@ -25,7 +25,7 @@
 - [x] OPERATOR: relay redeployed (10ebc8a6) + webhook restarted 2026-10-02; `/ask-docs` + `/cluster-status` threading confirmed in Slack.
 - [x] (done 2026-10-02 via AppSet reapply; all hub apps Synced) OPERATOR: check the CM tracking-id (must name `hub-grafana-dashboards`), then reapply the ACG dashboard appset; confirm `k3d-cluster-grafana-dashboards` Synced, no SharedResourceWarning.
 - [ ] `/ask-docs` operator steps: `wrangler deploy` relay, Slack manifest `/ask-docs`, `make restart-webhook`, live smoke; then Claude calibrates `K3DM_ASK_DOCS_MIN_SCORE` and replaces the PLACEHOLDER fixture.
-- [x] Hub alert fixes 2026-10-02 (Codex, verified): ldap rotator `96af55b1`, Istio no-HPA `119f8a7b`, ArgoCD orphanedResources `efaf4038`, federate raw-only `8b792fcc`. Operator rollouts pending (each bug doc's Rollout). E2EVerificationFailing: option (b) spec `090d237d` with Codex (3 repos). v1.43.0 Hermes alert-driven triage scoped `e7beaa73`, awaiting §8 decisions.
+- [x] Hub alert fixes 2026-10-02 (Codex, verified): ldap rotator `96af55b1`, Istio no-HPA `119f8a7b`, ArgoCD orphanedResources `efaf4038`, federate raw-only `8b792fcc`. Operator rollouts pending (each bug doc's Rollout). E2EVerificationFailing: option (b) spec `090d237d` with Codex (3 repos). Hermes alert-driven triage decided: v1.42.0 (scope + 3 specs, at cap), R10 → v1.43.0.
 - [x] Codex bug batch: bridge restart `52efebde`, data_layer cause `baedfdc5`, CFN orphan warning `82ba559b` on `k3d-manager-v1.40.0` (2026-10-01; make test 1223/1223, pytest 523). R1 regression + stale-marker false warning caught and fixed by Claude.
 
 # 2026-10-01 — v1.40.0 review fix spec (Codex)

@@ -114,13 +114,13 @@ status. Accurate duration and resumable run state are part of the foundation.
 Scope: [`v1.42.0-daily-offline-and-e2e-verification.md`](plans/v1.42.0-daily-offline-and-e2e-verification.md).
 Tier 2 ACG/Stripe remains opt-in and is not made an unattended daily job.
 
-### Candidate milestone — v1.43.0: Hermes alert-driven triage
-
-Hermes reads firing alerts from Alertmanager (read-only, through the apiserver proxy), runs a per-alert read-only
+Also in v1.42.0 — **Hermes alert-driven triage.** Hermes reads firing alerts from Alertmanager (read-only, through the apiserver proxy), runs a per-alert read-only
 evidence recipe, links prior art, posts one Slack thread per alert, and either proposes an allowlisted repair through
-the existing approval path or drafts a bug doc in its own worktree. No automatic code changes, PRs or silences.
+the existing approval path or drafts a bug doc in its own worktree. `critical` alerts get a Slack thread; `warning`
+and `info` go into a daily digest. No automatic code changes, PRs or silences. v1.42.0 is then at its five-plan cap;
+the R10 repair (delete a failed Job superseded by a newer CronJob spec) overflows to **v1.43.0**.
 
-Scope: [`v1.43.0-hermes-alert-driven-triage.md`](plans/v1.43.0-hermes-alert-driven-triage.md).
+Scope: [`v1.42.0-hermes-alert-driven-triage.md`](plans/v1.42.0-hermes-alert-driven-triage.md).
 
 ## Forward themes (unversioned until scoped)
 
@@ -149,7 +149,7 @@ milestone only when it gets a scope doc.
 - **Hermes Phase 2 / Phase 3 (event-driven operations automation)** — **Phase 1 shipped as v1.29.0**
   (read-only health/CI monitoring, bounded polling, Slack summaries — the current milestone above).
   Phase 2's allowlisted, approval-gated repairs have shipped incrementally (R1–R9 in
-  `scripts/lib/hermes/repairs.py`, Slack approval in v1.33.0); alert-driven triage is scoped as v1.43.0 above.
+  `scripts/lib/hermes/repairs.py`, Slack approval in v1.33.0); alert-driven triage is scoped into v1.42.0 above, R10 into v1.43.0.
   Phase 3 adds cooldowns, daily token/iteration budgets, audit records, and post-repair
   verification. Hermes does not replace the k3d-manager webhook or receive unrestricted cluster,
   cloud, Git, or branch-protection credentials. Each phase needs its own scope doc before a release
