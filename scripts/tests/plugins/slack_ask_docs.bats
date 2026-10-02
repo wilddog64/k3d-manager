@@ -12,7 +12,7 @@ POLICY="${BATS_TEST_DIRNAME}/../../..//scripts/lib/webhook/policy.py"
 }
 
 @test "ask-docs relay validates text and sends its own endpoint" {
-  run grep -F -- "Usage: /ask-docs <question>" "${WORKER}"
+  run grep -F -- "Usage: /ask-docs [--sources] <question>" "${WORKER}"
   [ "${status}" -eq 0 ]
   run grep -F -- "relay('/api/v1/ask-docs', payload, meta)" "${WORKER}"
   [ "${status}" -eq 0 ]

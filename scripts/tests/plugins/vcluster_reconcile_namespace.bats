@@ -44,7 +44,8 @@ _vcluster_test_run_command() {
   _vcluster_reconcile_namespace keep-me
 
   [ "$(grep -c '^vcluster delete orphan-a -n vclusters --wait$' "$VCLUSTER_CALLS")" -eq 1 ]
-  ! grep -q 'keep-me' "$VCLUSTER_CALLS"
+  run grep -q 'keep-me' "$VCLUSTER_CALLS"
+  [ "$status" -ne 0 ]
 }
 
 @test "reconcile: empty JSON list does not delete" {

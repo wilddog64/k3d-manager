@@ -52,7 +52,8 @@ setup() {
   preflight_line="$(grep -nF 'vault status -address=' "$ROTATE" | cut -d: -f1)"
   [ "$preflight_line" -gt "$main_line" ]
   [ "$preflight_line" -lt "$loop_line" ]
-  ! sed -n "${preflight_line}p" "$ROTATE" | grep -Fq 'VAULT_TOKEN'
+  run grep -Fq 'VAULT_TOKEN' <<<"$(sed -n "${preflight_line}p" "$ROTATE")"
+  [ "$status" -ne 0 ]
 }
 
 @test "password rotator deploy derives the Vault address from VAULT_NS" {
@@ -74,5 +75,6 @@ setup() {
   ' bash "$plugin"
 
   [ "$(<"$capture")" = 'http://vault.secrets.svc:8200' ]
-  ! grep -Fq 'vault.vault.svc' "${REPO_ROOT}/plugins/ldap.sh"
+  run grep -Fq 'vault.vault.svc' "${REPO_ROOT}/plugins/ldap.sh"
+  [ "$status" -ne 0 ]
 }

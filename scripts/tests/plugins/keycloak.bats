@@ -204,8 +204,10 @@ setup_smoke_stubs() {
   run keycloak_seed_smoke_user
   [ "$status" -eq 0 ]
   [ "$(cat "$BATS_TEST_TMPDIR/selected-password")" = "vault-password" ]
-  ! grep -q 'generated-password' "$SMOKE_KUBECTL_LOG" || false
-  ! grep -q 'ARGV.*vault-password' "$SMOKE_KUBECTL_LOG" || false
+  run grep -q 'generated-password' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
+  run grep -q 'ARGV.*vault-password' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "smoke seed reuses legacy password and writes all Vault fields" {
@@ -233,15 +235,18 @@ setup_smoke_stubs() {
   [ "$status" -eq 0 ]
   run keycloak_provision_shopping_cart_realm
   [ "$status" -eq 0 ]
-  ! grep -q 'create secret generic k3dm-smoke-user' "$SMOKE_KUBECTL_LOG" || false
+  run grep -q 'create secret generic k3dm-smoke-user' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "smoke Vault hygiene keeps token and password out of kubectl argv" {
   setup_smoke_stubs secret-password
   run keycloak_seed_smoke_user
   [ "$status" -eq 0 ]
-  ! grep -q 'ARGV.*root-token' "$SMOKE_KUBECTL_LOG" || false
-  ! grep -q 'ARGV.*secret-password' "$SMOKE_KUBECTL_LOG" || false
+  run grep -q 'ARGV.*root-token' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
+  run grep -q 'ARGV.*secret-password' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
   grep -q 'STDIN.*root-token' "$SMOKE_KUBECTL_LOG"
   grep -q '"password": "secret-password"' "$SMOKE_KUBECTL_LOG"
 }
@@ -264,5 +269,6 @@ setup_smoke_stubs() {
   setup_smoke_stubs '' '' '{"metadata":{"ownerReferences":[{"kind":"ExternalSecret"}]}}'
   run _keycloak_smoke_remove_unowned_secret identity k3dm-smoke-user
   [ "$status" -eq 0 ]
-  ! grep -q 'delete secret k3dm-smoke-user' "$SMOKE_KUBECTL_LOG" || false
+  run grep -q 'delete secret k3dm-smoke-user' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
 }
