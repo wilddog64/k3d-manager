@@ -296,6 +296,18 @@ For manual redeploy (e.g. after token rotation):
 gh workflow run deploy-worker.yml
 ```
 
+### GitHub secrets for the relay workflow
+
+Use `make gh-secret` to list the GitHub Actions secret names referenced by the workflows, or
+set one interactively with `make gh-secret NAME=SLACK_SIGNING_SECRET`. Use
+`make gh-secret-sync-relay` to copy `k3dm-webhook-token` and `k3dm-slack-signing-secret` from
+the macOS Keychain into the corresponding GitHub secrets without putting either value in a
+command-line argument.
+
+`deploy-worker.yml` overwrites the relay's `WEBHOOK_TOKEN` and `SLACK_SIGNING_SECRET` with the
+GitHub copies on deployment. If every slash command reports “app did not respond” immediately
+after a relay deploy, the signing secret likely does not match.
+
 ### View webhook logs
 
 ```bash

@@ -36,6 +36,9 @@
 
 ### Added
 
+- Added `make gh-secret` and `make gh-secret-sync-relay` to safely manage the allowlisted
+  GitHub Actions secrets used by the Slack relay workflow.
+
 - `/ask-docs --sources` returns matching document scores and paths without calling the summary model.
 
 - Added reader-only Slack `/ask-docs <question>`, which searches bounded, redacted documentation

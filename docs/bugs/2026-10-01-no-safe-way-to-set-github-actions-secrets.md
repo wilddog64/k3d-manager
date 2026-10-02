@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** medium. A typo or stale GitHub secret silently breaks the Slack relay on the next
 `deploy-worker.yml` run, and every slash command fails with "the app did not respond".
-**Status:** OPEN
+**Status:** FIXED
 
 ## Observed (2026-10-01)
 
@@ -84,6 +84,18 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 (a) skip the allowlist check → typo test red;
 (b) pass the value with `--body` in the sync → argv test red;
 (c) drop the empty-item guard → partial-set test red.
+
+## Resolution
+
+Implemented `make gh-secret` with a workflow-derived allowlist and unused-secret warnings,
+plus `make gh-secret-sync-relay`, which validates both Keychain values before piping them to
+`gh secret set`. Added offline BATS coverage for typo rejection, interactive secret setting,
+allowlist derivation, stdin-only sync, and empty-item atomicity. Documentation and the
+Unreleased changelog now describe the relay secret workflow.
+
+Claude review fix: piped `gh secret list` prints no header, so Codex's `tail -n +2` silently dropped
+the first secret from the unused-name check. Removed it; the stub now emits real tab-separated,
+headerless output with a typo name that sorts first (mutation: restore `tail -n +2` → test 1 red).
 
 ## Rules
 

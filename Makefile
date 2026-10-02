@@ -20,8 +20,10 @@ INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 ARGOCD_SERVER ?= localhost:8080
 ARGOCD_SCHEME ?= http
+GH_REPO          ?= wilddog64/k3d-manager
+GH_WORKFLOWS_DIR ?= .github/workflows
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -544,6 +546,48 @@ deploy-worker:
 	  -H "X-Slack-Signature: $$_sig" \
 	  --data "$$_body" 2>/dev/null || true) && \
 	[ "$$_code" = "200" ]
+
+## List or safely set an allowlisted GitHub Actions secret (NAME=<workflow secret>)
+gh-secret:
+	@set -euo pipefail; \
+	 _allowed="$$(grep -rhoE 'secrets\.[A-Z0-9_]+' "$(GH_WORKFLOWS_DIR)" --include='*.yml' --include='*.yaml' 2>/dev/null | cut -d. -f2 | grep -v '^GITHUB_TOKEN$$' | sort -u || true)"; \
+	 _secrets="$$(gh secret list --repo "$(GH_REPO)")"; \
+	 _print_allowed() { \
+	   echo 'Allowed names:'; \
+	   while IFS= read -r _name; do \
+	     [ -n "$$_name" ] || continue; \
+	     _date="$$(printf '%s\n' "$$_secrets" | awk -v name="$$_name" '$$1 == name { print $$2; exit }')"; \
+	     [ -n "$$_date" ] || _date='(not set)'; \
+	     printf '%s %s\n' "$$_name" "$$_date"; \
+	   done <<< "$$_allowed"; \
+	 }; \
+	 if [ -z "$(NAME)" ]; then \
+	   _print_allowed; \
+	   while IFS= read -r _row; do \
+	     _name="$${_row%%[[:space:]]*}"; \
+	     [ -n "$$_name" ] || continue; \
+	     if ! grep -Fxq "$$_name" <<< "$$_allowed"; then printf '%s unused (typo?)\n' "$$_name"; fi; \
+	   done <<< "$$_secrets"; \
+	   exit 0; \
+	 fi; \
+	 if ! grep -Fxq "$(NAME)" <<< "$$_allowed"; then \
+	   echo "ERROR: secret '$(NAME)' is not referenced by a workflow." >&2; \
+	   _print_allowed; \
+	   exit 1; \
+	 fi; \
+	 gh secret set "$(NAME)" --repo "$(GH_REPO)"; \
+	 _date="$$(gh secret list --repo "$(GH_REPO)" | awk -v name="$(NAME)" '$$1 == name { print $$2; exit }')"; \
+	 printf '%s %s\n' "$(NAME)" "$${_date:-unknown}"
+
+## Sync the relay's Keychain secrets to GitHub Actions without exposing values
+gh-secret-sync-relay:
+	@set -euo pipefail; \
+	 _tok="$$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null || true)"; \
+	 _sig="$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null || true)"; \
+	 [ -n "$$_tok" ] || { echo "ERROR: k3dm-webhook-token missing from Keychain — run bin/k3dm-webhook-setup" >&2; exit 1; }; \
+	 [ -n "$$_sig" ] || { echo "ERROR: k3dm-slack-signing-secret missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
+	 printf '%s' "$$_tok" | gh secret set K3DM_WEBHOOK_TOKEN --repo "$(GH_REPO)"; \
+	 printf '%s' "$$_sig" | gh secret set SLACK_SIGNING_SECRET --repo "$(GH_REPO)"
 
 ## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
 cloudflared-backup:
