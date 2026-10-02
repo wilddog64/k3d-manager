@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-10-02
+
 ### Fixed
 
 - Grafana Overview — Readable: Firing Alerts now reads `grafana_alerting_alerts` (the old
