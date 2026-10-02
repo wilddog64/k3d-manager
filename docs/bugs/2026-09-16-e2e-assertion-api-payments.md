@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-16 by k3dm-hermes
-**Status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Operator chose (b), a real Keycloak token (2026-10-02); fix spec below, dispatched to Codex.
+**Status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Operator chose (b), a real Keycloak token (2026-10-02); option (b) IMPLEMENTED on feature branches (payment `d2f2d55`, e2e-tests `df6b9c1`, k3d-manager substrate), pending PRs, image pins and a live Tier 1 run. Health test still open.
 **Run:** `1789549631-2079`, runner `m2`, tier `vcluster`, 24 passed / 33 failed / 102 total
 **Runner commit:** `ec4874fe62cab1ba120729dc5d48454f7d50dcc7`
 
@@ -369,3 +369,17 @@ Option (a) would have hidden this; (b) exposes it.
 `KEYCLOAK_CLIENT_*` / `TEST_*`, so the defaults (`e2e-tests` / `e2e-user`) are used against the production realm.
 `getAuthToken` then returns `null` and the orchestrator falls back to `X-User-ID`. Not fixed here; triage
 separately.
+
+### Resolution — option (b) implementation (2026-10-02)
+
+Implemented by Codex, verified by Claude:
+
+- `shopping-cart-payment` `fix/payment-jwt-keycloak-roles` `d2f2d55`: `KeycloakGrantedAuthoritiesConverter`, wired in
+  `SecurityConfig`; converter tests and two controller cases through the converter. **Not run locally:** the private
+  `rabbitmq-client` 1.0.2 package needs GitHub Packages auth that this laptop's `~/.m2` lacks, and `/usr/bin/java`
+  is the macOS stub (use `openjdk@21`). The branch CI (`ci.yaml`, `fix/**`) is the gate.
+- `shopping-cart-e2e-tests` `fix/payment-client-v1-bearer` `df6b9c1`: v1 paths, `mintToken`, honest `responseData`.
+  `tsc --noEmit` reports the same 11 errors as `origin/main` (pre-existing, other specs); none are new.
+- k3d-manager: substrate `keycloak.yaml`, payment issuer/JWK env, `_e2e_provision_keycloak_secret`, Job env via
+  `secretKeyRef`. `e2e.bats` + `e2e_image_prune.bats` 63/63; mutations (no keycloak rollout wait, literal
+  `TEST_PASSWORD`, no secret provisioning) red.

@@ -368,6 +368,17 @@ EOF
   [[ "$output" == *"name: ghcr-pull-secret"* ]]
 }
 
+@test "vcluster Job manifest wires the five Keycloak settings without a password literal" {
+  run _e2e_job_manifest "e2e-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  for name in KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID TEST_USERNAME KEYCLOAK_CLIENT_SECRET TEST_PASSWORD; do
+    [[ "$output" == *"name: ${name}"* ]]
+  done
+  [[ "$output" == *"name: e2e-keycloak-credentials"*"key: client-secret"* ]]
+  [[ "$output" == *"name: e2e-keycloak-credentials"*"key: user-password"* ]]
+  [[ "$output" != *"s3cr3t"* ]]
+}
+
 @test "payment is pinned in the E2E substrate kustomization" {
   local kustomization="${BATS_TEST_DIRNAME}/../../etc/e2e/kustomization.yaml"
   run awk '$1 == "-" && $2 == "payment.yaml" { found=1 } END { exit (found ? 0 : 1) }' "$kustomization"
@@ -401,6 +412,40 @@ EOF
   [ "$status" -eq 0 ]
   run awk '/rollout status deployment\/payment/ { found=1 } END { exit (found ? 0 : 1) }' "$RUN_LOG"
   [ "$status" -eq 0 ]
+}
+
+@test "substrate provisions Keycloak before apply and waits before payment" {
+  run _e2e_deploy_substrate "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  local secret_line apply_line keycloak_line payment_line
+  secret_line="$(grep -nF -- "create secret generic e2e-keycloak-credentials" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  apply_line="$(grep -nF -- "apply -k" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  keycloak_line="$(grep -nF -- "rollout status deployment/keycloak" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  payment_line="$(grep -nF -- "rollout status deployment/payment" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  [ "$secret_line" -lt "$apply_line" ]
+  [ "$keycloak_line" -lt "$payment_line" ]
+}
+
+@test "Keycloak secret value only appears in the create-secret argv" {
+  export E2E_KC_USER_PASSWORD=s3cr3t-sentinel
+  run _e2e_provision_keycloak_secret "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  run awk '/s3cr3t-sentinel/ && $0 !~ /create secret generic e2e-keycloak-credentials/ { found=1 } END { exit found ? 1 : 0 }' "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F -- "create secret generic e2e-keycloak-credentials" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--from-literal=user-password=s3cr3t-sentinel"* ]]
+}
+
+@test "Keycloak substrate renders and its realm JSON parses" {
+  command -v kubectl >/dev/null 2>&1 || skip "kubectl not installed"
+  local rendered="$BATS_TEST_TMPDIR/e2e-rendered.yaml"
+  run env kubectl kustomize "${BATS_TEST_DIRNAME}/../../etc/e2e"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" > "$rendered"
+  grep -F -- "kind: Deployment" "$rendered"
+  grep -F -- "name: keycloak" "$rendered"
+  awk '/shopping-cart-realm.json: \|/{capture=1; next} capture && /^kind: /{capture=0} capture{sub(/^    /, ""); print}' "$rendered" | jq empty
 }
 
 @test "payment substrate renders offline" {

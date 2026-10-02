@@ -518,6 +518,7 @@ function _e2e_deploy_substrate() {
   [[ -z "$kubeconfig" ]] && _err "e2e: _e2e_deploy_substrate requires a kubeconfig"
 
   _e2e_provision_pull_secret "$kubeconfig"
+  _e2e_provision_keycloak_secret "$kubeconfig"
 
   _info "[e2e] Applying substrate bundle (scripts/etc/e2e) into ${E2E_NAMESPACE}"
   _e2e_kc "$kubeconfig" apply -k "${SCRIPT_DIR}/etc/e2e"
@@ -529,7 +530,7 @@ function _e2e_deploy_substrate() {
   fi
 
   local rollout
-  for rollout in postgres redis product-catalog basket order payment; do
+  for rollout in postgres redis product-catalog basket order keycloak payment; do
     _info "[e2e] Waiting for rollout: ${rollout}"
     _e2e_kc "$kubeconfig" -n "$E2E_NAMESPACE" rollout status \
       "deployment/${rollout}" --timeout="${E2E_ROLLOUT_TIMEOUT}s"
@@ -570,6 +571,16 @@ function _e2e_provision_datastore_secret() {
     --from-literal=postgres-password="${postgres_password}" \
     --from-literal=redis-password="${redis_password}" \
     --from-literal=payment-encryption-key="${payment_encryption_key}" \
+    -n "$E2E_NAMESPACE" --dry-run=client -o yaml | _e2e_kc "$kubeconfig" apply -f -
+}
+
+function _e2e_provision_keycloak_secret() {
+  local kubeconfig="${1:-}" client_secret user_password
+  client_secret="${E2E_KC_CLIENT_SECRET:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  user_password="${E2E_KC_USER_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  _e2e_kc "$kubeconfig" create secret generic e2e-keycloak-credentials \
+    --from-literal=client-secret="${client_secret}" \
+    --from-literal=user-password="${user_password}" \
     -n "$E2E_NAMESPACE" --dry-run=client -o yaml | _e2e_kc "$kubeconfig" apply -f -
 }
 
@@ -617,6 +628,24 @@ spec:
           value: http://payment.${E2E_NAMESPACE}.svc:8084
         - name: OAUTH2_ENABLED
           value: "false"
+        - name: KEYCLOAK_URL
+          value: http://keycloak:8080
+        - name: KEYCLOAK_REALM
+          value: shopping-cart
+        - name: KEYCLOAK_CLIENT_ID
+          value: e2e-tests
+        - name: TEST_USERNAME
+          value: e2e-user
+        - name: KEYCLOAK_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: e2e-keycloak-credentials
+              key: client-secret
+        - name: TEST_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: e2e-keycloak-credentials
+              key: user-password
         - name: CI
           value: "true"
 EOF

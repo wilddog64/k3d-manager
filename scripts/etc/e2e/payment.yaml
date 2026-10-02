@@ -57,6 +57,10 @@ spec:
           value: "false"
         - name: OAUTH2_ENABLED
           value: "false"
+        - name: OAUTH2_ISSUER_URI
+          value: http://keycloak:8080/realms/shopping-cart
+        - name: OAUTH2_JWK_SET_URI
+          value: http://keycloak:8080/realms/shopping-cart/protocol/openid-connect/certs
         - name: RABBITMQ_VAULT_ENABLED
           value: "false"
         - name: PAYMENT_GATEWAY_DEFAULT
