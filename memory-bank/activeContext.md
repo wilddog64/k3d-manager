@@ -1,3 +1,14 @@
+# 2026-10-01 — slack-corpus-qa (`/ask-docs`) dispatched to Codex
+
+Worktree `../k3d-manager-codex-askdocs`, branch `codex-v1.40.0-slack-corpus-qa` from `k3d-manager-v1.40.0`.
+Spec corrected against the live tree in the handoff: there is no `/api/v1/analyze` handler (policy entry only) —
+the pattern is the `/api/v1/ask` route + async job; the model path is `_call_gemini` (AI CLI chain, "answer only
+from the text") — no Anthropic API client exists, so no Haiku and no new credential. No similarity floor exists:
+Codex adds `K3DM_ASK_DOCS_MIN_SCORE` (provisional), Claude calibrates live. Codex cannot commit in a worktree
+sandbox; told not to try — Claude verifies and commits. Then: live relay deploy + manifest, release steps
+(retro table, AppSet reapply hub+ACG, `argocd_check_values_branch`), remove both Codex worktrees.
+Closed a stale progress checkbox: the Vault embeddings credential was written 2026-09-30.
+
 # 2026-10-01 — open-bug batch dispatched to Codex
 
 Branch `codex-v1.40.0-bugs`, worktree `../k3d-manager-codex-bugs` (from 86ef9c93). Three bugs:

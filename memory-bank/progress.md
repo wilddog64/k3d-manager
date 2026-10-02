@@ -10,6 +10,7 @@
 - [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
 - [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
 - [x] README architecture diagram redrawn for v1.40.0 (Claude, docs only).
+- [ ] `v1.40.0-slack-corpus-qa` (`/ask-docs`) dispatched to Codex 2026-10-01 — branch `codex-v1.40.0-slack-corpus-qa`, worktree `../k3d-manager-codex-askdocs`.
 - [x] Codex bug batch: bridge restart `52efebde`, data_layer cause `baedfdc5`, CFN orphan warning `82ba559b` on `k3d-manager-v1.40.0` (2026-10-01; make test 1223/1223, pytest 523). R1 regression + stale-marker false warning caught and fixed by Claude.
 - [ ] `v1.40.0-slack-corpus-qa.md` — UNBLOCKED 2026-10-01 (live recall@5 measured); dispatch to Codex.
 
@@ -71,7 +72,7 @@
 
 - [x] Implemented tracked-ref corpus reads, fingerprinting, Hermes refresh, quota pause, ingestion
   gauges, alerts, dashboard row and offline tests. Final commit SHA is reported in the completion handoff.
-- [ ] Operator: write the durable Vault embeddings credential before live ingestion can succeed.
+- [x] Operator: write the durable Vault embeddings credential — done 2026-09-30 (`secret/embeddings/gemini` v1; see below).
 
 # 2026-09-30 — vector store freshness
 
