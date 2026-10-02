@@ -1,7 +1,7 @@
 # Bug: "Grafana Health & Firing Alerts" has no tags and no fixed uid
 
 **Filed:** 2026-10-02
-**Status:** OPEN — dispatched to Codex 2026-10-02
+**Status:** FIXED `86f21788` (Codex, Claude-verified: 32/32 grafana_dashboard_appsets bats, hub-copy uid-removal mutation red, both copies uid+tags); LIVE 2026-10-02 (hub-grafana-dashboards auto-synced 86f21788, ConfigMap carries uid k3dm-grafana-health)
 **Branch:** `k3d-manager-v1.41.0`
 **Found by:** operator, 2026-10-02. After the retitle went live, the dashboard showed no tag chips in the Dashboards list; the other k3dm dashboards do have them.
 **Related:** `docs/bugs/2026-10-02-grafana-overview-readable-title-collides-with-stock-dashboard.md`
