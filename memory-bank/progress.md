@@ -1,5 +1,7 @@
 # 2026-10-01 — v1.40.0 spec handoff
 
+- [x] vcluster.bats orphan seed still a table (stale since 5706eb21) — FIXED `bd88be39` (Codex edit, Claude commit — Codex hit .git lock): 30/30 + reconcile 4/4, `.Name`→`.name` mutation reds the 4 orphan tests, restored.
+- [x] Live e2e run `1790962990-9267` (commit cb8373ef, 2026-10-02): first run to reach Playwright — keycloak + payment rolled out (realm fix fef39649 works live). 49 passed / 8 failed / 102; all 8 = `api/payments.spec.ts` empty-body 401s, the known option-(b) set in `docs/bugs/2026-09-16-e2e-assertion-api-payments.md` (fix on payment `d2f2d55` + e2e-tests `df6b9c1` branches, unmerged; image pins pending). Health test now passes. [ ] Operator: merge both PRs, bump pins, rerun.
 - [x] Specs corrected against the live tree and handed to Codex (app-health first, then retrieval eval).
 - [x] Dispatched via `codex exec` into worktree `../k3d-manager-codex-v1.40.0` (branch `codex-v1.40.0-hermes`).
 - [x] Codex app-health sensor: `7319f07c`, Claude-verified (11/11, spot mutations red, default-off).

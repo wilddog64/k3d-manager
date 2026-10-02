@@ -1,7 +1,7 @@
 # Bug: 4 `vcluster.bats` orphan tests fail because their seed is still the old table listing
 
 **Filed:** 2026-10-02
-**Status:** OPEN
+**Status:** FIXED (bd88be39)
 **Branch:** `k3d-manager-v1.40.0`
 **File:** `scripts/tests/plugins/vcluster.bats` (`_seed_orphan_listing`)
 **Introduced by:** `5706eb21 fix(vcluster): reconcile orphans from vcluster list JSON, not the table`
