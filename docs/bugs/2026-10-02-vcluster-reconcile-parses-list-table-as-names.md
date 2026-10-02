@@ -5,7 +5,7 @@
 **Severity:** low. Every Tier 1 run logs two bogus "orphan" deletions with failing `vcluster delete` and
 `helm uninstall` calls, then continues. A real orphan is still found and deleted, but the noise buries the
 deliberate orphan `_warn`, which exists to surface teardown regressions.
-**Status:** OPEN
+**Status:** FIXED
 **Related:** `docs/bugs/2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`, which introduced
 the reconcile.
 
@@ -55,3 +55,9 @@ Mutation, `cp`-restored and `cmp`-proved: drop `--output json` from the list cal
 - `bats scripts/tests/plugins/vcluster_reconcile_namespace.bats` green; `shellcheck scripts/plugins/vcluster.sh` clean.
 - No cluster, network or git commits. Leave changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
 - Update this doc: Status FIXED, plus a short Resolution section.
+
+## Resolution
+
+`_vcluster_reconcile_namespace` now requests JSON from `vcluster list` and extracts only `.Name`
+values with `jq`, so headers, separators, malformed output, and empty output cannot become orphan names.
+Offline BATS coverage verifies keep-list handling, empty and non-JSON output, and the Helm fallback.
