@@ -1,7 +1,7 @@
 # Bug: every harness `vcluster` call prints "Run `vcluster upgrade`", which is the wrong action
 
 **Filed:** 2026-10-02
-**Status:** OPEN
+**Status:** FIXED (3657f4af)
 **Branch:** `k3d-manager-v1.40.0`
 **File:** `scripts/plugins/vcluster.sh`
 **Tests:** `scripts/tests/plugins/vcluster.bats`

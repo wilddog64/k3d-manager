@@ -189,6 +189,12 @@ STUB
   [ "$VCLUSTER_LOCAL_PORT" = "11443" ]
 }
 
+@test "VCLUSTER_SKIP_VERSION_CHECK defaults to true and reaches the CLI environment" {
+  [ "$VCLUSTER_SKIP_VERSION_CHECK" = "true" ]
+  run bash -c 'printf "%s" "${VCLUSTER_SKIP_VERSION_CHECK:-unset}"'
+  [ "$output" = "true" ]
+}
+
 @test "_vcluster_export_kubeconfig pins --local-port so the kubeconfig port survives proxy re-creation" {
   _write_sensitive_file() { :; }
   run _vcluster_export_kubeconfig demo
