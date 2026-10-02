@@ -18,6 +18,7 @@ spec:
         app.kubernetes.io/component: seed
         app.kubernetes.io/part-of: shopping-cart-e2e
     spec:
+      enableServiceLinks: false
       restartPolicy: OnFailure
       initContainers:
       - name: wait-for-service

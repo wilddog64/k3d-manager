@@ -18,6 +18,7 @@ spec:
         app.kubernetes.io/component: datastore
         app.kubernetes.io/part-of: shopping-cart-e2e
     spec:
+      enableServiceLinks: false
       containers:
       - name: rabbitmq
         image: rabbitmq:3.12-alpine

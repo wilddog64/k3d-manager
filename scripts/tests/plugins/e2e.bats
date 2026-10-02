@@ -74,6 +74,17 @@ FAKE
   shopping_cart_resolve_ghcr_pat() { _github_user="test-user"; _ghcr_pat="test-pat"; }
 }
 
+@test "every substrate pod spec disables service links" {
+  command -v kubectl >/dev/null 2>&1 || skip "kubectl not installed"
+  run env kubectl kustomize "${BATS_TEST_DIRNAME}/../../etc/e2e"
+  [ "$status" -eq 0 ]
+  local workloads links
+  workloads="$(grep -cE '^kind: (Deployment|Job)$' <<<"$output" || true)"
+  links="$(grep -cE '^      enableServiceLinks: false$' <<<"$output" || true)"
+  [ "$workloads" -eq 9 ]
+  [ "$links" -eq "$workloads" ]
+}
+
 @test "e2e_verify_vcluster is a public function (no leading underscore)" {
   run declare -f e2e_verify_vcluster
   [ "$status" -eq 0 ]
