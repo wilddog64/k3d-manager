@@ -8,6 +8,12 @@ cause (dashboard legend already shows evidence); (3) `2026-08-15-cluster-up-fail
 Closed as already fixed in code (stale status): ghcr PAT scope, appset CNI dirs (925c43e7), pf-supervisor.
 Not Codex-able (need operator decision or live access): payments 503 e2e, hub self-registration
 duplicate name, openldap CVE options, SSM agent registration.
+Run 1 result: Bug 1 committed `65a221fe` (verified: 4/4, recipe-read test, stub launchctl). Codex then hit
+`index.lock: Operation not permitted` (worktree git dir lives in main `.git`, outside its sandbox).
+Bug 2 finished uncommitted; Claude verification found a REAL regression: R1 (`repairs._unknown_webhook`)
+keys on "source unavailable" in data_layer evidence — new strings would have disabled R1 (Codex ran only
+test_hermes.py). Fixed by keeping the substring + R1 test; mutations red; committed `ff599a3a` (229 hermes).
+Bug 3 re-dispatched alone with `--add-dir <main>/.git` (log scratchpad codex-bug3.log). Nothing pushed yet.
 
 # 2026-10-01 — README architecture diagram redrawn
 
