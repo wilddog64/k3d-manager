@@ -12,6 +12,13 @@ REPO_ROOT="${BATS_TEST_DIRNAME}/../../.."
   [[ "${output}" != *"tee"* ]]
 }
 
+@test "e2e recording flushes on every write on both platforms" {
+  run make --no-print-directory -C "${REPO_ROOT}" -n e2e
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"script -q -F "* ]]
+  [[ "${output}" == *"script -q -f -e -c "* ]]
+}
+
 @test "e2e-sandbox records the sandbox harness" {
   run make --no-print-directory -C "${REPO_ROOT}" -n e2e-sandbox
   [ "${status}" -eq 0 ]

@@ -1,6 +1,6 @@
 # Bug: the `make e2e` recorded log lags far behind a live run
 
-**Status:** OPEN
+**Status:** FIXED (this commit)
 **Branch:** `k3d-manager-v1.40.0`
 **File:** `Makefile` (`define _e2e_recorded`)
 **Tests:** `scripts/tests/bin/makefile_e2e_recorded.bats`

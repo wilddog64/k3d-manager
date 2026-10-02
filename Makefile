@@ -1061,7 +1061,7 @@ mkdir -p "$(HOME)/.k3dm/e2e"; \
 _log="$(HOME)/.k3dm/e2e/make-$(1)-$$(date -u +%Y%m%dT%H%M%SZ).log"; \
 echo "[$(1)] recording full output to $${_log}"; \
 umask 077; \
-if [ "$$(uname -s)" = Darwin ]; then script -q "$${_log}" $(2); else script -q -e -c "$(2)" "$${_log}"; fi
+if [ "$$(uname -s)" = Darwin ]; then script -q -F "$${_log}" $(2); else script -q -f -e -c "$(2)" "$${_log}"; fi
 endef
 
 ## Run the Tier 1 e2e verification harness (throwaway vCluster + in-cluster Playwright Job). DIGEST=<candidate image digest> optional.

@@ -2942,3 +2942,5 @@ in the bug doc after commit: `3664bea7`.
 - 2026-10-02: vcluster reconcile JSON fix landed `5706eb21` (Codex, verified 4/4 bats, shellcheck clean). Operator re-running `make e2e` from their terminal.
 - 2026-10-02: e2e run 1790961003-14944 FAILED pre-test: product-catalog crash-loop on service-link `RABBITMQ_PORT=tcp://…` (regression from `034d9513`), found via new substrate diagnostics. Spec `af17b25c` dispatched to Codex.
 - 2026-10-02: service-link fix landed `c7fa36e4` (Codex, Claude-verified 60/60 bats, mutation red). Operator to re-run `make e2e`.
+- 2026-10-02: recorded make log lags live run (macOS script buffers); spec `6cd5697a` (script -F / -f) dispatched to Codex. Live e2e run 17:26:38Z in progress, watched via /tmp/e2e.log.
+- 2026-10-02: recorded-log flush fix landed (script -F / -f; 6/6 bats, mutation red; live flush unverified — no TTY in Claude shell).
