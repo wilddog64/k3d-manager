@@ -121,42 +121,48 @@ See **[docs/providers/](docs/providers/)** for per-provider guides:
 ## Architecture
 
 ```mermaid
-graph TD
-  U[User CLI] --> KM[./scripts/k3d-manager]
-  KM --> LIB["lib/ — system · core · providers"]
-  KM --|lazy-load|--> PLUG["plugins/ — acg · aws · gemini · tunnel · ..."]
-
-  subgraph Infra ["Infra Cluster — OrbStack / k3d / k3s (local)"]
-    VAULT["Vault (PKI + Auth)"]
-    ESO[ESO]
-    ARGOCD[ArgoCD]
-    ISTIO[Istio]
-    LDAP[LDAP / AD]
-    TRIVY[Trivy Operator]
-    ESO -->|sync| VAULT
-    ARGOCD -->|deploys| TRIVY
+graph LR
+  subgraph External ["External"]
+    GH["GitHub<br/>repos · CI · cloud-requests branch"]
+    SLACK["Slack + Cloudflare<br/>Worker relay"]
   end
 
-  subgraph AppCluster ["App Cluster — k3s-aws (EC2)"]
-    K3S[k3s node]
-    APPS[Shopping Cart pods]
-    K3S --> APPS
+  subgraph Laptop ["Operator laptop — macOS LaunchAgents"]
+    KM["./scripts/k3d-manager<br/>lib/ + lazy-loaded plugins/"]
+    WH["k3dm-webhook :7443<br/>reader / operator tiers"]
+    BRIDGE[k3dm-cloud-bridge]
+    HERMES["Hermes<br/>sensors · correlator · bug filer"]
+    CFD[cloudflared]
   end
 
-  ANTG["Chrome (Playwright CDP :9222)"]
-  AWSC["aws.sh — credential import"]
+  subgraph Hub ["Hub cluster — OrbStack / k3d"]
+    ARGOCD["ArgoCD<br/>ApplicationSets"]
+    VAULT["Vault + ESO"]
+    IDP["Keycloak + OpenLDAP / AD"]
+    OBS["Prometheus · Loki · Alertmanager<br/>Trivy · Istio ambient"]
+    PGV[("pgvector<br/>doc prior-art index")]
+    SC1[Shopping Cart]
+  end
 
-  PLUG -->|deploy stack| Infra
-  PLUG -->|acg_provision — EC2 + k3sup| AppCluster
-  PLUG -->|browser automation| ANTG
-  PLUG -->|credential import| AWSC
-  ANTG -->|extract from Pluralsight| AWSC
-  AWSC -->|auth| AppCluster
-  PLUG -.->|tunnel.sh — autossh :6443| K3S
-  ARGOCD -->|GitOps deploy| APPS
-  TRIVY -.->|vuln scan| APPS
-  VAULT -.->|cross-cluster auth| K3S
-  ESO -.->|sync| AKV[Azure Key Vault]
+  subgraph Apps ["App clusters — k3s"]
+    HOST[Hostinger VPS — permanent]
+    ACG[ACG AWS / GCP — ephemeral]
+    VC[vCluster — per-PR e2e]
+  end
+
+  KM -->|deploy + register| Hub
+  KM -->|provision| Apps
+  SLACK -->|/k3dm| CFD --> WH
+  GH <-->|requests / responses + artifacts| BRIDGE
+  BRIDGE -->|reader-tier actions| WH
+  WH -->|runs| KM
+  HERMES -.->|read-only sensors| Hub
+  HERMES -->|prior-art search| PGV
+  SLACK <-->|incidents / approvals| HERMES
+  GH -.->|release branch| ARGOCD
+  ARGOCD --> SC1
+  ARGOCD -->|app-cluster label| Apps
+  VAULT -.->|secrets| Apps
 ```
 
 ---

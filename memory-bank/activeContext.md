@@ -1,3 +1,10 @@
+# 2026-10-01 — README architecture diagram redrawn
+
+The README mermaid diagram predated the webhook, Hermes, cloud bridge, Slack relay, pgvector and
+Hostinger, and still drew an Azure Key Vault sync that has no backend (`scripts/lib/secret_backends/`
+holds only `vault.sh`). Redrawn as laptop → hub → app clusters, render-checked with mermaid-cli.
+The `## Directory Layout` `bin/` list below it is also stale (5 of ~60 scripts) — not touched.
+
 # 2026-10-01 — live retrieval eval recorded; slack-corpus-qa unblocked
 
 Operator ran `K3DM_RETRIEVAL_EVAL_LIVE=1` (64s, pass). Embeddings recall@5 bugs .875 / issues .833 / plans 1 / retro 1

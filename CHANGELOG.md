@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- README architecture diagram redrawn for the current system: operator laptop (webhook, Hermes,
+  cloud bridge, cloudflared), hub, app clusters (Hostinger, ACG, vCluster) and GitHub/Slack. The
+  stale Azure Key Vault sync is gone.
+
 ### Fixed
 
 - Seven bare `! cmd` BATS assertions added this release could never fail under `set -e`; they now

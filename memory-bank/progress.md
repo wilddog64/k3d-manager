@@ -9,6 +9,7 @@
 - [x] Claude: `v1.40.0-cloud-bridge-test-targets.md` (2026-10-01) — tripwire, 4 test + 6 diagnose actions.
 - [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
 - [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
+- [x] README architecture diagram redrawn for v1.40.0 (Claude, docs only).
 - [ ] `v1.40.0-slack-corpus-qa.md` — UNBLOCKED 2026-10-01 (live recall@5 measured); dispatch to Codex.
 
 # 2026-10-01 — v1.40.0 review fix spec (Codex)
