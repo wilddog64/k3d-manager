@@ -11,7 +11,7 @@ _event_count=0
 _hub_kubectl() {
   case "$*" in
     *" patch application "*)
-      printf 'patch application\n' >>"${TEST_LOG}"
+      printf '%s\n' "$*" >>"${TEST_LOG}"
       [ "${TEST_PATCH_RESULT}" -eq 0 ]
       ;;
     *" annotate application "*)
@@ -23,7 +23,7 @@ _emit_remediation_event() {
   _event_count=$((_event_count + 1))
 }
 _app_target_branch() { printf '%s\n' main; }
-_git_persist_promotion() { :; }
+_git_persist_promotion() { [ "${TEST_PERSIST_RESULT:-0}" -eq 0 ]; }
 _notify() { :; }
 _promote_image shopping-cart-frontend ghcr.io/wilddog64/shopping-cart-frontend sha-new sha256:testdigest old-image CVE-1
 printf 'rc=%s events=%s\n' "${_rc}" "${_event_count}"
@@ -50,4 +50,20 @@ EOF
   run env TEST_PATCH_RESULT=0 TEST_LOG="${TEST_LOG}" sh "${TEST_SCAN_SCRIPT}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"rc=0 events=1"* ]]
+}
+
+@test "git-persisted promotion clears the live image override" {
+  run env TEST_PATCH_RESULT=0 TEST_PERSIST_RESULT=0 TEST_LOG="${TEST_LOG}" sh "${TEST_SCAN_SCRIPT}"
+  [ "$status" -eq 0 ]
+  grep -qF -- '--type json -p [{"op":"remove","path":"/spec/source/kustomize/images"}]' "${TEST_LOG}"
+  [[ "$output" == *"cleared live image override"* ]]
+  [[ "$output" == *"persisted to git main@already-pinned"* ]]
+}
+
+@test "live-patch-only promotion keeps the live image override" {
+  run env TEST_PATCH_RESULT=0 TEST_PERSIST_RESULT=1 TEST_LOG="${TEST_LOG}" sh "${TEST_SCAN_SCRIPT}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"rc=0 events=1"* ]]
+  run grep -cF '/spec/source/kustomize/images' "${TEST_LOG}"
+  [ "$output" = "0" ]
 }
