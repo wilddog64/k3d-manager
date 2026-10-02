@@ -25,6 +25,10 @@
 
 ### Added
 
+- Added reader-only Slack `/ask-docs <question>`, which searches bounded, redacted documentation
+  excerpts and returns advisory answers with source paths. The provisional retrieval floor is
+  configurable with `K3DM_ASK_DOCS_MIN_SCORE`.
+
 - Cloud bridge: `make-test`, `make-test-bin`, `make-test-python`, `make-test-all` and six read-only
   `diagnose-*` actions (pods, describe-pod, logs, apps, app, appsets) at reader tier. The `test*`
   targets now run behind `scripts/tests/tripwire.sh`, which blocks real cluster, cloud and keychain

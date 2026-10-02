@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
+const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/ask-docs', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
 const APPROVAL_TTL_SECONDS = 3600
 const REAUTH_TTL_SECONDS   = 86400
 const HERMES_ACTION_ID_RE  = /^r[0-9]+-[0-9a-f]{8}$/
@@ -18,6 +18,7 @@ const COMMAND_ROLES     = Object.freeze({
   '/cleanup-stale-sandbox': 'admin',
   '/hermes-auth': 'admin',
   '/ask': 'reader',
+  '/ask-docs': 'reader',
   '/claude': 'reader',
   '/gemini': 'reader',
   '/codex': 'reader',
@@ -467,6 +468,18 @@ async function handle(req, event) {
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`🤖 Asking ${agent}…`, threadTs, true)
+  }
+
+  if (command === '/ask-docs') {
+    if (!text) return jsonReply('Usage: /ask-docs <question>', threadTs)
+    const payload = { question: text, response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    event.waitUntil((async () => {
+      const { ok, conflict } = await relay('/api/v1/ask-docs', payload, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
+    return jsonReply('📚 Searching the docs…', threadTs, true)
   }
 
   if (command === '/argocd-upgrade') {

@@ -57,6 +57,7 @@ from webhook.agent import (  # noqa: E402
     _run_cluster_ask,
     _sanitize_question,
 )
+from webhook import ask_docs  # noqa: E402
 from webhook.lifecycle import (  # noqa: E402
     _run_make_target, _run_upgrade, _run_cluster,
     _run_cluster_resume, _run_cluster_refresh, _run_hostinger_refresh,
@@ -1635,6 +1636,31 @@ def _run_analyze(job_id, alert_payload, response_url=""):
         _finish("failed")
 
 
+def _run_ask_docs(job_id, question, response_url="", thread_ts=None):
+    """Retrieve and summarise documentation, then post the sourced answer."""
+    job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
+    try:
+        (job_dir / "status").write_text("running")
+        text = ask_docs.answer(question)
+        (job_dir / "output").write_text(text)
+        (job_dir / "status").write_text("success")
+        if response_url:
+            _slack_post(response_url, text)
+        else:
+            _notify_job(job_id, text)
+    except Exception as exc:
+        text = "Could not summarise — read the sources directly.\n\nSources: none"
+        (job_dir / "output").write_text(text)
+        (job_dir / "status").write_text("failed")
+        if response_url:
+            _slack_post(response_url, text)
+        else:
+            _notify_job(job_id, text)
+        print(f"[ask-docs] job failed: {type(exc).__name__}", file=sys.stderr)
+
+
 # min_role is the floor that applies when no dynamic policy resolves.
 _POST_ROUTES = {
     "/api/v1/argocd-upgrade": {"handler": "argocd_upgrade", "min_role": "admin", "action_name": "argocd-upgrade"},
@@ -1651,6 +1677,7 @@ _POST_ROUTES = {
                      "dynamic": "_action_policy resolves from MAKE_TARGETS[target]['min_role']"},
     "/api/v1/analyze": {"handler": "analyze", "min_role": "operator", "action_name": "analyze"},
     "/api/v1/ask": {"handler": "ask", "min_role": "reader", "action_name": "ask"},
+    "/api/v1/ask-docs": {"handler": "ask_docs", "min_role": "reader", "action_name": "ask-docs"},
 }
 _GET_ROUTES = {
     "/api/v1/health": {"handler": "health", "min_role": "reader", "action_name": "health"},
@@ -2104,6 +2131,26 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 args=(job_id, agent, question, response_url),
                 kwargs={"thread_ts": thread_ts, "role": request_role},
                 daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if route["handler"] == "ask_docs":
+            question = body.get("question", "").strip()
+            if not question:
+                self._json(400, {"error": "question required"})
+                return
+            response_url = body.get("response_url", "")
+            thread_ts = body.get("thread_ts", None)
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            if response_url:
+                (JOB_DIR / job_id / "response_url").write_text(response_url)
+            threading.Thread(
+                target=_run_ask_docs,
+                args=(job_id, question, response_url, thread_ts),
+                daemon=True,
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
             return
