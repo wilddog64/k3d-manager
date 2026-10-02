@@ -116,8 +116,8 @@ Tier 2 ACG/Stripe remains opt-in and is not made an unattended daily job.
 
 Also in v1.42.0 — **Hermes alert-driven triage.** Hermes reads firing alerts from Alertmanager (read-only, through the apiserver proxy), runs a per-alert read-only
 evidence recipe, links prior art, posts one Slack thread per alert, and either proposes an allowlisted repair through
-the existing approval path or drafts a bug doc in its own worktree. `critical` alerts get a Slack thread; `warning`
-and `info` go into a daily digest. No automatic code changes, PRs or silences. v1.42.0 is then at its five-plan cap;
+the existing approval path or drafts a bug doc in its own worktree. Alerts go to a dedicated `#k3dm-alerts` channel:
+`critical` and `warning` get a thread each, `info` a daily digest. No automatic code changes, PRs or silences. v1.42.0 is then at its five-plan cap;
 the R10 repair (delete a failed Job superseded by a newer CronJob spec) overflows to **v1.43.0**.
 
 Scope: [`v1.42.0-hermes-alert-driven-triage.md`](plans/v1.42.0-hermes-alert-driven-triage.md).
