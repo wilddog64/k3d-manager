@@ -77,7 +77,7 @@ def _possible_prior_art(group):
     ]).strip()
     try:
         results = search(query, k=3)
-    except RetrievalUnavailable:
+    except (RetrievalUnavailable, ValueError, KeyError, TypeError):
         return ""
     if not results:
         return ""

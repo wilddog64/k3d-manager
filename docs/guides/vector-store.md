@@ -73,14 +73,6 @@ is about 1,705 calls against a ~1,000/day ceiling. The real cold start (2026-09-
 not the pacing. Plan a cold start as *two sittings* rather than one half-hour run. A **warm**
 re-index is unaffected — it embeds only what changed, so it is normally zero calls.
 
-## Offline retrieval-quality control
-
-The v1.40.0 offline evaluation uses a stdlib TF-IDF cosine scorer over the same `doc_embed_text`
-strings that the indexer embeds. On the mined 25-positive-pair control, recall@5 was 0.800 for
-`docs/bugs/`, 0.800 for `docs/issues/`, 1.000 for `docs/plans/`, and 1.000 for `docs/retro/`.
-These are lexical control numbers; the embedding scorer remains gated for a live pgvector/Gemini
-run and is not represented by synthetic or sandbox measurements.
-
 Telling the two apart is what `_error_detail` is for: a spent daily allowance now prints
 `index-docs: paused — ... (quota EmbedContentRequestsPerDayPerProjectPerModel-FreeTier)`, not
 `unavailable`, because the store and the credential are both fine and the only correct action is to
@@ -383,4 +375,32 @@ correctly. A bug filed as `eso-403-vault-path` does not match an existing
 `eso-ldap-policy-missing-keycloak`, so the same defect gets refiled under a new name — which has
 already happened in this repo. Similarity search catches the near-miss the glob cannot.
 
-Retrieval quality is **unmeasured** until the v1.40.0 eval lands. Treat the output as advisory.
+## Measuring retrieval quality
+
+`scripts/tests/bin/test_find_similar_docs.py` scores hand-labelled pairs from the real corpus
+(`scripts/tests/fixtures/doc-dedup/pairs.jsonl`): 27 **positives** (the same defect filed twice,
+or a symptom and its root cause) and 26 **hard negatives** (same component, different defect).
+Two metrics, per directory, both on the top 5 with the query document itself excluded:
+
+- **recall@5:** how often the known duplicate appears. This is the gate: it has a floor.
+- **intrusion@5:** how often a hard negative appears. That is the false positive a retriever
+  would act on if it ever gated filing. It is reported, not gated; gating needs its own spec.
+
+The control is a stdlib TF-IDF cosine scorer over the same `doc_embed_text` strings the indexer
+embeds, and it runs offline in `make test-pytest`. Measured 2026-10-01:
+
+| scorer | metric | bugs | issues | plans | retro |
+|---|---|---|---|---|---|
+| TF-IDF control | recall@5 | 0.750 (12/16) | 0.833 (5/6) | 1.000 (5/5) | 1.000 (5/5) |
+| TF-IDF control | intrusion@5 | 0.071 (1/14) | 0.500 (2/4) | 1.000 (4/4) | 0.250 (1/4) |
+| embeddings | both | **not yet measured** — needs the live run below | | | |
+
+Plans score 4/4 on intrusion because sibling specs share a template; lexical overlap there says
+"same shape", not "same defect". The embedding scorer runs only against the live store:
+
+```bash
+K3DM_RETRIEVAL_EVAL_LIVE=1 pytest -s scripts/tests/bin/test_find_similar_docs.py -k live
+```
+
+Until that run is recorded here, embedding quality is **unmeasured**: treat
+`find-similar-docs` output as advisory, and do not read a high score as "do not file".

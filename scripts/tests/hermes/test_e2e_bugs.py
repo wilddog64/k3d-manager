@@ -46,6 +46,16 @@ def test_retrieval_unavailable_omits_prior_art_without_failing(monkeypatch):
     assert "# Bug: e2e contract-drift" in text
 
 
+def test_malformed_store_output_omits_prior_art_without_failing(monkeypatch):
+    def garbled(*_args, **_kwargs):
+        raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    monkeypatch.setattr(e2e_bugs, "search", garbled)
+    text = _doc(group(), {"run_id": "r1", "summary": {}}, "k3d-manager-v9.9.9", "2026-09-16")
+    assert "## Possible prior art" not in text
+    assert "# Bug: e2e contract-drift" in text
+
+
 def test_status_bug_file_and_recurrence_use_status_context(tmp_path):
     from hermes.status_triage import triage
     _origin, clone = _repo(tmp_path)

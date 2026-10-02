@@ -36,7 +36,7 @@
 {"kind":"hard-negative","directory":"bugs","query":"docs/bugs/2026-09-30-keycloak-reconcile-flow-lookup-404-after-partial-import.md","expected":"docs/bugs/2026-05-25-keycloak-reconcile-partial-import-not-idempotent.md"}
 {"kind":"hard-negative","directory":"bugs","query":"docs/bugs/2026-06-08-prometheus-auth-missing.md","expected":"docs/bugs/2026-06-06-prometheus-port-forward-wrong-kubectl-context.md"}
 {"kind":"hard-negative","directory":"bugs","query":"docs/bugs/2026-09-16-e2e-assertion-api-payments.md","expected":"docs/bugs/2026-09-20-seed-clobbers-real-payment-secrets.md"}
-{"kind":"hard-negative","directory":"bugs","query":"docs/bugs/2026-09-23-e2e-harness-creating-vcluster.md","expected":"docs/bugs/2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md"}
+{"kind":"positive","directory":"bugs","query":"docs/bugs/2026-09-23-e2e-harness-creating-vcluster.md","expected":"docs/bugs/2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md"}
 {"kind":"hard-negative","directory":"bugs","query":"docs/bugs/2026-08-27-keycloak-restart-loop-tight-probes.md","expected":"docs/bugs/2026-09-30-keycloak-reconcile-flow-lookup-404-after-partial-import.md"}
 {"kind":"hard-negative","directory":"bugs","query":"docs/bugs/2026-06-09-pushgateway-deployment-metrics-gap.md","expected":"docs/bugs/2026-09-30-vectordb-metrics-published-to-the-wrong-cluster.md"}
 {"kind":"hard-negative","directory":"bugs","query":"docs/bugs/2026-09-23-appset-live-overrides-lock-in-stale-cni-dirs.md","expected":"docs/bugs/2026-07-21-ambient-cni-vars-missing-from-argocd-vars.md"}
@@ -46,7 +46,7 @@
 {"kind":"hard-negative","directory":"issues","query":"docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md","expected":"docs/issues/2026-02-24-orbstack-dry-run-errors.md"}
 {"kind":"hard-negative","directory":"issues","query":"docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md","expected":"docs/issues/2026-02-27-jenkins-crumb-issuer-xpath-forbidden.md"}
 {"kind":"hard-negative","directory":"issues","query":"docs/issues/2026-02-27-test-eso-apiversion-mismatch.md","expected":"docs/issues/2026-02-27-test-istio-hardcoded-namespace.md"}
-{"kind":"hard-negative","directory":"issues","query":"docs/issues/2026-05-16-agent-rigor-helper-index-lock-permission-error.md","expected":"docs/issues/2026-05-16-git-commit-index-lock-permission-error.md"}
+{"kind":"positive","directory":"issues","query":"docs/issues/2026-05-16-agent-rigor-helper-index-lock-permission-error.md","expected":"docs/issues/2026-05-16-git-commit-index-lock-permission-error.md"}
 {"kind":"hard-negative","directory":"issues","query":"docs/issues/2026-04-24-argocd-cli-login-eof-during-bootstrap.md","expected":"docs/issues/2026-05-11-acg-up-argocd-port-forward-flapping.md"}
 {"kind":"hard-negative","directory":"plans","query":"docs/plans/shopping-cart-order-go-rewrite-pr1.md","expected":"docs/plans/shopping-cart-payment-go-rewrite-pr1.md"}
 {"kind":"hard-negative","directory":"plans","query":"docs/plans/active-directory-integration.md","expected":"docs/plans/secret-backend-interface.md"}
