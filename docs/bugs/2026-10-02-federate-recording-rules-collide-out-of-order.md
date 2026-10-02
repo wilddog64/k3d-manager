@@ -5,7 +5,7 @@
 **Severity:** low–medium. The hub's Prometheus drops about 102 samples on every federate scrape (1.7/s), firing since
 2026-09-27T18:46Z (the hub rebuild). The dropped samples are aggregates, so the panels built on them are fed by two
 writers.
-**Status:** OPEN
+**Status:** FIXED (pending sync)
 **Related:** `docs/bugs/2026-09-13-hub-federate-acg-self-scrape-duplicates-series.md`, the same job's earlier
 duplicate-series defect, fixed by dropping `cluster="acg"` self-scrapes.
 
@@ -70,6 +70,11 @@ interval. Renaming the job from `federate-acg` is out of scope; the 2026-09-13 t
 - `bats scripts/tests/plugins/observability_federate_self_scrape.bats` is green; `yq` parses the values file.
 - No cluster, network or git commits. Leave the changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
 - Update this doc: Status FIXED (pending sync), plus a short Resolution section.
+
+## Resolution
+
+Updated the `federate-acg` selector to exclude recording-rule series, leaving the existing target, labels,
+interval, and self-scrape drop unchanged. Offline YAML/BATS coverage verifies the raw-series-only selector.
 
 ## Rollout
 

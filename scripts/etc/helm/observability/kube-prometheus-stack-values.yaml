@@ -50,7 +50,7 @@ prometheus:
         metrics_path: /federate
         params:
           match[]:
-            - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}'
+            - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy", __name__!~".+:.+"}'
         static_configs:
           - targets:
               - 'host.internal:19190'

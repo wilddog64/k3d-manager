@@ -56,6 +56,17 @@ DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-
   [ "${output}" = "acg" ]
 }
 
+@test "federate-acg selects raw series only" {
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .params["match[]"] | length' "${VALUES}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "1" ]
+
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .params["match[]"][0]' "${VALUES}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"'* ]]
+  [[ "${output}" == *'__name__!~".+:.+"'* ]]
+}
+
 @test "federate-acg labels the target acg and honors source labels" {
   run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .static_configs[0].labels.cluster' "${VALUES}"
   [ "${status}" -eq 0 ]
