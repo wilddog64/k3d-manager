@@ -1,3 +1,7 @@
+# 2026-10-01 — /ask + /ask-docs threaded answers, /ask-docs --sources
+
+`61d6d3fb` on `k3d-manager-v1.40.0` (Codex, verified by Claude; Claude added Slack escaping of the header). In `SLACK_CHANNEL_ID` with a bot token, the job posts a redacted header and replies in its thread; anywhere else, or if a bot post fails, it uses response_url as before. `--sources`/`-s` returns scored matches with no model call. pytest 542 passed / 1 skipped, relay 33/33. OPERATOR, pending: `make restart-webhook`, redeploy the relay from the release branch, make sure the bot is in the channel.
+
 # 2026-10-01 — Hub readable Overview ConfigMap had two owners
 
 `fd2323ff` on `k3d-manager-v1.40.0` (Codex, verified by Claude). `grafana-dashboards-acg` now excludes `grafana-overview-readable-configmap.yaml` only when `.server` is `https://kubernetes.default.svc`, so `hub-grafana-dashboards` is the sole writer on the hub. Hostinger keeps the app copy. 17/17 BATS, with a derived collision guard and mutations. OPERATOR, pending: check the CM tracking-id names `hub-grafana-dashboards`, reapply the ACG dashboard appset, then confirm `k3d-cluster-grafana-dashboards` is Synced.
