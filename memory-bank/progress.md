@@ -2926,3 +2926,4 @@ in the bug doc after commit: `3664bea7`.
 - 2026-10-02: e2e RabbitMQ broker + payment spring.rabbitmq key path landed — payment `9778e21`, k3d-manager `034d9513` (Codex, verified: 66/66 bats, 3 mutations red). PRs pending go.
 - 2026-10-02: payment CI 37025969474 GREEN on `9778e21` (137 tests, +1 RabbitPropertiesBindingTest). Payment + e2e-tests PRs ready to prepare; awaiting go.
 - 2026-10-02: e2e-tests PR #9 opened (fix/payment-client-v1-bearer). Payment fix branch still unmerged (ahead 2, behind 1); #76 merged was Dependabot.
+- 2026-10-02: payment PR #78 opened; e2e #9 Copilot fix dispatched to Codex.
