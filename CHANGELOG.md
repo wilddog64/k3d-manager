@@ -10,6 +10,9 @@
 
 ### Fixed
 
+- Grafana Overview Build Info now uses a positive field allowlist and presents only Version,
+  Edition, Job, and Instance in both dashboard copies.
+
 - `cluster-up` now tracks CloudFormation stacks created by the current run and warns with the
   exact `make down` reclaim command when a later failure leaves one billable.
 

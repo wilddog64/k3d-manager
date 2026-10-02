@@ -7,6 +7,25 @@ DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-
 OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/grafana-overview-readable-configmap.yaml"
 HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml"
 
+_build_info_panel() {
+  local dashboard_file="$1"
+  yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file" | jq -c '.panels[] | select(.id == 10)'
+}
+
+_assert_build_info_contract() {
+  local dashboard_file="$1"
+  local panel
+  panel="$(_build_info_panel "$dashboard_file")" || return 1
+  [ "$(jq -r '.targets[0].format' <<<"$panel")" = "table" ] || return 1
+  [ "$(jq -r '.targets[0].instant' <<<"$panel")" = "true" ] || return 1
+  [ "$(jq -r '.targets[0] | has("legendFormat")' <<<"$panel")" = "false" ] || return 1
+  [ "$(jq -c '.transformations[0].options.include.names' <<<"$panel")" = '["version","edition","job","instance"]' ] || return 1
+  [ "$(jq -r '[.transformations[].id] | join(",")' <<<"$panel")" = "filterFieldsByName,organize" ] || return 1
+  [ "$(jq -r '[.transformations[] | select(.id == "organize") | .options.indexByName | to_entries | sort_by(.value) | .[].key] | join(",")' <<<"$panel")" = "version,edition,job,instance" ] || return 1
+  [ "$(jq -r '[.transformations[] | select(.id == "organize") | .options.renameByName | to_entries | sort_by(.key) | .[] | (.key + "=" + .value)] | join(",")' <<<"$panel")" = "edition=Edition,instance=Instance,job=Job,version=Version" ] || return 1
+  [ "$(jq -e 'any(.transformations[]; .id == "labelsToFields") | not' <<<"$panel")" = "true" ] || return 1
+}
+
 @test "acg dashboard appset targets app-cluster role" {
   run yq -r '.spec.generators[0].clusters.selector.matchLabels["k3d-manager/role"]' "${ACG}"
   [ "$status" -eq 0 ]
@@ -71,6 +90,38 @@ HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboa
   [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
+}
+
+@test "Grafana Overview Build Info panels use the positive table contract" {
+  _assert_build_info_contract "${OVERVIEW}"
+  _assert_build_info_contract "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview Build Info panels stay byte-identical" {
+  local app_panel hub_panel
+  app_panel="$(_build_info_panel "${OVERVIEW}")"
+  hub_panel="$(_build_info_panel "${HUB_OVERVIEW}")"
+  [ "$(jq -S . <<<"$app_panel")" = "$(jq -S . <<<"$hub_panel")" ]
+}
+
+@test "Grafana Overview Build Info mutation guards reject a missing include" {
+  local snapshot="${BATS_TEST_TMPDIR}/hub-overview.yaml"
+  cp "${HUB_OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | del(.panels[] | select(.id == 10) | .transformations[0].options.include) | tojson))' "$snapshot"
+  run _assert_build_info_contract "$snapshot"
+  [ "$status" -ne 0 ]
+  cp "${HUB_OVERVIEW}" "$snapshot"
+  cmp -s "${HUB_OVERVIEW}" "$snapshot"
+}
+
+@test "Grafana Overview Build Info mutation guards reject an extra include name" {
+  local snapshot="${BATS_TEST_TMPDIR}/app-overview.yaml"
+  cp "${OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= fromjson | .data["grafana-overview-readable.json"].panels[] | select(.id == 10) | .transformations[0].options.include.names += ["__name__"] | .data["grafana-overview-readable.json"] |= tojson)' "$snapshot"
+  run _assert_build_info_contract "$snapshot"
+  [ "$status" -ne 0 ]
+  cp "${OVERVIEW}" "$snapshot"
+  cmp -s "${OVERVIEW}" "$snapshot"
 }
 
 @test "k3dm tests dashboard keeps the make exit code informational" {

@@ -42,9 +42,9 @@ data:
           "gridPos": {"h": 5, "w": 12, "x": 12, "y": 0},
           "id": 10,
           "options": {"showHeader": true},
-          "targets": [{"expr": "grafana_build_info{job=~\"$job\", instance=~\"$instance\"}", "instant": true, "legendFormat": "Build information", "refId": "A"}],
+          "targets": [{"expr": "grafana_build_info{job=~\"$job\", instance=~\"$instance\"}", "format": "table", "instant": true, "refId": "A"}],
           "title": "Build Info",
-          "transformations": [{"id": "labelsToFields", "options": {}}, {"id": "merge", "options": {}}, {"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "branch": true, "container": true, "goversion": true, "namespace": true, "pod": true, "revision": true}, "renameByName": {"edition": "Edition", "instance": "Instance", "job": "Job", "version": "Version"}}}],
+          "transformations": [{"id": "filterFieldsByName", "options": {"include": {"names": ["version", "edition", "job", "instance"]}}}, {"id": "organize", "options": {"indexByName": {"version": 0, "edition": 1, "job": 2, "instance": 3}, "renameByName": {"version": "Version", "edition": "Edition", "job": "Job", "instance": "Instance"}}}],
           "type": "table"
         },
         {
