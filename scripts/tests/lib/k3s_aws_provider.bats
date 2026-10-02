@@ -1,6 +1,12 @@
 #!/usr/bin/env bats
 # shellcheck shell=bash
 
+setup() {
+  export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+  mkdir -p "${_ACG_STATE_DIR}/run"
+  rm -f "${_ACG_STATE_DIR}/run/cf-stack-created"
+}
+
 @test "_provider_k3s_aws_deploy_cluster --help prints k3s-aws usage" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
@@ -68,6 +74,72 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"[stub] acg_provision"* ]]
   [ "$(echo "$output" | grep -c "\[stub\] acg_provision")" -eq 1 ]
+}
+
+@test "k3s-aws marks a newly created stack with its name and region" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _run_command() { return 1; }
+    _acg_extend_playwright() { return 0; }
+    acg_provision() { return 0; }
+    _provider_k3s_aws_autoselect_tunnel_mode() { return 0; }
+    deploy_app_cluster() { return 0; }
+    tunnel_start() { return 0; }
+    acg_watch() { return 0; }
+    kubectl() { printf "n1 Ready\nn2 Ready\nn3 Ready\n"; }
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    _provider_k3s_aws_deploy_cluster
+    cat "${_ACG_STATE_DIR}/run/cf-stack-created"
+  '
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"stack_name=k3d-manager-cluster"* ]]
+  [[ "${output}" == *"region=us-west-2"* ]]
+}
+
+@test "k3s-aws does not mark a healthy reused stack" {
+  run bash -c '
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/reuse-state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    rm -f "${_ACG_STATE_DIR}/run/cf-stack-created"
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _run_command() { printf "CREATE_COMPLETE"; }
+    _acg_extend_playwright() { return 0; }
+    acg_provision() { return 0; }
+    _provider_k3s_aws_autoselect_tunnel_mode() { return 0; }
+    deploy_app_cluster() { return 0; }
+    tunnel_start() { return 0; }
+    acg_watch() { return 0; }
+    kubectl() { printf "n1 Ready\nn2 Ready\nn3 Ready\n"; }
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    _provider_k3s_aws_deploy_cluster
+  '
+  [ "${status}" -eq 0 ]
+  run test -e "${BATS_TEST_TMPDIR}/reuse-state/run/cf-stack-created"
+  [ "${status}" -ne 0 ]
+}
+
+@test "k3s-aws dry-run does not write stack ownership" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    DRY_RUN=1
+    _dry_guard "record CloudFormation stack ownership" _provider_k3s_aws_mark_stack_created
+    if [[ -e "${_ACG_STATE_DIR}/run/cf-stack-created" ]]; then
+      exit 1
+    fi
+  '
+  [ "${status}" -eq 0 ]
 }
 
 @test "k3s-aws retries app provisioning over SSH after SSM bootstrap fails" {

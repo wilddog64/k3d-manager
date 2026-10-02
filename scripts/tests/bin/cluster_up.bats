@@ -377,6 +377,77 @@ _load_acg_up_cleanup() {
   source "${BATS_TEST_TMPDIR}/c.sh"
 }
 
+_load_acg_up_marker_clear() {
+  sed -n '/^function _acg_up_clear_stack_marker()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/c.sh"
+  source scripts/lib/system.sh
+  source "${BATS_TEST_TMPDIR}/c.sh"
+}
+
+@test "acg-up failure cleanup warns for a stack created by this run" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    printf "stack_name=k3d-manager-cluster\nregion=us-west-2\n" > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"CloudFormation stack 'k3d-manager-cluster' (us-west-2) was created by this run"* ]]
+  [[ "${output}" == *"make down"* ]]
+}
+
+@test "acg-up failure cleanup does not warn for a reused stack" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *"CloudFormation stack"* ]]
+}
+
+@test "acg-up success clears the CloudFormation ownership marker" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_marker_clear)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    : > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    _load_acg_up_marker_clear
+    _acg_up_clear_stack_marker
+    if [[ -e "${_ACG_STATE_DIR}/run/cf-stack-created" ]]; then
+      exit 1
+    fi
+  '
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up clears a stale ownership marker at start and after success" {
+  local _trap _start _state _done
+  _trap="$(grep -n '^trap _acg_up_cleanup EXIT$' bin/cluster-up | cut -d: -f1)"
+  _start="$(grep -n '^_acg_up_clear_stack_marker$' bin/cluster-up | head -1 | cut -d: -f1)"
+  _state="$(grep -n 'acg-state.json"$' bin/cluster-up | tail -1 | cut -d: -f1)"
+  _done="$(grep -n '^_acg_up_clear_stack_marker$' bin/cluster-up | tail -1 | cut -d: -f1)"
+  [ -n "${_trap}" ] && [ -n "${_start}" ] && [ -n "${_state}" ]
+  [ "${_start}" -eq $((_trap + 1)) ]
+  [ "${_done}" -gt "${_state}" ]
+}
+
+@test "acg-up failure cleanup tolerates a missing or unreadable marker" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    : > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    chmod 000 "${_ACG_STATE_DIR}/run/cf-stack-created"
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "${status}" -eq 0 ]
+}
+
 @test "acg-up failure cleanup leaves a pre-existing cloudflare tunnel running" {
   run bash -c '
     '"$(declare -f _load_acg_up_cleanup)"'

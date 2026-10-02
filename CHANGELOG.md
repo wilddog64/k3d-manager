@@ -10,6 +10,9 @@
 
 ### Fixed
 
+- `cluster-up` now tracks CloudFormation stacks created by the current run and warns with the
+  exact `make down` reclaim command when a later failure leaves one billable.
+
 - Hermes `data_layer` unknown records now retain distinct evidence for unavailable credentials,
   empty or ungraded webhook checks, missing/ungraded data-layer checks, and fetch errors without
   exposing exception messages.

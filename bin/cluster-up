@@ -139,8 +139,26 @@ function _acg_up_cleanup() {
   else
     _info "[acg-up] leaving the cloudflare tunnel up — it is the hub's public ingress and predates this run"
   fi
+  local _cf_marker="${_ACG_STATE_DIR}/run/cf-stack-created"
+  if [[ -r "${_cf_marker}" ]]; then
+    local _cf_stack_name _cf_region
+    _cf_stack_name="$(sed -n 's/^stack_name=//p' "${_cf_marker}" 2>/dev/null || true)"
+    _cf_region="$(sed -n 's/^region=//p' "${_cf_marker}" 2>/dev/null || true)"
+    if [[ -n "${_cf_stack_name}" && -n "${_cf_region}" ]]; then
+      _warn "[acg-up] CloudFormation stack '${_cf_stack_name}' (${_cf_region}) was created by this run and is still running — billable. Reclaim it with: make down"
+    fi
+  fi
+}
+
+function _acg_up_clear_stack_marker() {
+  if _dry_run_active; then
+    :
+  else
+    rm -f "${_ACG_STATE_DIR}/run/cf-stack-created"
+  fi
 }
 trap _acg_up_cleanup EXIT
+_acg_up_clear_stack_marker
 
 # ArgoCD reaches the app cluster through host.k3d.internal.  Rebuilds and
 # CoreDNS restarts can drop the NodeHosts entry, which otherwise leaves the
@@ -2014,6 +2032,7 @@ _info "[acg-up]   Grafana:     https://grafana.${CF_DOMAIN:-3ai-talk.org}"
 _acg_record_provider "${_cluster_provider}"
 echo "{\"provisioned_at\": $(date +%s), \"provider\": \"${_cluster_provider}\"}" \
   > "${_ACG_STATE_DIR}/acg-state.json"
+_acg_up_clear_stack_marker
 _info "[acg-up] === Local URLs (Mac only) ==="
 _info "[acg-up]   ArgoCD:   https://argocd.shopping-cart.local"
 _info "[acg-up]   Frontend: http://frontend.shopping-cart.local"

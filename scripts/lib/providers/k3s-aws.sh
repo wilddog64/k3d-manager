@@ -123,6 +123,14 @@ _provider_k3s_aws_autoselect_tunnel_mode() {
   fi
 }
 
+_provider_k3s_aws_mark_stack_created() {
+  local _state_dir="${_ACG_STATE_DIR:-$(_acg_provider_state_dir k3s-aws)}"
+  local _region="${ACG_REGION:-us-west-2}"
+  mkdir -p "${_state_dir}/run"
+  printf 'stack_name=%s\nregion=%s\n' "${_ACG_CF_STACK_NAME}" "${_region}" \
+    > "${_state_dir}/run/cf-stack-created"
+}
+
 # Start the selected API tunnel. SSM can be selected optimistically when the
 # stack has a profile, but the account-level Default Host Management Role may
 # still be missing. In that case fall back to SSH; provisioning fails only if
@@ -217,10 +225,14 @@ HELP
       ;;
     ROLLBACK_COMPLETE|CREATE_FAILED|ROLLBACK_FAILED|UPDATE_ROLLBACK_FAILED|DELETE_FAILED)
       _info "[k3s-aws] CloudFormation stack is in broken state (${_cf_stack_status}) — recreating"
+      _dry_guard "record CloudFormation stack ownership" _provider_k3s_aws_mark_stack_created \
+        || return 1
       _dry_guard "recreate CloudFormation stack" acg_provision --confirm --recreate || return 1
       ;;
     *)
       _info "[k3s-aws] CloudFormation stack not found or unknown state (${_cf_stack_status:-none}) — creating"
+      _dry_guard "record CloudFormation stack ownership" _provider_k3s_aws_mark_stack_created \
+        || return 1
       _dry_guard "provision CloudFormation stack" acg_provision --confirm || return 1
       ;;
   esac
