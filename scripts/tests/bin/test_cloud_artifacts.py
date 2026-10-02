@@ -60,6 +60,8 @@ def repos(tmp_path):
     _git(work, "push", "-q", "origin", "cloud-requests")
     repo = tmp_path / "bridge.git"
     _git(tmp_path, "clone", "-q", "--bare", str(origin), str(repo))
+    _git(repo, "config", "user.email", "test@example.invalid")
+    _git(repo, "config", "user.name", "test")
     return {"origin": origin, "work": work, "repo": repo}
 
 
