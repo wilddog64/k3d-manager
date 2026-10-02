@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- `/ask-docs` sources are now GitHub links at the webhook's checked-out branch (override with
+  `K3DM_ASK_DOCS_LINK_REF`), in both answers and `--sources` mode; the 3000-char reply budget counts the full
+  links so none is cut ([bug](docs/bugs/2026-10-02-ask-docs-sources-not-linked.md))
 - `/cluster-status` in the bot channel now posts only its verdict line top-level and puts the per-check report in
   that line's thread, so repeated runs no longer bury the channel. The relay forwards `channel_id`; other channels
   and thread replies keep the old delivery, and a failed bot post falls back to the response URL

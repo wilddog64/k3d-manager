@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -40,7 +41,7 @@ def test_real_tree_tfidf_retrieval_answers_with_real_sources(monkeypatch):
     prose, sources = reply.split("Sources:\n", 1)
     assert len(calls) == 1
     assert prose.strip()
-    paths = [line for line in sources.splitlines() if line]
+    paths = [line.rsplit("|", 1)[-1].rstrip(">") for line in sources.splitlines() if line]
     assert "docs/bugs/2026-08-15-cluster-up-failure-orphans-cloudformation-stack.md" in paths
     for path in paths:
         assert (REPO_ROOT / path).is_file()
@@ -57,7 +58,7 @@ def test_real_tree_driver_runs_as_a_subprocess():
     )
     result = subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT, capture_output=True, text=True, check=True)
     assert "grounded reply" in result.stdout
-    assert f"Sources:\n{path}" in result.stdout
+    assert ask_docs._doc_link(path) in result.stdout
 
 
 def test_no_match_does_not_call_model():
@@ -82,9 +83,9 @@ def test_sources_mode_lists_kept_documents_without_calling_model(monkeypatch):
     )
     assert calls == []
     assert "Top matching documents:" in reply
-    assert f"0.91  {ask_docs._doc_date(path)}  {path} — A source" in reply
+    assert f"0.91  {ask_docs._doc_date(path)}  {ask_docs._doc_link(path)} — A source" in reply
     assert "memory-bank/nope.md" not in reply
-    assert f"Sources:\n{path}" in reply
+    assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
 
 
 def test_retrieval_unavailable_does_not_call_model():
@@ -113,7 +114,7 @@ def test_model_failure_still_has_sources(model):
     path = _real_source()
     reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path), model=model)
     assert "Could not summarise" in reply
-    assert f"Sources:\n{path}" in reply
+    assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
 
 
 def test_all_reply_shapes_keep_sources_and_redact_excerpt_and_answer(tmp_path):
@@ -149,7 +150,71 @@ def test_truncated_prose_preserves_sources():
     reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path),
                             model=lambda _p: "x" * 10000)
     assert len(reply) <= 3000
-    assert reply.endswith(f"Sources:\n{path}")
+    assert reply.endswith(f"Sources:\n{ask_docs._doc_link(path)}")
+
+
+def test_sources_links_use_configured_ref(monkeypatch):
+    path = "docs/bugs/x.md"
+    monkeypatch.setenv("K3DM_ASK_DOCS_LINK_REF", "k3d-manager-v1.40.0")
+    monkeypatch.setattr(ask_docs, "_excerpt", lambda *_args: "excerpt")
+    reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path),
+                            model=lambda _p: "grounded")
+    assert f"<https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.40.0/{path}|{path}>" in reply
+
+
+def test_sources_mode_links_rows_with_configured_ref(monkeypatch):
+    path = _real_source()
+    monkeypatch.setenv("K3DM_ASK_DOCS_LINK_REF", "release/ref")
+    reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path),
+                            model=lambda _p: pytest.fail("model called"), summarise=False)
+    link = f"<https://github.com/wilddog64/k3d-manager/blob/release/ref/{path}|{path}>"
+    assert f"0.90  {ask_docs._doc_date(path)}  {link} — A source" in reply
+
+
+@pytest.mark.parametrize("stdout, expected", [("HEAD\n", "main"), ("feature/docs\n", "feature/docs")])
+def test_link_ref_uses_checked_out_branch_or_main(monkeypatch, stdout, expected):
+    monkeypatch.delenv("K3DM_ASK_DOCS_LINK_REF", raising=False)
+    monkeypatch.setattr(ask_docs, "_LINK_REF_CACHE", None)
+    monkeypatch.setattr(ask_docs.subprocess, "run",
+                        lambda *args, **kwargs: SimpleNamespace(stdout=stdout))
+    assert ask_docs._link_ref() == expected
+
+
+def test_link_ref_failure_uses_main(monkeypatch):
+    monkeypatch.delenv("K3DM_ASK_DOCS_LINK_REF", raising=False)
+    monkeypatch.setattr(ask_docs, "_LINK_REF_CACHE", None)
+
+    def fail(*_args, **_kwargs):
+        raise OSError("offline")
+
+    monkeypatch.setattr(ask_docs.subprocess, "run", fail)
+    assert ask_docs._link_ref() == "main"
+
+
+def test_long_reply_keeps_every_source_link_intact(monkeypatch):
+    paths = [f"docs/bugs/{'x' * 80}-{index}.md" for index in range(3)]
+    monkeypatch.setenv("K3DM_ASK_DOCS_LINK_REF", "main")
+    monkeypatch.setattr(ask_docs, "_excerpt", lambda *_args: "excerpt")
+    reply = ask_docs.answer(
+        "known",
+        retrieve=lambda _q, k=5: [(0.9, path, f"source {index}") for index, path in enumerate(paths)],
+        model=lambda _p: "x" * 10000,
+    )
+    assert len(reply) <= ask_docs.MAX_REPLY_CHARS
+    assert reply.count("<") == reply.count(">")
+    for path in paths:
+        assert ask_docs._doc_link(path) in reply
+
+
+def test_unsafe_source_path_is_plain_text(monkeypatch):
+    path = "docs/bugs/bad|path.md"
+    monkeypatch.setattr(ask_docs, "_allowed_path", lambda _path: True)
+    monkeypatch.setattr(ask_docs, "_excerpt", lambda *_args: "excerpt")
+    monkeypatch.setenv("K3DM_ASK_DOCS_LINK_REF", "main")
+    reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path),
+                            model=lambda _p: "grounded")
+    assert f"Sources:\n{path}" in reply
+    assert f"<{path}>" not in reply
 
 
 @pytest.mark.parametrize("question", [
@@ -225,7 +290,7 @@ def test_recent_mode_sorts_dates_and_keeps_floor(tmp_path, monkeypatch):
         ask_docs.REPO_ROOT = old_root
     assert calls == [50]
     assert reply.startswith("grounded")
-    assert reply.endswith("Sources:\ndocs/bugs/2026-10-01-new.md")
+    assert reply.endswith("Sources:\n" + ask_docs._doc_link("docs/bugs/2026-10-01-new.md"))
     assert "Date: 2026-10-01" in prompts[0]
     assert "2026-10-02-below-floor.md" not in reply
 
@@ -249,5 +314,5 @@ def test_non_recent_mode_keeps_score_order_and_sources_date(tmp_path):
     finally:
         ask_docs.REPO_ROOT = old_root
     assert calls == [5]
-    assert "0.80  2026-09-01  docs/bugs/2026-09-01-old.md — Old" in reply
-    assert "0.70  2026-10-01  docs/bugs/2026-10-01-new.md — New" in reply
+    assert f"0.80  2026-09-01  {ask_docs._doc_link('docs/bugs/2026-09-01-old.md')} — Old" in reply
+    assert f"0.70  2026-10-01  {ask_docs._doc_link('docs/bugs/2026-10-01-new.md')} — New" in reply

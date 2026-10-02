@@ -349,6 +349,8 @@ bin/k3dm-webhook-setup --uninstall
 | `/codex <question>` | Multi-agent cluster troubleshooting | `/codex explain this ArgoCD drift` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade 9.5.15 infra` | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
 
+`/ask-docs` source paths are links to GitHub at the webhook's checked-out branch; set `K3DM_ASK_DOCS_LINK_REF` to override the branch.
+
 ### /k3dm targets
 
 | Target | Role | Required | Optional | Confirm | Timeout |

@@ -3,6 +3,8 @@
 import logging
 import os
 import re
+import subprocess
+from urllib.parse import quote
 from pathlib import Path
 
 from hermes import prior_art
@@ -16,6 +18,7 @@ ASK_DOCS_MIN_SCORE = float(os.environ.get("K3DM_ASK_DOCS_MIN_SCORE", "0.60"))
 RECENT_POOL = 50
 MAX_EXCERPT_CHARS = 600
 MAX_REPLY_CHARS = 3000
+_LINK_REF_CACHE = None
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d .()\-]{7,}\d)(?!\w)")
 _DOC_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
@@ -38,6 +41,37 @@ def _allowed_path(path):
         return False
     candidate = (REPO_ROOT / normalized).resolve()
     return any(candidate.is_relative_to((REPO_ROOT / directory).resolve()) for directory in RETURNABLE_DIRS)
+
+
+def _link_ref():
+    override = os.environ.get("K3DM_ASK_DOCS_LINK_REF")
+    if override:
+        return override
+    global _LINK_REF_CACHE
+    if _LINK_REF_CACHE is None:
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(REPO_ROOT), "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            ref = result.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            ref = ""
+        _LINK_REF_CACHE = ref if ref and ref != "HEAD" else "main"
+    return _LINK_REF_CACHE
+
+
+def _doc_link(path):
+    path = str(path)
+    if any(character in path for character in ("<", ">", "|", "\n")):
+        return path
+    repo_url = os.environ.get(
+        "K3DM_ASK_DOCS_REPO_URL", "https://github.com/wilddog64/k3d-manager"
+    ).rstrip("/")
+    return f"<{repo_url}/blob/{quote(_link_ref(), safe='/')}/{quote(path, safe='/')}|{path}>"
 
 
 def _doc_date(path):
@@ -92,7 +126,7 @@ def _sources(results):
 
 
 def _reply(prose, paths, *, scrub_prose=True):
-    source_lines = "Sources: none" if not paths else "Sources:\n" + "\n".join(paths)
+    source_lines = "Sources: none" if not paths else "Sources:\n" + "\n".join(_doc_link(path) for path in paths)
     if not prose:
         prose = "Could not summarise — read the sources directly."
     if scrub_prose:
@@ -127,7 +161,7 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         return _reply("No matching documents for that question.", [])
     if not summarise:
         lines = ["Top matching documents:"]
-        lines.extend(f"{score:.2f}  {_doc_date(path) or '-'}  {path} — {_scrub(title)}" for score, path, title in results
+        lines.extend(f"{score:.2f}  {_doc_date(path) or '-'}  {_doc_link(path)} — {_scrub(title)}" for score, path, title in results
                      if score >= ASK_DOCS_MIN_SCORE and _allowed_path(path)
                      and path in paths)
         return _reply("\n".join(lines), paths, scrub_prose=False)

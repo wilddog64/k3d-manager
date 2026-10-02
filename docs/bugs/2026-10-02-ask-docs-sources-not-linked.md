@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** low. The reader has to copy a path such as `docs/bugs/2026-10-01-….md` and find it by hand
 before they can check what the answer is based on.
-**Status:** OPEN
+**Status:** FIXED (pending deploy)
 **Related:** `docs/bugs/2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`, which added
 `--sources` mode.
 
@@ -66,3 +66,9 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 ## Rollout
 
 `make restart-webhook`. No relay change.
+
+## Resolution
+
+`/ask-docs` now renders allowed source paths as GitHub links using the webhook's checked-out branch by default,
+with `K3DM_ASK_DOCS_LINK_REF` and `K3DM_ASK_DOCS_REPO_URL` overrides. Link-aware reply budgeting keeps every
+source link intact under the existing 3000-character limit; unsafe path characters remain plain text.
