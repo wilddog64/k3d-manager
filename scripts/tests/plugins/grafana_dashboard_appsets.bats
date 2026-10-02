@@ -162,6 +162,14 @@ _assert_no_panel_overlap() {
   [ "$output" = "true" ]
 }
 
+@test "Checkout Load Test CPU saturation uses a window that spans several scrapes" {
+  local file="${DASHBOARDS_DIR}/checkout-loadtest-configmap.yaml"
+  local panel
+  panel="$(yq -r '.data["checkout-loadtest.json"]' "$file" | jq -c '.panels[] | select(.id == 5)')"
+  [ -n "$panel" ]
+  jq -e '(.targets[0].expr | contains("container_cpu_usage_seconds_total")) and (.targets[0].expr | contains("[5m]")) and (.targets[0].expr | contains("[1m]") | not) and (.targets[0].expr | contains("$__rate_interval") | not) and (.description | contains("once a minute"))' <<<"$panel" >/dev/null
+}
+
 @test "observability plugin applies both dashboard appsets" {
   run grep -c 'grafana-dashboards-\(acg\|hub\).yaml' "${PLUGIN}"
   [ "$output" = "2" ]

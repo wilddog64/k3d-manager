@@ -1,7 +1,7 @@
 # Bug: Checkout Load Test "shopping-cart-apps CPU saturation" shows "No data"
 
 **Filed:** 2026-10-02
-**Status:** OPEN
+**Status:** FIXED (pending sync)
 **Branch:** `k3d-manager-v1.40.0`
 **File:** `scripts/etc/grafana/dashboards/checkout-loadtest-configmap.yaml` (panel `id` 5)
 **Tests:** `scripts/tests/plugins/grafana_dashboard_appsets.bats`
