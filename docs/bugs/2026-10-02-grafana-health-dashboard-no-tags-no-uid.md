@@ -106,3 +106,13 @@ The AppSets already track `k3d-manager-v1.41.0` (operator reapplied them 2026-10
 - Do NOT modify files other than the 4 listed
 - Do NOT commit to `main`
 - Do NOT edit memory-bank
+
+## Rollout gotcha (2026-10-02): a uid change needs a Grafana restart here
+
+After `86f21788` synced, the sidecar wrote the new JSON. Grafana 11.4 then logged this every 30s:
+`failed to save dashboard file=/tmp/dashboards/grafana-overview-readable.json error="could not resolve dashboards:uid:k3dm-grafana-health: Dashboard not found"`.
+Grafana keeps a provisioned file mapped to its existing (auto-generated) uid and cannot move the file to a new uid.
+The hub Grafana stores `/var/lib/grafana` on an `emptyDir`, so the operator ran
+`kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring`. The fresh database provisioned the
+dashboard directly under `k3dm-grafana-health`, and the new pod logged 0 save errors. Any future uid change on a
+provisioned dashboard here needs the same restart.
