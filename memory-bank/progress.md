@@ -2932,3 +2932,4 @@ in the bug doc after commit: `3664bea7`.
 - 2026-10-02: payment #78 Copilot finding (resource_access roles from ANY client grant payment roles) fixed `a3c0c24`: client roles scoped to payment.security.resource-client-id (default payment-service); CI pending.
 - 2026-10-02: payment #78 CI green on `a3c0c24` (139 tests); Copilot thread resolved. Both PRs ready for operator merge.
 - 2026-10-02: payment #78 MERGED (`412bc78`), e2e-tests #9 MERGED (`755ad2d`); e2e-tests enforce_admins re-enabled. Awaiting payment main build 37031252652 image publish → substrate pin bump.
+- 2026-10-02: Overview "Firing Alerts by Category" table spec `617ac4c8` (operator request; classifies the 55 firing alerts) dispatched to Codex.
