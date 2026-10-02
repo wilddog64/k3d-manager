@@ -121,3 +121,29 @@ Measured on the hub 2026-10-02: the steady ~0.4 req/s is `/api/health` (kubelet 
 small ripple is sampling: probe hits land in a 30s-scraped counter, so each `rate` window holds a whole number of
 hits and alternates between neighbouring counts. The 12:00–13:30 bursts are real traffic: dashboard-sidecar
 `/api/admin/provisioning/dashboards/reload` calls during the ArgoCD syncs, plus browser sessions.
+
+## Follow-up (2026-10-02): Request Rate description names the health-probe baseline
+
+**Status:** OPEN
+
+The operator read the steady HTTP 200 line as unexplained load. It is kubelet `/api/health` probes (see the note above).
+
+### Fix (panel `id` 2, "Request Rate by HTTP Status", both copies, kept identical)
+
+Replace `description` with exactly:
+
+```
+Request rate grouped by HTTP status code. The steady ~0.4 req/s HTTP 200 baseline is kubelet /api/health liveness and readiness probes; bursts above it are real traffic (browser sessions, dashboard provisioning reloads). Status -1 means the request did not produce a normal HTTP response, usually because instrumentation recorded an internal failure before a response was available.
+```
+
+Change nothing else: not the title, the query, or the legend.
+
+### Tests (`scripts/tests/plugins/grafana_dashboard_appsets.bats`)
+
+1. Extend `_assert_query_contract`: the Request Rate description contains `kubelet /api/health` and `Status -1`.
+2. The existing Request Rate byte-identity test keeps both copies identical.
+3. One mutation in the snapshot style: restore the old description → the query contract is red.
+
+### Rules
+
+Same as the Build Info follow-up. Update this section's Status to FIXED (pending sync).
