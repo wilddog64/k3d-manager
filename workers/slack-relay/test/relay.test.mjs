@@ -160,7 +160,7 @@ test('cluster-status still relays and events GET is missing', async () => {
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
 })
 
-test('/ask and /ask-docs relay channel_id, while cluster-status does not', async () => {
+test('/ask, /ask-docs and cluster-status relay channel_id', async () => {
   for (const [command, endpoint, text] of [
     ['/ask', '/api/v1/ask', 'why is the cluster slow?'],
     ['/ask-docs', '/api/v1/ask-docs', 'how is retrieval evaluated?'],
@@ -174,7 +174,7 @@ test('/ask and /ask-docs relay channel_id, while cluster-status does not', async
   const worker = loadWorker()
   await worker.dispatch(signed('/slack/commands', 'command=/cluster-status&channel_id=CSTATUS&user_id=UOP1'))
   const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster-status')
-  assert.equal(JSON.parse(call.init.body).channel_id, undefined)
+  assert.equal(JSON.parse(call.init.body).channel_id, 'CSTATUS')
 })
 
 test('/ask-docs --sources without a question returns the updated usage', async () => {

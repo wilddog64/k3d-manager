@@ -5,6 +5,8 @@ Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/clust
 that control the k3d-manager cluster from any Slack channel, plus thread-based AI troubleshooting
 and job control via thread replies.
 
+In the bot channel, the `/cluster-status` verdict posts top-level and the details go in its thread.
+
 ---
 
 ## Architecture

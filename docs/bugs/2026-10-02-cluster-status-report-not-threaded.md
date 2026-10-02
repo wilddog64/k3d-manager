@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** low. Each `/cluster-status` drops a report of about 21 lines into the channel, so two runs
 bury everything else. A follow-up has no thread to go in.
-**Status:** OPEN
+**Status:** FIXED (pending deploy)
 **Related:** `docs/bugs/2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`. `/ask` and
 `/ask-docs` got threaded delivery there. This doc applies the same pattern to `/cluster-status`.
 
@@ -85,3 +85,11 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 ## Rollout (operator)
 
 `make deploy-worker` for the relay, then `make restart-webhook`. Then run `/cluster-status` in the bot channel.
+
+## Resolution
+
+The relay now forwards the slash command's `channel_id`. The webhook passes it to both status jobs;
+when the request is a top-level command in the configured bot channel, the verdict is posted as a
+top-level message and the redacted details are posted in its thread. Failed header/body posts fall
+back to the response URL without duplicating the report. Tests cover the bot-channel, fallback,
+incoming-thread, route-forwarding, and relay behavior; Slack, cluster, and network calls remain stubbed.

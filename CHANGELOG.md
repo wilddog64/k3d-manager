@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- `/cluster-status` in the bot channel now posts only its verdict line top-level and puts the per-check report in
+  that line's thread, so repeated runs no longer bury the channel. The relay forwards `channel_id`; other channels
+  and thread replies keep the old delivery, and a failed bot post falls back to the response URL
+  ([bug](docs/bugs/2026-10-02-cluster-status-report-not-threaded.md))
 - The `k3dm-smoke-user` login credentials now live in Vault (`secret/keycloak/smoke-user`) and are recreated
   by an ExternalSecret in shopping-cart-infra, so a hub rebuild no longer leaves `/cluster-status` with two
   smoke-token warnings. The seed reuses the Vault password, then a legacy Secret, before generating one, and passes

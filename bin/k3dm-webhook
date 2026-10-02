@@ -1587,6 +1587,10 @@ _configure_status_runtime(
     None, _notify_job, _redact_secrets, _resolve_provider, _provider_context,
     _acg_stack_probe, _running_cluster_job, _smoke_test_services,
 )
+_status._slack_bot_token = lambda: SLACK_BOT_TOKEN
+_status._slack_channel_id = lambda: SLACK_CHANNEL_ID
+_status._start_bot_thread = _start_bot_thread
+_status._post_slack_bot = _post_slack_bot
 _status._ARCH_CONTEXT = _ARCH_CONTEXT
 
 
@@ -2022,13 +2026,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
                 target=_run_hostinger_status if provider == "hostinger" else _run_cluster_status,
                 args=(job_id, response_url),
-                kwargs={"thread_ts": thread_ts, "provider": provider},
+                kwargs={"thread_ts": thread_ts, "provider": provider, "channel_id": channel_id},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})

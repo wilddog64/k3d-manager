@@ -357,7 +357,7 @@ async function handle(req, event) {
 
   if (command === '/cluster-status') {
     const provider = resolveProvider(text, 'hostinger')
-    const payload = { provider, response_url: responseUrl }
+    const payload = { provider, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster-status', payload, meta)
