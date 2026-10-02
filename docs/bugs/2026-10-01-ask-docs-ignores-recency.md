@@ -5,7 +5,7 @@
 **Severity:** low. The answer looks authoritative but is wrong for the question. Asked for recent
 Slack/webhook issues, `/ask-docs` cited five docs dated 2026-06-04 to 2026-08-18. The same day it
 was asked had three Slack/webhook incidents filed.
-**Status:** OPEN
+**Status:** FIXED
 **Related:** `2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`
 
 ## Observed (operator, 2026-10-01)
@@ -101,3 +101,9 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 ## Operator step after the fix
 
 Run `make restart-webhook`, then ask the same question again; the 2026-10-01 docs should lead.
+
+## Resolution
+
+`/ask-docs` now detects recency intent, retrieves a larger candidate pool, filters by the configured
+score floor, and orders dated documents newest first. Dates are extracted from filenames or Filed
+metadata, included in excerpts and `--sources`, and the recency instruction is passed to the model.

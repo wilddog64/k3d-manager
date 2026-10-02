@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- `/ask-docs` answers questions about recent items: recency words switch to a 50-doc pool sorted
+  newest first, and excerpts and `--sources` show each doc's date.
+
+- `ask-docs` typed as a reply in a Slack thread now answers in that thread instead of being
+  silently dropped.
+
 - Hub recovery now selects the public frontend Cloudflare origin from the app cluster's
   frontend deployment, with an explicit override and a safe Hostinger fallback.
 

@@ -82,7 +82,7 @@ def test_sources_mode_lists_kept_documents_without_calling_model(monkeypatch):
     )
     assert calls == []
     assert "Top matching documents:" in reply
-    assert f"0.91  {path} — A source" in reply
+    assert f"0.91  {ask_docs._doc_date(path)}  {path} — A source" in reply
     assert "memory-bank/nope.md" not in reply
     assert f"Sources:\n{path}" in reply
 
@@ -164,3 +164,90 @@ def test_rejected_question_skips_retrieval_and_model(question):
     assert "Question rejected" in reply
     assert calls == []
     assert reply.endswith("Sources: none")
+
+
+def test_doc_date_uses_filename_then_filed_metadata(tmp_path):
+    root = tmp_path / "repo"
+    (root / "docs/bugs").mkdir(parents=True)
+    (root / "docs/bugs/2026-10-01-dated.md").write_text("no metadata")
+    filed = root / "docs/plans/v1.40.0-x.md"
+    filed.parent.mkdir(parents=True)
+    filed.write_text("\n" * 2 + "**Filed:** 2026-09-24\n")
+    undated = root / "docs/issues/no-date.md"
+    undated.parent.mkdir(parents=True)
+    undated.write_text("no metadata")
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    try:
+        assert ask_docs._doc_date("docs/bugs/2026-10-01-dated.md") == "2026-10-01"
+        assert ask_docs._doc_date("docs/plans/v1.40.0-x.md") == "2026-09-24"
+        assert ask_docs._doc_date("docs/issues/no-date.md") is None
+        assert ask_docs._doc_date("memory-bank/activeContext.md") is None
+    finally:
+        ask_docs.REPO_ROOT = old_root
+
+
+@pytest.mark.parametrize("question", ["recent issues", "latest bug", "this week"])
+def test_wants_recent(question):
+    assert ask_docs._wants_recent(question)
+
+
+@pytest.mark.parametrize("question", ["renewal issue", "newsletter update", "old issue"])
+def test_wants_recent_requires_word_boundaries(question):
+    assert not ask_docs._wants_recent(question)
+
+
+def test_recent_mode_sorts_dates_and_keeps_floor(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    (root / "docs/bugs").mkdir(parents=True)
+    for name in ("2026-10-01-new.md", "2026-09-30-old.md", "2026-09-01-older.md", "2026-10-02-below-floor.md"):
+        (root / "docs/bugs" / name).write_text("content")
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    calls = []
+    prompts = []
+    monkeypatch.setattr(ask_docs, "ASK_DOCS_MIN_SCORE", 0.60)
+
+    def retrieve(_question, k=5):
+        calls.append(k)
+        return [
+            (0.95, "docs/bugs/2026-09-01-older.md", "Older"),
+            (0.90, "docs/bugs/2026-09-30-old.md", "Old"),
+            (0.65, "docs/bugs/2026-10-01-new.md", "New"),
+            (0.55, "docs/bugs/2026-10-02-below-floor.md", "Below floor"),
+        ]
+
+    try:
+        reply = ask_docs.answer("what is recent?", retrieve=retrieve,
+                                model=lambda prompt: prompts.append(prompt) or "grounded",
+                                k=1)
+    finally:
+        ask_docs.REPO_ROOT = old_root
+    assert calls == [50]
+    assert reply.startswith("grounded")
+    assert reply.endswith("Sources:\ndocs/bugs/2026-10-01-new.md")
+    assert "Date: 2026-10-01" in prompts[0]
+    assert "2026-10-02-below-floor.md" not in reply
+
+
+def test_non_recent_mode_keeps_score_order_and_sources_date(tmp_path):
+    root = tmp_path / "repo"
+    (root / "docs/bugs").mkdir(parents=True)
+    (root / "docs/bugs/2026-10-01-new.md").write_text("content")
+    (root / "docs/bugs/2026-09-01-old.md").write_text("content")
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    calls = []
+
+    def retrieve(_question, k=5):
+        calls.append(k)
+        return [(0.80, "docs/bugs/2026-09-01-old.md", "Old"),
+                (0.70, "docs/bugs/2026-10-01-new.md", "New")]
+
+    try:
+        reply = ask_docs.answer("old issue", retrieve=retrieve, summarise=False)
+    finally:
+        ask_docs.REPO_ROOT = old_root
+    assert calls == [5]
+    assert "0.80  2026-09-01  docs/bugs/2026-09-01-old.md — Old" in reply
+    assert "0.70  2026-10-01  docs/bugs/2026-10-01-new.md — New" in reply
