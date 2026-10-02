@@ -2145,6 +2145,7 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - 2026-10-02: `fef39649` (realm roles list) + `cc43b5fc` (Grafana Dashboards Loaded) landed, Claude-verified. Checkout Load Test CPU saturation [1m]→[5m] spec dispatched to Codex.
 - 2026-10-02: operator `loadtest_run --confirm` failed (no LOADTEST_USERNAME/PASSWORD). `make loadtest-preflight` / `make loadtest CONFIRM=1` added to v1.41.1 plan `06e973dc` (v1.40.0 at 5-plan cap).
 - 2026-10-02: `a5e1e24f` CPU saturation [5m] landed (Claude-verified 30/30). vcluster upgrade nag: bug spec docs/bugs/2026-10-02-vcluster-upgrade-nag-in-harness-output.md (VCLUSTER_SKIP_VERSION_CHECK=true) dispatched to Codex; pin-drift check/bump plan docs/plans/v1.41.1-vcluster-version-drift.md (pinned 0.32.1, latest 0.37.2).
+- 2026-10-02: `7ce184e5` vcluster nag fix verified (shellcheck clean, new test green). 4 vcluster.bats orphan tests red since `5706eb21` (seed still a table; only reconcile suite was run at verify) — spec docs/bugs/2026-10-02-vcluster-bats-orphan-seed-still-a-table.md dispatched to Codex. Plan docs/plans/v1.41.1-scheduled-baseline-loadtest.md: 12h baseline profile via launchd + major-release stress gate before/during PR (operator decision).
 - [x] **Root-caused the product-catalog promotion failure** — never onboarded in the unenumerated
       2026-08-09 SSH-promoter rollout; Dependabot auto-merge imported the breaking change 2026-08-12;
       a 2026-09-01 DeployKey ruleset bypass was a misdiagnosis. Broken since 08-12, not 08-26.
