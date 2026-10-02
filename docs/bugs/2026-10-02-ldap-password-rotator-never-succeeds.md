@@ -5,7 +5,7 @@
 **Severity:** medium. Monthly LDAP password rotation has not run since the hub rebuild (CronJob created
 2026-09-20, `lastSuccessfulTime` empty). `KubeJobFailed` for `identity/ldap-password-rotator-29846880` has been
 firing since 2026-10-01T00:06Z.
-**Status:** OPEN
+**Status:** FIXED (pending rollout)
 **Related:** `docs/bugs/v1.23.0-bugfix-grafana-rotator-openssl-not-found.md`: the same `openssl: not found` on
 `alpine/k8s`, fixed there for the Grafana rotator only. This is the LDAP rotator's copy of that defect.
 
@@ -75,6 +75,10 @@ Mutations, each red, then `cp`-restored and `cmp`-proved: (a) put the `openssl` 
   is clean on `scripts/plugins/ldap.sh`.
 - No cluster, network or git commits. Leave the changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
 - Update this doc: Status FIXED (pending rollout), plus a short Resolution section.
+
+## Resolution
+
+The rotator now generates passwords using the image's portable `/dev/urandom` toolchain, rejects an empty generated password before any LDAP update, and performs a Vault reachability preflight before entering the user loop. Deployment now derives the in-cluster Vault address from `VAULT_NS`. Offline BATS coverage verifies rendering, password generation, guard ordering, preflight ordering, and namespace-derived deployment.
 
 ## Rollout (operator)
 
