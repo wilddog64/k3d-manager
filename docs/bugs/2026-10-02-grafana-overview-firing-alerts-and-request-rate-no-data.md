@@ -147,3 +147,42 @@ Change nothing else: not the title, the query, or the legend.
 ### Rules
 
 Same as the Build Info follow-up. Update this section's Status to FIXED (pending sync).
+
+## Follow-up (2026-10-02): Firing Alerts counts Grafana-managed rules, of which there are none
+
+**Status:** OPEN
+
+The panel counts `grafana_alerting_alerts{state="alerting"}`. The hub has **no** Grafana-managed alert rules: every
+`grafana_alerting_alerts` state (`alerting`, `pending`, `nodata`, `error`, `normal`) is `0`. So the panel reads `0`
+by construction. Every real alert is a Prometheus rule routed through Alertmanager; on 2026-10-02 the hub had
+`TrivyCriticalVulnerabilityDetected` ×48, `E2EVerificationFailing` ×3, `KubeHpaMaxedOut` ×2, `KubeJobFailed`,
+`CPUThrottlingHigh` and `PrometheusOutOfOrderTimestamps` firing, plus the always-on `Watchdog` and `InfoInhibitor`.
+
+### Fix (panel `id` 6, both copies, kept identical)
+
+- `title`: `Firing Alerts (Prometheus)`
+- `targets[0].expr`: `count(ALERTS{alertstate="firing", alertname!~"Watchdog|InfoInhibitor"}) or vector(0)`
+  (no `$job`/`$instance` filter: those select the Grafana instance, not the alert source)
+- `targets[0].legendFormat`: `Firing alerts`; keep `instant: true` and `refId`.
+- `description`: `Prometheus alerts currently firing (the ALERTS series), excluding the always-on Watchdog and InfoInhibitor. Grafana-managed alert rules are not counted; none are defined. Open Alertmanager for the list.`
+- `fieldConfig.defaults.thresholds.steps`: `[{"color":"green"},{"color":"red","value":1}]`. Keep `noValue: "0"`.
+- Change nothing else in either file.
+
+### Tests (`scripts/tests/plugins/grafana_dashboard_appsets.bats`)
+
+1. Update `_assert_query_contract` for the Firing Alerts panel: expr contains `ALERTS{alertstate="firing"`,
+   `Watchdog|InfoInhibitor` and `or vector(0)`; contains neither `grafana_alerting_alerts` nor
+   `grafana_alerting_result_total`; `noValue == "0"`; title is `Firing Alerts (Prometheus)`; the red threshold
+   step's value is `1`. Select the panel by `id == 6`, not by title. Keep the Request Rate checks unchanged.
+2. The existing Firing Alerts / Request Rate byte-identity test stays green.
+3. Mutations in the snapshot style, each red: put `grafana_alerting_alerts{state="alerting"}` back as the expr;
+   remove the `alertname!~` exclusion. Keep the existing `grafana_alerting_result_total` mutation working (adjust its
+   setup if it depended on the old expr).
+
+### Rules
+
+- `bats scripts/tests/plugins/grafana_dashboard_appsets.bats` green; `yq` parses both files; embedded JSON passes `jq -e .`.
+- Update `docs/guides/grafana-dashboards.md` only if it describes the Overview's Firing Alerts panel; if so, one
+  sentence to match.
+- No cluster, network or git commits. Leave changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
+- Update this section's Status to FIXED (pending sync).
