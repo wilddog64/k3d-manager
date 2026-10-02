@@ -2142,6 +2142,7 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **Promoter-key spec corrected twice** — deploy keys are per-repo, not shared; product-catalog
       is missing the `sc-image-promoter` deploy key AND the `PROMOTER_SSH_KEY` secret. Pin bump
       sequenced after the infra merge, not dispatched to Codex.
+- 2026-10-02: `fef39649` (realm roles list) + `cc43b5fc` (Grafana Dashboards Loaded) landed, Claude-verified. Checkout Load Test CPU saturation [1m]→[5m] spec dispatched to Codex.
 - [x] **Root-caused the product-catalog promotion failure** — never onboarded in the unenumerated
       2026-08-09 SSH-promoter rollout; Dependabot auto-merge imported the breaking change 2026-08-12;
       a 2026-09-01 DeployKey ruleset bypass was a misdiagnosis. Broken since 08-12, not 08-26.
@@ -2944,3 +2945,4 @@ in the bug doc after commit: `3664bea7`.
 - 2026-10-02: service-link fix landed `c7fa36e4` (Codex, Claude-verified 60/60 bats, mutation red). Operator to re-run `make e2e`.
 - 2026-10-02: recorded make log lags live run (macOS script buffers); spec `6cd5697a` (script -F / -f) dispatched to Codex. Live e2e run 17:26:38Z in progress, watched via /tmp/e2e.log.
 - 2026-10-02: recorded-log flush fix landed (script -F / -f; 6/6 bats, mutation red; live flush unverified — no TTY in Claude shell).
+- 2026-10-02: e2e run 1790961998-24160: service-link fix confirmed live (product-catalog/basket/order rolled out); FAILED at keycloak rollout — realm import roles.realm nested object (from `570734c7`). Spec + Overview "Dashboards" stat title spec `380bf24a` dispatched to Codex.
