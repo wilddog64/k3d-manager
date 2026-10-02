@@ -144,8 +144,10 @@ similarity score means *read that file before filing*, not *do not file*.
 
 Only each document's title, leading paragraph and `##` headings are embedded —
 roughly 3% of a typical file — and rows are keyed by a content hash of exactly
-that text, so re-running with no doc changes makes zero API calls. Retrieval
-quality is UNMEASURED until the v1.40.0 eval lands.
+that text, so re-running with no doc changes makes zero API calls. The v1.40.0
+live eval measured a modest recall gain over a TF-IDF control on bugs only, with
+more intrusion — results stay advisory; see
+[Vector Store](../guides/vector-store.md).
 
 A cold index on the free Gemini tier spans **two sittings**, not one: the
 per-day allowance is spent before the corpus finishes. A partial run is durable
@@ -166,6 +168,7 @@ the store rather than truncating it. See
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
 | `make test-all` | `test` + `test-bin` + `test-python` | Everything that runs offline, in one call — what `make test-metrics` wraps |
+| `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
 
 **A new BATS suite must live in one of those directories or nothing runs it.**
 Discovery is by directory glob, not by file pattern: the dispatcher globs

@@ -103,7 +103,8 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
     score means **read that file before filing**, not *do not file*: a recurrence is worth
     recording, and often belongs as a `Recurrence` section appended to the existing doc rather than
     as a new file. The command always exits 0 — a store that is down or an unset credential must
-    never block filing. Scores are UNMEASURED until the v1.40.0 retrieval eval lands.
+    never block filing. The v1.40.0 live eval found a modest recall gain on bugs only and more
+    intrusion than a TF-IDF control, so scores stay advisory — never a filing gate.
     See `docs/howto/find-prior-art.md`.
 
 ---
