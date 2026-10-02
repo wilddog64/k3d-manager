@@ -50,6 +50,21 @@ function _hub_recovery_render_cloudflared_config() {
   ' "$in_file"
 }
 
+function _hub_recovery_frontend_origin_provider() {
+  local hub_context="$1" app_context="$2"
+  if [[ -n "${HUB_RECOVERY_FRONTEND_PROVIDER:-}" ]]; then
+    printf '%s\n' "$HUB_RECOVERY_FRONTEND_PROVIDER"
+  elif _kubectl -- --context "$app_context" -n shopping-cart-apps get deployment frontend >/dev/null 2>&1; then
+    printf '%s\n' k3s-hostinger
+  elif _kubectl -- --context "$hub_context" -n shopping-cart-apps get deployment frontend >/dev/null 2>&1; then
+    printf '%s\n' k3d
+  else
+    printf '%s\n' k3s-hostinger
+    _warn "[hub-recovery] no frontend deployment found; leaving origin on permanent app cluster"
+  fi
+  return 0
+}
+
 function _hub_recovery_sync_vault_root_token() {
   local hub_context="$1" root_token=""
   if ! _is_mac; then
@@ -168,10 +183,12 @@ function _hub_recovery_mirror_argocd_admin() {
 }
 
 function _hub_recovery_install_cloudflared_config() {
-  local config_dir="${HOME}/.cloudflared" config_file="${HOME}/.cloudflared/config.yml" source_file="$SCRIPT_DIR/etc/cloudflared/config.yml" table="$SCRIPT_DIR/etc/cloudflared/origins.tsv" rendered timestamp
+  local hub_context="$1" app_context="$2" provider config_dir="${HOME}/.cloudflared" config_file="${HOME}/.cloudflared/config.yml" source_file="$SCRIPT_DIR/etc/cloudflared/config.yml" table="$SCRIPT_DIR/etc/cloudflared/origins.tsv" rendered timestamp
   rendered=$(mktemp -t hub-recovery-cloudflared.XXXXXX)
   trap 'trap - RETURN; rm -f "'"${rendered}"'" 2>/dev/null || true' RETURN
-  _hub_recovery_render_cloudflared_config k3d "$source_file" "$table" > "$rendered"
+  provider=$(_hub_recovery_frontend_origin_provider "$hub_context" "$app_context")
+  _info "[hub-recovery] cloudflared frontend origin: ${provider}"
+  _hub_recovery_render_cloudflared_config "$provider" "$source_file" "$table" > "$rendered"
   if ! cmp -s "$rendered" "$config_file"; then
     mkdir -p "$config_dir"
     if [[ -f "$config_file" ]]; then
@@ -288,7 +305,7 @@ function hub_recovery_reconcile() {
   _hub_recovery_replay_identity_hook "$hub_context" || return 1
   KEYCLOAK_BASE_URL="${KEYCLOAK_BASE_URL:-https://keycloak.3ai-talk.org}" keycloak_seed_smoke_user || return 1
   _hub_recovery_mirror_argocd_admin "$hub_context" || return 1
-  _hub_recovery_install_cloudflared_config
+  _hub_recovery_install_cloudflared_config "$hub_context" "$app_context"
 }
 
 function _hub_recovery_records() {

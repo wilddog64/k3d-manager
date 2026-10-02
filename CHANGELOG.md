@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Hub recovery now selects the public frontend Cloudflare origin from the app cluster's
+  frontend deployment, with an explicit override and a safe Hostinger fallback.
+
 - `/ask` and `/ask-docs` answers are threaded in `SLACK_CHANNEL_ID` when the bot can post there;
   other channels retain response-URL delivery.
 

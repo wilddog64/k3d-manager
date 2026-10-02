@@ -3,6 +3,9 @@
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
+  HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME"
+  export HOME
   source "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
   HOSTNET_DRIFT_BIN="$BATS_TEST_TMPDIR/hostnet-drift-default"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$HOSTNET_DRIFT_BIN"
@@ -131,6 +134,47 @@ YAML
   run _hub_recovery_render_cloudflared_config unknown "$config" "$table"
   [ "$status" -eq 0 ]
   [ "$output" = "$expected" ]
+}
+
+@test "_hub_recovery_install_cloudflared_config: app context frontend uses k3s-hostinger" {
+  _kubectl() { return 0; }
+  _info() { :; }
+  export -f _kubectl _info
+  run _hub_recovery_install_cloudflared_config hub-context app-context
+  [ "$status" -eq 0 ]
+  grep -Fq 'service: http://127.0.0.2:80' "$HOME/.cloudflared/config.yml"
+}
+
+@test "_hub_recovery_install_cloudflared_config: only hub frontend uses k3d" {
+  _kubectl() {
+    [[ "$*" == *"--context hub-context"*"get deployment frontend"* ]]
+  }
+  _info() { :; }
+  export -f _kubectl _info
+  run _hub_recovery_install_cloudflared_config hub-context app-context
+  [ "$status" -eq 0 ]
+  grep -Fq 'service: http://127.0.0.1:8000' "$HOME/.cloudflared/config.yml"
+}
+
+@test "_hub_recovery_install_cloudflared_config: missing frontend keeps k3s-hostinger with warning" {
+  _kubectl() { return 1; }
+  run _hub_recovery_install_cloudflared_config hub-context app-context
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no frontend deployment found"* ]]
+  grep -Fq 'service: http://127.0.0.2:80' "$HOME/.cloudflared/config.yml"
+}
+
+@test "_hub_recovery_install_cloudflared_config: explicit provider override wins" {
+  HUB_RECOVERY_FRONTEND_PROVIDER=k3d
+  _kubectl() {
+    [[ "$*" == *"--context app-context"*"get deployment frontend"* ]]
+  }
+  _info() { :; }
+  export HUB_RECOVERY_FRONTEND_PROVIDER
+  export -f _kubectl _info
+  run _hub_recovery_install_cloudflared_config hub-context app-context
+  [ "$status" -eq 0 ]
+  grep -Fq 'service: http://127.0.0.1:8000' "$HOME/.cloudflared/config.yml"
 }
 
 @test "hub_recovery_reconcile: dry run prints steps and invokes no operations" {

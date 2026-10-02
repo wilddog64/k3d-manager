@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** medium. The public shop (`frontend.3ai-talk.org`) returns 404, and `/cluster-status`
 reports `Frontend` and `Product images` as FAIL on a healthy Hostinger cluster.
-**Status:** OPEN
+**Status:** FIXED
 **Related:** `2026-09-13-hub-recovery-manual-fixes-not-declarative.md` (Defect 3, which added
 `origins.tsv`)
 
@@ -83,3 +83,10 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 Re-render, or hand-edit the frontend line in `~/.cloudflared/config.yml` to `http://127.0.0.2:80`.
 Then run `launchctl kickstart -k "gui/$(id -u)/com.k3d-manager.cloudflare-tunnel"` and rerun
 `/cluster-status`.
+
+## Resolution
+
+Hub recovery now probes the app context first for the `frontend` deployment and renders the
+`k3s-hostinger` origin when it is present. It falls back to the hub only when the hub owns the
+frontend, honors `HUB_RECOVERY_FRONTEND_PROVIDER`, and otherwise keeps the permanent Hostinger
+origin with a warning. The installer and tests use the selected contexts and a temporary `HOME`.
