@@ -5,7 +5,7 @@
 **Severity:** medium. The hub's ArgoCD controller is CFS-throttled in 31% of periods (firing since 2026-10-02T10:15Z).
 Throttling slows every sync and health update on the hub, including the 31 apps it manages for itself and
 `ubuntu-hostinger`.
-**Status:** OPEN
+**Status:** FIXED (pending rollout)
 **Related:** `docs/bugs/2026-07-19-missing-shopping-cart-appproject.md`; the `orphanedResources` block dates from
 the AppProject bootstrap (`7912adc7`).
 
@@ -70,6 +70,11 @@ Nothing reads the orphaned-resource list: `warn` is false, and no doc, test or d
   `bats scripts/tests/plugins/argocd_vectordb.bats` (which reads `platform.yaml.tmpl`) are green.
 - No cluster, network or git commits. Leave the changes uncommitted. Do not touch `CHANGELOG.md` or memory-bank.
 - Update this doc: Status FIXED (pending rollout), plus a short Resolution section.
+
+## Resolution
+
+Removed the `orphanedResources` blocks from both AppProject templates and added offline render coverage proving
+orphaned-resource monitoring is disabled while the project fields remain intact.
 
 ## Rollout (operator)
 
