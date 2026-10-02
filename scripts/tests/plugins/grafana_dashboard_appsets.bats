@@ -196,7 +196,7 @@ _assert_no_panel_overlap() {
   run yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | jq empty
-  [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
+  [[ "$output" == *'"title": "Grafana Health & Firing Alerts"'* ]]
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
   [[ "$output" == *'"legendFormat": "p50 — median"'* ]]
@@ -218,9 +218,17 @@ _assert_no_panel_overlap() {
   run yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | jq empty
-  [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
+  [[ "$output" == *'"title": "Grafana Health & Firing Alerts"'* ]]
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
+}
+
+@test "readable Overview title does not collide with the stock Grafana Overview" {
+  local dashboard
+  for dashboard in "${OVERVIEW}" "${HUB_OVERVIEW}"; do
+    run grep -F -- '"title": "Grafana Overview' "$dashboard"
+    [ "$status" -ne 0 ]
+  done
 }
 
 @test "Grafana Overview Build Info panels use the positive table contract" {

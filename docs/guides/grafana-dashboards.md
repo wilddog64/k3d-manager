@@ -23,6 +23,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | CVE Auto-Patch | `cve-autopatch` | `platform-ops/grafana-dashboard-cve-autopatch.yaml` | `make platform-ops` | hub |
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
+| Grafana Health & Firing Alerts | — (no fixed uid) | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | `make platform-ops` (hub); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
 | Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
@@ -50,6 +51,12 @@ The mirror-image failure also happened: the ArgoCD/Image-Updater dashboard was a
 the app cluster, where `argocd_*` and `kube_deployment_*{namespace="cicd"}` do not exist, so
 every panel read `No data` while the JSON itself loaded fine
 (`docs/bugs/2026-06-29-image-updater-grafana-wrong-cluster.md`).
+
+The chart also ships a stock **`Grafana Overview`** dashboard (Firing Alerts, Dashboards, RPS).
+It is not ours and none of our fixes apply to it. Ours is **`Grafana Health & Firing Alerts`**,
+which has the "Firing Alerts by Category" table. Before 2026-10-02 it was titled
+"Grafana Overview — Readable", and the operator kept opening the stock one by mistake
+(`docs/bugs/2026-10-02-grafana-overview-readable-title-collides-with-stock-dashboard.md`).
 
 **Check the instance before debugging the query.**
 

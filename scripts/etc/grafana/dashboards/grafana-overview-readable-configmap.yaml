@@ -94,6 +94,6 @@ data:
       ]},
       "time": {"from": "now-6h", "to": "now"},
       "timezone": "utc",
-      "title": "Grafana Overview — Readable",
+      "title": "Grafana Health & Firing Alerts",
       "version": 2
     }
