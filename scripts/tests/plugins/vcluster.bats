@@ -303,8 +303,7 @@ _stub_run_command_executing() {
 }
 
 _seed_orphan_listing() {
-  export VCLUSTER_LIST_OUTPUT="NAME                  NAMESPACE   STATUS    AGE
-${1} vclusters   Running   131m"
+  export VCLUSTER_LIST_OUTPUT="[{\"Name\":\"${1}\",\"Namespace\":\"vclusters\",\"Status\":\"Running\"}]"
 }
 
 @test "vcluster_create deletes an orphan occupying the shared namespace" {
