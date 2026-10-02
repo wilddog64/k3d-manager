@@ -312,6 +312,22 @@ def test_blind_webhook_all_none_still_reads_as_webhook_down():
     assert repairs._unknown_webhook(records)
 
 
+def test_every_data_layer_source_cause_still_reads_as_webhook_down():
+    from hermes.sensors import data_layer
+    eso_down = {"sensor": "eso", "status": "unknown", "evidence": "ESO status source unavailable"}
+
+    def raises(*_args):
+        raise TimeoutError()
+
+    fetches = [lambda *_: {"services": []},
+               lambda *_: {"services": [{"name": "Frontend", "ok": None}]},
+               raises]
+    for fetch in fetches:
+        assert repairs._unknown_webhook([eso_down, data_layer(fetch, {}, token="x")])
+    absent = data_layer(lambda *_: {"services": [{"name": "Frontend", "ok": True}]}, {}, token="x")
+    assert not repairs._unknown_webhook([eso_down, absent])
+
+
 def test_data_layer_none_is_healthy_only_when_not_deployed():
     from hermes.sensors import data_layer
 

@@ -668,6 +668,55 @@ def test_data_layer_narrow_tri_state_and_failure_contracts():
     assert data_layer(lambda *_: (_ for _ in ()).throw(TimeoutError()), {}, token="x")["status"] == "unknown"
 
 
+def test_data_layer_unknown_evidence_names_each_cause():
+    cases = [
+        (data_layer(lambda *_: {}, {}, token=""), "credential unavailable: k3dm-webhook-token"),
+        (data_layer(webhook(health([])), {}, token="x"), "data layer status source unavailable: webhook returned no service checks"),
+        (data_layer(webhook(health([{"name": "Frontend", "ok": None}])), {}, token="x"),
+         "data layer status source unavailable: all webhook checks ungraded"),
+        (data_layer(webhook(health([{"name": "Frontend", "ok": True}])), {}, token="x"),
+         "data layer check absent from webhook payload"),
+        (data_layer(webhook(health([{"name": "Frontend", "ok": True},
+                                    {"name": "Data layer", "ok": None, "detail": "payload pending"}])), {}, token="x"),
+         "data layer ungraded: payload pending"),
+        (data_layer(lambda *_: (_ for _ in ()).throw(TimeoutError()), {}, token="x"),
+         "data layer status source unavailable: TimeoutError"),
+    ]
+    assert all(item["status"] == "unknown" for item, _ in cases)
+    assert [item["evidence"] for item, _ in cases] == [evidence for _, evidence in cases]
+
+
+def test_data_layer_unknown_evidence_is_pairwise_distinct():
+    records = [
+        data_layer(lambda *_: {}, {}, token=""),
+        data_layer(webhook(health([])), {}, token="x"),
+        data_layer(webhook(health([{"name": "Frontend", "ok": None}])), {}, token="x"),
+        data_layer(webhook(health([{"name": "Frontend", "ok": True}])), {}, token="x"),
+        data_layer(webhook(health([{"name": "Frontend", "ok": True},
+                                   {"name": "Data layer", "ok": None, "detail": "payload pending"}])), {}, token="x"),
+        data_layer(lambda *_: (_ for _ in ()).throw(TimeoutError()), {}, token="x"),
+    ]
+    assert all(item["status"] == "unknown" for item in records)
+    assert {item["evidence"] for item in records} == {
+        "credential unavailable: k3dm-webhook-token",
+        "data layer status source unavailable: webhook returned no service checks",
+        "data layer status source unavailable: all webhook checks ungraded",
+        "data layer check absent from webhook payload",
+        "data layer ungraded: payload pending",
+        "data layer status source unavailable: TimeoutError",
+    }
+
+
+def test_data_layer_exception_evidence_does_not_include_exception_message():
+    def failing_fetch(*_args):
+        raise RuntimeError("Bearer synthetic0token")
+
+    result = data_layer(failing_fetch, {}, token="x")
+    assert result["status"] == "unknown"
+    assert result["evidence"] == "data layer status source unavailable: RuntimeError"
+    assert "Bearer synthetic0token" not in result["evidence"]
+
+
 def test_hostnet_drift_healthy_degraded_after_two_cycles_and_unknown_on_failure():
     payload = json.dumps({"drifted": [{"namespace": "monitoring", "pod": "node-exporter",
                                         "owner_kind": "DaemonSet"}]})
