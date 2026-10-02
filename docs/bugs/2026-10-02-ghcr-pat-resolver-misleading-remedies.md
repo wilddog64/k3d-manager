@@ -1,6 +1,6 @@
 # Bug: GHCR PAT resolver reports the wrong cause and the wrong remedy
 
-**Status:** OPEN
+**Status:** FIXED (pending)
 **Branch:** `k3d-manager-v1.40.0`
 **File:** `scripts/plugins/shopping_cart.sh`
 **Tests:** `scripts/tests/plugins/shopping_cart.bats`

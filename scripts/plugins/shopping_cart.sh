@@ -349,7 +349,7 @@ function shopping_cart_load_ghcr_pat_from_vault() {
   fi
 
   if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_ghcr_pat}"; then
-    _info "[acg-up] Vault PAT authenticates but cannot pull from ghcr.io — it is missing the read:packages scope; mint a PAT with read:packages and overwrite secret/github/pat"
+    _info "[acg-up] Vault PAT authenticates but cannot pull from ghcr.io — it is missing the read:packages scope; trying the gh CLI token next"
     _ghcr_pat=""
     return 1
   fi
@@ -373,7 +373,7 @@ function shopping_cart_load_ghcr_pat_from_gh() {
   fi
 
   if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_gh_token}"; then
-    _info "[acg-up] gh CLI token cannot pull from ghcr.io — its OAuth scopes are fixed and exclude read:packages, so it is NOT being saved to Vault"
+    _info "[acg-up] gh CLI token cannot pull from ghcr.io (missing read:packages) — NOT saving it to Vault; add the scope with: gh auth refresh -h github.com -s read:packages"
     return 1
   fi
 
@@ -397,7 +397,16 @@ function shopping_cart_prompt_ghcr_pat() {
   fi
 
   if ! _shopping_cart_ghcr_pat_can_pull "${_github_user}" "${_ghcr_pat}"; then
-    _warn "[acg-up] the pasted PAT cannot pull from ghcr.io — it is missing the read:packages scope; not saving it to Vault"
+    local _netrc _pat_http
+    _netrc=$(mktemp) && chmod 0600 "${_netrc}"
+    printf 'machine api.github.com login %s password %s\n' "${_github_user}" "${_ghcr_pat}" > "${_netrc}"
+    _pat_http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "${_netrc}" "https://api.github.com/user" 2>/dev/null || true)
+    rm -f "${_netrc}"
+    if [[ "${_pat_http}" != "200" ]]; then
+      _warn "[acg-up] the pasted token is rejected by GitHub (HTTP ${_pat_http}) — it is expired, revoked, or not a token; not saving it to Vault"
+    else
+      _warn "[acg-up] the pasted token is valid but cannot pull from ghcr.io — it is missing the read:packages scope (fine-grained PATs are not accepted by GHCR); not saving it to Vault"
+    fi
     _ghcr_pat=""
     return 1
   fi
@@ -425,7 +434,7 @@ function shopping_cart_resolve_ghcr_pat() {
     return 0
   fi
 
-  _err "[acg-up] GHCR_PAT not set and no valid PAT in Vault — set GHCR_PAT env var or run: pbpaste | bin/rotate-ghcr-pat"
+  _err "[acg-up] no credential that can pull from ghcr.io (env GHCR_PAT, Vault, gh CLI all failed) — run: gh auth refresh -h github.com -s read:packages  (or: pbpaste | bin/rotate-ghcr-pat with a classic PAT that has read:packages)"
 }
 
 function shopping_cart_create_ghcr_pull_secret() {
