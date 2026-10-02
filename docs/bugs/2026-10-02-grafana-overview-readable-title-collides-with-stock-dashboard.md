@@ -1,7 +1,7 @@
 # Bug: our Overview dashboard is named so close to the stock one that the operator opens the wrong one
 
 **Filed:** 2026-10-02
-**Status:** OPEN — dispatched to Codex 2026-10-02
+**Status:** FIXED `9ccfcccd` (Codex, Claude-verified: 31/31 grafana_dashboard_appsets bats, old title gone from scripts, hub-copy revert mutation red (tests 14+15), both JSON titles valid); live after `make platform-ops` / ArgoCD sync
 **Branch:** `k3d-manager-v1.41.0`
 **Found by:** operator, 2026-10-02. They opened Dashboards → "Grafana Overview" on the hub and reported that the "Firing Alerts by Category" table was missing.
 **Related:** `docs/bugs/2026-10-01-grafana-overview-raw-series-labels.md` (created the Readable copy), `docs/bugs/2026-10-02-grafana-overview-firing-alerts-and-request-rate-no-data.md`
