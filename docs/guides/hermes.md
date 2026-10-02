@@ -154,6 +154,20 @@ flap does not trip it). All are read-only.
    default and files debounced deltas into `docs/bugs/` through the same path as e2e and status
    triage.
 
+### `data_layer` unknown — evidence → cause
+
+| Evidence | Cause |
+|---|---|
+| `credential unavailable: k3dm-webhook-token` | Webhook credential is unavailable |
+| `data layer status source unavailable: webhook returned no service checks` | Webhook returned an empty `services` list |
+| `data layer status source unavailable: all webhook checks ungraded` | Every webhook service check has `ok: null` |
+| `data layer check absent from webhook payload` | No `Data layer` check was present |
+| `data layer ungraded: {detail}` | The `Data layer` check was present but ungraded |
+| `data layer status source unavailable: {ExceptionClassName}` | Fetch/parsing raised an exception; only its class name is retained |
+
+The three `status source unavailable` rows keep that substring on purpose: R1 (`repairs._unknown_webhook`)
+reads it as "the webhook is down". The other three are a reachable webhook with no usable data-layer check.
+
 ### App-health aggregate/probe deltas
 
 Enable the sensor only after a read-only dry run confirms the app-cluster context, API-server

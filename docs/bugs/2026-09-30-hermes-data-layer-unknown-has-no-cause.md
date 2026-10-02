@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30
-**Status:** OPEN
+**Status:** FIXED (Codex, 2026-10-01)
 **Severity:** medium — an unknown data-layer result is fail-closed, but the operator cannot tell
 whether the webhook was unavailable, the check was absent, or the payload was ungradeable.
 
@@ -48,3 +48,15 @@ Keep the existing fail-closed behavior and do not classify `unknown` as a servic
 For every historical `data_layer (unknown)` point, the dashboard or linked Hermes history identifies
 which source condition produced it, without exposing credentials or requiring access to the M4's
 local state files.
+
+## Resolution
+
+The `data_layer` sensor now emits distinct bounded evidence for all six unknown causes. Exception
+evidence retains only the exception class name, so messages containing URLs or tokens are never
+published. Status values, fail-closed behavior, healthy/degraded paths, and debounce behavior are
+unchanged.
+
+The three webhook-side causes keep the substring `status source unavailable` deliberately: R1
+(`repairs._unknown_webhook`) reads it as "the webhook is down", and the first draft of this fix
+dropped it, which would have disabled R1. `test_repairs.py` now asserts R1 still fires for each of
+those causes and not for an absent check (Claude verification, 2026-10-01).

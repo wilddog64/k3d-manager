@@ -10,6 +10,10 @@
 
 ### Fixed
 
+- Hermes `data_layer` unknown records now retain distinct evidence for unavailable credentials,
+  empty or ungraded webhook checks, missing/ungraded data-layer checks, and fetch errors without
+  exposing exception messages.
+
 - `make restart-webhook` now also restarts the cloud bridge; `make restart-cloud-bridge` safely
   skips an uninstalled bridge and is documented for operator use.
 
