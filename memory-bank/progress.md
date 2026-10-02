@@ -2930,3 +2930,4 @@ in the bug doc after commit: `3664bea7`.
 - 2026-10-02: e2e #9 Copilot thread fixed `ce145ee` and resolved.
 - 2026-10-02: operator added admin PR-merge bypass to payment ruleset 20607313 and disabled enforce_admins on e2e-tests main (re-enable after #9 merges). Payment #78 CI all green.
 - 2026-10-02: payment #78 Copilot finding (resource_access roles from ANY client grant payment roles) fixed `a3c0c24`: client roles scoped to payment.security.resource-client-id (default payment-service); CI pending.
+- 2026-10-02: payment #78 CI green on `a3c0c24` (139 tests); Copilot thread resolved. Both PRs ready for operator merge.
