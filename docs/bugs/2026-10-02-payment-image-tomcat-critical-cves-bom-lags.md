@@ -1,7 +1,7 @@
 # Bug: payment image carries 3 CRITICAL Tomcat CVEs that the latest Spring Boot BOM does not fix
 
 **Filed:** 2026-10-02
-**Status:** FIXED payment `90e3052` on `fix/payment-cve-bom-overrides` (Codex; Claude-verified: pom.xml only, effective-pom re-run shows all 5 fixed versions, branch CI 37068823246 green, 139 unit + 139 integration tests = main); PR pending merge, then Rollout
+**Status:** FIXED payment `90e3052` on `fix/payment-cve-bom-overrides` (Codex; Claude-verified: pom.xml only, effective-pom re-run shows all 5 fixed versions, branch CI 37068823246 green, 139 unit + 139 integration tests = main); PR #81 MERGED `2d9ec91`; Rollout steps 1-3 done 2026-10-02, step 4 pending sync
 **Repo (work):** `wilddog64/shopping-cart-payment` (`~/src/gitrepo/personal/shopping-carts/shopping-cart-payment`)
 **Branch (work repo):** `fix/payment-cve-bom-overrides`, from `origin/main`
 **Spec branch:** `k3d-manager-v1.41.0`
@@ -93,3 +93,14 @@ stop and report the failing test or compile error; do not swap in other versions
 2. Re-pin hostinger: `services/shopping-cart-payment/kustomization.yaml` `digest` → the new image digest.
 3. Bump the e2e substrate pin `scripts/etc/e2e/kustomization.yaml` (shared with the PR #80 follow-up).
 4. Confirm the hostinger VulnerabilityReport shows 0 CRITICAL for `payment-service` and the Trivy alert clears.
+
+## Rollout done (2026-10-02)
+
+1. Main CI 37070809364 built and pushed `sha-2d9ec91` (`sha256:b722319ec749aa0756b1c87306a2c2372d0950d6159b4dbf4713bc956e3eead3`).
+   Its Trivy scan no longer lists Tomcat, Jackson, amqp-client, httpcore5 or PostgreSQL. It does list a **new** finding:
+   `io.netty` 4.1.135.Final (the Spring Boot 3.5.16 BOM `netty.version`) carries CVE-2026-75595 CRITICAL (fixed 4.1.137)
+   and CVE-2026-59901 HIGH (fixed 4.1.136). Same root cause (BOM lags); the fix is one more override,
+   `<netty.version>4.1.138.Final</netty.version>` (latest 4.1.x on Central). Not part of this spec.
+2. Hostinger digest re-pinned to `sha256:b722319e…`.
+3. e2e `newTag` bumped to `sha-2d9ec91…` (it also carries #79; the Java `gatewayTransactionId` fix is PR #80, still open).
+4. Pending: the hostinger VulnerabilityReport will show 1 CRITICAL (netty) until the netty override lands, so the Trivy alert will not clear yet.
