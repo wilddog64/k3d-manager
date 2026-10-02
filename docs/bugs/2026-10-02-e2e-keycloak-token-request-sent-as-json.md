@@ -1,7 +1,7 @@
 # Bug: e2e Keycloak token request is labelled JSON, so Keycloak sees no `grant_type`
 
 **Filed:** 2026-10-02
-**Status:** OPEN
+**Status:** FIXED on branch (`wilddog64/shopping-cart-e2e-tests` `d3b4f83`, PR pending)
 **Repo:** `wilddog64/shopping-cart-e2e-tests`
 **Branch (work repo):** `fix/keycloak-token-form-content-type`, from `origin/main` (`755ad2d`)
 **File:** `tests/helpers/auth.ts` (`mintToken`)
