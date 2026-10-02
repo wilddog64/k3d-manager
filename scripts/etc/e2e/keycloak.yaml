@@ -12,12 +12,10 @@ data:
       "realm": "shopping-cart",
       "enabled": true,
       "roles": {
-        "realm": {
-          "roles": [
-            {"name": "PAYMENT_USER"},
-            {"name": "PAYMENT_WRITE"}
-          ]
-        }
+        "realm": [
+          {"name": "PAYMENT_USER"},
+          {"name": "PAYMENT_WRITE"}
+        ]
       },
       "clients": [
         {

@@ -1,6 +1,6 @@
 # Bug: the substrate Keycloak realm import fails because `roles.realm` is nested one level too deep
 
-**Status:** OPEN
+**Status:** FIXED (4db0e40c)
 **Branch:** `k3d-manager-v1.40.0`
 **File:** `scripts/etc/e2e/keycloak.yaml`
 **Tests:** `scripts/tests/plugins/e2e.bats`
