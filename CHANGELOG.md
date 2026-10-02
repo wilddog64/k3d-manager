@@ -10,6 +10,9 @@
 
 ### Fixed
 
+- `make restart-webhook` now also restarts the cloud bridge; `make restart-cloud-bridge` safely
+  skips an uninstalled bridge and is documented for operator use.
+
 - Seven bare `! cmd` BATS assertions added this release could never fail under `set -e`; they now
   use `run` + a status check, and `bats_negation_lint.bats` is green again.
 

@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** medium — after a pull, the cloud bridge keeps serving the previous action allowlist
 and redaction until someone remembers a second, undocumented restart.
-**Status:** OPEN — assigned to Codex 2026-10-01
+**Status:** FIXED (Codex, 2026-10-01)
 
 ## Problem
 

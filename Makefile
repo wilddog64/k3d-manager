@@ -21,7 +21,7 @@ ARGOCD_NS     ?= cicd
 ARGOCD_SERVER ?= localhost:8080
 ARGOCD_SCHEME ?= http
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -297,6 +297,15 @@ restart-webhook:
 		echo "[restart-webhook] service is not loaded; bootstrapping LaunchAgent" >&2; \
 		launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true; \
 		launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
+	fi
+	@$(MAKE) --no-print-directory restart-cloud-bridge
+
+## Restart the cloud-session request bridge LaunchAgent (picks up code changes)
+restart-cloud-bridge:
+	@if [ ! -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist" ]; then \
+		echo "[restart-cloud-bridge] not installed — skipping (make install-cloud-bridge)" >&2; \
+	else \
+		launchctl kickstart -k "gui/$$(id -u)/com.k3d-manager.cloud-bridge"; \
 	fi
 
 ## Remove k3d-manager-owned /tmp files
@@ -1025,6 +1034,8 @@ help:
 	@echo ""
 	@echo "  Targets (set CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
+	@echo "    make restart-webhook  Restart webhook and cloud bridge"
+	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
 	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
 	@echo "    make down ... CLEANUP_STALE=1  Also remove expired managed registrations and stale AWS local state"
 	@echo "    make status        Show concise service health (SERVICE=<name> for focused detail)"
