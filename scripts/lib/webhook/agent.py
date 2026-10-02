@@ -18,7 +18,10 @@ from webhook.config import (
 )
 from webhook.policy import _role_allows
 from webhook.proc import _spawn_capture_text
-from webhook.render import _fetch_thread_context, _post_slack_bot, _slack_post
+from webhook.render import (
+    _fetch_thread_context, _post_slack_bot, _slack_post, _start_bot_thread,
+    _redact_thread_question,
+)
 
 __all__ = [
     "_call_gemini",
@@ -284,13 +287,22 @@ def _parse_gemini_observations(raw):
     return answer, filed
 
 
-def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None, role="admin"):
+def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None, role="admin", channel_id=""):
     """Spawn claude/gemini/codex with the user's question; post the answer to Slack."""
     if max_turns is None:
         max_turns = _ASK_MAX_TURNS_DEFAULT
     job_dir = JOB_DIR / job_id
     if thread_ts:
         (job_dir / "thread_ts").write_text(thread_ts)
+    bot_thread = bool(SLACK_BOT_TOKEN and SLACK_CHANNEL_ID and channel_id == SLACK_CHANNEL_ID)
+    if bot_thread:
+        thread_ts = _start_bot_thread(
+            f"🤖 *ask {agent}:* {_redact_thread_question(question)}"
+        )
+        if thread_ts:
+            (job_dir / "thread_ts").write_text(thread_ts)
+        else:
+            bot_thread = False
     _ANSI = re.compile(r'\x1b\[[0-9;]*[mK]')
     thread_context = _fetch_thread_context(thread_ts) if thread_ts else ""
     _fix_denied = False
@@ -300,7 +312,10 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
             text = "⚠️ Fix actions require *operator* role — ran read-only.\n\n" + text
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text(text)
-        if response_url:
+        if bot_thread:
+            if not _post_slack_bot(text, thread_ts=thread_ts):
+                _slack_post(response_url, text)
+        elif response_url:
             _slack_post(response_url, text)
         else:
             _notify_job(job_id, text)

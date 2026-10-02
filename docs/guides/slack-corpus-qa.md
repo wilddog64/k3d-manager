@@ -1,9 +1,11 @@
 # Slack documentation Q&A
 
-`/ask-docs <question>` searches the documentation corpus and posts a concise, sourced answer
-through Slack's `response_url`. It is read-only: the model receives bounded excerpts and cannot
-run tools. Answers are advisory and sourced, not authoritative; read the listed documents before
-making an operational decision.
+`/ask-docs [--sources] <question>` searches the documentation corpus and posts a concise, sourced
+answer. In `SLACK_CHANNEL_ID`, `/ask` and `/ask-docs` start a bot-authored thread and post the
+answer in it; elsewhere they retain Slack's unthreaded `response_url` delivery. `--sources` skips
+the summary model and returns the matching document scores and paths. It is read-only: the model
+receives bounded excerpts and cannot run tools. Answers are advisory and sourced, not authoritative;
+read the listed documents before making an operational decision.
 
 The command is available to `reader` users, the same tier as `/ask` and `/cluster-status`. Readers
 already receive live topology and cluster-aware agent answers, so bounded excerpts from this corpus
@@ -34,4 +36,3 @@ The directory order for intrusion is bugs / issues / plans / retro. `/ask-docs` 
 existing `prior_art.search()` embedding path. The acceptance floor is **PROVISIONAL** while Claude
 calibrates against the live store: `ASK_DOCS_MIN_SCORE` defaults to `0.60` and can be overridden
 with `K3DM_ASK_DOCS_MIN_SCORE`.
-

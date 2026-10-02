@@ -180,7 +180,7 @@ Run once per machine. Safe to re-run.
         "command": "/ask-docs",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Ask a question over the documentation corpus",
-        "usage_hint": "<question>  e.g. how is retrieval evaluated?",
+        "usage_hint": "[--sources] <question>  e.g. how is retrieval evaluated?",
         "should_escape": false
       },
       {
@@ -327,7 +327,7 @@ bin/k3dm-webhook-setup --uninstall
 | `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | `/cluster-refresh hostinger` | Re-establishes SSH tunnel, refreshes kubeconfig |
 | `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
 | `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
-| `/ask-docs <question>` | Search the documentation corpus | `/ask-docs how is retrieval evaluated?` | Reader-only; answers are advisory and include sources |
+| `/ask-docs [--sources] <question>` | Search the documentation corpus | `/ask-docs --sources how is retrieval evaluated?` | Reader-only; answers are advisory and include sources |
 | `/cleanup-stale-sandbox [confirm]` | Clean expired k3s-aws sandbox state | `/cleanup-stale-sandbox` | Admin-only; dry-run by default, `confirm` applies |
 | `/k3dm <target> [KEY=value …] [confirm]` | Run an allowlisted make target | `/k3dm fix-status NS=cicd` | Role per target; `/k3dm help` lists yours; one job at a time |
 | `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` | See [agent commands](#claude--gemini--codex-commands) below |
@@ -657,7 +657,7 @@ Configuring alternate repo paths:
 
 ```bash
 # In LaunchAgent plist or shell env before make restart-webhook:
-export K3DM_REPO_ROOT=/path/to/k3d-manager
+expdocs/howto/slack-slash-commands.mdort K3DM_REPO_ROOT=/path/to/k3d-manager
 export K3DM_SHOPPING_CARTS_ROOT=/path/to/shopping-carts
 ```
 

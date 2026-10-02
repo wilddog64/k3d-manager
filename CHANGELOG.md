@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `/ask` and `/ask-docs` answers are threaded in `SLACK_CHANNEL_ID` when the bot can post there;
+  other channels retain response-URL delivery.
+
 ### Changed
 
 - README architecture diagram redrawn for the current system: operator laptop (webhook, Hermes,
@@ -30,6 +35,8 @@
   use `run` + a status check, and `bats_negation_lint.bats` is green again.
 
 ### Added
+
+- `/ask-docs --sources` returns matching document scores and paths without calling the summary model.
 
 - Added reader-only Slack `/ask-docs <question>`, which searches bounded, redacted documentation
   excerpts and returns advisory answers with source paths. The provisional retrieval floor is

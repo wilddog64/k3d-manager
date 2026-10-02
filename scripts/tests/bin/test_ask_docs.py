@@ -70,6 +70,23 @@ def test_no_match_does_not_call_model():
     assert reply.endswith("Sources: none")
 
 
+def test_sources_mode_lists_kept_documents_without_calling_model(monkeypatch):
+    path = _real_source()
+    calls = []
+    monkeypatch.setattr(ask_docs, "ASK_DOCS_MIN_SCORE", 0.6)
+    reply = ask_docs.answer(
+        "known",
+        retrieve=lambda _q, k=5: [(0.91, path, "A source"), (0.20, "memory-bank/nope.md", "Nope")],
+        model=lambda _p: calls.append(True),
+        summarise=False,
+    )
+    assert calls == []
+    assert "Top matching documents:" in reply
+    assert f"0.91  {path} — A source" in reply
+    assert "memory-bank/nope.md" not in reply
+    assert f"Sources:\n{path}" in reply
+
+
 def test_retrieval_unavailable_does_not_call_model():
     calls = []
 

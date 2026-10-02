@@ -58,18 +58,19 @@ def _sources(results):
     return kept, excerpts
 
 
-def _reply(prose, paths):
+def _reply(prose, paths, *, scrub_prose=True):
     source_lines = "Sources: none" if not paths else "Sources:\n" + "\n".join(paths)
     if not prose:
         prose = "Could not summarise — read the sources directly."
-    prose = _scrub(prose)
+    if scrub_prose:
+        prose = _scrub(prose)
     available = MAX_REPLY_CHARS - len(source_lines) - 2
     if available < 0:
         available = 0
     return prose[:available].rstrip() + "\n\n" + source_lines
 
 
-def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5):
+def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5, summarise=True):
     """Answer from retrieved documentation, always retaining a verifiable source list."""
     question = agent._sanitize_question(question or "")
     if not question:
@@ -82,6 +83,12 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
     paths, excerpts = _sources(results)
     if not excerpts:
         return _reply("No matching documents for that question.", [])
+    if not summarise:
+        lines = ["Top matching documents:"]
+        lines.extend(f"{score:.2f}  {path} — {_scrub(title)}" for score, path, title in results
+                     if score >= ASK_DOCS_MIN_SCORE and _allowed_path(path)
+                     and path in paths)
+        return _reply("\n".join(lines), paths, scrub_prose=False)
     prompt = (
         "Answer the question only from the documentation excerpts below. If they do not contain "
         "the answer, say so plainly. Do not invent facts or use tools.\n\n"

@@ -308,6 +308,7 @@ async function handle(req, event) {
   const text        = (p.get('text')      || '').trim()
   const responseUrl = p.get('response_url') || ''
   const threadTs    = p.get('thread_ts')  || ''
+  const channelId   = p.get('channel_id')  || ''
   const userId      = p.get('user_id')    || ''
   const userName    = p.get('user_name')  || ''
   const role        = COMMAND_ROLES[command] || 'reader'
@@ -460,7 +461,7 @@ async function handle(req, event) {
       question = text
     }
     if (!question) return jsonReply(`Usage: ${command} <question>`, threadTs)
-    const payload = { agent, question, response_url: responseUrl }
+    const payload = { agent, question, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/ask', payload, meta)
@@ -471,8 +472,8 @@ async function handle(req, event) {
   }
 
   if (command === '/ask-docs') {
-    if (!text) return jsonReply('Usage: /ask-docs <question>', threadTs)
-    const payload = { question: text, response_url: responseUrl }
+    if (!text || text === '--sources' || text === '-s') return jsonReply('Usage: /ask-docs [--sources] <question>', threadTs)
+    const payload = { question: text, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/ask-docs', payload, meta)

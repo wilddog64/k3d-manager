@@ -50,6 +50,8 @@ from webhook.render import (  # noqa: E402
     _slack_post,
     _post_slack_bot,
     _fetch_thread_context,
+    _start_bot_thread,
+    _redact_thread_question,
 )
 from webhook.proc import _spawn_capture_text  # noqa: E402
 from webhook.agent import (  # noqa: E402
@@ -1636,17 +1638,35 @@ def _run_analyze(job_id, alert_payload, response_url=""):
         _finish("failed")
 
 
-def _run_ask_docs(job_id, question, response_url="", thread_ts=None):
+def _run_ask_docs(job_id, question, response_url="", thread_ts=None, channel_id=""):
     """Retrieve and summarise documentation, then post the sourced answer."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
         (job_dir / "thread_ts").write_text(thread_ts)
+    summarise = True
+    for flag in ("--sources ", "-s "):
+        if question.startswith(flag):
+            question = question[len(flag):].strip()
+            summarise = False
+            break
+    bot_thread = bool(SLACK_BOT_TOKEN and SLACK_CHANNEL_ID and channel_id == SLACK_CHANNEL_ID)
+    if bot_thread:
+        thread_ts = _start_bot_thread(
+            f"📚 *ask-docs:* {_redact_thread_question(question, docs=True)}"
+        )
+        if thread_ts:
+            (job_dir / "thread_ts").write_text(thread_ts)
+        else:
+            bot_thread = False
     try:
         (job_dir / "status").write_text("running")
-        text = ask_docs.answer(question)
+        text = ask_docs.answer(question, summarise=summarise)
         (job_dir / "output").write_text(text)
         (job_dir / "status").write_text("success")
-        if response_url:
+        if bot_thread:
+            if not _post_slack_bot(text, thread_ts=thread_ts):
+                _slack_post(response_url, text)
+        elif response_url:
             _slack_post(response_url, text)
         else:
             _notify_job(job_id, text)
@@ -1654,7 +1674,10 @@ def _run_ask_docs(job_id, question, response_url="", thread_ts=None):
         text = "Could not summarise — read the sources directly.\n\nSources: none"
         (job_dir / "output").write_text(text)
         (job_dir / "status").write_text("failed")
-        if response_url:
+        if bot_thread:
+            if not _post_slack_bot(text, thread_ts=thread_ts):
+                _slack_post(response_url, text)
+        elif response_url:
             _slack_post(response_url, text)
         else:
             _notify_job(job_id, text)
@@ -2123,13 +2146,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 agent = "claude"
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
                 target=_run_cluster_ask,
                 args=(job_id, agent, question, response_url),
-                kwargs={"thread_ts": thread_ts, "role": request_role},
+                kwargs={"thread_ts": thread_ts, "role": request_role, "channel_id": channel_id},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
@@ -2142,6 +2166,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 return
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
@@ -2149,7 +2174,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
             threading.Thread(
                 target=_run_ask_docs,
-                args=(job_id, question, response_url, thread_ts),
+                args=(job_id, question, response_url, thread_ts, channel_id),
                 daemon=True,
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
