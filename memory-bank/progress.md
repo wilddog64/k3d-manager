@@ -2924,3 +2924,4 @@ in the bug doc after commit: `3664bea7`.
 - [x] Mutation checks: Hermes rerunnable ordering, Grafana verdict mapping, and stale ArgoCD
   session probe each failed their named regression test and were restored green.
 - 2026-10-02: e2e RabbitMQ broker + payment spring.rabbitmq key path landed — payment `9778e21`, k3d-manager `034d9513` (Codex, verified: 66/66 bats, 3 mutations red). PRs pending go.
+- 2026-10-02: payment CI 37025969474 GREEN on `9778e21` (137 tests, +1 RabbitPropertiesBindingTest). Payment + e2e-tests PRs ready to prepare; awaiting go.
