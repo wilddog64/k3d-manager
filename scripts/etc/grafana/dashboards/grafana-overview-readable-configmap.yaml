@@ -15,13 +15,13 @@ data:
       "panels": [
         {
           "datasource": {"uid": "$datasource"},
-          "description": "Number of Grafana alerting rules currently in the alerting state.",
-          "fieldConfig": {"defaults": {"mappings": [], "noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 80}]}}, "overrides": []},
+          "description": "Prometheus alerts currently firing (the ALERTS series), excluding the always-on Watchdog and InfoInhibitor. Grafana-managed alert rules are not counted; none are defined. Open Alertmanager for the list.",
+          "fieldConfig": {"defaults": {"mappings": [], "noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 1}]}}, "overrides": []},
           "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
           "id": 6,
           "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}, "textMode": "auto"},
-          "targets": [{"expr": "sum(grafana_alerting_alerts{job=~\"$job\", instance=~\"$instance\", state=\"alerting\"}) or vector(0)", "instant": true, "legendFormat": "Firing alerts", "refId": "A"}],
-          "title": "Firing Alerts",
+          "targets": [{"expr": "count(ALERTS{alertstate=\"firing\", alertname!~\"Watchdog|InfoInhibitor\"}) or vector(0)", "instant": true, "legendFormat": "Firing alerts", "refId": "A"}],
+          "title": "Firing Alerts (Prometheus)",
           "type": "stat"
         },
         {

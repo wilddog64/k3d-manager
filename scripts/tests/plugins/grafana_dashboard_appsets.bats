@@ -70,7 +70,7 @@ _assert_query_contract() {
   dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
   firing="$(jq -c '.panels[] | select(.id == 6)' <<<"$dashboard_json")" || return 1
   request="$(jq -c '.panels[] | select(.id == 2)' <<<"$dashboard_json")" || return 1
-  jq -e '(.targets[0].expr | contains("grafana_alerting_alerts")) and (.targets[0].expr | contains("or vector(0)")) and (.targets[0].expr | contains("grafana_alerting_result_total") | not) and (.fieldConfig.defaults.noValue == "0")' <<<"$firing" >/dev/null || return 1
+  jq -e '(.targets[0].expr | contains("ALERTS{alertstate=\"firing\"")) and (.targets[0].expr | contains("Watchdog|InfoInhibitor")) and (.targets[0].expr | contains("or vector(0)")) and (.targets[0].expr | contains("grafana_alerting_alerts") | not) and (.targets[0].expr | contains("grafana_alerting_result_total") | not) and (.fieldConfig.defaults.noValue == "0") and (.title == "Firing Alerts (Prometheus)") and ([.fieldConfig.defaults.thresholds.steps[] | select(.color == "red") | .value] | index(1) != null)' <<<"$firing" >/dev/null || return 1
   jq -e '(.targets[0].expr | contains("rate(")) and (.targets[0].expr | contains("[$__rate_interval]")) and (.targets[0].expr | contains("irate(") | not) and (.targets[0].expr | contains("[1m]") | not) and (.targets[0] | has("interval") | not) and (.description | contains("kubelet /api/health")) and (.description | contains("Status -1"))' <<<"$request" >/dev/null || return 1
 }
 
@@ -219,6 +219,16 @@ _assert_query_contract() {
   local snapshot="${BATS_TEST_TMPDIR}/app-overview-alert.yaml"
   cp "${OVERVIEW}" "$snapshot"
   yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 6) | .targets[0].expr) = "grafana_alerting_result_total{job=~\"$job\", instance=~\"$instance\", state=\"alerting\"}" | tojson))' "$snapshot"
+  run _assert_query_contract "$snapshot"
+  [ "$status" -ne 0 ]
+  cp "${OVERVIEW}" "$snapshot"
+  cmp -s "${OVERVIEW}" "$snapshot"
+}
+
+@test "Grafana Overview query mutation rejects missing alert exclusion" {
+  local snapshot="${BATS_TEST_TMPDIR}/app-overview-alert-exclusion.yaml"
+  cp "${OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 6) | .targets[0].expr) = "count(ALERTS{alertstate=\"firing\"}) or vector(0)" | tojson))' "$snapshot"
   run _assert_query_contract "$snapshot"
   [ "$status" -ne 0 ]
   cp "${OVERVIEW}" "$snapshot"

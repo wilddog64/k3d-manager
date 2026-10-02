@@ -150,7 +150,7 @@ Same as the Build Info follow-up. Update this section's Status to FIXED (pending
 
 ## Follow-up (2026-10-02): Firing Alerts counts Grafana-managed rules, of which there are none
 
-**Status:** OPEN
+**Status:** FIXED (pending sync)
 
 The panel counts `grafana_alerting_alerts{state="alerting"}`. The hub has **no** Grafana-managed alert rules: every
 `grafana_alerting_alerts` state (`alerting`, `pending`, `nodata`, `error`, `normal`) is `0`. So the panel reads `0`
