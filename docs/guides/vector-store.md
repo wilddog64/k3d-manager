@@ -1,5 +1,7 @@
 # Vector store credentials
 
+Architecture diagrams: [docs/architecture/vector-store.md](../architecture/vector-store.md).
+
 ArgoCD bootstrap seeds the Vault KV v2 path `secret/vectordb/postgres` with the `username` and
 `password` fields needed by the vectordb Postgres component. The seed is idempotent: if the entry
 already exists, bootstrap does not rotate it. Rotation would publish a credential that an already
@@ -246,7 +248,9 @@ Confirm it landed without printing it:
 kubectl --context k3d-k3d-cluster -n secrets get secret vault-root -o jsonpath='{.data.root_token}' | base64 --decode | kubectl --context k3d-k3d-cluster -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=api_key embeddings/gemini | wc -c'
 ```
 
-That prints a character count. Expect 40 for a standard `AIza…` key (39 characters plus a newline).
+That prints a character count. Expect 39 for a standard `AIza…` key: `vault kv get -field` writes the
+raw value with no trailing newline when its output is piped (confirmed live 2026-09-30). The keychain
+check above prints 40 because `security -w` does add one.
 
 Overrides, for a non-default hub: `K3DM_VAULT_CONTEXT`, `K3DM_VAULT_NAMESPACE`, `K3DM_VAULT_POD`,
 `K3DM_EMBEDDINGS_VAULT_PATH`. The path is validated against a plain-KV-path pattern and passed to
@@ -272,6 +276,19 @@ kubectl's trailer first.
 
 ## Health verification
 
+### Freshness and automatic indexing
+
+Hermes checks the checkout's upstream ref every poll (about five minutes), fetching that ref without
+pulling, checking out, merging or changing the working tree. It fingerprints corpus paths and blob
+IDs, so an unchanged corpus performs no embedding work. Changed documents are indexed in batches of
+100; a larger backlog drains over later polls. `K3DM_INDEX_REF` can pin a different tracked ref.
+
+The automatic path is advisory: a failed credential, store or fetch is logged and the monitoring poll
+continues. A daily embeddings quota response pauses until the next 00:00 UTC rather than retrying.
+The `k3dm-vectordb-index` Pushgateway job publishes the last result, backlog, duration, embedded and
+pruned counts, and quota pause time. `VectorDBIndexDrift` fires after two hours of backlog drift and
+`VectorDBIndexFailing` after thirty minutes of failed runs.
+
 ```bash
 bin/k3dm-vectordb-status --offline
 bin/k3dm-vectordb-status --json
@@ -289,8 +306,61 @@ It publishes rows, corpus size, drift, reachability, ExternalSecret sync and the
 to Pushgateway. The Grafana dashboard labels these values **last published** because Pushgateway
 retains gauges after a publisher stops.
 
-The alert watches only the last index timestamp: no publication for an hour, or an index older than
-seven days, is stale. A stale index can still return plausible results from `make find-similar-docs`;
+### The metrics publisher
+
+`bin/k3dm-vectordb-metrics` is the publisher named above. It takes no arguments and no flags: it
+runs `bin/k3dm-vectordb-status --json`, converts the payload to a Prometheus text block and POSTs it
+to `<pushgateway>/metrics/job/k3dm-vectordb`. `K3DM_VECTORDB_PUSHGATEWAY_URL` overrides the hub
+target (default `http://localhost:19094`); the generic `K3DM_PUSHGATEWAY_URL` remains reserved for
+app-cluster jobs.
+
+| Metric | Source field |
+|---|---|
+| `k3dm_vectordb_rows` | `rows` — indexed chunks in the store |
+| `k3dm_vectordb_corpus_docs` | `corpus_docs` — documents the tracked corpus contains |
+| `k3dm_vectordb_drift_docs` | `corpus_docs - rows`, emitted only when both are present |
+| `k3dm_vectordb_last_index_timestamp_seconds` | `last_indexed_epoch` — what the staleness alert reads |
+| `k3dm_vectordb_reachable` | `available`, as 0/1 |
+| `k3dm_vectordb_external_secret_synced` | `external_secret_synced`, as 0/1 |
+
+**A metric whose field is absent is omitted, not zeroed** — so a panel reading "No data" means the
+status probe could not determine that fact, which is different from a fact it determined to be zero.
+
+**Every failure path is deliberately non-fatal.** A `k3dm-vectordb-status` non-zero exit or
+unparseable output yields an empty payload and an empty publish; a Pushgateway that fails its
+`/-/healthy` check is retried three times, two seconds apart, and then skipped with
+`vectordb metrics push skipped (non-fatal)` on stderr. The script exits 0 regardless, because it is
+called from `make index-docs` and from the Hermes tick and must never fail either.
+
+That also means a **silent** publisher is the expected symptom of a broken one. It has only two call
+sites — `scripts/index-docs.py` after a successful index, and `bin/k3dm-hermes` on each tick — so if
+neither has run, nothing has ever published and the Grafana panels are blank for that reason rather
+than because the store is unhealthy. Run it by hand to distinguish the two:
+
+```bash
+K3DM_VECTORDB_PUSHGATEWAY_URL=http://localhost:19094 bin/k3dm-vectordb-metrics
+```
+
+### Hub metrics and dashboard
+
+VectorDB metrics belong to the hub because the store, its alerts and the Grafana dashboard all run
+there. The hub has a dedicated `prometheus-pushgateway` installed by ArgoCD and a static Prometheus
+scrape job that preserves the publisher's `job="k3dm-vectordb"` labels. On the M4, install the
+port-forward with `make install-hub-pushgateway-port-forward`; it maps hub Pushgateway port 9091 to
+localhost port 19094. Hermes and the standalone publisher use that endpoint by default, while the
+webhook, test metrics and smoke checks continue using the app-cluster `localhost:9091` path.
+
+The VectorDB dashboard is applied in the hub's platform-ops set as
+`grafana-dashboard-vectordb`. After the first sync, verify the hub endpoint with
+`curl -s localhost:19094/-/healthy` and allow one Hermes poll for fresh panels.
+
+Two alerts watch this. `VectorDBMetricsStale` fires when the index timestamp has never been
+published **or** when `push_time_seconds{job="k3dm-vectordb"}` is over an hour old;
+`VectorDBIndexStale` fires when the index itself is older than seven days. The push-age term is
+load-bearing: **Pushgateway retains gauges after a publisher stops**, so `absent()` alone can never
+go true once one publish has happened, and a dead publisher is indistinguishable from a healthy one
+on the panels. To tell "stale" from "never ran", read `time() - push_time_seconds{job="k3dm-vectordb"}`
+rather than the panel values. A stale index can still return plausible results from `make find-similar-docs`;
 check the sensor evidence and re-run `make index-docs` after confirming the store is reachable. See
 [`docs/howto/find-prior-art.md`](../howto/find-prior-art.md) for the retrieval workflow.
 
@@ -307,4 +377,42 @@ correctly. A bug filed as `eso-403-vault-path` does not match an existing
 `eso-ldap-policy-missing-keycloak`, so the same defect gets refiled under a new name — which has
 already happened in this repo. Similarity search catches the near-miss the glob cannot.
 
-Retrieval quality is **unmeasured** until the v1.40.0 eval lands. Treat the output as advisory.
+## Measuring retrieval quality
+
+`scripts/tests/bin/test_find_similar_docs.py` scores hand-labelled pairs from the real corpus
+(`scripts/tests/fixtures/doc-dedup/pairs.jsonl`): 27 **positives** (the same defect filed twice,
+or a symptom and its root cause) and 26 **hard negatives** (same component, different defect).
+Two metrics, per directory, both on the top 5 with the query document itself excluded:
+
+- **recall@5:** how often the known duplicate appears. This is the gate: it has a floor.
+- **intrusion@5:** how often a hard negative appears. That is the false positive a retriever
+  would act on if it ever gated filing. It is reported, not gated; gating needs its own spec.
+
+The control is a stdlib TF-IDF cosine scorer over the same `doc_embed_text` strings the indexer
+embeds, and it runs offline in `make test-pytest`. Measured 2026-10-01:
+
+| scorer | metric | bugs | issues | plans | retro |
+|---|---|---|---|---|---|
+| TF-IDF control | recall@5 | 0.750 (12/16) | 0.833 (5/6) | 1.000 (5/5) | 1.000 (5/5) |
+| TF-IDF control | intrusion@5 | 0.071 (1/14) | 0.500 (2/4) | 1.000 (4/4) | 0.250 (1/4) |
+| embeddings | recall@5 | 0.875 (14/16) | 0.833 (5/6) | 1.000 (5/5) | 1.000 (5/5) |
+| embeddings | intrusion@5 | 0.286 (4/14) | 0.500 (2/4) | 0.750 (3/4) | 0.500 (2/4) |
+
+Plans score 4/4 on intrusion because sibling specs share a template; lexical overlap there says
+"same shape", not "same defect".
+
+**Finding (live run, 2026-10-01, `gemini-embedding-2` over the hub store):** embeddings beat the
+lexical control on recall only for bugs (two more duplicates found of 16) and tie elsewhere. They
+are also noisier: three more hard negatives reach the bugs top 5, and one more for retros. The
+sample is small (27 positives, 26 negatives), so treat a one-pair difference as noise. This fits
+how retrieval is used today: an advisory "possible prior art" list that a person reads, never a
+filter that suppresses filing. It argues against letting either scorer gate filing without a
+larger labelled set. The embedding scorer runs only against the live store:
+
+```bash
+K3DM_RETRIEVAL_EVAL_LIVE=1 pytest -s scripts/tests/bin/test_find_similar_docs.py -k live
+```
+
+With `K3DM_RETRIEVAL_EVAL_LIVE=1` the live case enforces its own floors, one miss below the
+2026-10-01 measurement. Either way, treat `find-similar-docs` output as advisory and do not read a
+high score as "do not file".

@@ -935,7 +935,7 @@ function _ldap_deploy_password_rotator() {
    export LDAP_ADMIN_DN="${LDAP_BIND_DN}"
    export LDAP_USER_OU="${LDAP_USER_OU}"
    # Force internal Vault address for rotation job (ignore external VAULT_ADDR from environment)
-   export VAULT_ADDR="http://vault.vault.svc:8200"
+   export VAULT_ADDR="http://vault.${vault_ns}.svc:8200"
    export VAULT_ROOT_TOKEN_SECRET="${VAULT_ROOT_TOKEN_SECRET:-vault-root}"
    export VAULT_ROOT_TOKEN_KEY="${VAULT_ROOT_TOKEN_KEY:-root_token}"
    export USERS_TO_ROTATE="${LDAP_USERS_TO_ROTATE}"

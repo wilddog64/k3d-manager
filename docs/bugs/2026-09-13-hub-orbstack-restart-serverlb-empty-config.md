@@ -73,3 +73,9 @@ The restart reshuffled node IPs (agent-1 `.2` → `.4`; `.2` became serverlb). `
 - `frontend.3ai-talk.org` 200; `bin/smoke-test-cluster-health` 9/0.
 - No watchdog restarts since 13:24.
 - Docker VM 15.66GiB, hub using ~7.8GiB.
+
+## Recurrence 2026-09-29 — Defect 4 again, on node-exporter
+
+Three of four node-exporter pods kept stale IPs after a node restart around 2026-09-27. That caused
+`PrometheusDuplicateTimestamps` and left agent-2 unscraped. Defect 4 now has a durable spec:
+`2026-09-29-hostnetwork-pods-keep-stale-ip-after-node-restart.md`.

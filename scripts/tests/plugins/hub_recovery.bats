@@ -3,7 +3,14 @@
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
+  HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME"
+  export HOME
   source "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
+  HOSTNET_DRIFT_BIN="$BATS_TEST_TMPDIR/hostnet-drift-default"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$HOSTNET_DRIFT_BIN"
+  chmod +x "$HOSTNET_DRIFT_BIN"
+  export HOSTNET_DRIFT_BIN
   RECOVERY_ROOT="${BATS_TEST_TMPDIR}/recovery"
   mkdir -p "$RECOVERY_ROOT/server-db"
   : > "$RECOVERY_ROOT/server-db/state.db"
@@ -129,6 +136,47 @@ YAML
   [ "$output" = "$expected" ]
 }
 
+@test "_hub_recovery_install_cloudflared_config: app context frontend uses k3s-hostinger" {
+  _kubectl() { return 0; }
+  _info() { :; }
+  export -f _kubectl _info
+  run _hub_recovery_install_cloudflared_config hub-context app-context
+  [ "$status" -eq 0 ]
+  grep -Fq 'service: http://127.0.0.2:80' "$HOME/.cloudflared/config.yml"
+}
+
+@test "_hub_recovery_install_cloudflared_config: only hub frontend uses k3d" {
+  _kubectl() {
+    [[ "$*" == *"--context hub-context"*"get deployment frontend"* ]]
+  }
+  _info() { :; }
+  export -f _kubectl _info
+  run _hub_recovery_install_cloudflared_config hub-context app-context
+  [ "$status" -eq 0 ]
+  grep -Fq 'service: http://127.0.0.1:8000' "$HOME/.cloudflared/config.yml"
+}
+
+@test "_hub_recovery_install_cloudflared_config: missing frontend keeps k3s-hostinger with warning" {
+  _kubectl() { return 1; }
+  run _hub_recovery_install_cloudflared_config hub-context app-context
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no frontend deployment found"* ]]
+  grep -Fq 'service: http://127.0.0.2:80' "$HOME/.cloudflared/config.yml"
+}
+
+@test "_hub_recovery_install_cloudflared_config: explicit provider override wins" {
+  HUB_RECOVERY_FRONTEND_PROVIDER=k3d
+  _kubectl() {
+    [[ "$*" == *"--context app-context"*"get deployment frontend"* ]]
+  }
+  _info() { :; }
+  export HUB_RECOVERY_FRONTEND_PROVIDER
+  export -f _kubectl _info
+  run _hub_recovery_install_cloudflared_config hub-context app-context
+  [ "$status" -eq 0 ]
+  grep -Fq 'service: http://127.0.0.1:8000' "$HOME/.cloudflared/config.yml"
+}
+
 @test "hub_recovery_reconcile: dry run prints steps and invokes no operations" {
   local calls="${BATS_TEST_TMPDIR}/reconcile-calls"
   : > "$calls"
@@ -140,7 +188,7 @@ YAML
   export -f _kubectl security register_app_cluster docker_stub
   run hub_recovery_reconcile
   [ "$status" -eq 0 ]
-  for step in {1..11}; do
+  for step in {1..12}; do
     [[ "$output" == *"${step}."* ]]
   done
   [[ "$output" == *"k3d serverlb upstreams"* ]]
@@ -149,12 +197,44 @@ YAML
   [ ! -s "$calls" ]
 }
 
+@test "hub_recovery_reconcile: hostnet drift runs after serverlb and failure is non-fatal" {
+  local calls="${BATS_TEST_TMPDIR}/hostnet-reconcile-calls"
+  local drift="${BATS_TEST_TMPDIR}/hostnet-drift"
+  : >"$calls"
+  cat >"$drift" <<'STUB'
+#!/usr/bin/env bash
+printf 'drift %s\n' "$*" >>"$HOSTNET_CALLS"
+exit 1
+STUB
+  chmod +x "$drift"
+  export HOSTNET_DRIFT_BIN="$drift" HOSTNET_CALLS="$calls"
+  _hub_recovery_ensure_serverlb_upstreams() { echo serverlb >>"$calls"; }
+  _hub_recovery_sync_vault_root_token() { :; }
+  _hub_recovery_ensure_eso_apps_role() { :; }
+  _hub_recovery_restore_signing() { :; }
+  register_app_cluster() { :; }
+  argocd_reconcile_app_cluster_registrations() { :; }
+  _hub_recovery_seed_app_cluster_reader() { :; }
+  _hub_recovery_scale_openldap() { :; }
+  _hub_recovery_replay_identity_hook() { :; }
+  keycloak_seed_smoke_user() { :; }
+  _hub_recovery_mirror_argocd_admin() { :; }
+  _hub_recovery_install_cloudflared_config() { echo continued >>"$calls"; }
+  _warn() { echo warn >>"$calls"; }
+  run hub_recovery_reconcile --confirm
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$calls")" = serverlb ]
+  grep -q '^drift --context k3d-k3d-cluster --fix$' "$calls"
+  grep -q '^continued$' "$calls"
+}
+
 @test "hub_recovery_reconcile: confirm invokes app-cluster registration reconcile" {
   local calls="${BATS_TEST_TMPDIR}/reconcile-confirm-calls"
   : >"$calls"
   _hub_recovery_ensure_serverlb_upstreams() { :; }
   _hub_recovery_sync_vault_root_token() { :; }
   _hub_recovery_ensure_eso_apps_role() { :; }
+  _hub_recovery_restore_signing() { :; }
   register_app_cluster() { :; }
   argocd_reconcile_app_cluster_registrations() { echo reconcile >>"$calls"; }
   _hub_recovery_seed_app_cluster_reader() { :; }
@@ -164,12 +244,102 @@ YAML
   _hub_recovery_mirror_argocd_admin() { :; }
   _hub_recovery_install_cloudflared_config() { :; }
   export -f _hub_recovery_ensure_serverlb_upstreams _hub_recovery_sync_vault_root_token
-  export -f _hub_recovery_ensure_eso_apps_role register_app_cluster argocd_reconcile_app_cluster_registrations
+  export -f _hub_recovery_ensure_eso_apps_role _hub_recovery_restore_signing register_app_cluster argocd_reconcile_app_cluster_registrations
   export -f _hub_recovery_seed_app_cluster_reader _hub_recovery_scale_openldap _hub_recovery_replay_identity_hook
   export -f keycloak_seed_smoke_user _hub_recovery_mirror_argocd_admin _hub_recovery_install_cloudflared_config
   run hub_recovery_reconcile --confirm
   [ "$status" -eq 0 ]
   [ "$(<"$calls")" = reconcile ]
+}
+
+@test "hub_recovery_reconcile: restores signing after ESO policy with a pinned context" {
+  local calls="${BATS_TEST_TMPDIR}/signing-calls"
+  : >"$calls"
+  _hub_recovery_ensure_serverlb_upstreams() { :; }
+  _hub_recovery_sync_vault_root_token() { :; }
+  _hub_recovery_ensure_eso_apps_role() { echo eso >>"$calls"; }
+  _hub_recovery_restore_signing() { printf 'signing %s\n' "$1" >>"$calls"; }
+  register_app_cluster() { :; }
+  argocd_reconcile_app_cluster_registrations() { :; }
+  _hub_recovery_seed_app_cluster_reader() { :; }
+  _hub_recovery_scale_openldap() { :; }
+  _hub_recovery_replay_identity_hook() { :; }
+  keycloak_seed_smoke_user() { :; }
+  _hub_recovery_mirror_argocd_admin() { :; }
+  _hub_recovery_install_cloudflared_config() { :; }
+  export -f _hub_recovery_ensure_serverlb_upstreams _hub_recovery_sync_vault_root_token
+  export -f _hub_recovery_ensure_eso_apps_role _hub_recovery_restore_signing register_app_cluster
+  export -f argocd_reconcile_app_cluster_registrations _hub_recovery_seed_app_cluster_reader
+  export -f _hub_recovery_scale_openldap _hub_recovery_replay_identity_hook
+  export -f keycloak_seed_smoke_user _hub_recovery_mirror_argocd_admin _hub_recovery_install_cloudflared_config
+  run hub_recovery_reconcile --confirm
+  [ "$status" -eq 0 ]
+  [ "$(<"$calls")" = $'eso\nsigning k3d-k3d-cluster' ]
+}
+
+@test "hub_recovery_reconcile: signing restore failure warns and continues" {
+  local calls="${BATS_TEST_TMPDIR}/after-signing"
+  : >"$calls"
+  _hub_recovery_ensure_serverlb_upstreams() { :; }
+  _hub_recovery_sync_vault_root_token() { :; }
+  _hub_recovery_ensure_eso_apps_role() { :; }
+  _kubectl() { printf 'apiVersion: v1\n'; }
+  signing_restore() { return 1; }
+  register_app_cluster() { :; }
+  argocd_reconcile_app_cluster_registrations() { :; }
+  _hub_recovery_seed_app_cluster_reader() { :; }
+  _hub_recovery_scale_openldap() { :; }
+  _hub_recovery_replay_identity_hook() { :; }
+  keycloak_seed_smoke_user() { :; }
+  _hub_recovery_mirror_argocd_admin() { :; }
+  _hub_recovery_install_cloudflared_config() { echo continued >"$calls"; }
+  _warn() { echo "$*"; }
+  export -f _hub_recovery_ensure_serverlb_upstreams _hub_recovery_sync_vault_root_token
+  export -f _hub_recovery_ensure_eso_apps_role _kubectl signing_restore register_app_cluster
+  export -f argocd_reconcile_app_cluster_registrations _hub_recovery_seed_app_cluster_reader
+  export -f _hub_recovery_scale_openldap _hub_recovery_replay_identity_hook
+  export -f keycloak_seed_smoke_user _hub_recovery_mirror_argocd_admin _hub_recovery_install_cloudflared_config _warn
+  run hub_recovery_reconcile --confirm
+  [ "$status" -eq 0 ]
+  [ "$(<"$calls")" = continued ]
+  [[ "$output" == *"cosign signing restore failed"* ]]
+}
+
+@test "_hub_recovery_restore_signing: pins the hub context and removes the temp kubeconfig" {
+  local seen="${BATS_TEST_TMPDIR}/seen" tmp="${BATS_TEST_TMPDIR}/t"
+  mkdir -p "$tmp"
+  _kubectl() { printf 'apiVersion: v1\ncurrent-context: %s\n' "$3"; }
+  signing_restore() { cat "$KUBECONFIG" >"$seen"; }
+  _warn() { echo "WARN $*"; }
+  TMPDIR="$tmp" run _hub_recovery_restore_signing k3d-k3d-cluster
+  [ "$status" -eq 0 ]
+  grep -q 'current-context: k3d-k3d-cluster' "$seen"
+  [ -z "$(ls -A "$tmp")" ]
+}
+
+@test "_hub_recovery_restore_signing: a pin failure warns, skips the restore and leaves no temp file" {
+  local tmp="${BATS_TEST_TMPDIR}/t" called="${BATS_TEST_TMPDIR}/called"
+  mkdir -p "$tmp"
+  _kubectl() { return 1; }
+  signing_restore() { echo called >"$called"; }
+  _warn() { echo "WARN $*"; }
+  TMPDIR="$tmp" run _hub_recovery_restore_signing k3d-k3d-cluster
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"could not pin kubeconfig"* ]]
+  [[ "$output" != *"unexpected EOF"* ]]
+  [ ! -e "$called" ]
+  [ -z "$(ls -A "$tmp")" ]
+}
+
+@test "hub_recovery_reconcile: the dry list names the cosign step" {
+  run hub_recovery_reconcile
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"5. Cosign signing key"* ]]
+}
+
+@test "hub_recovery never generates or rotates a signing key" {
+  run grep -nE 'signing_(init|rotate_key)' "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
+  [ "$status" -ne 0 ]
 }
 
 @test "_hub_recovery_render_serverlb_values: servers on 6443, servers then agents on 80/443" {
@@ -451,6 +621,7 @@ function _stub_argocd_admin_mirror_dependencies() {
   _hub_recovery_ensure_serverlb_upstreams() { :; }
   _hub_recovery_sync_vault_root_token() { :; }
   _hub_recovery_ensure_eso_apps_role() { :; }
+  _hub_recovery_restore_signing() { :; }
   register_app_cluster() { printf '%s\n' "${ARGOCD_APP_CLUSTER_NAME}" >>"$seen"; }
   argocd_reconcile_app_cluster_registrations() { :; }
   _hub_recovery_seed_app_cluster_reader() { :; }
@@ -460,7 +631,7 @@ function _stub_argocd_admin_mirror_dependencies() {
   _hub_recovery_mirror_argocd_admin() { :; }
   _hub_recovery_install_cloudflared_config() { :; }
   export -f _hub_recovery_ensure_serverlb_upstreams _hub_recovery_sync_vault_root_token
-  export -f _hub_recovery_ensure_eso_apps_role register_app_cluster argocd_reconcile_app_cluster_registrations
+  export -f _hub_recovery_ensure_eso_apps_role _hub_recovery_restore_signing register_app_cluster argocd_reconcile_app_cluster_registrations
   export -f _hub_recovery_seed_app_cluster_reader _hub_recovery_scale_openldap _hub_recovery_replay_identity_hook
   export -f keycloak_seed_smoke_user _hub_recovery_mirror_argocd_admin _hub_recovery_install_cloudflared_config
   run hub_recovery_reconcile --confirm

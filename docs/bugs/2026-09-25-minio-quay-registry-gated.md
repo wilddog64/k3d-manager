@@ -4,6 +4,7 @@
 **Work repo:** `shopping-cart-infra` (NOT k3d-manager)
 **Branch (work repo):** `fix/minio-bitnamilegacy-registry` — create from `origin/main`
 **Severity:** blocks `make up CLUSTER_PROVIDER=k3s-aws` at Step 10b on every fresh cluster
+**Status:** FIXED and verified live 2026-09-30 — `shopping-cart-infra` `f909906` (#102). Follow-up: CVEs in the sunset image, see the end of this doc.
 
 ## Symptom
 
@@ -233,3 +234,125 @@ Do not change the `uploader` container — `python:3.12-slim` is unaffected.
 durable fix is to mirror both pinned images into `ghcr.io/wilddog64/` — which *is* possible because
 bitnamilegacy is public — so a second upstream gate cannot break provisioning again. That needs a
 GHCR push credential and is the owner's call.
+
+---
+
+## Recurrence and completion brief (2026-09-30, Claude)
+
+**Still live.** `shopping-cart-infra` `main` (`00d0d8a`) still pins `quay.io/minio/minio` and
+`quay.io/minio/mc`. The fix branch `fix/minio-bitnamilegacy-registry` (`e9d545dc`) was never merged and
+is 2 commits behind `main`. Hostinger keeps running MinIO from the node's image cache, but Trivy must
+pull the image to scan it, so `trivy-system/scan-vulnerabilityreport-5fb89fd85c` (container `minio`)
+fails every hour with `GET https://quay.io/v2/minio/minio/manifests/RELEASE.2024-11-07T00-52-20Z:
+UNAUTHORIZED`. That is the `KubeJobFailed on ubuntu-hostinger` email the operator receives, which fires
+and then resolves as the failed Job is cleaned up.
+
+### Codex brief — finish and land the port, safely for a cluster that already has data
+
+**Repo:** `shopping-cart-infra`. **Branch:** `fix/minio-bitnamilegacy-registry`. Merge `origin/main`
+into it; do not rebase or force-push.
+
+**The existing branch is written for a fresh cluster. Fix this before it can land:** it changes
+`runAsUser`/`fsGroup` from 1000 to 1001 and the data mount to `/bitnami/minio/data`. Hostinger has an
+existing MinIO PVC (product images) written as UID 1000 on **local-path** storage, and local-path does
+not apply `fsGroup` ownership changes. As written, MinIO could lose access to its own data.
+Pick one and say which:
+- **(preferred)** keep `runAsUser: 1000` / `fsGroup: 1000`. Bitnami images are built to run as an
+  arbitrary non-root UID; confirm from the image's docs or entrypoint that `/opt/bitnami/minio` and the
+  data dir work as 1000. If they don't, use the next option.
+- an `initContainer` (pinned busybox, runs as root, only `chown -R 1001:1001` on the data mount, and
+  only when the top-level owner is not already 1001), so the data carries over.
+
+The mount path change is safe (same PVC, new path), but confirm Bitnami's data dir is exactly
+`/bitnami/minio/data` and that existing buckets appear there unchanged.
+
+**Tests / proof (paste output):**
+- `kubectl kustomize` (or the repo's render target) of `data-layer/` renders cleanly;
+- no `quay.io/minio` reference remains: `git grep -n 'quay.io/minio' -- data-layer` → nothing;
+- the chosen ownership approach, with the evidence for it (image docs or entrypoint lines).
+
+**Do not:** log in to quay.io or add a pull secret; touch `secret.yaml`, `service.yaml`,
+`image-upload-configmap.yaml`; merge to `main` yourself. Open a PR and stop.
+
+**Operator acceptance after merge (live, hostinger):** `minio-0` Running; the storefront still shows
+product images; `kubectl -n trivy-system get vulnerabilityreports | grep minio` shows a report; no new
+`KubeJobFailed` email for `scan-vulnerabilityreport-*` within 2 h.
+
+## Verification of `shopping-cart-infra` `e8c0b8d9` (Claude, 2026-09-30) — changes requested
+
+Verified independently. Branch tip `e8c0b8d9`; `origin/main` merged in `40fd1df` (merge commit, no
+rebase or force-push). Scope: `data-layer/minio/{statefulset,bucket-init-job,image-upload-job}.yaml`,
+`CHANGELOG.md`, the bug doc. The repo's CI gates at CI's pinned versions, run by Claude: yamllint clean;
+kubeconform 1.34.0 `-strict` 6 valid / 0 invalid; every `kustomize build` overlay passes;
+`git grep quay.io/minio -- data-layer` returns nothing. Bitnami `mc` path and `MC_CONFIG_DIR=/tmp/.mc`
+are correct.
+
+Codex chose the brief's second option (keep Bitnami's UID 1001, re-own the existing data with a root
+`initContainer`). **Two changes are needed before merge:**
+
+1. **The ownership fix can fail partway and then never retry.** The init container drops every
+   capability except `CHOWN`. Without `DAC_READ_SEARCH`, root cannot enter a directory that denies
+   "others", so `chown -R` stops there and exits 1: the pod shows `Init:Error`. On retry, the top-level
+   directory is already 1001 (chown touched it first), so `stat -c '%u' … != 1001` skips the fix, and
+   MinIO starts with part of its data still owned by 1000. Reproduced with `setpriv` and the same
+   capability set (exit 1; a `0700` dir left owned by 1000). Fix, verified the same way (repairs the
+   partial state; the second run is a no-op):
+   ```yaml
+   command: ["sh", "-c", "if [ -n \"$(find /bitnami/minio/data ! -user 1001 | head -n 1)\" ]; then chown -R 1001:1001 /bitnami/minio/data; fi"]
+   capabilities: { drop: [ALL], add: [CHOWN, DAC_READ_SEARCH] }
+   ```
+2. **No recorded rationale.** The brief asked which ownership option was chosen and why UID 1000 was not
+   kept, with evidence. The commit body is empty, and the branch's bug doc still describes the original
+   fresh-cluster change with no mention of the init container. Add a short section: the decision, the
+   evidence (Bitnami entrypoint or docs on arbitrary UIDs), and the ownership migration.
+
+Then the operator's post-merge checks in the brief apply unchanged.
+
+## Re-verification of `shopping-cart-infra` `36ea68e9` (Claude, 2026-09-30) — ready to merge
+
+`36ea68e9` makes exactly the two requested changes, and nothing else (`statefulset.yaml`, the bug doc):
+the init container checks the whole tree with `find /bitnami/minio/data ! -user 1001 | head -n 1`, and
+adds `DAC_READ_SEARCH` beside `CHOWN` (still `drop: [ALL]`). The bug doc now records the decision and
+evidence: Bitnami requires writability by UID 1001 at `/bitnami/minio/data`; local-path ignores `fsGroup`.
+
+Proof, run by Claude: the **committed** script extracted from the manifest, run under **busybox 1.36.1**
+(`sh`, `find`, `head`, `chown`; the image is `busybox:1.36`) as root with exactly `CHOWN` +
+`DAC_READ_SEARCH`, on UID-1000 data containing a `0700` directory:
+- fresh data → exit 0, 0 files not owned by 1001;
+- the partial state that broke `e8c0b8d9` (top level already 1001) → exit 0, 0 remaining;
+- already migrated → exit 0, no-op;
+- control, the old `CHOWN`-only set → `Permission denied`, exit 1, 1 remaining.
+
+CI gates at CI's pinned versions: yamllint clean; kubeconform 6 valid / 0 invalid; every kustomize
+overlay builds; no `quay.io/minio` references. **Ready to merge.** After merge, run the operator checks
+in the completion brief above.
+
+**PR:** Codex pushed the branch but did not open a PR. Claude opened
+https://github.com/wilddog64/shopping-cart-infra/pull/102 (head `36ea68e9`) on 2026-09-30 for the operator to review and merge.
+
+**Merged 2026-09-30 02:25Z** as `shopping-cart-infra` `f909906` (#102, squash, admin bypass run by
+Codex). Claude checked that `main`'s tree is identical to the verified head `36ea68e9`. Open items:
+the operator confirms `enforce_admins` is back to `true`, then runs the four post-merge checks on hostinger.
+
+**Live on hostinger (operator, 2026-09-30):** `minio-0` 1/1 Running, 0 restarts, image
+`docker.io/bitnamilegacy/minio:2024.11.7-debian-12-r1`. The ownership migration completed: the
+`product-images` bucket and its objects (`bag.jpg`, `cable.jpg`, `charger.jpg`, …) are present under
+`/bitnami/minio/data`, and `find /bitnami/minio/data ! -user 1001` returns nothing. Remaining: a Trivy
+`VulnerabilityReport` for minio, and 2 h without a `KubeJobFailed` email.
+
+**Branch protection after the bypass (Codex report, 2026-09-30):** `enforce_admins: true`, required
+approvals 1, dismiss stale reviews true, code-owner reviews false. **Confirmed by the operator** with
+`gh api repos/wilddog64/shopping-cart-infra/branches/main/protection`: `enforce_admins: true`, approvals 1.
+
+## Closed 2026-09-30 — fixed and verified live
+
+Trivy now scans MinIO successfully on hostinger: `shopping-cart-data/statefulset-minio-minio`
+(`bitnamilegacy/minio:2024.11.7-debian-12-r1`) and `statefulset-minio-fix-data-ownership`
+(`busybox:1.36`, 0 findings), both created after the 02:25Z merge. The hourly failing scan Job, the
+source of the `KubeJobFailed on ubuntu-hostinger` emails, is gone.
+
+**Follow-up (security debt, not a regression):** the scan reports **12 CRITICAL / 80 HIGH** findings in
+`bitnamilegacy/minio:2024.11.7-debian-12-r1`. That is the same MinIO release as before, in a sunset
+repository that gets no patches; the findings were invisible only because the scan had been failing.
+The durable fix is still the one in "Follow-up" above: move to a maintained MinIO build (or mirror a
+patched one into `ghcr.io/wilddog64/`). Owner's call; file it as its own bug when scheduled.

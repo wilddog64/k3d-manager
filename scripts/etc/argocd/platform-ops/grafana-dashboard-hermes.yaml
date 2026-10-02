@@ -51,16 +51,18 @@ data:
         {
           "id": 5, "type": "table", "title": "Current Hermes findings",
           "gridPos": { "h": 10, "w": 24, "x": 0, "y": 5 },
+          "fieldConfig": { "defaults": {}, "overrides": [ { "matcher": { "id": "byName", "options": "CI run" }, "properties": [ { "id": "links", "value": [ { "title": "Open GitHub Actions run", "url": "${__value.raw}" } ] } ] } ] },
           "options": { "showHeader": true },
           "targets": [ { "expr": "hermes_sensor_status", "format": "table", "instant": true, "refId": "A" } ],
-          "transformations": [ { "id": "organize", "options": { "indexByName": { "sensor": 0, "evidence": 1, "status": 2, "target_namespace": 3 }, "renameByName": { "sensor": "Sensor", "evidence": "Finding", "status": "Status", "target_namespace": "Target namespace" }, "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "pod": true, "service": true, "namespace": true } } } ]
+          "transformations": [ { "id": "organize", "options": { "indexByName": { "sensor": 0, "evidence": 1, "failed_hosts": 2, "ci_run_url": 3, "status": 4, "target_namespace": 5 }, "renameByName": { "sensor": "Sensor", "evidence": "Finding", "failed_hosts": "Failed hosts", "ci_run_url": "CI run", "status": "Status", "target_namespace": "Target namespace" }, "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "container": true, "endpoint": true, "pod": true, "service": true, "namespace": true } } } ]
         },
         {
           "id": 6, "type": "timeseries", "title": "Sensor status history",
           "gridPos": { "h": 9, "w": 24, "x": 0, "y": 15 },
+          "description": "Status values: 0 = healthy, 1 = degraded, 2 = unknown. Unknown means the source was unavailable or ungradeable; it is not proof of a service failure. Evidence is shown in the legend.",
           "fieldConfig": { "defaults": { "custom": { "drawStyle": "stepped", "spanNulls": true }, "min": 0, "max": 2 }, "overrides": [] },
           "options": { "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
-          "targets": [ { "expr": "hermes_sensor_status", "legendFormat": "{{sensor}} ({{status}})", "refId": "A" } ]
+          "targets": [ { "expr": "hermes_sensor_status", "legendFormat": "{{sensor}} ({{status}}): {{evidence}}", "refId": "A" } ]
         }
       ]
     }

@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-16 by k3dm-hermes
-**Status:** OPEN — Hermes rule-based triage; unverified
+**Status:** CLOSED as stale (triage by Claude, 2026-10-01) — a point-in-time Hermes triage of run `1789549631-2079`, never verified. Re-triage from the next e2e run.
 **Run:** `1789549631-2079`, runner `m2`, tier `vcluster`, 24 passed / 33 failed / 102 total
 **Runner commit:** `ec4874fe62cab1ba120729dc5d48454f7d50dcc7`
 

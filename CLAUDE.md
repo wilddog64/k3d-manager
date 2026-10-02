@@ -19,8 +19,9 @@ Uses a dispatcher pattern with lazy plugin loading.
   environment with only the GitHub connection, you cannot reach the k3dm webhook, the cluster,
   or any host. Do not search for a token, do not attempt a tunnel, and do not ask the operator to
   place a credential in your environment — that is refused by policy. To read cluster state, file
-  a request on the `cloud-requests` branch: see **`docs/howto/cloud-session-requests.md`**. Four
-  read-only actions are available; everything else must be run by the operator.
+  a request on the `cloud-requests` branch: see **`docs/howto/cloud-session-requests.md`**. The
+  read-only actions listed in that how-to's table are available; everything else must be run
+  by the operator.
 
 - **Reapply the ApplicationSets on every release** — ApplicationSets template their `$values` source at `${K3D_MANAGER_BRANCH}`, which freezes to whatever branch was checked out when the set was last applied. Config committed to a newer branch is **inert** until the sets are reapplied: it is in git, CI is green, and no cluster reads it. This silently persisted for two releases (hub `trivy-operator` still on `k3d-manager-v1.16.0` as of 2026-07-24). Decision 2026-07-24: the values ref keeps tracking the **release branch**, not `main` — which makes this a required release step, not an optional one. Reapply for **both** the hub and ACG variants, then confirm with `argocd_check_values_branch`.
 
@@ -102,7 +103,8 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
     score means **read that file before filing**, not *do not file*: a recurrence is worth
     recording, and often belongs as a `Recurrence` section appended to the existing doc rather than
     as a new file. The command always exits 0 — a store that is down or an unset credential must
-    never block filing. Scores are UNMEASURED until the v1.40.0 retrieval eval lands.
+    never block filing. The v1.40.0 live eval found a modest recall gain on bugs only and more
+    intrusion than a TF-IDF control, so scores stay advisory — never a filing gate.
     See `docs/howto/find-prior-art.md`.
 
 ---

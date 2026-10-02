@@ -1,9 +1,11 @@
 # Slack Slash Commands & Webhook Server
 
 Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/cluster-diagnose`, `/cluster-refresh`,
-`/cluster-resume`, `/hostinger-status`, `/cleanup-stale-sandbox`, `/k3dm`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
+`/cluster-resume`, `/hostinger-status`, `/cleanup-stale-sandbox`, `/k3dm`, `/ask-docs`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
 that control the k3d-manager cluster from any Slack channel, plus thread-based AI troubleshooting
 and job control via thread replies.
+
+In the bot channel, the `/cluster-status` verdict posts top-level and the details go in its thread.
 
 ---
 
@@ -64,7 +66,7 @@ remote-operator role. The webhook enforces that role before it queues work.
 
 | Role | Allowed commands |
 |------|------------------|
-| `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
+| `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/ask-docs`, `/claude`, `/gemini`, `/codex` |
 | `operator` | `/cluster-refresh`, `/k3dm smoke` plus everything in `reader` |
 | `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade`, `/cleanup-stale-sandbox` plus everything in `operator` |
 
@@ -174,6 +176,13 @@ Run once per machine. Safe to re-run.
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Run an allowlisted make target",
         "usage_hint": "<target> [KEY=value …] [confirm]  (help lists targets)",
+        "should_escape": false
+      },
+      {
+        "command": "/ask-docs",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Ask a question over the documentation corpus",
+        "usage_hint": "[--sources] <question>  e.g. how is retrieval evaluated?",
         "should_escape": false
       },
       {
@@ -289,6 +298,18 @@ For manual redeploy (e.g. after token rotation):
 gh workflow run deploy-worker.yml
 ```
 
+### GitHub secrets for the relay workflow
+
+Use `make gh-secret` to list the GitHub Actions secret names referenced by the workflows, or
+set one interactively with `make gh-secret NAME=SLACK_SIGNING_SECRET`. Use
+`make gh-secret-sync-relay` to copy `k3dm-webhook-token` and `k3dm-slack-signing-secret` from
+the macOS Keychain into the corresponding GitHub secrets without putting either value in a
+command-line argument.
+
+`deploy-worker.yml` overwrites the relay's `WEBHOOK_TOKEN` and `SLACK_SIGNING_SECRET` with the
+GitHub copies on deployment. If every slash command reports “app did not respond” immediately
+after a relay deploy, the signing secret likely does not match.
+
 ### View webhook logs
 
 ```bash
@@ -320,12 +341,15 @@ bin/k3dm-webhook-setup --uninstall
 | `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | `/cluster-refresh hostinger` | Re-establishes SSH tunnel, refreshes kubeconfig |
 | `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
 | `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
+| `/ask-docs [--sources] <question>` | Search the documentation corpus | `/ask-docs --sources how is retrieval evaluated?` | Reader-only; answers are advisory and include sources |
 | `/cleanup-stale-sandbox [confirm]` | Clean expired k3s-aws sandbox state | `/cleanup-stale-sandbox` | Admin-only; dry-run by default, `confirm` applies |
 | `/k3dm <target> [KEY=value …] [confirm]` | Run an allowlisted make target | `/k3dm fix-status NS=cicd` | Role per target; `/k3dm help` lists yours; one job at a time |
 | `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/gemini <question>` | Multi-agent cluster troubleshooting | `/gemini why is data-layer out of sync?` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/codex <question>` | Multi-agent cluster troubleshooting | `/codex explain this ArgoCD drift` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade 9.5.15 infra` | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
+
+`/ask-docs` source paths are links to GitHub at the webhook's checked-out branch; set `K3DM_ASK_DOCS_LINK_REF` to override the branch.
 
 ### /k3dm targets
 
@@ -376,6 +400,9 @@ there) and retry.
 
 Examples:
 
+- `/cluster-diagnose aws` — no verb: every pod in every namespace on that cluster
+  (`kubectl get pods --all-namespaces -o wide`). The provider is required for this form;
+  `/cluster-diagnose` alone prints usage. Long output is clipped to its last 3500 characters.
 - `/cluster-diagnose hostinger pods shopping-cart-apps`
 - `/cluster-diagnose hostinger describe-pod shopping-cart-apps frontend-abc123`
 - `/cluster-diagnose hostinger logs shopping-cart-apps frontend-abc123`
@@ -383,8 +410,11 @@ Examples:
 - `/cluster-diagnose hub app shopping-cart-apps`
 - `/cluster-diagnose hub appsets`
 
-This path is deliberately read-only and the webhook rejects any namespace or
-context outside the repo-owned allowlist.
+This path is deliberately read-only. `pods <namespace>`, `describe-pod` and `logs` reject any
+namespace outside the repo-owned allowlist (`cicd`, `identity`, `monitoring`, `platform-ops`,
+`secrets`, `shopping-cart-apps`, `shopping-cart-data`, `shopping-cart-payment`, `trivy-system`).
+The no-verb overview lists pod names and status in every namespace but never reads env, logs or
+secrets. Every form rejects a context outside the approved set.
 
 ### Service smoke test
 
@@ -643,7 +673,7 @@ Configuring alternate repo paths:
 
 ```bash
 # In LaunchAgent plist or shell env before make restart-webhook:
-export K3DM_REPO_ROOT=/path/to/k3d-manager
+expdocs/howto/slack-slash-commands.mdort K3DM_REPO_ROOT=/path/to/k3d-manager
 export K3DM_SHOPPING_CARTS_ROOT=/path/to/shopping-carts
 ```
 

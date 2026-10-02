@@ -69,6 +69,7 @@ spec:
         app.kubernetes.io/component: datastore
         app.kubernetes.io/part-of: shopping-cart-e2e
     spec:
+      enableServiceLinks: false
       containers:
       - name: postgres
         image: postgres:16.4-alpine

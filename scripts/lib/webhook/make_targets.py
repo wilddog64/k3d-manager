@@ -26,8 +26,12 @@ MAKE_TARGETS = {
     "observability-status": {"min_role": "reader", "summary": "monitoring/trivy-system pods on both clusters"},
     "vuln-scan": {"min_role": "reader", "summary": "VulnerabilityReport summary"},
     "e2e-runner-health": {"min_role": "reader", "optional": ("RUNNER",), "summary": "hub vs remote-runner health"},
+    "test": {"min_role": "reader", "timeout": 1200, "summary": "offline BATS dispatcher suites"},
+    "test-bin": {"min_role": "reader", "timeout": 300, "summary": "offline BATS suites under scripts/tests/bin"},
     "test-pytest": {"min_role": "reader", "timeout": 600, "summary": "offline pytest suites"},
     "test-python-unit": {"min_role": "reader", "summary": "offline unittest suites"},
+    "test-python": {"min_role": "reader", "timeout": 900, "summary": "every offline Python suite"},
+    "test-all": {"min_role": "reader", "timeout": 1800, "summary": "every offline suite (BATS + Python)"},
     "find-similar-docs": {"min_role": "reader", "required": ("Q",), "optional": ("K",), "timeout": 120, "summary": "search docs/ for prior art by similarity"},
     "index-docs": {"min_role": "operator", "timeout": 1800, "summary": "re-embed changed docs into the vector store"},
     "e2e-remote": {"min_role": "operator", "required": ("RUNNER",), "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e on a remote runner"},
@@ -55,7 +59,7 @@ MAKE_TARGETS = {
 # Roles mirror COMMAND_ROLES in workers/slack-relay/index.js -- keep in sync.
 CLUSTER_COMMANDS = (
     ("/cluster-status [provider]", "reader", "cluster + access-layer status"),
-    ("/cluster-diagnose [provider|hub] <verb>", "reader", "pods, logs, apps, appsets"),
+    ("/cluster-diagnose [provider|hub] [verb]", "reader", "no verb: pods in all namespaces; pods, logs, apps, appsets"),
     ("/hostinger-status", "reader", "permanent app-cluster status"),
     ("/cluster-refresh [provider]", "operator", "refresh the access layer"),
     ("/cluster-up [provider]", "admin", "bring a cluster up (records deployment metrics)"),

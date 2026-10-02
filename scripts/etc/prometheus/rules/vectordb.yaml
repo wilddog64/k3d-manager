@@ -11,14 +11,21 @@ spec:
       interval: 60s
       rules:
         - alert: VectorDBMetricsStale
-          expr: absent(k3dm_vectordb_last_index_timestamp_seconds)
-          for: 1h
+          expr: >-
+            absent(k3dm_vectordb_last_index_timestamp_seconds)
+            or (time() - max by (job) (push_time_seconds{job="k3dm-vectordb"}) > 3600)
+          for: 15m
           labels:
             severity: warning
             cluster: hub
           annotations:
-            summary: "VectorDB metrics are absent"
-            description: "No VectorDB index timestamp has been published to Pushgateway for one hour."
+            summary: "VectorDB metrics are absent or no longer being published"
+            description: >-
+              Either no VectorDB index timestamp has ever been published to Pushgateway, or the
+              publisher has not pushed for over an hour. Pushgateway retains gauges after a
+              publisher stops, so absent() alone cannot detect a stopped publisher — the panels
+              keep showing the last values indefinitely. Check that bin/k3dm-vectordb-metrics is
+              still running (the Hermes tick, or make index-docs).
         - alert: VectorDBIndexStale
           expr: time() - k3dm_vectordb_last_index_timestamp_seconds > 7 * 86400
           for: 15m
@@ -28,3 +35,23 @@ spec:
           annotations:
             summary: "VectorDB index is stale"
             description: "The VectorDB index has not been refreshed for more than seven days."
+        - alert: VectorDBIndexDrift
+          expr: k3dm_vectordb_drift_docs != 0
+          for: 2h
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "VectorDB index has corpus drift"
+            description: >-
+              Documents differ from the indexed corpus. Check the Hermes log and run
+              make index-docs DRY_RUN=1.
+        - alert: VectorDBIndexFailing
+          expr: k3dm_vectordb_index_last_result{result="failed"} == 1
+          for: 30m
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "VectorDB automatic indexing is failing"
+            description: "Hermes could not complete the latest tracked-ref indexing run."

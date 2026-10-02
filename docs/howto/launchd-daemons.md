@@ -98,6 +98,19 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 - **Exposes:** `grafana.3ai-talk.org`, `prometheus.3ai-talk.org` → services on ubuntu-k3s; `alertmanager.3ai-talk.org` → the local Alertmanager login proxy
 - **Install:** via homebrew service (`brew services start cloudflared`) + plist at `~/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist`
 
+#### Regenerating the tunnel config
+
+The repo-managed template and provider origins render to `~/.cloudflared/config.yml` with the
+permanent app cluster selected by default:
+
+```bash
+make cloudflared-config
+```
+
+This checks for drift without changing the live file. Review the unified diff, then install it
+with `make cloudflared-config APPLY=1`; the previous file is saved as `config.yml.bak.<UTC timestamp>`.
+Restart the tunnel separately if needed using the launchd hint printed by the target.
+
 ---
 
 ## Periodic Daemons

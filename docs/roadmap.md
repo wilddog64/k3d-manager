@@ -102,6 +102,26 @@ originally-queued **v1.28.0 platform zero-downtime rollouts** was deferred (hard
 v1.28.0 tag instead shipped parallel multi-cloud provisioning + the public-endpoint probe. The next
 milestone will be chosen from Forward themes below once it gets a scope doc.
 
+### Candidate milestone — v1.42.0: k3d-manager Dot
+
+Turn Hermes into a focused, always-on project agent that keeps operational work moving while
+preserving human control. The first slice is deliberately narrow: once per day, launch the
+offline `k3dm-test` suite and Tier 1 vCluster E2E independently; retain separate result,
+freshness, and triage channels; investigate failures; and pause for approval before any repair
+or bug-writing mutation. The two runs must never depend on each other or mask each other's
+status. Accurate duration and resumable run state are part of the foundation.
+
+Scope: [`v1.42.0-daily-offline-and-e2e-verification.md`](plans/v1.42.0-daily-offline-and-e2e-verification.md).
+Tier 2 ACG/Stripe remains opt-in and is not made an unattended daily job.
+
+Also in v1.42.0 — **Hermes alert-driven triage.** Hermes reads firing alerts from Alertmanager (read-only, through the apiserver proxy), runs a per-alert read-only
+evidence recipe, links prior art, posts one Slack thread per alert, and either proposes an allowlisted repair through
+the existing approval path or drafts a bug doc in its own worktree. Alerts go to a dedicated `#k3dm-alerts` channel:
+`critical` and `warning` get a thread each, `info` a daily digest. No automatic code changes, PRs or silences. v1.42.0 is then at its five-plan cap;
+the R10 repair (delete a failed Job superseded by a newer CronJob spec) overflows to **v1.43.0**.
+
+Scope: [`v1.42.0-hermes-alert-driven-triage.md`](plans/v1.42.0-hermes-alert-driven-triage.md).
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
@@ -128,8 +148,9 @@ milestone only when it gets a scope doc.
   agents; `.git/` excluded from writable paths.
 - **Hermes Phase 2 / Phase 3 (event-driven operations automation)** — **Phase 1 shipped as v1.29.0**
   (read-only health/CI monitoring, bounded polling, Slack summaries — the current milestone above).
-  Phase 2 adds allowlisted, approval-gated repairs (restart webhook, refresh edge, retry transient
-  CI); Phase 3 adds cooldowns, daily token/iteration budgets, audit records, and post-repair
+  Phase 2's allowlisted, approval-gated repairs have shipped incrementally (R1–R9 in
+  `scripts/lib/hermes/repairs.py`, Slack approval in v1.33.0); alert-driven triage is scoped into v1.42.0 above, R10 into v1.43.0.
+  Phase 3 adds cooldowns, daily token/iteration budgets, audit records, and post-repair
   verification. Hermes does not replace the k3d-manager webhook or receive unrestricted cluster,
   cloud, Git, or branch-protection credentials. Each phase needs its own scope doc before a release
   is assigned (health-degraded ≠ safe-to-repair). Phase 1 scope:

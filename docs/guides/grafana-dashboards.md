@@ -234,7 +234,7 @@ redacted snapshot — no tokens, no raw log lines — as a `platform-ops` Config
 
 Read *Minutes since last poll* **first**. A stale poll age invalidates every other panel on
 the dashboard: sensor states are a snapshot, not a live read. Two sensors reading `unknown`
-together (`eso` + `node_pressure`) is the webhook-down signature and pages by SMS,
+together (`eso` + `data_layer`) is the webhook-down signature and pages by SMS,
 bypassing the correlator — see `docs/guides/hermes.md`.
 
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only

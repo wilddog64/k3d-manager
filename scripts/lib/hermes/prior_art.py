@@ -16,6 +16,7 @@ Retrieval is advisory everywhere it is used. Every failure path raises
 with one ``except``; nothing here is allowed to crash a Hermes run.
 """
 import base64
+import fnmatch
 import hashlib
 import json
 import os
@@ -318,19 +319,75 @@ def content_hash(embed_text):
     return hashlib.sha256(embed_text.encode("utf-8")).hexdigest()
 
 
-def iter_corpus(repo_root=None):
-    """Return ``[(relpath, title, embed_text, hash)]`` for every tracked corpus doc."""
-    root = Path(repo_root or REPO_ROOT)
+def _ref_entries(root, ref):
     listed = subprocess.run(
-        ["git", "ls-files", "-z", *CORPUS_GLOBS],
-        cwd=str(root), capture_output=True, text=True, timeout=120,
+        ["git", "ls-tree", "-r", "-z", "--format=%(objectname)%x09%(path)", ref],
+        cwd=str(root), capture_output=True, timeout=120,
     )
     if listed.returncode != 0:
-        raise StoreUnavailable(f"git ls-files failed: {listed.stderr.strip()}")
+        raise StoreUnavailable(f"git ls-tree failed: {listed.stderr.decode(errors='replace').strip()}")
+    entries = []
+    for record in listed.stdout.split(b"\0"):
+        if not record:
+            continue
+        oid, rel_bytes = record.split(b"\t", 1)
+        rel = rel_bytes.decode("utf-8", "replace")
+        if any(fnmatch.fnmatch(rel, pattern) for pattern in CORPUS_GLOBS):
+            entries.append((rel, oid.decode("ascii")))
+    return sorted(entries)
+
+
+def _batch_contents(root, entries):
+    process = subprocess.Popen(
+        ["git", "cat-file", "--batch"], cwd=str(root), stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    )
+    try:
+        contents = {}
+        for path, oid in entries:
+            process.stdin.write(oid.encode("ascii") + b"\n")
+            process.stdin.flush()
+            header = process.stdout.readline()
+            if not header:
+                raise StoreUnavailable("git cat-file --batch returned no header")
+            fields = header.split()
+            if len(fields) < 3 or fields[1] != b"blob":
+                raise StoreUnavailable(f"git cat-file could not read {path}")
+            size = int(fields[2])
+            raw = process.stdout.read(size)
+            process.stdout.read(1)
+            contents[path] = raw.decode("utf-8", "replace")
+        process.stdin.close()
+        if process.wait(timeout=120) != 0:
+            raise StoreUnavailable("git cat-file --batch failed")
+        return contents
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def iter_corpus(repo_root=None, ref=None):
+    """Return ``[(relpath, title, embed_text, hash)]`` for every corpus doc."""
+    root = Path(repo_root or REPO_ROOT)
+    if ref is not None:
+        entries = _ref_entries(root, ref)
+        raw_docs = _batch_contents(root, entries)
+        paths = sorted(raw_docs)
+    else:
+        raw_docs = {}
+        listed = subprocess.run(
+            ["git", "ls-files", "-z", *CORPUS_GLOBS], cwd=str(root),
+            capture_output=True, text=True, timeout=120,
+        )
+        if listed.returncode != 0:
+            raise StoreUnavailable(f"git ls-files failed: {listed.stderr.strip()}")
+        paths = sorted(p for p in listed.stdout.split("\0") if p)
     docs = []
-    for rel in sorted(p for p in listed.stdout.split("\0") if p):
+    for rel in paths:
         try:
-            raw = (root / rel).read_text(encoding="utf-8", errors="replace")
+            raw = raw_docs[rel] if ref is not None else (root / rel).read_text(
+                encoding="utf-8", errors="replace")
         except OSError:
             continue
         title, text = doc_embed_text(rel, raw)
@@ -338,6 +395,18 @@ def iter_corpus(repo_root=None):
             continue
         docs.append((rel, title, text, content_hash(text)))
     return docs
+
+
+def corpus_fingerprint(repo_root, ref):
+    """Return a stable digest of corpus paths and blob IDs at ``ref``."""
+    root = Path(repo_root or REPO_ROOT)
+    digest = hashlib.sha256()
+    for path, oid in _ref_entries(root, ref):
+        digest.update(path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(oid.encode("ascii"))
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _embed_request(text, task_type, key):

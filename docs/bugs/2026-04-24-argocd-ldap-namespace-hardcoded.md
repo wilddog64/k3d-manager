@@ -1,7 +1,7 @@
 # Bug: deploy_argocd hardcodes `ldap` namespace — always fails dependency check
 
 **Date:** 2026-04-24
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — `scripts/plugins/argocd.sh` no longer hardcodes an `ldap` namespace; the dependency check follows `LDAP_NAMESPACE`.
 **Severity:** HIGH (deploy_argocd always calls deploy_ldap --confirm directly → _err → exit 1)
 **Branch:** `k3d-manager-v1.1.0`
 

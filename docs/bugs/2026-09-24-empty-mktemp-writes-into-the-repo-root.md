@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.37.0`
 **Filed:** 2026-09-24 by Claude
-**Status:** OPEN — root cause confirmed by measurement; fix specced below, not applied
+**Status:** FIXED (`ecb46449`): F1 guards the empty kubeconfig path, F2 uses BATS test directories, and F3 is wired into `make check-doc-links`.
 
 ## Symptom
 
@@ -135,3 +135,13 @@ or a bare dotfile-with-pid shape exists at the repo root, and wire it where
   Vault request headers — they need their own spec and their own verification.
 - The three stray files currently in the working tree are the operator's to remove; they are
   untracked and harmless. Do not delete them as part of a fix commit.
+
+## Verification (Claude, 2026-10-01)
+
+`8fa82259`: all 33 bare `$(mktemp)` file paths in `shopping_cart.bats` (10) and `k3s_oci_provider.bats` (23)
+are replaced with `${BATS_TEST_TMPDIR}/…`; both suites pass 55/55. F1's guard already existed (`925c43e7`),
+and an empty kubeconfig path errors as specified. F3 (`check-repo-root-debris.sh`, now a whole-root scan wired into
+`check-doc-links`) passes clean and fails on `touch .join-failures.999`.
+The doc's reproduction recipe (`TMPDIR=/nonexistent bats …`) cannot work: BATS itself needs a writable TMPDIR,
+so no test runs before or after. The fix is proven by the removal count plus the guard and gate checks instead.
+Not in scope and left as is: `$(mktemp -d)` directory calls; an empty one does not write into the repo root.

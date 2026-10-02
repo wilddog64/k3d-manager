@@ -3,6 +3,7 @@
 **Filed:** 2026-09-27
 **Branch:** `k3d-manager-v1.39.0`
 **Severity:** High — the entire `/cluster-up` Slack path is non-functional, and `/cluster-down`
+**Status:** FIXED in `3a25448` (#133) — M1-M3 landed: `bin/cluster-up` and `bin/cluster-down` prepend `~/.local/bin`, and the hub teardown fails loudly when `k3d` is missing. Status line added 2026-09-29 by Claude (cloud session) after checking the code on `k3d-manager-v1.40.0`.
 silently skips the hub teardown.
 **Discovered by:** job `c7faf86b` (`/cluster-up aws` from Slack) failing with
 `make up CLUSTER_PROVIDER=k3s-aws exited 2`.

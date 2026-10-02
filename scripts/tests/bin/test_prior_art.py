@@ -7,6 +7,7 @@ the real code, because that is where this feature's defects live.
 """
 import io
 import json
+import subprocess
 import sys
 import urllib.error
 from pathlib import Path
@@ -106,6 +107,98 @@ class TestHashing:
         _, a = pa.doc_embed_text("docs/bugs/x.md", BUG_DOC)
         _, b = pa.doc_embed_text("docs/bugs/x.md", edited)
         assert pa.content_hash(a) == pa.content_hash(b)
+
+
+def _git_repo(tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
+    for tree in ("bugs", "issues", "plans", "retro"):
+        path = root / "docs" / tree / "archive" / "seed.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"# {tree}\n\nseed prose\n")
+    (root / "README.md").write_text("not corpus\n")
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-qm", "seed"], cwd=root, check=True)
+    return root
+
+
+def test_ref_reads_committed_branch_not_worktree(tmp_path):
+    root = _git_repo(tmp_path)
+    subprocess.run(["git", "switch", "-qc", "feature"], cwd=root, check=True)
+    extra = root / "docs/bugs/feature.md"
+    extra.write_text("# feature\n\ncommitted feature\n")
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-qm", "feature"], cwd=root, check=True)
+    subprocess.run(["git", "switch", "-q", "main"], cwd=root, check=True)
+    (root / "docs/bugs/working.md").write_text("# working\n\nnot committed\n")
+    names = {row[0] for row in pa.iter_corpus(root, ref="feature")}
+    assert "docs/bugs/feature.md" in names
+    assert "docs/bugs/working.md" not in names
+    assert "docs/bugs/archive/seed.md" in names
+
+
+def test_ref_cat_file_starts_once(tmp_path, monkeypatch):
+    root = _git_repo(tmp_path)
+    calls = []
+    original = pa.subprocess.Popen
+
+    def counted(*args, **kwargs):
+        calls.append(args[0])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(pa.subprocess, "Popen", counted)
+    pa.iter_corpus(root, ref="HEAD")
+    assert [command[:3] for command in calls if command[1] == "cat-file"] == [
+        ["git", "cat-file", "--batch"]
+    ]
+
+
+def test_corpus_fingerprint_changes_with_blob(tmp_path):
+    root = _git_repo(tmp_path)
+    first = pa.corpus_fingerprint(root, "HEAD")
+    path = root / "docs/bugs/new.md"
+    path.write_text("# new\n\nnew prose\n")
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-qm", "new"], cwd=root, check=True)
+    assert pa.corpus_fingerprint(root, "HEAD") != first
+
+
+def _large_repo(tmp_path, per_tree=500):
+    root = tmp_path / "large"
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
+    body = "\n".join(f"## Section {n}\n\n" + "prose " * 200 for n in range(6))
+    for tree in ("bugs", "issues", "plans", "retro"):
+        for n in range(per_tree):
+            sub = "archive/" if n % 10 == 0 else ""
+            path = root / "docs" / tree / f"{sub}doc-{n:04d}.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"# {tree} {n}\n\nLead paragraph {n}.\n\n{body}\n")
+    (root / "docs" / "guides").mkdir(parents=True)
+    (root / "docs" / "guides" / "not-corpus.md").write_text("# guide\n")
+    (root / "README.md").write_text("not corpus\n")
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-qm", "seed"], cwd=root, check=True)
+    return root
+
+
+def test_ref_matches_worktree_on_a_realistic_corpus(tmp_path):
+    """2,000 docs: more object IDs than a pipe buffer holds, and contents far larger than one."""
+    import threading
+    root = _large_repo(tmp_path)
+    result = {}
+    worker = threading.Thread(target=lambda: result.update(docs=pa.iter_corpus(root, ref="HEAD")), daemon=True)
+    worker.start()
+    worker.join(timeout=60)
+    assert not worker.is_alive(), "iter_corpus(ref=...) hung reading a realistic corpus"
+    assert len(result["docs"]) == 2000
+    assert result["docs"] == pa.iter_corpus(root)
+    assert "docs/guides/not-corpus.md" not in {row[0] for row in result["docs"]}
 
 
 class TestEscaping:

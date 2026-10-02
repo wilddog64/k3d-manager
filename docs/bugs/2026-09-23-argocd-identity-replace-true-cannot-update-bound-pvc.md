@@ -6,7 +6,7 @@
 identity manifest change reaches the cluster, and `keycloak-realm-reconcile` has been `Failed 0/1`
 for 2d1h. Nothing is currently broken at runtime (`health: Healthy`), which is why it has gone
 unnoticed.
-**Status:** OPEN — not assigned.
+**Status:** FIX LANDED in `shopping-cart-infra` `00d0d8a` (#101, "exempt bound PVCs from Replace=true so shopping-cart-identity can sync"), seen 2026-09-30 — live confirmation pending: Hermes `argocd` should stop reporting `shopping-cart-identity Healthy/OutOfSync`.
 
 ## Symptom
 
@@ -136,3 +136,8 @@ reconcile script, and it is the actual root cause of the two red SSO lines. Fixi
 `awk` until the script parses CSV in bash instead. **Two fixes are required, not one** — and
 because this one blocks the Job from existing at all, it must land first or the awk fix cannot be
 observed.
+
+## Recurrence 2026-09-29 — still live
+
+Hermes `argocd` sensor, every poll on 2026-09-29: `shopping-cart/shopping-cart-identity
+Healthy/OutOfSync`. Unchanged since this doc was filed; still unassigned.

@@ -6,8 +6,9 @@ from pathlib import Path
 
 from webhook.config import JOB_DIR
 from webhook.proc import _spawn_capture_text
-from webhook.render import _slack_post
+from webhook.render import _slack_post, _post_slack_bot, _start_bot_thread
 from webhook.agent import _call_gemini
+from webhook.redact import mask_env_values, scrub_credentials
 
 __all__ = [
     "_run_cluster_status", "_format_status_summary_slack",
@@ -23,6 +24,35 @@ _acg_stack_probe = lambda provider: None
 _running_cluster_job = lambda: None
 _smoke_test_services = lambda **kwargs: []
 _ARCH_CONTEXT = ""
+_slack_bot_token = lambda: ""
+_slack_channel_id = lambda: ""
+
+
+def _post_status_report(job_dir, response_url, output, channel_id, thread_ts):
+    """Post a status report in a bot-channel thread, with response_url fallbacks."""
+    bot_thread = bool(
+        _slack_bot_token() and _slack_channel_id()
+        and channel_id == _slack_channel_id() and not thread_ts
+    )
+    if not bot_thread:
+        if response_url:
+            _slack_post(response_url, output)
+        else:
+            return False
+        return True
+
+    header, _, body = output.lstrip().partition("\n")
+    body = body.lstrip("\n")
+    new_thread_ts = _start_bot_thread(header)
+    if not new_thread_ts:
+        if response_url:
+            _slack_post(response_url, output)
+        return True
+    (job_dir / "thread_ts").write_text(new_thread_ts)
+    if body and not _post_slack_bot(body, thread_ts=new_thread_ts):
+        if response_url:
+            _slack_post(response_url, body)
+    return True
 
 
 def configure_runtime(log, notify_job, redact_secrets, resolve_provider,
@@ -47,7 +77,7 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
     return output.strip(), timed_out
 
 
-def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
+def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None, channel_id=""):
     """Check ACG cluster reachability + ArgoCD app health; post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
@@ -65,9 +95,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
                       + "\n… middle of report truncated …\n"
                       + output[-1800:])
         (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
+        if not _post_status_report(job_dir, response_url, output, channel_id, thread_ts):
             _notify_job(job_id, output)
 
     def _pod_is_ready(line):
@@ -306,7 +334,7 @@ def _format_status_summary_slack(payload, provider):
     if overall == "unknown":
         out.append("_status source unavailable — run `make restart-webhook` on the hub_")
     return _redact_secrets("\n".join(out))
-def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
+def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None, channel_id=""):
     """Run bin/cluster-status for k3s-hostinger (read-only); post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
@@ -325,9 +353,7 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
                       + report[-1800:])
         output = report
         (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
+        if not _post_status_report(job_dir, response_url, output, channel_id, thread_ts):
             _notify_job(job_id, output)
 
     try:
@@ -371,7 +397,7 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = _redact_secrets("".join(lines))
+        output = scrub_credentials(_redact_secrets("".join(lines)))
         (job_dir / "output").write_text(output)
         if response_url:
             _slack_post(response_url, output)
@@ -393,6 +419,13 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
             title = f"🔎 *Diagnostics* — pods in `{namespace}` on `{context}`"
             cmd = [
                 "kubectl", "get", "pods", "-n", namespace,
+                "--context", context, "-o", "wide",
+                "--request-timeout=15s",
+            ]
+        elif action == "get-pods-all":
+            title = f"🔎 *Diagnostics* — pods in all namespaces on `{context}`"
+            cmd = [
+                "kubectl", "get", "pods", "--all-namespaces",
                 "--context", context, "-o", "wide",
                 "--request-timeout=15s",
             ]
@@ -440,6 +473,8 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
             _write_log("\n❌ diagnostics command timed out after 30s")
             _finish("failed")
             return
+        if action == "describe-pod":
+            out = mask_env_values(out)
         if out.strip():
             clipped = out.strip()
             if len(clipped) > 3500:

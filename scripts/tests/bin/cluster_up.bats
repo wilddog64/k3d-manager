@@ -193,6 +193,25 @@ STUB
   [[ "$output" == *'_import_status=$(curl -sS -o /dev/null -w "%{http_code}"'* ]]
 }
 
+@test "acg-up restores cosign signing only for a newly created Hub" {
+  run grep -nF '_dry_guard "restore cosign signing"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  local restore_line="${output%%:*}"
+  run grep -nF 'elif ! _argocd_bootstrap_is_ready' bin/cluster-up
+  [ "$status" -eq 0 ]
+  local existing_line="${output%%:*}"
+  [ "$restore_line" -lt "$existing_line" ]
+  run grep -nF '_dry_guard "deploy ArgoCD"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  local argocd_line="${output%%:*}"
+  [ "$argocd_line" -lt "$restore_line" ]
+}
+
+@test "acg-up never references signing_init or signing_rotate_key" {
+  run grep -nE 'signing_(init|rotate_key)' bin/cluster-up
+  [ "$status" -ne 0 ]
+}
+
 @test "acg-up preserves existing Vault identity secrets on rebuild" {
   run grep -nF '_vault_kv_exists "keycloak/admin"' scripts/plugins/shopping_cart.sh
   [ "$status" -eq 0 ]
@@ -356,6 +375,77 @@ _load_acg_up_cleanup() {
   sed -n '/^function _acg_up_cleanup()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/c.sh"
   source scripts/lib/system.sh
   source "${BATS_TEST_TMPDIR}/c.sh"
+}
+
+_load_acg_up_marker_clear() {
+  sed -n '/^function _acg_up_clear_stack_marker()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/c.sh"
+  source scripts/lib/system.sh
+  source "${BATS_TEST_TMPDIR}/c.sh"
+}
+
+@test "acg-up failure cleanup warns for a stack created by this run" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    printf "stack_name=k3d-manager-cluster\nregion=us-west-2\n" > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"CloudFormation stack 'k3d-manager-cluster' (us-west-2) was created by this run"* ]]
+  [[ "${output}" == *"make down"* ]]
+}
+
+@test "acg-up failure cleanup does not warn for a reused stack" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *"CloudFormation stack"* ]]
+}
+
+@test "acg-up success clears the CloudFormation ownership marker" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_marker_clear)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    : > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    _load_acg_up_marker_clear
+    _acg_up_clear_stack_marker
+    if [[ -e "${_ACG_STATE_DIR}/run/cf-stack-created" ]]; then
+      exit 1
+    fi
+  '
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up clears a stale ownership marker at start and after success" {
+  local _trap _start _state _done
+  _trap="$(grep -n '^trap _acg_up_cleanup EXIT$' bin/cluster-up | cut -d: -f1)"
+  _start="$(grep -n '^_acg_up_clear_stack_marker$' bin/cluster-up | head -1 | cut -d: -f1)"
+  _state="$(grep -n 'acg-state.json"$' bin/cluster-up | tail -1 | cut -d: -f1)"
+  _done="$(grep -n '^_acg_up_clear_stack_marker$' bin/cluster-up | tail -1 | cut -d: -f1)"
+  [ -n "${_trap}" ] && [ -n "${_start}" ] && [ -n "${_state}" ]
+  [ "${_start}" -eq $((_trap + 1)) ]
+  [ "${_done}" -gt "${_state}" ]
+}
+
+@test "acg-up failure cleanup tolerates a missing or unreadable marker" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    : > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    chmod 000 "${_ACG_STATE_DIR}/run/cf-stack-created"
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "${status}" -eq 0 ]
 }
 
 @test "acg-up failure cleanup leaves a pre-existing cloudflare tunnel running" {

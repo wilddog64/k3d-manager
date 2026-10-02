@@ -2,6 +2,7 @@ import importlib.machinery
 import importlib.util
 import json
 import subprocess
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -131,3 +132,23 @@ def test_a_null_readable_field_is_still_unknown():
     for field in ("available", "external_secret_synced", "pod_ready", "rows", "corpus_docs"):
         result = vectordb(runner(payload(**{field: None})), {}, threshold=0)
         assert result["status"] == "unknown", field
+
+
+def test_vectordb_publisher_uses_dedicated_hub_default_and_override(monkeypatch):
+    loader = importlib.machinery.SourceFileLoader("k3dm_vectordb_metrics", str(ROOT / "bin" / "k3dm-vectordb-metrics"))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(module)
+    requests = []
+    class Response:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *_args): pass
+    monkeypatch.setattr(module.urllib.request, "urlopen", lambda request, **_kw: requests.append(request) or Response())
+    module.publish(payload())
+    assert requests[1].full_url.startswith("http://localhost:19094/metrics/job/k3dm-vectordb")
+    requests.clear()
+    monkeypatch.setenv("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://example.invalid:1234")
+    module.publish(payload())
+    assert requests[1].full_url.startswith("http://example.invalid:1234/metrics/job/k3dm-vectordb")
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://wrong.invalid:9091")
+    assert module._pushgateway_url() == "http://example.invalid:1234"

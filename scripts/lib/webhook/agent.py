@@ -18,7 +18,10 @@ from webhook.config import (
 )
 from webhook.policy import _role_allows
 from webhook.proc import _spawn_capture_text
-from webhook.render import _fetch_thread_context, _post_slack_bot, _slack_post
+from webhook.render import (
+    _fetch_thread_context, _post_slack_bot, _slack_post, _start_bot_thread,
+    _redact_thread_question,
+)
 
 __all__ = [
     "_call_gemini",
@@ -30,7 +33,7 @@ __all__ = [
     "_run_cluster_ask",
 ]
 
-GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-3.5-flash-medium")
+GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-3.8-flash-medium")
 _ask_semaphore = threading.Semaphore(2)
 
 def _notify_job(job_id, text):
@@ -49,67 +52,132 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
     _rc, output, timed_out = _spawn_capture_text(cmd, cwd=cwd, env=env, timeout=timeout)
     return output.strip(), timed_out
 
-def _call_gemini(prompt):
-    """Shell out to the Antigravity CLI. Returns response text or error string.
+_AI_UNAVAILABLE_SIGNATURES = (
+    ("not-logged-in", "not logged into Antigravity"),
+    ("not-logged-in", "Authentication required. Please visit the URL"),
+    ("auth-timeout", "authentication failed or timed out"),
+    ("bad-api-key", "API key not valid"),
+    ("bad-api-key", "API_KEY_INVALID"),
+    ("untrusted-dir", "not running in a trusted directory"),
+    ("unknown-model", "is not recognized as a known model"),
+    ("headless-tool-denied", "auto-denied"),
+)
 
-    Uses os.posix_spawn (no fork) to avoid macOS NEF atfork SIGSEGV.
-    Output is captured via a temp file rather than a pipe.
-    """
-    import shutil, tempfile, time
-    analysis_bin = os.environ.get("K3DM_GEMINI_BIN", "agy")
-    resolved = shutil.which(analysis_bin) or analysis_bin
-    if not os.path.isfile(resolved):
-        return "agy CLI not found — skipping AI analysis"
+
+def _ai_classify_failure(exit_code, raw):
+    """Return a short reason string if this candidate is unavailable, else None."""
+    for reason, needle in _AI_UNAVAILABLE_SIGNATURES:
+        if needle in raw:
+            return reason
+    if exit_code != 0:
+        return f"exit {exit_code}"
+    return None
+
+
+def _ai_candidates():
+    """Return ordered candidates; K3DM_GEMINI_BIN pins exactly one binary."""
+    import shutil
+
+    pinned = os.environ.get("K3DM_GEMINI_BIN")
+    names = [pinned] if pinned else [
+        item.strip() for item in
+        os.environ.get("K3DM_AI_BIN_ORDER", "agy,gemini").split(",") if item.strip()
+    ]
+    out = []
+    for name in names:
+        resolved = shutil.which(name) or name
+        if not os.path.isfile(resolved):
+            out.append((name, None))
+            continue
+        argv = [resolved]
+        if os.path.basename(resolved) == "gemini":
+            argv.append("--skip-trust")
+            model = os.environ.get("K3DM_ANALYSIS_MODEL_GEMINI")
+            if model:
+                argv += ["--model", model]
+        else:
+            argv += ["--model", GEMINI_MODEL]
+        out.append((name, argv))
+    return out
+
+
+def _call_gemini(prompt):
+    """Run the first available AI CLI candidate and return its answer text."""
+    import tempfile, time
     env = {**os.environ, "TERM": "xterm-256color"}
-    try:
-        with tempfile.NamedTemporaryFile(
-            prefix="k3dm-gemini-", suffix=".out", delete=False, mode="w"
-        ) as tmp:
-            tmp_path = tmp.name
-        file_actions = [
-            (os.POSIX_SPAWN_OPEN, 1, tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
-            (os.POSIX_SPAWN_DUP2, 1, 2),
-        ]
-        guarded = (
-            "You are analyzing pre-collected data in a HEADLESS session with no "
-            "interactive approver. Do NOT run any commands or call any tools — a tool "
-            "call is auto-denied and yields no answer. Answer ONLY from the text below; "
-            "if it is insufficient, say so briefly.\n\n" + prompt
-        )
-        cmd = [resolved, "--model", GEMINI_MODEL, "--prompt", guarded]
-        child_pid = os.posix_spawn(
-            resolved, cmd, dict(env),
-            file_actions=file_actions, setsid=True,
-        )
-        deadline = time.monotonic() + 120
-        while True:
-            if time.monotonic() > deadline:
-                try:
-                    os.kill(child_pid, 9)
-                    os.waitpid(child_pid, 0)
-                except OSError:
-                    pass
-                return "agy analysis timed out after 120s — cluster state may be too large"
-            try:
-                done_pid, _ = os.waitpid(child_pid, os.WNOHANG)
-                if done_pid != 0:
+    guarded = (
+        "You are analyzing pre-collected data in a HEADLESS session with no "
+        "interactive approver. Do NOT run any commands or call any tools — a tool "
+        "call is auto-denied and yields no answer. Answer ONLY from the text below; "
+        "if it is insufficient, say so briefly.\n\n" + prompt
+    )
+    total_budget = float(os.environ.get("K3DM_AI_TOTAL_BUDGET_S", "180"))
+    started = time.monotonic()
+    failures = []
+    for name, argv in _ai_candidates():
+        if argv is None:
+            failures.append(f"{name}: not installed")
+            continue
+        remaining = total_budget - (time.monotonic() - started)
+        if remaining < 15:
+            failures.append(f"{name}: skipped, time budget exhausted")
+            continue
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix="k3dm-ai-", suffix=".out", delete=False, mode="w"
+            ) as tmp:
+                tmp_path = tmp.name
+            file_actions = [
+                (os.POSIX_SPAWN_OPEN, 1, tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+                (os.POSIX_SPAWN_DUP2, 1, 2),
+            ]
+            child_pid = os.posix_spawn(
+                argv[0], argv + ["--prompt", guarded], dict(env),
+                file_actions=file_actions, setsid=True,
+            )
+            deadline = time.monotonic() + remaining
+            exit_code = None
+            while True:
+                if time.monotonic() > deadline:
+                    try:
+                        os.kill(child_pid, 9)
+                        os.waitpid(child_pid, 0)
+                    except OSError:
+                        pass
+                    exit_code = -9
                     break
-            except ChildProcessError:
-                break
-            time.sleep(0.5)
-        raw = Path(tmp_path).read_text(errors="replace").strip()
-        Path(tmp_path).unlink(missing_ok=True)
-        if "headless mode" in raw and "auto-denied" in raw:
-            return "agy analysis skipped — headless tool use disabled"
-        raw = raw or "agy returned no output"
-        # Strip CLI startup banners (Warning: lines)
+                try:
+                    done_pid, status = os.waitpid(child_pid, os.WNOHANG)
+                    if done_pid != 0:
+                        exit_code = os.waitstatus_to_exitcode(status)
+                        break
+                except ChildProcessError:
+                    exit_code = 0
+                    break
+                time.sleep(0.5)
+            raw = Path(tmp_path).read_text(errors="replace").strip()
+        except Exception as exc:
+            failures.append(f"{name}: {type(exc).__name__}")
+            continue
+        finally:
+            if tmp_path:
+                Path(tmp_path).unlink(missing_ok=True)
+        if exit_code == -9:
+            failures.append(f"{name}: timed out")
+            continue
+        reason = _ai_classify_failure(exit_code, raw)
+        if reason:
+            failures.append(f"{name}: {reason}")
+            continue
         raw = re.sub(r'(?m)^Warning:.*\n?', '', raw).strip()
-        raw = raw or "agy returned no output"
+        if not raw:
+            failures.append(f"{name}: no output")
+            continue
         cleaned = re.sub(r'(?:^|\n)\s*\w+\([^)]{0,500}\)\s*', ' ', raw, flags=re.MULTILINE)
         cleaned = re.sub(r'<ctrl[^>]*>', '', cleaned).strip()
         return cleaned or raw
-    except Exception as exc:
-        return f"agy error: {exc}"
+    return "AI analysis unavailable — " + "; ".join(failures)
 
 
 _FIX_RE = re.compile(
@@ -219,13 +287,22 @@ def _parse_gemini_observations(raw):
     return answer, filed
 
 
-def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None, role="admin"):
+def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None, role="admin", channel_id=""):
     """Spawn claude/gemini/codex with the user's question; post the answer to Slack."""
     if max_turns is None:
         max_turns = _ASK_MAX_TURNS_DEFAULT
     job_dir = JOB_DIR / job_id
     if thread_ts:
         (job_dir / "thread_ts").write_text(thread_ts)
+    bot_thread = bool(SLACK_BOT_TOKEN and SLACK_CHANNEL_ID and channel_id == SLACK_CHANNEL_ID)
+    if bot_thread:
+        thread_ts = _start_bot_thread(
+            f"🤖 *ask {agent}:* {_redact_thread_question(question)}"
+        )
+        if thread_ts:
+            (job_dir / "thread_ts").write_text(thread_ts)
+        else:
+            bot_thread = False
     _ANSI = re.compile(r'\x1b\[[0-9;]*[mK]')
     thread_context = _fetch_thread_context(thread_ts) if thread_ts else ""
     _fix_denied = False
@@ -235,7 +312,10 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
             text = "⚠️ Fix actions require *operator* role — ran read-only.\n\n" + text
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text(text)
-        if response_url:
+        if bot_thread:
+            if not _post_slack_bot(text, thread_ts=thread_ts):
+                _slack_post(response_url, text)
+        elif response_url:
             _slack_post(response_url, text)
         else:
             _notify_job(job_id, text)

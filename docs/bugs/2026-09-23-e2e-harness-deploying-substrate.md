@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.37.0`
 **Filed:** 2026-09-23 by k3dm-hermes
-**Status:** OPEN — Hermes rule-based triage; unverified
+**Status:** CLOSED as stale (triage by Claude, 2026-10-01) — a harness failure during the vcluster-leak period, fixed the same day by `2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`. Reopen if the next run fails here.
 **Run:** `1790154235-20`, runner `m2`, tier `vcluster`, None passed / None failed / None total
 **Runner commit:** `da47dff461f73aff82f903eda279a334acc0e627`
 

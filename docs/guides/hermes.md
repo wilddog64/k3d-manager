@@ -49,6 +49,7 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 | R3 | Refresh Hostinger edge access | all public hosts fail for two cycles | `scripts/k3d-manager refresh_access_layer` (the public wrapper for `_hostinger_refresh_access_layer`; never `make refresh`) |
 | R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using the `k3dm-hermes-gh-token` PAT in `GH_TOKEN` |
 | R5 | Quarantine stale ACG reconciliation | sustained Kine pressure, `state.db` >= 8 GiB, and the known stale `host.k3d.internal` registration | pause hub ArgoCD application-controller (opt-in automatic circuit breaker only) |
+| R9 | Reapply ApplicationSets on the release branch | `values_branch` degraded with stale references | `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` with `K3D_MANAGER_BRANCH` pinned |
 
 ## Slack approvals (opt-in)
 
@@ -123,24 +124,85 @@ Sensor status is a three-value enum defined in
 
 ---
 
-## The five sensors
+## The sensors
 
 Each sensor emits one normalized record per cycle and debounces on a sustained signal (a single
 flap does not trip it). All are read-only.
 
-1. **`eso`** — ExternalSecrets health, from the webhook `services[]` entries `ESO ClusterSecretStore`
-   and `ESO ExternalSecrets`. Not-synced sustained beyond the debounce → `degraded`; source missing
-   → `unknown`.
+1. **`eso`** — ExternalSecrets health, from every webhook `services[]` row whose name ends in
+   `ESO ClusterSecretStore` or `ESO ExternalSecrets`, including the `Hub `-prefixed pair. Neutral
+   (`ok: null`) rows are skipped rather than treated as `unknown`; not-synced sustained beyond the
+   debounce → `degraded`, and `unknown` means no ESO row could be graded at all.
 2. **`argocd`** — per-`Application` `Degraded` / `OutOfSync`, from `argocd app list -o json --grpc-web`
    using the read-only `hermes` API token (get-only). The webhook JSON does not expose per-app state,
    which is the one reason Hermes holds an ArgoCD token at all.
 3. **`reachability`** — wraps the already-shipped [`bin/public-endpoint-probe --json`](../../bin/public-endpoint-probe)
    (v1.28.0), which discriminates edge-down from single-service failures. Probe "source unavailable"
    exit → `unknown`.
-4. **`node_pressure`** — node / control-plane / data-layer pressure, again via the **webhook** payload
-   (the `Data layer` entry plus aggregate service health), never a direct node probe.
-5. **`ci`** — GitHub Actions / required-check health via the GitHub read API (failed, timed-out,
+4. **`node_pressure`** — reads `Ready`, `MemoryPressure`, `DiskPressure` and `PIDPressure` directly
+   from the hub and app-cluster nodes with read-only `kubectl`; unreadable contexts are reported
+   separately and do not make a readable, clean context degraded.
+5. **`data_layer`** — the webhook's `Data layer` check only; unrelated service failures do not affect
+   it. A sustained `ok: false` degrades it, `ok: null` means not deployed and is healthy, and a
+   missing entry or unavailable webhook is unknown.
+6. **`ci`** — GitHub Actions / required-check health via the GitHub read API (failed, timed-out,
    cancelled, or stuck in-progress runs).
+7. **`app_health`** — compares each configured service's aggregate `/actuator/health` with its
+   liveness and readiness groups through the API-server service proxy. It reports a delta only
+   when the aggregate is not `UP` while both groups are `UP`; this is the application failure
+   Kubernetes and ArgoCD cannot see because they poll only the probe groups. It is disabled by
+   default and files debounced deltas into `docs/bugs/` through the same path as e2e and status
+   triage.
+
+### `data_layer` unknown — evidence → cause
+
+| Evidence | Cause |
+|---|---|
+| `credential unavailable: k3dm-webhook-token` | Webhook credential is unavailable |
+| `data layer status source unavailable: webhook returned no service checks` | Webhook returned an empty `services` list |
+| `data layer status source unavailable: all webhook checks ungraded` | Every webhook service check has `ok: null` |
+| `data layer check absent from webhook payload` | No `Data layer` check was present |
+| `data layer ungraded: {detail}` | The `Data layer` check was present but ungraded |
+| `data layer status source unavailable: {ExceptionClassName}` | Fetch/parsing raised an exception; only its class name is retained |
+
+The three `status source unavailable` rows keep that substring on purpose: R1 (`repairs._unknown_webhook`)
+reads it as "the webhook is down". The other three are a reachable webhook with no usable data-layer check.
+
+### App-health aggregate/probe deltas
+
+Enable the sensor only after a read-only dry run confirms the app-cluster context, API-server
+service proxy path, and actuator port. Set `K3DM_HERMES_APP_HEALTH_ENABLED=1` and provide
+`K3DM_HERMES_APP_CONTEXT`; set `K3DM_HERMES_APP_KUBECONFIG` when the app cluster needs a
+dedicated kubeconfig. The target table is
+[`scripts/etc/hermes/app-health-targets.json`](../../scripts/etc/hermes/app-health-targets.json).
+Adding a service is a one-line target-table edit, but the operator must confirm that service's
+port from its own Deployment first. The sensor is disabled by default, uses no port-forward, and
+files only a debounced delta through the existing e2e-bugs path.
+
+### Possible prior art
+
+New Hermes bug documents may include a `## Possible prior art` section containing up to three
+retrieved documents and their scores. This is advisory context for the human reviewer only. An
+unavailable vector store or embeddings credential omits the section without failing the run, and
+Hermes still decides new versus recurring strictly from the exact-slug glob; the prior-art list
+does not gate, suppress, or redirect filing.
+
+### `eso` says `unknown` — check the kube context before the credential.
+
+An `unknown` ESO result means no ESO row could be graded. Reproduce the webhook payload without
+using a credential or touching a cluster:
+
+```bash
+PYTHONPATH=scripts/lib python3 - <<'PY'
+from webhook import smoke
+from hermes.sensors import eso
+res = smoke._eso_health_results("ubuntu-k3s")
+for name, ok, detail in res:
+    print(f"  {name!r}: ok={ok!r} detail={detail!r}")
+payload = {"services": [{"name": n, "ok": ok, "detail": d} for n, ok, d in res]}
+print("sensor:", eso(lambda *a, **k: payload, {}, token="x")["status"])
+PY
+```
 
 ---
 
@@ -194,6 +256,77 @@ To confirm the read-only posture: `argocd account can-i get applications '*/*'` 
 `argocd account can-i sync applications '*/*'` → no; the GitHub PAT succeeds on a read call and is
 403/404 on any write.
 
+### Re-minting the ArgoCD token
+
+```bash
+make argocd-hermes-token
+```
+
+> **A 403 is probably Cloudflare, not ArgoCD.** `argocd.3ai-talk.org` sits behind Cloudflare, which
+> blocks `urllib`'s default `Python-urllib/<ver>` User-Agent with `HTTP 403` and a body of
+> `error code: 1010`. On the session call that looks identical to a rejected admin password or a
+> missing `accounts.hermes=apiKey`. Confirm which you have by reading the body:
+>
+> ```bash
+> python3 -c 'import urllib.request as u; print(u.urlopen(u.Request("https://argocd.3ai-talk.org/api/version", headers={"User-Agent":"k3d-manager/diag"})).read())'
+> ```
+>
+> A 200 here means the endpoint and the block are both understood — the target sets its own
+> User-Agent, so a remaining 403 is a genuine ArgoCD authz failure.
+
+> **A 400 is a request-shape problem, not a permission problem.** The token endpoint types
+> `expiresIn` as `integer/int64`; a quoted `"0"` is rejected by grpc-gateway before ArgoCD sees it.
+> The API's own schema is served unauthenticated and is the authority on any field's type:
+>
+> ```bash
+> python3 -c 'import json,urllib.request as u; s=json.loads(u.urlopen(u.Request("https://argocd.3ai-talk.org/swagger.json", headers={"User-Agent":"k3d-manager/diag"})).read()); print(json.dumps(s["definitions"]["accountCreateTokenRequest"], indent=1))'
+> ```
+
+Run this from a real terminal. The target mints a fresh token for the `hermes` account, stores it in
+the Keychain, proves it against `/api/v1/applications`, and restarts the Hermes agent. It never
+prints the token.
+
+**An ArgoCD rebuild invalidates the token even though it has no expiry.** Every API token and CLI
+session is signed with `server.secretkey` from the `argocd-secret` Secret, and a rebuild regenerates
+that key — so each previously issued credential becomes permanently unusable at once. The symptom is
+
+```
+rpc error: code = Unauthenticated desc = invalid session: token signature is invalid
+```
+
+which is neither an expiry nor a revocation: retrying, unlocking the Keychain, and re-checking the
+account's RBAC all explain nothing, and the `argocd` sensor reports `unknown` with
+"credential rejected". Date the cutoff from metadata alone, without reading any secret value — a
+recent `creationTimestamp` on `argocd-secret` with a **low `resourceVersion`** means the Secret was
+created with the datastore and never rotated since, so any credential older than it is dead:
+
+```bash
+kubectl -n cicd get secret argocd-secret --context k3d-k3d-cluster \
+  -o jsonpath='{.metadata.creationTimestamp} {.metadata.resourceVersion}{"\n"}'
+```
+
+Re-minting every ArgoCD token therefore belongs in the post-rebuild checklist.
+
+Three behaviours of the target are deliberate:
+
+- **It refuses to run without a TTY.** Minting a credential must not happen unattended, and a
+  Keychain write with no terminal can store an empty value at exit code 0 — a silent failure that
+  reads as success.
+- **It updates the Keychain item in place (`-U`) rather than deleting and recreating it.** A
+  recreated item gets a default ACL, which can make a non-interactive launchd read prompt for
+  authorization; Hermes would then fail silently.
+- **It reads the stored value back and calls the endpoint before reporting success**, so a green
+  result means the sensor will work, not merely that an item exists.
+
+The admin password resolves from `ARGOCD_ADMIN_PASSWORD`, else the `argocd-initial-admin-secret`
+Secret in `cicd`. Prefer that Secret over `make show-service-passwords`, which reads the Vault copy
+at `secret/data/argocd/admin` first — after a rebuild the Vault copy can predate the new install and
+hand you a password that no longer works. Override the endpoint with `ARGOCD_HOST`.
+
+Old tokens signed by a retired key remain listed on the account. `argocd account get --account
+hermes` shows the token IDs and `argocd account delete-token --account hermes <id>` clears the
+unusable ones.
+
 ---
 
 ## Install and uninstall
@@ -245,6 +378,9 @@ align to a hard boundary.
 | `K3DM_HERMES_SMS_DAILY_BUDGET` | `10` | Max SMS pages per UTC day |
 | `K3DM_HERMES_E2E_ENABLED` | (enabled) | Set to `0` to disable scheduled E2E dispatch |
 | `K3DM_HERMES_E2E_SCHEDULE` | `wed,sat@02:00` | Strict local-time E2E schedule |
+| `K3DM_HERMES_APP_HEALTH_ENABLED` | (disabled) | Set to `1` to enable aggregate/probe health-delta sampling |
+| `K3DM_HERMES_APP_CONTEXT` | (unset) | Kubernetes context for the app-cluster service proxy |
+| `K3DM_HERMES_APP_KUBECONFIG` | (unset) | Optional kubeconfig path used by app-health kubectl calls |
 
 ---
 
@@ -319,7 +455,7 @@ Slack and Alertmanager cannot: Alertmanager runs inside the cluster, and Hermes 
 
 | Event | Fires when | Recovery text |
 |-------|------------|---------------|
-| Webhook down | `eso` and `node_pressure` both `unknown` for 2 consecutive polls (~10 min) | yes |
+| Webhook down | `eso` and `data_layer` both `unknown` for 2 consecutive polls (~10 min) | yes |
 | Sensor stuck unknown | any other sensor `unknown` for 6 consecutive polls (~30 min); the text carries its evidence, e.g. `argocd ... credential rejected` | yes |
 | Poll job failing | the Hermes poll raises on 2 consecutive runs | yes |
 | Security | once per UTC hour, any **new** open critical/high CodeQL or Dependabot alert (read with `k3dm-hermes-audit-token`) | no |

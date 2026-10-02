@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** High — every private image pull on the hub 403s while ESO, ArgoCD and the PAT
 validation all report green.
-**Status:** Open
+**Status:** FIXED (rechecked by Claude 2026-10-01) — `_shopping_cart_ghcr_pat_can_pull` is in `scripts/plugins/shopping_cart.sh` and gates both load paths.
 
 ## Before You Start
 

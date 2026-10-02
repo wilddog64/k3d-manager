@@ -15,8 +15,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
+from webhook import config as webhook_config
 from webhook.auth import _get_reader_token
+from webhook.cloud_actions import ACTION_ALLOWLIST, JOB_ID_RE, NS_RE, Q_RE
+from webhook.make_targets import MAKE_TARGETS
 from webhook.proc import _spawn_capture_text
+from webhook.redact import scrub_credentials
 
 
 MAX_REQUEST_BYTES = 8 * 1024
@@ -24,28 +28,11 @@ MAX_PER_TICK = 10
 REQUEST_TTL_SECONDS = 30 * 60
 HTTP_TIMEOUT = min(float(os.environ.get("K3DM_CLOUD_BRIDGE_HTTP_TIMEOUT", "300")), REQUEST_TTL_SECONDS)
 ID_RE = re.compile(r"[0-9]{8}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,63}")
-JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
-NS_RE = re.compile(r"[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?")
-# Prose search text. Kept byte-identical to webhook _ARG_PATTERNS["Q"]: every shell
-# metacharacter is excluded because the value reaches a Makefile recipe.
-Q_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}")
 FETCH_REFSPEC = "+refs/heads/cloud-requests:refs/heads/cloud-requests"
 REQUIRED_FIELDS = {"schema", "action", "args", "requested_by", "requested_at", "expires_at"}
-ACTION_ALLOWLIST = {
-    "health": ("GET", "/api/v1/health", {}, None),
-    "cluster-status": ("POST", "/api/v1/cluster-status", {}, None),
-    "hostinger-status": ("POST", "/api/v1/hostinger-status", {}, None),
-    "job-status": ("GET", "/api/v1/status/{job_id}", {"job_id": JOB_ID_RE}, None),
-    "make-fix-list": ("POST", "/api/v1/make", {}, "fix-list"),
-    "make-fix-status": ("POST", "/api/v1/make", {"NS": NS_RE}, "fix-status"),
-    "make-status-public": ("POST", "/api/v1/make", {}, "status-public"),
-    "make-observability-status": ("POST", "/api/v1/make", {}, "observability-status"),
-    "make-vuln-scan": ("POST", "/api/v1/make", {}, "vuln-scan"),
-    "make-e2e-runner-health": ("POST", "/api/v1/make", {}, "e2e-runner-health"),
-    "make-test-pytest": ("POST", "/api/v1/make", {}, "test-pytest"),
-    "make-test-python-unit": ("POST", "/api/v1/make", {}, "test-python-unit"),
-    "make-find-similar-docs": ("POST", "/api/v1/make", {"Q": Q_RE}, "find-similar-docs"),
-}
+ARTIFACT_KEEP = max(1, int(os.environ.get("K3DM_CLOUD_ARTIFACT_KEEP", "50")))
+TERMINAL_JOB_STATES = ("success", "failed")
+MAX_JUNIT_BYTES = 512 * 1024
 
 
 def _now():
@@ -181,13 +168,15 @@ def _read_request(repo, ref, request_id):
 
 def _request_body(request):
     action = request["action"]
-    method, _, _, make_target = ACTION_ALLOWLIST[action]
+    method, _, _, fixed = ACTION_ALLOWLIST[action]
     if method == "GET":
         return b""
-    if make_target is None:
+    if fixed is None:
         return b"{}"
+    if isinstance(fixed, dict):
+        return json.dumps({**request["args"], **fixed}, sort_keys=True).encode()
     return json.dumps(
-        {"target": make_target, "args": request["args"]}, sort_keys=True).encode()
+        {"target": fixed, "args": request["args"]}, sort_keys=True).encode()
 
 
 def _call_webhook(request):
@@ -216,7 +205,80 @@ def _call_webhook(request):
         return _response("", action, "error", 0, body={"error": "webhook request failed"})
 
 
-def _write_commit(repo, parent, request_id, response):
+def _iso_utc(timestamp):
+    return datetime.fromtimestamp(timestamp, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _published_artifacts(repo, ref, job_id):
+    """Return the artifact paths already committed for job_id, or [] when none exist."""
+    rc, output, timed_out = _spawn_capture_text(
+        ["git", "grep", "-l", "-F", f'"job_id": "{job_id}"', ref, "--", "artifacts/*/summary.json"],
+        cwd=repo, timeout=30)
+    if timed_out or rc != 0 or not output.strip():
+        return []
+    request_dir = output.strip().splitlines()[0].removeprefix(f"{ref}:").rsplit("/", 1)[0]
+    names = _git(repo, ["ls-tree", "-r", "--name-only", ref, request_dir + "/"]).splitlines()
+    return sorted(name for name in names if name.startswith(request_dir + "/"))
+
+
+def job_artifacts(repo, ref, request_id, request, response):
+    """Return (blobs, paths) for a job-status response that first observes a finished job."""
+    if request.get("action") != "job-status" or response.get("status") != "ok":
+        return {}, []
+    body = response.get("body")
+    if not isinstance(body, dict) or body.get("status") not in TERMINAL_JOB_STATES:
+        return {}, []
+    job_id = request["args"]["job_id"]
+    published = _published_artifacts(repo, ref, job_id)
+    if published:
+        return {}, published
+    try:
+        job_dir = Path(webhook_config._safe_job_dir(job_id))
+        finished_at = _iso_utc((job_dir / "status").stat().st_mtime)
+    except (ValueError, OSError):
+        return {}, []
+    summary = {
+        "schema": 1,
+        "request_id": request_id,
+        "job_id": job_id,
+        "job_status": body["status"],
+        "http_status": response.get("http_status"),
+        "finished_at": finished_at,
+    }
+    try:
+        target = (job_dir / "target").read_text().strip()
+    except OSError:
+        target = ""
+    if target in MAKE_TARGETS:
+        summary["target"] = target
+    prefix = f"artifacts/{request_id}"
+    blobs = {f"{prefix}/summary.json": (json.dumps(summary, sort_keys=True) + "\n").encode()}
+    junit = job_dir / "junit.xml"
+    try:
+        if junit.is_file() and junit.stat().st_size <= MAX_JUNIT_BYTES:
+            blobs[f"{prefix}/junit.xml"] = scrub_credentials(junit.read_text(errors="replace")).encode()
+    except OSError:
+        pass
+    return blobs, sorted(blobs)
+
+
+def _stale_artifact_paths(repo, parent, request_id):
+    """Return paths of artifact trees beyond the keep window, oldest request ids first."""
+    try:
+        names = _git(repo, ["ls-tree", "--name-only", parent, "artifacts/"]).splitlines()
+    except RuntimeError:
+        return []
+    ids = sorted({name.removeprefix("artifacts/") for name in names if name.startswith("artifacts/")}
+                 | {request_id})
+    stale = ids[:-ARTIFACT_KEEP]
+    if not stale:
+        return []
+    listed = _git(repo, ["ls-tree", "-r", "--name-only", parent, *[f"artifacts/{item}/" for item in stale]])
+    return listed.splitlines()
+
+
+def _write_commit(repo, parent, request_id, response, artifacts=None):
+    artifacts = artifacts or {}
     response_bytes = (json.dumps(response, sort_keys=True) + "\n").encode()
     try:
         ledger = _git(repo, ["show", f"{parent}:ledger/processed.txt"])
@@ -237,6 +299,21 @@ def _write_commit(repo, parent, request_id, response):
         ledger_hash = _git(repo, ["hash-object", "-w", str(ledger_file)], env=env).strip()
         _git(repo, ["update-index", "--add", "--cacheinfo", f"100644,{response_hash},responses/{request_id}.json"], env=env)
         _git(repo, ["update-index", "--add", "--cacheinfo", f"100644,{ledger_hash},ledger/processed.txt"], env=env)
+        if artifacts:
+            artifact_file = Path(index_path + ".artifact")
+            for path, blob in sorted(artifacts.items()):
+                artifact_file.write_bytes(blob)
+                blob_hash = _git(repo, ["hash-object", "-w", str(artifact_file)], env=env).strip()
+                _git(repo, ["update-index", "--add", "--cacheinfo", f"100644,{blob_hash},{path}"], env=env)
+            stale = _stale_artifact_paths(repo, parent, request_id)
+            if stale:
+                empty_tree = Path(index_path + ".worktree")
+                empty_tree.mkdir()
+                try:
+                    _git(repo, ["update-index", "--force-remove", "--", *stale],
+                         env={**env, "GIT_WORK_TREE": str(empty_tree)})
+                finally:
+                    empty_tree.rmdir()
         tree = _git(repo, ["write-tree"], env=env).strip()
         commit = _git(repo, ["commit-tree", tree, "-p", parent, "-m", "cloud response"], env=env,
                       timeout=30).strip()
@@ -244,7 +321,8 @@ def _write_commit(repo, parent, request_id, response):
         _git(repo, ["push", "--force-with-lease=refs/heads/cloud-requests:" + parent,
                     "origin", f"{commit}:refs/heads/cloud-requests"], timeout=120)
     finally:
-        for path in (Path(index_path), Path(index_path + ".response"), Path(index_path + ".ledger")):
+        for path in (Path(index_path), Path(index_path + ".response"), Path(index_path + ".ledger"),
+                     Path(index_path + ".artifact")):
             try:
                 path.unlink()
             except OSError:
@@ -258,6 +336,7 @@ def process_tick(repo, root):
     for request_id in _request_ids(repo, ref):
         if request_id in processed:
             continue
+        artifacts = {}
         raw, read_error = _read_request(repo, ref, request_id)
         if read_error:
             response = _response(request_id, "", "rejected", 0, reason=read_error)
@@ -266,8 +345,14 @@ def process_tick(repo, root):
             if response is None:
                 response = _call_webhook(request)
                 response["id"] = request_id
+                body = response.get("body")
+                if request["action"] == "job-status" and isinstance(body, dict) and "output" in body:
+                    body["output"] = scrub_credentials(body["output"])
+                artifacts, paths = job_artifacts(repo, ref, request_id, request, response)
+                if paths:
+                    response["artifacts"] = paths
         processed.add(request_id)
-        _write_commit(repo, ref, request_id, response)
+        _write_commit(repo, ref, request_id, response, artifacts)
         ref = _fetch(repo)
         processed.add(request_id)
         processed_this_tick += 1

@@ -2,6 +2,305 @@
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-10-02
+
+### Fixed
+
+- Grafana Overview — Readable: Firing Alerts now reads `grafana_alerting_alerts` (the old
+  `grafana_alerting_result_total` does not exist in Grafana 11) and shows 0 instead of No data; Request Rate by
+  HTTP Status uses `rate(…[$__rate_interval])` instead of an empty `irate(…[1m])`; Build Info shows the pod name
+  instead of a truncated job and pod IP ([bug](docs/bugs/2026-10-02-grafana-overview-firing-alerts-and-request-rate-no-data.md))
+- `/ask-docs` sources are now GitHub links at the webhook's checked-out branch (override with
+  `K3DM_ASK_DOCS_LINK_REF`), in both answers and `--sources` mode; the 3000-char reply budget counts the full
+  links so none is cut ([bug](docs/bugs/2026-10-02-ask-docs-sources-not-linked.md))
+- `/cluster-status` in the bot channel now posts only its verdict line top-level and puts the per-check report in
+  that line's thread, so repeated runs no longer bury the channel. The relay forwards `channel_id`; other channels
+  and thread replies keep the old delivery, and a failed bot post falls back to the response URL
+  ([bug](docs/bugs/2026-10-02-cluster-status-report-not-threaded.md))
+- The `k3dm-smoke-user` login credentials now live in Vault (`secret/keycloak/smoke-user`) and are recreated
+  by an ExternalSecret in shopping-cart-infra, so a hub rebuild no longer leaves `/cluster-status` with two
+  smoke-token warnings. The seed reuses the Vault password, then a legacy Secret, before generating one, and passes
+  the token and password over stdin only.
+  ([bug](docs/bugs/2026-10-02-smoke-user-secret-lost-on-hub-rebuild.md))
+- `/cluster-status` on k3s-hostinger now passes the public Prometheus endpoint on an
+  unauthenticated 401 (`auth enforced`) instead of warning on every healthy run, and fails on a 200
+  (`auth proxy bypassed`). The local `localhost:19190` probe still expects 200.
+  ([bug](docs/bugs/2026-10-02-cluster-status-warns-on-intended-prometheus-401.md))
+- `/ask-docs` answers questions about recent items: recency words switch to a 50-doc pool sorted
+  newest first, and excerpts and `--sources` show each doc's date.
+
+- `ask-docs` typed as a reply in a Slack thread now answers in that thread instead of being
+  silently dropped.
+
+- Cloudflared backup and restore no longer expose tunnel credentials, `cert.pem`, or the Vault
+  root token in process arguments; Keychain restores decode legacy hex items and create mode-600 files.
+
+- Hub recovery now selects the public frontend Cloudflare origin from the app cluster's
+  frontend deployment, with an explicit override and a safe Hostinger fallback.
+
+- `/ask` and `/ask-docs` answers are threaded in `SLACK_CHANNEL_ID` when the bot can post there;
+  other channels retain response-URL delivery.
+
+### Changed
+
+- README architecture diagram redrawn for the current system: operator laptop (webhook, Hermes,
+  cloud bridge, cloudflared), hub, app clusters (Hostinger, ACG, vCluster) and GitHub/Slack. The
+  stale Azure Key Vault sync is gone.
+
+### Fixed
+
+- Hub and app Grafana dashboard ApplicationSets no longer compete for the readable Overview
+  ConfigMap; the app-cluster set excludes its copy only for the in-cluster hub server.
+
+- Grafana Overview Build Info now uses a positive field allowlist and presents only Version,
+  Edition, Job, and Instance in both dashboard copies.
+
+- `cluster-up` now tracks CloudFormation stacks created by the current run and warns with the
+  exact `make down` reclaim command when a later failure leaves one billable.
+
+- Hermes `data_layer` unknown records now retain distinct evidence for unavailable credentials,
+  empty or ungraded webhook checks, missing/ungraded data-layer checks, and fetch errors without
+  exposing exception messages.
+
+- `make restart-webhook` now also restarts the cloud bridge; `make restart-cloud-bridge` safely
+  skips an uninstalled bridge and is documented for operator use.
+
+- Seven bare `! cmd` BATS assertions added this release could never fail under `set -e`; they now
+  use `run` + a status check, and `bats_negation_lint.bats` is green again.
+
+### Added
+
+- `make cloudflared-config` renders, checks, and optionally installs the repo-managed tunnel config with provider-aware drift detection.
+
+- Added `make gh-secret` and `make gh-secret-sync-relay` to safely manage the allowlisted
+  GitHub Actions secrets used by the Slack relay workflow.
+
+- `/ask-docs --sources` returns matching document scores and paths without calling the summary model.
+
+- Added reader-only Slack `/ask-docs <question>`, which searches bounded, redacted documentation
+  excerpts and returns advisory answers with source paths. The provisional retrieval floor is
+  configurable with `K3DM_ASK_DOCS_MIN_SCORE`.
+
+- Cloud bridge: `make-test`, `make-test-bin`, `make-test-python`, `make-test-all` and six read-only
+  `diagnose-*` actions (pods, describe-pod, logs, apps, app, appsets) at reader tier. The `test*`
+  targets now run behind `scripts/tests/tripwire.sh`, which blocks real cluster, cloud and keychain
+  tools and fails the run on any non-read call; see
+  `docs/issues/2026-10-01-offline-test-sweep-tripwire.md`.
+- Cloud-request diagnostic artifacts: the first `job-status` response that sees a job finish
+  carries an `artifacts` array — `summary.json` plus a credential-scrubbed `junit.xml` for
+  `make-test-pytest` — committed with the response and pruned to `K3DM_CLOUD_ARTIFACT_KEEP` (50).
+  Raw job output is still not published. See `docs/howto/cloud-session-requests.md`.
+
+### Fixed
+
+- Hermes Grafana findings now expose failed hostnames and clickable CI run links, while status
+  history explains the 0/1/2 encoding and carries evidence in its legend.
+- Grafana ServiceMonitors now carry the release labels selected by Prometheus, restoring metrics
+  for the overview dashboard in both the hub and ACG observability stacks.
+- `make fix-sync` and `make fix-force-sync` now share `bin/argocd-app-sync`, probe ArgoCD sessions
+  server-side, re-mint stale authentication when needed, use plaintext gRPC-web, and clean up the
+  temporary tunnel; failed tunnel/login diagnostics now remain visible.
+- The sync login path now matches the repository's working ArgoCD login flags and reports CLI
+  authentication errors without exposing the password.
+- `fix-sync` now captures both stdout and stderr from ArgoCD login failures so the root cause is
+  visible instead of returning only a generic make error.
+- The sync fallback uses the ArgoCD session API and `ARGOCD_AUTH_TOKEN`, avoiding the unsupported
+  CLI `--stdin` flag and keeping the admin password out of argv.
+- The sync fallback resolves the ArgoCD admin password from `ARGOCD_ADMIN_PASSWORD`, Vault, then
+  the Kubernetes Secret, avoiding stale initial-admin credentials after rebuilds.
+- Fixed the embedded session-login Python newline escape so passwords are passed unchanged to
+  ArgoCD.
+- Added a source-controlled `Grafana Overview — Readable` dashboard with readable HTTP-status and
+  latency legends for both app-cluster and hub Grafana while preserving the existing metrics and
+  dashboard variables.
+- The k3dm-tests dashboard now presents the make exit code as informational data, with the Failed
+  cases panel remaining the pass/fail health signal.
+
+- Hermes CI sensor data now preserves the first timed-out, cancelled, or stuck check for R4 reruns
+  while retaining run URLs for pure failures.
+
+### Added
+
+- Hermes now measures application aggregate health against liveness/readiness probe groups through
+  the API-server service proxy, filing debounced deltas as app-health bug triage while disabled by default.
+
+- `make validate-manifests [FILES=…]` validates manifests, custom resources included, with kubeconform
+  against the Datree CRD catalog pinned to a commit. It installs kubeconform when it is missing: Homebrew
+  first, else the pinned v0.7.0 release into `~/.local/bin`, verified by SHA-256 (`_ensure_kubeconform`).
+  The default set (platform-ops, Prometheus rules, dashboards, ApplicationSets) validates 72/72, and it
+  rejects the PrometheusRule that `29b7f55c` broke.
+- VectorDB metrics now publish to a dedicated hub Pushgateway on port 19094, with the dashboard
+  moved to the hub platform-ops set; app-cluster Pushgateway jobs are unchanged.
+
+- Hermes now detects Applications left on an older k3d-manager release branch and proposes the
+  approval-gated R9 ApplicationSet reapply with the expected branch pinned.
+
+- Hermes now re-indexes changed documentation from the tracked Git ref every poll, with quota-aware
+  backlog draining, VectorDB ingestion metrics, dashboard panels and failure/drift alerts.
+
+- Grafana dashboard **k3dm Alertmanager Delivery** (hub, `k3dm-alertmanager-delivery`): delivery rate,
+  failures and latency only for integrations that have actually sent in the last 30 days, plus firing
+  alerts by severity with the SMS/email routing spelled out. The chart's Alertmanager / Overview draws a
+  panel for every integration Alertmanager supports and cannot be disabled on its own in chart 67.9.0.
+- Hermes now reports a separate `data_layer` sensor for the webhook Data layer check.
+- Hermes R7 proposes the approval-gated `make signing-restore` repair only when the Hub `cosign-public-key` ExternalSecret has been degraded for two cycles.
+- `make signing-restore [CONTEXT=…]` restores the cosign signing key (from the Keychain backup, only
+  if Vault lacks it) and the ESO `cosign-verify` grant on one cluster, then resyncs
+  `cosign-public-key`. It pins the cluster through a temporary kubeconfig and never generates a key.
+- `/cluster-diagnose <provider>` with no verb lists every pod in every namespace on that cluster
+  (`kubectl get pods --all-namespaces -o wide`, webhook action `get-pods-all`). The provider is
+  required; bare `/cluster-diagnose` still prints usage. It reads pod names and status only.
+- The diagnostics namespace allowlist now includes `shopping-cart-payment` and
+  `shopping-cart-data`, so `pods`, `describe-pod` and `logs` work there.
+
+### Fixed
+
+- Empty `mktemp` results can no longer make the shopping-cart tests write into the repository root:
+  the join helper rejects an empty kubeconfig, BATS fixtures use `BATS_TEST_TMPDIR`, and
+  `make check-doc-links` rejects root debris.
+
+- Hermes R2 now kickstarts the Prometheus auth proxy that serves the cloudflared ingress port,
+  rather than the backend port-forward behind it.
+
+- Webhook AI analysis now falls back between agy and gemini-cli, classifies unavailable
+  candidates, and never posts raw authentication or model errors (including OAuth URLs) as analysis.
+
+- `scripts/plugins/argocd.sh`: suppress shellcheck's SC2317 false positive on the sourced-or-executed
+  `return 1 2>/dev/null || exit 1` idiom, the only SC2317 finding outside the foundation subtree.
+- Automatic re-indexing no longer hangs on a real-sized corpus (`git cat-file --batch` was fed every
+  object ID before any output was read), drift is counted at the indexed ref rather than the working
+  tree, and the `VectorDBIndexStale` rule's annotations are restored, which had invalidated the whole
+  vectordb PrometheusRule.
+- `/k3dm find-similar-docs Q=…` from Slack accepts a sentence: after `Q=`, words run to the next
+  `KEY=value` or `confirm` (`/k3dm find-similar-docs Q=mac scheduler cannot find tools K=10`). The
+  relay rejected every query longer than one word. Character validation is unchanged in the webhook.
+- `node_pressure` now reads node Ready and pressure conditions directly from configured clusters instead of aggregating webhook service failures; R2 no longer double-counts unrelated ESO or service failures.
+- Hub recovery and node-health-watch now detect host-network pods stranded on stale node IPs and recycle only DaemonSet-owned pods after recovery; other owners are logged and skipped.
+- Hub recovery and newly created Hub bring-up now restore existing cosign signing material after Vault/ESO setup; a missing Keychain backup warns and continues without generating or rotating a key.
+- Hermes status publishing works: the `hermes-status` ConfigMap label was spliced into the YAML as
+  `key=value`, which made `metadata.labels` a string and failed every apply since v1.34.0, so the
+  Hermes Status dashboard never had data. The manifest is now built as JSON with a real label map.
+- Hermes now logs why its status ConfigMap publish failed — the failing `kubectl` step
+  (`create`, `apply`, `label` or `exec`), the context, namespace and payload size, and the
+  scrubbed, bounded stderr — instead of returning `False` silently. The Hermes Status dashboard
+  had been empty with no error anywhere.
+- `cluster-down` now removes the per-provider active marker through the provider-state helper
+  instead of hardcoding the legacy scalar marker path. The old teardown cleared the resolver's
+  tie-break while leaking the per-provider set entry, leaving a torn-down provider registered
+  indefinitely and sending provider-scoped probes at a kube context that no longer existed.
+- Webhook authorization no longer assumes every token role is ranked. A token role outside
+  `_ROLE_LEVELS` is returned unchanged by `_request_role` (an `X-K3DM-Role` header cannot widen or
+  narrow it), is allowed only the policy names in its `_ROLE_CAPABILITIES` set, and is refused when
+  it has none. Previously such a role raised `KeyError` inside authorization. The thread-command
+  refusal now names the fail-closed role (`reader`) instead of `admin`.
+- `/cluster-diagnose describe-pod` now masks the literal values of sensitive variables
+  (`*PASSWORD*`, `*SECRET*`, `*TOKEN*`, `*API_KEY*`, `*CREDENTIAL*`, `*DSN*`, `*_URL`) inside
+  `kubectl describe` `Environment:` blocks, keeping the names and the `<set to the key ...>`
+  references, before the shared credential scrubber runs over the whole output.
+- `/api/v1/make` jobs now write their full output to the job's `output` file, through the
+  registered-secret redaction and the shared credential scrubber, before the terminal status is
+  written. `job-status` previously returned `""` for every make job.
+- Diagnostics output now scrubs credential-shaped values, including unregistered bearer tokens,
+  JWTs, URL passwords, sensitive key/value pairs, Vault, Stripe and GitHub tokens before writing
+  job output or posting it to Slack.
+- Diagnostics redaction now also handles JSON and quoted values, `Basic` authorization, empty-user
+  connection strings, and `Bearer` values nested inside sensitive key/value fields.
+- `bin/k3dm-cloud-request` now fetches `cloud-requests` before filing on its tip, so a fresh clone
+  no longer fails while reading an object it has not downloaded, and derives its action choices and
+  argument validation from the bridge's shared allowlist so all thirteen permitted actions remain
+  available.
+
+### Added
+
+- Hermes now reports host-network IP drift and proposes the approval-gated R8 repair `bin/k3dm-hostnet-drift --fix` when a drifted pod is DaemonSet-owned.
+- **`make argocd-hermes-token`** re-mints the Hermes ArgoCD API token and stores it in the Keychain,
+  replacing a five-command manual procedure whose every step had a trap. The target mints through the
+  ArgoCD API (session and account-token calls, secrets passed by environment so nothing lands in
+  `argv` or shell history), writes the item with `-U`, reads the value back, proves it against
+  `/api/v1/applications`, and restarts the Hermes agent. It never prints the token.
+
+  Three guards encode failures already paid for. It **refuses to run without a TTY**, because minting
+  a credential must not happen unattended and because a Keychain write with no terminal stores an
+  empty value at exit code 0 — a silent failure that reads as success. It **updates the item in place
+  rather than deleting and recreating it**, because a recreated item gets a default ACL that can make
+  a non-interactive launchd read prompt for authorization, after which Hermes fails silently. And it
+  **verifies against the live endpoint before reporting success**, so a green result means the sensor
+  will work rather than merely that an item exists.
+
+  Both API calls send an explicit `User-Agent`. `urllib` otherwise announces itself as
+  `Python-urllib/<ver>`, which Cloudflare rejects with **HTTP 403 and `error code: 1010`** before the
+  request ever reaches ArgoCD. The first live run failed exactly this way, and a 403 on a session call
+  reads as a rejected password or a missing `accounts.hermes=apiKey` — sending the operator after two
+  causes that were both fine. The target's own error hint now names the 1010 case first, and a BATS
+  guard fails if the header is ever dropped.
+
+  `expiresIn` is sent as a JSON **integer**. The ArgoCD swagger types it `integer/int64`, so the
+  quoted `"0"` the target first used failed to unmarshal and grpc-gateway answered **HTTP 400**
+  before any ArgoCD logic ran — a second failure that again looked like an account or permission
+  problem. `https://<argocd-host>/swagger.json` is served unauthenticated and settles these shape
+  questions directly; a BATS guard rejects a quoted value.
+
+  Motivating incident: the `argocd` sensor had been reporting "credential rejected" since the
+  2026-09-20 ArgoCD rebuild. The error was `token signature is invalid` — neither an expiry nor a
+  revocation. Every token and CLI session is signed with `server.secretkey` from `argocd-secret`, and
+  the rebuild regenerated that key, invalidating every previously issued credential at once. A token
+  documented as having "no expiry" is really bounded by the lifetime of the signing key, so
+  re-minting now belongs in the post-rebuild checklist. `docs/guides/hermes.md` gains a
+  **Re-minting the ArgoCD token** section covering the target, the signature-invalid signature, and
+  how to date the cutoff from `argocd-secret` metadata without reading any secret value.
+
+  Covered by `scripts/tests/bin/makefile_argocd_hermes_token.bats` (8 tests), mutation-tested by
+  removing the TTY guard, swapping `-U` for delete-and-recreate, and echoing the token — each turns
+  the intended test red.
+
+- **`bin/k3dm-vectordb-metrics` is documented** in the Health verification section of
+  `docs/guides/vector-store.md`. The guide described "the metrics publisher" without ever naming the
+  script, so nothing told a reader how to invoke it, what it emits, or how it fails. The new
+  subsection names it, tables the six gauges against the `k3dm-vectordb-status` fields they come
+  from, records `K3DM_PUSHGATEWAY_URL`, and states the two properties that make its failures hard to
+  read: an absent status field is **omitted rather than zeroed**, so "No data" on a panel means
+  undetermined and not zero; and every failure path is deliberately non-fatal and exits 0, because
+  both call sites (`make index-docs` and the Hermes tick) must not fail. A silent publisher is
+  therefore the expected symptom of a broken one, and blank Grafana panels most often mean it has
+  never run rather than that the store is unhealthy.
+
+### Fixed
+
+- **Hermes `eso` could remain permanently `unknown`.** A kubeconfig error whose text contained
+  `not found` was classified as resource absence, making every app-cluster ESO row neutral, while
+  the `Hub ESO *` rows the sensor never read carried a real unsynced-ExternalSecret finding.
+
+- **`VectorDBMetricsStale` could never fire.** The alert was
+  `absent(k3dm_vectordb_last_index_timestamp_seconds)` with `for: 1h`, intended to catch "no
+  VectorDB metrics published for an hour". But Pushgateway **retains gauges after a publisher
+  stops**, so once a single publish had happened the series never disappeared again and `absent()`
+  could not go true — the one condition the alert existed to detect was the one condition it was
+  structurally incapable of detecting. The dashboard meanwhile keeps rendering the retained values,
+  so a dead publisher looks exactly like a healthy one. Confirmed live: with the last push 3.9 hours
+  old and no producer scheduled, the old expression returned an empty result while the new one
+  fired. The expression now also compares `push_time_seconds{job="k3dm-vectordb"}` against `time()`
+  with a one-hour threshold, keeping the `absent()` branch for the never-published case, and `for`
+  drops to `15m` so the hour is not counted twice. `scripts/tests/plugins/vectordb_rules.bats`
+  asserts the push-age term is present and fails with an explanation if the expression is ever
+  reduced to `absent()` alone.
+
+
+- **Three BATS suites ran in no `make` target and no CI job.**
+  `observability_keep_list.bats`, `observability_resume_layer.bats` and
+  `test_install_sudoers.bats` sat at the `scripts/tests/` root. The dispatcher
+  discovers suites under `scripts/tests/{lib,core,plugins,etc}` at
+  `-maxdepth 1`, and `make test-bin` globs `scripts/tests/bin`, so the repo root
+  is outside every search path: the 16 tests passed on demand and were never
+  run by `make test`, `make test-all` or CI. Moved the two observability suites
+  into `scripts/tests/plugins/` and the sudoers suite into `scripts/tests/bin/`
+  (renamed `install_sudoers.bats` to match its 26 siblings), and fixed the
+  `BATS_TEST_DIRNAME` relative paths for the new depth. A suite in a directory
+  nobody globs is indistinguishable from a suite that does not exist — the
+  failure mode is silence, not a red build.
+  `scripts/tests/core/suite_discovery.bats` now fails, naming the file, if any
+  `.bats` suite sits outside a globbed directory — including one nested a level
+  too deep — so the next one cannot go unnoticed.
+
 ## [1.39.0] - 2026-09-27
 
 ### Added

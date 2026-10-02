@@ -99,10 +99,11 @@ def main(argv=None):
     parser.add_argument("--limit", type=int, default=0,
                         help="embed at most N changed documents (0 = no limit)")
     parser.add_argument("--quiet", action="store_true", help="only print the summary line")
+    parser.add_argument("--ref", default=None, help="git ref to read instead of the working tree")
     args = parser.parse_args(argv)
 
     try:
-        docs = iter_corpus(ROOT)
+        docs = iter_corpus(ROOT) if args.ref is None else iter_corpus(ROOT, args.ref)
         ensure_schema()
         existing = fetch_hashes()
     except RetrievalUnavailable as exc:
@@ -121,6 +122,7 @@ def main(argv=None):
             print(f"  prune  {path}")
         return 0
 
+    changed_total = len(changed)
     if args.limit > 0:
         changed = changed[: args.limit]
 
@@ -170,10 +172,10 @@ def main(argv=None):
     counts = dict(
         line.split("=", 1) for line in summary.split() if "=" in line
     )
-    print(
-        f"index-docs: {len(docs)} docs, {written} embedded, "
-        f"{counts.get('pruned', '0')} pruned, {counts.get('indexed', '?')} in store"
-    )
+    remaining = max(0, changed_total - written)
+    print(f"index-docs: {len(docs)} docs, {written} embedded, "
+          f"{counts.get('pruned', '0')} pruned, {counts.get('indexed', '?')} in store, "
+          f"{remaining} remaining")
     subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
                    cwd=ROOT, capture_output=True, text=True, timeout=120, check=False)
     return 0

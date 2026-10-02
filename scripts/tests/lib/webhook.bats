@@ -592,11 +592,11 @@ PY
     done
 }
 
-@test "webhook analysis defaults to agy CLI instead of gemini" {
-    run grep -F -- 'os.environ.get("K3DM_GEMINI_BIN", "agy")' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
+@test "webhook analysis uses ordered candidates and a safe sentinel" {
+    run grep -F -- 'os.environ.get("K3DM_AI_BIN_ORDER", "agy,gemini")' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'return "agy CLI not found — skipping AI analysis"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
+    run grep -F -- 'return "AI analysis unavailable — "' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
     [ "$status" -eq 0 ]
 }
 

@@ -130,6 +130,100 @@ It installs the SSM plugin first via `make ssm` then provisions the full CloudFo
 
 ---
 
+## Docs & Prior Art
+
+| Target | Command | When to use |
+|---|---|---|
+| `make index-docs` | `python3 scripts/index-docs.py` | Embed the tracked `docs/bugs`, `docs/issues`, `docs/plans` and `docs/retro` trees into the pgvector store. Add `DRY_RUN=1` to report what would be embedded without calling the API, or `LIMIT=<n>` to cap the document count |
+| `make find-similar-docs` | `python3 scripts/find-similar-docs.py` | Dedup pass 2 before filing a bug or issue — `Q="<the symptom in prose>"` is required, `K=<n>` sets how many results to rank (default 5) |
+
+Both targets are **advisory and always exit 0**. A missing credential, an
+unreachable store or an empty index reports on stderr and succeeds, because a
+dedup aid must never become a new way for filing a bug to fail. A high
+similarity score means *read that file before filing*, not *do not file*.
+
+Only each document's title, leading paragraph and `##` headings are embedded —
+roughly 3% of a typical file — and rows are keyed by a content hash of exactly
+that text, so re-running with no doc changes makes zero API calls. The v1.40.0
+live eval measured a modest recall gain over a TF-IDF control on bugs only, with
+more intrusion — results stay advisory; see
+[Vector Store](../guides/vector-store.md).
+
+A cold index on the free Gemini tier spans **two sittings**, not one: the
+per-day allowance is spent before the corpus finishes. A partial run is durable
+— each batch of 100 commits in its own transaction — so a resumed run adds to
+the store rather than truncating it. See
+[Vector Store](../guides/vector-store.md) and
+[Find Prior Art](find-prior-art.md).
+
+---
+
+## Test Suites
+
+| Target | Command | When to use |
+|---|---|---|
+| `make test` | `scripts/k3d-manager test all` | The dispatcher BATS suites — `scripts/tests/lib`, `core`, `plugins` and `etc`, one level deep each. Takes **~15 minutes**; a quiet terminal is not a hang |
+| `make test-bin` | `bats scripts/tests/bin` | The BATS suites for `bin/` scripts and `Makefile` behaviour, which `make test` does **not** reach |
+| `make test-python-unit` | `python3 scripts/tests/bin/<suite>.py` | The stdlib-`unittest` suites — every `scripts/tests/bin/*.py` whose name is not `test_*.py` |
+| `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
+| `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
+| `make test-all` | `test` + `test-bin` + `test-python` | Everything that runs offline, in one call — what `make test-metrics` wraps |
+| `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
+
+**A new BATS suite must live in one of those directories or nothing runs it.**
+Discovery is by directory glob, not by file pattern: the dispatcher globs
+`scripts/tests/{lib,core,plugins,etc}` at `-maxdepth 1`, and `make test-bin`
+globs `scripts/tests/bin`. A `.bats` file at the `scripts/tests/` root, or
+nested a level deeper inside one of those directories, is collected by nothing
+and reported by nothing — it passes when run by hand and never runs again.
+Three suites sat at the root this way until v1.40.0. Put plugin tests in
+`plugins/`, `bin/` and `Makefile` tests in `bin/`.
+
+`make test` alone is **not the CI gate.** CI runs `make test`, `make test-bin`,
+`make test-python-unit` and `make test-pytest` as four separate steps, so a
+branch that is green under `make test` can still be red on a Python suite.
+
+**The two Python targets split on filename, and the split is enforced.**
+`test-python-unit` runs each file as a script, so a file that defines bare
+`def test_` functions with no `unittest.main()` or `pytest.main()` hook would
+execute nothing and still exit 0. Rather than pass silently, the target fails
+with exit 2 and tells you to rename the file to `test_*.py` so
+`make test-pytest` collects it. It also exits 2 when it finds no suites at all —
+an empty glob is a broken checkout, not a pass.
+
+**`make test-pytest` resolves an interpreter in four steps** and exits 2 with
+the list if none works: `$PYTEST` (word-split, so
+`PYTEST="python3 -m pytest"` works), `pytest` on `PATH`, `python3 -m pytest`,
+then `~/.pyenv/shims/python3 -m pytest`. The last fallback exists because this
+target also runs from the webhook, whose `PATH` excludes the pyenv shims. Exit 2
+from this target means *no pytest was found*, never *a test failed*.
+
+Missing `bats` is the same shape — `make test-bin` exits 2 with
+`brew install bats-core` rather than reporting a pass.
+
+**Read per-suite counts, not just the exit code.** A non-zero status from any of
+these can mean the tooling was absent (exit 2) or that assertions failed, and
+the two want opposite responses.
+
+---
+
+## Test Metrics
+
+| Target | Command | When to use |
+|---|---|---|
+| `make test-metrics` | `make test-all` → `bin/k3dm-test-metrics` | Run the full offline suite and publish its result to the Pushgateway for the `k3dm Tests` Grafana dashboard |
+
+The target **always exits 0** — it is a reporter, not a gate. The suite's real
+exit code travels in the `k3dm_test_exit_code` metric rather than the target's
+status, so a scheduled run cannot fail a caller that only wanted the numbers.
+Use `make test` or `make test-pytest` directly when you want a non-zero exit on
+failure.
+
+The raw log path is echoed on the last line; the log itself is kept under
+`${TMPDIR:-/tmp}/k3dm-test-all-<epoch>.log`.
+
+---
+
 ## Help
 
 ```bash

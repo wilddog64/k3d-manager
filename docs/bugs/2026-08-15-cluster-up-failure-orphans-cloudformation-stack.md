@@ -1,6 +1,6 @@
 # Bug: cluster-up failure leaves the CloudFormation cluster stack orphaned and billable
 
-**Status:** Open
+**Status:** FIXED (Codex, 2026-10-01, `82ba559b` on `k3d-manager-v1.40.0`)
 **Discovered:** 2026-08-15
 **Branch:** `k3d-manager-v1.25.0`
 **Files:** `bin/cluster-up` (`_acg_up_cleanup`), `scripts/lib/providers/k3s-aws.sh`
@@ -98,6 +98,19 @@ in order of preference:
   non-zero (it runs on the EXIT path).
 - Do NOT tear down a healthy, reachable cluster on a late-stage app failure —
   only reclaim on pre-cluster-readiness failure or behind the opt-in flag.
+
+## Resolution
+
+Options 2 and 3 were implemented: k3s-aws records the CloudFormation stack name
+and region when this run creates or recreates the stack, and a failed
+`cluster-up` run warns loudly with the exact `make down` reclaim command. A
+healthy pre-existing stack is not marked, and successful runs remove the marker.
+Option 1 was deliberately not implemented: this change does not add automatic
+or opt-in teardown.
+
+Verification fix (Claude): `cluster-up` also clears the marker when a run starts. Without that, a
+marker left by an earlier failed run would make a later run that reused the stack, and then failed,
+claim the stack "was created by this run".
 
 ---
 

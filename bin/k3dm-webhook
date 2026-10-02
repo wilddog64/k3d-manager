@@ -50,6 +50,8 @@ from webhook.render import (  # noqa: E402
     _slack_post,
     _post_slack_bot,
     _fetch_thread_context,
+    _start_bot_thread,
+    _redact_thread_question,
 )
 from webhook.proc import _spawn_capture_text  # noqa: E402
 from webhook.agent import (  # noqa: E402
@@ -57,6 +59,7 @@ from webhook.agent import (  # noqa: E402
     _run_cluster_ask,
     _sanitize_question,
 )
+from webhook import ask_docs  # noqa: E402
 from webhook.lifecycle import (  # noqa: E402
     _run_make_target, _run_upgrade, _run_cluster,
     _run_cluster_resume, _run_cluster_refresh, _run_hostinger_refresh,
@@ -95,7 +98,9 @@ from webhook.policy import (  # noqa: E402
     _audit_remote_action,
     _effective_make_role,
     effective_policy,
+    _normalize_actor_role,
     _normalize_role,
+    _policy_allows,
     _rate_hits,
     _RATE_MAX_DEFAULT,
     _rate_limited,
@@ -289,6 +294,8 @@ _DIAGNOSTIC_NAMESPACES = {
     "platform-ops",
     "secrets",
     "shopping-cart-apps",
+    "shopping-cart-data",
+    "shopping-cart-payment",
     "trivy-system",
 }
 _RESOURCE_NAME_RE = re.compile(r"^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$")
@@ -393,7 +400,7 @@ def _create_cve_scan_job():
 
 def _validate_diagnostics_request(body):
     action = (body.get("action", "") or "").strip()
-    allowed_actions = {"get-pods", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}
+    allowed_actions = {"get-pods", "get-pods-all", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}
     if action not in allowed_actions:
         return "unsupported diagnostics action"
     context = _resolve_diagnostics_context(body.get("provider", ""), body.get("context", ""))
@@ -406,6 +413,9 @@ def _validate_diagnostics_request(body):
     body["provider"] = provider
     if action in {"get-apps", "describe-app", "get-appsets"} and context != "k3d-k3d-cluster":
         return "ArgoCD diagnostics must target the hub context"
+    if action == "get-pods-all":
+        body.pop("namespace", None)
+        return None
     if action == "get-pods":
         if not _validate_namespace(body.get("namespace", "")):
             return "namespace must be one of the approved repo-owned namespaces"
@@ -575,7 +585,7 @@ def _find_job_by_thread_ts(thread_ts):
     for ts_file in JOB_DIR.glob("*/thread_ts"):
         try:
             action_file = ts_file.parent / "action"
-            if action_file.exists() and action_file.read_text().strip() == "ask":
+            if action_file.exists() and action_file.read_text().strip() in {"ask", "ask-docs"}:
                 continue
             if ts_file.read_text().strip() == thread_ts:
                 return ts_file.parent.name
@@ -585,7 +595,7 @@ def _find_job_by_thread_ts(thread_ts):
 
 
 _THREAD_COMMANDS = {
-    "kill", "diagnosis", "status", "logs", "ask",
+    "kill", "diagnosis", "status", "logs", "ask", "ask-docs",
     "cluster-up", "cluster-down", "cluster-refresh", "cluster-resume",
     "cleanup-stale-sandbox",
     "cluster-status", "hostinger-status", "gemini", "claude", "codex",
@@ -593,7 +603,7 @@ _THREAD_COMMANDS = {
 _STANDALONE_CMDS = {
     "cluster-up", "cluster-down", "cluster-resume",
     "cluster-status", "hostinger-status", "cluster-refresh", "refresh",
-    "ask", "claude", "gemini", "codex",
+    "ask", "ask-docs", "claude", "gemini", "codex",
     "cleanup-stale-sandbox",
 }
 
@@ -608,7 +618,7 @@ def _handle_thread_command(job_id, command, role="admin"):
             "/slack/events", f"thread-{cmd or 'unknown'}", "slack", role, False,
             reason=f"requires {required}",
         )
-        _notify_job(job_id, f"⛔ `{cmd or command.strip()}` requires role *{required}* — you have *{_normalize_role(role)}*.")
+        _notify_job(job_id, f"⛔ `{cmd or command.strip()}` requires role *{required}* — you have *{_normalize_actor_role(role)}*.")
         return
     if cmd in {"gemini", "claude", "codex"}:
         _alias_parts = command.strip().lstrip("/").split(None, 1)
@@ -851,10 +861,37 @@ def _handle_thread_command(job_id, command, role="admin"):
         ).start()
         _notify_job(job_id, f"🤖 Asking *{agent}*…")
 
+    elif cmd == "ask-docs":
+        parts = command.strip().split()
+        question = " ".join(parts[1:]).strip()
+        if not question or question in {"--sources", "-s"}:
+            _notify_job(job_id, "Usage: `ask-docs [--sources] <question>`")
+            return
+        question = _sanitize_question(question)
+        if not question:
+            _notify_job(job_id, "❌ Question rejected — too long or contains disallowed patterns.")
+            return
+        thread_ts_file = JOB_DIR / job_id / "thread_ts"
+        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        (new_job_dir / "action").write_text("ask-docs")
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        threading.Thread(
+            target=_run_ask_docs,
+            args=(new_job_id, question, "", thread_ts),
+            kwargs={"channel_id": ""},
+            daemon=True,
+        ).start()
+        _notify_job(job_id, "📚 Searching docs…")
+
     else:
         _notify_job(
             job_id,
-            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`, `cleanup-stale-sandbox [confirm]` (admin)",
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `ask-docs`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`, `cleanup-stale-sandbox [confirm]` (admin)",
         )
 
 
@@ -1378,67 +1415,6 @@ ESO sync failure is the most common root cause of "pod Running but app broken" s
 """
 
 
-def _kubectl_absent(output):
-    """True when combined kubectl output indicates a missing resource."""
-    if not output or not output.strip():
-        return False
-    _low = output.lower()
-    return any(sig in _low for sig in (
-        "notfound", "not found", "no resources found",
-        "doesn't have a resource type", "could not find the requested resource",
-    ))
-
-
-def _eso_health_results(context, label_prefix=""):
-    """ClusterSecretStore + ExternalSecret health on one kube context."""
-    results = []
-    css_name = f"{label_prefix}ESO ClusterSecretStore"
-    es_name = f"{label_prefix}ESO ExternalSecrets"
-    try:
-        _css_out, _css_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "clustersecretstore", "vault-backend",
-             "--context", context, "-o", "json"], timeout=8)
-        if _css_timeout:
-            raise RuntimeError("kubectl clustersecretstore timed out")
-        if _kubectl_absent(_css_out):
-            results.append((css_name, None,
-                            f"not installed (no ClusterSecretStore on {context})"))
-        else:
-            _data = json.loads(_css_out)
-            _conds = _data.get("status", {}).get("conditions", [])
-            _ready = next((c for c in _conds if c.get("type") == "Ready"), None)
-            _val = f"Ready={_ready.get('status', 'Unknown')}" if _ready else "no conditions"
-            results.append((css_name, _val == "Ready=True", _val))
-    except Exception as _exc:
-        results.append((css_name, False, str(_exc)[:200]))
-    try:
-        _es_out, _es_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "externalsecret", "-A", "--context", context, "-o", "json"],
-            timeout=10)
-        if _es_timeout:
-            raise RuntimeError("kubectl externalsecret timed out")
-        if _kubectl_absent(_es_out):
-            results.append((es_name, None,
-                            f"not installed (no ExternalSecret CRD on {context})"))
-            _es_data = None
-        else:
-            _es_data = json.loads(_es_out)
-        if _es_data is not None:
-            _items = _es_data.get("items", [])
-            _not_ready = [it["metadata"]["name"] for it in _items if not any(
-                c.get("type") == "Ready" and c.get("status") == "True"
-                for c in it.get("status", {}).get("conditions", []))]
-            _total = len(_items)
-            if _not_ready:
-                results.append((es_name, False,
-                                f"{len(_not_ready)}/{_total} not synced: {', '.join(_not_ready[:3])}"))
-            else:
-                results.append((es_name, True, f"{_total}/{_total} synced"))
-    except Exception as _exc:
-        results.append((es_name, False, str(_exc)[:200]))
-    return results
-
-
 def _run_post_provision_check(job_id, provider):
     """90s after cluster-up: check tunnel + apps; AI-triage each degraded app to Slack."""
     import time
@@ -1611,6 +1587,10 @@ _configure_status_runtime(
     None, _notify_job, _redact_secrets, _resolve_provider, _provider_context,
     _acg_stack_probe, _running_cluster_job, _smoke_test_services,
 )
+_status._slack_bot_token = lambda: SLACK_BOT_TOKEN
+_status._slack_channel_id = lambda: SLACK_CHANNEL_ID
+_status._start_bot_thread = _start_bot_thread
+_status._post_slack_bot = _post_slack_bot
 _status._ARCH_CONTEXT = _ARCH_CONTEXT
 
 
@@ -1689,6 +1669,52 @@ def _run_analyze(job_id, alert_payload, response_url=""):
         _finish("failed")
 
 
+def _run_ask_docs(job_id, question, response_url="", thread_ts=None, channel_id=""):
+    """Retrieve and summarise documentation, then post the sourced answer."""
+    job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
+    summarise = True
+    for flag in ("--sources ", "-s "):
+        if question.startswith(flag):
+            question = question[len(flag):].strip()
+            summarise = False
+            break
+    bot_thread = bool(SLACK_BOT_TOKEN and SLACK_CHANNEL_ID and channel_id == SLACK_CHANNEL_ID)
+    if bot_thread:
+        thread_ts = _start_bot_thread(
+            f"📚 *ask-docs:* {_redact_thread_question(question, docs=True)}"
+        )
+        if thread_ts:
+            (job_dir / "thread_ts").write_text(thread_ts)
+        else:
+            bot_thread = False
+    try:
+        (job_dir / "status").write_text("running")
+        text = ask_docs.answer(question, summarise=summarise)
+        (job_dir / "output").write_text(text)
+        (job_dir / "status").write_text("success")
+        if bot_thread:
+            if not _post_slack_bot(text, thread_ts=thread_ts):
+                _slack_post(response_url, text)
+        elif response_url:
+            _slack_post(response_url, text)
+        else:
+            _notify_job(job_id, text)
+    except Exception as exc:
+        text = "Could not summarise — read the sources directly.\n\nSources: none"
+        (job_dir / "output").write_text(text)
+        (job_dir / "status").write_text("failed")
+        if bot_thread:
+            if not _post_slack_bot(text, thread_ts=thread_ts):
+                _slack_post(response_url, text)
+        elif response_url:
+            _slack_post(response_url, text)
+        else:
+            _notify_job(job_id, text)
+        print(f"[ask-docs] job failed: {type(exc).__name__}", file=sys.stderr)
+
+
 # min_role is the floor that applies when no dynamic policy resolves.
 _POST_ROUTES = {
     "/api/v1/argocd-upgrade": {"handler": "argocd_upgrade", "min_role": "admin", "action_name": "argocd-upgrade"},
@@ -1705,6 +1731,7 @@ _POST_ROUTES = {
                      "dynamic": "_action_policy resolves from MAKE_TARGETS[target]['min_role']"},
     "/api/v1/analyze": {"handler": "analyze", "min_role": "operator", "action_name": "analyze"},
     "/api/v1/ask": {"handler": "ask", "min_role": "reader", "action_name": "ask"},
+    "/api/v1/ask-docs": {"handler": "ask_docs", "min_role": "reader", "action_name": "ask-docs"},
 }
 _GET_ROUTES = {
     "/api/v1/health": {"handler": "health", "min_role": "reader", "action_name": "health"},
@@ -1867,7 +1894,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             request_role = _effective_make_role(self.headers, body, token_role)
         request_actor = _request_actor(self.headers)
         policy = effective_policy(route, self.path, body)
-        if not _role_allows(request_role, policy["min_role"]):
+        if not _policy_allows(request_role, policy):
             _audit_remote_action(
                 self.path,
                 policy["name"],
@@ -1999,13 +2026,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
                 target=_run_hostinger_status if provider == "hostinger" else _run_cluster_status,
                 args=(job_id, response_url),
-                kwargs={"thread_ts": thread_ts, "provider": provider},
+                kwargs={"thread_ts": thread_ts, "provider": provider, "channel_id": channel_id},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
@@ -2116,6 +2144,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
+            (JOB_DIR / job_id / "target").write_text(target)
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
             threading.Thread(
@@ -2149,14 +2178,36 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 agent = "claude"
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
                 target=_run_cluster_ask,
                 args=(job_id, agent, question, response_url),
-                kwargs={"thread_ts": thread_ts, "role": request_role},
+                kwargs={"thread_ts": thread_ts, "role": request_role, "channel_id": channel_id},
                 daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if route["handler"] == "ask_docs":
+            question = body.get("question", "").strip()
+            if not question:
+                self._json(400, {"error": "question required"})
+                return
+            response_url = body.get("response_url", "")
+            thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            if response_url:
+                (JOB_DIR / job_id / "response_url").write_text(response_url)
+            threading.Thread(
+                target=_run_ask_docs,
+                args=(job_id, question, response_url, thread_ts, channel_id),
+                daemon=True,
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
             return

@@ -1,5 +1,7 @@
 # Cloud Session Requests — asking the local k3dm webhook for read-only state
 
+Architecture and trust boundaries: [docs/architecture/cloud-bridge.md](../architecture/cloud-bridge.md).
+
 **Audience:** a Claude cloud session (or any agent) that has this repo through a GitHub
 connection but no network path to the operator's machine. Also the operator, for the
 two-token model and revocation.
@@ -21,7 +23,6 @@ on the operator's machine reads the branch every 60 seconds, calls the webhook w
 credential you never see, and commits the response back.
 
 ```bash
-git fetch origin cloud-requests
 bin/k3dm-cloud-request cluster-status          # files the request, prints the id
 bin/k3dm-cloud-request --wait cluster-status   # files it, then polls until the response lands
 ```
@@ -45,9 +46,13 @@ when the classifier fires — that is dodging the check, not fixing it. Ask the 
 If nothing comes back within a few minutes, the bridge is not running. That is an operator
 problem, not something to work around. Say so and move on.
 
+After pulling changes, `make restart-webhook` restarts both the webhook and the cloud bridge.
+To restart only the bridge, run `make restart-cloud-bridge`; if it has not been installed, that
+target reports the skip and exits successfully.
+
 ## What you can ask for
 
-Thirteen actions. This list is a security boundary, not a convenience default — anything not on it
+The actions below, and only these (`ACTION_ALLOWLIST` in `scripts/lib/webhook/cloud_actions.py`). This list is a security boundary, not a convenience default — anything not on it
 is rejected by the bridge without being executed.
 
 | action | args | what you get back |
@@ -62,11 +67,62 @@ is rejected by the bridge without being executed.
 | `make-observability-status` | none | monitoring/trivy-system pods, both clusters |
 | `make-vuln-scan` | none | VulnerabilityReport summary |
 | `make-e2e-runner-health` | none | hub vs remote-runner health |
-| `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`) |
+| `make-test` | none | the BATS dispatcher suites (`./scripts/k3d-manager test all`), ~15 min |
+| `make-test-bin` | none | the BATS suites under `scripts/tests/bin`, ~1 min |
+| `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`), ~1.5 min; publishes `junit.xml` |
 | `make-test-python-unit` | none | the offline stdlib-unittest suites |
+| `make-test-python` | none | both Python groups above |
+| `make-test-all` | none | every offline suite (BATS + Python), ~20 min |
 | `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
 
 `job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected.
+
+**The test targets run on macOS, which is why they are worth asking for.** The host has BSD
+`sed`, `stat`, `grep` and `date`; your sandbox is Linux. A suite that is green in your sandbox can
+be red on the machine the tool ships on, and only the host can tell you. Each test target runs
+behind `scripts/tests/tripwire.sh`, so it cannot reach a real cluster, cloud API or keychain even
+on the operator's machine — see `docs/issues/2026-10-01-offline-test-sweep-tripwire.md`. Only one
+`/k3dm` make job runs at a time; a `make-test-all` occupies that slot for about 20 minutes, and a
+second make request is answered `409` until it finishes.
+
+**Every `make-*` and `diagnose-*` action is asynchronous.** The response carries `body.job_id`
+and `body.status: "queued"` within seconds, whatever the job's runtime. Poll it:
+
+```bash
+bin/k3dm-cloud-request --wait make-test-pytest            # -> body.job_id, e.g. 1a2b3c4d
+bin/k3dm-cloud-request --wait job-status --arg job_id=1a2b3c4d
+```
+
+Repeat `job-status` until `body.status` is `success` or `failed`. That first terminal
+`job-status` also carries the diagnostic `artifacts` described below.
+
+### Read-only cluster diagnostics
+
+The same verbs as Slack's `/cluster-diagnose`, each a `kubectl get`/`describe`/`logs` run by the
+webhook at reader tier. The webhook `action` is fixed per bridge action server-side; a request
+cannot choose it, and an `action` key in `args` is rejected as an unexpected argument.
+
+| action | args | what you get back (via `job-status`) |
+|---|---|---|
+| `diagnose-pods` | `provider`, `namespace` | pods in one namespace |
+| `diagnose-describe-pod` | `provider`, `namespace`, `name` | `kubectl describe pod`, sensitive env values masked |
+| `diagnose-logs` | `provider`, `namespace`, `name` | the last 120 log lines of the pod's default container |
+| `diagnose-apps` | none | hub ArgoCD Applications |
+| `diagnose-app` | `name` | one hub Application, described |
+| `diagnose-appsets` | none | hub ApplicationSets |
+
+- `provider` is one of `hostinger`, `aws`, `gcp`, `az`, `hub` (`azure` is not accepted here).
+- `namespace` must be in the webhook's `_DIAGNOSTIC_NAMESPACES` allowlist in `bin/k3dm-webhook`;
+  the bridge checks only that it is a DNS label, and the webhook is the authority.
+- `name` must be a Kubernetes-safe resource name.
+- Output is scrubbed twice before it reaches this branch: by the webhook when the job writes it,
+  and again by the bridge before it commits any `job-status` response. An application that logs
+  a credential in a shape nobody registered can still slip through both; treat logs as sensitive.
+
+**The boundary, in the operator's terms:** offline test targets and read-only diagnostics, yes.
+Creating, destroying or changing a cluster, a service, a pod or a cloud resource — never. That
+is why there is no `make-cluster-*`, `make-e2e*`, `fix-delete-pod`, `fix-force-sync` or
+`argocd-upgrade` action, and `test_no_lifecycle_or_mutating_target_is_reachable` keeps it so.
 
 ### What you cannot ask for, and why
 
@@ -77,7 +133,7 @@ another AI's prompt chains two injection surfaces together, which is exactly wha
 own `_INJECTION_RE` filter exists to prevent. Adding either one back requires its own spec and
 the operator's decision.
 
-The six reader-tier `make` targets above are reachable through mechanism 1. Every operator and
+The reader-tier `make` targets in the table above are reachable through mechanism 1. Every operator and
 admin target remains refused through this channel: the bridge presents a reader credential that
 the webhook will not accept for it, and the branch's content never becomes a command. Concrete
 examples still refused are `sync-apps`, `fix-restart`, `fix-sync`, `e2e-remote` and
@@ -115,8 +171,8 @@ expires is rejected, and its id is still consumed.
 Commit and push to `cloud-requests` only. Never open a PR from it and never merge it.
 
 The branch is an **orphan** — it shares no history with `main` or any release branch and holds
-only these three paths, never repo code. `git fetch origin cloud-requests` is enough; you do not
-need a local branch of that name, and the helper does not create one.
+only these three paths, never repo code. The helper fetches it as needed; you do not need a local
+branch of that name, and the helper does not create one.
 
 ## Reading the response
 
@@ -136,6 +192,37 @@ need a local branch of that name, and the helper does not create one.
 `body` is absent — the request was never executed. There is **no retry**: an id is consumed
 whether it succeeded, was rejected, or expired. To ask again, file a new request with a new id.
 
+### Diagnostic artifacts on a finished job
+
+Every `make-*` action is asynchronous: its response carries `body.job_id` and `body.status:
+"queued"`, and the job runs after the response is written. Poll it with `job-status`
+(`--arg job_id=<id>`). The **first** `job-status` response that sees the job finish (`success`
+or `failed`) also carries an `artifacts` array, committed in the same commit as the response:
+
+```
+artifacts/<job-status request id>/summary.json   always — request_id, job_id, job_status,
+                                                 http_status, finished_at, target (make jobs)
+artifacts/<job-status request id>/junit.xml      when the job produced one (make-test-pytest)
+```
+
+- `artifacts` is optional. A `job-status` that sees `queued` or `running` omits it, as does every
+  other action. Response-level `status` is still only `ok`, `rejected` or `error` — the job's own
+  outcome is `summary.json`'s `job_status`.
+- A later `job-status` for the same job lists the existing paths again; nothing is rewritten.
+- `summary.json` has no `exit_code`: the webhook records only the status word.
+- `junit.xml` comes from pytest's `--junitxml` with `-o junit_logging=no` (no captured
+  stdout/stderr). It still carries assertion messages, which can print compared values, so the
+  bridge passes it through the same credential scrubber as job output
+  (`scripts/lib/webhook/redact.py`) before committing; matches become `***REDACTED***`. Reports
+  over 512 KiB are skipped.
+- **Raw job output is deliberately not published.** The full log is the highest-leak artifact
+  there is, and a `cloud-requests` commit is permanent and readable by anyone with repo read
+  access. `output.log` waits for its own spec and a gated redaction filter; until then the last
+  2000 bytes in `body.output` are all you get.
+
+Read an artifact with `git show refs/remotes/origin/cloud-requests:<path>` after the helper's
+fetch.
+
 ## The helper
 
 ```
@@ -151,18 +238,19 @@ bin/k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECOND
 Two limits worth knowing before you wonder why nothing happened. The bridge rejects any request
 file of 8 KiB or more without parsing it, and it processes at most 10 requests per 60-second tick —
 file twenty and the rest wait for the next tick. Separately, `health` runs the full smoke sweep,
-including the browser login probes, so it is the slowest of the four actions by a wide margin and
+including the browser login probes, so it is the slowest action by a wide margin and
 can legitimately take minutes; `job-status` and the two `-status` actions return promptly. If you
 are polling `health` with a short `--timeout`, raise it rather than assuming the bridge is stuck.
 
 It needs no credential and no environment variables beyond the git access the session already
-has. That is the practical payoff of the pull design.
+has. That is the practical payoff of the pull design. The accepted actions and their arguments
+are the thirteen listed in the table above; the helper derives its choices and validation from the
+same shared table as the bridge.
 
 A cloud session still needs permission to *run* it. `.claude/settings.json` is committed and
-allows exactly `bin/k3dm-cloud-request` and `python3 bin/k3dm-cloud-request`, nothing else. That
-grant is safe to keep narrow because the helper's `argparse` `choices` already bound it to the four
-actions, and the bridge revalidates every request independently — the allowlist, not the caller's
-permissions, is the security boundary. Note that `.gitignore` excludes `.claude/*` rather than
+allows exactly `bin/k3dm-cloud-request` and `python3 bin/k3dm-cloud-request`, nothing else. The
+bridge revalidates every request independently — the allowlist, not the caller's permissions, is
+the security boundary. Note that `.gitignore` excludes `.claude/*` rather than
 `.claude/`, because git cannot re-include a file whose parent directory is excluded; keep it that
 way or the settings file silently stops being tracked.
 
@@ -264,6 +352,10 @@ delete the remote branch and recreate it empty with the three directories. Nothi
 history, and the ledger only needs to contain ids that could still be replayed — but if you
 truncate the ledger, any surviving `requests/` entry becomes eligible again, so clear `requests/`
 in the same operation.
+
+Artifact trees are pruned on write: when the bridge commits new artifacts it keeps the newest
+`K3DM_CLOUD_ARTIFACT_KEEP` trees (default 50, ordered by request id) and drops the rest in the
+same commit — no history rewrite.
 
 ### Bridge placement
 

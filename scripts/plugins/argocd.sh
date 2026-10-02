@@ -9,6 +9,7 @@
 PROVIDER_LIB="$SCRIPT_DIR/lib/provider.sh"
 if [[ ! -r "$PROVIDER_LIB" ]]; then
    printf '[argocd] required provider helpers not readable: %s\n' "$PROVIDER_LIB" >&2
+   # shellcheck disable=SC2317  # exit is reached when this file is executed rather than sourced
    return 1 2>/dev/null || exit 1
 fi
 # shellcheck disable=SC1090
@@ -1764,6 +1765,12 @@ EOF
 
       _info "[argocd] Deploying E2E verification Grafana dashboard..."
       _kubectl apply -f "${_dir}/grafana-dashboard-e2e.yaml"
+
+      _info "[argocd] Deploying Alertmanager delivery Grafana dashboard..."
+      _kubectl apply -f "${_dir}/grafana-dashboard-alertmanager-delivery.yaml"
+
+      _info "[argocd] Deploying VectorDB Grafana dashboard..."
+      _kubectl apply -f "${_dir}/grafana-dashboard-vectordb.yaml"
    else
       _info "[argocd] Prometheus-Operator CRDs / monitoring namespace absent; skipping PrometheusRule, AlertmanagerConfig, inventory-exporter, and Grafana dashboards (monitoring stack not yet installed)"
    fi

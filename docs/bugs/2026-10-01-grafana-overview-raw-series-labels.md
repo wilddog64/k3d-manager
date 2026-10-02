@@ -1,0 +1,73 @@
+# Bug: Grafana Overview uses opaque raw series labels
+
+**Branch:** `k3d-manager-v1.40.0`
+**Filed:** 2026-10-01
+**Status:** FIXED (`3664bea7`)
+**Severity:** low — the dashboard is functional, but its legends and panel descriptions make the
+HTTP status and latency series difficult to interpret.
+
+## Evidence
+
+The Overview dashboard displays raw status-code labels such as `-1`, `200`, `401`, `404`, and
+`503`, and generic percentile labels such as `99th Percentile`, `50th Percentile`, and `Average`.
+The screenshot also shows the underlying Grafana build-information labels directly (`job`,
+`instance`, `edition`, and `version`) without explanatory text.
+
+## Scope finding
+
+The dashboard JSON is Grafana's built-in Overview dashboard. Its definition is not present in this
+repository or the adjacent `shopping-cart-infra` checkout. The source-controlled dashboards under
+`scripts/etc/grafana/dashboards/` and `scripts/etc/argocd/platform-ops/` are separate custom
+dashboards and do not contain these panels.
+
+## Required fix
+
+Provide a source-controlled replacement or supported override for the Overview dashboard that:
+
+- labels status series as `HTTP <code> — <meaning>`;
+- explains `-1` as a non-HTTP or instrumented failure result;
+- labels latency series as `p99`, `median (p50)`, and `average`, with a panel description;
+- gives the Build Info table a human-readable description;
+- preserves the existing queries and dashboard data source selection.
+
+The replacement must be rendered and validated from source, and must not be created by editing the
+Grafana UI.
+
+## Resolution
+
+Added `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml`. It keeps the
+existing PromQL, datasource variable, job/instance filters, and panel layout, while adding
+explanatory panel descriptions and readable HTTP-status, percentile, median, and average legends.
+It uses the unique title `Grafana Overview — Readable` and lets the Grafana sidecar assign the UID,
+because the Helm-owned Overview dashboard cannot be safely overridden by a second ConfigMap with the
+same UID. The dashboard sidecar imports it from the existing ArgoCD-managed dashboards directory.
+
+The same dashboard is also present in `scripts/etc/argocd/platform-ops/` for the hub ApplicationSet;
+the app-cluster and hub dashboards must be synchronized separately.
+
+Implementation commits: `62940976`, `487b0a43`, `e6543d1f`, `3664bea7`.
+
+## Recurrence — Build Info table still shows raw series columns (2026-10-01)
+
+**Status:** FIXED (Codex, 2026-10-01)
+
+Observed live on the hub (`Grafana Overview — Readable`): the Build Info table renders the columns
+`grafana_build_info` (the sample value `1`), `__name__`, `Edition`, `endpoint`, … with `Version`
+pushed off-screen. The table answers nothing a reader asked.
+
+Cause: the two copies drifted, and both use a denylist.
+
+- Hub copy `scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml` (the one
+  deployed to the hub): `labelsToFields` → `merge` → `organize` with **no** `excludeByName`, so
+  every label and the value column render.
+- App copy `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml`: has an
+  `excludeByName` denylist, but it misses `__name__`, `endpoint` and `service`, and any new
+  label the ServiceMonitor adds would appear again.
+- The BATS in `scripts/tests/plugins/grafana_dashboard_appsets.bats` asserts readable request
+  labels only; nothing covers the Build Info panel or checks the two copies agree.
+
+Fix: in both copies, the Build Info target uses `"format": "table"` + `"instant": true`, and the
+panel shows exactly `Version`, `Edition`, `Job`, `Instance` in that order via a positive allowlist
+(`filterFieldsByName` include names), then `organize` to rename and order. The panel JSON must be
+identical in both files. Tests: assert the allowlist in both copies, and that the two Build Info
+panels are equal (drift guard). Mutation: remove the include from the hub copy → red.

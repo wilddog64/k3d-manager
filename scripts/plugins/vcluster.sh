@@ -6,12 +6,14 @@ VCLUSTER_VERSION="${VCLUSTER_VERSION:-0.32.1}"
 VCLUSTER_KUBECONFIG_DIR="${VCLUSTER_KUBECONFIG_DIR:-${HOME}/.kube/vclusters}"
 VCLUSTER_VALUES_FILE="${VCLUSTER_VALUES_FILE:-}"
 VCLUSTER_LOCAL_PORT="${VCLUSTER_LOCAL_PORT:-11443}"
+VCLUSTER_SKIP_VERSION_CHECK="${VCLUSTER_SKIP_VERSION_CHECK:-true}"
 _VCLUSTER_BIN=""
 export VCLUSTER_NAMESPACE
 export VCLUSTER_VERSION
 export VCLUSTER_KUBECONFIG_DIR
 export VCLUSTER_VALUES_FILE
 export VCLUSTER_LOCAL_PORT
+export VCLUSTER_SKIP_VERSION_CHECK
 
 function _vcluster_load_argocd_plugin() {
   if declare -f _argocd_hub_kubectl_cmd >/dev/null 2>&1; then
@@ -61,19 +63,17 @@ function vcluster_create() {
 # teardown regression instead of surfacing it.
 function _vcluster_reconcile_namespace() {
   local keep="${1:-}"
-  local list_output="" line="" cluster_name=""
-  list_output="$(_run_command --no-exit --quiet -- "$_VCLUSTER_BIN" list -n "$VCLUSTER_NAMESPACE" 2>/dev/null || true)"
+  local list_output="" cluster_name=""
+  list_output="$(_run_command --no-exit --quiet -- "$_VCLUSTER_BIN" list -n "$VCLUSTER_NAMESPACE" --output json 2>/dev/null || true)"
 
-  while IFS= read -r line; do
-    [[ -z "$line" || "$line" == NAME* ]] && continue
-    read -r cluster_name _ <<< "$line"
+  while IFS= read -r cluster_name; do
     [[ -z "$cluster_name" || "$cluster_name" == "$keep" ]] && continue
     _warn "vCluster '${cluster_name}' is an orphan in namespace '${VCLUSTER_NAMESPACE}' (its run never tore down); deleting it before creating '${keep}'"
     if ! _run_command --no-exit -- "$_VCLUSTER_BIN" delete "$cluster_name" -n "$VCLUSTER_NAMESPACE" --wait; then
       _warn "vcluster delete '${cluster_name}' failed; falling back to helm uninstall"
       _run_command --no-exit -- helm -n "$VCLUSTER_NAMESPACE" uninstall "$cluster_name" --wait || true
     fi
-  done <<< "$list_output"
+  done < <(jq -r '.[]?.Name // empty' 2>/dev/null <<< "$list_output" || true)
 
   return 0
 }

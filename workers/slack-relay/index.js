@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
+const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/cleanup-stale-sandbox', '/ask', '/ask-docs', '/claude', '/gemini', '/codex', '/argocd-upgrade', '/hermes-auth', '/k3dm'])
 const APPROVAL_TTL_SECONDS = 3600
 const REAUTH_TTL_SECONDS   = 86400
 const HERMES_ACTION_ID_RE  = /^r[0-9]+-[0-9a-f]{8}$/
@@ -18,6 +18,7 @@ const COMMAND_ROLES     = Object.freeze({
   '/cleanup-stale-sandbox': 'admin',
   '/hermes-auth': 'admin',
   '/ask': 'reader',
+  '/ask-docs': 'reader',
   '/claude': 'reader',
   '/gemini': 'reader',
   '/codex': 'reader',
@@ -49,8 +50,11 @@ function parseClusterDiagnose(text) {
     index = 1
   }
   const verb = parts[index] || ''
+  if (!verb && index === 1) {
+    return { payload: { provider: target, action: 'get-pods-all' } }
+  }
   if (!verb) {
-    return { error: 'Usage: /cluster-diagnose [hostinger|aws|gcp|az|hub] <pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets>' }
+    return { error: 'Usage: /cluster-diagnose <hostinger|aws|gcp|az|hub> (all pods) | /cluster-diagnose [hostinger|aws|gcp|az|hub] <pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets>' }
   }
   if (verb === 'pods') {
     const namespace = parts[index + 1] || ''
@@ -87,6 +91,7 @@ function parseClusterDiagnose(text) {
 }
 
 const K3DM_USAGE = 'Usage: /k3dm <target> [KEY=value …] [confirm] — `/k3dm help` lists targets for your role'
+const K3DM_FREE_TEXT_KEYS = new Set(['Q'])
 
 function parseK3dm(text) {
   const parts = (text || '').trim().split(/\s+/).filter(Boolean)
@@ -94,11 +99,17 @@ function parseK3dm(text) {
   if (!/^[a-z][a-z0-9-]{0,40}$/.test(target)) return { error: K3DM_USAGE }
   const args = {}
   let confirm = false
+  let freeKey = null
   for (const part of parts) {
-    if (part.toLowerCase() === 'confirm') { confirm = true; continue }
+    if (part.toLowerCase() === 'confirm') { confirm = true; freeKey = null; continue }
     const m = /^([A-Z][A-Z_]{0,31})=(\S{1,256})$/.exec(part)
-    if (!m) return { error: K3DM_USAGE }
-    args[m[1]] = m[2]
+    if (m) {
+      args[m[1]] = m[2]
+      freeKey = K3DM_FREE_TEXT_KEYS.has(m[1]) ? m[1] : null
+      continue
+    }
+    if (!freeKey || args[freeKey].length + 1 + part.length > 256) return { error: K3DM_USAGE }
+    args[freeKey] += ' ' + part
   }
   return { payload: { target, args, confirm } }
 }
@@ -297,6 +308,7 @@ async function handle(req, event) {
   const text        = (p.get('text')      || '').trim()
   const responseUrl = p.get('response_url') || ''
   const threadTs    = p.get('thread_ts')  || ''
+  const channelId   = p.get('channel_id')  || ''
   const userId      = p.get('user_id')    || ''
   const userName    = p.get('user_name')  || ''
   const role        = COMMAND_ROLES[command] || 'reader'
@@ -345,7 +357,7 @@ async function handle(req, event) {
 
   if (command === '/cluster-status') {
     const provider = resolveProvider(text, 'hostinger')
-    const payload = { provider, response_url: responseUrl }
+    const payload = { provider, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster-status', payload, meta)
@@ -449,7 +461,7 @@ async function handle(req, event) {
       question = text
     }
     if (!question) return jsonReply(`Usage: ${command} <question>`, threadTs)
-    const payload = { agent, question, response_url: responseUrl }
+    const payload = { agent, question, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/ask', payload, meta)
@@ -457,6 +469,18 @@ async function handle(req, event) {
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`🤖 Asking ${agent}…`, threadTs, true)
+  }
+
+  if (command === '/ask-docs') {
+    if (!text || text === '--sources' || text === '-s') return jsonReply('Usage: /ask-docs [--sources] <question>', threadTs)
+    const payload = { question: text, response_url: responseUrl, channel_id: channelId }
+    if (threadTs) payload.thread_ts = threadTs
+    event.waitUntil((async () => {
+      const { ok, conflict } = await relay('/api/v1/ask-docs', payload, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
+    return jsonReply('📚 Searching the docs…', threadTs, true)
   }
 
   if (command === '/argocd-upgrade') {

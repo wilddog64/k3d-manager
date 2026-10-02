@@ -86,11 +86,38 @@ K3DM_SMOKE_FE_REDIRECT = os.environ.get(
 _SMOKE_USER_AGENT = "k3dm-smoketest/1"
 
 
+_KUBECTL_CONFIG_ERROR_SIGNATURES = (
+    "error in configuration",
+    "context was not found",
+    "no configuration has been provided",
+    "error loading config file",
+    "unable to read client-cert",
+    "unable to read client-key",
+    "the connection to the server",
+)
+
+
+def _kubectl_config_error(output):
+    """True when kubectl never reached a cluster (bad or missing context, unreadable
+    kubeconfig, unreachable API server) as opposed to reporting on a resource.
+
+    Absence is a claim about a cluster that WAS queried. A kubeconfig error means the
+    resource's existence is unknown, so it must not be reported as 'not installed' —
+    note that 'context was not found for specified context: X' contains the substring
+    'not found' and would otherwise match _kubectl_absent()."""
+    if not output or not output.strip():
+        return False
+    _low = output.lower()
+    return any(sig in _low for sig in _KUBECTL_CONFIG_ERROR_SIGNATURES)
+
+
 def _kubectl_absent(output):
     """True when combined kubectl stdout+stderr indicates the resource, CRD, or
     namespace does not exist (as opposed to existing-but-unhealthy). Relies on
     _posix_spawn_capture merging stderr into the returned text."""
     if not output or not output.strip():
+        return False
+    if _kubectl_config_error(output):
         return False
     _low = output.lower()
     return any(sig in _low for sig in (
@@ -451,7 +478,10 @@ def _eso_health_results(context, label_prefix=""):
         )
         if _css_timeout:
             raise RuntimeError("kubectl clustersecretstore timed out")
-        if _kubectl_absent(_css_out):
+        if _kubectl_config_error(_css_out):
+            results.append((css_name, None,
+                            f"cluster unreachable (kube context '{context}' unusable)"))
+        elif _kubectl_absent(_css_out):
             results.append((css_name, None,
                             f"not installed (no ClusterSecretStore on {context})"))
         else:
@@ -471,7 +501,11 @@ def _eso_health_results(context, label_prefix=""):
         )
         if _es_timeout:
             raise RuntimeError("kubectl externalsecret timed out")
-        if _kubectl_absent(_es_out):
+        if _kubectl_config_error(_es_out):
+            results.append((es_name, None,
+                            f"cluster unreachable (kube context '{context}' unusable)"))
+            _es_data = None
+        elif _kubectl_absent(_es_out):
             results.append((es_name, None,
                             f"not installed (no ExternalSecret CRD on {context})"))
             _es_data = None
@@ -546,17 +580,19 @@ def _smoke_test_services(retries=None, provider=None, quick=False):
         prometheus_ready_url = "http://localhost:19190/-/ready"
 
     smoke_endpoints = [
-        ("ArgoCD", argocd_health_url, [200]),
-        ("Frontend", frontend_url, [200]),
-        ("Keycloak", keycloak_url, [200]),
-        ("Prometheus", prometheus_ready_url, [200]),
-        ("Grafana", "https://grafana.3ai-talk.org/api/health", [200]),
+        ("ArgoCD", argocd_health_url, [200], False),
+        ("Frontend", frontend_url, [200], False),
+        ("Keycloak", keycloak_url, [200], False),
+        ("Prometheus", prometheus_ready_url,
+         [401] if provider == "k3s-hostinger" else [200],
+         provider == "k3s-hostinger"),
+        ("Grafana", "https://grafana.3ai-talk.org/api/health", [200], False),
     ]
     if _provider_supports_pushgateway(provider):
-        smoke_endpoints.append(("Pushgateway", "http://localhost:9091/-/healthy", [200]))
+        smoke_endpoints.append(("Pushgateway", "http://localhost:9091/-/healthy", [200], False))
 
     def _probe_endpoint(endpoint):
-        name, url, ok_codes = endpoint
+        name, url, ok_codes, expected_auth = endpoint
         last_err = ""
         passed = False
         for attempt in range(_retries):
@@ -566,14 +602,16 @@ def _smoke_test_services(retries=None, provider=None, quick=False):
                     code = resp.status
                     if code in ok_codes:
                         passed = True
-                        last_err = f"HTTP {code}"
+                        last_err = "HTTP 401 (auth enforced)" if expected_auth else f"HTTP {code}"
                         break
-                    if name == "Prometheus" and code == 401:
-                        return name, None, "HTTP 401 (authentication required)"
+                    if expected_auth and code == 200:
+                        return name, False, "HTTP 200 without credentials — auth proxy bypassed"
                     last_err = f"HTTP {code}"
             except urllib.error.HTTPError as exc:
-                if name == "Prometheus" and exc.code == 401:
-                    return name, None, "HTTP 401 (authentication required)"
+                if expected_auth and exc.code == 401:
+                    return name, True, "HTTP 401 (auth enforced)"
+                if expected_auth and exc.code == 200:
+                    return name, False, "HTTP 200 without credentials — auth proxy bypassed"
                 last_err = str(exc)
             except (urllib.error.URLError, OSError) as exc:
                 last_err = _smoke_unreachable_detail(url, exc)

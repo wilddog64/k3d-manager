@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** OPEN
+**Status:** FIXED in `978ea60f` (#127) — `payment.yaml`, the `payments` initdb and `PAYMENT_URL` are in the substrate. Run `1790248982-25275` (2026-09-29) shows no `ECONNREFUSED …:8084`; its remaining payment failures are tracked in `2026-09-16-e2e-assertion-api-payments.md`. Status updated 2026-09-29 by Claude (cloud session).
 **Files:** `scripts/etc/e2e/payment.yaml` (new), `scripts/etc/e2e/kustomization.yaml`, `scripts/etc/e2e/postgres.yaml` (initdb), `scripts/plugins/e2e.sh`, `scripts/tests/plugins/e2e.bats`, `CHANGELOG.md`
 **Depends on:** `docs/bugs/2026-09-15-e2e-m2-runner-checkout-drift.md`, so the runner actually executes this substrate
 

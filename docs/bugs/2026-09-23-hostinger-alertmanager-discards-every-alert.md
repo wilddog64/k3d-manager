@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — `_observability_assert_alertmanager_delivery` and the Hermes `alert_delivery` sensor shipped in v1.37.0 (#131); hostinger RESOLVED emails received live 2026-09-30.
 **Severity:** high — the cluster the public edge serves has had **zero** alert delivery, and nothing detected it for 64 days
 
 ---

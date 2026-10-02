@@ -24,6 +24,38 @@ def test_template_only_names_bug_docs_path():
     assert Path("docs/bugs/2026-09-16-e2e-contract-drift-api-cart.md").parent == Path("docs/bugs")
 
 
+def test_new_bug_doc_adds_advisory_prior_art_without_changing_template_decision(monkeypatch):
+    monkeypatch.setattr(e2e_bugs, "search", lambda _query, k: [
+        (0.91, "docs/bugs/related.md", "Related bug"),
+        (0.80, "docs/issues/related.md", "Related issue"),
+        (0.70, "docs/plans/related.md", "Related plan"),
+        (0.60, "docs/retro/ignored.md", "Ignored extra"),
+    ])
+    text = _doc(group(), {"run_id": "r1", "summary": {}}, "k3d-manager-v9.9.9", "2026-09-16")
+    assert "## Possible prior art" in text
+    assert "related.md" in text and "ignored.md" not in text
+    assert "# Bug: e2e contract-drift" in text
+
+
+def test_retrieval_unavailable_omits_prior_art_without_failing(monkeypatch):
+    monkeypatch.setattr(e2e_bugs, "search",
+                        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                            e2e_bugs.RetrievalUnavailable("store down")))
+    text = _doc(group(), {"run_id": "r1", "summary": {}}, "k3d-manager-v9.9.9", "2026-09-16")
+    assert "## Possible prior art" not in text
+    assert "# Bug: e2e contract-drift" in text
+
+
+def test_malformed_store_output_omits_prior_art_without_failing(monkeypatch):
+    def garbled(*_args, **_kwargs):
+        raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    monkeypatch.setattr(e2e_bugs, "search", garbled)
+    text = _doc(group(), {"run_id": "r1", "summary": {}}, "k3d-manager-v9.9.9", "2026-09-16")
+    assert "## Possible prior art" not in text
+    assert "# Bug: e2e contract-drift" in text
+
+
 def test_status_bug_file_and_recurrence_use_status_context(tmp_path):
     from hermes.status_triage import triage
     _origin, clone = _repo(tmp_path)

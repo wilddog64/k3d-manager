@@ -121,42 +121,48 @@ See **[docs/providers/](docs/providers/)** for per-provider guides:
 ## Architecture
 
 ```mermaid
-graph TD
-  U[User CLI] --> KM[./scripts/k3d-manager]
-  KM --> LIB["lib/ — system · core · providers"]
-  KM --|lazy-load|--> PLUG["plugins/ — acg · aws · gemini · tunnel · ..."]
-
-  subgraph Infra ["Infra Cluster — OrbStack / k3d / k3s (local)"]
-    VAULT["Vault (PKI + Auth)"]
-    ESO[ESO]
-    ARGOCD[ArgoCD]
-    ISTIO[Istio]
-    LDAP[LDAP / AD]
-    TRIVY[Trivy Operator]
-    ESO -->|sync| VAULT
-    ARGOCD -->|deploys| TRIVY
+graph LR
+  subgraph External ["External"]
+    GH["GitHub<br/>repos · CI · cloud-requests branch"]
+    SLACK["Slack + Cloudflare<br/>Worker relay"]
   end
 
-  subgraph AppCluster ["App Cluster — k3s-aws (EC2)"]
-    K3S[k3s node]
-    APPS[Shopping Cart pods]
-    K3S --> APPS
+  subgraph Laptop ["Operator laptop — macOS LaunchAgents"]
+    KM["./scripts/k3d-manager<br/>lib/ + lazy-loaded plugins/"]
+    WH["k3dm-webhook :7443<br/>reader / operator tiers"]
+    BRIDGE[k3dm-cloud-bridge]
+    HERMES["Hermes<br/>sensors · correlator · bug filer"]
+    CFD[cloudflared]
   end
 
-  ANTG["Chrome (Playwright CDP :9222)"]
-  AWSC["aws.sh — credential import"]
+  subgraph Hub ["Hub cluster — OrbStack / k3d"]
+    ARGOCD["ArgoCD<br/>ApplicationSets"]
+    VAULT["Vault + ESO"]
+    IDP["Keycloak + OpenLDAP / AD"]
+    OBS["Prometheus · Loki · Alertmanager<br/>Trivy · Istio ambient"]
+    PGV[("pgvector<br/>doc prior-art index")]
+    SC1[Shopping Cart]
+  end
 
-  PLUG -->|deploy stack| Infra
-  PLUG -->|acg_provision — EC2 + k3sup| AppCluster
-  PLUG -->|browser automation| ANTG
-  PLUG -->|credential import| AWSC
-  ANTG -->|extract from Pluralsight| AWSC
-  AWSC -->|auth| AppCluster
-  PLUG -.->|tunnel.sh — autossh :6443| K3S
-  ARGOCD -->|GitOps deploy| APPS
-  TRIVY -.->|vuln scan| APPS
-  VAULT -.->|cross-cluster auth| K3S
-  ESO -.->|sync| AKV[Azure Key Vault]
+  subgraph Apps ["App clusters — k3s"]
+    HOST[Hostinger VPS — permanent]
+    ACG[ACG AWS / GCP — ephemeral]
+    VC[vCluster — per-PR e2e]
+  end
+
+  KM -->|deploy + register| Hub
+  KM -->|provision| Apps
+  SLACK -->|/k3dm| CFD --> WH
+  GH <-->|requests / responses + artifacts| BRIDGE
+  BRIDGE -->|reader-tier actions| WH
+  WH -->|runs| KM
+  HERMES -.->|read-only sensors| Hub
+  HERMES -->|prior-art search| PGV
+  SLACK <-->|incidents / approvals| HERMES
+  GH -.->|release branch| ARGOCD
+  ARGOCD --> SC1
+  ARGOCD -->|app-cluster label| Apps
+  VAULT -.->|secrets| Apps
 ```
 
 ---
@@ -221,6 +227,7 @@ docs/
 
 ### Guides
 - **[Alerting](docs/guides/alerting.md)** — Alertmanager receivers, default-deny routing, warning allowlist, and notification triage
+- **[Webhook AI analysis fallback](docs/guides/ai-analysis-fallback.md)** — Candidate ordering, failure classification, and safe sentinel output
 - **[Alert delivery](docs/guides/alert-delivery.md)** — Generated route-tree checks, missing configSecret triage, and Hermes blackout detection
 - **[App-cluster registration](docs/guides/app-cluster-registration.md)** — Hub registration durability, reconciliation, and registration-gap triage
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
@@ -244,6 +251,8 @@ docs/
 - **[OpenLDAP Directory Service](docs/architecture/openldap-directory-service.md)** — Symas `jp-gouin/openldap-stack-ha` topology, credential model, and consumer wiring after the v1.22.0 `bitnamilegacy` migration
 - **[CVE Detection and Remediation Pipeline](docs/architecture/cve-remediation-pipeline.md)** — Trivy alert → webhook → immutable-image promotion/rebuild, plus Dependabot escalation
 - **[Trivy Operator Observability](docs/architecture/trivy-operator-observability.md)** — Trivy Operator reconcile-error logs, scan-job failure alerts, and metrics scraping
+- **[Cloud Bridge](docs/architecture/cloud-bridge.md)** — Pull-model bridge that lets a cloud agent read cluster state: components, request sequence, and trust boundaries
+- **[Vector Store](docs/architecture/vector-store.md)** — pgvector prior-art index: components, index-run sequence, credential resolution, failure modes
 
 ### How-To
 
@@ -263,7 +272,7 @@ docs/
 - **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
 - **[Gemini Browser Automation](docs/howto/gemini.md)** — First-run setup, ACG extend, Copilot agent trigger
 - **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
-- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/claude` / `/gemini` / `/codex`, `/cluster-up` / `/cluster-down` / `/cluster-status` / `/cluster-refresh` / `/cluster-resume`, and `/argocd-upgrade`
+- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/ask-docs`, `/claude` / `/gemini` / `/codex`, `/cluster-up` / `/cluster-down` / `/cluster-status` / `/cluster-refresh` / `/cluster-resume`, and `/argocd-upgrade`
 - **[Cloud Session Requests](docs/howto/cloud-session-requests.md)** — How an agent with only repo access asks the local webhook for read-only cluster state via the `cloud-requests` branch, the action allowlist, and the two-token (admin / reader) model
 
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
@@ -278,6 +287,10 @@ docs/
 | `bin/cluster-status` | `/cluster-status` | Read-only health check — nodes, pods, ArgoCD, AWS |
 | `bin/rotate-ghcr-pat` | — | Rotate `PACKAGES_TOKEN` in all shopping-cart repos |
 
+| Slack command | Purpose |
+|---|---|
+| `/ask-docs <question>` | Reader-only, sourced Q&A over the documentation corpus |
+
 > `GHCR_PAT` env var must be set before `cluster-up` (used to create `ghcr-pull-secret`).
 > Pass tokens via `pbpaste | bin/rotate-ghcr-pat` — never paste into chat.
 
@@ -288,6 +301,7 @@ docs/
 
 **Networking**
 - **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
+- **[Public Endpoint Alerts](docs/howto/public-endpoint-alerts.md)** — Blackbox probes for the seven Cloudflare public hostnames, the UI vs authenticated module split, and the endpoint-failure / full-tunnel-failure / probe-silence alerts
 
 **LDAP / Directory**
 - **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** — Import users from a CSV into OpenLDAP

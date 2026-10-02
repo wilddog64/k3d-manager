@@ -12,10 +12,18 @@ setup() {
   export READYZ_FILE="$BATS_TEST_TMPDIR/readyz"
   export CONTAINER_STATE_FILE="$BATS_TEST_TMPDIR/container-state"
   export DOCKER_CALLS="$BATS_TEST_TMPDIR/docker-calls"
+  export DRIFT_CALLS="$BATS_TEST_TMPDIR/drift-calls"
+  export K3DM_HOSTNET_DRIFT_BIN="$BATS_TEST_TMPDIR/hostnet-drift"
   printf 'True\n' >"$READY_FILE"
   printf 'ok\n' >"$READYZ_FILE"
   printf 'running\n' >"$CONTAINER_STATE_FILE"
   : >"$DOCKER_CALLS"
+  : >"$DRIFT_CALLS"
+  cat >"$K3DM_HOSTNET_DRIFT_BIN" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$DRIFT_CALLS"
+STUB
+  chmod +x "$K3DM_HOSTNET_DRIFT_BIN"
 
   kubectl() {
     case "$*" in
@@ -43,6 +51,7 @@ setup() {
   _tick
   [ "$failures" -eq 0 ]
   [ ! -s "$DOCKER_CALLS" ]
+  [ ! -s "$DRIFT_CALLS" ]
 }
 
 @test "node health watchdog: NotReady with reachable API restarts after threshold" {
@@ -51,6 +60,12 @@ setup() {
   _tick
   [ "$(<"$DOCKER_CALLS")" = "restart agent-x" ]
   grep -q 'NotReady (2/2)' "$K3DM_NODE_RECOVERY_LOG"
+  [ "$(<"$DRIFT_CALLS")" = "--context ctx-x --fix" ]
+}
+
+@test "node health watchdog: advisory Ready path never runs host-network drift fix" {
+  _tick
+  [ ! -s "$DRIFT_CALLS" ]
 }
 
 @test "node health watchdog: unreachable API never restarts the agent" {

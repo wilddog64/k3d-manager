@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+context="k3d-k3d-cluster"
+mode="json"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --context)
+      [[ $# -ge 2 ]] || { printf '%s\n' 'ERROR: --context requires a value' >&2; exit 2; }
+      context="$2"
+      shift 2
+      ;;
+    --json)
+      mode="json"
+      shift
+      ;;
+    --fix)
+      mode="fix"
+      shift
+      ;;
+    *)
+      printf 'ERROR: unknown option: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+nodes_file="$(mktemp)"
+pods_file="$(mktemp)"
+trap 'rm -f "$nodes_file" "$pods_file"' EXIT
+[[ -n "$nodes_file" && -n "$pods_file" ]] || { printf '%s\n' 'ERROR: mktemp failed' >&2; exit 1; }
+kubectl --context "$context" get nodes -o json > "$nodes_file"
+kubectl --context "$context" get pods -A -o json > "$pods_file"
+drifted_json="$(jq -c --slurpfile nodes "$nodes_file" '
+  def node_ip($name):
+    ($nodes[0].items[] | select(.metadata.name == $name) |
+      (.status.addresses // [])[] | select(.type == "InternalIP") | .address);
+  [ .items[]
+    | select(.spec.hostNetwork == true and .status.phase == "Running")
+    | . as $pod
+    | ($pod.spec.nodeName // "") as $node
+    | ($pod.status.podIP // $pod.status.hostIP // "") as $pod_ip
+    | (node_ip($node) // "") as $node_ip
+    | select($pod_ip != "" and $node_ip != "" and $pod_ip != $node_ip)
+    | {namespace: ($pod.metadata.namespace // "default"),
+       pod: $pod.metadata.name,
+       node: $node,
+       pod_ip: $pod_ip,
+       node_ip: $node_ip,
+       owner_kind: ($pod.metadata.ownerReferences[0].kind // "")} ]
+' "$pods_file")"
+
+if [[ "$mode" == "json" ]]; then
+  jq -c '{drifted: .}' <<< "$drifted_json"
+  exit 0
+fi
+
+failed=0
+while IFS= read -r item; do
+  namespace="$(jq -r '.namespace' <<< "$item")"
+  pod="$(jq -r '.pod' <<< "$item")"
+  owner_kind="$(jq -r '.owner_kind' <<< "$item")"
+  if [[ "$owner_kind" != "DaemonSet" ]]; then
+    printf '[hostnet-drift] skipping %s/%s (owner=%s)\n' "$namespace" "$pod" "${owner_kind:-bare}"
+    continue
+  fi
+  printf '[hostnet-drift] deleting %s/%s (DaemonSet-owned stale IP)\n' "$namespace" "$pod"
+  if ! kubectl --context "$context" -n "$namespace" delete pod "$pod"; then
+    printf '[hostnet-drift] delete failed for %s/%s\n' "$namespace" "$pod" >&2
+    failed=1
+  fi
+done < <(jq -c '.[]' <<< "$drifted_json")
+
+exit "$failed"

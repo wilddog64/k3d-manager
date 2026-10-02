@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** OPEN
+**Status:** FIXED (triage by Claude, 2026-10-01) — `scripts/tests/bin/test_smoke_logins.py` (#127) covers the operator code flow and account-specific failure reasons.
 **Files:** `bin/k3dm-webhook` (`_smoke_test_logins`), `scripts/tests/bin/test_smoke_logins.py` (new; pytest), `CHANGELOG.md`
 **Related:** `docs/bugs/2026-07-23-smoke-login-credential-autodiscovery.md` (autodiscovery, done), `docs/bugs/2026-08-28-smoke-frontend-login-stub-token-false-fail.md`
 

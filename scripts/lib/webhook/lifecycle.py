@@ -10,6 +10,7 @@ from pathlib import Path
 
 from webhook.config import JOB_DIR, REPO_ROOT
 from webhook.proc import _spawn_capture_text
+from webhook.redact import scrub_credentials
 from webhook.render import _slack_post
 
 __all__ = [
@@ -86,7 +87,8 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
         (JOB_DIR / job_id / "status").write_text("running")
         _notify_job(job_id, f"🛠️ *make {label}* started by {actor}")
         cmd = ["make", "--no-print-directory", *argv_tail]
-        rc, output, timed_out = _spawn_capture_text(cmd, timeout=timeout, cwd=REPO_ROOT)
+        env = {**os.environ, "K3DM_JUNIT_XML": str(JOB_DIR / job_id / "junit.xml")}
+        rc, output, timed_out = _spawn_capture_text(cmd, timeout=timeout, cwd=REPO_ROOT, env=env)
         lines = output.rstrip().splitlines()
         tail = "\n".join(lines[-40:])[-3000:]
         if timed_out:
@@ -95,6 +97,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
             status, icon, verdict = "success", "✅", "succeeded"
         else:
             status, icon, verdict = "failed", "❌", f"failed (rc {rc})"
+        (JOB_DIR / job_id / "output").write_text(scrub_credentials(_redact_secrets(output)))
         (JOB_DIR / job_id / "status").write_text(status)
         _notify_job(job_id, f"{icon} *make {label}* {verdict}\n```{tail or '(no output)'}```")
     finally:

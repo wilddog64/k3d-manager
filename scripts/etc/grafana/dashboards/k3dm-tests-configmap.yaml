@@ -75,10 +75,18 @@ data:
         {
           "id": 7,
           "type": "table",
-          "title": "Exit code",
-          "description": "Informational only, not pass/fail. Exit code 2 is expected for test-all on this box because test-pytest's python3 has no pytest.",
+          "title": "Make exit code (informational)",
+          "description": "The make test-all exit code is informational. make returns 2 for any failed recipe, including the expected missing-pytest case. Pass/fail is shown in the Failed cases panel.",
           "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
-          "targets": [{ "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "k3dm_test_exit_code", "format": "table" }]
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "k3dm_test_exit_code", "format": "table", "instant": true }],
+          "transformations": [
+            { "id": "labelsToFields", "options": {} },
+            { "id": "organize", "options": {
+              "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true },
+              "renameByName": { "target": "Target", "Value": "Exit code" }
+            } }
+          ]
         }
       ]
     }

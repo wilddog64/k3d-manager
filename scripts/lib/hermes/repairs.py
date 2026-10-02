@@ -6,6 +6,8 @@ durable audit, auto-verification) is NOT implemented and needs its own scope doc
 """
 
 import hashlib
+import os
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -16,16 +18,15 @@ from hermes.sensors import GITHUB_SERVICE, _keychain_secret
 ROOT = Path(__file__).resolve().parents[3]
 WEBHOOK_LABEL = "com.k3d-manager.webhook"
 HUB_K3S_CONTAINER = "k3d-k3d-cluster-server-0"
-# Public host -> the launchd port-forward label that actually serves it. Grounded
-# in scripts/etc/cloudflared/config.yml (ingress local port) matched against the
-# installed com.k3d-manager.*-port-forward.plist listen ports: only
-# prometheus.3ai-talk.org (ingress :19090) maps cleanly to the prometheus PF
-# (19090:9090). The other public hosts are served by different mechanisms
-# (argocd via port-forward-wrapper.sh, keycloak/grafana/frontend by their own
-# services) and alertmanager's ingress (:9093) does not match its PF listen port
-# (:19093) -- none has a known launchd PF label, so R2 is not proposable for them.
+# Public host -> the launchd label listening on cloudflared's ingress port.
+# prometheus.3ai-talk.org enters at :19090 on the auth proxy
+# (com.k3d-manager.prometheus-auth-proxy); that proxy forwards to the backend
+# port-forward on :19091. The other public hosts are served by different
+# mechanisms (argocd via port-forward-wrapper.sh, keycloak/grafana/frontend by
+# their own services), and alertmanager's ingress (:9093) does not match its
+# PF listen port (:19093), so R2 is not proposable for them.
 PORT_FORWARD_LABELS = {
-    "prometheus.3ai-talk.org": "com.k3d-manager.prometheus-port-forward",
+    "prometheus.3ai-talk.org": "com.k3d-manager.prometheus-auth-proxy",
 }
 
 
@@ -49,11 +50,11 @@ def _sustained(history, predicate, cycles):
 
 def _unknown_webhook(records):
     eso = _rec(records, "eso")
-    node = _rec(records, "node_pressure")
+    data = _rec(records, "data_layer")
     return (_status(records, "eso") == "unknown" and
-            _status(records, "node_pressure") == "unknown" and
+            _status(records, "data_layer") == "unknown" and
             "source unavailable" in (eso or {}).get("evidence", "").lower() and
-            "source unavailable" in (node or {}).get("evidence", "").lower())
+            "source unavailable" in (data or {}).get("evidence", "").lower())
 
 
 def _r1_precondition(records, _history, state):
@@ -71,7 +72,8 @@ def _r2_precondition(records, _history, _state):
     reachability = _rec(records, "reachability") or {}
     return (_status(records, "reachability") == "degraded" and
             reachability.get("data", {}).get("verdict") == "single-service" and
-            _status(records, "node_pressure") == "healthy" and bool(_r2_label(records)))
+            _status(records, "node_pressure") == "healthy" and
+            _status(records, "data_layer") != "degraded" and bool(_r2_label(records)))
 
 
 def _r3_precondition(records, history, _state):
@@ -102,7 +104,8 @@ def _r1_command(_records):
 
 
 def _r2_command(records):
-    return ["launchctl", "kickstart", "-k", _r2_label(records)], {}
+    # kickstart takes a service target (gui/<uid>/<label>); a bare label is rejected.
+    return ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{_r2_label(records)}"], {}
 
 
 def _r3_command(_records):
@@ -141,6 +144,42 @@ def _r6_command(_records):
     return (["docker", "restart", HUB_K3S_CONTAINER], {})
 
 
+def _r7_precondition(records, history, _state):
+    eso = _rec(records, "eso") or {}
+    return (_status(records, "eso") == "degraded" and
+            "cosign-public-key" in eso.get("evidence", "").lower() and
+            _sustained(history, lambda cycle: "eso" in cycle, 2))
+
+
+def _r7_command(_records):
+    return (["make", "signing-restore"], {})
+
+
+def _r8_precondition(records, _history, _state):
+    drift = _rec(records, "hostnet_drift") or {}
+    return (_status(records, "hostnet_drift") == "degraded" and
+            any(item.get("owner_kind") == "DaemonSet"
+                for item in drift.get("data", {}).get("drifted", [])))
+
+
+def _r8_command(_records):
+    return (["bin/k3dm-hostnet-drift", "--fix"], {})
+
+
+def _r9_precondition(records, _history, _state):
+    item = _rec(records, "values_branch") or {}
+    expected = item.get("data", {}).get("expected", "")
+    return (_status(records, "values_branch") == "degraded" and
+            bool(item.get("data", {}).get("stale")) and
+            re.fullmatch(r"k3d-manager-v\d+\.\d+\.\d+", expected) is not None)
+
+
+def _r9_command(records):
+    expected = (_rec(records, "values_branch") or {}).get("data", {}).get("expected", "")
+    return (["./scripts/k3d-manager", "deploy_argocd_applicationsets", "--confirm"],
+            {"K3D_MANAGER_BRANCH": expected})
+
+
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
@@ -171,6 +210,18 @@ REPAIRS = {
            "precondition": _r6_precondition, "build_command": _r6_command, "cwd": None,
            "blast_radius": "hub control plane restarts; brief apiserver outage", "reversible": False,
            "needs_scope": "local docker socket"},
+    "r7": {"key": "r7", "name": "Restore cosign signing key and ESO grant",
+           "precondition": _r7_precondition, "build_command": _r7_command, "cwd": ROOT,
+           "blast_radius": "Vault secret/cosign/signing, cosign-verify policy, ESO role grant, one ExternalSecret resync",
+           "reversible": True, "needs_scope": "macOS Keychain (k3d-manager-signing), local hub kubeconfig"},
+    "r8": {"key": "r8", "name": "Recycle drifted host-network DaemonSet pods",
+           "precondition": _r8_precondition, "build_command": _r8_command, "cwd": ROOT,
+           "blast_radius": "DaemonSet pods on stale node IPs are recreated", "reversible": True,
+           "needs_scope": "local hub kubeconfig"},
+    "r9": {"key": "r9", "name": "Reapply ApplicationSets on the release branch",
+           "precondition": _r9_precondition, "build_command": _r9_command, "cwd": ROOT,
+           "blast_radius": "every k3d-manager-sourced Application on the hub and app cluster re-targets the release branch and syncs",
+           "reversible": False, "needs_scope": "local hub kubeconfig"},
 }
 
 
@@ -180,9 +231,10 @@ def _update_r1_debounce(records, state):
 
 
 def _evidence(records, key):
-    relevant = {"r1": ("eso", "node_pressure"), "r2": ("reachability", "node_pressure"),
+    relevant = {"r1": ("eso", "data_layer"), "r2": ("reachability", "node_pressure", "data_layer"),
                 "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
-                "r6": ("kine",)}[key]
+                "r6": ("kine",), "r7": ("eso",), "r8": ("hostnet_drift",),
+                "r9": ("values_branch",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
 

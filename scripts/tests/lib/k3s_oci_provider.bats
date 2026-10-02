@@ -300,7 +300,7 @@ _BOOTSTRAP='
 @test "_oci_install_k3s_server skips when k3s already installed" {
   run bash -c "
     ${_BOOTSTRAP}
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-1\"
     _OCI_SSH_USER='ubuntu'
     ssh() {
       if [[ \"\$*\" == *'command -v k3s'* ]]; then return 0; fi
@@ -317,8 +317,8 @@ _BOOTSTRAP='
 @test "_oci_install_k3s_server sends --flannel-backend=none and --disable-network-policy" {
   run bash -c "
     ${_BOOTSTRAP}
-    _CMD_LOG=\"\$(mktemp)\"
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _CMD_LOG=\"\${BATS_TEST_TMPDIR}/oci-cmd-log-1\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-2\"
     _OCI_SSH_USER='ubuntu'
     OCI_REGION='us-ashburn-1'
     _OCI_K3S_VERSION='v1.32.0+k3s1'
@@ -345,7 +345,7 @@ _BOOTSTRAP='
 @test "_oci_install_cilium skips when Cilium already installed" {
   run bash -c "
     ${_BOOTSTRAP}
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-3\"
     _OCI_SSH_USER='ubuntu'
     _OCI_STATE_DIR=\"\$(mktemp -d)\"
     echo 'ocid1.instance.server' > \"\${_OCI_STATE_DIR}/server-instance-id\"
@@ -366,8 +366,8 @@ _BOOTSTRAP='
 @test "_oci_install_cilium includes cni.exclusive=false and kubeProxyReplacement=true" {
   run bash -c "
     ${_BOOTSTRAP}
-    _CMD_LOG=\"\$(mktemp)\"
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _CMD_LOG=\"\${BATS_TEST_TMPDIR}/oci-cmd-log-2\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-4\"
     _OCI_SSH_USER='ubuntu'
     _OCI_CILIUM_VERSION='1.16.5'
     _oci_get_server_private_ip() { echo '10.0.0.5'; }
@@ -394,7 +394,7 @@ _BOOTSTRAP='
 @test "_oci_install_k3s_agent skips when k3s-agent already active" {
   run bash -c "
     ${_BOOTSTRAP}
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-5\"
     _OCI_SSH_USER='ubuntu'
     ssh() {
       if [[ \"\$*\" == *'systemctl is-active k3s-agent'* ]]; then return 0; fi
@@ -411,8 +411,8 @@ _BOOTSTRAP='
 @test "_oci_install_k3s_agent joins via server private IP, not public IP" {
   run bash -c "
     ${_BOOTSTRAP}
-    _CMD_LOG=\"\$(mktemp)\"
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _CMD_LOG=\"\${BATS_TEST_TMPDIR}/oci-cmd-log-3\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-6\"
     _OCI_SSH_USER='ubuntu'
     OCI_REGION='us-ashburn-1'
     _OCI_K3S_VERSION='v1.32.0+k3s1'
@@ -437,8 +437,8 @@ _BOOTSTRAP='
 @test "_oci_install_k3s_agent wait loop counts Ready nodes (not grep -v master)" {
   run bash -c "
     ${_BOOTSTRAP}
-    _CMD_LOG=\"\$(mktemp)\"
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _CMD_LOG=\"\${BATS_TEST_TMPDIR}/oci-cmd-log-4\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-7\"
     _OCI_SSH_USER='ubuntu'
     OCI_REGION='us-ashburn-1'
     _OCI_K3S_VERSION='v1.32.0+k3s1'
@@ -517,7 +517,7 @@ _BOOTSTRAP='
     _OCI_STATE_DIR=\"\${_state}\"
     printf '%s' 'ocid1.instance.server' > \"\${_state}/server-instance-id\"
     printf '%s' 'ocid1.instance.agent'  > \"\${_state}/agent-instance-id\"
-    _OCI_LOG=\"\$(mktemp)\"
+    _OCI_LOG=\"\${BATS_TEST_TMPDIR}/oci-log-1\"
     OCI_COMPARTMENT_ID='ocid1.compartment.test'
     oci() { echo \"\$*\" >> \"\${_OCI_LOG}\"; return 0; }
     _oci_destroy_infrastructure
@@ -536,9 +536,9 @@ _BOOTSTRAP='
 @test "oci_backup fails when etcd-snapshot SSH command fails" {
   run bash -c "
     ${_BOOTSTRAP}
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-8\"
     _OCI_SSH_USER='ubuntu'
-    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    _OCI_KUBECONFIG=\"\${BATS_TEST_TMPDIR}/oci-kubeconfig-1\"
     OCI_REGION='us-ashburn-1'
     _oci_storage_ensure_bucket() { return 0; }
     _oci_get_server_ip() { echo '1.2.3.4'; }
@@ -555,9 +555,9 @@ _BOOTSTRAP='
 @test "oci_backup fails when snapshot download produces empty file" {
   run bash -c "
     ${_BOOTSTRAP}
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-9\"
     _OCI_SSH_USER='ubuntu'
-    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    _OCI_KUBECONFIG=\"\${BATS_TEST_TMPDIR}/oci-kubeconfig-2\"
     OCI_REGION='us-ashburn-1'
     _oci_storage_ensure_bucket() { return 0; }
     _oci_get_server_ip() { echo '1.2.3.4'; }
@@ -576,9 +576,9 @@ _BOOTSTRAP='
 @test "oci_restore fails when snapshot name has invalid format" {
   run bash -c "
     ${_BOOTSTRAP}
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-10\"
     _OCI_SSH_USER='ubuntu'
-    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    _OCI_KUBECONFIG=\"\${BATS_TEST_TMPDIR}/oci-kubeconfig-3\"
     OCI_REGION='us-ashburn-1'
     _oci_storage_ensure_bucket() { return 0; }
     _oci_get_server_ip() { echo '1.2.3.4'; }
@@ -593,11 +593,11 @@ _BOOTSTRAP='
 @test "oci_restore fails when scp upload to server fails" {
   run bash -c "
     ${_BOOTSTRAP}
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-11\"
     _OCI_SSH_USER='ubuntu'
-    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    _OCI_KUBECONFIG=\"\${BATS_TEST_TMPDIR}/oci-kubeconfig-4\"
     OCI_REGION='us-ashburn-1'
-    _tmp_snap=\"\$(mktemp)\"
+    _tmp_snap=\"\${BATS_TEST_TMPDIR}/oci-snapshot\"
     printf 'data' > \"\${_tmp_snap}\"
     _oci_storage_ensure_bucket() { return 0; }
     _oci_get_server_ip() { echo '1.2.3.4'; }
@@ -615,9 +615,9 @@ _BOOTSTRAP='
 @test "oci_restore fails when remote restore SSH command fails" {
   run bash -c "
     ${_BOOTSTRAP}
-    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\${BATS_TEST_TMPDIR}/oci-ssh-key-12\"
     _OCI_SSH_USER='ubuntu'
-    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    _OCI_KUBECONFIG=\"\${BATS_TEST_TMPDIR}/oci-kubeconfig-5\"
     OCI_REGION='us-ashburn-1'
     _oci_storage_ensure_bucket() { return 0; }
     _oci_get_server_ip() { echo '1.2.3.4'; }

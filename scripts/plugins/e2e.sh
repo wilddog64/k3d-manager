@@ -425,6 +425,32 @@ function _e2e_sandbox_exit_trap() {
   exit "$rc"
 }
 
+function _e2e_dump_substrate_diagnostics() {
+  local name="${1:-}" run_id="${2:-unknown}"
+  [[ -z "$name" ]] && return 0
+  local kubeconfig out deploy
+  kubeconfig="$(_vcluster_kubeconfig_path "$name")"
+  out="${_E2E_REPORT_DIR:-$E2E_REPORT_DIR}/${run_id}.substrate.txt"
+  (
+    umask 077
+    {
+      echo "### pods"
+      KUBECONFIG="$kubeconfig" _run_command --no-exit -- kubectl -n "$E2E_NAMESPACE" \
+        --request-timeout=10s get pods -o wide
+      echo "### warning events"
+      KUBECONFIG="$kubeconfig" _run_command --no-exit -- kubectl -n "$E2E_NAMESPACE" \
+        --request-timeout=10s get events --field-selector type=Warning --sort-by=.lastTimestamp
+      for deploy in postgres redis rabbitmq product-catalog basket order keycloak payment; do
+        echo "### logs deployment/${deploy}"
+        KUBECONFIG="$kubeconfig" _run_command --no-exit -- kubectl -n "$E2E_NAMESPACE" \
+          --request-timeout=10s logs "deployment/${deploy}" --all-containers --tail=40
+      done
+    } > "$out" 2>&1
+  )
+  _warn "[e2e] substrate deploy failed; pods, warning events and logs saved to ${out}"
+  awk '/^### warning events/{p=1;next} /^### /{p=0} p' "$out" | tail -n 15 >&2 || true
+}
+
 function _e2e_exit_trap() {
   local rc=$?
   set +e
@@ -440,6 +466,9 @@ function _e2e_exit_trap() {
   # result event talks to the hub and stays last, where its failure costs only a dashboard
   # point. Teardown removes the per-run log and kubeconfig, never the summary JSON the
   # publish reads, so the order is safe.
+  if (( rc != 0 )) && [[ "${_E2E_ACTIVE_PHASE:-}" == "deploying-substrate" ]]; then
+    _e2e_dump_substrate_diagnostics "${_E2E_ACTIVE_NAME:-}" "${_E2E_RUN_ID:-unknown}" || true
+  fi
   _e2e_teardown "${_E2E_ACTIVE_NAME:-}" || true
   [[ -n "$publish_run_id" ]] && { _e2e_write_result_event "$publish_run_id" || true; }
   trap - EXIT
@@ -518,6 +547,7 @@ function _e2e_deploy_substrate() {
   [[ -z "$kubeconfig" ]] && _err "e2e: _e2e_deploy_substrate requires a kubeconfig"
 
   _e2e_provision_pull_secret "$kubeconfig"
+  _e2e_provision_keycloak_secret "$kubeconfig"
 
   _info "[e2e] Applying substrate bundle (scripts/etc/e2e) into ${E2E_NAMESPACE}"
   _e2e_kc "$kubeconfig" apply -k "${SCRIPT_DIR}/etc/e2e"
@@ -529,7 +559,7 @@ function _e2e_deploy_substrate() {
   fi
 
   local rollout
-  for rollout in postgres redis product-catalog basket order payment; do
+  for rollout in postgres redis rabbitmq product-catalog basket order keycloak payment; do
     _info "[e2e] Waiting for rollout: ${rollout}"
     _e2e_kc "$kubeconfig" -n "$E2E_NAMESPACE" rollout status \
       "deployment/${rollout}" --timeout="${E2E_ROLLOUT_TIMEOUT}s"
@@ -562,14 +592,26 @@ function _e2e_provision_pull_secret() {
 }
 
 function _e2e_provision_datastore_secret() {
-  local kubeconfig="${1:-}" postgres_password redis_password payment_encryption_key
+  local kubeconfig="${1:-}" postgres_password redis_password rabbitmq_password payment_encryption_key
   postgres_password="${E2E_POSTGRES_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
   redis_password="${E2E_REDIS_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  rabbitmq_password="${E2E_RABBITMQ_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
   payment_encryption_key="${E2E_PAYMENT_ENCRYPTION_KEY:-$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')}"
   _e2e_kc "$kubeconfig" create secret generic e2e-datastore-credentials \
     --from-literal=postgres-password="${postgres_password}" \
     --from-literal=redis-password="${redis_password}" \
+    --from-literal=rabbitmq-password="${rabbitmq_password}" \
     --from-literal=payment-encryption-key="${payment_encryption_key}" \
+    -n "$E2E_NAMESPACE" --dry-run=client -o yaml | _e2e_kc "$kubeconfig" apply -f -
+}
+
+function _e2e_provision_keycloak_secret() {
+  local kubeconfig="${1:-}" client_secret user_password
+  client_secret="${E2E_KC_CLIENT_SECRET:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  user_password="${E2E_KC_USER_PASSWORD:-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')}"
+  _e2e_kc "$kubeconfig" create secret generic e2e-keycloak-credentials \
+    --from-literal=client-secret="${client_secret}" \
+    --from-literal=user-password="${user_password}" \
     -n "$E2E_NAMESPACE" --dry-run=client -o yaml | _e2e_kc "$kubeconfig" apply -f -
 }
 
@@ -617,6 +659,24 @@ spec:
           value: http://payment.${E2E_NAMESPACE}.svc:8084
         - name: OAUTH2_ENABLED
           value: "false"
+        - name: KEYCLOAK_URL
+          value: http://keycloak:8080
+        - name: KEYCLOAK_REALM
+          value: shopping-cart
+        - name: KEYCLOAK_CLIENT_ID
+          value: e2e-tests
+        - name: TEST_USERNAME
+          value: e2e-user
+        - name: KEYCLOAK_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: e2e-keycloak-credentials
+              key: client-secret
+        - name: TEST_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: e2e-keycloak-credentials
+              key: user-password
         - name: CI
           value: "true"
 EOF

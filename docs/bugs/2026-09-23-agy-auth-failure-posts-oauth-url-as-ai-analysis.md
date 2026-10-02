@@ -2,7 +2,7 @@
 
 **Filed:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
-**Status:** OPEN — spec only, assigned to Codex.
+**Status:** FIXED (`f6008374`): `_call_gemini` now classifies unavailable candidates, uses child exit status, and never returns raw failure output.
 **Severity:** medium — all 7 webhook AI-analysis consumers return a CLI error string in place of
 analysis. `/ask gemini` posted a live Google OAuth URL into Slack while agy was unauthenticated,
 and posts a model-drift error now that it is.
@@ -481,3 +481,38 @@ so each now falls through instead of dead-ending.
 - `docs/bugs/v1.6.3-bugfix-gemini-cli-warnings-in-slack.md` — origin of the `^Warning:` strip
   this change preserves.
 - `docs/howto/gemini.md` — the browser-automation path, deliberately untouched here.
+
+## Addendum 2026-10-01 — re-anchor to the current code (read this before S0–S2)
+
+The webhook was modularised in v1.37.0 (#131). The spec above still names `bin/k3dm-webhook`; the
+code it targets now lives in **`scripts/lib/webhook/agent.py`**:
+
+| Spec says | Now |
+|---|---|
+| `GEMINI_MODEL` at `bin/k3dm-webhook:224` | `scripts/lib/webhook/agent.py:33`, **still the retired `gemini-3.5-flash-medium`**, so S0 is still a live break |
+| `def _call_gemini` at `bin/k3dm-webhook:1297` | `scripts/lib/webhook/agent.py:52` |
+| insert S1 above `_call_gemini` in `bin/k3dm-webhook` | insert it above `_call_gemini` in `agent.py` |
+
+The five call sites stay in `bin/k3dm-webhook` (`:967`, `:1165`, `:1473`, `:1525`, `:1624`) and need
+no change, because they import `_call_gemini`. The defect is unchanged:
+`done_pid, _ = os.waitpid(child_pid, os.WNOHANG)` drops the exit status.
+
+**S0 model ID:** `gemini-3.8-flash-medium` was verified on 2026-09-23. Codex cannot probe `agy`. Use
+it as written, and the operator probes once after the merge
+(`agy --model gemini-3.8-flash-medium --prompt 'Reply with exactly: PONG'`). S1/S2 exist so that a
+later retirement degrades to "candidate unavailable" instead of posting an error as analysis.
+
+**Tests:** `webhook_ai_fallback.py` should import `scripts/lib/webhook/agent.py` the way the other
+`scripts/tests/bin/test_*.py` webhook-module tests do (with `scripts/lib` on `sys.path`), not
+`SourceFileLoader` on `bin/k3dm-webhook`. Name it `test_webhook_ai_fallback.py` so `make
+test-pytest` collects it.
+
+## Verification (Claude, 2026-10-01)
+
+`8a7cdec9` touches only the spec's files; `bin/k3dm-webhook` is unchanged, since its five call sites import
+`_call_gemini`. The two `webhook.bats` assertions were replaced as the spec directs (65/65 pass). All three spec
+mutations went red: dropping the exit status fails `test_nonzero_exit_is_failure_even_with_answer_like_output`,
+dropping the not-logged-in rows fails `test_no_oauth_url_escapes`, and ignoring the pin fails
+`test_pinned_candidate_disables_fallback`. `make test-pytest` 442/442.
+**Operator probe done 2026-10-01:** `gemini-3.8-flash-medium` answered `PONG`. Command used:
+`agy --model gemini-3.8-flash-medium --prompt 'Reply with exactly: PONG'`.

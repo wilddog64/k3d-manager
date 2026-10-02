@@ -3,8 +3,10 @@
 import base64
 import binascii
 import json
+import os
 import subprocess
 import time
+import re
 from datetime import datetime, timezone
 
 from hermes.records import record
@@ -14,6 +16,7 @@ WEBHOOK_SERVICE = "k3dm-webhook-token"
 ARGOCD_SERVICE = "k3dm-hermes-argocd-token"
 GITHUB_SERVICE = "k3dm-hermes-gh-token"
 TERMINAL_OPERATION_FAILURES = ("Error", "Failed")
+RELEASE_BRANCH = re.compile(r"\Ak3d-manager-v\d+\.\d+\.\d+\Z")
 
 
 def _keychain_secret(service):
@@ -52,17 +55,19 @@ def eso(fetch, state, provider="", token=None, threshold=2):
         return _unavailable("eso", WEBHOOK_SERVICE)
     try:
         services = _webhook_services(fetch, token, provider)["services"]
-        entries = [item for item in services if item.get("name") in
-                   ("ESO ClusterSecretStore", "ESO ExternalSecrets")]
-        if len(entries) != 2 or any(item.get("ok") is None for item in entries):
+        entries = [item for item in services
+                   if isinstance(item.get("name"), str)
+                   and item["name"].endswith(("ESO ClusterSecretStore", "ESO ExternalSecrets"))]
+        graded = [item for item in entries if item.get("ok") is not None]
+        if not graded:
             return record("eso", "unknown", "ESO status source unavailable")
-        failed = [item for item in entries if item.get("ok") is False]
+        failed = [item for item in graded if item.get("ok") is False]
         if failed:
             detail = "; ".join(item.get("detail", item["name"]) for item in failed)
             status = "degraded" if _debounced("eso", True, threshold, state) else "healthy"
             return record("eso", status, detail)
         _debounced("eso", False, threshold, state)
-        return record("eso", "healthy", "; ".join(item.get("detail", item["name"]) for item in entries))
+        return record("eso", "healthy", "; ".join(item.get("detail", item["name"]) for item in graded))
     except Exception:
         return record("eso", "unknown", "ESO status source unavailable")
 
@@ -105,6 +110,79 @@ def argocd(run, state, token=None, threshold=3, server="argocd.3ai-talk.org"):
         return record("argocd", "unknown", "ArgoCD status source unavailable")
 
 
+def _values_branch_expected(run, expected=None):
+    if expected:
+        return expected, None
+    configured = os.environ.get("K3DM_RELEASE_BRANCH", "").strip()
+    if configured:
+        return configured, None
+    try:
+        code, output = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], {})
+        if code != 0 or not output.strip():
+            return None, "checkout branch could not be determined"
+        return output.strip(), None
+    except Exception:
+        return None, "checkout branch could not be determined"
+
+
+def values_branch(run, argocd_run, state, token=None, expected=None, threshold=3,
+                  server="argocd.3ai-talk.org"):
+    """Check k3d-manager Application sources against the checked-out release branch."""
+    branch, error = _values_branch_expected(run, expected)
+    if error:
+        return record("values_branch", "unknown", error)
+    if not RELEASE_BRANCH.fullmatch(branch):
+        return record("values_branch", "healthy",
+                      f"skipped: checkout on {branch}, not a release branch",
+                      data={"expected": branch, "skipped": True})
+    token = token if token is not None else _keychain_secret(ARGOCD_SERVICE)
+    if not token:
+        return _unavailable("values_branch", ARGOCD_SERVICE)
+    try:
+        code, output = argocd_run(["argocd", "app", "list", "-o", "json", "--grpc-web"],
+                                  {"ARGOCD_AUTH_TOKEN": token, "ARGOCD_SERVER": server})
+        if code != 0:
+            if "Unauthenticated" in (output or ""):
+                return record("values_branch", "unknown",
+                              f"ArgoCD status source unavailable: credential rejected; re-mint {ARGOCD_SERVICE}")
+            return record("values_branch", "unknown", "ArgoCD status source unavailable")
+        apps = json.loads(output) if output else None
+        if not isinstance(apps, list):
+            raise ValueError("invalid ArgoCD response")
+        stale = []
+        checked = 0
+        tracking_head = 0
+        for app in apps:
+            spec = app.get("spec", {}) if isinstance(app, dict) else {}
+            sources = spec.get("sources") or ([spec["source"]] if "source" in spec else [])
+            for source in sources:
+                if not isinstance(source, dict) or "github.com/wilddog64/k3d-manager" not in source.get("repoURL", ""):
+                    continue
+                revision = source.get("targetRevision", "")
+                if revision == "HEAD":
+                    tracking_head += 1
+                    continue
+                checked += 1
+                if revision != branch:
+                    name = app.get("name") or app.get("metadata", {}).get("name", "unnamed")
+                    stale.append({"app": name, "revision": revision})
+        data = {"expected": branch, "stale": stale, "checked": checked,
+                "tracking_head": tracking_head}
+        if checked == 0:
+            return record("values_branch", "unknown", "no k3d-manager references found", data=data)
+        if stale:
+            status = "degraded" if _debounced("values_branch", True, max(1, threshold - 1), state) else "healthy"
+            names = ", ".join(f"{item['app']}@{item['revision']}" for item in stale[:3])
+            if len(stale) > 3:
+                names += f" (+{len(stale) - 3} more)"
+            return record("values_branch", status,
+                          f"{len(stale)} apps not on {branch}: {names}", data=data)
+        _debounced("values_branch", False, threshold, state)
+        return record("values_branch", "healthy", f"{checked} references on {branch}", data=data)
+    except Exception:
+        return record("values_branch", "unknown", "ArgoCD status source unavailable")
+
+
 def reachability(run, state, threshold=2):
     try:
         code, output = run(["bin/public-endpoint-probe", "--json"], {})
@@ -120,7 +198,10 @@ def reachability(run, state, threshold=2):
         failed_hosts = [host.get("host") or host.get("name") or host.get("url")
                         for host in hosts if not host.get("healthy")]
         status = "degraded" if _debounced("reachability", True, threshold, state) else "healthy"
-        return record("reachability", status, f"{verdict} {failed}/{len(hosts)} hosts failing",
+        evidence = f"{verdict} {failed}/{len(hosts)} hosts failing"
+        if failed_hosts:
+            evidence += ": " + ", ".join(str(host) for host in failed_hosts[:5])
+        return record("reachability", status, evidence,
                       data={"verdict": verdict,
                             "failed_hosts": [host for host in failed_hosts if host]})
     except Exception:
@@ -165,26 +246,148 @@ def status_checks(run, state, threshold=2):
         return record("status_checks", "unknown", "cluster status source unavailable")
 
 
-def node_pressure(fetch, state, provider="", token=None, threshold=2, service_threshold=2):
+APP_HEALTH_PROBE_GROUPS = ("liveness", "readiness")
+
+
+def _health_payload(run, context, namespace, service, port, path):
+    """Read one actuator endpoint through the API server's service proxy."""
+    proxy = f"/api/v1/namespaces/{namespace}/services/{service}:{port}/proxy{path}"
+    code, output = run(["kubectl", "--context", context, "get", "--raw", proxy], {})
+    if code != 0 or not output:
+        return None
+    payload = json.loads(output)
+    return payload if isinstance(payload, dict) else None
+
+
+def _health_delta(run, context, target):
+    """Return (delta_detail, down_components) for one service; delta_detail is '' when none."""
+    namespace = target["namespace"]
+    service = target["service"]
+    port = target["port"]
+    aggregate = _health_payload(run, context, namespace, service, port, "/actuator/health")
+    if aggregate is None or not aggregate.get("status"):
+        raise ValueError(f"{service}: aggregate health unavailable")
+    if aggregate["status"] == "UP":
+        return "", []
+    groups = {}
+    for group in APP_HEALTH_PROBE_GROUPS:
+        payload = _health_payload(run, context, namespace, service, port,
+                                  f"/actuator/health/{group}")
+        if payload is None or not payload.get("status"):
+            raise ValueError(f"{service}: {group} group unavailable")
+        groups[group] = payload["status"]
+    if any(value != "UP" for value in groups.values()):
+        return "", []
+    components = aggregate.get("components") or {}
+    down = sorted(name for name, body in components.items()
+                  if isinstance(body, dict) and body.get("status") not in (None, "UP"))
+    return f"{service} aggregate {aggregate['status']} while both probe groups UP", down
+
+
+def app_health(run, state, targets=None, context="", threshold=2):
+    """Flag services whose aggregate health disagrees with the probe groups k8s polls."""
+    if not targets:
+        return record("app_health", "unknown", "no app health targets configured")
+    if not context:
+        return record("app_health", "unknown", "no app cluster context configured")
+    deltas, down = [], {}
+    try:
+        for target in targets:
+            detail, components = _health_delta(run, context, target)
+            if detail:
+                deltas.append(detail)
+                down[target["service"]] = components
+    except Exception:
+        return record("app_health", "unknown", "app health source unavailable")
+    if not deltas:
+        _debounced("app_health", False, threshold, state)
+        return record("app_health", "healthy",
+                      f"{len(targets)} service(s) agree with their probe groups "
+                      "(a group-visible outage is covered by the argocd sensor, not this one)")
+    status = "degraded" if _debounced("app_health", True, threshold, state) else "healthy"
+    detail = "; ".join(deltas[:3])
+    if len(deltas) > 3:
+        detail = f"{detail} (+{len(deltas) - 3} more)"
+    return record("app_health", status, redact(detail),
+                  data={"deltas": [redact(item) for item in deltas],
+                        "down_components": {key: [redact(name) for name in value]
+                                            for key, value in down.items()}})
+
+
+def _node_contexts(contexts):
+    if contexts is not None:
+        return [item for item in contexts if item]
+    configured = os.environ.get("K3DM_HERMES_NODE_CONTEXTS", "")
+    values = configured.split(",") if configured else ["k3d-k3d-cluster", "ubuntu-hostinger"]
+    return [item.strip() for item in values if item.strip()]
+
+
+def node_pressure(run, state, contexts=None, threshold=2):
+    """Report node Ready and pressure conditions from each configured cluster."""
+    problems = []
+    unreadable = []
+    for context in _node_contexts(contexts):
+        try:
+            code, output = run(["kubectl", "--context", context, "get", "nodes", "-o", "json",
+                                "--request-timeout=10s"], {})
+            payload = json.loads(output) if code == 0 and output else {}
+            nodes = payload.get("items")
+            if not isinstance(nodes, list):
+                raise ValueError("invalid node payload")
+        except Exception:
+            unreadable.append(context)
+            continue
+        for node in nodes:
+            name = node.get("metadata", {}).get("name", "unknown")
+            conditions = {item.get("type"): item.get("status")
+                          for item in node.get("status", {}).get("conditions", [])
+                          if isinstance(item, dict)}
+            if conditions.get("Ready") != "True":
+                problems.append({"context": context, "node": name, "condition": "NotReady"})
+            for pressure in ("MemoryPressure", "DiskPressure", "PIDPressure"):
+                if conditions.get(pressure) == "True":
+                    problems.append({"context": context, "node": name, "condition": pressure})
+    data = {"problems": problems, "unreadable": unreadable}
+    if not problems and len(unreadable) == len(_node_contexts(contexts)):
+        return record("node_pressure", "unknown", "node status source unavailable", data=data)
+    if problems:
+        status = "degraded" if _debounced("node_pressure", True, threshold, state) else "healthy"
+        evidence = "; ".join(f"{item['context']}/{item['node']} {item['condition']}"
+                             for item in problems[:3])
+    else:
+        _debounced("node_pressure", False, threshold, state)
+        evidence = "all readable nodes healthy"
+        if unreadable:
+            evidence += "; unreadable: " + ", ".join(unreadable)
+        status = "healthy"
+    return record("node_pressure", status, evidence, data=data)
+
+
+def data_layer(fetch, state, provider="", token=None, threshold=2):
+    """Report only the webhook's Data layer check."""
     token = token if token is not None else _keychain_secret(WEBHOOK_SERVICE)
     if not token:
-        return _unavailable("node_pressure", WEBHOOK_SERVICE)
+        return _unavailable("data_layer", WEBHOOK_SERVICE)
     try:
-        payload = _webhook_services(fetch, token, provider)
-        services = payload["services"]
-        if not services or all(item.get("ok") is None for item in services):
-            return record("node_pressure", "unknown", "node status source unavailable")
-        failed = [item for item in services if item.get("ok") is False]
-        data_layer = next((item for item in services if item.get("name") == "Data layer"), None)
-        raw = bool(data_layer and data_layer.get("ok") is False) or len(failed) >= service_threshold
-        if raw:
-            detail = ", ".join(item.get("name", "unknown") for item in failed[:3])
-            status = "degraded" if _debounced("node_pressure", True, threshold, state) else "healthy"
-            return record("node_pressure", status, f"webhook failures: {detail}")
-        _debounced("node_pressure", False, threshold, state)
-        return record("node_pressure", "healthy", "webhook data layer and services healthy")
-    except Exception:
-        return record("node_pressure", "unknown", "node status source unavailable")
+        services = _webhook_services(fetch, token, provider)["services"]
+        if not services:
+            return record("data_layer", "unknown", "data layer status source unavailable: webhook returned no service checks")
+        check = next((item for item in services if item.get("name") == "Data layer"), None)
+        detail = (check or {}).get("detail", "Data layer")
+        not_deployed = check is not None and check.get("ok") is None and str(detail).startswith("not deployed")
+        if not not_deployed and all(item.get("ok") is None for item in services):
+            return record("data_layer", "unknown", "data layer status source unavailable: all webhook checks ungraded")
+        if check is None:
+            return record("data_layer", "unknown", "data layer check absent from webhook payload")
+        if check.get("ok") is False:
+            status = "degraded" if _debounced("data_layer", True, threshold, state) else "healthy"
+            return record("data_layer", status, f"data layer: {detail}")
+        if check.get("ok") is None and not not_deployed:
+            return record("data_layer", "unknown", f"data layer ungraded: {detail}")
+        _debounced("data_layer", False, threshold, state)
+        return record("data_layer", "healthy", detail)
+    except Exception as exc:
+        return record("data_layer", "unknown", f"data layer status source unavailable: {type(exc).__name__}")
 
 
 def stale_acg_registration(items, marker="host.k3d.internal"):
@@ -252,6 +455,28 @@ def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024):
                       data=data)
     except Exception:
         return record("kine", "unknown", "hub datastore status source unavailable")
+
+
+def hostnet_drift(run, state, threshold=2):
+    """Report host-network pods whose recorded IP differs from the node IP."""
+    try:
+        code, output = run(["bin/k3dm-hostnet-drift", "--json"], {})
+        payload = json.loads(output) if code == 0 and output else {}
+        drifted = payload.get("drifted")
+        if not isinstance(drifted, list):
+            raise ValueError("invalid host-network drift probe")
+        data = {"drifted": drifted}
+        if drifted:
+            status = ("degraded" if _debounced("hostnet_drift", True, max(0, threshold - 1), state)
+                      else "healthy")
+            names = ", ".join(f"{item.get('namespace', 'default')}/{item.get('pod', '?')}"
+                              for item in drifted[:3])
+            return record("hostnet_drift", status,
+                          f"{len(drifted)} host-network pods on stale IPs: {names}", data=data)
+        _debounced("hostnet_drift", False, threshold, state)
+        return record("hostnet_drift", "healthy", "no host-network pods on stale IPs", data=data)
+    except Exception:
+        return record("hostnet_drift", "unknown", "host-network drift source unavailable")
 
 
 def vectordb(run, state, threshold=2, max_index_age_seconds=7 * 86400, now=None):
@@ -362,7 +587,8 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
     now = now or datetime.now(timezone.utc)
     try:
         bad = []
-        ci_data = {}
+        first_bad = {}
+        rerunnable = {}
         for repo_name in repos:
             run = fetch(f"/repos/{repo_name}/actions/runs", {"Authorization": f"token {token}"})
             runs = run.get("workflow_runs", []) if isinstance(run, dict) else []
@@ -374,17 +600,24 @@ def ci(fetch, state, repos=None, token=None, threshold=1, max_age_seconds=3600, 
             if not isinstance(checks, dict):
                 raise ValueError("invalid checks")
             for check in checks.get("check_runs", []):
+                conclusion = None
                 if check.get("conclusion") in ("failure", "timed_out", "cancelled"):
-                    bad.append(f"{repo_name} {check.get('name', 'check')} {check.get('conclusion')}")
-                    if check.get("conclusion") in ("timed_out", "cancelled") and not ci_data:
-                        ci_data = {"repo": repo_name, "run_id": latest["id"],
-                                   "conclusion": check["conclusion"]}
+                    conclusion = check["conclusion"]
+                    bad.append(f"{repo_name} {check.get('name', 'check')} {conclusion}")
                 elif check.get("status") == "in_progress" and _older_than(
                         check.get("started_at"), max_age_seconds, now):
+                    conclusion = "stuck"
                     bad.append(f"{repo_name} {check.get('name', 'check')} stuck")
-                    if not ci_data:
-                        ci_data = {"repo": repo_name, "run_id": latest["id"],
-                                   "conclusion": "stuck"}
+                if conclusion is None:
+                    continue
+                candidate = {"repo": repo_name, "run_id": latest["id"],
+                             "run_url": latest.get("html_url", ""),
+                             "conclusion": conclusion}
+                if not first_bad:
+                    first_bad = candidate
+                if not rerunnable and conclusion in ("timed_out", "cancelled", "stuck"):
+                    rerunnable = candidate
+        ci_data = rerunnable or first_bad
         if bad:
             status = "degraded" if _debounced("ci", True, threshold, state) else "healthy"
             return record("ci", status, ", ".join(bad[:3]), data=ci_data)

@@ -18,8 +18,12 @@ CLEANUP_STALE ?= 0
 BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
+ARGOCD_SERVER ?= localhost:8080
+ARGOCD_SCHEME ?= http
+GH_REPO          ?= wilddog64/k3d-manager
+GH_WORKFLOWS_DIR ?= .github/workflows
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret restore-google-app-password backup restore test test-bin test-python-unit test-pytest check-doc-links index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -123,6 +127,11 @@ cleanup-stale-sandbox:
 ## Remove expired, managed ephemeral ArgoCD cluster registrations (dry-run by default)
 cleanup-stale-clusters:
 	@ARGOCD_HUB_CONTEXT="$(INFRA_CONTEXT)" ARGOCD_NAMESPACE="$(ARGOCD_NS)" bin/cleanup-stale-clusters $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
+
+## Remove one explicitly named stale ArgoCD cluster registration (dry-run unless CONFIRM=1)
+cleanup-stale-registration:
+	@ARGOCD_HUB_CONTEXT="$(INFRA_CONTEXT)" ARGOCD_NAMESPACE="$(ARGOCD_NS)" \
+	  bin/cleanup-stale-registration --cluster "$(CLUSTER)" $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
 
 ## Run both stale-resource cleanup paths (dry-run unless CONFIRM=1; sandbox path is k3s-aws-only)
 cleanup-stale-resources:
@@ -291,6 +300,15 @@ restart-webhook:
 		launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true; \
 		launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
 	fi
+	@$(MAKE) --no-print-directory restart-cloud-bridge
+
+## Restart the cloud-session request bridge LaunchAgent (picks up code changes)
+restart-cloud-bridge:
+	@if [ ! -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist" ]; then \
+		echo "[restart-cloud-bridge] not installed — skipping (make install-cloud-bridge)" >&2; \
+	else \
+		launchctl kickstart -k "gui/$$(id -u)/com.k3d-manager.cloud-bridge"; \
+	fi
 
 ## Remove k3d-manager-owned /tmp files
 clean-tmp:
@@ -379,6 +397,21 @@ uninstall-prometheus-port-forward:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.prometheus-port-forward" 2>/dev/null || true
 	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
 	@echo "Prometheus port-forward agent removed"
+
+install-hub-pushgateway-port-forward:
+	sed \
+	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.hub-pushgateway-port-forward.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-pushgateway-port-forward" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
+	@echo "Hub Pushgateway port-forward agent installed — port 19094 will stay open while the hub is reachable"
+
+uninstall-hub-pushgateway-port-forward:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-pushgateway-port-forward" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
+	@echo "Hub Pushgateway port-forward agent removed"
 
 install-alertmanager-port-forward:
 	sed \
@@ -514,20 +547,90 @@ deploy-worker:
 	  --data "$$_body" 2>/dev/null || true) && \
 	[ "$$_code" = "200" ]
 
+## List or safely set an allowlisted GitHub Actions secret (NAME=<workflow secret>)
+gh-secret:
+	@set -euo pipefail; \
+	 _allowed="$$(grep -rhoE 'secrets\.[A-Z0-9_]+' "$(GH_WORKFLOWS_DIR)" --include='*.yml' --include='*.yaml' 2>/dev/null | cut -d. -f2 | grep -v '^GITHUB_TOKEN$$' | sort -u || true)"; \
+	 _secrets="$$(gh secret list --repo "$(GH_REPO)")"; \
+	 _print_allowed() { \
+	   echo 'Allowed names:'; \
+	   while IFS= read -r _name; do \
+	     [ -n "$$_name" ] || continue; \
+	     _date="$$(printf '%s\n' "$$_secrets" | awk -v name="$$_name" '$$1 == name { print $$2; exit }')"; \
+	     [ -n "$$_date" ] || _date='(not set)'; \
+	     printf '%s %s\n' "$$_name" "$$_date"; \
+	   done <<< "$$_allowed"; \
+	 }; \
+	 if [ -z "$(NAME)" ]; then \
+	   _print_allowed; \
+	   while IFS= read -r _row; do \
+	     _name="$${_row%%[[:space:]]*}"; \
+	     [ -n "$$_name" ] || continue; \
+	     if ! grep -Fxq "$$_name" <<< "$$_allowed"; then printf '%s unused (typo?)\n' "$$_name"; fi; \
+	   done <<< "$$_secrets"; \
+	   exit 0; \
+	 fi; \
+	 if ! grep -Fxq "$(NAME)" <<< "$$_allowed"; then \
+	   echo "ERROR: secret '$(NAME)' is not referenced by a workflow." >&2; \
+	   _print_allowed; \
+	   exit 1; \
+	 fi; \
+	 gh secret set "$(NAME)" --repo "$(GH_REPO)"; \
+	 _date="$$(gh secret list --repo "$(GH_REPO)" | awk -v name="$(NAME)" '$$1 == name { print $$2; exit }')"; \
+	 printf '%s %s\n' "$(NAME)" "$${_date:-unknown}"
+
+## Sync the relay's Keychain secrets to GitHub Actions without exposing values
+gh-secret-sync-relay:
+	@set -euo pipefail; \
+	 _tok="$$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null || true)"; \
+	 _sig="$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null || true)"; \
+	 [ -n "$$_tok" ] || { echo "ERROR: k3dm-webhook-token missing from Keychain — run bin/k3dm-webhook-setup" >&2; exit 1; }; \
+	 [ -n "$$_sig" ] || { echo "ERROR: k3dm-slack-signing-secret missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
+	 printf '%s' "$$_tok" | gh secret set K3DM_WEBHOOK_TOKEN --repo "$(GH_REPO)"; \
+	 printf '%s' "$$_sig" | gh secret set SLACK_SIGNING_SECRET --repo "$(GH_REPO)"
+
 ## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
 cloudflared-backup:
-	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	@set -euo pipefail; \
+	source "$(CURDIR)/scripts/lib/cloudflared_keychain.sh"; \
+	_creds_file="$$HOME/.cloudflared/bb7ece59-8680-4310-9437-232f862e2773.json"; \
+	_cert_file="$$HOME/.cloudflared/cert.pem"; \
+	_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
 	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
-	_creds=$$(cat "$$HOME/.cloudflared/bb7ece59-8680-4310-9437-232f862e2773.json"); \
-	_cert=$$(cat "$$HOME/.cloudflared/cert.pem"); \
-	security add-generic-password -a cloudflared -s k3d-manager-cloudflared-credentials -w "$$_creds" -U && \
-	security add-generic-password -a cloudflared -s k3d-manager-cloudflared-cert -w "$$_cert" -U && \
-	echo "[cloudflared-backup] Keychain updated" && \
-	curl -sf -X POST \
-	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
-	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
-	  -d "$$(CREDS="$$_creds" CERT="$$_cert" python3 -c 'import json,os; print(json.dumps({"data":{"credentials_json":os.environ["CREDS"],"cert_pem":os.environ["CERT"],"tunnel_id":"bb7ece59-8680-4310-9437-232f862e2773","tunnel_name":"k3d-manager"}}))')" >/dev/null && \
+	_cloudflared_keychain_write_file k3d-manager-cloudflared-credentials "$$_creds_file"; \
+	_cloudflared_keychain_write_file k3d-manager-cloudflared-cert "$$_cert_file"; \
+	echo "[cloudflared-backup] Keychain updated"; \
+	CREDS="$$(<"$$_creds_file")" CERT="$$(<"$$_cert_file")" python3 -c 'import json,os; print(json.dumps({"data":{"credentials_json":os.environ["CREDS"],"cert_pem":os.environ["CERT"],"tunnel_id":"bb7ece59-8680-4310-9437-232f862e2773","tunnel_name":"k3d-manager"}}))' | \
+	curl -sf -X POST -H @<(printf 'X-Vault-Token: %s\n' "$$_tok") -H "Content-Type: application/json" \
+	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" --data-binary @- >/dev/null; \
 	echo "[cloudflared-backup] Vault updated"
+
+## Render, check, or install the repo-managed Cloudflare tunnel config (APPLY=1 installs)
+cloudflared-config:
+	@set -euo pipefail; \
+	_cf_provider="$${CF_PROVIDER:-k3s-hostinger}"; \
+	_cf_config="$${CF_CONFIG:-$(HOME)/.cloudflared/config.yml}"; \
+	_cf_source="$(CURDIR)/scripts/etc/cloudflared/config.yml"; \
+	_cf_table="$(CURDIR)/scripts/etc/cloudflared/origins.tsv"; \
+	_cf_rendered=$$(mktemp "$${TMPDIR:-/tmp}/k3d-manager-cloudflared.XXXXXX"); \
+	trap 'rm -f -- "$$_cf_rendered"' EXIT; \
+	if ! awk -F '\t' -v provider="$$_cf_provider" 'NR > 1 && $$2 == provider { found=1 } END { exit found ? 0 : 1 }' "$$_cf_table"; then \
+		echo "ERROR: unknown CF_PROVIDER: $$_cf_provider" >&2; exit 2; \
+	fi; \
+	source "$(CURDIR)/scripts/lib/cloudflared_render.sh"; \
+	_hub_recovery_render_cloudflared_config "$$_cf_provider" "$$_cf_source" "$$_cf_table" > "$$_cf_rendered"; \
+	if [[ -f "$$_cf_config" ]] && cmp -s "$$_cf_rendered" "$$_cf_config"; then \
+		echo "cloudflared config up to date ($$_cf_provider)"; exit 0; \
+	fi; \
+	if [[ -f "$$_cf_config" ]]; then diff -u "$$_cf_config" "$$_cf_rendered" || true; else diff -u /dev/null "$$_cf_rendered" || true; fi; \
+	if [[ "$${APPLY:-0}" != "1" ]]; then \
+		echo "drift: rerun with APPLY=1 to install" >&2; exit 1; \
+	fi; \
+	mkdir -p "$$(dirname "$$_cf_config")"; \
+	if [[ -f "$$_cf_config" ]]; then cp "$$_cf_config" "$${_cf_config}.bak.$$(date -u +%Y%m%dT%H%M%SZ)"; fi; \
+	cp "$$_cf_rendered" "$$_cf_config"; \
+	echo "installed cloudflared config ($$_cf_provider)"; \
+	echo "hint: launchctl kickstart -k \"gui/$$(id -u)/com.k3d-manager.cloudflare-tunnel\""
 
 ## Backup k3s etcd snapshot + kubeconfig to OCI object storage (k3s-oci only)
 backup:
@@ -696,6 +799,85 @@ restore-google-app-password:
 	echo "[restore-google-app-password] Vault updated — rebuilding Alertmanager Secret" && \
 	$(MAKE) observability
 
+## Restore cosign signing material and the ESO read grant on one cluster, then resync its
+## cosign-public-key ExternalSecret. Idempotent: restores the key from the Keychain backup only if
+## Vault lacks it, and adds the cosign-verify grant only if the ESO role lacks it. Never generates
+## a key (that is signing_init, which forces re-signing every image). CONTEXT pins the cluster via
+## a temporary kubeconfig; the global current-context is not changed.
+## Hub: make signing-restore   Hostinger: make signing-restore CONTEXT=ubuntu-hostinger
+##   SIGNING_ES_NAMESPACE=kyverno SIGNING_ESO_ROLE=eso-app-cluster
+##   SIGNING_ESO_AUTH_MOUNT=kubernetes-ubuntu-hostinger
+signing-restore:
+	@_ctx="$(or $(CONTEXT),$(INFRA_CONTEXT))"; _ns="$${SIGNING_ES_NAMESPACE:-platform-ops}"; \
+	_kc="$$(mktemp)"; [ -n "$$_kc" ] && [ -f "$$_kc" ] || { echo "[signing-restore] ERROR: mktemp failed" >&2; exit 1; }; \
+	trap 'rm -f "$$_kc"' EXIT; \
+	kubectl config view --minify --flatten --context "$$_ctx" > "$$_kc" 2>/dev/null && [ -s "$$_kc" ] || { \
+	  echo "[signing-restore] ERROR: kube context '$$_ctx' not found" >&2; exit 1; }; \
+	echo "[signing-restore] restoring on $$_ctx (ExternalSecret namespace $$_ns)"; \
+	KUBECONFIG="$$_kc" ./scripts/k3d-manager signing_restore || { \
+	  echo "[signing-restore] ERROR: signing_restore failed on $$_ctx" >&2; exit 1; }; \
+	if kubectl --context "$$_ctx" -n "$$_ns" get externalsecret cosign-public-key >/dev/null 2>&1; then \
+	  kubectl --context "$$_ctx" -n "$$_ns" annotate externalsecret cosign-public-key \
+	    force-sync="$$(date +%s)" --overwrite >/dev/null && \
+	  kubectl --context "$$_ctx" -n "$$_ns" wait externalsecret cosign-public-key \
+	    --for=condition=Ready --timeout=60s; \
+	else \
+	  echo "[signing-restore] no cosign-public-key ExternalSecret in $$_ns on $$_ctx; nothing to resync"; \
+	fi
+
+## Re-mint the Hermes ArgoCD API token and store it in the Keychain (k3dm-hermes-argocd-token).
+## Required after ANY ArgoCD rebuild: a rebuild regenerates server.secretkey, which permanently
+## invalidates every token minted before it — the CLI reports "token signature is invalid", which
+## is neither an expiry nor a revocation, and retrying can never succeed.
+## The admin password resolves from ARGOCD_ADMIN_PASSWORD, else the argocd-initial-admin-secret
+## Secret. Override the endpoint with ARGOCD_HOST. Never prints the token.
+argocd-hermes-token:
+	@[ -t 0 ] || { \
+	  echo "[argocd-hermes-token] ERROR: refusing to run without a terminal." >&2; \
+	  echo "[argocd-hermes-token] This target mints a credential; it must not run unattended." >&2; \
+	  exit 1; \
+	}; \
+	_host="$${ARGOCD_HOST:-argocd.3ai-talk.org}"; \
+	_ns="$${ARGOCD_NAMESPACE:-cicd}"; \
+	_pw="$${ARGOCD_ADMIN_PASSWORD:-}"; \
+	[ -n "$$_pw" ] || _pw=$$(kubectl get secret argocd-initial-admin-secret -n "$$_ns" \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 -d); \
+	[ -n "$$_pw" ] || { \
+	  echo "[argocd-hermes-token] ERROR: no admin password. Set ARGOCD_ADMIN_PASSWORD, or check" >&2; \
+	  echo "[argocd-hermes-token]        that argocd-initial-admin-secret still exists in $$_ns." >&2; \
+	  exit 1; \
+	}; \
+	_tok=$$(ARGOCD_HOST="$$_host" ARGOCD_ADMIN_PW="$$_pw" python3 -c 'import json,os,urllib.request as u; UA="k3d-manager/argocd-hermes-token"; h=os.environ["ARGOCD_HOST"]; j={"Content-Type":"application/json","User-Agent":UA}; s=json.loads(u.urlopen(u.Request("https://%s/api/v1/session" % h, data=json.dumps({"username":"admin","password":os.environ["ARGOCD_ADMIN_PW"]}).encode(), headers=j, method="POST"), timeout=30).read())["token"]; k=dict(j); k["Authorization"]="Bearer "+s; print(json.loads(u.urlopen(u.Request("https://%s/api/v1/account/hermes/token" % h, data=json.dumps({"expiresIn":0}).encode(), headers=k, method="POST"), timeout=30).read())["token"])') || { \
+	  echo "[argocd-hermes-token] ERROR: could not mint a token on $$_host." >&2; \
+	  echo "[argocd-hermes-token]        A 403 with \"error code: 1010\" is Cloudflare blocking the" >&2; \
+	  echo "[argocd-hermes-token]        User-Agent, not an ArgoCD authz failure." >&2; \
+	  echo "[argocd-hermes-token]        Otherwise check that accounts.hermes=apiKey is set in argocd-cm and" >&2; \
+	  echo "[argocd-hermes-token]        that the admin password is the current one (a rebuild resets it)." >&2; \
+	  exit 1; \
+	}; \
+	[ -n "$$_tok" ] || { echo "[argocd-hermes-token] ERROR: minted an empty token; refusing to store it" >&2; exit 1; }; \
+	security add-generic-password -U -a k3dm -s k3dm-hermes-argocd-token -w "$$_tok" || { \
+	  echo "[argocd-hermes-token] ERROR: Keychain write failed (locked? run: security unlock-keychain)" >&2; \
+	  exit 1; \
+	}; \
+	_stored=$$(security find-generic-password -a k3dm -s k3dm-hermes-argocd-token -w 2>/dev/null); \
+	[ -n "$$_stored" ] || { \
+	  echo "[argocd-hermes-token] ERROR: the stored item reads back empty — the write did not take." >&2; \
+	  exit 1; \
+	}; \
+	echo "[argocd-hermes-token] stored in Keychain (k3dm-hermes-argocd-token)"; \
+	ARGOCD_HOST="$$_host" ARGOCD_TOKEN="$$_stored" python3 -c 'import json,os,urllib.request as u; d=json.loads(u.urlopen(u.Request("https://%s/api/v1/applications" % os.environ["ARGOCD_HOST"], headers={"Authorization":"Bearer "+os.environ["ARGOCD_TOKEN"],"User-Agent":"k3d-manager/argocd-hermes-token"}), timeout=30).read()); print("[argocd-hermes-token] verified: %d applications visible to hermes" % len(d.get("items") or []))' || { \
+	  echo "[argocd-hermes-token] ERROR: the stored token was rejected by $$_host." >&2; \
+	  echo "[argocd-hermes-token]        Check the hermes RBAC line in argocd-rbac-cm grants applications/get." >&2; \
+	  exit 1; \
+	}; \
+	if launchctl print "gui/$$(id -u)/com.k3d-manager.hermes" >/dev/null 2>&1; then \
+	  launchctl kickstart -k "gui/$$(id -u)/com.k3d-manager.hermes" >/dev/null 2>&1 && \
+	    echo "[argocd-hermes-token] Hermes restarted — the argocd sensor picks it up on the next cycle"; \
+	else \
+	  echo "[argocd-hermes-token] NOTE: the Hermes agent is not loaded; nothing to restart"; \
+	fi
+
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:
 	./scripts/k3d-manager deploy_observability --confirm
@@ -750,15 +932,15 @@ fix-delete-pod: ## APP and NS are required
 	@test -n "$(NS)"  || { echo "Usage: make fix-delete-pod APP=<label> NS=<namespace>"; exit 1; }
 	kubectl delete pod -l 'app=$(APP)' -n '$(NS)' --context '$(FIX_CONTEXT)' --grace-period=0
 
-## ArgoCD app sync with 120s timeout (APP=<argocd-app-name>)
+## ArgoCD app sync with 120s timeout (APP=<argocd-app-name>; ARGOCD_SERVER=host:port)
 fix-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-sync APP=<argocd-app-name>"; exit 1; }
-	argocd app sync '$(APP)' --timeout 120 --server localhost:8080 --insecure
+	@ARGOCD_SERVER='$(ARGOCD_SERVER)' ARGOCD_SCHEME='$(ARGOCD_SCHEME)' INFRA_CONTEXT='$(INFRA_CONTEXT)' ARGOCD_NS='$(ARGOCD_NS)' ./bin/argocd-app-sync '$(APP)' --timeout 120
 
-## ArgoCD force sync — discards local state (APP=<argocd-app-name>)
+## ArgoCD force sync — discards local state (APP=<argocd-app-name>; ARGOCD_SERVER=host:port)
 fix-force-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-force-sync APP=<argocd-app-name>"; exit 1; }
-	argocd app sync '$(APP)' --force --timeout 180 --server localhost:8080 --insecure
+	@ARGOCD_SERVER='$(ARGOCD_SERVER)' ARGOCD_SCHEME='$(ARGOCD_SCHEME)' INFRA_CONTEXT='$(INFRA_CONTEXT)' ARGOCD_NS='$(ARGOCD_NS)' ./bin/argocd-app-sync '$(APP)' --force --timeout 180
 
 ## Force ESO ClusterSecretStore reconcile (annotates vault-backend to trigger re-sync)
 fix-eso-refresh: ## No arguments needed
@@ -785,14 +967,14 @@ file-bug: ## FILE_TITLE and FILE_BODY required — write docs/bugs/<date>-<slug>
 
 ## Run all BATS test suites
 test:
-	./scripts/k3d-manager test all
+	scripts/tests/tripwire.sh ./scripts/k3d-manager test all
 
 ## Run the BATS suites under scripts/tests/bin (not covered by `make test`)
 test-bin:
 	@set -euo pipefail; \
 	 command -v bats >/dev/null 2>&1 || { \
 	   echo "[make] bats not found — install with: brew install bats-core" >&2; exit 2; }; \
-	 bats scripts/tests/bin
+	 scripts/tests/tripwire.sh bats scripts/tests/bin
 
 ## Run the stdlib-unittest Python suites (scripts/tests/bin/*.py, excluding test_*.py)
 test-python-unit:
@@ -808,13 +990,25 @@ test-python-unit:
 	     exit 2; \
 	   fi; \
 	   echo "[make] python3 $$f"; \
-	   python3 "$$f"; \
+	   scripts/tests/tripwire.sh python3 "$$f"; \
 	 done; \
 	 if [ "$$found" -eq 0 ]; then echo "[make] no unittest suites found" >&2; exit 2; fi
 
 ## Run the pytest suites (scripts/tests/hermes + scripts/tests/bin/test_*.py)
 check-doc-links:
 	@python3 scripts/check-doc-links.py
+	@./scripts/check-repo-root-debris.sh
+
+## Validate Kubernetes manifests, CRDs included, with kubeconform (installed if missing; needs network):
+## make validate-manifests [FILES="path/a.yaml path/b.yaml"]
+KUBECONFORM_CRD_CATALOG := https://raw.githubusercontent.com/datreeio/CRDs-catalog/d373c2da9702bc9509a004db83e57263fe3bdfc1/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+VALIDATE_MANIFESTS_DEFAULT := scripts/etc/argocd/platform-ops/*.yaml scripts/etc/prometheus/rules/*.yaml scripts/etc/grafana/dashboards/*.yaml scripts/etc/argocd/applicationsets/*.yaml
+validate-manifests:
+	@set -euo pipefail; \
+	 SCRIPT_DIR="$(CURDIR)/scripts" bash -c 'source "$$SCRIPT_DIR/lib/system.sh"; _ensure_kubeconform'; \
+	 PATH="$(HOME)/.local/bin:$$PATH" kubeconform -strict -summary \
+	   -schema-location default -schema-location '$(KUBECONFORM_CRD_CATALOG)' \
+	   $(or $(FILES),$(VALIDATE_MANIFESTS_DEFAULT))
 
 ## Embed the docs corpus into the pgvector store; only changed docs are re-embedded
 index-docs:
@@ -824,7 +1018,7 @@ index-docs:
 find-similar-docs:
 	@python3 scripts/find-similar-docs.py $(if $(K),--k $(K),) -- "$(Q)"
 
-## Fail if test/job debris (empty-mktemp derived paths) is staged at the repo root
+## Fail if test/job debris (empty-mktemp derived paths) exists at the repo root
 check-repo-root:
 	@./scripts/check-repo-root-debris.sh
 
@@ -843,8 +1037,9 @@ test-pytest:
 	   echo "[make] install with: python3 -m pip install --user pytest" >&2; \
 	   exit 2; \
 	 fi; \
+	 if [ -n "$${K3DM_JUNIT_XML:-}" ]; then set -- "$$@" --junitxml "$$K3DM_JUNIT_XML" -o junit_logging=no; fi; \
 	 echo "[make] $$* (pytest suites)"; \
-	 "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
+	 scripts/tests/tripwire.sh "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest
@@ -861,13 +1056,21 @@ test-metrics:
 	echo "[test-metrics] log: $${_log}"; \
 	exit 0
 
+define _e2e_recorded
+mkdir -p "$(HOME)/.k3dm/e2e"; \
+_log="$(HOME)/.k3dm/e2e/make-$(1)-$$(date -u +%Y%m%dT%H%M%SZ).log"; \
+echo "[$(1)] recording full output to $${_log}"; \
+umask 077; \
+if [ "$$(uname -s)" = Darwin ]; then script -q -F "$${_log}" $(2); else script -q -f -e -c "$(2)" "$${_log}"; fi
+endef
+
 ## Run the Tier 1 e2e verification harness (throwaway vCluster + in-cluster Playwright Job). DIGEST=<candidate image digest> optional.
 e2e:
-	./scripts/k3d-manager e2e_verify_vcluster $(DIGEST)
+	@$(call _e2e_recorded,e2e,./scripts/k3d-manager e2e_verify_vcluster $(DIGEST))
 
 ## Run the Tier 2 e2e verification harness (live ACG sandbox + Stripe project). DIGEST=<candidate image digest> optional. Needs a real TTY for the one-time interactive login.
 e2e-sandbox:
-	./scripts/k3d-manager e2e_verify_sandbox $(DIGEST)
+	@$(call _e2e_recorded,e2e-sandbox,./scripts/k3d-manager e2e_verify_sandbox $(DIGEST))
 
 ## Run the smoke gate (offline checks always; cluster checks when reachable). SMOKE_ONLY=offline|cluster optional.
 smoke:
@@ -911,6 +1114,8 @@ help:
 	@echo ""
 	@echo "  Targets (set CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
+	@echo "    make restart-webhook  Restart webhook and cloud bridge"
+	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
 	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
 	@echo "    make down ... CLEANUP_STALE=1  Also remove expired managed registrations and stale AWS local state"
 	@echo "    make status        Show concise service health (SERVICE=<name> for focused detail)"
@@ -965,7 +1170,11 @@ help:
 	@echo "    make restore-google-app-password   Restore Gmail App Password from Keychain → Vault → Alertmanager"
 	@echo "    make install-alertmanager-auth-proxy   Install Alertmanager auth proxy LaunchAgent"
 	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
+	@echo "    make install-hub-pushgateway-port-forward Install hub Pushgateway port-forward LaunchAgent"
+	@echo "    make validate-manifests         Validate manifests and CRDs with kubeconform (installs it if missing)"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
+	@echo "    make cloudflared-config         Check or install the repo-managed Cloudflare tunnel config"
+	@echo "    make argocd-hermes-token        Re-mint the Hermes ArgoCD token into Keychain (needs a TTY; required after an ArgoCD rebuild)"
 	@echo ""
 	@echo "  Examples:"
 	@echo "    make up                                          # k3s-aws (default)"

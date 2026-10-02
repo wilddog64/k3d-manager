@@ -50,7 +50,7 @@ prometheus:
         metrics_path: /federate
         params:
           match[]:
-            - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}'
+            - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy", __name__!~".+:.+"}'
         static_configs:
           - targets:
               - 'host.internal:19190'
@@ -60,8 +60,16 @@ prometheus:
           - source_labels: [cluster]
             regex: acg
             action: drop
+      - job_name: pushgateway
+        honor_labels: true
+        static_configs:
+          - targets:
+              - 'prometheus-pushgateway.monitoring:9091'
 
 grafana:
+  serviceMonitor:
+    labels:
+      release: kube-prometheus-stack
   admin:
     existingSecret: grafana-admin-credentials
     userKey: admin-user

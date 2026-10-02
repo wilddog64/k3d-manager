@@ -74,6 +74,17 @@ FAKE
   shopping_cart_resolve_ghcr_pat() { _github_user="test-user"; _ghcr_pat="test-pat"; }
 }
 
+@test "every substrate pod spec disables service links" {
+  command -v kubectl >/dev/null 2>&1 || skip "kubectl not installed"
+  run env kubectl kustomize "${BATS_TEST_DIRNAME}/../../etc/e2e"
+  [ "$status" -eq 0 ]
+  local workloads links
+  workloads="$(grep -cE '^kind: (Deployment|Job)$' <<<"$output" || true)"
+  links="$(grep -cE '^      enableServiceLinks: false$' <<<"$output" || true)"
+  [ "$workloads" -eq 9 ]
+  [ "$links" -eq "$workloads" ]
+}
+
 @test "e2e_verify_vcluster is a public function (no leading underscore)" {
   run declare -f e2e_verify_vcluster
   [ "$status" -eq 0 ]
@@ -368,6 +379,17 @@ EOF
   [[ "$output" == *"name: ghcr-pull-secret"* ]]
 }
 
+@test "vcluster Job manifest wires the five Keycloak settings without a password literal" {
+  run _e2e_job_manifest "e2e-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
+  [ "$status" -eq 0 ]
+  for name in KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID TEST_USERNAME KEYCLOAK_CLIENT_SECRET TEST_PASSWORD; do
+    [[ "$output" == *"name: ${name}"* ]]
+  done
+  [[ "$output" == *"name: e2e-keycloak-credentials"*"key: client-secret"* ]]
+  [[ "$output" == *"name: e2e-keycloak-credentials"*"key: user-password"* ]]
+  [[ "$output" != *"s3cr3t"* ]]
+}
+
 @test "payment is pinned in the E2E substrate kustomization" {
   local kustomization="${BATS_TEST_DIRNAME}/../../etc/e2e/kustomization.yaml"
   run awk '$1 == "-" && $2 == "payment.yaml" { found=1 } END { exit (found ? 0 : 1) }' "$kustomization"
@@ -401,6 +423,68 @@ EOF
   [ "$status" -eq 0 ]
   run awk '/rollout status deployment\/payment/ { found=1 } END { exit (found ? 0 : 1) }' "$RUN_LOG"
   [ "$status" -eq 0 ]
+}
+
+@test "datastore secret includes the RabbitMQ password" {
+  export E2E_RABBITMQ_PASSWORD="rabbitmq-key-not-echoed"
+  run _e2e_provision_datastore_secret "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"$E2E_RABBITMQ_PASSWORD"* ]]
+  run awk '/rabbitmq-password=rabbitmq-key-not-echoed/ { found=1 } END { exit (found ? 0 : 1) }' "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "substrate waits for RabbitMQ before payment" {
+  run _e2e_deploy_substrate "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  local rabbitmq_line payment_line
+  rabbitmq_line="$(grep -nF -- "rollout status deployment/rabbitmq" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  payment_line="$(grep -nF -- "rollout status deployment/payment" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  [ "$rabbitmq_line" -lt "$payment_line" ]
+}
+
+@test "payment RabbitMQ password is secret-backed and substrate renders the broker" {
+  command -v kubectl >/dev/null 2>&1 || skip "kubectl not installed"
+  run env kubectl kustomize "${BATS_TEST_DIRNAME}/../../etc/e2e"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"image: rabbitmq:3.12-alpine"* ]]
+  [[ "$output" == *"name: rabbitmq"* ]]
+  [[ "$output" == *"name: RABBITMQ_PASSWORD"*"key: rabbitmq-password"* ]]
+  [[ "$output" != *$'        - name: RABBITMQ_PASSWORD\n          value:'* ]]
+}
+
+@test "substrate provisions Keycloak before apply and waits before payment" {
+  run _e2e_deploy_substrate "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  local secret_line apply_line keycloak_line payment_line
+  secret_line="$(grep -nF -- "create secret generic e2e-keycloak-credentials" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  apply_line="$(grep -nF -- "apply -k" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  keycloak_line="$(grep -nF -- "rollout status deployment/keycloak" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  payment_line="$(grep -nF -- "rollout status deployment/payment" "$RUN_LOG" | head -1 | cut -d: -f1)"
+  [ "$secret_line" -lt "$apply_line" ]
+  [ "$keycloak_line" -lt "$payment_line" ]
+}
+
+@test "Keycloak secret value only appears in the create-secret argv" {
+  export E2E_KC_USER_PASSWORD=s3cr3t-sentinel
+  run _e2e_provision_keycloak_secret "$BATS_TEST_TMPDIR/kubeconfig"
+  [ "$status" -eq 0 ]
+  run awk '/s3cr3t-sentinel/ && $0 !~ /create secret generic e2e-keycloak-credentials/ { found=1 } END { exit found ? 1 : 0 }' "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F -- "create secret generic e2e-keycloak-credentials" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--from-literal=user-password=s3cr3t-sentinel"* ]]
+}
+
+@test "Keycloak substrate renders and its realm JSON parses" {
+  command -v kubectl >/dev/null 2>&1 || skip "kubectl not installed"
+  local rendered="$BATS_TEST_TMPDIR/e2e-rendered.yaml"
+  run env kubectl kustomize "${BATS_TEST_DIRNAME}/../../etc/e2e"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" > "$rendered"
+  grep -F -- "kind: Deployment" "$rendered"
+  grep -F -- "name: keycloak" "$rendered"
+  awk '/shopping-cart-realm.json: \|/{capture=1; next} capture && /^kind: /{capture=0} capture{sub(/^    /, ""); print}' "$rendered" | jq empty
 }
 
 @test "payment substrate renders offline" {
@@ -437,6 +521,36 @@ EOF
   [ "$rc" -ne 0 ]
   run grep -F -- "vcluster_destroy e2e-" "$VC_LOG"
   [ "$status" -eq 0 ]
+}
+
+@test "substrate diagnostics capture pods, events and per-deployment logs" {
+  run _e2e_dump_substrate_diagnostics e2e-x run-1
+  [ "$status" -eq 0 ]
+  diagnostics="${BATS_TEST_TMPDIR}/report/run-1.substrate.txt"
+  [ -f "$diagnostics" ]
+  mode=$(stat -c %a "$diagnostics" 2>/dev/null || stat -f %Lp "$diagnostics")
+  [ "$mode" = 600 ]
+  run grep -F -- "get pods" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F -- "--field-selector type=Warning" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F -- "logs deployment/product-catalog" "$RUN_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "substrate diagnostics no-op without a vCluster name" {
+  run _e2e_dump_substrate_diagnostics "" run-1
+  [ "$status" -eq 0 ]
+  run grep -F -- "get pods" "$RUN_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "exit trap dumps diagnostics before teardown" {
+  trap_body="$(declare -f _e2e_exit_trap)"
+  dump_line=$(printf '%s\n' "$trap_body" | grep -nF '_e2e_dump_substrate_diagnostics' | head -1 | cut -d: -f1)
+  teardown_line=$(printf '%s\n' "$trap_body" | grep -nF '_e2e_teardown' | head -1 | cut -d: -f1)
+  [ "$dump_line" -lt "$teardown_line" ]
+  [[ "$trap_body" == *'deploying-substrate'* ]]
 }
 
 @test "teardown removes orphaned kubeconfig and transient log when destroy is incomplete" {
@@ -724,6 +838,20 @@ JSON
   run _e2e_prune_result_events
   [ "$status" -eq 0 ]
   run grep -F -- "--no-exit" "$seen"
+  [ "$status" -eq 0 ]
+}
+
+@test "substrate Keycloak realm lists realm roles as an array" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  run python3 - "${BATS_TEST_DIRNAME}/../../etc/e2e/keycloak.yaml" <<'PY'
+import json, re, sys
+text = open(sys.argv[1]).read()
+block = re.search(r"shopping-cart-realm\.json: \|\n((?:    .*\n|\n)+)", text).group(1)
+realm = json.loads("\n".join(l[4:] for l in block.splitlines()))
+roles = realm["roles"]["realm"]
+assert isinstance(roles, list), type(roles)
+assert {r["name"] for r in roles} >= {"PAYMENT_USER", "PAYMENT_WRITE"}
+PY
   [ "$status" -eq 0 ]
 }
 

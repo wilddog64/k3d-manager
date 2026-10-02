@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Medium — self-inflicted Grafana/Prometheus flapping; intermittent Cloudflare 502.
-**Status:** observed live on the rebuilt hub 2026-09-20 ~16:57 PDT. Fix below NOT yet in git.
+**Status:** FIXED (rechecked by Claude 2026-10-01) — `K3DM_PF_HEALTH_TIMEOUT:-8` / `K3DM_PF_HEALTH_THRESHOLD:-3` and the consecutive-failure counter are in `_hostinger_write_monitoring_port_forward_wrapper`; asserted in `provider_contract.bats`.
 
 ## Symptom
 

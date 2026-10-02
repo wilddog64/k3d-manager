@@ -32,7 +32,8 @@
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    calls="$(mktemp)"
+    calls="${BATS_TEST_TMPDIR}/prune-keep-calls"
+    : > "$calls"
     kubectl() {
       if [[ "$1 $2 $3" == "config view -o" ]]; then
         printf "%s\\n" default
@@ -56,7 +57,8 @@
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    calls="$(mktemp)"
+    calls="${BATS_TEST_TMPDIR}/prune-delete-calls"
+    : > "$calls"
     kubectl() {
       if [[ "$1 $2 $3" == "config view -o" ]]; then
         printf "%s\\n" ubuntu-hostinger
@@ -154,7 +156,8 @@
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
     source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh
-    _state="$(mktemp)"
+    _state="${BATS_TEST_TMPDIR}/bootstrap-state"
+    : > "$_state"
     _command_exist() {
       case "$1" in
         k3sup) [[ -s "$_state" ]] ;;
@@ -172,7 +175,8 @@
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
     source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh
-    _state="$(mktemp)"
+    _state="${BATS_TEST_TMPDIR}/ensure-state"
+    : > "$_state"
     _command_exist() {
       case "$1" in
         k3sup) [[ -s "$_state" ]] ;;
@@ -195,13 +199,14 @@
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    log="$(mktemp)"
+    log="${BATS_TEST_TMPDIR}/parallel-join-log"
+    : > "$log"
     _k3s_agent_is_ready() { return 1; }
     _k3s_agent_address() { printf "%s\n" "$1"; }
     _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
     _k3sup_join_agent() { printf "join %s\n" "$1" >> "$log"; }
     _k3s_wait_agent_ready() { printf "ready %s\n" "$2" >> "$log"; }
-    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3,ubuntu-4 server "$(mktemp)"
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3,ubuntu-4 server "${BATS_TEST_TMPDIR}/parallel-kubeconfig"
     cat "$log"
   '
   [ "$status" -eq 0 ]
@@ -220,7 +225,7 @@
     _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
     _k3sup_join_agent() { [[ "$1" != ubuntu-2 ]]; }
     _k3s_wait_agent_ready() { return 0; }
-    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3 server "$(mktemp)"
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2,ubuntu-3 server "${BATS_TEST_TMPDIR}/failure-kubeconfig"
   '
   [ "$status" -ne 0 ]
   [[ "$output" == *"ubuntu-2"* ]]
@@ -232,12 +237,13 @@
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    log="$(mktemp)"
+    log="${BATS_TEST_TMPDIR}/idempotent-join-log"
+    : > "$log"
     _k3s_agent_is_ready() { return 0; }
     _k3s_agent_address() { printf "%s\n" "$1"; }
     _k3s_agent_private_ip() { printf "10.0.1.%s\n" "${1##*-}"; }
     _k3sup_join_agent() { printf "unexpected join\n" >> "$log"; return 1; }
-    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2 server "$(mktemp)"
+    _k3sup_join_agents_parallel ubuntu-1,ubuntu-2 server "${BATS_TEST_TMPDIR}/idempotent-kubeconfig"
     [ ! -s "$log" ]
   '
   [ "$status" -eq 0 ]
@@ -344,7 +350,8 @@ EOF
     source scripts/lib/system.sh
     source scripts/lib/core.sh
     source scripts/plugins/shopping_cart.sh
-    vault_writes="$(mktemp)"
+    vault_writes="${BATS_TEST_TMPDIR}/vault-writes"
+    : > "$vault_writes"
     gh() {
       case "$1" in
         auth) printf "%s\n" "gh-token" ;;
@@ -364,6 +371,85 @@ EOF
   '
   [ "$status" -eq 0 ]
   [[ "$output" == *"read:packages"* ]]
+}
+
+@test "gh CLI pull failure names gh auth refresh" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    gh() {
+      case "$1" in
+        auth) printf "%s\n" "gh-token" ;;
+        api) return 0 ;;
+      esac
+    }
+    _shopping_cart_ghcr_pat_can_pull() { return 1; }
+    _github_user="wilddog64"
+    shopping_cart_load_ghcr_pat_from_gh || true
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gh auth refresh -h github.com -s read:packages"* ]]
+  [[ "$output" != *"fixed"* ]]
+}
+
+@test "prompt reports HTTP 401 for a dead pasted token" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    eval "$(declare -f shopping_cart_prompt_ghcr_pat | sed '\''s/\[\[ ! -t 0 || ! -t 1 \]\]/false/'\'')"
+    marker="${BATS_TEST_TMPDIR}/vault-writes"
+    : > "$marker"
+    read() { _ghcr_pat="dead"; }
+    _shopping_cart_ghcr_pat_can_pull() { return 1; }
+    curl() { printf "%s" "401"; }
+    _shopping_cart_store_ghcr_pat_in_vault() { printf "%s\n" write >> "$marker"; }
+    _github_user="wilddog64"
+    shopping_cart_prompt_ghcr_pat
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"HTTP 401"* ]]
+  [[ "$output" != *"missing the read:packages"* ]]
+  [ ! -s "${BATS_TEST_TMPDIR}/vault-writes" ]
+}
+
+@test "prompt reports missing scope for a valid pasted token" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    eval "$(declare -f shopping_cart_prompt_ghcr_pat | sed '\''s/\[\[ ! -t 0 || ! -t 1 \]\]/false/'\'')"
+    read() { _ghcr_pat="valid"; }
+    _shopping_cart_ghcr_pat_can_pull() { return 1; }
+    curl() { printf "%s" "200"; }
+    _shopping_cart_store_ghcr_pat_in_vault() { return 1; }
+    _github_user="wilddog64"
+    shopping_cart_prompt_ghcr_pat
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing the read:packages scope"* ]]
+  [[ "$output" != *"HTTP"* ]]
+}
+
+@test "resolve error names gh auth refresh" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    shopping_cart_load_ghcr_pat_from_env() { return 1; }
+    shopping_cart_load_ghcr_pat_from_vault() { return 1; }
+    shopping_cart_load_ghcr_pat_from_gh() { return 1; }
+    shopping_cart_prompt_ghcr_pat() { return 1; }
+    _err() { printf "%s\n" "$1"; }
+    shopping_cart_resolve_ghcr_pat
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gh auth refresh -h github.com -s read:packages"* ]]
 }
 
 @test "GHCR path does not pass Vault token or PAT in curl argv" {

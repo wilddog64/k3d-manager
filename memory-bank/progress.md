@@ -1,3 +1,417 @@
+# 2026-10-02 — v1.40.0 release close-out (gh auth churn deferred to next release, operator call)
+
+- [x] Removed clean Codex worktrees `../k3d-manager-codex-askdocs`, `../k3d-manager-codex-bugs` (commits already cherry-picked; branches kept).
+- [x] Removed `.claude/worktrees/k3d-manager` + branch `worktree-k3d-manager` (operator go; May lock-dir edit superseded by the Sept wrapper rewrite; c5949cf4 is on main).
+- [x] Codex: CHANGELOG promoted to [1.40.0] + retro `82ec57a0` (Claude-verified: on origin, headings order, every in-repo SHA/path resolves; 755ad2d is e2e-tests repo). Audit gap: validate-manifests undocumented + stale UNMEASURED in CLAUDE.md/makefile.md → fixed `e6185b92` (Codex, Claude-verified: on origin, 3 files, doc-links 1872 OK, stale grep empty).
+- [x] e2e-tests publish run 37044992425 GREEN: sha-755ad2d… and latest both = sha256:78044624… (old latest 59abbc19). [ ] operator reruns `make e2e E2E_IMAGE_TAG=sha-755ad2d7efeb96dcb6d3701077264fc6b9374db3` (live smoke gate).
+- [x] Live e2e run 1790965743-22494 (operator refreshed gh read:packages; GHCR via gh CLI token; substrate all up; teardown clean): 48 passed / 8 failed / 102 — all 8 api/payments now fail at Keycloak token 400 Missing form parameter: grant_type (global extraHTTPHeaders Content-Type: application/json overrides form:). Spec docs/bugs/2026-10-02-e2e-keycloak-token-request-sent-as-json.md → Codex in e2e-tests branch fix/keycloak-token-form-content-type. Operator: do NOT gate v1.40.0 on it. FIXED `d3b4f83` on e2e-tests `fix/keycloak-token-form-content-type` (Codex edit; sandbox blocked commit; Claude verified diff = spec, proof script reproduces json vs form, tsc 11=11; npm run lint is broken pre-existing: no eslint config). PR wilddog64/shopping-cart-e2e-tests#10 (Copilot: approval recommended, 0 findings; GitGuardian pass). Then publish image + e2e rerun.
+- [x] v1.40.0 PR wilddog64/k3d-manager#134 opened from k3d-manager-v1.40.0 @ 38753c17; Copilot requested (attach pending), CI GREEN on d661d13d (run 37053149373) after the negation + git-identity fixes; Copilot 0 findings. enforce_admins DISABLED on k3d-manager main and shopping-cart-e2e-tests main for operator merge (2026-10-02) — RESTORE both after merge. After #134 merge: tag v1.40.0 + GH release; next branch first commit adds releases-table row.
+- [ ] Next release: Vault GHCR PAT lookup returns silently on empty/unreachable — should say which.
+- [x] Scope check done (283 files, all v1.40.0 specs/bugs + future plans).
+- [ ] v1.40.0 PR body drafted — operator go before gh pr create.
+
+# 2026-10-01 — v1.40.0 spec handoff
+
+- [x] vcluster.bats orphan seed still a table (stale since 5706eb21) — FIXED `bd88be39` (Codex edit, Claude commit — Codex hit .git lock): 30/30 + reconcile 4/4, `.Name`→`.name` mutation reds the 4 orphan tests, restored.
+- [x] Live e2e run `1790962990-9267` (commit cb8373ef, 2026-10-02): first run to reach Playwright — keycloak + payment rolled out (realm fix fef39649 works live). 49 passed / 8 failed / 102; all 8 = `api/payments.spec.ts` empty-body 401s, the known option-(b) set in `docs/bugs/2026-09-16-e2e-assertion-api-payments.md` (fix on payment `d2f2d55` + e2e-tests `df6b9c1` branches, unmerged; image pins pending). Health test now passes. [ ] Operator: merge both PRs, bump pins, rerun.
+- [x] Specs corrected against the live tree and handed to Codex (app-health first, then retrieval eval).
+- [x] Dispatched via `codex exec` into worktree `../k3d-manager-codex-v1.40.0` (branch `codex-v1.40.0-hermes`).
+- [x] Codex app-health sensor: `7319f07c`, Claude-verified (11/11, spot mutations red, default-off).
+- [x] Codex retrieval eval `0ded5a83` + prior art `428960fe`; Claude fixes `e35fcba9` (6 defects).
+- [x] Live retrieval eval run 2026-10-01; numbers in vector-store.md + live floors. [ ] copy into v1.40.0 retro at release.
+- [x] Bare-negation recurrence fixed `4c0dd7ac`.
+- [x] Claude: `v1.40.0-cloud-bridge-test-targets.md` (2026-10-01) — tripwire, 4 test + 6 diagnose actions.
+- [x] Claude: `v1.40.0-cloud-request-artifacts.md` (2026-10-01).
+- [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
+- [x] README architecture diagram redrawn for v1.40.0 (Claude, docs only).
+- [x] `v1.40.0-slack-corpus-qa` (`/ask-docs`) — IMPLEMENTED (Codex), verified + fixed by Claude 2026-10-01: `971c109d` on `codex-v1.40.0-slack-corpus-qa`, cherry-picked as `cccf9748` on `k3d-manager-v1.40.0` (tree-equal). Claude added `_sanitize_question` + real-corpus TF-IDF e2e test; 6 mutations red, cmp-restored.
+- [x] Grafana Overview Build Info table recurrence (raw series columns; hub/app copies drifted) — FIXED (Codex), verified by Claude 2026-10-01: positive allowlist Version/Edition/Job/Instance, panel identical in hub + app copies (drift guard), 13/13 BATS, 2 real-file mutations red + cmp-restored. Operator: confirm on hub after ArgoCD sync.
+- [x] Hub ConfigMap `grafana-dashboard-overview-readable` owned by two apps — FIXED (Codex, Claude-verified 2026-10-01): `grafana-dashboards-acg` excludes `grafana-overview-readable-configmap.yaml` only when `.server` is in-cluster; derived collision guard + 3 mutations in BATS (17/17). Bug doc `docs/bugs/2026-10-01-hub-overview-readable-configmap-owned-by-two-apps.md`.
+- [x] `/ask` + `/ask-docs` answers threaded (bot path, `SLACK_CHANNEL_ID` only, response_url fallback) + `/ask-docs --sources` fast mode — Codex, Claude-verified 2026-10-01; bug `docs/bugs/2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`.
+- [x] `make gh-secret` (workflow-derived allowlist, TTY prompt) + `make gh-secret-sync-relay` (Keychain → GH) — dispatched to Codex 2026-10-01; bug `docs/bugs/2026-10-01-no-safe-way-to-set-github-actions-secrets.md` (spec `86b274ed`). Incident: deploy-worker.yml first success pushed stale GH `SLACK_SIGNING_SECRET` → all slash commands down; operator re-set landed as typo `SLACK_SIGING_SECRET`.
+- [x] Hub recovery hardcodes `k3d` as the public frontend origin — FIXED `9cb1207b` (Codex, Claude-verified: 44 bats green, shellcheck clean, mutation (a) red). Live `~/.cloudflared/config.yml` hand-fixed to `127.0.0.2:80` + tunnel kickstarted 2026-10-01; operator confirms via `/cluster-status`.
+- [x] Cloudflared creds + Vault root token in process argv (`make cloudflared-backup`, `bin/cluster-up` restore) + hex-encoded multi-line `cert.pem` restore — FIXED `29c2d506` (Codex, Claude-verified: bats green, token-argv mutation red, shellcheck no new warnings). operator ran `make cloudflared-backup` 2026-10-01 from a GUI Terminal — Keychain (base64, read-back verified) + Vault updated; bug `docs/bugs/2026-10-01-cloudflared-credentials-exposed-in-process-argv.md`.
+- [x] `ask-docs <q>` typed in a thread silently dropped (not in `_THREAD_COMMANDS`) — FIXED `aee1a258` (Codex, Claude-verified, mutation red); bug `docs/bugs/2026-10-01-ask-docs-thread-follow-up-silently-dropped.md`.
+- [x] `/ask-docs` ignores recency (pure cosine; 2026-10-01 docs ranked 6th / absent) — FIXED `c0b7bc88` (Codex, Claude-verified, mutation red; CHANGELOG bullets for both); bug `docs/bugs/2026-10-01-ask-docs-ignores-recency.md`.
+- [x] `make cloudflared-config` render/drift target — FIXED (Codex, Claude-verified: 51 bats green, render body byte-identical after extraction, live check `up to date (k3s-hostinger)`); Part B drift line in /cluster-status skipped; bug `docs/bugs/2026-10-01-no-standalone-cloudflared-config-render-or-drift-check.md`.
+- [x] `/cluster-status` WARNs on the intended Prometheus 401 (auth proxy working; a 200 would read green) — bug `30113dc1`, FIXED 2026-10-02 (Codex; 401=pass auth enforced, 200=fail bypass; 13 tests, mutation verified) — operator: make restart-webhook then /cluster-status; bug `docs/bugs/2026-10-02-cluster-status-warns-on-intended-prometheus-401.md`.
+- [x] `identity/k3dm-smoke-user` lost on hub rebuild (2 smoke WARNs since 2026-09-20) — option 2: Vault `secret/keycloak/smoke-user` + ExternalSecret in shopping-cart-infra; bug `docs/bugs/2026-10-02-smoke-user-secret-lost-on-hub-rebuild.md`, landed 2026-10-02 (Codex + Claude test fixes); infra PR #106 MERGED 2026-10-02 13:41Z (enforce_admins briefly off for the admin merge, restored); operator deleted the hand-made Secret + reseeded (password rotated); ExternalSecret SecretSynced, Secret now owned by ExternalSecret. `/cluster-status` 21 ok / 0 warn / 0 fail confirmed by operator.
+- [x] OPERATOR: relay redeployed (10ebc8a6) + webhook restarted 2026-10-02; `/ask-docs` + `/cluster-status` threading confirmed in Slack.
+- [x] (done 2026-10-02 via AppSet reapply; all hub apps Synced) OPERATOR: check the CM tracking-id (must name `hub-grafana-dashboards`), then reapply the ACG dashboard appset; confirm `k3d-cluster-grafana-dashboards` Synced, no SharedResourceWarning.
+- [ ] `/ask-docs` operator steps: `wrangler deploy` relay, Slack manifest `/ask-docs`, `make restart-webhook`, live smoke; then Claude calibrates `K3DM_ASK_DOCS_MIN_SCORE` and replaces the PLACEHOLDER fixture.
+- [x] Hub alert fixes 2026-10-02 (Codex, verified): ldap rotator `96af55b1`, Istio no-HPA `119f8a7b`, ArgoCD orphanedResources `efaf4038`, federate raw-only `8b792fcc`. Operator rollouts pending (each bug doc's Rollout). E2EVerificationFailing: option (b) landed on branches — payment `d2f2d55`, e2e-tests `df6b9c1`, k3d-manager `570734c7`; PRs + pin bump + live run pending; health test still open. Hermes alert-driven triage decided: v1.42.0 (scope + 3 specs, at cap), R10 → v1.43.0.
+- [x] Codex bug batch: bridge restart `52efebde`, data_layer cause `baedfdc5`, CFN orphan warning `82ba559b` on `k3d-manager-v1.40.0` (2026-10-01; make test 1223/1223, pytest 523). R1 regression + stale-marker false warning caught and fixed by Claude.
+
+# 2026-10-01 — v1.40.0 review fix spec (Codex)
+
+- [x] Spec filed: `docs/bugs/2026-10-01-v1.40.0-review-fixes-ci-rerun-exit-code-argocd-session.md`.
+- [x] Codex implemented `b5227418`, `393a0aae`, `236219f6`, docs `6aaef4dc`. Claude verified them independently:
+  the SHAs are on origin, the diff stays within spec scope, shellcheck is clean, BATS passed 23/23, pytest passed 51, and doc links passed.
+  All three mutations went red. The faithful `get-context` exit-only probe fails `stale session mints a token`.
+- [ ] Deferred review items 5–10: Vault root token, latency unit, duplicated overview dashboard,
+  label cardinality, and release-label test location.
+
+# 2026-09-30 — Hermes data_layer unknown-cause bug filed
+
+- [ ] Preserve and display a bounded, redacted cause for historical `data_layer` unknown states.
+
+# 2026-09-30 — Hermes dashboard bugs filed
+
+- [ ] Add drill-down evidence/links to the current findings table.
+- [ ] Explain numeric status history and expose evidence for unknown/degraded transitions.
+
+# 2026-10-01 — Codex batch bug 3 complete (`ecb46449`)
+
+- [x] Empty mktemp paths: F1 guard, F2 BATS_TEST_TMPDIR sweep, F3 root-debris checker wired to
+  check-doc-links; TMPDIR pre-fix reproduction showed `.join-failures.*`; mutation red; full pytest 442/442.
+- [x] Three-commit batch complete; all three SHAs are recorded in the bug docs and memory-bank.
+
+# 2026-10-01 — Codex batch bug 2 complete (`2f8c3ec8`)
+
+- [x] Hermes R2 ingress mapping: auth proxy label, corrected topology comment, mapping-derived test,
+  old-label mutation red; full pytest 442/442.
+- [ ] Batch bug 3 remains.
+
+# 2026-10-01 — Codex batch bug 1 complete (`8a7cdec9`)
+
+- [x] Webhook AI fallback: agent.py S0–S2, eight offline tests, stale webhook BATS assertions,
+  guide/README/CHANGELOG updates; M1–M3 red/restored green; full pytest 441/441.
+- [ ] Batch bugs 2 and 3 remain.
+
+# 2026-10-01 — bug backlog triage
+
+- [x] Codex batch verified 2026-10-01: 8a7cdec9 (agy), 2f8c3ec8 (R2), 8fa82259 (mktemp); plus the R2 gui/<uid> service-target fix.
+- [x] agy model probe OK (PONG) 2026-10-01.
+- [ ] Operator: git pull + `make restart-webhook` so the running webhook loads the new agent.py.
+- [x] 27 OPEN docs triaged: 14 fixed, 7 stale-closed, 6 open (R2 label, agy exit status, mktemp, appset overrides dormant, payments a/b, hub self-registration).
+
+# 2026-09-30 — v1.41.0 planning
+
+- [x] Spec `docs/plans/v1.41.0-python-agent-rigor.md` written (3 of 5 v1.41.0 plans).
+- [ ] Codex briefs A (lib-foundation M1) and B (k3d-manager M1 adoption + M2–M4) once v1.41.0 opens.
+
+# 2026-09-30 — values_branch sensor and R9
+
+- [x] Implemented the amended values_branch/R9 brief, including realistic ArgoCD fixture coverage,
+  six mutation cases, exporter scope, docs and approval-pinned command. Final commit SHA is recorded
+  in the completion handoff.
+
+# 2026-09-30 — vector store auto-index implementation
+
+- [x] Implemented tracked-ref corpus reads, fingerprinting, Hermes refresh, quota pause, ingestion
+  gauges, alerts, dashboard row and offline tests. Final commit SHA is reported in the completion handoff.
+- [x] Operator: write the durable Vault embeddings credential — done 2026-09-30 (`secret/embeddings/gemini` v1; see below).
+
+# 2026-09-30 — vector store freshness
+
+- [x] Codex `29b7f55c` automatic re-indexing, verified by Claude with 4 defects fixed (deadlock, drift ref, pause match, rules YAML).
+- [x] Operator reapplied ApplicationSets on v1.40.0 (19 refs clean; Alertmanager Delivery ConfigMap present).
+- [x] Codex `a92f1f1d` Hermes `values_branch` sensor + R9, verified by Claude with 3 defects fixed (sensor order, vacuous pager test, Keychain-dependent test).
+- [ ] v1.41.0 design: fixed moving ref (e.g. `k3dm-live`) so a reapply is never needed.
+- [x] Automatic ingestion live 2026-09-30: `10e95119` indexed 2.5 min after commit, backlog 0.
+- [x] VectorDB dashboard shows data on the hostinger Grafana; Ingestion stat panels use instant queries.
+- [x] Decided 2026-09-30: vectordb metrics and dashboard move to the hub.
+- [x] Codex `50bd3591` hub Pushgateway + dashboard move, verified by Claude (`b46d5e06`).
+- [x] Codex `b11f1a2` keycloak flow wait, verified by Claude; shopping-cart-infra PR #103 open.
+- [x] shopping-cart-infra #103 merged as `98da0c5` (identical to the verified b11f1a2; CI green; Copilot found nothing).
+- [x] Live 2026-09-30: 98da0c5 synced; wait passed on attempt 1; the hook still 404s. Root cause corrected: missing flowId.
+- [x] Codex `4057069` flowId fix verified by Claude; shopping-cart-infra PR #104 open, CI green.
+- [x] #104 merged as 930a82d; flowId fix confirmed live; the hook now fails at PUT authentication/executions/{id}.
+- [x] Codex `b87bd8d` brief 3 verified by Claude; shopping-cart-infra PR #105 open, CI green.
+- [x] Keycloak reconcile hook FIXED live 2026-09-30 at e41f2ad (#105): Succeeded, no Job. Closes the 09-15 browser-flow live check. Watch for the KubeJobFailed RESOLVED email.
+- [x] Hub vectordb metrics live 2026-09-30 (ApplicationSets reapplied, forward 19094 healthy, rows=1732 pushed; the stray copy was pruned by ArgoCD).
+- [x] `make validate-manifests` + `_ensure_kubeconform` (self-installing kubeconform); SC2317 false positive suppressed.
+- [ ] Operator: let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.
+- [x] Operator: Vault copy written 2026-09-30 (`secret/embeddings/gemini` v1; verify prints 39).
+- [x] Operator: `make index-docs` 2026-09-30, 32/32 committed, 1727 in store (key read from Vault).
+- [x] Slack `/k3dm find-similar-docs` multi-word `Q` fixed in the relay parser.
+- [x] Operator deployed the relay 2026-09-30 (from a worktree); a multi-word `Q` is now accepted in Slack.
+- [x] Slack end-to-end 2026-09-30: `Q=mac scheduler cannot find tools` → launchd-path-omits-local-bin at #1 (0.643), key read unattended.
+- [x] Retrieval baseline 2026-09-30: 5/5 paraphrase queries in the top 5 (4 at rank 1), noise floor 0.55–0.57; see activeContext.
+
+# 2026-09-30 — MinIO registry bug closed
+
+- [x] Live: minio Running on bitnamilegacy, data intact, Trivy reports present, protection restored.
+- [ ] Follow-up (owner): replace the sunset bitnamilegacy MinIO image (12 CRITICAL / 80 HIGH).
+
+# 2026-09-30 — MinIO port merged
+
+- [x] #102 merged as `f909906`; tree identical to the reviewed head.
+- [ ] Operator: `enforce_admins` back to true; hostinger post-merge checks.
+
+# 2026-09-30 — MinIO port ready
+
+- [x] `36ea68e9` verified (busybox capability test + CI gates).
+- [ ] Operator: merge the shopping-cart-infra PR; run the post-merge checks.
+
+# 2026-09-30 — hostinger KubeJobFailed root-caused
+
+- [ ] Codex (shopping-cart-infra): finish the MinIO bitnamilegacy port safely for existing data; PR only.
+- [ ] Operator: confirm shopping-cart-identity is Synced now that #101 is on main.
+
+# 2026-09-30 — Alertmanager delivery dashboard
+
+- [x] Dashboard + tests + bug doc (`1e063919`).
+- [ ] Operator: confirm in Grafana after the next platform-ops sync.
+
+# 2026-09-30 — Codex verification #3
+
+- [x] Verified `d37b4347`; blind-webhook defect fixed in `4a2bf022`.
+- [ ] Operator: choose a fix for the Alertmanager Overview integration panels.
+
+# 2026-09-30 — node_pressure option (b) implementation complete; awaiting commit SHA
+
+- [x] Implemented the option (b) brief: real node conditions plus separate `data_layer`, pager/R1/R2
+  migration, exporter/docs, and tests. Focused Hermes tests 72/72; four mutations red/restored green;
+  no numbered test skipped. Full pytest result and commit SHA are in the completion handoff.
+
+# 2026-09-30 — Codex verification #2 + handoff #3
+
+- [x] Verified `72b402ea` (hostnet drift); argv-size defect fixed in `07c61ff9`.
+- [ ] Codex: node_pressure → data_layer brief. Claude verifies on return.
+
+# 2026-09-29 — hostnet-drift implementation complete; awaiting commit SHA
+
+- [x] Implemented all seven numbered tests from the host-network drift brief: focused BATS 46/46,
+  Hermes 55/55, full `make test-pytest` 401/401; shellcheck clean; all three mutations went red
+  and were restored green. No numbered test was skipped. Commit SHA is in the completion handoff.
+
+# 2026-09-29 — Codex verification + next handoff
+
+- [x] Verified `2dfa00ef` (cosign bring-up restore + R7); defect fixed in `c5b6def2`.
+- [ ] Codex: hostnet-drift brief. Claude verifies on return.
+
+# 2026-09-29 — Codex implementation: cosign prevention + Hermes R7
+
+- [x] Implemented the exact brief: hub recovery/new-hub restore hooks, approval-gated R7, allowlist
+  row, changelog, tests, and bug resolution. Focused BATS 57/57; Hermes repairs 24/24; all three
+  mutations went red and were restored green. The single commit SHA is recorded in the completion
+handoff.
+
+# 2026-09-29 — host-network IP drift
+
+- [x] Live: node-exporter pods recycled; drift check empty.
+- [ ] Codex: implement the brief in hostnetwork-pods-keep-stale-ip-after-node-restart.md.
+
+# 2026-09-29 — Codex handoff: cosign prevention + Hermes R7
+
+- [x] Brief written (hub-rebuild-loses-cosign-signing-key.md).
+- [ ] Codex implements; Claude verifies SHA, tests and mutations independently.
+- [ ] Operator: Prometheus log for the duplicate-timestamp scrape pool.
+
+# 2026-09-29 — cosign restore
+
+- [x] Hub cosign key + grant restored live (operator). `make signing-restore` added (`6ea6cd9b`).
+- [ ] Operator: approve Fix 1 (bring-up restore) and/or Fix 2 (Hermes R7).
+
+# 2026-09-29 — Hermes status publish fixed
+
+- [x] Label-as-string bug fixed (`e4ea49e0`); `test_publish_status.py` 9/9, pytest 396/396, 2 mutations red.
+- [x] Operator confirmed live: `published: True`, `hermes-status` ConfigMap present.
+
+# 2026-09-29 — Hermes status publish diagnostics
+
+- [x] `_publish_status` logs failures; `test_publish_status.py` 7/7; pytest 394/394; 3 mutations red. `349eab0c`.
+- [ ] Operator: read the new log line; then fix the named cause.
+- [ ] Operator: `bin/k3dm-worker-setup` to repopulate the empty `CLOUDFLARE_API_TOKEN` GitHub secret.
+
+# 2026-09-29 — /cluster-diagnose all-namespaces overview
+
+- [x] Relay + webhook + runner + docs. Relay node tests 23/23, `test_diagnostics_all_pods.py` 12/12,
+  `webhook.bats` 65/65, `slack_slash_commands.bats` 8/8, `make test-pytest` 387/387; relay and
+  webhook mutations red. Commit `64d87163`.
+- [ ] Operator: `make deploy-worker` (or merge to main) so Slack sees the new form.
+
+# 2026-09-29 — e2e payment root cause documented
+
+- [x] Root-caused the 8 JSON failures + vcluster health failure; recorded in the api-payments bug doc.
+- [ ] Operator: choose auth option (e2e profile vs real token) before a Codex spec for the two repos.
+
+# 2026-09-29 — retrieval-eval spec status corrected
+
+- [x] `v1.40.0-hermes-prior-art-and-retrieval-eval.md`: blocker removed (v1.39.0 shipped WS1-WS3).
+
+# 2026-09-29 — cloud-session fixes landed on k3d-manager-v1.40.0
+
+- [x] Fast-forwarded `k3d-manager-v1.40.0` to `a1ea1ab` (3 bug fixes + doc status sweep).
+  Local gates: `make test-pytest` 375/375, `make test-python-unit` 7/7. CI not yet run (PR-only).
+
+# 2026-09-29 — stale bug-doc statuses corrected
+
+- [x] Five bug docs whose fixes had already landed now read FIXED with commit SHAs. Commit `b0aca7b`.
+
+# 2026-09-29 — make-job output file fix implemented
+
+- [x] `docs/bugs/2026-09-28-make-jobs-never-write-output-file.md`: output written via
+  `_redact_secrets` + `scrub_credentials` before `status`. `test_make_job_output.py` 3/3;
+  `make test-pytest` 375/375; `make test-python-unit` 7/7 OK; three mutations red.
+  Commit `b66ca92` on `claude/inspiring-bohr-37ojhk`.
+
+# 2026-09-29 — describe-pod env masking implemented
+
+- [x] `docs/bugs/2026-09-28-diagnostics-describe-pod-prints-literal-env-values.md`: env-block
+  masking + existing scrubber. `scripts/tests/bin/test_describe_pod_env_masking.py` 5/5;
+  `make test-pytest` 372/372; `make test-python-unit` 7/7 OK; four mutations red and restored.
+  Commit `6c95ea8` on `claude/inspiring-bohr-37ojhk`.
+
+# 2026-09-29 — unranked token-role fix implemented
+
+- [x] `docs/bugs/2026-09-28-role-code-assumes-every-token-role-is-ranked.md`: capability roles
+  bypass rank comparison and are allowed only their policy-name set. Added
+  `scripts/tests/bin/test_role_capabilities.py` (26/26); `make test-pytest` 367/367;
+  `make test-python-unit` 7/7 suites OK; all three mutations red and restored green.
+  Commit `adb451c` on `claude/inspiring-bohr-37ojhk`.
+
+# 2026-09-28 — diagnostics redaction follow-up implemented
+
+- [x] Closed the follow-up scrubber gaps: JSON/quoted values, nested Bearer values, empty-user
+  URLs, Basic auth, Vault boundary guard, and a real registry-path integration test. Focused
+  tests 27/27 and `make test-pytest` 341/341; all three mutations were red and restored green.
+  Commit `89214fc0`.
+
+# 2026-09-27 — v1.40.0 cluster-down recurrence fix complete
+
+- [x] Item 1 from `docs/bugs/2026-06-24-hostinger-provider-switch-stale-active-provider.md`:
+  `bin/cluster-down` calls `_acg_unrecord_provider "${_cluster_provider}"` instead of removing
+  the legacy scalar directly. Added `scripts/tests/lib/cluster_down_provider_marker.bats` (2/2)
+  and the Unreleased Fixed entry. Commit `396afff89fb7830f4e12530967ada804c2106da2` pushed to
+  `origin/k3d-manager-v1.40.0`; mutation-tested both directions. Provider active set: 26/26;
+  provider contract: 57/57; shellcheck before/after unchanged with existing informational output.
+
+# 2026-09-28 — diagnostics logs redaction fix implemented
+
+- [x] Fixed unregistered credential-shaped values leaking through diagnostics logs. Added shared
+  `scripts/lib/webhook/redact.py`, the diagnostics integration, focused tests, and the Unreleased
+  changelog entry. `make test-pytest` passed 334 tests; the three required mutations were proven
+  red and restored to green. Commit `7208c043`.
+
+# 2026-09-28 — cloud-request helper fix implemented
+
+- [x] Fixed the fresh-clone fetch failure and four-action helper allowlist drift per the Codex brief.
+  Shared action definitions live in `scripts/lib/webhook/cloud_actions.py`; the helper validates
+  all action arguments from that table. Required tests and mutations passed; `make test-pytest`
+  passed 314 tests. Commit `66f642aa`; verified by Claude 2026-09-28 (tests, mutations, and a real
+  fresh-clone file against a local bare remote).
+
+# v1.40.0 in progress — 2026-09-27
+
+- [x] **fix the `eso` sensor `unknown`** — four stacked defects diagnosed 2026-09-27 (kubeconfig error read as absence; exit code discarded; `Hub ESO *` rows never graded; the bats suite tests dead duplicates). Spec `docs/bugs/2026-09-27-hermes-eso-sensor-unknown-kubeconfig-error-as-absence.md`, assigned to Codex. — FIXED, verified live (degraded on cycle 3, `cosign-public-key`); mutation-tested both guards
+- [x] vectordb dashboard investigated — **not blank.** All six gauges publish to
+      Pushgateway, Prometheus scrapes them (target up), all six panel queries
+      return values, dashboard uid `k3dm-vectordb` provisioned, ConfigMap present
+      in both clusters. The stale "blank because the producer never ran" item is
+      withdrawn.
+- [x] **`VectorDBMetricsStale` fixed** — `fa89fc6b`. Now also compares
+      `push_time_seconds{job="k3dm-vectordb"}` against `time()` (>1h), `for: 15m`;
+      proven in both directions against live Prometheus. New
+      `scripts/tests/plugins/vectordb_rules.bats` (6/6), mutation-tested. Guide
+      updated. Reaches the cluster on the next ArgoCD sync.
+- [x] **Hermes bootstrapped** — `com.k3d-manager.hermes` loaded, 300s interval,
+      last exit code 0; verified it publishes unattended (push_time advanced
+      ~392s at cycle 2, gauges 1708 → 1713, Prometheus then 136s old).
+- [ ] **the installer dropped `K3DM_HERMES_AUTO_KINE_GUARD=1` from the plist** —
+      `_install_hermes_agent` regenerates from a template that omits it, so the
+      auto Kine guard is now OFF. Restore or leave? User's call.
+- [x] **`make argocd-hermes-token` HTTP 400 fix** — `expiresIn` sent as string `"0"`; swagger types it `integer/int64`, so grpc-gateway rejected the body pre-ArgoCD. Integer now; BATS test 10 guards it. `swagger.json` is unauthenticated — the diagnosis lever
+- [x] **`make argocd-hermes-token` Cloudflare 1010 fix** — first live run 403'd on `urllib`'s default UA, not on ArgoCD authz; UA set on both API calls, error hint reordered, BATS test 9 added (mutation-proven), `docs/guides/hermes.md` troubleshooting block
+- [x] **re-mint `k3dm-hermes-argocd-token`** — **DONE and VERIFIED 2026-09-27** via
+      `make argocd-hermes-token`. Independent confirmation: 40 Applications reported by
+      the target matched `kubectl get applications -n cicd`; the first post-restart cycle
+      (23:15:45Z) shows `argocd` **degraded with real app evidence** instead of `unknown`,
+      which also proves Hermes can read the item from the Keychain under launchd — the
+      ACL failure `-U` exists to prevent. Beware: the last pre-restart cycle still logged
+      `credential rejected` (23:10:38Z, before the 23:14:56Z restart), which reads as a
+      failed mint if you don't date it against the process start.
+      Original diagnosis below, retained for the root cause:
+      The ArgoCD sensor reported
+      "credential rejected"; Hermes has no ArgoCD visibility. Operator-only.
+      **Root cause found 2026-09-27:** the error is `token signature is invalid`,
+      not an expiry. `argocd-secret` was created `2026-09-20T23:50:23Z` at
+      `resourceVersion: 2144` and never updated since; `argocd-server` started the
+      same second. The 2026-09-20 ArgoCD rebuild regenerated `server.secretkey`,
+      so **every API token minted before that date is permanently invalid** — the
+      key that signed it no longer exists. The operator's own CLI session was
+      rejected the same way. Re-minting is the only fix; retrying cannot work.
+      `argocd-initial-admin-secret` still exists (created 23:51:56Z, 93s later),
+      so the admin password is probably still the post-rebuild initial one — and
+      note `make show-service-passwords` prefers the **Vault** copy at
+      `secret/data/argocd/admin`, which may predate the rebuild, so it can print a
+      password that no longer works. The k8s Secret is authoritative.
+      **`make argocd-hermes-token` added (`80fb51c2`)** — mints via the ArgoCD API
+      (secrets by env, never argv), writes the Keychain item with `-U`, reads it
+      back, proves it against `/api/v1/applications`, restarts Hermes, never
+      prints the token. Refuses without a TTY. 8 BATS tests, mutation-tested.
+      **The operator still has to run it** — it cannot run unattended by design.
+- [x] **the other Hermes sensor reports deep-dived** — all four traced to root
+      cause, read-only. Real ESO health is fine on both clusters (hub CSS
+      Ready=True 7/8 synced; hostinger Ready=True 20/20).
+- [ ] **`eso` sensor reports unknown on a false negative** — the webhook defaults
+      the provider to `k3s-aws`, whose context `ubuntu-k3s` is not registered, and
+      `_kubectl_absent()` classifies kubectl's `context was not found` error as
+      resource absence. Two fixes available: delete the stale context (necessary,
+      not sufficient) and stop `_kubectl_absent()` treating a kubeconfig error as
+      absence (the real fix). Not started.
+- [ ] **`eso` sensor never evaluates the hub** — it exact-matches only the
+      unprefixed names, so the `Hub ESO *` entries the webhook emits are invisible
+      to it. Hub ESO failures surface only incidentally via `node_pressure`.
+- [ ] **`keycloak-realm-reconcile` Job Failed for 6d21h** — `awk: command not
+      found`; `quay.io/keycloak/keycloak:24.0` has no awk and the inline script
+      uses it ~9 times. ArgoCD PostSync hook of `shopping-cart-identity`, so the
+      manifest lives in **shopping-cart-infra** — spec + Codex. Likely the common
+      cause of both remaining `node_pressure` failures (Keycloak, Frontend SSO
+      login). Nothing alerted on it for six days.
+- [ ] **hub `platform-ops/cosign-public-key` ExternalSecret still not synced** —
+      1 of 8; this is the "Hub ESO ExternalSecrets" failure `node_pressure`
+      reports. Pre-existing backlog item, now confirmed as the live cause.
+- [x] **`reachability` confirmed unchanged** — verdict `single-service`; frontend
+      0/5 with a `1/1 Running` pod returning 404 (routing, the known unapproved
+      fix), all six other hosts 5/5.
+- [ ] Hermes sensors reporting: `eso` unknown, `reachability` degraded
+      (`frontend.3ai-talk.org`), `node_pressure` degraded (Keycloak, Hub ESO,
+      Frontend SSO), `kine` healthy with `stale_acg_registration: true`.
+- [ ] delete the stale `ubuntu-k3s` kube context — now load-bearing: it is the
+      current context and does not exist, so unqualified `kubectl` reads error and
+      read as empty listings.
+
+- [x] `docs/howto/makefile.md` documents the six test targets — `8312512d`
+      (Test Suites section, +39; `check-doc-links: 1 file(s) OK`)
+- [x] `bin/k3dm-vectordb-metrics` documented in `docs/guides/vector-store.md` —
+      `28e3f744` (six gauges tabled to their status fields, `K3DM_PUSHGATEWAY_URL`,
+      omitted-vs-zero and the non-fatal exit-0 contract). Both v1.39.0 Step 7b
+      leftovers now closed.
+- [x] the three root-level `scripts/tests/*.bats` files now live in globbed
+      directories — `1cf46580` (two into `plugins/`, `test_install_sudoers.bats`
+      into `bin/install_sudoers.bats`; `BATS_TEST_DIRNAME` depths corrected;
+      new `scripts/tests/core/suite_discovery.bats` guard, mutation-tested both
+      ways; `bats scripts/tests/bin` 167/167, `scripts/tests/core` 10/10)
+- [ ] `workers/slack-relay/test/relay.test.mjs` runs in no make target and no
+      CI job — same defect class, the only known remaining instance; no decision
+
+# v1.39.0 shipped — 2026-09-27
+
+- [x] **PR #133 merged** to `main` as squash commit `3a254484c04d0ff6d9a42de72eeae1ab3b12c473`.
+- [x] `enforce_admins` restored on `main` via the bodyless POST; read back `enabled: true`.
+      `required_approving_review_count` was never lowered this release (still `1`).
+- [x] Tag `v1.39.0` created on the merge commit and pushed; GitHub release `v1.39.0` published
+      as `latest` with the CHANGELOG section as notes.
+- [x] `main` synced locally (fast-forward, clean).
+- [x] `origin/main` merged into `k3d-manager-v1.40.0` as `8758dcf0` — six conflicts, all
+      resolved and verified: three files were strict subsets of main's and took `--theirs`,
+      `argocd_vectordb.bats` took main's `rg`-free version (suite re-run 16/16 on the merged
+      tree), and both memory-bank files were union-merged and proved supersets of both sides.
+- [x] Retro `docs/retro/2026-09-27-v1.39.0-retrospective.md` shipped with the PR.
+- [x] Step 7b standing-doc audit — four gaps found and fixed in `65e015ec`:
+      `docs/howto/makefile.md` (all three new targets were missing), `README.md`
+      (`public-endpoint-alerts.md` link), `memory-bank/projectbrief.md` (no vectordb/pgvector
+      mention anywhere), `.github/copilot-instructions.md` (Architecture bullets + a v1.39.0
+      review section). `docs/api/functions.md` needed no change — no new public shell functions.
+- [ ] `docs/howto/makefile.md` still documents no `test`/`test-pytest`/`test-bin`/`test-all`
+      target — pre-existing, not a v1.39.0 regression. Worth a pass in v1.40.0.
+- [ ] `bin/k3dm-vectordb-metrics` is undocumented. Its sibling `bin/k3dm-vectordb-status` is
+      covered in `docs/guides/vector-store.md`.
+- [ ] Branch cleanup not run — v1.39.0 is not a 5-release boundary and the user did not ask.
+      Branch deletion needs the user's explicit go.
+
 # v1.39.0 k3dm-tests alerts moved to the ACG stack — 2026-09-27
 
 - [x] **Blackbox probes inert: doubled image registry + unsubstituted `${CF_DOMAIN}`** — fixed in
@@ -98,7 +512,7 @@
       the correct doc for an `ArgoCD OutOfSync with no real diff` query ranked 4th of 5, and the
       whole band spanned 0.785-0.764 (0.021). Do not add a score threshold on this evidence; any
       cutoff in that band drops the right answer. Details in `activeContext.md`.
-- [ ] Operator: the durable slot is still open — write the Vault copy at `secret/embeddings/gemini`
+- [x] (closed 2026-09-30: Vault copy written) Operator: the durable slot is still open — write the Vault copy at `secret/embeddings/gemini`
       (still `No value found`) or fix the `gemini-cli-api-key` trusted-app ACL in Keychain Access.
       Until then `make find-similar-docs` and dedup Pass 2 are inert for every agent. No agent
       creates, reads, echoes or commits the value.
@@ -248,6 +662,7 @@ Zero entries is the default, not an anomaly.
   (existence check only, no value read). **`gemini-cli-api-key` does exist** and Gemini embeddings
   are free-tier, making it the candidate needing no new credential — but it was provisioned for the
   Gemini CLI and **repurposing it needs the operator's explicit go**. WS1 does not depend on this;
+  WS2 cannot start without it.
   WS2 cannot start without it. RESOLVED 2026-09-26: the operator approved reusing
   `gemini-cli-api-key`, and ruled that it stays the single keychain copy — the remaining absent items
   stay absent rather than being filled with duplicates. See the one-slot decision in
@@ -1741,6 +2156,10 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] **Promoter-key spec corrected twice** — deploy keys are per-repo, not shared; product-catalog
       is missing the `sc-image-promoter` deploy key AND the `PROMOTER_SSH_KEY` secret. Pin bump
       sequenced after the infra merge, not dispatched to Codex.
+- 2026-10-02: `fef39649` (realm roles list) + `cc43b5fc` (Grafana Dashboards Loaded) landed, Claude-verified. Checkout Load Test CPU saturation [1m]→[5m] spec dispatched to Codex.
+- 2026-10-02: operator `loadtest_run --confirm` failed (no LOADTEST_USERNAME/PASSWORD). `make loadtest-preflight` / `make loadtest CONFIRM=1` added to v1.41.1 plan `06e973dc` (v1.40.0 at 5-plan cap).
+- 2026-10-02: `a5e1e24f` CPU saturation [5m] landed (Claude-verified 30/30). vcluster upgrade nag: bug spec docs/bugs/2026-10-02-vcluster-upgrade-nag-in-harness-output.md (VCLUSTER_SKIP_VERSION_CHECK=true) dispatched to Codex; pin-drift check/bump plan docs/plans/v1.41.1-vcluster-version-drift.md (pinned 0.32.1, latest 0.37.2).
+- 2026-10-02: `7ce184e5` vcluster nag fix verified (shellcheck clean, new test green). 4 vcluster.bats orphan tests red since `5706eb21` (seed still a table; only reconcile suite was run at verify) — spec docs/bugs/2026-10-02-vcluster-bats-orphan-seed-still-a-table.md dispatched to Codex. Plan docs/plans/v1.41.1-scheduled-baseline-loadtest.md: 12h baseline profile via launchd + major-release stress gate before/during PR (operator decision).
 - [x] **Root-caused the product-catalog promotion failure** — never onboarded in the unenumerated
       2026-08-09 SSH-promoter rollout; Dependabot auto-merge imported the breaking change 2026-08-12;
       a 2026-09-01 DeployKey ruleset bypass was a misdiagnosis. Broken since 08-12, not 08-26.
@@ -2391,3 +2810,156 @@ Operator step now unblocked: `make refresh-registration CLUSTER_PROVIDER=k3s-hos
 - [!] Mutation proof against pre-fix HEAD copies: tests 1, 3 and 4 fail; test 2 passes because its
       literal body is self-contained and does not inspect either script, so it cannot fail against
       the unfixed source without altering the required test block.
+# 2026-09-29 — stale unmanaged ArgoCD registration cleanup fixed
+
+- [x] Added `make cleanup-stale-registration CLUSTER=<name> [CONFIRM=1]` for exact,
+  explicitly confirmed removal of one stale ArgoCD cluster registration. The helper
+  deletes the registration Secret first, then removes only matching Applications with
+  non-blocking deletion. Bug filed at `docs/bugs/2026-09-29-stale-unmanaged-argocd-registration.md`.
+  Targeted cleanup tests: 5/5; `bash -n`, ShellCheck, `_agent_checkpoint`, `_agent_lint`,
+  and `_agent_audit` passed. Commit `39193aae` pushed to `origin/k3d-manager-v1.40.0`.
+# 2026-09-30 — VectorDB hub metrics implementation
+
+- [x] Added hub Pushgateway chart application and static Prometheus scrape.
+- [x] Routed VectorDB publishers to `K3DM_VECTORDB_PUSHGATEWAY_URL` (default localhost:19094).
+- [x] Moved the dashboard to the hub platform-ops set with byte-identical JSON and corrected labels.
+- [x] Added offline tests, ran mutation red/green checks and repository gates; commit SHA is in the
+  completion handoff.
+
+# 2026-09-30 — Hermes dashboard evidence and status history
+
+- [x] Added failed-host labels and CI run URLs to the Hermes exporter and findings table.
+- [x] Added status enum/evidence guidance to the history panel.
+- [x] Added regression coverage for dashboard fields, sensor evidence, and CI run metadata.
+- [x] Mutation checks failed as expected when the history explanation or CI field was removed, then
+  passed after restoration. Full pytest: 442 passed; manifest validation: 10 valid; doc links: 1825
+  files OK. Final commit SHA: `3d0c5478`.
+
+# 2026-09-30 — Grafana overview no-data fix
+
+- [x] Added matching release labels to the hub and ACG Grafana ServiceMonitors.
+- [x] Added a regression test and confirmed the rendered Helm ServiceMonitors contain the labels.
+- [x] Mutation made the regression test fail; restoring the label made it pass. Final commit SHA is
+  recorded in the bug doc: `bc301f83`.
+
+# 2026-09-30 — fix-sync ArgoCD connection
+
+- [x] Fixed `fix-sync` and `fix-force-sync` to self-manage the default local ArgoCD port-forward
+  and use gRPC-web, with cleanup and a configurable server override.
+- [x] Added regression coverage; removing `--grpc-web` made the test fail, then restoration passed.
+  Final commit SHA: `ffe501fa`.
+
+# 2026-09-30 — fix-sync plaintext follow-up
+
+- [x] Added `--plaintext` to `fix-sync` and `fix-force-sync` for the local ArgoCD port-forward.
+- [x] Focused regression passed; removing `--plaintext` made it fail, then restoration passed.
+  Follow-up SHA: `14dab218`.
+
+# 2026-09-30 — fix-sync stale-token recovery
+
+- [x] Added automatic ArgoCD session validation and password-stdin login for stale tokens.
+- [x] Regression passed; removing the login plaintext flag made it fail, then restoration passed.
+  Final SHA: `a7fb7798`.
+
+# 2026-09-30 — fix-sync failure diagnostics
+
+- [x] Preserve the temporary port-forward log on failure and report Secret/login failures instead
+  of returning a bare status 1. Full fix-target BATS: 6/6. Final SHA is recorded in the bug doc
+  after commit: `36653c96`.
+
+# 2026-09-30 — fix-sync login compatibility
+
+- [x] Matched the working ArgoCD login flags and newline-fed stdin; login errors are now surfaced.
+- [x] Regression passed; removing `--skip-test-tls` made it fail, then restoration passed. Final
+  SHA: `e853c849`.
+
+# 2026-09-30 — fix-sync login diagnostic capture
+
+- [x] Captured both stdout and stderr from ArgoCD login failures, preserving the password boundary
+  while exposing the actual error. Focused BATS passed; final SHA is recorded in the bug doc after
+  commit: `75952f57`.
+
+# 2026-09-30 — fix-sync CLI-version compatibility
+
+- [x] Replaced unsupported `argocd login --stdin` with password-stdin API authentication and
+  `ARGOCD_AUTH_TOKEN`. Focused BATS passed; final SHA: `4335a601`.
+
+# 2026-10-01 — fix-sync Vault-first ArgoCD credentials
+
+- [x] Added explicit override, Vault-first lookup, and Kubernetes fallback for ArgoCD admin
+  credentials. Focused BATS passed; final SHA: `122129bb`.
+
+# 2026-10-01 — fix-sync password newline handling
+
+- [x] Corrected the embedded Python newline escape in both sync targets and added a regression
+  assertion. The faulty escape mutation failed the focused suite; restoration passed. Final SHA is
+recorded in the bug doc: `db351961`.
+
+# 2026-10-01 — Grafana Overview raw labels
+
+- [x] Filed the bug with screenshot evidence and confirmed the built-in Overview JSON is absent
+  from the available source checkouts.
+- [x] Add and deploy a source-controlled replacement/override after confirming dashboard ownership.
+
+# 2026-10-01 — Grafana Overview readable dashboard
+
+- [x] Added and tested the source-controlled readable dashboard with a unique UID/title; final SHA
+is recorded in the bug doc after commit. Final SHA: `3664bea7`.
+The hub platform-ops manifest and regression assertion are included as well; final SHA is recorded
+in the bug doc after commit: `3664bea7`.
+
+# 2026-10-01 — k3dm-tests exit result panel
+
+- [x] Replaced the raw exit-code table with a latest-result view and regression coverage; final SHA
+  is recorded in the bug doc: `e3db399e`.
+
+# 2026-10-01 — v1.41.1 load-test credential/preflight spec
+
+- [x] Specified the safe credential, preflight, remote-write, dashboard, testing, and scope
+  requirements for v1.41.1. Implementation remains pending.
+
+# 2026-10-01 — v1.41.0 find-similar-docs links spec
+
+- [x] Specified branch resolution, terminal/Slack/JSON output, offline tests, and scope for
+  link-enriched similarity results. Implementation remains pending.
+# 2026-10-01 — v1.42.0 daily verification plan
+
+- [x] Specified independent daily offline `k3dm-test` and Tier 1 E2E runs, separate result
+  channels/triage, stale-data semantics, timing metrics, mutations, and offline acceptance
+  gates in `docs/plans/v1.42.0-daily-offline-and-e2e-verification.md`.
+- [ ] Implementation not started; Tier 2 ACG/Stripe remains opt-in and outside this plan.
+# 2026-10-01 — k3d-manager Dot roadmap
+
+- [x] Added the candidate v1.42.0 “k3d-manager Dot” milestone to `docs/roadmap.md`, linking
+  the independent daily offline/E2E verification scope.
+- [ ] Implementation is not started; this remains a roadmap/specification item.
+# 2026-10-01 — v1.40.0 review fixes complete
+
+- [x] Four review findings fixed in commits `b5227418`, `393a0aae`, and `236219f6`; docs commit
+  records the spec as FIXED and updates CHANGELOG/memory-bank.
+- [x] Gates: `shellcheck bin/argocd-app-sync`; focused BATS 23/23; Hermes pytest 51 passed; and
+  `make check-doc-links` passed.
+- [x] Mutation checks: Hermes rerunnable ordering, Grafana verdict mapping, and stale ArgoCD
+  session probe each failed their named regression test and were restored green.
+- 2026-10-02: e2e RabbitMQ broker + payment spring.rabbitmq key path landed — payment `9778e21`, k3d-manager `034d9513` (Codex, verified: 66/66 bats, 3 mutations red). PRs pending go.
+- 2026-10-02: payment CI 37025969474 GREEN on `9778e21` (137 tests, +1 RabbitPropertiesBindingTest). Payment + e2e-tests PRs ready to prepare; awaiting go.
+- 2026-10-02: e2e-tests PR #9 opened (fix/payment-client-v1-bearer). Payment fix branch still unmerged (ahead 2, behind 1); #76 merged was Dependabot.
+- 2026-10-02: payment PR #78 opened; e2e #9 Copilot fix dispatched to Codex.
+- 2026-10-02: e2e #9 Copilot thread fixed `ce145ee` and resolved.
+- 2026-10-02: e2e runs 1790958376-31051 (dead keychain PAT, 401) and 1790959569-5392 (GHCR OK via gh refresh; product-catalog rollout timeout, no diagnostics) failed pre-test. Specs: GHCR resolver remedies + substrate failure diagnostics, dispatched to Codex.
+- 2026-10-02: landed `937c4bfe` (make e2e recording), `b2ca3acc` (GHCR messages), `6266ef9e` (substrate diagnostics) — Codex, Claude-verified. Architecture docs spec (cloud bridge + vector store) dispatched to Codex.
+- 2026-10-02: docs/architecture/cloud-bridge.md + vector-store.md landed with README links (Codex + Claude verification).
+- 2026-10-02: operator added admin PR-merge bypass to payment ruleset 20607313 and disabled enforce_admins on e2e-tests main (re-enable after #9 merges). Payment #78 CI all green.
+- 2026-10-02: payment #78 Copilot finding (resource_access roles from ANY client grant payment roles) fixed `a3c0c24`: client roles scoped to payment.security.resource-client-id (default payment-service); CI pending.
+- 2026-10-02: payment #78 CI green on `a3c0c24` (139 tests); Copilot thread resolved. Both PRs ready for operator merge.
+- 2026-10-02: payment #78 MERGED (`412bc78`), e2e-tests #9 MERGED (`755ad2d`); e2e-tests enforce_admins re-enabled. Awaiting payment main build 37031252652 image publish → substrate pin bump.
+- 2026-10-02: Overview "Firing Alerts by Category" table spec `617ac4c8` (operator request; classifies the 55 firing alerts) dispatched to Codex.
+- 2026-10-02: Firing Alerts by Category table landed `bf32ce99` (Codex, verified: 28/28 bats, panel 12 identical in both copies, shipped expr live-checked). Live on next ArgoCD sync.
+- 2026-10-02: payment image sha-412bc78 published (run 37031252652, build-push success); substrate pin bumped `7c9caff7` (Codex, verified 56/56 e2e bats). Next: operator live Tier 1.
+- 2026-10-02: live Tier 1 run 1790958044-29337 failed before tests: no GHCR pull PAT in env or Vault (gh token lacks read:packages). vcluster reconcile table-parsing bug filed `a8f52a5c`, dispatched to Codex.
+- 2026-10-02: vcluster reconcile JSON fix landed `5706eb21` (Codex, verified 4/4 bats, shellcheck clean). Operator re-running `make e2e` from their terminal.
+- 2026-10-02: e2e run 1790961003-14944 FAILED pre-test: product-catalog crash-loop on service-link `RABBITMQ_PORT=tcp://…` (regression from `034d9513`), found via new substrate diagnostics. Spec `af17b25c` dispatched to Codex.
+- 2026-10-02: service-link fix landed `c7fa36e4` (Codex, Claude-verified 60/60 bats, mutation red). Operator to re-run `make e2e`.
+- 2026-10-02: recorded make log lags live run (macOS script buffers); spec `6cd5697a` (script -F / -f) dispatched to Codex. Live e2e run 17:26:38Z in progress, watched via /tmp/e2e.log.
+- 2026-10-02: recorded-log flush fix landed (script -F / -f; 6/6 bats, mutation red; live flush unverified — no TTY in Claude shell).
+- 2026-10-02: e2e run 1790961998-24160: service-link fix confirmed live (product-catalog/basket/order rolled out); FAILED at keycloak rollout — realm import roles.realm nested object (from `570734c7`). Spec + Overview "Dashboards" stat title spec `380bf24a` dispatched to Codex.

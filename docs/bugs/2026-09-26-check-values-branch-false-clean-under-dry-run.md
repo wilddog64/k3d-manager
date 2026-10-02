@@ -3,7 +3,7 @@
 **Filed:** 2026-09-26 (Claude, during the v1.38.0 release ApplicationSet reapply)
 **Severity:** medium — the release step's own confirmation gate passes while the drift it
 exists to detect is present.
-**Status:** OPEN, unfixed. Found by measurement, not by the gate.
+**Status:** FIXED (triage by Claude, 2026-10-01) — `8acabaf8` makes zero-reference and unparseable results failures; the live gate reported "checked 19 references" on 2026-09-30.
 
 ## Symptom
 

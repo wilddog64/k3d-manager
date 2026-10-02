@@ -19,6 +19,7 @@ spec:
         app.kubernetes.io/component: service
         app.kubernetes.io/part-of: shopping-cart-e2e
     spec:
+      enableServiceLinks: false
       initContainers:
       - name: wait-for-postgres
         image: postgres:16.4-alpine
@@ -53,10 +54,25 @@ spec:
               key: postgres-password
         - name: DB_SSLMODE
           value: disable
+        - name: RABBITMQ_HOST
+          value: rabbitmq
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USERNAME
+          value: e2e
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: e2e-datastore-credentials
+              key: rabbitmq-password
         - name: SPRING_CLOUD_VAULT_ENABLED
           value: "false"
         - name: OAUTH2_ENABLED
           value: "false"
+        - name: OAUTH2_ISSUER_URI
+          value: http://keycloak:8080/realms/shopping-cart
+        - name: OAUTH2_JWK_SET_URI
+          value: http://keycloak:8080/realms/shopping-cart/protocol/openid-connect/certs
         - name: RABBITMQ_VAULT_ENABLED
           value: "false"
         - name: PAYMENT_GATEWAY_DEFAULT

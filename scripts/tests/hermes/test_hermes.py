@@ -3,15 +3,18 @@ import importlib.machinery
 import importlib.util
 import json
 import sys
+import time
+from types import SimpleNamespace
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
 from hermes.correlator import Correlator
-from hermes.sensors import (argocd, ci, eso, github_token_expiry, kine, kine_log_signals,
-                            node_pressure, reachability, stale_acg_registration,
-                            status_checks, token_expiry_advisory)
+from hermes import repairs
+from hermes.sensors import (argocd, ci, data_layer, eso, github_token_expiry, kine, kine_log_signals,
+                            hostnet_drift, node_pressure, reachability, stale_acg_registration,
+                            status_checks, token_expiry_advisory, values_branch)
 
 ROOT = Path(__file__).resolve().parents[3]
 loader = importlib.machinery.SourceFileLoader("k3dm_hermes_status", str(ROOT / "bin" / "k3dm-hermes"))
@@ -47,16 +50,116 @@ def test_status_checks_handles_invalid_empty_and_timeout_output_as_unknown():
     assert status_checks(lambda *_: (_ for _ in ()).throw(TimeoutError()), {})["status"] == "unknown"
 
 
+def _values_apps(revision="k3d-manager-v1.40.0", stale=0):
+    apps = []
+    for number in range(45):
+        source = {"repoURL": "https://github.com/wilddog64/k3d-manager",
+                  "targetRevision": "k3d-manager-v1.39.0" if number < stale else revision}
+        if number in (2, 4):
+            source["targetRevision"] = "HEAD"
+        if number == 2:
+            spec = {"sources": [source, {"repoURL": "https://charts.example.invalid/helm", "targetRevision": "HEAD"}]}
+        elif number == 3:
+            spec = {"source": {"repoURL": "https://charts.example.invalid/helm", "targetRevision": "1.2.3"}}
+        else:
+            spec = {"source": source} if number % 2 else {"sources": [source]}
+        apps.append({"metadata": {"name": f"app-{number}"}, "spec": spec,
+                     "status": {"health": {"status": "Healthy"}, "sync": {"status": "Synced"},
+                                "operationState": {"phase": "Succeeded"}, "padding": "x" * 6000}})
+    return apps
+
+
+def test_values_branch_realistic_fixture_ignores_head_and_other_repos():
+    apps = _values_apps()
+    output = json.dumps(apps)
+    assert len(output) > 200_000
+    calls = []
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                           lambda argv, _env: calls.append(argv) or (0, output), {}, token="x")
+    assert result["status"] == "healthy"
+    assert result["data"]["checked"] == 42
+    assert result["data"]["tracking_head"] == 2
+    assert calls == [["argocd", "app", "list", "-o", "json", "--grpc-web"]]
+
+
+def test_values_branch_debounces_lag_then_stale_and_clears():
+    output = json.dumps(_values_apps(stale=2))
+    current = {}
+    run = lambda *_: (0, output)
+    assert [values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), run, current, token="x")["status"]
+            for _ in range(2)] == ["healthy", "healthy"]
+    third = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), run, current, token="x")
+    assert third["status"] == "degraded" and "app-0@k3d-manager-v1.39.0" in third["evidence"]
+    clean = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                          lambda *_: (0, json.dumps(_values_apps())), current, token="x")
+    assert clean["status"] == "healthy"
+
+
+def test_values_branch_nonrelease_is_skipped_and_never_pages(monkeypatch):
+    from hermes import pager
+    calls = []
+    state = {}
+    def argo(*args):
+        calls.append(args)
+        return 0, "[]"
+    pager_state = {}
+    for _ in range(pager.SENSOR_UNKNOWN_CYCLES + 1):
+        item = values_branch(lambda *_: (0, "main"), argo, state, token="x")
+        assert item["status"] == "healthy" and item["data"]["skipped"] is True
+        assert pager.health_events([item], pager_state) == []
+    assert calls == []
+    unknown_state, pages = {}, []
+    for _ in range(pager.SENSOR_UNKNOWN_CYCLES):
+        pages += pager.health_events([dict(item, status="unknown")], unknown_state)
+    assert any("values_branch check unknown" in text for text in pages), "control: unknown must page"
+
+
+def test_values_branch_nonrelease_skips_even_without_a_token(monkeypatch):
+    from hermes import sensors as sensor_module
+    monkeypatch.setattr(sensor_module, "_keychain_secret", lambda *_: "")
+    item = values_branch(lambda *_: (0, "claude/foo"), lambda *_: (0, "[]"), {})
+    assert item["status"] == "healthy" and item["data"]["skipped"] is True
+
+
+def test_values_branch_zero_refs_and_real_failures_are_unknown():
+    no_refs = json.dumps([{"metadata": {"name": "head"}, "spec": {"source": {
+        "repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "HEAD"}}}])
+    item = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                         lambda *_: (0, no_refs), {}, token="x")
+    assert item["status"] == "unknown" and "no k3d-manager" in item["evidence"]
+    failed = values_branch(lambda *_: (1, "git failure"), lambda *_: (0, "[]"), {}, token="x")
+    assert failed["status"] == "unknown"
+
+
+def test_values_branch_resolution_order_and_argocd_failures(monkeypatch):
+    monkeypatch.setenv("K3DM_RELEASE_BRANCH", "k3d-manager-v1.39.0")
+    assert k3dm_hermes is not None
+    from hermes.sensors import _values_branch_expected
+    assert _values_branch_expected(lambda *_: (0, "main"), "k3d-manager-v1.40.0")[0] == "k3d-manager-v1.40.0"
+    assert _values_branch_expected(lambda *_: (0, "main"))[0] == "k3d-manager-v1.39.0"
+    bad_json = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                             lambda *_: (0, "not json"), {}, token="x")
+    assert bad_json["status"] == "unknown"
+    rejected = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                             lambda *_: (1, "Unauthenticated"), {}, token="x")
+    assert "re-mint" in rejected["evidence"]
+    from hermes import sensors as sensor_module
+    monkeypatch.setattr(sensor_module, "_keychain_secret", lambda *_: "")
+    missing = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"), lambda *_: (0, "[]"), {})
+    assert missing["status"] == "unknown" and "credential unavailable" in missing["evidence"]
+
+
 def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
     monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "1")
     monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_: "")
     monkeypatch.setenv("K3DM_HERMES_STATUS_INTERVAL_MIN", "39")
     calls = []
     runner = lambda *_: calls.append(True) or (0, status_payload("healthy"))
-    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci",
-                 "alert_delivery"):
+    for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
+                 "alert_delivery", "vectordb"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
+    monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     state = {}
     assert k3dm_hermes._status_due(state, 1_000)
     records, _event = k3dm_hermes._run_cycle(state, runner)
@@ -95,9 +198,12 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes.pager, "security_events", lambda *_: [])
     monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: True)
+    monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
-    for name in ("eso", "argocd", "reachability", "node_pressure", "kine", "ci",
-                 "alert_delivery"):
+    monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
+    for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
+                 "alert_delivery", "vectordb"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
     calls = []
@@ -147,6 +253,211 @@ def test_status_poll_redacts_nested_payload_before_stdout(monkeypatch, tmp_path,
     assert "<redacted>" in output
 
 
+def test_refresh_index_unchanged_does_not_start_indexer(monkeypatch):
+    commands = []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "same")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", lambda metrics: commands.append(metrics))
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run",
+                        lambda command, **_kw: commands.append(command) or
+                        SimpleNamespace(returncode=0, stdout="", stderr=""))
+    state = {"index_fingerprint": "same"}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert all(not (isinstance(item, list) and "index-docs.py" in item[0]) for item in commands)
+    assert commands[-1]["result"] == "noop"
+
+
+def test_refresh_index_success_uses_ref_and_limit_and_stores_fingerprint(monkeypatch):
+    commands = []
+    pushed = []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "new")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", pushed.append)
+
+    def run(command, **_kw):
+        commands.append(command)
+        if command[1:4] == ["fetch", "--quiet", "origin"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="index-docs: 4 docs, 2 embedded, 0 pruned, 4 in store, 0 remaining\n",
+                                stderr="")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    index_command = next(command for command in commands if "index-docs.py" in command[0])
+    assert "--ref" in index_command and "origin/main" in index_command
+    assert index_command[index_command.index("--limit") + 1] == "100"
+    assert state["index_fingerprint"] == "new"
+    assert pushed[-1]["result"] == "success"
+
+
+def test_refresh_index_failure_does_not_store_fingerprint_or_break_poll(monkeypatch):
+    pushed = []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "new")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", pushed.append)
+
+    def run(command, **_kw):
+        if command[1:4] == ["fetch", "--quiet", "origin"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=1, stdout="", stderr="unavailable")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert "index_fingerprint" not in state
+    assert pushed[-1]["result"] == "failed"
+
+
+def _index_runner(commands, index_result):
+    def run(command, **kwargs):
+        commands.append((command, kwargs))
+        if command[1:4] == ["fetch", "--quiet", "origin"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return index_result
+    return run
+
+
+def _stub_refresh(monkeypatch, commands, index_result, pushed):
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "new")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", pushed.append)
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", _index_runner(commands, index_result))
+
+
+def _index_calls(commands):
+    return [command for command, _kw in commands if "index-docs.py" in command[0]]
+
+
+def test_refresh_index_paused_waits_for_next_utc_midnight(monkeypatch):
+    commands, pushed = [], []
+    paused = SimpleNamespace(returncode=1, stdout="",
+                             stderr="index-docs: paused — daily quota (quota EmbedPerDay)\n")
+    _stub_refresh(monkeypatch, commands, paused, pushed)
+    state = {}
+    k3dm_hermes._refresh_index(state)
+    until = state["index_paused_until"]
+    midnight = datetime.fromtimestamp(until, timezone.utc)
+    assert (midnight.hour, midnight.minute, midnight.second) == (0, 0, 0)
+    assert 0 < until - time.time() <= 86400
+    assert pushed[-1]["result"] == "paused" and "index_fingerprint" not in state
+    k3dm_hermes._refresh_index(state, now=until - 60)
+    assert len(_index_calls(commands)) == 1
+    assert pushed[-1]["result"] == "paused"
+
+
+def test_refresh_index_failure_naming_a_paused_doc_is_not_a_pause(monkeypatch):
+    commands, pushed = [], []
+    failed = SimpleNamespace(returncode=1, stdout="",
+                             stderr="index-docs: unavailable — cannot read docs/bugs/monitoring-paused.md\n")
+    _stub_refresh(monkeypatch, commands, failed, pushed)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert pushed[-1]["result"] == "failed"
+    assert not state.get("index_paused_until")
+
+
+def test_refresh_index_backlog_keeps_fingerprint_unset(monkeypatch):
+    commands, pushed = [], []
+    partial = SimpleNamespace(returncode=0, stderr="",
+                              stdout="index-docs: 900 docs, 100 embedded, 0 pruned, 800 in store, 250 remaining\n")
+    _stub_refresh(monkeypatch, commands, partial, pushed)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert "index_fingerprint" not in state
+    assert pushed[-1]["result"] == "success" and pushed[-1]["backlog"] == 250
+
+
+def test_refresh_index_never_changes_the_checkout(monkeypatch):
+    commands, pushed = [], []
+    ok = SimpleNamespace(returncode=0, stderr="",
+                         stdout="index-docs: 4 docs, 1 embedded, 0 pruned, 4 in store, 0 remaining\n")
+    _stub_refresh(monkeypatch, commands, ok, pushed)
+    k3dm_hermes._refresh_index({}, now=1000)
+    git = [command for command, _kw in commands if command[0] == "git"]
+    assert git and all(command[1] not in ("pull", "checkout", "switch", "reset", "merge", "rebase")
+                       for command in git)
+
+
+def test_refresh_index_push_failure_keeps_outcome(monkeypatch):
+    commands = []
+    ok = SimpleNamespace(returncode=0, stderr="",
+                         stdout="index-docs: 4 docs, 1 embedded, 0 pruned, 4 in store, 0 remaining\n")
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "new")
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", _index_runner(commands, ok))
+
+    def refused(*_args, **_kw):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen", refused)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_fingerprint"] == "new" and state["index_last_success"] == 1000
+
+
+def test_health_metrics_count_the_corpus_at_the_indexed_ref(monkeypatch):
+    commands = []
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run",
+                        lambda command, **kw: commands.append((command, kw)) or SimpleNamespace(returncode=0))
+    k3dm_hermes._publish_health_metrics("origin/k3d-manager-v1.40.0")
+    assert commands[-1][1]["env"]["K3DM_INDEX_REF"] == "origin/k3d-manager-v1.40.0"
+    k3dm_hermes._publish_health_metrics(None)
+    assert commands[-1][1]["env"] is None
+
+
+def test_refresh_index_records_the_ref_for_health_metrics(monkeypatch):
+    commands, pushed = [], []
+    ok = SimpleNamespace(returncode=0, stderr="",
+                         stdout="index-docs: 4 docs, 0 embedded, 0 pruned, 4 in store, 0 remaining\n")
+    _stub_refresh(monkeypatch, commands, ok, pushed)
+    state = {}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_ref"] == "origin/main"
+
+
+def test_index_metrics_use_separate_job_and_one_current_result(monkeypatch):
+    requests = []
+
+    class Response:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda request, **_kw: requests.append(request) or Response())
+    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 2,
+                                     "pruned": 0, "backlog": 0, "duration": 0.2,
+                                     "paused_until": 0, "result": "success"})
+    assert requests[0].full_url.endswith("/metrics/job/k3dm-vectordb-index")
+    body = requests[0].data.decode()
+    assert 'result="success"} 1' in body
+    assert sum('last_result{result=' in line and line.endswith(' 1')
+               for line in body.splitlines()) == 1
+    assert "/metrics/job/k3dm-vectordb\n" not in body
+
+
+def test_index_metrics_use_dedicated_hub_endpoint_and_ignore_old_override(monkeypatch):
+    requests = []
+
+    class Response:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda request, **_kw: requests.append(request) or Response())
+    monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://old.invalid:9091")
+    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0,
+                                     "pruned": 0, "backlog": 0, "duration": 0.1,
+                                     "paused_until": 0, "result": "success"})
+    assert requests[0].full_url.startswith("http://localhost:19094/metrics/job/k3dm-vectordb-index")
+    requests.clear()
+    monkeypatch.setenv("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://hub.invalid:1234")
+    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0,
+                                     "pruned": 0, "backlog": 0, "duration": 0.1,
+                                     "paused_until": 0, "result": "success"})
+    assert requests[0].full_url.startswith("http://hub.invalid:1234/metrics/job/k3dm-vectordb-index")
+
+
 def test_status_reminder_waits_for_local_midnight(monkeypatch):
     from datetime import timedelta
     class LocalClock:
@@ -187,6 +498,21 @@ def webhook(payload):
     return lambda _url, _headers: payload
 
 
+def nodes_payload(ready="True", pressure=None):
+    conditions = [{"type": "Ready", "status": ready},
+                  {"type": "MemoryPressure", "status": "False"},
+                  {"type": "DiskPressure", "status": "False"},
+                  {"type": "PIDPressure", "status": "False"}]
+    if pressure:
+        for item in conditions:
+            if item["type"] == pressure:
+                item["status"] = "True"
+    node = {"metadata": {"name": "node-0"}, "status": {
+        "conditions": conditions,
+        "images": [{"names": [f"registry.example/image-{idx}:v1"]} for idx in range(2500)]}}
+    return json.dumps({"items": [node]})
+
+
 def assert_normalized(item, sensor):
     assert set(item) == {"sensor", "status", "evidence", "sampled_at", "data"}
     assert item["sensor"] == sensor
@@ -205,8 +531,36 @@ def test_eso_healthy_degraded_unknown_and_debounce():
     assert [eso(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
     unknown = health([{"name": "ESO ClusterSecretStore", "ok": None, "detail": "absent"},
                       {"name": "ESO ExternalSecrets", "ok": True, "detail": "ok"}])
-    assert eso(webhook(unknown), {}, token="x")["status"] == "unknown"
+    # Intentional tri-state contract inversion from docs/bugs/2026-09-27-hermes-eso-sensor-unknown-kubeconfig-error-as-absence.md.
+    assert eso(webhook(unknown), {}, token="x")["status"] == "healthy"
     assert eso(webhook(good), {}, token="")["status"] == "unknown"
+
+
+def test_eso_grades_hub_rows_and_ignores_unreachable_app_cluster():
+    payload = health([
+        {"name": "ESO ClusterSecretStore", "ok": None,
+         "detail": "cluster unreachable (kube context 'ubuntu-k3s' unusable)"},
+        {"name": "ESO ExternalSecrets", "ok": None,
+         "detail": "cluster unreachable (kube context 'ubuntu-k3s' unusable)"},
+        {"name": "Hub ESO ClusterSecretStore", "ok": True, "detail": "Ready=True"},
+        {"name": "Hub ESO ExternalSecrets", "ok": False,
+         "detail": "1/8 not synced: cosign-public-key"},
+    ])
+    state = {}
+    statuses = [eso(webhook(payload), state, token="x")["status"] for _ in range(3)]
+    assert statuses == ["healthy", "healthy", "degraded"]
+    final = eso(webhook(payload), state, token="x")
+    assert_normalized(final, "eso")
+    assert final["status"] == "degraded"
+    assert "cosign-public-key" in final["evidence"]
+
+
+def test_eso_stays_unknown_when_all_rows_are_neutral():
+    payload = health([
+        {"name": "ESO ClusterSecretStore", "ok": None, "detail": "absent"},
+        {"name": "Hub ESO ExternalSecrets", "ok": None, "detail": "absent"},
+    ])
+    assert eso(webhook(payload), {}, token="x")["status"] == "unknown"
 
 
 def test_argocd_healthy_degraded_unknown_and_debounce():
@@ -262,26 +616,117 @@ def test_argocd_evidence_names_apps_from_cr_shape_and_truncates():
 
 def test_reachability_healthy_degraded_unknown_and_debounce():
     good = json.dumps({"verdict": "ok", "hosts": []})
-    bad = json.dumps({"verdict": "edge-down", "hosts": [{"healthy": False}]})
+    bad = json.dumps({"verdict": "edge-down", "hosts": [{"host": "grafana.3ai-talk.org", "healthy": False}]})
     healthy = reachability(lambda *_: (0, good), {})
     assert_normalized(healthy, "reachability")
     assert healthy["status"] == "healthy"
     state = {}
     assert [reachability(lambda *_: (2, bad), state)["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
+    assert "grafana.3ai-talk.org" in reachability(lambda *_: (2, bad), {})["evidence"]
     assert reachability(lambda *_: (3, "{}"), {})["status"] == "unknown"
 
 
-def test_node_pressure_healthy_degraded_unknown_and_debounce():
-    good = health([{"name": "Data layer", "ok": True, "detail": "4/4 ready"}])
-    bad = health([{"name": "Data layer", "ok": False, "detail": "1 not ready"},
-                  {"name": "ArgoCD", "ok": False, "detail": "HTTP 502"}])
-    healthy = node_pressure(webhook(good), {}, token="x")
-    assert_normalized(healthy, "node_pressure")
-    assert healthy["status"] == "healthy"
+def test_node_pressure_and_data_layer_ignore_unrelated_webhook_failures():
+    runner = lambda _command, _env: (0, nodes_payload())
+    service_payload = health([{"name": "Frontend", "ok": False, "detail": "down"},
+                              {"name": "Hub ESO ExternalSecrets", "ok": False, "detail": "unsynced"},
+                              {"name": "Data layer", "ok": True, "detail": "4/4 ready"}])
+    node_state, data_state = {}, {}
+    assert [node_pressure(runner, node_state)["status"] for _ in range(3)] == ["healthy"] * 3
+    assert [data_layer(webhook(service_payload), data_state, token="x")["status"] for _ in range(3)] == ["healthy"] * 3
+
+
+def test_node_pressure_detects_pressure_and_not_ready_with_realistic_payloads():
+    pressure_runner = lambda _command, _env: (0, nodes_payload(pressure="DiskPressure"))
     state = {}
-    assert [node_pressure(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
-    assert node_pressure(webhook(health([{"name": "Data layer", "ok": None}])), {}, token="x")["status"] == "unknown"
-    assert node_pressure(webhook(good), {}, token="")["status"] == "unknown"
+    assert [node_pressure(pressure_runner, state)["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
+    assert "k3d-k3d-cluster/node-0 DiskPressure" in node_pressure(
+        pressure_runner, {}, contexts=["k3d-k3d-cluster"])["evidence"]
+    not_ready = node_pressure(lambda _command, _env: (0, nodes_payload(ready="False")), {},
+                              contexts=["k3d-k3d-cluster"])
+    assert "NotReady" in not_ready["evidence"]
+
+
+def test_node_pressure_unreadable_contexts_are_partial_or_unknown():
+    payload = nodes_payload()
+    def runner(command, _env):
+        return (0, payload) if command[2] == "k3d-k3d-cluster" else (1, "")
+    partial = node_pressure(runner, {}, contexts=["k3d-k3d-cluster", "ubuntu-hostinger"])
+    assert partial["status"] == "healthy"
+    assert partial["data"]["unreadable"] == ["ubuntu-hostinger"]
+    unknown = node_pressure(lambda _command, _env: (1, ""), {},
+                           contexts=["k3d-k3d-cluster", "ubuntu-hostinger"])
+    assert unknown["status"] == "unknown"
+
+
+def test_data_layer_narrow_tri_state_and_failure_contracts():
+    bad = health([{"name": "Data layer", "ok": False, "detail": "1 not ready"}])
+    state = {}
+    assert [data_layer(webhook(bad), state, token="x")["status"] for _ in range(3)] == ["healthy", "healthy", "degraded"]
+    assert data_layer(webhook(health([{"name": "Data layer", "ok": None, "detail": "not deployed"}])), {}, token="x")["status"] == "healthy"
+    assert data_layer(webhook(health([{"name": "Frontend", "ok": True}])), {}, token="x")["status"] == "unknown"
+    assert data_layer(lambda *_: (_ for _ in ()).throw(TimeoutError()), {}, token="x")["status"] == "unknown"
+
+
+def test_data_layer_unknown_evidence_names_each_cause():
+    cases = [
+        (data_layer(lambda *_: {}, {}, token=""), "credential unavailable: k3dm-webhook-token"),
+        (data_layer(webhook(health([])), {}, token="x"), "data layer status source unavailable: webhook returned no service checks"),
+        (data_layer(webhook(health([{"name": "Frontend", "ok": None}])), {}, token="x"),
+         "data layer status source unavailable: all webhook checks ungraded"),
+        (data_layer(webhook(health([{"name": "Frontend", "ok": True}])), {}, token="x"),
+         "data layer check absent from webhook payload"),
+        (data_layer(webhook(health([{"name": "Frontend", "ok": True},
+                                    {"name": "Data layer", "ok": None, "detail": "payload pending"}])), {}, token="x"),
+         "data layer ungraded: payload pending"),
+        (data_layer(lambda *_: (_ for _ in ()).throw(TimeoutError()), {}, token="x"),
+         "data layer status source unavailable: TimeoutError"),
+    ]
+    assert all(item["status"] == "unknown" for item, _ in cases)
+    assert [item["evidence"] for item, _ in cases] == [evidence for _, evidence in cases]
+
+
+def test_data_layer_unknown_evidence_is_pairwise_distinct():
+    records = [
+        data_layer(lambda *_: {}, {}, token=""),
+        data_layer(webhook(health([])), {}, token="x"),
+        data_layer(webhook(health([{"name": "Frontend", "ok": None}])), {}, token="x"),
+        data_layer(webhook(health([{"name": "Frontend", "ok": True}])), {}, token="x"),
+        data_layer(webhook(health([{"name": "Frontend", "ok": True},
+                                   {"name": "Data layer", "ok": None, "detail": "payload pending"}])), {}, token="x"),
+        data_layer(lambda *_: (_ for _ in ()).throw(TimeoutError()), {}, token="x"),
+    ]
+    assert all(item["status"] == "unknown" for item in records)
+    assert {item["evidence"] for item in records} == {
+        "credential unavailable: k3dm-webhook-token",
+        "data layer status source unavailable: webhook returned no service checks",
+        "data layer status source unavailable: all webhook checks ungraded",
+        "data layer check absent from webhook payload",
+        "data layer ungraded: payload pending",
+        "data layer status source unavailable: TimeoutError",
+    }
+
+
+def test_data_layer_exception_evidence_does_not_include_exception_message():
+    def failing_fetch(*_args):
+        raise RuntimeError("Bearer synthetic0token")
+
+    result = data_layer(failing_fetch, {}, token="x")
+    assert result["status"] == "unknown"
+    assert result["evidence"] == "data layer status source unavailable: RuntimeError"
+    assert "Bearer synthetic0token" not in result["evidence"]
+
+
+def test_hostnet_drift_healthy_degraded_after_two_cycles_and_unknown_on_failure():
+    payload = json.dumps({"drifted": [{"namespace": "monitoring", "pod": "node-exporter",
+                                        "owner_kind": "DaemonSet"}]})
+    state = {}
+    runner = lambda *_: (0, payload)
+    assert hostnet_drift(runner, state)["status"] == "healthy"
+    degraded = hostnet_drift(runner, state)
+    assert degraded["status"] == "degraded"
+    assert "monitoring/node-exporter" in degraded["evidence"]
+    assert hostnet_drift(lambda *_: (1, ""), {})["status"] == "unknown"
 
 
 def test_kine_log_signals_ignores_compact_rev_key_in_slow_sql():
@@ -350,22 +795,60 @@ def test_kine_degraded_only_for_stalled_compaction_or_size_and_never_writes():
 
 def test_ci_healthy_degraded_unknown_and_debounce():
     now = datetime(2026, 9, 5, tzinfo=timezone.utc)
-    def source(conclusion="success", status="completed"):
+    def source(conclusion="success", status="completed", checks=None):
         def fetch(url, _headers):
             if "actions/runs" in url:
-                return {"workflow_runs": [{"head_sha": "abc", "id": 123}]}
-            return {"check_runs": [{"name": "test", "conclusion": conclusion, "status": status,
-                                    "started_at": "2026-09-05T00:00:00Z"}]}
+                return {"workflow_runs": [{"head_sha": "abc", "id": 123,
+                                            "html_url": "https://github.com/wilddog64/k3d-manager/actions/runs/123"}]}
+            return {"check_runs": checks if checks is not None else
+                    [{"name": "test", "conclusion": conclusion, "status": status,
+                      "started_at": "2026-09-05T00:00:00Z"}]}
         return fetch
     healthy = ci(source(), {}, token="x", now=now)
     assert_normalized(healthy, "ci")
     assert healthy["status"] == "healthy"
     state = {}
-    assert [ci(source("failure"), state, token="x", now=now)["status"] for _ in range(2)] == ["healthy", "degraded"]
+    failed = [ci(source("failure"), state, token="x", now=now) for _ in range(2)]
+    assert [item["status"] for item in failed] == ["healthy", "degraded"]
+    assert failed[-1]["data"]["run_url"].endswith("/actions/runs/123")
     assert ci(lambda *_: (_ for _ in ()).throw(RuntimeError()), {}, token="x", now=now)["status"] == "unknown"
     assert ci(source(), {}, token="", now=now)["status"] == "unknown"
     stuck_now = datetime(2026, 9, 5, 2, tzinfo=timezone.utc)
     assert ci(source("success", "in_progress"), {"debounce": {"ci": 1}}, token="x", now=stuck_now)["status"] == "degraded"
+
+
+def test_ci_prefers_rerunnable_conclusion_after_failure():
+    now = datetime(2026, 9, 5, 2, tzinfo=timezone.utc)
+    def source(checks):
+        return lambda url, _headers: (
+            {"workflow_runs": [{"head_sha": "abc", "id": 123,
+                                 "html_url": "https://example.test/run/123"}]}
+            if "actions/runs" in url else {"check_runs": checks})
+
+    cancelled = [{"name": "failed", "conclusion": "failure", "status": "completed"},
+                 {"name": "cancelled", "conclusion": "cancelled", "status": "completed"}]
+    record = ci(source(cancelled), {"debounce": {"ci": 1}}, token="x", now=now)
+    assert record["data"]["conclusion"] == "cancelled"
+    assert record["data"]["run_url"]
+    assert repairs._r4_precondition([record], [], {}) is True
+
+    stuck = [{"name": "failed", "conclusion": "failure", "status": "completed"},
+             {"name": "stuck", "conclusion": None, "status": "in_progress",
+              "started_at": "2026-09-05T00:00:00Z"}]
+    record = ci(source(stuck), {"debounce": {"ci": 1}}, token="x", now=now)
+    assert record["data"]["conclusion"] == "stuck"
+    assert repairs._r4_precondition([record], [], {}) is True
+
+    record = ci(source([{"name": "failed", "conclusion": "failure", "status": "completed"}]),
+                {"debounce": {"ci": 1}}, token="x", now=now)
+    assert record["data"]["conclusion"] == "failure"
+    assert record["data"]["run_url"]
+    assert repairs._r4_precondition([record], [], {}) is False
+
+    record = ci(source([{ "name": "cancelled", "conclusion": "cancelled", "status": "completed"},
+                        {"name": "failed", "conclusion": "failure", "status": "completed"}]),
+                {"debounce": {"ci": 1}}, token="x", now=now)
+    assert record["data"]["conclusion"] == "cancelled"
 
 
 def sensor(name, status):

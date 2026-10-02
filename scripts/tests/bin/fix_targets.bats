@@ -32,6 +32,17 @@ setup() {
   [[ "${output}" == *"kubectl get pods -n 'shopping-cart-apps' --context 'k3d-k3d-cluster'"* ]]
 }
 
+@test "make fix targets invoke the shared ArgoCD sync helper" {
+  run make -n fix-sync APP=acg-kube-prometheus-stack
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"./bin/argocd-app-sync 'acg-kube-prometheus-stack' --timeout 120"* ]]
+  [[ "${output}" != *"account get-context"* ]]
+  run make -n fix-force-sync APP=acg-kube-prometheus-stack
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"./bin/argocd-app-sync 'acg-kube-prometheus-stack' --force --timeout 180"* ]]
+  [[ "${output}" != *"account get-context"* ]]
+}
+
 @test "ask sandbox allows make fix-list in fix mode" {
   run env K3DM_FIX_MODE=1 bin/k3dm-ask-bash -lc 'make fix-list'
   [ "${status}" -eq 0 ]

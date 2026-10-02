@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** OPEN — not assigned
+**Status:** FIXED (`b5a70e7a`): `PORT_FORWARD_LABELS` now maps the public Prometheus host to the auth proxy listening on cloudflared's ingress port.
 **Severity:** medium — a self-repair that cannot repair the failure it fires on, and its own
 stated grounding is now false.
 **Fix lands in:** `scripts/lib/hermes/repairs.py`, `scripts/tests/hermes/test_repairs.py`
@@ -87,3 +87,15 @@ cloudflared ingress port, so the next port move fails a test instead of silently
   frontend — that is a separate question.
 - Do not revert the port split to make the old mapping true again.
 - Do not have R2 reinstall plists or run `make` targets; kickstart only.
+
+## Verification (Claude, 2026-10-01)
+
+`2f8c3ec8` is correct as specified: the label matches the auth-proxy plist's `Label`, the Hermes suites
+pass 210/210, and mapping back to the port-forward fails 2 tests.
+
+**A further defect found and fixed in the follow-up commit:** `_r2_command` ran
+`launchctl kickstart -k <label>` with a bare label. `kickstart` requires a service target,
+`gui/<uid>/<label>`, which is the form every `launchctl kickstart` in the Makefile uses. With a bare
+label, launchctl rejects the target, so an approved R2 never restarted anything, before or after
+the port split. Fix: `gui/{os.getuid()}/{label}`. The tests assert the full target; reverting to the
+bare label fails 3 of them. The repair-scope doc row is updated.

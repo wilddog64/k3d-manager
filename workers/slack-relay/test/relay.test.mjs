@@ -160,6 +160,30 @@ test('cluster-status still relays and events GET is missing', async () => {
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
 })
 
+test('/ask, /ask-docs and cluster-status relay channel_id', async () => {
+  for (const [command, endpoint, text] of [
+    ['/ask', '/api/v1/ask', 'why is the cluster slow?'],
+    ['/ask-docs', '/api/v1/ask-docs', 'how is retrieval evaluated?'],
+  ]) {
+    const worker = loadWorker()
+    const body = `command=${encodeURIComponent(command)}&text=${encodeURIComponent(text)}&channel_id=CASK&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp`
+    await worker.dispatch(signed('/slack/commands', body))
+    const call = worker.fetches.find(item => item.url === `https://webhook.test${endpoint}`)
+    assert.equal(JSON.parse(call.init.body).channel_id, 'CASK')
+  }
+  const worker = loadWorker()
+  await worker.dispatch(signed('/slack/commands', 'command=/cluster-status&channel_id=CSTATUS&user_id=UOP1'))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster-status')
+  assert.equal(JSON.parse(call.init.body).channel_id, 'CSTATUS')
+})
+
+test('/ask-docs --sources without a question returns the updated usage', async () => {
+  const worker = loadWorker()
+  const response = await worker.dispatch(signed('/slack/commands', 'command=/ask-docs&text=--sources&user_id=UOP1'))
+  assert.match(await response.text(), /Usage: \/ask-docs \[--sources\] <question>/)
+  assert.equal(worker.fetches.length, 0)
+})
+
 test('GET /slack/events returns 404', async () => {
   const worker = loadWorker()
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
@@ -230,9 +254,83 @@ test('/k3dm rejects malformed arguments without relaying', async () => {
   assert.equal(worker.fetches.length, 0)
 })
 
+async function k3dmArgs(text) {
+  const worker = loadWorker()
+  const body = 'command=/k3dm&text=' + encodeURIComponent(text) + '&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/make')
+  return { text: await response.text(), payload: call && JSON.parse(call.init.body) }
+}
+
+test('/k3dm Q takes a multi-word query up to the end of the line', async () => {
+  const { payload } = await k3dmArgs('find-similar-docs Q=mac scheduler cannot find tools')
+  assert.deepEqual(payload.args, { Q: 'mac scheduler cannot find tools' })
+  assert.equal(payload.confirm, false)
+})
+
+test('/k3dm Q stops at the next KEY=value', async () => {
+  const { payload } = await k3dmArgs('find-similar-docs Q=stale node ip after restart K=10')
+  assert.deepEqual(payload.args, { Q: 'stale node ip after restart', K: '10' })
+})
+
+test('/k3dm Q stops at confirm', async () => {
+  const { payload } = await k3dmArgs('find-similar-docs Q=vault 403 on eso confirm')
+  assert.deepEqual(payload.args, { Q: 'vault 403 on eso' })
+  assert.equal(payload.confirm, true)
+})
+
+test('/k3dm bare words after confirm are rejected, not appended to Q', async () => {
+  const { text, payload } = await k3dmArgs('find-similar-docs Q=vault confirm extra')
+  assert.match(text, /Usage: \/k3dm/)
+  assert.equal(payload, undefined)
+})
+
+test('/k3dm bare words after a non-free-text key are still rejected', async () => {
+  const { text, payload } = await k3dmArgs('fix-status NS=monitoring extra words')
+  assert.match(text, /Usage: \/k3dm/)
+  assert.equal(payload, undefined)
+})
+
+test('/k3dm bare words before any key are still rejected', async () => {
+  const { text, payload } = await k3dmArgs('find-similar-docs mac scheduler Q=tools')
+  assert.match(text, /Usage: \/k3dm/)
+  assert.equal(payload, undefined)
+})
+
+test('/k3dm Q passes metacharacters through for the webhook to reject', async () => {
+  const { payload } = await k3dmArgs('find-similar-docs Q=foo; rm -rf /')
+  assert.equal(payload.args.Q, 'foo; rm -rf /')
+})
+
+test('/k3dm Q longer than 256 characters is rejected', async () => {
+  const { text, payload } = await k3dmArgs('find-similar-docs Q=' + Array(60).fill('word').join(' '))
+  assert.match(text, /Usage: \/k3dm/)
+  assert.equal(payload, undefined)
+})
+
 test('/k3dm with no text asks the webhook for help', async () => {
   const worker = loadWorker()
   await worker.dispatch(signed('/slack/commands', 'command=/k3dm&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
   const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/make')
   assert.equal(JSON.parse(call.init.body).target, 'help')
+})
+
+test('/cluster-diagnose <provider> with no verb asks for pods in all namespaces', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcluster-diagnose&text=aws&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await worker.dispatch(signed('/slack/commands', body))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/diagnostics')
+  assert.ok(call)
+  const payload = JSON.parse(call.init.body)
+  assert.equal(payload.provider, 'aws')
+  assert.equal(payload.action, 'get-pods-all')
+  assert.equal(payload.namespace, undefined)
+})
+
+test('/cluster-diagnose with no text still returns usage without relaying', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcluster-diagnose&text=&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  assert.match(await response.text(), /Usage: \/cluster-diagnose/)
+  assert.equal(worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/diagnostics'), undefined)
 })

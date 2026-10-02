@@ -22,6 +22,12 @@ spec:
             repoURL: https://prometheus-community.github.io/helm-charts
             targetRevision: 11.3.1
             valuesFile: scripts/etc/helm/observability/blackbox-exporter-values.yaml
+          - name: hub-pushgateway
+            namespace: monitoring
+            chart: prometheus-pushgateway
+            repoURL: https://prometheus-community.github.io/helm-charts
+            targetRevision: 2.14.0
+            valuesFile: scripts/etc/helm/observability/pushgateway-hub-values.yaml
           - name: hub-loki
             namespace: monitoring
             chart: loki

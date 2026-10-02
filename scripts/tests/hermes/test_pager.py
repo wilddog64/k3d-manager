@@ -21,12 +21,14 @@ def keychain(values):
 
 def webhook_down():
     return [record("eso", "unknown", "ESO status source unavailable"),
-            record("node_pressure", "unknown", "node pressure status source unavailable"),
+            record("data_layer", "unknown", "data layer status source unavailable"),
+            record("node_pressure", "healthy", "all readable nodes healthy"),
             record("ci", "healthy", "ok")]
 
 
 def all_healthy():
-    return [record("eso", "healthy", "ok"), record("node_pressure", "healthy", "ok"),
+    return [record("eso", "healthy", "ok"), record("data_layer", "healthy", "ok"),
+            record("node_pressure", "healthy", "ok"),
             record("ci", "healthy", "ok")]
 
 
@@ -87,7 +89,8 @@ def test_webhook_down_pages_once_after_two_polls_then_recovers():
 
 
 def test_other_sensor_unknown_pages_after_six_polls_with_evidence():
-    stuck = [record("eso", "healthy", "ok"), record("node_pressure", "healthy", "ok"),
+    stuck = [record("eso", "healthy", "ok"), record("data_layer", "healthy", "ok"),
+             record("node_pressure", "healthy", "ok"),
              record("argocd", "unknown", "ArgoCD status source unavailable: credential rejected")]
     state = {}
     results = [pager.health_events(stuck, state) for _ in range(7)]
@@ -96,6 +99,14 @@ def test_other_sensor_unknown_pages_after_six_polls_with_evidence():
     assert results[6] == []
     healthy = stuck[:2] + [record("argocd", "healthy", "12 applications healthy")]
     assert pager.health_events(healthy, state) == ["Hermes: argocd check recovered"]
+
+
+def test_node_pressure_unknown_pages_as_a_generic_sensor_after_six_polls():
+    records = [record("eso", "healthy", "ok"), record("data_layer", "healthy", "ok"),
+               record("node_pressure", "unknown", "node status source unavailable")]
+    state = {}
+    results = [pager.health_events(records, state) for _ in range(7)]
+    assert len(results[5]) == 1 and "node_pressure check unknown" in results[5][0]
 
 
 def test_single_flap_never_pages():

@@ -488,14 +488,48 @@ function _keycloak_smoke_set_password() {
    return 0
 }
 
-function _keycloak_smoke_write_secret() {
-   local ns="$1" secret_name="$2" username="$3" password="$4" wd="$5"
-   printf '%s' "$username" > "$wd/uname"
-   printf '%s' "$password" > "$wd/pword"
-   _kubectl -n "$ns" create secret generic "$secret_name" \
-      --from-file=username="$wd/uname" \
-      --from-file=password="$wd/pword" \
-      --dry-run=client -o yaml | _kubectl apply -f - >/dev/null
+function _keycloak_smoke_vault_get_password() {
+   local vault_ns="${VAULT_NS:-secrets}" root_token
+   root_token=$(_kubectl --no-exit -n "$vault_ns" get secret vault-root \
+      -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   [[ -n "$root_token" ]] || return 0
+   printf '%s\n' "$root_token" | _no_trace _kubectl -- -n "$vault_ns" exec -i vault-0 -- \
+      sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=password keycloak/smoke-user' \
+      2>/dev/null || true
+}
+
+function _keycloak_smoke_vault_put() {
+   local payload_file="$1" vault_ns="${VAULT_NS:-secrets}" root_token
+   root_token=$(_kubectl --no-exit -n "$vault_ns" get secret vault-root \
+      -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   [[ -n "$root_token" ]] || return 1
+   { printf '%s\n' "$root_token"; cat "$payload_file"; } | \
+      _no_trace _kubectl -- -n "$vault_ns" exec -i vault-0 -- \
+      sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put -mount=secret keycloak/smoke-user -' \
+      >/dev/null 2>&1
+}
+
+function _keycloak_smoke_password() {
+   local ns="$1" secret_name="$2" password
+   password=$(_keycloak_smoke_vault_get_password)
+   if [[ -z "$password" ]]; then
+      password=$(_kubectl --no-exit -n "$ns" get secret "$secret_name" \
+         -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   fi
+   if [[ -z "$password" ]]; then
+      password=$(openssl rand -hex 24)
+   fi
+   printf '%s' "$password"
+}
+
+function _keycloak_smoke_remove_unowned_secret() {
+   local ns="$1" secret_name="$2" secret_json
+   secret_json=$(_kubectl --no-exit -n "$ns" get secret "$secret_name" -o json 2>/dev/null || true)
+   [[ -n "$secret_json" ]] || return 0
+   if jq -e '.metadata.ownerReferences // [] | length > 0' >/dev/null 2>&1 <<<"$secret_json"; then
+      return 0
+   fi
+   _kubectl --no-exit -n "$ns" delete secret "$secret_name" >/dev/null 2>&1 || true
 }
 
 function keycloak_seed_smoke_user() {
@@ -505,8 +539,8 @@ Usage: keycloak_seed_smoke_user
 
 Idempotently seed a dedicated smoke client + local user in the app realm so the
 login smoke test (make status) can prove real realm-user auth without touching the
-app-owned 'frontend' client. Warns and returns 0 if Keycloak or the app realm is
-not reachable.
+app-owned 'frontend' client. Credentials are stored in Vault secret/keycloak/smoke-user
+and recreated by ESO. Warns and returns 0 if Keycloak or the app realm is not reachable.
 HELP
       return 0
    fi
@@ -537,10 +571,7 @@ HELP
    fi
 
    local password
-   password=$(_kubectl --no-exit -n "$ns" get secret "$secret_name" -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
-   if [[ -z "$password" ]]; then
-      password=$(openssl rand -hex 24)
-   fi
+   password=$(_keycloak_smoke_password "$ns" "$secret_name")
 
    if ! _keycloak_smoke_ensure_client "$base_url" "$token" "$realm" "$client_id"; then
       _warn "[keycloak] failed to create smoke client '${client_id}'"
@@ -559,8 +590,14 @@ HELP
       return 0
    fi
 
-   _keycloak_smoke_write_secret "$ns" "$secret_name" "$username" "$password" "$wd"
-   _info "[keycloak] smoke user '${username}' seeded in realm '${realm}' (secret ${ns}/${secret_name})"
+   K3DM_SMOKE_PASSWORD="$password" jq -n --arg username "$username" --arg realm "$realm" \
+      --arg client "$client_id" '{username:$username,password:$ENV.K3DM_SMOKE_PASSWORD,realm:$realm,client:$client}' > "$wd/smoke-user.json"
+   if ! _keycloak_smoke_vault_put "$wd/smoke-user.json"; then
+      _warn "[keycloak] could not store smoke credentials in Vault secret/keycloak/smoke-user"
+      return 0
+   fi
+   _keycloak_smoke_remove_unowned_secret "$ns" "$secret_name"
+   _info "[keycloak] smoke user '${username}' seeded in realm '${realm}' (stored in Vault secret/keycloak/smoke-user)"
 }
 
 function _keycloak_smoke_ensure_realm() {
@@ -670,9 +707,9 @@ the make-status login smoke test proves a real end-to-end 200 through /api/cart:
     the masked bindCredential with the real LDAP admin password;
   - creates the public direct-grant client (KEYCLOAK_SMOKE_CLIENT_ID);
   - adds the smoke user as an LDAP entry (READ_ONLY federation refuses local users)
-    with a generated password (reused from the existing Secret if present);
-  - writes Secret <namespace>/<KEYCLOAK_SMOKE_SECRET_NAME> (keys username, password,
-    realm, client) for the webhook smoke harness.
+    with a password recovered from Vault, the existing Secret, or generated once;
+  - stores username, password, realm and client in Vault secret/keycloak/smoke-user
+    for the ESO-managed Secret consumed by the webhook smoke harness.
 
 The admin API is reached via _keycloak_smoke_base_url; set KEYCLOAK_BASE_URL
 (e.g. http://localhost:8880 with the keycloak port-forward up) for a reliable path.
@@ -735,11 +772,7 @@ HELP
    fi
 
    local password
-   password=$(_kubectl --no-exit -n "$ns" get secret "$secret_name" \
-      -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
-   if [[ -z "$password" ]]; then
-      password=$(openssl rand -hex 24)
-   fi
+   password=$(_keycloak_smoke_password "$ns" "$secret_name")
 
    if ! _keycloak_smoke_ensure_ldap_user "$ns" "$ldap_pod" "$ldap_url" "$ldap_bind_dn" "$ldap_pw" \
         "$user_dn" "$username" "$password"; then
@@ -747,17 +780,14 @@ HELP
       return 0
    fi
 
-   printf '%s' "$username" > "$wd/uname"
-   printf '%s' "$password" > "$wd/pword"
-   printf '%s' "$realm" > "$wd/realmkey"
-   printf '%s' "$client_id" > "$wd/clientkey"
-   _kubectl -n "$ns" create secret generic "$secret_name" \
-      --from-file=username="$wd/uname" \
-      --from-file=password="$wd/pword" \
-      --from-file=realm="$wd/realmkey" \
-      --from-file=client="$wd/clientkey" \
-      --dry-run=client -o yaml | _kubectl apply -f - >/dev/null
-   _info "[keycloak] provisioned realm '${realm}' (frontendUrl=${frontend_url}); smoke user '${username}' seeded (secret ${ns}/${secret_name})"
+   K3DM_SMOKE_PASSWORD="$password" jq -n --arg username "$username" --arg realm "$realm" \
+      --arg client "$client_id" '{username:$username,password:$ENV.K3DM_SMOKE_PASSWORD,realm:$realm,client:$client}' > "$wd/smoke-user.json"
+   if ! _keycloak_smoke_vault_put "$wd/smoke-user.json"; then
+      _warn "[keycloak] could not store smoke credentials in Vault secret/keycloak/smoke-user"
+      return 0
+   fi
+   _keycloak_smoke_remove_unowned_secret "$ns" "$secret_name"
+   _info "[keycloak] provisioned realm '${realm}' (frontendUrl=${frontend_url}); smoke user '${username}' seeded (stored in Vault secret/keycloak/smoke-user)"
 }
 
 function test_keycloak() {

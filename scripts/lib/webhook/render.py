@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 
 from webhook.config import SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
+from webhook.redact import scrub_credentials
 
 
 _SLACK_POST_ALLOWED_HOSTS = frozenset({"hooks.slack.com", "slack.com"})
@@ -67,6 +68,21 @@ def _post_slack_bot(text, thread_ts=None):
             return result.get("ts", "") if result.get("ok") else ""
     except Exception:
         return ""
+
+
+def _start_bot_thread(header):
+    """Post a top-level Slack header and return its thread timestamp."""
+    return _post_slack_bot(header)
+
+
+def _redact_thread_question(question, *, docs=False):
+    """Return a short, credential-free question suitable for a Slack header."""
+    text = scrub_credentials(question)
+    if docs:
+        text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "[REDACTED IP]", text)
+        text = re.sub(r"(?<!\w)(?:\+?\d[\d .()\-]{7,}\d)(?!\w)", "[REDACTED PHONE]", text)
+    text = text[:199] + "…" if len(text) > 200 else text
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _fetch_thread_context(thread_ts, limit=20):

@@ -104,6 +104,8 @@ YAML
   # literal tagged infra images pinned directly in the manifests
   [[ "$output" == *"postgres:16.4-alpine"* ]]
   [[ "$output" == *"redis:7.4-alpine"* ]]
+  [[ "$output" == *"rabbitmq:3.12-alpine"* ]]
+  [[ "$output" == *"quay.io/keycloak/keycloak:24.0"* ]]
   # bare kustomize placeholders (no ':') must NOT leak through — every emitted
   # line is a real, tagged image reference
   local line

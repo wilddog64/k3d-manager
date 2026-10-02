@@ -25,24 +25,27 @@ if [[ -r "$KEYCLOAK_PLUGIN" ]]; then
   # shellcheck disable=SC1090
   source "$KEYCLOAK_PLUGIN"
 fi
+SIGNING_PLUGIN="$PLUGINS_DIR/signing.sh"
+if [[ -r "$SIGNING_PLUGIN" ]]; then
+  # shellcheck disable=SC1090
+  source "$SIGNING_PLUGIN"
+fi
+# shellcheck source=scripts/lib/cloudflared_render.sh
+source "$SCRIPT_DIR/lib/cloudflared_render.sh"
 
-function _hub_recovery_render_cloudflared_config() {
-  local provider="$1" in_file="$2" table="$3"
-  awk -v provider="$provider" -v table="$table" '
-    BEGIN {
-      while ((getline line < table) > 0) {
-        if (line ~ /^#/ || line == "") continue
-        split(line, f, "\\t")
-        if (f[2] == provider) origin[f[1]] = f[3]
-      }
-    }
-    /^[[:space:]]*-[[:space:]]*hostname:/ { host = $NF; print; next }
-    /^[[:space:]]*service:/ {
-      if (host != "" && (host in origin)) sub(/service:.*/, "service: " origin[host])
-      host = ""; print; next
-    }
-    { print }
-  ' "$in_file"
+function _hub_recovery_frontend_origin_provider() {
+  local hub_context="$1" app_context="$2"
+  if [[ -n "${HUB_RECOVERY_FRONTEND_PROVIDER:-}" ]]; then
+    printf '%s\n' "$HUB_RECOVERY_FRONTEND_PROVIDER"
+  elif _kubectl -- --context "$app_context" -n shopping-cart-apps get deployment frontend >/dev/null 2>&1; then
+    printf '%s\n' k3s-hostinger
+  elif _kubectl -- --context "$hub_context" -n shopping-cart-apps get deployment frontend >/dev/null 2>&1; then
+    printf '%s\n' k3d
+  else
+    printf '%s\n' k3s-hostinger
+    _warn "[hub-recovery] no frontend deployment found; leaving origin on permanent app cluster"
+  fi
+  return 0
 }
 
 function _hub_recovery_sync_vault_root_token() {
@@ -73,6 +76,24 @@ function _hub_recovery_ensure_eso_apps_role() {
   if ! printf '%s' "$role_json" | jq -e '.data.token_policies | index("eso-apps")' >/dev/null 2>&1; then
     _vault_configure_secret_reader_role secrets vault "$LDAP_ESO_SERVICE_ACCOUNT" "$LDAP_NAMESPACE" "$LDAP_VAULT_KV_MOUNT" "$LDAP_VAULT_POLICY_PREFIX" "$LDAP_ESO_ROLE" || return 1
   fi
+}
+
+function _hub_recovery_restore_signing() {
+  local hub_context="$1" kubeconfig=""
+  kubeconfig=$(mktemp -t hub-recovery-signing.XXXXXX) || kubeconfig=""
+  if [[ -z "$kubeconfig" || ! -f "$kubeconfig" ]]; then
+    _warn "[hub-recovery] could not create a temporary kubeconfig for cosign signing restore; continuing"
+    return 0
+  fi
+  if ! _kubectl -- --context "$hub_context" config view --minify --flatten > "$kubeconfig" 2>/dev/null || [[ ! -s "$kubeconfig" ]]; then
+    rm -f "$kubeconfig"
+    _warn "[hub-recovery] could not pin kubeconfig for cosign signing restore; continuing"
+    return 0
+  fi
+  if ! KUBECONFIG="$kubeconfig" signing_restore; then
+    _warn "[hub-recovery] cosign signing restore failed; continuing recovery"
+  fi
+  rm -f "$kubeconfig"
 }
 
 function _hub_recovery_seed_app_cluster_reader() {
@@ -145,10 +166,12 @@ function _hub_recovery_mirror_argocd_admin() {
 }
 
 function _hub_recovery_install_cloudflared_config() {
-  local config_dir="${HOME}/.cloudflared" config_file="${HOME}/.cloudflared/config.yml" source_file="$SCRIPT_DIR/etc/cloudflared/config.yml" table="$SCRIPT_DIR/etc/cloudflared/origins.tsv" rendered timestamp
+  local hub_context="$1" app_context="$2" provider config_dir="${HOME}/.cloudflared" config_file="${HOME}/.cloudflared/config.yml" source_file="$SCRIPT_DIR/etc/cloudflared/config.yml" table="$SCRIPT_DIR/etc/cloudflared/origins.tsv" rendered timestamp
   rendered=$(mktemp -t hub-recovery-cloudflared.XXXXXX)
   trap 'trap - RETURN; rm -f "'"${rendered}"'" 2>/dev/null || true' RETURN
-  _hub_recovery_render_cloudflared_config k3d "$source_file" "$table" > "$rendered"
+  provider=$(_hub_recovery_frontend_origin_provider "$hub_context" "$app_context")
+  _info "[hub-recovery] cloudflared frontend origin: ${provider}"
+  _hub_recovery_render_cloudflared_config "$provider" "$source_file" "$table" > "$rendered"
   if ! cmp -s "$rendered" "$config_file"; then
     mkdir -p "$config_dir"
     if [[ -f "$config_file" ]]; then
@@ -232,6 +255,13 @@ function _hub_recovery_ensure_serverlb_upstreams() {
   return 1
 }
 
+function _hub_recovery_reconcile_hostnet_drift() {
+  local hub_context="$1" drift_script="${HOSTNET_DRIFT_BIN:-${SCRIPT_DIR}/../bin/k3dm-hostnet-drift}"
+  if ! "$drift_script" --context "$hub_context" --fix; then
+    _warn "[hub-recovery] host-network IP drift reconciliation failed; continuing recovery"
+  fi
+}
+
 function hub_recovery_reconcile() {
   if [[ "${1:-}" == "--help" ]]; then
     echo "Usage: hub_recovery_reconcile [--confirm]"
@@ -240,15 +270,17 @@ function hub_recovery_reconcile() {
   local confirm=0 hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}" app_context="${HUB_RECOVERY_APP_CONTEXT:-ubuntu-hostinger}"
   if [[ "${1:-}" == "--confirm" ]]; then confirm=1
   elif [[ -n "${1:-}" ]]; then _err "[hub-recovery] only --confirm is accepted"; return 1; fi
-  local -a steps=("k3d serverlb upstreams" "Vault root token ↔ Keychain" "ESO policy" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
+  local -a steps=("k3d serverlb upstreams" "Host-network IP drift" "Vault root token ↔ Keychain" "ESO policy" "Cosign signing key" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
   local index
   if (( ! confirm )); then
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
     return 0
   fi
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
+  _hub_recovery_reconcile_hostnet_drift "$hub_context"
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1
   _hub_recovery_ensure_eso_apps_role || return 1
+  _hub_recovery_restore_signing "$hub_context"
   ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc ARGOCD_APP_CLUSTER_NAME="${HUB_RECOVERY_HUB_CLUSTER_NAME:-k3d-cluster}" ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster ARGOCD_APP_CLUSTER_PROVIDER=k3d ARGOCD_NAMESPACE=cicd register_app_cluster || return 1
   argocd_reconcile_app_cluster_registrations || true
   _hub_recovery_seed_app_cluster_reader "$hub_context" "$app_context" || return 1
@@ -256,7 +288,7 @@ function hub_recovery_reconcile() {
   _hub_recovery_replay_identity_hook "$hub_context" || return 1
   KEYCLOAK_BASE_URL="${KEYCLOAK_BASE_URL:-https://keycloak.3ai-talk.org}" keycloak_seed_smoke_user || return 1
   _hub_recovery_mirror_argocd_admin "$hub_context" || return 1
-  _hub_recovery_install_cloudflared_config
+  _hub_recovery_install_cloudflared_config "$hub_context" "$app_context"
 }
 
 function _hub_recovery_records() {

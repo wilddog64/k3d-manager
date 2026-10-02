@@ -96,11 +96,12 @@ data:
           "id": 5,
           "type": "timeseries",
           "title": "shopping-cart-apps CPU saturation (% of limits)",
+          "description": "CPU used by shopping-cart-apps as a percentage of its summed CPU limits. Uses a 5m rate window because the app-cluster kubelet is scraped once a minute; a 1m window holds a single sample and renders No data.",
           "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
           "fieldConfig": { "defaults": { "unit": "percent" } },
           "targets": [
             {
-              "expr": "100 * (sum(rate(container_cpu_usage_seconds_total{namespace=\"shopping-cart-apps\"}[1m])) / clamp_min(sum(kube_pod_container_resource_limits{namespace=\"shopping-cart-apps\",resource=\"cpu\"}), 1))",
+              "expr": "100 * (sum(rate(container_cpu_usage_seconds_total{namespace=\"shopping-cart-apps\"}[5m])) / clamp_min(sum(kube_pod_container_resource_limits{namespace=\"shopping-cart-apps\",resource=\"cpu\"}), 1))",
               "legendFormat": "cpu % of limit"
             }
           ]
