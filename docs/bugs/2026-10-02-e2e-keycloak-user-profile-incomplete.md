@@ -1,7 +1,7 @@
 # Bug: e2e Keycloak user has no profile attributes, so every payments token request fails "Account is not fully set up"
 
 **Filed:** 2026-10-02
-**Status:** OPEN — dispatched to Codex 2026-10-02
+**Status:** FIXED `5862c50d` (Codex, Claude-verified: 62/62 e2e.bats, email + firstName removal mutations red); live `make e2e` rerun pending
 **Branch:** `k3d-manager-v1.41.0`
 **Found by:** live Tier 1 `make e2e` run `1790968818-9643` (image `shopping-cart-e2e-tests:sha-35098aca…`): 48 passed, 8 failed, all `api/payments.spec.ts`
 **Related:** `docs/bugs/archive/2026-08-20-pre-v1.26/2026-07-23-smoke-login-keycloak-user-profile-attributes.md` (same root cause, smoke user), `docs/bugs/2026-10-02-e2e-keycloak-token-request-sent-as-json.md` (previous blocker, now fixed)
