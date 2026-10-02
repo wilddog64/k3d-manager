@@ -10,6 +10,9 @@
 
 ### Fixed
 
+- Hub and app Grafana dashboard ApplicationSets no longer compete for the readable Overview
+  ConfigMap; the app-cluster set excludes its copy only for the in-cluster hub server.
+
 - Grafana Overview Build Info now uses a positive field allowlist and presents only Version,
   Edition, Job, and Instance in both dashboard copies.
 

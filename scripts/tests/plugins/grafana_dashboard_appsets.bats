@@ -6,6 +6,41 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-autopatch.yaml"
 OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/grafana-overview-readable-configmap.yaml"
 HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml"
+PLATFORM_OPS_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops"
+DASHBOARDS_DIR="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards"
+
+_assert_server_keyed_hub_exclude() {
+  local appset="$1"
+  local exclude
+  exclude="$(yq -r '.spec.template.spec.source.directory.exclude // ""' "$appset")" || return 1
+  [[ "$exclude" == *'{{if eq .server "https://kubernetes.default.svc"}}'* ]] || return 1
+  [[ "$exclude" == *'{{end}}'* ]] || return 1
+  [[ "$exclude" != *'{{if eq .name'* ]] || return 1
+}
+
+_assert_collision_files_excluded() {
+  local appset="$1"
+  local platform_ops_dir="$2"
+  local dashboards_dir="$3"
+  local exclude platform_file dashboard_file platform_name dashboard_name dashboard_basename
+  exclude="$(yq -r '.spec.template.spec.source.directory.exclude // ""' "$appset")" || return 1
+
+  for platform_file in "$platform_ops_dir"/*.yaml; do
+    platform_name="$(yq -r 'select(.kind == "ConfigMap") | .metadata.name // ""' "$platform_file")" || return 1
+    [ -n "$platform_name" ] || continue
+    for dashboard_file in "$dashboards_dir"/*.yaml; do
+      dashboard_name="$(yq -r 'select(.kind == "ConfigMap") | .metadata.name // ""' "$dashboard_file")" || return 1
+      [ "$platform_name" = "$dashboard_name" ] || continue
+      dashboard_basename="$(basename "$dashboard_file")"
+      [[ "$exclude" == *"$dashboard_basename"* ]] || return 1
+    done
+  done
+}
+
+_assert_hub_exclude_contract() {
+  _assert_server_keyed_hub_exclude "$1" || return 1
+  _assert_collision_files_excluded "$1" "$2" "$3" || return 1
+}
 
 _build_info_panel() {
   local dashboard_file="$1"
@@ -35,6 +70,50 @@ _assert_build_info_contract() {
 @test "acg dashboard appset syncs the dashboards directory" {
   run yq -r '.spec.template.spec.source.path' "${ACG}"
   [ "$output" = "scripts/etc/grafana/dashboards" ]
+}
+
+@test "acg dashboard appset excludes hub collisions by server" {
+  _assert_hub_exclude_contract "${ACG}" "${PLATFORM_OPS_DIR}" "${DASHBOARDS_DIR}"
+}
+
+@test "acg dashboard appset collision guard rejects a missing exclude" {
+  local snapshot="${BATS_TEST_TMPDIR}/grafana-dashboards-acg.yaml"
+  cp "${ACG}" "$snapshot"
+  yq -i 'del(.spec.template.spec.source.directory.exclude)' "$snapshot"
+  run _assert_hub_exclude_contract "$snapshot" "${PLATFORM_OPS_DIR}" "${DASHBOARDS_DIR}"
+  printf 'mutation (a) missing exclude: status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+  cp "${ACG}" "$snapshot"
+  cmp -s "${ACG}" "$snapshot"
+  printf 'mutation (a) restore: cmp=identical\n'
+}
+
+@test "acg dashboard appset collision guard rejects a name-keyed condition" {
+  local snapshot="${BATS_TEST_TMPDIR}/grafana-dashboards-acg-name.yaml"
+  cp "${ACG}" "$snapshot"
+  sed 's/eq \.server/eq .name/' "${ACG}" > "$snapshot"
+  run _assert_hub_exclude_contract "$snapshot" "${PLATFORM_OPS_DIR}" "${DASHBOARDS_DIR}"
+  printf 'mutation (b) name condition: status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+  cp "${ACG}" "$snapshot"
+  cmp -s "${ACG}" "$snapshot"
+  printf 'mutation (b) restore: cmp=identical\n'
+}
+
+@test "acg dashboard appset collision guard derives a second platform collision" {
+  local platform_copy="${BATS_TEST_TMPDIR}/platform-ops"
+  local second_collision="${platform_copy}/grafana-dashboard-second-collision.yaml"
+  local second_snapshot="${BATS_TEST_TMPDIR}/grafana-dashboard-second-collision.snapshot.yaml"
+  cp -R "${PLATFORM_OPS_DIR}" "$platform_copy"
+  cp "${HUB_OVERVIEW}" "$second_collision"
+  yq -i '.metadata.name = "checkout-loadtest-dashboard"' "$second_collision"
+  cp "$second_collision" "$second_snapshot"
+  run _assert_hub_exclude_contract "${ACG}" "$platform_copy" "${DASHBOARDS_DIR}"
+  printf 'mutation (c) second collision: status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+  cp "$second_snapshot" "$second_collision"
+  cmp -s "$second_snapshot" "$second_collision"
+  printf 'mutation (c) restore: cmp=identical\n'
 }
 
 @test "hub dashboard appset includes all grafana-dashboard configmaps" {
