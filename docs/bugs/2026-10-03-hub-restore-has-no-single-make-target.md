@@ -191,7 +191,7 @@ Claude added a 6 h silence, `84a19233`.
 The sandbox path keeps only sandbox things. Gate: after a stubbed `make hub-recover`, nothing
 hub-side is left for a sandbox `make up` to create.
 
-### Follow-up F2 — embeddings key Vault copy (found 2026-10-03, about 19:40Z)
+### Follow-up F2 — embeddings key Vault copy (found 2026-10-03, about 19:40Z) — FIXED (see commit below)
 
 The hub rebuild lost `secret/embeddings/gemini`. The Hermes LaunchAgent cannot read the keychain
 item, so it falls through to that Vault copy. As a result, every 8-minute tick logs

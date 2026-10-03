@@ -33,6 +33,17 @@ case "${name}" in
   kubectl)
     if [[ "${1:-}" == "config" && "${2:-}" == "current-context" ]]; then
       printf '%s\n' "${KUBE_CONTEXT:-k3d-k3d-cluster}"
+    elif [[ "${*}" == *"exec -i -n secrets --context k3d-k3d-cluster vault-0"* ]]; then
+      if [[ "${*}" == *"kv put"* ]]; then
+        cat > "${EMBEDDINGS_STDIN}"
+      else
+        cat >/dev/null
+        if [[ -e "${EMBEDDINGS_STDIN}" ]]; then
+          printf '40\n'
+        else
+          printf '%s\n' "${EMBEDDINGS_LENGTH:-0}"
+        fi
+      fi
     fi
     ;;
   launchctl)
@@ -49,6 +60,7 @@ EOF
     chmod +x "${STUB}/${command_name}"
   done
   chmod +x "${STUB}/make-stub" "${STUB}/dispatcher"
+  export EMBEDDINGS_STDIN="${WORK}/embeddings.stdin"
   export PATH="${STUB}:/usr/bin:/bin"
   export HOME="${FAKE_HOME}"
   export K3DM_MAKE="${STUB}/make-stub"
@@ -85,11 +97,12 @@ teardown() { rm -rf "${WORK}"; }
   ! grep -q '^make ' "${CALL_LOG}"
 }
 
-@test "hub-restore happy path runs independent steps and prints eight-row summary" {
+@test "hub-restore happy path runs independent steps and prints nine-row summary" {
+  export EMBEDDINGS_LENGTH=40
   run bin/hub-restore
   [ "${status}" -eq 0 ]
   restore_output="${output}"
-  [ "$(grep -c '^\[hub-restore\] [1-8]/8 ' <<< "${restore_output}")" -eq 8 ]
+  [ "$(grep -c '^\[hub-restore\] [1-9]/9 ' <<< "${restore_output}")" -eq 9 ]
   run cat "${CALL_LOG}"
   [[ "${output}" == *"make restore-google-app-password"* ]]
   [[ "${output}" == *"make observability"* ]]
@@ -104,11 +117,52 @@ teardown() { rm -rf "${WORK}"; }
   export SIGNING_SKIP=1
   run bin/hub-restore
   [ "${status}" -eq 1 ]
-  [[ "${output}" == *"Step 3/8 FAIL"* ]]
-  [[ "${output}" == *"Step 4/8 SKIP"* ]]
+  [[ "${output}" == *"Step 3/9 FAIL"* ]]
+  [[ "${output}" == *"Step 4/9 SKIP"* ]]
   run cat "${CALL_LOG}"
   [[ "${output}" == *"dispatcher hub_recovery_reconcile --confirm"* ]]
   [[ "${output}" != *"signing_init"* ]]
+}
+
+@test "hub-restore accepts an existing embeddings key without prompting or writing" {
+  export EMBEDDINGS_LENGTH=40
+  run bin/hub-restore
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"embeddings key present in Vault"* ]]
+  [ ! -e "${EMBEDDINGS_STDIN}" ]
+  [[ "${output}" != *"Gemini embeddings API key"* ]]
+}
+
+@test "hub-restore skips an empty embeddings-key prompt" {
+  cat > "${WORK}/bash_env" <<'EOF'
+_hub_restore_stdin_is_tty() { return 0; }
+EOF
+  export BASH_ENV="${WORK}/bash_env"
+  run bash -c "printf '\\n' | bin/hub-restore"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"embeddings key missing from Vault"* ]]
+  [ ! -e "${EMBEDDINGS_STDIN}" ]
+}
+
+@test "hub-restore writes a non-empty embeddings key only through stdin" {
+  cat > "${WORK}/bash_env" <<'EOF'
+_hub_restore_stdin_is_tty() { return 0; }
+EOF
+  export BASH_ENV="${WORK}/bash_env"
+  export EMBEDDINGS_LENGTH=0
+  run bash -c "printf 'test-key-123\\n' | bin/hub-restore"
+  [ "${status}" -eq 0 ]
+  [ "$(grep -c 'kv put' "${CALL_LOG}")" -eq 1 ]
+  grep -q 'test-key-123' "${EMBEDDINGS_STDIN}"
+  ! grep -q 'test-key-123' "${CALL_LOG}"
+  [[ "${output}" != *"test-key-123"* ]]
+}
+
+@test "hub-restore skips an absent embeddings key without a TTY" {
+  run bin/hub-restore
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"embeddings key missing from Vault — run make hub-restore in a terminal"* ]]
+  [ ! -e "${EMBEDDINGS_STDIN}" ]
 }
 
 @test "hub-restore reports root-owned state folders before any make step" {

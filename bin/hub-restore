@@ -61,16 +61,17 @@ fi
 (( _preflight_only == 1 )) && exit 0
 
 _step_status=()
-_step_names=("Vault port-forward" "Alertmanager credentials" "Observability" "Signing key" "Hub reconcile" "Platform ops" "Local agents" "Verify")
+_step_names=("Vault port-forward" "Alertmanager credentials" "Observability" "Signing key" "Hub reconcile" "Embeddings key" "Platform ops" "Local agents" "Verify")
+_step_total=${#_step_names[@]}
 _step_index=0
 _step_result() {
   local result="$1"
   _step_status[_step_index]="${result}"
-  _info "[hub-restore] Step ${_step_index}/8 ${result}"
+  _info "[hub-restore] Step ${_step_index}/${_step_total} ${result}"
 }
 _step_start() {
   _step_index=$1
-  _info "[hub-restore] Step ${_step_index}/8 — ${_step_names[$((_step_index - 1))]}"
+  _info "[hub-restore] Step ${_step_index}/${_step_total} — ${_step_names[$((_step_index - 1))]}"
 }
 
 _step_start 1
@@ -105,9 +106,53 @@ _step_start 5
 if "${_dispatcher}" hub_recovery_reconcile --confirm; then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 6
-if "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
+_embeddings_key_length() {
+  kubectl get secret vault-root -n secrets --context "${_hub_context}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null | \
+    kubectl exec -i -n secrets --context "${_hub_context}" vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=api_key embeddings/gemini 2>/dev/null | wc -c' 2>/dev/null || true
+}
+
+if [[ "$(_embeddings_key_length)" -gt 1 ]]; then
+  _info "[hub-restore] embeddings key present in Vault"
+  _step_result PASS
+else
+  if ! declare -F _hub_restore_stdin_is_tty >/dev/null 2>&1; then
+    _hub_restore_stdin_is_tty() { [[ -t 0 ]]; }
+  fi
+  if _hub_restore_stdin_is_tty; then
+    _gemini_key=""
+    read -rs -p "Gemini embeddings API key (Enter to skip): " _gemini_key || true
+    printf '\n'
+    if [[ -z "${_gemini_key}" ]]; then
+      _info "[hub-restore] embeddings key missing from Vault — skipped; see docs/guides/vector-store.md for the manual command"
+      unset _gemini_key
+      _step_result SKIP
+    else
+      if { kubectl get secret vault-root -n secrets --context "${_hub_context}" \
+        -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null; \
+        GEMINI_KEY="${_gemini_key}" jq -n '{api_key: env.GEMINI_KEY}'; } | \
+        _no_trace kubectl exec -i -n secrets --context "${_hub_context}" vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put -mount=secret embeddings/gemini -'; then
+        _embedding_write_ok=1
+      else
+        _embedding_write_ok=0
+      fi
+      unset _gemini_key
+      if (( _embedding_write_ok )) && [[ "$(_embeddings_key_length)" -gt 1 ]]; then
+        _step_result PASS
+      else
+        _step_result FAIL
+      fi
+    fi
+  else
+    _info "[hub-restore] embeddings key missing from Vault — run make hub-restore in a terminal, or see docs/guides/vector-store.md"
+    _step_result SKIP
+  fi
+fi
 
 _step_start 7
+if "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
+
+_step_start 8
 _local_agents_ok=1
 if ! "${_make}" install-hub-pushgateway-port-forward; then _local_agents_ok=0; fi
 if launchctl list 2>/dev/null | grep -q 'com.k3d-manager.grafana-port-forward'; then
@@ -116,7 +161,7 @@ fi
 _ensure_cloudflare_tunnel_agent "$(_acg_provider_state_dir k3s-aws)" "[hub-restore]" || _local_agents_ok=0
 if (( _local_agents_ok )); then _step_result PASS; else _step_result FAIL; fi
 
-_step_start 8
+_step_start 9
 _verify_ok=1
 if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:18200/v1/sys/health 2>/dev/null || true)" == "200" ]]; then
   _info "[hub-restore] Vault :18200 health: PASS"
@@ -142,9 +187,9 @@ if (( _verify_ok )); then _step_result PASS; else _step_result FAIL; fi
 
 _info "[hub-restore] Summary"
 _summary_failed=0
-for _summary_i in {1..8}; do
+for ((_summary_i = 1; _summary_i <= _step_total; _summary_i++)); do
   _summary_status="${_step_status[$_summary_i]:-FAIL}"
-  printf '[hub-restore] %d/8 %-24s %s\n' "${_summary_i}" "${_step_names[$((_summary_i - 1))]}" "${_summary_status}"
+  printf '[hub-restore] %d/%d %-24s %s\n' "${_summary_i}" "${_step_total}" "${_step_names[$((_summary_i - 1))]}" "${_summary_status}"
   [[ "${_summary_status}" == "FAIL" ]] && _summary_failed=1
 done
 exit "${_summary_failed}"

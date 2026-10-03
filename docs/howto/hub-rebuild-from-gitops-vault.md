@@ -38,8 +38,9 @@ make hub-recover
 ```
 
 This runs `hub-up`, restores the Alertmanager credentials and signing material that have backups,
-reconciles the rebuilt Hub, reapplies platform operations, and restores the local port-forward and
-Cloudflare tunnel agents. It does not restore a signing key without a backup, Prometheus history,
+reconciles the rebuilt Hub, restores the Embeddings key to Vault from a hidden prompt, reapplies
+platform operations, and restores the local port-forward and Cloudflare tunnel agents. It does not
+restore a signing key without a backup, Prometheus history,
 Alertmanager silences, the vector index, or old ArgoCD/Vault tokens such as Hermes's ArgoCD token.
 
 The command requires a GUI-backed, interactive Keychain session. `!`, `nohup`, and ssh do not have
