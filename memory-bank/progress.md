@@ -2973,3 +2973,4 @@ in the bug doc after commit: `3664bea7`.
 
 - [x] 2026-10-02 hostinger payment outage (credential drift since 09-29 Vault KV regen) recovered by operator ALTER USER; 1/1 Ready on b722319e. [ ] same drift latent on orders/products/redis.
 - [ ] 2026-10-02 credential-drift tool spec dispatched to Codex (docs/bugs/2026-10-02-hostinger-shopping-cart-credential-drift-after-vault-kv-regen.md); operator rollout = make shopping-cart-credential-drift [APPLY=1].
+- [x] 2026-10-02 promoter live-override fix 78b1fe7a verified (operator rollout pending). [x] Netty override verified; payment PR #82 open, awaiting go.
