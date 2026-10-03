@@ -3017,3 +3017,4 @@ in the bug doc after commit: `3664bea7`.
 
 - [ ] **index-docs stalled at 700/1802 (2026-10-03 14:08)** — sleeping on an uncapped server `retryDelay` (likely per-day quota). Bug filed: `docs/bugs/2026-10-03-index-docs-sleeps-on-uncapped-server-retry-delay.md`; Codex queue. Operator to Ctrl-C and re-run later (resumes).
 - [ ] **index-docs re-run** — operator runs `make index-docs` morning of 2026-10-04 (after midnight-PT quota reset); 700/1802 committed, ~1102 remaining.
+- [ ] **Codex chain dispatched 2026-10-03 14:20** (`codex exec`, sequential): f3 Keycloak named port + Keychain write verify; f4 refresh `--interactive-sudo`; f5 index-docs retry-delay cap. Logs `scratchpad/codex-f{3,4,5}.log`. Claude verifies each SHA on origin. Not yet specced for Codex: preseed ESO force-sync, hub-restore embeddings key.
