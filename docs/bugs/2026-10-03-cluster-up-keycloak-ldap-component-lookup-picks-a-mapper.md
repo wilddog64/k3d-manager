@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-03, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN
+**Status:** OPEN — code fix `fd3616fd` (cluster-up selects the provider by type, deletes the stray mapper, sets attributes.frontendUrl); live check on the next sandbox `make up`
 **Severity:** medium. SSO works today only because `hub_recovery_reconcile` (the smoke path)
 repairs what `make up` gets wrong. Every `make up` prints three SSO warnings that look like an
 outage. It also leaves a stray Keycloak component behind, and that component throws an NPE

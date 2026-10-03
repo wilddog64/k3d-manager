@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude (found during the hub-loss recovery)
-**Status:** OPEN — the root cause is a hypothesis; confirm it before writing the fix brief
+**Status:** OPEN — one contributing defect confirmed (argocd.sh:83 shared log default); creator of the 744 folder still unconfirmed
 **Severity:** Medium. Local Grafana (`localhost:3001`) stays down after a rebuild, and nothing reports why.
 
 ## Evidence (2026-10-03, about 09:12)
@@ -41,3 +41,30 @@ sudo chown -R cliang:staff ~/.local/share/k3d-manager/logs
 ```
 launchctl kickstart -k gui/$(id -u)/com.k3d-manager.grafana-port-forward
 ```
+
+## Investigation update (2026-10-03, about 17:00, Claude, read-only)
+
+- **The flat-state migration is not the cause.** `_acg_migrate_flat_state` moves `${base}/logs`
+  only when the provider's scoped folder is missing. `k3s-hostinger/logs` is dated Sep 29 and was
+  not moved.
+- **What happened at 07:34:** at 07:34 the `k3s-hostinger/` folder and its `run/` were touched,
+  and root's `k3s-hostinger/logs/argocd-browser-https.log` (357 MB) stopped growing. The root-owned
+  top-level `logs/` folder was created at the same minute. From 08:06 to 08:38, root daemons wrote
+  `keycloak-`, `frontend-` and `argocd-browser` logs into it.
+- **Confirmed defect: the ArgoCD browser log falls back to the shared folder.**
+  `scripts/plugins/argocd.sh:83` sets the default
+  `ARGOCD_BROWSER_LISTENER_LOG:=${HOME}/.local/share/k3d-manager/logs/argocd-browser-https.log`.
+  `bin/cluster-up` sources `argocd.sh` early, so its own fallback
+  `${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/...}` (`:673`) is dead code. The **root**
+  ArgoCD browser daemon therefore logs into the shared top-level `logs/` folder. That is the same
+  folder the **user** Grafana agent writes `grafana-pf.log` into.
+- **Still unexplained:** the folder mode is `drwxr--r--` (744), not the user's umask 755. The
+  `mkdir -p` at `bin/cluster-up:681`, which runs as the user, would have made it user-owned. So
+  something running as root created the folder first. No `sudo mkdir` of a log path exists in
+  `bin/` or `scripts/`. The remaining candidate is launchd itself, opening `StandardOutPath` for a
+  root daemon whose folder was missing.
+- **Fix direction, refined:**
+  1. Remove the `argocd.sh:83` default, or point it at a per-provider folder, so root daemons
+     never share a log folder with user agents.
+  2. Keep the `bin/hub-restore` root-owned preflight. It already reports this case with the
+     exact `chown`.
