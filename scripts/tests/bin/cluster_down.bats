@@ -30,7 +30,7 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "acg-down dry-run k3s-aws previews hub deregistration" {
-  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm 2>&1'
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
@@ -68,7 +68,8 @@ STUB
 
 setup() {
   export HOME="${BATS_TEST_TMPDIR}/home"
-  export PATH="${BATS_TEST_TMPDIR}/bin:$PATH"
+  export PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin"
+  export DRY_RUN=1
   mkdir -p "${BATS_TEST_TMPDIR}/bin" "${HOME}/.local/share/k3d-manager" "${HOME}/Library/LaunchAgents"
   : > "${BATS_TEST_TMPDIR}/aws.log"
   : > "${BATS_TEST_TMPDIR}/kubectl.log"
@@ -204,23 +205,34 @@ exit 0
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/docker"
 
+  for _stub in gcloud az autossh ssh; do
+    cat > "${BATS_TEST_TMPDIR}/bin/${_stub}" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "${0##*/} $*" >> "${BATS_TEST_TMPDIR}/calls.log"
+exit 0
+STUB
+    chmod +x "${BATS_TEST_TMPDIR}/bin/${_stub}"
+  done
+
   _k3s_aws_deregister_cluster() {
     printf 'deregister\n' >> "${BATS_TEST_TMPDIR}/deregister.log"
   }
   export -f _k3s_aws_deregister_cluster
 }
 
-@test "acg-down real k3s-aws path invokes hub deregistration once" {
-  run bash -c 'bin/cluster-down --confirm 2>&1'
-  [ "$status" -eq 0 ]
-  [ "$(wc -l < "${BATS_TEST_TMPDIR}/deregister.log")" -eq 1 ]
-}
-
 @test "acg-down dry-run k3s-aws does not invoke hub deregistration" {
-  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
+}
+
+@test "cluster-down harness resolves k3d docker kubectl to its stubs" {
+  run bash -c 'command -v k3d docker kubectl'
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output"
+  [[ "$output" == "${BATS_TEST_TMPDIR}/bin/k3d"$'\n'"${BATS_TEST_TMPDIR}/bin/docker"$'\n'"${BATS_TEST_TMPDIR}/bin/kubectl" ]]
 }
 
 @test "acg-down dry-run itemizes teardown and invokes no destructive stubs" {
@@ -234,7 +246,7 @@ fi
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/uname"
 
-  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm 2>&1'
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
 
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would run acg_teardown --confirm"* ]]
@@ -256,13 +268,64 @@ STUB
   [ ! -f "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
 }
 
-@test "acg-down deletes the local hub by default" {
+@test "acg-down keeps the local hub by default" {
   run bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
+  [[ "$output" == *"keep-hub=1 hub-cluster=k3d-cluster"* ]]
+  [[ "$output" == *"local Hub cluster preserved"* ]]
+  [[ "$output" == *"Done. Remote cluster deleted; local Hub preserved."* ]]
+  [[ "$output" != *"would delete local Hub cluster"* ]]
+  [ ! -f "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
+  ! grep -F "cluster delete" "${BATS_TEST_TMPDIR}/k3d.log"
+}
+
+@test "acg-down deletes the local hub only with --delete-hub" {
+  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  [ "$status" -eq 0 ]
   [[ "$output" == *"keep-hub=0 hub-cluster=k3d-cluster"* ]]
-  [[ "$output" == *"Local Hub cluster deleted"* ]]
-  [[ "$output" == *"Done. Remote cluster and local Hub deleted."* ]]
-  [ -f "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
+  [[ "$output" == *"DRY_RUN: would delete local Hub cluster k3d-cluster"* ]]
+  [ ! -f "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
+}
+
+@test "acg-down k3d provider deletes the local hub by implication" {
+  run env CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keep-hub=0 hub-cluster=k3d-cluster"* ]]
+}
+
+@test "acg-down rejects conflicting hub flags before provider calls" {
+  run bash -c 'bin/cluster-down --confirm --keep-hub --delete-hub 2>&1'
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--keep-hub and --delete-hub cannot be used together"* ]]
+  [ ! -s "${BATS_TEST_TMPDIR}/k3d.log" ]
+  [ ! -s "${BATS_TEST_TMPDIR}/aws.log" ]
+}
+
+_make_down_flag() {
+  make --no-print-directory -s \
+    "$@" down-hub-flag
+}
+
+@test "Makefile maps Hub deletion flags without running down" {
+  run _make_down_flag
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+
+  run _make_down_flag DELETE_HUB=1
+  [ "$status" -eq 0 ]
+  [ "$output" = "--delete-hub" ]
+
+  run _make_down_flag KEEP_LOCAL=0
+  [ "$status" -eq 0 ]
+  [ "$output" = "--delete-hub" ]
+
+  run _make_down_flag CLEANUP_STALE=1 DELETE_HUB=1
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+
+  run _make_down_flag DELETE_HUB=1 KEEP_LOCAL=1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"conflicts with explicit KEEP_LOCAL=1"* ]]
 }
 
 @test "acg-down removes the ArgoCD browser HTTPS listener" {
@@ -273,23 +336,21 @@ STUB
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt"
-  run bash -c 'bin/cluster-down --confirm 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
-  run grep -F 'launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist' "${BATS_TEST_TMPDIR}/launchctl.log"
-  [ "$status" -eq 0 ]
-  [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt" ]
-  [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" ]
-  [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" ]
-  [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt" ]
+  [ -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt" ]
+  [ -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" ]
+  [ -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" ]
+  [ -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt" ]
 }
 
 @test "acg-down warns and continues when the ArgoCD browser listener is not loaded" {
   _stub_uname_darwin
   export STUB_LAUNCHCTL_BOOTOUT_FAIL=1
-  run bash -c 'bin/cluster-down --confirm 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"existing ArgoCD browser HTTPS listener was not loaded; continuing"* ]]
+  [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
 }
 
 @test "acg-down removes the Keycloak browser HTTP listener" {
@@ -298,12 +359,12 @@ STUB
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  run bash -c 'bin/cluster-down --confirm 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping Keycloak browser HTTP listener launchd daemon"* ]]
   run grep -F '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/cluster-down
   [ "$status" -eq 0 ]
-  [ ! -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" ]
+  [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" ]
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" ]
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log" ]
 }

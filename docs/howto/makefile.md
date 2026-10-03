@@ -15,7 +15,7 @@ make up URL=https://...      # provision with explicit sandbox URL
 | Target | Command | When to use |
 |---|---|---|
 | `make up` | `bin/cluster-up` | Start from scratch — credentials → Hub cluster → ESO → ArgoCD → app cluster |
-| `make down` | `bin/cluster-down --confirm` | Tear down app cluster, Hub cluster, and Vault port-forward; add `KEEP_LOCAL=1` to preserve the local Hub |
+| `make down` | `bin/cluster-down --confirm` | Tear down the app cluster and Vault port-forward while preserving the local Hub; add `DELETE_HUB=1` to delete the Hub |
 | `make down CLEANUP_STALE=1` | `cleanup-stale-clusters` (+ AWS local cleanup) | Explicitly remove expired managed registrations and stale AWS sandbox state after teardown |
 | `make cleanup-stale-sandbox` | `bin/cleanup-stale-sandbox` | Preview stale AWS sandbox local state; add `CONFIRM=1` to remove it |
 | `make cleanup-stale-clusters` | `bin/cleanup-stale-clusters` | Preview expired managed ArgoCD registrations; add `CONFIRM=1` to remove them |
@@ -239,7 +239,8 @@ make         # same as make help (DEFAULT_GOAL)
 |---|---|---|
 | `URL` | `https://app.pluralsight.com/cloud-playground/cloud-sandboxes` | Sandbox URL passed to `bin/cluster-up` and `bin/cluster-refresh` |
 | `GHCR_PAT` | `$(gh auth token)` | GitHub Container Registry token — used by `cluster-up` to create the `ghcr-pull-secret` |
-| `KEEP_LOCAL` | `0` | Set to `1` to preserve the local Hub cluster when running `make down` |
+| `KEEP_LOCAL` | `1` | Set to `0` to delete the local Hub cluster when running `make down` (equivalent to `DELETE_HUB=1`) |
+| `DELETE_HUB` | `0` | Set to `1` to delete the local Hub cluster when running `make down` |
 | `CLEANUP_STALE` | `0` | Set to `1` to run guarded stale-resource cleanup after `make down` |
 
 Set `GHCR_PAT` before running `make up`:

@@ -22,6 +22,8 @@
 
 ### Changed
 
+- `make down` now preserves the long-lived local Hub by default; pass `DELETE_HUB=1` only when the Hub and its access layer should also be deleted, reducing the blast radius of routine sandbox teardown.
+
 - Cloud-session round trips now poll every 5 seconds while active and skip a redundant bridge
   fetch, reducing the typical 30–90 second latency caused by the old 60-second bridge tick and
   30-second client poll.

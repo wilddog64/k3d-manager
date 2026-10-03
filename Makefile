@@ -13,7 +13,8 @@ CLUSTER_PROVIDER ?= k3s-aws
 ACG_AGENT_COUNT  ?= 2
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
-KEEP_LOCAL    ?= 0
+KEEP_LOCAL    ?= 1
+DELETE_HUB    ?= 0
 CLEANUP_STALE ?= 0
 BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
@@ -38,19 +39,28 @@ up:
 	@$(MAKE) --no-print-directory platform-ops
 
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
-## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
+## make down preserves the local Hub; set DELETE_HUB=1 to delete it
+ifneq ($(DELETE_HUB),0)
+ifneq ($(KEEP_LOCAL),0)
+ifneq ($(origin KEEP_LOCAL),file)
+$(error DELETE_HUB=1 conflicts with explicit KEEP_LOCAL=1)
+endif
+endif
+endif
+
+_DOWN_HUB_FLAG = $(if $(filter 1,$(CLEANUP_STALE)),,$(if $(filter 1,$(DELETE_HUB)),--delete-hub,$(if $(filter 0,$(KEEP_LOCAL)),--delete-hub,)))
+
+down-hub-flag:
+	@printf '%s\n' "$(_DOWN_HUB_FLAG)"
+
 down:
 	@MAKE_TARGET=down bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
 	@set +e; \
 	_down_rc=0; \
-	_keep_hub_flag=; \
-	if [ "$(KEEP_LOCAL)" = "1" ] || [ "$(CLEANUP_STALE)" = "1" ]; then \
-	  _keep_hub_flag=--keep-hub; \
-	fi; \
 	case "$(CLUSTER_PROVIDER)" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster || _down_rc=$$? ;; \
 	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager destroy_cluster --confirm || _down_rc=$$? ;; \
-	  *)       bin/cluster-down --confirm $$_keep_hub_flag || _down_rc=$$? ;; \
+	  *)       bin/cluster-down --confirm $(_DOWN_HUB_FLAG) || _down_rc=$$? ;; \
 	esac; \
 	if [ "$(CLEANUP_STALE)" = "1" ]; then \
 	  $(MAKE) --no-print-directory cleanup-stale-resources CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM=1 || _cleanup_rc=$$?; \
@@ -1144,7 +1154,7 @@ help:
 	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"
 	@echo "    make job-log ID=<job_id>  Print a local make-job log (operator-only)"
 	@echo "    make harvest-job-failures  Copy redacted failed-job notes into docs/job-failures"
-	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
+	@echo "    make down          Tear down cluster (preserves Hub; DELETE_HUB=1 also deletes it)"
 	@echo "    make down ... CLEANUP_STALE=1  Also remove expired managed registrations and stale AWS local state"
 	@echo "    make status        Show concise service health (SERVICE=<name> for focused detail)"
 	@echo "    make status-full   Show full pod and diagnostic report"
@@ -1209,7 +1219,7 @@ help:
 	@echo "    make up CLUSTER_PROVIDER=k3s-gcp"
 	@echo "    make up CLUSTER_PROVIDER=k3s-oci"
 	@echo "    make down CLUSTER_PROVIDER=k3s-oci"
-	@echo "    make down CLEANUP_STALE=1                 # teardown + guarded stale-resource cleanup"
+	@echo "    make down CLEANUP_STALE=1                 # teardown + guarded stale-resource cleanup (preserves Hub)"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
 	@echo "    make fleet-render ACG_AGENT_COUNT=4   # offline: render 4 agents / 5 nodes"
 	@echo "    make fleet-up ACG_AGENT_COUNT=4       # live node-join rung (k3s-aws only)"
