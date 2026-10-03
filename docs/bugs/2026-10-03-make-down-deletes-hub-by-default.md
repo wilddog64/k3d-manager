@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude
-**Status:** SPEC — ready for Codex
+**Status:** FIXED in `435c95a1` — `make down` keeps the hub; deleting it requires `DELETE_HUB=1`.
 **Severity:** High. A routine sandbox teardown destroyed the hub cluster: every hub service and dashboard, plus the Vault PVC.
 **Files:** `bin/cluster-down`, `Makefile`, `scripts/tests/bin/cluster_down.bats` (or a new BATS file), docs, `CHANGELOG.md`
 

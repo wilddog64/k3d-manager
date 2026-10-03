@@ -125,7 +125,7 @@ reads "credentials unavailable".
 
 ## Recurrence 2026-10-03 — on a fresh hub the smoke ExternalSecret deadlocks the identity sync (Claude)
 
-**Status:** SPEC — ready for Codex (F2 below). Operator unblock given 2026-10-03.
+**Status:** FIXED in `d5b986f4` (F2 pre-seed). Live 2026-10-03: identity `Synced/Healthy`, Keycloak `1/1` — after the manual ESO refresh and sync in the follow-up below.
 
 With F1 in place (`e08eaa83`, server-side apply), `shopping-cart-identity` gets past the PVC. It then
 fails at `ExternalSecret/k3dm-smoke-user [Failed]: could not get secret data from provider`.
@@ -185,3 +185,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 **Follow-up for shopping-cart-infra (separate, operator's call):** moving the ExternalSecret to wave
 `2` would also break the cycle. It would leave the app `Degraded` until the seed runs, so F2 is the
 primary fix.
+
+**Follow-up (open) — the pre-seed can race ESO.** Live on 2026-10-03, the identity sync ran 4 seconds
+after the Vault write and still failed, because the ExternalSecret's `refreshInterval` is 15 minutes.
+Recovery needed a `force-sync=<timestamp>` annotation on `ExternalSecret/k3dm-smoke-user` and a manual
+sync operation, since auto-sync does not retry a failed revision. `keycloak_smoke_vault_preseed`
+should annotate the ExternalSecret after it writes (when the ExternalSecret exists). The manual steps
+are in `docs/howto/hub-rebuild-from-gitops-vault.md` → *Identity app stuck after a rebuild*.

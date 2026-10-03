@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude
-**Status:** SPEC — ready for Codex
+**Status:** FIXED in `fb71deb4` — `make hub-recover` / `make hub-restore`.
 **Severity:** Medium. After the 2026-10-03 hub loss, `make hub-up` rebuilt the cluster, but restoring its credentials took six commands. They also failed repeatedly when run from Claude Code's `!` prompt.
 **Files:**
 - `bin/hub-restore` (new)

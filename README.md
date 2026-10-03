@@ -279,6 +279,7 @@ docs/
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
 
 - **[Makefile Reference](docs/howto/makefile.md)** — All `make` targets with usage, env vars, and when to use each
+- **[Hub Rebuild & Recovery](docs/howto/hub-rebuild-from-gitops-vault.md)** — Rebuild the hub, `make hub-recover`, unstick the identity sync, and what is not restored (DR drill planned v1.43.0)
 
 | Script | Claude Skill | When to use |
 |---|---|---|

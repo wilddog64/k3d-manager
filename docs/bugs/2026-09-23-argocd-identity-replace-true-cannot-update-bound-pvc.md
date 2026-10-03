@@ -144,7 +144,7 @@ Healthy/OutOfSync`. Unchanged since this doc was filed; still unassigned.
 
 ## Recurrence 2026-10-03 — now BLOCKING: sandbox `make up` fails at Step 10c (Claude)
 
-**Status:** SPEC — ready for Codex (fix F1 below).
+**Status:** FIX F1 LANDED in `e08eaa83` (server-side apply); identity synced on the rebuilt hub 2026-10-03.
 
 On the rebuilt hub, `make up CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1` exited 2 after
 `ERROR: [acg-up] Keycloak API not Ready after 900s — realm import is required for SSO`.

@@ -278,6 +278,29 @@ unless `--no-verify` is passed, so no separate verify call is needed. Do not set
       remaining candidate is the `fix/keycloak-role-authority-mapping` work in
       `shopping-cart-payment` (P3, PR not yet opened).
 
+### Identity app stuck after a rebuild
+
+Seen 2026-10-03 ([incident](../issues/2026-10-03-hub-deleted-by-sandbox-teardown.md)).
+`shopping-cart-identity` stays `OutOfSync/Degraded`, `deployment/keycloak` is never created, and the
+operation message names `ExternalSecret/k3dm-smoke-user`.
+
+1. **The Vault entry must exist.** `bin/cluster-up` and `hub_recovery_reconcile` pre-seed it
+   (`keycloak_smoke_vault_preseed`, `d5b986f4`). To run it on its own:
+   ```bash
+   ./scripts/k3d-manager keycloak_smoke_vault_preseed
+   ```
+2. **Make ESO re-read Vault.** The refresh interval is 15 minutes, so a just-written entry is not seen yet:
+   ```bash
+   kubectl --context k3d-k3d-cluster -n identity annotate externalsecret k3dm-smoke-user force-sync="$(date +%s)" --overwrite
+   ```
+   Wait until `kubectl --context k3d-k3d-cluster -n identity get externalsecret k3dm-smoke-user` shows `SecretSynced`.
+3. **Start a sync yourself.** Auto-sync does not retry a revision whose last sync failed, and
+   re-applying the same Application does not start one:
+   ```bash
+   kubectl --context k3d-k3d-cluster -n cicd patch app shopping-cart-identity --type merge -p '{"operation":{"sync":{}}}'
+   ```
+4. Keycloak takes about 4 minutes to start. Done when `deploy/keycloak` is `1/1` and the app is `Synced/Healthy`.
+
 ### 6. Aftermath
 
 - [ ] Re-mint the ArgoCD Hermes token — Hermes logs
@@ -292,6 +315,17 @@ unless `--no-verify` is passed, so no separate verify call is needed. Do not set
 - [ ] Stale generated ACG Applications (`istio-{base,cni}-ubuntu-k3s`, `istiod-ubuntu-k3s`) have no
       `ubuntu-k3s` context. Delete the registration Secret **before** the Applications.
 - [ ] Update `memory-bank/activeContext.md` with the outcome.
+
+## Data is not restored — DR drill (planned, v1.43.0)
+
+`make hub-recover` restores credentials and local agents only. Keycloak users, LDAP entries and
+Vault KV that has no Keychain mirror are regenerated, not restored. Weekly proof that hub data
+restores quickly is planned in [`docs/plans/v1.43.0-hub-dr-drill.md`](../plans/v1.43.0-hub-dr-drill.md):
+- an encrypted data export to a private git repo;
+- a restore onto the right node in a throwaway drill hub on the M2;
+- a quarterly real-hub drill.
+
+None of it is built yet. Its operator runbook will be `docs/howto/hub-dr-drill.md`.
 
 ## If a rebuild is refused
 

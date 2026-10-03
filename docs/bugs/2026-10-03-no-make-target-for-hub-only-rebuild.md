@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude
-**Status:** SPEC — ready for Codex. Dispatch it after `2026-10-03-make-down-deletes-hub-by-default.md`, which also edits the `Makefile` `up`/`down` area.
+**Status:** FIXED in `abbcfd65` (`make up CLUSTER_PROVIDER=k3d`); context guard follow-up in `ed22bda9`.
 **Files:** `Makefile`, `bin/hub-up` (new), `scripts/tests/bin/hub_up.bats` (new), docs, `CHANGELOG.md`
 
 ## What the operator asked for
