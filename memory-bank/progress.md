@@ -3016,3 +3016,4 @@ in the bug doc after commit: `3664bea7`.
 - [ ] **Hub VectorDB empty after rebuild** — the Hermes index tick fails every run because the Vault copy `secret/embeddings/gemini` was lost with the hub; launchd can't use the keychain. The operator reseeds it via `docs/guides/vector-store.md` (Terminal.app), then runs `make index-docs`. Durable fix = hub-restore follow-up F2.
 
 - [ ] **index-docs stalled at 700/1802 (2026-10-03 14:08)** — sleeping on an uncapped server `retryDelay` (likely per-day quota). Bug filed: `docs/bugs/2026-10-03-index-docs-sleeps-on-uncapped-server-retry-delay.md`; Codex queue. Operator to Ctrl-C and re-run later (resumes).
+- [ ] **index-docs re-run** — operator runs `make index-docs` morning of 2026-10-04 (after midnight-PT quota reset); 700/1802 committed, ~1102 remaining.
