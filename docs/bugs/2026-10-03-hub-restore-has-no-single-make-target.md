@@ -190,3 +190,13 @@ Claude added a 6 h silence, `84a19233`.
 
 The sandbox path keeps only sandbox things. Gate: after a stubbed `make hub-recover`, nothing
 hub-side is left for a sandbox `make up` to create.
+
+### Follow-up F2 — embeddings key Vault copy (found 2026-10-03, about 19:40Z)
+
+The hub rebuild lost `secret/embeddings/gemini`. The Hermes LaunchAgent cannot read the keychain
+item, so it falls through to that Vault copy. As a result, every 8-minute tick logs
+`vectordb index failed: index-docs: 0 of 100 documents were committed`, and the VectorDB Health
+dashboard shows rows=0 against a corpus of 1802 with "Last run result: failed".
+`bin/hub-restore` runs in Terminal.app with keychain access, so it should copy keychain item
+`gemini-cli-api-key` (or `k3dm-embeddings-api-key`) into `secret/embeddings/gemini`, using the
+stdin-only pattern in `docs/guides/vector-store.md`. If neither item is readable, report SKIP.
