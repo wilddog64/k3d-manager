@@ -120,3 +120,12 @@ went on as if the step had passed. That leaves the Keychain copy of the **rebuil
 token stale, which is a DR gap: the next recovery would push the old token back. Fix: verify the
 write by reading the item back and comparing it, without printing it. On a mismatch, `_err` and
 return 1. Re-run the reconcile in the foreground in Terminal.app.
+
+**Update 2026-10-03 (live):**
+- **Stopgap verified.** After the operator applied the stopgap, `localhost:8880/realms/master` and
+  `keycloak.3ai-talk.org/realms/master` both return 200. The reconcile that followed created the
+  `k3dm-smoke` client.
+- **The Keychain write also fails in the foreground.** The root-token write still failed with
+  `-25308` when the reconcile ran in the foreground in Terminal.app. So the cause is not only a
+  non-GUI session. The next step is for the operator to run `security show-keychain-info`, to tell a
+  locked keychain from an item-ACL refusal.
