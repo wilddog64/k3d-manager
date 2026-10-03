@@ -8196,4 +8196,4 @@ R4-eligible conclusion), `393a0aae` (informational k3dm-tests exit-code panel), 
 spec, changelog, and memory-bank update. Focused BATS: 23/23; Hermes pytest: 51 passed; shellcheck
 clean; all three mutations were red and restored green.
 
-- [ ] 2026-10-03 k3dm-tests duration bug filed (`docs/bugs/2026-10-03-k3dm-tests-duration-panel-shows-only-unittest-milliseconds.md`; pulls v1.42.0 §3 offline part forward) — dispatched to Codex on k3d-manager-v1.41.0.
+- [x] 2026-10-03 k3dm-tests duration bug filed (`docs/bugs/2026-10-03-k3dm-tests-duration-panel-shows-only-unittest-milliseconds.md`; pulls v1.42.0 §3 offline part forward) — Codex `15f59862` VERIFIED by Claude (7 spec files only; pytest 17 passed; mutation to hardcoded 0 turns 2 tests red, restored green; bats 38/38; dashboard JSON ok; make -n carries --run-duration). Dashboard shows real values only after the next `make test-metrics` + ArgoCD sync of the ACG dashboard ConfigMap.
