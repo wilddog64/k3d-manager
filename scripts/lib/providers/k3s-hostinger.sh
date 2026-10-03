@@ -354,7 +354,7 @@ function _hostinger_write_keycloak_port_forward_wrapper() {
   CONTEXT="k3d-k3d-cluster" \
   SERVICE="svc/keycloak" \
   LOCAL_PORT="8880" \
-  REMOTE_PORT="8080" \
+  REMOTE_PORT="http" \
   HEALTHZ_URL="http://127.0.0.1:8880/realms/master" \
   STARTUP_TIMEOUT="30" \
     envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \

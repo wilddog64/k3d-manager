@@ -51,6 +51,65 @@ YAML
   [[ "$output" == *"8 logical claims"* ]]
 }
 
+@test "_hub_recovery_sync_vault_root_token: accepts a matching Keychain read-back" {
+  _is_mac() { return 0; }
+  _kubectl() { printf '%s' 'dGVzdC1yb290LXRva2Vu'; }
+  security() {
+    case "$1" in
+      -i) cat >/dev/null; return 0 ;;
+      find-generic-password) printf '%s\n' 'test-root-token'; return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  export -f _is_mac _kubectl security
+
+  run _hub_recovery_sync_vault_root_token hub
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'test-root-token'* ]]
+}
+
+@test "_hub_recovery_sync_vault_root_token: rejects a mismatching Keychain read-back" {
+  _is_mac() { return 0; }
+  _kubectl() { printf '%s' 'dGVzdC1yb290LXRva2Vu'; }
+  security() {
+    case "$1" in
+      -i) cat >/dev/null; return 0 ;;
+      find-generic-password) printf '%s\n' 'different-token'; return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  export -f _is_mac _kubectl security
+
+  run _hub_recovery_sync_vault_root_token hub
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Keychain service k3dm-vault-root-token did not retain the Vault root token'* ]]
+  [[ "$output" == *'security unlock-keychain'* ]]
+  [[ "$output" != *'test-root-token'* ]]
+}
+
+@test "_hub_recovery_sync_vault_root_token: rejects a failed Keychain read-back without exposing the token" {
+  local argv_log="${BATS_TEST_TMPDIR}/security-argv.log"
+  _is_mac() { return 0; }
+  _kubectl() { printf '%s' 'dGVzdC1yb290LXRva2Vu'; }
+  security() {
+    printf '%s\n' "$*" >> "$argv_log"
+    case "$1" in
+      -i) cat >/dev/null; return 0 ;;
+      find-generic-password) return 1 ;;
+      *) return 1 ;;
+    esac
+  }
+  export -f _is_mac _kubectl security
+
+  run _hub_recovery_sync_vault_root_token hub
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Keychain service k3dm-vault-root-token could not be read back'* ]]
+  [[ "$output" == *'security unlock-keychain'* ]]
+  [[ "$output" != *'test-root-token'* ]]
+  run cat "$argv_log"
+  [[ "$output" != *'test-root-token'* ]]
+}
+
 @test "hub_recovery_plan: emits the dependency map by logical claim" {
   run hub_recovery_plan "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]

@@ -31,6 +31,13 @@
   [ "$output" -eq 1 ]
 }
 
+@test "acg-up forwards Keycloak to the named http Service port" {
+  local line
+  line=$(grep -F '_argocd_write_port_forward_wrapper "${_kc_pf_wrapper}"' bin/cluster-up)
+  [[ "$line" == *'"8880" "http"'* ]]
+  [[ "$line" != *'"8880" "8080"'* ]]
+}
+
 @test "acg-up sources overrides and exits at the dry-run Step 4 seam" {
   run grep -nF 'source "${REPO_ROOT}/scripts/lib/system_overrides.sh"' bin/cluster-up
   [ "$status" -eq 0 ]
