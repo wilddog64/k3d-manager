@@ -31,7 +31,8 @@ _ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}
 _ROLE_DEFAULT = "admin"
 # Capability roles are deliberately unranked: each is allowed exactly the policy names in its set,
 # never a tier, so one cannot transitively grant every lower-ranked target.
-_ROLE_CAPABILITIES: dict = {}
+CLOUD_RUNNER_TARGETS = {"e2e-remote", "e2e"}
+_ROLE_CAPABILITIES: dict = {"cloud-runner": CLOUD_RUNNER_TARGETS}
 
 _RATE_WINDOW_SECS = 60
 _RATE_MAX_DEFAULT = int(os.environ.get("K3DM_RATE_MAX_PER_MIN", "60"))
@@ -149,7 +150,8 @@ def _role_allows(actual_role, required_role):
 def _policy_allows(role, policy):
     """Authorize a request role against an effective policy; unranked roles need a capability set."""
     if role in _ROLE_CAPABILITIES:
-        return policy["name"] in _ROLE_CAPABILITIES[role]
+        action = policy["name"].removeprefix("make:")
+        return action in _ROLE_CAPABILITIES[role]
     if role not in _ROLE_LEVELS:
         return False
     return _role_allows(role, policy["min_role"])

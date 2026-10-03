@@ -8,6 +8,7 @@ NS_RE = re.compile(r"[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?")
 # Prose search text. Kept byte-identical to webhook _ARG_PATTERNS["Q"]: every shell
 # metacharacter is excluded because the value reaches a Makefile recipe.
 Q_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}")
+RUNNER_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
 # The /cluster-diagnose provider set; the webhook resolves each to a kube context.
 PROVIDER_RE = re.compile(r"hostinger|aws|gcp|az|hub")
 # The webhook's _RESOURCE_NAME_RE without anchors (fullmatch anchors it here).
@@ -32,6 +33,8 @@ ACTION_ALLOWLIST = {
     "make-test-python": ("POST", "/api/v1/make", {}, "test-python"),
     "make-test-all": ("POST", "/api/v1/make", {}, "test-all"),
     "make-find-similar-docs": ("POST", "/api/v1/make", {"Q": Q_RE}, "find-similar-docs"),
+    "make-e2e-remote": ("POST", "/api/v1/make", {"RUNNER": RUNNER_RE}, "e2e-remote"),
+    "make-e2e": ("POST", "/api/v1/make", {}, "e2e"),
     "diagnose-pods": ("POST", "/api/v1/diagnostics",
                       {"provider": PROVIDER_RE, "namespace": NS_RE}, {"action": "get-pods"}),
     "diagnose-describe-pod": ("POST", "/api/v1/diagnostics",

@@ -64,6 +64,13 @@ def _get_reader_token():
     return _keychain_secret("k3dm-webhook-token-reader") or None
 
 
+def _get_cloud_runner_token():
+    token = os.environ.get("K3DM_WEBHOOK_TOKEN_CLOUD_RUNNER")
+    if token:
+        return token
+    return _keychain_secret("k3dm-webhook-token-cloud-runner") or None
+
+
 def _resolve_token_role(presented):
     """Return the role bound to the presented bearer, or None if unknown."""
     if not presented:
@@ -74,6 +81,9 @@ def _resolve_token_role(presented):
     reader_token = _get_reader_token()
     if reader_token and hmac.compare_digest(presented, reader_token):
         return "reader"
+    cloud_runner_token = _get_cloud_runner_token()
+    if cloud_runner_token and hmac.compare_digest(presented, cloud_runner_token):
+        return "cloud-runner"
     return None
 
 

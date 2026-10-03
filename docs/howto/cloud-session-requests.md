@@ -1,4 +1,4 @@
-# Cloud Session Requests — asking the local k3dm webhook for read-only state
+# Cloud Session Requests — asking the local k3dm webhook for state and scoped e2e runs
 
 Architecture and trust boundaries: [docs/architecture/cloud-bridge.md](../architecture/cloud-bridge.md).
 
@@ -68,6 +68,8 @@ is rejected by the bridge without being executed.
 | `make-observability-status` | none | monitoring/trivy-system pods, both clusters |
 | `make-vuln-scan` | none | VulnerabilityReport summary |
 | `make-e2e-runner-health` | none | hub vs remote-runner health |
+| `make-e2e-remote` | `RUNNER` | Tier 1 e2e on the named remote runner |
+| `make-e2e` | none | Tier 1 e2e in a disposable vCluster |
 | `make-test` | none | the BATS dispatcher suites (`./scripts/k3d-manager test all`), ~15 min |
 | `make-test-bin` | none | the BATS suites under `scripts/tests/bin`, ~1 min |
 | `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`), ~1.5 min; publishes `junit.xml` |
@@ -76,7 +78,9 @@ is rejected by the bridge without being executed.
 | `make-test-all` | none | every offline suite (BATS + Python), ~20 min |
 | `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
 
-`job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected.
+`job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected. The two e2e actions are
+cloud-runner capabilities rather than reader actions; the bridge uses its separate scoped
+credential for them. `make-e2e` does not accept a digest through this interface.
 
 **The test targets run on macOS, which is why they are worth asking for.** The host has BSD
 `sed`, `stat`, `grep` and `date`; your sandbox is Linux. A suite that is green in your sandbox can
@@ -134,11 +138,20 @@ another AI's prompt chains two injection surfaces together, which is exactly wha
 own `_INJECTION_RE` filter exists to prevent. Adding either one back requires its own spec and
 the operator's decision.
 
-The reader-tier `make` targets in the table above are reachable through mechanism 1. Every operator and
-admin target remains refused through this channel: the bridge presents a reader credential that
-the webhook will not accept for it, and the branch's content never becomes a command. Concrete
-examples still refused are `sync-apps`, `fix-restart`, `fix-sync`, `e2e-remote` and
-`app-cve-scan`. If you need one of those, ask the operator to run it.
+The reader-tier `make` targets in the table above are reachable through mechanism 1. Every other
+operator and admin target remains refused through this channel. The two e2e actions are the only
+exception and are authorized by the scoped `cloud-runner` credential; `e2e-sandbox`, `e2e-replay`,
+`e2e-runner-unlock`, `sync-apps`, `fix-restart`, `fix-sync` and `app-cve-scan` remain refused.
+If you need one of those, ask the operator to run it.
+
+### Remote-runner contention
+
+`make-e2e-remote` is asynchronous like every other make action. The initial response is a queued
+job; poll it with `job-status`. The remote dispatcher atomically claims the runner lock. If the
+runner is already in use, the job becomes `failed` and its output says `runner <name> is busy
+(lock held)` followed by the lock metadata, including the `owner=` token. Ask the operator whose
+run is named to resolve the contention. Never unlock the runner from a cloud session, and never
+retry by probing or clearing the lock.
 
 ## Filing a request by hand
 
@@ -246,7 +259,7 @@ are polling `health` with a short `--timeout`, raise it rather than assuming the
 
 It needs no credential and no environment variables beyond the git access the session already
 has. That is the practical payoff of the pull design. The accepted actions and their arguments
-are the thirteen listed in the table above; the helper derives its choices and validation from the
+are the twenty-five listed in the table above; the helper derives its choices and validation from the
 same shared table as the bridge.
 
 A cloud session still needs permission to *run* it. `.claude/settings.json` is committed and
@@ -285,10 +298,17 @@ the only thing standing between that branch and the webhook.
 | credential | source | used by | can do |
 |---|---|---|---|
 | `k3dm-webhook-token` | env `K3DM_WEBHOOK_TOKEN`, Keychain, then `TOKEN_FILE` | Slack relay, `make` targets, you | everything, including cluster mutation |
-| `k3dm-webhook-token-reader` | env `K3DM_WEBHOOK_TOKEN_READER`, Keychain only | the cloud bridge, nothing else | reader-level routes only |
+| `k3dm-webhook-token-reader` | env `K3DM_WEBHOOK_TOKEN_READER`, Keychain only | the cloud bridge's reader actions | reader-level routes only |
+| `k3dm-webhook-token-cloud-runner` | env `K3DM_WEBHOOK_TOKEN_CLOUD_RUNNER`, Keychain only | the cloud bridge's two e2e actions | `e2e-remote` and `e2e` only |
 
 The reader token deliberately has **no `TOKEN_FILE` fallback** — sharing that file would make the
 two roles the same secret.
+
+The operator provisions `k3dm-webhook-token-cloud-runner` separately for the bridge. It is read
+from `K3DM_WEBHOOK_TOKEN_CLOUD_RUNNER` or the login Keychain service of the same name; it has no
+`TOKEN_FILE` fallback and its value must never be pasted into a cloud session, repository, command
+line, or log. The webhook grants it only the two explicit e2e target names above; it is not an
+`operator` rank.
 
 The role now comes from *which credential authenticated*, not from the `X-K3DM-Role` header. A
 header can only ever **narrow** a role; the credential sets the ceiling. Before this change the

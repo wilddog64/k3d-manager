@@ -35,6 +35,7 @@ MAKE_TARGETS = {
     "find-similar-docs": {"min_role": "reader", "required": ("Q",), "optional": ("K",), "timeout": 120, "summary": "search docs/ for prior art by similarity"},
     "index-docs": {"min_role": "operator", "timeout": 1800, "summary": "re-embed changed docs into the vector store"},
     "e2e-remote": {"min_role": "operator", "required": ("RUNNER",), "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e on a remote runner"},
+    "e2e": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e in a disposable vCluster"},
     "e2e-sandbox": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 2 e2e on the live ACG sandbox"},
     "e2e-replay": {"min_role": "operator", "required": ("RUNNER",), "timeout": 900, "summary": "replay retained runner results"},
     "sync-apps": {"min_role": "operator", "timeout": 600, "summary": "sync data-layer apps"},

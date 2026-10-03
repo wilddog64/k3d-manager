@@ -326,6 +326,8 @@ def test_make_actions_are_reader_targets():
         if not action.startswith("make-"):
             continue
         assert target in make_targets.MAKE_TARGETS
+        if target in {"e2e", "e2e-remote"}:
+            continue
         assert make_targets.MAKE_TARGETS[target]["min_role"] == "reader"
 
 
@@ -337,10 +339,49 @@ def test_make_action_args_match_required_args_only():
         assert set(args) == set(required)
 
 
+def test_cloud_runner_actions_are_explicit_and_use_the_webhook_runner_pattern():
+    assert bridge.ACTION_ALLOWLIST["make-e2e"] == ("POST", "/api/v1/make", {}, "e2e")
+    action = bridge.ACTION_ALLOWLIST["make-e2e-remote"]
+    assert action[:2] == ("POST", "/api/v1/make")
+    assert action[2]["RUNNER"].pattern == make_targets._ARG_PATTERNS["RUNNER"].pattern
+    assert action[3] == "e2e-remote"
+    assert make_targets.MAKE_TARGETS["e2e"]["min_role"] == "operator"
+    assert make_targets.MAKE_TARGETS["e2e"]["timeout"] == 3600
+
+
+def test_cloud_runner_actions_select_cloud_token_and_other_actions_select_reader(monkeypatch):
+    class Response:
+        status = 202
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    seen = []
+
+    def fake_urlopen(request, timeout):
+        seen.append((request.get_header("Authorization"), timeout))
+        return Response()
+
+    monkeypatch.setattr(bridge.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(bridge, "_get_cloud_runner_token", lambda: "cloud-runner-test-token")
+    monkeypatch.setattr(bridge, "_get_reader_token", lambda: "reader-test-token")
+    bridge._call_webhook(request("make-e2e"))
+    bridge._call_webhook(request("cluster-status"))
+    assert seen == [("Bearer cloud-runner-test-token", bridge.HTTP_TIMEOUT),
+                    ("Bearer reader-test-token", bridge.HTTP_TIMEOUT)]
+    assert "_get_token" not in Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
+
+
 def test_all_reader_targets_are_exposed_or_explicitly_unexposed():
     exposed = {
         target for action, (_, _, _, target) in bridge.ACTION_ALLOWLIST.items()
-        if action.startswith("make-")
+        if action.startswith("make-") and target not in {"e2e", "e2e-remote"}
     }
     reader_targets = {
         target for target, spec in make_targets.MAKE_TARGETS.items()
@@ -396,7 +437,7 @@ TEST_SUITE_ACTIONS = {
 }
 NEVER_EXPOSED = {
     "up", "down", "cluster", "cluster-up", "cluster-down", "fix-delete-pod", "fix-force-sync",
-    "e2e", "e2e-sandbox", "e2e-remote", "e2e-replay", "e2e-runner-unlock", "cleanup-stale-sandbox",
+    "e2e-sandbox", "e2e-replay", "e2e-runner-unlock", "cleanup-stale-sandbox",
     "argocd-upgrade", "index-docs", "sync-apps",
 }
 
@@ -418,7 +459,40 @@ def test_no_lifecycle_or_mutating_target_is_reachable():
     assert not {name.removeprefix("make-") for name in bridge.ACTION_ALLOWLIST} & NEVER_EXPOSED
     for _m, _p, _a, fixed in bridge.ACTION_ALLOWLIST.values():
         if isinstance(fixed, str):
+            if fixed in {"e2e", "e2e-remote"}:
+                continue
             assert make_targets.MAKE_TARGETS[fixed]["min_role"] == "reader", fixed
+
+
+def test_cloud_runner_set_is_scoped_and_unranked():
+    from webhook import policy
+    assert policy.CLOUD_RUNNER_TARGETS == {"e2e-remote", "e2e"}
+    assert "cloud-runner" not in policy._ROLE_LEVELS
+    assert not {"up", "down", "cleanup-stale-sandbox"} & policy.CLOUD_RUNNER_TARGETS
+    assert not {"up", "down", "cleanup-stale-sandbox"} & set(bridge.ACTION_ALLOWLIST)
+    assert "/api/v1/cluster" not in {entry[1] for entry in bridge.ACTION_ALLOWLIST.values()}
+
+
+def test_bridge_has_no_runner_lock_probe_or_ssh_call():
+    source = Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
+    assert "E2E_M2_LOCK" not in source
+    assert "ssh" not in source.lower()
+
+
+def test_no_cluster_lifecycle_path_is_reachable_from_the_bridge_or_e2e_verify():
+    bridge_source = Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
+    actions_source = Path(ROOT / "scripts" / "lib" / "webhook" / "cloud_actions.py").read_text()
+    assert all(name not in bridge_source for name in ("/api/v1/cluster", "/cluster-up", "/cluster-down", "/cluster-resume"))
+    assert "/api/v1/cluster" not in {entry[1] for entry in bridge.ACTION_ALLOWLIST.values()}
+    assert all(name not in actions_source for name in ("/cluster-up", "/cluster-down", "/cluster-resume"))
+    for relative in ("scripts/plugins/e2e.sh", "scripts/plugins/vcluster.sh"):
+        source = Path(ROOT / relative).read_text()
+        assert all(name not in source for name in ("deploy_cluster", "destroy_cluster", "bin/cluster-up", "bin/cluster-down"))
+
+
+def test_cloud_runner_cannot_reach_sandbox():
+    from webhook import policy
+    assert not policy._policy_allows("cloud-runner", policy._action_policy("/api/v1/make", {"target": "e2e-sandbox"}))
 
 
 def test_test_suite_actions_take_no_arguments():

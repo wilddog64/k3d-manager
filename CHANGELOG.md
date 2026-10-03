@@ -114,6 +114,8 @@
   carries an `artifacts` array — `summary.json` plus a credential-scrubbed `junit.xml` for
   `make-test-pytest` — committed with the response and pruned to `K3DM_CLOUD_ARTIFACT_KEEP` (50).
   Raw job output is still not published. See `docs/howto/cloud-session-requests.md`.
+- Cloud bridge e2e dispatch: added scoped `make-e2e-remote` and `make-e2e` actions using the
+  unranked `cloud-runner` capability and reporting the remote lock holder on contention.
 
 ### Fixed
 

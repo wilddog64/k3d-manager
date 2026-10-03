@@ -427,7 +427,9 @@ function e2e_runner_dispatch() {
   local token
   token="$(_e2e_lock_token)"
   if ! _e2e_remote_lock_acquire "$token"; then
-    _err "[e2e-remote] runner ${runner} is busy (lock held); not dispatching, no local fallback"
+    local lock_meta
+    lock_meta="$(_e2e_remote_ssh "cat \"${E2E_M2_LOCK}/meta\" 2>/dev/null" || true)"
+    _err "[e2e-remote] runner ${runner} is busy (lock held); ${lock_meta:-holder unknown}; not dispatching, no local fallback"
   fi
   # shellcheck disable=SC2064
   trap "_e2e_remote_lock_release '${token}' >/dev/null 2>&1 || true" RETURN

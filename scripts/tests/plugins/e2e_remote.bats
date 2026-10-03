@@ -183,6 +183,35 @@ _healthy_blob() {
   [[ "$output" != *"SSH SHOULD NOT RUN"* ]]
 }
 
+@test "dispatch reports the held lock holder and preserves the lock" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_LOCK="$BATS_TEST_TMPDIR/runner.lock"
+  mkdir -p "$E2E_M2_LOCK"
+  printf '%s\n' 'owner=m2 pid=4242 ts=1234567890' > "$E2E_M2_LOCK/meta"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  _e2e_remote_lock_acquire() { return 1; }
+  _e2e_remote_ssh() {
+    [[ "$*" == *'cat "'* ]] && cat "$E2E_M2_LOCK/meta"
+  }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.41.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
+  ssh() { printf 'SSH SHOULD NOT RUN\n' >&2; return 1; }
+  run e2e_runner_dispatch "m2"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"busy (lock held)"* ]]
+  [[ "$output" == *"owner=m2 pid=4242 ts=1234567890"* ]]
+  [[ "$output" == *"not dispatching, no local fallback"* ]]
+  [[ "$output" != *"SSH SHOULD NOT RUN"* ]]
+  [ -d "$E2E_M2_LOCK" ]
+  run cat "$E2E_M2_LOCK/meta"
+  [ "$output" = "owner=m2 pid=4242 ts=1234567890" ]
+}
+
 @test "dispatch builds the correct remote command and records a transcript" {
   export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
   local hex="0000000000000000000000000000000000000000000000000000000000000000"
