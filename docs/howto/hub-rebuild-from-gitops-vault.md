@@ -73,6 +73,23 @@ Credential paths are not all reseeded automatically after a Vault rebuild. `secr
 
 ## Procedure
 
+## Rebuild the hub
+
+To rebuild the local hub without touching AWS or the sandbox, run:
+
+```bash
+make up CLUSTER_PROVIDER=k3d
+```
+
+This restores the hub cluster, Vault, LDAP, ArgoCD, observability, platform-ops resources,
+and the hub Pushgateway port-forward. It does not restore shopping-cart Vault data (that is
+seeded on the next sandbox `make up`), `cosign-public-key`, `app-cluster-kubeconfig`, or old
+ArgoCD/Vault tokens. The matching teardown is:
+
+```bash
+make down CLUSTER_PROVIDER=k3d
+```
+
 Run from `/Users/cliang/src/gitrepo/personal/k3d-manager`. Do not delete the `profile` or
 `pw-profile` directories at any point. Raw SQLite retention deletion remains forbidden.
 

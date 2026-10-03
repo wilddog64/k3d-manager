@@ -4,6 +4,8 @@
 
 ### Added
 
+- `make up CLUSTER_PROVIDER=k3d` and `make hub-up` now rebuild the local hub only.
+
 - Cloud bridge throughput: slow health calls run off the polling loop, and queued Make jobs are followed to `.final.json` responses with artifacts.
 
 - Cloud sessions can bring the disposable ACG sandbox up or down through provider-bound, fixed `sandbox-up` and `sandbox-down` actions; the hub and Hostinger cluster remain unreachable.
