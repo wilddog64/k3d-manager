@@ -7,6 +7,8 @@
 - Webhook and cloud-bridge log levels (`error`, `warn`, `info`, `debug`) with
   redaction-safe request lines; use `make webhook-log-level LEVEL=debug` to
   update the LaunchAgents.
+- Make jobs now stream local output to a capped `make.log`; inspect it with
+  `make job-log ID=<job_id>` without publishing it as job-status output.
 - `find-similar-docs` results now include clickable GitHub links, pinned to the checked-out release
   branch (or `main`), with `K3DM_DOCS_BRANCH` and `K3DM_DOCS_REPO_URL` overrides.
 

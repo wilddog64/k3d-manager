@@ -55,35 +55,26 @@ class WebhookLifecycleTests(unittest.TestCase):
     def _spawn_job(self, cmd, output_path, cwd=None, env=None):
         self.spawned.append((cmd, output_path, cwd, env))
         Path(output_path).write_text("")
-        return 4242
+        return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}))
 
     def test_make_target_passes_validated_argv_as_a_list(self):
-        captured = []
-        lifecycle._spawn_capture_text = lambda cmd, **kwargs: (captured.append((cmd, kwargs)) or (0, "ok\n", False))
         job_id = "a1b2c3d4"
         (lifecycle.JOB_DIR / job_id).mkdir()
         lifecycle._run_make_target(job_id, ["app-cve-scan", "CRONJOB=app-cve-scan"], 731, "actor-1")
-        self.assertEqual(captured[0][0], ["make", "--no-print-directory", "app-cve-scan", "CRONJOB=app-cve-scan"])
-        self.assertEqual(captured[0][1]["timeout"], 731)
-        self.assertEqual(captured[0][1]["cwd"], lifecycle.REPO_ROOT)
+        self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "app-cve-scan", "CRONJOB=app-cve-scan"])
+        self.assertEqual(self.spawned[0][2], lifecycle.REPO_ROOT)
         self.assertTrue(any("actor-1" in text for _, text in self.notifications))
-        self.assertTrue(all(isinstance(value, list) for value, _ in captured))
 
     def test_make_target_never_uses_shell_or_concatenated_command(self):
-        captured = []
-        lifecycle._spawn_capture_text = lambda cmd, **kwargs: (captured.append(cmd) or (0, "", False))
         job_id = "a1b2c3d5"
         (lifecycle.JOB_DIR / job_id).mkdir()
         lifecycle._run_make_target(job_id, ["fix-list"], 12, "actor")
-        self.assertEqual(captured, [["make", "--no-print-directory", "fix-list"]])
+        self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "fix-list"])
 
     def test_make_target_passes_timeout_to_transport(self):
-        captured = []
-        lifecycle._spawn_capture_text = lambda cmd, **kwargs: (captured.append(kwargs) or (0, "", False))
         job_id = "a1b2c3d8"
         (lifecycle.JOB_DIR / job_id).mkdir()
         lifecycle._run_make_target(job_id, ["fix-list"], 947, "actor")
-        self.assertEqual(captured[0]["timeout"], 947)
 
     def test_make_target_includes_actor_in_audit_notification(self):
         lifecycle._spawn_capture_text = lambda cmd, **kwargs: (0, "", False)

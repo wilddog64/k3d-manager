@@ -16,4 +16,7 @@ log request bodies, headers, bearer tokens, Keychain values, Slack response
 URLs, or make output. Status routes are logged as `/api/v1/status/{job_id}`.
 
 Job logs and cleanup retention are described here as the v1.41.0 rollout
-lands; use the job ID from the webhook response when inspecting a job.
+lands; use the job ID from the webhook response when inspecting a job. Make
+jobs stream their local output to `make.log`, capped at the last 1 MiB when
+the job finishes. Inspect it with `make job-log ID=<job_id>`; this file is not
+the `output` returned by the cloud bridge.
