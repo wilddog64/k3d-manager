@@ -2979,3 +2979,4 @@ in the bug doc after commit: `3664bea7`.
 - [x] 2026-10-03 payment PRs #80 (19c42aa) + #82 (e3b6f06) MERGED. [ ] Trivy 0 CRITICAL on sha-e3b6f06, re-pin hostinger + e2e.
 - [x] 2026-10-03 payment sha-e3b6f06 Trivy 0 vulns; re-pinned hostinger digest + e2e tag b7604afe. [ ] payment repo k8s/base stuck at sha-19c42aa (CI commit-back rebase conflict). [ ] hostinger payment VulnerabilityReport 0 CRITICAL.
 - [ ] 2026-10-03 payment k8s/base stuck at sha-19c42aa: promote rebase bug (2026-09-21 doc) unimplemented; re-run fails deterministically. Spec needs is-ancestor guard + refresh; then bump caller pins.
+- [ ] 2026-10-02 promote-loop fix spec refreshed + dispatched to Codex (infra fix/promote-refetch-instead-of-rebase). [ ] infra PR. [ ] Part B: caller pin bumps, payment first (repairs k8s/base).
