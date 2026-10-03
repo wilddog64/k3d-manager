@@ -91,6 +91,10 @@ queued lifecycle job through its terminal response. The two e2e actions are
 cloud-runner capabilities rather than reader actions; the bridge uses its separate scoped
 credential for them. `make-e2e` does not accept a digest through this interface.
 
+The webhook ends a cluster job after 55 minutes for `sandbox-up` or 25 minutes for `sandbox-down`
+and marks it `failed`; a node that never answers SSH fails `sandbox-up` within about 3 minutes.
+After either failure, the agent can request `sandbox-down`.
+
 **The test targets run on macOS, which is why they are worth asking for.** The host has BSD
 `sed`, `stat`, `grep` and `date`; your sandbox is Linux. A suite that is green in your sandbox can
 be red on the machine the tool ships on, and only the host can tell you. Each test target runs

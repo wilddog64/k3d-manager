@@ -193,6 +193,75 @@
   [ "$status" -eq 0 ]
 }
 
+@test "SSH readiness fails after the configured budget with offline stubs" {
+  run bash -c '
+    stub_dir="${BATS_TEST_TMPDIR}/ssh-timeout-stubs"
+    mkdir -p "$stub_dir"
+    printf "#!/bin/sh\nn=0\n[ -f \"\${SSH_STUB_COUNT}\" ] && n=\$(cat \"\${SSH_STUB_COUNT}\")\nn=\$((n + 1))\necho \"\$n\" > \"\${SSH_STUB_COUNT}\"\nexit 1\n" > "$stub_dir/ssh"
+    printf "#!/bin/sh\nexit 0\n" > "$stub_dir/sleep"
+    chmod +x "$stub_dir/ssh" "$stub_dir/sleep"
+    SSH_STUB_COUNT="${BATS_TEST_TMPDIR}/ssh-count" PATH="$stub_dir:/usr/bin:/bin" SCRIPT_DIR="$(pwd)/scripts" K3DM_SSH_READY_TIMEOUT=30 \
+      bash -c '\''
+        source scripts/lib/system.sh
+        source scripts/lib/core.sh
+        source scripts/plugins/shopping_cart.sh
+        _err() { printf "%s\n" "$*"; return 1; }
+        _ubuntu_k3s_wait_ssh_ready node ubuntu key
+      '\''
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"did not answer SSH"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/ssh-count")" -eq 4 ]
+}
+
+@test "SSH readiness succeeds when the second probe answers" {
+  run bash -c '
+    stub_dir="${BATS_TEST_TMPDIR}/ssh-ready-stubs"
+    mkdir -p "$stub_dir"
+    printf "#!/bin/sh\ncount_file=\"\${SSH_STUB_COUNT}\"\nn=0\n[ -f \"\$count_file\" ] && n=\$(cat \"\$count_file\")\nn=\$((n + 1))\necho \"\$n\" > \"\$count_file\"\n[ \"\$n\" -ge 2 ]\n" > "$stub_dir/ssh"
+    printf "#!/bin/sh\nexit 0\n" > "$stub_dir/sleep"
+    chmod +x "$stub_dir/ssh" "$stub_dir/sleep"
+    SSH_STUB_COUNT="${BATS_TEST_TMPDIR}/ssh-count" PATH="$stub_dir:/usr/bin:/bin" SCRIPT_DIR="$(pwd)/scripts" \
+      bash -c '\''
+        source scripts/lib/system.sh
+        source scripts/lib/core.sh
+        source scripts/plugins/shopping_cart.sh
+        _ubuntu_k3s_wait_ssh_ready node ubuntu key
+      '\''
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "server install does not invoke k3sup when SSH preflight fails" {
+  run bash -c '
+    stub_dir="${BATS_TEST_TMPDIR}/server-install-stubs"
+    mkdir -p "$stub_dir"
+    printf "#!/bin/sh\necho \"\$*\" >> \"\${K3SUP_CALLS}\"\nexit 0\n" > "$stub_dir/k3sup"
+    printf "#!/bin/sh\nprintf \"ssh-key-Ed25519 AAAA stub\\n\"\nexit 0\n" > "$stub_dir/ssh-keyscan"
+    printf "#!/bin/sh\nexit 0\n" > "$stub_dir/ssh-keygen"
+    printf "#!/bin/sh\nexit 1\n" > "$stub_dir/ssh"
+    printf "#!/bin/sh\nexit 0\n" > "$stub_dir/sleep"
+    printf "#!/bin/sh\nexit 1\n" > "$stub_dir/kubectl"
+    chmod +x "$stub_dir"/*
+    : > "${BATS_TEST_TMPDIR}/k3sup-calls"
+    touch "${BATS_TEST_TMPDIR}/key.pem"
+    mkdir -p "${BATS_TEST_TMPDIR}/home"
+    K3SUP_CALLS="${BATS_TEST_TMPDIR}/k3sup-calls" PATH="$stub_dir:/usr/bin:/bin" SCRIPT_DIR="$(pwd)/scripts" \
+      HOME="${BATS_TEST_TMPDIR}/home" K3DM_SSH_READY_TIMEOUT=0 UBUNTU_K3S_SSH_KEY="${BATS_TEST_TMPDIR}/key.pem" \
+      UBUNTU_K3S_EXTERNAL_IP=node \
+      bash -c '\''
+        source scripts/lib/system.sh
+        source scripts/lib/core.sh
+        source scripts/plugins/shopping_cart.sh
+        _err() { printf "%s\n" "$*"; return 1; }
+        _run_command() { shift; "$@"; }
+        deploy_app_cluster --confirm
+      '\''
+  '
+  [ "$status" -ne 0 ]
+  [ ! -s "${BATS_TEST_TMPDIR}/k3sup-calls" ]
+}
+
 @test "agent joins fan out in parallel and wait for every worker" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"

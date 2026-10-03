@@ -1135,6 +1135,20 @@ function _ubuntu_k3s_trust_host() {
   _info "[shopping_cart] Trusted host key for ${host}"
 }
 
+function _ubuntu_k3s_wait_ssh_ready() {
+  local host="$1" ssh_user="$2" ssh_key="$3"
+  local budget="${K3DM_SSH_READY_TIMEOUT:-180}" waited=0
+  until ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o BatchMode=yes -o ConnectTimeout=10 "${ssh_user}@${host}" true >/dev/null 2>&1; do
+    if (( waited >= budget )); then
+      _err "[shopping_cart] ${ssh_user}@${host} did not answer SSH within ${budget}s — node unresponsive; not starting k3sup"
+      return 1
+    fi
+    sleep 10
+    (( waited += 10 ))
+  done
+}
+
 function _k3sup_join_agent() {
   local agent_host="$1" server_ip="$2"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
@@ -1403,6 +1417,7 @@ HELP
 
   _info "[shopping_cart] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
   _ubuntu_k3s_trust_host "${external_ip}"
+  _ubuntu_k3s_wait_ssh_ready "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
   local _k3s_extra_args='--disable traefik --disable servicelb'
   if [[ "${K3S_AMBIENT_MESH:-false}" == "true" ]]; then
     _k3s_extra_args="${_k3s_extra_args} --flannel-backend=none --disable-network-policy"
@@ -1420,7 +1435,8 @@ HELP
   # Copy system kubeconfig to user home so add_ubuntu_k3s_cluster can read it without sudo
   # SC2087: single-quoted heredoc intentionally prevents local expansion
   # shellcheck disable=SC2087
-  _run_command -- ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${ssh_user}@${external_ip}" bash <<'REMOTE'
+  _run_command -- ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 "${ssh_user}@${external_ip}" bash <<'REMOTE'
 SUDO="sudo"
 mkdir -p "${HOME}/.kube"
 $SUDO cp /etc/rancher/k3s/k3s.yaml "${HOME}/.kube/k3s.yaml"

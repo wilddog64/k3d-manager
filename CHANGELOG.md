@@ -32,6 +32,7 @@
 
 ### Fixed
 
+- Webhook cluster jobs now have hard deadlines, and sandbox `make up` fails fast when the server node does not answer SSH.
 - **k3dm Tests dashboard duration is now real.** `make test-metrics` now times the whole `make test-all` run and passes `--run-duration` to `bin/k3dm-test-metrics`. Before, the exporter pushed `k3dm_test_run_duration_seconds` as a literal `0` and published `0` for every suite with no parsed time, so the panel showed only the unittest files' millisecond timings against a roughly 15-minute run. The exporter now also reads pytest's summary time and omits suites with no reported duration. The panel is renamed "Run duration over time" and shows the whole run, and "Cases by suite" is renamed "Failing cases by suite", because an empty panel there is the healthy state.
 - Sandbox `make up` now resolves the hub host alias with the container's `nslookup` output and waits for the app-cluster PrometheusRule CRD before applying ACG rules.
 

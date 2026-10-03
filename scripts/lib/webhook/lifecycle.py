@@ -75,6 +75,16 @@ def _read_job_tail(output_path, n=3):
 
 _STALL_TICKS_THRESHOLD = 3
 
+
+def _cluster_job_timeout(action):
+    _defaults = {"up": 3300, "down": 1500}
+    _env = {"up": "K3DM_CLUSTER_UP_TIMEOUT", "down": "K3DM_CLUSTER_DOWN_TIMEOUT"}
+    try:
+        return int(os.environ.get(_env.get(action, ""), _defaults.get(action, 1500)))
+    except ValueError:
+        return _defaults.get(action, 1500)
+
+
 def _run_cleanup(job_id, provider):
     """Remove stale SSH tunnel and kubeconfig context after a failed cluster-up."""
     _notify_job(job_id, f"🧹 *Cleanup triggered* ({provider}) — removing stale SSH tunnel and kubeconfig context")
@@ -279,12 +289,37 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
         pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT, env=_spawn_env)
         with _running_procs_lock:
             _running_procs[job_id] = pid
-        _, _status = os.waitpid(pid, 0)
-        _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
+        timeout = _cluster_job_timeout(action)
+        deadline = time.monotonic() + timeout
+        timed_out = False
+        while time.monotonic() < deadline:
+            waited, _status = os.waitpid(pid, os.WNOHANG)
+            if waited == pid:
+                _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
+                break
+            time.sleep(0.1)
+        else:
+            timed_out = True
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except (ProcessLookupError, OSError):
+                pass
+            grace_deadline = time.monotonic() + 30
+            while time.monotonic() < grace_deadline:
+                waited, _status = os.waitpid(pid, os.WNOHANG)
+                if waited == pid:
+                    break
+                time.sleep(0.1)
+            else:
+                os.killpg(pid, signal.SIGKILL)
+                os.waitpid(pid, 0)
+            _write_log(f"ERROR: cluster-{action} timed out after {timeout}s — killed")
         try:
             os.killpg(pid, signal.SIGTERM)
         except (ProcessLookupError, OSError):
             pass
+        if timed_out:
+            raise RuntimeError(f"cluster-{action} timed out after {timeout}s")
         if _rc != 0:
             raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
         _write_log(f"{action} complete")
