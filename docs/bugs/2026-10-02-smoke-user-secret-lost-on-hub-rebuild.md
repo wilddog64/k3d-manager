@@ -186,7 +186,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 `2` would also break the cycle. It would leave the app `Degraded` until the seed runs, so F2 is the
 primary fix.
 
-**Follow-up (open) — the pre-seed can race ESO.** Live on 2026-10-03, the identity sync ran 4 seconds
+**Follow-up (FIXED by F3 below) — the pre-seed can race ESO.** Live on 2026-10-03, the identity sync ran 4 seconds
 after the Vault write and still failed, because the ExternalSecret's `refreshInterval` is 15 minutes.
 Recovery needed a `force-sync=<timestamp>` annotation on `ExternalSecret/k3dm-smoke-user` and a manual
 sync operation, since auto-sync does not retry a failed revision. `keycloak_smoke_vault_preseed`

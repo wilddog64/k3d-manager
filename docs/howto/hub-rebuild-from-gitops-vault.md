@@ -289,6 +289,7 @@ operation message names `ExternalSecret/k3dm-smoke-user`.
    ```bash
    ./scripts/k3d-manager keycloak_smoke_vault_preseed
    ```
+   `make hub-recover` now performs both the ESO refresh and failed identity-sync retry; the manual commands remain for a hub where reconcile is not run.
 2. **Make ESO re-read Vault.** The refresh interval is 15 minutes, so a just-written entry is not seen yet:
    ```bash
    kubectl --context k3d-k3d-cluster -n identity annotate externalsecret k3dm-smoke-user force-sync="$(date +%s)" --overwrite

@@ -509,6 +509,19 @@ function _keycloak_smoke_vault_put() {
       >/dev/null 2>&1
 }
 
+function _keycloak_smoke_force_eso_refresh() {
+   local ns="${KEYCLOAK_NAMESPACE:-identity}" sync_ts
+   if ! _kubectl --no-exit -n "$ns" get externalsecret k3dm-smoke-user >/dev/null 2>&1; then
+      return 0
+   fi
+   sync_ts=$(date +%s)
+   if ! _kubectl --no-exit -n "$ns" annotate externalsecret k3dm-smoke-user \
+      "force-sync=$sync_ts" --overwrite >/dev/null 2>&1; then
+      _warn "[keycloak] failed to force-refresh ExternalSecret k3dm-smoke-user"
+   fi
+   return 0
+}
+
 function keycloak_smoke_vault_preseed() {
    local realm="${KEYCLOAK_SMOKE_REALM:-shopping-cart}"
    local client_id="${KEYCLOAK_SMOKE_CLIENT_ID:-k3dm-smoke}"
@@ -529,7 +542,11 @@ function keycloak_smoke_vault_preseed() {
       '{username:$username,password:$ENV.K3DM_SMOKE_PASSWORD,realm:$realm,client:$client}' \
       > "$wd/smoke-user.json"
    chmod 600 "$wd/smoke-user.json"
-   _keycloak_smoke_vault_put "$wd/smoke-user.json"
+   if _keycloak_smoke_vault_put "$wd/smoke-user.json"; then
+      _keycloak_smoke_force_eso_refresh
+      return 0
+   fi
+   return 1
 }
 
 function _keycloak_smoke_password() {

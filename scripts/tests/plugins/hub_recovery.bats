@@ -257,6 +257,59 @@ YAML
   [ ! -s "$calls" ]
 }
 
+@test "_hub_recovery_retry_failed_identity_sync: Failed phase requests one cicd patch" {
+  local calls="${BATS_TEST_TMPDIR}/identity-retry-calls"
+  : > "$calls"
+  _kubectl() {
+    printf '%s\n' "$*" >> "$calls"
+    case "$*" in
+      *"get application shopping-cart-identity"*) printf 'Failed'; return 0 ;;
+      *"patch application shopping-cart-identity"*) return 0 ;;
+    esac
+    return 1
+  }
+  _info() { :; }
+  _warn() { :; }
+  run _hub_recovery_retry_failed_identity_sync hub-context
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'patch application shopping-cart-identity' "$calls")" -eq 1 ]
+  grep -q -- '-n cicd' "$calls"
+}
+
+@test "_hub_recovery_retry_failed_identity_sync: Succeeded, Running and empty phases do not patch" {
+  local phase calls="${BATS_TEST_TMPDIR}/identity-no-retry-calls"
+  for phase in Succeeded Running empty; do
+    : > "$calls"
+    _kubectl() {
+      printf '%s\n' "$*" >> "$calls"
+      case "$*" in
+        *"get application shopping-cart-identity"*) [[ "$IDENTITY_PHASE" != empty ]] && printf '%s' "$IDENTITY_PHASE"; return 0 ;;
+      esac
+      return 1
+    }
+    _info() { :; }
+    _warn() { :; }
+    IDENTITY_PHASE="$phase" run _hub_recovery_retry_failed_identity_sync hub-context
+    [ "$status" -eq 0 ]
+    run grep -q 'patch application shopping-cart-identity' "$calls"
+    [ "$status" -ne 0 ]
+  done
+}
+
+@test "_hub_recovery_retry_failed_identity_sync: patch failure is non-fatal" {
+  _kubectl() {
+    case "$*" in
+      *"get application shopping-cart-identity"*) printf 'Error'; return 0 ;;
+      *"patch application shopping-cart-identity"*) return 1 ;;
+    esac
+    return 1
+  }
+  _info() { :; }
+  _warn() { :; }
+  run _hub_recovery_retry_failed_identity_sync hub-context
+  [ "$status" -eq 0 ]
+}
+
 @test "hub_recovery_reconcile: hostnet drift runs after serverlb and failure is non-fatal" {
   local calls="${BATS_TEST_TMPDIR}/hostnet-reconcile-calls"
   local drift="${BATS_TEST_TMPDIR}/hostnet-drift"

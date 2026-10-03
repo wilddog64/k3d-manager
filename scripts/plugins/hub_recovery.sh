@@ -144,6 +144,25 @@ function _hub_recovery_replay_identity_hook() {
   return 1
 }
 
+function _hub_recovery_retry_failed_identity_sync() {
+  local hub_context="$1" phase
+  if ! phase=$(_kubectl --no-exit --context "$hub_context" -n cicd \
+    get application shopping-cart-identity -o jsonpath='{.status.operationState.phase}' 2>/dev/null); then
+    _warn "[hub-recovery] could not read shopping-cart-identity sync phase; continuing recovery"
+    return 0
+  fi
+  if [[ "$phase" != "Failed" && "$phase" != "Error" ]]; then
+    return 0
+  fi
+  if ! _kubectl --no-exit --context "$hub_context" -n cicd patch application shopping-cart-identity \
+    --type merge -p '{"operation":{"sync":{}}}' >/dev/null; then
+    _warn "[hub-recovery] failed to request a retry for shopping-cart-identity; continuing recovery"
+    return 0
+  fi
+  _info "[hub-recovery] requested a retry for failed shopping-cart-identity sync"
+  return 0
+}
+
 function _hub_recovery_mirror_argocd_admin() {
   local hub_context="$1" root_token password payload_file argocd_url="${HUB_RECOVERY_ARGOCD_URL:-https://argocd.3ai-talk.org}" code
   local __attempt
@@ -285,6 +304,7 @@ function hub_recovery_reconcile() {
     return 0
   fi
   keycloak_smoke_vault_preseed || _warn "[hub-recovery] smoke-user Vault preseed failed; continuing recovery"
+  _hub_recovery_retry_failed_identity_sync "$hub_context"
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
   _hub_recovery_reconcile_hostnet_drift "$hub_context"
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1
