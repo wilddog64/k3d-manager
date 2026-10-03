@@ -1,6 +1,6 @@
 # Cloud bridge round trip takes up to ~90 s for a request the webhook answers in seconds
 
-**Status:** OPEN — queued for Codex (after `v1.41.0-find-similar-docs-links.md`)
+**Status:** FIXED — `6fc0bc47` + `819e636a` (MAX_PER_TICK refetch); operator restarted the bridge 2026-10-03 06:18. Live: request→response commit 14 s and 9 s (was 7–31 s), client round trip ~20 s (was up to ~90 s)
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude (operator asked "how can we improve claude-bridge performance?")
 
