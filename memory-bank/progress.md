@@ -2974,6 +2974,6 @@ in the bug doc after commit: `3664bea7`.
 - [x] 2026-10-02 hostinger payment outage (credential drift since 09-29 Vault KV regen) recovered by operator ALTER USER; 1/1 Ready on b722319e. [ ] same drift latent on orders/products/redis.
 - [ ] 2026-10-02 credential-drift tool spec dispatched to Codex (docs/bugs/2026-10-02-hostinger-shopping-cart-credential-drift-after-vault-kv-regen.md); operator rollout = make shopping-cart-credential-drift [APPLY=1].
 - [x] 2026-10-02 promoter live-override fix 78b1fe7a verified (operator rollout pending). [x] Netty override verified; payment PR #82 open, awaiting go.
-- [x] 2026-10-02 credential-drift tool landed 64e52b65 (verified); [ ] operator: make shopping-cart-credential-drift [APPLY=1].
+- [x] 2026-10-02 credential-drift tool landed 64e52b65 (verified); [x] operator APPLY=1 run 2026-10-03: 5 stores FIXED, 1 MATCH; all pods Ready, apps Synced+Healthy (Claude-verified).
 - [x] 2026-10-02 k3dm-cleanup orphaned Docker volume prune LANDED `3204c74e` (Codex, Claude-verified 9/9 bats, mutation red, shellcheck 4=4). Check ~/Library/Logs/k3dm-cleanup.log after next 03:00 run.
 - [x] 2026-10-03 payment PRs #80 (19c42aa) + #82 (e3b6f06) MERGED. [ ] Trivy 0 CRITICAL on sha-e3b6f06, re-pin hostinger + e2e.
