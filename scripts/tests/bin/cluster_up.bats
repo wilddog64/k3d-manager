@@ -516,13 +516,19 @@ _load_acg_up_marker_clear() {
 }
 
 @test "acg-up marks the tunnel plist as created only when none existed" {
-  run grep -c '_ACG_TUNNEL_PLIST_CREATED=1' bin/cluster-up
+  local lib=scripts/lib/cloudflare_tunnel.sh
+  run grep -c '_ACG_TUNNEL_PLIST_CREATED=1' "$lib"
   [ "$status" -eq 0 ]
   [ "$output" -eq 1 ]
-  run bash -c "awk '/_ACG_TUNNEL_PLIST_CREATED=1/{print NR}' bin/cluster-up"
-  [ "$status" -eq 0 ]
-  run bash -c "awk '/install -m 644 .\{_named_tunnel_plist_tmp\}/{print NR; exit}' bin/cluster-up"
-  [ "$status" -eq 0 ]
+  run grep -c '\[\[ -f "${_named_tunnel_plist}" \]\] || _ACG_TUNNEL_PLIST_CREATED=1' "$lib"
+  [ "$output" -eq 1 ]
+  marker_line=$(awk '/_ACG_TUNNEL_PLIST_CREATED=1/{print NR; exit}' "$lib")
+  install_line=$(awk '/install -m 644 "\$\{_named_tunnel_plist_tmp\}"/{print NR; exit}' "$lib")
+  [ -n "$marker_line" ]
+  [ -n "$install_line" ]
+  [ "$marker_line" -lt "$install_line" ]
+  run grep -c 'source "${REPO_ROOT}/scripts/lib/cloudflare_tunnel.sh"' bin/cluster-up
+  [ "$output" -ge 1 ]
 }
 
 @test "acg-up failure cleanup never boots out the tunnel unconditionally" {
