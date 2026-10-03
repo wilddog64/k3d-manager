@@ -88,3 +88,34 @@ That is, one command that brings the hub back. The provider is named `k3d`, not 
 - Do NOT create a PR, merge, commit to `main`, or use `--no-verify`.
 - Do NOT edit `memory-bank/`, `scripts/lib/foundation/`, `scripts/lib/acg/`, `bin/cluster-up` or `bin/cluster-down`.
 - Do NOT run anything live: no dispatcher, k3d, Docker, kubectl against a real cluster, or `make up`/`down`.
+
+## Review finding on `abbcfd65` (Claude, 2026-10-03) — follow-up U4
+
+**Defect:** `bin/hub-up` pins the context only for its Step 2 API wait. Steps 3–5 call
+`deploy_vault`, `deploy_ldap` and `deploy_argocd`, and those act on the **current** kube context.
+When the operator's current context is `ubuntu-hostinger`, which is common, `make hub-up` against an
+existing hub would install Vault, LDAP and ArgoCD on Hostinger.
+
+**U4 fix (`bin/hub-up` only, plus its test):**
+- After Step 2 and before Step 3, read `kubectl config current-context`.
+- If it is not `${_hub_context}`, stop with
+  `_err "[hub-up] current kube context is '<ctx>', not '${_hub_context}' — run: kubectl config use-context ${_hub_context}"`.
+- Do not switch the context automatically; the global context is never changed by hub-up.
+- k3d's create switches the context to the new cluster, so the create path passes the guard naturally.
+
+**Gate:**
+- A test whose `kubectl` stub reports `current-context` = `ubuntu-hostinger` shows:
+  - a non-zero exit;
+  - output naming both contexts;
+  - no `deploy_vault`, `deploy_ldap` or `deploy_argocd` in the dispatcher call log.
+- Mutation: remove the guard → that test is red. Restore from a `cp` snapshot and confirm with `cmp`.
+- The existing 6 tests stay green. Their `kubectl` stub must return `k3d-k3d-cluster` for `config current-context`.
+
+**Commit message (exact):**
+
+```
+fix(hub-up): refuse to deploy when the current kube context is not the hub
+
+Co-Authored-By: Codex <noreply@openai.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
