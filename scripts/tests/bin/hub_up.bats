@@ -15,6 +15,10 @@ printf '%s %s\n' "$(basename "$0")" "$*" >> "${CALL_LOG}"
 if [[ "$(basename "$0")" == "k3d" && "${HUB_STATE:-missing}" == "existing" ]]; then
   printf 'k3d-cluster\tservers:1\tagents:1\n'
 fi
+if [[ "$(basename "$0")" == "kubectl" && "${1:-}" == "config" && "${2:-}" == "current-context" ]]; then
+  printf '%s\n' "${KUBE_CONTEXT:-k3d-k3d-cluster}"
+  exit 0
+fi
 if [[ "$(basename "$0")" == "kubectl" && "$*" == *"config use-context"* ]]; then
   exit 99
 fi
@@ -82,6 +86,18 @@ teardown() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"Step 3/5 failed: deploying Vault"* ]]
   run cat "${CALL_LOG}"
+  [[ "$output" != *"dispatcher deploy_ldap"* ]]
+  [[ "$output" != *"dispatcher deploy_argocd"* ]]
+}
+
+@test "hub-up refuses deployment when the current context is not the hub" {
+  export KUBE_CONTEXT=ubuntu-hostinger
+  run bin/hub-up
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"ubuntu-hostinger"* ]]
+  [[ "$output" == *"k3d-k3d-cluster"* ]]
+  run cat "${CALL_LOG}"
+  [[ "$output" != *"dispatcher deploy_vault"* ]]
   [[ "$output" != *"dispatcher deploy_ldap"* ]]
   [[ "$output" != *"dispatcher deploy_argocd"* ]]
 }

@@ -54,6 +54,11 @@ if [[ "${_api_ready}" -ne 1 ]]; then
   _err "[hub-up] Step 2/5 failed: Hub API did not become ready"
 fi
 
+_current_context="$(kubectl config current-context 2>/dev/null || true)"
+if [[ "${_current_context}" != "${_hub_context}" ]]; then
+  _err "[hub-up] current kube context is '${_current_context}', not '${_hub_context}' — run: kubectl config use-context ${_hub_context}"
+fi
+
 _hub_dispatch 3 "deploying Vault" deploy_vault --confirm
 _hub_dispatch 4 "deploying LDAP" deploy_ldap --confirm
 _hub_dispatch 5 "deploying ArgoCD" deploy_argocd --confirm
