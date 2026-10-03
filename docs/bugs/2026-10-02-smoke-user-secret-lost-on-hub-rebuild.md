@@ -122,3 +122,66 @@ Mutations, each red, then `cp`-restored and `cmp`-proved:
 **Out of scope:** the Keycloak *user* itself. It lives in the Keycloak DB. If a future rebuild loses it, the
 smoke token check now FAILs with HTTP 401, which is louder and points straight to the seed command, rather than a WARN that
 reads "credentials unavailable".
+
+## Recurrence 2026-10-03 — on a fresh hub the smoke ExternalSecret deadlocks the identity sync (Claude)
+
+**Status:** SPEC — ready for Codex (F2 below). Operator unblock given 2026-10-03.
+
+With F1 in place (`e08eaa83`, server-side apply), `shopping-cart-identity` gets past the PVC. It then
+fails at `ExternalSecret/k3dm-smoke-user [Failed]: could not get secret data from provider`.
+
+**This is a deadlock, not drift.** On a hub whose Vault was rebuilt:
+- the ExternalSecret is sync-wave `0`, and `deployment/keycloak` is wave `1`. A failed wave 0 stops the
+  sync, so Keycloak is never created;
+- `secret/keycloak/smoke-user` is written only by `keycloak_seed_smoke_user`, which runs from
+  `hub_recovery_reconcile` and needs a running Keycloak to mint an admin token.
+
+It never showed on 2026-10-02, because that hub's Vault already held the path.
+
+**What makes a pre-seed safe:** `_keycloak_smoke_password` prefers the password already in Vault.
+A Vault entry written **before** Keycloak exists is therefore adopted by the later seed, which sets
+the Keycloak user's password to it.
+
+### F2 — fix (k3d-manager only)
+
+1. **`scripts/plugins/keycloak.sh`:** add a public function `keycloak_smoke_vault_preseed`.
+   - If `secret/keycloak/smoke-user` already has a `password` (`_keycloak_smoke_vault_get_password`
+     non-empty), log `smoke-user Vault entry present — leaving it` and return 0.
+   - Otherwise, write `{username, password, realm, client}` with `_keycloak_smoke_vault_put`:
+     - the username, realm and client use the same defaults and env overrides as
+       `keycloak_seed_smoke_user`;
+     - the password is `openssl rand -hex 24`;
+     - build the payload with `jq -n` from env into a mode-600 `mktemp` file, removed by a `RETURN` trap.
+   - The password must never reach argv, stdout or a log.
+   - Return 1 if the Vault root token cannot be read.
+2. **`bin/cluster-up`:** call `keycloak_smoke_vault_preseed` through the dispatcher, with
+   `--context k3d-k3d-cluster` semantics (`KUBECONFIG`/context pinned as in the surrounding steps),
+   **immediately before** the Step 10c `kubectl apply` of the `shopping-cart-identity` Application.
+   A failure is `_warn`, not fatal: the reconcile seed remains the second chance.
+3. **`scripts/plugins/hub_recovery.sh`:** call the same preseed at the start of
+   `hub_recovery_reconcile`, before anything waits on identity.
+
+**Gates (offline; stubs only):**
+- **Absent:** the `kubectl` stub returns an empty `kv get`. One `kv put` is made, and its stdin
+  payload has all four keys with a 48-hex password. The password string does not appear in the
+  stub's argv log or in the output.
+- **Present:** `kv get` returns a value. No `kv put` is made.
+- **Order:** in `bin/cluster-up`, the preseed line comes before the `IDEOF` apply line. Assert by line
+  number, not by a whole-line match.
+- **Mutation:** drop the "present" early-return. The present test goes red. Restore from a `cp`
+  snapshot and confirm with `cmp`.
+- **Other checks:** shellcheck has no new warnings; the touched BATS files pass; `git diff --stat` shows
+  only `keycloak.sh`, `bin/cluster-up`, `hub_recovery.sh` and their two BATS files.
+
+**Commit message (exact):**
+
+```
+fix(keycloak): preseed the smoke-user Vault entry before the identity sync so a fresh hub cannot deadlock
+
+Co-Authored-By: Codex <noreply@openai.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+
+**Follow-up for shopping-cart-infra (separate, operator's call):** moving the ExternalSecret to wave
+`2` would also break the cycle. It would leave the app `Degraded` until the seed runs, so F2 is the
+primary fix.
