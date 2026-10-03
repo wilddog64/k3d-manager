@@ -53,3 +53,55 @@ PY
   run grep -F -- '_kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/"' "${_plugin}"
   [ "${status}" -eq 0 ]
 }
+
+@test "PrometheusRule CRD wait allows rules apply after delayed creation" {
+  export SCRIPT_DIR="${BATS_TEST_DIRNAME}/../../"
+  export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
+  source "${PLUGINS_DIR}/observability.sh"
+  _info() { :; }
+  _warn() { :; }
+  helm() { return 0; }
+  sleep() { :; }
+  local calls="${BATS_TEST_TMPDIR}/calls"
+  : > "${calls}"
+  _err() { printf '%s\n' "$*" >> "${calls}"; return 0; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "${calls}"
+    if [[ "$*" == *"get crd"* ]]; then
+      local gets
+      gets=$(grep -c 'get crd' "${calls}" || true)
+      (( gets >= 3 ))
+      return
+    fi
+    return 0
+  }
+  export K3DM_ACG_RULES_CRD_ATTEMPTS=3 K3DM_ACG_RULES_CRD_INTERVAL=0
+  run _deploy_pushgateway_acg test-context
+  [ "${status}" -eq 0 ]
+  [ "$(grep -c 'get crd prometheusrules.monitoring.coreos.com' "${calls}")" -eq 3 ]
+  [ "$(grep -c 'wait.*crd/prometheusrules.monitoring.coreos.com' "${calls}")" -eq 1 ]
+  [ "$(grep -c 'apply.*rules-acg' "${calls}")" -eq 1 ]
+}
+
+@test "PrometheusRule CRD wait skips apply when creation never completes" {
+  export SCRIPT_DIR="${BATS_TEST_DIRNAME}/../../"
+  export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
+  source "${PLUGINS_DIR}/observability.sh"
+  _info() { :; }
+  _warn() { :; }
+  helm() { return 0; }
+  sleep() { :; }
+  local calls="${BATS_TEST_TMPDIR}/calls"
+  : > "${calls}"
+  _err() { printf '%s\n' "$*" >> "${calls}"; return 0; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "${calls}"
+    [[ "$*" != *"get crd"* && "$*" != *"apply"* ]]
+  }
+  export K3DM_ACG_RULES_CRD_ATTEMPTS=3 K3DM_ACG_RULES_CRD_INTERVAL=0
+  run _deploy_pushgateway_acg test-context
+  [ "${status}" -ne 0 ]
+  run grep -F 'prometheusrules.monitoring.coreos.com' "${calls}"
+  [ "${status}" -eq 0 ]
+  [ "$(grep -c 'apply.*rules-acg' "${calls}" || true)" -eq 0 ]
+}

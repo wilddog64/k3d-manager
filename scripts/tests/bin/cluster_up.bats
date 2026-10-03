@@ -24,6 +24,26 @@
   [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
 }
 
+@test "acg-up uses the shared host resolver and fails when it cannot resolve the host" {
+  run grep -nF 'source "${REPO_ROOT}/scripts/lib/hub_host_ip.sh"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  run grep -nF 'source "${REPO_ROOT}/scripts/lib/hub_host_ip.sh"' bin/cluster-refresh
+  [ "$status" -eq 0 ]
+  run grep -nF 'getent hosts host.docker.internal' bin/cluster-up
+  [ "$status" -ne 0 ]
+  run grep -nF 'getent hosts host.docker.internal' bin/cluster-refresh
+  [ "$status" -ne 0 ]
+  run bash -c '
+    set -e
+    body=$(sed -n "/function _acg_repair_hub_host_alias/,/^}/p" bin/cluster-up)
+    grep -q "_host_ip=\$(_hub_docker_host_ip)" <<<"$body"
+    grep -q "_err" <<<"$body"
+    grep -q "_err \"\[acg-up\] Could not resolve host.docker.internal" <<<"$body"
+    if grep -q "_warn \"\[acg-up\] Could not detect host IP" <<<"$body"; then exit 1; fi
+  '
+  [ "$status" -eq 0 ]
+}
+
 @test "acg-up reconciles other app-cluster registrations after registering the hub" {
   run bash -c "awk '/register_app_cluster/{print NR; found=1} found && /argocd_reconcile_app_cluster_registrations/{print NR; exit}' bin/cluster-up"
   [ "$status" -eq 0 ]

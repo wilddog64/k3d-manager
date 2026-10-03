@@ -22,6 +22,7 @@ if ! NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('playwright')" >/dev/
 fi
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
+source "${REPO_ROOT}/scripts/lib/hub_host_ip.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/aws.sh"
@@ -246,8 +247,7 @@ fi
 
 # ── 2b-pre. CoreDNS NodeHosts patch + restart ────────────────────────────────
 _info "[acg-refresh] Detecting host IP for host.k3d.internal..."
-_coredns_host_ip=$(docker exec k3d-k3d-cluster-server-0 sh -c \
-  "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1}'" 2>/dev/null || echo "")
+_coredns_host_ip=$(_hub_docker_host_ip)
 if [[ -z "${_coredns_host_ip}" ]]; then
   _warn "[acg-refresh] Could not detect host IP from host.docker.internal — CoreDNS patch skipped"
 else

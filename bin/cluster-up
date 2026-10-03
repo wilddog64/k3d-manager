@@ -57,6 +57,7 @@ _cp_write() {
   _dry_guard "write lifecycle checkpoint ${1}" touch "${_ACG_CHECKPOINT_DIR}/${1}.done"
 }
 source "${REPO_ROOT}/scripts/lib/core.sh"
+source "${REPO_ROOT}/scripts/lib/hub_host_ip.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
@@ -171,11 +172,9 @@ function _acg_repair_hub_host_alias() {
   local _host_ip _existing_nodes _new_node_hosts _patch_json
 
   _info "[acg-up] Ensuring Hub CoreDNS resolves host.k3d.internal..."
-  _host_ip=$(docker exec k3d-k3d-cluster-server-0 sh -c \
-    "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1}'" 2>/dev/null || echo "")
+  _host_ip=$(_hub_docker_host_ip)
   if [[ -z "${_host_ip}" ]]; then
-    _warn "[acg-up] Could not detect host IP from host.docker.internal — CoreDNS host alias repair skipped"
-    return 0
+    _err "[acg-up] Could not resolve host.docker.internal inside k3d-k3d-cluster-server-0 — hub CoreDNS cannot be given host.k3d.internal and ArgoCD will not reach ubuntu-k3s"
   fi
 
   _existing_nodes=$(kubectl get configmap coredns -n kube-system \

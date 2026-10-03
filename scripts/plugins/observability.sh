@@ -735,7 +735,10 @@ function _deploy_pushgateway_acg() {
   local _acg_rules_failed=0
   local _acg_rules_dir="${SCRIPT_DIR}/etc/prometheus/rules-acg"
   if [[ -d "${_acg_rules_dir}" ]]; then
-    if _kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/" >/dev/null; then
+    if ! _observability_wait_for_prometheusrule_crd "${_app_context}"; then
+      _err "[observability] PrometheusRule CRD not established on ${_app_context} after waiting — kube-prometheus-stack (observability-acg) has not installed it"
+      _acg_rules_failed=1
+    elif _kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/" >/dev/null; then
       _info "[observability] app-cluster PrometheusRules applied from ${_acg_rules_dir}/"
     else
       _err "[observability] Failed to apply app-cluster PrometheusRules from ${_acg_rules_dir}/"
@@ -744,6 +747,25 @@ function _deploy_pushgateway_acg() {
   fi
   _observability_apply_trivy_dashboard "${_app_context}"
   return "${_acg_rules_failed}"
+}
+
+function _observability_wait_for_prometheusrule_crd() {
+  local _context="$1"
+  local _attempts="${K3DM_ACG_RULES_CRD_ATTEMPTS:-36}"
+  local _interval="${K3DM_ACG_RULES_CRD_INTERVAL:-5}"
+  local _attempt
+
+  for ((_attempt=1; _attempt<=_attempts; _attempt++)); do
+    if _kubectl --no-exit get crd prometheusrules.monitoring.coreos.com \
+        --context "${_context}" >/dev/null 2>&1; then
+      _kubectl --no-exit wait --context "${_context}" \
+        --for=condition=Established --timeout=120s \
+        crd/prometheusrules.monitoring.coreos.com >/dev/null 2>&1
+      return $?
+    fi
+    (( _attempt < _attempts )) && sleep "${_interval}"
+  done
+  return 1
 }
 
 function _deploy_promtail_acg() {
