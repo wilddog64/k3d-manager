@@ -7,6 +7,40 @@ setup() {
   HOME_ROOT="${BATS_TEST_TMPDIR}/home"
   RUN_ROOT="${HOME_ROOT}/.local/share/k3d-manager/run"
   mkdir -p "${TMP_ROOT}" "${RUN_ROOT}" "${HOME_ROOT}/.local/share/k3d-manager/logs"
+  mkdir -p "${BATS_TEST_TMPDIR}/stubbin"
+  : > "${BATS_TEST_TMPDIR}/calls"
+  cat > "${BATS_TEST_TMPDIR}/stubbin/docker" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/calls"
+case "$1 $2" in
+  "info ") exit 0 ;;
+  "volume ls")
+    [ -f "${BATS_TEST_TMPDIR}/volumes" ] && cat "${BATS_TEST_TMPDIR}/volumes"
+    ;;
+  "volume inspect")
+    volume="$3"
+    format="$5"
+    if [[ "${format}" == *CreatedAt* ]]; then
+      sed -n "s/^${volume} created=//p" "${BATS_TEST_TMPDIR}/meta"
+    elif [[ "${format}" == *com.docker.volume.anonymous* ]]; then
+      grep -q "^${volume} anon$" "${BATS_TEST_TMPDIR}/meta" && echo anon
+    fi
+    ;;
+  "volume rm") exit 0 ;;
+esac
+EOF
+  cat > "${BATS_TEST_TMPDIR}/stubbin/trivy" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/calls"
+exit 0
+EOF
+  cat > "${BATS_TEST_TMPDIR}/stubbin/brew" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/calls"
+exit 0
+EOF
+  chmod +x "${BATS_TEST_TMPDIR}/stubbin/docker" "${BATS_TEST_TMPDIR}/stubbin/trivy" "${BATS_TEST_TMPDIR}/stubbin/brew"
+  export PATH="${BATS_TEST_TMPDIR}/stubbin:${PATH}"
 }
 
 _touch_old() {
@@ -128,4 +162,59 @@ _touch_old() {
   [ -e "${packer_dir}/new.iso" ]
   [ ! -e "${port_dir}/old-marker" ]
   [ -e "${port_dir}/new-marker" ]
+}
+
+@test "k3dm-cleanup removes old orphaned volumes and keeps everything else" {
+  printf '%s\n' k3d-old-server-data anonold anonnew k3dm-gobuild-cache otherproject-db > "${BATS_TEST_TMPDIR}/volumes"
+  printf '%s\n' \
+    'k3d-old-server-data created=2026-01-01T00:00:00Z' \
+    'otherproject-db created=2026-01-01T00:00:00Z' \
+    'anonold created=2026-01-01T00:00:00Z' \
+    "anonnew created=$(date -u +%F)T00:00:00Z" \
+    'k3dm-gobuild-cache created=2026-01-01T00:00:00Z' \
+    'anonold anon' 'anonnew anon' 'k3dm-gobuild-cache anon' > "${BATS_TEST_TMPDIR}/meta"
+
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  run grep -c 'volume rm k3d-old-server-data' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 1 ]
+  run grep -c 'volume rm anonold' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 1 ]
+  run grep -c 'volume rm anonnew' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 0 ]
+  run grep -c 'volume rm k3dm-gobuild-cache' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 0 ]
+  run grep -c 'volume rm otherproject-db' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 0 ]
+}
+
+@test "k3dm-cleanup can disable Docker volume pruning" {
+  printf '%s\n' k3d-old-server-data anonold > "${BATS_TEST_TMPDIR}/volumes"
+  printf '%s\n' \
+    'k3d-old-server-data created=2026-01-01T00:00:00Z' \
+    'anonold created=2026-01-01T00:00:00Z' 'anonold anon' > "${BATS_TEST_TMPDIR}/meta"
+
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_DOCKER_VOLUME_PRUNE=0 "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  run grep -c 'volume rm' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 0 ]
+}
+
+@test "k3dm-cleanup prunes weekly caches on the prune day" {
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_WEEKLY_CACHE_PRUNE_DAY="$(date +%u)" "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  run grep -c 'clean --all' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 1 ]
+  run grep -c 'cleanup -s' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 1 ]
+}
+
+@test "k3dm-cleanup skips weekly caches off the prune day" {
+  other_day=$(( $(date +%u) % 7 + 1 ))
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_WEEKLY_CACHE_PRUNE_DAY="${other_day}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  run grep -c 'clean --all' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 0 ]
+  run grep -c 'cleanup -s' "${BATS_TEST_TMPDIR}/calls"
+  [ "${output}" -eq 0 ]
 }

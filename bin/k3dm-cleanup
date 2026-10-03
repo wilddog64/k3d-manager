@@ -9,6 +9,11 @@ K3DM_PACKER_CACHE_DIR="${K3DM_PACKER_CACHE_DIR:-${HOME}/.cache/packer}"
 K3DM_PACKER_RETENTION_DAYS="${K3DM_PACKER_RETENTION_DAYS:-30}"
 K3DM_PORT_CACHE_DIR="${K3DM_PORT_CACHE_DIR:-${HOME}/.cache/port}"
 K3DM_PORT_RETENTION_DAYS="${K3DM_PORT_RETENTION_DAYS:-7}"
+K3DM_DOCKER_VOLUME_PRUNE="${K3DM_DOCKER_VOLUME_PRUNE:-1}"
+K3DM_DOCKER_VOLUME_RETENTION_DAYS="${K3DM_DOCKER_VOLUME_RETENTION_DAYS:-7}"
+K3DM_DOCKER_KEEP_VOLUMES="${K3DM_DOCKER_KEEP_VOLUMES:-k3dm-*}"
+K3DM_WEEKLY_CACHE_PRUNE="${K3DM_WEEKLY_CACHE_PRUNE:-1}"
+K3DM_WEEKLY_CACHE_PRUNE_DAY="${K3DM_WEEKLY_CACHE_PRUNE_DAY:-7}"
 
 # Failure screenshots — keep most recent 10 in root, 10 in logs/
 _prune_pngs() {
@@ -147,6 +152,44 @@ _prune_port_markers() {
     -mtime "+${K3DM_PORT_RETENTION_DAYS}" -print 2>/dev/null)
 }
 
+# Hub rebuilds and recovery clusters leave their k3s node-data volumes behind. Remove
+# only volumes no container (running or stopped) references, older than the retention
+# window, that are anonymous or k3d-*; never named volumes from other projects.
+_prune_docker_volumes() {
+  local vol created anon keep cutoff
+  [[ "${K3DM_DOCKER_VOLUME_PRUNE}" == "1" ]] || return 0
+  command -v docker >/dev/null 2>&1 || return 0
+  docker info >/dev/null 2>&1 || return 0
+  cutoff="$(date -u -v-"${K3DM_DOCKER_VOLUME_RETENTION_DAYS}"d +%F 2>/dev/null \
+    || date -u -d "-${K3DM_DOCKER_VOLUME_RETENTION_DAYS} days" +%F)"
+  while IFS= read -r vol; do
+    [[ -n "${vol}" ]] || continue
+    for keep in ${K3DM_DOCKER_KEEP_VOLUMES}; do
+      # shellcheck disable=SC2053
+      [[ "${vol}" == ${keep} ]] && continue 2
+    done
+    anon="$(docker volume inspect "${vol}" --format '{{range $k, $v := .Labels}}{{if eq $k "com.docker.volume.anonymous"}}anon{{end}}{{end}}' 2>/dev/null || true)"
+    [[ "${anon}" == "anon" || "${vol}" == k3d-* ]] || continue
+    created="$(docker volume inspect "${vol}" --format '{{.CreatedAt}}' 2>/dev/null || true)"
+    [[ -n "${created}" && "${created:0:10}" < "${cutoff}" ]] || continue
+    if docker volume rm "${vol}" >/dev/null 2>&1; then
+      echo "k3dm-cleanup: removed unused Docker volume ${vol} (created ${created:0:10})"
+    fi
+  done < <(docker volume ls -q --filter dangling=true 2>/dev/null)
+}
+
+# Trivy's DB/scan cache and Homebrew's download cache are re-creatable; trim weekly.
+_prune_weekly_caches() {
+  [[ "${K3DM_WEEKLY_CACHE_PRUNE}" == "1" ]] || return 0
+  [[ "$(date +%u)" == "${K3DM_WEEKLY_CACHE_PRUNE_DAY}" ]] || return 0
+  if command -v trivy >/dev/null 2>&1 && trivy clean --all >/dev/null 2>&1; then
+    echo "k3dm-cleanup: cleaned Trivy cache"
+  fi
+  if command -v brew >/dev/null 2>&1 && brew cleanup -s >/dev/null 2>&1; then
+    echo "k3dm-cleanup: cleaned Homebrew cache"
+  fi
+}
+
 _prune_pngs "${K3DM_STATE_DIR}"
 _prune_pngs "${K3DM_STATE_DIR}/logs"
 _prune_chromium_cache "${K3DM_STATE_DIR}/profile"
@@ -175,5 +218,7 @@ _prune_old_paths 'k3s-etcd-*.db' f 'k3s etcd snapshots'
 _prune_placeholder_tmpdirs
 _prune_packer_cache
 _prune_port_markers
+_prune_docker_volumes
+_prune_weekly_caches
 
 echo "k3dm-cleanup: done"
