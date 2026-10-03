@@ -1,6 +1,8 @@
 import importlib.util
+import os
 import tempfile
 import threading
+import time
 import unittest
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -71,10 +73,29 @@ class WebhookLifecycleTests(unittest.TestCase):
         lifecycle._run_make_target(job_id, ["fix-list"], 12, "actor")
         self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "fix-list"])
 
-    def test_make_target_passes_timeout_to_transport(self):
+    def test_make_target_times_out_and_kills_the_job(self):
         job_id = "a1b2c3d8"
-        (lifecycle.JOB_DIR / job_id).mkdir()
-        lifecycle._run_make_target(job_id, ["fix-list"], 947, "actor")
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+        child = {}
+
+        def spawn_long_running_job(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("")
+            child["pid"] = lifecycle.os.posix_spawn(
+                "/bin/sleep", ["sleep", "30"], dict(env or {}), setsid=True
+            )
+            return child["pid"]
+
+        lifecycle._spawn_job = spawn_long_running_job
+        started = time.monotonic()
+        lifecycle._run_make_target(job_id, ["fix-list"], 0.3, "actor")
+        elapsed = time.monotonic() - started
+
+        self.assertEqual((job_dir / "status").read_text(), "failed")
+        self.assertTrue(any("timed out after" in text for _, text in self.notifications))
+        self.assertLess(elapsed, 5)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child["pid"], 0)
 
     def test_make_target_includes_actor_in_audit_notification(self):
         lifecycle._spawn_capture_text = lambda cmd, **kwargs: (0, "", False)
@@ -85,12 +106,22 @@ class WebhookLifecycleTests(unittest.TestCase):
 
     def test_cluster_provider_defaults_to_aws_for_unknown_value(self):
         (lifecycle.JOB_DIR / "a1b2c3d6").mkdir()
-        lifecycle.os.waitpid = lambda pid, options: (pid, 0)
-        lifecycle.os.WIFEXITED = lambda status: True
-        lifecycle.os.WEXITSTATUS = lambda status: 0
-        lifecycle.os.killpg = lambda pid, signal: None
-        lifecycle._run_cluster("a1b2c3d6", "up", provider="not-a-provider", dry_run=True)
-        self.assertEqual(self.spawned[0][0], ["make", "up", "CLUSTER_PROVIDER=k3s-aws"])
+        original_waitpid = lifecycle.os.waitpid
+        original_wifexited = lifecycle.os.WIFEXITED
+        original_wexitstatus = lifecycle.os.WEXITSTATUS
+        original_killpg = lifecycle.os.killpg
+        try:
+            lifecycle.os.waitpid = lambda pid, options: (pid, 0)
+            lifecycle.os.WIFEXITED = lambda status: True
+            lifecycle.os.WEXITSTATUS = lambda status: 0
+            lifecycle.os.killpg = lambda pid, signal: None
+            lifecycle._run_cluster("a1b2c3d6", "up", provider="not-a-provider", dry_run=True)
+            self.assertEqual(self.spawned[0][0], ["make", "up", "CLUSTER_PROVIDER=k3s-aws"])
+        finally:
+            lifecycle.os.waitpid = original_waitpid
+            lifecycle.os.WIFEXITED = original_wifexited
+            lifecycle.os.WEXITSTATUS = original_wexitstatus
+            lifecycle.os.killpg = original_killpg
 
     def test_cluster_refuses_a_concurrent_job(self):
         calls = []
