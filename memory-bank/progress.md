@@ -2972,3 +2972,4 @@ in the bug doc after commit: `3664bea7`.
 - [ ] CVE promoter live override shadows git pin: spec docs/bugs/2026-10-02-cve-promoter-live-override-shadows-git-pin.md (59d62e05); DISPATCHED to Codex 2026-10-02 on k3d-manager-v1.41.0; operator rollout = make platform-ops + remove 4 hostinger overrides (supersedes the set-override cmd)
 
 - [x] 2026-10-02 hostinger payment outage (credential drift since 09-29 Vault KV regen) recovered by operator ALTER USER; 1/1 Ready on b722319e. [ ] same drift latent on orders/products/redis.
+- [ ] 2026-10-02 credential-drift tool spec dispatched to Codex (docs/bugs/2026-10-02-hostinger-shopping-cart-credential-drift-after-vault-kv-regen.md); operator rollout = make shopping-cart-credential-drift [APPLY=1].
