@@ -35,6 +35,19 @@ TERMINAL_JOB_STATES = ("success", "failed")
 MAX_JUNIT_BYTES = 512 * 1024
 
 
+def _positive_env(name, default):
+    try:
+        value = float(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+ACTIVE_POLL_SECONDS = _positive_env("K3DM_CLOUD_BRIDGE_ACTIVE_POLL", 5)
+IDLE_POLL_SECONDS = _positive_env("K3DM_CLOUD_BRIDGE_IDLE_POLL", 60)
+IDLE_AFTER_SECONDS = _positive_env("K3DM_CLOUD_BRIDGE_IDLE_AFTER", 600)
+
+
 def _now():
     return datetime.now(timezone.utc)
 
@@ -139,6 +152,11 @@ def _ensure_bare_repo(repo, root):
 def _fetch(repo):
     _git(repo, ["fetch", "origin", FETCH_REFSPEC], timeout=120)
     return _git(repo, ["rev-parse", "FETCH_HEAD"]).strip()
+
+
+def _remote_tip(repo):
+    output = _git(repo, ["ls-remote", "origin", "refs/heads/cloud-requests"], timeout=30)
+    return output.split()[0] if output.split() else None
 
 
 def _processed(repo, ref):
@@ -320,6 +338,7 @@ def _write_commit(repo, parent, request_id, response, artifacts=None):
         _git(repo, ["update-ref", "refs/heads/cloud-requests", commit, parent], env=env)
         _git(repo, ["push", "--force-with-lease=refs/heads/cloud-requests:" + parent,
                     "origin", f"{commit}:refs/heads/cloud-requests"], timeout=120)
+        return commit
     finally:
         for path in (Path(index_path), Path(index_path + ".response"), Path(index_path + ".ledger"),
                      Path(index_path + ".artifact")):
@@ -329,7 +348,10 @@ def _write_commit(repo, parent, request_id, response, artifacts=None):
                 pass
 
 
-def process_tick(repo, root):
+def process_tick(repo, root, last_tip=None):
+    remote_tip = _remote_tip(repo)
+    if last_tip is not None and remote_tip == last_tip:
+        return last_tip, 0
     ref = _fetch(repo)
     processed = _processed(repo, ref)
     processed_this_tick = 0
@@ -352,12 +374,18 @@ def process_tick(repo, root):
                 if paths:
                     response["artifacts"] = paths
         processed.add(request_id)
-        _write_commit(repo, ref, request_id, response, artifacts)
-        ref = _fetch(repo)
+        ref = _write_commit(repo, ref, request_id, response, artifacts)
         processed.add(request_id)
         processed_this_tick += 1
         if processed_this_tick >= MAX_PER_TICK:
             break
+    return ref, processed_this_tick
+
+
+def _next_sleep(now, last_activity):
+    if now - last_activity < IDLE_AFTER_SECONDS:
+        return ACTIVE_POLL_SECONDS
+    return IDLE_POLL_SECONDS
 
 
 def main():
@@ -365,12 +393,17 @@ def main():
     repo = Path(os.environ.get("K3DM_CLOUD_BRIDGE_REPO",
                               str(Path.home() / ".k3d-manager" / "cloud-bridge" / "repo.git")))
     _ensure_bare_repo(repo, root)
+    last_tip = None
+    last_activity = time.monotonic()
     while True:
         try:
-            process_tick(repo, root)
+            last_tip, processed_count = process_tick(repo, root, last_tip=last_tip)
+            if processed_count:
+                last_activity = time.monotonic()
         except (RuntimeError, OSError, ValueError) as error:
             print(f"[cloud-bridge] {error}", file=sys.stderr, flush=True)
-        time.sleep(60)
+            last_tip = None
+        time.sleep(_next_sleep(time.monotonic(), last_activity))
 
 
 if __name__ == "__main__":

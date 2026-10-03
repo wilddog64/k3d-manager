@@ -28,11 +28,12 @@ def _git(args, cwd=ROOT, env=None, timeout=60):
 
 
 def _parse_args(argv):
-    parser = argparse.ArgumentParser(usage="k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS]")
+    parser = argparse.ArgumentParser(usage="k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS] [--poll-interval SECONDS]")
     parser.add_argument("action", choices=sorted(ACTION_ALLOWLIST))
     parser.add_argument("--arg", action="append", default=[])
     parser.add_argument("--wait", action="store_true")
     parser.add_argument("--timeout", type=float, default=300)
+    parser.add_argument("--poll-interval", type=float, default=5)
     parsed = parser.parse_args(argv)
     args = {}
     for item in parsed.arg:
@@ -49,6 +50,8 @@ def _parse_args(argv):
         parser.error("missing required argument")
     if parsed.timeout < 0:
         parser.error("timeout must be non-negative")
+    if parsed.poll_interval <= 0:
+        parser.error("poll-interval must be positive")
     return parsed, args
 
 
@@ -106,7 +109,11 @@ def main(argv=None):
     if not parsed.wait:
         return 0
     deadline = time.monotonic() + parsed.timeout
-    while time.monotonic() <= deadline:
+    while True:
+        try:
+            _git(["fetch", "origin", FETCH_REFSPEC], timeout=120)
+        except RuntimeError:
+            return 4
         try:
             raw = _git(["show", f"{RESPONSE_REF}:responses/{request_id}.json"])
             response = json.loads(raw)
@@ -115,12 +122,10 @@ def main(argv=None):
         if response is not None:
             print(json.dumps(response, sort_keys=True))
             return {"ok": 0, "rejected": 3, "error": 4}.get(response.get("status"), 4)
-        time.sleep(30)
-        try:
-            _git(["fetch", "origin", FETCH_REFSPEC], timeout=120)
-        except RuntimeError:
-            return 4
-    return 5
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return 5
+        time.sleep(min(parsed.poll_interval, remaining))
 
 
 if __name__ == "__main__":

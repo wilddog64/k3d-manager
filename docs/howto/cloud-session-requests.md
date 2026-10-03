@@ -19,8 +19,9 @@ tunnel, and do not ask the operator to paste a token into your environment — t
 refused by policy, not by accident.
 
 What you *can* do is **leave a request on a git branch and come back for the answer.** A poller
-on the operator's machine reads the branch every 60 seconds, calls the webhook with a read-only
-credential you never see, and commits the response back.
+on the operator's machine reads the branch every 5 seconds while active, then every 60 seconds
+after 10 minutes idle, calls the webhook with a read-only credential you never see, and commits
+the response back.
 
 ```bash
 bin/k3dm-cloud-request cluster-status          # files the request, prints the id
@@ -226,18 +227,19 @@ fetch.
 ## The helper
 
 ```
-bin/k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS]
+bin/k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS] [--poll-interval SECONDS]
 ```
 
 - files a request on `cloud-requests` and prints the id on stdout
-- `--wait` polls `responses/<id>.json` (default timeout 300s, poll interval 30s) and prints the
-  response JSON on stdout
+- `--wait` polls `responses/<id>.json` (default timeout 300s, `--poll-interval` 5s) and prints
+  the response JSON on stdout; it checks immediately before its first sleep
 - exit 0 = response received with `status: ok`; 3 = `rejected`; 4 = `error`; 5 = timed out with
   no response; 2 = bad usage (unknown action, malformed `--arg`)
 
 Two limits worth knowing before you wonder why nothing happened. The bridge rejects any request
-file of 8 KiB or more without parsing it, and it processes at most 10 requests per 60-second tick —
-file twenty and the rest wait for the next tick. Separately, `health` runs the full smoke sweep,
+file of 8 KiB or more without parsing it, and it processes at most 10 requests per tick — file
+twenty and the rest wait for the next tick. The first request after a long idle period can still
+wait up to 60 seconds. Separately, `health` runs the full smoke sweep,
 including the browser login probes, so it is the slowest action by a wide margin and
 can legitimately take minutes; `job-status` and the two `-status` actions return promptly. If you
 are polling `health` with a short `--timeout`, raise it rather than assuming the bridge is stuck.

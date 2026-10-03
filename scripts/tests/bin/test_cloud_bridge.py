@@ -148,6 +148,75 @@ def test_fetch_updates_the_local_branch_ref_not_only_fetch_head(monkeypatch):
     assert refspec.split(":")[1] == "refs/heads/cloud-requests"
 
 
+def test_process_tick_skips_fetch_when_remote_tip_is_unchanged(monkeypatch):
+    tip = "a" * 40
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: tip)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: pytest.fail("fetch must be skipped"))
+
+    assert bridge.process_tick(Path("/nonexistent"), ROOT, last_tip=tip) == (tip, 0)
+
+
+def test_process_tick_fetches_once_and_returns_pushed_tip(monkeypatch):
+    calls = []
+    pushed = "b" * 40
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+
+    def fake_fetch(repo):
+        calls.append("fetch")
+        return "parent"
+
+    monkeypatch.setattr(bridge, "_fetch", fake_fetch)
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: ["20260925T201403Z-cluster-status"])
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (request(), None))
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response("", "cluster-status", "ok", 200, body={}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args: calls.append("write") or pushed)
+
+    assert bridge.process_tick(Path("/nonexistent"), ROOT) == (pushed, 1)
+    assert calls == ["fetch", "write"]
+
+
+def test_next_sleep_uses_active_then_idle_interval():
+    assert bridge._next_sleep(bridge.IDLE_AFTER_SECONDS - 1, 0) == bridge.ACTIVE_POLL_SECONDS
+    assert bridge._next_sleep(bridge.IDLE_AFTER_SECONDS, 0) == bridge.IDLE_POLL_SECONDS
+
+
+@pytest.mark.parametrize("value", ["not-a-number", "0", "-1"])
+def test_invalid_active_poll_override_uses_default(monkeypatch, value):
+    monkeypatch.setenv("K3DM_CLOUD_BRIDGE_ACTIVE_POLL", value)
+    loader = importlib.machinery.SourceFileLoader("cloud_bridge_override", str(ROOT / "bin" / "k3dm-cloud-bridge"))
+    spec = importlib.util.spec_from_loader("cloud_bridge_override", loader)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.ACTIVE_POLL_SECONDS == 5
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_poll_interval_rejects_non_positive_values(value):
+    with pytest.raises(SystemExit) as error:
+        helper._parse_args(["cluster-status", "--poll-interval", value])
+    assert error.value.code == 2
+
+
+def test_wait_fetches_before_sleep_and_caps_sleep_at_deadline(monkeypatch):
+    calls = []
+    clock = iter([0, 2, 10])
+
+    monkeypatch.setattr(helper, "_commit_request", lambda request_id, payload: None)
+    monkeypatch.setattr(helper.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(helper.time, "sleep", lambda seconds: calls.append(("sleep", seconds)))
+
+    def fake_git(args, **kwargs):
+        calls.append(args[0])
+        if args[0] == "show":
+            raise RuntimeError("not ready")
+        return ""
+
+    monkeypatch.setattr(helper, "_git", fake_git)
+    assert helper.main(["cluster-status", "--wait", "--timeout", "5", "--poll-interval", "5"]) == 5
+    assert calls == ["fetch", "show", ("sleep", 3), "fetch", "show"]
+
+
 def test_request_helper_fetches_the_ref_it_reads_the_response_from():
     """The --wait poll read `git show origin/cloud-requests:responses/<id>.json` but
     refreshed with `git fetch origin cloud-requests` — a bare branch name, which
