@@ -1,5 +1,23 @@
 #!/usr/bin/env bats
 
+@test "acg-up identity Application uses server-side apply with server-side diff" {
+  local manifest="${BATS_TEST_TMPDIR}/shopping-cart-identity.yaml"
+  sed -n "/^kubectl apply --context k3d-k3d-cluster -f - <<'IDEOF'$/,/^IDEOF$/p" bin/cluster-up \
+    | sed '1d;$d' > "${manifest}"
+
+  run yq -r '.spec.syncPolicy.syncOptions | join("|")' "${manifest}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "CreateNamespace=true|ServerSideApply=true" ]
+
+  run yq -r '.metadata.annotations."argocd.argoproj.io/compare-options"' "${manifest}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "ServerSideDiff=true" ]
+
+  run yq -r '.. | select(tag == "!!str") | select(test("Replace=true"))' "${manifest}"
+  [ "${status}" -eq 0 ]
+  [ -z "${output}" ]
+}
+
 @test "acg-up leaves the hub Grafana port-forward wrapper path untouched" {
   run grep -c 'grafana-port-forward.sh" ]]; then' bin/cluster-up
   [ "$status" -eq 0 ]

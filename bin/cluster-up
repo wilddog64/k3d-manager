@@ -977,6 +977,7 @@ metadata:
   namespace: cicd
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -997,7 +998,7 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - Replace=true
+      - ServerSideApply=true
     retry:
       limit: 5
       backoff:
