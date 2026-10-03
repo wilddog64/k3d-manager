@@ -13,10 +13,11 @@ or added to an explicit child-route matcher.
   explicitly allowlisted warning alerts: `KubeJobFailed`, `KubeJobNotCompleted`,
   `E2EVerificationFailing`, `E2EVerificationStale`, and
   `PrometheusDuplicateTimestamps`.
+- ACG sandbox criticals email through `platform-warning`; only hub criticals text through
+  `sms-critical`.
 
-Child routes are first-match. The `severity = critical` route must remain before the
-`platform-warning` route so a critical alert continues to reach SMS even when its
-alertname is also in the warning allowlist.
+Child routes are first-match. The ACG sandbox critical route must remain before the
+general `severity = critical` SMS route.
 
 ## Triage
 

@@ -24,6 +24,9 @@
 
 ### Changed
 
+- ACG sandbox critical alerts now email through `platform-warning`; only hub critical alerts
+  continue to use the SMS gateway.
+
 - `make down` now preserves the long-lived local Hub by default; pass `DELETE_HUB=1` only when the Hub and its access layer should also be deleted, reducing the blast radius of routine sandbox teardown.
 
 - Cloud-session round trips now poll every 5 seconds while active and skip a redundant bridge
