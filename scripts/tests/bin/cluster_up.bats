@@ -310,6 +310,50 @@ STUB
   [ "$status" -ne 0 ]
 }
 
+@test "acg-up selects the LDAP provider by type and keeps its password off argv" {
+  local helper="${BATS_TEST_TMPDIR}/ldap-provider-helper.sh"
+  local argv_log="${BATS_TEST_TMPDIR}/kubectl-argv.log"
+  local stdin_log="${BATS_TEST_TMPDIR}/kubectl-stdin.log"
+  sed -n '/function _acg_keycloak_ldap_provider_id/,/^}/p' bin/cluster-up > "${helper}"
+  export KUBECTL_ARGV_LOG="${argv_log}" KUBECTL_STDIN_LOG="${stdin_log}"
+
+  run bash -c '
+    source "$1"
+    kubectl() {
+      printf "%s\n" "$*" >> "$KUBECTL_ARGV_LOG"
+      cat > "$KUBECTL_STDIN_LOG"
+      printf "%s\n" "398e5ed4,full-name-ldap-mapper" "a5a37610,ldap"
+    }
+    _acg_keycloak_ldap_provider_id keycloak-0 secret-pass
+  ' bash "${helper}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "a5a37610" ]
+  ! grep -qF 'secret-pass' "${argv_log}"
+  [ "$(cat "${stdin_log}")" = "secret-pass" ]
+}
+
+@test "acg-up uses the LDAP provider helper and removes the substring lookup" {
+  run grep -nF "grep -B1 'ldap'" bin/cluster-up
+  [ "${status}" -ne 0 ]
+  run grep -nF -- "--password '\${_kc_admin_pass}'" bin/cluster-up
+  [ "${status}" -ne 0 ]
+  run grep -nF 'bindCredential=[\"${_ldap_admin_pass}' bin/cluster-up
+  [ "${status}" -ne 0 ]
+  run bash -c '
+    block=$(sed -n "/Step 10d.7\\/14/,/step-10d7-group-mapper/p" bin/cluster-up)
+    grep -q '\''"\$parent" != "\$1"'\'' <<<"$block"
+    grep -q "group-ldap-mapper" <<<"$block"
+    grep -q '\''delete "components/\$id"'\'' <<<"$block"
+  '
+  [ "${status}" -eq 0 ]
+  run bash -c '
+    block=$(sed -n "/Step 10d\\/14/,/kill \"\${_kc_pf_pid}\"/p" bin/cluster-up)
+    grep -q _keycloak_smoke_ensure_realm <<<"$block"
+    ! grep -q '\''{\\"frontendUrl\\"'\'' <<<"$block"
+  '
+  [ "${status}" -eq 0 ]
+}
+
 @test "acg-up restarts the argocd browser listener when only the wrapper changed" {
   run grep -nF 'if [[ -f "${_argocd_browser_plist}" ]] && [[ "${_argocd_browser_wrapper_changed}" -eq 0 ]] && diff -q' bin/cluster-up
   [ "$status" -eq 0 ]

@@ -129,6 +129,23 @@ function _acg_fail() {
   exit 1
 }
 
+# shellcheck disable=SC2016
+function _acg_keycloak_ldap_provider_id() {
+  local kc_pod="$1" kc_admin_pass="$2"
+  printf '%s\n' "${kc_admin_pass}" | \
+    kubectl exec -i -n identity --context k3d-k3d-cluster "${kc_pod}" -- sh -c '
+      read -r KC_ADMIN_PASS
+      K=/opt/keycloak/bin/kcadm.sh
+      "$K" config credentials --server http://localhost:8080 --realm master \
+        --user admin --password "$KC_ADMIN_PASS" >/dev/null 2>&1 || exit 1
+      "$K" get components -r shopping-cart \
+        -q type=org.keycloak.storage.UserStorageProvider \
+        --fields id,providerId --format csv --noquotes 2>/dev/null' 2>/dev/null | \
+    while IFS=, read -r _id _provider; do
+      if [[ "${_provider}" == "ldap" ]]; then printf '%s\n' "${_id}"; break; fi
+    done
+}
+
 function _acg_up_cleanup() {
   local _exit_code=$?
   [[ "${_exit_code}" -eq 0 ]] && return
@@ -1112,14 +1129,14 @@ else
 
     # Set Keycloak frontendUrl so tokens carry the public Cloudflare domain as issuer
     _kc_frontend_url="${KEYCLOAK_PUBLIC_URL:-https://keycloak.3ai-talk.org}"
-    curl -sf -X PUT \
-      -H "Authorization: Bearer ${_kc_token}" \
-      -H "Content-Type: application/json" \
-      "http://localhost:${_kc_pf_port}/admin/realms/shopping-cart" \
-      -d "{\"frontendUrl\":\"${_kc_frontend_url}\"}" \
-      >/dev/null 2>&1 \
-      && _info "[acg-up] Keycloak frontendUrl set to ${_kc_frontend_url}" \
-      || _warn "[acg-up] Keycloak frontendUrl update failed — external SSO may not work"
+    _kc_realm_wd="$(mktemp -d)"
+    if _keycloak_smoke_ensure_realm "http://localhost:${_kc_pf_port}" "${_kc_token}" \
+         "shopping-cart" "${_kc_frontend_url}" "${_kc_realm_wd}"; then
+      _info "[acg-up] Keycloak frontendUrl set to ${_kc_frontend_url}"
+    else
+      _warn "[acg-up] Keycloak frontendUrl update failed — external SSO may not work"
+    fi
+    rm -rf "${_kc_realm_wd}"
 
     kill "${_kc_pf_pid}" 2>/dev/null || true
     rm -f "${_realm_json_file}"
@@ -1193,22 +1210,20 @@ else
   if [[ -z "${_kc_pod}" ]]; then
     _warn "[acg-up] Keycloak pod not found — skipping LDAP bind credential reconciliation"
   else
-    _ldap_component_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-      sh -c "/opt/keycloak/bin/kcadm.sh config credentials \
-        --server http://localhost:8080 --realm master \
-        --user admin --password '${_kc_admin_pass}' >/dev/null 2>&1 && \
-      /opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
-        --fields id,providerId 2>/dev/null | \
-      grep -B1 'ldap' | grep '\"id\"' | head -1 | \
-      sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+    _ldap_component_id=$(_acg_keycloak_ldap_provider_id "${_kc_pod}" "${_kc_admin_pass}" || true)
     if [[ -n "${_ldap_component_id}" ]]; then
-      kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-        sh -c "/opt/keycloak/bin/kcadm.sh update components/${_ldap_component_id} \
-          -r shopping-cart \
-          -s 'config.bindCredential=[\"${_ldap_admin_pass}\"]' >/dev/null 2>&1 && \
-        /opt/keycloak/bin/kcadm.sh create \
-          'user-storage/${_ldap_component_id}/sync?action=triggerFullSync' \
-          -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
+      # shellcheck disable=SC2015
+      printf '%s\n%s\n' "${_kc_admin_pass}" "${_ldap_admin_pass}" | \
+        kubectl exec -i -n identity --context k3d-k3d-cluster "${_kc_pod}" -- sh -c '
+          read -r KC_ADMIN_PASS
+          read -r LDAP_BIND
+          K=/opt/keycloak/bin/kcadm.sh
+          "$K" config credentials --server http://localhost:8080 --realm master \
+            --user admin --password "$KC_ADMIN_PASS" >/dev/null 2>&1 || exit 1
+          "$K" update "components/$1" -r shopping-cart \
+            -s "config.bindCredential=[\"$LDAP_BIND\"]" >/dev/null 2>&1 && \
+          "$K" create "user-storage/$1/sync?action=triggerFullSync" -r shopping-cart >/dev/null 2>&1
+        ' _ "${_ldap_component_id}" 2>/dev/null && \
         _info "[acg-up] LDAP federation bind credential reconciled and full sync triggered" || \
         _warn "[acg-up] LDAP bind credential reconciliation failed — SSO login may be broken"
     else
@@ -1252,18 +1267,19 @@ else
       -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
   fi
   if [[ -z "${_ldap_component_id:-}" && -n "${_kc_pod:-}" ]]; then
-    _ldap_component_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-      sh -c "/opt/keycloak/bin/kcadm.sh config credentials \
-        --server http://localhost:8080 --realm master \
-        --user admin --password '${_kc_admin_pass}' >/dev/null 2>&1 && \
-      /opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
-        --fields id,providerId 2>/dev/null | \
-      grep -B1 'ldap' | grep '\"id\"' | head -1 | \
-      sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+    _ldap_component_id=$(_acg_keycloak_ldap_provider_id "${_kc_pod}" "${_kc_admin_pass}" || true)
   fi
   if [[ -z "${_kc_pod:-}" ]] || [[ -z "${_ldap_component_id:-}" ]]; then
     _warn "[acg-up] Keycloak pod or LDAP component ID unavailable — skipping group mapper reconciliation"
   else
+    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- sh -c '
+      K=/opt/keycloak/bin/kcadm.sh
+      "$K" get components -r shopping-cart -q name=group-mapper \
+        --fields id,parentId,providerId --format csv --noquotes 2>/dev/null | \
+      while IFS=, read -r id parent provider; do
+        [ "$provider" = "group-ldap-mapper" ] && [ -n "$id" ] && [ "$parent" != "$1" ] && \
+          "$K" delete "components/$id" -r shopping-cart >/dev/null 2>&1
+      done; exit 0' _ "${_ldap_component_id}" 2>/dev/null || true
     _gm_existing=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
       sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
         -q parent=${_ldap_component_id} \
