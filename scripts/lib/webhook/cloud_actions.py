@@ -19,6 +19,8 @@ ACTION_ALLOWLIST = {
     "health": ("GET", "/api/v1/health", {}, None),
     "cluster-status": ("POST", "/api/v1/cluster-status", {}, None),
     "hostinger-status": ("POST", "/api/v1/hostinger-status", {}, None),
+    "sandbox-up": ("POST", "/api/v1/cluster", {}, {"action": "up", "provider": "aws"}),
+    "sandbox-down": ("POST", "/api/v1/cluster", {}, {"action": "down", "provider": "aws"}),
     "job-status": ("GET", "/api/v1/status/{job_id}", {"job_id": JOB_ID_RE}, None),
     "make-fix-list": ("POST", "/api/v1/make", {}, "fix-list"),
     "make-fix-status": ("POST", "/api/v1/make", {"NS": NS_RE}, "fix-status"),

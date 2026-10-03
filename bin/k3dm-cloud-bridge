@@ -37,9 +37,10 @@ ID_RE = re.compile(r"[0-9]{8}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,63}")
 FETCH_REFSPEC = "+refs/heads/cloud-requests:refs/heads/cloud-requests"
 REQUIRED_FIELDS = {"schema", "action", "args", "requested_by", "requested_at", "expires_at"}
 ARTIFACT_KEEP = max(1, int(os.environ.get("K3DM_CLOUD_ARTIFACT_KEEP", "50")))
-TERMINAL_JOB_STATES = ("success", "failed")
+TERMINAL_JOB_STATES = ("success", "failed", "killed")
 MAX_JUNIT_BYTES = 512 * 1024
 SLOW_ACTIONS = frozenset({"health"})
+LIFECYCLE_TIMEOUTS = {"sandbox-up": 3600, "sandbox-down": 1800}
 
 
 def _positive_env(name, default):
@@ -209,7 +210,7 @@ def _call_webhook(request):
     method, path_template, _, _ = ACTION_ALLOWLIST[action]
     path = path_template.format(**request["args"])
     target = ACTION_ALLOWLIST[action][3]
-    token = _get_cloud_runner_token() if target in ("e2e-remote", "e2e") else _get_reader_token()
+    token = _get_cloud_runner_token() if target in ("e2e-remote", "e2e") or action in LIFECYCLE_TIMEOUTS else _get_reader_token()
     headers = {"Authorization": f"Bearer {token}"}
     data = _request_body(request)
     http_request = urllib.request.Request(
@@ -359,12 +360,12 @@ def _read_watching(repo, ref):
 
 def _watch_entry(request_id, request, response):
     body = response.get("body")
-    if not request["action"].startswith("make-") or not isinstance(body, dict):
+    if not (request["action"].startswith("make-") or request["action"] in LIFECYCLE_TIMEOUTS) or not isinstance(body, dict):
         return None
     if body.get("status") != "queued" or not JOB_ID_RE.fullmatch(str(body.get("job_id", ""))):
         return None
     target = ACTION_ALLOWLIST[request["action"]][3]
-    timeout = MAKE_TARGETS.get(target, {}).get("timeout", 300)
+    timeout = LIFECYCLE_TIMEOUTS.get(request["action"], MAKE_TARGETS.get(target, {}).get("timeout", 300))
     return {"request_id": request_id, "job_id": body["job_id"], "created_at": time.time(),
             "timeout": timeout}
 

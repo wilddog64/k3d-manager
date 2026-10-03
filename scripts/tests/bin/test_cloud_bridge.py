@@ -67,6 +67,19 @@ def test_extra_argument_is_rejected():
     assert reason == "unexpected argument"
 
 
+@pytest.mark.parametrize("action, expected", [
+    ("sandbox-up", {"action": "up", "provider": "aws"}),
+    ("sandbox-down", {"action": "down", "provider": "aws"}),
+])
+def test_sandbox_lifecycle_actions_have_fixed_aws_bodies(action, expected):
+    value, reason = bridge.validate_request(request(action, {"provider": "hostinger"}), now=NOW)
+    assert value is None
+    assert reason == "unexpected argument"
+    value, reason = bridge.validate_request(request(action), now=NOW)
+    assert reason is None
+    assert json.loads(bridge._request_body(value)) == expected
+
+
 def test_expired_request_is_rejected_and_response_consumes_id():
     processed = set()
     value, response = bridge.prepare_request(
@@ -296,6 +309,22 @@ def test_terminal_watch_writes_one_final_response_and_clears_entry(monkeypatch):
     assert writes[0][0][4] == {"artifacts/x/summary.json": b"{}\n"}
 
 
+def test_killed_watch_writes_one_final_response_and_clears_entry(monkeypatch):
+    writes = []
+    entry = {"request_id": "20260925T201403Z-sandbox-up", "job_id": "a" * 8,
+             "created_at": time.time(), "timeout": 3600}
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", "job-status", "ok", 200, body={"status": "killed"}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append(kwargs) or "a" * 40)
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+    assert count == 1
+    assert len(writes) == 1
+    assert writes[0]["final"] is True
+    assert writes[0]["watch_remove"] == entry["request_id"]
+
+
 def test_expired_watch_writes_watch_expired_final_response(monkeypatch):
     writes = []
     entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,
@@ -509,10 +538,22 @@ def test_cloud_runner_actions_select_cloud_token_and_other_actions_select_reader
     monkeypatch.setattr(bridge.urllib.request, "urlopen", fake_urlopen)
     monkeypatch.setattr(bridge, "_get_cloud_runner_token", lambda: "cloud-runner-test-token")
     monkeypatch.setattr(bridge, "_get_reader_token", lambda: "reader-test-token")
-    bridge._call_webhook(request("make-e2e"))
-    bridge._call_webhook(request("cluster-status"))
-    assert seen == [("Bearer cloud-runner-test-token", bridge.HTTP_TIMEOUT),
-                    ("Bearer reader-test-token", bridge.HTTP_TIMEOUT)]
+    args_by_action = {
+        "job-status": {"job_id": "a" * 8},
+        "make-fix-status": {"NS": "identity"},
+        "make-find-similar-docs": {"Q": "cluster status"},
+        "make-e2e-remote": {"RUNNER": "m2"},
+        "diagnose-pods": {"provider": "aws", "namespace": "identity"},
+        "diagnose-describe-pod": {"provider": "aws", "namespace": "identity", "name": "pod"},
+        "diagnose-logs": {"provider": "aws", "namespace": "identity", "name": "pod"},
+        "diagnose-app": {"name": "app"},
+    }
+    for action in bridge.ACTION_ALLOWLIST:
+        bridge._call_webhook(request(action, args_by_action.get(action, {})))
+    cloud_actions = {"make-e2e", "make-e2e-remote", "sandbox-up", "sandbox-down"}
+    assert [auth for auth, _timeout in seen] == [
+        "Bearer cloud-runner-test-token" if action in cloud_actions else "Bearer reader-test-token"
+        for action in bridge.ACTION_ALLOWLIST]
     assert "_get_token" not in Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
 
 
@@ -608,7 +649,7 @@ def test_cloud_runner_set_is_scoped_and_unranked():
     assert "cloud-runner" not in policy._ROLE_LEVELS
     assert not {"up", "down", "cleanup-stale-sandbox"} & policy.CLOUD_RUNNER_TARGETS
     assert not {"up", "down", "cleanup-stale-sandbox"} & set(bridge.ACTION_ALLOWLIST)
-    assert "/api/v1/cluster" not in {entry[1] for entry in bridge.ACTION_ALLOWLIST.values()}
+    assert {"sandbox-up", "sandbox-down"} <= set(bridge.ACTION_ALLOWLIST)
 
 
 def test_bridge_has_no_runner_lock_probe_or_ssh_call():
@@ -617,11 +658,14 @@ def test_bridge_has_no_runner_lock_probe_or_ssh_call():
     assert "ssh" not in source.lower()
 
 
-def test_no_cluster_lifecycle_path_is_reachable_from_the_bridge_or_e2e_verify():
+def test_only_fixed_aws_sandbox_lifecycle_is_reachable_from_the_bridge():
     bridge_source = Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
     actions_source = Path(ROOT / "scripts" / "lib" / "webhook" / "cloud_actions.py").read_text()
-    assert all(name not in bridge_source for name in ("/api/v1/cluster", "/cluster-up", "/cluster-down", "/cluster-resume"))
-    assert "/api/v1/cluster" not in {entry[1] for entry in bridge.ACTION_ALLOWLIST.values()}
+    assert all(name not in bridge_source for name in ("/cluster-up", "/cluster-down", "/cluster-resume"))
+    assert all(entry[1] != "/api/v1/cluster" or entry[3].get("provider") == "aws"
+               for entry in bridge.ACTION_ALLOWLIST.values())
+    assert all("hostinger" not in json.dumps(entry[3])
+               for entry in bridge.ACTION_ALLOWLIST.values())
     assert all(name not in actions_source for name in ("/cluster-up", "/cluster-down", "/cluster-resume"))
     for relative in ("scripts/plugins/e2e.sh", "scripts/plugins/vcluster.sh"):
         source = Path(ROOT / relative).read_text()

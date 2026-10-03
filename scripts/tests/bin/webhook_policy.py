@@ -48,6 +48,7 @@ class WebhookPolicyTests(unittest.TestCase):
     def test_cloud_runner_authorization_is_exactly_the_two_target_set(self):
         self.assertNotIn("cloud-runner", policy._ROLE_LEVELS)
         self.assertEqual(policy.CLOUD_RUNNER_TARGETS, {"e2e-remote", "e2e"})
+        self.assertEqual(policy.CLOUD_RUNNER_LIFECYCLE, {"cluster-up@aws", "cluster-down@aws"})
         for target in ("e2e-remote", "e2e"):
             with self.subTest(target=target):
                 self.assertTrue(policy._policy_allows("cloud-runner", policy._action_policy("/api/v1/make", {"target": target})))
@@ -58,6 +59,30 @@ class WebhookPolicyTests(unittest.TestCase):
     def test_cloud_runner_only_matches_make_policy_names(self):
         self.assertFalse(policy._policy_allows("cloud-runner", {"name": "e2e", "min_role": "reader"}))
         self.assertTrue(policy._policy_allows("cloud-runner", {"name": "make:e2e", "min_role": "operator"}))
+
+    def test_cloud_runner_lifecycle_capability_binds_provider(self):
+        route = wh._POST_ROUTES["/api/v1/cluster"]
+        for action in ("up", "down"):
+            for provider in ("hostinger", "", "AWS", "gcp"):
+                body = {"action": action}
+                if provider:
+                    body["provider"] = provider
+                with self.subTest(action=action, provider=provider):
+                    self.assertFalse(policy._policy_allows(
+                        "cloud-runner", wh.effective_policy(route, "/api/v1/cluster", body)))
+            self.assertTrue(policy._policy_allows(
+                "cloud-runner", wh.effective_policy(
+                    route, "/api/v1/cluster", {"action": action, "provider": "aws"})))
+        self.assertFalse(policy._policy_allows(
+            "cloud-runner", wh.effective_policy(route, "/api/v1/cluster", {"action": "kill"})))
+
+    def test_reader_cannot_use_sandbox_lifecycle_policies(self):
+        route = wh._POST_ROUTES["/api/v1/cluster"]
+        for action in ("up", "down"):
+            with self.subTest(action=action):
+                self.assertFalse(policy._policy_allows(
+                    "reader", wh.effective_policy(
+                        route, "/api/v1/cluster", {"action": action, "provider": "aws"})))
 
     def test_reader_token_role_is_ceiling_without_header(self):
         self.assertEqual(wh._request_role({}, "reader"), "reader")
@@ -198,8 +223,8 @@ class WebhookPolicyTests(unittest.TestCase):
         expected = [
             (("/api/v1/argocd-upgrade", {}), {"name": "argocd-upgrade", "min_role": "admin"}),
             (("/api/v1/cve-remediate", {}), {"name": "cve-remediate", "min_role": "operator"}),
-            (("/api/v1/cluster", {"action": "up"}), {"name": "cluster-up", "min_role": "admin"}),
-            (("/api/v1/cluster", {"action": "down"}), {"name": "cluster-down", "min_role": "admin"}),
+            (("/api/v1/cluster", {"action": "up"}), {"name": "cluster-up", "min_role": "admin", "provider": ""}),
+            (("/api/v1/cluster", {"action": "down"}), {"name": "cluster-down", "min_role": "admin", "provider": ""}),
             (("/api/v1/cluster", {"action": "kill"}), {"name": "cluster-kill", "min_role": "operator"}),
             (("/api/v1/cluster", {"action": "other"}), {"name": "cluster", "min_role": "reader"}),
             (("/api/v1/cluster-status", {}), {"name": "cluster-status", "min_role": "reader"}),
