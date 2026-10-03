@@ -14,6 +14,7 @@ from webhook.proc import _spawn_capture_text
 from webhook.redact import scrub_credentials
 from webhook.render import _slack_post
 from webhook.log import get_logger
+from webhook.failure_notes import write_failure_note
 
 __all__ = [
     "_run_cleanup", "_run_make_target", "_run_upgrade", "_run_cluster",
@@ -136,6 +137,9 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
             status, icon, verdict = "failed", "❌", f"failed (rc {rc})"
         _LOG.info("job=%s make=%s status=%s rc=%s", job_id, label, status, rc)
         (job_dir / "status").write_text(status)
+        if status == "failed":
+            write_failure_note(job_dir, job_id, f"make {label}", timeout if timed_out else rc,
+                               timed_out=timed_out, redact=_redact_secrets)
         _notify_job(job_id, f"{icon} *make {label}* {verdict}\n```{tail or '(no output)'}```")
     finally:
         if progress_timer:
@@ -295,6 +299,7 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
     except Exception as exc:
         tb = traceback.format_exc()
         _write_log(f"ERROR: {exc}\n{tb}")
+        write_failure_note(job_dir, job_id, f"cluster-{action}", 1, redact=_redact_secrets)
         try:
             _all_lines = _out_file.read_text(errors="replace").splitlines() if _out_file.exists() else []
             analysis = _analyze_failure(_all_lines)

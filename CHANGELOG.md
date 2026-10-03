@@ -11,6 +11,8 @@
   `make job-log ID=<job_id>` without publishing it as job-status output.
 - The daily cleanup agent now prunes finished webhook jobs and rotates oversized
   `k3dm-*.log` files while preserving active jobs and the original log inode.
+- Failed webhook jobs now create redacted prior-art notes; `make harvest-job-failures`
+  copies them into the tracked corpus with recurrence deduplication.
 - `find-similar-docs` results now include clickable GitHub links, pinned to the checked-out release
   branch (or `main`), with `K3DM_DOCS_BRANCH` and `K3DM_DOCS_REPO_URL` overrides.
 

@@ -25,3 +25,8 @@ The daily cleanup agent removes finished job folders older than 14 days and
 keeps at most 500 finished folders. It never removes `running` or `queued`
 jobs. LaunchAgent files named `k3dm-*.log` over 10 MiB are rotated in place,
 with five compressed generations retained.
+
+Failed jobs also leave a short redacted `failure.md`. Run
+`make harvest-job-failures` to copy waiting notes into `docs/job-failures/` for
+review and commit; repeated signatures become recurrence entries, and
+harvested folders are marked so reruns are no-ops.

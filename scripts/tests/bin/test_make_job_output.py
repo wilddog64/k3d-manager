@@ -69,6 +69,14 @@ def test_make_job_log_keeps_local_command_output(job, monkeypatch):
     assert "make-synthetic-token" in written
     assert "hunter2-synthetic" in written
     assert not (job / "output").exists()
+    note = (job / "failure.md").read_text()
+    assert "hunter2-synthetic" not in note
+    assert "[REDACTED]" in note or "***REDACTED***" in note
+
+
+def test_successful_make_job_writes_no_failure_note(job, monkeypatch):
+    _run(job, monkeypatch, 0, "all good\n")
+    assert not (job / "failure.md").exists()
 
 
 def test_make_job_exports_its_junit_report_path(job, monkeypatch):
