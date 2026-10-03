@@ -2976,3 +2976,4 @@ in the bug doc after commit: `3664bea7`.
 - [x] 2026-10-02 promoter live-override fix 78b1fe7a verified (operator rollout pending). [x] Netty override verified; payment PR #82 open, awaiting go.
 - [x] 2026-10-02 credential-drift tool landed 64e52b65 (verified); [ ] operator: make shopping-cart-credential-drift [APPLY=1].
 - [x] 2026-10-02 k3dm-cleanup orphaned Docker volume prune LANDED `3204c74e` (Codex, Claude-verified 9/9 bats, mutation red, shellcheck 4=4). Check ~/Library/Logs/k3dm-cleanup.log after next 03:00 run.
+- [x] 2026-10-03 payment PRs #80 (19c42aa) + #82 (e3b6f06) MERGED. [ ] Trivy 0 CRITICAL on sha-e3b6f06, re-pin hostinger + e2e.
