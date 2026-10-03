@@ -304,15 +304,17 @@ exit code, drive health.
 | Suite freshness | `time() - k3dm_test_last_timestamp_seconds` |
 | Last passing run | `time() - k3dm_test_last_success_timestamp_seconds` |
 | Failed cases | `k3dm_test_cases_failed` |
-| Cases by suite | `k3dm_test_suite_cases{result="not_ok"} > 0` |
-| Suite duration over time | `k3dm_test_suite_duration_seconds` |
+| Failing cases by suite | `k3dm_test_suite_cases{result="not_ok"} > 0` (empty on a clean run) |
+| Run duration over time | `k3dm_test_run_duration_seconds`, `k3dm_test_suite_duration_seconds` |
 | Total cases | `k3dm_test_cases_total` |
 | Exit code | `k3dm_test_exit_code` (informational only) |
 
-**Suite duration is not wired yet.** `k3dm_test_run_duration_seconds` is pushed as a literal
-`0`, and the per-suite regex in `bin/k3dm-test-metrics` looks for a `# duration:` marker that
-no harness emits — so only the unittest files report real values and the `bats` and `pytest`
-bars stay flat at zero. A flat duration panel here is the known gap, not a broken push.
+**Duration.** `make test-metrics` times the whole `make test-all` run and pushes it as
+`k3dm_test_run_duration_seconds{target="test-all"}`. Per-suite duration is published only for
+suites whose runner prints its own time: pytest's `in X.XXs` summary and unittest's
+`Ran N tests in X s`. BATS prints no per-file time, so BATS suites have no duration series
+rather than a fake `0`. A run pushed by an older exporter still shows the old `0`/millisecond
+values until the next `make test-metrics`.
 
 **Where the alerts live.** The five `k3dm-tests.alerts` rules are in
 `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml`, labelled

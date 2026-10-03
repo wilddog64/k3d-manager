@@ -52,17 +52,22 @@ data:
         {
           "id": 4,
           "type": "table",
-          "title": "Cases by suite",
+          "title": "Failing cases by suite",
+          "description": "Lists only suites with at least one failed case. Empty on a clean run.",
           "gridPos": { "x": 8, "y": 5, "w": 16, "h": 5 },
           "targets": [{ "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "k3dm_test_suite_cases{result=\"not_ok\"} > 0", "format": "table" }]
         },
         {
           "id": 5,
           "type": "timeseries",
-          "title": "Suite duration over time",
+          "title": "Run duration over time",
+          "description": "Whole run is the wall-clock time of make test-all. Per-suite lines appear only for suites whose runner reports its own time (pytest and the unittest files); BATS reports none.",
           "gridPos": { "x": 0, "y": 10, "w": 24, "h": 8 },
           "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 10 } } },
-          "targets": [{ "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "k3dm_test_suite_duration_seconds", "legendFormat": "{{suite}}" }]
+          "targets": [
+            { "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "k3dm_test_run_duration_seconds", "legendFormat": "whole run ({{target}})" },
+            { "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" }, "expr": "k3dm_test_suite_duration_seconds", "legendFormat": "{{suite}}" }
+          ]
         },
         {
           "id": 6,

@@ -150,3 +150,36 @@ def test_payload_is_valid_prometheus_text_format():
             continue
         assert re.match(r"^[a-zA-Z_:][a-zA-Z0-9_:]*(\{[^}]*\})? -?[0-9]+(?:\.[0-9]+)?$", line)
         assert "NaN" not in line and "inf" not in line.lower()
+
+
+def test_pytest_summary_duration_is_parsed():
+    parsed = METRICS.parse_log(fixture_text())
+    assert parsed["durations"]["pytest"] == 4.0
+
+
+def test_suite_without_a_reported_duration_is_omitted_not_zero():
+    parsed = METRICS.parse_log("# file: clean.bats\n1..1\nok 1 works\n")
+    payload = METRICS.build_payload(parsed, "test-all", 0, now=123)
+    assert 'k3dm_test_suite_duration_seconds{suite="clean.bats"}' not in payload
+
+
+def test_run_duration_is_published_when_measured():
+    parsed = METRICS.parse_log(fixture_text())
+    payload = METRICS.build_payload(parsed, "test-all", 0, now=123, run_duration=917)
+    assert 'k3dm_test_run_duration_seconds{target="test-all"} 917' in payload
+    assert "k3dm_test_run_duration_seconds 0" not in payload
+
+
+def test_run_duration_is_omitted_when_not_measured():
+    parsed = METRICS.parse_log(fixture_text())
+    payload = METRICS.build_payload(parsed, "test-all", 0, now=123)
+    assert "k3dm_test_run_duration_seconds" not in payload
+
+
+def test_main_forwards_run_duration(monkeypatch, tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
+    pushed = []
+    monkeypatch.setattr(METRICS, "push_metrics", lambda payload, *args, **kwargs: pushed.append(payload))
+    METRICS.main([str(log), "--target", "test-all", "--run-duration", "42"])
+    assert 'k3dm_test_run_duration_seconds{target="test-all"} 42' in pushed[0]

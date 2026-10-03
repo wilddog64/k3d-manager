@@ -1055,8 +1055,10 @@ test-all: test test-bin test-python
 test-metrics:
 	@set -o pipefail; \
 	_log="$${TMPDIR:-/tmp}/k3dm-test-all-$$(date -u +%s).log"; \
+	_start=$$(date -u +%s); \
 	$(MAKE) test-all >"$${_log}" 2>&1; _rc=$$?; \
-	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}"; \
+	_dur=$$(( $$(date -u +%s) - _start )); \
+	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}" --run-duration "$${_dur}"; \
 	echo "[test-metrics] log: $${_log}"; \
 	exit 0
 
