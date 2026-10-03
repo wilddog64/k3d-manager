@@ -28,10 +28,11 @@ def _git(args, cwd=ROOT, env=None, timeout=60):
 
 
 def _parse_args(argv):
-    parser = argparse.ArgumentParser(usage="k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS] [--poll-interval SECONDS]")
+    parser = argparse.ArgumentParser(usage="k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--wait-final] [--timeout SECONDS] [--poll-interval SECONDS]")
     parser.add_argument("action", choices=sorted(ACTION_ALLOWLIST))
     parser.add_argument("--arg", action="append", default=[])
     parser.add_argument("--wait", action="store_true")
+    parser.add_argument("--wait-final", action="store_true")
     parser.add_argument("--timeout", type=float, default=300)
     parser.add_argument("--poll-interval", type=float, default=5)
     parsed = parser.parse_args(argv)
@@ -106,7 +107,7 @@ def main(argv=None):
         print(str(error), file=sys.stderr)
         return 4
     print(request_id)
-    if not parsed.wait:
+    if not parsed.wait and not parsed.wait_final:
         return 0
     deadline = time.monotonic() + parsed.timeout
     while True:
@@ -121,7 +122,28 @@ def main(argv=None):
             response = None
         if response is not None:
             print(json.dumps(response, sort_keys=True))
-            return {"ok": 0, "rejected": 3, "error": 4}.get(response.get("status"), 4)
+            if not parsed.wait_final:
+                return {"ok": 0, "rejected": 3, "error": 4}.get(response.get("status"), 4)
+            body = response.get("body")
+            if not isinstance(body, dict) or body.get("status") != "queued" or not body.get("job_id"):
+                return {"ok": 0, "rejected": 3, "error": 4}.get(response.get("status"), 4)
+            while True:
+                try:
+                    _git(["fetch", "origin", FETCH_REFSPEC], timeout=120)
+                except RuntimeError:
+                    return 4
+                try:
+                    raw = _git(["show", f"{RESPONSE_REF}:responses/{request_id}.final.json"])
+                    final_response = json.loads(raw)
+                except (RuntimeError, json.JSONDecodeError):
+                    final_response = None
+                if final_response is not None:
+                    print(json.dumps(final_response, sort_keys=True))
+                    return {"ok": 0, "rejected": 3, "error": 4}.get(final_response.get("status"), 4)
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return 5
+                time.sleep(min(parsed.poll_interval, remaining))
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return 5

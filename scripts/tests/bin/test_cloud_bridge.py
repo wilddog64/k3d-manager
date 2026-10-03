@@ -3,6 +3,8 @@
 import importlib.machinery
 import importlib.util
 import json
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -160,6 +162,7 @@ def test_process_tick_fetches_once_and_returns_pushed_tip(monkeypatch):
     calls = []
     pushed = "b" * 40
     monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
 
     def fake_fetch(repo):
         calls.append("fetch")
@@ -208,6 +211,121 @@ def test_process_tick_refetches_after_hitting_max_per_tick(monkeypatch):
     assert processed == set(request_ids)
 
 
+def test_slow_health_runs_off_loop_and_main_thread_commits(monkeypatch):
+    health_started = threading.Event()
+    release_health = threading.Event()
+    writes = []
+    pushed = "b" * 40
+    requests = {
+        "20260925T201400Z-health": request("health"),
+        "20260925T201401Z-cluster-status": request("cluster-status"),
+    }
+
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    request_id_calls = [0]
+    def request_ids(_repo, _ref):
+        request_id_calls[0] += 1
+        return list(requests) if request_id_calls[0] == 1 else []
+    monkeypatch.setattr(bridge, "_request_ids", request_ids)
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (requests[request_id], None))
+
+    def fake_call(value):
+        if value["action"] == "health":
+            health_started.set()
+            assert release_health.wait(2)
+        return bridge._response("", value["action"], "ok", 200, body={})
+
+    monkeypatch.setattr(bridge, "_call_webhook", fake_call)
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append(
+        (args[2], threading.get_ident())) or pushed)
+    bridge._slow_pending.clear()
+    first_tip, count = bridge.process_tick(Path("/nonexistent"), ROOT)
+    assert health_started.wait(1)
+    assert count == 1
+    assert [request_id for request_id, _thread_id in writes] == ["20260925T201401Z-cluster-status"]
+    assert all(thread_id == threading.get_ident() for _request_id, thread_id in writes)
+
+    release_health.set()
+    deadline = time.monotonic() + 2
+    while not bridge._slow_responses.qsize() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip=first_tip)
+    assert count == 1
+    assert [request_id for request_id, _thread_id in writes] == [
+        "20260925T201401Z-cluster-status", "20260925T201400Z-health"]
+
+
+def test_queued_make_response_adds_one_watch_entry(monkeypatch):
+    watched = []
+    pushed = "b" * 40
+    make_request = request("make-test-pytest")
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: ["20260925T201403Z-make-test-pytest"])
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (make_request, None))
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", value["action"], "ok", 202, body={"status": "queued", "job_id": "a" * 8}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: watched.append(
+        kwargs.get("watch_add")) or pushed)
+    bridge.process_tick(Path("/nonexistent"), ROOT)
+    assert len(watched) == 1
+    assert watched[0]["request_id"] == "20260925T201403Z-make-test-pytest"
+    assert watched[0]["job_id"] == "a" * 8
+
+
+def test_terminal_watch_writes_one_final_response_and_clears_entry(monkeypatch):
+    writes = []
+    entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,
+             "created_at": time.time(), "timeout": 600}
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", "job-status", "ok", 200, body={"status": "success", "output": "done"}))
+    monkeypatch.setattr(bridge, "job_artifacts", lambda *args: ({"artifacts/x/summary.json": b"{}\n"},
+                                                                   ["artifacts/x/summary.json"]))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append((args, kwargs)) or "a" * 40)
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+    assert count == 1
+    assert writes[0][1]["final"] is True
+    assert writes[0][1]["watch_remove"] == entry["request_id"]
+    assert writes[0][0][4] == {"artifacts/x/summary.json": b"{}\n"}
+
+
+def test_expired_watch_writes_watch_expired_final_response(monkeypatch):
+    writes = []
+    entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,
+             "created_at": 0, "timeout": 1}
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge.time, "time", lambda: 1000)
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append((args, kwargs)) or "a" * 40)
+    bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+    response = writes[0][0][3]
+    assert response["status"] == "error"
+    assert response["reason"] == "watch expired"
+    assert writes[0][1]["final"] is True
+
+
+def test_terminal_state_check_is_load_bearing(monkeypatch):
+    entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,
+             "created_at": time.time(), "timeout": 600}
+    writes = []
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", "job-status", "ok", 200, body={"status": "success"}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append(kwargs) or "a" * 40)
+    monkeypatch.setattr(bridge, "TERMINAL_JOB_STATES", ("never",))
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+    assert count == 0
+    assert writes == []
+
+
 def test_next_sleep_uses_active_then_idle_interval():
     assert bridge._next_sleep(bridge.IDLE_AFTER_SECONDS - 1, 0) == bridge.ACTIVE_POLL_SECONDS
     assert bridge._next_sleep(bridge.IDLE_AFTER_SECONDS, 0) == bridge.IDLE_POLL_SECONDS
@@ -247,6 +365,26 @@ def test_wait_fetches_before_sleep_and_caps_sleep_at_deadline(monkeypatch):
     monkeypatch.setattr(helper, "_git", fake_git)
     assert helper.main(["cluster-status", "--wait", "--timeout", "5", "--poll-interval", "5"]) == 5
     assert calls == ["fetch", "show", ("sleep", 3), "fetch", "show"]
+
+
+def test_wait_final_polls_the_final_response_after_queued_response(monkeypatch):
+    calls = []
+    clock = iter([0, 1, 2])
+    monkeypatch.setattr(helper, "_commit_request", lambda request_id, payload: None)
+    monkeypatch.setattr(helper.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(helper.time, "sleep", lambda seconds: calls.append(("sleep", seconds)))
+
+    def fake_git(args, **kwargs):
+        calls.append(args)
+        if args[0] == "show" and args[1].endswith(".final.json"):
+            return json.dumps({"status": "ok", "body": {"status": "success"}})
+        if args[0] == "show":
+            return json.dumps({"status": "ok", "body": {"status": "queued", "job_id": "a" * 8}})
+        return ""
+
+    monkeypatch.setattr(helper, "_git", fake_git)
+    assert helper.main(["make-test-pytest", "--wait-final", "--timeout", "5"]) == 0
+    assert any(args[0] == "show" and args[1].endswith(".final.json") for args in calls)
 
 
 def test_request_helper_fetches_the_ref_it_reads_the_response_from():

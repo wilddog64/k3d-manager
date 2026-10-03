@@ -4,6 +4,8 @@
 
 ### Added
 
+- Cloud bridge throughput: slow health calls run off the polling loop, and queued Make jobs are followed to `.final.json` responses with artifacts.
+
 - Webhook and cloud-bridge log levels (`error`, `warn`, `info`, `debug`) with
   redaction-safe request lines; use `make webhook-log-level LEVEL=debug` to
   update the LaunchAgents.

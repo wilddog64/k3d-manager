@@ -150,8 +150,8 @@ def _role_allows(actual_role, required_role):
 def _policy_allows(role, policy):
     """Authorize a request role against an effective policy; unranked roles need a capability set."""
     if role in _ROLE_CAPABILITIES:
-        action = policy["name"].removeprefix("make:")
-        return action in _ROLE_CAPABILITIES[role]
+        name = policy["name"]
+        return name.startswith("make:") and name.removeprefix("make:") in _ROLE_CAPABILITIES[role]
     if role not in _ROLE_LEVELS:
         return False
     return _role_allows(role, policy["min_role"])

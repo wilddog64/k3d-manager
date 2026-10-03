@@ -55,6 +55,10 @@ class WebhookPolicyTests(unittest.TestCase):
             with self.subTest(target=target):
                 self.assertFalse(policy._policy_allows("cloud-runner", policy._action_policy("/api/v1/make", {"target": target})))
 
+    def test_cloud_runner_only_matches_make_policy_names(self):
+        self.assertFalse(policy._policy_allows("cloud-runner", {"name": "e2e", "min_role": "reader"}))
+        self.assertTrue(policy._policy_allows("cloud-runner", {"name": "make:e2e", "min_role": "operator"}))
+
     def test_reader_token_role_is_ceiling_without_header(self):
         self.assertEqual(wh._request_role({}, "reader"), "reader")
 

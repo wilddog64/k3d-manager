@@ -98,8 +98,20 @@ bin/k3dm-cloud-request --wait make-test-pytest            # -> body.job_id, e.g.
 bin/k3dm-cloud-request --wait job-status --arg job_id=1a2b3c4d
 ```
 
-Repeat `job-status` until `body.status` is `success` or `failed`. That first terminal
-`job-status` also carries the diagnostic `artifacts` described below.
+Repeat `job-status` until `body.status` is `success` or `failed`. The bridge can now follow jobs
+it started: `--wait-final` waits for `responses/<id>.final.json` and prints the terminal response
+with any diagnostic `artifacts` described below.
+
+```bash
+bin/k3dm-cloud-request --wait-final make-test-pytest
+```
+
+Slow `health` requests run on the bridge's single background HTTP worker, so they do not block
+other requests. The worker never writes git commits; the main thread commits responses. Only one
+slow request runs at a time, in filing order. Queued Make responses are recorded in
+`ledger/watching.txt`; watched jobs are followed through the reader-token `job-status` path and
+removed when their `.final.json` response is committed. A job that exceeds its declared timeout
+plus ten minutes receives a final `watch expired` response.
 
 ### Read-only cluster diagnostics
 
