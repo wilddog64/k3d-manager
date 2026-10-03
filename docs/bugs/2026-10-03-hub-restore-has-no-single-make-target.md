@@ -197,6 +197,8 @@ The hub rebuild lost `secret/embeddings/gemini`. The Hermes LaunchAgent cannot r
 item, so it falls through to that Vault copy. As a result, every 8-minute tick logs
 `vectordb index failed: index-docs: 0 of 100 documents were committed`, and the VectorDB Health
 dashboard shows rows=0 against a corpus of 1802 with "Last run result: failed".
-`bin/hub-restore` runs in Terminal.app with keychain access, so it should copy keychain item
-`gemini-cli-api-key` (or `k3dm-embeddings-api-key`) into `secret/embeddings/gemini`, using the
-stdin-only pattern in `docs/guides/vector-store.md`. If neither item is readable, report SKIP.
+**Correction (2026-10-03):** do not read the keychain. `gemini-cli-api-key`'s ACL trusts only the
+Gemini CLI, and `security -w` returns rc 36 with **no stderr and empty output**. A copy step built on
+it wrote `api_key: ""` to Vault live. Instead, `bin/hub-restore` prompts with `read -rs`, refuses an
+empty value (SKIP), and writes it with the stdin-only pattern in `docs/guides/vector-store.md`.
+Gate: an empty prompt makes no `vault kv put` call.
