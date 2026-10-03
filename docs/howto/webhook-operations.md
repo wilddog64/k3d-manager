@@ -20,3 +20,8 @@ lands; use the job ID from the webhook response when inspecting a job. Make
 jobs stream their local output to `make.log`, capped at the last 1 MiB when
 the job finishes. Inspect it with `make job-log ID=<job_id>`; this file is not
 the `output` returned by the cloud bridge.
+
+The daily cleanup agent removes finished job folders older than 14 days and
+keeps at most 500 finished folders. It never removes `running` or `queued`
+jobs. LaunchAgent files named `k3dm-*.log` over 10 MiB are rotated in place,
+with five compressed generations retained.

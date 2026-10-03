@@ -47,6 +47,54 @@ _touch_old() {
   touch -t 202507010101 "$1"
 }
 
+@test "k3dm-cleanup prunes old finished jobs but keeps stale running jobs" {
+  local jobs="${HOME_ROOT}/.local/share/k3d-manager/webhook-jobs"
+  mkdir -p "${jobs}/deadbeef" "${jobs}/feedface"
+  printf 'success\n' > "${jobs}/deadbeef/status"
+  printf 'running\n' > "${jobs}/feedface/status"
+  _touch_old "${jobs}/deadbeef"
+  _touch_old "${jobs}/feedface"
+
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_JOB_DIR="${jobs}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  [ ! -e "${jobs}/deadbeef" ]
+  [ -e "${jobs}/feedface" ]
+}
+
+@test "k3dm-cleanup enforces the finished-job count cap oldest first" {
+  local jobs="${HOME_ROOT}/.local/share/k3d-manager/webhook-jobs"
+  local id
+  for id in deadbeef feedface cafe1234; do
+    mkdir -p "${jobs}/${id}"
+    printf 'success\n' > "${jobs}/${id}/status"
+  done
+  touch -t 202601010101 "${jobs}/deadbeef" "${jobs}/feedface" "${jobs}/cafe1234"
+  touch -t 202601010101 "${jobs}/deadbeef"
+  touch -t 202601010102 "${jobs}/feedface"
+  touch -t 202601010103 "${jobs}/cafe1234"
+
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_JOB_DIR="${jobs}" \
+    K3DM_JOB_RETENTION_DAYS=999 K3DM_JOB_RETENTION_MAX=2 "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  [ ! -e "${jobs}/deadbeef" ]
+  [ -e "${jobs}/feedface" ]
+  [ -e "${jobs}/cafe1234" ]
+}
+
+@test "k3dm-cleanup rotates oversized launchd logs in place" {
+  local logs="${HOME_ROOT}/Library/Logs" log="${HOME_ROOT}/Library/Logs/k3dm-webhook.log"
+  mkdir -p "${logs}"
+  dd if=/dev/zero of="${log}" bs=1048576 count=11 >/dev/null 2>&1
+  local inode
+  inode="$(stat -c '%i' "${log}")"
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_LOG_DIR="${logs}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  [ -f "${log}.1.gz" ]
+  [ ! -s "${log}" ]
+  [ "$(stat -c '%i' "${log}")" -eq "${inode}" ]
+  [ ! -e "${log}.6.gz" ]
+}
+
 @test "k3dm-cleanup prunes old repo-owned tmp leftovers and keeps recent ones" {
   mkdir -p "${TMP_ROOT}/playwright-artifacts-old" "${TMP_ROOT}/playwright-artifacts-new"
   : > "${TMP_ROOT}/k3dm-ask-old.out"

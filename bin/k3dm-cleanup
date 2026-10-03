@@ -14,14 +14,93 @@ K3DM_DOCKER_VOLUME_RETENTION_DAYS="${K3DM_DOCKER_VOLUME_RETENTION_DAYS:-7}"
 K3DM_DOCKER_KEEP_VOLUMES="${K3DM_DOCKER_KEEP_VOLUMES:-k3dm-*}"
 K3DM_WEEKLY_CACHE_PRUNE="${K3DM_WEEKLY_CACHE_PRUNE:-1}"
 K3DM_WEEKLY_CACHE_PRUNE_DAY="${K3DM_WEEKLY_CACHE_PRUNE_DAY:-7}"
+K3DM_JOB_DIR="${K3DM_JOB_DIR:-${K3DM_STATE_DIR}/webhook-jobs}"
+K3DM_JOB_RETENTION_DAYS="${K3DM_JOB_RETENTION_DAYS:-14}"
+K3DM_JOB_RETENTION_MAX="${K3DM_JOB_RETENTION_MAX:-500}"
+K3DM_LOG_DIR="${K3DM_LOG_DIR:-${HOME}/Library/Logs}"
+K3DM_LOG_MAX_MB="${K3DM_LOG_MAX_MB:-10}"
+K3DM_LOG_KEEP="${K3DM_LOG_KEEP:-5}"
+
+_file_size() {
+  stat -c '%s' "$1" 2>/dev/null || stat -f '%z' "$1"
+}
+
+_file_mtime() {
+  stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1"
+}
+
+_prune_webhook_jobs() {
+  local count=0 path status mtime now cutoff
+  local -a finished=()
+  [[ -d "${K3DM_JOB_DIR}" ]] || return 0
+  now="$(date +%s)"
+  cutoff=$((now - K3DM_JOB_RETENTION_DAYS * 86400))
+  shopt -s nullglob
+  for path in "${K3DM_JOB_DIR}"/*; do
+    [[ -d "${path}" && -f "${path}/status" ]] || continue
+    status="$(<"${path}/status")"
+    [[ "${status}" == running || "${status}" == queued ]] && continue
+    mtime="$(_file_mtime "${path}")"
+    if [[ "${mtime}" -lt "${cutoff}" ]]; then
+      rm -rf "${path}"
+      count=$((count + 1))
+    else
+      finished+=("${mtime}|${path}")
+    fi
+  done
+  shopt -u nullglob
+  if [[ "${#finished[@]}" -gt "${K3DM_JOB_RETENTION_MAX}" ]]; then
+    local remove_count=$(( ${#finished[@]} - K3DM_JOB_RETENTION_MAX ))
+    while IFS='|' read -r mtime path; do
+      rm -rf "${path}"
+      count=$((count + 1))
+      remove_count=$((remove_count - 1))
+      [[ "${remove_count}" -eq 0 ]] && break
+    done < <(printf '%s\n' "${finished[@]}" | sort -n)
+  fi
+  echo "k3dm-cleanup: pruned ${count} job folders"
+}
+
+_rotate_webhook_logs() {
+  local path size threshold rotated=0 freed=0 i source target
+  threshold=$((K3DM_LOG_MAX_MB * 1024 * 1024))
+  [[ -d "${K3DM_LOG_DIR}" ]] || return 0
+  shopt -s nullglob
+  for path in "${K3DM_LOG_DIR}"/k3dm-*.log; do
+    [[ -f "${path}" ]] || continue
+    size="$(_file_size "${path}")"
+    [[ "${size}" -gt "${threshold}" ]] || continue
+    for source in "${path}".*.gz; do
+      [[ -f "${source}" ]] || continue
+      i="${source#"${path}".}"
+      i="${i%.gz}"
+      [[ "${i}" =~ ^[0-9]+$ && "${i}" -gt "${K3DM_LOG_KEEP}" ]] && rm -f "${source}"
+    done
+    rm -f "${path}.${K3DM_LOG_KEEP}.gz"
+    for ((i=K3DM_LOG_KEEP - 1; i>=1; i--)); do
+      source="${path}.${i}.gz"
+      target="${path}.$((i + 1)).gz"
+      [[ -f "${source}" ]] && mv "${source}" "${target}"
+    done
+    gzip -c "${path}" > "${path}.1.gz"
+    : > "${path}"
+    rotated=$((rotated + 1))
+    freed=$((freed + size))
+  done
+  shopt -u nullglob
+  echo "k3dm-cleanup: rotated ${rotated} logs, freed $((freed / 1048576)) MiB"
+}
 
 # Failure screenshots — keep most recent 10 in root, 10 in logs/
 _prune_pngs() {
+  # shellcheck disable=SC2012
   local dir="$1"
   local keep="${2:-10}"
   local count
+  # shellcheck disable=SC2012
   count=$(( $(ls -1t "${dir}"/acg-extend-failure-*.png 2>/dev/null | wc -l | tr -d ' ' || true) ))
   if [[ "${count}" -gt "${keep}" ]]; then
+    # shellcheck disable=SC2012
     ls -1t "${dir}"/acg-extend-failure-*.png | tail -n "+$((keep + 1))" | xargs rm -f
     echo "k3dm-cleanup: pruned $((count - keep)) failure PNGs from ${dir}"
   fi
@@ -197,8 +276,10 @@ _prune_chromium_cache "${K3DM_STATE_DIR}/playwright-auth"
 _prune_run_dir
 
 # tmp screenshots — keep most recent 5; delete older ones
+# shellcheck disable=SC2012
 _tmp_ss_count=$(( $(ls -1t "${K3DM_TMP_ROOT}"/k3dm-acg-screenshot-*.png 2>/dev/null | wc -l | tr -d ' ' || true) ))
 if [[ "${_tmp_ss_count}" -gt 5 ]]; then
+  # shellcheck disable=SC2012
   ls -1t "${K3DM_TMP_ROOT}"/k3dm-acg-screenshot-*.png | tail -n "+6" | xargs rm -f
   echo "k3dm-cleanup: pruned $(( _tmp_ss_count - 5 )) screenshot(s) from ${K3DM_TMP_ROOT}"
 fi
@@ -220,5 +301,7 @@ _prune_packer_cache
 _prune_port_markers
 _prune_docker_volumes
 _prune_weekly_caches
+_prune_webhook_jobs
+_rotate_webhook_logs
 
 echo "k3dm-cleanup: done"
