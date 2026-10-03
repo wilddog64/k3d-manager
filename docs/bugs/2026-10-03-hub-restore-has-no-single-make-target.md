@@ -202,3 +202,62 @@ Gemini CLI, and `security -w` returns rc 36 with **no stderr and empty output**.
 it wrote `api_key: ""` to Vault live. Instead, `bin/hub-restore` prompts with `read -rs`, refuses an
 empty value (SKIP), and writes it with the stdin-only pattern in `docs/guides/vector-store.md`.
 Gate: an empty prompt makes no `vault kv put` call.
+
+### F2 — fix (spec, for Codex)
+
+Add an **Embeddings key** step to `bin/hub-restore`, directly after *Hub reconcile*. At that point
+Vault is up and the root token Secret exists.
+
+1. **Step bookkeeping:**
+   - insert `"Embeddings key"` into `_step_names` after `"Hub reconcile"`;
+   - renumber the later `_step_start` calls;
+   - replace every hard-coded `/8` and the `{1..8}` summary loop with the array length
+     (`${#_step_names[@]}`), so adding a step never needs a second edit.
+2. **Present check:** test only the length of the value.
+   - Pipe the root token from `secret/vault-root` (`-n secrets`, `--context "${_hub_context}"`) into
+     `kubectl exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get
+     -mount=secret -field=api_key embeddings/gemini 2>/dev/null | wc -c'`.
+   - A count greater than 1 means present → `_info "[hub-restore] embeddings key present in Vault"`
+     and PASS.
+   - The value itself must never reach a variable, stdout or a log.
+3. **Absent, stdin is a TTY:** use an injectable `_hub_restore_stdin_is_tty` helper (`[[ -t 0 ]]`) so
+   BATS can override it.
+   - Prompt with `read -rs -p "Gemini embeddings API key (Enter to skip): " _gemini_key`, then print
+     a newline.
+   - **Empty input:** SKIP, with `_info` naming `docs/guides/vector-store.md` for the manual command.
+   - **Otherwise:** write with the stdin-only pattern, `{ printf '%s\n' "$root_token";
+     GEMINI_KEY="$_gemini_key" jq -n '{api_key: env.GEMINI_KEY}'; } | kubectl ... exec -i vault-0
+     -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put -mount=secret
+     embeddings/gemini -'`. Run it under `_no_trace` if available in this script, otherwise with
+     `set +x` scoped around it.
+   - Then `unset _gemini_key`. Re-run the length check from 2: PASS if it is greater than 1, FAIL
+     otherwise.
+4. **Absent, no TTY:** SKIP, with `_info` "embeddings key missing from Vault — run make hub-restore in
+   a terminal, or see docs/guides/vector-store.md".
+5. **Never read the keychain** for this key (see the correction above). Do not add any
+   `security find-generic-password` call.
+6. **Docs:** in the `docs/howto/hub-rebuild-from-gitops-vault.md` hub-restore step list, add the
+   Embeddings key step (one line).
+
+**Gates (offline; stub `kubectl`, `jq` real, `make` and `curl` stubbed as in `hub_restore.bats`):**
+- present (`wc -c` stub prints `40`): no prompt and no `kv put`; step PASS.
+- absent + TTY + empty input: no `kv put`; step SKIP; the overall exit is unaffected by SKIP.
+- absent + TTY + key `test-key-123`: exactly one `kv put`. The string `test-key-123` does not appear in
+  the kubectl stub's **argv** log or in the script output; it appears only in the captured stdin.
+- absent + no TTY: no prompt, no `kv put`; step SKIP.
+- the summary prints 9 rows.
+- Mutation:
+  - remove the empty-input guard → the empty-input test goes red;
+  - hard-code `/8` back → the 9-row test goes red;
+  - restore from a `cp` snapshot and confirm with `cmp`. Never use `git checkout`.
+- shellcheck has no new warnings; `hub_restore.bats` and `makefile_signing_restore.bats` are green.
+- `git diff --stat` shows only `bin/hub-restore`, `scripts/tests/bin/hub_restore.bats` and the howto.
+
+**Commit message (exact):**
+
+```
+fix(hub-restore): restore the embeddings key to Vault from a hidden prompt so the Hermes index tick stops failing after a rebuild
+
+Co-Authored-By: Codex <noreply@openai.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
