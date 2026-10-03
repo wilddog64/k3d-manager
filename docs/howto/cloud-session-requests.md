@@ -82,8 +82,10 @@ is rejected by the bridge without being executed.
 
 `job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected. `sandbox-up` and `sandbox-down`
 always use the ACG sandbox provider; they cannot accept a provider or other argument. They never
-touch the local hub or Hostinger app cluster. `sandbox-down` keeps the hub. An expired ACG login
-makes `sandbox-up` fail safely and requires the operator to log in by hand. A `409` means a cluster
+touch the local hub or Hostinger app cluster. `sandbox-down` keeps the hub. An expired Pluralsight
+session is renewed automatically from the Keychain item `k3dm-acg-pluralsight`; only if that
+automatic login fails (for example an MFA prompt) does `sandbox-up` stop with `ACG_SESSION_EXPIRED`
+and need the operator. A `409` means a cluster
 job is already running; wait for it to finish before trying again. Use `--wait-final` to follow the
 queued lifecycle job through its terminal response. The two e2e actions are
 cloud-runner capabilities rather than reader actions; the bridge uses its separate scoped
