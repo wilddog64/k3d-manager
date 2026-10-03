@@ -13,6 +13,10 @@ import os
 
 from webhook.config import TOKEN_FILE
 from webhook.proc import _spawn_capture_text
+from webhook.log import get_logger
+
+
+_LOG = get_logger("webhook.auth")
 
 
 def _keychain_secret(service):
@@ -47,7 +51,7 @@ def _get_token():
         import stat
         mode = TOKEN_FILE.stat().st_mode
         if mode & (stat.S_IRWXG | stat.S_IRWXO):
-            print(f"[k3dm-webhook] ignoring {TOKEN_FILE}: group/other-accessible (chmod 600)", flush=True)
+            _LOG.warning("ignoring %s: group/other-accessible (chmod 600)", TOKEN_FILE)
             return None
         return TOKEN_FILE.read_text().strip()
     return None

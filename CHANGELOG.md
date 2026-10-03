@@ -4,6 +4,9 @@
 
 ### Added
 
+- Webhook and cloud-bridge log levels (`error`, `warn`, `info`, `debug`) with
+  redaction-safe request lines; use `make webhook-log-level LEVEL=debug` to
+  update the LaunchAgents.
 - `find-similar-docs` results now include clickable GitHub links, pinned to the checked-out release
   branch (or `main`), with `K3DM_DOCS_BRANCH` and `K3DM_DOCS_REPO_URL` overrides.
 

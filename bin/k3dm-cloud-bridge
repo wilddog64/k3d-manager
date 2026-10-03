@@ -21,6 +21,10 @@ from webhook.cloud_actions import ACTION_ALLOWLIST, JOB_ID_RE, NS_RE, Q_RE
 from webhook.make_targets import MAKE_TARGETS
 from webhook.proc import _spawn_capture_text
 from webhook.redact import scrub_credentials
+from webhook.log import get_logger
+
+
+_LOG = get_logger("cloud-bridge")
 
 
 MAX_REQUEST_BYTES = 8 * 1024
@@ -401,7 +405,7 @@ def main():
             if processed_count:
                 last_activity = time.monotonic()
         except (RuntimeError, OSError, ValueError) as error:
-            print(f"[cloud-bridge] {error}", file=sys.stderr, flush=True)
+            _LOG.error("%s", error)
             last_tip = None
         time.sleep(_next_sleep(time.monotonic(), last_activity))
 
