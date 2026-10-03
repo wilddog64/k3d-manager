@@ -24,7 +24,7 @@ ARGOCD_SCHEME ?= http
 GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
 
-.PHONY: up hub-up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -45,6 +45,16 @@ up:
 ## Rebuild the local Hub only (no AWS, no sandbox)
 hub-up:
 	@$(MAKE) --no-print-directory up CLUSTER_PROVIDER=k3d
+
+## Restore Keychain-backed Hub credentials and local agents (run in Terminal.app)
+hub-restore:
+	@bin/hub-restore
+
+## Full Hub disaster recovery: rebuild, then restore Keychain-backed state (run in Terminal.app)
+hub-recover:
+	@bin/hub-restore --preflight-only
+	@$(MAKE) --no-print-directory hub-up
+	@bin/hub-restore
 
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
 ## make down preserves the local Hub; set DELETE_HUB=1 to delete it
@@ -817,15 +827,24 @@ alertmanager-secret:
 	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-gmail-from -w "$$_gmail" 2>/dev/null && \
 	  echo "[alertmanager-secret] gmail_from backed up to Keychain"; \
 	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-sms-gateway -w "$$_sms" 2>/dev/null && \
-	  echo "[alertmanager-secret] sms_gateway backed up to Keychain"
+	  echo "[alertmanager-secret] sms_gateway backed up to Keychain"; \
+	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w "$$_pw" 2>/dev/null && \
+	  echo "[alertmanager-secret] gmail_app_pw backed up to Keychain"
 
 ## Restore the Alertmanager Gmail App Password from Keychain into Vault, then rebuild the Alertmanager Secret
 restore-google-app-password:
 	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
 	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
 	[ -n "$$_tok" ] || { echo "[restore-google-app-password] ERROR: cannot read Hub Vault root token" >&2; exit 1; }; \
-	_pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>/dev/null); \
-	[ -n "$$_pw" ] || { echo "[restore-google-app-password] ERROR: k3dm-alertmanager-gmail-app-password not in Keychain (locked? run: security unlock-keychain)" >&2; exit 1; }; \
+	_pw_err=$$(mktemp); _pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>"$$_pw_err" || true); _pw_stderr=$$(cat "$$_pw_err"); \
+	if [ -z "$$_pw" ]; then \
+	  if security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password >/dev/null 2>"$$_pw_err"; then \
+	    echo "[restore-google-app-password] ERROR: item exists but is EMPTY — re-create it with: make alertmanager-secret" >&2; \
+	  else \
+	    echo "[restore-google-app-password] ERROR: $$_pw_stderr" >&2; \
+	  fi; \
+	  rm -f "$$_pw_err"; exit 1; \
+	fi; rm -f "$$_pw_err"; \
 	_gmail=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-from -w 2>/dev/null || true); \
 	_sms=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-sms-gateway -w 2>/dev/null || true); \
 	_missing=; \
@@ -1158,6 +1177,8 @@ help:
 	@echo "  Targets (set CLUSTER_PROVIDER=k3d|k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
 	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
+	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
+	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
 	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
 	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"

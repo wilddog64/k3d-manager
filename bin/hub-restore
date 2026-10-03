@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Restore Keychain-backed Hub state and local agents after a Hub rebuild.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ -f "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/system.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/system.sh"
+else
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/system.sh"
+fi
+if [[ -f "${REPO_ROOT}/scripts/lib/system_overrides.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
+fi
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/lib/provider.sh"
+# shellcheck source=scripts/lib/cloudflare_tunnel.sh
+source "${REPO_ROOT}/scripts/lib/cloudflare_tunnel.sh"
+
+_hub_name="${HUB_CLUSTER_NAME:-k3d-cluster}"
+_hub_context="k3d-${_hub_name}"
+_dispatcher="${K3DM_DISPATCHER:-${REPO_ROOT}/scripts/k3d-manager}"
+_make="${K3DM_MAKE:-make}"
+_preflight_only=0
+[[ "${1:-}" == "--preflight-only" ]] && _preflight_only=1
+
+_preflight_fail() {
+  printf 'ERROR: %s\n' "$1" >&2
+  exit 2
+}
+
+if [[ "${HUB_RESTORE_SKIP_PREFLIGHT:-0}" != "1" ]]; then
+  [[ -t 0 ]] || _preflight_fail "[hub-restore] needs an interactive terminal with Keychain access — run it from Terminal.app/iTerm, not Claude Code '!', nohup or ssh"
+  if ! security show-keychain-info >/dev/null 2>&1; then
+    _preflight_fail "[hub-restore] needs an interactive terminal with Keychain access — run it from Terminal.app/iTerm, not Claude Code '!', nohup or ssh; try: security unlock-keychain"
+  fi
+fi
+
+if (( _preflight_only == 0 )); then
+  _current_context="$(kubectl config current-context 2>/dev/null || true)"
+  [[ "${_current_context}" == "${_hub_context}" ]] || \
+    _preflight_fail "[hub-restore] current kube context is '${_current_context}', not '${_hub_context}' — run: kubectl config use-context ${_hub_context}"
+
+  _state_base="${_ACG_STATE_BASE:-${HOME}/.local/share/k3d-manager}"
+  _root_owned_dirs="$(find "${_state_base}" -maxdepth 3 -type d -user root 2>/dev/null || true)"
+  if [[ -n "${_root_owned_dirs}" ]]; then
+    printf 'ERROR: [hub-restore] root-owned state folders found:\n' >&2
+    while IFS= read -r _root_dir; do
+      [[ -n "${_root_dir}" ]] || continue
+      printf 'ERROR: %s\n' "${_root_dir}" >&2
+      printf 'ERROR: sudo chown -R "%s":staff %s\n' "$(id -un)" "${_root_dir}" >&2
+    done <<< "${_root_owned_dirs}"
+    exit 2
+  fi
+fi
+
+(( _preflight_only == 1 )) && exit 0
+
+_step_status=()
+_step_names=("Vault port-forward" "Alertmanager credentials" "Observability" "Signing key" "Hub reconcile" "Platform ops" "Local agents" "Verify")
+_step_index=0
+_step_result() {
+  local result="$1"
+  _step_status[_step_index]="${result}"
+  _info "[hub-restore] Step ${_step_index}/8 ${result}"
+}
+_step_start() {
+  _step_index=$1
+  _info "[hub-restore] Step ${_step_index}/8 — ${_step_names[$((_step_index - 1))]}"
+}
+
+_step_start 1
+if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:18200/v1/sys/health 2>/dev/null || true)" == "200" ]]; then
+  _step_result PASS
+else
+  if "${_make}" install-vault-port-forward; then _step_result PASS; else _step_result FAIL; fi
+fi
+
+_step_start 2
+if "${_make}" restore-google-app-password; then _step_result PASS; else _step_result FAIL; fi
+
+_step_start 3
+if "${_make}" observability; then _step_result PASS; else _step_result FAIL; fi
+
+_step_start 4
+_signing_output=""
+if _signing_output="$(${_make} signing-restore CONTEXT="${_hub_context}" 2>&1)"; then
+  printf '%s\n' "${_signing_output}"
+  _step_result PASS
+else
+  printf '%s\n' "${_signing_output}"
+  if [[ "${_signing_output}" == *"no Keychain backup"* ]]; then
+    _info "[hub-restore] signing key has no backup — decide before running signing_init (a new key invalidates existing signatures)"
+    _step_result SKIP
+  else
+    _step_result FAIL
+  fi
+fi
+
+_step_start 5
+if "${_dispatcher}" hub_recovery_reconcile --confirm; then _step_result PASS; else _step_result FAIL; fi
+
+_step_start 6
+if "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
+
+_step_start 7
+_local_agents_ok=1
+if ! "${_make}" install-hub-pushgateway-port-forward; then _local_agents_ok=0; fi
+if launchctl list 2>/dev/null | grep -q 'com.k3d-manager.grafana-port-forward'; then
+  launchctl kickstart -k "gui/$(id -u)/com.k3d-manager.grafana-port-forward" || _local_agents_ok=0
+fi
+_ensure_cloudflare_tunnel_agent "$(_acg_provider_state_dir k3s-aws)" "[hub-restore]" || _local_agents_ok=0
+if (( _local_agents_ok )); then _step_result PASS; else _step_result FAIL; fi
+
+_step_start 8
+_verify_ok=1
+if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:18200/v1/sys/health 2>/dev/null || true)" == "200" ]]; then
+  _info "[hub-restore] Vault :18200 health: PASS"
+else
+  _info "[hub-restore] Vault :18200 health: FAIL"; _verify_ok=0
+fi
+if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:3001/api/health 2>/dev/null || true)" == "200" ]]; then
+  _info "[hub-restore] Grafana health: PASS"
+else
+  _info "[hub-restore] Grafana health: FAIL"; _verify_ok=0
+fi
+if kubectl --context "${_hub_context}" -n monitoring get secret alertmanager-smtp-secret >/dev/null 2>&1; then
+  _info "[hub-restore] Alertmanager SMTP Secret exists: PASS"
+else
+  _info "[hub-restore] Alertmanager SMTP Secret exists: FAIL"; _verify_ok=0
+fi
+if launchctl list 2>/dev/null | awk '$3 == "com.k3d-manager.cloudflare-tunnel" && $1 ~ /^[0-9]+$/ { found=1 } END { exit !found }'; then
+  _info "[hub-restore] Cloudflare tunnel LaunchAgent has a PID: PASS"
+else
+  _info "[hub-restore] Cloudflare tunnel LaunchAgent has a PID: FAIL"; _verify_ok=0
+fi
+if (( _verify_ok )); then _step_result PASS; else _step_result FAIL; fi
+
+_info "[hub-restore] Summary"
+_summary_failed=0
+for _summary_i in {1..8}; do
+  _summary_status="${_step_status[$_summary_i]:-FAIL}"
+  printf '[hub-restore] %d/8 %-24s %s\n' "${_summary_i}" "${_step_names[$((_summary_i - 1))]}" "${_summary_status}"
+  [[ "${_summary_status}" == "FAIL" ]] && _summary_failed=1
+done
+exit "${_summary_failed}"
