@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-03, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN — spec below, for Codex
+**Status:** FIXED in `1df58d4b`
 **Severity:** medium. The public shop (`frontend.3ai-talk.org`) stays at 502 after a "successful" refresh.
 **Related:** `v1.6.1-bugfix-system-daemon-plists-not-reinstalled-by-acg-refresh.md`, which introduced
 the installer

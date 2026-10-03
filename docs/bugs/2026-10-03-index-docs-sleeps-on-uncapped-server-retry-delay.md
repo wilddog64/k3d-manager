@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-03, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN — spec below, for Codex
+**Status:** FIXED in `7a4bd396`
 **Severity:** low. The index stalls silently. Batches already committed are kept, so nothing is lost.
 
 ## Observed (2026-10-03)

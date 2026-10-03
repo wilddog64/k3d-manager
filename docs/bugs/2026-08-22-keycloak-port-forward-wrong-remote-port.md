@@ -69,7 +69,7 @@ above makes this survive the next `cluster-up`.
 
 ## Recurrence 2026-10-03 — hub Keycloak now exposes port 80; the wrapper pins 8080 (Claude)
 
-**Status:** OPEN — spec below, for Codex. A live stopgap is for the operator to run.
+**Status:** FIXED in `2735a7d2` (named port + Keychain write read-back). The operator stopgap is no longer needed after the next `cluster-up`.
 
 After the hub rebuild, `deploy/keycloak` is `1/1` and `shopping-cart-identity` is `Synced/Healthy`.
 Even so, `https://keycloak.3ai-talk.org/realms/master` returns **502** and `localhost:8880` returns
