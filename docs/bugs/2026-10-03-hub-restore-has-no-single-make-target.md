@@ -159,3 +159,34 @@ Move the named-tunnel LaunchAgent block from `bin/cluster-up` (around lines 1834
 - Do NOT call `signing_init` or `sudo` anywhere in the new code.
 - Do NOT run anything live: no real make target, dispatcher, launchctl, security, kubectl, k3d or Docker.
 - Do NOT change what any existing make target does, except the one `alertmanager-secret` backup line.
+
+## Follow-up found live (Claude, 2026-10-03 12:45) — NOT in the current Codex run; brief after it lands
+
+`hub_recovery_reconcile` fails at `_hub_recovery_replay_identity_hook` with
+`applications.argoproj.io "shopping-cart-identity" not found`.
+
+**The hub-only path never creates the hub's identity stack.**
+- The `shopping-cart-identity` Application (Keycloak + LDAP from `shopping-cart-infra`) is applied
+  to the hub only by `bin/cluster-up` Step 10c, a sandbox `make up`.
+- Its Vault inputs are seeded only by `deploy_shopping_cart_data` (sandbox Step 10b):
+  `keycloak/admin`, `keycloak/clients`, `keycloak/smoke-user` and `ldap/admin`.
+- Claude applied the same Application by hand at 12:40. ESO then failed with "Secret does not exist"
+  on all four paths (404, not 403), and `postgres-keycloak` was stuck in `CreateContainerConfigError`.
+
+**The hub's public origins are also sandbox-path only.** The local agents behind them are installed
+only by `bin/cluster-up`:
+- `argocd.3ai-talk.org` → `127.0.0.1:8080` (the argocd-port-forward agent, missing);
+- `keycloak.3ai-talk.org` → `127.0.0.1:8880` (the keycloak-port-forward agent, missing);
+- `frontend.3ai-talk.org` → the sandbox frontend, so it is legitimately down while the sandbox is
+  down.
+
+These fired `PublicEndpointDown` (critical, `cluster=hub`) as SMS once Alertmanager was restored.
+Claude added a 6 h silence, `84a19233`.
+
+**Direction:** `hub-up` / `hub-restore` should own every *hub* component:
+- the identity Application;
+- the identity Vault seeding, split out of `deploy_shopping_cart_data`;
+- the ArgoCD and Keycloak port-forward agents.
+
+The sandbox path keeps only sandbox things. Gate: after a stubbed `make hub-recover`, nothing
+hub-side is left for a sandbox `make up` to create.
