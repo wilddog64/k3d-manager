@@ -174,8 +174,10 @@ from current `origin/main`.
 
 **Spec repo:** k3d-manager — `git pull origin k3d-manager-v1.41.0`, read this file in full.
 **Work repo:** `~/src/gitrepo/personal/shopping-carts/shopping-cart-infra`
-**Branch (work repo):** `fix/promote-refetch-instead-of-rebase`, created from fresh `origin/main`
-(`git fetch origin && git checkout -b fix/promote-refetch-instead-of-rebase origin/main`).
+**Branch (work repo):** `fix/promote-refetch-never-backwards`, created from fresh `origin/main`
+(`git fetch origin && git checkout -b fix/promote-refetch-never-backwards origin/main`).
+Do NOT use or touch `fix/promote-refetch-instead-of-rebase` — it holds the superseded 2026-09-21
+implementation (`e99960e`, no ordering guard, no refspec) and is left for the operator to delete.
 The work repo currently has another branch checked out with a clean tree; do not touch that branch.
 
 Read `.github/workflows/build-push-deploy.yml` from the `Verify the promoter SSH key was provided`
@@ -224,8 +226,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 - [ ] YAML parse output pasted; actionlint output pasted if available
 - [ ] All four `grep -c` counts pasted
 - [ ] Guard-before-promote step indices pasted
-- [ ] Committed on `fix/promote-refetch-instead-of-rebase` with the message above
-- [ ] Pushed — `git rev-parse origin/fix/promote-refetch-instead-of-rebase` matches local HEAD
+- [ ] Committed on `fix/promote-refetch-never-backwards` with the message above
+- [ ] Pushed — `git rev-parse origin/fix/promote-refetch-never-backwards` matches local HEAD
 - [ ] Report the SHA
 
 ## What NOT to Do
