@@ -378,7 +378,7 @@ def process_tick(repo, root, last_tip=None):
         processed.add(request_id)
         processed_this_tick += 1
         if processed_this_tick >= MAX_PER_TICK:
-            break
+            return None, processed_this_tick
     return ref, processed_this_tick
 
 

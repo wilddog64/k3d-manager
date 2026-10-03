@@ -176,6 +176,38 @@ def test_process_tick_fetches_once_and_returns_pushed_tip(monkeypatch):
     assert calls == ["fetch", "write"]
 
 
+def test_process_tick_refetches_after_hitting_max_per_tick(monkeypatch):
+    request_ids = [f"20260925T2014{index:02d}Z-cluster-status" for index in range(11)]
+    processed = set()
+    fetches = []
+    remote_tip = ["a" * 40]
+    commits = iter(letter * 40 for letter in "bcdefghijkl")
+
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: remote_tip[0])
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: fetches.append("fetch") or "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set(processed))
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: request_ids)
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (request(), None))
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response("", "cluster-status", "ok", 200, body={}))
+
+    def fake_write_commit(repo, parent, request_id, response, artifacts):
+        processed.add(request_id)
+        commit = next(commits)
+        if len(processed) == bridge.MAX_PER_TICK:
+            remote_tip[0] = commit
+        return commit
+
+    monkeypatch.setattr(bridge, "_write_commit", fake_write_commit)
+
+    first_tip, first_count = bridge.process_tick(Path("/nonexistent"), ROOT)
+    second_tip, second_count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip=first_tip)
+
+    assert (first_tip, first_count) == (None, bridge.MAX_PER_TICK)
+    assert (second_tip, second_count) == ("l" * 40, 1)
+    assert fetches == ["fetch", "fetch"]
+    assert processed == set(request_ids)
+
+
 def test_next_sleep_uses_active_then_idle_interval():
     assert bridge._next_sleep(bridge.IDLE_AFTER_SECONDS - 1, 0) == bridge.ACTIVE_POLL_SECONDS
     assert bridge._next_sleep(bridge.IDLE_AFTER_SECONDS, 0) == bridge.IDLE_POLL_SECONDS
