@@ -118,11 +118,20 @@ _launchd_restart() {
 # Writes plist to a temp path, then sudo-copies it to /Library/LaunchDaemons/.
 # No-op if plist already exists or wrapper is absent.
 # Usage: _system_daemon_install_if_missing <label> <wrapper> <log> <plist-dst>
+_cluster_refresh_stdin_is_tty() {
+  [[ -t 0 ]]
+}
+
 _system_daemon_install_if_missing() {
   local label="$1" wrapper="$2" log="$3" plist_dst="$4"
   local plist_tmp="${_ACG_STATE_DIR}/run/${label}.plist"
+  local sudo_mode="--prefer-sudo"
+  local refresh_provider="${_cluster_provider:-${CLUSTER_PROVIDER:-k3s-aws}}"
   [[ -f "${plist_dst}" ]] && return 0
   [[ -f "${wrapper}" ]] || return 0
+  if _cluster_refresh_stdin_is_tty; then
+    sudo_mode="--interactive-sudo"
+  fi
   _info "[acg-refresh] ${label} plist missing — regenerating from wrapper..."
   mkdir -p "$(dirname "${log}")" "$(dirname "${plist_tmp}")"
   cat > "${plist_tmp}" <<PLIST
@@ -148,9 +157,13 @@ _system_daemon_install_if_missing() {
 </dict>
 </plist>
 PLIST
-  _run_command --prefer-sudo --quiet --soft -- cp "${plist_tmp}" "${plist_dst}" \
+  _run_command "${sudo_mode}" --quiet --soft -- cp "${plist_tmp}" "${plist_dst}" \
     && _info "[acg-refresh] ${label} plist installed" \
-    || _warn "[acg-refresh] ${label} plist install failed — sudo may be required"
+    || if [[ "${sudo_mode}" == "--prefer-sudo" ]]; then
+      _warn "[acg-refresh] ${label} plist install failed in a non-TTY — run: sudo -v && make refresh CLUSTER_PROVIDER=${refresh_provider}"
+    else
+      _warn "[acg-refresh] ${label} plist install failed — sudo may be required"
+    fi
 }
 
 if [[ "$login_prompt" -eq 1 ]]; then
