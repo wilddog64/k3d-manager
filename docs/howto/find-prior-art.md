@@ -24,8 +24,13 @@ becoming a new way for filing to fail.
 ```
 Prior art for: "eso 403 on a vault path"
   0.847  docs/bugs/v1.4.5-bugfix-eso-ldap-policy-missing-keycloak.md
+         https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.41.0/docs/bugs/v1.4.5-bugfix-eso-ldap-policy-missing-keycloak.md
          Bugfix: v1.4.5 — eso-ldap-directory Vault policy missing keycloak/* paths
 ```
+
+Each result includes a clickable GitHub link. Links use the checked-out release branch when it is
+available, otherwise `main`; set `K3DM_DOCS_BRANCH` to override the branch explicitly. Set
+`K3DM_DOCS_REPO_URL` to use a repository mirror or fork.
 
 The score is cosine similarity in `[-1, 1]`; 1.0 is identical text. Rough bands, pending the
 v1.40.0 eval that will actually measure this:

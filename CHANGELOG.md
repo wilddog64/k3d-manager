@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- `find-similar-docs` results now include clickable GitHub links, pinned to the checked-out release
+  branch (or `main`), with `K3DM_DOCS_BRANCH` and `K3DM_DOCS_REPO_URL` overrides.
+
 ### Fixed
 
 - **k3dm Tests dashboard duration is now real.** `make test-metrics` now times the whole `make test-all` run and passes `--run-duration` to `bin/k3dm-test-metrics`. Before, the exporter pushed `k3dm_test_run_duration_seconds` as a literal `0` and published `0` for every suite with no parsed time, so the panel showed only the unittest files' millisecond timings against a roughly 15-minute run. The exporter now also reads pytest's summary time and omits suites with no reported duration. The panel is renamed "Run duration over time" and shows the whole run, and "Cases by suite" is renamed "Failing cases by suite", because an empty panel there is the healthy state.

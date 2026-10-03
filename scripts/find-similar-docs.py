@@ -13,13 +13,55 @@ reported on stderr.
 """
 import argparse
 import json
+import os
+import re
+import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 from hermes.prior_art import RetrievalUnavailable, search  # noqa: E402
+
+DEFAULT_REPO_URL = "https://github.com/wilddog64/k3d-manager"
+RELEASE_BRANCH = re.compile(r"\Ak3d-manager-v\d+\.\d+\.\d+\Z")
+SAFE_BRANCH = re.compile(r"\A[A-Za-z0-9._/-]+\Z")
+
+
+def _checkout_branch():
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "branch", "--show-current"],
+            capture_output=True, text=True, check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+    return result.stdout.strip()
+
+
+def _valid_override(branch):
+    return bool(branch and SAFE_BRANCH.fullmatch(branch) and ".." not in branch
+                and not branch.startswith("/") and not branch.endswith("/")
+                and "//" not in branch)
+
+
+def resolve_branch():
+    override = os.environ.get("K3DM_DOCS_BRANCH", "")
+    if _valid_override(override):
+        return override
+    checkout = _checkout_branch()
+    return checkout if RELEASE_BRANCH.fullmatch(checkout or "") else "main"
+
+
+def _url_path(path):
+    return "/".join(quote(component, safe="") for component in path.split("/"))
+
+
+def result_url(path):
+    repo_url = os.environ.get("K3DM_DOCS_REPO_URL", DEFAULT_REPO_URL).rstrip("/")
+    return f"{repo_url}/blob/{quote(resolve_branch(), safe='')}/{_url_path(path)}"
 
 
 def main(argv=None):
@@ -46,7 +88,8 @@ def main(argv=None):
 
     if args.as_json:
         print(json.dumps(
-            [{"score": s, "path": p, "title": t} for s, p, t in results], indent=2))
+            [{"score": s, "path": p, "title": t, "url": result_url(p)}
+             for s, p, t in results], indent=2))
         return 0
 
     if not results:
@@ -56,6 +99,7 @@ def main(argv=None):
     print(f'Prior art for: "{query}"')
     for score, path, title in results:
         print(f"  {score:5.3f}  {path}")
+        print(f"         {result_url(path)}")
         print(f"         {title}")
     print("\nA high score means read that file before filing, not that you must not file.")
     return 0

@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import math
 import os
 import re
@@ -24,6 +25,89 @@ TOKEN = re.compile(r"[a-z0-9]+")
 RECALL_FLOOR = {"bugs": 0.60, "issues": 0.60, "plans": 0.80, "retro": 0.80}
 # Live embeddings, measured 2026-10-01: bugs 14/16, issues 5/6, plans 5/5, retro 5/5.
 LIVE_RECALL_FLOOR = {"bugs": 0.81, "issues": 0.66, "plans": 0.80, "retro": 0.80}
+
+
+@pytest.fixture
+def cli_module():
+    spec = importlib.util.spec_from_file_location("find_similar_docs", CLI)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _stub_results(module, monkeypatch, results):
+    monkeypatch.setattr(module, "search", lambda query, k: results)
+
+
+def test_human_output_contains_branch_pinned_url(cli_module, monkeypatch, capsys):
+    _stub_results(cli_module, monkeypatch, [(0.873, "docs/bugs/example.md", "Example title")])
+    monkeypatch.setattr(cli_module, "_checkout_branch", lambda: "k3d-manager-v1.41.0")
+
+    assert cli_module.main(["example query"]) == 0
+
+    assert "https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.41.0/docs/bugs/example.md" in capsys.readouterr().out
+
+
+def test_json_output_adds_url_and_preserves_fields(cli_module, monkeypatch, capsys):
+    _stub_results(cli_module, monkeypatch, [(0.873, "docs/bugs/example.md", "Example")])
+    monkeypatch.setenv("K3DM_DOCS_BRANCH", "k3d-manager-v1.41.0")
+
+    assert cli_module.main(["--json", "example query"]) == 0
+
+    result = json.loads(capsys.readouterr().out)[0]
+    assert result == {
+        "score": 0.873,
+        "path": "docs/bugs/example.md",
+        "title": "Example",
+        "url": "https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.41.0/docs/bugs/example.md",
+    }
+
+
+def test_docs_branch_override_wins_over_checkout(cli_module, monkeypatch):
+    monkeypatch.setenv("K3DM_DOCS_BRANCH", "k3d-manager-v1.40.0")
+    monkeypatch.setattr(cli_module, "_checkout_branch", lambda: "k3d-manager-v1.41.0")
+
+    assert cli_module.resolve_branch() == "k3d-manager-v1.40.0"
+
+
+def test_non_release_checkout_falls_back_to_main(cli_module, monkeypatch):
+    monkeypatch.delenv("K3DM_DOCS_BRANCH", raising=False)
+    monkeypatch.setattr(cli_module, "_checkout_branch", lambda: "feature/docs-links")
+
+    assert cli_module.resolve_branch() == "main"
+
+
+def test_docs_repo_url_changes_only_repository_base(cli_module, monkeypatch):
+    monkeypatch.setenv("K3DM_DOCS_REPO_URL", "https://example.test/team/k3d-manager/")
+    monkeypatch.setenv("K3DM_DOCS_BRANCH", "k3d-manager-v1.41.0")
+
+    assert cli_module.result_url("docs/bugs/example.md") == (
+        "https://example.test/team/k3d-manager/blob/k3d-manager-v1.41.0/docs/bugs/example.md"
+    )
+
+
+def test_path_title_and_query_text_cannot_inject_into_url(cli_module, monkeypatch, capsys):
+    _stub_results(cli_module, monkeypatch, [(0.5, "docs/bugs/a b/<script>.md", "query\nINJECT")])
+    monkeypatch.setenv("K3DM_DOCS_BRANCH", "k3d-manager-v1.41.0")
+
+    assert cli_module.main(["query", "https://evil.test/?x=1"]) == 0
+
+    output = capsys.readouterr().out
+    assert "https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.41.0/docs/bugs/a%20b/%3Cscript%3E.md" in output
+    url_line = next(line.strip() for line in output.splitlines() if "/blob/" in line)
+    assert "evil.test" not in url_line
+    assert "INJECT" not in url_line
+
+
+def test_unavailable_and_empty_index_remain_advisory(cli_module, monkeypatch, capsys):
+    monkeypatch.setattr(cli_module, "search", lambda query, k: [])
+    assert cli_module.main(["query"]) == 0
+    assert "no indexed documents" in capsys.readouterr().out
+
+    monkeypatch.setattr(cli_module, "search",
+                        lambda query, k: (_ for _ in ()).throw(cli_module.RetrievalUnavailable("offline")))
+    assert cli_module.main(["query"]) == 0
+    assert "retrieval unavailable" in capsys.readouterr().err
 
 
 def _pairs():
