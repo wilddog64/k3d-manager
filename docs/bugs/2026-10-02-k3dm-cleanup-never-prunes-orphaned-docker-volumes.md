@@ -1,7 +1,7 @@
 # Bug: nightly `k3dm-cleanup` never prunes the Docker volumes orphaned by hub rebuilds
 
 **Filed:** 2026-10-02
-**Status:** OPEN — spec ready, dispatched to Codex
+**Status:** FIXED `3204c74e` (Codex; Claude-verified: 2 files, 9/9 bats, anon/k3d filter mutation red, shellcheck 4=4, pushed)
 **Branch:** `k3d-manager-v1.41.0`
 **Found by:** Claude, 2026-10-02, when the operator asked what to purge on the M4 (Data volume 68%, 281 GB used).
 
