@@ -192,3 +192,57 @@ Recovery needed a `force-sync=<timestamp>` annotation on `ExternalSecret/k3dm-sm
 sync operation, since auto-sync does not retry a failed revision. `keycloak_smoke_vault_preseed`
 should annotate the ExternalSecret after it writes (when the ExternalSecret exists). The manual steps
 are in `docs/howto/hub-rebuild-from-gitops-vault.md` → *Identity app stuck after a rebuild*.
+
+### F3 — fix for the ESO race (spec, for Codex)
+
+1. **`scripts/plugins/keycloak.sh` `keycloak_smoke_vault_preseed`:** after a **successful**
+   `_keycloak_smoke_vault_put` (not on the "present" path, and not when the put fails), call a new
+   private `_keycloak_smoke_force_eso_refresh`:
+   - If `_kubectl --no-exit -n "${KEYCLOAK_NAMESPACE:-identity}" get externalsecret k3dm-smoke-user`
+     fails, the ExternalSecret does not exist yet (a fresh `cluster-up`). Return 0 silently, because
+     ESO's first reconcile will read the new entry.
+   - Otherwise run `_kubectl --no-exit -n <ns> annotate externalsecret k3dm-smoke-user
+     force-sync="$(date +%s)" --overwrite`. A failure is `_warn`, never fatal.
+   - The preseed's return code is still the put's return code.
+2. **`scripts/plugins/hub_recovery.sh` `hub_recovery_reconcile`:** directly after the preseed line, call
+   a new private `_hub_recovery_retry_failed_identity_sync "$hub_context"`:
+   - read `.status.operationState.phase` of `application/shopping-cart-identity` in namespace `cicd`
+     (ArgoCD lives in `cicd`, not `argocd`) on `--context "$hub_context"`;
+   - only when the phase is `Failed` or `Error`, run
+     `kubectl patch application shopping-cart-identity --type merge -p '{"operation":{"sync":{}}}'`
+     (through `_kubectl`, with the same context and namespace) and `_info` that a sync was
+     requested;
+   - in any other phase, including a missing Application, do nothing;
+   - a failed read or patch is `_warn` plus return 0. Recovery continues either way.
+   - Why: ArgoCD auto-sync does not retry a revision whose last sync failed (2026-10-03 live).
+3. **Docs:** in `docs/howto/hub-rebuild-from-gitops-vault.md` → *Identity app stuck after a rebuild*,
+   add one sentence: `make hub-recover` now performs both steps; the manual commands remain for a
+   hub where reconcile is not run.
+
+**Gates (offline; stubs only):**
+- keycloak BATS:
+  - the absent path with the ExternalSecret present makes one `annotate ... force-sync=` call after
+    the `kv put`, asserted by order in the stub log;
+  - the absent path with the ExternalSecret missing makes no annotate call and returns 0;
+  - the present path makes no annotate call;
+  - a failed put makes no annotate call and returns non-zero.
+- hub_recovery BATS:
+  - phase `Failed` gives exactly one `patch ... shopping-cart-identity` with `-n cicd`;
+  - phases `Succeeded`, `Running` and empty give no patch;
+  - a stub patch failure still returns 0.
+- Mutation:
+  - remove the phase check → the `Succeeded` test goes red;
+  - drop the annotate call → the first keycloak test goes red;
+  - restore from a `cp` snapshot and confirm with `cmp`. Never use `git checkout`.
+- shellcheck has no new warnings. The keycloak, hub_recovery, cluster_up and provider_contract suites
+  stay green.
+- `git diff --stat` shows only `keycloak.sh`, `hub_recovery.sh`, their two BATS files and the howto.
+
+**Commit message (exact):**
+
+```
+fix(keycloak,hub-recovery): force an ESO refresh after the smoke-user preseed and retry a failed identity sync
+
+Co-Authored-By: Codex <noreply@openai.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
