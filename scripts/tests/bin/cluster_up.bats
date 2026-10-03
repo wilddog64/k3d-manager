@@ -18,6 +18,13 @@
   [ -z "${output}" ]
 }
 
+@test "acg-up preseeds smoke-user Vault before the identity Application apply" {
+  local preseed_line apply_line
+  preseed_line=$(grep -nF 'keycloak_smoke_vault_preseed' bin/cluster-up | cut -d: -f1)
+  apply_line=$(grep -nF 'kubectl apply --context k3d-k3d-cluster -f - <<'"'"'IDEOF'"'"'' bin/cluster-up | cut -d: -f1)
+  [ "$preseed_line" -lt "$apply_line" ]
+}
+
 @test "acg-up leaves the hub Grafana port-forward wrapper path untouched" {
   run grep -c 'grafana-port-forward.sh" ]]; then' bin/cluster-up
   [ "$status" -eq 0 ]

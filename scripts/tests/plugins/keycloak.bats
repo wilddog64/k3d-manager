@@ -210,6 +210,30 @@ setup_smoke_stubs() {
   [ "$status" -ne 0 ]
 }
 
+@test "smoke Vault preseed writes absent entry with four fields and a 48-hex password" {
+  setup_smoke_stubs
+  openssl() { printf '0123456789abcdef0123456789abcdef0123456789abcdef'; }
+  run keycloak_smoke_vault_preseed
+  [ "$status" -eq 0 ]
+  grep -q '"username": "k3dm-smoke"' "$SMOKE_KUBECTL_LOG"
+  grep -q '"password": "0123456789abcdef0123456789abcdef0123456789abcdef"' "$SMOKE_KUBECTL_LOG"
+  grep -q '"realm": "shopping-cart"' "$SMOKE_KUBECTL_LOG"
+  grep -q '"client": "k3dm-smoke"' "$SMOKE_KUBECTL_LOG"
+  run grep -q 'ARGV.*0123456789abcdef' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *0123456789abcdef* ]]
+}
+
+@test "smoke Vault preseed leaves present entry untouched" {
+  setup_smoke_stubs present-password
+  _info() { printf '%s\n' "$*" >> "$SMOKE_KUBECTL_LOG"; }
+  run keycloak_smoke_vault_preseed
+  [ "$status" -eq 0 ]
+  run grep -q 'vault kv put' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
+  grep -q 'smoke-user Vault entry present' "$SMOKE_KUBECTL_LOG"
+}
+
 @test "smoke seed reuses legacy password and writes all Vault fields" {
   setup_smoke_stubs '' legacy-password
   run keycloak_seed_smoke_user

@@ -968,6 +968,9 @@ else
 fi
 
 _info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
+# Preseed Vault before the ExternalSecret can block the identity sync on a fresh Hub.
+kubectl config use-context k3d-k3d-cluster >/dev/null 2>&1 || true
+"${REPO_ROOT}/scripts/k3d-manager" keycloak_smoke_vault_preseed || _warn "[acg-up] smoke-user Vault preseed failed; identity reconcile will retry"
 # Force ArgoCD to pick up the identity Application from shopping-cart-infra
 kubectl apply --context k3d-k3d-cluster -f - <<'IDEOF'
 apiVersion: argoproj.io/v1alpha1

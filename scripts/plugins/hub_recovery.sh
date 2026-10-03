@@ -276,6 +276,7 @@ function hub_recovery_reconcile() {
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
     return 0
   fi
+  keycloak_smoke_vault_preseed || _warn "[hub-recovery] smoke-user Vault preseed failed; continuing recovery"
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
   _hub_recovery_reconcile_hostnet_drift "$hub_context"
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1

@@ -509,6 +509,29 @@ function _keycloak_smoke_vault_put() {
       >/dev/null 2>&1
 }
 
+function keycloak_smoke_vault_preseed() {
+   local realm="${KEYCLOAK_SMOKE_REALM:-shopping-cart}"
+   local client_id="${KEYCLOAK_SMOKE_CLIENT_ID:-k3dm-smoke}"
+   local username="${KEYCLOAK_SMOKE_USERNAME:-k3dm-smoke}"
+   local password
+   password=$(_keycloak_smoke_vault_get_password)
+   if [[ -n "$password" ]]; then
+      _info "[keycloak] smoke-user Vault entry present — leaving it"
+      return 0
+   fi
+
+   local wd
+   wd=$(mktemp -d -t kc-smoke-preseed.XXXXXX)
+   trap 'trap - RETURN; rm -rf "'"${wd}"'" 2>/dev/null || true' RETURN
+   password=$(openssl rand -hex 24)
+   K3DM_SMOKE_PASSWORD="$password" jq -n \
+      --arg username "$username" --arg realm "$realm" --arg client "$client_id" \
+      '{username:$username,password:$ENV.K3DM_SMOKE_PASSWORD,realm:$realm,client:$client}' \
+      > "$wd/smoke-user.json"
+   chmod 600 "$wd/smoke-user.json"
+   _keycloak_smoke_vault_put "$wd/smoke-user.json"
+}
+
 function _keycloak_smoke_password() {
    local ns="$1" secret_name="$2" password
    password=$(_keycloak_smoke_vault_get_password)

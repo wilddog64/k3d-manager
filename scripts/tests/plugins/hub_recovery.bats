@@ -7,6 +7,7 @@ setup() {
   mkdir -p "$HOME"
   export HOME
   source "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
+  keycloak_smoke_vault_preseed() { :; }
   HOSTNET_DRIFT_BIN="$BATS_TEST_TMPDIR/hostnet-drift-default"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$HOSTNET_DRIFT_BIN"
   chmod +x "$HOSTNET_DRIFT_BIN"
