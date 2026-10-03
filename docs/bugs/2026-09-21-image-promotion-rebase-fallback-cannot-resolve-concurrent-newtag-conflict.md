@@ -247,3 +247,45 @@ Payment CI rebuilds and promotes on every `main` merge, so merging payment's pin
 its stale `k8s/base` (`sha-19c42aa` → the merge commit) and is the first live run of the new loop.
 A separate hand-edit of payment's `newTag` would be overwritten by that same promotion, so none is
 needed. Then basket, order, product-catalog.
+
+### Part B spec (dispatched 2026-10-02)
+
+infra PR #107 merged as `98b10f051bda5ffe28299dac288f11fe568a7a1c`. Every caller already forwards
+`PROMOTER_SSH_KEY` and holds that secret (checked by name), so the `Verify the promoter SSH key`
+step that basket/order/product-catalog gain by moving past `e41f2adb` cannot fail them. No other
+input or secret changed between the old pins and `98b10f0`.
+
+**Branch (all work repos):** `ci/bump-build-push-deploy-98b10f0`, created from `origin/main`.
+
+| Repo | File:line | OLD pin | NEW pin |
+|---|---|---|---|
+| shopping-cart-payment | `.github/workflows/ci.yaml:199` | `e41f2adbc2023064e277dae4bf9ba756c9560110` | `98b10f051bda5ffe28299dac288f11fe568a7a1c` |
+| shopping-cart-basket | `.github/workflows/go-ci.yml:71` | `45def89e151bc9d3506f7d641f46d045bc84029d` | `98b10f051bda5ffe28299dac288f11fe568a7a1c` |
+| shopping-cart-order | `.github/workflows/ci.yml:60` | `af4b053dc9e1015141ae142a5329ab90b6348b43` | `98b10f051bda5ffe28299dac288f11fe568a7a1c` |
+| shopping-cart-product-catalog | `.github/workflows/ci.yml:134` | `af4b053dc9e1015141ae142a5329ab90b6348b43` | `98b10f051bda5ffe28299dac288f11fe568a7a1c` |
+
+Each line reads `    uses: wilddog64/shopping-cart-infra/.github/workflows/build-push-deploy.yml@<OLD pin>`;
+replace only the 40-hex SHA.
+
+**Gates (per repo):**
+- `grep -c 'build-push-deploy.yml@<OLD pin>' <file>` → `0`
+- `grep -c 'build-push-deploy.yml@98b10f051bda5ffe28299dac288f11fe568a7a1c' <file>` → `1`
+- `git diff --stat origin/main` → exactly 1 file, `1 insertion(+), 1 deletion(-)`
+- `actionlint <file>` if installed (report if not)
+
+**Commit message (all four repos):**
+
+```
+ci: pin build-push-deploy to the never-backwards promote loop (infra #107)
+
+Co-Authored-By: Codex <noreply@openai.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+
+**What NOT to do:** no PR, no merge, no `--no-verify`, no commit to `main`, no other file, no edit
+to `k8s/base/kustomization.yaml` (the promote step owns `newTag`). Push each branch with
+`git push -u origin ci/bump-build-push-deploy-98b10f0` and confirm with
+`git rev-parse origin/ci/bump-build-push-deploy-98b10f0`.
+
+**Merge order (operator):** payment first; confirm its main run's promote step pushes
+`newTag: sha-<merge>` (repairs `k8s/base`), then basket, order, product-catalog.
