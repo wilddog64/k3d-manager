@@ -374,7 +374,8 @@ class TestFailureModes:
         and it lives only in the response body -- which the exhausted path did not read.
         """
         monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")
-        monkeypatch.setattr(pa.time, "sleep", lambda *_a: None)
+        slept = []
+        monkeypatch.setattr(pa.time, "sleep", lambda seconds: slept.append(seconds))
         body = json.dumps(
             {
                 "error": {
@@ -385,7 +386,8 @@ class TestFailureModes:
                             "violations": [
                                 {"quotaId": "EmbedContentRequestsPerDayPerProjectPerModel-FreeTier"}
                             ],
-                        }
+                        },
+                        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "3600s"},
                     ],
                 }
             }
@@ -403,6 +405,10 @@ class TestFailureModes:
         message = str(caught.value)
         assert "429" in message
         assert "EmbedContentRequestsPerDayPerProjectPerModel-FreeTier" in message
+        assert "3600s" in message
+        assert "exceeds max backoff 64s" in message
+        assert all(seconds <= pa.EMBED_MAX_BACKOFF for seconds in slept)
+        assert slept == []
 
     def test_requests_are_paced_between_texts(self, monkeypatch):
         monkeypatch.setenv(pa.KEY_ENV, "unused-test-value")

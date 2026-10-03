@@ -480,9 +480,14 @@ def _embed_one(text, task_type, key, attempts):
             last = f"HTTP {exc.code}"
             if quota:
                 last = f"{last} (quota {quota})"
+            wait = min(asked, EMBED_MAX_BACKOFF) if asked is not None else delay
+            if asked is not None and asked > EMBED_MAX_BACKOFF:
+                raise EmbeddingsUnavailable(
+                    f"embeddings API returned {last}; server retry delay {asked:g}s "
+                    f"exceeds max backoff {wait:g}s"
+                ) from None
             if exc.code not in (429, 500, 502, 503, 504) or attempt == attempts:
                 raise EmbeddingsUnavailable(f"embeddings API returned {last}") from None
-            wait = asked if asked is not None else delay
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             last = type(exc).__name__
             if attempt == attempts:
