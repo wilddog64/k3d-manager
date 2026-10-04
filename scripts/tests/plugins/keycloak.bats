@@ -40,6 +40,33 @@ setup() {
   declare -F _keycloak_reconcile_realm_client >/dev/null
 }
 
+@test "smoke admin Secret falls back to keycloak-secrets" {
+  _kubectl() {
+    case "$*" in
+      *"get secret keycloak-admin-secret"*) return 1 ;;
+      *"get secret keycloak-secrets"*) return 0 ;;
+    esac
+    return 1
+  }
+  run _keycloak_smoke_admin_secret_name identity keycloak-admin-secret
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "keycloak-secrets" ]
+}
+
+@test "smoke admin Secret keeps preferred Secret when both exist" {
+  _kubectl() { return 0; }
+  run _keycloak_smoke_admin_secret_name identity keycloak-admin-secret
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "keycloak-admin-secret" ]
+}
+
+@test "smoke admin Secret keeps preferred Secret when neither exists" {
+  _kubectl() { return 1; }
+  run _keycloak_smoke_admin_secret_name identity keycloak-admin-secret
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "keycloak-admin-secret" ]
+}
+
 @test "_keycloak_reconcile_realm_client updates argocd redirect URIs" {
   local realm_json="$BATS_TEST_TMPDIR/realm-shopping-cart.json"
   local realm_src

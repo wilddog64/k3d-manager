@@ -332,6 +332,26 @@ STUB
   [ "$(cat "${stdin_log}")" = "secret-pass" ]
 }
 
+@test "acg-up reads the LDAP bind password from openldap-admin" {
+  local helper="${BATS_TEST_TMPDIR}/ldap-bind-helper.sh"
+  local argv_log="${BATS_TEST_TMPDIR}/kubectl-argv.log"
+  sed -n '/function _acg_ldap_bind_pass/,/^}/p' bin/cluster-up > "${helper}"
+  export KUBECTL_ARGV_LOG="${argv_log}"
+
+  run bash -c '
+    source "$1"
+    kubectl() {
+      printf "%s\n" "$*" >> "$KUBECTL_ARGV_LOG"
+      printf "p/w&x+y" | base64
+    }
+    _acg_ldap_bind_pass
+  ' bash "${helper}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "p/w&x+y" ]
+  grep -qF "openldap-admin" "${argv_log}"
+  grep -qF "LDAP_ADMIN_PASSWORD" "${argv_log}"
+}
+
 @test "acg-up uses the LDAP provider helper and removes the substring lookup" {
   run grep -nF "grep -B1 'ldap'" bin/cluster-up
   [ "${status}" -ne 0 ]

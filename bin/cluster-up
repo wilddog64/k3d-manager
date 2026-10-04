@@ -129,6 +129,11 @@ function _acg_fail() {
   exit 1
 }
 
+function _acg_ldap_bind_pass() {
+  kubectl get secret openldap-admin -n identity --context k3d-k3d-cluster \
+    -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' 2>/dev/null | base64 --decode 2>/dev/null || true
+}
+
 # shellcheck disable=SC2016
 function _acg_keycloak_ldap_provider_id() {
   local kc_pod="$1" kc_admin_pass="$2"
@@ -1082,12 +1087,14 @@ else
     kill "${_kc_pf_pid}" 2>/dev/null || true
     _acg_fail "[acg-up] Could not get Keycloak admin token after 5 attempts — realm import is required for SSO and cannot be skipped"
   else
+    _ldap_bind_pass="$(_acg_ldap_bind_pass)"
+    _ldap_bind_pass_sed=$(printf '%s' "${_ldap_bind_pass}" | sed 's/[\/&]/\\&/g')
     _realm_json=$(sed \
       -e "s/\${ARGOCD_CLIENT_SECRET}/${_argocd_client_secret}/g" \
       -e "s/\${ORDER_SERVICE_CLIENT_SECRET}/${_order_client_secret}/g" \
       -e "s/\${PRODUCT_CATALOG_CLIENT_SECRET}/${_product_client_secret}/g" \
       -e "s/\${GRAFANA_CLIENT_SECRET}/${_grafana_client_secret}/g" \
-      -e "s/\${LDAP_BIND_CREDENTIAL}/${_ldap_admin_pass}/g" \
+      -e "s/\${LDAP_BIND_CREDENTIAL}/${_ldap_bind_pass_sed}/g" \
       "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
     _realm_json_file="$(mktemp -t keycloak-realm.XXXXXX.json)"
     printf '%s\n' "${_realm_json}" > "${_realm_json_file}"
@@ -1210,10 +1217,13 @@ else
   if [[ -z "${_kc_pod}" ]]; then
     _warn "[acg-up] Keycloak pod not found — skipping LDAP bind credential reconciliation"
   else
+    _ldap_bind_pass="$(_acg_ldap_bind_pass)"
     _ldap_component_id=$(_acg_keycloak_ldap_provider_id "${_kc_pod}" "${_kc_admin_pass}" || true)
-    if [[ -n "${_ldap_component_id}" ]]; then
+    if [[ -z "${_ldap_bind_pass}" ]]; then
+      _warn "[acg-up] LDAP bind password not readable from identity/openldap-admin — skipping bind credential reconciliation"
+    elif [[ -n "${_ldap_component_id}" ]]; then
       # shellcheck disable=SC2015
-      printf '%s\n%s\n' "${_kc_admin_pass}" "${_ldap_admin_pass}" | \
+      printf '%s\n%s\n' "${_kc_admin_pass}" "${_ldap_bind_pass}" | \
         kubectl exec -i -n identity --context k3d-k3d-cluster "${_kc_pod}" -- sh -c '
           read -r KC_ADMIN_PASS
           read -r LDAP_BIND
@@ -1229,7 +1239,7 @@ else
     else
       _info "[acg-up] LDAP federation component absent — creating it from canonical config"
       if kubectl exec -i -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-          env KC_ADMIN_PASS="${_kc_admin_pass}" LDAP_BIND="${_ldap_admin_pass}" sh -c '
+          env KC_ADMIN_PASS="${_kc_admin_pass}" LDAP_BIND="${_ldap_bind_pass}" sh -c '
             K=/opt/keycloak/bin/kcadm.sh
             "$K" config credentials --server http://localhost:8080 --realm master \
               --user admin --password "$KC_ADMIN_PASS" >/dev/null 2>&1 || exit 1

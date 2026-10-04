@@ -732,6 +732,16 @@ function _keycloak_smoke_ensure_ldap_user() {
    return $rc
 }
 
+function _keycloak_smoke_admin_secret_name() {
+   local ns="$1" preferred="$2"
+   if ! _kubectl --no-exit -n "$ns" get secret "$preferred" >/dev/null 2>&1 && \
+      _kubectl --no-exit -n "$ns" get secret keycloak-secrets >/dev/null 2>&1; then
+      printf '%s\n' keycloak-secrets
+      return 0
+   fi
+   printf '%s\n' "$preferred"
+}
+
 function keycloak_provision_shopping_cart_realm() {
    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
       cat <<'HELP'
@@ -764,7 +774,8 @@ HELP
    local username="${KEYCLOAK_SMOKE_USERNAME:-k3dm-smoke}"
    local secret_name="${KEYCLOAK_SMOKE_SECRET_NAME:-k3dm-smoke-user}"
    local ns="${KEYCLOAK_NAMESPACE:-identity}"
-   local admin_secret="${KEYCLOAK_SMOKE_ADMIN_SECRET_NAME:-keycloak-admin-secret}"
+   local admin_secret
+   admin_secret=$(_keycloak_smoke_admin_secret_name "$ns" "${KEYCLOAK_SMOKE_ADMIN_SECRET_NAME:-keycloak-admin-secret}")
    local frontend_url="${KEYCLOAK_SMOKE_ISSUER_BASE_URL:-https://keycloak.3ai-talk.org}"
 
    local ldap_secret="${KEYCLOAK_LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
