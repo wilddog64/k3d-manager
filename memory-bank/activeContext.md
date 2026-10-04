@@ -9,7 +9,7 @@ with a trailing `# agent-audit: remote-sudo`.
 `make test` at `709aba8d`: 1336/1341. Reds 58 (8 new bare `!`, third recurrence), 197/198 + 1070 (stubs
 predate the `3b789adf` jsonpath wait), 972 (keycloak trap count pinned at 2, `d5b986f4` added a third).
 All test-only. Spec `docs/bugs/2026-10-04-v1.41.0-make-test-reds-after-sandbox-recovery-fixes.md`.
-Codex runs one spec at a time (it cannot write `.git`; Claude commits): make-test reds DONE `9ec4434b`; R1+R2 DONE `98835aac`; app_health DONE `254a291e` (operator: `bin/k3dm-hermes-setup`); then a full `make test`.
+Codex runs one spec at a time (it cannot write `.git`; Claude commits): make-test reds DONE `9ec4434b`; R1+R2 DONE `98835aac`; app_health DONE `254a291e` (operator: `bin/k3dm-hermes-setup`); full `make test` at `402bd596`: 1342/1342 BATS, pytest 621 passed / 1 skipped.
 
 # 2026-10-04 — Sandbox-recovery fixes landed; review follow-ups; app_health enable spec
 
