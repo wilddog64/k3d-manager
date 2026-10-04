@@ -641,3 +641,58 @@ _load_acg_up_marker_clear() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | tr ':' '\n' | grep -c 'local/bin')" -eq 1 ]
 }
+
+@test "acg-up Keycloak reverse tunnel helper accepts a non-zero HTTP status" {
+  local stub_bin="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_bin}"
+  cat > "${stub_bin}/ssh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s' "${STUB_CODE}"
+exit "${STUB_RC:-0}"
+STUB
+  chmod +x "${stub_bin}/ssh"
+  export PATH="${stub_bin}:${PATH}" STUB_CODE=404 STUB_RC=0
+
+  run bash -c 'source <(sed -n "/function _acg_keycloak_reverse_tunnel_up/,/^}/p" bin/cluster-up); _acg_keycloak_reverse_tunnel_up'
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up Keycloak reverse tunnel helper rejects curl status 000" {
+  local stub_bin="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_bin}"
+  cat > "${stub_bin}/ssh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s' "${STUB_CODE}"
+exit "${STUB_RC:-0}"
+STUB
+  chmod +x "${stub_bin}/ssh"
+  export PATH="${stub_bin}:${PATH}" STUB_CODE=000 STUB_RC=7
+
+  run bash -c 'source <(sed -n "/function _acg_keycloak_reverse_tunnel_up/,/^}/p" bin/cluster-up); _acg_keycloak_reverse_tunnel_up'
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up Keycloak reverse tunnel helper rejects an empty curl status" {
+  local stub_bin="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_bin}"
+  cat > "${stub_bin}/ssh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s' "${STUB_CODE}"
+exit "${STUB_RC:-0}"
+STUB
+  chmod +x "${stub_bin}/ssh"
+  export PATH="${stub_bin}:${PATH}" STUB_CODE= STUB_RC=255
+
+  run bash -c 'source <(sed -n "/function _acg_keycloak_reverse_tunnel_up/,/^}/p" bin/cluster-up); _acg_keycloak_reverse_tunnel_up'
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up Step 10g.5 reuses or replaces the Keycloak reverse tunnel" {
+  local block before_ssh
+  block="$(sed -n "/Step 10g.5\\/14/,/Step 10e\\/14/p" bin/cluster-up)"
+  [[ "${block}" == *"_acg_keycloak_reverse_tunnel_up"* ]]
+  [[ "${block}" == *"already active on ubuntu:18080"* ]]
+  [[ "${block}" == *"pkill -f"* ]]
+  before_ssh="${block%%ssh -f -N*}"
+  [[ "${before_ssh}" == *"_acg_keycloak_reverse_tunnel_up"* ]]
+}

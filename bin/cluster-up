@@ -129,6 +129,12 @@ function _acg_fail() {
   exit 1
 }
 
+function _acg_keycloak_reverse_tunnel_up() {
+  local code
+  code=$(ssh -o ConnectTimeout=10 ubuntu "curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:18080/" 2>/dev/null || true)
+  [[ -n "${code}" && "${code}" != "000" ]]
+}
+
 function _acg_ldap_bind_pass() {
   kubectl get secret openldap-admin -n identity --context k3d-k3d-cluster \
     -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' 2>/dev/null | base64 --decode 2>/dev/null || true
@@ -1332,9 +1338,14 @@ _node_ip=$(kubectl get node --context ubuntu-k3s \
 if [[ -z "${_node_ip}" ]]; then
   _warn "[acg-up] Could not determine ubuntu-k3s node IP — skipping Keycloak cross-cluster tunnel"
 else
-  ssh -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
-    -R 127.0.0.1:18080:127.0.0.1:80 ubuntu 2>/dev/null || \
-    _warn "[acg-up] Keycloak reverse tunnel setup failed — JWT auth from app cluster may be unavailable"
+  if _acg_keycloak_reverse_tunnel_up; then
+    _info "[acg-up] Keycloak reverse tunnel already active on ubuntu:18080 — skipping"
+  else
+    pkill -f -- '-R 127.0.0.1:18080:127.0.0.1:80 ubuntu' 2>/dev/null || true
+    ssh -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
+      -R 127.0.0.1:18080:127.0.0.1:80 ubuntu 2>/dev/null || \
+      _warn "[acg-up] Keycloak reverse tunnel setup failed — JWT auth from app cluster may be unavailable"
+  fi
 
   ssh ubuntu "sudo sysctl -w net.ipv4.conf.all.route_localnet=1" >/dev/null 2>&1 || true
 
