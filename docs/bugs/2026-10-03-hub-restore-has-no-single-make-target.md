@@ -261,3 +261,27 @@ fix(hub-restore): restore the embeddings key to Vault from a hidden prompt so th
 Co-Authored-By: Codex <noreply@openai.com>
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ```
+
+## Follow-up F2b (2026-10-03, live): the root-owned preflight flags root daemons' own lock folders
+
+On the first live run in Terminal.app, `make hub-restore` stopped with exit 2. It listed
+`k3s-aws/logs/keycloak-browser-http.log.lock` and `k3s-hostinger/logs/keycloak-browser-http.log.lock`.
+Those are `LOCK_DIR`s that the **root** `keycloak-browser-http` LaunchDaemon wrapper creates with
+`mkdir`. Being root-owned is correct for them, and they are not the defect the check exists for
+(a root-owned **logs** folder that a user agent cannot write to).
+
+**Fix (Codex):** in `bin/hub-restore`, exclude lock folders from the scan:
+
+```bash
+  _root_owned_dirs="$(find "${_state_base}" -maxdepth 3 -type d -user root ! -name '*.lock' 2>/dev/null || true)"
+```
+
+**Gates:**
+- In `scripts/tests/bin/hub_restore.bats`, the `find` stub must now honour the filter. Make the
+  stub print the root-owned path only when its argv has no `! -name *.lock`, or assert the argv.
+  The test then shows that a root-owned `*.lock` folder no longer fails the run and that a
+  root-owned `logs` folder still does.
+- Mutation: removing `! -name '*.lock'` turns the new test red. Restore from a `cp` snapshot
+  and check with `cmp`.
+- `hub_restore.bats` and `makefile_signing_restore.bats` pass, shellcheck adds no new warnings,
+  and only those two files change.
