@@ -216,9 +216,18 @@ None is needed for logins. The real provider binds and syncs, and the issuer is 
 re-PUTs the provider's `bindCredential` from `openldap-admin`. Confirm the repair with the same
 `testAuthentication` (`Success`) and a group sync that has no error 49.
 
+**Done 2026-10-04 (operator).** The first attempt warned `master admin creds not found in secret
+'keycloak-admin-secret'`. The plugin's default `KEYCLOAK_SMOKE_ADMIN_SECRET_NAME` names a Secret this
+hub does not have; the hub keeps the admin login in `identity/keycloak-secrets`. Rerunning with
+`KEYCLOAK_SMOKE_ADMIN_SECRET_NAME=keycloak-secrets` provisioned the realm, and the read-only
+`testAuthentication` now exits 0. The bind is repaired.
+
 ### Fix F5 (Codex, to spec)
 
 In `bin/cluster-up`, 10d.6 and the realm import must read the bind password from hub Secret
 `identity/openldap-admin` `LDAP_ADMIN_PASSWORD`, not from `_ldap_admin_pass`. The 10d.6 update should
 also be skipped when `testAuthentication` of the stored credential already succeeds, so a rerun
 cannot overwrite a working bind.
+
+Also fix the `keycloak.sh` default `KEYCLOAK_SMOKE_ADMIN_SECRET_NAME=keycloak-admin-secret` →
+`keycloak-secrets`, or fall back to it. Without that, the documented repair command fails on this hub.
