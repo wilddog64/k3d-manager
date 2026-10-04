@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN
+**Status:** FIXED — `2054d058`, 2026-10-04.
 **Severity:** low. Operator friction, and a credential step that is easy to get subtly wrong.
 
 ## Observed
