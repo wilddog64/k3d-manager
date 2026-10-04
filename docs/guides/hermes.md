@@ -69,6 +69,23 @@ Operator setup (run in Terminal.app):
 3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth`.
 4. Set `K3DM_HERMES_APPROVAL_DRAIN_URL=https://<relay-host>/hermes/approvals` in the Hermes LaunchAgent `EnvironmentVariables`, then reload the agent.
 
+`APPROVERS` takes Slack member IDs, not emails: comma-separated with no spaces, each beginning with `U` or `W`.
+To find one in Slack, open a profile, click ⋮ (More), then **Copy member ID**.
+
+| Error | Cause | Fix |
+|---|---|---|
+| `wrangler kv namespace create failed` and, above it, `A KV namespace with the title "APPROVALS_KV" already exists` | The namespace was created by hand | Run `wrangler kv namespace list` and copy the id of `APPROVALS_KV`. Uncomment the `[[kv_namespaces]]` block in `workers/slack-relay/wrangler.toml` with that id, commit it, then rerun. |
+| `[hermes-drain-token] ERROR: the stored item is too short` | The Keychain token is shorter than the 32 characters the relay requires, typically because it was set by hand | Run `ROTATE=1 make hermes-approvals-setup APPROVERS=<ids>` once. |
+| `k3dm-cloudflare-api-token missing from Keychain` | The Keychain is locked, or the session is not a GUI session | Run the command in Terminal.app with the login keychain unlocked. |
+| `User interaction is not allowed` when writing the drain token | The session is not a GUI session (e.g. SSH or tmux started outside the GUI) | Run the command in Terminal.app. |
+
+**Recovery.**
+- **The KV binding** is versioned in git. The namespace id is not a secret.
+- **The data in KV** holds only short-lived approval and re-auth records, so it needs no backup.
+- **The drain token** lives in Keychain `k3dm-hermes-approval-drain-token`. `make hermes-drain-token` re-pushes it to the relay.
+- **The allowlist** is re-pushed with `make hermes-approvers APPROVERS=<ids>`.
+- **If the namespace is deleted**, remove the binding lines and rerun `make hermes-approvals-kv` to create and bind a new one. The target skips creation while a binding exists.
+
 ## Hub Kine circuit breaker
 
 Hermes samples the local hub datastore read-only: `state.db` size, recent K3s
