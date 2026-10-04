@@ -1,3 +1,13 @@
+# 2026-10-04 — Sandbox-recovery fixes landed; review follow-ups; app_health enable spec
+
+Codex landed `f61d3b3b` / `3b789adf` / `d49e5eb8`, Claude-verified (origin, scope, shellcheck, 61/61 BATS,
+independent mutation). Review follow-ups appended to the CRD bug doc: R1 (`$!` in the Step 14b warn
+expands at print time), R2 (drop the `"su""do"` split from the observability warn). R3: the tunnel wrapper
+also splits `"su""do"` for the remote `fuser`; root is genuinely needed (sandbox sshd is non-dumpable), so
+the operator decides between an explicit upstream audit exemption and accepting the split. New spec
+`docs/bugs/2026-10-04-hermes-app-health-sensor-never-enabled.md`. Next: make test, then dispatch R1/R2 +
+app_health to Codex.
+
 # 2026-10-04 — Sandbox recovered; three fix specs dispatched to Codex
 
 Sandbox recovery complete: k3s restart cleared the stuck CRD watch, tunnel kill+kickstart restored 6443,

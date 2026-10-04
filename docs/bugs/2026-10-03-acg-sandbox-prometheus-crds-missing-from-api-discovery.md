@@ -228,3 +228,26 @@ Put these in a new `scripts/tests/plugins/observability_acg_crd_discovery.bats`,
 In `scripts/tests/bin/cluster_up.bats`, add a static check that Step 14b's
 `kubectl port-forward svc/prometheus-operated` sits inside the
 `_acg_prom_svc_ready` else-branch: its line number falls between the `if` and the `fi`.
+
+## Review follow-up (Claude, 2026-10-04, on `3b789adf`)
+
+The fix landed in `3b789adf` (Codex). Claude verified it: on origin, scope matches, shellcheck
+adds no warnings, 61/61 targeted BATS. Two defects remain.
+
+**R1 — the Step 14b warning prints the wrong PID into its recovery command.** The `_warn` line in
+`bin/cluster-up` Step 14b is double-quoted and ends with `& echo $! > .../acg-prom-pf.pid`. The `$!`
+expands when the warning prints, to the last background job of *this* run (normally the Vault
+port-forward). An operator who pastes the command writes the Vault port-forward's PID into
+`acg-prom-pf.pid`, and the next Step 14b then kills the Vault port-forward. Fix: escape it as `\$!`
+in that `_warn` string. Add a BATS static check that the line contains `echo \$! >`.
+
+**R2 — `"su""do"` string split in `observability.sh`.** The second `_warn` in
+`_observability_warn_if_prometheus_kind_unserved` splits the word so the pre-commit `_agent_audit`
+bare-sudo check does not match. Do not defeat the audit. Replace that second `_warn` with:
+
+```bash
+  _warn "[observability] recover: restart k3s on the sandbox node, rollout-restart the prometheus operator, then make fix-sync APP=acg-kube-prometheus-stack (exact commands in the bug doc above)"
+```
+
+Update any BATS assertion that matched the old text to assert the tokens `restart k3s` and
+`fix-sync`.
