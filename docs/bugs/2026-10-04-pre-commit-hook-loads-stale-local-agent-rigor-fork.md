@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. The fix is specified below and dispatched to Codex.
+**Status:** FIXED — `e22b7df6` (shim) and `0670b075` (tunnel marked sudo), 2026-10-04.
 **Severity:** low. Audit fixes made upstream never reach this repo's commits.
 
 ## Observed

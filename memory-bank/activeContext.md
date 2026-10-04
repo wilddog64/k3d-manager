@@ -6,9 +6,11 @@ Claude committed + pushed; shellcheck clean, 27/27 BATS, mutation reds test 9, c
 #57 MERGED `44e7e8d`; subtree pulled `ce1164eb`. Gap: `.githooks/pre-commit`, `scripts/hooks/pre-commit`,
 `scripts/lib/system.sh:29` and `scripts/tests/lib/agent_rigor.bats` all load the stale local fork
 `scripts/lib/agent_rigor.sh`, not the subtree, so the marker is not live in k3d-manager yet. Operator chose
-retire-the-fork; spec `docs/bugs/2026-10-04-pre-commit-hook-loads-stale-local-agent-rigor-fork.md` to Codex.
-app_health live (healthy at 11:43:35Z). After merge: subtree pull, then the tunnel wrapper uses plain `sudo`
-with a trailing `# agent-audit: remote-sudo`.
+retire-the-fork; spec `docs/bugs/2026-10-04-pre-commit-hook-loads-stale-local-agent-rigor-fork.md` — DONE
+`e22b7df6` (shim) + `0670b075` (tunnel plain `sudo` + `# agent-audit: remote-sudo`). Codex edits, Claude committed;
+Claude verified: shellcheck clean, 23/23 BATS, independent mutation (old fork back) reds both new tests, cmp-restored;
+the live hook accepted the marked sudo on commit 2 (proof the shim loads upstream). Next: full `make test`.
+app_health live (healthy at 11:43:35Z).
 
 `make test` at `709aba8d`: 1336/1341. Reds 58 (8 new bare `!`, third recurrence), 197/198 + 1070 (stubs
 predate the `3b789adf` jsonpath wait), 972 (keycloak trap count pinned at 2, `d5b986f4` added a third).
