@@ -5,8 +5,9 @@ import json
 import sys
 import time
 from types import SimpleNamespace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
@@ -399,21 +400,28 @@ def _index_calls(commands):
     return [command for command, _kw in commands if "index-docs.py" in command[0]]
 
 
-def test_refresh_index_paused_waits_for_next_utc_midnight(monkeypatch):
+def test_refresh_index_paused_waits_for_next_pacific_reset(monkeypatch):
     commands, pushed = [], []
     paused = SimpleNamespace(returncode=1, stdout="",
                              stderr="index-docs: paused — daily quota (quota EmbedPerDay)\n")
     _stub_refresh(monkeypatch, commands, paused, pushed)
     state = {}
-    k3dm_hermes._refresh_index(state)
+    now = datetime(2026, 10, 4, 16, 42, tzinfo=ZoneInfo("America/Los_Angeles")).timestamp()
+    k3dm_hermes._refresh_index(state, now=now)
     until = state["index_paused_until"]
-    midnight = datetime.fromtimestamp(until, timezone.utc)
-    assert (midnight.hour, midnight.minute, midnight.second) == (0, 0, 0)
-    assert 0 < until - time.time() <= 86400
+    expected = datetime(2026, 10, 5, 0, 5, tzinfo=ZoneInfo("America/Los_Angeles")).timestamp()
+    assert until == expected
     assert pushed[-1]["result"] == "paused" and "index_fingerprint" not in state
     k3dm_hermes._refresh_index(state, now=until - 60)
     assert len(_index_calls(commands)) == 1
     assert pushed[-1]["result"] == "paused"
+
+
+def test_next_quota_reset_handles_dst_end():
+    pacific = ZoneInfo("America/Los_Angeles")
+    now = datetime(2026, 11, 1, 12, 0, tzinfo=pacific).timestamp()
+    expected = datetime(2026, 11, 2, 0, 5, tzinfo=pacific).timestamp()
+    assert k3dm_hermes._next_quota_reset(now) == expected
 
 
 def test_refresh_index_failure_naming_a_paused_doc_is_not_a_pause(monkeypatch):

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN.
+**Status:** FIXED — Codex, verified by Claude 2026-10-04: 654 pytest pass; mutations (drop hash match, skip the `get_many` check) each turn their test red. Claude reworded the howto paragraph.
 **Severity:** low. Until the next full re-embed, a hub loss still costs more than a day of Gemini quota.
 
 ## Observed

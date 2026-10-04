@@ -6,6 +6,7 @@
 
 - Hermes now re-indexes a rebuilt vector store from the embedding cache and reports cache reloads
   separately from embeddings API calls.
+- Hermes quota pauses now resume at 00:05 Pacific, after the Gemini daily quota reset.
 
 ### Added
 
@@ -15,6 +16,7 @@
   incompatible rows on read, and `make embed-cache-stats` / `make embed-cache-prune` show and trim it.
   Prune deletes only vectors that are both stale and unused for 90 days; rows carried over from v1 or
   from a restore are stamped on arrival, so the first prune cannot empty an existing cache.
+- `make embed-cache-seed` fills the cache from the hub store without Gemini calls.
 
 - `make hub-restore` / `make hub-recover` restore rebuilt Hub credentials and local agents from one
   GUI-backed Terminal session.

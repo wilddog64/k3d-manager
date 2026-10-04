@@ -1,5 +1,6 @@
 """Tests for the embedding-cache backup and restore CLI."""
 import importlib.util
+import json
 import sqlite3
 import sys
 from array import array
@@ -11,7 +12,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
 from hermes.embed_cache import EmbedCache, cache_key  # noqa: E402
-from hermes.prior_art import EMBED_DIM, EMBED_MODEL  # noqa: E402
+from hermes.prior_art import EMBED_DIM, EMBED_MODEL, RetrievalUnavailable  # noqa: E402
 
 
 SPEC = importlib.util.spec_from_file_location("embed_cache_cli", REPO_ROOT / "scripts" / "embed-cache.py")
@@ -34,6 +35,72 @@ def _seed(path, names):
 @pytest.fixture(autouse=True)
 def cache_env(monkeypatch, tmp_path):
     monkeypatch.setenv("K3DM_EMBED_CACHE", str(tmp_path / "primary.sqlite"))
+
+
+def _store_rows(rows):
+    return "".join(f"{path}\t{digest}\t{vector}\n" for path, digest, vector in rows)
+
+
+def test_seed_matches_store_rows_without_embedding(monkeypatch, capsys):
+    docs = [("docs/a.md", "A", "text a", "hash-a"),
+            ("docs/b.md", "B", "text b", "hash-b")]
+    monkeypatch.setattr(cli, "iter_corpus", lambda *_args: docs)
+    monkeypatch.setattr(cli, "run_sql", lambda _sql: _store_rows(
+        [("docs/a.md", "hash-a", json.dumps([0.1] * EMBED_DIM)),
+         ("docs/b.md", "stale", json.dumps([0.2] * EMBED_DIM)),
+         ("docs/c.md", "hash-c", json.dumps([0.3] * EMBED_DIM))]))
+    import hermes.prior_art as prior_art
+    monkeypatch.setattr(prior_art, "embed_batch", lambda *_args, **_kwargs: pytest.fail("embed_batch called"))
+    assert cli.main(["seed"]) == 0
+    cache = EmbedCache(Path(cli.cache_path()))
+    assert cache.get_many([cache_key(EMBED_MODEL, EMBED_DIM, "RETRIEVAL_DOCUMENT", "text a")])
+    assert cache.get_many([cache_key(EMBED_MODEL, EMBED_DIM, "RETRIEVAL_DOCUMENT", "text b")]) == {}
+    assert cache.connection.execute("SELECT content_hash FROM embeddings").fetchone()[0] == "hash-a"
+    output = capsys.readouterr().out
+    assert "1 vectors" in output and "2 unmatched" in output
+
+
+def test_seed_never_overwrites(monkeypatch, capsys):
+    docs = [("docs/a.md", "A", "text a", "hash-a")]
+    monkeypatch.setattr(cli, "iter_corpus", lambda *_args: docs)
+    monkeypatch.setattr(cli, "run_sql", lambda _sql: _store_rows(
+        [("docs/a.md", "hash-a", json.dumps([0.2] * EMBED_DIM))]))
+    primary = Path(cli.cache_path())
+    _seed(primary, ("text a",))
+    cache = EmbedCache(primary)
+    cache.connection.execute("UPDATE embeddings SET vector = ?", (array("f", [0.1] * EMBED_DIM).tobytes(),))
+    cache.connection.commit()
+    assert cli.main(["seed"]) == 0
+    row = cache.connection.execute("SELECT vector FROM embeddings").fetchone()[0]
+    assert row == array("f", [0.1] * EMBED_DIM).tobytes()
+    assert "1 already cached" in capsys.readouterr().out
+
+
+def test_seed_wrong_dimension_is_unmatched(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "iter_corpus", lambda *_args: [("docs/a.md", "A", "text a", "hash-a")])
+    monkeypatch.setattr(cli, "run_sql", lambda _sql: _store_rows(
+        [("docs/a.md", "hash-a", json.dumps([0.1] * (EMBED_DIM - 1)))]))
+    assert cli.main(["seed"]) == 0
+    output = capsys.readouterr().out
+    assert "0 vectors" in output and "1 unmatched" in output
+    assert _keys(Path(cli.cache_path())) == set()
+
+
+def test_seed_store_unavailable(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "iter_corpus", lambda *_args: [])
+    monkeypatch.setattr(cli, "run_sql", lambda _sql: (_ for _ in ()).throw(
+        RetrievalUnavailable("offline")))
+    assert cli.main(["seed"]) == 1
+    assert "store unavailable" in capsys.readouterr().err
+    assert _keys(Path(cli.cache_path())) == set()
+
+
+def test_seed_passes_ref_to_iter_corpus(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(cli, "iter_corpus", lambda *args: calls.append(args) or [])
+    monkeypatch.setattr(cli, "run_sql", lambda _sql: "")
+    assert cli.main(["seed", "--ref", "origin/x"]) == 0
+    assert calls == [(cli.ROOT, "origin/x")]
 
 
 def test_backup_restore_round_trip(tmp_path, capsys):

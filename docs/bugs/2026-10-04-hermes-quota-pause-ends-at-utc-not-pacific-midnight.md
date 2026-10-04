@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. Corrects an assumption in `2026-09-30-vectordb-index-never-refreshes-automatically.md`.
+**Status:** FIXED — Codex, verified by Claude 2026-10-04: the `timezone.utc` mutation turns both reset tests red. Corrects an assumption in `2026-09-30-vectordb-index-never-refreshes-automatically.md`.
 **Severity:** low. Each daily-quota hit costs most of an extra day of indexing.
 
 ## Observed

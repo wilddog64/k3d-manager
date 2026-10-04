@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Back up, restore, inspect, and prune the local embedding cache."""
+"""Back up, restore, inspect, prune, and seed the local embedding cache."""
 import argparse
+import json
 import os
 import sqlite3
 import sys
@@ -11,8 +12,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
-from hermes.embed_cache import EmbedCache, cache_path  # noqa: E402
-from hermes.prior_art import EMBED_DIM, iter_corpus  # noqa: E402
+from hermes.embed_cache import EmbedCache, cache_key, cache_path  # noqa: E402
+from hermes.prior_art import (EMBED_DIM, EMBED_MODEL, TABLE, RetrievalUnavailable,
+                              iter_corpus, run_sql)  # noqa: E402
 
 
 def _count(path):
@@ -131,6 +133,59 @@ def prune(days):
     return 0
 
 
+def seed(ref=None):
+    """Fill the local cache from matching vectors already in the hub store."""
+    cache = EmbedCache()
+    if not cache.enabled:
+        return 1
+    corpus = {
+        path: (embed_text, digest)
+        for path, _title, embed_text, digest in iter_corpus(ROOT, ref)
+    } if ref is not None else {
+        path: (embed_text, digest)
+        for path, _title, embed_text, digest in iter_corpus(ROOT)
+    }
+    try:
+        output = run_sql(
+            f"COPY (SELECT path, content_hash, embedding::text FROM {TABLE}) TO STDOUT;"
+        )
+    except RetrievalUnavailable as exc:
+        print(f"embed-cache: store unavailable — {exc}", file=sys.stderr)
+        return 1
+
+    matches = []
+    unmatched = 0
+    for line in output.splitlines():
+        fields = line.split("\t")
+        if len(fields) != 3 or "\\" in fields[0]:
+            unmatched += 1
+            continue
+        path, digest, encoded = fields
+        try:
+            vector = json.loads(encoded)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            unmatched += 1
+            continue
+        doc = corpus.get(path)
+        if doc is None or digest != doc[1] or len(vector) != EMBED_DIM:
+            unmatched += 1
+            continue
+        embed_text, content_hash = doc
+        matches.append((cache_key(EMBED_MODEL, EMBED_DIM, "RETRIEVAL_DOCUMENT", embed_text),
+                        vector, {"model": EMBED_MODEL, "dim": EMBED_DIM,
+                                 "task_type": "RETRIEVAL_DOCUMENT", "content_hash": content_hash}))
+
+    cached = cache.get_many([key for key, _vector, _meta in matches], EMBED_MODEL,
+                            EMBED_DIM, "RETRIEVAL_DOCUMENT")
+    pending = [item for item in matches if item[0] not in cached]
+    for start in range(0, len(pending), 200):
+        cache.put_many(pending[start:start + 200])
+    total = cache.connection.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+    print(f"embed-cache: seeded {len(matches)} vectors from the store "
+          f"({len(cached)} already cached, {unmatched} unmatched, {total} in cache)")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -141,6 +196,8 @@ def main(argv=None):
     subparsers.add_parser("stats")
     prune_parser = subparsers.add_parser("prune")
     prune_parser.add_argument("--days", type=int, default=90)
+    seed_parser = subparsers.add_parser("seed")
+    seed_parser.add_argument("--ref")
     args = parser.parse_args(argv)
     if args.command == "backup":
         return backup(args.destination)
@@ -148,6 +205,8 @@ def main(argv=None):
         return restore(args.source)
     if args.command == "stats":
         return stats()
+    if args.command == "seed":
+        return seed(args.ref)
     return prune(args.days)
 
 
