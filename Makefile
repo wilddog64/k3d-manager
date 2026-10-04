@@ -942,12 +942,13 @@ argocd-hermes-token:
 ## Create and bind the Hermes Slack-approval KV namespace (commit wrangler.toml afterward)
 hermes-approvals-kv:
 	@set -euo pipefail; \
-	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null); \
+	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null || true); \
 	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
 	if grep -Eq '^[[:space:]]*binding[[:space:]]*=[[:space:]]*"APPROVALS_KV"' "$(RELAY_DIR)/wrangler.toml"; then \
 	  echo "[hermes-approvals-kv] APPROVALS_KV already bound in wrangler.toml — nothing to do"; exit 0; \
 	fi; \
-	_out=$$(cd "$(RELAY_DIR)" && CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler kv namespace create APPROVALS_KV </dev/null 2>&1); \
+	_rc=0; _out=$$(cd "$(RELAY_DIR)" && CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler kv namespace create APPROVALS_KV </dev/null 2>&1) || _rc=$$?; \
+	[ "$$_rc" -eq 0 ] || { printf '%s\n' "$$_out" >&2; echo "[hermes-approvals-kv] ERROR: wrangler kv namespace create failed (exit $$_rc). If APPROVALS_KV already exists, put its id from 'wrangler kv namespace list' into $(RELAY_DIR)/wrangler.toml and rerun" >&2; exit 1; }; \
 	_id=$$(printf '%s\n' "$$_out" | grep -oE '[0-9a-f]{32}' | head -1 || true); \
 	[ -n "$$_id" ] || { printf '%s\n' "$$_out" >&2; echo "[hermes-approvals-kv] ERROR: wrangler did not return a namespace id" >&2; exit 1; }; \
 	KV_ID="$$_id" python3 - "$(RELAY_DIR)/wrangler.toml" < <(printf '%s\n' 'import os, pathlib, re, sys; p=pathlib.Path(sys.argv[1]); s=p.read_text(); q=chr(34); pattern=r"# \[\[kv_namespaces\]\]\n# binding = "+q+"APPROVALS_KV"+q+r"\n# id = "+q+"<namespace-id>"+q; replacement="[[kv_namespaces]]\nbinding = "+q+"APPROVALS_KV"+q+"\nid = "+q+os.environ["KV_ID"]+q; n=re.sub(pattern, replacement, s, count=1); p.write_text(n) if n != s else (_ for _ in ()).throw(SystemExit("commented APPROVALS_KV block not found"))'); \
@@ -961,7 +962,7 @@ hermes-drain-token:
 	  echo "[hermes-drain-token] This target handles a credential; it must not run unattended." >&2; \
 	  exit 1; \
 	}; \
-	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null); \
+	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null || true); \
 	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
 	_tok=$$(security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm -w 2>/dev/null || true); \
 	_mode=reused; \
@@ -970,7 +971,7 @@ hermes-drain-token:
 	  printf 'add-generic-password -U -a k3dm -s k3dm-hermes-approval-drain-token -w %s\n' "$$_tok" | security -i; \
 	  _mode=created; \
 	fi; \
-	_stored=$$(security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm -w 2>/dev/null); \
+	_stored=$$(security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm -w 2>/dev/null || true); \
 	[ -n "$$_stored" ] || { echo "[hermes-drain-token] ERROR: the stored item reads back empty" >&2; exit 1; }; \
 	[ "$${#_stored}" -ge 32 ] || { echo "[hermes-drain-token] ERROR: the stored item is too short" >&2; exit 1; }; \
 	if [ "$$_mode" = created ] && [ "$$_stored" != "$$_tok" ]; then echo "[hermes-drain-token] ERROR: Keychain value did not match generated token" >&2; exit 1; fi; \
@@ -982,7 +983,7 @@ hermes-drain-token:
 hermes-approvers:
 	@set -euo pipefail; \
 	printf '%s\n' "$${APPROVERS:-}" | grep -Eq '^[UW][A-Z0-9]{2,}(,[UW][A-Z0-9]{2,})*$$' || { echo "ERROR: set APPROVERS=U0123ABCD with comma-separated Slack user IDs and no spaces" >&2; exit 1; }; \
-	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null); \
+	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null || true); \
 	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
 	cd "$(RELAY_DIR)"; \
 	printf '%s' "$$APPROVERS" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put APPROVER_ALLOWLIST

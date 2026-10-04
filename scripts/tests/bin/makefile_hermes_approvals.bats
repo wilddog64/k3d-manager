@@ -117,3 +117,22 @@ EOF
   [ ! -s "${BATS_TEST_TMPDIR}/npx.log" ]
   [ ! -s "${BATS_TEST_TMPDIR}/openssl.log" ]
 }
+
+@test "hermes-approvals-kv reports a failed Cloudflare token read instead of exiting silently" {
+  printf '#!/usr/bin/env bash\nexit 44\n' >"${BATS_TEST_TMPDIR}/bin/security"
+
+  run make -f "${MAKEFILE}" RELAY_DIR="${RELAY_DIR}" hermes-approvals-kv </dev/null
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"k3dm-cloudflare-api-token missing"* ]]
+}
+
+@test "hermes-approvals-kv shows wrangler's output when namespace create fails" {
+  printf '#!/usr/bin/env bash\necho "A namespace with this title already exists"\nexit 1\n' >"${BATS_TEST_TMPDIR}/bin/npx"
+
+  run make -f "${MAKEFILE}" RELAY_DIR="${RELAY_DIR}" hermes-approvals-kv </dev/null
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"already exists"* ]]
+  [[ "${output}" == *"wrangler kv namespace create failed"* ]]
+}
