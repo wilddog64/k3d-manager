@@ -1,6 +1,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import plistlib
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -137,3 +138,14 @@ def test_commit_subject_says_app_health(monkeypatch, tmp_path):
     assert result == "pushed"
     commit = next(argv for argv in calls if "commit" in argv)
     assert "app-health" in " ".join(commit)
+
+
+def test_launchagent_template_enables_app_health_for_ubuntu_hostinger():
+    template = (ROOT / "scripts" / "etc" / "launchd" /
+                "com.k3d-manager.hermes.plist.tmpl").read_text()
+    for placeholder in ("HERMES_BIN", "K3DM_REPO_ROOT", "HERMES_LOG"):
+        template = template.replace("{{" + placeholder + "}}", "dummy")
+    plist = plistlib.loads(template.encode())
+    environment = plist["EnvironmentVariables"]
+    assert environment["K3DM_HERMES_APP_HEALTH_ENABLED"] == "1"
+    assert environment["K3DM_HERMES_APP_CONTEXT"] == "ubuntu-hostinger"

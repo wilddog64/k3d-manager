@@ -176,8 +176,10 @@ service proxy path, and actuator port. Set `K3DM_HERMES_APP_HEALTH_ENABLED=1` an
 dedicated kubeconfig. The target table is
 [`scripts/etc/hermes/app-health-targets.json`](../../scripts/etc/hermes/app-health-targets.json).
 Adding a service is a one-line target-table edit, but the operator must confirm that service's
-port from its own Deployment first. The sensor is disabled by default, uses no port-forward, and
-files only a debounced delta through the existing e2e-bugs path.
+port from its own Deployment first. The LaunchAgent template enables the sensor against
+`ubuntu-hostinger` (dry run 2026-10-04 passed); it uses no port-forward and files only a debounced delta
+through the existing e2e-bugs path. Unsetting `K3DM_HERMES_APP_HEALTH_ENABLED` in the template (then
+re-running `bin/k3dm-hermes-setup`) turns it off.
 
 ### Possible prior art
 
