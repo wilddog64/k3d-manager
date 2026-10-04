@@ -46,7 +46,7 @@ if (( _preflight_only == 0 )); then
     _preflight_fail "[hub-restore] current kube context is '${_current_context}', not '${_hub_context}' — run: kubectl config use-context ${_hub_context}"
 
   _state_base="${_ACG_STATE_BASE:-${HOME}/.local/share/k3d-manager}"
-  _root_owned_dirs="$(find "${_state_base}" -maxdepth 3 -type d -user root 2>/dev/null || true)"
+  _root_owned_dirs="$(find "${_state_base}" -maxdepth 3 -type d -user root ! -name '*.lock' 2>/dev/null || true)"
   if [[ -n "${_root_owned_dirs}" ]]; then
     printf 'ERROR: [hub-restore] root-owned state folders found:\n' >&2
     while IFS= read -r _root_dir; do

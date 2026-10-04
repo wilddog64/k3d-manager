@@ -53,7 +53,13 @@ case "${name}" in
     ;;
   curl) printf '200\n' ;;
   id) [[ "${1:-}" == "-u" ]] && printf '501\n' || printf 'tester\n' ;;
-  find) [[ "${FIND_ROOT:-0}" == "1" ]] && printf '%s\n' "${FAKE_HOME}/.local/share/k3d-manager/root-owned" ;;
+  find)
+    if [[ "${FIND_LOCK:-0}" == "1" && "${*}" != *"! -name *.lock"* ]]; then
+      printf '%s\n' "${FAKE_HOME}/.local/share/k3d-manager/logs/keycloak-browser-http.log.lock"
+    elif [[ "${FIND_ROOT:-0}" == "1" ]]; then
+      printf '%s\n' "${FAKE_HOME}/.local/share/k3d-manager/root-owned"
+    fi
+    ;;
 esac
 exit 0
 EOF
@@ -172,6 +178,13 @@ EOF
   [[ "${output}" == *"sudo chown -R"* ]]
   [[ "${output}" == *"root-owned"* ]]
   ! grep -q '^make ' "${CALL_LOG}"
+}
+
+@test "hub-restore ignores root-owned LaunchDaemon lock folders" {
+  export FIND_LOCK=1
+  run bin/hub-restore
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *"root-owned state folders found"* ]]
 }
 
 @test "Makefile documents and orders hub recovery targets" {
