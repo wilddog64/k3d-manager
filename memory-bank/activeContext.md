@@ -1,3 +1,16 @@
+# 2026-10-04 — make test 5 reds specced; lib-foundation remote-sudo marker ready for PR
+
+R3 decision (operator): explicit audit exemption, upstream-first. lib-foundation branch
+`fix/agent-audit-remote-sudo-marker`: spec `8e339cc2`, fix `5c9b631` (Codex edits; `.git` lock denied,
+Claude committed + pushed; shellcheck clean, 27/27 BATS, mutation reds test 9, cmp-restored). PR body in
+scratchpad; awaiting the operator's go. After merge: subtree pull, then the tunnel wrapper uses plain `sudo`
+with a trailing `# agent-audit: remote-sudo`.
+
+`make test` at `709aba8d`: 1336/1341. Reds 58 (8 new bare `!`, third recurrence), 197/198 + 1070 (stubs
+predate the `3b789adf` jsonpath wait), 972 (keycloak trap count pinned at 2, `d5b986f4` added a third).
+All test-only. Spec `docs/bugs/2026-10-04-v1.41.0-make-test-reds-after-sandbox-recovery-fixes.md`.
+Codex batch: R1+R2 (CRD doc) + make-test reds + app_health.
+
 # 2026-10-04 — Sandbox-recovery fixes landed; review follow-ups; app_health enable spec
 
 Codex landed `f61d3b3b` / `3b789adf` / `d49e5eb8`, Claude-verified (origin, scope, shellcheck, 61/61 BATS,
