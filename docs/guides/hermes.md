@@ -61,13 +61,13 @@ MFA at the Slack workspace or channel level. Deny dismisses only and writes no a
 may re-propose the repair. Each incident carries a random nonce, and buttons from a previous incident
 are dropped.
 
-Operator setup (document secret names only):
+Operator setup (run in Terminal.app):
 
-1. `cd workers/slack-relay && wrangler kv namespace create APPROVALS_KV`, then uncomment the binding in `wrangler.toml` with the id and commit.
-2. `wrangler secret put APPROVER_ALLOWLIST` and `wrangler secret put APPROVAL_DRAIN_TOKEN` (random, >= 32 characters).
-3. Store the same drain token in the Keychain as `k3dm-hermes-approval-drain-token` (account `k3dm`), entered via prompt, not argv: `security add-generic-password -a k3dm -s k3dm-hermes-approval-drain-token -w`.
-4. In the Slack app, enable Interactivity with Request URL `https://<relay-host>/slack/interactivity`, and register `/hermes-auth`.
-5. Add `K3DM_HERMES_APPROVAL_DRAIN_URL=https://<relay-host>/hermes/approvals` to the Hermes LaunchAgent `EnvironmentVariables`, then reload the agent.
+1. `make hermes-approvals-setup APPROVERS=<your Slack user ID>` creates and binds the KV namespace, creates or reuses the Keychain drain token and pushes it to the relay, and validates and pushes the approver allowlist.
+   `ROTATE=1 make hermes-drain-token` rotates the drain token and syncs it to the relay.
+2. Commit `workers/slack-relay/wrangler.toml` if it changed, then run `make deploy-worker`.
+3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth`.
+4. Set `K3DM_HERMES_APPROVAL_DRAIN_URL=https://<relay-host>/hermes/approvals` in the Hermes LaunchAgent `EnvironmentVariables`, then reload the agent.
 
 ## Hub Kine circuit breaker
 

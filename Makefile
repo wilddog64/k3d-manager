@@ -23,8 +23,9 @@ ARGOCD_SERVER ?= localhost:8080
 ARGOCD_SCHEME ?= http
 GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
+RELAY_DIR        ?= workers/slack-relay
 
-.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -937,6 +938,63 @@ argocd-hermes-token:
 	else \
 	  echo "[argocd-hermes-token] NOTE: the Hermes agent is not loaded; nothing to restart"; \
 	fi
+
+## Create and bind the Hermes Slack-approval KV namespace (commit wrangler.toml afterward)
+hermes-approvals-kv:
+	@set -euo pipefail; \
+	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null); \
+	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
+	if grep -Eq '^[[:space:]]*binding[[:space:]]*=[[:space:]]*"APPROVALS_KV"' "$(RELAY_DIR)/wrangler.toml"; then \
+	  echo "[hermes-approvals-kv] APPROVALS_KV already bound in wrangler.toml — nothing to do"; exit 0; \
+	fi; \
+	_out=$$(cd "$(RELAY_DIR)" && CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler kv namespace create APPROVALS_KV </dev/null 2>&1); \
+	_id=$$(printf '%s\n' "$$_out" | grep -oE '[0-9a-f]{32}' | head -1 || true); \
+	[ -n "$$_id" ] || { printf '%s\n' "$$_out" >&2; echo "[hermes-approvals-kv] ERROR: wrangler did not return a namespace id" >&2; exit 1; }; \
+	KV_ID="$$_id" python3 - "$(RELAY_DIR)/wrangler.toml" < <(printf '%s\n' 'import os, pathlib, re, sys; p=pathlib.Path(sys.argv[1]); s=p.read_text(); q=chr(34); pattern=r"# \[\[kv_namespaces\]\]\n# binding = "+q+"APPROVALS_KV"+q+r"\n# id = "+q+"<namespace-id>"+q; replacement="[[kv_namespaces]]\nbinding = "+q+"APPROVALS_KV"+q+"\nid = "+q+os.environ["KV_ID"]+q; n=re.sub(pattern, replacement, s, count=1); p.write_text(n) if n != s else (_ for _ in ()).throw(SystemExit("commented APPROVALS_KV block not found"))'); \
+	echo "[hermes-approvals-kv] bound APPROVALS_KV ($$_id). Commit $(RELAY_DIR)/wrangler.toml, then run: make deploy-worker"
+
+## Create or reuse the Hermes Slack-approval drain token and push it to the relay
+hermes-drain-token:
+	@set -euo pipefail; \
+	[ -t 0 ] || { \
+	  echo "[hermes-drain-token] ERROR: refusing to run without a terminal." >&2; \
+	  echo "[hermes-drain-token] This target handles a credential; it must not run unattended." >&2; \
+	  exit 1; \
+	}; \
+	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null); \
+	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
+	_tok=$$(security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm -w 2>/dev/null || true); \
+	_mode=reused; \
+	if [ "$${ROTATE:-0}" = 1 ] || [ -z "$$_tok" ]; then \
+	  _tok=$$(openssl rand -hex 32); \
+	  printf 'add-generic-password -U -a k3dm -s k3dm-hermes-approval-drain-token -w %s\n' "$$_tok" | security -i; \
+	  _mode=created; \
+	fi; \
+	_stored=$$(security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm -w 2>/dev/null); \
+	[ -n "$$_stored" ] || { echo "[hermes-drain-token] ERROR: the stored item reads back empty" >&2; exit 1; }; \
+	[ "$${#_stored}" -ge 32 ] || { echo "[hermes-drain-token] ERROR: the stored item is too short" >&2; exit 1; }; \
+	if [ "$$_mode" = created ] && [ "$$_stored" != "$$_tok" ]; then echo "[hermes-drain-token] ERROR: Keychain value did not match generated token" >&2; exit 1; fi; \
+	cd "$(RELAY_DIR)"; \
+	printf '%s' "$$_stored" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put APPROVAL_DRAIN_TOKEN; \
+	echo "[hermes-drain-token] drain token stored in Keychain and pushed to the relay ($$_mode)"
+
+## Set the Hermes Slack-approval approver allowlist
+hermes-approvers:
+	@set -euo pipefail; \
+	printf '%s\n' "$${APPROVERS:-}" | grep -Eq '^[UW][A-Z0-9]{2,}(,[UW][A-Z0-9]{2,})*$$' || { echo "ERROR: set APPROVERS=U0123ABCD with comma-separated Slack user IDs and no spaces" >&2; exit 1; }; \
+	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null); \
+	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
+	cd "$(RELAY_DIR)"; \
+	printf '%s' "$$APPROVERS" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put APPROVER_ALLOWLIST
+
+## Configure all Hermes Slack-approval credentials and report the remaining manual steps
+hermes-approvals-setup:
+	@set -euo pipefail; \
+	[ -n "$${APPROVERS:-}" ] || { echo "ERROR: set APPROVERS=U0123ABCD before running hermes-approvals-setup" >&2; exit 1; }; \
+	$(MAKE) --no-print-directory hermes-approvals-kv; \
+	$(MAKE) --no-print-directory hermes-drain-token; \
+	$(MAKE) --no-print-directory hermes-approvers APPROVERS="$$APPROVERS"; \
+	echo "[hermes-approvals-setup] Commit wrangler.toml if it changed; run make deploy-worker; turn on Slack Interactivity with Request URL https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity and register /hermes-auth; set K3DM_HERMES_APPROVAL_DRAIN_URL"
 
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:

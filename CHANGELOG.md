@@ -7,6 +7,11 @@
 - `make hub-restore` / `make hub-recover` restore rebuilt Hub credentials and local agents from one
   GUI-backed Terminal session.
 
+- Added `make hermes-approvals-kv`, `make hermes-drain-token`, `make hermes-approvers`, and
+  `make hermes-approvals-setup` for opt-in Slack approvals. The drain token reaches `security`
+  through `security -i` stdin, never argv; it is read back and compared before being pushed, and
+  the approver allowlist is validated before Cloudflare credentials are read.
+
 - `make up CLUSTER_PROVIDER=k3d` and `make hub-up` now rebuild the local hub only.
 
 - Cloud bridge throughput: slow health calls run off the polling loop, and queued Make jobs are followed to `.final.json` responses with artifacts.
