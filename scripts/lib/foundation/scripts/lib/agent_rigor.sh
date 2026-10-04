@@ -134,7 +134,8 @@ _agent_audit() {
             | sed 's/^+//' \
             | grep -E '\bsudo[[:space:]]' \
             | grep -Ev '^[[:space:]]*#' \
-            | grep -Ev '^[[:space:]]*_run_command\b' || true)
+            | grep -Ev '^[[:space:]]*_run_command\b' \
+            | grep -Ev '#[[:space:]]*agent-audit:[[:space:]]*remote-sudo[[:space:]]*$' || true)
          if [[ -n "$bare_sudo" ]]; then
             _warn "Agent audit: bare sudo call in $file (use _run_command --prefer-sudo):"
             _warn "$bare_sudo"

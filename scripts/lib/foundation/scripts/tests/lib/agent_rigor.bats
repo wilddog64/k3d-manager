@@ -109,6 +109,41 @@ SCRIPT
   [[ "$output" == *"bare sudo call"* ]]
 }
 
+@test "_agent_audit allows sudo marked agent-audit: remote-sudo" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/remote.sh
+function action() {
+   echo ok
+}
+SCRIPT
+  git add scripts/remote.sh
+  git commit -m "add remote action" >/dev/null
+  cat <<'SCRIPT' >> scripts/remote.sh
+   ssh host "sudo fuser -k -n tcp 8200" # agent-audit: remote-sudo
+SCRIPT
+  git add scripts/remote.sh
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit still flags sudo when the marker is not the trailing comment" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/non_trailing.sh
+function action() {
+   echo ok
+}
+SCRIPT
+  git add scripts/non_trailing.sh
+  git commit -m "add non-trailing action" >/dev/null
+  cat <<'SCRIPT' >> scripts/non_trailing.sh
+   sudo rm -rf /tmp/x # agent-audit: remote-sudo then more
+SCRIPT
+  git add scripts/non_trailing.sh
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"bare sudo call"* ]]
+}
+
 @test "_agent_audit ignores _run_command sudo usage" {
   mkdir -p scripts
   cat <<'SCRIPT' > scripts/run_cmd.sh

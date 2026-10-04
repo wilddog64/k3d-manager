@@ -46,6 +46,36 @@ module directory, and uses `npm ci` from `package-lock.json` when you want to ru
 - When reviewing changes under `scripts/lib/acg/playwright/**/*.js`, keep the Playwright helpers and
   fixtures isolated from the core Bash library.
 
+### Session-check contract
+
+`acg_session_check.js` is the unattended-login gate. It reports which path produced an
+authenticated browser and never prints a credential value:
+
+| Marker | Meaning |
+|---|---|
+| `ACG_SESSION_OK path=existing-session` | already authenticated; no login attempted |
+| `ACG_SESSION_OK path=auto-login` | signed in unattended during this run |
+| `ACG_SESSION_OK path=manual-login` | a human signed in interactively during this run; only reachable when `K3DM_NONINTERACTIVE` is unset **and** stdout is a TTY, so it never occurs in CI or an unattended gate |
+| `ACG_CREDENTIALS: username=… password=…` | store health only — `present`, `empty` or `absent` |
+| `ACG_CREDENTIALS_REQUIRED` | store unusable while `K3DM_ACG_REQUIRE_CREDENTIALS=1` |
+| `ACG_LOGIN_FIELDS_MISSING` | the sign-in form did not yield both fields |
+| `ACG_LOGIN_MFA_REQUIRED` | MFA challenge detected and deliberately refused |
+| `ACG_SESSION_EXPIRED` | unauthenticated; unattended login unavailable |
+
+The `path=` suffix is load-bearing for callers that need to prove auto-login itself works:
+without it, a run that merely reused a human's leftover browser session was indistinguishable
+from a successful unattended login, which is how headless auto-login stayed broken while the
+gate reported success. The three values above are the complete set emitted by
+`acg_session_check.js` — a caller matching on `path=` should treat an unrecognized value as a
+failure rather than as success, and a gate that must prove *unattended* login should accept
+`auto-login` alone.
+
+`K3DM_ACG_REQUIRE_CREDENTIALS=1` makes the check **fail closed** — it exits on
+`ACG_CREDENTIALS_REQUIRED` when the credential store is unusable instead of falling back to a
+pre-existing session. The default (unset) behavior is unchanged and still allows that fallback.
+Consumers running the check as an acceptance gate should set it; interactive use generally
+should not.
+
 ## Key Contracts
 
 ### `_run_command` (system.sh)

@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Changed
+- `_agent_audit`: accept a trailing `# agent-audit: remote-sudo` marker for privileged commands
+  that run on another host, where `_run_command` cannot apply; any other comment does not exempt
+  a line from the bare-sudo audit.
+- `README.md`, `docs/api/acg.md`: document the session-check contract that shipped **in**
+  v0.4.18 but was described nowhere — the marker table, why `ACG_SESSION_OK` carries a
+  `path=` suffix (without it a reused human session was indistinguishable from a working
+  unattended login, which is how headless auto-login stayed broken while the gate reported
+  success), and `K3DM_ACG_REQUIRE_CREDENTIALS=1` as the fail-closed credential gate whose
+  default-unset behavior preserves the pre-existing-session fallback. Also records the two
+  selector facts behind the v0.4.18 login fix: CSS attribute **values** are case-sensitive
+  while **names** are not, and Playwright's own CSS parser means a
+  `document.querySelectorAll` check proves nothing about `page.locator()`.
+- `docs/retro/2026-09-24-v0.4.18-retrospective.md`: v0.4.18 close-out retrospective.
+
 ## [v0.4.18] — 2026-09-24
 
 ### Changed
