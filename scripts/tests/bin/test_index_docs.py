@@ -309,6 +309,26 @@ class TestEmbeddingCache:
         assert ix.main(["--limit", "1"]) == 0
         assert calls == [["b"]]
 
+    def test_limit_counts_only_cache_misses(self, monkeypatch, capsys):
+        docs = [_doc(n) for n in ("one", "two", "three", "four", "five")]
+        cache = EmbedCache()
+        cache.put_many(
+            (cache_key(ix.EMBED_MODEL, ix.EMBED_DIM, "RETRIEVAL_DOCUMENT", docs[index][2]),
+             [float(index)] * pa.EMBED_DIM)
+            for index in (0, 1, 2)
+        )
+        calls = []
+        writes = []
+        self._configure(monkeypatch, docs, writes,
+                        lambda texts, task_type=None: calls.append(texts) or _vectors(len(texts)))
+        assert ix.main(["--limit", "1"]) == 0
+        upserts = [sql for sql in writes if "staging" in sql]
+        written_paths = [line.split("\t", 1)[0] for line in upserts[0].splitlines()
+                         if line.startswith("docs/")]
+        assert len(written_paths) == 4
+        assert calls and len(calls) == 1 and len(calls[0]) == 1
+        assert "1 remaining" in capsys.readouterr().out
+
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__]))

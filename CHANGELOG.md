@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Hermes now re-indexes a rebuilt vector store from the embedding cache and reports cache reloads
+  separately from embeddings API calls.
+
 ### Added
 
 - `make hub-restore` / `make hub-recover` restore rebuilt Hub credentials and local agents from one

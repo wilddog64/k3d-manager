@@ -74,5 +74,6 @@ what is deployed, the credential resolution order, and why losing the volume cos
 
 ### Hub rebuilt?
 
-`make index-docs` reloads vectors from the local cache with no embeddings quota spent. The summary
-line shows `from cache`; deleting `~/.cache/k3dm/embeddings.sqlite` only costs re-embedding.
+Hermes notices an empty store and re-indexes it on its own within one poll. With the local cache,
+that reload costs no embeddings quota, and the vectordb dashboard shows the restored documents as
+`from cache`; deleting `~/.cache/k3dm/embeddings.sqlite` only costs re-embedding.

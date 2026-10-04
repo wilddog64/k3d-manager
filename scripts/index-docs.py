@@ -106,7 +106,7 @@ def main(argv=None):
     parser.add_argument("--dry-run", action="store_true",
                         help="report what would change without calling the embeddings API")
     parser.add_argument("--limit", type=int, default=0,
-                        help="embed at most N changed documents (0 = no limit)")
+                        help="embed at most N uncached documents (0 = no limit)")
     parser.add_argument("--quiet", action="store_true", help="only print the summary line")
     parser.add_argument("--ref", default=None, help="git ref to read instead of the working tree")
     args = parser.parse_args(argv)
@@ -135,19 +135,26 @@ def main(argv=None):
         return 0
 
     changed_total = len(changed)
-    if args.limit > 0:
-        changed = changed[: args.limit]
 
     written = 0
     from_cache = 0
     embedded = 0
+    misses_remaining = args.limit if args.limit > 0 else None
     cache = EmbedCache()
     try:
         for start in range(0, len(changed), EMBED_BATCH):
             batch = changed[start:start + EMBED_BATCH]
             keys = [cache_key(EMBED_MODEL, EMBED_DIM, "RETRIEVAL_DOCUMENT", doc[2]) for doc in batch]
             cached = cache.get_many(keys)
-            missing = [(index, doc, key) for index, (doc, key) in enumerate(zip(batch, keys)) if key not in cached]
+            missing = [(index, doc, key) for index, (doc, key) in enumerate(zip(batch, keys))
+                       if key not in cached]
+            if misses_remaining is not None:
+                allowed = missing[:misses_remaining]
+                skipped = {key for _index, _doc, key in missing[len(allowed):]}
+                missing = allowed
+                misses_remaining -= len(missing)
+            else:
+                skipped = set()
             new_vectors = {}
             if missing:
                 vectors = embed_batch([doc[2] for _index, doc, _key in missing], task_type="RETRIEVAL_DOCUMENT")
@@ -157,9 +164,12 @@ def main(argv=None):
             from_cache += len(cached)
             rows = []
             for doc, key in zip(batch, keys):
+                if key in skipped:
+                    continue
                 vector = cached[key] if key in cached else new_vectors[key]
                 rows.append((doc[0], doc[1], doc[3], vector))
-            run_sql(_upsert_script(rows))
+            if rows:
+                run_sql(_upsert_script(rows))
             written += len(rows)
             if not args.quiet:
                 print(f"index-docs: committed {written}/{len(changed)} ({from_cache} from cache)", file=sys.stderr)

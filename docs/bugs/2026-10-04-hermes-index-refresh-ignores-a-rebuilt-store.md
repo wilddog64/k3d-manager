@@ -2,8 +2,8 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. Depends on `2026-10-04-index-docs-rebuild-after-hub-loss-costs-a-day-of-quota.md`
-(the `from cache` summary), which must land first.
+**Status:** FIXED — re-index commit, 2026-10-04. (Depended on `2026-10-04-index-docs-rebuild-after-hub-loss-costs-a-day-of-quota.md`
+(the `from cache` summary).)
 **Severity:** medium for recovery. After a hub rebuild, `find-similar-docs` stays empty until a corpus doc
 changes.
 

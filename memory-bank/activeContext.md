@@ -8254,4 +8254,5 @@ clean; all three mutations were red and restored green.
 - 2026-10-04: queued spec for a second copy of the embedding cache (backup/restore targets); dispatch after the embed-cache Codex task is verified.
 - 2026-10-04: folded integrity metadata/stats/prune into the second-copy spec (not into the in-flight Codex run).
 - 2026-10-04: Grafana question → found Hermes never re-indexes a rebuilt store; spec filed; queue: embed-cache (Codex running) → this → second-copy/metadata.
+- 2026-10-04: re-index + dashboard verified and committed (Codex + 2 Claude fixes). Next: dispatch `docs/bugs/2026-10-04-embedding-cache-has-no-second-copy.md` to Codex.
 - 2026-10-04: embed-cache verified + committed. Next dispatch: hermes-index-refresh-ignores-a-rebuilt-store, then embedding-cache-has-no-second-copy.
