@@ -2,8 +2,10 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. Depends on `2026-10-04-index-docs-rebuild-after-hub-loss-costs-a-day-of-quota.md`
-(`scripts/lib/hermes/embed_cache.py`), which must land first.
+**Status:** FIXED — second-copy commit, 2026-10-04. Claude's verification also fixed a spec defect:
+as written, `prune` treated a NULL `last_used_at` as unused and `restore` copied only `key` and
+`vector`, so the first `make embed-cache-prune` would have deleted every v1 or restored row. The
+migration now stamps missing timestamps, and restore copies the metadata columns.
 **Severity:** low. The cache can be rebuilt, so losing it costs quota and time, not data.
 
 ## Observed

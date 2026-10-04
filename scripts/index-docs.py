@@ -145,7 +145,7 @@ def main(argv=None):
         for start in range(0, len(changed), EMBED_BATCH):
             batch = changed[start:start + EMBED_BATCH]
             keys = [cache_key(EMBED_MODEL, EMBED_DIM, "RETRIEVAL_DOCUMENT", doc[2]) for doc in batch]
-            cached = cache.get_many(keys)
+            cached = cache.get_many(keys, EMBED_MODEL, EMBED_DIM, "RETRIEVAL_DOCUMENT")
             missing = [(index, doc, key) for index, (doc, key) in enumerate(zip(batch, keys))
                        if key not in cached]
             if misses_remaining is not None:
@@ -160,7 +160,19 @@ def main(argv=None):
                 vectors = embed_batch([doc[2] for _index, doc, _key in missing], task_type="RETRIEVAL_DOCUMENT")
                 embedded += len(vectors)
                 new_vectors = {key: vector for (_index, _doc, key), vector in zip(missing, vectors)}
-                cache.put_many(new_vectors.items())
+                cache.put_many(
+                    (
+                        key,
+                        vector,
+                        {
+                            "model": EMBED_MODEL,
+                            "dim": EMBED_DIM,
+                            "task_type": "RETRIEVAL_DOCUMENT",
+                            "content_hash": doc[3],
+                        },
+                    )
+                    for (_index, doc, key), vector in zip(missing, vectors)
+                )
             from_cache += len(cached)
             rows = []
             for doc, key in zip(batch, keys):

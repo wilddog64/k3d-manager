@@ -77,3 +77,11 @@ what is deployed, the credential resolution order, and why losing the volume cos
 Hermes notices an empty store and re-indexes it on its own within one poll. With the local cache,
 that reload costs no embeddings quota, and the vectordb dashboard shows the restored documents as
 `from cache`; deleting `~/.cache/k3dm/embeddings.sqlite` only costs re-embedding.
+
+Second copy: the layers are git docs → embedding cache → pgvector, and each layer can be rebuilt
+from the one before it. Use `make embed-cache-stats` to inspect the cache and
+`make embed-cache-prune` to remove old vectors. After a large index run, copy it to a second
+location with `make embed-cache-backup DEST=…`, such as an M2 share or synced folder. On a fresh or
+rebuilt Mac, run `make embed-cache-restore SRC=…` before `make index-docs`; restore merges by
+content hash and is safe to repeat. Time Machine already covers `~/.cache` unless it is excluded;
+check that with `tmutil isexcluded`.

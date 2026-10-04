@@ -9,6 +9,13 @@
 
 ### Added
 
+- Added `make embed-cache-backup` and `make embed-cache-restore`. Backups use a consistent SQLite
+  snapshot and atomic replacement; restores merge by content hash and never overwrite existing vectors.
+  The cache now records model, dimension, task type, content hash and last use (schema v2), rejects
+  incompatible rows on read, and `make embed-cache-stats` / `make embed-cache-prune` show and trim it.
+  Prune deletes only vectors that are both stale and unused for 90 days; rows carried over from v1 or
+  from a restore are stamped on arrival, so the first prune cannot empty an existing cache.
+
 - `make hub-restore` / `make hub-recover` restore rebuilt Hub credentials and local agents from one
   GUI-backed Terminal session.
 
