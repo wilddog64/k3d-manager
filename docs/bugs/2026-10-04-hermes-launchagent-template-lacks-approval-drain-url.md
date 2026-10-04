@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN
+**Status:** FIXED — drain-URL commit, 2026-10-04.
 **Severity:** low. Slack approvals silently stop working after any Hermes reinstall.
 
 ## Observed

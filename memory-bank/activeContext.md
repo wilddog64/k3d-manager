@@ -8250,3 +8250,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-04: operator did deploy-worker + Slack Interactivity//hermes-auth. Gave PlistBuddy Add of K3DM_HERMES_APPROVAL_DRAIN_URL=https://k3dm-slack-relay.k3dm.workers.dev/hermes/approvals to installed plist + bootout/bootstrap; lost on Hermes reinstall until template spec lands.
 - 2026-10-04: drain URL set by hand + verified. Spec filed to put it in the LaunchAgent template (opt-in = drain token present); Codex dispatched.
 - 2026-10-04: spec filed for index-docs local embedding cache; Codex dispatch queued behind the drain-URL task (same working tree).
+- 2026-10-04: drain-URL template change verified + committed; index-docs cache spec now dispatching to Codex.

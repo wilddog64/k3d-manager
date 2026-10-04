@@ -594,6 +594,8 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
         state["status_last_run"] = now
     relay = _keychain_secret("k3dm-slack-webhook")
     drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
+    if drain_url and not _keychain_secret(APPROVAL_DRAIN_SERVICE):
+        drain_url = ""
     if event:
         if drain_url and event.get("proposals"):
             blocks = interactive_blocks(event["text"], event["proposals"], event["nonce"])

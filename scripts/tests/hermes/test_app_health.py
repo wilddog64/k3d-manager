@@ -149,3 +149,4 @@ def test_launchagent_template_enables_app_health_for_ubuntu_hostinger():
     environment = plist["EnvironmentVariables"]
     assert environment["K3DM_HERMES_APP_HEALTH_ENABLED"] == "1"
     assert environment["K3DM_HERMES_APP_CONTEXT"] == "ubuntu-hostinger"
+    assert environment["K3DM_HERMES_APPROVAL_DRAIN_URL"] == "https://k3dm-slack-relay.k3dm.workers.dev/hermes/approvals"

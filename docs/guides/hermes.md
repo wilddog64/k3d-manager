@@ -67,7 +67,7 @@ Operator setup (run in Terminal.app):
    `ROTATE=1 make hermes-drain-token` rotates the drain token and syncs it to the relay.
 2. Commit `workers/slack-relay/wrangler.toml` if it changed, then run `make deploy-worker`.
 3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth`.
-4. Set `K3DM_HERMES_APPROVAL_DRAIN_URL=https://<relay-host>/hermes/approvals` in the Hermes LaunchAgent `EnvironmentVariables`, then reload the agent.
+4. The LaunchAgent template sets `K3DM_HERMES_APPROVAL_DRAIN_URL`. Approvals turn on once the drain token is in the Keychain (step 1). Run `bin/k3dm-hermes-setup` to re-render the agent after pulling this change.
 
 `APPROVERS` takes Slack member IDs, not emails: comma-separated with no spaces, each beginning with `U` or `W`.
 To find one in Slack, open a profile, click ⋮ (More), then **Copy member ID**.
@@ -393,7 +393,7 @@ align to a hard boundary.
 | `K3DM_HERMES_LLM_DAILY_BUDGET` | `10` | Max LLM calls per day before template fallback |
 | `K3DM_HERMES_JITTER` | (unset) | When set, sleep 0–30s before sensing |
 | `K3DM_HERMES_AUDIT_RUN_BATS` | (unset) | When `1`, the monthly audit runs the webhook security-regression bats subset (Group B); otherwise reported "skipped" |
-| `K3DM_HERMES_APPROVAL_DRAIN_URL` | (unset) | Opt-in Slack approvals: relay drain URL (https). Unset = no buttons, no drain |
+| `K3DM_HERMES_APPROVAL_DRAIN_URL` | `https://k3dm-slack-relay.k3dm.workers.dev/hermes/approvals` (template) | Relay drain URL. Approvals are active only when Keychain `k3dm-hermes-approval-drain-token` also exists. |
 | `K3DM_HERMES_SMS_DAILY_BUDGET` | `10` | Max SMS pages per UTC day |
 | `K3DM_HERMES_E2E_ENABLED` | (enabled) | Set to `0` to disable scheduled E2E dispatch |
 | `K3DM_HERMES_E2E_SCHEDULE` | `wed,sat@02:00` | Strict local-time E2E schedule |

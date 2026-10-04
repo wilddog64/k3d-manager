@@ -47,6 +47,7 @@
 
 ### Fixed
 
+- The LaunchAgent template now carries the Hermes approval drain URL, so a reinstall no longer turns approvals off; the opt-in is now the Keychain drain token, which also stops buttons appearing that cannot do anything.
 - `make alertmanager-secret` now backs up the Gmail app password in the Keychain for Hub restores.
 
 - Webhook cluster jobs now have hard deadlines, and sandbox `make up` fails fast when the server node does not answer SSH.

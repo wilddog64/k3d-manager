@@ -90,6 +90,48 @@ def test_post_interactive_posts_blocks_and_empty_relay_fails():
     assert not post_interactive("", "hello", blocks, fake_opener(calls))
 
 
+def _stub_approval_poll(monkeypatch, tmp_path, token):
+    from hermes import audit
+    monkeypatch.setenv("K3DM_HERMES_APPROVAL_DRAIN_URL", "https://drain")
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret",
+                        lambda service: token if service == k3dm_hermes.APPROVAL_DRAIN_SERVICE else "relay")
+    monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_status_due", lambda *_: False)
+    monkeypatch.setattr(k3dm_hermes, "_run_cycle", lambda *_: ([], {
+        "text": "proposal", "proposals": [{"action_id": "r2-0123abcd", "name": "repair", "blast_radius": "low"}],
+        "nonce": "0123456789abcdef"}))
+    interactive = []
+    monkeypatch.setattr(k3dm_hermes, "post_interactive", lambda *_: interactive.append(True) or True)
+    summaries = []
+    monkeypatch.setattr(k3dm_hermes, "post_summary", lambda *_args: summaries.append(True))
+    fetched = []
+    monkeypatch.setattr(k3dm_hermes, "fetch_approvals", lambda *_args: fetched.append(True) or [])
+    monkeypatch.setattr(k3dm_hermes, "token_expiry_advisory", lambda *_args, **_kw: None)
+    monkeypatch.setattr(audit, "monthly_audit_advisory", lambda *_args, **_kw: None)
+    monkeypatch.setattr(k3dm_hermes.pager, "health_events", lambda *_: [])
+    monkeypatch.setattr(k3dm_hermes.pager, "security_events", lambda *_: [])
+    monkeypatch.setattr(k3dm_hermes.pager, "job_events", lambda *_: [])
+    monkeypatch.setattr(k3dm_hermes, "_page", lambda *_: [])
+    monkeypatch.setattr(k3dm_hermes, "_file_app_health_bugs", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_save_state", lambda *_: None)
+    k3dm_hermes._poll({}, tmp_path / "state.json", now=1000)
+    return interactive, summaries, fetched
+
+
+def test_poll_with_drain_url_but_no_token_posts_summary_without_buttons(monkeypatch, tmp_path):
+    interactive, summaries, fetched = _stub_approval_poll(monkeypatch, tmp_path, "")
+    assert interactive == [] and summaries == [True] and fetched == []
+
+
+def test_poll_with_drain_token_posts_interactive_buttons(monkeypatch, tmp_path):
+    interactive, summaries, _fetched = _stub_approval_poll(monkeypatch, tmp_path, "t" * 64)
+    assert interactive == [True]
+    assert summaries == []
+
+
 def test_drain_empty_url_does_not_read_keychain(monkeypatch):
     monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_args: (_ for _ in ()).throw(AssertionError()))
     assert k3dm_hermes._drain_approvals({}, "relay", "") == []
