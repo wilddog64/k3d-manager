@@ -205,3 +205,12 @@ Step 3 calls `tunnel_start`, which migrates the agent automatically. To migrate 
 without `make up`, run:
 `./scripts/k3d-manager tunnel_start`
 Then confirm both `launchctl list | grep ssh-tunnel` and `nc -z localhost 6443`.
+
+## Review follow-up R3 (Claude, 2026-10-04, on `d49e5eb8`)
+
+The wrapper writes `"su""do"` so that the pre-commit bare-sudo audit misses the remote `fuser`. Root is
+genuinely needed there: the sandbox's 8200 listener belongs to a non-dumpable `sshd`. The operator
+chose an explicit audit exemption, built upstream first in lib-foundation PR #57 (`44e7e8d`). The
+tunnel change is Commit 2 of
+[`2026-10-04-pre-commit-hook-loads-stale-local-agent-rigor-fork.md`](2026-10-04-pre-commit-hook-loads-stale-local-agent-rigor-fork.md),
+because k3d-manager's hook did not load the upstream library until Commit 1 of that spec.
