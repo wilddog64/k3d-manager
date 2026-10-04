@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. Fix `22cecd0e` (Codex edits, Claude-verified and committed). Live check on the next `make up`.
+**Status:** CLOSED 2026-10-04. Fix `22cecd0e` (Codex edits, Claude-verified and committed), live-verified on the `make up` of 2026-10-04 (see Live verification results).
 **Severity:** low. The warning is a false alarm while the earlier tunnel lives. A half-dead
 earlier tunnel is never replaced, which would leave JWT auth from the app cluster broken.
 
@@ -104,3 +104,10 @@ Leave the rest of the step (sysctl, iptables, CoreDNS) unchanged.
 
 - A rerun on a reused stack prints `Keycloak reverse tunnel already active on ubuntu:18080 — skipping`.
 - `ssh ubuntu curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/` is not `000`.
+
+## Live verification results (2026-10-04, `make up` rerun on the reused stack)
+
+- 10g.5 printed `Keycloak reverse tunnel already active on ubuntu:18080 — skipping`; no
+  `reverse tunnel setup failed` warning.
+- `ssh ubuntu curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/` returned `404`
+  (Keycloak answered through the tunnel), not `000`.

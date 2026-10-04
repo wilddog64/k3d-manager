@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. The live hub bind was repaired by the operator on 2026-10-04. Code fix `cc81df52` (Codex; Claude-verified). Live check on the next sandbox `make up`.
+**Status:** CLOSED 2026-10-04. Code fix `cc81df52` (Codex; Claude-verified), live-verified on the sandbox `make up` of 2026-10-04 (see Live verification results).
 **Parent:** `docs/bugs/2026-10-03-cluster-up-keycloak-ldap-component-lookup-picks-a-mapper.md`,
 section "Live verification 2026-10-04".
 **Severity:** high. Every `make up` breaks LDAP-backed SSO on the hub (LDAP error 49), and the
@@ -172,3 +172,12 @@ New:
   `LDAP group sync complete`.
 - The read-only `testLDAPConnection action=testAuthentication` exits 0 after the run.
 - The Keycloak log has no `error code 49` after the run.
+
+## Live verification results (2026-10-04, sandbox `make up` rerun)
+
+- 10d.6 printed `LDAP federation bind credential reconciled and full sync triggered`; 10d.7 printed
+  `LDAP group sync complete`. Keycloak logged the full sync at 02:27:41Z: 5 users updated, no bind error.
+- Read-only `testLDAPConnection action=testAuthentication` against component
+  `a5a37610-…` (`cn=ldap-admin,dc=home,dc=org` @ `openldap.identity.svc.cluster.local:389`), with the
+  stored credential: rc 0.
+- `error code 49` in the Keycloak log: 8 hits, all at or before 02:05:02Z, which predates this run. None after the reconcile.
