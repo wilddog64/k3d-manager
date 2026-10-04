@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-03, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. Needs a repro on the next sandbox `make up` before a fix is specified.
+**Status:** OPEN. The fault persists on the same sandbox five hours later, and since `82fe2218` it makes `make up` exit 2 at Step 14 (see "Recurrence 2026-10-04")
 **Severity:** medium. The hub's `federate-acg` target is down for the whole sandbox lifetime, so
 `TargetDown` fires and no sandbox metrics reach the hub. `make up` exits 0 and does not notice.
 
@@ -64,3 +64,21 @@ whichever fix the checks above choose.
 None is needed for the hub. The sandbox expires at 4 h. If sandbox metrics are needed during a
 sandbox lifetime, ask the operator to restart k3s on the sandbox server node, then run a manual
 sync of `acg-kube-prometheus-stack`.
+
+## Recurrence 2026-10-04 (same sandbox, reused by `make up` at about 01:55 UTC)
+
+- `make up` failed at Step 14 (exit 2):
+  `ERROR: [observability] PrometheusRule CRD not established on ubuntu-k3s after waiting`.
+- The CRD **is** `Established=True`. But on the sandbox,
+  `kubectl wait --for=condition=Established crd/<any monitoring CRD>` **times out**: both
+  `prometheusrules` and `servicemonitors` do. On the hub, the same command against
+  `prometheusrules` returns immediately. `kubectl wait` on sandbox **nodes** works, and the sandbox
+  apiserver is the same version as the hub's (v1.32.0+k3s1), with client v1.37.1.
+- `kubectl get crd <name> -w` prints the initial row and then nothing.
+- Discovery now lists `prometheusrules`, but `prometheuses`, `prometheusagents`, `scrapeconfigs` and
+  `thanosrulers` are still missing.
+- This sharpens the hypothesis. The sandbox apiserver's **CRD watch / apiextensions informer is
+  stuck**, not just discovery. That would explain both the discovery gap and the `kubectl wait`
+  hang, and it points at a k3s server restart as the recovery step.
+- `_observability_wait_for_prometheusrule_crd` (added in `82fe2218`) relies on `kubectl wait`.
+  A plain `get` of `.status.conditions` would not depend on the watch.

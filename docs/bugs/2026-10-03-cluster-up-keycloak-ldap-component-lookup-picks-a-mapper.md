@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-03, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN — code fix `fd3616fd` (cluster-up selects the provider by type, deletes the stray mapper, sets attributes.frontendUrl); live check on the next sandbox `make up`
+**Status:** OPEN. Code fix `fd3616fd` passed live for F1, F3 and F4. F2 exposed a wrong password source, which now breaks LDAP binds; see "Live verification 2026-10-04" below
 **Severity:** medium. SSO works today only because `hub_recovery_reconcile` (the smoke path)
 repairs what `make up` gets wrong. Every `make up` prints three SSO warnings that look like an
 outage. It also leaves a stray Keycloak component behind, and that component throws an NPE
@@ -181,3 +181,44 @@ available in that context. If `_curl` is not defined there, stop and report; do 
 
 None is needed for logins. The real provider binds and syncs, and the issuer is correct after
 `hub_recovery_reconcile`. The stray mapper only adds an NPE to the log on each 10d.7 sync.
+
+## Live verification 2026-10-04 (sandbox `make up` at 01:53 UTC, same sandbox, reused)
+
+| Check | Result |
+|---|---|
+| F4 frontendUrl | PASS. `Keycloak frontendUrl set to https://keycloak.3ai-talk.org`, with no WARN |
+| F1 provider lookup | PASS. 10d.6 targeted `a5a37610`, the `ldap` provider. Neither password is in argv (checked with `ps`) |
+| F3 stray mapper | PASS. A single `group-mapper`, `b7eb43f7`, with parent `a5a37610`. `9233ebab` is gone |
+| No `ldapProvider is null` | PASS |
+| 10d.6 / 10d.7 WARNs | **FAIL**. Both still WARN, and for a new reason: LDAP error 49 |
+
+### Regression: 10d.6 now writes the wrong bind password to the real provider
+
+- The Keycloak log at 01:53:42 shows the 10d.7 group sync failing with
+  `javax.naming.AuthenticationException: [LDAP: error code 49 - Invalid Credentials]`. The last good
+  provider sync was at 00:38:29.
+- A read-only `testLDAPConnection action=testAuthentication` against the **stored** credential
+  returns `AuthenticationFailure`. LDAP-backed SSO login is broken on the hub until the credential is repaired.
+- **Cause.** 10d.6 sends `_ldap_admin_pass`, which `shopping_cart_seed_sandbox_vault_kv` sets from
+  Vault `secret/ldap/admin.admin_password`. That is the password of the shopping-cart `ldap`
+  Deployment (Secret `ldap-secrets`, 31 bytes). The provider binds
+  `cn=ldap-admin,dc=home,dc=org` at `ldap://openldap.identity.svc.cluster.local:389`, which is the
+  `openldap-0` StatefulSet. Its password lives in Secret `identity/openldap-admin` key
+  `LDAP_ADMIN_PASSWORD` (48 bytes). That is the source `keycloak_provision_shopping_cart_realm` already uses.
+- Before `fd3616fd` the wrong value never reached the provider, because the update was sent to a
+  mapper and rejected. The lookup bug was hiding this one.
+- The realm-import `sed` (`${LDAP_BIND_CREDENTIAL}`) uses the same wrong value. It is latent here,
+  because the realm already exists.
+
+### Repair (operator, hub mutation)
+
+`KEYCLOAK_BASE_URL=http://localhost:8880 ./scripts/k3d-manager keycloak_provision_shopping_cart_realm`
+re-PUTs the provider's `bindCredential` from `openldap-admin`. Confirm the repair with the same
+`testAuthentication` (`Success`) and a group sync that has no error 49.
+
+### Fix F5 (Codex, to spec)
+
+In `bin/cluster-up`, 10d.6 and the realm import must read the bind password from hub Secret
+`identity/openldap-admin` `LDAP_ADMIN_PASSWORD`, not from `_ldap_admin_pass`. The 10d.6 update should
+also be skipped when `testAuthentication` of the stored credential already succeeds, so a rerun
+cannot overwrite a working bind.
