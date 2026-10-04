@@ -8251,3 +8251,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-04: drain URL set by hand + verified. Spec filed to put it in the LaunchAgent template (opt-in = drain token present); Codex dispatched.
 - 2026-10-04: spec filed for index-docs local embedding cache; Codex dispatch queued behind the drain-URL task (same working tree).
 - 2026-10-04: drain-URL template change verified + committed; index-docs cache spec now dispatching to Codex.
+- 2026-10-04: queued spec for a second copy of the embedding cache (backup/restore targets); dispatch after the embed-cache Codex task is verified.
