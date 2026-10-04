@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. Spec ready for Codex.
+**Status:** OPEN. Fix `22cecd0e` (Codex edits, Claude-verified and committed). Live check on the next `make up`.
 **Severity:** low. The warning is a false alarm while the earlier tunnel lives. A half-dead
 earlier tunnel is never replaced, which would leave JWT auth from the app cluster broken.
 
