@@ -97,3 +97,20 @@ sync of `acg-kube-prometheus-stack`.
 - The fault has now persisted for about 6 h on one sandbox, so it is not self-healing. The two
   open decisions still stand: a `.status.conditions` get in place of `kubectl wait`, and a k3s
   server restart (operator) as the recovery or automated step.
+
+## k3s server restart confirms the recovery (2026-10-04 about 02:40 UTC)
+
+- The operator ran `ssh ubuntu sudo systemctl restart k3s` on the server node (`ip-10-0-1-44`).
+- Straight afterwards, `api-resources --api-group=monitoring.coreos.com` lists all 10 types,
+  including `prometheuses`, `prometheusagents`, `scrapeconfigs` and `thanosrulers`.
+  `kubectl wait --for=condition=Established crd/prometheusrules...` returns at once (rc 0).
+- This confirms the hypothesis: the sandbox apiserver's CRD watch was stuck, and a k3s server
+  restart clears it.
+- It does not undo two side effects:
+  - The hub ArgoCD app is left in `op=Error` (EOF during the restart window), and an Error phase
+    blocks self-heal, so it needs a manual sync.
+  - The Prometheus operator pod started while the four CRDs looked "not installed", so it needs
+    a rollout restart before it reconciles `Prometheus` objects.
+- This settles the fix direction. Replace `kubectl wait` with a `.status.conditions` get, then
+  check discovery for `prometheuses`. When it is missing, WARN and print the restart command,
+  rather than restarting k3s automatically.
