@@ -493,6 +493,46 @@ _load_acg_up_cleanup() {
   source "${BATS_TEST_TMPDIR}/c.sh"
 }
 
+@test "acg-up failure cleanup leaves a port-forward owned by another run" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    printf "93911\n" > "${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
+    kill() { echo "KILL_CALLED $*"; }
+    _ACG_UP_OWNED_PIDS=" 12345"
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+    [[ -f "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" ]]
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"KILL_CALLED"* ]]
+}
+
+@test "acg-up failure cleanup kills and removes a port-forward owned by this run" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    printf "93911\n" > "${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
+    kill() { echo "KILL_CALLED $*"; }
+    _ACG_UP_OWNED_PIDS=" 93911"
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+    [[ ! -f "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" ]]
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"KILL_CALLED 93911"* ]]
+}
+
+@test "acg-up records Vault and Prometheus port-forward ownership" {
+  local vault_line prom_line
+  vault_line="$(grep -n '_vault_pf_pid=\$!' bin/cluster-up | cut -d: -f1)"
+  prom_line="$(grep -n '_acg_prom_pf_pid=\$!' bin/cluster-up | cut -d: -f1)"
+  [ "$(sed -n "$((vault_line + 1))p" bin/cluster-up | grep -c '_ACG_UP_OWNED_PIDS+=')" -eq 1 ]
+  [ "$(sed -n "$((prom_line + 1))p" bin/cluster-up | grep -c '_ACG_UP_OWNED_PIDS+=')" -eq 1 ]
+}
+
 _load_acg_up_marker_clear() {
   sed -n '/^function _acg_up_clear_stack_marker()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/c.sh"
   source scripts/lib/system.sh

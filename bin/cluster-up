@@ -164,8 +164,12 @@ function _acg_up_cleanup() {
   for _pid_file in vault-pf frontend-pf acg-prom-pf; do
     local _f="${_ACG_STATE_DIR}/run/${_pid_file}.pid"
     if [[ -f "${_f}" ]]; then
-      kill "$(cat "${_f}")" 2>/dev/null || true
-      rm -f "${_f}"
+      local _pf_pid
+      _pf_pid="$(cat "${_f}" 2>/dev/null || true)"
+      if [[ -n "${_pf_pid}" && " ${_ACG_UP_OWNED_PIDS:-} " == *" ${_pf_pid} "* ]]; then
+        kill "${_pf_pid}" 2>/dev/null || true
+        rm -f "${_f}"
+      fi
     fi
   done
   if [[ "${_ACG_TUNNEL_PLIST_CREATED:-0}" == "1" ]]; then
@@ -192,6 +196,7 @@ function _acg_up_clear_stack_marker() {
     rm -f "${_ACG_STATE_DIR}/run/cf-stack-created"
   fi
 }
+_ACG_UP_OWNED_PIDS=""
 trap _acg_up_cleanup EXIT
 _acg_up_clear_stack_marker
 
@@ -526,6 +531,7 @@ fi
 kubectl port-forward svc/vault -n secrets --context k3d-k3d-cluster "${_vault_local_port}:8200" \
   >>"${_ACG_STATE_DIR}/logs/vault-pf.log" 2>&1 &
 _vault_pf_pid=$!
+_ACG_UP_OWNED_PIDS+=" ${_vault_pf_pid}"
 disown "${_vault_pf_pid}"
 echo "${_vault_pf_pid}" > "${_vault_pf_pid_file}"
 sleep 3
@@ -1927,6 +1933,7 @@ kubectl port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
   -n monitoring --context "${_acg_observability_context}" --address 0.0.0.0 \
   >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
 _acg_prom_pf_pid=$!
+_ACG_UP_OWNED_PIDS+=" ${_acg_prom_pf_pid}"
 echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
 disown "${_acg_prom_pf_pid}"
 _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
