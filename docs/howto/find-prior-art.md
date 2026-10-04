@@ -71,3 +71,8 @@ make index-docs             # bring it current
 An empty result set with no error means the store is reachable but has no rows — the index was
 never built, or the volume was lost. See [the vector store guide](../guides/vector-store.md) for
 what is deployed, the credential resolution order, and why losing the volume costs only a re-index.
+
+### Hub rebuilt?
+
+`make index-docs` reloads vectors from the local cache with no embeddings quota spent. The summary
+line shows `from cache`; deleting `~/.cache/k3dm/embeddings.sqlite` only costs re-embedding.

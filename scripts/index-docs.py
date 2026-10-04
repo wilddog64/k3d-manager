@@ -11,10 +11,16 @@ with ``git ls-files`` so untracked scratch files are never indexed. Each documen
 a hash of the text actually embedded, so a re-run with no doc changes performs zero
 embedding calls and costs one round trip.
 
+Every embedding is also kept in a local SQLite cache (``~/.cache/k3dm/embeddings.sqlite``,
+override with ``K3DM_EMBED_CACHE``), so rebuilding a lost store re-reads vectors from it instead
+of spending embeddings quota.
+
 Exit status is 0 on success, 1 when the credential or the store is unavailable, 2 on usage
-error. The store is a rebuildable cache: losing it costs one re-index, not data.
+error. The store is a rebuildable cache: losing it costs no re-index quota when the local cache
+is present.
 """
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +30,8 @@ sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 from hermes.prior_art import (  # noqa: E402
     EMBED_BATCH,
+    EMBED_DIM,
+    EMBED_MODEL,
     TABLE,
     RetrievalUnavailable,
     copy_escape,
@@ -34,6 +42,7 @@ from hermes.prior_art import (  # noqa: E402
     run_sql,
     vector_literal,
 )
+from hermes.embed_cache import EmbedCache, cache_key  # noqa: E402
 
 
 def _upsert_script(rows):
@@ -111,6 +120,9 @@ def main(argv=None):
         return 1
 
     changed = [doc for doc in docs if existing.get(doc[0]) != doc[3]]
+    dated = [doc for doc in changed if re.match(r"^\d{4}-\d{2}-\d{2}", Path(doc[0]).name)]
+    other = [doc for doc in changed if not re.match(r"^\d{4}-\d{2}-\d{2}", Path(doc[0]).name)]
+    changed = sorted(dated, key=lambda doc: Path(doc[0]).name[:10], reverse=True) + other
     stale = sorted(set(existing) - {doc[0] for doc in docs})
 
     if args.dry_run:
@@ -127,18 +139,30 @@ def main(argv=None):
         changed = changed[: args.limit]
 
     written = 0
+    from_cache = 0
+    embedded = 0
+    cache = EmbedCache()
     try:
         for start in range(0, len(changed), EMBED_BATCH):
             batch = changed[start:start + EMBED_BATCH]
-            vectors = embed_batch([doc[2] for doc in batch], task_type="RETRIEVAL_DOCUMENT")
-            rows = [
-                (path, title, digest, vector)
-                for (path, title, _text, digest), vector in zip(batch, vectors)
-            ]
+            keys = [cache_key(EMBED_MODEL, EMBED_DIM, "RETRIEVAL_DOCUMENT", doc[2]) for doc in batch]
+            cached = cache.get_many(keys)
+            missing = [(index, doc, key) for index, (doc, key) in enumerate(zip(batch, keys)) if key not in cached]
+            new_vectors = {}
+            if missing:
+                vectors = embed_batch([doc[2] for _index, doc, _key in missing], task_type="RETRIEVAL_DOCUMENT")
+                embedded += len(vectors)
+                new_vectors = {key: vector for (_index, _doc, key), vector in zip(missing, vectors)}
+                cache.put_many(new_vectors.items())
+            from_cache += len(cached)
+            rows = []
+            for doc, key in zip(batch, keys):
+                vector = cached[key] if key in cached else new_vectors[key]
+                rows.append((doc[0], doc[1], doc[3], vector))
             run_sql(_upsert_script(rows))
             written += len(rows)
             if not args.quiet:
-                print(f"index-docs: committed {written}/{len(changed)}", file=sys.stderr)
+                print(f"index-docs: committed {written}/{len(changed)} ({from_cache} from cache)", file=sys.stderr)
     except RetrievalUnavailable as exc:
         detail = str(exc)
         if "perday" in detail.lower():
@@ -173,7 +197,7 @@ def main(argv=None):
         line.split("=", 1) for line in summary.split() if "=" in line
     )
     remaining = max(0, changed_total - written)
-    print(f"index-docs: {len(docs)} docs, {written} embedded, "
+    print(f"index-docs: {len(docs)} docs, {written} written ({from_cache} from cache, {embedded} embedded), "
           f"{counts.get('pruned', '0')} pruned, {counts.get('indexed', '?')} in store, "
           f"{remaining} remaining")
     subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],

@@ -32,6 +32,10 @@
 
 ### Changed
 
+- `index-docs` keeps a local, content-addressed embedding cache keyed by model, dimension and task
+  type, so a lost Hub store is rebuilt without Gemini calls. Cache misses embed the newest dated
+  docs first, and the summary reports cache hits.
+
 - `scripts/lib/agent_rigor.sh` is now a shim to the lib-foundation copy, bringing in the
   `# agent-audit: remote-sudo` marker. The local fork had drifted since v1.8.0, and `_agent_lint`
   (opt-in) now also covers staged `*.js` and `*.md`.

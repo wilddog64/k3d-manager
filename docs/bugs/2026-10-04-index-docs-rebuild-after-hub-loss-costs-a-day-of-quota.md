@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN
+**Status:** FIXED — embed-cache commit, 2026-10-04.
 **Severity:** low. `find-similar-docs` is partial or empty for one to two days after every hub rebuild.
 
 ## Observed
