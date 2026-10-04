@@ -285,3 +285,40 @@ Those are `LOCK_DIR`s that the **root** `keycloak-browser-http` LaunchDaemon wra
   and check with `cmp`.
 - `hub_restore.bats` and `makefile_signing_restore.bats` pass, shellcheck adds no new warnings,
   and only those two files change.
+
+## Follow-up F2c (2026-10-03, live): Verify races the Grafana restart from step 8
+
+The first full live run (Terminal.app, 17:37 PDT) passed steps 1–8, then failed 9/9 Verify. Read
+straight afterwards, all four checks pass: Vault 200, Grafana 200, the SMTP Secret is present and
+the tunnel has a PID. The cause is a race. Step 8 runs `launchctl kickstart -k` on
+`com.k3d-manager.grafana-port-forward` (last exit -15; `grafana-pf.log` restarted at 17:37:30), and
+step 9 probes `:3001` straight away, before the new port-forward is listening.
+
+**Fix (Codex):** in `bin/hub-restore` step 9, retry the Grafana probe up to 15 times, one second
+apart, before marking it FAIL:
+
+```bash
+_grafana_ok=0
+for _grafana_try in $(seq 1 15); do
+  if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:3001/api/health 2>/dev/null || true)" == "200" ]]; then
+    _grafana_ok=1; break
+  fi
+  sleep 1
+done
+if (( _grafana_ok )); then
+  _info "[hub-restore] Grafana health: PASS"
+else
+  _info "[hub-restore] Grafana health: FAIL"; _verify_ok=0
+fi
+```
+
+**Gates:**
+- BATS: a `curl` stub returns `000` for its first 2 Grafana calls and then `200`. Verify passes,
+  and the stub records 3 Grafana calls.
+  - Stub `sleep` as a no-op on PATH.
+  - Keep the `curl` stub's default `200` for every other test.
+- A second BATS test: a stub that always returns `000` for Grafana makes Verify FAIL after 15 calls.
+- Mutation: going back to a single probe turns the first test red. Restore from a `cp` snapshot
+  and check with `cmp`.
+- `hub_restore.bats` and `makefile_signing_restore.bats` pass, shellcheck adds no new warnings,
+  and only those two files change.
