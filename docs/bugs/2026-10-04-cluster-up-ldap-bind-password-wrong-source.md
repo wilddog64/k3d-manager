@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. The live hub bind was repaired by the operator on 2026-10-04. The code fix below goes to Codex.
+**Status:** OPEN. The live hub bind was repaired by the operator on 2026-10-04. Code fix `cc81df52` (Codex; Claude-verified). Live check on the next sandbox `make up`.
 **Parent:** `docs/bugs/2026-10-03-cluster-up-keycloak-ldap-component-lookup-picks-a-mapper.md`,
 section "Live verification 2026-10-04".
 **Severity:** high. Every `make up` breaks LDAP-backed SSO on the hub (LDAP error 49), and the
