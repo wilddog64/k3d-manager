@@ -8,7 +8,7 @@ Claude committed + pushed; shellcheck clean, 27/27 BATS, mutation reds test 9, c
 `scripts/lib/agent_rigor.sh`, not the subtree, so the marker is not live in k3d-manager yet. Operator chose
 retire-the-fork; spec `docs/bugs/2026-10-04-pre-commit-hook-loads-stale-local-agent-rigor-fork.md` — DONE
 `e22b7df6` (shim) + `0670b075` (tunnel plain `sudo` + `# agent-audit: remote-sudo`). Codex edits, Claude committed;
-Claude verified: shellcheck clean, 23/23 BATS, independent mutation (old fork back) reds both new tests, cmp-restored;
+Claude verified: shellcheck clean, 23/23 BATS, independent mutation (old fork back) reds both new tests, cmp-restored; make test 5133de03 green (1345/1345 BATS, pytest 621/1 skip);
 the live hook accepted the marked sudo on commit 2 (proof the shim loads upstream). Next: full `make test`.
 app_health live (healthy at 11:43:35Z).
 
