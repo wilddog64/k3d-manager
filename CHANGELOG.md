@@ -27,6 +27,10 @@
 
 ### Changed
 
+- `scripts/lib/agent_rigor.sh` is now a shim to the lib-foundation copy, bringing in the
+  `# agent-audit: remote-sudo` marker. The local fork had drifted since v1.8.0, and `_agent_lint`
+  (opt-in) now also covers staged `*.js` and `*.md`.
+
 - ACG sandbox critical alerts now email through `platform-warning`; only hub critical alerts
   continue to use the SMS gateway.
 
