@@ -3,7 +3,9 @@
 R3 decision (operator): explicit audit exemption, upstream-first. lib-foundation branch
 `fix/agent-audit-remote-sudo-marker`: spec `8e339cc2`, fix `5c9b631` (Codex edits; `.git` lock denied,
 Claude committed + pushed; shellcheck clean, 27/27 BATS, mutation reds test 9, cmp-restored). PR
-https://github.com/wilddog64/lib-foundation/pull/57 opened 2026-10-04. After merge: subtree pull, then the tunnel wrapper uses plain `sudo`
+#57 MERGED `44e7e8d`; subtree pulled `ce1164eb`. Gap: `.githooks/pre-commit`, `scripts/hooks/pre-commit`,
+`scripts/lib/system.sh:29` and `scripts/tests/lib/agent_rigor.bats` all load the stale local fork
+`scripts/lib/agent_rigor.sh`, not the subtree, so the marker is not live in k3d-manager yet. After merge: subtree pull, then the tunnel wrapper uses plain `sudo`
 with a trailing `# agent-audit: remote-sudo`.
 
 `make test` at `709aba8d`: 1336/1341. Reds 58 (8 new bare `!`, third recurrence), 197/198 + 1070 (stubs
