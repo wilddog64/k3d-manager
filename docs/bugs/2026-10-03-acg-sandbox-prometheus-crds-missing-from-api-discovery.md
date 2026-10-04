@@ -82,3 +82,18 @@ sync of `acg-kube-prometheus-stack`.
   hang, and it points at a k3s server restart as the recovery step.
 - `_observability_wait_for_prometheusrule_crd` (added in `82fe2218`) relies on `kubectl wait`.
   A plain `get` of `.status.conditions` would not depend on the watch.
+
+## Recurrence 2026-10-04 #2 (same sandbox, `make up` rerun ending about 02:30 UTC)
+
+- `make up` failed at Step 14 with the same `PrometheusRule CRD not established on ubuntu-k3s after
+  waiting` (`make: *** [up] Error 1`). Steps 1–13 were clean, including the live checks for
+  `cc81df52` and `22cecd0e`.
+- Shortly after the failure: `prometheusrules` is `Established=True` and present in discovery, so
+  the Step 14 wait failed only because of the stuck watch. `prometheuses`, `prometheusagents`,
+  `scrapeconfigs` and `thanosrulers` are still missing from `api-resources`. All 10 CRD objects
+  exist, created 2026-10-03T20:42:29Z.
+- Hub ArgoCD `acg-kube-prometheus-stack`: `Unknown/Missing`, operation `Running`, retry #5, with the
+  same `no matches for kind "Prometheus"` error.
+- The fault has now persisted for about 6 h on one sandbox, so it is not self-healing. The two
+  open decisions still stand: a `.status.conditions` get in place of `kubectl wait`, and a k3s
+  server restart (operator) as the recovery or automated step.
