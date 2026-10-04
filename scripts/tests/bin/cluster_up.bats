@@ -328,7 +328,8 @@ STUB
   ' bash "${helper}"
   [ "${status}" -eq 0 ]
   [ "${output}" = "a5a37610" ]
-  ! grep -qF 'secret-pass' "${argv_log}"
+  run grep -qF 'secret-pass' "${argv_log}"
+  [ "$status" -ne 0 ]
   [ "$(cat "${stdin_log}")" = "secret-pass" ]
 }
 
@@ -369,7 +370,7 @@ STUB
   run bash -c '
     block=$(sed -n "/Step 10d\\/14/,/kill \"\${_kc_pf_pid}\"/p" bin/cluster-up)
     grep -q _keycloak_smoke_ensure_realm <<<"$block"
-    ! grep -q '\''{\\"frontendUrl\\"'\'' <<<"$block"
+    if grep -q '\''{\\"frontendUrl\\"'\'' <<<"$block"; then exit 1; fi
   '
   [ "${status}" -eq 0 ]
 }

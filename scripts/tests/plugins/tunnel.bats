@@ -82,7 +82,8 @@ setup() {
   export -f _tunnel_autossh_path
   _tunnel_write_plist
   grep -q '<string>-L</string>' "${TUNNEL_PLIST_PATH}"
-  ! grep -q '<string>-R</string>' "${TUNNEL_PLIST_PATH}"
+  run grep -q '<string>-R</string>' "${TUNNEL_PLIST_PATH}"
+  [ "$status" -ne 0 ]
 }
 
 @test "vault agent clears stale 8200 and owns the reverse forward" {

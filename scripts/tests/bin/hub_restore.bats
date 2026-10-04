@@ -104,7 +104,8 @@ teardown() { rm -rf "${WORK}"; }
   run script -q /dev/null bin/hub-restore
   [ "${status}" -eq 2 ]
   [[ "${output}" == *"security unlock-keychain"* ]]
-  ! grep -q '^make ' "${CALL_LOG}"
+  run grep -q '^make ' "${CALL_LOG}"
+  [ "$status" -ne 0 ]
 }
 
 @test "hub-restore rejects the wrong Kubernetes context before any make step" {
@@ -114,7 +115,8 @@ teardown() { rm -rf "${WORK}"; }
   [ "${status}" -eq 2 ]
   [[ "${output}" == *"ubuntu-hostinger"* ]]
   [[ "${output}" == *"k3d-k3d-cluster"* ]]
-  ! grep -q '^make ' "${CALL_LOG}"
+  run grep -q '^make ' "${CALL_LOG}"
+  [ "$status" -ne 0 ]
 }
 
 @test "hub-restore happy path runs independent steps and prints nine-row summary" {
@@ -190,8 +192,9 @@ EOF
   [ "${status}" -eq 0 ]
   [ "$(grep -c 'kv put' "${CALL_LOG}")" -eq 1 ]
   grep -q 'test-key-123' "${EMBEDDINGS_STDIN}"
-  ! grep -q 'test-key-123' "${CALL_LOG}"
   [[ "${output}" != *"test-key-123"* ]]
+  run grep -q 'test-key-123' "${CALL_LOG}"
+  [ "$status" -ne 0 ]
 }
 
 @test "hub-restore skips an absent embeddings key without a TTY" {
@@ -207,7 +210,8 @@ EOF
   [ "${status}" -eq 2 ]
   [[ "${output}" == *"sudo chown -R"* ]]
   [[ "${output}" == *"root-owned"* ]]
-  ! grep -q '^make ' "${CALL_LOG}"
+  run grep -q '^make ' "${CALL_LOG}"
+  [ "$status" -ne 0 ]
 }
 
 @test "hub-restore ignores root-owned LaunchDaemon lock folders" {

@@ -276,7 +276,8 @@ STUB
   [[ "$output" == *"Done. Remote cluster deleted; local Hub preserved."* ]]
   [[ "$output" != *"would delete local Hub cluster"* ]]
   [ ! -f "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
-  ! grep -F "cluster delete" "${BATS_TEST_TMPDIR}/k3d.log"
+  run grep -F "cluster delete" "${BATS_TEST_TMPDIR}/k3d.log"
+  [ "$status" -ne 0 ]
 }
 
 @test "acg-down deletes the local hub only with --delete-hub" {

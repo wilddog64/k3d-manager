@@ -70,8 +70,12 @@ PY
     if [[ "$*" == *"get crd"* ]]; then
       local gets
       gets=$(grep -c 'get crd' "${calls}" || true)
-      (( gets >= 3 ))
-      return
+      (( gets >= 3 )) && printf 'True'
+      return 0
+    fi
+    if [[ "$*" == *"api-resources"* ]]; then
+      printf 'prometheuses.monitoring.coreos.com\n'
+      return 0
     fi
     return 0
   }
@@ -79,7 +83,7 @@ PY
   run _deploy_pushgateway_acg test-context
   [ "${status}" -eq 0 ]
   [ "$(grep -c 'get crd prometheusrules.monitoring.coreos.com' "${calls}")" -eq 3 ]
-  [ "$(grep -c 'wait.*crd/prometheusrules.monitoring.coreos.com' "${calls}")" -eq 1 ]
+  [ "$(grep -c 'wait.*crd/prometheusrules.monitoring.coreos.com' "${calls}" || true)" -eq 0 ]
   [ "$(grep -c 'apply.*rules-acg' "${calls}")" -eq 1 ]
 }
 
