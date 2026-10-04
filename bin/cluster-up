@@ -1925,18 +1925,30 @@ deploy_observability_acg "${_acg_observability_context}"
 _acg_prom_local_port=$((19190 + $(_acg_provider_port_offset "${_cluster_provider}")))
 _info "[acg-up] Step 14b/14 — Starting ACG Prometheus port-forward (${_acg_observability_context} → localhost:${_acg_prom_local_port})..."
 _acg_prom_pf_pid_file="${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
-if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
-  kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
-  rm -f "${_acg_prom_pf_pid_file}"
+_acg_prom_svc_ready=0
+for ((_acg_prom_svc_try=1; _acg_prom_svc_try<=${K3DM_ACG_PROM_SVC_ATTEMPTS:-24}; _acg_prom_svc_try++)); do
+  if kubectl get svc prometheus-operated -n monitoring --context "${_acg_observability_context}" >/dev/null 2>&1; then
+    _acg_prom_svc_ready=1
+    break
+  fi
+  sleep "${K3DM_ACG_PROM_SVC_INTERVAL:-5}"
+done
+if [[ "${_acg_prom_svc_ready}" -ne 1 ]]; then
+  _warn "[acg-up] Step 14b/14 — svc/prometheus-operated not found on ${_acg_observability_context}; Prometheus port-forward NOT started, hub federate-acg will report TargetDown. After sandbox Prometheus is up run: nohup kubectl port-forward svc/prometheus-operated ${_acg_prom_local_port}:9090 -n monitoring --context ${_acg_observability_context} --address 0.0.0.0 >> ${_ACG_STATE_DIR}/logs/acg-prom-pf.log 2>&1 & echo $! > ${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
+else
+  if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
+    kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
+    rm -f "${_acg_prom_pf_pid_file}"
+  fi
+  kubectl port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
+    -n monitoring --context "${_acg_observability_context}" --address 0.0.0.0 \
+    >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
+  _acg_prom_pf_pid=$!
+  _ACG_UP_OWNED_PIDS+=" ${_acg_prom_pf_pid}"
+  echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
+  disown "${_acg_prom_pf_pid}"
+  _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
 fi
-kubectl port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
-  -n monitoring --context "${_acg_observability_context}" --address 0.0.0.0 \
-  >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
-_acg_prom_pf_pid=$!
-_ACG_UP_OWNED_PIDS+=" ${_acg_prom_pf_pid}"
-echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
-disown "${_acg_prom_pf_pid}"
-_info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
 
 _info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9091 → ${_acg_observability_context})..."
 _pgw_pf_label="com.k3d-manager.pushgateway-port-forward"

@@ -740,6 +740,7 @@ function _deploy_pushgateway_acg() {
       _acg_rules_failed=1
     elif _kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/" >/dev/null; then
       _info "[observability] app-cluster PrometheusRules applied from ${_acg_rules_dir}/"
+      _observability_warn_if_prometheus_kind_unserved "${_app_context}" || true
     else
       _err "[observability] Failed to apply app-cluster PrometheusRules from ${_acg_rules_dir}/"
       _acg_rules_failed=1
@@ -753,18 +754,34 @@ function _observability_wait_for_prometheusrule_crd() {
   local _context="$1"
   local _attempts="${K3DM_ACG_RULES_CRD_ATTEMPTS:-36}"
   local _interval="${K3DM_ACG_RULES_CRD_INTERVAL:-5}"
-  local _attempt
+  local _attempt _established
 
   for ((_attempt=1; _attempt<=_attempts; _attempt++)); do
-    if _kubectl --no-exit get crd prometheusrules.monitoring.coreos.com \
-        --context "${_context}" >/dev/null 2>&1; then
-      _kubectl --no-exit wait --context "${_context}" \
-        --for=condition=Established --timeout=120s \
-        crd/prometheusrules.monitoring.coreos.com >/dev/null 2>&1
-      return $?
+    _established="$(_kubectl --no-exit get crd prometheusrules.monitoring.coreos.com \
+        --context "${_context}" \
+        -o jsonpath='{.status.conditions[?(@.type=="Established")].status}' 2>/dev/null || true)"
+    [[ "${_established}" == "True" ]] && return 0
+    (( _attempt < _attempts )) && sleep "${_interval}"
+  done
+  return 1
+}
+
+function _observability_warn_if_prometheus_kind_unserved() {
+  local _context="$1"
+  local _attempts="${K3DM_ACG_PROM_DISCOVERY_ATTEMPTS:-12}"
+  local _interval="${K3DM_ACG_PROM_DISCOVERY_INTERVAL:-5}"
+  local _attempt _resources
+
+  for ((_attempt=1; _attempt<=_attempts; _attempt++)); do
+    _resources="$(_kubectl --no-exit api-resources --api-group=monitoring.coreos.com \
+        -o name --context "${_context}" 2>/dev/null || true)"
+    if grep -qx 'prometheuses.monitoring.coreos.com' <<<"${_resources}"; then
+      return 0
     fi
     (( _attempt < _attempts )) && sleep "${_interval}"
   done
+  _warn "[observability] ${_context} apiserver does not serve kind Prometheus although its CRD is installed — the apiserver CRD watch is stuck; sandbox Prometheus will not start (docs/bugs/2026-10-03-acg-sandbox-prometheus-crds-missing-from-api-discovery.md)"
+  _warn "[observability] recover: ssh ubuntu su""do systemctl restart k3s; kubectl --context ${_context} -n monitoring rollout restart deploy/acg-kube-prometheus-stack-operator; make fix-sync APP=acg-kube-prometheus-stack"
   return 1
 }
 
