@@ -88,13 +88,13 @@ PLIST
 }
 
 _tunnel_write_vault_agent() {
-  local ssh_bin _sudo_bin="su""do"
+  local ssh_bin
   ssh_bin="$(command -v ssh)"
   mkdir -p "$(dirname "${TUNNEL_VAULT_WRAPPER_PATH}")" "$(dirname "${TUNNEL_VAULT_PLIST_PATH}")"
   cat > "${TUNNEL_VAULT_WRAPPER_PATH}" <<WRAPPER
 #!/bin/bash
 "${ssh_bin}" -o BatchMode=yes -o ConnectTimeout=10 "${TUNNEL_SSH_HOST}" \
-  "${_sudo_bin} fuser -k -n tcp ${TUNNEL_VAULT_REMOTE_PORT} >/dev/null 2>&1 || true" >/dev/null 2>&1 || true
+  "sudo fuser -k -n tcp ${TUNNEL_VAULT_REMOTE_PORT} >/dev/null 2>&1 || true" >/dev/null 2>&1 || true # agent-audit: remote-sudo
 exec "${ssh_bin}" -N -o BatchMode=yes -o ExitOnForwardFailure=yes \
   -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
   -R ${TUNNEL_VAULT_REMOTE_PORT}:127.0.0.1:${TUNNEL_VAULT_LOCAL_PORT} "${TUNNEL_SSH_HOST}"

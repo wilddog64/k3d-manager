@@ -89,6 +89,9 @@ setup() {
 @test "vault agent clears stale 8200 and owns the reverse forward" {
   _tunnel_write_vault_agent
   grep -q 'fuser -k -n tcp 8200' "${TUNNEL_VAULT_WRAPPER_PATH}"
+  grep -q 'sudo fuser -k -n tcp 8200' "${TUNNEL_VAULT_WRAPPER_PATH}"
+  run bash -n "${TUNNEL_VAULT_WRAPPER_PATH}"
+  [ "$status" -eq 0 ]
   grep -q 'ExitOnForwardFailure=yes' "${TUNNEL_VAULT_WRAPPER_PATH}"
   grep -q -- '-R 8200:127.0.0.1:18200' "${TUNNEL_VAULT_WRAPPER_PATH}"
   grep -q 'KeepAlive' "${TUNNEL_VAULT_PLIST_PATH}"
@@ -120,4 +123,9 @@ setup() {
   run tunnel_stop
   [ "$status" -eq 0 ]
   grep -q "unload -w ${TUNNEL_VAULT_PLIST_PATH}" "${BATS_TEST_TMPDIR}/launchctl.log"
+}
+
+@test "tunnel.sh does not disguise sudo" {
+  run grep -F 'su""do' "${PLUGINS_DIR}/tunnel.sh"
+  [ "$status" -ne 0 ]
 }
