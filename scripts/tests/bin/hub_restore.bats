@@ -23,7 +23,7 @@ EOF
 #!/usr/bin/env bash
 printf 'dispatcher %s\n' "$*" >> "${CALL_LOG}"
 EOF
-  for command_name in security kubectl launchctl cloudflared id curl find; do
+  for command_name in security kubectl launchctl cloudflared id curl find sleep; do
     cat > "${STUB}/${command_name}" <<'EOF'
 #!/usr/bin/env bash
 name="$(basename "$0")"
@@ -51,7 +51,20 @@ case "${name}" in
       printf '101 0 com.k3d-manager.grafana-port-forward\n202 0 com.k3d-manager.cloudflare-tunnel\n'
     fi
     ;;
-  curl) printf '200\n' ;;
+  curl)
+    if [[ "${*}" == *"127.0.0.1:3001/api/health"* ]]; then
+      printf 'grafana\n' >> "${GRAFANA_CALL_LOG}"
+      grafana_calls="$(wc -l < "${GRAFANA_CALL_LOG}")"
+      if [[ "${GRAFANA_MODE:-}" == "always-fail" || ( "${GRAFANA_MODE:-}" == "flaky" && "${grafana_calls}" -le 2 ) ]]; then
+        printf '000\n'
+      else
+        printf '200\n'
+      fi
+    else
+      printf '200\n'
+    fi
+    ;;
+  sleep) : ;;
   id) [[ "${1:-}" == "-u" ]] && printf '501\n' || printf 'tester\n' ;;
   find)
     if [[ "${FIND_LOCK:-0}" == "1" && "${*}" != *"! -name *.lock"* ]]; then
@@ -67,6 +80,7 @@ EOF
   done
   chmod +x "${STUB}/make-stub" "${STUB}/dispatcher"
   export EMBEDDINGS_STDIN="${WORK}/embeddings.stdin"
+  export GRAFANA_CALL_LOG="${WORK}/grafana-calls.log"
   export PATH="${STUB}:/usr/bin:/bin"
   export HOME="${FAKE_HOME}"
   export K3DM_MAKE="${STUB}/make-stub"
@@ -116,6 +130,22 @@ teardown() { rm -rf "${WORK}"; }
   [[ "${output}" == *"make platform-ops"* ]]
   [[ "${output}" == *"make install-hub-pushgateway-port-forward"* ]]
   [[ "${output}" == *"dispatcher hub_recovery_reconcile --confirm"* ]]
+}
+
+@test "hub-restore retries Grafana health until the port-forward is ready" {
+  export GRAFANA_MODE=flaky
+  run bin/hub-restore
+  [ "${status}" -eq 0 ]
+  [ "$(wc -l < "${GRAFANA_CALL_LOG}")" -eq 3 ]
+  [[ "${output}" == *"Grafana health: PASS"* ]]
+}
+
+@test "hub-restore fails Grafana health after fifteen retries" {
+  export GRAFANA_MODE=always-fail
+  run bin/hub-restore
+  [ "${status}" -eq 1 ]
+  [ "$(wc -l < "${GRAFANA_CALL_LOG}")" -eq 15 ]
+  [[ "${output}" == *"Grafana health: FAIL"* ]]
 }
 
 @test "hub-restore keeps going and skips an unbacked signing key" {
