@@ -781,7 +781,7 @@ function _observability_warn_if_prometheus_kind_unserved() {
     (( _attempt < _attempts )) && sleep "${_interval}"
   done
   _warn "[observability] ${_context} apiserver does not serve kind Prometheus although its CRD is installed — the apiserver CRD watch is stuck; sandbox Prometheus will not start (docs/bugs/2026-10-03-acg-sandbox-prometheus-crds-missing-from-api-discovery.md)"
-  _warn "[observability] recover: ssh ubuntu su""do systemctl restart k3s; kubectl --context ${_context} -n monitoring rollout restart deploy/acg-kube-prometheus-stack-operator; make fix-sync APP=acg-kube-prometheus-stack"
+  _warn "[observability] recover: restart k3s on the sandbox node, rollout-restart the prometheus operator, then make fix-sync APP=acg-kube-prometheus-stack (exact commands in the bug doc above)"
   return 1
 }
 

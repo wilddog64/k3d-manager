@@ -46,7 +46,14 @@ setup() {
   export -f _kubectl
   run _observability_warn_if_prometheus_kind_unserved ubuntu-k3s
   [ "$status" -eq 1 ]
-  [[ "$output" == *"systemctl restart k3s"* ]]
+  [[ "$output" == *"restart k3s"* ]]
+  [[ "$output" == *"fix-sync"* ]]
+}
+
+@test "ACG Step 14b recovery hint escapes the port-forward PID" {
+  run grep -F 'echo \$! >' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"prometheus-operated not found"* ]]
 }
 
 @test "ACG discovery warning follows successful PrometheusRule apply" {

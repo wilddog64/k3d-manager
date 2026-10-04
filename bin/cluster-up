@@ -1934,7 +1934,7 @@ for ((_acg_prom_svc_try=1; _acg_prom_svc_try<=${K3DM_ACG_PROM_SVC_ATTEMPTS:-24};
   sleep "${K3DM_ACG_PROM_SVC_INTERVAL:-5}"
 done
 if [[ "${_acg_prom_svc_ready}" -ne 1 ]]; then
-  _warn "[acg-up] Step 14b/14 — svc/prometheus-operated not found on ${_acg_observability_context}; Prometheus port-forward NOT started, hub federate-acg will report TargetDown. After sandbox Prometheus is up run: nohup kubectl port-forward svc/prometheus-operated ${_acg_prom_local_port}:9090 -n monitoring --context ${_acg_observability_context} --address 0.0.0.0 >> ${_ACG_STATE_DIR}/logs/acg-prom-pf.log 2>&1 & echo $! > ${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
+  _warn "[acg-up] Step 14b/14 — svc/prometheus-operated not found on ${_acg_observability_context}; Prometheus port-forward NOT started, hub federate-acg will report TargetDown. After sandbox Prometheus is up run: nohup kubectl port-forward svc/prometheus-operated ${_acg_prom_local_port}:9090 -n monitoring --context ${_acg_observability_context} --address 0.0.0.0 >> ${_ACG_STATE_DIR}/logs/acg-prom-pf.log 2>&1 & echo \$! > ${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
 else
   if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
     kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
