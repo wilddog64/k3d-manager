@@ -54,7 +54,7 @@ a **basket-service** bug tracked separately in
 
 ## Recurrence — `flows/order-management.spec.ts` (2026-10-04)
 
-**Status:** SPEC — dispatched to Codex 2026-10-04 (branch created by Claude from `origin/main` `35098ac`).
+**Status:** IN PROGRESS — Codex fix `d8fb1ef` on `shopping-cart-e2e-tests` branch `fix/order-flow-status-enum` (pushed, Claude-verified: every sequence is a legal transition, no CONFIRMED/DELIVERED left, tsc errors unchanged at 11). Next: PR (waits for go), merge, image rebuild, pin, `make e2e`.
 
 `make e2e` run `1791168841-15959` (k3d-manager `02aeeed0`, e2e-tests `origin/main` `35098ac`):
 91 passed, 8 failed. All 8 are in `tests/flows/order-management.spec.ts`, each with
