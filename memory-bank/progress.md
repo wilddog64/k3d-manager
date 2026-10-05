@@ -3062,3 +3062,4 @@ in the bug doc after commit: `3664bea7`.
 - [x] Stale active-provider marker trusted without liveness (Makefile status, cluster-status-summary, webhook): Recurrence 4 FIXED 2026-10-05, Claude-verified. [ ] operator `make restart-webhook`.
 - [x] cluster-down legacy-cleanup dry-run test: FIXED 2026-10-05, Claude-verified.
 - [x] lib-foundation agent-audit `*-sudo` flag false positive: FIXED 16908e5 + a2115d1 on fix/agent-audit-sudo-flag-false-positive, Claude-verified. PR #60 open, CI green, Copilot 0 findings. PR #60 MERGED c6876cc, subtree pull 58f27f48.
+- [ ] lib-foundation `_browser_launch` missing ready helper under host: spec b731f14 on fix/cdp-browser-ready-host-load, Codex dispatched. Then PR + subtree pull.
