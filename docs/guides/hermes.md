@@ -387,7 +387,7 @@ align to a hard boundary.
 | `K3DM_HERMES_STATE` | `~/.k3dm/hermes/state.json` | State file (dir `0700`, file `0600`) |
 | `K3DM_HERMES_WEBHOOK_HOST` | `127.0.0.1:7443` | Webhook host:port (plain HTTP on loopback) |
 | `K3DM_HERMES_HTTP_TIMEOUT` | `90` | Per-request HTTP timeout, seconds (authenticated `/api/v1/health` runs the full smoke test and is slow on a degraded cluster) |
-| `K3DM_HERMES_PROVIDER` | (unset) | Cluster provider passed to the webhook query |
+| `K3DM_HERMES_PROVIDER` | `k3s-hostinger` (set by the LaunchAgent template) | Cluster provider passed to the webhook query |
 | `K3DM_HERMES_CORRELATION_WINDOW` | `3` | Cycles in the correlation window |
 | `K3DM_HERMES_LLM_PROVIDER` | `gemini` | LLM provider on trip (never `claude` as author) |
 | `K3DM_HERMES_LLM_DAILY_BUDGET` | `10` | Max LLM calls per day before template fallback |
@@ -400,6 +400,9 @@ align to a hard boundary.
 | `K3DM_HERMES_APP_HEALTH_ENABLED` | (disabled) | Set to `1` to enable aggregate/probe health-delta sampling |
 | `K3DM_HERMES_APP_CONTEXT` | (unset) | Kubernetes context for the app-cluster service proxy |
 | `K3DM_HERMES_APP_KUBECONFIG` | (unset) | Optional kubeconfig path used by app-health kubectl calls |
+
+An unset `K3DM_HERMES_PROVIDER` falls back to the shared active-provider marker, which a sandbox
+that expired without `make down` leaves pointing at a dead cluster.
 
 ---
 

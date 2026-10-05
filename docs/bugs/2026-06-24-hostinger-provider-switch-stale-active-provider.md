@@ -1,6 +1,6 @@
 # Bug: `make status` can resolve the wrong provider after switching between ACG and Hostinger
 
-**Status:** REOPENED 2026-10-05 (Hermes recurrence, spec below) — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
+**Status:** Recurrence 3 FIXED 2026-10-05 (Codex, Claude-verified: 71 passed; dropping the template key turns the test red; operator must rerun `bin/k3dm-hermes-setup`); `_acg_resolve_provider` liveness check still open — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
 
 **Date:** 2026-06-24  
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`  
