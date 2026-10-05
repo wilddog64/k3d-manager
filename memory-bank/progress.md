@@ -88,7 +88,7 @@
 # 2026-09-30 — v1.41.0 planning
 
 - [x] Spec `docs/plans/v1.41.0-python-agent-rigor.md` written (3 of 5 v1.41.0 plans).
-- [ ] Codex briefs A (lib-foundation M1) and B (k3d-manager M1 adoption + M2–M4) once v1.41.0 opens.
+- [ ] Codex brief A (lib-foundation M1) — spec `docs/plans/v0.5.0-agent-audit-python.md` `cbc73bd` on lib-foundation `feat/agent-audit-python`; DISPATCHED 2026-10-04. Item 4 (one copy) already done by shim `e22b7df6`; `AGENT_AUDIT_BATS_EXCLUDE` dropped (no `scripts/lib/acg`). Then brief B (subtree pull + M2–M4).
 
 # 2026-09-30 — values_branch sensor and R9
 
