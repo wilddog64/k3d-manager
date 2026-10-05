@@ -68,13 +68,13 @@ def _allowed_executable(path, tmp_path, basetemp):
     return _under(path, (tmp_path, basetemp, *tripwire_roots))
 
 
-def _remote_url(cwd):
+def _remote_url(cwd, name="origin"):
     try:
         probe = _ORIGINAL_POPEN_INIT
         process = subprocess.Popen.__new__(subprocess.Popen)
         probe(
             process,
-            ["git", "-C", str(cwd), "config", "--get", "remote.origin.url"],
+            ["git", "-C", str(cwd), "config", "--get", f"remote.{name}.url"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -89,19 +89,54 @@ def _is_remote_url(value):
     return value.startswith(("http://", "https://", "ssh://", "git@"))
 
 
+def _git_parse(words, cwd):
+    effective_cwd = Path(cwd).resolve()
+    index = 1
+    while index < len(words):
+        word = words[index]
+        if word == "-C" or word in {
+            "-c",
+            "--git-dir",
+            "--work-tree",
+            "--namespace",
+            "--config-env",
+        }:
+            if word == "-C" and index + 1 < len(words):
+                directory = Path(words[index + 1])
+                if not directory.is_absolute():
+                    directory = effective_cwd / directory
+                effective_cwd = directory.resolve()
+            index += 2
+            continue
+        if word.startswith("-"):
+            index += 1
+            continue
+        return word, index, effective_cwd
+    return "", -1, effective_cwd
+
+
 def _git_remote_violation(words, cwd):
-    if not words or words[0] != "git":
+    if not words or os.path.basename(words[0]) != "git":
         return False
-    subcommand = next((word for word in words[1:] if not word.startswith("-")), "")
+    subcommand, index, effective_cwd = _git_parse(words, cwd)
     if subcommand not in HERMETIC_GIT_COMMANDS:
         return False
-    if any(_is_remote_url(word) for word in words[1:]):
+    if any(_is_remote_url(word) for word in words[index + 1 :]):
         return True
     if subcommand == "clone":
-        source = words[words.index(subcommand) + 1] if len(words) > words.index(subcommand) + 1 else ""
+        source = words[index + 1] if len(words) > index + 1 else ""
         if source and Path(source).expanduser().exists():
             return False
-    return _is_remote_url(_remote_url(cwd))
+    remote_name = "origin"
+    if subcommand in {"fetch", "pull", "push", "ls-remote"}:
+        remote_name = next(
+            (word for word in words[index + 1 :] if not word.startswith("-")),
+            "origin",
+        )
+    remote = _remote_url(effective_cwd, remote_name)
+    if not remote and remote_name != "origin":
+        remote = _remote_url(effective_cwd)
+    return _is_remote_url(remote)
 
 
 def _network_violation(sock, address):
@@ -146,7 +181,7 @@ def _hermetic(monkeypatch, request, tmp_path, tmp_path_factory):
         env = kwargs.get("env")
         search_path = env["PATH"] if env is not None and "PATH" in env else os.environ.get("PATH")
         resolved = words[0] if words and os.path.isabs(words[0]) else shutil.which(command, path=search_path)
-        cwd = kwargs.get("cwd", os.getcwd())
+        cwd = kwargs.get("cwd") or os.getcwd()
         blocked = command in HERMETIC_BLOCKED and resolved and not _allowed_executable(
             resolved, tmp_path, basetemp
         )
