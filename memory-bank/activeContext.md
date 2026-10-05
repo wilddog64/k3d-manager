@@ -8284,3 +8284,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-04 deploy-worker keychain fix verified and committed. makefile_hermes_approvals.bats tests 8/11 red at HEAD since 42c51bf8 bound APPROVALS_KV in the real wrangler.toml: filing a bug.
 - 2026-10-04 filed + dispatched hermes-approvals-kv fixture bug to Codex.
 - 2026-10-05 Hostinger status FAIL: frontend-browser-http root daemon + pushgateway PF were rewritten to ubuntu-k3s by the Oct 3 sandbox make up; sandbox dead. Bug filed; workaround handed to operator. PR #11 Copilot fixed (6631f64).
+- 2026-10-05 e2e-tests PR #11 merged (e5e644d) via --admin; enforce_admins re-enabled (verified true); local main synced. fix/ branch, [Unreleased] only — no tag. Auto-mode classifier denied Claude the enforce_admins DELETE ([CI Bypass]); operator ran it. Next: image rebuild + pin + make e2e (#4).
