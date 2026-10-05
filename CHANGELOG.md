@@ -10,6 +10,9 @@
 
 ### Added
 
+- Python agent-audit protection via lib-foundation v0.5.0, plus the hermetic pytest guard for host
+  executables, remote Git, and non-loopback network calls.
+
 - Added `make embed-cache-backup` and `make embed-cache-restore`. Backups use a consistent SQLite
   snapshot and atomic replacement; restores merge by content hash and never overwrite existing vectors.
   The cache now records model, dimension, task type, content hash and last use (schema v2), rejects
@@ -47,6 +50,9 @@
   branch (or `main`), with `K3DM_DOCS_BRANCH` and `K3DM_DOCS_REPO_URL` overrides.
 
 ### Changed
+
+- CI now installs Ruff, runs `make lint-python`, and validates Kubernetes manifests with
+  `make validate-manifests` after the pytest suites.
 
 - `index-docs` keeps a local, content-addressed embedding cache keyed by model, dimension and task
   type, so a lost Hub store is rebuilt without Gemini calls. Cache misses embed the newest dated
