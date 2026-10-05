@@ -1,7 +1,7 @@
 # Bug: hostinger shopping-cart data stores keep their old passwords after the Vault KV was regenerated
 
 **Filed:** 2026-10-02
-**Status:** OPEN — spec ready, dispatched to Codex
+**Status:** RESOLVED 2026-10-03. The tool landed in `64e52b65` (Codex, Claude-verified). The operator ran `make shopping-cart-credential-drift APPLY=1`: 5 stores FIXED, 1 MATCH. All pods Ready and all apps Synced and Healthy (Claude-verified). Status line updated 2026-10-04.
 **Branch:** `k3d-manager-v1.41.0`
 **Found by:** Claude, 2026-10-02. A payment pod restart (image re-pin) went into CrashLoopBackOff with
 `FATAL: password authentication failed for user "postgres"`.

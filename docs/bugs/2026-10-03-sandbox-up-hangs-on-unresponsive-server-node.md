@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude
-**Status:** SPEC — ready for Codex
+**Status:** FIXED (Codex, Claude-verified; recorded in `396a3e2b`). Status line updated 2026-10-04.
 **Files:** `scripts/lib/webhook/lifecycle.py`, `scripts/plugins/shopping_cart.sh`, tests, `CHANGELOG.md`
 
 ## What the operator asked for

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. The fix is specified below; queued for Codex after the three sandbox-recovery fixes.
+**Status:** FIXED in `254a291e` (Codex edits, Claude-verified). Live 2026-10-04: the operator ran `bin/k3dm-hermes-setup`, and the first poll (11:43:35Z) reported app_health healthy. Status line updated 2026-10-04.
 **Severity:** low. Nothing is broken, but a sensor shipped in v1.40.0 has never sampled anything.
 
 ## Observed

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-03, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. Code fix `fd3616fd` passed live for F1, F3 and F4. F2 exposed a wrong password source, which now breaks LDAP binds; see "Live verification 2026-10-04" below
+**Status:** CLOSED 2026-10-04. `fd3616fd` fixed F1, F3 and F4 (verified live). F2's wrong password source was fixed in `cc81df52`; see `2026-10-04-cluster-up-ldap-bind-password-wrong-source.md`. Status line updated 2026-10-04.
 **Severity:** medium. SSO works today only because `hub_recovery_reconcile` (the smoke path)
 repairs what `make up` gets wrong. Every `make up` prints three SSO warnings that look like an
 outage. It also leaves a stray Keycloak component behind, and that component throws an NPE

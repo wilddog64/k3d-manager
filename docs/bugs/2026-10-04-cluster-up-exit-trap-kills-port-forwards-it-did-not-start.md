@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. The fix is specified below and dispatched to Codex.
+**Status:** FIXED in `f61d3b3b` (Codex, Claude-verified: scope = spec, 61/61 BATS). Status line updated 2026-10-04.
 **Severity:** low. It needs an orphaned run plus a manual restart to trigger, but when it does
 it silently takes down the hub's `federate-acg` scrape.
 

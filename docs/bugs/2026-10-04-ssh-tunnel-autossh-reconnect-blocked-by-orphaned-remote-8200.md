@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. The fix is specified below (options 2+3) and dispatched to Codex on 2026-10-04.
+**Status:** FIXED in `d49e5eb8` (Codex, Claude-verified): the Vault reverse forward runs as its own agent and clears a stale remote 8200. Status line updated 2026-10-04.
 **Severity:** high while it lasts. The hub ArgoCD loses `ubuntu-k3s` (`host.k3d.internal:6443`), so
 no sandbox app can sync, and nothing heals by itself.
 

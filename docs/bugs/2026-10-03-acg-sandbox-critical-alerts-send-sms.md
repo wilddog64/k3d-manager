@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude
-**Status:** SPEC — ready for Codex
+**Status:** FIXED. The ACG email-only route is live on the hub Alertmanager (recorded in `d2ad5098`). Status line updated 2026-10-04.
 **Files:** `scripts/etc/prometheus/alertmanager.yaml.tmpl`, `scripts/tests/plugins/alertmanager_config_secret.bats`, `docs/guides/grafana-dashboards.md` or the Alertmanager routing section that documents SMS vs email, `CHANGELOG.md`
 
 ## What the operator asked for

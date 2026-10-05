@@ -1,7 +1,7 @@
 # Image promotion's rebase fallback cannot resolve two concurrent `newTag:` bumps
 
 **Filed:** 2026-09-21
-**Status:** OPEN — spec refreshed 2026-10-02 (recurrence + ordering guard), dispatched to Codex
+**Status:** FIXED. infra PR #107 merged `98b10f05` on 2026-10-03. Part B pin bumps merged in payment, basket, order and product-catalog, and each repo's promote loop was proven on its next main run. Status line updated 2026-10-04.
 **Branch (spec):** `k3d-manager-v1.41.0`
 **Repo to fix:** `shopping-cart-infra` — `.github/workflows/build-push-deploy.yml`
 **Severity:** Medium — loses one image promotion whenever two `main` pushes land a few minutes apart.

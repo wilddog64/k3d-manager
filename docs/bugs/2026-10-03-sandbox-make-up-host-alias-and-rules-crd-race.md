@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude
-**Status:** SPEC — ready for Codex
+**Status:** FIXED in `82fe2218` (Codex, Claude-verified): the host alias resolves without getent, and cluster-up waits for the PrometheusRule CRD. Status line updated 2026-10-04.
 **Files:**
 - `scripts/lib/hub_host_ip.sh` (new);
 - `bin/cluster-up`;
