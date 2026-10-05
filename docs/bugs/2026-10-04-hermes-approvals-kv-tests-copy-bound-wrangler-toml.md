@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-04, Claude (found while verifying the deploy-worker keychain fix)
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** SPEC — queued for Codex
+**Status:** FIXED — Codex, verified by Claude 2026-10-04: 12/12 green; commenting out the `sed` turns 3 tests red. Codex also appends the commented `<namespace-id>` template to the copy, which this spec missed: the target rewrites that template in place and fails without it.
 **Severity:** low, test-only. Two tests are red at HEAD, and the code paths they cover
 (first-time KV binding, a failed `wrangler kv namespace create`) are untested until fixed.
 

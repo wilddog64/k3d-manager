@@ -7,6 +7,8 @@ setup() {
   RELAY_DIR="${BATS_TEST_TMPDIR}/relay"
   mkdir -p "${RELAY_DIR}"
   cp "${BATS_TEST_DIRNAME}/../../../workers/slack-relay/wrangler.toml" "${RELAY_DIR}/wrangler.toml"
+  sed -i.bak '/^\[\[kv_namespaces\]\]$/,/^id = /d' "${RELAY_DIR}/wrangler.toml"
+  printf '%s\n' '# [[kv_namespaces]]' '# binding = "APPROVALS_KV"' '# id = "<namespace-id>"' >>"${RELAY_DIR}/wrangler.toml"
   mkdir -p "${BATS_TEST_TMPDIR}/bin"
   cat >"${BATS_TEST_TMPDIR}/bin/security" <<'EOF'
 #!/usr/bin/env bash
@@ -110,6 +112,12 @@ EOF
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"nothing to do"* ]]
   [ "$(grep -c '^argv:' "${BATS_TEST_TMPDIR}/npx.log")" -eq 1 ]
+}
+
+@test "the test fixture starts unbound" {
+  run grep -q '^binding = "APPROVALS_KV"$' "${RELAY_DIR}/wrangler.toml"
+  [ "${status}" -ne 0 ]
+  grep -q '^binding = "APPROVALS_KV"$' "${BATS_TEST_DIRNAME}/../../../workers/slack-relay/wrangler.toml"
 }
 
 @test "hermes-approvals-setup rejects missing approvers before any stub" {
