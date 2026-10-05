@@ -2,7 +2,9 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN.
+**Status:** FIXED — Codex, verified by Claude 2026-10-04. Claude added keepalives, two retries per step, and
+`TimeoutExpired` handling (the operator's M4↔M2 link drops), and stopped quoting scp remote paths: OpenSSH 10's
+scp uses SFTP, which takes paths literally. 26 tests; 5 mutations each turn a test red.
 **Severity:** low. The second copy is a manual, error-prone step.
 
 ## Observed

@@ -83,7 +83,10 @@ from the one before it. Use `make embed-cache-stats` to inspect the cache and
 `make embed-cache-prune` to remove old vectors. After a large index run, copy it to a second
 location with `make embed-cache-backup DEST=…`, such as an M2 share or synced folder. On a fresh or
 rebuilt Mac, run `make embed-cache-restore SRC=…` before `make index-docs`; restore merges by
-content hash and is safe to repeat. If the cache holds fewer vectors than the hub store (for example,
+content hash and is safe to repeat. `DEST`/`SRC` may be `host:path`, for example `make embed-cache-backup DEST=m2-air:~/.local/backup`.
+The copy goes over ssh/scp with the operator's own keys, the directory is created when missing, and
+the file lands atomically. Each step retries twice (after 5s and 15s) and ssh keepalives
+fail a dead link in about 15 seconds, so a flaky local network leaves the previous backup intact. If the cache holds fewer vectors than the hub store (for example,
 a cache created after the store was already full), run `make embed-cache-seed` first: it copies every
 store vector whose doc is unchanged into the cache, makes no Gemini calls, and never overwrites a
 cached vector. Then take the backup. Time Machine already covers `~/.cache` unless it is excluded;

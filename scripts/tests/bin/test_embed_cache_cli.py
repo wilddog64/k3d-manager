@@ -1,11 +1,13 @@
 """Tests for the embedding-cache backup and restore CLI."""
 import importlib.util
 import json
+import shutil
 import sqlite3
 import sys
 from array import array
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -112,6 +114,118 @@ def test_backup_restore_round_trip(tmp_path, capsys):
     assert cli.main(["restore", str(destination)]) == 0
     assert _keys(primary) == {_key(name) for name in ("a", "b", "c")}
     assert "backed up 3 vectors" in capsys.readouterr().out
+
+
+def test_remote_backup_command_sequence(monkeypatch, capsys):
+    _seed(Path(cli.cache_path()), ("a",))
+    commands = []
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    assert cli.main(["backup", "m2-air:~/.local/backup"]) == 0
+    assert commands[0] == ["ssh", *cli.SSH_OPTIONS, "m2-air",
+                           "mkdir -p -- .local/backup"]
+    assert commands[1][:-2] == ["scp", "-q", *cli.SSH_OPTIONS]
+    assert commands[1][-1] == "m2-air:.local/backup/.embeddings.sqlite.tmp"
+    assert commands[2] == ["ssh", *cli.SSH_OPTIONS, "m2-air",
+                           "mv -f -- .local/backup/.embeddings.sqlite.tmp .local/backup/embeddings.sqlite"]
+    assert all("~" not in argument for command in commands for argument in command)
+    assert not Path(commands[1][-2]).parent.exists()
+    assert "m2-air:.local/backup/embeddings.sqlite" in capsys.readouterr().out
+
+
+def test_remote_backup_failed_scp_never_runs_mv(monkeypatch, capsys):
+    _seed(Path(cli.cache_path()), ("a",))
+    commands = []
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        return SimpleNamespace(returncode=1 if command[0] == "scp" else 0, stderr="copy failed\n")
+
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    sleeps = []
+    monkeypatch.setattr(cli.time, "sleep", sleeps.append)
+    assert cli.main(["backup", "m2-air:~/.local/backup"]) == 1
+    assert not any(command[-1].startswith("mv -f") for command in commands)
+    assert [command[0] for command in commands] == ["ssh", "scp", "scp", "scp"]
+    assert sleeps == list(cli.RETRY_DELAYS)
+    assert not Path(commands[1][-2]).parent.exists()
+    assert "failed at scp" in capsys.readouterr().err
+
+
+def test_remote_backup_retries_a_dropped_link(monkeypatch, capsys):
+    _seed(Path(cli.cache_path()), ("a",))
+    commands = []
+    outcomes = iter([cli.subprocess.TimeoutExpired("scp", 300), SimpleNamespace(returncode=255, stderr="Broken pipe\n")])
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        if command[0] == "scp":
+            outcome = next(outcomes, None)
+            if isinstance(outcome, Exception):
+                raise outcome
+            if outcome is not None:
+                return outcome
+        return SimpleNamespace(returncode=0, stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr(cli.time, "sleep", lambda _delay: None)
+    assert cli.main(["backup", "m2-air:~/.local/backup"]) == 0
+    assert [command[0] for command in commands] == ["ssh", "scp", "scp", "scp", "ssh"]
+    captured = capsys.readouterr()
+    assert "attempt 2/3" in captured.err and "Broken pipe" in captured.err
+    assert "backed up 1 vectors" in captured.out
+
+
+def test_remote_sqlite_destination_names_file(monkeypatch):
+    _seed(Path(cli.cache_path()), ("a",))
+    commands = []
+    monkeypatch.setattr(cli.subprocess, "run", lambda command, **_kwargs: (
+        commands.append(command) or SimpleNamespace(returncode=0, stderr="")))
+    assert cli.main(["backup", "host:backups/k3dm.sqlite"]) == 0
+    assert commands[1][-1] == "host:backups/.embeddings.sqlite.tmp"
+    assert commands[2][-1] == "mv -f -- backups/.embeddings.sqlite.tmp backups/k3dm.sqlite"
+
+
+def test_local_path_containing_colon_stays_local(tmp_path, monkeypatch):
+    _seed(Path(cli.cache_path()), ("a",))
+    destination = tmp_path / "a:b"
+    calls = []
+    monkeypatch.setattr(cli.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    assert cli.main(["backup", str(destination)]) == 0
+    assert destination.exists()
+    assert calls == []
+
+
+def test_remote_restore(monkeypatch, tmp_path, capsys):
+    fixture = tmp_path / "fixture.sqlite"
+    _seed(fixture, ("a", "b"))
+    calls = []
+
+    def run(command, **_kwargs):
+        calls.append(command)
+        shutil.copyfile(fixture, command[-1])
+        return SimpleNamespace(returncode=0, stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    assert cli.main(["restore", "m2-air:~/.local/backup"]) == 0
+    assert _keys(Path(cli.cache_path())) == {_key("a"), _key("b")}
+    assert calls == [["scp", "-q", *cli.SSH_OPTIONS,
+                      "m2-air:.local/backup/embeddings.sqlite", calls[0][-1]]]
+    assert "restored 2 new vectors" in capsys.readouterr().out
+
+
+def test_remote_path_with_space_is_quoted(monkeypatch):
+    _seed(Path(cli.cache_path()), ("a",))
+    commands = []
+    monkeypatch.setattr(cli.subprocess, "run", lambda command, **_kwargs: (
+        commands.append(command) or SimpleNamespace(returncode=0, stderr="")))
+    assert cli.main(["backup", "host:~/my backups"]) == 0
+    assert "'my backups'" in commands[0][-1]
+    assert commands[1][-1] == "host:my backups/.embeddings.sqlite.tmp"
 
 
 def _key(name):

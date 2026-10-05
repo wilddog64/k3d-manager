@@ -17,6 +17,8 @@
   Prune deletes only vectors that are both stale and unused for 90 days; rows carried over from v1 or
   from a restore are stamped on arrival, so the first prune cannot empty an existing cache.
 - `make embed-cache-seed` fills the cache from the hub store without Gemini calls.
+- Embed-cache backups and restores may use `host:path` scp destinations, with atomic remote backups; each ssh/scp
+  step retries a dropped link twice.
 
 - `make hub-restore` / `make hub-recover` restore rebuilt Hub credentials and local agents from one
   GUI-backed Terminal session.

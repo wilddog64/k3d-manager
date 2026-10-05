@@ -1133,9 +1133,9 @@ validate-manifests:
 index-docs:
 	@python3 scripts/index-docs.py $(if $(DRY_RUN),--dry-run,) $(if $(LIMIT),--limit $(LIMIT),)
 
-## Copy the index-docs embedding cache to a second location: make embed-cache-backup DEST=<file or dir>
+## Copy the index-docs embedding cache to a second location: make embed-cache-backup DEST=/Volumes/m2-share/k3dm or DEST=m2-air:~/.local/backup
 embed-cache-backup:
-	@[ -n "$(DEST)" ] || { echo "ERROR: DEST is required, e.g. make embed-cache-backup DEST=/Volumes/m2-share/k3dm" >&2; exit 1; }
+	@[ -n "$(DEST)" ] || { echo "ERROR: DEST is required, e.g. DEST=/Volumes/m2-share/k3dm or DEST=m2-air:~/.local/backup" >&2; exit 1; }
 	@python3 scripts/embed-cache.py backup -- "$(DEST)"
 
 ## Fill the embedding cache from the hub's vector store at zero quota cost: make embed-cache-seed [REF=origin/<branch>]
@@ -1150,9 +1150,9 @@ embed-cache-stats:
 embed-cache-prune:
 	@python3 scripts/embed-cache.py prune $(if $(DAYS),--days $(DAYS),)
 
-## Merge a backed-up embedding cache into the local one: make embed-cache-restore SRC=<file>
+## Merge a backed-up embedding cache into the local one: make embed-cache-restore SRC=/Volumes/m2-share/k3dm/embeddings.sqlite or SRC=m2-air:~/.local/backup
 embed-cache-restore:
-	@[ -n "$(SRC)" ] || { echo "ERROR: SRC is required, e.g. make embed-cache-restore SRC=/Volumes/m2-share/k3dm/embeddings.sqlite" >&2; exit 1; }
+	@[ -n "$(SRC)" ] || { echo "ERROR: SRC is required, e.g. SRC=/Volumes/m2-share/k3dm/embeddings.sqlite or SRC=m2-air:~/.local/backup" >&2; exit 1; }
 	@python3 scripts/embed-cache.py restore -- "$(SRC)"
 
 ## Find prior art in docs/ by similarity: make find-similar-docs Q="..." [K=5]
