@@ -1,6 +1,6 @@
 # Bug: the data-layer explainer's truncation test can never fail
 
-**Status:** OPEN — dispatched to Codex
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Low — test-only; the truncation it claims to guard is unguarded

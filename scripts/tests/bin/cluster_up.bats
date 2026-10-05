@@ -464,9 +464,10 @@ _load_data_layer_explain() {
         *"get nodes"*) : ;;
       esac
     }
-    _acg_data_layer_explain data-layer
-    x_count=$(printf "%s\n" "$output" | tr -cd x | wc -c)
-    [ "$x_count" -le 400 ]
+    explain_out=$(_acg_data_layer_explain data-layer 2>&1)
+    [[ "$explain_out" == *"last sync operation: "* ]]
+    x_count=$(printf "%s\n" "$explain_out" | tr -cd x | wc -c)
+    [ "$x_count" -eq 400 ]
   '
   [ "$status" -eq 0 ]
 }
