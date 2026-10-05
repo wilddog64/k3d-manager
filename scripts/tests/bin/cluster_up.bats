@@ -737,3 +737,36 @@ STUB
   before_ssh="${block%%ssh -f -N*}"
   [[ "${before_ssh}" == *"_acg_keycloak_reverse_tunnel_up"* ]]
 }
+
+@test "acg-up root-owned state preflight is before launchd sudo" {
+  local root_line sudo_line state_line
+  root_line="$(grep -n -m1 -- '-user root' bin/cluster-up | cut -d: -f1)"
+  sudo_line="$(grep -n -m1 -- '--interactive-sudo' bin/cluster-up | cut -d: -f1)"
+  state_line="$(grep -n -m1 'create local state directories' bin/cluster-up | cut -d: -f1)"
+  [ "${root_line}" -lt "${sudo_line}" ]
+  [ "${root_line}" -gt "${state_line}" ]
+}
+
+@test "acg-up root-owned state preflight passes with no root-owned folders" {
+  local block="${BATS_TEST_TMPDIR}/state-preflight.sh"
+  sed -n '/^_acg_state_root=/,/^fi$/p' bin/cluster-up > "${block}"
+  run env _ACG_STATE_BASE="${BATS_TEST_TMPDIR}/state" bash "${block}"
+  [ "${status}" -eq 0 ]
+  [ -z "${output}" ]
+}
+
+@test "acg-up root-owned state preflight stops with repair guidance" {
+  local block="${BATS_TEST_TMPDIR}/state-preflight.sh"
+  local stub_bin="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_bin}"
+  cat > "${stub_bin}/find" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "${BATS_TEST_TMPDIR}/state/logs"
+STUB
+  chmod +x "${stub_bin}/find"
+  sed -n '/^_acg_state_root=/,/^fi$/p' bin/cluster-up > "${block}"
+  run env _ACG_STATE_BASE="${BATS_TEST_TMPDIR}/state" PATH="${stub_bin}:${PATH}" bash "${block}"
+  [ "${status}" -eq 2 ]
+  [[ "${output}" == *"root-owned state folders found"* ]]
+  [[ "${output}" == *"sudo chown -R"* ]]
+}

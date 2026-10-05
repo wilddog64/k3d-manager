@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude (found during the hub-loss recovery)
-**Status:** SPEC — dispatched to Codex 2026-10-04 (see "Fix spec"). The creator of the 744 folder is still unconfirmed; the preflight below makes it loud instead.
+**Status:** FIXED — Codex, verified by Claude 2026-10-04: both `argocd.sh` defaults removed; `cluster-up` stops with the exact `chown` before any sudo step. 6 new tests; both mutations red. The creator of the 744 folder is still unconfirmed; the preflight makes a recurrence loud. Live state has no root-owned folders today, so the next `make up` is not blocked.
 **Severity:** Medium. Local Grafana (`localhost:3001`) stays down after a rebuild, and nothing reports why.
 
 ## Evidence (2026-10-03, about 09:12)
