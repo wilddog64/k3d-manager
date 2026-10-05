@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-05, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** FIXED — Codex, verified by Claude 2026-10-05: 139/139 across the listed suites plus pytest 13/13; all 3 mutations red. Claude corrected four things before the commit: docs had moved the webhook push target to `9092` (it stays `9091`, now always Hostinger); the `cluster-down` legacy bootouts ran under dry-run; the agent bootout used sudo and bad syntax; and the root-plist `rm` lacked sudo. The dry-run guard has no test. Live check pending the next sandbox `make up`.
+**Status:** FIXED — Codex, verified by Claude 2026-10-05: 139/139 across the listed suites plus pytest 13/13; all 3 mutations red. Claude corrected four things before the commit: docs had moved the webhook push target to `9092` (it stays `9091`, now always Hostinger); the `cluster-down` legacy bootouts ran under dry-run; the agent bootout used sudo and bad syntax; and the root-plist `rm` lacked sudo. The dry-run guard test is specified in the follow-up section and dispatched to Codex. Live check pending the next sandbox `make up`.
 **Severity:** high. The public `frontend.3ai-talk.org` returns 502 once the ACG sandbox expires,
 although the Hostinger cluster and its frontend pod are healthy.
 
@@ -252,5 +252,54 @@ restored.
 the same way, but serve no Cloudflare route that depends on them. A `make status` check that flags
 a `com.k3d-manager.*` job whose `--context` differs from the provider being checked.
 
+**Follow-ups triaged 2026-10-05 (Claude):**
+
+- `keycloak-browser-http` / `argocd-browser-https`: **closed, not a collision.** Both target the
+  hub context `k3d-k3d-cluster` (`bin/cluster-up:1411`), and no Hostinger code writes either label.
+  There is one owner per label.
+- Status context-mismatch flag: **closed.** The cause (shared labels) is gone, and
+  `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger` now rewrites the frontend plist. `make status`
+  already reported the symptom (Frontend 502, Pushgateway refused).
+- Dry-run guard test: **open**, specified below.
+
 **Live check (operator, after merge):** the next sandbox `make up`, then
 `make status CLUSTER_PROVIDER=k3s-hostinger`, must stay HEALTHY.
+
+## Follow-up fix spec — test the `cluster-down` dry-run guard (2026-10-05)
+
+**Status:** OPEN — dispatched to Codex.
+
+The legacy block in `bin/cluster-down` (between `# legacy-unscoped-cleanup:begin` and `:end`)
+checks `_dry_run_active` before each `launchctl` bootout and routes each `rm` through
+`_dry_guard`. Claude added that guard during review, and no test covers it.
+
+### File 1 — `scripts/tests/bin/sandbox_launchd_scope.bats`
+
+Add one test directly after
+`cluster-down removes legacy sandbox-owned plists but preserves Hostinger plists`, built the same
+way: extract the block with `sed -n`, use the same `launchctl`/`sudo`/`rm` stubs, and write the
+same sandbox-owned plist contents. The differences:
+
+- `_dry_run_active() { return 0; }`.
+- `_dry_guard` is the real definition, copied from `scripts/lib/system.sh:1826`:
+  `_dry_guard() { local _desc="${1:-}"; shift || true; if _dry_run_active; then _info "DRY_RUN: would ${_desc}"; return 0; fi; "$@"; }`.
+
+Name it `cluster-down legacy cleanup changes nothing under dry-run`, and assert:
+
+1. `status` is 0.
+2. The calls log is empty (`[ ! -s "${rm_log}" ]`): no `_run_command`, `launchctl` or `rm` ran.
+3. Both plist files still exist.
+4. The output contains `DRY_RUN: would unload legacy sandbox frontend browser HTTP daemon` and
+   `DRY_RUN: would remove legacy frontend browser HTTP plist`.
+
+Change no other file.
+
+## Rules (follow-up)
+
+- Do not commit or push; leave changes unstaged.
+- Run and paste: `bats scripts/tests/bin/sandbox_launchd_scope.bats` and
+  `bats scripts/tests/lib/bats_negation_lint.bats`.
+- Mutation: snapshot `bin/cluster-down` to `$TMPDIR`. In the legacy block, replace the frontend
+  `if _dry_run_active; then ...; else ...; fi` with the bare `_run_command ... launchctl bootout ...`
+  line. Show the new test going red, restore, and prove the restore with `cmp`.
+- Do not run `make test`.

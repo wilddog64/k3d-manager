@@ -1,6 +1,6 @@
 # Bug: `make status` can resolve the wrong provider after switching between ACG and Hostinger
 
-**Status:** Recurrence 3 FIXED 2026-10-05 (Codex, Claude-verified: 71 passed; dropping the template key turns the test red; operator must rerun `bin/k3dm-hermes-setup`); `_acg_resolve_provider` liveness check still open — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
+**Status:** Recurrence 4 OPEN 2026-10-05 (marker read without a liveness check in the Makefile, `cluster-status-summary` and the webhook; dispatched to Codex). Recurrence 3 FIXED 2026-10-05 (Codex, Claude-verified: 71 passed; dropping the template key turns the test red; operator must rerun `bin/k3dm-hermes-setup`); `_acg_resolve_provider` liveness check still open — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
 
 **Date:** 2026-06-24  
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`  
@@ -299,3 +299,175 @@ This corrects the stale marker; the next sandbox `make up` rewrites it.
 
 **Still open (separate):** `_acg_resolve_provider` should verify that the marker's context answers
 before trusting it.
+
+## Recurrence 4 — the marker is read without a liveness check in three places (2026-10-05)
+
+**Filed:** 2026-10-05, Claude. **Status:** OPEN — dispatched to Codex.
+
+The "still open" note above names `_acg_resolve_provider`, but that function already probes
+contexts before it trusts the marker (`scripts/lib/provider.sh:242`): with no `CLUSTER_PROVIDER` it
+returns the first context that answers `/readyz`, in the order `ubuntu-hostinger`, `ubuntu-k3s`,
+`ubuntu-azure`, `ubuntu-gcp`, and reads the marker only when none answers. Three other readers
+skip that function and trust the file as is:
+
+1. `Makefile:193` (`status`): when `CLUSTER_PROVIDER` is the Makefile default, it reads the marker
+   and passes it on as an explicit `CLUSTER_PROVIDER`.
+2. `bin/cluster-status-summary:6-10`: an empty **or `k3s-aws`** `CLUSTER_PROVIDER` is replaced by
+   the marker. So `make status CLUSTER_PROVIDER=k3s-aws` is silently redirected to whatever the
+   marker says.
+3. `bin/k3dm-webhook:128` (`_resolve_provider`): with no `preferred` and no env provider, it
+   returns the marker and falls back to `k3s-aws`. This is the path the Hermes sensors hit before
+   `d5fcb5bb` pinned them.
+
+After the sandbox expired on 2026-10-05, the marker still said `k3s-aws`. A bare `make status`
+and every unpinned webhook health query went to the dead `ubuntu-k3s` context.
+
+## Fix spec (Recurrence 4)
+
+The rule throughout: an explicit provider wins. Otherwise use the marker only if its context
+answers. Otherwise use the first context that answers, in the order above. Only if none answers,
+fall back to the marker (the old behaviour).
+
+### File 1 — `Makefile`, `status` target (line 193)
+
+Replace
+
+```make
+	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ]; then _provider=k3s-hostinger; if [ -r "$(HOME)/.local/share/k3d-manager/active-provider" ]; then _provider="$$(cat "$(HOME)/.local/share/k3d-manager/active-provider")"; fi; fi; case "$$_provider" in \
+```
+
+with
+
+```make
+	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ]; then _provider=""; fi; case "$$_provider" in \
+```
+
+An empty `CLUSTER_PROVIDER` then reaches `bin/cluster-status`, which resolves it (File 2).
+
+### File 2 — `bin/cluster-status-summary`, lines 6–10
+
+Replace
+
+```bash
+_provider="${CLUSTER_PROVIDER:-}"
+if [[ -z "${_provider}" || "${_provider}" == k3s-aws ]] && [[ -r "${HOME}/.local/share/k3d-manager/active-provider" ]]; then
+  _provider="$(<"${HOME}/.local/share/k3d-manager/active-provider")"
+fi
+_provider="${_provider:-k3s-aws}"
+```
+
+with
+
+```bash
+_provider="${CLUSTER_PROVIDER:-}"
+if [[ -z "${_provider}" ]]; then
+  _summary_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  # shellcheck source=/dev/null
+  source "${_summary_repo_root}/scripts/lib/system.sh"
+  # shellcheck source=/dev/null
+  source "${_summary_repo_root}/scripts/lib/provider.sh"
+  _provider="$(_acg_resolve_provider)"
+fi
+```
+
+An explicit `k3s-aws` is now honoured.
+
+### File 3 — `bin/k3dm-webhook`, `_resolve_provider` (line 128)
+
+Replace the `try:` block that reads `_ACTIVE_PROVIDER_FILE` and the final `return "k3s-aws"` with a
+call to a new helper `_resolve_live_provider()`, defined directly above `_resolve_provider`:
+
+```python
+_LIVE_PROVIDER_CACHE = {"at": 0.0, "marker": None, "provider": None}
+_LIVE_PROVIDER_TTL_SECS = 60
+_PROVIDER_PROBE_ORDER = (
+    ("k3s-hostinger", "ubuntu-hostinger"),
+    ("k3s-aws", "ubuntu-k3s"),
+    ("k3s-az", "ubuntu-azure"),
+    ("k3s-gcp", "ubuntu-gcp"),
+)
+
+
+def _context_reachable(ctx):
+    rc, _out, timed_out = _spawn_capture_text(
+        ["kubectl", "--context", ctx, "--request-timeout=5s", "get", "--raw=/readyz"], timeout=8)
+    return rc == 0 and not timed_out
+
+
+def _resolve_live_provider():
+    marker = None
+    try:
+        if _ACTIVE_PROVIDER_FILE.exists():
+            marker = _normalize_provider(_ACTIVE_PROVIDER_FILE.read_text()) or None
+    except OSError:
+        marker = None
+    now = time.monotonic()
+    cache = _LIVE_PROVIDER_CACHE
+    if cache["provider"] and cache["marker"] == marker and now - cache["at"] < _LIVE_PROVIDER_TTL_SECS:
+        return cache["provider"]
+    contexts = dict(_PROVIDER_PROBE_ORDER)
+    provider = None
+    if marker and marker in contexts and _context_reachable(contexts[marker]):
+        provider = marker
+    if provider is None:
+        for candidate, ctx in _PROVIDER_PROBE_ORDER:
+            if candidate != marker and _context_reachable(ctx):
+                provider = candidate
+                break
+    provider = provider or marker or "k3s-aws"
+    cache.update(at=now, marker=marker, provider=provider)
+    return provider
+```
+
+`_resolve_provider` keeps its first two steps (`preferred`, then the env provider) and ends with
+`return _resolve_live_provider()`. Do not change `_provider_context` or any caller.
+
+### File 4 — tests
+
+- `scripts/tests/bin/cluster_status_summary.bats`: in `setup()`, add a `kubectl` stub to
+  `${TMP_DIR}` that exits 1, so no test can probe a real context. Add two tests:
+  1. `summary honours an explicit k3s-aws over the marker`: marker `k3s-hostinger`,
+     `CLUSTER_PROVIDER=k3s-aws`, `--mode json` → `provider` is `k3s-aws`.
+  2. `summary skips a marker whose context is dead`: marker `k3s-aws`, `CLUSTER_PROVIDER` unset,
+     and a `kubectl` stub that exits 0 only when its arguments contain `ubuntu-hostinger`; also
+     create `active-providers/k3s-aws` under the test HOME, so the set agrees with the marker.
+     `--mode json` → `provider` is `k3s-hostinger`.
+  The existing tests that write a `k3s-hostinger` marker must still pass unchanged.
+- New `scripts/tests/bin/test_webhook_live_provider.py` (load `bin/k3dm-webhook` the way
+  `test_webhook_cluster_status_thread.py` does). Monkeypatch `_ACTIVE_PROVIDER_FILE` to a
+  `tmp_path` file, `_context_reachable` to a fake that records calls, and reset
+  `_LIVE_PROVIDER_CACHE` before each test. Clear `CLUSTER_PROVIDER` and
+  `K3D_MANAGER_CLUSTER_PROVIDER` with `monkeypatch.delenv(..., raising=False)`.
+  1. Marker `k3s-aws`, only `ubuntu-hostinger` reachable → `k3s-hostinger`.
+  2. Marker `k3s-aws`, `ubuntu-k3s` reachable → `k3s-aws`, and `ubuntu-k3s` was probed first.
+  3. Marker `k3s-aws`, nothing reachable → `k3s-aws`.
+  4. No marker file, nothing reachable → `k3s-aws`.
+  5. `preferred="hostinger"` → `k3s-hostinger` with no probe at all.
+  6. Cache: two calls within the TTL probe once. Changing the marker file content between the
+     calls probes again.
+- `Makefile` static check: add one test to `scripts/tests/bin/cluster_status_summary.bats`. Extract
+  the `status:` recipe (`sed -n '/^status:/,/^status-full:/p' Makefile`) and assert it does not
+  contain `active-provider`.
+
+## Rules (Recurrence 4)
+
+- Modify only the files named in File 1–4. Do not edit `scripts/lib/provider.sh` or anything
+  under `scripts/lib/foundation/`.
+- No live `kubectl`: every test stubs it.
+- Do not commit or push; leave changes unstaged.
+- Run and paste: `bats scripts/tests/bin/cluster_status_summary.bats scripts/tests/lib/provider_active_set.bats`,
+  `bats scripts/tests/lib/bats_negation_lint.bats`,
+  `pytest -q scripts/tests/bin/test_webhook_live_provider.py scripts/tests/bin/test_webhook_cluster_status_thread.py scripts/tests/bin/test_smoke_logins.py`
+  (use the `pytest` executable; `python3` has no pytest), `shellcheck bin/cluster-status-summary`
+  (no new warnings against `HEAD`), and `make -n status >/dev/null`.
+- Mutations: snapshot each file to `$TMPDIR`, mutate, run, restore, and prove the restore with `cmp`.
+  1. In `_resolve_live_provider`, return `marker` right after reading it → webhook tests 1 and 6
+     go red.
+  2. Restore the `|| "${_provider}" == k3s-aws` marker override in `cluster-status-summary` →
+     summary test 1 goes red.
+- Do not run `make test`.
+
+## Done when
+
+No status or webhook path returns a provider whose context is dead while another context
+answers. An explicit provider always wins. The listed suites pass, and both mutations go red.
