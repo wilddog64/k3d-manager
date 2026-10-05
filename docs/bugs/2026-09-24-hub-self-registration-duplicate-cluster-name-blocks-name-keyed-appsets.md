@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.37.0`
 **Filed:** 2026-09-24
-**Status:** OPEN — root cause confirmed; the remedy needs an owner decision (live registration Secret)
+**Status:** FIXED and verified live 2026-09-24 — option 2: `ac3ebb82` renamed the hub self-registration to `k3d-cluster` (`HUB_RECOVERY_HUB_CLUSTER_NAME`), and the live Secret was patched to match. All four AppSets generate; the hub's ESO was re-adopted by `k3d-cluster-eso`. Status line updated 2026-10-04.
 **Files:** `scripts/plugins/hub_recovery.sh:252` (source of the collision)
 **Related:**
 - `2026-09-24-cluster-up-registration-omits-provider-and-shopping-cart-labels.md` — the label fix (`ffe954a1`) that exposed this

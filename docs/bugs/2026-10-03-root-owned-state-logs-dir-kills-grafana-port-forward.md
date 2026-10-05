@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.41.0`
 **Filed:** 2026-10-03, Claude (found during the hub-loss recovery)
-**Status:** OPEN — one contributing defect confirmed (argocd.sh:83 shared log default); creator of the 744 folder still unconfirmed
+**Status:** SPEC — dispatched to Codex 2026-10-04 (see "Fix spec"). The creator of the 744 folder is still unconfirmed; the preflight below makes it loud instead.
 **Severity:** Medium. Local Grafana (`localhost:3001`) stays down after a rebuild, and nothing reports why.
 
 ## Evidence (2026-10-03, about 09:12)
@@ -68,3 +68,81 @@ launchctl kickstart -k gui/$(id -u)/com.k3d-manager.grafana-port-forward
      never share a log folder with user agents.
   2. Keep the `bin/hub-restore` root-owned preflight. It already reports this case with the
      exact `chown`.
+
+## Fix spec (Claude, 2026-10-04)
+
+Two changes. The first stops the root ArgoCD browser daemon from logging into the shared folder.
+The second makes `cluster-up` stop, loudly, before it installs anything when a root-owned folder
+already sits in the state tree. It never runs sudo to repair it.
+
+### File 1 — `scripts/plugins/argocd.sh`
+
+Delete these two lines (currently :82 and :83):
+
+```bash
+: "${ARGOCD_BROWSER_LISTENER_WRAPPER:=${HOME}/.local/share/k3d-manager/bin/argocd-browser-https.sh}"
+: "${ARGOCD_BROWSER_LISTENER_LOG:=${HOME}/.local/share/k3d-manager/logs/argocd-browser-https.log}"
+```
+
+Nothing inside `argocd.sh` reads either variable. Every consumer already has a per-provider
+fallback that these defaults shadow: `bin/cluster-up:690/692`, `bin/cluster-refresh:510/511`,
+`bin/cluster-down:230` and `scripts/lib/providers/k3s-hostinger.sh:581/582`. Do not edit those.
+
+### File 2 — `bin/cluster-up`
+
+Insert this block directly after the line
+`_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"`
+(currently :100). It is the same check `bin/hub-restore:48-58` already runs, with the
+`[acg-up]` prefix:
+
+```bash
+_acg_state_root="${_ACG_STATE_BASE:-${HOME}/.local/share/k3d-manager}"
+_acg_root_owned_dirs="$(find "${_acg_state_root}" -maxdepth 3 -type d -user root ! -name '*.lock' 2>/dev/null || true)"
+if [[ -n "${_acg_root_owned_dirs}" ]]; then
+  printf 'ERROR: [acg-up] root-owned state folders found; user launchd agents cannot write their logs there:\n' >&2
+  while IFS= read -r _acg_root_dir; do
+    [[ -n "${_acg_root_dir}" ]] || continue
+    printf 'ERROR: %s\n' "${_acg_root_dir}" >&2
+    printf 'ERROR: sudo chown -R "%s":staff %s\n' "$(id -un)" "${_acg_root_dir}" >&2
+  done <<< "${_acg_root_owned_dirs}"
+  exit 2
+fi
+```
+
+It must sit before the first `_run_command --interactive-sudo` in the file (currently :708).
+
+### File 3 — `scripts/tests/bin/cluster_up.bats` (append) and a new `scripts/tests/plugins/argocd_browser_listener_defaults.bats`
+
+1. `argocd_browser_listener_defaults.bats`: `argocd.sh` contains neither
+   `ARGOCD_BROWSER_LISTENER_LOG:=` nor `ARGOCD_BROWSER_LISTENER_WRAPPER:=` (use `run grep -F` and
+   assert `status -eq 1`, never a bare `! grep`).
+2. Same file: `bin/cluster-up` still contains the fallback
+   `${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}`.
+3. `cluster_up.bats`: the line number of `-user root` in `bin/cluster-up` is lower than the line
+   number of the first `--interactive-sudo`, and higher than the `create local state directories`
+   line.
+4. `cluster_up.bats`: functional. Extract the block (from `_acg_state_root=` through its closing
+   `fi`) with `sed -n`, run it in `bash` with `_ACG_STATE_BASE` set to a `$BATS_TEST_TMPDIR`
+   folder that holds no root-owned dirs, and assert exit 0 with no output. Root ownership cannot
+   be faked without sudo, so for the failing case put a stub `find` on `PATH` that prints
+   `$BATS_TEST_TMPDIR/state/logs`, and assert exit 2, `root-owned state folders found` and
+   `sudo chown -R` in the output.
+
+## Rules
+
+- Modify only Files 1–3. Do not touch `scripts/lib/foundation/`, `bin/hub-restore`,
+  `bin/cluster-refresh`, `bin/cluster-down` or `scripts/lib/providers/`.
+- Do not commit or push; `.git` writes are denied in your sandbox. Leave changes unstaged.
+- Run and paste: `shellcheck bin/cluster-up scripts/plugins/argocd.sh` (no new warnings: compare the
+  count against `git show HEAD:<file> | shellcheck -`),
+  `bats scripts/tests/bin/cluster_up.bats scripts/tests/plugins/argocd_browser_listener_defaults.bats`,
+  `bats scripts/tests/lib/bats_negation_lint.bats`.
+- Mutations (snapshot each file to `$TMPDIR` first, restore, prove with `cmp`):
+  1. Put the `ARGOCD_BROWSER_LISTENER_LOG:=` line back → test 1 red.
+  2. Delete the `exit 2` in the preflight → test 4 red.
+- Do not run `make test`.
+
+## Done when
+
+Both defaults are gone, `cluster-up` stops with the exact `chown` command before any sudo step
+when a root-owned folder exists, the new tests pass, both mutations go red and are restored.
