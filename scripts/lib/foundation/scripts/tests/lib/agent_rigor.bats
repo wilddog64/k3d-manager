@@ -144,6 +144,60 @@ SCRIPT
   [[ "$output" == *"bare sudo call"* ]]
 }
 
+@test "_agent_audit allows _run_command sudo flags after a prefix" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/run_cmd_prefix.sh
+function installer() {
+   echo ok
+}
+SCRIPT
+  git add scripts/run_cmd_prefix.sh
+  git commit -m "add prefixed installer" >/dev/null
+  cat <<'SCRIPT' >> scripts/run_cmd_prefix.sh
+   if ! _run_command --interactive-sudo --quiet -- install -m 644 a b; then :; fi
+   _out=$(_run_command --prefer-sudo -- ls)
+   true && _run_command --require-sudo -- mkdir /tmp/x
+SCRIPT
+  git add scripts/run_cmd_prefix.sh
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit flags sudo after a pipe" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/pipe.sh
+function action() {
+   echo ok
+}
+SCRIPT
+  git add scripts/pipe.sh
+  git commit -m "add pipe action" >/dev/null
+  cat <<'SCRIPT' >> scripts/pipe.sh
+   echo x | sudo tee /etc/x
+SCRIPT
+  git add scripts/pipe.sh
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"bare sudo call"* ]]
+}
+
+@test "_agent_audit flags sudo after a quote" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/quote.sh
+function action() {
+   echo ok
+}
+SCRIPT
+  git add scripts/quote.sh
+  git commit -m "add quote action" >/dev/null
+  cat <<'SCRIPT' >> scripts/quote.sh
+   ssh host "sudo reboot"
+SCRIPT
+  git add scripts/quote.sh
+  run _agent_audit
+  [ "$status" -ne 0 ]
+}
+
 @test "_agent_audit ignores _run_command sudo usage" {
   mkdir -p scripts
   cat <<'SCRIPT' > scripts/run_cmd.sh

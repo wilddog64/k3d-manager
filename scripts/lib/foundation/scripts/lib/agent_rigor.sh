@@ -169,7 +169,7 @@ _agent_audit() {
             { git diff --cached -- "$file" 2>/dev/null; git diff -- "$file" 2>/dev/null; } \
             | grep '^+' \
             | sed 's/^+//' \
-            | grep -E '\bsudo[[:space:]]' \
+            | grep -E '(^|[^-[:alnum:]_])sudo[[:space:]]' \
             | grep -Ev '^[[:space:]]*#' \
             | grep -Ev '^[[:space:]]*_run_command\b' \
             | grep -Ev '#[[:space:]]*agent-audit:[[:space:]]*remote-sudo[[:space:]]*$' || true)
