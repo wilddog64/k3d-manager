@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Fixed
+- `scripts/lib/acg/cdp.sh`: add a self-contained CDP readiness wait so `_browser_launch` does not
+  depend on a host's `_run_command` proxy guard loading foundation `system.sh`; the new probe also
+  honors `PLAYWRIGHT_CDP_HOST` and `PLAYWRIGHT_CDP_PORT` instead of hard-coding localhost:9222.
 - `_agent_audit`'s bare-sudo check no longer flags `_run_command`'s own `--prefer-sudo`,
   `--require-sudo` and `--interactive-sudo` flags. The pattern `\bsudo[[:space:]]` also matched the
   `-sudo` at the end of each flag, because `\b` sits between `-` and `s`. The `_run_command`
