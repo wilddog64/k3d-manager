@@ -215,6 +215,7 @@ def test_failed_poll_pages_job_failure_and_reraises(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["k3dm-hermes"])
     monkeypatch.setattr(hermes, "_poll", lambda *_: (_ for _ in ()).throw(RuntimeError("boom")))
     monkeypatch.setattr(hermes, "_keychain_secret", lambda service: "")
+    monkeypatch.setattr(hermes, "_sms_keychain", lambda service: "")
     monkeypatch.setattr(hermes, "post_summary", lambda relay, text: pages.append(text))
     for _ in range(2):
         try:
