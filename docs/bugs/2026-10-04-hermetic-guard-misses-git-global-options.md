@@ -2,7 +2,14 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN — dispatched to Codex 2026-10-04.
+**Status:** FIXED — Codex, verified by Claude 2026-10-04. Claude changed `cwd = kwargs.get("cwd",
+os.getcwd())` to `kwargs.get("cwd") or os.getcwd()`: callers that pass `cwd=None` broke the new path
+resolution (6 `test_e2e_bugs.py` reds that Codex reported as pre-existing; they were not). 14 guard
+tests; Codex's 4 mutations plus Claude's (`-c` as a one-word flag) each turn a test red.
+
+The guard also caught `test_pager.py::test_failed_poll_pages_job_failure_and_reraises` reading the
+real Keychain through `_sms_keychain`. It passed under `make test-pytest` only because the tripwire's
+`security` stub is allowed. The test now stubs `_sms_keychain`.
 **Severity:** low. No current test is known to reach the network this way. But the guard reports
 "hermetic" when it cannot see these calls, so a future test could reach GitHub and the guard would
 not stop it.
