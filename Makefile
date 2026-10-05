@@ -3,6 +3,8 @@
 
 .DEFAULT_GOAL := help
 
+.PHONY: lint-python
+
 # Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
 # /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
 # those recipes died on the CI runner while passing on macOS, whose /bin/sh is
@@ -1113,6 +1115,23 @@ test-python-unit:
 	 done; \
 	 if [ "$$found" -eq 0 ]; then echo "[make] no unittest suites found" >&2; exit 2; fi
 
+## Lint tracked Python files, including extensionless Python shebang scripts, with Ruff
+RUFF ?= ruff
+lint-python:
+	@set -euo pipefail; \
+	 ruff="$(RUFF)"; \
+	 if ! command -v "$$ruff" >/dev/null 2>&1; then \
+	   echo "[make] Ruff not found: install with python3 -m pip install --user ruff==0.15.8" >&2; \
+	   exit 2; \
+	 fi; \
+	 files=(); \
+	 while IFS= read -r f; do files+=("$$f"); done < <(git ls-files "*.py" | grep -v '^scripts/lib/foundation/'); \
+	 while IFS= read -r f; do \
+	   first=$$(sed -n '1p' "$$f"); \
+	   case "$$first" in '#!'*python*) files+=("$$f");; esac; \
+	 done < <(git ls-files | grep -v '^scripts/lib/foundation/' | grep -v '\.py$$'); \
+	 "$$ruff" check -- "$${files[@]}"
+
 ## Run the pytest suites (scripts/tests/hermes + scripts/tests/bin/test_*.py)
 check-doc-links:
 	@python3 scripts/check-doc-links.py
@@ -1277,6 +1296,7 @@ help:
 	@echo "    make test-all      Run every offline suite (BATS dispatcher + bin BATS + Python)"
 	@echo "    make test-bin      Run the BATS suites under scripts/tests/bin"
 	@echo "    make test-python   Run every Python suite (unittest + pytest)"
+	@echo "    make lint-python   Lint tracked Python files with Ruff (pyflakes)"
 	@echo "    make e2e           Run Tier 1 e2e harness (vCluster + Playwright Job; DIGEST=<image digest> optional)"
 	@echo "    make e2e-sandbox   Run Tier 2 e2e harness against the live ACG sandbox (DIGEST=<image digest> optional; needs a TTY)"
 	@echo "    make e2e-remote    Run Tier 1 e2e harness on a remote runner off the M4 (RUNNER=m2 [DIGEST=<image digest>]; no local fallback)"
