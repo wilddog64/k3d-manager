@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+- `_agent_audit`'s bare-sudo check no longer flags `_run_command`'s own `--prefer-sudo`,
+  `--require-sudo` and `--interactive-sudo` flags. The pattern `\bsudo[[:space:]]` also matched the
+  `-sudo` at the end of each flag, because `\b` sits between `-` and `s`. The `_run_command`
+  exemption only covers lines that *start* with `_run_command`, so a correct wrapper call behind
+  `if !`, `x=$(`, `&&` or `||` was blocked as bare sudo, which pushed agents to reshape correct code
+  to pass the hook. The pattern now requires `sudo` to start the line or follow a character other
+  than `-`, a letter, a digit or `_`. A real `sudo` after a pipe, a quote or `&&` is still flagged.
+  Spec: `docs/bugs/2026-10-04-agent-audit-bare-sudo-has-no-remote-exemption.md` (Recurrence).
+
 ## [v0.5.0] — 2026-10-04
 
 ### Added
