@@ -1,6 +1,6 @@
 # Bug: `cluster-up` restarts hub CoreDNS for no reason, and the ArgoCD controller restart right after it never becomes Ready
 
-**Status:** OPEN
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** High. `make up` (sandbox) fails at Step 10 with exit 1, after the billable stack is

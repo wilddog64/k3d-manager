@@ -215,7 +215,7 @@ _acg_up_clear_stack_marker
 # CoreDNS restarts can drop the NodeHosts entry, which otherwise leaves the
 # data-layer Application stuck in Unknown before any service is deployed.
 function _acg_repair_hub_host_alias() {
-  local _host_ip _existing_nodes _new_node_hosts _patch_json
+  local _host_ip _current_node_hosts _existing_nodes _new_node_hosts _patch_json
 
   _info "[acg-up] Ensuring Hub CoreDNS resolves host.k3d.internal..."
   _host_ip=$(_hub_docker_host_ip)
@@ -223,9 +223,13 @@ function _acg_repair_hub_host_alias() {
     _err "[acg-up] Could not resolve host.docker.internal inside k3d-k3d-cluster-server-0 — hub CoreDNS cannot be given host.k3d.internal and ArgoCD will not reach ubuntu-k3s"
   fi
 
-  _existing_nodes=$(kubectl get configmap coredns -n kube-system \
-    --context k3d-k3d-cluster -o jsonpath='{.data.NodeHosts}' 2>/dev/null \
-    | grep -v "host\.k3d\.internal" || true)
+  _current_node_hosts=$(kubectl get configmap coredns -n kube-system \
+    --context k3d-k3d-cluster -o jsonpath='{.data.NodeHosts}' 2>/dev/null || true)
+  if printf '%s\n' "${_current_node_hosts}" | grep -qxF "${_host_ip} host.k3d.internal"; then
+    _info "[acg-up] CoreDNS host.k3d.internal alias already present — no change"
+    return 0
+  fi
+  _existing_nodes=$(printf '%s\n' "${_current_node_hosts}" | grep -v "host\.k3d\.internal" || true)
   _new_node_hosts="${_host_ip} host.k3d.internal"
   if [[ -n "${_existing_nodes}" ]]; then
     _new_node_hosts="${_new_node_hosts}"$'\n'"${_existing_nodes}"
@@ -238,15 +242,7 @@ function _acg_repair_hub_host_alias() {
     _warn "[acg-up] CoreDNS host alias patch failed — ArgoCD may not reach ubuntu-k3s"
     return 0
   fi
-  if kubectl rollout restart deployment/coredns -n kube-system \
-      --context k3d-k3d-cluster >/dev/null 2>&1; then
-    kubectl rollout status deployment/coredns -n kube-system \
-      --context k3d-k3d-cluster --timeout=30s >/dev/null 2>&1 \
-      || _warn "[acg-up] CoreDNS rollout status timed out — DNS may still be recovering"
-    _info "[acg-up] CoreDNS host.k3d.internal alias restored"
-  else
-    _warn "[acg-up] CoreDNS restart failed — ArgoCD may not reach ubuntu-k3s"
-  fi
+  _info "[acg-up] CoreDNS host.k3d.internal alias patched — the hosts plugin reloads it within ~1m (no restart)"
 }
 
 # Report pods in a namespace whose containers are stuck on an unrecoverable image

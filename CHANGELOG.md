@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- `cluster-up` no longer restarts the single-replica hub CoreDNS deployment when repairing the
+  `host.k3d.internal` alias. The hosts plugin's `reload` picks up the patched NodeHosts file, so
+  the restart was unnecessary; it opened a DNS gap, and the subsequent ArgoCD controller restart
+  could land inside it, leaving its sidecar unable to reach istiod and refusing every outbound
+  connection from the pod.
 - E2E verification alerts now aggregate away exporter pod identity, so an exporter rollout does
   not re-page for an unchanged red run; their service subject uses the exported service label
   instead of the colliding exporter `service` label.

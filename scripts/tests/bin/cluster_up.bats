@@ -76,6 +76,63 @@
   [ "$status" -eq 0 ]
 }
 
+function _run_acg_repair_hub_host_alias_test() {
+  local node_hosts="$1"
+  local helper="${BATS_TEST_TMPDIR}/repair-hub-host-alias.sh"
+  local stub_log="${BATS_TEST_TMPDIR}/repair-hub-host-alias.log"
+
+  sed -n '/^function _acg_repair_hub_host_alias()/,/^}$/p' bin/cluster-up > "${helper}"
+  : > "${stub_log}"
+  run env STUB_NODE_HOSTS="${node_hosts}" STUB_LOG="${stub_log}" bash -c '
+    _hub_docker_host_ip() { printf "0.250.250.254\n"; }
+    _info() { printf "%s\n" "$*"; }
+    _warn() { printf "%s\n" "$*"; }
+    _err() { printf "%s\n" "$*"; }
+    kubectl() {
+      printf "kubectl %s\n" "$*" >> "${STUB_LOG}"
+      if [[ "$1" == "get" && "$2" == "configmap" ]]; then
+        printf "%s" "${STUB_NODE_HOSTS}"
+      fi
+    }
+    source "$1"
+    _acg_repair_hub_host_alias
+  ' bash "${helper}"
+  REPAIR_HUB_HOST_ALIAS_LOG="${stub_log}"
+}
+
+@test "acg-up skips the CoreDNS patch when the Hub host alias is already present" {
+  _run_acg_repair_hub_host_alias_test $'0.250.250.254 host.k3d.internal\n192.168.97.2 k3d-k3d-cluster-server-0'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"already present"* ]]
+  run grep -q 'patch' "${REPAIR_HUB_HOST_ALIAS_LOG}"
+  [ "$status" -ne 0 ]
+  run grep -q 'rollout' "${REPAIR_HUB_HOST_ALIAS_LOG}"
+  [ "$status" -ne 0 ]
+}
+
+@test "acg-up patches a wrong Hub host alias without restarting CoreDNS" {
+  _run_acg_repair_hub_host_alias_test $'10.0.0.9 host.k3d.internal\n192.168.97.2 k3d-k3d-cluster-server-0'
+
+  [ "$status" -eq 0 ]
+  run grep -c 'patch configmap coredns' "${REPAIR_HUB_HOST_ALIAS_LOG}"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+  run grep -q 'rollout' "${REPAIR_HUB_HOST_ALIAS_LOG}"
+  [ "$status" -ne 0 ]
+}
+
+@test "acg-up patches a missing Hub host alias without restarting CoreDNS" {
+  _run_acg_repair_hub_host_alias_test '192.168.97.2 k3d-k3d-cluster-server-0'
+
+  [ "$status" -eq 0 ]
+  run grep -c 'patch configmap coredns' "${REPAIR_HUB_HOST_ALIAS_LOG}"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+  run grep -q 'rollout' "${REPAIR_HUB_HOST_ALIAS_LOG}"
+  [ "$status" -ne 0 ]
+}
+
 @test "acg-up reconciles other app-cluster registrations after registering the hub" {
   run bash -c "awk '/register_app_cluster/{print NR; found=1} found && /argocd_reconcile_app_cluster_registrations/{print NR; exit}' bin/cluster-up"
   [ "$status" -eq 0 ]
