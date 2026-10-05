@@ -3,6 +3,7 @@
 #
 # Public functions:
 #   _browser_launch          — ensure Chrome is running with --remote-debugging-port=9222
+#   _cdp_browser_ready       — wait for the CDP endpoint to answer after a launch
 #   _cdp_ensure_acg_session  — verify Pluralsight session is active in CDP browser
 
 # Resolve foundation helpers. When a host already loaded foundation (k3d-manager),
@@ -117,6 +118,21 @@ function _cdp_port_has_listener() {
   lsof -nP -iTCP:"${_cdp_port}" -sTCP:LISTEN -t >/dev/null 2>&1
 }
 
+function _cdp_browser_ready() {
+  local _timeout="${1:-30}"
+  local _cdp_host="${PLAYWRIGHT_CDP_HOST:-127.0.0.1}"
+  local _cdp_port="${PLAYWRIGHT_CDP_PORT:-9222}"
+  local _elapsed=0
+  while (( _elapsed < _timeout )); do
+    if _run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}" -sf "http://${_cdp_host}:${_cdp_port}/json" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+    _elapsed=$(( _elapsed + 2 ))
+  done
+  _err "[acg] CDP browser not ready on ${_cdp_host}:${_cdp_port} after ${_timeout}s"
+}
+
 function _browser_launch() {
   local _cdp_host="${PLAYWRIGHT_CDP_HOST:-127.0.0.1}"
   local _cdp_port="${PLAYWRIGHT_CDP_PORT:-9222}"
@@ -159,7 +175,7 @@ function _browser_launch() {
   else
     _err "[acg] _browser_launch is macOS-only — $(uname) is not supported"
   fi
-  _antigravity_browser_ready 30
+  _cdp_browser_ready 30
   _cdp_ensure_acg_session
 }
 

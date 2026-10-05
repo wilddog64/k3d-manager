@@ -45,17 +45,17 @@ bats_require_minimum_version 1.5.0
   _info() { :; }
   uname() { echo "Darwin"; }
   node() { printf '%s' "$fake_chromium"; }
-  _antigravity_browser_ready() { :; }
+  _cdp_browser_ready() { :; }
   _cdp_ensure_acg_session() { echo "relaunched-session-check"; return 0; }
   export fake_chromium reclaim_log
-  export -f _command_exist _run_command _cdp_connectable _cdp_port_has_listener _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
+  export -f _command_exist _run_command _cdp_connectable _cdp_port_has_listener _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _cdp_browser_ready _cdp_ensure_acg_session
 
   run _browser_launch
   [ "$status" -eq 0 ]
   [ "$output" = "relaunched-session-check" ]
   [ -f "$reclaim_log" ]
 
-  unset -f _command_exist _run_command _cdp_connectable _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
+  unset -f _command_exist _run_command _cdp_connectable _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _cdp_browser_ready _cdp_ensure_acg_session
 }
 
 @test "_browser_launch: launches the managed Chromium then runs the session check" {
@@ -71,16 +71,16 @@ bats_require_minimum_version 1.5.0
   _info() { :; }
   uname() { echo "Darwin"; }
   node() { printf '%s' "$fake_chromium"; }
-  _antigravity_browser_ready() { :; }
+  _cdp_browser_ready() { :; }
   _cdp_ensure_acg_session() { echo "launched-session-check"; return 0; }
   export fake_chromium
-  export -f _command_exist _run_command _cdp_port_has_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
+  export -f _command_exist _run_command _cdp_port_has_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _cdp_browser_ready _cdp_ensure_acg_session
 
   run _browser_launch
   [ "$status" -eq 0 ]
   [ "$output" = "launched-session-check" ]
 
-  unset -f _command_exist _run_command _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
+  unset -f _command_exist _run_command _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _cdp_browser_ready _cdp_ensure_acg_session
 }
 
 @test "_browser_launch: reclaims an IPv6-only listener when the IPv4 CDP probe fails" {
@@ -98,17 +98,17 @@ bats_require_minimum_version 1.5.0
   _info() { :; }
   uname() { echo "Darwin"; }
   node() { printf '%s' "$fake_chromium"; }
-  _antigravity_browser_ready() { :; }
+  _cdp_browser_ready() { :; }
   _cdp_ensure_acg_session() { echo "reclaimed-ipv6-session-check"; return 0; }
   export fake_chromium reclaim_log
-  export -f _command_exist _run_command _cdp_port_has_listener _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
+  export -f _command_exist _run_command _cdp_port_has_listener _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _cdp_browser_ready _cdp_ensure_acg_session
 
   run _browser_launch
   [ "$status" -eq 0 ]
   [ "$output" = "reclaimed-ipv6-session-check" ]
   [ -f "$reclaim_log" ]
 
-  unset -f _command_exist _run_command _cdp_port_has_listener _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _antigravity_browser_ready _cdp_ensure_acg_session
+  unset -f _command_exist _run_command _cdp_port_has_listener _cdp_kill_port_listener _cdp_stop_chrome_cdp_agent _cdp_remove_stale_singleton_lock _info uname node _cdp_browser_ready _cdp_ensure_acg_session
 }
 
 @test "_browser_launch: K3DM_ACG_SKIP_SESSION_CHECK=1 still bypasses the session check end-to-end" {
@@ -126,4 +126,30 @@ bats_require_minimum_version 1.5.0
 
   unset K3DM_ACG_SKIP_SESSION_CHECK _LIB_ACG_ROOT
   unset -f _command_exist _run_command _info _err
+}
+
+@test "_browser_launch: launch branch works when a host already defines _run_command (no foundation system.sh)" {
+  fake_chromium="${BATS_TEST_TMPDIR}/fake-chromium"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_chromium"
+  chmod +x "$fake_chromium"
+  export fake_chromium CDP_LIB
+  run env -i HOME="${BATS_TEST_TMPDIR}" PATH="$PATH" fake_chromium="$fake_chromium" CDP_LIB="${CDP_LIB_OVERRIDE:-$CDP_LIB}" bash -c '
+    _probe_count=0
+    _run_command() { _probe_count=$(( _probe_count + 1 )); (( _probe_count > 1 )); }
+    _command_exist() { [[ "$1" == curl ]]; }
+    _info() { :; }
+    _err() { printf "ERR: %s\n" "$*" >&2; return 1; }
+    source "$CDP_LIB"
+    _cdp_port_has_listener() { return 1; }
+    _cdp_stop_chrome_cdp_agent() { :; }
+    _cdp_remove_stale_singleton_lock() { :; }
+    _acg_resolve_cdp_browser_bin() { printf "%s" "$fake_chromium"; }
+    uname() { echo Darwin; }
+    sleep() { :; }
+    _cdp_ensure_acg_session() { echo launched-session-check; }
+    _browser_launch
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"launched-session-check"* ]]
+  [[ "$output" != *"command not found"* ]]
 }

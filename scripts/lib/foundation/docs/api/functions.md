@@ -230,3 +230,17 @@ _antigravity_browser_ready [timeout_seconds]
 ```
 
 Returns 0 when port 9222 responds to `curl -sf http://localhost:9222/json`; otherwise calls `_err` after the timeout.
+
+### `_browser_launch`
+
+Ensures the Playwright-managed Chromium CDP endpoint is available, launching it when needed and then running the ACG session check.
+
+### `_cdp_browser_ready`
+
+Waits for the CDP endpoint used by `_browser_launch` to respond.
+
+```
+_cdp_browser_ready [timeout_seconds]
+```
+
+Uses `PLAYWRIGHT_CDP_HOST` and `PLAYWRIGHT_CDP_PORT` (defaulting to `127.0.0.1:9222`) and calls `_err` after the timeout.
