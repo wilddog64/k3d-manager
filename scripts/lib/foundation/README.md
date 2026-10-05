@@ -109,6 +109,42 @@ no package-manager installation or fallback to an arbitrary `vcluster` on `PATH`
 Returns active provider string (`k3d`, `k3s`, `orbstack`). Controlled by
 `CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER`.
 
+### `_agent_audit` (agent_rigor.sh)
+
+The pre-commit hook (`scripts/hooks/pre-commit`) runs `_agent_audit` on the staged changes. Any
+failed check blocks the commit, and the message names the file and the rule.
+
+| Staged files | Check |
+|---|---|
+| `*.bats` | fewer `@test` blocks, or removed `assert_*` lines |
+| `*.sh` | more `if` blocks per function than `AGENT_AUDIT_MAX_IF` (default 8); bare `sudo` (use `_run_command`); tab indentation |
+| any | `kubectl exec` with an inline credential |
+| `*.yaml`, `*.yml` | hardcoded IPv4 address (exempt paths listed in the file named by `AGENT_IP_ALLOWLIST`) |
+| Python test files | fewer `def test_` functions, removed `assert` / `self.assert…` lines, or a deleted test file |
+| Python files | syntax error in the staged version (skipped with a warning when the interpreter is missing) |
+| Python, non-test | `shell=True`, `eval(`, `exec(`, a `"sudo"` string, or a `"--password"` / `"--token"` / `"--username"` string |
+
+A **Python file** ends in `.py`, or has no extension and starts with a `python` shebang. A
+**Python test file** matches `AGENT_AUDIT_PY_TEST_GLOB` (default `*/tests/* test_*.py *_test.py`)
+on its path or file name. `AGENT_AUDIT_PYTHON` picks the interpreter for the syntax check
+(default `python3`). Comment lines are ignored by the Python dangerous-call rules.
+
+When a dangerous call is intended, mark the line with the rule name and a reason. A marker
+without a reason does not count:
+
+```python
+subprocess.run(cmd, shell=True)  # agent-audit: allow shell-true cmd is a fixed literal
+```
+
+The rule names are `shell-true`, `eval`, `exec`, `sudo` and `sensitive-flag`. Shell scripts that
+run a privileged command on another host use the trailing marker `# agent-audit: remote-sudo`.
+
+An edited assertion counts as removed. If a test change really needs it, the operator commits
+with `--no-verify` knowingly; an agent never does.
+
+`_agent_lint` (opt-in AI lint, `ENABLE_AGENT_LINT=1`) reviews staged files matching
+`AGENT_LINT_GLOBS` (default `*.sh *.js *.md`).
+
 ## Contributed Scripts and Templates
 
 Standalone tools for the spec-driven multi-agent workflow — copy into your repo or

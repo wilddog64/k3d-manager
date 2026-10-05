@@ -190,8 +190,8 @@ export ENABLE_AGENT_LINT=1
 | Function | Signature | Description |
 |---|---|---|
 | `_agent_checkpoint <label>` | Commit the working tree with a checkpoint message before a risky change (no-op if clean). |
-| `_agent_audit` | Audits staged diffs for: BATS assertion/test removal, if-count threshold violations (default: 8, configurable via `AGENT_AUDIT_MAX_IF`), bare `sudo` calls, `kubectl exec` commands with inline credentials, and hardcoded IPv4 literals in staged `.yaml`/`.yml` files. Set `AGENT_IP_ALLOWLIST` to a regular file path listing repo-relative paths to exempt from the IP check (one path per line; lines beginning with `#` are ignored). Returns non-zero if any check fails. |
-| `_agent_lint` | AI-based lint pass on staged `.sh` files. Gated by `AGENT_LINT_GATE_VAR` (default: `ENABLE_AGENT_LINT=1`). Invokes the function named by `AGENT_LINT_AI_FUNC` with staged file names and rules from `scripts/etc/agent/lint-rules.md`. No-op when gate is off or no `.sh` files are staged. |
+| `_agent_audit` | Audits staged diffs for BATS and Python test/assertion removal, Python syntax errors (including extensionless Python shebang files), dangerous Python calls, if-count threshold violations (default: 8, configurable via `AGENT_AUDIT_MAX_IF`), bare `sudo` calls, `kubectl exec` commands with inline credentials, and hardcoded IPv4 literals in staged `.yaml`/`.yml` files. Python dangerous-call findings may use the marker `# agent-audit: allow <rule> <reason>`. `AGENT_AUDIT_PY_TEST_GLOB` customizes Python test globs; `AGENT_AUDIT_PYTHON` selects the syntax-check interpreter. Set `AGENT_IP_ALLOWLIST` to a regular file path listing repo-relative paths to exempt from the IP check (one path per line; lines beginning with `#` are ignored). Returns non-zero if any check fails. |
+| `_agent_lint` | AI-based lint pass on staged files matching `AGENT_LINT_GLOBS` (default: `*.sh *.js *.md`). Gated by `AGENT_LINT_GATE_VAR` (default: `ENABLE_AGENT_LINT=1`). Invokes the function named by `AGENT_LINT_AI_FUNC` with staged file names and rules from `scripts/etc/agent/lint-rules.md`. No-op when gate is off or no matching files are staged. |
 
 ## Global Variables
 

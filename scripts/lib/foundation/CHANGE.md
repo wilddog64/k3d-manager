@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v0.5.0] — 2026-10-04
+
+### Added
+- `_agent_audit` now audits staged Python files for test shrinkage, syntax errors, and dangerous calls,
+  including extensionless Python scripts identified by a Python shebang. Dangerous-call rules
+  (`shell-true`, `eval`, `exec`, `sudo`, `sensitive-flag`) are exempted only by
+  `# agent-audit: allow <rule> <reason>`; `AGENT_AUDIT_PY_TEST_GLOB` and `AGENT_AUDIT_PYTHON`
+  configure it. `_agent_lint` takes its file globs from `AGENT_LINT_GLOBS`. README documents every
+  `_agent_audit` check.
+
 ### Changed
 - `_agent_audit`: accept a trailing `# agent-audit: remote-sudo` marker for privileged commands
   that run on another host, where `_run_command` cannot apply; any other comment does not exempt

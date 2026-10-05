@@ -37,6 +37,43 @@ _agent_checkpoint() {
    _err "Checkpoint commit failed; resolve git errors and retry"
 }
 
+# _agent_audit_is_python <path> <rev>
+_agent_audit_is_python() {
+   local path="$1" rev="${2:-}" first_line=""
+   [[ "$path" == *.py ]] && return 0
+   if [[ -n "$rev" ]]; then
+      first_line="$(git show "$rev:$path" 2>/dev/null | head -n 1 || true)"
+   else
+      first_line="$(git show ":$path" 2>/dev/null | head -n 1 || true)"
+   fi
+   [[ "$first_line" =~ ^#!.*python ]]
+}
+
+# _agent_audit_is_py_test <path>
+_agent_audit_is_py_test() {
+   local path="$1" base="${1##*/}" globs="${AGENT_AUDIT_PY_TEST_GLOB:-*/tests/* test_*.py *_test.py}"
+   local -a patterns=()
+   local pattern
+   read -r -a patterns <<< "$globs"
+   for pattern in "${patterns[@]}"; do
+      # shellcheck disable=SC2053
+      [[ "$path" == $pattern || "$base" == $pattern ]] && return 0
+   done
+   return 1
+}
+
+# _agent_audit_py_files
+_agent_audit_py_files() {
+   local path prefix
+   while IFS= read -r -d '' path; do
+      prefix=A
+      if ! git cat-file -e ":$path" 2>/dev/null; then
+         prefix=D
+      fi
+      printf '%s%s\0' "$prefix" "$path"
+   done < <(git diff --cached --name-only --no-renames -z 2>/dev/null || true)
+}
+
 # _agent_audit
 #
 # Audits staged diffs for safety violations. Requires SCRIPT_DIR to be set by
@@ -192,6 +229,89 @@ _agent_audit() {
       fi
    done < <(git diff --cached --name-only --diff-filter=ACM -z -- '*.yaml' '*.yml' 2>/dev/null || true)
 
+   local py_file py_status py_path
+   local py_test_diff="" removed_py_tests=0 added_py_tests=0 removed_py_assertions=""
+   while IFS= read -r -d '' py_file; do
+      py_status="${py_file%"${py_file#?}"}"
+      py_path="${py_file#?}"
+      if { [[ "$py_status" == D ]] && _agent_audit_is_python "$py_path" HEAD; } ||
+         { [[ "$py_status" == A ]] && _agent_audit_is_python "$py_path" ""; }; then
+         _agent_audit_is_py_test "$py_path" || continue
+         py_test_diff+="$(git diff --cached --no-renames -- "$py_path" 2>/dev/null || true)"$'\n'
+      fi
+   done < <(_agent_audit_py_files)
+   if [[ -n "$py_test_diff" ]]; then
+      removed_py_tests=$(grep -cE '^-[[:space:]]*(async[[:space:]]+)?def[[:space:]]+test_' <<<"$py_test_diff" || true)
+      added_py_tests=$(grep -cE '^\+[[:space:]]*(async[[:space:]]+)?def[[:space:]]+test_' <<<"$py_test_diff" || true)
+      if (( removed_py_tests > added_py_tests )); then
+         _warn "Agent audit: number of test functions decreased in Python test files"
+         status=1
+      fi
+      removed_py_assertions=$(grep -E '^-[[:space:]]*(assert([[:space:](]|$)|self\.assert)' <<<"$py_test_diff" || true)
+      if [[ -n "$removed_py_assertions" ]]; then
+         _warn "Agent audit: assertions removed from Python test files"
+         status=1
+      fi
+   fi
+
+   local py="${AGENT_AUDIT_PYTHON:-python3}" py_stderr="" py_available=1
+   if ! command -v "$py" >/dev/null 2>&1; then
+      _warn "Agent audit: $py not found; skipping Python syntax check"
+      py_available=0
+   fi
+   local py_error=""
+   while IFS= read -r -d '' py_file; do
+      py_status="${py_file%"${py_file#?}"}"
+      py_path="${py_file#?}"
+      if [[ "$py_status" == A && "$py_available" -eq 1 ]] &&
+         _agent_audit_is_python "$py_path" ""; then
+         py_stderr="$(mktemp "${TMPDIR:-/tmp}/agent-audit-python.XXXXXX")"
+         if ! git show :"$py_path" | "$py" -c 'import sys; compile(sys.stdin.buffer.read(), sys.argv[1], "exec")' "$py_path" 2>"$py_stderr"; then
+            _warn "Agent audit: Python syntax error in $py_path:"
+            py_error="$(tail -n 1 "$py_stderr" 2>/dev/null || true)"
+            _warn "$py_error"
+            status=1
+         fi
+         rm -f "$py_stderr"
+      fi
+   done < <(_agent_audit_py_files)
+
+   local -a py_rule_names=(shell-true eval exec sudo sensitive-flag)
+   local -a py_rule_patterns=(
+      "shell[[:space:]]*=[[:space:]]*True"
+      "(^|[^[:alnum:]_.])eval[[:space:]]*\("
+      "(^|[^[:alnum:]_.])exec[[:space:]]*\("
+      "[\"']sudo[\"']"
+      "[\"']--(password|token|username)(=[^\"']*)?[\"']"
+   )
+   local added_py_lines="" py_rule_index py_rule="" py_rule_lines="" allow_re="" line
+   while IFS= read -r -d '' py_file; do
+      py_status="${py_file%"${py_file#?}"}"
+      py_path="${py_file#?}"
+      if [[ "$py_status" == A ]] && _agent_audit_is_python "$py_path" "" &&
+         ! _agent_audit_is_py_test "$py_path"; then
+         added_py_lines="$(git diff --cached -- "$py_path" 2>/dev/null \
+            | grep '^+' | grep -v '^+++' | sed 's/^+//' \
+            | grep -Ev '^[[:space:]]*#' || true)"
+         for ((py_rule_index=0; py_rule_index<${#py_rule_names[@]}; py_rule_index++)); do
+            py_rule="${py_rule_names[$py_rule_index]}"
+            py_rule_lines=""
+            allow_re="#[[:space:]]*agent-audit:[[:space:]]*allow[[:space:]]+${py_rule}[[:space:]]+[^[:space:]]"
+            while IFS= read -r line; do
+               [[ -z "$line" ]] && continue
+               if [[ "$line" =~ ${py_rule_patterns[$py_rule_index]} ]] && [[ ! "$line" =~ $allow_re ]]; then
+                  py_rule_lines+="$line"$'\n'
+               fi
+            done <<< "$added_py_lines"
+            if [[ -n "$py_rule_lines" ]]; then
+               _warn "Agent audit: $py_rule in $py_path (add '# agent-audit: allow $py_rule <reason>' if intended):"
+               _warn "${py_rule_lines%$'\n'}"
+               status=1
+            fi
+         done
+      fi
+   done < <(_agent_audit_py_files)
+
    return "$status"
 }
 
@@ -217,8 +337,11 @@ _agent_lint() {
       return 0
    fi
 
+   local lint_globs="${AGENT_LINT_GLOBS:-*.sh *.js *.md}"
+   local -a lint_pathspecs=()
+   read -r -a lint_pathspecs <<< "$lint_globs"
    local staged_files
-   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' '*.js' '*.md' 2>/dev/null || true)"
+   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- "${lint_pathspecs[@]}" 2>/dev/null || true)"
    if [[ -z "$staged_files" ]]; then
       return 0
    fi
