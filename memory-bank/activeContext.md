@@ -8259,3 +8259,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-04: specs filed + dispatched to Codex together: embed-cache seed-from-store, Hermes quota pause → Pacific reset. Hermes currently paused until 17:00 PDT (will re-pause to tomorrow 17:00 until fixed).
 - 2026-10-04: embed-cache verified + committed. Next dispatch: hermes-index-refresh-ignores-a-rebuilt-store, then embedding-cache-has-no-second-copy.
 - 2026-10-04: seed-from-store + Pacific quota reset — Codex done, Claude verified (654 pytest, 3 mutations red, howto reworded), committed + pushed on k3d-manager-v1.41.0. Operator next: `make embed-cache-seed`, then `make embed-cache-backup DEST=…` after Hermes finishes post-reset.
+- 2026-10-04: operator ran `make embed-cache-seed` → 1693 seeded, 1 unmatched. Spec filed for remote backup (`DEST=host:path` via scp); dispatching to Codex.
