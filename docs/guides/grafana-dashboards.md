@@ -317,7 +317,7 @@ suites whose runner prints its own time: pytest's `in X.XXs` summary and unittes
 rather than a fake `0`. A run pushed by an older exporter still shows the old `0`/millisecond
 values until the next `make test-metrics`.
 
-**Where the alerts live.** The five `k3dm-tests.alerts` rules are in
+**Where the alerts live.** The six `k3dm-tests.alerts` rules are in
 `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml`, labelled
 `release: acg-kube-prometheus-stack`, and are applied to the app cluster by
 `make observability-acg`. They deliberately do **not** sit with the other rule files under
@@ -325,6 +325,8 @@ values until the next `make test-metrics`.
 `federate-acg` job selects only `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}`,
 and so the hub TSDB holds zero `k3dm_test_*` series. A rule on the hub for these metrics can
 never fire. `DeploymentMetricsStale` moved for the same reason.
+`OfflineSuiteRunMissed` fires when no run, pass or fail, has been pushed for 26h, which is the
+signature of a failed push.
 
 ### Trivy Security (`trivy-security`) — ACG only
 

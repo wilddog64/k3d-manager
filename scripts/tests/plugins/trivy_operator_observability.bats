@@ -123,6 +123,14 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   run grep -E '^  scanJobsConcurrentLimit: 1$' "${ACG_SETTINGS}"
   [ "${status}" -eq 0 ]
 
-  run grep -E '^excludeNamespaces:|scanJobsConcurrentLimit:' "${SETTINGS}"
+  run grep -E 'scanJobsConcurrentLimit:|kube-system' "${SETTINGS}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "trivy observability: hub values skip the ephemeral e2e vCluster namespace" {
+  run grep -E '^excludeNamespaces: "vclusters"$' "${SETTINGS}"
+  [ "${status}" -eq 0 ]
+
+  run grep -E '^excludeNamespaces:.*vclusters' "${ACG_SETTINGS}"
   [ "${status}" -ne 0 ]
 }

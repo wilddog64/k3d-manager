@@ -1,6 +1,6 @@
 # Bug: hub Trivy scans the e2e vCluster's short-lived pods, and the scan Job fails when they vanish
 
-**Status:** OPEN
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Low. A `KubeJobFailed` (`trivy-system`) fires after an e2e run, with no

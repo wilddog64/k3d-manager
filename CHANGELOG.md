@@ -4,6 +4,16 @@
 
 ### Fixed
 
+- E2E verification alerts now aggregate away exporter pod identity, so an exporter rollout does
+  not re-page for an unchanged red run; their service subject uses the exported service label
+  instead of the colliding exporter `service` label.
+- Hub Trivy now skips the ephemeral e2e `vclusters` namespace, whose synced pods can disappear
+  during a scan; those images remain covered on the app clusters and by `app-cve-scan`.
+- Added `OfflineSuiteRunMissed`, which alerts when no nightly test run has been pushed for 26h;
+  a non-fatal metrics push failure is now visible instead of leaving stale healthy-looking values.
+- The Argo CD CVE scan now treats finding CVEs with no newer chart as a finding, not a failure.
+  Exiting 1 made Kubernetes retry the scan twice and made `KubeJobFailed` fire and then resolve
+  every night through the Job TTL; an Artifact Hub lookup failure still exits 1.
 - Sandbox Trivy scans now skip `kube-system` and run one scan job at a time, preventing a single
   seven-container `cilium` scan pod from growing far beyond its scheduled requests; k3s nodes now
   reserve memory for the system and kubelet so a burst is OOM-killed inside the pod instead of

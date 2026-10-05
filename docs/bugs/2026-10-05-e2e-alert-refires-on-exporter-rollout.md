@@ -1,6 +1,6 @@
 # Bug: `E2EVerificationFailing` re-fires on every exporter rollout and names the wrong service
 
-**Status:** OPEN
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Low. The alert itself is correct, but it pages again for the same red run, and its

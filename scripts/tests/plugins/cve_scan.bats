@@ -83,6 +83,46 @@ EOF
   [[ "${output}" == *"cannot read the argocd-server image tag"* ]]
 }
 
+@test "cve scan treats no newer chart as a finding, but lookup failure as fatal" {
+  mkdir -p "${BATS_TEST_TMPDIR}/bin"
+
+  cat > "${BATS_TEST_TMPDIR}/bin/kubectl" <<'EOF'
+#!/bin/sh
+case " $* " in
+  *"helm"*"chart"*) printf '%s' 'argo-cd-10.8.4' ;;
+  *"containers[0].image"*) printf '%s' 'quay.io/argoproj/argocd:v3.5.2' ;;
+  *) printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log" ;;
+esac
+EOF
+  cat > "${BATS_TEST_TMPDIR}/bin/wget" <<'EOF'
+#!/bin/sh
+case " $* " in
+  *artifacthub.io*) printf '%s' "${STUB_CHART_JSON}" ;;
+esac
+EOF
+  cat > "${BATS_TEST_TMPDIR}/bin/trivy" <<'EOF'
+#!/bin/sh
+echo "argocd CVE-2026-0001 HIGH"
+EOF
+  chmod +x "${BATS_TEST_TMPDIR}/bin/kubectl" "${BATS_TEST_TMPDIR}/bin/wget" \
+    "${BATS_TEST_TMPDIR}/bin/trivy"
+
+  run env PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin" STUB_CHART_JSON='{"version":"10.8.4"}' \
+    KUBECTL_BIN="${BATS_TEST_TMPDIR}/bin/kubectl" sh "${SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"No newer chart than 10.8.4"* ]]
+  [[ "${output}" != *"FATAL"* ]]
+  run grep -F patch "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "${status}" -ne 0 ]
+
+  run env PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin" STUB_CHART_JSON='' \
+    KUBECTL_BIN="${BATS_TEST_TMPDIR}/bin/kubectl" sh "${SCAN_SCRIPT}"
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"could not resolve the latest argo-cd chart"* ]]
+  run grep -F patch "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "${status}" -ne 0 ]
+}
+
 @test "cve scan downloads kubectl when absent" {
   if [ -x /usr/bin/kubectl ] || [ -x /bin/kubectl ]; then
     skip "host kubectl on PATH"

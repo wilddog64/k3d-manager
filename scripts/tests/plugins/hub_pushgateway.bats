@@ -49,7 +49,9 @@ PY
   cd "${ROOT}/.."
   run bash -c "git grep -l 'localhost:9091' -- bin scripts/lib | sort"
   [ "${status}" -eq 0 ]
-  [ "${output}" = "$(printf '%s\n' bin/cluster-up bin/k3dm-test-metrics scripts/lib/webhook/config.py scripts/lib/webhook/smoke.py)" ]
+  [ "${output}" = "$(printf '%s\n' bin/k3dm-test-metrics scripts/lib/webhook/config.py)" ]
+  run git grep -n 'localhost:9091' -- bin/cluster-up
+  [ "${status}" -ne 0 ]
   run git grep -n 'localhost:9091' -- bin/k3dm-hermes bin/k3dm-vectordb-metrics
   [ "${status}" -ne 0 ]
 }

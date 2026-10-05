@@ -1,6 +1,6 @@
 # Bug: a nightly test run whose metrics push fails is lost without any alert
 
-**Status:** OPEN
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Medium. A red nightly suite went unreported for a full day.
