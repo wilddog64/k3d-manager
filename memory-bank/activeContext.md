@@ -8261,3 +8261,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-04: seed-from-store + Pacific quota reset — Codex done, Claude verified (654 pytest, 3 mutations red, howto reworded), committed + pushed on k3d-manager-v1.41.0. Operator next: `make embed-cache-seed`, then `make embed-cache-backup DEST=…` after Hermes finishes post-reset.
 - 2026-10-04: operator ran `make embed-cache-seed` → 1693 seeded, 1 unmatched. Spec filed for remote backup (`DEST=host:path` via scp); dispatching to Codex.
 - 2026-10-04: remote embed-cache backup (`DEST=host:path`) — Codex done, Claude added retries + keepalives (operator: M4↔M2 link drops) and fixed scp path quoting; committed + pushed. Operator: `make embed-cache-backup DEST=m2-air.local:~/.local/backup`.
+- 2026-10-04: operator ran `make embed-cache-backup DEST=m2-air.local:~/.local/backup` → 1693 vectors on the M2. Re-run after the post-reset Hermes index.
