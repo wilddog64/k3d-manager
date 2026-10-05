@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-05, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN — workaround applied 2026-10-05 (status HEALTHY); fix spec below, dispatched to Codex
+**Status:** FIXED — Codex, verified by Claude 2026-10-05: 139/139 across the listed suites plus pytest 13/13; all 3 mutations red. Claude corrected four things before the commit: docs had moved the webhook push target to `9092` (it stays `9091`, now always Hostinger); the `cluster-down` legacy bootouts ran under dry-run; the agent bootout used sudo and bad syntax; and the root-plist `rm` lacked sudo. The dry-run guard has no test. Live check pending the next sandbox `make up`.
 **Severity:** high. The public `frontend.3ai-talk.org` returns 502 once the ACG sandbox expires,
 although the Hostinger cluster and its frontend pod are healthy.
 

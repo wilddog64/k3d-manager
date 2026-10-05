@@ -667,7 +667,7 @@ _kc_browser_ip="127.0.0.1"
 _HOSTS_LIST=(
   "argocd.shopping-cart.local|${_argocd_host_ip}"
   "keycloak.shopping-cart.local|${_kc_browser_ip}"
-  "frontend.shopping-cart.local|127.0.0.2"
+  "frontend.shopping-cart.local|127.0.0.3"
 )
 for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _h="${_host_ip_pair%%|*}"
@@ -1575,8 +1575,8 @@ fi
 _info "[acg-up] ArgoCD SSO wired: login at ${_argocd_public_url} → Keycloak realm shopping-cart"
 
 if _is_mac; then
-  _info "[acg-up] Step 10g/14 — Installing frontend HTTP listener (frontend.shopping-cart.local → 127.0.0.2:80 → ubuntu-k3s, auto-restart)..."
-  _frontend_browser_label="com.k3d-manager.frontend-browser-http"
+  _info "[acg-up] Step 10g/14 — Installing frontend HTTP listener (frontend.shopping-cart.local → 127.0.0.3:80 → ubuntu-k3s, auto-restart)..."
+  _frontend_browser_label="com.k3d-manager.sandbox.frontend-browser-http"
   _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_frontend_browser_label}.plist}"
   _frontend_browser_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
   _frontend_browser_launchctl_log="${_ACG_STATE_DIR}/logs/frontend-browser-http-launchctl.log"
@@ -1584,16 +1584,16 @@ if _is_mac; then
   _frontend_browser_plist_tmp="${_ACG_STATE_DIR}/run/frontend-browser-http.plist"
   _frontend_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_frontend_browser_log}")"
-  # Ensure 127.0.0.2 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
-  if ! /sbin/ifconfig lo0 | grep -q '127\.0\.0\.2'; then
-    _run_command --prefer-sudo --quiet -- /sbin/ifconfig lo0 alias 127.0.0.2 || \
-      _warn "[acg-up] failed to add 127.0.0.2 loopback alias — frontend port-forward will fail to bind"
+  # Ensure 127.0.0.3 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
+  if ! /sbin/ifconfig lo0 | grep -q '127\.0\.0\.3'; then
+    _run_command --prefer-sudo --quiet -- /sbin/ifconfig lo0 alias 127.0.0.3 || \
+      _warn "[acg-up] failed to add 127.0.0.3 loopback alias — frontend port-forward will fail to bind"
   fi
 
   # Install persistent loopback alias launchd agent (survives reboots)
-  _loopback_label="com.k3d-manager.loopback-alias"
+  _loopback_label="com.k3d-manager.sandbox.loopback-alias"
   _loopback_plist="/Library/LaunchDaemons/${_loopback_label}.plist"
-  _loopback_plist_tmp="${_ACG_STATE_DIR}/run/loopback-alias.plist"
+  _loopback_plist_tmp="${_ACG_STATE_DIR}/run/sandbox-loopback-alias.plist"
   _loopback_launchctl_log="${_ACG_STATE_DIR}/logs/loopback-alias-launchctl.log"
   cat > "${_loopback_plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1607,7 +1607,7 @@ if _is_mac; then
     <string>/sbin/ifconfig</string>
     <string>lo0</string>
     <string>alias</string>
-    <string>127.0.0.2</string>
+    <string>127.0.0.3</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -1645,8 +1645,8 @@ set -euo pipefail
 export KUBECONFIG="${_frontend_browser_kubeconfig}"
 _log="${_frontend_browser_log}"
 while true; do
-  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
-  ${_kubectl_bin} --context ubuntu-k3s port-forward --address=127.0.0.2 \
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.3:80" >> "\${_log}"
+  ${_kubectl_bin} --context ubuntu-k3s port-forward --address=127.0.0.3 \
     svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
   sleep 2
 done
@@ -1708,7 +1708,7 @@ PLIST
       _err "[acg-up] failed to bootstrap frontend browser HTTP listener"
     fi
   fi
-  _info "[acg-up] Frontend HTTP listener active: http://frontend.shopping-cart.local → ubuntu-k3s svc/frontend via 127.0.0.2 (launchd: ${_frontend_browser_label})"
+  _info "[acg-up] Frontend HTTP listener active: http://frontend.shopping-cart.local → ubuntu-k3s svc/frontend via 127.0.0.3 (launchd: ${_frontend_browser_label})"
 fi
 
 if _is_mac; then
@@ -1926,7 +1926,7 @@ fi
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
-_info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward on 127.0.0.2:80 → ubuntu-k3s (Step 10g). URL: http://frontend.shopping-cart.local"
+_info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward on 127.0.0.3:80 → ubuntu-k3s (Step 10g). URL: http://frontend.shopping-cart.local"
 
 _info "[acg-up] Step 14/14 — Deploying ACG observability (Prometheus + Trivy)..."
 source "${REPO_ROOT}/scripts/plugins/observability.sh"
@@ -1961,8 +1961,8 @@ else
   _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
 fi
 
-_info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9091 → ${_acg_observability_context})..."
-_pgw_pf_label="com.k3d-manager.pushgateway-port-forward"
+_info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9092 → ${_acg_observability_context})..."
+_pgw_pf_label="com.k3d-manager.sandbox.pushgateway-port-forward"
 _pgw_pf_plist="${HOME}/Library/LaunchAgents/${_pgw_pf_label}.plist"
 _pgw_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
 _pgw_kubectl_bin="$(command -v kubectl)"
@@ -1984,7 +1984,7 @@ cat > "${_pgw_pf_plist}" <<PLIST
     <string>monitoring</string>
     <string>--context</string>
     <string>${_acg_observability_context}</string>
-    <string>9091:9091</string>
+    <string>9092:9091</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -2006,7 +2006,7 @@ if launchctl list "${_pgw_pf_label}" >/dev/null 2>&1; then
   launchctl unload "${_pgw_pf_plist}" 2>/dev/null || true
 fi
 launchctl load "${_pgw_pf_plist}"
-_info "[acg-up] Pushgateway port-forward agent loaded (launchd: ${_pgw_pf_label}, localhost:9091)"
+_info "[acg-up] Pushgateway port-forward agent loaded (launchd: ${_pgw_pf_label}, localhost:9092)"
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s

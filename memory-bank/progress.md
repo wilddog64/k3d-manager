@@ -3057,5 +3057,5 @@ in the bug doc after commit: `3664bea7`.
 - [x] hermes-approvals-kv tests copy the bound wrangler.toml: FIXED (Codex, Claude-verified, 12/12, mutation 3 red).
 - [ ] Sandbox make up hijacks Hostinger launchd labels (frontend.3ai-talk.org 502, Pushgateway refused after sandbox expiry): docs/bugs/2026-10-05-sandbox-make-up-hijacks-hostinger-launchd-labels.md OPEN; operator workaround = plutil repoint + make refresh-edge; fix spec pending.
 - [x] e2e-tests PR #11 (order flow statuses) MERGED e5e644d 2026-10-05 (admin merge; enforce_admins restored true). Next: e2e image rebuild + pin bump + make e2e (#4).
-- [ ] Sandbox/Hostinger launchd label collision fix (docs/bugs/2026-10-05-sandbox-make-up-hijacks-hostinger-launchd-labels.md): spec written 2026-10-05, dispatched to Codex; Claude verifies + mutations.
+- [x] Sandbox/Hostinger launchd label collision fix (docs/bugs/2026-10-05-sandbox-make-up-hijacks-hostinger-launchd-labels.md): FIXED 2026-10-05, Claude-verified; live check after next sandbox make up.
 - [ ] Hermes provider pin (K3DM_HERMES_PROVIDER=k3s-hostinger): spec in docs/bugs/2026-06-24-hostinger-provider-switch-stale-active-provider.md (Recurrence 3); Codex queued.

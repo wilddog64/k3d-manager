@@ -546,21 +546,21 @@ set -euo pipefail
 export KUBECONFIG="${HOME}/.kube/config"
 _log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
 while true; do
-  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
-  ${_frontend_browser_kubectl} --context ubuntu-k3s port-forward --address=127.0.0.2 \
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.3:80" >> "\${_log}"
+  ${_frontend_browser_kubectl} --context ubuntu-k3s port-forward --address=127.0.0.3 \
     svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
   sleep 2
 done
 FRONTEND_WRAPPER
   chmod +x "${_frontend_browser_wrapper}"
   _system_daemon_install_if_missing \
-    "com.k3d-manager.frontend-browser-http" \
+    "com.k3d-manager.sandbox.frontend-browser-http" \
     "${_frontend_browser_wrapper}" \
     "${_ACG_STATE_DIR}/logs/frontend-browser-http.log" \
-    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist"
+    "/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist"
   _launchd_ensure \
-    "com.k3d-manager.frontend-browser-http" \
-    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
+    "com.k3d-manager.sandbox.frontend-browser-http" \
+    "/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist" \
     system
 
   # ── 6. Cloudflare tunnel (always restart to pick up config changes) ───────────

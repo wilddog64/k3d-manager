@@ -271,7 +271,8 @@ bypassing the correlator — see `docs/guides/hermes.md`.
 Fed by `k3dm-webhook`'s `_push_metrics()` → Pushgateway, and this is the **only** dashboard
 whose producer is a push, not a scrape. The chain has three host-side links that each fail
 independently: the webhook LaunchAgent, the Pushgateway port-forward LaunchAgent on
-`localhost:9091` (installed by `bin/cluster-up` Step 14c), and the Pushgateway pod itself.
+`localhost:9091` (Hostinger's forward, rewritten by `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger`;
+a sandbox `bin/cluster-up` Step 14c installs its own on `localhost:9092`), and the Pushgateway pod itself.
 
 **The hub has no Pushgateway** — the webhook pushes only for the ACG provider. This
 dashboard being empty on the hub is by design, not a regression. See

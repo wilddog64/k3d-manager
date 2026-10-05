@@ -942,6 +942,9 @@ EOF
   }
 
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+  _run_command() {
+    :
+  }
   _hostinger_restart_launchd() {
     printf '%s\n' "$1" >> "${BATS_TEST_TMPDIR}/restart.log"
   }
