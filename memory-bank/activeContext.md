@@ -8266,3 +8266,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-04: brief A DONE `45b9326` on lib-foundation `feat/agent-audit-python` (Claude verified: 4 files, BATS 156/156, shellcheck clean, independent mutation red). PR prepared, waiting on the operator go; v0.5.0 tag after merge, then brief B.
 - 2026-10-04: opened wilddog64/lib-foundation#58 (brief A) on the operator go; Copilot requested; CI running.
 - 2026-10-04: lib-foundation#58 CI green; added README `_agent_audit` section `af9e534` (operator go). Copilot review not in yet. Brief B must include k3d-manager `docs/howto/agent-audit.md`.
+- 2026-10-04: lib-foundation#58 MERGED `dd39a90`. Rulesets only (deletion, non_fast_forward, copilot_code_review), no protection to restore. v0.5.0 untagged: CHANGE.md [Unreleased] holds #57 + #58; promote PR (precedent #51) pending operator go. Next: brief B.
