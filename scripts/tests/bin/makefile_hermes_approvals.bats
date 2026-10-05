@@ -18,6 +18,9 @@ if [[ "${1:-}" == "-i" ]]; then
   cat >>"${BATS_TEST_TMPDIR}/security.stdin"
   exit 0
 fi
+if [[ "${1:-}" == "show-keychain-info" ]]; then
+  exit 0
+fi
 if [[ "${1:-}" == "find-generic-password" ]]; then
   case "$*" in
     *k3dm-cloudflare-api-token*) printf 'cf-token\n' ;;

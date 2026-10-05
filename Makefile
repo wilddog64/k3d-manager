@@ -575,14 +575,16 @@ setup-worker:
 	bin/k3dm-webhook-setup
 	bin/k3dm-worker-setup
 
+# Defines _kc_read: print one k3dm Keychain item, or name the item and say whether
+# the keychain is locked (a non-GUI session) or the item is missing. Never prints a value on error.
+KEYCHAIN_READ = _kc_read() { _v=$$(security find-generic-password -s "$$1" -a k3dm -w 2>/dev/null) && [ -n "$$_v" ] && { printf '%s' "$$_v"; return 0; }; _info=$$(security show-keychain-info 2>&1 || true); case "$$_info" in *"User interaction is not allowed"*) echo "ERROR: $$1 unreadable — the login keychain is locked or not reachable from this session; run security unlock-keychain in a GUI terminal" >&2 ;; *) echo "ERROR: $$1 missing from Keychain — run $$2" >&2 ;; esac; return 1; }
+
 ## Re-deploy Cloudflare Worker and sync secrets from Keychain (run after Worker code changes)
 deploy-worker:
-	@_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null) && \
-	_tok=$$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null) && \
-	_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) && \
-	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup"; exit 1; } && \
-	[ -n "$$_tok" ] || { echo "ERROR: k3dm-webhook-token missing from Keychain — run bin/k3dm-webhook-setup"; exit 1; } && \
-	[ -n "$$_sig" ] || { echo "ERROR: k3dm-slack-signing-secret missing from Keychain — run bin/k3dm-worker-setup"; exit 1; } && \
+	@$(KEYCHAIN_READ); \
+	_cf=$$(_kc_read k3dm-cloudflare-api-token bin/k3dm-worker-setup) || exit 1; \
+	_tok=$$(_kc_read k3dm-webhook-token bin/k3dm-webhook-setup) || exit 1; \
+	_sig=$$(_kc_read k3dm-slack-signing-secret bin/k3dm-worker-setup) || exit 1; \
 	cd workers/slack-relay && \
 	printf '%s' "$$_tok" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put WEBHOOK_TOKEN && \
 	printf '%s' "$$_sig" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put SLACK_SIGNING_SECRET && \
@@ -944,8 +946,8 @@ argocd-hermes-token:
 ## Create and bind the Hermes Slack-approval KV namespace (commit wrangler.toml afterward)
 hermes-approvals-kv:
 	@set -euo pipefail; \
-	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null || true); \
-	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
+	$(KEYCHAIN_READ); \
+	_cf=$$(_kc_read k3dm-cloudflare-api-token bin/k3dm-worker-setup) || exit 1; \
 	if grep -Eq '^[[:space:]]*binding[[:space:]]*=[[:space:]]*"APPROVALS_KV"' "$(RELAY_DIR)/wrangler.toml"; then \
 	  echo "[hermes-approvals-kv] APPROVALS_KV already bound in wrangler.toml — nothing to do"; exit 0; \
 	fi; \
@@ -964,8 +966,8 @@ hermes-drain-token:
 	  echo "[hermes-drain-token] This target handles a credential; it must not run unattended." >&2; \
 	  exit 1; \
 	}; \
-	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null || true); \
-	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
+	$(KEYCHAIN_READ); \
+	_cf=$$(_kc_read k3dm-cloudflare-api-token bin/k3dm-worker-setup) || exit 1; \
 	_tok=$$(security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm -w 2>/dev/null || true); \
 	_mode=reused; \
 	if [ "$${ROTATE:-0}" = 1 ] || [ -z "$$_tok" ]; then \
@@ -985,8 +987,8 @@ hermes-drain-token:
 hermes-approvers:
 	@set -euo pipefail; \
 	printf '%s\n' "$${APPROVERS:-}" | grep -Eq '^[UW][A-Z0-9]{2,}(,[UW][A-Z0-9]{2,})*$$' || { echo "ERROR: set APPROVERS=U0123ABCD with comma-separated Slack user IDs and no spaces" >&2; exit 1; }; \
-	_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null || true); \
-	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup" >&2; exit 1; }; \
+	$(KEYCHAIN_READ); \
+	_cf=$$(_kc_read k3dm-cloudflare-api-token bin/k3dm-worker-setup) || exit 1; \
 	cd "$(RELAY_DIR)"; \
 	printf '%s' "$$APPROVERS" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put APPROVER_ALLOWLIST
 

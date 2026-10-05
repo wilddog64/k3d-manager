@@ -3,7 +3,7 @@
 **Filed:** 2026-10-02
 **Branch:** `k3d-manager-v1.40.0`
 **Severity:** low. The operator is sent to `bin/k3dm-worker-setup` to re-create a token that exists.
-**Status:** SPEC — dispatched to Codex 2026-10-04 (see "Fix spec")
+**Status:** FIXED — Codex, verified by Claude 2026-10-04: a shared `_kc_read` names the failing item and tells a locked keychain apart from a missing one, in `deploy-worker` and the three Hermes targets. 4 new tests; Claude's mutation (old `&&` chain) turns tests 1, 2 and 4 red.
 
 ## Symptom
 
