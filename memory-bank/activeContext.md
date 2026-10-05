@@ -8269,3 +8269,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-04: lib-foundation#58 MERGED `dd39a90`. Rulesets only (deletion, non_fast_forward, copilot_code_review), no protection to restore. v0.5.0 untagged: CHANGE.md [Unreleased] holds #57 + #58; promote PR (precedent #51) pending operator go. Next: brief B.
 - 2026-10-04: lib-foundation `release/v0.5.0` prepared `2004c7d` (CHANGE.md promote only, precedent #51); PR NOT opened, awaiting operator go. README/docs/releases.md release tables stale since v0.3.17 (no v0.4.x rows) — flagged, not fixed.
 - 2026-10-04: opened lib-foundation#59 (v0.5.0 promote) on operator go; Copilot requested.
+- 2026-10-04: lib-foundation v0.5.0 RELEASED — #59 merged `b6afd07`, annotated tag v0.5.0 -> b6afd07, GH release live (notes = CHANGE.md [v0.5.0]); retro `e247525` on `docs/v0.5.0-retrospective`. NEXT: brief B — subtree pull v0.5.0 into k3d-manager (`K3DM_SUBTREE_SYNC=1`) + spec M2–M4 + `docs/howto/agent-audit.md`.
