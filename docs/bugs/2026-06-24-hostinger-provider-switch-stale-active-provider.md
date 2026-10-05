@@ -1,6 +1,6 @@
 # Bug: `make status` can resolve the wrong provider after switching between ACG and Hostinger
 
-**Status:** FIXED — 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
+**Status:** REOPENED 2026-10-05 (Hermes recurrence, spec below) — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
 
 **Date:** 2026-06-24  
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`  
@@ -236,3 +236,66 @@ context that no longer existed.
   BATS and shellcheck only.
 - Do NOT edit `scripts/lib/foundation/` or `scripts/lib/acg/` (subtrees).
 - Do NOT modify files outside the four named above.
+
+## Recurrence 3 — Hermes `data_layer` (2026-10-05)
+
+**Symptom.** The Hermes `data_layer` sensor has reported `unknown — data layer status source
+unavailable: TimeoutError` on every poll since 2026-10-04 03:56Z.
+
+**Evidence (Claude, read-only):**
+- `~/.local/share/k3d-manager/active-provider` contains `k3s-aws`. It was written on Oct 3 at 13:42 by the sandbox
+  `make up`. The sandbox then expired without a `make down`, so `_acg_unrecord_provider` never ran.
+- Hermes sends no `provider=` (`K3DM_HERMES_PROVIDER` is unset in the LaunchAgent). The webhook
+  therefore resolves the provider to `k3s-aws` and probes the dead `ubuntu-k3s` cluster
+  (`54.187.188.234:6443` times out).
+- In the webhook log, `GET /api/v1/health` takes 98–159 s, against about 1 s normally. Hermes gives
+  up before then. It stayed at about 99 s even after the Hostinger frontend was repaired at about 11:20Z.
+- Hermes is a Hostinger monitor by design: its template already pins
+  `K3DM_HERMES_APP_CONTEXT=ubuntu-hostinger`.
+
+**Cause.** The marker is correct while a sandbox runs. A sandbox that **expires** instead of being
+torn down leaves it pointing at a dead context. Item 1 of the original root cause
+(`_acg_resolve_provider` trusts the file without checking that the context is live) was left out
+of scope in 2026-09 and is still open. Hermes inherits that gap because it does not pin its
+provider.
+
+### Fix spec (Claude, 2026-10-05) — pin Hermes to Hostinger
+
+**File 1 — `scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl`.** Directly after the
+`K3DM_HERMES_APP_CONTEXT` pair, add:
+
+```xml
+    <key>K3DM_HERMES_PROVIDER</key>
+    <string>k3s-hostinger</string>
+```
+
+**File 2 — `scripts/tests/hermes/test_app_health.py`.** In
+`test_launchagent_template_enables_app_health_for_ubuntu_hostinger`, add
+`assert environment["K3DM_HERMES_PROVIDER"] == "k3s-hostinger"`. Add one more test: call
+`_run_cycle`'s `webhook_fetch` path with `K3DM_HERMES_PROVIDER=k3s-hostinger` set (monkeypatch
+`_http_json` to record the URL, and `_keychain_secret` to return a dummy value), and assert that the requested
+URL ends with `provider=k3s-hostinger`. If `webhook_fetch` cannot be reached without running the
+whole cycle, extract it into a module-level `_webhook_url(host, path, provider)` helper used by
+`webhook_fetch`, and test that helper instead.
+
+**File 3 — `docs/guides/hermes.md:390`.** Change the default column of the `K3DM_HERMES_PROVIDER`
+row from `(unset)` to `k3s-hostinger (set by the LaunchAgent template)`, and add one sentence: an
+unset value falls back to the shared active-provider marker, which a sandbox that expired without
+`make down` leaves pointing at a dead cluster.
+
+**Rules.**
+- Modify only Files 1–3. Do not edit the installed plist, the active-provider file, or
+  `scripts/lib/provider.sh`.
+- Do not commit or push; leave the changes unstaged.
+- Run and paste `python3 -m pytest -q scripts/tests/hermes/test_app_health.py scripts/tests/hermes/test_hermes.py`
+  and `plutil -lint` on the template with its placeholders replaced, as the test does.
+- Mutation: delete the new template key, show that the test goes red, then restore it and prove the
+  restore with `cmp`.
+
+**Operator, after this lands:** run `bin/k3dm-hermes-setup` to reinstall the agent.
+
+**Interim workaround:** `printf 'k3s-hostinger\n' > ~/.local/share/k3d-manager/active-provider`.
+This corrects the stale marker; the next sandbox `make up` rewrites it.
+
+**Still open (separate):** `_acg_resolve_provider` should verify that the marker's context answers
+before trusting it.
