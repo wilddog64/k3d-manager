@@ -54,7 +54,7 @@ a **basket-service** bug tracked separately in
 
 ## Recurrence — `flows/order-management.spec.ts` (2026-10-04)
 
-**Status:** SPEC — queued for Codex.
+**Status:** SPEC — dispatched to Codex 2026-10-04 (branch created by Claude from `origin/main` `35098ac`).
 
 `make e2e` run `1791168841-15959` (k3d-manager `02aeeed0`, e2e-tests `origin/main` `35098ac`):
 91 passed, 8 failed. All 8 are in `tests/flows/order-management.spec.ts`, each with
@@ -89,5 +89,6 @@ of the state machine above:
   completed order".
 - Variable names such as `confirmedOrder` may stay.
 - Done when: `grep -nE "'(CONFIRMED|DELIVERED)'" tests/flows/order-management.spec.ts`
-  returns nothing, `npx tsc --noEmit` passes, a PR is open, and after the merge the image is
+  returns nothing, `npx tsc --noEmit` reports no more errors than `origin/main` (11 at
+  `35098ac`, 3 of them already in this file; fixing those is out of scope), a PR is open, and after the merge the image is
   rebuilt and `make e2e` shows 0 `order-management` failures.
