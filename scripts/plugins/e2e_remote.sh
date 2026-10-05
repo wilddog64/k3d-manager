@@ -38,6 +38,8 @@ E2E_M2_GHCR_TOKEN_SOURCE="${E2E_M2_GHCR_TOKEN_SOURCE:-gh}"
 E2E_M2_MIN_CPU_IDLE="${E2E_M2_MIN_CPU_IDLE:-35}"
 E2E_M2_MIN_MEM_FREE="${E2E_M2_MIN_MEM_FREE:-25}"
 E2E_M2_MIN_DISK_GB="${E2E_M2_MIN_DISK_GB:-40}"
+E2E_M2_CAPACITY_RETRIES="${E2E_M2_CAPACITY_RETRIES:-2}"
+E2E_M2_CAPACITY_RETRY_INTERVAL="${E2E_M2_CAPACITY_RETRY_INTERVAL:-120}"
 # The clean, e2e-owned checkout on the M2 that owns the remote E2E entry point.
 E2E_M2_REPO="${E2E_M2_REPO:-\$HOME/.k3dm/e2e/runner-src}"
 E2E_M2_REPO_URL="${E2E_M2_REPO_URL:-https://github.com/wilddog64/k3d-manager.git}"
@@ -76,6 +78,7 @@ export E2E_M2_SSH_HOST E2E_M2_RUNNER_CLUSTER E2E_M2_RUNNER_CONTEXT
 export E2E_M2_KUBECONFIG E2E_M2_LOCK E2E_M2_REMOTE_REPORT_DIR
 export E2E_M2_ORB_TIMEOUT E2E_M2_ORB_INTERVAL E2E_M2_SSH_CONNECT_TIMEOUT
 export E2E_M2_MIN_CPU_IDLE E2E_M2_MIN_MEM_FREE E2E_M2_MIN_DISK_GB
+export E2E_M2_CAPACITY_RETRIES E2E_M2_CAPACITY_RETRY_INTERVAL
 export E2E_M2_REMOTE_PATH E2E_M2_REPO E2E_M2_REPO_URL E2E_RUNNER_ALLOWLIST
 export E2E_REPORT_DIR E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP
 export E2E_HUB_CONTEXT E2E_PUBLISH_KUBECONFIG E2E_PUBLISH_MAX_BYTES E2E_PUBLISH_AUDIT_LOG
@@ -164,7 +167,7 @@ function _e2e_num_lt() {
 
 # Gather raw capacity metrics from the M2 in a single round-trip. Emits
 # key=value lines; the CPU sampler drops the first (cumulative-since-boot)
-# reading and returns two live samples.
+# reading and returns five live samples.
 function _e2e_remote_probe() {
   local script
   script="$(cat <<PROBE
@@ -176,7 +179,7 @@ else
 fi
 if [ -e "${E2E_M2_LOCK}" ]; then echo lock=1; else echo lock=0; fi
 idx=0
-for v in \$(top -l 3 -n 0 -s 1 2>/dev/null | awk '/^CPU usage/{gsub(/%/,"",\$7); print \$7}'); do
+for v in \$(top -l 6 -n 0 -s 1 2>/dev/null | awk '/^CPU usage/{gsub(/%/,"",\$7); print \$7}'); do
   idx=\$((idx+1))
   [ "\$idx" -eq 1 ] && continue
   echo "cpu_idle\${idx}=\${v}"
@@ -196,11 +199,12 @@ PROBE
 # unit-testable heart of the preflight; it performs no I/O.
 function _e2e_remote_eval_gates() {
   local blob="$1"
-  local docker_ok lock cpu2 cpu3 mem disk
+  local docker_ok lock mem disk
+  local cpu_samples cpu_mean
   docker_ok="$(_e2e_kv "$blob" docker_ok)"
   lock="$(_e2e_kv "$blob" lock)"
-  cpu2="$(_e2e_kv "$blob" cpu_idle2)"
-  cpu3="$(_e2e_kv "$blob" cpu_idle3)"
+  cpu_samples="$(awk -F= '/^cpu_idle[0-9]+=/{printf "%s%s", sep, $2; sep="/"}' <<<"$blob")"
+  cpu_mean="$(awk -F= '/^cpu_idle[0-9]+=/{s+=$2; n++} END{if (n) printf "%.1f", s/n; else print 0}' <<<"$blob")"
   mem="$(_e2e_kv "$blob" mem_free)"
   disk="$(_e2e_kv "$blob" disk_gb)"
 
@@ -212,8 +216,8 @@ function _e2e_remote_eval_gates() {
     printf 'reason=%s\nstatus=busy\n' "an E2E run already holds the runner lock"
     return 1
   fi
-  if _e2e_num_lt "$cpu2" "$E2E_M2_MIN_CPU_IDLE" || _e2e_num_lt "$cpu3" "$E2E_M2_MIN_CPU_IDLE"; then
-    printf 'reason=%s\nstatus=capacity_cpu\n' "CPU idle ${cpu2:-?}%/${cpu3:-?}% below floor ${E2E_M2_MIN_CPU_IDLE}%"
+  if _e2e_num_lt "$cpu_mean" "$E2E_M2_MIN_CPU_IDLE"; then
+    printf 'reason=%s\nstatus=capacity_cpu\n' "CPU idle mean ${cpu_mean}% (samples ${cpu_samples:-none}) below floor ${E2E_M2_MIN_CPU_IDLE}%"
     return 1
   fi
   if _e2e_num_lt "$mem" "$E2E_M2_MIN_MEM_FREE"; then
@@ -224,8 +228,8 @@ function _e2e_remote_eval_gates() {
     printf 'reason=%s\nstatus=capacity_disk\n' "disk free ${disk:-?}GiB below floor ${E2E_M2_MIN_DISK_GB}GiB"
     return 1
   fi
-  printf 'cpu_idle=%s/%s\nmem_free=%s\ndisk_gb=%s\nstatus=available\n' \
-    "${cpu2}" "${cpu3}" "${mem}" "${disk}"
+  printf 'cpu_idle=%s (samples %s)\nmem_free=%s\ndisk_gb=%s\nstatus=available\n' \
+    "${cpu_mean}" "${cpu_samples}" "${mem}" "${disk}"
   return 0
 }
 
@@ -237,6 +241,26 @@ function e2e_runner_preflight() {
     return 1
   fi
   _e2e_remote_eval_gates "$blob"
+}
+
+# Capacity is transient (a Spotlight or backup burst); docker_down, busy and
+# unreachable are not, so only capacity_* refusals are retried.
+function _e2e_remote_preflight_with_retry() {
+  local pf status attempt=0
+  while :; do
+    if pf="$(e2e_runner_preflight)"; then
+      printf '%s\n' "$pf"
+      return 0
+    fi
+    status="$(_e2e_kv "$pf" status)"
+    if [[ "$status" != capacity_* ]] || (( attempt >= E2E_M2_CAPACITY_RETRIES )); then
+      printf '%s\n' "$pf"
+      return 1
+    fi
+    attempt=$(( attempt + 1 ))
+    _warn "[e2e-remote] runner ${E2E_M2_SSH_HOST} refused (status=${status}); retry ${attempt}/${E2E_M2_CAPACITY_RETRIES} in ${E2E_M2_CAPACITY_RETRY_INTERVAL}s" >&2
+    sleep "$E2E_M2_CAPACITY_RETRY_INTERVAL"
+  done
 }
 
 # Start OrbStack only when stopped, then wait a bounded time for Docker.
@@ -416,7 +440,7 @@ function e2e_runner_dispatch() {
   fi
 
   local pf status
-  if ! pf="$(e2e_runner_preflight)"; then
+  if ! pf="$(_e2e_remote_preflight_with_retry)"; then
     printf '%s\n' "$pf"
     status="$(_e2e_kv "$pf" status)"
     _err "[e2e-remote] runner ${runner} not available (status=${status:-unknown}); not dispatching, no local fallback"

@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by k3dm-hermes
-**Status:** SPEC — root cause confirmed by Claude 2026-10-04, dispatched to Codex (see "Root cause" and "Fix spec")
+**Status:** FIXED — Codex, verified by Claude 2026-10-04: the gate uses the mean of 5 CPU samples, and only `capacity_*` refusals are retried (`E2E_M2_CAPACITY_RETRIES=2`, 120 s apart). `e2e_remote.bats` 87/87; both mutations (gate on the minimum; retry every refusal) turn tests red.
 **Run:** `unknown`, runner `m2`, tier `vcluster`, 0 passed / 1 failed / 1 total
 **Runner commit:** `unknown`
 
