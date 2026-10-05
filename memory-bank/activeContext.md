@@ -8282,3 +8282,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-04 20:08 make e2e run 1791168841-15959: 91 passed, 8 failed (all flows/order-management.spec.ts, CONFIRMED/DELIVERED not in Go enum). Payments green, gatewayTransactionId bug closed. e2e CPU-gate fix committed after the run.
 - 2026-10-04 20:20 deploy-worker keychain spec dispatched to Codex (codex exec, unstaged edits expected in Makefile + 3 bats files).
 - 2026-10-04 deploy-worker keychain fix verified and committed. makefile_hermes_approvals.bats tests 8/11 red at HEAD since 42c51bf8 bound APPROVALS_KV in the real wrangler.toml: filing a bug.
+- 2026-10-04 filed + dispatched hermes-approvals-kv fixture bug to Codex.

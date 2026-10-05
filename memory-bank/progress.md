@@ -3054,3 +3054,4 @@ in the bug doc after commit: `3664bea7`.
 - [x] 2026-10-04 bug-doc status sweep: 12 stale OPEN/SPEC status lines corrected to FIXED/CLOSED (docs only).
 - [ ] 2026-10-04 Codex queue: [x] root-owned logs (verified, committed this push) (docs/bugs/2026-10-03-root-owned-state-logs-dir-kills-grafana-port-forward.md) [x] e2e dispatch CPU gate — Codex done, Claude-verified, commit held until operator make e2e ends (docs/bugs/2026-09-30-e2e-harness-dispatch.md) [ ] deploy-worker keychain msg (docs/bugs/2026-10-02-deploy-worker-keychain-error-misleading.md) [ ] then payment e2e rerun (operator)
 - [x] deploy-worker keychain message (docs/bugs/2026-10-02-deploy-worker-keychain-error-misleading.md): Codex done, Claude-verified (mutation red 1,2,4), committed.
+- [ ] hermes-approvals-kv tests copy the bound wrangler.toml (2 reds at HEAD): spec docs/bugs/2026-10-04-hermes-approvals-kv-tests-copy-bound-wrangler-toml.md, dispatched to Codex 2026-10-04.
