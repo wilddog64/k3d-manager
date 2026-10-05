@@ -7,11 +7,9 @@ import signal
 import threading
 import time
 import traceback
-from pathlib import Path
 
 from webhook.config import JOB_DIR, REPO_ROOT
 from webhook.proc import _spawn_capture_text
-from webhook.redact import scrub_credentials
 from webhook.render import _slack_post
 from webhook.log import get_logger
 from webhook.failure_notes import write_failure_note

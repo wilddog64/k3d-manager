@@ -2,7 +2,6 @@
 """Read-only cluster status collection and Slack formatting for k3dm-webhook."""
 
 import datetime
-from pathlib import Path
 
 from webhook.config import JOB_DIR
 from webhook.proc import _spawn_capture_text
@@ -226,7 +225,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None, cha
             acg_apps = [l for l in apps_out.strip().splitlines()
                         if l.startswith("acg-") or "ubuntu-k3s" in l]
             if acg_apps:
-                _write_log(f"\n*ACG ArgoCD apps:*")
+                _write_log("\n*ACG ArgoCD apps:*")
                 if not acg_reachable:
                     _write_log("_(cached — ACG cluster was unreachable)_")
                 _write_log(f"```{chr(10).join(acg_apps)}```")

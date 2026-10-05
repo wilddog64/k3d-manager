@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 from webhook import config as webhook_config
 from webhook.auth import _get_cloud_runner_token, _get_reader_token
-from webhook.cloud_actions import ACTION_ALLOWLIST, JOB_ID_RE, NS_RE, Q_RE
+from webhook.cloud_actions import ACTION_ALLOWLIST, JOB_ID_RE
 from webhook.make_targets import MAKE_TARGETS
 from webhook.proc import _spawn_capture_text
 from webhook.redact import scrub_credentials

@@ -3,7 +3,6 @@ import importlib.machinery
 import importlib.util
 import json
 import sys
-import time
 from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -537,7 +536,6 @@ def test_index_metrics_use_dedicated_hub_endpoint_and_ignore_old_override(monkey
 
 
 def test_status_reminder_waits_for_local_midnight(monkeypatch):
-    from datetime import timedelta
     class LocalClock:
         current = datetime(2026, 9, 16, 23, 50, tzinfo=timezone(timedelta(hours=-7)))
         @classmethod

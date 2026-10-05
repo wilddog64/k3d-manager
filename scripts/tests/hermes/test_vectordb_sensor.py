@@ -2,7 +2,6 @@ import importlib.machinery
 import importlib.util
 import json
 import subprocess
-import urllib.request
 from pathlib import Path
 
 import pytest

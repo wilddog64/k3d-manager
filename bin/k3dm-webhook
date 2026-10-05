@@ -3,25 +3,18 @@
 
 import collections
 import datetime
-import base64
-import hashlib
 import http.server
 import json
 import os
 import re
 import shutil
 import signal
-import subprocess
 import sys
 import threading
 import time
-import traceback
 import urllib.request
 import urllib.parse
 import uuid
-from html import unescape
-from html.parser import HTMLParser
-from http.cookiejar import CookieJar
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
@@ -29,12 +22,8 @@ from webhook.config import (  # noqa: E402
     PORT,
     MAX_BODY,
     _JOB_ID_RE,
-    REPO_ROOT,
-    SHOPPING_CARTS_ROOT,
-    TOKEN_FILE,
     JOB_DIR,
     SCREENSHOT_DIR,
-    AUDIT_DIR,
     RUN_DIR,
     _ASK_MAX_TURNS_DEFAULT,
     SLACK_WEBHOOK_URL,
@@ -49,7 +38,6 @@ from webhook.config import (  # noqa: E402
 from webhook.render import (  # noqa: E402
     _slack_post,
     _post_slack_bot,
-    _fetch_thread_context,
     _start_bot_thread,
     _redact_thread_question,
 )
@@ -94,22 +82,17 @@ from webhook.make_targets import (  # noqa: E402
     parse_make_request,
 )
 from webhook.policy import (  # noqa: E402
-    _ACTION_POLICY,
-    _THREAD_COMMAND_MIN_ROLE,
-    _action_policy,
+    _action_policy,  # noqa: F401 -- re-exported; webhook_make_targets.py and webhook_policy.py call wh._action_policy
     _audit_remote_action,
     _effective_make_role,
     effective_policy,
     _normalize_actor_role,
-    _normalize_role,
     _policy_allows,
-    _rate_hits,
-    _RATE_MAX_DEFAULT,
     _rate_limited,
     _request_actor,
     _request_role,
     _role_allows,
-    strictest_role,
+    strictest_role,  # noqa: F401 -- re-exported; webhook_policy.py calls wh.strictest_role
     _thread_command_min_role,
 )
 import webhook.policy as _policy  # noqa: E402
