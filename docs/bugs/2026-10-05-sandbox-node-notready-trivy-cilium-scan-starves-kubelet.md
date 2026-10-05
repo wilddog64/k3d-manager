@@ -1,6 +1,6 @@
 # Bug: a sandbox node goes NotReady during bring-up — the Trivy scan of `cilium` starves the kubelet
 
-**Status:** OPEN — dispatched to Codex
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** High — `make up` (sandbox, `k3s-aws`) fails at Step 10b with exit 1

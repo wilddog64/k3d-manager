@@ -1162,12 +1162,15 @@ function _k3sup_join_agent() {
   : "${agent_ip:=${agent_host}}"
   _info "[shopping_cart] Joining agent ${agent_host} (${agent_ip}) to server ${server_ip}..."
   _ubuntu_k3s_trust_host "${agent_ip}"
+  local _agent_extra_args="${K3S_KUBELET_RESERVED_ARGS:-}"
+  [[ -n "${_agent_extra_args}" ]] || _agent_extra_args='--kubelet-arg=system-reserved=memory=256Mi --kubelet-arg=kube-reserved=memory=256Mi'
   _run_command -- k3sup join \
     --ip "${agent_ip}" \
     --server-ip "${server_ip}" \
     --user "${ssh_user}" \
     --ssh-key "${ssh_key}" \
-    --k3s-version "${K3S_VERSION:-v1.32.0+k3s1}"
+    --k3s-version "${K3S_VERSION:-v1.32.0+k3s1}" \
+    --k3s-extra-args "${_agent_extra_args}"
   _info "[shopping_cart] Agent ${agent_host} joined."
 }
 
@@ -1419,6 +1422,9 @@ HELP
   _ubuntu_k3s_trust_host "${external_ip}"
   _ubuntu_k3s_wait_ssh_ready "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
   local _k3s_extra_args='--disable traefik --disable servicelb'
+  local _kubelet_reserved="${K3S_KUBELET_RESERVED_ARGS:-}"
+  [[ -n "${_kubelet_reserved}" ]] || _kubelet_reserved='--kubelet-arg=system-reserved=memory=256Mi --kubelet-arg=kube-reserved=memory=256Mi'
+  _k3s_extra_args="${_k3s_extra_args} ${_kubelet_reserved}"
   if [[ "${K3S_AMBIENT_MESH:-false}" == "true" ]]; then
     _k3s_extra_args="${_k3s_extra_args} --flannel-backend=none --disable-network-policy"
     _info "[shopping_cart] K3S_AMBIENT_MESH=true — flannel disabled; Cilium will be installed as CNI"

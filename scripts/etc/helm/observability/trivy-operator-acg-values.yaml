@@ -1,3 +1,5 @@
+excludeNamespaces: "kube-system"
+
 image:
   registry: mirror.gcr.io
   repository: aquasec/trivy-operator
@@ -30,6 +32,7 @@ trivy:
 
 operator:
   scanJobTTL: 1h
+  scanJobsConcurrentLimit: 1
   builtInTrivyServer: true
   vulnerabilityReportsPlugin: Trivy
   configAuditScannerEnabled: true

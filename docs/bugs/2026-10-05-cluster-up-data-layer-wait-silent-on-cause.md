@@ -1,6 +1,6 @@
 # Bug: `cluster-up`'s data-layer wait fails without saying why, and the reconnect timeout logs "connected"
 
-**Status:** OPEN — dispatched to Codex
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Medium. Nothing breaks, but the operator watched 8 minutes of identical lines and

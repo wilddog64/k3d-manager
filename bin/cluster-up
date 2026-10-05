@@ -304,6 +304,23 @@ function _acg_data_layer_abort_on_image_pull() {
   return 0
 }
 
+# Explain why the data-layer Application is not Synced: ArgoCD's last sync
+# operation message and any app-cluster node that is not Ready.
+function _acg_data_layer_explain() {
+  local _app="$1" _msg _nodes _line
+  _msg=$(kubectl get application "${_app}" -n cicd --context k3d-k3d-cluster --request-timeout=15s \
+    -o jsonpath='{.status.operationState.message}' 2>/dev/null || true)
+  if [[ -n "${_msg}" ]]; then
+    _warn "[acg-up] data-layer last sync operation: ${_msg:0:400}"
+  fi
+  _nodes=$(kubectl get nodes --context ubuntu-k3s --request-timeout=15s --no-headers 2>/dev/null \
+    | awk '$2 != "Ready" {print $1 " " $2}' || true)
+  while IFS= read -r _line; do
+    [[ -n "${_line}" ]] && _warn "[acg-up] app-cluster node not Ready: ${_line}"
+  done <<< "${_nodes}"
+  return 0
+}
+
 login_prompt=0
 sandbox_url=""
 for arg in "$@"; do
@@ -915,6 +932,7 @@ argocd_reconcile_app_cluster_registrations || true
 
 _info "[acg-up] Waiting for ArgoCD controller to reconnect to ubuntu-k3s (max 120s)..."
 _argocd_conn_deadline=$(( $(date +%s) + 120 ))
+_argocd_connected=1
 until argocd cluster list -o json \
     --server localhost:8080 --insecure 2>/dev/null \
     | python3 -c "import sys,json; clusters=json.load(sys.stdin); \
@@ -923,12 +941,15 @@ until argocd cluster list -o json \
         'Unknown'))" 2>/dev/null | grep -q "Successful"; do
   if [[ $(date +%s) -ge ${_argocd_conn_deadline} ]]; then
     _warn "[acg-up] ArgoCD controller did not reconnect to ubuntu-k3s within 120s — proceeding anyway"
+    _argocd_connected=0
     break
   fi
   _info "[acg-up] ArgoCD controller not yet connected to ubuntu-k3s — waiting..."
   sleep 5
 done
-_info "[acg-up] ArgoCD controller connected to ubuntu-k3s — proceeding"
+if [[ "${_argocd_connected}" == "1" ]]; then
+  _info "[acg-up] ArgoCD controller connected to ubuntu-k3s — proceeding"
+fi
 
 _info "[acg-up] Ensuring argocd-redis secret on ubuntu-k3s (Helm chart hook skipped when ArgoCD manages ArgoCD)..."
 kubectl create namespace cicd --context ubuntu-k3s \
@@ -962,6 +983,7 @@ else
         -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
       if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
         _warn "[acg-up] data-layer did not reach Synced within 300s — force-syncing and retrying (one attempt)..."
+        _acg_data_layer_explain "${_dl_app_name}"
         argocd app sync "${_dl_app_name}" \
           --server localhost:8080 --insecure \
           --force \
@@ -982,6 +1004,7 @@ else
               _warn "[acg-up] data-layer ArgoCD sync timed out but all 4 StatefulSets are Ready — writing checkpoint and continuing"
               break
             fi
+            _acg_data_layer_explain "${_dl_app_name}"
             _err "[acg-up] data-layer ArgoCD Application did not reach Synced after force-sync + 180s retry — check: kubectl get application ${_dl_app_name} -n cicd --context k3d-k3d-cluster"
             exit 1
           fi

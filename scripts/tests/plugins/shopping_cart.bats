@@ -318,6 +318,83 @@
   [ "$status" -eq 0 ]
 }
 
+@test "_k3sup_join_agent reserves kubelet memory by default" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    export HOME="${BATS_TEST_TMPDIR}"
+    mkdir -p "${HOME}/.ssh"
+    : > "${HOME}/.ssh/config"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    _ubuntu_k3s_trust_host() { :; }
+    _info() { :; }
+    _run_command() { printf "%s\n" "$@"; }
+    _k3sup_join_agent ubuntu-1 10.0.1.130
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--k3s-extra-args"* ]]
+  [[ "$output" == *"--kubelet-arg=system-reserved=memory=256Mi --kubelet-arg=kube-reserved=memory=256Mi"* ]]
+}
+
+@test "_k3sup_join_agent honours K3S_KUBELET_RESERVED_ARGS" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    export HOME="${BATS_TEST_TMPDIR}"
+    export K3S_KUBELET_RESERVED_ARGS="--kubelet-arg=system-reserved=memory=128Mi"
+    mkdir -p "${HOME}/.ssh"
+    : > "${HOME}/.ssh/config"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    _ubuntu_k3s_trust_host() { :; }
+    _info() { :; }
+    _run_command() { printf "%s\n" "$@"; }
+    _k3sup_join_agent ubuntu-1 10.0.1.130
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--kubelet-arg=system-reserved=memory=128Mi"* ]]
+  [[ "$output" != *"kube-reserved=memory=256Mi"* ]]
+}
+
+@test "deploy_app_cluster passes kubelet reservations to k3sup install" {
+  run bash -c '
+    export HOME="${BATS_TEST_TMPDIR}"
+    export UBUNTU_K3S_SSH_KEY="${HOME}/k3d-manager-key.pem"
+    export UBUNTU_K3S_LOCAL_KUBECONFIG="${HOME}/k3s.yaml"
+    mkdir -p "${HOME}/.kube" "${HOME}/.ssh"
+    : > "${HOME}/.ssh/config"
+    : > "${UBUNTU_K3S_SSH_KEY}"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    _ensure_k3sup() { :; }
+    _ubuntu_k3s_trust_host() { :; }
+    _ubuntu_k3s_wait_ssh_ready() { :; }
+    _setup_vault_bridge() { :; }
+    _run_command() {
+      printf "%s\n" "$@"
+      [[ "$*" == *"k3sup install"* ]] && : > "${UBUNTU_K3S_LOCAL_KUBECONFIG}"
+      return 0
+    }
+    nodes_calls=0
+    kubectl() {
+      case "$*" in
+        *"get nodes"*)
+          [[ "$*" == *"--no-headers"* ]] && return 1
+          printf "node Ready\n"
+          ;;
+        *"config get-contexts"*) return 1 ;;
+        *"config view --flatten"*) printf "config\n" ;;
+      esac
+    }
+    deploy_app_cluster --confirm
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--k3s-extra-args"* ]]
+  [[ "$output" == *"--disable traefik --disable servicelb --kubelet-arg=system-reserved=memory=256Mi --kubelet-arg=kube-reserved=memory=256Mi"* ]]
+}
+
 @test "_k3s_agent_is_ready matches node InternalIP, not ssh alias or public IP" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"

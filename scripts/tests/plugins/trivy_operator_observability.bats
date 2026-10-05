@@ -115,3 +115,14 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   run grep -F -- 'https://webhook.3ai-talk.org/api/v1/analyze' "${ROUTE}"
   [ "${status}" -eq 0 ]
 }
+
+@test "trivy observability: acg values skip kube-system and run one scan job at a time" {
+  run grep -E '^excludeNamespaces: "kube-system"$' "${ACG_SETTINGS}"
+  [ "${status}" -eq 0 ]
+
+  run grep -E '^  scanJobsConcurrentLimit: 1$' "${ACG_SETTINGS}"
+  [ "${status}" -eq 0 ]
+
+  run grep -E '^excludeNamespaces:|scanJobsConcurrentLimit:' "${SETTINGS}"
+  [ "${status}" -ne 0 ]
+}

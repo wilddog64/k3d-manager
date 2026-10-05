@@ -4,6 +4,13 @@
 
 ### Fixed
 
+- Sandbox Trivy scans now skip `kube-system` and run one scan job at a time, preventing a single
+  seven-container `cilium` scan pod from growing far beyond its scheduled requests; k3s nodes now
+  reserve memory for the system and kubelet so a burst is OOM-killed inside the pod instead of
+  taking the node's kubelet down.
+- Sandbox `cluster-up` now reports the data-layer Application's last sync operation and any NotReady
+  app-cluster nodes at both wait timeouts, and no longer logs a false "connected" message after an
+  ArgoCD reconnect timeout.
 - Hermes now re-indexes a rebuilt vector store from the embedding cache and reports cache reloads
   separately from embeddings API calls.
 - Hermes quota pauses now resume at 00:05 Pacific, after the Gemini daily quota reset.

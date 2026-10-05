@@ -409,6 +409,104 @@ _load_image_pull_helpers() {
   source "${BATS_TEST_TMPDIR}/b.sh"
 }
 
+_load_data_layer_explain() {
+  sed -n '/^function _acg_data_layer_explain()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/data-layer-explain.sh"
+  source scripts/lib/system.sh
+  source "${BATS_TEST_TMPDIR}/data-layer-explain.sh"
+}
+
+@test "acg-up data-layer explanation reports sync cause and NotReady node" {
+  run bash -c '
+    '"$(declare -f _load_data_layer_explain)"'
+    _load_data_layer_explain
+    kubectl() {
+      case "$*" in
+        *"get application"*) printf "%s\n" "failed calling webhook validate.externalsecret.external-secrets.io: no endpoints available" ;;
+        *"get nodes"*) printf "%s\n" "ip-a Ready  control-plane 1h 1.32.0" "ip-b NotReady  <none> 1h 1.32.0" ;;
+      esac
+    }
+    _acg_data_layer_explain data-layer
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no endpoints available"* ]]
+  [[ "$output" == *"app-cluster node not Ready: ip-b NotReady"* ]]
+  [[ "$output" != *"ip-a"* ]]
+  run grep -c '_acg_data_layer_explain "${_dl_app_name}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 2 ]
+}
+
+@test "acg-up data-layer explanation stays silent when healthy" {
+  run bash -c '
+    '"$(declare -f _load_data_layer_explain)"'
+    _load_data_layer_explain
+    kubectl() {
+      case "$*" in
+        *"get application"*) : ;;
+        *"get nodes"*) printf "%s\n" "ip-a Ready  control-plane 1h 1.32.0" ;;
+      esac
+    }
+    _acg_data_layer_explain data-layer
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"last sync operation"* ]]
+  [[ "$output" != *"not Ready"* ]]
+}
+
+@test "acg-up data-layer explanation truncates long operation messages" {
+  run bash -c '
+    '"$(declare -f _load_data_layer_explain)"'
+    _load_data_layer_explain
+    message=$(printf "x%.0s" {1..1000})
+    kubectl() {
+      case "$*" in
+        *"get application"*) printf "%s\n" "$message" ;;
+        *"get nodes"*) : ;;
+      esac
+    }
+    _acg_data_layer_explain data-layer
+    x_count=$(printf "%s\n" "$output" | tr -cd x | wc -c)
+    [ "$x_count" -le 400 ]
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "acg-up data-layer explanation survives kubectl failure" {
+  run bash -c '
+    '"$(declare -f _load_data_layer_explain)"'
+    _load_data_layer_explain
+    kubectl() { return 1; }
+    _acg_data_layer_explain data-layer
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "acg-up reconnect timeout does not claim the controller connected" {
+  run bash -c '
+    sed -n "/^_argocd_conn_deadline=/,/^[[:space:]]*_info.*ArgoCD controller connected.*proceeding/p" bin/cluster-up > "${BATS_TEST_TMPDIR}/reconnect.sh"
+    printf "fi\n" >> "${BATS_TEST_TMPDIR}/reconnect.sh"
+    source scripts/lib/system.sh
+    _info() { printf "%s\n" "$*"; }
+    _warn() { printf "%s\n" "$*"; }
+    argocd() { printf "[]\n"; }
+    python3() { printf "Unknown\n"; }
+    sleep() { :; }
+    date_state="${BATS_TEST_TMPDIR}/date.calls"
+    date() {
+      if [[ -e "${date_state}" ]]; then
+        printf "999\n"
+      else
+        : > "${date_state}"
+        printf "0\n"
+      fi
+    }
+    source "${BATS_TEST_TMPDIR}/reconnect.sh"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"did not reconnect"* ]]
+  [[ "$output" != *"connected to ubuntu-k3s — proceeding"* ]]
+}
+
 _pods_json_imagepullbackoff() {
   cat <<'JSON'
 {"items":[{"metadata":{"name":"minio-0"},"status":{"containerStatuses":[
