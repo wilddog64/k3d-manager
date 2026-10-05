@@ -3059,6 +3059,6 @@ in the bug doc after commit: `3664bea7`.
 - [x] e2e-tests PR #11 (order flow statuses) MERGED e5e644d 2026-10-05 (admin merge; enforce_admins restored true). Next: e2e image rebuild + pin bump + make e2e (#4).
 - [x] Sandbox/Hostinger launchd label collision fix (docs/bugs/2026-10-05-sandbox-make-up-hijacks-hostinger-launchd-labels.md): FIXED 2026-10-05, Claude-verified; live check after next sandbox make up.
 - [x] Hermes provider pin (K3DM_HERMES_PROVIDER=k3s-hostinger): spec in docs/bugs/2026-06-24-hostinger-provider-switch-stale-active-provider.md (Recurrence 3); FIXED 2026-10-05, Claude-verified; operator reruns bin/k3dm-hermes-setup.
-- [ ] Stale active-provider marker trusted without liveness (Makefile status, cluster-status-summary, webhook): Recurrence 4 spec, dispatched to Codex 2026-10-05.
-- [ ] cluster-down legacy-cleanup dry-run test: follow-up spec, dispatched to Codex 2026-10-05.
-- [ ] lib-foundation agent-audit `*-sudo` flag false positive: spec 46813d8 on fix/agent-audit-sudo-flag-false-positive, dispatched to Codex 2026-10-05; then PR (wait for go) + subtree pull.
+- [x] Stale active-provider marker trusted without liveness (Makefile status, cluster-status-summary, webhook): Recurrence 4 FIXED 2026-10-05, Claude-verified. [ ] operator `make restart-webhook`.
+- [x] cluster-down legacy-cleanup dry-run test: FIXED 2026-10-05, Claude-verified.
+- [x] lib-foundation agent-audit `*-sudo` flag false positive: FIXED 16908e5 + a2115d1 on fix/agent-audit-sudo-flag-false-positive, Claude-verified. [ ] PR merge (operator) + subtree pull.

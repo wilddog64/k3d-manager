@@ -90,6 +90,40 @@ STUB
   [ "${status}" -ne 0 ]
 }
 
+@test "cluster-down legacy cleanup changes nothing under dry-run" {
+  local block="${BATS_TEST_TMPDIR}/legacy-cleanup-dry-run.sh"
+  local frontend="${BATS_TEST_TMPDIR}/frontend-dry-run.plist"
+  local pushgateway="${BATS_TEST_TMPDIR}/pushgateway-dry-run.plist"
+  local rm_log="${BATS_TEST_TMPDIR}/dry-run.log"
+  local stub_bin="${BATS_TEST_TMPDIR}/dry-run-bin"
+  mkdir -p "${stub_bin}"
+  sed -n '/# legacy-unscoped-cleanup:begin/,/# legacy-unscoped-cleanup:end/p' \
+    bin/cluster-down > "${block}"
+  for command in launchctl sudo rm; do
+    cat >"${stub_bin}/${command}" <<'STUB'
+#!/usr/bin/env bash
+printf '%s %s\n' "$(basename "$0")" "$*" >> "${RM_LOG}"
+STUB
+    chmod +x "${stub_bin}/${command}"
+  done
+  printf '%s\n' "${BATS_TEST_TMPDIR}/state/bin/frontend-browser-http.sh" > "${frontend}"
+  printf '%s\n' 'ubuntu-k3s' > "${pushgateway}"
+  run env PATH="${stub_bin}:${PATH}" RM_LOG="${rm_log}" \
+    LEGACY_FRONTEND_BROWSER_PLIST="${frontend}" LEGACY_PUSHGATEWAY_PLIST="${pushgateway}" \
+    bash -c '
+      _ACG_STATE_DIR="$1"
+      _run_command() { printf "run_command %s\n" "$*" >> "${RM_LOG}"; return 0; }
+      _dry_guard() { local _desc="${1:-}"; shift || true; if _dry_run_active; then _info "DRY_RUN: would ${_desc}"; return 0; fi; "$@"; }
+      _dry_run_active() { return 0; }
+      _info() { printf "%s\n" "$*"; }
+      source "$2"
+    ' bash "${BATS_TEST_TMPDIR}/state" "${block}"
+  [ "${status}" -eq 0 ]
+  [ ! -s "${rm_log}" ]
+  grep -Fq 'DRY_RUN: would unload legacy sandbox frontend browser HTTP daemon' <<<"${output}"
+  grep -Fq 'DRY_RUN: would unload legacy sandbox Pushgateway port-forward LaunchAgent' <<<"${output}"
+}
+
 @test "Hostinger frontend plist has exactly two ProgramArguments" {
   local plist="${BATS_TEST_TMPDIR}/frontend-browser-http.plist"
   local wrapper="${BATS_TEST_TMPDIR}/k3s-hostinger/bin/frontend-browser-http.sh"

@@ -10,6 +10,11 @@ cat <<'JSON'
 JSON
 EOF
   chmod +x "${TMP_DIR}/curl"
+  cat >"${TMP_DIR}/kubectl" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+  chmod +x "${TMP_DIR}/kubectl"
   export PATH="${TMP_DIR}:${PATH}" K3DM_WEBHOOK_TOKEN=test STATUS_COLOR=never
 }
 
@@ -51,6 +56,35 @@ teardown() { rm -rf "${TMP_DIR}"; }
   HOME="${TMP_DIR}" run "${STATUS_SCRIPT}" --mode json
   [ "${status}" -eq 1 ]
   python3 -c 'import json,sys; assert json.loads(sys.argv[1])["provider"] == "k3s-hostinger"' "${output}"
+}
+
+@test "summary honours an explicit k3s-aws over the marker" {
+  mkdir -p "${TMP_DIR}/.local/share/k3d-manager"
+  printf '%s\n' k3s-hostinger >"${TMP_DIR}/.local/share/k3d-manager/active-provider"
+  CLUSTER_PROVIDER=k3s-aws HOME="${TMP_DIR}" run "${STATUS_SCRIPT}" --mode json
+  [ "${status}" -eq 1 ]
+  python3 -c 'import json,sys; assert json.loads(sys.argv[1])["provider"] == "k3s-aws"' "${output}"
+}
+
+@test "summary skips a marker whose context is dead" {
+  mkdir -p "${TMP_DIR}/.local/share/k3d-manager/active-providers"
+  printf '%s\n' k3s-aws >"${TMP_DIR}/.local/share/k3d-manager/active-provider"
+  : >"${TMP_DIR}/.local/share/k3d-manager/active-providers/k3s-aws"
+  cat >"${TMP_DIR}/kubectl" <<'EOF'
+#!/bin/sh
+case " $* " in *" ubuntu-hostinger "*) exit 0;; *) exit 1;; esac
+EOF
+  chmod +x "${TMP_DIR}/kubectl"
+  unset CLUSTER_PROVIDER
+  HOME="${TMP_DIR}" run "${STATUS_SCRIPT}" --mode json
+  [ "${status}" -eq 1 ]
+  python3 -c 'import json,sys; assert json.loads(sys.argv[1])["provider"] == "k3s-hostinger"' "${output}"
+}
+
+@test "status recipe does not read the active-provider marker" {
+  run sed -n '/^status:/,/^status-full:/p' Makefile
+  [ "${status}" -eq 0 ]
+  [[ "${output}" != *active-provider* ]]
 }
 
 @test "hostinger edge-down 530s suggest refresh-edge" {

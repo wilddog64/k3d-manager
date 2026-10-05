@@ -1,6 +1,6 @@
 # Bug: `make status` can resolve the wrong provider after switching between ACG and Hostinger
 
-**Status:** Recurrence 4 OPEN 2026-10-05 (marker read without a liveness check in the Makefile, `cluster-status-summary` and the webhook; dispatched to Codex). Recurrence 3 FIXED 2026-10-05 (Codex, Claude-verified: 71 passed; dropping the template key turns the test red; operator must rerun `bin/k3dm-hermes-setup`); `_acg_resolve_provider` liveness check still open — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
+**Status:** Recurrence 4 FIXED 2026-10-05 (Codex, Claude-verified: BATS 45/45, pytest 35/35; Claude's mutations — webhook trusts the marker, old summary restored — turn 3 and 2 tests red; operator runs `make restart-webhook`). Recurrence 3 FIXED 2026-10-05 (Codex, Claude-verified: 71 passed; dropping the template key turns the test red; operator must rerun `bin/k3dm-hermes-setup`); `_acg_resolve_provider` liveness check still open — previously FIXED 2026-06-24 set migration (v1.8.0); the 2026-09-27 recurrence (M1, `cluster-down` leaked the set entry) was fixed in `396afff8` (`_acg_unrecord_provider`, test `cluster_down_provider_marker.bats`). Recurrence items 2–3 were out of scope by design. Status line added 2026-09-30.
 
 **Date:** 2026-06-24  
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`  
@@ -302,7 +302,7 @@ before trusting it.
 
 ## Recurrence 4 — the marker is read without a liveness check in three places (2026-10-05)
 
-**Filed:** 2026-10-05, Claude. **Status:** OPEN — dispatched to Codex.
+**Filed:** 2026-10-05, Claude. **Status:** FIXED — see the top status line.
 
 The "still open" note above names `_acg_resolve_provider`, but that function already probes
 contexts before it trusts the marker (`scripts/lib/provider.sh:242`): with no `CLUSTER_PROVIDER` it

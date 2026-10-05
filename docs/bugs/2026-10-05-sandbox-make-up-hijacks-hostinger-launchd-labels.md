@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-05, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** FIXED — Codex, verified by Claude 2026-10-05: 139/139 across the listed suites plus pytest 13/13; all 3 mutations red. Claude corrected four things before the commit: docs had moved the webhook push target to `9092` (it stays `9091`, now always Hostinger); the `cluster-down` legacy bootouts ran under dry-run; the agent bootout used sudo and bad syntax; and the root-plist `rm` lacked sudo. The dry-run guard test is specified in the follow-up section and dispatched to Codex. Live check pending the next sandbox `make up`.
+**Status:** FIXED — Codex, verified by Claude 2026-10-05: 139/139 across the listed suites plus pytest 13/13; all 3 mutations red. Claude corrected four things before the commit: docs had moved the webhook push target to `9092` (it stays `9091`, now always Hostinger); the `cluster-down` legacy bootouts ran under dry-run; the agent bootout used sudo and bad syntax; and the root-plist `rm` lacked sudo. The dry-run guard test landed 2026-10-05 (Codex; Claude's mutation, removing the frontend bootout guard, turns it red). Live check pending the next sandbox `make up`.
 **Severity:** high. The public `frontend.3ai-talk.org` returns 502 once the ACG sandbox expires,
 although the Hostinger cluster and its frontend pod are healthy.
 
@@ -256,7 +256,10 @@ a `com.k3d-manager.*` job whose `--context` differs from the provider being chec
 
 - `keycloak-browser-http` / `argocd-browser-https`: **closed, not a collision.** Both target the
   hub context `k3d-k3d-cluster` (`bin/cluster-up:1411`), and no Hostinger code writes either label.
-  There is one owner per label.
+  There is one owner per label. Correction (2026-10-05): Hostinger's `refresh-edge` does
+  *restart* both root jobs, and the live keycloak plist runs the wrapper from the `k3s-aws` state
+  dir. Both providers' wrappers target the hub, so the behaviour is identical, but deleting the
+  `k3s-aws` state dir would leave that job without a script.
 - Status context-mismatch flag: **closed.** The cause (shared labels) is gone, and
   `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger` now rewrites the frontend plist. `make status`
   already reported the symptom (Frontend 502, Pushgateway refused).
@@ -267,7 +270,7 @@ a `com.k3d-manager.*` job whose `--context` differs from the provider being chec
 
 ## Follow-up fix spec — test the `cluster-down` dry-run guard (2026-10-05)
 
-**Status:** OPEN — dispatched to Codex.
+**Status:** FIXED 2026-10-05 — Codex, verified by Claude.
 
 The legacy block in `bin/cluster-down` (between `# legacy-unscoped-cleanup:begin` and `:end`)
 checks `_dry_run_active` before each `launchctl` bootout and routes each `rm` through

@@ -125,6 +125,47 @@ def _normalize_provider(provider):
     }.get(provider, provider)
 
 
+_LIVE_PROVIDER_CACHE = {"at": 0.0, "marker": None, "provider": None}
+_LIVE_PROVIDER_TTL_SECS = 60
+_PROVIDER_PROBE_ORDER = (
+    ("k3s-hostinger", "ubuntu-hostinger"),
+    ("k3s-aws", "ubuntu-k3s"),
+    ("k3s-az", "ubuntu-azure"),
+    ("k3s-gcp", "ubuntu-gcp"),
+)
+
+
+def _context_reachable(ctx):
+    rc, _out, timed_out = _spawn_capture_text(
+        ["kubectl", "--context", ctx, "--request-timeout=5s", "get", "--raw=/readyz"], timeout=8)
+    return rc == 0 and not timed_out
+
+
+def _resolve_live_provider():
+    marker = None
+    try:
+        if _ACTIVE_PROVIDER_FILE.exists():
+            marker = _normalize_provider(_ACTIVE_PROVIDER_FILE.read_text()) or None
+    except OSError:
+        marker = None
+    now = time.monotonic()
+    cache = _LIVE_PROVIDER_CACHE
+    if cache["provider"] and cache["marker"] == marker and now - cache["at"] < _LIVE_PROVIDER_TTL_SECS:
+        return cache["provider"]
+    contexts = dict(_PROVIDER_PROBE_ORDER)
+    provider = None
+    if marker and marker in contexts and _context_reachable(contexts[marker]):
+        provider = marker
+    if provider is None:
+        for candidate, ctx in _PROVIDER_PROBE_ORDER:
+            if candidate != marker and _context_reachable(ctx):
+                provider = candidate
+                break
+    provider = provider or marker or "k3s-aws"
+    cache.update(at=now, marker=marker, provider=provider)
+    return provider
+
+
 def _resolve_provider(preferred=None):
     provider = _normalize_provider(preferred)
     if provider:
@@ -132,14 +173,7 @@ def _resolve_provider(preferred=None):
     provider = _normalize_provider(os.environ.get("CLUSTER_PROVIDER") or os.environ.get("K3D_MANAGER_CLUSTER_PROVIDER"))
     if provider:
         return provider
-    try:
-        if _ACTIVE_PROVIDER_FILE.exists():
-            provider = _normalize_provider(_ACTIVE_PROVIDER_FILE.read_text())
-            if provider:
-                return provider
-    except OSError:
-        pass
-    return "k3s-aws"
+    return _resolve_live_provider()
 
 
 def _provider_context(provider=None):

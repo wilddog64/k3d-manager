@@ -4,10 +4,14 @@ _mode=summary; _service=""
 while [[ $# -gt 0 ]]; do case "$1" in --mode) [[ $# -ge 2 ]] || exit 3; _mode="$2"; shift;; --service) [[ $# -ge 2 ]] || exit 3; _service="$2"; shift;; *) exit 3;; esac; shift; done
 case "${_mode}" in summary|json) ;; *) exit 3;; esac
 _provider="${CLUSTER_PROVIDER:-}"
-if [[ -z "${_provider}" || "${_provider}" == k3s-aws ]] && [[ -r "${HOME}/.local/share/k3d-manager/active-provider" ]]; then
-  _provider="$(<"${HOME}/.local/share/k3d-manager/active-provider")"
+if [[ -z "${_provider}" ]]; then
+  _summary_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  # shellcheck source=/dev/null
+  source "${_summary_repo_root}/scripts/lib/system.sh"
+  # shellcheck source=/dev/null
+  source "${_summary_repo_root}/scripts/lib/provider.sh"
+  _provider="$(_acg_resolve_provider)"
 fi
-_provider="${_provider:-k3s-aws}"
 _context="${APP_CONTEXT:-}"
 _color() { local code="$1" text="$2"; if [[ "${_mode}" == json || "${NO_COLOR:-}" == 1 || "${STATUS_COLOR:-}" == never || ( ! -t 1 && "${STATUS_COLOR:-}" != always ) ]]; then printf '%s' "${text}"; else printf '\033[%sm%s\033[0m' "${code}" "${text}"; fi; }
 _token_from_env="${K3DM_WEBHOOK_TOKEN:-}"; _keychain_err="$(mktemp -t k3dm-keychain.XXXXXX)"; trap 'rm -f "${_tmp:-}" "${_keychain_err}"' EXIT
