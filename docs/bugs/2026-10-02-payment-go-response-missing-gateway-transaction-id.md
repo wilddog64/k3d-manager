@@ -1,7 +1,7 @@
 # Bug: Go payment service drops `gatewayTransactionId` from the payment response
 
 **Filed:** 2026-10-02
-**Status:** Go FIXED `4a2503d`, PR #79 MERGED `ea86c42`; **e2e NOT fixed by that**: the published image is the Java service (see Correction). Java fix S4–S5 `4169430` (Codex, Claude-verified diff; branch CI 37065016633 green, 140 tests vs main 139); PR wilddog64/shopping-cart-payment#80 OPEN (Copilot requested)
+**Status:** FIXED — live-verified 2026-10-04 by `make e2e` run `1791168841-15959` (pin `sha-e3b6f06`): every `api/payments.spec.ts` test passes. Go fix `4a2503d` (PR #79, `ea86c42`); Java fix `4169430` (PR #80, merged `19c42aa`). The Java fix is the one e2e exercises (see Correction).
 **Repo:** `wilddog64/shopping-cart-payment` (work branch: `fix/payment-response-gateway-transaction-id` from `origin/main`)
 **Spec branch:** `k3d-manager-v1.41.0`
 **Found by:** live Tier 1 `make e2e` run `1790970000-22917` (image `shopping-cart-e2e-tests:sha-35098aca…`, commit `4a94eb0a`): 56 passed, 1 failed, 45 did not run
