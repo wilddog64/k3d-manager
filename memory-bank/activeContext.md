@@ -1,3 +1,13 @@
+## 2026-10-06 — Order-service Go Dependabot coverage gap documented (v1.41.0)
+
+Filed `docs/bugs/2026-10-06-shopping-cart-order-go-dependabot-coverage-gap.md`.
+Application issue #81 / PR #82: missing gomod /go and docker /go coverage fixed and merged
+as `fc3fae5a24675b464c2c72ed27b747cc1ef74b86`; Java CI and coverage guard green.
+Application module upgrade, image promotion, running-pod rescan, and vector ingestion remain
+unverified. Report is in the tracked index-docs corpus; next index run must include this commit.
+Similarity lookup unavailable (no embeddings credential / kubectl); offline dedup found no match.
+Documentation only; no k3d-manager runtime changes or live tests.
+
 # Active Context — k3d-manager
 
 > Compressed 2026-10-06 (v1.41.0 release prep). Full pre-compression detail:
