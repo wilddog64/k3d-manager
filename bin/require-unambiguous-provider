@@ -8,6 +8,10 @@
 # Purely additive — a no-op unless ALL of these hold:
 #   - CLUSTER_PROVIDER was NOT set on the command line / environment (arg1 != 1)
 #   - two or more providers are live in the active-providers set
+# For MAKE_TARGET=down, k3s-hostinger is not counted: a bare `make down` always
+# targets the Makefile default (k3s-aws) and can never reach Hostinger, which is
+# long-lived. `make status` keeps counting it, because a bare status resolves to
+# Hostinger first.
 # With 0 or 1 live providers, or an explicit CLUSTER_PROVIDER, it exits 0 and
 # changes nothing.
 #
@@ -33,6 +37,15 @@ _explicit="${1:-0}"
 
 _live=()
 mapfile -t _live < <(_acg_list_active_providers 2>/dev/null || true)
+
+if [[ "${MAKE_TARGET:-}" == "down" ]]; then
+  _counted=()
+  for _p in "${_live[@]}"; do
+    [[ "${_p}" == "k3s-hostinger" ]] && continue
+    _counted+=("${_p}")
+  done
+  _live=("${_counted[@]+"${_counted[@]}"}")
+fi
 
 if [[ "${#_live[@]}" -gt 1 ]]; then
   {

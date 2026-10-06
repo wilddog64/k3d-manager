@@ -8307,3 +8307,4 @@ clean; all three mutations were red and restored green.
 - 2026-10-05 Sandbox torn down (CFN k3d-manager-cluster deleted, ubuntu-k3s context gone, hub kept). Claude's `make -n down CLUSTER_PROVIDER=k3s-aws` executed the recipe (`$(MAKE)` line) — never `make -n` a lifecycle target.
 - 2026-10-05 CoreDNS-restart fix verified (Codex impl; early return when alias present, restart removed) and committed. Proposed next: `make down` guard should not count long-lived k3s-hostinger (awaiting go).
 - 2026-10-05 Operator approved the `make down` guard fix; spec filed (scoped to MAKE_TARGET=down, since bare `make status` resolves to Hostinger first) and dispatched to Codex.
+- 2026-10-05 `make down` guard fix committed: bare `make down` ignores long-lived k3s-hostinger; hub-rebuild how-to updated (bare down no longer a safety net there).

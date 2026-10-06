@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- A bare `make down` now proceeds when the only other live provider is Hostinger, since it always
+  targets the `k3s-aws` default and cannot reach Hostinger; it still refuses with two sandbox
+  providers live, and `make status` is unchanged because a bare status resolves to Hostinger first.
 - `cluster-up` no longer restarts the single-replica hub CoreDNS deployment when repairing the
   `host.k3d.internal` alias. The hosts plugin's `reload` picks up the patched NodeHosts file, so
   the restart was unnecessary; it opened a DNS gap, and the subsequent ArgoCD controller restart

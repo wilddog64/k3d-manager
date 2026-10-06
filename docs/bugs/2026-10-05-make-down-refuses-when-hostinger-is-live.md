@@ -1,6 +1,6 @@
 # Bug: a bare `make down` refuses whenever Hostinger is live, although it can only ever target the AWS sandbox
 
-**Status:** OPEN
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Low. A usability defect: no wrong teardown, but `make up` and `make down` are not

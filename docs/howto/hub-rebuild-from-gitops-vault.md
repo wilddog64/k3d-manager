@@ -150,9 +150,11 @@ Why the override matters — verified 2026-09-20:
   `ubuntu-hostinger` context. Never use it here.
 - `CLUSTER_PROVIDER=k3d` falls to the `*)` branch, which logs
   `Unknown CLUSTER_PROVIDER 'k3d' — skipping remote teardown` and proceeds to the local hub only.
-- A bare `make down` also **refuses** outright: `bin/require-unambiguous-provider` exits 3 because
-  two providers are live (`k3s-aws`, `k3s-hostinger`) and `CLUSTER_PROVIDER` was not set
-  explicitly. That guard is doing its job — do not defeat it, give it the right provider.
+- A bare `make down` does **not** protect you here. Since 2026-10-05,
+  `bin/require-unambiguous-provider` no longer counts the long-lived `k3s-hostinger` for
+  `make down`, so with only the sandbox and Hostinger live it proceeds with the `k3s-aws` default
+  and tears the sandbox down. It still refuses when two sandbox providers are live. Give the
+  provider explicitly.
 
 **Dry-run first and read the scope before committing to it:**
 
