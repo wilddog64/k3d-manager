@@ -142,9 +142,18 @@ STUB
     _hostinger_write_frontend_browser_plist "$2" "$3" "$4"
   ' bash "${REPO_ROOT}" "${plist}" "${wrapper}" "${log_file}"
   [ "${status}" -eq 0 ]
-  run plutil -extract ProgramArguments json -o - "${plist}"
+  run python3 - "${plist}" "${wrapper}" <<'PY'
+import plistlib
+import sys
+
+plist_path, wrapper_path = sys.argv[1:]
+with open(plist_path, "rb") as handle:
+    arguments = plistlib.load(handle)["ProgramArguments"]
+expected = ["/bin/bash", wrapper_path]
+if arguments != expected:
+    raise SystemExit(f"ProgramArguments={arguments!r}; expected {expected!r}")
+print("ProgramArguments match")
+PY
   [ "${status}" -eq 0 ]
-  local escaped_wrapper="${wrapper//\//\\/}"
-  [ "${output}" = "[\"\\/bin\\/bash\",\"${escaped_wrapper}\"]" ]
-  [ "$(printf '%s' "${output}" | tr -cd ',' | wc -c | tr -d ' ')" -eq 1 ]
+  [ "${output}" = "ProgramArguments match" ]
 }

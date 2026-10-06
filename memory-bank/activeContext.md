@@ -222,3 +222,11 @@ PR https://github.com/wilddog64/k3d-manager/pull/135 is open from
 GitHub Actions are in progress. The required Copilot reviewer request returned
 no requested reviewer and `gh pr view --json reviewRequests` confirmed `[]`.
 This is recorded in `docs/issues/2026-10-06-v1-41.0-pr-copilot-request.md`.
+## 2026-10-06 — Ubuntu CI plist test portability bug fixed
+
+PR #135 lint failed at BATS test 313 because `sandbox_launchd_scope.bats` used
+macOS-only `plutil` on `ubuntu-latest`. Filed
+`docs/bugs/2026-10-06-sandbox-launchd-test-requires-macos-plutil.md` and replaced
+the assertion with Python `plistlib`. Focused suite is 8/8 and `make test-bin`
+is 328/328; expected tripwire notices still block three Keychain probes without
+reaching real tools.

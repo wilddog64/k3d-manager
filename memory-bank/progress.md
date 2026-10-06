@@ -873,3 +873,9 @@ PR https://github.com/wilddog64/k3d-manager/pull/135 is open from
 Mergeability is `true` / `blocked` while checks run. The required Copilot
 reviewer request returned no requested reviewer; verification is recorded in
 `docs/issues/2026-10-06-v1.41.0-pr-copilot-request.md`.
+## 2026-10-06 — Ubuntu CI plist test portability bug fixed
+
+Filed `docs/bugs/2026-10-06-sandbox-launchd-test-requires-macos-plutil.md` for
+PR #135 lint test 313 and fixed the BATS assertion with Python `plistlib`.
+Focused suite: 8/8. Full `make test-bin`: 328/328; only expected tripwire
+notices for blocked Keychain probes remain.
