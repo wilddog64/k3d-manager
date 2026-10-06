@@ -16,6 +16,11 @@ values, and applies to both Tier 1 and Tier 2 runner Jobs. `scripts/tests/plugin
 66/66 passed; `shellcheck scripts/plugins/e2e.sh` clean; `_agent_audit` passed; doc links passed.
 The separate `make e2e` exit-1-after-pass behavior remains open. No PR created yet.
 
+The E2E exit-1-after-pass follow-up is fixed in commit `cb9184b0` on
+`k3d-manager-v1.42.0`: result-event stale ConfigMap deletion now uses `--no-exit`, and normal
+publication is guarded as best-effort. `scripts/tests/plugins/e2e.bats` is 67/67; ShellCheck,
+`_agent_audit`, and the commit doc-link hook pass. The user can now run the full live `make e2e`.
+
 ## 2026-10-06 — ask-docs summary failure bug filed (OPEN, v1.41.0)
 
 docs/bugs/2026-10-06-ask-docs-model-failure-reported-as-success.md records operator Slack

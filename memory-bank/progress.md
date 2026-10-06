@@ -93,6 +93,15 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [ ] Separate E2E exit-1-after-pass defect remains for the next bug; pause for user verification
       before continuing.
 
+## 2026-10-06 — v1.42.0 high-priority bug 2
+
+- [x] E2E pass-but-exit-1 result-event cleanup bug fixed in `cb9184b0` on
+      `k3d-manager-v1.42.0`; stale ConfigMap deletes use `--no-exit`, normal publication is
+      best-effort, and the bug doc records the root cause.
+- [x] Verification: `bats scripts/tests/plugins/e2e.bats` = 67/67; `shellcheck
+      scripts/plugins/e2e.sh` clean; `_agent_audit` passed; doc-link hook passed.
+- [ ] User to run the full live `make e2e` and verify before the next bug is selected.
+
 ## Process (standing rules — do not archive)
 
 - Every implementation updates this file and `activeContext.md` with the real commit/PR SHA.
