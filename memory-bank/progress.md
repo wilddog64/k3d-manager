@@ -1,3 +1,11 @@
+## 2026-10-06 — Cloud Make job-status empty output bug filed (OPEN, v1.41.0)
+
+`docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: test-all job ccc20dc9
+FAILED at 16:47:47Z; final bridge response has output="" and summary only. Code mismatch:
+Make executor writes make.log; job-status reads only output. Test failure cause remains unknown.
+Fix acceptance covers bounded log selection, redaction, legacy output, and regression cases.
+Docs only; live host log not accessed, similarity unavailable, vector ingestion not verified.
+
 ## 2026-10-06 — Cloud test-all Grafana publication gap filed (OPEN, v1.41.0)
 
 `docs/bugs/2026-10-06-cloud-bridge-test-all-does-not-publish-grafana-metrics.md` records
