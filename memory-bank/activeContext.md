@@ -236,3 +236,9 @@ The next lint run exposed two more failures in `hub_restore.bats`: BSD/macOS
 `script` argument ordering caused tests 150 and 151 to lose their expected rc=2
 under Ubuntu. Added a dialect-detecting `_run_with_tty` helper. `hub_restore.bats`
 is 14/14 and `make test-bin` is 328/328; pushed in the follow-up commit below.
+## 2026-10-06 — Ubuntu `script` exit propagation fixed
+
+The follow-up lint run still failed tests 150 and 151 because GNU `script`
+requires `-e`/`--return` to propagate the child command's rc. Added that flag
+to the GNU dialect branch while retaining the macOS fallback. Local
+`hub_restore.bats` is 14/14 and `make test-bin` is 328/328.

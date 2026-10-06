@@ -33,7 +33,9 @@ the exact two-element value `["/bin/bash", wrapper]`.
 The same suite also used BSD/macOS `script` argument ordering in the Keychain
 and wrong-context preflight tests. Ubuntu's util-linux `script` requires the
 command to be passed with `-c`, while macOS uses the positional command form.
-The tests now use a small dialect-detecting helper for both forms.
+The tests now use a small dialect-detecting helper for both forms. GNU
+`script` also needs `-e` (`--return`) so the wrapped command's exit status is
+propagated; the macOS fallback keeps the BSD invocation.
 
 The follow-up CI failure was:
 
@@ -42,6 +44,9 @@ not ok 150 hub-restore rejects an unreadable Keychain before any make step
 not ok 151 hub-restore rejects the wrong Kubernetes context before any make step
 make: *** [Makefile:1111: test-bin] Error 1
 ```
+
+The first portable helper detected GNU syntax but omitted `-e`, so Ubuntu still
+reported the two tests as failures despite the underlying command returning 2.
 
 ## Validation
 

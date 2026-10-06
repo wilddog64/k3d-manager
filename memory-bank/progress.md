@@ -884,3 +884,8 @@ notices for blocked Keychain probes remain.
 Tests 150 and 151 in `hub_restore.bats` used BSD/macOS `script` syntax. The
 portable dialect-detecting helper now passes locally: `hub_restore.bats` 14/14
 and `make test-bin` 328/328. CI rerun pending after push.
+## 2026-10-06 — Ubuntu `script` exit propagation fixed
+
+Added GNU `script -e` to preserve the wrapped preflight command's rc in tests
+150 and 151. Local `hub_restore.bats` is 14/14 and `make test-bin` is 328/328;
+the next CI run is pending.

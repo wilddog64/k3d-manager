@@ -89,8 +89,8 @@ EOF
 }
 
 _run_with_tty() {
-  if script -q -c "true" /dev/null >/dev/null 2>&1; then
-    script -q -c "$*" /dev/null
+  if script -q -e -c "true" /dev/null >/dev/null 2>&1; then
+    script -q -e -c "$*" /dev/null
     return $?
   fi
   script -q /dev/null "$@"
