@@ -92,11 +92,58 @@ async function _captureExtendFailure(page, phaseLabel) {
 
   try {
     await fs.promises.mkdir(diagnosticsDir, { recursive: true });
-    await page.screenshot({ path: screenshotPath, fullPage: true });
+    await page.screenshot({ path: screenshotPath, fullPage: false, timeout: 10000 });
     console.error(`INFO: Saved extend failure screenshot to ${screenshotPath}`);
   } catch (err) {
     console.error(`WARN: Could not save extend failure screenshot: ${err.message}`);
   }
+}
+
+function _safeButtonLabels(labels) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of labels || []) {
+    const label = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (!label) continue;
+    if (/[A-Za-z0-9+/=]{16,}/.test(label)) continue;
+    const clipped = label.length > 60 ? `${label.slice(0, 60)}…` : label;
+    if (seen.has(clipped)) continue;
+    seen.add(clipped);
+    out.push(clipped);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+async function _logVisibleButtonLabels(page) {
+  const state = await page.evaluate(() => {
+    const visible = (el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+    const labels = Array.from(document.querySelectorAll('button, [role="button"]'))
+      .filter(visible)
+      .map(el => el.innerText || el.getAttribute('aria-label') || '');
+    const dialog = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]'))
+      .some(visible);
+    return { labels, dialog };
+  }).catch(() => ({ labels: [], dialog: false }));
+  console.error(`INFO: Dialog open at failure: ${state.dialog ? 'yes' : 'no'}`);
+  console.error(`INFO: Visible buttons at failure: ${JSON.stringify(_safeButtonLabels(state.labels))}`);
+}
+
+async function _findExtendButton(page, selectors, targetUrl, waitMs = 15000) {
+  const onPage = await _waitForVisibleExtendButton(page, selectors, waitMs, 'on sandbox page');
+  if (onPage) return onPage;
+  console.error('INFO: Extend button not visible — reloading the sandbox page and retrying...');
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(
+    (e) => console.error(`WARN: Reload failed: ${e.message}`)
+  );
+  await page.waitForFunction(
+    () => !document.querySelector('[aria-busy="true"]'),
+    { timeout: 30000 }
+  ).catch(() => console.error('WARN: Skeleton loaders did not clear after reload — proceeding'));
+  return _waitForVisibleExtendButton(page, selectors, waitMs, 'after reload');
 }
 
 async function extendSandbox() {
@@ -180,6 +227,9 @@ async function extendSandbox() {
 
     // 1. "Button First" check — if the modal is already open, just click it and finish.
     const extendSelectors = [
+      '[data-testid="extend-sandbox-modal"] button:has-text("Extend")',
+      '[role="alertdialog"] button:has-text("Extend")',
+      '[role="dialog"] button:has-text("Extend")',
       '[data-heap-id="Hands-on Playground - Click - AWS Sandbox - Extend Sandbox"]',
       '[data-heap-id*="Extend Sandbox"]',
       '[data-heap-id*="Extend Session"]',
@@ -280,6 +330,16 @@ async function extendSandbox() {
       process.exit(0);
     }
 
+    // 2b. Wait for the button where it appears (listing card or "Extend Your Session" dialog),
+    // reloading once — the 0 ms immediate check above is a single snapshot.
+    if (!clicked && !(remainingMins !== null && remainingMins <= 0)) {
+      const _waitedBtn = await _findExtendButton(page, extendSelectors, targetUrl);
+      if (_waitedBtn) {
+        await _waitedBtn.click({ force: true });
+        clicked = true;
+      }
+    }
+
     // 3. Reveal the panel/modal if still not clicked
     // isPanelOpen: "Auto Shutdown" text appears on the listing-page card — not a reliable signal
     // that the extend panel is open. If step 1 found no extend button, the panel is NOT open.
@@ -366,6 +426,7 @@ async function extendSandbox() {
     }
 
     if (!clicked) {
+      await _logVisibleButtonLabels(page);
       await _captureExtendFailure(page, 'missing-extend-button');
       throw new Error('Extend button not found or not visible after multiple attempts (including recovery)');
     }
@@ -417,7 +478,7 @@ async function extendSandbox() {
 }
 
 if (require.main === module) {
-  const OVERALL_TIMEOUT_MS = 90000;
+  const OVERALL_TIMEOUT_MS = 240000;
   Promise.race([
     extendSandbox(),
     new Promise((_, reject) =>
@@ -430,7 +491,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  _findExtendButton,
   _isSandboxPageUrl,
   _normalizeSandboxUrl,
+  _safeButtonLabels,
   _selectExtendPage,
 };
