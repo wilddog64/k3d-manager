@@ -49,7 +49,7 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "_run_command: --interactive-sudo flag is accepted without error" {
-  function sudo() { "$@"; }
+  function sudo() { [[ "$1" == "-n" ]] && shift; "$@"; }
   export -f sudo
   run _run_command --interactive-sudo --soft -- echo hi
   [ "$status" -eq 0 ]

@@ -67,7 +67,7 @@ See [CLAUDE.md](../../CLAUDE.md) for the full security rules. Key points:
 - New Vault policies: grant minimum required paths
 - New ServiceAccounts: never `cluster-admin` — use namespace-scoped Role + RoleBinding
 - New Helm installs: pin chart versions explicitly
-- Sensitive CLI flags: register in `_args_have_sensitive_flag` in `scripts/lib/system.sh`
+- Sensitive CLI flags: register in `_args_have_sensitive_flag` in lib-foundation's `scripts/lib/system.sh` (upstream, then subtree-pull; the local `scripts/lib/system.sh` only loads it)
 
 ---
 

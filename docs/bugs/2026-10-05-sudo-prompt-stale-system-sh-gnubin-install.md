@@ -1,6 +1,6 @@
 # Bug: `make up` and `refresh-edge` prompt for a sudo password although NOPASSWD rules cover every call
 
-**Status:** OPEN — spec rewritten 2026-10-05 after lib-foundation PR #63 (`8b97c0b`) was
+**Status:** FIXED — spec rewritten 2026-10-05 after lib-foundation PR #63 (`8b97c0b`) was
 subtree-pulled (`c848d37c`).
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`

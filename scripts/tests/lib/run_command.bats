@@ -16,7 +16,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" = "hi" ]]
   read_lines "$RUN_LOG" log
-  [ "${log[1]}" = "sudo -n echo hi" ]
+  [[ "${log[1]}" == "sudo -n /"*"/echo hi" ]]
 }
 
 @test "--prefer-sudo falls back when sudo unavailable" {
@@ -29,32 +29,32 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
-@test "--interactive-sudo runs without -n flag" {
+@test "--interactive-sudo without a TTY passes -n and the system binary" {
   sudo() {
     echo "sudo $*" >> "$RUN_LOG"
-    [[ "$1" == "-n" ]] && return 1
+    [[ "$1" == "-n" ]] && shift
     "$@"
   }
   export -f sudo
-  run _run_command --interactive-sudo -- echo hi
+  run _run_command --interactive-sudo -- echo hi </dev/null
   [ "$status" -eq 0 ]
   [[ "$output" = "hi" ]]
   read_lines "$RUN_LOG" log
-  [ "${log[0]}" = "sudo echo hi" ]
+  [[ "${log[0]}" == "sudo -n /"*"/echo hi" ]]
 }
 
-@test "--require-sudo --interactive-sudo runs without -n flag" {
+@test "--require-sudo --interactive-sudo without a TTY passes -n and the system binary" {
   sudo() {
     echo "sudo $*" >> "$RUN_LOG"
-    [[ "$1" == "-n" ]] && return 1
+    [[ "$1" == "-n" ]] && shift
     "$@"
   }
   export -f sudo
-  run _run_command --require-sudo --interactive-sudo -- echo hi
+  run _run_command --require-sudo --interactive-sudo -- echo hi </dev/null
   [ "$status" -eq 0 ]
   [[ "$output" = "hi" ]]
   read_lines "$RUN_LOG" log
-  [ "${log[0]}" = "sudo echo hi" ]
+  [[ "${log[0]}" == "sudo -n /"*"/echo hi" ]]
 }
 
 @test "--require-sudo fails when sudo -n unavailable and no TTY" {

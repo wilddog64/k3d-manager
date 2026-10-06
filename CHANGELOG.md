@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- `bin/*` scripts, the Makefile and the tests sourced `scripts/lib/system.sh`, a stale local copy of
+  lib-foundation's system library, while the dispatcher loaded the subtree copy. The stale
+  `_run_command` lacked the no-TTY `-n` guard and lib-foundation's system-path fix, so `make up` Step
+  10g and `refresh-edge` ran GNU coreutils `install` under sudo and stopped at a `Password:` prompt.
+  `scripts/lib/system.sh` is now a shim that loads the subtree copy and defines only the kubeconform
+  helpers. See `docs/bugs/2026-10-05-sudo-prompt-stale-system-sh-gnubin-install.md`.
 - Step 10g adds the `127.0.0.3` loopback alias with `--prefer-sudo` and no `--soft`. When sudo was
   not cached, that call failed as a non-root user and `_run_command` exited. The intended warning
   never ran, and `make up` aborted with the stack still running. The call now uses
