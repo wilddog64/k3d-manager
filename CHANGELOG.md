@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `make acg-watch`, `make acg-watch-stop` and `make acg-watch-check` wrap the sandbox TTL watcher:
+  install or remove the launchd agent (`acg_watch_start` / `acg_watch_stop`), and print the
+  sandbox's remaining minutes without extending it (`acg-extend-test --check`). Reinstalling the
+  agent was the step needed to pick up lib-foundation v0.5.1's 30-minute interval, and it had no
+  make target. `URL=` is optional on all three. See `docs/bugs/2026-10-06-acg-watch-make-targets.md`.
+
 ### Fixed
 
 - `bin/*` scripts, the Makefile and the tests sourced `scripts/lib/system.sh`, a stale local copy of

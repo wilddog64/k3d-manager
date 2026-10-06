@@ -1,6 +1,6 @@
 # Make targets for the ACG sandbox TTL watcher
 
-**Status:** OPEN
+**Status:** FIXED (k3d-manager-v1.41.0)
 **Branch:** `k3d-manager-v1.41.0` (k3d-manager only — do NOT touch `scripts/lib/foundation/`)
 **Follow-up to:** lib-foundation v0.5.1, `scripts/lib/foundation/docs/bugs/2026-10-06-acg-watch-misses-extend-window-and-reads-expired-as-22h.md`
 
@@ -60,6 +60,18 @@ acg-watch-check:
 ```
 
 Recipe lines are indented with a TAB.
+
+**Implementation note — deviation from this spec.** `Makefile:16` defines a global
+`URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes` (an old URL path). Without an
+override, a bare `make acg-watch` would pass that URL to the watcher instead of letting
+`acg_watch_start` fall back to the sandbox list page, and `acg-watch-check` would never reach its
+`ACG_SANDBOX_LIST_URL` fallback. Codex added a target-specific reset above the targets:
+
+```make
+acg-watch acg-watch-check: URL =
+```
+
+A command-line `URL=` still wins over it. Removing the line fails BATS tests 1, 4 and 5.
 
 ### 3. `Makefile` — `help`
 

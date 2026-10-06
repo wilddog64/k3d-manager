@@ -27,7 +27,7 @@ GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
 RELAY_DIR        ?= workers/slack-relay
 
-.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -223,6 +223,20 @@ chrome-cdp:
 ## Uninstall Chrome CDP launchd agent
 chrome-cdp-stop:
 	scripts/k3d-manager acg_chrome_cdp_uninstall
+
+acg-watch acg-watch-check: URL =
+
+## Install the ACG sandbox TTL watcher launchd agent; checks every 30m (URL=<sandbox-url> optional)
+acg-watch:
+	scripts/k3d-manager acg_watch_start "$(URL)"
+
+## Uninstall the ACG sandbox TTL watcher launchd agent
+acg-watch-stop:
+	scripts/k3d-manager acg_watch_stop
+
+## Read-only: print the sandbox's remaining minutes without extending (URL=<sandbox-url> optional)
+acg-watch-check:
+	@_url="$(URL)"; cd scripts/lib/foundation/scripts/lib/acg && bin/acg-extend-test "$${_url:-$${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}}" --check
 
 ## Recover an expired ACG sandbox: delete it, start a fresh one, re-extract credentials (URL=<sandbox-url> PROVIDER=aws|gcp|azure; needs a TTY on first login)
 acg-restart:
@@ -1312,6 +1326,9 @@ help:
 	@echo "    make creds         Extract AWS credentials only"
 	@echo "    make chrome-cdp    Install Chrome CDP launchd agent (automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
+	@echo "    make acg-watch     Install the sandbox TTL watcher (checks every 30m; URL= optional)"
+	@echo "    make acg-watch-stop    Uninstall the sandbox TTL watcher"
+	@echo "    make acg-watch-check   Print the sandbox's remaining minutes without extending"
 	@echo "    make acg-restart   Recover an expired sandbox: delete, recreate, re-extract creds (needs a TTY)"
 	@echo "    make acg-recover   Full recovery: chrome-cdp + acg-restart + a clean make up (needs a TTY)"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"

@@ -84,6 +84,9 @@ context, calls `register_app_cluster`, and restarts the ArgoCD application contr
 | `make creds` | Extract AWS/GCP credentials only — no cluster changes |
 | `make chrome-cdp` | Install macOS Chrome CDP launchd agent (persistent CDP session on boot) |
 | `make chrome-cdp-stop` | Uninstall the launchd agent |
+| `make acg-watch` | Install the sandbox TTL watcher launchd agent (checks every 30 minutes) |
+| `make acg-watch-stop` | Uninstall the sandbox TTL watcher |
+| `make acg-watch-check` | Print the sandbox's remaining minutes without extending it (read-only) |
 | `make acg-restart` | Recover an expired ACG sandbox: delete it, recreate it, re-extract credentials |
 | `make acg-recover` | End-to-end recovery: `chrome-cdp` + `acg-restart` + a clean `make up` |
 
@@ -92,6 +95,14 @@ credentials without touching the cluster.
 
 `make chrome-cdp` installs a `launchd` plist so Chrome starts with CDP flags on login,
 enabling headless credential automation without a manual browser launch.
+
+`make acg-watch` wraps `acg_watch_start`: it installs the `com.k3d-manager.acg-watch` launchd agent,
+which checks the sandbox every 30 minutes and clicks Extend once 65 minutes or less remain. `make up`
+installs it too (Step 12); run `make acg-watch` on its own to pick up a newer lib-foundation without
+a full `make up`. `make acg-watch-check` is read-only: it prints `REMAINING_MINS:<n>` and never
+clicks Extend — a zero or negative value means the sandbox has already expired. Both accept
+`URL=<sandbox-url>` (default: the sandbox list page). See
+`scripts/lib/foundation/docs/api/acg.md` ("Sandbox TTL watcher and extend") for how a pass works.
 
 `make acg-restart` wraps `acg_restart` — the recovery path for a sandbox that has already expired
 (`acg_extend` only works while one is still alive). It deletes the dead sandbox, provisions a
