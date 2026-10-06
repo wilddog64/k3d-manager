@@ -15,7 +15,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | Function | Description |
 |---|---|
 | `_run_command [--prefer-sudo|--require-sudo|--interactive-sudo|--probe '<subcmd>'|--quiet|--soft] -- <cmd> [args...]` | Core wrapper for every privileged or traced command. Honors `--prefer-sudo` (attempt non-interactive sudo first), `--require-sudo` (fail if sudo unavailable), `--interactive-sudo` (allow password prompts), `--probe` to test a subcommand before deciding on sudo, `--quiet` to suppress wrapper errors, and `--soft` to return exit codes instead of exiting. Example: `_run_command --prefer-sudo -- apt-get update`. |
-| `_run_command_resolve_sudo <prog> <prefer> <require> <interactive> [probe_args...]` | Internal helper invoked by `_run_command`; resolves `_RCRS_RUNNER` to either the raw program or `sudo` with the correct flags, returning 127 when sudo is required but unavailable. |
+| `_run_command_resolve_sudo <prog> <prefer> <require> <interactive> [probe_args...]` | Internal helper invoked by `_run_command`; resolves `_RCRS_RUNNER` to either the raw program or `sudo` with the correct flags, returning 127 when sudo is required but unavailable. A bare program name is run under sudo from `/usr/bin`, `/bin`, `/usr/sbin` or `/sbin` when it exists there, so a PATH entry such as GNU coreutils cannot shadow the binary a sudoers rule names. |
 | `_command_exist <prog>` | Returns 0 if `<prog>` is found on `PATH`, 1 otherwise. |
 | `_args_have_sensitive_flag <args...>` | Returns 0 when CLI args contain `--password`, `--token`, or `--username` (either `--flag value` or `--flag=value` form); used to disable tracing. |
 

@@ -149,6 +149,7 @@
 - [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`, branch feat/init); mapfile compat fix (`8ae57bc`) + gist installer (`310fd16`).
 - [ ] Consumer integration: `shopping-carts`
 - [ ] `fix/acg-sandbox-robust-click` — ACG sandbox Open/Start/Resume/reopen clicks converted from `click({force:true})` to `_robustClick` (dispatched MouseEvent); spec `docs/bugs/acg-sandbox-force-click-panel-noop.md`. `npm run check` + jest 22/22 green. Pending: push, live gate, PR/tag/subtree-pull.
+- [ ] `fix/sudo-system-path-resolution` (2026-10-05) — `_run_command_resolve_sudo` passes bare names to sudo, which resolves them via the user's PATH (gnubin `install` shadows `/usr/bin/install`, so the NOPASSWD rule never matches → password prompt in k3d-manager `make up` 10g / refresh-edge). Spec `docs/bugs/2026-10-05-sudo-resolves-bare-name-through-user-path.md` filed [x] Codex [x] Claude verify (pre-fix RED, mutations A/B + cmp, bats 168/168, shellcheck clean) [x] commit `48f8a70` [x] PR #63 (CI green, Copilot 0 findings; awaiting operator merge) [ ] subtree-pull.
 
 ---
 

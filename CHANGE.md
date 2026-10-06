@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- `_run_command` passed bare program names to sudo, which resolved them through the caller's PATH. With GNU coreutils first in PATH, `install` ran as root from a user-writable Homebrew directory and the `/usr/bin/install` NOPASSWD rule never matched, so automated runs stopped at a password prompt. The resolver now runs a bare name from `/usr/bin`, `/bin`, `/usr/sbin` or `/sbin` when it exists there. Reference: `docs/bugs/2026-10-05-sudo-resolves-bare-name-through-user-path.md`.
 - `acg_extend.js` now waits up to 15 seconds for the Extend button, including the “Extend Your Session” dialog, reloads the sandbox page once, and only then falls back to Open Sandbox. On failure it logs visible button labels with credential-shaped labels filtered and takes a viewport screenshot with a 10-second timeout. The launchd watcher now runs `acg_extend.js` directly with an absolute Node path, while `acg_watch` retries failed extends up to 3 times 10 minutes apart instead of waiting 3.5 hours; the previous wrapper called a dispatcher path that does not exist inside k3d-manager and could not find Node under launchd.
 - `scripts/lib/acg/cdp.sh`: add a self-contained CDP readiness wait so `_browser_launch` does not
   depend on a host's `_run_command` proxy guard loading foundation `system.sh`; the new probe also
