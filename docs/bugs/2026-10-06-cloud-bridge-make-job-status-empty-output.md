@@ -95,3 +95,53 @@ Request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`, queued at
 This reproduces missing logs on a passing job as well as the failed test-all job. Success status
 alone does not verify test counts or assertions; the raw host log remains inaccessible through
 this response. No runtime fix or additional suite rerun was attempted.
+
+## Slack log lookup and E2E reproduction — 2026-10-06
+
+The operator reports that automatic Slack notifications show output, but Slack's `logs`
+command cannot retrieve the E2E job `033ceddc`. This is operator-observed behavior; the
+exact Slack command text and error message were not supplied, and no Slack command was
+executed by this agent.
+
+Code inspection of `bin/k3dm-webhook::_handle_thread_command` shows the `logs` branch
+selects `JOB_DIR / job_id / "log"`, then `"output"`, and never considers `"make.log"`.
+The adjacent `diagnosis` branch and the job-context selection for `ask` also omit
+`make.log`; check these consumers when implementing the fix. Automatic Make-job notifications
+in `scripts/lib/webhook/lifecycle.py::_run_make_target` read `make.log` directly, so
+notification output and failed on-demand retrieval can coexist.
+
+The Slack thread command resolves its job from the thread association; appending a job ID
+is not evidence that arbitrary ID lookup is supported. Distinguish a thread/job lookup failure
+from `No log found for job` when verifying the operator's exact command. The missing Make-log
+selection is independently visible in code.
+
+E2E request `20261006T172623Z-make-e2e` was accepted (HTTP 202), job `033ceddc`.
+The final bridge response at 10:36:37 America/Los_Angeles confirms failed status and empty output:
+
+```json
+{"action":"job-status","artifacts":["artifacts/20261006T172623Z-make-e2e/summary.json"],"body":{"job_id":"033ceddc","output":"","status":"failed"},"completed_at":"2026-10-06T17:36:37.017067Z","http_status":200,"id":"20261006T172623Z-make-e2e","schema":1,"status":"ok"}
+```
+
+[Final E2E response](https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261006T172623Z-make-e2e.final.json).
+The E2E test failure's cause remains unknown; no full host log was retrieved and no rerun
+was requested. Local operator workaround, already present in the Makefile:
+
+```bash
+make job-log ID=033ceddc
+```
+
+### Extended fix acceptance
+
+- [ ] Include `make.log` in Slack thread `logs` selection as well as HTTP job-status.
+- [ ] Preserve existing `log` / `output` behavior and define consistent precedence for all
+  applicable job types, preferably with a shared log selector.
+- [ ] Audit `diagnosis` and `ask` context selection for the same omission; cover affected
+  consumers without broadening roles, actions, or arbitrary file access.
+- [ ] Slack log tails remain bounded and redacted, with readable line breaks.
+- [ ] Tests cover Make-log-only, legacy logs, absent logs, and multiple-file precedence
+  for both Slack retrieval and cloud status; removing Make-log selection must turn them red.
+- [ ] Operator verifies `logs` in the actual E2E job's Slack thread retrieves the correct
+  bounded output, and cloud job-status returns the same job's useful tail.
+
+The original report now covers both retrieval interfaces. Automatic notification delivery is
+not itself broken based on the operator's report. No runtime code changed in this update.

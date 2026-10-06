@@ -1,3 +1,12 @@
+## 2026-10-06 — Existing empty-log bug extended to Slack and E2E
+
+Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
+automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
+diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response
+17:36:37Z is failed with empty output; failure cause remains unknown. Exact Slack command/error
+not supplied, so thread association versus file lookup must be distinguished in live verification.
+Added shared-selector/redaction/regression acceptance; no runtime changes or new test requests.
+
 ## 2026-10-06 — Second bridge test job succeeds but returns no log
 
 `make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
