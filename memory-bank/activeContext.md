@@ -1076,9 +1076,9 @@ genuinely collected; `check-doc-links` 1801 files OK.
 All four anomalies from the first post-bootstrap cycles were deep-dived read-only.
 Three resolve to known items; one is a defect nobody had reported.
 
-## 2026-10-06 — make acg-watch targets dispatched to Codex
+## 2026-10-06 — make acg-watch targets landed (`4c5df25d`)
 
-Operator asked for make targets for the watcher. Spec `docs/bugs/2026-10-06-acg-watch-make-targets.md` (bug follow-up, not a 6th v1.41.0 plan): `acg-watch` / `acg-watch-stop` / `acg-watch-check`, URL= optional, BATS `scripts/tests/bin/makefile_acg_watch.bats` (7 tests), howto + CHANGELOG. Codex dispatched via `codex exec`; Claude verifies, commits if `.git` is denied.
+Spec `docs/bugs/2026-10-06-acg-watch-make-targets.md` (bug follow-up, not a 6th v1.41.0 plan): `acg-watch` / `acg-watch-stop` / `acg-watch-check`, URL= optional, BATS `scripts/tests/bin/makefile_acg_watch.bats` (7 tests), howto + CHANGELOG. Codex implemented; `.git` denied so Claude committed `4c5df25d`. Verified BATS 7/7, RED 7/7, mutation. Spec gap Codex caught: global `URL ?= .../cloud-playground/cloud-sandboxes` (Makefile:16, stale path) would leak into the watcher — fixed with `acg-watch acg-watch-check: URL =`. `acg-restart` still inherits that stale default (out of scope, unverified whether it matters). Next: operator runs `make acg-watch` (reinstall at 30m) and kills the in-process 3h watcher (PID 42997/85368).
 
 ## 2026-10-06 — ACG watcher fix shipping as lib-foundation v0.5.1 (PR #64)
 
