@@ -1076,6 +1076,10 @@ genuinely collected; `check-doc-links` 1801 files OK.
 All four anomalies from the first post-bootstrap cycles were deep-dived read-only.
 Three resolve to known items; one is a defect nobody had reported.
 
+## 2026-10-06 — ACG watcher misses extend window (dispatched to Codex)
+
+lib-foundation branch `fix/acg-watch-interval-and-expired-ttl`, spec `25e2b75`. Fix: launchd/acg_watch interval 12600s -> 1800s; `_remainingMinsFromShutdown` reads a time >6h ahead as yesterday (expired). Operator restarted ACG via `make up` 2026-10-06 morning; the installed agent stays at 12600s until the fix is subtree-pulled and reinstalled.
+
 ## `eso` unknown is a false negative caused by the stale `ubuntu-k3s` context
 
 Real ESO health is **fine on both real clusters** — read directly, per context:
