@@ -6,7 +6,7 @@
 
 # 2026-10-06 — Current focus: v1.41.0 release prep
 
-- federate-acg scrape timeout FIXED `07385677` (Codex; Claude-verified BATS 14/14 + independent RED). Hub app Synced at `bd146637`; hub Prometheus target now `scrapeTimeout: 30s` with the new `match[]`. Remaining rollout: operator restarts the wedged sandbox PF `:19190` (kubectl PID 13954, `/-/ready` times out), then Claude confirms `up{job="federate-acg"}==1`.
+- federate-acg scrape timeout FIXED `07385677` and LIVE: hub app Synced `bd146637`, operator restarted PF :19190 (PID 3165) → hub target up, scrape 5.3 s, 23,772 samples.
 - Release prep order: memory-bank compression (this) → `make test` + `make test-pytest` (background, no commits mid-run) → docs sweep → CHANGELOG promote `[1.41.0]` → releases rows → AppSet reapply (hub + ACG) + `argocd_check_values_branch` → PR, merge on operator go.
 - Operator items outstanding: `make e2e`; confirm the Step 10g sudo fix on a reinstall run; `make index-docs` after quota reset; reinstall acg-watch agent done (30m).
 - Unfiled follow-ups: `shopping_cart.sh:1403` `kubectl get nodes` lacks a timeout; `sudo -n true` probe defect; kube-proxy alert spec.
