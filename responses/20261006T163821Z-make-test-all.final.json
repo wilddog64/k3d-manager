@@ -1,0 +1,1 @@
+{"action": "job-status", "artifacts": ["artifacts/20261006T163821Z-make-test-all/summary.json"], "body": {"job_id": "ccc20dc9", "output": "", "status": "failed"}, "completed_at": "2026-10-06T16:47:53.547652Z", "http_status": 200, "id": "20261006T163821Z-make-test-all", "schema": 1, "status": "ok"}
