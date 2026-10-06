@@ -135,7 +135,7 @@ function e2e_verify_vcluster() {
   _E2E_ACTIVE_PHASE="recording-result"
   _e2e_write_summary "$run_id" "$candidate_digest" "$rc" "${_E2E_ACTIVE_PHASE}"
   _E2E_SUMMARY_WRITTEN=1
-  _e2e_write_result_event "$run_id"
+  _e2e_write_result_event "$run_id" || true
   return "$rc"
 }
 
@@ -1006,7 +1006,7 @@ function _e2e_prune_result_events() {
   stale="$(printf '%s\n' "$names" | head -n "$keep_from")"
   while IFS= read -r name; do
     [[ -z "$name" ]] && continue
-    _kubectl -n "$E2E_RESULT_EVENT_NAMESPACE" delete configmap "$name" >/dev/null 2>&1 || true
+    _kubectl --no-exit -n "$E2E_RESULT_EVENT_NAMESPACE" delete configmap "$name" >/dev/null 2>&1 || true
   done <<< "$stale"
 }
 

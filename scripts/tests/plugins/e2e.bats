@@ -879,6 +879,28 @@ JSON
   [ "$status" -eq 0 ]
 }
 
+@test "result event prune survives a failed stale-event delete" {
+  export E2E_RESULT_EVENT_KEEP=1
+  local seen="$BATS_TEST_TMPDIR/prune-delete-flags"
+  _kubectl() {
+    printf '%s\n' "$*" >> "$seen"
+    local args="$*"
+    if [[ "$args" == *" get configmaps "* ]]; then
+      printf '%s\n' old-event newer-event
+      return 0
+    fi
+    if [[ "$args" == *" delete configmap "* && "$args" != *"--no-exit"* ]]; then
+      exit 77
+    fi
+    return 1
+  }
+  local rc=0
+  ( _e2e_prune_result_events ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 77 ]
+  run grep -F -- "--no-exit" "$seen"
+  [ "$status" -eq 0 ]
+}
+
 @test "substrate Keycloak realm lists realm roles as an array" {
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   run python3 - "${BATS_TEST_DIRNAME}/../../etc/e2e/keycloak.yaml" <<'PY'
