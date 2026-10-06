@@ -1,3 +1,13 @@
+## 2026-10-06 — ask-docs summary failure bug filed (OPEN, v1.41.0)
+
+docs/bugs/2026-10-06-ask-docs-model-failure-reported-as-success.md records operator Slack
+10:44/10:48 AM: agy exit 1, Gemini timed out. Cause of CLI failure unknown; host not probed.
+Current branch returns an unavailable sentinel as prose and writes job success; captured CLI
+detail is deleted. Acceptance covers honest outcome reporting, retained sources, bounded scrubbed
+failure metadata, and useful fallback budgets. Cheaper/cross-provider routing is optional design.
+Existing fake-CLI fallback tests: system Python 8/8; runtime spawn unsupported, pytest unavailable.
+Docs only; no runtime fix/provider switch. Local vector dedup unavailable; indexing unverified.
+
 ## 2026-10-06 — Empty Make-log regression traced; older canonical bug reopened
 
 Reopened docs/bugs/2026-09-28-make-jobs-never-write-output-file.md and cross-linked the
