@@ -44,6 +44,7 @@ function _command_exist() {
 # Resolves the runner array (plain prog, sudo -n prog, or sudo prog) and stores
 # it in the global _RCRS_RUNNER. _RCRS_RUNNER is reset unconditionally on entry;
 # caller reads it after this returns and may unset it when done.
+# A bare program name is run from /usr/bin, /bin, /usr/sbin or /sbin when it exists there, so sudoers rules that name those paths match.
 #
 # Returns 127 if --require-sudo is set but sudo is unavailable.
 function _run_command_resolve_sudo() {
@@ -63,9 +64,20 @@ function _run_command_resolve_sudo() {
     sudo_flags=(-n)
   fi
 
+  local sudo_prog="$prog"
+  if [[ "$prog" != */* ]]; then
+    local _sys_dir
+    for _sys_dir in /usr/bin /bin /usr/sbin /sbin; do
+      if [[ -x "${_sys_dir}/${prog}" ]]; then
+        sudo_prog="${_sys_dir}/${prog}"
+        break
+      fi
+    done
+  fi
+
   if (( require_sudo )); then
     if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
-      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$sudo_prog")
     else
       echo "sudo non-interactive not available" >&2
       _RCRS_RUNNER=()
@@ -77,14 +89,14 @@ function _run_command_resolve_sudo() {
   if (( ${#probe_args[@]} )); then
     if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
       _RCRS_RUNNER=("$prog")
-    elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
-    elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-      _RCRS_RUNNER=(sudo -n "$prog")
+    elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$sudo_prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$sudo_prog")
+    elif sudo -n "$sudo_prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo -n "$sudo_prog")
     elif (( prefer_sudo && interactive_sudo )); then
-      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$sudo_prog")
     elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-      _RCRS_RUNNER=(sudo -n "$prog")
+      _RCRS_RUNNER=(sudo -n "$sudo_prog")
     else
       _RCRS_RUNNER=("$prog")
     fi
@@ -92,9 +104,9 @@ function _run_command_resolve_sudo() {
   fi
 
   if (( prefer_sudo && interactive_sudo )); then
-    _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$sudo_prog")
   elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-    _RCRS_RUNNER=(sudo -n "$prog")
+    _RCRS_RUNNER=(sudo -n "$sudo_prog")
   else
     _RCRS_RUNNER=("$prog")
   fi
