@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-03, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN. The fault persists on the same sandbox five hours later, and since `82fe2218` it makes `make up` exit 2 at Step 14 (see "Recurrence 2026-10-04")
+**Status:** MITIGATED — `3b789adf` + `98835aac` (Step 14 reads the CRD condition instead of watching it; WARN with recovery steps when kind `Prometheus` is unserved; Step 14b skips the port-forward when `svc/prometheus-operated` is missing). The apiserver CRD-watch stall itself is not fixed; recovery stays an operator k3s restart. Not reproduced on the 2026-10-06 sandbox (all 10 kinds served, Prometheus 1/1). Today's `federate-acg` TargetDown has a different cause: `docs/bugs/2026-10-06-federate-acg-scrape-exceeds-timeout-k3s-control-plane-histograms.md`.
 **Severity:** medium. The hub's `federate-acg` target is down for the whole sandbox lifetime, so
 `TargetDown` fires and no sandbox metrics reach the hub. `make up` exits 0 and does not notice.
 
