@@ -1,3 +1,10 @@
+## 2026-10-06 — Second bridge test job succeeds but returns no log
+
+`make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
+terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
+`docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make
+jobs both lose log visibility; host fix pending. No assertion/count details available remotely.
+
 ## 2026-10-06 — Cloud Make job-status empty output bug filed (OPEN, v1.41.0)
 
 `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: test-all job ccc20dc9

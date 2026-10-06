@@ -81,3 +81,17 @@ find-similar-docs: falling back to the exact-slug glob is still correct.
 
 Documentation-only filing: no runtime implementation or new live test. This tracked report is
 eligible for index-docs after the host pulls the branch; vector ingestion is not verified.
+
+## Second live verification — passing Python unit job (2026-10-06)
+
+Request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`, queued at
+16:57:28Z and completed successfully by the 16:58:14Z final response. Output is still empty:
+
+```json
+{"action":"job-status","artifacts":["artifacts/20261006T165715Z-make-test-python-unit/summary.json"],"body":{"job_id":"5cc7f225","output":"","status":"success"},"completed_at":"2026-10-06T16:58:14.040996Z","http_status":200,"id":"20261006T165715Z-make-test-python-unit","schema":1,"status":"ok"}
+```
+
+[Final response](https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261006T165715Z-make-test-python-unit.final.json).
+This reproduces missing logs on a passing job as well as the failed test-all job. Success status
+alone does not verify test counts or assertions; the raw host log remains inaccessible through
+this response. No runtime fix or additional suite rerun was attempted.
