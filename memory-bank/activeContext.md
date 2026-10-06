@@ -1,6 +1,6 @@
 # 2026-10-05 — sudo prompt fix landed (`b3b2542a`); next: e2e order assertion failure
 
-`scripts/lib/system.sh` is now a shim over lib-foundation (bin/*, Makefile, tests get the foundation `_run_command`). Operator to confirm no `Password:` prompt on next `make up` / `refresh-edge`. Queued: e2e Failure groups row run `1791168841-15959` (local-m4, vcluster, flows-order-management, order, assertion).
+`scripts/lib/system.sh` is now a shim over lib-foundation (bin/*, Makefile, tests get the foundation `_run_command`). Operator to confirm no `Password:` prompt on next `make up` / `refresh-edge`. e2e Failure groups row run `1791168841-15959` = pre-fix run of the order flow-status bug; fix merged (e2e-tests #11 `e5e644d`, image published) — needs a fresh `make e2e`.
 
 # 2026-10-04 — make test 5 reds specced; lib-foundation remote-sudo marker ready for PR
 
