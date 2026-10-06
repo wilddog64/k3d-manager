@@ -54,7 +54,7 @@ a **basket-service** bug tracked separately in
 
 ## Recurrence — `flows/order-management.spec.ts` (2026-10-04)
 
-**Status:** FIXED, awaiting live confirmation — Codex fix `d8fb1ef` (Claude-verified: every sequence is a legal transition, no CONFIRMED/DELIVERED left, tsc errors unchanged at 11) merged as `shopping-cart-e2e-tests` PR #11 `e5e644d` (2026-10-05T11:14Z). `Publish E2E Image` `build-push` succeeded for `e5e644d` the same minute, so `:latest` (the `E2E_IMAGE_TAG` default) now carries the fix. Remaining: a fresh `make e2e` showing 0 `order-management` failures. The Grafana "Failure groups" row for run `1791168841-15959` is this pre-fix run (2026-10-05T03:08Z, the only e2e result on the hub) and will stay until a newer run is recorded.
+**Status:** FIXED, confirmed live 2026-10-06 — Codex fix `d8fb1ef` merged as `shopping-cart-e2e-tests` PR #11 `e5e644d`. A plain `make e2e` still failed the same 8 tests on 2026-10-06 because the hub node served a cached pre-fix `:latest` (`docs/bugs/2026-10-06-e2e-runner-ifnotpresent-serves-stale-latest-image.md`); the pinned run `E2E_IMAGE_TAG=sha-e5e644d…` (`1791290881-10078`) passed 98/102 with 0 `order-management` failures.
 
 `make e2e` run `1791168841-15959` (k3d-manager `02aeeed0`, e2e-tests `origin/main` `35098ac`):
 91 passed, 8 failed. All 8 are in `tests/flows/order-management.spec.ts`, each with

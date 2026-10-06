@@ -29,7 +29,8 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] Releases rows added; README table rotated to 3 rows (v1.38.0 + v1.37.0 into Older).
 - [x] AppSets: `argocd_check_values_branch k3d-manager-v1.41.0` rc=0 — 27 refs (hub + ACG) already on the release branch, no reapply needed. Scope check vs origin/main: 257 files / 326 commits, 5 v1.41.0 plans (cap), every code/config file maps to a CHANGELOG entry. Local `main` fast-forwarded to v1.40.0 `b5500db2` by the operator (2026-10-06).
 - [x] federate-acg rollout DONE 2026-10-06 12:29Z: operator restarted PF :19190 (new PID 3165); hub `up{job="federate-acg"}`=1, scrape 5.3 s / 30 s timeout, 23,772 samples (spec predicted 23,777).
-- [ ] PR body drafted (scratchpad `pr-v1.41.0.md`); waiting on operator: `make e2e` live smoke gate (diff touches bin/lib/plugins) + go to `gh pr create`. Merge waits for operator go.
+- [x] Live smoke gate 2026-10-06: plain `make e2e` 91/8 (run 1791290346-2661) — all 8 `order-management`, caused by hub agent-0 serving cached pre-fix `:latest` (sha-35098ac) under `IfNotPresent`. Pinned `E2E_IMAGE_TAG=sha-e5e644d… make e2e` (run 1791290881-10078, f945a8e5): **98 passed / 0 failed of 102** → gate GREEN. `make` still exited 1 after the pass (unexplained, see bug doc).
+- [ ] Filed `docs/bugs/2026-10-06-e2e-runner-ifnotpresent-serves-stale-latest-image.md` (pull policy from tag + exit-1-after-pass). Next: operator go on target release (v1.41.0 vs v1.42.0) + Codex dispatch; then go to `gh pr create` (body in scratchpad `pr-v1.41.0.md`). Merge waits for operator go.
 
 ## Open items (verbatim, grouped by original section)
 
