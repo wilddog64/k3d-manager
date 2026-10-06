@@ -1,6 +1,10 @@
 # Bug: `make up` and `refresh-edge` prompt for a sudo password although NOPASSWD rules cover every call
 
-**Status:** OPEN
+**Status:** OPEN — RETARGETED 2026-10-05. Do not implement the File 1 fix below in the local
+`scripts/lib/system.sh`. Defect 1 (PATH resolution) is fixed upstream: lib-foundation
+`docs/bugs/2026-10-05-sudo-resolves-bare-name-through-user-path.md` (branch
+`fix/sudo-system-path-resolution`). After that merges and is subtree-pulled, this doc is rewritten
+to fix defect 2 by making `bin/*` load the foundation resolver instead of the stale local copy.
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Medium. An automated run stops at a `Password:` prompt. Unattended (watcher, headless)
