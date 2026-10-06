@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+## [v0.5.1] — 2026-10-06
+
+### Changed
+- `docs/api/acg.md`: new "Sandbox TTL watcher and extend" section covering `acg_watch_start` / `acg_watch_stop` / `acg_watch`, the 65-minute extend window and why the interval must stay under it, the button wait and fallback, and how a date-less shutdown time is resolved. `README.md` and `docs/releases.md`: the release tables stopped at v0.3.17; back-filled v0.3.19 through v0.5.1, and the README main table again shows the 3 newest releases.
+
 ### Fixed
+- The launchd ACG watcher ran every 3.5 hours, but `acg_extend.js` only extends inside the last 65 minutes, so a run usually skipped with more than 65 minutes left and the next one came after the sandbox had expired. The watcher and `acg_watch` now check every 30 minutes. Separately, the page shows the shutdown as a time of day only, so a shutdown at 11:24 PM seen at 1:12 AM was read as about 22 hours away; since a sandbox never has more than 6 hours left, a time more than 6 hours ahead is now read as yesterday's, already expired. Reference: `docs/bugs/2026-10-06-acg-watch-misses-extend-window-and-reads-expired-as-22h.md`.
 - `_run_command` passed bare program names to sudo, which resolved them through the caller's PATH. With GNU coreutils first in PATH, `install` ran as root from a user-writable Homebrew directory and the `/usr/bin/install` NOPASSWD rule never matched, so automated runs stopped at a password prompt. The resolver now runs a bare name from `/usr/bin`, `/bin`, `/usr/sbin` or `/sbin` when it exists there. Reference: `docs/bugs/2026-10-05-sudo-resolves-bare-name-through-user-path.md`.
 - `acg_extend.js` now waits up to 15 seconds for the Extend button, including the “Extend Your Session” dialog, reloads the sandbox page once, and only then falls back to Open Sandbox. On failure it logs visible button labels with credential-shaped labels filtered and takes a viewport screenshot with a 10-second timeout. The launchd watcher now runs `acg_extend.js` directly with an absolute Node path, while `acg_watch` retries failed extends up to 3 times 10 minutes apart instead of waiting 3.5 hours; the previous wrapper called a dispatcher path that does not exist inside k3d-manager and could not find Node under launchd.
 - `scripts/lib/acg/cdp.sh`: add a self-contained CDP readiness wait so `_browser_launch` does not
