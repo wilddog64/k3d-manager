@@ -83,6 +83,16 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
       and produce a control matrix before assigning implementation work to a release. v1.42.0 is
       at its five-plan cap.
 
+## 2026-10-06 — v1.42.0 high-priority bug 1
+
+- [x] E2E mutable `:latest` stale-image bug fixed in `98d2bbcb` on
+      `k3d-manager-v1.42.0`; both runner manifests derive pull policy from the tag, explicit
+      overrides are validated, docs and regression issue note added.
+- [x] Verification: `bats scripts/tests/plugins/e2e.bats` = 66/66; `shellcheck
+      scripts/plugins/e2e.sh` clean; `_agent_audit` passed; `make check-doc-links` = 1944 files OK.
+- [ ] Separate E2E exit-1-after-pass defect remains for the next bug; pause for user verification
+      before continuing.
+
 ## Process (standing rules — do not archive)
 
 - Every implementation updates this file and `activeContext.md` with the real commit/PR SHA.

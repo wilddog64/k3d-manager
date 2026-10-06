@@ -7,6 +7,15 @@ Slack/AI/webhooks, CI artifacts, logs, and backups until data flows, BAAs, risk 
 control ownership are documented. A dedicated scope document and legal/security review are
 required before assigning a release; v1.42.0 is already at its five-plan cap.
 
+## 2026-10-06 — v1.42.0 first high-priority bug fixed
+
+E2E runner mutable-image pull policy fixed in commit `98d2bbcb` on
+`k3d-manager-v1.42.0`. `E2E_IMAGE_PULL_POLICY` now defaults to `Always` for `latest` and
+`IfNotPresent` for other tags, supports explicit `Always|IfNotPresent|Never`, rejects invalid
+values, and applies to both Tier 1 and Tier 2 runner Jobs. `scripts/tests/plugins/e2e.bats`:
+66/66 passed; `shellcheck scripts/plugins/e2e.sh` clean; `_agent_audit` passed; doc links passed.
+The separate `make e2e` exit-1-after-pass behavior remains open. No PR created yet.
+
 ## 2026-10-06 — ask-docs summary failure bug filed (OPEN, v1.41.0)
 
 docs/bugs/2026-10-06-ask-docs-model-failure-reported-as-success.md records operator Slack
