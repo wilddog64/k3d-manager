@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- Step 10g adds the `127.0.0.3` loopback alias with `--prefer-sudo` and no `--soft`. When sudo was
+  not cached, that call failed as a non-root user and `_run_command` exited. The intended warning
+  never ran, and `make up` aborted with the stack still running. The call now uses
+  `--interactive-sudo --soft`, like the daemon install beside it. It prompts on the TTY and, if it
+  still fails, warns and continues.
 - A bare `make down` now proceeds when the only other live provider is Hostinger, since it always
   targets the `k3s-aws` default and cannot reach Hostinger; it still refuses with two sandbox
   providers live, and `make status` is unchanged because a bare status resolves to Hostinger first.

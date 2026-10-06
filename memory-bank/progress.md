@@ -3072,4 +3072,4 @@ in the bug doc after commit: `3664bea7`.
 - [ ] 2026-10-05 hub agent-0 k3s agent memory leak: measure growth rate (scratchpad RSS sampler, 10-min), then spec a kube-proxy sync-staleness alert (`docs/issues/2026-10-05-hub-agent-0-k3s-agent-memory-wedges-kube-proxy.md`).
 - [x] 2026-10-05 bare `make down` with k3s-aws + k3s-hostinger live now proceeds (FIXED, Codex; Claude verified pre-fix RED 2/4, mutation caught, provider_active_set.bats 30/30, shellcheck 0=0). `make status` unchanged.
 - [ ] 2026-10-05 ACG extend fix (lib-foundation fix/acg-extend-wait-for-button): spec filed; [ ] Codex [ ] Claude verify [ ] PR/merge [ ] subtree pull [ ] launchd reinstall [ ] live wake verified
-- [ ] 2026-10-05 Step 10g loopback alias aborts make up — spec docs/bugs/2026-10-05-frontend-loopback-alias-aborts-cluster-up.md; [ ] Codex [ ] Claude verify
+- [x] 2026-10-05 Step 10g loopback alias aborts make up — spec docs/bugs/2026-10-05-frontend-loopback-alias-aborts-cluster-up.md; [x] Codex [x] Claude verify (pre-fix red, --soft mutation red, 8/8 BATS, shellcheck 159=159)

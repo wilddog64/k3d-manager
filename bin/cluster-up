@@ -1605,7 +1605,7 @@ if _is_mac; then
   mkdir -p "$(dirname "${_frontend_browser_log}")"
   # Ensure 127.0.0.3 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
   if ! /sbin/ifconfig lo0 | grep -q '127\.0\.0\.3'; then
-    _run_command --prefer-sudo --quiet -- /sbin/ifconfig lo0 alias 127.0.0.3 || \
+    _run_command --interactive-sudo --quiet --soft -- /sbin/ifconfig lo0 alias 127.0.0.3 || \
       _warn "[acg-up] failed to add 127.0.0.3 loopback alias — frontend port-forward will fail to bind"
   fi
 

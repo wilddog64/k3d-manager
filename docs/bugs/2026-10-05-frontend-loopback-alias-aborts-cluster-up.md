@@ -1,6 +1,6 @@
 # Bug: `make up` aborts at Step 10g when sudo is not cached, although the loopback-alias failure was meant to be a warning
 
-**Status:** OPEN
+**Status:** FIXED
 **Filed:** 2026-10-05
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Medium. A full `make up` dies at Step 10g, after about 30 minutes of work, and leaves a

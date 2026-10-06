@@ -28,6 +28,13 @@ setup() {
   [ "${status}" -eq 0 ]
 }
 
+@test "cluster-up loopback alias failure is soft and can prompt for sudo" {
+  run grep -nF -- '--interactive-sudo --quiet --soft -- /sbin/ifconfig lo0 alias 127.0.0.3' bin/cluster-up
+  [ "${status}" -eq 0 ]
+  run grep -nF -- '--prefer-sudo --quiet -- /sbin/ifconfig lo0 alias' bin/cluster-up
+  [ "${status}" -eq 1 ]
+}
+
 @test "cluster-refresh has only the sandbox frontend address and plist" {
   run grep -nF '127.0.0.2' bin/cluster-refresh
   [ "${status}" -ne 0 ]
