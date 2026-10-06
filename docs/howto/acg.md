@@ -73,6 +73,20 @@ The browser helper opens the sandbox page and clicks the extend button automatic
 
 Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (useful for CI or troubleshooting Playwright issues).
 
+You rarely need to extend by hand. `make up` installs a TTL watcher (Step 12), the
+`com.k3d-manager.acg-watch` launchd agent, which checks the sandbox every 30 minutes and clicks
+Extend once 65 minutes or less remain:
+
+```bash
+make acg-watch         # (re)install the watcher, e.g. after a lib-foundation subtree pull
+make acg-watch-check   # read-only: prints REMAINING_MINS:<n>, never clicks Extend
+make acg-watch-stop    # uninstall the watcher
+```
+
+All three accept `URL=<sandbox-url>` (default: the sandbox list page above). A zero or negative
+`REMAINING_MINS` means the sandbox has already expired, so go to 4a below. See
+[the Makefile how-to](makefile.md) for the full target list.
+
 ### 4a. Recover an Expired Sandbox
 
 Once a sandbox has expired there is nothing left to extend — it has to be replaced. `make acg-restart`
