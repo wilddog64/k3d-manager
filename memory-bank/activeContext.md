@@ -1076,9 +1076,9 @@ genuinely collected; `check-doc-links` 1801 files OK.
 All four anomalies from the first post-bootstrap cycles were deep-dived read-only.
 Three resolve to known items; one is a defect nobody had reported.
 
-## 2026-10-06 — ACG watcher misses extend window (dispatched to Codex)
+## 2026-10-06 — ACG watcher misses extend window (verified, PR pending go)
 
-lib-foundation branch `fix/acg-watch-interval-and-expired-ttl`, spec `25e2b75`. Fix: launchd/acg_watch interval 12600s -> 1800s; `_remainingMinsFromShutdown` reads a time >6h ahead as yesterday (expired). Operator restarted ACG via `make up` 2026-10-06 morning; the installed agent stays at 12600s until the fix is subtree-pulled and reinstalled.
+lib-foundation branch `fix/acg-watch-interval-and-expired-ttl`, spec `25e2b75`. Fix: launchd/acg_watch interval 12600s -> 1800s; `_remainingMinsFromShutdown` reads a time >6h ahead as yesterday (expired). Operator restarted ACG via `make up` 2026-10-06 morning; the installed agent stays at 12600s until the fix is subtree-pulled and reinstalled. Codex done; Claude verified and committed `211a3fd` (pushed). Next: lib-foundation PR on the go, merge, subtree-pull, reinstall agent.
 
 ## `eso` unknown is a false negative caused by the stale `ubuntu-k3s` context
 
