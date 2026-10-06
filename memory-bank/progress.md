@@ -1,3 +1,12 @@
+## 2026-10-06 — Cloud test-all Grafana publication gap filed (OPEN, v1.41.0)
+
+`docs/bugs/2026-10-06-cloud-bridge-test-all-does-not-publish-grafana-metrics.md` records
+real bridge request `20261006T163821Z-make-test-all`, job `ccc20dc9` (queued, then running).
+Code shows test-all does not call the test metrics exporter; only test-metrics publishes.
+Proposed acceptance: publish the captured result once without rerunning tests or hiding failures.
+No runtime changes; terminal test result, live dashboard, and vector ingestion not verified.
+Similarity retrieval unavailable; offline dedup distinguished the nightly push-failure bug.
+
 ## 2026-10-06 — Order-service Go Dependabot coverage gap documented (v1.41.0)
 
 Filed `docs/bugs/2026-10-06-shopping-cart-order-go-dependabot-coverage-gap.md`.
