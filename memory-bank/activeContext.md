@@ -1076,6 +1076,10 @@ genuinely collected; `check-doc-links` 1801 files OK.
 All four anomalies from the first post-bootstrap cycles were deep-dived read-only.
 Three resolve to known items; one is a defect nobody had reported.
 
+## 2026-10-06 — make acg-watch targets dispatched to Codex
+
+Operator asked for make targets for the watcher. Spec `docs/bugs/2026-10-06-acg-watch-make-targets.md` (bug follow-up, not a 6th v1.41.0 plan): `acg-watch` / `acg-watch-stop` / `acg-watch-check`, URL= optional, BATS `scripts/tests/bin/makefile_acg_watch.bats` (7 tests), howto + CHANGELOG. Codex dispatched via `codex exec`; Claude verifies, commits if `.git` is denied.
+
 ## 2026-10-06 — ACG watcher fix shipping as lib-foundation v0.5.1 (PR #64)
 
 lib-foundation branch `fix/acg-watch-interval-and-expired-ttl`, spec `25e2b75`. Fix: launchd/acg_watch interval 12600s -> 1800s; `_remainingMinsFromShutdown` reads a time >6h ahead as yesterday (expired). Operator restarted ACG via `make up` 2026-10-06 morning; the installed agent stays at 12600s until the fix is subtree-pulled and reinstalled. Codex done; Claude verified and committed `211a3fd` (pushed). Release PR #64 (v0.5.1) opened 2026-10-06 with docs `d86b452`: CHANGE.md promoted, acg.md watcher section, release tables back-filled v0.3.19–v0.5.1. PR #64 MERGED `cb5575c` 2026-10-06; tag v0.5.1 + GitHub release (Latest) published; subtree pulled into k3d-manager `09e8fe37` (tree equal to v0.5.1; ACG BATS 33/33 + subtree acg.bats green). Remaining: operator reinstalls the launchd agent (`acg_watch_start <url>`) and kills the in-process 3h watcher from make up Step 2 (PID 42997); `make up` 2026-10-06 recovered the expired sandbox via restart at Step 1.
