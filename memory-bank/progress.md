@@ -76,6 +76,13 @@ Documentation only; no k3d-manager runtime changes or live tests.
 Canonical: `docs/releases.md` (full history) and the README releases table (3 most recent).
 Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 
+## 2026-10-06 — HIPAA readiness roadmap decision
+
+- [x] Added an unversioned HIPAA readiness/compliance-gap-assessment theme to `docs/roadmap.md`.
+- [ ] Future scope: inventory ePHI flows and providers, confirm BAAs, define the no-PHI boundary,
+      and produce a control matrix before assigning implementation work to a release. v1.42.0 is
+      at its five-plan cap.
+
 ## Process (standing rules — do not archive)
 
 - Every implementation updates this file and `activeContext.md` with the real commit/PR SHA.
