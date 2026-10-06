@@ -1076,7 +1076,9 @@ genuinely collected; `check-doc-links` 1801 files OK.
 All four anomalies from the first post-bootstrap cycles were deep-dived read-only.
 Three resolve to known items; one is a defect nobody had reported.
 
-## 2026-10-06 — stale Makefile URL default re-dispatched to Codex
+## 2026-10-06 — stale Makefile URL default FIXED (`5426de02`)
+
+Codex committed and pushed `5426de02`; Claude verified (BATS 10/10, RED shown, scope 5 files). Spec status set FIXED.
 
 Operator asked for a bug + Codex dispatch. Dedup found `docs/bugs/2026-07-19-makefile-stale-acg-sandbox-url-default.md` (v1.18.0, never implemented — `git log -S` shows `Makefile:16` unchanged since `1a8307c6`); appended a "Recurrence — 2026-10-06" section as the v1.41.0 spec. Impact now cosmetic/latent: lib-foundation rewrites the legacy path (`sandbox.js:68`, `acg_extend.js:23`, `acg_restart.js:246`), so `make up` works. Scope: `Makefile:16`, `docs/howto/makefile.md:252`, three `docs/howto/acg.md` examples, CHANGELOG, new `scripts/tests/bin/makefile_default_url.bats` (3 tests). Keep the `acg-watch acg-watch-check: URL =` reset.
 

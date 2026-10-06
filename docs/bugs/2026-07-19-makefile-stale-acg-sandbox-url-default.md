@@ -141,7 +141,7 @@ not touch the browser automation or provision sandboxes.
 
 ## Recurrence — 2026-10-06 (v1.41.0)
 
-**Status:** OPEN — this section supersedes the original Fix, Rules, DoD and branch above.
+**Status:** FIXED `5426de02` (k3d-manager-v1.41.0) — this section supersedes the original Fix, Rules, DoD and branch above.
 
 The v1.18.0 fix never landed: `git log -S` shows `Makefile` still has the line it was created
 with in `1a8307c6`. It surfaced again on 2026-10-06, when the in-process watcher left behind by
