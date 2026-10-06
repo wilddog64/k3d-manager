@@ -132,6 +132,23 @@ async function _logVisibleButtonLabels(page) {
   console.error(`INFO: Visible buttons at failure: ${JSON.stringify(_safeButtonLabels(state.labels))}`);
 }
 
+// The page shows the shutdown time of day without a date. A sandbox never has more than 6 hours
+// left, so resolve the time to the instant within 6 hours of now: a time just past midnight is
+// tomorrow, and a time more than 6 hours ahead is yesterday's shutdown (already expired).
+function _remainingMinsFromShutdown(hours, mins, now) {
+  const windowMs = 6 * 60 * 60 * 1000;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const shutdownTime = new Date(now.getTime());
+  shutdownTime.setHours(hours, mins, 0, 0);
+  let deltaMs = shutdownTime.getTime() - now.getTime();
+  if (deltaMs < 0 && deltaMs + dayMs < windowMs) {
+    deltaMs += dayMs;
+  } else if (deltaMs > windowMs) {
+    deltaMs -= dayMs;
+  }
+  return Math.floor(deltaMs / 60000);
+}
+
 async function _findExtendButton(page, selectors, targetUrl, waitMs = 15000) {
   const onPage = await _waitForVisibleExtendButton(page, selectors, waitMs, 'on sandbox page');
   if (onPage) return onPage;
@@ -288,26 +305,7 @@ async function extendSandbox() {
           if (ampm === 'PM' && hours < 12) hours += 12;
           if (ampm === 'AM' && hours === 12) hours = 0;
           
-          const shutdownTime = new Date();
-          shutdownTime.setHours(hours, mins, 0, 0);
-          
-          // Midnight/Date-wrap fix: the UI shows times without a date, so "12:30AM" for a
-          // sandbox expiring tomorrow is constructed as today's 12:30AM (in the past).
-          // Only wrap to tomorrow when the resulting next-day time is ≤ 6 hours away —
-          // that covers the legitimate near-midnight case (e.g. 11:59PM→12:30AM = 31 min)
-          // while correctly treating truly-expired sandboxes (2:02PM expired → next-day
-          // 2:02PM is ~22h away) as expired rather than wrapping them.
-          if (shutdownTime < now) {
-            const minsUntilNextDay = Math.floor(
-              (shutdownTime.getTime() + 24 * 60 * 60 * 1000 - now.getTime()) / 60000
-            );
-            if (minsUntilNextDay > 0 && minsUntilNextDay < 360) {
-              shutdownTime.setDate(shutdownTime.getDate() + 1);
-            }
-          }
-          
-          const remainingMs = shutdownTime.getTime() - now.getTime();
-          remainingMins = Math.floor(remainingMs / 60000);
+          remainingMins = _remainingMinsFromShutdown(hours, mins, now);
           
           console.error(`INFO: Calculated remaining TTL: ~${remainingMins} minutes`);
           if (checkMode) {
@@ -494,6 +492,7 @@ module.exports = {
   _findExtendButton,
   _isSandboxPageUrl,
   _normalizeSandboxUrl,
+  _remainingMinsFromShutdown,
   _safeButtonLabels,
   _selectExtendPage,
 };

@@ -320,7 +320,7 @@ _acg_watch_write_plist() {
     <string>${_ACG_WATCH_WRAPPER}</string>
   </array>
   <key>StartInterval</key>
-  <integer>12600</integer>
+  <integer>1800</integer>
   <key>StandardOutPath</key>
   <string>/tmp/k3d-manager-acg-watch.out</string>
   <key>StandardErrorPath</key>
@@ -686,11 +686,12 @@ function acg_watch() {
     cat <<'HELP'
 Usage: acg_watch [interval_seconds]
 
-Background sandbox TTL watcher. Extends the ACG sandbox every 3.5 hours
-while the EC2 instance is alive. Stops automatically when the instance
+Background sandbox TTL watcher. Checks the ACG sandbox every 30 minutes and
+extends it once 65 minutes or less remain, while the EC2 instance is alive.
+Stops automatically when the instance
 is gone (after acg_teardown).
 
-Default interval: 12600 seconds (3.5 hours).
+Default interval: 1800 seconds (30 minutes).
 A failed extend is retried up to 3 times, ACG_WATCH_RETRY_INTERVAL seconds apart (default 600).
 
 Example (run after deploy_cluster):
@@ -700,10 +701,10 @@ HELP
     return 0
   fi
 
-  local interval="${1:-12600}"
+  local interval="${1:-1800}"
   local retry_interval="${ACG_WATCH_RETRY_INTERVAL:-600}"
   local attempt
-  _info "[acg] Sandbox watcher started (PID $$, extending every $((interval / 3600))h)"
+  _info "[acg] Sandbox watcher started (PID $$, checking every $((interval / 60))m)"
 
   while true; do
     sleep "$interval"
@@ -730,10 +731,10 @@ function acg_watch_start() {
     cat <<'HELP'
 Usage: acg_watch_start [sandbox-url]
 
-Install a launchd job that extends the ACG sandbox TTL every 3.5 hours,
+Install a launchd job that checks the ACG sandbox every 30 minutes and extends it once 65 minutes or less remain,
 independent of any terminal session or agent process.
 
-macOS only. The job fires automatically at StartInterval=12600s and
+macOS only. The job fires automatically at StartInterval=1800s and
 persists across reboots until acg_watch_stop is called.
 
 Arguments:
@@ -759,7 +760,7 @@ HELP
 
   launchctl load "${_ACG_WATCH_PLIST_PATH}"
   _info "[acg] Sandbox watcher installed: ${_ACG_WATCH_LAUNCHD_LABEL}"
-  _info "[acg] Extends TTL every 3.5h — log: /tmp/k3d-manager-acg-watch.err"
+  _info "[acg] Checks TTL every 30m — log: /tmp/k3d-manager-acg-watch.err"
 }
 
 function acg_watch_stop() {

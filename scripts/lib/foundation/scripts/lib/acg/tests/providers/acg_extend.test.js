@@ -2,6 +2,7 @@ const {
   _findExtendButton,
   _isSandboxPageUrl,
   _normalizeSandboxUrl,
+  _remainingMinsFromShutdown,
   _safeButtonLabels,
   _selectExtendPage,
 } = require('../../playwright/acg_extend');
@@ -113,5 +114,30 @@ describe('acg_extend button wait', () => {
       'Open Sandbox',
       '',
     ])).toEqual(['Open Sandbox', 'Extend Sandbox']);
+  });
+});
+
+describe('acg_extend remaining TTL from the shutdown time of day', () => {
+  const at = (h, m) => new Date(2026, 9, 6, h, m, 0, 0);
+
+  test('reads a shutdown later today as the time left', () => {
+    expect(_remainingMinsFromShutdown(23, 24, at(21, 42))).toBe(102);
+  });
+
+  test('reads a shutdown just past midnight as tomorrow', () => {
+    expect(_remainingMinsFromShutdown(0, 30, at(23, 59))).toBe(31);
+  });
+
+  test('reads a shutdown earlier today as expired', () => {
+    expect(_remainingMinsFromShutdown(14, 2, at(16, 0))).toBe(-118);
+  });
+
+  test('reads yesterday evening shutdown seen after midnight as expired, not ~22h left', () => {
+    expect(_remainingMinsFromShutdown(23, 24, at(1, 12))).toBe(-108);
+  });
+
+  test('keeps a shutdown up to 6 hours ahead as the time left', () => {
+    expect(_remainingMinsFromShutdown(4, 0, at(22, 30))).toBe(330);
+    expect(_remainingMinsFromShutdown(19, 0, at(13, 0))).toBe(360);
   });
 });

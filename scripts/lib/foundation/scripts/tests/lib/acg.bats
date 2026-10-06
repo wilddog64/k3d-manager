@@ -310,3 +310,19 @@ NODE
 
   [ "${status}" -ne 0 ]
 }
+
+@test "the launchd watcher plist runs every 30 minutes" {
+  _acg_watch_write_plist
+  grep -F '<integer>1800</integer>' "${_ACG_WATCH_PLIST_PATH}"
+  run grep -F '12600' "${_ACG_WATCH_PLIST_PATH}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg_watch defaults to a 30-minute interval" {
+  sleep() { printf '%s\n' "$1" >>"${BATS_TEST_TMPDIR}/sleep-args"; }
+  _acg_get_instance_id() { printf '\n'; }
+
+  run acg_watch
+  [ "${status}" -eq 0 ]
+  [ "$(head -n1 "${BATS_TEST_TMPDIR}/sleep-args")" = "1800" ]
+}
