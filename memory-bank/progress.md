@@ -879,3 +879,8 @@ Filed `docs/bugs/2026-10-06-sandbox-launchd-test-requires-macos-plutil.md` for
 PR #135 lint test 313 and fixed the BATS assertion with Python `plistlib`.
 Focused suite: 8/8. Full `make test-bin`: 328/328; only expected tripwire
 notices for blocked Keychain probes remain.
+## 2026-10-06 — Ubuntu CI follow-up portability bug fixed
+
+Tests 150 and 151 in `hub_restore.bats` used BSD/macOS `script` syntax. The
+portable dialect-detecting helper now passes locally: `hub_restore.bats` 14/14
+and `make test-bin` 328/328. CI rerun pending after push.

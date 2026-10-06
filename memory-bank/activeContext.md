@@ -230,3 +230,9 @@ macOS-only `plutil` on `ubuntu-latest`. Filed
 the assertion with Python `plistlib`. Focused suite is 8/8 and `make test-bin`
 is 328/328; expected tripwire notices still block three Keychain probes without
 reaching real tools.
+## 2026-10-06 — Ubuntu CI follow-up portability bug fixed
+
+The next lint run exposed two more failures in `hub_restore.bats`: BSD/macOS
+`script` argument ordering caused tests 150 and 151 to lose their expected rc=2
+under Ubuntu. Added a dialect-detecting `_run_with_tty` helper. `hub_restore.bats`
+is 14/14 and `make test-bin` is 328/328; pushed in the follow-up commit below.

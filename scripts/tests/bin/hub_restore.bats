@@ -88,6 +88,14 @@ EOF
   export HUB_RESTORE_SKIP_PREFLIGHT=1
 }
 
+_run_with_tty() {
+  if script -q -c "true" /dev/null >/dev/null 2>&1; then
+    script -q -c "$*" /dev/null
+    return $?
+  fi
+  script -q /dev/null "$@"
+}
+
 teardown() { rm -rf "${WORK}"; }
 
 @test "hub-restore rejects a non-TTY before any make step" {
@@ -101,7 +109,7 @@ teardown() { rm -rf "${WORK}"; }
 @test "hub-restore rejects an unreadable Keychain before any make step" {
   unset HUB_RESTORE_SKIP_PREFLIGHT
   export KEYCHAIN_FAIL=1
-  run script -q /dev/null bin/hub-restore
+  run _run_with_tty bin/hub-restore
   [ "${status}" -eq 2 ]
   [[ "${output}" == *"security unlock-keychain"* ]]
   run grep -q '^make ' "${CALL_LOG}"
@@ -111,7 +119,7 @@ teardown() { rm -rf "${WORK}"; }
 @test "hub-restore rejects the wrong Kubernetes context before any make step" {
   unset HUB_RESTORE_SKIP_PREFLIGHT
   export KUBE_CONTEXT=ubuntu-hostinger
-  run script -q /dev/null bin/hub-restore
+  run _run_with_tty bin/hub-restore
   [ "${status}" -eq 2 ]
   [[ "${output}" == *"ubuntu-hostinger"* ]]
   [[ "${output}" == *"k3d-k3d-cluster"* ]]

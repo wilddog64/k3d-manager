@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-06
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** FIXED — use Python `plistlib` for the portable assertion
+**Status:** FIXED — use Python `plistlib` and portable `script -c` syntax
 **Severity:** medium. The production plist writer is not reached by the CI gate because the test exits before the remaining offline suites run.
 
 ## Symptom
@@ -30,7 +30,21 @@ Python's standard-library `plistlib`, which is already required by the Python
 test jobs and is available on the Ubuntu runner. The assertion still requires
 the exact two-element value `["/bin/bash", wrapper]`.
 
+The same suite also used BSD/macOS `script` argument ordering in the Keychain
+and wrong-context preflight tests. Ubuntu's util-linux `script` requires the
+command to be passed with `-c`, while macOS uses the positional command form.
+The tests now use a small dialect-detecting helper for both forms.
+
+The follow-up CI failure was:
+
+```text
+not ok 150 hub-restore rejects an unreadable Keychain before any make step
+not ok 151 hub-restore rejects the wrong Kubernetes context before any make step
+make: *** [Makefile:1111: test-bin] Error 1
+```
+
 ## Validation
 
-Run the focused BATS test and the complete `make test-bin` suite on the fix
-branch. The pull request CI run should then proceed past test 313.
+Run the focused BATS suites and the complete `make test-bin` suite on the fix
+branch. The pull request CI run should then proceed past tests 150, 151, and
+313.
