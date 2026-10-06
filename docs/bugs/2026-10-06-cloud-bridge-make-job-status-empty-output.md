@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-06
 **Release / branch:** v1.41.0 / `k3d-manager-v1.41.0`
-**Status:** OPEN
+**Status:** OPEN recurrence — canonical bug: [September 28 report](2026-09-28-make-jobs-never-write-output-file.md)
 **Severity:** Medium — cloud agents see terminal failure but cannot diagnose it
 **Component:** webhook job-status log selection / cloud-bridge response
 
@@ -72,15 +72,19 @@ Do not publish full raw logs or broaden the bridge action allowlist as part of t
 
 [Cloud test-all does not publish Grafana metrics](2026-10-06-cloud-bridge-test-all-does-not-publish-grafana-metrics.md)
 is a separate missing metrics path. Publishing Grafana metrics will not fix this status/log mismatch.
-Exact-slug and local text searches found no duplicate report. Similarity retrieval was unavailable:
+The initial offline search missed the older report. Subsequent cloud similarity retrieval
+surfaced the [September 28 canonical bug](2026-09-28-make-jobs-never-write-output-file.md),
+which was fixed September 29 and has now been reopened for this regression. This document
+retains the new live evidence and current acceptance criteria. Initial local retrieval failed:
 
 ```text
 find-similar-docs: retrieval unavailable — no embeddings credential. $K3DM_EMBEDDINGS_API_KEY is unset or empty; k3dm-embeddings-api-key: cannot run security (FileNotFoundError); gemini-cli-api-key: cannot run security (FileNotFoundError); hub Vault: cannot run kubectl: [Errno 2] No such file or directory: 'kubectl'
 find-similar-docs: falling back to the exact-slug glob is still correct.
 ```
 
-Documentation-only filing: no runtime implementation or new live test. This tracked report is
-eligible for index-docs after the host pulls the branch; vector ingestion is not verified.
+The operator's later pasted cloud find-similar-docs result retrieved this report (0.856), the
+September report (0.778), and today's Grafana report (0.771), confirming indexing at that time.
+Documentation-only filing: no runtime implementation in this report.
 
 ## Second live verification — passing Python unit job (2026-10-06)
 
@@ -145,3 +149,12 @@ make job-log ID=033ceddc
 
 The original report now covers both retrieval interfaces. Automatic notification delivery is
 not itself broken based on the operator's report. No runtime code changed in this update.
+
+## Regression traced — 2026-10-06
+
+[Commit 73d0ef5682ed33f4792ab82181f37d41497fc96e](https://github.com/wilddog64/k3d-manager/commit/73d0ef5682ed33f4792ab82181f37d41497fc96e)
+introduced streaming `make.log` and removed the scrubbed `output` write while the HTTP
+reader still expected `output`. The same commit changed producer tests to assert
+`make.log` exists and `output` does not, leaving external retrieval uncovered. Full
+history and fix direction are recorded in the reopened September canonical bug.
+The repository cause is established; the deployed host revision is not independently verified.

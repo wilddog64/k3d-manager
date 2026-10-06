@@ -1,3 +1,14 @@
+## 2026-10-06 — Empty Make-log regression traced; older canonical bug reopened
+
+Reopened docs/bugs/2026-09-28-make-jobs-never-write-output-file.md and cross-linked the
+October 6 evidence report. Commit 73d0ef5682ed33f4792ab82181f37d41497fc96e removed the
+scrubbed output write when switching to streaming make.log; HTTP reader still expects output.
+Producer tests were changed to make.log and explicitly absent output, missing the consumer contract.
+Current acceptance: bounded redacted shared selection across cloud status and Slack consumers.
+Operator's pasted find-similar-docs result confirms September/October reports were indexed.
+Deployed revision and host logs remain unverified; underlying suite failures unknown.
+Documentation only; no runtime fix or additional test job.
+
 ## 2026-10-06 — Existing empty-log bug extended to Slack and E2E
 
 Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
