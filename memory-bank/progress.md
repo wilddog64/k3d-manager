@@ -3070,4 +3070,4 @@ in the bug doc after commit: `3664bea7`.
 - [x] 2026-10-05 alert deep dive fixes LANDED `536454bc` (all five specs; make test 1362/1362, test-bin 314/314).
 - [x] 2026-10-05 CoreDNS restart in `_acg_repair_hub_host_alias` FIXED (Codex; Claude verified pre-fix RED 3/3, two mutations caught, cluster_up.bats 56/56, shellcheck 31=31). Operator may rerun `make up`.
 - [ ] 2026-10-05 hub agent-0 k3s agent memory leak: measure growth rate (scratchpad RSS sampler, 10-min), then spec a kube-proxy sync-staleness alert (`docs/issues/2026-10-05-hub-agent-0-k3s-agent-memory-wedges-kube-proxy.md`).
-- [ ] 2026-10-05 bare `make down` refuses when k3s-aws + k3s-hostinger are live although the default target is always k3s-aws; proposed: exclude k3s-hostinger from the `bin/require-unambiguous-provider` count. Awaiting operator go before filing.
+- [ ] 2026-10-05 bare `make down` refuses with k3s-aws + k3s-hostinger live -> spec `docs/bugs/2026-10-05-make-down-refuses-when-hostinger-is-live.md` (down-only: do not count hostinger; status unchanged) -> Codex.
