@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-10-06
+
 ### Added
 
 - `make acg-watch`, `make acg-watch-stop` and `make acg-watch-check` wrap the sandbox TTL watcher:
@@ -9,63 +11,6 @@
   sandbox's remaining minutes without extending it (`acg-extend-test --check`). Reinstalling the
   agent was the step needed to pick up lib-foundation v0.5.1's 30-minute interval, and it had no
   make target. `URL=` is optional on all three. See `docs/bugs/2026-10-06-acg-watch-make-targets.md`.
-
-### Fixed
-
-- The hub's `federate-acg` scrape timed out on every attempt, so no sandbox metrics reached the
-  hub and `TargetDown` fired for the whole sandbox lifetime. k3s exposes the embedded apiserver,
-  etcd and scheduler metrics on the kubelet endpoint, so the `job="kubelet"` match federated
-  about 50,000 control-plane histogram series — a 37 MB response that took 15 s against a 10 s
-  timeout. The match now excludes `apiserver_`, `etcd_`, `scheduler_` and `workqueue_` (75,583 →
-  23,777 series) and the job's timeout is 30 s. See
-  `docs/bugs/2026-10-06-federate-acg-scrape-exceeds-timeout-k3s-control-plane-histograms.md`.
-- The Makefile's default `URL` still pointed at Pluralsight's retired
-  `cloud-playground/cloud-sandboxes` route, so `make help`, `docs/howto/makefile.md` and the
-  `docs/howto/acg.md` examples showed a dead address, and `make up` / `make creds` worked only
-  because lib-foundation rewrites that path. The default and the examples now use
-  `hands-on/playground/cloud-sandboxes`. Filed 2026-07-19 for v1.18.0 and never implemented. See
-  `docs/bugs/2026-07-19-makefile-stale-acg-sandbox-url-default.md`.
-- `bin/*` scripts, the Makefile and the tests sourced `scripts/lib/system.sh`, a stale local copy of
-  lib-foundation's system library, while the dispatcher loaded the subtree copy. The stale
-  `_run_command` lacked the no-TTY `-n` guard and lib-foundation's system-path fix, so `make up` Step
-  10g and `refresh-edge` ran GNU coreutils `install` under sudo and stopped at a `Password:` prompt.
-  `scripts/lib/system.sh` is now a shim that loads the subtree copy and defines only the kubeconform
-  helpers. See `docs/bugs/2026-10-05-sudo-prompt-stale-system-sh-gnubin-install.md`.
-- Step 10g adds the `127.0.0.3` loopback alias with `--prefer-sudo` and no `--soft`. When sudo was
-  not cached, that call failed as a non-root user and `_run_command` exited. The intended warning
-  never ran, and `make up` aborted with the stack still running. The call now uses
-  `--interactive-sudo --soft`, like the daemon install beside it. It prompts on the TTY and, if it
-  still fails, warns and continues.
-- A bare `make down` now proceeds when the only other live provider is Hostinger, since it always
-  targets the `k3s-aws` default and cannot reach Hostinger; it still refuses with two sandbox
-  providers live, and `make status` is unchanged because a bare status resolves to Hostinger first.
-- `cluster-up` no longer restarts the single-replica hub CoreDNS deployment when repairing the
-  `host.k3d.internal` alias. The hosts plugin's `reload` picks up the patched NodeHosts file, so
-  the restart was unnecessary; it opened a DNS gap, and the subsequent ArgoCD controller restart
-  could land inside it, leaving its sidecar unable to reach istiod and refusing every outbound
-  connection from the pod.
-- E2E verification alerts now aggregate away exporter pod identity, so an exporter rollout does
-  not re-page for an unchanged red run; their service subject uses the exported service label
-  instead of the colliding exporter `service` label.
-- Hub Trivy now skips the ephemeral e2e `vclusters` namespace, whose synced pods can disappear
-  during a scan; those images remain covered on the app clusters and by `app-cve-scan`.
-- Added `OfflineSuiteRunMissed`, which alerts when no nightly test run has been pushed for 26h;
-  a non-fatal metrics push failure is now visible instead of leaving stale healthy-looking values.
-- The Argo CD CVE scan now treats finding CVEs with no newer chart as a finding, not a failure.
-  Exiting 1 made Kubernetes retry the scan twice and made `KubeJobFailed` fire and then resolve
-  every night through the Job TTL; an Artifact Hub lookup failure still exits 1.
-- Sandbox Trivy scans now skip `kube-system` and run one scan job at a time, preventing a single
-  seven-container `cilium` scan pod from growing far beyond its scheduled requests; k3s nodes now
-  reserve memory for the system and kubelet so a burst is OOM-killed inside the pod instead of
-  taking the node's kubelet down.
-- Sandbox `cluster-up` now reports the data-layer Application's last sync operation and any NotReady
-  app-cluster nodes at both wait timeouts, and no longer logs a false "connected" message after an
-  ArgoCD reconnect timeout.
-- Hermes now re-indexes a rebuilt vector store from the embedding cache and reports cache reloads
-  separately from embeddings API calls.
-- Hermes quota pauses now resume at 00:05 Pacific, after the Gemini daily quota reset.
-
-### Added
 
 - Python agent-audit protection via lib-foundation v0.5.0, plus the hermetic pytest guard for host
   executables, remote Git, and non-loopback network calls.
@@ -129,6 +74,59 @@
   30-second client poll.
 
 ### Fixed
+
+- The hub's `federate-acg` scrape timed out on every attempt, so no sandbox metrics reached the
+  hub and `TargetDown` fired for the whole sandbox lifetime. k3s exposes the embedded apiserver,
+  etcd and scheduler metrics on the kubelet endpoint, so the `job="kubelet"` match federated
+  about 50,000 control-plane histogram series — a 37 MB response that took 15 s against a 10 s
+  timeout. The match now excludes `apiserver_`, `etcd_`, `scheduler_` and `workqueue_` (75,583 →
+  23,777 series) and the job's timeout is 30 s. See
+  `docs/bugs/2026-10-06-federate-acg-scrape-exceeds-timeout-k3s-control-plane-histograms.md`.
+- The Makefile's default `URL` still pointed at Pluralsight's retired
+  `cloud-playground/cloud-sandboxes` route, so `make help`, `docs/howto/makefile.md` and the
+  `docs/howto/acg.md` examples showed a dead address, and `make up` / `make creds` worked only
+  because lib-foundation rewrites that path. The default and the examples now use
+  `hands-on/playground/cloud-sandboxes`. Filed 2026-07-19 for v1.18.0 and never implemented. See
+  `docs/bugs/2026-07-19-makefile-stale-acg-sandbox-url-default.md`.
+- `bin/*` scripts, the Makefile and the tests sourced `scripts/lib/system.sh`, a stale local copy of
+  lib-foundation's system library, while the dispatcher loaded the subtree copy. The stale
+  `_run_command` lacked the no-TTY `-n` guard and lib-foundation's system-path fix, so `make up` Step
+  10g and `refresh-edge` ran GNU coreutils `install` under sudo and stopped at a `Password:` prompt.
+  `scripts/lib/system.sh` is now a shim that loads the subtree copy and defines only the kubeconform
+  helpers. See `docs/bugs/2026-10-05-sudo-prompt-stale-system-sh-gnubin-install.md`.
+- Step 10g adds the `127.0.0.3` loopback alias with `--prefer-sudo` and no `--soft`. When sudo was
+  not cached, that call failed as a non-root user and `_run_command` exited. The intended warning
+  never ran, and `make up` aborted with the stack still running. The call now uses
+  `--interactive-sudo --soft`, like the daemon install beside it. It prompts on the TTY and, if it
+  still fails, warns and continues.
+- A bare `make down` now proceeds when the only other live provider is Hostinger, since it always
+  targets the `k3s-aws` default and cannot reach Hostinger; it still refuses with two sandbox
+  providers live, and `make status` is unchanged because a bare status resolves to Hostinger first.
+- `cluster-up` no longer restarts the single-replica hub CoreDNS deployment when repairing the
+  `host.k3d.internal` alias. The hosts plugin's `reload` picks up the patched NodeHosts file, so
+  the restart was unnecessary; it opened a DNS gap, and the subsequent ArgoCD controller restart
+  could land inside it, leaving its sidecar unable to reach istiod and refusing every outbound
+  connection from the pod.
+- E2E verification alerts now aggregate away exporter pod identity, so an exporter rollout does
+  not re-page for an unchanged red run; their service subject uses the exported service label
+  instead of the colliding exporter `service` label.
+- Hub Trivy now skips the ephemeral e2e `vclusters` namespace, whose synced pods can disappear
+  during a scan; those images remain covered on the app clusters and by `app-cve-scan`.
+- Added `OfflineSuiteRunMissed`, which alerts when no nightly test run has been pushed for 26h;
+  a non-fatal metrics push failure is now visible instead of leaving stale healthy-looking values.
+- The Argo CD CVE scan now treats finding CVEs with no newer chart as a finding, not a failure.
+  Exiting 1 made Kubernetes retry the scan twice and made `KubeJobFailed` fire and then resolve
+  every night through the Job TTL; an Artifact Hub lookup failure still exits 1.
+- Sandbox Trivy scans now skip `kube-system` and run one scan job at a time, preventing a single
+  seven-container `cilium` scan pod from growing far beyond its scheduled requests; k3s nodes now
+  reserve memory for the system and kubelet so a burst is OOM-killed inside the pod instead of
+  taking the node's kubelet down.
+- Sandbox `cluster-up` now reports the data-layer Application's last sync operation and any NotReady
+  app-cluster nodes at both wait timeouts, and no longer logs a false "connected" message after an
+  ArgoCD reconnect timeout.
+- Hermes now re-indexes a rebuilt vector store from the embedding cache and reports cache reloads
+  separately from embeddings API calls.
+- Hermes quota pauses now resume at 00:05 Pacific, after the Gemini daily quota reset.
 
 - The LaunchAgent template now carries the Hermes approval drain URL, so a reinstall no longer turns approvals off; the opt-in is now the Keychain drain token, which also stops buttons appearing that cannot do anything.
 - `make alertmanager-secret` now backs up the Gmail app password in the Keychain for Hub restores.
