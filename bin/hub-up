@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Rebuild or bootstrap the local k3d Hub without touching a remote cluster.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Prefer the lib-foundation subtree copy, falling back to the local library during
+# the subtree transition, matching the dispatcher entrypoint.
+if [[ -f "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/system.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/system.sh"
+else
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/system.sh"
+fi
+if [[ -f "${REPO_ROOT}/scripts/lib/system_overrides.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
+fi
+
+_hub_name="${HUB_CLUSTER_NAME:-k3d-cluster}"
+_hub_context="k3d-${_hub_name}"
+_dispatcher="${K3DM_DISPATCHER:-${REPO_ROOT}/scripts/k3d-manager}"
+
+_hub_dispatch() {
+  local number="$1"
+  local name="$2"
+  shift 2
+  _info "[hub-up] Step ${number}/5 — ${name}"
+  if ! "${_dispatcher}" "$@"; then
+    _err "[hub-up] Step ${number}/5 failed: ${name}"
+  fi
+}
+
+_info "[hub-up] Step 1/5 — checking local Hub cluster"
+if k3d cluster list 2>/dev/null | grep -q "^${_hub_name}[[:space:]]"; then
+  _info "[hub-up] hub exists — skipping create"
+else
+  _hub_dispatch 1 "creating local Hub cluster" deploy_cluster --provider k3d "${_hub_name}"
+fi
+
+_info "[hub-up] Step 2/5 — waiting for Hub API"
+_api_ready=0
+for _attempt in $(seq 1 12); do
+  if kubectl get nodes --context "${_hub_context}" --request-timeout=10s >/dev/null 2>&1; then
+    _api_ready=1
+    break
+  fi
+  _info "[hub-up] waiting for Hub API (${_attempt}/12)"
+  sleep 5
+done
+if [[ "${_api_ready}" -ne 1 ]]; then
+  _err "[hub-up] Step 2/5 failed: Hub API did not become ready"
+fi
+
+_current_context="$(kubectl config current-context 2>/dev/null || true)"
+if [[ "${_current_context}" != "${_hub_context}" ]]; then
+  _err "[hub-up] current kube context is '${_current_context}', not '${_hub_context}' — run: kubectl config use-context ${_hub_context}"
+fi
+
+_hub_dispatch 3 "deploying Vault" deploy_vault --confirm
+_hub_dispatch 4 "deploying LDAP" deploy_ldap --confirm
+_hub_dispatch 5 "deploying ArgoCD" deploy_argocd --confirm
+
+_info "[hub-up] local Hub rebuild complete"

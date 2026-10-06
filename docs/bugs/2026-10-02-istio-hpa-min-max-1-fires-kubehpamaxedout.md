@@ -80,3 +80,7 @@ Then confirm
 `kubectl --context k3d-k3d-cluster -n istio-system get hpa` is empty. If `istioctl` leaves the old HPAs behind,
 delete them: `kubectl -n istio-system delete hpa istiod istio-ingressgateway`. Both `KubeHpaMaxedOut` alerts
 resolve within 15 minutes.
+
+## Rollout done (2026-10-02)
+
+Operator ran the rollout; Claude verified live: `istio-system` has no HPAs, istiod and istio-ingressgateway run 1/1, `KubeHpaMaxedOut` no longer firing.

@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Copy unharvested webhook failure notes into the tracked prior-art corpus."""
+
+import os
+import re
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+root = Path(os.environ.get("K3DM_REPO_ROOT", Path(__file__).resolve().parents[1]))
+job_dir = Path(os.environ.get("K3DM_JOB_DIR", Path.home() / ".local/share/k3d-manager/webhook-jobs"))
+dest = Path(os.environ.get("K3DM_FAILURE_DOCS_DIR", root / "docs/job-failures"))
+dest.mkdir(parents=True, exist_ok=True)
+added = changed = waiting = 0
+for note in sorted(job_dir.glob("*/failure.md")):
+    if (note.parent / "harvested").exists():
+        continue
+    waiting += 1
+    text = note.read_text(errors="replace")
+    signature = next((line.removeprefix("**Signature:** ") for line in text.splitlines()
+                      if line.startswith("**Signature:** ")), "")
+    target_line = next((line for line in text.splitlines() if line.startswith("**Date:**")), "")
+    target = target_line.split("**Target:**", 1)[1].split("**Result:", 1)[0].strip() if "**Target:**" in target_line else "job"
+    date = next((line.split("**Date:**", 1)[1].split()[0] for line in text.splitlines()
+                 if line.startswith("**Date:**")), datetime.now(timezone.utc).date().isoformat())
+    target = re.sub(r"[^a-z0-9-]+", "-", target.lower()).strip("-") or "job"
+    existing = None
+    for candidate in dest.glob("*.md"):
+        if f"**Signature:** {signature}" in candidate.read_text(errors="replace"):
+            existing = candidate
+            break
+    if existing:
+        existing_text = existing.read_text(errors="replace")
+        with existing.open("a") as handle:
+            if "## Recurrences" not in existing_text:
+                handle.write("\n## Recurrences\n")
+            handle.write(f"- {date} ({note.parent.name})\n")
+        changed += 1
+    else:
+        output = dest / f"{date}-{target}-{note.parent.name}.md"
+        shutil.copyfile(note, output)
+        added += 1
+    (note.parent / "harvested").touch()
+print(f"harvest-job-failures: added {added}, changed {changed}, waiting {waiting}")

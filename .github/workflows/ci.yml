@@ -86,13 +86,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --user pytest==9.1.1
+          python3 -m pip install --user pytest==9.1.1 ruff==0.15.8
 
       - name: Run pytest suites (hermes + bin)
         shell: bash
         run: |
           set -euo pipefail
           make test-pytest
+
+      - name: Lint Python (pyflakes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          make lint-python
+
+      - name: Validate manifests (kubeconform)
+        shell: bash
+        run: |
+          set -euo pipefail
+          make validate-manifests
 
   detect:
     needs: lint

@@ -3,10 +3,10 @@ import importlib.machinery
 import importlib.util
 import json
 import sys
-import time
 from types import SimpleNamespace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 
@@ -267,6 +267,75 @@ def test_refresh_index_unchanged_does_not_start_indexer(monkeypatch):
     assert commands[-1]["result"] == "noop"
 
 
+def test_refresh_index_rebuilds_empty_store_with_unchanged_fingerprint(monkeypatch, capsys):
+    commands = []
+    cleared_before_index = []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "same")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", lambda metrics: commands.append(metrics))
+
+    status_refs = []
+
+    def run(command, **kw):
+        commands.append(command)
+        if command[0].endswith("k3dm-vectordb-status"):
+            status_refs.append((kw.get("env") or {}).get("K3DM_INDEX_REF"))
+            return SimpleNamespace(returncode=0, stdout=json.dumps(
+                {"available": True, "rows": 0, "corpus_docs": 5}), stderr="")
+        if "index-docs.py" in command[0]:
+            cleared_before_index.append("index_fingerprint" not in state)
+            return SimpleNamespace(returncode=0, stdout="index-docs: 5 docs, 0 from cache, 0 embedded, 0 pruned, 5 in store, 0 remaining\n",
+                                   stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    state = {"index_fingerprint": "same"}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert cleared_before_index == [True]
+    assert status_refs == ["origin/main"]
+    assert state["index_fingerprint"] == "same"
+    assert any("index-docs.py" in item[0] for item in commands if isinstance(item, list))
+    assert commands[-1]["result"] == "success"
+    assert "re-indexing despite unchanged corpus" in capsys.readouterr().err
+
+
+def test_refresh_index_unchanged_full_store_stays_noop(monkeypatch):
+    commands = []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "same")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", lambda metrics: commands.append(metrics))
+
+    def run(command, **_kw):
+        commands.append(command)
+        if command[0].endswith("k3dm-vectordb-status"):
+            return SimpleNamespace(returncode=0, stdout=json.dumps(
+                {"available": True, "rows": 5, "corpus_docs": 5}), stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    k3dm_hermes._refresh_index({"index_fingerprint": "same"}, now=1000)
+    assert all(not (isinstance(item, list) and "index-docs.py" in item[0]) for item in commands)
+    assert commands[-1]["result"] == "noop"
+
+
+def test_refresh_index_unchanged_status_failure_stays_noop(monkeypatch):
+    commands = []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "same")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", lambda metrics: commands.append(metrics))
+
+    def run(command, **_kw):
+        commands.append(command)
+        if command[0].endswith("k3dm-vectordb-status"):
+            return SimpleNamespace(returncode=1, stdout="not-json", stderr="unavailable")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    k3dm_hermes._refresh_index({"index_fingerprint": "same"}, now=1000)
+    assert all(not (isinstance(item, list) and "index-docs.py" in item[0]) for item in commands)
+    assert commands[-1]["result"] == "noop"
+
+
 def test_refresh_index_success_uses_ref_and_limit_and_stores_fingerprint(monkeypatch):
     commands = []
     pushed = []
@@ -278,7 +347,7 @@ def test_refresh_index_success_uses_ref_and_limit_and_stores_fingerprint(monkeyp
         commands.append(command)
         if command[1:4] == ["fetch", "--quiet", "origin"]:
             return SimpleNamespace(returncode=0, stdout="", stderr="")
-        return SimpleNamespace(returncode=0, stdout="index-docs: 4 docs, 2 embedded, 0 pruned, 4 in store, 0 remaining\n",
+        return SimpleNamespace(returncode=0, stdout="index-docs: 4 docs, 1 written (1 from cache, 2 embedded), 0 pruned, 4 in store, 0 remaining\n",
                                 stderr="")
 
     monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
@@ -289,6 +358,7 @@ def test_refresh_index_success_uses_ref_and_limit_and_stores_fingerprint(monkeyp
     assert index_command[index_command.index("--limit") + 1] == "100"
     assert state["index_fingerprint"] == "new"
     assert pushed[-1]["result"] == "success"
+    assert pushed[-1]["from_cache"] == 1
 
 
 def test_refresh_index_failure_does_not_store_fingerprint_or_break_poll(monkeypatch):
@@ -329,21 +399,28 @@ def _index_calls(commands):
     return [command for command, _kw in commands if "index-docs.py" in command[0]]
 
 
-def test_refresh_index_paused_waits_for_next_utc_midnight(monkeypatch):
+def test_refresh_index_paused_waits_for_next_pacific_reset(monkeypatch):
     commands, pushed = [], []
     paused = SimpleNamespace(returncode=1, stdout="",
                              stderr="index-docs: paused — daily quota (quota EmbedPerDay)\n")
     _stub_refresh(monkeypatch, commands, paused, pushed)
     state = {}
-    k3dm_hermes._refresh_index(state)
+    now = datetime(2026, 10, 4, 16, 42, tzinfo=ZoneInfo("America/Los_Angeles")).timestamp()
+    k3dm_hermes._refresh_index(state, now=now)
     until = state["index_paused_until"]
-    midnight = datetime.fromtimestamp(until, timezone.utc)
-    assert (midnight.hour, midnight.minute, midnight.second) == (0, 0, 0)
-    assert 0 < until - time.time() <= 86400
+    expected = datetime(2026, 10, 5, 0, 5, tzinfo=ZoneInfo("America/Los_Angeles")).timestamp()
+    assert until == expected
     assert pushed[-1]["result"] == "paused" and "index_fingerprint" not in state
     k3dm_hermes._refresh_index(state, now=until - 60)
     assert len(_index_calls(commands)) == 1
     assert pushed[-1]["result"] == "paused"
+
+
+def test_next_quota_reset_handles_dst_end():
+    pacific = ZoneInfo("America/Los_Angeles")
+    now = datetime(2026, 11, 1, 12, 0, tzinfo=pacific).timestamp()
+    expected = datetime(2026, 11, 2, 0, 5, tzinfo=pacific).timestamp()
+    assert k3dm_hermes._next_quota_reset(now) == expected
 
 
 def test_refresh_index_failure_naming_a_paused_doc_is_not_a_pause(monkeypatch):
@@ -425,7 +502,7 @@ def test_index_metrics_use_separate_job_and_one_current_result(monkeypatch):
 
     monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
                         lambda request, **_kw: requests.append(request) or Response())
-    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 2,
+    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 2, "from_cache": 0,
                                      "pruned": 0, "backlog": 0, "duration": 0.2,
                                      "paused_until": 0, "result": "success"})
     assert requests[0].full_url.endswith("/metrics/job/k3dm-vectordb-index")
@@ -446,20 +523,19 @@ def test_index_metrics_use_dedicated_hub_endpoint_and_ignore_old_override(monkey
     monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
                         lambda request, **_kw: requests.append(request) or Response())
     monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://old.invalid:9091")
-    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0,
+    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0, "from_cache": 0,
                                      "pruned": 0, "backlog": 0, "duration": 0.1,
                                      "paused_until": 0, "result": "success"})
     assert requests[0].full_url.startswith("http://localhost:19094/metrics/job/k3dm-vectordb-index")
     requests.clear()
     monkeypatch.setenv("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://hub.invalid:1234")
-    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0,
+    k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0, "from_cache": 0,
                                      "pruned": 0, "backlog": 0, "duration": 0.1,
                                      "paused_until": 0, "result": "success"})
     assert requests[0].full_url.startswith("http://hub.invalid:1234/metrics/job/k3dm-vectordb-index")
 
 
 def test_status_reminder_waits_for_local_midnight(monkeypatch):
-    from datetime import timedelta
     class LocalClock:
         current = datetime(2026, 9, 16, 23, 50, tzinfo=timezone(timedelta(hours=-7)))
         @classmethod

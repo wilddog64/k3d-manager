@@ -130,7 +130,7 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
 
 **Secret Hygiene (OWASP A02)**
 - Vault tokens must never appear in script arguments visible in shell history or CI logs. Use env vars or stdin.
-- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in `scripts/lib/system.sh`.
+- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in lib-foundation's `scripts/lib/system.sh` (change it upstream, then subtree-pull; `scripts/lib/system.sh` here only loads it).
 - Test credentials (`alice/password`, etc.) are dev-only — never reference in production config paths.
 - No secrets in `kubectl exec` command strings that appear in logs.
 

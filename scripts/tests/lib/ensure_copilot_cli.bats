@@ -73,17 +73,15 @@ setup() {
   grep -q '^copilot-release$' "$RUN_LOG"
 }
 
-@test "fails when authentication is invalid and AI gated" {
-   export_stubs
+@test "fails when copilot is not authenticated" {
+  export_stubs
 
-   copilot_ready=1
-   export K3DM_ENABLE_AI=1
   _command_exist() {
     [[ "$1" == copilot ]]
   }
   _run_command() {
     local payload="$*"
-    if [[ "$payload" == *"copilot auth status"* ]]; then
+    if [[ "$payload" == *"gh auth status"* ]]; then
       return 1
     fi
     printf '%s\n' "$payload" >> "$RUN_LOG"
@@ -91,9 +89,12 @@ setup() {
   }
   export -f _command_exist _run_command
 
+  unset COPILOT_GITHUB_TOKEN GH_TOKEN GITHUB_TOKEN
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME"
   run _ensure_copilot_cli
   [ "$status" -ne 0 ]
-   [[ "$output" == *"Copilot CLI authentication failed"* ]]
+  [[ "$output" == *"Copilot CLI is not authenticated"* ]]
 }
 
 @test "copilot binary is operational with COPILOT_GITHUB_TOKEN" {

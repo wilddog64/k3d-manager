@@ -228,11 +228,13 @@ launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.k3d-manager.<label
 ```
 127.0.0.1   keycloak.shopping-cart.local
 127.0.0.1   argocd.shopping-cart.local
-127.0.0.2   frontend.shopping-cart.local
+127.0.0.3   frontend.shopping-cart.local
 127.0.0.1   prometheus.shopping-cart.local
 127.0.0.1   grafana.shopping-cart.local
 127.0.0.1   prometheus.3ai-talk.org
 127.0.0.1   grafana.3ai-talk.org
 ```
 
-`127.0.0.2` (frontend) uses the loopback alias — managed by `com.k3d-manager.loopback-alias.plist`.
+`127.0.0.3` (sandbox frontend) uses the loopback alias managed by `com.k3d-manager.sandbox.loopback-alias.plist`.
+`127.0.0.2` is Hostinger's frontend address, the target of the Cloudflare route `frontend.3ai-talk.org`, and
+keeps its alias in `com.k3d-manager.loopback-alias.plist`. A sandbox never binds or removes it.

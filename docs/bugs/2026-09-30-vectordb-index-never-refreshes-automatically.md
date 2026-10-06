@@ -5,6 +5,7 @@
 into the vector DB?"
 **Status:** FIXED — Codex `29b7f55c`, verified by Claude 2026-09-30 with four defects fixed in the
 follow-up commit (see Verification). Unexercised live until Hermes restarts on the new code.
+Superseded on the quota reset time by `2026-10-04-hermes-quota-pause-ends-at-utc-not-pacific-midnight.md`.
 **Severity:** Medium. Prior-art dedup (`make find-similar-docs`, which CLAUDE.md requires before
 filing) silently misses recent docs, and the v1.40.0 retrieval eval would measure a stale index.
 

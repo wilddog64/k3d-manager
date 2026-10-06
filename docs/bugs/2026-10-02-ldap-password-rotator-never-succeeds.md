@@ -89,3 +89,7 @@ The rotator now generates passwords using the image's portable `/dev/urandom` to
    `kubectl -n identity create job --from=cronjob/ldap-password-rotator ldap-rotator-manual`. This **really
    rotates** the LDAP passwords of `chengkai.liang` and `test-user` and writes them to Vault `secret/ldap/users/*`.
    Otherwise the next scheduled run is 2026-11-01.
+
+## Rollout done (2026-10-02)
+
+Operator ran the rollout; Claude verified live: CronJob env `VAULT_ADDR=http://vault.secrets.svc:8200`, ConfigMap script generates from `/dev/urandom` with a Vault preflight, failed Job deleted, `KubeJobFailed` no longer firing. First real run: 2026-11-01.

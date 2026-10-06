@@ -115,6 +115,12 @@ EOF
       *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
         printf "%s" "dG9rZW4="
         ;;
+      *"get crd prometheusrules.monitoring.coreos.com"*)
+        printf 'True'
+        ;;
+      *"api-resources --api-group=monitoring.coreos.com"*)
+        printf 'prometheuses.monitoring.coreos.com\n'
+        ;;
       *)
         printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
         ;;
@@ -122,6 +128,10 @@ EOF
   }
   kubectl() {
     printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    case "$*" in
+      *"get crd prometheusrules.monitoring.coreos.com"*) printf 'True' ;;
+      *"api-resources --api-group=monitoring.coreos.com"*) printf 'prometheuses.monitoring.coreos.com\n' ;;
+    esac
   }
   helm() {
     printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
@@ -153,6 +163,7 @@ EOF
     printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
   }
   _is_mac() { return 0; }
+  export K3DM_ACG_RULES_CRD_ATTEMPTS=1 K3DM_ACG_PROM_DISCOVERY_ATTEMPTS=1
   run deploy_observability_acg
   [ "$status" -eq 0 ]
   [[ -f "${envsubst_log}" ]]
@@ -193,6 +204,12 @@ EOF
       *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
         printf "%s" "dG9rZW4="
         ;;
+      *"get crd prometheusrules.monitoring.coreos.com"*)
+        printf 'True'
+        ;;
+      *"api-resources --api-group=monitoring.coreos.com"*)
+        printf 'prometheuses.monitoring.coreos.com\n'
+        ;;
       *)
         printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
         ;;
@@ -200,6 +217,10 @@ EOF
   }
   kubectl() {
     printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    case "$*" in
+      *"get crd prometheusrules.monitoring.coreos.com"*) printf 'True' ;;
+      *"api-resources --api-group=monitoring.coreos.com"*) printf 'prometheuses.monitoring.coreos.com\n' ;;
+    esac
   }
   launchctl() {
     printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
@@ -224,6 +245,7 @@ EOF
     esac
   }
   _is_mac() { return 0; }
+  export K3DM_ACG_RULES_CRD_ATTEMPTS=1 K3DM_ACG_PROM_DISCOVERY_ATTEMPTS=1
   run deploy_observability_acg
   [ "$status" -eq 0 ]
   [[ "$output" == *"Failed to create Prometheus basic auth secret in Vault — using generated web config for this run"* ]]

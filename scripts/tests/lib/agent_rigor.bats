@@ -176,3 +176,28 @@ setup() {
   run _agent_audit
   [ "$status" -eq 0 ]
 }
+
+@test "_agent_audit: k3d-manager honours the lib-foundation remote-sudo marker" {
+  local repo="$BATS_TEST_TMPDIR/repo_remote_sudo"
+  git init "$repo"
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+
+  cd "$repo"
+  echo "#!/bin/bash" > test.sh
+  git add test.sh
+  git commit -m "initial"
+
+  echo '   ssh host "sudo fuser -k -n tcp 8200" # agent-audit: remote-sudo' >> test.sh
+  git add test.sh
+
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "scripts/lib/agent_rigor.sh is a shim to the subtree copy" {
+  run grep -F "foundation/scripts/lib/agent_rigor.sh" "${SCRIPT_DIR}/lib/agent_rigor.sh"
+  [ "$status" -eq 0 ]
+  run grep -c '^_agent_audit()' "${SCRIPT_DIR}/lib/agent_rigor.sh"
+  [ "$output" -eq 0 ]
+}

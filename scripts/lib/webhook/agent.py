@@ -9,7 +9,6 @@ from pathlib import Path
 from webhook.config import (
     JOB_DIR,
     REPO_ROOT,
-    RUN_DIR,
     SHOPPING_CARTS_ROOT,
     SLACK_BOT_TOKEN,
     SLACK_CHANNEL_ID,

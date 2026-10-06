@@ -1,3 +1,5 @@
+excludeNamespaces: "vclusters"
+
 image:
   registry: mirror.gcr.io
   repository: aquasec/trivy-operator

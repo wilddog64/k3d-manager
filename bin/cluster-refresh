@@ -22,6 +22,7 @@ if ! NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('playwright')" >/dev/
 fi
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
+source "${REPO_ROOT}/scripts/lib/hub_host_ip.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/aws.sh"
@@ -117,11 +118,20 @@ _launchd_restart() {
 # Writes plist to a temp path, then sudo-copies it to /Library/LaunchDaemons/.
 # No-op if plist already exists or wrapper is absent.
 # Usage: _system_daemon_install_if_missing <label> <wrapper> <log> <plist-dst>
+_cluster_refresh_stdin_is_tty() {
+  [[ -t 0 ]]
+}
+
 _system_daemon_install_if_missing() {
   local label="$1" wrapper="$2" log="$3" plist_dst="$4"
   local plist_tmp="${_ACG_STATE_DIR}/run/${label}.plist"
+  local sudo_mode="--prefer-sudo"
+  local refresh_provider="${_cluster_provider:-${CLUSTER_PROVIDER:-k3s-aws}}"
   [[ -f "${plist_dst}" ]] && return 0
   [[ -f "${wrapper}" ]] || return 0
+  if _cluster_refresh_stdin_is_tty; then
+    sudo_mode="--interactive-sudo"
+  fi
   _info "[acg-refresh] ${label} plist missing — regenerating from wrapper..."
   mkdir -p "$(dirname "${log}")" "$(dirname "${plist_tmp}")"
   cat > "${plist_tmp}" <<PLIST
@@ -147,9 +157,13 @@ _system_daemon_install_if_missing() {
 </dict>
 </plist>
 PLIST
-  _run_command --prefer-sudo --quiet --soft -- cp "${plist_tmp}" "${plist_dst}" \
+  _run_command "${sudo_mode}" --quiet --soft -- cp "${plist_tmp}" "${plist_dst}" \
     && _info "[acg-refresh] ${label} plist installed" \
-    || _warn "[acg-refresh] ${label} plist install failed — sudo may be required"
+    || if [[ "${sudo_mode}" == "--prefer-sudo" ]]; then
+      _warn "[acg-refresh] ${label} plist install failed in a non-TTY — run: sudo -v && make refresh CLUSTER_PROVIDER=${refresh_provider}"
+    else
+      _warn "[acg-refresh] ${label} plist install failed — sudo may be required"
+    fi
 }
 
 if [[ "$login_prompt" -eq 1 ]]; then
@@ -246,8 +260,7 @@ fi
 
 # ── 2b-pre. CoreDNS NodeHosts patch + restart ────────────────────────────────
 _info "[acg-refresh] Detecting host IP for host.k3d.internal..."
-_coredns_host_ip=$(docker exec k3d-k3d-cluster-server-0 sh -c \
-  "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1}'" 2>/dev/null || echo "")
+_coredns_host_ip=$(_hub_docker_host_ip)
 if [[ -z "${_coredns_host_ip}" ]]; then
   _warn "[acg-refresh] Could not detect host IP from host.docker.internal — CoreDNS patch skipped"
 else
@@ -533,21 +546,21 @@ set -euo pipefail
 export KUBECONFIG="${HOME}/.kube/config"
 _log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
 while true; do
-  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
-  ${_frontend_browser_kubectl} --context ubuntu-k3s port-forward --address=127.0.0.2 \
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.3:80" >> "\${_log}"
+  ${_frontend_browser_kubectl} --context ubuntu-k3s port-forward --address=127.0.0.3 \
     svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
   sleep 2
 done
 FRONTEND_WRAPPER
   chmod +x "${_frontend_browser_wrapper}"
   _system_daemon_install_if_missing \
-    "com.k3d-manager.frontend-browser-http" \
+    "com.k3d-manager.sandbox.frontend-browser-http" \
     "${_frontend_browser_wrapper}" \
     "${_ACG_STATE_DIR}/logs/frontend-browser-http.log" \
-    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist"
+    "/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist"
   _launchd_ensure \
-    "com.k3d-manager.frontend-browser-http" \
-    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
+    "com.k3d-manager.sandbox.frontend-browser-http" \
+    "/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist" \
     system
 
   # ── 6. Cloudflare tunnel (always restart to pick up config changes) ───────────

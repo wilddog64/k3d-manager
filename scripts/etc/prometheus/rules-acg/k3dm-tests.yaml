@@ -45,6 +45,15 @@ spec:
           annotations:
             summary: "no passing offline suite for {{ $labels.target }} in >7d"
             description: "Pushgateway retains the last pushed value indefinitely, so a stale success is indistinguishable from a current one. No zero-failure run has been recorded for over 7 days."
+        - alert: OfflineSuiteRunMissed
+          expr: time() - k3dm_test_last_timestamp_seconds > 93600
+          for: 1h
+          labels:
+            group: k3dm-tests
+            severity: warning
+          annotations:
+            summary: "no offline test run recorded in >26h"
+            description: "The nightly make test-metrics pushes k3dm_test_last_timestamp_seconds on every run, pass or fail. Pushgateway retains the last value, so a failed push looks like a current result; on 2026-10-04 a run with 2 failing cases was lost this way. Check ~/Library/Logs/k3dm-test-metrics.log for 'metrics push skipped' and the Pushgateway port-forward on localhost:9091."
         - alert: DeploymentMetricsStale
           expr: time() - k3dm_deployment_last_timestamp_seconds > 1209600
           for: 1h

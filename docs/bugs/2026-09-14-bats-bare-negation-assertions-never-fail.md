@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
-**Status:** FIXED `81048cea`; recurred and re-fixed 2026-10-01 (see Recurrence) (Codex; Claude verified + committed, incl. S5 signing.sh env://COSIGN_KEY)
+**Status:** FIXED `81048cea`; recurred and re-fixed 2026-10-01; recurred again 2026-10-04, fix dispatched (see Recurrence sections) (Codex; Claude verified + committed, incl. S5 signing.sh env://COSIGN_KEY)
 **Files:** the 14 `.bats` files listed below, `scripts/plugins/signing.sh` (S5), `scripts/tests/lib/bats_negation_lint.bats` (new), `CHANGELOG.md`
 
 ## Problem
@@ -200,3 +200,14 @@ green.
 
 **Lesson:** the lint is the right control, but it only runs where `make test` runs. Run `make test`
 before handing a release branch to PR, not only the suites a change touched.
+
+## Recurrence — 2026-10-04 (`k3d-manager-v1.41.0`)
+
+Eight more bare `! cmd` lines landed on the v1.41.0 branch in two days, in `hub_restore.bats` (4),
+`cluster_up.bats` (2), `cluster_down.bats` and `tunnel.bats`. The cause is the same as before:
+`ci.yml` does not run on release-branch pushes, and the agent prompts named only the suites each
+change touched. The fix is specified as F4 in
+[`2026-10-04-v1.41.0-make-test-reds-after-sandbox-recovery-fixes.md`](2026-10-04-v1.41.0-make-test-reds-after-sandbox-recovery-fixes.md).
+
+**Process change:** every Codex prompt that touches a `.bats` file now includes
+`bats scripts/tests/lib/bats_negation_lint.bats` as a required check.

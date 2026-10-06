@@ -46,6 +46,36 @@ module directory, and uses `npm ci` from `package-lock.json` when you want to ru
 - When reviewing changes under `scripts/lib/acg/playwright/**/*.js`, keep the Playwright helpers and
   fixtures isolated from the core Bash library.
 
+### Session-check contract
+
+`acg_session_check.js` is the unattended-login gate. It reports which path produced an
+authenticated browser and never prints a credential value:
+
+| Marker | Meaning |
+|---|---|
+| `ACG_SESSION_OK path=existing-session` | already authenticated; no login attempted |
+| `ACG_SESSION_OK path=auto-login` | signed in unattended during this run |
+| `ACG_SESSION_OK path=manual-login` | a human signed in interactively during this run; only reachable when `K3DM_NONINTERACTIVE` is unset **and** stdout is a TTY, so it never occurs in CI or an unattended gate |
+| `ACG_CREDENTIALS: username=… password=…` | store health only — `present`, `empty` or `absent` |
+| `ACG_CREDENTIALS_REQUIRED` | store unusable while `K3DM_ACG_REQUIRE_CREDENTIALS=1` |
+| `ACG_LOGIN_FIELDS_MISSING` | the sign-in form did not yield both fields |
+| `ACG_LOGIN_MFA_REQUIRED` | MFA challenge detected and deliberately refused |
+| `ACG_SESSION_EXPIRED` | unauthenticated; unattended login unavailable |
+
+The `path=` suffix is load-bearing for callers that need to prove auto-login itself works:
+without it, a run that merely reused a human's leftover browser session was indistinguishable
+from a successful unattended login, which is how headless auto-login stayed broken while the
+gate reported success. The three values above are the complete set emitted by
+`acg_session_check.js` — a caller matching on `path=` should treat an unrecognized value as a
+failure rather than as success, and a gate that must prove *unattended* login should accept
+`auto-login` alone.
+
+`K3DM_ACG_REQUIRE_CREDENTIALS=1` makes the check **fail closed** — it exits on
+`ACG_CREDENTIALS_REQUIRED` when the credential store is unusable instead of falling back to a
+pre-existing session. The default (unset) behavior is unchanged and still allows that fallback.
+Consumers running the check as an acceptance gate should set it; interactive use generally
+should not.
+
 ## Key Contracts
 
 ### `_run_command` (system.sh)
@@ -78,6 +108,42 @@ no package-manager installation or fallback to an arbitrary `vcluster` on `PATH`
 
 Returns active provider string (`k3d`, `k3s`, `orbstack`). Controlled by
 `CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER`.
+
+### `_agent_audit` (agent_rigor.sh)
+
+The pre-commit hook (`scripts/hooks/pre-commit`) runs `_agent_audit` on the staged changes. Any
+failed check blocks the commit, and the message names the file and the rule.
+
+| Staged files | Check |
+|---|---|
+| `*.bats` | fewer `@test` blocks, or removed `assert_*` lines |
+| `*.sh` | more `if` blocks per function than `AGENT_AUDIT_MAX_IF` (default 8); bare `sudo` (use `_run_command`); tab indentation |
+| any | `kubectl exec` with an inline credential |
+| `*.yaml`, `*.yml` | hardcoded IPv4 address (exempt paths listed in the file named by `AGENT_IP_ALLOWLIST`) |
+| Python test files | fewer `def test_` functions, removed `assert` / `self.assert…` lines, or a deleted test file |
+| Python files | syntax error in the staged version (skipped with a warning when the interpreter is missing) |
+| Python, non-test | `shell=True`, `eval(`, `exec(`, a `"sudo"` string, or a `"--password"` / `"--token"` / `"--username"` string |
+
+A **Python file** ends in `.py`, or has no extension and starts with a `python` shebang. A
+**Python test file** matches `AGENT_AUDIT_PY_TEST_GLOB` (default `*/tests/* test_*.py *_test.py`)
+on its path or file name. `AGENT_AUDIT_PYTHON` picks the interpreter for the syntax check
+(default `python3`). Comment lines are ignored by the Python dangerous-call rules.
+
+When a dangerous call is intended, mark the line with the rule name and a reason. A marker
+without a reason does not count:
+
+```python
+subprocess.run(cmd, shell=True)  # agent-audit: allow shell-true cmd is a fixed literal
+```
+
+The rule names are `shell-true`, `eval`, `exec`, `sudo` and `sensitive-flag`. Shell scripts that
+run a privileged command on another host use the trailing marker `# agent-audit: remote-sudo`.
+
+An edited assertion counts as removed. If a test change really needs it, the operator commits
+with `--no-verify` knowingly; an agent never does.
+
+`_agent_lint` (opt-in AI lint, `ENABLE_AGENT_LINT=1`) reviews staged files matching
+`AGENT_LINT_GLOBS` (default `*.sh *.js *.md`).
 
 ## Contributed Scripts and Templates
 
@@ -119,14 +185,35 @@ shellcheck scripts/lib/core.sh scripts/lib/system.sh
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v0.3.17](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.17) | 2026-05-01 | `_ai_agent_review` dispatch wrapper (`AI_REVIEW_FUNC`/`AI_REVIEW_MODEL`); `_copilot_review` rename; `K3DM_ENABLE_AI` gate removed from backend; `_agent_lint` glob expanded to `.sh`/`.js`/`.md`; 3 BATS |
-| [v0.3.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.16) | 2026-04-05 | `_agent_audit` IP allowlist: `grep -Fqx -- "$file"` prevents dash-prefix paths from being parsed as grep flags; 2 BATS |
-| [v0.3.15](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.15) | 2026-03-31 | `_agent_audit` IP allowlist — `AGENT_IP_ALLOWLIST` env var skips IP check for listed paths; 2 BATS |
+| [v0.5.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.1) | 2026-10-06 | ACG watcher checks every 30 min (was 3.5 h, which missed the 65 min extend window); yesterday's shutdown time read as expired, not ~22 h left; extend waits for the button and the launchd wrapper runs Node by absolute path; sudo runs bare names from system dirs, not the user's PATH; self-contained CDP readiness wait; `_agent_audit` no longer flags `_run_command`'s `*-sudo` flags |
+| [v0.5.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.0) | 2026-10-04 | `_agent_audit` audits staged Python files (test shrinkage, syntax, dangerous calls with `# agent-audit: allow` markers); `# agent-audit: remote-sudo` marker; session-check contract documented |
+| [v0.4.18](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18) | 2026-09-24 | `ACG_SESSION_OK path=` marker and `K3DM_ACG_REQUIRE_CREDENTIALS=1` fail-closed gate; headless login selector fixes; package renamed `lib-foundation-acg`; brace-expansion / js-yaml audit fixes |
 
 <details><summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.4.17](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.17) | 2026-09-12 | Explicit signed-out detection and Prism monogram login signal; chrome-cdp launchd agent uses the managed Chromium and `pw-profile`; credential-test no longer restarts a sandbox over a broken CLI; sign-in wait no longer targets the dead `id.pluralsight.com` host |
+| [v0.4.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.16) | 2026-09-12 | `browserslist` family lockfile bump (GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx) |
+| [v0.4.15](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.15) | 2026-09-05 | `_install_hermes_agent` / `_uninstall_hermes_agent` read-only launchd installer; 5 BATS |
+| [v0.4.14](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.14) | 2026-09-04 | ACG sandbox reveal/provision clicks use a dispatched MouseEvent (`_robustClick`) |
+| [v0.4.13](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.13) | 2026-08-21 | `foundation_ensure_vcluster_cli` — checksum-verified, per-version vCluster CLI install; 7 BATS |
+| [v0.4.12](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.12) | 2026-08-21 | Count-agnostic ACG agent fleet (`ACG_AGENT_COUNT`), numeric agent-IP discovery; `make shellcheck-lib` / `make bats` |
+| [v0.4.11](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.11) | 2026-08-20 | `js-yaml` 3.15.1 (CVE-2026-59870) |
+| [v0.4.10](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.10) | 2026-08-20 | ACG stale-route credential recovery; CDP listener reclaim on probe failure |
+| [v0.4.9](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.9) | 2026-08-14 | `_dry_run_active` / `_dry_guard` DRY_RUN primitives |
+| [v0.4.8](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.8) | 2026-07-25 | `brace-expansion` 1.1.16 (GHSA-3jxr-9vmj-r5cp) |
+| [v0.4.7](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.7) | 2026-07-23 | `acg_check_ttl` exit-code capture made `set -e`-safe |
+| [v0.4.6](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.6) | 2026-07-21 | `acg_restart` entrypoint restored; stale `playwright-artifacts-*` sweep |
+| [v0.4.4](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.4) | 2026-07-13 | ACG Extend sandbox-tab routing fix; `js-yaml` 3.15.0 |
+| [v0.4.3](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.3) | 2026-07-07 | Session-check render-timing race fix; parallel logged-in probes |
+| [v0.4.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.2) | 2026-07-06 | Headless CDP auto-login with stale-browser reclaim/reuse; managed Chromium for CDP |
+| [v0.4.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.1) | 2026-07-06 | Headless Pluralsight auto-login for unattended provisioning |
+| [v0.4.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.0) | 2026-06-22 | lib-acg absorbed as the optional `scripts/lib/acg/` module; `_ensure_agy_cli`; `_run_command_resolve_sudo` no-TTY `sudo -n` fallback |
+| [v0.3.19](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.19) | 2026-05-03 | `_copilot_auth_check` token/apps.json/gh fallback chain; `_copilot_review` deny-tool pattern fix; 6 BATS |
+| [v0.3.17](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.17) | 2026-05-01 | `_ai_agent_review` dispatch wrapper (`AI_REVIEW_FUNC`/`AI_REVIEW_MODEL`); `_copilot_review` rename; `K3DM_ENABLE_AI` gate removed from backend; `_agent_lint` glob expanded to `.sh`/`.js`/`.md`; 3 BATS |
+| [v0.3.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.16) | 2026-04-05 | `_agent_audit` IP allowlist: `grep -Fqx -- "$file"` prevents dash-prefix paths from being parsed as grep flags; 2 BATS |
+| [v0.3.15](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.15) | 2026-03-31 | `_agent_audit` IP allowlist — `AGENT_IP_ALLOWLIST` env var skips IP check for listed paths; 2 BATS |
 | [v0.3.14](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.14) | 2026-03-27 | `agy` binary detection, `_antigravity_browser_ready` curl fast-fail, NUL-safe tab scan, doc + CHANGE.md fixes; 78 BATS |
 | [v0.3.13](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.13) | 2026-03-25 | `_antigravity_browser_ready` curl probe fix — `_run_command --soft -- curl` replaces `_curl` to allow polling retries |
 | [v0.3.12](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.12) | 2026-03-25 | `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` — Antigravity IDE install + Playwright MCP config helpers; 7 BATS |

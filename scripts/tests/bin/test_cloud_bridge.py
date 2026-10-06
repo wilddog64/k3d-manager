@@ -3,6 +3,8 @@
 import importlib.machinery
 import importlib.util
 import json
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -63,6 +65,19 @@ def test_extra_argument_is_rejected():
         request("cluster-status", {"unexpected": "value"}), now=NOW)
     assert value is None
     assert reason == "unexpected argument"
+
+
+@pytest.mark.parametrize("action, expected", [
+    ("sandbox-up", {"action": "up", "provider": "aws"}),
+    ("sandbox-down", {"action": "down", "provider": "aws"}),
+])
+def test_sandbox_lifecycle_actions_have_fixed_aws_bodies(action, expected):
+    value, reason = bridge.validate_request(request(action, {"provider": "hostinger"}), now=NOW)
+    assert value is None
+    assert reason == "unexpected argument"
+    value, reason = bridge.validate_request(request(action), now=NOW)
+    assert reason is None
+    assert json.loads(bridge._request_body(value)) == expected
 
 
 def test_expired_request_is_rejected_and_response_consumes_id():
@@ -148,6 +163,259 @@ def test_fetch_updates_the_local_branch_ref_not_only_fetch_head(monkeypatch):
     assert refspec.split(":")[1] == "refs/heads/cloud-requests"
 
 
+def test_process_tick_skips_fetch_when_remote_tip_is_unchanged(monkeypatch):
+    tip = "a" * 40
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: tip)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: pytest.fail("fetch must be skipped"))
+
+    assert bridge.process_tick(Path("/nonexistent"), ROOT, last_tip=tip) == (tip, 0)
+
+
+def test_process_tick_fetches_once_and_returns_pushed_tip(monkeypatch):
+    calls = []
+    pushed = "b" * 40
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+
+    def fake_fetch(repo):
+        calls.append("fetch")
+        return "parent"
+
+    monkeypatch.setattr(bridge, "_fetch", fake_fetch)
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: ["20260925T201403Z-cluster-status"])
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (request(), None))
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response("", "cluster-status", "ok", 200, body={}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args: calls.append("write") or pushed)
+
+    assert bridge.process_tick(Path("/nonexistent"), ROOT) == (pushed, 1)
+    assert calls == ["fetch", "write"]
+
+
+def test_process_tick_refetches_after_hitting_max_per_tick(monkeypatch):
+    request_ids = [f"20260925T2014{index:02d}Z-cluster-status" for index in range(11)]
+    processed = set()
+    fetches = []
+    remote_tip = ["a" * 40]
+    commits = iter(letter * 40 for letter in "bcdefghijkl")
+
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: remote_tip[0])
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: fetches.append("fetch") or "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set(processed))
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: request_ids)
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (request(), None))
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response("", "cluster-status", "ok", 200, body={}))
+
+    def fake_write_commit(repo, parent, request_id, response, artifacts):
+        processed.add(request_id)
+        commit = next(commits)
+        if len(processed) == bridge.MAX_PER_TICK:
+            remote_tip[0] = commit
+        return commit
+
+    monkeypatch.setattr(bridge, "_write_commit", fake_write_commit)
+
+    first_tip, first_count = bridge.process_tick(Path("/nonexistent"), ROOT)
+    second_tip, second_count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip=first_tip)
+
+    assert (first_tip, first_count) == (None, bridge.MAX_PER_TICK)
+    assert (second_tip, second_count) == ("l" * 40, 1)
+    assert fetches == ["fetch", "fetch"]
+    assert processed == set(request_ids)
+
+
+def test_slow_health_runs_off_loop_and_main_thread_commits(monkeypatch):
+    health_started = threading.Event()
+    release_health = threading.Event()
+    writes = []
+    pushed = "b" * 40
+    requests = {
+        "20260925T201400Z-health": request("health"),
+        "20260925T201401Z-cluster-status": request("cluster-status"),
+    }
+
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    request_id_calls = [0]
+    def request_ids(_repo, _ref):
+        request_id_calls[0] += 1
+        return list(requests) if request_id_calls[0] == 1 else []
+    monkeypatch.setattr(bridge, "_request_ids", request_ids)
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (requests[request_id], None))
+
+    def fake_call(value):
+        if value["action"] == "health":
+            health_started.set()
+            assert release_health.wait(2)
+        return bridge._response("", value["action"], "ok", 200, body={})
+
+    monkeypatch.setattr(bridge, "_call_webhook", fake_call)
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append(
+        (args[2], threading.get_ident())) or pushed)
+    bridge._slow_pending.clear()
+    first_tip, count = bridge.process_tick(Path("/nonexistent"), ROOT)
+    assert health_started.wait(1)
+    assert count == 1
+    assert [request_id for request_id, _thread_id in writes] == ["20260925T201401Z-cluster-status"]
+    assert all(thread_id == threading.get_ident() for _request_id, thread_id in writes)
+
+    release_health.set()
+    deadline = time.monotonic() + 2
+    while not bridge._slow_responses.qsize() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip=first_tip)
+    assert count == 1
+    assert [request_id for request_id, _thread_id in writes] == [
+        "20260925T201401Z-cluster-status", "20260925T201400Z-health"]
+
+
+def test_queued_make_response_adds_one_watch_entry(monkeypatch):
+    watched = []
+    pushed = "b" * 40
+    make_request = request("make-test-pytest")
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: ["20260925T201403Z-make-test-pytest"])
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (make_request, None))
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", value["action"], "ok", 202, body={"status": "queued", "job_id": "a" * 8}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: watched.append(
+        kwargs.get("watch_add")) or pushed)
+    bridge.process_tick(Path("/nonexistent"), ROOT)
+    assert len(watched) == 1
+    assert watched[0]["request_id"] == "20260925T201403Z-make-test-pytest"
+    assert watched[0]["job_id"] == "a" * 8
+
+
+def test_terminal_watch_writes_one_final_response_and_clears_entry(monkeypatch):
+    writes = []
+    entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,
+             "created_at": time.time(), "timeout": 600}
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", "job-status", "ok", 200, body={"status": "success", "output": "done"}))
+    monkeypatch.setattr(bridge, "job_artifacts", lambda *args: ({"artifacts/x/summary.json": b"{}\n"},
+                                                                   ["artifacts/x/summary.json"]))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append((args, kwargs)) or "a" * 40)
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+    assert count == 1
+    assert writes[0][1]["final"] is True
+    assert writes[0][1]["watch_remove"] == entry["request_id"]
+    assert writes[0][0][4] == {"artifacts/x/summary.json": b"{}\n"}
+
+
+def test_killed_watch_writes_one_final_response_and_clears_entry(monkeypatch):
+    writes = []
+    entry = {"request_id": "20260925T201403Z-sandbox-up", "job_id": "a" * 8,
+             "created_at": time.time(), "timeout": 3600}
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", "job-status", "ok", 200, body={"status": "killed"}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append(kwargs) or "a" * 40)
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+    assert count == 1
+    assert len(writes) == 1
+    assert writes[0]["final"] is True
+    assert writes[0]["watch_remove"] == entry["request_id"]
+
+
+def test_expired_watch_writes_watch_expired_final_response(monkeypatch):
+    writes = []
+    entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,
+             "created_at": 0, "timeout": 1}
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge.time, "time", lambda: 1000)
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append((args, kwargs)) or "a" * 40)
+    bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+    response = writes[0][0][3]
+    assert response["status"] == "error"
+    assert response["reason"] == "watch expired"
+    assert writes[0][1]["final"] is True
+
+
+def test_terminal_state_check_is_load_bearing(monkeypatch):
+    entry = {"request_id": "20260925T201403Z-make-test-pytest", "job_id": "a" * 8,
+             "created_at": time.time(), "timeout": 600}
+    writes = []
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_read_watching", lambda repo, ref: [entry])
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: bridge._response(
+        "", "job-status", "ok", 200, body={"status": "success"}))
+    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append(kwargs) or "a" * 40)
+    monkeypatch.setattr(bridge, "TERMINAL_JOB_STATES", ("never",))
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT, last_tip="a" * 40)
+    assert count == 0
+    assert writes == []
+
+
+def test_next_sleep_uses_active_then_idle_interval():
+    assert bridge._next_sleep(bridge.IDLE_AFTER_SECONDS - 1, 0) == bridge.ACTIVE_POLL_SECONDS
+    assert bridge._next_sleep(bridge.IDLE_AFTER_SECONDS, 0) == bridge.IDLE_POLL_SECONDS
+
+
+@pytest.mark.parametrize("value", ["not-a-number", "0", "-1"])
+def test_invalid_active_poll_override_uses_default(monkeypatch, value):
+    monkeypatch.setenv("K3DM_CLOUD_BRIDGE_ACTIVE_POLL", value)
+    loader = importlib.machinery.SourceFileLoader("cloud_bridge_override", str(ROOT / "bin" / "k3dm-cloud-bridge"))
+    spec = importlib.util.spec_from_loader("cloud_bridge_override", loader)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.ACTIVE_POLL_SECONDS == 5
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_poll_interval_rejects_non_positive_values(value):
+    with pytest.raises(SystemExit) as error:
+        helper._parse_args(["cluster-status", "--poll-interval", value])
+    assert error.value.code == 2
+
+
+def test_wait_fetches_before_sleep_and_caps_sleep_at_deadline(monkeypatch):
+    calls = []
+    clock = iter([0, 2, 10])
+
+    monkeypatch.setattr(helper, "_commit_request", lambda request_id, payload: None)
+    monkeypatch.setattr(helper.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(helper.time, "sleep", lambda seconds: calls.append(("sleep", seconds)))
+
+    def fake_git(args, **kwargs):
+        calls.append(args[0])
+        if args[0] == "show":
+            raise RuntimeError("not ready")
+        return ""
+
+    monkeypatch.setattr(helper, "_git", fake_git)
+    assert helper.main(["cluster-status", "--wait", "--timeout", "5", "--poll-interval", "5"]) == 5
+    assert calls == ["fetch", "show", ("sleep", 3), "fetch", "show"]
+
+
+def test_wait_final_polls_the_final_response_after_queued_response(monkeypatch):
+    calls = []
+    clock = iter([0, 1, 2])
+    monkeypatch.setattr(helper, "_commit_request", lambda request_id, payload: None)
+    monkeypatch.setattr(helper.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(helper.time, "sleep", lambda seconds: calls.append(("sleep", seconds)))
+
+    def fake_git(args, **kwargs):
+        calls.append(args)
+        if args[0] == "show" and args[1].endswith(".final.json"):
+            return json.dumps({"status": "ok", "body": {"status": "success"}})
+        if args[0] == "show":
+            return json.dumps({"status": "ok", "body": {"status": "queued", "job_id": "a" * 8}})
+        return ""
+
+    monkeypatch.setattr(helper, "_git", fake_git)
+    assert helper.main(["make-test-pytest", "--wait-final", "--timeout", "5"]) == 0
+    assert any(args[0] == "show" and args[1].endswith(".final.json") for args in calls)
+
+
 def test_request_helper_fetches_the_ref_it_reads_the_response_from():
     """The --wait poll read `git show origin/cloud-requests:responses/<id>.json` but
     refreshed with `git fetch origin cloud-requests` — a bare branch name, which
@@ -225,6 +493,8 @@ def test_make_actions_are_reader_targets():
         if not action.startswith("make-"):
             continue
         assert target in make_targets.MAKE_TARGETS
+        if target in {"e2e", "e2e-remote"}:
+            continue
         assert make_targets.MAKE_TARGETS[target]["min_role"] == "reader"
 
 
@@ -236,10 +506,61 @@ def test_make_action_args_match_required_args_only():
         assert set(args) == set(required)
 
 
+def test_cloud_runner_actions_are_explicit_and_use_the_webhook_runner_pattern():
+    assert bridge.ACTION_ALLOWLIST["make-e2e"] == ("POST", "/api/v1/make", {}, "e2e")
+    action = bridge.ACTION_ALLOWLIST["make-e2e-remote"]
+    assert action[:2] == ("POST", "/api/v1/make")
+    assert action[2]["RUNNER"].pattern == make_targets._ARG_PATTERNS["RUNNER"].pattern
+    assert action[3] == "e2e-remote"
+    assert make_targets.MAKE_TARGETS["e2e"]["min_role"] == "operator"
+    assert make_targets.MAKE_TARGETS["e2e"]["timeout"] == 3600
+
+
+def test_cloud_runner_actions_select_cloud_token_and_other_actions_select_reader(monkeypatch):
+    class Response:
+        status = 202
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    seen = []
+
+    def fake_urlopen(request, timeout):
+        seen.append((request.get_header("Authorization"), timeout))
+        return Response()
+
+    monkeypatch.setattr(bridge.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(bridge, "_get_cloud_runner_token", lambda: "cloud-runner-test-token")
+    monkeypatch.setattr(bridge, "_get_reader_token", lambda: "reader-test-token")
+    args_by_action = {
+        "job-status": {"job_id": "a" * 8},
+        "make-fix-status": {"NS": "identity"},
+        "make-find-similar-docs": {"Q": "cluster status"},
+        "make-e2e-remote": {"RUNNER": "m2"},
+        "diagnose-pods": {"provider": "aws", "namespace": "identity"},
+        "diagnose-describe-pod": {"provider": "aws", "namespace": "identity", "name": "pod"},
+        "diagnose-logs": {"provider": "aws", "namespace": "identity", "name": "pod"},
+        "diagnose-app": {"name": "app"},
+    }
+    for action in bridge.ACTION_ALLOWLIST:
+        bridge._call_webhook(request(action, args_by_action.get(action, {})))
+    cloud_actions = {"make-e2e", "make-e2e-remote", "sandbox-up", "sandbox-down"}
+    assert [auth for auth, _timeout in seen] == [
+        "Bearer cloud-runner-test-token" if action in cloud_actions else "Bearer reader-test-token"
+        for action in bridge.ACTION_ALLOWLIST]
+    assert "_get_token" not in Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
+
+
 def test_all_reader_targets_are_exposed_or_explicitly_unexposed():
     exposed = {
         target for action, (_, _, _, target) in bridge.ACTION_ALLOWLIST.items()
-        if action.startswith("make-")
+        if action.startswith("make-") and target not in {"e2e", "e2e-remote"}
     }
     reader_targets = {
         target for target, spec in make_targets.MAKE_TARGETS.items()
@@ -295,7 +616,7 @@ TEST_SUITE_ACTIONS = {
 }
 NEVER_EXPOSED = {
     "up", "down", "cluster", "cluster-up", "cluster-down", "fix-delete-pod", "fix-force-sync",
-    "e2e", "e2e-sandbox", "e2e-remote", "e2e-replay", "e2e-runner-unlock", "cleanup-stale-sandbox",
+    "e2e-sandbox", "e2e-replay", "e2e-runner-unlock", "cleanup-stale-sandbox",
     "argocd-upgrade", "index-docs", "sync-apps",
 }
 
@@ -317,7 +638,43 @@ def test_no_lifecycle_or_mutating_target_is_reachable():
     assert not {name.removeprefix("make-") for name in bridge.ACTION_ALLOWLIST} & NEVER_EXPOSED
     for _m, _p, _a, fixed in bridge.ACTION_ALLOWLIST.values():
         if isinstance(fixed, str):
+            if fixed in {"e2e", "e2e-remote"}:
+                continue
             assert make_targets.MAKE_TARGETS[fixed]["min_role"] == "reader", fixed
+
+
+def test_cloud_runner_set_is_scoped_and_unranked():
+    from webhook import policy
+    assert policy.CLOUD_RUNNER_TARGETS == {"e2e-remote", "e2e"}
+    assert "cloud-runner" not in policy._ROLE_LEVELS
+    assert not {"up", "down", "cleanup-stale-sandbox"} & policy.CLOUD_RUNNER_TARGETS
+    assert not {"up", "down", "cleanup-stale-sandbox"} & set(bridge.ACTION_ALLOWLIST)
+    assert {"sandbox-up", "sandbox-down"} <= set(bridge.ACTION_ALLOWLIST)
+
+
+def test_bridge_has_no_runner_lock_probe_or_ssh_call():
+    source = Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
+    assert "E2E_M2_LOCK" not in source
+    assert "ssh" not in source.lower()
+
+
+def test_only_fixed_aws_sandbox_lifecycle_is_reachable_from_the_bridge():
+    bridge_source = Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
+    actions_source = Path(ROOT / "scripts" / "lib" / "webhook" / "cloud_actions.py").read_text()
+    assert all(name not in bridge_source for name in ("/cluster-up", "/cluster-down", "/cluster-resume"))
+    assert all(entry[1] != "/api/v1/cluster" or entry[3].get("provider") == "aws"
+               for entry in bridge.ACTION_ALLOWLIST.values())
+    assert all("hostinger" not in json.dumps(entry[3])
+               for entry in bridge.ACTION_ALLOWLIST.values())
+    assert all(name not in actions_source for name in ("/cluster-up", "/cluster-down", "/cluster-resume"))
+    for relative in ("scripts/plugins/e2e.sh", "scripts/plugins/vcluster.sh"):
+        source = Path(ROOT / relative).read_text()
+        assert all(name not in source for name in ("deploy_cluster", "destroy_cluster", "bin/cluster-up", "bin/cluster-down"))
+
+
+def test_cloud_runner_cannot_reach_sandbox():
+    from webhook import policy
+    assert not policy._policy_allows("cloud-runner", policy._action_policy("/api/v1/make", {"target": "e2e-sandbox"}))
 
 
 def test_test_suite_actions_take_no_arguments():

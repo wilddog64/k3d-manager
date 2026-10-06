@@ -354,7 +354,7 @@ function _hostinger_write_keycloak_port_forward_wrapper() {
   CONTEXT="k3d-k3d-cluster" \
   SERVICE="svc/keycloak" \
   LOCAL_PORT="8880" \
-  REMOTE_PORT="8080" \
+  REMOTE_PORT="http" \
   HEALTHZ_URL="http://127.0.0.1:8880/realms/master" \
   STARTUP_TIMEOUT="30" \
     envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
@@ -409,6 +409,34 @@ while true; do
 done
 FRONTEND_WRAPPER
   chmod 700 "${wrapper_path}"
+}
+
+function _hostinger_write_frontend_browser_plist() {
+  local plist_tmp="$1" wrapper="$2" log_file="$3"
+  mkdir -p "$(dirname "${plist_tmp}")"
+  cat > "${plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.k3d-manager.frontend-browser-http</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${log_file}</string>
+  <key>StandardErrorPath</key>
+  <string>${log_file}</string>
+</dict>
+</plist>
+PLIST
 }
 
 function _hostinger_write_monitoring_port_forward_wrapper() {
@@ -691,6 +719,20 @@ PLIST
     "com.k3d-manager.keycloak-browser-http" \
     "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist" \
     system
+  local _frontend_browser_plist_tmp="${_ACG_STATE_DIR}/run/frontend-browser-http.plist"
+  _hostinger_write_frontend_browser_plist \
+    "${_frontend_browser_plist_tmp}" \
+    "${_frontend_browser_wrapper}" \
+    "${_frontend_browser_log}"
+  if [[ ! -f "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" ]] || \
+      ! diff -q "${_frontend_browser_plist_tmp}" \
+        "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" >/dev/null 2>&1; then
+    _run_command --interactive-sudo --quiet --soft -- install -m 644 \
+        "${_frontend_browser_plist_tmp}" \
+        "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
+      || _warn "[k3s-hostinger] could not install frontend-browser-http plist — public frontend may still point at another provider"
+  fi
+  rm -f "${_frontend_browser_plist_tmp}"
   _hostinger_restart_launchd \
     "com.k3d-manager.frontend-browser-http" \
     "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \

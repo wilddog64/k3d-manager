@@ -42,10 +42,8 @@ else
   echo "[k3dm-hermes-setup] note: k3dm-hermes-audit-token not found — the monthly security audit will report its checks unavailable until you provision it (docs/guides/hermes.md#monthly-security-audit)." >&2
 fi
 
-if [[ -n "${K3DM_HERMES_APPROVAL_DRAIN_URL:-}" ]]; then
-  if security find-generic-password -a k3dm -s k3dm-hermes-approval-drain-token >/dev/null 2>&1; then
-    echo "[k3dm-hermes-setup] Slack approval drain token present (k3dm-hermes-approval-drain-token)."
-  else
-    echo "[k3dm-hermes-setup] note: K3DM_HERMES_APPROVAL_DRAIN_URL is set but k3dm-hermes-approval-drain-token is missing — Slack approvals stay inactive (docs/guides/hermes.md#slack-approvals-opt-in)." >&2
-  fi
+if security find-generic-password -a k3dm -s k3dm-hermes-approval-drain-token >/dev/null 2>&1; then
+  echo "[k3dm-hermes-setup] Slack approval drain token present (k3dm-hermes-approval-drain-token)."
+else
+  echo "[k3dm-hermes-setup] note: k3dm-hermes-approval-drain-token not found — Slack approvals stay off until you run make hermes-approvals-setup (docs/guides/hermes.md#slack-approvals-opt-in)." >&2
 fi

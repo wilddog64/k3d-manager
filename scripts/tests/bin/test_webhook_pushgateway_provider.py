@@ -29,3 +29,28 @@ SPEC.loader.exec_module(WEBHOOK)
 )
 def test_provider_supports_pushgateway(provider, supported):
     assert WEBHOOK._provider_supports_pushgateway(provider) is supported
+
+
+def test_smoke_uses_provider_scoped_pushgateway_ports(monkeypatch):
+    requested = []
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    def urlopen(request, **_kwargs):
+        requested.append(request.full_url)
+        return Response()
+
+    monkeypatch.setattr(WEBHOOK.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(WEBHOOK, "_provider_supports_pushgateway", lambda _provider: True)
+    WEBHOOK._smoke_test_services(retries=1, provider="k3s-aws", quick=True)
+    assert any(url.endswith(":9092/-/healthy") for url in requested)
+    requested.clear()
+    WEBHOOK._smoke_test_services(retries=1, provider="k3s-hostinger", quick=True)
+    assert any(url.endswith(":9091/-/healthy") for url in requested)

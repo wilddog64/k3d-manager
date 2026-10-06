@@ -509,6 +509,46 @@ function _keycloak_smoke_vault_put() {
       >/dev/null 2>&1
 }
 
+function _keycloak_smoke_force_eso_refresh() {
+   local ns="${KEYCLOAK_NAMESPACE:-identity}" sync_ts
+   if ! _kubectl --no-exit -n "$ns" get externalsecret k3dm-smoke-user >/dev/null 2>&1; then
+      return 0
+   fi
+   sync_ts=$(date +%s)
+   if ! _kubectl --no-exit -n "$ns" annotate externalsecret k3dm-smoke-user \
+      "force-sync=$sync_ts" --overwrite >/dev/null 2>&1; then
+      _warn "[keycloak] failed to force-refresh ExternalSecret k3dm-smoke-user"
+   fi
+   return 0
+}
+
+function keycloak_smoke_vault_preseed() {
+   local realm="${KEYCLOAK_SMOKE_REALM:-shopping-cart}"
+   local client_id="${KEYCLOAK_SMOKE_CLIENT_ID:-k3dm-smoke}"
+   local username="${KEYCLOAK_SMOKE_USERNAME:-k3dm-smoke}"
+   local password
+   password=$(_keycloak_smoke_vault_get_password)
+   if [[ -n "$password" ]]; then
+      _info "[keycloak] smoke-user Vault entry present — leaving it"
+      return 0
+   fi
+
+   local wd
+   wd=$(mktemp -d -t kc-smoke-preseed.XXXXXX)
+   trap 'trap - RETURN; rm -rf "'"${wd}"'" 2>/dev/null || true' RETURN
+   password=$(openssl rand -hex 24)
+   K3DM_SMOKE_PASSWORD="$password" jq -n \
+      --arg username "$username" --arg realm "$realm" --arg client "$client_id" \
+      '{username:$username,password:$ENV.K3DM_SMOKE_PASSWORD,realm:$realm,client:$client}' \
+      > "$wd/smoke-user.json"
+   chmod 600 "$wd/smoke-user.json"
+   if _keycloak_smoke_vault_put "$wd/smoke-user.json"; then
+      _keycloak_smoke_force_eso_refresh
+      return 0
+   fi
+   return 1
+}
+
 function _keycloak_smoke_password() {
    local ns="$1" secret_name="$2" password
    password=$(_keycloak_smoke_vault_get_password)
@@ -692,6 +732,16 @@ function _keycloak_smoke_ensure_ldap_user() {
    return $rc
 }
 
+function _keycloak_smoke_admin_secret_name() {
+   local ns="$1" preferred="$2"
+   if ! _kubectl --no-exit -n "$ns" get secret "$preferred" >/dev/null 2>&1 && \
+      _kubectl --no-exit -n "$ns" get secret keycloak-secrets >/dev/null 2>&1; then
+      printf '%s\n' keycloak-secrets
+      return 0
+   fi
+   printf '%s\n' "$preferred"
+}
+
 function keycloak_provision_shopping_cart_realm() {
    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
       cat <<'HELP'
@@ -724,7 +774,8 @@ HELP
    local username="${KEYCLOAK_SMOKE_USERNAME:-k3dm-smoke}"
    local secret_name="${KEYCLOAK_SMOKE_SECRET_NAME:-k3dm-smoke-user}"
    local ns="${KEYCLOAK_NAMESPACE:-identity}"
-   local admin_secret="${KEYCLOAK_SMOKE_ADMIN_SECRET_NAME:-keycloak-admin-secret}"
+   local admin_secret
+   admin_secret=$(_keycloak_smoke_admin_secret_name "$ns" "${KEYCLOAK_SMOKE_ADMIN_SECRET_NAME:-keycloak-admin-secret}")
    local frontend_url="${KEYCLOAK_SMOKE_ISSUER_BASE_URL:-https://keycloak.3ai-talk.org}"
 
    local ldap_secret="${KEYCLOAK_LDAP_ADMIN_SECRET_NAME:-openldap-admin}"

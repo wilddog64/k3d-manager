@@ -15,7 +15,7 @@ make up URL=https://...      # provision with explicit sandbox URL
 | Target | Command | When to use |
 |---|---|---|
 | `make up` | `bin/cluster-up` | Start from scratch — credentials → Hub cluster → ESO → ArgoCD → app cluster |
-| `make down` | `bin/cluster-down --confirm` | Tear down app cluster, Hub cluster, and Vault port-forward; add `KEEP_LOCAL=1` to preserve the local Hub |
+| `make down` | `bin/cluster-down --confirm` | Tear down the app cluster and Vault port-forward while preserving the local Hub; add `DELETE_HUB=1` to delete the Hub |
 | `make down CLEANUP_STALE=1` | `cleanup-stale-clusters` (+ AWS local cleanup) | Explicitly remove expired managed registrations and stale AWS sandbox state after teardown |
 | `make cleanup-stale-sandbox` | `bin/cleanup-stale-sandbox` | Preview stale AWS sandbox local state; add `CONFIRM=1` to remove it |
 | `make cleanup-stale-clusters` | `bin/cleanup-stale-clusters` | Preview expired managed ArgoCD registrations; add `CONFIRM=1` to remove them |
@@ -84,6 +84,9 @@ context, calls `register_app_cluster`, and restarts the ArgoCD application contr
 | `make creds` | Extract AWS/GCP credentials only — no cluster changes |
 | `make chrome-cdp` | Install macOS Chrome CDP launchd agent (persistent CDP session on boot) |
 | `make chrome-cdp-stop` | Uninstall the launchd agent |
+| `make acg-watch` | Install the sandbox TTL watcher launchd agent (checks every 30 minutes) |
+| `make acg-watch-stop` | Uninstall the sandbox TTL watcher |
+| `make acg-watch-check` | Print the sandbox's remaining minutes without extending it (read-only) |
 | `make acg-restart` | Recover an expired ACG sandbox: delete it, recreate it, re-extract credentials |
 | `make acg-recover` | End-to-end recovery: `chrome-cdp` + `acg-restart` + a clean `make up` |
 
@@ -92,6 +95,14 @@ credentials without touching the cluster.
 
 `make chrome-cdp` installs a `launchd` plist so Chrome starts with CDP flags on login,
 enabling headless credential automation without a manual browser launch.
+
+`make acg-watch` wraps `acg_watch_start`: it installs the `com.k3d-manager.acg-watch` launchd agent,
+which checks the sandbox every 30 minutes and clicks Extend once 65 minutes or less remain. `make up`
+installs it too (Step 12); run `make acg-watch` on its own to pick up a newer lib-foundation without
+a full `make up`. `make acg-watch-check` is read-only: it prints `REMAINING_MINS:<n>` and never
+clicks Extend — a zero or negative value means the sandbox has already expired. Both accept
+`URL=<sandbox-url>` (default: the sandbox list page). See
+`scripts/lib/foundation/docs/api/acg.md` ("Sandbox TTL watcher and extend") for how a pass works.
 
 `make acg-restart` wraps `acg_restart` — the recovery path for a sandbox that has already expired
 (`acg_extend` only works while one is still alive). It deletes the dead sandbox, provisions a
@@ -168,6 +179,7 @@ the store rather than truncating it. See
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
 | `make test-all` | `test` + `test-bin` + `test-python` | Everything that runs offline, in one call — what `make test-metrics` wraps |
+| `make lint-python` | `ruff check -- <tracked Python files>` | Run Ruff's pyflakes rules over `.py` files and Python-shebang scripts |
 | `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
 
 **A new BATS suite must live in one of those directories or nothing runs it.**
@@ -237,9 +249,10 @@ make         # same as make help (DEFAULT_GOAL)
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `URL` | `https://app.pluralsight.com/cloud-playground/cloud-sandboxes` | Sandbox URL passed to `bin/cluster-up` and `bin/cluster-refresh` |
+| `URL` | `https://app.pluralsight.com/hands-on/playground/cloud-sandboxes` | Sandbox URL passed to `bin/cluster-up` and `bin/cluster-refresh` |
 | `GHCR_PAT` | `$(gh auth token)` | GitHub Container Registry token — used by `cluster-up` to create the `ghcr-pull-secret` |
-| `KEEP_LOCAL` | `0` | Set to `1` to preserve the local Hub cluster when running `make down` |
+| `KEEP_LOCAL` | `1` | Set to `0` to delete the local Hub cluster when running `make down` (equivalent to `DELETE_HUB=1`) |
+| `DELETE_HUB` | `0` | Set to `1` to delete the local Hub cluster when running `make down` |
 | `CLEANUP_STALE` | `0` | Set to `1` to run guarded stale-resource cleanup after `make down` |
 
 Set `GHCR_PAT` before running `make up`:

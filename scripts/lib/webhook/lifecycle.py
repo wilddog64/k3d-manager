@@ -5,13 +5,14 @@ import datetime
 import os
 import signal
 import threading
+import time
 import traceback
-from pathlib import Path
 
 from webhook.config import JOB_DIR, REPO_ROOT
 from webhook.proc import _spawn_capture_text
-from webhook.redact import scrub_credentials
 from webhook.render import _slack_post
+from webhook.log import get_logger
+from webhook.failure_notes import write_failure_note
 
 __all__ = [
     "_run_cleanup", "_run_make_target", "_run_upgrade", "_run_cluster",
@@ -27,6 +28,7 @@ _analyze_failure = lambda lines: ""
 _redact_secrets = lambda text: text
 _spawn_job = None
 _helpers = {}
+_LOG = get_logger("webhook.lifecycle")
 
 
 def configure_runtime(log, notify_job, push_metrics, analyze_stall, analyze_failure,
@@ -71,6 +73,16 @@ def _read_job_tail(output_path, n=3):
 
 _STALL_TICKS_THRESHOLD = 3
 
+
+def _cluster_job_timeout(action):
+    _defaults = {"up": 3300, "down": 1500}
+    _env = {"up": "K3DM_CLUSTER_UP_TIMEOUT", "down": "K3DM_CLUSTER_DOWN_TIMEOUT"}
+    try:
+        return int(os.environ.get(_env.get(action, ""), _defaults.get(action, 1500)))
+    except ValueError:
+        return _defaults.get(action, 1500)
+
+
 def _run_cleanup(job_id, provider):
     """Remove stale SSH tunnel and kubeconfig context after a failed cluster-up."""
     _notify_job(job_id, f"🧹 *Cleanup triggered* ({provider}) — removing stale SSH tunnel and kubeconfig context")
@@ -83,12 +95,46 @@ def _run_cleanup(job_id, provider):
 def _run_make_target(job_id, argv_tail, timeout, actor):
     """Run one allowlisted /k3dm make target and post the tail of its output."""
     label = " ".join(argv_tail)
+    job_dir = JOB_DIR / job_id
+    log_file = job_dir / "make.log"
+    start = time.monotonic()
+    progress_timer = None
+
+    def _post_progress():
+        elapsed = int((time.monotonic() - start) / 60)
+        tail = "\n".join(_read_job_tail(log_file)) or "—"
+        _notify_job(job_id, f"⏳ *make {label}* still running — {elapsed}m elapsed\n```{tail}```")
+
+    def _wait(pid):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            waited, status = os.waitpid(pid, os.WNOHANG)
+            if waited == pid:
+                return (os.WEXITSTATUS(status) if os.WIFEXITED(status) else -os.WTERMSIG(status)), False
+            time.sleep(0.1)
+        try:
+            os.killpg(pid, signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            pass
+        os.waitpid(pid, 0)
+        return 124, True
+
     try:
-        (JOB_DIR / job_id / "status").write_text("running")
+        (job_dir / "status").write_text("running")
+        log_file.touch()
         _notify_job(job_id, f"🛠️ *make {label}* started by {actor}")
         cmd = ["make", "--no-print-directory", *argv_tail]
-        env = {**os.environ, "K3DM_JUNIT_XML": str(JOB_DIR / job_id / "junit.xml")}
-        rc, output, timed_out = _spawn_capture_text(cmd, timeout=timeout, cwd=REPO_ROOT, env=env)
+        env = {**os.environ, "K3DM_JUNIT_XML": str(job_dir / "junit.xml")}
+        _LOG.debug("make job %s argv=%r", job_id, cmd)
+        progress_timer = threading.Timer(120, _post_progress)
+        progress_timer.daemon = True
+        progress_timer.start()
+        pid = _spawn_job(cmd, log_file, cwd=REPO_ROOT, env=env)
+        rc, timed_out = _wait(pid)
+        output = log_file.read_text(errors="replace") if log_file.exists() else ""
+        if len(output.encode()) > 1024 * 1024:
+            output = output.encode()[-1024 * 1024:].decode(errors="replace")
+            log_file.write_text(output)
         lines = output.rstrip().splitlines()
         tail = "\n".join(lines[-40:])[-3000:]
         if timed_out:
@@ -97,10 +143,15 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
             status, icon, verdict = "success", "✅", "succeeded"
         else:
             status, icon, verdict = "failed", "❌", f"failed (rc {rc})"
-        (JOB_DIR / job_id / "output").write_text(scrub_credentials(_redact_secrets(output)))
-        (JOB_DIR / job_id / "status").write_text(status)
+        _LOG.info("job=%s make=%s status=%s rc=%s", job_id, label, status, rc)
+        (job_dir / "status").write_text(status)
+        if status == "failed":
+            write_failure_note(job_dir, job_id, f"make {label}", timeout if timed_out else rc,
+                               timed_out=timed_out, redact=_redact_secrets)
         _notify_job(job_id, f"{icon} *make {label}* {verdict}\n```{tail or '(no output)'}```")
     finally:
+        if progress_timer:
+            progress_timer.cancel()
         _helpers["make_job_lock"].release()
 
 
@@ -236,12 +287,37 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
         pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT, env=_spawn_env)
         with _running_procs_lock:
             _running_procs[job_id] = pid
-        _, _status = os.waitpid(pid, 0)
-        _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
+        timeout = _cluster_job_timeout(action)
+        deadline = time.monotonic() + timeout
+        timed_out = False
+        while time.monotonic() < deadline:
+            waited, _status = os.waitpid(pid, os.WNOHANG)
+            if waited == pid:
+                _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
+                break
+            time.sleep(0.1)
+        else:
+            timed_out = True
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except (ProcessLookupError, OSError):
+                pass
+            grace_deadline = time.monotonic() + 30
+            while time.monotonic() < grace_deadline:
+                waited, _status = os.waitpid(pid, os.WNOHANG)
+                if waited == pid:
+                    break
+                time.sleep(0.1)
+            else:
+                os.killpg(pid, signal.SIGKILL)
+                os.waitpid(pid, 0)
+            _write_log(f"ERROR: cluster-{action} timed out after {timeout}s — killed")
         try:
             os.killpg(pid, signal.SIGTERM)
         except (ProcessLookupError, OSError):
             pass
+        if timed_out:
+            raise RuntimeError(f"cluster-{action} timed out after {timeout}s")
         if _rc != 0:
             raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
         _write_log(f"{action} complete")
@@ -256,6 +332,7 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
     except Exception as exc:
         tb = traceback.format_exc()
         _write_log(f"ERROR: {exc}\n{tb}")
+        write_failure_note(job_dir, job_id, f"cluster-{action}", 1, redact=_redact_secrets)
         try:
             _all_lines = _out_file.read_text(errors="replace").splitlines() if _out_file.exists() else []
             analysis = _analyze_failure(_all_lines)

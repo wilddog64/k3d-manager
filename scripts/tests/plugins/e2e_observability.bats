@@ -224,6 +224,24 @@ PY
   [[ "${output}" == *"ok"* ]]
 }
 
+@test "e2e alerts aggregate away the scrape target and name the exported service" {
+  run python3 - "${RULE}" <<'PY'
+import sys, yaml
+r = list(yaml.safe_load_all(open(sys.argv[1])))[0]
+groups = {g["name"]: g for g in r["spec"]["groups"]}
+for rule in groups["e2e.alerts"]["rules"]:
+    expr = rule["expr"]
+    assert "max by (tier, exported_service, project, runner)" in expr, (rule["alert"], expr)
+    for field in ("summary", "description"):
+        text = rule["annotations"][field]
+        assert "$labels.service " not in text and "$labels.service}" not in text, (rule["alert"], field)
+        assert "$labels.exported_service" in text, (rule["alert"], field)
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "argocd platform-ops deploy applies the e2e dashboard" {
   run grep -F -- 'grafana-dashboard-e2e.yaml' "${ARGOCD}"
   [ "${status}" -eq 0 ]

@@ -23,6 +23,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | CVE Auto-Patch | `cve-autopatch` | `platform-ops/grafana-dashboard-cve-autopatch.yaml` | `make platform-ops` | hub |
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
+| Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | ArgoCD app `hub-grafana-dashboards` (hub; NOT `make platform-ops`); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
 | Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
@@ -50,6 +51,12 @@ The mirror-image failure also happened: the ArgoCD/Image-Updater dashboard was a
 the app cluster, where `argocd_*` and `kube_deployment_*{namespace="cicd"}` do not exist, so
 every panel read `No data` while the JSON itself loaded fine
 (`docs/bugs/2026-06-29-image-updater-grafana-wrong-cluster.md`).
+
+The chart also ships a stock **`Grafana Overview`** dashboard (Firing Alerts, Dashboards, RPS).
+It is not ours and none of our fixes apply to it. Ours is **`Grafana Health & Firing Alerts`**,
+which has the "Firing Alerts by Category" table. Before 2026-10-02 it was titled
+"Grafana Overview — Readable", and the operator kept opening the stock one by mistake
+(`docs/bugs/2026-10-02-grafana-overview-readable-title-collides-with-stock-dashboard.md`).
 
 **Check the instance before debugging the query.**
 
@@ -264,7 +271,8 @@ bypassing the correlator — see `docs/guides/hermes.md`.
 Fed by `k3dm-webhook`'s `_push_metrics()` → Pushgateway, and this is the **only** dashboard
 whose producer is a push, not a scrape. The chain has three host-side links that each fail
 independently: the webhook LaunchAgent, the Pushgateway port-forward LaunchAgent on
-`localhost:9091` (installed by `bin/cluster-up` Step 14c), and the Pushgateway pod itself.
+`localhost:9091` (Hostinger's forward, rewritten by `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger`;
+a sandbox `bin/cluster-up` Step 14c installs its own on `localhost:9092`), and the Pushgateway pod itself.
 
 **The hub has no Pushgateway** — the webhook pushes only for the ACG provider. This
 dashboard being empty on the hub is by design, not a regression. See
@@ -297,24 +305,30 @@ exit code, drive health.
 | Suite freshness | `time() - k3dm_test_last_timestamp_seconds` |
 | Last passing run | `time() - k3dm_test_last_success_timestamp_seconds` |
 | Failed cases | `k3dm_test_cases_failed` |
-| Cases by suite | `k3dm_test_suite_cases{result="not_ok"} > 0` |
-| Suite duration over time | `k3dm_test_suite_duration_seconds` |
+| Failing cases by suite | `k3dm_test_suite_cases{result="not_ok"} > 0` (empty on a clean run) |
+| Run duration over time | `k3dm_test_run_duration_seconds`, `k3dm_test_suite_duration_seconds` |
 | Total cases | `k3dm_test_cases_total` |
 | Exit code | `k3dm_test_exit_code` (informational only) |
 
-**Suite duration is not wired yet.** `k3dm_test_run_duration_seconds` is pushed as a literal
-`0`, and the per-suite regex in `bin/k3dm-test-metrics` looks for a `# duration:` marker that
-no harness emits — so only the unittest files report real values and the `bats` and `pytest`
-bars stay flat at zero. A flat duration panel here is the known gap, not a broken push.
+**Duration.** `make test-metrics` times the whole `make test-all` run and pushes it as
+`k3dm_test_run_duration_seconds{target="test-all"}`. Per-suite duration is published only for
+suites whose runner prints its own time: pytest's `in X.XXs` summary and unittest's
+`Ran N tests in X s`. BATS prints no per-file time, so BATS suites have no duration series
+rather than a fake `0`. A run pushed by an older exporter still shows the old `0`/millisecond
+values until the next `make test-metrics`.
 
-**Where the alerts live.** The five `k3dm-tests.alerts` rules are in
+**Where the alerts live.** The six `k3dm-tests.alerts` rules are in
 `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml`, labelled
 `release: acg-kube-prometheus-stack`, and are applied to the app cluster by
 `make observability-acg`. They deliberately do **not** sit with the other rule files under
 `scripts/etc/prometheus/rules/`, which are hub-side: the hub has no Pushgateway, its
-`federate-acg` job selects only `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}`,
+`federate-acg` job selects only `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}`
+(minus the k3s control-plane `apiserver_`, `etcd_`, `scheduler_` and `workqueue_` series, which
+k3s exposes on the kubelet endpoint and which made the scrape outgrow its timeout),
 and so the hub TSDB holds zero `k3dm_test_*` series. A rule on the hub for these metrics can
 never fire. `DeploymentMetricsStale` moved for the same reason.
+`OfflineSuiteRunMissed` fires when no run, pass or fail, has been pushed for 26h, which is the
+signature of a failed push.
 
 ### Trivy Security (`trivy-security`) — ACG only
 

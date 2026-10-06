@@ -52,11 +52,87 @@ _healthy_blob() {
   [[ "$output" == *"status=busy"* ]]
 }
 
-@test "eval_gates fails on low CPU idle in either sample" {
-  blob="$(printf '%s\n' docker_ok=1 lock=0 cpu_idle2=80 cpu_idle3=20 mem_free=90 disk_gb=900)"
+@test "eval_gates fails when the mean CPU idle is below the floor" {
+  blob="$(printf '%s\n' docker_ok=1 lock=0 cpu_idle2=40 cpu_idle3=20 cpu_idle4=30 cpu_idle5=25 cpu_idle6=30 mem_free=90 disk_gb=900)"
   run _e2e_remote_eval_gates "$blob"
   [ "$status" -ne 0 ]
   [[ "$output" == *"status=capacity_cpu"* ]]
+  [[ "$output" == *"mean 29.0%"* ]]
+}
+
+@test "one dipped sample does not refuse a mostly idle runner" {
+  blob="$(printf '%s\n' docker_ok=1 lock=0 cpu_idle2=64.4 cpu_idle3=31.92 mem_free=90 disk_gb=900)"
+  run _e2e_remote_eval_gates "$blob"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"status=available"* ]]
+}
+
+@test "eval_gates refuses a blob with no CPU samples" {
+  blob="$(printf '%s\n' docker_ok=1 lock=0 mem_free=90 disk_gb=900)"
+  run _e2e_remote_eval_gates "$blob"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"status=capacity_cpu"* ]]
+}
+
+@test "preflight retry retries capacity refusal and then succeeds" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  : > "$calls"
+  e2e_runner_preflight() {
+    local count
+    count="$(wc -l < "$calls")"
+    printf '%s\n' call >> "$calls"
+    if [ "$count" -eq 0 ]; then
+      printf 'status=capacity_cpu\n'
+      return 1
+    fi
+    printf 'status=available\n'
+    return 0
+  }
+  sleep() { :; }
+  E2E_M2_CAPACITY_RETRY_INTERVAL=0
+  run _e2e_remote_preflight_with_retry
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$calls")" -eq 2 ]
+  [[ "$output" == *"status=available"* ]]
+}
+
+@test "preflight retry does not retry busy refusal" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  : > "$calls"
+  e2e_runner_preflight() {
+    printf '%s\n' call >> "$calls"
+    printf 'status=busy\n'
+    return 1
+  }
+  sleep() { :; }
+  run _e2e_remote_preflight_with_retry
+  [ "$status" -ne 0 ]
+  [ "$(wc -l < "$calls")" -eq 1 ]
+  [[ "$output" == *"status=busy"* ]]
+}
+
+@test "preflight retry stops after the configured capacity retries" {
+  local calls="$BATS_TEST_TMPDIR/calls"
+  : > "$calls"
+  e2e_runner_preflight() {
+    printf '%s\n' call >> "$calls"
+    printf 'status=capacity_mem\n'
+    return 1
+  }
+  sleep() { :; }
+  E2E_M2_CAPACITY_RETRIES=2
+  E2E_M2_CAPACITY_RETRY_INTERVAL=0
+  run _e2e_remote_preflight_with_retry
+  [ "$status" -ne 0 ]
+  [ "$(wc -l < "$calls")" -eq 3 ]
+  [[ "$output" == *"status=capacity_mem"* ]]
+}
+
+@test "dispatch uses retry preflight and probe takes six top samples" {
+  run grep -F -- 'pf="$(_e2e_remote_preflight_with_retry)"' scripts/plugins/e2e_remote.sh
+  [ "$status" -eq 0 ]
+  run grep -F -- 'top -l 6' scripts/plugins/e2e_remote.sh
+  [ "$status" -eq 0 ]
 }
 
 @test "eval_gates fails on low memory" {
@@ -181,6 +257,35 @@ _healthy_blob() {
   [[ "$output" == *"status=busy"* ]]
   [[ "$output" == *"no local fallback"* ]]
   [[ "$output" != *"SSH SHOULD NOT RUN"* ]]
+}
+
+@test "dispatch reports the held lock holder and preserves the lock" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_LOCK="$BATS_TEST_TMPDIR/runner.lock"
+  mkdir -p "$E2E_M2_LOCK"
+  printf '%s\n' 'owner=m2 pid=4242 ts=1234567890' > "$E2E_M2_LOCK/meta"
+  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
+  _e2e_remote_lock_acquire() { return 1; }
+  _e2e_remote_ssh() {
+    [[ "$*" == *'cat "'* ]] && cat "$E2E_M2_LOCK/meta"
+  }
+  git() {
+    if [[ "$*" == *"branch -r --contains"* ]]; then
+      printf '  origin/k3d-manager-v1.41.0\n'
+    else
+      printf '0123456789abcdef\n'
+    fi
+  }
+  ssh() { printf 'SSH SHOULD NOT RUN\n' >&2; return 1; }
+  run e2e_runner_dispatch "m2"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"busy (lock held)"* ]]
+  [[ "$output" == *"owner=m2 pid=4242 ts=1234567890"* ]]
+  [[ "$output" == *"not dispatching, no local fallback"* ]]
+  [[ "$output" != *"SSH SHOULD NOT RUN"* ]]
+  [ -d "$E2E_M2_LOCK" ]
+  run cat "$E2E_M2_LOCK/meta"
+  [ "$output" = "owner=m2 pid=4242 ts=1234567890" ]
 }
 
 @test "dispatch builds the correct remote command and records a transcript" {

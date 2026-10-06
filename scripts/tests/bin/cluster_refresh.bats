@@ -70,7 +70,61 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"frontend-browser-http.sh"* ]]
 
-  run grep -nF 'starting frontend port-forward: svc/frontend → 127.0.0.2:80' bin/cluster-refresh
+  run grep -nF 'starting frontend port-forward: svc/frontend → 127.0.0.3:80' bin/cluster-refresh
   [ "$status" -eq 0 ]
   [[ "$output" == *"starting frontend port-forward"* ]]
+}
+
+@test "cluster-refresh uses interactive sudo for a missing system daemon in a TTY" {
+  local state_dir="${BATS_TEST_TMPDIR}/state"
+  local wrapper="${BATS_TEST_TMPDIR}/wrapper.sh"
+  local log="${BATS_TEST_TMPDIR}/daemon.log"
+  local plist="${BATS_TEST_TMPDIR}/daemon.plist"
+  local block="${BATS_TEST_TMPDIR}/daemon-block.sh"
+  local repo_root
+
+  repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  : > "${wrapper}"
+  sed -n '/^_cluster_refresh_stdin_is_tty()/,/^}/p; /^_system_daemon_install_if_missing()/,/^}/p' \
+    "${repo_root}/bin/cluster-refresh" > "${block}"
+  run env CLUSTER_PROVIDER=k3s-aws bash -c '
+    _ACG_STATE_DIR="$1"
+    _info() { :; }
+    _warn() { printf "%s\n" "$*"; }
+    _run_command() { printf "%s\n" "$*"; return 1; }
+    source "$2"
+    _cluster_refresh_stdin_is_tty() { return 0; }
+    _system_daemon_install_if_missing test-daemon "$3" "$4" "$5"
+  ' bash "${state_dir}" "${block}" "${wrapper}" "${log}" "${plist}"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--interactive-sudo"* ]]
+  [[ "$output" != *"--prefer-sudo"* ]]
+}
+
+@test "cluster-refresh warns with recovery command for a missing system daemon without a TTY" {
+  local state_dir="${BATS_TEST_TMPDIR}/state"
+  local wrapper="${BATS_TEST_TMPDIR}/wrapper.sh"
+  local log="${BATS_TEST_TMPDIR}/daemon.log"
+  local plist="${BATS_TEST_TMPDIR}/daemon.plist"
+  local block="${BATS_TEST_TMPDIR}/daemon-block.sh"
+  local repo_root
+
+  repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  : > "${wrapper}"
+  sed -n '/^_cluster_refresh_stdin_is_tty()/,/^}/p; /^_system_daemon_install_if_missing()/,/^}/p' \
+    "${repo_root}/bin/cluster-refresh" > "${block}"
+  run env CLUSTER_PROVIDER=k3s-aws bash -c '
+    _ACG_STATE_DIR="$1"
+    _info() { :; }
+    _warn() { printf "%s\n" "$*"; }
+    _run_command() { printf "%s\n" "$*"; return 1; }
+    source "$2"
+    _cluster_refresh_stdin_is_tty() { return 1; }
+    _system_daemon_install_if_missing test-daemon "$3" "$4" "$5"
+  ' bash "${state_dir}" "${block}" "${wrapper}" "${log}" "${plist}"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--prefer-sudo"* ]]
+  [[ "$output" == *"sudo -v && make refresh CLUSTER_PROVIDER=k3s-aws"* ]]
 }

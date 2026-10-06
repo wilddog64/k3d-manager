@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
 
 from hermes import prior_art as pa  # noqa: E402
+from hermes.embed_cache import EmbedCache, cache_key  # noqa: E402
 
 
 def _load_indexer():
@@ -28,6 +29,11 @@ def _load_indexer():
 
 
 ix = _load_indexer()
+
+
+@pytest.fixture(autouse=True)
+def isolated_embedding_cache(monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_EMBED_CACHE", str(tmp_path / "cache.sqlite"))
 
 
 def _doc(name):
@@ -191,6 +197,137 @@ class TestDryRun:
         monkeypatch.setattr(ix, "embed_batch", explode)
         monkeypatch.setattr(ix, "run_sql", explode)
         assert ix.main(["--dry-run"]) == 0
+
+    def test_dry_run_creates_no_cache_file(self, monkeypatch, tmp_path):
+        docs = [_doc("one")]
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: docs)
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: {})
+        assert ix.main(["--dry-run"]) == 0
+        assert not (tmp_path / "cache.sqlite").exists()
+
+
+class TestEmbeddingCache:
+    def _configure(self, monkeypatch, docs, writes, embed):
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: docs)
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: {})
+        monkeypatch.setattr(ix, "embed_batch", embed)
+        monkeypatch.setattr(ix, "run_sql", lambda sql: writes.append(sql) or "indexed=5")
+        monkeypatch.setattr(ix.subprocess, "run", lambda *_a, **_k: None)
+
+    def test_rebuild_after_store_loss_uses_cache_without_api_calls(self, monkeypatch, capsys):
+        docs = [_doc(n) for n in ("one", "two", "three", "four", "five")]
+        writes = []
+        calls = []
+        self._configure(monkeypatch, docs, writes,
+                        lambda texts, task_type=None: calls.append(texts) or _vectors(len(texts)))
+        assert ix.main([]) == 0
+        first_writes = len(writes)
+
+        monkeypatch.setattr(ix, "embed_batch", lambda *_a, **_k: pytest.fail("cache miss"))
+        assert ix.main([]) == 0
+        assert len(writes) == first_writes * 2
+        assert "5 from cache, 0 embedded" in capsys.readouterr().out
+
+    def test_partial_hit_embeds_only_misses_and_preserves_order(self, monkeypatch):
+        docs = [_doc(n) for n in ("one", "two", "three", "four")]
+        cache = EmbedCache()
+        cache.put_many((cache_key(ix.EMBED_MODEL, ix.EMBED_DIM, "RETRIEVAL_DOCUMENT", docs[i][2]),
+                        [[float(i + 1)] * pa.EMBED_DIM][0]) for i in (0, 2))
+        calls = []
+        writes = []
+
+        def embed(texts, task_type=None):
+            calls.append(texts)
+            return [[float(10 + i)] * pa.EMBED_DIM for i in range(len(texts))]
+
+        self._configure(monkeypatch, docs, writes, embed)
+        assert ix.main([]) == 0
+        assert calls == [[docs[1][2], docs[3][2]]]
+        upsert = writes[0]
+        paths = [line.split("\t", 1)[0] for line in upsert.splitlines() if line.startswith("docs/")]
+        assert paths == [doc[0] for doc in docs]
+        data_lines = [line for line in upsert.splitlines() if line.startswith("docs/")]
+        assert data_lines[0].endswith("[1.0," + "1.0," * (pa.EMBED_DIM - 2) + "1.0]")
+        assert data_lines[1].endswith("[10.0," + "10.0," * (pa.EMBED_DIM - 2) + "10.0]")
+        assert data_lines[2].endswith("[3.0," + "3.0," * (pa.EMBED_DIM - 2) + "3.0]")
+        assert data_lines[3].endswith("[11.0," + "11.0," * (pa.EMBED_DIM - 2) + "11.0]")
+
+    def test_model_or_task_type_change_is_a_cache_miss(self):
+        text = "same"
+        assert cache_key("model-a", 768, "RETRIEVAL_DOCUMENT", text) != cache_key(
+            "model-b", 768, "RETRIEVAL_DOCUMENT", text)
+        assert cache_key("model-a", 768, "RETRIEVAL_DOCUMENT", text) != cache_key(
+            "model-a", 768, "RETRIEVAL_QUERY", text)
+
+    def test_unwritable_cache_does_not_fail_index(self, monkeypatch, tmp_path, capsys):
+        blocker = tmp_path / "plain-file"
+        blocker.write_text("x")
+        monkeypatch.setenv("K3DM_EMBED_CACHE", str(blocker / "cache.sqlite"))
+        docs = [_doc(n) for n in ("one", "two")]
+        writes = []
+        self._configure(monkeypatch, docs, writes,
+                        lambda texts, task_type=None: _vectors(len(texts)))
+        assert ix.main([]) == 0
+        assert "embedding cache unavailable" in capsys.readouterr().err
+
+    def test_quota_pause_keeps_embedded_vectors_in_cache(self, monkeypatch):
+        monkeypatch.setattr(ix, "EMBED_BATCH", 2)
+        docs = [_doc(n) for n in ("one", "two", "three", "four")]
+        writes = []
+        calls = []
+
+        def embed(texts, task_type=None):
+            calls.append(texts)
+            if len(calls) == 2:
+                raise pa.RetrievalUnavailable("perday quota")
+            return _vectors(len(texts))
+
+        self._configure(monkeypatch, docs, writes, embed)
+        assert ix.main([]) == 1
+        cached = EmbedCache()
+        keys = [cache_key(ix.EMBED_MODEL, ix.EMBED_DIM, "RETRIEVAL_DOCUMENT", doc[2]) for doc in docs[:2]]
+        assert len(cached.get_many(keys)) == 2
+
+        monkeypatch.setattr(ix, "embed_batch",
+                            lambda *_a, **_k: (_ for _ in ()).throw(pa.RetrievalUnavailable("perday quota")))
+        writes.clear()
+        assert ix.main([]) == 1
+        assert writes and "docs/bugs/one.md" in writes[0]
+
+    def test_newest_dated_docs_are_embedded_first_under_limit(self, monkeypatch):
+        docs = [
+            ("docs/plans/v1.0.0-x.md", "X", "x", "hx"),
+            ("docs/bugs/2026-01-01-a.md", "A", "a", "ha"),
+            ("docs/bugs/2026-10-01-b.md", "B", "b", "hb"),
+        ]
+        calls = []
+        writes = []
+        self._configure(monkeypatch, docs, writes,
+                        lambda texts, task_type=None: calls.append(texts) or _vectors(len(texts)))
+        assert ix.main(["--limit", "1"]) == 0
+        assert calls == [["b"]]
+
+    def test_limit_counts_only_cache_misses(self, monkeypatch, capsys):
+        docs = [_doc(n) for n in ("one", "two", "three", "four", "five")]
+        cache = EmbedCache()
+        cache.put_many(
+            (cache_key(ix.EMBED_MODEL, ix.EMBED_DIM, "RETRIEVAL_DOCUMENT", docs[index][2]),
+             [float(index)] * pa.EMBED_DIM)
+            for index in (0, 1, 2)
+        )
+        calls = []
+        writes = []
+        self._configure(monkeypatch, docs, writes,
+                        lambda texts, task_type=None: calls.append(texts) or _vectors(len(texts)))
+        assert ix.main(["--limit", "1"]) == 0
+        upserts = [sql for sql in writes if "staging" in sql]
+        written_paths = [line.split("\t", 1)[0] for line in upserts[0].splitlines()
+                         if line.startswith("docs/")]
+        assert len(written_paths) == 4
+        assert calls and len(calls) == 1 and len(calls[0]) == 1
+        assert "1 remaining" in capsys.readouterr().out
 
 
 if __name__ == "__main__":

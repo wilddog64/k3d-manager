@@ -15,7 +15,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | Function | Description |
 |---|---|
 | `_run_command [--prefer-sudo|--require-sudo|--interactive-sudo|--probe '<subcmd>'|--quiet|--soft] -- <cmd> [args...]` | Core wrapper for every privileged or traced command. Honors `--prefer-sudo` (attempt non-interactive sudo first), `--require-sudo` (fail if sudo unavailable), `--interactive-sudo` (allow password prompts), `--probe` to test a subcommand before deciding on sudo, `--quiet` to suppress wrapper errors, and `--soft` to return exit codes instead of exiting. Example: `_run_command --prefer-sudo -- apt-get update`. |
-| `_run_command_resolve_sudo <prog> <prefer> <require> <interactive> [probe_args...]` | Internal helper invoked by `_run_command`; resolves `_RCRS_RUNNER` to either the raw program or `sudo` with the correct flags, returning 127 when sudo is required but unavailable. |
+| `_run_command_resolve_sudo <prog> <prefer> <require> <interactive> [probe_args...]` | Internal helper invoked by `_run_command`; resolves `_RCRS_RUNNER` to either the raw program or `sudo` with the correct flags, returning 127 when sudo is required but unavailable. A bare program name is run under sudo from `/usr/bin`, `/bin`, `/usr/sbin` or `/sbin` when it exists there, so a PATH entry such as GNU coreutils cannot shadow the binary a sudoers rule names. |
 | `_command_exist <prog>` | Returns 0 if `<prog>` is found on `PATH`, 1 otherwise. |
 | `_args_have_sensitive_flag <args...>` | Returns 0 when CLI args contain `--password`, `--token`, or `--username` (either `--flag value` or `--flag=value` form); used to disable tracing. |
 
@@ -190,8 +190,8 @@ export ENABLE_AGENT_LINT=1
 | Function | Signature | Description |
 |---|---|---|
 | `_agent_checkpoint <label>` | Commit the working tree with a checkpoint message before a risky change (no-op if clean). |
-| `_agent_audit` | Audits staged diffs for: BATS assertion/test removal, if-count threshold violations (default: 8, configurable via `AGENT_AUDIT_MAX_IF`), bare `sudo` calls, `kubectl exec` commands with inline credentials, and hardcoded IPv4 literals in staged `.yaml`/`.yml` files. Set `AGENT_IP_ALLOWLIST` to a regular file path listing repo-relative paths to exempt from the IP check (one path per line; lines beginning with `#` are ignored). Returns non-zero if any check fails. |
-| `_agent_lint` | AI-based lint pass on staged `.sh` files. Gated by `AGENT_LINT_GATE_VAR` (default: `ENABLE_AGENT_LINT=1`). Invokes the function named by `AGENT_LINT_AI_FUNC` with staged file names and rules from `scripts/etc/agent/lint-rules.md`. No-op when gate is off or no `.sh` files are staged. |
+| `_agent_audit` | Audits staged diffs for BATS and Python test/assertion removal, Python syntax errors (including extensionless Python shebang files), dangerous Python calls, if-count threshold violations (default: 8, configurable via `AGENT_AUDIT_MAX_IF`), bare `sudo` calls (a `sudo` command word only — `_run_command`'s own `--prefer-sudo`/`--require-sudo`/`--interactive-sudo` flags are not flagged, and a privileged command run on another host may carry a trailing `# agent-audit: remote-sudo` marker), `kubectl exec` commands with inline credentials, and hardcoded IPv4 literals in staged `.yaml`/`.yml` files. Python dangerous-call findings may use the marker `# agent-audit: allow <rule> <reason>`. `AGENT_AUDIT_PY_TEST_GLOB` customizes Python test globs; `AGENT_AUDIT_PYTHON` selects the syntax-check interpreter. Set `AGENT_IP_ALLOWLIST` to a regular file path listing repo-relative paths to exempt from the IP check (one path per line; lines beginning with `#` are ignored). Returns non-zero if any check fails. |
+| `_agent_lint` | AI-based lint pass on staged files matching `AGENT_LINT_GLOBS` (default: `*.sh *.js *.md`). Gated by `AGENT_LINT_GATE_VAR` (default: `ENABLE_AGENT_LINT=1`). Invokes the function named by `AGENT_LINT_AI_FUNC` with staged file names and rules from `scripts/etc/agent/lint-rules.md`. No-op when gate is off or no matching files are staged. |
 
 ## Global Variables
 
@@ -230,3 +230,17 @@ _antigravity_browser_ready [timeout_seconds]
 ```
 
 Returns 0 when port 9222 responds to `curl -sf http://localhost:9222/json`; otherwise calls `_err` after the timeout.
+
+### `_browser_launch`
+
+Ensures the Playwright-managed Chromium CDP endpoint is available, launching it when needed and then running the ACG session check.
+
+### `_cdp_browser_ready`
+
+Waits for the CDP endpoint used by `_browser_launch` to respond.
+
+```
+_cdp_browser_ready [timeout_seconds]
+```
+
+Uses `PLAYWRIGHT_CDP_HOST` and `PLAYWRIGHT_CDP_PORT` (defaulting to `127.0.0.1:9222`) and calls `_err` after the timeout.

@@ -141,3 +141,79 @@ observed.
 
 Hermes `argocd` sensor, every poll on 2026-09-29: `shopping-cart/shopping-cart-identity
 Healthy/OutOfSync`. Unchanged since this doc was filed; still unassigned.
+
+## Recurrence 2026-10-03 — now BLOCKING: sandbox `make up` fails at Step 10c (Claude)
+
+**Status:** FIX F1 LANDED in `e08eaa83` (server-side apply); identity synced on the rebuilt hub 2026-10-03.
+
+On the rebuilt hub, `make up CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1` exited 2 after
+`ERROR: [acg-up] Keycloak API not Ready after 900s — realm import is required for SSO`.
+`deployment/keycloak` was never created. The Application's last operation is `Failed`, with the
+same immutable-PVC error on `postgres-keycloak-pvc`, retried 5 times.
+
+**Option 1 is proven not to work.** It is the per-PVC `argocd.argoproj.io/sync-options: Replace=false` annotation from
+`shopping-cart-infra` `00d0d8a`. That annotation is **present on the live PVC**, read back on
+2026-10-03, and ArgoCD still replaced it. The app-level `Replace=true` wins over a per-resource
+`Replace=false`.
+
+**The source of `Replace=true` is in this repo.** `bin/cluster-up` Step 10c (`kubectl apply` heredoc,
+around line 1000) writes it into `syncOptions` on every `make up`. The unmerged infra branch
+`bugfix/identity-global-replace-drift` (`29068e5`) edits `argocd/applications/identity.yaml`,
+which nothing applies to the hub, so it cannot fix this either.
+
+**`Replace=true` is not needed for object size.** The largest generated object is
+`realm-shopping-cart.json` at 12,429 bytes, far under the 262,144-byte last-applied-annotation limit.
+Server-side apply covers size anyway.
+
+### F1 — fix (`bin/cluster-up` + `scripts/tests/bin/cluster_up.bats` only)
+
+In the Step 10c `shopping-cart-identity` heredoc:
+
+1. In `syncOptions`, replace `- Replace=true` with `- ServerSideApply=true`. Keep
+   `- CreateNamespace=true`.
+2. Under `metadata.annotations`, next to the existing `argocd.argoproj.io/sync-wave: "-1"`, add
+   `argocd.argoproj.io/compare-options: ServerSideDiff=true`. Without it, SSA leaves the app perpetually
+   OutOfSync with no real diff; see `reference_argocd_ssa_without_ssdiff_perpetual_outofsync`.
+3. No other change to the heredoc, the wait loop or the timeout.
+
+**Gates (offline; paste output):**
+- Extract the heredoc between `IDEOF` markers from `bin/cluster-up` and parse it as YAML (`yq` or
+  `python3 -c 'import yaml'`). Assert:
+  - `spec.syncPolicy.syncOptions` == `["CreateNamespace=true", "ServerSideApply=true"]`;
+  - the compare-options annotation is `ServerSideDiff=true`;
+  - no string anywhere in the document contains `Replace=true`.
+
+  Add this as a BATS test in `scripts/tests/bin/cluster_up.bats`. Assert parsed values, not a
+  whole source line.
+- **Mutation:** put `- Replace=true` back, show the test red, restore from a `cp` snapshot, and confirm with `cmp`.
+- `shellcheck bin/cluster-up` has no new warnings. `bats scripts/tests/bin/cluster_up.bats` is all green.
+- `git diff --stat` shows only the 2 files.
+
+**Commit message (exact; trailers on consecutive lines):**
+
+```
+fix(cluster-up): identity Application uses server-side apply, not Replace=true, so a bound PVC syncs
+
+Co-Authored-By: Codex <noreply@openai.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+
+Push to `origin/k3d-manager-v1.41.0` and report `git rev-parse origin/k3d-manager-v1.41.0`. Do NOT
+create a PR, commit to `main`, use `--no-verify`, edit `memory-bank/`, or run anything live.
+
+### Operator rollout (after F1 lands)
+
+1. **Patch the live Application** so it stops replacing, without waiting for the next `make up`:
+   ```
+   kubectl --context k3d-k3d-cluster -n cicd patch application shopping-cart-identity --type json -p '[{"op":"replace","path":"/spec/syncPolicy/syncOptions","value":["CreateNamespace=true","ServerSideApply=true"]},{"op":"add","path":"/metadata/annotations/argocd.argoproj.io~1compare-options","value":"ServerSideDiff=true"}]'
+   ```
+2. **Start a sync.** The last operation is `Failed`, so selfHeal will not retry on its own:
+   ```
+   kubectl --context k3d-k3d-cluster -n cicd patch application shopping-cart-identity --type merge -p '{"operation":{"initiatedBy":{"username":"operator"},"sync":{"syncOptions":["ServerSideApply=true"]}}}'
+   ```
+3. **Re-run `make up CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1`** from a checkout that has F1, so Step 10c does not re-apply `Replace=true`.
+
+**Verify:**
+- the PVC still shows `volumeName: pvc-7daa614b-…` and `Bound`;
+- `deployment/keycloak` is Available;
+- the app is `Synced`/`Healthy` across one resync interval.

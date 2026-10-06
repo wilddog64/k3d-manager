@@ -46,19 +46,67 @@ setup() {
   [ "${status}" -eq 0 ]
   [ "${output}" = "null" ]
 
-  run yq -r '.route.routes[1].receiver' "${tmpl}"
+  run yq -r '.route.routes[2].receiver' "${tmpl}"
   [ "${status}" -eq 0 ]
   [ "${output}" = "sms-critical" ]
+}
+
+@test "Alertmanager sends ACG sandbox criticals to email, not SMS" {
+  local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
+
+  run yq -r '.route.routes[1].receiver' "${tmpl}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "platform-warning" ]
+
+  run yq -r '.route.routes[1].matchers[]' "${tmpl}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"severity = critical"* ]]
+  [[ "${output}" == *'cluster =~ "acg|ubuntu-k3s"'* ]]
+
+  run yq -r '.route.routes[2].matchers[0]' "${tmpl}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "severity = critical" ]
+
+  run yq -r '.route.routes[2].receiver' "${tmpl}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "sms-critical" ]
+}
+
+@test "Alertmanager amtool routes ACG sandbox criticals to email" {
+  command -v amtool >/dev/null 2>&1 || skip "amtool is not installed"
+
+  local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
+  local rendered="${BATS_TEST_TMPDIR}/alertmanager.yaml"
+  env ALERTMANAGER_GMAIL_FROM=a@example.com \
+    ALERTMANAGER_GMAIL_APP_PASSWORD=x \
+    ALERTMANAGER_SMS_GATEWAY=1234567890@example.com \
+    envsubst < "${tmpl}" > "${rendered}"
+
+  run amtool config routes test --config.file="${rendered}" severity=critical cluster=ubuntu-k3s
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "platform-warning" ]
+
+  run amtool config routes test --config.file="${rendered}" severity=critical cluster=acg
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "platform-warning" ]
+
+  run amtool config routes test --config.file="${rendered}" severity=critical cluster=hub
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "sms-critical" ]
+
+  run amtool config routes test --config.file="${rendered}" alertname=TrivyCriticalVulnerabilityDetected severity=critical cluster=hub
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "null" ]
 }
 
 @test "Alertmanager routes KubeJobFailed to platform-warning" {
   local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
 
-  run yq -r '.route.routes[2].matchers[0]' "${tmpl}"
+  run yq -r '.route.routes[3].matchers[0]' "${tmpl}"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"KubeJobFailed"* ]]
 
-  run yq -r '.route.routes[2].receiver' "${tmpl}"
+  run yq -r '.route.routes[3].receiver' "${tmpl}"
   [ "${status}" -eq 0 ]
   [ "${output}" = "platform-warning" ]
 }
@@ -79,7 +127,7 @@ setup() {
 @test "Alertmanager keeps the critical route before platform-warning" {
   local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
 
-  run yq -r '.route.routes[1].receiver + " " + .route.routes[2].receiver' "${tmpl}"
+  run yq -r '.route.routes[2].receiver + " " + .route.routes[3].receiver' "${tmpl}"
   [ "${status}" -eq 0 ]
   [ "${output}" = "sms-critical platform-warning" ]
 }

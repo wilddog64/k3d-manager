@@ -2,6 +2,52 @@
 
 ## [Unreleased]
 
+## [v0.5.1] — 2026-10-06
+
+### Changed
+- `docs/api/acg.md`: new "Sandbox TTL watcher and extend" section covering `acg_watch_start` / `acg_watch_stop` / `acg_watch`, the 65-minute extend window and why the interval must stay under it, the button wait and fallback, and how a date-less shutdown time is resolved. `README.md` and `docs/releases.md`: the release tables stopped at v0.3.17; back-filled v0.3.19 through v0.5.1, and the README main table again shows the 3 newest releases.
+
+### Fixed
+- The launchd ACG watcher ran every 3.5 hours, but `acg_extend.js` only extends inside the last 65 minutes, so a run usually skipped with more than 65 minutes left and the next one came after the sandbox had expired. The watcher and `acg_watch` now check every 30 minutes. Separately, the page shows the shutdown as a time of day only, so a shutdown at 11:24 PM seen at 1:12 AM was read as about 22 hours away; since a sandbox never has more than 6 hours left, a time more than 6 hours ahead is now read as yesterday's, already expired. Reference: `docs/bugs/2026-10-06-acg-watch-misses-extend-window-and-reads-expired-as-22h.md`.
+- `_run_command` passed bare program names to sudo, which resolved them through the caller's PATH. With GNU coreutils first in PATH, `install` ran as root from a user-writable Homebrew directory and the `/usr/bin/install` NOPASSWD rule never matched, so automated runs stopped at a password prompt. The resolver now runs a bare name from `/usr/bin`, `/bin`, `/usr/sbin` or `/sbin` when it exists there. Reference: `docs/bugs/2026-10-05-sudo-resolves-bare-name-through-user-path.md`.
+- `acg_extend.js` now waits up to 15 seconds for the Extend button, including the “Extend Your Session” dialog, reloads the sandbox page once, and only then falls back to Open Sandbox. On failure it logs visible button labels with credential-shaped labels filtered and takes a viewport screenshot with a 10-second timeout. The launchd watcher now runs `acg_extend.js` directly with an absolute Node path, while `acg_watch` retries failed extends up to 3 times 10 minutes apart instead of waiting 3.5 hours; the previous wrapper called a dispatcher path that does not exist inside k3d-manager and could not find Node under launchd.
+- `scripts/lib/acg/cdp.sh`: add a self-contained CDP readiness wait so `_browser_launch` does not
+  depend on a host's `_run_command` proxy guard loading foundation `system.sh`; the new probe also
+  honors `PLAYWRIGHT_CDP_HOST` and `PLAYWRIGHT_CDP_PORT` instead of hard-coding localhost:9222.
+- `_agent_audit`'s bare-sudo check no longer flags `_run_command`'s own `--prefer-sudo`,
+  `--require-sudo` and `--interactive-sudo` flags. The pattern `\bsudo[[:space:]]` also matched the
+  `-sudo` at the end of each flag, because `\b` sits between `-` and `s`. The `_run_command`
+  exemption only covers lines that *start* with `_run_command`, so a correct wrapper call behind
+  `if !`, `x=$(`, `&&` or `||` was blocked as bare sudo, which pushed agents to reshape correct code
+  to pass the hook. The pattern now requires `sudo` to start the line or follow a character other
+  than `-`, a letter, a digit or `_`. A real `sudo` after a pipe, a quote or `&&` is still flagged.
+  Spec: `docs/bugs/2026-10-04-agent-audit-bare-sudo-has-no-remote-exemption.md` (Recurrence).
+
+## [v0.5.0] — 2026-10-04
+
+### Added
+- `_agent_audit` now audits staged Python files for test shrinkage, syntax errors, and dangerous calls,
+  including extensionless Python scripts identified by a Python shebang. Dangerous-call rules
+  (`shell-true`, `eval`, `exec`, `sudo`, `sensitive-flag`) are exempted only by
+  `# agent-audit: allow <rule> <reason>`; `AGENT_AUDIT_PY_TEST_GLOB` and `AGENT_AUDIT_PYTHON`
+  configure it. `_agent_lint` takes its file globs from `AGENT_LINT_GLOBS`. README documents every
+  `_agent_audit` check.
+
+### Changed
+- `_agent_audit`: accept a trailing `# agent-audit: remote-sudo` marker for privileged commands
+  that run on another host, where `_run_command` cannot apply; any other comment does not exempt
+  a line from the bare-sudo audit.
+- `README.md`, `docs/api/acg.md`: document the session-check contract that shipped **in**
+  v0.4.18 but was described nowhere — the marker table, why `ACG_SESSION_OK` carries a
+  `path=` suffix (without it a reused human session was indistinguishable from a working
+  unattended login, which is how headless auto-login stayed broken while the gate reported
+  success), and `K3DM_ACG_REQUIRE_CREDENTIALS=1` as the fail-closed credential gate whose
+  default-unset behavior preserves the pre-existing-session fallback. Also records the two
+  selector facts behind the v0.4.18 login fix: CSS attribute **values** are case-sensitive
+  while **names** are not, and Playwright's own CSS parser means a
+  `document.querySelectorAll` check proves nothing about `page.locator()`.
+- `docs/retro/2026-09-24-v0.4.18-retrospective.md`: v0.4.18 close-out retrospective.
+
 ## [v0.4.18] — 2026-09-24
 
 ### Changed

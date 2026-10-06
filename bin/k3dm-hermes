@@ -9,8 +9,9 @@ import subprocess
 import sys
 import time
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
@@ -36,6 +37,16 @@ from hermes import status_triage
 from hermes import app_health_triage
 from webhook.redact import scrub_credentials
 from hermes.prior_art import corpus_fingerprint
+
+QUOTA_RESET_TZ = ZoneInfo("America/Los_Angeles")
+
+
+def _next_quota_reset(now):
+    """Return the epoch of the next 00:05 Pacific, when the Gemini per-day quota has reset."""
+    local = datetime.fromtimestamp(now, QUOTA_RESET_TZ)
+    reset = datetime.combine(local.date() + timedelta(days=1), datetime.min.time(),
+                             tzinfo=QUOTA_RESET_TZ) + timedelta(minutes=5)
+    return reset.timestamp()
 
 
 def _load_state(path):
@@ -496,6 +507,7 @@ def _push_index_metrics(metrics):
         f"k3dm_vectordb_index_last_run_timestamp_seconds {metrics['last_run']}",
         f"k3dm_vectordb_index_last_success_timestamp_seconds {metrics['last_success']}",
         f"k3dm_vectordb_index_embedded_last {metrics['embedded']}",
+        f"k3dm_vectordb_index_from_cache_last {metrics['from_cache']}",
         f"k3dm_vectordb_index_pruned_last {metrics['pruned']}",
         f"k3dm_vectordb_index_backlog_docs {metrics['backlog']}",
         f"k3dm_vectordb_index_duration_seconds {metrics['duration']}",
@@ -521,7 +533,8 @@ def _refresh_index(state, now=None):
     started = time.monotonic()
     metrics = {
         "last_run": now, "last_success": state.get("index_last_success", 0),
-        "embedded": 0, "pruned": 0, "backlog": state.get("index_backlog_docs", 0),
+        "embedded": 0, "from_cache": 0, "pruned": 0,
+        "backlog": state.get("index_backlog_docs", 0),
         "duration": 0, "paused_until": state.get("index_paused_until", 0),
         "result": "failed",
     }
@@ -539,9 +552,29 @@ def _refresh_index(state, now=None):
             return
         fingerprint = corpus_fingerprint(ROOT, ref)
         if fingerprint == state.get("index_fingerprint"):
-            metrics["result"] = "noop"
-            metrics["backlog"] = 0
-            return
+            try:
+                status = subprocess.run(
+                    [str(ROOT / "bin" / "k3dm-vectordb-status"), "--json"],
+                    cwd=ROOT, capture_output=True, text=True, timeout=120, check=False,
+                    env={**os.environ, "K3DM_INDEX_REF": ref},
+                )
+                payload = json.loads(status.stdout) if status.returncode == 0 else {}
+            except (OSError, subprocess.SubprocessError, TypeError, ValueError, json.JSONDecodeError):
+                payload = {}
+            rows = payload.get("rows")
+            corpus_docs = payload.get("corpus_docs")
+            if (payload.get("available") is True and type(rows) is int and
+                    type(corpus_docs) is int and rows < corpus_docs):
+                state.pop("index_fingerprint", None)
+                print(
+                    f"vectordb index: store has {rows} of {corpus_docs} docs; "
+                    "re-indexing despite unchanged corpus",
+                    file=sys.stderr,
+                )
+            else:
+                metrics["result"] = "noop"
+                metrics["backlog"] = 0
+                return
         env = {**os.environ, "K3DM_INDEX_REF": ref}
         result = subprocess.run(
             [str(ROOT / "scripts" / "index-docs.py"), "--ref", ref, "--limit", "100", "--quiet"],
@@ -550,14 +583,15 @@ def _refresh_index(state, now=None):
         output = (result.stdout or "") + "\n" + (result.stderr or "")
         import re
         embedded = re.search(r"(\d+) embedded", output)
+        from_cache = re.search(r"(\d+) from cache", output)
         pruned = re.search(r"(\d+) pruned", output)
         remaining = re.search(r"(\d+) remaining", output)
         metrics["embedded"] = int(embedded.group(1)) if embedded else 0
+        metrics["from_cache"] = int(from_cache.group(1)) if from_cache else 0
         metrics["pruned"] = int(pruned.group(1)) if pruned else 0
         metrics["backlog"] = int(remaining.group(1)) if remaining else 0
         if "index-docs: paused" in output:
-            tomorrow = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-            metrics["paused_until"] = (tomorrow + timedelta(days=1)).timestamp()
+            metrics["paused_until"] = _next_quota_reset(now)
             metrics["result"] = "paused"
         elif result.returncode == 0:
             metrics["result"] = "success"
@@ -594,6 +628,8 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
         state["status_last_run"] = now
     relay = _keychain_secret("k3dm-slack-webhook")
     drain_url = os.environ.get("K3DM_HERMES_APPROVAL_DRAIN_URL", "")
+    if drain_url and not _keychain_secret(APPROVAL_DRAIN_SERVICE):
+        drain_url = ""
     if event:
         if drain_url and event.get("proposals"):
             blocks = interactive_blocks(event["text"], event["proposals"], event["nonce"])

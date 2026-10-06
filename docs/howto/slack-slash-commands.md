@@ -429,7 +429,7 @@ probe fails and Gemini triages it automatically.
 | Keycloak | `http://keycloak.shopping-cart.local/health/live` | 200 |
 | Prometheus | `http://localhost:19190/-/ready` (app cluster; hostinger uses `https://prometheus.3ai-talk.org/-/ready`) | 200 |
 | Grafana | `https://grafana.3ai-talk.org/api/health` | 200 |
-| **Pushgateway** | `http://localhost:9091/-/healthy` | 200 |
+| **Pushgateway** | `http://localhost:9092/-/healthy` (sandbox; Hostinger uses `http://localhost:9091/-/healthy`) | 200 |
 
 On failure, the webhook fetches pod state for the matching `monitoring` pod and asks
 Gemini to classify it as TRANSIENT or REAL FAILURE before posting to Slack.

@@ -6,7 +6,7 @@
 # Requires --confirm to prevent accidental teardown.
 #
 # Usage:
-#   bin/cluster-down --confirm [--keep-hub]
+#   bin/cluster-down --confirm [--keep-hub|--delete-hub]
 #
 # Environment:
 #   CLUSTER_PROVIDER   k3s-aws (default), k3s-gcp, or k3s-az
@@ -38,20 +38,33 @@ _dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/run" "${
 
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
 _confirm=0
-_keep_hub=0
+_keep_hub=1
+_keep_hub_arg=0
+_delete_hub_arg=0
 _HUB_CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
 for _arg in "$@"; do
   case "${_arg}" in
     --confirm)  _confirm=1 ;;
-    --keep-hub) _keep_hub=1 ;;
+    --keep-hub) _keep_hub=1; _keep_hub_arg=1 ;;
+    --delete-hub) _keep_hub=0; _delete_hub_arg=1 ;;
   esac
 done
 
+if [[ "${_keep_hub_arg}" -eq 1 && "${_delete_hub_arg}" -eq 1 ]]; then
+  echo "bin/cluster-down: --keep-hub and --delete-hub cannot be used together" >&2
+  exit 2
+fi
+
+if [[ "${_cluster_provider}" == "k3d" ]]; then
+  _keep_hub=0
+fi
+
 if [[ "${_confirm}" -eq 0 ]]; then
-  echo "Usage: bin/cluster-down --confirm [--keep-hub]"
+  echo "Usage: bin/cluster-down --confirm [--keep-hub|--delete-hub]"
   echo ""
-  echo "  --confirm    Required. Tears down remote cluster and local Hub cluster."
-  echo "  --keep-hub   Optional. Preserve local Hub and its access layer."
+  echo "  --confirm    Required. Tears down remote cluster; the local Hub is preserved."
+  echo "  --delete-hub Optional. Also deletes the local Hub cluster and its access layer."
+  echo "  --keep-hub   Accepted for compatibility; preserve the local Hub."
   exit 1
 fi
 
@@ -267,7 +280,7 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   fi
 
   _info "[acg-down] Stopping frontend browser HTTP listener launchd daemon..."
-  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist}"
+  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist}"
   _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   _frontend_browser_launchctl_log="${_ACG_STATE_DIR}/logs/frontend-browser-http-launchctl.log"
   _frontend_browser_log_target="${_frontend_browser_launchctl_log}"
@@ -284,7 +297,7 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _run_command --prefer-sudo --soft -- rm -f "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" >/dev/null 2>&1 || true
 
   _info "[acg-down] Stopping Pushgateway port-forward launchd agent..."
-  _pgw_pf_label="com.k3d-manager.pushgateway-port-forward"
+  _pgw_pf_label="com.k3d-manager.sandbox.pushgateway-port-forward"
   _pgw_pf_plist="${HOME}/Library/LaunchAgents/${_pgw_pf_label}.plist"
   if _dry_run_active; then
     _info "DRY_RUN: would unload Pushgateway port-forward LaunchAgent"
@@ -293,6 +306,31 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
       _info "[acg-down] Pushgateway port-forward launchd agent unloaded"
   fi
   _dry_guard "remove Pushgateway port-forward plist" rm -f "${_pgw_pf_plist}"
+
+  # legacy-unscoped-cleanup:begin
+  _legacy_frontend_plist="${LEGACY_FRONTEND_BROWSER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist}"
+  _legacy_pushgateway_plist="${LEGACY_PUSHGATEWAY_PLIST:-${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist}"
+  if [[ -f "${_legacy_frontend_plist}" ]] && grep -Fq -- "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh" "${_legacy_frontend_plist}"; then
+    if _dry_run_active; then
+      _info "DRY_RUN: would unload legacy sandbox frontend browser HTTP daemon"
+    else
+      _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_legacy_frontend_plist}" >/dev/null 2>&1 || true
+    fi
+    _dry_guard "remove legacy frontend browser HTTP plist" _run_command --prefer-sudo --soft -- rm -f "${_legacy_frontend_plist}"
+  elif [[ -f "${_legacy_frontend_plist}" ]]; then
+    _info "[acg-down] unscoped com.k3d-manager.frontend-browser-http belongs to another provider — left in place"
+  fi
+  if [[ -f "${_legacy_pushgateway_plist}" ]] && grep -Fq -- 'ubuntu-k3s' "${_legacy_pushgateway_plist}"; then
+    if _dry_run_active; then
+      _info "DRY_RUN: would unload legacy sandbox Pushgateway port-forward LaunchAgent"
+    else
+      launchctl unload "${_legacy_pushgateway_plist}" 2>/dev/null || true
+    fi
+    _dry_guard "remove legacy Pushgateway port-forward plist" rm -f "${_legacy_pushgateway_plist}"
+  elif [[ -f "${_legacy_pushgateway_plist}" ]]; then
+    _info "[acg-down] unscoped com.k3d-manager.pushgateway-port-forward belongs to another provider — left in place"
+  fi
+  # legacy-unscoped-cleanup:end
 
   _info "[acg-down] Stopping Alertmanager port-forward launchd agent..."
   _am_pf_label="com.k3d-manager.alertmanager-port-forward"

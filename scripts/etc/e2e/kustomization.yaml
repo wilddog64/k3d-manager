@@ -36,4 +36,4 @@ images:
   newTag: sha-56033880a16e77ad5df0752eac8ad1c00c4a258a
 - name: shopping-cart-payment
   newName: ghcr.io/wilddog64/shopping-cart-payment
-  newTag: sha-412bc7876dbcc2b63e67b016d0a7c2c4dcc86e4e
+  newTag: sha-e3b6f06aea2598444b9526fffaaf88b829dbd906

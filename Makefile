@@ -1,7 +1,9 @@
 # Makefile — k3d-manager cluster lifecycle (provider-aware)
-# Usage: make [target] [CLUSTER_PROVIDER=k3s-aws|k3s-az|k3s-gcp|k3s-oci] [URL=https://...]
+# Usage: make [target] [CLUSTER_PROVIDER=k3d|k3s-aws|k3s-az|k3s-gcp|k3s-oci] [URL=https://...]
 
 .DEFAULT_GOAL := help
+
+.PHONY: lint-python
 
 # Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
 # /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
@@ -11,9 +13,10 @@ SHELL := /bin/bash
 
 CLUSTER_PROVIDER ?= k3s-aws
 ACG_AGENT_COUNT  ?= 2
-URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
+URL ?= https://app.pluralsight.com/hands-on/playground/cloud-sandboxes
 GHCR_PAT ?=
-KEEP_LOCAL    ?= 0
+KEEP_LOCAL    ?= 1
+DELETE_HUB    ?= 0
 CLEANUP_STALE ?= 0
 BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
@@ -22,12 +25,14 @@ ARGOCD_SERVER ?= localhost:8080
 ARGOCD_SCHEME ?= http
 GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
+RELAY_DIR        ?= workers/slack-relay
 
-.PHONY: up down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
-## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
+## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
 	@case "$(CLUSTER_PROVIDER)" in \
+	  k3d) bin/hub-up ;; \
 	  k3s-oci) mkdir -p "$(HOME)/.local/share/k3d-manager/logs" && \
 	           CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm 2>&1 | \
 	           tee "$(HOME)/.local/share/k3d-manager/logs/k3s-oci-up.log" ;; \
@@ -36,21 +41,47 @@ up:
 	esac
 	@$(MAKE) --no-print-directory observability
 	@$(MAKE) --no-print-directory platform-ops
+	@if [ "$(CLUSTER_PROVIDER)" = "k3d" ]; then \
+	  $(MAKE) --no-print-directory install-hub-pushgateway-port-forward; \
+	fi
+
+## Rebuild the local Hub only (no AWS, no sandbox)
+hub-up:
+	@$(MAKE) --no-print-directory up CLUSTER_PROVIDER=k3d
+
+## Restore Keychain-backed Hub credentials and local agents (run in Terminal.app)
+hub-restore:
+	@bin/hub-restore
+
+## Full Hub disaster recovery: rebuild, then restore Keychain-backed state (run in Terminal.app)
+hub-recover:
+	@bin/hub-restore --preflight-only
+	@$(MAKE) --no-print-directory hub-up
+	@bin/hub-restore
 
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
-## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
+## make down preserves the local Hub; set DELETE_HUB=1 to delete it
+ifneq ($(DELETE_HUB),0)
+ifneq ($(KEEP_LOCAL),0)
+ifneq ($(origin KEEP_LOCAL),file)
+$(error DELETE_HUB=1 conflicts with explicit KEEP_LOCAL=1)
+endif
+endif
+endif
+
+_DOWN_HUB_FLAG = $(if $(filter 1,$(CLEANUP_STALE)),,$(if $(filter 1,$(DELETE_HUB)),--delete-hub,$(if $(filter 0,$(KEEP_LOCAL)),--delete-hub,)))
+
+down-hub-flag:
+	@printf '%s\n' "$(_DOWN_HUB_FLAG)"
+
 down:
 	@MAKE_TARGET=down bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
 	@set +e; \
 	_down_rc=0; \
-	_keep_hub_flag=; \
-	if [ "$(KEEP_LOCAL)" = "1" ] || [ "$(CLEANUP_STALE)" = "1" ]; then \
-	  _keep_hub_flag=--keep-hub; \
-	fi; \
 	case "$(CLUSTER_PROVIDER)" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster || _down_rc=$$? ;; \
 	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager destroy_cluster --confirm || _down_rc=$$? ;; \
-	  *)       bin/cluster-down --confirm $$_keep_hub_flag || _down_rc=$$? ;; \
+	  *)       bin/cluster-down --confirm $(_DOWN_HUB_FLAG) || _down_rc=$$? ;; \
 	esac; \
 	if [ "$(CLEANUP_STALE)" = "1" ]; then \
 	  $(MAKE) --no-print-directory cleanup-stale-resources CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM=1 || _cleanup_rc=$$?; \
@@ -159,7 +190,7 @@ refresh-registration:
 ## Show cluster nodes, pods, endpoint + ESO health (provider-aware)
 status:
 	@MAKE_TARGET=status bin/require-unambiguous-provider $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),1,0)
-	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ]; then _provider=k3s-hostinger; if [ -r "$(HOME)/.local/share/k3d-manager/active-provider" ]; then _provider="$$(cat "$(HOME)/.local/share/k3d-manager/active-provider")"; fi; fi; case "$$_provider" in \
+	@_provider="$(CLUSTER_PROVIDER)"; if [ "$(origin CLUSTER_PROVIDER)" = file ]; then _provider=""; fi; case "$$_provider" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
 	             || echo "OCI cluster unreachable" ;; \
@@ -192,6 +223,20 @@ chrome-cdp:
 ## Uninstall Chrome CDP launchd agent
 chrome-cdp-stop:
 	scripts/k3d-manager acg_chrome_cdp_uninstall
+
+acg-watch acg-watch-check: URL =
+
+## Install the ACG sandbox TTL watcher launchd agent; checks every 30m (URL=<sandbox-url> optional)
+acg-watch:
+	scripts/k3d-manager acg_watch_start "$(URL)"
+
+## Uninstall the ACG sandbox TTL watcher launchd agent
+acg-watch-stop:
+	scripts/k3d-manager acg_watch_stop
+
+## Read-only: print the sandbox's remaining minutes without extending (URL=<sandbox-url> optional)
+acg-watch-check:
+	@_url="$(URL)"; cd scripts/lib/foundation/scripts/lib/acg && bin/acg-extend-test "$${_url:-$${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}}" --check
 
 ## Recover an expired ACG sandbox: delete it, start a fresh one, re-extract credentials (URL=<sandbox-url> PROVIDER=aws|gcp|azure; needs a TTY on first login)
 acg-restart:
@@ -301,6 +346,25 @@ restart-webhook:
 		launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
 	fi
 	@$(MAKE) --no-print-directory restart-cloud-bridge
+
+## Set webhook/cloud-bridge log level (LEVEL=error|warn|info|debug) and restart both agents
+webhook-log-level:
+	@case "$(LEVEL)" in error|warn|info|debug) ;; *) echo "webhook-log-level: LEVEL must be error, warn, info, or debug" >&2; exit 2 ;; esac
+	@_plist="$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
+	[ -f "$$_plist" ] || { echo "webhook-log-level: $$_plist not found — run make install-webhook" >&2; exit 1; }; \
+	_LEVEL="$(LEVEL)" WEBHOOK_PLIST="$$_plist" BRIDGE_PLIST="$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist" python3 -c 'import os,plistlib; level=os.environ["_LEVEL"]; [((d:=plistlib.load(open(p,"rb"))).setdefault("EnvironmentVariables",{}).__setitem__("K3DM_LOG_LEVEL",level), plistlib.dump(d,open(p,"wb"))) for p in (os.environ["WEBHOOK_PLIST"],os.environ["BRIDGE_PLIST"]) if os.path.isfile(p)]'
+	@$(MAKE) --no-print-directory restart-webhook
+
+## Print a local make-job log (operator-only; ID must be an 8-character job ID)
+job-log:
+	@case "$(ID)" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f] ) ;; *) echo "job-log: use ID=<8-character hex job ID>" >&2; exit 2 ;; esac; \
+	_dir="$${K3DM_JOB_DIR:-$${HOME}/.local/share/k3d-manager/webhook-jobs}/$(ID)"; \
+	[ -f "$$_dir/make.log" ] || { echo "job-log: make.log not found for $(ID)" >&2; exit 1; }; \
+	cat "$$_dir/make.log"
+
+## Copy unharvested redacted failed-job notes into docs/job-failures for review and commit
+harvest-job-failures:
+	@K3DM_REPO_ROOT="$(CURDIR)" bin/k3dm-harvest-job-failures
 
 ## Restart the cloud-session request bridge LaunchAgent (picks up code changes)
 restart-cloud-bridge:
@@ -525,14 +589,16 @@ setup-worker:
 	bin/k3dm-webhook-setup
 	bin/k3dm-worker-setup
 
+# Defines _kc_read: print one k3dm Keychain item, or name the item and say whether
+# the keychain is locked (a non-GUI session) or the item is missing. Never prints a value on error.
+KEYCHAIN_READ = _kc_read() { _v=$$(security find-generic-password -s "$$1" -a k3dm -w 2>/dev/null) && [ -n "$$_v" ] && { printf '%s' "$$_v"; return 0; }; _info=$$(security show-keychain-info 2>&1 || true); case "$$_info" in *"User interaction is not allowed"*) echo "ERROR: $$1 unreadable — the login keychain is locked or not reachable from this session; run security unlock-keychain in a GUI terminal" >&2 ;; *) echo "ERROR: $$1 missing from Keychain — run $$2" >&2 ;; esac; return 1; }
+
 ## Re-deploy Cloudflare Worker and sync secrets from Keychain (run after Worker code changes)
 deploy-worker:
-	@_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null) && \
-	_tok=$$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null) && \
-	_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) && \
-	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup"; exit 1; } && \
-	[ -n "$$_tok" ] || { echo "ERROR: k3dm-webhook-token missing from Keychain — run bin/k3dm-webhook-setup"; exit 1; } && \
-	[ -n "$$_sig" ] || { echo "ERROR: k3dm-slack-signing-secret missing from Keychain — run bin/k3dm-worker-setup"; exit 1; } && \
+	@$(KEYCHAIN_READ); \
+	_cf=$$(_kc_read k3dm-cloudflare-api-token bin/k3dm-worker-setup) || exit 1; \
+	_tok=$$(_kc_read k3dm-webhook-token bin/k3dm-webhook-setup) || exit 1; \
+	_sig=$$(_kc_read k3dm-slack-signing-secret bin/k3dm-worker-setup) || exit 1; \
 	cd workers/slack-relay && \
 	printf '%s' "$$_tok" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put WEBHOOK_TOKEN && \
 	printf '%s' "$$_sig" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put SLACK_SIGNING_SECRET && \
@@ -738,6 +804,10 @@ show-service-passwords:
 	echo "      password: $${_op:-$$_kc_hint}";\
 	echo ""
 
+## Check shopping-cart DB/broker/cache passwords against their Secrets (APPLY=1 fixes + restarts consumers)
+shopping-cart-credential-drift:
+	@./scripts/k3d-manager shopping_cart_credential_drift --context "$(or $(CONTEXT),ubuntu-hostinger)" $(if $(filter 1,$(APPLY)),--apply,)
+
 ## Store Alertmanager credentials in Vault (requires Hub Vault + port-forward)
 ## Each value resolves from env, then Keychain, then an interactive prompt. Runs
 ## non-interactively when ALERTMANAGER_GMAIL_FROM and ALERTMANAGER_SMS_GATEWAY are set.
@@ -776,15 +846,24 @@ alertmanager-secret:
 	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-gmail-from -w "$$_gmail" 2>/dev/null && \
 	  echo "[alertmanager-secret] gmail_from backed up to Keychain"; \
 	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-sms-gateway -w "$$_sms" 2>/dev/null && \
-	  echo "[alertmanager-secret] sms_gateway backed up to Keychain"
+	  echo "[alertmanager-secret] sms_gateway backed up to Keychain"; \
+	security add-generic-password -U -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w "$$_pw" 2>/dev/null && \
+	  echo "[alertmanager-secret] gmail_app_pw backed up to Keychain"
 
 ## Restore the Alertmanager Gmail App Password from Keychain into Vault, then rebuild the Alertmanager Secret
 restore-google-app-password:
 	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
 	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
 	[ -n "$$_tok" ] || { echo "[restore-google-app-password] ERROR: cannot read Hub Vault root token" >&2; exit 1; }; \
-	_pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>/dev/null); \
-	[ -n "$$_pw" ] || { echo "[restore-google-app-password] ERROR: k3dm-alertmanager-gmail-app-password not in Keychain (locked? run: security unlock-keychain)" >&2; exit 1; }; \
+	_pw_err=$$(mktemp); _pw=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password -w 2>"$$_pw_err" || true); _pw_stderr=$$(cat "$$_pw_err"); \
+	if [ -z "$$_pw" ]; then \
+	  if security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-app-password >/dev/null 2>"$$_pw_err"; then \
+	    echo "[restore-google-app-password] ERROR: item exists but is EMPTY — re-create it with: make alertmanager-secret" >&2; \
+	  else \
+	    echo "[restore-google-app-password] ERROR: $$_pw_stderr" >&2; \
+	  fi; \
+	  rm -f "$$_pw_err"; exit 1; \
+	fi; rm -f "$$_pw_err"; \
 	_gmail=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-gmail-from -w 2>/dev/null || true); \
 	_sms=$$(security find-generic-password -a "$$USER" -s k3dm-alertmanager-sms-gateway -w 2>/dev/null || true); \
 	_missing=; \
@@ -877,6 +956,64 @@ argocd-hermes-token:
 	else \
 	  echo "[argocd-hermes-token] NOTE: the Hermes agent is not loaded; nothing to restart"; \
 	fi
+
+## Create and bind the Hermes Slack-approval KV namespace (commit wrangler.toml afterward)
+hermes-approvals-kv:
+	@set -euo pipefail; \
+	$(KEYCHAIN_READ); \
+	_cf=$$(_kc_read k3dm-cloudflare-api-token bin/k3dm-worker-setup) || exit 1; \
+	if grep -Eq '^[[:space:]]*binding[[:space:]]*=[[:space:]]*"APPROVALS_KV"' "$(RELAY_DIR)/wrangler.toml"; then \
+	  echo "[hermes-approvals-kv] APPROVALS_KV already bound in wrangler.toml — nothing to do"; exit 0; \
+	fi; \
+	_rc=0; _out=$$(cd "$(RELAY_DIR)" && CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler kv namespace create APPROVALS_KV </dev/null 2>&1) || _rc=$$?; \
+	[ "$$_rc" -eq 0 ] || { printf '%s\n' "$$_out" >&2; echo "[hermes-approvals-kv] ERROR: wrangler kv namespace create failed (exit $$_rc). If APPROVALS_KV already exists, put its id from 'wrangler kv namespace list' into $(RELAY_DIR)/wrangler.toml and rerun" >&2; exit 1; }; \
+	_id=$$(printf '%s\n' "$$_out" | grep -oE '[0-9a-f]{32}' | head -1 || true); \
+	[ -n "$$_id" ] || { printf '%s\n' "$$_out" >&2; echo "[hermes-approvals-kv] ERROR: wrangler did not return a namespace id" >&2; exit 1; }; \
+	KV_ID="$$_id" python3 - "$(RELAY_DIR)/wrangler.toml" < <(printf '%s\n' 'import os, pathlib, re, sys; p=pathlib.Path(sys.argv[1]); s=p.read_text(); q=chr(34); pattern=r"# \[\[kv_namespaces\]\]\n# binding = "+q+"APPROVALS_KV"+q+r"\n# id = "+q+"<namespace-id>"+q; replacement="[[kv_namespaces]]\nbinding = "+q+"APPROVALS_KV"+q+"\nid = "+q+os.environ["KV_ID"]+q; n=re.sub(pattern, replacement, s, count=1); p.write_text(n) if n != s else (_ for _ in ()).throw(SystemExit("commented APPROVALS_KV block not found"))'); \
+	echo "[hermes-approvals-kv] bound APPROVALS_KV ($$_id). Commit $(RELAY_DIR)/wrangler.toml, then run: make deploy-worker"
+
+## Create or reuse the Hermes Slack-approval drain token and push it to the relay
+hermes-drain-token:
+	@set -euo pipefail; \
+	[ -t 0 ] || { \
+	  echo "[hermes-drain-token] ERROR: refusing to run without a terminal." >&2; \
+	  echo "[hermes-drain-token] This target handles a credential; it must not run unattended." >&2; \
+	  exit 1; \
+	}; \
+	$(KEYCHAIN_READ); \
+	_cf=$$(_kc_read k3dm-cloudflare-api-token bin/k3dm-worker-setup) || exit 1; \
+	_tok=$$(security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm -w 2>/dev/null || true); \
+	_mode=reused; \
+	if [ "$${ROTATE:-0}" = 1 ] || [ -z "$$_tok" ]; then \
+	  _tok=$$(openssl rand -hex 32); \
+	  printf 'add-generic-password -U -a k3dm -s k3dm-hermes-approval-drain-token -w %s\n' "$$_tok" | security -i; \
+	  _mode=created; \
+	fi; \
+	_stored=$$(security find-generic-password -s k3dm-hermes-approval-drain-token -a k3dm -w 2>/dev/null || true); \
+	[ -n "$$_stored" ] || { echo "[hermes-drain-token] ERROR: the stored item reads back empty" >&2; exit 1; }; \
+	[ "$${#_stored}" -ge 32 ] || { echo "[hermes-drain-token] ERROR: the stored item is too short" >&2; exit 1; }; \
+	if [ "$$_mode" = created ] && [ "$$_stored" != "$$_tok" ]; then echo "[hermes-drain-token] ERROR: Keychain value did not match generated token" >&2; exit 1; fi; \
+	cd "$(RELAY_DIR)"; \
+	printf '%s' "$$_stored" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put APPROVAL_DRAIN_TOKEN; \
+	echo "[hermes-drain-token] drain token stored in Keychain and pushed to the relay ($$_mode)"
+
+## Set the Hermes Slack-approval approver allowlist
+hermes-approvers:
+	@set -euo pipefail; \
+	printf '%s\n' "$${APPROVERS:-}" | grep -Eq '^[UW][A-Z0-9]{2,}(,[UW][A-Z0-9]{2,})*$$' || { echo "ERROR: set APPROVERS=U0123ABCD with comma-separated Slack user IDs and no spaces" >&2; exit 1; }; \
+	$(KEYCHAIN_READ); \
+	_cf=$$(_kc_read k3dm-cloudflare-api-token bin/k3dm-worker-setup) || exit 1; \
+	cd "$(RELAY_DIR)"; \
+	printf '%s' "$$APPROVERS" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put APPROVER_ALLOWLIST
+
+## Configure all Hermes Slack-approval credentials and report the remaining manual steps
+hermes-approvals-setup:
+	@set -euo pipefail; \
+	[ -n "$${APPROVERS:-}" ] || { echo "ERROR: set APPROVERS=U0123ABCD before running hermes-approvals-setup" >&2; exit 1; }; \
+	$(MAKE) --no-print-directory hermes-approvals-kv; \
+	$(MAKE) --no-print-directory hermes-drain-token; \
+	$(MAKE) --no-print-directory hermes-approvers APPROVERS="$$APPROVERS"; \
+	echo "[hermes-approvals-setup] Commit wrangler.toml if it changed; run make deploy-worker; turn on Slack Interactivity with Request URL https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity and register /hermes-auth; set K3DM_HERMES_APPROVAL_DRAIN_URL"
 
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:
@@ -994,6 +1131,23 @@ test-python-unit:
 	 done; \
 	 if [ "$$found" -eq 0 ]; then echo "[make] no unittest suites found" >&2; exit 2; fi
 
+## Lint tracked Python files, including extensionless Python shebang scripts, with Ruff
+RUFF ?= ruff
+lint-python:
+	@set -euo pipefail; \
+	 ruff="$(RUFF)"; \
+	 if ! command -v "$$ruff" >/dev/null 2>&1; then \
+	   echo "[make] Ruff not found: install with python3 -m pip install --user ruff==0.15.8" >&2; \
+	   exit 2; \
+	 fi; \
+	 files=(); \
+	 while IFS= read -r f; do files+=("$$f"); done < <(git ls-files "*.py" | grep -v '^scripts/lib/foundation/'); \
+	 while IFS= read -r f; do \
+	   first=$$(sed -n '1p' "$$f"); \
+	   case "$$first" in '#!'*python*) files+=("$$f");; esac; \
+	 done < <(git ls-files | grep -v '^scripts/lib/foundation/' | grep -v '\.py$$'); \
+	 "$$ruff" check -- "$${files[@]}"
+
 ## Run the pytest suites (scripts/tests/hermes + scripts/tests/bin/test_*.py)
 check-doc-links:
 	@python3 scripts/check-doc-links.py
@@ -1013,6 +1167,28 @@ validate-manifests:
 ## Embed the docs corpus into the pgvector store; only changed docs are re-embedded
 index-docs:
 	@python3 scripts/index-docs.py $(if $(DRY_RUN),--dry-run,) $(if $(LIMIT),--limit $(LIMIT),)
+
+## Copy the index-docs embedding cache to a second location: make embed-cache-backup DEST=/Volumes/m2-share/k3dm or DEST=m2-air:~/.local/backup
+embed-cache-backup:
+	@[ -n "$(DEST)" ] || { echo "ERROR: DEST is required, e.g. DEST=/Volumes/m2-share/k3dm or DEST=m2-air:~/.local/backup" >&2; exit 1; }
+	@python3 scripts/embed-cache.py backup -- "$(DEST)"
+
+## Fill the embedding cache from the hub's vector store at zero quota cost: make embed-cache-seed [REF=origin/<branch>]
+embed-cache-seed:
+	@python3 scripts/embed-cache.py seed $(if $(REF),--ref $(REF),)
+
+## Show what the embedding cache holds (models, dims, age)
+embed-cache-stats:
+	@python3 scripts/embed-cache.py stats
+
+## Drop cached vectors for deleted/edited docs or old models unused for DAYS (default 90)
+embed-cache-prune:
+	@python3 scripts/embed-cache.py prune $(if $(DAYS),--days $(DAYS),)
+
+## Merge a backed-up embedding cache into the local one: make embed-cache-restore SRC=/Volumes/m2-share/k3dm/embeddings.sqlite or SRC=m2-air:~/.local/backup
+embed-cache-restore:
+	@[ -n "$(SRC)" ] || { echo "ERROR: SRC is required, e.g. SRC=/Volumes/m2-share/k3dm/embeddings.sqlite or SRC=m2-air:~/.local/backup" >&2; exit 1; }
+	@python3 scripts/embed-cache.py restore -- "$(SRC)"
 
 ## Find prior art in docs/ by similarity: make find-similar-docs Q="..." [K=5]
 find-similar-docs:
@@ -1051,8 +1227,10 @@ test-all: test test-bin test-python
 test-metrics:
 	@set -o pipefail; \
 	_log="$${TMPDIR:-/tmp}/k3dm-test-all-$$(date -u +%s).log"; \
+	_start=$$(date -u +%s); \
 	$(MAKE) test-all >"$${_log}" 2>&1; _rc=$$?; \
-	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}"; \
+	_dur=$$(( $$(date -u +%s) - _start )); \
+	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}" --run-duration "$${_dur}"; \
 	echo "[test-metrics] log: $${_log}"; \
 	exit 0
 
@@ -1112,11 +1290,17 @@ help:
 	@echo ""
 	@echo "  k3d-manager — cluster lifecycle"
 	@echo ""
-	@echo "  Targets (set CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
+	@echo "  Targets (set CLUSTER_PROVIDER=k3d|k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
+	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
+	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
+	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
 	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
-	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
+	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"
+	@echo "    make job-log ID=<job_id>  Print a local make-job log (operator-only)"
+	@echo "    make harvest-job-failures  Copy redacted failed-job notes into docs/job-failures"
+	@echo "    make down          Tear down cluster (preserves Hub; DELETE_HUB=1 also deletes it)"
 	@echo "    make down ... CLEANUP_STALE=1  Also remove expired managed registrations and stale AWS local state"
 	@echo "    make status        Show concise service health (SERVICE=<name> for focused detail)"
 	@echo "    make status-full   Show full pod and diagnostic report"
@@ -1128,6 +1312,7 @@ help:
 	@echo "    make test-all      Run every offline suite (BATS dispatcher + bin BATS + Python)"
 	@echo "    make test-bin      Run the BATS suites under scripts/tests/bin"
 	@echo "    make test-python   Run every Python suite (unittest + pytest)"
+	@echo "    make lint-python   Lint tracked Python files with Ruff (pyflakes)"
 	@echo "    make e2e           Run Tier 1 e2e harness (vCluster + Playwright Job; DIGEST=<image digest> optional)"
 	@echo "    make e2e-sandbox   Run Tier 2 e2e harness against the live ACG sandbox (DIGEST=<image digest> optional; needs a TTY)"
 	@echo "    make e2e-remote    Run Tier 1 e2e harness on a remote runner off the M4 (RUNNER=m2 [DIGEST=<image digest>]; no local fallback)"
@@ -1141,6 +1326,9 @@ help:
 	@echo "    make creds         Extract AWS credentials only"
 	@echo "    make chrome-cdp    Install Chrome CDP launchd agent (automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
+	@echo "    make acg-watch     Install the sandbox TTL watcher (checks every 30m; URL= optional)"
+	@echo "    make acg-watch-stop    Uninstall the sandbox TTL watcher"
+	@echo "    make acg-watch-check   Print the sandbox's remaining minutes without extending"
 	@echo "    make acg-restart   Recover an expired sandbox: delete, recreate, re-extract creds (needs a TTY)"
 	@echo "    make acg-recover   Full recovery: chrome-cdp + acg-restart + a clean make up (needs a TTY)"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
@@ -1181,7 +1369,7 @@ help:
 	@echo "    make up CLUSTER_PROVIDER=k3s-gcp"
 	@echo "    make up CLUSTER_PROVIDER=k3s-oci"
 	@echo "    make down CLUSTER_PROVIDER=k3s-oci"
-	@echo "    make down CLEANUP_STALE=1                 # teardown + guarded stale-resource cleanup"
+	@echo "    make down CLEANUP_STALE=1                 # teardown + guarded stale-resource cleanup (preserves Hub)"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
 	@echo "    make fleet-render ACG_AGENT_COUNT=4   # offline: render 4 agents / 5 nodes"
 	@echo "    make fleet-up ACG_AGENT_COUNT=4       # live node-join rung (k3s-aws only)"

@@ -7,6 +7,7 @@ setup() {
   mkdir -p "$HOME"
   export HOME
   source "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
+  keycloak_smoke_vault_preseed() { :; }
   HOSTNET_DRIFT_BIN="$BATS_TEST_TMPDIR/hostnet-drift-default"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$HOSTNET_DRIFT_BIN"
   chmod +x "$HOSTNET_DRIFT_BIN"
@@ -48,6 +49,65 @@ YAML
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"8 logical claims"* ]]
+}
+
+@test "_hub_recovery_sync_vault_root_token: accepts a matching Keychain read-back" {
+  _is_mac() { return 0; }
+  _kubectl() { printf '%s' 'dGVzdC1yb290LXRva2Vu'; }
+  security() {
+    case "$1" in
+      -i) cat >/dev/null; return 0 ;;
+      find-generic-password) printf '%s\n' 'test-root-token'; return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  export -f _is_mac _kubectl security
+
+  run _hub_recovery_sync_vault_root_token hub
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'test-root-token'* ]]
+}
+
+@test "_hub_recovery_sync_vault_root_token: rejects a mismatching Keychain read-back" {
+  _is_mac() { return 0; }
+  _kubectl() { printf '%s' 'dGVzdC1yb290LXRva2Vu'; }
+  security() {
+    case "$1" in
+      -i) cat >/dev/null; return 0 ;;
+      find-generic-password) printf '%s\n' 'different-token'; return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  export -f _is_mac _kubectl security
+
+  run _hub_recovery_sync_vault_root_token hub
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Keychain service k3dm-vault-root-token did not retain the Vault root token'* ]]
+  [[ "$output" == *'security unlock-keychain'* ]]
+  [[ "$output" != *'test-root-token'* ]]
+}
+
+@test "_hub_recovery_sync_vault_root_token: rejects a failed Keychain read-back without exposing the token" {
+  local argv_log="${BATS_TEST_TMPDIR}/security-argv.log"
+  _is_mac() { return 0; }
+  _kubectl() { printf '%s' 'dGVzdC1yb290LXRva2Vu'; }
+  security() {
+    printf '%s\n' "$*" >> "$argv_log"
+    case "$1" in
+      -i) cat >/dev/null; return 0 ;;
+      find-generic-password) return 1 ;;
+      *) return 1 ;;
+    esac
+  }
+  export -f _is_mac _kubectl security
+
+  run _hub_recovery_sync_vault_root_token hub
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Keychain service k3dm-vault-root-token could not be read back'* ]]
+  [[ "$output" == *'security unlock-keychain'* ]]
+  [[ "$output" != *'test-root-token'* ]]
+  run cat "$argv_log"
+  [[ "$output" != *'test-root-token'* ]]
 }
 
 @test "hub_recovery_plan: emits the dependency map by logical claim" {
@@ -195,6 +255,59 @@ YAML
   [[ "$output" == *"ArgoCD admin Vault mirror"* ]]
   [[ "$output" == *"Other app-cluster registrations"* ]]
   [ ! -s "$calls" ]
+}
+
+@test "_hub_recovery_retry_failed_identity_sync: Failed phase requests one cicd patch" {
+  local calls="${BATS_TEST_TMPDIR}/identity-retry-calls"
+  : > "$calls"
+  _kubectl() {
+    printf '%s\n' "$*" >> "$calls"
+    case "$*" in
+      *"get application shopping-cart-identity"*) printf 'Failed'; return 0 ;;
+      *"patch application shopping-cart-identity"*) return 0 ;;
+    esac
+    return 1
+  }
+  _info() { :; }
+  _warn() { :; }
+  run _hub_recovery_retry_failed_identity_sync hub-context
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'patch application shopping-cart-identity' "$calls")" -eq 1 ]
+  grep -q -- '-n cicd' "$calls"
+}
+
+@test "_hub_recovery_retry_failed_identity_sync: Succeeded, Running and empty phases do not patch" {
+  local phase calls="${BATS_TEST_TMPDIR}/identity-no-retry-calls"
+  for phase in Succeeded Running empty; do
+    : > "$calls"
+    _kubectl() {
+      printf '%s\n' "$*" >> "$calls"
+      case "$*" in
+        *"get application shopping-cart-identity"*) [[ "$IDENTITY_PHASE" != empty ]] && printf '%s' "$IDENTITY_PHASE"; return 0 ;;
+      esac
+      return 1
+    }
+    _info() { :; }
+    _warn() { :; }
+    IDENTITY_PHASE="$phase" run _hub_recovery_retry_failed_identity_sync hub-context
+    [ "$status" -eq 0 ]
+    run grep -q 'patch application shopping-cart-identity' "$calls"
+    [ "$status" -ne 0 ]
+  done
+}
+
+@test "_hub_recovery_retry_failed_identity_sync: patch failure is non-fatal" {
+  _kubectl() {
+    case "$*" in
+      *"get application shopping-cart-identity"*) printf 'Error'; return 0 ;;
+      *"patch application shopping-cart-identity"*) return 1 ;;
+    esac
+    return 1
+  }
+  _info() { :; }
+  _warn() { :; }
+  run _hub_recovery_retry_failed_identity_sync hub-context
+  [ "$status" -eq 0 ]
 }
 
 @test "hub_recovery_reconcile: hostnet drift runs after serverlb and failure is non-fatal" {

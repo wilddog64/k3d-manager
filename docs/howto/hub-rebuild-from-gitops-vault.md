@@ -29,6 +29,23 @@ Everything downstream follows from that one fault:
 
 None of these have independent fixes. The rebuild clears all of them together.
 
+## One command
+
+Run the complete recovery from Terminal.app (or iTerm):
+
+```bash
+make hub-recover
+```
+
+This runs `hub-up`, restores the Alertmanager credentials and signing material that have backups,
+reconciles the rebuilt Hub, restores the Embeddings key to Vault from a hidden prompt, reapplies
+platform operations, and restores the local port-forward and Cloudflare tunnel agents. It does not
+restore a signing key without a backup, Prometheus history,
+Alertmanager silences, the vector index, or old ArgoCD/Vault tokens such as Hermes's ArgoCD token.
+
+The command requires a GUI-backed, interactive Keychain session. `!`, `nohup`, and ssh do not have
+that session, so Keychain reads fail with `User interaction is not allowed` even when the items exist.
+
 ## What survives a rebuild, and what does not
 
 **Survives — verified present in Keychain on 2026-09-20:**
@@ -73,6 +90,23 @@ Credential paths are not all reseeded automatically after a Vault rebuild. `secr
 
 ## Procedure
 
+## Rebuild the hub
+
+To rebuild the local hub without touching AWS or the sandbox, run:
+
+```bash
+make up CLUSTER_PROVIDER=k3d
+```
+
+This restores the hub cluster, Vault, LDAP, ArgoCD, observability, platform-ops resources,
+and the hub Pushgateway port-forward. It does not restore shopping-cart Vault data (that is
+seeded on the next sandbox `make up`), `cosign-public-key`, `app-cluster-kubeconfig`, or old
+ArgoCD/Vault tokens. The matching teardown is:
+
+```bash
+make down CLUSTER_PROVIDER=k3d
+```
+
 Run from `/Users/cliang/src/gitrepo/personal/k3d-manager`. Do not delete the `profile` or
 `pw-profile` directories at any point. Raw SQLite retention deletion remains forbidden.
 
@@ -116,9 +150,11 @@ Why the override matters — verified 2026-09-20:
   `ubuntu-hostinger` context. Never use it here.
 - `CLUSTER_PROVIDER=k3d` falls to the `*)` branch, which logs
   `Unknown CLUSTER_PROVIDER 'k3d' — skipping remote teardown` and proceeds to the local hub only.
-- A bare `make down` also **refuses** outright: `bin/require-unambiguous-provider` exits 3 because
-  two providers are live (`k3s-aws`, `k3s-hostinger`) and `CLUSTER_PROVIDER` was not set
-  explicitly. That guard is doing its job — do not defeat it, give it the right provider.
+- A bare `make down` does **not** protect you here. Since 2026-10-05,
+  `bin/require-unambiguous-provider` no longer counts the long-lived `k3s-hostinger` for
+  `make down`, so with only the sandbox and Hostinger live it proceeds with the `k3s-aws` default
+  and tears the sandbox down. It still refuses when two sandbox providers are live. Give the
+  provider explicitly.
 
 **Dry-run first and read the scope before committing to it:**
 
@@ -245,6 +281,30 @@ unless `--no-verify` is passed, so no separate verify call is needed. Do not set
       remaining candidate is the `fix/keycloak-role-authority-mapping` work in
       `shopping-cart-payment` (P3, PR not yet opened).
 
+### Identity app stuck after a rebuild
+
+Seen 2026-10-03 ([incident](../issues/2026-10-03-hub-deleted-by-sandbox-teardown.md)).
+`shopping-cart-identity` stays `OutOfSync/Degraded`, `deployment/keycloak` is never created, and the
+operation message names `ExternalSecret/k3dm-smoke-user`.
+
+1. **The Vault entry must exist.** `bin/cluster-up` and `hub_recovery_reconcile` pre-seed it
+   (`keycloak_smoke_vault_preseed`, `d5b986f4`). To run it on its own:
+   ```bash
+   ./scripts/k3d-manager keycloak_smoke_vault_preseed
+   ```
+   `make hub-recover` now performs both the ESO refresh and failed identity-sync retry; the manual commands remain for a hub where reconcile is not run.
+2. **Make ESO re-read Vault.** The refresh interval is 15 minutes, so a just-written entry is not seen yet:
+   ```bash
+   kubectl --context k3d-k3d-cluster -n identity annotate externalsecret k3dm-smoke-user force-sync="$(date +%s)" --overwrite
+   ```
+   Wait until `kubectl --context k3d-k3d-cluster -n identity get externalsecret k3dm-smoke-user` shows `SecretSynced`.
+3. **Start a sync yourself.** Auto-sync does not retry a revision whose last sync failed, and
+   re-applying the same Application does not start one:
+   ```bash
+   kubectl --context k3d-k3d-cluster -n cicd patch app shopping-cart-identity --type merge -p '{"operation":{"sync":{}}}'
+   ```
+4. Keycloak takes about 4 minutes to start. Done when `deploy/keycloak` is `1/1` and the app is `Synced/Healthy`.
+
 ### 6. Aftermath
 
 - [ ] Re-mint the ArgoCD Hermes token — Hermes logs
@@ -259,6 +319,17 @@ unless `--no-verify` is passed, so no separate verify call is needed. Do not set
 - [ ] Stale generated ACG Applications (`istio-{base,cni}-ubuntu-k3s`, `istiod-ubuntu-k3s`) have no
       `ubuntu-k3s` context. Delete the registration Secret **before** the Applications.
 - [ ] Update `memory-bank/activeContext.md` with the outcome.
+
+## Data is not restored — DR drill (planned, v1.43.0)
+
+`make hub-recover` restores credentials and local agents only. Keycloak users, LDAP entries and
+Vault KV that has no Keychain mirror are regenerated, not restored. Weekly proof that hub data
+restores quickly is planned in [`docs/plans/v1.43.0-hub-dr-drill.md`](../plans/v1.43.0-hub-dr-drill.md):
+- an encrypted data export to a private git repo;
+- a restore onto the right node in a throwaway drill hub on the M2;
+- a quarterly real-hub drill.
+
+None of it is built yet. Its operator runbook will be `docs/howto/hub-dr-drill.md`.
 
 ## If a rebuild is refused
 

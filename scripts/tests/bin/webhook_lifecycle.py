@@ -1,6 +1,8 @@
 import importlib.util
+import os
 import tempfile
 import threading
+import time
 import unittest
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -46,6 +48,7 @@ class WebhookLifecycleTests(unittest.TestCase):
                 "make_job_lock": self.lock,
             },
         )
+        lifecycle._run_cleanup = lambda *args: None
 
     def tearDown(self):
         if self.lock.locked():
@@ -55,35 +58,45 @@ class WebhookLifecycleTests(unittest.TestCase):
     def _spawn_job(self, cmd, output_path, cwd=None, env=None):
         self.spawned.append((cmd, output_path, cwd, env))
         Path(output_path).write_text("")
-        return 4242
+        return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}))
 
     def test_make_target_passes_validated_argv_as_a_list(self):
-        captured = []
-        lifecycle._spawn_capture_text = lambda cmd, **kwargs: (captured.append((cmd, kwargs)) or (0, "ok\n", False))
         job_id = "a1b2c3d4"
         (lifecycle.JOB_DIR / job_id).mkdir()
         lifecycle._run_make_target(job_id, ["app-cve-scan", "CRONJOB=app-cve-scan"], 731, "actor-1")
-        self.assertEqual(captured[0][0], ["make", "--no-print-directory", "app-cve-scan", "CRONJOB=app-cve-scan"])
-        self.assertEqual(captured[0][1]["timeout"], 731)
-        self.assertEqual(captured[0][1]["cwd"], lifecycle.REPO_ROOT)
+        self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "app-cve-scan", "CRONJOB=app-cve-scan"])
+        self.assertEqual(self.spawned[0][2], lifecycle.REPO_ROOT)
         self.assertTrue(any("actor-1" in text for _, text in self.notifications))
-        self.assertTrue(all(isinstance(value, list) for value, _ in captured))
 
     def test_make_target_never_uses_shell_or_concatenated_command(self):
-        captured = []
-        lifecycle._spawn_capture_text = lambda cmd, **kwargs: (captured.append(cmd) or (0, "", False))
         job_id = "a1b2c3d5"
         (lifecycle.JOB_DIR / job_id).mkdir()
         lifecycle._run_make_target(job_id, ["fix-list"], 12, "actor")
-        self.assertEqual(captured, [["make", "--no-print-directory", "fix-list"]])
+        self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "fix-list"])
 
-    def test_make_target_passes_timeout_to_transport(self):
-        captured = []
-        lifecycle._spawn_capture_text = lambda cmd, **kwargs: (captured.append(kwargs) or (0, "", False))
+    def test_make_target_times_out_and_kills_the_job(self):
         job_id = "a1b2c3d8"
-        (lifecycle.JOB_DIR / job_id).mkdir()
-        lifecycle._run_make_target(job_id, ["fix-list"], 947, "actor")
-        self.assertEqual(captured[0]["timeout"], 947)
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+        child = {}
+
+        def spawn_long_running_job(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("")
+            child["pid"] = lifecycle.os.posix_spawn(
+                "/bin/sleep", ["sleep", "30"], dict(env or {}), setsid=True
+            )
+            return child["pid"]
+
+        lifecycle._spawn_job = spawn_long_running_job
+        started = time.monotonic()
+        lifecycle._run_make_target(job_id, ["fix-list"], 0.3, "actor")
+        elapsed = time.monotonic() - started
+
+        self.assertEqual((job_dir / "status").read_text(), "failed")
+        self.assertTrue(any("timed out after" in text for _, text in self.notifications))
+        self.assertLess(elapsed, 5)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child["pid"], 0)
 
     def test_make_target_includes_actor_in_audit_notification(self):
         lifecycle._spawn_capture_text = lambda cmd, **kwargs: (0, "", False)
@@ -94,12 +107,22 @@ class WebhookLifecycleTests(unittest.TestCase):
 
     def test_cluster_provider_defaults_to_aws_for_unknown_value(self):
         (lifecycle.JOB_DIR / "a1b2c3d6").mkdir()
-        lifecycle.os.waitpid = lambda pid, options: (pid, 0)
-        lifecycle.os.WIFEXITED = lambda status: True
-        lifecycle.os.WEXITSTATUS = lambda status: 0
-        lifecycle.os.killpg = lambda pid, signal: None
-        lifecycle._run_cluster("a1b2c3d6", "up", provider="not-a-provider", dry_run=True)
-        self.assertEqual(self.spawned[0][0], ["make", "up", "CLUSTER_PROVIDER=k3s-aws"])
+        original_waitpid = lifecycle.os.waitpid
+        original_wifexited = lifecycle.os.WIFEXITED
+        original_wexitstatus = lifecycle.os.WEXITSTATUS
+        original_killpg = lifecycle.os.killpg
+        try:
+            lifecycle.os.waitpid = lambda pid, options: (pid, 0)
+            lifecycle.os.WIFEXITED = lambda status: True
+            lifecycle.os.WEXITSTATUS = lambda status: 0
+            lifecycle.os.killpg = lambda pid, signal: None
+            lifecycle._run_cluster("a1b2c3d6", "up", provider="not-a-provider", dry_run=True)
+            self.assertEqual(self.spawned[0][0], ["make", "up", "CLUSTER_PROVIDER=k3s-aws"])
+        finally:
+            lifecycle.os.waitpid = original_waitpid
+            lifecycle.os.WIFEXITED = original_wifexited
+            lifecycle.os.WEXITSTATUS = original_wexitstatus
+            lifecycle.os.killpg = original_killpg
 
     def test_cluster_refuses_a_concurrent_job(self):
         calls = []
@@ -109,6 +132,117 @@ class WebhookLifecycleTests(unittest.TestCase):
         lifecycle._run_cluster("a1b2c3d7", "up", provider="aws", dry_run=True)
         self.assertEqual(calls, [])
         self.assertTrue(any("already running" in text for _, text in self.notifications))
+
+    def test_cluster_timeout_kills_sleep_and_marks_failed(self):
+        job_id = "a1b2c3e0"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+        child = {}
+
+        def spawn_long_running_job(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("")
+            child["pid"] = lifecycle.os.posix_spawn(
+                "/bin/sleep", ["sleep", "60"], dict(env or {}), setsid=True
+            )
+            return child["pid"]
+
+        lifecycle._spawn_job = spawn_long_running_job
+        lifecycle._posix_spawn_job = spawn_long_running_job
+        old_timeout = os.environ.get("K3DM_CLUSTER_UP_TIMEOUT")
+        os.environ["K3DM_CLUSTER_UP_TIMEOUT"] = "1"
+        try:
+            started = time.monotonic()
+            lifecycle._run_cluster(job_id, "up")
+            elapsed = time.monotonic() - started
+        finally:
+            if old_timeout is None:
+                os.environ.pop("K3DM_CLUSTER_UP_TIMEOUT", None)
+            else:
+                os.environ["K3DM_CLUSTER_UP_TIMEOUT"] = old_timeout
+
+        self.assertLess(elapsed, 40)
+        self.assertEqual((job_dir / "status").read_text(), "failed")
+        self.assertIn("timed out after 1s", (job_dir / "output").read_text())
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child["pid"], 0)
+
+    def test_cluster_normal_exit_is_success(self):
+        job_id = "a1b2c3e1"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+
+        def spawn_quick_job(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("")
+            return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}), setsid=True)
+
+        lifecycle._spawn_job = spawn_quick_job
+        lifecycle._posix_spawn_job = spawn_quick_job
+        lifecycle._run_cluster(job_id, "up", dry_run=True)
+        self.assertEqual((job_dir / "status").read_text(), "success")
+
+    def test_cluster_timeout_escalates_to_sigkill(self):
+        job_id = "a1b2c3e2"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+        child = {}
+
+        def spawn_term_resistant_job(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("")
+            child["pid"] = lifecycle.os.posix_spawn(
+                "/bin/sh", ["sh", "-c", "trap '' TERM; exec sleep 60"],
+                dict(env or {}), setsid=True
+            )
+            return child["pid"]
+
+        lifecycle._spawn_job = spawn_term_resistant_job
+        lifecycle._posix_spawn_job = spawn_term_resistant_job
+        old_timeout = os.environ.get("K3DM_CLUSTER_UP_TIMEOUT")
+        os.environ["K3DM_CLUSTER_UP_TIMEOUT"] = "1"
+        try:
+            started = time.monotonic()
+            lifecycle._run_cluster(job_id, "up")
+            elapsed = time.monotonic() - started
+        finally:
+            if old_timeout is None:
+                os.environ.pop("K3DM_CLUSTER_UP_TIMEOUT", None)
+            else:
+                os.environ["K3DM_CLUSTER_UP_TIMEOUT"] = old_timeout
+
+        self.assertLess(elapsed, 40)
+        self.assertEqual((job_dir / "status").read_text(), "failed")
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child["pid"], 0)
+
+    def test_cluster_timeout_defaults_and_bridge_bounds(self):
+        bridge_spec = importlib.util.spec_from_loader(
+            "k3dm_cloud_bridge",
+            SourceFileLoader("k3dm_cloud_bridge", str(ROOT / "bin" / "k3dm-cloud-bridge")),
+        )
+        bridge = importlib.util.module_from_spec(bridge_spec)
+        bridge_spec.loader.exec_module(bridge)
+        old_up = os.environ.get("K3DM_CLUSTER_UP_TIMEOUT")
+        old_down = os.environ.get("K3DM_CLUSTER_DOWN_TIMEOUT")
+        try:
+            os.environ.pop("K3DM_CLUSTER_UP_TIMEOUT", None)
+            os.environ.pop("K3DM_CLUSTER_DOWN_TIMEOUT", None)
+            self.assertEqual(lifecycle._cluster_job_timeout("up"), 3300)
+            self.assertEqual(lifecycle._cluster_job_timeout("down"), 1500)
+            os.environ["K3DM_CLUSTER_UP_TIMEOUT"] = "17"
+            os.environ["K3DM_CLUSTER_DOWN_TIMEOUT"] = "19"
+            self.assertEqual(lifecycle._cluster_job_timeout("up"), 17)
+            self.assertEqual(lifecycle._cluster_job_timeout("down"), 19)
+            os.environ["K3DM_CLUSTER_UP_TIMEOUT"] = "not-an-int"
+            os.environ["K3DM_CLUSTER_DOWN_TIMEOUT"] = "not-an-int"
+            self.assertEqual(lifecycle._cluster_job_timeout("up"), 3300)
+            self.assertEqual(lifecycle._cluster_job_timeout("down"), 1500)
+            self.assertLess(3300, bridge.LIFECYCLE_TIMEOUTS["sandbox-up"])
+            self.assertLess(1500, bridge.LIFECYCLE_TIMEOUTS["sandbox-down"])
+        finally:
+            for name, value in (("K3DM_CLUSTER_UP_TIMEOUT", old_up), ("K3DM_CLUSTER_DOWN_TIMEOUT", old_down)):
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
 
 
 if __name__ == "__main__":

@@ -1135,6 +1135,20 @@ function _ubuntu_k3s_trust_host() {
   _info "[shopping_cart] Trusted host key for ${host}"
 }
 
+function _ubuntu_k3s_wait_ssh_ready() {
+  local host="$1" ssh_user="$2" ssh_key="$3"
+  local budget="${K3DM_SSH_READY_TIMEOUT:-180}" waited=0
+  until ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o BatchMode=yes -o ConnectTimeout=10 "${ssh_user}@${host}" true >/dev/null 2>&1; do
+    if (( waited >= budget )); then
+      _err "[shopping_cart] ${ssh_user}@${host} did not answer SSH within ${budget}s — node unresponsive; not starting k3sup"
+      return 1
+    fi
+    sleep 10
+    (( waited += 10 ))
+  done
+}
+
 function _k3sup_join_agent() {
   local agent_host="$1" server_ip="$2"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
@@ -1148,12 +1162,15 @@ function _k3sup_join_agent() {
   : "${agent_ip:=${agent_host}}"
   _info "[shopping_cart] Joining agent ${agent_host} (${agent_ip}) to server ${server_ip}..."
   _ubuntu_k3s_trust_host "${agent_ip}"
+  local _agent_extra_args="${K3S_KUBELET_RESERVED_ARGS:-}"
+  [[ -n "${_agent_extra_args}" ]] || _agent_extra_args='--kubelet-arg=system-reserved=memory=256Mi --kubelet-arg=kube-reserved=memory=256Mi'
   _run_command -- k3sup join \
     --ip "${agent_ip}" \
     --server-ip "${server_ip}" \
     --user "${ssh_user}" \
     --ssh-key "${ssh_key}" \
-    --k3s-version "${K3S_VERSION:-v1.32.0+k3s1}"
+    --k3s-version "${K3S_VERSION:-v1.32.0+k3s1}" \
+    --k3s-extra-args "${_agent_extra_args}"
   _info "[shopping_cart] Agent ${agent_host} joined."
 }
 
@@ -1403,7 +1420,11 @@ HELP
 
   _info "[shopping_cart] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
   _ubuntu_k3s_trust_host "${external_ip}"
+  _ubuntu_k3s_wait_ssh_ready "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
   local _k3s_extra_args='--disable traefik --disable servicelb'
+  local _kubelet_reserved="${K3S_KUBELET_RESERVED_ARGS:-}"
+  [[ -n "${_kubelet_reserved}" ]] || _kubelet_reserved='--kubelet-arg=system-reserved=memory=256Mi --kubelet-arg=kube-reserved=memory=256Mi'
+  _k3s_extra_args="${_k3s_extra_args} ${_kubelet_reserved}"
   if [[ "${K3S_AMBIENT_MESH:-false}" == "true" ]]; then
     _k3s_extra_args="${_k3s_extra_args} --flannel-backend=none --disable-network-policy"
     _info "[shopping_cart] K3S_AMBIENT_MESH=true — flannel disabled; Cilium will be installed as CNI"
@@ -1420,7 +1441,8 @@ HELP
   # Copy system kubeconfig to user home so add_ubuntu_k3s_cluster can read it without sudo
   # SC2087: single-quoted heredoc intentionally prevents local expansion
   # shellcheck disable=SC2087
-  _run_command -- ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${ssh_user}@${external_ip}" bash <<'REMOTE'
+  _run_command -- ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 "${ssh_user}@${external_ip}" bash <<'REMOTE'
 SUDO="sudo"
 mkdir -p "${HOME}/.kube"
 $SUDO cp /etc/rancher/k3s/k3s.yaml "${HOME}/.kube/k3s.yaml"
@@ -1602,4 +1624,125 @@ function _ssm_bootstrap_k3s() {
 
   _info "[shopping_cart] k3s install complete (SSM mode)."
   _info "[shopping_cart] Note: Vault reverse bridge not available in SSM mode."
+}
+
+_SHOPPING_CART_CRED_STORES=(
+  "postgres-orders|postgres|shopping-cart-data/postgres-orders-admin|postgresql-orders-0|shopping-cart-apps/order-service"
+  "postgres-products|postgres|shopping-cart-data/postgres-products-admin|postgresql-products-0|shopping-cart-apps/product-catalog"
+  "postgres-payment|postgres|shopping-cart-data/postgres-payment-admin|postgresql-payment-0|shopping-cart-payment/payment-service"
+  "rabbitmq|rabbitmq|shopping-cart-data/rabbitmq-credentials|rabbitmq-0|shopping-cart-apps/order-service shopping-cart-apps/product-catalog shopping-cart-payment/payment-service"
+  "redis-cart|redis|shopping-cart-data/redis-cart-secret|redis-cart-0|shopping-cart-apps/basket-service"
+  "redis-orders-cache|redis|shopping-cart-data/redis-orders-cache-secret|redis-orders-cache-0|"
+)
+
+function _shopping_cart_cred_secret_b64() {
+  local ctx="$1" sref="$2" key="$3"
+  kubectl --context "$ctx" -n "${sref%%/*}" get secret "${sref#*/}" -o "jsonpath={.data.${key}}"
+}
+
+function _shopping_cart_cred_check() {
+  local ctx="$1" kind="$2" sref="$3" pod="$4" user
+  case "$kind" in
+    postgres)
+      # shellcheck disable=SC2016
+      _shopping_cart_cred_secret_b64 "$ctx" "$sref" password \
+        | kubectl --context "$ctx" -n shopping-cart-data exec -i "$pod" -- \
+            sh -c 'p=$(base64 -d); PGPASSWORD="$p" psql -h "$(hostname -i)" -U postgres -tAc "select 1" >/dev/null 2>&1'
+      ;;
+    rabbitmq)
+      user=$(_shopping_cart_cred_secret_b64 "$ctx" "$sref" username | base64 -d)
+      # shellcheck disable=SC2016
+      _shopping_cart_cred_secret_b64 "$ctx" "$sref" password \
+        | kubectl --context "$ctx" -n shopping-cart-data exec -i "$pod" -c rabbitmq -- \
+            sh -c 'p=$(base64 -d); rabbitmqctl -q authenticate_user "$1" "$p" >/dev/null 2>&1' sh "$user"
+      ;;
+    redis)
+      # shellcheck disable=SC2016
+      _shopping_cart_cred_secret_b64 "$ctx" "$sref" password \
+        | kubectl --context "$ctx" -n shopping-cart-data exec -i "$pod" -- \
+            sh -c 'REDISCLI_AUTH="$(base64 -d)" redis-cli --no-auth-warning ping 2>/dev/null | grep -qx PONG'
+      ;;
+  esac
+}
+
+function _shopping_cart_cred_apply() {
+  local ctx="$1" kind="$2" sref="$3" pod="$4" user
+  case "$kind" in
+    postgres)
+      # shellcheck disable=SC2016
+      _shopping_cart_cred_secret_b64 "$ctx" "$sref" password \
+        | kubectl --context "$ctx" -n shopping-cart-data exec -i "$pod" -- \
+            sh -c 'p=$(base64 -d); printf "%s\n" "ALTER USER postgres PASSWORD :'\''pw'\'';" | psql -U postgres -q -v ON_ERROR_STOP=1 -v pw="$p" >/dev/null'
+      ;;
+    rabbitmq)
+      user=$(_shopping_cart_cred_secret_b64 "$ctx" "$sref" username | base64 -d)
+      # shellcheck disable=SC2016
+      _shopping_cart_cred_secret_b64 "$ctx" "$sref" password \
+        | kubectl --context "$ctx" -n shopping-cart-data exec -i "$pod" -c rabbitmq -- \
+            sh -c 'p=$(base64 -d); rabbitmqctl -q change_password "$1" "$p" >/dev/null' sh "$user"
+      ;;
+    redis)
+      kubectl --context "$ctx" -n shopping-cart-data rollout restart "statefulset/${pod%-0}" >/dev/null \
+        && kubectl --context "$ctx" -n shopping-cart-data rollout status "statefulset/${pod%-0}" --timeout=180s >/dev/null
+      ;;
+  esac
+}
+
+function shopping_cart_credential_drift() {
+  local ctx="" apply=0 entry name kind sref pod consumers c drift=0 failed=0
+  local -a restart=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --context) ctx="${2:-}"; shift 2 ;;
+      --apply) apply=1; shift ;;
+      -h|--help)
+        echo "Usage: shopping_cart_credential_drift --context <kube-context> [--apply]"
+        echo "Checks each shopping-cart DB/broker/cache password against the Secret its apps read."
+        echo "--apply resets drifted stores to the Secret value and restarts their consumers."
+        return 0 ;;
+      *) _err "[cred-drift] unknown argument: $1"; return 2 ;;
+    esac
+  done
+  [[ -n "$ctx" ]] || { _err "[cred-drift] --context is required"; return 2; }
+
+  for entry in "${_SHOPPING_CART_CRED_STORES[@]}"; do
+    IFS='|' read -r name kind sref pod consumers <<<"$entry"
+    if ! kubectl --context "$ctx" -n shopping-cart-data get pod "$pod" >/dev/null 2>&1; then
+      _info "[cred-drift] ${name}: SKIP (pod ${pod} not found)"
+      continue
+    fi
+    if _shopping_cart_cred_check "$ctx" "$kind" "$sref" "$pod"; then
+      _info "[cred-drift] ${name}: MATCH"
+      continue
+    fi
+    drift=1
+    if [[ "$apply" -eq 0 ]]; then
+      _info "[cred-drift] ${name}: DRIFT (consumers to restart on --apply: ${consumers:-none})"
+      continue
+    fi
+    if _shopping_cart_cred_apply "$ctx" "$kind" "$sref" "$pod" \
+        && _shopping_cart_cred_check "$ctx" "$kind" "$sref" "$pod"; then
+      _info "[cred-drift] ${name}: FIXED"
+      for c in $consumers; do
+        [[ " ${restart[*]} " == *" ${c} "* ]] || restart+=("$c")
+      done
+    else
+      _err "[cred-drift] ${name}: FAILED to reconcile"
+      failed=1
+    fi
+  done
+
+  for c in "${restart[@]}"; do
+    _info "[cred-drift] restarting ${c}"
+    # shellcheck disable=SC2015
+    kubectl --context "$ctx" -n "${c%%/*}" rollout restart "deployment/${c#*/}" >/dev/null \
+      && kubectl --context "$ctx" -n "${c%%/*}" rollout status "deployment/${c#*/}" --timeout=300s >/dev/null \
+      || { _err "[cred-drift] ${c} did not become ready"; failed=1; }
+  done
+
+  [[ "$failed" -eq 0 ]] || return 1
+  if [[ "$apply" -eq 0 && "$drift" -eq 1 ]]; then
+    return 1
+  fi
+  return 0
 }

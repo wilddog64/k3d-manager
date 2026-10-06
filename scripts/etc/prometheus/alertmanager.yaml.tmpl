@@ -17,6 +17,10 @@ route:
       receiver: 'null'
     - matchers:
         - severity = critical
+        - cluster =~ "acg|ubuntu-k3s"
+      receiver: platform-warning
+    - matchers:
+        - severity = critical
       receiver: sms-critical
     - matchers:
         - alertname =~ "KubeJobFailed|KubeJobNotCompleted|E2EVerificationFailing|E2EVerificationStale|PrometheusDuplicateTimestamps"

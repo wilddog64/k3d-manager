@@ -1,4 +1,4 @@
-# Cloud Session Requests — asking the local k3dm webhook for read-only state
+# Cloud Session Requests — asking the local k3dm webhook for state and scoped e2e runs
 
 Architecture and trust boundaries: [docs/architecture/cloud-bridge.md](../architecture/cloud-bridge.md).
 
@@ -19,8 +19,9 @@ tunnel, and do not ask the operator to paste a token into your environment — t
 refused by policy, not by accident.
 
 What you *can* do is **leave a request on a git branch and come back for the answer.** A poller
-on the operator's machine reads the branch every 60 seconds, calls the webhook with a read-only
-credential you never see, and commits the response back.
+on the operator's machine reads the branch every 5 seconds while active, then every 60 seconds
+after 10 minutes idle, calls the webhook with a read-only credential you never see, and commits
+the response back.
 
 ```bash
 bin/k3dm-cloud-request cluster-status          # files the request, prints the id
@@ -60,6 +61,8 @@ is rejected by the bridge without being executed.
 | `health` | none | per-service smoke results plus `all_ok` |
 | `cluster-status` | none | the hub/app cluster status summary |
 | `hostinger-status` | none | the hostinger cluster status |
+| `sandbox-up` | none | bring up the disposable ACG sandbox only |
+| `sandbox-down` | none | tear down the disposable ACG sandbox while keeping the hub |
 | `job-status` | `job_id` | status and the last 2000 bytes of output for one webhook job |
 | `make-fix-list` | none | the list of fix targets |
 | `make-fix-status` | `NS` | node + pod status for a namespace |
@@ -67,6 +70,8 @@ is rejected by the bridge without being executed.
 | `make-observability-status` | none | monitoring/trivy-system pods, both clusters |
 | `make-vuln-scan` | none | VulnerabilityReport summary |
 | `make-e2e-runner-health` | none | hub vs remote-runner health |
+| `make-e2e-remote` | `RUNNER` | Tier 1 e2e on the named remote runner |
+| `make-e2e` | none | Tier 1 e2e in a disposable vCluster |
 | `make-test` | none | the BATS dispatcher suites (`./scripts/k3d-manager test all`), ~15 min |
 | `make-test-bin` | none | the BATS suites under `scripts/tests/bin`, ~1 min |
 | `make-test-pytest` | none | the offline pytest suites (hermes + `scripts/tests/bin/test_*.py`), ~1.5 min; publishes `junit.xml` |
@@ -75,7 +80,20 @@ is rejected by the bridge without being executed.
 | `make-test-all` | none | every offline suite (BATS + Python), ~20 min |
 | `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
 
-`job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected.
+`job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected. `sandbox-up` and `sandbox-down`
+always use the ACG sandbox provider; they cannot accept a provider or other argument. They never
+touch the local hub or Hostinger app cluster. `sandbox-down` keeps the hub. An expired Pluralsight
+session is renewed automatically from the Keychain item `k3dm-acg-pluralsight`; only if that
+automatic login fails (for example an MFA prompt) does `sandbox-up` stop with `ACG_SESSION_EXPIRED`
+and need the operator. A `409` means a cluster
+job is already running; wait for it to finish before trying again. Use `--wait-final` to follow the
+queued lifecycle job through its terminal response. The two e2e actions are
+cloud-runner capabilities rather than reader actions; the bridge uses its separate scoped
+credential for them. `make-e2e` does not accept a digest through this interface.
+
+The webhook ends a cluster job after 55 minutes for `sandbox-up` or 25 minutes for `sandbox-down`
+and marks it `failed`; a node that never answers SSH fails `sandbox-up` within about 3 minutes.
+After either failure, the agent can request `sandbox-down`.
 
 **The test targets run on macOS, which is why they are worth asking for.** The host has BSD
 `sed`, `stat`, `grep` and `date`; your sandbox is Linux. A suite that is green in your sandbox can
@@ -93,8 +111,20 @@ bin/k3dm-cloud-request --wait make-test-pytest            # -> body.job_id, e.g.
 bin/k3dm-cloud-request --wait job-status --arg job_id=1a2b3c4d
 ```
 
-Repeat `job-status` until `body.status` is `success` or `failed`. That first terminal
-`job-status` also carries the diagnostic `artifacts` described below.
+Repeat `job-status` until `body.status` is `success` or `failed`. The bridge can now follow jobs
+it started: `--wait-final` waits for `responses/<id>.final.json` and prints the terminal response
+with any diagnostic `artifacts` described below.
+
+```bash
+bin/k3dm-cloud-request --wait-final make-test-pytest
+```
+
+Slow `health` requests run on the bridge's single background HTTP worker, so they do not block
+other requests. The worker never writes git commits; the main thread commits responses. Only one
+slow request runs at a time, in filing order. Queued Make responses are recorded in
+`ledger/watching.txt`; watched jobs are followed through the reader-token `job-status` path and
+removed when their `.final.json` response is committed. A job that exceeds its declared timeout
+plus ten minutes receives a final `watch expired` response.
 
 ### Read-only cluster diagnostics
 
@@ -133,11 +163,20 @@ another AI's prompt chains two injection surfaces together, which is exactly wha
 own `_INJECTION_RE` filter exists to prevent. Adding either one back requires its own spec and
 the operator's decision.
 
-The reader-tier `make` targets in the table above are reachable through mechanism 1. Every operator and
-admin target remains refused through this channel: the bridge presents a reader credential that
-the webhook will not accept for it, and the branch's content never becomes a command. Concrete
-examples still refused are `sync-apps`, `fix-restart`, `fix-sync`, `e2e-remote` and
-`app-cve-scan`. If you need one of those, ask the operator to run it.
+The reader-tier `make` targets in the table above are reachable through mechanism 1. Every other
+operator and admin target remains refused through this channel. The two e2e actions are the only
+exception and are authorized by the scoped `cloud-runner` credential; `e2e-sandbox`, `e2e-replay`,
+`e2e-runner-unlock`, `sync-apps`, `fix-restart`, `fix-sync` and `app-cve-scan` remain refused.
+If you need one of those, ask the operator to run it.
+
+### Remote-runner contention
+
+`make-e2e-remote` is asynchronous like every other make action. The initial response is a queued
+job; poll it with `job-status`. The remote dispatcher atomically claims the runner lock. If the
+runner is already in use, the job becomes `failed` and its output says `runner <name> is busy
+(lock held)` followed by the lock metadata, including the `owner=` token. Ask the operator whose
+run is named to resolve the contention. Never unlock the runner from a cloud session, and never
+retry by probing or clearing the lock.
 
 ## Filing a request by hand
 
@@ -226,25 +265,26 @@ fetch.
 ## The helper
 
 ```
-bin/k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS]
+bin/k3dm-cloud-request <action> [--arg key=value ...] [--wait] [--timeout SECONDS] [--poll-interval SECONDS]
 ```
 
 - files a request on `cloud-requests` and prints the id on stdout
-- `--wait` polls `responses/<id>.json` (default timeout 300s, poll interval 30s) and prints the
-  response JSON on stdout
+- `--wait` polls `responses/<id>.json` (default timeout 300s, `--poll-interval` 5s) and prints
+  the response JSON on stdout; it checks immediately before its first sleep
 - exit 0 = response received with `status: ok`; 3 = `rejected`; 4 = `error`; 5 = timed out with
   no response; 2 = bad usage (unknown action, malformed `--arg`)
 
 Two limits worth knowing before you wonder why nothing happened. The bridge rejects any request
-file of 8 KiB or more without parsing it, and it processes at most 10 requests per 60-second tick —
-file twenty and the rest wait for the next tick. Separately, `health` runs the full smoke sweep,
+file of 8 KiB or more without parsing it, and it processes at most 10 requests per tick — file
+twenty and the rest wait for the next tick. The first request after a long idle period can still
+wait up to 60 seconds. Separately, `health` runs the full smoke sweep,
 including the browser login probes, so it is the slowest action by a wide margin and
 can legitimately take minutes; `job-status` and the two `-status` actions return promptly. If you
 are polling `health` with a short `--timeout`, raise it rather than assuming the bridge is stuck.
 
 It needs no credential and no environment variables beyond the git access the session already
 has. That is the practical payoff of the pull design. The accepted actions and their arguments
-are the thirteen listed in the table above; the helper derives its choices and validation from the
+are the twenty-seven listed in the table above; the helper derives its choices and validation from the
 same shared table as the bridge.
 
 A cloud session still needs permission to *run* it. `.claude/settings.json` is committed and
@@ -283,10 +323,18 @@ the only thing standing between that branch and the webhook.
 | credential | source | used by | can do |
 |---|---|---|---|
 | `k3dm-webhook-token` | env `K3DM_WEBHOOK_TOKEN`, Keychain, then `TOKEN_FILE` | Slack relay, `make` targets, you | everything, including cluster mutation |
-| `k3dm-webhook-token-reader` | env `K3DM_WEBHOOK_TOKEN_READER`, Keychain only | the cloud bridge, nothing else | reader-level routes only |
+| `k3dm-webhook-token-reader` | env `K3DM_WEBHOOK_TOKEN_READER`, Keychain only | the cloud bridge's reader actions | reader-level routes only |
+| `k3dm-webhook-token-cloud-runner` | env `K3DM_WEBHOOK_TOKEN_CLOUD_RUNNER`, Keychain only | the cloud bridge's e2e and ACG sandbox lifecycle actions | `e2e-remote`, `e2e`, `cluster-up@aws` and `cluster-down@aws` only |
 
 The reader token deliberately has **no `TOKEN_FILE` fallback** — sharing that file would make the
 two roles the same secret.
+
+The operator provisions `k3dm-webhook-token-cloud-runner` separately for the bridge. It is read
+from `K3DM_WEBHOOK_TOKEN_CLOUD_RUNNER` or the login Keychain service of the same name; it has no
+`TOKEN_FILE` fallback and its value must never be pasted into a cloud session, repository, command
+line, or log. The webhook grants it only the explicit e2e target names and provider-bound
+`cluster-up@aws` / `cluster-down@aws` policies above; it is not an `operator` rank. The provider
+binding ensures this credential cannot reach Hostinger, another provider, or `kill`.
 
 The role now comes from *which credential authenticated*, not from the `X-K3DM-Role` header. A
 header can only ever **narrow** a role; the credential sets the ceiling. Before this change the

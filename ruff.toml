@@ -1,0 +1,7 @@
+[lint]
+select = ["F"]
+
+[lint.per-file-ignores]
+# These names are injected by configure_runtime() through globals().update(...); replacing the
+# injection with explicit parameters is a separate refactor.
+"scripts/lib/webhook/lifecycle.py" = ["F821"]

@@ -40,6 +40,33 @@ setup() {
   declare -F _keycloak_reconcile_realm_client >/dev/null
 }
 
+@test "smoke admin Secret falls back to keycloak-secrets" {
+  _kubectl() {
+    case "$*" in
+      *"get secret keycloak-admin-secret"*) return 1 ;;
+      *"get secret keycloak-secrets"*) return 0 ;;
+    esac
+    return 1
+  }
+  run _keycloak_smoke_admin_secret_name identity keycloak-admin-secret
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "keycloak-secrets" ]
+}
+
+@test "smoke admin Secret keeps preferred Secret when both exist" {
+  _kubectl() { return 0; }
+  run _keycloak_smoke_admin_secret_name identity keycloak-admin-secret
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "keycloak-admin-secret" ]
+}
+
+@test "smoke admin Secret keeps preferred Secret when neither exists" {
+  _kubectl() { return 1; }
+  run _keycloak_smoke_admin_secret_name identity keycloak-admin-secret
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "keycloak-admin-secret" ]
+}
+
 @test "_keycloak_reconcile_realm_client updates argocd redirect URIs" {
   local realm_json="$BATS_TEST_TMPDIR/realm-shopping-cart.json"
   local realm_src
@@ -141,6 +168,7 @@ setup_smoke_stubs() {
   export SMOKE_OWNER_JSON="${3:-}"
   [[ -n "$SMOKE_OWNER_JSON" ]] || export SMOKE_OWNER_JSON='{}'
   export SMOKE_VAULT_PUT_RC="${4:-0}"
+  export SMOKE_EXTERNALSECRET_EXISTS="${5:-0}"
   export SMOKE_KUBECTL_LOG="$BATS_TEST_TMPDIR/smoke-kubectl.log"
   : > "$SMOKE_KUBECTL_LOG"
 
@@ -173,6 +201,10 @@ setup_smoke_stubs() {
       *"get secret k3dm-smoke-user"*"-o json"*)
         printf '%s' "$SMOKE_OWNER_JSON"
         return 0
+        ;;
+      *"get externalsecret k3dm-smoke-user"*)
+        [[ "$SMOKE_EXTERNALSECRET_EXISTS" == 1 ]]
+        return $?
         ;;
       *"get secret openldap-admin"*)
         printf 'bGRhcC1wYXNz'
@@ -207,6 +239,58 @@ setup_smoke_stubs() {
   run grep -q 'generated-password' "$SMOKE_KUBECTL_LOG"
   [ "$status" -ne 0 ]
   run grep -q 'ARGV.*vault-password' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "smoke Vault preseed writes absent entry with four fields and a 48-hex password" {
+  setup_smoke_stubs
+  openssl() { printf '0123456789abcdef0123456789abcdef0123456789abcdef'; }
+  run keycloak_smoke_vault_preseed
+  [ "$status" -eq 0 ]
+  grep -q '"username": "k3dm-smoke"' "$SMOKE_KUBECTL_LOG"
+  grep -q '"password": "0123456789abcdef0123456789abcdef0123456789abcdef"' "$SMOKE_KUBECTL_LOG"
+  grep -q '"realm": "shopping-cart"' "$SMOKE_KUBECTL_LOG"
+  grep -q '"client": "k3dm-smoke"' "$SMOKE_KUBECTL_LOG"
+  run grep -q 'ARGV.*0123456789abcdef' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *0123456789abcdef* ]]
+}
+
+@test "smoke Vault preseed leaves present entry untouched" {
+  setup_smoke_stubs present-password
+  _info() { printf '%s\n' "$*" >> "$SMOKE_KUBECTL_LOG"; }
+  run keycloak_smoke_vault_preseed
+  [ "$status" -eq 0 ]
+  run grep -q 'vault kv put' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
+  grep -q 'smoke-user Vault entry present' "$SMOKE_KUBECTL_LOG"
+}
+
+@test "smoke Vault preseed forces ESO refresh after a successful put" {
+  setup_smoke_stubs '' '' '{}' 0 1
+  run keycloak_smoke_vault_preseed
+  [ "$status" -eq 0 ]
+  local put_line annotate_line
+  put_line=$(grep -n 'vault kv put' "$SMOKE_KUBECTL_LOG" | cut -d: -f1)
+  annotate_line=$(grep -n 'annotate externalsecret k3dm-smoke-user force-sync=' "$SMOKE_KUBECTL_LOG" | cut -d: -f1)
+  [ -n "$put_line" ]
+  [ -n "$annotate_line" ]
+  [ "$put_line" -lt "$annotate_line" ]
+}
+
+@test "smoke Vault preseed skips ESO refresh when ExternalSecret is absent" {
+  setup_smoke_stubs
+  run keycloak_smoke_vault_preseed
+  [ "$status" -eq 0 ]
+  run grep -q 'annotate externalsecret k3dm-smoke-user' "$SMOKE_KUBECTL_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "smoke Vault preseed skips ESO refresh when the put fails" {
+  setup_smoke_stubs '' '' '{}' 1 1
+  run keycloak_smoke_vault_preseed
+  [ "$status" -ne 0 ]
+  run grep -q 'annotate externalsecret k3dm-smoke-user' "$SMOKE_KUBECTL_LOG"
   [ "$status" -ne 0 ]
 }
 

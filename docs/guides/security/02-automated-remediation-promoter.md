@@ -73,6 +73,10 @@ are the interesting engineering:
   A tag can be repointed; a digest is the immutable bytes. This is also why it's
   called *git-persisted*: the digest is written to the app's frozen target branch,
   so ArgoCD deploys exactly those bytes and the choice survives a resync.
+  Once that commit lands, the promoter removes its live `spec.source.kustomize.images`
+  override from the Application, so git is the only pin and a later manual re-pin takes
+  effect. If git persistence fails, the override stays and shadows git until removed
+  (`docs/bugs/2026-10-02-cve-promoter-live-override-shadows-git-pin.md`).
 - **Fail loud, not green** — missing `VulnerabilityReport`s cause a *non-zero* scan
   result, never a fake success. A remediation loop that false-greens is worse than
   no loop.

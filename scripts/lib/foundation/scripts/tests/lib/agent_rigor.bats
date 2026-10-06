@@ -109,6 +109,95 @@ SCRIPT
   [[ "$output" == *"bare sudo call"* ]]
 }
 
+@test "_agent_audit allows sudo marked agent-audit: remote-sudo" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/remote.sh
+function action() {
+   echo ok
+}
+SCRIPT
+  git add scripts/remote.sh
+  git commit -m "add remote action" >/dev/null
+  cat <<'SCRIPT' >> scripts/remote.sh
+   ssh host "sudo fuser -k -n tcp 8200" # agent-audit: remote-sudo
+SCRIPT
+  git add scripts/remote.sh
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit still flags sudo when the marker is not the trailing comment" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/non_trailing.sh
+function action() {
+   echo ok
+}
+SCRIPT
+  git add scripts/non_trailing.sh
+  git commit -m "add non-trailing action" >/dev/null
+  cat <<'SCRIPT' >> scripts/non_trailing.sh
+   sudo rm -rf /tmp/x # agent-audit: remote-sudo then more
+SCRIPT
+  git add scripts/non_trailing.sh
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"bare sudo call"* ]]
+}
+
+@test "_agent_audit allows _run_command sudo flags after a prefix" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/run_cmd_prefix.sh
+function installer() {
+   echo ok
+}
+SCRIPT
+  git add scripts/run_cmd_prefix.sh
+  git commit -m "add prefixed installer" >/dev/null
+  cat <<'SCRIPT' >> scripts/run_cmd_prefix.sh
+   if ! _run_command --interactive-sudo --quiet -- install -m 644 a b; then :; fi
+   _out=$(_run_command --prefer-sudo -- ls)
+   true && _run_command --require-sudo -- mkdir /tmp/x
+SCRIPT
+  git add scripts/run_cmd_prefix.sh
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit flags sudo after a pipe" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/pipe.sh
+function action() {
+   echo ok
+}
+SCRIPT
+  git add scripts/pipe.sh
+  git commit -m "add pipe action" >/dev/null
+  cat <<'SCRIPT' >> scripts/pipe.sh
+   echo x | sudo tee /etc/x
+SCRIPT
+  git add scripts/pipe.sh
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"bare sudo call"* ]]
+}
+
+@test "_agent_audit flags sudo after a quote" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/quote.sh
+function action() {
+   echo ok
+}
+SCRIPT
+  git add scripts/quote.sh
+  git commit -m "add quote action" >/dev/null
+  cat <<'SCRIPT' >> scripts/quote.sh
+   ssh host "sudo reboot"
+SCRIPT
+  git add scripts/quote.sh
+  run _agent_audit
+  [ "$status" -ne 0 ]
+}
+
 @test "_agent_audit ignores _run_command sudo usage" {
   mkdir -p scripts
   cat <<'SCRIPT' > scripts/run_cmd.sh
@@ -381,6 +470,176 @@ SCRIPT
   export AGENT_LINT_AI_FUNC="_mock_ai"
   _agent_lint
   grep -q "app.js" "$log"
+}
+
+@test "_agent_audit detects removed Python test functions" {
+  mkdir -p tests
+  printf 'def test_one():\n  pass\ndef test_two():\n  pass\n' > tests/test_a.py
+  git add tests/test_a.py
+  git commit -m "add python tests" >/dev/null
+  printf 'def test_one():\n  pass\n' > tests/test_a.py
+  git add tests/test_a.py
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"test functions decreased"* ]]
+}
+
+@test "_agent_audit detects removed Python assertions" {
+  mkdir -p tests
+  printf 'def test_one():\n  assert value\n  self.assertEqual(value, value)\n' > tests/test_a.py
+  git add tests/test_a.py
+  git commit -m "add assertion tests" >/dev/null
+  printf 'def test_one():\n  pass\n' > tests/test_a.py
+  git add tests/test_a.py
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"assertions removed"* ]]
+}
+
+@test "_agent_audit allows added Python test functions" {
+  mkdir -p tests
+  printf 'def test_one():\n  pass\n' > tests/test_a.py
+  git add tests/test_a.py
+  git commit -m "add one python test" >/dev/null
+  printf 'def test_one():\n  pass\ndef test_two():\n  pass\n' > tests/test_a.py
+  git add tests/test_a.py
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit detects deleted Python test files" {
+  mkdir -p tests
+  printf 'def test_one():\n  assert True\n' > tests/test_a.py
+  git add tests/test_a.py
+  git commit -m "add deletable python test" >/dev/null
+  git rm tests/test_a.py >/dev/null
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"test functions decreased"* ]]
+}
+
+@test "_agent_audit detects syntax errors in extensionless Python files" {
+  mkdir -p bin
+  printf '#!/usr/bin/env python3\ndef broken(:\n  pass\n' > bin/tool
+  git add bin/tool
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"bin/tool"* ]]
+}
+
+@test "_agent_audit ignores syntax errors in non-Python files" {
+  printf 'def broken(:\n  pass\n' > notes.txt
+  git add notes.txt
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit compiles the staged Python blob" {
+  printf 'def broken(:\n  pass\n' > x.py
+  git add x.py
+  printf 'def fixed():\n  pass\n' > x.py
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  printf 'def valid():\n  pass\n' > x.py
+  git add x.py
+  printf 'def broken(:\n  pass\n' > x.py
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit skips Python syntax when configured interpreter is missing" {
+  printf 'def broken(:\n  pass\n' > x.py
+  git add x.py
+  AGENT_AUDIT_PYTHON=/nonexistent/python3 run _agent_audit
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"not found"* ]]
+}
+
+@test "_agent_audit detects dangerous Python calls" {
+  printf '%s\n' \
+    'subprocess.run(cmd, shell=True)' \
+    'result = eval("x")' \
+    'exec("x")' \
+    'command = "sudo"' \
+    'flag = "--password=secret"' > app.py
+  git add app.py
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"shell-true"* ]]
+  [[ "$output" == *"eval"* ]]
+  [[ "$output" == *"exec"* ]]
+  [[ "$output" == *"sudo"* ]]
+  [[ "$output" == *"sensitive-flag"* ]]
+}
+
+@test "_agent_audit allows dangerous Python calls with reasons" {
+  printf '%s\n' \
+    'subprocess.run(cmd, shell=True)  # agent-audit: allow shell-true stubbed in tests' \
+    'result = eval("x")  # agent-audit: allow eval stubbed in tests' \
+    'exec("x")  # agent-audit: allow exec stubbed in tests' \
+    'command = "sudo"  # agent-audit: allow sudo stubbed in tests' \
+    'flag = "--password=secret"  # agent-audit: allow sensitive-flag stubbed in tests' > app.py
+  git add app.py
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit rejects an allow marker without a reason" {
+  printf 'subprocess.run(cmd, shell=True)  # agent-audit: allow shell-true\n' > app.py
+  git add app.py
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"shell-true"* ]]
+}
+
+@test "_agent_audit exempts Python test files from dangerous-call checks" {
+  mkdir -p tests
+  printf 'def test_shell():\n  subprocess.run(cmd, shell=True)\n' > tests/test_a.py
+  git add tests/test_a.py
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit ignores guarded Python method names" {
+  printf 'model.eval()\nos.execv(path, args)\ncreate_subprocess_exec(cmd)\n' > app.py
+  git add app.py
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit ignores commented Python dangerous calls" {
+  printf '# subprocess.run(x, shell=True)\n' > app.py
+  git add app.py
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit honors custom Python test globs without shell glob expansion" {
+  mkdir -p checks
+  printf 'def test_one():\n  pass\n' > checks/x.py
+  git add checks/x.py
+  git commit -m "add custom python test" >/dev/null
+  printf 'def test_one():\n  pass\ndef test_two():\n  pass\n' > checks/x.py
+  git add checks/x.py
+  touch 'test_*.py'
+  AGENT_AUDIT_PY_TEST_GLOB='checks/*' run _agent_audit
+  [ "$status" -eq 0 ]
+  rm -f 'test_*.py'
+}
+
+@test "_agent_lint uses configurable staged Python globs" {
+  mkdir -p "$TEST_REPO/etc/agent"
+  echo "No violations." > "$TEST_REPO/etc/agent/lint-rules.md"
+  echo "print('python')" > "$TEST_REPO/a.py"
+  echo "echo shell" > "$TEST_REPO/a.sh"
+  git -C "$TEST_REPO" add a.py a.sh
+  _mock_ai() { printf '%s\n' "$2"; }
+  export -f _mock_ai
+  export ENABLE_AGENT_LINT=1 AGENT_LINT_AI_FUNC=_mock_ai AGENT_LINT_GLOBS='*.py'
+  run _agent_lint
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"a.py"* ]]
+  [[ "$output" != *"a.sh"* ]]
 }
 
 @test "_agent_lint picks up staged .md files" {

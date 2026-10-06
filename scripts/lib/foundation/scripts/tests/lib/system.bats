@@ -99,6 +99,42 @@ bats_require_minimum_version 1.5.0
   unset _RCRS_RUNNER
 }
 
+@test "_run_command_resolve_sudo: sudo runner uses the system binary, not a PATH shadow" {
+  shadow_dir="${BATS_TEST_TMPDIR}/shadow"
+  mkdir -p "${shadow_dir}"
+  printf '%s\n' '#!/bin/sh' 'exit 0' > "${shadow_dir}/install"
+  chmod +x "${shadow_dir}/install"
+  saved_path="$PATH"
+  PATH="${shadow_dir}:${PATH}"
+  _run_command_resolve_sudo install 1 0 1 </dev/null
+  [ "${_RCRS_RUNNER[0]}" = "sudo" ]
+  [ "${_RCRS_RUNNER[1]}" = "-n" ]
+  [ "${_RCRS_RUNNER[2]}" = "/usr/bin/install" ]
+  [ "${#_RCRS_RUNNER[@]}" -eq 3 ]
+  PATH="$saved_path"
+  unset _RCRS_RUNNER
+}
+
+@test "_run_command_resolve_sudo: interactive sudo without a TTY adds -n" {
+  _run_command_resolve_sudo echo 1 0 1 </dev/null
+  [ "${_RCRS_RUNNER[0]}" = "sudo" ]
+  [ "${_RCRS_RUNNER[1]}" = "-n" ]
+  unset _RCRS_RUNNER
+}
+
+@test "_run_command_resolve_sudo: plain runner keeps the bare name" {
+  _run_command_resolve_sudo install 0 0 0
+  [ "${_RCRS_RUNNER[0]}" = "install" ]
+  [ "${#_RCRS_RUNNER[@]}" -eq 1 ]
+  unset _RCRS_RUNNER
+}
+
+@test "_run_command_resolve_sudo: absolute program path is left unchanged" {
+  _run_command_resolve_sudo /opt/custom/tool 1 0 1 </dev/null
+  [ "${_RCRS_RUNNER[${#_RCRS_RUNNER[@]}-1]}" = "/opt/custom/tool" ]
+  unset _RCRS_RUNNER
+}
+
 @test "_run_command: missing program → exits 127" {
   run -127 _run_command --soft -- __nonexistent_prog_xyz__
 }

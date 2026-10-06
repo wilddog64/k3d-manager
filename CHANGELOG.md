@@ -2,6 +2,139 @@
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-10-06
+
+### Added
+
+- `make acg-watch`, `make acg-watch-stop` and `make acg-watch-check` wrap the sandbox TTL watcher:
+  install or remove the launchd agent (`acg_watch_start` / `acg_watch_stop`), and print the
+  sandbox's remaining minutes without extending it (`acg-extend-test --check`). Reinstalling the
+  agent was the step needed to pick up lib-foundation v0.5.1's 30-minute interval, and it had no
+  make target. `URL=` is optional on all three. See `docs/bugs/2026-10-06-acg-watch-make-targets.md`.
+
+- Python agent-audit protection via lib-foundation v0.5.0, plus the hermetic pytest guard for host
+  executables, remote Git, and non-loopback network calls.
+
+- Added `make embed-cache-backup` and `make embed-cache-restore`. Backups use a consistent SQLite
+  snapshot and atomic replacement; restores merge by content hash and never overwrite existing vectors.
+  The cache now records model, dimension, task type, content hash and last use (schema v2), rejects
+  incompatible rows on read, and `make embed-cache-stats` / `make embed-cache-prune` show and trim it.
+  Prune deletes only vectors that are both stale and unused for 90 days; rows carried over from v1 or
+  from a restore are stamped on arrival, so the first prune cannot empty an existing cache.
+- `make embed-cache-seed` fills the cache from the hub store without Gemini calls.
+- Embed-cache backups and restores may use `host:path` scp destinations, with atomic remote backups; each ssh/scp
+  step retries a dropped link twice.
+
+- `make hub-restore` / `make hub-recover` restore rebuilt Hub credentials and local agents from one
+  GUI-backed Terminal session.
+
+- Added `make hermes-approvals-kv`, `make hermes-drain-token`, `make hermes-approvers`, and
+  `make hermes-approvals-setup` for opt-in Slack approvals. The drain token reaches `security`
+  through `security -i` stdin, never argv; it is read back and compared before being pushed, and
+  the approver allowlist is validated before Cloudflare credentials are read.
+
+- `make up CLUSTER_PROVIDER=k3d` and `make hub-up` now rebuild the local hub only.
+
+- Cloud bridge throughput: slow health calls run off the polling loop, and queued Make jobs are followed to `.final.json` responses with artifacts.
+
+- Cloud sessions can bring the disposable ACG sandbox up or down through provider-bound, fixed `sandbox-up` and `sandbox-down` actions; the hub and Hostinger cluster remain unreachable.
+
+- Webhook and cloud-bridge log levels (`error`, `warn`, `info`, `debug`) with
+  redaction-safe request lines; use `make webhook-log-level LEVEL=debug` to
+  update the LaunchAgents.
+- Make jobs now stream local output to a capped `make.log`; inspect it with
+  `make job-log ID=<job_id>` without publishing it as job-status output.
+- The daily cleanup agent now prunes finished webhook jobs and rotates oversized
+  `k3dm-*.log` files while preserving active jobs and the original log inode.
+- Failed webhook jobs now create redacted prior-art notes; `make harvest-job-failures`
+  copies them into the tracked corpus with recurrence deduplication.
+- `find-similar-docs` results now include clickable GitHub links, pinned to the checked-out release
+  branch (or `main`), with `K3DM_DOCS_BRANCH` and `K3DM_DOCS_REPO_URL` overrides.
+
+### Changed
+
+- CI now installs Ruff, runs `make lint-python`, and validates Kubernetes manifests with
+  `make validate-manifests` after the pytest suites.
+
+- `index-docs` keeps a local, content-addressed embedding cache keyed by model, dimension and task
+  type, so a lost Hub store is rebuilt without Gemini calls. Cache misses embed the newest dated
+  docs first, and the summary reports cache hits.
+
+- `scripts/lib/agent_rigor.sh` is now a shim to the lib-foundation copy, bringing in the
+  `# agent-audit: remote-sudo` marker. The local fork had drifted since v1.8.0, and `_agent_lint`
+  (opt-in) now also covers staged `*.js` and `*.md`.
+
+- ACG sandbox critical alerts now email through `platform-warning`; only hub critical alerts
+  continue to use the SMS gateway.
+
+- `make down` now preserves the long-lived local Hub by default; pass `DELETE_HUB=1` only when the Hub and its access layer should also be deleted, reducing the blast radius of routine sandbox teardown.
+
+- Cloud-session round trips now poll every 5 seconds while active and skip a redundant bridge
+  fetch, reducing the typical 30–90 second latency caused by the old 60-second bridge tick and
+  30-second client poll.
+
+### Fixed
+
+- The hub's `federate-acg` scrape timed out on every attempt, so no sandbox metrics reached the
+  hub and `TargetDown` fired for the whole sandbox lifetime. k3s exposes the embedded apiserver,
+  etcd and scheduler metrics on the kubelet endpoint, so the `job="kubelet"` match federated
+  about 50,000 control-plane histogram series — a 37 MB response that took 15 s against a 10 s
+  timeout. The match now excludes `apiserver_`, `etcd_`, `scheduler_` and `workqueue_` (75,583 →
+  23,777 series) and the job's timeout is 30 s. See
+  `docs/bugs/2026-10-06-federate-acg-scrape-exceeds-timeout-k3s-control-plane-histograms.md`.
+- The Makefile's default `URL` still pointed at Pluralsight's retired
+  `cloud-playground/cloud-sandboxes` route, so `make help`, `docs/howto/makefile.md` and the
+  `docs/howto/acg.md` examples showed a dead address, and `make up` / `make creds` worked only
+  because lib-foundation rewrites that path. The default and the examples now use
+  `hands-on/playground/cloud-sandboxes`. Filed 2026-07-19 for v1.18.0 and never implemented. See
+  `docs/bugs/2026-07-19-makefile-stale-acg-sandbox-url-default.md`.
+- `bin/*` scripts, the Makefile and the tests sourced `scripts/lib/system.sh`, a stale local copy of
+  lib-foundation's system library, while the dispatcher loaded the subtree copy. The stale
+  `_run_command` lacked the no-TTY `-n` guard and lib-foundation's system-path fix, so `make up` Step
+  10g and `refresh-edge` ran GNU coreutils `install` under sudo and stopped at a `Password:` prompt.
+  `scripts/lib/system.sh` is now a shim that loads the subtree copy and defines only the kubeconform
+  helpers. See `docs/bugs/2026-10-05-sudo-prompt-stale-system-sh-gnubin-install.md`.
+- Step 10g adds the `127.0.0.3` loopback alias with `--prefer-sudo` and no `--soft`. When sudo was
+  not cached, that call failed as a non-root user and `_run_command` exited. The intended warning
+  never ran, and `make up` aborted with the stack still running. The call now uses
+  `--interactive-sudo --soft`, like the daemon install beside it. It prompts on the TTY and, if it
+  still fails, warns and continues.
+- A bare `make down` now proceeds when the only other live provider is Hostinger, since it always
+  targets the `k3s-aws` default and cannot reach Hostinger; it still refuses with two sandbox
+  providers live, and `make status` is unchanged because a bare status resolves to Hostinger first.
+- `cluster-up` no longer restarts the single-replica hub CoreDNS deployment when repairing the
+  `host.k3d.internal` alias. The hosts plugin's `reload` picks up the patched NodeHosts file, so
+  the restart was unnecessary; it opened a DNS gap, and the subsequent ArgoCD controller restart
+  could land inside it, leaving its sidecar unable to reach istiod and refusing every outbound
+  connection from the pod.
+- E2E verification alerts now aggregate away exporter pod identity, so an exporter rollout does
+  not re-page for an unchanged red run; their service subject uses the exported service label
+  instead of the colliding exporter `service` label.
+- Hub Trivy now skips the ephemeral e2e `vclusters` namespace, whose synced pods can disappear
+  during a scan; those images remain covered on the app clusters and by `app-cve-scan`.
+- Added `OfflineSuiteRunMissed`, which alerts when no nightly test run has been pushed for 26h;
+  a non-fatal metrics push failure is now visible instead of leaving stale healthy-looking values.
+- The Argo CD CVE scan now treats finding CVEs with no newer chart as a finding, not a failure.
+  Exiting 1 made Kubernetes retry the scan twice and made `KubeJobFailed` fire and then resolve
+  every night through the Job TTL; an Artifact Hub lookup failure still exits 1.
+- Sandbox Trivy scans now skip `kube-system` and run one scan job at a time, preventing a single
+  seven-container `cilium` scan pod from growing far beyond its scheduled requests; k3s nodes now
+  reserve memory for the system and kubelet so a burst is OOM-killed inside the pod instead of
+  taking the node's kubelet down.
+- Sandbox `cluster-up` now reports the data-layer Application's last sync operation and any NotReady
+  app-cluster nodes at both wait timeouts, and no longer logs a false "connected" message after an
+  ArgoCD reconnect timeout.
+- Hermes now re-indexes a rebuilt vector store from the embedding cache and reports cache reloads
+  separately from embeddings API calls.
+- Hermes quota pauses now resume at 00:05 Pacific, after the Gemini daily quota reset.
+
+- The LaunchAgent template now carries the Hermes approval drain URL, so a reinstall no longer turns approvals off; the opt-in is now the Keychain drain token, which also stops buttons appearing that cannot do anything.
+- `make alertmanager-secret` now backs up the Gmail app password in the Keychain for Hub restores.
+
+- Webhook cluster jobs now have hard deadlines, and sandbox `make up` fails fast when the server node does not answer SSH.
+- **k3dm Tests dashboard duration is now real.** `make test-metrics` now times the whole `make test-all` run and passes `--run-duration` to `bin/k3dm-test-metrics`. Before, the exporter pushed `k3dm_test_run_duration_seconds` as a literal `0` and published `0` for every suite with no parsed time, so the panel showed only the unittest files' millisecond timings against a roughly 15-minute run. The exporter now also reads pytest's summary time and omits suites with no reported duration. The panel is renamed "Run duration over time" and shows the whole run, and "Cases by suite" is renamed "Failing cases by suite", because an empty panel there is the healthy state.
+- Sandbox `make up` now resolves the hub host alias with the container's `nslookup` output and waits for the app-cluster PrometheusRule CRD before applying ACG rules.
+
 ## [1.40.0] - 2026-10-02
 
 ### Fixed
@@ -90,6 +223,8 @@
   carries an `artifacts` array — `summary.json` plus a credential-scrubbed `junit.xml` for
   `make-test-pytest` — committed with the response and pruned to `K3DM_CLOUD_ARTIFACT_KEEP` (50).
   Raw job output is still not published. See `docs/howto/cloud-session-requests.md`.
+- Cloud bridge e2e dispatch: added scoped `make-e2e-remote` and `make-e2e` actions using the
+  unranked `cloud-runner` capability and reporting the remote lock holder on contention.
 
 ### Fixed
 

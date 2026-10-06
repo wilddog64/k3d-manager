@@ -2,6 +2,27 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.5.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.1) | 2026-10-06 | ACG watcher checks every 30 min (was 3.5 h, which missed the 65 min extend window); yesterday's shutdown time read as expired, not ~22 h left; extend waits for the button and the launchd wrapper runs Node by absolute path; sudo runs bare names from system dirs, not the user's PATH; self-contained CDP readiness wait; `_agent_audit` no longer flags `_run_command`'s `*-sudo` flags |
+| [v0.5.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.0) | 2026-10-04 | `_agent_audit` audits staged Python files (test shrinkage, syntax, dangerous calls with `# agent-audit: allow` markers); `# agent-audit: remote-sudo` marker; session-check contract documented |
+| [v0.4.18](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18) | 2026-09-24 | `ACG_SESSION_OK path=` marker and `K3DM_ACG_REQUIRE_CREDENTIALS=1` fail-closed gate; headless login selector fixes; package renamed `lib-foundation-acg`; brace-expansion / js-yaml audit fixes |
+| [v0.4.17](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.17) | 2026-09-12 | Explicit signed-out detection and Prism monogram login signal; chrome-cdp launchd agent uses the managed Chromium and `pw-profile`; credential-test no longer restarts a sandbox over a broken CLI; sign-in wait no longer targets the dead `id.pluralsight.com` host |
+| [v0.4.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.16) | 2026-09-12 | `browserslist` family lockfile bump (GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx) |
+| [v0.4.15](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.15) | 2026-09-05 | `_install_hermes_agent` / `_uninstall_hermes_agent` read-only launchd installer; 5 BATS |
+| [v0.4.14](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.14) | 2026-09-04 | ACG sandbox reveal/provision clicks use a dispatched MouseEvent (`_robustClick`) |
+| [v0.4.13](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.13) | 2026-08-21 | `foundation_ensure_vcluster_cli` — checksum-verified, per-version vCluster CLI install; 7 BATS |
+| [v0.4.12](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.12) | 2026-08-21 | Count-agnostic ACG agent fleet (`ACG_AGENT_COUNT`), numeric agent-IP discovery; `make shellcheck-lib` / `make bats` |
+| [v0.4.11](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.11) | 2026-08-20 | `js-yaml` 3.15.1 (CVE-2026-59870) |
+| [v0.4.10](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.10) | 2026-08-20 | ACG stale-route credential recovery; CDP listener reclaim on probe failure |
+| [v0.4.9](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.9) | 2026-08-14 | `_dry_run_active` / `_dry_guard` DRY_RUN primitives |
+| [v0.4.8](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.8) | 2026-07-25 | `brace-expansion` 1.1.16 (GHSA-3jxr-9vmj-r5cp) |
+| [v0.4.7](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.7) | 2026-07-23 | `acg_check_ttl` exit-code capture made `set -e`-safe |
+| [v0.4.6](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.6) | 2026-07-21 | `acg_restart` entrypoint restored; stale `playwright-artifacts-*` sweep |
+| [v0.4.4](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.4) | 2026-07-13 | ACG Extend sandbox-tab routing fix; `js-yaml` 3.15.0 |
+| [v0.4.3](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.3) | 2026-07-07 | Session-check render-timing race fix; parallel logged-in probes |
+| [v0.4.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.2) | 2026-07-06 | Headless CDP auto-login with stale-browser reclaim/reuse; managed Chromium for CDP |
+| [v0.4.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.1) | 2026-07-06 | Headless Pluralsight auto-login for unattended provisioning |
+| [v0.4.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.0) | 2026-06-22 | lib-acg absorbed as the optional `scripts/lib/acg/` module; `_ensure_agy_cli`; `_run_command_resolve_sudo` no-TTY `sudo -n` fallback |
+| [v0.3.19](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.19) | 2026-05-03 | `_copilot_auth_check` token/apps.json/gh fallback chain; `_copilot_review` deny-tool pattern fix; 6 BATS |
 | [v0.3.17](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.17) | 2026-05-01 | `_ai_agent_review` dispatch wrapper (`AI_REVIEW_FUNC`/`AI_REVIEW_MODEL`); `_copilot_review` rename; `K3DM_ENABLE_AI` gate removed from backend; `_agent_lint` glob expanded to `.sh`/`.js`/`.md`; 3 BATS |
 | [v0.3.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.16) | 2026-04-05 | `_agent_audit` IP allowlist: `grep -Fqx -- "$file"` prevents dash-prefix paths from being parsed as grep flags; 2 BATS |
 | [v0.3.15](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.15) | 2026-03-31 | `_agent_audit` IP allowlist — `AGENT_IP_ALLOWLIST` env var skips IP check for listed paths; 2 BATS |

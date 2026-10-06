@@ -589,7 +589,8 @@ def _smoke_test_services(retries=None, provider=None, quick=False):
         ("Grafana", "https://grafana.3ai-talk.org/api/health", [200], False),
     ]
     if _provider_supports_pushgateway(provider):
-        smoke_endpoints.append(("Pushgateway", "http://localhost:9091/-/healthy", [200], False))
+        pushgateway_port = 9091 if provider == "k3s-hostinger" else 9092
+        smoke_endpoints.append(("Pushgateway", f"http://localhost:{pushgateway_port}/-/healthy", [200], False))
 
     def _probe_endpoint(endpoint):
         name, url, ok_codes, expected_auth = endpoint

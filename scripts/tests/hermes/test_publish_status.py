@@ -3,7 +3,6 @@
 import importlib.machinery
 import json
 import importlib.util
-import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 

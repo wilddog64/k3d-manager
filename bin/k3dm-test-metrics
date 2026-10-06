@@ -105,6 +105,9 @@ def parse_log(text):
             suites["pytest"]["not_ok"] += bad
             total += passed + bad
             failed += bad
+            pytest_time = re.search(r"\bin\s+([0-9.]+)s\b", line)
+            if pytest_time:
+                durations["pytest"] = float(pytest_time.group(1))
             last_step = "test-pytest"
 
     return {
@@ -116,7 +119,7 @@ def parse_log(text):
     }
 
 
-def build_payload(parsed, target, exit_code, now=None):
+def build_payload(parsed, target, exit_code, now=None, run_duration=None):
     now = int(time.time()) if now is None else now
     lines = [
         "# HELP k3dm_test_suite_cases Test cases by suite and result",
@@ -130,8 +133,8 @@ def build_payload(parsed, target, exit_code, now=None):
         "# HELP k3dm_test_suite_duration_seconds Wall-clock duration of one suite",
         "# TYPE k3dm_test_suite_duration_seconds gauge",
     ]
-    for suite in sorted(parsed["suites"]):
-        lines.append(f'k3dm_test_suite_duration_seconds{{suite="{suite}"}} {parsed["durations"].get(suite, 0)}')
+    for suite in sorted(parsed["durations"]):
+        lines.append(f'k3dm_test_suite_duration_seconds{{suite="{suite}"}} {parsed["durations"][suite]}')
     lines += [
         "# HELP k3dm_test_cases_total Total cases in the run",
         "# TYPE k3dm_test_cases_total gauge",
@@ -139,13 +142,16 @@ def build_payload(parsed, target, exit_code, now=None):
         "# HELP k3dm_test_cases_failed Failed cases in the run — THE health signal",
         "# TYPE k3dm_test_cases_failed gauge",
         f'k3dm_test_cases_failed{{target="{target}"}} {parsed["failed"]}',
-        "# HELP k3dm_test_run_duration_seconds Wall-clock duration of the whole run",
-        "# TYPE k3dm_test_run_duration_seconds gauge",
-        "k3dm_test_run_duration_seconds 0",
         "# HELP k3dm_test_last_timestamp_seconds Unix timestamp of the last completed run",
         "# TYPE k3dm_test_last_timestamp_seconds gauge",
         f"k3dm_test_last_timestamp_seconds {now}",
     ]
+    if run_duration is not None:
+        lines += [
+            "# HELP k3dm_test_run_duration_seconds Wall-clock duration of the whole run",
+            "# TYPE k3dm_test_run_duration_seconds gauge",
+            f'k3dm_test_run_duration_seconds{{target="{target}"}} {run_duration}',
+        ]
     if parsed["failed"] == 0:
         lines += [
             "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures",
@@ -195,10 +201,14 @@ def main(argv=None):
     parser.add_argument("--target", choices=("test", "test-all"), required=True)
     parser.add_argument("--origin", choices=("local", "ci"), default="local")
     parser.add_argument("--exit-code", type=int, default=0)
+    parser.add_argument("--run-duration", type=int, default=None)
     args = parser.parse_args(argv)
     parsed = parse_log(Path(args.log_path).read_text())
     print(f"[k3dm-test-metrics] {parsed['total']} cases, {parsed['failed']} failed")
-    push_metrics(build_payload(parsed, args.target, args.exit_code), args.target, args.origin)
+    push_metrics(
+        build_payload(parsed, args.target, args.exit_code, run_duration=args.run_duration),
+        args.target, args.origin,
+    )
     return 0
 
 

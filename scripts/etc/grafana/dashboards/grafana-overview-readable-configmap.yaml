@@ -92,8 +92,10 @@ data:
         {"allValue": ".*", "datasource": "$datasource", "definition": "label_values(grafana_build_info, job)", "includeAll": true, "multi": true, "name": "job", "query": {"query": "label_values(grafana_build_info, job)", "refId": "job-variable"}, "refresh": 1, "type": "query"},
         {"allValue": ".*", "datasource": "$datasource", "definition": "label_values(grafana_build_info, instance)", "includeAll": true, "multi": true, "name": "instance", "query": {"query": "label_values(grafana_build_info, instance)", "refId": "instance-variable"}, "refresh": 1, "type": "query"}
       ]},
+      "tags": ["grafana", "alerts", "k3d-manager"],
       "time": {"from": "now-6h", "to": "now"},
       "timezone": "utc",
-      "title": "Grafana Overview — Readable",
+      "title": "Grafana Health & Firing Alerts",
+      "uid": "k3dm-grafana-health",
       "version": 2
     }

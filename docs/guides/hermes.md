@@ -61,13 +61,30 @@ MFA at the Slack workspace or channel level. Deny dismisses only and writes no a
 may re-propose the repair. Each incident carries a random nonce, and buttons from a previous incident
 are dropped.
 
-Operator setup (document secret names only):
+Operator setup (run in Terminal.app):
 
-1. `cd workers/slack-relay && wrangler kv namespace create APPROVALS_KV`, then uncomment the binding in `wrangler.toml` with the id and commit.
-2. `wrangler secret put APPROVER_ALLOWLIST` and `wrangler secret put APPROVAL_DRAIN_TOKEN` (random, >= 32 characters).
-3. Store the same drain token in the Keychain as `k3dm-hermes-approval-drain-token` (account `k3dm`), entered via prompt, not argv: `security add-generic-password -a k3dm -s k3dm-hermes-approval-drain-token -w`.
-4. In the Slack app, enable Interactivity with Request URL `https://<relay-host>/slack/interactivity`, and register `/hermes-auth`.
-5. Add `K3DM_HERMES_APPROVAL_DRAIN_URL=https://<relay-host>/hermes/approvals` to the Hermes LaunchAgent `EnvironmentVariables`, then reload the agent.
+1. `make hermes-approvals-setup APPROVERS=<your Slack user ID>` creates and binds the KV namespace, creates or reuses the Keychain drain token and pushes it to the relay, and validates and pushes the approver allowlist.
+   `ROTATE=1 make hermes-drain-token` rotates the drain token and syncs it to the relay.
+2. Commit `workers/slack-relay/wrangler.toml` if it changed, then run `make deploy-worker`.
+3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth`.
+4. The LaunchAgent template sets `K3DM_HERMES_APPROVAL_DRAIN_URL`. Approvals turn on once the drain token is in the Keychain (step 1). Run `bin/k3dm-hermes-setup` to re-render the agent after pulling this change.
+
+`APPROVERS` takes Slack member IDs, not emails: comma-separated with no spaces, each beginning with `U` or `W`.
+To find one in Slack, open a profile, click ⋮ (More), then **Copy member ID**.
+
+| Error | Cause | Fix |
+|---|---|---|
+| `wrangler kv namespace create failed` and, above it, `A KV namespace with the title "APPROVALS_KV" already exists` | The namespace was created by hand | Run `wrangler kv namespace list` and copy the id of `APPROVALS_KV`. Uncomment the `[[kv_namespaces]]` block in `workers/slack-relay/wrangler.toml` with that id, commit it, then rerun. |
+| `[hermes-drain-token] ERROR: the stored item is too short` | The Keychain token is shorter than the 32 characters the relay requires, typically because it was set by hand | Run `ROTATE=1 make hermes-approvals-setup APPROVERS=<ids>` once. |
+| `k3dm-cloudflare-api-token missing from Keychain` | The Keychain is locked, or the session is not a GUI session | Run the command in Terminal.app with the login keychain unlocked. |
+| `User interaction is not allowed` when writing the drain token | The session is not a GUI session (e.g. SSH or tmux started outside the GUI) | Run the command in Terminal.app. |
+
+**Recovery.**
+- **The KV binding** is versioned in git. The namespace id is not a secret.
+- **The data in KV** holds only short-lived approval and re-auth records, so it needs no backup.
+- **The drain token** lives in Keychain `k3dm-hermes-approval-drain-token`. `make hermes-drain-token` re-pushes it to the relay.
+- **The allowlist** is re-pushed with `make hermes-approvers APPROVERS=<ids>`.
+- **If the namespace is deleted**, remove the binding lines and rerun `make hermes-approvals-kv` to create and bind a new one. The target skips creation while a binding exists.
 
 ## Hub Kine circuit breaker
 
@@ -176,8 +193,10 @@ service proxy path, and actuator port. Set `K3DM_HERMES_APP_HEALTH_ENABLED=1` an
 dedicated kubeconfig. The target table is
 [`scripts/etc/hermes/app-health-targets.json`](../../scripts/etc/hermes/app-health-targets.json).
 Adding a service is a one-line target-table edit, but the operator must confirm that service's
-port from its own Deployment first. The sensor is disabled by default, uses no port-forward, and
-files only a debounced delta through the existing e2e-bugs path.
+port from its own Deployment first. The LaunchAgent template enables the sensor against
+`ubuntu-hostinger` (dry run 2026-10-04 passed); it uses no port-forward and files only a debounced delta
+through the existing e2e-bugs path. Unsetting `K3DM_HERMES_APP_HEALTH_ENABLED` in the template (then
+re-running `bin/k3dm-hermes-setup`) turns it off.
 
 ### Possible prior art
 
@@ -368,19 +387,22 @@ align to a hard boundary.
 | `K3DM_HERMES_STATE` | `~/.k3dm/hermes/state.json` | State file (dir `0700`, file `0600`) |
 | `K3DM_HERMES_WEBHOOK_HOST` | `127.0.0.1:7443` | Webhook host:port (plain HTTP on loopback) |
 | `K3DM_HERMES_HTTP_TIMEOUT` | `90` | Per-request HTTP timeout, seconds (authenticated `/api/v1/health` runs the full smoke test and is slow on a degraded cluster) |
-| `K3DM_HERMES_PROVIDER` | (unset) | Cluster provider passed to the webhook query |
+| `K3DM_HERMES_PROVIDER` | `k3s-hostinger` (set by the LaunchAgent template) | Cluster provider passed to the webhook query |
 | `K3DM_HERMES_CORRELATION_WINDOW` | `3` | Cycles in the correlation window |
 | `K3DM_HERMES_LLM_PROVIDER` | `gemini` | LLM provider on trip (never `claude` as author) |
 | `K3DM_HERMES_LLM_DAILY_BUDGET` | `10` | Max LLM calls per day before template fallback |
 | `K3DM_HERMES_JITTER` | (unset) | When set, sleep 0–30s before sensing |
 | `K3DM_HERMES_AUDIT_RUN_BATS` | (unset) | When `1`, the monthly audit runs the webhook security-regression bats subset (Group B); otherwise reported "skipped" |
-| `K3DM_HERMES_APPROVAL_DRAIN_URL` | (unset) | Opt-in Slack approvals: relay drain URL (https). Unset = no buttons, no drain |
+| `K3DM_HERMES_APPROVAL_DRAIN_URL` | `https://k3dm-slack-relay.k3dm.workers.dev/hermes/approvals` (template) | Relay drain URL. Approvals are active only when Keychain `k3dm-hermes-approval-drain-token` also exists. |
 | `K3DM_HERMES_SMS_DAILY_BUDGET` | `10` | Max SMS pages per UTC day |
 | `K3DM_HERMES_E2E_ENABLED` | (enabled) | Set to `0` to disable scheduled E2E dispatch |
 | `K3DM_HERMES_E2E_SCHEDULE` | `wed,sat@02:00` | Strict local-time E2E schedule |
 | `K3DM_HERMES_APP_HEALTH_ENABLED` | (disabled) | Set to `1` to enable aggregate/probe health-delta sampling |
 | `K3DM_HERMES_APP_CONTEXT` | (unset) | Kubernetes context for the app-cluster service proxy |
 | `K3DM_HERMES_APP_KUBECONFIG` | (unset) | Optional kubeconfig path used by app-health kubectl calls |
+
+An unset `K3DM_HERMES_PROVIDER` falls back to the shared active-provider marker, which a sandbox
+that expired without `make down` leaves pointing at a dead cluster.
 
 ---
 

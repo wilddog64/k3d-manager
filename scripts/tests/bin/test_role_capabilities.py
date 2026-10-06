@@ -26,7 +26,7 @@ _spec.loader.exec_module(wh)
 
 @pytest.fixture
 def cloud_runner(monkeypatch):
-    monkeypatch.setitem(policy._ROLE_CAPABILITIES, "cloud-runner", frozenset({"make:e2e-remote"}))
+    monkeypatch.setitem(policy._ROLE_CAPABILITIES, "cloud-runner", policy.CLOUD_RUNNER_TARGETS)
     return "cloud-runner"
 
 
@@ -42,6 +42,7 @@ def test_capability_token_role_is_returned_unchanged(cloud_runner):
 
 def test_capability_role_is_a_set_not_a_rank(cloud_runner):
     assert policy._policy_allows(cloud_runner, {"name": "make:e2e-remote", "min_role": "operator"})
+    assert policy._policy_allows(cloud_runner, {"name": "make:e2e", "min_role": "operator"})
     assert not policy._policy_allows(cloud_runner, _make_policy("test-pytest"))
     assert not policy._policy_allows(cloud_runner, _make_policy("fix-delete-pod"))
     assert not policy._role_allows(cloud_runner, "reader")

@@ -14,8 +14,15 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"CLEANUP_STALE = 0"* ]]
   [[ "$output" == *'$(MAKE) --no-print-directory cleanup-stale-resources CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" CONFIRM=1'* ]]
-  [[ "$output" == *'_keep_hub_flag=--keep-hub'* ]]
-  [[ "$output" == *'if [ "$(KEEP_LOCAL)" = "1" ] || [ "$(CLEANUP_STALE)" = "1" ]; then'* ]]
+  run make -s down-hub-flag
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run make -s down-hub-flag CLEANUP_STALE=1 DELETE_HUB=1
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run make -s down-hub-flag DELETE_HUB=1
+  [ "$status" -eq 0 ]
+  [ "$output" = "--delete-hub" ]
 }
 
 @test "cleanup-stale-resources dispatches both paths for AWS" {

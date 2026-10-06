@@ -229,3 +229,43 @@ _stub_kubectl_all_unreachable() {
           "${REPO_ROOT}/bin/require-unambiguous-provider" 0
   [[ "${status}" -eq 0 ]]
 }
+
+@test "require-unambiguous-provider down allows aws plus hostinger" {
+  local dir="${BATS_TEST_TMPDIR}/active-providers"
+  mkdir -p "${dir}"; : > "${dir}/k3s-aws"; : > "${dir}/k3s-hostinger"
+  run env MAKE_TARGET=down _ACG_ACTIVE_PROVIDERS_DIR="${dir}" \
+          _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/none" \
+          "${REPO_ROOT}/bin/require-unambiguous-provider" 0
+  [[ "${status}" -eq 0 ]]
+}
+
+@test "require-unambiguous-provider down refuses two sandboxes plus hostinger" {
+  local dir="${BATS_TEST_TMPDIR}/active-providers"
+  mkdir -p "${dir}"; : > "${dir}/k3s-aws"; : > "${dir}/k3s-gcp"; : > "${dir}/k3s-hostinger"
+  run env MAKE_TARGET=down _ACG_ACTIVE_PROVIDERS_DIR="${dir}" \
+          _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/none" \
+          "${REPO_ROOT}/bin/require-unambiguous-provider" 0
+  [[ "${status}" -eq 3 ]]
+  [[ "${output}" == *"2 providers are live"* ]]
+  [[ "${output}" == *"k3s-aws"* ]]
+  [[ "${output}" == *"k3s-gcp"* ]]
+  if [[ "${output}" == *"k3s-hostinger"* ]]; then false; fi
+}
+
+@test "require-unambiguous-provider down allows hostinger only" {
+  local dir="${BATS_TEST_TMPDIR}/active-providers"
+  mkdir -p "${dir}"; : > "${dir}/k3s-hostinger"
+  run env MAKE_TARGET=down _ACG_ACTIVE_PROVIDERS_DIR="${dir}" \
+          _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/none" \
+          "${REPO_ROOT}/bin/require-unambiguous-provider" 0
+  [[ "${status}" -eq 0 ]]
+}
+
+@test "require-unambiguous-provider status still refuses aws plus hostinger" {
+  local dir="${BATS_TEST_TMPDIR}/active-providers"
+  mkdir -p "${dir}"; : > "${dir}/k3s-aws"; : > "${dir}/k3s-hostinger"
+  run env MAKE_TARGET=status _ACG_ACTIVE_PROVIDERS_DIR="${dir}" \
+          _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/none" \
+          "${REPO_ROOT}/bin/require-unambiguous-provider" 0
+  [[ "${status}" -eq 3 ]]
+}

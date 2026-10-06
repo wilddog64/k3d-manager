@@ -1,6 +1,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import plistlib
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -137,3 +138,33 @@ def test_commit_subject_says_app_health(monkeypatch, tmp_path):
     assert result == "pushed"
     commit = next(argv for argv in calls if "commit" in argv)
     assert "app-health" in " ".join(commit)
+
+
+def test_launchagent_template_enables_app_health_for_ubuntu_hostinger():
+    template = (ROOT / "scripts" / "etc" / "launchd" /
+                "com.k3d-manager.hermes.plist.tmpl").read_text()
+    for placeholder in ("HERMES_BIN", "K3DM_REPO_ROOT", "HERMES_LOG"):
+        template = template.replace("{{" + placeholder + "}}", "dummy")
+    plist = plistlib.loads(template.encode())
+    environment = plist["EnvironmentVariables"]
+    assert environment["K3DM_HERMES_APP_HEALTH_ENABLED"] == "1"
+    assert environment["K3DM_HERMES_APP_CONTEXT"] == "ubuntu-hostinger"
+    assert environment["K3DM_HERMES_PROVIDER"] == "k3s-hostinger"
+    assert environment["K3DM_HERMES_APPROVAL_DRAIN_URL"] == "https://k3dm-slack-relay.k3dm.workers.dev/hermes/approvals"
+
+
+def test_run_cycle_webhook_fetch_pins_hostinger_provider(monkeypatch):
+    monkeypatch.setenv("K3DM_HERMES_PROVIDER", "k3s-hostinger")
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda *_: "dummy")
+    urls = []
+    monkeypatch.setattr(k3dm_hermes, "_http_json",
+                        lambda url, _headers: urls.append(url) or {"services": []})
+    for name in ("eso", "argocd", "values_branch", "reachability", "node_pressure",
+                 "hostnet_drift", "kine", "vectordb", "alert_delivery", "ci", "app_health"):
+        monkeypatch.setattr(k3dm_hermes, name, lambda *_args, **_kwargs: {
+            "sensor": "stub", "status": "healthy", "evidence": "stub", "data": {}
+        })
+
+    k3dm_hermes._run_cycle({})
+
+    assert urls and urls[0].endswith("provider=k3s-hostinger")

@@ -64,7 +64,31 @@ DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-
   run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .params["match[]"][0]' "${VALUES}"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *'job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"'* ]]
-  [[ "${output}" == *'__name__!~".+:.+"'* ]]
+  [[ "${output}" == *'__name__!~".+:.+'* ]]
+}
+
+@test "federate-acg excludes k3s control-plane histograms" {
+  local match
+  match="$(yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .params["match[]"][0]' "${VALUES}")"
+  for token in 'apiserver_.+' 'etcd_.+' 'scheduler_.+' 'workqueue_.+' '.+:.+'; do
+    [[ "${match}" == *"${token}"* ]]
+  done
+}
+
+@test "federate-acg timeout stays below interval" {
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .scrape_timeout' "${VALUES}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "30s" ]
+
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .scrape_interval' "${VALUES}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "60s" ]
+}
+
+@test "federate-acg job selector is unchanged" {
+  run yq -r '.prometheus.prometheusSpec.additionalScrapeConfigs[] | select(.job_name == "federate-acg") | .params["match[]"][0]' "${VALUES}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"'* ]]
 }
 
 @test "federate-acg labels the target acg and honors source labels" {

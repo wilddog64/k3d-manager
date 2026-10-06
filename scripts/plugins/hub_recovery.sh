@@ -49,7 +49,7 @@ function _hub_recovery_frontend_origin_provider() {
 }
 
 function _hub_recovery_sync_vault_root_token() {
-  local hub_context="$1" root_token=""
+  local hub_context="$1" root_token="" readback_token=""
   if ! _is_mac; then
     _info "[hub-recovery] Vault root token Keychain sync skipped (macOS only)"
     return 0
@@ -57,6 +57,14 @@ function _hub_recovery_sync_vault_root_token() {
   root_token=$(_kubectl -- --context "$hub_context" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
   if [[ -n "$root_token" ]]; then
     printf 'add-generic-password -U -s %s -a %s -w %s\n' "k3dm-vault-root-token" "$hub_context" "$root_token" | _no_trace security -i >/dev/null
+    if ! readback_token=$(_no_trace security find-generic-password -s "k3dm-vault-root-token" -a "$hub_context" -w 2>/dev/null); then
+      _err '[hub-recovery] Keychain service k3dm-vault-root-token could not be read back; unlock the login keychain: security unlock-keychain, then re-run make hub-recover'
+      return 1
+    fi
+    if [[ "$readback_token" != "$root_token" ]]; then
+      _err '[hub-recovery] Keychain service k3dm-vault-root-token did not retain the Vault root token; unlock the login keychain: security unlock-keychain, then re-run make hub-recover'
+      return 1
+    fi
     return 0
   fi
   root_token=$(_no_trace security find-generic-password -s "k3dm-vault-root-token" -a "$hub_context" -w 2>/dev/null || true)
@@ -134,6 +142,25 @@ function _hub_recovery_replay_identity_hook() {
   done
   _err "[hub-recovery] identity hook replay did not succeed (phase: ${phase:-unknown})"
   return 1
+}
+
+function _hub_recovery_retry_failed_identity_sync() {
+  local hub_context="$1" phase
+  if ! phase=$(_kubectl --no-exit --context "$hub_context" -n cicd \
+    get application shopping-cart-identity -o jsonpath='{.status.operationState.phase}' 2>/dev/null); then
+    _warn "[hub-recovery] could not read shopping-cart-identity sync phase; continuing recovery"
+    return 0
+  fi
+  if [[ "$phase" != "Failed" && "$phase" != "Error" ]]; then
+    return 0
+  fi
+  if ! _kubectl --no-exit --context "$hub_context" -n cicd patch application shopping-cart-identity \
+    --type merge -p '{"operation":{"sync":{}}}' >/dev/null; then
+    _warn "[hub-recovery] failed to request a retry for shopping-cart-identity; continuing recovery"
+    return 0
+  fi
+  _info "[hub-recovery] requested a retry for failed shopping-cart-identity sync"
+  return 0
 }
 
 function _hub_recovery_mirror_argocd_admin() {
@@ -276,6 +303,8 @@ function hub_recovery_reconcile() {
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
     return 0
   fi
+  keycloak_smoke_vault_preseed || _warn "[hub-recovery] smoke-user Vault preseed failed; continuing recovery"
+  _hub_recovery_retry_failed_identity_sync "$hub_context"
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
   _hub_recovery_reconcile_hostnet_drift "$hub_context"
   _hub_recovery_sync_vault_root_token "$hub_context" || return 1

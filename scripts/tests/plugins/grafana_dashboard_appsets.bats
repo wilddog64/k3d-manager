@@ -196,7 +196,7 @@ _assert_no_panel_overlap() {
   run yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | jq empty
-  [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
+  [[ "$output" == *'"title": "Grafana Health & Firing Alerts"'* ]]
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
   [[ "$output" == *'"legendFormat": "p50 — median"'* ]]
@@ -218,9 +218,25 @@ _assert_no_panel_overlap() {
   run yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | jq empty
-  [[ "$output" == *'"title": "Grafana Overview — Readable"'* ]]
+  [[ "$output" == *'"title": "Grafana Health & Firing Alerts"'* ]]
   [[ "$output" == *'"legendFormat": "HTTP {{status_code}}"'* ]]
   [[ "$output" == *'"legendFormat": "p99 — 99th percentile"'* ]]
+}
+
+@test "readable Overview title does not collide with the stock Grafana Overview" {
+  local dashboard
+  for dashboard in "${OVERVIEW}" "${HUB_OVERVIEW}"; do
+    run grep -F -- '"title": "Grafana Overview' "$dashboard"
+    [ "$status" -ne 0 ]
+  done
+}
+
+@test "Grafana Health dashboard has a fixed uid and k3dm tags" {
+  local dashboard
+  for dashboard in "${OVERVIEW}" "${HUB_OVERVIEW}"; do
+    run bash -c "yq -r '.data[\"grafana-overview-readable.json\"]' '$dashboard' | jq -e '.uid == \"k3dm-grafana-health\" and (.tags | index(\"k3d-manager\")) != null'"
+    [ "$status" -eq 0 ]
+  done
 }
 
 @test "Grafana Overview Build Info panels use the positive table contract" {

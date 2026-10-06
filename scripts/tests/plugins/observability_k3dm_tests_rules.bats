@@ -17,9 +17,9 @@ HUB_RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml
   [ "${status}" -ne 0 ]
 }
 
-@test "all five k3dm test-suite alerts are present" {
+@test "all six k3dm test-suite alerts are present" {
   for _alert in OfflineSuiteFailing OfflineSuiteVacuous OfflineSuiteCaseCountDropped \
-                OfflineSuiteStale DeploymentMetricsStale; do
+                OfflineSuiteStale OfflineSuiteRunMissed DeploymentMetricsStale; do
     run grep -F -- "alert: ${_alert}" "${ACG_RULE}"
     [ "${status}" -eq 0 ]
   done
@@ -37,13 +37,30 @@ HUB_RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml
 import sys, re
 text = open(sys.argv[1]).read()
 alerts = re.findall(r"- alert: (\S+)\n\s+expr: (.+)", text)
-assert len(alerts) == 5, f"expected 5 alerts, found {len(alerts)}"
+assert len(alerts) == 6, f"expected 6 alerts, found {len(alerts)}"
 for name, expr in alerts:
     assert expr.strip(), f"{name} has an empty expr"
 print("OK", len(alerts))
 PY
   [ "${status}" -eq 0 ]
-  [[ "${output}" == *"OK 5"* ]]
+  [[ "${output}" == *"OK 6"* ]]
+}
+
+@test "OfflineSuiteRunMissed keys on the per-run timestamp, not the last success" {
+  run python3 - "${ACG_RULE}" <<'PY'
+import sys, re
+text = open(sys.argv[1]).read()
+m = re.search(r"- alert: OfflineSuiteRunMissed\n\s+expr: (.+)", text)
+assert m, "OfflineSuiteRunMissed missing"
+expr = m.group(1)
+assert "k3dm_test_last_timestamp_seconds" in expr, expr
+assert "last_success" not in expr, expr
+window = int(re.search(r">\s*(\d+)", expr).group(1))
+assert 86400 < window < 172800, window
+print("OK")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"OK"* ]]
 }
 
 @test "the ACG rules dir is applied to the app cluster by the observability plugin" {
@@ -52,4 +69,60 @@ PY
   [ "${status}" -eq 0 ]
   run grep -F -- '_kubectl apply --context "${_app_context}" -f "${_acg_rules_dir}/"' "${_plugin}"
   [ "${status}" -eq 0 ]
+}
+
+@test "PrometheusRule CRD wait allows rules apply after delayed creation" {
+  export SCRIPT_DIR="${BATS_TEST_DIRNAME}/../../"
+  export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
+  source "${PLUGINS_DIR}/observability.sh"
+  _info() { :; }
+  _warn() { :; }
+  helm() { return 0; }
+  sleep() { :; }
+  local calls="${BATS_TEST_TMPDIR}/calls"
+  : > "${calls}"
+  _err() { printf '%s\n' "$*" >> "${calls}"; return 0; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "${calls}"
+    if [[ "$*" == *"get crd"* ]]; then
+      local gets
+      gets=$(grep -c 'get crd' "${calls}" || true)
+      (( gets >= 3 )) && printf 'True'
+      return 0
+    fi
+    if [[ "$*" == *"api-resources"* ]]; then
+      printf 'prometheuses.monitoring.coreos.com\n'
+      return 0
+    fi
+    return 0
+  }
+  export K3DM_ACG_RULES_CRD_ATTEMPTS=3 K3DM_ACG_RULES_CRD_INTERVAL=0
+  run _deploy_pushgateway_acg test-context
+  [ "${status}" -eq 0 ]
+  [ "$(grep -c 'get crd prometheusrules.monitoring.coreos.com' "${calls}")" -eq 3 ]
+  [ "$(grep -c 'wait.*crd/prometheusrules.monitoring.coreos.com' "${calls}" || true)" -eq 0 ]
+  [ "$(grep -c 'apply.*rules-acg' "${calls}")" -eq 1 ]
+}
+
+@test "PrometheusRule CRD wait skips apply when creation never completes" {
+  export SCRIPT_DIR="${BATS_TEST_DIRNAME}/../../"
+  export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
+  source "${PLUGINS_DIR}/observability.sh"
+  _info() { :; }
+  _warn() { :; }
+  helm() { return 0; }
+  sleep() { :; }
+  local calls="${BATS_TEST_TMPDIR}/calls"
+  : > "${calls}"
+  _err() { printf '%s\n' "$*" >> "${calls}"; return 0; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "${calls}"
+    [[ "$*" != *"get crd"* && "$*" != *"apply"* ]]
+  }
+  export K3DM_ACG_RULES_CRD_ATTEMPTS=3 K3DM_ACG_RULES_CRD_INTERVAL=0
+  run _deploy_pushgateway_acg test-context
+  [ "${status}" -ne 0 ]
+  run grep -F 'prometheusrules.monitoring.coreos.com' "${calls}"
+  [ "${status}" -eq 0 ]
+  [ "$(grep -c 'apply.*rules-acg' "${calls}" || true)" -eq 0 ]
 }

@@ -13,6 +13,10 @@ import os
 
 from webhook.config import TOKEN_FILE
 from webhook.proc import _spawn_capture_text
+from webhook.log import get_logger
+
+
+_LOG = get_logger("webhook.auth")
 
 
 def _keychain_secret(service):
@@ -47,7 +51,7 @@ def _get_token():
         import stat
         mode = TOKEN_FILE.stat().st_mode
         if mode & (stat.S_IRWXG | stat.S_IRWXO):
-            print(f"[k3dm-webhook] ignoring {TOKEN_FILE}: group/other-accessible (chmod 600)", flush=True)
+            _LOG.warning("ignoring %s: group/other-accessible (chmod 600)", TOKEN_FILE)
             return None
         return TOKEN_FILE.read_text().strip()
     return None
@@ -60,6 +64,13 @@ def _get_reader_token():
     return _keychain_secret("k3dm-webhook-token-reader") or None
 
 
+def _get_cloud_runner_token():
+    token = os.environ.get("K3DM_WEBHOOK_TOKEN_CLOUD_RUNNER")
+    if token:
+        return token
+    return _keychain_secret("k3dm-webhook-token-cloud-runner") or None
+
+
 def _resolve_token_role(presented):
     """Return the role bound to the presented bearer, or None if unknown."""
     if not presented:
@@ -70,6 +81,9 @@ def _resolve_token_role(presented):
     reader_token = _get_reader_token()
     if reader_token and hmac.compare_digest(presented, reader_token):
         return "reader"
+    cloud_runner_token = _get_cloud_runner_token()
+    if cloud_runner_token and hmac.compare_digest(presented, cloud_runner_token):
+        return "cloud-runner"
     return None
 
 

@@ -31,7 +31,9 @@ _ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}
 _ROLE_DEFAULT = "admin"
 # Capability roles are deliberately unranked: each is allowed exactly the policy names in its set,
 # never a tier, so one cannot transitively grant every lower-ranked target.
-_ROLE_CAPABILITIES: dict = {}
+CLOUD_RUNNER_TARGETS = {"e2e-remote", "e2e"}
+CLOUD_RUNNER_LIFECYCLE = {"cluster-up@aws", "cluster-down@aws"}
+_ROLE_CAPABILITIES: dict = {"cloud-runner": CLOUD_RUNNER_TARGETS | CLOUD_RUNNER_LIFECYCLE}
 
 _RATE_WINDOW_SECS = 60
 _RATE_MAX_DEFAULT = int(os.environ.get("K3DM_RATE_MAX_PER_MIN", "60"))
@@ -149,7 +151,13 @@ def _role_allows(actual_role, required_role):
 def _policy_allows(role, policy):
     """Authorize a request role against an effective policy; unranked roles need a capability set."""
     if role in _ROLE_CAPABILITIES:
-        return policy["name"] in _ROLE_CAPABILITIES[role]
+        name = policy["name"]
+        capabilities = _ROLE_CAPABILITIES[role]
+        if name.startswith("make:"):
+            return name.removeprefix("make:") in capabilities
+        if name in {"cluster-up", "cluster-down"}:
+            return f"{name}@{policy.get('provider')}" in capabilities
+        return False
     if role not in _ROLE_LEVELS:
         return False
     return _role_allows(role, policy["min_role"])
@@ -161,7 +169,8 @@ def _action_policy(path, body):
         if action == "kill":
             return {"name": "cluster-kill", "min_role": "operator"}
         if action in ("up", "down"):
-            return {"name": f"cluster-{action}", "min_role": "admin"}
+            return {"name": f"cluster-{action}", "min_role": "admin",
+                    "provider": body.get("provider", "")}
     if path == "/api/v1/make":
         target = str(body.get("target", "")).strip()
         spec = MAKE_TARGETS.get(target)
@@ -181,7 +190,10 @@ def effective_policy(route, path, body):
     if route is None:
         return dynamic
     min_role = strictest_role(route["min_role"], (dynamic or {}).get("min_role"))
-    return {"name": (dynamic or {}).get("name") or route["action_name"], "min_role": min_role}
+    result = {"name": (dynamic or {}).get("name") or route["action_name"], "min_role": min_role}
+    if dynamic and "provider" in dynamic:
+        result["provider"] = dynamic["provider"]
+    return result
 
 
 def _audit_remote_action(path, action_name, actor, role, allowed, body=None, reason=""):

@@ -8,6 +8,6 @@ WEBHOOK_URL = "https://webhook.3ai-talk.org"
 # Hermes Slack approvals (docs/plans/v1.33.0-hermes-slack-approval.md §13.6).
 # Operator: `wrangler kv namespace create APPROVALS_KV`, then uncomment with the returned id.
 # Secrets (wrangler secret put): APPROVER_ALLOWLIST, APPROVAL_DRAIN_TOKEN (>= 32 chars).
-# [[kv_namespaces]]
-# binding = "APPROVALS_KV"
-# id = "<namespace-id>"
+[[kv_namespaces]]
+binding = "APPROVALS_KV"
+id = "ee9eb140ea624a09802fef9e16396caf"

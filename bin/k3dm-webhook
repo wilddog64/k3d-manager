@@ -3,25 +3,18 @@
 
 import collections
 import datetime
-import base64
-import hashlib
 import http.server
 import json
 import os
 import re
 import shutil
 import signal
-import subprocess
 import sys
 import threading
 import time
-import traceback
 import urllib.request
 import urllib.parse
 import uuid
-from html import unescape
-from html.parser import HTMLParser
-from http.cookiejar import CookieJar
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
@@ -29,12 +22,8 @@ from webhook.config import (  # noqa: E402
     PORT,
     MAX_BODY,
     _JOB_ID_RE,
-    REPO_ROOT,
-    SHOPPING_CARTS_ROOT,
-    TOKEN_FILE,
     JOB_DIR,
     SCREENSHOT_DIR,
-    AUDIT_DIR,
     RUN_DIR,
     _ASK_MAX_TURNS_DEFAULT,
     SLACK_WEBHOOK_URL,
@@ -49,11 +38,11 @@ from webhook.config import (  # noqa: E402
 from webhook.render import (  # noqa: E402
     _slack_post,
     _post_slack_bot,
-    _fetch_thread_context,
     _start_bot_thread,
     _redact_thread_question,
 )
 from webhook.proc import _spawn_capture_text  # noqa: E402
+from webhook.log import get_logger  # noqa: E402
 from webhook.agent import (  # noqa: E402
     _call_gemini,
     _run_cluster_ask,
@@ -80,6 +69,7 @@ from webhook.smoke import (  # noqa: E402
 from webhook.auth import (  # noqa: E402
     _get_token,
     _get_reader_token,
+    _get_cloud_runner_token,
     _resolve_token_role,
     _verify_slack_signature,
     _slack_user_is_allowlisted,
@@ -92,27 +82,23 @@ from webhook.make_targets import (  # noqa: E402
     parse_make_request,
 )
 from webhook.policy import (  # noqa: E402
-    _ACTION_POLICY,
-    _THREAD_COMMAND_MIN_ROLE,
-    _action_policy,
+    _action_policy,  # noqa: F401 -- re-exported; webhook_make_targets.py and webhook_policy.py call wh._action_policy
     _audit_remote_action,
     _effective_make_role,
     effective_policy,
     _normalize_actor_role,
-    _normalize_role,
     _policy_allows,
-    _rate_hits,
-    _RATE_MAX_DEFAULT,
     _rate_limited,
     _request_actor,
     _request_role,
     _role_allows,
-    strictest_role,
+    strictest_role,  # noqa: F401 -- re-exported; webhook_policy.py calls wh.strictest_role
     _thread_command_min_role,
 )
 import webhook.policy as _policy  # noqa: E402
 
 _policy._slack_user_role = _slack_user_role
+_LOG = get_logger("webhook")
 
 
 def _provider_supports_pushgateway(provider):
@@ -139,6 +125,47 @@ def _normalize_provider(provider):
     }.get(provider, provider)
 
 
+_LIVE_PROVIDER_CACHE = {"at": 0.0, "marker": None, "provider": None}
+_LIVE_PROVIDER_TTL_SECS = 60
+_PROVIDER_PROBE_ORDER = (
+    ("k3s-hostinger", "ubuntu-hostinger"),
+    ("k3s-aws", "ubuntu-k3s"),
+    ("k3s-az", "ubuntu-azure"),
+    ("k3s-gcp", "ubuntu-gcp"),
+)
+
+
+def _context_reachable(ctx):
+    rc, _out, timed_out = _spawn_capture_text(
+        ["kubectl", "--context", ctx, "--request-timeout=5s", "get", "--raw=/readyz"], timeout=8)
+    return rc == 0 and not timed_out
+
+
+def _resolve_live_provider():
+    marker = None
+    try:
+        if _ACTIVE_PROVIDER_FILE.exists():
+            marker = _normalize_provider(_ACTIVE_PROVIDER_FILE.read_text()) or None
+    except OSError:
+        marker = None
+    now = time.monotonic()
+    cache = _LIVE_PROVIDER_CACHE
+    if cache["provider"] and cache["marker"] == marker and now - cache["at"] < _LIVE_PROVIDER_TTL_SECS:
+        return cache["provider"]
+    contexts = dict(_PROVIDER_PROBE_ORDER)
+    provider = None
+    if marker and marker in contexts and _context_reachable(contexts[marker]):
+        provider = marker
+    if provider is None:
+        for candidate, ctx in _PROVIDER_PROBE_ORDER:
+            if candidate != marker and _context_reachable(ctx):
+                provider = candidate
+                break
+    provider = provider or marker or "k3s-aws"
+    cache.update(at=now, marker=marker, provider=provider)
+    return provider
+
+
 def _resolve_provider(preferred=None):
     provider = _normalize_provider(preferred)
     if provider:
@@ -146,14 +173,7 @@ def _resolve_provider(preferred=None):
     provider = _normalize_provider(os.environ.get("CLUSTER_PROVIDER") or os.environ.get("K3D_MANAGER_CLUSTER_PROVIDER"))
     if provider:
         return provider
-    try:
-        if _ACTIVE_PROVIDER_FILE.exists():
-            provider = _normalize_provider(_ACTIVE_PROVIDER_FILE.read_text())
-            if provider:
-                return provider
-    except OSError:
-        pass
-    return "k3s-aws"
+    return _resolve_live_provider()
 
 
 def _provider_context(provider=None):
@@ -1278,7 +1298,7 @@ def _init_k8s_ctx():
     try:
         result = _parse_kubeconfig("k3d-k3d-cluster")
         if result is None:
-            print("[k3dm-webhook] k8s API context: k3d-k3d-cluster not found in kubeconfig")
+            _LOG.warning("k8s API context k3d-k3d-cluster not found in kubeconfig")
             return
         server, ca_b64, cert_b64, key_b64 = result
         ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
@@ -1291,9 +1311,9 @@ def _init_k8s_ctx():
         _os.unlink(crt_f.name); _os.unlink(key_f.name)
         _k3d_ssl_ctx = ctx
         _k3d_server = server
-        print(f"[k3dm-webhook] k8s API context initialized: {server}")
+        _LOG.info("k8s API context initialized: %s", server)
     except Exception as exc:
-        print(f"[k3dm-webhook] k8s API context init failed: {exc}")
+        _LOG.error("k8s API context init failed: %s", exc)
 
 
 _JOB_RETENTION_SECS = 7 * 24 * 3600  # keep completed/failed jobs for 7 days
@@ -1311,7 +1331,7 @@ def _clear_stale_jobs():
             status = status_file.read_text().strip() if status_file.exists() else ""
             if status == "running":
                 status_file.write_text("failed")
-                print(f"[k3dm-webhook] cleared stale job {entry.name}")
+                _LOG.warning("cleared stale job %s", entry.name)
                 action_file = entry / "action"
                 action = action_file.read_text().strip() if action_file.exists() else "job"
                 _notify_job(
@@ -1321,7 +1341,7 @@ def _clear_stale_jobs():
                 )
             elif status in {"success", "failed"} and (now - entry.stat().st_mtime) > _JOB_RETENTION_SECS:
                 shutil.rmtree(entry, ignore_errors=True)
-                print(f"[k3dm-webhook] purged old job {entry.name} (status={status})")
+                _LOG.info("purged old job %s (status=%s)", entry.name, status)
         except Exception:
             pass
 
@@ -1361,18 +1381,15 @@ def _push_metrics(action, provider, status, duration_secs, job_id):
                 headers={"Content-Type": "text/plain; charset=utf-8"},
             )
             urllib.request.urlopen(req, timeout=5)
-            print(f"[k3dm-webhook] metrics pushed: {action}/{provider}/{status} {duration_secs}s")
+            _LOG.info("metrics pushed: %s/%s/%s %ss", action, provider, status, duration_secs)
             return
         except Exception as exc:
             if attempt < _PUSHGATEWAY_PUSH_RETRIES:
-                print(
-                    f"[k3dm-webhook] metrics push attempt {attempt}/"
-                    f"{_PUSHGATEWAY_PUSH_RETRIES} failed: {exc} — retrying in "
-                    f"{_PUSHGATEWAY_PUSH_SLEEP_SECS}s"
-                )
+                _LOG.warning("metrics push attempt %s/%s failed: %s — retrying in %ss",
+                             attempt, _PUSHGATEWAY_PUSH_RETRIES, exc, _PUSHGATEWAY_PUSH_SLEEP_SECS)
                 time.sleep(_PUSHGATEWAY_PUSH_SLEEP_SECS)
             else:
-                print(f"[k3dm-webhook] metrics push skipped (non-fatal): {exc}")
+                _LOG.warning("metrics push skipped (non-fatal): %s", exc)
 
 
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period
@@ -1712,7 +1729,7 @@ def _run_ask_docs(job_id, question, response_url="", thread_ts=None, channel_id=
             _slack_post(response_url, text)
         else:
             _notify_job(job_id, text)
-        print(f"[ask-docs] job failed: {type(exc).__name__}", file=sys.stderr)
+        _LOG.error("ask-docs job failed: %s", type(exc).__name__)
 
 
 # min_role is the floor that applies when no dynamic policy resolves.
@@ -1748,6 +1765,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self._token_role = _resolve_token_role(authorization[len(prefix):])
         _register_secret(_get_token())
         _register_secret(_get_reader_token())
+        _register_secret(_get_cloud_runner_token())
         return self._token_role is not None
 
     def _json(self, code, body):
@@ -1798,19 +1816,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ev_text = ev.get("text", "").strip()
             ev_user = ev.get("user", "")
             if not _slack_user_is_allowlisted(ev_user):
-                print(
-                    f"[slack/events] ignored type={ev_type!r} user={ev_user!r} reason=unallowlisted",
-                    flush=True,
-                )
+                _LOG.warning("slack event ignored type=%r user=%r reason=unallowlisted", ev_type, ev_user)
                 self._json(200, {"ok": True})
                 return
             slack_role = _slack_user_role(ev_user)
-            print(
-                f"[slack/events] type={ev_type!r} thread_ts={ev_thread_ts!r} "
-                f"ts={ev_ts!r} bot_id={ev_bot_id!r} subtype={ev_subtype!r} "
-                f"user={ev_user!r} role={slack_role!r} text={ev_text[:60]!r}",
-                flush=True,
-            )
+            _LOG.debug("slack event type=%r thread_ts=%r ts=%r bot_id=%r subtype=%r user=%r role=%r",
+                       ev_type, ev_thread_ts, ev_ts, ev_bot_id, ev_subtype, ev_user, slack_role)
             if (
                 ev_type == "message"
                 and not ev_bot_id
@@ -1823,7 +1834,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 cmd = text.lstrip("/").lower().split()[0] if text else ""
                 if is_thread_reply:
                     job_id = _find_job_by_thread_ts(thread_ts)
-                    print(f"[slack/events] thread reply — thread_ts={thread_ts!r} job_id={job_id!r} cmd={cmd!r}", flush=True)
+                    _LOG.debug("slack thread reply thread_ts=%r job_id=%r cmd=%r", thread_ts, job_id, cmd)
                     if job_id:
                         threading.Thread(
                             target=_handle_thread_command,
@@ -1836,14 +1847,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         anchor_dir.mkdir(parents=True, exist_ok=True)
                         (anchor_dir / "status").write_text("thread-anchor")
                         (anchor_dir / "thread_ts").write_text(thread_ts)
-                        print(f"[slack/events] orphan thread — anchor_id={anchor_id!r} cmd={cmd!r}", flush=True)
+                        _LOG.warning("slack orphan thread anchor_id=%r cmd=%r", anchor_id, cmd)
                         threading.Thread(
                             target=_handle_thread_command,
                             args=(anchor_id, text, slack_role),
                             daemon=True,
                         ).start()
                 elif cmd in _STANDALONE_CMDS:
-                    print(f"[slack/events] top-level cmd={cmd!r} ev_ts={ev_ts!r}", flush=True)
+                    _LOG.info("slack top-level command=%r event_ts=%r", cmd, ev_ts)
                     anchor_id = str(uuid.uuid4())[:8]
                     anchor_dir = JOB_DIR / anchor_id
                     anchor_dir.mkdir(parents=True, exist_ok=True)
@@ -1956,17 +1967,17 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 }
                 cooldown_file = _cve_cooldown_file(key)
                 if _cve_cooldown_active(cooldown_file):
-                    print(f"[cve-remediate] cooldown skip ns={namespace} repo={image_repository} key={key}", flush=True)
+                    _LOG.info("cve-remediate cooldown skip ns=%s repo=%s key=%s", namespace, image_repository, key)
                     skipped_on_cooldown.append(entry)
                     continue
                 if active_job:
-                    print(f"[cve-remediate] scan already running job={active_job} ns={namespace} repo={image_repository}", flush=True)
+                    _LOG.warning("cve-remediate scan already running job=%s ns=%s repo=%s", active_job, namespace, image_repository)
                     skipped_running.append({**entry, "active_job": active_job})
                     continue
                 _cve_touch_cooldown(cooldown_file)
                 job_name = _create_cve_scan_job()
                 active_job = job_name
-                print(f"[cve-remediate] triggered ns={namespace} repo={image_repository} job={job_name}", flush=True)
+                _LOG.info("cve-remediate triggered ns=%s repo=%s job=%s", namespace, image_repository, job_name)
                 triggered.append({**entry, "job_name": job_name})
             self._json(200, {
                 "status": "ok",
@@ -2271,8 +2282,18 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         output = output_file.read_text()[-2000:] if output_file.exists() else ""
         self._json(200, {"job_id": job_id, "status": status, "output": output})
 
-    def log_message(self, *_):
-        pass  # suppress access log noise
+    def setup(self):
+        super().setup()
+        self._request_started = time.monotonic()
+
+    def log_message(self, _fmt, *args):
+        status = args[1] if len(args) > 1 else getattr(self, "_response_code", "?")
+        route = self.path.split("?", 1)[0]
+        if route.startswith("/api/v1/status/"):
+            route = "/api/v1/status/{job_id}"
+        duration_ms = int((time.monotonic() - getattr(self, "_request_started", time.monotonic())) * 1000)
+        _LOG.info("request method=%s path=%s status=%s role=%s duration_ms=%s",
+                  self.command, route, status, getattr(self, "_token_role", "unknown"), duration_ms)
 
 
 if __name__ == "__main__":
@@ -2287,5 +2308,5 @@ if __name__ == "__main__":
     _init_k8s_ctx()
     _clear_stale_jobs()
     server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
-    print(f"[k3dm-webhook] listening on 127.0.0.1:{PORT}")
+    _LOG.info("listening on 127.0.0.1:%s", PORT)
     server.serve_forever()
