@@ -27,9 +27,9 @@ Per-release detail: `CHANGELOG.md` and `docs/retro/`.
 - [x] Docs sweep — `0ceb5a37` (acg.md watcher section; 5 plan statuses DONE, SHAs verified).
 - [x] CHANGELOG promoted to `[1.41.0] - 2026-10-06`; duplicate Added/Fixed blocks merged (entry text unchanged, verified); empty `[Unreleased]` kept.
 - [x] Releases rows added; README table rotated to 3 rows (v1.38.0 + v1.37.0 into Older).
-- [ ] Reapply ApplicationSets (hub + ACG); `argocd_check_values_branch`.
+- [x] AppSets: `argocd_check_values_branch k3d-manager-v1.41.0` rc=0 — 27 refs (hub + ACG) already on the release branch, no reapply needed. Scope check vs origin/main: 257 files / 326 commits, 5 v1.41.0 plans (cap), every code/config file maps to a CHANGELOG entry. NOTE: local `main` is stale at v1.39.0 `3a254484`; diff against `origin/main`.
 - [x] federate-acg rollout DONE 2026-10-06 12:29Z: operator restarted PF :19190 (new PID 3165); hub `up{job="federate-acg"}`=1, scrape 5.3 s / 30 s timeout, 23,772 samples (spec predicted 23,777).
-- [ ] PR (after gates); merge waits for operator go.
+- [ ] PR body drafted (scratchpad `pr-v1.41.0.md`); waiting on operator: `make e2e` live smoke gate (diff touches bin/lib/plugins) + go to `gh pr create`. Merge waits for operator go.
 
 ## Open items (verbatim, grouped by original section)
 
