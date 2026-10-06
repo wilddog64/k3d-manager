@@ -17,7 +17,7 @@ Before provisioning, extract the sandbox AWS credentials from the Pluralsight Cl
 **Option A - Playwright (browser helper must be running):**
 
 ```bash
-./scripts/k3d-manager acg_get_credentials "https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<sandbox-id>"
+./scripts/k3d-manager acg_get_credentials "https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/<sandbox-id>"
 ```
 
 **Option B - Paste from clipboard (no Playwright needed):**
@@ -65,8 +65,8 @@ ACG sandboxes expire after 4 hours. To extend:
 
 ```bash
 ./scripts/k3d-manager acg_extend_playwright <sandbox-url>
-# Example cloud playground URL
-./scripts/k3d-manager acg_extend_playwright "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+# Example sandbox list URL
+./scripts/k3d-manager acg_extend_playwright "https://app.pluralsight.com/hands-on/playground/cloud-sandboxes"
 ```
 
 The browser helper opens the sandbox page and clicks the extend button automatically. First run: you will be prompted to log into Pluralsight manually in the browser window; the session persists for subsequent runs.
@@ -89,7 +89,7 @@ time it returns.
 Override the defaults when you need a specific sandbox or cloud:
 
 ```bash
-make acg-restart URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<sandbox-id>" PROVIDER=aws
+make acg-restart URL="https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/<sandbox-id>" PROVIDER=aws
 ```
 
 `URL` defaults to the sandbox list page and `PROVIDER` defaults to `aws` (`gcp` and `azure` are also accepted).

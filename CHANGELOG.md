@@ -12,6 +12,12 @@
 
 ### Fixed
 
+- The Makefile's default `URL` still pointed at Pluralsight's retired
+  `cloud-playground/cloud-sandboxes` route, so `make help`, `docs/howto/makefile.md` and the
+  `docs/howto/acg.md` examples showed a dead address, and `make up` / `make creds` worked only
+  because lib-foundation rewrites that path. The default and the examples now use
+  `hands-on/playground/cloud-sandboxes`. Filed 2026-07-19 for v1.18.0 and never implemented. See
+  `docs/bugs/2026-07-19-makefile-stale-acg-sandbox-url-default.md`.
 - `bin/*` scripts, the Makefile and the tests sourced `scripts/lib/system.sh`, a stale local copy of
   lib-foundation's system library, while the dispatcher loaded the subtree copy. The stale
   `_run_command` lacked the no-TTY `-n` guard and lib-foundation's system-path fix, so `make up` Step

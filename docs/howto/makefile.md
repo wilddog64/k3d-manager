@@ -249,7 +249,7 @@ make         # same as make help (DEFAULT_GOAL)
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `URL` | `https://app.pluralsight.com/cloud-playground/cloud-sandboxes` | Sandbox URL passed to `bin/cluster-up` and `bin/cluster-refresh` |
+| `URL` | `https://app.pluralsight.com/hands-on/playground/cloud-sandboxes` | Sandbox URL passed to `bin/cluster-up` and `bin/cluster-refresh` |
 | `GHCR_PAT` | `$(gh auth token)` | GitHub Container Registry token — used by `cluster-up` to create the `ghcr-pull-secret` |
 | `KEEP_LOCAL` | `1` | Set to `0` to delete the local Hub cluster when running `make down` (equivalent to `DELETE_HUB=1`) |
 | `DELETE_HUB` | `0` | Set to `1` to delete the local Hub cluster when running `make down` |

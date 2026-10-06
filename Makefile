@@ -13,7 +13,7 @@ SHELL := /bin/bash
 
 CLUSTER_PROVIDER ?= k3s-aws
 ACG_AGENT_COUNT  ?= 2
-URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
+URL ?= https://app.pluralsight.com/hands-on/playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL    ?= 1
 DELETE_HUB    ?= 0
