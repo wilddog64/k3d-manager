@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-06, Claude
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** OPEN
+**Status:** FIXED `07385677` (rollout pending: hub sync + operator PF restart + `up==1`)
 **Severity:** medium. The hub's `federate-acg` target is down for the whole sandbox lifetime, so
 `TargetDown` fires and no sandbox metrics reach the hub, even though the sandbox Prometheus is
 healthy.

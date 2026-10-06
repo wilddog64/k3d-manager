@@ -1076,9 +1076,9 @@ genuinely collected; `check-doc-links` 1801 files OK.
 All four anomalies from the first post-bootstrap cycles were deep-dived read-only.
 Three resolve to known items; one is a defect nobody had reported.
 
-## 2026-10-06 — federate-acg scrape timeout dispatched to Codex
+## 2026-10-06 — federate-acg scrape timeout FIXED (`07385677`), rollout pending
 
-The CRD-discovery bug is MITIGATED, not reproduced today. The real current fault: hub `up{job="federate-acg"}`=0, `context deadline exceeded` at 10 s. k3s exposes apiserver/etcd/scheduler metrics on the kubelet endpoint, so `job=kubelet` federates ~50k histogram buckets (75,583 series, 37.6 MB, 15.6 s). Exclusion measured: 23,777. Hub holds 0 acg control-plane series, so nothing depends on them. Port-forward :19190 (kubectl PID 13954) wedged after the oversized transfers — operator restarts it after the fix syncs. Next after this: v1.41.0 release prep (operator 2026-10-06: compress memory-bank + release activities).
+The CRD-discovery bug is MITIGATED, not reproduced today. The real current fault: hub `up{job="federate-acg"}`=0, `context deadline exceeded` at 10 s. k3s exposes apiserver/etcd/scheduler metrics on the kubelet endpoint, so `job=kubelet` federates ~50k histogram buckets (75,583 series, 37.6 MB, 15.6 s). Exclusion measured: 23,777. Hub holds 0 acg control-plane series, so nothing depends on them. Port-forward :19190 (kubectl PID 13954) wedged after the oversized transfers — operator restarts it after the fix syncs. Next after this: v1.41.0 release prep (operator 2026-10-06: compress memory-bank + release activities). Codex commit `07385677` verified by Claude (BATS 14/14, independent RED, scope 4 files). Rollout: hub app sync → operator restarts PF → confirm `up==1`.
 
 ## 2026-10-06 — stale Makefile URL default FIXED (`5426de02`)
 
