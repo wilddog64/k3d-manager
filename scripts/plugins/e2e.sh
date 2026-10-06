@@ -3,6 +3,7 @@ set -euo pipefail
 
 E2E_IMAGE="${E2E_IMAGE:-ghcr.io/wilddog64/shopping-cart-e2e-tests}"
 E2E_IMAGE_TAG="${E2E_IMAGE_TAG:-latest}"
+E2E_IMAGE_PULL_POLICY="${E2E_IMAGE_PULL_POLICY:-}"
 E2E_NAMESPACE="${E2E_NAMESPACE:-shopping-cart-apps}"
 E2E_JOB_TIMEOUT="${E2E_JOB_TIMEOUT:-1200}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-${HOME}/.k3dm/e2e}"
@@ -15,7 +16,7 @@ E2E_RESULT_EVENT_NAMESPACE="${E2E_RESULT_EVENT_NAMESPACE:-platform-ops}"
 E2E_RESULT_EVENT_KEEP="${E2E_RESULT_EVENT_KEEP:-20}"
 E2E_TIER="${E2E_TIER:-vcluster}"
 E2E_PROJECT="${E2E_PROJECT:-api+flows}"
-export E2E_IMAGE E2E_IMAGE_TAG E2E_NAMESPACE E2E_JOB_TIMEOUT E2E_REPORT_DIR
+export E2E_IMAGE E2E_IMAGE_TAG E2E_IMAGE_PULL_POLICY E2E_NAMESPACE E2E_JOB_TIMEOUT E2E_REPORT_DIR
 export E2E_SERVICE_UNDER_TEST E2E_ROLLOUT_TIMEOUT E2E_VCLUSTER_READY_TIMEOUT
 export E2E_VCLUSTER_READY_INTERVAL E2E_VCLUSTER_READY_REFRESH_INTERVAL
 export E2E_RESULT_EVENT_NAMESPACE E2E_RESULT_EVENT_KEEP E2E_TIER E2E_PROJECT
@@ -34,6 +35,28 @@ function _e2e_load_deps() {
     # shellcheck source=/dev/null
     source "$plugin"
   fi
+}
+
+function _e2e_image_pull_policy() {
+  local policy="${E2E_IMAGE_PULL_POLICY:-}"
+
+  if [[ -z "$policy" ]]; then
+    if [[ "$E2E_IMAGE_TAG" == "latest" ]]; then
+      printf '%s\n' 'Always'
+    else
+      printf '%s\n' 'IfNotPresent'
+    fi
+    return 0
+  fi
+
+  case "$policy" in
+    Always|IfNotPresent|Never)
+      printf '%s\n' "$policy"
+      ;;
+    *)
+      _err "e2e: E2E_IMAGE_PULL_POLICY must be Always, IfNotPresent, or Never (got: ${policy})"
+      ;;
+  esac
 }
 
 function _e2e_kc() {
@@ -210,7 +233,10 @@ function _e2e_sandbox_configure_vault_token_review() {
 }
 
 function _e2e_sandbox_job_manifest() {
-  local job_name="${1:-}" image="${2:-}"
+  local job_name="${1:-}" image="${2:-}" pull_policy
+  if ! pull_policy="$(_e2e_image_pull_policy)"; then
+    return 1
+  fi
   cat <<EOF
 apiVersion: batch/v1
 kind: Job
@@ -229,7 +255,7 @@ spec:
       containers:
         - name: e2e
           image: ${image}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: ${pull_policy}
           command:
             - sh
             - -c
@@ -618,6 +644,10 @@ function _e2e_provision_keycloak_secret() {
 function _e2e_job_manifest() {
   local job_name="${1:-}"
   local image="${2:-}"
+  local pull_policy
+  if ! pull_policy="$(_e2e_image_pull_policy)"; then
+    return 1
+  fi
   cat <<EOF
 apiVersion: batch/v1
 kind: Job
@@ -643,7 +673,7 @@ spec:
       containers:
       - name: e2e
         image: ${image}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: ${pull_policy}
         command:
         - sh
         - -c

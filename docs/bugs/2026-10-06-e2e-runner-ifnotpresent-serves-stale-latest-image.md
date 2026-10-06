@@ -1,7 +1,7 @@
 # E2E runner Job uses `IfNotPresent` on `:latest`, so a hub node serves a stale test image
 
 **Filed:** 2026-10-06
-**Status:** OPEN — spec below, for Codex
+**Status:** FIXED in v1.42.0 branch — pull policy fix implemented and covered by BATS; the separate post-run exit-1 issue remains open
 **Component:** `scripts/plugins/e2e.sh` — both Playwright runner Job manifests (`imagePullPolicy: IfNotPresent`, lines 232 and 646)
 **Severity:** high — the Tier 1 release gate reports failures that were already fixed upstream, and would equally report a pass for tests that were since broken
 **Found by:** v1.41.0 release smoke (`make e2e`, run `1791290346-2661`)

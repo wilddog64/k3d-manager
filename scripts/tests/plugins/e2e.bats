@@ -12,6 +12,7 @@ setup() {
   RUN_EXIT_CODES=()
 
   export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_IMAGE_PULL_POLICY=""
   mkdir -p "$E2E_REPORT_DIR"
   export E2E_JOB_TIMEOUT=5
   export E2E_ROLLOUT_TIMEOUT=5
@@ -377,6 +378,43 @@ EOF
   [[ "$output" == *"restartPolicy: Never"* ]]
   [[ "$output" == *"backoffLimit: 0"* ]]
   [[ "$output" == *"name: ghcr-pull-secret"* ]]
+}
+
+@test "latest E2E image defaults both runner manifests to Always" {
+  export E2E_IMAGE_TAG=latest
+  run _e2e_job_manifest "e2e-run-latest" "ghcr.io/example/e2e:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"imagePullPolicy: Always"* ]]
+  run _e2e_sandbox_job_manifest "sandbox-run-latest" "ghcr.io/example/e2e:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"imagePullPolicy: Always"* ]]
+}
+
+@test "immutable E2E image tags default both runner manifests to IfNotPresent" {
+  export E2E_IMAGE_TAG=sha-abc
+  run _e2e_job_manifest "e2e-run-pinned" "ghcr.io/example/e2e:sha-abc"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"imagePullPolicy: IfNotPresent"* ]]
+  run _e2e_sandbox_job_manifest "sandbox-run-pinned" "ghcr.io/example/e2e:sha-abc"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"imagePullPolicy: IfNotPresent"* ]]
+}
+
+@test "explicit E2E image pull policy overrides tag-derived default" {
+  export E2E_IMAGE_TAG=latest E2E_IMAGE_PULL_POLICY=Never
+  run _e2e_job_manifest "e2e-run-never" "ghcr.io/example/e2e:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"imagePullPolicy: Never"* ]]
+  run _e2e_sandbox_job_manifest "sandbox-run-never" "ghcr.io/example/e2e:latest"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"imagePullPolicy: Never"* ]]
+}
+
+@test "invalid E2E image pull policy is rejected" {
+  export E2E_IMAGE_PULL_POLICY=Sometimes
+  run _e2e_job_manifest "e2e-run-invalid" "ghcr.io/example/e2e:latest"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"E2E_IMAGE_PULL_POLICY must be Always, IfNotPresent, or Never"* ]]
 }
 
 @test "vcluster Job manifest wires the five Keycloak settings without a password literal" {
