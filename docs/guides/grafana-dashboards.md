@@ -322,7 +322,9 @@ values until the next `make test-metrics`.
 `release: acg-kube-prometheus-stack`, and are applied to the app cluster by
 `make observability-acg`. They deliberately do **not** sit with the other rule files under
 `scripts/etc/prometheus/rules/`, which are hub-side: the hub has no Pushgateway, its
-`federate-acg` job selects only `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}`,
+`federate-acg` job selects only `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}`
+(minus the k3s control-plane `apiserver_`, `etcd_`, `scheduler_` and `workqueue_` series, which
+k3s exposes on the kubelet endpoint and which made the scrape outgrow its timeout),
 and so the hub TSDB holds zero `k3dm_test_*` series. A rule on the hub for these metrics can
 never fire. `DeploymentMetricsStale` moved for the same reason.
 `OfflineSuiteRunMissed` fires when no run, pass or fail, has been pushed for 26h, which is the

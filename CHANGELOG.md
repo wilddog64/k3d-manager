@@ -12,6 +12,13 @@
 
 ### Fixed
 
+- The hub's `federate-acg` scrape timed out on every attempt, so no sandbox metrics reached the
+  hub and `TargetDown` fired for the whole sandbox lifetime. k3s exposes the embedded apiserver,
+  etcd and scheduler metrics on the kubelet endpoint, so the `job="kubelet"` match federated
+  about 50,000 control-plane histogram series — a 37 MB response that took 15 s against a 10 s
+  timeout. The match now excludes `apiserver_`, `etcd_`, `scheduler_` and `workqueue_` (75,583 →
+  23,777 series) and the job's timeout is 30 s. See
+  `docs/bugs/2026-10-06-federate-acg-scrape-exceeds-timeout-k3s-control-plane-histograms.md`.
 - The Makefile's default `URL` still pointed at Pluralsight's retired
   `cloud-playground/cloud-sandboxes` route, so `make help`, `docs/howto/makefile.md` and the
   `docs/howto/acg.md` examples showed a dead address, and `make up` / `make creds` worked only

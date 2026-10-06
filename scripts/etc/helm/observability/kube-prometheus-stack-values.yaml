@@ -46,11 +46,12 @@ prometheus:
             regex: http-monitoring
       - job_name: federate-acg
         scrape_interval: 60s
+        scrape_timeout: 30s
         honor_labels: true
         metrics_path: /federate
         params:
           match[]:
-            - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy", __name__!~".+:.+"}'
+            - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy", __name__!~".+:.+|apiserver_.+|etcd_.+|scheduler_.+|workqueue_.+"}'
         static_configs:
           - targets:
               - 'host.internal:19190'
