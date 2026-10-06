@@ -1,3 +1,12 @@
+## 2026-10-06 — HIPAA readiness added as an unversioned roadmap theme
+
+The user asked to put HIPAA compliance into the roadmap. `docs/roadmap.md` now records this as
+future HIPAA readiness and compliance-gap-assessment work, not a certification claim. The initial
+boundary is no PHI by default in development, k3d/k3s sandboxes, automation, external agents,
+Slack/AI/webhooks, CI artifacts, logs, and backups until data flows, BAAs, risk analysis, and
+control ownership are documented. A dedicated scope document and legal/security review are
+required before assigning a release; v1.42.0 is already at its five-plan cap.
+
 ## 2026-10-06 — ask-docs summary failure bug filed (OPEN, v1.41.0)
 
 docs/bugs/2026-10-06-ask-docs-model-failure-reported-as-success.md records operator Slack
