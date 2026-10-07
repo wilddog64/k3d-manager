@@ -120,6 +120,13 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — long Slack command help standardization in progress
+
+- [x] Filed `docs/bugs/2026-10-06-slack-command-help-inconsistent.md`.
+- [x] Replaced dense long-form usage messages with readable examples across the
+      remaining Slack command handlers and added representative regression coverage.
+- [ ] Run tests, commit/push, deploy the relay, and verify help in Slack.
+
 ## 2026-10-06 — Slack cluster-diagnose help clarification in progress
 
 - [x] Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-help-ambiguous.md`.

@@ -337,6 +337,22 @@ test('/cluster-diagnose help explains the request forms with examples', async ()
   assert.match(message, /Applications: \/cluster-diagnose hub apps \| app <name> \| appsets/)
 })
 
+test('long Slack command help uses examples instead of dense grammar', async () => {
+  const cases = [
+    ['/cluster-up', '', /Example: \/cluster-up aws/],
+    ['/cluster-resume', 'nope', /Example: \/cluster-resume aws/],
+    ['/cleanup-stale-sandbox', 'later', /Without `confirm`, the command previews changes only/],
+    ['/ask-docs', '--sources', /Examples: \/ask-docs/],
+    ['/argocd-upgrade', '', /Examples: \/argocd-upgrade/],
+  ]
+  for (const [command, text, expected] of cases) {
+    const worker = loadWorker()
+    const body = `command=${encodeURIComponent(command)}&text=${encodeURIComponent(text)}&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp`
+    const response = await worker.dispatch(signed('/slack/commands', body))
+    assert.match(await response.text(), expected)
+  }
+})
+
 test('/cluster-diagnose with no text still returns usage without relaying', async () => {
   const worker = loadWorker()
   const body = 'command=%2Fcluster-diagnose&text=&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'

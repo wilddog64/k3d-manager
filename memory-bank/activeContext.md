@@ -151,6 +151,12 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — long Slack command help standardized
+
+Filed `docs/bugs/2026-10-06-slack-command-help-inconsistent.md`. Audited the relay's
+long usage/error messages and converted cluster lifecycle, resume, cleanup, `/k3dm`,
+`/ask-docs`, and ArgoCD upgrade help to example-based text. Tests and deployment remain.
+
 ## 2026-10-06 — Slack cluster-diagnose help clarified
 
 Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-help-ambiguous.md`. Replaced the

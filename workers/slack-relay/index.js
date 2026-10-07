@@ -40,6 +40,31 @@ function resolveProviderStrict(text) {
 }
 
 const CLUSTER_ARG_USAGE = '`hostinger` is the permanent app cluster; `aws`, `gcp` and `az` are ephemeral lab sandboxes.'
+const K3DM_USAGE = [
+  'Usage: /k3dm <target> [KEY=value …] [confirm]',
+  'Examples: /k3dm help · /k3dm status · /k3dm test-all',
+  'Use `/k3dm help` to see targets allowed for your role.',
+].join('\n')
+const CLUSTER_RESUME_USAGE = [
+  'Usage: /cluster-resume <cluster>',
+  'Clusters: aws, gcp, az',
+  'Example: /cluster-resume aws',
+  'Resumes a lab sandbox from its last checkpoint.',
+].join('\n')
+const CLEANUP_USAGE = [
+  'Usage: /cleanup-stale-sandbox [confirm]',
+  'Example: /cleanup-stale-sandbox confirm',
+  'Without `confirm`, the command previews changes only.',
+].join('\n')
+const ASK_DOCS_USAGE = [
+  'Usage: /ask-docs [--sources] <question>',
+  'Examples: /ask-docs how does test-all publish metrics?',
+  '/ask-docs --sources where is the webhook status documented?',
+].join('\n')
+const ARGOCD_UPGRADE_USAGE = [
+  'Usage: /argocd-upgrade <chart-version> [acg|infra]',
+  'Examples: /argocd-upgrade 7.9.1 infra · /argocd-upgrade 7.9.1 acg',
+].join('\n')
 const CLUSTER_DIAGNOSE_USAGE = [
   'Usage: /cluster-diagnose [cluster] <request>',
   'Clusters: hostinger, aws, gcp, az, hub (default: hostinger)',
@@ -106,7 +131,6 @@ function parseClusterDiagnose(text) {
   return { error: `${CLUSTER_DIAGNOSE_USAGE}\nUnknown request: ${verb}` }
 }
 
-const K3DM_USAGE = 'Usage: /k3dm <target> [KEY=value …] [confirm] — `/k3dm help` lists targets for your role'
 const K3DM_FREE_TEXT_KEYS = new Set(['Q'])
 
 function parseK3dm(text) {
@@ -343,7 +367,7 @@ async function handle(req, event) {
 
   if (command === '/cluster-up') {
     const { provider, error } = resolveProviderStrict(text)
-    if (error) return jsonReply(`⚠️ ${error} — usage: \`${command} <aws|gcp|az|hostinger>\`. ${CLUSTER_ARG_USAGE}`, threadTs, true)
+    if (error) return jsonReply(`⚠️ ${error}\nUsage: ${command} <cluster>\nClusters: aws, gcp, az, hostinger\nExample: ${command} aws\n${CLUSTER_ARG_USAGE}`, threadTs, true)
     const payload = { action: 'up', provider, response_url: responseUrl }
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
@@ -358,7 +382,7 @@ async function handle(req, event) {
 
   if (command === '/cluster-down') {
     const { provider, error } = resolveProviderStrict(text)
-    if (error) return jsonReply(`⚠️ ${error} — usage: \`${command} <aws|gcp|az|hostinger>\`. ${CLUSTER_ARG_USAGE}`, threadTs, true)
+    if (error) return jsonReply(`⚠️ ${error}\nUsage: ${command} <cluster>\nClusters: aws, gcp, az, hostinger\nExample: ${command} aws\n${CLUSTER_ARG_USAGE}`, threadTs, true)
     const payload = { action: 'down', provider, response_url: responseUrl }
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
@@ -426,7 +450,7 @@ async function handle(req, event) {
   if (command === '/cluster-resume') {
     const provider = resolveProvider(text, '')
     if (!VALID_PROVIDERS.has(provider)) {
-      return jsonReply('Usage: /cluster-resume <aws|gcp|az> — resumes a lab sandbox provision from its last checkpoint', threadTs)
+      return jsonReply(CLUSTER_RESUME_USAGE, threadTs)
     }
     const payload = { provider, response_url: responseUrl }
     event.waitUntil((async () => {
@@ -440,7 +464,7 @@ async function handle(req, event) {
   if (command === '/cleanup-stale-sandbox') {
     const cleanupText = (text || '').trim().toLowerCase()
     if (cleanupText && !['confirm', 'apply'].includes(cleanupText)) {
-      return jsonReply('Usage: /cleanup-stale-sandbox [confirm] — dry-run by default; confirm applies the cleanup', threadTs)
+      return jsonReply(CLEANUP_USAGE, threadTs)
     }
     const confirm = ['confirm', 'apply'].includes(cleanupText)
     event.waitUntil((async () => {
@@ -476,7 +500,7 @@ async function handle(req, event) {
       agent = command.slice(1)
       question = text
     }
-    if (!question) return jsonReply(`Usage: ${command} <question>`, threadTs)
+    if (!question) return jsonReply(`Usage: ${command} <question>\nExample: ${command} investigate the latest failed check`, threadTs)
     const payload = { agent, question, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
@@ -488,7 +512,7 @@ async function handle(req, event) {
   }
 
   if (command === '/ask-docs') {
-    if (!text || text === '--sources' || text === '-s') return jsonReply('Usage: /ask-docs [--sources] <question>', threadTs)
+    if (!text || text === '--sources' || text === '-s') return jsonReply(ASK_DOCS_USAGE, threadTs)
     const payload = { question: text, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
@@ -503,8 +527,8 @@ async function handle(req, event) {
     const parts   = text.split(/\s+/)
     const version = parts[0] || ''
     const stage   = parts[1] || 'infra'
-    if (!version) return jsonReply('Usage: /argocd-upgrade <chart_version> [acg|infra]', threadTs)
-    if (!['acg', 'infra'].includes(stage)) return jsonReply('stage must be acg or infra', threadTs)
+    if (!version) return jsonReply(ARGOCD_UPGRADE_USAGE, threadTs)
+    if (!['acg', 'infra'].includes(stage)) return jsonReply(`${ARGOCD_UPGRADE_USAGE}\nStage must be acg or infra.`, threadTs)
     event.waitUntil((async () => {
       const { ok } = await relay('/api/v1/argocd-upgrade',
         { chart_version: version, stage, response_url: responseUrl }, meta)
