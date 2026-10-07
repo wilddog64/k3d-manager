@@ -1,3 +1,12 @@
+## 2026-10-07 — Slack thread routing audit filed; bug dashboard specified
+
+Filed docs/bugs/2026-10-07-slack-thread-command-routing-gaps.md and docs/issues/2026-10-07-slack-thread-command-routing-audit.md. Compared all 16 relay commands: diagnostics,
+k3dm, argocd-upgrade lack thread routes; hermes-auth is relay-local and requires design, not
+auth bypass. Bare refresh/up/down/resume aliases return early; 8/8 isolated probes confirmed.
+Other 12 have routing presence only; no live success claim or runtime fix. Added docs/plans/v1.44.0-bug-lifecycle-dashboard.md
+as PROPOSED fourth v1.44.0 plan: canonical doc counts, unknown metadata, truthful transition
+history, scan freshness and linked inventory. No deployment. Publication SHA is in git history.
+
 ## 2026-10-07 — v1.44.0 operator acceptance automation specified
 
 Added docs/plans/v1.44.0-operator-acceptance-automation.md as PROPOSED, the third v1.44.0 plan after
