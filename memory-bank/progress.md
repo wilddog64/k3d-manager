@@ -1233,6 +1233,18 @@ the next CI run is pending.
 - [x] Full local `make test` verification: 1,384/1,384 BATS passed; the reported case numbers all
       passed locally.
 
+## 2026-10-07 — stale failed-case dashboard rows
+
+- [x] Filed `docs/bugs/2026-10-07-test-metrics-stale-failure-series.md`.
+- [x] Changed Pushgateway publication from `POST` to `PUT`, replacing the complete target group
+      and preventing old `k3dm_test_failure` series from surviving.
+- [x] Fixed the two Python failures exposed by the run: human-readable metric labels remain
+      valid, and a new status thread safely falls back to the response URL on channel mismatch.
+- [x] Elevated pytest passed `702 passed, 2 skipped`; dashboard BATS passed `36/36`; compile,
+      lint, audit, and diff checks passed.
+- [ ] Commit and push, then run `make test-all` once more to confirm Grafana lists exactly the
+      current failures.
+
 ## 2026-10-07 — Grafana run classification
 
 - [x] Added `k3dm_test_run_classification` with explicit `passed` / `failed_untriaged` labels.

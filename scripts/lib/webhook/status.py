@@ -36,8 +36,10 @@ def _post_slack_message(output, thread_ts, channel_id):
 
 def _start_status_thread(header, channel_id):
     """Start a status thread in the event channel when needed."""
+    # A new thread has no trusted incoming message context. Use the configured
+    # channel; only an existing incoming thread may target a different channel.
     if channel_id and channel_id != _slack_channel_id():
-        return _start_bot_thread(header, channel_id=channel_id)
+        return None
     return _start_bot_thread(header)
 
 

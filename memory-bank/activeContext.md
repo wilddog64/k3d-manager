@@ -578,6 +578,17 @@ The complete local BATS dispatcher subsequently passed all `1,384` cases, includ
 198, 970, 971, 972, 974, and 981. No code change was made because the reported failures remain
 cloud-only and lack assertion diagnostics.
 
+## 2026-10-07 — stale failed-case metrics fixed
+
+The latest `make test-all` published `2,509` cases with `2` failures, but Grafana mixed current
+and older failed-case rows. Filed `docs/bugs/2026-10-07-test-metrics-stale-failure-series.md`.
+The exporter now uses Pushgateway `PUT` replacement semantics, so omitted old failure series are
+removed. Updated the metrics label contract to preserve human-readable names and restored the
+safe Slack response-URL fallback for a new thread when the supplied channel mismatches the
+configured channel. Elevated pytest verification passed `702 passed, 2 skipped`; Grafana
+dashboard BATS passed `36/36`; compilation, lint, audit, and diff checks passed. Commit and push
+remain pending.
+
 ## 2026-10-07 — test-run classification published to Grafana
 
 Added `k3dm_test_run_classification` to the test metrics payload. It publishes `passed` only for
