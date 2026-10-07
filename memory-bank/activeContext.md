@@ -55,6 +55,13 @@ unittest files passed; `make test-pytest`: 689 passed / 2 skipped. `ruff` was un
 operator. Commit `d39ecf9d` is pushed to `origin/k3d-manager-v1.42.0`; no PR was created per
 repository instructions.
 
+## 2026-10-07 — v1.43.0 E2E failure-evidence enhancement specified
+
+Added `docs/plans/v1.43.0-e2e-failure-artifacts.md` as a proposed enhancement. It specifies
+best-effort pre-teardown capture of E2E summaries, Playwright logs/screenshots/traces, bounded
+redacted structured bridge evidence, failure classification, artifact retention, and live
+success/failure verification. No runtime code changed.
+
 Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
 automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
 diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response

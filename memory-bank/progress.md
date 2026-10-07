@@ -39,6 +39,13 @@ tests passed (12/12), `make test-python-unit` passed, and `make test-pytest` pas
 2 skipped). Commit `d39ecf9d` is pushed to `origin/k3d-manager-v1.42.0`; no PR was created per
 repository instructions. Live cloud/Slack verification is pending operator review.
 
+## 2026-10-07 — v1.43.0 E2E failure-evidence enhancement specified
+
+Added the proposed plan `docs/plans/v1.43.0-e2e-failure-artifacts.md`. Scope is structured
+failure evidence captured before vCluster teardown, not a bug fix: run ID, exit code, failed
+step/classification, bounded redacted excerpt, and durable summary/log/screenshot/trace links.
+Implementation and artifact-store decisions remain future work.
+
 `make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
 terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
 `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make
