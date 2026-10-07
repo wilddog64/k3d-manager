@@ -151,6 +151,13 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — namespace-first Slack pod diagnosis fixed
+
+Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-pod-order.md`. The relay rejected
+`/cluster-diagnose hub platform-ops pod acg-expiry-check-29855580-ssvb` because it only
+accepted verb-first `describe-pod <namespace> <pod>`. The parser now accepts namespace-first
+`pod` as the same read-only describe action; focused relay verification and deployment remain.
+
 ## 2026-10-06 — Slack status thread context fixed
 
 Filed `docs/bugs/2026-10-06-slack-status-thread-context-dropped.md`. The Slack relay

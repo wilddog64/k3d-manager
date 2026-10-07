@@ -120,6 +120,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — Slack namespace-first pod diagnosis fix in progress
+
+- [x] Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-pod-order.md` with the exact
+      Slack failure and requested command.
+- [x] Added namespace-first `pod` shorthand mapping to the existing `describe-pod`
+      diagnostic action, plus documentation and a regression test.
+- [ ] Run relay tests, commit/push, deploy the Cloudflare Worker, and re-test live.
+
 ## 2026-10-06 — Slack status thread context fix in progress
 
 - [x] Filed `docs/bugs/2026-10-06-slack-status-thread-context-dropped.md`.

@@ -409,6 +409,8 @@ Examples:
 - `/cluster-diagnose hub apps`
 - `/cluster-diagnose hub app shopping-cart-apps`
 - `/cluster-diagnose hub appsets`
+- `/cluster-diagnose hub platform-ops pod acg-expiry-check-29855580-ssvb` — shorthand for
+  `describe-pod` when the namespace comes before the `pod` verb.
 
 This path is deliberately read-only. `pods <namespace>`, `describe-pod` and `logs` reject any
 namespace outside the repo-owned allowlist (`cicd`, `identity`, `monitoring`, `platform-ops`,

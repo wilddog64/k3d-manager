@@ -335,3 +335,19 @@ test('/cluster-diagnose with no text still returns usage without relaying', asyn
   assert.match(await response.text(), /Usage: \/cluster-diagnose/)
   assert.equal(worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/diagnostics'), undefined)
 })
+
+test('/cluster-diagnose accepts namespace pod order as describe-pod', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcluster-diagnose&text=hub%20platform-ops%20pod%20acg-expiry-check-29855580-ssvb&channel_id=CDIAG&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await worker.dispatch(signed('/slack/commands', body))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/diagnostics')
+  const payload = JSON.parse(call.init.body)
+  assert.deepEqual(payload, {
+    provider: 'hub',
+    action: 'describe-pod',
+    namespace: 'platform-ops',
+    name: 'acg-expiry-check-29855580-ssvb',
+    response_url: 'https://hooks.slack.test/resp',
+    channel_id: 'CDIAG',
+  })
+})

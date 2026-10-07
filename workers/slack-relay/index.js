@@ -56,21 +56,28 @@ function parseClusterDiagnose(text) {
   if (!verb) {
     return { error: 'Usage: /cluster-diagnose <hostinger|aws|gcp|az|hub> (all pods) | /cluster-diagnose [hostinger|aws|gcp|az|hub] <pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets>' }
   }
-  if (verb === 'pods') {
-    const namespace = parts[index + 1] || ''
+  const namespaceFirst = !['pods', 'describe-pod', 'logs', 'apps', 'app', 'appsets'].includes(verb) &&
+    ['pod', 'describe-pod', 'logs'].includes(parts[index + 1])
+  if (namespaceFirst) {
+    index += 1
+  }
+  const diagnosticVerb = (namespaceFirst ? parts[index] : verb) === 'pod'
+    ? 'describe-pod' : (namespaceFirst ? parts[index] : verb)
+  if (diagnosticVerb === 'pods') {
+    const namespace = namespaceFirst ? parts[index - 1] : parts[index + 1]
     if (!namespace) return { error: 'Usage: /cluster-diagnose [provider|hub] pods <namespace>' }
     return { payload: { provider: target, action: 'get-pods', namespace } }
   }
-  if (verb === 'describe-pod') {
-    const namespace = parts[index + 1] || ''
-    const name = parts[index + 2] || ''
+  if (diagnosticVerb === 'describe-pod') {
+    const namespace = namespaceFirst ? parts[index - 1] : parts[index + 1]
+    const name = namespaceFirst ? parts[index + 1] : parts[index + 2]
     if (!namespace || !name) return { error: 'Usage: /cluster-diagnose [provider|hub] describe-pod <namespace> <pod>' }
     return { payload: { provider: target, action: 'describe-pod', namespace, name } }
   }
-  if (verb === 'logs') {
-    const namespace = parts[index + 1] || ''
-    const name = parts[index + 2] || ''
-    const container = parts[index + 3] || ''
+  if (diagnosticVerb === 'logs') {
+    const namespace = namespaceFirst ? parts[index - 1] : parts[index + 1]
+    const name = namespaceFirst ? parts[index + 1] : parts[index + 2]
+    const container = namespaceFirst ? parts[index + 2] : parts[index + 3]
     if (!namespace || !name) return { error: 'Usage: /cluster-diagnose [provider|hub] logs <namespace> <pod> [container]' }
     const payload = { provider: target, action: 'logs', namespace, name }
     if (container) payload.container = container
