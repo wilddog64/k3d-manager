@@ -120,6 +120,17 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — `make test-all` hang triaged
+
+- [x] Inspected the active tmux pane and process tree; the run stopped after case 152
+      in `scripts/tests/bin/hub_restore.bats`.
+- [x] Confirmed the next Grafana retry test was blocked for over 36 minutes in
+      `bin/hub-restore` while inheriting `/dev/ttys007` as stdin.
+- [x] Filed `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md` and
+      `docs/issues/2026-10-06-hub-restore-test-hang.md` with verbatim evidence.
+- [ ] Make the unrelated-to-prompt tests non-interactive, add focused regression coverage,
+      and rerun `make test-all`.
+
 ## 2026-10-07 — Make failure context live verification complete
 
 - [x] Live `job-status` response for `ccc20dc9` included early failing tests 198 and

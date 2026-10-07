@@ -151,6 +151,15 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — `make test-all` hang diagnosed
+
+Filed `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md` and the
+verbatim live evidence in `docs/issues/2026-10-06-hub-restore-test-hang.md`. The
+interactive test run stopped after case 152 because the next `hub_restore.bats` test
+inherits the tmux TTY and `bin/hub-restore` waits for the missing embeddings-key prompt
+before reaching its Grafana retry assertion. No process was stopped and no code fix has
+been made yet.
+
 ## 2026-10-07 — Make failure context live-verified
 
 Operator queried failed job `ccc20dc9` after restart. `body.output` now included the
