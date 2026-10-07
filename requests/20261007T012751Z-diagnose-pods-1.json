@@ -1,0 +1,1 @@
+{"schema":1,"action":"diagnose-pods","args":{"provider":"hostinger","namespace":"shopping-cart"},"requested_by":"codex-cloud","requested_at":"2026-10-07T01:27:51.743Z","expires_at":"2026-10-07T01:57:51.743Z"}
