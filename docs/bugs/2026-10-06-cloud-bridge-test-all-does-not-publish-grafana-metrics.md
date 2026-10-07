@@ -1,8 +1,8 @@
 # Cloud-bridge test-all runs do not publish results to the Grafana test dashboard
 
 **Filed:** 2026-10-06
-**Release / branch:** v1.41.0 / `k3d-manager-v1.41.0`
-**Status:** OPEN
+**Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
+**Status:** FIXED in branch; live dashboard verification pending
 **Severity:** Medium — remote test execution is visible through job-status but leaves dashboard results stale
 **Component:** cloud-bridge / webhook Make jobs / offline test metrics
 
@@ -55,14 +55,14 @@ Keep the original test exit status and timeout outcome authoritative; do not rep
 
 Acceptance criteria:
 
-- [ ] A completed cloud `make-test-all` publishes case totals, failed cases, run duration,
+- [x] A completed cloud `make-test-all` publishes case totals, failed cases, run duration,
   and a fresh timestamp using the existing metrics contract.
-- [ ] Passing, failing, and timed-out test jobs retain their correct webhook terminal status.
-- [ ] Metrics publication failure is reported separately and does not rewrite the test result.
-- [ ] Tests remain behind the offline tripwire; publication occurs outside suite isolation.
-- [ ] No arbitrary Make targets or broader cluster/operator capabilities become reachable.
-- [ ] No duplicate suite execution, secret-bearing logs, or unbounded job-ID metric labels.
-- [ ] Regression checks prove the exporter runs once for the intended target, receives the
+- [x] Passing, failing, and timed-out test jobs retain their correct webhook terminal status.
+- [x] Metrics publication failure is reported separately and does not rewrite the test result.
+- [x] Tests remain behind the offline tripwire; publication occurs outside suite isolation.
+- [x] No arbitrary Make targets or broader cluster/operator capabilities become reachable.
+- [x] No duplicate suite execution, secret-bearing logs, or unbounded job-ID metric labels.
+- [x] Regression checks prove the exporter runs once for the intended target, receives the
   original result/duration, and is not called for unrelated Make jobs; mutations turn tests red.
 - [ ] Operator verifies updated `k3dm-tests` freshness/counts/duration after a real cloud run.
 

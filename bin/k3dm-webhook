@@ -1387,6 +1387,23 @@ def _push_metrics(action, provider, status, duration_secs, job_id):
                 _LOG.warning("metrics push skipped (non-fatal): %s", exc)
 
 
+def _publish_test_metrics(job_id, log_path, exit_code, run_duration):
+    """Publish a completed test-all log without rerunning the suites."""
+    command = [
+        sys.executable, str(REPO_ROOT / "bin" / "k3dm-test-metrics"), str(log_path),
+        "--target", "test-all", "--exit-code", str(exit_code),
+        "--run-duration", str(run_duration),
+    ]
+    rc, output, timed_out = _spawn_capture_text(
+        command, cwd=REPO_ROOT, env=dict(os.environ), timeout=60,
+    )
+    if timed_out or rc != 0 or "metrics push skipped" in output:
+        _LOG.warning("job=%s test-all metrics publication was not confirmed", job_id)
+        _notify_job(job_id, "⚠️ test-all completed, but Grafana metrics publication was not confirmed")
+    else:
+        _LOG.info("job=%s test-all metrics published from captured log", job_id)
+
+
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period
 
 _ARCH_CONTEXT = """
@@ -1593,6 +1610,7 @@ _configure_lifecycle_runtime(
         "run_post_provision_check": _run_post_provision_check,
         "running_cluster_job": _running_cluster_job,
         "make_job_lock": _MAKE_JOB_LOCK,
+        "publish_test_metrics": _publish_test_metrics,
     },
 )
 _configure_status_runtime(

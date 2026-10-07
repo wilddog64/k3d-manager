@@ -73,6 +73,13 @@ placement remains TBD, with v1.43.0 as the candidate after capacity review. It c
 sources, citations, summary/fallback outcomes, explicit feedback, follow-up signals, and pinned
 offline groundedness evaluation without raw-question or identity labels.
 
+## 2026-10-07 — cloud make-test-all metrics publication fixed
+
+Added the lifecycle hook that publishes the captured `test-all` log once through the existing
+metrics exporter, preserving the real test exit status and reporting publication failure
+separately. Unit coverage proves publication occurs only for `test-all` and receives the log,
+exit code, and duration. Live Pushgateway/Grafana verification remains pending.
+
 `make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
 terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
 `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make

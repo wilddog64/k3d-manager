@@ -92,6 +92,15 @@ v1.43.0 as the candidate. It defines privacy-safe source usefulness, citation, s
 feedback, follow-up, and offline groundedness signals, plus human-readable Grafana panels and
 table columns. No runtime changes.
 
+## 2026-10-07 — cloud make-test-all metrics publication fixed
+
+Fixed `docs/bugs/2026-10-06-cloud-bridge-test-all-does-not-publish-grafana-metrics.md` on
+`k3d-manager-v1.42.0`: completed `test-all` jobs now invoke the existing
+`bin/k3dm-test-metrics` exporter once from the captured `make.log`, passing the original exit
+code and elapsed duration. Publication warnings remain separate and cannot rewrite the test
+status; unrelated Make targets are unchanged. `make test-python-unit` passed (11 lifecycle
+tests plus all other unit files). Live Pushgateway/Grafana verification remains pending.
+
 Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
 automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
 diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response
