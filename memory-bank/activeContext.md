@@ -1,3 +1,13 @@
+## 2026-10-07 — k3dm Tests failure-history gap filed (OPEN, v1.42.0)
+
+Filed docs/bugs/2026-10-07-k3dm-tests-failure-history-missing.md and an issue evidence note.
+Operator screenshot shows latest passed / zero failures but "No data" in the instant current
+failure table despite earlier failures in the six-hour graph. Acceptance adds a separate
+time-range history table while preserving PUT replacement/current clearing; deduplicate scrape
+samples and avoid invented run timestamps or high-cardinality run labels. Historical sample
+availability remains unverified. Documentation only; implementation pending. No PR.
+Publication commit is recorded in the git history for these files.
+
 ## 2026-10-06 — HIPAA readiness added as an unversioned roadmap theme
 
 The user asked to put HIPAA compliance into the roadmap. `docs/roadmap.md` now records this as
