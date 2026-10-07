@@ -45,6 +45,15 @@ def test_real_combined_bats_output_aggregates_and_counts_its_red():
     assert "k3dm_test_last_success_timestamp_seconds" not in payload
 
 
+def test_failed_bats_cases_publish_bounded_name_and_reason_labels():
+    parsed = METRICS.parse_log(
+        "# file: observability.bats\n1..2\nok 1 good\nnot ok 2 deploy fallback\n"
+        "#   expected generated config\n"
+    )
+    payload = METRICS.build_payload(parsed, "test-all", 2)
+    assert 'k3dm_test_failure{target="test-all",suite="observability.bats",case="2",name="deploy fallback",reason="expected generated config"} 1' in payload
+
+
 def test_unittest_and_pytest_blocks_are_parsed():
     parsed = METRICS.parse_log(fixture_text())
     assert parsed["suites"]["webhook_policy.py"] == {"ok": 12, "not_ok": 2}
@@ -96,6 +105,16 @@ def test_no_metric_is_labelled_by_test_name():
         if "{" in line:
             labels = line.split("}", 1)[0]
             assert all(" " not in value and len(value) <= 80 for value in re.findall(r'="([^"]*)"', labels))
+
+
+def test_failure_labels_are_bounded_and_escaped():
+    parsed = METRICS.parse_log(
+        '# file: clean.bats\n1..1\nnot ok 1 bad "case"\n# reason\n'
+    )
+    payload = METRICS.build_payload(parsed, "test-all", 1)
+    assert 'name="bad \\"case\\""' in payload
+    failure_line = next(line for line in payload.splitlines() if line.startswith("k3dm_test_failure"))
+    assert all(len(value) <= METRICS.MAX_LABEL_LENGTH for value in re.findall(r'="((?:\\.|[^"])*)"', failure_line))
 
 
 def test_push_failure_is_non_fatal(monkeypatch, capsys):

@@ -65,6 +65,18 @@ def test_failed_make_output_keeps_failure_context_and_final_tail(tmp_path):
     assert "[Final output tail]" in result
 
 
+def test_failed_make_output_keeps_multiple_failure_summaries(tmp_path):
+    _write(tmp_path, "target", "test-all")
+    _write(tmp_path, "status", "failed")
+    _write(tmp_path, "make.log", "not ok 198 first failure\n# first reason\nnot ok 200 second failure\n# second reason\nmake: *** [test] Error 1\n")
+
+    result = read_job_output(tmp_path, max_chars=2000)
+
+    assert "not ok 198 first failure" in result
+    assert "not ok 200 second failure" in result
+    assert "second reason" in result
+
+
 def test_output_is_redacted_before_return(tmp_path):
     _write(tmp_path, "target", "test")
     _write(tmp_path, "make.log", "token=secret-value\nBearer abc123")

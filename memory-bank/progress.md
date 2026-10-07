@@ -1166,3 +1166,17 @@ the next CI run is pending.
       `Failed cases`, and `Target` columns and hidden Prometheus internals.
 - [x] Dashboard appset BATS: 36 tests passed; doc links and diff checks passed.
 - [ ] Commit/push and live Grafana sync pending.
+
+## 2026-10-07 — failed test case metrics and bounded cloud diagnostics
+
+- [x] Diagnosed the visible cloud failures as observability BATS cases 198 and 200; recorded
+      the original job output and the uncertainty around the aggregate 34 failures.
+- [x] Made cases 198/200 hermetic by stubbing the newer observability helpers and deterministic
+      Prometheus basic-auth generation.
+- [x] Added bounded `k3dm_test_failure` metrics with failed case number, name, suite, target,
+      and first diagnostic reason; capped records and label sizes for Prometheus safety.
+- [x] Changed the Grafana panel to show one readable row per failed test case and expanded the
+      cloud response to preserve multiple failure summaries plus the final tail under 2,000 chars.
+- [x] Verification: observability BATS 18/18; dashboard contract BATS 36/36; Python unit bundle
+      7/12/33/27/6/6/4 all OK; smoke, compilation, and diff checks passed.
+- [ ] Commit/push, restart webhook, sync the hub dashboard, and rerun cloud `make-test-all`.

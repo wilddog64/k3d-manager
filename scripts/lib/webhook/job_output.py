@@ -7,13 +7,6 @@ from webhook.redact import scrub_credentials
 
 
 DEFAULT_MAX_CHARS = 2000
-_FAILURE_MARKER_RE = re.compile(
-    r"(?:^|\s)(?:not ok\b|failed\b|failure\b|error:\b|traceback\b|"
-    r"assertionerror\b|make:\s+\*\*\*)",
-    re.IGNORECASE,
-)
-
-
 def _output_candidates(job_dir):
     """Return output files in deterministic precedence order for a job."""
     job_dir = Path(job_dir)
@@ -24,18 +17,23 @@ def _output_candidates(job_dir):
 
 
 def _failure_excerpt(text, max_chars):
-    """Keep an early failure marker and the final tail within the output budget."""
+    """Keep multiple bounded failure summaries and the final tail."""
     lines = text.splitlines()
-    marker_index = next(
-        (index for index, line in enumerate(lines) if _FAILURE_MARKER_RE.search(line)),
-        None,
-    )
-    if marker_index is None or max_chars <= 0:
+    if max_chars <= 0:
+        return text
+    marker_indexes = [
+        index for index, line in enumerate(lines)
+        if re.search(r"^\s*(?:not ok\b|FAILED\b|failure\b|error:\b|Traceback\b)", line, re.IGNORECASE)
+    ]
+    if not marker_indexes:
         return text[-max_chars:] if max_chars > 0 else text
-    context_budget = max(400, max_chars // 2)
+    context_budget = max(600, int(max_chars * 0.65))
     tail_budget = max(0, max_chars - context_budget - 40)
-    context_lines = lines[max(0, marker_index - 2):marker_index + 9]
-    context = "\n".join(context_lines)[:context_budget]
+    blocks = []
+    for marker_index in marker_indexes[:20]:
+        block = lines[marker_index:marker_index + 3]
+        blocks.append("\n".join(block))
+    context = "\n".join(blocks)[:context_budget]
     tail = text[-tail_budget:] if tail_budget else ""
     return f"[Failure context]\n{context}\n[Final output tail]\n{tail}"[:max_chars]
 

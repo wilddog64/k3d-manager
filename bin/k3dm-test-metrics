@@ -15,10 +15,19 @@ from pathlib import Path
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 1
 DEFAULT_PUSHGATEWAY_URL = "http://localhost:9091"
+MAX_FAILURES = 100
+MAX_LABEL_LENGTH = 120
 
 
 def _suite_name(value):
     return Path(value.strip()).name
+
+
+def _metric_label(value):
+    """Escape and bound a value used in a Prometheus label."""
+    value = re.sub(r"\s+", " ", str(value or "")).strip()
+    value = value[:MAX_LABEL_LENGTH]
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 def parse_log(text):
@@ -29,6 +38,7 @@ def parse_log(text):
     current_python = None
     last_step = "unknown"
     unittest_pending = None
+    failures = []
     total = 0
     failed = 0
 
@@ -54,7 +64,7 @@ def parse_log(text):
         if re.search(r"\bpytest(?:\s|$).*scripts/tests", line):
             last_step = "test-pytest"
 
-        tap = re.match(r"^\s*(not )?ok\s+\d+\b", line)
+        tap = re.match(r"^\s*(not )?ok\s+(\d+)\b\s*(.*)$", line)
         if tap:
             if current_suite is None:
                 current_suite = "bats"
@@ -63,7 +73,19 @@ def parse_log(text):
             suites[current_suite][result] += 1
             total += 1
             failed += result == "not_ok"
+            if result == "not_ok" and len(failures) < MAX_FAILURES:
+                failures.append({
+                    "suite": current_suite,
+                    "case": tap.group(2),
+                    "name": tap.group(3).strip() or "unnamed test",
+                    "reason": "",
+                })
             continue
+
+        if failures and not failures[-1]["reason"] and line.lstrip().startswith("#"):
+            detail = line.lstrip()[1:].strip()
+            if detail and not detail.startswith("(in test file"):
+                failures[-1]["reason"] = detail
 
         duration = re.search(r"#\s+(?:duration|time)\s*[:=]\s*([0-9.]+)\s*s?\b", line, re.I)
         if duration and current_suite:
@@ -115,6 +137,7 @@ def parse_log(text):
         "durations": durations,
         "total": total,
         "failed": failed,
+        "failures": failures,
         "last_step": last_step,
     }
 
@@ -129,6 +152,21 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None):
         values = parsed["suites"][suite]
         for result in ("ok", "not_ok"):
             lines.append(f'k3dm_test_suite_cases{{suite="{suite}",result="{result}"}} {values[result]}')
+    if parsed.get("failures"):
+        lines += [
+            "# HELP k3dm_test_failure One bounded failed test case with its first diagnostic reason",
+            "# TYPE k3dm_test_failure gauge",
+        ]
+        for failure in parsed["failures"]:
+            labels = {
+                "target": target,
+                "suite": failure["suite"],
+                "case": failure["case"],
+                "name": failure["name"],
+                "reason": failure["reason"] or "diagnostic unavailable",
+            }
+            rendered = ",".join(f'{key}="{_metric_label(value)}"' for key, value in labels.items())
+            lines.append(f"k3dm_test_failure{{{rendered}}} 1")
     lines += [
         "# HELP k3dm_test_suite_duration_seconds Wall-clock duration of one suite",
         "# TYPE k3dm_test_suite_duration_seconds gauge",

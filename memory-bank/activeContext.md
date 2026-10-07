@@ -509,3 +509,23 @@ root cause remains unconfirmed and is recorded in `docs/issues/2026-10-07-cloud-
 Updated the k3dm-tests Grafana panel to an instant, transformed table with human-readable
 `Test suite`, `Result`, `Failed cases`, and `Target` columns. Focused dashboard tests pass; live
 dashboard sync is pending.
+
+## 2026-10-07 — cloud test failure detail and log context improved
+
+The next cloud `make-test-all` report showed 1,383 cases and 34 failures; the bounded response
+identified observability BATS cases 198 and 200 as the first actionable failures. Case 198 was
+not hermetic after newer ServiceMonitor/API-server scrape helpers were added, and case 200 could
+depend on host `htpasswd` while testing the Vault fallback. The focused fixtures now stub those
+unrelated dependencies and deterministic bcrypt generation.
+
+`bin/k3dm-test-metrics` now emits bounded `k3dm_test_failure` records containing target, suite,
+case number, test name, and first diagnostic reason. The Grafana panel is now an instant table
+with human-readable `Test suite`, `Case`, `Test name`, `Failure reason`, and `Target` columns.
+Failed cloud responses retain multiple failure summaries plus the final tail within the existing
+2,000-character bound and redaction path. Findings are recorded in
+`docs/issues/2026-10-07-cloud-test-failure-detail-and-log-context.md`.
+
+Verification: observability BATS 18/18; Grafana dashboard contract BATS 36/36; Python unit
+bundle completed with 7/12/33/27/6/6/4 tests all OK; metrics/cloud-log smoke checks, Python
+compilation, and `git diff --check` passed. Full cloud rerun is still needed to confirm the
+aggregate 34 failures are cleared. Commit and live deployment pending.

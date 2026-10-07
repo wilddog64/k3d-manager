@@ -185,11 +185,11 @@ _assert_no_panel_overlap() {
   dashboard="$(yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}")"
   panel="$(jq -c '.panels[] | select(.id == 4)' <<<"${dashboard}")"
   [ -n "${panel}" ]
-  [ "$(jq -r '.title' <<<"${panel}")" = "Failing cases by test suite" ]
+  [ "$(jq -r '.title' <<<"${panel}")" = "Failing test cases" ]
   [ "$(jq -r '.targets[0].instant' <<<"${panel}")" = "true" ]
-  jq -e '.targets[0].expr == "k3dm_test_suite_cases{result=\"not_ok\"} > 0"' <<<"${panel}" >/dev/null
-  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .suite == "Test suite" and .result == "Result" and .Value == "Failed cases"' <<<"${panel}" >/dev/null
-  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .instance and .job' <<<"${panel}" >/dev/null
+  [ "$(jq -r '.targets[0].expr' <<<"${panel}")" = "k3dm_test_failure" ]
+  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .suite == "Test suite" and .case == "Case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .instance and .job and .Value' <<<"${panel}" >/dev/null
 }
 
 @test "both dashboard appsets self-heal" {
