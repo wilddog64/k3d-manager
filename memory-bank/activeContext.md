@@ -151,6 +151,21 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — test-all case 236 and Grafana no-data bugs filed
+
+The prompt-hang fix worked: `hub_restore.bats` cases 149–235 passed. The next
+`make test-all` run completed 328 cases but failed only case 236,
+`recorded output preserves exit status and is mode 600`. Its fixture extractor exits
+at the first earlier `endef`, so the generated Makefile omits `_e2e_recorded` and Make
+reports `probe` up to date. Filed `docs/bugs/2026-10-06-makefile-e2e-recorded-fixture-exits-early.md`.
+
+The same run published metrics successfully: localhost:9091 contained 1707 total
+cases, one failed BATS case, exit code 2, and duration 466 seconds. The Grafana
+dashboard still showed no data because its configured ACG datasource UID differs from
+the Hostinger Pushgateway receiving localhost:9091 writes. Filed
+`docs/bugs/2026-10-06-k3dm-tests-dashboard-no-data.md` with the topology evidence;
+deployed Grafana datasource resolution still needs live confirmation.
+
 ## 2026-10-06 — `hub_restore` test hang fixed
 
 Fixed `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`. Added a

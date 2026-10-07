@@ -120,6 +120,18 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — test-all case 236 and dashboard no-data triage
+
+- [x] Confirmed the TTY fix: `hub_restore.bats` cases 149–235 passed.
+- [x] Confirmed case 236 is a fixture bug: the awk extractor exits at an earlier
+      `endef`, producing an empty `_e2e_recorded` fixture and the output `make: \\`probe' is up to date.`
+- [x] Filed `docs/bugs/2026-10-06-makefile-e2e-recorded-fixture-exits-early.md`.
+- [x] Confirmed the exporter pushed `test-all/local`; localhost:9091 contains the
+      1707-case result, one failed case, exit code 2, and 466-second duration.
+- [x] Filed `docs/bugs/2026-10-06-k3dm-tests-dashboard-no-data.md` because the
+      dashboard's ACG datasource UID does not match the Hostinger Pushgateway topology.
+- [ ] Fix the fixture extractor and align/verify the canonical Grafana Prometheus target.
+
 ## 2026-10-06 — `make test-all` hang fixed
 
 - [x] Added `_run_noninteractive_restore` to redirect stdin from `/dev/null` for
