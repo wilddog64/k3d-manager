@@ -419,3 +419,16 @@ _assert_no_panel_overlap() {
   jq -e '.description | contains("failed_untriaged")' <<<"$panel" >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failed cases" and (.targets[0].expr == "k3dm_test_cases_failed"))' >/dev/null
 }
+
+@test "k3dm tests freshness stats aggregate to one latest value" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  run yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}"
+  [ "$status" -eq 0 ]
+  local dashboard_json="$output"
+  for panel_id in 1 2; do
+    local panel
+    panel=$(printf '%s\n' "$dashboard_json" | jq -c ".panels[] | select(.id == ${panel_id})")
+    jq -e '.targets[0].expr | startswith("time() - max(")' <<<"$panel" >/dev/null
+    [ "$(jq -r '.targets[0].instant' <<<"$panel")" = "true" ]
+  done
+}

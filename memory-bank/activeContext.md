@@ -578,6 +578,15 @@ The complete local BATS dispatcher subsequently passed all `1,384` cases, includ
 198, 970, 971, 972, 974, and 981. No code change was made because the reported failures remain
 cloud-only and lack assertion diagnostics.
 
+## 2026-10-07 — test dashboard freshness semantics fixed
+
+Filed `docs/bugs/2026-10-07-test-dashboard-freshness-aggregation.md`. Grafana freshness panels
+were evaluating raw Pushgateway vectors, exposing scrape labels and potentially selecting an
+ambiguous stat value. They now use instant `max(...)` queries. The exporter also only writes the
+last-success timestamp when both parsed failures and Make exit code are zero. Metrics regression
+tests passed `21`; the Grafana dashboard contract passed `37/37`; compilation, lint, audit, and
+diff checks passed. Commit and dashboard sync remain pending.
+
 ## 2026-10-07 — stale failed-case metrics fixed
 
 The latest `make test-all` published `2,509` cases with `2` failures, but Grafana mixed current

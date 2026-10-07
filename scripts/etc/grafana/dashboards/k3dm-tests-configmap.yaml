@@ -20,23 +20,23 @@ data:
           "id": 1,
           "type": "stat",
           "title": "Suite freshness",
-          "description": "Seconds since the last completed suite run. Read this first because Pushgateway retains its last value indefinitely.",
+          "description": "Minutes since the latest completed suite run across published targets. Read this first because Pushgateway retains its last value indefinitely.",
           "gridPos": { "x": 0, "y": 0, "w": 12, "h": 5 },
           "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [
             { "color": "green", "value": null }, { "color": "yellow", "value": 86400 }, { "color": "red", "value": 259200 }
           ] } } },
-            "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - k3dm_test_last_timestamp_seconds" }]
+            "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - max(k3dm_test_last_timestamp_seconds)", "instant": true }]
         },
         {
           "id": 2,
           "type": "stat",
           "title": "Last passing run",
-          "description": "Seconds since the last run with zero failed cases.",
+          "description": "Minutes since the latest run with zero parsed failures and Make exit code 0 across published targets.",
           "gridPos": { "x": 12, "y": 0, "w": 12, "h": 5 },
           "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [
             { "color": "green", "value": null }, { "color": "yellow", "value": 86400 }, { "color": "red", "value": 259200 }
           ] } } },
-          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - k3dm_test_last_success_timestamp_seconds" }]
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - max(k3dm_test_last_success_timestamp_seconds)", "instant": true }]
         },
         {
           "id": 3,

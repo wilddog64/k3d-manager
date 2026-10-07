@@ -195,9 +195,9 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None):
             "# TYPE k3dm_test_run_duration_seconds gauge",
             f'k3dm_test_run_duration_seconds{{target="{target}"}} {run_duration}',
         ]
-    if parsed["failed"] == 0:
+    if parsed["failed"] == 0 and exit_code == 0:
         lines += [
-            "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures",
+            "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures and exit code 0",
             "# TYPE k3dm_test_last_success_timestamp_seconds gauge",
             f"k3dm_test_last_success_timestamp_seconds {now}",
         ]

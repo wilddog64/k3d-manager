@@ -1245,6 +1245,15 @@ the next CI run is pending.
 - [x] Committed and pushed as `b5c8ca6a`; run `make test-all` once more to confirm Grafana lists
       exactly the current failures.
 
+## 2026-10-07 — freshness panels made unambiguous
+
+- [x] Filed `docs/bugs/2026-10-07-test-dashboard-freshness-aggregation.md`.
+- [x] Aggregated freshness and last-passing queries with instant `max(...)` PromQL.
+- [x] Prevented nonzero Make runs with zero parsed failures from updating the last-success metric.
+- [x] Metrics pytest passed `21`; Grafana dashboard BATS passed `37/37`; compile, lint, audit,
+      and diff checks passed.
+- [ ] Commit, push, sync the hub dashboard, and verify the live panels.
+
 ## 2026-10-07 — Grafana run classification
 
 - [x] Added `k3dm_test_run_classification` with explicit `passed` / `failed_untriaged` labels.

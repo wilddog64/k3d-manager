@@ -73,11 +73,18 @@ def test_success_timestamp_is_omitted_when_any_case_failed():
     assert "k3dm_test_last_success_timestamp_seconds" not in payload
 
 
-def test_exit_code_2_with_zero_failures_is_not_a_failure():
+def test_exit_code_0_with_zero_failures_is_a_success():
     parsed = METRICS.parse_log("# file: clean.bats\n1..1\nok 1 works\n")
-    payload = METRICS.build_payload(parsed, "test-all", 2, now=123)
+    payload = METRICS.build_payload(parsed, "test-all", 0, now=123)
     assert 'k3dm_test_cases_failed{target="test-all"} 0' in payload
     assert "k3dm_test_last_success_timestamp_seconds 123" in payload
+
+
+def test_nonzero_exit_code_does_not_update_last_success_timestamp():
+    parsed = METRICS.parse_log("# file: clean.bats\n1..1\nok 1 works\n")
+    payload = METRICS.build_payload(parsed, "test-all", 2, now=123)
+    assert 'k3dm_test_run_classification{target="test-all",classification="failed_untriaged"} 1' in payload
+    assert "k3dm_test_last_success_timestamp_seconds" not in payload
 
 
 def test_run_classification_follows_terminal_exit_code():
