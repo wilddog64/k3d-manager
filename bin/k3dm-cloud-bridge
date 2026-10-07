@@ -274,6 +274,11 @@ def _iso_utc(timestamp):
     return datetime.fromtimestamp(timestamp, timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _result_classification(status):
+    """Describe whether a terminal result is passed or still untriaged."""
+    return {"success": "passed", "failed": "failed_untriaged"}.get(status, "in_progress")
+
+
 def _published_artifacts(repo, ref, job_id):
     """Return the artifact paths already committed for job_id, or [] when none exist."""
     rc, output, timed_out = _spawn_capture_text(
@@ -307,6 +312,8 @@ def job_artifacts(repo, ref, request_id, request, response):
         "request_id": request_id,
         "job_id": job_id,
         "job_status": body["status"],
+        "result_classification": body.get(
+            "result_classification", _result_classification(body["status"])),
         "http_status": response.get("http_status"),
         "finished_at": finished_at,
     }

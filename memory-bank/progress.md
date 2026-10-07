@@ -1222,5 +1222,13 @@ the next CI run is pending.
 - [ ] Obtain a focused cloud rerun with complete BATS assertion output before changing snapshot
       behavior; the aggregate failures may share one cloud-only capture failure.
 
+## 2026-10-07 — cloud failure classification fix
+
+- [x] Filed `docs/bugs/2026-10-07-cloud-failure-classification-missing.md`.
+- [x] Added `result_classification` to webhook status responses and cloud summary artifacts;
+      failed first runs remain `failed_untriaged` until separately triaged.
+- [x] Added artifact regression coverage for failed-job classification.
+- [ ] Commit, push, restart webhook, and verify the next cloud response exposes the field.
+
 - [x] Full local `make test` verification: 1,384/1,384 BATS passed; the reported case numbers all
       passed locally.

@@ -559,6 +559,13 @@ but the subsequent read-only `make status-full CLUSTER_PROVIDER=k3s-hostinger` c
 remediation was performed. The screenshot still does not prove the channel-aware threading fix
 because no matching status job metadata was present locally.
 
+## 2026-10-07 — cloud failure classification made explicit
+
+Filed `docs/bugs/2026-10-07-cloud-failure-classification-missing.md`. Cloud terminal responses and
+summary artifacts now distinguish `passed`, `failed_untriaged`, and `in_progress` while retaining
+the authoritative original status and exit code. This prevents a locally passing focused rerun
+from being mistaken for proof that the original cloud failure was harmless.
+
 ## 2026-10-07 — cloud hub snapshot failures not locally reproducible
 
 Cloud job `5cda3d09` reported six failures, including five `hub_snapshot.bats` cases sharing the

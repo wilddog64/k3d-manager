@@ -2309,7 +2309,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         status = (job_dir / "status").read_text().strip()
         output = read_job_output(job_dir, redact=_redact_secrets)
-        payload = {"job_id": job_id, "status": status, "output": output}
+        classification = {"success": "passed", "failed": "failed_untriaged"}.get(
+            status, "in_progress")
+        payload = {
+            "job_id": job_id,
+            "status": status,
+            "result_classification": classification,
+            "output": output,
+        }
         exit_code_file = job_dir / "exit_code"
         if exit_code_file.is_file():
             try:
