@@ -72,6 +72,12 @@ now propagates the outcome and exposes safe metadata. Focused tests: 40 passed; 
 692 passed / 2 skipped; Python unit suites passed; `_agent_audit`, compile, and diff checks passed.
 Live host credential/service verification remains pending.
 
+## 2026-10-07 — ask-docs ISO-date redaction false positive fixed
+
+Filed and fixed `docs/bugs/2026-10-07-ask-docs-redacts-iso-dates-as-phone.md`: the phone scrubber
+now excludes `YYYY-MM-DD` while continuing to redact phone-like values. Regression coverage was
+added to the ask-docs suite; live Slack verification remains pending.
+
 Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
 automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
 diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response

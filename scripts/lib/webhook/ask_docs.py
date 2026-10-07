@@ -21,7 +21,9 @@ MAX_REPLY_CHARS = 3000
 MAX_FAILURE_METADATA_CHARS = 1200
 _LINK_REF_CACHE = None
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-_PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d .()\-]{7,}\d)(?!\w)")
+_PHONE_RE = re.compile(
+    r"(?<!\w)(?!\d{4}-\d{2}-\d{2}\b)(?:\+?\d[\d .()\-]{7,}\d)(?!\w)"
+)
 _DOC_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
 _FILED_DATE_RE = re.compile(r"\*\*Filed:\*\*\s+(\d{4}-\d{2}-\d{2})")
 _RECENT_INTENT_RE = re.compile(

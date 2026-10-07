@@ -54,6 +54,12 @@ a useful reserved budget. Focused tests passed (40/40), `make test-pytest` passe
 2 skipped), and `make test-python-unit` passed. Live service/credential verification is pending
 operator review.
 
+## 2026-10-07 — ask-docs ISO-date redaction false positive fixed
+
+Added the bug record and narrowed `_PHONE_RE` so ISO dates remain readable in sourced answers.
+The existing ask-docs redaction regression now checks both preserved date and masked phone value.
+Live Slack verification remains pending.
+
 `make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
 terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
 `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make

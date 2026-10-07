@@ -147,7 +147,7 @@ def test_all_reply_shapes_keep_sources_and_redact_excerpt_and_answer(tmp_path):
     root = tmp_path / "repo"
     source = root / "docs/bugs/known.md"
     source.parent.mkdir(parents=True)
-    source.write_text("Bearer synthetic0token 10.1.2.3 +1 415 555 0100")
+    source.write_text("2026-10-06 Bearer synthetic0token 10.1.2.3 +1 415 555 0100")
     old_root = ask_docs.REPO_ROOT
     ask_docs.REPO_ROOT = root
     def retrieve(_q, k=5):
@@ -160,6 +160,9 @@ def test_all_reply_shapes_keep_sources_and_redact_excerpt_and_answer(tmp_path):
         assert "synthetic0token" not in reply
         assert "10.1.2.3" not in reply
         assert "+1 415 555 0100" not in reply
+        scrubbed = ask_docs._scrub("Date: 2026-10-06 +1 415 555 0100")
+        assert "2026-10-06" in scrubbed
+        assert "+1 415 555 0100" not in scrubbed
     finally:
         ask_docs.REPO_ROOT = old_root
 
