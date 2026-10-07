@@ -1,3 +1,12 @@
+## 2026-10-07 — v1.44.0 operator acceptance automation specified
+
+Added docs/plans/v1.44.0-operator-acceptance-automation.md as PROPOSED, the third v1.44.0 plan after
+cloud notification routing and submitter authentication (two found at drafting).
+Pilot automates k3dm Tests transitions, bridge/log contracts, fake Slack cleanup, and indexing
+canaries with honest result classification, redacted evidence, and deduplicated bug drafts.
+Offline is default; live checks are opt-in, bounded, serialized, and do not execute cleanup.
+Known bugs stay separate; no runtime code or deployment. Publication SHA is in file git history.
+
 ## 2026-10-07 — Slack stale sandbox cleanup reporting bug filed (OPEN, v1.42.0)
 
 Filed docs/bugs/2026-10-07-slack-stale-sandbox-cleanup-misleading-reporting.md and an evidence issue. Operator used apply intentionally.
