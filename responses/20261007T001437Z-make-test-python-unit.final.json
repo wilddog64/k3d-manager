@@ -1,0 +1,1 @@
+{"action": "job-status", "artifacts": ["artifacts/20261007T001437Z-make-test-python-unit/summary.json"], "body": {"job_id": "b6282d9e", "output": "", "status": "success"}, "completed_at": "2026-10-07T00:15:46.842908Z", "http_status": 200, "id": "20261007T001437Z-make-test-python-unit", "schema": 1, "status": "ok"}
