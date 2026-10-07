@@ -591,7 +591,8 @@ with both freshness panels verified as instant `max(...)` queries.
 ## 2026-10-07 — successful-run panel label clarified
 
 Renamed the Grafana panel from `Last passing run` to `Last successful run` to make its meaning
-explicit. The dashboard contract test now guards the label. Commit and live sync are pending.
+explicit. The dashboard contract test now guards the label. Commit `1aea506b` is pushed, and the
+live ConfigMap verifies `Last successful run` with ArgoCD `Synced Healthy`.
 
 ## 2026-10-07 — stale failed-case metrics fixed
 

@@ -1258,7 +1258,8 @@ the next CI run is pending.
 ## 2026-10-07 — successful-run label clarified
 
 - [x] Renamed `Last passing run` to `Last successful run` and added a dashboard contract check.
-- [ ] Commit, push, sync, and verify the live label.
+- [x] Committed and pushed as `1aea506b`; synced and verified the live label as `Last successful
+      run` with ArgoCD `Synced Healthy`.
 
 ## 2026-10-07 — Grafana run classification
 
