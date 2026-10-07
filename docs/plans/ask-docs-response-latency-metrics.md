@@ -1,4 +1,4 @@
-# Enhancement — ask-docs response-latency observability
+# Enhancement — Ask-docs response time and troubleshooting dashboard
 
 **Status:** PROPOSED — release placement TBD; candidate for v1.43.0
 **Requested scope:** Track document retrieval, model execution, and end-to-end ask-docs timing
@@ -82,17 +82,34 @@ The existing `--sources` mode should publish `status="sources_only"` and omit th
 or record it as zero only if the metric contract explicitly defines zero as “not attempted.”
 Prefer omission or a separate mode label so zero is not confused with an instantaneous model.
 
-## Grafana panels
+## Human-readable Grafana layout
 
 Add a small ask-docs section to the existing webhook/operations dashboard, or create a focused
 panel group if no suitable dashboard exists:
 
-- Total response latency: p50 / p95 / p99.
-- Retrieval versus model latency by phase.
-- Requests per minute by terminal status.
-- Failure rate by finite failure class.
-- Sources-only share versus summarized-answer share.
-- A panel description linking exact-job investigation to webhook job metadata/logs.
+- **Ask-docs response time** — p50, p95, and p99 total response time.
+- **Where ask-docs spends time** — retrieval, model, delivery, and total time by phase.
+- **Ask-docs requests completed** — requests per minute grouped by outcome.
+- **Ask-docs failure reasons** — failure rate grouped by a human-readable failure reason.
+- **Summaries versus source lists** — summarized-answer and sources-only request counts.
+- **Recent ask-docs requests** — a table for exact-job investigation when the dashboard's log
+  or metadata source supports table panels.
+
+Use these human-readable table columns for the recent-request view:
+
+| Column title | Meaning |
+| --- | --- |
+| **Completed** | When the request finished, shown in the dashboard timezone |
+| **Job ID** | Linkable webhook job identifier for exact investigation; not a metric label |
+| **Outcome** | Succeeded, failed, or source list only |
+| **Total time** | End-to-end worker duration |
+| **Document search** | Time spent finding and preparing source documents |
+| **AI summary** | Time spent generating the answer, including fallback attempts |
+| **Failure reason** | Human-readable category, or `—` when successful |
+
+Avoid abbreviations such as `p95`, `retrieval`, `model`, and `failure_class` in visible panel
+titles or table headers without explanatory text. Keep those terms in Prometheus expressions,
+legend internals, or panel descriptions where they help operators inspect the implementation.
 
 Use recording rules or `histogram_quantile` as appropriate to the selected metric transport.
 Do not show a misleading per-job time series from a Pushgateway last-value gauge.
@@ -136,4 +153,3 @@ This is an observability enhancement, not a correctness bug. Assign it to v1.43.
 release has room after the structured E2E evidence work; otherwise carry the same spec forward
 unchanged. Do not backport it to v1.34.0 without confirming that milestone is still active and
 that its dashboard/metric transport matches the current webhook architecture.
-
