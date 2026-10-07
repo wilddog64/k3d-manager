@@ -179,6 +179,19 @@ _assert_no_panel_overlap() {
   printf '%s\n' "$output" | jq -e 'all(.panels[] | .targets[]?; .datasource.uid == "prometheus")' >/dev/null
 }
 
+@test "k3dm tests failing-suite table has human-readable columns" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  local dashboard panel
+  dashboard="$(yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}")"
+  panel="$(jq -c '.panels[] | select(.id == 4)' <<<"${dashboard}")"
+  [ -n "${panel}" ]
+  [ "$(jq -r '.title' <<<"${panel}")" = "Failing cases by test suite" ]
+  [ "$(jq -r '.targets[0].instant' <<<"${panel}")" = "true" ]
+  jq -e '.targets[0].expr == "k3dm_test_suite_cases{result=\"not_ok\"} > 0"' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .suite == "Test suite" and .result == "Result" and .Value == "Failed cases"' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .instance and .job' <<<"${panel}" >/dev/null
+}
+
 @test "both dashboard appsets self-heal" {
   run yq -r '.spec.template.spec.syncPolicy.automated.selfHeal' "${ACG}"
   [ "$output" = "true" ]

@@ -1157,3 +1157,12 @@ the next CI run is pending.
 - [x] Defined signed canonical envelopes, protected agent capabilities, replay/expiry checks,
       key revocation and rotation, migration modes, audit metadata, tests, and rollout.
 - [x] No runtime code changed.
+
+## 2026-10-07 — test-all failing-suite table clarified
+
+- [x] Recorded cloud job `195eff6a` failure evidence and separated the two visible observability
+      BATS failures from the aggregate 34-failure count; root cause remains pending full logs.
+- [x] Changed panel 4 to an instant table with human-readable `Test suite`, `Result`,
+      `Failed cases`, and `Target` columns and hidden Prometheus internals.
+- [x] Dashboard appset BATS: 36 tests passed; doc links and diff checks passed.
+- [ ] Commit/push and live Grafana sync pending.

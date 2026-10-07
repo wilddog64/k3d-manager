@@ -52,10 +52,18 @@ data:
         {
           "id": 4,
           "type": "table",
-          "title": "Failing cases by suite",
-          "description": "Lists only suites with at least one failed case. Empty on a clean run.",
+          "title": "Failing cases by test suite",
+          "description": "One current row per test suite with failed cases. Empty on a clean run. The count is the number of failed cases reported by that suite.",
           "gridPos": { "x": 8, "y": 5, "w": 16, "h": 5 },
-          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_suite_cases{result=\"not_ok\"} > 0", "format": "table" }]
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_suite_cases{result=\"not_ok\"} > 0", "format": "table", "instant": true }],
+          "transformations": [
+            { "id": "labelsToFields", "options": {} },
+            { "id": "organize", "options": {
+              "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true },
+              "renameByName": { "suite": "Test suite", "result": "Result", "target": "Target", "Value": "Failed cases" },
+              "indexByName": { "suite": 0, "result": 1, "Value": 2, "target": 3 }
+            } }
+          ]
         },
         {
           "id": 5,

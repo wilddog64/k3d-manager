@@ -500,3 +500,12 @@ Added `docs/plans/v1.44.0-cloud-request-submitter-authentication.md`. The propos
 write access as transport only and adds Ed25519-signed canonical request envelopes, protected
 agent/key capabilities, replay and expiry checks, revocation, migration modes, and audit metadata.
 No runtime changes.
+
+## 2026-10-07 — test-all failing-suite table clarified
+
+The cloud `make-test-all` job `195eff6a` published metrics but failed. The bounded failure context
+identifies observability BATS cases 198 and 200; complete cloud diagnostics are not available, so
+root cause remains unconfirmed and is recorded in `docs/issues/2026-10-07-cloud-test-all-observability-failures.md`.
+Updated the k3dm-tests Grafana panel to an instant, transformed table with human-readable
+`Test suite`, `Result`, `Failed cases`, and `Target` columns. Focused dashboard tests pass; live
+dashboard sync is pending.
