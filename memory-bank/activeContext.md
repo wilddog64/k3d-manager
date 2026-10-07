@@ -151,6 +151,15 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — `hub_restore` test hang fixed
+
+Fixed `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`. Added a
+`_run_noninteractive_restore` test helper that redirects stdin from `/dev/null` for
+restore cases unrelated to prompt behavior, preventing an inherited tmux TTY from
+blocking on the embeddings-key prompt. `bats scripts/tests/bin/hub_restore.bats` passed
+14/14 normally and 14/14 under a TTY; the agent audit passed. Full `make test-all` remains
+for operator verification.
+
 ## 2026-10-06 — `make test-all` hang diagnosed
 
 Filed `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md` and the

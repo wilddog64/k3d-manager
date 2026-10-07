@@ -120,6 +120,16 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — `make test-all` hang fixed
+
+- [x] Added `_run_noninteractive_restore` to redirect stdin from `/dev/null` for
+      `hub_restore.bats` cases that do not test interactive key entry.
+- [x] Focused suite passed 14/14 normally and 14/14 under a real TTY; the formerly
+      hanging Grafana retry test completed and recorded all three health probes.
+- [x] `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/tests/bin/hub_restore.bats`
+      passed; the existing ShellCheck warnings are unchanged lines in the BATS fixture.
+- [ ] Operator reruns the full `make test-all` to verify the suite progresses beyond case 152.
+
 ## 2026-10-06 — `make test-all` hang triaged
 
 - [x] Inspected the active tmux pane and process tree; the run stopped after case 152

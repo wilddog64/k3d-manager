@@ -37,7 +37,10 @@ The test is blocked before the Grafana assertion because the missing embeddings 
 causes `bin/hub-restore` to wait for its interactive API-key prompt. This is tracked
 in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`.
 
+The fix adds a `_run_noninteractive_restore` helper that redirects stdin from
+`/dev/null` for tests unrelated to prompt behavior. The focused suite now passes
+14/14 both normally and under a real TTY.
+
 ## Recommended follow-up
 
-Fix the test fixture or redirect stdin for non-interactive test cases, then rerun the
-focused `hub_restore.bats` suite and the full `make test-all`.
+The remaining verification is a full `make test-all` run by the operator.

@@ -1,6 +1,6 @@
 # `make test-all` hangs in `hub-restore` Grafana retry test
 
-Status: OPEN
+Status: FIXED
 Severity: Medium
 Area: Test isolation / non-interactive execution
 
@@ -45,13 +45,12 @@ suite hang instead of failing with a bounded assertion.
 
 ## Recommended fix
 
-Make tests that are unrelated to interactive key entry explicitly non-interactive,
-for example by redirecting stdin from `/dev/null` or by setting the existing test
-fixture so the embeddings key is present. Add a regression check that the focused
-Grafana retry test completes when invoked from a TTY, and consider a bounded prompt
-policy for `hub-restore` when used by automated Make targets.
+Tests that are unrelated to interactive key entry now run `bin/hub-restore` with
+stdin redirected from `/dev/null`. This keeps the production prompt behavior intact
+while preventing an inherited tmux/Terminal TTY from blocking the suite. The focused
+Grafana retry test completes under a TTY and verifies its three health probes.
 
 ## Follow-up
 
-Check the adjacent Grafana failure test and every other `hub_restore.bats` case for
-the same inherited-TTY hazard before changing production behavior.
+The adjacent Grafana failure test and the other non-interactive restore cases now use
+the same helper. Interactive prompt tests retain their explicit stdin fixtures.

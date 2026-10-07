@@ -96,6 +96,10 @@ _run_with_tty() {
   script -q /dev/null "$@"
 }
 
+_run_noninteractive_restore() {
+  run bash -c "bin/hub-restore </dev/null"
+}
+
 teardown() { rm -rf "${WORK}"; }
 
 @test "hub-restore rejects a non-TTY before any make step" {
@@ -129,7 +133,7 @@ teardown() { rm -rf "${WORK}"; }
 
 @test "hub-restore happy path runs independent steps and prints nine-row summary" {
   export EMBEDDINGS_LENGTH=40
-  run bin/hub-restore
+  _run_noninteractive_restore
   [ "${status}" -eq 0 ]
   restore_output="${output}"
   [ "$(grep -c '^\[hub-restore\] [1-9]/9 ' <<< "${restore_output}")" -eq 9 ]
@@ -144,7 +148,7 @@ teardown() { rm -rf "${WORK}"; }
 
 @test "hub-restore retries Grafana health until the port-forward is ready" {
   export GRAFANA_MODE=flaky
-  run bin/hub-restore
+  _run_noninteractive_restore
   [ "${status}" -eq 0 ]
   [ "$(wc -l < "${GRAFANA_CALL_LOG}")" -eq 3 ]
   [[ "${output}" == *"Grafana health: PASS"* ]]
@@ -152,7 +156,7 @@ teardown() { rm -rf "${WORK}"; }
 
 @test "hub-restore fails Grafana health after fifteen retries" {
   export GRAFANA_MODE=always-fail
-  run bin/hub-restore
+  _run_noninteractive_restore
   [ "${status}" -eq 1 ]
   [ "$(wc -l < "${GRAFANA_CALL_LOG}")" -eq 15 ]
   [[ "${output}" == *"Grafana health: FAIL"* ]]
@@ -161,7 +165,7 @@ teardown() { rm -rf "${WORK}"; }
 @test "hub-restore keeps going and skips an unbacked signing key" {
   export FAIL_STEP=observability
   export SIGNING_SKIP=1
-  run bin/hub-restore
+  _run_noninteractive_restore
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"Step 3/9 FAIL"* ]]
   [[ "${output}" == *"Step 4/9 SKIP"* ]]
@@ -172,7 +176,7 @@ teardown() { rm -rf "${WORK}"; }
 
 @test "hub-restore accepts an existing embeddings key without prompting or writing" {
   export EMBEDDINGS_LENGTH=40
-  run bin/hub-restore
+  _run_noninteractive_restore
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"embeddings key present in Vault"* ]]
   [ ! -e "${EMBEDDINGS_STDIN}" ]
@@ -206,7 +210,7 @@ EOF
 }
 
 @test "hub-restore skips an absent embeddings key without a TTY" {
-  run bin/hub-restore
+  _run_noninteractive_restore
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"embeddings key missing from Vault — run make hub-restore in a terminal"* ]]
   [ ! -e "${EMBEDDINGS_STDIN}" ]
@@ -214,7 +218,7 @@ EOF
 
 @test "hub-restore reports root-owned state folders before any make step" {
   export FIND_ROOT=1
-  run bin/hub-restore
+  _run_noninteractive_restore
   [ "${status}" -eq 2 ]
   [[ "${output}" == *"sudo chown -R"* ]]
   [[ "${output}" == *"root-owned"* ]]
@@ -224,7 +228,7 @@ EOF
 
 @test "hub-restore ignores root-owned LaunchDaemon lock folders" {
   export FIND_LOCK=1
-  run bin/hub-restore
+  _run_noninteractive_restore
   [ "${status}" -eq 0 ]
   [[ "${output}" != *"root-owned state folders found"* ]]
 }
