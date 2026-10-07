@@ -120,6 +120,13 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-07 — Make failure context live verification complete
+
+- [x] Live `job-status` response for `ccc20dc9` included early failing tests 198 and
+      200 with source lines, plus the final Make failure tail.
+- [x] Closed the failure-context bug; underlying `deploy_observability` test failures
+      remain separate defects to triage.
+
 ## 2026-10-07 — Make failure context fix in progress
 
 - [x] Implemented failure-aware bounded output in `webhook.job_output` with redaction

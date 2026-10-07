@@ -151,6 +151,13 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-07 — Make failure context live-verified
+
+Operator queried failed job `ccc20dc9` after restart. `body.output` now included the
+two earlier failing BATS tests and source lines, followed by the final `make: *** [test]
+Error 1` tail. The failure-context bug is closed; the underlying observability test
+failures are separate follow-ups.
+
 ## 2026-10-07 — Make failure context fix implemented
 
 Fixed `docs/bugs/2026-10-07-make-job-tail-omits-failure-context.md`. The shared job-output

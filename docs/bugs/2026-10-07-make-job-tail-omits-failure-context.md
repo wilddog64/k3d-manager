@@ -2,7 +2,7 @@
 
 ## Status
 
-FIXED in `k3d-manager-v1.42.0`; live deployment verification remains for the operator.
+FIXED and live-verified on `k3d-manager-v1.42.0`.
 
 ## Evidence
 
@@ -55,3 +55,14 @@ Verification: focused output/lifecycle/status tests passed 24/24; `make test-pyt
 passed; `make test-pytest` passed 696 with 2 skipped. An initial focused run exposed a
 fixture without a `status` file; the selector was corrected to treat that as a non-failed
 job, and the full focused suite then passed.
+
+Live verification then queried failed job `ccc20dc9` after restarting the webhook and
+cloud bridge. The returned `body.output` included:
+
+```text
+not ok 198 deploy_observability calls envsubst with $ARGOCD_NAMESPACE and $K3D_MANAGER_BRANCH
+not ok 200 deploy_observability_acg falls back to generated Prometheus config when Vault bootstrap write fails
+```
+
+followed by the final `make: *** [test] Error 1` tail. The bug is closed; any underlying
+test failures are separate defects.
