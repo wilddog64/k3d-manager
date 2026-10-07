@@ -30,6 +30,15 @@ Added shared-selector/redaction/regression acceptance; no runtime changes or new
 
 ## 2026-10-06 — Second bridge test job succeeds but returns no log
 
+## 2026-10-06 — Cloud-bridge Make output selection fixed
+
+Implemented the shared bounded/redacted job-output selector for Make and non-Make jobs. Make
+jobs prefer `make.log`, with deterministic fallback to `output` then `log`; other jobs retain
+`log` then `output`. HTTP status and Slack logs/diagnosis/ask now share the selector. Focused
+tests passed (12/12), `make test-python-unit` passed, and `make test-pytest` passed (689 passed,
+2 skipped). Live cloud/Slack verification is pending operator review. Commit/push and final SHA
+are pending.
+
 `make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
 terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
 `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make

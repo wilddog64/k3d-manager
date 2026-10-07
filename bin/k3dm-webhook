@@ -43,6 +43,7 @@ from webhook.render import (  # noqa: E402
 )
 from webhook.proc import _spawn_capture_text  # noqa: E402
 from webhook.log import get_logger  # noqa: E402
+from webhook.job_output import read_job_output  # noqa: E402
 from webhook.agent import (  # noqa: E402
     _call_gemini,
     _run_cluster_ask,
@@ -658,11 +659,9 @@ def _handle_thread_command(job_id, command, role="admin"):
             _notify_job(job_id, f"⚠️ Job `{job_id}` is not running — nothing to kill")
 
     elif cmd == "diagnosis":
-        log_file = JOB_DIR / job_id / "log"
-        output_file = JOB_DIR / job_id / "output"
-        source_file = log_file if log_file.exists() else (output_file if output_file.exists() else None)
-        if source_file:
-            lines = source_file.read_text().splitlines(keepends=True)
+        output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets, max_chars=6000)
+        if output:
+            lines = output.splitlines(keepends=True)
             try:
                 result = _analyze_failure(lines)
                 _notify_job(job_id, f"🔍 *Re-diagnosis* (job `{job_id}`)\n{result}")
@@ -677,12 +676,10 @@ def _handle_thread_command(job_id, command, role="admin"):
         _notify_job(job_id, f"ℹ️ *Job `{job_id}`* status: `{status}`")
 
     elif cmd == "logs":
-        log_file = JOB_DIR / job_id / "log"
-        output_file = JOB_DIR / job_id / "output"
-        source_file = log_file if log_file.exists() else (output_file if output_file.exists() else None)
-        if source_file:
-            last = [l.rstrip() for l in source_file.read_text().splitlines() if l.strip()][-20:]
-            _notify_job(job_id, f"📋 *Last 20 lines* (job `{job_id}`)\n```{''.join(last)}```")
+        output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets)
+        if output:
+            last = [line.rstrip() for line in output.splitlines() if line.strip()][-20:]
+            _notify_job(job_id, f"📋 *Last 20 lines* (job `{job_id}`)\n```{chr(10).join(last)}```")
         else:
             _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
 
@@ -847,11 +844,9 @@ def _handle_thread_command(job_id, command, role="admin"):
         if not question:
             _notify_job(job_id, "❌ Question rejected — too long or contains disallowed patterns.")
             return
-        _job_log = JOB_DIR / job_id / "log"
-        _job_out = JOB_DIR / job_id / "output"
-        _ctx_file = _job_log if _job_log.exists() else (_job_out if _job_out.exists() else None)
-        if _ctx_file:
-            _ctx_lines = [l.rstrip() for l in _ctx_file.read_text().splitlines() if l.strip()][-80:]
+        _job_output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets, max_chars=6000)
+        if _job_output:
+            _ctx_lines = [line.rstrip() for line in _job_output.splitlines() if line.strip()][-80:]
             _ctx_text = "\n".join(_ctx_lines)
             question = (
                 f"Job output context (last 80 lines of job `{job_id}`):\n"
@@ -2278,8 +2273,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         status = (job_dir / "status").read_text().strip()
-        output_file = job_dir / "output"
-        output = output_file.read_text()[-2000:] if output_file.exists() else ""
+        output = read_job_output(job_dir, redact=_redact_secrets)
         self._json(200, {"job_id": job_id, "status": status, "output": output})
 
     def setup(self):

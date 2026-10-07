@@ -44,6 +44,16 @@ Documentation only; no runtime fix or additional test job.
 
 ## 2026-10-06 — Existing empty-log bug extended to Slack and E2E
 
+## 2026-10-06 — Cloud-bridge Make output selection fixed
+
+Fixed the Make-job output mismatch on `k3d-manager-v1.42.0`: added the shared bounded/redacted
+`webhook.job_output.read_job_output` selector, preferring `make.log` for Make jobs and preserving
+`log`/`output` precedence for non-Make jobs. HTTP job-status, Slack `logs`, `diagnosis`, and
+`ask` context now use it. Focused regression tests: 12 passed; `make test-python-unit`: 7
+unittest files passed; `make test-pytest`: 689 passed / 2 skipped. `ruff` was unavailable;
+`git diff --check` and Python compilation passed. Live cloud/Slack verification remains for the
+operator. Commit and push are pending at this point in the session.
+
 Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
 automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
 diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response
