@@ -685,3 +685,10 @@ Last successful run intentionally display the same elapsed age. Clarified the fa
 failed-case details; operators should confirm `Failed cases` is 0. Dashboard contract tests pass
 37/37. Dashboard source commit `c2009c06` is pushed; `make observability` completed and Argo
 reports `Synced Healthy`. The live ConfigMap now has the clarified title and description.
+## 2026-10-07 — dashboard elapsed-time labels clarified
+
+Verified live Pushgateway data: latest and last-success timestamps are both `2026-10-07
+16:02:42 PDT`, classification is `passed`, and failed cases are `0`; the matching 43-minute
+values are therefore correct. Renamed the stat panels to `Time since latest run` and `Time since
+last successful run` so the displayed elapsed duration cannot be mistaken for a timestamp.
+Dashboard contract tests pass 37/37; live rollout pending.

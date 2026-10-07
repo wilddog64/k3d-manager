@@ -1339,3 +1339,8 @@ the next CI run is pending.
 - [x] Confirmed equal freshness ages are expected for a latest passing run.
 - [x] Clarified the failure table title and clean-run `No data` description.
 - [x] Dashboard contract suite passed 37/37; live ConfigMap verified after `make observability`.
+## 2026-10-07 — dashboard elapsed-time labels clarified
+
+- [x] Verified raw timestamps and passed classification explain equal elapsed values.
+- [x] Renamed both stat panels to explicitly describe elapsed time.
+- [x] Dashboard contract suite passed 37/37; live rollout pending.
