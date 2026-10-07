@@ -78,6 +78,13 @@ Filed and fixed `docs/bugs/2026-10-07-ask-docs-redacts-iso-dates-as-phone.md`: t
 now excludes `YYYY-MM-DD` while continuing to redact phone-like values. Regression coverage was
 added to the ask-docs suite; live Slack verification remains pending.
 
+## 2026-10-07 — ask-docs latency metrics enhancement specified
+
+Added `docs/plans/ask-docs-response-latency-metrics.md` as a release-placement-neutral
+observability spec, with v1.43.0 as the candidate milestone. It separates retrieval/model/
+delivery/total timing, defines bounded Prometheus labels and Grafana panels, and keeps exact
+per-job timing in scrubbed metadata rather than high-cardinality metrics. No runtime changes.
+
 Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
 automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
 diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response

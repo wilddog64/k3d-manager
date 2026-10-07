@@ -60,6 +60,12 @@ Added the bug record and narrowed `_PHONE_RE` so ISO dates remain readable in so
 The existing ask-docs redaction regression now checks both preserved date and masked phone value.
 Live Slack verification remains pending.
 
+## 2026-10-07 — ask-docs latency metrics enhancement specified
+
+Drafted `docs/plans/ask-docs-response-latency-metrics.md`. It is deliberately not assigned to
+v1.34.0; v1.43.0 is the candidate after capacity review. The proposal covers bounded metrics,
+Grafana p50/p95/p99 panels, phase timing, failure rates, and exact-job metadata correlation.
+
 `make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
 terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
 `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make
