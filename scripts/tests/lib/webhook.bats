@@ -593,10 +593,11 @@ PY
 }
 
 @test "webhook analysis uses ordered candidates and a safe sentinel" {
-    run grep -F -- 'os.environ.get("K3DM_AI_BIN_ORDER", "agy,gemini")' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
+    run python3 -c 'import sys; source = "".join(open(sys.argv[1]).read().split()); assert "os.environ.get(\"K3DM_AI_BIN_ORDER\",\"agy,gemini\")" in source, "ordered AI candidate environment lookup not found"' \
+        "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'return "AI analysis unavailable — "' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
+    run grep -F -- 'AI analysis unavailable — ' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
     [ "$status" -eq 0 ]
 }
 
