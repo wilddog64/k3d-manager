@@ -1,3 +1,12 @@
+## 2026-10-07 — Slack stale sandbox cleanup reporting bug filed (OPEN, v1.42.0)
+
+Filed docs/bugs/2026-10-07-slack-stale-sandbox-cleanup-misleading-reporting.md and an evidence issue. Operator used apply intentionally.
+Help wrongly says every command without confirm previews despite supporting apply; local-only
+scope is unclear. launchctl/kubectl failures are suppressed while completion claims success;
+rm failures actually abort. Worker does not persist terminal status/exit evidence.
+No live resource failure established, cleanup execution, or runtime fix. Index/search verification
+follows publication; commit SHA is recorded in file git history. No PR.
+
 ## 2026-10-07 — last-success timestamp deletion bug filed (OPEN, v1.42.0)
 
 Operator screenshot shows equal elapsed ages of 3.41 hours; that is expected when the latest
