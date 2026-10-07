@@ -151,6 +151,16 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-07 — webhook analysis test false failure fixed
+
+Filed `docs/bugs/2026-10-07-webhook-analysis-test-brittle-source-match.md` and fixed the
+format-sensitive source assertions in `scripts/tests/lib/webhook.bats`. The ordered-candidate
+check now ignores Python whitespace formatting, and the safe-sentinel check matches the semantic
+sentinel text used by the current `AIResult` implementation. Focused test passed 1/1; full
+`bats scripts/tests/lib/webhook.bats` passed 65 tests with 6 intentional skips; ShellCheck,
+`git diff --check`, and `_agent_audit` passed. Commit `c0f5777e` is pushed to
+`origin/k3d-manager-v1.42.0`; no PR was created per repository instructions.
+
 > Compressed 2026-10-06 (v1.41.0 release prep). Full pre-compression detail:
 > `memory-bank/archive/activeContext-2026-10-06.md`. Kept here: the v1.41.0 sections from
 > 2026-10-03 onward, verbatim.

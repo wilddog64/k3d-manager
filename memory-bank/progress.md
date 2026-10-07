@@ -120,6 +120,16 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-07 — webhook analysis test false failure fixed
+
+- [x] Filed `docs/bugs/2026-10-07-webhook-analysis-test-brittle-source-match.md` for the
+      false failure caused by fixed-string source assertions.
+- [x] Replaced the ordered-candidate assertion with a whitespace-independent Python source check
+      and made the safe-sentinel assertion match the current semantic sentinel.
+- [x] Verification: focused BATS 1/1; `bats scripts/tests/lib/webhook.bats` 65 passed / 6
+      intentional skips; ShellCheck, `git diff --check`, and `_agent_audit` passed.
+- [x] Commit `c0f5777e` pushed to `origin/k3d-manager-v1.42.0`.
+
 > Compressed 2026-10-06 (v1.41.0 release prep). Full pre-compression detail:
 > `memory-bank/archive/progress-2026-10-06.md`. Settled work lives in `CHANGELOG.md`,
 > `docs/releases.md`, `docs/retro/`, `docs/issues/`, `docs/bugs/` and git history.
