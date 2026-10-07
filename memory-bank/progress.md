@@ -993,3 +993,10 @@ the next CI run is pending.
       compilation, `git diff --check`, doc links (1954 files), and `_agent_audit` passed.
 - [x] Hostinger status evidence recorded in `docs/issues/2026-10-07-hostinger-status-transient-eso-data-layer.md`;
       live recheck was healthy. Commit `c67c3a9a` pushed to `origin/k3d-manager-v1.42.0`.
+## 2026-10-07 — v1.35.0 health-probe diagnostics enhancement specified
+
+- [x] Added `docs/plans/v1.35.0-health-probe-diagnostics.md`.
+- [x] Scope covers probe exit codes, timeout state, bounded redacted stderr/stdout, explicit
+      unknown versus failed states, consistent Slack/JSON output, and focused verification.
+- [x] No runtime code changed; `make check-doc-links` passed for 1954 files and `git diff --check`
+      passed.

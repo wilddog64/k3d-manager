@@ -350,3 +350,10 @@ ESO/data-layer status report in `docs/issues/2026-10-07-hostinger-status-transie
 Current recheck: `make status CLUSTER_PROVIDER=k3s-hostinger` healthy; ClusterSecretStore ready,
 ExternalSecrets all synced, PostgreSQL/MinIO 1/1. Commit `c67c3a9a` is pushed to
 `origin/k3d-manager-v1.42.0`; no PR was created per repository instructions.
+## 2026-10-07 — v1.35.0 health-probe diagnostics enhancement specified
+
+Added `docs/plans/v1.35.0-health-probe-diagnostics.md` as a proposed observability enhancement.
+It specifies structured probe outcomes, preserved exit/timeout state, bounded redacted stdout and
+stderr, stable reason categories, consistent Slack/JSON rendering, and tests for empty output,
+malformed JSON, timeouts, missing CRDs, valid ESO readiness, and data-layer readiness. No runtime
+code changed; the plan is the first v1.35.0 plan.
