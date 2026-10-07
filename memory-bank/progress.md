@@ -981,3 +981,15 @@ and `make test-bin` 328/328. CI rerun pending after push.
 Added GNU `script -e` to preserve the wrapped preflight command's rc in tests
 150 and 151. Local `hub_restore.bats` is 14/14 and `make test-bin` is 328/328;
 the next CI run is pending.
+## 2026-10-07 — direct test-all Grafana publication fixed
+
+- [x] Filed `docs/bugs/2026-10-07-test-all-does-not-publish-grafana-result.md` after a direct
+      full-suite run left the `k3dm Tests` dashboard with no data.
+- [x] `make test-all` now captures and publishes the existing metrics contract on pass or failure,
+      while returning the original suite exit status. `make test-metrics` remains always zero.
+- [x] Cloud webhook fallback avoids duplicate publication after a Make-level metrics push.
+- [x] Verification: webhook lifecycle publication tests 2/2; `make test-python-unit` completed
+      its 7/12/33/27/6/6/4 Python unit files successfully; Make lifecycle BATS 6/6; Python
+      compilation, `git diff --check`, doc links (1954 files), and `_agent_audit` passed.
+- [x] Hostinger status evidence recorded in `docs/issues/2026-10-07-hostinger-status-transient-eso-data-layer.md`;
+      live recheck was healthy. Commit `c67c3a9a` pushed to `origin/k3d-manager-v1.42.0`.

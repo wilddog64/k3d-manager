@@ -339,3 +339,14 @@ The follow-up lint run still failed tests 150 and 151 because GNU `script`
 requires `-e`/`--return` to propagate the child command's rc. Added that flag
 to the GNU dialect branch while retaining the macOS fallback. Local
 `hub_restore.bats` is 14/14 and `make test-bin` is 328/328.
+## 2026-10-07 — direct test-all Grafana publication fixed; Hostinger status transient recorded
+
+Filed `docs/bugs/2026-10-07-test-all-does-not-publish-grafana-result.md` and fixed `make
+test-all` so it streams/captures the complete offline run, publishes pass/failure metrics once
+through `bin/k3dm-test-metrics`, and preserves the original exit code. `make test-metrics` remains
+an always-zero compatibility wrapper. Cloud webhook lifecycle publication skips a duplicate when
+the Make target already reports a successful push. Also recorded the non-reproduced Hostinger
+ESO/data-layer status report in `docs/issues/2026-10-07-hostinger-status-transient-eso-data-layer.md`.
+Current recheck: `make status CLUSTER_PROVIDER=k3s-hostinger` healthy; ClusterSecretStore ready,
+ExternalSecrets all synced, PostgreSQL/MinIO 1/1. Commit `c67c3a9a` is pushed to
+`origin/k3d-manager-v1.42.0`; no PR was created per repository instructions.
