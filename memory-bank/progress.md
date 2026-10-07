@@ -1334,3 +1334,8 @@ the next CI run is pending.
       ArgoCD reports `Synced Healthy` and the live ConfigMap queries the new metric.
 - [ ] Run the next `make test-all` and verify that the panel displays its `passed` or
       `failed_untriaged` classification row.
+## 2026-10-07 — test dashboard clean-run clarification
+
+- [x] Confirmed equal freshness ages are expected for a latest passing run.
+- [x] Clarified the failure table title and clean-run `No data` description.
+- [x] Dashboard contract suite passed 37/37; live Argo sync pending.

@@ -677,3 +677,10 @@ meaning, so the next `make test-all` metrics push can be verified without treati
 as a confirmed defect. Focused dashboard tests (36/36), Python unit target, compilation, smoke
 check, lint, audit, and diff checks passed. Commit `9bf7898f` is pushed; ArgoCD reports the hub
 dashboard `Synced Healthy`, and the live `k3dm-test-metrics` ConfigMap contains the new panel.
+## 2026-10-07 — test dashboard clean-run state clarified
+
+Live metrics show the latest test-all run passed with zero failed cases, so Suite freshness and
+Last successful run intentionally display the same elapsed age. Clarified the failure table as
+`Failing test cases (latest run)` and documented that `No data` means the latest run has no
+failed-case details; operators should confirm `Failed cases` is 0. Dashboard contract tests pass
+37/37. Live dashboard sync remains pending.

@@ -185,7 +185,7 @@ _assert_no_panel_overlap() {
   dashboard="$(yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}")"
   panel="$(jq -c '.panels[] | select(.id == 4)' <<<"${dashboard}")"
   [ -n "${panel}" ]
-  [ "$(jq -r '.title' <<<"${panel}")" = "Failing test cases" ]
+  [ "$(jq -r '.title' <<<"${panel}")" = "Failing test cases (latest run)" ]
   [ "$(jq -r '.targets[0].instant' <<<"${panel}")" = "true" ]
   [ "$(jq -r '.targets[0].expr' <<<"${panel}")" = "k3dm_test_failure" ]
   jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .suite == "Test suite" and .case == "Case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
@@ -418,6 +418,7 @@ _assert_no_panel_overlap() {
   [ "$status" -ne 0 ]
   jq -e '.description | contains("failed_untriaged")' <<<"$panel" >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failed cases" and (.targets[0].expr == "k3dm_test_cases_failed"))' >/dev/null
+  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failing test cases (latest run)" and (.description | contains("No data means")))' >/dev/null
 }
 
 @test "k3dm tests freshness stats aggregate to one latest value" {

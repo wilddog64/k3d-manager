@@ -52,8 +52,8 @@ data:
         {
           "id": 4,
           "type": "table",
-          "title": "Failing test cases",
-          "description": "One current row per failed test case with its suite, case number, test name, and first diagnostic reason. Empty on a clean run.",
+          "title": "Failing test cases (latest run)",
+          "description": "One current row per failed test case with its suite, case number, test name, and first diagnostic reason. No data means the latest run has no failed-case details; confirm Failed cases is 0 for a clean run.",
           "gridPos": { "x": 8, "y": 5, "w": 16, "h": 5 },
           "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_failure", "format": "table", "instant": true }],
           "transformations": [
