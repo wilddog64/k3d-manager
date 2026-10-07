@@ -92,6 +92,13 @@ v1.43.0 as the candidate. It defines privacy-safe source usefulness, citation, s
 feedback, follow-up, and offline groundedness signals, plus human-readable Grafana panels and
 table columns. No runtime changes.
 
+## 2026-10-07 — durable test-metrics log enhancement specified
+
+Added `docs/plans/v1.43.0-test-metrics-log-retention.md` as the fifth and final v1.43.0 plan
+candidate. It specifies durable user-owned logs under `~/.local/share/k3d-manager/test-metrics`,
+immediate path announcement, live tailing, private file modes, bounded retention, safe fallback,
+and preservation of the existing exporter/exit-status contract. No runtime changes.
+
 ## 2026-10-07 — cloud make-test-all metrics publication fixed
 
 Fixed `docs/bugs/2026-10-06-cloud-bridge-test-all-does-not-publish-grafana-metrics.md` on

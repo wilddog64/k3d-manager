@@ -73,6 +73,12 @@ placement remains TBD, with v1.43.0 as the candidate after capacity review. It c
 sources, citations, summary/fallback outcomes, explicit feedback, follow-up signals, and pinned
 offline groundedness evaluation without raw-question or identity labels.
 
+## 2026-10-07 — durable test-metrics log enhancement specified
+
+Drafted `docs/plans/v1.43.0-test-metrics-log-retention.md` as the fifth and final v1.43.0 plan
+candidate. Scope is durable local test-metrics logs, immediate tail path, permissions, retention,
+and safe fallback; exporter semantics and test exit status remain unchanged.
+
 ## 2026-10-07 — cloud make-test-all metrics publication fixed
 
 Added the lifecycle hook that publishes the captured `test-all` log once through the existing
