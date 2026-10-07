@@ -76,7 +76,6 @@ class WebhookLifecycleTests(unittest.TestCase):
         lifecycle._run_make_target(job_id, ["fix-list"], 12, "actor")
         self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "fix-list"])
         self.assertEqual(self.published_metrics, [])
-
     def test_test_all_publishes_captured_log_once_after_completion(self):
         job_id = "a1b2c3d6"
         (lifecycle.JOB_DIR / job_id).mkdir()
