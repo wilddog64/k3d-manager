@@ -66,6 +66,13 @@ Drafted `docs/plans/ask-docs-response-latency-metrics.md`. It is deliberately no
 v1.34.0; v1.43.0 is the candidate after capacity review. The proposal covers bounded metrics,
 Grafana p50/p95/p99 panels, phase timing, failure rates, and exact-job metadata correlation.
 
+## 2026-10-07 — ask-docs quality observability enhancement specified
+
+Drafted `docs/plans/ask-docs-quality-observability.md` as the companion quality spec. Release
+placement remains TBD, with v1.43.0 as the candidate after capacity review. It covers useful
+sources, citations, summary/fallback outcomes, explicit feedback, follow-up signals, and pinned
+offline groundedness evaluation without raw-question or identity labels.
+
 `make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
 terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
 `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make

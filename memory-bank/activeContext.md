@@ -85,6 +85,13 @@ observability spec, with v1.43.0 as the candidate milestone. It separates retrie
 delivery/total timing, defines bounded Prometheus labels and Grafana panels, and keeps exact
 per-job timing in scrubbed metadata rather than high-cardinality metrics. No runtime changes.
 
+## 2026-10-07 — ask-docs quality observability enhancement specified
+
+Added `docs/plans/ask-docs-quality-observability.md` as a companion, release-neutral spec with
+v1.43.0 as the candidate. It defines privacy-safe source usefulness, citation, summary outcome,
+feedback, follow-up, and offline groundedness signals, plus human-readable Grafana panels and
+table columns. No runtime changes.
+
 Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
 automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
 diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response
