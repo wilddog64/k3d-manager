@@ -1338,4 +1338,4 @@ the next CI run is pending.
 
 - [x] Confirmed equal freshness ages are expected for a latest passing run.
 - [x] Clarified the failure table title and clean-run `No data` description.
-- [x] Dashboard contract suite passed 37/37; live Argo sync pending.
+- [x] Dashboard contract suite passed 37/37; live ConfigMap verified after `make observability`.
