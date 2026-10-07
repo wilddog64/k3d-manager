@@ -486,3 +486,10 @@ The live no-data issue included duplicate Argo ownership: ACG and hub both manag
 hub-owned dashboard. Hub Argo is `Succeeded Synced Healthy`; the live ConfigMap uses UID
 `prometheus`; the scrape target `host.internal:9091` is up; and Prometheus returned
 `k3dm_test_cases_total=2501`. Commit pending.
+
+## 2026-10-07 — v1.44.0 cloud-request Slack routing specified
+
+Added `docs/plans/v1.44.0-cloud-request-slack-notification-routing.md`. The proposal uses
+server-controlled notification aliases, validates them before queueing, stores only the alias,
+keeps the route fixed for the job lifetime, preserves the default channel, and fails closed on
+invalid configuration or delivery failure. No runtime changes.

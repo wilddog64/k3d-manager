@@ -1143,3 +1143,10 @@ the next CI run is pending.
 - [x] Live verification: hub Argo `Succeeded Synced Healthy`; datasource UID `prometheus`;
       `host.internal:9091` target up; Prometheus returned `k3dm_test_cases_total=2501`.
 - [ ] Commit and remote proof pending.
+
+## 2026-10-07 — v1.44.0 cloud-request Slack routing specified
+
+- [x] Added `docs/plans/v1.44.0-cloud-request-slack-notification-routing.md`.
+- [x] Defined alias-only routing, deny-by-default validation, fixed job-lifetime routing,
+      bounded safe metadata, fallback behavior, security constraints, tests, and rollout.
+- [x] No runtime code changed.
