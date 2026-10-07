@@ -129,6 +129,8 @@ Documentation only; no k3d-manager runtime changes or live tests.
       and diff checks passed.
 - [ ] Run repository gates, commit/push, then operator re-tests `/cluster-status` and
       `/cluster-diagnose` in the Slack thread.
+- [x] Deployed the Cloudflare relay with `make deploy-worker`; version
+      `432e1dfc-2f5c-4430-9e21-f45c4eb9b3fb`; smoke check completed successfully.
 
 ## 2026-10-07 — webhook analysis test false failure fixed
 

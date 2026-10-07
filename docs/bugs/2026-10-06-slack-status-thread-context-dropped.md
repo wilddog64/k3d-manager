@@ -31,6 +31,10 @@ configured bot channel.
 - `node --test workers/slack-relay/test/relay.test.mjs` — 33 passed.
 - Python compilation and `git diff --check` passed.
 
+The Cloudflare relay was then deployed with `make deploy-worker`; Wrangler reported
+Worker version `432e1dfc-2f5c-4430-9e21-f45c4eb9b3fb`, and the repository smoke check
+completed successfully. The local webhook was also restarted after the code fix.
+
 ## Acceptance
 
 - A status command invoked in the configured Slack channel posts its report in the

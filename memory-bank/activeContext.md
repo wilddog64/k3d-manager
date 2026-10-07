@@ -158,7 +158,9 @@ omitted `channel_id` for `/cluster-diagnose`, and native Slack event dispatch dr
 the event channel before launching status workers. Both paths now preserve channel
 context so cluster status/diagnostics can use the existing Slack thread safely.
 Focused verification: Python 11 passed, relay Node tests 33 passed, compilation and
-diff checks passed. Commit and live Slack confirmation remain pending.
+diff checks passed. Commit `40591d93` is pushed. The Cloudflare relay was deployed with
+`make deploy-worker` as version `432e1dfc-2f5c-4430-9e21-f45c4eb9b3fb`; live Slack
+retest remains pending.
 
 ## 2026-10-07 — webhook analysis test false failure fixed
 
