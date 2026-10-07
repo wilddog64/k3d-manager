@@ -1,0 +1,1 @@
+{"action": "hostinger-status", "body": {"job_id": "8641768e", "status": "queued"}, "completed_at": "2026-10-07T01:28:23.486178Z", "http_status": 202, "id": "20261007T012751Z-hostinger-status-0", "schema": 1, "status": "ok"}
