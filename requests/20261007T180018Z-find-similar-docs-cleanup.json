@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "action": "make-find-similar-docs",
+  "args": {
+    "Q": "Slack stale sandbox cleanup help and completion reporting are misleading apply confirm local port forward kube context failures"
+  },
+  "requested_by": "codex-cloud",
+  "requested_at": "2026-10-07T18:00:18.178Z",
+  "expires_at": "2026-10-07T18:30:18.178Z"
+}
