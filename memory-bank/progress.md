@@ -120,6 +120,15 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-07 — Make-job output retrieval live verification
+
+- [x] Operator ran `make restart-webhook; make restart-cloud-bridge` successfully.
+- [x] Passing job `715265ab` returned `success` with non-empty `body.output`.
+- [x] Failed job `ccc20dc9` returned `failed` with non-empty `body.output` ending in
+      `make: *** [test] Error 1`.
+- [ ] Follow up separately on preserving enough earlier failure context to explain a
+      failed suite; the bounded output contract itself is now verified live.
+
 ## 2026-10-06 — long Slack command help standardization in progress
 
 - [x] Filed `docs/bugs/2026-10-06-slack-command-help-inconsistent.md`.

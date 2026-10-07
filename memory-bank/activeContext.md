@@ -151,6 +151,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-07 — Make-job output retrieval live-verified
+
+Operator restarted the webhook and cloud bridge, then verified job-status retrieval.
+Passing job `715265ab` returned `body.status=success` with a non-empty Make log tail;
+failed job `ccc20dc9` returned `body.status=failed` with a non-empty tail ending in
+`make: *** [test] Error 1`. The output-persistence bug is live-fixed. The bounded tail
+still omits earlier failing-test diagnostics; track that as an evidence-quality follow-up.
+
 ## 2026-10-06 — long Slack command help standardized
 
 Filed `docs/bugs/2026-10-06-slack-command-help-inconsistent.md`. Audited the relay's

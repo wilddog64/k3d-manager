@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-28 by Claude (cloud session), found while live-testing the cloud request helper
-**Status:** OPEN — regression confirmed in v1.41.0 on 2026-10-06 (see below).
+**Status:** FIXED — live bridge verification completed 2026-10-07; bounded failure-context follow-up remains.
 **Historical fix:** FIXED 2026-09-29 by Claude (cloud session). The redaction hold is resolved: the output
 goes through `_redact_secrets` then `scrub_credentials` (the shared scrubber the artifacts spec's M2
 now imports), the same filters diagnostics output uses. Tests: `scripts/tests/bin/test_make_job_output.py`;
@@ -101,3 +101,19 @@ file; retain the October path as linked evidence rather than a competing fix spe
 
 Documentation-only investigation: no runtime fix, additional test job, or raw log
 publication in this update.
+
+## Live verification — 2026-10-07
+
+The operator restarted the webhook and cloud bridge, then verified two job-status
+responses:
+
+- Passing job `715265ab`: `body.status` was `success` and `body.output` contained a
+  non-empty tail from the Python unit-test Make run.
+- Failed job `ccc20dc9`: `body.status` was `failed` and `body.output` contained a
+  non-empty tail ending in `make: *** [test] Error 1`.
+
+This confirms the core regression is fixed in the deployed path: terminal Make jobs
+now have retrievable output while the producer retains streaming `make.log`. The
+failed job's bounded tail did not include the earlier failing-test diagnostics; that
+is a separate evidence-quality follow-up and does not justify exposing raw, unbounded
+logs.
