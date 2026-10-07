@@ -1,0 +1,1 @@
+{"action": "make-find-similar-docs", "body": {"job_id": "f4a866f9", "status": "queued"}, "completed_at": "2026-10-07T16:07:33.364337Z", "http_status": 202, "id": "20261007T160724Z-find-similar-docs-history", "schema": 1, "status": "ok"}
