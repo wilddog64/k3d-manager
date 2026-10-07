@@ -151,6 +151,12 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — Slack cluster-diagnose help clarified
+
+Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-help-ambiguous.md`. Replaced the
+single dense grammar line with example-based help showing cluster selection, all-pods,
+pod, logs, and application forms. `pod <namespace> <pod>` is now the primary example.
+
 ## 2026-10-06 — namespace-first Slack pod diagnosis fixed
 
 Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-pod-order.md`. The relay rejected

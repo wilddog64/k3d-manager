@@ -120,6 +120,13 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — Slack cluster-diagnose help clarification in progress
+
+- [x] Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-help-ambiguous.md`.
+- [x] Replaced the dense parser grammar with example-based Slack help and added a
+      regression test for the human-readable pod/application examples.
+- [ ] Run tests, commit/push, deploy the relay, and re-test help in Slack.
+
 ## 2026-10-06 — Slack namespace-first pod diagnosis fix in progress
 
 - [x] Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-pod-order.md` with the exact

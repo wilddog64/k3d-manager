@@ -398,6 +398,9 @@ there) and retry.
 
 ### `/cluster-diagnose` usage
 
+The compact form is intentionally example-based: put the cluster first, then the
+request. `pod` is the recommended shorthand for describing one pod.
+
 Examples:
 
 - `/cluster-diagnose aws` — no verb: every pod in every namespace on that cluster

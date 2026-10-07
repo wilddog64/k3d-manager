@@ -328,6 +328,15 @@ test('/cluster-diagnose <provider> with no verb asks for pods in all namespaces'
   assert.equal(payload.channel_id, 'CDIAG')
 })
 
+test('/cluster-diagnose help explains the request forms with examples', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcluster-diagnose&text=&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  const message = await response.text()
+  assert.match(message, /Describe pod: \/cluster-diagnose hub pod <namespace> <pod>/)
+  assert.match(message, /Applications: \/cluster-diagnose hub apps \| app <name> \| appsets/)
+})
+
 test('/cluster-diagnose with no text still returns usage without relaying', async () => {
   const worker = loadWorker()
   const body = 'command=%2Fcluster-diagnose&text=&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'

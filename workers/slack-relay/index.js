@@ -40,6 +40,15 @@ function resolveProviderStrict(text) {
 }
 
 const CLUSTER_ARG_USAGE = '`hostinger` is the permanent app cluster; `aws`, `gcp` and `az` are ephemeral lab sandboxes.'
+const CLUSTER_DIAGNOSE_USAGE = [
+  'Usage: /cluster-diagnose [cluster] <request>',
+  'Clusters: hostinger, aws, gcp, az, hub (default: hostinger)',
+  'All pods: /cluster-diagnose hub',
+  'List pods: /cluster-diagnose hub pods <namespace>',
+  'Describe pod: /cluster-diagnose hub pod <namespace> <pod>',
+  'Pod logs: /cluster-diagnose hub logs <namespace> <pod> [container]',
+  'Applications: /cluster-diagnose hub apps | app <name> | appsets',
+].join('\n')
 
 function parseClusterDiagnose(text) {
   const parts = (text || '').trim().split(/\s+/).filter(Boolean)
@@ -54,7 +63,7 @@ function parseClusterDiagnose(text) {
     return { payload: { provider: target, action: 'get-pods-all' } }
   }
   if (!verb) {
-    return { error: 'Usage: /cluster-diagnose <hostinger|aws|gcp|az|hub> (all pods) | /cluster-diagnose [hostinger|aws|gcp|az|hub] <pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets>' }
+    return { error: CLUSTER_DIAGNOSE_USAGE }
   }
   const namespaceFirst = !['pods', 'describe-pod', 'logs', 'apps', 'app', 'appsets'].includes(verb) &&
     ['pod', 'describe-pod', 'logs'].includes(parts[index + 1])
@@ -94,7 +103,7 @@ function parseClusterDiagnose(text) {
   if (verb === 'appsets') {
     return { payload: { provider: target, action: 'get-appsets' } }
   }
-  return { error: 'Unsupported diagnostic. Use pods, describe-pod, logs, apps, app, or appsets.' }
+  return { error: `${CLUSTER_DIAGNOSE_USAGE}\nUnknown request: ${verb}` }
 }
 
 const K3DM_USAGE = 'Usage: /k3dm <target> [KEY=value …] [confirm] — `/k3dm help` lists targets for your role'
