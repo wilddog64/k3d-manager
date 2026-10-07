@@ -1252,7 +1252,8 @@ the next CI run is pending.
 - [x] Prevented nonzero Make runs with zero parsed failures from updating the last-success metric.
 - [x] Metrics pytest passed `21`; Grafana dashboard BATS passed `37/37`; compile, lint, audit,
       and diff checks passed.
-- [ ] Commit, push, sync the hub dashboard, and verify the live panels.
+- [x] Committed and pushed as `ea896a3d`; ArgoCD reports `Synced Healthy`, and the live ConfigMap
+      contains the instant `max(...)` freshness queries.
 
 ## 2026-10-07 — Grafana run classification
 

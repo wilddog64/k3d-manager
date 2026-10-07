@@ -585,7 +585,8 @@ were evaluating raw Pushgateway vectors, exposing scrape labels and potentially 
 ambiguous stat value. They now use instant `max(...)` queries. The exporter also only writes the
 last-success timestamp when both parsed failures and Make exit code are zero. Metrics regression
 tests passed `21`; the Grafana dashboard contract passed `37/37`; compilation, lint, audit, and
-diff checks passed. Commit and dashboard sync remain pending.
+diff checks passed. Commit `ea896a3d` is pushed, and the live hub dashboard is `Synced Healthy`
+with both freshness panels verified as instant `max(...)` queries.
 
 ## 2026-10-07 — stale failed-case metrics fixed
 
