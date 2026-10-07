@@ -1,0 +1,1 @@
+{"action": "diagnose-pods", "body": {"error": "namespace must be one of the approved repo-owned namespaces"}, "completed_at": "2026-10-07T01:28:10.509308Z", "http_status": 400, "id": "20261007T012751Z-diagnose-pods-1", "schema": 1, "status": "error"}
