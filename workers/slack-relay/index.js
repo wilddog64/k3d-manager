@@ -52,9 +52,10 @@ const CLUSTER_RESUME_USAGE = [
   'Resumes a lab sandbox from its last checkpoint.',
 ].join('\n')
 const CLEANUP_USAGE = [
-  'Usage: /cleanup-stale-sandbox [confirm]',
-  'Example: /cleanup-stale-sandbox confirm',
-  'Without `confirm`, the command previews changes only.',
+  'Usage: /cleanup-stale-sandbox [preview|confirm|apply]',
+  'Examples: /cleanup-stale-sandbox preview · /cleanup-stale-sandbox apply',
+  'Preview reports local ACG connection cleanup only: launchd agents, plist files, and the kube context.',
+  '`confirm` or `apply` performs the local cleanup; it does not terminate AWS or delete workloads.',
 ].join('\n')
 const ASK_DOCS_USAGE = [
   'Usage: /ask-docs [--sources] <question>',
@@ -463,7 +464,7 @@ async function handle(req, event) {
 
   if (command === '/cleanup-stale-sandbox') {
     const cleanupText = (text || '').trim().toLowerCase()
-    if (cleanupText && !['confirm', 'apply'].includes(cleanupText)) {
+    if (cleanupText && !['preview', 'confirm', 'apply'].includes(cleanupText)) {
       return jsonReply(CLEANUP_USAGE, threadTs)
     }
     const confirm = ['confirm', 'apply'].includes(cleanupText)

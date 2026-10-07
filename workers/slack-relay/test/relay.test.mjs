@@ -341,7 +341,7 @@ test('long Slack command help uses examples instead of dense grammar', async () 
   const cases = [
     ['/cluster-up', '', /Example: \/cluster-up aws/],
     ['/cluster-resume', 'nope', /Example: \/cluster-resume aws/],
-    ['/cleanup-stale-sandbox', 'later', /Without `confirm`, the command previews changes only/],
+    ['/cleanup-stale-sandbox', 'later', /Usage: \/cleanup-stale-sandbox \[preview\|confirm\|apply\]/],
     ['/ask-docs', '--sources', /Examples: \/ask-docs/],
     ['/argocd-upgrade', '', /Examples: \/argocd-upgrade/],
   ]

@@ -498,14 +498,28 @@ def _patch_label(cluster_name, version):
 
 def _run_stale_sandbox_cleanup(job_id, confirm=False):
     """Stop expired ACG-only forwards and remove the stale ubuntu-k3s context."""
+    job_dir = JOB_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    (job_dir / "status").write_text("running")
     cmd = [str(Path(__file__).resolve().parent / "cleanup-stale-sandbox")]
     if confirm:
         cmd.append("--confirm")
-    output, timed_out = _posix_spawn_capture(cmd, timeout=30)
+    rc, output, timed_out = _spawn_capture_text(cmd, timeout=30)
+    safe_output = _redact_secrets(output)[-64000:]
+    (job_dir / "output").write_text(safe_output)
     if timed_out:
-        _notify_job(job_id, "⚠️ *Stale sandbox cleanup timed out*")
+        status, exit_code = "failed", 124
+        message = "⚠️ *Stale sandbox cleanup timed out*"
+    elif rc == 0:
+        status, exit_code = "success", 0
+        message = "✅ *Stale sandbox cleanup complete*"
     else:
-        _notify_job(job_id, f"🧹 *Stale sandbox cleanup*\n```{output.strip()}```")
+        status, exit_code = "failed", rc
+        message = f"❌ *Stale sandbox cleanup incomplete* (exit code {rc})"
+    (job_dir / "status").write_text(status)
+    (job_dir / "exit_code").write_text(str(exit_code))
+    tail = safe_output[-3000:].strip() or "(no cleanup output)"
+    _notify_job(job_id, f"{message}\n```{tail}```")
 
 
 

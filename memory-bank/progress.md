@@ -1354,3 +1354,10 @@ the next CI run is pending.
 - [x] Recorded the seconds-versus-milliseconds Grafana rendering bug.
 - [x] Converted the latest-run timestamp query to milliseconds for `dateTimeAsIso`.
 - [x] Dashboard contract suite passed 37/37; live rollout pending.
+## 2026-10-07 — P1 stale sandbox cleanup reporting fixed
+
+- [x] Corrected cleanup preview/apply help and local-only scope wording.
+- [x] Added truthful per-resource outcomes and nonzero incomplete-cleanup status.
+- [x] Persisted webhook terminal status, exit code, and bounded redacted output.
+- [x] Focused tests passed: cleanup 4/4, lifecycle 8/8, Slack relay 36/36.
+- [ ] Live Slack verification remains pending.

@@ -1,6 +1,6 @@
 # Slack stale sandbox cleanup help and completion reporting are misleading
 
-**Status:** OPEN
+**Status:** FIXED in branch; live Slack verification pending
 **Filed:** 2026-10-07
 **Affected release:** v1.42.0
 **Verified revision:** 83ff7991a4468bc431fc7b29cae105d7c6ab9eef
@@ -76,5 +76,9 @@ initializes a queued job, but this worker does not write its terminal status/out
 
 Compared the operator evidence with current relay, executable, and webhook source.
 No cleanup was run by this agent and no local/remote resources were changed.
-Documentation only; runtime fix and live failure reproduction remain pending.
+Implemented the runtime fix on `k3d-manager-v1.42.0`: preview/apply help is now truthful,
+cleanup reports per-resource outcomes and returns nonzero on incomplete work, and the webhook
+persists terminal status, exit code, and bounded redacted output. Focused cleanup tests pass 4/4,
+webhook lifecycle tests pass 8/8, and Slack relay tests pass 36/36. Live Slack verification
+remains pending.
 Repository path/title dedup found no equivalent report. Search verification follows publication.

@@ -3,7 +3,14 @@ set -euo pipefail
 
 provider="${CLUSTER_PROVIDER:-k3s-aws}"
 confirm="${CONFIRM:-0}"
-if [[ "${1:-}" == "--confirm" ]]; then confirm=1; fi
+case "${1:-}" in
+  --confirm|--apply) confirm=1 ;;
+  --dry-run|"") : ;;
+  *)
+    printf 'Usage: cleanup-stale-sandbox [--dry-run|--confirm|--apply]\n'
+    exit 2
+    ;;
+esac
 if [[ "${provider}" != "k3s-aws" ]]; then
   printf 'cleanup-stale-sandbox is k3s-aws-only (CLUSTER_PROVIDER=%s)\n' "${provider}"
   exit 1
@@ -14,12 +21,54 @@ printf 'Stale ACG sandbox cleanup (provider=%s, context=%s)\n' "${provider}" "${
 printf '  - stop launchd agents: %s\n' "${agents[*]}"
 printf '  - remove kube context: %s\n' "${context}"
 if [[ "${confirm}" != 1 ]]; then
-  printf 'DRY RUN: no changes made (rerun with CONFIRM=1 or --confirm)\n'
+  printf 'DRY RUN: no changes made (rerun with --confirm or --apply)\n'
   exit 0
 fi
+
+failed=0
+report_failure() {
+  printf '  - FAILED: %s\n' "$1"
+  failed=1
+}
+
 for label in "${agents[@]}"; do
-  launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true
-  rm -f "${HOME}/Library/LaunchAgents/${label}.plist"
+  plist="${HOME}/Library/LaunchAgents/${label}.plist"
+  if launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null; then
+    printf '  - stopped launchd agent: %s\n' "${label}"
+  elif [[ -e "${plist}" ]]; then
+    report_failure "could not stop launchd agent: ${label}"
+  else
+    printf '  - already absent launchd agent: %s\n' "${label}"
+  fi
+  if [[ -e "${plist}" ]]; then
+    if rm -f "${plist}"; then
+      printf '  - removed launchd plist: %s\n' "${label}"
+    else
+      report_failure "could not remove launchd plist: ${label}"
+    fi
+  else
+    printf '  - already absent launchd plist: %s\n' "${label}"
+  fi
 done
-kubectl config delete-context "${context}" >/dev/null 2>&1 || true
-printf 'Cleanup complete: stale sandbox agents stopped and context removed.\n'
+
+contexts=""
+if contexts="$(kubectl config get-contexts -o name 2>&1)"; then
+  if grep -Fxq "${context}" <<<"${contexts}"; then
+    if kubectl config delete-context "${context}" >/dev/null 2>&1; then
+      printf '  - removed kube context: %s\n' "${context}"
+    else
+      report_failure "could not remove kube context: ${context}"
+    fi
+  else
+    printf '  - already absent kube context: %s\n' "${context}"
+  fi
+else
+  report_failure "could not inspect kube contexts: ${contexts}"
+fi
+
+if [[ "${failed}" -eq 0 ]]; then
+  printf 'Cleanup complete: stale sandbox local state removed or already absent.\n'
+else
+  printf 'Cleanup incomplete: one or more local cleanup operations failed.\n'
+  exit 1
+fi

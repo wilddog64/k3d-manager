@@ -704,3 +704,10 @@ The first absolute timestamp rollout displayed January 1970 because Grafana's `d
 unit expects milliseconds while the Prometheus metric is in seconds. Recorded the finding in
 `docs/issues/2026-10-07-grafana-latest-run-epoch-unit.md`; the query now multiplies by `1000`.
 Dashboard contract tests pass 37/37. Live rollout pending.
+## 2026-10-07 — P1 stale sandbox cleanup reporting fixed
+
+Fixed `cleanup-stale-sandbox`: preview/apply help now matches parser behavior, cleanup reports
+stopped/removed/already-absent/failed resources, preserves real command errors, and returns
+nonzero for incomplete cleanup. The webhook now persists terminal status, exit code, and bounded
+redacted output for status/log retrieval. Focused cleanup tests pass 4/4, webhook lifecycle
+tests 8/8, and Slack relay tests 36/36. Live Slack verification remains pending.
