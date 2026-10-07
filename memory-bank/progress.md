@@ -1212,3 +1212,12 @@ the next CI run is pending.
 - [x] Classified the ESO parse errors as transient empty/non-JSON probe output pending the
       v1.35.0 diagnostic enhancement; no remediation was applied.
 - [ ] Reproduce the Slack command after restart and verify the actual-channel thread path.
+
+## 2026-10-07 — cloud hub snapshot failures triaged
+
+- [x] Mapped five of the six new failures to `scripts/tests/plugins/hub_snapshot.bats`.
+- [x] Ran the focused suite locally: 14/14 passed.
+- [x] Recorded cloud output and local TAP evidence in
+      `docs/issues/2026-10-07-cloud-hub-snapshot-suite-failures.md`.
+- [ ] Obtain a focused cloud rerun with complete BATS assertion output before changing snapshot
+      behavior; the aggregate failures may share one cloud-only capture failure.

@@ -558,3 +558,11 @@ but the subsequent read-only `make status-full CLUSTER_PROVIDER=k3s-hostinger` c
 `docs/issues/2026-10-07-cluster-status-eso-empty-output-and-thread-followup.md`; no live ESO
 remediation was performed. The screenshot still does not prove the channel-aware threading fix
 because no matching status job metadata was present locally.
+
+## 2026-10-07 — cloud hub snapshot failures not locally reproducible
+
+Cloud job `5cda3d09` reported six failures, including five `hub_snapshot.bats` cases sharing the
+snapshot capture setup. The focused local suite passes 14/14, so no production patch is justified
+without the cloud assertion diagnostics. Findings and the exact local TAP output are recorded in
+`docs/issues/2026-10-07-cloud-hub-snapshot-suite-failures.md`; next action is a focused cloud rerun
+with complete output.
