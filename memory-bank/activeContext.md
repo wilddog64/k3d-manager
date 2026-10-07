@@ -548,3 +548,13 @@ not the Make return code, so cloud-bridge had nothing to relay. Make jobs now pe
 and `/api/v1/status/{job_id}` includes the integer while the existing summary artifact contract
 stays unchanged. Finding recorded in
 `docs/issues/2026-10-07-cloud-job-response-missing-exit-code.md`. Commit pending.
+
+## 2026-10-07 — transient ESO status report recorded
+
+A Slack screenshot reported empty/non-JSON ESO probe output and two data-layer readiness failures,
+but the subsequent read-only `make status-full CLUSTER_PROVIDER=k3s-hostinger` check returned
+`ESO ClusterSecretStore: Ready=True`, `ESO ExternalSecrets: 20/20 synced`, hub ESO `9/9 synced`,
+`Data layer: 4/4 ready`, and `Overall: HEALTHY`. This is recorded in
+`docs/issues/2026-10-07-cluster-status-eso-empty-output-and-thread-followup.md`; no live ESO
+remediation was performed. The screenshot still does not prove the channel-aware threading fix
+because no matching status job metadata was present locally.

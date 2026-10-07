@@ -1202,3 +1202,13 @@ the next CI run is pending.
       regression test for persisted exit code.
 - [ ] Run the focused Python tests when pytest is available, commit, push, restart webhook, and
       verify a subsequent cloud job response includes `body.exit_code`.
+
+## 2026-10-07 — transient ESO report investigated
+
+- [x] Ran read-only Hostinger status checks after the screenshot; the short check was healthy and
+      the full check confirmed ESO/data-layer recovery (`20/20`, `9/9`, and `4/4 ready`).
+- [x] Recorded the exact screenshot symptoms and live evidence in
+      `docs/issues/2026-10-07-cluster-status-eso-empty-output-and-thread-followup.md`.
+- [x] Classified the ESO parse errors as transient empty/non-JSON probe output pending the
+      v1.35.0 diagnostic enhancement; no remediation was applied.
+- [ ] Reproduce the Slack command after restart and verify the actual-channel thread path.
