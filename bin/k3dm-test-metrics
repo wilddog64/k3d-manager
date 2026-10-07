@@ -30,6 +30,11 @@ def _metric_label(value):
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
+def run_classification(exit_code):
+    """Classify the terminal run without claiming that a failure is a defect."""
+    return "passed" if exit_code == 0 else "failed_untriaged"
+
+
 def parse_log(text):
     """Return suite counts, totals, failures, durations, and last step."""
     suites = defaultdict(lambda: {"ok": 0, "not_ok": 0})
@@ -197,9 +202,15 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None):
             f"k3dm_test_last_success_timestamp_seconds {now}",
         ]
     lines += [
+        "# HELP k3dm_test_run_classification Current terminal test-run classification",
+        "# TYPE k3dm_test_run_classification gauge",
+        (
+            f'k3dm_test_run_classification{{target="{_metric_label(target)}",'
+            f'classification="{run_classification(exit_code)}"}} 1'
+        ),
         "# HELP k3dm_test_exit_code Make exit code — INFORMATIONAL ONLY, see the staleness note",
         "# TYPE k3dm_test_exit_code gauge",
-        f'k3dm_test_exit_code{{target="{target}"}} {exit_code}',
+        f'k3dm_test_exit_code{{target="{_metric_label(target)}"}} {exit_code}',
         "# HELP k3dm_test_last_step_reached Last make sub-target that ran (1 per step name)",
         "# TYPE k3dm_test_last_step_reached gauge",
         f'k3dm_test_last_step_reached{{target="{target}",step="{parsed["last_step"]}"}} 1',

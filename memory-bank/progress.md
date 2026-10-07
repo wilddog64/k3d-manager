@@ -1232,3 +1232,12 @@ the next CI run is pending.
 
 - [x] Full local `make test` verification: 1,384/1,384 BATS passed; the reported case numbers all
       passed locally.
+
+## 2026-10-07 — Grafana run classification
+
+- [x] Added `k3dm_test_run_classification` with explicit `passed` / `failed_untriaged` labels.
+- [x] Updated the hub-owned k3dm tests dashboard panel to show the classification and retain the
+      raw exit-code metric as supporting data.
+- [x] Focused Grafana dashboard suite passed 36/36; `make test-python-unit`, Python compilation,
+      metric smoke check, `_agent_lint`, `_agent_audit`, and `git diff --check` passed.
+- [ ] Commit, push, sync the hub dashboard, and verify the panel after the next `make test-all`.

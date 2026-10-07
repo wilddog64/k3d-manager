@@ -577,3 +577,12 @@ with complete output.
 The complete local BATS dispatcher subsequently passed all `1,384` cases, including cloud cases
 198, 970, 971, 972, 974, and 981. No code change was made because the reported failures remain
 cloud-only and lack assertion diagnostics.
+
+## 2026-10-07 — test-run classification published to Grafana
+
+Added `k3dm_test_run_classification` to the test metrics payload. It publishes `passed` only for
+Make exit code 0 and `failed_untriaged` for any nonzero terminal exit code, while preserving the
+raw `k3dm_test_exit_code` metric. Grafana panel 7 now shows the classification and explains its
+meaning, so the next `make test-all` metrics push can be verified without treating every failure
+as a confirmed defect. Focused dashboard tests (36/36), Python unit target, compilation, smoke
+check, lint, audit, and diff checks passed. Commit and hub dashboard sync remain pending.

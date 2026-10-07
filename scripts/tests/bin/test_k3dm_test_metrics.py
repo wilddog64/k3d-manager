@@ -80,6 +80,14 @@ def test_exit_code_2_with_zero_failures_is_not_a_failure():
     assert "k3dm_test_last_success_timestamp_seconds 123" in payload
 
 
+def test_run_classification_follows_terminal_exit_code():
+    parsed = METRICS.parse_log("# file: clean.bats\n1..1\nok 1 works\n")
+    passed = METRICS.build_payload(parsed, "test-all", 0)
+    failed = METRICS.build_payload(parsed, "test-all", 2)
+    assert 'k3dm_test_run_classification{target="test-all",classification="passed"} 1' in passed
+    assert 'k3dm_test_run_classification{target="test-all",classification="failed_untriaged"} 1' in failed
+
+
 def test_origin_is_in_the_grouping_url_not_only_a_label():
     def healthy_opener(request, timeout):
         class Response:

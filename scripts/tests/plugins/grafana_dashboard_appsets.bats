@@ -403,7 +403,7 @@ _assert_no_panel_overlap() {
   cmp -s "${HUB_OVERVIEW}" "$snapshot"
 }
 
-@test "k3dm tests dashboard keeps the make exit code informational" {
+@test "k3dm tests dashboard shows the latest run classification" {
   local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
   run yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}"
   [ "$status" -eq 0 ]
@@ -411,11 +411,11 @@ _assert_no_panel_overlap() {
   local panel
   panel=$(printf '%s\n' "$dashboard_json" | jq -c '.panels[] | select(.id == 7)')
   [ -n "$panel" ]
-  [ "$(jq -r '.title' <<<"$panel")" = "Make exit code (informational)" ]
+  [ "$(jq -r '.title' <<<"$panel")" = "Latest run classification" ]
   [ "$(jq '[.fieldConfig.defaults.mappings[]? | tostring | test("PASS|EXPECTED ENVIRONMENT")] | any' <<<"$panel")" = "false" ]
-  [ "$(jq -r '.targets[0].expr' <<<"$panel")" = "k3dm_test_exit_code" ]
+  [ "$(jq -r '.targets[0].expr' <<<"$panel")" = "k3dm_test_run_classification" ]
   run jq -e '.targets[0].expr | contains("last_over_time")' <<<"$panel"
   [ "$status" -ne 0 ]
-  jq -e '.description | contains("Failed cases")' <<<"$panel" >/dev/null
+  jq -e '.description | contains("failed_untriaged")' <<<"$panel" >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failed cases" and (.targets[0].expr == "k3dm_test_cases_failed"))' >/dev/null
 }

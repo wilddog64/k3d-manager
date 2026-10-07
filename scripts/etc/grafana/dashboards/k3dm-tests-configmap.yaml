@@ -88,16 +88,16 @@ data:
         {
           "id": 7,
           "type": "table",
-          "title": "Make exit code (informational)",
-          "description": "The make test-all exit code is informational. make returns 2 for any failed recipe, including the expected missing-pytest case. Pass/fail is shown in the Failed cases panel.",
+          "title": "Latest run classification",
+          "description": "The current terminal run classification. passed means the publisher received exit code 0; failed_untriaged means the run failed but has not yet been confirmed as a reproducible defect. The raw Make exit code remains available as k3dm_test_exit_code.",
           "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
           "fieldConfig": { "defaults": {}, "overrides": [] },
-          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_exit_code", "format": "table", "instant": true }],
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_run_classification", "format": "table", "instant": true }],
           "transformations": [
             { "id": "labelsToFields", "options": {} },
             { "id": "organize", "options": {
-              "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true },
-              "renameByName": { "target": "Target", "Value": "Exit code" }
+              "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true, "Value": true },
+              "renameByName": { "target": "Target", "classification": "Classification" }
             } }
           ]
         }
