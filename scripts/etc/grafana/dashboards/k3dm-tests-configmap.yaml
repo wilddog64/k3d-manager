@@ -30,7 +30,7 @@ data:
         {
           "id": 2,
           "type": "stat",
-          "title": "Last passing run",
+          "title": "Last successful run",
           "description": "Minutes since the latest run with zero parsed failures and Make exit code 0 across published targets.",
           "gridPos": { "x": 12, "y": 0, "w": 12, "h": 5 },
           "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [

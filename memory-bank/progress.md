@@ -1255,6 +1255,11 @@ the next CI run is pending.
 - [x] Committed and pushed as `ea896a3d`; ArgoCD reports `Synced Healthy`, and the live ConfigMap
       contains the instant `max(...)` freshness queries.
 
+## 2026-10-07 — successful-run label clarified
+
+- [x] Renamed `Last passing run` to `Last successful run` and added a dashboard contract check.
+- [ ] Commit, push, sync, and verify the live label.
+
 ## 2026-10-07 — Grafana run classification
 
 - [x] Added `k3dm_test_run_classification` with explicit `passed` / `failed_untriaged` labels.

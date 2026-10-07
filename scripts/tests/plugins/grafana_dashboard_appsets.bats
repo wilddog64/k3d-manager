@@ -431,4 +431,5 @@ _assert_no_panel_overlap() {
     jq -e '.targets[0].expr | startswith("time() - max(")' <<<"$panel" >/dev/null
     [ "$(jq -r '.targets[0].instant' <<<"$panel")" = "true" ]
   done
+  [ "$(printf '%s\n' "$dashboard_json" | jq -r '.panels[] | select(.id == 2) | .title')" = "Last successful run" ]
 }

@@ -588,6 +588,11 @@ tests passed `21`; the Grafana dashboard contract passed `37/37`; compilation, l
 diff checks passed. Commit `ea896a3d` is pushed, and the live hub dashboard is `Synced Healthy`
 with both freshness panels verified as instant `max(...)` queries.
 
+## 2026-10-07 — successful-run panel label clarified
+
+Renamed the Grafana panel from `Last passing run` to `Last successful run` to make its meaning
+explicit. The dashboard contract test now guards the label. Commit and live sync are pending.
+
 ## 2026-10-07 — stale failed-case metrics fixed
 
 The latest `make test-all` published `2,509` cases with `2` failures, but Grafana mixed current
