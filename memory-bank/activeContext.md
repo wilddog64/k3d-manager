@@ -493,3 +493,10 @@ Added `docs/plans/v1.44.0-cloud-request-slack-notification-routing.md`. The prop
 server-controlled notification aliases, validates them before queueing, stores only the alias,
 keeps the route fixed for the job lifetime, preserves the default channel, and fails closed on
 invalid configuration or delivery failure. No runtime changes.
+
+## 2026-10-07 — v1.44.0 cloud-request submitter authentication specified
+
+Added `docs/plans/v1.44.0-cloud-request-submitter-authentication.md`. The proposal treats branch
+write access as transport only and adds Ed25519-signed canonical request envelopes, protected
+agent/key capabilities, replay and expiry checks, revocation, migration modes, and audit metadata.
+No runtime changes.

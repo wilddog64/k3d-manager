@@ -1150,3 +1150,10 @@ the next CI run is pending.
 - [x] Defined alias-only routing, deny-by-default validation, fixed job-lifetime routing,
       bounded safe metadata, fallback behavior, security constraints, tests, and rollout.
 - [x] No runtime code changed.
+
+## 2026-10-07 — v1.44.0 cloud-request submitter authentication specified
+
+- [x] Added `docs/plans/v1.44.0-cloud-request-submitter-authentication.md`.
+- [x] Defined signed canonical envelopes, protected agent capabilities, replay/expiry checks,
+      key revocation and rotation, migration modes, audit metadata, tests, and rollout.
+- [x] No runtime code changed.
