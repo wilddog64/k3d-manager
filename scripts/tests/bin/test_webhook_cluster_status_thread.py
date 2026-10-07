@@ -98,13 +98,40 @@ def test_wrong_or_empty_channel_uses_response_url_only(monkeypatch, status_env, 
     assert calls == [("https://hooks.slack.test/response", output)]
 
 
-def test_incoming_thread_does_not_start_new_header(monkeypatch, status_env, tmp_path):
+def test_channel_mismatch_incoming_thread_uses_response_url(monkeypatch, status_env, tmp_path):
     calls = []
     monkeypatch.setattr(wh, "_start_bot_thread", lambda header: calls.append("header") or "NEW")
-    monkeypatch.setattr(wh, "_post_slack_bot", lambda *args, **kwargs: calls.append("body") or "OK")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None: calls.append(("body", text, thread_ts)) or "OK")
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: calls.append(args))
+    output = _run_hostinger(monkeypatch, tmp_path, channel_id="C2", thread_ts="INCOMING")
+    assert calls == [("https://hooks.slack.test/response", output)]
+    assert (tmp_path / "job" / "thread_ts").read_text() == "INCOMING"
+
+
+def test_incoming_thread_uses_existing_thread(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda header: calls.append("header") or "NEW")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None: calls.append(("body", text, thread_ts)) or "OK")
     monkeypatch.setattr(wh, "_slack_post", lambda *args: calls.append(args))
     output = _run_hostinger(monkeypatch, tmp_path, channel_id="C1", thread_ts="INCOMING")
-    assert calls == [("https://hooks.slack.test/response", output)]
+    assert calls == [("body", output, "INCOMING")]
+    assert (tmp_path / "job" / "thread_ts").read_text() == "INCOMING"
+
+
+def test_cluster_diagnose_bot_path_replies_in_existing_thread(monkeypatch, status_env, tmp_path):
+    calls = []
+    (tmp_path / "job").mkdir()
+    monkeypatch.setattr(wh._status, "_spawn_capture_text",
+                        lambda *args, **kwargs: (0, "NAMESPACE NAME READY\nkube-system coredns 1/1", False))
+    monkeypatch.setattr(wh, "_post_slack_bot",
+                        lambda text, thread_ts=None: calls.append(("body", text, thread_ts)) or "OK")
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: calls.append(("fallback", args)))
+    wh._status._run_cluster_diagnostics(
+        "job", "https://hooks.slack.test/response", thread_ts="INCOMING", channel_id="C1",
+        request={"action": "get-pods-all", "context": "ubuntu-k3s", "provider": "hostinger"},
+    )
+    output = (tmp_path / "job" / "output").read_text()
+    assert calls == [("body", output, "INCOMING")]
     assert (tmp_path / "job" / "thread_ts").read_text() == "INCOMING"
 
 

@@ -1000,3 +1000,11 @@ the next CI run is pending.
       unknown versus failed states, consistent Slack/JSON output, and focused verification.
 - [x] No runtime code changed; `make check-doc-links` passed for 1954 files and `git diff --check`
       passed.
+## 2026-10-07 — Slack cluster-status and cluster-diagnose threading fixed
+
+- [x] Filed `docs/bugs/2026-10-07-slack-cluster-diagnostics-not-threaded.md` for inconsistent
+      top-level versus thread replies.
+- [x] Routed `cluster-diagnose` through the shared thread-aware status delivery helper and passed
+      `channel_id`; incoming thread replies now use the existing Slack thread.
+- [x] Verification: focused status/diagnostics/masking tests 54/54; Python compilation,
+      `git diff --check`, doc links (1955 files), and `_agent_audit` passed.

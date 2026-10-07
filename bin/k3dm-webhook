@@ -2085,13 +2085,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 return
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
                 target=_run_cluster_diagnostics,
                 args=(job_id, response_url),
-                kwargs={"thread_ts": thread_ts, "request": body},
+                kwargs={"thread_ts": thread_ts, "channel_id": channel_id, "request": body},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})

@@ -357,3 +357,11 @@ It specifies structured probe outcomes, preserved exit/timeout state, bounded re
 stderr, stable reason categories, consistent Slack/JSON rendering, and tests for empty output,
 malformed JSON, timeouts, missing CRDs, valid ESO readiness, and data-layer readiness. No runtime
 code changed; the plan is the first v1.35.0 plan.
+## 2026-10-07 — Slack cluster-status and cluster-diagnose threading fixed
+
+Filed `docs/bugs/2026-10-07-slack-cluster-diagnostics-not-threaded.md` and unified status and
+diagnostics delivery through the thread-aware Slack helper. Existing thread commands now reply to
+the incoming `thread_ts`; top-level commands retain the parent-header/details-thread layout, and
+response-URL fallback remains for channel mismatch or unavailable bot delivery. Focused status,
+diagnostics, masking, and pod tests passed 54/54; Python compilation, `git diff --check`, doc
+links (1955 files), and `_agent_audit` passed. Runtime commit pending.
