@@ -1315,6 +1315,14 @@ the next CI run is pending.
       and diff checks passed.
 - [ ] Commit, push, and live-verify success -> failure retention in Grafana.
 
+## 2026-10-07 — test dashboard no-data recovery
+
+- [x] Diagnosed missing localhost:9091 Pushgateway forward; no exporter or dashboard code change
+      was needed.
+- [x] Ran `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger` and verified Pushgateway `OK`,
+      retained success marker, and `passed` classification.
+- [x] Recorded the live output in `docs/issues/2026-10-07-test-metrics-no-data-port-forward.md`.
+
 ## 2026-10-07 — Grafana run classification
 
 - [x] Added `k3dm_test_run_classification` with explicit `passed` / `failed_untriaged` labels.

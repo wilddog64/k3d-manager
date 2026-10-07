@@ -42,6 +42,15 @@ prior successful timestamp. Focused metrics tests passed `24`; Grafana dashboard
 `37/37`; compilation, lint, audit, and diff checks passed. Commit and live success -> failure
 Grafana verification remain pending.
 
+## 2026-10-07 — test dashboard no-data state diagnosed
+
+The dashboard temporarily showed no data because the Hostinger Pushgateway LaunchAgent was not
+loaded and localhost:9091 refused connections. Ran `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger`;
+localhost:9091 now listens and returns `OK`, with the retained success marker and passed
+classification present. Recorded exact evidence in
+`docs/issues/2026-10-07-test-metrics-no-data-port-forward.md`. This was access-layer downtime,
+not a P0 exporter regression.
+
 ## 2026-10-07 — k3dm Tests failure-history gap filed (OPEN, v1.42.0)
 
 Filed docs/bugs/2026-10-07-k3dm-tests-failure-history-missing.md and an issue evidence note.
