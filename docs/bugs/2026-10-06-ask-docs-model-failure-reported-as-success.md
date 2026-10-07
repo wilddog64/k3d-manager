@@ -1,8 +1,8 @@
 # ask-docs model failure is reported as success and loses diagnostic detail
 
 **Filed:** 2026-10-06
-**Release / branch:** v1.41.0 / `k3d-manager-v1.41.0`
-**Status:** OPEN
+**Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
+**Status:** FIXED in branch; live service verification pending
 **Severity:** Medium — a sourced Q&A request cannot be summarized and failure is hidden in job status
 **Components:** `scripts/lib/webhook/agent.py`, `scripts/lib/webhook/ask_docs.py`, `bin/k3dm-webhook`
 
@@ -51,19 +51,19 @@ reporting and insufficient actionable diagnostics are the bug here.
 
 ## Expected behavior / acceptance
 
-- [ ] Distinguish successful summarization, intentional sources-only mode, and a failed
+- [x] Distinguish successful summarization, intentional sources-only mode, and a failed
   summary with usable retrieved sources. Use explicit result metadata rather than treating
   an unavailable sentinel as a successful answer.
-- [ ] Failed summarization must not appear as an ordinary successful summary in job status.
+- [x] Failed summarization must not appear as an ordinary successful summary in job status.
   Define and document the degraded/failed status contract while preserving source links.
-- [ ] Return retrieved titles, dates, and links when summarization fails, with a concise
+- [x] Return retrieved titles, dates, and links when summarization fails, with a concise
   reason. `--sources` remains read-only and does not invoke the summary model.
-- [ ] Preserve bounded, scrubbed diagnostic metadata: candidate, elapsed time, exit code,
+- [x] Preserve bounded, scrubbed diagnostic metadata: candidate, elapsed time, exit code,
   timeout, and a safe error category. Never publish raw prompts, credentials, OAuth URLs,
   or unfiltered stdout/stderr to Slack or GitHub.
-- [ ] Bound each candidate attempt within the total deadline and reserve a useful budget
+- [x] Bound each candidate attempt within the total deadline and reserve a useful budget
   for an enabled fallback. Keep pinned-binary behavior and existing configuration compatible.
-- [ ] Test nonzero exit, timeout, both candidates unavailable, first candidate success,
+- [x] Test nonzero exit, timeout, both candidates unavailable, first candidate success,
   fallback success, exhausted budget, sources retention, status propagation, and redaction.
   Removing failure propagation or fallback budget reservation must turn a test red.
 - [ ] Verify the actual service environment on the host; a successful interactive CLI

@@ -55,6 +55,20 @@ class WebhookAIFallbackTests(unittest.TestCase):
         self.assertIn("not-logged-in", result)
         self.assertNotIn("accounts.google.com", result)
 
+    def test_unavailable_result_carries_safe_failure_metadata(self):
+        self.fake("agy", 'echo "Authentication required. Please visit the URL"; exit 1')
+        self.fake("gemini", 'echo "not logged into Antigravity"; exit 1')
+        result = self.call()
+        self.assertEqual(result.metadata["status"], "failed")
+        self.assertEqual(result.metadata["failure_class"], "summary_model_unavailable")
+        self.assertIn("agy: not-logged-in", result.metadata["failures"])
+        self.assertIn("gemini: not-logged-in", result.metadata["failures"])
+        first = result.metadata["failure_details"][0]
+        self.assertEqual(first["candidate"], "agy")
+        self.assertEqual(first["exit_code"], 1)
+        self.assertIsInstance(first["elapsed_s"], float)
+        self.assertFalse(first["timed_out"])
+
     def test_nonzero_exit_is_failure_even_with_answer_like_output(self):
         self.fake("agy", 'echo "STALLED — waiting on a pod"; exit 1')
         self.fake("gemini", 'echo PROGRESSING; exit 0')

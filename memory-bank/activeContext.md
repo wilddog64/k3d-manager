@@ -62,6 +62,16 @@ best-effort pre-teardown capture of E2E summaries, Playwright logs/screenshots/t
 redacted structured bridge evidence, failure classification, artifact retention, and live
 success/failure verification. No runtime code changed.
 
+## 2026-10-07 — ask-docs failure propagation fixed
+
+Fixed `docs/bugs/2026-10-06-ask-docs-model-failure-reported-as-success.md` on
+`k3d-manager-v1.42.0`: ask-docs now returns explicit string-compatible result metadata, marks
+empty/unavailable/model-exception summaries as failed while preserving sources, records bounded
+safe candidate failure details, and reserves a fallback budget between AI candidates. Job status
+now propagates the outcome and exposes safe metadata. Focused tests: 40 passed; full pytest:
+692 passed / 2 skipped; Python unit suites passed; `_agent_audit`, compile, and diff checks passed.
+Live host credential/service verification remains pending.
+
 Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
 automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
 diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response

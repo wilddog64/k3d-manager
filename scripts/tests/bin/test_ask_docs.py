@@ -117,6 +117,32 @@ def test_model_failure_still_has_sources(model):
     assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
 
 
+def test_model_failure_is_explicit_and_preserves_safe_metadata():
+    path = _real_source()
+    model_result = type("Result", (str,), {
+        "metadata": {
+            "status": "failed",
+            "failure_class": "summary_model_unavailable",
+            "failures": ["agy: exit 1"],
+        }
+    })("AI analysis unavailable — agy: exit 1")
+    reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path), model=lambda _p: model_result)
+
+    assert reply.status == "failed"
+    assert reply.metadata["failure_class"] == "summary_model_unavailable"
+    assert "AI analysis unavailable" in reply
+    assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
+
+
+def test_empty_model_result_is_failed_and_preserves_sources():
+    path = _real_source()
+    reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path), model=lambda _p: "")
+
+    assert reply.status == "failed"
+    assert reply.metadata["failure_class"] == "summary_model_empty"
+    assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
+
+
 def test_all_reply_shapes_keep_sources_and_redact_excerpt_and_answer(tmp_path):
     root = tmp_path / "repo"
     source = root / "docs/bugs/known.md"

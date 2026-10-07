@@ -46,6 +46,14 @@ failure evidence captured before vCluster teardown, not a bug fix: run ID, exit 
 step/classification, bounded redacted excerpt, and durable summary/log/screenshot/trace links.
 Implementation and artifact-store decisions remain future work.
 
+## 2026-10-07 — ask-docs failure propagation fixed
+
+Implemented the ask-docs outcome fix: failed, empty, or unavailable model summaries now produce
+failed job status with preserved source links and bounded safe metadata; fallback attempts retain
+a useful reserved budget. Focused tests passed (40/40), `make test-pytest` passed (692 passed,
+2 skipped), and `make test-python-unit` passed. Live service/credential verification is pending
+operator review.
+
 `make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
 terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
 `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make

@@ -18,6 +18,7 @@ ASK_DOCS_MIN_SCORE = float(os.environ.get("K3DM_ASK_DOCS_MIN_SCORE", "0.60"))
 RECENT_POOL = 50
 MAX_EXCERPT_CHARS = 600
 MAX_REPLY_CHARS = 3000
+MAX_FAILURE_METADATA_CHARS = 1200
 _LINK_REF_CACHE = None
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d .()\-]{7,}\d)(?!\w)")
@@ -27,6 +28,16 @@ _RECENT_INTENT_RE = re.compile(
     r"\b(?:recent|recently|latest|newest|last week|this week|today|yesterday|lately|new)\b",
     re.IGNORECASE,
 )
+
+
+class AskDocsResult(str):
+    """String-compatible answer carrying a safe terminal outcome."""
+
+    def __new__(cls, text, *, status="success", metadata=None):
+        result = super().__new__(cls, text)
+        result.status = status
+        result.metadata = metadata or {}
+        return result
 
 
 def _scrub(text):
@@ -125,7 +136,7 @@ def _sources(results):
     return kept, excerpts
 
 
-def _reply(prose, paths, *, scrub_prose=True):
+def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None):
     source_lines = "Sources: none" if not paths else "Sources:\n" + "\n".join(_doc_link(path) for path in paths)
     if not prose:
         prose = "Could not summarise — read the sources directly."
@@ -134,7 +145,11 @@ def _reply(prose, paths, *, scrub_prose=True):
     available = MAX_REPLY_CHARS - len(source_lines) - 2
     if available < 0:
         available = 0
-    return prose[:available].rstrip() + "\n\n" + source_lines
+    return AskDocsResult(
+        prose[:available].rstrip() + "\n\n" + source_lines,
+        status=status,
+        metadata=metadata,
+    )
 
 
 def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5, summarise=True):
@@ -178,5 +193,32 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         prose = model(prompt)
     except Exception as exc:
         LOGGER.warning("ask-docs model unavailable: %s", type(exc).__name__)
-        prose = ""
-    return _reply(prose, paths)
+        return _reply(
+            f"Could not summarise — model error: {type(exc).__name__}",
+            paths,
+            status="failed",
+            metadata={
+                "status": "failed",
+                "failure_class": "summary_model_exception",
+                "error_category": type(exc).__name__,
+            },
+        )
+    metadata = getattr(prose, "metadata", {})
+    if not prose:
+        return _reply(
+            "Could not summarise — model returned no output",
+            paths,
+            status="failed",
+            metadata={
+                "status": "failed",
+                "failure_class": "summary_model_empty",
+            },
+        )
+    if isinstance(prose, str) and prose.startswith("AI analysis unavailable"):
+        return _reply(
+            prose,
+            paths,
+            status="failed",
+            metadata=metadata,
+        )
+    return _reply(prose, paths, metadata=metadata)

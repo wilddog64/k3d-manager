@@ -1705,7 +1705,17 @@ def _run_ask_docs(job_id, question, response_url="", thread_ts=None, channel_id=
         (job_dir / "status").write_text("running")
         text = ask_docs.answer(question, summarise=summarise)
         (job_dir / "output").write_text(text)
-        (job_dir / "status").write_text("success")
+        metadata = getattr(text, "metadata", {})
+        if metadata:
+            encoded_metadata = json.dumps(metadata)
+            if len(encoded_metadata) > ask_docs.MAX_FAILURE_METADATA_CHARS:
+                encoded_metadata = json.dumps({
+                    "status": getattr(text, "status", "failed"),
+                    "failure_class": "metadata_truncated",
+                })
+            (job_dir / "metadata.json").write_text(encoded_metadata)
+        status = getattr(text, "status", "success")
+        (job_dir / "status").write_text(status)
         if bot_thread:
             if not _post_slack_bot(text, thread_ts=thread_ts):
                 _slack_post(response_url, text)
@@ -1717,6 +1727,11 @@ def _run_ask_docs(job_id, question, response_url="", thread_ts=None, channel_id=
         text = "Could not summarise — read the sources directly.\n\nSources: none"
         (job_dir / "output").write_text(text)
         (job_dir / "status").write_text("failed")
+        (job_dir / "metadata.json").write_text(json.dumps({
+            "status": "failed",
+            "failure_class": "summary_worker_exception",
+            "error_category": type(exc).__name__,
+        }))
         if bot_thread:
             if not _post_slack_bot(text, thread_ts=thread_ts):
                 _slack_post(response_url, text)
@@ -2274,7 +2289,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         status = (job_dir / "status").read_text().strip()
         output = read_job_output(job_dir, redact=_redact_secrets)
-        self._json(200, {"job_id": job_id, "status": status, "output": output})
+        payload = {"job_id": job_id, "status": status, "output": output}
+        metadata_file = job_dir / "metadata.json"
+        if metadata_file.is_file():
+            try:
+                payload["metadata"] = json.loads(metadata_file.read_text())
+            except (OSError, ValueError):
+                payload["metadata"] = {"status": status, "failure_class": "metadata_unavailable"}
+        self._json(200, payload)
 
     def setup(self):
         super().setup()
