@@ -145,6 +145,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
             status, icon, verdict = "failed", "❌", f"failed (rc {rc})"
         _LOG.info("job=%s make=%s status=%s rc=%s", job_id, label, status, rc)
         (job_dir / "status").write_text(status)
+        (job_dir / "exit_code").write_text(str(rc))
         if argv_tail == ["test-all"] and "[k3dm-test-metrics] metrics pushed:" not in output:
             publish_test_metrics = _helpers.get("publish_test_metrics")
             if publish_test_metrics:

@@ -539,3 +539,12 @@ incoming channel for both new status threads and replies to existing threads, wh
 empty-channel response-URL fallback. Regression coverage was added in
 `scripts/tests/bin/test_webhook_cluster_status_thread.py` and the finding is recorded in
 `docs/issues/2026-10-07-slack-status-channel-fallback-not-threaded.md`. Commit pending.
+
+## 2026-10-07 — cloud Make response now exposes exit code
+
+Cloud job `470f0304` returned failure status and detailed bounded diagnostics but omitted the
+numeric exit code from both the body and summary artifact. The webhook persisted status/logs but
+not the Make return code, so cloud-bridge had nothing to relay. Make jobs now persist `exit_code`
+and `/api/v1/status/{job_id}` includes the integer while the existing summary artifact contract
+stays unchanged. Finding recorded in
+`docs/issues/2026-10-07-cloud-job-response-missing-exit-code.md`. Commit pending.

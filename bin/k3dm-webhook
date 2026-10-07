@@ -2310,6 +2310,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         status = (job_dir / "status").read_text().strip()
         output = read_job_output(job_dir, redact=_redact_secrets)
         payload = {"job_id": job_id, "status": status, "output": output}
+        exit_code_file = job_dir / "exit_code"
+        if exit_code_file.is_file():
+            try:
+                payload["exit_code"] = int(exit_code_file.read_text().strip())
+            except (OSError, ValueError):
+                payload["exit_code"] = None
         metadata_file = job_dir / "metadata.json"
         if metadata_file.is_file():
             try:

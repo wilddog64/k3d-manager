@@ -1191,3 +1191,14 @@ the next CI run is pending.
 - [x] Python compilation, `_agent_lint`, `_agent_audit`, and `git diff --check` passed.
 - [ ] Run the focused pytest thread suite when the local pytest dependency is available, commit,
       push, restart webhook, and live-verify `/cluster-status` in the affected Slack channel.
+
+## 2026-10-07 — cloud job exit code exposed
+
+- [x] Diagnosed job `470f0304`: status and diagnostics were returned, but the Make return code was
+      absent from the webhook status payload and summary artifact.
+- [x] Persisted Make `exit_code` and added it to the terminal status API response; preserved the
+      existing summary artifact schema.
+- [x] Added `docs/issues/2026-10-07-cloud-job-response-missing-exit-code.md` and a lifecycle
+      regression test for persisted exit code.
+- [ ] Run the focused Python tests when pytest is available, commit, push, restart webhook, and
+      verify a subsequent cloud job response includes `body.exit_code`.
