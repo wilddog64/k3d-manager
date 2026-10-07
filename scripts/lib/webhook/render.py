@@ -45,11 +45,12 @@ def _slack_post(url, text):
         pass
 
 
-def _post_slack_bot(text, thread_ts=None):
+def _post_slack_bot(text, thread_ts=None, channel_id=None):
     """POST to Slack chat.postMessage API. Returns ts on success, empty string on failure."""
-    if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
+    channel = channel_id or SLACK_CHANNEL_ID
+    if not SLACK_BOT_TOKEN or not channel:
         return ""
-    payload = {"channel": SLACK_CHANNEL_ID, "text": text}
+    payload = {"channel": channel, "text": text}
     if thread_ts:
         payload["thread_ts"] = thread_ts
     data = json.dumps(payload).encode()
@@ -70,9 +71,9 @@ def _post_slack_bot(text, thread_ts=None):
         return ""
 
 
-def _start_bot_thread(header):
+def _start_bot_thread(header, channel_id=None):
     """Post a top-level Slack header and return its thread timestamp."""
-    return _post_slack_bot(header)
+    return _post_slack_bot(header, channel_id=channel_id)
 
 
 def _redact_thread_question(question, *, docs=False):

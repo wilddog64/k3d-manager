@@ -27,14 +27,25 @@ _slack_bot_token = lambda: ""
 _slack_channel_id = lambda: ""
 
 
+def _post_slack_message(output, thread_ts, channel_id):
+    """Use an event channel only when it differs from the configured default."""
+    if channel_id and channel_id != _slack_channel_id():
+        return _post_slack_bot(output, thread_ts=thread_ts, channel_id=channel_id)
+    return _post_slack_bot(output, thread_ts=thread_ts)
+
+
+def _start_status_thread(header, channel_id):
+    """Start a status thread in the event channel when needed."""
+    if channel_id and channel_id != _slack_channel_id():
+        return _start_bot_thread(header, channel_id=channel_id)
+    return _start_bot_thread(header)
+
+
 def _post_status_report(job_dir, response_url, output, channel_id, thread_ts):
     """Post a status report in a bot-channel thread, with response_url fallbacks."""
-    bot_channel = bool(
-        _slack_bot_token() and _slack_channel_id()
-        and channel_id == _slack_channel_id()
-    )
+    bot_channel = bool(_slack_bot_token() and channel_id)
     if bot_channel and thread_ts:
-        if _post_slack_bot(output, thread_ts=thread_ts):
+        if _post_slack_message(output, thread_ts, channel_id):
             (job_dir / "thread_ts").write_text(thread_ts)
             return True
         if response_url:
@@ -49,13 +60,13 @@ def _post_status_report(job_dir, response_url, output, channel_id, thread_ts):
 
     header, _, body = output.lstrip().partition("\n")
     body = body.lstrip("\n")
-    new_thread_ts = _start_bot_thread(header)
+    new_thread_ts = _start_status_thread(header, channel_id)
     if not new_thread_ts:
         if response_url:
             _slack_post(response_url, output)
         return True
     (job_dir / "thread_ts").write_text(new_thread_ts)
-    if body and not _post_slack_bot(body, thread_ts=new_thread_ts):
+    if body and not _post_slack_message(body, new_thread_ts, channel_id):
         if response_url:
             _slack_post(response_url, body)
     return True

@@ -1180,3 +1180,14 @@ the next CI run is pending.
 - [x] Verification: observability BATS 18/18; dashboard contract BATS 36/36; Python unit bundle
       7/12/33/27/6/6/4 all OK; smoke, compilation, and diff checks passed.
 - [ ] Commit/push, restart webhook, sync the hub dashboard, and rerun cloud `make-test-all`.
+
+## 2026-10-07 — Slack status replies use the incoming channel
+
+- [x] Diagnosed the top-level `/cluster-status` screenshot as the configured-channel fallback
+      bypassing thread delivery.
+- [x] Added channel-aware Slack bot posting for cluster status and diagnostics, including new
+      status threads and existing incoming threads; retained empty-channel fallback behavior.
+- [x] Added issue doc `docs/issues/2026-10-07-slack-status-channel-fallback-not-threaded.md`.
+- [x] Python compilation, `_agent_lint`, `_agent_audit`, and `git diff --check` passed.
+- [ ] Run the focused pytest thread suite when the local pytest dependency is available, commit,
+      push, restart webhook, and live-verify `/cluster-status` in the affected Slack channel.

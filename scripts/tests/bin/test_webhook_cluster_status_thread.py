@@ -98,7 +98,8 @@ def test_wrong_or_empty_channel_uses_response_url_only(monkeypatch, status_env, 
     assert calls == [("https://hooks.slack.test/response", output)]
 
 
-def test_channel_mismatch_incoming_thread_uses_response_url(monkeypatch, status_env, tmp_path):
+def test_channel_mismatch_incoming_thread_uses_actual_channel(monkeypatch, status_env, tmp_path):
+    monkeypatch.setattr(wh._status, "_slack_bot_token", lambda: "")
     calls = []
     monkeypatch.setattr(wh, "_start_bot_thread", lambda header: calls.append("header") or "NEW")
     monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None: calls.append(("body", text, thread_ts)) or "OK")
@@ -106,6 +107,14 @@ def test_channel_mismatch_incoming_thread_uses_response_url(monkeypatch, status_
     output = _run_hostinger(monkeypatch, tmp_path, channel_id="C2", thread_ts="INCOMING")
     assert calls == [("https://hooks.slack.test/response", output)]
     assert (tmp_path / "job" / "thread_ts").read_text() == "INCOMING"
+
+
+def test_channel_mismatch_with_bot_posts_to_actual_thread_channel(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None, channel_id=None: calls.append((text, thread_ts, channel_id)) or "OK")
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: calls.append(("fallback", args)))
+    output = _run_hostinger(monkeypatch, tmp_path, channel_id="C2", thread_ts="INCOMING")
+    assert calls == [(output, "INCOMING", "C2")]
 
 
 def test_incoming_thread_uses_existing_thread(monkeypatch, status_env, tmp_path):

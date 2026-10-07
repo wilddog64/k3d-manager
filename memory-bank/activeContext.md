@@ -529,3 +529,13 @@ Verification: observability BATS 18/18; Grafana dashboard contract BATS 36/36; P
 bundle completed with 7/12/33/27/6/6/4 tests all OK; metrics/cloud-log smoke checks, Python
 compilation, and `git diff --check` passed. Full cloud rerun is still needed to confirm the
 aggregate 34 failures are cleared. Commit and live deployment pending.
+
+## 2026-10-07 — Slack status channel fallback fixed
+
+The operator captured a live `/cluster-status` response posted as one top-level message. Review
+found the status helper only considered the configured Slack channel eligible for bot delivery;
+an event from another channel fell back to a non-threaded response. Status delivery now uses the
+incoming channel for both new status threads and replies to existing threads, while retaining the
+empty-channel response-URL fallback. Regression coverage was added in
+`scripts/tests/bin/test_webhook_cluster_status_thread.py` and the finding is recorded in
+`docs/issues/2026-10-07-slack-status-channel-fallback-not-threaded.md`. Commit pending.
