@@ -91,6 +91,22 @@ class WebhookLifecycleTests(unittest.TestCase):
         self.assertGreaterEqual(duration, 0)
         self.assertEqual((lifecycle.JOB_DIR / job_id / "status").read_text(), "success")
 
+    def test_test_all_does_not_duplicate_make_published_metrics(self):
+        job_id = "a1b2c3e0"
+        (lifecycle.JOB_DIR / job_id).mkdir()
+        original_spawn = lifecycle._spawn_job
+
+        def spawn_with_published_metrics(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("[k3dm-test-metrics] metrics pushed: test-all/local\n")
+            return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}))
+
+        lifecycle._spawn_job = spawn_with_published_metrics
+        try:
+            lifecycle._run_make_target(job_id, ["test-all"], 731, "cloud-bridge")
+        finally:
+            lifecycle._spawn_job = original_spawn
+        self.assertEqual(self.published_metrics, [])
+
     def test_make_target_times_out_and_kills_the_job(self):
         job_id = "a1b2c3d8"
         job_dir = lifecycle.JOB_DIR / job_id

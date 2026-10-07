@@ -178,7 +178,7 @@ the store rather than truncating it. See
 | `make test-python-unit` | `python3 scripts/tests/bin/<suite>.py` | The stdlib-`unittest` suites — every `scripts/tests/bin/*.py` whose name is not `test_*.py` |
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
-| `make test-all` | `test` + `test-bin` + `test-python` | Everything that runs offline, in one call — what `make test-metrics` wraps |
+| `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard |
 | `make lint-python` | `ruff check -- <tracked Python files>` | Run Ruff's pyflakes rules over `.py` files and Python-shebang scripts |
 | `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
 
@@ -223,15 +223,14 @@ the two want opposite responses.
 
 | Target | Command | When to use |
 |---|---|---|
-| `make test-metrics` | `make test-all` → `bin/k3dm-test-metrics` | Run the full offline suite and publish its result to the Pushgateway for the `k3dm Tests` Grafana dashboard |
+| `make test-metrics` | `make test-all` | Compatibility reporting wrapper; `test-all` now performs the single metrics publication |
 
-The target **always exits 0** — it is a reporter, not a gate. The suite's real
-exit code travels in the `k3dm_test_exit_code` metric rather than the target's
-status, so a scheduled run cannot fail a caller that only wanted the numbers.
-Use `make test` or `make test-pytest` directly when you want a non-zero exit on
-failure.
+The `test-metrics` wrapper **always exits 0** — it is a reporter, not a gate. The
+suite's real exit code travels in the `k3dm_test_exit_code` metric rather than the
+wrapper's status. `make test-all` itself remains a gate and returns the original
+suite status after publishing, so use it when the caller must fail on a test failure.
 
-The raw log path is echoed on the last line; the log itself is kept under
+The raw log path is echoed by `test-all`; the log itself is kept under
 `${TMPDIR:-/tmp}/k3dm-test-all-<epoch>.log`.
 
 ---

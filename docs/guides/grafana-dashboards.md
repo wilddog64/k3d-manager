@@ -294,7 +294,7 @@ reading pre-v1.39.0 data, treat any zero-duration group as test exhaust and dele
 ### k3dm Tests (`k3dm-tests`) — ACG only
 
 These metrics come from a laptop-side push and therefore exist only after someone runs
-`make test-metrics`. Pushgateway retains the last value indefinitely, so read the **Suite
+`make test-all` (or its `make test-metrics` compatibility wrapper). Pushgateway retains the last value indefinitely, so read the **Suite
 freshness** panel first. The exit-code panel is informational only: `make test-all` here exits 2 when `test-pytest`
 falls back to a `python3` without pytest and 0 when a real `pytest` is on PATH, so the same
 healthy suite reports either value depending on the shell it ran in. Failed cases, never the
@@ -310,7 +310,7 @@ exit code, drive health.
 | Total cases | `k3dm_test_cases_total` |
 | Exit code | `k3dm_test_exit_code` (informational only) |
 
-**Duration.** `make test-metrics` times the whole `make test-all` run and pushes it as
+**Duration.** `make test-all` times the whole run and pushes it as
 `k3dm_test_run_duration_seconds{target="test-all"}`. Per-suite duration is published only for
 suites whose runner prints its own time: pytest's `in X.XXs` summary and unittest's
 `Ran N tests in X s`. BATS prints no per-file time, so BATS suites have no duration series
@@ -387,7 +387,7 @@ Work down this table before editing a query. Every row is a real past incident.
 | E2E entirely blank after a real remote run | `E2E_M2_PUBLISH_BACK_HOST` unset under launchd; result stuck `publication_pending` | count `k3dm.k3d.io/e2e-result` ConfigMaps on the hub |
 | k3dm Deployment panels blank | `k3dm Deployment Metrics` is empty: the Pushgateway release must be installed on the app cluster, the local `:9091` port-forward agent must be loaded, and the `job="pushgateway"` target must be up | `curl -s -o /dev/null -w '%{http_code}' http://localhost:9091/-/healthy` |
 | Checkout Load Test blank except CPU | no producer — expected | nothing to fix |
-| k3dm Tests panels blank | nobody has run `make test-metrics` yet — these metrics are a laptop-side push, not a scrape, so there is no producer until someone runs it | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
+| k3dm Tests panels blank | nobody has run `make test-all`/`make test-metrics` yet, or the Pushgateway forward is unavailable | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
 
 The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub has no
