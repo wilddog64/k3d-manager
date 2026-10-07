@@ -156,7 +156,8 @@ Documentation only; no k3d-manager runtime changes or live tests.
 Filed `docs/bugs/2026-10-06-slack-cluster-diagnose-pod-order.md`. The relay rejected
 `/cluster-diagnose hub platform-ops pod acg-expiry-check-29855580-ssvb` because it only
 accepted verb-first `describe-pod <namespace> <pod>`. The parser now accepts namespace-first
-`pod` as the same read-only describe action; focused relay verification and deployment remain.
+`pod` as the same read-only describe action. Relay tests passed and Worker version
+`0f46f722-0d87-4b86-815b-3f278bc8e9de` is deployed; live Slack retest remains pending.
 
 ## 2026-10-06 — Slack status thread context fixed
 

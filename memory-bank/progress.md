@@ -126,7 +126,9 @@ Documentation only; no k3d-manager runtime changes or live tests.
       Slack failure and requested command.
 - [x] Added namespace-first `pod` shorthand mapping to the existing `describe-pod`
       diagnostic action, plus documentation and a regression test.
-- [ ] Run relay tests, commit/push, deploy the Cloudflare Worker, and re-test live.
+- [x] Relay tests passed (34/34 plus 8 Slack-command BATS); commit `75e6f56d` pushed.
+- [x] Cloudflare Worker deployed as version `0f46f722-0d87-4b86-815b-3f278bc8e9de`;
+      smoke check completed successfully. Live Slack retest remains pending.
 
 ## 2026-10-06 — Slack status thread context fix in progress
 

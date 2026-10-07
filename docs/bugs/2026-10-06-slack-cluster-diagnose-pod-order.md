@@ -32,3 +32,7 @@ relay regression test for the exact reported command.
 - Existing `pods`, `describe-pod`, `logs`, `apps`, `app`, and `appsets` forms remain
   unchanged.
 - Unsupported diagnostic text remains rejected.
+
+The fix was deployed with `make deploy-worker`; Wrangler reported Worker version
+`0f46f722-0d87-4b86-815b-3f278bc8e9de`, and the repository smoke check completed
+successfully.
