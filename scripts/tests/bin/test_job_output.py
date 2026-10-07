@@ -51,6 +51,20 @@ def test_output_is_bounded_to_tail(tmp_path):
     assert result == "a" * 2000
 
 
+def test_failed_make_output_keeps_failure_context_and_final_tail(tmp_path):
+    _write(tmp_path, "target", "test-all")
+    _write(tmp_path, "status", "failed")
+    _write(tmp_path, "make.log", "setup\nnot ok 379 webhook analysis\n  expected status 0\n" + "progress\n" * 300 + "make: *** [test] Error 1\n")
+
+    result = read_job_output(tmp_path, max_chars=2000)
+
+    assert len(result) <= 2000
+    assert "not ok 379 webhook analysis" in result
+    assert "make: *** [test] Error 1" in result
+    assert "[Failure context]" in result
+    assert "[Final output tail]" in result
+
+
 def test_output_is_redacted_before_return(tmp_path):
     _write(tmp_path, "target", "test")
     _write(tmp_path, "make.log", "token=secret-value\nBearer abc123")

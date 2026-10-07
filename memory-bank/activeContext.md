@@ -151,6 +151,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-07 — Make failure context fix implemented
+
+Fixed `docs/bugs/2026-10-07-make-job-tail-omits-failure-context.md`. The shared job-output
+selector now preserves an early failure marker/context plus the final bounded tail for
+failed Make jobs, while retaining prior behavior for passing and non-Make jobs. Focused
+tests passed 24/24; `make test-python-unit` passed; pytest passed 696/2 skipped. Commit and
+live deployment remain pending.
+
 ## 2026-10-07 — failed Make-job evidence gap queued
 
 Filed `docs/bugs/2026-10-07-make-job-tail-omits-failure-context.md`. Live job `ccc20dc9`

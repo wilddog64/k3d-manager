@@ -2,7 +2,7 @@
 
 ## Status
 
-OPEN — queued for follow-up after the live Make-log retrieval fix.
+FIXED in `k3d-manager-v1.42.0`; live deployment verification remains for the operator.
 
 ## Evidence
 
@@ -43,3 +43,15 @@ tripwire noise, and high-cardinality raw logs out of permanent cloud responses.
 - Tests cover a failure whose cause appears before the final 2,000 characters.
 - The failure-evidence design is coordinated with
   `docs/plans/v1.43.0-e2e-failure-artifacts.md` where artifact retention overlaps.
+
+## Resolution
+
+`read_job_output` now recognizes failed Make jobs, preserves a bounded early failure
+context excerpt, and appends the final output tail. Passing jobs and non-Make jobs keep
+their existing tail behavior. The result is still redacted and size-bounded, so the
+same selector serves cloud `job-status`, Slack `logs`, and Slack `diagnosis` safely.
+
+Verification: focused output/lifecycle/status tests passed 24/24; `make test-python-unit`
+passed; `make test-pytest` passed 696 with 2 skipped. An initial focused run exposed a
+fixture without a `status` file; the selector was corrected to treat that as a non-failed
+job, and the full focused suite then passed.

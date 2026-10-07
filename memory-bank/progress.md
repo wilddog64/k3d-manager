@@ -120,6 +120,15 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-07 — Make failure context fix in progress
+
+- [x] Implemented failure-aware bounded output in `webhook.job_output` with redaction
+      preserved and a regression test for early `not ok` plus final `make` failure.
+- [x] Focused tests passed 24/24; `make test-python-unit` passed; `make test-pytest`
+      passed 696 with 2 skipped.
+- [ ] Run audit, commit/push, deploy/restart the relevant services, and live-verify a
+      failed Make job includes both early failure context and final tail.
+
 ## 2026-10-07 — failed Make-job evidence gap queued
 
 - [x] Filed `docs/bugs/2026-10-07-make-job-tail-omits-failure-context.md` with the live
