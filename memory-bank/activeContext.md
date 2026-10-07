@@ -585,4 +585,5 @@ Make exit code 0 and `failed_untriaged` for any nonzero terminal exit code, whil
 raw `k3dm_test_exit_code` metric. Grafana panel 7 now shows the classification and explains its
 meaning, so the next `make test-all` metrics push can be verified without treating every failure
 as a confirmed defect. Focused dashboard tests (36/36), Python unit target, compilation, smoke
-check, lint, audit, and diff checks passed. Commit and hub dashboard sync remain pending.
+check, lint, audit, and diff checks passed. Commit `9bf7898f` is pushed; ArgoCD reports the hub
+dashboard `Synced Healthy`, and the live `k3dm-test-metrics` ConfigMap contains the new panel.

@@ -1240,4 +1240,7 @@ the next CI run is pending.
       raw exit-code metric as supporting data.
 - [x] Focused Grafana dashboard suite passed 36/36; `make test-python-unit`, Python compilation,
       metric smoke check, `_agent_lint`, `_agent_audit`, and `git diff --check` passed.
-- [ ] Commit, push, sync the hub dashboard, and verify the panel after the next `make test-all`.
+- [x] Committed as `9bf7898f`, pushed to `k3d-manager-v1.42.0`, and synced the hub dashboard;
+      ArgoCD reports `Synced Healthy` and the live ConfigMap queries the new metric.
+- [ ] Run the next `make test-all` and verify that the panel displays its `passed` or
+      `failed_untriaged` classification row.
