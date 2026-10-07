@@ -586,8 +586,8 @@ The exporter now uses Pushgateway `PUT` replacement semantics, so omitted old fa
 removed. Updated the metrics label contract to preserve human-readable names and restored the
 safe Slack response-URL fallback for a new thread when the supplied channel mismatches the
 configured channel. Elevated pytest verification passed `702 passed, 2 skipped`; Grafana
-dashboard BATS passed `36/36`; compilation, lint, audit, and diff checks passed. Commit and push
-remain pending.
+dashboard BATS passed `36/36`; compilation, lint, audit, and diff checks passed. Commit
+`b5c8ca6a` is pushed to `origin/k3d-manager-v1.42.0`.
 
 ## 2026-10-07 — test-run classification published to Grafana
 

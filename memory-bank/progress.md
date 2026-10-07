@@ -1242,8 +1242,8 @@ the next CI run is pending.
       valid, and a new status thread safely falls back to the response URL on channel mismatch.
 - [x] Elevated pytest passed `702 passed, 2 skipped`; dashboard BATS passed `36/36`; compile,
       lint, audit, and diff checks passed.
-- [ ] Commit and push, then run `make test-all` once more to confirm Grafana lists exactly the
-      current failures.
+- [x] Committed and pushed as `b5c8ca6a`; run `make test-all` once more to confirm Grafana lists
+      exactly the current failures.
 
 ## 2026-10-07 — Grafana run classification
 
