@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "action": "make-find-similar-docs",
+  "args": {
+    "Q": "k3dm Tests dashboard lacks a failure-history table earlier failed tests disappear after passing run selected time range"
+  },
+  "requested_by": "codex-cloud",
+  "requested_at": "2026-10-07T16:09:26.129Z",
+  "expires_at": "2026-10-07T16:39:26.129Z"
+}
