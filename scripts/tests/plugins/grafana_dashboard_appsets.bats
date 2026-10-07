@@ -418,7 +418,7 @@ _assert_no_panel_overlap() {
   [ "$status" -ne 0 ]
   jq -e '.description | contains("failed_untriaged")' <<<"$panel" >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failed cases" and (.targets[0].expr == "k3dm_test_cases_failed"))' >/dev/null
-  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Last run" and .fieldConfig.defaults.unit == "dateTimeAsIso" and .targets[0].expr == "max(k3dm_test_last_timestamp_seconds)")' >/dev/null
+  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Last run" and .fieldConfig.defaults.unit == "dateTimeAsIso" and .targets[0].expr == "max(k3dm_test_last_timestamp_seconds) * 1000")' >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Time since last successful run")' >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failing test cases (latest run)" and (.description | contains("No data means")))' >/dev/null
 }
@@ -431,7 +431,7 @@ _assert_no_panel_overlap() {
   local latest_panel successful_panel
   latest_panel=$(printf '%s\n' "$dashboard_json" | jq -c '.panels[] | select(.id == 1)')
   successful_panel=$(printf '%s\n' "$dashboard_json" | jq -c '.panels[] | select(.id == 2)')
-  [ "$(jq -r '.targets[0].expr' <<<"$latest_panel")" = "max(k3dm_test_last_timestamp_seconds)" ]
+  [ "$(jq -r '.targets[0].expr' <<<"$latest_panel")" = "max(k3dm_test_last_timestamp_seconds) * 1000" ]
   [ "$(jq -r '.targets[0].instant' <<<"$latest_panel")" = "true" ]
   jq -e '.targets[0].expr | startswith("time() - max(")' <<<"$successful_panel" >/dev/null
   [ "$(jq -r '.targets[0].instant' <<<"$successful_panel")" = "true" ]

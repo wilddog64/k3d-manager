@@ -1349,3 +1349,8 @@ the next CI run is pending.
 - [x] Changed the first panel from elapsed age to fixed latest-run timestamp.
 - [x] Preserved increasing elapsed semantics for the last-success panel.
 - [x] Dashboard contract suite passed 37/37; live rollout pending.
+## 2026-10-07 — fixed latest-run epoch display
+
+- [x] Recorded the seconds-versus-milliseconds Grafana rendering bug.
+- [x] Converted the latest-run timestamp query to milliseconds for `dateTimeAsIso`.
+- [x] Dashboard contract suite passed 37/37; live rollout pending.

@@ -23,7 +23,7 @@ data:
           "description": "Timestamp of the latest completed suite run across published targets. This value stays fixed until another run is published.",
           "gridPos": { "x": 0, "y": 0, "w": 12, "h": 5 },
           "fieldConfig": { "defaults": { "unit": "dateTimeAsIso" } },
-        "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k3dm_test_last_timestamp_seconds)", "instant": true }]
+        "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k3dm_test_last_timestamp_seconds) * 1000", "instant": true }]
         },
         {
           "id": 2,

@@ -698,3 +698,9 @@ The operator clarified that `Last run` must remain a fixed run timestamp, while 
 successful run` should continue increasing until a newer successful build. Panel 1 now queries
 `max(k3dm_test_last_timestamp_seconds)` with an absolute ISO datetime unit; panel 2 retains the
 elapsed-time query. Dashboard contract tests pass 37/37. Live rollout pending.
+## 2026-10-07 — fixed latest-run epoch display
+
+The first absolute timestamp rollout displayed January 1970 because Grafana's `dateTimeAsIso`
+unit expects milliseconds while the Prometheus metric is in seconds. Recorded the finding in
+`docs/issues/2026-10-07-grafana-latest-run-epoch-unit.md`; the query now multiplies by `1000`.
+Dashboard contract tests pass 37/37. Live rollout pending.
