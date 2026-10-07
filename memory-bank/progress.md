@@ -1221,3 +1221,6 @@ the next CI run is pending.
       `docs/issues/2026-10-07-cloud-hub-snapshot-suite-failures.md`.
 - [ ] Obtain a focused cloud rerun with complete BATS assertion output before changing snapshot
       behavior; the aggregate failures may share one cloud-only capture failure.
+
+- [x] Full local `make test` verification: 1,384/1,384 BATS passed; the reported case numbers all
+      passed locally.

@@ -39,6 +39,10 @@ ok 13 hub snapshot: Loki record is present
 ok 14 hub snapshot: remote dir default survives single-quoting on the remote shell
 ```
 
+The complete local BATS dispatcher also passes all `1,384` cases, including cloud-reported cases
+198, 970, 971, 972, 974, and 981. The local run emitted only the expected tripwire notices for
+blocked host tools and exited zero.
+
 ## Follow-up
 
 Run `bats --formatter tap13 scripts/tests/plugins/hub_snapshot.bats` in the same cloud worker and

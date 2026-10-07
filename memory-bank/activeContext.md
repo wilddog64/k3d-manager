@@ -566,3 +566,7 @@ snapshot capture setup. The focused local suite passes 14/14, so no production p
 without the cloud assertion diagnostics. Findings and the exact local TAP output are recorded in
 `docs/issues/2026-10-07-cloud-hub-snapshot-suite-failures.md`; next action is a focused cloud rerun
 with complete output.
+
+The complete local BATS dispatcher subsequently passed all `1,384` cases, including cloud cases
+198, 970, 971, 972, 974, and 981. No code change was made because the reported failures remain
+cloud-only and lack assertion diagnostics.
