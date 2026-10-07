@@ -1344,3 +1344,8 @@ the next CI run is pending.
 - [x] Verified raw timestamps and passed classification explain equal elapsed values.
 - [x] Renamed both stat panels to explicitly describe elapsed time.
 - [x] Dashboard contract suite passed 37/37; live rollout pending.
+## 2026-10-07 — latest-run dashboard semantics corrected
+
+- [x] Changed the first panel from elapsed age to fixed latest-run timestamp.
+- [x] Preserved increasing elapsed semantics for the last-success panel.
+- [x] Dashboard contract suite passed 37/37; live rollout pending.

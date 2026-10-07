@@ -692,3 +692,9 @@ Verified live Pushgateway data: latest and last-success timestamps are both `202
 values are therefore correct. Renamed the stat panels to `Time since latest run` and `Time since
 last successful run` so the displayed elapsed duration cannot be mistaken for a timestamp.
 Dashboard contract tests pass 37/37; live rollout pending.
+## 2026-10-07 — latest-run dashboard semantics corrected
+
+The operator clarified that `Last run` must remain a fixed run timestamp, while `Time since last
+successful run` should continue increasing until a newer successful build. Panel 1 now queries
+`max(k3dm_test_last_timestamp_seconds)` with an absolute ISO datetime unit; panel 2 retains the
+elapsed-time query. Dashboard contract tests pass 37/37. Live rollout pending.
