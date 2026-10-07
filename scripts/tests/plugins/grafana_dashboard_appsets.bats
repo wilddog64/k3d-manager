@@ -18,6 +18,13 @@ _assert_server_keyed_hub_exclude() {
   [[ "$exclude" != *'{{if eq .name'* ]] || return 1
 }
 
+_assert_acg_excludes_hub_owned_tests() {
+  local appset="$1"
+  local exclude
+  exclude="$(yq -r '.spec.template.spec.source.directory.exclude // ""' "$appset")" || return 1
+  [[ "$exclude" == *"k3dm-tests-configmap.yaml"* ]] || return 1
+}
+
 _assert_collision_files_excluded() {
   local appset="$1"
   local platform_ops_dir="$2"
@@ -108,6 +115,10 @@ _assert_no_panel_overlap() {
 
 @test "acg dashboard appset excludes hub collisions by server" {
   _assert_hub_exclude_contract "${ACG}" "${PLATFORM_OPS_DIR}" "${DASHBOARDS_DIR}"
+}
+
+@test "acg dashboard appset does not manage the hub-owned k3dm tests dashboard" {
+  _assert_acg_excludes_hub_owned_tests "${ACG}"
 }
 
 @test "acg dashboard appset collision guard rejects a missing exclude" {

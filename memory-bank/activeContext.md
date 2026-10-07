@@ -478,3 +478,11 @@ the incoming `thread_ts`; top-level commands retain the parent-header/details-th
 response-URL fallback remains for channel mismatch or unavailable bot delivery. Focused status,
 diagnostics, masking, and pod tests passed 54/54; Python compilation, `git diff --check`, doc
 links (1955 files), and `_agent_audit` passed. Runtime commit pending.
+
+## 2026-10-07 — k3dm Tests Grafana no-data fix live-verified
+
+The live no-data issue included duplicate Argo ownership: ACG and hub both managed
+`k3dm-test-metrics`, and the ACG copy overwrote the hub dashboard. ACG now excludes the
+hub-owned dashboard. Hub Argo is `Succeeded Synced Healthy`; the live ConfigMap uses UID
+`prometheus`; the scrape target `host.internal:9091` is up; and Prometheus returned
+`k3dm_test_cases_total=2501`. Commit pending.

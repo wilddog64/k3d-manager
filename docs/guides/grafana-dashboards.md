@@ -291,7 +291,7 @@ takes the `if not PUSHGATEWAY_URL: return` early exit in `_push_metrics()`. If y
 reading pre-v1.39.0 data, treat any zero-duration group as test exhaust and delete it:
 `curl -X DELETE http://localhost:9091/metrics/job/k3dm-webhook/instance/<action>-<provider>`.
 
-### k3dm Tests (`k3dm-tests`) — hub and ACG
+### k3dm Tests (`k3dm-tests`) — hub
 
 These metrics come from a laptop-side push and therefore exist only after someone runs
 `make test-all` (or its `make test-metrics` compatibility wrapper). The hub Prometheus
@@ -301,7 +301,9 @@ port-forward. Pushgateway retains the last value indefinitely, so read the **Sui
 freshness** panel first. The exit-code panel is informational only: `make test-all` here exits 2 when `test-pytest`
 falls back to a `python3` without pytest and 0 when a real `pytest` is on PATH, so the same
 healthy suite reports either value depending on the shell it ran in. Failed cases, never the
-exit code, drive health.
+exit code, drive health. The dashboard ConfigMap is owned only by the hub dashboard
+ApplicationSet; the ACG dashboard ApplicationSet excludes it so the two Argo applications
+cannot overwrite each other.
 
 | Panel | Query |
 |---|---|

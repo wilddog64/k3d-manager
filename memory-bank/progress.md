@@ -1134,3 +1134,12 @@ the next CI run is pending.
       `channel_id`; incoming thread replies now use the existing Slack thread.
 - [x] Verification: focused status/diagnostics/masking tests 54/54; Python compilation,
       `git diff --check`, doc links (1955 files), and `_agent_audit` passed.
+
+## 2026-10-07 — k3dm Tests Grafana no-data fix live-verified
+
+- [x] Confirmed duplicate ownership: ACG and hub both managed `k3dm-test-metrics`; ACG's
+      v1.41.0 copy overwrote the hub dashboard.
+- [x] ACG ApplicationSet now excludes `k3dm-tests-configmap.yaml`; hub is the sole owner.
+- [x] Live verification: hub Argo `Succeeded Synced Healthy`; datasource UID `prometheus`;
+      `host.internal:9091` target up; Prometheus returned `k3dm_test_cases_total=2501`.
+- [ ] Commit and remote proof pending.

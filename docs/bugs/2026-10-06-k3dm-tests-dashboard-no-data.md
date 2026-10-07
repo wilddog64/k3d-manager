@@ -1,6 +1,6 @@
 # k3dm tests dashboard shows no data after metrics are pushed
 
-Status: FIXED
+Status: LIVE-VERIFIED
 Severity: High
 Area: Test observability / Grafana datasource topology
 
@@ -40,8 +40,20 @@ The producer, Pushgateway port-forward, Prometheus scrape target, and Grafana
 dashboard are not using one explicit topology. A successful push can therefore be
 invisible to the Grafana instance shown by the operator.
 
+## Live root cause
+
+The first fix was deployed, but the live ConfigMap remained on v1.41.0 because
+both the ACG and hub dashboard applications managed `k3dm-test-metrics`. The ACG
+copy overwrote the hub dashboard and retained its old datasource UID.
+
 ## Recommended fix
 
 Imported `k3dm_test_*` from `host.internal:9091` into hub Prometheus, added the dashboard
 to the hub dashboard ApplicationSet, and switched its panels to the hub `prometheus`
-datasource. Live `make test-all` verification remains pending.
+datasource, and excluded the dashboard from the ACG ApplicationSet. Live verification:
+
+```text
+hub-grafana-dashboards: Succeeded Synced Healthy
+up{instance="host.internal:9091",job="k3dm-test-pushgateway"} 1
+k3dm_test_cases_total{instance="test-all-local",job="k3dm-tests",target="test-all"} 2501
+```
