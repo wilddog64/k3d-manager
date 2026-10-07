@@ -25,3 +25,7 @@ semantics and validation remain unchanged.
 The initial verification caught and corrected a JavaScript template-literal quoting
 error in the ArgoCD stage message before deployment. The corrected syntax check and
 test results are recorded by the implementation handoff.
+
+The standardized help was deployed with `make deploy-worker`; Wrangler reported Worker
+version `1c21d3e7-1e39-4dfc-aeee-b16f5b326233`, and the repository smoke check completed
+successfully.

@@ -125,7 +125,9 @@ Documentation only; no k3d-manager runtime changes or live tests.
 - [x] Filed `docs/bugs/2026-10-06-slack-command-help-inconsistent.md`.
 - [x] Replaced dense long-form usage messages with readable examples across the
       remaining Slack command handlers and added representative regression coverage.
-- [ ] Run tests, commit/push, deploy the relay, and verify help in Slack.
+- [x] Relay tests passed (36/36 plus 8 Slack-command BATS); commit `eaa619dc` pushed.
+- [x] Cloudflare Worker deployed as version `1c21d3e7-1e39-4dfc-aeee-b16f5b326233`;
+      smoke check completed successfully. Live Slack confirmation remains pending.
 
 ## 2026-10-06 — Slack cluster-diagnose help clarification in progress
 

@@ -155,7 +155,9 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 Filed `docs/bugs/2026-10-06-slack-command-help-inconsistent.md`. Audited the relay's
 long usage/error messages and converted cluster lifecycle, resume, cleanup, `/k3dm`,
-`/ask-docs`, and ArgoCD upgrade help to example-based text. Tests and deployment remain.
+`/ask-docs`, and ArgoCD upgrade help to example-based text. Relay tests passed and
+Worker version `1c21d3e7-1e39-4dfc-aeee-b16f5b326233` is deployed; live Slack confirmation
+remains pending.
 
 ## 2026-10-06 — Slack cluster-diagnose help clarified
 
