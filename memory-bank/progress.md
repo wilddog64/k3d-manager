@@ -120,6 +120,16 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — Slack status thread context fix in progress
+
+- [x] Filed `docs/bugs/2026-10-06-slack-status-thread-context-dropped.md`.
+- [x] Forwarded `/cluster-diagnose` channel context and preserved channel context
+      through native Slack thread-command dispatch for cluster status workers.
+- [x] Focused Python tests: 11 passed; Slack relay Node tests: 33 passed; compilation
+      and diff checks passed.
+- [ ] Run repository gates, commit/push, then operator re-tests `/cluster-status` and
+      `/cluster-diagnose` in the Slack thread.
+
 ## 2026-10-07 — webhook analysis test false failure fixed
 
 - [x] Filed `docs/bugs/2026-10-07-webhook-analysis-test-brittle-source-match.md` for the

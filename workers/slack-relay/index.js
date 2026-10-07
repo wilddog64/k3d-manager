@@ -371,7 +371,7 @@ async function handle(req, event) {
   if (command === '/cluster-diagnose') {
     const parsed = parseClusterDiagnose(text)
     if (parsed.error) return jsonReply(parsed.error, threadTs)
-    const payload = { ...parsed.payload, response_url: responseUrl }
+    const payload = { ...parsed.payload, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/diagnostics', payload, meta)

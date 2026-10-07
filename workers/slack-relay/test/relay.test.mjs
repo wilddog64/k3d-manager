@@ -317,7 +317,7 @@ test('/k3dm with no text asks the webhook for help', async () => {
 
 test('/cluster-diagnose <provider> with no verb asks for pods in all namespaces', async () => {
   const worker = loadWorker()
-  const body = 'command=%2Fcluster-diagnose&text=aws&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const body = 'command=%2Fcluster-diagnose&text=aws&channel_id=CDIAG&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
   await worker.dispatch(signed('/slack/commands', body))
   const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/diagnostics')
   assert.ok(call)
@@ -325,6 +325,7 @@ test('/cluster-diagnose <provider> with no verb asks for pods in all namespaces'
   assert.equal(payload.provider, 'aws')
   assert.equal(payload.action, 'get-pods-all')
   assert.equal(payload.namespace, undefined)
+  assert.equal(payload.channel_id, 'CDIAG')
 })
 
 test('/cluster-diagnose with no text still returns usage without relaying', async () => {

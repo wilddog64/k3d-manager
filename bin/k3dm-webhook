@@ -628,7 +628,7 @@ _STANDALONE_CMDS = {
     "cleanup-stale-sandbox",
 }
 
-def _handle_thread_command(job_id, command, role="admin"):
+def _handle_thread_command(job_id, command, role="admin", channel_id=""):
     """Dispatch a thread command for job_id. Runs in a background thread."""
     cmd = command.strip().lstrip("/").lower().split()[0] if command.strip() else ""
     if not command.strip().startswith("/") and cmd not in _THREAD_COMMANDS:
@@ -695,7 +695,7 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_hostinger_status if _status_provider == "hostinger" else _run_cluster_status,
             args=(new_job_id, ""),
-            kwargs={"thread_ts": thread_ts},
+            kwargs={"thread_ts": thread_ts, "channel_id": channel_id},
             daemon=True,
         ).start()
         _notify_job(job_id, f"🔎 *cluster-status* queued — job `{new_job_id}`")
@@ -710,7 +710,7 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_hostinger_status,
             args=(new_job_id, ""),
-            kwargs={"thread_ts": thread_ts},
+            kwargs={"thread_ts": thread_ts, "channel_id": channel_id},
             daemon=True,
         ).start()
         _notify_job(job_id, f"🖥️ *hostinger-status* queued — job `{new_job_id}`")
@@ -1856,6 +1856,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 and not ev_subtype
                 and ev_text
             ):
+                ev_channel_id = ev.get("channel", "")
                 is_thread_reply = bool(ev_thread_ts and ev_thread_ts != ev_ts)
                 thread_ts = ev_thread_ts if is_thread_reply else None
                 text = ev_text
@@ -1866,7 +1867,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     if job_id:
                         threading.Thread(
                             target=_handle_thread_command,
-                            args=(job_id, text, slack_role),
+                            args=(job_id, text, slack_role, ev_channel_id),
                             daemon=True,
                         ).start()
                     elif cmd in _STANDALONE_CMDS:
@@ -1878,7 +1879,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         _LOG.warning("slack orphan thread anchor_id=%r cmd=%r", anchor_id, cmd)
                         threading.Thread(
                             target=_handle_thread_command,
-                            args=(anchor_id, text, slack_role),
+                            args=(anchor_id, text, slack_role, ev_channel_id),
                             daemon=True,
                         ).start()
                 elif cmd in _STANDALONE_CMDS:
@@ -1891,7 +1892,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         (anchor_dir / "thread_ts").write_text(ev_ts)
                     threading.Thread(
                         target=_handle_thread_command,
-                        args=(anchor_id, text, slack_role),
+                        args=(anchor_id, text, slack_role, ev_channel_id),
                         daemon=True,
                     ).start()
             self._json(200, {"ok": True})

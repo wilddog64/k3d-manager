@@ -151,6 +151,15 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — Slack status thread context fixed
+
+Filed `docs/bugs/2026-10-06-slack-status-thread-context-dropped.md`. The Slack relay
+omitted `channel_id` for `/cluster-diagnose`, and native Slack event dispatch dropped
+the event channel before launching status workers. Both paths now preserve channel
+context so cluster status/diagnostics can use the existing Slack thread safely.
+Focused verification: Python 11 passed, relay Node tests 33 passed, compilation and
+diff checks passed. Commit and live Slack confirmation remain pending.
+
 ## 2026-10-07 — webhook analysis test false failure fixed
 
 Filed `docs/bugs/2026-10-07-webhook-analysis-test-brittle-source-match.md` and fixed the

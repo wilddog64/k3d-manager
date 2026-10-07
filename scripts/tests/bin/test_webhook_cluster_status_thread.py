@@ -184,3 +184,24 @@ def test_cluster_status_route_passes_channel_id(monkeypatch, tmp_path):
     wh._Handler.do_POST(fake)
     assert started
     assert started[0][2]["channel_id"] == "C1"
+
+
+def test_thread_command_passes_channel_id_to_status_worker(monkeypatch, tmp_path):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    (tmp_path / "job").mkdir()
+    (tmp_path / "job" / "thread_ts").write_text("THREAD")
+    started = []
+
+    class Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append((target, args, kwargs))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(wh.threading, "Thread", Thread)
+    monkeypatch.setattr(wh, "_notify_job", lambda *args: None)
+    monkeypatch.setattr(wh, "_role_allows", lambda *args: True)
+    wh._handle_thread_command("job", "cluster-status hostinger", "reader", "C1")
+    assert started
+    assert started[0][2] == {"thread_ts": "THREAD", "channel_id": "C1"}
