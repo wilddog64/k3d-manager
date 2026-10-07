@@ -151,6 +151,15 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — test metrics imported into hub Grafana
+
+Fixed the dashboard no-data topology in `docs/bugs/2026-10-06-k3dm-tests-dashboard-no-data.md`.
+Hub Prometheus now scrapes the laptop Hostinger Pushgateway at `host.internal:9091` and keeps
+only `k3dm_test_*` metrics. The hub dashboard ApplicationSet now imports `k3dm-tests`, whose
+panels use the hub `prometheus` datasource; the existing hub Grafana port-forward is unchanged.
+Dashboard and Pushgateway configuration tests passed 41/41, and doc links passed 1966 files.
+Operator live `make test-all` and Grafana refresh verification are still pending.
+
 ## 2026-10-06 — test-all case 236 fixed
 
 Fixed `docs/bugs/2026-10-06-makefile-e2e-recorded-fixture-exits-early.md`: the

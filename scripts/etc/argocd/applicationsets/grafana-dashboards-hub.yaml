@@ -22,13 +22,19 @@ spec:
       destination:
         server: https://kubernetes.default.svc
         namespace: monitoring
-      source:
-        repoURL: https://github.com/wilddog64/k3d-manager
-        targetRevision: '${K3D_MANAGER_BRANCH}'
-        path: scripts/etc/argocd/platform-ops
-        directory:
-          recurse: false
-          include: 'grafana-dashboard-*.yaml'
+      sources:
+        - repoURL: https://github.com/wilddog64/k3d-manager
+          targetRevision: '${K3D_MANAGER_BRANCH}'
+          path: scripts/etc/argocd/platform-ops
+          directory:
+            recurse: false
+            include: 'grafana-dashboard-*.yaml'
+        - repoURL: https://github.com/wilddog64/k3d-manager
+          targetRevision: '${K3D_MANAGER_BRANCH}'
+          path: scripts/etc/grafana/dashboards
+          directory:
+            recurse: false
+            include: 'k3dm-tests-configmap.yaml'
       syncPolicy:
         automated:
           prune: true

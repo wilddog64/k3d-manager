@@ -27,7 +27,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
 | Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
-| k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `make observability-acg` | **ACG** |
+| k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `make observability-acg` + hub dashboard ApplicationSet | **hub + ACG** |
 | Public endpoint probes | `probe_*` | Prometheus blackbox-exporter | Hub observability ApplicationSet + `Probe` resources | hub |
 
 All eight are `ConfigMap`s in the `monitoring` namespace carrying
@@ -291,10 +291,13 @@ takes the `if not PUSHGATEWAY_URL: return` early exit in `_push_metrics()`. If y
 reading pre-v1.39.0 data, treat any zero-duration group as test exhaust and delete it:
 `curl -X DELETE http://localhost:9091/metrics/job/k3dm-webhook/instance/<action>-<provider>`.
 
-### k3dm Tests (`k3dm-tests`) — ACG only
+### k3dm Tests (`k3dm-tests`) — hub and ACG
 
 These metrics come from a laptop-side push and therefore exist only after someone runs
-`make test-all` (or its `make test-metrics` compatibility wrapper). Pushgateway retains the last value indefinitely, so read the **Suite
+`make test-all` (or its `make test-metrics` compatibility wrapper). The hub Prometheus
+imports the `k3dm_test_*` series from the laptop's Hostinger Pushgateway on `host.internal:9091`,
+so the same dashboard is now visible from the hub Grafana without changing the hub Grafana
+port-forward. Pushgateway retains the last value indefinitely, so read the **Suite
 freshness** panel first. The exit-code panel is informational only: `make test-all` here exits 2 when `test-pytest`
 falls back to a `python3` without pytest and 0 when a real `pytest` is on PATH, so the same
 healthy suite reports either value depending on the shell it ran in. Failed cases, never the

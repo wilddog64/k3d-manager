@@ -1,6 +1,6 @@
 # k3dm tests dashboard shows no data after metrics are pushed
 
-Status: OPEN
+Status: FIXED
 Severity: High
 Area: Test observability / Grafana datasource topology
 
@@ -42,7 +42,6 @@ invisible to the Grafana instance shown by the operator.
 
 ## Recommended fix
 
-Choose and document the canonical Prometheus for local `test-all` metrics. Align the
-Pushgateway port-forward, scrape configuration, Grafana datasource UID, and dashboard
-deployment to that same target. Add a live smoke check that pushes a uniquely named
-test metric and confirms it is queryable through the dashboard's Prometheus.
+Imported `k3dm_test_*` from `host.internal:9091` into hub Prometheus, added the dashboard
+to the hub dashboard ApplicationSet, and switched its panels to the hub `prometheus`
+datasource. Live `make test-all` verification remains pending.

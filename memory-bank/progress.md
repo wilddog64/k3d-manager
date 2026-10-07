@@ -120,6 +120,17 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — hub import for test metrics implemented
+
+- [x] Added a hub Prometheus scrape job for `host.internal:9091` that retains only
+      `k3dm_test_*` metrics and preserves Pushgateway labels.
+- [x] Added `k3dm-tests-configmap.yaml` to the hub dashboard ApplicationSet.
+- [x] Switched k3dm test dashboard panels to the hub `prometheus` datasource.
+- [x] Dashboard and Pushgateway configuration BATS: 41/41 passed.
+- [x] `make check-doc-links`: 1966 files OK.
+- [ ] Operator runs `make test-all`, waits for the hub scrape interval, refreshes
+      the existing hub Grafana dashboard, and confirms the metrics are visible.
+
 ## 2026-10-06 — makefile e2e recording fixture fixed
 
 - [x] Scoped the fixture extractor's `endef` exit condition to the active

@@ -66,6 +66,16 @@ prometheus:
         static_configs:
           - targets:
               - 'prometheus-pushgateway.monitoring:9091'
+      - job_name: k3dm-test-pushgateway
+        honor_labels: true
+        metrics_path: /metrics
+        static_configs:
+          - targets:
+              - 'host.internal:9091'
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: 'k3dm_test_.+'
+            action: keep
 
 grafana:
   serviceMonitor:

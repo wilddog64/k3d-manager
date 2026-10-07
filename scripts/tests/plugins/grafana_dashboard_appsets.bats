@@ -151,8 +151,21 @@ _assert_no_panel_overlap() {
 }
 
 @test "hub dashboard appset includes all grafana-dashboard configmaps" {
-  run yq -r '.spec.template.spec.source.directory.include' "${HUB}"
+  run yq -r '.spec.template.spec.sources[] | select(.path == "scripts/etc/argocd/platform-ops") | .directory.include' "${HUB}"
   [ "$output" = "grafana-dashboard-*.yaml" ]
+}
+
+@test "hub dashboard appset imports the k3dm tests dashboard" {
+  run yq -r '.spec.template.spec.sources[] | select(.path == "scripts/etc/grafana/dashboards") | .directory.include' "${HUB}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "k3dm-tests-configmap.yaml" ]
+}
+
+@test "k3dm tests dashboard uses the hub Prometheus datasource" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  run yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq -e 'all(.panels[] | .targets[]?; .datasource.uid == "prometheus")' >/dev/null
 }
 
 @test "both dashboard appsets self-heal" {
