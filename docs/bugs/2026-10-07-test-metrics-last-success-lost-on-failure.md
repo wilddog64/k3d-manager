@@ -1,6 +1,6 @@
 # Test metrics deletes the last-success timestamp after a failed run
 
-**Status:** OPEN
+**Status:** FIXED in branch; live success -> failure verification pending
 **Filed:** 2026-10-07
 **Affected release:** v1.42.0
 **Source:** Operator freshness-panel investigation
@@ -70,9 +70,19 @@ Expected middle state: last_run=2000, last_success=1000.
 - Explain elapsed age in panel titles/descriptions, or provide an absolute completion date
   separately; equal elapsed ages after a passing latest run are expected.
 
+## Resolution
+
+The exporter now publishes a separate `test-all-local-last-success` Pushgateway group only after
+a successful run. Failed runs continue to replace the current target group with `PUT`, clearing
+current failure labels without deleting the durable success marker. The dashboard's existing
+`max(k3dm_test_last_success_timestamp_seconds)` query therefore retains the prior success age
+through failed runs. The marker is stored in Pushgateway rather than process memory, so a publisher
+restart does not fabricate or erase the last known success.
+
 ## Validation and scope
 
-Deterministic offline reproduction confirmed the producer/publication contract defect.
-No live Prometheus query, live failing test run, deployment, or runtime fix was performed.
+Deterministic offline reproduction confirmed the producer/publication contract defect. The fix has
+focused regression coverage for marker construction and success/failure publication decisions;
+live success -> failure Grafana verification remains pending.
 Repository path/title dedup found related bugs with different causes; vector similarity
 was not requested during this filing.

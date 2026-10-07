@@ -218,9 +218,20 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None):
     return "\n".join(lines) + "\n"
 
 
-def push_metrics(payload, target, origin, endpoint=None, opener=None):
+def build_success_marker(now=None):
+    """Build the separately grouped timestamp that survives failed-run replacement."""
+    now = int(time.time()) if now is None else now
+    return "\n".join([
+        "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures and exit code 0",
+        "# TYPE k3dm_test_last_success_timestamp_seconds gauge",
+        f"k3dm_test_last_success_timestamp_seconds {now}",
+        "",
+    ])
+
+
+def push_metrics(payload, target, origin, endpoint=None, opener=None, group_suffix=""):
     endpoint = (endpoint or os.environ.get("K3DM_PUSHGATEWAY_URL", DEFAULT_PUSHGATEWAY_URL)).rstrip("/")
-    url = f"{endpoint}/metrics/job/k3dm-tests/instance/{target}-{origin}"
+    url = f"{endpoint}/metrics/job/k3dm-tests/instance/{target}-{origin}{group_suffix}"
     opener = opener or urllib.request.urlopen
     for attempt in range(1, PUSH_RETRIES + 1):
         try:
@@ -253,11 +264,17 @@ def main(argv=None):
     parser.add_argument("--run-duration", type=int, default=None)
     args = parser.parse_args(argv)
     parsed = parse_log(Path(args.log_path).read_text())
+    now = int(time.time())
     print(f"[k3dm-test-metrics] {parsed['total']} cases, {parsed['failed']} failed")
     push_metrics(
-        build_payload(parsed, args.target, args.exit_code, run_duration=args.run_duration),
+        build_payload(parsed, args.target, args.exit_code, now=now, run_duration=args.run_duration),
         args.target, args.origin,
     )
+    if parsed["failed"] == 0 and args.exit_code == 0:
+        push_metrics(
+            build_success_marker(now), args.target, args.origin,
+            group_suffix="-last-success",
+        )
     return 0
 
 

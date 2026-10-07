@@ -1307,6 +1307,14 @@ the next CI run is pending.
 - [x] Committed and pushed as `1aea506b`; synced and verified the live label as `Last successful
       run` with ArgoCD `Synced Healthy`.
 
+## 2026-10-07 — P0 last-success retention
+
+- [x] Added a separately grouped Pushgateway success marker updated only after successful runs.
+- [x] Preserved current-run `PUT` replacement so failed-case series still clear correctly.
+- [x] Metrics pytest passed `24`; Grafana dashboard BATS passed `37/37`; compile, lint, audit,
+      and diff checks passed.
+- [ ] Commit, push, and live-verify success -> failure retention in Grafana.
+
 ## 2026-10-07 — Grafana run classification
 
 - [x] Added `k3dm_test_run_classification` with explicit `passed` / `failed_untriaged` labels.

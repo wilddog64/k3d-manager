@@ -34,6 +34,14 @@ deletes the last-success metric on failure (1000 -> ABSENT -> 3000), instead of 
 Preserve current failure-series replacement and durable per-target/origin success state.
 Documentation only; no runtime fix or live service test. Publication SHA is in file git history.
 
+## 2026-10-07 — P0 last-success retention fixed
+
+The exporter now publishes a separate `-last-success` Pushgateway group only after a successful
+run. Failed current-run `PUT` replacement still clears stale failure labels but cannot delete the
+prior successful timestamp. Focused metrics tests passed `24`; Grafana dashboard BATS passed
+`37/37`; compilation, lint, audit, and diff checks passed. Commit and live success -> failure
+Grafana verification remain pending.
+
 ## 2026-10-07 — k3dm Tests failure-history gap filed (OPEN, v1.42.0)
 
 Filed docs/bugs/2026-10-07-k3dm-tests-failure-history-missing.md and an issue evidence note.

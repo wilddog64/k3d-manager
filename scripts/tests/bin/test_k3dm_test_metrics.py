@@ -95,6 +95,34 @@ def test_run_classification_follows_terminal_exit_code():
     assert 'k3dm_test_run_classification{target="test-all",classification="failed_untriaged"} 1' in failed
 
 
+def test_success_marker_is_separate_and_bounded_to_the_success_group():
+    marker = METRICS.build_success_marker(now=123)
+    assert marker == (
+        "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures and exit code 0\n"
+        "# TYPE k3dm_test_last_success_timestamp_seconds gauge\n"
+        "k3dm_test_last_success_timestamp_seconds 123\n"
+    )
+
+
+def test_main_publishes_success_marker_only_after_a_success(monkeypatch, tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
+    calls = []
+    monkeypatch.setattr(METRICS, "push_metrics", lambda payload, *args, **kwargs: calls.append((payload, args, kwargs)))
+    METRICS.main([str(log), "--target", "test-all", "--exit-code", "0"])
+    assert len(calls) == 2
+    assert calls[1][2]["group_suffix"] == "-last-success"
+
+
+def test_main_does_not_publish_success_marker_after_a_failure(monkeypatch, tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
+    calls = []
+    monkeypatch.setattr(METRICS, "push_metrics", lambda payload, *args, **kwargs: calls.append((payload, args, kwargs)))
+    METRICS.main([str(log), "--target", "test-all", "--exit-code", "2"])
+    assert len(calls) == 1
+
+
 def test_origin_is_in_the_grouping_url_not_only_a_label():
     def healthy_opener(request, timeout):
         class Response:
