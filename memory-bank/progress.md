@@ -1,3 +1,12 @@
+## 2026-10-07 — last-success timestamp deletion bug filed (OPEN, v1.42.0)
+
+Operator screenshot shows equal elapsed ages of 3.41 hours; that is expected when the latest
+run passed. Offline success -> failure -> success reproduction confirms PUT replacement
+deletes the last-success metric on failure (1000 -> ABSENT -> 3000), instead of preserving
+1000 across the failed run. Filed docs/bugs/2026-10-07-test-metrics-last-success-lost-on-failure.md plus an evidence issue.
+Preserve current failure-series replacement and durable per-target/origin success state.
+Documentation only; no runtime fix or live service test. Publication SHA is in file git history.
+
 ## 2026-10-07 — k3dm Tests failure-history gap filed (OPEN, v1.42.0)
 
 Filed docs/bugs/2026-10-07-k3dm-tests-failure-history-missing.md and an issue evidence note.
