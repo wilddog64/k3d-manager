@@ -120,6 +120,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-07 — failed Make-job evidence gap queued
+
+- [x] Filed `docs/bugs/2026-10-07-make-job-tail-omits-failure-context.md` with the live
+      `ccc20dc9` evidence and bounded/redacted acceptance criteria.
+- [x] Cross-linked the follow-up from the live-fixed Make output bug.
+- [ ] Implement failure-aware bounded excerpts or retained redacted artifacts; coordinate
+      with the v1.43.0 failure-evidence plan before changing the response contract.
+
 ## 2026-10-07 — Make-job output retrieval live verification
 
 - [x] Operator ran `make restart-webhook; make restart-cloud-bridge` successfully.

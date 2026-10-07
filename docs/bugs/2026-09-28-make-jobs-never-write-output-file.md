@@ -116,4 +116,5 @@ This confirms the core regression is fixed in the deployed path: terminal Make j
 now have retrievable output while the producer retains streaming `make.log`. The
 failed job's bounded tail did not include the earlier failing-test diagnostics; that
 is a separate evidence-quality follow-up and does not justify exposing raw, unbounded
-logs.
+logs. It is queued in
+`docs/bugs/2026-10-07-make-job-tail-omits-failure-context.md`.

@@ -151,6 +151,13 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-07 — failed Make-job evidence gap queued
+
+Filed `docs/bugs/2026-10-07-make-job-tail-omits-failure-context.md`. Live job `ccc20dc9`
+returned a non-empty failed tail, but the bounded response omitted the earlier failing
+test name and diagnostics. This is a separate open follow-up; the output-persistence fix
+remains live-verified.
+
 ## 2026-10-07 — Make-job output retrieval live-verified
 
 Operator restarted the webhook and cloud bridge, then verified job-status retrieval.
