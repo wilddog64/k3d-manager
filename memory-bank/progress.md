@@ -120,6 +120,17 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-06 — makefile e2e recording fixture fixed
+
+- [x] Scoped the fixture extractor's `endef` exit condition to the active
+      `_e2e_recorded` definition and asserted that `script -q` is present.
+- [x] Focused BATS test passed 1/1.
+- [x] Full `bats scripts/tests/bin` passed 328/328.
+- [x] `shellcheck -S error scripts/tests/bin/makefile_e2e_recorded.bats` passed.
+- [x] `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh
+      scripts/tests/bin/makefile_e2e_recorded.bats` passed.
+- [ ] Fix and live-verify the separate Grafana datasource/topology no-data bug.
+
 ## 2026-10-06 — test-all case 236 and dashboard no-data triage
 
 - [x] Confirmed the TTY fix: `hub_restore.bats` cases 149–235 passed.

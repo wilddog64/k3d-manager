@@ -1,6 +1,6 @@
 # `make test-all` case 236 uses an empty `_e2e_recorded` fixture
 
-Status: OPEN
+Status: FIXED
 Severity: Medium
 Area: Test fixture
 
@@ -47,3 +47,7 @@ Use a state-aware extractor that starts copying only at `_e2e_recorded` and exit
 only after that definition's matching `endef`, or avoid extracting the macro by
 using a temporary include that references the real Makefile. Add an assertion that
 the generated fixture contains `script -q` before running the probe.
+
+Implemented by scoping the `endef` exit condition to the active copy state and
+asserting that the generated fixture contains the recording command. The focused
+test passes, and the complete `scripts/tests/bin` suite passes 328/328.

@@ -27,6 +27,10 @@ make: `probe' is up to date.
 This proves the test fixture extractor stopped at an earlier `endef` and did not
 include `_e2e_recorded`.
 
+The fixture was corrected to scope the `endef` exit condition and to assert that
+`script -q` is present. The focused test now passes and the full bin suite passes
+328/328.
+
 ## Dashboard result
 
 The local Pushgateway health endpoint returned `OK`, and its metrics endpoint

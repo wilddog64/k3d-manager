@@ -151,6 +151,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-06 — test-all case 236 fixed
+
+Fixed `docs/bugs/2026-10-06-makefile-e2e-recorded-fixture-exits-early.md`: the
+`makefile_e2e_recorded.bats` extractor now exits only after the `_e2e_recorded`
+definition's `endef`, and asserts that `script -q` was captured. The focused test
+passes and `bats scripts/tests/bin` passes 328/328. The separate Grafana no-data
+topology bug remains open.
+
 ## 2026-10-06 — test-all case 236 and Grafana no-data bugs filed
 
 The prompt-hang fix worked: `hub_restore.bats` cases 149–235 passed. The next
