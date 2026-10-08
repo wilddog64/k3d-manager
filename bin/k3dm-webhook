@@ -808,7 +808,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         ).start()
         _notify_job(job_id, f"⏳ *argocd-upgrade* {version} ({stage}) queued — job `{new_job_id}`")
 
-    if cmd == "kill":
+    elif cmd == "kill":
         proc = _running_procs.get(job_id)
         if proc:
             try:
