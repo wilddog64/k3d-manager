@@ -1,3 +1,12 @@
+## 2026-10-08 — Hermes values_branch warning investigated
+
+Recorded docs/issues/2026-10-08-hermes-values-branch-drift-investigation.md. Read-only diagnose-app jobs d6bfca01/76b9f911 confirm
+hub-platform-ops and hub-vectordb compared-to v1.41.0 and Synced, versus sensor expected v1.42.0.
+Expected derives from K3DM_RELEASE_BRANCH or Hermes checkout; pull does not reapply AppSets.
+Baseline intent remains unknown; no live repin/restart. Filed docs/bugs/2026-10-08-hermes-values-branch-counts-sources-as-apps.md:
+1 app/2 stale sources reproduces "2 apps" wording. Full 15 references not enumerated.
+Documentation checks only; source fixture confirmed. Publication SHA in git history; no PR.
+
 ## 2026-10-08 — Checkout / Deployment No data investigated (PARTIAL)
 
 Recorded docs/issues/2026-10-08-checkout-and-deployment-dashboard-no-data-triage.md. Bridge observability job 39c7dff6 succeeded, exit0;
