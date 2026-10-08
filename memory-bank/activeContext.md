@@ -5,6 +5,7 @@
   after `security unlock-keychain` it deployed `k3dm-slack-relay` version `7cab1773` (sends
   `slack_user_id`). Signed probe 23:06:03Z = `/cluster-status` allowed as reader. Pending operator
   live checks: unmapped `/cluster-down` refused, thread `cluster-diagnose`, `/ask` shell.
+- Live: `/k3dm help` → role admin (audit 23:09:57Z) ✅. Thread reply `cluster-diagnose` → no `/slack/events` at all since 17:00:35Z (Slack stopped delivering after 401 burst); webhook pid 20722 started before keychain unlock, signing secret may be empty. Operator: `make restart-webhook` + re-verify Slack Event Subscriptions. Recurrence logged in `2fdc9b48`.
 
 ## 2026-10-08 — cleanup/pushgateway fix VERIFIED by Claude
 
