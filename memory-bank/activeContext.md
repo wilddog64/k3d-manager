@@ -834,4 +834,5 @@ The existing latest-run table remains current-state only; new panel 8, `Failures
 time range`, queries `max_over_time(k3dm_test_failure[$__range])`, deduplicates scrape samples,
 and exposes target/origin, suite, case, name, and bounded reason. Dashboard BATS passed 38/38
 and exporter metrics pytest passed 24/24. Live failed-then-passed Grafana verification remains
-pending. Commit/push is pending for this work.
+pending. Implementation commit `448498b5` is pushed to `origin/k3d-manager-v1.42.0`; no PR was
+created.

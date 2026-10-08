@@ -1472,4 +1472,4 @@ the next CI run is pending.
 - [x] Deduplicated repeated scrape observations with `max_over_time` and exposed target/origin.
 - [x] Dashboard BATS: 38/38 passed; exporter metrics pytest: 24 passed.
 - [ ] Verify failed -> passed history and selected-range filtering live in Grafana.
-- [ ] Commit and push implementation.
+- [x] Commit `448498b5` pushed to `origin/k3d-manager-v1.42.0`; no PR created.
