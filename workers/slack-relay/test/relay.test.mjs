@@ -246,6 +246,15 @@ test('/k3dm relays target, args, confirm and user id to /api/v1/make', async () 
   assert.equal(call.init.headers['X-K3DM-Source-Command'], '/k3dm')
 })
 
+test('/k3dm preserves the originating Slack thread and channel', async () => {
+  const worker = loadWorker()
+  const body = 'command=/k3dm&text=test-all&thread_ts=1700000000.000001&channel_id=C123&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await worker.dispatch(signed('/slack/commands', body))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/make')
+  assert.equal(JSON.parse(call.init.body).thread_ts, '1700000000.000001')
+  assert.equal(JSON.parse(call.init.body).channel_id, 'C123')
+})
+
 test('/k3dm rejects malformed arguments without relaying', async () => {
   const worker = loadWorker()
   const body = 'command=/k3dm&text=' + encodeURIComponent('fix-sync APP=$(id) extra') + '&user_id=UOP1'

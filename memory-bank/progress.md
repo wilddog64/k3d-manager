@@ -1414,3 +1414,10 @@ the next CI run is pending.
 - [x] Webhook focused tests: 17 passed; Slack relay tests: 38 passed.
 - [ ] Restart webhook and perform live Slack verification.
 - [x] Implementation commit `1f8c09ef` pushed to `k3d-manager-v1.42.0`.
+
+## 2026-10-07 — k3dm thread context and test Slack isolation
+
+- [x] Forwarded and persisted `/k3dm` Slack thread/channel metadata.
+- [x] Prevented webhook BATS fixtures from inheriting live Slack delivery credentials.
+- [x] Focused webhook tests: 17 passed; Slack relay tests: 39 passed; shellcheck clean.
+- [ ] Restart webhook and verify a threaded `k3dm test-all` live.

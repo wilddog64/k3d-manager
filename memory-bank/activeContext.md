@@ -769,3 +769,12 @@ webhook thread dispatcher, and direct API now require explicit confirmation for 
 remains confirmation-free. Focused webhook tests pass 17/17 and Slack relay tests pass 38/38.
 Live deployment/restart remains pending.
 Implementation commit pushed: `1f8c09ef`.
+
+## 2026-10-07 — k3dm thread context and test Slack isolation
+
+Filed and fixed `docs/bugs/2026-10-07-k3dm-thread-context-and-test-slack-leak.md`. `/k3dm`
+now forwards and persists `thread_ts`/`channel_id`, so threaded slash jobs can report progress
+and completion in the originating thread. The webhook BATS fixture unsets live Slack delivery
+variables, preventing stubbed cluster tests inside `make test-all` from posting misleading
+cluster-up/down messages. Focused webhook tests pass 17/17; Slack relay tests pass 39/39;
+shellcheck is clean. Live restart/verification remains pending.

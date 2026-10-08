@@ -483,6 +483,8 @@ async function handle(req, event) {
     const parsed = parseK3dm(text)
     if (parsed.error) return jsonReply(parsed.error, threadTs, true)
     const payload = { ...parsed.payload, slack_user_id: userId, response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    if (channelId) payload.channel_id = channelId
     const isHelp = payload.target === 'help'
     event.waitUntil((async () => {
       const { ok, conflict, data } = await relay('/api/v1/make', payload, meta)

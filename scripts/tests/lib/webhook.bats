@@ -18,6 +18,9 @@ setup_file() {
     export K3DM_WEBHOOK_PORT="${_WEBHOOK_PORT}"
     export SLACK_SIGNING_SECRET="bats-slack-signing-secret"
     export K3DM_SLACK_ROLE_MAP="U-reader:reader"
+    # Never let local webhook tests post their stubbed cluster jobs to the real
+    # Slack channel when `make test-all` is launched from a live webhook.
+    unset SLACK_BOT_TOKEN SLACK_CHANNEL_ID K3DM_SLACK_WEBHOOK_URL
 
     # Stub the analysis binary so queued /analyze and /diagnostics jobs cannot
     # spawn the real agy CLI (which launches Chrome via ACG browser automation).
