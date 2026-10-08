@@ -1,3 +1,11 @@
+## 2026-10-08 — cleanup/pushgateway fix VERIFIED by Claude
+
+- Codex `87eef35e` (label fix + regression test), `0c487442` (ask-bash sandbox test rewrite),
+  docs `ddbef25d` — on origin, scope matches the bug doc. Claude reran outside Codex: shellcheck
+  clean, BATS 9/9; RED: new cleanup test fails vs `50975556` script; mutation: sandbox test fails
+  with sandbox-exec disabled. Pending operator: `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger`,
+  then confirm hub `up{job="k3dm-test-pushgateway"}` = 1. Live verify of v1.42.0 fixes still pending.
+
 ## 2026-10-08 — cleanup-stale-sandbox Hostinger pushgateway fix committed
 
 - Implemented the bug spec Fix items 1–3 on `k3d-manager-v1.42.0`. Commits: `87eef35e` (agent
