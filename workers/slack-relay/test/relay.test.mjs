@@ -216,6 +216,33 @@ test('root JSON Slack Events are forwarded for shared slash-command URLs', async
   assert.equal(worker.fetches[0].init.body, body)
 })
 
+test('Slack bot-echo event callbacks are acknowledged at the edge', async () => {
+  const worker = loadWorker()
+  const body = JSON.stringify({ type: 'event_callback', event: { type: 'message', bot_id: 'B1', text: 'echo' } })
+  const response = await worker.dispatch(signedJson('/slack/events', body))
+  assert.equal(response.status, 200)
+  assert.equal(await response.text(), '{"ok":true}')
+  assert.equal(worker.fetches.length, 0)
+})
+
+test('Slack message update event callbacks are acknowledged at the edge', async () => {
+  const worker = loadWorker()
+  const body = JSON.stringify({ type: 'event_callback', event: { type: 'message', subtype: 'message_changed' } })
+  const response = await worker.dispatch(signedJson('/slack/events', body))
+  assert.equal(response.status, 200)
+  assert.equal(worker.fetches.length, 0)
+})
+
+test('human Slack event callbacks are forwarded unchanged', async () => {
+  const worker = loadWorker()
+  const body = JSON.stringify({ type: 'event_callback', event: { type: 'message', user: 'U1', text: 'hello' } })
+  const response = await worker.dispatch(signedJson('/slack/events', body))
+  assert.equal(response.status, 200)
+  assert.equal(worker.fetches.length, 1)
+  assert.equal(worker.fetches[0].url, 'https://webhook.test/slack/events')
+  assert.equal(worker.fetches[0].init.body, body)
+})
+
 test('cluster-up and cluster-down refuse to default to a cluster', async () => {
   for (const command of ['/cluster-up', '/cluster-down']) {
     const worker = loadWorker()

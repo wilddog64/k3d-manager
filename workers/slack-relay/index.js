@@ -335,6 +335,12 @@ async function handle(req, event) {
   if (pathname === '/slack/events' || isRootSlackEvent) {
     const body = await req.text()
     if (!await verifySlack(req, body)) return new Response('Unauthorized', { status: 401 })
+    let parsedEvent = null
+    try { parsedEvent = JSON.parse(body) } catch (_) { parsedEvent = null }
+    const innerEvent = parsedEvent && parsedEvent.type === 'event_callback' ? (parsedEvent.event || {}) : null
+    if (innerEvent && (innerEvent.bot_id || innerEvent.subtype)) {
+      return new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
     const upstream = await fetch(`${WEBHOOK_URL}/slack/events`, {
       method: 'POST',
       headers: {
