@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "action": "diagnose-app",
+  "args": {
+    "name": "hub-vectordb"
+  },
+  "requested_by": "codex-cloud",
+  "requested_at": "2026-10-08T16:54:16Z",
+  "expires_at": "2026-10-08T17:24:16Z"
+}
