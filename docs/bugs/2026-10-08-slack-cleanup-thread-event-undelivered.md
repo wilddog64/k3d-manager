@@ -84,11 +84,70 @@ would be dropped anyway (`bot_id`), so nothing visible breaks today, but:
   most of its events fail within an hour, and the 15–16h 80×401 run fits this pattern;
 - a human message over 4 KB would be rejected the same way.
 
-### Fix (proposed)
-1. `bin/k3dm-webhook` `/slack/events`: if `length` exceeds a Slack-specific cap (64 KiB), return
-   413. Otherwise read the full body. Never verify a body truncated by the generic 4 KB cap.
-2. `workers/slack-relay/index.js`: once `verifySlack` passes, parse the JSON. For an
-   `event_callback` whose `event.bot_id` or `event.subtype` is set, return
-   `200 {"ok":true}` and do not forward it. This drops the bot's own echoes at the edge.
-3. BATS/pytest: a signed body over 4096 bytes is accepted (200). A body over the Slack cap
-   returns 413. Relay unit test (if a harness exists): a bot_id event is not forwarded.
+### Fix (spec for Codex)
+
+Files: `scripts/lib/webhook/config.py`, `bin/k3dm-webhook`, `workers/slack-relay/index.js`,
+`workers/slack-relay/test/relay.test.mjs`, `scripts/tests/lib/webhook.bats`, this doc, memory-bank.
+
+**1. `scripts/lib/webhook/config.py`** — after `MAX_BODY = 4096` add:
+
+```python
+SLACK_EVENT_MAX_BODY = 65536
+```
+
+**2. `bin/k3dm-webhook`**
+- Add `SLACK_EVENT_MAX_BODY,` to the `from webhook.config import (...)` list, directly after `MAX_BODY,`.
+- In `do_POST`'s `/slack/events` branch:
+
+Old:
+```python
+            raw_body = self.rfile.read(min(length, MAX_BODY))
+```
+New:
+```python
+            if length > SLACK_EVENT_MAX_BODY:
+                self._json(413, {"error": "request too large"})
+                return
+            raw_body = self.rfile.read(length)
+```
+
+- Thread usage text (around line 724). Make it match the relay's slash usage, `pod <namespace> <pod>`.
+  The parser already accepts both `pod` and `describe-pod`:
+
+Old: `describe-pod <namespace> <pod>` inside the ``Usage: `cluster-diagnose ...` `` string
+New: `pod <namespace> <pod>`
+
+**3. `workers/slack-relay/index.js`** — in the `/slack/events` branch, directly after the
+`verifySlack` 401 line, add:
+
+```js
+    let parsedEvent = null
+    try { parsedEvent = JSON.parse(body) } catch (_) { parsedEvent = null }
+    const innerEvent = parsedEvent && parsedEvent.type === 'event_callback' ? (parsedEvent.event || {}) : null
+    if (innerEvent && (innerEvent.bot_id || innerEvent.subtype)) {
+      return new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+```
+(url_verification and human messages are still forwarded unchanged.)
+
+**4. Tests**
+- `workers/slack-relay/test/relay.test.mjs`, next to the root-JSON forwarding test:
+  - `event_callback` with `event.bot_id` → 200 and `worker.fetches.length === 0`.
+  - `event_callback` with `event.subtype: 'message_changed'` → not forwarded.
+  - a human `event_callback` (user set, no bot_id or subtype) → forwarded once to
+    `https://webhook.test/slack/events`, with the body unchanged.
+- `scripts/tests/lib/webhook.bats`:
+  - `Slack event larger than 4 KB is verified on the full body`: build a signed
+    `{"type":"event_callback","event":{"type":"message","bot_id":"B1","text":"<5000 x's>","ts":"9"}}`
+    with `_slack_event`, then assert the response contains `"ok":true`. Before the fix it returns
+    `invalid signature`.
+  - `Slack event over the Slack cap returns 413`: send 70000 bytes with
+    `curl -s -o /dev/null -w "%{http_code}"`, signed or not, and assert `413`.
+- **RED is mandatory:** run the new webhook test against the pre-fix `bin/k3dm-webhook` on a
+  temp copy. It must fail with `invalid signature`. Do NOT revert the working tree to do this.
+
+**Gates:** `node --test workers/slack-relay/test/relay.test.mjs`;
+`bats scripts/tests/lib/webhook.bats` (it starts its own webhook — leave `K3DM_JOB_DIR`/`K3DM_RUN_DIR`
+to the harness and never touch the live :7443 instance); `python3 -m py_compile bin/k3dm-webhook`.
+
+**Operator after merge to branch:** `make restart-webhook` and `make deploy-worker`.
