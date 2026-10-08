@@ -927,3 +927,24 @@ JSON events while preserving form-encoded slash commands. Node relay tests pass 
 Cloudflare relay version `e9d3dfc2-ee92-4444-938f-440b4bcc9aad`; the retry still produced no
 `/slack/events` request, so Slack app Event Subscriptions configuration/delivery is now the
 remaining blocker.
+## 2026-10-08 — v1.42.0 Slack authz, thread dispatch, and ask-bash fixes complete
+
+- Three fix commits are pushed to `origin/k3d-manager-v1.42.0`:
+  `fedcfcd88a6de92ed0a4f7e0617310029cb41304`,
+  `8aa14053fecd89930c680ce2a6a975069ae9e6d6`,
+  `b2c45ae3c2e8a96c383b943bab242e8a3f0e9d59`.
+- Remote verification: `git rev-parse origin/k3d-manager-v1.42.0` equals local HEAD
+  `b2c45ae3c2e8a96c383b943bab242e8a3f0e9d59`.
+- Fix 1 changes only the thread dispatch fallthrough and adds 7 focused tests. Fix 2 carries
+  `slack_user_id` through every slash relay and caps every route at the mapped caller role.
+  Fix 3 adds shell-string scope enforcement, Darwin OS read boundary, and `$SHELL` injection.
+- Gates: `shellcheck bin/k3dm-ask-bash` clean; `pytest scripts/tests/bin -q` = 516 passed,
+  1 skipped; `node --test workers/slack-relay/test/` = 42 passed, 0 failed; focused ask-bash
+  BATS = 4/4 and affected legacy BATS = 2/2.
+- The single required `make test` reached 1,387 BATS cases but exited 2: two fixture failures
+  were corrected and rechecked; four `e2e_remote` failures remain and are documented in
+  `docs/issues/2026-10-08-v1420-gate-results.md`.
+- Relay call-site audit: all 12 slash-handler `relay(...)` calls already pass the shared `meta`;
+  there were no Events/thread forwarding `relay(...)` call sites left unchanged.
+- Live verification remains pending. No worker deployment, webhook restart, `/ask`, PR, merge,
+  or live-cluster operation was performed.

@@ -66,10 +66,13 @@ No runtime fix, live job submission, Slack message, or service restart was perfo
 
 ## Fix
 
-The webhook now routes `cluster-diagnose`, `k3dm`, and `argocd-upgrade` from both
+Commit `fedcfcd88a6de92ed0a4f7e0617310029cb41304` changes the fallthrough chain so the
+webhook now routes `cluster-diagnose`, `k3dm`, and `argocd-upgrade` from both
 top-level Slack messages and existing/orphan threads. Child jobs inherit the originating
 thread timestamp and channel, and ArgoCD upgrade jobs now publish a terminal result to Slack.
 `hermes-auth` remains intentionally relay-local.
+
+Status: FIXED in branch; live verification pending.
 
 ## 2026-10-08 regression triage: handled commands fall through
 

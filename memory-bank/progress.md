@@ -1563,3 +1563,21 @@ the next CI run is pending.
 - [x] Deployed relay version `e9d3dfc2-ee92-4444-938f-440b4bcc9aad`.
 - [x] Retried plain threaded cleanup; no `/slack/events` request or job was created.
 - [ ] Verify Slack Event Subscriptions Request URL and message event subscriptions.
+## 2026-10-08 — v1.42.0 three-fix implementation and verification
+
+- [x] Fix 1 committed and pushed: `fedcfcd88a6de92ed0a4f7e0617310029cb41304`.
+- [x] Fix 2 committed and pushed: `8aa14053fecd89930c680ce2a6a975069ae9e6d6`.
+- [x] Fix 3 committed and pushed: `b2c45ae3c2e8a96c383b943bab242e8a3f0e9d59`.
+- [x] Three bug docs now state `FIXED in branch; live verification pending` with their fix SHA.
+- [x] `shellcheck bin/k3dm-ask-bash`: clean.
+- [x] `pytest scripts/tests/bin -q`: 516 passed, 1 skipped.
+- [x] `node --test workers/slack-relay/test/`: 42 passed, 0 failed.
+- [x] Focused RED/green checks: Fix 1 old-copy RED 3 failed/4 passed; Fix 2 old-guard RED
+  17 failed/35 passed; Fix 3 old wrapper read the canary with rc 0 for absolute `-c`, sibling,
+  and `..` cases; new ask-bash BATS 4/4.
+- [ ] Full `make test`: one run reached 1,387 cases and exited 2 with four unrelated
+  `e2e_remote` failures after two affected fixture failures were corrected and rechecked 2/2.
+  Verbatim output and follow-up are in `docs/issues/2026-10-08-v1420-gate-results.md`.
+- [x] Remote branch tip verified equal to local HEAD after push.
+- [ ] Operator live verification remains pending; no deployment, restart, `/ask`, PR, merge,
+  or live-cluster action was performed.

@@ -61,3 +61,11 @@ the fixture itself tests the policy seam, not a live Slack end-to-end exploit.
 
 [Earlier role normalizer bug](2026-09-24-normalize-role-defaults-unknown-actor-to-admin.md)
 is fixed and is a different mechanism. This defect uses a valid admin command role.
+
+## Fix
+
+Commit `8aa14053fecd89930c680ce2a6a975069ae9e6d6` carries the signed Slack caller identity
+through relayed request bodies and caps every relayed route at the caller's mapped role,
+while preserving direct-token and capability-token behavior.
+
+Status: FIXED in branch; live verification pending.

@@ -63,3 +63,11 @@ mode. Those controls are present and should remain; they do not fix this path-ch
 [September security audit](../issues/2026-09-07-webhook-server-security-audit.md), F2, and
 [Phase 1 sandbox hardening plan](../plans/v1.32.0-ask-bash-sandbox-hardening.md).
 This is a concrete surviving scope bypass after Phase 1, not a claim that its fixes vanished.
+
+## Fix
+
+Commit `b2c45ae3c2e8a96c383b943bab242e8a3f0e9d59` adds shell-string scope checks with
+canonical directory-boundary matching, fail-closed path handling, a Darwin `sandbox-exec`
+read boundary, and `$SHELL` injection for the agent subprocess.
+
+Status: FIXED in branch; live verification pending.
