@@ -39,3 +39,19 @@ webhook request or job. The next required check is the Slack app Event Subscript
 URL and `message.channels`/`message.groups` bot subscriptions; the repository cannot change
 those workspace settings. The immediate supported path remains invoking
 `/cleanup-stale-sandbox apply` as a slash command.
+
+## Recurrence — 2026-10-08 23:11Z (v1.42.0 live check)
+
+A thread reply `cluster-diagnose` produced no `POST /slack/events` at all; the slash-command
+form worked. Webhook log, `/slack/events` by hour (UTC) on 2026-10-08: 15h 18×200 / 80×401,
+16h 2×200 / 14×401, 17h 2×401, then **nothing** — Slack stopped delivering after 17:00:35Z.
+Slack disables an app's event delivery after sustained failures, which matches a 401 burst
+followed by silence (unconfirmed — check the Slack app's Event Subscriptions page).
+
+Second, independent risk: `scripts/lib/webhook/auth.py:33` reads `k3dm-slack-signing-secret`
+from the keychain once, at import. The current webhook (pid 20722) started 23:03:02Z; the login
+keychain was unlocked at 23:05:35Z, after a `make deploy-worker` failed on a locked keychain.
+If the read failed, `SLACK_SIGNING_SECRET` is empty and every event is a 401 until restart.
+
+Operator steps: `make restart-webhook` (keychain now unlocked), then re-enable/re-verify the
+Request URL under the Slack app's Event Subscriptions, then retry the thread reply.
