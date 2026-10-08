@@ -1,3 +1,19 @@
+## 2026-10-08 — v1.42.0 fixes verified; cleanup-stale-sandbox kills Hostinger pushgateway PF
+
+- Codex v1.42.0 fixes VERIFIED by Claude on origin: `fedcfcd8` (thread elif), `8aa14053` (relay
+  caller cap), `b2c45ae3` (ask-bash scope; amended to also adjust `scripts/tests/lib/webhook.bats`
+  fixtures — justified), docs `08918765`. Re-ran: shellcheck clean, pytest 516 passed/1 skipped,
+  node 42/0. Real kubectl/helm reads work inside the sandbox.
+- FALSE GREEN found: `ask_bash_scope.bats` test 4 (OS sandbox) sets repo root = fake HOME, so it
+  fails on a real Mac (canary readable); passed only inside Codex's sandbox. The sandbox itself
+  works (manual: indirect read → Operation not permitted). Test rewrite in the bug doc below.
+- Alert investigation (`TargetDown{job=k3dm-test-pushgateway}` flapping): `bin/cleanup-stale-sandbox`
+  boots out the UNSCOPED `com.k3d-manager.pushgateway-port-forward` = Hostinger's 9091 forwarder.
+  3 outages each 1 min after a confirmed Slack cleanup; down since 15:32Z. `federate-acg` TargetDown
+  = sandbox genuinely dead. Bug: `docs/bugs/2026-10-08-cleanup-stale-sandbox-kills-hostinger-pushgateway-forward.md`.
+- Operator: run `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger` to restore :9091.
+- Codex dispatched for the cleanup label fix + ask-bash test rewrite. Status: IN PROGRESS.
+
 ## 2026-10-08 — v1.42.0 review done; security + dispatch fixes dispatched to Codex
 
 - Review outcome: v1.42.0 = bug-fix + Slack-hardening release. P0 = slash caller role (HIGH),
