@@ -783,10 +783,12 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
 
     elif cmd == "argocd-upgrade":
         parts = command.strip().lstrip("/").split()
-        version = parts[1] if len(parts) > 1 else ""
-        stage = parts[2] if len(parts) > 2 else "infra"
-        if not version or stage not in {"acg", "infra"} or len(parts) > 3:
-            _notify_job(job_id, "Usage: `argocd-upgrade <chart-version> [acg|infra]`")
+        confirm = "confirm" in parts[1:]
+        args = [part for part in parts[1:] if part != "confirm"]
+        version = args[0] if args else ""
+        stage = args[1] if len(args) > 1 else "infra"
+        if not version or stage not in {"acg", "infra"} or len(args) > 2 or (stage == "infra" and not confirm):
+            _notify_job(job_id, "Usage: `argocd-upgrade <chart-version> [acg|infra] [confirm]` — infra requires `confirm`")
             return
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
@@ -2142,6 +2144,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             stage = body.get("stage", "")
             if not chart_version or stage not in ("acg", "infra"):
                 self._json(400, {"error": "chart_version and stage (acg|infra) required"})
+                return
+            if stage == "infra" and body.get("confirm") is not True:
+                self._json(400, {"error": "infra ArgoCD upgrades require confirm=true"})
                 return
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)

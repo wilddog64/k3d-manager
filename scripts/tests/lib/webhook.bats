@@ -171,7 +171,7 @@ setup() {
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"7.8.2","stage":"infra"}' \
+        -d '{"chart_version":"7.8.2","stage":"infra","confirm":true}' \
         "${_WEBHOOK_URL}/api/v1/argocd-upgrade"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]
@@ -246,7 +246,7 @@ setup() {
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
         -H "Content-Type: application/json" \
-        --data-raw '{"chart_version":"7.8.2\",\"injected\":\"val","stage":"infra"}' \
+        --data-raw '{"chart_version":"7.8.2\",\"injected\":\"val","stage":"infra","confirm":true}' \
         "${_WEBHOOK_URL}/api/v1/argocd-upgrade"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]
@@ -731,7 +731,7 @@ PY
     response="$(curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"0.0.1-test","stage":"infra"}' \
+        -d '{"chart_version":"0.0.1-test","stage":"infra","confirm":true}' \
         "${_WEBHOOK_URL}/api/v1/argocd-upgrade")"
     job_id="$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["job_id"])')"
     [[ -n "$job_id" ]]
@@ -755,7 +755,7 @@ PY
     response="$(curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"0.0.1-test","stage":"infra"}' \
+        -d '{"chart_version":"0.0.1-test","stage":"infra","confirm":true}' \
         "${_WEBHOOK_URL}/api/v1/argocd-upgrade")"
     job_id="$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["job_id"])')"
 
@@ -812,7 +812,7 @@ PY
     run curl -s -o /dev/null -w "%{http_code}" -X POST \
         -H "Authorization: Bearer wrongtoken" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"7.8.2","stage":"infra"}' \
+        -d '{"chart_version":"7.8.2","stage":"infra","confirm":true}' \
         "${_TUNNEL_URL}/api/v1/argocd-upgrade"
     [ "$status" -eq 0 ]
     [ "$output" = "401" ]
@@ -836,7 +836,7 @@ PY
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_LEVEL3_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"0.0.1-tunnel-test","stage":"infra"}' \
+        -d '{"chart_version":"0.0.1-tunnel-test","stage":"infra","confirm":true}' \
         "${_TUNNEL_URL}/api/v1/argocd-upgrade"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]

@@ -761,3 +761,10 @@ and 90 subtests; Slack relay Node tests pass 37/37. Combined webhook BATS remain
 connection-refused fixture startup, documented in `docs/issues/2026-10-07-slack-thread-routing-validation.md`.
 Live Slack verification and webhook restart remain pending.
 Implementation commit pushed: `b5cf7272`.
+
+## 2026-10-07 — ArgoCD infra upgrade confirmation gate
+
+Filed and fixed `docs/bugs/2026-10-07-argocd-infra-upgrade-needs-confirm.md`. The Slack relay,
+webhook thread dispatcher, and direct API now require explicit confirmation for `infra`; `acg`
+remains confirmation-free. Focused webhook tests pass 17/17 and Slack relay tests pass 38/38.
+Live deployment/restart remains pending.

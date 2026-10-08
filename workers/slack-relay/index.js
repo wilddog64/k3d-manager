@@ -63,8 +63,9 @@ const ASK_DOCS_USAGE = [
   '/ask-docs --sources where is the webhook status documented?',
 ].join('\n')
 const ARGOCD_UPGRADE_USAGE = [
-  'Usage: /argocd-upgrade <chart-version> [acg|infra]',
-  'Examples: /argocd-upgrade 7.9.1 infra · /argocd-upgrade 7.9.1 acg',
+  'Usage: /argocd-upgrade <chart-version> [acg|infra] [confirm]',
+  'Examples: /argocd-upgrade 7.9.1 infra confirm · /argocd-upgrade 7.9.1 acg',
+  'The infra stage changes shared infrastructure and requires confirm.',
 ].join('\n')
 const CLUSTER_DIAGNOSE_USAGE = [
   'Usage: /cluster-diagnose [cluster] <request>',
@@ -527,14 +528,18 @@ async function handle(req, event) {
   }
 
   if (command === '/argocd-upgrade') {
-    const parts   = text.split(/\s+/)
-    const version = parts[0] || ''
-    const stage   = parts[1] || 'infra'
+    const parts = text.split(/\s+/).filter(Boolean)
+    const confirm = parts.includes('confirm')
+    const args = parts.filter(part => part !== 'confirm')
+    const version = args[0] || ''
+    const stage = args[1] || 'infra'
     if (!version) return jsonReply(ARGOCD_UPGRADE_USAGE, threadTs)
-    if (!['acg', 'infra'].includes(stage)) return jsonReply(`${ARGOCD_UPGRADE_USAGE}\nStage must be acg or infra.`, threadTs)
+    if (!['acg', 'infra'].includes(stage) || args.length > 2 || (stage === 'infra' && !confirm)) {
+      return jsonReply(`${ARGOCD_UPGRADE_USAGE}\nStage must be acg or infra; infra also requires confirm.`, threadTs)
+    }
     event.waitUntil((async () => {
       const { ok } = await relay('/api/v1/argocd-upgrade',
-        { chart_version: version, stage, response_url: responseUrl }, meta)
+        { chart_version: version, stage, confirm, response_url: responseUrl }, meta)
       if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`⏳ Upgrading ArgoCD to chart ${version} on ${stage}…`, threadTs, true)

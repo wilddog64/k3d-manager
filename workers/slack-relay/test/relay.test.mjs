@@ -353,6 +353,25 @@ test('long Slack command help uses examples instead of dense grammar', async () 
   }
 })
 
+test('/argocd-upgrade requires confirm for infra but not acg', async () => {
+  const missing = loadWorker()
+  const missingBody = 'command=/argocd-upgrade&text=7.9.1%20infra&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  assert.match(await (await missing.dispatch(signed('/slack/commands', missingBody))).text(), /infra also requires confirm/)
+  assert.equal(missing.fetches.filter(item => item.url.includes('/api/v1/argocd-upgrade')).length, 0)
+
+  const acg = loadWorker()
+  const acgBody = 'command=/argocd-upgrade&text=7.9.1%20acg&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await acg.dispatch(signed('/slack/commands', acgBody))
+  const acgCall = acg.fetches.find(item => item.url.includes('/api/v1/argocd-upgrade'))
+  assert.equal(JSON.parse(acgCall.init.body).confirm, false)
+
+  const infra = loadWorker()
+  const infraBody = 'command=/argocd-upgrade&text=7.9.1%20infra%20confirm&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await infra.dispatch(signed('/slack/commands', infraBody))
+  const infraCall = infra.fetches.find(item => item.url.includes('/api/v1/argocd-upgrade'))
+  assert.equal(JSON.parse(infraCall.init.body).confirm, true)
+})
+
 test('/cleanup-stale-sandbox preserves the originating thread timestamp', async () => {
   const worker = loadWorker()
   const body = 'command=%2Fcleanup-stale-sandbox&text=preview&thread_ts=1700000000.000001&channel_id=C123&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'

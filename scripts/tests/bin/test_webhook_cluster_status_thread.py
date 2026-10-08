@@ -234,7 +234,7 @@ def test_thread_command_parses_cluster_diagnose_forms():
     [
         "cluster-diagnose hub",
         "k3dm test-all",
-        "argocd-upgrade 7.9.1 infra",
+        "argocd-upgrade 7.9.1 infra confirm",
     ],
 )
 def test_new_thread_commands_are_routable(monkeypatch, tmp_path, command):
@@ -261,3 +261,26 @@ def test_new_thread_commands_are_routable(monkeypatch, tmp_path, command):
     wh._handle_thread_command("job", command, "admin", "C1")
     assert started
     assert (tmp_path / started[0][1][0] / "thread_ts").read_text() == "THREAD"
+
+
+def test_argocd_upgrade_api_requires_infra_confirmation(monkeypatch, tmp_path):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh._Handler, "_auth", lambda self: True)
+    monkeypatch.setattr(wh, "_rate_limited", lambda key: False)
+    monkeypatch.setattr(wh, "_request_role", lambda headers, token_role: "admin")
+    monkeypatch.setattr(wh, "_request_actor", lambda headers: "test")
+    body = json.dumps({"chart_version": "7.9.1", "stage": "infra"}).encode()
+    result = {}
+    fake = type("FakeHandler", (), {
+        "path": "/api/v1/argocd-upgrade",
+        "headers": {"Content-Length": str(len(body))},
+        "rfile": io.BytesIO(body),
+        "wfile": io.BytesIO(),
+        "_auth": lambda self: True,
+        "send_response": lambda self, code: result.update(code=code),
+        "send_header": lambda self, key, value: None,
+        "end_headers": lambda self: None,
+        "_json": lambda self, code, response: result.update(code=code, response=response),
+    })()
+    wh._Handler.do_POST(fake)
+    assert result == {"code": 400, "response": {"error": "infra ArgoCD upgrades require confirm=true"}}

@@ -1406,3 +1406,10 @@ the next CI run is pending.
 - [ ] Live Slack verification and webhook restart remain pending.
 - [ ] Combined webhook BATS has connection-refused fixture failures; see the validation issue doc.
 - [x] Implementation commit `b5cf7272` pushed to `k3d-manager-v1.42.0`.
+
+## 2026-10-07 — ArgoCD infra upgrade confirmation gate
+
+- [x] Filed and fixed the unsafe unconfirmed shared-infra upgrade path.
+- [x] `/argocd-upgrade <version> infra` now requires `confirm`; `acg` remains unchanged.
+- [x] Webhook focused tests: 17 passed; Slack relay tests: 38 passed.
+- [ ] Restart webhook and perform live Slack verification.
