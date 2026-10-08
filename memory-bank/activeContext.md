@@ -786,3 +786,4 @@ Filed and fixed `docs/bugs/2026-10-07-argocd-thread-usage-duplicated.md`. Invali
 ArgoCD requests now use one thread-aware response-URL post and suppress the duplicate immediate
 in-channel acknowledgement; top-level validation still returns one normal response. Slack relay
 tests pass 40/40 and shellcheck is clean. Live verification remains pending.
+Implementation commit pushed: `7882f338`.
