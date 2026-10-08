@@ -1,3 +1,13 @@
+## 2026-10-08 — webhook/bridge security follow-up filed
+
+Filed docs/bugs/2026-10-08-slack-slash-commands-trust-command-role.md and docs/bugs/2026-10-08-ask-bash-shell-string-bypasses-path-scope.md (OPEN, HIGH) after offline review of 6e54ca66bddf47973eff57216d290b5df821b529.
+Policy seam: admin relay header accepts cluster-down despite reader caller; /k3dm caps to reader.
+Exact wrapper reads harmless out-of-scope canary through -c; no credential read or live exploit.
+Evidence and reproducible commands: docs/issues/2026-10-08-webhook-cloud-bridge-security-review.md. September fixes remain present;
+sandbox Phase 1 is not a filesystem boundary. Bridge submitter identity already has v1.44 plan.
+Cloudflare Access/runtime OS isolation remain unverified. Docs-only; no restart, runtime change or PR.
+Publication SHA is recorded in git history; local doc checks/audit required before publication.
+
 ## 2026-10-08 — Hermes values_branch warning investigated
 
 Recorded docs/issues/2026-10-08-hermes-values-branch-drift-investigation.md. Read-only diagnose-app jobs d6bfca01/76b9f911 confirm
