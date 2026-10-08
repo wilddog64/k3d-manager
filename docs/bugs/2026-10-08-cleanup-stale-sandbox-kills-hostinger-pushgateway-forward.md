@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude
 **Branch:** `k3d-manager-v1.42.0`
-**Status:** OPEN — fix dispatched to Codex
+**Status:** FIXED in branch; operator recovery: make refresh-edge CLUSTER_PROVIDER=k3s-hostinger
 **Severity:** medium. Every confirmed `/cleanup-stale-sandbox` silently takes down the hub's
 `k3dm-test-pushgateway` target until the next Hostinger refresh, so `k3dm_test_*` metrics go stale,
 `TargetDown` fires, and the `OfflineSuite*` rules on ubuntu-hostinger can fire on stale data.
@@ -93,3 +93,13 @@ canary printed, rc 0.
 `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger` rewrites and reloads the Hostinger agents
 (cloudflared restarts too — a few seconds of tunnel blip). Run it after any confirmed
 `/cleanup-stale-sandbox` until this fix is deployed.
+
+## Fix applied
+
+`cleanup-stale-sandbox` now targets only the sandbox pushgateway agent, preserving Hostinger's
+unscoped pushgateway forwarder. Its regression test logs fake `launchctl` arguments and verifies
+the Hostinger plist remains while the sandbox plist is removed. The Darwin OS-sandbox test now
+keeps the repository root outside the fake HOME, uses a repository reader script, and proves the
+canary is denied with `sandbox-exec` but readable when the OS sandbox is disabled.
+
+Commits: `87eef35e`, `0c487442`.

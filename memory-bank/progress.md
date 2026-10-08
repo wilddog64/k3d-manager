@@ -245,6 +245,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-08 — cleanup-stale-sandbox Hostinger pushgateway fix
+
+- [x] Changed cleanup to stop only `com.k3d-manager.sandbox.pushgateway-port-forward`.
+- [x] Added fake-launchctl logging and regression coverage proving Hostinger's unscoped plist is
+  preserved; the pre-change RED test failed as required.
+- [x] Rewrote the Darwin OS-sandbox test to use a repository reader script with Layer A control.
+- [x] ShellCheck passed; targeted BATS passed 9/9. Commits: `87eef35e`, `0c487442`.
+
 ## 2026-10-07 — webhook thread mock contract fixed
 
 - [x] Updated the ask-docs thread test stub for the production `channel_id` keyword.

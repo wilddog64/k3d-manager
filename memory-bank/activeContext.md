@@ -1,3 +1,10 @@
+## 2026-10-08 — cleanup-stale-sandbox Hostinger pushgateway fix committed
+
+- Implemented the bug spec Fix items 1–3 on `k3d-manager-v1.42.0`. Commits: `87eef35e` (agent
+  label and regression test), `0c487442` (OS-sandbox test rewrite). ShellCheck passed; targeted
+  BATS passed 9/9, including the real Darwin `sandbox-exec` test. The final docs commit records
+  the fixed status and operator recovery.
+
 ## 2026-10-08 — v1.42.0 fixes verified; cleanup-stale-sandbox kills Hostinger pushgateway PF
 
 - Codex v1.42.0 fixes VERIFIED by Claude on origin: `fedcfcd8` (thread elif), `8aa14053` (relay
