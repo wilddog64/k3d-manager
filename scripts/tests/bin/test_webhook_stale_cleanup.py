@@ -14,7 +14,7 @@ webhook = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(webhook)
 
 
-def _run(monkeypatch, tmp_path, rc, output, confirm=False, timed_out=False):
+def _run(monkeypatch, tmp_path, rc, output, confirm=False, timed_out=False, channel_id=""):
     job_id = "a1b2c3f0"
     job_dir = tmp_path / job_id
     job_dir.mkdir()
@@ -23,7 +23,8 @@ def _run(monkeypatch, tmp_path, rc, output, confirm=False, timed_out=False):
     monkeypatch.setattr(webhook, "_notify_job", lambda job, text: notifications.append((job, text)))
     monkeypatch.setattr(webhook, "_redact_secrets", lambda text: text)
     monkeypatch.setattr(webhook, "_spawn_capture_text", lambda *_args, **_kwargs: (rc, output, timed_out))
-    webhook._run_stale_sandbox_cleanup(job_id, confirm=confirm)
+    monkeypatch.setattr(webhook, "_start_bot_thread", lambda *_args, **_kwargs: "1700000000.000099")
+    webhook._run_stale_sandbox_cleanup(job_id, confirm=confirm, channel_id=channel_id)
     return job_dir, notifications
 
 
@@ -77,3 +78,8 @@ def test_notify_job_prefers_response_url_over_configured_bot_channel(monkeypatch
 
     assert calls == [(('https://hooks.slack.com/commands/test', 'cleanup complete'),
                       {'thread_ts': '1700000000.000001'})]
+
+
+def test_top_level_cleanup_starts_a_thread(monkeypatch, tmp_path):
+    job_dir, _ = _run(monkeypatch, tmp_path, 0, "preview\n", channel_id="C123")
+    assert (job_dir / "thread_ts").read_text() == "1700000000.000099"

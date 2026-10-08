@@ -496,11 +496,17 @@ def _patch_label(cluster_name, version):
 
 
 
-def _run_stale_sandbox_cleanup(job_id, confirm=False):
+def _run_stale_sandbox_cleanup(job_id, confirm=False, channel_id=""):
     """Stop expired ACG-only forwards and remove the stale ubuntu-k3s context."""
     job_dir = JOB_DIR / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     (job_dir / "status").write_text("running")
+    thread_ts_file = job_dir / "thread_ts"
+    if not thread_ts_file.exists() and channel_id:
+        _thread_header = f"🧹 *cleanup-stale-sandbox* ({'apply' if confirm else 'preview'}) queued"
+        _thread_ts = _start_bot_thread(_thread_header, channel_id=channel_id)
+        if _thread_ts:
+            thread_ts_file.write_text(_thread_ts)
     cmd = [str(Path(__file__).resolve().parent / "cleanup-stale-sandbox")]
     if confirm:
         cmd.append("--confirm")
@@ -2187,6 +2193,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if route["handler"] == "cleanup_stale_sandbox":
             confirm = bool(body.get("confirm", False))
             response_url = body.get("response_url", "")
+            channel_id = str(body.get("channel_id", "")).strip()
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
@@ -2195,9 +2202,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 (JOB_DIR / job_id / "thread_ts").write_text(thread_ts)
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
+            if channel_id:
+                (JOB_DIR / job_id / "channel_id").write_text(channel_id)
             threading.Thread(
                 target=_run_stale_sandbox_cleanup,
-                args=(job_id, confirm),
+                args=(job_id, confirm, channel_id),
                 daemon=True,
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})

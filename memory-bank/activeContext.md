@@ -738,3 +738,10 @@ The cleanup job's bot post could return success while targeting the webhook's co
 not the command's channel. `_notify_job` now prefers the stored Slack response URL with its
 `thread_ts`, using bot posting only as fallback; response posting returns success/failure instead
 of being silent. Webhook notification tests pass 4/4; live Slack verification remains pending.
+## 2026-10-07 — cleanup now creates threads for top-level Slack commands
+
+Unlike status/diagnostics, cleanup previously used only the slash response URL and did not create
+a bot thread when invoked at channel level. The relay now forwards `channel_id`; the webhook
+creates a thread for top-level cleanup requests and retains existing thread context. Webhook
+cleanup tests pass 5/5 and Slack relay tests 37/37. Worker deployment and live verification remain
+pending.

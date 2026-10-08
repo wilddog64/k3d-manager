@@ -469,7 +469,7 @@ async function handle(req, event) {
     }
     const confirm = ['confirm', 'apply'].includes(cleanupText)
     event.waitUntil((async () => {
-      const payload = { confirm, response_url: responseUrl }
+      const payload = { confirm, response_url: responseUrl, channel_id: p.get('channel_id') || '' }
       if (threadTs) payload.thread_ts = threadTs
       const { ok, conflict } = await relay('/api/v1/cleanup-stale-sandbox', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)

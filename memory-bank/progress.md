@@ -1384,3 +1384,9 @@ the next CI run is pending.
 - [x] Prefer command-specific response URL for threaded job notifications.
 - [x] Retain bot posting as fallback and expose response-post success/failure to callers.
 - [x] Webhook notification tests passed 4/4; live Slack verification remains pending.
+## 2026-10-07 — cleanup now creates threads for top-level Slack commands
+
+- [x] Forwarded Slack channel ID with cleanup requests.
+- [x] Created a bot thread for top-level cleanup invocations, matching status/diagnostics.
+- [x] Validation passed: webhook cleanup 5/5, Slack relay 37/37.
+- [ ] Deploy worker and perform live verification.

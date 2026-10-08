@@ -25,6 +25,10 @@ The next live retry showed bot posting could return success while targeting the 
 configured channel rather than the command's channel. Notifications now prefer the stored
 response URL and use bot posting only as fallback.
 
+The remaining consistency gap was top-level cleanup invocation: unlike status/diagnostics, it did
+not create a bot thread when no incoming `thread_ts` existed. Cleanup now forwards the event
+channel and creates a thread for top-level requests, matching those commands.
+
 An additional guard now posts a generic authorization failure to the originating thread for
 recognized commands from an unallowlisted Slack user. The allowlist remains enforced and no
 command is executed.
@@ -35,6 +39,6 @@ role map.
 
 ## Validation
 
-The Slack relay regression asserts thread propagation, webhook notification regressions pass 4/4,
+The Slack relay regression asserts thread/channel propagation, webhook cleanup tests pass 5/5,
 and the existing cleanup tests cover preview/apply behavior. Live Slack verification remains
 pending.
