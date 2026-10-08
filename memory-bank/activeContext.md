@@ -827,3 +827,11 @@ The next live run showed the top-level `/k3dm` job had a channel but no thread. 
 creates a bot parent thread for top-level jobs when Slack bot credentials are available. Focused
 webhook tests pass 18/18; another webhook restart and live retry are required.
 Implementation commit pushed: `6c5ef7fb`.
+## 2026-10-08 — k3dm Tests historical failure table implemented
+
+Implemented the P1 dashboard fix from `docs/bugs/2026-10-07-k3dm-tests-failure-history-missing.md`.
+The existing latest-run table remains current-state only; new panel 8, `Failures in selected
+time range`, queries `max_over_time(k3dm_test_failure[$__range])`, deduplicates scrape samples,
+and exposes target/origin, suite, case, name, and bounded reason. Dashboard BATS passed 38/38
+and exporter metrics pytest passed 24/24. Live failed-then-passed Grafana verification remains
+pending. Commit/push is pending for this work.

@@ -98,6 +98,22 @@ data:
               "renameByName": { "target": "Target", "classification": "Classification" }
             } }
           ]
+        },
+        {
+          "id": 8,
+          "type": "table",
+          "title": "Failures in selected time range",
+          "description": "Retained failed-test observations from the selected dashboard time range. Repeated scrapes are deduplicated; rows identify a failure seen during the range, not an exact individual run. No data means no failed-case samples were retained in the selected range.",
+          "gridPos": { "x": 0, "y": 26, "w": 24, "h": 8 },
+          "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max_over_time(k3dm_test_failure[$__range])", "format": "table", "instant": true }],
+          "transformations": [
+            { "id": "labelsToFields", "options": {} },
+            { "id": "organize", "options": {
+              "excludeByName": { "Time": true, "__name__": true, "job": true, "Value": true },
+              "renameByName": { "instance": "Target / origin", "suite": "Test suite", "case": "Case", "name": "Test name", "reason": "Failure reason", "target": "Target" },
+              "indexByName": { "instance": 0, "target": 1, "suite": 2, "case": 3, "name": 4, "reason": 5 }
+            } }
+          ]
         }
       ]
     }

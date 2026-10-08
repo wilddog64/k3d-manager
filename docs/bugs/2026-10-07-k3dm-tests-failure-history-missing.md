@@ -1,6 +1,6 @@
 # k3dm Tests dashboard lacks a failure-history table
 
-**Status:** OPEN
+**Status:** FIXED (dashboard implementation; live Grafana verification pending)
 **Filed:** 2026-10-07
 **Affected release:** k3d-manager v1.42.0
 **Type:** Observability / usability gap
@@ -77,9 +77,28 @@ as separate failure occurrences.
 - Validate a failed -> passed sequence and time-range filtering with representative
   Prometheus data and live Grafana verification.
 
-## Validation and scope
+## Fix and validation
 
-Documentation only; no dashboard/exporter changes, test execution, or new cloud job.
-Code inspection and the operator screenshot confirm the missing history view.
-Path/title dedup found no existing failure-history report; related stale-series and
-freshness bugs cover different behavior. Vector similarity lookup was not performed.
+Added dashboard panel 8, `Failures in selected time range`, using
+`max_over_time(k3dm_test_failure[$__range])`. This preserves the existing latest-run
+table and current-series clearing behavior while exposing retained failure observations
+from the selected Grafana range. Repeated scrapes are deduplicated by the range
+aggregation. The table shows the Pushgateway `instance` as `Target / origin`, plus
+suite, case, test name, bounded reason, and target; it does not claim an exact run time.
+
+Validation:
+
+```text
+bats scripts/tests/plugins/grafana_dashboard_appsets.bats
+1..38
+ok 12 k3dm tests dashboard preserves failed cases across the selected range
+...
+ok 38 k3dm tests freshness stats aggregate to one latest value
+
+pytest -q scripts/tests/bin/test_k3dm_test_metrics.py
+24 passed in 0.61s
+```
+
+The focused dashboard contract and exporter tests pass. Live Grafana verification of a
+failed-then-passed run and range filtering remains pending; historical visibility is
+bounded by Prometheus retention and scrape availability.

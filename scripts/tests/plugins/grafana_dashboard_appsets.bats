@@ -192,6 +192,19 @@ _assert_no_panel_overlap() {
   jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .instance and .job and .Value' <<<"${panel}" >/dev/null
 }
 
+@test "k3dm tests dashboard preserves failed cases across the selected range" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  local dashboard panel
+  dashboard="$(yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}")"
+  panel="$(jq -c '.panels[] | select(.id == 8)' <<<"${dashboard}")"
+  [ -n "${panel}" ]
+  [ "$(jq -r '.title' <<<"${panel}")" = "Failures in selected time range" ]
+  [ "$(jq -r '.targets[0].instant' <<<"${panel}")" = "true" ]
+  [ "$(jq -r '.targets[0].expr' <<<"${panel}")" = "max_over_time(k3dm_test_failure[\$__range])" ]
+  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .instance == "Target / origin" and .suite == "Test suite" and .case == "Case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .job and .Value and (has("instance") | not)' <<<"${panel}" >/dev/null
+}
+
 @test "both dashboard appsets self-heal" {
   run yq -r '.spec.template.spec.syncPolicy.automated.selfHeal' "${ACG}"
   [ "$output" = "true" ]

@@ -1465,3 +1465,11 @@ the next CI run is pending.
 - [x] Focused webhook tests: 18 passed.
 - [ ] Restart webhook and retry top-level `k3dm test-all`.
 - [x] Implementation commit `6c5ef7fb` pushed to `k3d-manager-v1.42.0`.
+## 2026-10-08 — k3dm Tests failure history panel
+
+- [x] Added a separate `Failures in selected time range` Grafana table.
+- [x] Preserved latest-run table semantics and current failure clearing.
+- [x] Deduplicated repeated scrape observations with `max_over_time` and exposed target/origin.
+- [x] Dashboard BATS: 38/38 passed; exporter metrics pytest: 24 passed.
+- [ ] Verify failed -> passed history and selected-range filtering live in Grafana.
+- [ ] Commit and push implementation.
