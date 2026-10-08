@@ -1,6 +1,6 @@
 # Slack cleanup thread messages were dropped at the relay root
 
-**Status:** Delivery resolved (bot was not in the channel); residual 401s on oversized bot-echo events — fix proposed
+**Status:** Fixed in `f127fd7b` and `d0eb99e8`; delivery resolved (bot was not in the channel)
 **Severity:** P1 — cleanup follow-up commands were silently ignored
 **Component:** Cloudflare Slack relay / Slack Events forwarding
 
@@ -151,3 +151,9 @@ New: `pod <namespace> <pod>`
 to the harness and never touch the live :7443 instance); `python3 -m py_compile bin/k3dm-webhook`.
 
 **Operator after merge to branch:** `make restart-webhook` and `make deploy-worker`.
+
+## Fix applied
+
+Implemented the specified full-body Slack event verification and 64 KiB cap in
+`f127fd7b`, plus edge acknowledgment for Slack bot-echo and subtype events in
+`d0eb99e8`. Human event callbacks and URL verification remain forwarded unchanged.

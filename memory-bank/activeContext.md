@@ -1,3 +1,12 @@
+## 2026-10-08 — Slack oversized event verification and bot-echo relay fix
+
+- Implemented the requested bug fix on `k3d-manager-v1.42.0`: full-body Slack signature
+  verification with a 65536-byte cap, corrected thread usage text, and edge acknowledgment
+  for bot/subtype event callbacks. Code commits: `f127fd7b`, `d0eb99e8`.
+- Relay tests passed 45/45; Python compilation passed. BATS had one initial assertion typo in
+  the new test, then was corrected; the full rerun and final remote push are pending.
+- No PR, deployment, live :7443 change, launchd change, or wrangler deploy. PR URL: none per task.
+
 ## 2026-10-08 — operator recovery done; relay redeployed
 
 - Operator ran `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger` + `make restart-webhook`; hub

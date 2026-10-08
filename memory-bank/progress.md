@@ -255,6 +255,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-08 — Slack cleanup thread event fix
+
+- [x] Applied the specified webhook full-body verification and Slack 64 KiB cap in `f127fd7b`.
+- [x] Applied relay edge acknowledgment for bot-echo/subtype events and human-event tests in
+  `d0eb99e8`; relay gate passed 45/45.
+- [ ] Final BATS rerun, docs commit, push, and remote SHA confirmation remain pending.
+- No PR URL: task explicitly prohibits PR creation.
+
 ## 2026-10-08 — cleanup-stale-sandbox Hostinger pushgateway fix
 
 - [x] Changed cleanup to stop only `com.k3d-manager.sandbox.pushgateway-port-forward`.
