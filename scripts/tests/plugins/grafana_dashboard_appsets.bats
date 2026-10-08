@@ -348,6 +348,7 @@ _assert_no_panel_overlap() {
 @test "Grafana Overview query mutation rejects a fixed one-minute window" {
   local snapshot="${BATS_TEST_TMPDIR}/hub-overview-rate.yaml"
   cp "${HUB_OVERVIEW}" "$snapshot"
+  # shellcheck disable=SC2016
   yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 2) | .targets[0].expr) = "sum by (status_code) (rate(grafana_http_request_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[1m]))" | tojson))' "$snapshot"
   run _assert_query_contract "$snapshot"
   [ "$status" -ne 0 ]
@@ -358,6 +359,7 @@ _assert_no_panel_overlap() {
 @test "Grafana Overview query mutation rejects the removed alert metric" {
   local snapshot="${BATS_TEST_TMPDIR}/app-overview-alert.yaml"
   cp "${OVERVIEW}" "$snapshot"
+  # shellcheck disable=SC2016
   yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 6) | .targets[0].expr) = "grafana_alerting_result_total{job=~\"$job\", instance=~\"$instance\", state=\"alerting\"}" | tojson))' "$snapshot"
   run _assert_query_contract "$snapshot"
   [ "$status" -ne 0 ]
