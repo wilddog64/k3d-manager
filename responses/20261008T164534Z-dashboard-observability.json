@@ -1,0 +1,1 @@
+{"action": "make-observability-status", "body": {"job_id": "39c7dff6", "status": "queued"}, "completed_at": "2026-10-08T16:46:03.162121Z", "http_status": 202, "id": "20261008T164534Z-dashboard-observability", "schema": 1, "status": "ok"}
