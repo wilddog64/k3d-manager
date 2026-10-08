@@ -17,6 +17,14 @@ The relay now forwards `thread_ts`; the webhook persists it with the cleanup job
 dispatch validates `preview`, `confirm`, and `apply` instead of silently treating unknown
 arguments as a dry run.
 
+An additional guard now posts a generic authorization failure to the originating thread for
+recognized commands from an unallowlisted Slack user. The allowlist remains enforced and no
+command is executed.
+
+Live evidence showed user `U0B89H45SUA` was rejected with `reason=unallowlisted`; this explains
+the silent follow-up messages and is a configuration follow-up, not permission to bypass the
+role map.
+
 ## Validation
 
 The Slack relay regression asserts thread propagation and the existing cleanup tests cover the

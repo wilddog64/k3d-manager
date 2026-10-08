@@ -719,3 +719,10 @@ the thread timestamp, the webhook persists it, and thread dispatch validates pre
 arguments. Slack relay tests pass 37/37; cleanup BATS 4/4 and webhook cleanup pytest 2/2 pass.
 Worker deployment completed as Cloudflare version `6c4509c9-6567-4113-bbcb-b2cc9cd3ed0a`; the
 signed health probe returned HTTP 200. Operator thread verification remains pending.
+## 2026-10-07 — Slack authorization failures now reply in-thread
+
+Live logs showed cleanup follow-ups were rejected before dispatch because Slack user
+`U0B89H45SUA` was absent from the webhook role map. Added a generic denial reply for recognized
+commands from unallowlisted users; authorization remains fail-closed. Focused authorization
+guard test passes 1/1; full webhook BATS remains blocked by unrelated local connection-refused
+fixtures. Role-map configuration still needs the operator's explicit update.

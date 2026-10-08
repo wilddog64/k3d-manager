@@ -1368,3 +1368,9 @@ the next CI run is pending.
 - [x] Focused validation passed: Slack relay 37/37, cleanup BATS 4/4, webhook pytest 2/2.
 - [x] Deployed Cloudflare worker version `6c4509c9-6567-4113-bbcb-b2cc9cd3ed0a`; signed probe returned HTTP 200.
 - [ ] Perform live Slack thread verification.
+## 2026-10-07 — Slack authorization failures now reply in-thread
+
+- [x] Diagnosed silent cleanup follow-ups as `unallowlisted` user rejection.
+- [x] Added a generic in-thread authorization failure response without bypassing the allowlist.
+- [x] Focused guard test passed 1/1; full webhook BATS has unrelated connection-refused failures.
+- [ ] Add `U0B89H45SUA` to the Slack role map if this operator should be authorized.

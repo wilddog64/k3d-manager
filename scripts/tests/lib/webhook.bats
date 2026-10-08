@@ -366,6 +366,13 @@ assert not _verify_slack_signature(b"\xff", "0", "v0=x")
     [ "${after}" = "${before}" ]
 }
 
+@test "Slack reports an authorization failure in the originating command thread" {
+    run grep -F -- 'This Slack account is not authorized for webhook commands' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- 'thread_ts=ev_thread_ts or None' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+}
+
 @test "Slack allowlisted reader can dispatch cluster-status" {
     local before after response
     before="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"

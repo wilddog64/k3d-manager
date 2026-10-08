@@ -1863,6 +1863,15 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ev_user = ev.get("user", "")
             if not _slack_user_is_allowlisted(ev_user):
                 _LOG.warning("slack event ignored type=%r user=%r reason=unallowlisted", ev_type, ev_user)
+                if ev_type == "message" and not ev_bot_id and not ev_subtype and ev_text:
+                    _event_command = ev_text.lstrip("/").lower().split()[0]
+                    if _event_command in (_THREAD_COMMANDS | _STANDALONE_CMDS):
+                        _post_slack_bot(
+                            "⛔ This Slack account is not authorized for webhook commands. "
+                            "Ask an admin to add it to the webhook role map.",
+                            thread_ts=ev_thread_ts or None,
+                            channel_id=ev.get("channel", ""),
+                        )
                 self._json(200, {"ok": True})
                 return
             slack_role = _slack_user_role(ev_user)
