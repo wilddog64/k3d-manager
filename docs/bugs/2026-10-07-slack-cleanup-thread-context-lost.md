@@ -29,6 +29,10 @@ The remaining consistency gap was top-level cleanup invocation: unlike status/di
 not create a bot thread when no incoming `thread_ts` existed. Cleanup now forwards the event
 channel and creates a thread for top-level requests, matching those commands.
 
+The first top-level-thread retry confirmed the thread was created, but the completion still used
+the response URL and appeared at channel level. Newly created bot threads now use `chat.postMessage`
+directly for completion; response URLs remain fallback for incoming slash-command threads.
+
 An additional guard now posts a generic authorization failure to the originating thread for
 recognized commands from an unallowlisted Slack user. The allowlist remains enforced and no
 command is executed.
@@ -39,6 +43,6 @@ role map.
 
 ## Validation
 
-The Slack relay regression asserts thread/channel propagation, webhook cleanup tests pass 5/5,
+The Slack relay regression asserts thread/channel propagation, webhook cleanup tests pass 6/6,
 and the existing cleanup tests cover preview/apply behavior. Live Slack verification remains
 pending.

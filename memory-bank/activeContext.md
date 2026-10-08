@@ -745,3 +745,9 @@ a bot thread when invoked at channel level. The relay now forwards `channel_id`;
 creates a thread for top-level cleanup requests and retains existing thread context. Webhook
 cleanup tests pass 5/5 and Slack relay tests 37/37. Cloudflare worker version
 `d44059a2-964b-47d8-8a7b-7e4390b7b623` is deployed; live Slack verification remains pending.
+## 2026-10-07 — top-level cleanup completion now posts into created thread
+
+The latest retry proved the top-level bot thread was created, but completion still used the
+response URL and appeared at channel level. Newly created cleanup threads are now marked as bot
+threads and completion uses `chat.postMessage` with the originating channel/thread; response URL
+remains fallback for existing incoming threads. Webhook tests pass 6/6; live verification pending.

@@ -507,6 +507,7 @@ def _run_stale_sandbox_cleanup(job_id, confirm=False, channel_id=""):
         _thread_ts = _start_bot_thread(_thread_header, channel_id=channel_id)
         if _thread_ts:
             thread_ts_file.write_text(_thread_ts)
+            (job_dir / "thread_source").write_text("bot")
     cmd = [str(Path(__file__).resolve().parent / "cleanup-stale-sandbox")]
     if confirm:
         cmd.append("--confirm")
@@ -1013,11 +1014,19 @@ def _notify_job(job_id, text):
     """
     thread_ts_file = JOB_DIR / job_id / "thread_ts"
     thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+    channel_id_file = JOB_DIR / job_id / "channel_id"
+    channel_id = channel_id_file.read_text().strip() if channel_id_file.exists() else None
+    thread_source_file = JOB_DIR / job_id / "thread_source"
+    thread_source = thread_source_file.read_text().strip() if thread_source_file.exists() else ""
     response_url_file = JOB_DIR / job_id / "response_url"
     response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
-    posted = bool(response_url and _slack_post(response_url, text, thread_ts=thread_ts))
+    posted = False
+    if thread_source == "bot" and SLACK_BOT_TOKEN and channel_id and thread_ts:
+        posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
+    if not posted and response_url:
+        posted = bool(_slack_post(response_url, text, thread_ts=thread_ts))
     if not posted and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
-        ts = _post_slack_bot(text, thread_ts=thread_ts)
+        ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id)
         if ts and not thread_ts:
             thread_ts_file.write_text(ts)
         posted = bool(ts)

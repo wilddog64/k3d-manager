@@ -1391,3 +1391,8 @@ the next CI run is pending.
 - [x] Validation passed: webhook cleanup 5/5, Slack relay 37/37.
 - [x] Deployed Cloudflare worker version `d44059a2-964b-47d8-8a7b-7e4390b7b623`.
 - [ ] Perform live verification.
+## 2026-10-07 — top-level cleanup completion now posts into created thread
+
+- [x] Marked webhook-created cleanup threads and posted completion directly into them.
+- [x] Kept response URL fallback for existing incoming threads.
+- [x] Webhook notification tests passed 6/6; live verification pending.

@@ -83,3 +83,23 @@ def test_notify_job_prefers_response_url_over_configured_bot_channel(monkeypatch
 def test_top_level_cleanup_starts_a_thread(monkeypatch, tmp_path):
     job_dir, _ = _run(monkeypatch, tmp_path, 0, "preview\n", channel_id="C123")
     assert (job_dir / "thread_ts").read_text() == "1700000000.000099"
+    assert (job_dir / "thread_source").read_text() == "bot"
+
+
+def test_notify_job_uses_bot_for_a_new_thread(monkeypatch, tmp_path):
+    job_dir = tmp_path / "deadbeef"
+    job_dir.mkdir()
+    (job_dir / "thread_ts").write_text("1700000000.000001")
+    (job_dir / "thread_source").write_text("bot")
+    (job_dir / "channel_id").write_text("C123")
+    (job_dir / "response_url").write_text("https://hooks.slack.com/commands/test")
+    calls = []
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook, "SLACK_BOT_TOKEN", "bot-token")
+    monkeypatch.setattr(webhook, "SLACK_CHANNEL_ID", "wrong-channel")
+    monkeypatch.setattr(webhook, "_post_slack_bot", lambda *args, **kwargs: calls.append((args, kwargs)) or "bot-ts")
+    monkeypatch.setattr(webhook, "_slack_post", lambda *args, **kwargs: calls.append((args, kwargs)) or True)
+
+    webhook._notify_job("deadbeef", "cleanup complete")
+
+    assert calls == [(('cleanup complete',), {'thread_ts': '1700000000.000001', 'channel_id': 'C123'})]
