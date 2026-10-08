@@ -1437,3 +1437,4 @@ the next CI run is pending.
 - [x] Added automatic parent-thread creation for top-level `/k3dm` jobs.
 - [x] Focused webhook tests: 18 passed.
 - [ ] Restart webhook and retry top-level `k3dm test-all`.
+- [x] Implementation commit `6c5ef7fb` pushed to `k3d-manager-v1.42.0`.
