@@ -214,3 +214,50 @@ def test_thread_command_passes_channel_id_to_status_worker(monkeypatch, tmp_path
     wh._handle_thread_command("job", "cluster-status hostinger", "reader", "C1")
     assert started
     assert started[0][2] == {"thread_ts": "THREAD", "channel_id": "C1"}
+
+
+def test_thread_command_parses_cluster_diagnose_forms():
+    assert wh._parse_thread_diagnose("cluster-diagnose hub") == {
+        "provider": "hub", "action": "get-pods-all",
+    }
+    assert wh._parse_thread_diagnose("cluster-diagnose aws pods platform-ops") == {
+        "provider": "aws", "action": "get-pods", "namespace": "platform-ops",
+    }
+    assert wh._parse_thread_diagnose("cluster-diagnose hub logs monitoring grafana grafana") == {
+        "provider": "hub", "action": "logs", "namespace": "monitoring",
+        "name": "grafana", "container": "grafana",
+    }
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cluster-diagnose hub",
+        "k3dm test-all",
+        "argocd-upgrade 7.9.1 infra",
+    ],
+)
+def test_new_thread_commands_are_routable(monkeypatch, tmp_path, command):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    (tmp_path / "job").mkdir()
+    (tmp_path / "job" / "thread_ts").write_text("THREAD")
+    monkeypatch.setattr(wh, "_role_allows", lambda actual, needed: actual == "admin" or needed == "reader")
+    monkeypatch.setattr(wh, "_notify_job", lambda *args: None)
+    monkeypatch.setattr(wh, "_validate_diagnostics_request", lambda request: None)
+    monkeypatch.setattr(wh, "_run_cluster_diagnostics", lambda *args, **kwargs: None)
+    monkeypatch.setattr(wh, "_run_upgrade_thread_job", lambda *args: None)
+    monkeypatch.setattr(wh, "_run_make_target", lambda *args: None)
+    monkeypatch.setattr(wh, "_MAKE_JOB_LOCK", __import__("threading").Lock())
+    started = []
+
+    class Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append((target, args, kwargs))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(wh.threading, "Thread", Thread)
+    wh._handle_thread_command("job", command, "admin", "C1")
+    assert started
+    assert (tmp_path / started[0][1][0] / "thread_ts").read_text() == "THREAD"

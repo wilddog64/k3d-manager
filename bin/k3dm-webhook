@@ -640,14 +640,63 @@ _THREAD_COMMANDS = {
     "kill", "diagnosis", "status", "logs", "ask", "ask-docs",
     "cluster-up", "cluster-down", "cluster-refresh", "cluster-resume",
     "cleanup-stale-sandbox",
-    "cluster-status", "hostinger-status", "gemini", "claude", "codex",
+    "cluster-status", "hostinger-status", "cluster-diagnose", "k3dm",
+    "argocd-upgrade", "gemini", "claude", "codex",
 }
 _STANDALONE_CMDS = {
     "cluster-up", "cluster-down", "cluster-resume",
-    "cluster-status", "hostinger-status", "cluster-refresh", "refresh",
+    "cluster-status", "hostinger-status", "cluster-diagnose", "cluster-refresh", "refresh",
     "ask", "ask-docs", "claude", "gemini", "codex",
-    "cleanup-stale-sandbox",
+    "cleanup-stale-sandbox", "k3dm", "argocd-upgrade",
 }
+
+
+def _thread_ts_for_job(job_id):
+    path = JOB_DIR / job_id / "thread_ts"
+    return path.read_text().strip() if path.exists() else None
+
+
+def _parse_thread_diagnose(command):
+    """Parse the Slack bare-message form of /cluster-diagnose."""
+    parts = command.strip().lstrip("/").split()
+    parts = parts[1:]
+    providers = {"hostinger", "aws", "gcp", "az", "azure", "hub"}
+    provider = "hostinger"
+    if parts and parts[0].lower() in providers:
+        provider_token = parts.pop(0).lower()
+        provider = "az" if provider_token == "azure" else provider_token
+    verb = parts.pop(0) if parts else ""
+    if not verb:
+        return {"provider": provider, "action": "get-pods-all"}
+    if verb == "pods" and len(parts) == 1:
+        return {"provider": provider, "action": "get-pods", "namespace": parts[0]}
+    if verb in {"pod", "describe-pod"} and len(parts) == 2:
+        return {"provider": provider, "action": "describe-pod", "namespace": parts[0], "name": parts[1]}
+    if verb == "logs" and len(parts) in {2, 3}:
+        request = {"provider": provider, "action": "logs", "namespace": parts[0], "name": parts[1]}
+        if len(parts) == 3:
+            request["container"] = parts[2]
+        return request
+    if verb == "apps" and not parts:
+        return {"provider": provider, "action": "get-apps"}
+    if verb == "app" and len(parts) == 1:
+        return {"provider": provider, "action": "describe-app", "name": parts[0]}
+    if verb == "appsets" and not parts:
+        return {"provider": provider, "action": "get-appsets"}
+    return None
+
+
+def _run_upgrade_thread_job(job_id, chart_version, stage):
+    """Run an ArgoCD upgrade and publish its terminal result to the thread."""
+    _run_upgrade(job_id, chart_version, stage)
+    status_path = JOB_DIR / job_id / "status"
+    status = status_path.read_text().strip() if status_path.exists() else "unknown"
+    output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets, max_chars=3000)
+    icon = "✅" if status == "success" else "❌"
+    text = f"{icon} *argocd-upgrade* {chart_version} ({stage}) — `{status}`"
+    if output:
+        text += f"\n```{output}```"
+    _notify_job(job_id, text)
 
 def _handle_thread_command(job_id, command, role="admin", channel_id=""):
     """Dispatch a thread command for job_id. Runs in a background thread."""
@@ -666,6 +715,94 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         _alias_parts = command.strip().lstrip("/").split(None, 1)
         command = f"ask {cmd} {_alias_parts[1]}" if len(_alias_parts) > 1 else f"ask {cmd}"
         cmd = "ask"
+
+    if cmd == "cluster-diagnose":
+        request = _parse_thread_diagnose(command)
+        if request is None or _validate_diagnostics_request(request):
+            _notify_job(job_id, "Usage: `cluster-diagnose [provider|hub] [pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets]`")
+            return
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts = _thread_ts_for_job(job_id)
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        if channel_id:
+            (new_job_dir / "channel_id").write_text(channel_id)
+        threading.Thread(
+            target=_run_cluster_diagnostics,
+            args=(new_job_id, ""),
+            kwargs={"thread_ts": thread_ts, "channel_id": channel_id, "request": request},
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🔎 *cluster-diagnose* queued — job `{new_job_id}`")
+
+    elif cmd == "k3dm":
+        parts = command.strip().lstrip("/").split()
+        target = parts[1].lower() if len(parts) > 1 else "help"
+        args = {}
+        confirm = False
+        for part in parts[2:]:
+            if part.lower() == "confirm":
+                confirm = True
+            elif "=" in part:
+                key, value = part.split("=", 1)
+                args[key] = value
+            else:
+                _notify_job(job_id, "Usage: `k3dm <target> [KEY=value ...] [confirm]`")
+                return
+        if target == "help":
+            _notify_job(job_id, f"*/k3dm targets for role {_normalize_actor_role(role)}*\n{make_target_help(_normalize_actor_role(role), _role_allows)}")
+            return
+        argv_tail, error = parse_make_request(target, args, confirm)
+        if error:
+            _notify_job(job_id, error)
+            return
+        if not _role_allows(role, MAKE_TARGETS[target].get("min_role", "reader")):
+            _notify_job(job_id, f"⛔ `k3dm {target}` requires role *{MAKE_TARGETS[target].get('min_role', 'reader')}* — you have *{_normalize_actor_role(role)}*.")
+            return
+        if not _MAKE_JOB_LOCK.acquire(blocking=False):
+            _notify_job(job_id, "⚠️ A `/k3dm` job is already running")
+            return
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts = _thread_ts_for_job(job_id)
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        if channel_id:
+            (new_job_dir / "channel_id").write_text(channel_id)
+        threading.Thread(
+            target=_run_make_target,
+            args=(new_job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), f"slack-thread:{role}"),
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🛠️ *k3dm {target}* queued — job `{new_job_id}`")
+
+    elif cmd == "argocd-upgrade":
+        parts = command.strip().lstrip("/").split()
+        version = parts[1] if len(parts) > 1 else ""
+        stage = parts[2] if len(parts) > 2 else "infra"
+        if not version or stage not in {"acg", "infra"} or len(parts) > 3:
+            _notify_job(job_id, "Usage: `argocd-upgrade <chart-version> [acg|infra]`")
+            return
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts = _thread_ts_for_job(job_id)
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        if channel_id:
+            (new_job_dir / "channel_id").write_text(channel_id)
+        threading.Thread(
+            target=_run_upgrade_thread_job,
+            args=(new_job_id, version, stage),
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"⏳ *argocd-upgrade* {version} ({stage}) queued — job `{new_job_id}`")
 
     if cmd == "kill":
         proc = _running_procs.get(job_id)

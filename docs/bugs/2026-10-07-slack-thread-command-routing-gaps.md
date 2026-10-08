@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-07
 **Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
-**Status:** OPEN
+**Status:** FIXED in the local webhook; live Slack verification remains pending
 **Severity:** Medium — read-only investigation commands disappear without feedback
 **Component:** Slack Events API command dispatch
 
@@ -63,3 +63,10 @@ had the same class of early-return failure.
    mutation confirmation semantics, and channel/thread correlation.
 
 No runtime fix, live job submission, Slack message, or service restart was performed.
+
+## Fix
+
+The webhook now routes `cluster-diagnose`, `k3dm`, and `argocd-upgrade` from both
+top-level Slack messages and existing/orphan threads. Child jobs inherit the originating
+thread timestamp and channel, and ArgoCD upgrade jobs now publish a terminal result to Slack.
+`hermes-auth` remains intentionally relay-local.

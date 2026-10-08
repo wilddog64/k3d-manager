@@ -92,6 +92,9 @@ _THREAD_COMMAND_MIN_ROLE = {
     "cluster-up": "admin",
     "up": "admin",
     "cleanup-stale-sandbox": "admin",
+    "cluster-diagnose": "reader",
+    "k3dm": "admin",
+    "argocd-upgrade": "admin",
 }
 
 

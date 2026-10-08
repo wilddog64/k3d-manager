@@ -751,3 +751,12 @@ The latest retry proved the top-level bot thread was created, but completion sti
 response URL and appeared at channel level. Newly created cleanup threads are now marked as bot
 threads and completion uses `chat.postMessage` with the originating channel/thread; response URL
 remains fallback for existing incoming threads. Webhook tests pass 6/6; live verification pending.
+
+## 2026-10-07 — three Slack thread command routes implemented
+
+Added event routing for `cluster-diagnose`, `k3dm`, and `argocd-upgrade` in top-level messages,
+orphan threads, and existing job threads. Child jobs inherit the originating Slack thread and
+channel; ArgoCD upgrade jobs now post terminal status/output. Focused Python tests pass 55 tests
+and 90 subtests; Slack relay Node tests pass 37/37. Combined webhook BATS remains blocked by
+connection-refused fixture startup, documented in `docs/issues/2026-10-07-slack-thread-routing-validation.md`.
+Live Slack verification and webhook restart remain pending.

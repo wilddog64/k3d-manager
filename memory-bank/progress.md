@@ -1396,3 +1396,12 @@ the next CI run is pending.
 - [x] Marked webhook-created cleanup threads and posted completion directly into them.
 - [x] Kept response URL fallback for existing incoming threads.
 - [x] Webhook notification tests passed 6/6; live verification pending.
+
+## 2026-10-07 — three Slack thread command routes implemented
+
+- [x] Routed `cluster-diagnose`, `k3dm`, and `argocd-upgrade` from top-level and threaded messages.
+- [x] Preserved originating `thread_ts` and channel for child jobs.
+- [x] Added terminal Slack reporting for threaded ArgoCD upgrades.
+- [x] Focused Python validation: 55 tests, 90 subtests passed; Slack relay: 37/37 passed.
+- [ ] Live Slack verification and webhook restart remain pending.
+- [ ] Combined webhook BATS has connection-refused fixture failures; see the validation issue doc.
