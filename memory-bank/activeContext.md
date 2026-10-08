@@ -717,4 +717,5 @@ The cleanup slash relay dropped Slack `thread_ts`, so a follow-up `cleanup-stale
 message could not reliably associate with the originating cleanup job. The relay now forwards
 the thread timestamp, the webhook persists it, and thread dispatch validates preview/confirm/apply
 arguments. Slack relay tests pass 37/37; cleanup BATS 4/4 and webhook cleanup pytest 2/2 pass.
-Worker deployment and live Slack verification remain pending.
+Worker deployment completed as Cloudflare version `6c4509c9-6567-4113-bbcb-b2cc9cd3ed0a`; the
+signed health probe returned HTTP 200. Operator thread verification remains pending.

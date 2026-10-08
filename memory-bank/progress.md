@@ -1366,4 +1366,5 @@ the next CI run is pending.
 - [x] Preserved `thread_ts` from slash command through cleanup webhook job creation.
 - [x] Validated cleanup action names in thread messages.
 - [x] Focused validation passed: Slack relay 37/37, cleanup BATS 4/4, webhook pytest 2/2.
-- [ ] Deploy worker and perform live Slack verification.
+- [x] Deployed Cloudflare worker version `6c4509c9-6567-4113-bbcb-b2cc9cd3ed0a`; signed probe returned HTTP 200.
+- [ ] Perform live Slack thread verification.
