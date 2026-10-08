@@ -32,11 +32,14 @@ def _is_allowed_slack_url(url):
     return parsed.scheme == "https" and parsed.hostname in _SLACK_POST_ALLOWED_HOSTS
 
 
-def _slack_post(url, text):
+def _slack_post(url, text, thread_ts=None):
     """POST a text message to a Slack incoming webhook or response_url."""
     if not _is_allowed_slack_url(url):
         return
-    data = json.dumps({"text": text, "response_type": "in_channel"}).encode()
+    payload = {"text": text, "response_type": "in_channel"}
+    if thread_ts:
+        payload["thread_ts"] = thread_ts
+    data = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=data,
                                  headers={"Content-Type": "application/json"})
     try:

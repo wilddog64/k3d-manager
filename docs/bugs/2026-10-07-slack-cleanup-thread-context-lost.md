@@ -17,6 +17,10 @@ The relay now forwards `thread_ts`; the webhook persists it with the cleanup job
 dispatch validates `preview`, `confirm`, and `apply` instead of silently treating unknown
 arguments as a dry run.
 
+The first live retry persisted `thread_ts` and completed successfully, but produced no visible
+reply because bot posting failed silently. Job notifications now fall back to the stored Slack
+response URL while preserving the same thread timestamp.
+
 An additional guard now posts a generic authorization failure to the originating thread for
 recognized commands from an unallowlisted Slack user. The allowlist remains enforced and no
 command is executed.
@@ -27,5 +31,6 @@ role map.
 
 ## Validation
 
-The Slack relay regression asserts thread propagation and the existing cleanup tests cover the
-preview/apply behavior. Live Slack verification remains pending.
+The Slack relay regression asserts thread propagation, the webhook notification regression passes
+3/3, and the existing cleanup tests cover preview/apply behavior. Live Slack verification remains
+pending.

@@ -1374,3 +1374,8 @@ the next CI run is pending.
 - [x] Added a generic in-thread authorization failure response without bypassing the allowlist.
 - [x] Focused guard test passed 1/1; full webhook BATS has unrelated connection-refused failures.
 - [ ] Add `U0B89H45SUA` to the Slack role map if this operator should be authorized.
+## 2026-10-07 — Slack cleanup notification fallback added
+
+- [x] Added response-URL fallback for failed bot-thread notifications.
+- [x] Preserved the originating `thread_ts` in the fallback payload.
+- [x] Webhook cleanup tests passed 3/3; live Slack verification remains pending.

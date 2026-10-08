@@ -726,3 +726,9 @@ Live logs showed cleanup follow-ups were rejected before dispatch because Slack 
 commands from unallowlisted users; authorization remains fail-closed. Focused authorization
 guard test passes 1/1; full webhook BATS remains blocked by unrelated local connection-refused
 fixtures. Role-map configuration still needs the operator's explicit update.
+## 2026-10-07 — Slack cleanup notification fallback added
+
+The cleanup job persisted the correct `thread_ts` and completed, but the bot notification path
+could fail silently when its configured channel/thread target was unavailable. `_notify_job` now
+falls back to the stored Slack response URL with the same thread timestamp. Webhook cleanup tests
+pass 3/3; live Slack verification remains pending.

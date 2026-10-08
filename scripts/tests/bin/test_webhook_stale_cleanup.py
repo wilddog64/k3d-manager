@@ -41,3 +41,21 @@ def test_stale_cleanup_persists_failure_and_exit_code(monkeypatch, tmp_path):
     assert (job_dir / "exit_code").read_text() == "1"
     assert (job_dir / "output").read_text() == "permission denied\n"
     assert "incomplete" in notifications[0][1].lower()
+
+
+def test_notify_job_falls_back_to_response_url_in_same_thread(monkeypatch, tmp_path):
+    job_dir = tmp_path / "deadbeef"
+    job_dir.mkdir()
+    (job_dir / "thread_ts").write_text("1700000000.000001")
+    (job_dir / "response_url").write_text("https://hooks.slack.com/commands/test")
+    calls = []
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook, "SLACK_BOT_TOKEN", "bot-token")
+    monkeypatch.setattr(webhook, "SLACK_CHANNEL_ID", "configured-channel")
+    monkeypatch.setattr(webhook, "_post_slack_bot", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(webhook, "_slack_post", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    webhook._notify_job("deadbeef", "cleanup failed")
+
+    assert calls == [(("https://hooks.slack.com/commands/test", "cleanup failed"),
+                      {"thread_ts": "1700000000.000001"})]
