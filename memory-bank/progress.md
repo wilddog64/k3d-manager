@@ -173,6 +173,7 @@ Documentation only; no k3d-manager runtime changes or live tests.
 - [x] Full `make test-all` passed 2,531 cases with 0 failures.
 - [x] Pytest passed 718 with 2 skips.
 - [x] Pushgateway refusal was non-fatal; test-all exited successfully.
+- [x] Committed and pushed as `5309ec3a`; no PR created per repository instructions.
 
 ## 2026-10-07 — full `make test-all` verification
 

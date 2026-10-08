@@ -220,7 +220,8 @@ Fixed `scripts/tests/bin/test_webhook_ask_docs_thread.py`: its `_post_slack_bot`
 accepts `channel_id` and verifies the no-channel parent-thread path. Related webhook tests
 passed 29/29. Full `make test-all` from tmux passed 2,531 cases with 0 failures; pytest was
 718 passed and 2 skipped. Pushgateway connection refusal remained non-fatal during local
-metrics publication. Implementation commit is pending the final documentation commit.
+metrics publication. Implementation and verification are committed and pushed as `5309ec3a`;
+no PR was created.
 
 ## 2026-10-07 — full test-all found stale webhook thread mock
 
