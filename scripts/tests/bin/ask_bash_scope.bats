@@ -82,8 +82,11 @@ assert_denied_without_canary() {
     skip "sandbox-exec is Darwin-only"
   fi
   export K3DM_ASK_OS_SANDBOX=1
-  export K3DM_REPO_ROOT="$TEST_HOME"
-  ask_bash -c "cat $TEST_OUTSIDE/canary"
+  printf '#!/bin/bash\ncat "%s/canary"\n' "$TEST_OUTSIDE" > "$TEST_REPO/reader.sh"
+  ask_bash -c "bash $TEST_REPO/reader.sh"
   assert_denied_without_canary
-  unset K3DM_ASK_OS_SANDBOX
+  export K3DM_ASK_OS_SANDBOX=0
+  ask_bash -c "bash $TEST_REPO/reader.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *HARMLESS_CANARY* ]]
 }
