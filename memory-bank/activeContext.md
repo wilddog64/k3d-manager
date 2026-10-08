@@ -743,5 +743,5 @@ of being silent. Webhook notification tests pass 4/4; live Slack verification re
 Unlike status/diagnostics, cleanup previously used only the slash response URL and did not create
 a bot thread when invoked at channel level. The relay now forwards `channel_id`; the webhook
 creates a thread for top-level cleanup requests and retains existing thread context. Webhook
-cleanup tests pass 5/5 and Slack relay tests 37/37. Worker deployment and live verification remain
-pending.
+cleanup tests pass 5/5 and Slack relay tests 37/37. Cloudflare worker version
+`d44059a2-964b-47d8-8a7b-7e4390b7b623` is deployed; live Slack verification remains pending.

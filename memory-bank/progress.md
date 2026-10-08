@@ -1389,4 +1389,5 @@ the next CI run is pending.
 - [x] Forwarded Slack channel ID with cleanup requests.
 - [x] Created a bot thread for top-level cleanup invocations, matching status/diagnostics.
 - [x] Validation passed: webhook cleanup 5/5, Slack relay 37/37.
-- [ ] Deploy worker and perform live verification.
+- [x] Deployed Cloudflare worker version `d44059a2-964b-47d8-8a7b-7e4390b7b623`.
+- [ ] Perform live verification.
