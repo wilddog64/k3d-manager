@@ -1,3 +1,15 @@
+## 2026-10-08 — v1.42.0 review done; security + dispatch fixes dispatched to Codex
+
+- Review outcome: v1.42.0 = bug-fix + Slack-hardening release. P0 = slash caller role (HIGH),
+  ask-bash scope (HIGH); P1 = thread dispatch fallthrough (`bin/k3dm-webhook:811` `if`→`elif`).
+  Operator items: Slack Event Subscriptions check, AppSets reapply for v1.42.0, live-verify ~10
+  "FIXED in branch" bugs. Recommended: move the 2 v1.42.0 features to v1.43.0, freeze new specs.
+- Spec: `docs/plans/v1.42.0-slack-authz-and-ask-scope-fixes.md` (plan 3 of 5). New findings in it:
+  `/tmp` allowlist never matches canonical `/private/tmp`; wrapper injected via PATH only — Claude
+  Code picks shell from `$SHELL`, so it may never run (Layer C sets `SHELL`); Layer B adds macOS
+  `sandbox-exec` HOME read-deny.
+- Codex dispatched (codex exec, background). Status: IN PROGRESS — verify SHAs on origin before trusting.
+
 ## 2026-10-08 — v1.44.0 bounded index diagnostics specified
 
 Added docs/plans/v1.44.0-bounded-index-metrics-diagnostics.md as PROPOSED fifth/final v1.44.0 plan (four remote plans verified before writing).
