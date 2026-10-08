@@ -2384,6 +2384,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             response_url = body.get("response_url", "")
             thread_ts = str(body.get("thread_ts", "")).strip()
             channel_id = str(body.get("channel_id", "")).strip()
+            thread_source = ""
+            if not thread_ts and channel_id and SLACK_BOT_TOKEN:
+                thread_ts = _start_bot_thread(f"🛠️ *make {target}* queued", channel_id=channel_id)
+                if thread_ts:
+                    thread_source = "bot"
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
@@ -2394,6 +2399,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 (JOB_DIR / job_id / "thread_ts").write_text(thread_ts)
             if channel_id:
                 (JOB_DIR / job_id / "channel_id").write_text(channel_id)
+            if thread_source:
+                (JOB_DIR / job_id / "thread_source").write_text(thread_source)
             threading.Thread(
                 target=_run_make_target,
                 args=(job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), request_actor),

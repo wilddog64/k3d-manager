@@ -1434,3 +1434,6 @@ the next CI run is pending.
 - [x] Hardened thread anchors to persist the incoming Slack channel before child dispatch.
 - [ ] Restart webhook and retry the threaded `k3dm test-all` job.
 - [x] Implementation commit `22208b72` pushed to `k3d-manager-v1.42.0`.
+- [x] Added automatic parent-thread creation for top-level `/k3dm` jobs.
+- [x] Focused webhook tests: 18 passed.
+- [ ] Restart webhook and retry top-level `k3dm test-all`.

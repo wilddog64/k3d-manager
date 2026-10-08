@@ -793,3 +793,6 @@ The subsequent live run showed a thread timestamp without channel metadata; the 
 persists the incoming event channel on the anchor before dispatching a child job. Focused webhook
 tests remain 17/17; another webhook restart and live retry are required.
 Implementation commit pushed: `22208b72`.
+The next live run showed the top-level `/k3dm` job had a channel but no thread. The Make route now
+creates a bot parent thread for top-level jobs when Slack bot credentials are available. Focused
+webhook tests pass 18/18; another webhook restart and live retry are required.
