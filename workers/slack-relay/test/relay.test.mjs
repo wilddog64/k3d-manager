@@ -381,6 +381,18 @@ test('/argocd-upgrade requires confirm for infra but not acg', async () => {
   assert.equal(JSON.parse(infraCall.init.body).confirm, true)
 })
 
+test('/argocd-upgrade sends one thread-only usage response for invalid threaded input', async () => {
+  const worker = loadWorker()
+  const body = 'command=/argocd-upgrade&text=7.9.1%20infra&thread_ts=1700000000.000001&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  assert.equal(await response.text(), '')
+  const replies = worker.fetches.filter(item => item.url === 'https://hooks.slack.test/resp')
+  assert.equal(replies.length, 1)
+  const payload = JSON.parse(replies[0].init.body)
+  assert.equal(payload.thread_ts, '1700000000.000001')
+  assert.match(payload.text, /infra also requires confirm/)
+})
+
 test('/cleanup-stale-sandbox preserves the originating thread timestamp', async () => {
   const worker = loadWorker()
   const body = 'command=%2Fcleanup-stale-sandbox&text=preview&thread_ts=1700000000.000001&channel_id=C123&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'

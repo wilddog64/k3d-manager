@@ -284,14 +284,21 @@ async function relay(endpoint, payload, meta = {}) {
   }
 }
 
-async function postResponseUrl(url, text, ephemeral = true) {
+async function postResponseUrl(url, text, ephemeral = true, threadTs = '') {
   if (!url) return
   const body = { text, response_type: ephemeral ? 'ephemeral' : 'in_channel' }
+  if (threadTs) body.thread_ts = threadTs
   await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).catch(() => {})
+}
+
+function threadOnlyReply(event, responseUrl, text, threadTs) {
+  if (!threadTs || !responseUrl) return null
+  event.waitUntil(postResponseUrl(responseUrl, text, false, threadTs))
+  return new Response('', { status: 200 })
 }
 
 async function replaceResponseUrl(url, text) {
@@ -535,9 +542,14 @@ async function handle(req, event) {
     const args = parts.filter(part => part !== 'confirm')
     const version = args[0] || ''
     const stage = args[1] || 'infra'
-    if (!version) return jsonReply(ARGOCD_UPGRADE_USAGE, threadTs)
+    if (!version) {
+      const threaded = threadOnlyReply(event, responseUrl, ARGOCD_UPGRADE_USAGE, threadTs)
+      return threaded || jsonReply(ARGOCD_UPGRADE_USAGE, threadTs)
+    }
     if (!['acg', 'infra'].includes(stage) || args.length > 2 || (stage === 'infra' && !confirm)) {
-      return jsonReply(`${ARGOCD_UPGRADE_USAGE}\nStage must be acg or infra; infra also requires confirm.`, threadTs)
+      const usage = `${ARGOCD_UPGRADE_USAGE}\nStage must be acg or infra; infra also requires confirm.`
+      const threaded = threadOnlyReply(event, responseUrl, usage, threadTs)
+      return threaded || jsonReply(usage, threadTs)
     }
     event.waitUntil((async () => {
       const { ok } = await relay('/api/v1/argocd-upgrade',

@@ -1422,3 +1422,10 @@ the next CI run is pending.
 - [x] Focused webhook tests: 17 passed; Slack relay tests: 39 passed; shellcheck clean.
 - [ ] Restart webhook and verify a threaded `k3dm test-all` live.
 - [x] Implementation commit `2acbf4cd` pushed to `k3d-manager-v1.42.0`.
+
+## 2026-10-07 — threaded ArgoCD usage de-duplicated
+
+- [x] Suppressed the duplicate channel-level acknowledgement for invalid threaded requests.
+- [x] Preserved a single top-level usage response.
+- [x] Slack relay tests: 40 passed; shellcheck clean.
+- [ ] Restart/deploy and perform live Slack verification.
