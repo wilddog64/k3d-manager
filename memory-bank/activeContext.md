@@ -787,3 +787,5 @@ ArgoCD requests now use one thread-aware response-URL post and suppress the dupl
 in-channel acknowledgement; top-level validation still returns one normal response. Slack relay
 tests pass 40/40 and shellcheck is clean. Live verification remains pending.
 Implementation commit pushed: `7882f338`.
+Cloudflare relay deployment completed as version `92eb6acf-b158-4b7a-aa8f-eafb594348b5`;
+the local webhook had already been restarted. Live Slack retry is now ready.
