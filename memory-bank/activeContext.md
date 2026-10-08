@@ -1001,3 +1001,5 @@ remaining blocker.
 - 2026-10-08 23:44Z: Slack thread replies verified working (bot must be in the channel). Residual: /slack/events 401s from bot-echo events over MAX_BODY=4096 truncating before HMAC; fix proposed in docs/bugs/2026-10-08-slack-cleanup-thread-event-undelivered.md, awaiting go for Codex.
 
 - 2026-10-08 23:55Z: Oversized Slack event 401 fix specced (70d09218) and dispatched to Codex.
+
+- 2026-10-09: Claude verified Codex Slack body-cap fix (f127fd7b, d0eb99e8, 26ae4eb7 on origin): relay node tests 45/45, webhook.bats Slack 8/8, RED on pre-fix worktree 2/2 fail. Operator: make restart-webhook && make deploy-worker.
