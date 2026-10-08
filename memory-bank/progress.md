@@ -166,6 +166,15 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-07 — full `make test-all` verification
+
+- [x] Ran `make test-all` in tmux pane `20261004195335:2.1`.
+- [x] Main BATS suite passed 1,386/1,386, including all previously failing cases.
+- [x] Bin BATS suite passed 332/332.
+- [x] Python unit suites passed.
+- [ ] Pytest failed 1/720: stale `_post_slack_bot` mock lacks `channel_id`.
+- [x] Filed `docs/issues/2026-10-07-test-all-webhook-thread-mock-signature.md`.
+
 ## 2026-10-07 — `fab52a19` test-all failure investigation
 
 - [x] Reviewed the six cloud failures and preserved their exact BATS output.

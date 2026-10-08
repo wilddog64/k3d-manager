@@ -214,6 +214,17 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-07 — full test-all found stale webhook thread mock
+
+Ran `make test-all` from tmux pane `20261004195335:2.1`. All 1,386 BATS cases passed,
+including the five hub-snapshot cases and observability case from `fab52a19`; the 332-case
+bin suite also passed. Pytest failed one test because
+`test_webhook_ask_docs_thread.py` stubs `_post_slack_bot` without the new `channel_id`
+keyword accepted by production at `bin/k3dm-webhook:1170`. Filed
+`docs/issues/2026-10-07-test-all-webhook-thread-mock-signature.md`; the next fix is a test
+stub/contract update, not a production Slack outage. Metrics Pushgateway refusal was
+non-fatal.
+
 ## 2026-10-07 — cloud `fab52a19` failures classified as test-harness instability
 
 Investigated six failures from cloud `make test-all` job `fab52a19`: case 198 in
