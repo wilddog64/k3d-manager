@@ -1,0 +1,1 @@
+{"action": "diagnose-app", "body": {"job_id": "76b9f911", "status": "queued"}, "completed_at": "2026-10-08T16:54:33.489551Z", "http_status": 202, "id": "20261008T165416Z-diagnose-hub-vectordb", "schema": 1, "status": "ok"}
