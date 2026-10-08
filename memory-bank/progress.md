@@ -1629,3 +1629,5 @@ the next CI run is pending.
 - 2026-10-08 23:55Z: Oversized Slack event 401 fix specced (70d09218) and dispatched to Codex.
 
 - 2026-10-09: Claude verified Codex Slack body-cap fix (f127fd7b, d0eb99e8, 26ae4eb7 on origin): relay node tests 45/45, webhook.bats Slack 8/8, RED on pre-fix worktree 2/2 fail. Operator: make restart-webhook && make deploy-worker.
+
+- 2026-10-08 23:58Z: Slack body-cap fix verified live — job ff32a425 success, /slack/events 3x200, 0x401 after bot posts.

@@ -1,6 +1,6 @@
 # Slack cleanup thread messages were dropped at the relay root
 
-**Status:** Fixed in `f127fd7b` and `d0eb99e8`; delivery resolved (bot was not in the channel)
+**Status:** FIXED and verified live 2026-10-08 23:58Z (webhook pid 59061, relay 62d11d77)
 **Severity:** P1 — cleanup follow-up commands were silently ignored
 **Component:** Cloudflare Slack relay / Slack Events forwarding
 
@@ -157,3 +157,11 @@ to the harness and never touch the live :7443 instance); `python3 -m py_compile 
 Implemented the specified full-body Slack event verification and 64 KiB cap in
 `f127fd7b`, plus edge acknowledgment for Slack bot-echo and subtype events in
 `d0eb99e8`. Human event callbacks and URL verification remain forwarded unchanged.
+
+## Live verification — 2026-10-08 23:58Z
+
+After `make restart-webhook` (pid 59061, 23:56:13Z) and `make deploy-worker` (relay version
+`62d11d77-88f7-4c80-bf97-29bdfc1d0097`), a thread reply `cluster-diagnose hub pods monitoring` ran
+job `ff32a425` (status `success`, the pod table posted in the thread). `/slack/events` since the restart:
+3 events, all 200; zero 401s after the bot posted. Before the fix, every bot post was followed
+1–2s later by a pair of 401s.
