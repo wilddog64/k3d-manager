@@ -768,3 +768,4 @@ Filed and fixed `docs/bugs/2026-10-07-argocd-infra-upgrade-needs-confirm.md`. Th
 webhook thread dispatcher, and direct API now require explicit confirmation for `infra`; `acg`
 remains confirmation-free. Focused webhook tests pass 17/17 and Slack relay tests pass 38/38.
 Live deployment/restart remains pending.
+Implementation commit pushed: `1f8c09ef`.
