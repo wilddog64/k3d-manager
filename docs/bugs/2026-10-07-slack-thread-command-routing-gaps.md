@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-07
 **Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
-**Status:** FIXED in the local webhook; live Slack verification remains pending
+**Status:** REOPENED — routing added, but successful handlers emit a false Unknown command
 **Severity:** Medium — read-only investigation commands disappear without feedback
 **Component:** Slack Events API command dispatch
 
@@ -70,3 +70,24 @@ The webhook now routes `cluster-diagnose`, `k3dm`, and `argocd-upgrade` from bot
 top-level Slack messages and existing/orphan threads. Child jobs inherit the originating
 thread timestamp and channel, and ArgoCD upgrade jobs now publish a terminal result to Slack.
 `hermes-auth` remains intentionally relay-local.
+
+## 2026-10-08 regression triage: handled commands fall through
+
+Operator screenshot shows `cluster-diagnose hub pods monitoring` acknowledged with job
+`a41b5ddc`, then an Unknown command message, then the diagnostics result. The syntax is valid.
+Source revision `fefb741070ff87418b181508a8589969f38dcec3` has the new handlers, but they
+are followed by a separate `if cmd == "kill"` chain instead of continuing with `elif`.
+A successful diagnostics, k3dm target, or ArgoCD upgrade branch therefore runs the second chain
+and reaches its final unknown-command else. This directly reproduces both messages in one
+handler invocation; duplicate servers are not required. Running deployment revision is unknown.
+
+See [reproduction and evidence](../issues/2026-10-08-slack-thread-dispatch-fallthrough.md).
+Three stubbed-worker probes queue exactly one worker and emit both queued and unknown-command;
+`k3dm help` returns explicitly and is unaffected. Validation/rejection branches that return early
+are also outside the successful-handler fallthrough path.
+
+Follow-up: change the second chain's initial `if` to `elif`, or explicitly return after each
+successful new handler. Test successful diagnostics, authorized k3dm target and upgrade commands
+for one queue acknowledgement and zero unknown-command replies; retain help/error/role checks,
+existing kill/status/logs behavior, and event-level thread/channel assertions. Stub workers and
+assert absence of contradictory replies, not only that a worker was invoked. No runtime fix yet.

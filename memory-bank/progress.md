@@ -1,3 +1,15 @@
+## 2026-10-08 — Slack thread dispatch fallthrough triaged (REOPENED)
+
+Reopened docs/bugs/2026-10-07-slack-thread-command-routing-gaps.md for a regression after routing was added.
+At fefb741070ff87418b181508a8589969f38dcec3, new diagnostics/k3dm/argocd handlers form one
+if/elif chain, followed by an independent `if cmd == "kill"` chain. Successful handlers
+fall through to its unknown-command else. Stubbed workers reproduce one queued worker plus
+false error for all three; k3dm help returns correctly. Evidence: docs/issues/2026-10-08-slack-thread-dispatch-fallthrough.md.
+No deployed SHA/log confirmation, runtime fix, job submission, or restart. Suggested fix:
+join dispatch chains with elif or explicit successful-handler returns, plus negative reply tests.
+Previous duplicate-webhook explanation was a hypothesis; it is unnecessary to reproduce this.
+Publication SHA is recorded in git history; no PR.
+
 ## 2026-10-07 — Slack thread routing audit filed; bug dashboard specified
 
 Filed docs/bugs/2026-10-07-slack-thread-command-routing-gaps.md and docs/issues/2026-10-07-slack-thread-command-routing-audit.md. Compared all 16 relay commands: diagnostics,
