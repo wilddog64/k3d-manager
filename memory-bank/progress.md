@@ -1497,4 +1497,5 @@ the next CI run is pending.
 - [x] Filed the cleanup-specific P1 bug with exact webhook evidence.
 - [x] Forward root JSON Slack Events to the webhook event endpoint.
 - [x] Node relay tests: 41/41 passed.
-- [ ] Deploy the relay and retry plain threaded cleanup command.
+- [x] Deployed relay version `e9d3dfc2-ee92-4444-938f-440b4bcc9aad`.
+- [ ] Retry plain threaded cleanup command for live verification.

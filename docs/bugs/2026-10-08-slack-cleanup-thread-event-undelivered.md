@@ -1,6 +1,6 @@
 # Slack cleanup thread messages were dropped at the relay root
 
-**Status:** FIXED in relay source; deployment and live Slack verification pending
+**Status:** FIXED in relay source and deployed; live Slack verification pending
 **Severity:** P1 — cleanup follow-up commands were silently ignored
 **Component:** Cloudflare Slack relay / Slack Events forwarding
 
@@ -33,5 +33,6 @@ node --test workers/slack-relay/test/relay.test.mjs
 ```
 
 The new regression test proves that a signed root JSON Slack Event is forwarded unchanged to
-the webhook event endpoint. Deploy the worker and retry the plain threaded cleanup message to
-complete live verification.
+the webhook event endpoint. The worker was deployed as Cloudflare version
+`e9d3dfc2-ee92-4444-938f-440b4bcc9aad` on 2026-10-08. Retry the plain threaded cleanup
+message to complete live verification.
