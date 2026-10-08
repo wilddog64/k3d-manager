@@ -35,7 +35,7 @@ def _is_allowed_slack_url(url):
 def _slack_post(url, text, thread_ts=None):
     """POST a text message to a Slack incoming webhook or response_url."""
     if not _is_allowed_slack_url(url):
-        return
+        return False
     payload = {"text": text, "response_type": "in_channel"}
     if thread_ts:
         payload["thread_ts"] = thread_ts
@@ -44,8 +44,9 @@ def _slack_post(url, text, thread_ts=None):
                                  headers={"Content-Type": "application/json"})
     try:
         urllib.request.urlopen(req, timeout=10)
+        return True
     except Exception:
-        pass
+        return False
 
 
 def _post_slack_bot(text, thread_ts=None, channel_id=None):

@@ -732,3 +732,9 @@ The cleanup job persisted the correct `thread_ts` and completed, but the bot not
 could fail silently when its configured channel/thread target was unavailable. `_notify_job` now
 falls back to the stored Slack response URL with the same thread timestamp. Webhook cleanup tests
 pass 3/3; live Slack verification remains pending.
+## 2026-10-07 — Slack response URL preferred for job replies
+
+The cleanup job's bot post could return success while targeting the webhook's configured channel,
+not the command's channel. `_notify_job` now prefers the stored Slack response URL with its
+`thread_ts`, using bot posting only as fallback; response posting returns success/failure instead
+of being silent. Webhook notification tests pass 4/4; live Slack verification remains pending.

@@ -1006,20 +1006,15 @@ def _notify_job(job_id, text):
     Subsequent calls reply in-thread. Falls back to webhook URL if bot token not set.
     """
     thread_ts_file = JOB_DIR / job_id / "thread_ts"
-    posted = False
-    if SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
-        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+    thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+    response_url_file = JOB_DIR / job_id / "response_url"
+    response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
+    posted = bool(response_url and _slack_post(response_url, text, thread_ts=thread_ts))
+    if not posted and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
         ts = _post_slack_bot(text, thread_ts=thread_ts)
         if ts and not thread_ts:
             thread_ts_file.write_text(ts)
         posted = bool(ts)
-    if not posted:
-        response_url_file = JOB_DIR / job_id / "response_url"
-        response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
-        if response_url:
-            thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
-            _slack_post(response_url, text, thread_ts=thread_ts)
-            posted = True
     if not posted and SLACK_WEBHOOK_URL:
         _slack_post(SLACK_WEBHOOK_URL, text)
 

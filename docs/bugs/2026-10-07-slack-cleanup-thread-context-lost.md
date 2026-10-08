@@ -21,6 +21,10 @@ The first live retry persisted `thread_ts` and completed successfully, but produ
 reply because bot posting failed silently. Job notifications now fall back to the stored Slack
 response URL while preserving the same thread timestamp.
 
+The next live retry showed bot posting could return success while targeting the webhook's
+configured channel rather than the command's channel. Notifications now prefer the stored
+response URL and use bot posting only as fallback.
+
 An additional guard now posts a generic authorization failure to the originating thread for
 recognized commands from an unallowlisted Slack user. The allowlist remains enforced and no
 command is executed.
@@ -31,6 +35,6 @@ role map.
 
 ## Validation
 
-The Slack relay regression asserts thread propagation, the webhook notification regression passes
-3/3, and the existing cleanup tests cover preview/apply behavior. Live Slack verification remains
+The Slack relay regression asserts thread propagation, webhook notification regressions pass 4/4,
+and the existing cleanup tests cover preview/apply behavior. Live Slack verification remains
 pending.

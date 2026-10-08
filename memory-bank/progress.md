@@ -1379,3 +1379,8 @@ the next CI run is pending.
 - [x] Added response-URL fallback for failed bot-thread notifications.
 - [x] Preserved the originating `thread_ts` in the fallback payload.
 - [x] Webhook cleanup tests passed 3/3; live Slack verification remains pending.
+## 2026-10-07 — Slack response URL preferred for job replies
+
+- [x] Prefer command-specific response URL for threaded job notifications.
+- [x] Retain bot posting as fallback and expose response-post success/failure to callers.
+- [x] Webhook notification tests passed 4/4; live Slack verification remains pending.
