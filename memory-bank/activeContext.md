@@ -836,3 +836,9 @@ and exposes target/origin, suite, case, name, and bounded reason. Dashboard BATS
 and exporter metrics pytest passed 24/24. Live failed-then-passed Grafana verification remains
 pending. Implementation commit `448498b5` is pushed to `origin/k3d-manager-v1.42.0`; no PR was
 created.
+## 2026-10-08 — Slack cleanup thread channel handoff fixed
+
+The P1 cleanup reporting follow-up found that `_handle_thread_command` started
+`_run_stale_sandbox_cleanup` without passing the originating `channel_id`. Fixed the handoff
+and added a regression test. Focused webhook tests passed 25/25 and Python compilation passed.
+Live Slack verification and commit/push remain pending.

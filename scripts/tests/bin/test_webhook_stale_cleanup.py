@@ -103,3 +103,27 @@ def test_notify_job_uses_bot_for_a_new_thread(monkeypatch, tmp_path):
     webhook._notify_job("deadbeef", "cleanup complete")
 
     assert calls == [(('cleanup complete',), {'thread_ts': '1700000000.000001', 'channel_id': 'C123'})]
+
+
+def test_thread_cleanup_passes_channel_to_worker(monkeypatch, tmp_path):
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook, "_notify_job", lambda *_args: None)
+    started = []
+
+    class _Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append((target, args, kwargs))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(webhook.threading, "Thread", _Thread)
+    (tmp_path / "parent").mkdir()
+    (tmp_path / "parent" / "thread_ts").write_text("1700000000.000001")
+
+    webhook._handle_thread_command(
+        "parent", "cleanup-stale-sandbox apply", role="admin", channel_id="C123"
+    )
+
+    assert started[0][0] is webhook._run_stale_sandbox_cleanup
+    assert started[0][1] == ("parent", True, "C123")

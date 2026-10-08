@@ -962,7 +962,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
             return
         _confirm = _cleanup_action in ("confirm", "apply")
         threading.Thread(target=_run_stale_sandbox_cleanup,
-                         args=(job_id, _confirm), daemon=True).start()
+                         args=(job_id, _confirm, channel_id), daemon=True).start()
         _tag = "apply" if _confirm else "dry-run"
         _notify_job(job_id, f"🧹 *cleanup-stale-sandbox* ({_tag}) queued")
 

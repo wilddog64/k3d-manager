@@ -1473,3 +1473,10 @@ the next CI run is pending.
 - [x] Dashboard BATS: 38/38 passed; exporter metrics pytest: 24 passed.
 - [ ] Verify failed -> passed history and selected-range filtering live in Grafana.
 - [x] Commit `448498b5` pushed to `origin/k3d-manager-v1.42.0`; no PR created.
+## 2026-10-08 — Slack cleanup thread channel handoff
+
+- [x] Pass the originating Slack channel into threaded cleanup workers.
+- [x] Add regression coverage for `cleanup-stale-sandbox apply` thread dispatch.
+- [x] Focused webhook tests: 25 passed; Python compilation and diff checks passed.
+- [ ] Restart/deploy webhook and perform live Slack preview/apply/failure verification.
+- [ ] Commit and push implementation.

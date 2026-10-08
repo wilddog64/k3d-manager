@@ -3,7 +3,7 @@
 **Status:** FIXED in branch; live Slack verification pending
 **Filed:** 2026-10-07
 **Affected release:** v1.42.0
-**Verified revision:** 83ff7991a4468bc431fc7b29cae105d7c6ab9eef
+**Verified revision:** 83ff7991a4468bc431fc7b29cae105d7c6ab9eef (cleanup behavior); follow-up thread handoff fix pending
 **Source:** Operator Slack command and screenshot
 
 ## Operator evidence
@@ -81,4 +81,10 @@ cleanup reports per-resource outcomes and returns nonzero on incomplete work, an
 persists terminal status, exit code, and bounded redacted output. Focused cleanup tests pass 4/4,
 webhook lifecycle tests pass 8/8, and Slack relay tests pass 36/36. Live Slack verification
 remains pending.
+
+Follow-up investigation found one remaining routing gap: the thread-command dispatcher
+started `_run_stale_sandbox_cleanup` without passing the originating Slack `channel_id`.
+The worker could therefore lose the channel context needed for creating or replying to the
+cleanup thread. The fix passes that value through and adds regression coverage; live Slack
+verification remains pending.
 Repository path/title dedup found no equivalent report. Search verification follows publication.
