@@ -1,3 +1,11 @@
+## 2026-10-08 — operator recovery done; relay redeployed
+
+- Operator ran `make refresh-edge CLUSTER_PROVIDER=k3s-hostinger` + `make restart-webhook`; hub
+  `up{job="k3dm-test-pushgateway"}` = 1. `make deploy-worker` first failed (locked login keychain);
+  after `security unlock-keychain` it deployed `k3dm-slack-relay` version `7cab1773` (sends
+  `slack_user_id`). Signed probe 23:06:03Z = `/cluster-status` allowed as reader. Pending operator
+  live checks: unmapped `/cluster-down` refused, thread `cluster-diagnose`, `/ask` shell.
+
 ## 2026-10-08 — cleanup/pushgateway fix VERIFIED by Claude
 
 - Codex `87eef35e` (label fix + regression test), `0c487442` (ask-bash sandbox test rewrite),

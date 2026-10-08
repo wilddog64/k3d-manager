@@ -1,5 +1,7 @@
 ## 2026-10-08 — cleanup/pushgateway fix VERIFIED by Claude
 
+- 2026-10-08: relay redeployed (`7cab1773`, keychain unlocked first); pushgateway target back (up=1).
+
 - Codex `87eef35e` (label fix + regression test), `0c487442` (ask-bash sandbox test rewrite),
   docs `ddbef25d` — on origin, scope matches the bug doc. Claude reran outside Codex: shellcheck
   clean, BATS 9/9; RED: new cleanup test fails vs `50975556` script; mutation: sandbox test fails
