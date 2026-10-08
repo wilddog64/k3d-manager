@@ -2,7 +2,9 @@
 
 **Date:** 2026-10-07  
 **Command:** `make test-all` from tmux pane `20261004195335:2.1`  
-**Result:** 2,531 total cases, 1 failed
+**Initial result:** 2,531 total cases, 1 failed
+
+**Resolution:** Fixed and verified
 
 ## What passed
 
@@ -50,7 +52,24 @@ Slack or webhook-service outage.
 
 The Pushgateway connection refusal was non-fatal and did not cause the pytest failure.
 
-## Recommended fix
+## Fix applied
 
-Update the test stub to accept `channel_id` and assert the expected channel/thread routing,
-then rerun the focused webhook-thread test and the complete `make test-all`.
+Updated `scripts/tests/bin/test_webhook_ask_docs_thread.py` so its `_post_slack_bot` stub
+accepts `channel_id` and asserts that the no-channel path passes `None` while preserving the
+parent thread timestamp.
+
+Focused related webhook tests passed:
+
+```text
+29 passed in 0.37s
+```
+
+The complete rerun passed:
+
+```text
+================== 718 passed, 2 skipped in 98.55s (0:01:38) ===================
+[k3dm-test-metrics] 2531 cases, 0 failed
+```
+
+Metrics publication still reported local Pushgateway connection refusal, but publication is
+non-fatal and the test result remained successful.

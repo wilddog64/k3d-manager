@@ -214,6 +214,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-07 — stale webhook thread mock fixed and full test-all is green
+
+Fixed `scripts/tests/bin/test_webhook_ask_docs_thread.py`: its `_post_slack_bot` stub now
+accepts `channel_id` and verifies the no-channel parent-thread path. Related webhook tests
+passed 29/29. Full `make test-all` from tmux passed 2,531 cases with 0 failures; pytest was
+718 passed and 2 skipped. Pushgateway connection refusal remained non-fatal during local
+metrics publication. Implementation commit is pending the final documentation commit.
+
 ## 2026-10-07 — full test-all found stale webhook thread mock
 
 Ran `make test-all` from tmux pane `20261004195335:2.1`. All 1,386 BATS cases passed,

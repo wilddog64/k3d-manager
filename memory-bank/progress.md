@@ -166,6 +166,14 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-07 — webhook thread mock contract fixed
+
+- [x] Updated the ask-docs thread test stub for the production `channel_id` keyword.
+- [x] Related webhook thread/delivery tests passed 29/29.
+- [x] Full `make test-all` passed 2,531 cases with 0 failures.
+- [x] Pytest passed 718 with 2 skips.
+- [x] Pushgateway refusal was non-fatal; test-all exited successfully.
+
 ## 2026-10-07 — full `make test-all` verification
 
 - [x] Ran `make test-all` in tmux pane `20261004195335:2.1`.
