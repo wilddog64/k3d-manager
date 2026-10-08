@@ -1,6 +1,6 @@
 # Slack cleanup thread messages were dropped at the relay root
 
-**Status:** FIXED in relay source and deployed; live Slack verification pending
+**Status:** Relay compatibility fixed and deployed; Slack Events delivery still blocked
 **Severity:** P1 — cleanup follow-up commands were silently ignored
 **Component:** Cloudflare Slack relay / Slack Events forwarding
 
@@ -34,5 +34,8 @@ node --test workers/slack-relay/test/relay.test.mjs
 
 The new regression test proves that a signed root JSON Slack Event is forwarded unchanged to
 the webhook event endpoint. The worker was deployed as Cloudflare version
-`e9d3dfc2-ee92-4444-938f-440b4bcc9aad` on 2026-10-08. Retry the plain threaded cleanup
-message to complete live verification.
+`e9d3dfc2-ee92-4444-938f-440b4bcc9aad` on 2026-10-08, but the retry still produced no
+webhook request or job. The next required check is the Slack app Event Subscriptions Request
+URL and `message.channels`/`message.groups` bot subscriptions; the repository cannot change
+those workspace settings. The immediate supported path remains invoking
+`/cleanup-stale-sandbox apply` as a slash command.

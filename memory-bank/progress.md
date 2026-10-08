@@ -1498,4 +1498,5 @@ the next CI run is pending.
 - [x] Forward root JSON Slack Events to the webhook event endpoint.
 - [x] Node relay tests: 41/41 passed.
 - [x] Deployed relay version `e9d3dfc2-ee92-4444-938f-440b4bcc9aad`.
-- [ ] Retry plain threaded cleanup command for live verification.
+- [x] Retried plain threaded cleanup; no `/slack/events` request or job was created.
+- [ ] Verify Slack Event Subscriptions Request URL and message event subscriptions.

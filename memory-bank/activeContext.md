@@ -861,4 +861,6 @@ Filed `docs/bugs/2026-10-08-slack-cleanup-thread-event-undelivered.md`. Root cau
 compatibility gap: JSON Slack Events posted to the worker root (the slash-command URL) were not
 forwarded to `/slack/events`; only the explicit path was recognized. The worker now forwards root
 JSON events while preserving form-encoded slash commands. Node relay tests pass 41/41. Deployed
-Cloudflare relay version `e9d3dfc2-ee92-4444-938f-440b4bcc9aad`; live retry remains pending.
+Cloudflare relay version `e9d3dfc2-ee92-4444-938f-440b4bcc9aad`; the retry still produced no
+`/slack/events` request, so Slack app Event Subscriptions configuration/delivery is now the
+remaining blocker.
