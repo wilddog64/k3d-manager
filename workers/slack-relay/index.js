@@ -272,7 +272,7 @@ async function relay(endpoint, payload, meta = {}) {
         'X-K3DM-Actor': meta.actor || 'slack:unknown',
         'X-K3DM-Source-Command': meta.sourceCommand || 'unknown',
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(meta.slackUserId ? { ...payload, slack_user_id: meta.slackUserId } : payload)
     })
     const data = await resp.json().catch(() => ({}))
     if (resp.status === 409) return { ok: false, conflict: data.error || 'cluster job already running' }
@@ -364,7 +364,7 @@ async function handle(req, event) {
   const userName    = p.get('user_name')  || ''
   const role        = COMMAND_ROLES[command] || 'reader'
   const actor       = userName ? `slack:${userName}${userId ? `:${userId}` : ''}` : `slack:${userId || 'unknown'}`
-  const meta        = { role, actor, sourceCommand: command }
+  const meta        = { role, actor, sourceCommand: command, slackUserId: userId }
 
   if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`, threadTs)
 

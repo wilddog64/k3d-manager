@@ -88,3 +88,73 @@ def test_empty_token_role_is_not_admin():
     role = policy._request_role({}, token_role="")
     assert role != "admin"
     assert not policy._policy_allows(role, _make_policy("test-pytest"))
+
+
+@pytest.mark.parametrize(
+    ("path", "body", "ceiling", "required"),
+    [
+        ("/api/v1/cluster", {"action": "up", "provider": "aws"}, "admin", "admin"),
+        ("/api/v1/cluster", {"action": "down", "provider": "aws"}, "admin", "admin"),
+        ("/api/v1/cluster-resume", {"provider": "aws"}, "admin", "admin"),
+        ("/api/v1/cluster-refresh", {"provider": "hostinger"}, "operator", "operator"),
+        ("/api/v1/cleanup-stale-sandbox", {"confirm": True}, "admin", "admin"),
+        ("/api/v1/argocd-upgrade", {"chart_version": "7.9.1", "stage": "acg", "confirm": False}, "admin", "admin"),
+    ],
+)
+@pytest.mark.parametrize("caller", ["admin", "operator", "reader", "unmapped"])
+def test_privileged_relay_routes_cap_before_dispatch(
+    monkeypatch, tmp_path, path, body, ceiling, required, caller
+):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh._Handler, "_auth", lambda self: True)
+    monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
+    monkeypatch.setattr(policy, "_slack_user_role", lambda _user_id: caller if caller != "unmapped" else "reader")
+    audits = []
+    monkeypatch.setattr(wh, "_audit_remote_action", lambda *args, **kwargs: audits.append((args, kwargs)))
+    started = []
+    class Thread:
+        def __init__(self, **kwargs):
+            started.append(kwargs)
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(wh.threading, "Thread", Thread)
+
+    import json
+    request_body = {**body, "slack_user_id": "U1"}
+    encoded = json.dumps(request_body).encode()
+    result = {}
+    fake = type("FakeHandler", (), {
+        "path": path,
+        "headers": {
+            "Content-Length": str(len(encoded)),
+            "X-K3DM-Role": ceiling,
+            "X-K3DM-Actor": "slack:test:U1",
+        },
+        "rfile": __import__("io").BytesIO(encoded),
+        "wfile": __import__("io").BytesIO(),
+        "_auth": lambda self: True,
+        "send_response": lambda self, code: result.update(code=code),
+        "send_header": lambda self, key, value: None,
+        "end_headers": lambda self: None,
+        "_json": lambda self, code, response: result.update(code=code, response=response),
+    })()
+
+    wh._Handler.do_POST(fake)
+
+    allowed = caller == "admin" or (caller == "operator" and required == "operator")
+    if allowed:
+        assert result["code"] != 403
+    else:
+        assert result["code"] == 403
+        assert started == []
+        assert audits[-1][0][4] is False
+
+
+def test_direct_token_role_is_unchanged_without_relay_identity():
+    assert policy._effective_make_role({}, {}, token_role="admin") == "admin"
+
+
+def test_cloud_runner_capability_token_is_unchanged_without_relay_identity(cloud_runner):
+    assert policy._effective_make_role({}, {}, token_role=cloud_runner) == cloud_runner

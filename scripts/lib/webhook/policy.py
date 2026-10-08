@@ -130,7 +130,7 @@ def _request_role(headers, token_role=None):
 
 
 def _effective_make_role(headers, body, token_role=None):
-    """Cap a relayed /k3dm role at the caller's mapped Slack role (unknown → reader)."""
+    """Cap a relayed request's role at the caller's mapped Slack role (unknown → reader)."""
     header_role = _request_role(headers, token_role)
     if header_role not in _ROLE_LEVELS or headers.get("X-K3DM-Role") is None:
         return header_role

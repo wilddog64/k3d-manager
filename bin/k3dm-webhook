@@ -2120,9 +2120,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
             return
         token_role = getattr(self, "_token_role", None)
-        request_role = _request_role(self.headers, token_role)
-        if route["handler"] == "make":
-            request_role = _effective_make_role(self.headers, body, token_role)
+        request_role = _effective_make_role(self.headers, body, token_role)
         request_actor = _request_actor(self.headers)
         policy = effective_policy(route, self.path, body)
         if not _policy_allows(request_role, policy):

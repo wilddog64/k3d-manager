@@ -165,8 +165,17 @@ test('/hermes-auth grants allowlisted users a 24h re-auth', async () => {
 test('cluster-status still relays and events GET is missing', async () => {
   const worker = loadWorker({ APPROVALS_KV: fakeKv(), APPROVER_ALLOWLIST: 'UAPPROVER1,UAPPROVER2', APPROVAL_DRAIN_TOKEN: token })
   await worker.dispatch(signed('/slack/commands', 'command=/cluster-status&user_id=UAPPROVER1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
-  assert.ok(worker.fetches.some(item => item.url === 'https://webhook.test/api/v1/cluster-status'))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster-status')
+  assert.ok(call)
+  assert.equal(JSON.parse(call.init.body).slack_user_id, 'UAPPROVER1')
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
+})
+
+test('cluster-down forwards the signed Slack caller identity', async () => {
+  const worker = loadWorker()
+  await worker.dispatch(signed('/slack/commands', 'command=/cluster-down&text=aws&user_id=UDOWN&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster')
+  assert.equal(JSON.parse(call.init.body).slack_user_id, 'UDOWN')
 })
 
 test('/ask, /ask-docs and cluster-status relay channel_id', async () => {
@@ -445,5 +454,6 @@ test('/cluster-diagnose accepts namespace pod order as describe-pod', async () =
     name: 'acg-expiry-check-29855580-ssvb',
     response_url: 'https://hooks.slack.test/resp',
     channel_id: 'CDIAG',
+    slack_user_id: 'UOP1',
   })
 })
