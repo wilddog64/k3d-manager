@@ -214,6 +214,16 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Active Context — k3d-manager
 
+## 2026-10-07 — cloud `fab52a19` failures classified as test-harness instability
+
+Investigated six failures from cloud `make test-all` job `fab52a19`: case 198 in
+`observability.bats` and cases 972, 973, 974, 976, and 983 in `hub_snapshot.bats`.
+Both affected suites pass together under the tripwire harness (32/32), and the first
+535 cases of a full local run also pass case 198. The full run independently reproduced
+webhook fixture failures with curl status `000`/curl status 7, showing order/startup
+instability rather than a proven product regression. Filed
+`docs/issues/2026-10-07-test-all-fab52a19-order-dependent-failures.md`; no runtime fix yet.
+
 ## 2026-10-06 — test metrics imported into hub Grafana
 
 Fixed the dashboard no-data topology in `docs/bugs/2026-10-06-k3dm-tests-dashboard-no-data.md`.

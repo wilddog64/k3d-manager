@@ -166,6 +166,15 @@ Documentation only; no k3d-manager runtime changes or live tests.
 
 # Progress — k3d-manager
 
+## 2026-10-07 — `fab52a19` test-all failure investigation
+
+- [x] Reviewed the six cloud failures and preserved their exact BATS output.
+- [x] Re-ran observability and hub-snapshot suites together under tripwire: 32/32 passed.
+- [x] Reproduced independent full-suite webhook fixture failures with curl status `000`
+      and status 7, confirming test-harness/startup instability.
+- [x] Filed `docs/issues/2026-10-07-test-all-fab52a19-order-dependent-failures.md`.
+- [ ] Fix webhook fixture readiness/state isolation and improve failed-test artifact capture.
+
 ## 2026-10-06 — hub import for test metrics implemented
 
 - [x] Added a hub Prometheus scrape job for `host.internal:9091` that retains only
