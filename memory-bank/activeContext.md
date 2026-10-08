@@ -1,3 +1,13 @@
+## 2026-10-08 — Checkout / Deployment No data investigated (PARTIAL)
+
+Recorded docs/issues/2026-10-08-checkout-and-deployment-dashboard-no-data-triage.md. Bridge observability job 39c7dff6 succeeded, exit0;
+Hostinger Grafana/Prometheus/Pushgateway pods Running. Source: deployment dashboard pins app-only
+UID P5A1115AEDF367D43 but hub values do not pin that UID; Checkout uses default Prometheus while
+k6 producer defaults to app Prometheus, k6 is not federated. CPU [5m] fix exists; live series and
+rendered query unknown. Grafana browser login blocked panel inspector; current allowlist has no
+PromQL. No datasource edits/loadtest/restarts. Older no-producer/no-applier/no-hub-Pushgateway prose
+is stale against current code. Publication SHA is in git history; no PR.
+
 ## 2026-10-08 — Slack thread dispatch fallthrough triaged (REOPENED)
 
 Reopened docs/bugs/2026-10-07-slack-thread-command-routing-gaps.md for a regression after routing was added.
