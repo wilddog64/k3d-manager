@@ -1485,3 +1485,10 @@ the next CI run is pending.
 - [x] Redeployed Cloudflare Slack relay version `f91afb9f-e447-4d6f-897a-1a3122836065`.
 - [x] Worker smoke request passed; webhook restart completed.
 - [ ] Retry threaded `cleanup-stale-sandbox apply` and confirm queued/completion or failure in-thread.
+## 2026-10-08 — Slack cleanup plain-message delivery remains blocked
+
+- [x] Verified the local cleanup handler and thread-channel fix.
+- [x] Restarted webhook and redeployed relay version `f91afb9f-e447-4d6f-897a-1a3122836065`.
+- [x] Captured exact evidence: no `POST /slack/events` for the plain threaded message.
+- [ ] Investigate Slack Events subscription/delivery configuration.
+- [x] Slash command inside thread remains the supported workaround.

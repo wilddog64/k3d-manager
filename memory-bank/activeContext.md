@@ -848,3 +848,10 @@ After the local webhook fix, the top-level cleanup preview reached the server bu
 reply produced no `/slack/events` request. Redeployed the current Cloudflare relay successfully:
 version `f91afb9f-e447-4d6f-897a-1a3122836065`; its smoke request passed. The webhook was already
 restarted. Operator retry of the threaded cleanup command remains the live acceptance check.
+## 2026-10-08 — plain threaded cleanup message still not delivered
+
+The operator retried `cleanup-stale-sandbox apply` as a plain thread message after webhook
+restart and Cloudflare relay redeploy; it still received no response. The webhook log showed
+the slash-command API POSTs but no `POST /slack/events`, proving the remaining blocker is Slack
+Events subscription/delivery rather than cleanup execution. Immediate workaround: invoke
+`/cleanup-stale-sandbox apply` with the slash prefix inside the thread.
