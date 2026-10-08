@@ -778,3 +778,4 @@ and completion in the originating thread. The webhook BATS fixture unsets live S
 variables, preventing stubbed cluster tests inside `make test-all` from posting misleading
 cluster-up/down messages. Focused webhook tests pass 17/17; Slack relay tests pass 39/39;
 shellcheck is clean. Live restart/verification remains pending.
+Implementation commit pushed: `2acbf4cd`.

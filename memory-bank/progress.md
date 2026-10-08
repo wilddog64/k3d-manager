@@ -1421,3 +1421,4 @@ the next CI run is pending.
 - [x] Prevented webhook BATS fixtures from inheriting live Slack delivery credentials.
 - [x] Focused webhook tests: 17 passed; Slack relay tests: 39 passed; shellcheck clean.
 - [ ] Restart webhook and verify a threaded `k3dm test-all` live.
+- [x] Implementation commit `2acbf4cd` pushed to `k3d-manager-v1.42.0`.
