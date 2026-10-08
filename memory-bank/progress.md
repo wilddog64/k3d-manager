@@ -1431,3 +1431,5 @@ the next CI run is pending.
 - [ ] Restart/deploy and perform live Slack verification.
 - [x] Implementation commit `7882f338` pushed to `k3d-manager-v1.42.0`.
 - [x] Deployed Cloudflare relay version `92eb6acf-b158-4b7a-aa8f-eafb594348b5`.
+- [x] Hardened thread anchors to persist the incoming Slack channel before child dispatch.
+- [ ] Restart webhook and retry the threaded `k3dm test-all` job.

@@ -17,9 +17,14 @@ did not persist those fields. A threaded slash invocation therefore had no job-t
 The webhook BATS fixture also inherited live Slack bot/webhook environment variables from the
 parent `make test-all` process, allowing stubbed cluster test jobs to post notifications.
 
+The live follow-up also exposed a second edge: a bare threaded event could have a thread
+timestamp but no persisted channel metadata. The notifier then fell back to the configured
+channel, so the final failure appeared outside the originating thread.
+
 ## Fix
 
 The relay forwards and the webhook persists `thread_ts` and `channel_id` for Make jobs. The BATS
 fixture now unsets Slack delivery variables so local test jobs cannot post to the real channel.
 Regression coverage verifies threaded `/k3dm` metadata and the existing lifecycle stubs remain
-isolated.
+isolated. Thread dispatch now persists the incoming channel on the anchor before launching the
+child job.

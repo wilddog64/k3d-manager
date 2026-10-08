@@ -214,6 +214,7 @@ def test_thread_command_passes_channel_id_to_status_worker(monkeypatch, tmp_path
     wh._handle_thread_command("job", "cluster-status hostinger", "reader", "C1")
     assert started
     assert started[0][2] == {"thread_ts": "THREAD", "channel_id": "C1"}
+    assert (tmp_path / "job" / "channel_id").read_text() == "C1"
 
 
 def test_thread_command_parses_cluster_diagnose_forms():

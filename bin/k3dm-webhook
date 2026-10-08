@@ -703,6 +703,8 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
     cmd = command.strip().lstrip("/").lower().split()[0] if command.strip() else ""
     if not command.strip().startswith("/") and cmd not in _THREAD_COMMANDS:
         return
+    if channel_id:
+        (JOB_DIR / job_id / "channel_id").write_text(channel_id)
     required = _thread_command_min_role(command)
     if not _role_allows(role, required):
         _audit_remote_action(
@@ -2060,6 +2062,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         anchor_dir = JOB_DIR / anchor_id
                         anchor_dir.mkdir(parents=True, exist_ok=True)
                         (anchor_dir / "status").write_text("thread-anchor")
+                        if ev_channel_id:
+                            (anchor_dir / "channel_id").write_text(ev_channel_id)
                         (anchor_dir / "thread_ts").write_text(thread_ts)
                         _LOG.warning("slack orphan thread anchor_id=%r cmd=%r", anchor_id, cmd)
                         threading.Thread(
@@ -2073,6 +2077,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     anchor_dir = JOB_DIR / anchor_id
                     anchor_dir.mkdir(parents=True, exist_ok=True)
                     (anchor_dir / "status").write_text("thread-anchor")
+                    if ev_channel_id:
+                        (anchor_dir / "channel_id").write_text(ev_channel_id)
                     if ev_ts:
                         (anchor_dir / "thread_ts").write_text(ev_ts)
                     threading.Thread(
