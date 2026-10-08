@@ -1615,3 +1615,5 @@ the next CI run is pending.
 - [x] Remote branch tip verified equal to local HEAD after push.
 - [ ] Operator live verification remains pending; no deployment, restart, `/ask`, PR, merge,
   or live-cluster action was performed.
+
+- 2026-10-08 23:44Z: Slack thread replies verified working (bot must be in the channel). Residual: /slack/events 401s from bot-echo events over MAX_BODY=4096 truncating before HMAC; fix proposed in docs/bugs/2026-10-08-slack-cleanup-thread-event-undelivered.md, awaiting go for Codex.

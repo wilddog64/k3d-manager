@@ -1,6 +1,6 @@
 # Slack cleanup thread messages were dropped at the relay root
 
-**Status:** Relay compatibility fixed and deployed; Slack Events delivery still blocked
+**Status:** Delivery resolved (bot was not in the channel); residual 401s on oversized bot-echo events — fix proposed
 **Severity:** P1 — cleanup follow-up commands were silently ignored
 **Component:** Cloudflare Slack relay / Slack Events forwarding
 
@@ -55,3 +55,40 @@ If the read failed, `SLACK_SIGNING_SECRET` is empty and every event is a 401 unt
 
 Operator steps: `make restart-webhook` (keychain now unlocked), then re-enable/re-verify the
 Request URL under the Slack app's Event Subscriptions, then retry the thread reply.
+
+## Resolution + residual 401s — 2026-10-08 23:44Z
+
+**Delivery resolved.** The test channel did not contain the bot. Slash-command replies go out
+through `response_url`, which works in any channel, but `message.channels` events are only
+sent for channels the bot has joined. In a channel the bot is in, a plain thread reply
+`cluster-diagnose hub pods monitoring` worked end to end: the log shows
+`slack orphan thread anchor_id='fbe1aa7e'`, and job `08d3e617` posted the pod table into the thread.
+
+**Residual defect — oversized events fail the signature check.** In the same window, about one
+`/slack/events` in three still returns 401. Each one arrives 1–2s after the bot has posted:
+
+```
+23:44:44Z slack top-level command='cluster-diagnose'   200
+23:44:46Z /slack/events 401
+23:44:46Z /slack/events 401
+23:46:04Z ... 200 (job post)  23:46:06Z 401  23:46:07Z 401
+```
+
+Cause: `do_POST` reads `self.rfile.read(min(length, MAX_BODY))`, and
+`MAX_BODY = 4096` (`scripts/lib/webhook/config.py:15`). When the bot posts a message, Slack
+sends an event for it, and that event carries the full `text` and `blocks`. A diagnostics table
+is far larger than 4 KB, so the body is truncated and the HMAC over the truncated body fails. The
+relay checked the same request against the full body, and it passed there. The bot's own messages
+would be dropped anyway (`bot_id`), so nothing visible breaks today, but:
+- every bot post adds 401s to Slack's failure count. Slack disables an app's event delivery when
+  most of its events fail within an hour, and the 15–16h 80×401 run fits this pattern;
+- a human message over 4 KB would be rejected the same way.
+
+### Fix (proposed)
+1. `bin/k3dm-webhook` `/slack/events`: if `length` exceeds a Slack-specific cap (64 KiB), return
+   413. Otherwise read the full body. Never verify a body truncated by the generic 4 KB cap.
+2. `workers/slack-relay/index.js`: once `verifySlack` passes, parse the JSON. For an
+   `event_callback` whose `event.bot_id` or `event.subtype` is set, return
+   `200 {"ok":true}` and do not forward it. This drops the bot's own echoes at the edge.
+3. BATS/pytest: a signed body over 4096 bytes is accepted (200). A body over the Slack cap
+   returns 413. Relay unit test (if a harness exists): a bot_id event is not forwarded.

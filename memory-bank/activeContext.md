@@ -988,3 +988,5 @@ remaining blocker.
   there were no Events/thread forwarding `relay(...)` call sites left unchanged.
 - Live verification remains pending. No worker deployment, webhook restart, `/ask`, PR, merge,
   or live-cluster operation was performed.
+
+- 2026-10-08 23:44Z: Slack thread replies verified working (bot must be in the channel). Residual: /slack/events 401s from bot-echo events over MAX_BODY=4096 truncating before HMAC; fix proposed in docs/bugs/2026-10-08-slack-cleanup-thread-event-undelivered.md, awaiting go for Codex.
