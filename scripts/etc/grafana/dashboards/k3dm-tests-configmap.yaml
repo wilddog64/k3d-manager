@@ -68,7 +68,7 @@ data:
           "type": "timeseries",
           "title": "Run duration over time",
           "description": "Whole run is the wall-clock time of make test-all. Per-suite lines appear only for suites whose runner reports its own time (pytest and the unittest files); BATS reports none.",
-          "gridPos": { "x": 0, "y": 10, "w": 24, "h": 8 },
+          "gridPos": { "x": 0, "y": 18, "w": 24, "h": 8 },
           "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 10 } } },
           "targets": [
             { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_run_duration_seconds", "legendFormat": "whole run ({{target}})" },
@@ -80,7 +80,7 @@ data:
           "type": "timeseries",
           "title": "Total cases",
           "description": "A sudden drop means a suite may have disappeared from collection.",
-          "gridPos": { "x": 0, "y": 18, "w": 12, "h": 8 },
+          "gridPos": { "x": 0, "y": 26, "w": 12, "h": 8 },
           "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_cases_total" }]
         },
         {
@@ -88,7 +88,7 @@ data:
           "type": "table",
           "title": "Latest run classification",
           "description": "The current terminal run classification. passed means the publisher received exit code 0; failed_untriaged means the run failed but has not yet been confirmed as a reproducible defect. The raw Make exit code remains available as k3dm_test_exit_code.",
-          "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
+          "gridPos": { "x": 12, "y": 26, "w": 12, "h": 8 },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k3dm_test_run_classification", "format": "table", "instant": true }],
           "transformations": [
@@ -104,7 +104,7 @@ data:
           "type": "table",
           "title": "Failures in selected time range",
           "description": "Retained failed-test observations from the selected dashboard time range. Repeated scrapes are deduplicated; rows identify a failure seen during the range, not an exact individual run. No data means no failed-case samples were retained in the selected range.",
-          "gridPos": { "x": 0, "y": 26, "w": 24, "h": 8 },
+          "gridPos": { "x": 0, "y": 10, "w": 24, "h": 8 },
           "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max_over_time(k3dm_test_failure[$__range])", "format": "table", "instant": true }],
           "transformations": [
             { "id": "labelsToFields", "options": {} },
