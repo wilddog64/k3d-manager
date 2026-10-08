@@ -855,3 +855,10 @@ restart and Cloudflare relay redeploy; it still received no response. The webhoo
 the slash-command API POSTs but no `POST /slack/events`, proving the remaining blocker is Slack
 Events subscription/delivery rather than cleanup execution. Immediate workaround: invoke
 `/cleanup-stale-sandbox apply` with the slash prefix inside the thread.
+## 2026-10-08 — Slack cleanup root-event forwarding fixed
+
+Filed `docs/bugs/2026-10-08-slack-cleanup-thread-event-undelivered.md`. Root cause was a relay
+compatibility gap: JSON Slack Events posted to the worker root (the slash-command URL) were not
+forwarded to `/slack/events`; only the explicit path was recognized. The worker now forwards root
+JSON events while preserving form-encoded slash commands. Node relay tests pass 41/41. Deployment
+and live retry remain pending.

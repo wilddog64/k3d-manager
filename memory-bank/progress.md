@@ -1492,3 +1492,9 @@ the next CI run is pending.
 - [x] Captured exact evidence: no `POST /slack/events` for the plain threaded message.
 - [ ] Investigate Slack Events subscription/delivery configuration.
 - [x] Slash command inside thread remains the supported workaround.
+## 2026-10-08 — Slack cleanup root-event forwarding
+
+- [x] Filed the cleanup-specific P1 bug with exact webhook evidence.
+- [x] Forward root JSON Slack Events to the webhook event endpoint.
+- [x] Node relay tests: 41/41 passed.
+- [ ] Deploy the relay and retry plain threaded cleanup command.

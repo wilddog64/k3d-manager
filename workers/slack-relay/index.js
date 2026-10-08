@@ -330,7 +330,9 @@ async function handle(req, event) {
 
   if (pathname === '/slack/interactivity') return handleInteractivity(req, event)
 
-  if (pathname === '/slack/events') {
+  const contentType = req.headers.get('Content-Type') || ''
+  const isRootSlackEvent = pathname === '/' && contentType.toLowerCase().includes('application/json')
+  if (pathname === '/slack/events' || isRootSlackEvent) {
     const body = await req.text()
     if (!await verifySlack(req, body)) return new Response('Unauthorized', { status: 401 })
     const upstream = await fetch(`${WEBHOOK_URL}/slack/events`, {

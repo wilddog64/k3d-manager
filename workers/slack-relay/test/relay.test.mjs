@@ -53,6 +53,15 @@ function signed(path, body) {
   } })
 }
 
+function signedJson(path, body) {
+  const ts = String(Math.floor(Date.now() / 1000))
+  const signature = createHmac('sha256', 'test-signing-secret').update(`v0:${ts}:${body}`).digest('hex')
+  return new Request(`https://relay.test${path}`, { method: 'POST', body, headers: {
+    'Content-Type': 'application/json',
+    'X-Slack-Request-Timestamp': ts, 'X-Slack-Signature': `v0=${signature}`,
+  } })
+}
+
 function interactivityBody(userId, actionId, actionValue) {
   return 'payload=' + encodeURIComponent(JSON.stringify({ type: 'block_actions', user: { id: userId },
     response_url: 'https://hooks.slack.test/resp', actions: [{ action_id: actionId, value: actionValue }] }))
@@ -187,6 +196,15 @@ test('/ask-docs --sources without a question returns the updated usage', async (
 test('GET /slack/events returns 404', async () => {
   const worker = loadWorker()
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
+})
+
+test('root JSON Slack Events are forwarded for shared slash-command URLs', async () => {
+  const worker = loadWorker()
+  const body = JSON.stringify({ type: 'url_verification', challenge: 'challenge' })
+  const response = await worker.dispatch(signedJson('/', body))
+  assert.equal(response.status, 200)
+  assert.equal(worker.fetches[0].url, 'https://webhook.test/slack/events')
+  assert.equal(worker.fetches[0].init.body, body)
 })
 
 test('cluster-up and cluster-down refuse to default to a cluster', async () => {
