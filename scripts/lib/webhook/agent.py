@@ -559,6 +559,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
             env = {
                 **os.environ,
                 "PATH": f"{sandbox_bin}:{os.environ.get('PATH', '')}",
+                "SHELL": str(Path(sandbox_bin) / "bash"),
                 "K3DM_REPO_ROOT": REPO_ROOT,
                 "K3DM_SHOPPING_CARTS_ROOT": SHOPPING_CARTS_ROOT,
                 "K3DM_FIX_MODE": "1" if fixing else "0",

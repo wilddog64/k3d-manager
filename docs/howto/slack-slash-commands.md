@@ -670,6 +670,13 @@ against the allowed roots. Paths outside the following are blocked with
 | `/var/log` | System logs |
 | `/usr/local/bin`, `/usr/bin`, `/bin`, `/opt/homebrew` | CLI tool paths |
 
+The wrapper's Layer A check also scans shell strings passed with `-c`, canonicalizes paths,
+requires directory boundaries, and rejects symlinks, `..`, tilde paths, shell substitutions,
+and bare `cd`/`pushd` commands. On macOS, Layer B runs the shell under `sandbox-exec`: reads
+and writes under the agent's home are denied except for the explicitly allowed repositories,
+kube/configuration paths, and k3dm state/cache paths. Set `K3DM_ASK_OS_SANDBOX=0` only for
+debugging; it disables the OS read boundary and must not be used as an operational setting.
+
 **Prompt scope (all three agents)**
 All system prompts explicitly state the allowed repos and instruct the agent not to access
 or reference files or systems outside them. Example:

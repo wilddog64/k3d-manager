@@ -17,7 +17,7 @@ setup_file() {
     K3DM_WEBHOOK_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     export K3DM_WEBHOOK_PORT="${_WEBHOOK_PORT}"
     export SLACK_SIGNING_SECRET="bats-slack-signing-secret"
-    export K3DM_SLACK_ROLE_MAP="U-reader:reader"
+    export K3DM_SLACK_ROLE_MAP="U-reader:reader,U123:operator"
     # Never let local webhook tests post their stubbed cluster jobs to the real
     # Slack channel when `make test-all` is launched from a live webhook.
     unset SLACK_BOT_TOKEN SLACK_CHANNEL_ID K3DM_SLACK_WEBHOOK_URL
@@ -544,7 +544,7 @@ PY
         -H "X-K3DM-Actor: slack:test-user:U123" \
         -H "X-K3DM-Source-Command: /cluster-refresh" \
         -H "Content-Type: application/json" \
-        -d '{"provider":"hostinger"}' \
+        -d '{"provider":"hostinger","slack_user_id":"U123"}' \
         "${_WEBHOOK_URL}/api/v1/cluster-refresh"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]
@@ -883,7 +883,7 @@ PY
 @test "k3dm-ask-bash allows a plain kubectl read" {
     local repo_root
     repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
-    run "${repo_root}/bin/k3dm-ask-bash" -c "kubectl get pods -n cicd"
+    run env K3DM_ASK_OS_SANDBOX=0 "${repo_root}/bin/k3dm-ask-bash" -c "kubectl get pods -n cicd"
     [ "$status" -eq 0 ]
 }
 

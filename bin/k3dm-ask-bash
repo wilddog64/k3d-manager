@@ -157,21 +157,100 @@ _DIAG_PATHS=(
   /opt/homebrew
 )
 
-# Block file access outside allowed repos and diagnosis paths (absolute path arguments only)
-for arg in "$@"; do
-  if [[ "$arg" == /* ]]; then
-    real_arg="$(realpath -m "$arg" 2>/dev/null || echo "$arg")"
+_canon() {
+  local candidate="$1" resolved
+  if resolved="$(realpath -m -- "$candidate" 2>/dev/null)"; then
+    printf '%s\n' "$resolved"
+  elif [[ -e "$candidate" ]] && resolved="$(realpath -- "$candidate" 2>/dev/null)"; then
+    printf '%s\n' "$resolved"
+  elif [[ ! "$candidate" =~ (^|/)\.\.(/|$) ]]; then
+    printf '%s\n' "$candidate"
+  else
+    return 1
+  fi
+}
+
+_profile_path() {
+  local path="$1"
+  if [[ "$path" == *\"* || "$path" == *\\* ]]; then
+    _deny_scope "$path"
+  fi
+  _canon "$path"
+}
+
+_CMD="$*"
+_backtick='`'
+_dollar_paren="\$("
+_dollar_brace="\${"
+if [[ "$CMD" == *"$_backtick"* || "$CMD" == *"$_dollar_paren"* || "$CMD" == *"$_dollar_brace"* || "$CMD" =~ \$[a-zA-Z_] ]]; then
+  _deny_scope "$CMD"
+fi
+_bare_cd='(^|[[:space:];|&])(cd|pushd)([[:space:];|&]|$)'
+_unsafe_cd='(^|[[:space:];|&])(cd|pushd)[[:space:]]+(-|~)([[:space:];|&]|$)'
+if [[ "$CMD" =~ $_bare_cd || "$CMD" =~ $_unsafe_cd ]]; then
+  _deny_scope "$CMD"
+fi
+
+_ALLOWED=()
+for _p in "${K3DM_REPO}" "${SHOPPING_CARTS_ROOT}" /tmp /var/tmp /proc /sys "${_DIAG_PATHS[@]}"; do
+  if [[ -e "$_p" ]]; then
+    _real_p="$(_canon "$_p")" || _deny_scope "$_p"
+    _ALLOWED+=("$_real_p")
+  fi
+done
+
+_scope_text="$(printf '%s' "$CMD" | sed "s/[;|&()<>\"'=]/ /g")"
+read -r -a _tokens <<< "$_scope_text"
+for _token in "${_tokens[@]}"; do
+  if [[ "$_token" == ~* ]]; then
+    _deny_scope "$_token"
+  fi
+  if [[ "$_token" =~ (^|/)\.\.(/|$) ]]; then
+    _deny_scope "$_token"
+  fi
+  if [[ "$_token" == /* ]]; then
+    _real_token="$(_canon "$_token")" || _deny_scope "$_token"
     _allowed=0
-    for _p in "${K3DM_REPO}" "${SHOPPING_CARTS_ROOT}" /tmp /var/tmp /proc /sys "${_DIAG_PATHS[@]}"; do
-      if [[ "$real_arg" == "${_p}"* ]]; then
+    for _p in "${_ALLOWED[@]}"; do
+      if [[ "$_real_token" == "$_p" || "$_real_token" == "$_p/"* ]]; then
         _allowed=1
         break
       fi
     done
     if [[ "$_allowed" -eq 0 ]]; then
-      _deny_scope "$arg"
+      _deny_scope "$_token"
     fi
   fi
 done
+
+_HOME_CANON="$(_profile_path "$HOME")" || _deny_scope "$HOME"
+_REPO_CANON="$(_profile_path "$K3DM_REPO")" || _deny_scope "$K3DM_REPO"
+_SHOPPING_CANON="$(_profile_path "$SHOPPING_CARTS_ROOT")" || _deny_scope "$SHOPPING_CARTS_ROOT"
+_LOCAL_DATA="$(_profile_path "$HOME/.local/share/k3d-manager")" || _deny_scope "$HOME/.local/share/k3d-manager"
+_KUBE="$(_profile_path "$HOME/.kube")" || _deny_scope "$HOME/.kube"
+_ARGOCD="$(_profile_path "$HOME/.config/argocd")" || _deny_scope "$HOME/.config/argocd"
+_HELM="$(_profile_path "$HOME/.config/helm")" || _deny_scope "$HOME/.config/helm"
+_HELM_PREFS="$(_profile_path "$HOME/Library/Preferences/helm")" || _deny_scope "$HOME/Library/Preferences/helm"
+_HELM_CACHE="$(_profile_path "$HOME/Library/Caches/helm")" || _deny_scope "$HOME/Library/Caches/helm"
+_GITCONFIG="$(_profile_path "$HOME/.gitconfig")" || _deny_scope "$HOME/.gitconfig"
+_GIT_CONFIG="$(_profile_path "$HOME/.config/git")" || _deny_scope "$HOME/.config/git"
+_KUBE_CACHE="$(_profile_path "$HOME/.kube/cache")" || _deny_scope "$HOME/.kube/cache"
+
+_profile="(version 1)
+(allow default)
+(deny file-read* file-write* (subpath \"$_HOME_CANON\"))
+(allow file-read* (subpath \"$_REPO_CANON\") (subpath \"$_SHOPPING_CANON\")
+                  (subpath \"$_LOCAL_DATA\") (subpath \"$_KUBE\")
+                  (subpath \"$_ARGOCD\") (subpath \"$_HELM\")
+                  (subpath \"$_HELM_PREFS\") (subpath \"$_HELM_CACHE\")
+                  (literal \"$_GITCONFIG\") (subpath \"$_GIT_CONFIG\"))
+(allow file-write* (subpath \"$_KUBE_CACHE\") (subpath \"$_HELM_CACHE\"))"
+
+if [[ "$(uname -s)" == "Darwin" && "${K3DM_ASK_OS_SANDBOX:-1}" != "0" ]]; then
+  if [[ ! -x /usr/bin/sandbox-exec ]]; then
+    _deny "sandbox-exec is unavailable"
+  fi
+  exec /usr/bin/sandbox-exec -p "$_profile" /bin/bash "$@"
+fi
 
 exec /bin/bash "$@"
