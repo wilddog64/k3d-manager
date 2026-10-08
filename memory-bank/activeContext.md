@@ -1,3 +1,13 @@
+## 2026-10-08 — v1.44.0 bounded index diagnostics specified
+
+Added docs/plans/v1.44.0-bounded-index-metrics-diagnostics.md as PROPOSED fifth/final v1.44.0 plan (four remote plans verified before writing).
+Fixed Prometheus queries/source mapping, signed submitter capability, disabled-by-default activation,
+dedicated collector isolation, time/series/byte limits and field-filtered evidence; no arbitrary
+shell/agent/URL/PromQL. Distinguishes absent metrics from scrape failure with historical uncertainty.
+Vector metrics producer defaults hub Pushgateway19094; do not assume test Pushgateway9091.
+October8 screenshot gap cause remains unverified; no cloud request or runtime change.
+Documentation gates required; publication SHA recorded in git history. No PR.
+
 ## 2026-10-08 — webhook/bridge security follow-up filed
 
 Filed docs/bugs/2026-10-08-slack-slash-commands-trust-command-role.md and docs/bugs/2026-10-08-ask-bash-shell-string-bypasses-path-scope.md (OPEN, HIGH) after offline review of 6e54ca66bddf47973eff57216d290b5df821b529.
