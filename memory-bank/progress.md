@@ -1361,3 +1361,9 @@ the next CI run is pending.
 - [x] Persisted webhook terminal status, exit code, and bounded redacted output.
 - [x] Focused tests passed: cleanup 4/4, lifecycle 8/8, Slack relay 36/36.
 - [ ] Live Slack verification remains pending.
+## 2026-10-07 — Slack cleanup thread context fixed
+
+- [x] Preserved `thread_ts` from slash command through cleanup webhook job creation.
+- [x] Validated cleanup action names in thread messages.
+- [x] Focused validation passed: Slack relay 37/37, cleanup BATS 4/4, webhook pytest 2/2.
+- [ ] Deploy worker and perform live Slack verification.

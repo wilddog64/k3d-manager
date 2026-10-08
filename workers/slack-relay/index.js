@@ -469,7 +469,9 @@ async function handle(req, event) {
     }
     const confirm = ['confirm', 'apply'].includes(cleanupText)
     event.waitUntil((async () => {
-      const { ok, conflict } = await relay('/api/v1/cleanup-stale-sandbox', { confirm, response_url: responseUrl }, meta)
+      const payload = { confirm, response_url: responseUrl }
+      if (threadTs) payload.thread_ts = threadTs
+      const { ok, conflict } = await relay('/api/v1/cleanup-stale-sandbox', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())

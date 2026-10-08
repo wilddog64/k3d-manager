@@ -808,7 +808,11 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
 
     elif cmd == "cleanup-stale-sandbox":
         _parts = command.strip().split()
-        _confirm = len(_parts) > 1 and _parts[1].lower() in ("confirm", "apply")
+        _cleanup_action = _parts[1].lower() if len(_parts) > 1 else "preview"
+        if _cleanup_action not in ("preview", "confirm", "apply"):
+            _notify_job(job_id, "Usage: `cleanup-stale-sandbox [preview|confirm|apply]`")
+            return
+        _confirm = _cleanup_action in ("confirm", "apply")
         threading.Thread(target=_run_stale_sandbox_cleanup,
                          args=(job_id, _confirm), daemon=True).start()
         _tag = "apply" if _confirm else "dry-run"
@@ -2173,6 +2177,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
+            thread_ts = str(body.get("thread_ts", "")).strip()
+            if thread_ts:
+                (JOB_DIR / job_id / "thread_ts").write_text(thread_ts)
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
             threading.Thread(

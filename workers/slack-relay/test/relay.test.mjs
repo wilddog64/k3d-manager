@@ -353,6 +353,18 @@ test('long Slack command help uses examples instead of dense grammar', async () 
   }
 })
 
+test('/cleanup-stale-sandbox preserves the originating thread timestamp', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcleanup-stale-sandbox&text=preview&thread_ts=1700000000.000001&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  assert.match(await response.text(), /Previewing stale ACG sandbox cleanup/)
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cleanup-stale-sandbox')
+  assert.ok(call)
+  const payload = JSON.parse(call.init.body)
+  assert.equal(payload.thread_ts, '1700000000.000001')
+  assert.equal(payload.confirm, false)
+})
+
 test('/cluster-diagnose with no text still returns usage without relaying', async () => {
   const worker = loadWorker()
   const body = 'command=%2Fcluster-diagnose&text=&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'

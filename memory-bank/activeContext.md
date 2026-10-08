@@ -711,3 +711,10 @@ stopped/removed/already-absent/failed resources, preserves real command errors, 
 nonzero for incomplete cleanup. The webhook now persists terminal status, exit code, and bounded
 redacted output for status/log retrieval. Focused cleanup tests pass 4/4, webhook lifecycle
 tests 8/8, and Slack relay tests 36/36. Live Slack verification remains pending.
+## 2026-10-07 — Slack cleanup thread context fixed
+
+The cleanup slash relay dropped Slack `thread_ts`, so a follow-up `cleanup-stale-sandbox apply`
+message could not reliably associate with the originating cleanup job. The relay now forwards
+the thread timestamp, the webhook persists it, and thread dispatch validates preview/confirm/apply
+arguments. Slack relay tests pass 37/37; cleanup BATS 4/4 and webhook cleanup pytest 2/2 pass.
+Worker deployment and live Slack verification remain pending.
