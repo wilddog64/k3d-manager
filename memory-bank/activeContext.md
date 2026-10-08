@@ -842,3 +842,9 @@ The P1 cleanup reporting follow-up found that `_handle_thread_command` started
 `_run_stale_sandbox_cleanup` without passing the originating `channel_id`. Fixed the handoff
 and added a regression test. Focused webhook tests passed 25/25 and Python compilation passed.
 Live Slack verification and commit/push remain pending.
+## 2026-10-08 — Slack cleanup relay redeployed for live verification
+
+After the local webhook fix, the top-level cleanup preview reached the server but the threaded
+reply produced no `/slack/events` request. Redeployed the current Cloudflare relay successfully:
+version `f91afb9f-e447-4d6f-897a-1a3122836065`; its smoke request passed. The webhook was already
+restarted. Operator retry of the threaded cleanup command remains the live acceptance check.

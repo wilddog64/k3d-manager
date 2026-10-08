@@ -86,5 +86,7 @@ Follow-up investigation found one remaining routing gap: the thread-command disp
 started `_run_stale_sandbox_cleanup` without passing the originating Slack `channel_id`.
 The worker could therefore lose the channel context needed for creating or replying to the
 cleanup thread. The fix passes that value through and adds regression coverage; live Slack
-verification remains pending.
+verification remains pending. The webhook was restarted and Cloudflare relay version
+`f91afb9f-e447-4d6f-897a-1a3122836065` was deployed on 2026-10-08; the operator must retry
+the threaded command to complete live verification.
 Repository path/title dedup found no equivalent report. Search verification follows publication.

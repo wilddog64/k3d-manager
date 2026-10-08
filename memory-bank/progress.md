@@ -1480,3 +1480,8 @@ the next CI run is pending.
 - [x] Focused webhook tests: 25 passed; Python compilation and diff checks passed.
 - [ ] Restart/deploy webhook and perform live Slack preview/apply/failure verification.
 - [ ] Commit and push implementation.
+## 2026-10-08 — Slack cleanup relay deployment
+
+- [x] Redeployed Cloudflare Slack relay version `f91afb9f-e447-4d6f-897a-1a3122836065`.
+- [x] Worker smoke request passed; webhook restart completed.
+- [ ] Retry threaded `cleanup-stale-sandbox apply` and confirm queued/completion or failure in-thread.
