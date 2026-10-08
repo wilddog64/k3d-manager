@@ -13,6 +13,7 @@ from pathlib import Path
 
 PORT = int(os.environ.get("K3DM_WEBHOOK_PORT", "7443"))
 MAX_BODY = 4096
+SLACK_EVENT_MAX_BODY = 65536
 _JOB_ID_RE = re.compile(r'^[0-9a-f]{8}$')
 
 REPO_ROOT = os.environ.get(

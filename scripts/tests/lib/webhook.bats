@@ -369,6 +369,27 @@ assert not _verify_slack_signature(b"\xff", "0", "v0=x")
     [ "${after}" = "${before}" ]
 }
 
+@test "Slack event larger than 4 KB is verified on the full body" {
+    local padding body response
+    padding="$(printf '%5000s' '')"
+    padding="${padding// /x}"
+    body="{\"type\":\"event_callback\",\"event\":{\"type\":\"message\",\"bot_id\":\"B1\",\"text\":\"${padding}\",\"ts\":\"9\"}}"
+    response="$(_slack_event "${body}")"
+    [[ "${response}" == *'"ok":true'* ]]
+}
+
+@test "Slack event over the Slack cap returns 413" {
+    local body
+    body="$(printf '%70000s' '')"
+    body="${body// /x}"
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Content-Type: application/json" \
+        --data-raw "${body}" \
+        "${_WEBHOOK_URL}/slack/events"
+    [ "${status}" -eq 0 ]
+    [ "${output}" = "413" ]
+}
+
 @test "Slack reports an authorization failure in the originating command thread" {
     run grep -F -- 'This Slack account is not authorized for webhook commands' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "${status}" -eq 0 ]

@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib
 from webhook.config import (  # noqa: E402
     PORT,
     MAX_BODY,
+    SLACK_EVENT_MAX_BODY,
     _JOB_ID_RE,
     JOB_DIR,
     SCREENSHOT_DIR,
@@ -721,7 +722,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
     if cmd == "cluster-diagnose":
         request = _parse_thread_diagnose(command)
         if request is None or _validate_diagnostics_request(request):
-            _notify_job(job_id, "Usage: `cluster-diagnose [provider|hub] [pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets]`")
+            _notify_job(job_id, "Usage: `cluster-diagnose [provider|hub] [pods <namespace>|pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets]`")
             return
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
@@ -1988,7 +1989,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if length is None:
                 self._json(400, {"error": "invalid content-length"})
                 return
-            raw_body = self.rfile.read(min(length, MAX_BODY))
+            if length > SLACK_EVENT_MAX_BODY:
+                self._json(413, {"error": "request too large"})
+                return
+            raw_body = self.rfile.read(length)
             timestamp = self.headers.get("X-Slack-Request-Timestamp", "0")
             signature = self.headers.get("X-Slack-Signature", "")
             if not _verify_slack_signature(raw_body, timestamp, signature):
