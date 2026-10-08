@@ -16,7 +16,7 @@ if [[ "${provider}" != "k3s-aws" ]]; then
   exit 1
 fi
 context="${ACG_KUBE_CONTEXT:-ubuntu-k3s}"
-agents=(com.k3d-manager.frontend-port-forward com.k3d-manager.pushgateway-port-forward)
+agents=(com.k3d-manager.frontend-port-forward com.k3d-manager.sandbox.pushgateway-port-forward)
 printf 'Stale ACG sandbox cleanup (provider=%s, context=%s)\n' "${provider}" "${context}"
 printf '  - stop launchd agents: %s\n' "${agents[*]}"
 printf '  - remove kube context: %s\n' "${context}"

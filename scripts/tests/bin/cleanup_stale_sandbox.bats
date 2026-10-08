@@ -6,6 +6,7 @@ setup() {
   mkdir -p "${FAKE_BIN}" "${BATS_TEST_TMPDIR}/home/Library/LaunchAgents"
   cat > "${FAKE_BIN}/launchctl" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/launchctl.log"
 if [[ "${FAIL_AGENT:-0}" == 1 ]]; then exit 1; fi
 exit 0
 EOF
@@ -41,6 +42,18 @@ EOF
   [[ "${output}" == *"removed kube context: ubuntu-k3s"* ]]
   [[ "${output}" == *"Cleanup complete"* ]]
   [ ! -e "${HOME}/Library/LaunchAgents/com.k3d-manager.frontend-port-forward.plist" ]
+}
+
+@test "cleanup-stale-sandbox never touches the Hostinger pushgateway agent" {
+  touch "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
+  touch "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.pushgateway-port-forward.plist"
+  run "${REPO_ROOT}/bin/cleanup-stale-sandbox" --apply
+  [ "${status}" -eq 0 ]
+  [ -e "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist" ]
+  [ ! -e "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.pushgateway-port-forward.plist" ]
+  [[ "$(<"${BATS_TEST_TMPDIR}/launchctl.log")" == *"bootout gui/"*"com.k3d-manager.sandbox.pushgateway-port-forward"* ]]
+  run grep -F "/com.k3d-manager.pushgateway-port-forward" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "${status}" -ne 0 ]
 }
 
 @test "cleanup-stale-sandbox returns failure for an agent operation" {
