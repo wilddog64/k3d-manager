@@ -760,3 +760,4 @@ channel; ArgoCD upgrade jobs now post terminal status/output. Focused Python tes
 and 90 subtests; Slack relay Node tests pass 37/37. Combined webhook BATS remains blocked by
 connection-refused fixture startup, documented in `docs/issues/2026-10-07-slack-thread-routing-validation.md`.
 Live Slack verification and webhook restart remain pending.
+Implementation commit pushed: `b5cf7272`.

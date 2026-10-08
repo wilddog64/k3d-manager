@@ -1405,3 +1405,4 @@ the next CI run is pending.
 - [x] Focused Python validation: 55 tests, 90 subtests passed; Slack relay: 37/37 passed.
 - [ ] Live Slack verification and webhook restart remain pending.
 - [ ] Combined webhook BATS has connection-refused fixture failures; see the validation issue doc.
+- [x] Implementation commit `b5cf7272` pushed to `k3d-manager-v1.42.0`.
