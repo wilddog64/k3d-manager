@@ -146,7 +146,8 @@ make targets, line counts) move into generated blocks that `make docs-regen` rew
 `make docs-check` gates in CI and pre-commit. Standing docs declare the code they describe with a
 `covers:` line, and a weekly Hermes digest posts to Slack each doc whose covered code has changed
 substantially since the doc was last edited; far-behind docs get a drafted bug doc. Hermes never
-edits a doc. Prompted by the 2026-10-09 audit that found all four sampled docs stale.
+edits a doc. Hermes also publishes per-doc drift to the hub Pushgateway for a new Grafana
+"Docs Health" dashboard, with one `info` rule that fires if the check stops running. Prompted by the 2026-10-09 audit that found all four sampled docs stale.
 
 Scope: [`v1.45.0-docs-drift-detection.md`](plans/v1.45.0-docs-drift-detection.md). Also queued for
 v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve-remediation-terminal-notifications.md).
