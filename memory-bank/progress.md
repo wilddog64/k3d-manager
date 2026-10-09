@@ -1,3 +1,11 @@
+## 2026-10-08 — make snapshot round 4: setgid EPERM under /tmp; tar-stream capture dispatched to Codex
+
+- The operator's live `make snapshot` after `2e8996ae` got the correct container but failed with `fchmodat2 raft: operation not permitted`.
+- Cause: Vault's `raft` dir is setgid (`drwx--S--- 100:1000`). `docker cp` extracts into `/tmp` (group `wheel`, and the operator isn't a member), and macOS rejects setgid there. `docker cp` also drops uid 100 ownership.
+- Fix spec "Live verification — round 4": `docker exec <node> tar -C <path> -cf - .` into one `.tar` per claim.
+- `make status CLUSTER_PROVIDER=k3s-aws` printed "webhook token unavailable". That's operator-side; the hint is `make restart-webhook`.
+- A stale `~/.local/share/k3d-manager/active-providers/k3s-aws` marker (Oct 6 04:22) is left from an expired sandbox, so `make status` sees two live providers. The existing remedy is `make down CLEANUP_STALE=1`.
+
 ## 2026-10-08 — Claude verified hub snapshot round 3 (`2e8996ae`); remote snapshot targets specced
 
 - Verified on origin: `2e8996ae` (fix), `e918fcd0` (bug status) and `d2a60860` (memory-bank). Capture now maps the PV's nodeAffinity hostname through `_hub_recovery_logical_node` before building the container name. The bats kubectl stub returns real hostnames, and a new test asserts `docker cp k3d-k3d-cluster-agent-1:` and no doubled prefix.

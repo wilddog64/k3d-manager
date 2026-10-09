@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** FIXED in branch `2e8996ae` — live verification pending (operator).
+**Status:** PARTIAL — guard and container-name fix verified; `make hub-retain-pvs` LIVE-VERIFIED; `make snapshot` still fails live on setgid restore under /tmp (see "Live verification — round 4"); dispatched to Codex.
 
 ## Question that prompted this
 
@@ -329,3 +329,62 @@ since `d53ea1ba`.
 3. Assert the container name: the `docker` stub must record `k3d-k3d-cluster-agent-1:` in its
    `cp` args, and must never record a doubled `k3d-k3d-cluster-k3d-` prefix.
 4. RED: the changed stub plus the assertion fail against `32395370` on a temp worktree.
+
+## Live verification — round 4 (operator, 2026-10-08, after `2e8996ae`)
+
+The container name is now correct (`k3d-k3d-cluster-agent-1`). Capture fails at the first claim:
+
+```text
+fchmodat2 raft: operation not permitted
+docker command failed (1): docker cp k3d-k3d-cluster-agent-1:/var/lib/rancher/k3s/storage/pvc-..._secrets_data-vault-0/. /tmp/k3dm-hub-snapshot.34RvGY/node-server-0-storage/pvc-..._secrets_data-vault-0
+```
+
+### Root cause (Claude, read-only checks)
+
+- In the node, Vault's `raft` directory is `drwx--S--- 100:1000`, which has the setgid bit set.
+- `docker cp` to the macOS host extracts with the original modes. The operator's `TMPDIR=/tmp`, and
+  `/private/tmp` is group `wheel`, so new directories inherit group `wheel`.
+- macOS refuses setgid on a directory whose group the user doesn't belong to. The operator isn't
+  in `wheel`, so the call fails with EPERM.
+- Second, latent problem: `docker cp` to the host also drops ownership. Vault's files (uid 100,
+  mode 0600) would come back owned by the operator. Even a "successful" copy would not restore
+  cleanly.
+
+### Fix (round 4, for Codex)
+
+Capture each source as a tar stream from inside the node. The host then never applies modes or
+ownership, and the archive keeps owner, mode and setgid for restore. BusyBox `tar` is at `/bin/tar`
+in the k3s node image (checked live).
+
+1. Replace `_hub_snapshot_copy`'s `docker cp` with:
+
+   ```bash
+   function _hub_snapshot_copy() {
+     local _container="$1" _source="$2" _destination="$3"
+     _run_command -- docker exec "$_container" tar -C "$_source" -cf - . > "$_destination"
+   }
+   ```
+
+   Here `_destination` is a `.tar` file path.
+2. Callers:
+   - `server-db` writes `${_stage}/server-db.tar`.
+   - Each claim writes `${_stage}/${_storage}/pvc-${_uid}_${_namespace}_${_claim}.tar`. Create
+     only the `${_stage}/${_storage}` directory, not a per-claim directory.
+   - A failed copy must still `return 1` and trigger `.INCOMPLETE`, as today.
+   - `MANIFEST.tsv`'s last column stays the claim directory name, without `.tar`.
+3. `SHA256SUMS` and the remote `sha256sum -c` work unchanged, since they hash every file.
+4. Tests (`hub_snapshot.bats`):
+   - The docker stub handles `exec <container> tar -C <path> -cf - .` by writing a real tar of a
+     fixture dir to stdout, and logs the args.
+   - Update the existing assertions that expect copied files to expect `.tar` archives.
+   - Add a test that the archive lists the fixture's files (`tar -tf`).
+   - Keep the logical-container test, now asserting `docker exec k3d-k3d-cluster-agent-1 tar`.
+   - Assert no `docker cp` is called anywhere.
+   - RED: the new tar assertions fail at `2e8996ae` on a temp worktree.
+5. `docs/howto/hub-snapshots.md`: say each claim is stored as `<claim-dir>.tar`, which keeps owner,
+   mode and setgid, and that a restore extracts it inside the node (`docker exec -i <node> tar -C
+   <path> -xpf -`), not on the Mac. Restore itself remains the v1.43.0 DR drill's scope.
+
+Out of scope: hot-copy consistency of `vault.db` while Vault runs (v1.43.0 DR drill), and
+`hub_recovery.sh`.
+
