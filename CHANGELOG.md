@@ -27,8 +27,9 @@
   `DISCARD_HUB_DATA=1`; `make status` reports local snapshot freshness and
   `make hub-retain-pvs` applies the operator-run PV safety net.
 - Hub snapshot pruning now keeps the newest verified snapshots instead of deleting them.
-- Alertmanager now sends SMS recovery texts and has a Docker-backed pytest suite for notification
-  deduplication, repeats, recovery, routing guards, and resolved-template rendering.
+- Alertmanager now sends SMS recovery texts, has a Docker-backed pytest suite for notification
+  deduplication, repeats, recovery, routing guards, and resolved-template rendering, and supports
+  `make alertmanager-config` to re-render and apply only its hub Secret.
 
 ### Added
 - Added `make appsets-reapply` and `make appsets-check` for the release ApplicationSet reapply step.

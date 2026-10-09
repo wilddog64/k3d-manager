@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude (operator: "let's do that at v1.44.0. text is free so that's fine")
 **Branch:** target **v1.44.0**. Bug docs are exempt from the 5-plan cap; v1.44.0 already has 5 plan files.
-**Status:** IMPLEMENTED — items 1,2,3,5 on k3d-manager-v1.42.0; item 4 (make alertmanager-config) not done; live verification pending (operator)
+**Status:** IMPLEMENTED — items 1–5 on k3d-manager-v1.42.0; live verification pending (operator)
 **Priority:** P2 — a page with no "all clear" means checking a dashboard to learn a problem ended
 **Severity:** Medium
 **Component:** `scripts/etc/prometheus/alertmanager.yaml.tmpl`, new behaviour test, `scripts/plugins/observability.sh` (apply path)

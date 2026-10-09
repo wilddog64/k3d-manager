@@ -40,6 +40,10 @@ make check-doc-links
 make test-alertmanager-behaviour
 ```
 
+To re-render and apply only the hub Alertmanager Secret after changing the template, use
+`make alertmanager-config`; it reads the Alertmanager credentials from Vault and never prints the
+rendered configuration.
+
 The operator verifies the deployed route tree and a delivered `KubeJobFailed` email after
 deployment; this guide covers the repository-side checks only. The behaviour test renders the
 real template with dummy recipients, rewrites email delivery to a local HTTP sink, scales only

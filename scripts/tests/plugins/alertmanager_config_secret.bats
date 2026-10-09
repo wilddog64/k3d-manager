@@ -2,6 +2,7 @@
 
 setup() {
   ETC_DIR="${BATS_TEST_DIRNAME}/../../etc"
+  OBSERVABILITY_PLUGIN="${OBSERVABILITY_PLUGIN:-${BATS_TEST_DIRNAME}/../../plugins/observability.sh}"
 }
 
 @test "kube-prometheus-stack values point Alertmanager at the SMTP secret" {
@@ -152,5 +153,101 @@ setup() {
 @test "observability treats empty Alertmanager Vault values as absent" {
   run grep -c 'all(v) or sys.exit(1)' "${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   [ "${status}" -eq 0 ]
-  [ "${output}" = "2" ]
+  [ "${output}" = "1" ]
+}
+
+@test "Alertmanager config helper applies the secret without exposing the password" {
+  local stub_dir="${BATS_TEST_TMPDIR}/bin" log="${BATS_TEST_TMPDIR}/kubectl.log"
+  mkdir -p "${stub_dir}"
+  cat > "${stub_dir}/kubectl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${KUBECTL_LOG}"
+if [[ "$*" == *"get secret vault-root"* ]]; then
+  printf 'dG9rZW4='
+elif [[ "$*" == *"apply"* ]]; then
+  cat >/dev/null
+fi
+EOF
+  cat > "${stub_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s' '{"data":{"data":{"gmail_from":"a@example.invalid","gmail_app_pw":"SENTINEL-PW","sms_gateway":"s@example.invalid"}}}'
+EOF
+  chmod +x "${stub_dir}/kubectl" "${stub_dir}/curl"
+  run env PATH="${stub_dir}:${PATH}" KUBECTL_LOG="${log}" OBSERVABILITY_PLUGIN="${OBSERVABILITY_PLUGIN}" \
+    bash -c '
+      _info() { :; }
+      _warn() { :; }
+      _kubectl() { kubectl "$@"; }
+      export PLUGINS_DIR=/nonexistent SCRIPT_DIR="${1%/scripts/plugins/observability.sh}"
+      source "${OBSERVABILITY_PLUGIN}"
+      _observability_apply_alertmanager_config ctx-x
+    ' _ "${BATS_TEST_DIRNAME}/../../.."
+  [ "${status}" -eq 0 ]
+  [[ "$(cat "${log}")" == *"create secret generic alertmanager-smtp-secret --context ctx-x"* ]]
+  [[ "${output}" != *"SENTINEL-PW"* ]]
+}
+
+@test "missing Alertmanager Vault secret fails the helper and public command" {
+  local stub_dir="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_dir}"
+  cat > "${stub_dir}/kubectl" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$*" == *"get secret vault-root"* ]]; then printf 'dG9rZW4='; fi
+EOF
+  cat > "${stub_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+exit 22
+EOF
+  chmod +x "${stub_dir}/kubectl" "${stub_dir}/curl"
+  run env PATH="${stub_dir}:${PATH}" OBSERVABILITY_PLUGIN="${OBSERVABILITY_PLUGIN}" \
+    bash -c '
+      _info() { :; }
+      _warn() { :; }
+      _kubectl() { kubectl "$@"; }
+      export PLUGINS_DIR=/nonexistent SCRIPT_DIR="${1%/scripts/plugins/observability.sh}"
+      source "${OBSERVABILITY_PLUGIN}"
+      _observability_apply_alertmanager_config ctx-x && exit 1
+      observability_alertmanager_config && exit 1
+      true
+    ' _ "${BATS_TEST_DIRNAME}/../../.."
+  [ "${status}" -eq 0 ]
+}
+
+@test "Alertmanager config helper does not leak credentials into the calling shell" {
+  local stub_dir="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_dir}"
+  cat > "${stub_dir}/kubectl" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$*" == *"get secret vault-root"* ]]; then printf 'dG9rZW4='; fi
+EOF
+  cat > "${stub_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s' '{"data":{"data":{"gmail_from":"a@example.invalid","gmail_app_pw":"SENTINEL-PW","sms_gateway":"s@example.invalid"}}}'
+EOF
+  chmod +x "${stub_dir}/kubectl" "${stub_dir}/curl"
+  run env PATH="${stub_dir}:${PATH}" OBSERVABILITY_PLUGIN="${OBSERVABILITY_PLUGIN}" \
+    bash -c '
+      unset ALERTMANAGER_GMAIL_APP_PW
+      _info() { :; }
+      _warn() { :; }
+      _kubectl() { kubectl "$@"; }
+      export PLUGINS_DIR=/nonexistent SCRIPT_DIR="${1%/scripts/plugins/observability.sh}"
+      source "${OBSERVABILITY_PLUGIN}"
+      declare -F _observability_apply_alertmanager_config >/dev/null || exit 1
+      _observability_apply_alertmanager_config ctx-x >/dev/null
+      [[ -z "${ALERTMANAGER_GMAIL_APP_PW+x}" ]]
+    ' _ "${BATS_TEST_DIRNAME}/../../.."
+  [ "${status}" -eq 0 ]
+}
+
+@test "Alertmanager template has one render site" {
+  run grep -c 'alertmanager.yaml.tmpl' "${OBSERVABILITY_PLUGIN}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+}
+
+@test "make alertmanager-config invokes the public command" {
+  run make -n -s -C "${BATS_TEST_DIRNAME}/../../.." alertmanager-config
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"observability_alertmanager_config"* ]]
 }
