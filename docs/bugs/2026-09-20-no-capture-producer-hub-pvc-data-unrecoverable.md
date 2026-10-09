@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** PARTIAL — fixed: capture/offload/retention `d53ea1ba` (`make snapshot`); hub delete became opt-in (`DELETE_HUB=1`); full Vault coverage (the snapshot copies the whole `data-vault-0` volume). Still open, dispatched to Codex 2026-10-08: fail-closed `--delete-hub`, snapshot freshness in `make status`, Retain on the seven claims. See "Remaining fix (2026-10-08)".
+**Status:** FIXED in branch fa3340bc — live verification pending (Codex).
 
 ## Question that prompted this
 
