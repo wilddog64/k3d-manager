@@ -1095,6 +1095,7 @@ remaining blocker.
 
 2026-10-08: Hub teardown guard round 2 fixed in `32395370`; status recorded in `ca8db0d9`; live verification pending (operator).
 2026-10-08: Hub snapshot round 3 hostname mapping fixed in `2e8996ae`; live verification pending (operator).
+2026-10-08: Hub snapshot round 4 now captures claim trees as in-node tar streams in `fbebe9df`; live verification pending (operator).
 ## 2026-10-08 — September bug-doc triage completed
 
 Triaged all 19 requested September bug docs on `k3d-manager-v1.42.0`; status counts: 16 FIXED, 2 PARTIAL, 0 OPEN, 1 UNKNOWN. Docs commit `fbdf1c23` is pushed; `make check-doc-links` passed (`19 file(s) OK`). PR URL: none.
