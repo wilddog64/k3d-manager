@@ -1,3 +1,16 @@
+## 2026-10-09 — v1.42.0 RELEASED; current branch k3d-manager-v1.43.0
+
+- **PR #138 merged** as `cc88386c`. Tag `v1.42.0` pushed and verified on origin (peels to `cc88386c`). GitHub release `v1.42.0` created and marked Latest: https://github.com/wilddog64/k3d-manager/releases/tag/v1.42.0
+- **enforce_admins on main restored** (true). No further branch-protection changes needed.
+- **CodeQL #31, #32, #33 dismissed as false positives** by the operator. Pre-existing on main; see `docs/issues/2026-10-09-copilot-pr138-review-findings.md`.
+- **Retro:** `docs/retro/2026-10-09-v1.42.0-retrospective.md`.
+- **Current branch: `k3d-manager-v1.43.0`** (created from `cc88386c`, tracks origin).
+- **Pending operator steps:**
+  - `make restart-webhook` (picks up the webhook fixes).
+  - Hostinger istio-ambient apply, then check the istio-cni alert.
+  - `make appsets-reapply` then `make appsets-check` on `k3d-manager-v1.43.0` when ready.
+- **Ready to dispatch to Codex:** the v1.43.0 specs in `docs/plans/` (5 files, at the cap).
+- **2026-10-15 reminder:** delete pushgateway job `k3dm-disk-smstest` (the deliberate fake disk alert ends then).
 ## 2026-10-09 — PR #138 CodeQL resolved; ready to merge
 
 - Operator committed the regex fix `0e74f3f2` (`--no-verify`); alert #34 fixed, thread resolved. CI green (lint, alertmanager-behaviour, Analyze x3). The CodeQL check stays red only on the existing `main` alerts #31/#32 (status.py clear-text storage) and #33 (test_hermes URL substring), re-reported because the PR touched those files; CodeQL is not a required check. Findings doc updated.

@@ -49,6 +49,8 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `hub_snapshot_capture` | `scripts/plugins/hub_snapshot.sh` | Capture hub state (PVCs + kine snapshot) locally and transfer to M2 remote storage via rsync; checksum-verified, with Loki recovery record written to Vault for unattended restore (v1.36.0+) |
 | `hub_snapshot_list` | `scripts/plugins/hub_snapshot.sh` | List remote hub snapshots on M2 storage; read-only (v1.36.0+) |
 | `hub_snapshot_restore` | `scripts/plugins/hub_snapshot.sh` | Restore a hub snapshot from M2 remote storage; uses the Vault-stored Loki recovery record from `hub_snapshot_capture` (v1.36.0+) |
+| `hub_snapshot_guard_delete` | `scripts/plugins/hub_snapshot.sh` | Pre-delete guard used by `bin/cluster-down`: refuses to delete hub data unless M2 is reachable and holds a verified, recent snapshot; `DISCARD_HUB_DATA=1` overrides (v1.42.0+) |
+| `hub_snapshot_retain_pvs` | `scripts/plugins/hub_snapshot.sh` | Set `persistentVolumeReclaimPolicy: Retain` on the hub's seven data PVs so deleting claims does not delete data (v1.42.0+) |
 | `configure_vault_app_auth_for_context` | `scripts/plugins/vault.sh` | Provider-agnostic Kubernetes auth configuration for app cluster; resolves kubeconfig context to cluster name before CA/server lookup (v1.10.0+) |
 | `vault_install_unseal_watchdog` | `scripts/plugins/vault.sh` | Deploy in-cluster Vault auto-unseal watchdog CronJob (Tier 3 P2a); replays Shamir shard on `vault status` exit-code trigger |
 | `vault_deploy_hub_into_context` | `scripts/plugins/vault.sh` | Provision hub Vault inside an app cluster with least-privilege `app-cluster-reader` policy and kubernetes-auth ClusterSecretStore (v1.10.0+) |
@@ -137,6 +139,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `deploy_observability_acg` | `scripts/plugins/observability.sh` | Apply ACG `observability-acg` ApplicationSet — minimal Prometheus (NodePort 30090, no Grafana) + Trivy Operator 0.24.1 with ServiceMonitor scraping to ubuntu-k3s |
 | `observability_status` | `scripts/plugins/observability.sh` | Show pod status for `monitoring` and `trivy-system` namespaces on both Hub (k3d) and ACG (ubuntu-k3s) |
 | `observability_seed_grafana` | `scripts/plugins/observability.sh` | Public entrypoint: seed the Grafana Vault KV store with fresh admin credentials if absent (idempotent fresh-generate strategy); callable during cluster bring-up for self-healing after Vault raft wipe on rebuild (v1.29.0+) |
+| `observability_alertmanager_config` | `scripts/plugins/observability.sh` | Apply the Alertmanager config to the hub (`make alertmanager-config`); single shared apply path (v1.42.0+) |
 | `trivy_scan_report` | `scripts/plugins/observability.sh` | Print VulnerabilityReport summary (namespace, name, critical, high counts) for both Hub and ACG clusters |
 | `signing_init` | `scripts/plugins/signing.sh` | Initialize cosign keypair: generate or restore from Keychain backup (prefer restore if available), write to Vault `secret/cosign/signing`, mirror public key via ESO, backup private key to Keychain, install read-only Vault policy |
 | `signing_status` | `scripts/plugins/signing.sh` | Report cosign key material status: `vault_key` (present/absent), `keychain_backup` (present/absent), `eso_public_secret` (present/absent) |
