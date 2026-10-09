@@ -265,11 +265,14 @@ do not: apply them with `make prometheus-rules`, which applies only
 
 Shows whether alerts are actually being delivered. Stats at the top: notifications sent and failed
 per integration over 24h, and a count of firing alerts by severity. Below them, the **Firing
-alerts** table lists every alert firing right now (Watchdog excluded), one row per alert, with
+alerts** table lists every alert firing right now, one row per alert, with
 `severity`, `alertname`, `cluster`, `namespace` and, for Trivy alerts, `image_repository`, `tier`
 and `remediation`. It reads Prometheus's `ALERTS` series, so it answers "which alerts make up that
-count" without opening Prometheus. Severity decides the route: `critical` texts (`sms-critical`),
-`warning` emails.
+count" without opening Prometheus. Severity mostly decides the route: `critical` texts (`sms-critical`),
+`warning` emails. The exception is `TrivyCriticalVulnerabilityDetected`, which goes to the CVE
+auto-patch webhook and the analysis receiver, not SMS. Both the count and the table leave out two always-on kube-prometheus-stack
+meta-alerts: `Watchdog` (the heartbeat) and `InfoInhibitor` (severity `none`, which fires whenever an
+`info` alert such as `CPUThrottlingHigh` is active, to mute it). Neither one is a real problem.
 
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 

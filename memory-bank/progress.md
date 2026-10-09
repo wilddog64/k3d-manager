@@ -1,3 +1,10 @@
+## 2026-10-08 — Payment critical CVE investigated; bug filed; `none` severity explained
+
+- The only critical alert (`TrivyCriticalVulnerabilityDetected`, ubuntu-hostinger, `wilddog64/shopping-cart-payment`) is **CVE-2026-47884**, `spring-webmvc` 6.2.19, XsltView RCE (CVSS 9.8). There is **no open-source fix on Spring 6.x**; it is fixed only in 7.0.9 (Spring Boot 4). We already ship the newest 6.2.19 / Boot 3.5.16, and the deployed `sha-e3b6f06` is the newest payment build. Payment never uses XsltView. The alert does NOT go to SMS; it goes to cve-remediate + analyze. It has fired the whole 48h window.
+- Filed `docs/bugs/2026-10-08-payment-spring-webmvc-cve-no-oss-6x-fix.md`. Options: A, Boot 4 upgrade; B, ship the Go port; C, a time-boxed VEX/ignore exception; D, accept. Recommended: C now with a 90-day expiry, then A or B. **Waiting on an operator decision.**
+- Dashboard: the `none` row in "Firing alerts by severity" was `InfoInhibitor`, a kube-prometheus-stack meta-alert that fires while an `info` alert is active (`CPUThrottlingHigh` on argocd-repo-server). The stat and the table now exclude `Watchdog|InfoInhibitor`. The guide also notes that the Trivy critical does not text.
+- SMS test: HostDiskSpaceCritical{host=smstest} **firing 20:08:30**; watcher checking delivery.
+
 ## 2026-10-08 — Alertmanager Delivery dashboard: Firing alerts table
 
 - Operator asked which alerts the "40 warning / 1 critical" stat was counting. Added a **Firing alerts** table panel (instant `ALERTS{alertstate="firing",alertname!="Watchdog"}`, one row per alert) under the stats; documented in `docs/guides/grafana-dashboards.md`; CHANGELOG. Syncs via `hub-grafana-dashboards`.

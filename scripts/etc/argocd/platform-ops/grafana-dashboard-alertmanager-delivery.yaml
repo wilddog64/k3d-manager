@@ -241,7 +241,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "count by (severity) (ALERTS{alertstate=\"firing\",alertname!=\"Watchdog\"})",
+              "expr": "count by (severity) (ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor\"})",
               "legendFormat": "{{severity}}",
               "instant": true
             }
@@ -251,7 +251,7 @@ data:
           "id": 9,
           "type": "table",
           "title": "Firing alerts",
-          "description": "Every alert firing now (Watchdog excluded), one row per alert. Severity decides routing: critical goes to SMS, warning to email.",
+          "description": "Every alert firing now (the Watchdog and InfoInhibitor meta-alerts excluded), one row per alert. Severity decides routing: critical goes to SMS, warning to email.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -290,7 +290,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "ALERTS{alertstate=\"firing\",alertname!=\"Watchdog\"}",
+              "expr": "ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor\"}",
               "format": "table",
               "instant": true,
               "refId": "A"
