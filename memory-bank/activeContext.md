@@ -1,3 +1,5 @@
+- **2026-10-09 Expired-sandbox reaper designed** (`ffe1de90`): watcher path dropped (acg_watch never started by k3d-manager); launchd reaper with Unknown≥30min (keyed on Secret UID) + CFN/creds gone signal, dry-run first. Awaiting operator choice: auto reaper vs Hermes approval. Next after that: frontend public URL.
+
 - **2026-10-09 SMS recovery (items 1,2,3,5) verified** — Codex `088378ea` (on origin). Claude ran pytest with real Docker: 7/7; RED on pre-fix template: exactly `test_sms_sends_resolved_notification` + `test_resolved_text_templates_render_with_amtool` fail. Item 4 (`make alertmanager-config`) deliberately not done. Live: operator runs `make observability` (only apply path today) before 2026-10-15, then smstest delete should text RESOLVED.
 - **2026-10-09 Host Disk dashboard had no tags** (user report) — added `["k3dm","disk"]` + BATS guard (every provisioned dashboard has ≥1 tag; RED named only host-disk; 39/39). PRs: infra #110 (green, Copilot 0 findings; operator patches 2 PVs to Delete before merge), frontend #117 (all green after prettier fix `99a95485`; main rerun 37942894719 green).
 
