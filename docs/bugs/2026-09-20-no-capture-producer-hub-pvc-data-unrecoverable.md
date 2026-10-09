@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** FIXED in branch fa3340bc — live verification pending (Codex).
+**Status:** PARTIAL — `fa3340bc` blocks hub deletion live, but Claude's review found 3 defects (see "Review findings — round 1"); round 2 dispatched to Codex 2026-10-08.
 
 ## Question that prompted this
 
@@ -245,3 +245,39 @@ Show RED for the `--delete-hub` refusal case against the pre-fix `bin/cluster-do
 - `docs/howto/hub-snapshots.md`: the delete guard, `DISCARD_HUB_DATA=1`, the stamp and `make status` line, `make hub-retain-pvs` and its limit.
 - `docs/howto/makefile.md`: `DISCARD_HUB_DATA`, `hub-retain-pvs`.
 - `CHANGELOG.md` `[Unreleased]` → `### Fixed`.
+
+## Review findings — round 1 (Claude, 2026-10-08, against `fa3340bc`)
+
+The live safety property holds: with no fresh snapshot, `cluster-down --delete-hub` stops before
+any teardown. Three defects remain.
+
+1. **The guard exits 1 through `_err`, not 2.** `_err` in lib-foundation `system.sh` prints and
+   then calls `exit 1`. So `hub_snapshot_guard_delete` never returns, and `bin/cluster-down`'s
+   `exit 2` and its DRY_RUN branch can't be reached. Fix: in `hub_snapshot_guard_delete`, report
+   each refusal with `_warn` (or `printf 'ERROR: ...' >&2`) and then `return 1`. Keep the message
+   text, which names `make snapshot` and `DISCARD_HUB_DATA=1`.
+2. **Under DRY_RUN the guard parses the dry-run preview as data.** `_hub_snapshot_ssh` calls
+   `_run_command`, and the `system_overrides.sh` dry-run override prints
+   `[dry-run] ssh ...` and returns 0. `_hub_snapshot_latest_verified` then takes that line as a
+   snapshot name ("latest snapshot [dry-run] ssh ... has an invalid timestamp"). The guard's calls
+   are read-only, so they should really run even in a preview. Fix: run the guard's reads with
+   `DRY_RUN=0 K3DM_DEPLOY_DRY_RUN=0` scoped to those calls, for example a `local` override or a
+   subshell inside `hub_snapshot_guard_delete`. `hub_snapshot_capture` and `hub_snapshot_prune`
+   keep honoring DRY_RUN.
+3. **The tests lock in defect 1, and one change is outside the spec.**
+   - `acg-down refuses hub deletion without a verified snapshot` asserts `status -eq 1`, which
+     passes only because `_err` exits.
+   - Replace it with two tests, both stubbing `ssh` on PATH to list no verified snapshot:
+     - a non-DRY_RUN run asserts `status -eq 2`, the `DISCARD_HUB_DATA=1` message, and no
+       `k3d cluster delete` and no provider call;
+     - a DRY_RUN run asserts `status -eq 0`, `DRY_RUN: hub snapshot guard refused`, and that
+       the preview continued.
+   - Add a test where a fresh snapshot (a name built from the current UTC time) lets deletion
+     proceed.
+   - Show RED for the `status -eq 2` test against `fa3340bc` on a temp copy.
+   - Revert `_hub_snapshot_ssh`'s `--probe " "` back to the plain `_run_command -- ssh ...`. Under
+     Bash 3.2 a whitespace probe still leaves `probe_args` empty, so it fixes nothing (checked with
+     `/bin/bash -c 'set -u; local -a a=(); read -r -a a <<< " "; g "${a[@]}"'`, which still reports
+     unbound). Under Bash 5 it isn't needed. If a test genuinely needs it, show that test failing
+     without it.
+

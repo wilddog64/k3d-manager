@@ -1,3 +1,11 @@
+## 2026-10-08 — Claude reviewed Codex hub teardown guard (`fa3340bc`): 3 defects, round 2 dispatched
+
+- Verified on origin: `fa3340bc`, `81d66e5b` and `b893a76e`. The change touches only spec-allowed files (13 files, +290/-18).
+- The live refusal works: hub deletion stops before teardown. But the guard reports through `_err`, which `exit 1`s, so the spec'd exit 2 and the DRY_RUN preview are unreachable.
+- Under DRY_RUN the guard parses the `[dry-run] ssh ...` preview as a snapshot name.
+- The new test asserts `status -eq 1`, which locks in the defect. The unrequested `--probe " "` on `_hub_snapshot_ssh` fixes nothing under Bash 3.2.
+- Findings are in the bug doc's "Review findings — round 1". Round 2 dispatched to Codex.
+
 ## 2026-10-08 — September PARTIAL bugs: rotator already fixed; hub PVC remaining fix dispatched to Codex
 
 - `2026-09-22-ci-red-prometheus-reseed-and-rotator-base64.md`: actually FIXED. `base64 -d` landed in `945018ee` (PR #130) with `platform_ops_rotators.bats`; the triage's PARTIAL was wrong. Status corrected.
