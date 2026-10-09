@@ -1,3 +1,11 @@
+## 2026-10-09 — Aithon comparison → two v1.45.0 specs + one bug (operator: "go ahead")
+
+- Decision: adopt isolated parallel agent execution + alert-to-draft-bug intake; REJECT per-PR human-review classifier and full beta/staging rails (overhead for one operator). Replace staging with a hub-first two-stage appsets rollout.
+- `docs/plans/v1.45.0-worktree-isolated-codex-dispatch.md` — `bin/k3dm-codex-dispatch` start/status/land/abandon; one worktree + `task/<ver>/<slug>` branch per spec outside the repo; Codex never commits; land checks `## Files` scope and ff-merges, never pushes.
+- `docs/plans/v1.45.0-alert-intake-draft-bugs.md` — `_run_analyze` drafts a redacted bug doc outside the repo for alerts firing ≥30m or ≥3 episodes/7d; `make intake-promote` copies into docs/bugs, never runs git.
+- `docs/bugs/2026-10-09-appsets-reapply-switches-hub-and-hostinger-together.md` — P2; rollout-stage label + hub-gated app-cluster stage; implement after the confirm-wait bug.
+- v1.45.0 now at the 5-spec cap (cve-remediation-terminal-notifications, docs-drift, node-tunnel drill, codex-dispatch, alert-intake).
+
 ## 2026-10-09 — istio-cni release step VERIFIED
 
 - `make appsets-reapply` (2nd run, clean) + `make platform-ops`: istio-cni on Hostinger uses k3s CNI dirs, Synced/Healthy, DS 1/1; `ArgoCDAppProgressingStuck` loaded in hub Prometheus (ok, inactive). Bug doc marked VERIFIED.
