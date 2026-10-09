@@ -1,3 +1,8 @@
+## 2026-10-08 — SMS-test fake disk left firing until 2026-10-15 (deliberate)
+
+- The operator is keeping `host="smstest"` (Pushgateway job `k3dm-disk-smstest`) firing for a week as interview material. It re-texts about once a day. **Do not treat `HostDiskSpaceCritical{host=smstest}` as a real disk alert.**
+- **On or after 2026-10-15**, the operator runs `curl -sS -X DELETE http://localhost:19094/metrics/job/k3dm-disk-smstest`; Claude then confirms the series is gone and the alert resolved. The session cron reminder is best-effort; this entry is the durable record.
+
 ## 2026-10-08 — Payment CVE: Option A (Spring Boot 4) chosen; two-phase spec; SMS proof PASSED
 
 - **SMS proof PASSED:** fake `host=smstest` → HostDiskSpaceCritical firing 20:08:30 → receiver `sms-critical` → sent 20:13:17 (email counter 21→22, failed 0; the 5m `group_wait` is why it took ~5m after firing) → the operator got the text. Cleanup DELETE pending (operator).
