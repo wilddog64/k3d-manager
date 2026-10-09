@@ -8,6 +8,7 @@ setup() {
   export K3DM_SNAPSHOT_TIMESTAMP=20260922T000000Z
   export K3DM_SNAPSHOT_STAMP="$BATS_TEST_TMPDIR/hub-snapshot-last"
   export K3DM_SNAPSHOT_MAX_AGE_HOURS=24
+  export K3DM_SNAPSHOT_KEEP=3 K3DM_SNAPSHOT_AUTO_PRUNE=1 K3DM_SNAPSHOT_MIN_FREE_GB=20
   export TMPDIR="$BATS_TEST_TMPDIR/staging"
   export SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
   export RSYNC_LOG="$BATS_TEST_TMPDIR/rsync.log"
@@ -97,6 +98,13 @@ printf '%s\n' "$*" >> "$SSH_LOG"
 command_text="${@: -1}"
 [[ "${SSH_RC:-0}" == 1 ]] && exit 1
 [[ "$command_text" == true ]] && exit 0
+if [[ "$command_text" == df\ * ]]; then
+  printf '%s\n' "${DF_OUTPUT:-9999999999}"
+  exit 0
+fi
+if [[ "$command_text" == mv\ *INCOMPLETE* && "${MV_FAIL:-0}" == 1 ]]; then
+  exit 1
+fi
 if [[ "$command_text" == mkdir\ * || "$command_text" == mv\ *INCOMPLETE* || "$command_text" == rm\ * ]]; then
   eval "$command_text"; exit $?
 fi
@@ -237,8 +245,8 @@ PY
 
 @test "hub snapshot: capture probes no remote free space" {
   capture_snapshot
-  run command grep -c 'df ' "$SSH_LOG"
-  [ "$output" -eq 0 ]
+  run grep -c 'df -Pk' "$SSH_LOG"
+  [ "$output" -eq 1 ]
 }
 
 @test "hub snapshot: checksum mismatch marks incomplete" {
@@ -277,7 +285,65 @@ PY
   for name in 20260919T000000Z 20260920T000000Z 20260921T000000Z 20260922T000000Z; do mkdir -p "$K3DM_SNAPSHOT_DIR/$name"; done
   export K3DM_SNAPSHOT_KEEP=3
   run hub_snapshot_prune
-  [ "$status" -eq 0 ]; [ "$(find "$K3DM_SNAPSHOT_DIR" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" -eq 3 ]
+  [ "$status" -eq 0 ]
+  for name in 20260920T000000Z 20260921T000000Z 20260922T000000Z; do [ -d "$K3DM_SNAPSHOT_DIR/$name" ]; done
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20260919T000000Z" ]
+}
+
+@test "hub snapshot: capture auto-prunes to newest verified snapshots" {
+  for name in 20260919T000000Z 20260920T000000Z 20260921T000000Z; do mkdir -p "$K3DM_SNAPSHOT_DIR/$name"; done
+  capture_snapshot
+  for name in 20260920T000000Z 20260921T000000Z 20260922T000000Z; do [ -d "$K3DM_SNAPSHOT_DIR/$name" ]; done
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20260919T000000Z" ]
+}
+
+@test "hub snapshot: auto-prune leaves incomplete entries" {
+  mkdir -p "$K3DM_SNAPSHOT_DIR/20260919T000000Z.INCOMPLETE"
+  capture_snapshot
+  [ -d "$K3DM_SNAPSHOT_DIR/20260919T000000Z.INCOMPLETE" ]
+  [[ "$output" == *"remove with make snapshot-prune"* ]]
+}
+
+@test "hub snapshot: auto-prune can be disabled" {
+  export K3DM_SNAPSHOT_AUTO_PRUNE=0
+  for name in 20260919T000000Z 20260920T000000Z 20260921T000000Z; do mkdir -p "$K3DM_SNAPSHOT_DIR/$name"; done
+  capture_snapshot
+  for name in 20260919T000000Z 20260920T000000Z 20260921T000000Z 20260922T000000Z; do [ -d "$K3DM_SNAPSHOT_DIR/$name" ]; done
+}
+
+@test "hub snapshot: auto-prune failure does not fail capture" {
+  _hub_snapshot_prune_verified() { return 1; }
+  run hub_snapshot_capture
+  [ "$status" -eq 0 ]
+  [ "$(cat "$K3DM_SNAPSHOT_STAMP")" = "$K3DM_SNAPSHOT_TIMESTAMP" ]
+  [[ "$output" == *"auto-prune failed"* ]]
+}
+
+@test "hub snapshot: insufficient space fails before rsync" {
+  export K3DM_SNAPSHOT_MIN_FREE_GB=999999999
+  run hub_snapshot_capture
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"stub-m2"* ]]
+  [ ! -s "$RSYNC_LOG" ]
+  [ ! -e "$K3DM_SNAPSHOT_STAMP" ]
+  [ ! -d "$K3DM_SNAPSHOT_DIR/${K3DM_SNAPSHOT_TIMESTAMP}.INCOMPLETE" ]
+}
+
+@test "hub snapshot: non-numeric free space fails closed" {
+  export DF_OUTPUT=garbage
+  run hub_snapshot_capture
+  [ "$status" -ne 0 ]
+  [ ! -e "$K3DM_SNAPSHOT_STAMP" ]
+}
+
+@test "hub snapshot: rename failure leaves capture unverified" {
+  for name in 20260919T000000Z 20260920T000000Z 20260921T000000Z; do mkdir -p "$K3DM_SNAPSHOT_DIR/$name"; done
+  export MV_FAIL=1
+  run hub_snapshot_capture
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"rename failed"* ]]
+  [ ! -e "$K3DM_SNAPSHOT_STAMP" ]
+  for name in 20260919T000000Z 20260920T000000Z 20260921T000000Z; do [ -d "$K3DM_SNAPSHOT_DIR/$name" ]; done
 }
 
 @test "hub snapshot: prune removes incomplete snapshots first" {

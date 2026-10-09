@@ -5,6 +5,8 @@ set -euo pipefail
 K3DM_SNAPSHOT_HOST="${K3DM_SNAPSHOT_HOST:-${E2E_M2_SSH_HOST:-m2jump}}"
 K3DM_SNAPSHOT_DIR="${K3DM_SNAPSHOT_DIR:-k3dm-snapshots}"
 K3DM_SNAPSHOT_KEEP="${K3DM_SNAPSHOT_KEEP:-3}"
+K3DM_SNAPSHOT_AUTO_PRUNE="${K3DM_SNAPSHOT_AUTO_PRUNE:-1}"
+K3DM_SNAPSHOT_MIN_FREE_GB="${K3DM_SNAPSHOT_MIN_FREE_GB:-20}"
 K3DM_SNAPSHOT_CLUSTER="${K3DM_SNAPSHOT_CLUSTER:-k3d-k3d-cluster}"
 K3DM_SNAPSHOT_CONTEXT="${K3DM_SNAPSHOT_CONTEXT:-k3d-k3d-cluster}"
 K3DM_SNAPSHOT_MAX_AGE_HOURS="${K3DM_SNAPSHOT_MAX_AGE_HOURS:-24}"
@@ -109,6 +111,39 @@ function _hub_snapshot_guard_read() {
   )
 }
 
+function _hub_snapshot_preflight_space() {
+  local _stage="$1" _remote="$2" _stage_kib _free_kib _required_kib _min_free_kib
+  _stage_kib="$(_run_command -- du -sk "$_stage" | awk '{print $1}')"
+  _free_kib="$(_hub_snapshot_ssh "df -Pk '$K3DM_SNAPSHOT_DIR' | awk 'NR==2 {print \$4}'")"
+  _min_free_kib="$((K3DM_SNAPSHOT_MIN_FREE_GB * 1024 * 1024))"
+  if [[ ! "$_stage_kib" =~ ^[0-9]+$ || ! "$_free_kib" =~ ^[0-9]+$ ]]; then
+    _err "[hub-snapshot] unable to read free space on ${K3DM_SNAPSHOT_HOST}"
+    _hub_snapshot_ssh "rm -rf -- '${_remote}.INCOMPLETE'" || true
+    return 1
+  fi
+  _required_kib=$((_stage_kib + _min_free_kib))
+  if [[ "$_free_kib" -lt "$_required_kib" ]]; then
+    _err "[hub-snapshot] insufficient free space on ${K3DM_SNAPSHOT_HOST}: ${_free_kib} KiB free, ${_required_kib} KiB needed"
+    _hub_snapshot_ssh "rm -rf -- '${_remote}.INCOMPLETE'" || true
+    return 1
+  fi
+}
+
+function _hub_snapshot_capture_retention_notice() {
+  local _name _incomplete_count=0
+  if [[ "$K3DM_SNAPSHOT_AUTO_PRUNE" == 1 ]]; then
+    if ! _hub_snapshot_prune_verified "$K3DM_SNAPSHOT_KEEP"; then
+      _warn "[hub-snapshot] auto-prune failed; run make snapshot-prune"
+    fi
+  fi
+  while IFS= read -r _name; do
+    [[ "$_name" == *.INCOMPLETE ]] && _incomplete_count=$((_incomplete_count + 1))
+  done < <(_hub_snapshot_remote_names)
+  if [[ "$_incomplete_count" -gt 0 ]]; then
+    _warn "[hub-snapshot] ${_incomplete_count} incomplete snapshot(s) on ${K3DM_SNAPSHOT_HOST}; remove with make snapshot-prune"
+  fi
+}
+
 function hub_snapshot_guard_delete() {
   local _latest _age
   if ! _hub_snapshot_guard_read _hub_snapshot_ssh true; then
@@ -137,6 +172,7 @@ function hub_snapshot_capture() {
   fi
   [[ "$#" -eq 0 ]] || { echo "Usage: hub_snapshot_capture" >&2; return 2; }
   local _stage _timestamp _remote _node _namespace _claim _storage _pv _uid _path _container
+  [[ "${K3DM_SNAPSHOT_KEEP}" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-snapshot] K3DM_SNAPSHOT_KEEP must be a positive integer"; return 2; }
   _stage="$(_run_command -- mktemp -d "${TMPDIR:-/tmp}/k3dm-hub-snapshot.XXXXXX")"
   _run_command -- chmod 700 "$_stage"
   _hub_snapshot_stage="$_stage"
@@ -166,6 +202,7 @@ function hub_snapshot_capture() {
   done < <(_hub_recovery_records)
   _hub_snapshot_checksums "$_stage"
   _hub_snapshot_ssh "mkdir -p '$K3DM_SNAPSHOT_DIR' '${_remote}.INCOMPLETE'"
+  if ! _hub_snapshot_preflight_space "$_stage" "$_remote"; then return 1; fi
   if ! _run_command -- rsync -a -e "ssh -o BatchMode=yes -o ConnectTimeout=10" "${_stage}/" "${K3DM_SNAPSHOT_HOST}:${_remote}.INCOMPLETE/"; then
     _err "[hub-snapshot] rsync upload failed for ${_timestamp}; left ${_remote}.INCOMPLETE"
     return 1
@@ -174,10 +211,14 @@ function hub_snapshot_capture() {
     _err "[hub-snapshot] checksum verification failed for ${_timestamp}"
     return 1
   fi
-  _hub_snapshot_ssh "mv -- '${_remote}.INCOMPLETE' '${_remote}'"
+  if ! _hub_snapshot_ssh "mv -- '${_remote}.INCOMPLETE' '${_remote}'"; then
+    _err "[hub-snapshot] rename failed for ${_timestamp}; left ${_remote}.INCOMPLETE"
+    return 1
+  fi
   _run_command -- mkdir -p "$(dirname "$K3DM_SNAPSHOT_STAMP")"
   printf '%s\n' "$_timestamp" > "$K3DM_SNAPSHOT_STAMP"
   _info "[hub-snapshot] captured ${_timestamp} to ${K3DM_SNAPSHOT_HOST}:${_remote}"
+  _hub_snapshot_capture_retention_notice
 }
 
 function _hub_snapshot_remote_names() {
@@ -199,19 +240,29 @@ function _hub_snapshot_remote_remove() {
   _hub_snapshot_ssh "rm -rf -- '$K3DM_SNAPSHOT_DIR/$1'"
 }
 
+function _hub_snapshot_prune_verified() {
+  local _keep="$1" _name _count=0
+  [[ "$_keep" =~ ^[1-9][0-9]*$ ]] || return 2
+  while IFS= read -r _name; do
+    [[ -z "$_name" || "$_name" == *.INCOMPLETE ]] && continue
+    _count=$((_count + 1))
+    if [[ "$_count" -gt "$_keep" ]]; then
+      _hub_snapshot_remote_remove "$_name" || return 1
+    fi
+  done < <(_hub_snapshot_remote_names | sort -r)
+}
+
 function hub_snapshot_prune() {
-  local _keep="${K3DM_SNAPSHOT_KEEP}" _name _count=0 _verified=0
-  local -a _incomplete=() _good=()
+  local _keep="${K3DM_SNAPSHOT_KEEP}" _name _verified=0
+  local -a _incomplete=()
   [[ "$_keep" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-snapshot] K3DM_SNAPSHOT_KEEP must be a positive integer"; return 2; }
   while IFS= read -r _name; do
     [[ -z "$_name" ]] && continue
     if [[ "$_name" == *.INCOMPLETE ]]; then
       _incomplete+=("$_name")
-    else
-      _good+=("$_name")
     fi
   done < <(_hub_snapshot_remote_names)
-  _verified="${#_good[@]}"
+  _verified="$(_hub_snapshot_remote_names | while IFS= read -r _name; do [[ -n "$_name" && "$_name" != *.INCOMPLETE ]] && printf '%s\n' "$_name"; done | wc -l | tr -d ' ')"
   if [[ "$_verified" -eq 0 ]]; then
     _err "[hub-snapshot] refusing to prune: no verified snapshots exist"
     return 1
@@ -219,12 +270,7 @@ function hub_snapshot_prune() {
   for _name in "${_incomplete[@]}"; do
     _hub_snapshot_remote_remove "$_name"
   done
-  for _name in "${_good[@]}"; do
-    _count=$((_count + 1))
-    if [[ "$_count" -gt "$_keep" ]]; then
-      _hub_snapshot_remote_remove "$_name"
-    fi
-  done
+  _hub_snapshot_prune_verified "$_keep" || return 1
   _info "[hub-snapshot] retained ${_keep} newest verified snapshots"
 }
 

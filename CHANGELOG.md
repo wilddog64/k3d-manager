@@ -10,6 +10,13 @@
 - Hub deletion now requires a fresh verified M2 snapshot unless the operator explicitly sets
   `DISCARD_HUB_DATA=1`; `make status` reports local snapshot freshness and
   `make hub-retain-pvs` applies the operator-run PV safety net.
+- Hub snapshot pruning now keeps the newest verified snapshots instead of deleting them.
+
+### Added
+
+- `make snapshot` automatically prunes verified snapshots after a successful capture (disable with
+  `K3DM_SNAPSHOT_AUTO_PRUNE=0`) and checks M2 free space before upload via
+  `K3DM_SNAPSHOT_MIN_FREE_GB`.
 
 ## [1.41.0] - 2026-10-06
 

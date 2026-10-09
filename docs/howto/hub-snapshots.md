@@ -7,9 +7,17 @@ trees. It uses the existing `E2E_M2_SSH_HOST` alias; override it
 with `K3DM_SNAPSHOT_HOST` or set `K3DM_SNAPSHOT_DIR` for another remote store.
 
 `make snapshot-list` reports each timestamp, size, and verified/incomplete
-state. `make snapshot-prune` deletes incomplete snapshots first and retains the
-newest three verified snapshots by default. Change the ceiling with
+state. After a successful capture, `make snapshot` automatically prunes to the
+newest `K3DM_SNAPSHOT_KEEP` (default 3) verified snapshots. Set
+`K3DM_SNAPSHOT_AUTO_PRUNE=0` to disable that automatic step. Auto-prune leaves
+incomplete uploads alone; `make snapshot-prune` deletes incomplete snapshots
+first and retains the newest verified snapshots. Change the ceiling with
 `K3DM_SNAPSHOT_KEEP`; pruning refuses to remove the last verified snapshot.
+
+Before upload, the capture checks that the M2 has enough free space for the
+staging directory plus `K3DM_SNAPSHOT_MIN_FREE_GB` (default 20 GiB). A failed
+preflight stops before rsync and leaves no incomplete directory. A snapshot is
+roughly 3.3 GB today, so the default three-snapshot retention uses about 10 GB.
 
 Prometheus has a three-day retention ceiling (`--storage.tsdb.retention.time=3d`).
 An older snapshot contains blocks Prometheus immediately prunes on startup, so
