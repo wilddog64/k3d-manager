@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+"""Publish host disk-space gauges to the hub Pushgateway."""
+
+import os
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+PUSH_RETRIES = 3
+PUSH_SLEEP_SECONDS = 2
+DEFAULT_TARGETS = "m4=local:/System/Volumes/Data m2=m2jump:k3d-snapshots"
+
+
+def _targets():
+    targets = []
+    for item in os.environ.get("K3DM_DISK_TARGETS", DEFAULT_TARGETS).split():
+        label, separator, target = item.partition("=")
+        host, separator, path = target.partition(":")
+        if label and separator and host and path:
+            targets.append((label, host, path))
+    return targets
+
+
+def _probe(host, path):
+    if host == "local":
+        command = ["df", "-Pk", path]
+    else:
+        command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "--",
+                   host, "df", "-Pk", path]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"df exited {result.returncode}")
+    lines = result.stdout.splitlines()
+    if len(lines) < 2:
+        raise ValueError("df output has no data line")
+    columns = lines[1].split()
+    if len(columns) < 5:
+        raise ValueError("df data line has too few columns")
+    size_kib = int(columns[1])
+    avail_kib = int(columns[3])
+    return size_kib * 1024, avail_kib * 1024
+
+
+def _label(value):
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def _metrics(results):
+    lines = []
+    for host, path, size, avail in results:
+        labels = f'host="{_label(host)}",path="{_label(path)}"'
+        if size is None:
+            lines.append(f"k3dm_disk_probe_success{{{labels}}} 0")
+        else:
+            lines.extend((f"k3dm_disk_size_bytes{{{labels}}} {size}",
+                          f"k3dm_disk_avail_bytes{{{labels}}} {avail}",
+                          f"k3dm_disk_probe_success{{{labels}}} 1"))
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def _collect():
+    results = []
+    for host, probe_host, path in _targets():
+        try:
+            size, avail = _probe(probe_host, path)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            size, avail = None, None
+        results.append((host, path, size, avail))
+    return results
+
+
+def publish(body):
+    base = os.environ.get("K3DM_DISK_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    request = urllib.request.Request(f"{base}/metrics/job/k3dm-disk", data=body.encode(), method="PUT",
+                                     headers={"Content-Type": "text/plain; charset=utf-8"})
+    for attempt in range(1, PUSH_RETRIES + 1):
+        try:
+            urllib.request.urlopen(request, timeout=5).close()
+            return True
+        except Exception as exc:
+            if attempt < PUSH_RETRIES:
+                print(f"disk metrics push attempt {attempt}/{PUSH_RETRIES} failed: {exc}", file=sys.stderr)
+                time.sleep(PUSH_SLEEP_SECONDS)
+            else:
+                print(f"disk metrics push skipped (non-fatal): {exc}", file=sys.stderr)
+    return False
+
+
+def main():
+    body = _metrics(_collect())
+    if "--dry-run" in sys.argv[1:]:
+        print(body, end="")
+        return 0
+    publish(body)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

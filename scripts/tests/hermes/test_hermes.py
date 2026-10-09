@@ -240,6 +240,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: True)
     monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: None, raising=False)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
@@ -248,6 +249,22 @@ def _stub_status_poll(monkeypatch, payload):
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
     calls = []
     return calls, lambda *_: calls.append(True) or (0, payload)
+
+
+def test_poll_invokes_disk_publisher_and_publisher_failure_is_nonfatal(monkeypatch, tmp_path):
+    publisher = getattr(k3dm_hermes, "_publish_disk_metrics", None)
+    assert publisher is not None
+    calls, runner = _stub_status_poll(monkeypatch, status_payload("healthy"))
+    published = []
+    monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: published.append(True))
+    k3dm_hermes._poll({}, tmp_path / "state.json", now=1000, status_runner=runner)
+    assert published == [True]
+
+    def failed_run(*_args, **_kwargs):
+        raise OSError("collector unavailable")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", failed_run)
+    publisher()
 
 
 def test_status_poll_advances_gate_only_when_sampled_and_defaults_off(monkeypatch, tmp_path, capsys):
