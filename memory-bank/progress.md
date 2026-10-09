@@ -1,3 +1,5 @@
+- **2026-10-09 OpenLDAP orphan removal — both parts verified.** Part 1 k3d-manager `773dc75d` (on origin; shellcheck 0; BATS 104/104 hub_recovery+hub_snapshot+cluster_down; RED: 8 tests fail against pre-fix plugin). Part 2 shopping-cart-infra `aca9f9e` on `fix/remove-orphan-osixia-ldap` (kustomize ok; `identity/ldap` grep gate empty). Live read-only: only the orphan `ldap` pod consumes `ldap-secrets`; no `ldap://ldap` short-name refs; Keycloak federates `openldap.identity`. Next: infra PR; operator patches PVs `pvc-2f1c2ab2-…` + `pvc-7e307e74-…` to Delete BEFORE merge; then SMS spec → Codex.
+
 - **2026-10-09 — OpenLDAP CVE (doc 2026-08-02-openldap-…):** bitnamilegacy migration already DONE (jp-gouin
   `openldap`, 19 crit, newest tag). The 66 crit are an ORPHANED osixia `ldap` Deployment (shopping-cart-infra
   `identity/ldap`) nothing uses. Operator decision: remove incl. PVCs + data. Two-part spec → Codex: Part 1 k3d-manager
