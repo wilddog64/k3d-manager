@@ -1,3 +1,16 @@
+## 2026-10-09 — P1 node-health-watch dead-tunnel fix IMPLEMENTED (`90d8942a`, Claude-verified)
+
+- Codex commit `90d8942a` is on origin and changes exactly the 5 spec files.
+- Claude checks:
+  - shellcheck clean; `node_health_watch.bats` 11/11 green; `launchd_plist_path.bats` green.
+  - RED reproduced independently: the 6-tick tunnel test fails against `90d8942a^`.
+- Not live yet: launchd PID 60971 still runs the old in-memory functions.
+  - Operator: `launchctl kickstart -k gui/$(id -u)/com.k3d-manager.node-health-watch`.
+- Side finding (dashboard dots): the "Trivy Operator Job Reconcile Errors" panel's `{}` dots are the unlabeled `sum(...)` series.
+  - 87 errors on 2026-10-03 during the hub rebuild: scan jobs failed because CoreDNS answered "server misbehaving" for quay.io and docker.io.
+  - 1 more on 2026-10-06: a transient `StorageError` on a ClusterRbacAssessmentReport.
+  - No ongoing errors.
+
 ## 2026-10-09 — P1 node-health-watch dead-tunnel fix dispatched to Codex
 
 - Spec: the "Implementation spec" section of `docs/bugs/2026-10-09-node-health-watch-ignores-ready-node-with-dead-kubelet-tunnel.md`.
