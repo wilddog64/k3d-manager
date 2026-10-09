@@ -61,6 +61,51 @@ def test_real_tree_driver_runs_as_a_subprocess():
     assert ask_docs._doc_link(path) in result.stdout
 
 
+def test_bug_sources_have_metadata_suffix_and_excerpt(monkeypatch, tmp_path):
+    root = tmp_path / "repo"
+    path = root / "docs/bugs/2026-01-01-example.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("# Example\n\n**Priority:** P1\n**Status:** Open\nproblem\n")
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    monkeypatch.setattr(ask_docs.prior_art, "fetch_doc_meta", lambda paths: {paths[0]: ("P1", "open")})
+    try:
+        reply = ask_docs.answer("known", retrieve=lambda *_a, **_k: [(0.9, "docs/bugs/2026-01-01-example.md", "Example")], model=lambda prompt: assert_in_prompt(prompt))
+        assert "[P1 · open]" in reply
+    finally:
+        ask_docs.REPO_ROOT = old_root
+
+
+def assert_in_prompt(prompt):
+    assert "Priority: P1 · State: open" in prompt
+    return "grounded"
+
+
+def test_plans_source_is_unchanged_and_metadata_failure_degrades(monkeypatch, tmp_path):
+    root = tmp_path / "repo"
+    path = root / "docs/plans/example.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("# Plan\n\nproblem\n")
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    monkeypatch.setattr(ask_docs.prior_art, "fetch_doc_meta", lambda _paths: (_ for _ in ()).throw(RetrievalUnavailable("offline")))
+    try:
+        reply = ask_docs.answer("known", retrieve=lambda *_a, **_k: [(0.9, "docs/plans/example.md", "Plan")], model=lambda _p: "grounded")
+        assert "Priority:" not in reply and "[unset · unknown]" not in reply
+    finally:
+        ask_docs.REPO_ROOT = old_root
+
+
+def test_bug_count_question_bypasses_retrieval_recent_and_model(monkeypatch):
+    calls = []
+    monkeypatch.setattr(ask_docs.bug_count, "match", lambda _q: ask_docs.bug_count.CountQuery("v1.42.0", "P1", None))
+    monkeypatch.setattr(ask_docs.bug_count, "reply", lambda _q: "counted")
+    monkeypatch.setattr(ask_docs, "_recent_docs", lambda *_a, **_k: calls.append("recent"))
+    reply = ask_docs.answer("how many P1 bugs in v1.42.0", retrieve=lambda *_a, **_k: calls.append("retrieve"), model=lambda _p: calls.append("model"))
+    assert "counted" in reply
+    assert calls == []
+
+
 def test_no_match_does_not_call_model():
     calls = []
     path = _real_source()
@@ -430,3 +475,19 @@ def test_non_recent_mode_keeps_score_order_and_sources_date(tmp_path):
     assert calls == [5]
     assert f"0.80  2026-09-01  {ask_docs._doc_link('docs/bugs/2026-09-01-old.md')} — Old" in reply
     assert f"0.70  2026-10-01  {ask_docs._doc_link('docs/bugs/2026-10-01-new.md')} — New" in reply
+
+
+def test_source_metadata_is_per_answer_not_shared(monkeypatch, tmp_path):
+    root = tmp_path / "repo"
+    path = root / "docs/bugs/2026-01-01-example.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("# Example\n\n**Priority:** P1\n**Status:** Open\nproblem\n")
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    monkeypatch.setattr(ask_docs.prior_art, "fetch_doc_meta", lambda paths: {paths[0]: ("P1", "open")})
+    try:
+        ask_docs._sources([(0.9, "docs/bugs/2026-01-01-example.md", "Example")])
+        other = ask_docs._reply("other answer", ["docs/bugs/2026-01-01-example.md"])
+        assert "[P1 · open]" not in other
+    finally:
+        ask_docs.REPO_ROOT = old_root

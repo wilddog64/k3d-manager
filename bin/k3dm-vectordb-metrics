@@ -10,6 +10,8 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+from hermes.prior_art import doc_meta  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
 
@@ -76,8 +78,60 @@ def publish(payload):
     return False
 
 
+def _bug_metrics(root, ref=None):
+    """Return a complete bug inventory snapshot, or raise on any read/parse failure."""
+    root = Path(root)
+    if ref:
+        listing = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only", ref,
+                                  "docs/bugs"], capture_output=True, text=True, check=True)
+        paths = [p for p in listing.stdout.splitlines()
+                 if p.startswith("docs/bugs/") and "/" not in p[len("docs/bugs/"):]]
+        texts = {p: subprocess.run(["git", "-C", str(root), "show", f"{ref}:{p}"],
+                                   capture_output=True, text=True, check=True).stdout for p in paths}
+    else:
+        paths = sorted(p.relative_to(root).as_posix() for p in (root / "docs/bugs").glob("*.md"))
+        texts = {p: (root / p).read_text(encoding="utf-8") for p in paths}
+    counts = {(priority, state): 0 for priority in ("P0", "P1", "P2", "P3", "unset")
+              for state in ("open", "closed", "unknown")}
+    for text in texts.values():
+        priority, state = doc_meta(text)
+        counts[(priority, state)] += 1
+    lines = [f'k3dm_bug_docs{{priority="{priority}",state="{state}"}} {counts[(priority, state)]}'
+             for priority, state in counts]
+    lines.append(f"k3dm_bug_docs_scan_timestamp_seconds {time.time()}")
+    return "\n".join(lines) + "\n"
+
+
+def publish_bug_metrics(root, ref=None):
+    try:
+        payload = _bug_metrics(root, ref)
+    except Exception as exc:
+        print(f"bug metrics scan skipped (non-fatal): {exc}", file=sys.stderr)
+        return False
+    base = _pushgateway_url()
+    healthy_url = f"{base}/-/healthy"
+    url = f"{base}/metrics/job/k3dm-bug-docs"
+    for attempt in range(1, PUSH_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(healthy_url, timeout=2) as response:
+                if response.status != 200:
+                    raise RuntimeError(f"Pushgateway unhealthy (HTTP {response.status})")
+            request = urllib.request.Request(url, data=payload.encode(), method="POST",
+                                             headers={"Content-Type": "text/plain; charset=utf-8"})
+            urllib.request.urlopen(request, timeout=5)
+            return True
+        except Exception as exc:
+            if attempt < PUSH_RETRIES:
+                print(f"bug metrics push attempt {attempt}/{PUSH_RETRIES} failed: {exc}", file=sys.stderr)
+                time.sleep(PUSH_SLEEP_SECONDS)
+            else:
+                print(f"bug metrics push skipped (non-fatal): {exc}", file=sys.stderr)
+    return False
+
+
 def main():
     publish(_status())
+    publish_bug_metrics(ROOT, os.environ.get("K3DM_INDEX_REF"))
     return 0
 
 

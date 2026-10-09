@@ -194,6 +194,7 @@ the store rather than truncating it. See
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
 | `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard |
+| `make bug-tally` | Count bug documents by release, status and priority | Deterministic bug inventory; use `RELEASE=vX.Y.Z` or `JSON=1` |
 | `make lint-python` | `ruff check -- <tracked Python files>` | Run Ruff's pyflakes rules over `.py` files and Python-shebang scripts |
 | `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
 

@@ -7,6 +7,17 @@ if [[ ! -f "${SCRIPT_DIR}/lib/agent_rigor.sh" ]]; then
    exit 0
 fi
 
+# New bug documents must carry a canonical urgency field; legacy edits remain allowed.
+new_bug_docs="$(git diff --cached --name-only --diff-filter=A -- 'docs/bugs/*.md')"
+while IFS= read -r bug_doc; do
+   [[ -z "${bug_doc}" ]] && continue
+   if ! git show ":${bug_doc}" | grep -Eq '^\*\*Priority:\*\* P[0-3]\b'; then
+      echo "Pre-commit hook: ${bug_doc} needs **Priority:** P0/P1/P2/P3" >&2
+      echo "Legend: P0 outage/security now; P1 broken without workaround; P2 degraded with workaround; P3 cosmetic/hygiene." >&2
+      exit 1
+   fi
+done <<< "${new_bug_docs}"
+
 # Guard: block direct edits to git subtree directories
 # Bypass: set K3DM_SUBTREE_SYNC=1 when running git subtree pull/add
 if [[ "${K3DM_SUBTREE_SYNC:-0}" != "1" ]]; then

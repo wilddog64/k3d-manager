@@ -90,6 +90,10 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
 
 ## Docs Conventions
 
+Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
+without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
+new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
+
 - **`docs/bugs/`** — unplanned bug fix specs filed by agents or Claude during a session.
 - **`docs/issues/`** — Copilot PR findings and post-incident notes.
 - **Dedup before filing — two passes.** The exact-slug glob only matches a slug someone already

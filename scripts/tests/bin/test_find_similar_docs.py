@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 LIB = REPO_ROOT / "scripts" / "lib"
 sys.path.insert(0, str(LIB))
 
+from hermes import prior_art  # noqa: E402
 from hermes.prior_art import doc_embed_text, iter_corpus, search  # noqa: E402
 
 PAIR_FILE = REPO_ROOT / "scripts/tests/fixtures/doc-dedup/pairs.jsonl"
@@ -240,6 +241,20 @@ def test_cli_unavailable_is_distinguishable_from_zero_results(tmp_path):
     assert zero.returncode == 0
     assert zero.stdout == "[]\n"
     assert "retrieval unavailable" not in zero.stderr
+
+
+def test_bug_results_include_priority_and_state(cli_module, monkeypatch, capsys):
+    monkeypatch.setattr(cli_module, "search", lambda *_a, **_k: [(0.873, "docs/bugs/example.md", "Example")])
+    monkeypatch.setattr(cli_module.prior_art, "fetch_doc_meta", lambda _paths: {"docs/bugs/example.md": ("P1", "open")})
+    assert cli_module.main(["example query"]) == 0
+    assert "priority=P1 state=open" in capsys.readouterr().out
+
+
+def test_json_metadata_unavailable_adds_nothing(cli_module, monkeypatch, capsys):
+    monkeypatch.setattr(cli_module, "search", lambda *_a, **_k: [(0.873, "docs/plans/example.md", "Example")])
+    monkeypatch.setattr(cli_module.prior_art, "fetch_doc_meta", lambda _paths: (_ for _ in ()).throw(cli_module.RetrievalUnavailable("offline")))
+    assert cli_module.main(["--json", "example query"]) == 0
+    assert "priority" not in capsys.readouterr().out
 
 
 @pytest.mark.skipif(os.environ.get("K3DM_RETRIEVAL_EVAL_LIVE") != "1",

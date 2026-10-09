@@ -35,6 +35,7 @@ from hermes.prior_art import (  # noqa: E402
     TABLE,
     RetrievalUnavailable,
     copy_escape,
+    doc_meta,
     embed_batch,
     ensure_schema,
     fetch_hashes,
@@ -99,6 +100,38 @@ def _prune_script(present_paths):
     parts.append("COMMIT;")
     parts.append(f"SELECT 'indexed=' || count(*) FROM {TABLE};")
     return "\n".join(parts) + "\n"
+
+
+def _metadata_script(rows):
+    parts = [
+        "BEGIN;",
+        "CREATE TEMP TABLE metadata_staging (path text, priority text, state text) ON COMMIT DROP;",
+        "COPY metadata_staging (path, priority, state) FROM STDIN;",
+    ]
+    parts.extend("\t".join(copy_escape(value) for value in row) for row in rows)
+    parts.extend([
+        "\\.",
+        f"UPDATE {TABLE} AS docs SET priority = staging.priority, state = staging.state "
+        "FROM metadata_staging AS staging WHERE docs.path = staging.path;",
+        "COMMIT;",
+    ])
+    return "\n".join(parts) + "\n"
+
+
+def _raw_docs(root, docs, ref):
+    if ref is None:
+        raw = {}
+        for path, *_ in docs:
+            try:
+                raw[path] = (root / path).read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+        return raw
+    return {
+        path: subprocess.run(["git", "-C", str(root), "show", f"{ref}:{path}"],
+                             capture_output=True, text=True, check=True).stdout
+        for path, *_ in docs
+    }
 
 
 def main(argv=None):
@@ -213,6 +246,15 @@ def main(argv=None):
         print(f"index-docs: unavailable — {exc}", file=sys.stderr)
         print(f"index-docs: {written} documents were committed; only the prune failed",
               file=sys.stderr)
+        return 1
+
+    try:
+        raw_docs = _raw_docs(ROOT, docs, args.ref)
+        metadata = [(path, *doc_meta(raw_docs[path])) for path in present if path in raw_docs]
+        if metadata:
+            run_sql(_metadata_script(metadata))
+    except (OSError, subprocess.SubprocessError, RetrievalUnavailable) as exc:
+        print(f"index-docs: unavailable — metadata update failed: {exc}", file=sys.stderr)
         return 1
 
     counts = dict(

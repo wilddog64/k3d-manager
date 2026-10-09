@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-bugs
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    release: kube-prometheus-stack
+data:
+  k3dm-bugs.json: |
+    {"title":"k3dm Bug Tracking","uid":"k3dm-bugs","tags":["k3dm"],"schemaVersion":38,"version":1,"refresh":"30s","datasource":{"type":"prometheus","uid":"prometheus"},"panels":[
+      {"id":1,"type":"stat","title":"Open P0","targets":[{"expr":"sum(k3dm_bug_docs{state=\"open\",priority=\"P0\"})"}],"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"green","value":null},{"color":"red","value":1}]}}}},
+      {"id":2,"type":"stat","title":"Open P1","targets":[{"expr":"sum(k3dm_bug_docs{state=\"open\",priority=\"P1\"})"}],"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"green","value":null},{"color":"orange","value":1}]}}}},
+      {"id":3,"type":"stat","title":"Open, untriaged","targets":[{"expr":"sum(k3dm_bug_docs{state=~\"open|unknown\",priority=\"unset\"})"}]},
+      {"id":4,"type":"bargauge","title":"Open by priority","targets":[{"expr":"sum by (priority) (k3dm_bug_docs{state=\"open\"})"}]},
+      {"id":5,"type":"timeseries","title":"Open by priority over time","description":"This is an inventory snapshot. A falling open count does not prove a fix, because a doc can be archived, superseded or deleted.","targets":[{"expr":"sum by (priority) (k3dm_bug_docs{state=\"open\"})"}]},
+      {"id":6,"type":"stat","title":"Scan age","targets":[{"expr":"time() - k3dm_bug_docs_scan_timestamp_seconds"}]}
+    ]}

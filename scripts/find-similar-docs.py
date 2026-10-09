@@ -23,6 +23,7 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
+from hermes import prior_art  # noqa: E402
 from hermes.prior_art import RetrievalUnavailable, search  # noqa: E402
 
 DEFAULT_REPO_URL = "https://github.com/wilddog64/k3d-manager"
@@ -86,9 +87,16 @@ def main(argv=None):
               file=sys.stderr)
         return 0
 
+    metadata = {}
+    try:
+        metadata = prior_art.fetch_doc_meta([path for _s, path, _t in results])
+    except Exception:
+        pass
     if args.as_json:
         print(json.dumps(
-            [{"score": s, "path": p, "title": t, "url": result_url(p)}
+            [{"score": s, "path": p, "title": t, "url": result_url(p), **(
+                {"priority": metadata[p][0], "state": metadata[p][1]}
+                if p.startswith("docs/bugs/") and p in metadata else {})}
              for s, p, t in results], indent=2))
         return 0
 
@@ -101,6 +109,8 @@ def main(argv=None):
         print(f"  {score:5.3f}  {path}")
         print(f"         {result_url(path)}")
         print(f"         {title}")
+        if path.startswith("docs/bugs/") and path in metadata:
+            print(f"         priority={metadata[path][0]} state={metadata[path][1]}")
     print("\nA high score means read that file before filing, not that you must not file.")
     return 0
 

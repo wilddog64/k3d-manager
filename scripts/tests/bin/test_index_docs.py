@@ -62,6 +62,17 @@ class TestScriptShape:
         assert "'indexed=' ||" in sql
         assert "staging" not in sql
 
+    def test_schema_adds_metadata_columns_without_reembedding(self):
+        assert "ALTER TABLE doc_embeddings ADD COLUMN IF NOT EXISTS priority" in pa.SCHEMA_SQL
+        assert "ALTER TABLE doc_embeddings ADD COLUMN IF NOT EXISTS state" in pa.SCHEMA_SQL
+
+    def test_metadata_update_is_copy_and_update_only(self):
+        sql = ix._metadata_script([("docs/bugs/a.md", "P1", "open")])
+        assert "COPY metadata_staging (path, priority, state)" in sql
+        assert "UPDATE doc_embeddings AS docs" in sql
+        assert "content_hash" not in sql
+        assert "embedding vector" not in sql
+
 
 class TestPerBatchCommit:
     def test_one_write_per_batch(self, monkeypatch):
@@ -165,6 +176,22 @@ class TestPerBatchCommit:
         monkeypatch.setattr(ix, "run_sql", lambda _sql: "pruned=0 indexed=1")
         monkeypatch.setattr(ix.subprocess, "run", lambda *_a, **_k: None)
         assert ix.main([]) == 0
+
+    def test_unchanged_corpus_still_updates_metadata(self, monkeypatch, tmp_path):
+        path = tmp_path / "docs/bugs/one.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("# one\n\n**Priority:** P2\n**Status:** Open\n")
+        docs = [("docs/bugs/one.md", "one", "text", "hash-one")]
+        writes = []
+        monkeypatch.setattr(ix, "ROOT", tmp_path)
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: docs)
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: {docs[0][0]: docs[0][3]})
+        monkeypatch.setattr(ix, "embed_batch", lambda *_a, **_k: pytest.fail("embedded"))
+        monkeypatch.setattr(ix, "run_sql", lambda sql: writes.append(sql) or "pruned=0 indexed=1")
+        monkeypatch.setattr(ix.subprocess, "run", lambda *_a, **_k: None)
+        assert ix.main([]) == 0
+        assert any("UPDATE doc_embeddings AS docs" in sql for sql in writes)
 
     def test_a_prune_failure_says_the_documents_landed(self, monkeypatch, capsys):
         docs = [_doc("one")]

@@ -156,6 +156,33 @@ def test_ref_cat_file_starts_once(tmp_path, monkeypatch):
     ]
 
 
+@pytest.mark.parametrize("status", ["FIXED", "CLOSED", "RESOLVED", "DONE", "WONTFIX",
+                                     "WON'T FIX", "SUPERSEDED", "DUPLICATE", "VERIFIED live 2026-10-09",
+                                     "LIVE-VERIFIED now", "Fixed on 2026-10-09", "Fixed in v1.0.0"])
+def test_doc_meta_closed_status_prefixes(status):
+    assert pa.doc_meta(f"**Status:** {status}\n") == ("unset", "closed")
+
+
+def test_doc_meta_open_and_unknown_states():
+    assert pa.doc_meta("**Status:** IMPLEMENTED — no release\n") == ("unset", "open")
+    assert pa.doc_meta("# bug\nno status\n") == ("unset", "unknown")
+    assert pa.doc_meta("Status: FIXED\n") == ("unset", "closed")
+    assert pa.doc_meta("## Status\n\nFixed on 2026-10-09\n") == ("unset", "closed")
+
+
+def test_doc_meta_priority_wins_and_only_first_line_counts():
+    assert pa.doc_meta("**Priority:** P1 — urgent\n**Severity:** P2\n") == ("P1", "unknown")
+    assert pa.doc_meta("**Priority:** P3\n**Priority:** P0\n") == ("P3", "unknown")
+    assert pa.doc_meta("**Severity:** high\n") == ("unset", "unknown")
+
+
+def test_doc_release_uses_branch_or_added_release():
+    assert pa.doc_release("**Branch:** k3d-manager-v1.42.0\n") == ("v1.42.0", "branch_line")
+    assert pa.doc_release("**Branch:** target **v1.44.0**\n") == ("v1.44.0", "branch_line")
+    assert pa.doc_release("no branch", "v1.41.0") == ("v1.41.0", "added_tag")
+    assert pa.doc_release("no branch") == ("unknown", "unknown")
+
+
 def test_corpus_fingerprint_changes_with_blob(tmp_path):
     root = _git_repo(tmp_path)
     first = pa.corpus_fingerprint(root, "HEAD")
