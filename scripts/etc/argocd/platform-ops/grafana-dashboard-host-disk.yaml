@@ -14,6 +14,7 @@ data:
       "graphTooltip": 1,
       "title": "k3dm Host Disk",
       "uid": "k3dm-host-disk",
+      "tags": ["k3dm", "disk"],
       "schemaVersion": 39,
       "version": 1,
       "refresh": "1m",

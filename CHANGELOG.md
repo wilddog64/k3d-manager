@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- **The k3dm Host Disk dashboard had no tags**, so it was the only k3dm dashboard missing from tag filters in the Grafana dashboard list. It now carries `k3dm` and `disk`, and a new BATS guard fails when any provisioned dashboard (`platform-ops/grafana-dashboard-*.yaml`, `grafana/dashboards/*.yaml`) ships with no tags.
 
 - `make down` now deregisters sandbox Applications matched by their ArgoCD destination server.
 - `make down` preserves the Hub Vault LaunchAgent when the Hub is kept.

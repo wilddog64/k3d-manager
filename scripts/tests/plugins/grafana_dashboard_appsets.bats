@@ -452,3 +452,16 @@ _assert_no_panel_overlap() {
   [ "$(jq -r '.targets[0].instant' <<<"$successful_panel")" = "true" ]
   [ "$(printf '%s\n' "$dashboard_json" | jq -r '.panels[] | select(.id == 2) | .title')" = "Time since last successful run" ]
 }
+
+@test "every provisioned Grafana dashboard carries at least one tag" {
+  local file untagged=""
+  for file in "${PLATFORM_OPS_DIR}"/grafana-dashboard-*.yaml "${DASHBOARDS_DIR}"/*.yaml; do
+    while IFS= read -r dashboard_json; do
+      [ -n "$dashboard_json" ] || continue
+      if ! jq -e '(.tags // []) | length > 0' <<<"$dashboard_json" >/dev/null; then
+        untagged+="${file##*/} "
+      fi
+    done < <(yq -o=json -I=0 '.data // {} | to_entries | .[] | select(.key | test("\\.json$")) | .value' "$file" | jq -c 'fromjson')
+  done
+  [ -z "$untagged" ] || { echo "untagged dashboards: ${untagged}"; false; }
+}
