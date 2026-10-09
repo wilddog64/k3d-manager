@@ -50,6 +50,7 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 | R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using the `k3dm-hermes-gh-token` PAT in `GH_TOKEN` |
 | R5 | Quarantine stale ACG reconciliation | sustained Kine pressure, `state.db` >= 8 GiB, and the known stale `host.k3d.internal` registration | pause hub ArgoCD application-controller (opt-in automatic circuit breaker only) |
 | R9 | Reapply ApplicationSets on the release branch | `values_branch` degraded with stale references | `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` with `K3D_MANAGER_BRANCH` pinned |
+| R10 | Delete failed Jobs superseded by a newer CronJob spec | A failed, inactive CronJob-owned Job in `identity`, `monitoring`, or `cicd` has a different runnable template (image/command/args); never automatic | `kubectl ... delete job --wait=false -- <pinned Job names>`; the allowlisted namespace and exact target set are rechecked and pinned at approval time |
 
 ## Slack approvals (opt-in)
 
