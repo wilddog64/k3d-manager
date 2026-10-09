@@ -1,6 +1,6 @@
 # k3dm Tests dashboard lacks a failure-history table
 
-**Status:** FIXED (dashboard implementation; live Grafana verification pending)
+**Status:** VERIFIED live 2026-10-09 — after a failed `make test-all` (19:09Z: bats #60, #203) followed by a passing one (20:01Z, 0 failed), hub Grafana "k3dm Tests" showed the passing run as latest while `max_over_time(k3dm_test_failure[7d])` / "Failures in selected time range" still listed #60 and #203 alongside the older failures.
 **Filed:** 2026-10-07
 **Affected release:** k3d-manager v1.42.0
 **Type:** Observability / usability gap

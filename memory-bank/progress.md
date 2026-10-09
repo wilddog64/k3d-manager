@@ -1,3 +1,6 @@
+<!-- 2026-10-09 failure-history verified -->
+- **2026-10-09: `k3dm-tests-failure-history-missing` VERIFIED live.** The 7-day failure table keeps #60 and #203 from the 19:09Z failed run after the 20:01Z green run. Both Grafana test-metric bug docs are now verified. The operator's first screenshot was taken before the panel refreshed.
+
 <!-- 2026-10-09 test-all green + v1.43.0 spec counting update -->
 - **2026-10-09 `make test-all` GREEN:** 2664 cases, 0 failed, exit 0. Prometheus `k3dm_test_last_success_timestamp_seconds` advanced to 20:01:33Z after the 19:09Z failure had kept 2026-10-08. `test-metrics-last-success-lost-on-failure` is marked VERIFIED. `k3dm-tests-failure-history-missing` is still unchecked (dashboard).
 - **2026-10-09 ask-docs recency VERIFIED live in Slack** (the doc is marked).
