@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** PARTIAL — make-down path FIXED `209addbe` + `cbd2f564` (Claude-verified: RED on old code, 67/67 BATS); watcher/reaper still open (needs lib-foundation)
+**Status:** PARTIAL — make-down path FIXED `209addbe` + `cbd2f564`; watcher path dropped (never started); reaper designed below, awaiting operator choice (auto vs Hermes approval)
 **Priority:** P3 — noise in ArgoCD, and alert/dashboard pollution; no outage
 **Severity:** Low
 **Component:**
@@ -224,3 +224,47 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 - Do not touch `scripts/lib/foundation/` or `bin/cleanup-stale-registration`.
 - Do not change which Secret is deleted or add deletes of `ubuntu-k3s-app-cluster` (it is the hub).
 - Do not run anything against a cluster.
+
+---
+
+## Design — automatic cleanup after expiry (Claude, 2026-10-09; not yet specced for Codex)
+
+### Drop the watcher path
+
+`acg_watch` / `acg_watch_start` are never started by k3d-manager (`git grep` over `bin/`,
+`scripts/plugins/`, `scripts/lib/providers/` and the `Makefile` finds no caller), and the launchd
+wrapper only runs the Playwright extend; it never checks whether the sandbox is gone. Hooking a
+deregister into it would hook a loop that does not run. No lib-foundation change is needed.
+
+### Reaper (k3d-manager only)
+
+A new `bin/k3dm-sandbox-reaper` run by a launchd agent `com.k3d-manager.sandbox-reaper`
+(`StartInterval` 600, `RunAtLoad`), installed with `make install-sandbox-reaper` (operator).
+Each run:
+
+1. List hub registration Secrets in `cicd` for provider `k3s-aws`. None → exit 0.
+2. For each, collect the Applications that target it by destination name **or** server (the same
+   selector as `_k3s_aws_deregister_cluster`). Require at least one, and all `sync.status == Unknown`.
+3. Keep a first-seen timestamp in `~/.local/share/k3d-manager/sandbox-reaper/<secret-uid>`.
+   Keying on the Secret **UID** means a fresh `make up` that re-registers the same name starts a
+   new clock. Remove the file as soon as any app is not `Unknown`.
+4. Gone signal, only once the clock is ≥ 30 min:
+   `aws cloudformation describe-stacks --stack-name "${_ACG_CF_STACK_NAME}"`.
+   - stderr `does not exist` → gone
+   - `InvalidClientTokenId` / `ExpiredToken` / `UnrecognizedClientException` → gone (ACG allows one
+     sandbox; dead creds mean that sandbox ended)
+   - anything else (network, throttling, success) → **not** gone; do nothing
+5. Both hold → `bin/cleanup-stale-registration --cluster=<name> --confirm` (Secret first, then apps),
+   and one log line per action in `~/.local/share/k3d-manager/logs/sandbox-reaper.log`.
+
+**Rollout:** ship with `K3DM_SANDBOX_REAPER_DRYRUN=1` as the plist default, so it logs
+"would deregister" only. Flip it after one real expiry shows the log line at the right time.
+
+**Tests (BATS, stubbed `kubectl`/`aws`, RED first):** stack gone + Unknown ≥ 30 min → deregisters;
+Unknown only (aws network error) → no action; Unknown < 30 min → no action; new Secret UID →
+clock resets; one app `Synced` → clock file removed; never selects `ubuntu-k3s-app-cluster`.
+
+**Open question for the operator:** this reaper deletes without asking. The alternative is a Hermes
+sensor that proposes the same cleanup through the Slack approval flow (Hermes already runs every
+5 min). Recommended: the reaper as above, because the two-signal gate makes a wrong delete
+unlikely and the action is cheap to redo (`make argocd-registration`).
