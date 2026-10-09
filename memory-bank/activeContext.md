@@ -1,3 +1,7 @@
+## 2026-10-09 — stale ubuntu-k3s registration cleaned (verified)
+- Operator ran `make cleanup-stale-registration CLUSTER=ubuntu-k3s CONFIRM=1`: removed `cluster-ubuntu-k3s` + 10 apps.
+- Claude verified: hub cluster Secrets now only `cluster-ubuntu-hostinger` + `ubuntu-k3s-app-cluster` (hub); no app targets `ubuntu-k3s` or `host.k3d.internal`; none regenerated. Automatic deregister (bug doc) still OPEN.
+
 ## 2026-10-09 — make down misses server-matched sandbox apps (doc only)
 - `_k3s_aws_deregister_cluster` matches apps by destination name only; `ubuntu-k3s-eso` / `-platform` (server `host.k3d.internal:6443`) survive even a normal `make down`.
 - Chaining `cleanup-stale-registration` after down cannot catch them: the Secret (source of the server) is already gone. Fix item 0 added to `docs/bugs/2026-10-09-expired-acg-sandbox-leaves-hub-registration-and-apps.md`.
