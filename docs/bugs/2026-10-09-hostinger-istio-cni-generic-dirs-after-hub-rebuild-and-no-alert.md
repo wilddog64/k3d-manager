@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator saw `istio-cni-ubuntu-hostinger` spinning in ArgoCD)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** OPEN — recovered 2026-10-09 by `make refresh`; root cause of the bad apply not yet traced, no alert yet
+**Status:** OPEN — root cause traced 2026-10-09 (provider looked up for the shell cluster, not the live destination); dispatched to Codex
 **Priority:** P2 — ambient still works, but the CNI plugin is not chained, and nothing alerts
 **Severity:** Medium
 **Component:**
@@ -100,3 +100,138 @@ The next hub rebuild can reintroduce the generic dirs until fix item 1 lands.
 - Do not patch the Application or DaemonSet by hand: the ApplicationSet / self-heal reverts it.
 - Do not change the `vars.sh` defaults to the rancher paths. Cilium substrates need the generic
   pair.
+
+---
+
+## Root cause (traced 2026-10-09, Claude)
+
+There is **one** `istio-ambient` ApplicationSet on the hub (its name is not templated), and
+`_argocd_appset_live_overrides` (`scripts/plugins/argocd.sh`) resolves its two inputs from
+**different clusters**:
+
+- `APP_CLUSTER_NAME` (the destination) comes from the **live** set: `ubuntu-hostinger`.
+- The CNI provider is looked up with the **shell's** `${APP_CLUSTER_NAME:-ubuntu-k3s}`. On any
+  apply that is not the Hostinger reapply (`make up` for ACG on 2026-10-06, the hub rebuild), that
+  is `ubuntu-k3s`, whose registration says `k3d-manager/provider: k3s-aws`. That maps to the
+  generic `/etc/cni/net.d` + `/opt/cni/bin`, and `k3s-aws` is not a "specific" provider, so the
+  refusal guard does not fire either.
+
+Result: the destination stays Hostinger, but it gets the sandbox's CNI dirs. The existing BATS
+never caught it because no test template contains `${APP_CLUSTER_NAME}`.
+
+## Implementation spec (Codex, 2026-10-09)
+
+**Branch:** `k3d-manager-v1.42.0`.
+**Files (only these):**
+- `scripts/plugins/argocd.sh`
+- `scripts/tests/plugins/argocd_appset_cni_dir_precedence.bats` (add one test)
+- `scripts/etc/argocd/platform-ops/prometheusrule.yaml` (add one rule)
+- `scripts/tests/plugins/argocd_metrics_servicemonitor.bats` (add one assertion block)
+- `docs/howto/argocd-alerts.md` (list the new alert and its window)
+- `CHANGELOG.md` (`[Unreleased]` → `### Fixed`, one bullet for each change)
+- this doc's Status line
+
+### Change 1 — look the provider up for the destination actually being written
+
+In `_argocd_appset_live_overrides`:
+
+**OLD:**
+```bash
+   local file="$1" name live value conf bin provider dirs
+```
+**NEW:**
+```bash
+   local file="$1" name live value conf bin provider dirs target
+```
+
+**OLD:**
+```bash
+   if grep -q '\${APP_CLUSTER_NAME}' "$file" && [[ -n "${live}" ]]; then
+      value="$(printf '%s' "${live}" | jq -r '.spec.template.spec.destination.name // ""')"
+      [[ -z "${value}" || "${value}" == *'{{'* || "${value}" == *'$'* ]] || printf 'APP_CLUSTER_NAME=%s\n' "${value}"
+   fi
+```
+**NEW:**
+```bash
+   target="${APP_CLUSTER_NAME:-ubuntu-k3s}"
+   if grep -q '\${APP_CLUSTER_NAME}' "$file" && [[ -n "${live}" ]]; then
+      value="$(printf '%s' "${live}" | jq -r '.spec.template.spec.destination.name // ""')"
+      if [[ -n "${value}" && "${value}" != *'{{'* && "${value}" != *'$'* ]]; then
+         printf 'APP_CLUSTER_NAME=%s\n' "${value}"
+         target="${value}"
+      fi
+   fi
+```
+
+**OLD:**
+```bash
+         provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${APP_CLUSTER_NAME:-ubuntu-k3s}")}"
+```
+**NEW:**
+```bash
+         provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${target}")}"
+```
+Nothing else in the function changes.
+
+### Test for Change 1 (add to `argocd_appset_cni_dir_precedence.bats`)
+
+`@test "provider is resolved for the live destination, not the shell APP_CLUSTER_NAME"`:
+- Write a template that contains **both** `${APP_CLUSTER_NAME}` and the two CNI placeholders
+  (e.g. append a line `  destination: ${APP_CLUSTER_NAME}` to the file `setup()` creates).
+- `APP_CLUSTER_NAME=ubuntu-k3s` (the shell side).
+- `LIVE_JSON` with `"spec":{"template":{"spec":{"destination":{"name":"ubuntu-hostinger"}}},"generators":[ ...istio-cni with /etc/cni/net.d and /opt/cni/bin... ]}` and `"kind":"ApplicationSet"`.
+- Stub `_istio_ambient_target_provider` to print `k3s-hostinger` when `$3 == ubuntu-hostinger`
+  and `k3s-aws` otherwise. Use the **real** `_istio_ambient_cni_dirs` (re-source
+  `istio_ambient.sh` or do not stub it in this test).
+- Assert the output contains `APP_CLUSTER_NAME=ubuntu-hostinger`,
+  `AMBIENT_CNI_CONF_DIR=/var/lib/rancher/k3s/agent/etc/cni/net.d` and
+  `AMBIENT_CNI_BIN_DIR=/var/lib/rancher/k3s/data/cni`, and does **not** contain the line
+  `AMBIENT_CNI_CONF_DIR=/etc/cni/net.d` (use `run grep -Fqx ...; [ "$status" -ne 0 ]`).
+
+**RED gate:** this test must fail on the pre-fix `argocd.sh`. Do NOT `git stash`/`git checkout`:
+write `git show HEAD:scripts/plugins/argocd.sh` to a temp file, source that copy once by hand in
+the same harness, and paste the failing output.
+
+### Change 2 — alert on an app stuck `Progressing`
+
+In `scripts/etc/argocd/platform-ops/prometheusrule.yaml`, add directly after the
+`ArgoCDAppOutOfSync` rule (same indentation as its siblings):
+```yaml
+        - alert: ArgoCDAppProgressingStuck
+          expr: |
+            argocd_app_info{health_status="Progressing"} == 1
+          for: 30m
+          labels:
+            group: argocd
+            severity: warning
+          annotations:
+            summary: "ArgoCD app {{ $labels.name }} has been Progressing for 30 minutes"
+            description: "App {{ $labels.name }} (destination {{ $labels.dest_server }}, namespace {{ $labels.dest_namespace }}) has been Progressing for 30 minutes. A DaemonSet or Deployment is not becoming ready; check its pods on the destination cluster."
+```
+No name allowlist: this must cover platform apps such as `istio-cni-*`. `severity: warning`
+routes to email (`platform-warning`), never SMS. Do **not** edit `alertmanager-config.yaml`.
+
+Test: in `argocd_metrics_servicemonitor.bats`, in the existing test that greps the rule file for
+`ArgoCDAppDegraded`, add assertions that the rule file contains `alert: ArgoCDAppProgressingStuck`
+and `health_status="Progressing"`.
+
+### Gates
+- `shellcheck -S warning scripts/plugins/argocd.sh` — no new warnings
+- `bats scripts/tests/plugins/argocd_appset_cni_dir_precedence.bats scripts/tests/plugins/argocd_appset_live_overrides.bats scripts/tests/plugins/argocd_metrics_servicemonitor.bats scripts/tests/plugins/argocd.bats`
+- `python3 -c 'import yaml,sys; list(yaml.safe_load_all(open("scripts/etc/argocd/platform-ops/prometheusrule.yaml")))'`
+
+### Status line
+`**Status:** IMPLEMENTED — provider resolved for the live destination + ArgoCDAppProgressingStuck; awaiting Claude verification`
+
+### Commit message (exact)
+```
+fix(argocd): resolve istio-cni dirs for the live destination; alert on stuck Progressing
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+
+### What NOT to do
+- Do not rename or template the `istio-ambient` ApplicationSet name (separate design question).
+- Do not change `scripts/etc/argocd/vars.sh` defaults or `_istio_ambient_cni_dirs`.
+- Do not touch `scripts/lib/providers/k3s-hostinger.sh`.
+- Do not apply anything to a cluster.
