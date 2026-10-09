@@ -1761,3 +1761,9 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 2026-10-08: Hub snapshot round 3 hostname mapping fixed in `2e8996ae`; live verification pending (operator).
 2026-10-08: Hub snapshot round 4 now captures claim trees as in-node tar streams in `fbebe9df`; live verification pending (operator).
 2026-10-08: Hub snapshot round 5 fix committed as e3040689; live verification pending (operator). PR URL: none.
+## 2026-10-08 — Hub snapshot retention round 6 fixed (`81baeca9f455a94110716d0ccc54fc7c3f969112`)
+
+- Implemented the spec's Fix 1–6 and Tests 1–8 on `k3d-manager-v1.42.0`: newest-first verified pruning, automatic post-capture pruning with incomplete protection, M2 free-space preflight, checked final rename, docs, changelog, and regression coverage.
+- RED at `a6a53d7d` with only the updated BATS file: the five required tests failed — prune newest, capture auto-prune, auto-prune failure tolerance, insufficient space, and rename failure.
+- GREEN: the eight new hub snapshot tests passed; the required hub snapshot, hub recovery, and cluster-down suites passed; shellcheck was clean; `_agent_audit` passed.
+- Pushed fix commit to `origin/k3d-manager-v1.42.0`; `HEAD` and remote both equal `81baeca9f455a94110716d0ccc54fc7c3f969112`. PR URL: none. Live verification remains pending.

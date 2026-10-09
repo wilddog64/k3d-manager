@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude (operator: "be sure we have a retention policy as we don't have unlimited space")
 **Branch:** k3d-manager-v1.42.0
-**Status:** SPEC — not started
+**Status:** FIXED in branch 81baeca9f455a94110716d0ccc54fc7c3f969112 — live verification pending
 **Priority:** P1 — the one retention tool we have deletes exactly the snapshots it should keep
 **Severity:** High
 **Component:** `scripts/plugins/hub_snapshot.sh` (`hub_snapshot_prune`, `hub_snapshot_capture`)
