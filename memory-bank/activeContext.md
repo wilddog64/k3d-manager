@@ -1,3 +1,18 @@
+## 2026-10-09 — Hostinger payment DOWN after repin: DB credential drift, not the image
+
+- Repinned payment to `2d930a93` (payment #86, CI Trivy 0 findings) in `f92ae552`. The new pod
+  crash-loops: Flyway `password authentication failed for user "postgres"`. maxSurge=0, so payment is down.
+- Cause: ESO rewrote every shopping-cart Secret at 2026-10-09 11:47 UTC (data changed; the untouched
+  `payment-encryption-secret` proves ESO writes only on change). `postgresql-payment-0` is 64 days old
+  and keeps its old password. Any restart since 11:47 fails, old image included, so a rollback does
+  not help (Claude's revert attempt was blocked by the permission classifier; not retried).
+- Running pods (order, basket, product-catalog) still hold pre-11:47 values and will fail on restart.
+- Operator fix: `make shopping-cart-credential-drift` (report), then `... APPLY=1`.
+- Open question: what changed the Vault/ESO values at 11:47 (suspect the day's `make refresh`).
+- Codex batch done, Claude verification pending: frontend `f28a1b93` (fix/login-callback-timeout),
+  infra `63cfcfa5` (fix/keycloak-postgres-probe-user), k3d-manager `209addbe` (ACG deregister).
+  istio-cni `350fac28` verified. Preflight `6cd750b9` + GHCR `3d33d687` verified.
+
 ## 2026-10-09 — Trivy reconcile-errors panel made readable (`08273e98`)
 
 - Panel id 12 on "ArgoCD Apps & Image Updater Hub" (`scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`): line → bars, `interval: 1h`, `legendFormat: "errors / hour"` (was `{}`), added a description. Query unchanged; `trivy_operator_observability.bats` 9/9.
