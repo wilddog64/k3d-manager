@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude (found during the operator's live check of `7089dd10`)
 **Branch:** k3d-manager-v1.42.0
-**Status:** OPEN
+**Status:** FIXED in branch e92d1d85 — live verification pending (Codex)
 **Priority:** P2 — the answer is correct, but every claude ask now posts three paragraphs of permission-rule warnings above it, and those warnings quote local allow rules into a Slack channel
 **Severity:** Medium
 **Component:** `scripts/lib/webhook/agent.py` `_parse_gemini_observations`
