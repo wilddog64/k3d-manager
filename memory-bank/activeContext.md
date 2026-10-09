@@ -1,3 +1,9 @@
+- **2026-10-09 — frontend #114 CLOSED** (with explanation). It was a Dependabot **security** update for alert #41
+  (GHSA-rj75-hqrm-r3gf, postcss-selector-parser, medium; patched only in 7.1.6, which needs tailwindcss 4). The
+  existing `ignore: "*" semver-major` in dependabot.yml covers version updates only, so it did not stop the PR. Alert
+  #41 stays open, so Dependabot can open another one when tailwind 4 ships a new release. Lasting fix = the Tailwind v4 migration
+  (spec + Codex on a feature branch); interim option = dismiss #41 as tolerable risk (build-time only). Awaiting the user.
+
 - **2026-10-09 ~16:10 UTC — `make appsets-reapply` / `make appsets-check` VERIFIED** (Codex `8bdc5ccd`, on origin).
   4/4 new BATS green; all 13 `makefile_*.bats` green; RED on the pre-change Makefile (4/4 fail); mutation
   (drop the `$$` anchor) turns test 2 red. Exact commit message. Codex's Status line cited a dangling pre-amend
