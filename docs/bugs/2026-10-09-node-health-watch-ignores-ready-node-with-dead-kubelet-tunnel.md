@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator received a `PublicEndpointDown` SMS for argocd)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IMPLEMENTED — <sha>; live verification pending
+**Status:** IMPLEMENTED — `90d8942a`; live-checked 2026-10-09 (see "Live verification"); the restart path waits for the first natural recurrence
 **Priority:** P1 — a public endpoint stays down until a human restarts the agent
 **Severity:** High
 **Component:** `bin/k3dm-node-health-watch` (`_healthy`, `_tick`)
@@ -266,3 +266,20 @@ consecutive ticks (default 6), while a slow `/healthz` stays advisory; link this
 - Do NOT commit to `main`.
 - Do NOT make `slow` recoverable, change `_recover`, lower the cooldown, or touch server-0.
 - Do NOT run `kubectl` or `docker` against a real cluster; tests are fully stubbed.
+
+## Live verification (Claude, 2026-10-09, read-only)
+
+- **Fixed code is running.** The launchd watchdog (pid 24859) started at 05:51 PDT, six minutes
+  after `90d8942a` (05:45 PDT). Its log has no lines after 04:18 PDT, because a healthy tick logs nothing.
+- **Classifier, live.** Sourcing the script (the `BASH_SOURCE` guard keeps the loop from starting) and
+  calling `_healthz_state` against the hub returns `ok` for server-0 and agents 0–2. All four nodes are Ready.
+- **Classifier, real error text.** The first real 502 line in `k3s-hostinger/logs/argocd-pf.log`
+  (403 occurrences: `error dialing backend: proxy error from 127.0.0.1:6443 while dialing
+  192.168.97.4:10250, code 502`) matches the `tunnel` regex.
+- **Stubbed paths.** `bats scripts/tests/bin/node_health_watch.bats` has 11/11 passing, including the four
+  new tunnel, streak, slow-guard and cooldown tests.
+- **Not yet observed live:** an actual `tunnel` streak leading to a `docker restart`. A dead tunnel
+  cannot be induced safely, so this waits for the next recurrence. It has happened about 30 times
+  since 2026-10-05, usually after a host sleep or wake. Check with:
+  `grep -E 'kubelet tunnel dead|restarting' ~/.local/share/k3d-manager/logs/node-health-watch.log | tail`.
+  The expected sequence is `(1/6)` … `(6/6)`, then `restarting k3d-k3d-cluster-agent-0`, then `recovered`. Close this doc when that appears.

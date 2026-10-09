@@ -1,3 +1,8 @@
+- **2026-10-09 — P1 node-health-watch (`90d8942a`) live-checked:** fixed code running (pid started 05:51 PDT, after
+  the commit); live `_healthz_state` = ok on all 4 hub nodes; tunnel regex matches the real 502 line; BATS 11/11.
+  The real tunnel → restart path awaits the first natural recurrence (check `grep 'kubelet tunnel dead'` in
+  node-health-watch.log); close the doc then.
+
 - **2026-10-09 — Tailwind v4 migration spec** `docs/bugs/2026-10-09-frontend-tailwind-v4-migration-for-postcss-selector-parser-advisory.md`
   → Codex, in a fresh clone `shopping-carts/shopping-cart-frontend-tw4`, branch `chore/tailwind-v4-migration` from
   origin/main `3623e5b`. Clears alert #41 (GHSA-rj75-hqrm-r3gf). Note: frontend `dependabot-automerge.yml` auto-merges
