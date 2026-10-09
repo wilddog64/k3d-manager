@@ -1,3 +1,10 @@
+## 2026-10-09 — expired-sandbox reaper implemented + verified
+
+- Codex `f089c36f` (bin/k3dm-sandbox-reaper, bin/k3dm-slack-notify, plist tmpl, Makefile install/uninstall-sandbox-reaper, 2 BATS suites, howto, CHANGELOG). Claude fix `90643a02`: `(A||B)&&C` precedence reported stack-deleted as credentials-dead; mid-test `! grep` guards hardened with `|| false`.
+- Verified: 20/20 BATS (reaper 14, notify 2, cleanup-stale-registration 4), shellcheck clean, plist lints; mutation checks caught grace/inconclusive/dry-run removal + original precedence bug.
+- NEXT (operator): `make install-sandbox-reaper` (live, DRYRUN=0, Slack notice per action). Then: frontend public URL bug.
+- Grafana Host Disk "m2 down" = stale series `path=k3d-snapshots` (typo, 10-08 19:29–19:33); live series `path=k3dm-snapshots` is up. Not a fault.
+
 - 2026-10-09: operator `make snapshot` OK — m2jump:k3dm-snapshots/20261009T170742Z (3.4G, 18m), all checksums OK; contains data-openldap-0, no osixia ldap PVCs. OpenLDAP CVE item CLOSED. Next: reaper decision (auto vs Hermes), then frontend public URL bug.
 
 - 2026-10-09 post-merge: frontend #117 merged 05ec17e (Tailwind 4; enforce_admins never disabled, stays true); infra #110 merged c7ff88a, enforce_admins RESTORED true. No tags (both [Unreleased], chore/fix branches). Hub verified read-only: osixia ldap Deployment/Service/ExternalSecret/PVCs + ldap-secrets gone; operator patched PVs to Delete (tmux confirmed), both PVs deleted; openldap-0 Running 1/1, data-openldap-0 Bound, shopping-cart-identity Synced/Healthy. NEXT: operator `make snapshot`. Noticed in operator pane: `make shopping-cart-credential-drift` reported DRIFT on all 6 creds with probe exit codes 1/2/65 — not yet investigated.
