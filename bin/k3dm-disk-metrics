@@ -10,7 +10,7 @@ from pathlib import Path
 
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
-DEFAULT_TARGETS = "m4=local:/System/Volumes/Data m2=m2jump:k3d-snapshots"
+DEFAULT_TARGETS = "m4=local:/System/Volumes/Data m2=m2jump:k3dm-snapshots"
 
 
 def _targets():

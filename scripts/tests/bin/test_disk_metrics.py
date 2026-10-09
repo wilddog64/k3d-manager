@@ -63,3 +63,8 @@ def test_push_failure_is_non_fatal(monkeypatch, capsys):
 
     assert disk.publish("metric 1\n") is False
     assert "push skipped (non-fatal)" in capsys.readouterr().err
+
+
+def test_default_m2_target_is_the_snapshot_dir(monkeypatch):
+    monkeypatch.delenv("K3DM_DISK_TARGETS", raising=False)
+    assert ("m2", "m2jump", "k3dm-snapshots") in disk._targets()

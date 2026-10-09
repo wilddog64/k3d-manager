@@ -1,3 +1,11 @@
+## 2026-10-08 — Claude verified host disk-space sensor (`fb563727`); fixed default M2 path
+
+- Codex `fb563727` (feature) + `acc7d05b` (memory-bank) on origin; HEAD = origin. Scope matches the spec's allowed files (13 files).
+- RED (new tests on `5872ba40`, temp worktree): 7 fail — 4 collector, 2 rules/dashboard, 1 Hermes. GREEN: bare `pytest scripts/tests/bin scripts/tests/hermes -q` 769 passed / 1 skipped; `make validate-manifests` 2/2 valid.
+- Claude fix: the collector's default M2 target was `m2jump:k3d-snapshots` (typo; real dir is `k3dm-snapshots`, `K3DM_SNAPSHOT_DIR` default) — live it would have reported probe_success 0 and fired `HostDiskMetricsStale` forever. Added `test_default_m2_target_is_the_snapshot_dir` (fails on the typo, passes on the fix). Dashboard "Free GiB" panel used `decgbytes` on a GiB value → now raw bytes with unit `bytes`, titled "Free".
+- Live steps (operator): apply `scripts/etc/prometheus/rules/host-disk.yaml`; reapply hub AppSets (dashboard ConfigMap); `launchctl kickstart -k gui/$(id -u)/com.k3d-manager.hermes`; then Claude queries Prometheus for `k3dm_disk_avail_bytes`; prove the SMS path once. Open question for live: Hermes runs under launchd — ssh `BatchMode` to `m2jump` must work from that context, or m2 shows probe_success 0.
+- Hub snapshot live run (`make snapshot; make status …; make snapshot-prune`) in progress in tmux `work:1.0`.
+
 ## 2026-10-08 — Claude verified hub snapshot round 6 (`81baeca9`); disk-sensor spec dispatched to Codex
 
 - Codex `81baeca9` (fix) + `9587d645` (memory-bank) on origin; HEAD = origin. Scope = hub_snapshot.sh, hub_snapshot.bats, howto, CHANGELOG, bug-doc Status, memory-bank.
