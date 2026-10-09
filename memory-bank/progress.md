@@ -1,3 +1,11 @@
+## 2026-10-08 — make snapshot round 5: capture LIVE-VERIFIED, upload cancelled; Trivy drop + atomic rename to Codex
+
+- Live (tmux): tar capture of server-db + 8 claims OK in ~2 min (4.7 GB); rsync to m2jump at ~3.8 MB/s; operator cancelled at ~2.0 GB.
+- Trivy claim = public vuln DB + scan cache (1.4 GB); operator approved dropping it (claims 8 → 7).
+- SAFETY: an interrupted rsync leaves a bare `<ts>` dir that the guard counts as verified. Fix = upload to `.INCOMPLETE`, `mv` only after `sha256sum -c`.
+- Spec: bug doc "Live verification — round 5"; Codex prompt `$CLAUDE_JOB_DIR/tmp/codex-hub-guard-r5.md`.
+- Operator one-off: rename the partial `k3dm-snapshots/20261009T014249Z` to `.INCOMPLETE` on the M2.
+
 ## 2026-10-08 — Claude verified hub snapshot round 4 (`fbebe9df`, tar-stream capture)
 
 - Codex `fbebe9df`/`2847d1e0`/`23f4e4b4` on origin; scope = hub_snapshot.sh, hub_snapshot.bats, howto, bug doc, memory-bank.

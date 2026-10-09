@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** FIXED in branch `fbebe9df` — live verification pending (operator)
+**Status:** PARTIAL — tar-stream capture LIVE-VERIFIED (`fbebe9df`); round 5 (drop Trivy cache, atomic verified rename) dispatched to Codex
 
 ## Question that prompted this
 
@@ -387,3 +387,81 @@ in the k3s node image (checked live).
 
 Out of scope: hot-copy consistency of `vault.db` while Vault runs (v1.43.0 DR drill), and
 `hub_recovery.sh`.
+
+## Live verification — round 5 (operator, 2026-10-08, after `fbebe9df`)
+
+`make snapshot` from the operator's tmux pane, 18:42 PDT:
+
+- **Capture works.** server-db plus all 8 claims were archived in about 2 minutes, with no setgid
+  error. Staging was 4.7 GB.
+- **The upload is the bottleneck.** rsync to `m2jump` ran at about 3.8 MB/s. The operator cancelled
+  it (`INT`, 12m40s) at about 2.0 GB to take the two fixes below first.
+
+Archive sizes: Prometheus 2.6 GB, Trivy 1.4 GB, server-db 465 MB, Loki 182 MB, Keycloak Postgres
+68 MB, Vault 49 MB, OpenLDAP under 0.5 MB.
+
+### Finding A — the Trivy claim is a re-downloadable cache (1.4 GB, 30% of every snapshot)
+
+The `data-trivy-server-0` archive holds only `trivy/db/trivy.db` (1.46 GB, the public
+vulnerability DB) and `trivy/fanal/fanal.db` (8 MB, scan cache). The repo has no offline or
+air-gapped Trivy setting, so the server downloads a fresh DB at startup.
+
+Scan results are not in this volume. They are VulnerabilityReport CRs in the datastore, which
+`server-db.tar` already captures. Backing it up preserves nothing that a restart does not rebuild.
+
+### Finding B (safety) — an interrupted upload is indistinguishable from a verified snapshot
+
+`hub_snapshot_capture` rsyncs straight into the final `<ts>` directory. It only renames to
+`<ts>.INCOMPLETE` when `sha256sum -c` fails. An interrupt, a kill, a dropped ssh or a laptop sleep
+during the rsync leaves a bare `<ts>` directory, and `SHA256SUMS` may already be inside it.
+
+`_hub_snapshot_latest_verified` and `hub_snapshot_list` treat every non-`.INCOMPLETE` name as
+verified. So after tonight's cancel, `k3dm-snapshots/20261009T014249Z/` (partial) would satisfy
+the teardown guard for 24h. `make down DELETE_HUB=1` would then destroy the hub against a broken
+backup, which is exactly what the guard exists to prevent.
+
+### Fix (round 5, for Codex)
+
+1. **Drop Trivy from the claim set.** Delete the
+   `agent-2|trivy-system|data-trivy-server-0|node-agent-2-storage` line from
+   `_hub_recovery_records` in `scripts/plugins/hub_recovery.sh`. The set becomes 7 claims. Capture,
+   `hub-retain-pvs` and restore all read this one list, so nothing else needs a per-claim edit.
+   After a restore, Trivy gets a fresh dynamically provisioned PVC and downloads its DB.
+2. **Upload to a staging name, then rename only after verification.** In `hub_snapshot_capture`:
+   - rsync into `${_remote}.INCOMPLETE/`, not `${_remote}/`;
+   - run `sha256sum -c SHA256SUMS` inside `${_remote}.INCOMPLETE`;
+   - only on success, `mv -- '${_remote}.INCOMPLETE' '${_remote}'` over ssh, then write the stamp;
+   - on verify failure, leave it as `.INCOMPLETE`. `_hub_snapshot_remote_mark_incomplete` is no
+     longer needed in that path; remove it if it becomes unused;
+   - check the rsync exit status: on failure, `_err` with the timestamp and return 1, leaving the
+     `.INCOMPLETE` directory in place.
+
+   A bare `<ts>` name therefore exists only after a passing `sha256sum -c`, whatever kills the
+   process. `_hub_snapshot_latest_verified` and `hub_snapshot_list` stay as they are.
+3. **Fix the counts in tests and docs.** `scripts/tests/plugins/hub_recovery.bats`: the
+   "eight-claim" test becomes seven, and remove or rewrite the trivy-specific assertions near
+   lines 125–129. `scripts/tests/plugins/hub_snapshot.bats`: drop the trivy fixture. Update
+   `docs/howto/hub-snapshots.md`:
+   - list the 7 claims;
+   - state that the Trivy DB is deliberately excluded, and why;
+   - add the `.INCOMPLETE`-until-verified rule.
+
+### Tests (round 5)
+
+- `_hub_recovery_records` has 7 lines, and none contains `trivy`.
+- Capture with stubs: the rsync destination ends in `.INCOMPLETE/`. The remote `mv` to the bare
+  name runs after `sha256sum -c` and before the stamp write.
+- Failing rsync stub: return 1, no `mv` to the bare name, no stamp written.
+- Failing `sha256sum -c` stub: no `mv` to the bare name, no stamp written.
+- RED: the rsync-destination and failing-rsync tests fail against `fbebe9df` on a temp worktree.
+
+### Operator action (one-off, not part of the fix)
+
+The partial directory from tonight's cancel predates the fix and has a bare name. It must not stay
+readable as verified. Rename it on the M2, rather than deleting it, so the operator can inspect
+it:
+
+```bash
+ssh m2jump 'mv k3dm-snapshots/20261009T014249Z k3dm-snapshots/20261009T014249Z.INCOMPLETE'
+```
+
