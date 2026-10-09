@@ -1,6 +1,6 @@
 # postgres-keycloak rolling update runs two postmasters on one data directory
 
-**Status:** FIX ON BRANCH — shopping-cart-infra `fix/keycloak-postgres-recreate-strategy` `05b2e9e` (verified: kustomize renders `strategy: Recreate`); PR pending. Also RWO + Deployment: `identity/ldap/deployment.yaml` (`ldap`) — not changed, follow-up.
+**Status:** FIXED (merged) — shopping-cart-infra #109 `7028ae5` 2026-10-09; hub sync to `Recreate` pending at merge time. Follow-up: `identity/ldap/deployment.yaml` (`ldap`, Deployment + RWO PVCs) has the same risk, not changed.
 **Priority:** P2 — every pod-template change to `postgres-keycloak` risks corrupting the Keycloak database
 **Component:** `shopping-cart-infra` `identity/keycloak/postgres.yaml` (Deployment `identity/postgres-keycloak`, hub)
 **Found:** 2026-10-09, while verifying the probe fix (shopping-cart-infra #108, `03c6206`)
