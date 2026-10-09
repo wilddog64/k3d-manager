@@ -1,3 +1,10 @@
+## 2026-10-09 — Bug triage: 2 closed, 2 prioritized; payment #84 conflict resolved
+
+- Closed as FIXED: `2026-04-26-shopping-cart-imagepullbackoff-no-ghcr-pull-secret` (pull secret + imagePullSecrets in tree; Hostinger apps healthy) and `2026-04-27-orders-init-sql-serial-vs-uuid` (infra init SQL is UUID; order rewritten in Go).
+- Prioritized: `2026-08-14-k3s-aws-ssm-agent-cannot-register` → P4, mitigated by the SSH fallback. `2026-09-16-e2e-assertion-api-payments` → P3, all fixes merged (payment #78, e2e-tests #9/#10); a live Tier 1 rerun is the only thing left.
+- Payment #84: a conflict with #85 (stripe 34.0.0) in `pom.xml` properties. Resolved with a merge commit `b3a8741b` keeping `rabbitmq-client` 1.1.0 + stripe 34.0.0. No force push. A local build can't run (GitHub Packages 401), so CI is the gate.
+- 375 of 683 bug docs still have no Status line. That sweep is not done.
+
 ## 2026-10-09 — payment #84 merge-ready (verified)
 - Head `6dfb8bab`: all 5 ruleset-required checks green (Integration Tests now pass with rabbitmq-client 1.1.0); Copilot 0 findings, 0 threads; mergeStateStatus CLEAN; image resolves spring-webmvc 7.0.9.
 - Repo uses ruleset `main-protection` (0 approvals) — no enforce_admins lever. PR-side Trivy does not run (Build, Scan & Push skipped on PRs); verify CVE-2026-47884 gone after merge, then re-pin Hostinger digest.

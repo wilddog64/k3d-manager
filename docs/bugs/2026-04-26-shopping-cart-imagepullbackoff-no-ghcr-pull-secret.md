@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-26
 **Severity:** High — all 5 shopping-cart services fail to start on ubuntu-k3s
-**Status:** Open
+**Status:** FIXED — closed 2026-10-09 in triage
 **Assignee:** Codex
 **Branch:** `k3d-manager-v1.2.0`
 
@@ -243,3 +243,13 @@ patches:
 - Do NOT modify `bin/pat-rotate.sh`
 - Do NOT add `GHCR_PAT` or any token value to any file in git
 - Do NOT use Vault as the fallback — Vault is wiped on `acg-down`; use `gh auth token`
+
+## Triage (2026-10-09, Claude): closed as FIXED
+
+Both parts of the fix are in the tree:
+- `scripts/plugins/shopping_cart.sh` creates `ghcr-pull-secret`. It takes the PAT from the env,
+  then Vault, then `gh auth token`.
+- The service kustomizations (`services/shopping-cart-*/`) carry `imagePullSecrets`.
+
+Live check 2026-10-09: every shopping-cart Application on Hostinger is `Synced`/`Healthy` and no pod is
+in `ImagePullBackOff`.

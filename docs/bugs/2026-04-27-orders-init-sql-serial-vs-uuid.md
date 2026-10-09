@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-27
 **Severity:** High (order-service fails to start without ddl-auto workaround)
-**Status:** Open — workaround applied in k3d-manager kustomization
+**Status:** FIXED — closed 2026-10-09 in triage
 **Repos:** `shopping-cart-infra` (fix), `shopping-cart-order` (fix SecurityConfig)
 
 ---
@@ -130,3 +130,13 @@ File: `src/main/java/com/shoppingcart/order/config/SecurityConfig.java`
 - Do NOT modify files outside the listed targets
 - Do NOT commit to `main` — always work on the specified feature branch
 - Do NOT edit `shopping-cart-infra` or `shopping-cart-order` from k3d-manager context
+
+## Triage (2026-10-09, Claude): closed as FIXED
+
+- **Root cause 1 (init SQL):** fixed in `shopping-cart-infra`. On `origin/main`,
+  `data-layer/postgresql/orders/configmap.yaml` creates `orders.id` and `order_items.id` as
+  `UUID PRIMARY KEY DEFAULT gen_random_uuid()` ("Aligned with Order and OrderItem JPA entities").
+- **Root cause 2 (`SecurityConfig.java`):** obsolete. `shopping-cart-order` was rewritten in Go
+  (`go/`), so that Java class no longer ships.
+- The `ddl-auto` workaround is gone from `services/shopping-cart-order`.
+- Live check 2026-10-09: `ubuntu-hostinger-shopping-cart-order` is `Synced`/`Healthy`.

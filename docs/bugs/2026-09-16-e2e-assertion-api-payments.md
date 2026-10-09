@@ -2,7 +2,9 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-16 by k3dm-hermes
-**Status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Operator chose (b), a real Keycloak token (2026-10-02); option (b) IMPLEMENTED on feature branches (payment `d2f2d55`, e2e-tests `df6b9c1`, k3d-manager substrate), pending PRs, image pins and a live Tier 1 run. Health fix (substrate broker + `spring.rabbitmq`) IMPLEMENTED: payment `9778e21` + k3d-manager substrate.
+**Status:** OPEN — all fixes merged; only the live Tier 1 rerun remains (triage 2026-10-09)
+**Priority:** P3 — test-substrate only; production payment is healthy
+**Previous status:** OPEN, CONFIRMED (triage by Claude, 2026-10-01) — real: payment `/actuator/health` returns 503 in the e2e substrate. Operator chose (b), a real Keycloak token (2026-10-02); option (b) IMPLEMENTED on feature branches (payment `d2f2d55`, e2e-tests `df6b9c1`, k3d-manager substrate), pending PRs, image pins and a live Tier 1 run. Health fix (substrate broker + `spring.rabbitmq`) IMPLEMENTED: payment `9778e21` + k3d-manager substrate.
 **Run:** `1789549631-2079`, runner `m2`, tier `vcluster`, 24 passed / 33 failed / 102 total
 **Runner commit:** `ec4874fe62cab1ba120729dc5d48454f7d50dcc7`
 
@@ -472,3 +474,14 @@ auth needed for `/actuator/**`) before changing anything: another indicator (for
   restores `cmp`-proved.
 - Still needed for a green Tier 1: merge both payment fixes and the e2e-tests fix, bump the substrate payment pin,
   then a live `e2e_verify_vcluster` run.
+
+## Triage (2026-10-09, Claude): P3, fixes merged, live verification pending
+
+Every code fix this doc asked for is now merged:
+- payment PR #78 ("map Keycloak realm roles and bind spring.rabbitmq for the health check"), merged 2026-10-02
+- e2e-tests PR #9 (real Keycloak bearer token) and PR #10 (token request sent as a form)
+- the substrate RabbitMQ broker, `scripts/etc/e2e/rabbitmq.yaml`
+
+No live `e2e_verify_vcluster` run since then is recorded. Close this doc when the next Tier 1 run
+shows `api/payments.spec.ts` green. If it is still red, file a new bug for the new failure and
+link it here.
