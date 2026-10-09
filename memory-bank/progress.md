@@ -1,3 +1,9 @@
+## 2026-10-09 — post-release ops on k3d-manager-v1.43.0
+
+- Operator ran `make restart-webhook` (REPO_ROOT fix live) and `make appsets-reapply` + `make appsets-check`: all Applications on `k3d-manager-v1.43.0` (21 refs checked).
+- Reapply's built-in confirmation false-failed (3 apps still on v1.42.0 at first read; reconcile lag). Bug filed: `docs/bugs/2026-10-09-appsets-reapply-confirms-before-controller-regenerates.md` — bounded retry, Codex-ready.
+- Still pending: Hostinger istio-ambient apply + alert check; v1.43.0 spec dispatch to Codex.
+
 ## 2026-10-09 — v1.42.0 RELEASED; current branch k3d-manager-v1.43.0
 
 - **PR #138 merged** as `cc88386c`. Tag `v1.42.0` pushed and verified on origin (peels to `cc88386c`). GitHub release `v1.42.0` created and marked Latest: https://github.com/wilddog64/k3d-manager/releases/tag/v1.42.0
