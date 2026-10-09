@@ -536,22 +536,24 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
                     "Plain text or Slack mrkdwn only in your final reply. No ANSI. No markdown headers."
                 )
                 cmd = [
-                    "claude", "-p", user_prompt,
+                    "claude", "-p",
                     "--system-prompt", composite_system,
                     "--allowedTools", "Bash,Write" if filing else "Bash",
                     "--add-dir", REPO_ROOT,
                     "--add-dir", SHOPPING_CARTS_ROOT,
                     "--max-turns", str(max_turns),
+                    "--", user_prompt,
                 ]
                 timeout = 400
             else:
                 cmd = [
-                    "claude", "-p", user_prompt,
+                    "claude", "-p",
                     "--system-prompt", claude_system,
                     "--allowedTools", "Bash",
                     "--add-dir", REPO_ROOT,
                     "--add-dir", SHOPPING_CARTS_ROOT,
                     "--max-turns", str(max_turns),
+                    "--", user_prompt,
                 ]
                 timeout = 300
                 _observe = True
