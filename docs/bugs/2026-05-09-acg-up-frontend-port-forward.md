@@ -1,5 +1,6 @@
 # Bugfix: acg-up missing frontend port-forward launchd agent
 
+**Status:** CLOSED — doc merged to main in PR #74; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.5`
 **File:** `bin/acg-up` (after step 12, before final log line)
 

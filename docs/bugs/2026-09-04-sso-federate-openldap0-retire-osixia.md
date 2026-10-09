@@ -1,5 +1,6 @@
 # Remediation: unify shopping-cart SSO on openldap-0 (retire bundled osixia ldap) — Option B
 
+**Status:** CLOSED — doc merged to main in PR #120; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-09-04
 **Decision:** Option B (user-chosen 2026-09-04) — openldap-0 is the canonical directory for
 shopping-cart SSO. Repoint the Keycloak `shopping-cart` realm federation to k3d-manager's openldap-0

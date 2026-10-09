@@ -4,6 +4,7 @@
 **Revised:** 2026-09-21 — scope corrected after Codex caught a spec/repository mismatch. See
 `## Spec correction` for what the first version got wrong.
 **Branch (spec):** `k3d-manager-v1.36.0`
+**Status:** FIXED in `shopping-cart-product-catalog#55` + `shopping-cart-infra#99` — evidence: `.github/workflows/ci.yml:145` (triaged 2026-10-08, Codex)
 **Severity:** High — `shopping-cart-product-catalog` has failed image promotion on **every** push to
 `main` since 2026-08-12 (six consecutive pushes). An earlier revision of this spec said 2026-08-26;
 that was wrong, and came from reading only the three most recent runs. The image builds, pushes and is attested, but the infra repo never

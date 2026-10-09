@@ -1,5 +1,6 @@
 # Bug: E2E OIDC auth mock uses misleading variable name and hardcodes realm/clientId
 
+**Status:** CLOSED — doc merged to main in PR #84; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-05-22
 **Repo:** shopping-cart-frontend
 **Branch:** docs/next-improvements

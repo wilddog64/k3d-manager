@@ -1,8 +1,8 @@
 # Cloud-bridge Make job-status returns empty output, hiding test failure diagnostics
 
 **Filed:** 2026-10-06
-**Release / branch:** v1.41.0 / `k3d-manager-v1.41.0`
-**Status:** OPEN recurrence — canonical bug: [September 28 report](2026-09-28-make-jobs-never-write-output-file.md)
+**Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
+**Status:** FIXED in branch; live cloud/Slack verification pending — canonical bug: [September 28 report](2026-09-28-make-jobs-never-write-output-file.md)
 **Severity:** Medium — cloud agents see terminal failure but cannot diagnose it
 **Component:** webhook job-status log selection / cloud-bridge response
 
@@ -53,14 +53,14 @@ against the actual job directory before declaring the runtime cause confirmed.
 
 ## Expected behavior / acceptance criteria
 
-- [ ] Return a bounded log tail for Make jobs from `make.log`, while preserving `output`
+- [x] Return a bounded log tail for Make jobs from `make.log`, while preserving `output`
   handling for other job types. Define deterministic precedence if both exist.
-- [ ] Preserve webhook and bridge credential redaction before returning or committing any tail.
-- [ ] Keep the existing output size bound and safe job-ID/path validation; no arbitrary file reads.
-- [ ] Running and terminal Make jobs both return meaningful diagnostics when logs exist.
-- [ ] A genuinely absent/empty log is distinguishable from a log-selection defect without
+- [x] Preserve webhook and bridge credential redaction before returning or committing any tail.
+- [x] Keep the existing output size bound and safe job-ID/path validation; no arbitrary file reads.
+- [x] Running and terminal Make jobs both return meaningful diagnostics when logs exist.
+- [x] A genuinely absent/empty log is distinguishable from a log-selection defect without
   inventing a test failure reason.
-- [ ] Regression cases: make.log-only job, output-only job, both files, missing files,
+- [x] Regression cases: make.log-only job, output-only job, both files, missing files,
   large log truncation, and redaction. Removing make.log handling must turn a test red.
 - [ ] Operator reads ccc20dc9/make.log to identify the separate test failure; track that
   root cause separately if it is not already filed.
@@ -136,13 +136,13 @@ make job-log ID=033ceddc
 
 ### Extended fix acceptance
 
-- [ ] Include `make.log` in Slack thread `logs` selection as well as HTTP job-status.
-- [ ] Preserve existing `log` / `output` behavior and define consistent precedence for all
+- [x] Include `make.log` in Slack thread `logs` selection as well as HTTP job-status.
+- [x] Preserve existing `log` / `output` behavior and define consistent precedence for all
   applicable job types, preferably with a shared log selector.
-- [ ] Audit `diagnosis` and `ask` context selection for the same omission; cover affected
+- [x] Audit `diagnosis` and `ask` context selection for the same omission; cover affected
   consumers without broadening roles, actions, or arbitrary file access.
-- [ ] Slack log tails remain bounded and redacted, with readable line breaks.
-- [ ] Tests cover Make-log-only, legacy logs, absent logs, and multiple-file precedence
+- [x] Slack log tails remain bounded and redacted, with readable line breaks.
+- [x] Tests cover Make-log-only, legacy logs, absent logs, and multiple-file precedence
   for both Slack retrieval and cloud status; removing Make-log selection must turn them red.
 - [ ] Operator verifies `logs` in the actual E2E job's Slack thread retrieves the correct
   bounded output, and cloud job-status returns the same job's useful tail.

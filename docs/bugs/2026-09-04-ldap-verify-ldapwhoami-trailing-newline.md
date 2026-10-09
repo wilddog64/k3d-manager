@@ -1,5 +1,7 @@
 # Bug: LDAP password seed verify fails — `ldapwhoami -y` file carries a trailing newline
 
+**Status:** CLOSED — doc merged to main in PR #119; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Symptom
 
 On a fresh-hub `make up`, Step 10d.5/14 (Seeding Keycloak LDAP user passwords in LDAP + Vault)

@@ -15,7 +15,7 @@ make up URL=https://...      # provision with explicit sandbox URL
 | Target | Command | When to use |
 |---|---|---|
 | `make up` | `bin/cluster-up` | Start from scratch — credentials → Hub cluster → ESO → ArgoCD → app cluster |
-| `make down` | `bin/cluster-down --confirm` | Tear down the app cluster and Vault port-forward while preserving the local Hub; add `DELETE_HUB=1` to delete the Hub |
+| `make down` | `bin/cluster-down --confirm` | Tear down the app cluster and Vault port-forward while preserving the local Hub; add `DELETE_HUB=1` to delete it only with a fresh snapshot |
 | `make down CLEANUP_STALE=1` | `cleanup-stale-clusters` (+ AWS local cleanup) | Explicitly remove expired managed registrations and stale AWS sandbox state after teardown |
 | `make cleanup-stale-sandbox` | `bin/cleanup-stale-sandbox` | Preview stale AWS sandbox local state; add `CONFIRM=1` to remove it |
 | `make cleanup-stale-clusters` | `bin/cleanup-stale-clusters` | Preview expired managed ArgoCD registrations; add `CONFIRM=1` to remove them |
@@ -43,6 +43,11 @@ size, and verification state. `make snapshot-prune` removes incomplete
 snapshots first and keeps the newest three verified snapshots by default; set
 `K3DM_SNAPSHOT_KEEP` to change that ceiling.
 
+`make hub-retain-pvs` patches the mapped Hub PVs to `Retain`; rerun it after
+each rebuild. `DISCARD_HUB_DATA=1` explicitly bypasses the `make down`
+snapshot guard and permanently loses Hub claims, so use it only when that
+consequence is intended.
+
 Prometheus retains only three days (`--storage.tsdb.retention.time=3d`), so an
 older snapshot restores blocks that Prometheus immediately prunes on startup.
 Snapshots preserve history across a down/up cycle inside that window; they are
@@ -63,6 +68,8 @@ After a rebuild, generate the new target map and restore with:
 |---|---|
 | `make sync-apps` | Sync `rollout-demo-default` in ArgoCD and show remote pod status |
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
+| `make appsets-reapply` | **Every release:** reapply every ApplicationSet (hub and ACG) so its `$values` source tracks the release branch (`BRANCH=`, default: current branch; refuses anything that is not `k3d-manager-vX.Y.Z`) |
+| `make appsets-check` | Read-only: list Applications whose k3d-manager values source is not on `BRANCH`; run after `appsets-reapply` |
 
 `sync-apps` delegates to `bin/cluster-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).
@@ -71,6 +78,10 @@ Slack admin commands also support `cluster-up [provider] [dry-run]` and
 `cluster-down [provider] [dry-run]`. Dry-run tokens (`dry`, `dry-run`, `--dry-run`,
 or `dryrun`) may appear in any order and preview the lifecycle operation without
 changing the sandbox.
+
+ApplicationSets freeze their `$values` ref to the branch checked out when they were last applied, so
+config committed to a newer release branch is inert until `make appsets-reapply` runs. It is a required
+release step (see `CLAUDE.md`).
 
 `argocd-registration` reads the `ubuntu-k3s` kubeconfig, switches to `k3d-k3d-cluster`
 context, calls `register_app_cluster`, and restarts the ArgoCD application controller.
@@ -178,7 +189,7 @@ the store rather than truncating it. See
 | `make test-python-unit` | `python3 scripts/tests/bin/<suite>.py` | The stdlib-`unittest` suites — every `scripts/tests/bin/*.py` whose name is not `test_*.py` |
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
-| `make test-all` | `test` + `test-bin` + `test-python` | Everything that runs offline, in one call — what `make test-metrics` wraps |
+| `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard |
 | `make lint-python` | `ruff check -- <tracked Python files>` | Run Ruff's pyflakes rules over `.py` files and Python-shebang scripts |
 | `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
 
@@ -223,15 +234,14 @@ the two want opposite responses.
 
 | Target | Command | When to use |
 |---|---|---|
-| `make test-metrics` | `make test-all` → `bin/k3dm-test-metrics` | Run the full offline suite and publish its result to the Pushgateway for the `k3dm Tests` Grafana dashboard |
+| `make test-metrics` | `make test-all` | Compatibility reporting wrapper; `test-all` now performs the single metrics publication |
 
-The target **always exits 0** — it is a reporter, not a gate. The suite's real
-exit code travels in the `k3dm_test_exit_code` metric rather than the target's
-status, so a scheduled run cannot fail a caller that only wanted the numbers.
-Use `make test` or `make test-pytest` directly when you want a non-zero exit on
-failure.
+The `test-metrics` wrapper **always exits 0** — it is a reporter, not a gate. The
+suite's real exit code travels in the `k3dm_test_exit_code` metric rather than the
+wrapper's status. `make test-all` itself remains a gate and returns the original
+suite status after publishing, so use it when the caller must fail on a test failure.
 
-The raw log path is echoed on the last line; the log itself is kept under
+The raw log path is echoed by `test-all`; the log itself is kept under
 `${TMPDIR:-/tmp}/k3dm-test-all-<epoch>.log`.
 
 ---
@@ -253,6 +263,7 @@ make         # same as make help (DEFAULT_GOAL)
 | `GHCR_PAT` | `$(gh auth token)` | GitHub Container Registry token — used by `cluster-up` to create the `ghcr-pull-secret` |
 | `KEEP_LOCAL` | `1` | Set to `0` to delete the local Hub cluster when running `make down` (equivalent to `DELETE_HUB=1`) |
 | `DELETE_HUB` | `0` | Set to `1` to delete the local Hub cluster when running `make down` |
+| `DISCARD_HUB_DATA` | `0` | Set to `1` to bypass the fresh-snapshot guard when deleting the local Hub |
 | `CLEANUP_STALE` | `0` | Set to `1` to run guarded stale-resource cleanup after `make down` |
 
 Set `GHCR_PAT` before running `make up`:

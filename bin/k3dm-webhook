@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib
 from webhook.config import (  # noqa: E402
     PORT,
     MAX_BODY,
+    SLACK_EVENT_MAX_BODY,
     _JOB_ID_RE,
     JOB_DIR,
     SCREENSHOT_DIR,
@@ -43,6 +44,7 @@ from webhook.render import (  # noqa: E402
 )
 from webhook.proc import _spawn_capture_text  # noqa: E402
 from webhook.log import get_logger  # noqa: E402
+from webhook.job_output import read_job_output  # noqa: E402
 from webhook.agent import (  # noqa: E402
     _call_gemini,
     _run_cluster_ask,
@@ -495,16 +497,37 @@ def _patch_label(cluster_name, version):
 
 
 
-def _run_stale_sandbox_cleanup(job_id, confirm=False):
+def _run_stale_sandbox_cleanup(job_id, confirm=False, channel_id=""):
     """Stop expired ACG-only forwards and remove the stale ubuntu-k3s context."""
+    job_dir = JOB_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    (job_dir / "status").write_text("running")
+    thread_ts_file = job_dir / "thread_ts"
+    if not thread_ts_file.exists() and channel_id:
+        _thread_header = f"🧹 *cleanup-stale-sandbox* ({'apply' if confirm else 'preview'}) queued"
+        _thread_ts = _start_bot_thread(_thread_header, channel_id=channel_id)
+        if _thread_ts:
+            thread_ts_file.write_text(_thread_ts)
+            (job_dir / "thread_source").write_text("bot")
     cmd = [str(Path(__file__).resolve().parent / "cleanup-stale-sandbox")]
     if confirm:
         cmd.append("--confirm")
-    output, timed_out = _posix_spawn_capture(cmd, timeout=30)
+    rc, output, timed_out = _spawn_capture_text(cmd, timeout=30)
+    safe_output = _redact_secrets(output)[-64000:]
+    (job_dir / "output").write_text(safe_output)
     if timed_out:
-        _notify_job(job_id, "⚠️ *Stale sandbox cleanup timed out*")
+        status, exit_code = "failed", 124
+        message = "⚠️ *Stale sandbox cleanup timed out*"
+    elif rc == 0:
+        status, exit_code = "success", 0
+        message = "✅ *Stale sandbox cleanup complete*"
     else:
-        _notify_job(job_id, f"🧹 *Stale sandbox cleanup*\n```{output.strip()}```")
+        status, exit_code = "failed", rc
+        message = f"❌ *Stale sandbox cleanup incomplete* (exit code {rc})"
+    (job_dir / "status").write_text(status)
+    (job_dir / "exit_code").write_text(str(exit_code))
+    tail = safe_output[-3000:].strip() or "(no cleanup output)"
+    _notify_job(job_id, f"{message}\n```{tail}```")
 
 
 
@@ -618,20 +641,71 @@ _THREAD_COMMANDS = {
     "kill", "diagnosis", "status", "logs", "ask", "ask-docs",
     "cluster-up", "cluster-down", "cluster-refresh", "cluster-resume",
     "cleanup-stale-sandbox",
-    "cluster-status", "hostinger-status", "gemini", "claude", "codex",
+    "cluster-status", "hostinger-status", "cluster-diagnose", "k3dm",
+    "argocd-upgrade", "gemini", "claude", "codex",
 }
 _STANDALONE_CMDS = {
     "cluster-up", "cluster-down", "cluster-resume",
-    "cluster-status", "hostinger-status", "cluster-refresh", "refresh",
+    "cluster-status", "hostinger-status", "cluster-diagnose", "cluster-refresh", "refresh",
     "ask", "ask-docs", "claude", "gemini", "codex",
-    "cleanup-stale-sandbox",
+    "cleanup-stale-sandbox", "k3dm", "argocd-upgrade",
 }
 
-def _handle_thread_command(job_id, command, role="admin"):
+
+def _thread_ts_for_job(job_id):
+    path = JOB_DIR / job_id / "thread_ts"
+    return path.read_text().strip() if path.exists() else None
+
+
+def _parse_thread_diagnose(command):
+    """Parse the Slack bare-message form of /cluster-diagnose."""
+    parts = command.strip().lstrip("/").split()
+    parts = parts[1:]
+    providers = {"hostinger", "aws", "gcp", "az", "azure", "hub"}
+    provider = "hostinger"
+    if parts and parts[0].lower() in providers:
+        provider_token = parts.pop(0).lower()
+        provider = "az" if provider_token == "azure" else provider_token
+    verb = parts.pop(0) if parts else ""
+    if not verb:
+        return {"provider": provider, "action": "get-pods-all"}
+    if verb == "pods" and len(parts) == 1:
+        return {"provider": provider, "action": "get-pods", "namespace": parts[0]}
+    if verb in {"pod", "describe-pod"} and len(parts) == 2:
+        return {"provider": provider, "action": "describe-pod", "namespace": parts[0], "name": parts[1]}
+    if verb == "logs" and len(parts) in {2, 3}:
+        request = {"provider": provider, "action": "logs", "namespace": parts[0], "name": parts[1]}
+        if len(parts) == 3:
+            request["container"] = parts[2]
+        return request
+    if verb == "apps" and not parts:
+        return {"provider": provider, "action": "get-apps"}
+    if verb == "app" and len(parts) == 1:
+        return {"provider": provider, "action": "describe-app", "name": parts[0]}
+    if verb == "appsets" and not parts:
+        return {"provider": provider, "action": "get-appsets"}
+    return None
+
+
+def _run_upgrade_thread_job(job_id, chart_version, stage):
+    """Run an ArgoCD upgrade and publish its terminal result to the thread."""
+    _run_upgrade(job_id, chart_version, stage)
+    status_path = JOB_DIR / job_id / "status"
+    status = status_path.read_text().strip() if status_path.exists() else "unknown"
+    output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets, max_chars=3000)
+    icon = "✅" if status == "success" else "❌"
+    text = f"{icon} *argocd-upgrade* {chart_version} ({stage}) — `{status}`"
+    if output:
+        text += f"\n```{output}```"
+    _notify_job(job_id, text)
+
+def _handle_thread_command(job_id, command, role="admin", channel_id=""):
     """Dispatch a thread command for job_id. Runs in a background thread."""
     cmd = command.strip().lstrip("/").lower().split()[0] if command.strip() else ""
     if not command.strip().startswith("/") and cmd not in _THREAD_COMMANDS:
         return
+    if channel_id:
+        (JOB_DIR / job_id / "channel_id").write_text(channel_id)
     required = _thread_command_min_role(command)
     if not _role_allows(role, required):
         _audit_remote_action(
@@ -645,7 +719,97 @@ def _handle_thread_command(job_id, command, role="admin"):
         command = f"ask {cmd} {_alias_parts[1]}" if len(_alias_parts) > 1 else f"ask {cmd}"
         cmd = "ask"
 
-    if cmd == "kill":
+    if cmd == "cluster-diagnose":
+        request = _parse_thread_diagnose(command)
+        if request is None or _validate_diagnostics_request(request):
+            _notify_job(job_id, "Usage: `cluster-diagnose [provider|hub] [pods <namespace>|pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets]`")
+            return
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts = _thread_ts_for_job(job_id)
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        if channel_id:
+            (new_job_dir / "channel_id").write_text(channel_id)
+        threading.Thread(
+            target=_run_cluster_diagnostics,
+            args=(new_job_id, ""),
+            kwargs={"thread_ts": thread_ts, "channel_id": channel_id, "request": request},
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🔎 *cluster-diagnose* queued — job `{new_job_id}`")
+
+    elif cmd == "k3dm":
+        parts = command.strip().lstrip("/").split()
+        target = parts[1].lower() if len(parts) > 1 else "help"
+        args = {}
+        confirm = False
+        for part in parts[2:]:
+            if part.lower() == "confirm":
+                confirm = True
+            elif "=" in part:
+                key, value = part.split("=", 1)
+                args[key] = value
+            else:
+                _notify_job(job_id, "Usage: `k3dm <target> [KEY=value ...] [confirm]`")
+                return
+        if target == "help":
+            _notify_job(job_id, f"*/k3dm targets for role {_normalize_actor_role(role)}*\n{make_target_help(_normalize_actor_role(role), _role_allows)}")
+            return
+        argv_tail, error = parse_make_request(target, args, confirm)
+        if error:
+            _notify_job(job_id, error)
+            return
+        if not _role_allows(role, MAKE_TARGETS[target].get("min_role", "reader")):
+            _notify_job(job_id, f"⛔ `k3dm {target}` requires role *{MAKE_TARGETS[target].get('min_role', 'reader')}* — you have *{_normalize_actor_role(role)}*.")
+            return
+        if not _MAKE_JOB_LOCK.acquire(blocking=False):
+            _notify_job(job_id, "⚠️ A `/k3dm` job is already running")
+            return
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts = _thread_ts_for_job(job_id)
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        if channel_id:
+            (new_job_dir / "channel_id").write_text(channel_id)
+        threading.Thread(
+            target=_run_make_target,
+            args=(new_job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), f"slack-thread:{role}"),
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🛠️ *k3dm {target}* queued — job `{new_job_id}`")
+
+    elif cmd == "argocd-upgrade":
+        parts = command.strip().lstrip("/").split()
+        confirm = "confirm" in parts[1:]
+        args = [part for part in parts[1:] if part != "confirm"]
+        version = args[0] if args else ""
+        stage = args[1] if len(args) > 1 else "infra"
+        if not version or stage not in {"acg", "infra"} or len(args) > 2 or (stage == "infra" and not confirm):
+            _notify_job(job_id, "Usage: `argocd-upgrade <chart-version> [acg|infra] [confirm]` — infra requires `confirm`")
+            return
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts = _thread_ts_for_job(job_id)
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        if channel_id:
+            (new_job_dir / "channel_id").write_text(channel_id)
+        threading.Thread(
+            target=_run_upgrade_thread_job,
+            args=(new_job_id, version, stage),
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"⏳ *argocd-upgrade* {version} ({stage}) queued — job `{new_job_id}`")
+
+    elif cmd == "kill":
         proc = _running_procs.get(job_id)
         if proc:
             try:
@@ -658,11 +822,9 @@ def _handle_thread_command(job_id, command, role="admin"):
             _notify_job(job_id, f"⚠️ Job `{job_id}` is not running — nothing to kill")
 
     elif cmd == "diagnosis":
-        log_file = JOB_DIR / job_id / "log"
-        output_file = JOB_DIR / job_id / "output"
-        source_file = log_file if log_file.exists() else (output_file if output_file.exists() else None)
-        if source_file:
-            lines = source_file.read_text().splitlines(keepends=True)
+        output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets, max_chars=6000)
+        if output:
+            lines = output.splitlines(keepends=True)
             try:
                 result = _analyze_failure(lines)
                 _notify_job(job_id, f"🔍 *Re-diagnosis* (job `{job_id}`)\n{result}")
@@ -677,12 +839,10 @@ def _handle_thread_command(job_id, command, role="admin"):
         _notify_job(job_id, f"ℹ️ *Job `{job_id}`* status: `{status}`")
 
     elif cmd == "logs":
-        log_file = JOB_DIR / job_id / "log"
-        output_file = JOB_DIR / job_id / "output"
-        source_file = log_file if log_file.exists() else (output_file if output_file.exists() else None)
-        if source_file:
-            last = [l.rstrip() for l in source_file.read_text().splitlines() if l.strip()][-20:]
-            _notify_job(job_id, f"📋 *Last 20 lines* (job `{job_id}`)\n```{''.join(last)}```")
+        output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets)
+        if output:
+            last = [line.rstrip() for line in output.splitlines() if line.strip()][-20:]
+            _notify_job(job_id, f"📋 *Last 20 lines* (job `{job_id}`)\n```{chr(10).join(last)}```")
         else:
             _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
 
@@ -698,7 +858,7 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_hostinger_status if _status_provider == "hostinger" else _run_cluster_status,
             args=(new_job_id, ""),
-            kwargs={"thread_ts": thread_ts},
+            kwargs={"thread_ts": thread_ts, "channel_id": channel_id},
             daemon=True,
         ).start()
         _notify_job(job_id, f"🔎 *cluster-status* queued — job `{new_job_id}`")
@@ -713,7 +873,7 @@ def _handle_thread_command(job_id, command, role="admin"):
         threading.Thread(
             target=_run_hostinger_status,
             args=(new_job_id, ""),
-            kwargs={"thread_ts": thread_ts},
+            kwargs={"thread_ts": thread_ts, "channel_id": channel_id},
             daemon=True,
         ).start()
         _notify_job(job_id, f"🖥️ *hostinger-status* queued — job `{new_job_id}`")
@@ -797,9 +957,13 @@ def _handle_thread_command(job_id, command, role="admin"):
 
     elif cmd == "cleanup-stale-sandbox":
         _parts = command.strip().split()
-        _confirm = len(_parts) > 1 and _parts[1].lower() in ("confirm", "apply")
+        _cleanup_action = _parts[1].lower() if len(_parts) > 1 else "preview"
+        if _cleanup_action not in ("preview", "confirm", "apply"):
+            _notify_job(job_id, "Usage: `cleanup-stale-sandbox [preview|confirm|apply]`")
+            return
+        _confirm = _cleanup_action in ("confirm", "apply")
         threading.Thread(target=_run_stale_sandbox_cleanup,
-                         args=(job_id, _confirm), daemon=True).start()
+                         args=(job_id, _confirm, channel_id), daemon=True).start()
         _tag = "apply" if _confirm else "dry-run"
         _notify_job(job_id, f"🧹 *cleanup-stale-sandbox* ({_tag}) queued")
 
@@ -847,11 +1011,9 @@ def _handle_thread_command(job_id, command, role="admin"):
         if not question:
             _notify_job(job_id, "❌ Question rejected — too long or contains disallowed patterns.")
             return
-        _job_log = JOB_DIR / job_id / "log"
-        _job_out = JOB_DIR / job_id / "output"
-        _ctx_file = _job_log if _job_log.exists() else (_job_out if _job_out.exists() else None)
-        if _ctx_file:
-            _ctx_lines = [l.rstrip() for l in _ctx_file.read_text().splitlines() if l.strip()][-80:]
+        _job_output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets, max_chars=6000)
+        if _job_output:
+            _ctx_lines = [line.rstrip() for line in _job_output.splitlines() if line.strip()][-80:]
             _ctx_text = "\n".join(_ctx_lines)
             question = (
                 f"Job output context (last 80 lines of job `{job_id}`):\n"
@@ -993,12 +1155,24 @@ def _notify_job(job_id, text):
     Subsequent calls reply in-thread. Falls back to webhook URL if bot token not set.
     """
     thread_ts_file = JOB_DIR / job_id / "thread_ts"
-    if SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
-        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
-        ts = _post_slack_bot(text, thread_ts=thread_ts)
+    thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+    channel_id_file = JOB_DIR / job_id / "channel_id"
+    channel_id = channel_id_file.read_text().strip() if channel_id_file.exists() else None
+    thread_source_file = JOB_DIR / job_id / "thread_source"
+    thread_source = thread_source_file.read_text().strip() if thread_source_file.exists() else ""
+    response_url_file = JOB_DIR / job_id / "response_url"
+    response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
+    posted = False
+    if thread_source == "bot" and SLACK_BOT_TOKEN and channel_id and thread_ts:
+        posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
+    if not posted and response_url:
+        posted = bool(_slack_post(response_url, text, thread_ts=thread_ts))
+    if not posted and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
+        ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id)
         if ts and not thread_ts:
             thread_ts_file.write_text(ts)
-    elif SLACK_WEBHOOK_URL:
+        posted = bool(ts)
+    if not posted and SLACK_WEBHOOK_URL:
         _slack_post(SLACK_WEBHOOK_URL, text)
 
 
@@ -1392,6 +1566,24 @@ def _push_metrics(action, provider, status, duration_secs, job_id):
                 _LOG.warning("metrics push skipped (non-fatal): %s", exc)
 
 
+def _publish_test_metrics(job_id, log_path, exit_code, run_duration):
+    """Publish a completed test-all log without rerunning the suites."""
+    repo_root = Path(__file__).resolve().parent.parent
+    command = [
+        sys.executable, str(repo_root / "bin" / "k3dm-test-metrics"), str(log_path),
+        "--target", "test-all", "--exit-code", str(exit_code),
+        "--run-duration", str(run_duration),
+    ]
+    rc, output, timed_out = _spawn_capture_text(
+        command, cwd=repo_root, env=dict(os.environ), timeout=60,
+    )
+    if timed_out or rc != 0 or "metrics push skipped" in output:
+        _LOG.warning("job=%s test-all metrics publication was not confirmed", job_id)
+        _notify_job(job_id, "⚠️ test-all completed, but Grafana metrics publication was not confirmed")
+    else:
+        _LOG.info("job=%s test-all metrics published from captured log", job_id)
+
+
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period
 
 _ARCH_CONTEXT = """
@@ -1598,6 +1790,7 @@ _configure_lifecycle_runtime(
         "run_post_provision_check": _run_post_provision_check,
         "running_cluster_job": _running_cluster_job,
         "make_job_lock": _MAKE_JOB_LOCK,
+        "publish_test_metrics": _publish_test_metrics,
     },
 )
 _configure_status_runtime(
@@ -1710,7 +1903,17 @@ def _run_ask_docs(job_id, question, response_url="", thread_ts=None, channel_id=
         (job_dir / "status").write_text("running")
         text = ask_docs.answer(question, summarise=summarise)
         (job_dir / "output").write_text(text)
-        (job_dir / "status").write_text("success")
+        metadata = getattr(text, "metadata", {})
+        if metadata:
+            encoded_metadata = json.dumps(metadata)
+            if len(encoded_metadata) > ask_docs.MAX_FAILURE_METADATA_CHARS:
+                encoded_metadata = json.dumps({
+                    "status": getattr(text, "status", "failed"),
+                    "failure_class": "metadata_truncated",
+                })
+            (job_dir / "metadata.json").write_text(encoded_metadata)
+        status = getattr(text, "status", "success")
+        (job_dir / "status").write_text(status)
         if bot_thread:
             if not _post_slack_bot(text, thread_ts=thread_ts):
                 _slack_post(response_url, text)
@@ -1722,6 +1925,11 @@ def _run_ask_docs(job_id, question, response_url="", thread_ts=None, channel_id=
         text = "Could not summarise — read the sources directly.\n\nSources: none"
         (job_dir / "output").write_text(text)
         (job_dir / "status").write_text("failed")
+        (job_dir / "metadata.json").write_text(json.dumps({
+            "status": "failed",
+            "failure_class": "summary_worker_exception",
+            "error_category": type(exc).__name__,
+        }))
         if bot_thread:
             if not _post_slack_bot(text, thread_ts=thread_ts):
                 _slack_post(response_url, text)
@@ -1782,7 +1990,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if length is None:
                 self._json(400, {"error": "invalid content-length"})
                 return
-            raw_body = self.rfile.read(min(length, MAX_BODY))
+            if length > SLACK_EVENT_MAX_BODY:
+                self._json(413, {"error": "request too large"})
+                return
+            raw_body = self.rfile.read(length)
             timestamp = self.headers.get("X-Slack-Request-Timestamp", "0")
             signature = self.headers.get("X-Slack-Signature", "")
             if not _verify_slack_signature(raw_body, timestamp, signature):
@@ -1817,6 +2028,15 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ev_user = ev.get("user", "")
             if not _slack_user_is_allowlisted(ev_user):
                 _LOG.warning("slack event ignored type=%r user=%r reason=unallowlisted", ev_type, ev_user)
+                if ev_type == "message" and not ev_bot_id and not ev_subtype and ev_text:
+                    _event_command = ev_text.lstrip("/").lower().split()[0]
+                    if _event_command in (_THREAD_COMMANDS | _STANDALONE_CMDS):
+                        _post_slack_bot(
+                            "⛔ This Slack account is not authorized for webhook commands. "
+                            "Ask an admin to add it to the webhook role map.",
+                            thread_ts=ev_thread_ts or None,
+                            channel_id=ev.get("channel", ""),
+                        )
                 self._json(200, {"ok": True})
                 return
             slack_role = _slack_user_role(ev_user)
@@ -1828,6 +2048,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 and not ev_subtype
                 and ev_text
             ):
+                ev_channel_id = ev.get("channel", "")
                 is_thread_reply = bool(ev_thread_ts and ev_thread_ts != ev_ts)
                 thread_ts = ev_thread_ts if is_thread_reply else None
                 text = ev_text
@@ -1838,7 +2059,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     if job_id:
                         threading.Thread(
                             target=_handle_thread_command,
-                            args=(job_id, text, slack_role),
+                            args=(job_id, text, slack_role, ev_channel_id),
                             daemon=True,
                         ).start()
                     elif cmd in _STANDALONE_CMDS:
@@ -1846,11 +2067,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         anchor_dir = JOB_DIR / anchor_id
                         anchor_dir.mkdir(parents=True, exist_ok=True)
                         (anchor_dir / "status").write_text("thread-anchor")
+                        if ev_channel_id:
+                            (anchor_dir / "channel_id").write_text(ev_channel_id)
                         (anchor_dir / "thread_ts").write_text(thread_ts)
                         _LOG.warning("slack orphan thread anchor_id=%r cmd=%r", anchor_id, cmd)
                         threading.Thread(
                             target=_handle_thread_command,
-                            args=(anchor_id, text, slack_role),
+                            args=(anchor_id, text, slack_role, ev_channel_id),
                             daemon=True,
                         ).start()
                 elif cmd in _STANDALONE_CMDS:
@@ -1859,11 +2082,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     anchor_dir = JOB_DIR / anchor_id
                     anchor_dir.mkdir(parents=True, exist_ok=True)
                     (anchor_dir / "status").write_text("thread-anchor")
+                    if ev_channel_id:
+                        (anchor_dir / "channel_id").write_text(ev_channel_id)
                     if ev_ts:
                         (anchor_dir / "thread_ts").write_text(ev_ts)
                     threading.Thread(
                         target=_handle_thread_command,
-                        args=(anchor_id, text, slack_role),
+                        args=(anchor_id, text, slack_role, ev_channel_id),
                         daemon=True,
                     ).start()
             self._json(200, {"ok": True})
@@ -1900,9 +2125,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
             return
         token_role = getattr(self, "_token_role", None)
-        request_role = _request_role(self.headers, token_role)
-        if route["handler"] == "make":
-            request_role = _effective_make_role(self.headers, body, token_role)
+        request_role = _effective_make_role(self.headers, body, token_role)
         request_actor = _request_actor(self.headers)
         policy = effective_policy(route, self.path, body)
         if not _policy_allows(request_role, policy):
@@ -1930,6 +2153,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             stage = body.get("stage", "")
             if not chart_version or stage not in ("acg", "infra"):
                 self._json(400, {"error": "chart_version and stage (acg|infra) required"})
+                return
+            if stage == "infra" and body.get("confirm") is not True:
+                self._json(400, {"error": "infra ArgoCD upgrades require confirm=true"})
                 return
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
@@ -2057,13 +2283,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 return
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
                 target=_run_cluster_diagnostics,
                 args=(job_id, response_url),
-                kwargs={"thread_ts": thread_ts, "request": body},
+                kwargs={"thread_ts": thread_ts, "channel_id": channel_id, "request": body},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
@@ -2126,14 +2353,20 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if route["handler"] == "cleanup_stale_sandbox":
             confirm = bool(body.get("confirm", False))
             response_url = body.get("response_url", "")
+            channel_id = str(body.get("channel_id", "")).strip()
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
+            thread_ts = str(body.get("thread_ts", "")).strip()
+            if thread_ts:
+                (JOB_DIR / job_id / "thread_ts").write_text(thread_ts)
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
+            if channel_id:
+                (JOB_DIR / job_id / "channel_id").write_text(channel_id)
             threading.Thread(
                 target=_run_stale_sandbox_cleanup,
-                args=(job_id, confirm),
+                args=(job_id, confirm, channel_id),
                 daemon=True,
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
@@ -2152,12 +2385,25 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self._json(409, {"error": "a /k3dm job is already running"})
                 return
             response_url = body.get("response_url", "")
+            thread_ts = str(body.get("thread_ts", "")).strip()
+            channel_id = str(body.get("channel_id", "")).strip()
+            thread_source = ""
+            if not thread_ts and channel_id and SLACK_BOT_TOKEN:
+                thread_ts = _start_bot_thread(f"🛠️ *make {target}* queued", channel_id=channel_id)
+                if thread_ts:
+                    thread_source = "bot"
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             (JOB_DIR / job_id / "target").write_text(target)
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
+            if thread_ts:
+                (JOB_DIR / job_id / "thread_ts").write_text(thread_ts)
+            if channel_id:
+                (JOB_DIR / job_id / "channel_id").write_text(channel_id)
+            if thread_source:
+                (JOB_DIR / job_id / "thread_source").write_text(thread_source)
             threading.Thread(
                 target=_run_make_target,
                 args=(job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), request_actor),
@@ -2278,9 +2524,28 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         status = (job_dir / "status").read_text().strip()
-        output_file = job_dir / "output"
-        output = output_file.read_text()[-2000:] if output_file.exists() else ""
-        self._json(200, {"job_id": job_id, "status": status, "output": output})
+        output = read_job_output(job_dir, redact=_redact_secrets)
+        classification = {"success": "passed", "failed": "failed_untriaged"}.get(
+            status, "in_progress")
+        payload = {
+            "job_id": job_id,
+            "status": status,
+            "result_classification": classification,
+            "output": output,
+        }
+        exit_code_file = job_dir / "exit_code"
+        if exit_code_file.is_file():
+            try:
+                payload["exit_code"] = int(exit_code_file.read_text().strip())
+            except (OSError, ValueError):
+                payload["exit_code"] = None
+        metadata_file = job_dir / "metadata.json"
+        if metadata_file.is_file():
+            try:
+                payload["metadata"] = json.loads(metadata_file.read_text())
+            except (OSError, ValueError):
+                payload["metadata"] = {"status": status, "failure_class": "metadata_unavailable"}
+        self._json(200, payload)
 
     def setup(self):
         super().setup()

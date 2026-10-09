@@ -72,7 +72,10 @@ EOF
     _is_mac() { return 0; }
     _observability_seed_grafana_if_absent() { :; }
     _vault_login() { :; }
-    export -f envsubst _kubectl curl kubectl launchctl _is_mac _observability_seed_grafana_if_absent _vault_login
+    _observability_ensure_argocd_servicemonitors() { :; }
+    _observability_ensure_apiserver_scrape_timeout() { :; }
+    export -f envsubst _kubectl curl kubectl launchctl _is_mac _observability_seed_grafana_if_absent _vault_login \
+      _observability_ensure_argocd_servicemonitors _observability_ensure_apiserver_scrape_timeout
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability
   '
@@ -167,7 +170,7 @@ EOF
   run deploy_observability_acg
   [ "$status" -eq 0 ]
   [[ -f "${envsubst_log}" ]]
-  [[ "$output" == *"Alertmanager config secret created on ACG (ubuntu-hostinger)"* ]]
+  [[ "$output" == *"Alertmanager config secret applied on ACG (ubuntu-hostinger)"* ]]
   [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
   [[ "$output" == *"Alertmanager login credentials ready"* ]]
   [[ "$output" == *"Alertmanager port-forward agent installed"* ]]
@@ -245,6 +248,10 @@ EOF
     esac
   }
   _is_mac() { return 0; }
+  _observability_generate_prometheus_basic_auth() {
+    _PROM_BASIC_AUTH_PASSWORD="generated-test-password"
+    _PROM_BASIC_AUTH_BCRYPT="\$2a\$12\$generated-test-bcrypt"
+  }
   export K3DM_ACG_RULES_CRD_ATTEMPTS=1 K3DM_ACG_PROM_DISCOVERY_ATTEMPTS=1
   run deploy_observability_acg
   [ "$status" -eq 0 ]

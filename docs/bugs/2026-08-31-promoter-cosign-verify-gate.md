@@ -1,5 +1,6 @@
 # Promoter cosign-verify gate — refuse to promote unsigned candidates
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-08-31
 **Branch:** `k3d-manager-v1.27.0`
 **Milestone:** v1.27.0 Image-signing — CVE-loop closure (Stage D deferral #1)

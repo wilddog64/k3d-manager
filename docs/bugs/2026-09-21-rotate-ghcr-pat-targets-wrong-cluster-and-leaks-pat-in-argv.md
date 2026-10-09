@@ -4,8 +4,7 @@
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Medium — the tool an operator would reach for during a GHCR outage silently does not
 touch the affected cluster, and leaks credentials into the process table.
-**Status:** Assigned to Codex 2026-09-21. **Scope extended 2026-09-23** — see Defect 4; the fix
-must cover `scripts/plugins/shopping_cart.sh` as well as `bin/rotate-ghcr-pat`.
+**Status:** FIXED — Defects 1–3 (3c3f0753); Defect 4 `3d33d687` (Claude-verified: RED on old code, green), PAT now applied via a stdin manifest
 
 ## Context
 
@@ -429,3 +428,97 @@ Claude-Session: https://claude.ai/code/session_01B9RRyT5eU8S76oXYMrLZN8
   assertions; no cluster access is needed or permitted for this task.
 - Do NOT modify files outside `bin/rotate-ghcr-pat`, `scripts/tests/bin/rotate_ghcr_pat.bats`,
   and the two memory-bank files.
+
+---
+
+## Implementation spec — Defect 4 only (Codex, 2026-10-09)
+
+Defects 1–3 are fixed. This closes Defect 4: `shopping_cart_create_ghcr_pull_secret` in
+`scripts/plugins/shopping_cart.sh` passes the PAT as `--docker-password=` on argv.
+
+**Branch:** `k3d-manager-v1.42.0`.
+**Files:** `scripts/plugins/shopping_cart.sh`, a new
+`scripts/tests/plugins/shopping_cart_ghcr_pull_secret.bats`, `CHANGELOG.md` (`[Unreleased]` →
+`### Fixed`, one bullet), and this doc's Status line. Nothing else.
+
+### Change — build the dockerconfigjson in-shell, apply it on stdin
+
+Use the same encoding `bin/rotate-ghcr-pat` already uses (lines 126–127). `printf` is a bash
+builtin, so the PAT never reaches a child process's argv; `base64` reads it from stdin.
+
+**OLD** (inside the first `for ns in ...` loop):
+```bash
+    kubectl create secret docker-registry ghcr-pull-secret \
+      --docker-server=ghcr.io \
+      --docker-username="${_github_user}" \
+      --docker-password="${_ghcr_pat}" \
+      --context "${_ctx}" \
+      -n "$ns" \
+      --dry-run=client -o yaml \
+      | kubectl apply --context "${_ctx}" -f -
+```
+
+**NEW** (heredoc body and the `MANIFEST` terminator at column 0):
+```bash
+    kubectl apply --context "${_ctx}" -f - <<MANIFEST
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ghcr-pull-secret
+  namespace: ${ns}
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: ${_dockercfg}
+MANIFEST
+```
+
+Compute `_dockercfg` once, right after the `_ctx=...` line and **before** the first `for ns` loop:
+```bash
+  local _auth _dockercfg
+  _auth=$(printf '%s:%s' "${_github_user}" "${_ghcr_pat}" | base64 | tr -d '\n')
+  _dockercfg=$(printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${_auth}" | base64 | tr -d '\n')
+  _auth=""
+```
+and clear it after the second (service-account patch) loop: `_dockercfg=""`.
+Keep everything else in the function as is (namespace create/label, the `_info` line, the
+service-account patch loop).
+
+### Tests (new BATS file)
+
+Source the plugin as `scripts/tests/plugins/shopping_cart_credential_drift.bats` does
+(`SCRIPT_DIR="$(pwd)/scripts"`, `source scripts/lib/system.sh`, `scripts/lib/core.sh`,
+`scripts/plugins/shopping_cart.sh`). Stub `kubectl` to append `"$*"` to an argv log and, when its
+args contain `apply`, append its stdin to a stdin log (otherwise `cat >/dev/null` is not needed —
+only `apply` reads stdin). Set `APP_CONTEXT=test-ctx`, `_github_user=octo`,
+`_ghcr_pat=PAT-SENTINEL-123`.
+1. After `shopping_cart_create_ghcr_pull_secret`, the argv log contains neither
+   `PAT-SENTINEL-123` nor `--docker-password` (assert a `grep -c` count of `0`; `grep -c`
+   exits 1 on zero matches, so capture with `|| true`).
+2. The stdin log has three `type: kubernetes.io/dockerconfigjson` manifests, one each for
+   `shopping-cart-apps`, `shopping-cart-payment`, `shopping-cart-data`.
+3. Decoding the `.dockerconfigjson` value gives `{"auths":{"ghcr.io":{"auth":"<b64>"}}}`, and
+   decoding `<b64>` gives `octo:PAT-SENTINEL-123`.
+
+**RED gate:** test 1 must fail against the pre-fix function. Do NOT `git stash` or `git checkout`
+files: write `git show HEAD:scripts/plugins/shopping_cart.sh` to a temp file, source that copy
+once by hand in the same harness, and paste the failing output.
+
+### Gates
+- `shellcheck -S warning scripts/plugins/shopping_cart.sh` — no new warnings
+- `bats scripts/tests/plugins/shopping_cart_ghcr_pull_secret.bats scripts/tests/plugins/shopping_cart.bats`
+
+### Status line
+Set this doc's `**Status:**` to
+`FIXED — Defects 1–3 (3c3f0753); Defect 4 <sha>, PAT now applied via a stdin manifest`.
+
+### Commit message (exact)
+```
+fix(shopping-cart): keep the GHCR PAT off argv when minting ghcr-pull-secret
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+
+### What NOT to do
+- Do not touch `bin/rotate-ghcr-pat`, `bin/restore-hub-ghcr-pat`, or any other function.
+- Do not add ESO awareness here (out of scope for this change).
+- Do not print, log or echo the PAT, `_auth` or `_dockercfg`.

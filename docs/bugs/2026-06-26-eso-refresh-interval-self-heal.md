@@ -1,5 +1,6 @@
 # Bugfix: ESO ExternalSecret refreshInterval 24h → 15m (self-heal after tunnel flap)
 
+**Status:** CLOSED — doc merged to main in PR #100; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Repo (work):** `shopping-cart-infra`
 **Branch (all work repos):** `fix/eso-refresh-interval-self-heal` (from `origin/main`)
 **Spec repo:** k3d-manager (this file) — read here, implement in shopping-cart-infra.

@@ -301,9 +301,9 @@ data:
             "defaults": {
               "unit": "short",
               "custom": {
-                "drawStyle": "line",
-                "lineWidth": 2,
-                "fillOpacity": 10,
+                "drawStyle": "bars",
+                "lineWidth": 1,
+                "fillOpacity": 80,
                 "showPoints": "never",
                 "spanNulls": false
               }
@@ -312,6 +312,8 @@ data:
           },
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
           "id": 12,
+          "interval": "1h",
+          "description": "Error lines logged by trivy-operator per hour, last 30 days. Each bar is one hour; an empty hour has no bar. Bursts usually mean scan jobs could not pull images (e.g. in-cluster DNS failing during a hub rebuild). Read the operator log in Loki for the cause.",
           "options": {
             "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
             "tooltip": { "mode": "single", "sort": "none" }
@@ -319,6 +321,7 @@ data:
           "targets": [
             {
               "expr": "sum(count_over_time({namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | level=\"error\" [$__interval]))",
+              "legendFormat": "errors / hour",
               "refId": "A"
             }
           ],

@@ -53,6 +53,15 @@ function signed(path, body) {
   } })
 }
 
+function signedJson(path, body) {
+  const ts = String(Math.floor(Date.now() / 1000))
+  const signature = createHmac('sha256', 'test-signing-secret').update(`v0:${ts}:${body}`).digest('hex')
+  return new Request(`https://relay.test${path}`, { method: 'POST', body, headers: {
+    'Content-Type': 'application/json',
+    'X-Slack-Request-Timestamp': ts, 'X-Slack-Signature': `v0=${signature}`,
+  } })
+}
+
 function interactivityBody(userId, actionId, actionValue) {
   return 'payload=' + encodeURIComponent(JSON.stringify({ type: 'block_actions', user: { id: userId },
     response_url: 'https://hooks.slack.test/resp', actions: [{ action_id: actionId, value: actionValue }] }))
@@ -156,8 +165,17 @@ test('/hermes-auth grants allowlisted users a 24h re-auth', async () => {
 test('cluster-status still relays and events GET is missing', async () => {
   const worker = loadWorker({ APPROVALS_KV: fakeKv(), APPROVER_ALLOWLIST: 'UAPPROVER1,UAPPROVER2', APPROVAL_DRAIN_TOKEN: token })
   await worker.dispatch(signed('/slack/commands', 'command=/cluster-status&user_id=UAPPROVER1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
-  assert.ok(worker.fetches.some(item => item.url === 'https://webhook.test/api/v1/cluster-status'))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster-status')
+  assert.ok(call)
+  assert.equal(JSON.parse(call.init.body).slack_user_id, 'UAPPROVER1')
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
+})
+
+test('cluster-down forwards the signed Slack caller identity', async () => {
+  const worker = loadWorker()
+  await worker.dispatch(signed('/slack/commands', 'command=/cluster-down&text=aws&user_id=UDOWN&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster')
+  assert.equal(JSON.parse(call.init.body).slack_user_id, 'UDOWN')
 })
 
 test('/ask, /ask-docs and cluster-status relay channel_id', async () => {
@@ -187,6 +205,42 @@ test('/ask-docs --sources without a question returns the updated usage', async (
 test('GET /slack/events returns 404', async () => {
   const worker = loadWorker()
   assert.equal((await worker.dispatch(new Request('https://relay.test/slack/events'))).status, 404)
+})
+
+test('root JSON Slack Events are forwarded for shared slash-command URLs', async () => {
+  const worker = loadWorker()
+  const body = JSON.stringify({ type: 'url_verification', challenge: 'challenge' })
+  const response = await worker.dispatch(signedJson('/', body))
+  assert.equal(response.status, 200)
+  assert.equal(worker.fetches[0].url, 'https://webhook.test/slack/events')
+  assert.equal(worker.fetches[0].init.body, body)
+})
+
+test('Slack bot-echo event callbacks are acknowledged at the edge', async () => {
+  const worker = loadWorker()
+  const body = JSON.stringify({ type: 'event_callback', event: { type: 'message', bot_id: 'B1', text: 'echo' } })
+  const response = await worker.dispatch(signedJson('/slack/events', body))
+  assert.equal(response.status, 200)
+  assert.equal(await response.text(), '{"ok":true}')
+  assert.equal(worker.fetches.length, 0)
+})
+
+test('Slack message update event callbacks are acknowledged at the edge', async () => {
+  const worker = loadWorker()
+  const body = JSON.stringify({ type: 'event_callback', event: { type: 'message', subtype: 'message_changed' } })
+  const response = await worker.dispatch(signedJson('/slack/events', body))
+  assert.equal(response.status, 200)
+  assert.equal(worker.fetches.length, 0)
+})
+
+test('human Slack event callbacks are forwarded unchanged', async () => {
+  const worker = loadWorker()
+  const body = JSON.stringify({ type: 'event_callback', event: { type: 'message', user: 'U1', text: 'hello' } })
+  const response = await worker.dispatch(signedJson('/slack/events', body))
+  assert.equal(response.status, 200)
+  assert.equal(worker.fetches.length, 1)
+  assert.equal(worker.fetches[0].url, 'https://webhook.test/slack/events')
+  assert.equal(worker.fetches[0].init.body, body)
 })
 
 test('cluster-up and cluster-down refuse to default to a cluster', async () => {
@@ -244,6 +298,15 @@ test('/k3dm relays target, args, confirm and user id to /api/v1/make', async () 
   assert.deepEqual(JSON.parse(call.init.body), { target: 'fix-delete-pod', args: { APP: 'frontend', NS: 'shopping-cart-apps' },
     confirm: true, slack_user_id: 'UOP1', response_url: 'https://hooks.slack.test/resp' })
   assert.equal(call.init.headers['X-K3DM-Source-Command'], '/k3dm')
+})
+
+test('/k3dm preserves the originating Slack thread and channel', async () => {
+  const worker = loadWorker()
+  const body = 'command=/k3dm&text=test-all&thread_ts=1700000000.000001&channel_id=C123&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await worker.dispatch(signed('/slack/commands', body))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/make')
+  assert.equal(JSON.parse(call.init.body).thread_ts, '1700000000.000001')
+  assert.equal(JSON.parse(call.init.body).channel_id, 'C123')
 })
 
 test('/k3dm rejects malformed arguments without relaying', async () => {
@@ -317,7 +380,7 @@ test('/k3dm with no text asks the webhook for help', async () => {
 
 test('/cluster-diagnose <provider> with no verb asks for pods in all namespaces', async () => {
   const worker = loadWorker()
-  const body = 'command=%2Fcluster-diagnose&text=aws&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const body = 'command=%2Fcluster-diagnose&text=aws&channel_id=CDIAG&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
   await worker.dispatch(signed('/slack/commands', body))
   const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/diagnostics')
   assert.ok(call)
@@ -325,6 +388,76 @@ test('/cluster-diagnose <provider> with no verb asks for pods in all namespaces'
   assert.equal(payload.provider, 'aws')
   assert.equal(payload.action, 'get-pods-all')
   assert.equal(payload.namespace, undefined)
+  assert.equal(payload.channel_id, 'CDIAG')
+})
+
+test('/cluster-diagnose help explains the request forms with examples', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcluster-diagnose&text=&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  const message = await response.text()
+  assert.match(message, /Describe pod: \/cluster-diagnose hub pod <namespace> <pod>/)
+  assert.match(message, /Applications: \/cluster-diagnose hub apps \| app <name> \| appsets/)
+})
+
+test('long Slack command help uses examples instead of dense grammar', async () => {
+  const cases = [
+    ['/cluster-up', '', /Example: \/cluster-up aws/],
+    ['/cluster-resume', 'nope', /Example: \/cluster-resume aws/],
+    ['/cleanup-stale-sandbox', 'later', /Usage: \/cleanup-stale-sandbox \[preview\|confirm\|apply\]/],
+    ['/ask-docs', '--sources', /Examples: \/ask-docs/],
+    ['/argocd-upgrade', '', /Examples: \/argocd-upgrade/],
+  ]
+  for (const [command, text, expected] of cases) {
+    const worker = loadWorker()
+    const body = `command=${encodeURIComponent(command)}&text=${encodeURIComponent(text)}&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp`
+    const response = await worker.dispatch(signed('/slack/commands', body))
+    assert.match(await response.text(), expected)
+  }
+})
+
+test('/argocd-upgrade requires confirm for infra but not acg', async () => {
+  const missing = loadWorker()
+  const missingBody = 'command=/argocd-upgrade&text=7.9.1%20infra&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  assert.match(await (await missing.dispatch(signed('/slack/commands', missingBody))).text(), /infra also requires confirm/)
+  assert.equal(missing.fetches.filter(item => item.url.includes('/api/v1/argocd-upgrade')).length, 0)
+
+  const acg = loadWorker()
+  const acgBody = 'command=/argocd-upgrade&text=7.9.1%20acg&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await acg.dispatch(signed('/slack/commands', acgBody))
+  const acgCall = acg.fetches.find(item => item.url.includes('/api/v1/argocd-upgrade'))
+  assert.equal(JSON.parse(acgCall.init.body).confirm, false)
+
+  const infra = loadWorker()
+  const infraBody = 'command=/argocd-upgrade&text=7.9.1%20infra%20confirm&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await infra.dispatch(signed('/slack/commands', infraBody))
+  const infraCall = infra.fetches.find(item => item.url.includes('/api/v1/argocd-upgrade'))
+  assert.equal(JSON.parse(infraCall.init.body).confirm, true)
+})
+
+test('/argocd-upgrade sends one thread-only usage response for invalid threaded input', async () => {
+  const worker = loadWorker()
+  const body = 'command=/argocd-upgrade&text=7.9.1%20infra&thread_ts=1700000000.000001&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  assert.equal(await response.text(), '')
+  const replies = worker.fetches.filter(item => item.url === 'https://hooks.slack.test/resp')
+  assert.equal(replies.length, 1)
+  const payload = JSON.parse(replies[0].init.body)
+  assert.equal(payload.thread_ts, '1700000000.000001')
+  assert.match(payload.text, /infra also requires confirm/)
+})
+
+test('/cleanup-stale-sandbox preserves the originating thread timestamp', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcleanup-stale-sandbox&text=preview&thread_ts=1700000000.000001&channel_id=C123&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  const response = await worker.dispatch(signed('/slack/commands', body))
+  assert.match(await response.text(), /Previewing stale ACG sandbox cleanup/)
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cleanup-stale-sandbox')
+  assert.ok(call)
+  const payload = JSON.parse(call.init.body)
+  assert.equal(payload.thread_ts, '1700000000.000001')
+  assert.equal(payload.channel_id, 'C123')
+  assert.equal(payload.confirm, false)
 })
 
 test('/cluster-diagnose with no text still returns usage without relaying', async () => {
@@ -333,4 +466,21 @@ test('/cluster-diagnose with no text still returns usage without relaying', asyn
   const response = await worker.dispatch(signed('/slack/commands', body))
   assert.match(await response.text(), /Usage: \/cluster-diagnose/)
   assert.equal(worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/diagnostics'), undefined)
+})
+
+test('/cluster-diagnose accepts namespace pod order as describe-pod', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcluster-diagnose&text=hub%20platform-ops%20pod%20acg-expiry-check-29855580-ssvb&channel_id=CDIAG&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await worker.dispatch(signed('/slack/commands', body))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/diagnostics')
+  const payload = JSON.parse(call.init.body)
+  assert.deepEqual(payload, {
+    provider: 'hub',
+    action: 'describe-pod',
+    namespace: 'platform-ops',
+    name: 'acg-expiry-check-29855580-ssvb',
+    response_url: 'https://hooks.slack.test/resp',
+    channel_id: 'CDIAG',
+    slack_user_id: 'UOP1',
+  })
 })

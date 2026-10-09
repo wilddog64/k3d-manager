@@ -1,5 +1,7 @@
 # Bug: LDAP password seed checkpoint hides Vault credential drift
 
+**Status:** CLOSED — doc merged to main in PR #109; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Symptom
 
 The passwords returned by `bin/get-keycloak-password` could not log in to the frontend.

@@ -1,5 +1,6 @@
 # Bug: `keycloak-realm-reconcile` dies on `pipefail`, and the realm has no LDAP federation
 
+**Status:** CLOSED — doc merged to main in PR #126; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-09-12
 **Spec repo:** `k3d-manager` (this file)
 **Work repo:** `shopping-cart-infra` — `identity/keycloak/keycloak-reconcile-hook-job.yaml`

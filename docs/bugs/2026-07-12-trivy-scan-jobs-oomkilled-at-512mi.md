@@ -1,5 +1,6 @@
 # Bug: Trivy scan jobs OOMKilled at 512Mi scanner limit
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.14.0`
 **Files:** `scripts/etc/helm/observability/trivy-operator-values.yaml`, `scripts/etc/helm/observability/trivy-operator-acg-values.yaml`
 

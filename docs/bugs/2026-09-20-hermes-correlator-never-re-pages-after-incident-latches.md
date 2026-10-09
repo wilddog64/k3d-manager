@@ -3,6 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** High — Hermes detected a total public-endpoint outage and sent nothing.
+**Status:** FIXED in `71681100` — evidence: `scripts/lib/hermes/correlator.py:20-35` (triaged 2026-10-08, Codex)
 
 ## Symptom
 

@@ -1,5 +1,6 @@
 # Bug: LDAP users share a hardcoded test password instead of Vault-generated unique passwords
 
+**Status:** CLOSED — doc merged to main in PR #67; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-04-26
 **Severity:** High — shared static credential, not real-world
 **Spec type:** bug

@@ -122,6 +122,36 @@ the R10 repair (delete a failed Job superseded by a newer CronJob spec) overflow
 
 Scope: [`v1.42.0-hermes-alert-driven-triage.md`](plans/v1.42.0-hermes-alert-driven-triage.md).
 
+### Candidate milestone — v1.43.0
+
+**Bug priority tracking.** Every bug doc gets a `**Priority:** P0`–`P3` field, which records
+urgency and is separate from Severity. The vector store keeps priority and open/closed state as
+non-embedded metadata, so `/ask-docs` and `find-similar-docs` label bug sources (for example
+`[P1 · open]`). A `k3dm_bug_docs{priority,state}` gauge feeds a new Grafana "Bugs" dashboard (open
+P0/P1, untriaged, open by priority over time), and a pre-commit check rejects new bug docs that
+have no Priority. Once it lands, Claude backfills priorities on the open bugs.
+
+Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.md). Also queued
+for v1.43.0: [`v1.43.0-e2e-failure-artifacts.md`](plans/v1.43.0-e2e-failure-artifacts.md),
+[`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
+[`v1.43.0-test-metrics-log-retention.md`](plans/v1.43.0-test-metrics-log-retention.md), and the
+R10 overflow from v1.42.0, [`v1.43.0-hermes-r10-delete-superseded-failed-job.md`](plans/v1.43.0-hermes-r10-delete-superseded-failed-job.md)
+(an approval-gated deletion of a failed Job whose CronJob spec has since changed, in `identity`/`monitoring`/`cicd` only).
+v1.43.0 is now at its five-plan cap, so anything new goes to v1.44.0.
+
+### Candidate milestone — v1.45.0
+
+**Docs drift detection.** Facts that can be derived from code (module tables, route tables,
+make targets, line counts) move into generated blocks that `make docs-regen` rewrites and
+`make docs-check` gates in CI and pre-commit. Standing docs declare the code they describe with a
+`covers:` line, and a weekly Hermes digest posts to Slack each doc whose covered code has changed
+substantially since the doc was last edited; far-behind docs get a drafted bug doc. Hermes never
+edits a doc. Hermes also publishes per-doc drift to the hub Pushgateway for a new Grafana
+"Docs Health" dashboard, with one `info` rule that fires if the check stops running. Prompted by the 2026-10-09 audit that found all four sampled docs stale.
+
+Scope: [`v1.45.0-docs-drift-detection.md`](plans/v1.45.0-docs-drift-detection.md). Also queued for
+v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve-remediation-terminal-notifications.md).
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
@@ -155,6 +185,15 @@ milestone only when it gets a scope doc.
   cloud, Git, or branch-protection credentials. Each phase needs its own scope doc before a release
   is assigned (health-degraded ≠ safe-to-repair). Phase 1 scope:
   `docs/architecture/hermes-phase1-monitoring-scope.md`.
+- **HIPAA readiness and compliance gap assessment** — future infrastructure work, not a compliance
+  certification or a promise that the current stack may process ePHI. Start with a formal inventory
+  of PHI data flows, providers, BAAs, logs, backups, CI artifacts, webhooks, Slack/AI integrations,
+  and access paths. Establish a no-PHI-by-default boundary for development, k3d/k3s sandbox,
+  automation, and external-agent workflows; any PHI-capable workload requires a dedicated,
+  BAA-covered environment with least-privilege access, MFA, encryption and key management,
+  immutable audit logging, network/egress controls, backup/restore testing, incident response,
+  periodic risk analysis, and independent legal/security review. Scope document required before
+  assigning a release; v1.42.0 remains at its five-plan cap.
 - **Distribution packages** — deb/rpm/brew. Long-standing vision item, never scoped.
 - **Home lab** — `CLUSTER_PROVIDER=k3s-local-arm64` on a Mac Mini M5 (hardware target ~Oct 2026),
   bare-metal ingress via **MetalLB + Envoy Gateway (Gateway API)** replacing the Istio

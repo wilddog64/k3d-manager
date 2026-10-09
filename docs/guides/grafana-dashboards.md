@@ -23,11 +23,13 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | CVE Auto-Patch | `cve-autopatch` | `platform-ops/grafana-dashboard-cve-autopatch.yaml` | `make platform-ops` | hub |
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
+| k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
+| k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | ArgoCD app `hub-grafana-dashboards` (hub; NOT `make platform-ops`); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
 | Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
-| k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `make observability-acg` | **ACG** |
+| k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `make observability-acg` + hub dashboard ApplicationSet | **hub + ACG** |
 | Public endpoint probes | `probe_*` | Prometheus blackbox-exporter | Hub observability ApplicationSet + `Probe` resources | hub |
 
 All eight are `ConfigMap`s in the `monitoring` namespace carrying
@@ -176,6 +178,7 @@ restarts — cosmetic, fixed by wrapping in `max()`.
 | Remediation Failure Outcomes by Service | `state=~"failed\|superseded\|deployment_advanced"` | exporter, remediation path |
 | Platform / Shopping-cart Unique CVEs | `topk(500, trivy_vulnerability_inventory{severity=~"CRITICAL\|HIGH"})`, second split by `image_repository=~"wilddog64/shopping-cart-.*"` | the split is deliberate |
 | Current CVE Remediation Status / History (audit) | `cve_remediation_event_info{current="true"}` / unfiltered | first to go blank |
+| Open critical CVEs in our images (not remediated) | `trivy_vulnerability_inventory{severity="CRITICAL", image_repository=~"wilddog64/.*"}` | exporter. The remediation tables only record an event when app-cve-scan finds a newer image to promote, so a CVE that no newer image fixes (for example, one whose fix needs a major-version upgrade) never appears there. It appears here. |
 
 Traps:
 
@@ -244,6 +247,36 @@ the dashboard: sensor states are a snapshot, not a live read. Two sensors readin
 together (`eso` + `data_layer`) is the webhook-down signature and pages by SMS,
 bypassing the correlator — see `docs/guides/hermes.md`.
 
+### Host disk (`k3dm-host-disk`) — hub
+
+Hermes ticks every five minutes and runs `bin/k3dm-disk-metrics`, which probes the M4 locally,
+the M2 over the existing SSH alias, and the Hostinger node (`/`) over SSH with the
+`HOSTINGER_*` settings before pushing gauges to the hub Pushgateway. The
+dashboard shows used percentage, free GiB, probe status, and Pushgateway age for each host.
+
+80% used sends a warning email. 90% used or less than 20 GiB free sends a critical SMS; M2
+alerts recommend `make snapshot-prune` / lowering `K3DM_SNAPSHOT_KEEP`, while Hostinger alerts
+recommend pruning unused k3s images (`sudo k3s crictl rmi --prune`) and checking logs. M4 alerts
+recommend `docker system df` and pruning images. A `No data` panel means Hermes is not running
+or the Pushgateway port-forward is down.
+
+The dashboard syncs from git through the `grafana-dashboards-hub` ApplicationSet. The alert rules
+do not: apply them with `make prometheus-rules`, which applies only
+`scripts/etc/prometheus/rules/*.yaml` to the hub, without the full `make observability` redeploy.
+
+### k3dm Alertmanager Delivery (`k3dm-alertmanager-delivery`) — hub
+
+Shows whether alerts are actually being delivered. Stats at the top: notifications sent and failed
+per integration over 24h, and a count of firing alerts by severity. Below them, the **Firing
+alerts** table lists every alert firing right now, one row per alert, with
+`severity`, `alertname`, `cluster`, `namespace` and, for Trivy alerts, `image_repository`, `tier`
+and `remediation`. It reads Prometheus's `ALERTS` series, so it answers "which alerts make up that
+count" without opening Prometheus. Severity mostly decides the route: `critical` texts (`sms-critical`),
+`warning` emails. The exception is `TrivyCriticalVulnerabilityDetected`, which goes to the CVE
+auto-patch webhook and the analysis receiver, not SMS. Both the count and the table leave out two always-on kube-prometheus-stack
+meta-alerts: `Watchdog` (the heartbeat) and `InfoInhibitor` (severity `none`, which fires whenever an
+`info` alert such as `CPUThrottlingHigh` is active, to mute it). Neither one is a real problem.
+
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 
 | Panel | Query |
@@ -291,14 +324,19 @@ takes the `if not PUSHGATEWAY_URL: return` early exit in `_push_metrics()`. If y
 reading pre-v1.39.0 data, treat any zero-duration group as test exhaust and delete it:
 `curl -X DELETE http://localhost:9091/metrics/job/k3dm-webhook/instance/<action>-<provider>`.
 
-### k3dm Tests (`k3dm-tests`) — ACG only
+### k3dm Tests (`k3dm-tests`) — hub
 
 These metrics come from a laptop-side push and therefore exist only after someone runs
-`make test-metrics`. Pushgateway retains the last value indefinitely, so read the **Suite
+`make test-all` (or its `make test-metrics` compatibility wrapper). The hub Prometheus
+imports the `k3dm_test_*` series from the laptop's Hostinger Pushgateway on `host.internal:9091`,
+so the same dashboard is now visible from the hub Grafana without changing the hub Grafana
+port-forward. Pushgateway retains the last value indefinitely, so read the **Suite
 freshness** panel first. The exit-code panel is informational only: `make test-all` here exits 2 when `test-pytest`
 falls back to a `python3` without pytest and 0 when a real `pytest` is on PATH, so the same
 healthy suite reports either value depending on the shell it ran in. Failed cases, never the
-exit code, drive health.
+exit code, drive health. The dashboard ConfigMap is owned only by the hub dashboard
+ApplicationSet; the ACG dashboard ApplicationSet excludes it so the two Argo applications
+cannot overwrite each other.
 
 | Panel | Query |
 |---|---|
@@ -310,7 +348,7 @@ exit code, drive health.
 | Total cases | `k3dm_test_cases_total` |
 | Exit code | `k3dm_test_exit_code` (informational only) |
 
-**Duration.** `make test-metrics` times the whole `make test-all` run and pushes it as
+**Duration.** `make test-all` times the whole run and pushes it as
 `k3dm_test_run_duration_seconds{target="test-all"}`. Per-suite duration is published only for
 suites whose runner prints its own time: pytest's `in X.XXs` summary and unittest's
 `Ran N tests in X s`. BATS prints no per-file time, so BATS suites have no duration series
@@ -387,11 +425,13 @@ Work down this table before editing a query. Every row is a real past incident.
 | E2E entirely blank after a real remote run | `E2E_M2_PUBLISH_BACK_HOST` unset under launchd; result stuck `publication_pending` | count `k3dm.k3d.io/e2e-result` ConfigMaps on the hub |
 | k3dm Deployment panels blank | `k3dm Deployment Metrics` is empty: the Pushgateway release must be installed on the app cluster, the local `:9091` port-forward agent must be loaded, and the `job="pushgateway"` target must be up | `curl -s -o /dev/null -w '%{http_code}' http://localhost:9091/-/healthy` |
 | Checkout Load Test blank except CPU | no producer — expected | nothing to fix |
-| k3dm Tests panels blank | nobody has run `make test-metrics` yet — these metrics are a laptop-side push, not a scrape, so there is no producer until someone runs it | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
+| k3dm Tests panels blank | nobody has run `make test-all`/`make test-metrics` yet, or the Pushgateway forward is unavailable | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
+| Host disk panels show `No data` | Hermes is not running or the hub Pushgateway port-forward is down | check Hermes and the *Last push age* panel |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
 
-The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub has no
-Pushgateway by design.
+The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub's own
+Pushgateway (`hub-pushgateway`, port-forwarded to `localhost:19094`) carries only host-side
+gauges such as vector-DB health and host disk.
 
 ---
 

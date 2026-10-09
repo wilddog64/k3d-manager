@@ -1,5 +1,7 @@
 # Bug: Slack `logs` command ignores acg-up job output file
 
+**Status:** CLOSED — doc merged to main in PR #93; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Summary
 
 Slack thread command `logs <job_id>` reports `No log found for job <job_id>` for `acg-up` jobs even when the job directory contains an `output` transcript.

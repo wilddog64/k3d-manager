@@ -30,7 +30,7 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "acg-down dry-run k3s-aws previews hub deregistration" {
-  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
@@ -219,10 +219,14 @@ STUB
     printf 'deregister\n' >> "${BATS_TEST_TMPDIR}/deregister.log"
   }
   export -f _k3s_aws_deregister_cluster
+  _hub_recovery_records() {
+    printf 'server-0|secrets|data-vault-0|node-server-0-storage\n'
+  }
+  export -f _hub_recovery_records
 }
 
 @test "acg-down dry-run k3s-aws does not invoke hub deregistration" {
-  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
@@ -246,7 +250,7 @@ fi
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/uname"
 
-  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
 
   [ "$status" -eq 0 ]
   [[ "$output" == *"DRY_RUN: would run acg_teardown --confirm"* ]]
@@ -281,7 +285,7 @@ STUB
 }
 
 @test "acg-down deletes the local hub only with --delete-hub" {
-  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"keep-hub=0 hub-cluster=k3d-cluster"* ]]
   [[ "$output" == *"DRY_RUN: would delete local Hub cluster k3d-cluster"* ]]
@@ -289,9 +293,45 @@ STUB
 }
 
 @test "acg-down k3d provider deletes the local hub by implication" {
-  run env CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm 2>&1'
+  run env CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"keep-hub=0 hub-cluster=k3d-cluster"* ]]
+}
+
+@test "acg-down refuses hub deletion without a verified snapshot" {
+  run env DRY_RUN=0 CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"DISCARD_HUB_DATA=1"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
+  [ ! -s "${BATS_TEST_TMPDIR}/aws.log" ]
+  run grep -F "cluster delete" "${BATS_TEST_TMPDIR}/k3d.log"
+  [ "$status" -ne 0 ]
+}
+
+@test "acg-down dry-run previews refusal and continues" {
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"DRY_RUN: hub snapshot guard refused"* ]]
+  [[ "$output" == *"DRY_RUN: would delete local Hub cluster k3d-cluster"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
+}
+
+@test "acg-down deletes the local hub when a fresh snapshot exists" {
+  export K3DM_SNAPSHOT_DIR="${BATS_TEST_TMPDIR}/remote"
+  mkdir -p "${K3DM_SNAPSHOT_DIR}/$(date -u +%Y%m%dT%H%M%SZ)"
+  cat > "${BATS_TEST_TMPDIR}/bin/ssh" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$*" == *"find "* ]]; then
+  find "$K3DM_SNAPSHOT_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
+fi
+exit 0
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/ssh"
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"latest verified snapshot"* ]]
+  [[ "$output" == *"DRY_RUN: hub snapshot guard passed"* ]]
+  [[ "$output" == *"DRY_RUN: would delete local Hub cluster k3d-cluster"* ]]
 }
 
 @test "acg-down rejects conflicting hub flags before provider calls" {
@@ -316,6 +356,10 @@ _make_down_flag() {
   [ "$status" -eq 0 ]
   [ "$output" = "--delete-hub" ]
 
+  run _make_down_flag DELETE_HUB=1 DISCARD_HUB_DATA=1
+  [ "$status" -eq 0 ]
+  [ "$output" = "--delete-hub --discard-hub-data" ]
+
   run _make_down_flag KEEP_LOCAL=0
   [ "$status" -eq 0 ]
   [ "$output" = "--delete-hub" ]
@@ -337,7 +381,7 @@ _make_down_flag() {
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt"
-  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
   [ -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt" ]
@@ -349,7 +393,7 @@ _make_down_flag() {
 @test "acg-down warns and continues when the ArgoCD browser listener is not loaded" {
   _stub_uname_darwin
   export STUB_LAUNCHCTL_BOOTOUT_FAIL=1
-  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
 }
@@ -360,7 +404,7 @@ _make_down_flag() {
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  run bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping Keycloak browser HTTP listener launchd daemon"* ]]
   run grep -F '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/cluster-down

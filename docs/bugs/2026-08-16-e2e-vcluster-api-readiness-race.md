@@ -1,5 +1,6 @@
 # e2e vCluster harness races substrate apply before the vCluster API is serving
 
+**Status:** CLOSED — doc merged to main in PR #116; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-16
 **Component:** `scripts/plugins/e2e.sh` (Tier 1 vCluster harness, `e2e_verify_vcluster`)
 **Severity:** medium (harness robustness — first live end-to-end run failed here; the e2e image

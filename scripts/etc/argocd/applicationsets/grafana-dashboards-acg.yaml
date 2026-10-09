@@ -31,7 +31,7 @@ spec:
         path: scripts/etc/grafana/dashboards
         directory:
           recurse: false
-          exclude: '{{if eq .server "https://kubernetes.default.svc"}}{grafana-overview-readable-configmap.yaml}{{end}}'
+          exclude: '{k3dm-tests-configmap.yaml,{{if eq .server "https://kubernetes.default.svc"}}grafana-overview-readable-configmap.yaml{{end}}}'
       syncPolicy:
         automated:
           prune: true

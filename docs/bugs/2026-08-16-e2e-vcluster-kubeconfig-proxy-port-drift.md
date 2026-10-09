@@ -1,5 +1,6 @@
 # e2e vCluster kubeconfig port drifts — background-proxy port is not durable
 
+**Status:** CLOSED — doc merged to main in PR #116; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-16
 **Component:** `scripts/plugins/vcluster.sh` (`_vcluster_export_kubeconfig`), consumed by
 `scripts/plugins/e2e.sh` (Tier 1 harness, all `_e2e_kc` calls)

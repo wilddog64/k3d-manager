@@ -1,5 +1,6 @@
 # e2e substrate: order/product-catalog use stale DB env vars → crash-loop on localhost
 
+**Status:** CLOSED — doc merged to main in PR #116; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-16
 **Component:** `scripts/etc/e2e/order.yaml`, `scripts/etc/e2e/product-catalog.yaml`
 (Tier 1 harness substrate bundle, applied by `scripts/plugins/e2e.sh`)

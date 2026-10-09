@@ -72,6 +72,8 @@ remote-operator role. The webhook enforces that role before it queues work.
 
 `/k3dm <target>` runs an allowlisted Makefile target (`scripts/lib/webhook/make_targets.py`). The relay stamps it `admin`; the webhook caps that at the caller's `K3DM_SLACK_ROLE_MAP` role (unmapped users are `reader`), then applies the target's own minimum role. Destructive targets also require the `confirm` token.
 
+Every relayed command is capped at the caller's mapped Slack role; unmapped users receive the `reader` role.
+
 The relay forwards these metadata headers to the webhook:
 
 - `X-K3DM-Role`
@@ -342,6 +344,7 @@ bin/k3dm-webhook-setup --uninstall
 | `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
 | `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
 | `/ask-docs [--sources] <question>` | Search the documentation corpus | `/ask-docs --sources how is retrieval evaluated?` | Reader-only; answers are advisory and include sources |
+| `/argocd-upgrade <chart-version> [acg\|infra] [confirm]` | Upgrade the ArgoCD Helm chart | `/argocd-upgrade 7.9.1 acg` | Admin-only; the `infra` stage changes shared infrastructure and is refused without `confirm` |
 | `/cleanup-stale-sandbox [confirm]` | Clean expired k3s-aws sandbox state | `/cleanup-stale-sandbox` | Admin-only; dry-run by default, `confirm` applies |
 | `/k3dm <target> [KEY=value …] [confirm]` | Run an allowlisted make target | `/k3dm fix-status NS=cicd` | Role per target; `/k3dm help` lists yours; one job at a time |
 | `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` | See [agent commands](#claude--gemini--codex-commands) below |
@@ -398,6 +401,9 @@ there) and retry.
 
 ### `/cluster-diagnose` usage
 
+The compact form is intentionally example-based: put the cluster first, then the
+request. `pod` is the recommended shorthand for describing one pod.
+
 Examples:
 
 - `/cluster-diagnose aws` — no verb: every pod in every namespace on that cluster
@@ -409,6 +415,8 @@ Examples:
 - `/cluster-diagnose hub apps`
 - `/cluster-diagnose hub app shopping-cart-apps`
 - `/cluster-diagnose hub appsets`
+- `/cluster-diagnose hub platform-ops pod acg-expiry-check-29855580-ssvb` — shorthand for
+  `describe-pod` when the namespace comes before the `pod` verb.
 
 This path is deliberately read-only. `pods <namespace>`, `describe-pod` and `logs` reject any
 namespace outside the repo-owned allowlist (`cicd`, `identity`, `monitoring`, `platform-ops`,
@@ -662,6 +670,13 @@ against the allowed roots. Paths outside the following are blocked with
 | `~/.cloudflared` | Cloudflare tunnel credentials and config |
 | `/var/log` | System logs |
 | `/usr/local/bin`, `/usr/bin`, `/bin`, `/opt/homebrew` | CLI tool paths |
+
+The wrapper's Layer A check also scans shell strings passed with `-c`, canonicalizes paths,
+requires directory boundaries, and rejects symlinks, `..`, tilde paths, shell substitutions,
+and bare `cd`/`pushd` commands. On macOS, Layer B runs the shell under `sandbox-exec`: reads
+and writes under the agent's home are denied except for the explicitly allowed repositories,
+kube/configuration paths, and k3dm state/cache paths. Set `K3DM_ASK_OS_SANDBOX=0` only for
+debugging; it disables the OS read boundary and must not be used as an operational setting.
 
 **Prompt scope (all three agents)**
 All system prompts explicitly state the allowed repos and instruct the agent not to access

@@ -95,6 +95,46 @@ def test_values_branch_debounces_lag_then_stale_and_clears():
     assert clean["status"] == "healthy"
 
 
+def test_values_branch_counts_two_stale_sources_as_one_app():
+    apps = [{"metadata": {"name": "one-app"}, "spec": {"sources": [
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+    ]}}]
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                           lambda *_: (0, json.dumps(apps)), {}, token="x")
+
+    assert result["evidence"].startswith("1 apps (2 source refs) not on")
+    assert result["evidence"].count("one-app@k3d-manager-v1.39.0") == 1
+    assert len(result["data"]["stale"]) == 2
+
+
+def test_values_branch_counts_multiple_apps_and_mixed_sources():
+    apps = [
+        {"metadata": {"name": "one-app"}, "spec": {"sources": [
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.40.0"},
+        ]}},
+        {"metadata": {"name": "two-app"}, "spec": {"source":
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"}}},
+    ]
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                           lambda *_: (0, json.dumps(apps)), {}, token="x")
+
+    assert result["evidence"].startswith("2 apps (2 source refs) not on")
+
+
+def test_values_branch_excludes_head_from_stale_counts():
+    apps = [{"metadata": {"name": "one-app"}, "spec": {"sources": [
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "HEAD"},
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+    ]}}]
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                           lambda *_: (0, json.dumps(apps)), {}, token="x")
+
+    assert result["evidence"].startswith("1 apps (1 source refs) not on")
+    assert result["data"]["tracking_head"] == 1
+
+
 def test_values_branch_nonrelease_is_skipped_and_never_pages(monkeypatch):
     from hermes import pager
     calls = []
@@ -200,6 +240,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: True)
     monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: None, raising=False)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
@@ -208,6 +249,22 @@ def _stub_status_poll(monkeypatch, payload):
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
     calls = []
     return calls, lambda *_: calls.append(True) or (0, payload)
+
+
+def test_poll_invokes_disk_publisher_and_publisher_failure_is_nonfatal(monkeypatch, tmp_path):
+    publisher = getattr(k3dm_hermes, "_publish_disk_metrics", None)
+    assert publisher is not None
+    calls, runner = _stub_status_poll(monkeypatch, status_payload("healthy"))
+    published = []
+    monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: published.append(True))
+    k3dm_hermes._poll({}, tmp_path / "state.json", now=1000, status_runner=runner)
+    assert published == [True]
+
+    def failed_run(*_args, **_kwargs):
+        raise OSError("collector unavailable")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", failed_run)
+    publisher()
 
 
 def test_status_poll_advances_gate_only_when_sampled_and_defaults_off(monkeypatch, tmp_path, capsys):

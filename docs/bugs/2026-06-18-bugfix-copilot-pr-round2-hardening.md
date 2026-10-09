@@ -1,5 +1,6 @@
 # Bugfix: Go rewrite PR1 — Copilot round-2 hardening (payment #23 + order #33)
 
+**Status:** CLOSED — doc merged to main in PR #96; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Repos / branches (all work repos):**
 - `shopping-cart-payment` — branch `feat/go-rewrite`
 - `shopping-cart-order` — branch `feat/go-rewrite`

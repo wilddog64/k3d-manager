@@ -2,6 +2,7 @@
 
 **Filed:** 2026-09-24
 **Branch:** `k3d-manager-v1.37.0` — work on this branch, never `main`
+**Status:** FIXED in `f8a7e118` — evidence: `scripts/lib/providers/k3s-hostinger.sh:162-172` (triaged 2026-10-08, Codex)
 **Type:** bug (same defect shape as
 `2026-09-23-hostinger-registration-never-sets-provider-label.md`, same function, one line away)
 

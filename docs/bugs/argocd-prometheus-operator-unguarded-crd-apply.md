@@ -1,5 +1,7 @@
 # Bug: argocd.sh applies Prometheus-Operator CRs without a CRD guard — aborts fresh-hub `make up`
 
+**Status:** CLOSED — doc merged to main in PR #119; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Symptom
 
 On a **fresh hub** (no monitoring stack / Prometheus Operator yet), `make up` aborts during the

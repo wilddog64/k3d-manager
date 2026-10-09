@@ -1,5 +1,7 @@
 # Rename CLUSTER_PROVIDER `k3s-azure` → `k3s-az` (hard rename) + slack param `azure` → `az`
 
+**Status:** CLOSED — doc merged to main in PR #94; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 > **✅ REINSTATED (2026-06-12).** The earlier "subtree-discipline violation" was a misdiagnosis.
 > `scripts/lib/core.sh` is **not** the lib-foundation subtree — the subtree lives at
 > `scripts/lib/foundation/` (lib-foundation's `scripts/lib/core.sh` maps to

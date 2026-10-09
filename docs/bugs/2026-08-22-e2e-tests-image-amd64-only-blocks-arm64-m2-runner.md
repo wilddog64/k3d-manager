@@ -1,5 +1,7 @@
 # E2E Playwright image `shopping-cart-e2e-tests` is amd64-only — blocks the M2 (arm64) remote runner (2026-08-22)
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 > **RESOLVED 2026-08-24.** Multiarch build shipped: `wilddog64/shopping-cart-e2e-tests`
 > **PR #7 MERGED** (`90c13994`) — adds `docker/setup-qemu-action` + `platforms:
 > linux/amd64,linux/arm64` + `provenance: false` to `publish-image.yml`. `:latest` rebuilt on

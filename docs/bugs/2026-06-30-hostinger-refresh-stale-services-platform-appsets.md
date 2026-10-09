@@ -1,5 +1,6 @@
 # Bug: Hostinger refresh leaves `services-git` and `platform-helm` stale, so product-catalog and platform stay OutOfSync
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.12.0`
 **Files:**
 - `scripts/lib/providers/k3s-hostinger.sh` (edit)

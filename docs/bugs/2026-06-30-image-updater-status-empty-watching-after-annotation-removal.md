@@ -1,5 +1,6 @@
 # Bug: `make status` still reports empty Image Updater "Watching" after static enrollment was removed
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.12.0`
 **Files:**
 - `bin/cluster-status` (edit)

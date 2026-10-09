@@ -3,6 +3,7 @@
 **Filed:** 2026-09-22
 **Branch:** `k3d-manager-v1.36.0`
 **Blocks:** PR #130 (cannot merge while `lint` is red)
+**Status:** FIXED — Prometheus reseed `7d475a9f`; rotator `base64 --decode` → `base64 -d` in `945018ee` (PR #130, v1.36.0), guarded by `scripts/tests/plugins/platform_ops_rotators.bats` (2 cases). Re-checked 2026-10-08, Claude: zero `base64 --decode` left under `scripts/etc/argocd/platform-ops/`. The 2026-10-08 Codex triage marked this PARTIAL in error.
 **Failing run:** [35722946408](https://github.com/wilddog64/k3d-manager/actions/runs/35722946408) at `02c4bee3` — job `lint`, `make test` exits 1
 
 ## Symptom

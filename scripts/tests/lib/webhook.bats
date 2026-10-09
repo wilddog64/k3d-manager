@@ -17,7 +17,10 @@ setup_file() {
     K3DM_WEBHOOK_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     export K3DM_WEBHOOK_PORT="${_WEBHOOK_PORT}"
     export SLACK_SIGNING_SECRET="bats-slack-signing-secret"
-    export K3DM_SLACK_ROLE_MAP="U-reader:reader"
+    export K3DM_SLACK_ROLE_MAP="U-reader:reader,U123:operator"
+    # Never let local webhook tests post their stubbed cluster jobs to the real
+    # Slack channel when `make test-all` is launched from a live webhook.
+    unset SLACK_BOT_TOKEN SLACK_CHANNEL_ID K3DM_SLACK_WEBHOOK_URL
 
     # Stub the analysis binary so queued /analyze and /diagnostics jobs cannot
     # spawn the real agy CLI (which launches Chrome via ACG browser automation).
@@ -171,7 +174,7 @@ setup() {
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"7.8.2","stage":"infra"}' \
+        -d '{"chart_version":"7.8.2","stage":"infra","confirm":true}' \
         "${_WEBHOOK_URL}/api/v1/argocd-upgrade"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]
@@ -246,7 +249,7 @@ setup() {
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
         -H "Content-Type: application/json" \
-        --data-raw '{"chart_version":"7.8.2\",\"injected\":\"val","stage":"infra"}' \
+        --data-raw '{"chart_version":"7.8.2\",\"injected\":\"val","stage":"infra","confirm":true}' \
         "${_WEBHOOK_URL}/api/v1/argocd-upgrade"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]
@@ -364,6 +367,34 @@ assert not _verify_slack_signature(b"\xff", "0", "v0=x")
     [[ "${response}" == *'"ok":true'* ]]
     after="$(find "${K3DM_JOB_DIR}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
     [ "${after}" = "${before}" ]
+}
+
+@test "Slack event larger than 4 KB is verified on the full body" {
+    local padding body response
+    padding="$(printf '%5000s' '')"
+    padding="${padding// /x}"
+    body="{\"type\":\"event_callback\",\"event\":{\"type\":\"message\",\"bot_id\":\"B1\",\"text\":\"${padding}\",\"ts\":\"9\"}}"
+    response="$(_slack_event "${body}")"
+    [[ "${response}" == *'"ok":true'* ]]
+}
+
+@test "Slack event over the Slack cap returns 413" {
+    local body
+    body="$(printf '%70000s' '')"
+    body="${body// /x}"
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Content-Type: application/json" \
+        --data-raw "${body}" \
+        "${_WEBHOOK_URL}/slack/events"
+    [ "${status}" -eq 0 ]
+    [ "${output}" = "413" ]
+}
+
+@test "Slack reports an authorization failure in the originating command thread" {
+    run grep -F -- 'This Slack account is not authorized for webhook commands' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
+    run grep -F -- 'thread_ts=ev_thread_ts or None' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "${status}" -eq 0 ]
 }
 
 @test "Slack allowlisted reader can dispatch cluster-status" {
@@ -534,7 +565,7 @@ PY
         -H "X-K3DM-Actor: slack:test-user:U123" \
         -H "X-K3DM-Source-Command: /cluster-refresh" \
         -H "Content-Type: application/json" \
-        -d '{"provider":"hostinger"}' \
+        -d '{"provider":"hostinger","slack_user_id":"U123"}' \
         "${_WEBHOOK_URL}/api/v1/cluster-refresh"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]
@@ -593,10 +624,11 @@ PY
 }
 
 @test "webhook analysis uses ordered candidates and a safe sentinel" {
-    run grep -F -- 'os.environ.get("K3DM_AI_BIN_ORDER", "agy,gemini")' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
+    run python3 -c 'import sys; source = "".join(open(sys.argv[1]).read().split()); assert "os.environ.get(\"K3DM_AI_BIN_ORDER\",\"agy,gemini\")" in source, "ordered AI candidate environment lookup not found"' \
+        "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'return "AI analysis unavailable — "' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
+    run grep -F -- 'AI analysis unavailable — ' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/agent.py"
     [ "$status" -eq 0 ]
 }
 
@@ -723,7 +755,7 @@ PY
     response="$(curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"0.0.1-test","stage":"infra"}' \
+        -d '{"chart_version":"0.0.1-test","stage":"infra","confirm":true}' \
         "${_WEBHOOK_URL}/api/v1/argocd-upgrade")"
     job_id="$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["job_id"])')"
     [[ -n "$job_id" ]]
@@ -747,7 +779,7 @@ PY
     response="$(curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"0.0.1-test","stage":"infra"}' \
+        -d '{"chart_version":"0.0.1-test","stage":"infra","confirm":true}' \
         "${_WEBHOOK_URL}/api/v1/argocd-upgrade")"
     job_id="$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["job_id"])')"
 
@@ -804,7 +836,7 @@ PY
     run curl -s -o /dev/null -w "%{http_code}" -X POST \
         -H "Authorization: Bearer wrongtoken" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"7.8.2","stage":"infra"}' \
+        -d '{"chart_version":"7.8.2","stage":"infra","confirm":true}' \
         "${_TUNNEL_URL}/api/v1/argocd-upgrade"
     [ "$status" -eq 0 ]
     [ "$output" = "401" ]
@@ -828,7 +860,7 @@ PY
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_LEVEL3_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d '{"chart_version":"0.0.1-tunnel-test","stage":"infra"}' \
+        -d '{"chart_version":"0.0.1-tunnel-test","stage":"infra","confirm":true}' \
         "${_TUNNEL_URL}/api/v1/argocd-upgrade"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]
@@ -872,7 +904,7 @@ PY
 @test "k3dm-ask-bash allows a plain kubectl read" {
     local repo_root
     repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
-    run "${repo_root}/bin/k3dm-ask-bash" -c "kubectl get pods -n cicd"
+    run env K3DM_ASK_OS_SANDBOX=0 "${repo_root}/bin/k3dm-ask-bash" -c "kubectl get pods -n cicd"
     [ "$status" -eq 0 ]
 }
 

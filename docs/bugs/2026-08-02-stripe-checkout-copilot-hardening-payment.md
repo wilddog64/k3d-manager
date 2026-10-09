@@ -1,5 +1,6 @@
 # Bugfix: Stripe checkout Copilot hardening — payment service
 
+**Status:** CLOSED — doc merged to main in PR #110; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Repo:** `shopping-cart-payment` (work here; this spec lives in k3d-manager)
 **Branch:** `feat/stripe-checkout-gateway` (Phase B)
 **File:** `go/internal/gateway/mock.go`

@@ -54,3 +54,11 @@ EOF
   [ "${status}" -eq 2 ]
   [[ "${output}" == *"--cluster must be a non-empty"* ]]
 }
+
+@test "make cleanup-stale-registration passes CLUSTER in the form the script accepts" {
+  run make --no-print-directory -C "${REPO_ROOT}" cleanup-stale-registration CLUSTER=ubuntu-k3s
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"secret: cluster-ubuntu-k3s"* ]]
+  [[ "${output}" == *"DRY_RUN: no changes made"* ]]
+  [ ! -s "${KUBECTL_LOG}" ]
+}

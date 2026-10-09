@@ -1,5 +1,6 @@
 # Webhook clear-text secret storage — CodeQL HIGH x2 (defensive redaction barrier)
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-09-03
 **PR:** #118 (v1.27.0)
 **CodeQL:** 2 HIGH `py/clear-text-storage-sensitive-data` — `bin/k3dm-webhook:2286` and `:2601`, both `(job_dir / "output").write_text(output)`.

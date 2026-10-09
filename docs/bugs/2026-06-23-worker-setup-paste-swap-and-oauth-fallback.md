@@ -1,5 +1,6 @@
 # Bugfix: v1.8.0 — worker-setup secret paste-swap + OAuth fallback
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch (implement on a NEW branch off main):** `fix/worker-setup-secret-validation-oauth-fallback`
 **Files:** `bin/k3dm-worker-setup`, `Makefile`
 

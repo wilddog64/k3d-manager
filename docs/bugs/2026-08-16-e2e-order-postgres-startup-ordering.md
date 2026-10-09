@@ -1,5 +1,6 @@
 # e2e substrate: order CrashLoopBackOff + postgres first-boot restart (startup ordering)
 
+**Status:** CLOSED — doc merged to main in PR #116; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-16
 **Component:** `scripts/etc/e2e/order.yaml`, `scripts/etc/e2e/postgres.yaml` (Tier 1 harness substrate)
 **Severity:** high (blocks a green Tier 1 e2e smoke — order never reaches Ready within the rollout timeout)

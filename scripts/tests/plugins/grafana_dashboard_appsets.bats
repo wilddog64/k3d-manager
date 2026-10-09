@@ -18,6 +18,13 @@ _assert_server_keyed_hub_exclude() {
   [[ "$exclude" != *'{{if eq .name'* ]] || return 1
 }
 
+_assert_acg_excludes_hub_owned_tests() {
+  local appset="$1"
+  local exclude
+  exclude="$(yq -r '.spec.template.spec.source.directory.exclude // ""' "$appset")" || return 1
+  [[ "$exclude" == *"k3dm-tests-configmap.yaml"* ]] || return 1
+}
+
 _assert_collision_files_excluded() {
   local appset="$1"
   local platform_ops_dir="$2"
@@ -110,6 +117,10 @@ _assert_no_panel_overlap() {
   _assert_hub_exclude_contract "${ACG}" "${PLATFORM_OPS_DIR}" "${DASHBOARDS_DIR}"
 }
 
+@test "acg dashboard appset does not manage the hub-owned k3dm tests dashboard" {
+  _assert_acg_excludes_hub_owned_tests "${ACG}"
+}
+
 @test "acg dashboard appset collision guard rejects a missing exclude" {
   local snapshot="${BATS_TEST_TMPDIR}/grafana-dashboards-acg.yaml"
   cp "${ACG}" "$snapshot"
@@ -151,8 +162,47 @@ _assert_no_panel_overlap() {
 }
 
 @test "hub dashboard appset includes all grafana-dashboard configmaps" {
-  run yq -r '.spec.template.spec.source.directory.include' "${HUB}"
+  run yq -r '.spec.template.spec.sources[] | select(.path == "scripts/etc/argocd/platform-ops") | .directory.include' "${HUB}"
   [ "$output" = "grafana-dashboard-*.yaml" ]
+}
+
+@test "hub dashboard appset imports the k3dm tests dashboard" {
+  run yq -r '.spec.template.spec.sources[] | select(.path == "scripts/etc/grafana/dashboards") | .directory.include' "${HUB}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "k3dm-tests-configmap.yaml" ]
+}
+
+@test "k3dm tests dashboard uses the hub Prometheus datasource" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  run yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | jq -e 'all(.panels[] | .targets[]?; .datasource.uid == "prometheus")' >/dev/null
+}
+
+@test "k3dm tests failing-suite table has human-readable columns" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  local dashboard panel
+  dashboard="$(yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}")"
+  panel="$(jq -c '.panels[] | select(.id == 4)' <<<"${dashboard}")"
+  [ -n "${panel}" ]
+  [ "$(jq -r '.title' <<<"${panel}")" = "Failing test cases (latest run)" ]
+  [ "$(jq -r '.targets[0].instant' <<<"${panel}")" = "true" ]
+  [ "$(jq -r '.targets[0].expr' <<<"${panel}")" = "k3dm_test_failure" ]
+  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .suite == "Test suite" and .case == "Case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .instance and .job and .Value' <<<"${panel}" >/dev/null
+}
+
+@test "k3dm tests dashboard preserves failed cases across the selected range" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  local dashboard panel
+  dashboard="$(yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}")"
+  panel="$(jq -c '.panels[] | select(.id == 8)' <<<"${dashboard}")"
+  [ -n "${panel}" ]
+  [ "$(jq -r '.title' <<<"${panel}")" = "Failures in selected time range" ]
+  [ "$(jq -r '.targets[0].instant' <<<"${panel}")" = "true" ]
+  [ "$(jq -r '.targets[0].expr' <<<"${panel}")" = "max_over_time(k3dm_test_failure[\$__range])" ]
+  jq -e '.transformations[] | select(.id == "organize") | .options.renameByName | .instance == "Target / origin" and .suite == "Test suite" and .case == "Case" and .name == "Test name" and .reason == "Failure reason"' <<<"${panel}" >/dev/null
+  jq -e '.transformations[] | select(.id == "organize") | .options.excludeByName | .Time and .__name__ and .job and .Value and (has("instance") | not)' <<<"${panel}" >/dev/null
 }
 
 @test "both dashboard appsets self-heal" {
@@ -298,6 +348,7 @@ _assert_no_panel_overlap() {
 @test "Grafana Overview query mutation rejects a fixed one-minute window" {
   local snapshot="${BATS_TEST_TMPDIR}/hub-overview-rate.yaml"
   cp "${HUB_OVERVIEW}" "$snapshot"
+  # shellcheck disable=SC2016
   yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 2) | .targets[0].expr) = "sum by (status_code) (rate(grafana_http_request_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[1m]))" | tojson))' "$snapshot"
   run _assert_query_contract "$snapshot"
   [ "$status" -ne 0 ]
@@ -308,6 +359,7 @@ _assert_no_panel_overlap() {
 @test "Grafana Overview query mutation rejects the removed alert metric" {
   local snapshot="${BATS_TEST_TMPDIR}/app-overview-alert.yaml"
   cp "${OVERVIEW}" "$snapshot"
+  # shellcheck disable=SC2016
   yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 6) | .targets[0].expr) = "grafana_alerting_result_total{job=~\"$job\", instance=~\"$instance\", state=\"alerting\"}" | tojson))' "$snapshot"
   run _assert_query_contract "$snapshot"
   [ "$status" -ne 0 ]
@@ -366,7 +418,7 @@ _assert_no_panel_overlap() {
   cmp -s "${HUB_OVERVIEW}" "$snapshot"
 }
 
-@test "k3dm tests dashboard keeps the make exit code informational" {
+@test "k3dm tests dashboard shows the latest run classification" {
   local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
   run yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}"
   [ "$status" -eq 0 ]
@@ -374,11 +426,43 @@ _assert_no_panel_overlap() {
   local panel
   panel=$(printf '%s\n' "$dashboard_json" | jq -c '.panels[] | select(.id == 7)')
   [ -n "$panel" ]
-  [ "$(jq -r '.title' <<<"$panel")" = "Make exit code (informational)" ]
+  [ "$(jq -r '.title' <<<"$panel")" = "Latest run classification" ]
   [ "$(jq '[.fieldConfig.defaults.mappings[]? | tostring | test("PASS|EXPECTED ENVIRONMENT")] | any' <<<"$panel")" = "false" ]
-  [ "$(jq -r '.targets[0].expr' <<<"$panel")" = "k3dm_test_exit_code" ]
+  [ "$(jq -r '.targets[0].expr' <<<"$panel")" = "k3dm_test_run_classification" ]
   run jq -e '.targets[0].expr | contains("last_over_time")' <<<"$panel"
   [ "$status" -ne 0 ]
-  jq -e '.description | contains("Failed cases")' <<<"$panel" >/dev/null
+  jq -e '.description | contains("failed_untriaged")' <<<"$panel" >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failed cases" and (.targets[0].expr == "k3dm_test_cases_failed"))' >/dev/null
+  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Last run" and .fieldConfig.defaults.unit == "dateTimeAsIso" and .targets[0].expr == "max(k3dm_test_last_timestamp_seconds) * 1000")' >/dev/null
+  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Last run" and .fieldConfig.defaults.color.mode == "fixed" and .fieldConfig.defaults.color.fixedColor == "text")' >/dev/null
+  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Time since last successful run")' >/dev/null
+  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failing test cases (latest run)" and (.description | contains("No data means")))' >/dev/null
+}
+
+@test "k3dm tests freshness stats aggregate to one latest value" {
+  local tests_dashboard="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-tests-configmap.yaml"
+  run yq -r '.data["k3dm-tests.json"]' "${tests_dashboard}"
+  [ "$status" -eq 0 ]
+  local dashboard_json="$output"
+  local latest_panel successful_panel
+  latest_panel=$(printf '%s\n' "$dashboard_json" | jq -c '.panels[] | select(.id == 1)')
+  successful_panel=$(printf '%s\n' "$dashboard_json" | jq -c '.panels[] | select(.id == 2)')
+  [ "$(jq -r '.targets[0].expr' <<<"$latest_panel")" = "max(k3dm_test_last_timestamp_seconds) * 1000" ]
+  [ "$(jq -r '.targets[0].instant' <<<"$latest_panel")" = "true" ]
+  jq -e '.targets[0].expr | startswith("time() - max(")' <<<"$successful_panel" >/dev/null
+  [ "$(jq -r '.targets[0].instant' <<<"$successful_panel")" = "true" ]
+  [ "$(printf '%s\n' "$dashboard_json" | jq -r '.panels[] | select(.id == 2) | .title')" = "Time since last successful run" ]
+}
+
+@test "every provisioned Grafana dashboard carries at least one tag" {
+  local file untagged=""
+  for file in "${PLATFORM_OPS_DIR}"/grafana-dashboard-*.yaml "${DASHBOARDS_DIR}"/*.yaml; do
+    while IFS= read -r dashboard_json; do
+      [ -n "$dashboard_json" ] || continue
+      if ! jq -e '(.tags // []) | length > 0' <<<"$dashboard_json" >/dev/null; then
+        untagged+="${file##*/} "
+      fi
+    done < <(yq -o=json -I=0 '.data // {} | to_entries | .[] | select(.key | test("\\.json$")) | .value' "$file" | jq -c 'fromjson')
+  done
+  [ -z "$untagged" ] || { echo "untagged dashboards: ${untagged}"; false; }
 }

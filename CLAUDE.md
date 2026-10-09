@@ -23,7 +23,7 @@ Uses a dispatcher pattern with lazy plugin loading.
   read-only actions listed in that how-to's table are available; everything else must be run
   by the operator.
 
-- **Reapply the ApplicationSets on every release** — ApplicationSets template their `$values` source at `${K3D_MANAGER_BRANCH}`, which freezes to whatever branch was checked out when the set was last applied. Config committed to a newer branch is **inert** until the sets are reapplied: it is in git, CI is green, and no cluster reads it. This silently persisted for two releases (hub `trivy-operator` still on `k3d-manager-v1.16.0` as of 2026-07-24). Decision 2026-07-24: the values ref keeps tracking the **release branch**, not `main` — which makes this a required release step, not an optional one. Reapply for **both** the hub and ACG variants, then confirm with `argocd_check_values_branch`.
+- **Reapply the ApplicationSets on every release** — ApplicationSets template their `$values` source at `${K3D_MANAGER_BRANCH}`, which freezes to whatever branch was checked out when the set was last applied. Config committed to a newer branch is **inert** until the sets are reapplied: it is in git, CI is green, and no cluster reads it. This silently persisted for two releases (hub `trivy-operator` still on `k3d-manager-v1.16.0` as of 2026-07-24). Decision 2026-07-24: the values ref keeps tracking the **release branch**, not `main` — which makes this a required release step, not an optional one. Reapply for **both** the hub and ACG variants with `make appsets-reapply` (refuses a non-release branch), then confirm with `make appsets-check`.
 
 ## Environment Constraints
 - **Thinking Budget:** Capped at 8,192 tokens (set via .envrc).

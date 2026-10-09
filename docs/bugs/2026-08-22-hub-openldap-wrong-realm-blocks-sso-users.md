@@ -1,5 +1,7 @@
 # `bin/cluster-up` seeds LDAP/realm at `dc=shopping-cart,dc=local` but the directory is `dc=home,dc=org` → dev-user SSO can't be seeded (2026-08-22)
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 > **Direction corrected 2026-08-22:** `dc=home,dc=org` is the *correct* designed
 > directory (per `scripts/etc/ldap/vars.sh`); the consumers in `bin/cluster-up`
 > are what's wrong. Original title implied the openldap was misconfigured — it is not.

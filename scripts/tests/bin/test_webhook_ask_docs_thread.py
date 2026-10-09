@@ -43,9 +43,16 @@ def test_ask_docs_thread_runs_without_channel_and_replies_in_parent_thread(
     monkeypatch, thread_job, capsys
 ):
     calls = []
+    bot_calls = []
     monkeypatch.setattr(wh.ask_docs, "answer", lambda question, summarise: calls.append((question, summarise)) or "doc answer")
     monkeypatch.setattr(wh, "_start_bot_thread", lambda header: calls.append(("header", header)) or "NEW")
-    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None: calls.append((text, thread_ts)) or "reply")
+    monkeypatch.setattr(
+        wh,
+        "_post_slack_bot",
+        lambda text, thread_ts=None, channel_id=None: calls.append((text, thread_ts))
+        or bot_calls.append((text, thread_ts, channel_id))
+        or "reply",
+    )
 
     wh._handle_thread_command("parent", "ask-docs what is X", role="reader")
 
@@ -55,6 +62,7 @@ def test_ask_docs_thread_runs_without_channel_and_replies_in_parent_thread(
     assert (subjobs[0] / "thread_ts").read_text() == "T"
     assert calls[0] == ("what is X", True)
     assert ("doc answer", "T") in calls
+    assert ("doc answer", "T", None) in bot_calls
     assert "what is X" not in capsys.readouterr().out
 
 

@@ -5,6 +5,7 @@
 # advisory only and never triggers a restart (a slow node under CPU pressure is
 # alive, and bouncing it evicts pods and adds load). Keep it disabled when
 # running manually unless K3DM_NODE_RECOVERY_ENABLED=1 is explicitly set.
+# A Ready node whose kubelet tunnel fails fast with a 502 for K3DM_NODE_TUNNEL_THRESHOLD consecutive ticks is recovered, because that failure never self-heals.
 # An unreachable API server (e.g. a broken k3d serverlb) is also advisory only: the node's state is unknown, so no restart.
 set -u
 
@@ -14,6 +15,7 @@ context="${K3DM_NODE_RECOVERY_CONTEXT:-k3d-k3d-cluster}"
 node="${K3DM_NODE_RECOVERY_NODE:-k3d-k3d-cluster-agent-0}"
 interval="${K3DM_NODE_RECOVERY_INTERVAL:-30}"
 threshold="${K3DM_NODE_RECOVERY_FAILURE_THRESHOLD:-5}"
+tunnel_threshold="${K3DM_NODE_TUNNEL_THRESHOLD:-6}"
 cooldown="${K3DM_NODE_RECOVERY_COOLDOWN:-300}"
 healthz_timeout="${K3DM_NODE_RECOVERY_HEALTHZ_TIMEOUT:-15s}"
 enabled="${K3DM_NODE_RECOVERY_ENABLED:-0}"
@@ -25,9 +27,20 @@ mkdir -p "$(dirname "$log_file")" "$(dirname "$state_file")"
 
 _log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >>"$log_file"; }
 
+_healthz_state() {
+  local out
+  if out="$(kubectl --context "$context" get --raw "/api/v1/nodes/${node}/proxy/healthz" \
+    --request-timeout="$healthz_timeout" 2>&1)" && [[ "$out" == "ok" ]]; then
+    echo ok
+  elif grep -Eq 'proxy error from .* while dialing .*:10250, code 502' <<<"$out"; then
+    echo tunnel
+  else
+    echo slow
+  fi
+}
+
 _healthy() {
-  kubectl --context "$context" get --raw "/api/v1/nodes/${node}/proxy/healthz" \
-    --request-timeout="$healthz_timeout" 2>/dev/null | grep -qx 'ok'
+  [[ "$(_healthz_state)" == "ok" ]]
 }
 
 _ready() {
@@ -72,15 +85,34 @@ _recover() {
 }
 
 failures=0
+tunnel_failures=0
 
 _tick() {
+  local hz
   if _ready; then
     failures=0
-    _healthy || _log "${node} Ready but /healthz slow/unreachable (advisory, no restart)"
+    hz="$(_healthz_state)"
+    case "$hz" in
+      ok) tunnel_failures=0 ;;
+      tunnel)
+        tunnel_failures=$((tunnel_failures + 1))
+        _log "${node} Ready but kubelet tunnel dead (${tunnel_failures}/${tunnel_threshold})"
+        if (( tunnel_failures >= tunnel_threshold )); then
+          _recover || true
+          tunnel_failures=0
+        fi
+        ;;
+      *)
+        tunnel_failures=0
+        _log "${node} Ready but /healthz slow/unreachable (advisory, no restart)"
+        ;;
+    esac
   elif ! _api_reachable; then
+    tunnel_failures=0
     failures=0
     _log "API server unreachable from host via ${context}; ${node} state unknown (advisory, no restart)"
   else
+    tunnel_failures=0
     failures=$((failures + 1))
     _log "${node} NotReady (${failures}/${threshold})"
     if (( failures >= threshold )); then

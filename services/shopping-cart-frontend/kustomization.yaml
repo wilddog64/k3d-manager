@@ -31,4 +31,4 @@ patches:
       name: frontend
 images:
   - name: ghcr.io/wilddog64/shopping-cart-frontend
-    digest: sha256:ca25a63658b546f44058c17fd9a2ae360e56f63555028db19d0f575f97cada72
+    digest: sha256:17f46a0d6265c1baf05f8a55a8fd69bec8fab11a6b96c7600dd53d57fc691fcc

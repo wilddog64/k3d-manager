@@ -54,3 +54,24 @@ def test_smoke_uses_provider_scoped_pushgateway_ports(monkeypatch):
     requested.clear()
     WEBHOOK._smoke_test_services(retries=1, provider="k3s-hostinger", quick=True)
     assert any(url.endswith(":9091/-/healthy") for url in requested)
+
+
+def test_publish_test_metrics_runs_repo_exporter_from_repo_root(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_spawn(command, cwd, env, timeout):
+        calls.append((command, cwd))
+        return 0, "[k3dm-test-metrics] metrics pushed: test-all/local", False
+
+    notices = []
+    monkeypatch.setattr(WEBHOOK, "_spawn_capture_text", fake_spawn)
+    monkeypatch.setattr(WEBHOOK, "_notify_job", lambda job_id, text: notices.append(text))
+
+    WEBHOOK._publish_test_metrics("abcd1234", tmp_path / "make.log", 2, 42)
+
+    assert len(calls) == 1
+    command, cwd = calls[0]
+    assert Path(command[1]) == ROOT / "bin" / "k3dm-test-metrics"
+    assert Path(cwd) == ROOT
+    assert command[3:] == ["--target", "test-all", "--exit-code", "2", "--run-duration", "42"]
+    assert notices == []

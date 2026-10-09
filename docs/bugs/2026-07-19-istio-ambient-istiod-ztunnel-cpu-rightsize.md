@@ -1,5 +1,6 @@
 # Bug: istiod cannot schedule on the 2-CPU hostinger node — right-size istiod + ztunnel requests
 
+**Status:** CLOSED — doc merged to main in PR #106; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `scripts/etc/argocd/applicationsets/istio-ambient.yaml` (ONLY)
 **Classification:** Bugfix in `docs/bugs/` (exempt from the max-5-plan limit).

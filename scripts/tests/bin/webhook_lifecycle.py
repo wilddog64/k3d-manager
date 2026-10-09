@@ -26,6 +26,7 @@ class WebhookLifecycleTests(unittest.TestCase):
         lifecycle.JOB_DIR = Path(self.temp_dir.name)
         self.notifications = []
         self.spawned = []
+        self.published_metrics = []
         self.lock = threading.Lock()
         self.lock.acquire()
         lifecycle.configure_runtime(
@@ -46,6 +47,7 @@ class WebhookLifecycleTests(unittest.TestCase):
                 "run_post_provision_check": lambda job_id, provider: None,
                 "running_cluster_job": lambda: None,
                 "make_job_lock": self.lock,
+                "publish_test_metrics": lambda *args: self.published_metrics.append(args),
             },
         )
         lifecycle._run_cleanup = lambda *args: None
@@ -73,6 +75,36 @@ class WebhookLifecycleTests(unittest.TestCase):
         (lifecycle.JOB_DIR / job_id).mkdir()
         lifecycle._run_make_target(job_id, ["fix-list"], 12, "actor")
         self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "fix-list"])
+        self.assertEqual(self.published_metrics, [])
+    def test_test_all_publishes_captured_log_once_after_completion(self):
+        job_id = "a1b2c3d6"
+        (lifecycle.JOB_DIR / job_id).mkdir()
+
+        lifecycle._run_make_target(job_id, ["test-all"], 731, "cloud-bridge")
+
+        self.assertEqual(len(self.published_metrics), 1)
+        published_job, log_path, exit_code, duration = self.published_metrics[0]
+        self.assertEqual(published_job, job_id)
+        self.assertEqual(log_path, lifecycle.JOB_DIR / job_id / "make.log")
+        self.assertEqual(exit_code, 0)
+        self.assertGreaterEqual(duration, 0)
+        self.assertEqual((lifecycle.JOB_DIR / job_id / "status").read_text(), "success")
+
+    def test_test_all_does_not_duplicate_make_published_metrics(self):
+        job_id = "a1b2c3e0"
+        (lifecycle.JOB_DIR / job_id).mkdir()
+        original_spawn = lifecycle._spawn_job
+
+        def spawn_with_published_metrics(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("[k3dm-test-metrics] metrics pushed: test-all/local\n")
+            return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}))
+
+        lifecycle._spawn_job = spawn_with_published_metrics
+        try:
+            lifecycle._run_make_target(job_id, ["test-all"], 731, "cloud-bridge")
+        finally:
+            lifecycle._spawn_job = original_spawn
+        self.assertEqual(self.published_metrics, [])
 
     def test_make_target_times_out_and_kills_the_job(self):
         job_id = "a1b2c3d8"

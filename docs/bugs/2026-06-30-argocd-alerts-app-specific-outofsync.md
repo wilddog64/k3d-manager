@@ -1,5 +1,6 @@
 # Bugfix: app-specific ArgoCD alerts and Grafana views should cover data-layer, payment, and infra services
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.12.0`
 **Files:**
 - `scripts/etc/argocd/platform-ops/prometheusrule.yaml` (edit)

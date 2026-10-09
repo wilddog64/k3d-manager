@@ -1,5 +1,6 @@
 # Bugfix — webhook `/ask` fix-mode role gating (F1) + `response_url` host allowlist (F3)
 
+**Status:** CLOSED — doc merged to main in PR #123; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-09-07
 **Source:** webhook-server security audit (`docs/issues/2026-09-07-webhook-server-security-audit.md`), findings F1 (HIGH) and F3 (MEDIUM).
 **Branch:** `k3d-manager-v1.32.0`

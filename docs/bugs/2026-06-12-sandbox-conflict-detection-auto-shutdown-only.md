@@ -1,5 +1,6 @@
 # Bug: _deleteConflictingSandbox misses conflict when panel closed; panelStartBtn clicks disabled button forever
 
+**Status:** CLOSED — doc merged to main in PR #94; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-12
 **Branch (lib-acg):** `feat/v0.1.7`
 **File:** `playwright/lib/sandbox.js`

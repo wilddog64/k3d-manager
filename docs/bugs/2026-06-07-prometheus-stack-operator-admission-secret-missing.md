@@ -1,5 +1,6 @@
 # Bug: kube-prometheus-stack-operator Stuck in ContainerCreating — Admission Secret Missing
 
+**Status:** CLOSED — doc merged to main in PR #93; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.6.4`
 **Date:** 2026-06-07
 **Files:** Helm values for `acg-kube-prometheus-stack`

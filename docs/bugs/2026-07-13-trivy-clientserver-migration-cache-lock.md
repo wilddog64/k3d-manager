@@ -1,5 +1,6 @@
 # Trivy Standalone → ClientServer migration (fix multi-container scan cache-lock)
 
+**Status:** CLOSED — doc merged to main in PR #105; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.15.0`
 **Files:** `scripts/etc/helm/observability/trivy-operator-values.yaml`, `scripts/etc/helm/observability/trivy-operator-acg-values.yaml`, `scripts/tests/plugins/trivy_operator_observability.bats`
 

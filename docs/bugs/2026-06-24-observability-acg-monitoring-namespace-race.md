@@ -1,5 +1,6 @@
 # Bug: ACG observability creates monitoring secrets before the target namespace exists
 
+**Status:** CLOSED — doc merged to main in PR #99; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-06-24
 **Type:** bugfix
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`

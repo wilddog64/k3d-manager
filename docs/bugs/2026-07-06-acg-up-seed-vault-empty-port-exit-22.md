@@ -1,5 +1,6 @@
 # Bugfix: v1.14.0 — acg-up Vault KV seed fails with exit 22 (empty-port freeze)
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.14.0`
 **Files:** `scripts/plugins/shopping_cart.sh`, `scripts/tests/plugins/shopping_cart_seed_idempotent.bats`
 

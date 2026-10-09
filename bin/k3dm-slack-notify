@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+message="$(cat)"
+[[ -n "${message}" ]] || { printf '%s\n' 'k3dm-slack-notify: empty message' >&2; exit 2; }
+K3DM_NOTIFY_MESSAGE="${message}" PYTHONPATH="${repo_root}/scripts/lib" python3 - <<'PY'
+import os
+import sys
+
+from hermes.sensors import _keychain_secret
+from hermes.slack import post_summary
+
+sys.exit(0 if post_summary(_keychain_secret("k3dm-slack-webhook"),
+                           os.environ["K3DM_NOTIFY_MESSAGE"]) else 1)
+PY

@@ -1,5 +1,6 @@
 # Bugfix: v1.6.5 — poll for data-layer StatefulSet presence (Application Synced ≠ StatefulSets exist)
 
+**Status:** CLOSED — doc merged to main in PR #94; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.6.5`
 **Files:** `scripts/plugins/shopping_cart.sh`
 

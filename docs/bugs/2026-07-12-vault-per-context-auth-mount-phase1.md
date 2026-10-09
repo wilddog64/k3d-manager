@@ -1,5 +1,6 @@
 # Bugfix: v1.14.0 — Vault per-context auth mount (Phase 1)
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.14.0`
 **Files:** `scripts/lib/core.sh`, `scripts/plugins/vault.sh`, `scripts/plugins/shopping_cart.sh`,
 `scripts/plugins/eso.sh`, `scripts/tests/plugins/vault_app_auth.bats`,

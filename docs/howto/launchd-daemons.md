@@ -23,10 +23,26 @@ Install via `make <target>` or via the plugin function noted below.
 | `com.k3d-manager.alertmanager-auth-proxy` | Alertmanager login proxy → `localhost:9093` | ✅ | `make install-alertmanager-auth-proxy` | `~/Library/Logs/k3dm-alertmanager-auth-proxy.log` |
 | `com.k3d-manager.cleanup` | Purges stale repo-owned temp files, Playwright artifacts, screenshots, Packer ISO/lock files (>30d), port markers (>7d), and placeholder `TemporaryDirectory.*` dirs | ❌ (timer: daily 03:00) | `make install-cleanup` | `~/Library/Logs/k3dm-cleanup.log` |
 | `com.k3d-manager.acg-watch` | Watches ACG sandbox TTL; auto-extends or notifies | ❌ (on-demand) | `acg_watch_install` | `~/.local/share/k3d-manager/run/k3d-manager-acg-watch.err` |
+| com.k3d-manager.sandbox-reaper | Removes the hub registration + apps of an expired ACG sandbox; Slack notice | ❌ (timer: 10m) | make install-sandbox-reaper | ~/.local/share/k3d-manager/logs/sandbox-reaper.log |
 
 ---
 
 ## Persistent Port-Forwards
+
+## Sandbox reaper (bin/k3dm-sandbox-reaper)
+
+The reaper uses a two-signal gate: every matching ArgoCD Application must remain `Unknown`
+for a 30-minute grace period, and AWS must confirm that the sandbox is gone (the CloudFormation
+stack is deleted or the credentials are dead). Reachability alone never triggers cleanup. Each
+successful or failed action is logged, and actions are notified to Slack.
+
+Install with `make install-sandbox-reaper`; remove with `make uninstall-sandbox-reaper`. Slack
+notices go through `bin/k3dm-slack-notify`, which reads the message on stdin and posts it with the
+Hermes Slack webhook (Keychain `k3dm-slack-webhook`).
+
+To preview a run by hand, use `K3DM_SANDBOX_REAPER_DRYRUN=1 bin/k3dm-sandbox-reaper` and then
+`tail ~/.local/share/k3d-manager/logs/sandbox-reaper.log`. If a registration was removed
+wrongfully, redo it with `make argocd-registration`.
 
 These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 
@@ -143,6 +159,12 @@ Restart the tunnel separately if needed using the launchd hint printed by the ta
 - **Install:** `acg_watch_install` plugin function
 
 ---
+
+## Node health watchdog (`bin/k3dm-node-health-watch`)
+
+The watchdog restarts a node that stays NotReady past the failure threshold. A Ready node with a slow `/healthz` is advisory only and is never restarted. A Ready node whose kubelet tunnel fails fast with `proxy error ... :10250, code 502` for `K3DM_NODE_TUNNEL_THRESHOLD` ticks (default 6, or 3 minutes at the 30-second tick) is restarted through the same cooldown. An unreachable API server is advisory only.
+
+The recovery environment knobs are `K3DM_NODE_RECOVERY_CONTEXT`, `K3DM_NODE_RECOVERY_NODE`, `K3DM_NODE_RECOVERY_INTERVAL`, `K3DM_NODE_RECOVERY_FAILURE_THRESHOLD`, `K3DM_NODE_RECOVERY_COOLDOWN`, `K3DM_NODE_RECOVERY_HEALTHZ_TIMEOUT`, `K3DM_NODE_RECOVERY_ENABLED`, `K3DM_NODE_RECOVERY_LOG`, `K3DM_NODE_RECOVERY_STATE`, and `K3DM_NODE_TUNNEL_THRESHOLD`. The log is `~/.local/share/k3d-manager/logs/node-health-watch.log` by default. See [the dead kubelet tunnel bug](../bugs/2026-10-09-node-health-watch-ignores-ready-node-with-dead-kubelet-tunnel.md).
 
 ## PATH under launchd
 

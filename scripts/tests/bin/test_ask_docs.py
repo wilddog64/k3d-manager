@@ -117,11 +117,37 @@ def test_model_failure_still_has_sources(model):
     assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
 
 
+def test_model_failure_is_explicit_and_preserves_safe_metadata():
+    path = _real_source()
+    model_result = type("Result", (str,), {
+        "metadata": {
+            "status": "failed",
+            "failure_class": "summary_model_unavailable",
+            "failures": ["agy: exit 1"],
+        }
+    })("AI analysis unavailable — agy: exit 1")
+    reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path), model=lambda _p: model_result)
+
+    assert reply.status == "failed"
+    assert reply.metadata["failure_class"] == "summary_model_unavailable"
+    assert "AI analysis unavailable" in reply
+    assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
+
+
+def test_empty_model_result_is_failed_and_preserves_sources():
+    path = _real_source()
+    reply = ask_docs.answer("known", retrieve=lambda _q, k=5: _result(path), model=lambda _p: "")
+
+    assert reply.status == "failed"
+    assert reply.metadata["failure_class"] == "summary_model_empty"
+    assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
+
+
 def test_all_reply_shapes_keep_sources_and_redact_excerpt_and_answer(tmp_path):
     root = tmp_path / "repo"
     source = root / "docs/bugs/known.md"
     source.parent.mkdir(parents=True)
-    source.write_text("Bearer synthetic0token 10.1.2.3 +1 415 555 0100")
+    source.write_text("2026-10-06 Bearer synthetic0token 10.1.2.3 +1 415 555 0100")
     old_root = ask_docs.REPO_ROOT
     ask_docs.REPO_ROOT = root
     def retrieve(_q, k=5):
@@ -134,6 +160,9 @@ def test_all_reply_shapes_keep_sources_and_redact_excerpt_and_answer(tmp_path):
         assert "synthetic0token" not in reply
         assert "10.1.2.3" not in reply
         assert "+1 415 555 0100" not in reply
+        scrubbed = ask_docs._scrub("Date: 2026-10-06 +1 415 555 0100")
+        assert "2026-10-06" in scrubbed
+        assert "+1 415 555 0100" not in scrubbed
     finally:
         ask_docs.REPO_ROOT = old_root
 
@@ -293,6 +322,91 @@ def test_recent_mode_sorts_dates_and_keeps_floor(tmp_path, monkeypatch):
     assert reply.endswith("Sources:\n" + ask_docs._doc_link("docs/bugs/2026-10-01-new.md"))
     assert "Date: 2026-10-01" in prompts[0]
     assert "2026-10-02-below-floor.md" not in reply
+
+
+def _write_recent_fixture(root):
+    docs = {
+        "docs/bugs/2026-10-09-verified.md": "# Bug: Verified bug\n**Status:** VERIFIED live after deploy\n",
+        "docs/bugs/2026-10-08-fixed.md": "# Fixed bug\n**Status:** FIXED\n",
+        "docs/bugs/2026-10-08-open.md": "# Open bug\n**Status:** OPEN\n",
+        "docs/bugs/2026-10-01-old-fixed.md": "# Old fixed bug\n**Status:** FIXED\n",
+        "docs/retro/2026-10-09-retro.md": "# Recent retro\n**Status:** FIXED\n",
+    }
+    for path, content in docs.items():
+        file_path = root / path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(content)
+
+
+def test_recent_done_kind_enumerates_newest_docs_without_retrieval(tmp_path):
+    root = tmp_path / "repo"
+    _write_recent_fixture(root)
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    prompts = []
+    try:
+        reply = ask_docs.answer(
+            "what is the latest bugs fixed",
+            retrieve=lambda *_args, **_kwargs: pytest.fail("semantic retrieval called"),
+            model=lambda prompt: prompts.append(prompt) or "grounded",
+        )
+    finally:
+        ask_docs.REPO_ROOT = old_root
+    expected = [
+        "docs/bugs/2026-10-09-verified.md",
+        "docs/bugs/2026-10-08-fixed.md",
+        "docs/bugs/2026-10-01-old-fixed.md",
+    ]
+    assert [line.rsplit("|", 1)[-1].rstrip(">") for line in reply.splitlines() if "|docs/bugs/" in line] == expected
+    assert "2026-10-08-open.md" not in reply
+    assert "2026-10-09-retro.md" not in reply
+    assert "newest matching documents" in prompts[0]
+
+
+def test_recent_kind_without_done_intent_keeps_open_docs(tmp_path):
+    root = tmp_path / "repo"
+    _write_recent_fixture(root)
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    try:
+        reply = ask_docs.answer(
+            "latest bugs",
+            retrieve=lambda *_args, **_kwargs: pytest.fail("semantic retrieval called"),
+            model=lambda _prompt: "grounded",
+        )
+    finally:
+        ask_docs.REPO_ROOT = old_root
+    assert "docs/bugs/2026-10-08-open.md" in reply
+
+
+def test_recent_kind_sources_mode_prints_date_for_date_selected_docs(tmp_path):
+    root = tmp_path / "repo"
+    _write_recent_fixture(root)
+    old_root = ask_docs.REPO_ROOT
+    ask_docs.REPO_ROOT = root
+    try:
+        reply = ask_docs.answer(
+            "latest bugs fixed",
+            retrieve=lambda *_args, **_kwargs: pytest.fail("semantic retrieval called"),
+            model=lambda _prompt: pytest.fail("model called"),
+            summarise=False,
+        )
+    finally:
+        ask_docs.REPO_ROOT = old_root
+    assert "None" not in reply
+    assert "0." not in reply
+    assert "2026-10-09" in reply
+
+
+def test_reply_converts_commonmark_bold_to_slack_bold():
+    path = _real_source()
+    reply = ask_docs.answer(
+        "known",
+        retrieve=lambda _q, k=5: _result(path),
+        model=lambda _prompt: "**FIXED** and **Date:** x",
+    )
+    assert "*FIXED* and *Date:* x" in reply
+    assert "**" not in reply
 
 
 def test_non_recent_mode_keeps_score_order_and_sources_date(tmp_path):

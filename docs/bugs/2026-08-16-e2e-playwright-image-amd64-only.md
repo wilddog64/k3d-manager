@@ -1,5 +1,6 @@
 # e2e Playwright test-runner image is amd64-only → ErrImagePull on arm64 substrate
 
+**Status:** CLOSED — doc merged to main in PR #116; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-16
 **Component:** `ghcr.io/wilddog64/shopping-cart-e2e-tests:latest` (published by the
 `shopping-cart-e2e-tests` repo, `.github/workflows/publish-image.yml`); consumed by the k3d-manager

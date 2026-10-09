@@ -1,5 +1,7 @@
 # Bugfix: add an alert for ArgoCD Image Updater flapping
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Problem
 
 The dashboard already showed `Possible Flapping (30m syncs)` for the Image

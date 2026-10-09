@@ -1,5 +1,7 @@
 # ACG credential test aborted before reclaiming stale CDP listeners
 
+**Status:** CLOSED — doc merged to main in PR #117; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Symptom
 
 `make credential-test PROVIDER=aws` exited immediately while probing `127.0.0.1:9222`, and the

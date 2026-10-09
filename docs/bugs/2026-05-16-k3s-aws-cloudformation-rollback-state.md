@@ -1,5 +1,6 @@
 # Bug: k3s-aws — CloudFormation deploy hangs when stack is in terminal failure state
 
+**Status:** CLOSED — doc merged to main in PR #75; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.6`
 **Files:** `scripts/lib/providers/k3s-aws.sh`
 

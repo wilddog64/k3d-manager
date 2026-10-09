@@ -1,5 +1,6 @@
 # Bugfix: Stripe checkout — order service access-control hardening (Copilot #2 aud/azp + #4 IDOR)
 
+**Status:** CLOSED — doc merged to main in PR #110; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Coordinating repo:** k3d-manager (this file). **Work repo:** `shopping-cart-order`.
 **Branch (work repo):** `fix/order-access-control-hardening` off `origin/main`.
 **Files:** `go/internal/auth/jwt.go`, `go/internal/config/config.go`, `go/cmd/server/main.go`,

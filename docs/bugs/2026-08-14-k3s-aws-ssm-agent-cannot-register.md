@@ -1,6 +1,7 @@
 # k3s-aws provisioning waits for an SSM agent that never registers
 
-**Status:** Open
+**Status:** OPEN — mitigated (SSH fallback); not a bring-up blocker
+**Priority:** P4 — the sandbox comes up over the autossh tunnel; SSM is optional
 **Discovered:** 2026-08-14
 **Component:** `scripts/lib/providers/k3s-aws.sh` SSM tunnel bring-up
 
@@ -96,3 +97,17 @@ bring-up blocker; the flannel fallback itself is not the cause.
    and timeout path.
 
 No live mutation or deployment was performed while investigating this issue.
+
+## Triage (2026-10-09, Claude): P4, mitigated
+
+- No longer a bring-up blocker. `_provider_k3s_aws_start_tunnel` (`scripts/lib/providers/k3s-aws.sh`)
+  now warns "SSM agent is not Online — falling back to SSH tunnel", sets
+  `K3S_AWS_SSM_ENABLED=false` and starts autossh. Provisioning fails only if both transports fail.
+  Tunnel mode is auto-detected (an `iam:CreateRole` probe), and SSH is the default whenever SSM
+  is unavailable. ACG sandboxes have come up over the tunnel since then (most recently 2026-10-06).
+- Likely root cause: the SSM agent backs off for about 28m50s on credential errors after the
+  instance profile is attached to a running node. That is longer than the 150 s wait, so the
+  agent is not Online in time. Restarting the agent after the attach would register it;
+  raising the timeout would not help.
+- Remaining work, only if SSM mode is wanted again: restart `amazon-ssm-agent` after the profile
+  attach, then add the BATS case for the timeout path from "Recommended follow-up".

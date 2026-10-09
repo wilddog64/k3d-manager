@@ -35,8 +35,9 @@ REPO_ROOT="${BATS_TEST_DIRNAME}/../../.."
 
 @test "recorded output preserves exit status and is mode 600" {
   minimal="${BATS_TEST_TMPDIR}/Makefile"
-  awk '/^define _e2e_recorded$/{copy=1} copy{print} /^endef$/{exit}' "${MAKEFILE}" > "${minimal}"
+  awk '/^define _e2e_recorded$/{copy=1} copy{print} copy && /^endef$/{exit}' "${MAKEFILE}" > "${minimal}"
   printf '\nprobe:\n\t@$(call _e2e_recorded,probe,/bin/sh -c '\''exit 7'\'')\n' >> "${minimal}"
+  grep -q 'script -q' "${minimal}"
 
   run env HOME="${BATS_TEST_TMPDIR}/home" make --no-print-directory -f "${minimal}" probe
   if [ "${status}" -ne 7 ]; then

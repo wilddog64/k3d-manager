@@ -5,6 +5,7 @@
 **Files:** `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml`, `scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml`, `CHANGELOG.md`
 **Affects:** hub (`k3d-k3d-cluster`) **and** app cluster (`ubuntu-hostinger`) — identically
 **Related:** `reference_grafana_no_data_is_a_missing_producer` — this is a missing producer, not a dashboard bug
+**Status:** FIXED in `bc301f83` — evidence: `scripts/etc/helm/observability/kube-prometheus-stack-values.yaml:80-83` (triaged 2026-10-08, Codex)
 
 ---
 

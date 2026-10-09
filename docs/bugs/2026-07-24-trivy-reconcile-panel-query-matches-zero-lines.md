@@ -1,6 +1,7 @@
 # Bug: Trivy Operator Job Reconcile Errors panel query matches zero lines
 
 **Branch:** `k3d-manager-v1.18.0`
+**Status:** FIXED (v1.18.0, `85742ef7`) — the `controller="job"` query is gone; the panel now counts `level="error"` trivy-operator lines (verified 2026-10-09 code check)
 **Files:** `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`, `scripts/tests/plugins/trivy_operator_observability.bats`
 
 ---

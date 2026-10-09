@@ -98,13 +98,49 @@ def test_wrong_or_empty_channel_uses_response_url_only(monkeypatch, status_env, 
     assert calls == [("https://hooks.slack.test/response", output)]
 
 
-def test_incoming_thread_does_not_start_new_header(monkeypatch, status_env, tmp_path):
+def test_channel_mismatch_incoming_thread_uses_actual_channel(monkeypatch, status_env, tmp_path):
+    monkeypatch.setattr(wh._status, "_slack_bot_token", lambda: "")
     calls = []
     monkeypatch.setattr(wh, "_start_bot_thread", lambda header: calls.append("header") or "NEW")
-    monkeypatch.setattr(wh, "_post_slack_bot", lambda *args, **kwargs: calls.append("body") or "OK")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None: calls.append(("body", text, thread_ts)) or "OK")
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: calls.append(args))
+    output = _run_hostinger(monkeypatch, tmp_path, channel_id="C2", thread_ts="INCOMING")
+    assert calls == [("https://hooks.slack.test/response", output)]
+    assert (tmp_path / "job" / "thread_ts").read_text() == "INCOMING"
+
+
+def test_channel_mismatch_with_bot_posts_to_actual_thread_channel(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None, channel_id=None: calls.append((text, thread_ts, channel_id)) or "OK")
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: calls.append(("fallback", args)))
+    output = _run_hostinger(monkeypatch, tmp_path, channel_id="C2", thread_ts="INCOMING")
+    assert calls == [(output, "INCOMING", "C2")]
+
+
+def test_incoming_thread_uses_existing_thread(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda header: calls.append("header") or "NEW")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None: calls.append(("body", text, thread_ts)) or "OK")
     monkeypatch.setattr(wh, "_slack_post", lambda *args: calls.append(args))
     output = _run_hostinger(monkeypatch, tmp_path, channel_id="C1", thread_ts="INCOMING")
-    assert calls == [("https://hooks.slack.test/response", output)]
+    assert calls == [("body", output, "INCOMING")]
+    assert (tmp_path / "job" / "thread_ts").read_text() == "INCOMING"
+
+
+def test_cluster_diagnose_bot_path_replies_in_existing_thread(monkeypatch, status_env, tmp_path):
+    calls = []
+    (tmp_path / "job").mkdir()
+    monkeypatch.setattr(wh._status, "_spawn_capture_text",
+                        lambda *args, **kwargs: (0, "NAMESPACE NAME READY\nkube-system coredns 1/1", False))
+    monkeypatch.setattr(wh, "_post_slack_bot",
+                        lambda text, thread_ts=None: calls.append(("body", text, thread_ts)) or "OK")
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: calls.append(("fallback", args)))
+    wh._status._run_cluster_diagnostics(
+        "job", "https://hooks.slack.test/response", thread_ts="INCOMING", channel_id="C1",
+        request={"action": "get-pods-all", "context": "ubuntu-k3s", "provider": "hostinger"},
+    )
+    output = (tmp_path / "job" / "output").read_text()
+    assert calls == [("body", output, "INCOMING")]
     assert (tmp_path / "job" / "thread_ts").read_text() == "INCOMING"
 
 
@@ -157,3 +193,144 @@ def test_cluster_status_route_passes_channel_id(monkeypatch, tmp_path):
     wh._Handler.do_POST(fake)
     assert started
     assert started[0][2]["channel_id"] == "C1"
+
+
+def test_thread_command_passes_channel_id_to_status_worker(monkeypatch, tmp_path):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    (tmp_path / "job").mkdir()
+    (tmp_path / "job" / "thread_ts").write_text("THREAD")
+    started = []
+
+    class Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append((target, args, kwargs))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(wh.threading, "Thread", Thread)
+    monkeypatch.setattr(wh, "_notify_job", lambda *args: None)
+    monkeypatch.setattr(wh, "_role_allows", lambda *args: True)
+    wh._handle_thread_command("job", "cluster-status hostinger", "reader", "C1")
+    assert started
+    assert started[0][2] == {"thread_ts": "THREAD", "channel_id": "C1"}
+    assert (tmp_path / "job" / "channel_id").read_text() == "C1"
+
+
+def test_thread_command_parses_cluster_diagnose_forms():
+    assert wh._parse_thread_diagnose("cluster-diagnose hub") == {
+        "provider": "hub", "action": "get-pods-all",
+    }
+    assert wh._parse_thread_diagnose("cluster-diagnose aws pods platform-ops") == {
+        "provider": "aws", "action": "get-pods", "namespace": "platform-ops",
+    }
+    assert wh._parse_thread_diagnose("cluster-diagnose hub logs monitoring grafana grafana") == {
+        "provider": "hub", "action": "logs", "namespace": "monitoring",
+        "name": "grafana", "container": "grafana",
+    }
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cluster-diagnose hub",
+        "k3dm test-all",
+        "argocd-upgrade 7.9.1 infra confirm",
+    ],
+)
+def test_new_thread_commands_are_routable(monkeypatch, tmp_path, command):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    (tmp_path / "job").mkdir()
+    (tmp_path / "job" / "thread_ts").write_text("THREAD")
+    monkeypatch.setattr(wh, "_role_allows", lambda actual, needed: actual == "admin" or needed == "reader")
+    monkeypatch.setattr(wh, "_notify_job", lambda *args: None)
+    monkeypatch.setattr(wh, "_validate_diagnostics_request", lambda request: None)
+    monkeypatch.setattr(wh, "_run_cluster_diagnostics", lambda *args, **kwargs: None)
+    monkeypatch.setattr(wh, "_run_upgrade_thread_job", lambda *args: None)
+    monkeypatch.setattr(wh, "_run_make_target", lambda *args: None)
+    monkeypatch.setattr(wh, "_MAKE_JOB_LOCK", __import__("threading").Lock())
+    started = []
+
+    class Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append((target, args, kwargs))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(wh.threading, "Thread", Thread)
+    wh._handle_thread_command("job", command, "admin", "C1")
+    assert started
+    assert (tmp_path / started[0][1][0] / "thread_ts").read_text() == "THREAD"
+
+
+def test_argocd_upgrade_api_requires_infra_confirmation(monkeypatch, tmp_path):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh._Handler, "_auth", lambda self: True)
+    monkeypatch.setattr(wh, "_rate_limited", lambda key: False)
+    monkeypatch.setattr(wh, "_request_role", lambda headers, token_role: "admin")
+    monkeypatch.setattr(wh, "_request_actor", lambda headers: "test")
+    body = json.dumps({"chart_version": "7.9.1", "stage": "infra"}).encode()
+    result = {}
+    fake = type("FakeHandler", (), {
+        "path": "/api/v1/argocd-upgrade",
+        "headers": {"Content-Length": str(len(body))},
+        "rfile": io.BytesIO(body),
+        "wfile": io.BytesIO(),
+        "_auth": lambda self: True,
+        "send_response": lambda self, code: result.update(code=code),
+        "send_header": lambda self, key, value: None,
+        "end_headers": lambda self: None,
+        "_json": lambda self, code, response: result.update(code=code, response=response),
+    })()
+    wh._Handler.do_POST(fake)
+    assert result == {"code": 400, "response": {"error": "infra ArgoCD upgrades require confirm=true"}}
+
+
+def test_top_level_make_job_creates_a_slack_thread(monkeypatch, tmp_path):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "xoxb-test")
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda header, channel_id=None: "THREAD-TS")
+    monkeypatch.setattr(wh, "_request_role", lambda headers, token_role: "admin")
+    monkeypatch.setattr(wh, "_request_actor", lambda headers: "test")
+    monkeypatch.setattr(wh, "_rate_limited", lambda key: False)
+    monkeypatch.setattr(wh, "_run_make_target", lambda *args: None)
+    monkeypatch.setattr(wh, "_MAKE_JOB_LOCK", __import__("threading").Lock())
+    started = []
+
+    class Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append(args)
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(wh.threading, "Thread", Thread)
+    body = json.dumps({"target": "test-all", "channel_id": "C1"}).encode()
+    result = {}
+    fake = type("FakeHandler", (), {
+        "path": "/api/v1/make",
+        "headers": {"Content-Length": str(len(body))},
+        "rfile": io.BytesIO(body),
+        "wfile": io.BytesIO(),
+        "_auth": lambda self: True,
+        "send_response": lambda self, code: result.update(code=code),
+        "send_header": lambda self, key, value: None,
+        "end_headers": lambda self: None,
+        "_json": lambda self, code, response: result.update(code=code, response=response),
+    })()
+    wh._Handler.do_POST(fake)
+    job_id = result["response"]["job_id"]
+    assert (tmp_path / job_id / "thread_ts").read_text() == "THREAD-TS"
+    assert (tmp_path / job_id / "channel_id").read_text() == "C1"
+    assert (tmp_path / job_id / "thread_source").read_text() == "bot"
+    assert started
+
+
+def test_audit_remote_action_uses_isolated_directory():
+    from webhook import policy
+
+    policy._audit_remote_action("/api/v1/x", "x", "test", "admin", True)
+
+    assert Path(policy.AUDIT_DIR) != Path.home() / ".local/share/k3d-manager/audit"
+    assert (policy.AUDIT_DIR / "remote-operator.jsonl").read_text()

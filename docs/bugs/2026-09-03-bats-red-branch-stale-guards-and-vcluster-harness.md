@@ -1,5 +1,6 @@
 # BATS red on `k3d-manager-v1.27.0` — stale guard tests + vcluster harness gaps
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-09-03
 **Branch:** `k3d-manager-v1.27.0` (HEAD `83cbdbe1`)
 **Trigger:** pre-PR local BATS scope check for the v1.27.0 milestone PR found the branch RED.

@@ -1,5 +1,6 @@
 # Bugfix: v1.7.0 — de-obfuscate remote sudo in k3s-hostinger; drop spurious issue doc
 
+**Status:** CLOSED — doc merged to main in PR #95; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.7.0`
 **Files:** `scripts/lib/providers/k3s-hostinger.sh`, `docs/issues/2026-06-13-webhook-live-tests-require-running-service.md` (DELETE)
 

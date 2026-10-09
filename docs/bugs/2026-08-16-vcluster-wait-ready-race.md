@@ -1,5 +1,6 @@
 # `_vcluster_wait_ready` races vCluster pod creation → `no matching resources found`
 
+**Status:** CLOSED — doc merged to main in PR #116; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-16
 **Component:** `scripts/plugins/vcluster.sh` — `_vcluster_wait_ready()` (line ~230-237)
 **Severity:** high (intermittent blocker for a green Tier 1 e2e smoke; flaky by timing)

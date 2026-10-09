@@ -1,5 +1,6 @@
 # Bug: OCI vars in global vars.sh instead of scripts/etc/oci/vars.sh
 
+**Status:** CLOSED — doc merged to main in PR #84; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.5.0`
 **Introduced by:** commit `bda61dde`
 **Severity:** P3 — wrong file layout; OCI vars loaded on every invocation regardless of CLUSTER_PROVIDER

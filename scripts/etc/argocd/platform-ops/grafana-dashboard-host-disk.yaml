@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-host-disk
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    release: kube-prometheus-stack
+data:
+  host-disk.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "graphTooltip": 1,
+      "title": "k3dm Host Disk",
+      "uid": "k3dm-host-disk",
+      "tags": ["k3dm", "disk"],
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "1m",
+      "time": {"from": "now-24h", "to": "now"},
+      "panels": [
+        {"id": 1, "type": "stat", "title": "Used %", "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0}, "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 90}]}}, "overrides": []}, "targets": [{"expr": "100 * (1 - k3dm_disk_avail_bytes / k3dm_disk_size_bytes)", "legendFormat": "{{host}}"}]},
+        {"id": 2, "type": "stat", "title": "Free", "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0}, "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []}, "targets": [{"expr": "k3dm_disk_avail_bytes", "legendFormat": "{{host}}"}]},
+        {"id": 3, "type": "timeseries", "title": "Used % over time", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 6}, "fieldConfig": {"defaults": {"unit": "percent", "custom": {"showPoints": "never"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 90}]}}, "overrides": []}, "targets": [{"expr": "100 * (1 - k3dm_disk_avail_bytes / k3dm_disk_size_bytes)", "legendFormat": "{{host}}"}]},
+        {"id": 4, "type": "stat", "title": "Probe status", "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0}, "fieldConfig": {"defaults": {"unit": "none", "mappings": [{"type": "value", "options": {"0": {"text": "down", "color": "red"}, "1": {"text": "up", "color": "green"}}}]}, "overrides": []}, "targets": [{"expr": "k3dm_disk_probe_success", "legendFormat": "{{host}}"}]},
+        {"id": 5, "type": "stat", "title": "Last push age", "gridPos": {"h": 6, "w": 8, "x": 16, "y": 14}, "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}, "targets": [{"expr": "time() - max(push_time_seconds{job=\"k3dm-disk\"})"}]}
+      ]
+    }

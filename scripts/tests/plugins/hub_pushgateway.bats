@@ -39,6 +39,22 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "hub Prometheus imports k3dm test metrics from the laptop Pushgateway" {
+  run python3 - "${ROOT}/etc/helm/observability/kube-prometheus-stack-values.yaml" <<'PY'
+import sys
+import yaml
+
+values = yaml.safe_load(open(sys.argv[1]))
+jobs = values["prometheus"]["prometheusSpec"]["additionalScrapeConfigs"]
+job = next(item for item in jobs if item["job_name"] == "k3dm-test-pushgateway")
+assert job["honor_labels"] is True
+assert job["static_configs"][0]["targets"] == ["host.internal:9091"]
+keep = next(item for item in job["metric_relabel_configs"] if item["action"] == "keep")
+assert keep["regex"] == "k3dm_test_.+"
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "observability ApplicationSet pins the hub chart" {
   run grep -A6 -F -- 'name: hub-pushgateway' "${ROOT}/etc/argocd/applicationsets/observability.yaml"
   [ "${status}" -eq 0 ]

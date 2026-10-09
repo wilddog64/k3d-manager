@@ -6,6 +6,7 @@ import shlex
 import shutil
 import socket
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,14 @@ _ORIGINAL_POPEN_INIT = subprocess.Popen.__init__
 
 class HermeticViolation(RuntimeError):
     """Raised when a test attempts an unapproved external operation."""
+
+
+@pytest.fixture(autouse=True)
+def _k3dm_isolated_audit_dir(tmp_path_factory, monkeypatch):
+    policy = sys.modules.get("webhook.policy")
+    if policy is None:
+        return
+    monkeypatch.setattr(policy, "AUDIT_DIR", tmp_path_factory.mktemp("audit"))
 
 
 def pytest_configure(config):

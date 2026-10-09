@@ -6,7 +6,7 @@
 # Requires --confirm to prevent accidental teardown.
 #
 # Usage:
-#   bin/cluster-down --confirm [--keep-hub|--delete-hub]
+#   bin/cluster-down --confirm [--keep-hub|--delete-hub] [--discard-hub-data]
 #
 # Environment:
 #   CLUSTER_PROVIDER   k3s-aws (default), k3s-gcp, or k3s-az
@@ -41,12 +41,14 @@ _confirm=0
 _keep_hub=1
 _keep_hub_arg=0
 _delete_hub_arg=0
+_discard_hub_data=0
 _HUB_CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
 for _arg in "$@"; do
   case "${_arg}" in
     --confirm)  _confirm=1 ;;
     --keep-hub) _keep_hub=1; _keep_hub_arg=1 ;;
     --delete-hub) _keep_hub=0; _delete_hub_arg=1 ;;
+    --discard-hub-data) _discard_hub_data=1 ;;
   esac
 done
 
@@ -60,12 +62,32 @@ if [[ "${_cluster_provider}" == "k3d" ]]; then
 fi
 
 if [[ "${_confirm}" -eq 0 ]]; then
-  echo "Usage: bin/cluster-down --confirm [--keep-hub|--delete-hub]"
+  echo "Usage: bin/cluster-down --confirm [--keep-hub|--delete-hub] [--discard-hub-data]"
   echo ""
   echo "  --confirm    Required. Tears down remote cluster; the local Hub is preserved."
   echo "  --delete-hub Optional. Also deletes the local Hub cluster and its access layer."
   echo "  --keep-hub   Accepted for compatibility; preserve the local Hub."
+  echo "  --discard-hub-data  Explicitly delete Hub data without a verified snapshot."
   exit 1
+fi
+
+source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
+if [[ "${_keep_hub}" -eq 0 ]] && _command_exist k3d && k3d cluster list 2>/dev/null | grep -q "^${_HUB_CLUSTER}[[:space:]]"; then
+  if [[ "${_discard_hub_data}" -eq 1 ]]; then
+    _warn "[acg-down] --discard-hub-data set: the seven Hub claims will be destroyed without a verified snapshot"
+  else
+    # shellcheck source=/dev/null
+    source "${PLUGINS_DIR}/hub_snapshot.sh"
+    if ! hub_snapshot_guard_delete; then
+      if [[ "${DRY_RUN:-0}" == "1" || "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+        _info "DRY_RUN: hub snapshot guard refused Hub deletion; continuing preview"
+      else
+        exit 2
+      fi
+    elif [[ "${DRY_RUN:-0}" == "1" || "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+      _info "DRY_RUN: hub snapshot guard passed"
+    fi
+  fi
 fi
 
 _info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
@@ -151,7 +173,7 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
     _info "[acg-down] Vault port-forward stopped"
   fi
 fi
-if _is_mac; then
+if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _vault_pf_label="com.k3d-manager.vault-port-forward"
   _vault_pf_plist="${HOME}/Library/LaunchAgents/${_vault_pf_label}.plist"
   if launchctl list "${_vault_pf_label}" >/dev/null 2>&1; then

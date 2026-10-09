@@ -1,5 +1,6 @@
 # Bug: fts-index-job CREATE FUNCTION fails — busybox ash strips $$ in heredoc
 
+**Status:** CLOSED — doc merged to main in PR #80; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-05-24
 **File:** `shopping-cart-product-catalog/k8s/base/fts-index-job.yaml`
 **Branch:** `docs/next-improvements` (shopping-cart-product-catalog)

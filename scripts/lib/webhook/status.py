@@ -27,13 +27,33 @@ _slack_bot_token = lambda: ""
 _slack_channel_id = lambda: ""
 
 
+def _post_slack_message(output, thread_ts, channel_id):
+    """Use an event channel only when it differs from the configured default."""
+    if channel_id and channel_id != _slack_channel_id():
+        return _post_slack_bot(output, thread_ts=thread_ts, channel_id=channel_id)
+    return _post_slack_bot(output, thread_ts=thread_ts)
+
+
+def _start_status_thread(header, channel_id):
+    """Start a status thread in the event channel when needed."""
+    # A new thread has no trusted incoming message context. Use the configured
+    # channel; only an existing incoming thread may target a different channel.
+    if channel_id and channel_id != _slack_channel_id():
+        return None
+    return _start_bot_thread(header)
+
+
 def _post_status_report(job_dir, response_url, output, channel_id, thread_ts):
     """Post a status report in a bot-channel thread, with response_url fallbacks."""
-    bot_thread = bool(
-        _slack_bot_token() and _slack_channel_id()
-        and channel_id == _slack_channel_id() and not thread_ts
-    )
-    if not bot_thread:
+    bot_channel = bool(_slack_bot_token() and channel_id)
+    if bot_channel and thread_ts:
+        if _post_slack_message(output, thread_ts, channel_id):
+            (job_dir / "thread_ts").write_text(thread_ts)
+            return True
+        if response_url:
+            _slack_post(response_url, output)
+        return True
+    if not bot_channel:
         if response_url:
             _slack_post(response_url, output)
         else:
@@ -42,13 +62,13 @@ def _post_status_report(job_dir, response_url, output, channel_id, thread_ts):
 
     header, _, body = output.lstrip().partition("\n")
     body = body.lstrip("\n")
-    new_thread_ts = _start_bot_thread(header)
+    new_thread_ts = _start_status_thread(header, channel_id)
     if not new_thread_ts:
         if response_url:
             _slack_post(response_url, output)
         return True
     (job_dir / "thread_ts").write_text(new_thread_ts)
-    if body and not _post_slack_bot(body, thread_ts=new_thread_ts):
+    if body and not _post_slack_message(body, new_thread_ts, channel_id):
         if response_url:
             _slack_post(response_url, body)
     return True
@@ -384,7 +404,7 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None, c
     except Exception as exc:
         _write_log(f"ERROR: {exc}")
         _finish("failed")
-def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None):
+def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, channel_id="", request=None):
     """Run an explicit read-only diagnostic command and post the result."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
@@ -398,9 +418,7 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None)
         (job_dir / "status").write_text(status)
         output = scrub_credentials(_redact_secrets("".join(lines)))
         (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
+        if not _post_status_report(job_dir, response_url, output, channel_id, thread_ts):
             _notify_job(job_id, output)
 
     try:

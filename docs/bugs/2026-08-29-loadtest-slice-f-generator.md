@@ -1,5 +1,6 @@
 # Slice F — adaptive checkout load generator (k6 + metrics + live run)
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-29
 **Area:** `scripts/plugins/loadtest.sh` (wire the Slice E stubs), new k6 generator, Grafana dashboard
 **Type:** enhancement (implements `docs/plans/v1.27.0-adaptive-checkout-load-testing.md`, Slice F)

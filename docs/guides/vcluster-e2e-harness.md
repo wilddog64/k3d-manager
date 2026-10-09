@@ -165,8 +165,9 @@ E2E_SERVICE_UNDER_TEST=product-catalog \
 ```
 
 Useful knobs (all env-overridable): `E2E_IMAGE` / `E2E_IMAGE_TAG` (the test-runner
-image), `E2E_NAMESPACE`, `E2E_JOB_TIMEOUT`, `E2E_ROLLOUT_TIMEOUT`, `E2E_REPORT_DIR`,
-`E2E_SERVICE_UNDER_TEST`.
+image), `E2E_IMAGE_PULL_POLICY` (`Always`, `IfNotPresent`, or `Never`; when unset,
+mutable `latest` uses `Always` and other tags use `IfNotPresent`), `E2E_NAMESPACE`,
+`E2E_JOB_TIMEOUT`, `E2E_ROLLOUT_TIMEOUT`, `E2E_REPORT_DIR`, `E2E_SERVICE_UNDER_TEST`.
 
 > **The test-runner image** (`ghcr.io/wilddog64/shopping-cart-e2e-tests`) is built and
 > published from the `shopping-cart-e2e-tests` repo (Part 1 of the Tier 1 spec:

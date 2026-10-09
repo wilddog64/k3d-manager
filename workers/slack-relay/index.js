@@ -40,6 +40,42 @@ function resolveProviderStrict(text) {
 }
 
 const CLUSTER_ARG_USAGE = '`hostinger` is the permanent app cluster; `aws`, `gcp` and `az` are ephemeral lab sandboxes.'
+const K3DM_USAGE = [
+  'Usage: /k3dm <target> [KEY=value …] [confirm]',
+  'Examples: /k3dm help · /k3dm status · /k3dm test-all',
+  'Use `/k3dm help` to see targets allowed for your role.',
+].join('\n')
+const CLUSTER_RESUME_USAGE = [
+  'Usage: /cluster-resume <cluster>',
+  'Clusters: aws, gcp, az',
+  'Example: /cluster-resume aws',
+  'Resumes a lab sandbox from its last checkpoint.',
+].join('\n')
+const CLEANUP_USAGE = [
+  'Usage: /cleanup-stale-sandbox [preview|confirm|apply]',
+  'Examples: /cleanup-stale-sandbox preview · /cleanup-stale-sandbox apply',
+  'Preview reports local ACG connection cleanup only: launchd agents, plist files, and the kube context.',
+  '`confirm` or `apply` performs the local cleanup; it does not terminate AWS or delete workloads.',
+].join('\n')
+const ASK_DOCS_USAGE = [
+  'Usage: /ask-docs [--sources] <question>',
+  'Examples: /ask-docs how does test-all publish metrics?',
+  '/ask-docs --sources where is the webhook status documented?',
+].join('\n')
+const ARGOCD_UPGRADE_USAGE = [
+  'Usage: /argocd-upgrade <chart-version> [acg|infra] [confirm]',
+  'Examples: /argocd-upgrade 7.9.1 infra confirm · /argocd-upgrade 7.9.1 acg',
+  'The infra stage changes shared infrastructure and requires confirm.',
+].join('\n')
+const CLUSTER_DIAGNOSE_USAGE = [
+  'Usage: /cluster-diagnose [cluster] <request>',
+  'Clusters: hostinger, aws, gcp, az, hub (default: hostinger)',
+  'All pods: /cluster-diagnose hub',
+  'List pods: /cluster-diagnose hub pods <namespace>',
+  'Describe pod: /cluster-diagnose hub pod <namespace> <pod>',
+  'Pod logs: /cluster-diagnose hub logs <namespace> <pod> [container]',
+  'Applications: /cluster-diagnose hub apps | app <name> | appsets',
+].join('\n')
 
 function parseClusterDiagnose(text) {
   const parts = (text || '').trim().split(/\s+/).filter(Boolean)
@@ -54,23 +90,30 @@ function parseClusterDiagnose(text) {
     return { payload: { provider: target, action: 'get-pods-all' } }
   }
   if (!verb) {
-    return { error: 'Usage: /cluster-diagnose <hostinger|aws|gcp|az|hub> (all pods) | /cluster-diagnose [hostinger|aws|gcp|az|hub] <pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets>' }
+    return { error: CLUSTER_DIAGNOSE_USAGE }
   }
-  if (verb === 'pods') {
-    const namespace = parts[index + 1] || ''
+  const namespaceFirst = !['pods', 'describe-pod', 'logs', 'apps', 'app', 'appsets'].includes(verb) &&
+    ['pod', 'describe-pod', 'logs'].includes(parts[index + 1])
+  if (namespaceFirst) {
+    index += 1
+  }
+  const diagnosticVerb = (namespaceFirst ? parts[index] : verb) === 'pod'
+    ? 'describe-pod' : (namespaceFirst ? parts[index] : verb)
+  if (diagnosticVerb === 'pods') {
+    const namespace = namespaceFirst ? parts[index - 1] : parts[index + 1]
     if (!namespace) return { error: 'Usage: /cluster-diagnose [provider|hub] pods <namespace>' }
     return { payload: { provider: target, action: 'get-pods', namespace } }
   }
-  if (verb === 'describe-pod') {
-    const namespace = parts[index + 1] || ''
-    const name = parts[index + 2] || ''
+  if (diagnosticVerb === 'describe-pod') {
+    const namespace = namespaceFirst ? parts[index - 1] : parts[index + 1]
+    const name = namespaceFirst ? parts[index + 1] : parts[index + 2]
     if (!namespace || !name) return { error: 'Usage: /cluster-diagnose [provider|hub] describe-pod <namespace> <pod>' }
     return { payload: { provider: target, action: 'describe-pod', namespace, name } }
   }
-  if (verb === 'logs') {
-    const namespace = parts[index + 1] || ''
-    const name = parts[index + 2] || ''
-    const container = parts[index + 3] || ''
+  if (diagnosticVerb === 'logs') {
+    const namespace = namespaceFirst ? parts[index - 1] : parts[index + 1]
+    const name = namespaceFirst ? parts[index + 1] : parts[index + 2]
+    const container = namespaceFirst ? parts[index + 2] : parts[index + 3]
     if (!namespace || !name) return { error: 'Usage: /cluster-diagnose [provider|hub] logs <namespace> <pod> [container]' }
     const payload = { provider: target, action: 'logs', namespace, name }
     if (container) payload.container = container
@@ -87,10 +130,9 @@ function parseClusterDiagnose(text) {
   if (verb === 'appsets') {
     return { payload: { provider: target, action: 'get-appsets' } }
   }
-  return { error: 'Unsupported diagnostic. Use pods, describe-pod, logs, apps, app, or appsets.' }
+  return { error: `${CLUSTER_DIAGNOSE_USAGE}\nUnknown request: ${verb}` }
 }
 
-const K3DM_USAGE = 'Usage: /k3dm <target> [KEY=value …] [confirm] — `/k3dm help` lists targets for your role'
 const K3DM_FREE_TEXT_KEYS = new Set(['Q'])
 
 function parseK3dm(text) {
@@ -230,7 +272,7 @@ async function relay(endpoint, payload, meta = {}) {
         'X-K3DM-Actor': meta.actor || 'slack:unknown',
         'X-K3DM-Source-Command': meta.sourceCommand || 'unknown',
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(meta.slackUserId ? { ...payload, slack_user_id: meta.slackUserId } : payload)
     })
     const data = await resp.json().catch(() => ({}))
     if (resp.status === 409) return { ok: false, conflict: data.error || 'cluster job already running' }
@@ -242,14 +284,21 @@ async function relay(endpoint, payload, meta = {}) {
   }
 }
 
-async function postResponseUrl(url, text, ephemeral = true) {
+async function postResponseUrl(url, text, ephemeral = true, threadTs = '') {
   if (!url) return
   const body = { text, response_type: ephemeral ? 'ephemeral' : 'in_channel' }
+  if (threadTs) body.thread_ts = threadTs
   await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).catch(() => {})
+}
+
+function threadOnlyReply(event, responseUrl, text, threadTs) {
+  if (!threadTs || !responseUrl) return null
+  event.waitUntil(postResponseUrl(responseUrl, text, false, threadTs))
+  return new Response('', { status: 200 })
 }
 
 async function replaceResponseUrl(url, text) {
@@ -281,9 +330,17 @@ async function handle(req, event) {
 
   if (pathname === '/slack/interactivity') return handleInteractivity(req, event)
 
-  if (pathname === '/slack/events') {
+  const contentType = req.headers.get('Content-Type') || ''
+  const isRootSlackEvent = pathname === '/' && contentType.toLowerCase().includes('application/json')
+  if (pathname === '/slack/events' || isRootSlackEvent) {
     const body = await req.text()
     if (!await verifySlack(req, body)) return new Response('Unauthorized', { status: 401 })
+    let parsedEvent = null
+    try { parsedEvent = JSON.parse(body) } catch (_) { parsedEvent = null }
+    const innerEvent = parsedEvent && parsedEvent.type === 'event_callback' ? (parsedEvent.event || {}) : null
+    if (innerEvent && (innerEvent.bot_id || innerEvent.subtype)) {
+      return new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
     const upstream = await fetch(`${WEBHOOK_URL}/slack/events`, {
       method: 'POST',
       headers: {
@@ -313,7 +370,7 @@ async function handle(req, event) {
   const userName    = p.get('user_name')  || ''
   const role        = COMMAND_ROLES[command] || 'reader'
   const actor       = userName ? `slack:${userName}${userId ? `:${userId}` : ''}` : `slack:${userId || 'unknown'}`
-  const meta        = { role, actor, sourceCommand: command }
+  const meta        = { role, actor, sourceCommand: command, slackUserId: userId }
 
   if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`, threadTs)
 
@@ -327,7 +384,7 @@ async function handle(req, event) {
 
   if (command === '/cluster-up') {
     const { provider, error } = resolveProviderStrict(text)
-    if (error) return jsonReply(`⚠️ ${error} — usage: \`${command} <aws|gcp|az|hostinger>\`. ${CLUSTER_ARG_USAGE}`, threadTs, true)
+    if (error) return jsonReply(`⚠️ ${error}\nUsage: ${command} <cluster>\nClusters: aws, gcp, az, hostinger\nExample: ${command} aws\n${CLUSTER_ARG_USAGE}`, threadTs, true)
     const payload = { action: 'up', provider, response_url: responseUrl }
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
@@ -342,7 +399,7 @@ async function handle(req, event) {
 
   if (command === '/cluster-down') {
     const { provider, error } = resolveProviderStrict(text)
-    if (error) return jsonReply(`⚠️ ${error} — usage: \`${command} <aws|gcp|az|hostinger>\`. ${CLUSTER_ARG_USAGE}`, threadTs, true)
+    if (error) return jsonReply(`⚠️ ${error}\nUsage: ${command} <cluster>\nClusters: aws, gcp, az, hostinger\nExample: ${command} aws\n${CLUSTER_ARG_USAGE}`, threadTs, true)
     const payload = { action: 'down', provider, response_url: responseUrl }
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
@@ -371,7 +428,7 @@ async function handle(req, event) {
   if (command === '/cluster-diagnose') {
     const parsed = parseClusterDiagnose(text)
     if (parsed.error) return jsonReply(parsed.error, threadTs)
-    const payload = { ...parsed.payload, response_url: responseUrl }
+    const payload = { ...parsed.payload, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/diagnostics', payload, meta)
@@ -410,7 +467,7 @@ async function handle(req, event) {
   if (command === '/cluster-resume') {
     const provider = resolveProvider(text, '')
     if (!VALID_PROVIDERS.has(provider)) {
-      return jsonReply('Usage: /cluster-resume <aws|gcp|az> — resumes a lab sandbox provision from its last checkpoint', threadTs)
+      return jsonReply(CLUSTER_RESUME_USAGE, threadTs)
     }
     const payload = { provider, response_url: responseUrl }
     event.waitUntil((async () => {
@@ -423,12 +480,14 @@ async function handle(req, event) {
 
   if (command === '/cleanup-stale-sandbox') {
     const cleanupText = (text || '').trim().toLowerCase()
-    if (cleanupText && !['confirm', 'apply'].includes(cleanupText)) {
-      return jsonReply('Usage: /cleanup-stale-sandbox [confirm] — dry-run by default; confirm applies the cleanup', threadTs)
+    if (cleanupText && !['preview', 'confirm', 'apply'].includes(cleanupText)) {
+      return jsonReply(CLEANUP_USAGE, threadTs)
     }
     const confirm = ['confirm', 'apply'].includes(cleanupText)
     event.waitUntil((async () => {
-      const { ok, conflict } = await relay('/api/v1/cleanup-stale-sandbox', { confirm, response_url: responseUrl }, meta)
+      const payload = { confirm, response_url: responseUrl, channel_id: p.get('channel_id') || '' }
+      if (threadTs) payload.thread_ts = threadTs
+      const { ok, conflict } = await relay('/api/v1/cleanup-stale-sandbox', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
@@ -439,6 +498,8 @@ async function handle(req, event) {
     const parsed = parseK3dm(text)
     if (parsed.error) return jsonReply(parsed.error, threadTs, true)
     const payload = { ...parsed.payload, slack_user_id: userId, response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    if (channelId) payload.channel_id = channelId
     const isHelp = payload.target === 'help'
     event.waitUntil((async () => {
       const { ok, conflict, data } = await relay('/api/v1/make', payload, meta)
@@ -460,7 +521,7 @@ async function handle(req, event) {
       agent = command.slice(1)
       question = text
     }
-    if (!question) return jsonReply(`Usage: ${command} <question>`, threadTs)
+    if (!question) return jsonReply(`Usage: ${command} <question>\nExample: ${command} investigate the latest failed check`, threadTs)
     const payload = { agent, question, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
@@ -472,7 +533,7 @@ async function handle(req, event) {
   }
 
   if (command === '/ask-docs') {
-    if (!text || text === '--sources' || text === '-s') return jsonReply('Usage: /ask-docs [--sources] <question>', threadTs)
+    if (!text || text === '--sources' || text === '-s') return jsonReply(ASK_DOCS_USAGE, threadTs)
     const payload = { question: text, response_url: responseUrl, channel_id: channelId }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
@@ -484,14 +545,23 @@ async function handle(req, event) {
   }
 
   if (command === '/argocd-upgrade') {
-    const parts   = text.split(/\s+/)
-    const version = parts[0] || ''
-    const stage   = parts[1] || 'infra'
-    if (!version) return jsonReply('Usage: /argocd-upgrade <chart_version> [acg|infra]', threadTs)
-    if (!['acg', 'infra'].includes(stage)) return jsonReply('stage must be acg or infra', threadTs)
+    const parts = text.split(/\s+/).filter(Boolean)
+    const confirm = parts.includes('confirm')
+    const args = parts.filter(part => part !== 'confirm')
+    const version = args[0] || ''
+    const stage = args[1] || 'infra'
+    if (!version) {
+      const threaded = threadOnlyReply(event, responseUrl, ARGOCD_UPGRADE_USAGE, threadTs)
+      return threaded || jsonReply(ARGOCD_UPGRADE_USAGE, threadTs)
+    }
+    if (!['acg', 'infra'].includes(stage) || args.length > 2 || (stage === 'infra' && !confirm)) {
+      const usage = `${ARGOCD_UPGRADE_USAGE}\nStage must be acg or infra; infra also requires confirm.`
+      const threaded = threadOnlyReply(event, responseUrl, usage, threadTs)
+      return threaded || jsonReply(usage, threadTs)
+    }
     event.waitUntil((async () => {
       const { ok } = await relay('/api/v1/argocd-upgrade',
-        { chart_version: version, stage, response_url: responseUrl }, meta)
+        { chart_version: version, stage, confirm, response_url: responseUrl }, meta)
       if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`⏳ Upgrading ArgoCD to chart ${version} on ${stage}…`, threadTs, true)

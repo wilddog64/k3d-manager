@@ -18,15 +18,39 @@ ASK_DOCS_MIN_SCORE = float(os.environ.get("K3DM_ASK_DOCS_MIN_SCORE", "0.60"))
 RECENT_POOL = 50
 MAX_EXCERPT_CHARS = 600
 MAX_REPLY_CHARS = 3000
+MAX_FAILURE_METADATA_CHARS = 1200
 _LINK_REF_CACHE = None
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-_PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d .()\-]{7,}\d)(?!\w)")
+_PHONE_RE = re.compile(
+    r"(?<!\w)(?!\d{4}-\d{2}-\d{2}\b)(?:\+?\d[\d .()\-]{7,}\d)(?!\w)"
+)
 _DOC_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
 _FILED_DATE_RE = re.compile(r"\*\*Filed:\*\*\s+(\d{4}-\d{2}-\d{2})")
+_KIND_DIRS = (
+    (re.compile(r"\bbugs?\b", re.IGNORECASE), "docs/bugs/"),
+    (re.compile(r"\bissues?\b", re.IGNORECASE), "docs/issues/"),
+    (re.compile(r"\b(?:plans?|specs?)\b", re.IGNORECASE), "docs/plans/"),
+    (re.compile(r"\b(?:retros?|retrospectives?)\b", re.IGNORECASE), "docs/retro/"),
+)
+_DONE_INTENT_RE = re.compile(r"\b(?:fixed|resolved|closed|verified|done)\b", re.IGNORECASE)
+_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.*)$")
+_DONE_STATUS_RE = re.compile(
+    r"^(?:FIXED|VERIFIED|LIVE-VERIFIED|RESOLVED|CLOSED|DONE)\b", re.IGNORECASE
+)
 _RECENT_INTENT_RE = re.compile(
     r"\b(?:recent|recently|latest|newest|last week|this week|today|yesterday|lately|new)\b",
     re.IGNORECASE,
 )
+
+
+class AskDocsResult(str):
+    """String-compatible answer carrying a safe terminal outcome."""
+
+    def __new__(cls, text, *, status="success", metadata=None):
+        result = super().__new__(cls, text)
+        result.status = status
+        result.metadata = metadata or {}
+        return result
 
 
 def _scrub(text):
@@ -98,6 +122,40 @@ def _wants_recent(question):
     return bool(_RECENT_INTENT_RE.search(question or ""))
 
 
+def _recent_docs(question, limit):
+    directories = [directory for pattern, directory in _KIND_DIRS if pattern.search(question or "")]
+    if not directories:
+        return []
+    done_intent = _DONE_INTENT_RE.search(question or "")
+    candidates = []
+    for directory in directories:
+        try:
+            files = (REPO_ROOT / directory).glob("*.md")
+            for file_path in files:
+                path = file_path.relative_to(REPO_ROOT).as_posix()
+                date = _doc_date(path)
+                if not _allowed_path(path) or date is None:
+                    continue
+                try:
+                    lines = file_path.read_text(errors="replace").splitlines()
+                except OSError:
+                    continue
+                if done_intent:
+                    status = next((_STATUS_RE.match(line) for line in lines[:40] if _STATUS_RE.match(line)), None)
+                    if status is None or not _DONE_STATUS_RE.match(status.group(1)):
+                        continue
+                title = next((line[2:].strip() for line in lines if line.startswith("# ")), None)
+                if title is None:
+                    title = file_path.stem
+                if title.startswith("Bug: "):
+                    title = title[5:]
+                candidates.append((date, path, title))
+        except OSError:
+            continue
+    candidates.sort(key=lambda candidate: (candidate[0], candidate[1]), reverse=True)
+    return [(None, path, title) for _date, path, title in candidates[:limit]]
+
+
 def _excerpt(path, title):
     file_path = REPO_ROOT / path
     if not file_path.is_file():
@@ -115,7 +173,7 @@ def _sources(results):
     kept = []
     excerpts = []
     for score, path, title in results:
-        if score < ASK_DOCS_MIN_SCORE or not _allowed_path(path):
+        if (score is not None and score < ASK_DOCS_MIN_SCORE) or not _allowed_path(path):
             continue
         excerpt = _excerpt(path, title)
         if excerpt is None:
@@ -125,16 +183,21 @@ def _sources(results):
     return kept, excerpts
 
 
-def _reply(prose, paths, *, scrub_prose=True):
+def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None):
     source_lines = "Sources: none" if not paths else "Sources:\n" + "\n".join(_doc_link(path) for path in paths)
     if not prose:
         prose = "Could not summarise — read the sources directly."
     if scrub_prose:
         prose = _scrub(prose)
+        prose = re.sub(r"\*\*(\S(?:.*?\S)?)\*\*", r"*\1*", prose)
     available = MAX_REPLY_CHARS - len(source_lines) - 2
     if available < 0:
         available = 0
-    return prose[:available].rstrip() + "\n\n" + source_lines
+    return AskDocsResult(
+        prose[:available].rstrip() + "\n\n" + source_lines,
+        status=status,
+        metadata=metadata,
+    )
 
 
 def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5, summarise=True):
@@ -144,11 +207,14 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         return _reply("Question rejected — too long or contains disallowed patterns.", [])
     recent = _wants_recent(question)
     try:
-        results = retrieve(question, k=RECENT_POOL if recent else k)
+        results = _recent_docs(question, k) if recent else []
+        date_selected = bool(results)
+        if not date_selected:
+            results = retrieve(question, k=RECENT_POOL if recent else k)
     except Exception as exc:
         LOGGER.warning("ask-docs retrieval unavailable: %s", type(exc).__name__)
         return _reply("No matching documents — document search is unavailable right now.", [])
-    if recent:
+    if recent and not date_selected:
         kept = [result for result in results
                 if result[0] >= ASK_DOCS_MIN_SCORE and _allowed_path(result[1])]
         dated = [result for result in kept if _doc_date(result[1])]
@@ -161,11 +227,14 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         return _reply("No matching documents for that question.", [])
     if not summarise:
         lines = ["Top matching documents:"]
-        lines.extend(f"{score:.2f}  {_doc_date(path) or '-'}  {_doc_link(path)} — {_scrub(title)}" for score, path, title in results
-                     if score >= ASK_DOCS_MIN_SCORE and _allowed_path(path)
+        lines.extend(f"{_doc_date(path) if score is None else f'{score:.2f}'}  {_doc_date(path) or '-'}  {_doc_link(path)} — {_scrub(title)}" for score, path, title in results
+                     if (score is None or score >= ASK_DOCS_MIN_SCORE) and _allowed_path(path)
                      and path in paths)
         return _reply("\n".join(lines), paths, scrub_prose=False)
     recent_note = (
+        "The user asked for recent items; these are the newest matching documents, newest first. "
+        "List each with its date and one-line summary. Do not say there are no newer items — only "
+        "these were provided.\n\n" if date_selected else
         "The user asked for recent items; excerpts are ordered newest first — lead with the newest "
         "and state each item's date.\n\n" if recent else ""
     )
@@ -178,5 +247,32 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         prose = model(prompt)
     except Exception as exc:
         LOGGER.warning("ask-docs model unavailable: %s", type(exc).__name__)
-        prose = ""
-    return _reply(prose, paths)
+        return _reply(
+            f"Could not summarise — model error: {type(exc).__name__}",
+            paths,
+            status="failed",
+            metadata={
+                "status": "failed",
+                "failure_class": "summary_model_exception",
+                "error_category": type(exc).__name__,
+            },
+        )
+    metadata = getattr(prose, "metadata", {})
+    if not prose:
+        return _reply(
+            "Could not summarise — model returned no output",
+            paths,
+            status="failed",
+            metadata={
+                "status": "failed",
+                "failure_class": "summary_model_empty",
+            },
+        )
+    if isinstance(prose, str) and prose.startswith("AI analysis unavailable"):
+        return _reply(
+            prose,
+            paths,
+            status="failed",
+            metadata=metadata,
+        )
+    return _reply(prose, paths, metadata=metadata)

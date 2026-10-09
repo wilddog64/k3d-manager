@@ -1,5 +1,6 @@
 # CLOSED — Bugfix: v1.25.0 — namespace labels missing for payment NetworkPolicy selectors
 
+**Status:** CLOSED (per the title; shipped in v1.25.0) (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.25.0`
 **Files:** `services/shopping-cart-namespace/namespace.yaml`, `scripts/etc/argocd/applicationsets/data-git.yaml`
 

@@ -1,5 +1,6 @@
 # Bug: `shopping-cart` AppProject referenced but never created — data-layer + services never sync
 
+**Status:** CLOSED — doc merged to main in PR #106; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `scripts/etc/argocd/projects/shopping-cart.yaml.tmpl` (NEW), `scripts/plugins/argocd.sh`
 **Classification:** Bugfix in `docs/bugs/` (exempt from the max-5-plan limit).

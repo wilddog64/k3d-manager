@@ -35,6 +35,16 @@ spec:
           annotations:
             summary: "ArgoCD app {{ $labels.name }} is OutOfSync"
             description: "App {{ $labels.name }} in namespace {{ $labels.dest_namespace }} has been OutOfSync for 15 minutes"
+        - alert: ArgoCDAppProgressingStuck
+          expr: |
+            argocd_app_info{health_status="Progressing"} == 1
+          for: 30m
+          labels:
+            group: argocd
+            severity: warning
+          annotations:
+            summary: "ArgoCD app {{ $labels.name }} has been Progressing for 30 minutes"
+            description: "App {{ $labels.name }} (destination {{ $labels.dest_server }}, namespace {{ $labels.dest_namespace }}) has been Progressing for 30 minutes. A DaemonSet or Deployment is not becoming ready; check its pods on the destination cluster."
         - alert: ArgoCDImageUpdaterFlapping
           expr: |
             max by (name) (

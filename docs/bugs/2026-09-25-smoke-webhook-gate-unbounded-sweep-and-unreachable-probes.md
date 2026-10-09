@@ -4,6 +4,7 @@
 **Target branch:** `k3d-manager-v1.38.0` (held — v1.37.0 is awaiting merge)
 **Files:** `bin/smoke-test-webhook`, `scripts/lib/webhook/smoke.py`, `scripts/tests/bin/` (new BATS), `CHANGELOG.md`
 **Pre-existing:** `bin/smoke-test-webhook` is untouched since v1.16.0 (`4c5d3556`). Not a v1.37.0 regression — the identical call exists on `origin/main`.
+**Status:** FIXED in `70417db0` — evidence: `bin/smoke-test-webhook:80-90` (triaged 2026-10-08, Codex)
 
 ---
 

@@ -2,6 +2,96 @@
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-10-09
+
+### Added
+- **Expired ACG sandboxes are cleaned off the hub automatically.** A new launchd agent (`make install-sandbox-reaper`) checks every 10 minutes; once every app of a `k3s-aws` registration has been Unknown for 30 minutes and AWS confirms the sandbox is gone (stack deleted or credentials dead), it removes the registration and its Applications with `bin/cleanup-stale-registration` and posts a Slack notice. Covers expiries that `make down` never saw.
+- Added `make appsets-reapply` and `make appsets-check` for the release ApplicationSet reapply step.
+- The Hermes host disk-space sensor now probes the Hostinger node root filesystem.
+- The **CVE Auto-Patch** dashboard has an **Open critical CVEs in our images (not remediated)** table. The remediation status tables only show CVEs that auto-patch acted on, so a critical with no newer fixing image (CVE-2026-47884 in payment, whose fix needs Spring Boot 4) was invisible there.
+- The **k3dm Alertmanager Delivery** dashboard has a **Firing alerts** table that lists every alert firing now (the always-on `Watchdog` and `InfoInhibitor` meta-alerts excluded; `InfoInhibitor` had shown up as a confusing `none` severity in the count) with its severity, cluster, namespace and, for Trivy alerts, the image. The existing stat only counted alerts by severity, so seeing which 40 warnings were firing meant opening Prometheus.
+- `make prometheus-rules` applies only the hub PrometheusRules (`scripts/etc/prometheus/rules/*.yaml`, with the same `CF_DOMAIN` substitution as `make observability`) so a new or changed alert rule, such as the host disk-space alerts, can go live without a full observability redeploy. Dashboards already sync from git; rules did not.
+- Added the Hermes host disk-space sensor, Pushgateway gauges, Grafana dashboard, and low/critical/stale alerts.
+- `make snapshot` automatically prunes verified snapshots after a successful capture (disable with
+  `K3DM_SNAPSHOT_AUTO_PRUNE=0`) and checks M2 free space before upload via
+  `K3DM_SNAPSHOT_MIN_FREE_GB`.
+
+### Security
+- **Every relayed Slack slash command is capped at the caller's mapped role.** The relay forwarded the
+  command and the webhook trusted the role it was told, so a reader-mapped Slack user could reach an
+  admin command. The webhook now resolves the role from the Slack caller itself and can only narrow it.
+- **`/ask` keeps `ask-bash` inside its file scope** for shell strings as well as argv, with an OS-level
+  read boundary, and passes the prompt after `--` so a dash-led prompt cannot be parsed as a CLI option.
+- The relay acknowledges Slack bot-echo events at the edge instead of forwarding them to the webhook.
+- The Slack-triggered infra ArgoCD upgrade (`/api/v1/argocd-upgrade`) requires an explicit
+  confirmation, so shared infrastructure cannot be mutated by an accidental command.
+
+### Fixed
+- A webhook-run `make test-all` publishes its fallback Grafana metrics again. The publisher
+  referenced an undefined `REPO_ROOT`, and the caller's broad `except` reduced the `NameError` to a
+  log warning, so the fallback never ran ([PR #138 findings](docs/issues/2026-10-09-copilot-pr138-review-findings.md)).
+- Slack events larger than 4 KB were truncated before signature verification, so every large
+  event failed it; the webhook now verifies the full body (up to 64 KB, `413` above).
+- **Slack replies stay in their thread.** Top-level jobs, `/cluster-status`, `/cluster-diagnose`,
+  stale-sandbox cleanup and three other commands now open a thread and keep every follow-up in it,
+  with the source channel preserved; handled thread commands no longer fall through to
+  "unknown command", authorization failures are reported, and namespace-first pod diagnosis is accepted.
+- `/ask` replies drop the CLI preamble before the answer marker; `/ask-docs` propagates model
+  failures instead of answering empty, and redaction no longer mistakes ISO dates for phone numbers.
+- `cleanup-stale-sandbox` no longer boots out Hostinger's Pushgateway port-forward, and reports its
+  own failures.
+- **k3dm Tests dashboard:** cloud and local `test-all` runs publish failed-case details, a run
+  classification, the Make exit code and a last-success time that survives a failed run; stale
+  failure series are removed, a **Failures in selected time range** table keeps earlier failures
+  visible after a passing run, and the **Last run** stat is neutral-coloured instead of always red.
+- Hub snapshots capture claims as in-node tar streams, map PV hostnames to the logical node, drop
+  the Trivy cache claim and rename a snapshot only after it verifies; the hub-deletion guard
+  returns instead of exiting and performs real reads under `DRY_RUN`.
+- Hermes counts stale values-branch Applications separately from source references.
+- The e2e runner refreshes mutable images and keeps result cleanup best effort; the recording
+  fixture extraction is stateful.
+- The vectordb reachability panel drops its unlabelled sparkline; the disk sensor's default M2
+  path is `k3dm-snapshots` and its free-space panel shows bytes.
+- Hostinger frontend is repinned to main `05ec17e3` (login-callback timeout, Tailwind v4) and
+  payment to the clean Spring Boot 4 image.
+- `/ask-docs` now lists newest matching bug, issue, plan/spec, or retro documents by date for kind-specific recent questions, filters done statuses when requested, and renders CommonMark bold as Slack bold.
+
+- **The k3dm Host Disk dashboard had no tags**, so it was the only k3dm dashboard missing from tag filters in the Grafana dashboard list. It now carries `k3dm` and `disk`, and a new BATS guard fails when any provisioned dashboard (`platform-ops/grafana-dashboard-*.yaml`, `grafana/dashboards/*.yaml`) ships with no tags.
+
+- `make down` now deregisters sandbox Applications matched by their ArgoCD destination server.
+- `make down` preserves the Hub Vault LaunchAgent when the Hub is kept.
+- ArgoCD ApplicationSet live overrides now resolve Istio CNI directories for the live destination cluster, so a Hostinger destination cannot inherit the shell's sandbox cluster provider.
+- Added the warning-level `ArgoCDAppProgressingStuck` alert, which fires after 30 minutes for any ArgoCD app that remains Progressing.
+- Kept the GHCR PAT out of `kubectl` argv when minting shopping-cart pull secrets by applying an in-shell dockerconfigjson manifest on stdin.
+- Guarded the preflight wait-loop app-status read so empty or newline-less kubectl output keeps polling instead of tripping `set -e`.
+- The watchdog now recovers a Ready node whose kubelet tunnel is dead (API server 502 dialing `:10250`) after `K3DM_NODE_TUNNEL_THRESHOLD` consecutive ticks (default 6), while a slow `/healthz` stays advisory; see [the dead kubelet tunnel bug](docs/bugs/2026-10-09-node-health-watch-ignores-ready-node-with-dead-kubelet-tunnel.md).
+- `make cleanup-stale-registration CLUSTER=<name>` works again. The target passed
+  `--cluster <name>` as two words, but `bin/cleanup-stale-registration` only accepts
+  `--cluster=<name>`, so every run (even the dry-run preview) exited 2 before reading anything.
+  The script's own tests called it directly, so nothing covered the Makefile wiring; a new BATS
+  case now runs the make target against a stubbed `kubectl`.
+- `make test-all` now records and publishes its pass or failure result to the `k3dm Tests`
+  Grafana dashboard while preserving the original test exit code; `make test-metrics` remains
+  an always-zero compatibility wrapper.
+- Hub deletion now requires a fresh verified M2 snapshot unless the operator explicitly sets
+  `DISCARD_HUB_DATA=1`; `make status` reports local snapshot freshness and
+  `make hub-retain-pvs` applies the operator-run PV safety net.
+- Hub snapshot pruning now keeps the newest verified snapshots instead of deleting them.
+- Alertmanager now sends SMS recovery texts, has a Docker-backed pytest suite for notification
+  deduplication, repeats, recovery, routing guards, and resolved-template rendering, and supports
+  `make alertmanager-config` to re-render and apply only its hub Secret.
+
+### Changed
+
+- Retired the orphaned osixia LDAP PVC claims from Hub snapshots and stopped
+  `cluster-up` from adding the `identity/ldap` source to the identity Application;
+  see [the OpenLDAP CVE bug](docs/bugs/2026-08-02-openldap-legacy-image-cve-and-trivy-alert-grouping.md).
+- **The "Trivy Operator Job Reconcile Errors" panel is readable now.** Errors are rare, so the
+  old line chart drew isolated dots labelled `{}` (an unnamed `sum(...)`), with a bucket size
+  that changed with the zoom level. The panel now draws one bar per hour, names the series
+  `errors / hour`, and has a description that explains what a burst usually means. The query
+  is unchanged.
+
 ## [1.41.0] - 2026-10-06
 
 ### Added

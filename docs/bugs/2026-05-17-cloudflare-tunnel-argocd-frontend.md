@@ -1,5 +1,6 @@
 # Feature: Cloudflare Tunnel for public ArgoCD + frontend access
 
+**Status:** CLOSED — doc merged to main in PR #75; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.6`
 **Files:**
 - `bin/acg-up` — add Step 10h after Step 10g

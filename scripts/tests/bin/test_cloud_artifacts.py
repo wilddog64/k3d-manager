@@ -140,6 +140,7 @@ def test_finished_job_publishes_summary_and_junit_in_the_same_commit(repos, job_
     summary = json.loads(_git(repos["origin"], "show", f"cloud-requests:artifacts/{request_id}/summary.json"))
     assert summary["job_id"] == JOB_ID
     assert summary["job_status"] == "failed"
+    assert summary["result_classification"] == "failed_untriaged"
     assert summary["request_id"] == request_id
     assert summary["target"] == "test-pytest"
     assert "exit_code" not in summary

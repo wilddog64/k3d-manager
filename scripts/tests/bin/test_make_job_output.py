@@ -63,6 +63,11 @@ def test_output_exists_before_terminal_status(job, monkeypatch):
     assert (job / "status").read_text() == "failed"
 
 
+def test_make_job_persists_exit_code_for_status_api(job, monkeypatch):
+    _run(job, monkeypatch, 2, "boom\n")
+    assert (job / "exit_code").read_text() == "2"
+
+
 def test_make_job_log_keeps_local_command_output(job, monkeypatch):
     _run(job, monkeypatch, 1, "Authorization: Bearer make-synthetic-token\nDB_PASSWORD=hunter2-synthetic\n")
     written = (job / "make.log").read_text()

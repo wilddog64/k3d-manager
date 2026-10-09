@@ -323,6 +323,11 @@ function _k3s_aws_deregister_cluster() {
   local -a hub_kubectl=()
   read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
 
+  local server=""
+  server="$("${hub_kubectl[@]}" -n "${argocd_ns}" get secret "${secret_name}" \
+    -o jsonpath='{.data.server}' 2>/dev/null | base64 --decode 2>/dev/null || true)"
+  [[ "${server}" == "https://kubernetes.default.svc" ]] && server=""
+
   "${hub_kubectl[@]}" -n "${argocd_ns}" delete secret "${secret_name}" \
     --ignore-not-found >/dev/null 2>&1 || true
 
@@ -333,9 +338,10 @@ function _k3s_aws_deregister_cluster() {
       -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
     "${hub_kubectl[@]}" -n "${argocd_ns}" delete "${app}" --ignore-not-found >/dev/null 2>&1 || true
   done < <(
-    "${hub_kubectl[@]}" -n "${argocd_ns}" get applications -o \
-      jsonpath='{range .items[?(@.spec.destination.name=="'"${ctx}"'")]}application/{.metadata.name}{"\n"}{end}' \
-      2>/dev/null
+    "${hub_kubectl[@]}" -n "${argocd_ns}" get applications -o json 2>/dev/null \
+      | jq -r --arg ctx "${ctx}" --arg server "${server}" \
+        '.items[]? | select(.spec.destination.name == $ctx or ($server != "" and .spec.destination.server == $server)) | "application/" + .metadata.name' \
+        2>/dev/null
   )
 
   _info "[k3s-aws] Deregistered ${secret_name} + generated Applications from hub ArgoCD (${argocd_ns})"

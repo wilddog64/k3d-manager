@@ -1,5 +1,7 @@
 # ArgoCD Keycloak OIDC values were rendered with literal placeholders
 
+**Status:** CLOSED — doc merged to main in PR #116; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Problem
 
 Signing in to ArgoCD through Keycloak failed with a provider-query error. The live

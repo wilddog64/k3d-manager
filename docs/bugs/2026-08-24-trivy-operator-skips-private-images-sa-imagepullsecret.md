@@ -1,5 +1,6 @@
 # Bug: trivy-operator 0.32.0 silently skips private images whose pull cred is a ServiceAccount `imagePullSecrets`
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Cluster:** `ubuntu-hostinger` (app-cluster)
 **Component:** trivy-operator 0.32.0 (chart 0.34.0), trivy 0.72.0, ClientServer mode
 **Impact:** CVE dashboard **panel ② ("Shopping-cart Unique CVEs")** stays empty — the private

@@ -5,6 +5,7 @@
 **Template:** `scripts/etc/argocd/port-forward-wrapper.sh.tmpl`
 **Severity:** High — one wrapper has been port-forwarding against the **wrong cluster** for 16
 days while silently killing a second, healthy listener every 31 seconds.
+**Status:** FIXED in `81d2e186` — evidence: `scripts/etc/argocd/port-forward-wrapper.sh.tmpl:15,29-49,88-126` (triaged 2026-10-08, Codex)
 
 ## Symptom
 

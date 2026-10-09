@@ -1,5 +1,6 @@
 # Bug: acg-credentials — isEnabled() gate skips Start Sandbox click when button appears active
 
+**Status:** CLOSED — superseded: one iteration in the 2026-05-16 chain of fixes for the ACG "Extend session" modal. ACG browser automation now lives in lib-foundation; reopen there if it recurs (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.6`
 **Files:** `scripts/lib/acg/playwright/acg_credentials.js`
 

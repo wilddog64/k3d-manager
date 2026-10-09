@@ -45,6 +45,15 @@ def test_real_combined_bats_output_aggregates_and_counts_its_red():
     assert "k3dm_test_last_success_timestamp_seconds" not in payload
 
 
+def test_failed_bats_cases_publish_bounded_name_and_reason_labels():
+    parsed = METRICS.parse_log(
+        "# file: observability.bats\n1..2\nok 1 good\nnot ok 2 deploy fallback\n"
+        "#   expected generated config\n"
+    )
+    payload = METRICS.build_payload(parsed, "test-all", 2)
+    assert 'k3dm_test_failure{target="test-all",suite="observability.bats",case="2",name="deploy fallback",reason="expected generated config"} 1' in payload
+
+
 def test_unittest_and_pytest_blocks_are_parsed():
     parsed = METRICS.parse_log(fixture_text())
     assert parsed["suites"]["webhook_policy.py"] == {"ok": 12, "not_ok": 2}
@@ -64,11 +73,54 @@ def test_success_timestamp_is_omitted_when_any_case_failed():
     assert "k3dm_test_last_success_timestamp_seconds" not in payload
 
 
-def test_exit_code_2_with_zero_failures_is_not_a_failure():
+def test_exit_code_0_with_zero_failures_is_a_success():
     parsed = METRICS.parse_log("# file: clean.bats\n1..1\nok 1 works\n")
-    payload = METRICS.build_payload(parsed, "test-all", 2, now=123)
+    payload = METRICS.build_payload(parsed, "test-all", 0, now=123)
     assert 'k3dm_test_cases_failed{target="test-all"} 0' in payload
     assert "k3dm_test_last_success_timestamp_seconds 123" in payload
+
+
+def test_nonzero_exit_code_does_not_update_last_success_timestamp():
+    parsed = METRICS.parse_log("# file: clean.bats\n1..1\nok 1 works\n")
+    payload = METRICS.build_payload(parsed, "test-all", 2, now=123)
+    assert 'k3dm_test_run_classification{target="test-all",classification="failed_untriaged"} 1' in payload
+    assert "k3dm_test_last_success_timestamp_seconds" not in payload
+
+
+def test_run_classification_follows_terminal_exit_code():
+    parsed = METRICS.parse_log("# file: clean.bats\n1..1\nok 1 works\n")
+    passed = METRICS.build_payload(parsed, "test-all", 0)
+    failed = METRICS.build_payload(parsed, "test-all", 2)
+    assert 'k3dm_test_run_classification{target="test-all",classification="passed"} 1' in passed
+    assert 'k3dm_test_run_classification{target="test-all",classification="failed_untriaged"} 1' in failed
+
+
+def test_success_marker_is_separate_and_bounded_to_the_success_group():
+    marker = METRICS.build_success_marker(now=123)
+    assert marker == (
+        "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures and exit code 0\n"
+        "# TYPE k3dm_test_last_success_timestamp_seconds gauge\n"
+        "k3dm_test_last_success_timestamp_seconds 123\n"
+    )
+
+
+def test_main_publishes_success_marker_only_after_a_success(monkeypatch, tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
+    calls = []
+    monkeypatch.setattr(METRICS, "push_metrics", lambda payload, *args, **kwargs: calls.append((payload, args, kwargs)))
+    METRICS.main([str(log), "--target", "test-all", "--exit-code", "0"])
+    assert len(calls) == 2
+    assert calls[1][2]["group_suffix"] == "-last-success"
+
+
+def test_main_does_not_publish_success_marker_after_a_failure(monkeypatch, tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text("# file: clean.bats\n1..1\nok 1 works\n")
+    calls = []
+    monkeypatch.setattr(METRICS, "push_metrics", lambda payload, *args, **kwargs: calls.append((payload, args, kwargs)))
+    METRICS.main([str(log), "--target", "test-all", "--exit-code", "2"])
+    assert len(calls) == 1
 
 
 def test_origin_is_in_the_grouping_url_not_only_a_label():
@@ -94,8 +146,20 @@ def test_no_metric_is_labelled_by_test_name():
     payload = METRICS.build_payload(parsed, "test-all", 0)
     for line in payload.splitlines():
         if "{" in line:
+            if line.startswith("k3dm_test_failure{"):
+                continue
             labels = line.split("}", 1)[0]
             assert all(" " not in value and len(value) <= 80 for value in re.findall(r'="([^"]*)"', labels))
+
+
+def test_failure_labels_are_bounded_and_escaped():
+    parsed = METRICS.parse_log(
+        '# file: clean.bats\n1..1\nnot ok 1 bad "case"\n# reason\n'
+    )
+    payload = METRICS.build_payload(parsed, "test-all", 1)
+    assert 'name="bad \\"case\\""' in payload
+    failure_line = next(line for line in payload.splitlines() if line.startswith("k3dm_test_failure"))
+    assert all(len(value) <= METRICS.MAX_LABEL_LENGTH for value in re.findall(r'="((?:\\.|[^"\\])*)"', failure_line))
 
 
 def test_push_failure_is_non_fatal(monkeypatch, capsys):
@@ -117,7 +181,7 @@ def test_push_to_local_throwaway_server_receives_payload(monkeypatch):
             self.send_response(200)
             self.end_headers()
 
-        def do_POST(self):
+        def do_PUT(self):
             received.append(self.rfile.read(int(self.headers["Content-Length"])).decode())
             self.send_response(200)
             self.end_headers()

@@ -1,5 +1,6 @@
 # Bugfix: Stripe checkout Copilot hardening — order service
 
+**Status:** CLOSED — doc merged to main in PR #110; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Repo:** `shopping-cart-order` (work here; this spec lives in k3d-manager)
 **Branches (two — apply each change to the branch named for it):**
 - `feat/stripe-checkout-auth` (Phase A) — Change 1

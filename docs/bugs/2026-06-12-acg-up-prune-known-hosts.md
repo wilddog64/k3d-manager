@@ -1,5 +1,6 @@
 # SSH host-key hygiene — non-interactive provisioning + automated known_hosts prune
 
+**Status:** CLOSED — doc merged to main in PR #94; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-12
 **Branch:** `k3d-manager-v1.6.5`
 **Files:** `scripts/plugins/shopping_cart.sh`, `bin/acg-up`

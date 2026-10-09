@@ -1,5 +1,6 @@
 # Bugfix: backfill Copilot PR findings docs — payment #23 + order #33
 
+**Status:** CLOSED — doc merged to main in PR #96; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Spec repo:** k3d-manager (this file). **Work repos:** `shopping-cart-payment`, `shopping-cart-order`.
 **Branch (both work repos):** `feat/go-rewrite` (existing PR branches — do NOT create new branches).
 **Type:** docs-only. No code, config, workflow, or test files may be touched.

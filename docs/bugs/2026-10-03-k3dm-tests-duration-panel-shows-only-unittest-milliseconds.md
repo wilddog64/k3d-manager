@@ -1,6 +1,7 @@
 # Bug: k3dm Tests duration panel shows only unittest milliseconds; the ~15-minute run reports 0
 
 **Filed:** 2026-10-03
+**Status:** FIXED in `3a254484` (#133): the run duration is measured and pushed as `k3dm_test_run_duration_seconds{target}`
 **Branch:** `k3d-manager-v1.41.0`
 **Severity:** Medium — the dashboard misstates how long the offline suite takes; no test result is wrong.
 

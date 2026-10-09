@@ -1,5 +1,6 @@
 # Bugfix: v1.7.1 — `ghcr-pull-secret` provisioned on hardcoded `ubuntu-k3s`, not the active provider
 
+**Status:** CLOSED — doc merged to main in PR #96; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.7.1`
 **Files:** `scripts/plugins/shopping_cart.sh`
 

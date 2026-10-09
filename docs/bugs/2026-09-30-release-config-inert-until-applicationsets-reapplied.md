@@ -3,8 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's "I don't see any" (the
 *k3dm Alertmanager Delivery* dashboard)
-**Status:** FIXED — Codex `a92f1f1d`, verified by Claude 2026-09-30 with one ordering defect and two test
-defects fixed in the follow-up commit. Unexercised live until the next release-branch switch.
+**Status:** FIXED — R9 sensor (a92f1f1d); 2026-10-09 recurrence → make appsets-reapply/appsets-check (8bdc5ccd)
 **Classification:** Bugfix in `docs/bugs/` (v1.40.0 already has five plan docs).
 **Severity:** Medium. Nothing fails; config merged and green in CI never reaches a cluster.
 **Related:** `2026-07-24-make-status-values-branch-drift-wiring.md` (the same check in `make status`,
@@ -152,3 +151,82 @@ reapplied, and nothing reports it. `kube-prometheus-stack` had already synced it
 git, while `hub-pushgateway` stayed "not found" until `deploy_argocd_applicationsets --confirm`. A
 candidate check: render each `scripts/etc/argocd/applicationsets/*.yaml` with the same envsubst and
 compare `spec` against the live object. That is a v1.41.0 item, not widened into this fix.
+
+## Recurrence (2026-10-09, v1.42.0) and the make targets
+
+`hub-vectordb` and `hub-platform-ops` were still on `k3d-manager-v1.41.0` on 2026-10-09 because the
+v1.42.0 sets had been applied one at a time and never as a full set. The new *Host Disk* dashboard
+and the `prometheusrule.yaml` changes did not reach the hub. The operator ran
+`K3D_MANAGER_BRANCH=k3d-manager-v1.42.0 ./scripts/k3d-manager deploy_argocd_applicationsets --confirm`:
+13/13 sets applied, 21 references clean, and both apps showed `Synced Healthy` on v1.42.0.
+
+The operator's first try was `make appsets-reapply`, which did not exist. The release step should
+be one command that cannot pin the wrong branch.
+
+### Implementation spec (Codex)
+
+**Branch:** `k3d-manager-v1.42.0`. **Files (only these):** `Makefile`, new
+`scripts/tests/bin/makefile_appsets.bats`, `CHANGELOG.md` (`[Unreleased]` → `### Added`, one
+bullet), and this doc's Status line.
+
+**Change 1: Makefile targets.** Add `appsets-reapply appsets-check` to the `.PHONY` list on line 31.
+Put these two targets directly after the `sync-main` target (after its recipe and the blank line
+following it):
+
+```make
+## Reapply every ApplicationSet pinned to a release branch (BRANCH=, default: current branch)
+appsets-reapply:
+	@_b='$(BRANCH)'; \
+	if ! printf '%s\n' "$$_b" | grep -Eq '^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+	  echo "[appsets-reapply] ERROR: '$$_b' is not a release branch (k3d-manager-vX.Y.Z)." >&2; \
+	  echo "[appsets-reapply] Check out the release branch or pass BRANCH=k3d-manager-vX.Y.Z." >&2; \
+	  exit 1; \
+	fi; \
+	K3D_MANAGER_BRANCH="$$_b" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+
+## Report Applications whose k3d-manager values source is not on BRANCH (read-only)
+appsets-check:
+	@./scripts/k3d-manager argocd_check_values_branch '$(BRANCH)' '$(INFRA_CONTEXT)'
+```
+
+In `help`, after the `make sync-main` line, add:
+```make
+	@echo "    make appsets-reapply       Reapply all ApplicationSets on the release branch (BRANCH= optional; required each release)"
+	@echo "    make appsets-check         Report Applications not reading BRANCH's values (read-only)"
+```
+
+**Tests (`scripts/tests/bin/makefile_appsets.bats`).** Copy the pattern of
+`scripts/tests/bin/makefile_acg_watch.bats`: copy the Makefile into `${BATS_TEST_TMPDIR}/work`, write
+a stub `work/scripts/k3d-manager` that logs `$@` and `K3D_MANAGER_BRANCH` to a call log, and run
+`make -C "${WORK}" <target> BRANCH=…`. **Never run make against the real repo dir** (the real
+dispatcher would reach the cluster).
+1. `appsets-reapply BRANCH=k3d-manager-v1.42.0` → status 0; the log holds exactly one call with args
+   `deploy_argocd_applicationsets --confirm` and `K3D_MANAGER_BRANCH=k3d-manager-v1.42.0`.
+2. Refused branches: each of `main`, `HEAD`, `k3d-manager-v1.42`, `feat/k3d-manager-v1.42.0`,
+   `k3d-manager-v1.42.0-x` → status non-zero, output contains `not a release branch`, and the call log
+   is **empty**.
+3. `appsets-check BRANCH=k3d-manager-v1.42.0` → log holds
+   `argocd_check_values_branch k3d-manager-v1.42.0 k3d-cluster-context` when run with
+   `INFRA_CONTEXT=k3d-cluster-context`.
+4. Both targets are in `.PHONY`, and `make -C "${WORK}" help` lists both.
+
+**RED gate:** run the new suite against the pre-change Makefile (`git show HEAD:Makefile` copied to a
+temp path; point `MAKEFILE` at it via an env override in the test, or copy it into a temp tree). All
+four tests must fail. Paste the output. Then mutate the regex to drop the `$$` end anchor. Test 2
+must go red on `k3d-manager-v1.42.0-x`. Paste it and restore. Do NOT `git stash` or `git checkout`.
+
+**Gates (paste output):** `bats scripts/tests/bin/makefile_appsets.bats`;
+`bats scripts/tests/bin/makefile_*.bats`; `git diff --stat` shows only the listed files.
+**Never run** `make appsets-reapply`, `make appsets-check`, or any `make` lifecycle target in the
+real repo, not even with `-n`.
+
+**Status line:** `**Status:** FIXED — R9 sensor (a92f1f1d); 2026-10-09 recurrence → make appsets-reapply/appsets-check (<sha>)`
+
+**Commit message (exact):**
+```
+feat(make): add appsets-reapply and appsets-check for the release reapply step
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+**Do not:** touch `scripts/plugins/argocd.sh`, the ApplicationSets, other targets, or
+`scripts/lib/foundation/`. No PR, no merge, no `main`, no `--no-verify`, nothing against a cluster.

@@ -1,6 +1,7 @@
 # Bug: product-catalog CI red — SQLAlchemy 2.1 resolves a bare `postgresql://` URL to psycopg 3, which is not installed
 
 **Filed:** 2026-10-03
+**Status:** FIXED. `shopping-cart-product-catalog` PR #58 was merged on 2026-10-03, and #57 was merged after it.
 **Repo:** `shopping-cart-product-catalog`
 **Severity:** High — every PR and every push to `main` fails CI; the publish job is skipped, so no new image can be built or promoted.
 

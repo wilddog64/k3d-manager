@@ -1,5 +1,6 @@
 # Bugfix: ArgoCD SSO Fails — CoreDNS maps keycloak.shopping-cart.local to IngressGateway node IP
 
+**Status:** CLOSED — doc merged to main in PR #74; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.5`
 **File:** `bin/acg-up` (step 10e, lines ~604–622)
 

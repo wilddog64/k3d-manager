@@ -619,6 +619,14 @@ def _publish_health_metrics(ref=None):
                    env=env, capture_output=True, text=True, timeout=120, check=False)
 
 
+def _publish_disk_metrics():
+    try:
+        subprocess.run([str(ROOT / "bin" / "k3dm-disk-metrics")],
+                       capture_output=True, text=True, timeout=120, check=False)
+    except Exception as exc:
+        print(f"disk metrics publish skipped: {exc}", file=sys.stderr)
+
+
 def _poll(state, state_path, now=None, status_runner=_status_run):
     now = time.time() if now is None else now
     _refresh_index(state, now)
@@ -676,6 +684,7 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
             ) + "; " + app_health_filed.get("push", "")))
     _publish_status(records, state)
     _publish_health_metrics(state.get("index_ref"))
+    _publish_disk_metrics()
     _schedule_e2e(state)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event, "approvals": approvals,

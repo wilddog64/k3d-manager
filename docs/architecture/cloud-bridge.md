@@ -62,8 +62,8 @@ sequenceDiagram
     alt Action is not allowlisted or validation fails
         Bridge->>Bridge: Build rejected response
     else Action is allowlisted
-        Bridge->>Keychain: Read k3dm-webhook-token-reader
-        Keychain-->>Bridge: Reader credential
+        Bridge->>Keychain: Read k3dm-webhook-token-reader, or k3dm-webhook-token-cloud-runner for e2e and sandbox-up/down
+        Keychain-->>Bridge: Credential for that action
         Bridge->>Hook: POST or GET allowlisted path over loopback
         Hook-->>Bridge: HTTP response and job status body
         Bridge->>Bridge: Add artifacts when terminal job-status permits
@@ -87,7 +87,7 @@ after the declared timeout plus ten minutes.
 | Action allowlist | A request becomes one fixed webhook route and, where applicable, fixed action or Make target | `ACTION_ALLOWLIST`; unknown actions and extra or missing args are rejected | `scripts/lib/webhook/cloud_actions.py`, `bin/k3dm-cloud-bridge` |
 | Credential-bound role | Reader bearer credential and an optional role header | Reader token sets the ceiling; `X-K3DM-Role` can only narrow it; route and target policy still applies. Cloud-runner lifecycle capabilities bind the provider (`cluster-up@aws`, `cluster-down@aws`). | `bin/k3dm-cloud-bridge`, `scripts/lib/webhook/auth.py`, `scripts/lib/webhook/policy.py` |
 | Loopback-only webhook | The bridge's HTTP call to port 7443 | The bridge connects to `127.0.0.1`; the webhook's authentication and route policy remain in force | `bin/k3dm-cloud-bridge`, `bin/k3dm-webhook` |
-| Agent capability boundary | Read-only health, status, diagnostics and allowlisted test/query requests | The bridge has no lifecycle or mutating action in its allowlist, and the reader credential cannot satisfy higher role floors | `scripts/lib/webhook/cloud_actions.py`, `scripts/lib/webhook/make_targets.py`, `scripts/lib/webhook/policy.py` |
+| Agent capability boundary | Read-only health, status, diagnostics and allowlisted test/query requests, plus the cloud-runner set: `make-e2e`, `make-e2e-remote`, and `sandbox-up`/`sandbox-down` fixed to provider `aws` | No hub lifecycle, fix, or other mutating action is in the allowlist; the reader credential cannot satisfy higher role floors, and the cloud-runner credential is bound to its named targets and `cluster-up@aws`/`cluster-down@aws` | `scripts/lib/webhook/cloud_actions.py`, `scripts/lib/webhook/make_targets.py`, `scripts/lib/webhook/policy.py` |
 
 The agent can never choose an arbitrary URL, shell command, Make target outside the allowlist,
 provider, destructive target, or administrator/operator-only target through this channel. The only

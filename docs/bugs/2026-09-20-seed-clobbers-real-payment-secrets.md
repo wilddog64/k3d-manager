@@ -3,6 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** High — blocks the hub rebuild. A rebuild today injects a placeholder Stripe key.
+**Status:** FIXED in `f28a4539` — evidence: `scripts/plugins/shopping_cart.sh:797-838` (triaged 2026-10-08, Codex)
 
 ## Symptom
 

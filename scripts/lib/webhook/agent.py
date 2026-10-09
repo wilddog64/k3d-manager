@@ -35,6 +35,15 @@ __all__ = [
 GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-3.8-flash-medium")
 _ask_semaphore = threading.Semaphore(2)
 
+
+class AIResult(str):
+    """String-compatible model result with safe outcome metadata."""
+
+    def __new__(cls, text, metadata=None):
+        result = super().__new__(cls, text)
+        result.metadata = metadata or {}
+        return result
+
 def _notify_job(job_id, text):
     """Post a Slack message in the thread for job_id."""
     thread_ts_file = JOB_DIR / job_id / "thread_ts"
@@ -113,15 +122,33 @@ def _call_gemini(prompt):
     total_budget = float(os.environ.get("K3DM_AI_TOTAL_BUDGET_S", "180"))
     started = time.monotonic()
     failures = []
-    for name, argv in _ai_candidates():
+    failure_details = []
+
+    def record_failure(name, reason, *, elapsed_s=None, exit_code=None, timed_out=False):
+        failures.append(f"{name}: {reason}")
+        failure_details.append({
+            "candidate": name,
+            "category": reason.split(" ", 1)[0],
+            "elapsed_s": elapsed_s,
+            "exit_code": exit_code,
+            "timed_out": timed_out,
+        })
+
+    candidates = _ai_candidates()
+    for index, (name, argv) in enumerate(candidates):
         if argv is None:
-            failures.append(f"{name}: not installed")
+            record_failure(name, "not-installed")
             continue
         remaining = total_budget - (time.monotonic() - started)
-        if remaining < 15:
-            failures.append(f"{name}: skipped, time budget exhausted")
+        fallback_reserve = 15 * (len(candidates) - index - 1)
+        attempt_budget = remaining - fallback_reserve
+        if attempt_budget < 14.5:
+            record_failure(name, "budget-exhausted")
             continue
+        attempt_started = time.monotonic()
         tmp_path = None
+        exit_code = None
+        timed_out = False
         try:
             with tempfile.NamedTemporaryFile(
                 prefix="k3dm-ai-", suffix=".out", delete=False, mode="w"
@@ -135,8 +162,7 @@ def _call_gemini(prompt):
                 argv[0], argv + ["--prompt", guarded], dict(env),
                 file_actions=file_actions, setsid=True,
             )
-            deadline = time.monotonic() + remaining
-            exit_code = None
+            deadline = time.monotonic() + attempt_budget
             while True:
                 if time.monotonic() > deadline:
                     try:
@@ -145,6 +171,7 @@ def _call_gemini(prompt):
                     except OSError:
                         pass
                     exit_code = -9
+                    timed_out = True
                     break
                 try:
                     done_pid, status = os.waitpid(child_pid, os.WNOHANG)
@@ -157,26 +184,40 @@ def _call_gemini(prompt):
                 time.sleep(0.5)
             raw = Path(tmp_path).read_text(errors="replace").strip()
         except Exception as exc:
-            failures.append(f"{name}: {type(exc).__name__}")
+            record_failure(name, type(exc).__name__, elapsed_s=round(time.monotonic() - attempt_started, 3))
             continue
         finally:
             if tmp_path:
                 Path(tmp_path).unlink(missing_ok=True)
-        if exit_code == -9:
-            failures.append(f"{name}: timed out")
+        elapsed = round(time.monotonic() - attempt_started, 3)
+        if timed_out:
+            record_failure(name, "timeout", elapsed_s=elapsed, exit_code=exit_code, timed_out=True)
             continue
         reason = _ai_classify_failure(exit_code, raw)
         if reason:
-            failures.append(f"{name}: {reason}")
+            record_failure(name, reason, elapsed_s=elapsed, exit_code=exit_code)
             continue
         raw = re.sub(r'(?m)^Warning:.*\n?', '', raw).strip()
         if not raw:
-            failures.append(f"{name}: no output")
+            record_failure(name, "no-output", elapsed_s=elapsed, exit_code=exit_code)
             continue
         cleaned = re.sub(r'(?:^|\n)\s*\w+\([^)]{0,500}\)\s*', ' ', raw, flags=re.MULTILINE)
         cleaned = re.sub(r'<ctrl[^>]*>', '', cleaned).strip()
-        return cleaned or raw
-    return "AI analysis unavailable — " + "; ".join(failures)
+        return AIResult(cleaned or raw, {
+            "status": "success",
+            "elapsed_s": round(time.monotonic() - started, 3),
+            "candidate": name,
+        })
+    return AIResult(
+        "AI analysis unavailable — " + "; ".join(failures),
+        {
+            "status": "failed",
+            "elapsed_s": round(time.monotonic() - started, 3),
+            "failures": failures,
+            "failure_details": failure_details,
+            "failure_class": "summary_model_unavailable",
+        },
+    )
 
 
 _FIX_RE = re.compile(
@@ -243,6 +284,10 @@ def _parse_gemini_observations(raw):
 
     If the format is not present, returns (raw, []) unchanged.
     """
+    marker = re.search(r"(?m)^ANSWER:[ \t]*\n", raw)
+    if marker:
+        raw = raw[marker.end():]
+
     obs_marker = "\nOBSERVATIONS:\n"
     if obs_marker not in raw:
         answer = raw.removeprefix("ANSWER:\n").strip()
@@ -495,22 +540,24 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
                     "Plain text or Slack mrkdwn only in your final reply. No ANSI. No markdown headers."
                 )
                 cmd = [
-                    "claude", "-p", user_prompt,
+                    "claude", "-p",
                     "--system-prompt", composite_system,
                     "--allowedTools", "Bash,Write" if filing else "Bash",
                     "--add-dir", REPO_ROOT,
                     "--add-dir", SHOPPING_CARTS_ROOT,
                     "--max-turns", str(max_turns),
+                    "--", user_prompt,
                 ]
                 timeout = 400
             else:
                 cmd = [
-                    "claude", "-p", user_prompt,
+                    "claude", "-p",
                     "--system-prompt", claude_system,
                     "--allowedTools", "Bash",
                     "--add-dir", REPO_ROOT,
                     "--add-dir", SHOPPING_CARTS_ROOT,
                     "--max-turns", str(max_turns),
+                    "--", user_prompt,
                 ]
                 timeout = 300
                 _observe = True
@@ -518,6 +565,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
             env = {
                 **os.environ,
                 "PATH": f"{sandbox_bin}:{os.environ.get('PATH', '')}",
+                "SHELL": str(Path(sandbox_bin) / "bash"),
                 "K3DM_REPO_ROOT": REPO_ROOT,
                 "K3DM_SHOPPING_CARTS_ROOT": SHOPPING_CARTS_ROOT,
                 "K3DM_FIX_MODE": "1" if fixing else "0",

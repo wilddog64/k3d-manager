@@ -440,6 +440,10 @@ function shopping_cart_resolve_ghcr_pat() {
 function shopping_cart_create_ghcr_pull_secret() {
   local ns _ctx
   _ctx="${APP_CONTEXT:-$(_acg_provider_context "$(_acg_resolve_provider)")}"
+  local _auth _dockercfg
+  _auth=$(printf '%s:%s' "${_github_user}" "${_ghcr_pat}" | base64 | tr -d '\n')
+  _dockercfg=$(printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${_auth}" | base64 | tr -d '\n')
+  _auth=""
   for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
     kubectl create namespace "$ns" --context "${_ctx}" \
       --dry-run=client -o yaml \
@@ -461,14 +465,16 @@ function shopping_cart_create_ghcr_pull_secret() {
           app.kubernetes.io/part-of=shopping-cart \
           --overwrite >/dev/null ;;
     esac
-    kubectl create secret docker-registry ghcr-pull-secret \
-      --docker-server=ghcr.io \
-      --docker-username="${_github_user}" \
-      --docker-password="${_ghcr_pat}" \
-      --context "${_ctx}" \
-      -n "$ns" \
-      --dry-run=client -o yaml \
-      | kubectl apply --context "${_ctx}" -f -
+    kubectl apply --context "${_ctx}" -f - <<MANIFEST
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ghcr-pull-secret
+  namespace: ${ns}
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: ${_dockercfg}
+MANIFEST
     _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns} (context ${_ctx})"
   done
   for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
@@ -476,6 +482,7 @@ function shopping_cart_create_ghcr_pull_secret() {
       --context "${_ctx}" \
       -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
   done
+  _dockercfg=""
 }
 
 function shopping_cart_provision_ghcr_pull_secret() {

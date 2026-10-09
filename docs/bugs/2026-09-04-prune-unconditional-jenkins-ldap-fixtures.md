@@ -1,5 +1,7 @@
 # Cleanup: prune unconditional Jenkins fixtures from the LDAP bootstrap seed
 
+**Status:** CLOSED — doc merged to main in PR #119; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Context
 
 Jenkins is a deprecated demo feature — disabled by default, never deployed (CLAUDE.md; decision

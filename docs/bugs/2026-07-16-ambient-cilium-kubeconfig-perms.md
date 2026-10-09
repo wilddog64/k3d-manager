@@ -1,5 +1,6 @@
 # Bugfix: v1.16.0 — `_ambient_install_cilium` uses root-only kubeconfig as non-root SSH user
 
+**Status:** CLOSED — doc merged to main in PR #106; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `scripts/plugins/shopping_cart.sh`
 

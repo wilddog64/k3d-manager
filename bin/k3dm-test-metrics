@@ -15,10 +15,24 @@ from pathlib import Path
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 1
 DEFAULT_PUSHGATEWAY_URL = "http://localhost:9091"
+MAX_FAILURES = 100
+MAX_LABEL_LENGTH = 120
 
 
 def _suite_name(value):
     return Path(value.strip()).name
+
+
+def _metric_label(value):
+    """Escape and bound a value used in a Prometheus label."""
+    value = re.sub(r"\s+", " ", str(value or "")).strip()
+    value = value[:MAX_LABEL_LENGTH]
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def run_classification(exit_code):
+    """Classify the terminal run without claiming that a failure is a defect."""
+    return "passed" if exit_code == 0 else "failed_untriaged"
 
 
 def parse_log(text):
@@ -29,6 +43,7 @@ def parse_log(text):
     current_python = None
     last_step = "unknown"
     unittest_pending = None
+    failures = []
     total = 0
     failed = 0
 
@@ -54,7 +69,7 @@ def parse_log(text):
         if re.search(r"\bpytest(?:\s|$).*scripts/tests", line):
             last_step = "test-pytest"
 
-        tap = re.match(r"^\s*(not )?ok\s+\d+\b", line)
+        tap = re.match(r"^\s*(not )?ok\s+(\d+)\b\s*(.*)$", line)
         if tap:
             if current_suite is None:
                 current_suite = "bats"
@@ -63,7 +78,19 @@ def parse_log(text):
             suites[current_suite][result] += 1
             total += 1
             failed += result == "not_ok"
+            if result == "not_ok" and len(failures) < MAX_FAILURES:
+                failures.append({
+                    "suite": current_suite,
+                    "case": tap.group(2),
+                    "name": tap.group(3).strip() or "unnamed test",
+                    "reason": "",
+                })
             continue
+
+        if failures and not failures[-1]["reason"] and line.lstrip().startswith("#"):
+            detail = line.lstrip()[1:].strip()
+            if detail and not detail.startswith("(in test file"):
+                failures[-1]["reason"] = detail
 
         duration = re.search(r"#\s+(?:duration|time)\s*[:=]\s*([0-9.]+)\s*s?\b", line, re.I)
         if duration and current_suite:
@@ -115,6 +142,7 @@ def parse_log(text):
         "durations": durations,
         "total": total,
         "failed": failed,
+        "failures": failures,
         "last_step": last_step,
     }
 
@@ -129,6 +157,21 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None):
         values = parsed["suites"][suite]
         for result in ("ok", "not_ok"):
             lines.append(f'k3dm_test_suite_cases{{suite="{suite}",result="{result}"}} {values[result]}')
+    if parsed.get("failures"):
+        lines += [
+            "# HELP k3dm_test_failure One bounded failed test case with its first diagnostic reason",
+            "# TYPE k3dm_test_failure gauge",
+        ]
+        for failure in parsed["failures"]:
+            labels = {
+                "target": target,
+                "suite": failure["suite"],
+                "case": failure["case"],
+                "name": failure["name"],
+                "reason": failure["reason"] or "diagnostic unavailable",
+            }
+            rendered = ",".join(f'{key}="{_metric_label(value)}"' for key, value in labels.items())
+            lines.append(f"k3dm_test_failure{{{rendered}}} 1")
     lines += [
         "# HELP k3dm_test_suite_duration_seconds Wall-clock duration of one suite",
         "# TYPE k3dm_test_suite_duration_seconds gauge",
@@ -152,16 +195,22 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None):
             "# TYPE k3dm_test_run_duration_seconds gauge",
             f'k3dm_test_run_duration_seconds{{target="{target}"}} {run_duration}',
         ]
-    if parsed["failed"] == 0:
+    if parsed["failed"] == 0 and exit_code == 0:
         lines += [
-            "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures",
+            "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures and exit code 0",
             "# TYPE k3dm_test_last_success_timestamp_seconds gauge",
             f"k3dm_test_last_success_timestamp_seconds {now}",
         ]
     lines += [
+        "# HELP k3dm_test_run_classification Current terminal test-run classification",
+        "# TYPE k3dm_test_run_classification gauge",
+        (
+            f'k3dm_test_run_classification{{target="{_metric_label(target)}",'
+            f'classification="{run_classification(exit_code)}"}} 1'
+        ),
         "# HELP k3dm_test_exit_code Make exit code — INFORMATIONAL ONLY, see the staleness note",
         "# TYPE k3dm_test_exit_code gauge",
-        f'k3dm_test_exit_code{{target="{target}"}} {exit_code}',
+        f'k3dm_test_exit_code{{target="{_metric_label(target)}"}} {exit_code}',
         "# HELP k3dm_test_last_step_reached Last make sub-target that ran (1 per step name)",
         "# TYPE k3dm_test_last_step_reached gauge",
         f'k3dm_test_last_step_reached{{target="{target}",step="{parsed["last_step"]}"}} 1',
@@ -169,9 +218,20 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None):
     return "\n".join(lines) + "\n"
 
 
-def push_metrics(payload, target, origin, endpoint=None, opener=None):
+def build_success_marker(now=None):
+    """Build the separately grouped timestamp that survives failed-run replacement."""
+    now = int(time.time()) if now is None else now
+    return "\n".join([
+        "# HELP k3dm_test_last_success_timestamp_seconds Unix timestamp of the last run with zero failures and exit code 0",
+        "# TYPE k3dm_test_last_success_timestamp_seconds gauge",
+        f"k3dm_test_last_success_timestamp_seconds {now}",
+        "",
+    ])
+
+
+def push_metrics(payload, target, origin, endpoint=None, opener=None, group_suffix=""):
     endpoint = (endpoint or os.environ.get("K3DM_PUSHGATEWAY_URL", DEFAULT_PUSHGATEWAY_URL)).rstrip("/")
-    url = f"{endpoint}/metrics/job/k3dm-tests/instance/{target}-{origin}"
+    url = f"{endpoint}/metrics/job/k3dm-tests/instance/{target}-{origin}{group_suffix}"
     opener = opener or urllib.request.urlopen
     for attempt in range(1, PUSH_RETRIES + 1):
         try:
@@ -179,7 +239,7 @@ def push_metrics(payload, target, origin, endpoint=None, opener=None):
                 if response.status != 200:
                     raise RuntimeError(f"Pushgateway unhealthy (HTTP {response.status})")
             request = urllib.request.Request(
-                url, data=payload.encode(), method="POST",
+                url, data=payload.encode(), method="PUT",
                 headers={"Content-Type": "text/plain; charset=utf-8"},
             )
             with opener(request, timeout=5):
@@ -204,11 +264,17 @@ def main(argv=None):
     parser.add_argument("--run-duration", type=int, default=None)
     args = parser.parse_args(argv)
     parsed = parse_log(Path(args.log_path).read_text())
+    now = int(time.time())
     print(f"[k3dm-test-metrics] {parsed['total']} cases, {parsed['failed']} failed")
     push_metrics(
-        build_payload(parsed, args.target, args.exit_code, run_duration=args.run_duration),
+        build_payload(parsed, args.target, args.exit_code, now=now, run_duration=args.run_duration),
         args.target, args.origin,
     )
+    if parsed["failed"] == 0 and args.exit_code == 0:
+        push_metrics(
+            build_success_marker(now), args.target, args.origin,
+            group_suffix="-last-success",
+        )
     return 0
 
 
