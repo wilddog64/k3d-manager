@@ -1009,3 +1009,5 @@ remaining blocker.
 - 2026-10-08: Spec docs/plans/v1.43.0-bug-priority-tracking.md (bug Priority P0-P3, vectordb priority/state columns, ask-doc suffix, k3dm_bug_docs metric + Grafana dashboard, pre-commit check). 4th v1.43.0 spec. Awaiting go; Codex dispatch needs k3d-manager-v1.43.0 branch.
 
 - 2026-10-08: Bug priority tracking added to docs/roadmap.md as v1.43.0 candidate; spec QUEUED, dispatch to Codex when k3d-manager-v1.43.0 opens.
+
+- 2026-10-08: Spec docs/plans/v1.43.0-hermes-r10-delete-superseded-failed-job.md (superseded_jobs sensor + R10 approval-gated, target-pinned). v1.43.0 now at 5-plan cap; roadmap updated.

@@ -135,7 +135,9 @@ Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.
 for v1.43.0: [`v1.43.0-e2e-failure-artifacts.md`](plans/v1.43.0-e2e-failure-artifacts.md),
 [`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
 [`v1.43.0-test-metrics-log-retention.md`](plans/v1.43.0-test-metrics-log-retention.md), and the
-R10 overflow from v1.42.0. That is four plan docs against the cap of five.
+R10 overflow from v1.42.0, [`v1.43.0-hermes-r10-delete-superseded-failed-job.md`](plans/v1.43.0-hermes-r10-delete-superseded-failed-job.md)
+(an approval-gated deletion of a failed Job whose CronJob spec has since changed, in `identity`/`monitoring`/`cicd` only).
+v1.43.0 is now at its five-plan cap, so anything new goes to v1.44.0.
 
 ## Forward themes (unversioned until scoped)
 
