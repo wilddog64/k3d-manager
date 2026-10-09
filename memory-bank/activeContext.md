@@ -1,3 +1,9 @@
+## 2026-10-09 — v1.42.0 release PR prep
+
+- CHANGELOG promoted to `[1.42.0] - 2026-10-09` (empty `[Unreleased]` kept); added a Security section and the missing Slack-threading, test-dashboard, hub-snapshot, frontend/payment and Last-run entries; merged duplicate Added blocks.
+- Docs: `makefile.md` (appsets-reapply/check), `launchd-daemons.md` (reaper uninstall + slack-notify), `slack-slash-commands.md` (`/argocd-upgrade` row); README + `docs/releases.md` v1.42.0 row (v1.39.0 moved to Older); Issue Logs refreshed with the five 2026-10-08 issues.
+- Next: PR to main, Copilot review, CI; enforce_admins DELETE only when ready to merge.
+
 ## 2026-10-09 — Event-triggered checks: release decision + v1.45.0 fault-drill spec
 
 - Operator asked whether vCluster could simulate the event-triggered v1.42.0 checks. It can't (virtual nodes: no kubelet/tunnel, no CNI, no AWS). Decision: release v1.42.0 with them marked:

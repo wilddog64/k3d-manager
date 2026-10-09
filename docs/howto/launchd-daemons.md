@@ -36,6 +36,10 @@ for a 30-minute grace period, and AWS must confirm that the sandbox is gone (the
 stack is deleted or the credentials are dead). Reachability alone never triggers cleanup. Each
 successful or failed action is logged, and actions are notified to Slack.
 
+Install with `make install-sandbox-reaper`; remove with `make uninstall-sandbox-reaper`. Slack
+notices go through `bin/k3dm-slack-notify`, which reads the message on stdin and posts it with the
+Hermes Slack webhook (Keychain `k3dm-slack-webhook`).
+
 To preview a run by hand, use `K3DM_SANDBOX_REAPER_DRYRUN=1 bin/k3dm-sandbox-reaper` and then
 `tail ~/.local/share/k3d-manager/logs/sandbox-reaper.log`. If a registration was removed
 wrongfully, redo it with `make argocd-registration`.

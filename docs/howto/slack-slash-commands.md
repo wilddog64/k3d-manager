@@ -344,6 +344,7 @@ bin/k3dm-webhook-setup --uninstall
 | `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
 | `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
 | `/ask-docs [--sources] <question>` | Search the documentation corpus | `/ask-docs --sources how is retrieval evaluated?` | Reader-only; answers are advisory and include sources |
+| `/argocd-upgrade <chart-version> [acg\|infra] [confirm]` | Upgrade the ArgoCD Helm chart | `/argocd-upgrade 7.9.1 acg` | Admin-only; the `infra` stage changes shared infrastructure and is refused without `confirm` |
 | `/cleanup-stale-sandbox [confirm]` | Clean expired k3s-aws sandbox state | `/cleanup-stale-sandbox` | Admin-only; dry-run by default, `confirm` applies |
 | `/k3dm <target> [KEY=value …] [confirm]` | Run an allowlisted make target | `/k3dm fix-status NS=cicd` | Role per target; `/k3dm help` lists yours; one job at a time |
 | `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` | See [agent commands](#claude--gemini--codex-commands) below |

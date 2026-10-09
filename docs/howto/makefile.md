@@ -68,6 +68,8 @@ After a rebuild, generate the new target map and restore with:
 |---|---|
 | `make sync-apps` | Sync `rollout-demo-default` in ArgoCD and show remote pod status |
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
+| `make appsets-reapply` | **Every release:** reapply every ApplicationSet (hub and ACG) so its `$values` source tracks the release branch (`BRANCH=`, default: current branch; refuses anything that is not `k3d-manager-vX.Y.Z`) |
+| `make appsets-check` | Read-only: list Applications whose k3d-manager values source is not on `BRANCH`; run after `appsets-reapply` |
 
 `sync-apps` delegates to `bin/cluster-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).
@@ -76,6 +78,10 @@ Slack admin commands also support `cluster-up [provider] [dry-run]` and
 `cluster-down [provider] [dry-run]`. Dry-run tokens (`dry`, `dry-run`, `--dry-run`,
 or `dryrun`) may appear in any order and preview the lifecycle operation without
 changing the sandbox.
+
+ApplicationSets freeze their `$values` ref to the branch checked out when they were last applied, so
+config committed to a newer release branch is inert until `make appsets-reapply` runs. It is a required
+release step (see `CLAUDE.md`).
 
 `argocd-registration` reads the `ubuntu-k3s` kubeconfig, switches to `k3d-k3d-cluster`
 context, calls `register_app_cluster`, and restarts the ArgoCD application controller.

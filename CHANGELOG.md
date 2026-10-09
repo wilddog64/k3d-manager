@@ -2,10 +2,55 @@
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-10-09
+
 ### Added
 - **Expired ACG sandboxes are cleaned off the hub automatically.** A new launchd agent (`make install-sandbox-reaper`) checks every 10 minutes; once every app of a `k3s-aws` registration has been Unknown for 30 minutes and AWS confirms the sandbox is gone (stack deleted or credentials dead), it removes the registration and its Applications with `bin/cleanup-stale-registration` and posts a Slack notice. Covers expiries that `make down` never saw.
+- Added `make appsets-reapply` and `make appsets-check` for the release ApplicationSet reapply step.
+- The Hermes host disk-space sensor now probes the Hostinger node root filesystem.
+- The **CVE Auto-Patch** dashboard has an **Open critical CVEs in our images (not remediated)** table. The remediation status tables only show CVEs that auto-patch acted on, so a critical with no newer fixing image (CVE-2026-47884 in payment, whose fix needs Spring Boot 4) was invisible there.
+- The **k3dm Alertmanager Delivery** dashboard has a **Firing alerts** table that lists every alert firing now (the always-on `Watchdog` and `InfoInhibitor` meta-alerts excluded; `InfoInhibitor` had shown up as a confusing `none` severity in the count) with its severity, cluster, namespace and, for Trivy alerts, the image. The existing stat only counted alerts by severity, so seeing which 40 warnings were firing meant opening Prometheus.
+- `make prometheus-rules` applies only the hub PrometheusRules (`scripts/etc/prometheus/rules/*.yaml`, with the same `CF_DOMAIN` substitution as `make observability`) so a new or changed alert rule, such as the host disk-space alerts, can go live without a full observability redeploy. Dashboards already sync from git; rules did not.
+- Added the Hermes host disk-space sensor, Pushgateway gauges, Grafana dashboard, and low/critical/stale alerts.
+- `make snapshot` automatically prunes verified snapshots after a successful capture (disable with
+  `K3DM_SNAPSHOT_AUTO_PRUNE=0`) and checks M2 free space before upload via
+  `K3DM_SNAPSHOT_MIN_FREE_GB`.
+
+### Security
+- **Every relayed Slack slash command is capped at the caller's mapped role.** The relay forwarded the
+  command and the webhook trusted the role it was told, so a reader-mapped Slack user could reach an
+  admin command. The webhook now resolves the role from the Slack caller itself and can only narrow it.
+- **`/ask` keeps `ask-bash` inside its file scope** for shell strings as well as argv, with an OS-level
+  read boundary, and passes the prompt after `--` so a dash-led prompt cannot be parsed as a CLI option.
+- The relay acknowledges Slack bot-echo events at the edge instead of forwarding them to the webhook.
+- The Slack-triggered infra ArgoCD upgrade (`/api/v1/argocd-upgrade`) requires an explicit
+  confirmation, so shared infrastructure cannot be mutated by an accidental command.
 
 ### Fixed
+- Slack events larger than 4 KB were truncated before signature verification, so every large
+  event failed it; the webhook now verifies the full body (up to 64 KB, `413` above).
+- **Slack replies stay in their thread.** Top-level jobs, `/cluster-status`, `/cluster-diagnose`,
+  stale-sandbox cleanup and three other commands now open a thread and keep every follow-up in it,
+  with the source channel preserved; handled thread commands no longer fall through to
+  "unknown command", authorization failures are reported, and namespace-first pod diagnosis is accepted.
+- `/ask` replies drop the CLI preamble before the answer marker; `/ask-docs` propagates model
+  failures instead of answering empty, and redaction no longer mistakes ISO dates for phone numbers.
+- `cleanup-stale-sandbox` no longer boots out Hostinger's Pushgateway port-forward, and reports its
+  own failures.
+- **k3dm Tests dashboard:** cloud and local `test-all` runs publish failed-case details, a run
+  classification, the Make exit code and a last-success time that survives a failed run; stale
+  failure series are removed, a **Failures in selected time range** table keeps earlier failures
+  visible after a passing run, and the **Last run** stat is neutral-coloured instead of always red.
+- Hub snapshots capture claims as in-node tar streams, map PV hostnames to the logical node, drop
+  the Trivy cache claim and rename a snapshot only after it verifies; the hub-deletion guard
+  returns instead of exiting and performs real reads under `DRY_RUN`.
+- Hermes counts stale values-branch Applications separately from source references.
+- The e2e runner refreshes mutable images and keeps result cleanup best effort; the recording
+  fixture extraction is stateful.
+- The vectordb reachability panel drops its unlabelled sparkline; the disk sensor's default M2
+  path is `k3dm-snapshots` and its free-space panel shows bytes.
+- Hostinger frontend is repinned to main `05ec17e3` (login-callback timeout, Tailwind v4) and
+  payment to the clean Spring Boot 4 image.
 - `/ask-docs` now lists newest matching bug, issue, plan/spec, or retro documents by date for kind-specific recent questions, filters done statuses when requested, and renders CommonMark bold as Slack bold.
 
 - **The k3dm Host Disk dashboard had no tags**, so it was the only k3dm dashboard missing from tag filters in the Grafana dashboard list. It now carries `k3dm` and `disk`, and a new BATS guard fails when any provisioned dashboard (`platform-ops/grafana-dashboard-*.yaml`, `grafana/dashboards/*.yaml`) ships with no tags.
@@ -32,18 +77,6 @@
 - Alertmanager now sends SMS recovery texts, has a Docker-backed pytest suite for notification
   deduplication, repeats, recovery, routing guards, and resolved-template rendering, and supports
   `make alertmanager-config` to re-render and apply only its hub Secret.
-
-### Added
-- Added `make appsets-reapply` and `make appsets-check` for the release ApplicationSet reapply step.
-- The Hermes host disk-space sensor now probes the Hostinger node root filesystem.
-- The **CVE Auto-Patch** dashboard has an **Open critical CVEs in our images (not remediated)** table. The remediation status tables only show CVEs that auto-patch acted on, so a critical with no newer fixing image (CVE-2026-47884 in payment, whose fix needs Spring Boot 4) was invisible there.
-- The **k3dm Alertmanager Delivery** dashboard has a **Firing alerts** table that lists every alert firing now (the always-on `Watchdog` and `InfoInhibitor` meta-alerts excluded; `InfoInhibitor` had shown up as a confusing `none` severity in the count) with its severity, cluster, namespace and, for Trivy alerts, the image. The existing stat only counted alerts by severity, so seeing which 40 warnings were firing meant opening Prometheus.
-- `make prometheus-rules` applies only the hub PrometheusRules (`scripts/etc/prometheus/rules/*.yaml`, with the same `CF_DOMAIN` substitution as `make observability`) so a new or changed alert rule, such as the host disk-space alerts, can go live without a full observability redeploy. Dashboards already sync from git; rules did not.
-
-- Added the Hermes host disk-space sensor, Pushgateway gauges, Grafana dashboard, and low/critical/stale alerts.
-- `make snapshot` automatically prunes verified snapshots after a successful capture (disable with
-  `K3DM_SNAPSHOT_AUTO_PRUNE=0`) and checks M2 free space before upload via
-  `K3DM_SNAPSHOT_MIN_FREE_GB`.
 
 ### Changed
 
