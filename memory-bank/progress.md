@@ -1,3 +1,8 @@
+## 2026-10-08 — Payment PR #84: Copilot clean; CI red only because rabbitmq-client 1.1.0 is not published
+
+- Copilot reviewed #84 with 0 comments. Two checks failed, Validate PR and Checkstyle & SpotBugs, both with `Could not resolve dependencies … com.shoppingcart:rabbitmq-client:jar:1.1.0`. This is the expected ordering failure. The dependent jobs (Build and Test, Integration Tests, Security Scan, image build) were skipped.
+- Waiting on the operator to merge #9. Then Claude re-runs #84's CI, checks Integration Tests and the Trivy report, and stops for the operator to merge #84.
+
 ## 2026-10-08 — Boot 4: payment PR #84 open; Phase 2 verified (with a fix)
 
 - Phase 2: Codex `a5ab5f8` is on origin, diff limited to 8 files. Claude found and fixed a spec violation in `6dfb8ba`: Codex dropped every CVE override and re-added none, so Boot 4.0.8 would have shipped `amqp-client` 5.27.1, `httpcore5` 5.3.6 and Jackson 2 2.21.5, all below the PR #81 CVE pins. They are re-added under Boot 4 property names (`jackson-2-bom.version`). Re-verified: 103 tests, 0 failures, Checkstyle 0, SpotBugs 0; spring-webmvc 7.0.9.
