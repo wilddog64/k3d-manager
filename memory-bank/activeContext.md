@@ -1,3 +1,5 @@
+- 2026-10-09 post-merge: frontend #117 merged 05ec17e (Tailwind 4; enforce_admins never disabled, stays true); infra #110 merged c7ff88a, enforce_admins RESTORED true. No tags (both [Unreleased], chore/fix branches). Hub verified read-only: osixia ldap Deployment/Service/ExternalSecret/PVCs + ldap-secrets gone; operator patched PVs to Delete (tmux confirmed), both PVs deleted; openldap-0 Running 1/1, data-openldap-0 Bound, shopping-cart-identity Synced/Healthy. NEXT: operator `make snapshot`. Noticed in operator pane: `make shopping-cart-credential-drift` reported DRIFT on all 6 creds with probe exit codes 1/2/65 — not yet investigated.
+
 - 2026-10-09: shopping-cart-infra enforce_admins DISABLED for PR #110 merge (restore with bodyless POST after merge or if deferred). Operator patches the 2 osixia PVs to Delete before merging.
 
 - **2026-10-09 Expired-sandbox reaper designed** (`ffe1de90`): watcher path dropped (acg_watch never started by k3d-manager); launchd reaper with Unknown≥30min (keyed on Secret UID) + CFN/creds gone signal, dry-run first. Awaiting operator choice: auto reaper vs Hermes approval. Next after that: frontend public URL.
