@@ -1,3 +1,11 @@
+## 2026-10-08 — Hub snapshot LIVE-VERIFIED; both bug docs closed
+
+- Operator tmux run: `make snapshot` → `captured 20261009T022625Z` (preflight passed, rsync ~12m, auto-prune left the `.INCOMPLETE` with a warning); `make status` → `✓ Hub snapshot: 20261009T022625Z (0h old)`; `make snapshot-prune` removed `20261009T014249Z.INCOMPLETE`.
+- M2 read-only: only `20261009T022625Z` remains (3.4 GB), MANIFEST 7 lines, SHA256SUMS 11/11 OK.
+- `docs/bugs/2026-09-20-no-capture-producer-hub-pvc-data-unrecoverable.md` + `docs/bugs/2026-10-08-hub-snapshot-prune-deletes-newest-no-auto-retention.md` → LIVE-VERIFIED.
+- Cosmetic: the prune message prints `K3DM_SNAPSHOT_KEEP`, not the actual retained count ("retained 3" with 1 present). Not filed.
+- Next: operator `make prometheus-rules`; then dispatch the remote-targets spec (raise the Slack snapshot timeout above 1800 first — the capture took ~12m of rsync alone).
+
 ## 2026-10-08 — Disk sensor live: metrics + dashboard confirmed; `make prometheus-rules` added for the rule
 
 - Hub Pushgateway `localhost:19094` already holds `job="k3dm-disk"` from the running Hermes (collector runs from the tree): m2 `k3dm-snapshots` 366 GiB free / 926 GiB (60% used), m4 `/System/Volumes/Data` 171 GiB free / 460 GiB (63%); probe_success 1 for both. launchd ssh `BatchMode` to m2jump works — NO Hermes restart needed.

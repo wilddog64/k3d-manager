@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** FIXED in branch e3040689 — live verification pending (operator)
+**Status:** LIVE-VERIFIED 2026-10-08 — `make snapshot` captured `20261009T022625Z` (fixes through round 6, `81baeca9`)
 
 ## Question that prompted this
 
@@ -464,3 +464,13 @@ it:
 ```bash
 ssh m2jump 'mv k3dm-snapshots/20261009T014249Z k3dm-snapshots/20261009T014249Z.INCOMPLETE'
 ```
+
+## Live verification — 2026-10-08
+
+The operator ran `make snapshot; make status CLUSTER_PROVIDER=k3s-hostinger; make snapshot-prune` in tmux. Claude read the pane and checked the M2 read-only.
+
+- `make snapshot`: the free-space preflight passed. rsync took ~12 minutes. The run printed `captured 20261009T022625Z to m2jump:k3dm-snapshots/20261009T022625Z`. Auto-prune then warned `1 incomplete snapshot(s) on m2jump; remove with make snapshot-prune` and left the `.INCOMPLETE` alone, as designed.
+- `make status`: printed `✓ Hub snapshot: 20261009T022625Z (0h old)`.
+- `make snapshot-prune`: removed `20261009T014249Z.INCOMPLETE`.
+- M2 (`ssh m2jump`, read-only): `k3dm-snapshots/` now holds only `20261009T022625Z`, at 3.4 GB. `MANIFEST.tsv` has 7 lines. `shasum -a 256 -c SHA256SUMS` reported 11/11 OK and 0 failures.
+- Cosmetic follow-up (not filed): the prune message `retained ${_keep} newest verified snapshots` (`hub_snapshot.sh:274`) prints the configured `K3DM_SNAPSHOT_KEEP`, not the actual count. With one snapshot it said "retained 3".

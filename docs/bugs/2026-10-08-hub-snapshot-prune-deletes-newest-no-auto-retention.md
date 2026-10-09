@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude (operator: "be sure we have a retention policy as we don't have unlimited space")
 **Branch:** k3d-manager-v1.42.0
-**Status:** FIXED in branch 81baeca9f455a94110716d0ccc54fc7c3f969112 — live verification pending
+**Status:** LIVE-VERIFIED 2026-10-08 (fix `81baeca9`)
 **Priority:** P1 — the one retention tool we have deletes exactly the snapshots it should keep
 **Severity:** High
 **Component:** `scripts/plugins/hub_snapshot.sh` (`hub_snapshot_prune`, `hub_snapshot_capture`)
@@ -157,3 +157,13 @@ and `shellcheck scripts/plugins/hub_snapshot.sh` — zero new warnings.
 - Do not run a real `ssh`, `rsync`, `make snapshot` or `make snapshot-prune`.
 - Do not touch `bin/cluster-status-summary` (its UNKNOWN-path item is a separate follow-up).
 - No PR, no merge, no `main`, no `--no-verify`.
+
+## Live verification — 2026-10-08
+
+The operator ran `make snapshot; make status CLUSTER_PROVIDER=k3s-hostinger; make snapshot-prune` in tmux. Claude read the pane and checked the M2 read-only.
+
+- `make snapshot`: the free-space preflight passed. rsync took ~12 minutes. The run printed `captured 20261009T022625Z to m2jump:k3dm-snapshots/20261009T022625Z`. Auto-prune then warned `1 incomplete snapshot(s) on m2jump; remove with make snapshot-prune` and left the `.INCOMPLETE` alone, as designed.
+- `make status`: printed `✓ Hub snapshot: 20261009T022625Z (0h old)`.
+- `make snapshot-prune`: removed `20261009T014249Z.INCOMPLETE`.
+- M2 (`ssh m2jump`, read-only): `k3dm-snapshots/` now holds only `20261009T022625Z`, at 3.4 GB. `MANIFEST.tsv` has 7 lines. `shasum -a 256 -c SHA256SUMS` reported 11/11 OK and 0 failures.
+- Cosmetic follow-up (not filed): the prune message `retained ${_keep} newest verified snapshots` (`hub_snapshot.sh:274`) prints the configured `K3DM_SNAPSHOT_KEEP`, not the actual count. With one snapshot it said "retained 3".
