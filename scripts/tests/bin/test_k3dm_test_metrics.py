@@ -159,7 +159,7 @@ def test_failure_labels_are_bounded_and_escaped():
     payload = METRICS.build_payload(parsed, "test-all", 1)
     assert 'name="bad \\"case\\""' in payload
     failure_line = next(line for line in payload.splitlines() if line.startswith("k3dm_test_failure"))
-    assert all(len(value) <= METRICS.MAX_LABEL_LENGTH for value in re.findall(r'="((?:\\.|[^"])*)"', failure_line))
+    assert all(len(value) <= METRICS.MAX_LABEL_LENGTH for value in re.findall(r'="((?:\\.|[^"\\])*)"', failure_line))
 
 
 def test_push_failure_is_non_fatal(monkeypatch, capsys):
