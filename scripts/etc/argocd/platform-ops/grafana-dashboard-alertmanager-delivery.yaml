@@ -194,15 +194,15 @@ data:
         {
           "id": 4,
           "type": "stat",
-          "title": "Firing alerts by severity",
-          "description": "Routing: severity=critical goes to the SMS gateway (sms-critical), severity=warning goes to Gmail (platform-warning). Many warnings and no critical alerts means email but no texts, by design. Hermes's own SMS pager sends from the M4 through Gmail SMTP and does not appear here.",
+          "title": "Actionable alerts by severity",
+          "description": "Routing: severity=critical goes to the SMS gateway (sms-critical), severity=warning goes to Gmail (platform-warning). Many warnings and no critical alerts means email but no texts, by design. Hermes's own SMS pager sends from the M4 through Gmail SMTP and does not appear here. Trivy findings and synthetic test alerts are counted in their own panels below.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "gridPos": {
             "h": 6,
-            "w": 8,
+            "w": 5,
             "x": 16,
             "y": 1
           },
@@ -241,8 +241,67 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "count by (severity) (ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor\"})",
+              "expr": "count by (severity) (ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor|Trivy.*\",job!~\".*smstest.*\"})",
               "legendFormat": "{{severity}}",
+              "instant": true
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "stat",
+          "title": "Alerting pipeline",
+          "description": "These are the kube-prometheus-stack rules that watch the alerting system itself (send failures, Prometheus not connected to Alertmanager, rule evaluation falling behind). 0 means none firing. Look at the alert names in Prometheus when this is red.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 3,
+            "x": 21,
+            "y": 1
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value_and_name",
+            "orientation": "horizontal"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "count(ALERTS{alertstate=\"firing\",alertname=~\"Alertmanager.*|PrometheusNotConnectedToAlertmanagers|PrometheusErrorSendingAlerts.*|PrometheusNotificationQueueRunningFull|PrometheusRuleFailures|PrometheusMissingRuleEvaluations\"}) or vector(0)",
               "instant": true
             }
           ]
@@ -250,14 +309,14 @@ data:
         {
           "id": 9,
           "type": "table",
-          "title": "Firing alerts",
-          "description": "Every alert firing now (the Watchdog and InfoInhibitor meta-alerts excluded), one row per alert. Severity decides routing: critical goes to SMS, warning to email.",
+          "title": "Actionable alerts",
+          "description": "Alerts firing now, excluding Trivy findings and synthetic tests.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "gridPos": {
-            "h": 11,
+            "h": 8,
             "w": 24,
             "x": 0,
             "y": 7
@@ -290,7 +349,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor\"}",
+              "expr": "ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor|Trivy.*\",job!~\".*smstest.*\"}",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -321,6 +380,195 @@ data:
           ]
         },
         {
+          "id": 10,
+          "type": "table",
+          "title": "Security findings by image",
+          "description": "One row per image. tier=\"upstream\" is a third-party image we only consume; anything else is ours and has a remediation path through the CVE loop. This is a backlog, not a page.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 15
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "tier",
+                "desc": false
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "count by (tier, image_repository, alertname) (ALERTS{alertstate=\"firing\",alertname=~\"Trivy.*\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "indexByName": {
+                  "tier": 0,
+                  "image_repository": 1,
+                  "alertname": 2,
+                  "Value": 3
+                },
+                "renameByName": {
+                  "Value": "findings"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "type": "table",
+          "title": "Synthetic / test alerts",
+          "description": "Deliberate test alerts (for example the k3dm-disk-smstest Pushgateway job used to check SMS delivery). They route like real alerts, so they do send texts. Delete the test job when the test is over.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 15
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor\",job=~\".*smstest.*\"}",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true,
+                  "__name__": true,
+                  "alertstate": true
+                },
+                "indexByName": {
+                  "severity": 0,
+                  "alertname": 1,
+                  "cluster": 2,
+                  "namespace": 3,
+                  "image_repository": 4,
+                  "tier": 5,
+                  "remediation": 6
+                },
+                "renameByName": {}
+              }
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "type": "table",
+          "title": "Noisiest alerts (3d)",
+          "description": "Hub Prometheus keeps 3 days (retention: 3d). firing series-hours is time spent firing, summed over series, assuming the 60s rule evaluation interval. trips counts how many times an alert started pending, including ones that cleared before firing. A high count with no firing hours is flapping. Alertmanager does not label notification counts or latency by alert name, so this panel cannot show notifications per alert.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 24
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "firing series-hours",
+                "desc": true
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (alertname) (count_over_time(ALERTS{alertstate=\"firing\",alertname!~\"Watchdog|InfoInhibitor\"}[3d])) / 60",
+              "format": "table",
+              "instant": true,
+              "refId": "A",
+              "legendFormat": "firing series-hours"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (alertname) (changes(ALERTS_FOR_STATE{alertname!~\"Watchdog|InfoInhibitor\"}[3d]))",
+              "format": "table",
+              "instant": true,
+              "refId": "B",
+              "legendFormat": "trips (pending or firing)"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "Value #A": "firing series-hours",
+                  "Value #B": "trips (pending or firing)"
+                }
+              }
+            }
+          ]
+        },
+        {
           "id": 5,
           "type": "row",
           "title": "Per integration: $integration",
@@ -329,7 +577,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 18
+            "y": 32
           },
           "panels": [],
           "repeat": "integration"
@@ -347,7 +595,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 19
+            "y": 33
           },
           "fieldConfig": {
             "defaults": {
@@ -400,7 +648,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 19
+            "y": 33
           },
           "fieldConfig": {
             "defaults": {
