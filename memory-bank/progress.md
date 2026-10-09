@@ -1,3 +1,9 @@
+## 2026-10-08 — September PARTIAL bugs: rotator already fixed; hub PVC remaining fix dispatched to Codex
+
+- `2026-09-22-ci-red-prometheus-reseed-and-rotator-base64.md`: actually FIXED. `base64 -d` landed in `945018ee` (PR #130) with `platform_ops_rotators.bats`; the triage's PARTIAL was wrong. Status corrected.
+- `2026-09-20-no-capture-producer-hub-pvc-data-unrecoverable.md`: capture and full Vault coverage are done (`d53ea1ba`). Spec "Remaining fix (2026-10-08)" added: Fix A `--delete-hub` refuses without a verified M2 snapshot ≤24h or `DISCARD_HUB_DATA=1`; Fix B snapshot age in `make status`; Fix C `make hub-retain-pvs` (operator-run). Scheduling is out of scope (v1.43.0 DR plan D7). Dispatched to Codex.
+- `docs/plans/v1.43.0-hub-dr-drill.md` D7: note to extend `hub_snapshot_guard_delete` rather than add a second guard.
+
 ## 2026-10-08 — Claude verified Codex ask preamble fix; settings allow rules removed
 
 - Verified `e92d1d85` (fix), `1a0399f1` (bug status) and `a0daeab0` (memory-bank) on origin. The diff touches only `agent.py` (+4), the test file (+44), the bug doc and the memory-bank. GREEN: 5 passed. RED against pre-fix `agent.py` on a temp copy: 2 failed (the two preamble tests). `pytest scripts/tests/bin`: 522 passed, 1 skipped.

@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** PARTIAL — fixed: hub snapshot capture/offload/retention, `d53ea1ba`; still open: fail-closed `cluster-down`, Retain PV policy, scheduled freshness reporting, and complete Vault-key coverage (triaged 2026-10-08, Codex)
+**Status:** PARTIAL — fixed: capture/offload/retention `d53ea1ba` (`make snapshot`); hub delete became opt-in (`DELETE_HUB=1`); full Vault coverage (the snapshot copies the whole `data-vault-0` volume). Still open, dispatched to Codex 2026-10-08: fail-closed `--delete-hub`, snapshot freshness in `make status`, Retain on the seven claims. See "Remaining fix (2026-10-08)".
 
 ## Question that prompted this
 
@@ -175,3 +175,73 @@ only server-node data, and has never been validated as a capture. It is **not** 
 - Do NOT "fix" this by removing `k3d cluster delete` from `cluster-down` without providing the
   capture first — that trades data loss for an unusable teardown.
 - Do NOT run `signing_init` to recover `cosign-public-key`.
+
+## Remaining fix (2026-10-08)
+
+State on `k3d-manager-v1.42.0`, re-checked by Claude:
+
+| Item | State |
+|---|---|
+| 1 — capture producer | **Done**, `d53ea1ba`: `hub_snapshot_capture` / `make snapshot` copies server DB, token, `pv-pvc.yaml` and all seven claims to the M2, with `SHA256SUMS` verified on the M2. |
+| 2 — fail-closed teardown | **Partly done.** `make down` keeps the hub by default now; `DELETE_HUB=1` → `--delete-hub` still deletes it with no snapshot check. The `k3d` provider deletes it by implication, also unchecked. |
+| 3 — Retain | **Open.** |
+| 4 — schedule + freshness | Scheduling is **not** in scope: operator decision D7 in `docs/plans/v1.43.0-hub-dr-drill.md` is "nothing runs unattended". Freshness in `make status` is **open**. |
+| 5 — Vault coverage | **Done** by item 1: the snapshot copies the whole `secrets/data-vault-0` volume, so every KV key is in it, not only the 14 canonical ones. |
+
+### Fix A — `cluster-down` refuses to delete the hub without a fresh snapshot
+
+Target files: `scripts/plugins/hub_snapshot.sh`, `bin/cluster-down`, `Makefile`.
+
+1. In `hub_snapshot.sh` add:
+   - `K3DM_SNAPSHOT_MAX_AGE_HOURS="${K3DM_SNAPSHOT_MAX_AGE_HOURS:-24}"`
+   - `K3DM_SNAPSHOT_STAMP="${K3DM_SNAPSHOT_STAMP:-${HOME}/.local/share/k3d-manager/hub-snapshot-last}"`
+   - `_hub_snapshot_age_hours <name>`: prints the whole-hour age of a `YYYYmmddTHHMMSSZ` name (UTC). Use `python3 -c` for the date maths so it works on macOS and Linux; return 1 for a name that does not parse.
+   - `_hub_snapshot_latest_verified`: prints the newest name from `_hub_snapshot_remote_names` that does not end in `.INCOMPLETE`; prints nothing and returns 1 when none exist or the M2 is unreachable.
+   - `hub_snapshot_guard_delete`: returns 0 when the latest verified snapshot is ≤ `K3DM_SNAPSHOT_MAX_AGE_HOURS` old and prints `[hub-snapshot] latest verified snapshot <name> on <host> is <N>h old`. Otherwise returns 1 with an `_err` naming the reason (M2 unreachable / none / too old with its age) and the two ways forward: `make snapshot`, or `DISCARD_HUB_DATA=1` (`--discard-hub-data`), which permanently loses the seven claims.
+2. At the end of a successful `hub_snapshot_capture` (after the remote checksum passes), write the timestamp to `K3DM_SNAPSHOT_STAMP` (create the parent dir). The stamp is a convenience for `make status` only; the guard never trusts it.
+3. `bin/cluster-down`:
+   - accept `--discard-hub-data`; add it to the usage text.
+   - When `_keep_hub` is 0 (from `--delete-hub` **or** the `k3d` provider implication), the hub cluster exists, and `--discard-hub-data` is not set: source `"${PLUGINS_DIR}/hub_snapshot.sh"` and call `hub_snapshot_guard_delete`. On failure `exit 2` **before any teardown step runs** — place the check right after the flag/confirm validation, not at the hub-delete step, so a refusal never leaves the remote cluster half torn down.
+   - Under DRY_RUN, run the guard, report its verdict with `_info "DRY_RUN: ..."` and do not exit.
+   - With `--discard-hub-data`, `_warn` once that the seven claims will be destroyed with no snapshot, then proceed.
+4. `Makefile`: `DISCARD_HUB_DATA ?= 0`; when it is 1, append `--discard-hub-data` to the `cluster-down` call `make down` builds. Add it to the `make down` help line.
+
+### Fix B — snapshot freshness in `make status`
+
+Target file: `bin/cluster-status-summary`. In text mode only (not `--json`), before the `Details: make status-full` line, print one line:
+- stamp present: `Hub snapshot: <name> (<N>h old)`; yellow `!` when older than 7 days, otherwise green `✓`;
+- stamp absent: yellow `! Hub snapshot: none recorded — run make snapshot`.
+
+It reads only the local stamp file (no ssh, so `make status` never waits on the M2), and it does **not** change the exit code or the error/warning counts.
+
+### Fix C — Retain on the seven mapped claims (operator-run)
+
+Target files: `scripts/plugins/hub_snapshot.sh`, `Makefile`.
+
+`hub_snapshot_retain_pvs`: for each record in `_hub_recovery_records`, resolve the bound PV (`_hub_snapshot_claim_pv`) and, if its `persistentVolumeReclaimPolicy` is not `Retain`, `_kubectl patch pv <pv> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'`. Print `<ns>/<claim> <pv> <old> -> Retain` or `already Retain`. Idempotent; a missing PVC is an `_err` and a non-zero return after the loop finishes. Make target `hub-retain-pvs`. Do not change the `local-path` StorageClass.
+
+Limit, to state in the howto: Retain protects the data from a PVC delete only. `k3d cluster delete` removes the node containers and their storage regardless — Fix A is the guard for that. A rebuilt hub gets new PVs with `Delete`, so the target is re-run after each rebuild.
+
+### Tests (BATS, stubbed — no cluster, no ssh, no docker)
+
+`scripts/tests/plugins/hub_snapshot.bats`:
+- guard passes for a 2h-old verified snapshot; fails for 30h old, for only `.INCOMPLETE` entries, and for an unreachable M2 (stub `_hub_snapshot_ssh` return 255); the failure text names `DISCARD_HUB_DATA=1`;
+- `_hub_snapshot_age_hours` returns 1 for a malformed name;
+- capture writes the stamp only after the remote checksum passes (checksum failure → no stamp);
+- `hub_snapshot_retain_pvs` patches a `Delete` PV, skips an `already Retain` one, and returns non-zero for a missing PVC while still processing the rest.
+
+`scripts/tests/bin/cluster_down.bats`:
+- `--delete-hub` with a failing guard exits 2 and never calls `k3d cluster delete` or any remote teardown stub;
+- `--delete-hub --discard-hub-data` deletes without calling the guard;
+- the `k3d` provider implication is guarded too (update the existing "deletes the local hub by implication" case to pass `--discard-hub-data` or a passing guard stub);
+- the Makefile maps `DISCARD_HUB_DATA=1` to `--discard-hub-data` (extend the existing mapping case; never run `make down` or `make -n down`).
+
+`scripts/tests/bin/cluster_status_summary.bats`: fresh stamp → `✓ Hub snapshot`; 8-day stamp → `!`; no stamp → `none recorded`; exit code unchanged in all three.
+
+Show RED for the `--delete-hub` refusal case against the pre-fix `bin/cluster-down` on a temp copy.
+
+### Docs
+
+- `docs/howto/hub-snapshots.md`: the delete guard, `DISCARD_HUB_DATA=1`, the stamp and `make status` line, `make hub-retain-pvs` and its limit.
+- `docs/howto/makefile.md`: `DISCARD_HUB_DATA`, `hub-retain-pvs`.
+- `CHANGELOG.md` `[Unreleased]` → `### Fixed`.
