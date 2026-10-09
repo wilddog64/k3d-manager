@@ -161,6 +161,59 @@ def test_r9_ignores_unknown_healthy_or_empty_stale():
     assert repairs.propose(r9_records("degraded", False), state()) == []
 
 
+def r10_records(names=("job-b", "job-a"), context="ctx"):
+    return [record("superseded_jobs", "degraded", "2 superseded failed Jobs",
+                    {"context": context, "jobs": [{"namespace": "monitoring", "name": name,
+                    "cronjob": "nightly", "failed_at": "2026-10-09T00:00:00Z"} for name in names],
+                     "unreadable": []})]
+
+
+def test_r10_pins_sorted_targets_and_is_not_automatic():
+    current = state()
+    proposal = repairs.propose(r10_records(), current)[0]
+    assert proposal["key"] == "r10"
+    assert proposal["command"] == "kubectl --context ctx -n monitoring delete job --wait=false -- job-a job-b"
+    assert repairs.REPAIRS["r10"]["reversible"] is False
+    calls = []
+    outcome = repairs.approve(proposal["action_id"], current, r10_records(),
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "executed"
+    assert calls[0][0] == ["kubectl", "--context", "ctx", "-n", "monitoring", "delete", "job",
+                           "--wait=false", "--", "job-a", "job-b"]
+    assert current["repairs_attempted_this_incident"] == ["r10"]
+
+
+def test_r10_drops_invalid_names_and_refuses_target_changes():
+    records = r10_records(("valid-job", "bad;job", "UPPER"))
+    assert repairs._r10_targets(records) == ("ctx", "monitoring", ["valid-job"])
+    current = state()
+    proposal = repairs.propose(r10_records(("job-a",)), current)[0]
+    calls = []
+    outcome = repairs.approve(proposal["action_id"], current, r10_records(("job-a", "job-b")),
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "refused: target set changed since proposal"
+    assert calls == []
+
+
+def test_r10_refuses_when_jobs_are_no_longer_superseded():
+    current = state()
+    proposal = repairs.propose(r10_records(("job-a",)), current)[0]
+    healed = [record("superseded_jobs", "healthy", "no superseded failed Jobs",
+                     {"context": "ctx", "jobs": [], "unreadable": []})]
+    calls = []
+    outcome = repairs.approve(proposal["action_id"], current, healed,
+                              lambda *args: calls.append(args) or (0, "done"))
+    assert outcome["outcome"] == "refused: precondition no longer holds"
+    assert calls == []
+
+
+def test_kine_auto_guard_never_runs_r10():
+    current, calls = state(), []
+    assert repairs.auto_remediate_kine(r10_records(), current,
+                                       lambda *args: calls.append(args), True) is None
+    assert calls == []
+
+
 def test_r7_requires_cosign_evidence_for_two_cycles():
     records = [record("eso", "degraded", "1/8 not synced: cosign-public-key")]
     proposals = repairs.propose(records, state([["eso"], ["eso"]]))

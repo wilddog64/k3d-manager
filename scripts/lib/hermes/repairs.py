@@ -29,6 +29,7 @@ PORT_FORWARD_LABELS = {
     "prometheus.3ai-talk.org": "com.k3d-manager.prometheus-auth-proxy",
 }
 R10_NAMESPACES = ("identity", "monitoring", "cicd")
+R10_NAME = re.compile(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?")
 
 
 def _rec(records, name):
@@ -181,6 +182,30 @@ def _r9_command(records):
             {"K3D_MANAGER_BRANCH": expected})
 
 
+def _r10_targets(records):
+    item = _rec(records, "superseded_jobs") or {}
+    data = item.get("data", {})
+    context = data.get("context")
+    for namespace in sorted(R10_NAMESPACES):
+        names = sorted({job.get("name") for job in data.get("jobs", [])
+                        if isinstance(job, dict) and job.get("namespace") == namespace
+                        and isinstance(job.get("name"), str)
+                        and len(job["name"]) <= 63
+                        and R10_NAME.fullmatch(job["name"])})
+        if names and context:
+            return context, namespace, names
+    return None
+
+
+def _r10_precondition(records, _history, _state):
+    return _status(records, "superseded_jobs") == "degraded" and _r10_targets(records) is not None
+
+
+def _r10_command(records):
+    context, namespace, names = _r10_targets(records)
+    return (["kubectl", "--context", context, "-n", namespace, "delete", "job", "--wait=false", "--", *names], {})
+
+
 REPAIRS = {
     "r1": {"key": "r1", "name": "Restart webhook", "precondition": _r1_precondition,
            "build_command": _r1_command, "cwd": ROOT,
@@ -223,6 +248,10 @@ REPAIRS = {
            "precondition": _r9_precondition, "build_command": _r9_command, "cwd": ROOT,
            "blast_radius": "every k3d-manager-sourced Application on the hub and app cluster re-targets the release branch and syncs",
            "reversible": False, "needs_scope": "local hub kubeconfig"},
+    "r10": {"key": "r10", "name": "Delete failed Jobs superseded by a newer CronJob spec",
+            "precondition": _r10_precondition, "build_command": _r10_command, "cwd": None,
+            "blast_radius": "named failed Job objects (and their finished pods) in one allowlisted namespace; CronJobs untouched",
+            "reversible": False, "needs_scope": "local hub kubeconfig"},
 }
 
 
@@ -235,7 +264,7 @@ def _evidence(records, key):
     relevant = {"r1": ("eso", "data_layer"), "r2": ("reachability", "node_pressure", "data_layer"),
                 "r3": ("reachability",), "r4": ("ci",), "r5": ("kine",),
                 "r6": ("kine",), "r7": ("eso",), "r8": ("hostnet_drift",),
-                "r9": ("values_branch",)}[key]
+                "r9": ("values_branch",), "r10": ("superseded_jobs",)}[key]
     return "; ".join(item.get("evidence", "") for item in records
                      if item.get("sensor") in relevant)
 
@@ -290,6 +319,8 @@ def approve(action_id, state, records_now, runner):
         return {"outcome": "refused: webhook LaunchAgent not present", "action_id": action_id}
 
     argv, env = repair["build_command"](records_now)
+    if key == "r10" and shlex.join(argv) != proposal["command"]:
+        return {"outcome": "refused: target set changed since proposal", "action_id": action_id}
     if key == "r4" and not env.get("GH_TOKEN"):
         return {"outcome": "skipped: hermes GitHub token unavailable", "action_id": action_id}
     command = shlex.join(argv)
