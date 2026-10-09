@@ -68,7 +68,7 @@ After a rebuild, generate the new target map and restore with:
 |---|---|
 | `make sync-apps` | Sync `rollout-demo-default` in ArgoCD and show remote pod status |
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
-| `make appsets-reapply` | **Every release:** reapply every ApplicationSet (hub and ACG) so its `$values` source tracks the release branch (`BRANCH=`, default: current branch; refuses anything that is not `k3d-manager-vX.Y.Z`) |
+| `make appsets-reapply` | **Every release:** reapply every ApplicationSet (hub and ACG) so its `$values` source tracks the release branch; confirmation waits up to 90s for the ApplicationSet controller to regenerate Applications (`BRANCH=`, `K3DM_APPSET_CONFIRM_TIMEOUT=`, `K3DM_APPSET_CONFIRM_INTERVAL=`, default interval: 5s; refuses anything that is not `k3d-manager-vX.Y.Z`) |
 | `make appsets-check` | Read-only: list Applications whose k3d-manager values source is not on `BRANCH`; run after `appsets-reapply` |
 | `make codex-dispatch SPEC=...` | Start Codex in an isolated worktree for a spec |
 | `make codex-status` | Show Codex task state, changes, and scope |

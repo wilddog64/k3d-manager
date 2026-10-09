@@ -1276,6 +1276,27 @@ EOF
          _info "[argocd] DRY_RUN: skipping the values-branch confirmation — nothing was applied, so there is nothing to confirm"
       else
          _info "[argocd] Confirming values-branch pin (${K3D_MANAGER_BRANCH})"
+         local confirm_timeout="${K3DM_APPSET_CONFIRM_TIMEOUT:-90}"
+         local confirm_interval="${K3DM_APPSET_CONFIRM_INTERVAL:-5}"
+         [[ "${confirm_timeout}" =~ ^[0-9]+$ ]] || confirm_timeout=90
+         [[ "${confirm_interval}" =~ ^[1-9][0-9]*$ ]] || confirm_interval=5
+         local elapsed="${confirm_interval}" confirm_out
+
+         if (( confirm_timeout > 0 )) && confirm_out="$(argocd_check_values_branch "${K3D_MANAGER_BRANCH}" 2>&1)"; then
+            printf '%s\n' "${confirm_out}"
+            return 0
+         fi
+
+         while (( elapsed < confirm_timeout )); do
+            _info "[argocd] waiting for ApplicationSet controller to regenerate Applications (${elapsed}s/${confirm_timeout}s)"
+            sleep "${confirm_interval}"
+            if confirm_out="$(argocd_check_values_branch "${K3D_MANAGER_BRANCH}" 2>&1)"; then
+               printf '%s\n' "${confirm_out}"
+               return 0
+            fi
+            elapsed=$((elapsed + confirm_interval))
+         done
+
          argocd_check_values_branch "${K3D_MANAGER_BRANCH}"
       fi
    fi
@@ -1293,8 +1314,41 @@ function _argocd_warn_generic_cni_dirs() {
    _warn "[argocd] ${name}: re-register the target so its k3d-manager/provider label is set"
 }
 
+function _argocd_appset_cni_overrides() {
+   local name="$1" live="$2" target="$3" value conf bin provider dirs
+   if ! declare -f _istio_ambient_cni_dirs >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/istio_ambient.sh" ]]; then
+      # shellcheck disable=SC1090,SC1091
+      source "${PLUGINS_DIR}/istio_ambient.sh"
+   fi
+   if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
+      provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${target}")}"
+      if [[ -n "${provider}" ]]; then
+         dirs="$(_istio_ambient_cni_dirs "${provider}")"
+         conf="${dirs%% *}"
+         bin="${dirs##* }"
+      fi
+   fi
+   if [[ -z "${conf:-}" || -z "${bin:-}" ]] && [[ -n "${live}" ]]; then
+      value="$(printf '%s' "${live}" | jq -r '[.spec.generators[]?.list.elements[]? | select(.name == "istio-cni") | .values][0] // ""')"
+      conf="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniConfDir:[[:space:]]*//p' | head -1)"
+      bin="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniBinDir:[[:space:]]*//p' | head -1)"
+   fi
+   if [[ -n "${conf:-}" && "${conf}" == "/etc/cni/net.d" ]] \
+      && declare -f _istio_ambient_cni_provider_is_specific >/dev/null 2>&1 \
+      && _istio_ambient_cni_provider_is_specific "${provider:-}"; then
+      _warn "[argocd] ${name}: refusing generic CNI dirs for provider ${provider}"
+      conf=""
+      bin=""
+   fi
+   _argocd_warn_generic_cni_dirs "${name}" "${conf:-}" "${provider:-}"
+   if [[ -n "${conf:-}" && -n "${bin:-}" ]]; then
+      printf 'AMBIENT_CNI_CONF_DIR=%s\nAMBIENT_CNI_BIN_DIR=%s\n' "${conf}" "${bin}"
+   fi
+   return 0
+}
+
 function _argocd_appset_live_overrides() {
-   local file="$1" name live value conf bin provider dirs target
+   local file="$1" name live value target
    name="$(sed -n 's/^  name: //p' "$file" | head -1)"
    [[ -z "${name}" ]] && return 0
    live="$(_kubectl --no-exit get applicationset "${name}" -n "${ARGOCD_NAMESPACE:-cicd}" -o json 2>/dev/null || true)"
@@ -1310,34 +1364,7 @@ function _argocd_appset_live_overrides() {
    fi
 
    if grep -q '\${AMBIENT_CNI_CONF_DIR}' "$file"; then
-      if ! declare -f _istio_ambient_cni_dirs >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/istio_ambient.sh" ]]; then
-         # shellcheck disable=SC1090,SC1091
-         source "${PLUGINS_DIR}/istio_ambient.sh"
-      fi
-      if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
-         provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${target}")}"
-         if [[ -n "${provider}" ]]; then
-            dirs="$(_istio_ambient_cni_dirs "${provider}")"
-            conf="${dirs%% *}"
-            bin="${dirs##* }"
-         fi
-      fi
-      if [[ -z "${conf:-}" || -z "${bin:-}" ]] && [[ -n "${live}" ]]; then
-         value="$(printf '%s' "${live}" | jq -r '[.spec.generators[]?.list.elements[]? | select(.name == "istio-cni") | .values][0] // ""')"
-         conf="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniConfDir:[[:space:]]*//p' | head -1)"
-         bin="$(printf '%s\n' "${value}" | sed -n 's/^[[:space:]]*cniBinDir:[[:space:]]*//p' | head -1)"
-      fi
-      if [[ -n "${conf:-}" && "${conf}" == "/etc/cni/net.d" ]] \
-         && declare -f _istio_ambient_cni_provider_is_specific >/dev/null 2>&1 \
-         && _istio_ambient_cni_provider_is_specific "${provider:-}"; then
-         _warn "[argocd] ${name}: refusing generic CNI dirs for provider ${provider}"
-         conf=""
-         bin=""
-      fi
-      _argocd_warn_generic_cni_dirs "${name}" "${conf:-}" "${provider:-}"
-      if [[ -n "${conf:-}" && -n "${bin:-}" ]]; then
-         printf 'AMBIENT_CNI_CONF_DIR=%s\nAMBIENT_CNI_BIN_DIR=%s\n' "${conf}" "${bin}"
-      fi
+      _argocd_appset_cni_overrides "${name}" "${live}" "${target}"
    fi
    return 0
 }
