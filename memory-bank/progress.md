@@ -1,3 +1,10 @@
+## 2026-10-09 — Vector DB dashboard: removed unlabeled sparkline on the reachability panel
+
+- In `grafana-dashboard-vectordb.yaml`, panel 4 now has `graphMode: none`, the same as the other stat panels.
+- It also has a hover description: 1 = ok, 0 = not ok, last published values.
+- The operator found the unlabeled green band confusing.
+- `vectordb_rules.bats` passes 10/10. `hub-grafana-dashboards` follows `k3d-manager-v1.42.0`, so the change is live after ArgoCD syncs.
+
 ## 2026-10-09 — Bug filed: frontend login hangs when Keycloak's Postgres restarts
 
 - `docs/bugs/2026-10-09-frontend-login-callback-hangs-when-keycloak-db-restarts.md` (OPEN, P2):
