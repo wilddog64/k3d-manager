@@ -1,3 +1,9 @@
+## 2026-10-09 — P1 node-health-watch dead-tunnel fix dispatched to Codex
+
+- Spec: the "Implementation spec" section of `docs/bugs/2026-10-09-node-health-watch-ignores-ready-node-with-dead-kubelet-tunnel.md`.
+- Codex is on `k3d-manager-v1.42.0`; expected commit "fix(node-health-watch): recover a Ready node whose kubelet tunnel is dead".
+- Claude verifies: SHA on origin, RED + green BATS, shellcheck, 5-file scope.
+
 ## 2026-10-09 — Bug-doc sweep pass 2: 17 stale statuses checked against code
 
 - 15 closed as FIXED or SUPERSEDED: the 8 v1.23.0 QUEUED docs, the 3 2026-08-28 "SPEC → FIX" docs, argocd-ldap-vars, hostinger-status report body, and the trivy reconcile panel.
