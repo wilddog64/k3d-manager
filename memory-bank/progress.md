@@ -1,3 +1,10 @@
+## 2026-10-08 — Hub PVC live check: retain-pvs passed, make snapshot fails live (doubled container name), round 3 to Codex
+
+- Operator ran `make hub-retain-pvs`: 8/8 PVs Delete → Retain. LIVE-VERIFIED.
+- `make status` hit the multi-provider gate. Rerun it with `CLUSTER_PROVIDER=k3s-aws`.
+- `make snapshot` failed with `No such container: k3d-k3d-cluster-k3d-k3d-cluster-agent-1`. Capture passes the PV's full nodeAffinity hostname to `_hub_snapshot_node_container`, which prefixes it again. The bats kubectl stub returns logical `agent-1`, so tests never saw it. Capture has never worked live since `d53ea1ba`.
+- Spec appended to the bug doc ("Live verification — round 3"). Dispatched to Codex.
+
 ## 2026-10-08 — Claude verified hub teardown guard round 2 (`32395370`)
 
 - Verified on origin: `32395370` (fix), `ca8db0d9` (bug status) and `06c3ab0e` (memory-bank). Scope: hub_snapshot.sh, the two .bats files, the bug doc and the memory-bank only.

@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** FIXED in branch `32395370` — live verification pending (operator)
+**Status:** PARTIAL — guard `32395370` verified in tests; `make hub-retain-pvs` LIVE-VERIFIED 2026-10-08; `make snapshot` fails live (doubled container name, see "Live verification — round 3"); dispatched to Codex.
 
 ## Question that prompted this
 
@@ -280,3 +280,53 @@ any teardown. Three defects remain.
      `/bin/bash -c 'set -u; local -a a=(); read -r -a a <<< " "; g "${a[@]}"'`, which still reports
      unbound). Under Bash 5 it isn't needed. If a test genuinely needs it, show that test failing
      without it.
+
+## Live verification — round 3 (operator, 2026-10-08)
+
+- `make hub-retain-pvs`: **passed.** All 8 mapped PVs went Delete → Retain. The record table has 8
+  claims (it includes `monitoring/storage-loki-0`), not 7.
+- `make status`: refused before printing anything, because two providers are live and
+  `CLUSTER_PROVIDER` wasn't set. That's the existing multi-provider gate, not a defect. Rerun with
+  `CLUSTER_PROVIDER=k3s-aws`.
+- `make snapshot`: **failed.** Output:
+
+  ```text
+  Error response from daemon: No such container: k3d-k3d-cluster-k3d-k3d-cluster-agent-1
+  docker command failed (1): docker cp k3d-k3d-cluster-k3d-k3d-cluster-agent-1:/var/lib/rancher/k3s/storage/pvc-..._secrets_data-vault-0/. ...
+  ```
+
+  The real containers are `k3d-k3d-cluster-{server-0,agent-0,agent-1,agent-2}`.
+
+### Root cause
+
+`hub_snapshot_capture` (`scripts/plugins/hub_snapshot.sh:162`) passes
+`_hub_snapshot_claim_node`'s result to `_hub_snapshot_node_container`. That result is the PV's
+`nodeAffinity` hostname, which on a real k3d hub is the full node name `k3d-k3d-cluster-agent-1`.
+`_hub_snapshot_node_container` then prepends `k3d-k3d-cluster-` again. Line 151 passes the
+logical name `server-0` and is correct.
+
+The tests missed it because the `kubectl` stub in `hub_snapshot.bats` (line 44) returns the
+logical name `agent-1`, which a real cluster never returns. So capture has never worked live
+since `d53ea1ba`.
+
+### Fix (round 3, for Codex)
+
+1. At line 162, map the hostname to its logical node before building the container name, using
+   the existing helper in `hub_recovery.sh` (already sourced):
+
+   ```bash
+   _container="$(_hub_snapshot_node_container "$(_hub_recovery_logical_node "$_node")")" || return 1
+   ```
+
+   Do not change `_hub_snapshot_node_container` or line 151. Note `|| return 1`: an unsupported
+   hostname must stop capture, not run `docker cp` against an empty container name. If command
+   substitution inside the argument hides the failure, split it into two assignments, each with
+   `|| return 1`.
+2. Change the `hub_snapshot.bats` kubectl stub (line 44) to return real hostnames,
+   `k3d-k3d-cluster-agent-1` and `k3d-k3d-cluster-agent-0`. Leave the MANIFEST.tsv assertions
+   (logical `agent-1`) as they are, if MANIFEST still records the logical node; if it records the
+   hostname, report which and don't change it.
+3. Assert the container name: the `docker` stub must record `k3d-k3d-cluster-agent-1:` in its
+   `cp` args, and must never record a doubled `k3d-k3d-cluster-k3d-` prefix.
+4. RED: the changed stub plus the assertion fail against `32395370` on a temp worktree.
+
