@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** PARTIAL — guard `32395370` verified in tests; `make hub-retain-pvs` LIVE-VERIFIED 2026-10-08; `make snapshot` fails live (doubled container name, see "Live verification — round 3"); dispatched to Codex.
+**Status:** FIXED in branch `2e8996ae` — live verification pending (operator).
 
 ## Question that prompted this
 
@@ -329,4 +329,3 @@ since `d53ea1ba`.
 3. Assert the container name: the `docker` stub must record `k3d-k3d-cluster-agent-1:` in its
    `cp` args, and must never record a doubled `k3d-k3d-cluster-k3d-` prefix.
 4. RED: the changed stub plus the assertion fail against `32395370` on a temp worktree.
-
