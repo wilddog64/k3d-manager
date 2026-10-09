@@ -1,5 +1,7 @@
 # Cloud test failures lack an explicit triage classification
 
+**Status:** FIXED in `2833c894`: `result_classification` is in terminal job responses
+
 ## Problem
 
 A cloud `make-test-all` run can fail in the cloud environment while the same focused suite passes

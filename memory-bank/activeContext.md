@@ -1,3 +1,10 @@
+## 2026-10-08 — Claude verified Codex three-bug fixes; v1.44.0 bug dashboard folded into v1.43.0; September bug triage queued for Codex
+
+- Verified `7089dd10`/`2f7e0eb5`/`895221cb` on origin. The diff matches the specs. Claude ran full `pytest scripts/tests`: 758 passed, 1 skipped. The real `audit/remote-operator.jsonl` stayed at 6225 lines across the run (before the fix, every run added 3). Live check pending: the operator runs `make restart-webhook`, then a top-level `ask claude: what shell are you in`.
+- Folded `docs/plans/v1.44.0-bug-lifecycle-dashboard.md` (now SUPERSEDED) into `v1.43.0-bug-priority-tracking.md`. Added: the 3 status formats, the archive exclusion, no partial push on failure, and the snapshot label. The ledger, inventory table, buckets and rename identity are deferred. v1.44.0 now has 4 live plans.
+- Added status lines to 3 October docs that were already fixed: test-duration panel `3a254484`, product-catalog psycopg2 PR #58, cloud failure classification `2833c894`. Every October bug is now FIXED.
+- Queued for Codex: an evidence-based triage of 18 September bug docs that have no Status line (Status lines only, no code). The OPEN ones then get fix dispatches.
+
 ## 2026-10-08 — v1.42.0 three bug fixes committed and pushed
 
 - Ask Claude argv fix: `7089dd10`; audit pytest isolation: `2f7e0eb5`; Hermes values-branch count fix: `895221cb`.
