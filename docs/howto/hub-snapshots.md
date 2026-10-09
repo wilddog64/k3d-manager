@@ -33,6 +33,11 @@ not apply those attributes. Restore extracts it inside the node with
 `docker exec -i <node> tar -C <path> -xpf -`. Restore itself remains the
 v1.43.0 DR drill's scope.
 
+`hub_recovery_restore` and `hub_recovery_plan` still read the older directory
+layout (`server-db/state.db` and `pvc-*` directories), not these `.tar` files.
+Until the v1.43.0 DR drill teaches them the archive layout, the restore command
+above does not accept a snapshot taken with `make snapshot`.
+
 Deleting the local Hub is guarded by the newest verified M2 snapshot. The
 snapshot must be no older than 24 hours; otherwise `--delete-hub` refuses
 before any teardown starts. `make down DELETE_HUB=1` therefore requires a

@@ -1,3 +1,13 @@
+## 2026-10-08 — Claude verified hub snapshot round 4 (`fbebe9df`, tar-stream capture)
+
+- Codex `fbebe9df`/`2847d1e0`/`23f4e4b4` on origin; scope = hub_snapshot.sh, hub_snapshot.bats, howto, bug doc, memory-bank.
+- GREEN: hub_snapshot + cluster_down + cluster_status_summary bats 61/61; shellcheck clean; `docker cp` count 0.
+- RED: round-4 tests against `2e8996ae` hub_snapshot.sh fail (10 not ok) on a temp worktree.
+- Gap found + documented (Claude): `hub_recovery_plan/restore` still read the directory layout, not `.tar`. Noted in howto and as a required input change in `docs/plans/v1.43.0-hub-dr-drill.md` §4.
+- `make status CLUSTER_PROVIDER=k3s-hostinger` from tmux: HEALTHY; `Hub snapshot: none recorded` line LIVE-VERIFIED. `!`-shell "token unavailable" = locked Keychain, environmental.
+- Queued (Codex): print the `Hub snapshot:` line on the UNKNOWN/token-unavailable path of `bin/cluster-status-summary`.
+- NEXT: operator reruns `make snapshot` in tmux, then `make status CLUSTER_PROVIDER=k3s-hostinger`.
+
 ## 2026-10-08 — make snapshot round 4: setgid EPERM under /tmp; tar-stream capture dispatched to Codex
 
 - The operator's live `make snapshot` after `2e8996ae` got the correct container but failed with `fchmodat2 raft: operation not permitted`.
