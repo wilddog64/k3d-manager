@@ -37,17 +37,17 @@ EOF
 run_reaper() { run "${REPO_ROOT}/bin/k3dm-sandbox-reaper"; }
 seed_clock() { printf '%s\n' "$1" > "${STATE_DIR}/u1"; }
 
-@test "reaper: Unknown apps create first-seen clock without AWS or cleanup" { run_reaper; [ "$status" -eq 0 ]; [ -f "$STATE_DIR/u1" ]; ! grep -q '^aws ' "$CALL_LOG"; ! grep -q '^cleanup ' "$CALL_LOG"; }
-@test "reaper: clock younger than grace does not act" { seed_clock 8201; run_reaper; [ "$status" -eq 0 ]; ! grep -q '^aws ' "$CALL_LOG"; ! grep -q '^cleanup ' "$CALL_LOG"; }
-@test "reaper: deleted stack cleans up and notifies" { seed_clock 7000; run_reaper; [ "$status" -eq 0 ]; grep -q '^cleanup --cluster=ubuntu-k3s --confirm$' "$CALL_LOG"; grep -q 'removed hub registration ubuntu-k3s' "$NOTIFY_LOG"; [ ! -e "$STATE_DIR/u1" ]; }
+@test "reaper: Unknown apps create first-seen clock without AWS or cleanup" { run_reaper; [ "$status" -eq 0 ]; [ -f "$STATE_DIR/u1" ]; ! grep -q '^aws ' "$CALL_LOG" || false; ! grep -q '^cleanup ' "$CALL_LOG" || false; }
+@test "reaper: clock younger than grace does not act" { seed_clock 8201; run_reaper; [ "$status" -eq 0 ]; ! grep -q '^aws ' "$CALL_LOG" || false; ! grep -q '^cleanup ' "$CALL_LOG" || false; }
+@test "reaper: deleted stack cleans up and notifies" { seed_clock 7000; run_reaper; [ "$status" -eq 0 ]; grep -q '^cleanup --cluster=ubuntu-k3s --confirm$' "$CALL_LOG"; grep -q 'removed hub registration ubuntu-k3s' "$NOTIFY_LOG"; grep -q '(stack-deleted)' "$NOTIFY_LOG"; [ ! -e "$STATE_DIR/u1" ]; }
 @test "reaper: dead credentials clean up and include reason" { seed_clock 7000; AWS_MODE=dead run_reaper; [ "$status" -eq 0 ]; grep -q '^cleanup --cluster=ubuntu-k3s --confirm$' "$CALL_LOG"; grep -q 'credentials-dead' "$NOTIFY_LOG"; }
-@test "reaper: existing stack does not clean up" { seed_clock 7000; AWS_MODE=exists run_reaper; [ "$status" -eq 0 ]; ! grep -q '^cleanup ' "$CALL_LOG"; [ ! -s "$NOTIFY_LOG" ]; }
-@test "reaper: inconclusive AWS result does not clean up" { seed_clock 7000; AWS_MODE=network run_reaper; [ "$status" -eq 0 ]; ! grep -q '^cleanup ' "$CALL_LOG"; [ ! -s "$NOTIFY_LOG" ]; }
-@test "reaper: Synced app removes existing clock" { seed_clock 7000; APPS_JSON='{"items":[{"metadata":{"name":"ubuntu-k3s-order"},"spec":{"destination":{"name":"ubuntu-k3s"}},"status":{"sync":{"status":"Synced"}}}]}' run_reaper; [ "$status" -eq 0 ]; [ ! -e "$STATE_DIR/u1" ]; ! grep -q '^cleanup ' "$CALL_LOG"; }
-@test "reaper: zero matching apps does not act" { APPS_JSON='{"items":[{"metadata":{"name":"ubuntu-hostinger"},"spec":{"destination":{"name":"ubuntu-hostinger"}},"status":{"sync":{"status":"Unknown"}}}]}' run_reaper; [ "$status" -eq 0 ]; [ ! -e "$STATE_DIR/u1" ]; ! grep -q '^aws ' "$CALL_LOG"; }
-@test "reaper: dry-run logs would-deregister without cleanup or notify" { seed_clock 7000; K3DM_SANDBOX_REAPER_DRYRUN=1 run_reaper; [ "$status" -eq 0 ]; grep -q would-deregister "$LOG_FILE"; ! grep -q '^cleanup ' "$CALL_LOG"; [ ! -s "$NOTIFY_LOG" ]; }
+@test "reaper: existing stack does not clean up" { seed_clock 7000; AWS_MODE=exists run_reaper; [ "$status" -eq 0 ]; ! grep -q '^cleanup ' "$CALL_LOG" || false; [ ! -s "$NOTIFY_LOG" ]; }
+@test "reaper: inconclusive AWS result does not clean up" { seed_clock 7000; AWS_MODE=network run_reaper; [ "$status" -eq 0 ]; ! grep -q '^cleanup ' "$CALL_LOG" || false; [ ! -s "$NOTIFY_LOG" ]; }
+@test "reaper: Synced app removes existing clock" { seed_clock 7000; APPS_JSON='{"items":[{"metadata":{"name":"ubuntu-k3s-order"},"spec":{"destination":{"name":"ubuntu-k3s"}},"status":{"sync":{"status":"Synced"}}}]}' run_reaper; [ "$status" -eq 0 ]; [ ! -e "$STATE_DIR/u1" ]; ! grep -q '^cleanup ' "$CALL_LOG" || false; }
+@test "reaper: zero matching apps does not act" { APPS_JSON='{"items":[{"metadata":{"name":"ubuntu-hostinger"},"spec":{"destination":{"name":"ubuntu-hostinger"}},"status":{"sync":{"status":"Unknown"}}}]}' run_reaper; [ "$status" -eq 0 ]; [ ! -e "$STATE_DIR/u1" ]; ! grep -q '^aws ' "$CALL_LOG" || false; }
+@test "reaper: dry-run logs would-deregister without cleanup or notify" { seed_clock 7000; K3DM_SANDBOX_REAPER_DRYRUN=1 run_reaper; [ "$status" -eq 0 ]; grep -q would-deregister "$LOG_FILE"; ! grep -q '^cleanup ' "$CALL_LOG" || false; [ ! -s "$NOTIFY_LOG" ]; }
 @test "reaper: cleanup failure notifies once and keeps state" { seed_clock 7000; CLEANUP_RC=1 run_reaper; CLEANUP_RC=1 run_reaper; [ "$status" -eq 0 ]; [ "$(wc -l < "$NOTIFY_LOG")" -eq 1 ]; [ -e "$STATE_DIR/u1" ]; }
 @test "reaper: notify failure does not change successful cleanup" { seed_clock 7000; NOTIFY_RC=1 run_reaper; [ "$status" -eq 0 ]; grep -q 'deregistered ubuntu-k3s' "$LOG_FILE"; grep -q 'notify failed' "$LOG_FILE"; }
-@test "reaper: lifecycle process skips kubectl" { PGREP_RUNNING=1 run_reaper; [ "$status" -eq 0 ]; ! grep -q '^kubectl ' "$CALL_LOG"; }
+@test "reaper: lifecycle process skips kubectl" { PGREP_RUNNING=1 run_reaper; [ "$status" -eq 0 ]; ! grep -q '^kubectl ' "$CALL_LOG" || false; }
 @test "reaper: Secret selector includes k3s-aws provider" { run_reaper; [ "$status" -eq 0 ]; grep -q 'k3d-manager/provider=k3s-aws' "$CALL_LOG"; }
 @test "reaper: stale unknown UID state is removed" { printf '%s\n' 1 > "$STATE_DIR/stale-uid"; run_reaper; [ "$status" -eq 0 ]; [ ! -e "$STATE_DIR/stale-uid" ]; }

@@ -86,8 +86,11 @@ reap_one() {
     return 0
   fi
   reason=""
-  grep -Eqi 'does not exist' "${aws_err}" && reason="stack-deleted"
-  [[ -n "${reason}" ]] || grep -Eqi 'InvalidClientTokenId|ExpiredToken|UnrecognizedClientException' "${aws_err}" && reason="credentials-dead"
+  if grep -Eqi 'does not exist' "${aws_err}"; then
+    reason="stack-deleted"
+  elif grep -Eqi 'InvalidClientTokenId|ExpiredToken|UnrecognizedClientException' "${aws_err}"; then
+    reason="credentials-dead"
+  fi
   rm -f "${aws_err}"
   if [[ -z "${reason}" ]]; then
     log "skip: aws inconclusive ${cluster}"
