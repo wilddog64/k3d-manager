@@ -1,4 +1,4 @@
-# An expired ACG sandbox leaves its hub ArgoCD registration and 8 apps behind
+# An expired ACG sandbox leaves its hub ArgoCD registration and 10 apps behind
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
@@ -34,7 +34,24 @@ any other way, nothing removes the registration:
 - a Pluralsight-side delete
 - a laptop sleep through expiry
 
+### Second gap: `make down` itself misses 2 of the 10 apps
+
+`_k3s_aws_deregister_cluster` selects Applications only by `spec.destination.name == ubuntu-k3s`.
+`ubuntu-k3s-eso` and `ubuntu-k3s-platform` target the sandbox by **server**
+(`https://host.k3d.internal:6443`), so even a normal `make down` leaves them behind.
+
+Chaining `make cleanup-stale-registration` *after* `make down` does not fix this. The deregister
+has already deleted the Secret, and the cleanup script derives the server from that Secret; it
+finds no registration and exits 0 ("No ArgoCD cluster registration found"). The server match has
+to happen while the Secret still exists.
+
 ## Fix direction (to spec)
+
+0. **`make down` path:** in the k3s-aws branch of `bin/cluster-down`, replace the
+   `_k3s_aws_deregister_cluster` call with `bin/cleanup-stale-registration --cluster=ubuntu-k3s
+   --confirm` (it reads the server before deleting the Secret), or teach the deregister to match
+   by server too. BATS: a stubbed hub with one name-matched and one server-matched app; both are
+   deleted, Secret first. RED first.
 
 Deregister automatically once the sandbox is provably gone, not merely unreachable for a moment:
 - **Watcher path:** when `acg_watch` sees the sandbox expire or end, call

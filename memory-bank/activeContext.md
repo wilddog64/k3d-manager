@@ -1,3 +1,7 @@
+## 2026-10-09 — make down misses server-matched sandbox apps (doc only)
+- `_k3s_aws_deregister_cluster` matches apps by destination name only; `ubuntu-k3s-eso` / `-platform` (server `host.k3d.internal:6443`) survive even a normal `make down`.
+- Chaining `cleanup-stale-registration` after down cannot catch them: the Secret (source of the server) is already gone. Fix item 0 added to `docs/bugs/2026-10-09-expired-acg-sandbox-leaves-hub-registration-and-apps.md`.
+
 ## 2026-10-09 — Fixed `make cleanup-stale-registration`; documented `make down` over-reach
 
 - **Fix:** the Makefile passed `--cluster "$(CLUSTER)"`, but the script requires `--cluster=<name>`, so every call exited 2.
