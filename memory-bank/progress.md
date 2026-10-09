@@ -1,3 +1,9 @@
+## 2026-10-09 — Hermes R10 LANDED via worktree dispatch (first dogfood)
+
+- R10 commits d6beebf9 / 7da544ad / bfc6e432 pushed. Claude verification: full hermes suite 249 passed; added superseded_jobs to both stubbed-sensor lists in test_hermes.py (unstubbed it probed the real hub and paged); added the missing 'precondition no longer holds' approve() test; commit 1 passes standalone (245).
+- Dogfood found P2 gap: scope is read from the task's own spec copy, so a task can widen its own scope (land said in-scope). Bug: docs/bugs/2026-10-09-codex-dispatch-task-can-widen-its-own-scope.md — dispatching via make codex-dispatch.
+- Operator: R10 needs `make restart-hermes`-equivalent (Hermes LaunchAgent reload) to go live; never automatic.
+
 ## 2026-10-09 — worktree-isolated Codex dispatch LANDED (b5223944)
 
 - Codex implemented the 6 files; Claude verification found and fixed: (1) status/land picked the spec as the first root `*.md` (README/CLAUDE.md in the real repo → every land would refuse) — spec path now recorded in `<run>/spec`; (2) memory-bank not hard-excluded when a spec lists it; (3) two `! cmd` mid-test no-ops and a land test that never checked the fast-forward. 13/13 BATS, shellcheck clean, 5 mutations all red (incl. Codex's original lookup), script restored by cmp.
