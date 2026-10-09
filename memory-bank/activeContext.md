@@ -1,3 +1,11 @@
+## 2026-10-09 — ArgoCD public 502: agent-0 kubelet tunnel dead; watchdog treats it as advisory (bug filed)
+
+- An SMS `PublicEndpointDown` fired for argocd.3ai-talk.org (502). The API server can't dial agent-0's kubelet (`proxy error ... 192.168.97.4:10250, code 502`); the other nodes are fine and all are Ready. The argocd-pf supervisor is looping.
+- `node-health-watch` logs "Ready but /healthz slow/unreachable (advisory, no restart)". This is the 2026-08-28 slow-node fix swallowing the dead-tunnel case.
+- Filed `docs/bugs/2026-10-09-node-health-watch-ignores-ready-node-with-dead-kubelet-tunnel.md`: classify a fast tunnel 502 apart from slow, and recover after 6 ticks.
+- Operator recovery: `docker restart k3d-k3d-cluster-agent-0`; Claude then verifies.
+- Payment #84 re-run is all green (CI plus PR Validation, including Integration Tests). The Trivy check and the `enforce_admins` disable are still pending.
+
 ## 2026-10-09 — rabbitmq-client 1.1.0 released (library PR #9 merged); payment #84 CI re-run
 
 - The operator merged **rabbitmq-client-java#9** at `572b7834`. Claude disabled `enforce_admins` for the merge, then restored it (read back `true`).
