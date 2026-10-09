@@ -1,3 +1,10 @@
+## 2026-10-08 — Boot 4: payment PR #84 open; Phase 2 verified (with a fix)
+
+- Phase 2: Codex `a5ab5f8` is on origin, diff limited to 8 files. Claude found and fixed a spec violation in `6dfb8ba`: Codex dropped every CVE override and re-added none, so Boot 4.0.8 would have shipped `amqp-client` 5.27.1, `httpcore5` 5.3.6 and Jackson 2 2.21.5, all below the PR #81 CVE pins. They are re-added under Boot 4 property names (`jackson-2-bom.version`). Re-verified: 103 tests, 0 failures, Checkstyle 0, SpotBugs 0; spring-webmvc 7.0.9.
+- Integration tests (Testcontainers) did NOT run locally: the OrbStack Docker API hangs (`docker info` / `docker ps` time out). The hub runs on OrbStack, so it was not restarted. Payment CI has an Integration Tests job.
+- Library PR #9: CI green; 2 Copilot style comments fixed in `df376e2`, threads resolved. Waiting for the operator to merge.
+- Payment PR **wilddog64/shopping-cart-payment#84** opened; Copilot requested. CI will fail to resolve rabbitmq-client 1.1.0 until #9 merges and publishes.
+
 ## 2026-10-08 — Boot 4: Phase 1 verified, library PR #9 open; Phase 2 dispatched
 
 - Phase 1 verified independently: rabbitmq-client-java `00e70fd`, plus Claude's CHANGELOG commit `55a279c`, both on origin. `mvn clean install` with JDK 21 passes 73 tests, 0 failures. Gotcha: on this M4, `/usr/bin/java -version` hangs, so set `JAVA_HOME=/opt/homebrew/opt/openjdk@21/...`.
