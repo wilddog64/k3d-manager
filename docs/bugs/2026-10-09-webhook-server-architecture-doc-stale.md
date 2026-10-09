@@ -1,7 +1,7 @@
 # Bug: `docs/architecture/webhook-server.md` no longer describes the webhook server
 
 **Date:** 2026-10-09
-**Status:** OPEN — dispatched to Codex
+**Status:** FIXED — architecture document rewritten against the 2026-10-09 tree
 **Branch:** `k3d-manager-v1.42.0`
 **Severity:** low (documentation); the doc says it describes the server "as it currently exists",
 and a reader who trusts it gets the module map, the route table and the extraction status wrong.
