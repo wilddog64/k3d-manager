@@ -67,6 +67,19 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/one" ]
 }
 
+@test "codex dispatch: piped start returns before Codex exits" {
+  export STUB_SLEEP=5 STUB_ARGV="$BATS_TEST_TMPDIR/one.argv" STUB_ENV="$BATS_TEST_TMPDIR/one.env"
+  timeout_bin=timeout
+  command -v "$timeout_bin" >/dev/null 2>&1 || timeout_bin=gtimeout
+  command -v "$timeout_bin" >/dev/null 2>&1 || skip "timeout or gtimeout is unavailable"
+
+  run "$timeout_bin" 3 bash -c 'cd "$1" && "$2" start --spec docs/plans/v9.9.9-demo.md --slug one | cat' _ "$FIXTURE" "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch"
+  [ "$status" -eq 0 ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  sleep 6
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
+}
+
 @test "codex dispatch: parallel starts isolate each edit" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env" STUB_EDITS=a.txt
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null

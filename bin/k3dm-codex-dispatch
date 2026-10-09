@@ -129,7 +129,7 @@ EOF
       env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1
     fi
     printf '%s\n' "$?" >"$run/exit"
-  ) &
+  ) </dev/null >/dev/null 2>&1 &
   printf '%s\n' "$!" >"$run/pid"
   echo "worktree: $worktree"; echo "run: $run"; echo "status: bin/k3dm-codex-dispatch status $slug"
 }
