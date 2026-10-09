@@ -1,3 +1,8 @@
+## 2026-10-09 — PR #138 (v1.42.0) opened; CI lint red fixed
+
+- PR #138 https://github.com/wilddog64/k3d-manager/pull/138. Copilot: 0 findings (overview only). CI `lint` red: pyflakes F821 `REPO_ROOT` undefined in `bin/k3dm-webhook` `_publish_test_metrics` (silent NameError swallowed by lifecycle's broad except → webhook test-all fallback metrics never published). Fixed + direct test (RED NameError on old code; `pytest scripts/tests/bin` 536 passed). CodeQL ambiguous regex in `test_k3dm_test_metrics.py:162`: fix is an edited assert line, blocked by `_agent_audit` (operator-only `--no-verify`) — left to operator (commit or dismiss as used-in-tests). Findings: `docs/issues/2026-10-09-copilot-pr138-review-findings.md`.
+- After merge/pull: `make restart-webhook` so the running webhook picks up the fix.
+
 ## 2026-10-09 — v1.42.0 release PR prep
 
 - CHANGELOG promoted to `[1.42.0] - 2026-10-09` (empty `[Unreleased]` kept); added a Security section and the missing Slack-threading, test-dashboard, hub-snapshot, frontend/payment and Last-run entries; merged duplicate Added blocks.

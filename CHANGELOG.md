@@ -27,6 +27,9 @@
   confirmation, so shared infrastructure cannot be mutated by an accidental command.
 
 ### Fixed
+- A webhook-run `make test-all` publishes its fallback Grafana metrics again. The publisher
+  referenced an undefined `REPO_ROOT`, and the caller's broad `except` reduced the `NameError` to a
+  log warning, so the fallback never ran ([PR #138 findings](docs/issues/2026-10-09-copilot-pr138-review-findings.md)).
 - Slack events larger than 4 KB were truncated before signature verification, so every large
   event failed it; the webhook now verifies the full body (up to 64 KB, `413` above).
 - **Slack replies stay in their thread.** Top-level jobs, `/cluster-status`, `/cluster-diagnose`,

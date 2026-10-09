@@ -1568,13 +1568,14 @@ def _push_metrics(action, provider, status, duration_secs, job_id):
 
 def _publish_test_metrics(job_id, log_path, exit_code, run_duration):
     """Publish a completed test-all log without rerunning the suites."""
+    repo_root = Path(__file__).resolve().parent.parent
     command = [
-        sys.executable, str(REPO_ROOT / "bin" / "k3dm-test-metrics"), str(log_path),
+        sys.executable, str(repo_root / "bin" / "k3dm-test-metrics"), str(log_path),
         "--target", "test-all", "--exit-code", str(exit_code),
         "--run-duration", str(run_duration),
     ]
     rc, output, timed_out = _spawn_capture_text(
-        command, cwd=REPO_ROOT, env=dict(os.environ), timeout=60,
+        command, cwd=repo_root, env=dict(os.environ), timeout=60,
     )
     if timed_out or rc != 0 or "metrics push skipped" in output:
         _LOG.warning("job=%s test-all metrics publication was not confirmed", job_id)
