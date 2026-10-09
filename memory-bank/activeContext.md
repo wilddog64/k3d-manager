@@ -1,3 +1,11 @@
+## 2026-10-08 — Disk sensor live: metrics + dashboard confirmed; `make prometheus-rules` added for the rule
+
+- Hub Pushgateway `localhost:19094` already holds `job="k3dm-disk"` from the running Hermes (collector runs from the tree): m2 `k3dm-snapshots` 366 GiB free / 926 GiB (60% used), m4 `/System/Volumes/Data` 171 GiB free / 460 GiB (63%); probe_success 1 for both. launchd ssh `BatchMode` to m2jump works — NO Hermes restart needed.
+- Dashboard ConfigMap `grafana-dashboard-host-disk` synced by `hub-grafana-dashboards` (pinned `k3d-manager-v1.42.0`, at `2ac8d68a`). NO AppSet reapply needed.
+- PrometheusRule `host-disk` NOT in cluster: rules are only applied by full `make observability`. Added `make prometheus-rules` (Makefile-only; applies `scripts/etc/prometheus/rules/*.yaml` with the same `CF_DOMAIN` envsubst to `$(INFRA_CONTEXT)`). Server-side dry-run of every rule file passes. Operator runs it (cluster mutation).
+- Fixed stale guide line "The hub has no Pushgateway by design" — `hub-pushgateway` exists (observability AppSet).
+- Next: operator `make prometheus-rules`; Claude confirms `host-disk` rules loaded in Prometheus; prove the SMS path once.
+
 ## 2026-10-08 — Claude verified host disk-space sensor (`fb563727`); fixed default M2 path
 
 - Codex `fb563727` (feature) + `acc7d05b` (memory-bank) on origin; HEAD = origin. Scope matches the spec's allowed files (13 files).

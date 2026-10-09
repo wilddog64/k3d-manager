@@ -13,6 +13,7 @@
 - Hub snapshot pruning now keeps the newest verified snapshots instead of deleting them.
 
 ### Added
+- `make prometheus-rules` applies only the hub PrometheusRules (`scripts/etc/prometheus/rules/*.yaml`, with the same `CF_DOMAIN` substitution as `make observability`) so a new or changed alert rule, such as the host disk-space alerts, can go live without a full observability redeploy. Dashboards already sync from git; rules did not.
 
 - Added the Hermes host disk-space sensor, Pushgateway gauges, Grafana dashboard, and low/critical/stale alerts.
 - `make snapshot` automatically prunes verified snapshots after a successful capture (disable with

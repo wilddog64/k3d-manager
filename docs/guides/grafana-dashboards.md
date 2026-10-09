@@ -256,6 +256,10 @@ alerts recommend `make snapshot-prune` / lowering `K3DM_SNAPSHOT_KEEP`, while M4
 recommend `docker system df` and pruning images. A `No data` panel means Hermes is not running
 or the Pushgateway port-forward is down.
 
+The dashboard syncs from git through the `grafana-dashboards-hub` ApplicationSet. The alert rules
+do not: apply them with `make prometheus-rules`, which applies only
+`scripts/etc/prometheus/rules/*.yaml` to the hub, without the full `make observability` redeploy.
+
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 
 | Panel | Query |
@@ -408,8 +412,9 @@ Work down this table before editing a query. Every row is a real past incident.
 | Host disk panels show `No data` | Hermes is not running or the hub Pushgateway port-forward is down | check Hermes and the *Last push age* panel |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
 
-The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub has no
-Pushgateway by design.
+The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub's own
+Pushgateway (`hub-pushgateway`, port-forwarded to `localhost:19094`) carries only host-side
+gauges such as vector-DB health and host disk.
 
 ---
 

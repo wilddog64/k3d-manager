@@ -1024,6 +1024,15 @@ observability:
 platform-ops:
 	./scripts/k3d-manager deploy_argocd_platform_ops --confirm
 
+## Apply hub PrometheusRules only (scripts/etc/prometheus/rules) — no full observability redeploy
+prometheus-rules:
+	@_n=0; for _f in scripts/etc/prometheus/rules/*.yaml; do \
+		CF_DOMAIN="$${CF_DOMAIN:-3ai-talk.org}" envsubst '$$CF_DOMAIN' < "$$_f" \
+			| kubectl --context $(INFRA_CONTEXT) apply -f - || exit 1; \
+		_n=$$((_n + 1)); \
+	done; \
+	echo "[prometheus-rules] $$_n rule file(s) applied to $(INFRA_CONTEXT)"
+
 ## Deploy observability stack (Prometheus+Trivy) to ACG ubuntu-k3s
 observability-acg:
 	./scripts/k3d-manager deploy_observability_acg --confirm
