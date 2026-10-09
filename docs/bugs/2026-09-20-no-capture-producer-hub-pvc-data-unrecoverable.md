@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** PARTIAL — `fa3340bc` blocks hub deletion live, but Claude's review found 3 defects (see "Review findings — round 1"); round 2 dispatched to Codex 2026-10-08.
+**Status:** FIXED in branch `32395370` — live verification pending (operator)
 
 ## Question that prompted this
 
@@ -280,4 +280,3 @@ any teardown. Three defects remain.
      `/bin/bash -c 'set -u; local -a a=(); read -r -a a <<< " "; g "${a[@]}"'`, which still reports
      unbound). Under Bash 5 it isn't needed. If a test genuinely needs it, show that test failing
      without it.
-
