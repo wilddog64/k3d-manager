@@ -153,7 +153,7 @@ for item in payload.get("items", []):
         _kubectl -n "${ARGOCD_NAMESPACE}" get application "${app}" \
           -o jsonpath='{.status.sync.status}{" "}{.status.health.status}' 2>/dev/null \
           || printf 'Unknown Unknown'
-      )
+      ) || true
       if [[ "${sync_status}" != "Synced" || "${health_status}" != "Healthy" ]]; then
         all_ready=0
         break
