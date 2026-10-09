@@ -1,3 +1,7 @@
+## 2026-10-09 — payment CVE bug FIXED
+
+- `docs/bugs/2026-10-08-payment-spring-webmvc-cve-no-oss-6x-fix.md` → FIXED. Payment Trivy alert cleared on the hub; all 42 firing TrivyCritical are tier=upstream. Trivy has not yet written a report for the live RS `5b6bf56678`.
+
 ## 2026-10-09 — enforce_admins DISABLED for merge (restore with bodyless POST after merge)
 
 - shopping-cart-infra (#108) and shopping-cart-frontend (#115): classic protection, NOT rulesets. enforce_admins disabled for the user's merge; /post-merge must re-enable both.
