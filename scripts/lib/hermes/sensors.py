@@ -2,6 +2,7 @@
 
 import base64
 import binascii
+import hashlib
 import json
 import os
 import subprocess
@@ -480,6 +481,78 @@ def hostnet_drift(run, state, threshold=2):
         return record("hostnet_drift", "healthy", "no host-network pods on stale IPs", data=data)
     except Exception:
         return record("hostnet_drift", "unknown", "host-network drift source unavailable")
+
+
+def _template_fingerprint(pod_spec):
+    containers = []
+    for container in ((pod_spec or {}).get("initContainers", []) +
+                      (pod_spec or {}).get("containers", [])):
+        if not isinstance(container, dict):
+            continue
+        containers.append([container.get("name"), container.get("image"),
+                           container.get("command") or [], container.get("args") or []])
+    canonical = json.dumps(containers, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def superseded_jobs(run, state, context=None, threshold=2):
+    """Report failed CronJob Jobs whose runnable template no longer matches."""
+    from hermes.repairs import R10_NAMESPACES
+
+    ctx = context or os.environ.get("K3DM_HERMES_JOB_CONTEXT", "k3d-k3d-cluster")
+    jobs = []
+    unreadable = []
+    for namespace in R10_NAMESPACES:
+        try:
+            job_code, job_output = run(["kubectl", "--context", ctx, "-n", namespace,
+                                        "get", "jobs", "-o", "json",
+                                        "--request-timeout=10s"], {})
+            cron_code, cron_output = run(["kubectl", "--context", ctx, "-n", namespace,
+                                          "get", "cronjobs", "-o", "json",
+                                          "--request-timeout=10s"], {})
+            job_payload = json.loads(job_output) if job_code == 0 and job_output else {}
+            cron_payload = json.loads(cron_output) if cron_code == 0 and cron_output else {}
+            if not isinstance(job_payload.get("items"), list) or not isinstance(cron_payload.get("items"), list):
+                raise ValueError("invalid jobs or cronjobs payload")
+        except Exception:
+            unreadable.append(namespace)
+            continue
+        cronjobs = {item.get("metadata", {}).get("name"): item
+                    for item in cron_payload["items"] if isinstance(item, dict)}
+        for job in job_payload["items"]:
+            if not isinstance(job, dict):
+                continue
+            metadata = job.get("metadata", {})
+            status = job.get("status", {})
+            if status.get("active", 0) not in (None, 0):
+                continue
+            failed = next((condition for condition in status.get("conditions", [])
+                           if isinstance(condition, dict) and condition.get("type") == "Failed"
+                           and condition.get("status") == "True"), None)
+            owner = next((item for item in metadata.get("ownerReferences", [])
+                          if isinstance(item, dict) and item.get("kind") == "CronJob"
+                          and item.get("controller") is True), None)
+            cronjob = cronjobs.get(owner.get("name")) if owner else None
+            name = metadata.get("name", "")
+            if not failed or not cronjob or not re.fullmatch(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?", name or "") or len(name) > 63:
+                continue
+            current = job.get("spec", {}).get("template", {}).get("spec", {})
+            desired = cronjob.get("spec", {}).get("jobTemplate", {}).get("spec", {}).get("template", {}).get("spec", {})
+            if _template_fingerprint(current) == _template_fingerprint(desired):
+                continue
+            jobs.append({"namespace": namespace, "name": name, "cronjob": owner["name"],
+                         "failed_at": failed.get("lastTransitionTime") or failed.get("lastProbeTime", "")})
+    jobs.sort(key=lambda item: (item["namespace"], item["name"]))
+    data = {"context": ctx, "jobs": jobs, "unreadable": sorted(unreadable)}
+    if len(unreadable) == len(R10_NAMESPACES):
+        return record("superseded_jobs", "unknown", "superseded Job status source unavailable", data=data)
+    if jobs:
+        status = "degraded" if _debounced("superseded_jobs", True, threshold, state) else "healthy"
+        detail = ", ".join(f"{item['namespace']}/{item['name']} (cronjob {item['cronjob']})"
+                            for item in jobs[:3])
+        return record("superseded_jobs", status, f"{len(jobs)} superseded failed Jobs: {detail}", data=data)
+    _debounced("superseded_jobs", False, threshold, state)
+    return record("superseded_jobs", "healthy", "no superseded failed Jobs", data=data)
 
 
 def vectordb(run, state, threshold=2, max_index_age_seconds=7 * 86400, now=None):

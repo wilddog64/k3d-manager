@@ -26,7 +26,7 @@ from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
                             app_health, data_layer, hostnet_drift, node_pressure, reachability,
-                            stale_acg_registration,
+                            stale_acg_registration, superseded_jobs,
                             status_checks, token_expiry_advisory, values_branch, vectordb)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
@@ -182,6 +182,7 @@ def _run_cycle(state, status_runner=None):
         node_pressure(_probe_run, state),
         data_layer(webhook_fetch, state, token=webhook),
         hostnet_drift(_probe_run, state),
+        superseded_jobs(_probe_run, state),
         kine(_datastore_run, state),
         vectordb(_vectordb_run, state),
         alert_delivery(_alert_delivery_run, state),

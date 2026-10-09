@@ -28,6 +28,7 @@ HUB_K3S_CONTAINER = "k3d-k3d-cluster-server-0"
 PORT_FORWARD_LABELS = {
     "prometheus.3ai-talk.org": "com.k3d-manager.prometheus-auth-proxy",
 }
+R10_NAMESPACES = ("identity", "monitoring", "cicd")
 
 
 def _rec(records, name):
