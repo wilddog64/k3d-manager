@@ -1,6 +1,6 @@
 ## 2026-10-09 — sc-infra PR #109 MERGED `7028ae5` (postgres-keycloak Recreate)
 - PRs merged: sc-infra #109 `7028ae5`. enforce_admins restored (bodyless POST → true). Local sc-infra main synced. Fix branch, stays [Unreleased] — no tag.
-- Hub Deployment still RollingUpdate right after merge — confirm ArgoCD sync flips it to Recreate (spec-only change, no pod restart).
+- Hub synced: strategy Recreate confirmed live, pod `897bc7b6c-sv6q6` untouched.
 - Follow-up: ldap Deployment + RWO PVCs, same risk.
 
 ## 2026-10-09 — sc-infra PR #109 open (postgres-keycloak Recreate)
