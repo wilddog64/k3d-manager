@@ -20,6 +20,7 @@ setup() {
 | File |
 |---|
 | `a.txt` |
+| `docs/plans/v9.9.9-demo.md` |
 EOF
   git -C "$FIXTURE" add a.txt README.md docs/plans/v9.9.9-demo.md memory-bank/.keep; git -C "$FIXTURE" commit -m base >/dev/null
   git -C "$FIXTURE" push -u origin k3d-manager-v9.9.9 >/dev/null
@@ -167,4 +168,47 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   run dispatch status one
   [[ "$output" == *"out-of-scope: memory-bank/x.md"* ]]
+}
+
+@test "codex dispatch: edited spec cannot widen scope" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  printf '| `b.txt` |\n' >>"$K3DM_WORKTREE_ROOT/v9.9.9/one/docs/plans/v9.9.9-demo.md"
+  printf 'edited\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/one/b.txt"
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt b.txt docs/plans/v9.9.9-demo.md
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m widen >/dev/null
+  run dispatch status one
+  [[ "$output" == *"out-of-scope: b.txt"* ]]
+  [[ "$output" == *"out-of-scope: docs/plans/v9.9.9-demo.md"* ]]
+  run dispatch land --slug one
+  [ "$status" -eq 2 ]
+}
+
+@test "codex dispatch: records the release base at start" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/base")" = "$(git -C "$FIXTURE" rev-parse origin/k3d-manager-v9.9.9)" ]
+}
+
+@test "codex dispatch: scope ignores commits pushed after dispatch" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  printf 'release change\n' >"$FIXTURE/release.txt"
+  git -C "$FIXTURE" add release.txt; git -C "$FIXTURE" commit -m release-change >/dev/null
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+  git -C "$FIXTURE" fetch -q origin k3d-manager-v9.9.9:refs/remotes/origin/k3d-manager-v9.9.9
+  run dispatch status one
+  [[ "$output" != *"release.txt"* ]]
+}
+
+@test "codex dispatch: land refuses a missing recorded base" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
+  rm "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/base"
+  run dispatch status one
+  [[ "$output" == *"scope: unknown (no recorded base)"* ]]
+  run dispatch land --slug one
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"no recorded base"* ]]
 }

@@ -28,18 +28,23 @@ _dispatch_release_branch() {
 }
 
 _dispatch_spec_files() {
-  awk '/^## Files[[:space:]]*$/ { in_files=1; next } in_files && /^## / { exit } in_files { print }' "$1" |
+  awk '/^## Files[[:space:]]*$/ { in_files=1; next } in_files && /^## / { exit } in_files { print }' |
     grep -oE "\`[^\`]+\`" | sed "s/^\`//; s/\`$//" || true
 }
 
 _dispatch_scope_verdict() {
-  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched
+  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched base
   local -a patterns=()
-  while IFS= read -r path; do [[ -n "$path" ]] && patterns+=("$path"); done < <(_dispatch_spec_files "$worktree/$spec")
+  if [[ ! -f "$worktree.run/base" ]]; then
+    echo "scope: unknown (no recorded base)"
+    return 1
+  fi
+  base="$(<"$worktree.run/base")"
+  while IFS= read -r path; do [[ -n "$path" ]] && patterns+=("$path"); done < <(git -C "$worktree" show "$base:$spec" | _dispatch_spec_files)
   while IFS= read -r path; do
     [[ -n "$path" ]] || continue
     matched=1
-    [[ "$path" == memory-bank/* ]] && { echo "out-of-scope: $path"; in_scope=0; continue; }
+    [[ "$path" == "$spec" || "$path" == memory-bank/* ]] && { echo "out-of-scope: $path"; in_scope=0; continue; }
     for pattern in "${patterns[@]}"; do
       # shellcheck disable=SC2254
       case "$path" in
@@ -48,7 +53,7 @@ _dispatch_scope_verdict() {
     done
     if (( matched )); then echo "out-of-scope: $path"; in_scope=0; fi
   done < <({
-    git -C "$worktree" diff --name-only "origin/$rel...HEAD"
+    git -C "$worktree" diff --name-only "$base...HEAD"
     git -C "$worktree" diff --name-only
     git -C "$worktree" ls-files --others --exclude-standard
   } | sort -u)
@@ -87,7 +92,7 @@ _dispatch_start() {
   git -C "$_dispatch_repo_root" fetch origin "$rel:refs/remotes/origin/$rel" >/dev/null 2>&1 || _dispatch_error "could not fetch origin/$rel"
   head="$(git -C "$_dispatch_repo_root" rev-parse HEAD)"; remote="$(git -C "$_dispatch_repo_root" rev-parse "origin/$rel")"
   [[ "$head" == "$remote" ]] || _dispatch_error "HEAD is not pushed to origin/$rel"
-  _dispatch_spec_files "$_dispatch_repo_root/$spec" | grep -q . || _dispatch_error "spec has no backticked path in its ## Files section"
+  _dispatch_spec_files <"$_dispatch_repo_root/$spec" | grep -q . || _dispatch_error "spec has no backticked path in its ## Files section"
   spec_base="$(basename "$spec" .md)"
   [[ -n "$slug" ]] || slug="${spec_base#"${version}"-}"
   [[ "$slug" != "$spec_base" ]] || slug="$spec_base"
@@ -101,6 +106,7 @@ _dispatch_start() {
   git -C "$_dispatch_repo_root" worktree add -b "task/$version/$slug" "$worktree" "origin/$rel" >/dev/null
   mkdir -m 700 "$run"; state_dir="$run/state"; mkdir -m 700 "$state_dir"
   for arg in jobs run state logs tmp port-cache; do mkdir -m 700 "$state_dir/$arg"; done
+  printf '%s\n' "$remote" >"$run/base"
   printf '%s\n' "$spec" >"$run/spec"
   cat >"$run/prompt.md" <<EOF
 Read the spec at $spec in full, and implement it in this directory only.
@@ -159,6 +165,7 @@ _dispatch_land() {
   [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
   [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
   [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null || _dispatch_error "Codex is still running"
+  [[ -f "$run/base" ]] || _dispatch_error "no recorded base for $slug (expected $run/base)"
   [[ -z "$(git -C "$task" status --porcelain)" ]] || _dispatch_error "worktree has uncommitted changes"
   [[ "$(git -C "$task" rev-list --count "origin/$rel..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$rel"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
