@@ -6,6 +6,8 @@ setup() {
   export K3DM_SNAPSHOT_HOST=stub-m2
   export K3DM_SNAPSHOT_DIR="$BATS_TEST_TMPDIR/remote"
   export K3DM_SNAPSHOT_TIMESTAMP=20260922T000000Z
+  export K3DM_SNAPSHOT_STAMP="$BATS_TEST_TMPDIR/hub-snapshot-last"
+  export K3DM_SNAPSHOT_MAX_AGE_HOURS=24
   export TMPDIR="$BATS_TEST_TMPDIR/staging"
   export SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
   export DOCKER_FAIL=0 NO_BOUND= SHA_MISMATCH=0
@@ -14,7 +16,16 @@ setup() {
   _err() { printf '%s\n' "$*" >&2; }
   _warn() { printf '%s\n' "$*" >&2; }
   _info() { printf '%s\n' "$*"; }
-  _run_command() { shift; "$@"; }
+  _run_command() {
+    while [[ "$#" -gt 0 ]]; do
+      case "$1" in
+        --probe) shift 2 ;;
+        --) shift; break ;;
+        *) shift ;;
+      esac
+    done
+    "$@"
+  }
   _kubectl() {
     local args="$*" claim
     if [[ "$args" == *"get pv,pvc -A -o yaml"* ]]; then
@@ -36,6 +47,15 @@ setup() {
     if [[ "$args" == *"get pv"* && "$args" == *".spec.local.path"* ]]; then
       claim="${args#*get pv }"; claim="${claim%% *}"
       printf '/data/%s\n' "$claim"; return 0
+    fi
+    if [[ "$args" == *"get pv"* && "$args" == *"persistentVolumeReclaimPolicy"* ]]; then
+      claim="${args#*get pv }"; claim="${claim%% *}"
+      [[ "$claim" == "${PV_RETAIN:-}" ]] && printf 'Retain\n' || printf 'Delete\n'
+      return 0
+    fi
+    if [[ "$args" == *"patch pv"* ]]; then
+      printf '%s\n' "$args" >> "$PATCH_LOG"
+      return 0
     fi
     return 0
   }
@@ -91,7 +111,8 @@ fi
 exit 0
 EOF
   chmod +x "$BATS_TEST_TMPDIR/bin"/*
-  export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+  export PATH="$BATS_TEST_TMPDIR/bin:$PATH" PATCH_LOG="$BATS_TEST_TMPDIR/patch.log"
+  : > "$PATCH_LOG"
   source "$SCRIPT_DIR/plugins/hub_snapshot.sh"
 }
 
@@ -99,6 +120,47 @@ capture_snapshot() {
   run hub_snapshot_capture
   [ "$status" -eq 0 ]
   export CAPTURED="$K3DM_SNAPSHOT_DIR/$K3DM_SNAPSHOT_TIMESTAMP"
+}
+
+snapshot_name_hours_ago() {
+  python3 - "$1" <<'PY'
+import datetime, sys
+print((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=int(sys.argv[1]))).strftime("%Y%m%dT%H%M%SZ"))
+PY
+}
+
+@test "hub snapshot: guard accepts a fresh verified snapshot" {
+  mkdir -p "$K3DM_SNAPSHOT_DIR/$(snapshot_name_hours_ago 2)"
+  run hub_snapshot_guard_delete
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"latest verified snapshot"* ]]
+}
+
+@test "hub snapshot: guard refuses an old verified snapshot" {
+  mkdir -p "$K3DM_SNAPSHOT_DIR/$(snapshot_name_hours_ago 30)"
+  run hub_snapshot_guard_delete
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"DISCARD_HUB_DATA=1"* ]]
+}
+
+@test "hub snapshot: guard refuses incomplete-only snapshots" {
+  mkdir -p "$K3DM_SNAPSHOT_DIR/$(snapshot_name_hours_ago 2).INCOMPLETE"
+  run hub_snapshot_guard_delete
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no verified snapshot"* ]]
+}
+
+@test "hub snapshot: guard refuses an unreachable M2" {
+  _hub_snapshot_ssh() { return 255; }
+  run hub_snapshot_guard_delete
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unreachable"* ]]
+  [[ "$output" == *"DISCARD_HUB_DATA=1"* ]]
+}
+
+@test "hub snapshot: malformed age name fails" {
+  run _hub_snapshot_age_hours malformed
+  [ "$status" -eq 1 ]
 }
 
 @test "hub snapshot: capture emits the restore layout" {
@@ -139,6 +201,12 @@ capture_snapshot() {
   export SHA_MISMATCH=1
   run hub_snapshot_capture
   [ "$status" -ne 0 ]; [ -d "$K3DM_SNAPSHOT_DIR/${K3DM_SNAPSHOT_TIMESTAMP}.INCOMPLETE" ]
+  [ ! -e "$K3DM_SNAPSHOT_STAMP" ]
+}
+
+@test "hub snapshot: capture writes stamp after verification" {
+  capture_snapshot
+  [ "$(cat "$K3DM_SNAPSHOT_STAMP")" = "$K3DM_SNAPSHOT_TIMESTAMP" ]
 }
 
 @test "hub snapshot: prune keeps the configured verified snapshots" {
@@ -205,4 +273,22 @@ capture_snapshot() {
   '
   [ "$status" -eq 0 ]
   [[ "$output" != *"~"* ]]
+}
+
+@test "hub snapshot: retain patches Delete and skips Retain" {
+  export PV_RETAIN=pv-postgres-keycloak-pvc
+  run hub_snapshot_retain_pvs
+  [ "$status" -eq 0 ]
+  run grep -F "patch pv pv-data-vault-0" "$PATCH_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F "patch pv pv-postgres-keycloak-pvc" "$PATCH_LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "hub snapshot: retain processes remaining claims after missing PVC" {
+  export NO_BOUND=data-vault-0
+  run hub_snapshot_retain_pvs
+  [ "$status" -ne 0 ]
+  run grep -F "patch pv pv-postgres-keycloak-pvc" "$PATCH_LOG"
+  [ "$status" -eq 0 ]
 }

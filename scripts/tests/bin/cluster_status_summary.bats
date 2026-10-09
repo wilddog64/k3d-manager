@@ -15,10 +15,17 @@ EOF
 exit 1
 EOF
   chmod +x "${TMP_DIR}/kubectl"
-  export PATH="${TMP_DIR}:${PATH}" K3DM_WEBHOOK_TOKEN=test STATUS_COLOR=never
+  export PATH="${TMP_DIR}:${PATH}" K3DM_WEBHOOK_TOKEN=test STATUS_COLOR=never K3DM_SNAPSHOT_STAMP="${TMP_DIR}/hub-snapshot-last"
 }
 
 teardown() { rm -rf "${TMP_DIR}"; }
+
+stamp_hours_ago() {
+  python3 - "$1" <<'PY'
+import datetime, sys
+print((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=int(sys.argv[1]))).strftime("%Y%m%dT%H%M%SZ"))
+PY
+}
 
 @test "summary reports failed services before healthy checks" {
   run "${STATUS_SCRIPT}" --mode summary
@@ -42,6 +49,26 @@ teardown() { rm -rf "${TMP_DIR}"; }
   [[ "${output}" == *'"http_code"'* ]]
   [[ "${output}" != *$'\033['* ]]
   python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["overall"] == "fail"; failed={e["service"] for e in d["errors"]}; assert failed == {"shopping-cart-order","Pushgateway"}, failed; assert d["counts"]["services_failed"] == len(failed), d["counts"]' "${output}"
+}
+
+@test "text status reports a fresh hub snapshot" {
+  printf '%s\n' "$(stamp_hours_ago 2)" > "$K3DM_SNAPSHOT_STAMP"
+  run "${STATUS_SCRIPT}" --mode summary
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✓ Hub snapshot"* ]]
+}
+
+@test "text status marks an old hub snapshot" {
+  printf '%s\n' "$(stamp_hours_ago 192)" > "$K3DM_SNAPSHOT_STAMP"
+  run "${STATUS_SCRIPT}" --mode summary
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"! Hub snapshot"* ]]
+}
+
+@test "text status reports no recorded hub snapshot" {
+  run "${STATUS_SCRIPT}" --mode summary
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"none recorded"* ]]
 }
 
 @test "unknown service returns usage error" {

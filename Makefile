@@ -17,6 +17,7 @@ URL ?= https://app.pluralsight.com/hands-on/playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL    ?= 1
 DELETE_HUB    ?= 0
+DISCARD_HUB_DATA ?= 0
 CLEANUP_STALE ?= 0
 BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
@@ -69,7 +70,7 @@ endif
 endif
 endif
 
-_DOWN_HUB_FLAG = $(if $(filter 1,$(CLEANUP_STALE)),,$(if $(filter 1,$(DELETE_HUB)),--delete-hub,$(if $(filter 0,$(KEEP_LOCAL)),--delete-hub,)))
+_DOWN_HUB_FLAG = $(strip $(if $(filter 1,$(CLEANUP_STALE)),,$(if $(filter 1,$(DELETE_HUB)),--delete-hub,$(if $(filter 0,$(KEEP_LOCAL)),--delete-hub,))) $(if $(filter 1,$(DISCARD_HUB_DATA)),--discard-hub-data,))
 
 down-hub-flag:
 	@printf '%s\n' "$(_DOWN_HUB_FLAG)"
@@ -1281,6 +1282,10 @@ snapshot-list:
 snapshot-prune:
 	./scripts/k3d-manager hub_snapshot_prune
 
+## Set the mapped Hub PVs to Retain (operator-run; repeat after rebuild).
+hub-retain-pvs:
+	./scripts/k3d-manager hub_snapshot_retain_pvs
+
 ## Run the Tier 1 e2e harness on a remote runner off the M4 laptop. RUNNER=m2 required, DIGEST=<image digest> optional. No local fallback.
 e2e-remote:
 	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-remote RUNNER=m2 [DIGEST=sha256:...]" >&2; exit 2; fi
@@ -1315,7 +1320,7 @@ help:
 	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"
 	@echo "    make job-log ID=<job_id>  Print a local make-job log (operator-only)"
 	@echo "    make harvest-job-failures  Copy redacted failed-job notes into docs/job-failures"
-	@echo "    make down          Tear down cluster (preserves Hub; DELETE_HUB=1 also deletes it)"
+	@echo "    make down          Tear down cluster (preserves Hub; DELETE_HUB=1 also deletes it; DISCARD_HUB_DATA=1 bypasses the snapshot guard)"
 	@echo "    make down ... CLEANUP_STALE=1  Also remove expired managed registrations and stale AWS local state"
 	@echo "    make status        Show concise service health (SERVICE=<name> for focused detail)"
 	@echo "    make status-full   Show full pod and diagnostic report"

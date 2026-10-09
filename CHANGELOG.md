@@ -7,6 +7,9 @@
 - `make test-all` now records and publishes its pass or failure result to the `k3dm Tests`
   Grafana dashboard while preserving the original test exit code; `make test-metrics` remains
   an always-zero compatibility wrapper.
+- Hub deletion now requires a fresh verified M2 snapshot unless the operator explicitly sets
+  `DISCARD_HUB_DATA=1`; `make status` reports local snapshot freshness and
+  `make hub-retain-pvs` applies the operator-run PV safety net.
 
 ## [1.41.0] - 2026-10-06
 

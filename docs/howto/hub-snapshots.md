@@ -26,3 +26,21 @@ directory with:
 
 Capture is intentionally not wired into `make down` or `make up`; run it
 explicitly while the hub is available and before teardown.
+
+Deleting the local Hub is guarded by the newest verified M2 snapshot. The
+snapshot must be no older than 24 hours; otherwise `--delete-hub` refuses
+before any teardown starts. `make down DELETE_HUB=1` therefore requires a
+fresh `make snapshot`. To explicitly accept permanent loss of the seven
+mapped Hub claims, use `make down DELETE_HUB=1 DISCARD_HUB_DATA=1` (or
+`--discard-hub-data` with `bin/cluster-down`).
+
+Successful captures write a local timestamp stamp at
+`~/.local/share/k3d-manager/hub-snapshot-last`. Text `make status` reports
+its age without contacting the M2; JSON status is unchanged.
+
+Run `make hub-retain-pvs` as an operator after the Hub is running and after
+each rebuild. It patches the mapped claims' PVs to `Retain`, is idempotent,
+and continues processing after a missing PVC. Retain protects data from PVC
+deletion only. `k3d cluster delete` removes node containers and their
+storage regardless, so the delete guard remains necessary. A rebuilt Hub
+creates PVs with `Delete`, so rerun the target after rebuilding.

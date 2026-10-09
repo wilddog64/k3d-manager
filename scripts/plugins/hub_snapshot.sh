@@ -7,6 +7,8 @@ K3DM_SNAPSHOT_DIR="${K3DM_SNAPSHOT_DIR:-k3dm-snapshots}"
 K3DM_SNAPSHOT_KEEP="${K3DM_SNAPSHOT_KEEP:-3}"
 K3DM_SNAPSHOT_CLUSTER="${K3DM_SNAPSHOT_CLUSTER:-k3d-k3d-cluster}"
 K3DM_SNAPSHOT_CONTEXT="${K3DM_SNAPSHOT_CONTEXT:-k3d-k3d-cluster}"
+K3DM_SNAPSHOT_MAX_AGE_HOURS="${K3DM_SNAPSHOT_MAX_AGE_HOURS:-24}"
+K3DM_SNAPSHOT_STAMP="${K3DM_SNAPSHOT_STAMP:-${HOME}/.local/share/k3d-manager/hub-snapshot-last}"
 
 if [[ -r "${PLUGINS_DIR}/hub_recovery.sh" ]] && ! declare -f _hub_recovery_records >/dev/null 2>&1; then
   # shellcheck disable=SC1091
@@ -14,7 +16,7 @@ if [[ -r "${PLUGINS_DIR}/hub_recovery.sh" ]] && ! declare -f _hub_recovery_recor
 fi
 
 function _hub_snapshot_ssh() {
-  _run_command -- ssh -o BatchMode=yes -o ConnectTimeout=10 -- "$K3DM_SNAPSHOT_HOST" "$*"
+  _run_command --probe " " -- ssh -o BatchMode=yes -o ConnectTimeout=10 -- "$K3DM_SNAPSHOT_HOST" "$*"
 }
 
 function _hub_snapshot_node_container() {
@@ -70,6 +72,48 @@ function _hub_snapshot_remote_mark_incomplete() {
   _hub_snapshot_ssh "mv -- '${_remote}' '${_remote}.INCOMPLETE'" || _warn "[hub-snapshot] could not mark ${_remote} incomplete"
 }
 
+function _hub_snapshot_age_hours() {
+  local _name="$1"
+  python3 -c 'import datetime, sys
+try:
+    stamp = datetime.datetime.strptime(sys.argv[1], "%Y%m%dT%H%M%SZ").replace(tzinfo=datetime.timezone.utc)
+except (IndexError, ValueError):
+    raise SystemExit(1)
+age = int((datetime.datetime.now(datetime.timezone.utc) - stamp).total_seconds() // 3600)
+print(age)' "$_name"
+}
+
+function _hub_snapshot_latest_verified() {
+  local _name
+  while IFS= read -r _name; do
+    [[ -z "$_name" || "$_name" == *.INCOMPLETE ]] && continue
+    printf '%s\n' "$_name"
+    return 0
+  done < <(_hub_snapshot_remote_names | sort -r)
+  return 1
+}
+
+function hub_snapshot_guard_delete() {
+  local _latest _age
+  if ! _hub_snapshot_ssh true; then
+    _err "[hub-snapshot] M2 host ${K3DM_SNAPSHOT_HOST} is unreachable; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
+    return 1
+  fi
+  if ! _latest="$(_hub_snapshot_latest_verified)"; then
+    _err "[hub-snapshot] no verified snapshot exists on ${K3DM_SNAPSHOT_HOST}; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
+    return 1
+  fi
+  if ! _age="$(_hub_snapshot_age_hours "$_latest")"; then
+    _err "[hub-snapshot] latest snapshot ${_latest} has an invalid timestamp; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
+    return 1
+  fi
+  if [[ "$_age" -gt "$K3DM_SNAPSHOT_MAX_AGE_HOURS" ]]; then
+    _err "[hub-snapshot] latest verified snapshot ${_latest} on ${K3DM_SNAPSHOT_HOST} is ${_age}h old, older than ${K3DM_SNAPSHOT_MAX_AGE_HOURS}h; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
+    return 1
+  fi
+  _info "[hub-snapshot] latest verified snapshot ${_latest} on ${K3DM_SNAPSHOT_HOST} is ${_age}h old"
+}
+
 function hub_snapshot_capture() {
   if [[ "${1:-}" == "--help" ]]; then
     echo "Usage: hub_snapshot_capture"
@@ -112,6 +156,8 @@ function hub_snapshot_capture() {
     _err "[hub-snapshot] checksum verification failed for ${_timestamp}"
     return 1
   fi
+  _run_command -- mkdir -p "$(dirname "$K3DM_SNAPSHOT_STAMP")"
+  printf '%s\n' "$_timestamp" > "$K3DM_SNAPSHOT_STAMP"
   _info "[hub-snapshot] captured ${_timestamp} to ${K3DM_SNAPSHOT_HOST}:${_remote}"
 }
 
@@ -161,4 +207,26 @@ function hub_snapshot_prune() {
     fi
   done
   _info "[hub-snapshot] retained ${_keep} newest verified snapshots"
+}
+
+function hub_snapshot_retain_pvs() {
+  local _node _namespace _claim _storage _pv _policy _rc=0
+  while IFS='|' read -r _node _namespace _claim _storage; do
+    if ! _pv="$(_hub_snapshot_claim_pv "$_namespace" "$_claim")"; then
+      _rc=1
+      continue
+    fi
+    if ! _policy="$(_kubectl get pv "$_pv" -o jsonpath='{.spec.persistentVolumeReclaimPolicy}')"; then
+      _rc=1
+      continue
+    fi
+    if [[ "$_policy" == Retain ]]; then
+      _info "${_namespace}/${_claim} ${_pv} already Retain"
+    elif _kubectl patch pv "$_pv" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'; then
+      _info "${_namespace}/${_claim} ${_pv} ${_policy:-unknown} -> Retain"
+    else
+      _rc=1
+    fi
+  done < <(_hub_recovery_records)
+  return "$_rc"
 }

@@ -15,7 +15,7 @@ make up URL=https://...      # provision with explicit sandbox URL
 | Target | Command | When to use |
 |---|---|---|
 | `make up` | `bin/cluster-up` | Start from scratch — credentials → Hub cluster → ESO → ArgoCD → app cluster |
-| `make down` | `bin/cluster-down --confirm` | Tear down the app cluster and Vault port-forward while preserving the local Hub; add `DELETE_HUB=1` to delete the Hub |
+| `make down` | `bin/cluster-down --confirm` | Tear down the app cluster and Vault port-forward while preserving the local Hub; add `DELETE_HUB=1` to delete it only with a fresh snapshot |
 | `make down CLEANUP_STALE=1` | `cleanup-stale-clusters` (+ AWS local cleanup) | Explicitly remove expired managed registrations and stale AWS sandbox state after teardown |
 | `make cleanup-stale-sandbox` | `bin/cleanup-stale-sandbox` | Preview stale AWS sandbox local state; add `CONFIRM=1` to remove it |
 | `make cleanup-stale-clusters` | `bin/cleanup-stale-clusters` | Preview expired managed ArgoCD registrations; add `CONFIRM=1` to remove them |
@@ -42,6 +42,11 @@ and Trivy local-path trees. Use `make snapshot-list` to show each timestamp,
 size, and verification state. `make snapshot-prune` removes incomplete
 snapshots first and keeps the newest three verified snapshots by default; set
 `K3DM_SNAPSHOT_KEEP` to change that ceiling.
+
+`make hub-retain-pvs` patches the mapped Hub PVs to `Retain`; rerun it after
+each rebuild. `DISCARD_HUB_DATA=1` explicitly bypasses the `make down`
+snapshot guard and permanently loses Hub claims, so use it only when that
+consequence is intended.
 
 Prometheus retains only three days (`--storage.tsdb.retention.time=3d`), so an
 older snapshot restores blocks that Prometheus immediately prunes on startup.
@@ -252,6 +257,7 @@ make         # same as make help (DEFAULT_GOAL)
 | `GHCR_PAT` | `$(gh auth token)` | GitHub Container Registry token — used by `cluster-up` to create the `ghcr-pull-secret` |
 | `KEEP_LOCAL` | `1` | Set to `0` to delete the local Hub cluster when running `make down` (equivalent to `DELETE_HUB=1`) |
 | `DELETE_HUB` | `0` | Set to `1` to delete the local Hub cluster when running `make down` |
+| `DISCARD_HUB_DATA` | `0` | Set to `1` to bypass the fresh-snapshot guard when deleting the local Hub |
 | `CLEANUP_STALE` | `0` | Set to `1` to run guarded stale-resource cleanup after `make down` |
 
 Set `GHCR_PAT` before running `make up`:

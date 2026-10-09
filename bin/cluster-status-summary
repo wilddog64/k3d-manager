@@ -96,4 +96,21 @@ if (( _errors > 0 )); then printf '%s\n' "$(_color 31 "Overall: FAIL (${_errors}
 if [[ "${_provider}" == k3s-hostinger ]] && (( _edge530 >= 2 )); then
   printf '%s\n' "  hint: edge down (Cloudflare 530 x${_edge530}) — cluster likely healthy; run: make refresh-edge CLUSTER_PROVIDER=k3s-hostinger"
 fi
+_snapshot_stamp="${K3DM_SNAPSHOT_STAMP:-${HOME}/.local/share/k3d-manager/hub-snapshot-last}"
+if [[ -s "${_snapshot_stamp}" ]]; then
+  _snapshot_name="$(head -n 1 "${_snapshot_stamp}")"
+  _snapshot_age="$(python3 -c 'import datetime,sys
+try:
+ stamp=datetime.datetime.strptime(sys.argv[1], "%Y%m%dT%H%M%SZ").replace(tzinfo=datetime.timezone.utc)
+ print(int((datetime.datetime.now(datetime.timezone.utc)-stamp).total_seconds()//3600))
+except (IndexError,ValueError):
+ raise SystemExit(1)' "${_snapshot_name}" 2>/dev/null || true)"
+  if [[ -n "${_snapshot_age}" ]] && [[ "${_snapshot_age}" -le 168 ]]; then
+    printf '%s\n' "  $(_color 32 '✓') Hub snapshot: ${_snapshot_name} (${_snapshot_age}h old)"
+  else
+    printf '%s\n' "  $(_color 33 '!') Hub snapshot: ${_snapshot_name} (${_snapshot_age:-unknown} old)"
+  fi
+else
+  printf '%s\n' "  $(_color 33 '!') Hub snapshot: none recorded — run make snapshot"
+fi
 printf '%s\n' 'Details: make status-full'; (( _errors == 0 )) || exit 1
