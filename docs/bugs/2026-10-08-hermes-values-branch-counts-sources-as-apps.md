@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08
 **Branch:** k3d-manager-v1.42.0
-**Status:** OPEN
+**Status:** OPEN — spec ready for Codex
 **Severity:** Low — misleading scope in an operator warning
 **Component:** scripts/lib/hermes/sensors.py:values_branch
 
@@ -36,3 +36,34 @@ Do not fix the text by dropping a source from the branch-drift check.
 Branch mismatch itself is relative to Hermes's configured/checkout expectation, not proof of
 a failed deployment. Evaluate intended deployed baseline before reapplying live ApplicationSets.
 See the associated investigation issue for live evidence and follow-up. No runtime fix yet.
+
+## Fix (spec for Codex)
+
+`scripts/lib/hermes/sensors.py` `values_branch`, in the `if stale:` branch only. Source
+iteration, HEAD exclusion, `checked`, debouncing and the unknown paths stay unchanged. Every
+stale source is still recorded in `data["stale"]`.
+
+```python
+        if stale:
+            status = "degraded" if _debounced("values_branch", True, max(1, threshold - 1), state) else "healthy"
+            stale_apps = list(dict.fromkeys(item["app"] for item in stale))
+            data["stale_apps"] = len(stale_apps)
+            refs = list(dict.fromkeys(f"{item['app']}@{item['revision']}" for item in stale))
+            names = ", ".join(refs[:3])
+            if len(refs) > 3:
+                names += f" (+{len(refs) - 3} more)"
+            return record("values_branch", status,
+                          f"{len(stale_apps)} apps ({len(stale)} source refs) not on {branch}: {names}",
+                          data=data)
+```
+
+## Tests (`scripts/tests/hermes/test_hermes.py`)
+
+- One app with two stale k3d-manager sources at the same revision gives a message starting
+  `1 apps (2 source refs) not on`, `one-app@...` listed once, and `len(data["stale"]) == 2`.
+- Two apps, one with a stale ref plus a current ref and one with a stale ref, give
+  `2 apps (2 source refs)`.
+- A HEAD-tracking source is still excluded from both counts.
+- The existing `values_branch` tests stay green unchanged.
+
+Show RED against the pre-fix `sensors.py` on a temp copy.

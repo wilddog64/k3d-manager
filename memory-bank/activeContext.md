@@ -1,3 +1,11 @@
+## 2026-10-08 — v1.42.0 bug survey; 2 new bugs filed; 3 fixes queued for Codex
+
+- Filed `docs/bugs/2026-10-08-ask-claude-prompt-parsed-as-cli-option.md` (P1): top-level `/ask claude` dies with `unknown option '---USER QUESTION START---'` (claude CLI 2.1.290 rejects a dash-led positional). Fix: `-- user_prompt` last. Reproduced locally; `--` form verified working.
+- Filed `docs/bugs/2026-10-08-webhook-tests-write-real-audit-log.md` (P2): 3 tests in `test_webhook_cluster_status_thread.py` write `actor:"test"` admin rows to the live `audit/remote-operator.jsonl` (72 rows since 10-02). Fix: autouse conftest fixture redirecting `webhook.policy.AUDIT_DIR`.
+- Added Fix spec to `2026-10-08-hermes-values-branch-counts-sources-as-apps.md`.
+- Stale statuses corrected: slash-role FIXED+live (`8aa14053`), thread routing FIXED+live (`fedcfcd8`), ask-bash FIXED in branch (`b2c45ae3`, live check blocked by the /ask claude bug), plan `v1.42.0-slack-authz-and-ask-scope-fixes.md` IMPLEMENTED.
+- Next: dispatch the 3 bug fixes to Codex on `k3d-manager-v1.42.0`; operator: AppSets reapply.
+
 ## 2026-10-08 — Slack oversized event verification and bot-echo relay fix
 
 - Implemented the requested bug fix on `k3d-manager-v1.42.0`: full-body Slack signature

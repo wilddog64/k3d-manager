@@ -1,7 +1,7 @@
 # Bug: Slack slash commands trust command role instead of caller authorization
 
 **Filed:** 2026-10-08
-**Status:** OPEN
+**Status:** FIXED `8aa14053` — live-verified 2026-10-08 (admin caller got admin; unknown caller capped at reader)
 **Severity:** HIGH (authenticated Slack user privilege escalation)
 **Branch:** k3d-manager-v1.42.0
 **Reviewed revision:** 6e54ca66bddf47973eff57216d290b5df821b529

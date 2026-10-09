@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-07
 **Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
-**Status:** REOPENED — routing added, but successful handlers emit a false Unknown command
+**Status:** FIXED `fedcfcd8` — live-verified 2026-10-08 (thread `cluster-diagnose` ran with no false Unknown command)
 **Severity:** Medium — read-only investigation commands disappear without feedback
 **Component:** Slack Events API command dispatch
 
