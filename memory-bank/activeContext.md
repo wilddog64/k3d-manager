@@ -1,3 +1,9 @@
+## 2026-10-08 — v1.42.0 three bug fixes committed and pushed
+
+- Ask Claude argv fix: `7089dd10`; audit pytest isolation: `2f7e0eb5`; Hermes values-branch count fix: `895221cb`.
+- Bug status commits: `0753460c`, `71cca587`, `eae01de6`; all pushed to `origin/k3d-manager-v1.42.0`. PR URL: none.
+- RED regression runs failed against pre-fix temp copies as specified. GREEN gates: pytest `287 passed, 90 subtests passed`; Python compilation clean; `bats scripts/tests/lib/webhook.bats` `1..68` with all tests `ok`. Live verification remains pending (Claude).
+
 ## 2026-10-08 — v1.42.0 bug survey; 2 new bugs filed; 3 fixes queued for Codex
 
 - Filed `docs/bugs/2026-10-08-ask-claude-prompt-parsed-as-cli-option.md` (P1): top-level `/ask claude` dies with `unknown option '---USER QUESTION START---'` (claude CLI 2.1.290 rejects a dash-led positional). Fix: `-- user_prompt` last. Reproduced locally; `--` form verified working.

@@ -1,3 +1,9 @@
+## 2026-10-08 — v1.42.0 three bug fixes complete
+
+- `7089dd10` fixes Claude prompt argv termination; `2f7e0eb5` isolates the remote-operator audit directory per pytest; `895221cb` separates stale Hermes apps from source refs.
+- Status commits `0753460c`, `71cca587`, `eae01de6` record `FIXED in branch` with live verification pending (Claude); all commits pushed to `origin/k3d-manager-v1.42.0`. PR URL: none.
+- RED tests failed against temporary pre-fix copies. GREEN: pytest `287 passed, 90 subtests passed`, Python `py_compile` clean, BATS `68/68` passed. No live cluster/webhook commands were run.
+
 ## 2026-10-08 — v1.42.0 bug survey; 2 new bugs filed; 3 fixes queued for Codex
 
 - Filed `docs/bugs/2026-10-08-ask-claude-prompt-parsed-as-cli-option.md` (P1): top-level `/ask claude` dies with `unknown option '---USER QUESTION START---'` (claude CLI 2.1.290 rejects a dash-led positional). Fix: `-- user_prompt` last. Reproduced locally; `--` form verified working.
