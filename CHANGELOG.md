@@ -14,6 +14,7 @@
 
 ### Added
 
+- Added the Hermes host disk-space sensor, Pushgateway gauges, Grafana dashboard, and low/critical/stale alerts.
 - `make snapshot` automatically prunes verified snapshots after a successful capture (disable with
   `K3DM_SNAPSHOT_AUTO_PRUNE=0`) and checks M2 free space before upload via
   `K3DM_SNAPSHOT_MIN_FREE_GB`.

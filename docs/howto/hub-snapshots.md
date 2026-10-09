@@ -18,6 +18,7 @@ Before upload, the capture checks that the M2 has enough free space for the
 staging directory plus `K3DM_SNAPSHOT_MIN_FREE_GB` (default 20 GiB). A failed
 preflight stops before rsync and leaves no incomplete directory. A snapshot is
 roughly 3.3 GB today, so the default three-snapshot retention uses about 10 GB.
+The host-disk alert is the backstop when retention is no longer enough.
 
 Prometheus has a three-day retention ceiling (`--storage.tsdb.retention.time=3d`).
 An older snapshot contains blocks Prometheus immediately prunes on startup, so

@@ -23,6 +23,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | CVE Auto-Patch | `cve-autopatch` | `platform-ops/grafana-dashboard-cve-autopatch.yaml` | `make platform-ops` | hub |
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
+| k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
 | Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | ArgoCD app `hub-grafana-dashboards` (hub; NOT `make platform-ops`); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
@@ -244,6 +245,17 @@ the dashboard: sensor states are a snapshot, not a live read. Two sensors readin
 together (`eso` + `data_layer`) is the webhook-down signature and pages by SMS,
 bypassing the correlator — see `docs/guides/hermes.md`.
 
+### Host disk (`k3dm-host-disk`) — hub
+
+Hermes ticks every five minutes and runs `bin/k3dm-disk-metrics`, which probes the M4 locally
+and the M2 over the existing SSH alias before pushing gauges to the hub Pushgateway. The
+dashboard shows used percentage, free GiB, probe status, and Pushgateway age for each host.
+
+80% used sends a warning email. 90% used or less than 20 GiB free sends a critical SMS; M2
+alerts recommend `make snapshot-prune` / lowering `K3DM_SNAPSHOT_KEEP`, while M4 alerts
+recommend `docker system df` and pruning images. A `No data` panel means Hermes is not running
+or the Pushgateway port-forward is down.
+
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 
 | Panel | Query |
@@ -393,6 +405,7 @@ Work down this table before editing a query. Every row is a real past incident.
 | k3dm Deployment panels blank | `k3dm Deployment Metrics` is empty: the Pushgateway release must be installed on the app cluster, the local `:9091` port-forward agent must be loaded, and the `job="pushgateway"` target must be up | `curl -s -o /dev/null -w '%{http_code}' http://localhost:9091/-/healthy` |
 | Checkout Load Test blank except CPU | no producer — expected | nothing to fix |
 | k3dm Tests panels blank | nobody has run `make test-all`/`make test-metrics` yet, or the Pushgateway forward is unavailable | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
+| Host disk panels show `No data` | Hermes is not running or the hub Pushgateway port-forward is down | check Hermes and the *Last push age* panel |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
 
 The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub has no

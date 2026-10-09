@@ -1770,6 +1770,12 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 2026-10-08: Hub snapshot round 3 hostname mapping fixed in `2e8996ae`; live verification pending (operator).
 2026-10-08: Hub snapshot round 4 now captures claim trees as in-node tar streams in `fbebe9df`; live verification pending (operator).
 2026-10-08: Hub snapshot round 5 fix committed as e3040689; live verification pending (operator). PR URL: none.
+## 2026-10-08 — Host disk-space sensor implemented (`fb563727`)
+
+- Implemented the v1.42.0 host disk sensor Changes 1–5 and Tests: local/SSH argv-only `df`, non-fatal Pushgateway PUT retries, Hermes integration, three hub alerts, dashboard, docs, and regression tests.
+- RED: archived pre-change commit `5872ba40` with only changed/new tests had 7 failures: four collector tests, two host-disk manifest/dashboard tests, and the Hermes disk publisher test; 61 existing tests passed.
+- GREEN: `pytest scripts/tests/bin scripts/tests/hermes -q` → `769 passed, 1 skipped in 126.40s (0:02:06)`; `make validate-manifests FILES="scripts/etc/prometheus/rules/host-disk.yaml scripts/etc/argocd/platform-ops/grafana-dashboard-host-disk.yaml"` → `Summary: 2 resources found in 2 files - Valid: 2, Invalid: 0, Errors: 0, Skipped: 0`.
+- Commit 1: `fb563727`; Commit 2: this documentation commit after `fb563727`; PR URL: none. Live verification remains pending (operator). No SSH, remote `df`, kubectl, observability deployment, launchctl, or Hermes restart was run.
 ## 2026-10-08 — Hub snapshot retention round 6 fixed (`81baeca9f455a94110716d0ccc54fc7c3f969112`)
 
 - Implemented the spec's Fix 1–6 and Tests 1–8 on `k3d-manager-v1.42.0`: newest-first verified pruning, automatic post-capture pruning with incomplete protection, M2 free-space preflight, checked final rename, docs, changelog, and regression coverage.
