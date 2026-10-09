@@ -1,3 +1,15 @@
+## 2026-10-09 — Bug filed: frontend login hangs when Keycloak's Postgres restarts
+
+- `docs/bugs/2026-10-09-frontend-login-callback-hangs-when-keycloak-db-restarts.md` (OPEN, P2):
+  - The agent-0 `docker restart` (11:19 UTC) killed `postgres-keycloak`, and Keycloak's DB was refused.
+  - The frontend `/callback` spinner has no timeout, so it spun with no error.
+  - Healthy again by 11:25 (token/auth endpoints 0.08–0.24 s).
+- Fix directions:
+  - A. `LoginCallback.tsx` timeout plus retry (shopping-cart-frontend).
+  - B. Get `postgres-keycloak` off agent-0, or tune the Keycloak DB pool (shopping-cart-infra `identity/keycloak`).
+  - C. `FATAL: role "root"` log noise (the probe `$(POSTGRES_USER)` is not expanded in exec probes?).
+- Not specified yet. Shopping-cart changes go via spec plus Codex on feature branches.
+
 ## 2026-10-09 — ArgoCD recovered; v1.43.0 spec gains the per-release bug tally and count routing
 
 - The operator ran `docker restart k3d-k3d-cluster-agent-0`. Verified: agent-0 `/proxy/healthz` returns `ok`, all nodes are Ready, all 13 agent-0 pods are Running, the argocd-pf log says "healthz reachable", local :8080 and public argocd both return 200, `probe_success` is 1, and the `PublicEndpointDown` alert cleared.
