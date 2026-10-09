@@ -24,6 +24,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
 | k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
+| k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | ArgoCD app `hub-grafana-dashboards` (hub; NOT `make platform-ops`); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
@@ -259,6 +260,16 @@ or the Pushgateway port-forward is down.
 The dashboard syncs from git through the `grafana-dashboards-hub` ApplicationSet. The alert rules
 do not: apply them with `make prometheus-rules`, which applies only
 `scripts/etc/prometheus/rules/*.yaml` to the hub, without the full `make observability` redeploy.
+
+### k3dm Alertmanager Delivery (`k3dm-alertmanager-delivery`) — hub
+
+Shows whether alerts are actually being delivered. Stats at the top: notifications sent and failed
+per integration over 24h, and a count of firing alerts by severity. Below them, the **Firing
+alerts** table lists every alert firing right now (Watchdog excluded), one row per alert, with
+`severity`, `alertname`, `cluster`, `namespace` and, for Trivy alerts, `image_repository`, `tier`
+and `remediation`. It reads Prometheus's `ALERTS` series, so it answers "which alerts make up that
+count" without opening Prometheus. Severity decides the route: `critical` texts (`sms-critical`),
+`warning` emails.
 
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 

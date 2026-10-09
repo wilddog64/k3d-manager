@@ -1,3 +1,9 @@
+## 2026-10-08 — Alertmanager Delivery dashboard: Firing alerts table
+
+- Operator asked which alerts the "40 warning / 1 critical" stat was counting. Added a **Firing alerts** table panel (instant `ALERTS{alertstate="firing",alertname!="Watchdog"}`, one row per alert) under the stats; documented in `docs/guides/grafana-dashboards.md`; CHANGELOG. Syncs via `hub-grafana-dashboards`.
+- At 20:00 the 40 warnings were 26 hub + 13 ubuntu-hostinger `TrivyCriticalVulnerabilityDetected` (upstream images, e.g. argoproj/argocd, hashicorp/vault) + 1 `TargetDown` acg (sandbox down, expected); the 1 critical was `TrivyCriticalVulnerabilityDetected` on ubuntu-hostinger. Deep-dive deferred until the SMS test is done.
+- SMS test in flight: operator pushed fake `host="smstest"` at 19:57; HostDiskSpaceCritical pending 19:58:16.
+
 ## 2026-10-08 — host-disk PrometheusRules live; SMS proof pending (operator)
 
 - Operator ran `make prometheus-rules` → `host-disk` created, 6 rule files applied. Prometheus `host.disk` group: HostDiskSpaceLow / HostDiskSpaceCritical / HostDiskMetricsStale all health `ok`, state `inactive` (m2 60%, m4 63%).

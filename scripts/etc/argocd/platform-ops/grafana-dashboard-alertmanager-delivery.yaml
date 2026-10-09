@@ -248,6 +248,79 @@ data:
           ]
         },
         {
+          "id": 9,
+          "type": "table",
+          "title": "Firing alerts",
+          "description": "Every alert firing now (Watchdog excluded), one row per alert. Severity decides routing: critical goes to SMS, warning to email.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 11,
+            "w": 24,
+            "x": 0,
+            "y": 7
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "severity",
+                "desc": false
+              }
+            ],
+            "footer": {
+              "show": true,
+              "reducer": [
+                "count"
+              ],
+              "fields": [
+                "alertname"
+              ]
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "ALERTS{alertstate=\"firing\",alertname!=\"Watchdog\"}",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true,
+                  "__name__": true,
+                  "alertstate": true
+                },
+                "indexByName": {
+                  "severity": 0,
+                  "alertname": 1,
+                  "cluster": 2,
+                  "namespace": 3,
+                  "image_repository": 4,
+                  "tier": 5,
+                  "remediation": 6
+                },
+                "renameByName": {}
+              }
+            }
+          ]
+        },
+        {
           "id": 5,
           "type": "row",
           "title": "Per integration: $integration",
@@ -256,7 +329,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 7
+            "y": 18
           },
           "panels": [],
           "repeat": "integration"
@@ -274,7 +347,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 8
+            "y": 19
           },
           "fieldConfig": {
             "defaults": {
@@ -327,7 +400,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 8
+            "y": 19
           },
           "fieldConfig": {
             "defaults": {
