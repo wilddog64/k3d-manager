@@ -1,3 +1,7 @@
+## 2026-10-09 — enforce_admins DISABLED for merge (restore with bodyless POST after merge)
+
+- shopping-cart-infra (#108) and shopping-cart-frontend (#115): classic protection, NOT rulesets. enforce_admins disabled for the user's merge; /post-merge must re-enable both.
+
 ## 2026-10-09 ~14:00 UTC — Hostinger payment restored; shopping-cart PRs open
 
 - Operator ran `make shopping-cart-credential-drift` + `APPLY=1`: postgres-orders/products/payment, rabbitmq, redis-cart, redis-orders-cache all FIXED; order, product-catalog, payment, basket restarted and Running.
