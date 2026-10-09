@@ -1,3 +1,9 @@
+## 2026-10-09 — doc fixes + webhook doc rewrite dispatched; PR #136 not merged
+
+- `733ce24a`: cloud-bridge.md capability row + token diagram, vector-store.md SQLite embed cache, roadmap-v1.md ARCHIVED banner.
+- Bug doc `docs/bugs/2026-10-09-webhook-server-architecture-doc-stale.md` — dispatched to Codex (rewrite against tree; no line ranges).
+- PR #136 (Dependabot brace-expansion 1.1.21) — recommended NOT merging: it edits the `scripts/lib/foundation/` subtree directly. Fix upstream in lib-foundation (its Dependabot alerts are disabled), then subtree-pull. sprintf-js alert has no patched version (dev-only, transitive). enforce_admins left ON.
+
 ## 2026-10-09 — sandbox reaper: first live run failed, fixed
 
 - Operator ran `make install-sandbox-reaper`; first run exit 1 — launchd PATH resolved `/bin/bash` 3.2 (`mapfile`/`local -A`). Fix `c125dd11`: PATH in plist + BATS guard (RED-checked). Launchd-env dry-run clean (no k3s-aws registration on hub now).
