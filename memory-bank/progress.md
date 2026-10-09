@@ -1,3 +1,9 @@
+## 2026-10-09 — swap: agent isolation pulled into v1.43.0; Codex dispatched
+
+- `docs/plans/v1.43.0-worktree-isolated-codex-dispatch.md` (was v1.45.0) ⇄ `docs/plans/v1.45.0-test-metrics-log-retention.md` (was v1.43.0). Both releases stay at 5 plans; roadmap + cross-links updated.
+- Codex dispatched on the codex-dispatch spec in the shared checkout (codex exec workspace-write; cannot commit — Claude verifies and commits with the spec's exact message). DO NOT edit the tree until it finishes.
+- After it lands: dogfood on one v1.43.0 spec, then parallel dispatch of Hermes R10, bug-priority tracking, appsets confirm-wait bug (then hub-first bug).
+
 ## 2026-10-09 — operator: Codex work stays sequential until agent isolation lands
 
 - Decision: no parallel Codex dispatch until worktree-isolated dispatch (currently v1.45.0 spec) is complete; then parallel development.
