@@ -4,8 +4,7 @@
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Medium — the tool an operator would reach for during a GHCR outage silently does not
 touch the affected cluster, and leaks credentials into the process table.
-**Status:** Assigned to Codex 2026-09-21. **Scope extended 2026-09-23** — see Defect 4; the fix
-must cover `scripts/plugins/shopping_cart.sh` as well as `bin/rotate-ghcr-pat`.
+**Status:** OPEN (Defect 4 only) — Defects 1–3 fixed in `bin/rotate-ghcr-pat` (stdin PAT, `HUB_CONTEXT`/`TARGET_CONTEXT`; verified 2026-09-21 `3c3f0753`). Defect 4 remains: `scripts/plugins/shopping_cart.sh:467` still passes `--docker-password="${_ghcr_pat}"` on argv (2026-10-09 code check)
 
 ## Context
 

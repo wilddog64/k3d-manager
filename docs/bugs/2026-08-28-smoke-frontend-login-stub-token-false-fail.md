@@ -1,7 +1,7 @@
 # make status: Frontend login false-FAILs when the smoke user is absent
 
 **Date:** 2026-08-28
-**Status:** SPEC → FIX
+**Status:** SUPERSEDED — the smoke harness moved to `scripts/lib/webhook/smoke.py`; `_smoke_frontend_api` uses only the `k3dm-smoke-user` token and reports a skip when it is unavailable, so no admin-cli fallback token reaches `/api/cart` (verified 2026-10-09 code check)
 **Area:** `bin/k3dm-webhook` (`_smoke_test_logins`, ~lines 1771–1839)
 **Severity:** Low (cosmetic) — a healthy hub reports a hard FAIL on `make status`.
 

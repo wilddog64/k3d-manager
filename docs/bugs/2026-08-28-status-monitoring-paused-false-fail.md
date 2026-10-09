@@ -1,7 +1,7 @@
 # make status hard-FAILs when monitoring is deliberately paused
 
 **Date:** 2026-08-28
-**Status:** SPEC → FIX
+**Status:** FIXED — `_monitoring_paused` in `scripts/lib/webhook/smoke.py` downgrades the Grafana/Prometheus checks to a skip (verified 2026-10-09 code check)
 **Area:** `bin/k3dm-webhook` (`_smoke_test_services`, `_smoke_test_logins`)
 **Severity:** Low (cosmetic) — but it makes the `monitoring-pause` toggle and
 `make status` fight each other.

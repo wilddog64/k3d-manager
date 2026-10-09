@@ -1,7 +1,7 @@
 # Vault unseal-watchdog pins a stale image → job dies before it can unseal
 
 **Date:** 2026-08-28
-**Status:** SPEC → FIX
+**Status:** FIXED — `vault_install_unseal_watchdog` derives `VAULT_UNSEAL_IMAGE` from the live Vault image (`_live_vault_image`), pinned default only as fallback (verified 2026-10-09 code check)
 **Area:** `scripts/plugins/vault.sh` (`vault_install_unseal_watchdog`), `scripts/etc/vault/unseal-watchdog.yaml.tmpl`
 **Severity:** High — the watchdog is non-functional in the exact scenario it exists for.
 

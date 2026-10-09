@@ -1,6 +1,7 @@
 # Bugfix: v1.7.1 — `/hostinger-status` drops the report body on success
 
 **Branch:** `k3d-manager-v1.7.1`
+**Status:** FIXED — `_run_hostinger_status` (`scripts/lib/webhook/status.py`) posts the redacted report via `_post_status_report` (verified 2026-10-09 code check)
 **Files:** `bin/k3dm-webhook`
 
 ---

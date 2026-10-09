@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-24
 **Branch:** `k3d-manager-v1.1.0`
-**Status:** READY FOR IMPLEMENTATION
+**Status:** FIXED — `argocd.sh` loads `ARGOCD_LDAP_VARS_FILE` and both namespace probes use `_kubectl --no-exit` (verified 2026-10-09 code check)
 
 ## Problem
 

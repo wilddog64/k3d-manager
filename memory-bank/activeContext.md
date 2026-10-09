@@ -1,3 +1,11 @@
+## 2026-10-09 — Bug-doc sweep pass 2: 17 stale statuses checked against code
+
+- 15 closed as FIXED or SUPERSEDED: the 8 v1.23.0 QUEUED docs, the 3 2026-08-28 "SPEC → FIX" docs, argocd-ldap-vars, hostinger-status report body, and the trivy reconcile panel.
+- 2 still OPEN (real defects):
+  - `v1.1.1-bugfix-preflight-wait-read-set-e-abort`: `bin/cluster-preflight:152` has an unguarded `read` under `set -e`.
+  - `2026-09-21-rotate-ghcr-pat` Defect 4: `scripts/plugins/shopping_cart.sh:467` passes the PAT on argv (secret hygiene).
+- Next: the P1 node-health-watch spec to Codex.
+
 ## 2026-10-09 — Payment #84 on main: CVE-2026-47884 cleared; repin held for payment #86
 
 - Main CI run 37927654332 on `ea63cddc` is all green. The image is `sha-ea63cddc…`, index
