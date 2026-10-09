@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+hub_context="${ARGOCD_HUB_CONTEXT:-k3d-k3d-cluster}"
+argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+provider="${K3DM_SANDBOX_REAPER_PROVIDER:-k3s-aws}"
+grace="${K3DM_SANDBOX_REAPER_GRACE:-1800}"
+dryrun="${K3DM_SANDBOX_REAPER_DRYRUN:-0}"
+state_dir="${K3DM_SANDBOX_REAPER_STATE_DIR:-${HOME}/.local/share/k3d-manager/sandbox-reaper}"
+log_file="${K3DM_SANDBOX_REAPER_LOG:-${HOME}/.local/share/k3d-manager/logs/sandbox-reaper.log}"
+cleanup_bin="${K3DM_SANDBOX_REAPER_CLEANUP_BIN:-${repo_root}/bin/cleanup-stale-registration}"
+notify_bin="${K3DM_SANDBOX_REAPER_NOTIFY_BIN:-${repo_root}/bin/k3dm-slack-notify}"
+region="${ACG_REGION:-us-west-2}"
+stack="${K3DM_SANDBOX_REAPER_STACK:-k3d-manager-cluster}"
+now="${K3DM_SANDBOX_REAPER_NOW:-$(date +%s)}"
+kubectl_bin="${K3DM_SANDBOX_REAPER_KUBECTL_BIN:-kubectl}"
+pgrep_bin="${K3DM_SANDBOX_REAPER_PGREP_BIN:-pgrep}"
+aws_bin="${K3DM_SANDBOX_REAPER_AWS_BIN:-aws}"
+
+log() {
+  mkdir -p "$(dirname "${log_file}")"
+  printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "${log_file}"
+}
+
+remove_state() {
+  rm -f "${state_dir}/$1" "${state_dir}/$1.failed-notified"
+}
+
+notify() {
+  local message="$1"
+  if ! printf '%s\n' "${message}" | "${notify_bin}" >/dev/null 2>&1; then
+    log "notify failed"
+  fi
+}
+
+reap_one() {
+  local uid="$1" cluster="$2" server="$3" apps_json="$4"
+  local -a matches=()
+  mapfile -t matches < <(printf '%s' "${apps_json}" | jq -r \
+    --arg cluster "${cluster}" --arg server "${server}" '
+      .items[]? | select((.spec.destination.name // "") == $cluster or
+        (.metadata.labels["k3d-manager/cluster"] // "") == $cluster or
+        ($server != "" and (.spec.destination.server // "") == $server)) |
+      [.metadata.name, (.status.sync.status // "")] | @tsv')
+
+  local app_count="${#matches[@]}" row status all_unknown=1
+  if (( app_count == 0 )); then
+    remove_state "${uid}"
+    return 0
+  fi
+  for row in "${matches[@]}"; do
+    IFS=$'\t' read -r _ status <<< "${row}"
+    if [[ "${status}" != "Unknown" ]]; then
+      all_unknown=0
+      break
+    fi
+  done
+  if (( all_unknown == 0 )); then
+    remove_state "${uid}"
+    return 0
+  fi
+
+  local clock_file="${state_dir}/${uid}" first_seen age
+  if [[ ! -f "${clock_file}" ]]; then
+    printf '%s\n' "${now}" > "${clock_file}"
+    log "first-seen ${cluster} uid=${uid} apps=${app_count}"
+    return 0
+  fi
+  first_seen="$(<"${clock_file}")"
+  [[ "${first_seen}" =~ ^[0-9]+$ ]] || { printf '%s\n' "${now}" > "${clock_file}"; return 0; }
+  age=$(( now - first_seen ))
+  (( age >= grace )) || return 0
+
+  local aws_err aws_rc reason cleanup_rc output minutes
+  aws_err="$(mktemp)"
+  set +e
+  "${aws_bin}" cloudformation describe-stacks --region "${region}" --stack-name "${stack}" \
+    >/dev/null 2>"${aws_err}"
+  aws_rc=$?
+  set -e
+  if (( aws_rc == 0 )); then
+    rm -f "${aws_err}"
+    log "skip: stack exists ${cluster}"
+    return 0
+  fi
+  reason=""
+  grep -Eqi 'does not exist' "${aws_err}" && reason="stack-deleted"
+  [[ -n "${reason}" ]] || grep -Eqi 'InvalidClientTokenId|ExpiredToken|UnrecognizedClientException' "${aws_err}" && reason="credentials-dead"
+  rm -f "${aws_err}"
+  if [[ -z "${reason}" ]]; then
+    log "skip: aws inconclusive ${cluster}"
+    return 0
+  fi
+  minutes=$(( age / 60 ))
+  if [[ "${dryrun}" == 1 ]]; then
+    log "would-deregister ${cluster} reason=${reason} unknown_for=${age}s"
+    return 0
+  fi
+  output="$(mktemp)"
+  set +e
+  "${cleanup_bin}" "--cluster=${cluster}" --confirm >"${output}" 2>&1
+  cleanup_rc=$?
+  set -e
+  rm -f "${output}"
+  if (( cleanup_rc != 0 )); then
+    log "cleanup failed ${cluster} rc=${cleanup_rc}"
+    if [[ ! -e "${clock_file}.failed-notified" ]]; then
+      notify "k3dm sandbox reaper: FAILED to remove hub registration ${cluster} (rc=${cleanup_rc}); see sandbox-reaper.log"
+      : > "${clock_file}.failed-notified"
+    fi
+    return 0
+  fi
+  log "deregistered ${cluster} reason=${reason} unknown_for=${age}s"
+  remove_state "${uid}"
+  notify "k3dm sandbox reaper: removed hub registration ${cluster} and ${app_count} apps — sandbox gone (${reason}), apps Unknown for ${minutes} min."
+}
+
+main() {
+  mkdir -p "${state_dir}"
+  if "${pgrep_bin}" -f 'bin/cluster-up|bin/cluster-down' >/dev/null 2>&1; then
+    log "skip: lifecycle command running"
+    return 0
+  fi
+  local secrets_json apps_json
+  if ! secrets_json="$("${kubectl_bin}" --context "${hub_context}" -n "${argocd_ns}" get secrets \
+    -l "argocd.argoproj.io/secret-type=cluster,k3d-manager/provider=${provider}" -o json 2>/dev/null)"; then
+    log "skip: hub unreachable"
+    return 0
+  fi
+  apps_json="$("${kubectl_bin}" --context "${hub_context}" -n "${argocd_ns}" get applications -o json 2>/dev/null || printf '%s' '{"items":[]}')"
+  local -a secret_rows=()
+  mapfile -t secret_rows < <(printf '%s' "${secrets_json}" | jq -r '.items[]? | [.metadata.uid, (.metadata.labels["argocd.argoproj.io/cluster-name"] // ""), (.data.server // "")] | @tsv')
+  local -A current_uids=()
+  local row uid cluster server_b64 server
+  for row in "${secret_rows[@]}"; do
+    IFS=$'\t' read -r uid cluster server_b64 <<< "${row}"
+    current_uids["${uid}"]=1
+    [[ "${cluster}" =~ ^[A-Za-z0-9._-]+$ ]] || continue
+    server=""
+    [[ -n "${server_b64}" ]] && server="$(printf '%s' "${server_b64}" | base64 --decode 2>/dev/null || true)"
+    reap_one "${uid}" "${cluster}" "${server}" "${apps_json}"
+  done
+  local file uid_file
+  for file in "${state_dir}"/*; do
+    [[ -f "${file}" ]] || continue
+    uid_file="${file##*/}"
+    uid_file="${uid_file%.failed-notified}"
+    [[ -n "${current_uids[${uid_file}]:-}" ]] || rm -f "${file}"
+  done
+}
+
+set +e
+main
+rc=$?
+set -e
+(( rc == 0 )) || log "error: reaper run failed rc=${rc}"
+exit 0

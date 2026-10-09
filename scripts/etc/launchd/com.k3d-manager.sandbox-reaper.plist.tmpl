@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.k3d-manager.sandbox-reaper</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{REPO_ROOT}}/bin/k3dm-sandbox-reaper</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>{{HOME}}/.kube/config</string>
+    <key>K3DM_SANDBOX_REAPER_DRYRUN</key>
+    <string>0</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>600</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>{{HOME}}/.local/share/k3d-manager/logs/sandbox-reaper.log</string>
+  <key>StandardErrorPath</key>
+  <string>{{HOME}}/.local/share/k3d-manager/logs/sandbox-reaper.log</string>
+</dict>
+</plist>

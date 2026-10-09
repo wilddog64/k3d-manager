@@ -23,10 +23,22 @@ Install via `make <target>` or via the plugin function noted below.
 | `com.k3d-manager.alertmanager-auth-proxy` | Alertmanager login proxy → `localhost:9093` | ✅ | `make install-alertmanager-auth-proxy` | `~/Library/Logs/k3dm-alertmanager-auth-proxy.log` |
 | `com.k3d-manager.cleanup` | Purges stale repo-owned temp files, Playwright artifacts, screenshots, Packer ISO/lock files (>30d), port markers (>7d), and placeholder `TemporaryDirectory.*` dirs | ❌ (timer: daily 03:00) | `make install-cleanup` | `~/Library/Logs/k3dm-cleanup.log` |
 | `com.k3d-manager.acg-watch` | Watches ACG sandbox TTL; auto-extends or notifies | ❌ (on-demand) | `acg_watch_install` | `~/.local/share/k3d-manager/run/k3d-manager-acg-watch.err` |
+| com.k3d-manager.sandbox-reaper | Removes the hub registration + apps of an expired ACG sandbox; Slack notice | ❌ (timer: 10m) | make install-sandbox-reaper | ~/.local/share/k3d-manager/logs/sandbox-reaper.log |
 
 ---
 
 ## Persistent Port-Forwards
+
+## Sandbox reaper (bin/k3dm-sandbox-reaper)
+
+The reaper uses a two-signal gate: every matching ArgoCD Application must remain `Unknown`
+for a 30-minute grace period, and AWS must confirm that the sandbox is gone (the CloudFormation
+stack is deleted or the credentials are dead). Reachability alone never triggers cleanup. Each
+successful or failed action is logged, and actions are notified to Slack.
+
+To preview a run by hand, use `K3DM_SANDBOX_REAPER_DRYRUN=1 bin/k3dm-sandbox-reaper` and then
+`tail ~/.local/share/k3d-manager/logs/sandbox-reaper.log`. If a registration was removed
+wrongfully, redo it with `make argocd-registration`.
 
 These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 

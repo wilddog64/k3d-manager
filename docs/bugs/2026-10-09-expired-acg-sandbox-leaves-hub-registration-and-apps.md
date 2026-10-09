@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** PARTIAL — make-down path FIXED `209addbe` + `cbd2f564`; watcher path dropped (never started); reaper SPECCED below (operator chose automatic, no approval, Slack notification on every action), dispatched to Codex
+**Status:** IMPLEMENTED — reaper on k3d-manager-v1.42.0; operator install pending (make install-sandbox-reaper)
 **Priority:** P3 — noise in ArgoCD, and alert/dashboard pollution; no outage
 **Severity:** Low
 **Component:**

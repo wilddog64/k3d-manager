@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Expired ACG sandboxes are cleaned off the hub automatically.** A new launchd agent (`make install-sandbox-reaper`) checks every 10 minutes; once every app of a `k3s-aws` registration has been Unknown for 30 minutes and AWS confirms the sandbox is gone (stack deleted or credentials dead), it removes the registration and its Applications with `bin/cleanup-stale-registration` and posts a Slack notice. Covers expiries that `make down` never saw.
+
 ### Fixed
 - **The k3dm Host Disk dashboard had no tags**, so it was the only k3dm dashboard missing from tag filters in the Grafana dashboard list. It now carries `k3dm` and `disk`, and a new BATS guard fails when any provisioned dashboard (`platform-ops/grafana-dashboard-*.yaml`, `grafana/dashboards/*.yaml`) ships with no tags.
 
