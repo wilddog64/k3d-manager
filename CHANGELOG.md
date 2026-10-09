@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- The watchdog now recovers a Ready node whose kubelet tunnel is dead (API server 502 dialing `:10250`) after `K3DM_NODE_TUNNEL_THRESHOLD` consecutive ticks (default 6), while a slow `/healthz` stays advisory; see [the dead kubelet tunnel bug](docs/bugs/2026-10-09-node-health-watch-ignores-ready-node-with-dead-kubelet-tunnel.md).
 - `make cleanup-stale-registration CLUSTER=<name>` works again. The target passed
   `--cluster <name>` as two words, but `bin/cleanup-stale-registration` only accepts
   `--cluster=<name>`, so every run (even the dry-run preview) exited 2 before reading anything.

@@ -6,16 +6,19 @@ setup() {
   export K3DM_NODE_RECOVERY_ENABLED=1
   export K3DM_NODE_RECOVERY_FAILURE_THRESHOLD=2
   export K3DM_NODE_RECOVERY_COOLDOWN=0
+  unset K3DM_NODE_TUNNEL_THRESHOLD
   export K3DM_NODE_RECOVERY_NODE=agent-x
   export K3DM_NODE_RECOVERY_CONTEXT=ctx-x
   export READY_FILE="$BATS_TEST_TMPDIR/ready"
   export READYZ_FILE="$BATS_TEST_TMPDIR/readyz"
+  export HEALTHZ_FILE="$BATS_TEST_TMPDIR/healthz"
   export CONTAINER_STATE_FILE="$BATS_TEST_TMPDIR/container-state"
   export DOCKER_CALLS="$BATS_TEST_TMPDIR/docker-calls"
   export DRIFT_CALLS="$BATS_TEST_TMPDIR/drift-calls"
   export K3DM_HOSTNET_DRIFT_BIN="$BATS_TEST_TMPDIR/hostnet-drift"
   printf 'True\n' >"$READY_FILE"
   printf 'ok\n' >"$READYZ_FILE"
+  printf 'ok\n' >"$HEALTHZ_FILE"
   printf 'running\n' >"$CONTAINER_STATE_FILE"
   : >"$DOCKER_CALLS"
   : >"$DRIFT_CALLS"
@@ -29,20 +32,98 @@ STUB
     case "$*" in
       *"get --raw /readyz"*) [[ -s "$READYZ_FILE" ]] || return 1; cat "$READYZ_FILE" ;;
       *"get node"*) cat "$READY_FILE" ;;
-      *"/proxy/healthz"*) echo ok ;;
+      *"/proxy/healthz"*)
+        case "$(<"$HEALTHZ_FILE")" in
+          ok) echo ok ;;
+          tunnel) echo 'Error from server: error dialing backend: proxy error from 127.0.0.1:6443 while dialing 192.168.97.4:10250, code 502: 502 Bad Gateway' >&2; return 1 ;;
+          *) echo 'Unable to connect to the server: context deadline exceeded' >&2; return 1 ;;
+        esac
+        ;;
     esac
   }
 
   docker() {
     case "$1" in
       inspect) cat "$CONTAINER_STATE_FILE" ;;
-      restart|start) printf '%s %s\n' "$1" "$2" >>"$DOCKER_CALLS"; printf 'True\n' >"$READY_FILE" ;;
+      restart|start) printf '%s %s\n' "$1" "$2" >>"$DOCKER_CALLS"; printf 'True\n' >"$READY_FILE"; printf 'ok\n' >"$HEALTHZ_FILE" ;;
     esac
   }
 
   sleep() { :; }
 
   source "${BATS_TEST_DIRNAME}/../../../bin/k3dm-node-health-watch"
+}
+
+@test "node health watchdog: Ready node with dead kubelet tunnel restarts after 6 ticks" {
+  printf 'tunnel\n' >"$HEALTHZ_FILE"
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  [ "$(<"$DOCKER_CALLS")" = "restart agent-x" ]
+  grep -q 'kubelet tunnel dead (6/6)' "$K3DM_NODE_RECOVERY_LOG"
+  [ "$tunnel_failures" -eq 0 ]
+}
+
+@test "node health watchdog: tunnel streak broken by ok does not restart" {
+  printf 'tunnel\n' >"$HEALTHZ_FILE"
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  printf 'ok\n' >"$HEALTHZ_FILE"
+  _tick
+  printf 'tunnel\n' >"$HEALTHZ_FILE"
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  [ ! -s "$DOCKER_CALLS" ]
+}
+
+@test "node health watchdog: slow healthz on a Ready node never restarts (2026-08-28 guard)" {
+  printf 'slow\n' >"$HEALTHZ_FILE"
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  [ ! -s "$DOCKER_CALLS" ]
+  [ "$tunnel_failures" -eq 0 ]
+}
+
+@test "node health watchdog: tunnel failure during cooldown does not restart again" {
+  export K3DM_NODE_RECOVERY_COOLDOWN=3600
+  printf '%s\n' "$(date +%s)" >"$K3DM_NODE_RECOVERY_STATE"
+  source "${BATS_TEST_DIRNAME}/../../../bin/k3dm-node-health-watch"
+  printf 'tunnel\n' >"$HEALTHZ_FILE"
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  _tick
+  [ ! -s "$DOCKER_CALLS" ]
+  grep -q 'recovery cooldown active' "$K3DM_NODE_RECOVERY_LOG"
 }
 
 @test "node health watchdog: Ready node resets failures and never restarts" {

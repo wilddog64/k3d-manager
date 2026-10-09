@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator received a `PublicEndpointDown` SMS for argocd)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IN PROGRESS — implementation spec below dispatched to Codex 2026-10-09
+**Status:** IMPLEMENTED — <sha>; live verification pending
 **Priority:** P1 — a public endpoint stays down until a human restarts the agent
 **Severity:** High
 **Component:** `bin/k3dm-node-health-watch` (`_healthy`, `_tick`)
