@@ -10,6 +10,7 @@ setup() {
   export K3DM_SNAPSHOT_MAX_AGE_HOURS=24
   export TMPDIR="$BATS_TEST_TMPDIR/staging"
   export SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
+  export DOCKER_LOG="$BATS_TEST_TMPDIR/docker.log"
   export DOCKER_FAIL=0 NO_BOUND= SHA_MISMATCH=0
   mkdir -p "$K3DM_SNAPSHOT_DIR" "$TMPDIR" "$BATS_TEST_TMPDIR/bin"
   : > "$SSH_LOG"
@@ -41,7 +42,7 @@ setup() {
       printf 'uid-%s\n' "$claim"; return 0
     fi
     if [[ "$args" == *"get pv"* && "$args" == *"matchExpressions"* ]]; then
-      [[ "$args" == *"prometheus-kube-prometheus"* ]] && printf 'agent-1\n' || printf 'agent-0\n'
+      [[ "$args" == *"prometheus-kube-prometheus"* ]] && printf 'k3d-k3d-cluster-agent-1\n' || printf 'k3d-k3d-cluster-agent-0\n'
       return 0
     fi
     if [[ "$args" == *"get pv"* && "$args" == *".spec.local.path"* ]]; then
@@ -61,6 +62,7 @@ setup() {
   }
   cat > "$BATS_TEST_TMPDIR/bin/docker" <<'EOF'
 #!/usr/bin/env bash
+echo "docker $*" >> "$DOCKER_LOG"
 [[ "${DOCKER_FAIL:-0}" == 1 ]] && exit 1
 destination="${@: -1}"
 source_path="${@: -2:1}"
@@ -192,6 +194,14 @@ PY
   capture_snapshot
   run grep -F $'agent-1\tmonitoring\tprometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0' "$CAPTURED/MANIFEST.tsv"
   [ "$status" -eq 0 ]
+}
+
+@test "hub snapshot: PV hostname maps to one logical docker container" {
+  capture_snapshot
+  run grep -F 'docker cp k3d-k3d-cluster-agent-1:' "$DOCKER_LOG"
+  [ "$status" -eq 0 ]
+  run grep -F 'k3d-k3d-cluster-k3d-' "$DOCKER_LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "hub snapshot: unbound claim fails closed" {

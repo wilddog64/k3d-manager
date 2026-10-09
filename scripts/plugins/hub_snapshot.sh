@@ -159,6 +159,7 @@ function hub_snapshot_capture() {
     _node="$(_hub_snapshot_claim_node "$_namespace" "$_claim")" || return 1
     _path="$(_hub_snapshot_claim_path "$_pv")" || return 1
     [[ -n "$_path" ]] || { _err "[hub-snapshot] local path missing for ${_namespace}/${_claim}"; return 1; }
+    _node="$(_hub_recovery_logical_node "$_node")" || return 1
     _container="$(_hub_snapshot_node_container "$_node")"
     _run_command -- mkdir -p "${_stage}/${_storage}/pvc-${_uid}_${_namespace}_${_claim}"
     _hub_snapshot_copy "$_container" "$_path" "${_stage}/${_storage}/pvc-${_uid}_${_namespace}_${_claim}" || return 1
