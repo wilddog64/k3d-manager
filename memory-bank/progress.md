@@ -1,3 +1,9 @@
+## 2026-10-09 — Trivy reconcile-errors panel made readable (`08273e98`)
+
+- Panel id 12 on "ArgoCD Apps & Image Updater Hub" (`scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`): line → bars, `interval: 1h`, `legendFormat: "errors / hour"` (was `{}`), added a description. Query unchanged; `trivy_operator_observability.bats` 9/9.
+- Served live by `hub-grafana-dashboards` (targetRevision `k3d-manager-v1.42.0`), so it appears after the next ArgoCD sync.
+- Done directly by Claude (cosmetic dashboard JSON), not via Codex.
+
 ## 2026-10-09 — P1 node-health-watch dead-tunnel fix IMPLEMENTED (`90d8942a`, Claude-verified)
 
 - Codex commit `90d8942a` is on origin and changes exactly the 5 spec files.
