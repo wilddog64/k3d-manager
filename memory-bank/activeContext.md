@@ -1,3 +1,12 @@
+## 2026-10-08 — Claude verified hub snapshot round 6 (`81baeca9`); disk-sensor spec dispatched to Codex
+
+- Codex `81baeca9` (fix) + `9587d645` (memory-bank) on origin; HEAD = origin. Scope = hub_snapshot.sh, hub_snapshot.bats, howto, CHANGELOG, bug-doc Status, memory-bank.
+- RED (new bats on `a6a53d7d`, temp worktree): spec tests 1/2/5/6/8 fail, plus 3, 7 and the flipped `df` probe test. GREEN: hub_snapshot + hub_recovery 80/80, `scripts/tests/bin/cluster_down.bats` + `lib/cluster_down_provider_marker.bats` 24/24, shellcheck clean.
+- Claude renamed the stale test "capture probes no remote free space" → "capture probes remote free space once" (it asserts exactly one `df`).
+- `make snapshot-prune` is now SAFE (keeps newest). Auto-prune runs inside `make snapshot`; no separate scheduled prune (it could delete a concurrent upload's `.INCOMPLETE`).
+- Disk sensor: `docs/plans/v1.42.0-host-disk-space-sensor.md` — 5th v1.42.0 plan, the CAP; anything further → v1.44.0. Hermes tick → `bin/k3dm-disk-metrics` → Pushgateway; rules `host-disk.yaml` (80% email, 90%/<20GiB SMS, stale email); dashboard `k3dm-host-disk`. Dispatched to Codex.
+- Next (operator): rerun `make snapshot` in tmux → `make status CLUSTER_PROVIDER=k3s-hostinger`; then `make snapshot-prune` removes `20261009T014249Z.INCOMPLETE`.
+
 ## 2026-10-08 — Hub snapshot retention bug filed; dispatched to Codex (round 6)
 
 - Operator asked for a retention policy (M2 space is finite). `K3DM_SNAPSHOT_KEEP=3` + `make snapshot-prune` exist, but: (1) prune keeps the OLDEST N and deletes the newest (`_hub_snapshot_remote_names` sorts ascending; the count-only test at hub_snapshot.bats:276 hid it); (2) nothing prunes automatically.

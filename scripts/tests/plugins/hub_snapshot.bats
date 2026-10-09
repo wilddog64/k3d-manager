@@ -243,7 +243,7 @@ PY
   [ "$status" -ne 0 ]; [[ "$output" == *"storage-loki-0"* ]]
 }
 
-@test "hub snapshot: capture probes no remote free space" {
+@test "hub snapshot: capture probes remote free space once" {
   capture_snapshot
   run grep -c 'df -Pk' "$SSH_LOG"
   [ "$output" -eq 1 ]
