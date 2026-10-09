@@ -1,5 +1,7 @@
 # Bugfix: Image Updater processing logs need parsed drilldown, not repeated generic lines
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Problem
 
 The `Image Updater Processing Results` Grafana panel is useful only in a very

@@ -1,5 +1,6 @@
 # Bug: frontend.shopping-cart.local still blank — ServiceEntry blocked by ACG SG, replace with direct launchd port-forward
 
+**Status:** CLOSED — doc merged to main in PR #75; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.6`
 **Files:**
 - `bin/acg-up` — line 232 (hosts list) + lines 947–1015 (Step 10g) + line 1038 (Step 13 info)

@@ -1,5 +1,6 @@
 # Bugfix: ESO ExternalSecret stale cadence comments (Copilot PR #86 follow-up)
 
+**Status:** CLOSED — doc merged to main in PR #100; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Repo (work):** `shopping-cart-infra`
 **Branch (all work repos):** `fix/eso-refresh-interval-self-heal` (the SAME branch as open PR #86 — the fix lands on that PR)
 **Spec repo:** k3d-manager (this file) — read here, implement in shopping-cart-infra.

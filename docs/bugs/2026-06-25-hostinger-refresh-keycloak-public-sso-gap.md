@@ -1,5 +1,6 @@
 # Bugfix: Hostinger refresh was not restoring the public Keycloak `localhost:8880` hop
 
+**Status:** CLOSED — doc merged to main in PR #99; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`  
 **Files:** `scripts/lib/providers/k3s-hostinger.sh`, `scripts/tests/lib/provider_contract.bats`
 

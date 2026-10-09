@@ -1,5 +1,6 @@
 # Bugfix: v1.14.0 — Trivy drilldown banner renders literal `\n\n` and three tables show the same data
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.14.0`
 **Files:** `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`, `scripts/tests/plugins/argocd_metrics_servicemonitor.bats`
 

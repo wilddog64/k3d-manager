@@ -1,5 +1,6 @@
 # Bugfix: v1.7.0 — default HOSTINGER_HOST via config vars (no more per-command export)
 
+**Status:** CLOSED — doc merged to main in PR #95; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.7.0`
 **Files:** `scripts/etc/hostinger/vars.sh` (NEW), `scripts/lib/providers/k3s-hostinger.sh`
 

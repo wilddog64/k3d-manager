@@ -1,5 +1,6 @@
 # Bugfix: v1.16.0 — status health: distinguish "not deployed" from "failing"
 
+**Status:** CLOSED — doc merged to main in PR #106; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `bin/k3dm-webhook`, `bin/cluster-status`, `bin/smoke-test-webhook`
 

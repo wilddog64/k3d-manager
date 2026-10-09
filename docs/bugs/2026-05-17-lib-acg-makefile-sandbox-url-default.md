@@ -1,5 +1,6 @@
 # Fix: lib-acg — `credential-test`/`extend-test` require explicit SANDBOX_URL; no default
 
+**Status:** CLOSED — doc merged to main in PR #75; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch (lib-acg work):** `fix/acg-credentials-extend-dialog`
 **Files (lib-acg):**
 - `Makefile` — add `SANDBOX_URL ?=` default, remove exit-1 guard

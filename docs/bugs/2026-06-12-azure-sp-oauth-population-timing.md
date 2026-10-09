@@ -1,5 +1,6 @@
 # Bug: Azure SP OAuth reprovision budget too small — deadline + cap allow ~2–3 cycles but worst case needs 5–6
 
+**Status:** CLOSED — doc merged to main in PR #94; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-12
 **Branch (lib-acg):** `feat/v0.1.7`
 **Spec repo:** k3d-manager `k3d-manager-v1.6.5`

@@ -1,5 +1,6 @@
 # Bugfix: v1.36.0 — `istiod` scrape job has no port filter, firing TargetDown permanently
 
+**Status:** CLOSED — doc merged to main in PR #130; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-09-19
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Low impact, high noise — a permanently-firing alert that trains the operator to ignore `TargetDown`.

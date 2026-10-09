@@ -1,5 +1,6 @@
 # 2026-06-19 — Slack `/codex` posts the same answer every time (codex banner + echoed prompt captured as the answer)
 
+**Status:** CLOSED — doc merged to main in PR #96; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-06-19 (Claude)
 **Type:** bugfix
 **Branch:** `k3d-manager-v1.7.1`

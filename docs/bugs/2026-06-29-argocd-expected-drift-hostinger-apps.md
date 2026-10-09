@@ -1,5 +1,6 @@
 # Bug: Hostinger app-cluster ArgoCD apps remain OutOfSync on expected controller drift and stale tracking ownership
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.12.0`
 **Files:**
 - `scripts/etc/argocd/applicationsets/data-git.yaml` (edit)

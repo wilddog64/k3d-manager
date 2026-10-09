@@ -1,5 +1,6 @@
 # Bug: Hostinger data layer stuck Pending — orphaned green1 vcluster squats on the 2-CPU node
 
+**Status:** CLOSED — doc merged to main in PR #99; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-25
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`
 **Affects:** `k3d-manager` (`scripts/plugins/vcluster.sh`), live `ubuntu-hostinger` host

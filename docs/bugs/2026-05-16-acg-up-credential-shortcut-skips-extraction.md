@@ -1,5 +1,6 @@
 # Bug: acg-up — aws sts shortcut skips credential extraction — proceeds to CloudFormation with stale credentials
 
+**Status:** CLOSED — doc merged to main in PR #75; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.6`
 **Files:** `bin/acg-up`
 

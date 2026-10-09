@@ -1,5 +1,7 @@
 # Bugfix: 2026-06-29 — Image Updater Grafana dashboard used unresolved datasource variables
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Summary
 
 After the dashboard was moved to hub Grafana, the page still failed at runtime even though:

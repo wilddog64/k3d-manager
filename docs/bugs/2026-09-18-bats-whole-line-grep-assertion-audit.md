@@ -1,5 +1,6 @@
 # Bugfix — tree-wide audit of whole-line `grep -F` assertions in BATS
 
+**Status:** CLOSED — doc merged to main in PR #129; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-09-18
 **Branch:** `fix/bats-whole-line-grep-assertions` — authored on `main` @ `978ea60f`, rebased onto
 `main` @ `e259c718` (the v1.35.0 squash) once PR #128 merged. The rebase was conflict-free: these

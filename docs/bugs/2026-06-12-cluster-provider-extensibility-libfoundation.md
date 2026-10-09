@@ -1,5 +1,6 @@
 # lib-foundation: make `_cluster_provider` validation extensible (optional consumer hook)
 
+**Status:** CLOSED — doc merged to main in PR #94; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-12
 **Repo (work):** `lib-foundation` (NOT k3d-manager — the spec lives in k3d-manager, the code change is in lib-foundation)
 **Branch (lib-foundation):** `feat/v0.3.21`

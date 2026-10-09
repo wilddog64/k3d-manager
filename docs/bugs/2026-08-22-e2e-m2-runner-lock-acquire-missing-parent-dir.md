@@ -1,5 +1,6 @@
 # `e2e_runner_dispatch` reports a fresh M2 runner as "busy (lock held)" when the lock parent dir is missing (2026-08-22)
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Severity:** medium (false-positive dispatch block on any runner that has not yet
 completed a run; the failure text misdirects to the unlock path, which is a no-op).
 **Component:** `scripts/plugins/e2e_remote.sh` — `_e2e_remote_lock_acquire` (line ~298–301).

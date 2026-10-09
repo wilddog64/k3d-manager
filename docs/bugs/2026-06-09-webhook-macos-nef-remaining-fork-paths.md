@@ -1,5 +1,7 @@
 # Bug: `bin/k3dm-webhook` can still crash on macOS from remaining fork-based helpers
 
+**Status:** CLOSED — doc merged to main in PR #93; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Summary
 
 The webhook can still hit a macOS `Python quit unexpectedly` / `EXC_BAD_ACCESS (SIGSEGV)` crash because a few remaining helper paths still use fork-based subprocess calls after the process has imported networking code.

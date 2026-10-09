@@ -1,5 +1,6 @@
 # Bug: Hostinger refresh did not restart the ArgoCD port-forward behind `argocd.3ai-talk.org`
 
+**Status:** CLOSED — doc merged to main in PR #99; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-24  
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`  
 **Files:** `scripts/lib/providers/k3s-hostinger.sh`, `scripts/tests/lib/provider_contract.bats`

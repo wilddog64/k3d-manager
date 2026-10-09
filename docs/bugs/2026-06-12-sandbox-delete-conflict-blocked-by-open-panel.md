@@ -1,5 +1,6 @@
 # Bug: _deleteConflictingSandbox can't find Azure buttons when AWS credential panel is open; _waitForCredentials falls through to reopen loop
 
+**Status:** CLOSED — doc merged to main in PR #94; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-12
 **Branch (lib-acg):** `feat/v0.1.7`
 **File:** `playwright/lib/sandbox.js`

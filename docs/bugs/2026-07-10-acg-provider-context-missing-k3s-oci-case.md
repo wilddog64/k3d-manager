@@ -1,5 +1,6 @@
 # Bugfix: v1.14.0 — `_acg_provider_context` has no `k3s-oci` case, so OCI resolves to the AWS sandbox context
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.14.0`
 **Files:** `scripts/lib/provider.sh`, `scripts/tests/lib/provider_contract.bats`
 

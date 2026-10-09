@@ -1,3 +1,11 @@
+## 2026-10-09 — Bug-doc status sweep: all 683 docs now carry a Status line
+
+368 docs in `docs/bugs/` had no Status line. Each one now has one, tagged `(2026-10-09 status sweep)`:
+- 340 `CLOSED — doc merged to main in PR #N; no open follow-up was found`. This is inferred: the doc's spec merged in a shipped release and nothing in the memory-bank or roadmap carries it as open. It was not re-verified doc by doc; I spot-checked about 15 against the code (kubeconfig prune helper, CRD guards, `monitoring-resume LAYER`, loadtest, signing `--app-cluster`, the openldap federation on infra main, the reconcile `|| true`) and all of them were present.
+- 25 `CLOSED — superseded`: the 2026-05-16 chain of ACG "Extend session" modal iterations. ACG automation now lives in lib-foundation.
+- Kine compaction stall: CLOSED, because the 2026-10-03 hub rebuild replaced the datastore. Hub control-plane re-adoption: OBSOLETE.
+- 7 docs already had a `## Status` section saying fixed (the 10-06 Slack fixes, the 10-07 make-job tail, the git-persist clone, the keycloak redirect). Those were left unchanged.
+
 ## 2026-10-09 — Bug triage: 2 closed, 2 prioritized; payment #84 conflict resolved
 
 - Closed as FIXED: `2026-04-26-shopping-cart-imagepullbackoff-no-ghcr-pull-secret` (pull secret + imagePullSecrets in tree; Hostinger apps healthy) and `2026-04-27-orders-init-sql-serial-vs-uuid` (infra init SQL is UUID; order rewritten in Go).

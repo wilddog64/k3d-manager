@@ -1,5 +1,6 @@
 # Bug: App-cluster Prometheus keeps only 2h
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-07-06 (observation) / 2026-07-07 (fix spec)
 **Source:** /ask agent observation, verified live on `ubuntu-hostinger`
 **Branch:** `k3d-manager-v1.14.0`

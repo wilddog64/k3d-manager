@@ -1,5 +1,6 @@
 # Bug: Grafana repeatedly killed by liveness probe under argocd-image-updater dashboard load
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-07-06 (observation) / 2026-07-07 (live root cause + fix spec)
 **Source:** /ask agent observation, root-caused live on `k3d-k3d-cluster` 2026-07-07
 **Branch:** `k3d-manager-v1.14.0`

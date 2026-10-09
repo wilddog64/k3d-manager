@@ -1,5 +1,6 @@
 # 2026-06-19 — Roll out committed pre-push main-guard hook across shopping-cart repos + k3d-manager
 
+**Status:** CLOSED — doc merged to main in PR #96; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-06-19 (Claude)
 **Type:** hardening (incident-driven) — multi-repo
 **Repos:** `k3d-manager` + all shopping-cart repos

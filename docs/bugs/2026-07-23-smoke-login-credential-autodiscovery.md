@@ -1,5 +1,6 @@
 # Bugfix: v1.17.0 — smoke-login credential auto-discovery (no operator env setup)
 
+**Status:** CLOSED — doc merged to main in PR #107; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.17.0`
 **Files:** `bin/k3dm-webhook`
 

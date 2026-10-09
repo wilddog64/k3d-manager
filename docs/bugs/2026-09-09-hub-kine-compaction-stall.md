@@ -1,5 +1,7 @@
 # Hub Kine compaction stall causes control-plane saturation
 
+**Status:** CLOSED — the 2026-10-03 hub rebuild replaced the saturated kine datastore. If compaction stalls again, rebuild; a restart does not fix it (2026-10-09 status sweep)
+
 ## What was observed
 
 The hub K3s Kine SQLite datastore reached 8.3 GiB with 1,013,597 rows. An

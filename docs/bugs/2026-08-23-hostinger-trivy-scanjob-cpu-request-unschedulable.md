@@ -1,5 +1,6 @@
 # Bugfix: hostinger Trivy scan jobs unschedulable — scan-job CPU request too large for a saturated 2-CPU node
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.27.0`
 **File:** `scripts/etc/helm/observability/trivy-operator-acg-values.yaml`
 

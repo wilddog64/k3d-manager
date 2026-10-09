@@ -1,5 +1,6 @@
 # Bug: keycloak-reconcile-hook-job partialImport not idempotent — LDAP setup never runs on re-runs
 
+**Status:** CLOSED — doc merged to main in PR #80; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-05-25
 **File:** `shopping-cart-infra/identity/keycloak/keycloak-reconcile-hook-job.yaml`
 **Branch (work):** `fix/keycloak-reconcile-idempotency` (same branch as realm-json redirect URI fix)

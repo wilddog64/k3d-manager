@@ -1,5 +1,6 @@
 # Bug: `provider_contract.bats` test 17 asserts the pre-rename `data-layer` Application name
 
+**Status:** CLOSED — doc merged to main in PR #106; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `scripts/tests/lib/provider_contract.bats` (ONLY)
 

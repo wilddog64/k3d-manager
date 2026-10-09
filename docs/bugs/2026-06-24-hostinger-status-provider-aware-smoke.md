@@ -1,5 +1,6 @@
 # Bug: `make status` reports sandbox-only smoke results on Hostinger
 
+**Status:** CLOSED — doc merged to main in PR #99; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.7.1`
 **Files:** `bin/cluster-status`, `bin/k3dm-webhook`, `scripts/lib/provider.sh`
 

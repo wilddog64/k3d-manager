@@ -1,5 +1,6 @@
 # Bug: ArgoCD SSO login fails — invalid_scope: groups not defined as Keycloak client scope
 
+**Status:** CLOSED — doc merged to main in PR #76; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.7`
 **Work repo:** `shopping-cart-infra` — branch `fix/argocd-groups-scope`
 **File:** `argocd/config/argocd-cm.yaml`

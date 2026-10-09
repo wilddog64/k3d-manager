@@ -1,5 +1,6 @@
 # Bug: Grafana dashboards are imperative — do not survive a cluster rebuild
 
+**Status:** CLOSED — doc merged to main in PR #106; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.16.0`
 **Scope:** Phase 1 only — ADDITIVE. Do not delete any existing imperative apply.
 

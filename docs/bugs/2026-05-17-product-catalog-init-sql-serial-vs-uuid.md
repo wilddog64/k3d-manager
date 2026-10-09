@@ -1,5 +1,6 @@
 # Bug: product-catalog PostgreSQL init SQL creates products table with SERIAL PK — conflicts with SQLAlchemy UUID model
 
+**Status:** CLOSED — doc merged to main in PR #75; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.6`
 **Work repo:** `shopping-cart-infra` — branch `fix/product-catalog-uuid-pk`
 **File:** `data-layer/postgresql/products/init-db.sql`

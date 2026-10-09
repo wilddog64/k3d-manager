@@ -1,5 +1,6 @@
 # hostinger edge recovery has no narrow, side-effect-free entrypoint
 
+**Status:** CLOSED — doc merged to main in PR #116; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-16
 **Provider:** k3s-hostinger
 **Severity:** low (ergonomics / operational safety — not a correctness bug)

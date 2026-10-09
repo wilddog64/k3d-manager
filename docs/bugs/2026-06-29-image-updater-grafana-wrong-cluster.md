@@ -1,5 +1,7 @@
 # Bugfix: 2026-06-29 — Image Updater Grafana dashboard was deployed against the wrong cluster
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Summary
 
 The new `ArgoCD Apps & Image Updater` dashboard rendered as all `No data` in the

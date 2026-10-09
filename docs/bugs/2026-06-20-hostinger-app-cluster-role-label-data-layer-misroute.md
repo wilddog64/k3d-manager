@@ -1,5 +1,6 @@
 # Bugfix: Hostinger app cluster missing `k3d-manager/role: app-cluster` label → data-layer misrouted; ESO never bootstrapped
 
+**Status:** CLOSED — doc merged to main in PR #97; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-20
 **Severity:** High — shopping-cart apps on `ubuntu-hostinger` cannot start (no DB, no secrets)
 **Affects:** `k3d-manager` (ArgoCD GitOps wiring, `k3s-hostinger` provider)

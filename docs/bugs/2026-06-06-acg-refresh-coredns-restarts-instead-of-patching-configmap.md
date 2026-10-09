@@ -1,5 +1,6 @@
 # Bug: acg-refresh restarts CoreDNS but never patches the NodeHosts ConfigMap
 
+**Status:** CLOSED — doc merged to main in PR #92; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.6.3`
 **Files:** `bin/acg-refresh`
 

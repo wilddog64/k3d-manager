@@ -1,5 +1,6 @@
 # Bug: keycloak ExternalSecret files missing from shopping-cart-infra
 
+**Status:** CLOSED — doc merged to main in PR #73; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch (shopping-cart-infra):** `docs/next-improvements`
 **Discovered:** 2026-05-08 during Gemini verify pass after v1.4.4-identity-sso-fixes work
 

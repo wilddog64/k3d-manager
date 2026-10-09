@@ -1,5 +1,7 @@
 # Bug: Hostinger refresh can leave frontend nginx pinned to stale shopping-cart service IPs
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Symptom
 
 After a Hostinger refresh, cluster health can show:

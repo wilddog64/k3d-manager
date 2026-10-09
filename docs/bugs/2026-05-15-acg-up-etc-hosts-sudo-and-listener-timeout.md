@@ -1,5 +1,6 @@
 # Bug: acg-up — /etc/hosts update silently skipped + ArgoCD HTTPS listener timeout too short
 
+**Status:** CLOSED — doc merged to main in PR #75; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-05-15
 **File:** `bin/acg-up`
 **Symptom:** `make up` fails at step 4c even after the /etc/hosts ordering fix:

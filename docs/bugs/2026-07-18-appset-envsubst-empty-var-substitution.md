@@ -1,5 +1,6 @@
 # Bug: derived envsubst list substitutes UNSET vars with empty string (regression from `db1ed1ce`)
 
+**Status:** CLOSED — doc merged to main in PR #106; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `scripts/plugins/argocd.sh`, `scripts/etc/argocd/vars.sh`, `scripts/tests/plugins/appset_envsubst_coverage.bats`
 

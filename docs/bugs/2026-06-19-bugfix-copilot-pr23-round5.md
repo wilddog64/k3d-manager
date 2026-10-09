@@ -1,5 +1,6 @@
 # Bugfix: payment Go rewrite — round-5 Copilot finding (PCI: zero card fields on `req`)
 
+**Status:** CLOSED — doc merged to main in PR #96; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Work repo:** `shopping-cart-payment` — branch `feat/go-rewrite` (continue the existing branch; do
 NOT branch anew, do NOT open a PR — #23 is already open against this branch).
 **Spec lives in:** `k3d-manager` (`k3d-manager-v1.7.1`) — this file only.

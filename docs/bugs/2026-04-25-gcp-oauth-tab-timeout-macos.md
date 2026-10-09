@@ -1,5 +1,6 @@
 # Bug: gcp_login OAuth tab timeout on macOS
 
+**Status:** CLOSED — doc merged to main in PR #67; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.2.0`
 **Work repo:** `wilddog64/lib-acg` at `/Users/cliang/src/gitrepo/personal/lib-acg/`
 **File:** `scripts/plugins/gcp.sh`

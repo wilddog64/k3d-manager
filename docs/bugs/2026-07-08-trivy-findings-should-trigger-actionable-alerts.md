@@ -1,5 +1,7 @@
 # Bugfix: Trivy High/Critical findings should trigger actionable alerts, not just passive Grafana panels
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Problem
 
 The hub Grafana dashboard already exposes Trivy security data:

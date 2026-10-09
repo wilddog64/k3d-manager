@@ -1,5 +1,6 @@
 # E2E substrate pins a product-catalog image tag that no longer exists in ghcr (404) (2026-08-22)
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Severity:** medium (blocks every E2E: product-catalog never rolls out).
 **Component:** `scripts/etc/e2e/kustomization.yaml` (`images:` pins).
 **Found while:** the v1.27.0 plan #2 live-acceptance passing run on M2, after the ghcr

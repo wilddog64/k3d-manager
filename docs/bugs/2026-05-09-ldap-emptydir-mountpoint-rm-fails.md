@@ -1,5 +1,6 @@
 # Bug: LDAP pod CrashLoopBackOff — emptyDir at ldif/custom is a mount point, rm -rf fails
 
+**Status:** CLOSED — doc merged to main in PR #74; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** shopping-cart-infra `main` → new branch `fix/ldap-ldif-staging`
 **Severity:** High — `identity/ldap` pod stays in CrashLoopBackOff on every fresh cluster bring-up
 **Repo affected:** `wilddog64/shopping-cart-infra`

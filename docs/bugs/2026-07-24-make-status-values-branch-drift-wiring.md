@@ -1,5 +1,6 @@
 # Bug: `make status` does not report ApplicationSet values-branch drift
 
+**Status:** CLOSED — doc merged to main in PR #108; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.18.0`
 **Files (edit ONLY these two):**
 - `bin/cluster-status`

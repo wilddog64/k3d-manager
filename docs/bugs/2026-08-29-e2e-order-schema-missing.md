@@ -1,5 +1,7 @@
 # Tier-1 E2E: order service 500s — `orders` table never created
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Symptom
 
 The Tier-1 vCluster acceptance gate (`e2e_verify_vcluster`) reports `orders.spec`

@@ -1,5 +1,6 @@
 # Bugfix: payment Go CI — gate the integration test (`-tags integration`)
 
+**Status:** CLOSED — doc merged to main in PR #96; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Spec repo:** k3d-manager (`k3d-manager-v1.7.1`)
 **Work repo:** `shopping-cart-payment`
 **Branch (all work repos):** `feat/go-rewrite`

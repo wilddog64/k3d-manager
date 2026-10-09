@@ -1,5 +1,6 @@
 # Bugfix: bin/acg-up aborts on expired sandbox instead of auto-restarting
 
+**Status:** CLOSED — doc merged to main in PR #79; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.4.9`
 **Files:** `bin/acg-up`
 

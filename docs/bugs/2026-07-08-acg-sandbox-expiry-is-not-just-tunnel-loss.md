@@ -1,5 +1,6 @@
 # Bug: ACG sandbox expiry is reported as generic tunnel loss
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-07-08  
 **Branch:** `k3d-manager-v1.14.0`  
 **Files:** `bin/cluster-status`, `bin/k3dm-webhook`, `scripts/tests/bin/cluster_status_observability.bats`, `scripts/tests/lib/webhook.bats`

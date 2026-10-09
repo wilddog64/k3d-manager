@@ -1,5 +1,6 @@
 # Bug: Hostinger services not green — app-cluster role label stuck on dead ubuntu-k3s + stale green1 preflight stack
 
+**Status:** CLOSED — doc merged to main in PR #99; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-06-25
 **Branch:** `feat/v1.8.0-acg-absorb-phase2-agy`
 **Affects:** `k3d-manager` (ArgoCD GitOps wiring, `k3s-hostinger` provider)

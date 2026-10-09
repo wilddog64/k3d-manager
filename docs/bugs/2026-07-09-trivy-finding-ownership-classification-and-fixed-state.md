@@ -1,5 +1,7 @@
 # Bugfix: Trivy findings need ownership classification and a fixed-state dashboard contract
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Problem
 
 The Trivy sections on the hub Grafana dashboard already show security findings, but they still behave like a passive snapshot:

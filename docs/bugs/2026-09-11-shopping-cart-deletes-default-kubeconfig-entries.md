@@ -1,5 +1,6 @@
 # `add_ubuntu_k3s_cluster` deletes `default` kubeconfig entries it does not own
 
+**Status:** CLOSED — doc merged to main in PR #126; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-09-11
 **Branch:** `k3d-manager-v1.33.0`
 **Severity:** latent — orphans the hub context on the next run

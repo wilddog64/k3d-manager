@@ -1,5 +1,6 @@
 # Keycloak not deployed on the hub → SSO + admin login down (2026-08-22)
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Severity:** high (frontend SSO + Keycloak admin unusable).
 **Parent incident:** `docs/issues/2026-08-22-service-credentials-na-multi-root-cause.md`.
 **Cluster:** hub `k3d-k3d-cluster`; frontend on hostinger app cluster.

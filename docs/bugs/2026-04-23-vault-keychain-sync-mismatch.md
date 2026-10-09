@@ -1,5 +1,6 @@
 # Bug: Vault storage / cached unseal state can still drift out of sync
 
+**Status:** CLOSED — doc merged to main in PR #65; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.1.0`
 **Files Implicated:** `scripts/plugins/vault.sh`, `scripts/lib/system.sh`
 

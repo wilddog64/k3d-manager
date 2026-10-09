@@ -1,5 +1,6 @@
 # Bug: `acg-down` only tears down remote state and leaves stale local Hub state behind
 
+**Status:** CLOSED — doc merged to main in PR #65; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.1.0`
 **Files Implicated:** `bin/acg-down`, `bin/acg-up`
 

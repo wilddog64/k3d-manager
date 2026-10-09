@@ -1,5 +1,6 @@
 # Bug: Stale kube context assumptions
 
+**Status:** CLOSED — doc merged to main in PR #104; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-07-07
 **Source:** /ask agent observation
 

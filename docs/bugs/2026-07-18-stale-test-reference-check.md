@@ -1,5 +1,6 @@
 # Add `scripts/check-stale-test-refs.sh` — catch stale test assertions after a move/rename
 
+**Status:** CLOSED — doc merged to main in PR #106; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `scripts/check-stale-test-refs.sh` (NEW), `scripts/tests/lib/stale_test_refs.bats` (NEW)
 

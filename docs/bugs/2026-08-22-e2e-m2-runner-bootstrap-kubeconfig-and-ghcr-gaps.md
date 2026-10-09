@@ -1,5 +1,6 @@
 # M2 e2e runner bootstrap leaves no host kubeconfig, no current-context, and no off-hub GHCR pull path (2026-08-22)
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Severity:** medium-high (a freshly bootstrapped M2 runner cannot complete an E2E:
 the host context is unusable and the private shopping-cart images 403 on pull).
 **Component:** `scripts/plugins/e2e_remote.sh` — `_e2e_remote_reconcile_cluster`

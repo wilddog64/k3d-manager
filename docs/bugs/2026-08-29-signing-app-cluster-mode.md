@@ -1,5 +1,6 @@
 # `deploy_image_signing --app-cluster` — deploy the verifyImages gate without hub Vault
 
+**Status:** CLOSED — doc merged to main in PR #118; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Filed:** 2026-08-29
 **Area:** `scripts/plugins/signing.sh` — `deploy_image_signing`, `_signing_install_kyverno`
 **Type:** enhancement / implementation gap

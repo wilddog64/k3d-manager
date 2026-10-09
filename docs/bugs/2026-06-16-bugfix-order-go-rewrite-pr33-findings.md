@@ -1,5 +1,6 @@
 # Bugfix: order Go rewrite — PR #33 GitGuardian + Copilot findings
 
+**Status:** CLOSED — doc merged to main in PR #96; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Work repo:** `shopping-cart-order` (NOT k3d-manager)
 **Branch (all work):** `feat/go-rewrite` (existing — the PR #33 branch; do NOT create a new branch)
 **PR:** https://github.com/wilddog64/shopping-cart-order/pull/33

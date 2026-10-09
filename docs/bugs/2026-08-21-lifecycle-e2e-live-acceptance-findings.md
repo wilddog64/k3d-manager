@@ -1,5 +1,6 @@
 # v1.26.0 — live acceptance of the last two queue items (E2E gate + stale-cluster cleanup)
 
+**Status:** CLOSED — doc merged to main in PR #117; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-08-21
 **Branch:** `k3d-manager-v1.26.0`
 **Context:** Hub `k3d-k3d-cluster` (healthy, 26h), fresh ACG sandbox `604492140645`

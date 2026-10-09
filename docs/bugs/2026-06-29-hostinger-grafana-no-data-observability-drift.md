@@ -1,5 +1,6 @@
 # Bug: Hostinger Grafana shows no data because observability drifts to an old branch and undersized Prometheus
 
+**Status:** CLOSED — doc merged to main in PR #102; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Branch:** `k3d-manager-v1.12.0`
 **Files:**
 - `scripts/lib/providers/k3s-hostinger.sh` (edit)

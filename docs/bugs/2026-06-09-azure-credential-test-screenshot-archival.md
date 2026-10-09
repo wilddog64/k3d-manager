@@ -1,5 +1,7 @@
 # Bug: Azure credential-test screenshots stay in `/tmp` instead of shared screenshots dir
 
+**Status:** CLOSED — doc merged to main in PR #93; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
+
 ## Summary
 
 When `make credential-test PROVIDER=azure` fails, the credential-test flow reports a screenshot path under `/tmp`:

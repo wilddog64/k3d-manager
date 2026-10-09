@@ -1,5 +1,6 @@
 # Bug — `_register_secret` coverage gaps in `bin/k3dm-webhook`
 
+**Status:** CLOSED — doc merged to main in PR #128; no open follow-up was found. Not individually re-verified; reopen with a Recurrence section if it is seen again (2026-10-09 status sweep)
 **Date:** 2026-09-17
 **Branch:** `k3d-manager-v1.35.0`
 **Severity:** Medium (defence-in-depth gap, no known live leak)
