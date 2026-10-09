@@ -51,3 +51,4 @@ seed_clock() { printf '%s\n' "$1" > "${STATE_DIR}/u1"; }
 @test "reaper: lifecycle process skips kubectl" { PGREP_RUNNING=1 run_reaper; [ "$status" -eq 0 ]; ! grep -q '^kubectl ' "$CALL_LOG" || false; }
 @test "reaper: Secret selector includes k3s-aws provider" { run_reaper; [ "$status" -eq 0 ]; grep -q 'k3d-manager/provider=k3s-aws' "$CALL_LOG"; }
 @test "reaper: stale unknown UID state is removed" { printf '%s\n' 1 > "$STATE_DIR/stale-uid"; run_reaper; [ "$status" -eq 0 ]; [ ! -e "$STATE_DIR/stale-uid" ]; }
+@test "reaper: launchd plist puts Homebrew bash ahead of /bin/bash 3.2" { plist="${REPO_ROOT}/scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl"; grep -A1 '<key>PATH</key>' "$plist" | grep -q '/opt/homebrew/bin:.*/usr/bin:/bin'; }
