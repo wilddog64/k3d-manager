@@ -1118,3 +1118,4 @@ remaining blocker.
 
 Triaged all 19 requested September bug docs on `k3d-manager-v1.42.0`; status counts: 16 FIXED, 2 PARTIAL, 0 OPEN, 1 UNKNOWN. Docs commit `fbdf1c23` is pushed; `make check-doc-links` passed (`19 file(s) OK`). PR URL: none.
 ## 2026-10-08 — Hub teardown guard fixed in fa3340bc; live verification pending (Codex)
+2026-10-08: Hub snapshot round 5 fix committed as e3040689; live verification pending (operator). PR URL: none.
