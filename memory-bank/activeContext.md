@@ -1,3 +1,10 @@
+## 2026-10-08 — Codex September triage verified; /ask fixes live-verified; ask preamble leak filed and dispatched
+
+- Verified Codex triage `fbdf1c23` + `65971034` on origin: only the 19 September bug docs + memory-bank changed. All 15 cited fix SHAs exist on earlier release branches (v1.36.0–v1.40.0). Result: 16 FIXED, 2 PARTIAL (hub PVC capture `d53ea1ba`, prometheus reseed/rotator `7d475a9f`), 1 UNKNOWN (frontend public URL), 0 OPEN.
+- Live-verified `7089dd10` (ask argv `--`) and `b2c45ae3` (sandbox SHELL): operator's top-level `ask claude` answered "bash" in thread.
+- Filed `docs/bugs/2026-10-08-ask-reply-leaks-cli-preamble.md` (P2): Claude CLI settings warnings print before `ANSWER:` and `removeprefix` keeps them, so they post to Slack. Dispatched to Codex.
+- Operator decision pending: remove 3 over-broad allow rules in `.claude/settings.local.json` (lines 215, 671, 1524) that trigger the warnings.
+
 ## 2026-10-08 — Claude verified Codex three-bug fixes; v1.44.0 bug dashboard folded into v1.43.0; September bug triage queued for Codex
 
 - Verified `7089dd10`/`2f7e0eb5`/`895221cb` on origin. The diff matches the specs. Claude ran full `pytest scripts/tests`: 758 passed, 1 skipped. The real `audit/remote-operator.jsonl` stayed at 6225 lines across the run (before the fix, every run added 3). Live check pending: the operator runs `make restart-webhook`, then a top-level `ask claude: what shell are you in`.

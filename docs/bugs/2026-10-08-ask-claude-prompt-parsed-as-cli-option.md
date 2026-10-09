@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude (found during the operator's live check of `b2c45ae3`)
 **Branch:** k3d-manager-v1.42.0
-**Status:** FIXED in branch `7089dd10` — live verification pending (Claude)
+**Status:** LIVE-VERIFIED 2026-10-08 — FIXED in branch `7089dd10`; top-level `ask claude` answered in thread (operator screenshot). Found the preamble leak, filed as `2026-10-08-ask-reply-leaks-cli-preamble.md`
 **Priority:** P1 — top-level `/ask claude` is fully broken; only a thread ask (prompt starts with context) works
 **Severity:** High
 **Component:** `scripts/lib/webhook/agent.py` `_run_cluster_ask` (claude branch)

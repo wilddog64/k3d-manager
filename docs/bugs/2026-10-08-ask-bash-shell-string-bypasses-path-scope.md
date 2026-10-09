@@ -1,7 +1,7 @@
 # Bug: ask Bash shell strings bypass filesystem scope checks
 
 **Filed:** 2026-10-08
-**Status:** FIXED in branch `b2c45ae3` — live check blocked by `2026-10-08-ask-claude-prompt-parsed-as-cli-option.md`; re-check after that fix
+**Status:** LIVE-VERIFIED 2026-10-08 — FIXED in branch `b2c45ae3`; top-level `ask claude: which shell are you in` answered "bash" in thread (operator screenshot)
 **Severity:** HIGH (authenticated AI path; file confidentiality)
 **Branch:** k3d-manager-v1.42.0
 **Reviewed revision:** 6e54ca66bddf47973eff57216d290b5df821b529
