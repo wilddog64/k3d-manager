@@ -1,3 +1,9 @@
+## 2026-10-09 — istio-cni release step VERIFIED
+
+- `make appsets-reapply` (2nd run, clean) + `make platform-ops`: istio-cni on Hostinger uses k3s CNI dirs, Synced/Healthy, DS 1/1; `ArgoCDAppProgressingStuck` loaded in hub Prometheus (ok, inactive). Bug doc marked VERIFIED.
+- Note: `make platform-ops` warned `k3dm-webhook-token not found in Keychain` and skipped that Secret sync (no change made).
+- Remaining: v1.43.0 Codex dispatch (specs + appsets-reapply confirm-wait bug) on operator go; 2026-10-15 smstest cleanup.
+
 ## 2026-10-09 — post-release ops on k3d-manager-v1.43.0
 
 - Operator ran `make restart-webhook` (REPO_ROOT fix live) and `make appsets-reapply` + `make appsets-check`: all Applications on `k3d-manager-v1.43.0` (21 refs checked).
