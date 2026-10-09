@@ -18,8 +18,12 @@
 
 - Hub Secret `cicd/cluster-ubuntu-k3s` (`k3d-manager/provider: k3s-aws`) still exists. It was
   created 2026-10-06 00:44 UTC; the sandbox lives at most 8h.
-- Eight generated Applications still target `ubuntu-k3s`, all with sync status `Unknown`:
-  `ubuntu-k3s-{data-layer,grafana-dashboards,shopping-cart-basket,-frontend,-namespace,-order,-payment,-product-catalog}`.
+- Ten generated Applications still target the sandbox, all with sync status `Unknown`:
+  - Eight by destination name `ubuntu-k3s`:
+    `ubuntu-k3s-{data-layer,grafana-dashboards,shopping-cart-basket,-frontend,-namespace,-order,-payment,-product-catalog}`.
+  - Two by server `https://host.k3d.internal:6443` (the sandbox tunnel endpoint):
+    `ubuntu-k3s-eso` and `ubuntu-k3s-platform`. The hub's own ESO is `k3d-cluster-eso`
+    (`kubernetes.default.svc`) and is not matched.
 
 ## Root cause
 
@@ -46,10 +50,27 @@ Deregister automatically once the sandbox is provably gone, not merely unreachab
 
 ## Immediate cleanup (operator)
 
-The operator runs this. It is the same function `destroy_cluster` calls, and it touches only
-`cluster-ubuntu-k3s` and apps whose destination is `ubuntu-k3s`. Read
-`_k3s_aws_deregister_cluster` before running it. Then confirm `ubuntu-k3s-app-cluster` and
-`cluster-ubuntu-hostinger` are untouched.
+Use the dedicated target, not `make down`. It is dry-run by default. It was broken (exit 2 on
+every call) until fixed alongside this doc; see the CHANGELOG.
+```
+make cleanup-stale-registration CLUSTER=ubuntu-k3s            # preview: 1 Secret + 10 apps
+make cleanup-stale-registration CLUSTER=ubuntu-k3s CONFIRM=1  # delete Secret first, then apps
+```
+It selects by the label `argocd.argoproj.io/cluster-name=ubuntu-k3s`, so `ubuntu-k3s-app-cluster`
+(`cluster-name: k3d-cluster`, the hub) is never selected.
+
+### Why not `make down`
+
+`make down` (the default provider is k3s-aws, and the default `KEEP_LOCAL=1` keeps the hub) does
+call `_k3s_aws_deregister_cluster`. After the provider `case` in `bin/cluster-down`, however,
+these steps run **without** a `_keep_hub` guard:
+- It kills `vault-pf.pid` and unloads and removes `com.k3d-manager.vault-port-forward`.
+  That LaunchAgent forwards the **hub's** Vault (`vault-0 18200:8200 --context k3d-k3d-cluster`),
+  so the hub loses its local Vault access.
+- It stops the frontend port-forward PID and the ACG Prometheus port-forward.
+
+That is an over-broad teardown with the hub kept. Confirm and fix it in the spec. Until then, use
+the cleanup target above for a sandbox that has already expired.
 
 ## What NOT to do
 

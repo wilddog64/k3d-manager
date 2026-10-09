@@ -163,7 +163,7 @@ cleanup-stale-clusters:
 ## Remove one explicitly named stale ArgoCD cluster registration (dry-run unless CONFIRM=1)
 cleanup-stale-registration:
 	@ARGOCD_HUB_CONTEXT="$(INFRA_CONTEXT)" ARGOCD_NAMESPACE="$(ARGOCD_NS)" \
-	  bin/cleanup-stale-registration --cluster "$(CLUSTER)" $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
+	  bin/cleanup-stale-registration --cluster="$(CLUSTER)" $(if $(filter 1 true yes,$(CONFIRM)),--confirm,--dry-run)
 
 ## Run both stale-resource cleanup paths (dry-run unless CONFIRM=1; sandbox path is k3s-aws-only)
 cleanup-stale-resources:

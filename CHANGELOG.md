@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- `make cleanup-stale-registration CLUSTER=<name>` works again. The target passed
+  `--cluster <name>` as two words, but `bin/cleanup-stale-registration` only accepts
+  `--cluster=<name>`, so every run (even the dry-run preview) exited 2 before reading anything.
+  The script's own tests called it directly, so nothing covered the Makefile wiring; a new BATS
+  case now runs the make target against a stubbed `kubectl`.
 - `make test-all` now records and publishes its pass or failure result to the `k3dm Tests`
   Grafana dashboard while preserving the original test exit code; `make test-metrics` remains
   an always-zero compatibility wrapper.

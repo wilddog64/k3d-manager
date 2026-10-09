@@ -1,3 +1,14 @@
+## 2026-10-09 — Fixed `make cleanup-stale-registration`; documented `make down` over-reach
+
+- **Fix:** the Makefile passed `--cluster "$(CLUSTER)"`, but the script requires `--cluster=<name>`, so every call exited 2.
+  - Fixed, with a BATS case for the make wiring (`cleanup_stale_registration.bats`: RED, then 4/4 green).
+- **Live dry-run** of `CLUSTER=ubuntu-k3s` matches `cluster-ubuntu-k3s` plus 10 Unknown apps:
+  - the 8 matched by name,
+  - plus `ubuntu-k3s-eso` and `ubuntu-k3s-platform`, which use the `host.k3d.internal:6443` tunnel server.
+  - The hub's `k3d-cluster-eso` is not matched.
+  - The operator runs `CONFIRM=1`.
+- **`make down` over-reach** (in the ACG bug doc): even with `KEEP_LOCAL=1`, `bin/cluster-down` kills and unloads `com.k3d-manager.vault-port-forward` (the HUB Vault, 18200), plus the frontend and ACG Prometheus port-forwards. None of those steps checks `_keep_hub`.
+
 ## 2026-10-09 — Bugs filed: Hostinger istio-cni stuck Progressing; expired ACG sandbox leaves its registration
 
 - `docs/bugs/2026-10-09-hostinger-istio-cni-generic-dirs-after-hub-rebuild-and-no-alert.md` (OPEN, P2):
