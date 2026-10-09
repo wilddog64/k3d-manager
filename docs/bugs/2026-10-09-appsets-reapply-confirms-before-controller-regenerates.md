@@ -64,3 +64,17 @@ Mutation check: remove the retry loop. Test 1 must go red.
 
 `docs/howto/makefile.md`, `appsets-reapply` row: say that the confirmation waits up to 90s for
 the controller, and name the two env vars.
+
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/plugins/argocd.sh` | bounded retry in `deploy_argocd_applicationsets`'s verify block |
+| `scripts/tests/plugins/argocd_appset_reapply_confirm_wait.bats` | new |
+| `docs/howto/makefile.md` | `appsets-reapply` row |
+
+## Rules
+
+- `shellcheck scripts/plugins/argocd.sh`: no new warnings.
+- `bats scripts/tests/plugins/argocd_appset_reapply_confirm_wait.bats`: all green. Paste the output.
+- Do not commit. `.git` is read-only in the sandbox.
