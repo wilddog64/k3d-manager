@@ -1,3 +1,7 @@
+## 2026-10-09 — payment #84 merge-ready (verified)
+- Head `6dfb8bab`: all 5 ruleset-required checks green (Integration Tests now pass with rabbitmq-client 1.1.0); Copilot 0 findings, 0 threads; mergeStateStatus CLEAN; image resolves spring-webmvc 7.0.9.
+- Repo uses ruleset `main-protection` (0 approvals) — no enforce_admins lever. PR-side Trivy does not run (Build, Scan & Push skipped on PRs); verify CVE-2026-47884 gone after merge, then re-pin Hostinger digest.
+
 ## 2026-10-09 — Hostinger istio-cni recovered (verified)
 - Operator ran `make refresh CLUSTER_PROVIDER=k3s-hostinger`. App values now rancher dirs; app Synced/Healthy; `istio-cni-node` 1/1 (`istio-cni-node-rv94s`).
 - Bug doc stays OPEN: apply-path trace + `ArgoCDAppProgressingStuck` alert still to spec.
