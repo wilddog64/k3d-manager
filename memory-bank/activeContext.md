@@ -1,3 +1,14 @@
+## 2026-10-08 — v1.44.0 bug: SMS recovery notifications + notify behaviour test
+
+- Filed `docs/bugs/2026-10-08-sms-critical-no-resolved-notification-and-untested-notify-behaviour.md`, targeting v1.44.0. It is a bug doc, so exempt from the cap; v1.44.0 has 5 plan files. The operator agreed: "texts are free".
+- Scope:
+  - `sms-critical` gets `send_resolved: true`.
+  - Both receivers get a resolved block in the body. Today the body only ranges `.Alerts.Firing`, so a resolved text would be blank.
+  - A real-Alertmanager (v0.27.0) pytest with a webhook sink covers dedup, repeat, recovery, and guards for the acg email-only route and the Trivy null route, plus an `amtool template render` test.
+  - Optional `make alertmanager-config`.
+- The 10/15 `smstest` delete resolves silently unless this ships first.
+- Operator instruction: after Phase 1 is verified, dispatch Phase 2. Then open the PRs, fix Copilot findings, and wait for the operator to merge before deploy.
+
 ## 2026-10-08 — SMS-test fake disk left firing until 2026-10-15 (deliberate)
 
 - The operator is keeping `host="smstest"` (Pushgateway job `k3dm-disk-smstest`) firing for a week as interview material. It re-texts about once a day. **Do not treat `HostDiskSpaceCritical{host=smstest}` as a real disk alert.**
