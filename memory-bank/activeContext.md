@@ -1,3 +1,13 @@
+## 2026-10-08 — Payment CVE: Option A (Spring Boot 4) chosen; two-phase spec; SMS proof PASSED
+
+- **SMS proof PASSED:** fake `host=smstest` → HostDiskSpaceCritical firing 20:08:30 → receiver `sms-critical` → sent 20:13:17 (email counter 21→22, failed 0; the 5m `group_wait` is why it took ~5m after firing) → the operator got the text. Cleanup DELETE pending (operator).
+- The operator chose **Option A** and to **port rabbitmq-client** (not drop it). Spec appended to `docs/bugs/2026-10-08-payment-spring-webmvc-cve-no-oss-6x-fix.md`:
+  - Phase 1: rabbitmq-client-java 1.1.0 on Boot 4.0.8 / Spring Cloud 2025.1.3, branch `feat/spring-boot-4`.
+  - Phase 2: payment on Boot 4.0.8 with rabbitmq-client 1.1.0, branch `feat/spring-boot-4`.
+  - Traps called out: the `jackson-bom.version` override now means Jackson 3; drop the Tomcat 10/Netty 4.1 overrides; a bare `flyway-core` stops auto-configuring in Boot 4; health classes moved to `org.springframework.boot.health.contributor`.
+- The CVE Auto-Patch dashboard's "Critical CVE Alerts Firing 40" counts all `TrivyCriticalVulnerabilityDetected` alerts (39 upstream warning + 1 payment critical). The payment CVE is visible in the "Shopping-cart Unique CVEs" table. Offered to split the stat (not done).
+- Next: dispatch Phase 1 to Codex → verify → library PR (operator go) → publish → Phase 2.
+
 ## 2026-10-08 — Payment critical CVE investigated; bug filed; `none` severity explained
 
 - The only critical alert (`TrivyCriticalVulnerabilityDetected`, ubuntu-hostinger, `wilddog64/shopping-cart-payment`) is **CVE-2026-47884**, `spring-webmvc` 6.2.19, XsltView RCE (CVSS 9.8). There is **no open-source fix on Spring 6.x**; it is fixed only in 7.0.9 (Spring Boot 4). We already ship the newest 6.2.19 / Boot 3.5.16, and the deployed `sha-e3b6f06` is the newest payment build. Payment never uses XsltView. The alert does NOT go to SMS; it goes to cve-remediate + analyze. It has fired the whole 48h window.
