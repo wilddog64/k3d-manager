@@ -1,3 +1,10 @@
+## 2026-10-09 ~14:00 UTC — Hostinger payment restored; shopping-cart PRs open
+
+- Operator ran `make shopping-cart-credential-drift` + `APPLY=1`: postgres-orders/products/payment, rabbitmq, redis-cart, redis-orders-cache all FIXED; order, product-catalog, payment, basket restarted and Running.
+- payment-service on `2d930a93…2876`: Flyway connected, app started 13:54 UTC. VulnerabilityReport/Trivy alert check pending (new report not yet written).
+- PRs open: shopping-cart-frontend #115 (Prettier fix `b2f7b5b5`, CI re-running), shopping-cart-infra #108 (CI green). Copilot: approval recommended, 0 findings on both. Rulesets — user merges.
+- Still open: what rewrote Vault/ESO shopping-cart values at 11:47 UTC.
+
 ## 2026-10-09 — P2/P3 Codex batch: all Claude-verified
 
 - istio-cni `350fac28`; ACG deregister `209addbe` + Claude cleanup `cbd2f564` (removed a test-only
