@@ -1,3 +1,12 @@
+## 2026-10-08 — Claude verified hub snapshot round 5 (`e3040689`)
+
+- Codex `e3040689`/`a416dff2`/`d718c674` on origin; scope = hub_snapshot.sh, hub_recovery.sh, 2 bats, howto, bug doc, memory-bank.
+- GREEN: hub_snapshot + hub_recovery + cluster_down + cluster_status_summary bats 109/109. shellcheck: only pre-existing SC1091 info in hub_recovery.sh. `trivy` count 0 in both plugins.
+- RED: against `fbebe9df` plugins, the new rsync-staging, failing-rsync and seven-claim tests fail (temp worktree).
+- Minor (queued for Codex with the status UNKNOWN-path item): the final remote `mv .INCOMPLETE → <ts>` exit status is unchecked. If it fails, the stamp is still written and "captured" printed, while the M2 copy stays `.INCOMPLETE`. The guard stays safe; only the local status line would be wrong.
+- Operator renamed tonight's partial to `20261009T014249Z.INCOMPLETE`. Delete it after round 5 is live-verified: `ssh m2jump 'rm -rf k3dm-snapshots/20261009T014249Z.INCOMPLETE'`.
+- NEXT: operator reruns `make snapshot` (~3.3 GB, 7 claims), then `make status CLUSTER_PROVIDER=k3s-hostinger`.
+
 ## 2026-10-08 — make snapshot round 5: capture LIVE-VERIFIED, upload cancelled; Trivy drop + atomic rename to Codex
 
 - Live (tmux): tar capture of server-db + 8 claims OK in ~2 min (4.7 GB); rsync to m2jump at ~3.8 MB/s; operator cancelled at ~2.0 GB.
