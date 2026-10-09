@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — spec ready for Codex
+**Status:** FIXED `8bd03a4f` 2026-10-09 (Codex via parallel worktree dispatch; Claude fixed first-check output, timing validation, if-count refactor; 6/6 BATS, 2 mutations red)
 **Priority:** P3 — false failure on a required release step; the real state is correct
 **Severity:** low
 
