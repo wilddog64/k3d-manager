@@ -1,3 +1,7 @@
+## 2026-10-09 — Hostinger istio-cni recovered (verified)
+- Operator ran `make refresh CLUSTER_PROVIDER=k3s-hostinger`. App values now rancher dirs; app Synced/Healthy; `istio-cni-node` 1/1 (`istio-cni-node-rv94s`).
+- Bug doc stays OPEN: apply-path trace + `ArgoCDAppProgressingStuck` alert still to spec.
+
 ## 2026-10-09 — stale ubuntu-k3s registration cleaned (verified)
 - Operator ran `make cleanup-stale-registration CLUSTER=ubuntu-k3s CONFIRM=1`: removed `cluster-ubuntu-k3s` + 10 apps.
 - Claude verified: hub cluster Secrets now only `cluster-ubuntu-hostinger` + `ubuntu-k3s-app-cluster` (hub); no app targets `ubuntu-k3s` or `host.k3d.internal`; none regenerated. Automatic deregister (bug doc) still OPEN.

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator saw `istio-cni-ubuntu-hostinger` spinning in ArgoCD)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** OPEN — filed; root cause of the bad apply not yet traced
+**Status:** OPEN — recovered 2026-10-09 by `make refresh`; root cause of the bad apply not yet traced, no alert yet
 **Priority:** P2 — ambient still works, but the CNI plugin is not chained, and nothing alerts
 **Severity:** Medium
 **Component:**
@@ -84,6 +84,16 @@ Verify afterwards:
 - The Application values show `/var/lib/rancher/...`.
 - `istio-cni-node` is 1/1.
 - The app is Healthy.
+
+### Recovery result (2026-10-09)
+
+The operator ran `make refresh CLUSTER_PROVIDER=k3s-hostinger`. Claude verified:
+- The Application values are now `cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d` and
+  `cniBinDir: /var/lib/rancher/k3s/data/cni`.
+- The app is `Synced` / `Healthy`.
+- DaemonSet `istio-cni-node` is 1/1 (new pod `istio-cni-node-rv94s`, 0 restarts).
+
+The next hub rebuild can reintroduce the generic dirs until fix item 1 lands.
 
 ## What NOT to do
 
