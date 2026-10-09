@@ -15,6 +15,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  alertmanager-behaviour:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pytest and PyYAML
+        run: python3 -m pip install --user pytest==9.1.1 PyYAML==6.0.2
+
+      - name: Run Alertmanager behaviour test
+        run: make test-alertmanager-behaviour
+
   lint:
     if: >-
       ${{ github.event.pull_request.head.repo.full_name == github.repository }}
