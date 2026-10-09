@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude (operator: "let's do that at v1.44.0. text is free so that's fine")
 **Branch:** target **v1.44.0**. Bug docs are exempt from the 5-plan cap; v1.44.0 already has 5 plan files.
-**Status:** IMPLEMENTED — items 1–5 on k3d-manager-v1.42.0; live verification pending (operator)
+**Status:** IMPLEMENTED — items 1–5 on k3d-manager-v1.42.0. Live 2026-10-09: the operator ran `make alertmanager-config`, and the hub Alertmanager `/api/v2/status` reads `send_resolved: true` for `sms-critical` and `platform-warning` (live verification steps 1–2). Steps 3–4 remain: the `[RESOLVED]` text arrives when the `k3dm-disk-smstest` job is deleted on 2026-10-15.
 **Priority:** P2 — a page with no "all clear" means checking a dashboard to learn a problem ended
 **Severity:** Medium
 **Component:** `scripts/etc/prometheus/alertmanager.yaml.tmpl`, new behaviour test, `scripts/plugins/observability.sh` (apply path)

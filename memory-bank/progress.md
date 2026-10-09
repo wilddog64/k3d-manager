@@ -1,3 +1,7 @@
+<!-- 2026-10-09 frontend repin + alertmanager-config live -->
+- **2026-10-09: frontend repin deployed** (user's go). `ce21efda` repins Hostinger's frontend to `sha256:17f46a0d…` (`sha-05ec17e`). ArgoCD auto-synced, the rollout completed, and the public 200 response carries "Login took too long" in the bundle. Login-callback A and Tailwind v4 are now live.
+- **2026-10-09: SMS live.** The operator ran `make alertmanager-config`. The live config has `send_resolved: true` for `sms-critical` and `platform-warning`. The `[RESOLVED]` text will be proven by the smstest delete on 2026-10-15.
+
 <!-- 2026-10-09 v1.42.0 bug closure, round 2 -->
 - **2026-10-09: v1.42.0 bug closure, round 2.**
   - **SMS item 4:** Codex `ea72ba1e` (`make alertmanager-config`, one `_observability_apply_alertmanager_config`). Claude verified it: shellcheck clean, 89 BATS ok, 1 render site, no credential export. The operator still needs to run `make alertmanager-config`.
