@@ -1,3 +1,5 @@
+- **2026-10-09 appsets reapply done + make targets dispatched:** operator reapplied 13/13 sets on v1.42.0; `hub-vectordb` + `hub-platform-ops` now v1.42.0 Synced/Healthy, check clean (21 refs). Spec for `make appsets-reapply` (release-branch guard) + `make appsets-check` appended to `docs/bugs/2026-09-30-release-config-inert-until-applicationsets-reapplied.md` (recurrence section); CLAUDE.md release rule points at the targets. Dispatched to Codex.
+
 ## 2026-10-09 — hub-vectordb + hub-platform-ops still on v1.41.0
 - `argocd_check_values_branch k3d-manager-v1.42.0`: 21 refs checked, 2 stale (hub-platform-ops, hub-vectordb). Both appsets last applied 2026-10-03 15:58; v1.42.0 sets were applied one at a time, never as a full set.
 - v1.41→v1.42 delta: vectordb none; platform-ops = dashboards (host-disk new, alertmanager-delivery, argocd, cve-autopatch, vectordb) + prometheusrule (+10).
