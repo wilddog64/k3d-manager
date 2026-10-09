@@ -1,3 +1,10 @@
+## 2026-10-09 — ArgoCD recovered; v1.43.0 spec gains the per-release bug tally and count routing
+
+- The operator ran `docker restart k3d-k3d-cluster-agent-0`. Verified: agent-0 `/proxy/healthz` returns `ok`, all nodes are Ready, all 13 agent-0 pods are Running, the argocd-pf log says "healthz reachable", local :8080 and public argocd both return 200, `probe_success` is 1, and the `PublicEndpointDown` alert cleared.
+- `docs/plans/v1.43.0-bug-priority-tracking.md` gains item 8 (`scripts/bug-tally.py` and `make bug-tally`: the release comes from the `**Branch:**` line, else the lowest tag containing the commit that added the doc, else the current `k3d-manager-v*` branch) and item 9 (`bug_count.match`/`reply`, which intercepts count questions in `ask_docs.answer` and `_run_cluster_ask` before any model or agent runs).
+- Trigger: in Slack, Codex answered "3 bugs fixed in v1.42.0". Actual: 35 docs, about 24 fixed, 3 open, 8 with no Status line.
+- Still pending: the Trivy check for payment #84, then the `enforce_admins` disable.
+
 ## 2026-10-09 — ArgoCD public 502: agent-0 kubelet tunnel dead; watchdog treats it as advisory (bug filed)
 
 - An SMS `PublicEndpointDown` fired for argocd.3ai-talk.org (502). The API server can't dial agent-0's kubelet (`proxy error ... 192.168.97.4:10250, code 502`); the other nodes are fine and all are Ready. The argocd-pf supervisor is looping.
