@@ -1059,6 +1059,8 @@ remaining blocker.
 - 2026-10-08: Bug priority tracking added to docs/roadmap.md as v1.43.0 candidate; spec QUEUED, dispatch to Codex when k3d-manager-v1.43.0 opens.
 
 - 2026-10-08: Spec docs/plans/v1.43.0-hermes-r10-delete-superseded-failed-job.md (superseded_jobs sensor + R10 approval-gated, target-pinned). v1.43.0 now at 5-plan cap; roadmap updated.
+
+2026-10-08: Hub teardown guard round 2 fixed in `32395370`; status recorded in `ca8db0d9`; live verification pending (operator).
 ## 2026-10-08 — September bug-doc triage completed
 
 Triaged all 19 requested September bug docs on `k3d-manager-v1.42.0`; status counts: 16 FIXED, 2 PARTIAL, 0 OPEN, 1 UNKNOWN. Docs commit `fbdf1c23` is pushed; `make check-doc-links` passed (`19 file(s) OK`). PR URL: none.
