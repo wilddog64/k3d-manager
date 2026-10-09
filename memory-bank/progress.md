@@ -1680,3 +1680,4 @@ the next CI run is pending.
 ## 2026-10-08 — September bug-doc triage completed
 
 Added one evidence-backed Status line to each of the 19 requested September bug docs. Counts: 16 FIXED, 2 PARTIAL, 0 OPEN, 1 UNKNOWN. Docs commit `fbdf1c23` is pushed; `make check-doc-links` passed (`19 file(s) OK`). PR URL: none.
+2026-10-08: Hub snapshot deletion guard, status freshness, and PV Retain target committed in fa3340bc; live verification pending (Codex).
