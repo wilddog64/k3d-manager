@@ -1,3 +1,5 @@
+- 2026-10-09: codex-dispatch stdout-hold bug FIXED `50fdf67b` (third worktree dispatch). Background subshell now `</dev/null >/dev/null 2>&1 &`; new BATS test (piped start returns < 3s). Claude verified 18/18, shellcheck clean, removing redirect -> test red. Dispatcher work complete; piping `start` is safe now. Next: `## Files` tables for bug-priority-tracking + appsets bugs, then parallel dispatch. Pending: user's Alertmanager-delivery-dashboard ChatGPT critique (images #53/#54 not visible to Claude — re-share needed).
+
 ## 2026-10-09 — codex-dispatch scope fix LANDED (774747ac); stdout-hold bug filed
 
 - Scope now comes from the spec as dispatched (`<run>/base` + `git show base:spec`); editing the spec is out of scope; scope diff from base. 17/17 BATS, both mutations red (Claude-run in the task worktree). Landed with the fixed tool.

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — dispatch via `make codex-dispatch`
+**Status:** FIXED `50fdf67b` 2026-10-09 (Codex via worktree dispatch; Claude verified 18/18 BATS, shellcheck clean, mutation red)
 **Priority:** P3 — `start` appears to hang when its output is piped; the run itself is fine
 **Severity:** low
 
