@@ -47,8 +47,8 @@ _run_deregister() {
   [ "${status}" -eq 0 ]
   grep -q 'delete application/ubuntu-k3s-order' "${CALL_LOG}"
   grep -q 'delete application/ubuntu-k3s-eso' "${CALL_LOG}"
-  ! grep -q 'delete application/k3d-cluster-eso' "${CALL_LOG}"
-  ! grep -q 'delete application/ubuntu-hostinger-platform' "${CALL_LOG}"
+  run ! grep -q 'delete application/k3d-cluster-eso' "${CALL_LOG}"
+  run ! grep -q 'delete application/ubuntu-hostinger-platform' "${CALL_LOG}"
 }
 
 @test "Secret is deleted before the first Application" {
@@ -76,7 +76,7 @@ STUB
   chmod +x "${STUB_BIN}/kubectl"
   run _run_deregister
   [ "${status}" -eq 0 ]
-  ! grep -q 'delete application/k3d-cluster-eso' "${CALL_LOG}"
+  run ! grep -q 'delete application/k3d-cluster-eso' "${CALL_LOG}"
 }
 
 @test "cluster-down keep-hub guard protects the Vault LaunchAgent" {

@@ -170,7 +170,7 @@ EOF
   run deploy_observability_acg
   [ "$status" -eq 0 ]
   [[ -f "${envsubst_log}" ]]
-  [[ "$output" == *"Alertmanager config secret created on ACG (ubuntu-hostinger)"* ]]
+  [[ "$output" == *"Alertmanager config secret applied on ACG (ubuntu-hostinger)"* ]]
   [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
   [[ "$output" == *"Alertmanager login credentials ready"* ]]
   [[ "$output" == *"Alertmanager port-forward agent installed"* ]]
