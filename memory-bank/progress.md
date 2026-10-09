@@ -1,3 +1,9 @@
+## 2026-10-09 — hub-vectordb + hub-platform-ops still on v1.41.0
+- `argocd_check_values_branch k3d-manager-v1.42.0`: 21 refs checked, 2 stale (hub-platform-ops, hub-vectordb). Both appsets last applied 2026-10-03 15:58; v1.42.0 sets were applied one at a time, never as a full set.
+- v1.41→v1.42 delta: vectordb none; platform-ops = dashboards (host-disk new, alertmanager-delivery, argocd, cve-autopatch, vectordb) + prometheusrule (+10).
+- Operator fix: `K3D_MANAGER_BRANCH=k3d-manager-v1.42.0 ./scripts/k3d-manager deploy_argocd_applicationsets --confirm` (then re-run the check).
+- Lead for the 11:47 UTC Vault/ESO rewrite: appset `services-git` was kubectl-applied at 2026-10-09T11:46:41Z.
+
 ## 2026-10-09 — sc-infra PR #109 MERGED `7028ae5` (postgres-keycloak Recreate)
 - PRs merged: sc-infra #109 `7028ae5`. enforce_admins restored (bodyless POST → true). Local sc-infra main synced. Fix branch, stays [Unreleased] — no tag.
 - Hub synced: strategy Recreate confirmed live, pod `897bc7b6c-sv6q6` untouched.
