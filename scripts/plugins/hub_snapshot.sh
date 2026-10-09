@@ -49,7 +49,12 @@ function _hub_snapshot_claim_path() {
 
 function _hub_snapshot_copy() {
   local _container="$1" _source="$2" _destination="$3"
-  _run_command -- docker cp "${_container}:${_source}/." "$_destination"
+  _run_command -- docker exec "$_container" tar -C "$_source" -cf - . > "$_destination"
+}
+
+function _hub_snapshot_copy_token() {
+  local _container="$1" _source="$2" _destination="$3"
+  _run_command -- docker exec "$_container" cat "$_source" > "$_destination"
 }
 
 function _hub_snapshot_manifest() {
@@ -147,10 +152,9 @@ function hub_snapshot_capture() {
     _err "[hub-snapshot] M2 host ${K3DM_SNAPSHOT_HOST} is unreachable"
     return 1
   fi
-  _run_command -- mkdir -p "${_stage}/server-db"
   _container="$(_hub_snapshot_node_container server-0)"
-  _hub_snapshot_copy "$_container" /var/lib/rancher/k3s/server/db "${_stage}/server-db" || return 1
-  _run_command -- docker cp "${_container}:/var/lib/rancher/k3s/server/token" "${_stage}/server-token" || return 1
+  _hub_snapshot_copy "$_container" /var/lib/rancher/k3s/server/db "${_stage}/server-db.tar" || return 1
+  _hub_snapshot_copy_token "$_container" /var/lib/rancher/k3s/server/token "${_stage}/server-token" || return 1
   _kubectl --context "$K3DM_SNAPSHOT_CONTEXT" get pv,pvc -A -o yaml > "${_stage}/pv-pvc.yaml"
   while IFS='|' read -r _node _namespace _claim _storage; do
     _pv="$(_hub_snapshot_claim_pv "$_namespace" "$_claim")" || return 1
@@ -161,8 +165,8 @@ function hub_snapshot_capture() {
     [[ -n "$_path" ]] || { _err "[hub-snapshot] local path missing for ${_namespace}/${_claim}"; return 1; }
     _node="$(_hub_recovery_logical_node "$_node")" || return 1
     _container="$(_hub_snapshot_node_container "$_node")"
-    _run_command -- mkdir -p "${_stage}/${_storage}/pvc-${_uid}_${_namespace}_${_claim}"
-    _hub_snapshot_copy "$_container" "$_path" "${_stage}/${_storage}/pvc-${_uid}_${_namespace}_${_claim}" || return 1
+    _run_command -- mkdir -p "${_stage}/${_storage}"
+    _hub_snapshot_copy "$_container" "$_path" "${_stage}/${_storage}/pvc-${_uid}_${_namespace}_${_claim}.tar" || return 1
     _hub_snapshot_manifest "$_stage" "$_node" "$_namespace" "$_claim" "$_storage" "$_uid"
   done < <(_hub_recovery_records)
   _hub_snapshot_checksums "$_stage"

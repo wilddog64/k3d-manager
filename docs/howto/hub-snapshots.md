@@ -27,6 +27,12 @@ directory with:
 Capture is intentionally not wired into `make down` or `make up`; run it
 explicitly while the hub is available and before teardown.
 
+Each claim is stored as `<claim-dir>.tar`, captured by `tar` inside its node
+container. The archive preserves owner, mode, and setgid bits; the host does
+not apply those attributes. Restore extracts it inside the node with
+`docker exec -i <node> tar -C <path> -xpf -`. Restore itself remains the
+v1.43.0 DR drill's scope.
+
 Deleting the local Hub is guarded by the newest verified M2 snapshot. The
 snapshot must be no older than 24 hours; otherwise `--delete-hub` refuses
 before any teardown starts. `make down DELETE_HUB=1` therefore requires a

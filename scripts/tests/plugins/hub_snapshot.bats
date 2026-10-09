@@ -62,19 +62,21 @@ setup() {
   }
   cat > "$BATS_TEST_TMPDIR/bin/docker" <<'EOF'
 #!/usr/bin/env bash
+set -euo pipefail
 echo "docker $*" >> "$DOCKER_LOG"
 [[ "${DOCKER_FAIL:-0}" == 1 ]] && exit 1
-destination="${@: -1}"
-source_path="${@: -2:1}"
-if [[ "$source_path" == *:/var/lib/rancher/k3s/server/token ]]; then
-  printf 'server-token-stub\n' > "$destination"
+if [[ "${1:-}" == exec && "${3:-}" == tar ]]; then
+  source_path="${5:-}"
+  fixture="${TAR_FIXTURE_DIR:-}"
+  [[ -n "$fixture" ]] || { echo "missing tar fixture" >&2; exit 1; }
+  fixture="${fixture}/${source_path##*/}"
+  fixture="${fixture/pv-/}"
+  tar -C "$fixture" -cf - .
+elif [[ "${1:-}" == exec && "${3:-}" == cat ]]; then
+  printf 'server-token-stub\n'
 else
-  mkdir -p "$destination"
-  if [[ "$source_path" == *:/var/lib/rancher/k3s/server/db/. ]]; then
-    printf 'captured-data\n' > "$destination/state.db"
-  else
-    printf 'captured-data\n' > "$destination/data"
-  fi
+  echo "unexpected docker command" >&2
+  exit 1
 fi
 EOF
   cat > "$BATS_TEST_TMPDIR/bin/rsync" <<'EOF'
@@ -114,6 +116,17 @@ exit 0
 EOF
   chmod +x "$BATS_TEST_TMPDIR/bin"/*
   export PATH="$BATS_TEST_TMPDIR/bin:$PATH" PATCH_LOG="$BATS_TEST_TMPDIR/patch.log"
+  export TAR_FIXTURE_DIR="$BATS_TEST_TMPDIR/fixtures"
+  mkdir -p "$TAR_FIXTURE_DIR/db" "$TAR_FIXTURE_DIR/data-vault-0" "$TAR_FIXTURE_DIR/postgres-keycloak-pvc" "$TAR_FIXTURE_DIR/ldap-data-pvc" "$TAR_FIXTURE_DIR/data-openldap-0" "$TAR_FIXTURE_DIR/ldap-config-pvc" "$TAR_FIXTURE_DIR/data-trivy-server-0" "$TAR_FIXTURE_DIR/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0" "$TAR_FIXTURE_DIR/storage-loki-0"
+  printf 'db fixture\n' > "$TAR_FIXTURE_DIR/db/state.db"
+  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/data-vault-0/raft"
+  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/postgres-keycloak-pvc/data"
+  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/ldap-data-pvc/data"
+  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/data-openldap-0/data"
+  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/ldap-config-pvc/data"
+  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/data-trivy-server-0/data"
+  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0/data"
+  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/storage-loki-0/data"
   : > "$PATCH_LOG"
   source "$SCRIPT_DIR/plugins/hub_snapshot.sh"
 }
@@ -176,18 +189,25 @@ PY
 
 @test "hub snapshot: capture emits the restore layout" {
   capture_snapshot
-  for path in server-db/state.db server-token pv-pvc.yaml; do [ -e "$CAPTURED/$path" ]; done
+  for path in server-db.tar server-token pv-pvc.yaml; do [ -e "$CAPTURED/$path" ]; done
   while IFS='|' read -r _node namespace claim storage; do
-    [ "$(find "$CAPTURED/$storage" -mindepth 1 -maxdepth 1 -type d -name "pvc-*_${namespace}_${claim}" | wc -l | tr -d ' ')" -eq 1 ]
+    [ "$(find "$CAPTURED/$storage" -mindepth 1 -maxdepth 1 -type f -name "pvc-*_${namespace}_${claim}.tar" | wc -l | tr -d ' ')" -eq 1 ]
   done < <(_hub_recovery_records)
 }
 
 @test "hub snapshot: tree names satisfy hub recovery claim tree" {
   capture_snapshot
   while IFS='|' read -r _node namespace claim storage; do
-    run _hub_recovery_claim_tree "$CAPTURED" "$namespace" "$claim" "$storage"
+    run test -f "$CAPTURED/$storage/$(find "$CAPTURED/$storage" -mindepth 1 -maxdepth 1 -type f -name "pvc-*_${namespace}_${claim}.tar" -exec basename {} \;)"
     [ "$status" -eq 0 ]
   done < <(_hub_recovery_records)
+}
+
+@test "hub snapshot: claim archive lists fixture files" {
+  capture_snapshot
+  run tar -tf "$CAPTURED/node-server-0-storage/pvc-uid-data-vault-0_secrets_data-vault-0.tar"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"./raft"* ]]
 }
 
 @test "hub snapshot: node placement comes from the PV" {
@@ -198,10 +218,12 @@ PY
 
 @test "hub snapshot: PV hostname maps to one logical docker container" {
   capture_snapshot
-  run grep -F 'docker cp k3d-k3d-cluster-agent-1:' "$DOCKER_LOG"
+  run grep -F 'docker exec k3d-k3d-cluster-agent-1 tar' "$DOCKER_LOG"
   [ "$status" -eq 0 ]
   run grep -F 'k3d-k3d-cluster-k3d-' "$DOCKER_LOG"
   [ "$status" -ne 0 ]
+  run grep -c 'docker cp' "$DOCKER_LOG"
+  [ "$output" -eq 0 ]
 }
 
 @test "hub snapshot: unbound claim fails closed" {
