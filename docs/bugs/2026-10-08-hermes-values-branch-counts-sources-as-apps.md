@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08
 **Branch:** k3d-manager-v1.42.0
-**Status:** OPEN — spec ready for Codex
+**Status:** FIXED in branch `895221cb` — live verification pending (Claude)
 **Severity:** Low — misleading scope in an operator warning
 **Component:** scripts/lib/hermes/sensors.py:values_branch
 
