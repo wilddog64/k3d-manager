@@ -72,11 +72,6 @@ function _hub_snapshot_checksums() {
   done < <(find "$_stage" -type f ! -name SHA256SUMS -print | sort)
 }
 
-function _hub_snapshot_remote_mark_incomplete() {
-  local _remote="$1"
-  _hub_snapshot_ssh "mv -- '${_remote}' '${_remote}.INCOMPLETE'" || _warn "[hub-snapshot] could not mark ${_remote} incomplete"
-}
-
 function _hub_snapshot_age_hours() {
   local _name="$1"
   python3 -c 'import datetime, sys
@@ -170,13 +165,16 @@ function hub_snapshot_capture() {
     _hub_snapshot_manifest "$_stage" "$_node" "$_namespace" "$_claim" "$_storage" "$_uid"
   done < <(_hub_recovery_records)
   _hub_snapshot_checksums "$_stage"
-  _hub_snapshot_ssh "mkdir -p '$K3DM_SNAPSHOT_DIR' '$_remote'"
-  _run_command -- rsync -a -e "ssh -o BatchMode=yes -o ConnectTimeout=10" "${_stage}/" "${K3DM_SNAPSHOT_HOST}:${_remote}/"
-  if ! _hub_snapshot_ssh "cd '$_remote' && sha256sum -c SHA256SUMS"; then
-    _hub_snapshot_remote_mark_incomplete "$_remote"
+  _hub_snapshot_ssh "mkdir -p '$K3DM_SNAPSHOT_DIR' '${_remote}.INCOMPLETE'"
+  if ! _run_command -- rsync -a -e "ssh -o BatchMode=yes -o ConnectTimeout=10" "${_stage}/" "${K3DM_SNAPSHOT_HOST}:${_remote}.INCOMPLETE/"; then
+    _err "[hub-snapshot] rsync upload failed for ${_timestamp}; left ${_remote}.INCOMPLETE"
+    return 1
+  fi
+  if ! _hub_snapshot_ssh "cd '${_remote}.INCOMPLETE' && sha256sum -c SHA256SUMS"; then
     _err "[hub-snapshot] checksum verification failed for ${_timestamp}"
     return 1
   fi
+  _hub_snapshot_ssh "mv -- '${_remote}.INCOMPLETE' '${_remote}'"
   _run_command -- mkdir -p "$(dirname "$K3DM_SNAPSHOT_STAMP")"
   printf '%s\n' "$_timestamp" > "$K3DM_SNAPSHOT_STAMP"
   _info "[hub-snapshot] captured ${_timestamp} to ${K3DM_SNAPSHOT_HOST}:${_remote}"

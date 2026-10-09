@@ -2,8 +2,8 @@
 
 Use `make snapshot` before a planned hub rebuild to copy the cold hub state to
 the M2 store. The capture includes k3s server state, PV/PVC metadata, Vault's
-file-backed data, Prometheus, Loki, Keycloak Postgres, OpenLDAP, and Trivy
-local-path trees. It uses the existing `E2E_M2_SSH_HOST` alias; override it
+file-backed data, Prometheus, Loki, Keycloak Postgres, and OpenLDAP local-path
+trees. It uses the existing `E2E_M2_SSH_HOST` alias; override it
 with `K3DM_SNAPSHOT_HOST` or set `K3DM_SNAPSHOT_DIR` for another remote store.
 
 `make snapshot-list` reports each timestamp, size, and verified/incomplete
@@ -55,3 +55,14 @@ and continues processing after a missing PVC. Retain protects data from PVC
 deletion only. `k3d cluster delete` removes node containers and their
 storage regardless, so the delete guard remains necessary. A rebuilt Hub
 creates PVs with `Delete`, so rerun the target after rebuilding.
+
+The seven captured claims are `data-vault-0`, `postgres-keycloak-pvc`,
+`ldap-data-pvc`, `data-openldap-0`, `ldap-config-pvc`, the Prometheus data
+claim, and `storage-loki-0`. The Trivy database is deliberately excluded
+because it is a re-downloadable cache; vulnerability reports are already
+preserved in `server-db.tar`.
+
+Uploads first use `<timestamp>.INCOMPLETE/`. A snapshot is renamed to the bare
+timestamp only after the remote `sha256sum -c SHA256SUMS` succeeds. Failed or
+interrupted uploads therefore remain visibly incomplete and cannot satisfy the
+verified-snapshot guard.

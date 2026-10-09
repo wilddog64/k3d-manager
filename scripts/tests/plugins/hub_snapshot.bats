@@ -10,10 +10,12 @@ setup() {
   export K3DM_SNAPSHOT_MAX_AGE_HOURS=24
   export TMPDIR="$BATS_TEST_TMPDIR/staging"
   export SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
+  export RSYNC_LOG="$BATS_TEST_TMPDIR/rsync.log"
   export DOCKER_LOG="$BATS_TEST_TMPDIR/docker.log"
   export DOCKER_FAIL=0 NO_BOUND= SHA_MISMATCH=0
   mkdir -p "$K3DM_SNAPSHOT_DIR" "$TMPDIR" "$BATS_TEST_TMPDIR/bin"
   : > "$SSH_LOG"
+  : > "$RSYNC_LOG"
   _err() { printf '%s\n' "$*" >&2; }
   _warn() { printf '%s\n' "$*" >&2; }
   _info() { printf '%s\n' "$*"; }
@@ -81,6 +83,8 @@ fi
 EOF
   cat > "$BATS_TEST_TMPDIR/bin/rsync" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' "${@: -1}" >> "$RSYNC_LOG"
+[[ "${RSYNC_RC:-0}" == 1 ]] && exit 1
 source_path="${@: -2:1}"
 destination="${@: -1}"
 destination="${destination#*:}"
@@ -117,14 +121,13 @@ EOF
   chmod +x "$BATS_TEST_TMPDIR/bin"/*
   export PATH="$BATS_TEST_TMPDIR/bin:$PATH" PATCH_LOG="$BATS_TEST_TMPDIR/patch.log"
   export TAR_FIXTURE_DIR="$BATS_TEST_TMPDIR/fixtures"
-  mkdir -p "$TAR_FIXTURE_DIR/db" "$TAR_FIXTURE_DIR/data-vault-0" "$TAR_FIXTURE_DIR/postgres-keycloak-pvc" "$TAR_FIXTURE_DIR/ldap-data-pvc" "$TAR_FIXTURE_DIR/data-openldap-0" "$TAR_FIXTURE_DIR/ldap-config-pvc" "$TAR_FIXTURE_DIR/data-trivy-server-0" "$TAR_FIXTURE_DIR/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0" "$TAR_FIXTURE_DIR/storage-loki-0"
+  mkdir -p "$TAR_FIXTURE_DIR/db" "$TAR_FIXTURE_DIR/data-vault-0" "$TAR_FIXTURE_DIR/postgres-keycloak-pvc" "$TAR_FIXTURE_DIR/ldap-data-pvc" "$TAR_FIXTURE_DIR/data-openldap-0" "$TAR_FIXTURE_DIR/ldap-config-pvc" "$TAR_FIXTURE_DIR/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0" "$TAR_FIXTURE_DIR/storage-loki-0"
   printf 'db fixture\n' > "$TAR_FIXTURE_DIR/db/state.db"
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/data-vault-0/raft"
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/postgres-keycloak-pvc/data"
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/ldap-data-pvc/data"
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/data-openldap-0/data"
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/ldap-config-pvc/data"
-  printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/data-trivy-server-0/data"
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0/data"
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/storage-loki-0/data"
   : > "$PATCH_LOG"
@@ -242,6 +245,26 @@ PY
   export SHA_MISMATCH=1
   run hub_snapshot_capture
   [ "$status" -ne 0 ]; [ -d "$K3DM_SNAPSHOT_DIR/${K3DM_SNAPSHOT_TIMESTAMP}.INCOMPLETE" ]
+  [ ! -e "$K3DM_SNAPSHOT_STAMP" ]
+}
+
+@test "hub snapshot: rsync stages under incomplete and renames after verification" {
+  capture_snapshot
+  run grep -F ":${K3DM_SNAPSHOT_DIR}/${K3DM_SNAPSHOT_TIMESTAMP}.INCOMPLETE/" "$RSYNC_LOG"
+  [ "$status" -eq 0 ]
+  run grep -n -E "sha256sum -c|mv --" "$SSH_LOG"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p' | cut -d: -f1)" -lt "$(printf '%s\n' "$output" | sed -n '2p' | cut -d: -f1)" ]
+}
+
+@test "hub snapshot: failing rsync leaves incomplete without rename or stamp" {
+  export RSYNC_RC=1
+  run hub_snapshot_capture
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"rsync upload failed"* ]]
+  [ -d "$K3DM_SNAPSHOT_DIR/${K3DM_SNAPSHOT_TIMESTAMP}.INCOMPLETE" ]
+  run grep -F "mv -- '${K3DM_SNAPSHOT_DIR}/${K3DM_SNAPSHOT_TIMESTAMP}.INCOMPLETE' '${K3DM_SNAPSHOT_DIR}/${K3DM_SNAPSHOT_TIMESTAMP}'" "$SSH_LOG"
+  [ "$status" -ne 0 ]
   [ ! -e "$K3DM_SNAPSHOT_STAMP" ]
 }
 

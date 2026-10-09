@@ -45,10 +45,17 @@ YAML
   done < <(_hub_recovery_records)
 }
 
-@test "hub_recovery_validate: accepts the complete eight-claim source map" {
+@test "hub recovery records: maps seven restorable claims without Trivy" {
+  run _hub_recovery_records
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 7 ]
+  [[ "$output" != *trivy* ]]
+}
+
+@test "hub_recovery_validate: accepts the complete seven-claim source map" {
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"8 logical claims"* ]]
+  [[ "$output" == *"7 logical claims"* ]]
 }
 
 @test "_hub_recovery_sync_vault_root_token: accepts a matching Keychain read-back" {
@@ -113,20 +120,13 @@ YAML
 @test "hub_recovery_plan: emits the dependency map by logical claim" {
   run hub_recovery_plan "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 8 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 7 ]
   [[ "$output" == *"node=server-0 claim=secrets/data-vault-0"* ]]
   [[ "$output" == *"node=agent-1 claim=identity/postgres-keycloak-pvc"* ]]
 }
 
-@test "hub_recovery_validate: rejects a missing captured claim" {
-  rm -rf "$RECOVERY_ROOT/node-agent-2-storage"
-  run hub_recovery_validate "$RECOVERY_ROOT"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"trivy-system/data-trivy-server-0"* ]]
-}
-
 @test "hub_recovery_validate: rejects a duplicate captured claim" {
-  mkdir -p "$RECOVERY_ROOT/node-agent-2-storage/pvc-11111111-1111-1111-1111-111111111111_trivy-system_data-trivy-server-0"
+  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-11111111-1111-1111-1111-111111111111_identity_ldap-data-pvc"
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -ne 0 ]
   [[ "$output" == *"Expected exactly one source tree"* ]]
@@ -136,7 +136,7 @@ YAML
   mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-22222222-2222-2222-2222-222222222222_extra_unknown"
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"expected 8"* ]]
+  [[ "$output" == *"expected 7"* ]]
 }
 
 @test "hub_recovery_validate: ignores files below a mapped PVC root" {
@@ -148,7 +148,7 @@ YAML
 @test "hub_recovery_restore: plans all mapped claims by default" {
   run hub_recovery_restore "$RECOVERY_ROOT" "$TARGETS_FILE"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 8 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 7 ]
   [[ "$output" == *"Dry-run only"* ]]
 }
 
@@ -162,7 +162,7 @@ YAML
 @test "hub_recovery_targets: renders exactly one current PV target per claim" {
   run hub_recovery_targets
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^agent\|^server' )" -eq 8 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^agent\|^server' )" -eq 7 ]
   [[ "$output" == *"server-0|secrets|data-vault-0|k3d-k3d-cluster-server-0|${TARGET_ROOT}/pvc-"* ]]
 }
 
