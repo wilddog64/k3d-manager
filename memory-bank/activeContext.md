@@ -1,3 +1,5 @@
+- 2026-10-09: shopping-cart-infra enforce_admins DISABLED for PR #110 merge (restore with bodyless POST after merge or if deferred). Operator patches the 2 osixia PVs to Delete before merging.
+
 - **2026-10-09 Expired-sandbox reaper designed** (`ffe1de90`): watcher path dropped (acg_watch never started by k3d-manager); launchd reaper with Unknown≥30min (keyed on Secret UID) + CFN/creds gone signal, dry-run first. Awaiting operator choice: auto reaper vs Hermes approval. Next after that: frontend public URL.
 
 - **2026-10-09 SMS recovery (items 1,2,3,5) verified** — Codex `088378ea` (on origin). Claude ran pytest with real Docker: 7/7; RED on pre-fix template: exactly `test_sms_sends_resolved_notification` + `test_resolved_text_templates_render_with_amtool` fail. Item 4 (`make alertmanager-config`) deliberately not done. Live: operator runs `make observability` (only apply path today) before 2026-10-15, then smstest delete should text RESOLVED.
