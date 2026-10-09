@@ -95,6 +95,46 @@ def test_values_branch_debounces_lag_then_stale_and_clears():
     assert clean["status"] == "healthy"
 
 
+def test_values_branch_counts_two_stale_sources_as_one_app():
+    apps = [{"metadata": {"name": "one-app"}, "spec": {"sources": [
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+    ]}}]
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                           lambda *_: (0, json.dumps(apps)), {}, token="x")
+
+    assert result["evidence"].startswith("1 apps (2 source refs) not on")
+    assert result["evidence"].count("one-app@k3d-manager-v1.39.0") == 1
+    assert len(result["data"]["stale"]) == 2
+
+
+def test_values_branch_counts_multiple_apps_and_mixed_sources():
+    apps = [
+        {"metadata": {"name": "one-app"}, "spec": {"sources": [
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.40.0"},
+        ]}},
+        {"metadata": {"name": "two-app"}, "spec": {"source":
+            {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"}}},
+    ]
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                           lambda *_: (0, json.dumps(apps)), {}, token="x")
+
+    assert result["evidence"].startswith("2 apps (2 source refs) not on")
+
+
+def test_values_branch_excludes_head_from_stale_counts():
+    apps = [{"metadata": {"name": "one-app"}, "spec": {"sources": [
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "HEAD"},
+        {"repoURL": "https://github.com/wilddog64/k3d-manager", "targetRevision": "k3d-manager-v1.39.0"},
+    ]}}]
+    result = values_branch(lambda *_: (0, "k3d-manager-v1.40.0"),
+                           lambda *_: (0, json.dumps(apps)), {}, token="x")
+
+    assert result["evidence"].startswith("1 apps (1 source refs) not on")
+    assert result["data"]["tracking_head"] == 1
+
+
 def test_values_branch_nonrelease_is_skipped_and_never_pages(monkeypatch):
     from hermes import pager
     calls = []

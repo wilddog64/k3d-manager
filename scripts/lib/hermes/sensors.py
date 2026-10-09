@@ -172,11 +172,14 @@ def values_branch(run, argocd_run, state, token=None, expected=None, threshold=3
             return record("values_branch", "unknown", "no k3d-manager references found", data=data)
         if stale:
             status = "degraded" if _debounced("values_branch", True, max(1, threshold - 1), state) else "healthy"
-            names = ", ".join(f"{item['app']}@{item['revision']}" for item in stale[:3])
-            if len(stale) > 3:
-                names += f" (+{len(stale) - 3} more)"
+            stale_apps = list(dict.fromkeys(item["app"] for item in stale))
+            data["stale_apps"] = len(stale_apps)
+            refs = list(dict.fromkeys(f"{item['app']}@{item['revision']}" for item in stale))
+            names = ", ".join(refs[:3])
+            if len(refs) > 3:
+                names += f" (+{len(refs) - 3} more)"
             return record("values_branch", status,
-                          f"{len(stale)} apps not on {branch}: {names}", data=data)
+                          f"{len(stale_apps)} apps ({len(stale)} source refs) not on {branch}: {names}", data=data)
         _debounced("values_branch", False, threshold, state)
         return record("values_branch", "healthy", f"{checked} references on {branch}", data=data)
     except Exception:
