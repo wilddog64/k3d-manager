@@ -1,3 +1,5 @@
+- 2026-10-09 — webhook-server.md rewrite VERIFIED (Codex `d1f66a98`, on origin): 2 files only; all 16 modules with wc -l matching; intra-package imports match code; all 15 `_POST/_GET_ROUTES` keys present; no line ranges; monolith 2,576 lines; confirm targets listed; `make check-doc-links` OK. Bug doc `2026-10-09-webhook-server-architecture-doc-stale.md` FIXED. All 4 audited docs now current. PR #136 (brace-expansion in subtree) — recommended not merging; awaiting user on lib-foundation bump.
+
 ## 2026-10-09 — doc fixes + webhook doc rewrite dispatched; PR #136 not merged
 
 - `733ce24a`: cloud-bridge.md capability row + token diagram, vector-store.md SQLite embed cache, roadmap-v1.md ARCHIVED banner.
