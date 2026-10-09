@@ -324,11 +324,16 @@ function _hub_recovery_records() {
   cat <<'EOF'
 server-0|secrets|data-vault-0|node-server-0-storage
 agent-1|identity|postgres-keycloak-pvc|node-agent-1-storage
-agent-0|identity|ldap-data-pvc|node-agent-0-storage
 agent-0|identity|data-openldap-0|node-agent-0-storage
-agent-0|identity|ldap-config-pvc|node-agent-0-storage
 agent-0|monitoring|prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0|node-agent-0-storage
 agent-1|monitoring|storage-loki-0|node-agent-1-storage
+EOF
+}
+
+function _hub_recovery_retired_claims() {
+  cat <<'EOF'
+identity|ldap-data-pvc
+identity|ldap-config-pvc
 EOF
 }
 
@@ -376,8 +381,13 @@ function _hub_recovery_validate_claims() {
     fi
   done < <(_hub_recovery_records)
   local found_count
+  local -a retired_args=()
+  local retired_namespace retired_claim
+  while IFS='|' read -r retired_namespace retired_claim; do
+    retired_args+=(! -name "pvc-*_${retired_namespace}_${retired_claim}")
+  done < <(_hub_recovery_retired_claims)
   found_count=$(find "$source_dir"/node-*-storage -mindepth 1 -maxdepth 1 -type d \
-    -name 'pvc-*' -print | wc -l | tr -d ' ')
+    -name 'pvc-*' "${retired_args[@]}" -print | wc -l | tr -d ' ')
   if [[ "$found_count" != "${#trees[@]}" ]]; then
     echo "Recovery source has ${found_count} PVC trees; expected ${#trees[@]}." >&2
     return 1

@@ -45,17 +45,33 @@ YAML
   done < <(_hub_recovery_records)
 }
 
-@test "hub recovery records: maps seven restorable claims without Trivy" {
+@test "hub recovery records: maps five restorable claims without Trivy" {
   run _hub_recovery_records
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 7 ]
+  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 5 ]
   [[ "$output" != *trivy* ]]
 }
 
-@test "hub_recovery_validate: accepts the complete seven-claim source map" {
+@test "hub_recovery_validate: accepts the complete five-claim source map" {
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"7 logical claims"* ]]
+  [[ "$output" == *"5 logical claims"* ]]
+}
+
+@test "hub_recovery_validate: a pre-2026-10-09 snapshot with retired ldap claims still validates" {
+  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-00000000-0000-0000-0000-000000000000_identity_ldap-data-pvc"
+  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-00000000-0000-0000-0000-000000000000_identity_ldap-config-pvc"
+  run hub_recovery_validate "$RECOVERY_ROOT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"5 logical claims"* ]]
+}
+
+@test "hub recovery records: retired osixia ldap claims are not captured" {
+  run _hub_recovery_records
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"ldap-data-pvc"* ]]
+  [[ "$output" != *"ldap-config-pvc"* ]]
+  [[ "$output" == *"identity|data-openldap-0"* ]]
 }
 
 @test "_hub_recovery_sync_vault_root_token: accepts a matching Keychain read-back" {
@@ -120,13 +136,13 @@ YAML
 @test "hub_recovery_plan: emits the dependency map by logical claim" {
   run hub_recovery_plan "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 7 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 5 ]
   [[ "$output" == *"node=server-0 claim=secrets/data-vault-0"* ]]
   [[ "$output" == *"node=agent-1 claim=identity/postgres-keycloak-pvc"* ]]
 }
 
 @test "hub_recovery_validate: rejects a duplicate captured claim" {
-  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-11111111-1111-1111-1111-111111111111_identity_ldap-data-pvc"
+  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-11111111-1111-1111-1111-111111111111_identity_data-openldap-0"
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -ne 0 ]
   [[ "$output" == *"Expected exactly one source tree"* ]]
@@ -136,11 +152,11 @@ YAML
   mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-22222222-2222-2222-2222-222222222222_extra_unknown"
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"expected 7"* ]]
+  [[ "$output" == *"expected 5"* ]]
 }
 
 @test "hub_recovery_validate: ignores files below a mapped PVC root" {
-  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-00000000-0000-0000-0000-000000000000_identity_ldap-data-pvc/database"
+  mkdir -p "$RECOVERY_ROOT/node-agent-0-storage/pvc-00000000-0000-0000-0000-000000000000_identity_data-openldap-0/database"
   run hub_recovery_validate "$RECOVERY_ROOT"
   [ "$status" -eq 0 ]
 }
@@ -148,7 +164,7 @@ YAML
 @test "hub_recovery_restore: plans all mapped claims by default" {
   run hub_recovery_restore "$RECOVERY_ROOT" "$TARGETS_FILE"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 7 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^RESTORE ' )" -eq 5 ]
   [[ "$output" == *"Dry-run only"* ]]
 }
 
@@ -162,7 +178,7 @@ YAML
 @test "hub_recovery_targets: renders exactly one current PV target per claim" {
   run hub_recovery_targets
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -c '^agent\|^server' )" -eq 7 ]
+  [ "$(printf '%s\n' "$output" | grep -c '^agent\|^server' )" -eq 5 ]
   [[ "$output" == *"server-0|secrets|data-vault-0|k3d-k3d-cluster-server-0|${TARGET_ROOT}/pvc-"* ]]
 }
 

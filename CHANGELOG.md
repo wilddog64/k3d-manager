@@ -38,6 +38,9 @@
 
 ### Changed
 
+- Retired the orphaned osixia LDAP PVC claims from Hub snapshots and stopped
+  `cluster-up` from adding the `identity/ldap` source to the identity Application;
+  see [the OpenLDAP CVE bug](docs/bugs/2026-08-02-openldap-legacy-image-cve-and-trivy-alert-grouping.md).
 - **The "Trivy Operator Job Reconcile Errors" panel is readable now.** Errors are rare, so the
   old line chart drew isolated dots labelled `{}` (an unnamed `sum(...)`), with a bucket size
   that changed with the zoom level. The panel now draws one bar per hour, names the series

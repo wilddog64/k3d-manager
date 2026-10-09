@@ -50,7 +50,7 @@ above does not accept a snapshot taken with `make snapshot`.
 Deleting the local Hub is guarded by the newest verified M2 snapshot. The
 snapshot must be no older than 24 hours; otherwise `--delete-hub` refuses
 before any teardown starts. `make down DELETE_HUB=1` therefore requires a
-fresh `make snapshot`. To explicitly accept permanent loss of the seven
+fresh `make snapshot`. To explicitly accept permanent loss of the five
 mapped Hub claims, use `make down DELETE_HUB=1 DISCARD_HUB_DATA=1` (or
 `--discard-hub-data` with `bin/cluster-down`).
 
@@ -65,11 +65,14 @@ deletion only. `k3d cluster delete` removes node containers and their
 storage regardless, so the delete guard remains necessary. A rebuilt Hub
 creates PVs with `Delete`, so rerun the target after rebuilding.
 
-The seven captured claims are `data-vault-0`, `postgres-keycloak-pvc`,
-`ldap-data-pvc`, `data-openldap-0`, `ldap-config-pvc`, the Prometheus data
-claim, and `storage-loki-0`. The Trivy database is deliberately excluded
+The five captured claims are `data-vault-0`, `postgres-keycloak-pvc`,
+`data-openldap-0`, the Prometheus data claim, and `storage-loki-0`. The Trivy
+database is deliberately excluded
 because it is a re-downloadable cache; vulnerability reports are already
 preserved in `server-db.tar`.
+
+Snapshots taken before 2026-10-09 still contain the retired `ldap-data-pvc` and
+`ldap-config-pvc` trees; validation ignores them and restore skips them.
 
 Uploads first use `<timestamp>.INCOMPLETE/`. A snapshot is renamed to the bare
 timestamp only after the remote `sha256sum -c SHA256SUMS` succeeds. Failed or

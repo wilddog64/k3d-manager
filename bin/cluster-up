@@ -1031,7 +1031,7 @@ else
   fi
 fi
 
-_info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
+_info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak) via ArgoCD..."
 # Preseed Vault before the ExternalSecret can block the identity sync on a fresh Hub.
 kubectl config use-context k3d-k3d-cluster >/dev/null 2>&1 || true
 "${REPO_ROOT}/scripts/k3d-manager" keycloak_smoke_vault_preseed || _warn "[acg-up] smoke-user Vault preseed failed; identity reconcile will retry"
@@ -1053,9 +1053,6 @@ spec:
     - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
       targetRevision: HEAD
       path: identity/keycloak
-    - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
-      targetRevision: HEAD
-      path: identity/ldap
   destination:
     server: https://kubernetes.default.svc
     namespace: identity
