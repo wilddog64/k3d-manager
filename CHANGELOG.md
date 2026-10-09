@@ -28,6 +28,14 @@
   `K3DM_SNAPSHOT_AUTO_PRUNE=0`) and checks M2 free space before upload via
   `K3DM_SNAPSHOT_MIN_FREE_GB`.
 
+### Changed
+
+- **The "Trivy Operator Job Reconcile Errors" panel is readable now.** Errors are rare, so the
+  old line chart drew isolated dots labelled `{}` (an unnamed `sum(...)`), with a bucket size
+  that changed with the zoom level. The panel now draws one bar per hour, names the series
+  `errors / hour`, and has a description that explains what a burst usually means. The query
+  is unchanged.
+
 ## [1.41.0] - 2026-10-06
 
 ### Added
