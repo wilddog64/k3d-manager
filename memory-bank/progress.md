@@ -1,3 +1,10 @@
+## 2026-10-08 — Boot 4: Phase 1 verified, library PR #9 open; Phase 2 dispatched
+
+- Phase 1 verified independently: rabbitmq-client-java `00e70fd`, plus Claude's CHANGELOG commit `55a279c`, both on origin. `mvn clean install` with JDK 21 passes 73 tests, 0 failures. Gotcha: on this M4, `/usr/bin/java -version` hangs, so set `JAVA_HOME=/opt/homebrew/opt/openjdk@21/...`.
+- Opened **wilddog64/rabbitmq-client-java#9**. CI is running. The Copilot request did not show up in `reviewRequests`; a background poller is waiting for its review.
+- Phase 2 dispatched to Codex in shopping-cart-payment on `feat/spring-boot-4`, from `4e79be2`.
+- Merge order for the operator: **#9 first**, since its merge publishes 1.1.0; then the payment PR. After merge, Claude re-pins `services/shopping-cart-payment` and verifies the CVE clears.
+
 ## 2026-10-08 — CVE Auto-Patch: "Open critical CVEs in our images (not remediated)" table
 
 - Operator: "Current CVE Remediation Status" only shows applied patches and has nothing for CVEs that were not remediated. Cause: app-cve-scan writes a remediation event only when it finds a newer image to promote. Payment has none, so CVE-2026-47884 never showed there.
