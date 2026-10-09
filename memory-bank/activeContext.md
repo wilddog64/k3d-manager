@@ -1,3 +1,9 @@
+## 2026-10-09 — sandbox reaper: first live run failed, fixed
+
+- Operator ran `make install-sandbox-reaper`; first run exit 1 — launchd PATH resolved `/bin/bash` 3.2 (`mapfile`/`local -A`). Fix `c125dd11`: PATH in plist + BATS guard (RED-checked). Launchd-env dry-run clean (no k3s-aws registration on hub now).
+- NEXT (operator): re-run `make install-sandbox-reaper` to load the new plist.
+- Doc audit (operator asked): webhook-server.md stale (line counts, 7 modules missing, 17→29 make targets, no /api/v1/ask-docs, contradictory phase table); cloud-bridge.md one contradiction (says no lifecycle actions; sandbox-up/down + make-e2e exist); vector-store.md index diagram misses SQLite embed cache (v1.41.0); roadmap-v1.md archived but no ARCHIVED banner.
+
 ## 2026-10-09 — expired-sandbox reaper implemented + verified
 
 - Codex `f089c36f` (bin/k3dm-sandbox-reaper, bin/k3dm-slack-notify, plist tmpl, Makefile install/uninstall-sandbox-reaper, 2 BATS suites, howto, CHANGELOG). Claude fix `90643a02`: `(A||B)&&C` precedence reported stack-deleted as credentials-dead; mid-test `! grep` guards hardened with `|| false`.
