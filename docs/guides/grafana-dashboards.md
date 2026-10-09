@@ -249,12 +249,14 @@ bypassing the correlator — see `docs/guides/hermes.md`.
 
 ### Host disk (`k3dm-host-disk`) — hub
 
-Hermes ticks every five minutes and runs `bin/k3dm-disk-metrics`, which probes the M4 locally
-and the M2 over the existing SSH alias before pushing gauges to the hub Pushgateway. The
+Hermes ticks every five minutes and runs `bin/k3dm-disk-metrics`, which probes the M4 locally,
+the M2 over the existing SSH alias, and the Hostinger node (`/`) over SSH with the
+`HOSTINGER_*` settings before pushing gauges to the hub Pushgateway. The
 dashboard shows used percentage, free GiB, probe status, and Pushgateway age for each host.
 
 80% used sends a warning email. 90% used or less than 20 GiB free sends a critical SMS; M2
-alerts recommend `make snapshot-prune` / lowering `K3DM_SNAPSHOT_KEEP`, while M4 alerts
+alerts recommend `make snapshot-prune` / lowering `K3DM_SNAPSHOT_KEEP`, while Hostinger alerts
+recommend pruning unused k3s images (`sudo k3s crictl rmi --prune`) and checking logs. M4 alerts
 recommend `docker system df` and pruning images. A `No data` panel means Hermes is not running
 or the Pushgateway port-forward is down.
 

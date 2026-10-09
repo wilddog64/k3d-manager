@@ -10,7 +10,16 @@ from pathlib import Path
 
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
-DEFAULT_TARGETS = "m4=local:/System/Volumes/Data m2=m2jump:k3dm-snapshots"
+DEFAULT_TARGETS = "m4=local:/System/Volumes/Data m2=m2jump:k3dm-snapshots hostinger=hostinger:/"
+
+
+def _ssh_destination(host):
+    if host != "hostinger":
+        return [host]
+    user = os.environ.get("HOSTINGER_SSH_USER", "ubuntu")
+    address = os.environ.get("HOSTINGER_HOST", "srv1754834.hstgr.cloud")
+    key = os.environ.get("HOSTINGER_SSH_KEY", str(Path.home() / ".ssh" / "hostinger"))
+    return ["-i", key, "-o", "IdentitiesOnly=yes", f"{user}@{address}"]
 
 
 def _targets():
@@ -27,8 +36,9 @@ def _probe(host, path):
     if host == "local":
         command = ["df", "-Pk", path]
     else:
-        command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "--",
-                   host, "df", "-Pk", path]
+        destination = _ssh_destination(host)
+        command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+                   *destination[:-1], "--", destination[-1], "df", "-Pk", path]
     result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"df exited {result.returncode}")

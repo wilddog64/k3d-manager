@@ -27,7 +27,7 @@ spec:
             cluster: hub
           annotations:
             summary: "Host disk space is critical on {{ $labels.host }}"
-            description: "{{ $labels.host }} ({{ $labels.path }}) needs action: {{ if eq $labels.host \"m2\" }}run make snapshot-prune / lower K3DM_SNAPSHOT_KEEP{{ else }}docker system df; prune images{{ end }}."
+            description: "{{ $labels.host }} ({{ $labels.path }}) needs action: {{ if eq $labels.host \"m2\" }}run make snapshot-prune / lower K3DM_SNAPSHOT_KEEP{{ else if eq $labels.host \"hostinger\" }}ssh in; sudo k3s crictl rmi --prune and check /var/log + journalctl --disk-usage{{ else }}docker system df; prune images{{ end }}."
         - alert: HostDiskMetricsStale
           expr: k3dm_disk_probe_success == 0 or (time() - max(push_time_seconds{job="k3dm-disk"}) > 1800) or absent(k3dm_disk_size_bytes)
           for: 30m

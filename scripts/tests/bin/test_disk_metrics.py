@@ -68,3 +68,28 @@ def test_push_failure_is_non_fatal(monkeypatch, capsys):
 def test_default_m2_target_is_the_snapshot_dir(monkeypatch):
     monkeypatch.delenv("K3DM_DISK_TARGETS", raising=False)
     assert ("m2", "m2jump", "k3dm-snapshots") in disk._targets()
+
+
+def test_default_targets_include_hostinger_root(monkeypatch):
+    monkeypatch.delenv("K3DM_DISK_TARGETS", raising=False)
+    assert ("hostinger", "hostinger", "/") in disk._targets()
+
+
+def test_hostinger_probe_uses_key_user_and_host(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setenv("HOSTINGER_SSH_USER", "u")
+    monkeypatch.setenv("HOSTINGER_HOST", "h.example")
+    monkeypatch.setenv("HOSTINGER_SSH_KEY", "/k")
+    monkeypatch.setenv("K3DM_DISK_TARGETS", "hostinger=hostinger:/")
+    monkeypatch.setattr(disk.subprocess, "run", lambda command, **kwargs: calls.append(command) or _run())
+    monkeypatch.setattr(sys, "argv", [str(ROOT / "bin/k3dm-disk-metrics"), "--dry-run"])
+
+    assert disk.main() == 0
+    output = capsys.readouterr().out
+    command = calls[0]
+    assert "-i" in command
+    assert "/k" in command
+    assert "IdentitiesOnly=yes" in command
+    assert command[command.index("--") + 1] == "u@h.example"
+    assert command[-3:] == ["df", "-Pk", "/"]
+    assert 'k3dm_disk_probe_success{host="hostinger",path="/"} 1' in output
