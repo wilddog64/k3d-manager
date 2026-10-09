@@ -61,6 +61,12 @@ TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-con
   run grep -F -- 'ArgoCDAppOutOfSync' "${RULE}"
   [ "${status}" -eq 0 ]
 
+  run grep -F -- 'alert: ArgoCDAppProgressingStuck' "${RULE}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'health_status="Progressing"' "${RULE}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- 'ArgoCDImageUpdaterFlapping' "${RULE}"
   [ "${status}" -eq 0 ]
 

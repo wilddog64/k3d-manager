@@ -1,10 +1,11 @@
 # How-To: ArgoCD Alerts
 
-This repo currently wires two ArgoCD health alerts and one Image Updater flapping
+This repo currently wires three ArgoCD health alerts and one Image Updater flapping
 alert through Prometheus and Alertmanager:
 
 - `ArgoCDAppDegraded`
 - `ArgoCDAppOutOfSync`
+- `ArgoCDAppProgressingStuck` (30 minutes)
 
 It also wires an Image Updater flapping alert for the three apps that still use
 digest-based image promotion:
@@ -118,6 +119,7 @@ the rule `for:` window to elapse:
 
 - `ArgoCDAppDegraded` fires after 5 minutes
 - `ArgoCDAppOutOfSync` fires after 15 minutes
+- `ArgoCDAppProgressingStuck` fires after 30 minutes
 - `ArgoCDImageUpdaterFlapping` fires after 10 minutes of at least 5 syncs in
   30 minutes
 

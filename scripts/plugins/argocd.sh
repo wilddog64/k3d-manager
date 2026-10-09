@@ -1294,15 +1294,19 @@ function _argocd_warn_generic_cni_dirs() {
 }
 
 function _argocd_appset_live_overrides() {
-   local file="$1" name live value conf bin provider dirs
+   local file="$1" name live value conf bin provider dirs target
    name="$(sed -n 's/^  name: //p' "$file" | head -1)"
    [[ -z "${name}" ]] && return 0
    live="$(_kubectl --no-exit get applicationset "${name}" -n "${ARGOCD_NAMESPACE:-cicd}" -o json 2>/dev/null || true)"
    [[ -z "${live}" ]] || printf '%s' "${live}" | jq -e '.kind == "ApplicationSet"' >/dev/null 2>&1 || live=""
 
+   target="${APP_CLUSTER_NAME:-ubuntu-k3s}"
    if grep -q '\${APP_CLUSTER_NAME}' "$file" && [[ -n "${live}" ]]; then
       value="$(printf '%s' "${live}" | jq -r '.spec.template.spec.destination.name // ""')"
-      [[ -z "${value}" || "${value}" == *'{{'* || "${value}" == *'$'* ]] || printf 'APP_CLUSTER_NAME=%s\n' "${value}"
+      if [[ -n "${value}" && "${value}" != *'{{'* && "${value}" != *'$'* ]]; then
+         printf 'APP_CLUSTER_NAME=%s\n' "${value}"
+         target="${value}"
+      fi
    fi
 
    if grep -q '\${AMBIENT_CNI_CONF_DIR}' "$file"; then
@@ -1311,7 +1315,7 @@ function _argocd_appset_live_overrides() {
          source "${PLUGINS_DIR}/istio_ambient.sh"
       fi
       if declare -f _istio_ambient_target_provider >/dev/null 2>&1; then
-         provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${APP_CLUSTER_NAME:-ubuntu-k3s}")}"
+         provider="${AMBIENT_CNI_PROVIDER:-$(_istio_ambient_target_provider "${ARGOCD_CONTEXT:-k3d-k3d-cluster}" "${ARGOCD_NAMESPACE:-cicd}" "${target}")}"
          if [[ -n "${provider}" ]]; then
             dirs="$(_istio_ambient_cni_dirs "${provider}")"
             conf="${dirs%% *}"

@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- ArgoCD ApplicationSet live overrides now resolve Istio CNI directories for the live destination cluster, so a Hostinger destination cannot inherit the shell's sandbox cluster provider.
+- Added the warning-level `ArgoCDAppProgressingStuck` alert, which fires after 30 minutes for any ArgoCD app that remains Progressing.
 - Kept the GHCR PAT out of `kubectl` argv when minting shopping-cart pull secrets by applying an in-shell dockerconfigjson manifest on stdin.
 - Guarded the preflight wait-loop app-status read so empty or newline-less kubectl output keeps polling instead of tripping `set -e`.
 - The watchdog now recovers a Ready node whose kubelet tunnel is dead (API server 502 dialing `:10250`) after `K3DM_NODE_TUNNEL_THRESHOLD` consecutive ticks (default 6), while a slow `/healthz` stays advisory; see [the dead kubelet tunnel bug](docs/bugs/2026-10-09-node-health-watch-ignores-ready-node-with-dead-kubelet-tunnel.md).

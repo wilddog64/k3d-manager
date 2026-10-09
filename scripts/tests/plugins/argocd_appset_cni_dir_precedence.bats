@@ -132,6 +132,27 @@ capture_overrides() {
   [[ "${output}" == *"AMBIENT_CNI_CONF_DIR=/k3s/conf"* ]]
 }
 
+@test "provider is resolved for the live destination, not the shell APP_CLUSTER_NAME" {
+  printf '%s\n' '  destination: ${APP_CLUSTER_NAME}' >> "${ARGOCD_CONFIG_DIR}/applicationsets/istio-ambient.yaml"
+  APP_CLUSTER_NAME=ubuntu-k3s
+  LIVE_JSON='{"kind":"ApplicationSet","spec":{"template":{"spec":{"destination":{"name":"ubuntu-hostinger"}}},"generators":[{"list":{"elements":[{"name":"istio-cni","values":"cni:\n  cniConfDir: /etc/cni/net.d\n  cniBinDir: /opt/cni/bin"}]}}]}}'
+  _istio_ambient_target_provider() {
+    if [[ "${3:-}" == "ubuntu-hostinger" ]]; then
+      printf '%s\n' k3s-hostinger
+    else
+      printf '%s\n' k3s-aws
+    fi
+  }
+  configure_live_stub
+  capture_overrides
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"APP_CLUSTER_NAME=ubuntu-hostinger"* ]]
+  [[ "${output}" == *"AMBIENT_CNI_CONF_DIR=/var/lib/rancher/k3s/agent/etc/cni/net.d"* ]]
+  [[ "${output}" == *"AMBIENT_CNI_BIN_DIR=/var/lib/rancher/k3s/data/cni"* ]]
+  run grep -Fqx 'AMBIENT_CNI_CONF_DIR=/etc/cni/net.d' <<<"${output}"
+  [ "${status}" -ne 0 ]
+}
+
 @test "non-JSON live read still returns zero" {
   LIVE_JSON=''
   set_provider '' '' ''
