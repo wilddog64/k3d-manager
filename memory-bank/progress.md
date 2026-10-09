@@ -1,3 +1,5 @@
+2026-10-08 — Ask reply CLI preamble fix committed as e92d1d85; status recorded in 1a0399f1; live verification pending.
+
 ## 2026-10-08 — Codex September triage verified; /ask fixes live-verified; ask preamble leak filed and dispatched
 
 - Verified Codex triage `fbdf1c23` + `65971034` on origin: only the 19 September bug docs + memory-bank changed. All 15 cited fix SHAs exist on earlier release branches (v1.36.0–v1.40.0). Result: 16 FIXED, 2 PARTIAL (hub PVC capture `d53ea1ba`, prometheus reseed/rotator `7d475a9f`), 1 UNKNOWN (frontend public URL), 0 OPEN.
