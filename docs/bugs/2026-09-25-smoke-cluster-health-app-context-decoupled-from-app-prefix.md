@@ -6,6 +6,7 @@
 **Lineage:** third iteration of the same defect —
 `docs/bugs/2026-09-13-smoke-test-cluster-health-stale-defaults-silent-exit.md` (DONE `77008edb`) →
 `docs/bugs/2026-09-13-smoke-test-cluster-health-pods-checked-on-wrong-cluster.md` (FIXED) → this
+**Status:** FIXED in `ff47bc2b` — evidence: `bin/smoke-test-cluster-health:32-40` (triaged 2026-10-08, Codex)
 
 ---
 

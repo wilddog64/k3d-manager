@@ -1,6 +1,7 @@
 # Stale unmanaged ArgoCD registrations survive ACG sandbox cleanup
 
 **Filed:** 2026-09-29
+**Status:** FIXED in `39193aae` — evidence: `bin/cleanup-stale-registration:33-82` (triaged 2026-10-08, Codex)
 
 ## Symptom
 

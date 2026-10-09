@@ -5,6 +5,7 @@
 **Severity:** High noise, real alert fatigue — the operator received this repeatedly and it is
 the alert that actually reached them, unlike the permanently-firing `TargetDown` cases.
 **Cluster:** hub `k3d-k3d-cluster` (k3d/OrbStack, 4 nodes, k3s v1.32.0+k3s1)
+**Status:** FIXED in `0d663a40` — evidence: `scripts/plugins/observability.sh:848-890` (triaged 2026-10-08, Codex)
 
 ## Symptom
 

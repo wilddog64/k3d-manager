@@ -4,6 +4,7 @@
 **Area:** `scripts/tests/core/deploy_app_cluster_confirm.bats` (test 3); `scripts/plugins/shopping_cart.sh` (`deploy_app_cluster`, SSH-key guard placement)
 **Type:** bugfix
 **Related:** `docs/bugs/2026-08-29-dispatcher-confirm-flag-deploy-app-cluster.md` (the Finding 2b fix this test guards)
+**Status:** FIXED in `1cbdab25` — evidence: `scripts/tests/core/deploy_app_cluster_confirm.bats:15-19,43-52` (triaged 2026-10-08, Codex)
 
 ## Problem
 

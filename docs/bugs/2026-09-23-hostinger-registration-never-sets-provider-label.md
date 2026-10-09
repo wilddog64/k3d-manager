@@ -2,6 +2,7 @@
 
 **Filed:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
+**Status:** FIXED in `834149ea` — evidence: `scripts/plugins/argocd.sh:1554` (triaged 2026-10-08, Codex)
 **Severity:** high — this is the remaining link in the chain that kept `istio-cni-node` 0/1 on
 ubuntu-hostinger for 17 days. `02e3fa76` fixed the overwrite mechanism but cannot produce a correct
 value while the provider label reads `unknown`.

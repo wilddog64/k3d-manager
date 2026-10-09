@@ -4,6 +4,7 @@
 **Area:** `scripts/lib/webhook/smoke.py` (`_smoke_test_services`); `bin/k3dm-webhook` (`do_GET` health branches, post-provision check)
 **Type:** bugfix
 **Introduced by:** `925c43e7` — "feat: v1.37.0 — webhook decomposition and gates that prove their claim (#131)"
+**Status:** FIXED in `925c43e7` — evidence: `scripts/lib/webhook/smoke.py:731` (triaged 2026-10-08, Codex)
 
 ## Problem
 

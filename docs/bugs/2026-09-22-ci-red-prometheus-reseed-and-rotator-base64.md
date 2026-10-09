@@ -3,6 +3,7 @@
 **Filed:** 2026-09-22
 **Branch:** `k3d-manager-v1.36.0`
 **Blocks:** PR #130 (cannot merge while `lint` is red)
+**Status:** PARTIAL — fixed: Vault-unreachable versus absent Prometheus reseed handling, `7d475a9f`; still open: platform-ops rotators retain BusyBox-incompatible `base64 --decode` calls (triaged 2026-10-08, Codex)
 **Failing run:** [35722946408](https://github.com/wilddog64/k3d-manager/actions/runs/35722946408) at `02c4bee3` — job `lint`, `make test` exits 1
 
 ## Symptom

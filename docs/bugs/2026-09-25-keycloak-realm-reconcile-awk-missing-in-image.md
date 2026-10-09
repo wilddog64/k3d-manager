@@ -2,6 +2,7 @@
 
 **Filed:** 2026-09-25
 **Work repo:** `shopping-cart-infra` (NOT k3d-manager)
+**Status:** FIXED in `shopping-cart-infra#100` — evidence: `identity/keycloak/keycloak-reconcile-hook-job.yaml:108-187` (triaged 2026-10-08, Codex)
 **Branch (work repo):** `fix/keycloak-reconcile-awk-free` — create from `origin/main`
 **Target file:** `identity/keycloak/keycloak-reconcile-hook-job.yaml` (517 lines) — and nothing else
 **Severity:** the ArgoCD PostSync hook fails on every sync; `shopping-cart-identity` is stuck `OutOfSync`

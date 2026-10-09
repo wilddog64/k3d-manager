@@ -5,6 +5,7 @@
 **Component:** `scripts/plugins/e2e.sh` — `_e2e_sandbox_job_manifest()`, `e2e_verify_sandbox()`
 **Implementation under test:** `ffeb9ba2` (Tier 2 `e2e_verify_sandbox`)
 **Severity:** blocks the first live Tier 2 run entirely
+**Status:** FIXED in `56df33f5` — evidence: `scripts/plugins/e2e.sh:262,267,269,271,320` (triaged 2026-10-08, Codex)
 
 ## Summary
 

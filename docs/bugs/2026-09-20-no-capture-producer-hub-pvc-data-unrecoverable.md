@@ -3,6 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
+**Status:** PARTIAL — fixed: hub snapshot capture/offload/retention, `d53ea1ba`; still open: fail-closed `cluster-down`, Retain PV policy, scheduled freshness reporting, and complete Vault-key coverage (triaged 2026-10-08, Codex)
 
 ## Question that prompted this
 

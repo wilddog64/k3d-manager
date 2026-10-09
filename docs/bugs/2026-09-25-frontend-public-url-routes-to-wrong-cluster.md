@@ -3,6 +3,7 @@
 **Filed:** 2026-09-25
 **Severity:** the public storefront has been unreachable while every health signal stayed green
 **Reported by:** the operator, via `make status CLUSTER_PROVIDER=k3s-hostinger`
+**Status:** UNKNOWN — the doc leaves the correct tunnel/origin routing fix undecided and source history has no resolved choice to verify (triaged 2026-10-08, Codex)
 
 ---
 

@@ -6,6 +6,7 @@
 never merged to `main`, so no released version is affected)
 **Blocks:** every operator-owned verification gate in
 `docs/plans/v1.39.0-public-endpoint-blackbox-probes.md`
+**Status:** FIXED in `cc4d634b` — evidence: `scripts/plugins/observability.sh:98-112` (triaged 2026-10-08, Codex)
 
 ## Symptom
 
