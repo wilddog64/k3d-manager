@@ -16,7 +16,7 @@ if [[ -r "${PLUGINS_DIR}/hub_recovery.sh" ]] && ! declare -f _hub_recovery_recor
 fi
 
 function _hub_snapshot_ssh() {
-  _run_command --probe " " -- ssh -o BatchMode=yes -o ConnectTimeout=10 -- "$K3DM_SNAPSHOT_HOST" "$*"
+  _run_command -- ssh -o BatchMode=yes -o ConnectTimeout=10 -- "$K3DM_SNAPSHOT_HOST" "$*"
 }
 
 function _hub_snapshot_node_container() {
@@ -93,22 +93,38 @@ function _hub_snapshot_latest_verified() {
   return 1
 }
 
+function _hub_snapshot_guard_read() {
+  (
+    export DRY_RUN=0 K3DM_DEPLOY_DRY_RUN=0
+    # The base runner's empty probe array is not nounset-safe on Bash 3.2.
+    # shellcheck disable=SC2329
+    _run_command() {
+      while [[ "$1" != "--" ]]; do
+        shift
+      done
+      shift
+      "$@"
+    }
+    "$@"
+  )
+}
+
 function hub_snapshot_guard_delete() {
   local _latest _age
-  if ! _hub_snapshot_ssh true; then
-    _err "[hub-snapshot] M2 host ${K3DM_SNAPSHOT_HOST} is unreachable; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
+  if ! _hub_snapshot_guard_read _hub_snapshot_ssh true; then
+    _warn "[hub-snapshot] M2 host ${K3DM_SNAPSHOT_HOST} is unreachable; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
     return 1
   fi
-  if ! _latest="$(_hub_snapshot_latest_verified)"; then
-    _err "[hub-snapshot] no verified snapshot exists on ${K3DM_SNAPSHOT_HOST}; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
+  if ! _latest="$(_hub_snapshot_guard_read _hub_snapshot_latest_verified)"; then
+    _warn "[hub-snapshot] no verified snapshot exists on ${K3DM_SNAPSHOT_HOST}; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
     return 1
   fi
   if ! _age="$(_hub_snapshot_age_hours "$_latest")"; then
-    _err "[hub-snapshot] latest snapshot ${_latest} has an invalid timestamp; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
+    _warn "[hub-snapshot] latest snapshot ${_latest} has an invalid timestamp; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
     return 1
   fi
   if [[ "$_age" -gt "$K3DM_SNAPSHOT_MAX_AGE_HOURS" ]]; then
-    _err "[hub-snapshot] latest verified snapshot ${_latest} on ${K3DM_SNAPSHOT_HOST} is ${_age}h old, older than ${K3DM_SNAPSHOT_MAX_AGE_HOURS}h; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
+    _warn "[hub-snapshot] latest verified snapshot ${_latest} on ${K3DM_SNAPSHOT_HOST} is ${_age}h old, older than ${K3DM_SNAPSHOT_MAX_AGE_HOURS}h; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
     return 1
   fi
   _info "[hub-snapshot] latest verified snapshot ${_latest} on ${K3DM_SNAPSHOT_HOST} is ${_age}h old"

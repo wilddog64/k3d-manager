@@ -136,6 +136,15 @@ PY
   [[ "$output" == *"latest verified snapshot"* ]]
 }
 
+@test "hub snapshot: guard reads verified snapshots during dry-run" {
+  export DRY_RUN=1
+  mkdir -p "$K3DM_SNAPSHOT_DIR/$(snapshot_name_hours_ago 2)"
+  run hub_snapshot_guard_delete
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"latest verified snapshot"* ]]
+  [[ "$output" != *"[dry-run]"* ]]
+}
+
 @test "hub snapshot: guard refuses an old verified snapshot" {
   mkdir -p "$K3DM_SNAPSHOT_DIR/$(snapshot_name_hours_ago 30)"
   run hub_snapshot_guard_delete

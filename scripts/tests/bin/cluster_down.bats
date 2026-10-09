@@ -299,13 +299,39 @@ STUB
 }
 
 @test "acg-down refuses hub deletion without a verified snapshot" {
-  run env CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
-  [ "$status" -eq 1 ]
+  run env DRY_RUN=0 CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  [ "$status" -eq 2 ]
   [[ "$output" == *"DISCARD_HUB_DATA=1"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
   [ ! -s "${BATS_TEST_TMPDIR}/aws.log" ]
   run grep -F "cluster delete" "${BATS_TEST_TMPDIR}/k3d.log"
   [ "$status" -ne 0 ]
+}
+
+@test "acg-down dry-run previews refusal and continues" {
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"DRY_RUN: hub snapshot guard refused"* ]]
+  [[ "$output" == *"DRY_RUN: would delete local Hub cluster k3d-cluster"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
+}
+
+@test "acg-down deletes the local hub when a fresh snapshot exists" {
+  export K3DM_SNAPSHOT_DIR="${BATS_TEST_TMPDIR}/remote"
+  mkdir -p "${K3DM_SNAPSHOT_DIR}/$(date -u +%Y%m%dT%H%M%SZ)"
+  cat > "${BATS_TEST_TMPDIR}/bin/ssh" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$*" == *"find "* ]]; then
+  find "$K3DM_SNAPSHOT_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
+fi
+exit 0
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/ssh"
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3d bash -c 'bin/cluster-down --confirm --delete-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"latest verified snapshot"* ]]
+  [[ "$output" == *"DRY_RUN: hub snapshot guard passed"* ]]
+  [[ "$output" == *"DRY_RUN: would delete local Hub cluster k3d-cluster"* ]]
 }
 
 @test "acg-down rejects conflicting hub flags before provider calls" {
