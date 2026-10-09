@@ -1,3 +1,6 @@
+## 2026-10-09 — sc-infra PR #109 open (postgres-keycloak Recreate)
+- https://github.com/wilddog64/shopping-cart-infra/pull/109 — Copilot: approval recommended, 0 findings. Waiting for user go; enforce_admins still ON.
+
 ## 2026-10-09 15:30 UTC — merges done; disk Hostinger target + postgres Recreate verified
 - sc-infra #108 merged `03c6206f`, sc-frontend #115 merged `3623e5b2`; enforce_admins restored (bodyless POST) on both.
 - Disk amendment (Hostinger node): Codex `f88993a6` on `k3d-manager-v1.42.0` — verified: 7/7 pytest, 2 new tests FAIL on pre-fix script, yaml OK. Live check pending: next Hermes tick → `k3dm_disk_avail_bytes{host="hostinger"}` in hub Prometheus.
