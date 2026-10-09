@@ -1,3 +1,11 @@
+## 2026-10-08 — Hub snapshot retention bug filed; dispatched to Codex (round 6)
+
+- Operator asked for a retention policy (M2 space is finite). `K3DM_SNAPSHOT_KEEP=3` + `make snapshot-prune` exist, but: (1) prune keeps the OLDEST N and deletes the newest (`_hub_snapshot_remote_names` sorts ascending; the count-only test at hub_snapshot.bats:276 hid it); (2) nothing prunes automatically.
+- Spec: `docs/bugs/2026-10-08-hub-snapshot-prune-deletes-newest-no-auto-retention.md`: newest-first prune, auto-prune after a verified capture (`K3DM_SNAPSHOT_AUTO_PRUNE=1`, never touches `.INCOMPLETE`), M2 free-space preflight (`K3DM_SNAPSHOT_MIN_FREE_GB=20`), checked final `mv` (round-5 minor finding).
+- M2 read 2026-10-08: 369 GiB free of 926 GiB; partial `20261009T014249Z.INCOMPLETE` is 480 MB.
+- Do NOT run `make snapshot-prune` until round 6 lands; today it would delete the newest snapshots.
+- Status UNKNOWN-path `Hub snapshot:` line still queued separately.
+
 ## 2026-10-08 — Claude verified hub snapshot round 5 (`e3040689`)
 
 - Codex `e3040689`/`a416dff2`/`d718c674` on origin; scope = hub_snapshot.sh, hub_recovery.sh, 2 bats, howto, bug doc, memory-bank.
