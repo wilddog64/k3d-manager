@@ -1,3 +1,16 @@
+## 2026-10-09 — Payment #84 on main: CVE-2026-47884 cleared; repin held for payment #86
+
+- Main CI run 37927654332 on `ea63cddc` is all green. The image is `sha-ea63cddc…`, index
+  `sha256:1a14ed1a…`, and the promote loop committed `6382a3e9`.
+- Trivy: spring-webmvc 7.0.9 has 0 findings. The image still shows 3 CRITICAL in Tomcat 11.0.24 and
+  5 HIGH in Jackson 3 3.1.5.
+- **The Hostinger repin is HELD.** The current `3551ec8d` image has only 1 CRITICAL, so repinning now
+  would keep the alert firing.
+- Payment PR #86 (`fix/tomcat-jackson3-cve-overrides`, `b583d8a6`) overrides `tomcat.version` to
+  11.0.26 and `jackson-bom.version` to 3.1.7. It is waiting on CI and Copilot, then on the user's merge.
+- After #86 merges: repin the digest in `services/shopping-cart-payment/kustomization.yaml`, verify
+  the alert clears, and mark the CVE bug doc FIXED.
+
 ## 2026-10-09 — Bug-doc status sweep: all 683 docs now carry a Status line
 
 368 docs in `docs/bugs/` had no Status line. Each one now has one, tagged `(2026-10-09 status sweep)`:
