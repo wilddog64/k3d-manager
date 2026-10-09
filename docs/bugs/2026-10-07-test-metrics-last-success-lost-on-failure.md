@@ -1,6 +1,6 @@
 # Test metrics deletes the last-success timestamp after a failed run
 
-**Status:** FIXED in branch; live success -> failure verification pending
+**Status:** VERIFIED live 2026-10-09 — failed `make test-all` (19:09:08Z, exit 2) left `k3dm_test_last_success_timestamp_seconds` at the prior success 2026-10-08T03:21:26Z; the next passing run (20:01:33Z, 2664 cases, 0 failed) advanced it to 20:01:33Z (hub Prometheus, job `k3dm-tests`, `test-all-local-last-success`).
 **Filed:** 2026-10-07
 **Affected release:** v1.42.0
 **Source:** Operator freshness-panel investigation

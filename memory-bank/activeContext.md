@@ -1,3 +1,12 @@
+<!-- 2026-10-09 test-all green + v1.43.0 spec counting update -->
+- **2026-10-09 `make test-all` GREEN:** 2664 cases, 0 failed, exit 0. Prometheus `k3dm_test_last_success_timestamp_seconds` advanced to 20:01:33Z after the 19:09Z failure had kept 2026-10-08. `test-metrics-last-success-lost-on-failure` is marked VERIFIED. `k3dm-tests-failure-history-missing` is still unchecked (dashboard).
+- **2026-10-09 ask-docs recency VERIFIED live in Slack** (the doc is marked).
+- **2026-10-09 v1.43.0 spec `v1.43.0-bug-priority-tracking.md` updated.** The question `/ask-docs how many P1 bugs … v1.42.0` came back "insufficient data", quoting the spec's stale "none has a priority" line. The real answer: 3 P1 bugs, all closed.
+  - Item 9 `match` now requires only a count word plus "bug(s)"; release, priority and state are optional, and it returns a `CountQuery`.
+  - Item 8 tally gains `by_priority` and `--priority`. The reply states how many docs are unset.
+  - `doc_meta` counts `VERIFIED` as closed.
+  - Tests were added for each.
+
 <!-- 2026-10-09 ask-docs fix verified -->
 - **2026-10-09 ask-docs recency + Slack bold: Codex `f120fce2`, verified by Claude.** 5 spec files changed. 40 ask-docs tests pass. Mutation check: with `_recent_docs` disabled, the 3 new tests fail. On the real corpus, "latest bugs fixed" now returns the 2026-10-09 FIXED bug docs. NEXT: the operator runs `make restart-webhook`, then reruns `/ask-docs what is the latest bugs fixed` in `C0B7ZHG2LR4`.
 - **2026-10-09 `make test-pytest` tripwire red fixed:** the 2 `_poll` tests in `test_approvals.py` ran the real `bin/k3dm-disk-metrics` (ssh df to m2jump and hostinger) because they never stubbed `_publish_disk_metrics`. The disk-sensor commits left that gap. The stub is added; the gate now exits 0 with 775 passed.
