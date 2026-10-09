@@ -1,3 +1,7 @@
+## 2026-10-09 — PR #138 CodeQL resolved; ready to merge
+
+- Operator committed the regex fix `0e74f3f2` (`--no-verify`); alert #34 fixed, thread resolved. CI green (lint, alertmanager-behaviour, Analyze x3). The CodeQL check stays red only on the existing `main` alerts #31/#32 (status.py clear-text storage) and #33 (test_hermes URL substring), re-reported because the PR touched those files; CodeQL is not a required check. Findings doc updated.
+
 ## 2026-10-09 — PR #138 (v1.42.0) opened; CI lint red fixed
 
 - PR #138 https://github.com/wilddog64/k3d-manager/pull/138. Copilot: 0 findings (overview only). CI `lint` red: pyflakes F821 `REPO_ROOT` undefined in `bin/k3dm-webhook` `_publish_test_metrics` (silent NameError swallowed by lifecycle's broad except → webhook test-all fallback metrics never published). Fixed + direct test (RED NameError on old code; `pytest scripts/tests/bin` 536 passed). CodeQL ambiguous regex in `test_k3dm_test_metrics.py:162`: fix is an edited assert line, blocked by `_agent_audit` (operator-only `--no-verify`) — left to operator (commit or dismiss as used-in-tests). Findings: `docs/issues/2026-10-09-copilot-pr138-review-findings.md`.

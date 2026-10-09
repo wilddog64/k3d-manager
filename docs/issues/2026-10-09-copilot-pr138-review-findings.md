@@ -55,8 +55,18 @@ tests, the real helper still needs one direct test.
 can backtrack exponentially. The fix is `r'="((?:\\.|[^"\\])*)"'`, which gives the same matches
 for well-formed escaped labels. `test_k3dm_test_metrics.py`: 24 passed with it.
 
-**Status: not committed by Claude.** The regex lives inside an `assert` line. `_agent_audit`
-counts an edited assertion as removed, and only the operator may override that with
-`--no-verify`. The input is a fixed test payload, so the alert has no runtime exposure. The
-operator can either commit the one-line change with `--no-verify`, or dismiss the alert as
-"used in tests".
+**Status: FIXED in `0e74f3f2`.** The operator committed it with `--no-verify`, because the regex sits
+inside an `assert` line and `_agent_audit` counts an edited assertion as removed. Alert #34 is fixed,
+and its review thread is resolved.
+
+## 3. CodeQL check still red: three alerts already open on `main`
+
+After `0e74f3f2`, the CodeQL check reported "3 new alerts". They are the existing `main` alerts:
+- #31 and #32, `py/clear-text-storage-sensitive-data`, `scripts/lib/webhook/status.py`: the redacted
+  cluster-status report written to the job dir.
+- #33, `py/incomplete-url-substring-sanitization`, `scripts/tests/hermes/test_hermes.py`: a
+  hostname-in-evidence assertion.
+
+This PR edits both files, so the lines moved, and GitHub labels them "new in code changed by this
+pull request". Its own summary warns that this happens on large diffs. Nothing here was introduced
+by v1.42.0, and CodeQL is not a required check. These stay as tracked debt on `main`.
