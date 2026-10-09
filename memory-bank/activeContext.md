@@ -1,3 +1,9 @@
+- **2026-10-09 — Tailwind v4: PR shopping-cart-frontend #117 open** (`chore/tailwind-v4-migration`, Codex `c9d3a95d` +
+  Claude `d6fc1bf1`). Verified: scope OK, lint/build/unit 30/30, audit 0, local Chromium E2E 42/42 (after installing
+  chromium-headless-shell 1243 — Codex's sandbox hung on the download). Copilot tagged; awaiting CI. Clone at
+  `shopping-carts/shopping-cart-frontend-tw4`. **Next (user order):** OpenLDAP CVE → SMS resolved → expired ACG
+  sandbox → frontend public URL.
+
 - **2026-10-09 — P1 node-health-watch (`90d8942a`) live-checked:** fixed code running (pid started 05:51 PDT, after
   the commit); live `_healthz_state` = ok on all 4 hub nodes; tunnel regex matches the real 502 line; BATS 11/11.
   The real tunnel → restart path awaits the first natural recurrence (check `grep 'kubelet tunnel dead'` in

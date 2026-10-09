@@ -1,6 +1,6 @@
 # Frontend: Tailwind v4 migration to clear the postcss-selector-parser advisory
 
-**Status:** OPEN — spec ready, dispatched to Codex 2026-10-09
+**Status:** IMPLEMENTED — Codex `c9d3a95d` + Claude `d6fc1bf1` (codemod renamed a test title); PR shopping-cart-frontend #117; local Chromium E2E 42/42
 **Priority:** P3 — medium advisory in a build-time dependency; Dependabot reopens a breaking PR until it is fixed
 **Component:** `shopping-cart-frontend` (Tailwind CSS 3.4 → 4.3, PostCSS pipeline)
 **Found:** 2026-10-09, E2E failure on Dependabot PR #114 (closed)
