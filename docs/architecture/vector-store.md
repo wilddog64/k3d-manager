@@ -55,12 +55,20 @@ sequenceDiagram
 
     Index->>Docs: Enumerate git ls-files corpus
     Index->>Index: Build embedded text and SHA-256 content hash
+    participant Cache as Local SQLite embedding cache
+
     Index->>DB: Fetch existing path to content_hash map
     alt Hash unchanged
         Index->>Index: Skip embedding
     else Hash changed
-        Index->>API: Embed changed text
-        API-->>Index: 768-dimensional vector
+        Index->>Cache: Look up model, dimension, task and text key
+        alt Cache hit
+            Cache-->>Index: Stored vector, no API call
+        else Cache miss
+            Index->>API: Embed changed text
+            API-->>Index: 768-dimensional vector
+            Index->>Cache: Store vector
+        end
         Index->>DB: Commit one batch transaction
     end
     alt API returns retryable 429 or transient 5xx
@@ -76,6 +84,14 @@ Each batch is committed independently, so a later failure leaves completed batch
 the next run. A quota pause does not mean the store or credential is broken; rerunning after the
 daily reset resumes from the stored hashes. The final prune is separate, so a failed embedding
 run does not delete rows.
+
+Every vector is also kept in a local SQLite cache at `~/.cache/k3dm/embeddings.sqlite`, keyed by
+model, dimension, task type and text. Rebuilding the store after a hub loss therefore reads vectors
+from that cache and spends no embeddings quota for unchanged text. The cache lives on the operator's
+Mac, not in the cluster, so it needs its own copy: `make embed-cache-backup DEST=...` and
+`make embed-cache-restore SRC=...` copy it off and merge it back, `make embed-cache-seed` fills an empty cache from
+the store, and `make embed-cache-stats` / `make embed-cache-prune` inspect and trim it. See
+[`docs/howto/find-prior-art.md`](../howto/find-prior-art.md).
 
 ## Credential resolution
 

@@ -1,5 +1,10 @@
 # k3d-manager Strategic Roadmap
 
+> **ARCHIVED — superseded by [`docs/roadmap.md`](../../roadmap.md).** This is the early v1.0–v1.4
+> vision plan, kept for history. Its version numbers, its "upcoming" items, and its OCI Always Free
+> permanent-cloud target (since descoped) do not describe current plans. Read `docs/roadmap.md`
+> for the current roadmap and `docs/releases.md` for what shipped.
+
 ## Vision
 
 k3d-manager is a **kops-for-k3s** — a cluster lifecycle manager for lightweight k3s/k3d
