@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Medium — the tool an operator would reach for during a GHCR outage silently does not
 touch the affected cluster, and leaks credentials into the process table.
-**Status:** FIXED — Defects 1–3 (3c3f0753); Defect 4 see commit, PAT now applied via a stdin manifest
+**Status:** FIXED — Defects 1–3 (3c3f0753); Defect 4 `3d33d687` (Claude-verified: RED on old code, green), PAT now applied via a stdin manifest
 
 ## Context
 
