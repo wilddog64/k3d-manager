@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** PARTIAL — tar-stream capture LIVE-VERIFIED (`fbebe9df`); round 5 (drop Trivy cache, atomic verified rename) dispatched to Codex
+**Status:** FIXED in branch e3040689 — live verification pending (operator)
 
 ## Question that prompted this
 
@@ -464,4 +464,3 @@ it:
 ```bash
 ssh m2jump 'mv k3dm-snapshots/20261009T014249Z k3dm-snapshots/20261009T014249Z.INCOMPLETE'
 ```
-
