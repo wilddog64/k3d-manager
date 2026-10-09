@@ -348,7 +348,7 @@ setup() {
     kubectl() {
       printf "%s\n" "$*" >> "$LOG"
       case "$*" in
-        *"get applications"*) printf "%s\n" "application/ubuntu-k3s-shopping-cart-payment" ;;
+        *"get applications"*) printf "%s\n" "{\"items\":[{\"metadata\":{\"name\":\"ubuntu-k3s-shopping-cart-payment\"},\"spec\":{\"destination\":{\"name\":\"ubuntu-k3s\"}}}]}" ;;
       esac
       return 0
     }

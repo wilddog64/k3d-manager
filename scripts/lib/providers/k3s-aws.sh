@@ -338,14 +338,10 @@ function _k3s_aws_deregister_cluster() {
       -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
     "${hub_kubectl[@]}" -n "${argocd_ns}" delete "${app}" --ignore-not-found >/dev/null 2>&1 || true
   done < <(
-    _applications="$("${hub_kubectl[@]}" -n "${argocd_ns}" get applications -o json 2>/dev/null)"
-    if [[ "${_applications}" == application/* ]]; then
-      printf '%s\n' "${_applications}"
-    else
-      jq -r --arg ctx "${ctx}" --arg server "${server}" \
+    "${hub_kubectl[@]}" -n "${argocd_ns}" get applications -o json 2>/dev/null \
+      | jq -r --arg ctx "${ctx}" --arg server "${server}" \
         '.items[]? | select(.spec.destination.name == $ctx or ($server != "" and .spec.destination.server == $server)) | "application/" + .metadata.name' \
-        <<< "${_applications}" 2>/dev/null
-    fi
+        2>/dev/null
   )
 
   _info "[k3s-aws] Deregistered ${secret_name} + generated Applications from hub ArgoCD (${argocd_ns})"
