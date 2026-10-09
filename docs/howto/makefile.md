@@ -70,6 +70,10 @@ After a rebuild, generate the new target map and restore with:
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
 | `make appsets-reapply` | **Every release:** reapply every ApplicationSet (hub and ACG) so its `$values` source tracks the release branch (`BRANCH=`, default: current branch; refuses anything that is not `k3d-manager-vX.Y.Z`) |
 | `make appsets-check` | Read-only: list Applications whose k3d-manager values source is not on `BRANCH`; run after `appsets-reapply` |
+| `make codex-dispatch SPEC=...` | Start Codex in an isolated worktree for a spec |
+| `make codex-status` | Show Codex task state, changes, and scope |
+| `make codex-land SLUG=...` | Land a verified, in-scope task |
+| `make codex-abandon SLUG=... [YES=1]` | Preview or remove an abandoned task |
 
 `sync-apps` delegates to `bin/cluster-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).

@@ -276,6 +276,7 @@ docs/
 - **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/ask-docs`, `/claude` / `/gemini` / `/codex`, `/cluster-up` / `/cluster-down` / `/cluster-status` / `/cluster-refresh` / `/cluster-resume`, and `/argocd-upgrade`
 - **[Webhook Operations](docs/howto/webhook-operations.md)** — Log levels, job logs, retention, and failed-job notes
 - **[Cloud Session Requests](docs/howto/cloud-session-requests.md)** — How an agent with only repo access asks the local webhook for read-only cluster state via the `cloud-requests` branch, the action allowlist, and the two-token (admin / reader) model
+- **[Codex dispatch](docs/howto/codex-dispatch.md)** — Run specs in isolated worktrees and land verified changes
 
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
 

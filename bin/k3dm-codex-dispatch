@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+_dispatch_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_dispatch_repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[[ -n "${_dispatch_repo_root}" ]] || _dispatch_repo_root="$(cd "${_dispatch_script_dir}/.." && pwd)"
+# shellcheck source=/dev/null
+source "${_dispatch_script_dir}/../scripts/lib/system.sh"
+_dispatch_worktree_root="${K3DM_WORKTREE_ROOT:-${HOME}/.local/share/k3d-manager/worktrees}"
+
+_dispatch_error() { echo "[codex-dispatch] ERROR: $*" >&2; exit 2; }
+_dispatch_usage() {
+  cat <<'EOF'
+Usage:
+  bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--network]
+  bin/k3dm-codex-dispatch status [SLUG]
+  bin/k3dm-codex-dispatch land --slug SLUG [--allow-out-of-scope]
+  bin/k3dm-codex-dispatch abandon --slug SLUG --yes
+EOF
+}
+
+_dispatch_release_branch() {
+  local branch
+  branch="$(git -C "${_dispatch_repo_root}" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  [[ "${branch}" =~ ^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "current branch '${branch:-detached}' is not a release branch"
+  printf '%s\n' "${branch}"
+}
+
+_dispatch_spec_files() {
+  awk '/^## Files[[:space:]]*$/ { in_files=1; next } in_files && /^## / { exit } in_files { print }' "$1" |
+    grep -oE "\`[^\`]+\`" | sed "s/^\`//; s/\`$//" || true
+}
+
+_dispatch_scope_verdict() {
+  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched
+  local -a patterns=()
+  while IFS= read -r path; do [[ -n "$path" ]] && patterns+=("$path"); done < <(_dispatch_spec_files "$worktree/$spec")
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    matched=1
+    [[ "$path" == memory-bank/* ]] && { echo "out-of-scope: $path"; in_scope=0; continue; }
+    for pattern in "${patterns[@]}"; do
+      # shellcheck disable=SC2254
+      case "$path" in
+        $pattern) matched=0; break ;;
+      esac
+    done
+    if (( matched )); then echo "out-of-scope: $path"; in_scope=0; fi
+  done < <({
+    git -C "$worktree" diff --name-only "origin/$rel...HEAD"
+    git -C "$worktree" diff --name-only
+    git -C "$worktree" ls-files --others --exclude-standard
+  } | sort -u)
+  if (( in_scope )); then echo "scope: in-scope"; elif (( allow )); then echo "scope: out-of-scope (allowed)"; else return 1; fi
+}
+
+_dispatch_task_spec() {
+  local task="$1" run="$2" spec
+  [[ -f "$run/spec" ]] || return 1
+  spec="$(<"$run/spec")"
+  [[ -n "$spec" && -f "$task/$spec" ]] || return 1
+  printf '%s\n' "$spec"
+}
+
+_dispatch_task_paths() {
+  _dispatch_task_dir="${_dispatch_worktree_root}/$1/$2"
+  _dispatch_run_dir="${_dispatch_worktree_root}/$1/$2.run"
+}
+
+_dispatch_start() {
+  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg
+  while (($#)); do
+    case "$1" in
+      --spec) (($# >= 2)) || _dispatch_error "--spec requires a path"; spec="$2"; shift 2 ;;
+      --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --network) network=1; shift ;;
+      -h|--help) _dispatch_usage; return 0 ;;
+      *) _dispatch_error "unknown start option: $1" ;;
+    esac
+  done
+  [[ -n "$spec" ]] || _dispatch_error "start requires --spec PATH"
+  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
+  [[ -f "$_dispatch_repo_root/$spec" ]] || _dispatch_error "spec does not exist: $spec"
+  git -C "$_dispatch_repo_root" ls-files --error-unmatch -- "$spec" >/dev/null 2>&1 || _dispatch_error "spec is not tracked: $spec"
+  git -C "$_dispatch_repo_root" diff --quiet HEAD -- "$spec" || _dispatch_error "spec is changed: $spec"
+  git -C "$_dispatch_repo_root" fetch origin "$rel:refs/remotes/origin/$rel" >/dev/null 2>&1 || _dispatch_error "could not fetch origin/$rel"
+  head="$(git -C "$_dispatch_repo_root" rev-parse HEAD)"; remote="$(git -C "$_dispatch_repo_root" rev-parse "origin/$rel")"
+  [[ "$head" == "$remote" ]] || _dispatch_error "HEAD is not pushed to origin/$rel"
+  _dispatch_spec_files "$_dispatch_repo_root/$spec" | grep -q . || _dispatch_error "spec has no backticked path in its ## Files section"
+  spec_base="$(basename "$spec" .md)"
+  [[ -n "$slug" ]] || slug="${spec_base#"${version}"-}"
+  [[ "$slug" != "$spec_base" ]] || slug="$spec_base"
+  [[ "$slug" =~ ^[A-Za-z0-9._-]+$ ]] || _dispatch_error "invalid slug: $slug"
+  git -C "$_dispatch_repo_root" show-ref --verify --quiet "refs/heads/task/$version/$slug" && _dispatch_error "task branch already exists: task/$version/$slug"
+  git -C "$_dispatch_repo_root" ls-remote --exit-code --heads origin "task/$version/$slug" >/dev/null 2>&1 && _dispatch_error "remote task branch already exists: task/$version/$slug"
+  worktree="$_dispatch_worktree_root/$version/$slug"; run="$_dispatch_worktree_root/$version/$slug.run"
+  [[ ! -e "$worktree" ]] || _dispatch_error "worktree path already exists: $worktree"
+  [[ ! -e "$run" ]] || _dispatch_error "run path already exists: $run"
+  mkdir -p "$_dispatch_worktree_root/$version"
+  git -C "$_dispatch_repo_root" worktree add -b "task/$version/$slug" "$worktree" "origin/$rel" >/dev/null
+  mkdir -m 700 "$run"; state_dir="$run/state"; mkdir -m 700 "$state_dir"
+  for arg in jobs run state logs tmp port-cache; do mkdir -m 700 "$state_dir/$arg"; done
+  printf '%s\n' "$spec" >"$run/spec"
+  cat >"$run/prompt.md" <<EOF
+Read the spec at $spec in full, and implement it in this directory only.
+Run the spec's Rules gates and paste their output.
+Do not run git add, git commit or git push. .git is read-only to you. Leave the changes in the working tree.
+Do not touch memory-bank/.
+Do not unset or override the K3DM_* and TMPDIR variables you were given. They keep this task's state away from the live webhook and from other tasks.
+Your last message must list every file you changed.
+EOF
+  local -a _dispatch_state_vars=(
+    "K3DM_REPO_ROOT=$worktree" "K3DM_JOB_DIR=$state_dir/jobs" "K3DM_RUN_DIR=$state_dir/run"
+    "K3DM_STATE_DIR=$state_dir/state" "K3DM_LOG_DIR=$state_dir/logs" "K3DM_TMP_ROOT=$state_dir/tmp"
+    "K3DM_PORT_CACHE_DIR=$state_dir/port-cache" "TMPDIR=$state_dir/tmp"
+  )
+  (
+    set +e
+    if (( network )); then
+      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$run/prompt.md" >"$run/codex.log" 2>&1
+    else
+      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1
+    fi
+    printf '%s\n' "$?" >"$run/exit"
+  ) &
+  printf '%s\n' "$!" >"$run/pid"
+  echo "worktree: $worktree"; echo "run: $run"; echo "status: bin/k3dm-codex-dispatch status $slug"
+}
+
+_dispatch_status() {
+  local rel version task slug run state spec pid
+  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
+  [[ -d "$_dispatch_worktree_root/$version" ]] || return 0
+  for task in "$_dispatch_worktree_root/$version"/*; do
+    [[ -d "$task" && "$task" != *.run ]] || continue
+    slug="$(basename "$task")"; run="$task.run"
+    if [[ -f "$run/landed" ]]; then state=landed
+    elif [[ -f "$run/pid" ]] && kill -0 "$(<"$run/pid")" 2>/dev/null; then state=running
+    elif [[ -f "$run/exit" ]]; then state="exited $(<"$run/exit")"
+    else state=unknown; fi
+    [[ -z "${1:-}" || "$1" == "$slug" ]] || continue
+    echo "task: $slug"; echo "state: $state"; git -C "$task" status --porcelain || true; git -C "$task" log --oneline "origin/$rel..HEAD" || true
+    if spec="$(_dispatch_task_spec "$task" "$run")"; then _dispatch_scope_verdict "$task" "$spec" "$rel" 1 || true; else echo "scope: unknown (no recorded spec)"; fi
+  done
+}
+
+_dispatch_land() {
+  local slug="" allow=0 rel version task run pid spec current
+  while (($#)); do
+    case "$1" in
+      --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --allow-out-of-scope) allow=1; shift ;;
+      *) _dispatch_error "unknown land option: $1" ;;
+    esac
+  done
+  [[ -n "$slug" ]] || _dispatch_error "land requires --slug SLUG"
+  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
+  [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
+  [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
+  [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null || _dispatch_error "Codex is still running"
+  [[ -z "$(git -C "$task" status --porcelain)" ]] || _dispatch_error "worktree has uncommitted changes"
+  [[ "$(git -C "$task" rev-list --count "origin/$rel..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$rel"
+  spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
+  _dispatch_scope_verdict "$task" "$spec" "$rel" "$allow" || _dispatch_error "task changes are out of scope"
+  current="$(git -C "$_dispatch_repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"; [[ "$current" == "$rel" ]] || _dispatch_error "operator checkout is not on $rel"
+  [[ -z "$(git -C "$_dispatch_repo_root" status --porcelain)" ]] || _dispatch_error "operator checkout is dirty"
+  git -C "$task" rebase "$rel" >/dev/null || _dispatch_error "rebase of task/$version/$slug onto $rel failed; resolve it in $task"
+  git -C "$_dispatch_repo_root" merge --ff-only "task/$version/$slug" >/dev/null
+  git -C "$_dispatch_repo_root" worktree remove "$task"
+  git -C "$_dispatch_repo_root" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
+  git -C "$_dispatch_repo_root" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
+  echo "landed: $slug"; echo "push: git push origin $rel"
+}
+
+_dispatch_abandon() {
+  local slug="" yes=0 rel version
+  while (($#)); do
+    case "$1" in
+      --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --yes) yes=1; shift ;;
+      *) _dispatch_error "unknown abandon option: $1" ;;
+    esac
+  done
+  [[ -n "$slug" ]] || _dispatch_error "abandon requires --slug SLUG"
+  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"
+  if (( ! yes )); then echo "would remove: $_dispatch_task_dir"; echo "would delete branch: task/$version/$slug"; exit 2; fi
+  git -C "$_dispatch_repo_root" worktree remove --force "$_dispatch_task_dir"; git -C "$_dispatch_repo_root" branch -D "task/$version/$slug" >/dev/null; echo "abandoned: $slug"
+}
+
+main() {
+  (($#)) || { _dispatch_usage; exit 2; }
+  case "$1" in
+    start) shift; _dispatch_start "$@" ;;
+    status) shift; (($# <= 1)) || _dispatch_error "status accepts at most one slug"; _dispatch_status "${1:-}" ;;
+    land) shift; _dispatch_land "$@" ;;
+    abandon) shift; _dispatch_abandon "$@" ;;
+    -h|--help) _dispatch_usage ;;
+    *) _dispatch_error "unknown command: $1" ;;
+  esac
+}
+main "$@"
