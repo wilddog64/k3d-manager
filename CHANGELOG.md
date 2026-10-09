@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- `make down` now deregisters sandbox Applications matched by their ArgoCD destination server.
+- `make down` preserves the Hub Vault LaunchAgent when the Hub is kept.
 - ArgoCD ApplicationSet live overrides now resolve Istio CNI directories for the live destination cluster, so a Hostinger destination cannot inherit the shell's sandbox cluster provider.
 - Added the warning-level `ArgoCDAppProgressingStuck` alert, which fires after 30 minutes for any ArgoCD app that remains Progressing.
 - Kept the GHCR PAT out of `kubectl` argv when minting shopping-cart pull secrets by applying an in-shell dockerconfigjson manifest on stdin.

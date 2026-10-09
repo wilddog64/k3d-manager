@@ -173,7 +173,7 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
     _info "[acg-down] Vault port-forward stopped"
   fi
 fi
-if _is_mac; then
+if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _vault_pf_label="com.k3d-manager.vault-port-forward"
   _vault_pf_plist="${HOME}/Library/LaunchAgents/${_vault_pf_label}.plist"
   if launchctl list "${_vault_pf_label}" >/dev/null 2>&1; then

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** OPEN — make-down path dispatched to Codex 2026-10-09; watcher/reaper still open
+**Status:** PARTIAL — make down path fixed (server match + keep-hub Vault agent); watcher/reaper still open (needs lib-foundation)
 **Priority:** P3 — noise in ArgoCD, and alert/dashboard pollution; no outage
 **Severity:** Low
 **Component:**
