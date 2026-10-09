@@ -1,3 +1,8 @@
+## 2026-10-09 — worktree-isolated Codex dispatch LANDED (b5223944)
+
+- Codex implemented the 6 files; Claude verification found and fixed: (1) status/land picked the spec as the first root `*.md` (README/CLAUDE.md in the real repo → every land would refuse) — spec path now recorded in `<run>/spec`; (2) memory-bank not hard-excluded when a spec lists it; (3) two `! cmd` mid-test no-ops and a land test that never checked the fast-forward. 13/13 BATS, shellcheck clean, 5 mutations all red (incl. Codex's original lookup), script restored by cmp.
+- Dogfood next: Hermes R10 spec gained a `## Files` table + worktree DoD; dispatching via `make codex-dispatch`. Other v1.43.0 specs and the two appsets bugs need a `## Files` table before they can be dispatched this way.
+
 ## 2026-10-09 — swap: agent isolation pulled into v1.43.0; Codex dispatched
 
 - `docs/plans/v1.43.0-worktree-isolated-codex-dispatch.md` (was v1.45.0) ⇄ `docs/plans/v1.45.0-test-metrics-log-retention.md` (was v1.43.0). Both releases stay at 5 plans; roadmap + cross-links updated.
