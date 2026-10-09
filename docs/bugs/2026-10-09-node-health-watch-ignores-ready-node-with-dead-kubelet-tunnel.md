@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator received a `PublicEndpointDown` SMS for argocd)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IMPLEMENTED — `90d8942a`; live-checked 2026-10-09 (see "Live verification"); the restart path waits for the first natural recurrence
+**Status:** IMPLEMENTED — `90d8942a`; live-checked 2026-10-09 (see "Live verification"); the restart path waits for the first natural recurrence. Release decision 2026-10-09: ships in v1.42.0 as **verify on next occurrence**; a fault drill to prove it on demand is queued as `docs/plans/v1.45.0-node-tunnel-fault-drill.md`
 **Priority:** P1 — a public endpoint stays down until a human restarts the agent
 **Severity:** High
 **Component:** `bin/k3dm-node-health-watch` (`_healthy`, `_tick`)

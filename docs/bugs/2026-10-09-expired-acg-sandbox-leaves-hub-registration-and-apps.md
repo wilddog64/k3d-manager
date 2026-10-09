@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IMPLEMENTED — the reaper is on k3d-manager-v1.42.0. The operator installed it 2026-10-09: `com.k3d-manager.sandbox-reaper` is loaded, the first run exited 0, and PATH is set in the plist. The live reap waits for the next sandbox to expire.
+**Status:** IMPLEMENTED — the reaper is on k3d-manager-v1.42.0. The operator installed it 2026-10-09: `com.k3d-manager.sandbox-reaper` is loaded, the first run exited 0, and PATH is set in the plist. The live reap waits for the next sandbox to expire. Release decision 2026-10-09: ships in v1.42.0 as **verify on next occurrence** (an ACG sandbox expires every 4–8h, so the next lapse is the test; simulating it would delete real hub registrations).
 **Priority:** P3 — noise in ArgoCD, and alert/dashboard pollution; no outage
 **Severity:** Low
 **Component:**

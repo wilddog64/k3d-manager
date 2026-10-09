@@ -1,3 +1,11 @@
+## 2026-10-09 — Event-triggered checks: release decision + v1.45.0 fault-drill spec
+
+- Operator asked whether vCluster could simulate the event-triggered v1.42.0 checks. It can't (virtual nodes: no kubelet/tunnel, no CNI, no AWS). Decision: release v1.42.0 with them marked:
+  - **Verify on next occurrence:** expired-sandbox reaper (next ACG lapse), node-health-watch tunnel restart (P1; `grep -E 'kubelet tunnel dead|restarting' ~/.local/share/k3d-manager/logs/node-health-watch.log`).
+  - **v1.42.0 release step:** Hostinger istio-cni — `make appsets-reapply` + next istio-ambient apply, then check the alert.
+  - cleanup-stale-sandbox vs Hostinger PF: verify at the next real stale-sandbox cleanup.
+- Spec QUEUED: `docs/plans/v1.45.0-node-tunnel-fault-drill.md` — `make drill-node-tunnel`: throwaway k3d cluster `k3dm-drill-tunnel`, iptables REJECT agent-local dial to :10250 (node stays Ready, healthz 502), fidelity gate on the watchdog's own regex, real watchdog with isolated log/state, PASS/FAIL/INCONCLUSIVE. Operator runs it; Codex implements when `k3d-manager-v1.45.0` exists (v1.43.0/v1.44.0 at the 5-plan cap; v1.45.0 now 3/5).
+
 <!-- 2026-10-09 last-run panel colour -->
 - **2026-10-09: k3dm Tests "Last run" was always red.** It used Grafana default thresholds, and the epoch value in ms is always above 80. The fix gives it a fixed neutral colour, with a BATS assertion that fails against the old dashboard (jq rc 4). Bug doc `2026-10-09-k3dm-tests-last-run-panel-always-red.md`. Rolls out via `hub-grafana-dashboards` auto-sync on the v1.42.0 branch.
 
