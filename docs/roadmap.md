@@ -122,6 +122,21 @@ the R10 repair (delete a failed Job superseded by a newer CronJob spec) overflow
 
 Scope: [`v1.42.0-hermes-alert-driven-triage.md`](plans/v1.42.0-hermes-alert-driven-triage.md).
 
+### Candidate milestone — v1.43.0
+
+**Bug priority tracking.** Every bug doc gets a `**Priority:** P0`–`P3` field, which records
+urgency and is separate from Severity. The vector store keeps priority and open/closed state as
+non-embedded metadata, so `/ask-docs` and `find-similar-docs` label bug sources (for example
+`[P1 · open]`). A `k3dm_bug_docs{priority,state}` gauge feeds a new Grafana "Bugs" dashboard (open
+P0/P1, untriaged, open by priority over time), and a pre-commit check rejects new bug docs that
+have no Priority. Once it lands, Claude backfills priorities on the open bugs.
+
+Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.md). Also queued
+for v1.43.0: [`v1.43.0-e2e-failure-artifacts.md`](plans/v1.43.0-e2e-failure-artifacts.md),
+[`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
+[`v1.43.0-test-metrics-log-retention.md`](plans/v1.43.0-test-metrics-log-retention.md), and the
+R10 overflow from v1.42.0. That is four plan docs against the cap of five.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a

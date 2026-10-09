@@ -1633,3 +1633,5 @@ the next CI run is pending.
 - 2026-10-08 23:58Z: Slack body-cap fix verified live — job ff32a425 success, /slack/events 3x200, 0x401 after bot posts.
 
 - 2026-10-08: Spec docs/plans/v1.43.0-bug-priority-tracking.md (bug Priority P0-P3, vectordb priority/state columns, ask-doc suffix, k3dm_bug_docs metric + Grafana dashboard, pre-commit check). 4th v1.43.0 spec. Awaiting go; Codex dispatch needs k3d-manager-v1.43.0 branch.
+
+- 2026-10-08: Bug priority tracking added to docs/roadmap.md as v1.43.0 candidate; spec QUEUED, dispatch to Codex when k3d-manager-v1.43.0 opens.
