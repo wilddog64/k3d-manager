@@ -1,3 +1,7 @@
+## 2026-10-09 — codex-dispatch spec: per-task state isolation added
+
+- Operator approved: dispatcher exports K3DM_REPO_ROOT/JOB_DIR/RUN_DIR/STATE_DIR/LOG_DIR/TMP_ROOT/PORT_CACHE_DIR + TMPDIR under `<run>/state` (one array `_dispatch_state_vars`), `--add-dir <run>/state`, HOME unchanged; test 5b + 3rd mutation check; worktree caveats in the how-to.
+
 ## 2026-10-09 — Aithon comparison → two v1.45.0 specs + one bug (operator: "go ahead")
 
 - Decision: adopt isolated parallel agent execution + alert-to-draft-bug intake; REJECT per-PR human-review classifier and full beta/staging rails (overhead for one operator). Replace staging with a hub-first two-stage appsets rollout.
