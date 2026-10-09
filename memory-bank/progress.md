@@ -1,3 +1,9 @@
+## 2026-10-09 — codex-dispatch scope fix LANDED (774747ac); stdout-hold bug filed
+
+- Scope now comes from the spec as dispatched (`<run>/base` + `git show base:spec`); editing the spec is out of scope; scope diff from base. 17/17 BATS, both mutations red (Claude-run in the task worktree). Landed with the fixed tool.
+- CORRECTION to the R10 note below: Hermes needs NO reload — its LaunchAgent runs bin/k3dm-hermes from the operator checkout every 300s (StartInterval), so superseded_jobs is live from the next cycle.
+- New P3: docs/bugs/2026-10-09-codex-dispatch-start-holds-caller-stdout.md — start's background subshell keeps caller stdout open (piped start waits ~10 min). Dispatching via the tool (unpiped).
+
 ## 2026-10-09 — Hermes R10 LANDED via worktree dispatch (first dogfood)
 
 - R10 commits d6beebf9 / 7da544ad / bfc6e432 pushed. Claude verification: full hermes suite 249 passed; added superseded_jobs to both stubbed-sensor lists in test_hermes.py (unstubbed it probed the real hub and paged); added the missing 'precondition no longer holds' approve() test; commit 1 passes standalone (245).

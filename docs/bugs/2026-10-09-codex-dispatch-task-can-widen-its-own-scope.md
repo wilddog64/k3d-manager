@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — dispatch via `make codex-dispatch`
+**Status:** FIXED `774747ac` 2026-10-09 (Codex via worktree dispatch; Claude verified 17/17 BATS, both mutations red)
 **Priority:** P2 — the scope gate is the point of the tool, and an agent can bypass it silently
 **Severity:** medium
 
