@@ -1,3 +1,5 @@
+- 2026-10-09 — Spec `docs/plans/v1.45.0-docs-drift-detection.md` filed (operator chose v1.45.0; v1.43.0 and v1.44.0 at cap). 3 layers: generated doc blocks + `make docs-check` (CI/pre-commit), weekly Hermes drift digest via `covers:` lines, drift → bug-doc draft. Hermes never edits docs. Roadmap v1.45.0 section added. v1.45.0 now 2/5 plans. Dispatch to Codex when `k3d-manager-v1.45.0` opens.
+
 - 2026-10-09 — PR #136 (Dependabot brace-expansion in subtree) CLOSED at user request, with comment; fix belongs upstream in lib-foundation then subtree-pull. Dependabot alerts #13 (brace-expansion) and #15 (sprintf-js, no patch) remain open on main.
 
 - 2026-10-09 — webhook-server.md rewrite VERIFIED (Codex `d1f66a98`, on origin): 2 files only; all 16 modules with wc -l matching; intra-package imports match code; all 15 `_POST/_GET_ROUTES` keys present; no line ranges; monolith 2,576 lines; confirm targets listed; `make check-doc-links` OK. Bug doc `2026-10-09-webhook-server-architecture-doc-stale.md` FIXED. All 4 audited docs now current. PR #136 (brace-expansion in subtree) — recommended not merging; awaiting user on lib-foundation bump.
