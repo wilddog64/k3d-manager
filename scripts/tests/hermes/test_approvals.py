@@ -115,6 +115,7 @@ def _stub_approval_poll(monkeypatch, tmp_path, token):
     monkeypatch.setattr(k3dm_hermes, "_file_app_health_bugs", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_status", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: None)
     monkeypatch.setattr(k3dm_hermes, "_schedule_e2e", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_save_state", lambda *_: None)
     k3dm_hermes._poll({}, tmp_path / "state.json", now=1000)
