@@ -1,3 +1,14 @@
+## 2026-10-08 — Claude verified hub snapshot round 3 (`2e8996ae`); remote snapshot targets specced
+
+- Verified on origin: `2e8996ae` (fix), `e918fcd0` (bug status) and `d2a60860` (memory-bank). Capture now maps the PV's nodeAffinity hostname through `_hub_recovery_logical_node` before building the container name. The bats kubectl stub returns real hostnames, and a new test asserts `docker cp k3d-k3d-cluster-agent-1:` and no doubled prefix.
+- Claude's gates: bats 60/60 GREEN, shellcheck clean, RED at `32395370` (the new test fails).
+- Pending, operator: rerun `make snapshot`, then `make status CLUSTER_PROVIDER=k3s-aws`.
+- New spec `docs/plans/v1.42.0-hub-snapshot-remote-targets.md` (4th v1.42.0 plan doc):
+  - Slack: `snapshot-list` at reader; `snapshot` and `hub-retain-pvs` at operator.
+  - Cloud bridge: `make-snapshot-list` only.
+  - `snapshot-prune` is never exposed.
+  - Dispatch to Codex waits until the operator's live `make snapshot` succeeds.
+
 ## 2026-10-08 — Hub PVC live check: retain-pvs passed, make snapshot fails live (doubled container name), round 3 to Codex
 
 - Operator ran `make hub-retain-pvs`: 8/8 PVs Delete → Retain. LIVE-VERIFIED.
