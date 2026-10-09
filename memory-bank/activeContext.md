@@ -1,3 +1,8 @@
+## 2026-10-09 15:30 UTC — merges done; disk Hostinger target + postgres Recreate verified
+- sc-infra #108 merged `03c6206f`, sc-frontend #115 merged `3623e5b2`; enforce_admins restored (bodyless POST) on both.
+- Disk amendment (Hostinger node): Codex `f88993a6` on `k3d-manager-v1.42.0` — verified: 7/7 pytest, 2 new tests FAIL on pre-fix script, yaml OK. Live check pending: next Hermes tick → `k3dm_disk_avail_bytes{host="hostinger"}` in hub Prometheus.
+- postgres-keycloak Recreate: Codex `05b2e9e` on sc-infra `fix/keycloak-postgres-recreate-strategy` — verified diff (2 files), kustomize renders Recreate. PR next. Codex flagged `identity/ldap/deployment.yaml` (Deployment + RWO PVCs) — same risk, not changed.
+
 ## 2026-10-09 — payment CVE bug FIXED
 
 - `docs/bugs/2026-10-08-payment-spring-webmvc-cve-no-oss-6x-fix.md` → FIXED. Payment Trivy alert cleared on the hub; all 42 firing TrivyCritical are tier=upstream. Trivy has not yet written a report for the live RS `5b6bf56678`.
