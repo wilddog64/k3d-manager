@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.42.0`
-**Status:** FIXED — the panel uses a fixed neutral colour (`color.mode: fixed`, `fixedColor: text`)
+**Status:** VERIFIED live 2026-10-09 — after `9b604284` synced, hub Grafana shows "Last run" in neutral text colour; pass/fail stays on the green time-since-success and `passed` classification panels
 **Priority:** P3 — cosmetic, but a red value reads as a failure signal
 **Severity:** low
 
