@@ -1,3 +1,9 @@
+<!-- 2026-10-09 v1.42.0 bug audit — dispatch round -->
+- **2026-10-09: v1.42.0 bug closure.**
+  - **frontend-public-url (2026-09-25):** FIXED, superseded by the 2026-10-01 hub-recovery fix. Public URL returns 200 via `127.0.0.2:80` to hostinger; the stale agent is gone.
+  - **SMS item 4:** the spec (`make alertmanager-config`, a deduped `_observability_apply_alertmanager_config`) is appended to the SMS bug doc and dispatched to Codex.
+  - **login-callback A and C:** Claude opens the PRs. Codex may not create PRs.
+
 <!-- 2026-10-09 v1.42.0 bug audit — Claude-owned live checks done -->
 - **2026-10-09: v1.42.0 bug audit.** Claude verified two fixes and set them to verified:
   - hermes-values-branch (`895221cb`): the live hub record is healthy, 21 refs, 0 stale. The stale-path message is covered by 10 pytest cases.

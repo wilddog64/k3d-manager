@@ -3,7 +3,7 @@
 **Filed:** 2026-09-25
 **Severity:** the public storefront has been unreachable while every health signal stayed green
 **Reported by:** the operator, via `make status CLUSTER_PROVIDER=k3s-hostinger`
-**Status:** UNKNOWN — the doc leaves the correct tunnel/origin routing fix undecided and source history has no resolved choice to verify (triaged 2026-10-08, Codex)
+**Status:** FIXED — superseded by `2026-10-01-hub-recovery-points-public-frontend-at-hub.md`, which took the "point the tunnel at hostinger" option. `scripts/etc/cloudflared/origins.tsv` maps `frontend.3ai-talk.org` to `http://127.0.0.2:80` for `k3s-hostinger`, served by the hostinger frontend port-forward in `scripts/lib/providers/k3s-hostinger.sh`. Verified 2026-10-09 (Claude): the live tunnel config routes to `127.0.0.2:80`, `https://frontend.3ai-talk.org/` returns 200 with the storefront HTML, and the stale `com.k3d-manager.frontend-port-forward` agent (`ubuntu-k3s` `3000:80`) is no longer loaded.
 
 ---
 
