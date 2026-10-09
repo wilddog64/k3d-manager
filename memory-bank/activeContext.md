@@ -1,3 +1,6 @@
+<!-- 2026-10-09 last-run panel colour -->
+- **2026-10-09: k3dm Tests "Last run" was always red.** It used Grafana default thresholds, and the epoch value in ms is always above 80. The fix gives it a fixed neutral colour, with a BATS assertion that fails against the old dashboard (jq rc 4). Bug doc `2026-10-09-k3dm-tests-last-run-panel-always-red.md`. Rolls out via `hub-grafana-dashboards` auto-sync on the v1.42.0 branch.
+
 <!-- 2026-10-09 failure-history verified -->
 - **2026-10-09: `k3dm-tests-failure-history-missing` VERIFIED live.** The 7-day failure table keeps #60 and #203 from the 19:09Z failed run after the 20:01Z green run. Both Grafana test-metric bug docs are now verified. The operator's first screenshot was taken before the panel refreshed.
 

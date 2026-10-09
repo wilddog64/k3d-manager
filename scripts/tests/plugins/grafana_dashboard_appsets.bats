@@ -434,6 +434,7 @@ _assert_no_panel_overlap() {
   jq -e '.description | contains("failed_untriaged")' <<<"$panel" >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failed cases" and (.targets[0].expr == "k3dm_test_cases_failed"))' >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Last run" and .fieldConfig.defaults.unit == "dateTimeAsIso" and .targets[0].expr == "max(k3dm_test_last_timestamp_seconds) * 1000")' >/dev/null
+  printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Last run" and .fieldConfig.defaults.color.mode == "fixed" and .fieldConfig.defaults.color.fixedColor == "text")' >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Time since last successful run")' >/dev/null
   printf '%s\n' "$dashboard_json" | jq -e '.panels[] | select(.title == "Failing test cases (latest run)" and (.description | contains("No data means")))' >/dev/null
 }

@@ -20,9 +20,9 @@ data:
           "id": 1,
           "type": "stat",
           "title": "Last run",
-          "description": "Timestamp of the latest completed suite run across published targets. This value stays fixed until another run is published.",
+          "description": "Timestamp of the latest completed suite run across published targets. This value stays fixed until another run is published. Its colour is neutral on purpose: pass or fail is shown by Latest run classification and Time since last successful run.",
           "gridPos": { "x": 0, "y": 0, "w": 12, "h": 5 },
-          "fieldConfig": { "defaults": { "unit": "dateTimeAsIso" } },
+          "fieldConfig": { "defaults": { "unit": "dateTimeAsIso", "color": { "mode": "fixed", "fixedColor": "text" } } },
         "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k3dm_test_last_timestamp_seconds) * 1000", "instant": true }]
         },
         {
