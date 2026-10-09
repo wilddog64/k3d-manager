@@ -325,3 +325,12 @@ def test_top_level_make_job_creates_a_slack_thread(monkeypatch, tmp_path):
     assert (tmp_path / job_id / "channel_id").read_text() == "C1"
     assert (tmp_path / job_id / "thread_source").read_text() == "bot"
     assert started
+
+
+def test_audit_remote_action_uses_isolated_directory():
+    from webhook import policy
+
+    policy._audit_remote_action("/api/v1/x", "x", "test", "admin", True)
+
+    assert Path(policy.AUDIT_DIR) != Path.home() / ".local/share/k3d-manager/audit"
+    assert (policy.AUDIT_DIR / "remote-operator.jsonl").read_text()
