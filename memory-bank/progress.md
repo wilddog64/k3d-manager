@@ -1,3 +1,16 @@
+## 2026-10-09 — Bugs filed: Hostinger istio-cni stuck Progressing; expired ACG sandbox leaves its registration
+
+- `docs/bugs/2026-10-09-hostinger-istio-cni-generic-dirs-after-hub-rebuild-and-no-alert.md` (OPEN, P2):
+  - `istio-cni-ubuntu-hostinger` has been Progressing since 2026-10-03, with `istio-cni-node` at 0/1 (readyz 503).
+  - Its Helm values use the generic `/etc/cni/net.d` + `/opt/cni/bin`, but Hostinger needs the rancher dirs.
+  - The ApplicationSet was created during the 10-03 hub rebuild and updated 10-06. Which path applied it is not yet traced.
+  - No alert: `ArgoCDAppDegraded` uses a name allowlist and only matches Degraded; the hub has no Hostinger DaemonSet metrics.
+  - Operator recovery: `make refresh CLUSTER_PROVIDER=k3s-hostinger`.
+- `docs/bugs/2026-10-09-expired-acg-sandbox-leaves-hub-registration-and-apps.md` (OPEN, P3):
+  - `cluster-ubuntu-k3s` and 8 `ubuntu-k3s-*` apps (sync Unknown) remain.
+  - Deregister runs only from `destroy_cluster`. The fix is a watcher plus a reaper that requires a positive "gone" signal.
+- Vector DB dashboard change `a8f8dc13` is live: the ConfigMap has `graphMode: none`.
+
 ## 2026-10-09 — Vector DB dashboard: removed unlabeled sparkline on the reachability panel
 
 - In `grafana-dashboard-vectordb.yaml`, panel 4 now has `graphMode: none`, the same as the other stat panels.
