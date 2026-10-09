@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08
 **Branch:** k3d-manager-v1.42.0
-**Status:** FIXED in branch `895221cb` — live verification pending (Claude)
+**Status:** FIXED in branch `895221cb` — verified 2026-10-09 (Claude): the hub `hermes-status` record sampled 2026-10-09T18:17:57Z, after the fix, reads `healthy`, 21 references on k3d-manager-v1.42.0, 0 stale. With nothing stale, the new degraded message cannot show live; the 10 `values_branch` pytest cases cover it.
 **Severity:** Low — misleading scope in an operator warning
 **Component:** scripts/lib/hermes/sensors.py:values_branch
 

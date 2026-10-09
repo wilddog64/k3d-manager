@@ -1,3 +1,14 @@
+<!-- 2026-10-09 v1.42.0 bug audit — Claude-owned live checks done -->
+- **2026-10-09: v1.42.0 bug audit.** Claude verified two fixes and set them to verified:
+  - hermes-values-branch (`895221cb`): the live hub record is healthy, 21 refs, 0 stale. The stale-path message is covered by 10 pytest cases.
+  - webhook-tests-audit-log (`2f7e0eb5`): pytest ran 779 passed and the audit log stayed at 72 test rows.
+  - The tailwind v4 bug is now FIXED; shopping-cart-frontend PR #117 merged as `05ec17e3`.
+  - **Still open for v1.42.0:**
+    - login-callback A and C need PRs; B is deferred.
+    - SMS item 4 is optional.
+    - The frontend-public-url bug is UNFIXED, and its fix choice is undecided.
+    - About 13 fixes are waiting on operator or live checks: the Slack threads, the test metrics, the reaper, node-health-watch and istio-cni.
+
 - 2026-10-09 — v1.45.0 docs-drift spec amended with §7 Grafana (operator yes): 7 `k3dm_docs_*` metrics via Pushgateway job `k3dm-docs-drift` (hourly gate), "Docs Health" dashboard (`make platform-ops`), `DocsDriftCheckStale` info rule; tests 8–11 + live step 4.
 
 - 2026-10-09 — Spec `docs/plans/v1.45.0-docs-drift-detection.md` filed (operator chose v1.45.0; v1.43.0 and v1.44.0 at cap). 3 layers: generated doc blocks + `make docs-check` (CI/pre-commit), weekly Hermes drift digest via `covers:` lines, drift → bug-doc draft. Hermes never edits docs. Roadmap v1.45.0 section added. v1.45.0 now 2/5 plans. Dispatch to Codex when `k3d-manager-v1.45.0` opens.
