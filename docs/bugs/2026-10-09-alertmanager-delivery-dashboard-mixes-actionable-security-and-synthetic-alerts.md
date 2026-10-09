@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — dispatch via `make codex-dispatch`
+**Status:** FIXED `42c4ac9a` 2026-10-09 (Codex via parallel worktree dispatch; Claude restored the routing paragraph, ran every new query against hub Prometheus, mutation red). Live in Grafana after the next `hub-grafana-dashboards` sync.
 **Priority:** P3 — the dashboard is correct but misleading; the real signal is hidden
 **Severity:** low
 **Origin:** operator, 2026-10-09, from a ChatGPT review of the dashboard. Claude's evaluation kept
