@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator saw the spinner on `frontend.3ai-talk.org`)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** OPEN — A (frontend timeout) and C (probe) dispatched to Codex 2026-10-09; B deferred (PV pinned to agent-0, needs a data migration decision)
+**Status:** PARTIAL — A `f28a1b93` (shopping-cart-frontend `fix/login-callback-timeout`) and C `63cfcfa5` (shopping-cart-infra `fix/keycloak-postgres-probe-user`) Claude-verified, PRs not opened; B deferred (PV pinned to agent-0)
 **Priority:** P2 — login recovers on its own once the DB is back, but the page never tells the user
 **Severity:** Medium
 **Component:**

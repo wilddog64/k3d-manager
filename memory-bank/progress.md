@@ -1,3 +1,14 @@
+## 2026-10-09 — P2/P3 Codex batch: all Claude-verified
+
+- istio-cni `350fac28`; ACG deregister `209addbe` + Claude cleanup `cbd2f564` (removed a test-only
+  branch Codex put in production code; old stub now returns JSON), 67/67 BATS, RED on old code.
+- Frontend `f28a1b93` on `fix/login-callback-timeout`: lint/tsc clean, vitest 30/30; on the old
+  component exactly the 2 new tests fail. Infra `63cfcfa5` on `fix/keycloak-postgres-probe-user`:
+  kustomize renders. PRs NOT opened (awaiting the user's review).
+- Still open: Keycloak DB off agent-0 (needs data-migration decision), ACG watcher/reaper
+  (lib-foundation first), SMS resolved (parked v1.44.0), Hostinger payment outage (operator:
+  `make shopping-cart-credential-drift` then `APPLY=1`).
+
 ## 2026-10-09 — Hostinger payment DOWN after repin: DB credential drift, not the image
 
 - Repinned payment to `2d930a93` (payment #86, CI Trivy 0 findings) in `f92ae552`. The new pod
