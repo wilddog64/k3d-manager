@@ -28,6 +28,8 @@ GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
 RELAY_DIR        ?= workers/slack-relay
 
+.PHONY: appsets-reapply appsets-check
+
 .PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
@@ -317,6 +319,20 @@ sync-main:
 	    argocd.argoproj.io/refresh=normal --overwrite 2>/dev/null || true; \
 	done
 	@echo "[make] Refresh triggered — run 'make status' to confirm"
+
+## Reapply every ApplicationSet pinned to a release branch (BRANCH=, default: current branch)
+appsets-reapply:
+	@_b='$(BRANCH)'; \
+	if ! printf '%s\n' "$$_b" | grep -Eq '^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+	  echo "[appsets-reapply] ERROR: '$$_b' is not a release branch (k3d-manager-vX.Y.Z)." >&2; \
+	  echo "[appsets-reapply] Check out the release branch or pass BRANCH=k3d-manager-vX.Y.Z." >&2; \
+	  exit 1; \
+	fi; \
+	K3D_MANAGER_BRANCH="$$_b" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+
+## Report Applications whose k3d-manager values source is not on BRANCH (read-only)
+appsets-check:
+	@./scripts/k3d-manager argocd_check_values_branch '$(BRANCH)' '$(INFRA_CONTEXT)'
 
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:
@@ -1367,6 +1383,8 @@ help:
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make sync-branch           Point services-git at BRANCH (default: current branch) and refresh"
 	@echo "    make sync-main             Revert services-git to main and refresh"
+	@echo "    make appsets-reapply       Reapply all ApplicationSets on the release branch (BRANCH= optional; required each release)"
+	@echo "    make appsets-check         Report Applications not reading BRANCH's values (read-only)"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo "    make fleet-render          Render count-driven ACG fleet (offline)"

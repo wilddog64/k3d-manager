@@ -3,8 +3,7 @@
 **Branch:** `k3d-manager-v1.40.0`
 **Filed:** 2026-09-30 by Claude (cloud session), from the operator's "I don't see any" (the
 *k3dm Alertmanager Delivery* dashboard)
-**Status:** FIXED — Codex `a92f1f1d`, verified by Claude 2026-09-30 with one ordering defect and two test
-defects fixed in the follow-up commit. Unexercised live until the next release-branch switch.
+**Status:** FIXED — R9 sensor (a92f1f1d); 2026-10-09 recurrence → make appsets-reapply/appsets-check (5542947f)
 **Classification:** Bugfix in `docs/bugs/` (v1.40.0 already has five plan docs).
 **Severity:** Medium. Nothing fails; config merged and green in CI never reaches a cluster.
 **Related:** `2026-07-24-make-status-values-branch-drift-wiring.md` (the same check in `make status`,
