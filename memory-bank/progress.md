@@ -1,3 +1,9 @@
+## 2026-10-08 — host-disk PrometheusRules live; SMS proof pending (operator)
+
+- Operator ran `make prometheus-rules` → `host-disk` created, 6 rule files applied. Prometheus `host.disk` group: HostDiskSpaceLow / HostDiskSpaceCritical / HostDiskMetricsStale all health `ok`, state `inactive` (m2 60%, m4 63%).
+- SMS proof method: running the collector by hand does NOT work — it PUTs job `k3dm-disk`, and Hermes overwrites that group every 300s, shorter than the critical rule's 10m `for`. Instead push a fake `host="smstest"` series under a separate job `k3dm-disk-smstest` (rules have no job filter), wait ~11–12m for the SMS, then `curl -X DELETE` that job.
+- Next: operator runs the SMS proof; then dispatch the remote-targets spec (raise the Slack snapshot timeout above 1800 first).
+
 ## 2026-10-08 — Hub snapshot LIVE-VERIFIED; both bug docs closed
 
 - Operator tmux run: `make snapshot` → `captured 20261009T022625Z` (preflight passed, rsync ~12m, auto-prune left the `.INCOMPLETE` with a warning); `make status` → `✓ Hub snapshot: 20261009T022625Z (0h old)`; `make snapshot-prune` removed `20261009T014249Z.INCOMPLETE`.
