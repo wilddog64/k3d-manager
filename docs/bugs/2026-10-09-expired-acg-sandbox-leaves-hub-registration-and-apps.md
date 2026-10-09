@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** PARTIAL — make-down path FIXED `209addbe` + `cbd2f564`; watcher path dropped (never started); reaper designed below, awaiting operator choice (auto vs Hermes approval)
+**Status:** PARTIAL — make-down path FIXED `209addbe` + `cbd2f564`; watcher path dropped (never started); reaper SPECCED below (operator chose automatic, no approval, Slack notification on every action), dispatched to Codex
 **Priority:** P3 — noise in ArgoCD, and alert/dashboard pollution; no outage
 **Severity:** Low
 **Component:**
@@ -268,3 +268,187 @@ clock resets; one app `Synced` → clock file removed; never selects `ubuntu-k3s
 sensor that proposes the same cleanup through the Slack approval flow (Hermes already runs every
 5 min). Recommended: the reaper as above, because the two-signal gate makes a wrong delete
 unlikely and the action is cheap to redo (`make argocd-registration`).
+
+## Operator decision (2026-10-09)
+
+> "expired-sandbox cleanup should happen automatically without approval. this typically happen
+> during ACG sandbox up and down unless there a debug session initial by cloud agent. even that
+> happen that's would be initial by me ... but notification should happen so I am aware of activities"
+
+- **Automatic, no approval.** The Hermes-approval alternative is dropped.
+- **No dry-run soak.** The two-signal gate is the safety. The plist ships live
+  (`K3DM_SANDBOX_REAPER_DRYRUN=0`); the variable stays for manual runs.
+- **Notify every action to Slack** through the relay Hermes already uses (Keychain item
+  `k3dm-slack-webhook`, account `k3dm`). Debug sessions need no exemption: the operator starts them.
+
+## Implementation spec (Codex)
+
+**Repo / branch:** k3d-manager, `k3d-manager-v1.42.0` (already checked out; do not switch).
+
+**Files (nothing else):**
+
+| File | Change |
+|---|---|
+| `bin/k3dm-sandbox-reaper` | new, executable |
+| `bin/k3dm-slack-notify` | new, executable |
+| `scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl` | new |
+| `Makefile` | `install-sandbox-reaper` / `uninstall-sandbox-reaper` targets + `.PHONY` |
+| `scripts/tests/bin/k3dm_sandbox_reaper.bats` | new |
+| `scripts/tests/bin/k3dm_slack_notify.bats` | new |
+| `docs/howto/launchd-daemons.md` | row in "Daemons at a Glance" + a `## Sandbox reaper` section |
+| `CHANGELOG.md` | `[Unreleased]` → `### Added`, one bullet |
+| this doc | `**Status:**` → `IMPLEMENTED — reaper on k3d-manager-v1.42.0; operator install pending (make install-sandbox-reaper)` |
+
+### 1. `bin/k3dm-slack-notify`
+
+A small bash wrapper: reads the message from **stdin**, posts it with the existing
+`scripts/lib/hermes/slack.py` `post_summary`, URL read from Keychain by the existing
+`scripts/lib/hermes/sensors.py` `_keychain_secret("k3dm-slack-webhook")`. The URL must never be on
+argv, in an env var exported to children, or in a log.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+message="$(cat)"
+[[ -n "${message}" ]] || { printf '%s\n' 'k3dm-slack-notify: empty message' >&2; exit 2; }
+K3DM_NOTIFY_MESSAGE="${message}" PYTHONPATH="${repo_root}/scripts/lib" python3 - <<'PY'
+import os, sys
+from hermes.sensors import _keychain_secret
+from hermes.slack import post_summary
+sys.exit(0 if post_summary(_keychain_secret("k3dm-slack-webhook"), os.environ["K3DM_NOTIFY_MESSAGE"]) else 1)
+PY
+```
+
+Before writing it, confirm `hermes.sensors` imports cleanly with only `PYTHONPATH=scripts/lib`
+(no side effects at import). If it does not, copy the 10-line `_keychain_secret` body inline instead
+and say so in the report.
+
+BATS (`k3dm_slack_notify.bats`): stub `security` and `python3` is NOT stubbed; instead put a fake
+`security` on `PATH` that prints `http://127.0.0.1:9/never` and assert: empty stdin → exit 2;
+non-empty stdin → exit 1 (post fails to the closed port) and the URL never appears in the output.
+
+### 2. `bin/k3dm-sandbox-reaper`
+
+`#!/usr/bin/env bash`, `set -euo pipefail`, `export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"`.
+**Always exits 0** after a run (launchd must not throttle it); errors are logged.
+
+Configuration (env, with defaults):
+
+| Variable | Default |
+|---|---|
+| `ARGOCD_HUB_CONTEXT` | `k3d-k3d-cluster` |
+| `ARGOCD_NAMESPACE` | `cicd` |
+| `K3DM_SANDBOX_REAPER_PROVIDER` | `k3s-aws` |
+| `K3DM_SANDBOX_REAPER_GRACE` | `1800` (seconds) |
+| `K3DM_SANDBOX_REAPER_DRYRUN` | `0` |
+| `K3DM_SANDBOX_REAPER_STATE_DIR` | `${HOME}/.local/share/k3d-manager/sandbox-reaper` |
+| `K3DM_SANDBOX_REAPER_LOG` | `${HOME}/.local/share/k3d-manager/logs/sandbox-reaper.log` |
+| `K3DM_SANDBOX_REAPER_CLEANUP_BIN` | `<repo>/bin/cleanup-stale-registration` |
+| `K3DM_SANDBOX_REAPER_NOTIFY_BIN` | `<repo>/bin/k3dm-slack-notify` |
+| `K3DM_SANDBOX_REAPER_NOW` | unset → `date +%s` (tests set it) |
+| `ACG_REGION` | `us-west-2` |
+| `K3DM_SANDBOX_REAPER_STACK` | `k3d-manager-cluster` (matches lib `_ACG_CF_STACK_NAME`) |
+
+Each run:
+
+1. If `pgrep -f 'bin/cluster-up|bin/cluster-down'` finds a process, log `skip: lifecycle command running` and exit 0.
+2. `kubectl --context "$ARGOCD_HUB_CONTEXT" -n "$ARGOCD_NAMESPACE" get secrets -l "argocd.argoproj.io/secret-type=cluster,k3d-manager/provider=${K3DM_SANDBOX_REAPER_PROVIDER}" -o json`.
+   kubectl failure → log `skip: hub unreachable`, exit 0. No items → remove every file in the state dir, exit 0.
+3. For each Secret: `uid`, cluster name (label `argocd.argoproj.io/cluster-name`), and decoded `.data.server`.
+   Skip a Secret whose cluster name fails `^[A-Za-z0-9._-]+$`.
+4. Applications: one `get applications -o json`; select with the **same predicate as
+   `bin/cleanup-stale-registration`** (destination name, label `k3d-manager/cluster`, or server match).
+   Healthy-sandbox condition = zero matching apps **or** any app whose `.status.sync.status != "Unknown"`
+   → delete `${STATE_DIR}/${uid}` if present and continue.
+5. All matching apps `Unknown`: if `${STATE_DIR}/${uid}` is missing, write `NOW` into it, log
+   `first-seen <cluster> uid=<uid> apps=<n>`, continue. Otherwise `age = NOW - first_seen`;
+   `age < GRACE` → continue.
+6. Gone signal: `aws cloudformation describe-stacks --region "$ACG_REGION" --stack-name "$STACK"`,
+   stdout to `/dev/null`, stderr captured.
+   - rc 0 → **alive**, log `skip: stack exists`, continue.
+   - stderr matches `does not exist` → gone (`stack-deleted`).
+   - stderr matches `InvalidClientTokenId|ExpiredToken|UnrecognizedClientException` → gone (`credentials-dead`).
+   - anything else (incl. `Unable to locate credentials`, network) → log `skip: aws inconclusive`, continue.
+7. Gone and `DRYRUN=1` → log `would-deregister …` only, no notify.
+8. Gone and `DRYRUN=0` → run `"$CLEANUP_BIN" --cluster="<cluster>" --confirm`, capturing output.
+   - success → log `deregistered <cluster> reason=<reason> unknown_for=<age>s`, delete the state file,
+     notify: `k3dm sandbox reaper: removed hub registration <cluster> and <n> apps — sandbox gone (<reason>), apps Unknown for <minutes> min.`
+   - failure → log `cleanup failed <cluster> rc=<rc>`, keep the state file, notify:
+     `k3dm sandbox reaper: FAILED to remove hub registration <cluster> (rc=<rc>); see sandbox-reaper.log`.
+     To avoid a Slack message every 10 minutes, write `${STATE_DIR}/${uid}.failed-notified` and do not
+     notify the failure again while it exists.
+9. Notification failure (notify bin non-zero) is logged as `notify failed` and never changes the outcome.
+10. Remove state files whose uid is not among the current Secrets.
+
+Log line format: `[<ISO-8601 time>] <message>` (same as `bin/k3dm-node-health-watch`). Never log Secret data.
+
+### 3. `scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl`
+
+Model on `com.k3d-manager.node-health-watch.plist.tmpl`, with:
+`ProgramArguments` = `{{REPO_ROOT}}/bin/k3dm-sandbox-reaper`; `EnvironmentVariables`:
+`KUBECONFIG={{HOME}}/.kube/config`, `K3DM_SANDBOX_REAPER_DRYRUN=0`; `StartInterval` 600;
+`RunAtLoad` true; **no** `KeepAlive`; stdout/stderr → `{{HOME}}/.local/share/k3d-manager/logs/sandbox-reaper.log`.
+
+### 4. Makefile
+
+Copy the `install-node-health-watch` / `uninstall-node-health-watch` recipes (sed `{{REPO_ROOT}}` and
+`{{HOME}}`, `launchctl bootout` then `bootstrap`), label `com.k3d-manager.sandbox-reaper`, with a
+`##` help comment: `Install the expired-ACG-sandbox reaper (every 10 min; removes the hub registration once the sandbox is gone; Slack notice)`.
+Add both targets to `.PHONY`. Do not run them.
+
+### 5. BATS — `scripts/tests/bin/k3dm_sandbox_reaper.bats`
+
+Stub `kubectl`, `aws`, `pgrep` and the cleanup/notify bins on `PATH` / via the env overrides (pattern:
+`scripts/tests/bin/cleanup_stale_registration.bats`). Fixtures: one `k3s-aws` Secret
+`cluster-ubuntu-k3s` (uid `u1`, cluster `ubuntu-k3s`), apps targeting it, plus a `ubuntu-hostinger`
+app that must never count. Cases:
+
+1. All apps Unknown, no state file → writes the clock file, no aws call, no cleanup.
+2. Clock 1799 s old → no aws call, no cleanup.
+3. Clock ≥ 1800 s, aws `does not exist` → cleanup called once with `--cluster=ubuntu-k3s --confirm`;
+   notify called once with a message containing `removed hub registration ubuntu-k3s`; state file removed.
+4. Same with aws `InvalidClientTokenId` → cleanup called; message contains `credentials-dead`.
+5. aws rc 0 → no cleanup, no notify.
+6. aws `Could not connect to the endpoint URL` → no cleanup, no notify.
+7. One app `Synced` → no cleanup, existing state file removed.
+8. Zero matching apps → no cleanup.
+9. `DRYRUN=1` past grace with stack gone → no cleanup, no notify, log contains `would-deregister`.
+10. Cleanup bin exits 1 → failure notified once; a second run notifies nothing more; state file kept.
+11. Notify bin exits 1 → cleanup still recorded as `deregistered`, log contains `notify failed`, exit 0.
+12. `pgrep` finds `bin/cluster-up` → no kubectl call at all.
+13. kubectl label selector passed for Secrets contains `k3d-manager/provider=k3s-aws` (assert the stub's argv log).
+14. Stale state file for an unknown uid is removed.
+
+**RED:** every case must fail with the reaper absent (it is a new file — show the run against an empty stub).
+**Gates (paste output):** `shellcheck bin/k3dm-sandbox-reaper bin/k3dm-slack-notify` (0 findings);
+`bats scripts/tests/bin/k3dm_sandbox_reaper.bats scripts/tests/bin/k3dm_slack_notify.bats`;
+`bats scripts/tests/bin/cleanup_stale_registration.bats` (unchanged, still green);
+`plutil -lint` on the plist rendered to a temp file with the Makefile's sed; `make check-doc-links`.
+
+### 6. Docs
+
+`docs/howto/launchd-daemons.md`: table row
+`| com.k3d-manager.sandbox-reaper | Removes the hub registration + apps of an expired ACG sandbox; Slack notice | ❌ (timer: 10m) | make install-sandbox-reaper | ~/.local/share/k3d-manager/logs/sandbox-reaper.log |`
+and a `## Sandbox reaper (bin/k3dm-sandbox-reaper)` section: the two-signal gate, the 30-minute grace,
+what is notified, how to dry-run by hand (`K3DM_SANDBOX_REAPER_DRYRUN=1 bin/k3dm-sandbox-reaper; tail ~/.local/share/k3d-manager/logs/sandbox-reaper.log`),
+and how to redo a wrongful removal (`make argocd-registration`).
+
+CHANGELOG `[Unreleased]` → `### Added` (create it above `### Fixed` if missing):
+`**Expired ACG sandboxes are cleaned off the hub automatically.** A new launchd agent (`make install-sandbox-reaper`) checks every 10 minutes; once every app of a `k3s-aws` registration has been Unknown for 30 minutes and AWS confirms the sandbox is gone (stack deleted or credentials dead), it removes the registration and its Applications with `bin/cleanup-stale-registration` and posts a Slack notice. Covers expiries that `make down` never saw.`
+
+### Commit
+
+```
+feat(acg): reap expired-sandbox hub registrations automatically with Slack notice
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+Push `git push origin k3d-manager-v1.42.0`; confirm `git ls-remote origin k3d-manager-v1.42.0` == `git rev-parse HEAD`.
+
+### What NOT to do
+
+No PR, no merge, no `main`, no `--no-verify`. Do not run `make install-sandbox-reaper`, any `make`
+lifecycle target, `make -n`, `launchctl`, real `aws` or real `kubectl`. Do not read the Keychain or any
+credential. Do not touch `scripts/lib/foundation/`, `scripts/lib/hermes/`, `bin/cleanup-stale-registration`,
+or memory-bank.
