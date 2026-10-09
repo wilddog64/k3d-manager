@@ -1,4 +1,8 @@
-2026-10-08 — Ask reply CLI preamble fix committed as e92d1d85; status recorded in 1a0399f1; live verification pending.
+## 2026-10-08 — Claude verified Codex ask preamble fix; settings allow rules removed
+
+- Verified `e92d1d85` (fix), `1a0399f1` (bug status) and `a0daeab0` (memory-bank) on origin. The diff touches only `agent.py` (+4), the test file (+44), the bug doc and the memory-bank. GREEN: 5 passed. RED against pre-fix `agent.py` on a temp copy: 2 failed (the two preamble tests). `pytest scripts/tests/bin`: 522 passed, 1 skipped.
+- With the operator's approval, removed 3 over-broad allow rules from `.claude/settings.local.json` (former lines 215 awk, 671 grep, 1524 pkill). Backup: `.claude/settings.local.json.bak-2026-10-08`. Both files are gitignored and not committed.
+- Pending (operator): `make restart-webhook`, then a top-level `ask claude: which shell are you in` should reply with only the answer.
 
 ## 2026-10-08 — Codex September triage verified; /ask fixes live-verified; ask preamble leak filed and dispatched
 
