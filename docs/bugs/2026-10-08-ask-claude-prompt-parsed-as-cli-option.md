@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude (found during the operator's live check of `b2c45ae3`)
 **Branch:** k3d-manager-v1.42.0
-**Status:** OPEN — spec ready for Codex
+**Status:** FIXED in branch `7089dd10` — live verification pending (Claude)
 **Priority:** P1 — top-level `/ask claude` is fully broken; only a thread ask (prompt starts with context) works
 **Severity:** High
 **Component:** `scripts/lib/webhook/agent.py` `_run_cluster_ask` (claude branch)
