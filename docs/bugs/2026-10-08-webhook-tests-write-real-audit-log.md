@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-08, Claude
 **Branch:** k3d-manager-v1.42.0
-**Status:** OPEN — spec ready for Codex
+**Status:** FIXED in branch `2f7e0eb5` — live verification pending (Claude)
 **Priority:** P2 — the security audit trail is polluted; there is no data loss and the entries are tell-able by `actor:"test"`
 **Severity:** Medium
 **Component:** `scripts/tests/bin/test_webhook_cluster_status_thread.py`, `scripts/tests/conftest.py`
