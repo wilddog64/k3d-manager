@@ -1,3 +1,10 @@
+## 2026-10-08 — Claude verified hub teardown guard round 2 (`32395370`)
+
+- Verified on origin: `32395370` (fix), `ca8db0d9` (bug status) and `06c3ab0e` (memory-bank). Scope: hub_snapshot.sh, the two .bats files, the bug doc and the memory-bank only.
+- The guard now reports with `_warn` and returns 1, so `cluster-down` exits 2. Under DRY_RUN, the guard's reads run for real in a subshell while the preview continues. The `--probe " "` change is reverted.
+- Claude's own gates: bats 59/59 GREEN (cluster_down, hub_snapshot, cluster_status_summary). Shellcheck clean. RED on a temp worktree at `fa3340bc`: the exit-2 and DRY_RUN-refusal tests both fail.
+- Pending live verification (operator): `make snapshot`, then `make status` shows the `Hub snapshot:` line, then `make hub-retain-pvs`.
+
 ## 2026-10-08 — Claude reviewed Codex hub teardown guard (`fa3340bc`): 3 defects, round 2 dispatched
 
 - Verified on origin: `fa3340bc`, `81d66e5b` and `b893a76e`. The change touches only spec-allowed files (13 files, +290/-18).
