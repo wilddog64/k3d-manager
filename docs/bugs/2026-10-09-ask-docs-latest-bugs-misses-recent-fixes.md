@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.42.0`
 **Severity:** low. `/ask-docs` confidently answers a "what's recent" question with week-old
 documents, so the reader believes nothing newer was fixed.
-**Status:** OPEN — spec ready for Codex
+**Status:** FIXED — `/ask-docs` now enumerates recent kind-specific documents by date and converts CommonMark bold for Slack.
 
 ## Observed (operator, Slack, 2026-10-09)
 

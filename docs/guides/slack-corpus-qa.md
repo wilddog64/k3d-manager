@@ -36,3 +36,5 @@ The directory order for intrusion is bugs / issues / plans / retro. `/ask-docs` 
 existing `prior_art.search()` embedding path. The acceptance floor is **PROVISIONAL** while Claude
 calibrates against the live store: `ASK_DOCS_MIN_SCORE` defaults to `0.60` and can be overridden
 with `K3DM_ASK_DOCS_MIN_SCORE`.
+
+For recent questions that name a document kind (bugs, issues, plans/specs, or retros), `/ask-docs` lists the newest documents of that kind by date; "fixed", "verified", or "resolved" narrows the results to done statuses. Other recent questions still rank by similarity and then date.

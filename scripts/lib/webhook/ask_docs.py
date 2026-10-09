@@ -26,6 +26,17 @@ _PHONE_RE = re.compile(
 )
 _DOC_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
 _FILED_DATE_RE = re.compile(r"\*\*Filed:\*\*\s+(\d{4}-\d{2}-\d{2})")
+_KIND_DIRS = (
+    (re.compile(r"\bbugs?\b", re.IGNORECASE), "docs/bugs/"),
+    (re.compile(r"\bissues?\b", re.IGNORECASE), "docs/issues/"),
+    (re.compile(r"\b(?:plans?|specs?)\b", re.IGNORECASE), "docs/plans/"),
+    (re.compile(r"\b(?:retros?|retrospectives?)\b", re.IGNORECASE), "docs/retro/"),
+)
+_DONE_INTENT_RE = re.compile(r"\b(?:fixed|resolved|closed|verified|done)\b", re.IGNORECASE)
+_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.*)$")
+_DONE_STATUS_RE = re.compile(
+    r"^(?:FIXED|VERIFIED|LIVE-VERIFIED|RESOLVED|CLOSED|DONE)\b", re.IGNORECASE
+)
 _RECENT_INTENT_RE = re.compile(
     r"\b(?:recent|recently|latest|newest|last week|this week|today|yesterday|lately|new)\b",
     re.IGNORECASE,
@@ -111,6 +122,40 @@ def _wants_recent(question):
     return bool(_RECENT_INTENT_RE.search(question or ""))
 
 
+def _recent_docs(question, limit):
+    directories = [directory for pattern, directory in _KIND_DIRS if pattern.search(question or "")]
+    if not directories:
+        return []
+    done_intent = _DONE_INTENT_RE.search(question or "")
+    candidates = []
+    for directory in directories:
+        try:
+            files = (REPO_ROOT / directory).glob("*.md")
+            for file_path in files:
+                path = file_path.relative_to(REPO_ROOT).as_posix()
+                date = _doc_date(path)
+                if not _allowed_path(path) or date is None:
+                    continue
+                try:
+                    lines = file_path.read_text(errors="replace").splitlines()
+                except OSError:
+                    continue
+                if done_intent:
+                    status = next((_STATUS_RE.match(line) for line in lines[:40] if _STATUS_RE.match(line)), None)
+                    if status is None or not _DONE_STATUS_RE.match(status.group(1)):
+                        continue
+                title = next((line[2:].strip() for line in lines if line.startswith("# ")), None)
+                if title is None:
+                    title = file_path.stem
+                if title.startswith("Bug: "):
+                    title = title[5:]
+                candidates.append((date, path, title))
+        except OSError:
+            continue
+    candidates.sort(key=lambda candidate: (candidate[0], candidate[1]), reverse=True)
+    return [(None, path, title) for _date, path, title in candidates[:limit]]
+
+
 def _excerpt(path, title):
     file_path = REPO_ROOT / path
     if not file_path.is_file():
@@ -128,7 +173,7 @@ def _sources(results):
     kept = []
     excerpts = []
     for score, path, title in results:
-        if score < ASK_DOCS_MIN_SCORE or not _allowed_path(path):
+        if (score is not None and score < ASK_DOCS_MIN_SCORE) or not _allowed_path(path):
             continue
         excerpt = _excerpt(path, title)
         if excerpt is None:
@@ -144,6 +189,7 @@ def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None):
         prose = "Could not summarise — read the sources directly."
     if scrub_prose:
         prose = _scrub(prose)
+        prose = re.sub(r"\*\*(\S(?:.*?\S)?)\*\*", r"*\1*", prose)
     available = MAX_REPLY_CHARS - len(source_lines) - 2
     if available < 0:
         available = 0
@@ -161,11 +207,14 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         return _reply("Question rejected — too long or contains disallowed patterns.", [])
     recent = _wants_recent(question)
     try:
-        results = retrieve(question, k=RECENT_POOL if recent else k)
+        results = _recent_docs(question, k) if recent else []
+        date_selected = bool(results)
+        if not date_selected:
+            results = retrieve(question, k=RECENT_POOL if recent else k)
     except Exception as exc:
         LOGGER.warning("ask-docs retrieval unavailable: %s", type(exc).__name__)
         return _reply("No matching documents — document search is unavailable right now.", [])
-    if recent:
+    if recent and not date_selected:
         kept = [result for result in results
                 if result[0] >= ASK_DOCS_MIN_SCORE and _allowed_path(result[1])]
         dated = [result for result in kept if _doc_date(result[1])]
@@ -178,11 +227,14 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         return _reply("No matching documents for that question.", [])
     if not summarise:
         lines = ["Top matching documents:"]
-        lines.extend(f"{score:.2f}  {_doc_date(path) or '-'}  {_doc_link(path)} — {_scrub(title)}" for score, path, title in results
-                     if score >= ASK_DOCS_MIN_SCORE and _allowed_path(path)
+        lines.extend(f"{_doc_date(path) if score is None else f'{score:.2f}'}  {_doc_date(path) or '-'}  {_doc_link(path)} — {_scrub(title)}" for score, path, title in results
+                     if (score is None or score >= ASK_DOCS_MIN_SCORE) and _allowed_path(path)
                      and path in paths)
         return _reply("\n".join(lines), paths, scrub_prose=False)
     recent_note = (
+        "The user asked for recent items; these are the newest matching documents, newest first. "
+        "List each with its date and one-line summary. Do not say there are no newer items — only "
+        "these were provided.\n\n" if date_selected else
         "The user asked for recent items; excerpts are ordered newest first — lead with the newest "
         "and state each item's date.\n\n" if recent else ""
     )
