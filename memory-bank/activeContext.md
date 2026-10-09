@@ -1,3 +1,10 @@
+## 2026-10-08 — CVE Auto-Patch: "Open critical CVEs in our images (not remediated)" table
+
+- Operator: "Current CVE Remediation Status" only shows applied patches and has nothing for CVEs that were not remediated. Cause: app-cve-scan writes a remediation event only when it finds a newer image to promote. Payment has none, so CVE-2026-47884 never showed there.
+- Added panel id 11, `trivy_vulnerability_inventory{severity="CRITICAL", image_repository=~"wilddog64/.*"}`, at y 39; History moved to y 48. Guide row and CHANGELOG updated. `grafana_dashboard_appsets.bats`: 0 failures.
+- Noticed, not filed: frontend and product-catalog log an `applied` event about daily with the **same** `to_image`. Worth a look later.
+- Phase 1 (rabbitmq-client `00e70fd`) is on origin; Claude is re-running `mvn clean install` before dispatching Phase 2.
+
 ## 2026-10-08 — v1.44.0 bug: SMS recovery notifications + notify behaviour test
 
 - Filed `docs/bugs/2026-10-08-sms-critical-no-resolved-notification-and-untested-notify-behaviour.md`, targeting v1.44.0. It is a bug doc, so exempt from the cap; v1.44.0 has 5 plan files. The operator agreed: "texts are free".

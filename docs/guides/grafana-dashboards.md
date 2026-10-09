@@ -178,6 +178,7 @@ restarts — cosmetic, fixed by wrapping in `max()`.
 | Remediation Failure Outcomes by Service | `state=~"failed\|superseded\|deployment_advanced"` | exporter, remediation path |
 | Platform / Shopping-cart Unique CVEs | `topk(500, trivy_vulnerability_inventory{severity=~"CRITICAL\|HIGH"})`, second split by `image_repository=~"wilddog64/shopping-cart-.*"` | the split is deliberate |
 | Current CVE Remediation Status / History (audit) | `cve_remediation_event_info{current="true"}` / unfiltered | first to go blank |
+| Open critical CVEs in our images (not remediated) | `trivy_vulnerability_inventory{severity="CRITICAL", image_repository=~"wilddog64/.*"}` | exporter. The remediation tables only record an event when app-cve-scan finds a newer image to promote, so a CVE that no newer image fixes (for example, one whose fix needs a major-version upgrade) never appears there. It appears here. |
 
 Traps:
 

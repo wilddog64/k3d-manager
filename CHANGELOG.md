@@ -13,6 +13,7 @@
 - Hub snapshot pruning now keeps the newest verified snapshots instead of deleting them.
 
 ### Added
+- The **CVE Auto-Patch** dashboard has an **Open critical CVEs in our images (not remediated)** table. The remediation status tables only show CVEs that auto-patch acted on, so a critical with no newer fixing image (CVE-2026-47884 in payment, whose fix needs Spring Boot 4) was invisible there.
 - The **k3dm Alertmanager Delivery** dashboard has a **Firing alerts** table that lists every alert firing now (the always-on `Watchdog` and `InfoInhibitor` meta-alerts excluded; `InfoInhibitor` had shown up as a confusing `none` severity in the count) with its severity, cluster, namespace and, for Trivy alerts, the image. The existing stat only counted alerts by severity, so seeing which 40 warnings were firing meant opening Prometheus.
 - `make prometheus-rules` applies only the hub PrometheusRules (`scripts/etc/prometheus/rules/*.yaml`, with the same `CF_DOMAIN` substitution as `make observability`) so a new or changed alert rule, such as the host disk-space alerts, can go live without a full observability redeploy. Dashboards already sync from git; rules did not.
 
