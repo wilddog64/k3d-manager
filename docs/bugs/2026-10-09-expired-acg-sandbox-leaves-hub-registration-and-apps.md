@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** OPEN — filed; not specified
+**Status:** OPEN — make-down path dispatched to Codex 2026-10-09; watcher/reaper still open
 **Priority:** P3 — noise in ArgoCD, and alert/dashboard pollution; no outage
 **Severity:** Low
 **Component:**
@@ -96,3 +96,131 @@ the cleanup target above for a sandbox that has already expired.
 - Do not deregister on unreachability alone.
 - Do not delete the Applications before the registration Secret: the ApplicationSet would
   regenerate them.
+
+---
+
+## Implementation spec — fix item 0 + the keep-hub Vault LaunchAgent (Codex, 2026-10-09)
+
+Scope: the `make down` path only. The watcher and reaper paths are **not** in this spec:
+`acg_watch` lives in lib-foundation (`scripts/lib/foundation/scripts/lib/acg/acg.sh`), so that
+change must go upstream first, and the reaper needs its own design. Until then
+`make cleanup-stale-registration` remains the manual cleanup for an expired sandbox.
+
+**Branch:** `k3d-manager-v1.42.0`.
+**Files (only these):** `scripts/lib/providers/k3s-aws.sh`, `bin/cluster-down`, a new
+`scripts/tests/lib/k3s_aws_deregister.bats`, `CHANGELOG.md` (`[Unreleased]` → `### Fixed`,
+one bullet per change), and this doc's Status line.
+
+### Change 1 — `_k3s_aws_deregister_cluster` also matches Applications by server
+
+Read the registration's server **before** deleting the Secret, then select Applications whose
+destination name **or** server matches. Never match the in-cluster server.
+
+**OLD:**
+```bash
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+
+  "${hub_kubectl[@]}" -n "${argocd_ns}" delete secret "${secret_name}" \
+    --ignore-not-found >/dev/null 2>&1 || true
+```
+**NEW:**
+```bash
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+
+  local server=""
+  server="$("${hub_kubectl[@]}" -n "${argocd_ns}" get secret "${secret_name}" \
+    -o jsonpath='{.data.server}' 2>/dev/null | base64 --decode 2>/dev/null || true)"
+  [[ "${server}" == "https://kubernetes.default.svc" ]] && server=""
+
+  "${hub_kubectl[@]}" -n "${argocd_ns}" delete secret "${secret_name}" \
+    --ignore-not-found >/dev/null 2>&1 || true
+```
+
+**OLD:**
+```bash
+  done < <(
+    "${hub_kubectl[@]}" -n "${argocd_ns}" get applications -o \
+      jsonpath='{range .items[?(@.spec.destination.name=="'"${ctx}"'")]}application/{.metadata.name}{"\n"}{end}' \
+      2>/dev/null
+  )
+```
+**NEW:**
+```bash
+  done < <(
+    "${hub_kubectl[@]}" -n "${argocd_ns}" get applications -o json 2>/dev/null \
+      | jq -r --arg ctx "${ctx}" --arg server "${server}" \
+        '.items[]? | select(.spec.destination.name == $ctx or ($server != "" and .spec.destination.server == $server)) | "application/" + .metadata.name' \
+        2>/dev/null
+  )
+```
+The Secret is still deleted before any Application (the ApplicationSets would regenerate them
+otherwise). Nothing else in the function changes.
+
+### Change 2 — `bin/cluster-down` keeps the hub's Vault LaunchAgent when the hub is kept
+
+`com.k3d-manager.vault-port-forward` forwards the **hub's** Vault (`vault-0 18200:8200
+--context k3d-k3d-cluster`). Removing it on a sandbox teardown with the hub kept cuts local
+Vault access to the hub.
+
+**OLD:**
+```bash
+if _is_mac; then
+  _vault_pf_label="com.k3d-manager.vault-port-forward"
+```
+**NEW:**
+```bash
+if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
+  _vault_pf_label="com.k3d-manager.vault-port-forward"
+```
+Leave the `vault-pf.pid` kill above it unchanged (that forward is started by `cluster-up` for
+the sandbox run). Leave the frontend and ACG Prometheus port-forward stops unchanged.
+
+### Tests (new `scripts/tests/lib/k3s_aws_deregister.bats`)
+
+Follow the sourcing pattern of an existing provider test under `scripts/tests/lib/` (look for
+one that sources `scripts/lib/providers/k3s-aws.sh`). Stub `_argocd_hub_kubectl_cmd` to print
+`kubectl`, and stub `kubectl` to log every call (`"$*"`) in order to a file and to answer:
+- `get secret cluster-ubuntu-k3s ... jsonpath={.data.server}` → `printf '%s' "$(printf '%s' https://host.k3d.internal:6443 | base64)"`
+- `get applications -o json` → four apps: `ubuntu-k3s-order` (destination name `ubuntu-k3s`),
+  `ubuntu-k3s-eso` (server `https://host.k3d.internal:6443`), `k3d-cluster-eso`
+  (server `https://kubernetes.default.svc`), `ubuntu-hostinger-platform` (name `ubuntu-hostinger`).
+- everything else: return 0.
+
+1. **Name- and server-matched apps are both deleted; others are not.** The log contains
+   `delete application/ubuntu-k3s-order` and `delete application/ubuntu-k3s-eso`, and contains
+   neither `k3d-cluster-eso` nor `ubuntu-hostinger-platform` in any `delete` line.
+2. **Secret first.** The line number of `delete secret cluster-ubuntu-k3s` is lower than the line
+   number of the first `delete application/` line.
+3. **In-cluster server is never used.** With the Secret stub returning
+   `https://kubernetes.default.svc`, `k3d-cluster-eso` is not deleted.
+4. **cluster-down keep-hub guard.** A grep test on `bin/cluster-down`: the line containing
+   `_vault_pf_label="com.k3d-manager.vault-port-forward"` is preceded by a line containing
+   `_keep_hub` (assert on the token, not the whole line).
+
+**RED gate:** tests 1 and 4 must fail on the pre-fix files. Do NOT `git stash`/`git checkout`:
+copy the old files from `git show HEAD:<path>` into a temp tree and run against them. Paste the
+failing output.
+
+### Gates
+- `shellcheck -S warning scripts/lib/providers/k3s-aws.sh bin/cluster-down`
+- `bash -n bin/cluster-down`
+- `bats scripts/tests/lib/k3s_aws_deregister.bats` plus every existing BATS file that references
+  `_k3s_aws_deregister_cluster` or `cluster-down` (`grep -rl` them under `scripts/tests`).
+- Never run `bin/cluster-down` or any `make` lifecycle target, not even with `-n` or `DRY_RUN`.
+
+### Status line
+`**Status:** PARTIAL — make down path fixed (server match + keep-hub Vault agent); watcher/reaper still open (needs lib-foundation)`
+
+### Commit message (exact)
+```
+fix(k3s-aws): deregister server-matched apps too; keep hub Vault agent on keep-hub down
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+
+### What NOT to do
+- Do not touch `scripts/lib/foundation/` or `bin/cleanup-stale-registration`.
+- Do not change which Secret is deleted or add deletes of `ubuntu-k3s-app-cluster` (it is the hub).
+- Do not run anything against a cluster.

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator saw `istio-cni-ubuntu-hostinger` spinning in ArgoCD)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IMPLEMENTED — provider resolved for the live destination + ArgoCDAppProgressingStuck; awaiting Claude verification
+**Status:** FIXED — `350fac28` (Claude-verified: RED on old code, 68/68 BATS); live after the next istio-ambient apply, and the alert after platform-ops is reapplied at release
 **Priority:** P2 — ambient still works, but the CNI plugin is not chained, and nothing alerts
 **Severity:** Medium
 **Component:**
