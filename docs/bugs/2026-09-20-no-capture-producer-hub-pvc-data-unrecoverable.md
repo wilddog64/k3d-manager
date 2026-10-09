@@ -3,7 +3,7 @@
 **Filed:** 2026-09-20
 **Branch:** `k3d-manager-v1.36.0`
 **Severity:** Critical — data loss already occurred today and the same command will do it again.
-**Status:** PARTIAL — guard and container-name fix verified; `make hub-retain-pvs` LIVE-VERIFIED; `make snapshot` still fails live on setgid restore under /tmp (see "Live verification — round 4"); dispatched to Codex.
+**Status:** FIXED in branch `fbebe9df` — live verification pending (operator)
 
 ## Question that prompted this
 
@@ -387,4 +387,3 @@ in the k3s node image (checked live).
 
 Out of scope: hot-copy consistency of `vault.db` while Vault runs (v1.43.0 DR drill), and
 `hub_recovery.sh`.
-
