@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IMPLEMENTED — reaper on k3d-manager-v1.42.0; operator install pending (make install-sandbox-reaper)
+**Status:** IMPLEMENTED — the reaper is on k3d-manager-v1.42.0. The operator installed it 2026-10-09: `com.k3d-manager.sandbox-reaper` is loaded, the first run exited 0, and PATH is set in the plist. The live reap waits for the next sandbox to expire.
 **Priority:** P3 — noise in ArgoCD, and alert/dashboard pollution; no outage
 **Severity:** Low
 **Component:**

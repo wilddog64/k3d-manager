@@ -1,3 +1,13 @@
+<!-- 2026-10-09 v1.42.0 bug closure, round 2 -->
+- **2026-10-09: v1.42.0 bug closure, round 2.**
+  - **SMS item 4:** Codex `ea72ba1e` (`make alertmanager-config`, one `_observability_apply_alertmanager_config`). Claude verified it: shellcheck clean, 89 BATS ok, 1 render site, no credential export. The operator still needs to run `make alertmanager-config`.
+  - **Login-callback:** A (#115 `3623e5b2`) and C (#108 `03c6206f`) were already merged. Claude opened duplicate PRs (frontend #119, infra #111) and closed both.
+    - C is verified live.
+    - A plus Tailwind v4 are NOT live: Hostinger's frontend is pinned to `sha-85265e7`. The repin to `sha-05ec17e` (`sha256:17f46a0d…`) waits for the user's go.
+  - **Reaper doc:** status corrected to installed.
+  - **Slack live-verification script:** sent to the operator. `make restart-webhook` is done; `make deploy-worker` is not confirmed.
+  - **Lesson:** check MERGED PRs (`gh pr list --state merged`), not just open ones, before opening a PR from a bug doc.
+
 <!-- 2026-10-09 v1.42.0 bug audit — dispatch round -->
 - **2026-10-09: v1.42.0 bug closure.**
   - **frontend-public-url (2026-09-25):** FIXED, superseded by the 2026-10-01 hub-recovery fix. Public URL returns 200 via `127.0.0.2:80` to hostinger; the stale agent is gone.
