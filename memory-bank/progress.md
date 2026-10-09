@@ -1,3 +1,15 @@
+- **2026-10-09 ~16:10 UTC — `make appsets-reapply` / `make appsets-check` VERIFIED** (Codex `8bdc5ccd`, on origin).
+  4/4 new BATS green; all 13 `makefile_*.bats` green; RED on the pre-change Makefile (4/4 fail); mutation
+  (drop the `$$` anchor) turns test 2 red. Exact commit message. Codex's Status line cited a dangling pre-amend
+  SHA `5542947f`; corrected to `8bdc5ccd`. Not run against the real repo.
+- **Frontend (2026-10-09):** PR #114 (Dependabot tailwindcss 3→4) fails E2E: v4 removed the PostCSS plugin
+  `postcss.config.js` loads, so every page 500s. Recommendation: close + Dependabot ignore for tailwind major;
+  v4 migration later as its own spec (awaiting the user). Main run `37942894719` deploy job hung 2h on the image
+  build; the operator cancelled it, Claude reran it at ~16:10 UTC (#115's image not built until it passes).
+- **Alerts (2026-10-09):** all resolved/expected — istio-cni rollout (fixed `350fac28`), payment crashloop from DB
+  credential drift (fixed by the operator's drift restart 13:54), smstest fake disk, `federate-acg` TargetDown
+  (no sandbox). Offered: bug doc to suppress federate-acg TargetDown when no sandbox exists.
+
 - **2026-10-09 appsets reapply done + make targets dispatched:** operator reapplied 13/13 sets on v1.42.0; `hub-vectordb` + `hub-platform-ops` now v1.42.0 Synced/Healthy, check clean (21 refs). Spec for `make appsets-reapply` (release-branch guard) + `make appsets-check` appended to `docs/bugs/2026-09-30-release-config-inert-until-applicationsets-reapplied.md` (recurrence section); CLAUDE.md release rule points at the targets. Dispatched to Codex.
 
 ## 2026-10-09 — hub-vectordb + hub-platform-ops still on v1.41.0
