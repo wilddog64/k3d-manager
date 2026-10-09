@@ -1,3 +1,10 @@
+- **2026-10-09 — OpenLDAP CVE (doc 2026-08-02-openldap-…):** bitnamilegacy migration already DONE (jp-gouin
+  `openldap`, 19 crit, newest tag). The 66 crit are an ORPHANED osixia `ldap` Deployment (shopping-cart-infra
+  `identity/ldap`) nothing uses. Operator decision: remove incl. PVCs + data. Two-part spec → Codex: Part 1 k3d-manager
+  (cluster-up inline source, `_hub_recovery_records` minus 2 claims + `_hub_recovery_retired_claims` so old snapshots
+  validate, docs); Part 2 shopping-cart-infra clone `shopping-cart-infra-ldap`, branch `fix/remove-orphan-osixia-ldap`.
+  Before merging Part 2 the operator patches the 2 PVs (pvc-2f1c2ab2…, pvc-7e307e74…) to Delete (they're Retain).
+
 - **2026-10-09 — Tailwind v4: PR shopping-cart-frontend #117 open** (`chore/tailwind-v4-migration`, Codex `c9d3a95d` +
   Claude `d6fc1bf1`). Verified: scope OK, lint/build/unit 30/30, audit 0, local Chromium E2E 42/42 (after installing
   chromium-headless-shell 1243 — Codex's sandbox hung on the download). Copilot tagged; awaiting CI. Clone at
