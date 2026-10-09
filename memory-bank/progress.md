@@ -1,3 +1,9 @@
+## 2026-10-09 — rabbitmq-client 1.1.0 released (library PR #9 merged); payment #84 CI re-run
+
+- The operator merged **rabbitmq-client-java#9** at `572b7834`. Claude disabled `enforce_admins` for the merge, then restored it (read back `true`).
+- Tagged **v1.1.0** at the merge SHA and created the GitHub release. Main CI: Build and Test, Integration Tests and Publish to GitHub Packages all succeeded. Maven package `com.shoppingcart.rabbitmq-client` now lists `1.1.0`.
+- Re-ran payment #84's CI (`37882980617`) and PR Validation (`37882979798`). Next: confirm Integration Tests pass and the Trivy report no longer lists CVE-2026-47884, then disable `enforce_admins` on shopping-cart-payment for the operator to merge.
+
 ## 2026-10-08 — Payment PR #84: Copilot clean; CI red only because rabbitmq-client 1.1.0 is not published
 
 - Copilot reviewed #84 with 0 comments. Two checks failed, Validate PR and Checkstyle & SpotBugs, both with `Could not resolve dependencies … com.shoppingcart:rabbitmq-client:jar:1.1.0`. This is the expected ordering failure. The dependent jobs (Build and Test, Integration Tests, Security Scan, image build) were skipped.
