@@ -284,6 +284,10 @@ def _parse_gemini_observations(raw):
 
     If the format is not present, returns (raw, []) unchanged.
     """
+    marker = re.search(r"(?m)^ANSWER:[ \t]*\n", raw)
+    if marker:
+        raw = raw[marker.end():]
+
     obs_marker = "\nOBSERVATIONS:\n"
     if obs_marker not in raw:
         answer = raw.removeprefix("ANSWER:\n").strip()
