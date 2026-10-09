@@ -1,3 +1,8 @@
+- **2026-10-09 — Tailwind v4 migration spec** `docs/bugs/2026-10-09-frontend-tailwind-v4-migration-for-postcss-selector-parser-advisory.md`
+  → Codex, in a fresh clone `shopping-carts/shopping-cart-frontend-tw4`, branch `chore/tailwind-v4-migration` from
+  origin/main `3623e5b`. Clears alert #41 (GHSA-rj75-hqrm-r3gf). Note: frontend `dependabot-automerge.yml` auto-merges
+  ALL security updates on green CI, so E2E was the only gate that stopped #114.
+
 - **2026-10-09 — frontend #114 CLOSED** (with explanation). It was a Dependabot **security** update for alert #41
   (GHSA-rj75-hqrm-r3gf, postcss-selector-parser, medium; patched only in 7.1.6, which needs tailwindcss 4). The
   existing `ignore: "*" semver-major` in dependabot.yml covers version updates only, so it did not stop the PR. Alert
