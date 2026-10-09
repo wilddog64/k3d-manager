@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-07
 **Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
-**Status:** FIXED in branch; live Slack verification pending
+**Status:** VERIFIED live 2026-10-09 — operator ran the Slack check script after relay deploy `b2ce7b54` (webhook restarted on `ef3eadb2`); behaviour confirmed in Slack, webhook job records carry `thread_ts`/`channel_id`.
 **Severity:** Low — dates in sourced answers are obscured, reducing document-triage usefulness
 **Component:** `scripts/lib/webhook/ask_docs.py` redaction
 
@@ -35,3 +35,11 @@ this false-positive case is unchanged.
 
 The ask-docs redaction tests cover an ISO date and a phone number in the same text, proving the
 date survives while the phone value is masked.
+
+## Live verification 2026-10-09
+
+`/ask-docs when was the webhook audit log bug filed?` answered `2026-10-08`, not `[REDACTED PHONE]`.
+The answer was not threaded because it was run in `#grafana-notification`; `/ask` and `/ask-docs`
+open a bot thread only in the webhook's configured `SLACK_CHANNEL_ID` (by design, see
+`2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`). Cosmetic: the model's
+`**bold**` renders literally in Slack mrkdwn.

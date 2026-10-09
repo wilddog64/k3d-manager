@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-07
 **Severity:** High — threaded job output is misplaced and offline tests create misleading Slack activity
-**Status:** FIXED in the local branch; live verification pending
+**Status:** VERIFIED live 2026-10-09 — operator ran the Slack check script after relay deploy `b2ce7b54` (webhook restarted on `ef3eadb2`); behaviour confirmed in Slack, webhook job records carry `thread_ts`/`channel_id`.
 
 ## Evidence
 

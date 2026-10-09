@@ -1,6 +1,6 @@
 # Slack cleanup commands lost their originating thread context
 
-**Status:** FIXED in branch; live verification pending
+**Status:** VERIFIED live 2026-10-09 — operator ran the Slack check script after relay deploy `b2ce7b54` (webhook restarted on `ef3eadb2`); behaviour confirmed in Slack, webhook job records carry `thread_ts`/`channel_id`.
 **Filed:** 2026-10-07
 **Affected release:** v1.42.0
 **Severity:** Medium — follow-up cleanup actions in a Slack thread were not reliably associated with the cleanup job

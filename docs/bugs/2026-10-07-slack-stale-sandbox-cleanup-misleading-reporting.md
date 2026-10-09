@@ -1,6 +1,6 @@
 # Slack stale sandbox cleanup help and completion reporting are misleading
 
-**Status:** FIXED in branch; live Slack verification pending
+**Status:** VERIFIED live 2026-10-09 — operator ran the Slack check script after relay deploy `b2ce7b54` (webhook restarted on `ef3eadb2`); behaviour confirmed in Slack, webhook job records carry `thread_ts`/`channel_id`.
 **Filed:** 2026-10-07
 **Affected release:** v1.42.0
 **Verified revision:** 83ff7991a4468bc431fc7b29cae105d7c6ab9eef (cleanup behavior); follow-up thread handoff fix pending
