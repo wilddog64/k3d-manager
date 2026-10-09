@@ -1631,3 +1631,5 @@ the next CI run is pending.
 - 2026-10-09: Claude verified Codex Slack body-cap fix (f127fd7b, d0eb99e8, 26ae4eb7 on origin): relay node tests 45/45, webhook.bats Slack 8/8, RED on pre-fix worktree 2/2 fail. Operator: make restart-webhook && make deploy-worker.
 
 - 2026-10-08 23:58Z: Slack body-cap fix verified live — job ff32a425 success, /slack/events 3x200, 0x401 after bot posts.
+
+- 2026-10-08: Spec docs/plans/v1.43.0-bug-priority-tracking.md (bug Priority P0-P3, vectordb priority/state columns, ask-doc suffix, k3dm_bug_docs metric + Grafana dashboard, pre-commit check). 4th v1.43.0 spec. Awaiting go; Codex dispatch needs k3d-manager-v1.43.0 branch.
