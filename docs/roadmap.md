@@ -229,6 +229,37 @@ commit, unless a recorded override is given. Scope:
 **Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0) on 2026-10-10. Scope:
 [`v1.48.0-e2e-failure-artifacts.md`](plans/v1.48.0-e2e-failure-artifacts.md).
 
+### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
+
+**Proposed 2026-10-10 (operator; not yet scoped).** The shopping-cart apps are a demo. Their
+replacement is the TwinkleAI real-estate research platform: a Next.js app in its own repo that
+answers questions in Chinese or English. It reaches Taiwan open data (`realestate_land`) through MCP,
+and keeps a research log. The plan source is the operator's
+`房地產生成式 AI × MCP × TwinkleAI 網站 Codex 實作計畫.md`.
+
+**English counts in the research.** The 15 questions each get an equivalent English version, so the
+study is 15 × 2 languages × 3 runs = **90 records**, and human scoring doubles. English questions are
+mapped to Chinese place names with a fixed district table, not by model guesswork.
+
+Shopping-cart is the platform's acceptance contract today:
+- the Tier 1 and Tier 2 e2e tests, and the v1.47.0 promotion gate;
+- image signing and Kyverno, loadtest;
+- the Keycloak realm, ESO and Vault paths, Dependabot coverage;
+- about 100 files in `scripts/`, `bin/` and `scripts/etc/`.
+
+So it is retired only after the new app covers the same platform surfaces. The removal is the
+breaking change that makes this a major version.
+
+| Step | Where | Scope |
+|---|---|---|
+| App M1–M4 | app repo, its own versions | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
+| v1.49.0 | k3d-manager | Onboard alongside shopping-cart: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard. |
+| v1.50.0 | k3d-manager | Re-point the platform proofs: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. |
+| v2.0.0 | k3d-manager | Retire shopping-cart. Scale it to zero and soak; remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
+
+What the platform loses: the multi-service mesh traffic, RabbitMQ and Stripe payment flows. Keep one
+of those only if a platform feature still needs it to prove itself.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
