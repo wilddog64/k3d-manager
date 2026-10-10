@@ -1,3 +1,4 @@
+- 2026-10-10: v1.47.0 planned = infra e2e + promotion gate only (spec written). v1.46.0 now 4 specs; v1.48.0 = e2e-failure-artifacts.
 - 2026-10-10: v1.43.1 planned: hub-data-recover + dr-clean-room-checks (2/5). v1.43.0 scope = export schedule (Codex running).
 - 2026-10-10: [ ] P1 v1.43.0-hub-data-export-schedule spec written; dispatching to Codex.
 - 2026-10-10: [x] First live DR drill passed and published (run 20261010T182508Z, results f19fea8).

@@ -134,7 +134,7 @@ have no Priority. Once it lands, Claude backfills priorities on the open bugs.
 Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.md). Also queued
 for v1.43.0: [`v1.43.0-hub-data-export-schedule.md`](plans/v1.43.0-hub-data-export-schedule.md)
 (daily unattended export, 5-day retention; P1 2026-10-10, took the slot of the e2e failure-artifacts
-spec, now v1.47.0),
+spec, now v1.48.0),
 [`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
 [`v1.43.0-worktree-isolated-codex-dispatch.md`](plans/v1.43.0-worktree-isolated-codex-dispatch.md)
 (dispatched first: Codex work stays sequential until each spec can run in its own git worktree), and the
@@ -152,7 +152,7 @@ with the drill. The drill gains a Keychain credential allowlist (audit, then enf
 that every destructive call targets the drill cluster. Scope:
 [`v1.43.1-hub-data-recover.md`](plans/v1.43.1-hub-data-recover.md),
 [`v1.43.1-dr-clean-room-checks.md`](plans/v1.43.1-dr-clean-room-checks.md). v1.43.1 is at 2 of 5
-plans. Full-hub recovery on the M2 (Level 3) stays in v1.46.0, pending the egress decision.
+plans. Full-hub recovery on the M2 moves into the v1.47.0 candidate-hub engine.
 
 ### Candidate milestone — v1.45.0
 
@@ -191,9 +191,19 @@ is now at 2 of 5 plans.
 
 ### Candidate milestone — v1.47.0
 
-**Structured E2E failure evidence**, moved from v1.43.0 on 2026-10-10 to make room for the P1 daily
-hub data export. Scope: [`v1.47.0-e2e-failure-artifacts.md`](plans/v1.47.0-e2e-failure-artifacts.md).
-v1.47.0 is at 1 of 5 plans.
+**Infra e2e and promotion gate — the only item in this release** (operator, 2026-10-10). `make
+hub-e2e REF=<release branch>` builds a full candidate hub on the M2 from that commit (the M2's
+other clusters are stopped for the run), proves it cannot act on the outside world, checks every
+required Application, Vault/ESO, Keycloak/LDAP logins, Prometheus rules, Alertmanager, dashboards
+and `make smoke`, and records the platform RTO (absorbs the former v1.46.0 full-recovery spec,
+option A). `make appsets-reapply` and `make hub-up` then refuse without a passing run for the exact
+commit, unless a recorded override is given. Scope:
+[`v1.47.0-hub-e2e-promotion-gate.md`](plans/v1.47.0-hub-e2e-promotion-gate.md).
+
+### Candidate milestone — v1.48.0
+
+**Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0) on 2026-10-10. Scope:
+[`v1.48.0-e2e-failure-artifacts.md`](plans/v1.48.0-e2e-failure-artifacts.md).
 
 ## Forward themes (unversioned until scoped)
 
