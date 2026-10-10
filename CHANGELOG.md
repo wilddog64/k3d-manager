@@ -4,7 +4,11 @@
 
 - Added the attended weekly hub disaster-recovery drill: durable Vault shards,
   encrypted claim exports, isolated M2 restore, result publishing, freshness
-  checks, and DR alerts.
+  checks, and DR alerts. Architecture and diagrams: `docs/architecture/hub-dr-drill.md`.
+- The E2E dashboard's Recent runs table now shows each run's date and a "Status now" column
+  (`passed`, `still failing`, or `fixed: passed <date>`), newest first. Before, an old failed run
+  stayed in the table with no date and no sign that a later run had passed, which read as a
+  current failure.
 
 ## [1.42.0] - 2026-10-09
 

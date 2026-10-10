@@ -261,3 +261,40 @@ PY
   [[ "${warning}" =~ ^[0-9]+$ ]]
   [ "${warning}" -gt "${allow}" ]
 }
+
+@test "e2e runs carry a run date and say whether a failure was fixed later" {
+  run python3 - "${EXPORTER}" "${DASH}" <<'PY'
+import ast, json, sys, time, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+tree = ast.parse(src)
+ns = {"time": time}
+for node in ast.walk(tree):
+    if isinstance(node, ast.FunctionDef) and node.name in ("e2e_utc", "e2e_run_status"):
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "exporter", "exec"), ns)
+def ev(seconds, passed, service="product-catalog"):
+    return {"tier": "vcluster", "service": service, "project": "api+flows",
+            "runner": "local-m4", "run_seconds": seconds, "passed": passed}
+old_fail = ev(1791290346, False)
+fix = ev(1791290881, True)
+open_fail = ev(1791400000, False)
+other = ev(1791500000, True, service="basket")
+events = [old_fail, fix, open_fail, other]
+assert ns["e2e_utc"](1791290346) == "2026-10-06 12:39 UTC", ns["e2e_utc"](1791290346)
+assert ns["e2e_run_status"](fix, events) == "passed"
+assert ns["e2e_run_status"](old_fail, events) == "fixed: passed 2026-10-06 12:48 UTC", ns["e2e_run_status"](old_fail, events)
+assert ns["e2e_run_status"](open_fail, events) == "still failing"
+assert 'info["run_date"]' in src and 'info["run_status"]' in src
+dash = json.loads(yaml.safe_load(open(sys.argv[2]))["data"]["e2e.json"])
+panel = next(p for p in dash["panels"] if p["title"] == "Recent runs")
+org = panel["transformations"][0]["options"]
+assert org["indexByName"]["run_date"] == 0 and org["indexByName"]["run_status"] == 1
+assert org["renameByName"]["run_status"] == "Status now"
+assert panel["options"]["sortBy"][0] == {"displayName": "Run date", "desc": True}
+print("ok")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}

@@ -252,6 +252,7 @@ docs/
 - **[CVE Detection and Remediation Pipeline](docs/architecture/cve-remediation-pipeline.md)** — Trivy alert → webhook → immutable-image promotion/rebuild, plus Dependabot escalation
 - **[Trivy Operator Observability](docs/architecture/trivy-operator-observability.md)** — Trivy Operator reconcile-error logs, scan-job failure alerts, and metrics scraping
 - **[Cloud Bridge](docs/architecture/cloud-bridge.md)** — Pull-model bridge that lets a cloud agent read cluster state: components, request sequence, and trust boundaries
+- **[Weekly Hub DR Drill](docs/architecture/hub-dr-drill.md)** — Export → encrypted data repo → M2 drill cluster → verify → publish: components, drill sequence, trust boundaries, failure modes
 - **[Vector Store](docs/architecture/vector-store.md)** — pgvector prior-art index: components, index-run sequence, credential resolution, failure modes
 
 ### How-To

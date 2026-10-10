@@ -7,6 +7,7 @@ ApplicationSets. Every drill namespace gets a default-deny egress policy before
 any workload starts, and check V0 proves egress is denied before Vault is
 unsealed.
 
+Architecture and diagrams: [`docs/architecture/hub-dr-drill.md`](../architecture/hub-dr-drill.md).
 Plan and design decisions: `docs/plans/v1.43.0-hub-dr-drill.md`.
 
 ## One-time setup

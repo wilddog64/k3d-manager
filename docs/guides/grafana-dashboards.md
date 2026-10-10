@@ -205,7 +205,7 @@ Templated on `$service` / `$tier` / `$runner`. Everything is exporter-fed from
 | Last success age | `time() - e2e_last_success_timestamp_seconds{...}` |
 | Failing runs in window | `count(e2e_run_info{passed="false",...})` |
 | Duration trend | `e2e_last_run_duration_seconds{...}` |
-| Recent runs | `topk(100, e2e_run_info{...,failure_ratio=~".*%.*"})` |
+| Recent runs | `topk(100, e2e_run_info{...,failure_ratio=~".*%.*"})`; newest first. **Run date** is when the run happened (UTC). **Status now** is `passed`, `still failing`, or `fixed: passed <date>` when a later run of the same tier/service/suite/runner passed, so an old failure is not mistaken for a current one |
 | Failure groups / details | `topk(200, e2e_failure_group_info{...})`, `topk(100, e2e_failure_info{...})` |
 | Failure trend / causes by service | `sum by (exported_service[, kind]) (e2e_failure_group_info{...})` |
 | Top failing specs | `topk(10, sum by (exported_service,file) (e2e_failure_info{...}))` |
