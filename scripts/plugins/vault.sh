@@ -86,7 +86,7 @@ function __vault_exec_kubectl() {
    local retries=0
    local max_retries=5
    local container_removed=0
-   local stdin_payload
+   local stdin_payload=""
    if (( buffer_stdin )); then
       stdin_payload=$(__vault_exec_kubectl_read_stdin)
    fi

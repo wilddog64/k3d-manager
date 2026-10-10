@@ -21,6 +21,12 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: `make hub-data-export` could never generate its Vault root token, which is why the run 15
+  export's Vault listing was empty. `__vault_exec_kubectl` declared `local stdin_payload` with no
+  value and read it on calls that send no stdin (the first `generate-root -generate-otp`). Under the
+  export's `set -u` that aborted with "stdin_payload: unbound variable". The drill ran the same
+  code under `set +u`, so it never failed there. The variable now starts empty, and a test runs
+  the no-stdin path under `set -u`; it fails on the old line.
 - Fixed: DR drill check V2 passed without checking anything (drill run 15). The export recorded
   `"vault_paths": null` because its `secret/` listing came back empty and the export ignored that:
   its "non-empty" check expected `{"data": [...]}`, but `vault kv list -format=json` prints a bare
