@@ -45,7 +45,12 @@ age-keygen -o ~/k3dm-hub-data.age     # prints "Public key: age1..."
   security add-generic-password -s k3dm-hub-data-age -a identity -w
   ```
 
-- Copy `~/k3dm-hub-data.age` to the offline medium, then delete it from disk.
+- Keep a second copy off the M2: a Bitwarden secure note named `k3d-hub-data`
+  holding the `age1...` public key and the `AGE-SECRET-KEY-1...` line. In
+  Terminal.app, `grep '^AGE-SECRET-KEY-1' ~/k3dm-hub-data.age | pbcopy`, paste
+  it into the note, then `pbcopy </dev/null`. Once the note shows the full line,
+  `rm -P ~/k3dm-hub-data.age`. Without this copy, losing the M2 makes every
+  export unreadable.
 - Send the `age1...` public key to Claude to commit as
   `scripts/etc/dr/age-recipient.txt`. It is not a secret.
 
@@ -141,9 +146,11 @@ reported for 8 days) route to `platform-warning` email, never SMS.
 
 ## Quarterly checks
 
-- **Offline key:** decrypt one file of the newest export with the **offline**
-  identity, not the M2 Keychain copy:
-  `age -d -i <offline identity> <file>.tar.age | tar -tf - | head`.
+- **Bitwarden key:** decrypt one file of the newest export with the identity
+  from the Bitwarden note, not the M2 Keychain copy. Copy the note's
+  `AGE-SECRET-KEY-1...` line, run
+  `age -d -i <(pbpaste) <file>.tar.age | tar -tf - | head`, then
+  `pbcopy </dev/null`.
 - **Real-hub drill:** run `make hub-recover` on the M4, then restore the data
   into the real hub (below). This is the only test of the tunnel,
   port-forwards, launchd agents and cluster registrations.
@@ -154,10 +161,10 @@ The drill proves an export restores. To restore the real hub from it:
 
 The restore streams into the hub's node containers with `docker exec`, so it
 must run on the M4, the hub's own Docker host. The M4 normally holds no age
-identity, so this is the one time the offline copy goes on the M4, temporarily.
+identity, so this is the one time the Bitwarden copy goes on the M4, temporarily.
 
 1. Rebuild the hub on the M4 (`make hub-recover`), so the claims exist.
-2. On the M4, store the offline identity's `AGE-SECRET-KEY-1...` line at the
+2. On the M4, store the Bitwarden note's `AGE-SECRET-KEY-1...` line at the
    prompt: `security add-generic-password -s k3dm-hub-data-age -a identity -w`.
 3. Run the restore against the real hub. It scales Vault, postgres-keycloak and
    OpenLDAP to zero, recreates their claims, and stops at the first claim whose
