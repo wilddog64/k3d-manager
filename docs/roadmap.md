@@ -156,6 +156,16 @@ v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve
 [`v1.45.0-alert-intake-draft-bugs.md`](plans/v1.45.0-alert-intake-draft-bugs.md) (a long-firing or recurring alert drafts a bug doc outside the repo for the operator to promote), and
 [`v1.45.0-test-metrics-log-retention.md`](plans/v1.45.0-test-metrics-log-retention.md) (moved from v1.43.0). v1.45.0 is at its five-plan cap.
 
+### Candidate milestone — v1.46.0
+
+**Hermes self-recovery via the webhook.** When `HermesNotRunning` fires, Alertmanager routes it to a
+new webhook route that diagnoses the Hermes LaunchAgent with a fixed routine (no model): not loaded,
+interpreter missing (reports the `brew install`), mid-cycle, or on cooldown are reported only;
+otherwise it runs `launchctl kickstart` at most once an hour. Every outcome posts to Slack. Prompted
+by the 2026-10-09 exit-78 outage.
+
+Scope: [`v1.46.0-hermes-not-running-recovery.md`](plans/v1.46.0-hermes-not-running-recovery.md).
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a

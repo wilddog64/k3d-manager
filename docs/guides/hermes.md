@@ -354,9 +354,11 @@ unusable ones.
 The Hermes LaunchAgent uses the pinned Homebrew interpreter
 `/opt/homebrew/opt/python@3.14/bin/python3.14`. The `opt/` link survives patch upgrades,
 while changing to a new Python minor version is an explicit template change. Render the plist
-with that interpreter, then bootstrap it as usual:
+with that interpreter, then bootstrap it. On a reinstall, boot out the loaded agent first;
+`bootstrap` fails with "service already loaded" otherwise:
 
 ```bash
+launchctl bootout "gui/$(id -u)/com.k3d-manager.hermes" 2>/dev/null || true
 sed -e "s|{{HERMES_BIN}}|$PWD/bin/k3dm-hermes|g" \
     -e "s|{{K3DM_REPO_ROOT}}|$PWD|g" \
     -e "s|{{HERMES_LOG}}|$HOME/Library/Logs/k3dm-hermes.log|g" \
