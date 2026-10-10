@@ -21,6 +21,11 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: the DR drill unsealed the restored Vault the moment the restore scaled it back up. The new
+  `vault-0` was still pulling its image (55 s on a node that had not run it), so the exec failed and
+  the drill reported `failed: unseal` with no reason, although the restored Vault was fine
+  (initialised, sealed, 1 of 1 shares). The drill now waits up to `DR_DRILL_VAULT_START_S` (300 s)
+  for `vault-0` to be Running and its API to answer, and says which wait ran out.
 - Fixed: the DR drill restore exited silently at the second claim. It applied Keycloak's manifests
   from `../shopping-cart-infra`, a path that exists on neither Mac, ignored that failure, and then
   scaled the missing `deployment/postgres-keycloak` to 0 with its error sent to `/dev/null`. The

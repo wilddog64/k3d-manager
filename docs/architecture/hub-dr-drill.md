@@ -123,5 +123,5 @@ reads the realm's users straight from postgres. The image major version must mat
 | `operator init … cannot be recovered` | Phase 2 | Vault initialised but the keys were lost; delete the cluster and rerun |
 | `could not record the inventory` | `make hub-data-export` on the M4 | The Vault, Keycloak or LDAP count failed; nothing was pushed. Fix that service, then export again |
 | `unable to scale <workload>` | Phase 3 | A restored workload is missing from the drill hub. Postgres comes from `scripts/etc/dr/postgres-keycloak.yaml`; Vault and LDAP from `hub-up` Steps 3–4 |
-| `failed: unseal` | result JSON | The M2 Keychain shards do not match the export's Vault; repeat the shard copy |
+| `failed: unseal` | result JSON | Read the line above it. `vault-0 is not Running` or `API did not answer`: the restored Vault did not start in `DR_DRILL_VAULT_START_S`. Otherwise the M2 Keychain shards do not match the export's Vault; repeat the shard copy |
 | `failed: V0` | result JSON | A drill pod reached the internet; the egress policy is not working |

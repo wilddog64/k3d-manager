@@ -97,6 +97,9 @@ elif [[ "$args" == *'delete pod dr-egress-check-'* ]]; then exit 0
 elif [[ "$args" == *'exec deployment/postgres-keycloak'* ]]; then printf '1\n'; exit 0
 elif [[ "$args" == *'exec statefulset/openldap'* ]]; then printf 'dn: a\ndn: b\n'; exit 0
 elif [[ "$args" == *'get pods'*'app.kubernetes.io/name=postgres-keycloak'* ]]; then printf 'postgres-keycloak-abc\n'; exit 0
+elif [[ "$args" == *'get pod vault-0'*'status.phase'* ]]; then
+  n=$(( $(cat "$HOME/vault-phase-polls" 2>/dev/null || echo 0) + 1 )); printf '%s' "$n" > "$HOME/vault-phase-polls"
+  if (( n <= ${DR_TEST_VAULT_PENDING_POLLS:-0} )); then printf Pending; else printf Running; fi; exit 0
 elif [[ "$args" == *'get pod vault-0'*'nodeName'* ]]; then printf 'dr-drill-server-0\n'; exit 0
 elif [[ "$args" == *'get pod postgres-keycloak-abc'*'nodeName'* ]]; then printf 'dr-drill-agent-0\n'; exit 0
 elif [[ "$args" == *'get pod openldap-0'*'nodeName'* ]]; then printf 'dr-drill-agent-1\n'; exit 0
@@ -194,6 +197,21 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   run_drill; [ "$status" -eq 0 ]
   while IFS= read -r line; do [[ "$line" == *'--kubeconfig '* && "$line" == *'--context k3d-dr-drill'* ]]; done < "$KLOG"
   [ "$(grep -c use-context "$KLOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: unseal waits until the restored vault-0 is Running" {
+  export DR_TEST_VAULT_PENDING_POLLS=2 DR_DRILL_POLL_S=0
+  run_drill; [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/vault-phase-polls")" -eq 3 ]
+  [ "$(grep -c 'operator unseal' "$VLOG")" -eq 1 ]
+}
+
+@test "dr drill: a vault-0 that never runs fails unseal with a reason and no unseal call" {
+  export DR_TEST_VAULT_PENDING_POLLS=1000 DR_DRILL_POLL_S=0 DR_DRILL_VAULT_START_S=1
+  run_drill; [ "$status" -ne 0 ]
+  [[ "$output" == *"vault-0 is not Running after 1s (phase: Pending)"* ]]
+  [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
+  result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"; [ "$(jq -r .failed "$result")" = unseal ]
 }
 
 @test "dr drill: unseal shard is executed through stdin only" {

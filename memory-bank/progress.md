@@ -1,3 +1,4 @@
+- 2026-10-10: Drill run 10 passed restore + V0; failed unseal (vault-0 still pulling). Added wait. Rerun pending.
 - 2026-10-10: Drill run 9 passed Phase 2; failed Phase 3 (no postgres-keycloak in drill). Fixed with a drill-own postgres manifest. Rerun pending.
 - 2026-10-10: Drill run 8 got past Vault; failed LDAP (egress blocked ESO->Vault). Fixed egress-deny intra-namespace allow. Rerun pending.
 - 2026-10-10: Drill run 7 failed phase2; root cause = drill egress policy blocked Vault->API server. Fixed in bin/hub-up (allow /32 API endpoint). Rerun pending.

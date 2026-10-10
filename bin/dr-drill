@@ -171,8 +171,26 @@ _dr_drill_v0() {
   return "$status"
 }
 
+_dr_drill_wait_vault() {
+  local limit="${DR_DRILL_VAULT_START_S:-300}" deadline phase="" rc
+  deadline=$((SECONDS + limit))
+  while (( SECONDS < deadline )); do
+    phase="$(_dr_drill_kubectl --no-exit -n secrets get pod vault-0 -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    [[ "$phase" == Running ]] && break
+    sleep "${DR_DRILL_POLL_S:-5}"
+  done
+  if [[ "$phase" != Running ]]; then
+    printf '[dr-drill] vault-0 is not Running after %ss (phase: %s)\n' "$limit" "${phase:-none}" >&2
+    return 1
+  fi
+  set +u; VAULT_API_WAIT_S="$limit" _vault_wait_api secrets vault; rc=$?; set -u
+  (( rc == 0 )) || printf '[dr-drill] the restored Vault API did not answer within %ss\n' "$limit" >&2
+  return "$rc"
+}
+
 _dr_drill_unseal() {
   local count shard idx
+  _dr_drill_wait_vault || return 1
   count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)"
   [[ "$count" =~ ^[1-9][0-9]*$ ]] || return 1
   for ((idx=1; idx<=count; idx++)); do
