@@ -21,6 +21,13 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: the DR drill never unsealed the restored Vault (drill runs 13 and 14). It piped the shard
+  into `vault operator unseal -`, but `operator unseal` has no stdin form: it sent a literal `-` as
+  the key, and Vault answered "'key' must be a valid hex or base64 string" whatever the Keychain
+  held. The drill now sends the shard with `vault write sys/unseal key=-`, which does read stdin,
+  so the shard still never appears in any argv. The test stub had accepted `unseal -` as a stdin
+  read; it now fails the way real Vault does, so the old command turns the green-run tests red.
+  `operator generate-root` and `-decode` do document `-` as stdin and are unchanged.
 - Fixed: a malformed DR unseal shard reached Vault, which refused it with "'key' must be a valid
   hex or base64 string" (drill run 13). The DR shard import stored whatever line it read, with no
   check and no `\r` strip, unlike the normal unseal cache. Import, export and the drill now strip a

@@ -122,7 +122,8 @@ STUB
 { printf 'vault'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
 [[ "$*" == *SHARDSENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97
 case "$*" in
-  *'operator unseal -'*) [[ "$*" == *SHARDSENTINEL* ]] && exit 97; key="$(cat)"; printf '%s\n' "$key" >> "$SHARD_LOG"; if [[ "${DR_TEST_UNSEAL_FAIL:-0}" == 1 ]]; then printf 'Error unsealing: bad key %s\n* cipher: message authentication failed\n' "$key" >&2; exit 2; fi; exit 0 ;;
+  *'operator unseal'*) printf "Error unsealing: Error making API request.\nCode: 400. Errors:\n* 'key' must be a valid hex or base64 string\n" >&2; exit 2 ;;
+  *'write -format=json sys/unseal key=-'*) key="$(cat)"; printf '%s\n' "$key" >> "$SHARD_LOG"; if [[ "${DR_TEST_UNSEAL_FAIL:-0}" == 1 ]]; then printf 'Error unsealing: bad key %s\n* cipher: message authentication failed\n' "$key" >&2; exit 2; fi; exit 0 ;;
   *'-generate-otp'*) printf '{"otp":"OTP-SENTINEL"}' ;;
   *'-init'*) printf '{"nonce":"NONCE"}' ;;
   *'-decode=-'*) [[ "$*" == *OTP-SENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97; cat >> "$SHARD_LOG"; printf ROOT-TOKEN ;;
@@ -172,12 +173,12 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
 @test "dr drill: V0 handles readiness, curl codes, deletion, and exact image" {
   export DR_TEST_NOT_READY=1
   : > "$KLOG"; : > "$VLOG"
-  run_drill; [ "$status" -ne 0 ]; [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]; [ "$(grep -c 'delete pod dr-egress-check-secrets' "$KLOG" || true)" -eq 1 ]; [ "$(grep -c 'delete pod dr-egress-check-identity' "$KLOG" || true)" -eq 1 ]
+  run_drill; [ "$status" -ne 0 ]; [ "$(grep -c 'sys/unseal' "$VLOG" || true)" -eq 0 ]; [ "$(grep -c 'delete pod dr-egress-check-secrets' "$KLOG" || true)" -eq 1 ]; [ "$(grep -c 'delete pod dr-egress-check-identity' "$KLOG" || true)" -eq 1 ]
   unset DR_TEST_NOT_READY; export DR_TEST_CURL_RC=7
   : > "$KLOG"; : > "$VLOG"
   run_drill; [ "$status" -eq 0 ]; [ "$(grep -c 'image=curlimages/curl:8.10.1' "$KLOG" || true)" -eq 2 ]; [ "$(grep -c 'delete pod dr-egress-check-secrets' "$KLOG" || true)" -eq 1 ]; [ "$(grep -c 'delete pod dr-egress-check-identity' "$KLOG" || true)" -eq 1 ]
   : > "$KLOG"; : > "$VLOG"; export DR_TEST_EXEC_FAIL=1
-  run_drill; [ "$status" -ne 0 ]; [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]; [ "$(grep -c 'delete pod dr-egress-check-secrets' "$KLOG" || true)" -eq 1 ]; [ "$(grep -c 'delete pod dr-egress-check-identity' "$KLOG" || true)" -eq 1 ]
+  run_drill; [ "$status" -ne 0 ]; [ "$(grep -c 'sys/unseal' "$VLOG" || true)" -eq 0 ]; [ "$(grep -c 'delete pod dr-egress-check-secrets' "$KLOG" || true)" -eq 1 ]; [ "$(grep -c 'delete pod dr-egress-check-identity' "$KLOG" || true)" -eq 1 ]
 }
 
 @test "dr drill: unseal and restore failures report and tear down" {
@@ -205,14 +206,14 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   export DR_TEST_VAULT_PENDING_POLLS=2 DR_DRILL_POLL_S=0
   run_drill; [ "$status" -eq 0 ]
   [ "$(cat "$HOME/vault-phase-polls")" -eq 3 ]
-  [ "$(grep -c 'operator unseal' "$VLOG")" -eq 1 ]
+  [ "$(grep -c 'sys/unseal' "$VLOG")" -eq 1 ]
 }
 
 @test "dr drill: a vault-0 that never runs fails unseal with a reason and no unseal call" {
   export DR_TEST_VAULT_PENDING_POLLS=1000 DR_DRILL_POLL_S=0 DR_DRILL_VAULT_START_S=1
   run_drill; [ "$status" -ne 0 ]
   [[ "$output" == *"vault-0 is not Running after 1s (phase: Pending)"* ]]
-  [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
+  [ "$(grep -c 'sys/unseal' "$VLOG" || true)" -eq 0 ]
   result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"; [ "$(jq -r .failed "$result")" = unseal ]
 }
 
@@ -220,14 +221,14 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   export DR_TEST_SHARD_COUNT=
   run_drill; [ "$status" -ne 0 ]
   [[ "$output" == *"no DR shard count in Keychain service k3dm-vault-unseal-dr"* ]]
-  [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
+  [ "$(grep -c 'sys/unseal' "$VLOG" || true)" -eq 0 ]
 }
 
 @test "dr drill: a non-numeric shard count fails unseal and says so" {
   export DR_TEST_SHARD_COUNT=abc
   run_drill; [ "$status" -ne 0 ]
   [[ "$output" == *"is not a positive number"* ]]
-  [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
+  [ "$(grep -c 'sys/unseal' "$VLOG" || true)" -eq 0 ]
 }
 
 @test "dr drill: a missing shard is named without printing any shard" {
@@ -250,7 +251,7 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   run_drill; [ "$status" -ne 0 ]
   [[ "$output" == *"DR shard 1 of 1 in Keychain is not a base64 or hex unseal key"* ]]
   [[ "$output" != *'SHARD"SENTINEL'* ]]
-  [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
+  [ "$(grep -c 'sys/unseal' "$VLOG" || true)" -eq 0 ]
 }
 
 @test "dr drill: a trailing CR on a Keychain shard is stripped before unseal" {
