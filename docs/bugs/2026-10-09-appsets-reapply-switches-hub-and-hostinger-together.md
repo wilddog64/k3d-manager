@@ -65,3 +65,25 @@ Roll out in two stages, gated on the hub. This is not new environments.
 - `docs/howto/makefile.md`: the `appsets-reapply` row and `APPSETS_STAGE`.
 - `CLAUDE.md` "Reapply the ApplicationSets on every release" rule: add a mention of the
   two stages. Claude makes that edit itself when verifying; it is not Codex's job.
+
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/etc/argocd/applicationsets/*.yaml` | `k3dm.k3d.io/rollout-stage` label on every set |
+| `scripts/plugins/argocd.sh` | staged apply + per-stage confirmation in `deploy_argocd_applicationsets` / `_argocd_deploy_applicationsets` |
+| `Makefile` | `APPSETS_STAGE` → `K3DM_APPSETS_STAGE` on `appsets-reapply` |
+| `scripts/tests/plugins/argocd_appset_rollout_stage.bats` | new |
+| `scripts/tests/plugins/argocd_appset_reapply_confirm_wait.bats` | adjust only if the staged flow changes how the confirmation is called |
+| `docs/howto/makefile.md` | `appsets-reapply` row |
+
+`CLAUDE.md` is not in this table: Claude edits it after verification.
+
+## Rules
+
+- `scripts/plugins/argocd.sh` must stay under the agent audit's if-count limit of 8 per function.
+  Put the stage logic in new helpers, not inside an existing function.
+- `shellcheck scripts/plugins/argocd.sh`: no new warnings.
+- `bats scripts/tests/plugins/argocd_appset_rollout_stage.bats scripts/tests/plugins/argocd_appset_reapply_confirm_wait.bats scripts/tests/plugins/argocd.bats`: all green. Paste the output.
+- Do not commit. `.git` is read-only in the sandbox.
+

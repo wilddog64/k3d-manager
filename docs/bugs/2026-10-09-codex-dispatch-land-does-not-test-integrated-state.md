@@ -68,18 +68,51 @@ All in `bin/k3dm-codex-dispatch`.
   - the test-before-land step, with an example `TEST="bats scripts/tests/bin/codex_dispatch.bats"`;
   - the landing lock;
   - the networked-task rule;
-  - a note that tests must not bind fixed local ports, because parallel tasks run tests at the same time.
+  - a note that tests must not bind fixed local ports, because parallel tasks run tests at the same time;
+  - `resume`, and when to use it rather than `abandon` and re-dispatch.
 - `docs/howto/makefile.md`: update the `codex-land` row.
+
+### 5. `resume`: send a follow-up to the same Codex session
+
+Added 2026-10-09. Bug-priority tracking came back with no tests. Claude resumed the session by hand
+with `codex exec resume`, rebuilding the environment and sandbox flags from memory. That should be
+a subcommand.
+
+- `resume --slug SLUG --prompt-file PATH`. `make codex-resume SLUG= PROMPT=`.
+- **Refusals** (exit 2):
+  - Codex is still running (live `pid` and no `exit`);
+  - the task has landed (`<run>/landed`);
+  - the worktree does not exist;
+  - the prompt file is missing or empty;
+  - no `session id:` line is found in `<run>/codex.log`.
+- The session id is the first `^session id: ` value in `<run>/codex.log`. Validate it as a UUID.
+- **Files.**
+  - Number the resume: `n` = 2, 3, and so on.
+  - Copy the prompt to `<run>/prompt-<n>.md`.
+  - Log to `<run>/codex-<n>.log`, and write `-o <run>/last-message-<n>.md`.
+  - Before launching, remove `<run>/exit`, so `status` and `land` see the task as running again.
+  - Write the new pid to `<run>/pid`. Write `<run>/exit` when it finishes, exactly like `start`.
+- **Launch.**
+  - Use the same `_dispatch_state_vars` environment, the worktree as the working directory, and
+    `</dev/null >/dev/null 2>&1 &` detachment as `start`.
+  - Command: `codex exec resume -c sandbox_mode="workspace-write" -c 'sandbox_workspace_write.writable_roots=["<run>/state"]' -o <run>/last-message-<n>.md <id> - < <run>/prompt-<n>.md`.
+  - Add `-c sandbox_workspace_write.network_access=true` only when `<run>/network` exists (item 3),
+    and the networked-task check applies as in `start`.
+  - `codex exec resume` has no `-C` or `--add-dir`. That is why the working directory and the
+    writable root are set this way.
+- **Status.** `status` shows `resumes: <n-1>` when any resume happened.
+- **Scope is unchanged.** It still comes from the spec at `<run>/base`, so a resume prompt cannot
+  widen it.
 
 ## Files
 
 | File | Change |
 |---|---|
-| `bin/k3dm-codex-dispatch` | items 1–3 |
+| `bin/k3dm-codex-dispatch` | items 1–3, 5 |
 | `scripts/tests/bin/codex_dispatch.bats` | regression tests |
-| `Makefile` | `codex-land` passes `TEST` / `NO_TEST` |
+| `Makefile` | `codex-land` passes `TEST` / `NO_TEST`; new `codex-resume` |
 | `docs/howto/codex-dispatch.md` | item 4 |
-| `docs/howto/makefile.md` | `codex-land` row |
+| `docs/howto/makefile.md` | `codex-land` row; `codex-resume` row |
 
 ## Tests
 
@@ -102,11 +135,24 @@ Add to `scripts/tests/bin/codex_dispatch.bats`, using the existing fixture:
    - A second `start` without `--network` succeeds.
    - After the first one's `exit` file appears, a new `start --network` succeeds.
 7. The test command sees `K3DM_JOB_DIR` under `<run>/state`, not the operator's.
+8. **Resume.** The stub Codex prints `session id: 01a122dd-71c3-7763-87f0-3de505f10168` on start
+   and records its argv on every call.
+   - After the first run exits, `resume --slug one --prompt-file p.md` launches the stub with
+     `exec resume`, the session id, `writable_roots` naming `<run>/state`, and the working
+     directory equal to the worktree.
+   - `prompt-2.md`, `codex-2.log` and `last-message-2.md` exist. `exit` is re-created after the stub
+     finishes.
+   - With `STUB_SLEEP=5`, a resume while the first run is still running exits 2.
+   - A resume of a landed task exits 2.
+   - A resume when `codex.log` has no session id exits 2.
+   - A second resume uses `n` = 3.
+   - Without `<run>/network`, the argv has no `network_access=true`.
 
 Mutation checks. Paste the red output for each:
 - Move the test after `merge --ff-only`. Test 1 must fail (HEAD moved).
 - Delete the lock `trap`. The "lock released after failure" part of test 5 must fail.
 - Drop the `network` marker scan. Test 6 must fail.
+- Skip removing `<run>/exit` before a resume. The "exit is re-created after the stub finishes" part of test 8 must fail.
 
 ## Rules
 
