@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN
+**Status:** FIXED `625b44a7` 2026-10-09 (Codex via worktree dispatch; Claude verified 8 BATS + 64 pytest, both mutations red, landed with `land --test`). Hermes was recovered first by the operator (brew install python@3.14 + symlink + kickstart). Operator follow-up: re-render the three plists from the templates, then remove the symlink. HermesNotRunning goes live with the next platform-ops sync.
 **Priority:** P1 — Hermes (sensors, triage, index refresh) has been down since 18:42 with no workaround short of fixing the path; the webhook and cloud-bridge fail on their next restart
 **Severity:** high
 **Origin:** operator, 2026-10-09: "the documents you created are not indexed". The index had not changed since 18:22.
