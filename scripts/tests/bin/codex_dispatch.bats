@@ -3,6 +3,7 @@
 setup() {
   export FIXTURE="$BATS_TEST_TMPDIR/fixture" ORIGIN="$BATS_TEST_TMPDIR/origin.git"
   export K3DM_WORKTREE_ROOT="$BATS_TEST_TMPDIR/worktrees" HOME="$BATS_TEST_TMPDIR/home"
+  export K3DM_DISPATCH_PUSHGATEWAY_URL="http://127.0.0.1:9"
   export K3DM_CODEX_BIN="$BATS_TEST_TMPDIR/codex-stub"
   mkdir -p "$FIXTURE" "$HOME" "$K3DM_WORKTREE_ROOT"
   git init --bare "$ORIGIN" >/dev/null
@@ -45,6 +46,7 @@ if [[ "$*" != *"exec resume"* ]]; then
   IFS=, read -ra edits <<<"${STUB_EDITS:-a.txt}"
   for edit in "${edits[@]}"; do printf 'edited\n' >"$codex_dir/$edit"; done
 fi
+[[ "${STUB_TOKENS:-}" == none ]] || printf 'tokens used\n%s\n' "${STUB_TOKENS:-12,345}"
 STUB
   chmod +x "$K3DM_CODEX_BIN"
 }
@@ -363,4 +365,60 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
   [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/prompt-2.md" ]
   sleep 6
+}
+
+@test "codex dispatch: ledger snapshots Codex output and restores the index" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  ledger="$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$(jq -s 'length' "$ledger")" -eq 2 ]
+  [ "$(jq -r -s '.[0].event' "$ledger")" = start ]
+  [ "$(jq -r -s '.[1].event' "$ledger")" = codex_exit ]
+  [ "$(jq -r -s '.[1].tokens' "$ledger")" = 12345 ]
+  [[ "$(jq -r -s '.[1].tree' "$ledger")" =~ ^[0-9a-f]{40}$ ]]
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-tree" ]
+  [ -z "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" diff --cached --name-only)" ]
+}
+
+@test "codex dispatch: ledger records verifier lines before a release rebase" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  printf 'edited\nextra\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/one/a.txt"
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
+  printf 'release\n' >"$FIXTURE/release.txt"
+  git -C "$FIXTURE" add release.txt; git -C "$FIXTURE" commit -m release >/dev/null
+  run dispatch land --slug one --no-test
+  [ "$status" -eq 0 ]
+  [ "$(jq -r -s '.[-1].event' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = land ]
+  [ "$(jq -r -s '.[-1].verifier_lines' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 1 ]
+  [ "$(jq -r -s '.[-1].wait_seconds' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -ge 0 ]
+}
+
+@test "codex dispatch: ledger records scope refusal and valid JSON" {
+  export STUB_EDITS=b.txt STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  printf 'out of scope\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/one/b.txt"
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add b.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m out >/dev/null
+  run dispatch land --slug one --no-test
+  [ "$status" -eq 2 ]
+  grep -q '"event":"land_refused"' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  while IFS= read -r line; do jq -e . >/dev/null <<<"$line"; done <"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+}
+
+@test "codex dispatch: resume records the latest token total" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  export STUB_TOKENS=20000
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null; sleep 1
+  [ "$(jq -r -s 'map(select(.event == "resume"))[0].n' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 2 ]
+  [ "$(jq -r -s 'map(select(.event == "codex_exit"))[-1].tokens' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 20000 ]
+}
+
+@test "codex dispatch: ledger records a Codex exit with no token count" {
+  export STUB_TOKENS=none STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  ledger="$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$(jq -r -s 'map(select(.event == "codex_exit"))[0].tokens' "$ledger")" = null ]
+  [[ "$(jq -r -s 'map(select(.event == "codex_exit"))[0].tree' "$ledger")" =~ ^[0-9a-f]{40}$ ]]
 }

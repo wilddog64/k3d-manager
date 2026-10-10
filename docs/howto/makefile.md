@@ -75,6 +75,7 @@ After a rebuild, generate the new target map and restore with:
 | `make codex-land SLUG=... TEST='bats scripts/tests/...'` | Rebase, test, and land a verified, in-scope task; use `NO_TEST=1` for docs-only work |
 | `make codex-resume SLUG=... PROMPT=...` | Send a follow-up prompt to the same Codex session |
 | `make codex-abandon SLUG=... [YES=1]` | Preview or remove an abandoned task |
+| `make dispatch-metrics [DRY_RUN=1]` | Export Codex dispatch ledger metrics to Pushgateway, or render them locally |
 
 `sync-apps` delegates to `bin/cluster-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).

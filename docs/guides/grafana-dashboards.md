@@ -25,6 +25,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
 | k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
 | k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
+| k3dm Agent Dispatch | `k3dm-agent-dispatch` | `platform-ops/grafana-dashboard-agent-dispatch.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | ArgoCD app `hub-grafana-dashboards` (hub; NOT `make platform-ops`); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
 | Bug tracking | `k3dm-bugs` | `platform-ops/grafana-dashboard-bugs.yaml` | `make platform-ops` | hub |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
@@ -294,6 +295,15 @@ starts of pending or firing states, including alerts that cleared before firing;
 no firing hours indicates flapping. Alertmanager does not label notification counts or latency by alert
 name, so this table cannot show notifications per alert. The dashboard's 41-warning example was 39
 Trivy findings, plus one actionable `TargetDown` and one deliberate `HostDiskSpaceLow` synthetic alert.
+
+### k3dm Agent Dispatch (`k3dm-agent-dispatch`) — hub
+
+The dispatch dashboard reads the shared Codex ledger export and selects 1d, 7d, or 30d. It shows
+accepted specs, integration-test landing success, verifier lines changed, wait minutes, Codex
+tokens per accepted spec, running and awaiting-land tasks, outcome counts, and export age. Wait
+minutes are wall-clock waiting time rather than active human minutes; token cost is Codex tokens
+only, excludes Claude verification, and is not converted to dollars because token pricing is not
+stable. Scope and rebase refusals are excluded from the integration success ratio.
 
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 

@@ -34,3 +34,19 @@ Worktree caveats:
 - Gitignored files such as `.envrc`, `bin/.ask-sandbox/`, `node_modules` and `.wrangler` are not in a new worktree. Anything that needs them fails there.
 - A branch can be checked out in only one worktree at a time.
 - `git worktree prune` cleans up stale entries.
+
+## Metrics
+
+The dispatcher appends lifecycle events to the shared `K3DM_WORKTREE_ROOT/ledger.jsonl` and
+publishes them to the hub Pushgateway with `make dispatch-metrics`. The exporter keeps 1d, 7d,
+and 30d windows for the `k3dm Agent Dispatch` dashboard:
+
+- Fleet throughput is landed tasks per day.
+- Landing success is landed divided by landed plus refusals at the integration-test step.
+- Human intervention is verifier lines changed after Codex, plus wall-clock waiting minutes from
+  Codex exit to land. Waiting time is not active minutes.
+- Agent efficiency is Codex tokens per landed task. It excludes Claude's verification tokens and
+  is not converted to dollars because token pricing is not stable.
+
+Use `make dispatch-metrics DRY_RUN=1` to render the Prometheus text without contacting
+Pushgateway. The exporter uses the latest resumed Codex token total for a task.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
 
 set -euo pipefail
 
@@ -8,6 +9,48 @@ _dispatch_repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 # shellcheck source=/dev/null
 source "${_dispatch_script_dir}/../scripts/lib/system.sh"
 _dispatch_worktree_root="${K3DM_WORKTREE_ROOT:-${HOME}/.local/share/k3d-manager/worktrees}"
+
+_dispatch_ledger_event() {
+  local event="$1" version="$2" slug="$3" json filter='.' arg_count
+  shift 3
+  if (($#)); then
+    arg_count=$#; filter="${!arg_count}"; set -- "${@:1:arg_count-1}"
+  fi
+  json="$(jq -nc --arg event "$event" --arg version "$version" --arg slug "$slug" \
+    --argjson ts "$(date +%s)" "$@" "{ts:\$ts,event:\$event,version:\$version,slug:\$slug} | ($filter)" 2>/dev/null)" || {
+    echo "[codex-dispatch] WARNING: could not build ledger event ${event} for ${slug}" >&2
+    return 0
+  }
+  if ! printf '%s\n' "$json" >>"$_dispatch_worktree_root/ledger.jsonl"; then
+    echo "[codex-dispatch] WARNING: could not write $_dispatch_worktree_root/ledger.jsonl" >&2
+  fi
+}
+
+_dispatch_schedule_metrics() {
+  mkdir -p "$_dispatch_worktree_root" 2>/dev/null || true
+  "$_dispatch_script_dir/k3dm-dispatch-metrics" >>"$_dispatch_worktree_root/metrics.log" 2>&1 &
+}
+
+_dispatch_codex_exit() {
+  local worktree="$1" run="$2" version="$3" slug="$4" log="$5" exit_code="$6" tokens tree ts
+  tokens="$(awk '/^tokens used$/{getline; gsub(/,/, ""); if ($0 ~ /^[0-9]+$/) value=$0} END{if (value != "") print value}' "$log" 2>/dev/null || true)"
+  git -C "$worktree" add -A
+  tree="$(git -C "$worktree" write-tree)"
+  git -C "$worktree" reset -q
+  printf '%s\n' "$tree" >"$run/codex-tree"
+  ts="$(date +%s)"
+  printf '%s\n' "$ts" >"$run/codex-exit-ts"
+  if [[ -n "$tokens" ]]; then
+    _dispatch_ledger_event codex_exit "$version" "$slug" \
+      --argjson exit "$exit_code" --argjson tokens "$tokens" --arg tree "$tree" \
+      '.["exit"]=$exit|.["tokens"]=$tokens|.["tree"]=$tree'
+  else
+    _dispatch_ledger_event codex_exit "$version" "$slug" \
+      --argjson exit "$exit_code" --arg tree "$tree" \
+      '.["exit"]=$exit|.["tokens"]=null|.["tree"]=$tree'
+  fi
+  _dispatch_schedule_metrics
+}
 
 _dispatch_error() { echo "[codex-dispatch] ERROR: $*" >&2; exit 2; }
 _dispatch_usage() {
@@ -135,6 +178,7 @@ _dispatch_start() {
   fi
   printf '%s\n' "$remote" >"$run/base"
   printf '%s\n' "$spec" >"$run/spec"
+  _dispatch_ledger_event start "$version" "$slug" --argjson network "$network" '.["network"]=$network'
   cat >"$run/prompt.md" <<EOF
 Read the spec at $spec in full, and implement it in this directory only.
 Run the spec's Rules gates and paste their output.
@@ -155,7 +199,9 @@ EOF
     else
       env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1
     fi
-    printf '%s\n' "$?" >"$run/exit"
+    exit_code="$?"
+    _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$run/codex.log" "$exit_code"
+    printf '%s\n' "$exit_code" >"$run/exit"
   ) </dev/null >/dev/null 2>&1 &
   printf '%s\n' "$!" >"$run/pid"
   echo "worktree: $worktree"; echo "run: $run"; echo "status: bin/k3dm-codex-dispatch status $slug"
@@ -183,7 +229,7 @@ _dispatch_status() {
 }
 
 _dispatch_land() {
-  local slug="" allow=0 test_set=0 no_test=0 test_cmd="" rel version task run pid spec current land_lock
+  local slug="" allow=0 test_set=0 no_test=0 test_cmd="" rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
@@ -203,7 +249,15 @@ _dispatch_land() {
   [[ -z "$(git -C "$task" status --porcelain)" ]] || _dispatch_error "worktree has uncommitted changes"
   [[ "$(git -C "$task" rev-list --count "origin/$rel..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$rel"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
-  _dispatch_scope_verdict "$task" "$spec" "$rel" "$allow" || _dispatch_error "task changes are out of scope"
+  if ! _dispatch_scope_verdict "$task" "$spec" "$rel" "$allow"; then
+    _dispatch_ledger_event land_refused "$version" "$slug" --arg reason scope '.["reason"]=$reason'
+    _dispatch_schedule_metrics
+    _dispatch_error "task changes are out of scope"
+  fi
+  verifier_lines=0
+  if [[ -s "$run/codex-tree" ]]; then
+    verifier_lines="$(git -C "$task" diff --numstat "$(<"$run/codex-tree")" HEAD | awk '{if ($1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/) total += $1 + $2} END {print total + 0}')"
+  fi
   land_lock="$_dispatch_worktree_root/$version/.land.lock"
   if ! mkdir "$land_lock" 2>/dev/null; then
     if [[ -f "$land_lock/pid" ]] && kill -0 "$(<"$land_lock/pid")" 2>/dev/null; then
@@ -217,7 +271,11 @@ _dispatch_land() {
   trap '_dispatch_release_land_lock "${_dispatch_land_lock_path}"' EXIT
   current="$(git -C "$_dispatch_repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"; [[ "$current" == "$rel" ]] || _dispatch_error "operator checkout is not on $rel"
   [[ -z "$(git -C "$_dispatch_repo_root" status --porcelain)" ]] || _dispatch_error "operator checkout is dirty"
-  git -C "$task" rebase "$rel" >/dev/null || _dispatch_error "rebase of task/$version/$slug onto $rel failed; resolve it in $task"
+  if ! git -C "$task" rebase "$rel" >/dev/null; then
+    _dispatch_ledger_event land_refused "$version" "$slug" --arg reason rebase '.["reason"]=$reason'
+    _dispatch_schedule_metrics
+    _dispatch_error "rebase of task/$version/$slug onto $rel failed; resolve it in $task"
+  fi
   if (( no_test )); then
     echo "tests: skipped (--no-test)"
   elif ! (cd "$task" && env \
@@ -226,11 +284,20 @@ _dispatch_land() {
     "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp" \
     bash -c "$test_cmd" >"$run/land-test.log" 2>&1); then
     tail -n 20 "$run/land-test.log"
+    _dispatch_ledger_event land_refused "$version" "$slug" --arg reason tests '.["reason"]=$reason'
+    _dispatch_schedule_metrics
     _dispatch_error "tests failed after rebase onto $rel; see $run/land-test.log"
   else
     echo "tests: passed"
   fi
   git -C "$_dispatch_repo_root" merge --ff-only "task/$version/$slug" >/dev/null || _dispatch_error "fast-forward merge of task/$version/$slug failed"
+  land_ts="$(date +%s)"; wait_seconds=null
+  if [[ -s "$run/codex-exit-ts" ]]; then
+    codex_ts="$(<"$run/codex-exit-ts")"; wait_seconds=$((land_ts - codex_ts))
+  fi
+  _dispatch_ledger_event land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
+    --argjson wait_seconds "$wait_seconds" '.["verifier_lines"]=$verifier_lines|.["wait_seconds"]=$wait_seconds'
+  _dispatch_schedule_metrics
   git -C "$_dispatch_repo_root" worktree remove "$task"
   git -C "$_dispatch_repo_root" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
   git -C "$_dispatch_repo_root" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
@@ -244,7 +311,7 @@ _dispatch_release_land_lock() {
 }
 
 _dispatch_resume() {
-  local slug="" prompt_file="" rel version task run pid session_id n network_slug
+  local slug="" prompt_file="" rel version task run pid session_id n network_slug exit_code
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
@@ -284,9 +351,13 @@ _dispatch_resume() {
     else
       env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
     fi
-    printf '%s\n' "$?" >"$run/exit"
+    exit_code="$?"
+    _dispatch_codex_exit "$task" "$run" "$version" "$slug" "$run/codex-$n.log" "$exit_code"
+    printf '%s\n' "$exit_code" >"$run/exit"
   ) </dev/null >/dev/null 2>&1 &
   printf '%s\n' "$!" >"$run/pid"
+  _dispatch_ledger_event resume "$version" "$slug" --argjson n "$n" '.["n"]=$n'
+  _dispatch_schedule_metrics
   echo "resumed: $slug"; echo "resume: $n"
 }
 
@@ -302,7 +373,10 @@ _dispatch_abandon() {
   [[ -n "$slug" ]] || _dispatch_error "abandon requires --slug SLUG"
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"
   if (( ! yes )); then echo "would remove: $_dispatch_task_dir"; echo "would delete branch: task/$version/$slug"; exit 2; fi
-  git -C "$_dispatch_repo_root" worktree remove --force "$_dispatch_task_dir"; git -C "$_dispatch_repo_root" branch -D "task/$version/$slug" >/dev/null; echo "abandoned: $slug"
+  git -C "$_dispatch_repo_root" worktree remove --force "$_dispatch_task_dir"; git -C "$_dispatch_repo_root" branch -D "task/$version/$slug" >/dev/null
+  _dispatch_ledger_event abandon "$version" "$slug"
+  _dispatch_schedule_metrics
+  echo "abandoned: $slug"
 }
 
 main() {

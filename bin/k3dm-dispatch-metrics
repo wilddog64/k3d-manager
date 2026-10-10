@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Export Codex dispatch ledger facts to a Pushgateway."""
+
+import argparse
+import json
+import os
+import time
+import urllib.request
+from collections import defaultdict
+from pathlib import Path
+
+WINDOWS = {"1d": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
+RESULTS = ("landed", "tests", "scope", "rebase")
+
+
+def _root():
+    return Path(os.environ.get("K3DM_WORKTREE_ROOT", "~/.local/share/k3d-manager/worktrees")).expanduser()
+
+
+def read_ledger(path):
+    events = []
+    bad = 0
+    if not path.exists():
+        return events, bad
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            item = json.loads(line)
+            if not isinstance(item, dict) or not isinstance(item.get("ts"), (int, float)):
+                raise ValueError("invalid event")
+            events.append(item)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            bad += 1
+    return events, bad
+
+
+def _task_states(events):
+    states = defaultdict(list)
+    for event in events:
+        key = (event.get("version"), event.get("slug"))
+        states[key].append(event)
+    return states
+
+
+def _task_state(task_events):
+    names = {event.get("event") for event in task_events}
+    if names & {"land", "abandon"}:
+        return None
+    launches = [e["ts"] for e in task_events if e.get("event") in {"start", "resume"}]
+    exits = [e["ts"] for e in task_events if e.get("event") == "codex_exit"]
+    if not launches:
+        return None
+    if not exits or max(exits) < max(launches):
+        return "running"
+    return "awaiting"
+
+
+def _window_metrics(events, now, seconds):
+    cutoff = now - seconds
+    current = [event for event in events if event["ts"] >= cutoff]
+    attempts = {result: 0 for result in RESULTS}
+    landed = {}
+    for event in current:
+        if event.get("event") == "land":
+            landed[(event.get("version"), event.get("slug"))] = event
+            attempts["landed"] += 1
+        elif event.get("event") == "land_refused" and event.get("reason") in attempts:
+            attempts[event["reason"]] += 1
+
+    states = _task_states(events)
+    token_values = []
+    verifier_values = []
+    wait_values = []
+    latest_exit = {}
+    for key, task_events in states.items():
+        exits = [e for e in task_events if e.get("event") == "codex_exit"]
+        if exits:
+            latest_exit[key] = exits[-1]
+    for key, event in landed.items():
+        exit_event = latest_exit.get(key, {})
+        if isinstance(exit_event.get("tokens"), int):
+            token_values.append(exit_event["tokens"])
+        if isinstance(event.get("verifier_lines"), (int, float)):
+            verifier_values.append(event["verifier_lines"])
+        if isinstance(event.get("wait_seconds"), (int, float)):
+            wait_values.append(event["wait_seconds"] / 60)
+
+    return {
+        "landed": len(landed),
+        "attempts": attempts,
+        "tokens": sum(token_values) / len(token_values) if token_values else 0,
+        "verifier": sum(verifier_values) / len(verifier_values) if verifier_values else 0,
+        "wait": sum(wait_values) / len(wait_values) if wait_values else None,
+    }
+
+
+def render(events, bad_lines, now=None):
+    now = time.time() if now is None else now
+    lines = [f"k3dm_dispatch_ledger_bad_lines {bad_lines}"]
+    for window, seconds in WINDOWS.items():
+        metrics = _window_metrics(events, now, seconds)
+        lines.append(f'k3dm_dispatch_landed{{window="{window}"}} {metrics["landed"]}')
+        for result in RESULTS:
+            lines.append(f'k3dm_dispatch_land_attempts{{window="{window}",result="{result}"}} '
+                         f'{metrics["attempts"][result]}')
+        lines.append(f'k3dm_dispatch_codex_tokens_per_landed{{window="{window}"}} '
+                     f'{metrics["tokens"]}')
+        lines.append(f'k3dm_dispatch_verifier_lines_per_landed{{window="{window}"}} '
+                     f'{metrics["verifier"]}')
+        if metrics["wait"] is not None:
+            lines.append(f'k3dm_dispatch_wait_minutes_per_landed{{window="{window}"}} '
+                         f'{metrics["wait"]}')
+    task_states = [_task_state(task_events) for task_events in _task_states(events).values()]
+    lines.append(f"k3dm_dispatch_running {task_states.count('running')}")
+    lines.append(f"k3dm_dispatch_awaiting_land {task_states.count('awaiting')}")
+    lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
+    return "\n".join(lines) + "\n"
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args(argv)
+    events, bad_lines = read_ledger(_root() / "ledger.jsonl")
+    payload = render(events, bad_lines)
+    if args.dry_run:
+        print(payload, end="")
+        return 0
+    base = os.environ.get("K3DM_DISPATCH_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    request = urllib.request.Request(
+        f"{base}/metrics/job/k3dm-dispatch", data=payload.encode(), method="PUT",
+        headers={"Content-Type": "text/plain; version=0.0.4"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5):
+            pass
+    except Exception as exc:  # one bounded request; callers should not retry forever
+        print(f"dispatch metrics push failed: {exc}")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
