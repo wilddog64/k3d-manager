@@ -93,7 +93,9 @@ sequenceDiagram
 | Metrics | M4 → hub Pushgateway | pushed from the M2 |
 
 The drill cluster gets a default-deny egress policy in every drill namespace before any workload
-starts. Check V0 proves egress is blocked before Vault is unsealed, so restored data cannot leave
+starts. It allows only DNS and the drill cluster's own API server (its `kubernetes` endpoint, as a
+/32 on the API port). Vault needs the API server: it writes its init state to its pod labels and does
+not answer `operator init` until that write finishes. Check V0 proves egress is blocked before Vault is unsealed, so restored data cannot leave
 the M2.
 
 ## Monitoring

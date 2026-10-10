@@ -23,6 +23,14 @@ fi
 if [[ "$(basename "$0")" == "kubectl" && "$*" == *"config use-context"* ]]; then
   exit 99
 fi
+if [[ "$(basename "$0")" == "kubectl" && "$*" == *"get endpoints kubernetes"* ]]; then
+  printf '%s\n' "${DR_TEST_API_ENDPOINT-192.168.117.2 6443}"
+  exit 0
+fi
+if [[ "$(basename "$0")" == "kubectl" && "$*" == *"apply -f -"* ]]; then
+  cat >> "${CALL_LOG}.stdin"
+  exit 0
+fi
 exit 0
 EOF
     chmod +x "${STUB_DIR}/${command_name}"
@@ -154,4 +162,28 @@ teardown() {
   vault_line="$(grep -n 'dispatcher deploy_vault' "$CALL_LOG" | head -1 | cut -d: -f1)"
   [ "$create_line" -lt "$policy_line" ]
   [ "$policy_line" -lt "$vault_line" ]
+}
+
+@test "hub-up: DR mode lets drill pods reach only the drill API server" {
+  export DR_DRILL_MODE=1 KUBE_CONTEXT=k3d-dr-drill HUB_CLUSTER_NAME=dr-drill
+  export KUBECONFIG="${FAKE_HOME}/dr-drill/kubeconfig"
+  run bin/hub-up
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'name: dr-allow-apiserver-egress' "${CALL_LOG}.stdin")" -eq 2 ]
+  grep -q 'namespace: secrets' "${CALL_LOG}.stdin"; grep -q 'namespace: identity' "${CALL_LOG}.stdin"
+  [ "$(grep -c 'cidr: 192.168.117.2/32' "${CALL_LOG}.stdin")" -eq 2 ]
+  [ "$(grep -c 'port: 6443' "${CALL_LOG}.stdin")" -eq 2 ]
+  [ "$(grep -c 'cidr:' "${CALL_LOG}.stdin")" -eq 2 ]
+  allow_line="$(grep -n 'apply -f -' "$CALL_LOG" | head -1 | cut -d: -f1)"
+  vault_line="$(grep -n 'dispatcher deploy_vault' "$CALL_LOG" | head -1 | cut -d: -f1)"
+  [ "$allow_line" -lt "$vault_line" ]
+}
+
+@test "hub-up: DR mode stops when the API server endpoint is unreadable" {
+  export DR_DRILL_MODE=1 KUBE_CONTEXT=k3d-dr-drill HUB_CLUSTER_NAME=dr-drill DR_TEST_API_ENDPOINT='0.0.0.0/0 6443'
+  export KUBECONFIG="${FAKE_HOME}/dr-drill/kubeconfig"
+  run bin/hub-up
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cannot read the drill API server endpoint"* ]]
+  [ "$(grep -c 'dispatcher deploy_vault' "$CALL_LOG" || true)" -eq 0 ]
 }

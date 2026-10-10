@@ -21,6 +21,12 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: the DR drill's default-deny egress policy also blocked the drill cluster's own API server.
+  Vault writes its init state to its pod labels through the API server and holds the
+  `operator init` response until that write gives up, so the CLI timed out ("context deadline
+  exceeded") after Vault had initialised, and the keys were lost. `bin/hub-up` now adds a
+  `dr-allow-apiserver-egress` policy in each drill namespace: TCP to the cluster's `kubernetes`
+  endpoint only, as a /32. The internet stays blocked, and V0 still checks that.
 - Fixed: the DR drill tests pinned their export to 2026-10-09T12:00Z and began failing the 26 h
   freshness check on 2026-10-10 at 14:00Z; the fixture now uses the current time.
 
