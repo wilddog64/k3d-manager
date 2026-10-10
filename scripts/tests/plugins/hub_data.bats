@@ -9,8 +9,18 @@ setup() {
   cat > "$STUB_BIN/git" <<'STUB'
 #!/usr/bin/env bash
 printf 'git %q\n' "$*" >> "$CALL_LOG"
-if [[ "$1" == clone ]]; then dest="${@: -1}"; mkdir -p "$dest"; cp -R "$DR_TEST_REPO_FIXTURE/snapshots" "$dest/"; fi
-if [[ "$1" == commit ]]; then rm -rf "$TEST_ROOT/last-snapshots"; cp -R snapshots "$TEST_ROOT/last-snapshots"; fi
+if [[ "$*" == *clone* ]]; then dest="${@: -1}"; mkdir -p "$dest"; cp -R "$DR_TEST_REPO_FIXTURE/snapshots" "$dest/"; fi
+if [[ "$*" == *commit* ]]; then rm -rf "$TEST_ROOT/last-snapshots"; cp -R snapshots "$TEST_ROOT/last-snapshots"; fi
+if [[ "$*" == *rev-parse* ]]; then printf 'SHA-SENTINEL\n'; fi
+if [[ "$*" == *ls-remote* && "${DR_TEST_REMOTE_MISMATCH:-0}" != 1 ]]; then printf 'SHA-SENTINEL\trefs/heads/snapshots\n'; fi
+if [[ "$*" == *ls-tree* ]]; then printf 'results/20261010T182508Z.json\n'; fi
+if [[ "$*" == *show* ]]; then printf '{"success":true,"export":"%s"}\n' "${DR_TEST_RESULT_EXPORT:-20261009T120000Z}"; fi
+if [[ "$*" == *config* ]]; then printf 'apiVersion: v1\nkind: Config\n' ; fi
+if [[ "$*" == *fetch* && "${DR_TEST_FETCH_FAIL:-0}" == 1 ]]; then exit 1; fi
+if [[ "$*" == *ls-remote* && "${DR_TEST_REMOTE_MISMATCH:-0}" == 1 ]]; then printf 'OTHER-SHA\trefs/heads/snapshots\n'; fi
+if [[ "$*" == *push* ]]; then printf 'push %s\n' "$*" >> "$TEST_ROOT/push.log"; fi
+if [[ "$*" == *rm\ * ]]; then printf 'rm %s\n' "$*" >> "$TEST_ROOT/git.log"; fi
+if [[ "$*" == *write-tree* || "$*" == *commit-tree* ]]; then printf 'NEW-SHA\n'; fi
 STUB
   cat > "$STUB_BIN/vault" <<'STUB'
 #!/usr/bin/env bash
@@ -21,6 +31,7 @@ case "$*" in
   *-decode=-*) cat >> "$STDIN_LOG"; printf 'ROOT-TOKEN' ;;
   *-cancel*) : ;;
   *'token revoke -self'*) : ;;
+  *'auth/kubernetes/login'*) printf 'INVENTORY-TOKEN' ;;
   *'kv list'*) printf '%s' "${DR_TEST_KV_LIST:-[\"app/\",\"shared\"]}" ;;
   *'generate-root'*'-format=json -'*) [[ "${DR_TEST_KEY_FAIL:-0}" == 1 ]] && exit 1; cat >> "$STDIN_LOG"; printf '{"encoded_token":"ENCODED-SENTINEL"}' ;;
 esac
@@ -28,7 +39,9 @@ STUB
   cat > "$STUB_BIN/kubectl" <<'STUB'
 #!/usr/bin/env bash
 printf 'kubectl' >> "$CALL_LOG"; printf ' %q' "$@" >> "$CALL_LOG"; printf '\n' >> "$CALL_LOG"; args="$*"
-if [[ "$args" == *"exec deployment/postgres-keycloak"* ]]; then printf '3\n'
+if [[ "$args" == *"config view"* ]]; then printf 'apiVersion: v1\nkind: Config\n'
+elif [[ "$args" == *"create token hub-data-export"* ]]; then printf 'JWT-SENTINEL\n'
+elif [[ "$args" == *"exec deployment/postgres-keycloak"* ]]; then printf '3\n'
 elif [[ "$args" == *"exec statefulset/openldap"* ]]; then printf 'dn: a\ndn: b\n'
 elif [[ "$args" == *"get pvc"* && "$args" == *"volumeName"* ]]; then claim="${args#*get pvc }"; claim="${claim%% *}"; printf 'pv-%s\n' "$claim"
 elif [[ "$args" == *"get pvc"* && "$args" == *"-o json"* ]]; then
@@ -54,10 +67,15 @@ STUB
   cat > "$STUB_BIN/age" <<'STUB'
 #!/usr/bin/env bash
 printf 'age' >> "$CALL_LOG"; printf ' %q' "$@" >> "$CALL_LOG"; printf '\n' >> "$CALL_LOG"
-  if [[ "$1" == -r ]]; then out=""; next=0; for arg in "$@"; do [[ "$arg" == -o ]] && next=1 && continue; [[ "$next" == 1 ]] && out="$arg" && next=0; done; ls -1 "$(dirname "$out")" >> "$TEST_ROOT/age-stage.log"; cat >/dev/null; [[ "${DR_TEST_LARGE:-0}" == 1 ]] && truncate -s 99614720 "$out" || printf encrypted > "$out"
+  if [[ "$1" == -r ]]; then out=""; next=0; for arg in "$@"; do [[ "$arg" == -o ]] && next=1 && continue; [[ "$next" == 1 ]] && out="$arg" && next=0; done; ls -1 "$(dirname "$out")" >> "$TEST_ROOT/age-stage.log"; cat >/dev/null; [[ "${DR_TEST_LARGE:-0}" == 1 ]] && { printf 'age-encryption.org/v1\n' > "$out"; truncate -s 99614720 "$out"; } || printf 'age-encryption.org/v1\nencrypted\n' > "$out"
 else identity=""; input="-"; idx=1; while (( idx <= $# )); do case "${!idx}" in -i) idx=$((idx+1)); identity="${!idx}";; -) input=-;; *) input="${!idx}";; esac; idx=$((idx+1)); done; [[ -r "$identity" ]] && cat "$identity" >> "$STDIN_LOG"; printf 'decrypt %s\n' "$input" >> "$TEST_ROOT/decrypt.log"; [[ "$input" == - ]] && cat >/dev/null; printf tar-stream; fi
 STUB
   chmod +x "$STUB_BIN"/*; export PATH="$STUB_BIN:$PATH" PLUGINS_DIR="$PWD/scripts/plugins"
+  cat > "$STUB_BIN/curl" <<'STUB'
+#!/usr/bin/env bash
+for arg in "$@"; do [[ "$arg" == @* ]] && cp "${arg#@}" "$TEST_ROOT/metrics-body"; done
+STUB
+  chmod +x "$STUB_BIN/curl"
 }
 
 make_fixture() {
@@ -102,16 +120,19 @@ spec:
 ---
 YAML
   printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$root/inventory.json"
-  printf encrypted > "$root/secrets-data-vault-0.tar.age"; printf encrypted > "$root/identity-postgres-keycloak-pvc.tar.age"; printf encrypted > "$root/identity-data-openldap-0.tar.age"
-  (cd "$root" && sha256sum *.age > SHA256SUMS)
+  printf 'age-encryption.org/v1\nencrypted\n' > "$root/secrets-data-vault-0.tar.age"; printf 'age-encryption.org/v1\nencrypted\n' > "$root/identity-postgres-keycloak-pvc.tar.age"; printf 'age-encryption.org/v1\nencrypted\n' > "$root/identity-data-openldap-0.tar.age"
+  (cd "$root" && sha256sum *.age pv-pvc.yaml inventory.json > SHA256SUMS)
 }
 
 source_plugin() {
   export SCRIPT_DIR="$PWD/scripts"
   _err() { printf '%s\n' "$*" >&2; }
   _warn() { printf '%s\n' "$*" >&2; }
+  _no_trace() { "$@"; }
   source "$PLUGINS_DIR/hub_data.sh"
   _kubectl() { kubectl "$@"; }
+  export K3DM_HUB_DATA_CONTEXT=ctx
+  export K3DM_HUB_DATA_DIR="$TEST_ROOT/hub-data"
   _hub_recovery_logical_node() { printf '%s\n' "$1"; }
   _hub_snapshot_claim_node() { case "$1/$2" in secrets/data-vault-0) printf node-a;; identity/postgres-keycloak-pvc) printf node-b;; identity/data-openldap-0) printf node-c;; esac; }
   _hub_snapshot_claim_pv() { printf 'pv-%s\n' "$2"; }
@@ -132,12 +153,33 @@ source_plugin() {
       printf '%s' "$input" >> "$STDIN_LOG"
       printf '%s' "$input" | bash -c "${command[2]}" "${command[3]:-sh}"
     elif [[ "$command_name" == vault ]]; then
+      [[ "${command[*]}" == *auth/kubernetes/login* ]] && cat >> "$STDIN_LOG"
       "${command[@]}" </dev/null
     else
       return 1
     fi
   }
   : > "$CALL_LOG"; : > "$STDIN_LOG"; : > "$VLOG"
+}
+
+make_export_dir() {
+  local dir="$1" mode="${2:-full}"
+  mkdir -p "$dir"
+  printf 'age-encryption.org/v1\nencrypted\n' > "$dir/x.tar.age"
+  printf '{}\n' > "$dir/inventory.json"
+  printf 'metadata\n' > "$dir/pv-pvc.yaml"
+  if [[ "$mode" == legacy ]]; then
+    (cd "$dir" && sha256sum x.tar.age > SHA256SUMS)
+  else
+    (cd "$dir" && sha256sum x.tar.age pv-pvc.yaml inventory.json > SHA256SUMS)
+  fi
+}
+
+make_prune_fixture() {
+  local root="$TEST_ROOT/fixture/snapshots" stamp
+  rm -rf "$TEST_ROOT/fixture"; mkdir -p "$root"
+  for stamp in "$@"; do make_export_dir "$root/$stamp"; done
+  export DR_TEST_REPO_FIXTURE="$TEST_ROOT/fixture" K3DM_HUB_DATA_DIR="$TEST_ROOT/prune-state"
 }
 
 @test "hub data restore: decrypts every claim and uses metadata" {
@@ -198,17 +240,17 @@ source_plugin() {
 }
 
 @test "hub data export: streams each claim from its own node and path" {
-  source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z
+  make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z
   _hub_data_inventory() { printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$1/inventory.json"; }
   run hub_data_export; [ "$status" -eq 0 ]; [ "$(find "${TMPDIR:-/tmp}" -name '*.tar' -print | wc -l)" -eq 0 ]; [ "$(grep -Ec '\.tar$' "$TEST_ROOT/age-stage.log" || true)" -eq 0 ]
   grep -Fq 'docker exec k3d-test-node-a tar -C /var/lib/k3s/data-vault-0 -cf - .' "$CALL_LOG"; grep -Fq 'docker exec k3d-test-node-b tar -C /var/lib/k3s/postgres-keycloak-pvc -cf - .' "$CALL_LOG"; grep -Fq 'docker exec k3d-test-node-c tar -C /var/lib/k3s/data-openldap-0 -cf - .' "$CALL_LOG"
 }
 
 @test "hub data export: encrypted contents, checksums, and split limit" {
-  source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z DR_TEST_LARGE=1
+  make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z DR_TEST_LARGE=1
   _hub_data_inventory() { printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$1/inventory.json"; }
   run hub_data_export; [ "$status" -eq 0 ]; [ "$(grep -R -c 'state.db\|kind: Secret' "$TEST_ROOT/last-snapshots" | awk -F: '{s += $NF} END {print s+0}')" -eq 0 ]
-  while read -r sum file; do [[ "$file" == *.age || "$file" == *.age.part-* ]]; done < "$TEST_ROOT/last-snapshots/20261009T120000Z/SHA256SUMS"
+  while read -r sum file; do [[ "$file" == *.age || "$file" == *.age.part-* || "$file" == pv-pvc.yaml || "$file" == inventory.json ]]; done < "$TEST_ROOT/last-snapshots/20261009T120000Z/SHA256SUMS"
   [ "$(find "$TEST_ROOT/last-snapshots" -type f -size +95M -print | wc -l)" -eq 0 ]
 }
 
@@ -292,8 +334,8 @@ STUB
   source_plugin; _fake_identity_pod
   _hub_data_vault_kv_list() { printf ''; }
   run --separate-stderr _hub_data_inventory "$TEST_ROOT"; [ "$status" -ne 0 ]; [[ "$stderr" == *"returned no paths"* ]]; [ ! -e "$TEST_ROOT/inventory.json" ]
-  _hub_data_vault_kv_list() { printf '["app/"]'; }; _hub_data_generate_root() { return 1; }
-  run --separate-stderr _hub_data_inventory "$TEST_ROOT"; [ "$status" -ne 0 ]; [[ "$stderr" == *"could not generate a Vault root token"* ]]; [ ! -e "$TEST_ROOT/inventory.json" ]
+  _hub_data_vault_kv_list() { printf '["app/"]'; }; _hub_data_inventory_token() { return 1; }
+  run --separate-stderr _hub_data_inventory "$TEST_ROOT"; [ "$status" -ne 0 ]; [ ! -e "$TEST_ROOT/inventory.json" ]
 }
 
 @test "hub data vault: an inventory without Vault paths fails before any Vault call" {
@@ -317,9 +359,132 @@ STUB
 }
 
 @test "hub data export: an inventory failure stops the export before anything is pushed" {
-  source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z
+  make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z
   _hub_data_inventory() { return 1; }
   run hub_data_export; [ "$status" -ne 0 ]
   [[ "$output" == *"could not record the inventory"* ]]
   [ "$(grep -c '^git commit\|^git push' "$CALL_LOG" || true)" -eq 0 ]
+}
+
+@test "1 inventory uses Kubernetes login JWT on stdin only" {
+  source_plugin; run _hub_data_inventory "$TEST_ROOT"; [ "$status" -eq 0 ]
+  ! grep -q JWT-SENTINEL "$VLOG"; grep -q JWT-SENTINEL "$STDIN_LOG"; grep -q 'auth/kubernetes/login' "$VLOG"; grep -q 'jwt=-' "$VLOG"
+}
+
+@test "2 export never loads DR shards or generate-root" {
+  make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"
+  _hub_data_inventory() { printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$1/inventory.json"; }
+  _hub_data_remote_verify() { :; }; run hub_data_export; [ "$status" -eq 0 ]; ! grep -q 'generate-root\|k3dm-vault-unseal-dr' "$VLOG" "$CALL_LOG"
+}
+
+@test "3 empty login fails with setup guidance and pushes nothing" {
+  make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"
+  _hub_data_inventory_token() { _err '[hub-data] Vault login as hub-data-export failed; run make hub-data-export-setup'; return 1; }
+  run hub_data_export; [ "$status" -ne 0 ]; [[ "$output" == *make\ hub-data-export-setup* ]]; ! grep -q 'git commit\|git push' "$CALL_LOG"
+}
+
+@test "4 missing pinned context fails before docker or git clone" {
+  source_plugin; export K3DM_HUB_DATA_CONTEXT=missing; _kubectl() { [[ "$1" == config ]] && return 1; kubectl "$@"; }
+  printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"
+  run hub_data_export; [ "$status" -ne 0 ]; [[ "$output" == *'hub context missing not found'* ]]; ! grep -q 'docker\|git clone' "$CALL_LOG"
+}
+
+@test "5 prune keeps recent exports and the last passing export" {
+  make_prune_fixture 20261009T120000Z 20261007T120000Z 20261004T120000Z 20261002T120000Z 20260928T120000Z
+  source_plugin; export DR_TEST_RESULT_EXPORT=20261002T120000Z; run hub_data_prune; [ "$status" -eq 0 ]; [[ "$output" == *'keep: 20261009T120000Z'* ]]; [[ "$output" == *'keep: 20261007T120000Z'* ]]; [[ "$output" == *'keep: 20261002T120000Z'* ]]; [[ "$output" == *'prune: 20261004T120000Z'* ]]; [[ "$output" == *'prune: 20260928T120000Z'* ]]
+}
+
+@test "6 prune keeps the newest when all exports are old" {
+  make_prune_fixture 20261004T120000Z 20261002T120000Z; source_plugin; export K3DM_HUB_DATA_RETAIN_DAYS=1
+  run hub_data_prune; [ "$status" -eq 0 ]; [[ "$output" == *'keep: 20261004T120000Z'* ]]; [[ "$output" == *'prune: 20261002T120000Z'* ]]
+}
+
+@test "7 results fetch failure is nonzero and does not push" {
+  make_prune_fixture 20261009T120000Z; source_plugin; export DR_TEST_FETCH_FAIL=1
+  run hub_data_prune; [ "$status" -ne 0 ]; [[ "$output" == *'cannot read drill results'* ]]; [ ! -s "$TEST_ROOT/push.log" ]
+}
+
+@test "8 prune force-pushes snapshots only" {
+  make_prune_fixture 20261004T120000Z 20261002T120000Z; source_plugin; export K3DM_HUB_DATA_RETAIN_DAYS=1
+  run hub_data_prune; [ "$status" -eq 0 ]; grep -q -- '--force-with-lease=snapshots:' "$TEST_ROOT/push.log"; grep -q 'refs/heads/snapshots' "$TEST_ROOT/push.log"; ! grep -q 'refs/heads/results' "$TEST_ROOT/push.log"
+}
+
+@test "8b export passes its existing clone to prune" {
+  make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"; _hub_data_inventory() { printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$1/inventory.json"; }; _hub_data_remote_verify() { :; }
+  run hub_data_export; [ "$status" -eq 0 ]; [ "$(grep -c 'git .*clone' "$CALL_LOG")" -eq 1 ]
+}
+
+@test "9a manifest detects edited, extra, missing, and bad-age files" {
+  source_plugin; local dir="$TEST_ROOT/export"; make_export_dir "$dir"; printf changed > "$dir/pv-pvc.yaml"; run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
+  make_export_dir "$dir"; printf 'age-encryption.org/v1\nextra\n' > "$dir/extra.age"; run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
+  make_export_dir "$dir"; sed -i.bak '/inventory.json/d' "$dir/SHA256SUMS"; run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
+  make_export_dir "$dir"; printf not-age > "$dir/x.tar.age"; (cd "$dir" && sha256sum x.tar.age pv-pvc.yaml inventory.json > SHA256SUMS); run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
+}
+
+@test "9b remote mismatch writes no success metric and does not prune" {
+  source_plugin; export DR_TEST_REMOTE_MISMATCH=1; _hub_data_verify_export() { :; }; run _hub_data_remote_verify "$TEST_ROOT/repo" 20261009T120000Z; [ "$status" -ne 0 ]; [[ "$output" == *'ls-remote mismatch'* ]]
+}
+
+@test "9c prune refuses a kept export with a bad manifest" {
+  make_prune_fixture 20261009T120000Z; printf bad > "$TEST_ROOT/fixture/snapshots/20261009T120000Z/pv-pvc.yaml"; source_plugin
+  run hub_data_prune; [ "$status" -ne 0 ]; [[ "$output" == *'cannot verify kept export'* ]]; [ ! -s "$TEST_ROOT/push.log" ]
+}
+
+@test "9 dry-run prune prints keep and prune without pushing" {
+  make_prune_fixture 20261004T120000Z 20261002T120000Z; source_plugin; export K3DM_HUB_DATA_RETAIN_DAYS=1 K3DM_HUB_DATA_PRUNE_DRY_RUN=1
+  run hub_data_prune; [ "$status" -eq 0 ]; [[ "$output" == *'keep:'* && "$output" == *'prune:'* ]]; [ ! -e "$TEST_ROOT/prune-state/last-kept" ]; [ ! -s "$TEST_ROOT/push.log" ]
+}
+
+@test "11 rendered plist has scheduled command and calendar" {
+  run sed -e "s|{{K3D_MANAGER_PATH}}|$PWD/scripts/k3d-manager|g" -e "s|{{HOME}}|$HOME|g" scripts/etc/launchd/com.k3d-manager.hub-data-export.plist.tmpl
+  [ "$status" -eq 0 ]; [[ "$output" == *hub_data_export_scheduled* && "$output" == *'<integer>3</integer>'* && "$output" == *'<integer>30</integer>'* ]]; ! [[ "$output" == *'{{'* ]]
+}
+
+@test "12 alert manifest contains all three export alerts" {
+  grep -q 'HubDataExportFailed' "$PWD/scripts/etc/argocd/platform-ops/prometheusrule.yaml"; grep -q 'HubDataExportStale' "$PWD/scripts/etc/argocd/platform-ops/prometheusrule.yaml"; grep -q 'HubDataExportNeverRan' "$PWD/scripts/etc/argocd/platform-ops/prometheusrule.yaml"
+}
+
+@test "13 legacy export verifies and one-sided metadata listing fails" {
+  source_plugin; local dir="$TEST_ROOT/export"; make_export_dir "$dir" legacy; run _hub_data_verify_export "$dir"; [ "$status" -eq 0 ]; [[ "$output" == *'legacy export'* ]]
+  (cd "$dir" && sha256sum x.tar.age inventory.json > SHA256SUMS); run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
+}
+
+@test "14 split export first part must have an age header" {
+  source_plugin; local dir="$TEST_ROOT/export"; mkdir -p "$dir"; printf bad > "$dir/x.tar.age.part-aa"; printf 'age-encryption.org/v1\nrest' > "$dir/x.tar.age.part-ab"; printf '{}\n' > "$dir/inventory.json"; printf metadata > "$dir/pv-pvc.yaml"; (cd "$dir" && sha256sum x.tar.age.part-aa x.tar.age.part-ab pv-pvc.yaml inventory.json > SHA256SUMS)
+  run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
+}
+
+@test "15 unparseable export timestamp stops prune without push" {
+  make_prune_fixture 20261009T120000Z 2026BADT120000Z; source_plugin; run hub_data_prune; [ "$status" -ne 0 ]; [[ "$output" == *'cannot parse export timestamp 2026BADT120000Z'* ]]; [ ! -s "$TEST_ROOT/push.log" ]
+}
+
+@test "10 scheduled run posts newline-delimited metrics and kept count" {
+  source_plugin; export K3DM_HUB_DATA_DIR="$TEST_ROOT/scheduled" K3DM_HUB_DATA_PUSHGATEWAY_URL=http://push; mkdir -p "$K3DM_HUB_DATA_DIR"; hub_data_export() { printf 7 > "$K3DM_HUB_DATA_DIR/last-kept"; printf 123 > "$K3DM_HUB_DATA_DIR/last-bytes"; return 0; }; run hub_data_export_scheduled; [ "$status" -eq 0 ]; [ "$(wc -l < "$TEST_ROOT/metrics-body")" -eq 5 ]; tail -c 1 "$TEST_ROOT/metrics-body" | od -An -t x1 | grep -q 0a; grep -q 'exports_kept 7' "$TEST_ROOT/metrics-body"
+  [ ! -e "$K3DM_HUB_DATA_DIR/export.lock" ]
+  hub_data_export() { return 1; }; run hub_data_export_scheduled; [ "$status" -ne 0 ]; [ ! -e "$K3DM_HUB_DATA_DIR/export.lock" ]
+  run hub_data_export_scheduled; [ "$status" -ne 0 ]; grep -q 'last_run_success 0' "$TEST_ROOT/metrics-body"
+}
+
+@test "19 a lock left by a dead run is taken over; a live owner's lock is not" {
+  source_plugin; export K3DM_HUB_DATA_DIR="$TEST_ROOT/stale" K3DM_HUB_DATA_PUSHGATEWAY_URL=http://push; mkdir -p "$K3DM_HUB_DATA_DIR/export.lock"
+  ( exit 0 ) & dead=$!; wait "$dead"; printf '%s\n' "$dead" > "$K3DM_HUB_DATA_DIR/export.lock/pid"
+  hub_data_export() { printf ran > "$TEST_ROOT/export-ran"; printf 1 > "$K3DM_HUB_DATA_DIR/last-kept"; return 0; }
+  run hub_data_export_scheduled; [ "$status" -eq 0 ]; [ -e "$TEST_ROOT/export-ran" ]; [[ "$output" == *'removing stale export lock'* ]]; [ ! -e "$K3DM_HUB_DATA_DIR/export.lock" ]
+  rm -f "$TEST_ROOT/export-ran"; mkdir -p "$K3DM_HUB_DATA_DIR/export.lock"; printf '%s\n' "$$" > "$K3DM_HUB_DATA_DIR/export.lock/pid"
+  run hub_data_export_scheduled; [ "$status" -eq 0 ]; [ ! -e "$TEST_ROOT/export-ran" ]; [ -d "$K3DM_HUB_DATA_DIR/export.lock" ]
+}
+
+@test "17 setup self-test passes and revokes its single token" {
+  source_plugin; _vault_login() { :; }; _vault_exec() { :; }; _hub_data_vault_revoke() { printf 'token revoke -self\n' >> "$VLOG"; }; run hub_data_export_setup; [ "$status" -eq 0 ]; grep -q 'token revoke -self' "$VLOG"; [ "$(grep -c 'auth/kubernetes/login' "$VLOG")" -eq 1 ]
+}
+
+@test "18 lock semantics distinguish manual, scheduled, and delegated ownership" {
+  source_plugin; export K3DM_HUB_DATA_DIR="$TEST_ROOT/lock-state"; mkdir -p "$K3DM_HUB_DATA_DIR/export.lock"; printf '%s\n' "$$" > "$K3DM_HUB_DATA_DIR/export.lock/pid"
+  run hub_data_export; [ "$status" -eq 1 ]; [[ "$output" == *'another export is running'* ]]
+  run hub_data_export_scheduled; [ "$status" -eq 0 ]; [ ! -e "$TEST_ROOT/metrics-body" ]
+  [ "$(cat "$K3DM_HUB_DATA_DIR/export.lock/pid")" = "$$" ]
+  rm -rf "$K3DM_HUB_DATA_DIR/export.lock"; mkdir -p "$K3DM_HUB_DATA_DIR/export.lock"; printf '%s\n' "$$" > "$K3DM_HUB_DATA_DIR/export.lock/pid"
+  make_fixture; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"; _hub_data_inventory() { return 1; }
+  HUB_DATA_LOCK_HELD=1 run hub_data_export; [ "$status" -ne 0 ]
+  [ -d "$K3DM_HUB_DATA_DIR/export.lock" ]; [ "$(cat "$K3DM_HUB_DATA_DIR/export.lock/pid")" = "$$" ]
 }

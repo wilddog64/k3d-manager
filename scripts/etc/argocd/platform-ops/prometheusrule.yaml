@@ -176,3 +176,24 @@ spec:
           annotations:
             summary: "Hub DR drill is stale"
             description: "No hub disaster-recovery drill has been reported for more than eight days."
+        - alert: HubDataExportFailed
+          expr: k3dm_hub_data_export_last_run_success == 0
+          for: 10m
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub data export failed"
+            description: "The latest scheduled hub data export failed."
+        - alert: HubDataExportStale
+          expr: time() - k3dm_hub_data_export_last_success_timestamp_seconds > 129600
+          for: 30m
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub data export is stale"
+            description: "No successful hub data export has been verified for more than 36 hours."
+        - alert: HubDataExportNeverRan
+          expr: absent(k3dm_hub_data_export_last_success_timestamp_seconds)
+          for: 48h
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub data export has never run"
+            description: "No successful hub data export metric exists."

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2016,SC2016,SC2329,SC2030,SC2031
+# shellcheck disable=SC2015,SC2016,SC2329,SC2030,SC2031
 
 set -euo pipefail
 
 K3DM_HUB_DATA_REPO="${K3DM_HUB_DATA_REPO:-git@github-k3dm-hub-data:wilddog64/k3dm-hub-data.git}"
-K3DM_HUB_DATA_KEEP="${K3DM_HUB_DATA_KEEP:-4}"
 K3DM_HUB_DATA_DIR="${K3DM_HUB_DATA_DIR:-${HOME}/.k3dm/hub-data}"
 K3DM_HUB_DATA_AGE_RECIPIENT="${K3DM_HUB_DATA_AGE_RECIPIENT:-${REPO_ROOT:-.}/scripts/etc/dr/age-recipient.txt}"
+K3DM_HUB_DATA_CONTEXT="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}"
+K3DM_HUB_DATA_RETAIN_DAYS="${K3DM_HUB_DATA_RETAIN_DAYS:-5}"
+K3DM_HUB_DATA_PUSHGATEWAY_URL="${K3DM_HUB_DATA_PUSHGATEWAY_URL:-http://localhost:19094/metrics/job/k3dm-hub-data-export}"
 
 if [[ -r "${PLUGINS_DIR}/hub_snapshot.sh" ]] && ! declare -f _hub_snapshot_copy >/dev/null 2>&1; then
   # shellcheck source=/dev/null
@@ -42,7 +44,52 @@ function _hub_data_encrypted_checksum() {
     else
       shasum -a 256 "$file" | awk -v r="$rel" '{print $1 "  " r}' >> "${root}/SHA256SUMS"
     fi
-  done < <(find "$root" -type f \( -name '*.age' -o -name '*.age.part-*' \) -print | sort)
+  done < <(find "$root" -type f \( -name '*.age' -o -name '*.age.part-*' -o -name 'pv-pvc.yaml' -o -name 'inventory.json' \) -print | sort)
+}
+
+function _hub_data_verify_export() {
+  local dir="$1" stamp="${1##*/}" sum file rel actual key has_pv=0 has_inventory=0 legacy=0
+  local -A manifest=() files=() age_seen=()
+  [[ -s "$dir/SHA256SUMS" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: SHA256SUMS"; return 1; }
+  while read -r sum rel; do
+    [[ "$sum" =~ ^[[:xdigit:]]{64}$ && -n "$rel" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: ${rel:-invalid SHA256SUMS line}"; return 1; }
+    [[ -z "${manifest[$rel]+x}" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
+    manifest["$rel"]="$sum"
+    [[ "$rel" == pv-pvc.yaml ]] && has_pv=1
+    [[ "$rel" == inventory.json ]] && has_inventory=1
+    [[ -f "$dir/$rel" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
+    if command -v sha256sum >/dev/null 2>&1; then actual="$(sha256sum "$dir/$rel" | awk '{print $1}')"; else actual="$(shasum -a 256 "$dir/$rel" | awk '{print $1}')"; fi
+    [[ "$actual" == "$sum" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
+  done < "$dir/SHA256SUMS"
+  if (( has_pv == 0 && has_inventory == 0 )); then
+    legacy=1
+    _err "[hub-data] export ${stamp} is a legacy export; pv-pvc.yaml and inventory.json are not covered by its manifest"
+  elif (( has_pv != has_inventory )); then
+    _err "[hub-data] export ${stamp} does not match its manifest: pv-pvc.yaml and inventory.json must be listed together"
+    return 1
+  fi
+  while IFS= read -r file; do
+    rel="${file#"$dir"/}"
+    files["$rel"]=1
+  done < <(find "$dir" -type f ! -name SHA256SUMS -print)
+  for rel in "${!manifest[@]}" "${!files[@]}"; do
+    if (( legacy == 1 )) && [[ "$rel" == pv-pvc.yaml || "$rel" == inventory.json ]]; then continue; fi
+    [[ -n "${manifest[$rel]+x}" && -n "${files[$rel]+x}" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
+  done
+  while IFS= read -r file; do
+    if [[ "$file" == *.age ]]; then
+      key="$file"
+    else
+      key="${file%%.part-*}"
+      [[ -z "${age_seen[$key]+x}" ]] || continue
+      age_seen["$key"]=1
+      file="$(find "$dir" -name "$(basename "$key").part-*" -print | sort | head -1)"
+    fi
+    if [[ "$(head -n 1 "$file")" != age-encryption.org/v1* ]]; then
+      _err "[hub-data] export ${stamp} does not match its manifest: ${file#"$dir"/} is not an age file"
+      return 1
+    fi
+  done < <(find "$dir" -type f \( -name '*.age' -o -name '*.age.part-*' \) -print | sort)
 }
 
 function _hub_data_split_large() {
@@ -120,6 +167,17 @@ function _hub_data_generate_root() (
   printf '%s\n' "$token"
 )
 
+function _hub_data_inventory_token() {
+  local ns="$1" release="$2" jwt token
+  jwt="$(_no_trace _kubectl -n secrets create token hub-data-export --duration=10m)" || return 1
+  token="$(printf '%s\n' "$jwt" | _no_trace _vault_exec_stream --no-exit --stdin --pod "${release}-0" "$ns" "$release" -- vault write -field=token auth/kubernetes/login role=hub-data-inventory jwt=-)" || true
+  if [[ -z "$token" ]]; then
+    _err "[hub-data] Vault login as hub-data-export failed; run make hub-data-export-setup"
+    return 1
+  fi
+  printf '%s\n' "$token"
+}
+
 # Both counts run with the pod's own credentials: the hub's Postgres role is $POSTGRES_USER, not
 # postgres, and OpenLDAP refuses anonymous binds, so LDAP is read over ldapi as the server's own uid.
 function _hub_data_keycloak_user_count() {
@@ -136,7 +194,7 @@ function _hub_data_inventory() (
   local root="$1" ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" token paths users ldap cleanup=0
   _hub_data_revoke_root() { (( cleanup == 1 )) || return 0; _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1 || true; }
   trap _hub_data_revoke_root EXIT
-  token="$(_hub_data_generate_root "$ns" "$release")" && [[ -n "$token" ]] || { _err "[hub-data] could not generate a Vault root token from the DR shards"; return 1; }
+  token="$(_hub_data_inventory_token "$ns" "$release")" && [[ -n "$token" ]] || return 1
   cleanup=1
   paths="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)" || { _err "[hub-data] vault kv list secret/ failed"; return 1; }
   paths="$(_hub_data_kv_names "$paths")" || { _err "[hub-data] vault kv list secret/ returned no paths"; return 1; }
@@ -147,11 +205,128 @@ function _hub_data_inventory() (
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
 )
 
+function hub_data_export_setup() { (
+  local ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" policy='path "secret/metadata/" { capabilities = ["list"] }' stage token listing cleanup=0
+  stage="$(_hub_data_stage)"; trap 'rm -rf -- "$stage"' EXIT
+  _hub_data_pin_context "$stage"
+  _vault_login "$ns" "$release"
+  _kubectl -n secrets create sa hub-data-export --dry-run=client -o yaml | _kubectl apply -f -
+  printf '%s\n' "$policy" | _no_trace _vault_exec_stream --no-exit --stdin --pod "${release}-0" "$ns" "$release" -- vault policy write hub-data-inventory -
+  _vault_exec "$ns" 'vault write auth/kubernetes/role/hub-data-inventory bound_service_account_names=hub-data-export bound_service_account_namespaces=secrets policies=hub-data-inventory ttl=5m' "$release"
+  token="$(_hub_data_inventory_token "$ns" "$release")" || return 1
+  cleanup=1
+  _hub_data_revoke_setup_token() { (( cleanup == 1 )) || return 0; _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1 || true; }
+  trap '_hub_data_revoke_setup_token; rm -rf -- "$stage"' EXIT
+  listing="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)" || return 1
+  _hub_data_kv_names "$listing" >/dev/null || { _err "[hub-data] Vault inventory self-test returned no paths"; return 1; }
+  _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
+) }
+
+function _hub_data_pin_context() {
+  local stage="$1" context kubeconfig
+  context="${K3DM_HUB_DATA_CONTEXT}"; kubeconfig="${stage}/kubeconfig"
+  if ! _kubectl config view --minify --flatten --context "$context" > "$kubeconfig" 2>/dev/null || [[ ! -s "$kubeconfig" ]]; then
+    _err "[hub-data] hub context ${context} not found"
+    return 1
+  fi
+  chmod 600 "$kubeconfig"
+  export KUBECONFIG="$kubeconfig"
+}
+
+# The lock records its owner's PID, so a run killed mid-export (a shutdown at 03:30) does not block
+# every later run: a lock whose owner is gone is taken over.
+function _hub_data_take_lock() {
+  local lock="${K3DM_HUB_DATA_DIR}/export.lock" owner
+  mkdir -p "$K3DM_HUB_DATA_DIR"
+  if ! mkdir "$lock" 2>/dev/null; then
+    owner="$(cat "$lock/pid" 2>/dev/null || true)"
+    if [[ "$owner" =~ ^[0-9]+$ ]] && kill -0 "$owner" 2>/dev/null; then
+      _info "[hub-data] another export is running"
+      return 1
+    fi
+    _warn "[hub-data] removing stale export lock (owner ${owner:-unknown} is not running)"
+    rm -rf -- "$lock"
+    mkdir "$lock" 2>/dev/null || { _info "[hub-data] another export is running"; return 1; }
+  fi
+  printf '%s\n' "$BASHPID" > "$lock/pid"
+}
+
+function _hub_data_release_lock() {
+  local lock="${K3DM_HUB_DATA_DIR}/export.lock"
+  [[ "$(cat "$lock/pid" 2>/dev/null || true)" == "$BASHPID" ]] && rm -rf -- "$lock"
+  return 0
+}
+
+function _hub_data_remote_verify() (
+  local repo="$1" stamp="$2" pushed_sha remote_sha verify_stage verify_repo
+  verify_stage="$(_hub_data_stage)"
+  trap 'rm -rf -- "$verify_stage"' EXIT
+  pushed_sha="$(git -C "$repo" rev-parse HEAD)"
+  remote_sha="$(git -C "$repo" ls-remote origin refs/heads/snapshots | awk '{print $1}')"
+  if [[ "$remote_sha" != "$pushed_sha" ]]; then
+    _err "[hub-data] export ${stamp} pushed but the remote copy did not verify: ls-remote mismatch"
+    return 1
+  fi
+  verify_repo="${verify_stage}/repo"
+  if ! git clone --depth 1 --filter=blob:none --no-checkout --branch snapshots "$K3DM_HUB_DATA_REPO" "$verify_repo" >/dev/null; then
+    _err "[hub-data] export ${stamp} pushed but the remote copy did not verify: clone failed"
+    return 1
+  fi
+  if ! git -C "$verify_repo" checkout "$pushed_sha" -- "snapshots/${stamp}" >/dev/null; then
+    _err "[hub-data] export ${stamp} pushed but the remote copy did not verify: checkout failed"
+    return 1
+  fi
+  if ! _hub_data_verify_export "$verify_repo/snapshots/${stamp}"; then
+    _err "[hub-data] export ${stamp} pushed but the remote copy did not verify: manifest"
+    return 1
+  fi
+)
+
+function _hub_data_export_bytes() { find "$1" -type f -exec wc -c {} + | awk '{sum += $1} END {print sum+0}'; }
+
+function _hub_data_export_timestamp_epoch() {
+  local stamp="$1" iso parsed
+  if parsed="$(TZ=UTC date -j -f '%Y%m%dT%H%M%SZ' "$stamp" +%s 2>/dev/null)"; then
+    printf '%s\n' "$parsed"
+    return 0
+  fi
+  if [[ "$stamp" =~ ^([0-9]{8})T([0-9]{6})Z$ ]]; then
+    iso="${BASH_REMATCH[1]:0:4}-${BASH_REMATCH[1]:4:2}-${BASH_REMATCH[1]:6:2} ${BASH_REMATCH[2]:0:2}:${BASH_REMATCH[2]:2:2}:${BASH_REMATCH[2]:4:2}"
+    if parsed="$(TZ=UTC date -u -d "$iso" +%s 2>/dev/null)"; then
+      printf '%s\n' "$parsed"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+function _hub_data_push_metrics() (
+  local success="$1" bytes="$2" kept="$3" now body
+  now="$(date +%s)"
+  body="$(mktemp "${TMPDIR:-/tmp}/k3dm-hub-data-metrics.XXXXXX")"
+  trap 'rm -f -- "$body"' EXIT
+  printf 'k3dm_hub_data_export_last_run_timestamp_seconds %s\nk3dm_hub_data_export_last_run_success %s\n' "$now" "$success" > "$body"
+  if (( success == 1 )); then
+    printf 'k3dm_hub_data_export_last_success_timestamp_seconds %s\nk3dm_hub_data_export_exports_kept %s\nk3dm_hub_data_export_bytes %s\n' "$now" "$kept" "$bytes" >> "$body"
+  fi
+  if ! curl --fail -X POST --data-binary "@${body}" "$K3DM_HUB_DATA_PUSHGATEWAY_URL" >/dev/null; then
+    _warn "[hub-data] metrics push failed"
+  fi
+)
+
 function hub_data_export() { (
   [[ -r "$K3DM_HUB_DATA_AGE_RECIPIENT" ]] || { _err "[hub-data] missing age recipient: $K3DM_HUB_DATA_AGE_RECIPIENT"; return 1; }
-  local stage repo root stamp ns claim logical path container
+  local stage repo root stamp ns claim logical path container export_rc bytes kept
+  if [[ "${HUB_DATA_LOCK_HELD:-0}" != 1 ]]; then
+    _hub_data_take_lock || return 1
+  fi
   stage="$(_hub_data_stage)"
-  trap 'rm -rf -- "$stage"' EXIT
+  if [[ "${HUB_DATA_LOCK_HELD:-0}" == 1 ]]; then
+    trap 'rm -rf -- "$stage"' EXIT
+  else
+    trap 'rm -rf -- "$stage"; _hub_data_release_lock' EXIT
+  fi
+  _hub_data_pin_context "$stage" || return 1
   repo="${stage}/repo"; git clone --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo"; chmod 700 "$repo"
   stamp="${K3DM_HUB_DATA_TIMESTAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"; root="${repo}/snapshots/${stamp}"
   mkdir -p "$root"; : > "${root}/pv-pvc.yaml"
@@ -164,7 +339,103 @@ function hub_data_export() { (
   done < <(_hub_data_claims)
   if ! _hub_data_inventory "$root"; then _err "[hub-data] could not record the inventory (Vault paths, Keycloak users, LDAP entries); nothing was pushed"; return 1; fi
   _hub_data_split_large "$root"; _hub_data_encrypted_checksum "$root"
-  (cd "$repo" && git add snapshots && git commit -m "snapshot: ${stamp}" && git push origin snapshots)
+  _hub_data_verify_export "$root" || return 1
+  (cd "$repo" && git add snapshots && git commit -m "snapshot: ${stamp}" && git push origin snapshots) || return 1
+  _hub_data_remote_verify "$repo" "$stamp" || return 1
+  if ! hub_data_prune "$repo"; then
+    _err "[hub-data] export ${stamp} pushed; prune failed"
+    return 1
+  fi
+  export_rc=0
+  bytes="$(_hub_data_export_bytes "$root")"
+  kept=0
+  [[ -r "${K3DM_HUB_DATA_DIR}/last-kept" ]] && kept="$(<"${K3DM_HUB_DATA_DIR}/last-kept")"
+  printf '%s\n' "$stamp" > "${K3DM_HUB_DATA_DIR}/last-success"
+  printf '%s\n' "$bytes" > "${K3DM_HUB_DATA_DIR}/last-bytes"
+  return "$export_rc"
+) }
+
+function hub_data_prune() { (
+  local stage repo results_ref now cutoff newest result_file passing keep_csv="" dir stamp age tree new old_sha repo_arg result_files
+  local -a keep=() prune=()
+  repo_arg="${1:-}"
+  if [[ -n "$repo_arg" ]]; then
+    repo="$repo_arg"
+  else
+    stage="$(_hub_data_stage)"; trap 'rm -rf -- "$stage"' EXIT
+    repo="${stage}/repo"; git clone --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo" >/dev/null || return 1
+  fi
+  if ! git -C "$repo" fetch origin '+refs/heads/results:refs/remotes/origin/results' >/dev/null 2>&1; then
+    _err "[hub-data] cannot read drill results; nothing pruned"; return 1
+  fi
+  results_ref="refs/remotes/origin/results"
+  result_files="$(git -C "$repo" ls-tree -r --name-only "$results_ref" | grep -E '^results/[0-9]{8}T[0-9]{6}Z\.json$' | sort -r || true)"
+  result_file=""
+  while IFS= read -r dir; do
+    if git -C "$repo" show "${results_ref}:${dir}" 2>/dev/null | jq -e '.success == true and (.export | type == "string")' >/dev/null 2>&1; then result_file="$dir"; break; fi
+  done <<< "$result_files"
+  if [[ -z "$result_file" ]]; then
+    if [[ -z "$result_files" ]]; then
+      _err "[hub-data] cannot read drill results; nothing pruned"; return 1
+    fi
+    passing=""
+  else
+    passing="$(git -C "$repo" show "${results_ref}:${result_file}" | jq -er '.export')"
+  fi
+  now="$(date -u +%s)"; cutoff=$((now - K3DM_HUB_DATA_RETAIN_DAYS * 86400))
+  newest="$(find "$repo/snapshots" -mindepth 1 -maxdepth 1 -type d -name '20*T*Z' -print | sort -r | head -1)"
+  [[ -n "$newest" ]] || return 0
+  while IFS= read -r dir; do
+    stamp="${dir##*/}"
+    if ! age="$(_hub_data_export_timestamp_epoch "$stamp")"; then
+      _err "[hub-data] cannot parse export timestamp ${stamp}; nothing pruned"
+      return 1
+    fi
+    if (( age >= cutoff )) || [[ "$dir" == "$newest" ]] || [[ "$stamp" == "$passing" ]]; then keep+=("$stamp"); else prune+=("$stamp"); fi
+  done < <(find "$repo/snapshots" -mindepth 1 -maxdepth 1 -type d -name '20*T*Z' -print | sort)
+  for stamp in "${keep[@]}"; do
+    _hub_data_verify_export "$repo/snapshots/$stamp" || { _err "[hub-data] cannot verify kept export ${stamp}; nothing pruned"; return 1; }
+  done
+  keep_csv="$(IFS=,; printf '%s' "${keep[*]}")"
+  K3DM_HUB_DATA_EXPORTS_KEPT="${#keep[@]}"
+  export K3DM_HUB_DATA_EXPORTS_KEPT
+  for stamp in "${keep[@]}"; do printf 'keep: %s\n' "$stamp"; done
+  for stamp in "${prune[@]}"; do printf 'prune: %s\n' "$stamp"; done
+  [[ "${K3DM_HUB_DATA_PRUNE_DRY_RUN:-0}" == 1 ]] && return 0
+  mkdir -p "$K3DM_HUB_DATA_DIR"
+  printf '%s\n' "$K3DM_HUB_DATA_EXPORTS_KEPT" > "$K3DM_HUB_DATA_DIR/last-kept"
+  (( ${#prune[@]} )) || return 0
+  old_sha="$(git -C "$repo" rev-parse refs/remotes/origin/snapshots 2>/dev/null || git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" rm -r -q --cached "${prune[@]/#/snapshots/}" || return 1
+  tree="$(git -C "$repo" write-tree)"; new="$(cd "$repo" && git commit-tree "$tree" -m "prune: keep ${keep_csv}")"
+  git -C "$repo" push --force-with-lease="snapshots:${old_sha}" origin "${new}:refs/heads/snapshots"
+) }
+
+function hub_data_export_scheduled() { (
+  local rc=0 bytes kept
+  _hub_data_take_lock || return 0
+  trap '_hub_data_release_lock' EXIT
+  export GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=15'
+  HUB_DATA_LOCK_HELD=1 hub_data_export || rc=$?
+  bytes=0; kept=0
+  [[ -r "$K3DM_HUB_DATA_DIR/last-bytes" ]] && bytes="$(<"$K3DM_HUB_DATA_DIR/last-bytes")"
+  [[ -r "$K3DM_HUB_DATA_DIR/last-kept" ]] && kept="$(<"$K3DM_HUB_DATA_DIR/last-kept")"
+  if (( rc == 0 )); then _hub_data_push_metrics 1 "$bytes" "$kept"; else _hub_data_push_metrics 0 0 0; fi
+  return "$rc"
+) }
+
+function hub_data_export_schedule() { (
+  local template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.hub-data-export.plist.tmpl" plist="${HOME}/Library/LaunchAgents/com.k3d-manager.hub-data-export.plist"
+  _is_mac || return 0; command -v launchctl >/dev/null 2>&1 || { _warn "[hub-data] launchctl not available"; return 0; }
+  mkdir -p "$(dirname "$plist")"
+  sed -e "s|{{K3D_MANAGER_PATH}}|${SCRIPT_DIR}/k3d-manager|g" -e "s|{{HOME}}|${HOME}|g" "$template" > "$plist"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.hub-data-export" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$plist"
+) }
+
+function hub_data_export_unschedule() { (
+  _is_mac || return 0
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.hub-data-export" 2>/dev/null || true
 ) }
 
 function _hub_data_meta_field() {
@@ -250,12 +521,9 @@ function hub_data_restore() { (
   if (( created == 1 )); then trap 'rm -rf -- "$stage"' EXIT; fi
   repo="${stage}/repo"; : > "${stage}/restore-targets.tsv"
   git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo"; chmod 700 "$repo"; latest="$(_hub_data_latest_export_dir "$repo")"; [[ -n "$latest" ]] || return 1
+  _hub_data_verify_export "$latest" || return 1
   cp "$latest/pv-pvc.yaml" "$stage/pv-pvc.yaml"
   cp "$latest/inventory.json" "$stage/inventory.json"
-  while read -r sum file; do
-    [[ -f "${latest}/${file}" ]] || return 1
-    if command -v sha256sum >/dev/null 2>&1; then printf '%s  %s\n' "$sum" "${latest}/${file}" | sha256sum -c - >/dev/null; else printf '%s  %s\n' "$sum" "${latest}/${file}" | shasum -a 256 -c - >/dev/null; fi
-  done < "${latest}/SHA256SUMS"
   _hub_data_apply_keycloak || return 1
   while IFS='|' read -r ns claim; do
     if ! _hub_data_prepare_claim "$stage" "$ns" "$claim" "${latest}/${ns}-${claim}.tar.age"; then return 1; fi

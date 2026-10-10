@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+- Added: the hub data export now runs daily and unattended (launchd, 03:30 on the M4), which cuts
+  the worst-case data loss from a week to about a day. It no longer generates a Vault root token
+  from the Keychain unseal shards: it lists Vault with a list-only Kubernetes login
+  (`make hub-data-export-setup` creates the service account, policy and role once), so nothing
+  unattended reads the shards. Each run pins the hub context, checks every file against a manifest
+  that now covers `pv-pvc.yaml` and `inventory.json` before uploading, confirms GitHub holds the
+  exact commit and that a fresh download of the new export verifies, and only then records success
+  and prunes. Prune removes exports older than five days but always keeps the newest and the last
+  one a drill proved good, rewrites the `snapshots` branch with `--force-with-lease` so the repo
+  actually shrinks, and refuses when it cannot read the drill results or verify a kept export.
+  Exports made before this change verify as legacy. The run takes a lock that records its owner,
+  so a run killed mid-export does not block later ones. Metrics go to the hub Pushgateway (job
+  `k3dm-hub-data-export`), with `HubDataExportFailed`, `HubDataExportStale` (36 h) and
+  `HubDataExportNeverRan` alerts.
 - Added the attended weekly hub disaster-recovery drill: durable Vault shards,
   encrypted claim exports, isolated M2 restore, result publishing, freshness
   checks, and DR alerts. Architecture and diagrams: `docs/architecture/hub-dr-drill.md`.

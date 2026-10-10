@@ -6,6 +6,9 @@ The drill proves, every week, that the hub's data can be restored. It restores t
 Vault, Keycloak and LDAP claims into a throwaway `dr-drill` k3d cluster on the M2, checks them
 (V0–V7), records the restore time (RTO) and the data age (RPO), and publishes the result to the
 hub's monitoring. The production hub on the M4 is only read, never changed.
+Daily exports run from launchd at 03:30 with a pinned hub context and a
+short-lived list-only Kubernetes-authenticated Vault token; they do not read
+the unseal shards.
 
 How to run it: [`docs/howto/hub-dr-drill.md`](../howto/hub-dr-drill.md).
 Design decisions: [`docs/plans/v1.43.0-hub-dr-drill.md`](../plans/v1.43.0-hub-dr-drill.md).
@@ -16,7 +19,8 @@ Design decisions: [`docs/plans/v1.43.0-hub-dr-drill.md`](../plans/v1.43.0-hub-dr
 flowchart LR
     subgraph M4["M4 (production hub host)"]
         Hub["k3d-cluster hub<br/>Vault · Keycloak · OpenLDAP"]
-        Export["make hub-data-export"]
+        Export["launchd 03:30<br/>hub_data_export_scheduled"]
+        Login["list-only Vault login<br/>hub-data-inventory"]
         Publish["make dr-drill-publish"]
         Recipient["age public key<br/>scripts/etc/dr/age-recipient.txt"]
         PGW["Pushgateway :19094<br/>job k3dm-dr-drill"]
@@ -39,6 +43,7 @@ flowchart LR
     end
 
     Hub -->|"read claims"| Export
+    Login --> Export
     Recipient --> Export
     Export -->|"push (m4-write key)"| Snap
     Snap -->|"fetch (m2-read key)"| Drill
@@ -107,7 +112,8 @@ reads the realm's users straight from postgres. The image major version must mat
 
 ## Monitoring
 
-- **Alerts:** `DRDrillFailed` (latest drill failed) and `DRDrillStale` (no drill for 8 days),
+- **Alerts:** `DRDrillFailed`, `DRDrillStale`, `HubDataExportFailed`, `HubDataExportStale`, and
+  `HubDataExportNeverRan`,
   both email only (`platform-warning`).
 - **Independent check:** the data repo's scheduled `drill-freshness` workflow fails, and GitHub
   emails, when the newest result is older than 8 days or failed. It works even if the M4 is down.
@@ -126,5 +132,7 @@ reads the realm's users straight from postgres. The image major version must mat
 | `failed: unseal` | result JSON | Read the line above it. `vault-0 is not Running` or `API did not answer`: the restored Vault did not start in `DR_DRILL_VAULT_START_S`. `vault operator unseal failed`: the indented lines under it are Vault's or kubectl's error. `cipher: message authentication failed` means the M2 Keychain shard does not match the export's Vault; repeat the shard copy. `not a base64 or hex unseal key`: the copied shard was changed in transit (a CR, a space, a quote); repeat the shard copy with the file unchanged |
 | `the inventory records no Vault paths` | Phase 4, V2 | The export predates the v1.43.0 inventory fix; run `make hub-data-export` on the M4 again |
 | `could not generate a Vault root token` / `vault kv list secret/ …` | `make hub-data-export` or V2 | The step named failed; nothing was pushed (export) or V2 is false (drill) |
+| `Vault login as hub-data-export failed` | `make hub-data-export` | Re-run `make hub-data-export-setup`; the export uses the list-only Kubernetes auth role |
+| `cannot read drill results` / `prune failed` | scheduled export log | Results could not be fetched or a kept export failed manifest verification; nothing is pruned |
 | `Vault path missing after restore: secret/<name>` | Phase 4, V2 | The restored Vault lacks a path the hub had when exported |
 | `failed: V0` | result JSON | A drill pod reached the internet; the egress policy is not working |

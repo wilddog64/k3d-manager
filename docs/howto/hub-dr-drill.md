@@ -93,6 +93,28 @@ Copy `scripts/etc/dr/drill-freshness.yml` to `.github/workflows/` and
 workflow checks out `results` itself. It fails, and GitHub emails you, when the
 newest result is older than 8 days or reports `success: false`.
 
+## Daily export
+
+First time, on the M4, in this order, from Terminal.app:
+
+1. Confirm the data repo key works without a prompt (GitHub answers "successfully
+   authenticated"; exit code 1 is normal): `ssh -o BatchMode=yes -T git@github-k3dm-hub-data`.
+2. `make hub-data-export-setup`: creates the `hub-data-export` service account, the list-only
+   `hub-data-inventory` Vault policy and role, and self-tests the login.
+3. `make hub-data-export`: one manual run, which proves the new login, the upload check and the
+   prune end to end.
+4. `make hub-data-prune DRY_RUN=1`: read the `keep:` and `prune:` lines.
+5. `make hub-data-export-schedule`: installs the 03:30 launchd job. A slot missed while the Mac
+   sleeps runs on wake. `make hub-data-export-unschedule` removes it.
+The three alerts need no step: ArgoCD syncs `hub-platform-ops` from the release branch.
+
+The job writes `~/Library/Logs/k3dm-hub-data-export.log` and publishes the
+`HubDataExportFailed`, `HubDataExportStale`, and `HubDataExportNeverRan`
+alerts. Retention keeps the last five days, the newest export, and the newest
+successful drill export. Preview cleanup with `make hub-data-prune DRY_RUN=1`.
+The weekly export step is optional when the newest export is less than 26 hours
+old. If list-only Vault login fails, rerun `make hub-data-export-setup`.
+
 ## Weekly run (about 30 minutes, attended)
 
 1. **M4:** `make hub-data-export`. This writes an age-encrypted export of the

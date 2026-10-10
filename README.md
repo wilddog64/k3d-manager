@@ -1,5 +1,7 @@
 # k3d-manager
 
+Daily hub data export and retention are documented in the [DR how-to](docs/howto/hub-dr-drill.md#daily-export); install the M4 schedule with `make hub-data-export-schedule` after `make hub-data-export-setup`.
+
 Modular Bash utility for creating and managing local Kubernetes development clusters. Supports a **two-cluster architecture** — an infra cluster (Vault, ESO, Istio, ArgoCD, OpenLDAP, Keycloak) and an app cluster (Ubuntu k3s) managed via ArgoCD GitOps.
 
 The entry point is `./scripts/k3d-manager`, which dispatches to core libraries and lazily loads plugins on demand. On macOS with OrbStack running, the `orbstack` provider is auto-selected; otherwise `k3d` is the default. Linux hosts use `CLUSTER_PROVIDER=k3s`.
