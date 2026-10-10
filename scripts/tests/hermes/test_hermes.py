@@ -604,6 +604,7 @@ def test_index_metrics_use_dedicated_hub_endpoint_and_ignore_old_override(monkey
     monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
                         lambda request, **_kw: requests.append(request) or Response())
     monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://old.invalid:9091")
+    monkeypatch.delenv("K3DM_VECTORDB_PUSHGATEWAY_URL", raising=False)
     k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0, "from_cache": 0,
                                      "pruned": 0, "backlog": 0, "duration": 0.1,
                                      "paused_until": 0, "result": "success"})

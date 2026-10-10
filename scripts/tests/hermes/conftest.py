@@ -16,3 +16,12 @@ def _no_live_retrieval(monkeypatch):
         raise e2e_bugs.RetrievalUnavailable("retrieval is stubbed out in tests")
 
     monkeypatch.setattr(e2e_bugs, "search", unavailable)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_pushgateway(monkeypatch):
+    """Unstubbed, a poll pushes the Hermes heartbeat and index metrics to the hub Pushgateway on
+    localhost:19094, which makes a dead Hermes look alive to HermesNotRunning. Point every
+    Pushgateway URL at a closed local port; tests that check the URL set their own."""
+    for name in ("K3DM_VECTORDB_PUSHGATEWAY_URL", "K3DM_DISK_PUSHGATEWAY_URL", "K3DM_PUSHGATEWAY_URL"):
+        monkeypatch.setenv(name, "http://127.0.0.1:9")

@@ -143,6 +143,7 @@ def test_vectordb_publisher_uses_dedicated_hub_default_and_override(monkeypatch)
         def __enter__(self): return self
         def __exit__(self, *_args): pass
     monkeypatch.setattr(module.urllib.request, "urlopen", lambda request, **_kw: requests.append(request) or Response())
+    monkeypatch.delenv("K3DM_VECTORDB_PUSHGATEWAY_URL", raising=False)
     module.publish(payload())
     assert requests[1].full_url.startswith("http://localhost:19094/metrics/job/k3dm-vectordb")
     requests.clear()
