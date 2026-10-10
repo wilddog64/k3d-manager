@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — dispatched 2026-10-09 (land-test dependency landed `c0871808`)
+**Status:** FIXED `db822e33` 2026-10-09 (Codex via worktree dispatch; Claude verified 36/36 BATS, 3/3 pytest, shellcheck clean, five mutations red, landed with `land --test`). Claude's changes: a `codex_exit` with no token count passed the tree id through `--argjson` and was silently dropped; `running`/`awaiting_land` are now unwindowed current state and a resumed task counts as running; the dispatcher BATS point `K3DM_DISPATCH_PUSHGATEWAY_URL` at a closed local port so tests never push fixture data to the hub Pushgateway.
 **Priority:** P3 — no outage; without it, parallel dispatch cannot be judged by numbers
 **Severity:** low
 **Origin:** operator, 2026-10-09: track fleet throughput (accepted specs/day), landing success

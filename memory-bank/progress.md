@@ -1,3 +1,5 @@
+- 2026-10-09: Dispatch metrics FIXED `db822e33` (ledger `~/.local/share/k3d-manager/worktrees/ledger.jsonl`, `bin/k3dm-dispatch-metrics` → hub Pushgateway job `k3dm-dispatch`, dashboard `k3dm-agent-dispatch`). Claude fixed: null-token codex_exit dropped (`--argjson tree`), unwindowed running/awaiting, tests isolated from the real Pushgateway. Ledger starts empty — the first recorded task is the next dispatch. Both parallel tasks of this batch are landed; no Codex tasks running.
+
 - 2026-10-09: P3 staged appsets-reapply output FIXED `40bd1278` (landed with `land --test` on the argocd suites). Preamble runs once via `_argocd_prepare_applicationsets`; stage lines name the stage; owner-scoped success line names the ApplicationSets. Claude added: an unknown stage refuses before labelling. Metrics task still running (waiter by9y09uhj).
 
 ## 2026-10-09 — filed P3 staged appsets-reapply output bug; dispatched
