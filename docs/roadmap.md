@@ -166,6 +166,15 @@ by the 2026-10-09 exit-78 outage.
 
 Scope: [`v1.46.0-hermes-not-running-recovery.md`](plans/v1.46.0-hermes-not-running-recovery.md).
 
+**Offsite hub watch from Hostinger.** Hostinger runs two independent checks of the hub: a blackbox
+probe of a public endpoint (`argocd.3ai-talk.org/healthz`) and a one-series `/federate` read of the
+hub Prometheus. When both fail, `HubExternallyUnreachable` sends email at 10 minutes and SMS at 30.
+When only the Prometheus read fails, `HubPrometheusUnreachable` sends email. A stale Hermes
+heartbeat alerts only while the hub is reachable. Planned downtime takes a `make hub-watch-silence`
+maintenance silence. Scope:
+[`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md). v1.46.0
+is now at 2 of 5 plans.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
