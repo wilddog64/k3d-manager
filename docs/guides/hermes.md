@@ -351,6 +351,29 @@ unusable ones.
 
 ## Install and uninstall
 
+The Hermes LaunchAgent uses the pinned Homebrew interpreter
+`/opt/homebrew/opt/python@3.14/bin/python3.14`. The `opt/` link survives patch upgrades,
+while changing to a new Python minor version is an explicit template change. Render the plist
+with that interpreter, then bootstrap it as usual:
+
+```bash
+sed -e "s|{{HERMES_BIN}}|$PWD/bin/k3dm-hermes|g" \
+    -e "s|{{K3DM_REPO_ROOT}}|$PWD|g" \
+    -e "s|{{HERMES_LOG}}|$HOME/Library/Logs/k3dm-hermes.log|g" \
+    scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl \
+    > "$HOME/Library/LaunchAgents/com.k3d-manager.hermes.plist"
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.k3d-manager.hermes.plist"
+```
+
+`HermesNotRunning` alerts when no heartbeat has arrived for 15 minutes. Check
+`launchctl print gui/$UID/com.k3d-manager.hermes` and `~/Library/Logs/k3dm-hermes.log`.
+Exit 78 (`EX_CONFIG`) means launchd could not start the interpreter named in the plist. Recover
+with `brew install python@3.14`, then kick Hermes back into service:
+
+```bash
+launchctl kickstart gui/$(id -u)/com.k3d-manager.hermes
+```
+
 The installer helper `_install_hermes_agent` lives in **lib-foundation** (`scripts/lib/system.sh`,
 subtree-pulled into [`scripts/lib/foundation/`](../../scripts/lib/foundation)); never edit the subtree
 copy directly. It is macOS-launchd only, and it **preflights** that the four Keychain entries above

@@ -27,6 +27,7 @@ ARGOCD_SCHEME ?= http
 GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
 RELAY_DIR        ?= workers/slack-relay
+K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon dispatch-metrics bug-tally
 
@@ -590,6 +591,8 @@ init-cloud-requests:
 ## Install the cloud-session request bridge LaunchAgent (reads origin/cloud-requests every 60s)
 install-cloud-bridge:
 	@set -euo pipefail; \
+	[ -x "$(K3DM_PYTHON3_PATH)" ] || \
+	  { echo "[install-cloud-bridge] ERROR: python@3.14 is not installed; run: brew install python@3.14" >&2; exit 1; }; \
 	security find-generic-password -s k3dm-webhook-token-reader -a k3dm >/dev/null 2>&1 || \
 	  { echo "[install-cloud-bridge] ERROR: Keychain item k3dm-webhook-token-reader (account k3dm) not found — create it from a real terminal first; see docs/howto/cloud-session-requests.md" >&2; exit 1; }; \
 	[ -n "$$(git ls-remote --heads origin cloud-requests)" ] || \

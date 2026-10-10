@@ -528,6 +528,19 @@ def _push_index_metrics(metrics):
         print(f"vectordb index metrics push skipped (non-fatal): {exc}", file=sys.stderr)
 
 
+def _push_hermes_heartbeat():
+    """Publish the time of the most recent Hermes poll, without affecting the poll."""
+    body = f"k3dm_hermes_last_tick_timestamp_seconds {time.time()}\n".encode()
+    base = os.environ.get("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    url = f"{base}/metrics/job/k3dm-hermes"
+    try:
+        request = urllib.request.Request(url, data=body, method="POST",
+                                         headers={"Content-Type": "text/plain; charset=utf-8"})
+        urllib.request.urlopen(request, timeout=5).close()
+    except Exception as exc:
+        print(f"Hermes heartbeat push skipped (non-fatal): {exc}", file=sys.stderr)
+
+
 def _refresh_index(state, now=None):
     """Fetch the tracked ref and index changed corpus docs without touching the checkout."""
     now = time.time() if now is None else now
@@ -628,7 +641,7 @@ def _publish_disk_metrics():
         print(f"disk metrics publish skipped: {exc}", file=sys.stderr)
 
 
-def _poll(state, state_path, now=None, status_runner=_status_run):
+def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     now = time.time() if now is None else now
     _refresh_index(state, now)
     due = _status_due(state, now)
@@ -691,6 +704,13 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
     print(json.dumps({"records": records, "event": event, "approvals": approvals,
                       "pages": pages}))
     return 0
+
+
+def _poll(state, state_path, now=None, status_runner=_status_run):
+    try:
+        return _poll_cycle(state, state_path, now, status_runner)
+    finally:
+        _push_hermes_heartbeat()
 
 
 def _usage():

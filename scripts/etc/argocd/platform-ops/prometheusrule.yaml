@@ -148,3 +148,15 @@ spec:
           annotations:
             summary: "no passing e2e for {{ $labels.exported_service }}/{{ $labels.tier }} (runner {{ $labels.runner }}) in >3d"
             description: "No passing e2e run for {{ $labels.exported_service }} on the {{ $labels.tier }} substrate (runner {{ $labels.runner }}) in over 3 days; the verification signal is stale."
+    - name: hermes.alerts
+      rules:
+        - alert: HermesNotRunning
+          expr: time() - k3dm_hermes_last_tick_timestamp_seconds > 900 or absent(k3dm_hermes_last_tick_timestamp_seconds)
+          for: 5m
+          labels:
+            group: hermes
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "Hermes has not completed a poll in over 15 minutes"
+            description: "Hermes runs every 300 s. Check launchctl print gui/$UID/com.k3d-manager.hermes for the last exit code and ~/Library/Logs/k3dm-hermes.log. Exit 78 (EX_CONFIG) means launchd could not start the interpreter named in the plist."

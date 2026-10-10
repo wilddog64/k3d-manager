@@ -616,6 +616,30 @@ def test_index_metrics_use_dedicated_hub_endpoint_and_ignore_old_override(monkey
     assert requests[0].full_url.startswith("http://hub.invalid:1234/metrics/job/k3dm-vectordb-index")
 
 
+def test_poll_heartbeat_runs_when_sensors_raise_and_push_failure_is_nonfatal(monkeypatch, tmp_path):
+    requests = []
+
+    class Response:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(k3dm_hermes, "_poll_cycle", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("sensor failed")))
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda request, **_kw: requests.append(request) or Response())
+    try:
+        k3dm_hermes._poll({}, tmp_path / "state.json", now=1000)
+    except RuntimeError:
+        pass
+    assert requests[0].full_url.endswith("/metrics/job/k3dm-hermes")
+    assert "k3dm_hermes_last_tick_timestamp_seconds" in requests[0].data.decode()
+
+    def refused(*_args, **_kw):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen", refused)
+    k3dm_hermes._push_hermes_heartbeat()
+
+
 def test_status_reminder_waits_for_local_midnight(monkeypatch):
     class LocalClock:
         current = datetime(2026, 9, 16, 23, 50, tzinfo=timezone(timedelta(hours=-7)))
