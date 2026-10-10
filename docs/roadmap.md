@@ -133,7 +133,7 @@ have no Priority. Once it lands, Claude backfills priorities on the open bugs.
 
 Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.md). Also queued
 for v1.43.0: [`v1.43.0-hub-data-export-schedule.md`](plans/v1.43.0-hub-data-export-schedule.md)
-(daily unattended export, 5-day retention, one-command restore; P1 2026-10-10, took the slot of the e2e failure-artifacts
+(daily unattended export, 5-day retention; P1 2026-10-10, took the slot of the e2e failure-artifacts
 spec, now v1.47.0),
 [`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
 [`v1.43.0-worktree-isolated-codex-dispatch.md`](plans/v1.43.0-worktree-isolated-codex-dispatch.md)
@@ -141,6 +141,18 @@ spec, now v1.47.0),
 R10 overflow from v1.42.0, [`v1.43.0-hermes-r10-delete-superseded-failed-job.md`](plans/v1.43.0-hermes-r10-delete-superseded-failed-job.md)
 (an approval-gated deletion of a failed Job whose CronJob spec has since changed, in `identity`/`monitoring`/`cicd` only).
 v1.43.0 is now at its five-plan cap, so anything new goes to v1.44.0.
+
+### Candidate milestone — v1.43.1
+
+**One-command hub restore and DR clean-room checks** (P1, split from v1.43.0 on 2026-10-10 so
+v1.43.0 stops growing). `make hub-recover-all` rebuilds the hub, restores the data and proves it
+(typed approval, resumable checkpoints that never repeat a destructive step, export compatibility,
+Vault key versions and identity digests, auditable report), sharing one restore and verify engine
+with the drill. The drill gains a Keychain credential allowlist (audit, then enforce) and a guard
+that every destructive call targets the drill cluster. Scope:
+[`v1.43.1-hub-data-recover.md`](plans/v1.43.1-hub-data-recover.md),
+[`v1.43.1-dr-clean-room-checks.md`](plans/v1.43.1-dr-clean-room-checks.md). v1.43.1 is at 2 of 5
+plans. Full-hub recovery on the M2 (Level 3) stays in v1.46.0, pending the egress decision.
 
 ### Candidate milestone — v1.45.0
 
