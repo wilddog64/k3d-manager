@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN
+**Status:** FIXED `be13c3fa` 2026-10-09 (Codex via worktree dispatch; Claude verified 67 pytest, both regression tests red with the fix removed, no Pushgateway series moved, landed with `land --test`). Live from the next Hermes tick.
 **Priority:** P3 — display only; the pause itself expired and indexing runs
 **Severity:** low
 **Origin:** operator, 2026-10-09: the vectordb dashboard read `2026-10-05 00:05:00` next to a `success` result.
