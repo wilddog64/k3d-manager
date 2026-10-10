@@ -216,7 +216,9 @@ function hub_data_export_setup() { (
   _vault_login "$ns" "$release"
   _kubectl -n secrets create sa hub-data-export --dry-run=client -o yaml | _kubectl apply -f -
   printf '%s\n' "$policy" | _no_trace _vault_exec_stream --no-exit --stdin --pod "${release}-0" "$ns" "$release" -- vault policy write hub-data-inventory -
-  _vault_exec "$ns" 'vault write auth/kubernetes/role/hub-data-inventory bound_service_account_names=hub-data-export bound_service_account_namespaces=secrets policies=hub-data-inventory ttl=5m' "$release"
+  local audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
+  [[ "$audience" =~ ^[A-Za-z0-9:/._-]+$ ]] || { _err "[hub-data] invalid K8S_TOKEN_AUDIENCE: ${audience}"; return 1; }
+  _vault_exec "$ns" "vault write auth/kubernetes/role/hub-data-inventory bound_service_account_names=hub-data-export bound_service_account_namespaces=secrets policies=hub-data-inventory ttl=5m audience=${audience}" "$release"
   # The self-test must run as the unattended export does. _vault_login's admin session would be
   # injected on stdin ahead of the list call's own token and path, so drop it first.
   unset "_VAULT_SESSION_TOKENS[${ns}/${release}]"

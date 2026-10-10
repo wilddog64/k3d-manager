@@ -482,6 +482,13 @@ STUB
   run hub_data_export_setup; [ "$status" -eq 0 ]
 }
 
+@test "17b setup binds the role to the API server audience (required from Vault 1.21)" {
+  source_plugin; _vault_login() { :; }; _vault_exec() { printf '%s\n' "$2" >> "$VLOG"; }; _hub_data_vault_revoke() { :; }
+  run hub_data_export_setup; [ "$status" -eq 0 ]
+  grep -q 'auth/kubernetes/role/hub-data-inventory .*audience=https://kubernetes.default.svc.cluster.local' "$VLOG"
+  K8S_TOKEN_AUDIENCE='x;rm' run hub_data_export_setup; [ "$status" -ne 0 ]
+}
+
 @test "18 lock semantics distinguish manual, scheduled, and delegated ownership" {
   source_plugin; export K3DM_HUB_DATA_DIR="$TEST_ROOT/lock-state"; mkdir -p "$K3DM_HUB_DATA_DIR/export.lock"; printf '%s\n' "$$" > "$K3DM_HUB_DATA_DIR/export.lock/pid"
   run hub_data_export; [ "$status" -eq 1 ]; [[ "$output" == *'another export is running'* ]]
