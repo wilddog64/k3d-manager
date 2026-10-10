@@ -12,8 +12,8 @@ setup() {
 printf 'ssh %s\n' "$*" >> "$LOG"
 if [[ "$SSH_MODE" == malicious ]]; then
   printf '%s\n' "x'; touch pwned; '.json"
-elif [[ "${@: -1}" == find\ * ]]; then
-  printf '%s\n' '~/.k3dm/dr-drill/20261009T120000Z.json'
+elif [[ "${@: -1}" == cd\ * ]]; then
+  printf '%s\n' './20261009T120000Z.json'
 else
   printf '%s\n' '{"run_timestamp":"20261009T120000Z","export":"20261009T110000Z","success":true,"rto_seconds":42,"rpo_seconds":3600,"checks":{"V0":true,"V1":true,"V2":true,"V3":true,"V4":true,"V5":true,"V6":true,"V7":true}}'
 fi
@@ -47,6 +47,20 @@ STUB
   expected="$(python3 -c 'import datetime; print(int(datetime.datetime.strptime("20261009T120000Z", "%Y%m%dT%H%M%SZ").replace(tzinfo=datetime.timezone.utc).timestamp()))')"
   grep -q "k3dm_dr_drill_last_run_timestamp_seconds $expected" "$LOG"
   for check in V0 V1 V2 V3 V4 V5 V6 V7; do grep -q "check=\\\"$check\\\"" "$LOG"; done
+  grep -q 'ssh .* cat -- .k3dm/dr-drill/20261009T120000Z.json' "$LOG"
+}
+
+@test "dr drill publish: a listing outside the result directory is refused" {
+  cat > "$STUB_BIN/ssh" <<'STUB'
+#!/usr/bin/env bash
+printf 'ssh %s\n' "$*" >> "$LOG"
+if [[ "${@: -1}" == cd\ * ]]; then printf '%s\n' './sub/20261009T120000Z.json'; else printf '%s\n' '{}'; fi
+STUB
+  chmod +x "$STUB_BIN/ssh"
+  run bin/dr-drill-publish
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"refusing unexpected M2 result path"* ]]
+  [ "$(grep -c ' cat -- ' "$LOG" || true)" -eq 0 ]
 }
 
 @test "dr drill publish: duplicate result refuses before push and curl" {
@@ -65,7 +79,7 @@ STUB
 @test "dr drill publish: invalid schema refuses before git" {
   cat > "$STUB_BIN/ssh" <<'STUB'
 #!/usr/bin/env bash
-if [[ "${@: -1}" == find\ * ]]; then printf '%s\n' '~/.k3dm/dr-drill/20261009T120000Z.json'; else printf '%s\n' '{"run_timestamp":"20261009T120000Z","success":"true","rto_seconds":1,"rpo_seconds":1,"checks":{}}'; fi
+if [[ "${@: -1}" == cd\ * ]]; then printf '%s\n' './20261009T120000Z.json'; else printf '%s\n' '{"run_timestamp":"20261009T120000Z","success":"true","rto_seconds":1,"rpo_seconds":1,"checks":{}}'; fi
 STUB
   chmod +x "$STUB_BIN/ssh"
   run bin/dr-drill-publish

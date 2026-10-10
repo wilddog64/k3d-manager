@@ -21,6 +21,13 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: `make dr-drill-publish` refused every real result with "refusing unexpected M2 result
+  path". The M2's shell expands `~` before `find` prints, so the path was
+  `/Users/<user>/.k3dm/dr-drill/<ts>.json`, but the check compared it to a literal `~/` prefix. The
+  test stub printed the literal `~` form, which ssh never returns, so the tests passed. The script
+  now lists from inside the result directory, accepts only `./<ts>.json`, and reads that name by a
+  path relative to the M2 home. The stubs print the real shape, and a new test refuses a listing
+  from a subdirectory.
 - Fixed: `make hub-data-export` could never generate its Vault root token, which is why the run 15
   export's Vault listing was empty. `__vault_exec_kubectl` declared `local stdin_payload` with no
   value and read it on calls that send no stdin (the first `generate-root -generate-otp`). Under the
