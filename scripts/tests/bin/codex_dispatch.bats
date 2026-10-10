@@ -27,16 +27,24 @@ EOF
   cat >"$K3DM_CODEX_BIN" <<'STUB'
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$*" >"${STUB_ARGV:?}"
+printf '%s\n' "$*" >>"${STUB_ARGV:?}"
+printf '%s\n' "$PWD" >>"${STUB_ARGV}.cwd"
+printf 'session id: 01a122dd-71c3-7763-87f0-3de505f10168\n'
 printf 'K3DM_REPO_ROOT=%s\nK3DM_JOB_DIR=%s\nK3DM_RUN_DIR=%s\nK3DM_STATE_DIR=%s\nK3DM_LOG_DIR=%s\nK3DM_TMP_ROOT=%s\nK3DM_PORT_CACHE_DIR=%s\nTMPDIR=%s\nHOME=%s\n' "$K3DM_REPO_ROOT" "$K3DM_JOB_DIR" "$K3DM_RUN_DIR" "$K3DM_STATE_DIR" "$K3DM_LOG_DIR" "$K3DM_TMP_ROOT" "$K3DM_PORT_CACHE_DIR" "$TMPDIR" "$HOME" >"${STUB_ENV:?}"
-codex_dir=""
+codex_dir="${K3DM_REPO_ROOT:-}"
+out_file=""
 while (($#)); do
-  if [[ "$1" == -C ]]; then codex_dir="$2"; shift 2; else shift; fi
+  if [[ "$1" == -C ]]; then codex_dir="$2"; shift 2
+  elif [[ "$1" == -o ]]; then out_file="$2"; shift 2
+  else shift; fi
 done
 [[ -n "$codex_dir" ]] || exit 1
+if [[ -n "$out_file" ]]; then printf 'stub last message\n' >"$out_file"; fi
 [[ -z "${STUB_SLEEP:-}" ]] || sleep "$STUB_SLEEP"
-IFS=, read -ra edits <<<"${STUB_EDITS:-a.txt}"
-for edit in "${edits[@]}"; do printf 'edited\n' >"$codex_dir/$edit"; done
+if [[ "$*" != *"exec resume"* ]]; then
+  IFS=, read -ra edits <<<"${STUB_EDITS:-a.txt}"
+  for edit in "${edits[@]}"; do printf 'edited\n' >"$codex_dir/$edit"; done
+fi
 STUB
   chmod +x "$K3DM_CODEX_BIN"
 }
@@ -127,21 +135,21 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
 @test "codex dispatch: land refuses running, out-of-scope, and dirty tasks" {
   export STUB_SLEEP=5 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
-  run dispatch land --slug one; [ "$status" -eq 2 ]
+  run dispatch land --slug one --no-test; [ "$status" -eq 2 ]
   sleep 6
   git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
   printf 'out\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/one/memory-bank/x.md"
   git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add memory-bank/x.md; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m out >/dev/null
-  run dispatch land --slug one; [ "$status" -eq 2 ]
+  run dispatch land --slug one --no-test; [ "$status" -eq 2 ]
   printf 'dirty\n' >>"$K3DM_WORKTREE_ROOT/v9.9.9/one/a.txt"
-  run dispatch land --slug one; [ "$status" -eq 2 ]
+  run dispatch land --slug one --no-test; [ "$status" -eq 2 ]
 }
 
 @test "codex dispatch: land refuses a dirty operator checkout" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
-  printf 'dirty\n' >>"$FIXTURE/a.txt"; run dispatch land --slug one; [ "$status" -eq 2 ]
+  printf 'dirty\n' >>"$FIXTURE/a.txt"; run dispatch land --slug one --no-test; [ "$status" -eq 2 ]
 }
 
 @test "codex dispatch: land fast-forwards without pushing" {
@@ -149,7 +157,7 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
   task_head="$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" rev-parse HEAD)"
-  before="$(git -C "$FIXTURE" rev-parse origin/k3d-manager-v9.9.9)"; run dispatch land --slug one
+  before="$(git -C "$FIXTURE" rev-parse origin/k3d-manager-v9.9.9)"; run dispatch land --slug one --no-test
   [ "$status" -eq 0 ]
   [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$task_head" ]
   [ "$(<"$FIXTURE/a.txt")" = edited ]
@@ -193,7 +201,7 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   run dispatch status one
   [[ "$output" == *"out-of-scope: b.txt"* ]]
   [[ "$output" == *"out-of-scope: docs/plans/v9.9.9-demo.md"* ]]
-  run dispatch land --slug one
+  run dispatch land --slug one --no-test
   [ "$status" -eq 2 ]
 }
 
@@ -221,7 +229,138 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   rm "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/base"
   run dispatch status one
   [[ "$output" == *"scope: unknown (no recorded base)"* ]]
-  run dispatch land --slug one
+  run dispatch land --slug one --no-test
   [ "$status" -eq 2 ]
   [[ "$output" == *"no recorded base"* ]]
+}
+
+@test "codex dispatch: tests the rebased task before merging" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  printf 'v1\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/one/a.txt"
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m task >/dev/null
+  printf '#!/usr/bin/env bash\ngrep -qx v2 a.txt\n' >"$FIXTURE/check.sh"
+  chmod +x "$FIXTURE/check.sh"
+  git -C "$FIXTURE" add check.sh; git -C "$FIXTURE" commit -m check >/dev/null
+  before="$(git -C "$FIXTURE" rev-parse HEAD)"
+  run dispatch land --slug one --test 'bash check.sh'
+  [ "$status" -eq 2 ]; [[ "$output" == *"tests failed after rebase"* ]]
+  [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$before" ]
+  [ "$(<"$FIXTURE/a.txt")" = original ]
+  [ -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/land-test.log" ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/.land.lock" ]
+  run dispatch land --slug one --test false
+  [ "$status" -eq 2 ]; [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$before" ]
+  run dispatch land --slug one --test true
+  [ "$status" -eq 0 ]; [[ "$output" == *"tests: passed"* ]]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/.land.lock" ]
+}
+
+@test "codex dispatch: land --no-test says the tests were skipped" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
+  run dispatch land --slug one --no-test
+  [ "$status" -eq 0 ]; [[ "$output" == *"tests: skipped (--no-test)"* ]]
+}
+
+@test "codex dispatch: land requires exactly one test selector" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  run dispatch land --slug one; [ "$status" -eq 2 ]
+  run dispatch land --slug one --test true --no-test; [ "$status" -eq 2 ]
+}
+
+@test "codex dispatch: land test command sees isolated state" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
+  run dispatch land --slug one --test '[[ "$K3DM_JOB_DIR" == *one.run/state/jobs ]]'
+  [ "$status" -eq 0 ]; [[ "$output" == *"tests: passed"* ]]
+}
+
+@test "codex dispatch: landing lock is released after refusal" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
+  mkdir "$K3DM_WORKTREE_ROOT/v9.9.9/.land.lock"; sleep 30 & lock_pid=$!; printf '%s\n' "$lock_pid" >"$K3DM_WORKTREE_ROOT/v9.9.9/.land.lock/pid"
+  run dispatch land --slug one --no-test; [ "$status" -eq 2 ]; [[ "$output" == *"another land is in progress"* ]]
+  kill "$lock_pid" 2>/dev/null || true; wait "$lock_pid" 2>/dev/null || true
+  printf '999999\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/.land.lock/pid"
+  run dispatch land --slug one --no-test; [ "$status" -eq 0 ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/.land.lock" ]
+}
+
+@test "codex dispatch: network tasks are exclusive" {
+  export STUB_SLEEP=5 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one --network >/dev/null
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug two --network
+  [ "$status" -eq 2 ]; [[ "$output" == *"only one networked task at a time"* ]]
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug two >/dev/null
+  sleep 6
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug three --network >/dev/null
+  run dispatch status one
+  [[ "$output" == *"network: yes"* ]]
+}
+
+@test "codex dispatch: resume continues the same session" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 0 ]; sleep 1
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/prompt-2.md" ]
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-2.log" ]
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/last-message-2.md" ]
+  [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  [[ "$(<"$BATS_TEST_TMPDIR/a.argv")" == *"exec resume"* ]]
+  [[ "$(<"$BATS_TEST_TMPDIR/a.argv")" == *"01a122dd-71c3-7763-87f0-3de505f10168"* ]]
+  run dispatch status one; [[ "$output" == *"resumes: 1"* ]]
+  export STUB_SLEEP=5
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 2 ]; [[ "$output" == *"Codex is still running"* ]]
+  sleep 6
+  [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-3.log" ]
+}
+
+@test "codex dispatch: resume passes the state root and runs in the worktree" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null; sleep 1
+  resume_argv="$(tail -n 1 "$BATS_TEST_TMPDIR/a.argv")"
+  [[ "$resume_argv" == *"writable_roots=[\"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/state\"]"* ]]
+  [[ "$resume_argv" != *"network_access=true"* ]]
+  [ "$(cd "$(tail -n 1 "$BATS_TEST_TMPDIR/a.argv.cwd")" && pwd -P)" = "$(cd "$K3DM_WORKTREE_ROOT/v9.9.9/one" && pwd -P)" ]
+}
+
+@test "codex dispatch: resume refuses a landed task and a log without a session id" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  sed -i.bak '/^session id: /d' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex.log"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 2 ]; [[ "$output" == *"no valid session id"* ]]
+  [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/empty.md"
+  [ "$status" -eq 2 ]
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug two >/dev/null; sleep 1
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/two" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/two" commit -m edit >/dev/null
+  dispatch land --slug two --no-test >/dev/null
+  run dispatch resume --slug two --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 2 ]
+}
+
+@test "codex dispatch: a refused networked resume leaves the task finished" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one --network >/dev/null; sleep 1
+  STUB_SLEEP=5 dispatch start --spec docs/plans/v9.9.9-demo.md --slug two --network >/dev/null
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 2 ]; [[ "$output" == *"network task two is still running"* ]]
+  [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/prompt-2.md" ]
+  sleep 6
 }

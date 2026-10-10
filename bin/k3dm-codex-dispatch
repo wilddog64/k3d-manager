@@ -15,7 +15,8 @@ _dispatch_usage() {
 Usage:
   bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--network]
   bin/k3dm-codex-dispatch status [SLUG]
-  bin/k3dm-codex-dispatch land --slug SLUG [--allow-out-of-scope]
+  bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--allow-out-of-scope]
+  bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH
   bin/k3dm-codex-dispatch abandon --slug SLUG --yes
 EOF
 }
@@ -33,13 +34,17 @@ _dispatch_spec_files() {
 }
 
 _dispatch_scope_verdict() {
-  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched base
+  local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched base from merge_base
   local -a patterns=()
   if [[ ! -f "$worktree.run/base" ]]; then
     echo "scope: unknown (no recorded base)"
     return 1
   fi
   base="$(<"$worktree.run/base")"
+  from="$base"
+  if merge_base="$(git -C "$worktree" merge-base "$rel" HEAD 2>/dev/null)" && git -C "$worktree" merge-base --is-ancestor "$base" "$merge_base"; then
+    from="$merge_base"
+  fi
   while IFS= read -r path; do [[ -n "$path" ]] && patterns+=("$path"); done < <(git -C "$worktree" show "$base:$spec" | _dispatch_spec_files)
   while IFS= read -r path; do
     [[ -n "$path" ]] || continue
@@ -53,7 +58,7 @@ _dispatch_scope_verdict() {
     done
     if (( matched )); then echo "out-of-scope: $path"; in_scope=0; fi
   done < <({
-    git -C "$worktree" diff --name-only "$base...HEAD"
+    git -C "$worktree" diff --name-only "$from" HEAD
     git -C "$worktree" diff --name-only
     git -C "$worktree" ls-files --others --exclude-standard
   } | sort -u)
@@ -73,8 +78,24 @@ _dispatch_task_paths() {
   _dispatch_run_dir="${_dispatch_worktree_root}/$1/$2.run"
 }
 
+_dispatch_network_task_running() {
+  local version="$1" candidate_run candidate_slug candidate_pid
+  for candidate_run in "$_dispatch_worktree_root/$version"/*.run; do
+    [[ -d "$candidate_run" && -f "$candidate_run/network" ]] || continue
+    [[ -f "$candidate_run/exit" ]] && continue
+    [[ -f "$candidate_run/pid" ]] || continue
+    candidate_pid="$(<"$candidate_run/pid")"
+    if kill -0 "$candidate_pid" 2>/dev/null; then
+      candidate_slug="$(basename "$candidate_run" .run)"
+      printf '%s\n' "$candidate_slug"
+      return 0
+    fi
+  done
+  return 1
+}
+
 _dispatch_start() {
-  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg
+  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug
   while (($#)); do
     case "$1" in
       --spec) (($# >= 2)) || _dispatch_error "--spec requires a path"; spec="$2"; shift 2 ;;
@@ -102,10 +123,16 @@ _dispatch_start() {
   worktree="$_dispatch_worktree_root/$version/$slug"; run="$_dispatch_worktree_root/$version/$slug.run"
   [[ ! -e "$worktree" ]] || _dispatch_error "worktree path already exists: $worktree"
   [[ ! -e "$run" ]] || _dispatch_error "run path already exists: $run"
+  if (( network )) && network_slug="$(_dispatch_network_task_running "$version")"; then
+    _dispatch_error "network task $network_slug is still running; only one networked task at a time"
+  fi
   mkdir -p "$_dispatch_worktree_root/$version"
   git -C "$_dispatch_repo_root" worktree add -b "task/$version/$slug" "$worktree" "origin/$rel" >/dev/null
   mkdir -m 700 "$run"; state_dir="$run/state"; mkdir -m 700 "$state_dir"
   for arg in jobs run state logs tmp port-cache; do mkdir -m 700 "$state_dir/$arg"; done
+  if (( network )); then
+    : >"$run/network"
+  fi
   printf '%s\n' "$remote" >"$run/base"
   printf '%s\n' "$spec" >"$run/spec"
   cat >"$run/prompt.md" <<EOF
@@ -146,21 +173,28 @@ _dispatch_status() {
     elif [[ -f "$run/exit" ]]; then state="exited $(<"$run/exit")"
     else state=unknown; fi
     [[ -z "${1:-}" || "$1" == "$slug" ]] || continue
-    echo "task: $slug"; echo "state: $state"; git -C "$task" status --porcelain || true; git -C "$task" log --oneline "origin/$rel..HEAD" || true
+    echo "task: $slug"; echo "state: $state"; [[ -f "$run/network" ]] && echo "network: yes" || true
+    if compgen -G "$run/prompt-[0-9]*.md" >/dev/null; then
+      echo "resumes: $(find "$run" -maxdepth 1 -name 'prompt-[0-9]*.md' | wc -l | tr -d ' ')"
+    fi
+    git -C "$task" status --porcelain || true; git -C "$task" log --oneline "origin/$rel..HEAD" || true
     if spec="$(_dispatch_task_spec "$task" "$run")"; then _dispatch_scope_verdict "$task" "$spec" "$rel" 1 || true; else echo "scope: unknown (no recorded spec)"; fi
   done
 }
 
 _dispatch_land() {
-  local slug="" allow=0 rel version task run pid spec current
+  local slug="" allow=0 test_set=0 no_test=0 test_cmd="" rel version task run pid spec current land_lock
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --test) (($# >= 2)) || _dispatch_error "--test requires a command"; test_set=1; test_cmd="$2"; shift 2 ;;
+      --no-test) no_test=1; shift ;;
       --allow-out-of-scope) allow=1; shift ;;
       *) _dispatch_error "unknown land option: $1" ;;
     esac
   done
   [[ -n "$slug" ]] || _dispatch_error "land requires --slug SLUG"
+  (( test_set + no_test == 1 )) || _dispatch_error "land requires exactly one of --test CMD or --no-test"
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
   [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
   [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
@@ -170,14 +204,90 @@ _dispatch_land() {
   [[ "$(git -C "$task" rev-list --count "origin/$rel..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$rel"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
   _dispatch_scope_verdict "$task" "$spec" "$rel" "$allow" || _dispatch_error "task changes are out of scope"
+  land_lock="$_dispatch_worktree_root/$version/.land.lock"
+  if ! mkdir "$land_lock" 2>/dev/null; then
+    if [[ -f "$land_lock/pid" ]] && kill -0 "$(<"$land_lock/pid")" 2>/dev/null; then
+      _dispatch_error "another land is in progress (pid $(<"$land_lock/pid"))"
+    fi
+    rm -f "$land_lock/pid"; rmdir "$land_lock" 2>/dev/null || _dispatch_error "could not remove stale landing lock"
+    mkdir "$land_lock" 2>/dev/null || _dispatch_error "another land is in progress"
+  fi
+  printf '%s\n' "$$" >"$land_lock/pid"
+  _dispatch_land_lock_path="$land_lock"
+  trap '_dispatch_release_land_lock "${_dispatch_land_lock_path}"' EXIT
   current="$(git -C "$_dispatch_repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"; [[ "$current" == "$rel" ]] || _dispatch_error "operator checkout is not on $rel"
   [[ -z "$(git -C "$_dispatch_repo_root" status --porcelain)" ]] || _dispatch_error "operator checkout is dirty"
   git -C "$task" rebase "$rel" >/dev/null || _dispatch_error "rebase of task/$version/$slug onto $rel failed; resolve it in $task"
-  git -C "$_dispatch_repo_root" merge --ff-only "task/$version/$slug" >/dev/null
+  if (( no_test )); then
+    echo "tests: skipped (--no-test)"
+  elif ! (cd "$task" && env \
+    "K3DM_REPO_ROOT=$task" "K3DM_JOB_DIR=$run/state/jobs" "K3DM_RUN_DIR=$run/state/run" \
+    "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp" \
+    "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp" \
+    bash -c "$test_cmd" >"$run/land-test.log" 2>&1); then
+    tail -n 20 "$run/land-test.log"
+    _dispatch_error "tests failed after rebase onto $rel; see $run/land-test.log"
+  else
+    echo "tests: passed"
+  fi
+  git -C "$_dispatch_repo_root" merge --ff-only "task/$version/$slug" >/dev/null || _dispatch_error "fast-forward merge of task/$version/$slug failed"
   git -C "$_dispatch_repo_root" worktree remove "$task"
   git -C "$_dispatch_repo_root" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
   git -C "$_dispatch_repo_root" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
   echo "landed: $slug"; echo "push: git push origin $rel"
+}
+
+_dispatch_release_land_lock() {
+  local lock="$1"
+  rm -f "$lock/pid"
+  rmdir "$lock" 2>/dev/null || true
+}
+
+_dispatch_resume() {
+  local slug="" prompt_file="" rel version task run pid session_id n network_slug
+  while (($#)); do
+    case "$1" in
+      --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --prompt-file) (($# >= 2)) || _dispatch_error "--prompt-file requires a path"; prompt_file="$2"; shift 2 ;;
+      *) _dispatch_error "unknown resume option: $1" ;;
+    esac
+  done
+  [[ -n "$slug" ]] || _dispatch_error "resume requires --slug SLUG"
+  [[ -n "$prompt_file" ]] || _dispatch_error "resume requires --prompt-file PATH"
+  [[ -s "$prompt_file" ]] || _dispatch_error "prompt file is missing or empty: $prompt_file"
+  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
+  [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
+  [[ ! -f "$run/landed" ]] || _dispatch_error "task has landed: $slug"
+  [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
+  if [[ -n "$pid" && ! -f "$run/exit" ]] && kill -0 "$pid" 2>/dev/null; then
+    _dispatch_error "Codex is still running"
+  fi
+  session_id="$(sed -n 's/^session id: //p' "$run/codex.log" 2>/dev/null | head -n 1)"
+  [[ "$session_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || _dispatch_error "no valid session id in $run/codex.log"
+  n=2
+  while [[ -e "$run/prompt-$n.md" ]]; do ((n++)); done
+  if [[ -f "$run/network" ]] && network_slug="$(_dispatch_network_task_running "$version")" && [[ "$network_slug" != "$slug" ]]; then
+    _dispatch_error "network task $network_slug is still running; only one networked task at a time"
+  fi
+  cp "$prompt_file" "$run/prompt-$n.md"
+  rm -f "$run/exit"
+  local -a _dispatch_state_vars=(
+    "K3DM_REPO_ROOT=$task" "K3DM_JOB_DIR=$run/state/jobs" "K3DM_RUN_DIR=$run/state/run"
+    "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp"
+    "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp"
+  )
+  (
+    cd "$task"
+    set +e
+    if [[ -f "$run/network" ]]; then
+      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
+    else
+      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
+    fi
+    printf '%s\n' "$?" >"$run/exit"
+  ) </dev/null >/dev/null 2>&1 &
+  printf '%s\n' "$!" >"$run/pid"
+  echo "resumed: $slug"; echo "resume: $n"
 }
 
 _dispatch_abandon() {
@@ -201,6 +311,7 @@ main() {
     start) shift; _dispatch_start "$@" ;;
     status) shift; (($# <= 1)) || _dispatch_error "status accepts at most one slug"; _dispatch_status "${1:-}" ;;
     land) shift; _dispatch_land "$@" ;;
+    resume) shift; _dispatch_resume "$@" ;;
     abandon) shift; _dispatch_abandon "$@" ;;
     -h|--help) _dispatch_usage ;;
     *) _dispatch_error "unknown command: $1" ;;

@@ -72,7 +72,8 @@ After a rebuild, generate the new target map and restore with:
 | `make appsets-check` | Read-only: list Applications whose k3d-manager values source is not on `BRANCH`; run after `appsets-reapply` |
 | `make codex-dispatch SPEC=...` | Start Codex in an isolated worktree for a spec |
 | `make codex-status` | Show Codex task state, changes, and scope |
-| `make codex-land SLUG=...` | Land a verified, in-scope task |
+| `make codex-land SLUG=... TEST='bats scripts/tests/...'` | Rebase, test, and land a verified, in-scope task; use `NO_TEST=1` for docs-only work |
+| `make codex-resume SLUG=... PROMPT=...` | Send a follow-up prompt to the same Codex session |
 | `make codex-abandon SLUG=... [YES=1]` | Preview or remove an abandoned task |
 
 `sync-apps` delegates to `bin/cluster-sync-apps` which manages the argocd-server port-forward
