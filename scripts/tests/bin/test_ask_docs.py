@@ -13,6 +13,13 @@ from hermes.prior_art import RetrievalUnavailable  # noqa: E402
 from webhook import ask_docs  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _offline_doc_meta(monkeypatch):
+    def offline(_paths):
+        raise RetrievalUnavailable("vector store is never reached from tests")
+    monkeypatch.setattr(ask_docs.prior_art, "fetch_doc_meta", offline)
+
+
 def _result(path, score=0.9, title="A source"):
     return [(score, path, title)]
 
@@ -54,6 +61,8 @@ def test_real_tree_driver_runs_as_a_subprocess():
         "import sys; "
         "sys.path.insert(0, 'scripts/lib'); "
         "from webhook import ask_docs; "
+        "from hermes.prior_art import RetrievalUnavailable; "
+        "ask_docs.prior_art.fetch_doc_meta = lambda _p: (_ for _ in ()).throw(RetrievalUnavailable('offline')); "
         f"print(ask_docs.answer('known', retrieve=lambda _q, k=5: [(0.9, '{path}', 'source')], model=lambda _p: 'grounded reply'))"
     )
     result = subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT, capture_output=True, text=True, check=True)

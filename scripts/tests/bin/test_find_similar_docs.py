@@ -27,6 +27,13 @@ RECALL_FLOOR = {"bugs": 0.60, "issues": 0.60, "plans": 0.80, "retro": 0.80}
 LIVE_RECALL_FLOOR = {"bugs": 0.81, "issues": 0.66, "plans": 0.80, "retro": 0.80}
 
 
+@pytest.fixture(autouse=True)
+def _offline_doc_meta(monkeypatch):
+    def offline(_paths):
+        raise prior_art.RetrievalUnavailable("vector store is never reached from tests")
+    monkeypatch.setattr(prior_art, "fetch_doc_meta", offline)
+
+
 @pytest.fixture
 def cli_module():
     spec = importlib.util.spec_from_file_location("find_similar_docs", CLI)
