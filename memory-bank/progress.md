@@ -1,3 +1,4 @@
+- 2026-10-10: v1.43.1 planned: hub-data-recover + dr-clean-room-checks (2/5). v1.43.0 scope = export schedule (Codex running).
 - 2026-10-10: [ ] P1 v1.43.0-hub-data-export-schedule spec written; dispatching to Codex.
 - 2026-10-10: [x] First live DR drill passed and published (run 20261010T182508Z, results f19fea8).
 - 2026-10-10: dr-drill-publish path check fixed (literal ~ vs expanded home). Operator: rerun on the M4.
