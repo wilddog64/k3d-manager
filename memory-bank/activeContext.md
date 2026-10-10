@@ -1,3 +1,8 @@
+## 2026-10-09 — dispatched throughput/cost metrics bug (from `fd307ae2`)
+
+- Spec amended first: resume writes `resume` + a second `codex_exit`; tokens are the Codex SESSION total, so the exporter uses the latest `codex_exit` per slug, never a sum.
+- Waiter `by9y09uhj`. Verify, then `land --test` with codex_dispatch.bats + agent_dispatch_dashboard.bats + pytest test_dispatch_metrics.py.
+
 ## 2026-10-09 — batch 2 DONE: hub-first appsets LANDED `b90a15f1`
 
 - `make appsets-reapply` now applies `hub` sets → confirms (owner-scoped: only Applications whose ownerReferences name a hub set; branch pin + none Degraded) → then `app-cluster` sets → confirms. `APPSETS_STAGE=hub` stops after the hub. Unlabelled set → nothing applied. CLAUDE.md reapply rule updated.
