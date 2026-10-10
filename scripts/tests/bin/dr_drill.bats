@@ -24,7 +24,7 @@ STUB
 printf '%s|%s|%s\n' "$DR_DRILL_CONTEXT" "$DR_DRILL_CLUSTER" "$DR_DRILL_RESTORE_STAGE" >> "$RESTORE_LOG"
 [[ "${DR_TEST_RESTORE_FAIL:-0}" == 1 ]] && exit 1
 mkdir -p "$DR_DRILL_RESTORE_STAGE"
-printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":1,"ldap_entry_count":2}' > "$DR_DRILL_RESTORE_STAGE/inventory.json"
+printf '%s\n' '{"vault_paths":["app/"],"keycloak_realm_user_count":1,"ldap_entry_count":2}' > "$DR_DRILL_RESTORE_STAGE/inventory.json"
 cat > "$DR_DRILL_RESTORE_STAGE/pv-pvc.yaml" <<'YAML'
 metadata:
   name: data-vault-0
@@ -130,7 +130,7 @@ case "$*" in
   *'generate-root'*'-format=json -'*) [[ "${DR_TEST_KEY_FAIL:-0}" == 1 ]] && exit 1; cat >> "$SHARD_LOG"; printf '{"encoded_token":"ENCODED-SENTINEL"}' ;;
   *'generate-root -cancel'*) : > "${HOME}/cancel-seen" ;;
   *'status'*) printf '{"sealed":false}' ;;
-  *'kv list'*) printf '{"data":["secret/app"]}' ;;
+  *'kv list'*) printf '["app/"]' ;;
   *'token revoke -self'*) : ;;
 esac
 STUB

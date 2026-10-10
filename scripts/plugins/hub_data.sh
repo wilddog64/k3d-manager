@@ -89,6 +89,10 @@ function _hub_data_vault_kv_list() {
   printf '%s\n%s\n' "$token" "$path" | _vault_exec_stream --no-exit "$ns" "$release" -- sh -lc 'read -r VAULT_TOKEN; read -r KV_PATH; export VAULT_TOKEN; exec vault kv list -format=json "$KV_PATH"' sh
 }
 
+function _hub_data_kv_names() {
+  jq -ce 'if type == "array" then . else .data end | select(type == "array" and length > 0 and all(.[]; type == "string"))' <<<"$1"
+}
+
 function _hub_data_generate_root() (
   local ns="$1" release="$2" otp nonce token encoded shard count idx output started=0 complete=0
   _hub_data_cancel_root() {
@@ -132,13 +136,14 @@ function _hub_data_inventory() (
   local root="$1" ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" token paths users ldap cleanup=0
   _hub_data_revoke_root() { (( cleanup == 1 )) || return 0; _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1 || true; }
   trap _hub_data_revoke_root EXIT
-  token="$(_hub_data_generate_root "$ns" "$release")"; cleanup=1
-  paths="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)"
-  jq -e '.data | type == "array" and length > 0' <<<"$paths" >/dev/null
+  token="$(_hub_data_generate_root "$ns" "$release")" && [[ -n "$token" ]] || { _err "[hub-data] could not generate a Vault root token from the DR shards"; return 1; }
+  cleanup=1
+  paths="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)" || { _err "[hub-data] vault kv list secret/ failed"; return 1; }
+  paths="$(_hub_data_kv_names "$paths")" || { _err "[hub-data] vault kv list secret/ returned no paths"; return 1; }
   users="$(_hub_data_keycloak_user_count _kubectl)"
   ldap="$(_hub_data_ldap_entry_count _kubectl)"
   [[ "$users" =~ ^[1-9][0-9]*$ && "$ldap" =~ ^[1-9][0-9]*$ ]] || return 1
-  jq -n --argjson p "${paths:-null}" --argjson u "$users" --argjson l "$ldap" '{vault_paths:($p.data // $p),keycloak_realm_user_count:$u,ldap_entry_count:$l}' > "${root}/inventory.json"
+  jq -n --argjson p "$paths" --argjson u "$users" --argjson l "$ldap" '{vault_paths:$p,keycloak_realm_user_count:$u,ldap_entry_count:$l}' > "${root}/inventory.json"
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
 )
 
@@ -264,18 +269,21 @@ function hub_data_restore() { (
 ) }
 
 function hub_data_verify_vault_paths() { (
-  local ns="${1:-secrets}" release="${2:-vault}" inventory="${3:?inventory path required}" token cleanup=0 path
+  local ns="${1:-secrets}" release="${2:-vault}" inventory="${3:?inventory path required}" token cleanup=0 path want restored
   local -a paths=()
   _hub_data_revoke_root() { (( cleanup == 1 )) || return 0; _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1 || true; }
   trap _hub_data_revoke_root EXIT
+  want="$(jq -ce '.vault_paths' "$inventory" 2>/dev/null)" && want="$(_hub_data_kv_names "$want")" || { _err "[hub-data] the inventory records no Vault paths; nothing to verify"; return 1; }
   while IFS= read -r path; do
-    [[ -n "$path" ]] || continue
     [[ "$path" =~ ^[A-Za-z0-9_./-]+$ ]] || { _err "[hub-data] invalid Vault KV path: ${path}"; return 1; }
     paths+=("$path")
-  done < <(jq -r '.vault_paths[]' "$inventory")
-  token="$(_hub_data_generate_root "$ns" "$release")"; cleanup=1
+  done < <(jq -r '.[]' <<<"$want")
+  token="$(_hub_data_generate_root "$ns" "$release")" && [[ -n "$token" ]] || { _err "[hub-data] could not generate a Vault root token from the DR shards"; return 1; }
+  cleanup=1
+  restored="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)" || { _err "[hub-data] vault kv list secret/ failed"; return 1; }
+  restored="$(_hub_data_kv_names "$restored")" || { _err "[hub-data] vault kv list secret/ returned no paths"; return 1; }
   for path in "${paths[@]}"; do
-    _hub_data_vault_kv_list "$token" "$ns" "$release" "$path" >/dev/null || return 1
+    jq -e --arg p "$path" 'any(.[]; . == $p)' <<<"$restored" >/dev/null || { _err "[hub-data] Vault path missing after restore: secret/${path}"; return 1; }
   done
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
 ) }

@@ -21,6 +21,15 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: DR drill check V2 passed without checking anything (drill run 15). The export recorded
+  `"vault_paths": null` because its `secret/` listing came back empty and the export ignored that:
+  its "non-empty" check expected `{"data": [...]}`, but `vault kv list -format=json` prints a bare
+  array, and its exit status was never read. V2 then iterated `null` inside an unchecked process
+  substitution, never checked the root token, and passed with zero paths. The export now stops
+  before pushing, saying whether the root token or the listing failed. V2 fails on an inventory
+  with no paths and on an empty token, lists the restored `secret/` once, and names any recorded
+  path that is missing. (It used to run `kv list` on each name as if it were a full path, which
+  could not have worked.) The test stubs now print Vault's real array shape.
 - Fixed: the DR drill never unsealed the restored Vault (drill runs 13 and 14). It piped the shard
   into `vault operator unseal -`, but `operator unseal` has no stdin form: it sent a literal `-` as
   the key, and Vault answered "'key' must be a valid hex or base64 string" whatever the Keychain

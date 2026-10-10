@@ -124,4 +124,7 @@ reads the realm's users straight from postgres. The image major version must mat
 | `could not record the inventory` | `make hub-data-export` on the M4 | The Vault, Keycloak or LDAP count failed; nothing was pushed. Fix that service, then export again |
 | `unable to scale <workload>` | Phase 3 | A restored workload is missing from the drill hub. Postgres comes from `scripts/etc/dr/postgres-keycloak.yaml`; Vault and LDAP from `hub-up` Steps 3–4 |
 | `failed: unseal` | result JSON | Read the line above it. `vault-0 is not Running` or `API did not answer`: the restored Vault did not start in `DR_DRILL_VAULT_START_S`. `vault operator unseal failed`: the indented lines under it are Vault's or kubectl's error. `cipher: message authentication failed` means the M2 Keychain shard does not match the export's Vault; repeat the shard copy. `not a base64 or hex unseal key`: the copied shard was changed in transit (a CR, a space, a quote); repeat the shard copy with the file unchanged |
+| `the inventory records no Vault paths` | Phase 4, V2 | The export predates the v1.43.0 inventory fix; run `make hub-data-export` on the M4 again |
+| `could not generate a Vault root token` / `vault kv list secret/ …` | `make hub-data-export` or V2 | The step named failed; nothing was pushed (export) or V2 is false (drill) |
+| `Vault path missing after restore: secret/<name>` | Phase 4, V2 | The restored Vault lacks a path the hub had when exported |
 | `failed: V0` | result JSON | A drill pod reached the internet; the egress policy is not working |

@@ -1,3 +1,4 @@
+- 2026-10-10: Drill run 15 passed except V2, which was vacuous (null vault_paths in the export). Fixed fail-closed. Do not publish run 15; operator: M4 re-export, M2 rerun.
 - 2026-10-10: Drill run 14: real unseal bug = `vault operator unseal -` sends literal '-'. Now `vault write sys/unseal key=-`. Operator: M2 pull, delete dr-drill, rerun.
 - 2026-10-10: Drill run 13: malformed M2 DR shard. Import/export/drill now validate + strip CR. Operator: redo shard copy, rerun.
 - 2026-10-10: Drill run 12: unseal rejected or exec failed (output hidden). Unseal now prints the filtered error. Operator rerun.

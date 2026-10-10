@@ -1,5 +1,7 @@
 #!/usr/bin/env bats
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   export TEST_ROOT="$BATS_TEST_TMPDIR/root" STUB_BIN="$BATS_TEST_TMPDIR/root/bin"
   export CALL_LOG="$TEST_ROOT/calls.log" STDIN_LOG="$TEST_ROOT/stdin.log" VLOG="$TEST_ROOT/vault.log"
@@ -19,7 +21,7 @@ case "$*" in
   *-decode=-*) cat >> "$STDIN_LOG"; printf 'ROOT-TOKEN' ;;
   *-cancel*) : ;;
   *'token revoke -self'*) : ;;
-  *'kv list'*) printf '{"data":["secret/app"]}' ;;
+  *'kv list'*) printf '%s' "${DR_TEST_KV_LIST:-[\"app/\",\"shared\"]}" ;;
   *'generate-root'*'-format=json -'*) [[ "${DR_TEST_KEY_FAIL:-0}" == 1 ]] && exit 1; cat >> "$STDIN_LOG"; printf '{"encoded_token":"ENCODED-SENTINEL"}' ;;
 esac
 STUB
@@ -213,7 +215,7 @@ source_plugin() {
 @test "hub data vault: executing stub proves order, stdin hygiene, and cancel" {
   source_plugin; export DR_TEST_SHARD=SHARD-SENTINEL
   _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf '%s\n' "$DR_TEST_SHARD"; }
-  printf '%s\n' '{"vault_paths":["secret/app"]}' > "$TEST_ROOT/inventory.json"
+  printf '%s\n' '{"vault_paths":["app/"]}' > "$TEST_ROOT/inventory.json"
   run hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -eq 0 ]
   [ "$(grep -n -- '-generate-otp' "$VLOG" | cut -d: -f1)" -lt "$(grep -n -- '-init' "$VLOG" | cut -d: -f1)" ]
   [ "$(grep -c 'generate-root -nonce' "$VLOG" || true)" -eq 1 ]
@@ -226,12 +228,12 @@ source_plugin() {
 }
 
 @test "hub data vault: revoke runs after a post-root KV failure" {
-  source_plugin; printf '%s\n' '{"vault_paths":["secret/app"]}' > "$TEST_ROOT/inventory.json"; _hub_data_generate_root() { printf root-token; }; _hub_data_vault_kv_list() { return 1; }; _hub_data_vault_revoke() { printf revoke >> "$VLOG"; }
+  source_plugin; printf '%s\n' '{"vault_paths":["app/"]}' > "$TEST_ROOT/inventory.json"; _hub_data_generate_root() { printf root-token; }; _hub_data_vault_kv_list() { return 1; }; _hub_data_vault_revoke() { printf revoke >> "$VLOG"; }
   run hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]; grep -q revoke "$VLOG"
 }
 
 @test "hub data vault: invalid path is rejected before any exec" {
-  source_plugin; printf '%s\n' '{"vault_paths":["secret/app; bad"]}' > "$TEST_ROOT/inventory.json"; _hub_data_generate_root() { printf root-token; }
+  source_plugin; printf '%s\n' '{"vault_paths":["app; bad"]}' > "$TEST_ROOT/inventory.json"; _hub_data_generate_root() { printf root-token; }
   run hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]; [ "$(grep -c kubectl "$CALL_LOG" || true)" -eq 0 ]; [ "$(wc -c < "$VLOG")" -eq 0 ]
   _vault_exec_stream() { printf '%s\n' "$*" >> "$VLOG"; printf '{"data":[]}' ; }
   _hub_data_vault_kv_list token secrets vault secret/app >/dev/null
@@ -269,7 +271,7 @@ STUB
     POSTGRES_USER=keycloak POSTGRES_DB=keycloak LDAP_ROOT=dc=home,dc=org PATH="$POD_BIN:$PATH" "$@"
   }
   _hub_data_generate_root() { printf root-token; }
-  _hub_data_vault_kv_list() { printf '{"data":["secret/app"]}'; }
+  _hub_data_vault_kv_list() { printf '["app/","shared"]'; }
   _hub_data_vault_revoke() { :; }
 }
 
@@ -278,6 +280,40 @@ STUB
   run _hub_data_inventory "$TEST_ROOT"; [ "$status" -eq 0 ]
   [ "$(jq -r .keycloak_realm_user_count "$TEST_ROOT/inventory.json")" = 6 ]
   [ "$(jq -r .ldap_entry_count "$TEST_ROOT/inventory.json")" = 12 ]
+}
+
+@test "hub data inventory: records the bare array vault kv list prints" {
+  source_plugin; _fake_identity_pod
+  run _hub_data_inventory "$TEST_ROOT"; [ "$status" -eq 0 ]
+  [ "$(jq -c .vault_paths "$TEST_ROOT/inventory.json")" = '["app/","shared"]' ]
+}
+
+@test "hub data inventory: an empty Vault listing or no root token fails instead of recording null" {
+  source_plugin; _fake_identity_pod
+  _hub_data_vault_kv_list() { printf ''; }
+  run --separate-stderr _hub_data_inventory "$TEST_ROOT"; [ "$status" -ne 0 ]; [[ "$stderr" == *"returned no paths"* ]]; [ ! -e "$TEST_ROOT/inventory.json" ]
+  _hub_data_vault_kv_list() { printf '["app/"]'; }; _hub_data_generate_root() { return 1; }
+  run --separate-stderr _hub_data_inventory "$TEST_ROOT"; [ "$status" -ne 0 ]; [[ "$stderr" == *"could not generate a Vault root token"* ]]; [ ! -e "$TEST_ROOT/inventory.json" ]
+}
+
+@test "hub data vault: an inventory without Vault paths fails before any Vault call" {
+  source_plugin; printf '%s\n' '{"vault_paths":null}' > "$TEST_ROOT/inventory.json"
+  run --separate-stderr hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]
+  [[ "$stderr" == *"records no Vault paths"* ]]; [ "$(wc -c < "$VLOG")" -eq 0 ]
+}
+
+@test "hub data vault: a recorded path missing from the restored Vault fails and names it" {
+  source_plugin; export DR_TEST_SHARD=SHARD-SENTINEL DR_TEST_KV_LIST='["shared"]'
+  _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf '%s\n' "$DR_TEST_SHARD"; }
+  printf '%s\n' '{"vault_paths":["app/","shared"]}' > "$TEST_ROOT/inventory.json"
+  run --separate-stderr hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]
+  [[ "$stderr" == *"missing after restore: secret/app/"* ]]; grep -q 'token revoke -self' "$VLOG"
+}
+
+@test "hub data vault: an empty root token fails before listing" {
+  source_plugin; printf '%s\n' '{"vault_paths":["app/"]}' > "$TEST_ROOT/inventory.json"; _hub_data_generate_root() { printf ''; }
+  run --separate-stderr hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]
+  [[ "$stderr" == *"could not generate a Vault root token"* ]]; [ "$(grep -c 'kv list' "$VLOG" || true)" -eq 0 ]
 }
 
 @test "hub data export: an inventory failure stops the export before anything is pushed" {
